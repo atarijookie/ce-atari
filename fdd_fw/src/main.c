@@ -1,18 +1,22 @@
 #include "lpc13xx.h"
 
-#include <cr_section_macros.h>
-#include <NXP/crp.h>
-
-__CRP const unsigned int CRP_WORD = CRP_NO_CRP ;
-
 #include <stdio.h>
 #include "defs.h"
 
 void init_timer32(void);
 void setupClock(void);
+void printit(void);
+void appendBit(BYTE bit);
 
-BYTE times[2048];
+WORD times[2048];
 WORD cnt;
+
+BYTE newByte;
+BYTE newBits;
+BYTE prevBit;
+
+DWORD sync;
+BYTE scnt;
 
 int main(void) {
 	setupClock();
@@ -40,27 +44,130 @@ int main(void) {
 
 	cnt = 0;
 
+//	// PIO1_0 - PIO1_2  --- A0 - A2
+//	WORD *pio15  = (WORD *) 0x50010080;
+//	WORD prev = 0;
+//
+//	while(1) {
+//		WORD val;
+//		val = *pio15;
+//
+//		if(val == prev) {	// no change? continue
+//			continue;
+//		}
+//		prev = val;
+//
+////		if(val != 0) {		// rising edge? continue
+////			continue;
+////		}
+//
+//		DWORD dw = LPC_TMR32B0->TC;
+//		LPC_TMR32B0->TC = 0;
+//		if(dw > 0xffff) {
+//			val = 0xffff;
+//		} else {
+//			val = dw;
+//		}
+//
+//		if(cnt < 2048) {			// if don't have 2048 values
+//			times[cnt] = val;		// store
+//			cnt++;					// move to next slot
+//		} else {
+//			printf("done\n");
+//
+//			printit();
+//		}
+//
+//	}
+
+	newByte	= 0;
+	newBits	= 0;
+	prevBit = 0;
+	sync	= 0;
+	scnt	= 0;
+
 	while(1) {
-		WORD val = LPC_TMR32B0->IR;
+		WORD val = LPC_TMR32B0->IR;		// get interrupt status
 
 		if(val & 0x10) {				// is CR0INT set?
 			LPC_TMR32B0->IR = 0x10;		// clear CR0INT
 
 			val = LPC_TMR32B0->CR0;		// read CR0
+			LPC_TMR32B0->TC = 0;
 
-			if(cnt < 2048) {			// if don't have 2048 values
-				times[cnt] = val;		// store
-				cnt++;					// move to next slot
-			} else {
+			if(cnt == 2048) {			// if have 2048 values
 				printf("done\n");
+				printit();
 			}
 
-			LPC_TMR32B0->TCR = 0x03;				// enable TC and reset TC value
-			LPC_TMR32B0->TCR = 0x01;				// enable TC and no reset anymore
+			//--------------
+			if(val < 360) {			// 4 is bellow 360
+				val = 4;
+
+				appendBit(1);
+			} else if(val < 500) {	// 6 is above 360 and bellow 500
+				val = 6;
+
+				if(prevBit == 0) {
+					appendBit(0);
+					appendBit(1);
+				} else {
+					appendBit(0);
+				}
+			} else {				// 5 is above 500
+				val = 8;
+
+				appendBit(0);
+				appendBit(1);
+			}
+
+			sync = sync << 8;
+			sync = sync | ((DWORD) val);
+
+			if(sync == 0x08060806) {
+				scnt++;
+				sync = 0;
+				newBits = 0;
+			}
+
+			//				times[cnt] = val;		// store
+			//				cnt++;					// move to next slot
 		}
 
 	}
 	return 0 ;
+}
+
+void appendBit(BYTE bit)
+{
+	newByte = newByte << 1;
+
+	if(bit != 0) {
+		newByte = newByte | 0x01;
+	}
+
+	newBits++;
+
+	if(newBits == 8) {
+		times[cnt] = newByte;		// store
+		cnt++;						// move to next slot
+		newBits = 0;
+	}
+
+	prevBit = bit;
+}
+
+void printit(void)
+{
+	printf("Found syncs: %d\n", (int)scnt);
+
+	WORD i;
+	for(i=0; i<2048; i++) {
+//		printf("%d\n", (int)times[i]);
+		printf("%02x\n", (int)times[i]);
+	}
+
+	while(1);
 }
 
 void init_timer32(void)
@@ -77,7 +184,7 @@ void init_timer32(void)
 	LPC_TMR32B0->CCR = 0x06;				// Capture on CT32Bn_CAP0 falling edge, Interrupt on CT32Bn_CAP0 event
 
 	// LPC_TMR32B0->PR  -- prescale, 0= TC++ on every PCLK, 1= TC++ on every 2 PCLKs, ...
-	LPC_TMR32B0->PR = 35;					// prescale of TC++. When CLK is 72 MHz and prescale is 35, it should prescale TC++ to 0.5 us
+//	LPC_TMR32B0->PR = 35;					// prescale of TC++. When CLK is 72 MHz and prescale is 35, it should prescale TC++ to 0.5 us
 
 	// LPC_TMR32B0->IR  -- bit 4 - CR0INT - Interrupt flag for capture channel 0 event.
 	// LPC_TMR32B0->CR0 -- Capture Register. CR0 is loaded with the value of TC when there is an event on the CT32B0_CAP0 input.
