@@ -7,6 +7,7 @@ void init_timer32(void);
 void setupClock(void);
 void printit(void);
 void appendBit(BYTE bit);
+void appendChange(BYTE change);
 
 WORD times[2048];
 WORD cnt;
@@ -14,6 +15,9 @@ WORD cnt;
 BYTE newByte;
 BYTE newBits;
 BYTE prevBit;
+
+BYTE changes;
+BYTE chCount;
 
 DWORD sync;
 BYTE scnt;
@@ -86,6 +90,9 @@ int main(void) {
 	sync	= 0;
 	scnt	= 0;
 
+	changes = 0;
+	chCount = 0;
+
 	while(1) {
 		WORD val = LPC_TMR32B0->IR;		// get interrupt status
 
@@ -104,21 +111,23 @@ int main(void) {
 			if(val < 360) {			// 4 is bellow 360
 				val = 4;
 
-				appendBit(1);
+				appendChange(1);	// R
+				appendChange(0);	// N
+
 			} else if(val < 500) {	// 6 is above 360 and bellow 500
 				val = 6;
 
-				if(prevBit == 0) {
-					appendBit(0);
-					appendBit(1);
-				} else {
-					appendBit(0);
-				}
+				appendChange(1);	// R
+				appendChange(0);	// N
+				appendChange(0);	// N
+
 			} else {				// 5 is above 500
 				val = 8;
 
-				appendBit(0);
-				appendBit(1);
+				appendChange(1);	// R
+				appendChange(0);	// N
+				appendChange(0);	// N
+				appendChange(0);	// N
 			}
 
 			sync = sync << 8;
@@ -128,6 +137,8 @@ int main(void) {
 				scnt++;
 				sync = 0;
 				newBits = 0;
+
+				chCount = 1;						// mark that we got half of the last bit - this might fuck up decoded sync mark when not in sync before
 			}
 
 			//				times[cnt] = val;		// store
@@ -138,13 +149,29 @@ int main(void) {
 	return 0 ;
 }
 
+void appendChange(BYTE change)		// 1 means change (R), 0 means no change (N)
+{
+	changes = changes << 1;			// shift up 1 bit
+	changes = changes & 0x03;		// leave only 2 bottom bits
+	changes = changes | change;		// append new change
+
+	chCount++;						// increment stored change count
+
+	if(chCount == 2) {				// if got 2 changes
+		if(changes == 0 || changes == 2) {		// if it's NN or RN
+			appendBit(0);
+		} else if(changes == 1) {				// if it's NR
+			appendBit(1);
+		}
+
+		chCount = 0;
+	}
+}
+
 void appendBit(BYTE bit)
 {
 	newByte = newByte << 1;
-
-	if(bit != 0) {
-		newByte = newByte | 0x01;
-	}
+	newByte = newByte | bit;
 
 	newBits++;
 
@@ -162,9 +189,11 @@ void printit(void)
 	printf("Found syncs: %d\n", (int)scnt);
 
 	WORD i;
-	for(i=0; i<2048; i++) {
+	for(i=0; i<2048; i += 16) {
 //		printf("%d\n", (int)times[i]);
-		printf("%02x\n", (int)times[i]);
+		printf("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+				times[i+0], times[i+1], times[i+ 2], times[i+ 3], times[i+ 4], times[i+ 5], times[i+ 6], times[i+ 7],
+				times[i+8], times[i+9], times[i+10], times[i+11], times[i+12], times[i+13], times[i+14], times[i+15]);
 	}
 
 	while(1);
