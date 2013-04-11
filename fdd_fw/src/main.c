@@ -9,18 +9,19 @@ void printit(void);
 void appendBit(BYTE bit);
 void appendChange(BYTE change);
 
-WORD times[2048];
+BYTE data[2048];
 WORD cnt;
 
 BYTE newByte;
 BYTE newBits;
-BYTE prevBit;
 
 BYTE changes;
 BYTE chCount;
 
 DWORD sync;
 BYTE scnt;
+
+void mfm_append_change(BYTE change);
 
 int main(void) {
 	setupClock();
@@ -48,50 +49,15 @@ int main(void) {
 
 	cnt = 0;
 
-//	// PIO1_0 - PIO1_2  --- A0 - A2
-//	WORD *pio15  = (WORD *) 0x50010080;
-//	WORD prev = 0;
-//
-//	while(1) {
-//		WORD val;
-//		val = *pio15;
-//
-//		if(val == prev) {	// no change? continue
-//			continue;
-//		}
-//		prev = val;
-//
-////		if(val != 0) {		// rising edge? continue
-////			continue;
-////		}
-//
-//		DWORD dw = LPC_TMR32B0->TC;
-//		LPC_TMR32B0->TC = 0;
-//		if(dw > 0xffff) {
-//			val = 0xffff;
-//		} else {
-//			val = dw;
-//		}
-//
-//		if(cnt < 2048) {			// if don't have 2048 values
-//			times[cnt] = val;		// store
-//			cnt++;					// move to next slot
-//		} else {
-//			printf("done\n");
-//
-//			printit();
-//		}
-//
-//	}
-
 	newByte	= 0;
 	newBits	= 0;
-	prevBit = 0;
 	sync	= 0;
 	scnt	= 0;
 
 	changes = 0;
 	chCount = 0;
+
+	BYTE spare = 0;
 
 	while(1) {
 		WORD val = LPC_TMR32B0->IR;		// get interrupt status
@@ -109,25 +75,62 @@ int main(void) {
 
 			//--------------
 			if(val < 360) {			// 4 is bellow 360
-				val = 4;
+				val = 4;			// 4 us = RN
 
-				appendChange(1);	// R
-				appendChange(0);	// N
+				if(spare) {			// input is RN, we got spare N, this creates NRN - it means NR and spare N
+					appendBit(1);	// NR = 1, still got spare N
+				} else {			// no spare N
+					appendBit(0);	// RN = 0, still no spare
+				}
+
+//				mfm_append_change(1);
+//				mfm_append_change(0);
+
+//				appendChange(1);	// R
+//				appendChange(0);	// N
 
 			} else if(val < 500) {	// 6 is above 360 and bellow 500
-				val = 6;
+				val = 6;			// 6 us = RNN
 
-				appendChange(1);	// R
-				appendChange(0);	// N
-				appendChange(0);	// N
+				if(spare) {			// input is RNN, we got spare N, this creates NRNN - it means NR and NN
+					appendBit(1);	// NR = 1
+					appendBit(0);	// NN = 0
+					spare = 0;		// no spare anymore
+				} else {			// no spare N, we got RNN, this is RN and spare N
+					appendBit(0);	// RN = 0
+					spare = 1;		// last N is spare
+				}
 
-			} else {				// 5 is above 500
-				val = 8;
+//				mfm_append_change(1);
+//				mfm_append_change(0);
+//				mfm_append_change(0);
 
-				appendChange(1);	// R
-				appendChange(0);	// N
-				appendChange(0);	// N
-				appendChange(0);	// N
+//				appendChange(1);	// R
+//				appendChange(0);	// N
+//				appendChange(0);	// N
+
+			} else {				// 8 is above 500
+				val = 8;			// 8 us = RNNN
+
+				if(spare) {			// input is RNNN, we got spare N, this creates NRNNN - it means NR, NN and spare N
+					appendBit(1);	// NR = 1
+					appendBit(0);	// NN = 0
+					// still one spare N
+				} else {			// no spare N, we got RNNN, this is RN and NN
+					appendBit(0);	// RN = 0
+					appendBit(0);	// NN = 0
+					// still no spare N
+				}
+
+//				mfm_append_change(1);
+//				mfm_append_change(0);
+//				mfm_append_change(0);
+//				mfm_append_change(0);
+
+//				appendChange(1);	// R
+//				appendChange(0);	// N
+//				appendChange(0);	// N
+//				appendChange(0);	// N
 			}
 
 			sync = sync << 8;
@@ -136,7 +139,11 @@ int main(void) {
 			if(sync == 0x08060806) {
 				scnt++;
 				sync = 0;
-				newBits = 0;
+
+//				newBits = 0;
+
+				newBits = 7;
+				spare = 1;
 
 				chCount = 1;						// mark that we got half of the last bit - this might fuck up decoded sync mark when not in sync before
 			}
@@ -174,14 +181,12 @@ void appendBit(BYTE bit)
 	newByte = newByte | bit;
 
 	newBits++;
+	newBits = newBits & 7;			// leave only lowest 3 bits
 
-	if(newBits == 8) {
-		times[cnt] = newByte;		// store
+	if(newBits == 0) {
+		data[cnt] = newByte;		// store
 		cnt++;						// move to next slot
-		newBits = 0;
 	}
-
-	prevBit = bit;
 }
 
 void printit(void)
@@ -192,8 +197,8 @@ void printit(void)
 	for(i=0; i<2048; i += 16) {
 //		printf("%d\n", (int)times[i]);
 		printf("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-				times[i+0], times[i+1], times[i+ 2], times[i+ 3], times[i+ 4], times[i+ 5], times[i+ 6], times[i+ 7],
-				times[i+8], times[i+9], times[i+10], times[i+11], times[i+12], times[i+13], times[i+14], times[i+15]);
+				data[i+0], data[i+1], data[i+ 2], data[i+ 3], data[i+ 4], data[i+ 5], data[i+ 6], data[i+ 7],
+				data[i+8], data[i+9], data[i+10], data[i+11], data[i+12], data[i+13], data[i+14], data[i+15]);
 	}
 
 	while(1);
