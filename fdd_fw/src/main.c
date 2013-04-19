@@ -10,9 +10,18 @@ void appendBit(BYTE bit);
 void appendChange(BYTE change);
 void addAttention(BYTE atn);
 void init_timer_index(void);
+void init_timer_rdata(void);
+void getNextMfmTime(void);
 
-BYTE data[7000];
-WORD cnt;
+// worst case scenario: 1 sector with all bullshit encoded in MFM should be max. 1228 bytes
+// So a 4096 bytes big buffer should contain at least 3.3 sectors (one currently streamed, one received from host + something more)
+
+// gap byte 0x4e == 666446 us = 222112 times = 10'10'10'01'01'10 = 0xa96
+// 2 gap bytes 0x4e 0x4e = 0xa96a96 times = 0xa9 0x6a 0x96 bytes
+
+BYTE mfm[4096];
+WORD mfmIndexAdd, mfmIndexGet, mfmCount;
+BYTE mfmByte, mfmByteIndex;
 
 BYTE newByte;
 BYTE newBits;
@@ -28,17 +37,25 @@ BYTE scnt;
 #define CMD_SECTOR_WRITTEN      3               // + sector # + side (highest bit)
 #define CMD_BUTTON_PRESSED      4
 
+#define MFM_4US     1
+#define MFM_6US     2
+#define MFM_8US     3
+
 void mfm_append_change(BYTE change);
+
+// - viem zapisanim do TMR16B0EMR nastavit hodnotu EM0 a EM1?
+// - check a obnova rdata timeru musi zbehnut do 260 cyklov (tolko je pre 4 us) -- of jedneho po druhe volanie getNextMfmTime()
+// - write support
 
 int main(void) {
 	setupClock();
 
 	printf("FDD FW\n");
 
-	//	// config PIO2 outputs
-	//	WORD *pio2dir = (WORD *) 0x50028000;
-	//	*pio2dir = INDEX | TRACK0 | RDATA | WR_PROTECT | DISK_CHANGE;
-	//
+	// config PIO2 outputs
+	WORD *pio2dir = (WORD *) 0x50028000;
+	*pio2dir = 0;							// all pins as inputs, drive not selected
+
 	//	// config PIO3 outputs
 	//	WORD *pio3dir = (WORD *) 0x50038000;
 	//	*pio3dir = ATN;
@@ -63,21 +80,51 @@ int main(void) {
 	LPC_SYSCON->SYSAHBCLKCTRL |= (1<<16);			// enable IOCON clock
 
 	init_timer32();
-	init_timer_index();
 
+	init_timer_index();
+	init_timer_rdata();
+
+	// init circular buffer for streamed data
+	mfmIndexAdd		= 0;
+	mfmIndexGet		= 0;
+	mfmCount		= 0;
+
+	mfmByte			= 0;
+	mfmByteIndex	= 0;
+
+	// init track and side vars for the floppy position
 	BYTE track = 0;
 	BYTE side, prevSide = 0;
 
+	// init floppy signals
 	*wr_prt = WR_PROTECT;						// not write protected
 	*dskchg = DISK_CHANGE;						// not changing disk (ready!)
+
+	BYTE outputsActive = 0;
 
 	while(1) {
 		WORD inputs = *in;										// read floppy inputs
 
-		// add reading of SPI here
+		// TODO: add reading of SPI here
 
 		if((inputs & (MOTOR_ENABLE | DRIVE_SELECT)) != 0) {		// motor not enabled, drive not selected? do nothing
+			if(outputsActive == 1) {							// if we got outputs active
+				*pio2dir = 0;									// all pins as inputs, drive not selected
+				outputsActive = 0;
+			}
+
 			continue;
+		}
+
+		if(outputsActive == 0) {								// if the outputs are inactive
+			*pio2dir = INDEX | TRACK0 | RDATA | WR_PROTECT | DISK_CHANGE;	// set these as outputs
+			outputsActive = 1;
+		}
+
+		WORD tmr1Ints = LPC_TMR16B1->IR;						// read TMR16B1, which we to create MFM stream
+		if(tmr1Ints & 2) {										// is MR1INT set? we streamed out one time
+			LPC_TMR16B1->IR = 2;								// clear MR1INT
+			getNextMfmTime();									// get the next time from stream, set up TMR16B1
 		}
 
 		// check for STEP pulse - should we go to a different track?
@@ -107,6 +154,7 @@ int main(void) {
 		}
 
 		//------------
+		// update SIDE var
 		side = (inputs & SIDE1) ? 0 : 1;						// get the current SIDE
 		if(prevSide != side) {									// side changed?
 			addAttention(CMD_SEND_NEXT_SECTOR);					// we need another sector, this time from the right side!
@@ -120,16 +168,16 @@ int main(void) {
 			LPC_TMR16B0->IR = 1;								// clear MR0INT
 			*index = 0;											// index pulse low
 
-			// TRACK started! init code needed
+
+			// TODO: TRACK started! init code needed
+
+
 		}
 
 		if(tmr0Ints & 2) {										// is MR1INT set? (200 ms elapsed?)
 			LPC_TMR16B0->IR = 2;								// clear MR0INT
 			*index = INDEX;										// index pulse high
 		}
-
-		// add MFM stream output here
-
 	}
 
 //	cnt = 0;
@@ -221,59 +269,123 @@ int main(void) {
 	return 0 ;
 }
 
+void getNextMfmTime(void)
+{
+	// 0.4 us = 28 cycles (pulse low width)
+	// 4 us = 288 cycles  (260 cycles)
+	// 6 us = 432 cycles  (404 cycles)
+	// 8 us = 576 cycles  (548 cycles)
+
+	static BYTE gap[3] = {0xa9, 0x6a, 0x96};
+	static BYTE gapCnt = 0;
+
+	BYTE time = mfmByte >> 6;								// get only 2 highest bits
+
+	mfmByte = mfmByte << 2;									// move the mfmByte to next position
+	mfmByteIndex++;
+
+	WORD mr0, mr1;
+
+	switch(time) {											// convert time code to timer match values
+	case MFM_8US:											// 8 us?
+		mr0 = 548;
+		mr1 = 576;
+		break;
+
+	case MFM_6US:											// 6 us?
+		mr0 = 404;
+		mr1 = 432;
+		break;
+
+	case MFM_4US:											// 4 us?
+	default:
+		mr0 = 260;
+		mr1 = 288;
+		break;
+	}
+
+	LPC_TMR16B1->MR0 = mr0;
+	LPC_TMR16B1->MR1 = mr1;
+
+	if(mfmByteIndex == 4) {										// streamed all times from byte?
+		mfmByteIndex = 0;
+
+		if(mfmCount == 0) {										// nothing to stream?
+			mfmByte	= gap[gapCnt];								// stream this GAP byte
+			gapCnt++;
+
+			if(gapCnt > 2) {									// we got only 3 gap byte times, go back to 0
+				gapCnt = 0;
+			}
+		} else {												// got data to stream?
+			BYTE hostByte;
+			hostByte = mfm[mfmIndexGet];						// get byte from host buffer
+			mfmIndexGet++;										// increment position for reading in host buffer
+			mfmCount--;											// decrement data in cyclic buffer
+
+			// TODO: add checking and handling of some commands from host (e.g. media change)
+
+
+			mfmByte = hostByte;
+		}
+	}
+}
+
 void addAttention(BYTE atn)
 {
+	//TODO: signal to host, send command to host
+
 
 }
 
-void appendChange(BYTE change)		// 1 means change (R), 0 means no change (N)
-{
-	changes = changes << 1;			// shift up 1 bit
-	changes = changes & 0x03;		// leave only 2 bottom bits
-	changes = changes | change;		// append new change
+//void appendChange(BYTE change)		// 1 means change (R), 0 means no change (N)
+//{
+//	changes = changes << 1;			// shift up 1 bit
+//	changes = changes & 0x03;		// leave only 2 bottom bits
+//	changes = changes | change;		// append new change
+//
+//	chCount++;						// increment stored change count
+//
+//	if(chCount == 2) {				// if got 2 changes
+//		if(changes == 0 || changes == 2) {		// if it's NN or RN
+//			appendBit(0);
+//		} else if(changes == 1) {				// if it's NR
+//			appendBit(1);
+//		}
+//
+//		chCount = 0;
+//	}
+//}
 
-	chCount++;						// increment stored change count
+//void appendBit(BYTE bit)
+//{
+//	newByte = newByte << 1;
+//	newByte = newByte | bit;
+//
+//	newBits++;
+//	newBits = newBits & 7;			// leave only lowest 3 bits
+//
+//	if(newBits == 0) {
+//		data[cnt] = newByte;		// store
+//		cnt++;						// move to next slot
+//	}
+//}
 
-	if(chCount == 2) {				// if got 2 changes
-		if(changes == 0 || changes == 2) {		// if it's NN or RN
-			appendBit(0);
-		} else if(changes == 1) {				// if it's NR
-			appendBit(1);
-		}
-
-		chCount = 0;
-	}
-}
-
-void appendBit(BYTE bit)
-{
-	newByte = newByte << 1;
-	newByte = newByte | bit;
-
-	newBits++;
-	newBits = newBits & 7;			// leave only lowest 3 bits
-
-	if(newBits == 0) {
-		data[cnt] = newByte;		// store
-		cnt++;						// move to next slot
-	}
-}
-
-void printit(void)
-{
-//	printf("Found syncs: %d\n", (int)scnt);
-
-	WORD i;
-//	for(i=0; i<2048; i += 16) {
-	for(i=0; i<7000; i += 16) {
-//		printf("%d\n", (int)data[i]);
-		printf("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-				data[i+0], data[i+1], data[i+ 2], data[i+ 3], data[i+ 4], data[i+ 5], data[i+ 6], data[i+ 7],
-				data[i+8], data[i+9], data[i+10], data[i+11], data[i+12], data[i+13], data[i+14], data[i+15]);
-	}
-
-	while(1);
-}
+//void printit(void)
+//{
+////	printf("Found syncs: %d\n", (int)scnt);
+//
+//	WORD i;
+////	for(i=0; i<2048; i += 16) {
+//	for(i=0; i<7000; i += 16) {
+////		printf("%d\n", (int)data[i]);
+//		printf("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+//				data[i+0], data[i+1], data[i+ 2], data[i+ 3], data[i+ 4], data[i+ 5], data[i+ 6], data[i+ 7],
+//				data[i+8], data[i+9], data[i+10], data[i+11], data[i+12], data[i+13], data[i+14], data[i+15]);
+//	}
+//
+//	while(1);
+//}
 
 void init_timer32(void)
 {
@@ -312,6 +424,24 @@ void init_timer_index(void)
 	LPC_TMR16B0->TCR = 0x01;				// enable TC
 }
 
+void init_timer_rdata(void)
+{
+	LPC_SYSCON->SYSAHBCLKCTRL |= (1<<8);	// enable clock for CT16B1
+
+	LPC_TMR16B1->PR	= 0;					// no prescale of TC++
+
+	// MR0 captures start of L on R data (it's period (4,6,8 us) - 0.4 us) - no int, no reset, no stop
+	// MR1 captures end of L on R data   (it's the period - 4,6,8 us) - int + reset, no stop
+	LPC_TMR16B1->MCR = 0x0018;				// MR0 - no action, MR1 -- reset & enable int
+
+	// 4 us = 288 cycles  (260 cycles)
+	LPC_TMR16B1->MR0 = 260;
+	LPC_TMR16B1->MR1 = 288;
+
+	LPC_TMR16B1->EMR = 0x00f0;				// EMC0, EMC1 -- toggle MAT0, MAT1 on match
+
+	LPC_TMR16B1->TCR = 0x01;				// enable TC
+}
 
 void setupClock(void)
 {
