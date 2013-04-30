@@ -1,0 +1,21 @@
+*** Creating Trace Output File 'fdd_fw2.tra' Ok.
+### Preparing for ADS-LD.
+### Creating ADS-LD Command Line
+### List of Objects: adding '"startup_stm32f10x_ld.o"'
+### List of Objects: adding '"main.o"'
+### List of Objects: adding '"system_stm32f10x.o"'
+### ADS-LD Command completed:
+--cpu Cortex-M3 "startup_stm32f10x_ld.o" "main.o" "system_stm32f10x.o" 
+--ro-base 0x08000000 --entry 0x08000000 --rw-base 0x20000000 --entry Reset_Handler --first __Vectors --strict --summary_stderr --info summarysizes --map --xref --callgraph --symbols 
+--info sizes --info totals --info unused --info veneers 
+ --list ".\fdd_fw2.map" -o fdd_fw2.axf### Preparing Environment (PrepEnvAds)
+### ADS-LD Output File: 'fdd_fw2.axf'
+### ADS-LD Command File: 'fdd_fw2.lnp'
+### Checking for dirty Components...
+### Creating CmdFile 'fdd_fw2.lnp', Handle=0x0000085C
+### Writing '.lnp' file
+### ADS-LD Command file 'fdd_fw2.lnp' is ready.
+### ADS-LD: About to start ADS-LD Thread.
+### ADS-LD: executed with 0 errors
+### Updating obj list
+### LDADS_file() completed.
