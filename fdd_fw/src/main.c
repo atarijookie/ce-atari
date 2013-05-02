@@ -19,6 +19,8 @@ void getNextMfmTime(void);
 // gap byte 0x4e == 666446 us = 222112 times = 10'10'10'01'01'10 = 0xa96
 // 2 gap bytes 0x4e 0x4e = 0xa96a96 times = 0xa9 0x6a 0x96 bytes
 
+// first gap (60 * 0x4e) takes 1920 us (1.9 ms)
+
 BYTE mfm[4096];
 WORD mfmIndexAdd, mfmIndexGet, mfmCount;
 BYTE mfmByte, mfmByteIndex;
@@ -43,12 +45,15 @@ BYTE scnt;
 
 void mfm_append_change(BYTE change);
 
-// - viem zapisanim do TMR16B0EMR nastavit hodnotu EM0 a EM1?
+// - viem zapisanim do TMR16B0EMR nastavit hodnotu EM0 a EM1? asi ano
 // - check a obnova rdata timeru musi zbehnut do 260 cyklov (tolko je pre 4 us) -- of jedneho po druhe volanie getNextMfmTime()
+//     -- trvania: d4, a9, bd, e0 -- bez SPI. Mozno pridat ten getNextMfmTime na viacere miesta na znizenie trvania checku.
 // - write support
+// - otestovat, ci je mozne ist s SSP na viac ako 1/12 z 72 MHz
 
 int main(void) {
 	setupClock();
+	LPC_SYSCON->SYSAHBCLKCTRL |= (1<<16);			// enable IOCON clock
 
 	printf("FDD FW\n");
 
@@ -75,10 +80,8 @@ int main(void) {
 
 	WORD *GPIO2RIS	= (WORD *) 0x50028014;		// GPIO raw interrupt status register -- read to get interrupt status
 	WORD *GPIO2IC	= (WORD *) 0x5002801C;		// GPIO interrupt clear register      -- write 1 to clear interrupt bit
-	//----------
-	// need to enable clock of IOCON to make IOCON work
-	LPC_SYSCON->SYSAHBCLKCTRL |= (1<<16);			// enable IOCON clock
 
+	//----------
 	init_timer32();
 
 	init_timer_index();
@@ -168,8 +171,8 @@ int main(void) {
 			LPC_TMR16B0->IR = 1;								// clear MR0INT
 			*index = 0;											// index pulse low
 
-
 			// TODO: TRACK started! init code needed
+			addAttention(CMD_TRACK_CHANGED);
 
 
 		}
@@ -338,6 +341,58 @@ void addAttention(BYTE atn)
 
 }
 
+void SSPInit( void )
+{
+//	CS   - PIO0.2
+//	SCK  - PIO0.6
+//	MISO - PIO0.8
+//	MOSI - PIO0.9         --- shared with SWO, hopefully will work
+
+  LPC_SYSCON->PRESETCTRL	|= 1;			// De-assert SSP0 reset.
+  LPC_SYSCON->SYSAHBCLKCTRL	|= (1<<11);		// Enables clock for SSP
+
+  // In Slave mode, the SSP clock rate provided by the master must not exceed 1/12 of the SSP peripheral clock -- 6 MHz max???
+  LPC_SYSCON->SSPCLKDIV = 1;		// Divided by 1
+
+  LPC_IOCON->PIO0_2 &= ~0x07;
+  LPC_IOCON->PIO0_2 |=  0x01;		// 0x1 - Selects function SSEL0
+
+  LPC_IOCON->SCKLOC  =  0x02;
+  LPC_IOCON->PIO0_6 &= ~0x07;
+  LPC_IOCON->PIO0_6 |=  0x02;		// 0x2 - Selects function SCK0 (only if pin PIO0_6 selected in Table 139).
+
+  LPC_IOCON->PIO0_8	&= ~0x07;
+  LPC_IOCON->PIO0_8 |=  0x01;		// 0x1 - Selects function MISO0
+
+  LPC_IOCON->PIO0_9 &= ~0x07;
+  LPC_IOCON->PIO0_9 |=  0x01;		// 0x1 - Selects function MOSI0.
+
+  /* Set DSS data to 8-bit, Frame format SPI, CPOL = 0, CPHA = 0, and SCR is 15 */
+  LPC_SSP->CR0 = 0x0707;
+
+  // In Slave mode, ... The content of the SSP0CPSR register is not relevant.
+  // LPC_SSP->CPSR = 0x2;
+
+  for (BYTE i = 0; i<FIFOSIZE; i++) {	// clear the RxFIFO
+	  BYTE dummy = LPC_SSP->DR;
+  }
+
+  if(LPC_SSP->CR1 & SSPCR1_SSE) {		// if SSP is enabled, disable it (you can set slave bit only when SSP is disabled)
+	  LPC_SSP->CR1 &= ~SSPCR1_SSE;
+  }
+
+  LPC_SSP->CR1 = SSPCR1_MS;				// enable slave bit first
+  LPC_SSP->CR1 |= SSPCR1_SSE;			// enable SSP (again)
+
+//  /* Enable the SSP Interrupt */
+//  NVIC_EnableIRQ(SSP_IRQn);
+
+//  /* Set SSPINMS registers to enable interrupts */
+//  /* enable all error related interrupts */
+//  LPC_SSP->IMSC = SSPIMSC_RORIM | SSPIMSC_RTIM;
+  return;
+}
+
 //void appendChange(BYTE change)		// 1 means change (R), 0 means no change (N)
 //{
 //	changes = changes << 1;			// shift up 1 bit
@@ -433,6 +488,12 @@ void init_timer_rdata(void)
 	// MR0 captures start of L on R data (it's period (4,6,8 us) - 0.4 us) - no int, no reset, no stop
 	// MR1 captures end of L on R data   (it's the period - 4,6,8 us) - int + reset, no stop
 	LPC_TMR16B1->MCR = 0x0018;				// MR0 - no action, MR1 -- reset & enable int
+
+	LPC_IOCON->PIO1_9	&= ~0x07;			// remove 3 lowest bits of this IOCON
+	LPC_IOCON->PIO1_9	|=  0x01;			// 0x01 Selects function CT16B1_MAT0
+
+	LPC_IOCON->PIO1_10	&= ~0x07;			// remove 3 lowest bits of this IOCON
+	LPC_IOCON->PIO1_10	|=  0x02;			// 0x02 Selects function CT16B1_MAT1
 
 	// 4 us = 288 cycles  (260 cycles)
 	LPC_TMR16B1->MR0 = 260;
