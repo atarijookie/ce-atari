@@ -1,5 +1,0 @@
--c --cpu Cortex-M3 -D__EVAL -g -O0 --apcs=interwork 
--I C:\Keil\ARM\RV31\INC 
--I C:\Keil\ARM\CMSIS\Include 
--I C:\Keil\ARM\Inc\ST\STM32F10x 
--o "system_stm32f10x.o" --omf_browse "system_stm32f10x.crf" --depend "system_stm32f10x.d" "system_stm32f10x.c"
