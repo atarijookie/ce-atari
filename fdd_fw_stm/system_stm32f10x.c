@@ -1,4 +1,3 @@
-#define STM32F10X_LD
 #include "stm32f10x.h"
 
 #define SYSCLK_FREQ_72MHz  72000000

@@ -5,3 +5,7 @@ main.o: C:\Keil\ARM\ARMCC\bin\..\include\stdint.h
 main.o: C:\Keil\ARM\CMSIS\Include\core_cmInstr.h
 main.o: C:\Keil\ARM\CMSIS\Include\core_cmFunc.h
 main.o: C:\Keil\ARM\Inc\ST\STM32F10x\system_stm32f10x.h
+main.o: stm32f10x_spi.h
+main.o: stm32f10x_tim.h
+main.o: defs.h
+main.o: timers.h
