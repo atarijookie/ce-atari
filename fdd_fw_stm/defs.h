@@ -39,9 +39,8 @@ GPIOB_8  - WRITE_PROTECT
 GPIOB_9  - DISK_CHANGE
 GPIOB_10 - TRACK0
 
-
 PIO2_9  - RDATA
-PIO3_0  - ATTENTION (need more data)
+GPIOB_15 - ATTENTION (need more data / data available to retrieve)
 */
 
 // on GPIOB
@@ -57,11 +56,11 @@ PIO3_0  - ATTENTION (need more data)
 #define	DISK_CHANGE		(1 <<   9)
 #define	TRACK0				(1 <<  10)
 
+#define	ATN						(1 <<  15)
+
 
 #define	RDATA					(1 <<  9)
 
-// on PIO3
-#define	ATN						(1 <<  0)
 
 
 #endif /* DEFS_H_ */

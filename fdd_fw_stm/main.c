@@ -7,11 +7,10 @@
 #include "defs.h"
 #include "timers.h"
 
-void initSpi(void);
-
-void mfm_append_change(BYTE change);
 void getNextMfmTime(void);
 void addAttention(BYTE atn);
+
+void spi_init(void);
 void spi_TxRx(void);
 
 
@@ -87,11 +86,9 @@ int main (void)
 	GPIOA->CRL &= ~(0xffff0000);						// remove bits from GPIOA
 	GPIOA->CRL |=   0xbbbb0000;							// set GPIOA as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
 
-	
-	
-	//	// config PIO3 outputs
-	//	WORD *pio3dir = (WORD *) 0x50038000;
-	//	*pio3dir = ATN;
+	// set GPIOB_15 (ATTENTION) as --- CNF1:0 -- 00 (push-pull output), MODE1:0 -- 11 (output 50 Mhz)
+	GPIOB->CRH &= ~(0xf0000000); 
+	GPIOB->CRH |=  (0x30000000);
 
 
 	RCC->APB2ENR |= (1 << 0);									// enable AFIO
@@ -113,7 +110,7 @@ int main (void)
   NVIC_Init(&Init);
 */
 
-	initSpi();																		// init SPI interface
+	spi_init();																		// init SPI interface
 
 	while(1) {
 		
@@ -306,8 +303,6 @@ void addAttention(BYTE atn)
 {
 	BYTE val;
 	
-	//TODO: signal to host, send command to host
-
 	outBuffer[outIndexAdd] = atn;					// 1st byte: ATN code
 	outIndexAdd++;												// update index for adding data
 	outIndexAdd = outIndexGet & 0x7ff;		// limit to 2048 bytes
@@ -328,9 +323,11 @@ void addAttention(BYTE atn)
 	outIndexAdd = outIndexGet & 0x7ff;		// limit to 2048 bytes
 	
 	outCount += 3;												// update count
+	
+	GPIOB->BSRR = ATN;										// ATTENTION bit high - got something to read
 }
 
-void initSpi(void)
+void spi_init(void)
 {
 	SPI_InitTypeDef spiStruct;
 
@@ -355,6 +352,9 @@ void spi_TxRx(void)
 			
 			outCount--;
 		} else {															// no data to send, just send zero
+			DWORD clrAtn = ATN;
+			clrAtn = clrAtn << 16;
+			GPIOB->BSRR = clrAtn;								// ATTENTION bit low - nothing to read
 			SPI1->DR = 0;
 		}
 	}
