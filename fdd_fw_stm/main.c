@@ -48,6 +48,18 @@ BYTE scnt;
 //     -- trvania: d4, a9, bd, e0 -- bez SPI. Mozno pridat ten getNextMfmTime na viacere miesta na znizenie trvania checku.
 // - write support
 
+// set GPIOB as --- CNF1:0 -- 00 (push-pull output), MODE1:0 -- 11 (output 50 Mhz)
+#define 	FloppyOut_Enable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000333); FloppyIndex_Enable(); }
+// set GPIOB as --- CNF1:0 -- 01 (floating input), MODE1:0 -- 00 (input)
+#define 	FloppyOut_Disable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000444); FloppyIndex_Disable(); }
+
+
+
+// enable TIM1 CH1 output on GPIOA_8
+#define		FloppyIndex_Enable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x0000000b); };
+#define		FloppyIndex_Disable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x00000004); };
+
+/*
 void TIM1_UP_IRQHandler (void) {
 
   if ((TIM1->SR & 0x0001) != 0) {                 // check interrupt source
@@ -61,19 +73,27 @@ void TIM1_UP_IRQHandler (void) {
     TIM1->SR &= ~(1<<0);                          // clear UIF flag
  }
 }
+*/
 
 int main (void) 
 {
 	BYTE track = 0;
 	BYTE side, prevSide = 0;
 	BYTE outputsActive = 0;
-	NVIC_InitTypeDef Init;
-
+// NVIC_InitTypeDef Init;
 	
-//  RCC->APB2ENR |= (1UL << 3);                /* Enable GPIOB clock            */
-//  GPIOB->CRH    =  0x33333333;               /* PB.8..16 defined as Outputs   */
-//  GPIOB->BSRR = i;                       /* Turn LED on                   */
-//  GPIOB->BRR = i;                        /* Turn LED off                  */
+  RCC->APB2ENR |= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     			// Enable SPI1, TIM1, GPIOA and GPIOB clock
+
+	// set FLOATING INPUTs for GPIOB_0 ... 6
+	GPIOB->CRL &= ~(0x0fffffff);						// remove bits from GPIOB
+	GPIOB->CRL |=   0x04444444;							// set GPIOB as --- CNF1:0 -- 01 (floating input), MODE1:0 -- 00 (input), PxODR -- don't care
+
+	FloppyOut_Disable();
+	
+	// enable atlernate function for PA4, PA5, PA6, PA7 == SPI
+	GPIOA->CRL &= ~(0xffff0000);						// remove bits from GPIOA
+	GPIOA->CRL |=   0xbbbb0000;							// set GPIOA as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
+
 
 	// config PIO2 outputs
 //	WORD *pio2dir = (WORD *) 0x50028000;
@@ -88,50 +108,22 @@ int main (void)
 	//	WORD *GPIO3RIS = (WORD *) 0x50038014;		// GPIO raw interrupt status register -- read to get interrupt status
 	//	WORD *GPIO3IC  = (WORD *) 0x5003801C;		// GPIO interrupt clear register      -- write 1 to clear interrupt bit
 
-//	WORD *index		= (WORD *) 0x50020200;			// PIO2_7 - INDEX
-//	WORD *track0	= (WORD *) 0x50020400;			// PIO2_8 - TRACK0
-//	WORD *rdata		= (WORD *) 0x50020800;			// PIO2_9 - RDATA
-//	WORD *wr_prt	= (WORD *) 0x50021000;			// PIO2_10 - WRITE_PROTECT
-//	WORD *dskchg	= (WORD *) 0x50022000;			// PIO2_11 - DISK_CHANGE
-
-//	WORD *in = (WORD *) 0x500201FC;				// floppy input pins
-
 //	WORD *GPIO2RIS	= (WORD *) 0x50028014;		// GPIO raw interrupt status register -- read to get interrupt status
 //	WORD *GPIO2IC	= (WORD *) 0x5002801C;		// GPIO interrupt clear register      -- write 1 to clear interrupt bit
 
 	//----------
-  RCC->APB2ENR |= (1 << 3) | (1 << 2);     			// Enable GPIOA and GPIOB clock
-
-	RCC->APB2ENR |= (1 << 12);										// enable SPI1
-	RCC->APB2ENR |= (1 << 11);										// enable TIM1 (TIM1EN)
-
-/*
-#define __TIM1_DIER               0x0001                  // 19
-
-      TIM1->DIER = __TIM1_DIER;                             // enable interrupt
-      NVIC->ISER[0] |= (1 << (TIM1_UP_IRQChannel & 0x1F));  // enable interrupt
-*/
 
 	timerSetup_index();
 	TIM_ITConfig(TIM1, TIM_IT_Update, ENABLE);
 
+/*
 //  Init.NVIC_IRQChannel = TIM1_IRQn;
 	Init.NVIC_IRQChannel = TIM1_UP_IRQn;
 	Init.NVIC_IRQChannelCmd = ENABLE;
   NVIC_Init(&Init);
-
-	
-	// enable TIM1 CH1 output on GPIOA_8
-	GPIOA->CRH			&= ~(0x0000000f);							// remove bits for GPIOA_8
-	GPIOA->CRH			|=   0x0000000b;							// set GPIOA_8 as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
-	
-
-	// enable atlernate function for PA4, PA5, PA6, PA7 == SPI
-	GPIOA->CRL			&= ~(0xffff0000);							// remove bits from GPIOA
-	GPIOA->CRL			|=   0xbbbb0000;							// set GPIOA as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
+*/
 
 	initSpi();																		// init SPI interface
-	
 
 	while(1) {
 		
@@ -158,9 +150,6 @@ int main (void)
 	}
 	*/
 
-//	init_timer_index();
-//	init_timer_rdata();
-
 	// init circular buffer for streamed data
 	mfmIndexAdd		= 0;
 	mfmIndexGet		= 0;
@@ -171,19 +160,20 @@ int main (void)
 
 	// init track and side vars for the floppy position
 
+
+
 	// init floppy signals
-//	*wr_prt = WR_PROTECT;						// not write protected
-//	*dskchg = DISK_CHANGE;						// not changing disk (ready!)
+	GPIOB->BSRR = (WR_PROTECT | DISK_CHANGE);			// not write protected, not changing disk (ready!)
 
 	while(1) {
-//		WORD inputs = *in;										// read floppy inputs
-		WORD inputs = 0;
+		WORD inputs = GPIOB->IDR;															// read floppy inputs
 
 		// TODO: add reading of SPI here
+		
 
 		if((inputs & (MOTOR_ENABLE | DRIVE_SELECT)) != 0) {		// motor not enabled, drive not selected? do nothing
 			if(outputsActive == 1) {							// if we got outputs active
-//				*pio2dir = 0;									// all pins as inputs, drive not selected
+				FloppyOut_Disable();								// all pins as inputs, drive not selected
 				outputsActive = 0;
 			}
 
@@ -191,10 +181,11 @@ int main (void)
 		}
 
 		if(outputsActive == 0) {								// if the outputs are inactive
-//			*pio2dir = INDEX | TRACK0 | RDATA | WR_PROTECT | DISK_CHANGE;	// set these as outputs
+			FloppyOut_Disable();									// set these as outputs
 			outputsActive = 1;
 		}
 
+		
 //		WORD tmr1Ints = LPC_TMR16B1->IR;						// read TMR16B1, which we to create MFM stream
 //		if(tmr1Ints & 2) {										// is MR1INT set? we streamed out one time
 		{
@@ -202,6 +193,7 @@ int main (void)
 			getNextMfmTime();									// get the next time from stream, set up TMR16B1
 		}
 
+		
 		// check for STEP pulse - should we go to a different track?
 //		WORD ints = *GPIO2RIS;									// read interrupt status of GPIO2
 //		if(ints & STEP) {										// if falling edge of STEP signal was found
@@ -223,9 +215,9 @@ int main (void)
 			}
 
 			if(track == 0) {									// if track is 0
-//				*track0 = 0;									// TRACK 0 signal to L
-			} else {											// if track is not 0
-//				*track0 = TRACK0;								// TRACK 0 signal is H
+				GPIOB->BSRR = (TRACK0 << 16);		// TRACK 0 signal to L			(write bit 26)
+			} else {													// if track is not 0
+				GPIOB->BSRR = TRACK0;						// TRACK 0 signal is H			(write bit 10)
 			}
 		}
 

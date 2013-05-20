@@ -9,42 +9,56 @@
 #define FALSE	0
 
 /*
+reserved:
+---------
+GPIOA_4 - SPI
+GPIOA_5 - SPI
+GPIOA_6 - SPI
+GPIOA_7 - SPI
+
+GPIOA_13 - SWD
+GPIOA_14 - SWD
+
+
 inputs:
-PIO2_0  - MOTOR_ENABLE
-PIO2_1  - DRIVE_SELECT
-PIO2_2  - DIRECTION
-PIO2_3  - STEP
-PIO2_4  - WDATA
-PIO2_5  - WGATE
-PIO2_6  - SIDE1
+-------
+GPIOB_0  - MOTOR_ENABLE
+GPIOB_1  - DRIVE_SELECT
+GPIOB_2  - DIRECTION
+GPIOB_3  - STEP
+GPIOB_4  - WDATA
+GPIOB_5  - WGATE
+GPIOB_6  - SIDE1
+
 
 outputs:
-PIO2_7  - INDEX
-PIO2_8  - TRACK0
-PIO2_9  - RDATA
-PIO2_10 - WRITE_PROTECT
-PIO2_11 - DISK_CHANGE
+---------
+GPIOA_8 - INDEX (using TIM1_CH1)
 
+GPIOB_8  - WRITE_PROTECT
+GPIOB_9  - DISK_CHANGE
+GPIOB_10 - TRACK0
+
+
+PIO2_9  - RDATA
 PIO3_0  - ATTENTION (need more data)
 
-temp inputs on counters:
-PIO1_5 - RDATA
-PIO1_8 - WDATA
 */
 
 // on PIO2
 #define	MOTOR_ENABLE	(1 <<  0)
 #define	DRIVE_SELECT	(1 <<  1)
-#define	DIR				(1 <<  2)
-#define	STEP			(1 <<  3)
-#define	WDATA			(1 <<  4)
-#define	WGATE			(1 <<  5)
-#define	SIDE1			(1 <<  6)
-#define	INDEX			(1 <<  7)
-#define	TRACK0			(1 <<  8)
-#define	RDATA			(1 <<  9)
-#define	WR_PROTECT		(1 << 10)
-#define	DISK_CHANGE		(1 << 11)
+#define	DIR						(1 <<  2)
+#define	STEP					(1 <<  3)
+#define	WDATA					(1 <<  4)
+#define	WGATE					(1 <<  5)
+#define	SIDE1					(1 <<  6)
+
+#define	WR_PROTECT		(1 <<   8)
+#define	DISK_CHANGE		(1 <<   9)
+#define	TRACK0				(1 <<  10)
+
+#define	RDATA					(1 <<  9)
 
 // on PIO3
 #define	ATN				(1 <<  0)
