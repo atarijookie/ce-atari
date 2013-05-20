@@ -53,9 +53,7 @@ BYTE scnt;
 // set GPIOB as --- CNF1:0 -- 01 (floating input), MODE1:0 -- 00 (input)
 #define 	FloppyOut_Disable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000444); FloppyIndex_Disable(); }
 
-
-
-// enable TIM1 CH1 output on GPIOA_8
+// enable / disable TIM1 CH1 output on GPIOA_8
 #define		FloppyIndex_Enable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x0000000b); };
 #define		FloppyIndex_Disable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x00000004); };
 
@@ -100,7 +98,12 @@ int main (void)
 	//	WORD *pio3dir = (WORD *) 0x50038000;
 	//	*pio3dir = ATN;
 
-	EXTI->FTSR = STEP;												// Falling trigger selection register - STEP pulse
+
+	RCC->APB2ENR |= (1 << 0);									// enable AFIO
+	AFIO->EXTICR[0] = 0x1000;									// EXTI3 -- source input: GPIOB_3
+	EXTI->IMR			= STEP;											// EXTO3 -- 1 means: Interrupt from line 3 not masked
+	EXTI->EMR			= STEP;											// EXTO3 -- 1 means: Event     form line 3 not masked
+	EXTI->FTSR 		= STEP;												// Falling trigger selection register - STEP pulse
 	
 
 	//----------
@@ -187,7 +190,7 @@ int main (void)
 		}
 
 		// check for STEP pulse - should we go to a different track?
-		ints = EXTI->PR;								// Pending register (EXTI_PR)
+		ints = EXTI->PR;										// Pending register (EXTI_PR)
 		if(ints & STEP) {										// if falling edge of STEP signal was found
 			EXTI->PR = STEP;									// clear that int
 

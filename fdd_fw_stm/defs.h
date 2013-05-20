@@ -45,7 +45,7 @@ PIO3_0  - ATTENTION (need more data)
 
 */
 
-// on PIO2
+// on GPIOB
 #define	MOTOR_ENABLE	(1 <<  0)
 #define	DRIVE_SELECT	(1 <<  1)
 #define	DIR						(1 <<  2)
