@@ -12,6 +12,7 @@ void initSpi(void);
 void mfm_append_change(BYTE change);
 void getNextMfmTime(void);
 void addAttention(BYTE atn);
+void spi_TxRx(void);
 
 
 // worst case scenario: 1 sector with all bullshit encoded in MFM should be max. 1228 bytes
@@ -22,23 +23,19 @@ void addAttention(BYTE atn);
 
 // first gap (60 * 0x4e) takes 1920 us (1.9 ms)
 
-BYTE mfm[4096];
-WORD mfmIndexAdd, mfmIndexGet, mfmCount;
+BYTE inBuffer[4096];
+WORD inIndexAdd, inIndexGet, inCount;
+
+BYTE outBuffer[2048];
+WORD outIndexAdd, outIndexGet, outCount;
+
 BYTE mfmByte, mfmByteIndex;
 
-BYTE newByte;
-BYTE newBits;
+BYTE side, track, sector;
 
-BYTE changes;
-BYTE chCount;
-
-DWORD sync;
-BYTE scnt;
-
-#define CMD_TRACK_CHANGED       1               // +  track # + side (highest bit)
-#define CMD_SEND_NEXT_SECTOR    2               // +  track # + side (highest bit)
-#define CMD_SECTOR_WRITTEN      3               // + sector # + side (highest bit)
-#define CMD_BUTTON_PRESSED      4
+#define CMD_TRACK_CHANGED       1               // sent: 1, side (highest bit) + track #, current sector #
+#define CMD_SEND_NEXT_SECTOR    2               // sent: 2, side (highest bit) + track #, current sector #
+#define CMD_SECTOR_WRITTEN      3               // sent: 3, side (highest bit) + track #, current sector #
 
 #define MFM_4US     1
 #define MFM_6US     2
@@ -75,9 +72,7 @@ void TIM1_UP_IRQHandler (void) {
 
 int main (void) 
 {
-	BYTE track = 0;
-	BYTE side, prevSide = 0;
-	BYTE outputsActive = 0;
+	BYTE prevSide, outputsActive;
 // NVIC_InitTypeDef Init;
 	
   RCC->APB2ENR |= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     			// Enable SPI1, TIM1, GPIOA and GPIOB clock
@@ -103,7 +98,7 @@ int main (void)
 	AFIO->EXTICR[0] = 0x1000;									// EXTI3 -- source input: GPIOB_3
 	EXTI->IMR			= STEP;											// EXTO3 -- 1 means: Interrupt from line 3 not masked
 	EXTI->EMR			= STEP;											// EXTO3 -- 1 means: Event     form line 3 not masked
-	EXTI->FTSR 		= STEP;												// Falling trigger selection register - STEP pulse
+	EXTI->FTSR 		= STEP;											// Falling trigger selection register - STEP pulse
 	
 
 	//----------
@@ -145,27 +140,35 @@ int main (void)
 	}
 	*/
 
-	// init circular buffer for streamed data
-	mfmIndexAdd		= 0;
-	mfmIndexGet		= 0;
-	mfmCount			= 0;
+	// init circular buffer for data incomming via SPI
+	inIndexAdd		= 0;
+	inIndexGet		= 0;
+	inCount				= 0;
+	
+	// init circular buffer for data outgoing via SPI
+	outIndexAdd		= 0;
+	outIndexGet		= 0;
+	outCount			= 0;
+
 
 	mfmByte				= 0;
 	mfmByteIndex	= 0;
 
 	// init track and side vars for the floppy position
-
-
+	side					= 0;
+	track 				= 0;
+	sector				= 0;
+	prevSide			= 0;
+	outputsActive	= 0;
 
 	// init floppy signals
 	GPIOB->BSRR = (WR_PROTECT | DISK_CHANGE);			// not write protected, not changing disk (ready!)
 
 	while(1) {
 		WORD ints;
-		WORD inputs = GPIOB->IDR;															// read floppy inputs
+		WORD inputs = GPIOB->IDR;								// read floppy inputs
 
-		// TODO: add reading of SPI here
-		
+		spi_TxRx();															// 0.5 us per received byte
 
 		if((inputs & (MOTOR_ENABLE | DRIVE_SELECT)) != 0) {		// motor not enabled, drive not selected? do nothing
 			if(outputsActive == 1) {							// if we got outputs active
@@ -275,21 +278,21 @@ void getNextMfmTime(void)
 //	LPC_TMR16B1->MR0 = mr0;
 //	LPC_TMR16B1->MR1 = mr1;
 
-	if(mfmByteIndex == 4) {										// streamed all times from byte?
+	if(mfmByteIndex == 4) {								// streamed all times from byte?
 		mfmByteIndex = 0;
 
-		if(mfmCount == 0) {										// nothing to stream?
-			mfmByte	= gap[gapCnt];								// stream this GAP byte
+		if(inCount == 0) {									// nothing to stream?
+			mfmByte	= gap[gapCnt];						// stream this GAP byte
 			gapCnt++;
 
 			if(gapCnt > 2) {									// we got only 3 gap byte times, go back to 0
 				gapCnt = 0;
 			}
-		} else {												// got data to stream?
+		} else {														// got data to stream?
 			BYTE hostByte;
-			hostByte = mfm[mfmIndexGet];						// get byte from host buffer
-			mfmIndexGet++;										// increment position for reading in host buffer
-			mfmCount--;											// decrement data in cyclic buffer
+			hostByte = inBuffer[inIndexGet];	// get byte from host buffer
+			inIndexGet++;											// increment position for reading in host buffer
+			inCount--;												// decrement data in cyclic buffer
 
 			// TODO: add checking and handling of some commands from host (e.g. media change)
 
@@ -301,9 +304,30 @@ void getNextMfmTime(void)
 
 void addAttention(BYTE atn)
 {
+	BYTE val;
+	
 	//TODO: signal to host, send command to host
 
+	outBuffer[outIndexAdd] = atn;					// 1st byte: ATN code
+	outIndexAdd++;												// update index for adding data
+	outIndexAdd = outIndexGet & 0x7ff;		// limit to 2048 bytes
 
+	//-----
+	val = track;													// create 2nd byte: track + side
+	if(side == 1) {
+		val = val | 0x80;
+	}
+	
+	outBuffer[outIndexAdd] = val;					// 2nd byte: side (highest bit) + track #
+	outIndexAdd++;												// update index for adding data
+	outIndexAdd = outIndexGet & 0x7ff;		// limit to 2048 bytes
+
+	//-----
+	outBuffer[outIndexAdd] = sector;			// 3rd byte: current sector #
+	outIndexAdd++;												// update index for adding data
+	outIndexAdd = outIndexGet & 0x7ff;		// limit to 2048 bytes
+	
+	outCount += 3;												// update count
 }
 
 void initSpi(void)
@@ -316,4 +340,31 @@ void initSpi(void)
   SPI_Init(SPI1, &spiStruct);
 	
 	SPI_Cmd(SPI1, ENABLE);
+}
+
+void spi_TxRx(void)
+{
+	WORD status = SPI1->SR;
+	
+	if(status & (1 << 1)) {									// TXE flag: Tx buffer empty
+		if(outCount > 0) {										// something to send? good
+			SPI1->DR = outBuffer[outIndexGet];
+			
+			outIndexGet++;
+			outIndexGet = outIndexGet & 0x7ff;	// limit to 2048 bytes
+			
+			outCount--;
+		} else {															// no data to send, just send zero
+			SPI1->DR = 0;
+		}
+	}
+	
+	if(status & (1 << 0)) {								// RXNE flag: Rx buffer not empty
+		inBuffer[inIndexAdd] = SPI1->DR;		// get data
+		
+		inIndexAdd++;												// update index for adding data
+		inIndexAdd = inIndexAdd & 0xfff;		// limit to 4096 bytes
+		
+		inCount++;													// update count
+	}
 }

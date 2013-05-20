@@ -33,7 +33,7 @@ GPIOB_6  - SIDE1
 
 outputs:
 ---------
-GPIOA_8 - INDEX (using TIM1_CH1)
+GPIOA_8  - INDEX (using TIM1_CH1)
 
 GPIOB_8  - WRITE_PROTECT
 GPIOB_9  - DISK_CHANGE
@@ -42,7 +42,6 @@ GPIOB_10 - TRACK0
 
 PIO2_9  - RDATA
 PIO3_0  - ATTENTION (need more data)
-
 */
 
 // on GPIOB
@@ -58,14 +57,11 @@ PIO3_0  - ATTENTION (need more data)
 #define	DISK_CHANGE		(1 <<   9)
 #define	TRACK0				(1 <<  10)
 
+
 #define	RDATA					(1 <<  9)
 
 // on PIO3
-#define	ATN				(1 <<  0)
-
-// temp inputs on PIO1
-#define	RDATAtmp		(1 <<  5)
-#define	WDATAtmp		(1 <<  8)
+#define	ATN						(1 <<  0)
 
 
 #endif /* DEFS_H_ */
