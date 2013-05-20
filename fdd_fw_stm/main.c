@@ -94,22 +94,14 @@ int main (void)
 	GPIOA->CRL &= ~(0xffff0000);						// remove bits from GPIOA
 	GPIOA->CRL |=   0xbbbb0000;							// set GPIOA as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
 
-
-	// config PIO2 outputs
-//	WORD *pio2dir = (WORD *) 0x50028000;
-//	*pio2dir = 0;							// all pins as inputs, drive not selected
-
+	
+	
 	//	// config PIO3 outputs
 	//	WORD *pio3dir = (WORD *) 0x50038000;
 	//	*pio3dir = ATN;
 
-	// GPIO3IS  is 0 after reset = edge sensitive
-	// GPIO3IEV is 0 after reset = interrupt on falling edge
-	//	WORD *GPIO3RIS = (WORD *) 0x50038014;		// GPIO raw interrupt status register -- read to get interrupt status
-	//	WORD *GPIO3IC  = (WORD *) 0x5003801C;		// GPIO interrupt clear register      -- write 1 to clear interrupt bit
-
-//	WORD *GPIO2RIS	= (WORD *) 0x50028014;		// GPIO raw interrupt status register -- read to get interrupt status
-//	WORD *GPIO2IC	= (WORD *) 0x5002801C;		// GPIO interrupt clear register      -- write 1 to clear interrupt bit
+	EXTI->FTSR = STEP;												// Falling trigger selection register - STEP pulse
+	
 
 	//----------
 
@@ -166,6 +158,7 @@ int main (void)
 	GPIOB->BSRR = (WR_PROTECT | DISK_CHANGE);			// not write protected, not changing disk (ready!)
 
 	while(1) {
+		WORD ints;
 		WORD inputs = GPIOB->IDR;															// read floppy inputs
 
 		// TODO: add reading of SPI here
@@ -181,7 +174,7 @@ int main (void)
 		}
 
 		if(outputsActive == 0) {								// if the outputs are inactive
-			FloppyOut_Disable();									// set these as outputs
+			FloppyOut_Enable();										// set these as outputs
 			outputsActive = 1;
 		}
 
@@ -193,14 +186,12 @@ int main (void)
 			getNextMfmTime();									// get the next time from stream, set up TMR16B1
 		}
 
-		
 		// check for STEP pulse - should we go to a different track?
-//		WORD ints = *GPIO2RIS;									// read interrupt status of GPIO2
-//		if(ints & STEP) {										// if falling edge of STEP signal was found
-		{
-//			*GPIO2IC = STEP;									// clear that int
+		ints = EXTI->PR;								// Pending register (EXTI_PR)
+		if(ints & STEP) {										// if falling edge of STEP signal was found
+			EXTI->PR = STEP;									// clear that int
 
-			if(inputs & DIR) {									// direction is High? track--
+			if(inputs & DIR) {								// direction is High? track--
 				if(track > 0) {
 					track--;
 
