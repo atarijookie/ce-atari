@@ -2,6 +2,8 @@
 #include "stm32f10x_spi.h"
 #include "stm32f10x_tim.h"
 
+#include "misc.h"
+
 #include "defs.h"
 #include "timers.h"
 
@@ -46,11 +48,27 @@ BYTE scnt;
 //     -- trvania: d4, a9, bd, e0 -- bez SPI. Mozno pridat ten getNextMfmTime na viacere miesta na znizenie trvania checku.
 // - write support
 
+void TIM1_UP_IRQHandler (void) {
+
+  if ((TIM1->SR & 0x0001) != 0) {                 // check interrupt source
+
+ 		if(GPIOA->ODR & (1 << 10)) {
+			GPIOA->BSRR = (1 << 26);
+		} else {
+			GPIOA->BSRR = (1 << 10);
+		}
+
+    TIM1->SR &= ~(1<<0);                          // clear UIF flag
+ }
+}
+
 int main (void) 
 {
 	BYTE track = 0;
 	BYTE side, prevSide = 0;
 	BYTE outputsActive = 0;
+	NVIC_InitTypeDef Init;
+
 	
 //  RCC->APB2ENR |= (1UL << 3);                /* Enable GPIOB clock            */
 //  GPIOB->CRH    =  0x33333333;               /* PB.8..16 defined as Outputs   */
@@ -86,14 +104,27 @@ int main (void)
 
 	RCC->APB2ENR |= (1 << 12);										// enable SPI1
 	RCC->APB2ENR |= (1 << 11);										// enable TIM1 (TIM1EN)
-	
-	timerSetup_index();
 
-/*	
+/*
+#define __TIM1_DIER               0x0001                  // 19
+
+      TIM1->DIER = __TIM1_DIER;                             // enable interrupt
+      NVIC->ISER[0] |= (1 << (TIM1_UP_IRQChannel & 0x1F));  // enable interrupt
+*/
+
+	timerSetup_index();
+	TIM_ITConfig(TIM1, TIM_IT_Update, ENABLE);
+
+//  Init.NVIC_IRQChannel = TIM1_IRQn;
+	Init.NVIC_IRQChannel = TIM1_UP_IRQn;
+	Init.NVIC_IRQChannelCmd = ENABLE;
+  NVIC_Init(&Init);
+
+	
 	// enable TIM1 CH1 output on GPIOA_8
 	GPIOA->CRH			&= ~(0x0000000f);							// remove bits for GPIOA_8
 	GPIOA->CRH			|=   0x0000000b;							// set GPIOA_8 as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
-*/	
+	
 
 	// enable atlernate function for PA4, PA5, PA6, PA7 == SPI
 	GPIOA->CRL			&= ~(0xffff0000);							// remove bits from GPIOA
@@ -103,6 +134,9 @@ int main (void)
 	
 
 	while(1) {
+		
+	}
+/*	
 		WORD val = TIM1->SR;
 		
 		if((val & 0x0001) == 0) {			// no overflow? continue
@@ -113,15 +147,16 @@ int main (void)
 		
 //		if(TIM1->CNT == 0) {
 			
-		if(GPIOA->ODR & (1 << 8)) {
-			GPIOA->BSRR = (1 << 24);
+		if(GPIOA->ODR & (1 << 10)) {
+			GPIOA->BSRR = (1 << 26);
 		} else {
-			GPIOA->BSRR = (1 << 8);
+			GPIOA->BSRR = (1 << 10);
 		}
 			
 //			while(TIM1->CNT == 0);
 //		}
 	}
+	*/
 
 //	init_timer_index();
 //	init_timer_rdata();

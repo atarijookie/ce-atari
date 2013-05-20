@@ -23,7 +23,7 @@ void timerSetup_index(void)
   TIM_OCInitStructure.TIM_OCMode			= TIM_OCMode_PWM1;
   TIM_OCInitStructure.TIM_OutputState	= TIM_OutputState_Enable;
   TIM_OCInitStructure.TIM_Pulse				= 10;											// pulse will be 10 ticks == 5 ms long
-  TIM_OCInitStructure.TIM_OCPolarity	= TIM_OCPolarity_High;
+  TIM_OCInitStructure.TIM_OCPolarity	= TIM_OCPolarity_Low;
 
   TIM_OC1Init(TIM1, &TIM_OCInitStructure);
   TIM_OC1PreloadConfig(TIM1, TIM_OCPreload_Enable);
@@ -150,6 +150,20 @@ void TIM_OC1PreloadConfig(TIM_TypeDef* TIMx, uint16_t TIM_OCPreload)
   tmpccmr1 |= TIM_OCPreload;
   /* Write to TIMx CCMR1 register */
   TIMx->CCMR1 = tmpccmr1;
+}
+
+void TIM_ITConfig(TIM_TypeDef* TIMx, uint16_t TIM_IT, FunctionalState NewState)
+{  
+  if (NewState != DISABLE)
+  {
+    /* Enable the Interrupt sources */
+    TIMx->DIER |= TIM_IT;
+  }
+  else
+  {
+    /* Disable the Interrupt sources */
+    TIMx->DIER &= (uint16_t)~TIM_IT;
+  }
 }
 
 void TIM_ARRPreloadConfig(TIM_TypeDef* TIMx, FunctionalState NewState)
