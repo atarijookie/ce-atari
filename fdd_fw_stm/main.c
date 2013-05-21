@@ -14,6 +14,16 @@ void processHostCommand(BYTE hostByte);
 void spi_init(void);
 void spi_TxRx(void);
 
+/*
+TODO:
+ - rozchodit check na index timer overflow
+ - rozchodit IDR cez button pre STEP
+ - rozchodit generovanie MFM streamu - pwm?
+ - zosekanie / prepisanie do asm kvoli stihaniu obsluhy SPI + MFM
+ - doriesit nacitanie dalsieho byte ked sa robi processHostCommand()
+*/
+
+
 // worst case scenario: 1 sector with all bullshit encoded in MFM should be max. 1228 bytes
 // So a 4096 bytes big buffer should contain at least 3.3 sectors (one currently streamed, one received from host + something more)
 
@@ -319,9 +329,12 @@ void getNextMfmTime(void)
 			BYTE hostByte;
 			inBuffer_get(hostByte);						// get byte from host buffer
 
-			if((hostByte & 0x0f) == 0) {			// lower nibble == 0? it's a command from host. if we should turn on/off the write protect or disk change
+			// lower nibble == 0? it's a command from host. if we should turn on/off the write protect or disk change
+			if((hostByte & 0x0f) == 0) {			
 				processHostCommand(hostByte);
-			} else {																																	// this wasn't a command, just store it
+				
+				getNextMfmTime();				
+			} else { // this wasn't a command, just store it
 				mfmByte = hostByte;
 			}
 		}
@@ -335,7 +348,11 @@ void processHostCommand(BYTE hostByte)
 		case CMD_WRITE_PROTECT_ON:		GPIOB->BRR	= WR_PROTECT;		break;			// WR PROTECT to 0
 		case CMD_DISK_CHANGE_OFF:			GPIOB->BSRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 1
 		case CMD_DISK_CHANGE_ON:			GPIOB->BRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 0
-		case CMD_CURRENT_SECTOR:			inBuffer_get(sector);				break;			// get the next byte, which is sector #, and store it in sector variable
+		
+		case CMD_CURRENT_SECTOR:								// get the next byte, which is sector #, and store it in sector variable
+			inBuffer_get(sector);				
+			addAttention(CMD_SEND_NEXT_SECTOR);		// also ask for the next sector to this one
+			break;			
 	}
 }
 
