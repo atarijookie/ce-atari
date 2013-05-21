@@ -32,9 +32,16 @@ BYTE mfmByte, mfmByteIndex;
 
 BYTE side, track, sector;
 
-#define CMD_TRACK_CHANGED       1               // sent: 1, side (highest bit) + track #, current sector #
-#define CMD_SEND_NEXT_SECTOR    2               // sent: 2, side (highest bit) + track #, current sector #
-#define CMD_SECTOR_WRITTEN      3               // sent: 3, side (highest bit) + track #, current sector #
+// commands sent from device to host
+#define CMD_TRACK_CHANGED       0x01               	// sent: 1, side (highest bit) + track #, current sector #
+#define CMD_SEND_NEXT_SECTOR    0x02               	// sent: 2, side (highest bit) + track #, current sector #
+#define CMD_SECTOR_WRITTEN      0x03               	// sent: 3, side (highest bit) + track #, current sector #
+
+// commands sent from host to device
+#define CMD_WRITE_PROTECT_OFF		0x10
+#define CMD_WRITE_PROTECT_ON		0x20
+#define CMD_DISK_CHANGE_OFF			0x30
+#define CMD_DISK_CHANGE_ON			0x40
 
 #define MFM_4US     1
 #define MFM_6US     2
@@ -52,6 +59,15 @@ BYTE side, track, sector;
 // enable / disable TIM1 CH1 output on GPIOA_8
 #define		FloppyIndex_Enable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x0000000b); };
 #define		FloppyIndex_Disable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x00000004); };
+
+// cyclic buffer add macros
+#define 	outBuffer_add(X)				{ outBuffer[outIndexAdd]	= X;			outIndexAdd++;			outIndexAdd		= outIndexAdd & 0x7ff; 	outCount++; }
+#define 	inBuffer_add(X)					{ inBuffer [inIndexAdd]		= X;			inIndexAdd++;				inIndexAdd		= inIndexAdd  & 0xfff;	inCount++;	}
+
+// cyclic buffer get macros
+#define		outBuffer_get(X)				{ X = outBuffer[outIndexGet];				outIndexGet++;			outIndexGet		= outIndexGet & 0x7ff;	outCount--;	}
+#define		inBuffer_get(X)					{ X = inBuffer[inIndexGet];					inIndexGet++;				inIndexGet		= inIndexGet	& 0xfff;	inCount--;	}
+
 
 /*
 void TIM1_UP_IRQHandler (void) {
@@ -112,9 +128,6 @@ int main (void)
 
 	spi_init();																		// init SPI interface
 
-	while(1) {
-		
-	}
 /*	
 		WORD val = TIM1->SR;
 		
@@ -165,7 +178,7 @@ int main (void)
 		WORD ints;
 		WORD inputs = GPIOB->IDR;								// read floppy inputs
 
-		spi_TxRx();															// 0.5 us per received byte
+		spi_TxRx();															// every 1 us might a SPI WORD be received! (16 MHz SPI clock)
 
 		if((inputs & (MOTOR_ENABLE | DRIVE_SELECT)) != 0) {		// motor not enabled, drive not selected? do nothing
 			if(outputsActive == 1) {							// if we got outputs active
@@ -253,7 +266,6 @@ void getNextMfmTime(void)
 	mfmByte = mfmByte << 2;									// move the mfmByte to next position
 	mfmByteIndex++;
 
-
 	switch(time) {											// convert time code to timer match values
 	case MFM_8US:											// 8 us?
 		mr0 = 548;
@@ -287,14 +299,18 @@ void getNextMfmTime(void)
 			}
 		} else {														// got data to stream?
 			BYTE hostByte;
-			hostByte = inBuffer[inIndexGet];	// get byte from host buffer
-			inIndexGet++;											// increment position for reading in host buffer
-			inCount--;												// decrement data in cyclic buffer
+			inBuffer_get(hostByte);						// get byte from host buffer
 
-			// TODO: add checking and handling of some commands from host (e.g. media change)
-
-
-			mfmByte = hostByte;
+			if((hostByte & 0x0f) == 0) {			// lower nibble == 0? it's a command from host. if we should turn on/off the write protect or disk change
+				switch(hostByte) {
+					case CMD_WRITE_PROTECT_OFF:		GPIOB->BSRR	= WR_PROTECT;		break;			// WR PROTECT to 1
+					case CMD_WRITE_PROTECT_ON:		GPIOB->BRR	= WR_PROTECT;		break;			// WR PROTECT to 0
+					case CMD_DISK_CHANGE_OFF:			GPIOB->BSRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 1
+					case CMD_DISK_CHANGE_ON:			GPIOB->BRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 0
+				}
+			} else {																																	// this wasn't a command, just store it
+				mfmByte = hostByte;
+			}
 		}
 	}
 }
@@ -303,26 +319,14 @@ void addAttention(BYTE atn)
 {
 	BYTE val;
 	
-	outBuffer[outIndexAdd] = atn;					// 1st byte: ATN code
-	outIndexAdd++;												// update index for adding data
-	outIndexAdd = outIndexGet & 0x7ff;		// limit to 2048 bytes
-
-	//-----
 	val = track;													// create 2nd byte: track + side
 	if(side == 1) {
 		val = val | 0x80;
 	}
 	
-	outBuffer[outIndexAdd] = val;					// 2nd byte: side (highest bit) + track #
-	outIndexAdd++;												// update index for adding data
-	outIndexAdd = outIndexGet & 0x7ff;		// limit to 2048 bytes
-
-	//-----
-	outBuffer[outIndexAdd] = sector;			// 3rd byte: current sector #
-	outIndexAdd++;												// update index for adding data
-	outIndexAdd = outIndexGet & 0x7ff;		// limit to 2048 bytes
-	
-	outCount += 3;												// update count
+	outBuffer_add(atn);										// 1st byte: ATN code
+	outBuffer_add(val);										// 2nd byte: side (highest bit) + track #
+	outBuffer_add(sector);								// 3rd byte: current sector #
 	
 	GPIOB->BSRR = ATN;										// ATTENTION bit high - got something to read
 }
@@ -334,6 +338,8 @@ void spi_init(void)
 	SPI_Cmd(SPI1, DISABLE);
 	
 	SPI_StructInit(&spiStruct);
+	spiStruct.SPI_DataSize = SPI_DataSize_16b;		// use 16b data size to lower the MCU load
+	
   SPI_Init(SPI1, &spiStruct);
 	
 	SPI_Cmd(SPI1, ENABLE);
@@ -341,30 +347,26 @@ void spi_init(void)
 
 void spi_TxRx(void)
 {
-	WORD status = SPI1->SR;
+	WORD status = SPI1->SR;									// read SPI status
 	
 	if(status & (1 << 1)) {									// TXE flag: Tx buffer empty
-		if(outCount > 0) {										// something to send? good
-			SPI1->DR = outBuffer[outIndexGet];
+		if(outCount >= 2) {										// something to send? good
+			WORD hi, lo;
+			outBuffer_get(hi);									// get from outbuffer twice
+			outBuffer_get(lo);
+			hi = (hi << 8) | lo;								// combine bytes into word
 			
-			outIndexGet++;
-			outIndexGet = outIndexGet & 0x7ff;	// limit to 2048 bytes
-			
-			outCount--;
+			SPI1->DR = hi;											// send over SPI
 		} else {															// no data to send, just send zero
-			DWORD clrAtn = ATN;
-			clrAtn = clrAtn << 16;
-			GPIOB->BSRR = clrAtn;								// ATTENTION bit low - nothing to read
+			GPIOB->BRR = ATN;										// ATTENTION bit low - nothing to read	
+			
 			SPI1->DR = 0;
 		}
 	}
 	
-	if(status & (1 << 0)) {								// RXNE flag: Rx buffer not empty
-		inBuffer[inIndexAdd] = SPI1->DR;		// get data
-		
-		inIndexAdd++;												// update index for adding data
-		inIndexAdd = inIndexAdd & 0xfff;		// limit to 4096 bytes
-		
-		inCount++;													// update count
+	if(status & (1 << 0)) {									// RXNE flag: Rx buffer not empty
+		WORD data = SPI1->DR;									// get data
+		inBuffer_add(data >> 8);
+		inBuffer_add(data & 0xff);
 	}
 }
