@@ -9,6 +9,7 @@
 
 void getNextMfmTime(void);
 void addAttention(BYTE atn);
+void processHostCommand(BYTE hostByte);
 
 void spi_init(void);
 void spi_TxRx(void);
@@ -159,7 +160,6 @@ int main (void)
 	outIndexGet		= 0;
 	outCount			= 0;
 
-
 	mfmByte				= 0;
 	mfmByteIndex	= 0;
 
@@ -172,6 +172,7 @@ int main (void)
 
 	// init floppy signals
 	GPIOB->BSRR = (WR_PROTECT | DISK_CHANGE);			// not write protected, not changing disk (ready!)
+	GPIOB->BRR = TRACK0;													// TRACK 0 signal to L			
 
 	while(1) {
 		WORD ints;
@@ -183,6 +184,16 @@ int main (void)
 			if(outputsActive == 1) {							// if we got outputs active
 				FloppyOut_Disable();								// all pins as inputs, drive not selected
 				outputsActive = 0;
+				
+				// now that the floppy is disabled, drop the data from inBuffer, but process the host commands
+				while(inCount > 0) {								// something in the buffer?
+					BYTE hostByte;
+					inBuffer_get(hostByte);						// get byte from host buffer
+
+					if((hostByte & 0x0f) == 0) {			// lower nibble == 0? it's a command from host, process it; otherwise drop it
+						processHostCommand(hostByte);
+					}
+				}
 			}
 
 			continue;
@@ -221,9 +232,9 @@ int main (void)
 			}
 
 			if(track == 0) {									// if track is 0
-				GPIOB->BSRR = (TRACK0 << 16);		// TRACK 0 signal to L			(write bit 26)
+				GPIOB->BRR = TRACK0;						// TRACK 0 signal to L			
 			} else {													// if track is not 0
-				GPIOB->BSRR = TRACK0;						// TRACK 0 signal is H			(write bit 10)
+				GPIOB->BSRR = TRACK0;						// TRACK 0 signal is H
 			}
 		}
 
@@ -309,17 +320,22 @@ void getNextMfmTime(void)
 			inBuffer_get(hostByte);						// get byte from host buffer
 
 			if((hostByte & 0x0f) == 0) {			// lower nibble == 0? it's a command from host. if we should turn on/off the write protect or disk change
-				switch(hostByte) {
-					case CMD_WRITE_PROTECT_OFF:		GPIOB->BSRR	= WR_PROTECT;		break;			// WR PROTECT to 1
-					case CMD_WRITE_PROTECT_ON:		GPIOB->BRR	= WR_PROTECT;		break;			// WR PROTECT to 0
-					case CMD_DISK_CHANGE_OFF:			GPIOB->BSRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 1
-					case CMD_DISK_CHANGE_ON:			GPIOB->BRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 0
-					case CMD_CURRENT_SECTOR:			inBuffer_get(sector);				break;			// get the next byte, which is sector #, and store it in sector variable
-				}
+				processHostCommand(hostByte);
 			} else {																																	// this wasn't a command, just store it
 				mfmByte = hostByte;
 			}
 		}
+	}
+}
+
+void processHostCommand(BYTE hostByte)
+{
+	switch(hostByte) {
+		case CMD_WRITE_PROTECT_OFF:		GPIOB->BSRR	= WR_PROTECT;		break;			// WR PROTECT to 1
+		case CMD_WRITE_PROTECT_ON:		GPIOB->BRR	= WR_PROTECT;		break;			// WR PROTECT to 0
+		case CMD_DISK_CHANGE_OFF:			GPIOB->BSRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 1
+		case CMD_DISK_CHANGE_ON:			GPIOB->BRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 0
+		case CMD_CURRENT_SECTOR:			inBuffer_get(sector);				break;			// get the next byte, which is sector #, and store it in sector variable
 	}
 }
 
