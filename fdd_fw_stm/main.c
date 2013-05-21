@@ -13,7 +13,6 @@ void addAttention(BYTE atn);
 void spi_init(void);
 void spi_TxRx(void);
 
-
 // worst case scenario: 1 sector with all bullshit encoded in MFM should be max. 1228 bytes
 // So a 4096 bytes big buffer should contain at least 3.3 sectors (one currently streamed, one received from host + something more)
 
@@ -33,9 +32,8 @@ BYTE mfmByte, mfmByteIndex;
 BYTE side, track, sector;
 
 // commands sent from device to host
-#define CMD_TRACK_CHANGED       0x01               	// sent: 1, side (highest bit) + track #, current sector #
-#define CMD_SEND_NEXT_SECTOR    0x02               	// sent: 2, side (highest bit) + track #, current sector #
-#define CMD_SECTOR_WRITTEN      0x03               	// sent: 3, side (highest bit) + track #, current sector #
+#define CMD_SEND_NEXT_SECTOR    0x01               	// sent: 1, side (highest bit) + track #, current sector #
+#define CMD_SECTOR_WRITTEN      0x02               	// sent: 2, side (highest bit) + track #, current sector #
 
 // commands sent from host to device
 #define CMD_WRITE_PROTECT_OFF		0x10
@@ -168,7 +166,7 @@ int main (void)
 	// init track and side vars for the floppy position
 	side					= 0;
 	track 				= 0;
-	sector				= 0;
+	sector				= 1;
 	prevSide			= 0;
 	outputsActive	= 0;
 
@@ -212,13 +210,13 @@ int main (void)
 				if(track > 0) {
 					track--;
 
-					addAttention(CMD_TRACK_CHANGED);
+					addAttention(CMD_SEND_NEXT_SECTOR);
 				}
 			} else {											// direction is Low? track++
 				if(track < 82) {
 					track++;
 
-					addAttention(CMD_TRACK_CHANGED);
+					addAttention(CMD_SEND_NEXT_SECTOR);
 				}
 			}
 
@@ -231,9 +229,9 @@ int main (void)
 
 		//------------
 		// update SIDE var
-		side = (inputs & SIDE1) ? 0 : 1;						// get the current SIDE
-		if(prevSide != side) {									// side changed?
-			addAttention(CMD_SEND_NEXT_SECTOR);					// we need another sector, this time from the right side!
+		side = (inputs & SIDE1) ? 0 : 1;					// get the current SIDE
+		if(prevSide != side) {										// side changed?
+			addAttention(CMD_SEND_NEXT_SECTOR);			// we need another sector, this time from the right side!
 			prevSide = side;
 		}
 
@@ -242,10 +240,18 @@ int main (void)
 		// if((TIM1->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
 		// TIM1->SR &= 0xfffe;							// clear UIF flag
 		{
+			int i;
+			
+			// create GAP1: 60 x 0x4e
+			for(i=0; i<30; i++) {				// add 30* two encoded 4e marks into 3 bytes (2* 0xA96)
+				inBuffer_add(0xa9);
+				inBuffer_add(0x6a);
+				inBuffer_add(0x96);
+			}
 
-			// TODO: TRACK started! init code needed
-			addAttention(CMD_TRACK_CHANGED);
-
+			sector = 1;
+			
+			addAttention(CMD_SEND_NEXT_SECTOR);
 		}
 	}
 }
