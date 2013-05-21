@@ -42,6 +42,7 @@ BYTE side, track, sector;
 #define CMD_WRITE_PROTECT_ON		0x20
 #define CMD_DISK_CHANGE_OFF			0x30
 #define CMD_DISK_CHANGE_ON			0x40
+#define CMD_CURRENT_SECTOR			0x50								// followed by sector #
 
 #define MFM_4US     1
 #define MFM_6US     2
@@ -307,6 +308,7 @@ void getNextMfmTime(void)
 					case CMD_WRITE_PROTECT_ON:		GPIOB->BRR	= WR_PROTECT;		break;			// WR PROTECT to 0
 					case CMD_DISK_CHANGE_OFF:			GPIOB->BSRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 1
 					case CMD_DISK_CHANGE_ON:			GPIOB->BRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 0
+					case CMD_CURRENT_SECTOR:			inBuffer_get(sector);				break;			// get the next byte, which is sector #, and store it in sector variable
 				}
 			} else {																																	// this wasn't a command, just store it
 				mfmByte = hostByte;
