@@ -12,11 +12,12 @@ void timerSetup_index(void)
   PrescalerValue = (uint16_t) (SystemCoreClock / 2000) - 1;			// prescale to 2000 Hz - 1 tick is 0.5 ms
 	
   // Time base configuration
-  TIM_TimeBaseStructure.TIM_Period				= period - 1;					// count of tick per period for 5 RPMs - 400 ticks (-1)
-  TIM_TimeBaseStructure.TIM_Prescaler			= PrescalerValue;
-  TIM_TimeBaseStructure.TIM_ClockDivision	= 0;
-  TIM_TimeBaseStructure.TIM_CounterMode		= TIM_CounterMode_Up;
-
+  TIM_TimeBaseStructure.TIM_Period						= period - 1;					// count of tick per period for 5 RPMs - 400 ticks (-1)
+  TIM_TimeBaseStructure.TIM_Prescaler					= PrescalerValue;
+  TIM_TimeBaseStructure.TIM_ClockDivision			= 0;
+  TIM_TimeBaseStructure.TIM_CounterMode				= TIM_CounterMode_Up;
+	TIM_TimeBaseStructure.TIM_RepetitionCounter	=	0;
+	
   TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
 
   // PWM1 Mode configuration: Channel1

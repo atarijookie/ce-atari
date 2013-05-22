@@ -21,6 +21,7 @@ TODO:
  - rozchodit generovanie MFM streamu - pwm?
  - zosekanie / prepisanie do asm kvoli stihaniu obsluhy SPI + MFM
  - doriesit nacitanie dalsieho byte ked sa robi processHostCommand()
+ - write support??
 */
 
 
@@ -56,10 +57,6 @@ BYTE side, track, sector;
 #define MFM_4US     1
 #define MFM_6US     2
 #define MFM_8US     3
-
-// - check a obnova rdata timeru musi zbehnut do 260 cyklov (tolko je pre 4 us) -- of jedneho po druhe volanie getNextMfmTime()
-//     -- trvania: d4, a9, bd, e0 -- bez SPI. Mozno pridat ten getNextMfmTime na viacere miesta na znizenie trvania checku.
-// - write support
 
 // set GPIOB as --- CNF1:0 -- 00 (push-pull output), MODE1:0 -- 11 (output 50 Mhz)
 #define 	FloppyOut_Enable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000333); FloppyIndex_Enable(); }
@@ -138,27 +135,24 @@ int main (void)
 
 	spi_init();																		// init SPI interface
 
-/*	
+/*
+FloppyOut_Enable();
+while(1) {
 		WORD val = TIM1->SR;
 		
 		if((val & 0x0001) == 0) {			// no overflow? continue
 			continue;
 		}
 		
-		TIM1->SR = val & 0xfffe;			// clear UIF flag
+		TIM1->SR = 0xfffe;			// clear UIF flag
 		
-//		if(TIM1->CNT == 0) {
-			
 		if(GPIOA->ODR & (1 << 10)) {
-			GPIOA->BSRR = (1 << 26);
+			GPIOA->BRR	= (1 << 10);
 		} else {
-			GPIOA->BSRR = (1 << 10);
+			GPIOA->BSRR	= (1 << 10);
 		}
-			
-//			while(TIM1->CNT == 0);
-//		}
 	}
-	*/
+*/
 
 	// init circular buffer for data incomming via SPI
 	inIndexAdd		= 0;
@@ -258,10 +252,9 @@ int main (void)
 
 		//------------
 		// check INDEX pulse as needed
-		// if((TIM1->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
-		// TIM1->SR &= 0xfffe;							// clear UIF flag
-		{
+		if((TIM1->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
 			int i;
+			TIM1->SR = 0xfffe;							// clear UIF flag
 			
 			// create GAP1: 60 x 0x4e
 			for(i=0; i<30; i++) {				// add 30* two encoded 4e marks into 3 bytes (2* 0xA96)
