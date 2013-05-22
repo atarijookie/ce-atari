@@ -16,7 +16,6 @@ void spi_TxRx(void);
 
 /*
 TODO:
- - rozchodit check na index timer overflow
  - rozchodit IDR cez button pre STEP
  - rozchodit generovanie MFM streamu - pwm?
  - zosekanie / prepisanie do asm kvoli stihaniu obsluhy SPI + MFM
@@ -75,27 +74,9 @@ BYTE side, track, sector;
 #define		outBuffer_get(X)				{ X = outBuffer[outIndexGet];				outIndexGet++;			outIndexGet		= outIndexGet & 0x7ff;	outCount--;	}
 #define		inBuffer_get(X)					{ X = inBuffer[inIndexGet];					inIndexGet++;				inIndexGet		= inIndexGet	& 0xfff;	inCount--;	}
 
-
-/*
-void TIM1_UP_IRQHandler (void) {
-
-  if ((TIM1->SR & 0x0001) != 0) {                 // check interrupt source
-
- 		if(GPIOA->ODR & (1 << 10)) {
-			GPIOA->BSRR = (1 << 26);
-		} else {
-			GPIOA->BSRR = (1 << 10);
-		}
-
-    TIM1->SR &= ~(1<<0);                          // clear UIF flag
- }
-}
-*/
-
 int main (void) 
 {
 	BYTE prevSide, outputsActive;
-// NVIC_InitTypeDef Init;
 	
   RCC->APB2ENR |= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     			// Enable SPI1, TIM1, GPIOA and GPIOB clock
 
@@ -126,14 +107,15 @@ int main (void)
 	timerSetup_index();
 	TIM_ITConfig(TIM1, TIM_IT_Update, ENABLE);
 
-/*
-//  Init.NVIC_IRQChannel = TIM1_IRQn;
-	Init.NVIC_IRQChannel = TIM1_UP_IRQn;
-	Init.NVIC_IRQChannelCmd = ENABLE;
-  NVIC_Init(&Init);
-*/
-
 	spi_init();																		// init SPI interface
+
+while(1) {
+	WORD ints = EXTI->PR;										// Pending register (EXTI_PR)
+			
+	if(ints & STEP) {										// if falling edge of STEP signal was found
+		EXTI->PR = STEP;									// clear that int
+	}
+}
 
 /*
 FloppyOut_Enable();
