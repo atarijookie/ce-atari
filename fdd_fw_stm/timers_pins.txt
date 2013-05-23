@@ -1,0 +1,38 @@
+PA0   TIM2_CH1_ETR
+PA1   TIM2_CH2
+PA2   TIM2_CH3
+PA3   TIM2_CH4
+                -- SPI1
+                -- SPI1
+                -- SPI1
+                -- SPI1
+
+PA8   TIM1_CH1
+PA9   TIM1_CH2  -- UART1
+PA10  TIM1_CH3  -- UART1
+PA11  TIM1_CH4
+PA12  TIM1_ETR
+                -- SWD
+                -- SWD
+
+PA15  TIM2_CH1_ETR
+
+
+PB0   TIM3_CH3
+PB1   TIM3_CH4
+
+PB3   TIM2_CH2
+PB4   TIM3_CH1
+PB5   TIM3_CH2
+
+PB10  TIM2_CH3
+PB11  TIM2_CH4
+
+PB12  TIM1_BKIN
+PB13  TIM1_CH1N
+PB14  TIM1_CH2N
+PB15  TIM1_CH3N
+
+
+
+

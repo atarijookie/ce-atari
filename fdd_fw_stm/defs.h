@@ -16,8 +16,11 @@ GPIOA_5 - SPI
 GPIOA_6 - SPI
 GPIOA_7 - SPI
 
-GPIOA_13 - SWD
-GPIOA_14 - SWD
+GPIOA_9  USART1_TX -- for bootloader
+GPIOA_10 USART1_RX -- for bootloader
+
+GPIOA_13 - SWD -- for debugging
+GPIOA_14 - SWD -- for debugging
 
 
 inputs:

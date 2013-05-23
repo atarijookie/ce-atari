@@ -97,8 +97,8 @@ int main (void)
 
 	RCC->APB2ENR |= (1 << 0);									// enable AFIO
 	AFIO->EXTICR[0] = 0x1000;									// EXTI3 -- source input: GPIOB_3
-	EXTI->IMR			= STEP;											// EXTO3 -- 1 means: Interrupt from line 3 not masked
-	EXTI->EMR			= STEP;											// EXTO3 -- 1 means: Event     form line 3 not masked
+	EXTI->IMR			= STEP;											// EXTI3 -- 1 means: Interrupt from line 3 not masked
+	EXTI->EMR			= STEP;											// EXTI3 -- 1 means: Event     form line 3 not masked
 	EXTI->FTSR 		= STEP;											// Falling trigger selection register - STEP pulse
 	
 
