@@ -58,13 +58,17 @@ BYTE side, track, sector;
 #define MFM_8US     3
 
 // set GPIOB as --- CNF1:0 -- 00 (push-pull output), MODE1:0 -- 11 (output 50 Mhz)
-#define 	FloppyOut_Enable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000333); FloppyIndex_Enable(); }
+#define 	FloppyOut_Enable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000333); FloppyIndex_Enable();	FloppyMFMread_Enable();		}
 // set GPIOB as --- CNF1:0 -- 01 (floating input), MODE1:0 -- 00 (input)
-#define 	FloppyOut_Disable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000444); FloppyIndex_Disable(); }
+#define 	FloppyOut_Disable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000444); FloppyIndex_Disable();	FloppyMFMread_Disable();	}
 
 // enable / disable TIM1 CH1 output on GPIOA_8
 #define		FloppyIndex_Enable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x0000000b); };
 #define		FloppyIndex_Disable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x00000004); };
+
+// enable / disable TIM2 CH4 output on GPIOB_11
+#define		FloppyMFMread_Enable()		{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x0000b000); };
+#define		FloppyMFMread_Disable()		{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x00004000); };
 
 // cyclic buffer add macros
 #define 	outBuffer_add(X)				{ outBuffer[outIndexAdd]	= X;			outIndexAdd++;			outIndexAdd		= outIndexAdd & 0x7ff; 	outCount++; }
@@ -101,12 +105,10 @@ int main (void)
 	EXTI->EMR			= STEP;											// EXTI3 -- 1 means: Event     form line 3 not masked
 	EXTI->FTSR 		= STEP;											// Falling trigger selection register - STEP pulse
 	
-
 	//----------
-
 	timerSetup_index();
-	TIM_ITConfig(TIM1, TIM_IT_Update, ENABLE);
-
+	timerSetup_mfm();
+	
 	spi_init();																		// init SPI interface
 
 while(1) {

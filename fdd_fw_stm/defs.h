@@ -11,13 +11,13 @@
 /*
 reserved:
 ---------
-GPIOA_4 - SPI
-GPIOA_5 - SPI
-GPIOA_6 - SPI
-GPIOA_7 - SPI
+GPIOA_4  - SPI
+GPIOA_5  - SPI
+GPIOA_6  - SPI
+GPIOA_7  - SPI
 
-GPIOA_9  USART1_TX -- for bootloader
-GPIOA_10 USART1_RX -- for bootloader
+GPIOA_9  - USART1_TX -- for bootloader
+GPIOA_10 - USART1_RX -- for bootloader
 
 GPIOA_13 - SWD -- for debugging
 GPIOA_14 - SWD -- for debugging
@@ -41,8 +41,7 @@ GPIOA_8  - INDEX (using TIM1_CH1)
 GPIOB_8  - WRITE_PROTECT
 GPIOB_9  - DISK_CHANGE
 GPIOB_10 - TRACK0
-
-PIO2_9  - RDATA
+GPIOB_11 - RDATA (using TIM2_CH4)
 GPIOB_15 - ATTENTION (need more data / data available to retrieve)
 */
 
@@ -58,12 +57,10 @@ GPIOB_15 - ATTENTION (need more data / data available to retrieve)
 #define	WR_PROTECT		(1 <<   8)
 #define	DISK_CHANGE		(1 <<   9)
 #define	TRACK0				(1 <<  10)
+#define	RDATA					(1 <<  11)
+
 
 #define	ATN						(1 <<  15)
-
-
-#define	RDATA					(1 <<  9)
-
 
 
 #endif /* DEFS_H_ */
