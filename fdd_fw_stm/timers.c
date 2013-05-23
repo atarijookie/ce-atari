@@ -56,7 +56,7 @@ void timerSetup_mfm(void)
 	TIM_TimeBaseStructure.TIM_RepetitionCounter	=	0;
 	
   TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
-
+	
   // PWM1 Mode configuration: Channel4
   TIM_OCInitStructure.TIM_OCMode			= TIM_OCMode_PWM1;
   TIM_OCInitStructure.TIM_OutputState	= TIM_OutputState_Enable;
@@ -66,12 +66,10 @@ void timerSetup_mfm(void)
   TIM_OC4Init(TIM2, &TIM_OCInitStructure);
   TIM_OC4PreloadConfig(TIM2, TIM_OCPreload_Enable);
 	
-  TIM_ARRPreloadConfig(TIM2, ENABLE);
+  TIM_ARRPreloadConfig(TIM2, DISABLE);							// disable preloading
 
   TIM_Cmd(TIM2, ENABLE);														// enable timer
 	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);				// inable int from this timer
-	
-	// TIM2->BDTR = 0x8000;				// set MOE bit (Main Output Enable) --- TIM2 doesn't have BDTR!
 }
 
 void TIM_TimeBaseInit(TIM_TypeDef* TIMx, TIM_TimeBaseInitTypeDef* TIM_TimeBaseInitStruct)

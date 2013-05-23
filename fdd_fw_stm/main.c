@@ -82,8 +82,9 @@ int main (void)
 {
 	BYTE prevSide, outputsActive;
 	
+	RCC->APB1ENR |= (1 << 0);																							// enable TIM2
   RCC->APB2ENR |= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     			// Enable SPI1, TIM1, GPIOA and GPIOB clock
-
+	
 	// set FLOATING INPUTs for GPIOB_0 ... 6
 	GPIOB->CRL &= ~(0x0fffffff);						// remove bits from GPIOB
 	GPIOB->CRL |=   0x04444444;							// set GPIOB as --- CNF1:0 -- 01 (floating input), MODE1:0 -- 00 (input), PxODR -- don't care
@@ -98,19 +99,20 @@ int main (void)
 	GPIOB->CRH &= ~(0xf0000000); 
 	GPIOB->CRH |=  (0x30000000);
 
-
 	RCC->APB2ENR |= (1 << 0);									// enable AFIO
 	AFIO->EXTICR[0] = 0x1000;									// EXTI3 -- source input: GPIOB_3
 	EXTI->IMR			= STEP;											// EXTI3 -- 1 means: Interrupt from line 3 not masked
 	EXTI->EMR			= STEP;											// EXTI3 -- 1 means: Event     form line 3 not masked
 	EXTI->FTSR 		= STEP;											// Falling trigger selection register - STEP pulse
-	
+
+	AFIO->MAPR |= 0x0300;											// TIM2_REMAP -- Full remap (CH1/ETR/PA15, CH2/PB3, CH3/PB10, CH4/PB11)
 	//----------
 	timerSetup_index();
 	timerSetup_mfm();
 	
 	spi_init();																		// init SPI interface
-
+	
+/*
 // test of EXTI for STEP handling
 while(1) {
 	WORD ints = EXTI->PR;										// Pending register (EXTI_PR)
@@ -119,39 +121,6 @@ while(1) {
 		EXTI->PR = STEP;									// clear that int
 	}
 }
-
-// test of MFM read stream and changes:
-// ARPE = 0 -- no preloading, immediate change
-// skontroluj ci TIMx->CR1 ma ARPE na 0!!!
-while(1) {
-	if((TIM2->SR & 0x0001) != 0) {		// overflow of TIM2 occured?
-			TIM2->SR = 0xfffe;						// clear UIF flag
-		
-		// use period-1
-		// TIMx->ARR = 7;								// 4 us
-		// TIMx->ARR = 11;							// 6 us
-		// TIMx->ARR = 15;							// 8 us
-	}
-
-}
-
-/*
-FloppyOut_Enable();
-while(1) {
-		WORD val = TIM1->SR;
-		
-		if((val & 0x0001) == 0) {			// no overflow? continue
-			continue;
-		}
-		
-		TIM1->SR = 0xfffe;			// clear UIF flag
-		
-		if(GPIOA->ODR & (1 << 10)) {
-			GPIOA->BRR	= (1 << 10);
-		} else {
-			GPIOA->BSRR	= (1 << 10);
-		}
-	}
 */
 
 	// init circular buffer for data incomming via SPI
@@ -274,7 +243,7 @@ void getNextMfmTime(void)
 	// 6 us = 432 cycles  (404 cycles)
 	// 8 us = 576 cycles  (548 cycles)
 
-	WORD mr0, mr1;
+	WORD arr;
 	
 	static BYTE gap[3] = {0xa9, 0x6a, 0x96};
 	static BYTE gapCnt = 0;
@@ -284,27 +253,23 @@ void getNextMfmTime(void)
 	mfmByte = mfmByte << 2;									// move the mfmByte to next position
 	mfmByteIndex++;
 
-	switch(time) {											// convert time code to timer match values
+	switch(time) {										// convert time code to timer match values
 	case MFM_8US:											// 8 us?
-		mr0 = 548;
-		mr1 = 576;
+		arr = 15;
 		break;
 
 	case MFM_6US:											// 6 us?
-		mr0 = 404;
-		mr1 = 432;
+		arr = 11;
 		break;
 
 	case MFM_4US:											// 4 us?
 	default:
-		mr0 = 260;
-		mr1 = 288;
+		arr = 7;
 		break;
 	}
 
-//	LPC_TMR16B1->MR0 = mr0;
-//	LPC_TMR16B1->MR1 = mr1;
-
+	TIM2->ARR = arr;
+	
 	if(mfmByteIndex == 4) {								// streamed all times from byte?
 		mfmByteIndex = 0;
 
