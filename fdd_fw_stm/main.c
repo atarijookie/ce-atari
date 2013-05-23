@@ -100,29 +100,22 @@ int main (void)
 	GPIOB->CRH |=  (0x30000000);
 
 	RCC->APB2ENR |= (1 << 0);									// enable AFIO
+	
 	AFIO->EXTICR[0] = 0x1000;									// EXTI3 -- source input: GPIOB_3
 	EXTI->IMR			= STEP;											// EXTI3 -- 1 means: Interrupt from line 3 not masked
 	EXTI->EMR			= STEP;											// EXTI3 -- 1 means: Event     form line 3 not masked
 	EXTI->FTSR 		= STEP;											// Falling trigger selection register - STEP pulse
-
+	
+	//----------
+	AFIO->MAPR |= (2 << 24);									// SWJ_CFG[2:0] (Bits 26:24) -- 010: JTAG-DP Disabled and SW-DP Enabled
 	AFIO->MAPR |= 0x0300;											// TIM2_REMAP -- Full remap (CH1/ETR/PA15, CH2/PB3, CH3/PB10, CH4/PB11)
+
 	//----------
 	timerSetup_index();
 	timerSetup_mfm();
 	
 	spi_init();																		// init SPI interface
 	
-/*
-// test of EXTI for STEP handling
-while(1) {
-	WORD ints = EXTI->PR;										// Pending register (EXTI_PR)
-			
-	if(ints & STEP) {										// if falling edge of STEP signal was found
-		EXTI->PR = STEP;									// clear that int
-	}
-}
-*/
-
 	// init circular buffer for data incomming via SPI
 	inIndexAdd		= 0;
 	inIndexGet		= 0;
