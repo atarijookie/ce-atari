@@ -111,12 +111,28 @@ int main (void)
 	
 	spi_init();																		// init SPI interface
 
+// test of EXTI for STEP handling
 while(1) {
 	WORD ints = EXTI->PR;										// Pending register (EXTI_PR)
 			
 	if(ints & STEP) {										// if falling edge of STEP signal was found
 		EXTI->PR = STEP;									// clear that int
 	}
+}
+
+// test of MFM read stream and changes:
+// ARPE = 0 -- no preloading, immediate change
+// skontroluj ci TIMx->CR1 ma ARPE na 0!!!
+while(1) {
+	if((TIM2->SR & 0x0001) != 0) {		// overflow of TIM2 occured?
+			TIM2->SR = 0xfffe;						// clear UIF flag
+		
+		// use period-1
+		// TIMx->ARR = 7;								// 4 us
+		// TIMx->ARR = 11;							// 6 us
+		// TIMx->ARR = 15;							// 8 us
+	}
+
 }
 
 /*
@@ -191,12 +207,9 @@ while(1) {
 			FloppyOut_Enable();										// set these as outputs
 			outputsActive = 1;
 		}
-
 		
-//		WORD tmr1Ints = LPC_TMR16B1->IR;						// read TMR16B1, which we to create MFM stream
-//		if(tmr1Ints & 2) {										// is MR1INT set? we streamed out one time
-		{
-//			LPC_TMR16B1->IR = 2;								// clear MR1INT
+		if((TIM2->SR & 0x0001) != 0) {			// overflow of TIM2 occured? we've streamed out one MFM symbol and need another!
+			TIM2->SR = 0xfffe;								// clear UIF flag
 			getNextMfmTime();									// get the next time from stream, set up TMR16B1
 		}
 

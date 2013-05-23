@@ -1,6 +1,6 @@
 Dependencies for Project 'fdd_fw2', Target 'CosmosEx': (DO NOT MODIFY !)
 F (.\startup_stm32f10x_ld.s)(0x517FA395)(--cpu Cortex-M3 --pd "__EVAL SETA 1" -g --apcs=interwork -I C:\Keil\ARM\RV31\INC -I C:\Keil\ARM\CMSIS\Include -I C:\Keil\ARM\Inc\ST\STM32F10x --list "startup_stm32f10x_ld.lst" --xref -o "startup_stm32f10x_ld.o" --depend "startup_stm32f10x_ld.d")
-F (.\main.c)(0x519E1834)(-c --cpu Cortex-M3 -D__EVAL -g -O0 --apcs=interwork -I C:\Keil\ARM\RV31\INC -I C:\Keil\ARM\CMSIS\Include -I C:\Keil\ARM\Inc\ST\STM32F10x -DSTM32F10X_LD -o "main.o" --omf_browse "main.crf" --depend "main.d")
+F (.\main.c)(0x519E1E34)(-c --cpu Cortex-M3 -D__EVAL -g -O0 --apcs=interwork -I C:\Keil\ARM\RV31\INC -I C:\Keil\ARM\CMSIS\Include -I C:\Keil\ARM\Inc\ST\STM32F10x -DSTM32F10X_LD -o "main.o" --omf_browse "main.crf" --depend "main.d")
 I (C:\Keil\ARM\Inc\ST\STM32F10x\stm32f10x.h)(0x51824C86)
 I (C:\Keil\ARM\CMSIS\Include\core_cm3.h)(0x5087AFDE)
 I (C:\Keil\ARM\ARMCC\bin\..\include\stdint.h)(0x50F9C3C0)
