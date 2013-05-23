@@ -16,8 +16,8 @@ void spi_TxRx(void);
 
 /*
 TODO:
- - rozchodit IDR cez button pre STEP
- - rozchodit generovanie MFM streamu - pwm?
+ - pomeranie kolko trvaju jednotlive casti kodu
+ - DMA timer, DMA SPI
  - zosekanie / prepisanie do asm kvoli stihaniu obsluhy SPI + MFM
  - doriesit nacitanie dalsieho byte ked sa robi processHostCommand()
  - write support??
