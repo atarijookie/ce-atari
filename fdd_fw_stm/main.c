@@ -9,6 +9,8 @@
 #include "timers.h"
 
 void getNextMfmTime(void);
+void fillMfmTimesForDMA(void);
+
 void addAttention(BYTE atn);
 void processHostCommand(BYTE hostByte);
 
@@ -145,15 +147,15 @@ int main (void)
 	
 	mfmStreamBuffer[15] = 7;
 	
-	// DMA1 channel2
+	// DMA1 channel2 test
 	while(1) {
 		if((DMA1->ISR & (1 << 6)) == 1) {			// HTIF2 -- Half Transfer IF 2
-			DMA1->IFCR = (1 << 6);								// clear HTIF2 flag
+			DMA1->IFCR = (1 << 6);							// clear HTIF2 flag
 			
 		}
 
 		if((DMA1->ISR & (1 << 5)) == 1) {			// TCIF2 -- Transfer Complete IF 2
-			DMA1->IFCR = (1 << 5);								// clear TCIF2 flag
+			DMA1->IFCR = (1 << 5);							// clear TCIF2 flag
 			
 		}
 		
@@ -344,6 +346,51 @@ void getNextMfmTime(void)
 			}
 		}
 	}
+}
+
+void fillMfmTimesForDMA(void)
+{
+	WORD ind = 0xff;
+
+	// code to ARR value:      ??, 4us, 6us, 8us
+	static WORD mfmTimes[4] = { 7,   7,  11,  15};
+	static BYTE gap[3] = {0xa9, 0x6a, 0x96};
+	static BYTE gapCnt = 0;
+	BYTE times4, time, i;
+	
+	// check for half transfer or transfer complete IF
+	if((DMA1->ISR & (1 << 6)) == 1) {						// HTIF2 -- Half Transfer IF 2
+		DMA1->IFCR = (1 << 6);										// clear HTIF2 flag
+		ind = 0;
+	} else if((DMA1->ISR & (1 << 5)) == 1) {		// TCIF2 -- Transfer Complete IF 2
+		DMA1->IFCR = (1 << 5);										// clear TCIF2 flag
+		ind = 8;
+	}
+	
+	if(ind == 0xff) {														// no IF found? this shouldn't happen! did you come here without a reason?
+		return;
+	}
+
+
+	
+	// TODO: get stuff to stream into times4 
+	
+	
+	
+
+	for(i=0; i<4; i++) {													// convert all 4 codes to ARR values
+		time		= times4 >> 6;											// get bits 7,6 (and then 5,4; and 3,2; and 1,0) 
+		time		= mfmTimes[time];										// convert to ARR value
+		times4	= times4 << 2;											// shift 2 bits higher so we would get lower bits next time
+
+		mfmStreamBuffer[ind] = time;								// store and move to next one
+		ind++;
+	}
+	
+	
+	// TODO: do the same for the the next times4
+	
+	
 }
 
 void processHostCommand(BYTE hostByte)
