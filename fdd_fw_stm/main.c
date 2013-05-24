@@ -1,6 +1,7 @@
 #include "stm32f10x.h"                       /* STM32F103 definitions         */
 #include "stm32f10x_spi.h"
 #include "stm32f10x_tim.h"
+#include "stm32f10x_dma.h"
 
 #include "misc.h"
 
@@ -13,6 +14,8 @@ void processHostCommand(BYTE hostByte);
 
 void spi_init(void);
 void spi_TxRx(void);
+
+void dma_mfm_init(void);
 
 /*
 TODO:
@@ -42,6 +45,7 @@ BYTE mfmByte, mfmByteIndex;
 
 BYTE side, track, sector;
 
+WORD mfmStreamBuffer[16];							// 16 words - 16 mfm times. Half of buffer is 8 times - at least 32 us (8 * 4us), 
 
 // cycle measure: t1 = TIM3->CNT;	t2 = TIM3->CNT;	dt = t2 - t1; -- subtrack 0x12 because that's how much measuring takes
 WORD t1, t2, dt; 
@@ -120,11 +124,41 @@ int main (void)
 
 	//----------
 	timerSetup_index();
-	timerSetup_mfm();
 	
 	timerSetup_measure();
 	
 	spi_init();																		// init SPI interface
+
+	//--------------
+	// configure MFM read stream by TIM2 CH4 and DMA in circular mode
+	timerSetup_mfm();
+	dma_mfm_init();
+	
+	// test of TIMer + DMA, 0, 3, 6, 9, 12,
+	FloppyOut_Enable();
+	
+	for(dt=0; dt<13; dt += 3) {	// 4us, 6 us, 8 us
+		mfmStreamBuffer[dt  ] =  7;					
+		mfmStreamBuffer[dt+1] = 11;
+		mfmStreamBuffer[dt+2] = 15;
+	}
+	
+	mfmStreamBuffer[15] = 7;
+	
+	// DMA1 channel2
+	while(1) {
+		if((DMA1->ISR & (1 << 6)) == 1) {			// HTIF2 -- Half Transfer IF 2
+			DMA1->IFCR = (1 << 6);								// clear HTIF2 flag
+			
+		}
+
+		if((DMA1->ISR & (1 << 5)) == 1) {			// TCIF2 -- Transfer Complete IF 2
+			DMA1->IFCR = (1 << 5);								// clear TCIF2 flag
+			
+		}
+		
+	}
+	//--------------
 	
 	// init circular buffer for data incomming via SPI
 	inIndexAdd		= 0;
@@ -381,4 +415,32 @@ void spi_TxRx(void)
 		inBuffer_add(data >> 8);
 		inBuffer_add(data & 0xff);
 	}
+}
+
+void dma_mfm_init(void)
+{
+	DMA_InitTypeDef DMA_InitStructure;
+	
+	// DMA1 channel2 configuration -- TIM2_UP (update)
+  DMA_DeInit(DMA1_Channel2);
+	
+  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) mfmStreamBuffer;				// from this buffer located in memory
+  DMA_InitStructure.DMA_PeripheralBaseAddr	= (uint32_t) &(TIM2->DMAR);					// to this peripheral address
+  DMA_InitStructure.DMA_DIR									= DMA_DIR_PeripheralDST;						// dir: from mem to periph
+  DMA_InitStructure.DMA_BufferSize					= 16;																// 16 datas to transfer
+  DMA_InitStructure.DMA_PeripheralInc				= DMA_PeripheralInc_Disable;				// PINC = 0 -- don't icrement, always write to DMAR register
+  DMA_InitStructure.DMA_MemoryInc						= DMA_MemoryInc_Enable;							// MINC = 1 -- increment in memory -- go though buffer
+  DMA_InitStructure.DMA_PeripheralDataSize	= DMA_PeripheralDataSize_HalfWord;	// each data item: 16 bits 
+  DMA_InitStructure.DMA_MemoryDataSize			= DMA_MemoryDataSize_HalfWord;			// each data item: 16 bits 
+  DMA_InitStructure.DMA_Mode								= DMA_Mode_Circular;								// circular mode
+  DMA_InitStructure.DMA_Priority						= DMA_Priority_Medium;
+  DMA_InitStructure.DMA_M2M									= DMA_M2M_Disable;									// M2M disabled, because we move to peripheral
+  DMA_Init(DMA1_Channel2, &DMA_InitStructure);
+
+  // Enable DMA1 Channel2 Transfer Complete interrupt
+  DMA_ITConfig(DMA1_Channel2, DMA_IT_HT, ENABLE);			// interrupt on Half Transfer (HT)
+  DMA_ITConfig(DMA1_Channel2, DMA_IT_TC, ENABLE);			// interrupt on Transfer Complete (TC)
+
+  // Enable DMA1 Channel2 transfer
+  DMA_Cmd(DMA1_Channel2, ENABLE);
 }

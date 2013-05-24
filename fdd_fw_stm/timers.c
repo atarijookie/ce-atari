@@ -68,8 +68,16 @@ void timerSetup_mfm(void)
 	
   TIM_ARRPreloadConfig(TIM2, DISABLE);							// disable preloading
 
+	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);				// enable int from this timer
+
+	// set TIM2 DMA control register (TIMx_DCR) as: DBL (<<8) =0 (1 transfer), DBA (<<0) =11 (0x2C TIMx_ARR)
+	TIM2->DCR = 11;
+
+	// reference manual on page 407 says only UDE
+	TIM_ITConfig(TIM2, (1 <<  8), ENABLE);						// enable Bit  8 - UDE: Update DMA request enable
+//	TIM_ITConfig(TIM2, (1 << 14), ENABLE);						// enable Bit 14 - TDE: Trigger DMA request enable
+
   TIM_Cmd(TIM2, ENABLE);														// enable timer
-	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);				// inable int from this timer
 }
 
 void timerSetup_measure(void)
