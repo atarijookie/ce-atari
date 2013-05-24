@@ -42,6 +42,11 @@ BYTE mfmByte, mfmByteIndex;
 
 BYTE side, track, sector;
 
+
+// cycle measure: t1 = TIM3->CNT;	t2 = TIM3->CNT;	dt = t2 - t1; -- subtrack 0x12 because that's how much measuring takes
+WORD t1, t2, dt; 
+
+
 // commands sent from device to host
 #define CMD_SEND_NEXT_SECTOR    0x01               	// sent: 1, side (highest bit) + track #, current sector #
 #define CMD_SECTOR_WRITTEN      0x02               	// sent: 2, side (highest bit) + track #, current sector #
@@ -70,6 +75,8 @@ BYTE side, track, sector;
 #define		FloppyMFMread_Enable()		{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x0000b000); };
 #define		FloppyMFMread_Disable()		{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x00004000); };
 
+//--------------
+// watch out, these macros take 0.73 us for _add, and 0.83 us for _get operation!
 // cyclic buffer add macros
 #define 	outBuffer_add(X)				{ outBuffer[outIndexAdd]	= X;			outIndexAdd++;			outIndexAdd		= outIndexAdd & 0x7ff; 	outCount++; }
 #define 	inBuffer_add(X)					{ inBuffer [inIndexAdd]		= X;			inIndexAdd++;				inIndexAdd		= inIndexAdd  & 0xfff;	inCount++;	}
@@ -77,12 +84,13 @@ BYTE side, track, sector;
 // cyclic buffer get macros
 #define		outBuffer_get(X)				{ X = outBuffer[outIndexGet];				outIndexGet++;			outIndexGet		= outIndexGet & 0x7ff;	outCount--;	}
 #define		inBuffer_get(X)					{ X = inBuffer[inIndexGet];					inIndexGet++;				inIndexGet		= inIndexGet	& 0xfff;	inCount--;	}
+//--------------
 
 int main (void) 
 {
 	BYTE prevSide, outputsActive;
 	
-	RCC->APB1ENR |= (1 << 0);																							// enable TIM2
+	RCC->APB1ENR |= (1 <<  1) | (1 <<  0);																// enable TIM3, TIM2
   RCC->APB2ENR |= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     			// Enable SPI1, TIM1, GPIOA and GPIOB clock
 	
 	// set FLOATING INPUTs for GPIOB_0 ... 6
@@ -114,6 +122,8 @@ int main (void)
 	timerSetup_index();
 	timerSetup_mfm();
 	
+	timerSetup_measure();
+	
 	spi_init();																		// init SPI interface
 	
 	// init circular buffer for data incomming via SPI
@@ -140,13 +150,15 @@ int main (void)
 	GPIOB->BSRR = (WR_PROTECT | DISK_CHANGE);			// not write protected, not changing disk (ready!)
 	GPIOB->BRR = TRACK0;													// TRACK 0 signal to L			
 
+	// whole loop without INDEX and MOTOR_ENABLE checking: 2.8 us (other bits), 3.7 us (when fetching new mfm byte)
 	while(1) {
 		WORD ints;
 		WORD inputs = GPIOB->IDR;								// read floppy inputs
 
 		spi_TxRx();															// every 1 us might a SPI WORD be received! (16 MHz SPI clock)
-
-		if((inputs & (MOTOR_ENABLE | DRIVE_SELECT)) != 0) {		// motor not enabled, drive not selected? do nothing
+		
+//		if((inputs & (MOTOR_ENABLE | DRIVE_SELECT)) != 0) {		// motor not enabled, drive not selected? do nothing
+		if(0) {
 			if(outputsActive == 1) {							// if we got outputs active
 				FloppyOut_Disable();								// all pins as inputs, drive not selected
 				outputsActive = 0;
@@ -170,11 +182,20 @@ int main (void)
 			outputsActive = 1;
 		}
 		
-		if((TIM2->SR & 0x0001) != 0) {			// overflow of TIM2 occured? we've streamed out one MFM symbol and need another!
-			TIM2->SR = 0xfffe;								// clear UIF flag
-			getNextMfmTime();									// get the next time from stream, set up TMR16B1
+		if((inputs & WGATE) == 0) {							// when write gate is low, the data is written to floppy
+			// TODO: do write support here!
+			
+			
+			
 		}
 
+		if((TIM2->SR & 0x0001) != 0) {			// overflow of TIM2 occured? we've streamed out one MFM symbol and need another!
+			TIM2->SR = 0xfffe;								// clear UIF flag
+
+			 // 2.1 us (fetching new byte), 1.2 us (other bytes)
+			getNextMfmTime();									// get the next time from stream, set up TMR16B1
+		}
+		
 		// check for STEP pulse - should we go to a different track?
 		ints = EXTI->PR;										// Pending register (EXTI_PR)
 		if(ints & STEP) {										// if falling edge of STEP signal was found
@@ -210,8 +231,9 @@ int main (void)
 		}
 
 		//------------
-		// check INDEX pulse as needed
-		if((TIM1->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
+		// check INDEX pulse as needed -- duration when filling with marks: 69.8 us
+// 	if((TIM1->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
+		if(0) {
 			int i;
 			TIM1->SR = 0xfffe;							// clear UIF flag
 			
@@ -229,6 +251,7 @@ int main (void)
 	}
 }
 
+// duration of getNextMfmTime - 1.14 us (other bits), 2.33 us (when fetching new byte)
 void getNextMfmTime(void)
 {
 	// 0.4 us = 28 cycles (pulse low width)

@@ -72,6 +72,24 @@ void timerSetup_mfm(void)
 	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);				// inable int from this timer
 }
 
+void timerSetup_measure(void)
+{
+	TIM_TimeBaseInitTypeDef		TIM_TimeBaseStructure;
+	TIM_OCInitTypeDef					TIM_OCInitStructure;
+
+  // Time base configuration
+  TIM_TimeBaseStructure.TIM_Period						= 65500;					
+  TIM_TimeBaseStructure.TIM_Prescaler					= 0;
+  TIM_TimeBaseStructure.TIM_ClockDivision			= 0;
+  TIM_TimeBaseStructure.TIM_CounterMode				= TIM_CounterMode_Up;
+	TIM_TimeBaseStructure.TIM_RepetitionCounter	=	0;
+	
+  TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
+  TIM_ARRPreloadConfig(TIM3, DISABLE);							// disable preloading
+
+  TIM_Cmd(TIM3, ENABLE);														// enable timer
+}
+
 void TIM_TimeBaseInit(TIM_TypeDef* TIMx, TIM_TimeBaseInitTypeDef* TIM_TimeBaseInitStruct)
 {
   uint16_t tmpcr1 = 0;
