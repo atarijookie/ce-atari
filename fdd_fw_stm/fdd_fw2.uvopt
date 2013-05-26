@@ -145,7 +145,7 @@
         <SetRegEntry>
           <Number>0</Number>
           <Key>DLGTARM</Key>
-          <Name>(1010=-1,-1,-1,-1,0)(1007=-1,-1,-1,-1,0)(1008=90,117,456,339,0)(1009=-1,-1,-1,-1,0)(100=804,121,1440,780,0)(110=-1,-1,-1,-1,0)(111=1230,329,1440,775,0)(1011=-1,-1,-1,-1,0)(180=-1,-1,-1,-1,0)(120=925,141,1336,532,0)(121=354,328,765,719,0)(122=-1,-1,-1,-1,0)(123=-1,-1,-1,-1,0)(140=-1,-1,-1,-1,0)(240=-1,-1,-1,-1,0)(190=-1,-1,-1,-1,0)(200=-1,-1,-1,-1,0)(170=-1,-1,-1,-1,0)(130=731,170,1315,850,0)(131=762,144,1346,824,0)(132=-1,-1,-1,-1,0)(160=-1,-1,-1,-1,0)(161=-1,-1,-1,-1,0)(210=-1,-1,-1,-1,0)(220=-1,-1,-1,-1,0)(230=-1,-1,-1,-1,0)(231=-1,-1,-1,-1,0)(232=-1,-1,-1,-1,0)(233=-1,-1,-1,-1,0)(150=-1,-1,-1,-1,0)(151=-1,-1,-1,-1,0)</Name>
+          <Name>(1010=-1,-1,-1,-1,0)(1007=105,133,282,394,0)(1008=90,117,456,339,0)(1009=120,149,354,683,0)(100=804,121,1440,780,0)(110=-1,-1,-1,-1,0)(111=1230,329,1440,775,0)(1011=747,309,1271,656,0)(180=120,149,405,432,0)(120=925,141,1336,532,0)(121=354,328,765,719,0)(122=-1,-1,-1,-1,0)(123=-1,-1,-1,-1,0)(140=-1,-1,-1,-1,0)(240=105,133,494,464,0)(190=-1,-1,-1,-1,0)(200=-1,-1,-1,-1,0)(170=-1,-1,-1,-1,0)(130=731,170,1315,850,0)(131=762,144,1346,824,0)(132=150,182,734,862,0)(160=-1,-1,-1,-1,0)(161=-1,-1,-1,-1,0)(210=-1,-1,-1,-1,0)(220=-1,-1,-1,-1,0)(230=-1,-1,-1,-1,0)(231=-1,-1,-1,-1,0)(232=-1,-1,-1,-1,0)(233=-1,-1,-1,-1,0)(150=-1,-1,-1,-1,0)(151=-1,-1,-1,-1,0)</Name>
         </SetRegEntry>
         <SetRegEntry>
           <Number>0</Number>
@@ -172,7 +172,7 @@
         <Bp>
           <Number>0</Number>
           <Type>0</Type>
-          <LineNumber>118</LineNumber>
+          <LineNumber>140</LineNumber>
           <EnabledFlag>1</EnabledFlag>
           <Address>0</Address>
           <ByteObject>0</ByteObject>
@@ -255,10 +255,10 @@
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <Focus>0</Focus>
-      <ColumnNumber>5</ColumnNumber>
+      <ColumnNumber>0</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>197</TopLine>
-      <CurrentLine>229</CurrentLine>
+      <TopLine>135</TopLine>
+      <CurrentLine>143</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\main.c</PathWithFileName>
       <FilenameWithoutPath>main.c</FilenameWithoutPath>
@@ -321,7 +321,7 @@
       <Focus>0</Focus>
       <ColumnNumber>0</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>31</TopLine>
+      <TopLine>65</TopLine>
       <CurrentLine>73</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\timers.c</PathWithFileName>
@@ -406,6 +406,38 @@
       <bDave2>0</bDave2>
       <PathWithFileName>.\misc.h</PathWithFileName>
       <FilenameWithoutPath>misc.h</FilenameWithoutPath>
+      <RteFlg>0</RteFlg>
+      <bShared>0</bShared>
+    </File>
+    <File>
+      <GroupNumber>1</GroupNumber>
+      <FileNumber>12</FileNumber>
+      <FileType>1</FileType>
+      <tvExp>0</tvExp>
+      <Focus>0</Focus>
+      <ColumnNumber>12</ColumnNumber>
+      <tvExpOptDlg>0</tvExpOptDlg>
+      <TopLine>180</TopLine>
+      <CurrentLine>227</CurrentLine>
+      <bDave2>0</bDave2>
+      <PathWithFileName>.\stm32f10x_dma.c</PathWithFileName>
+      <FilenameWithoutPath>stm32f10x_dma.c</FilenameWithoutPath>
+      <RteFlg>0</RteFlg>
+      <bShared>0</bShared>
+    </File>
+    <File>
+      <GroupNumber>1</GroupNumber>
+      <FileNumber>13</FileNumber>
+      <FileType>5</FileType>
+      <tvExp>0</tvExp>
+      <Focus>0</Focus>
+      <ColumnNumber>0</ColumnNumber>
+      <tvExpOptDlg>0</tvExpOptDlg>
+      <TopLine>0</TopLine>
+      <CurrentLine>0</CurrentLine>
+      <bDave2>0</bDave2>
+      <PathWithFileName>.\stm32f10x_dma.h</PathWithFileName>
+      <FilenameWithoutPath>stm32f10x_dma.h</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
     </File>

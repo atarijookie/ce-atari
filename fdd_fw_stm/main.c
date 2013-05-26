@@ -94,10 +94,11 @@ WORD t1, t2, dt;
 
 int main (void) 
 {
-	BYTE prevSide, outputsActive;
+	BYTE prevSide, outputsActive, i;
 	
-	RCC->APB1ENR |= (1 <<  1) | (1 <<  0);																// enable TIM3, TIM2
-  RCC->APB2ENR |= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     			// Enable SPI1, TIM1, GPIOA and GPIOB clock
+	RCC->AHBENR		|= (1 <<  0);																						// enable DMA1
+	RCC->APB1ENR	|= (1 <<  1) | (1 <<  0);																// enable TIM3, TIM2
+  RCC->APB2ENR	|= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     		// Enable SPI1, TIM1, GPIOA and GPIOB clock
 	
 	// set FLOATING INPUTs for GPIOB_0 ... 6
 	GPIOB->CRL &= ~(0x0fffffff);						// remove bits from GPIOB
@@ -133,33 +134,29 @@ int main (void)
 
 	//--------------
 	// configure MFM read stream by TIM2 CH4 and DMA in circular mode
-	timerSetup_mfm();
-	dma_mfm_init();
-	
-	// test of TIMer + DMA, 0, 3, 6, 9, 12,
-	FloppyOut_Enable();
-	
-	for(dt=0; dt<13; dt += 3) {	// 4us, 6 us, 8 us
-		mfmStreamBuffer[dt  ] =  7;					
-		mfmStreamBuffer[dt+1] = 11;
-		mfmStreamBuffer[dt+2] = 15;
+	// WARNING!!! Never let mfmStreamBuffer[] contain a 0! With 0 the timer update never comes and streaming stops!
+	for(i=0; i<16; i++) {
+		mfmStreamBuffer[i] = 7;				// by default -- all pulses 4 us
 	}
 	
-	mfmStreamBuffer[15] = 7;
-	
+	timerSetup_mfm();
+	dma_mfm_init();
+
+/*	
 	// DMA1 channel2 test
 	while(1) {
-		if((DMA1->ISR & (1 << 6)) == 1) {			// HTIF2 -- Half Transfer IF 2
+		if((DMA1->ISR & (1 << 6)) != 0) {			// HTIF2 -- Half Transfer IF 2
 			DMA1->IFCR = (1 << 6);							// clear HTIF2 flag
 			
 		}
 
-		if((DMA1->ISR & (1 << 5)) == 1) {			// TCIF2 -- Transfer Complete IF 2
+		if((DMA1->ISR & (1 << 5)) != 0) {			// TCIF2 -- Transfer Complete IF 2
 			DMA1->IFCR = (1 << 5);							// clear TCIF2 flag
 			
 		}
 		
 	}
+*/
 	//--------------
 	
 	// init circular buffer for data incomming via SPI

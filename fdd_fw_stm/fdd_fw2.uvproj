@@ -503,6 +503,16 @@
               <FileType>5</FileType>
               <FilePath>.\misc.h</FilePath>
             </File>
+            <File>
+              <FileName>stm32f10x_dma.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\stm32f10x_dma.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f10x_dma.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\stm32f10x_dma.h</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>

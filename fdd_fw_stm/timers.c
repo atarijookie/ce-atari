@@ -75,7 +75,6 @@ void timerSetup_mfm(void)
 
 	// reference manual on page 407 says only UDE
 	TIM_ITConfig(TIM2, (1 <<  8), ENABLE);						// enable Bit  8 - UDE: Update DMA request enable
-//	TIM_ITConfig(TIM2, (1 << 14), ENABLE);						// enable Bit 14 - TDE: Trigger DMA request enable
 
   TIM_Cmd(TIM2, ENABLE);														// enable timer
 }
@@ -83,7 +82,6 @@ void timerSetup_mfm(void)
 void timerSetup_measure(void)
 {
 	TIM_TimeBaseInitTypeDef		TIM_TimeBaseStructure;
-	TIM_OCInitTypeDef					TIM_OCInitStructure;
 
   // Time base configuration
   TIM_TimeBaseStructure.TIM_Period						= 65500;					
