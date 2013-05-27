@@ -22,10 +22,9 @@ void dma_mfm_init(void);
 /*
 TODO:
  - get current FW version 
+ - replace generating of GAP 0x4e bytes after index pulse
+ - DMA SPI
  - pomeranie kolko trvaju jednotlive casti kodu
- - DMA timer, DMA SPI
- - zosekanie / prepisanie do asm kvoli stihaniu obsluhy SPI + MFM
- - doriesit nacitanie dalsieho byte ked sa robi processHostCommand()
  - write support??
 */
 
