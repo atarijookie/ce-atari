@@ -45,8 +45,6 @@ WORD inIndexAdd, inIndexGet, inCount;
 BYTE outBuffer[2048];
 WORD outIndexAdd, outIndexGet, outCount;
 
-BYTE mfmByte, mfmByteIndex;
-
 BYTE side, track, sector;
 
 WORD mfmStreamBuffer[16];							// 16 words - 16 mfm times. Half of buffer is 8 times - at least 32 us (8 * 4us), 
@@ -58,6 +56,7 @@ WORD t1, t2, dt;
 // commands sent from device to host
 #define CMD_SEND_NEXT_SECTOR    0x01               	// sent: 1, side (highest bit) + track #, current sector #
 #define CMD_SECTOR_WRITTEN      0x02               	// sent: 2, side (highest bit) + track #, current sector #
+#define CMD_FW_VERSION					0x03								// followed by string with FW version
 
 // commands sent from host to device
 #define CMD_WRITE_PROTECT_OFF		0x10
@@ -88,14 +87,15 @@ WORD t1, t2, dt;
 // watch out, these macros take 0.73 us for _add, and 0.83 us for _get operation!
 // cyclic buffer add macros
 #define 	outBuffer_add(X)				{ outBuffer[outIndexAdd]	= X;			outIndexAdd++;			outIndexAdd		= outIndexAdd & 0x7ff; 	outCount++; }
-#define 	inBuffer_add(X)					{ inBuffer [inIndexAdd]		= X;			inIndexAdd++;				inIndexAdd		= inIndexAdd  & 0xfff;	inCount++;	}
+//#define 	inBuffer_add(X)					{ inBuffer [inIndexAdd]		= X;			inIndexAdd++;				inIndexAdd		= inIndexAdd  & 0xfff;	inCount++;	}
 
 // cyclic buffer get macros
-#define		outBuffer_get(X)				{ X = outBuffer[outIndexGet];				outIndexGet++;			outIndexGet		= outIndexGet & 0x7ff;	outCount--;	}
+//#define		outBuffer_get(X)				{ X = outBuffer[outIndexGet];				outIndexGet++;			outIndexGet		= outIndexGet & 0x7ff;	outCount--;	}
 #define		inBuffer_get(X)					{ X = inBuffer[inIndexGet];					inIndexGet++;				inIndexGet		= inIndexGet	& 0xfff;	inCount--;	}
 //--------------
 
-BYTE version[16] = "Franz 2013-05-27";
+#define VERSION_LENGTH	16
+char *version = "Franz 2013-05-27";
 
 int main (void) 
 {
@@ -190,14 +190,17 @@ int main (void)
 		if(0) {
 			int i;
 			TIM1->SR = 0xfffe;							// clear UIF flag
-			
+	
+// TODO: remake this			
+/*			
 			// create GAP1: 60 x 0x4e
 			for(i=0; i<30; i++) {				// add 30* two encoded 4e marks into 3 bytes (2* 0xA96)
+				
 				inBuffer_add(0xa9);
 				inBuffer_add(0x6a);
 				inBuffer_add(0x96);
 			}
-
+*/
 			sector = 1;
 			
 			addAttention(CMD_SEND_NEXT_SECTOR);
@@ -265,9 +268,6 @@ void init_hw_sw(void)
 	outIndexAdd		= 0;
 	outIndexGet		= 0;
 	outCount			= 0;
-
-	mfmByte				= 0;
-	mfmByteIndex	= 0;
 
 	// init track and side vars for the floppy position
 	side					= 0;
@@ -348,15 +348,18 @@ void processHostCommand(BYTE hostByte)
 		case CMD_DISK_CHANGE_OFF:			GPIOB->BSRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 1
 		case CMD_DISK_CHANGE_ON:			GPIOB->BRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 0
 		
-		case CMD_GET_FW_VERSION:
+		case CMD_GET_FW_VERSION:							// send FW version string
+		{
+			BYTE i;
+			outBuffer_add(CMD_FW_VERSION);			// command
+		
+			for(i=0; i<VERSION_LENGTH; i++) {		// version string
+				outBuffer_add(version[i]);
+			}	 
 			
-		
-		
-		// TODO: add handler!
-		
-		
-		
+			outBuffer_add(0);										// terminating zero
 			break;
+		}
 		
 		case CMD_CURRENT_SECTOR:								// get the next byte, which is sector #, and store it in sector variable
 			inBuffer_get(sector);				
@@ -402,8 +405,10 @@ void spi_TxRx(void)
 	if(status & (1 << 1)) {									// TXE flag: Tx buffer empty
 		if(outCount >= 2) {										// something to send? good
 			WORD hi, lo;
+/*			
 			outBuffer_get(hi);									// get from outbuffer twice
 			outBuffer_get(lo);
+*/			
 			hi = (hi << 8) | lo;								// combine bytes into word
 			
 			SPI1->DR = hi;											// send over SPI
@@ -416,8 +421,10 @@ void spi_TxRx(void)
 	
 	if(status & (1 << 0)) {									// RXNE flag: Rx buffer not empty
 		WORD data = SPI1->DR;									// get data
+/*		
 		inBuffer_add(data >> 8);
 		inBuffer_add(data & 0xff);
+*/		
 	}
 }
 
