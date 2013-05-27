@@ -20,10 +20,28 @@ void spi_init(void);
 void spi_TxRx(void);
 
 void dma_mfm_init(void);
+void dma_spi_init(void);
+
+/*
+DMA1_CH2 -- SPI1_RX + TIM2_UP
+DMA1_CH3 -- SPI1_TX + TIM3_UP
+DMA1_CH5 -- TIM1_UP
+
+teraz: 
+INDEX (using TIM1_CH1)  -- ziadne ovladanie
+RDATA (using TIM2_CH4)  -- DMA
+
+presun:
+RDATA: TIM2 -> TIM1, potom pouzijem DMA1_CH5
+INDEX: TIM1 -> TIM2, ziadne ovladanie
+
+potom pouzitie DMA na SPI:
+SPI1_TX -- DMA1_CH3
+SPI1_RX -- DMA1_CH2
+*/
 
 /*
 TODO:
- - get current FW version 
  - replace generating of GAP 0x4e bytes after index pulse
  - DMA SPI
  - pomeranie kolko trvaju jednotlive casti kodu
@@ -119,15 +137,15 @@ int main (void)
 			if(outputsActive == 1) {							// if we got outputs active
 				FloppyOut_Disable();								// all pins as inputs, drive not selected
 				outputsActive = 0;
-				
-				// now that the floppy is disabled, drop the data from inBuffer, but process the host commands
-				while(inCount > 0) {								// something in the buffer?
-					BYTE hostByte;
-					inBuffer_get(hostByte);						// get byte from host buffer
+			}
 
-					if((hostByte & 0x0f) == 0) {			// lower nibble == 0? it's a command from host, process it; otherwise drop it
-						processHostCommand(hostByte);
-					}
+			// with the floppy disabled, drop the data from inBuffer, but process the host commands
+			while(inCount > 0) {								// something in the buffer?
+				BYTE hostByte;
+				inBuffer_get(hostByte);						// get byte from host buffer
+
+				if((hostByte & 0x0f) == 0) {			// lower nibble == 0? it's a command from host, process it; otherwise drop it
+					processHostCommand(hostByte);
 				}
 			}
 
@@ -247,7 +265,8 @@ void init_hw_sw(void)
 	timerSetup_measure();
 	
 	spi_init();																		// init SPI interface
-
+	dma_spi_init();
+	
 	//--------------
 	// configure MFM read stream by TIM2 CH4 and DMA in circular mode
 	// WARNING!!! Never let mfmStreamBuffer[] contain a 0! With 0 the timer update never comes and streaming stops!
@@ -454,4 +473,10 @@ void dma_mfm_init(void)
 
   // Enable DMA1 Channel2 transfer
   DMA_Cmd(DMA1_Channel2, ENABLE);
+}
+
+void dma_spi_init(void)
+{
+
+
 }
