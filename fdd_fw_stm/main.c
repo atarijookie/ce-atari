@@ -8,6 +8,8 @@
 #include "defs.h"
 #include "timers.h"
 
+void init_hw_sw(void);
+
 void fillMfmTimesForDMA(void);
 BYTE getNextMFMbyte(void);
 
@@ -97,79 +99,14 @@ BYTE version[16] = "Franz 2013-05-27";
 
 int main (void) 
 {
-	BYTE prevSide, outputsActive, i;
+	BYTE prevSide =0, outputsActive = 0;
 	
-	RCC->AHBENR		|= (1 <<  0);																						// enable DMA1
-	RCC->APB1ENR	|= (1 <<  1) | (1 <<  0);																// enable TIM3, TIM2
-  RCC->APB2ENR	|= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     		// Enable SPI1, TIM1, GPIOA and GPIOB clock
-	
-	// set FLOATING INPUTs for GPIOB_0 ... 6
-	GPIOB->CRL &= ~(0x0fffffff);						// remove bits from GPIOB
-	GPIOB->CRL |=   0x04444444;							// set GPIOB as --- CNF1:0 -- 01 (floating input), MODE1:0 -- 00 (input), PxODR -- don't care
-
-	FloppyOut_Disable();
-	
-	// enable atlernate function for PA4, PA5, PA6, PA7 == SPI
-	GPIOA->CRL &= ~(0xffff0000);						// remove bits from GPIOA
-	GPIOA->CRL |=   0xbbbb0000;							// set GPIOA as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
-
-	// set GPIOB_15 (ATTENTION) as --- CNF1:0 -- 00 (push-pull output), MODE1:0 -- 11 (output 50 Mhz)
-	GPIOB->CRH &= ~(0xf0000000); 
-	GPIOB->CRH |=  (0x30000000);
-
-	RCC->APB2ENR |= (1 << 0);									// enable AFIO
-	
-	AFIO->EXTICR[0] = 0x1000;									// EXTI3 -- source input: GPIOB_3
-	EXTI->IMR			= STEP;											// EXTI3 -- 1 means: Interrupt from line 3 not masked
-	EXTI->EMR			= STEP;											// EXTI3 -- 1 means: Event     form line 3 not masked
-	EXTI->FTSR 		= STEP;											// Falling trigger selection register - STEP pulse
-	
-	//----------
-	AFIO->MAPR |= (2 << 24);									// SWJ_CFG[2:0] (Bits 26:24) -- 010: JTAG-DP Disabled and SW-DP Enabled
-	AFIO->MAPR |= 0x0300;											// TIM2_REMAP -- Full remap (CH1/ETR/PA15, CH2/PB3, CH3/PB10, CH4/PB11)
-
-	//----------
-	timerSetup_index();
-	
-	timerSetup_measure();
-	
-	spi_init();																		// init SPI interface
-
-	//--------------
-	// configure MFM read stream by TIM2 CH4 and DMA in circular mode
-	// WARNING!!! Never let mfmStreamBuffer[] contain a 0! With 0 the timer update never comes and streaming stops!
-	for(i=0; i<16; i++) {
-		mfmStreamBuffer[i] = 7;				// by default -- all pulses 4 us
-	}
-	
-	timerSetup_mfm();								// init MFM stream timer
-	dma_mfm_init();									// and init the DMA which will feed it from circular buffer
-	//--------------
-	
-	// init circular buffer for data incomming via SPI
-	inIndexAdd		= 0;
-	inIndexGet		= 0;
-	inCount				= 0;
-	
-	// init circular buffer for data outgoing via SPI
-	outIndexAdd		= 0;
-	outIndexGet		= 0;
-	outCount			= 0;
-
-	mfmByte				= 0;
-	mfmByteIndex	= 0;
-
-	// init track and side vars for the floppy position
-	side					= 0;
-	track 				= 0;
-	sector				= 1;
-	prevSide			= 0;
-	outputsActive	= 0;
+	init_hw_sw();																	// init GPIO pins, timers, DMA, global variables
 
 	// init floppy signals
 	GPIOB->BSRR = (WR_PROTECT | DISK_CHANGE);			// not write protected, not changing disk (ready!)
 	GPIOB->BRR = TRACK0;													// TRACK 0 signal to L			
-
+	
 	// whole loop without INDEX and MOTOR_ENABLE checking: 2.8 us (other bits), 3.7 us (when fetching new mfm byte)
 	while(1) {
 		WORD ints;
@@ -266,6 +203,76 @@ int main (void)
 			addAttention(CMD_SEND_NEXT_SECTOR);
 		}
 	}
+}
+
+void init_hw_sw(void)
+{
+	BYTE i;
+	
+	RCC->AHBENR		|= (1 <<  0);																						// enable DMA1
+	RCC->APB1ENR	|= (1 <<  1) | (1 <<  0);																// enable TIM3, TIM2
+  RCC->APB2ENR	|= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     		// Enable SPI1, TIM1, GPIOA and GPIOB clock
+	
+	// set FLOATING INPUTs for GPIOB_0 ... 6
+	GPIOB->CRL &= ~(0x0fffffff);						// remove bits from GPIOB
+	GPIOB->CRL |=   0x04444444;							// set GPIOB as --- CNF1:0 -- 01 (floating input), MODE1:0 -- 00 (input), PxODR -- don't care
+
+	FloppyOut_Disable();
+	
+	// SPI -- enable atlernate function for PA4, PA5, PA6, PA7
+	GPIOA->CRL &= ~(0xffff0000);						// remove bits from GPIOA
+	GPIOA->CRL |=   0xbbbb0000;							// set GPIOA as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
+
+	// ATTENTION -- set GPIOB_15 (ATTENTION) as --- CNF1:0 -- 00 (push-pull output), MODE1:0 -- 11 (output 50 Mhz)
+	GPIOB->CRH &= ~(0xf0000000); 
+	GPIOB->CRH |=  (0x30000000);
+
+	RCC->APB2ENR |= (1 << 0);									// enable AFIO
+	
+	AFIO->EXTICR[0] = 0x1000;									// EXTI3 -- source input: GPIOB_3
+	EXTI->IMR			= STEP;											// EXTI3 -- 1 means: Interrupt from line 3 not masked
+	EXTI->EMR			= STEP;											// EXTI3 -- 1 means: Event     form line 3 not masked
+	EXTI->FTSR 		= STEP;											// Falling trigger selection register - STEP pulse
+	
+	//----------
+	AFIO->MAPR |= (2 << 24);									// SWJ_CFG[2:0] (Bits 26:24) -- 010: JTAG-DP Disabled and SW-DP Enabled
+	AFIO->MAPR |= 0x0300;											// TIM2_REMAP -- Full remap (CH1/ETR/PA15, CH2/PB3, CH3/PB10, CH4/PB11)
+
+	//----------
+	timerSetup_index();
+	
+	timerSetup_measure();
+	
+	spi_init();																		// init SPI interface
+
+	//--------------
+	// configure MFM read stream by TIM2 CH4 and DMA in circular mode
+	// WARNING!!! Never let mfmStreamBuffer[] contain a 0! With 0 the timer update never comes and streaming stops!
+	for(i=0; i<16; i++) {
+		mfmStreamBuffer[i] = 7;				// by default -- all pulses 4 us
+	}
+	
+	timerSetup_mfm();								// init MFM stream timer
+	dma_mfm_init();									// and init the DMA which will feed it from circular buffer
+	//--------------
+	
+	// init circular buffer for data incomming via SPI
+	inIndexAdd		= 0;
+	inIndexGet		= 0;
+	inCount				= 0;
+	
+	// init circular buffer for data outgoing via SPI
+	outIndexAdd		= 0;
+	outIndexGet		= 0;
+	outCount			= 0;
+
+	mfmByte				= 0;
+	mfmByteIndex	= 0;
+
+	// init track and side vars for the floppy position
+	side					= 0;
+	track 				= 0;
+	sector				= 1;
 }
 
 void fillMfmTimesForDMA(void)
