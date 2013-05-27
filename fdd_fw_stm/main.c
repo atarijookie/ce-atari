@@ -8,7 +8,6 @@
 #include "defs.h"
 #include "timers.h"
 
-void getNextMfmTime(void);
 void fillMfmTimesForDMA(void);
 BYTE getNextMFMbyte(void);
 
@@ -144,24 +143,8 @@ int main (void)
 		mfmStreamBuffer[i] = 7;				// by default -- all pulses 4 us
 	}
 	
-	timerSetup_mfm();
-	dma_mfm_init();
-
-/*	
-	// DMA1 channel2 test
-	while(1) {
-		if((DMA1->ISR & (1 << 6)) != 0) {			// HTIF2 -- Half Transfer IF 2
-			DMA1->IFCR = (1 << 6);							// clear HTIF2 flag
-			
-		}
-
-		if((DMA1->ISR & (1 << 5)) != 0) {			// TCIF2 -- Transfer Complete IF 2
-			DMA1->IFCR = (1 << 5);							// clear TCIF2 flag
-			
-		}
-		
-	}
-*/
+	timerSetup_mfm();								// init MFM stream timer
+	dma_mfm_init();									// and init the DMA which will feed it from circular buffer
 	//--------------
 	
 	// init circular buffer for data incomming via SPI
@@ -227,11 +210,8 @@ int main (void)
 			
 		}
 
-		if((TIM2->SR & 0x0001) != 0) {			// overflow of TIM2 occured? we've streamed out one MFM symbol and need another!
-			TIM2->SR = 0xfffe;								// clear UIF flag
-
-			 // 2.1 us (fetching new byte), 1.2 us (other bytes)
-			getNextMfmTime();									// get the next time from stream, set up TMR16B1
+		if((DMA1->ISR & (DMA1_IT_TC2 | DMA1_IT_HT2)) != 0) {			// TC or HT interrupt? we've streamed half of circular buffer!
+			fillMfmTimesForDMA();																		// fill the circular DMA buffer with mfm times
 		}
 		
 		// check for STEP pulse - should we go to a different track?
@@ -289,67 +269,6 @@ int main (void)
 	}
 }
 
-// duration of getNextMfmTime - 1.14 us (other bits), 2.33 us (when fetching new byte)
-void getNextMfmTime(void)
-{
-	// 0.4 us = 28 cycles (pulse low width)
-	// 4 us = 288 cycles  (260 cycles)
-	// 6 us = 432 cycles  (404 cycles)
-	// 8 us = 576 cycles  (548 cycles)
-
-	WORD arr;
-	
-	static BYTE gap[3] = {0xa9, 0x6a, 0x96};
-	static BYTE gapCnt = 0;
-
-	BYTE time = mfmByte >> 6;								// get only 2 highest bits
-
-	mfmByte = mfmByte << 2;									// move the mfmByte to next position
-	mfmByteIndex++;
-
-	switch(time) {										// convert time code to timer match values
-	case MFM_8US:											// 8 us?
-		arr = 15;
-		break;
-
-	case MFM_6US:											// 6 us?
-		arr = 11;
-		break;
-
-	case MFM_4US:											// 4 us?
-	default:
-		arr = 7;
-		break;
-	}
-
-	TIM2->ARR = arr;
-	
-	if(mfmByteIndex == 4) {								// streamed all times from byte?
-		mfmByteIndex = 0;
-
-		if(inCount == 0) {									// nothing to stream?
-			mfmByte	= gap[gapCnt];						// stream this GAP byte
-			gapCnt++;
-
-			if(gapCnt > 2) {									// we got only 3 gap byte times, go back to 0
-				gapCnt = 0;
-			}
-		} else {														// got data to stream?
-			BYTE hostByte;
-			inBuffer_get(hostByte);						// get byte from host buffer
-
-			// lower nibble == 0? it's a command from host. if we should turn on/off the write protect or disk change
-			if((hostByte & 0x0f) == 0) {			
-				processHostCommand(hostByte);
-				
-				getNextMfmTime();				
-			} else { // this wasn't a command, just store it
-				mfmByte = hostByte;
-			}
-		}
-	}
-}
-
 void fillMfmTimesForDMA(void)
 {
 	WORD ind = 0xff;
@@ -357,13 +276,13 @@ void fillMfmTimesForDMA(void)
 	// code to ARR value:      ??, 4us, 6us, 8us
 	static WORD mfmTimes[4] = { 7,   7,  11,  15};
 	BYTE times4, time, i, j;
-	
+
 	// check for half transfer or transfer complete IF
-	if((DMA1->ISR & (1 << 6)) == 1) {						// HTIF2 -- Half Transfer IF 2
-		DMA1->IFCR = (1 << 6);										// clear HTIF2 flag
+	if((DMA1->ISR & DMA1_IT_HT2) != 0) {				// HTIF2 -- Half Transfer IF 2
+		DMA1->IFCR = DMA1_IT_HT2;									// clear HTIF2 flag
 		ind = 0;
-	} else if((DMA1->ISR & (1 << 5)) == 1) {		// TCIF2 -- Transfer Complete IF 2
-		DMA1->IFCR = (1 << 5);										// clear TCIF2 flag
+	} else if((DMA1->ISR & DMA1_IT_TC2) != 0) {	// TCIF2 -- Transfer Complete IF 2
+		DMA1->IFCR = DMA1_IT_TC2;									// clear TCIF2 flag
 		ind = 8;
 	}
 	
