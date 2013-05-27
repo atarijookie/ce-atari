@@ -18,7 +18,7 @@ void timerSetup_index(void)
   TIM_TimeBaseStructure.TIM_CounterMode				= TIM_CounterMode_Up;
 	TIM_TimeBaseStructure.TIM_RepetitionCounter	=	0;
 	
-  TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
+  TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
 
   // PWM1 Mode configuration: Channel1
   TIM_OCInitStructure.TIM_OCMode			= TIM_OCMode_PWM1;
@@ -26,15 +26,13 @@ void timerSetup_index(void)
   TIM_OCInitStructure.TIM_Pulse				= 10;											// pulse will be 10 ticks == 5 ms long
   TIM_OCInitStructure.TIM_OCPolarity	= TIM_OCPolarity_Low;
 
-  TIM_OC1Init(TIM1, &TIM_OCInitStructure);
-  TIM_OC1PreloadConfig(TIM1, TIM_OCPreload_Enable);
+  TIM_OC1Init(TIM2, &TIM_OCInitStructure);
+  TIM_OC1PreloadConfig(TIM2, TIM_OCPreload_Enable);
 	
-  TIM_ARRPreloadConfig(TIM1, ENABLE);
+  TIM_ARRPreloadConfig(TIM2, ENABLE);
 
-  TIM_Cmd(TIM1, ENABLE);														// enable timer
-	TIM_ITConfig(TIM1, TIM_IT_Update, ENABLE);				// inable int from this timer
-	
-	TIM1->BDTR = 0x8000;															// set MOE bit (Main Output Enable)
+  TIM_Cmd(TIM2, ENABLE);														// enable timer
+	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);				// inable int from this timer
 }
 
 void timerSetup_mfm(void)
@@ -55,7 +53,7 @@ void timerSetup_mfm(void)
   TIM_TimeBaseStructure.TIM_CounterMode				= TIM_CounterMode_Up;
 	TIM_TimeBaseStructure.TIM_RepetitionCounter	=	0;
 	
-  TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
+  TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
 	
   // PWM1 Mode configuration: Channel4
   TIM_OCInitStructure.TIM_OCMode			= TIM_OCMode_PWM1;
@@ -63,20 +61,21 @@ void timerSetup_mfm(void)
   TIM_OCInitStructure.TIM_Pulse				= 1;													// pulse will be 1 tick == 0.5 us long
   TIM_OCInitStructure.TIM_OCPolarity	= TIM_OCPolarity_Low;
 
-  TIM_OC4Init(TIM2, &TIM_OCInitStructure);
-  TIM_OC4PreloadConfig(TIM2, TIM_OCPreload_Enable);
+  TIM_OC4Init(TIM1, &TIM_OCInitStructure);
+  TIM_OC4PreloadConfig(TIM1, TIM_OCPreload_Enable);
 	
-  TIM_ARRPreloadConfig(TIM2, DISABLE);							// disable preloading
+  TIM_ARRPreloadConfig(TIM1, DISABLE);							// disable preloading
 
-	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);				// enable int from this timer
+	TIM_ITConfig(TIM1, TIM_IT_Update, ENABLE);				// enable int from this timer
 
-	// set TIM2 DMA control register (TIMx_DCR) as: DBL (<<8) =0 (1 transfer), DBA (<<0) =11 (0x2C TIMx_ARR)
-	TIM2->DCR = 11;
+	// set TIM1 DMA control register (TIMx_DCR) as: DBL (<<8) =0 (1 transfer), DBA (<<0) =11 (0x2C TIMx_ARR)
+	TIM1->DCR = 11;
 
 	// reference manual on page 407 says only UDE
-	TIM_ITConfig(TIM2, (1 <<  8), ENABLE);						// enable Bit  8 - UDE: Update DMA request enable
+	TIM_ITConfig(TIM1, (1 <<  8), ENABLE);						// enable Bit  8 - UDE: Update DMA request enable
 
-  TIM_Cmd(TIM2, ENABLE);														// enable timer
+	TIM1->BDTR = 0x8000;															// set MOE bit (Main Output Enable)
+  TIM_Cmd(TIM1, ENABLE);														// enable timer
 }
 
 void timerSetup_measure(void)

@@ -36,12 +36,12 @@ GPIOB_6  - SIDE1
 
 outputs:
 ---------
-GPIOA_8  - INDEX (using TIM1_CH1)
+GPIOA_8  - RDATA (using TIM1_CH1)
 
 GPIOB_8  - WRITE_PROTECT
 GPIOB_9  - DISK_CHANGE
 GPIOB_10 - TRACK0
-GPIOB_11 - RDATA (using TIM2_CH4)
+GPIOB_11 - INDEX (using TIM2_CH4)
 GPIOB_15 - ATTENTION (need more data / data available to retrieve)
 */
 

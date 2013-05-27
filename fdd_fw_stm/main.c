@@ -23,18 +23,6 @@ void dma_mfm_init(void);
 void dma_spi_init(void);
 
 /*
-DMA1_CH2 -- SPI1_RX + TIM2_UP
-DMA1_CH3 -- SPI1_TX + TIM3_UP
-DMA1_CH5 -- TIM1_UP
-
-teraz: 
-INDEX (using TIM1_CH1)  -- ziadne ovladanie
-RDATA (using TIM2_CH4)  -- DMA
-
-presun:
-RDATA: TIM2 -> TIM1, potom pouzijem DMA1_CH5
-INDEX: TIM1 -> TIM2, ziadne ovladanie
-
 potom pouzitie DMA na SPI:
 SPI1_TX -- DMA1_CH3
 SPI1_RX -- DMA1_CH2
@@ -44,6 +32,8 @@ SPI1_RX -- DMA1_CH2
 TODO:
  - replace generating of GAP 0x4e bytes after index pulse
  - DMA SPI
+ - fix working with inBuffer and outBuffer for WORD memory elements
+ - test TIM1, TIM2 po presune!
  - pomeranie kolko trvaju jednotlive casti kodu
  - write support??
 */
@@ -57,10 +47,10 @@ TODO:
 
 // first gap (60 * 0x4e) takes 1920 us (1.9 ms)
 
-BYTE inBuffer[4096];
+WORD inBuffer[2048];
 WORD inIndexAdd, inIndexGet, inCount;
 
-BYTE outBuffer[2048];
+WORD outBuffer[1024];
 WORD outIndexAdd, outIndexGet, outCount;
 
 BYTE side, track, sector;
@@ -164,7 +154,7 @@ int main (void)
 			
 		}
 
-		if((DMA1->ISR & (DMA1_IT_TC2 | DMA1_IT_HT2)) != 0) {			// TC or HT interrupt? we've streamed half of circular buffer!
+		if((DMA1->ISR & (DMA1_IT_TC5 | DMA1_IT_HT5)) != 0) {			// TC or HT interrupt? we've streamed half of circular buffer!
 			fillMfmTimesForDMA();																		// fill the circular DMA buffer with mfm times
 		}
 		
@@ -204,10 +194,10 @@ int main (void)
 
 		//------------
 		// check INDEX pulse as needed -- duration when filling with marks: 69.8 us
-// 	if((TIM1->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
+// 	if((TIM2->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
 		if(0) {
 			int i;
-			TIM1->SR = 0xfffe;							// clear UIF flag
+			TIM2->SR = 0xfffe;							// clear UIF flag
 	
 // TODO: remake this			
 /*			
@@ -303,11 +293,11 @@ void fillMfmTimesForDMA(void)
 	BYTE times4, time, i, j;
 
 	// check for half transfer or transfer complete IF
-	if((DMA1->ISR & DMA1_IT_HT2) != 0) {				// HTIF2 -- Half Transfer IF 2
-		DMA1->IFCR = DMA1_IT_HT2;									// clear HTIF2 flag
+	if((DMA1->ISR & DMA1_IT_HT5) != 0) {				// HTIF5 -- Half Transfer IF 5
+		DMA1->IFCR = DMA1_IT_HT5;									// clear HTIF5 flag
 		ind = 0;
-	} else if((DMA1->ISR & DMA1_IT_TC2) != 0) {	// TCIF2 -- Transfer Complete IF 2
-		DMA1->IFCR = DMA1_IT_TC2;									// clear TCIF2 flag
+	} else if((DMA1->ISR & DMA1_IT_TC5) != 0) {	// TCIF5 -- Transfer Complete IF 5
+		DMA1->IFCR = DMA1_IT_TC5;									// clear TCIF5 flag
 		ind = 8;
 	}
 	
@@ -451,11 +441,11 @@ void dma_mfm_init(void)
 {
 	DMA_InitTypeDef DMA_InitStructure;
 	
-	// DMA1 channel2 configuration -- TIM2_UP (update)
-  DMA_DeInit(DMA1_Channel2);
+	// DMA1 channel5 configuration -- TIM1_UP (update)
+  DMA_DeInit(DMA1_Channel5);
 	
   DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) mfmStreamBuffer;				// from this buffer located in memory
-  DMA_InitStructure.DMA_PeripheralBaseAddr	= (uint32_t) &(TIM2->DMAR);					// to this peripheral address
+  DMA_InitStructure.DMA_PeripheralBaseAddr	= (uint32_t) &(TIM1->DMAR);					// to this peripheral address
   DMA_InitStructure.DMA_DIR									= DMA_DIR_PeripheralDST;						// dir: from mem to periph
   DMA_InitStructure.DMA_BufferSize					= 16;																// 16 datas to transfer
   DMA_InitStructure.DMA_PeripheralInc				= DMA_PeripheralInc_Disable;				// PINC = 0 -- don't icrement, always write to DMAR register
@@ -465,6 +455,60 @@ void dma_mfm_init(void)
   DMA_InitStructure.DMA_Mode								= DMA_Mode_Circular;								// circular mode
   DMA_InitStructure.DMA_Priority						= DMA_Priority_Medium;
   DMA_InitStructure.DMA_M2M									= DMA_M2M_Disable;									// M2M disabled, because we move to peripheral
+  DMA_Init(DMA1_Channel5, &DMA_InitStructure);
+
+  // Enable DMA1 Channel5 Transfer Complete interrupt
+  DMA_ITConfig(DMA1_Channel5, DMA_IT_HT, ENABLE);			// interrupt on Half Transfer (HT)
+  DMA_ITConfig(DMA1_Channel5, DMA_IT_TC, ENABLE);			// interrupt on Transfer Complete (TC)
+
+  // Enable DMA1 Channel5 transfer
+  DMA_Cmd(DMA1_Channel5, ENABLE);
+}
+
+void dma_spi_init(void)
+{
+	// SPI1_TX -- DMA1_CH3
+	DMA_InitTypeDef DMA_InitStructure;
+	
+	// DMA1 channel3 configuration -- SPI1 TX
+  DMA_DeInit(DMA1_Channel3);
+	
+  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) outBuffer;							// from this buffer located in memory
+  DMA_InitStructure.DMA_PeripheralBaseAddr	= (uint32_t) &(SPI1->DR);						// to this peripheral address
+  DMA_InitStructure.DMA_DIR									= DMA_DIR_PeripheralDST;						// dir: from mem to periph
+  DMA_InitStructure.DMA_BufferSize					= 1024;															// 1024 datas to transfer
+  DMA_InitStructure.DMA_PeripheralInc				= DMA_PeripheralInc_Disable;				// PINC = 0 -- don't icrement, always write to SPI1->DR register
+  DMA_InitStructure.DMA_MemoryInc						= DMA_MemoryInc_Enable;							// MINC = 1 -- increment in memory -- go though buffer
+  DMA_InitStructure.DMA_PeripheralDataSize	= DMA_PeripheralDataSize_HalfWord;	// each data item: 16 bits 
+  DMA_InitStructure.DMA_MemoryDataSize			= DMA_MemoryDataSize_HalfWord;			// each data item: 16 bits 
+  DMA_InitStructure.DMA_Mode								= DMA_Mode_Circular;								// circular mode
+  DMA_InitStructure.DMA_Priority						= DMA_Priority_Medium;
+  DMA_InitStructure.DMA_M2M									= DMA_M2M_Disable;									// M2M disabled, because we move to peripheral
+  DMA_Init(DMA1_Channel3, &DMA_InitStructure);
+
+  // Enable DMA1 Channel3 Transfer Complete interrupt
+  DMA_ITConfig(DMA1_Channel3, DMA_IT_HT, ENABLE);			// interrupt on Half Transfer (HT)
+  DMA_ITConfig(DMA1_Channel3, DMA_IT_TC, ENABLE);			// interrupt on Transfer Complete (TC)
+
+  // Enable DMA1 Channel3 transfer
+  DMA_Cmd(DMA1_Channel3, ENABLE);
+	
+	//----------------
+	// SPI1_RX -- DMA1_CH2
+	// DMA1 channel2 configuration -- SPI1 RX
+  DMA_DeInit(DMA1_Channel2);
+	
+  DMA_InitStructure.DMA_PeripheralBaseAddr	= (uint32_t) &(SPI1->DR);						// from this peripheral address
+  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) inBuffer;							// to this buffer located in memory
+  DMA_InitStructure.DMA_DIR									= DMA_DIR_PeripheralSRC;						// dir: from periph to mem
+  DMA_InitStructure.DMA_BufferSize					= 2048;															// 2048 datas to transfer
+  DMA_InitStructure.DMA_PeripheralInc				= DMA_PeripheralInc_Disable;				// PINC = 0 -- don't icrement, always write to SPI1->DR register
+  DMA_InitStructure.DMA_MemoryInc						= DMA_MemoryInc_Enable;							// MINC = 1 -- increment in memory -- go though buffer
+  DMA_InitStructure.DMA_PeripheralDataSize	= DMA_PeripheralDataSize_HalfWord;	// each data item: 16 bits 
+  DMA_InitStructure.DMA_MemoryDataSize			= DMA_MemoryDataSize_HalfWord;			// each data item: 16 bits 
+  DMA_InitStructure.DMA_Mode								= DMA_Mode_Circular;								// circular mode
+  DMA_InitStructure.DMA_Priority						= DMA_Priority_Medium;
+  DMA_InitStructure.DMA_M2M									= DMA_M2M_Disable;									// M2M disabled, because we move from peripheral
   DMA_Init(DMA1_Channel2, &DMA_InitStructure);
 
   // Enable DMA1 Channel2 Transfer Complete interrupt
@@ -473,10 +517,4 @@ void dma_mfm_init(void)
 
   // Enable DMA1 Channel2 transfer
   DMA_Cmd(DMA1_Channel2, ENABLE);
-}
-
-void dma_spi_init(void)
-{
-
-
 }
