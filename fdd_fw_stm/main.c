@@ -11,10 +11,10 @@
 void init_hw_sw(void);
 
 void fillMfmTimesForDMA(void);
-BYTE getNextMFMbyte(void);
+BYTE getNextMFMword(void);
 
 void addAttention(BYTE atn);
-void processHostCommand(BYTE hostByte);
+void processHostCommand(WORD hostWord);
 
 void spi_init(void);
 void spi_TxRx(void);
@@ -31,7 +31,7 @@ SPI1_RX -- DMA1_CH2
 /*
 TODO:
  - replace generating of GAP 0x4e bytes after index pulse
- - DMA SPI
+ - test DMA SPI
  - fix working with inBuffer and outBuffer for WORD memory elements
  - test TIM1, TIM2 po presune!
  - pomeranie kolko trvaju jednotlive casti kodu
@@ -102,6 +102,7 @@ WORD t1, t2, dt;
 #define		inBuffer_get(X)					{ X = inBuffer[inIndexGet];					inIndexGet++;				inIndexGet		= inIndexGet	& 0xfff;	inCount--;	}
 //--------------
 
+// the VERSION_LENGTH must be EVEN number
 #define VERSION_LENGTH	16
 char *version = "Franz 2013-05-27";
 
@@ -130,12 +131,12 @@ int main (void)
 			}
 
 			// with the floppy disabled, drop the data from inBuffer, but process the host commands
-			while(inCount > 0) {								// something in the buffer?
-				BYTE hostByte;
-				inBuffer_get(hostByte);						// get byte from host buffer
+			while(inCount > 0) {						// something in the buffer?
+				WORD wval;
+				inBuffer_get(wval);						// get byte from host buffer
 
-				if((hostByte & 0x0f) == 0) {			// lower nibble == 0? it's a command from host, process it; otherwise drop it
-					processHostCommand(hostByte);
+				if((wval & 0x0f00) == 0) {		// lower nibble == 0? it's a command from host, process it; otherwise drop it
+					processHostCommand(wval);
 				}
 			}
 
@@ -290,7 +291,8 @@ void fillMfmTimesForDMA(void)
 
 	// code to ARR value:      ??, 4us, 6us, 8us
 	static WORD mfmTimes[4] = { 7,   7,  11,  15};
-	BYTE times4, time, i, j;
+	BYTE time, i;
+	WORD times8;
 
 	// check for half transfer or transfer complete IF
 	if((DMA1->ISR & DMA1_IT_HT5) != 0) {				// HTIF5 -- Half Transfer IF 5
@@ -305,73 +307,78 @@ void fillMfmTimesForDMA(void)
 		return;
 	}
 	
-	for(j=0; j<2; j++) {														// repeat 2x -- half of mfmStreamBuffer buffer is 8 elements
-		times4 = getNextMFMbyte();
+	times8 = getNextMFMword();									// get next word
+	
+	for(i=0; i<8; i++) {													// convert all 8 codes to ARR values
+		time		= times8 >> 14;											// get bits 15,14 (and then 13,12 ... 1,0) 
+		time		= mfmTimes[time];										// convert to ARR value
+		times8	= times8 << 2;											// shift 2 bits higher so we would get lower bits next time
 
-		for(i=0; i<4; i++) {													// convert all 4 codes to ARR values
-			time		= times4 >> 6;											// get bits 7,6 (and then 5,4; and 3,2; and 1,0) 
-			time		= mfmTimes[time];										// convert to ARR value
-			times4	= times4 << 2;											// shift 2 bits higher so we would get lower bits next time
-
-			mfmStreamBuffer[ind] = time;								// store and move to next one
-			ind++;
-		}
+		mfmStreamBuffer[ind] = time;								// store and move to next one
+		ind++;
 	}
 }
 
-BYTE getNextMFMbyte(void)
+BYTE getNextMFMword(void)
 {
-	static BYTE gap[3] = {0xa9, 0x6a, 0x96};
+	static WORD gap[3] = {0xa96a, 0x96a9, 0x6a96};
 	static BYTE gapIndex = 0;
-	BYTE val;
+	WORD wval;
 
-	while(inCount > 0) {					// go through inBuffer to process commands and to find some data
-		inBuffer_get(val);					// get byte from buffer
+	while(inCount > 0) {								// go through inBuffer to process commands and to find some data
+		inBuffer_get(wval);								// get WORD from buffer
 		
 		// lower nibble == 0? it's a command from host - if we should turn on/off the write protect or disk change
-		if((val & 0x0f) == 0) {			// it's a command?
-			processHostCommand(val);
-		} else {										// not a command? return it
+		if((wval & 0x0f00) == 0) {				// it's a command?
+			processHostCommand(wval);
+		} else {													// not a command? return it
 			gapIndex = 0;		
-			return val;
+			return wval;
 		}
 	} 
 
 	//---------
 	// if we got here, we have no data to stream
-	val = gap[gapIndex];					// stream this GAP byte
+	wval = gap[gapIndex];					// stream this GAP byte
 	gapIndex++;
 
 	if(gapIndex > 2) {						// we got only 3 gap byte times, go back to 0
 		gapIndex = 0;
 	}
 
-	return val;
+	return wval;
 }
 
-void processHostCommand(BYTE hostByte)
+void processHostCommand(WORD hostWord)
 {
-	switch(hostByte) {
+	BYTE hi, lo;
+	hi = hostWord >> 8;												// get upper byte
+	lo = hostWord  & 0xff;										// get lower byte
+	
+	switch(hi) {
 		case CMD_WRITE_PROTECT_OFF:		GPIOB->BSRR	= WR_PROTECT;		break;			// WR PROTECT to 1
 		case CMD_WRITE_PROTECT_ON:		GPIOB->BRR	= WR_PROTECT;		break;			// WR PROTECT to 0
 		case CMD_DISK_CHANGE_OFF:			GPIOB->BSRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 1
 		case CMD_DISK_CHANGE_ON:			GPIOB->BRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 0
-		
-		case CMD_GET_FW_VERSION:							// send FW version string
+
+		case CMD_GET_FW_VERSION:								// send FW version string
 		{
 			BYTE i;
-			outBuffer_add(CMD_FW_VERSION);			// command
+			WORD wval;
+			
+			outBuffer_add(CMD_FW_VERSION);				// command		(this adds 0 and CMD_FW_VERSION)
 		
-			for(i=0; i<VERSION_LENGTH; i++) {		// version string
-				outBuffer_add(version[i]);
+			for(i=0; i<VERSION_LENGTH; i+= 2) {		// version string
+				wval = (version[i] << 8) | version[i+1];
+				outBuffer_add(wval);
 			}	 
 			
-			outBuffer_add(0);										// terminating zero
+			outBuffer_add(0);											// terminating zero(s) (0, 0)
 			break;
 		}
 		
 		case CMD_CURRENT_SECTOR:								// get the next byte, which is sector #, and store it in sector variable
-			inBuffer_get(sector);				
+			sector = lo;
 			addAttention(CMD_SEND_NEXT_SECTOR);		// also ask for the next sector to this one
 			break;			
 	}
@@ -379,16 +386,19 @@ void processHostCommand(BYTE hostByte)
 
 void addAttention(BYTE atn)
 {
-	BYTE val;
+	WORD wval;
+	BYTE sideTrack;
 	
-	val = track;													// create 2nd byte: track + side
+	sideTrack = track;										// create 2nd byte: track + side
 	if(side == 1) {
-		val = val | 0x80;
+		sideTrack = sideTrack | 0x80;
 	}
 	
-	outBuffer_add(atn);										// 1st byte: ATN code
-	outBuffer_add(val);										// 2nd byte: side (highest bit) + track #
-	outBuffer_add(sector);								// 3rd byte: current sector #
+	wval = (atn << 8) | sideTrack;				// 1st byte: ATN code, 2nd byte: side (highest bit) + track #
+	outBuffer_add(wval);
+	
+	wval = (sector << 8);
+	outBuffer_add(wval);									// 3rd byte: current sector #, 4th byte: 0
 	
 	GPIOB->BSRR = ATN;										// ATTENTION bit high - got something to read
 }
