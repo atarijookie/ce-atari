@@ -10,6 +10,7 @@
 
 void getNextMfmTime(void);
 void fillMfmTimesForDMA(void);
+BYTE getNextMFMbyte(void);
 
 void addAttention(BYTE atn);
 void processHostCommand(BYTE hostByte);
@@ -21,6 +22,7 @@ void dma_mfm_init(void);
 
 /*
 TODO:
+ - get current FW version 
  - pomeranie kolko trvaju jednotlive casti kodu
  - DMA timer, DMA SPI
  - zosekanie / prepisanie do asm kvoli stihaniu obsluhy SPI + MFM
@@ -63,6 +65,7 @@ WORD t1, t2, dt;
 #define CMD_DISK_CHANGE_OFF			0x30
 #define CMD_DISK_CHANGE_ON			0x40
 #define CMD_CURRENT_SECTOR			0x50								// followed by sector #
+#define CMD_GET_FW_VERSION			0x60
 
 #define MFM_4US     1
 #define MFM_6US     2
@@ -91,6 +94,8 @@ WORD t1, t2, dt;
 #define		outBuffer_get(X)				{ X = outBuffer[outIndexGet];				outIndexGet++;			outIndexGet		= outIndexGet & 0x7ff;	outCount--;	}
 #define		inBuffer_get(X)					{ X = inBuffer[inIndexGet];					inIndexGet++;				inIndexGet		= inIndexGet	& 0xfff;	inCount--;	}
 //--------------
+
+BYTE version[16] = "Franz 2013-05-27";
 
 int main (void) 
 {
@@ -351,9 +356,7 @@ void fillMfmTimesForDMA(void)
 
 	// code to ARR value:      ??, 4us, 6us, 8us
 	static WORD mfmTimes[4] = { 7,   7,  11,  15};
-	static BYTE gap[3] = {0xa9, 0x6a, 0x96};
-	static BYTE gapCnt = 0;
-	BYTE times4, time, i;
+	BYTE times4, time, i, j;
 	
 	// check for half transfer or transfer complete IF
 	if((DMA1->ISR & (1 << 6)) == 1) {						// HTIF2 -- Half Transfer IF 2
@@ -367,27 +370,49 @@ void fillMfmTimesForDMA(void)
 	if(ind == 0xff) {														// no IF found? this shouldn't happen! did you come here without a reason?
 		return;
 	}
-
-
 	
-	// TODO: get stuff to stream into times4 
-	
-	
-	
+	for(j=0; j<2; j++) {														// repeat 2x -- half of mfmStreamBuffer buffer is 8 elements
+		times4 = getNextMFMbyte();
 
-	for(i=0; i<4; i++) {													// convert all 4 codes to ARR values
-		time		= times4 >> 6;											// get bits 7,6 (and then 5,4; and 3,2; and 1,0) 
-		time		= mfmTimes[time];										// convert to ARR value
-		times4	= times4 << 2;											// shift 2 bits higher so we would get lower bits next time
+		for(i=0; i<4; i++) {													// convert all 4 codes to ARR values
+			time		= times4 >> 6;											// get bits 7,6 (and then 5,4; and 3,2; and 1,0) 
+			time		= mfmTimes[time];										// convert to ARR value
+			times4	= times4 << 2;											// shift 2 bits higher so we would get lower bits next time
 
-		mfmStreamBuffer[ind] = time;								// store and move to next one
-		ind++;
+			mfmStreamBuffer[ind] = time;								// store and move to next one
+			ind++;
+		}
 	}
-	
-	
-	// TODO: do the same for the the next times4
-	
-	
+}
+
+BYTE getNextMFMbyte(void)
+{
+	static BYTE gap[3] = {0xa9, 0x6a, 0x96};
+	static BYTE gapIndex = 0;
+	BYTE val;
+
+	while(inCount > 0) {					// go through inBuffer to process commands and to find some data
+		inBuffer_get(val);					// get byte from buffer
+		
+		// lower nibble == 0? it's a command from host - if we should turn on/off the write protect or disk change
+		if((val & 0x0f) == 0) {			// it's a command?
+			processHostCommand(val);
+		} else {										// not a command? return it
+			gapIndex = 0;		
+			return val;
+		}
+	} 
+
+	//---------
+	// if we got here, we have no data to stream
+	val = gap[gapIndex];					// stream this GAP byte
+	gapIndex++;
+
+	if(gapIndex > 2) {						// we got only 3 gap byte times, go back to 0
+		gapIndex = 0;
+	}
+
+	return val;
 }
 
 void processHostCommand(BYTE hostByte)
@@ -397,6 +422,16 @@ void processHostCommand(BYTE hostByte)
 		case CMD_WRITE_PROTECT_ON:		GPIOB->BRR	= WR_PROTECT;		break;			// WR PROTECT to 0
 		case CMD_DISK_CHANGE_OFF:			GPIOB->BSRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 1
 		case CMD_DISK_CHANGE_ON:			GPIOB->BRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 0
+		
+		case CMD_GET_FW_VERSION:
+			
+		
+		
+		// TODO: add handler!
+		
+		
+		
+			break;
 		
 		case CMD_CURRENT_SECTOR:								// get the next byte, which is sector #, and store it in sector variable
 			inBuffer_get(sector);				
