@@ -24,6 +24,7 @@ void dma_spi_init(void);
 
 /*
 TODO:
+ - solve problem that the new sector / just short command received won't increment this!
  - ATN clearing!
  - fix working with outBuffer for WORD memory elements - with DMA
  - test DMA SPI
@@ -145,8 +146,22 @@ int main (void)
 			
 		}
 
-		if((DMA1->ISR & (DMA1_IT_TC5 | DMA1_IT_HT5)) != 0) {			// TC or HT interrupt? we've streamed half of circular buffer!
+		if((DMA1->ISR & (DMA1_IT_TC5 | DMA1_IT_HT5)) != 0) {			// MFM stream: TC or HT interrupt? we've streamed half of circular buffer!
 			fillMfmTimesForDMA();																		// fill the circular DMA buffer with mfm times
+		}
+
+		if((DMA1->ISR & (DMA1_IT_TC3 | DMA1_IT_HT3)) != 0) {			// SPI TX: TC or HT interrupt? (TX goes to outBuffer)
+			
+			
+			DMA1->IFCR = (DMA1_IT_TC3 | DMA1_IT_HT3);								// clear flags
+		}
+
+		if((DMA1->ISR & (DMA1_IT_TC2 | DMA1_IT_HT2)) != 0) {			// SPI RX: TC or HT interrupt? (RX goes to inBuffer)
+			inCount += 1024;																				// we got half buffer!
+			// TODO: solve problem that the new sector / just short command received won't increment this!
+
+			
+			DMA1->IFCR = (DMA1_IT_TC2 | DMA1_IT_HT2);								// clear flags
 		}
 		
 		// check for STEP pulse - should we go to a different track?
