@@ -24,15 +24,13 @@ void dma_spi_init(void);
 
 /*
 TODO:
- - finish SPI setup for DMA
- - ATN setting and clearing!
+ - ATN clearing!
  - fix working with outBuffer for WORD memory elements - with DMA
  - test DMA SPI
  - test TIM1, TIM2 po presune!
  - pomeranie kolko trvaju jednotlive casti kodu
  - write support??
 */
-
 
 // worst case scenario: 1 sector with all bullshit encoded in MFM should be max. 1228 bytes
 // So a 4096 bytes big buffer should contain at least 3.3 sectors (one currently streamed, one received from host + something more)
@@ -89,10 +87,8 @@ WORD t1, t2, dt;
 // watch out, these macros take 0.73 us for _add, and 0.83 us for _get operation!
 // cyclic buffer add macros
 #define 	outBuffer_add(X)				{ outBuffer[outIndexAdd]	= X;			outIndexAdd++;			outIndexAdd		= outIndexAdd & 0x7ff; 	outCount++; }
-//#define 	inBuffer_add(X)					{ inBuffer [inIndexAdd]		= X;			inIndexAdd++;				inIndexAdd		= inIndexAdd  & 0xfff;	inCount++;	}
 
 // cyclic buffer get macros
-//#define		outBuffer_get(X)				{ X = outBuffer[outIndexGet];				outIndexGet++;			outIndexGet		= outIndexGet & 0x7ff;	outCount--;	}
 #define		inBuffer_get(X)					{ X = inBuffer[inIndexGet];					inIndexGet++;				inIndexGet		= inIndexGet	& 0xfff;	inCount--;	}
 //--------------
 
@@ -415,6 +411,7 @@ void spi_init(void)
 	spiStruct.SPI_DataSize = SPI_DataSize_16b;		// use 16b data size to lower the MCU load
 	
   SPI_Init(SPI1, &spiStruct);
+	SPI1->CR2 |= (1 << 7) | (1 << 6) | SPI_I2S_DMAReq_Tx | SPI_I2S_DMAReq_Rx;		// enable TXEIE, RXNEIE, TXDMAEN, RXDMAEN
 	
 	SPI_Cmd(SPI1, ENABLE);
 }
