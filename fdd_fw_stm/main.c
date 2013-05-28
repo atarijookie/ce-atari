@@ -23,16 +23,11 @@ void dma_mfm_init(void);
 void dma_spi_init(void);
 
 /*
-potom pouzitie DMA na SPI:
-SPI1_TX -- DMA1_CH3
-SPI1_RX -- DMA1_CH2
-*/
-
-/*
 TODO:
- - replace generating of GAP 0x4e bytes after index pulse
+ - finish SPI setup for DMA
+ - ATN setting and clearing!
+ - fix working with outBuffer for WORD memory elements - with DMA
  - test DMA SPI
- - fix working with inBuffer and outBuffer for WORD memory elements
  - test TIM1, TIM2 po presune!
  - pomeranie kolko trvaju jednotlive casti kodu
  - write support??
@@ -43,8 +38,6 @@ TODO:
 // So a 4096 bytes big buffer should contain at least 3.3 sectors (one currently streamed, one received from host + something more)
 
 // gap byte 0x4e == 666446 us = 222112 times = 10'10'10'01'01'10 = 0xa96
-// 2 gap bytes 0x4e 0x4e = 0xa96a96 times = 0xa9 0x6a 0x96 bytes
-
 // first gap (60 * 0x4e) takes 1920 us (1.9 ms)
 
 WORD inBuffer[2048];
@@ -56,6 +49,7 @@ WORD outIndexAdd, outIndexGet, outCount;
 BYTE side, track, sector;
 
 WORD mfmStreamBuffer[16];							// 16 words - 16 mfm times. Half of buffer is 8 times - at least 32 us (8 * 4us), 
+BYTE stream4e;												// the count of 0x4e bytes we should stream (used for the 1st gap)
 
 // cycle measure: t1 = TIM3->CNT;	t2 = TIM3->CNT;	dt = t2 - t1; -- subtrack 0x12 because that's how much measuring takes
 WORD t1, t2, dt; 
@@ -108,7 +102,7 @@ char *version = "Franz 2013-05-27";
 
 int main (void) 
 {
-	BYTE prevSide =0, outputsActive = 0;
+	BYTE prevSide = 0, outputsActive = 0;
 	
 	init_hw_sw();																	// init GPIO pins, timers, DMA, global variables
 
@@ -197,20 +191,16 @@ int main (void)
 		// check INDEX pulse as needed -- duration when filling with marks: 69.8 us
 // 	if((TIM2->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
 		if(0) {
+			static BYTE broken4e[16] = {11,7,7,11,11,11,11,7,7,11,11,11,11,7,7,11};
 			int i;
 			TIM2->SR = 0xfffe;							// clear UIF flag
 	
-// TODO: remake this			
-/*			
-			// create GAP1: 60 x 0x4e
-			for(i=0; i<30; i++) {				// add 30* two encoded 4e marks into 3 bytes (2* 0xA96)
-				
-				inBuffer_add(0xa9);
-				inBuffer_add(0x6a);
-				inBuffer_add(0x96);
-			}
-*/
+			stream4e = 60;									// start of the track -- we should stream 60* 0x4e
 			sector = 1;
+			
+			for(i=0; i<16; i++) {						// copy in the 'broken' 0x4e sequence to start streaming 0x4e immediately 
+				mfmStreamBuffer[i] = broken4e[i];
+			}
 			
 			addAttention(CMD_SEND_NEXT_SECTOR);
 		}
@@ -283,6 +273,8 @@ void init_hw_sw(void)
 	side					= 0;
 	track 				= 0;
 	sector				= 1;
+	
+	stream4e			= 0;			// mark that we shouldn't stream any 0x4e (yet)
 }
 
 void fillMfmTimesForDMA(void)
@@ -325,25 +317,35 @@ BYTE getNextMFMword(void)
 	static BYTE gapIndex = 0;
 	WORD wval;
 
-	while(inCount > 0) {								// go through inBuffer to process commands and to find some data
-		inBuffer_get(wval);								// get WORD from buffer
+	if(stream4e == 0) {
+		while(inCount > 0) {								// go through inBuffer to process commands and to find some data
+			inBuffer_get(wval);								// get WORD from buffer
 		
-		// lower nibble == 0? it's a command from host - if we should turn on/off the write protect or disk change
-		if((wval & 0x0f00) == 0) {				// it's a command?
-			processHostCommand(wval);
-		} else {													// not a command? return it
-			gapIndex = 0;		
-			return wval;
+			// lower nibble == 0? it's a command from host - if we should turn on/off the write protect or disk change
+			if((wval & 0x0f00) == 0) {				// it's a command?
+				processHostCommand(wval);
+			} else {													// not a command? return it
+				gapIndex = 0;		
+				return wval;
+			}
 		}
-	} 
+	}
 
 	//---------
 	// if we got here, we have no data to stream
 	wval = gap[gapIndex];					// stream this GAP byte
 	gapIndex++;
 
-	if(gapIndex > 2) {						// we got only 3 gap byte times, go back to 0
+	if(gapIndex > 2) {						// we got only 3 gap WORD times, go back to 0
 		gapIndex = 0;
+		
+		if(stream4e > 0) {					// if we streamed 3 gap elements, we've streamed 4* 0x4e
+			if(stream4e < 4) {				// for 0...3 resize to 0
+				stream4e = 0;
+			} else {									// for higher numbers subtract 4
+				stream4e -= 4;
+			}
+		}		
 	}
 
 	return wval;
