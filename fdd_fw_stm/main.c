@@ -24,7 +24,6 @@ void dma_spi_init(void);
 
 /*
 TODO:
- - solve problem that the new sector / just short command received won't increment this!
  - ATN clearing!
  - fix working with outBuffer for WORD memory elements - with DMA
  - test DMA SPI
@@ -33,17 +32,19 @@ TODO:
  - write support??
 */
 
-// worst case scenario: 1 sector with all bullshit encoded in MFM should be max. 1228 bytes
-// So a 4096 bytes big buffer should contain at least 3.3 sectors (one currently streamed, one received from host + something more)
+// 1 sector with all headers, gaps, data and crc: 614 B of data needed to stream -> 4912 bits to stream -> with 4 bits encoded to 1 byte: 1228 of encoded data
+// Each sector takes around 22ms to stream out, so you have this time to ask for new one and get it in... the SPI transfer of 1228 B should take 0,8 ms.
+// inBuffer size of 2048 WORDs can contain 3.3 encoded sectors
 
 // gap byte 0x4e == 666446 us = 222112 times = 10'10'10'01'01'10 = 0xa96
 // first gap (60 * 0x4e) takes 1920 us (1.9 ms)
 
-WORD inBuffer[2048];
-WORD inIndexAdd, inIndexGet, inCount;
+#define INBUFFER_SIZE		2048
+WORD inBuffer[INBUFFER_SIZE];
+WORD inIndexGet;
 
 WORD outBuffer[1024];
-WORD outIndexAdd, outIndexGet, outCount;
+WORD outIndexAdd, outCount;
 
 BYTE side, track, sector;
 
@@ -66,6 +67,7 @@ WORD t1, t2, dt;
 #define CMD_DISK_CHANGE_ON			0x40
 #define CMD_CURRENT_SECTOR			0x50								// followed by sector #
 #define CMD_GET_FW_VERSION			0x60
+#define CMD_MARK_READ						0xF000							// this is not sent from host, but just a mark that this WORD has been read and you shouldn't continue to read further
 
 #define MFM_4US     1
 #define MFM_6US     2
@@ -87,10 +89,12 @@ WORD t1, t2, dt;
 //--------------
 // watch out, these macros take 0.73 us for _add, and 0.83 us for _get operation!
 // cyclic buffer add macros
-#define 	outBuffer_add(X)				{ outBuffer[outIndexAdd]	= X;			outIndexAdd++;			outIndexAdd		= outIndexAdd & 0x7ff; 	outCount++; }
+#define 	outBuffer_add(X)				{ outBuffer[outIndexAdd]	= X;						outIndexAdd++;	outIndexAdd	= outIndexAdd & 0x3ff; 	outCount++; }
 
 // cyclic buffer get macros
-#define		inBuffer_get(X)					{ X = inBuffer[inIndexGet];					inIndexGet++;				inIndexGet		= inIndexGet	& 0xfff;	inCount--;	}
+#define		inBuffer_get(X)					{ X = inBuffer[inIndexGet];								inIndexGet++;		inIndexGet = inIndexGet	& 0x7ff;	}
+#define		inBuffer_get_noMove(X)	{ X = inBuffer[inIndexGet];																																	}
+#define		inBuffer_markAndmove()	{ inBuffer[inIndexGet] = CMD_MARK_READ;		inIndexGet++;		inIndexGet = inIndexGet	& 0x7ff;	}
 //--------------
 
 // the VERSION_LENGTH must be EVEN number
@@ -122,11 +126,17 @@ int main (void)
 			}
 
 			// with the floppy disabled, drop the data from inBuffer, but process the host commands
-			while(inCount > 0) {						// something in the buffer?
+			while(1) {														// empty the buffer
 				WORD wval;
-				inBuffer_get(wval);						// get byte from host buffer
+				inBuffer_get_noMove(wval);					// get byte from host buffer
 
-				if((wval & 0x0f00) == 0) {		// lower nibble == 0? it's a command from host, process it; otherwise drop it
+				if(wval == CMD_MARK_READ) {					// we've hit the already read part of buffer? (underflow) quit loop
+					break;
+				}
+				
+				inBuffer_markAndmove();							// mark this word as read and move to the next one
+				
+				if((wval & 0x0f00) == 0) {					// lower nibble == 0? it's a command from host, process it; otherwise drop it
 					processHostCommand(wval);
 				}
 			}
@@ -156,14 +166,6 @@ int main (void)
 			DMA1->IFCR = (DMA1_IT_TC3 | DMA1_IT_HT3);								// clear flags
 		}
 
-		if((DMA1->ISR & (DMA1_IT_TC2 | DMA1_IT_HT2)) != 0) {			// SPI RX: TC or HT interrupt? (RX goes to inBuffer)
-			inCount += 1024;																				// we got half buffer!
-			// TODO: solve problem that the new sector / just short command received won't increment this!
-
-			
-			DMA1->IFCR = (DMA1_IT_TC2 | DMA1_IT_HT2);								// clear flags
-		}
-		
 		// check for STEP pulse - should we go to a different track?
 		ints = EXTI->PR;										// Pending register (EXTI_PR)
 		if(ints & STEP) {										// if falling edge of STEP signal was found
@@ -220,7 +222,7 @@ int main (void)
 
 void init_hw_sw(void)
 {
-	BYTE i;
+	WORD i;
 	
 	RCC->AHBENR		|= (1 <<  0);																						// enable DMA1
 	RCC->APB1ENR	|= (1 <<  1) | (1 <<  0);																// enable TIM3, TIM2
@@ -256,6 +258,12 @@ void init_hw_sw(void)
 	
 	timerSetup_measure();
 	
+	//--------------
+	// DMA + SPI initialization
+	for(i=0; i<INBUFFER_SIZE; i++) {							// fill the inBuffer with CMD_MARK_READ, which will tell that every byte is empty (already read)
+		inBuffer[i] = CMD_MARK_READ;
+	}
+	
 	spi_init();																		// init SPI interface
 	dma_spi_init();
 	
@@ -271,13 +279,10 @@ void init_hw_sw(void)
 	//--------------
 	
 	// init circular buffer for data incomming via SPI
-	inIndexAdd		= 0;
 	inIndexGet		= 0;
-	inCount				= 0;
 	
 	// init circular buffer for data outgoing via SPI
 	outIndexAdd		= 0;
-	outIndexGet		= 0;
 	outCount			= 0;
 
 	// init track and side vars for the floppy position
@@ -329,13 +334,19 @@ BYTE getNextMFMword(void)
 	WORD wval;
 
 	if(stream4e == 0) {
-		while(inCount > 0) {								// go through inBuffer to process commands and to find some data
-			inBuffer_get(wval);								// get WORD from buffer
+		while(1) {														// go through inBuffer to process commands and to find some data
+			inBuffer_get_noMove(wval);					// get WORD from buffer, but don't move
 		
+			if(wval == CMD_MARK_READ) {					// we've hit the already read part of buffer? (underflow) quit loop
+				break;
+			}
+			
+			inBuffer_markAndmove();							// mark this word as read
+			
 			// lower nibble == 0? it's a command from host - if we should turn on/off the write protect or disk change
-			if((wval & 0x0f00) == 0) {				// it's a command?
+			if((wval & 0x0f00) == 0) {					// it's a command?
 				processHostCommand(wval);
-			} else {													// not a command? return it
+			} else {														// not a command? return it
 				gapIndex = 0;		
 				return wval;
 			}
@@ -525,7 +536,7 @@ void dma_spi_init(void)
   DMA_InitStructure.DMA_PeripheralBaseAddr	= (uint32_t) &(SPI1->DR);						// from this peripheral address
   DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) inBuffer;							// to this buffer located in memory
   DMA_InitStructure.DMA_DIR									= DMA_DIR_PeripheralSRC;						// dir: from periph to mem
-  DMA_InitStructure.DMA_BufferSize					= 2048;															// 2048 datas to transfer
+  DMA_InitStructure.DMA_BufferSize					= INBUFFER_SIZE;										// 2048 datas to transfer
   DMA_InitStructure.DMA_PeripheralInc				= DMA_PeripheralInc_Disable;				// PINC = 0 -- don't icrement, always write to SPI1->DR register
   DMA_InitStructure.DMA_MemoryInc						= DMA_MemoryInc_Enable;							// MINC = 1 -- increment in memory -- go though buffer
   DMA_InitStructure.DMA_PeripheralDataSize	= DMA_PeripheralDataSize_HalfWord;	// each data item: 16 bits 
