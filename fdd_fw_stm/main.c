@@ -17,7 +17,6 @@ void addAttention(BYTE atn);
 void processHostCommand(WORD hostWord);
 
 void spi_init(void);
-void spi_TxRx(void);
 
 void dma_mfm_init(void);
 void dma_spi_init(void);
@@ -39,12 +38,14 @@ TODO:
 // gap byte 0x4e == 666446 us = 222112 times = 10'10'10'01'01'10 = 0xa96
 // first gap (60 * 0x4e) takes 1920 us (1.9 ms)
 
-#define INBUFFER_SIZE		2048
+#define INBUFFER_SIZE				2048
 WORD inBuffer[INBUFFER_SIZE];
 WORD inIndexGet;
 
+#define OUTBUFFERDMA_SIZE		32
+WORD outBufferDma[OUTBUFFERDMA_SIZE];
 WORD outBuffer[1024];
-WORD outIndexAdd, outCount;
+WORD outIndexAdd, outIndexGet, outCount;
 
 BYTE side, track, sector;
 
@@ -87,11 +88,11 @@ WORD t1, t2, dt;
 #define		FloppyMFMread_Disable()		{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x00004000); };
 
 //--------------
+// circular buffer 
 // watch out, these macros take 0.73 us for _add, and 0.83 us for _get operation!
-// cyclic buffer add macros
-#define 	outBuffer_add(X)				{ outBuffer[outIndexAdd]	= X;						outIndexAdd++;	outIndexAdd	= outIndexAdd & 0x3ff; 	outCount++; }
+#define 	outBuffer_add(X)				{ outBuffer[outIndexAdd] = X;		outIndexAdd++;	outIndexAdd	= outIndexAdd & 0x3ff; 	outCount++; }
+#define		outBuffer_get(X)				{ X = outBuffer[outIndexGet];		outIndexGet++;	outIndexGet	= outIndexGet & 0x3ff;	outCount--;	}
 
-// cyclic buffer get macros
 #define		inBuffer_get(X)					{ X = inBuffer[inIndexGet];								inIndexGet++;		inIndexGet = inIndexGet	& 0x7ff;	}
 #define		inBuffer_get_noMove(X)	{ X = inBuffer[inIndexGet];																																	}
 #define		inBuffer_markAndmove()	{ inBuffer[inIndexGet] = CMD_MARK_READ;		inIndexGet++;		inIndexGet = inIndexGet	& 0x7ff;	}
@@ -109,14 +110,20 @@ int main (void)
 
 	// init floppy signals
 	GPIOB->BSRR = (WR_PROTECT | DISK_CHANGE);			// not write protected, not changing disk (ready!)
-	GPIOB->BRR = TRACK0;													// TRACK 0 signal to L			
+	GPIOB->BRR = TRACK0;													// TRACK 0 signal to L		
+	GPIOB->BRR = ATN;															// ATTENTION bit low - nothing to read
 	
 	// whole loop without INDEX and MOTOR_ENABLE checking: 2.8 us (other bits), 3.7 us (when fetching new mfm byte)
 	while(1) {
 		WORD ints;
 		WORD inputs = GPIOB->IDR;								// read floppy inputs
 
-		spi_TxRx();															// every 1 us might a SPI WORD be received! (16 MHz SPI clock)
+/*		
+		t1 = TIM3->CNT;
+		outBuffer_get(ints);
+		t2 = TIM3->CNT;	
+		dt = t2 - t1;
+*/	
 		
 //		if((inputs & (MOTOR_ENABLE | DRIVE_SELECT)) != 0) {		// motor not enabled, drive not selected? do nothing
 		if(0) {
@@ -160,10 +167,32 @@ int main (void)
 			fillMfmTimesForDMA();																		// fill the circular DMA buffer with mfm times
 		}
 
-		if((DMA1->ISR & (DMA1_IT_TC3 | DMA1_IT_HT3)) != 0) {			// SPI TX: TC or HT interrupt? (TX goes to outBuffer)
+		if((DMA1->ISR & (DMA1_IT_TC3 | DMA1_IT_HT3)) != 0) {			// SPI TX: TC or HT interrupt? (TX goes to outBufferDma)
+			WORD i, wval;
+			WORD ind = 0;																						// default index: as if HC is set (can work with lower half - 0-15)
 			
-			
+			if((DMA1->ISR & DMA1_IT_TC3) != 0) {										// if TC is set, can work with upper half (16-31)
+				ind = OUTBUFFERDMA_SIZE/2;
+			}
+
 			DMA1->IFCR = (DMA1_IT_TC3 | DMA1_IT_HT3);								// clear flags
+			
+			for(i=0; i<OUTBUFFERDMA_SIZE/2; i++) {									// fill the outBuffer for DMA SPI TX 
+				if(outCount > 0) {																		// something to send? get if from buffer
+					outBuffer_get(wval);
+				} else {																							// nothing to send? just use zero
+					wval = 0;
+				}
+				
+				outBufferDma[ind] = wval;															// store to DMA buffer
+				ind++;
+			}			
+			
+			if(outCount > 0) {
+				GPIOB->BSRR = ATN;									// ATTENTION bit high - got something to read
+			} else {
+				GPIOB->BRR = ATN;										// ATTENTION bit low - nothing to read
+			}			
 		}
 
 		// check for STEP pulse - should we go to a different track?
@@ -264,6 +293,10 @@ void init_hw_sw(void)
 		inBuffer[i] = CMD_MARK_READ;
 	}
 	
+	for(i=0; i<OUTBUFFERDMA_SIZE; i++) {					// fill the outBuffer for DMA SPI TX with zeros
+		outBufferDma[i] = 0;
+	}
+	
 	spi_init();																		// init SPI interface
 	dma_spi_init();
 	
@@ -283,6 +316,7 @@ void init_hw_sw(void)
 	
 	// init circular buffer for data outgoing via SPI
 	outIndexAdd		= 0;
+	outIndexGet		= 0;
 	outCount			= 0;
 
 	// init track and side vars for the floppy position
@@ -442,36 +476,6 @@ void spi_init(void)
 	SPI_Cmd(SPI1, ENABLE);
 }
 
-void spi_TxRx(void)
-{
-	WORD status = SPI1->SR;									// read SPI status
-	
-	if(status & (1 << 1)) {									// TXE flag: Tx buffer empty
-		if(outCount >= 2) {										// something to send? good
-			WORD hi, lo;
-/*			
-			outBuffer_get(hi);									// get from outbuffer twice
-			outBuffer_get(lo);
-*/			
-			hi = (hi << 8) | lo;								// combine bytes into word
-			
-			SPI1->DR = hi;											// send over SPI
-		} else {															// no data to send, just send zero
-			GPIOB->BRR = ATN;										// ATTENTION bit low - nothing to read	
-			
-			SPI1->DR = 0;
-		}
-	}
-	
-	if(status & (1 << 0)) {									// RXNE flag: Rx buffer not empty
-		WORD data = SPI1->DR;									// get data
-/*		
-		inBuffer_add(data >> 8);
-		inBuffer_add(data & 0xff);
-*/		
-	}
-}
-
 void dma_mfm_init(void)
 {
 	DMA_InitTypeDef DMA_InitStructure;
@@ -508,10 +512,10 @@ void dma_spi_init(void)
 	// DMA1 channel3 configuration -- SPI1 TX
   DMA_DeInit(DMA1_Channel3);
 	
-  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) outBuffer;							// from this buffer located in memory
+  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) outBufferDma;					// from this buffer located in memory
   DMA_InitStructure.DMA_PeripheralBaseAddr	= (uint32_t) &(SPI1->DR);						// to this peripheral address
   DMA_InitStructure.DMA_DIR									= DMA_DIR_PeripheralDST;						// dir: from mem to periph
-  DMA_InitStructure.DMA_BufferSize					= 1024;															// 1024 datas to transfer
+  DMA_InitStructure.DMA_BufferSize					= OUTBUFFERDMA_SIZE;								// 32 datas to transfer
   DMA_InitStructure.DMA_PeripheralInc				= DMA_PeripheralInc_Disable;				// PINC = 0 -- don't icrement, always write to SPI1->DR register
   DMA_InitStructure.DMA_MemoryInc						= DMA_MemoryInc_Enable;							// MINC = 1 -- increment in memory -- go though buffer
   DMA_InitStructure.DMA_PeripheralDataSize	= DMA_PeripheralDataSize_HalfWord;	// each data item: 16 bits 
