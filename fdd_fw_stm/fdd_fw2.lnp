@@ -1,4 +1,4 @@
---cpu Cortex-M3 "startup_stm32f10x_ld.o" "main.o" "system_stm32f10x.o" "timers.o" "stm32f10x_spi.o" "misc.o" "stm32f10x_dma.o" 
+--cpu Cortex-M3 "startup_stm32f10x_ld.o" "main.o" "system_stm32f10x.o" "timers.o" "stm32f10x_spi.o" "misc.o" "stm32f10x_dma.o" "stm32f10x_tim.o" 
 --ro-base 0x08000000 --entry 0x08000000 --rw-base 0x20000000 --entry Reset_Handler --first __Vectors --strict --summary_stderr --info summarysizes --map --xref --callgraph --symbols 
 --info sizes --info totals --info unused --info veneers 
  --list ".\fdd_fw2.map" -o fdd_fw2.axf
