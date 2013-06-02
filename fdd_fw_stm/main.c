@@ -1,8 +1,7 @@
-#include "stm32f10x.h"                       /* STM32F103 definitions         */
+#include "stm32f10x.h"                       // STM32F103 definitions
 #include "stm32f10x_spi.h"
 #include "stm32f10x_tim.h"
 #include "stm32f10x_dma.h"
-
 #include "misc.h"
 
 #include "defs.h"
@@ -17,15 +16,12 @@ void addAttention(BYTE atn);
 void processHostCommand(WORD hostWord);
 
 void spi_init(void);
-void fillSpiTxDmaBuffer(void);
 
 void dma_mfm_init(void);
 void dma_spi_init(void);
 
 /*
 TODO:
- - ATN clearing!
- - fix working with outBuffer for WORD memory elements - with DMA
  - test DMA SPI
  - test TIM1, TIM2 po presune!
  - pomeranie kolko trvaju jednotlive casti kodu
@@ -39,17 +35,15 @@ TODO:
 // gap byte 0x4e == 666446 us = 222112 times = 10'10'10'01'01'10 = 0xa96
 // first gap (60 * 0x4e) takes 1920 us (1.9 ms)
 
-#define INBUFFER_SIZE				2048
+#define INBUFFER_SIZE					2048
 WORD inBuffer[INBUFFER_SIZE];
 WORD inIndexGet;
 
-#define OUTBUFFERDMA_SIZE		32
-WORD outBufferDma[OUTBUFFERDMA_SIZE];
-WORD outBuffer[1024];
-WORD outIndexAdd, outIndexGet, outCount;
-
-TAtnBuffer atnBuffer[2];
+TAtnBuffer atnBuffer[2];							// two buffers for ATNs 
 TAtnBuffer *atnNow;
+
+TWriteBuffer wrBuffer[2];							// two buffers for written sectors
+TWriteBuffer *wrNow;
 
 BYTE side, track, sector;
 
@@ -94,10 +88,9 @@ WORD t1, t2, dt;
 //--------------
 // circular buffer 
 // watch out, these macros take 0.73 us for _add, and 0.83 us for _get operation!
-//#define 	outBuffer_add(X)				{ outBuffer[outIndexAdd] = X;		outIndexAdd++;	outIndexAdd	= outIndexAdd & 0x3ff; 	outCount++; }
-#define		outBuffer_get(X)				{ X = outBuffer[outIndexGet];		outIndexGet++;	outIndexGet	= outIndexGet & 0x3ff;	outCount--;	}
 
-#define		atnBuffer_add(X)				{ if(atnNow->count > 15) return;	atnNow->buffer[atnNow->count] = X; atnNow->count++; }
+#define		atnBuffer_add(X)				{ if(atnNow->count > 15) return;	atnNow->buffer[atnNow->count] = X;	atnNow->count++;	}
+#define		wrBuffer_add(X)					{ if(wrNow->count > 549) return;	wrNow->buffer[wrNow->count] = X;		wrNow->count++;		}
 
 #define		inBuffer_get(X)					{ X = inBuffer[inIndexGet];								inIndexGet++;		inIndexGet = inIndexGet	& 0x7ff;	}
 #define		inBuffer_get_noMove(X)	{ X = inBuffer[inIndexGet];																																	}
@@ -122,13 +115,6 @@ int main (void)
 		WORD ints;
 		WORD inputs = GPIOB->IDR;								// read floppy inputs
 
-/*		
-		t1 = TIM3->CNT;
-		outBuffer_get(ints);
-		t2 = TIM3->CNT;	
-		dt = t2 - t1;
-*/	
-		
 //		if((inputs & (MOTOR_ENABLE | DRIVE_SELECT)) != 0) {		// motor not enabled, drive not selected? do nothing
 		if(0) {
 			if(outputsActive == 1) {							// if we got outputs active
@@ -167,26 +153,43 @@ int main (void)
 			
 		}
 
-		if((DMA1->ISR & (DMA1_IT_TC5 | DMA1_IT_HT5)) != 0) {			// MFM stream: TC or HT interrupt? we've streamed half of circular buffer!
-			fillMfmTimesForDMA();																		// fill the circular DMA buffer with mfm times
+		if((DMA1->ISR & (DMA1_IT_TC5 | DMA1_IT_HT5)) != 0) {		// MFM stream: TC or HT interrupt? we've streamed half of circular buffer!
+			fillMfmTimesForDMA();																	// fill the circular DMA buffer with mfm times
 		}
 
 		if(DMA1_Channel3->CNDTR == 0) {													// SPI TX: nothing to transfer?
-			// TODO: add setting and clearing of ATN pin here!	
-			// GPIOB->BSRR = ATN;																	// ATTENTION bit high - got something to read
+			BYTE sending = FALSE;
 			
 			if(atnNow->count > 0) {																// the current ATN buffer holds some ATNs to send?
-				atnNow->sending	= TRUE;															// mark this buffer as being sent
-
+				sending = TRUE;
+				
 				DMA1_Channel3->CCR		&= 0xfffffffe;								// disable DMA1 Channel3 transfer
 				DMA1_Channel3->CMAR		= (uint32_t) atnNow->buffer;	// from this buffer located in memory
 				DMA1_Channel3->CNDTR	= atnNow->count;							// this much data
 				DMA1_Channel3->CCR		|= 1;													// enable DMA1 Channel3 transfer
 				
-				atnNow					= atnNow->next;					// and now we will select the next buffer as current
+				atnNow					= atnNow->next;											// and now we will select the next buffer as current
 				atnNow->count		= 0;
-				atnNow->sending	= FALSE;
 			}
+
+			if(sending != TRUE && wrNow->count > 0) {							// not sending any ATN right now? and current write buffer has something?
+				sending = TRUE;
+				
+				DMA1_Channel3->CCR		&= 0xfffffffe;								// disable DMA1 Channel3 transfer
+				DMA1_Channel3->CMAR		= (uint32_t) wrNow->buffer;		// from this buffer located in memory
+				DMA1_Channel3->CNDTR	= wrNow->count;								// this much data
+				DMA1_Channel3->CCR		|= 1;													// enable DMA1 Channel3 transfer
+				
+				wrNow						= wrNow->next;											// and now we will select the next buffer as current
+				wrNow->count		= 0;
+			}
+			
+			if(sending == TRUE) {
+				GPIOB->BSRR = ATN;																	// ATTENTION bit high - got something to read
+			} else {
+				DMA1_Channel3->CCR		&= 0xfffffffe;								// disable DMA1 Channel3 transfer
+				GPIOB->BRR = ATN;																		// ATTENTION bit low  - nothing to read
+			}				 
 		}
 
 		// check for STEP pulse - should we go to a different track?
@@ -287,23 +290,26 @@ void init_hw_sw(void)
 		inBuffer[i] = CMD_MARK_READ;
 	}
 	
-	for(i=0; i<OUTBUFFERDMA_SIZE; i++) {					// fill the outBuffer for DMA SPI TX with zeros
-		outBufferDma[i] = 0;
-	}
-	
 	spi_init();																		// init SPI interface
 	dma_spi_init();
 
 	// init both ATN buffers - mark them as empty, not sending, use first as current
 	atnBuffer[0].count		= 0;			
-	atnBuffer[0].sending	= FALSE;	
 	atnBuffer[0].next			= &atnBuffer[1];
 	
 	atnBuffer[1].count		= 0;
-	atnBuffer[1].sending	= FALSE;	
 	atnBuffer[1].next			= &atnBuffer[0];
 
 	atnNow = &atnBuffer[0];
+	
+	// now init both writeBuffers
+	wrBuffer[0].count			= 0;
+	wrBuffer[0].next			= &wrBuffer[1];
+	
+	wrBuffer[1].count			= 0;
+	wrBuffer[1].next			= &wrBuffer[0];
+
+	wrNow = &wrBuffer[0];
 	//--------------
 	// configure MFM read stream by TIM2 CH4 and DMA in circular mode
 	// WARNING!!! Never let mfmStreamBuffer[] contain a 0! With 0 the timer update never comes and streaming stops!
@@ -318,46 +324,12 @@ void init_hw_sw(void)
 	// init circular buffer for data incomming via SPI
 	inIndexGet		= 0;
 	
-	// init circular buffer for data outgoing via SPI
-	outIndexAdd		= 0;
-	outIndexGet		= 0;
-	outCount			= 0;
-
 	// init track and side vars for the floppy position
 	side					= 0;
 	track 				= 0;
 	sector				= 1;
 	
 	stream4e			= 0;			// mark that we shouldn't stream any 0x4e (yet)
-}
-
-void fillSpiTxDmaBuffer(void)
-{
-	WORD i, wval;
-	WORD ind = 0;																						// default index: as if HC is set (can work with lower half - 0-15)
-		
-	if((DMA1->ISR & DMA1_IT_TC3) != 0) {										// if TC is set, can work with upper half (16-31)
-		ind = OUTBUFFERDMA_SIZE/2;
-	}
-
-	DMA1->IFCR = (DMA1_IT_TC3 | DMA1_IT_HT3);								// clear flags
-		
-	for(i=0; i<OUTBUFFERDMA_SIZE/2; i++) {									// fill the outBuffer for DMA SPI TX 
-		if(outCount > 0) {																		// something to send? get if from buffer
-			outBuffer_get(wval);
-		} else {																							// nothing to send? just use zero
-			wval = 0;
-		}
-			
-		outBufferDma[ind] = wval;															// store to DMA buffer
-		ind++;
-	}			
-		
-	if(outCount > 0) {
-		GPIOB->BSRR = ATN;									// ATTENTION bit high - got something to read
-	} else {
-		GPIOB->BRR = ATN;										// ATTENTION bit low - nothing to read
-	}			
 }
 
 void fillMfmTimesForDMA(void)
@@ -480,8 +452,6 @@ void addAttention(BYTE atn)
 
 	atnBuffer_add(0);											
 	atnBuffer_add(0);											// last word: 0
-	
-	GPIOB->BSRR = ATN;										// ATTENTION bit high - got something to read
 }
 
 void spi_init(void)

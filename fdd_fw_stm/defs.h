@@ -12,10 +12,17 @@ typedef struct
 {
 	WORD buffer[16];					// for 4 ATNs (of length 4 WORDs)
 	WORD count;								// count of WORDs in buffer (0 .. 15)
-	WORD sending;							// mark this struct as currently sending
 	
 	void *next;								// pointer to the next available TAtnBuffer
 } TAtnBuffer;
+
+typedef struct 
+{
+	WORD buffer[550];					// buffer for the written data
+	WORD count;								// count of WORDs in buffer 
+	
+	void *next;								// pointer to the next available TAtnBuffer
+} TWriteBuffer;
 
 /*
 reserved:
