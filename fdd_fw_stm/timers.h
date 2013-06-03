@@ -1,8 +1,8 @@
 #include "stm32f10x_tim.h"
 
 void timerSetup_index(void);
-void timerSetup_mfm(void);
-void timerSetup_measure(void);
+void timerSetup_mfmRead(void);
+void timerSetup_mfmWrite(void);
 
 void TIM_TimeBaseInit(TIM_TypeDef* TIMx, TIM_TimeBaseInitTypeDef* TIM_TimeBaseInitStruct);
 void TIM_OC1Init(TIM_TypeDef* TIMx, TIM_OCInitTypeDef* TIM_OCInitStruct);

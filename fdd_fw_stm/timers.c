@@ -35,11 +35,10 @@ void timerSetup_index(void)
 	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);				// inable int from this timer
 }
 
-void timerSetup_mfm(void)
+void timerSetup_mfmRead(void)
 {
 	TIM_TimeBaseInitTypeDef		TIM_TimeBaseStructure;
 	TIM_OCInitTypeDef					TIM_OCInitStructure;
-	TIM_ICInitTypeDef					TIM_CH1_ICInitStructure;
 	
 	uint16_t PrescalerValue = 0;
 	uint16_t period					= 8;																			// 4us - length of 1 period in clock ticks when timer is prescaled to 2 MHz
@@ -75,24 +74,18 @@ void timerSetup_mfm(void)
 	// reference manual on page 407 says only UDE
 	TIM_ITConfig(TIM1, (1 <<  8), ENABLE);						// enable Bit  8 - UDE: Update DMA request enable
 
-	// setup input capture
-	TIM_CH1_ICInitStructure.TIM_Channel			= TIM_Channel_1;
-  TIM_CH1_ICInitStructure.TIM_ICPolarity	= TIM_ICPolarity_Falling;
-  TIM_CH1_ICInitStructure.TIM_ICSelection	= TIM_ICSelection_DirectTI;
-  TIM_CH1_ICInitStructure.TIM_ICPrescaler	= TIM_ICPSC_DIV1;
-  TIM_CH1_ICInitStructure.TIM_ICFilter		= 0;
-  TIM_ICInit(TIM1, &TIM_CH1_ICInitStructure);
-	
 	TIM1->BDTR = 0x8000;															// set MOE bit (Main Output Enable)
   TIM_Cmd(TIM1, ENABLE);														// enable timer
 }
 
-void timerSetup_measure(void)
+void timerSetup_mfmWrite(void)					
 {
+	// TIM3_CH1 can be used with DMA1_CH6
 	TIM_TimeBaseInitTypeDef		TIM_TimeBaseStructure;
+	TIM_ICInitTypeDef					TIM_CH1_ICInitStructure;
 
   // Time base configuration
-  TIM_TimeBaseStructure.TIM_Period						= 65500;					
+  TIM_TimeBaseStructure.TIM_Period						= 0xffff;					
   TIM_TimeBaseStructure.TIM_Prescaler					= 0;
   TIM_TimeBaseStructure.TIM_ClockDivision			= 0;
   TIM_TimeBaseStructure.TIM_CounterMode				= TIM_CounterMode_Up;
@@ -101,6 +94,18 @@ void timerSetup_measure(void)
   TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
   TIM_ARRPreloadConfig(TIM3, DISABLE);							// disable preloading
 
+	// setup input capture
+	TIM_CH1_ICInitStructure.TIM_Channel			= TIM_Channel_1;
+  TIM_CH1_ICInitStructure.TIM_ICPolarity	= TIM_ICPolarity_Falling;
+  TIM_CH1_ICInitStructure.TIM_ICSelection	= TIM_ICSelection_DirectTI;
+  TIM_CH1_ICInitStructure.TIM_ICPrescaler	= TIM_ICPSC_DIV1;
+  TIM_CH1_ICInitStructure.TIM_ICFilter		= 0;
+  TIM_ICInit(TIM3, &TIM_CH1_ICInitStructure);
+	
+	// set TIM1 DMA control register (TIMx_DCR) as: DBL (<<8) =0 (1 transfer), DBA (<<0) = 13	(0x34 TIMx_CCR1)
+	TIM3->DCR = 13;
+	TIM_ITConfig(TIM3, (1 <<  9), ENABLE);						// enable Bit 9 - CC1DE: Capture/Compare 1 DMA request enable (CC1 DMA request enabled)
+	
   TIM_Cmd(TIM3, ENABLE);														// enable timer
 }
 

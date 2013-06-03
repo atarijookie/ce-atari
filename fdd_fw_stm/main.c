@@ -17,11 +17,15 @@ void processHostCommand(WORD hostWord);
 
 void spi_init(void);
 
-void dma_mfm_init(void);
+void dma_mfmRead_init(void);
+void dma_mfmWrite_init(void);
 void dma_spi_init(void);
 
 /*
 TODO:
+ - odmerat tvar WDATA, polaritu WGATE
+ - test TIM3 input capture bez DMA, potom s DMA
+ - pridat kod na transformaciu TIM3 casov na MFM casy
  - test DMA SPI
  - test TIM1, TIM2 po presune!
  - pomeranie kolko trvaju jednotlive casti kodu
@@ -47,8 +51,10 @@ TWriteBuffer *wrNow;
 
 BYTE side, track, sector;
 
-WORD mfmStreamBuffer[16];							// 16 words - 16 mfm times. Half of buffer is 8 times - at least 32 us (8 * 4us), 
+WORD mfmReadStreamBuffer[16];							// 16 words - 16 mfm times. Half of buffer is 8 times - at least 32 us (8 * 4us),
 BYTE stream4e;												// the count of 0x4e bytes we should stream (used for the 1st gap)
+
+WORD mfmWriteStreamBuffer[16];
 
 // cycle measure: t1 = TIM3->CNT;	t2 = TIM3->CNT;	dt = t2 - t1; -- subtrack 0x12 because that's how much measuring takes
 WORD t1, t2, dt; 
@@ -238,7 +244,7 @@ int main (void)
 			sector = 1;
 			
 			for(i=0; i<16; i++) {						// copy in the 'broken' 0x4e sequence to start streaming 0x4e immediately 
-				mfmStreamBuffer[i] = broken4e[i];
+				mfmReadStreamBuffer[i] = broken4e[i];
 			}
 			
 			addAttention(ATN_SEND_NEXT_SECTOR);
@@ -276,14 +282,14 @@ void init_hw_sw(void)
 	EXTI->FTSR 		= STEP;											// Falling trigger selection register - STEP pulse
 	
 	//----------
-	AFIO->MAPR |= (2 << 24);									// SWJ_CFG[2:0] (Bits 26:24) -- 010: JTAG-DP Disabled and SW-DP Enabled
-	AFIO->MAPR |= 0x0300;											// TIM2_REMAP -- Full remap (CH1/ETR/PA15, CH2/PB3, CH3/PB10, CH4/PB11)
-
+	AFIO->MAPR |= 0x02000000;									// SWJ_CFG[2:0] (Bits 26:24) -- 010: JTAG-DP Disabled and SW-DP Enabled
+	AFIO->MAPR |= 0x00000300;									// TIM2_REMAP -- Full remap (CH1/ETR/PA15, CH2/PB3, CH3/PB10, CH4/PB11)
+	AFIO->MAPR |= 0x00000800;									// TIM3_REMAP -- Partial remap (CH1/PB4, CH2/PB5, CH3/PB0, CH4/PB1)
 	//----------
 	timerSetup_index();
 	
-	timerSetup_measure();
-	
+	timerSetup_mfmWrite();
+	dma_mfmWrite_init();
 	//--------------
 	// DMA + SPI initialization
 	for(i=0; i<INBUFFER_SIZE; i++) {							// fill the inBuffer with CMD_MARK_READ, which will tell that every byte is empty (already read)
@@ -312,13 +318,13 @@ void init_hw_sw(void)
 	wrNow = &wrBuffer[0];
 	//--------------
 	// configure MFM read stream by TIM2 CH4 and DMA in circular mode
-	// WARNING!!! Never let mfmStreamBuffer[] contain a 0! With 0 the timer update never comes and streaming stops!
+	// WARNING!!! Never let mfmReadStreamBuffer[] contain a 0! With 0 the timer update never comes and streaming stops!
 	for(i=0; i<16; i++) {
-		mfmStreamBuffer[i] = 7;				// by default -- all pulses 4 us
+		mfmReadStreamBuffer[i] = 7;				// by default -- all pulses 4 us
 	}
 	
-	timerSetup_mfm();								// init MFM stream timer
-	dma_mfm_init();									// and init the DMA which will feed it from circular buffer
+	timerSetup_mfmRead();								// init MFM READ stream timer
+	dma_mfmRead_init();									// and init the DMA which will feed it from circular buffer
 	//--------------
 	
 	// init circular buffer for data incomming via SPI
@@ -361,7 +367,7 @@ void fillMfmTimesForDMA(void)
 		time		= mfmTimes[time];										// convert to ARR value
 		times8	= times8 << 2;											// shift 2 bits higher so we would get lower bits next time
 
-		mfmStreamBuffer[ind] = time;								// store and move to next one
+		mfmReadStreamBuffer[ind] = time;								// store and move to next one
 		ind++;
 	}
 }
@@ -469,14 +475,14 @@ void spi_init(void)
 	SPI_Cmd(SPI1, ENABLE);
 }
 
-void dma_mfm_init(void)
+void dma_mfmRead_init(void)
 {
 	DMA_InitTypeDef DMA_InitStructure;
 	
 	// DMA1 channel5 configuration -- TIM1_UP (update)
   DMA_DeInit(DMA1_Channel5);
 	
-  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) mfmStreamBuffer;				// from this buffer located in memory
+  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) mfmReadStreamBuffer;				// from this buffer located in memory
   DMA_InitStructure.DMA_PeripheralBaseAddr	= (uint32_t) &(TIM1->DMAR);					// to this peripheral address
   DMA_InitStructure.DMA_DIR									= DMA_DIR_PeripheralDST;						// dir: from mem to periph
   DMA_InitStructure.DMA_BufferSize					= 16;																// 16 datas to transfer
@@ -497,6 +503,34 @@ void dma_mfm_init(void)
   DMA_Cmd(DMA1_Channel5, ENABLE);
 }
 
+void dma_mfmWrite_init(void)
+{
+	DMA_InitTypeDef DMA_InitStructure;
+	
+	// DMA1 channel6 configuration -- TIM3_CH1 (capture)
+  DMA_DeInit(DMA1_Channel6);
+	
+  DMA_InitStructure.DMA_PeripheralBaseAddr	= (uint32_t) &(TIM3->DMAR);					// from this peripheral address
+  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) mfmWriteStreamBuffer;	// to this buffer located in memory
+  DMA_InitStructure.DMA_DIR									= DMA_DIR_PeripheralSRC;						// dir: from periph to mem
+  DMA_InitStructure.DMA_BufferSize					= 16;																// 16 datas to transfer
+  DMA_InitStructure.DMA_PeripheralInc				= DMA_PeripheralInc_Disable;				// PINC = 0 -- don't icrement, always read from DMAR register
+  DMA_InitStructure.DMA_MemoryInc						= DMA_MemoryInc_Enable;							// MINC = 1 -- increment in memory -- go though buffer
+  DMA_InitStructure.DMA_PeripheralDataSize	= DMA_PeripheralDataSize_HalfWord;	// each data item: 16 bits 
+  DMA_InitStructure.DMA_MemoryDataSize			= DMA_MemoryDataSize_HalfWord;			// each data item: 16 bits 
+  DMA_InitStructure.DMA_Mode								= DMA_Mode_Circular;								// circular mode
+  DMA_InitStructure.DMA_Priority						= DMA_Priority_Medium;
+  DMA_InitStructure.DMA_M2M									= DMA_M2M_Disable;									// M2M disabled, because we move to peripheral
+  DMA_Init(DMA1_Channel6, &DMA_InitStructure);
+
+  // Enable DMA1 Channel6 Transfer Complete interrupt
+  DMA_ITConfig(DMA1_Channel6, DMA_IT_HT, ENABLE);			// interrupt on Half Transfer (HT)
+  DMA_ITConfig(DMA1_Channel6, DMA_IT_TC, ENABLE);			// interrupt on Transfer Complete (TC)
+
+  // Enable DMA1 Channel6 transfer
+  DMA_Cmd(DMA1_Channel6, ENABLE);
+}
+
 void dma_spi_init(void)
 {
 	// SPI1_TX -- DMA1_CH3
@@ -514,7 +548,7 @@ void dma_spi_init(void)
   DMA_InitStructure.DMA_PeripheralDataSize	= DMA_PeripheralDataSize_HalfWord;	// each data item: 16 bits 
   DMA_InitStructure.DMA_MemoryDataSize			= DMA_MemoryDataSize_HalfWord;			// each data item: 16 bits 
   DMA_InitStructure.DMA_Mode								= DMA_Mode_Normal;									// normal mode
-  DMA_InitStructure.DMA_Priority						= DMA_Priority_Medium;
+  DMA_InitStructure.DMA_Priority						= DMA_Priority_High;
   DMA_InitStructure.DMA_M2M									= DMA_M2M_Disable;									// M2M disabled, because we move to peripheral
   DMA_Init(DMA1_Channel3, &DMA_InitStructure);
 
@@ -539,7 +573,7 @@ void dma_spi_init(void)
   DMA_InitStructure.DMA_PeripheralDataSize	= DMA_PeripheralDataSize_HalfWord;	// each data item: 16 bits 
   DMA_InitStructure.DMA_MemoryDataSize			= DMA_MemoryDataSize_HalfWord;			// each data item: 16 bits 
   DMA_InitStructure.DMA_Mode								= DMA_Mode_Circular;								// circular mode
-  DMA_InitStructure.DMA_Priority						= DMA_Priority_Medium;
+  DMA_InitStructure.DMA_Priority						= DMA_Priority_High;
   DMA_InitStructure.DMA_M2M									= DMA_M2M_Disable;									// M2M disabled, because we move from peripheral
   DMA_Init(DMA1_Channel2, &DMA_InitStructure);
 
