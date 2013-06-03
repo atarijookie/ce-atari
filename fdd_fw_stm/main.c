@@ -12,6 +12,8 @@ void init_hw_sw(void);
 void fillMfmTimesForDMA(void);
 BYTE getNextMFMword(void);
 
+void getMfmWriteTimes(void);
+
 void addAttention(BYTE atn);
 void processHostCommand(WORD hostWord);
 
@@ -55,6 +57,7 @@ WORD mfmReadStreamBuffer[16];							// 16 words - 16 mfm times. Half of buffer i
 BYTE stream4e;												// the count of 0x4e bytes we should stream (used for the 1st gap)
 
 WORD mfmWriteStreamBuffer[16];
+WORD lastMfmWriteTC;
 
 // cycle measure: t1 = TIM3->CNT;	t2 = TIM3->CNT;	dt = t2 - t1; -- subtrack 0x12 because that's how much measuring takes
 WORD t1, t2, dt; 
@@ -153,13 +156,16 @@ int main (void)
 		}
 		
 		if((inputs & WGATE) == 0) {							// when write gate is low, the data is written to floppy
-			// TODO: do write support here!
+			// TODO: set lastMfmWriteTC to current TC value on WRITE start
+			// TODO: add header to wrBuffer_add on WRITE start
+			// TODO: on write done - mark buffer as ready to send, fix starting of sending
 			
-			
-			
+			if((DMA1->ISR & (DMA1_IT_TC6 | DMA1_IT_HT6)) != 0) {	// MFM write stream: TC or HT interrupt? we've streamed half of circular buffer!
+				getMfmWriteTimes();
+			}
 		}
 
-		if((DMA1->ISR & (DMA1_IT_TC5 | DMA1_IT_HT5)) != 0) {		// MFM stream: TC or HT interrupt? we've streamed half of circular buffer!
+		if((DMA1->ISR & (DMA1_IT_TC5 | DMA1_IT_HT5)) != 0) {		// MFM read stream: TC or HT interrupt? we've streamed half of circular buffer!
 			fillMfmTimesForDMA();																	// fill the circular DMA buffer with mfm times
 		}
 
@@ -336,6 +342,56 @@ void init_hw_sw(void)
 	sector				= 1;
 	
 	stream4e			= 0;			// mark that we shouldn't stream any 0x4e (yet)
+	
+	lastMfmWriteTC = 0;
+}
+
+void getMfmWriteTimes(void)
+{
+	WORD ind1, ind2, i, tmp, val, wval;
+	
+	// check for half transfer or transfer complete IF
+	if((DMA1->ISR & DMA1_IT_HT6) != 0) {				// HTIF6 -- Half Transfer IF 6
+		DMA1->IFCR = DMA1_IT_HT6;									// clear HTIF6 flag
+		ind1 = 7;
+		ind2 = 0;
+	} else if((DMA1->ISR & DMA1_IT_TC6) != 0) {	// TCIF6 -- Transfer Complete IF 6
+		DMA1->IFCR = DMA1_IT_TC6;									// clear TCIF6 flag
+		ind1 = 15;
+		ind2 = 8;
+	}
+
+	tmp = mfmWriteStreamBuffer[ind1];						// store the last one, we will move it to lastMfmWriteTC later
+	
+	for(i=0; i<7; i++) {												// create differences: this = this - previous; but only for 7 values
+		mfmWriteStreamBuffer[ind1] = mfmWriteStreamBuffer[ind1] - mfmWriteStreamBuffer[ind1-1];
+		ind1--;
+	}
+
+	mfmWriteStreamBuffer[ind1] = mfmWriteStreamBuffer[ind1] - lastMfmWriteTC;			// buffer[0] = buffer[0] - previousBuffer[15];  or buffer[8] = buffer[8] - previousBuffer[7];
+	lastMfmWriteTC = tmp;																													// store current last item as last
+	
+	for(i=0; i<8; i++) {												// now convert timer counter times to MFM times / codes
+		tmp = mfmWriteStreamBuffer[ind2];
+		ind2++;
+		
+		if(tmp < 200) {						// too short? skip it
+			continue;
+		} else if(tmp < 360) {		// 4 us?
+			
+		} else if(tmp < 504) {		// 6 us?
+			
+		} else if(tmp < 650) {		// 8 us?
+			
+		} else {									// too long?
+			continue;
+		}
+		
+		wval = wval << 2;					// shift and add to the WORD 
+		wval = wval | val;
+	}
+	
+	wrBuffer_add(wval);					// add to write buffer
 }
 
 void fillMfmTimesForDMA(void)
