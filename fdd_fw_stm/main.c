@@ -98,8 +98,8 @@ WORD t1, t2, dt;
 // circular buffer 
 // watch out, these macros take 0.73 us for _add, and 0.83 us for _get operation!
 
-#define		atnBuffer_add(X)				{ if(atnNow->count > 15) return;	atnNow->buffer[atnNow->count] = X;	atnNow->count++;	}
-#define		wrBuffer_add(X)					{ if(wrNow->count > 549) return;	wrNow->buffer[wrNow->count] = X;		wrNow->count++;		}
+#define		atnBuffer_add(X)				{ if(atnNow->count < 16)	{		atnNow->buffer[atnNow->count]	= X;	atnNow->count++;	}	}
+#define		wrBuffer_add(X)					{ if(wrNow->count  < 550)	{		wrNow->buffer[wrNow->count]		= X;	wrNow->count++;		}	}
 
 #define		inBuffer_get(X)					{ X = inBuffer[inIndexGet];								inIndexGet++;		inIndexGet = inIndexGet	& 0x7ff;	}
 #define		inBuffer_get_noMove(X)	{ X = inBuffer[inIndexGet];																																	}
@@ -111,6 +111,7 @@ WORD version[2] = {0xf013, 0x0527};				// this means: Franz, 2013-05-27
 int main (void) 
 {
 	BYTE prevSide = 0, outputsActive = 0;
+	WORD prevWGate = WGATE, WGate;
 	
 	init_hw_sw();																	// init GPIO pins, timers, DMA, global variables
 
@@ -155,11 +156,30 @@ int main (void)
 			outputsActive = 1;
 		}
 		
-		if((inputs & WGATE) == 0) {							// when write gate is low, the data is written to floppy
-			// TODO: set lastMfmWriteTC to current TC value on WRITE start
-			// TODO: add header to wrBuffer_add on WRITE start
-			// TODO: on write done - mark buffer as ready to send, fix starting of sending
+		WGate = inputs & WGATE;												// get current WGATE value
+		if(prevWGate != WGate) {											// if WGate changed
 			
+			if(WGate == 0) {														// on falling edge of WGATE
+				WORD wval;
+
+				lastMfmWriteTC = TIM3->CNT;								// set lastMfmWriteTC to current TC value on WRITE start
+				wrNow->readyToSend = FALSE;								// mark this buffer as not ready to be sent yet
+				
+				wval = (ATN_SECTOR_WRITTEN << 8) | side;	// 1st byte: ATN code, 2nd byte: side 
+				wrBuffer_add(wval);
+	
+				wval = (track << 8) | sector;							// 3rd byte: track #, 4th byte: current sector #
+				wrBuffer_add(wval);									
+			} else {																		// on rising edge
+				wrBuffer_add(0);													// last word: 0
+				
+				wrNow->readyToSend = TRUE;								// mark this buffer as ready to be sent
+			}			
+			
+			prevWGate = WGate;													// store WGATE value
+		}
+		
+		if(WGate == 0) {																				// when write gate is low, the data is written to floppy
 			if((DMA1->ISR & (DMA1_IT_TC6 | DMA1_IT_HT6)) != 0) {	// MFM write stream: TC or HT interrupt? we've streamed half of circular buffer!
 				getMfmWriteTimes();
 			}
@@ -184,16 +204,19 @@ int main (void)
 				atnNow->count		= 0;
 			}
 
-			if(sending != TRUE && wrNow->count > 0) {							// not sending any ATN right now? and current write buffer has something?
+			if(sending == FALSE && wrNow->readyToSend == TRUE) {		// not sending any ATN right now? and current write buffer has something?
 				sending = TRUE;
-				
+
 				DMA1_Channel3->CCR		&= 0xfffffffe;								// disable DMA1 Channel3 transfer
 				DMA1_Channel3->CMAR		= (uint32_t) wrNow->buffer;		// from this buffer located in memory
 				DMA1_Channel3->CNDTR	= wrNow->count;								// this much data
 				DMA1_Channel3->CCR		|= 1;													// enable DMA1 Channel3 transfer
 				
-				wrNow						= wrNow->next;											// and now we will select the next buffer as current
-				wrNow->count		= 0;
+				wrNow->readyToSend	= FALSE;												// mark the current buffer as not ready to send (so we won't send this one again)
+				
+				wrNow								= wrNow->next;									// and now we will select the next buffer as current
+				wrNow->readyToSend	= FALSE;												// the next buffer is not ready to send (yet)
+				wrNow->count				= 0;														
 			}
 			
 			if(sending == TRUE) {
@@ -315,11 +338,13 @@ void init_hw_sw(void)
 	atnNow = &atnBuffer[0];
 	
 	// now init both writeBuffers
-	wrBuffer[0].count			= 0;
-	wrBuffer[0].next			= &wrBuffer[1];
+	wrBuffer[0].count				= 0;
+	wrBuffer[0].readyToSend	= FALSE;
+	wrBuffer[0].next				= &wrBuffer[1];
 	
-	wrBuffer[1].count			= 0;
-	wrBuffer[1].next			= &wrBuffer[0];
+	wrBuffer[1].count				= 0;
+	wrBuffer[1].readyToSend	= FALSE;
+	wrBuffer[1].next				= &wrBuffer[0];
 
 	wrNow = &wrBuffer[0];
 	//--------------
@@ -371,6 +396,8 @@ void getMfmWriteTimes(void)
 	mfmWriteStreamBuffer[ind1] = mfmWriteStreamBuffer[ind1] - lastMfmWriteTC;			// buffer[0] = buffer[0] - previousBuffer[15];  or buffer[8] = buffer[8] - previousBuffer[7];
 	lastMfmWriteTC = tmp;																													// store current last item as last
 	
+	wval = 0;																		// init to zero
+	
 	for(i=0; i<8; i++) {												// now convert timer counter times to MFM times / codes
 		tmp = mfmWriteStreamBuffer[ind2];
 		ind2++;
@@ -378,11 +405,11 @@ void getMfmWriteTimes(void)
 		if(tmp < 200) {						// too short? skip it
 			continue;
 		} else if(tmp < 360) {		// 4 us?
-			
+			val = MFM_4US;
 		} else if(tmp < 504) {		// 6 us?
-			
+			val = MFM_6US;
 		} else if(tmp < 650) {		// 8 us?
-			
+			val = MFM_8US;
 		} else {									// too long?
 			continue;
 		}

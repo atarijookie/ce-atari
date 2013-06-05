@@ -21,6 +21,8 @@ typedef struct
 	WORD buffer[550];					// buffer for the written data
 	WORD count;								// count of WORDs in buffer 
 	
+	BYTE readyToSend;					// until we store all the data, don't 
+	
 	void *next;								// pointer to the next available TAtnBuffer
 } TWriteBuffer;
 
