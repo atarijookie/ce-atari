@@ -25,13 +25,10 @@ void dma_spi_init(void);
 
 /*
 TODO:
- - odmerat tvar WDATA, polaritu WGATE
  - test TIM3 input capture bez DMA, potom s DMA
- - pridat kod na transformaciu TIM3 casov na MFM casy
  - test DMA SPI
  - test TIM1, TIM2 po presune!
  - pomeranie kolko trvaju jednotlive casti kodu
- - write support??
 */
 
 // 1 sector with all headers, gaps, data and crc: 614 B of data needed to stream -> 4912 bits to stream -> with 4 bits encoded to 1 byte: 1228 of encoded data
@@ -87,12 +84,12 @@ WORD t1, t2, dt;
 #define 	FloppyOut_Disable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000444); FloppyIndex_Disable();	FloppyMFMread_Disable();	}
 
 // enable / disable TIM1 CH1 output on GPIOA_8
-#define		FloppyIndex_Enable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x0000000b); };
-#define		FloppyIndex_Disable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x00000004); };
+#define		FloppyMFMread_Enable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x0000000b); };
+#define		FloppyMFMread_Disable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x00000004); };
 
 // enable / disable TIM2 CH4 output on GPIOB_11
-#define		FloppyMFMread_Enable()		{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x0000b000); };
-#define		FloppyMFMread_Disable()		{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x00004000); };
+#define		FloppyIndex_Enable()			{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x0000b000); };
+#define		FloppyIndex_Disable()			{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x00004000); };
 
 //--------------
 // circular buffer 
