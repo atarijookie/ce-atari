@@ -6,15 +6,19 @@
 class ConfigStream
 {
 public:
-	ConfigStream(void);
+	ConfigStream();
+	~ConfigStream();
 	
 	void onKeyDown(char vkey, char key);
-
-	void goToHomeScreen(void);
-	void getStream(char *bfr, int maxLen);
+	void getStream(bool homeScreen, char *bfr, int maxLen);
 	
 	
 private:
 	std::vector<ConfigComponent *> screen;
 
+	bool showingHomeScreen;
+	bool screenChanged;
+	
+	void createScreen_homeScreen(void);
+	void destroyCurrentScreen(void);
 };

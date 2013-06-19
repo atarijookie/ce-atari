@@ -12,10 +12,9 @@ int main()
 	 printf("The bool is: %d\n", val);
 	 
 	 ConfigStream cs;
-	 cs.goToHomeScreen();
 	 
-	 char bfr[1024];
-	 cs.getStream(bfr, 1024);
+	 char bfr[10240];
+	 cs.getStream(true, bfr, 10240);
 	 printf("STREAM: %s\n", bfr);	 
 	 
      return 0;

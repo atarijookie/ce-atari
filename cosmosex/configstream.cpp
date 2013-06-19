@@ -3,9 +3,17 @@
 
 #include "configstream.h"
 
-ConfigStream::ConfigStream(void)
+ConfigStream::ConfigStream()
 {
+	showingHomeScreen	= false;
+	screenChanged		= true;
+	
+	createScreen_homeScreen();
+}
 
+ConfigStream::~ConfigStream()
+{
+	destroyCurrentScreen();
 }
 
 void ConfigStream::onKeyDown(char vkey, char key)
@@ -97,21 +105,39 @@ void ConfigStream::onKeyDown(char vkey, char key)
 	c->onKeyPressed(vkey, key);
 }
 
-void ConfigStream::getStream(char *bfr, int maxLen)
+void ConfigStream::getStream(bool homeScreen, char *bfr, int maxLen)
 {
-	memset(bfr, 0, maxLen);
+	if(homeScreen) {									// if we should show the stream for homescreen
+		if(!showingHomeScreen) {						// and we're not showing it yet
+			createScreen_homeScreen();					// create homescreen
+		}
+	}
+	
+	if(screen.size() == 0) {							// if we wanted to show current screen, but there is nothing, just show home screen
+		createScreen_homeScreen();
+	}
 
-	for(int i=0; i<screen.size(); i++) {
+	memset(bfr, 0, maxLen);								// clear the buffer
+
+	for(int i=0; i<screen.size(); i++) {				// go through all the components of screen and gather their streams
 		ConfigComponent *c = screen[i];
 		
 		int gotLen;
-		c->getStream(true, bfr, gotLen);
+		c->getStream(screenChanged, bfr, gotLen);		// if screenChanged, will get full stream, not only change
 		bfr += gotLen;
 	}
+	
+	screenChanged = false;
 }
 
-void ConfigStream::goToHomeScreen(void)
+void ConfigStream::createScreen_homeScreen(void)
 {
+	// the following 2 lines should be at start of each createScreen_ method
+	destroyCurrentScreen();				// destroy current components
+	screenChanged = true;				// mark that the screen has changed
+
+	showingHomeScreen = true;
+	
 	ConfigComponent *comp;
 	
 	comp = new ConfigComponent(ConfigComponent::label, "Home Screen", 12, 0, 0);
@@ -125,5 +151,15 @@ void ConfigStream::goToHomeScreen(void)
 
 	comp = new ConfigComponent(ConfigComponent::button, " OK ", 4, 0, 3);
 	screen.push_back(comp);
+}
+
+void ConfigStream::destroyCurrentScreen(void)
+{
+	for(int i=0; i<screen.size(); i++) {			// go through the current screen, delete all components
+		ConfigComponent *c = screen[i];
+		delete c;
+	}
+	
+	screen.clear();									// now clear the list
 }
 
