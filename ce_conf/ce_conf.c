@@ -1,4 +1,5 @@
 /*--------------------------------------------------*/
+#include <tos.h>
 #include <stdio.h>
 #include <screen.h>
 #include <string.h>
@@ -39,6 +40,7 @@ void main(void)
   DWORD scancode;
   BYTE key, vkey, res;
   BYTE i;
+  WORD timeNow, timePrev;
   DWORD toEven;
  
   /* ---------------------- */
@@ -81,19 +83,31 @@ void main(void)
   
 	printf("\n\nCosmosEx ACSI ID: %d\nFirmWare: %s", (int) deviceID, (char *)pBuffer);
 	/* ----------------- */
+	/* use Ctrl + C to quit */
+	timePrev = Tgettime();
+	
 	while(1) {
-		scancode = Cnecin();
+		res = Bconstat(2);						/* see if there's something waiting from keyboard */
+		
+		if(res == 0) {							/* nothing waiting from keyboard? */
+			timeNow = Tgettime();
+			
+			if((timeNow - timePrev) > 0) {		/* check if time changed (2 seconds passed) */
+				timePrev = timeNow;
+				
+				getScreenStream();				/* display a new stream (if something changed) */
+			}
+			
+			continue;							/* try again */
+		}
+	
+		scancode = Cnecin();					/* get char form keyboard, no echo on screen */
 
 		vkey	= (scancode>>16)	& 0xff;
 		key		=  scancode			& 0xff;
 
-		sendKeyDown(vkey, key);
-		getScreenStream();
-		
-		/* todo: disable the following, because we couldn't write 'q' then */
-		if(key=='q' || key=='Q') {		
-			break;
-		}      
+		sendKeyDown(vkey, key);					/* send this key to device */
+		getScreenStream();						/* and display the screen */
 	}
 }
 /*--------------------------------------------------*/
