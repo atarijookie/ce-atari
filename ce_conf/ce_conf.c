@@ -27,7 +27,7 @@ struct hd_drv {
 /*--------------------------------------------------*/
 BYTE CE_ReadRunningFW(BYTE ACSI_id, BYTE *buffer);
 
-void getScreenStream(void);
+void getScreenStream(BYTE homeScreen);			/* if homeScreen=1, gets homescreen; for 0 it gets current screen */
 void sendKeyDown(BYTE vkey, BYTE key);
 /*--------------------------------------------------*/
 BYTE      deviceID;
@@ -83,6 +83,8 @@ void main(void)
   
 	printf("\n\nCosmosEx ACSI ID: %d\nFirmWare: %s", (int) deviceID, (char *)pBuffer);
 	/* ----------------- */
+	getScreenStream(1);							/* get the home screen */
+	
 	/* use Ctrl + C to quit */
 	timePrev = Tgettime();
 	
@@ -95,7 +97,7 @@ void main(void)
 			if((timeNow - timePrev) > 0) {		/* check if time changed (2 seconds passed) */
 				timePrev = timeNow;
 				
-				getScreenStream();				/* display a new stream (if something changed) */
+				getScreenStream(0);				/* display a new stream (if something changed) */
 			}
 			
 			continue;							/* try again */
@@ -107,7 +109,7 @@ void main(void)
 		key		=  scancode			& 0xff;
 
 		sendKeyDown(vkey, key);					/* send this key to device */
-		getScreenStream();						/* and display the screen */
+		getScreenStream(0);						/* and display the screen */
 	}
 }
 /*--------------------------------------------------*/
@@ -117,7 +119,7 @@ void sendKeyDown(BYTE vkey, BYTE key)
 	
 }
 /*--------------------------------------------------*/
-void getScreenStream(void)
+void getScreenStream(BYTE homeScreen)			/* if homeScreen=1, gets homescreen; for 0 it gets current screen */
 {
 	/* todo: send command over ACSI and receive screen stream to pBuffer */
 	
