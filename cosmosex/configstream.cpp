@@ -107,6 +107,8 @@ void ConfigStream::onKeyDown(char vkey, char key)
 
 void ConfigStream::getStream(bool homeScreen, char *bfr, int maxLen)
 {
+	int totalCnt = 0;
+
 	if(homeScreen) {									// if we should show the stream for homescreen
 		if(!showingHomeScreen) {						// and we're not showing it yet
 			createScreen_homeScreen();					// create homescreen
@@ -119,12 +121,22 @@ void ConfigStream::getStream(bool homeScreen, char *bfr, int maxLen)
 
 	memset(bfr, 0, maxLen);								// clear the buffer
 
+	if(screenChanged) {									// if screen changed, clear screen (CLEAR_HOME) and draw it all
+		bfr[0] = 27;		
+		bfr[1] = 'E';
+		
+		bfr += 2;
+		totalCnt += 2;
+	}
+	
 	for(int i=0; i<screen.size(); i++) {				// go through all the components of screen and gather their streams
 		ConfigComponent *c = screen[i];
 		
 		int gotLen;
 		c->getStream(screenChanged, bfr, gotLen);		// if screenChanged, will get full stream, not only change
 		bfr += gotLen;
+		
+		totalCnt += gotLen;
 	}
 	
 	screenChanged = false;
