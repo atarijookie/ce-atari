@@ -20,6 +20,9 @@ public:
 	void onKeyPressed(char vkey, char key);
 	void setText(std::string text);
 	
+	bool isFocused(void);
+	bool canFocus(void);
+	
 private:
 	bool			changed;
 

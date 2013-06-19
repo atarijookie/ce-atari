@@ -7,6 +7,8 @@ class ConfigStream
 {
 public:
 	ConfigStream(void);
+	
+	void onKeyDown(char vkey, char key);
 
 	void goToHomeScreen(void);
 	void getStream(char *bfr, int maxLen);

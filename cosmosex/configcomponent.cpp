@@ -259,6 +259,16 @@ void ConfigComponent::setText(std::string text)
 	textLength = text.length();
 }
 
+bool ConfigComponent::isFocused(void)
+{
+	return hasFocus;
+}
+
+bool ConfigComponent::canFocus(void)
+{
+	return (type != label);						// if not label, then can focus
+}
+
 void ConfigComponent::terminal_addGoto(char *bfr, int x, int y)
 {
 	bfr[0] = 27;		
