@@ -1,0 +1,23 @@
+>> CosmosEx config tool - Jookie 2013 <<
+       Software & Firmware update
+
+
+
+
+
+
+part         curr vers.   new vers.
+
+CosmosEx     2013-06-19
+Franz        2013-06-19   2013-06-20
+Hans         2013-06-19
+Config image 2013-06-19
+
+         [ Update ]  [ Cancel ]
+
+
+
+
+
+
+        To quit - press Ctrl + C

@@ -1,0 +1,23 @@
+>> CosmosEx config tool - Jookie 2013 <<
+          Shared drive settings
+
+Define what folder on which machine will
+be used as drive mounted through network
+on CosmosEx. 
+   This works in translated mode only.
+
+
+
+        IP address of NFS server
+           [   .   .   .   ]
+
+             Name of share
+        [                      ]
+
+
+   [  Test  ]  [  Save  ]  [ Cancel ]
+
+
+
+
+        To quit - press Ctrl + C

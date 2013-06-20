@@ -128,15 +128,30 @@ void ConfigStream::getStream(bool homeScreen, char *bfr, int maxLen)
 		bfr += 2;
 		totalCnt += 2;
 	}
+
+	int focused = -1;
 	
 	for(int i=0; i<screen.size(); i++) {				// go through all the components of screen and gather their streams
 		ConfigComponent *c = screen[i];
+		
+		if(c->isFocused()) {							// if this component has focus, store it's index
+			focused = i;
+		}
 		
 		int gotLen;
 		c->getStream(screenChanged, bfr, gotLen);		// if screenChanged, will get full stream, not only change
 		bfr += gotLen;
 		
 		totalCnt += gotLen;
+	}
+
+	if(focused != -1) {									// if got some component with focus
+		int gotLen;
+		ConfigComponent *c = screen[focused];
+		c->terminal_addGotoCurrentCursor(bfr, gotLen);	// position the cursor at the right place
+
+		bfr			+= gotLen;
+		totalCnt	+= gotLen;
 	}
 	
 	screenChanged = false;
@@ -158,6 +173,16 @@ void ConfigStream::createScreen_homeScreen(void)
 	comp = new ConfigComponent(ConfigComponent::checkbox, "", 3, 0, 1);
 	screen.push_back(comp);
 
+   	comp = new ConfigComponent(ConfigComponent::checkbox, "", 3, 0, 1);
+   	comp->setCheckboxGroupIds(1,1);
+	comp->setOnChBEnterFunction(onCheckboxGroupEnter);
+	screen.push_back(comp);
+
+	comp = new ConfigComponent(ConfigComponent::checkbox, "", 3, 0, 1);
+   	comp->setCheckboxGroupIds(1,2);
+	comp->setOnChBEnterFunction(onCheckboxGroupEnter);
+	screen.push_back(comp);
+
 	comp = new ConfigComponent(ConfigComponent::editline, "", 16, 0, 2);
 	screen.push_back(comp);
 
@@ -175,3 +200,47 @@ void ConfigStream::destroyCurrentScreen(void)
 	screen.clear();									// now clear the list
 }
 
+int ConfigStream::checkboxGroup_getCheckedId(int groupId) 
+{
+	for(int i=0; i<screen.size(); i++) {					// go through the current screen and find the checked checkbox
+		ConfigComponent *c = screen[i];
+		
+		int thisGroupId, checkboxId;
+		c->getCheckboxGroupIds(thisGroupId, checkboxId);	// get the IDs
+
+		if(thisGroupId != groupId) {        				// if the group ID doesn't match, skip
+			continue;
+		}
+
+        if(c->isChecked()) {								// is checked and from the group?
+			return checkboxId;
+		}
+	}
+	
+	return -1;
+}
+
+void ConfigStream::checkboxGroup_setCheckedId(int groupId, int checkedId)
+{
+	for(int i=0; i<screen.size(); i++) {					// go through the current screen and find the checked checkbox
+		ConfigComponent *c = screen[i];
+		
+		int thisGroupId, checkboxId;
+		c->getCheckboxGroupIds(thisGroupId, checkboxId);	// get the IDs
+
+		if(thisGroupId != groupId) {        				// if the group ID doesn't match, skip
+			continue;
+		}
+
+		if(checkboxId == checkedId) {						// for the matching id - check
+			c->setIsChecked(true);
+		} else {											// for mismatching id - uncheck
+			c->setIsChecked(false);
+		}
+	}
+}
+
+void onCheckboxGroupEnter(int groupId, int checkboxId)
+{
+	ConfigStream::instance().checkboxGroup_setCheckedId(groupId, checkboxId);
+}

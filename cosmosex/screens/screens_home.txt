@@ -1,0 +1,23 @@
+>> CosmosEx config tool - Jookie 2013 <<
+               Main menu
+
+
+
+
+
+          [ ACSI config      ] 
+
+          [ Floppy config    ]  
+
+          [ Network settings ] 
+
+          [ Shared drive     ]
+
+          [ Update software  ]
+
+
+
+
+
+
+        To quit - press Ctrl + C

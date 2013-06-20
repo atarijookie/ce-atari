@@ -3,17 +3,27 @@
 
 #include "configcomponent.h"
 
+void onCheckboxGroupEnter(int groupId, int checkboxId);
+
 class ConfigStream
 {
 public:
-	ConfigStream();
+	static ConfigStream& instance(void) {
+		static ConfigStream configStream;
+		return configStream;
+	}
+	
 	~ConfigStream();
 	
 	void onKeyDown(char vkey, char key);
 	void getStream(bool homeScreen, char *bfr, int maxLen);
 	
+	int  checkboxGroup_getCheckedId(int groupId);
+	void checkboxGroup_setCheckedId(int groupId, int checkedId);
 	
 private:
+	ConfigStream();
+
 	std::vector<ConfigComponent *> screen;
 
 	bool showingHomeScreen;
@@ -21,4 +31,5 @@ private:
 	
 	void createScreen_homeScreen(void);
 	void destroyCurrentScreen(void);
+	
 };

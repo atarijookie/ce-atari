@@ -6,14 +6,19 @@
 
 ConfigComponent::ConfigComponent(ComponentType type, std::string text, int maxLen, int x, int y)
 {
-	onEnter = NULL;
+	onEnter		= NULL;
+	onChBEnter	= NULL;
+	
 	cursorPos = 0;
+
+	checkBoxGroup	= -1;
+	checkBoxId		= -1;
 	
 	this->type	= type;
 
 	hasFocus	= false;
 	isReverse	= false;
-	isChecked	= false;
+	checked		= false;
 	
 	posX	= x;
 	posY	= y;
@@ -87,9 +92,26 @@ void ConfigComponent::getStream(bool fullNotChange, char *bfr, int &len)
 	}
 }
 
-void ConfigComponent::setOnEnterFunction(TFonEnter *onEnter)
+void ConfigComponent::setOnEnterFunction(TFonEnter onEnter)
 {
 	this->onEnter = onEnter;
+}
+
+void ConfigComponent::setOnChBEnterFunction(TFonChBEnter onChBEnter)
+{
+	this->onChBEnter = onChBEnter;
+}
+
+void ConfigComponent::setCheckboxGroupIds(int groupId, int checkboxId)
+{
+	checkBoxGroup	= groupId;
+	checkBoxId		= checkboxId;
+}
+
+void ConfigComponent::getCheckboxGroupIds(int& groupId, int& checkboxId)
+{
+	groupId		= checkBoxGroup;
+	checkboxId	= checkBoxId;
 }
 
 void ConfigComponent::setFocus(bool hasFocus)
@@ -124,21 +146,30 @@ void ConfigComponent::setIsChecked(bool isChecked)
 		return;
 	}
 
-	if(this->isChecked != isChecked) {			// if data changed
+	if(checked != isChecked) {					// if data changed
 		changed = true;							// mark that we got new data and we should display them
 	}
 
-	this->isChecked = isChecked;
+	checked = isChecked;
 	
 	text.resize(maxLen, ' ');
 	for(int i=0; i<maxLen; i++) {				// fill with spaces
 		text[i] = ' ';
 	}
 	
-	if(isChecked) {								// if is checked, put a star in the middle
+	if(checked) {								// if is checked, put a star in the middle
 		int pos = (maxLen / 2);					// calculate the position of '*' in string
 		text[pos] = '*';
 	}
+}
+
+bool ConfigComponent::isChecked(void)
+{
+	if(type != checkbox) {						// for other types - not checked
+		return false;
+	}
+
+	return checked;
 }
 
 /*
@@ -164,10 +195,17 @@ void ConfigComponent::onKeyPressed(char vkey, char key)
 	
 	if(type == checkbox || type == button) {	// for checkbox and button
 		if(key == 13 || key == 32) {			// when ENTER or SPACE pressed on checkbox
-			setIsChecked(!isChecked);			// invert isChecked
+			
+			if(!isGroupCheckBox()) {			// for non group checkbox - just invert
+				setIsChecked(!checked);			// invert isChecked
+			} else {							// for group checkbox - special handling
+				if(onChBEnter != NULL) {		// got group function? call it
+					(*onChBEnter) (checkBoxGroup, checkBoxId);
+				}			
+			}
 			
 			if(onEnter != NULL) {				// if we got onEnter function, call it
-				(*onEnter)(this);
+				(*onEnter) (this);
 			}
 			
 			changed = true;						// mark that we got new data and we should display them
@@ -304,3 +342,7 @@ void ConfigComponent::terminal_addGotoCurrentCursor(char *bfr, int &cnt)
 	cnt = 4;
 }
 
+bool ConfigComponent::isGroupCheckBox(void)
+{
+	return (checkBoxGroup != -1);		// if the group ID is not -1, then it's a group checkbox
+}
