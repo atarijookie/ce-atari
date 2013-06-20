@@ -19,11 +19,10 @@ ConfigStream::~ConfigStream()
 void ConfigStream::onKeyDown(char vkey, char key)
 {
 	int focused = -1, firstFocusable = -1, lastFocusable = -1;
-	ConfigComponent *c;
-	
+
 	// go through the current screen and find focused component, also first focusable component
 	for(int i=0; i<screen.size(); i++) {			
-		c = screen[i];
+		ConfigComponent *c = screen[i];
 		
 		if(c->isFocused()) {						// if found focused component, store index
 			focused = i;
@@ -48,12 +47,12 @@ void ConfigStream::onKeyDown(char vkey, char key)
 		focused = firstFocusable;
 	}
 	
-	c = screen[focused];							// focus this component
-	c->setFocus(true);
+	ConfigComponent *curr = screen[focused];		// focus this component
+	curr->setFocus(true);
 
 	int prevFocusable = -1, nextFocusable = -1;		// now find previous and next focusable item in the list of components
 	for(int i=0; i<screen.size(); i++) {			
-		c = screen[i];
+		ConfigComponent *c = screen[i];
 		
 		if(!c->canFocus()) {						// can't focus? fuck you!						
 			continue;
@@ -72,37 +71,36 @@ void ConfigStream::onKeyDown(char vkey, char key)
 	
 	if(key == 0) {									// if it's some non-char key
 		if(vkey == 72) {							// arrow up
-			c->setFocus(false);						// unfocus this component
+			curr->setFocus(false);					// unfocus this component
 			
 			if(prevFocusable != -1) {				// got previous focusable item?
-				c = screen[prevFocusable];			// move to the previous component	
+				curr = screen[prevFocusable];		// move to the previous component	
 			} else if(lastFocusable != -1) {		// got last focusable? 
-				c = screen[lastFocusable];			// move to the last component (wrap around)
+				curr = screen[lastFocusable];		// move to the last component (wrap around)
 			}
 			
-			c->setFocus(true);						// focus this component
+			curr->setFocus(true);					// focus this component
 			
 			return;
 		}
 		
 		if(vkey == 80) {							// arrow down
-
-			c->setFocus(false);						// unfocus this component
+			curr->setFocus(false);					// unfocus this component
 			
 			if(nextFocusable != -1) {				// got next focusable item?
-				c = screen[nextFocusable];			// move to the next component	
+				curr = screen[nextFocusable];		// move to the next component	
 			} else if(firstFocusable != -1) {		// got first focusable? 
-				c = screen[firstFocusable];			// move to the first component (wrap around)
-			}
+				curr = screen[firstFocusable];		// move to the first component (wrap around)
+			} 
 			
-			c->setFocus(true);						// focus this component
+			curr->setFocus(true);					// focus this component
 		
 			return;
 		}
 	}
 
 	// if it got here, we didn't handle it, let the component handle it
-	c->onKeyPressed(vkey, key);
+	curr->onKeyPressed(vkey, key);
 }
 
 void ConfigStream::getStream(bool homeScreen, char *bfr, int maxLen)
