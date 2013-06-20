@@ -13,7 +13,7 @@ Franz        2013-06-19   2013-06-20
 Hans         2013-06-19
 Config image 2013-06-19
 
-         [ Update ]  [ Cancel ]
+      [ Update ]  [ Cancel ]
 
 
 

@@ -17,7 +17,7 @@ Filter:    [                 ]
     [                              ]
     [                              ]
     [                              ]
-	      [  Save  ] [ Cancel ]
+        [  Save  ] [ Cancel ]
 
 Use arrows, use 1,2,3 to insert in Silo.
         To quit - press Ctrl + C
