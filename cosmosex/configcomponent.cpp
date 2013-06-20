@@ -26,9 +26,10 @@ ConfigComponent::ConfigComponent(ComponentType type, std::string text, int maxLe
 	this->maxLen = maxLen;
 	
 	this->text = text;
-	this->text.resize(maxLen, ' ');
 	
-	textLength = text.length();
+	if(text.length() > maxLen) {
+		this->text.resize(maxLen);
+	}
 	
 	changed = true;							// mark that we got new data and we should display them
 }
@@ -53,7 +54,11 @@ void ConfigComponent::getStream(bool fullNotChange, char *bfr, int &len)
 			terminal_addReverse(bfr, true);
 			bfr += 2;
 		}
-			
+		
+		for(int i=0; i<maxLen; i++) {				// fill with spaces
+			bfr[i] = ' ';
+		}
+		
 		strncpy(bfr, text.c_str(), text.length());	// copy the text
 		bfr += maxLen;
 
@@ -78,7 +83,11 @@ void ConfigComponent::getStream(bool fullNotChange, char *bfr, int &len)
 
 		bfr[         0] = '[';
 		bfr[maxLen + 1] = ']';
-			
+
+		for(int i=0; i<maxLen; i++) {					// fill with spaces
+			bfr[i+1] = ' ';
+		}
+
 		strncpy(bfr+1, text.c_str(), text.length());	// copy the text
 		bfr += maxLen + 2;								// +2 because of [ and ]
 		
@@ -152,7 +161,7 @@ void ConfigComponent::setIsChecked(bool isChecked)
 
 	checked = isChecked;
 	
-	text.resize(maxLen, ' ');
+	text.resize(maxLen);
 	for(int i=0; i<maxLen; i++) {				// fill with spaces
 		text[i] = ' ';
 	}
@@ -228,7 +237,7 @@ void ConfigComponent::handleEditLineKeyPress(char vkey, char key)
 		}
 		
 		if(vkey == 77) {			// arrow right?
-			if(cursorPos < textLength) {
+			if(cursorPos < text.length()) {
 				cursorPos++;
 			}
 		}
@@ -242,42 +251,43 @@ void ConfigComponent::handleEditLineKeyPress(char vkey, char key)
 	//-----
 	// now for the other keys
 	if(key == 8) {											// backspace?
-		if(textLength > 0 && cursorPos > 0) {				// we got some text and we're not at the start of the line?
-			text.erase(cursorPos-1, 1);					// delete char before cursor
-			text.resize(maxLen, ' ');						// stretch string to maxLen
+		if(text.length() > 0) { 
 		
-			cursorPos--;
-			textLength--;
+			if(cursorPos < text.length()) {					// cursor IN text
+				if(cursorPos > 0) {							// and we're not at the start of the line
+					text.erase(cursorPos - 1, 1);
+					cursorPos--;
+				}
+			} else {										// cursor BEHIND text
+				text.resize(text.length() - 1);				// just remove the last char
+				cursorPos--;
+			}
 		}
 		
 		return;
 	}
-	
-	if(key == 127) {										// delete?
-		if(textLength > 0 && cursorPos < textLength) {		// we got some text and we're not at the end of the line?
-			text.erase(cursorPos, 1);						// delete char at cursor
-			text.resize(maxLen, ' ');						// stretch string to maxLen
-		
-			textLength--;
+
+	if(key == 127) {											// delete?
+		if(text.length() > 0 && cursorPos < text.length()) {	// we got some text and we're not at the end of the line?
+			text.erase(cursorPos, 1);							// delete char at cursor
 		}
-		
+			
 		return;
 	}
-	
+
 	//-------
 	// now for the other chars - just add them
-	if(cursorPos < textLength) {							// if should insert
-		text.insert(cursorPos, 1, key);
-	} else {												// if should append
-		text.push_back(key);
+	if(cursorPos < text.length()) {					// cursor IN text
+		text.insert(cursorPos, 1, key);				// insert somewhere in the middle
+	} else {										// cursor BEHIND text
+		text.push_back(key);						// insert char at the end
 	}
+
 	
-	textLength++;
 	cursorPos++;
 
-	if(textLength > maxLen) {								// if too long
-		text.resize(maxLen, ' ');							// cut string to maxLen
-		textLength = maxLen;
+	if(text.length() > maxLen) {							// if too long
+		text.resize(maxLen);								// cut string to maxLen
 	}
 
 	if(cursorPos >= maxLen) {								// if cursor too far
@@ -292,9 +302,10 @@ void ConfigComponent::setText(std::string text)
 	}
 
 	this->text = text;
-	this->text.resize(maxLen, ' ');
-	
-	textLength = text.length();
+
+	if(text.length() > maxLen) {
+		this->text.resize(maxLen);
+	}
 }
 
 bool ConfigComponent::isFocused(void)

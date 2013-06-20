@@ -45,7 +45,6 @@ private:
 
 	// for editline	
 	int				cursorPos;
-	int				textLength;
 
 	// for checkbox
 	int				checkBoxGroup;
