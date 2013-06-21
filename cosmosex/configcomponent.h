@@ -1,3 +1,6 @@
+#ifndef _CONFIGCOMPONENT_H_
+#define _CONFIGCOMPONENT_H_
+
 #include <stdio.h>
 #include <string>
 
@@ -59,4 +62,6 @@ private:
 	void handleEditLineKeyPress(char vkey, char key);
 	bool isGroupCheckBox(void);
 };
+
+#endif
 

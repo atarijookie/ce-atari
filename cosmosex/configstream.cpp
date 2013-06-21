@@ -3,6 +3,9 @@
 
 #include "configstream.h"
 
+#include "configscreen_main.h"
+
+
 ConfigStream::ConfigStream()
 {
 	showingHomeScreen	= false;
@@ -155,39 +158,6 @@ void ConfigStream::getStream(bool homeScreen, char *bfr, int maxLen)
 	screenChanged = false;
 }
 
-void ConfigStream::createScreen_homeScreen(void)
-{
-	// the following 2 lines should be at start of each createScreen_ method
-	destroyCurrentScreen();				// destroy current components
-	screenChanged = true;				// mark that the screen has changed
-
-	showingHomeScreen = true;
-	
-	ConfigComponent *comp;
-	
-	comp = new ConfigComponent(ConfigComponent::label, "Home Screen", 12, 0, 0);
-	screen.push_back(comp);
-
-	comp = new ConfigComponent(ConfigComponent::checkbox, "", 3, 0, 1);
-	screen.push_back(comp);
-
-   	comp = new ConfigComponent(ConfigComponent::checkbox, "", 3, 0, 1);
-   	comp->setCheckboxGroupIds(1,1);
-	comp->setOnChBEnterFunction(onCheckboxGroupEnter);
-	screen.push_back(comp);
-
-	comp = new ConfigComponent(ConfigComponent::checkbox, "", 3, 0, 1);
-   	comp->setCheckboxGroupIds(1,2);
-	comp->setOnChBEnterFunction(onCheckboxGroupEnter);
-	screen.push_back(comp);
-
-	comp = new ConfigComponent(ConfigComponent::editline, "", 16, 0, 2);
-	screen.push_back(comp);
-
-	comp = new ConfigComponent(ConfigComponent::button, " OK ", 4, 0, 3);
-	screen.push_back(comp);
-}
-
 void ConfigStream::destroyCurrentScreen(void)
 {
 	for(int i=0; i<screen.size(); i++) {			// go through the current screen, delete all components
@@ -196,6 +166,18 @@ void ConfigStream::destroyCurrentScreen(void)
 	}
 	
 	screen.clear();									// now clear the list
+}
+
+void ConfigStream::setFocusToFirstFocusable(void)
+{
+	for(int i=0; i<screen.size(); i++) {			// go through the current screen
+		ConfigComponent *c = screen[i];
+
+		if(c->canFocus()) {
+			c->setFocus(true);
+			return;
+		}
+	}
 }
 
 int ConfigStream::checkboxGroup_getCheckedId(int groupId) 
@@ -241,4 +223,68 @@ void ConfigStream::checkboxGroup_setCheckedId(int groupId, int checkedId)
 void onCheckboxGroupEnter(int groupId, int checkboxId)
 {
 	ConfigStream::instance().checkboxGroup_setCheckedId(groupId, checkboxId);
+}
+
+void ConfigStream::screen_addHeaderAndFooter(char *screenName)
+{
+	ConfigComponent *comp;
+
+	// insert header
+	comp = new ConfigComponent(ConfigComponent::label, ">> CosmosEx config tool - Jookie 2013 <<", 40, 0, 0);
+	comp->setReverse(true);
+	screen.push_back(comp);
+
+	// insert footer
+	comp = new ConfigComponent(ConfigComponent::label, "        To quit - press Ctrl + C        ", 40, 0, 22);
+	comp->setReverse(true);
+	screen.push_back(comp);
+
+	// insert screen name as part of header
+	char bfr[41];
+	memset(bfr, 32, 40);					// fill with spaces (0 - 39)
+	bfr[40] = 0;							// terminate with a zero
+	
+	int len = strlen(screenName);
+	int pos = (40 / 2) - (len / 2);			// calculate the position in the middle of screen
+	strncpy(bfr + pos, screenName, len);	// copy the string in the middle, withouth the terminating zero
+	
+	comp = new ConfigComponent(ConfigComponent::label, bfr, 40, 0, 1);
+	comp->setReverse(true);
+	screen.push_back(comp);
+}
+
+//--------------------------
+// screen creation methods
+void ConfigStream::createScreen_homeScreen(void)
+{
+	// the following 3 lines should be at start of each createScreen_ method
+	destroyCurrentScreen();				// destroy current components
+	screenChanged		= true;			// mark that the screen has changed
+	showingHomeScreen	= true;			// mark that we're showing the home screen
+	
+	screen_addHeaderAndFooter((char *) "Main menu");
+	
+	ConfigComponent *comp;
+	
+	comp = new ConfigComponent(ConfigComponent::button, " ACSI config ",		18, 10,  7);
+	comp->setOnEnterFunction(onMainMenu_acsiConfig);
+	screen.push_back(comp);
+	
+	comp = new ConfigComponent(ConfigComponent::button, " Floppy config ",		18, 10,  9);
+	comp->setOnEnterFunction(onMainMenu_floppyConfig);
+	screen.push_back(comp);
+
+	comp = new ConfigComponent(ConfigComponent::button, " Network settings ",	18, 10, 11);
+	comp->setOnEnterFunction(onMainMenu_networkSettings);
+	screen.push_back(comp);
+
+	comp = new ConfigComponent(ConfigComponent::button, " Shared drive ",		18, 10, 13);
+	comp->setOnEnterFunction(onMainMenu_sharedDrive);
+	screen.push_back(comp);
+
+	comp = new ConfigComponent(ConfigComponent::button, " Update software ",	18, 10, 15);
+	comp->setOnEnterFunction(onMainMenu_updateSoftware);
+	screen.push_back(comp);
+	
+	setFocusToFirstFocusable();
 }

@@ -1,6 +1,6 @@
 all: cosmosex
 
-cosmosex: main.o settings.o configcomponent.o configstream.o
+cosmosex: main.o settings.o configcomponent.o configstream.o configscreen_main.o
 	g++ $^ -o cosmosex
 
 %.o: %.cpp 

@@ -1,3 +1,6 @@
+#ifndef _CONFIGSTREAM_H_
+#define _CONFIGSTREAM_H_
+
 #include <stdio.h>
 #include <vector>
 
@@ -21,6 +24,8 @@ public:
 	int  checkboxGroup_getCheckedId(int groupId);
 	void checkboxGroup_setCheckedId(int groupId, int checkedId);
 	
+	void screen_addHeaderAndFooter(char *screenName);
+	
 private:
 	ConfigStream();
 
@@ -31,5 +36,7 @@ private:
 	
 	void createScreen_homeScreen(void);
 	void destroyCurrentScreen(void);
-	
+	void setFocusToFirstFocusable(void);	
 };
+
+#endif
