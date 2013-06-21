@@ -27,6 +27,9 @@ public:
 	void showMessageScreen(char *msgTitle, char *msgTxt);
 	void hideMessageScreen(void);
 	
+	void createScreen_homeScreen(void);
+	void createScreen_acsiConfig(void);
+	
 private:
 	ConfigStream();
 
@@ -37,7 +40,6 @@ private:
 	bool showingMessage;
 	bool screenChanged;
 	
-	void createScreen_homeScreen(void);
 	void destroyCurrentScreen(void);
 	void setFocusToFirstFocusable(void);	
 	

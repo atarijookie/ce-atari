@@ -1,4 +1,4 @@
-#ifndef _CONFIGSCREEN_MAIN_H_
+#ifndef _SETTINGS_H_
 #define _SETTINGS_H_
 
 #include <stdio.h>

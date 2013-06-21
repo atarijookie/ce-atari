@@ -3,26 +3,43 @@
 #include "settings.h"
 #include "configstream.h"
 
+#include "globaldefs.h"
+
 #include <termios.h>
 
 int main()
  {
-     printf("CosmosEx starting...\n");
+    printf("CosmosEx starting...\n");
+
+	//-----------------	 
+	// read the settings and create devices as needed
+	Settings s;
 	 
-struct termios oldt;
-struct termios newt;
-tcgetattr(STDIN_FILENO, &oldt); /*store old settings */
-newt = oldt; /* copy old settings to new settings */
-newt.c_lflag &= ~(ICANON | ECHO); /* make one change to old settings in new settings */
-tcsetattr(STDIN_FILENO, TCSANOW, &newt); /*apply the new settings immediatly */
+	char key[32];
+	int devTypes[8];
+	bool somethingActive = false;						// flag to see if we got at least one device active
 	 
-	 Settings s;
-	 bool val = s.getBool((char *) "test", false);
-	 printf("The bool is: %d\n", val);
+	for(int id=0; id<8; id++) {						// read the list of device types from settings
+		sprintf(key, "ACSI_DEVTYPE_%d", id);			// create settings KEY, e.g. ACSI_DEVTYPE_0
+		devTypes[id] = s.getInt(key, DEVTYPE_OFF);		
+		
+		if(devTypes[id] < 0) {
+			devTypes[id] = DEVTYPE_OFF;
+		}
+		
+		if(devTypes[id] != DEVTYPE_OFF) {				// if we found something active, set the flag
+			somethingActive = true;
+		}
+	}
 	 
-	 char bfr[10240];
-	 ConfigStream::instance().getStream(true, bfr, 10240);
-	 printf("STREAM: %s\n", bfr);	 
+	if(!somethingActive) {								// if no device is activated, activate CONFIG_DRIVE on ACSI ID 0 to avoid bricking the device
+		devTypes[0] = DEVTYPE_CONFIG_DRIVE;
+	}
+	//-----------------
+	 
+	char bfr[10240];
+	ConfigStream::instance().getStream(true, bfr, 10240);
+	printf("STREAM: %s\n", bfr);	 
 /*
 enter     - key = 13
 esc       - key = 27
@@ -36,6 +53,14 @@ right     - vkey = 77, key = 0
 up        - vkey = 72, key = 0
 down      - vkey = 80, key = 0	 
 */	 
+struct termios oldt;
+struct termios newt;
+tcgetattr(STDIN_FILENO, &oldt); /*store old settings */
+newt = oldt; /* copy old settings to new settings */
+newt.c_lflag &= ~(ICANON | ECHO); /* make one change to old settings in new settings */
+tcsetattr(STDIN_FILENO, TCSANOW, &newt); /*apply the new settings immediatly */
+	 
+
 	 while(1) {
 		int ch = getchar();
 		

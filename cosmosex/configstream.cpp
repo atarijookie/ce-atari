@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "globaldefs.h"
+#include "settings.h"
 #include "configstream.h"
-
 #include "configscreen_main.h"
 
 
@@ -187,10 +188,10 @@ void ConfigStream::showMessageScreen(char *msgTitle, char *msgTxt)
 	
 	ConfigComponent *comp;
 
-	comp = new ConfigComponent(ConfigComponent::label, msgTxt,	40, 0, 10);
+	comp = new ConfigComponent(ConfigComponent::label, msgTxt, 240, 0, 10);
 	message.push_back(comp);
 	
-	comp = new ConfigComponent(ConfigComponent::button, " OK ",	4, 17, 20);
+	comp = new ConfigComponent(ConfigComponent::button, " OK ", 4, 17, 20);
 	comp->setOnEnterFunction(onMessageOk);
 	comp->setFocus(true);
 	message.push_back(comp);
@@ -337,6 +338,84 @@ void ConfigStream::createScreen_homeScreen(void)
 	comp = new ConfigComponent(ConfigComponent::button, " Update software ",	18, 10, 15);
 	comp->setOnEnterFunction(onMainMenu_updateSoftware);
 	screen.push_back(comp);
+	
+	setFocusToFirstFocusable();
+}
+
+void onGoToHomeScreen(ConfigComponent *sender)
+{
+	ConfigStream::instance().createScreen_homeScreen();
+}
+
+void ConfigStream::createScreen_acsiConfig(void)
+{
+	// the following 3 lines should be at start of each createScreen_ method
+	destroyCurrentScreen();				// destroy current components
+	screenChanged		= true;			// mark that the screen has changed
+	showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+	
+	screen_addHeaderAndFooter(screen, (char *) "ACSI config");
+	
+	ConfigComponent *comp;
+
+	comp = new ConfigComponent(ConfigComponent::label, "ID   off   raw  tran  shar   net  conf  ", 40, 0, 3);
+	comp->setReverse(true);
+	screen.push_back(comp);
+
+	for(int row=0; row<8; row++) {			// now make 8 * 7 checkboxes
+		char bfr[5];
+		sprintf(bfr, "%d", row);
+		
+		comp = new ConfigComponent(ConfigComponent::label, bfr, 2, 1, row + 4);
+		screen.push_back(comp);
+
+		for(int col=0; col<6; col++) {
+			comp = new ConfigComponent(ConfigComponent::checkbox, "   ", 3, 4 + (col * 6), row + 4);			// create and place checkbox on screen
+			comp->setCheckboxGroupIds(row, col);																// set checkbox group id to row, and checbox id to col
+			comp->setOnChBEnterFunction(onCheckboxGroupEnter);													// set this as general checkbox group handler, which switched checkboxed in group
+			screen.push_back(comp);
+		}
+	}
+	
+	comp = new ConfigComponent(ConfigComponent::label, "off  - turned off, not responding here",	40, 0, 15);
+	screen.push_back(comp);
+
+	comp = new ConfigComponent(ConfigComponent::label, "raw  - raw sector access (use HDDr/ICD)",	40, 0, 16);
+	screen.push_back(comp);
+
+	comp = new ConfigComponent(ConfigComponent::label, "tran - translated access on media",			40, 0, 17);
+	screen.push_back(comp);
+
+	comp = new ConfigComponent(ConfigComponent::label, "shar - shared network drive   (only one)",	40, 0, 18);
+	screen.push_back(comp);
+
+	comp = new ConfigComponent(ConfigComponent::label, "net  - network card interface (only one)",	40, 0, 19);
+	screen.push_back(comp);
+
+	comp = new ConfigComponent(ConfigComponent::label, "conf - config tools image     (only one)",	40, 0, 20);
+	screen.push_back(comp);
+	
+	comp = new ConfigComponent(ConfigComponent::button, "  Save  ", 8,  9, 13);
+	comp->setOnEnterFunction(onAcsiConfig_save);
+	screen.push_back(comp);
+
+	comp = new ConfigComponent(ConfigComponent::button, " Cancel ", 8, 20, 13);
+	comp->setOnEnterFunction(onGoToHomeScreen);
+	screen.push_back(comp);
+	
+	Settings s;
+	 
+	char key[32];
+	for(int id=0; id<8; id++) {							// read the list of device types from settings
+		sprintf(key, "ACSI_DEVTYPE_%d", id);			// create settings KEY, e.g. ACSI_DEVTYPE_0
+		int devType = s.getInt(key, DEVTYPE_OFF);		
+		
+		if(devType < 0) {
+			devType = DEVTYPE_OFF;
+		}
+		
+		checkboxGroup_setCheckedId(id, devType);		// set the checkboxes according to settings
+	}
 	
 	setFocusToFirstFocusable();
 }

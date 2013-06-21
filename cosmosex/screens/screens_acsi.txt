@@ -1,7 +1,7 @@
 >> CosmosEx config tool - Jookie 2013 <<
         ACSI IDs configuration
 
-ID   off   raw  tran  shar   net  conf
+ID   off   raw  tran  shar   net  conf  
  0  [   ] [   ] [   ] [   ] [   ] [   ] 
  1  [   ] [   ] [   ] [   ] [   ] [   ] 
  2  [   ] [   ] [   ] [   ] [   ] [   ] 
@@ -11,7 +11,7 @@ ID   off   raw  tran  shar   net  conf
  6  [   ] [   ] [   ] [   ] [   ] [   ] 
  7  [   ] [   ] [   ] [   ] [   ] [   ] 
             
-         [ SAVE ] [ Cancel ]
+         [  SAVE  ] [ Cancel ]
 
 off  - turned off, not responding here
 raw  - raw sector access (use HDDr/ICD)
