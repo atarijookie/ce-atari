@@ -61,6 +61,77 @@ void Settings::setBool(char *key, bool value)
 	fclose(file);
 }
 	
+//-------------------------	
+int Settings::getInt(char *key, int defValue)
+{
+	FILE *file = open(key, true);
+	if(!file) {											// failed to open settings?
+		printf("Settings::getInt -- returning default value for %s\n", key);
+		return defValue;
+	}
+
+	int val, res;
+	res = fscanf(file, "%d", &val);						// try to read the value
+	fclose(file);
+	
+	if(res != 1) {										// failed to read value?
+		printf("Settings::getInt -- returning default value for %s\n", key);
+		return defValue;
+	}
+	
+	return val;											// return
+}
+
+void Settings::setInt(char *key, int value)
+{
+	FILE *file = open(key, false);
+	if(!file) {											// failed to open settings?
+		printf("Settings::setInt -- could not write key %s\n", key);
+		return;
+	}
+
+	fprintf(file, "%d\n", value);
+	fclose(file);
+}
+//-------------------------	
+char *Settings::getString(char *key, char *defValue)
+{
+	static char buffer[256];
+	memset(buffer, 0, 256);
+
+	FILE *file = open(key, true);
+	if(!file) {											// failed to open settings?
+		printf("Settings::getString -- returning default value for %s\n", key);
+		strcpy(buffer, defValue);
+		return buffer;
+	}
+
+	char *res;
+	res = fgets(buffer, 256, file);						// try to read the value
+	fclose(file);
+	
+	if(res == NULL) {									// failed to read value?
+		printf("Settings::getString -- returning default value for %s\n", key);
+		strcpy(buffer, defValue);
+		return buffer;
+	}
+	
+	return buffer;											// return
+}
+
+void Settings::setString(char *key, char *value)
+{
+	FILE *file = open(key, false);
+	if(!file) {											// failed to open settings?
+		printf("Settings::setString -- could not write key %s\n", key);
+		return;
+	}
+
+	fputs(value, file);
+	fclose(file);
+}	
+//-------------------------
+
 FILE *Settings::open(char *key, bool readNotWrite)
 {
 	char path[1024];
