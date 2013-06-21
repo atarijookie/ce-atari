@@ -9,23 +9,28 @@
 ConfigStream::ConfigStream()
 {
 	showingHomeScreen	= false;
+	showingMessage		= false;
 	screenChanged		= true;
 	
+	message.clear();
 	createScreen_homeScreen();
 }
 
 ConfigStream::~ConfigStream()
 {
 	destroyCurrentScreen();
+	destroyScreen(message);
 }
 
 void ConfigStream::onKeyDown(char vkey, char key)
 {
+	std::vector<ConfigComponent *> &scr = showingMessage ? message : screen;		// if we should show message, set reference to message, otherwise set reference to screen
+
 	int focused = -1, firstFocusable = -1, lastFocusable = -1;
 
 	// go through the current screen and find focused component, also first focusable component
-	for(int i=0; i<screen.size(); i++) {			
-		ConfigComponent *c = screen[i];
+	for(int i=0; i<scr.size(); i++) {			
+		ConfigComponent *c = scr[i];
 		
 		if(c->isFocused()) {						// if found focused component, store index
 			focused = i;
@@ -50,12 +55,12 @@ void ConfigStream::onKeyDown(char vkey, char key)
 		focused = firstFocusable;
 	}
 	
-	ConfigComponent *curr = screen[focused];		// focus this component
+	ConfigComponent *curr = scr[focused];		// focus this component
 	curr->setFocus(true);
 
 	int prevFocusable = -1, nextFocusable = -1;		// now find previous and next focusable item in the list of components
-	for(int i=0; i<screen.size(); i++) {			
-		ConfigComponent *c = screen[i];
+	for(int i=0; i<scr.size(); i++) {			
+		ConfigComponent *c = scr[i];
 		
 		if(!c->canFocus()) {						// can't focus? fuck you!						
 			continue;
@@ -77,9 +82,9 @@ void ConfigStream::onKeyDown(char vkey, char key)
 			curr->setFocus(false);					// unfocus this component
 			
 			if(prevFocusable != -1) {				// got previous focusable item?
-				curr = screen[prevFocusable];		// move to the previous component	
+				curr = scr[prevFocusable];		// move to the previous component	
 			} else if(lastFocusable != -1) {		// got last focusable? 
-				curr = screen[lastFocusable];		// move to the last component (wrap around)
+				curr = scr[lastFocusable];		// move to the last component (wrap around)
 			}
 			
 			curr->setFocus(true);					// focus this component
@@ -91,9 +96,9 @@ void ConfigStream::onKeyDown(char vkey, char key)
 			curr->setFocus(false);					// unfocus this component
 			
 			if(nextFocusable != -1) {				// got next focusable item?
-				curr = screen[nextFocusable];		// move to the next component	
+				curr = scr[nextFocusable];		// move to the next component	
 			} else if(firstFocusable != -1) {		// got first focusable? 
-				curr = screen[firstFocusable];		// move to the first component (wrap around)
+				curr = scr[firstFocusable];		// move to the first component (wrap around)
 			} 
 			
 			curr->setFocus(true);					// focus this component
@@ -110,6 +115,12 @@ void ConfigStream::getStream(bool homeScreen, char *bfr, int maxLen)
 {
 	int totalCnt = 0;
 
+	if(showingMessage) {								// if we're showing the message
+		if(homeScreen) {								// but we should show home screen
+			hideMessageScreen();						// hide the message
+		}
+	}
+	
 	if(homeScreen) {									// if we should show the stream for homescreen
 		if(!showingHomeScreen) {						// and we're not showing it yet
 			createScreen_homeScreen();					// create homescreen
@@ -122,6 +133,8 @@ void ConfigStream::getStream(bool homeScreen, char *bfr, int maxLen)
 
 	memset(bfr, 0, maxLen);								// clear the buffer
 
+	std::vector<ConfigComponent *> &scr = showingMessage ? message : screen;		// if we should show message, set reference to message, otherwise set reference to screen
+	
 	if(screenChanged) {									// if screen changed, clear screen (CLEAR_HOME) and draw it all
 		bfr[0] = 27;		
 		bfr[1] = 'E';
@@ -132,8 +145,8 @@ void ConfigStream::getStream(bool homeScreen, char *bfr, int maxLen)
 
 	int focused = -1;
 	
-	for(int i=0; i<screen.size(); i++) {				// go through all the components of screen and gather their streams
-		ConfigComponent *c = screen[i];
+	for(int i=0; i<scr.size(); i++) {				// go through all the components of screen and gather their streams
+		ConfigComponent *c = scr[i];
 		
 		if(c->isFocused()) {							// if this component has focus, store it's index
 			focused = i;
@@ -148,7 +161,7 @@ void ConfigStream::getStream(bool homeScreen, char *bfr, int maxLen)
 
 	if(focused != -1) {									// if got some component with focus
 		int gotLen;
-		ConfigComponent *c = screen[focused];
+		ConfigComponent *c = scr[focused];
 		c->terminal_addGotoCurrentCursor(bfr, gotLen);	// position the cursor at the right place
 
 		bfr			+= gotLen;
@@ -158,15 +171,54 @@ void ConfigStream::getStream(bool homeScreen, char *bfr, int maxLen)
 	screenChanged = false;
 }
 
+void onMessageOk(ConfigComponent *sender)
+{
+	ConfigStream::instance().hideMessageScreen();
+}
+
+void ConfigStream::showMessageScreen(char *msgTitle, char *msgTxt)
+{
+	screenChanged = true;
+	
+	showingMessage = true;
+	destroyScreen(message);
+
+	screen_addHeaderAndFooter(message, msgTitle);
+	
+	ConfigComponent *comp;
+
+	comp = new ConfigComponent(ConfigComponent::label, msgTxt,	40, 0, 10);
+	message.push_back(comp);
+	
+	comp = new ConfigComponent(ConfigComponent::button, " OK ",	4, 17, 20);
+	comp->setOnEnterFunction(onMessageOk);
+	comp->setFocus(true);
+	message.push_back(comp);
+}
+
+void ConfigStream::hideMessageScreen(void)
+{
+	screenChanged = true;
+
+	showingMessage = false;
+	destroyScreen(message);
+}
+
 void ConfigStream::destroyCurrentScreen(void)
 {
-	for(int i=0; i<screen.size(); i++) {			// go through the current screen, delete all components
-		ConfigComponent *c = screen[i];
+	destroyScreen(screen);
+}
+
+void ConfigStream::destroyScreen(std::vector<ConfigComponent *> &scr)
+{
+	for(int i=0; i<scr.size(); i++) {				// go through this screen, delete all components
+		ConfigComponent *c = scr[i];
 		delete c;
 	}
 	
-	screen.clear();									// now clear the list
+	scr.clear();									// now clear the list
 }
+
 
 void ConfigStream::setFocusToFirstFocusable(void)
 {
@@ -225,19 +277,19 @@ void onCheckboxGroupEnter(int groupId, int checkboxId)
 	ConfigStream::instance().checkboxGroup_setCheckedId(groupId, checkboxId);
 }
 
-void ConfigStream::screen_addHeaderAndFooter(char *screenName)
+void ConfigStream::screen_addHeaderAndFooter(std::vector<ConfigComponent *> &scr, char *screenName)
 {
 	ConfigComponent *comp;
 
 	// insert header
 	comp = new ConfigComponent(ConfigComponent::label, ">> CosmosEx config tool - Jookie 2013 <<", 40, 0, 0);
 	comp->setReverse(true);
-	screen.push_back(comp);
+	scr.push_back(comp);
 
 	// insert footer
 	comp = new ConfigComponent(ConfigComponent::label, "        To quit - press Ctrl + C        ", 40, 0, 22);
 	comp->setReverse(true);
-	screen.push_back(comp);
+	scr.push_back(comp);
 
 	// insert screen name as part of header
 	char bfr[41];
@@ -250,7 +302,7 @@ void ConfigStream::screen_addHeaderAndFooter(char *screenName)
 	
 	comp = new ConfigComponent(ConfigComponent::label, bfr, 40, 0, 1);
 	comp->setReverse(true);
-	screen.push_back(comp);
+	scr.push_back(comp);
 }
 
 //--------------------------
@@ -262,7 +314,7 @@ void ConfigStream::createScreen_homeScreen(void)
 	screenChanged		= true;			// mark that the screen has changed
 	showingHomeScreen	= true;			// mark that we're showing the home screen
 	
-	screen_addHeaderAndFooter((char *) "Main menu");
+	screen_addHeaderAndFooter(screen, (char *) "Main menu");
 	
 	ConfigComponent *comp;
 	

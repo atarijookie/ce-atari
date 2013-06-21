@@ -17,7 +17,7 @@ newt.c_lflag &= ~(ICANON | ECHO); /* make one change to old settings in new sett
 tcsetattr(STDIN_FILENO, TCSANOW, &newt); /*apply the new settings immediatly */
 	 
 	 Settings s;
-	 bool val = s.getBool("test", false);
+	 bool val = s.getBool((char *) "test", false);
 	 printf("The bool is: %d\n", val);
 	 
 	 char bfr[10240];
@@ -45,9 +45,10 @@ down      - vkey = 80, key = 0
 			case 'w': ConfigStream::instance().onKeyDown(72,0); break;		// up
 			case 's': ConfigStream::instance().onKeyDown(80,0); break;		// down
 			
-			case 10: ConfigStream::instance().onKeyDown(0, 13); break;		// enter
+			case 10:  ConfigStream::instance().onKeyDown(0, 13); break;		// enter
 			case 'q': ConfigStream::instance().onKeyDown(0,127); break;		// delete
 			case 'e': ConfigStream::instance().onKeyDown(0,8); break;		// backspace
+			case 'm': ConfigStream::instance().showMessageScreen((char *)"Warning", (char *)"This is a test warning!"); break;
 			default: ConfigStream::instance().onKeyDown(0, ch); break;
 		}
 

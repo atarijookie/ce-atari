@@ -24,19 +24,25 @@ public:
 	int  checkboxGroup_getCheckedId(int groupId);
 	void checkboxGroup_setCheckedId(int groupId, int checkedId);
 	
-	void screen_addHeaderAndFooter(char *screenName);
+	void showMessageScreen(char *msgTitle, char *msgTxt);
+	void hideMessageScreen(void);
 	
 private:
 	ConfigStream();
 
 	std::vector<ConfigComponent *> screen;
+	std::vector<ConfigComponent *> message;
 
 	bool showingHomeScreen;
+	bool showingMessage;
 	bool screenChanged;
 	
 	void createScreen_homeScreen(void);
 	void destroyCurrentScreen(void);
 	void setFocusToFirstFocusable(void);	
+	
+	void screen_addHeaderAndFooter(std::vector<ConfigComponent *> &scr, char *screenName);
+	void destroyScreen(std::vector<ConfigComponent *> &scr);
 };
 
 #endif
