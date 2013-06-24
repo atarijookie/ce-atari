@@ -4,20 +4,20 @@
 
 
 
+          [ ACSI IDs config  ] 
 
-          [ ACSI config      ] 
+          [ Translated disks ] 
+
+          [ Shared drive     ]
 
           [ Floppy config    ]  
 
           [ Network settings ] 
 
-          [ Shared drive     ]
-
           [ Update software  ]
 
 
-
-
+		  
 
 
         To quit - press Ctrl + C        

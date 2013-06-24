@@ -319,23 +319,27 @@ void ConfigStream::createScreen_homeScreen(void)
 	
 	ConfigComponent *comp;
 	
-	comp = new ConfigComponent(ConfigComponent::button, " ACSI config ",		18, 10,  7);
+	comp = new ConfigComponent(ConfigComponent::button, " ACSI IDs config ",	18, 10,  6);
 	comp->setOnEnterFunction(onMainMenu_acsiConfig);
 	screen.push_back(comp);
+
+	comp = new ConfigComponent(ConfigComponent::button, " Translated disks ",	18, 10,  8);
+	comp->setOnEnterFunction(onMainMenu_translatedDisks);
+	screen.push_back(comp);
+
+	comp = new ConfigComponent(ConfigComponent::button, " Shared drive ",		18, 10, 10);
+	comp->setOnEnterFunction(onMainMenu_sharedDrive);
+	screen.push_back(comp);
 	
-	comp = new ConfigComponent(ConfigComponent::button, " Floppy config ",		18, 10,  9);
+	comp = new ConfigComponent(ConfigComponent::button, " Floppy config ",		18, 10, 12);
 	comp->setOnEnterFunction(onMainMenu_floppyConfig);
 	screen.push_back(comp);
 
-	comp = new ConfigComponent(ConfigComponent::button, " Network settings ",	18, 10, 11);
+	comp = new ConfigComponent(ConfigComponent::button, " Network settings ",	18, 10, 14);
 	comp->setOnEnterFunction(onMainMenu_networkSettings);
 	screen.push_back(comp);
 
-	comp = new ConfigComponent(ConfigComponent::button, " Shared drive ",		18, 10, 13);
-	comp->setOnEnterFunction(onMainMenu_sharedDrive);
-	screen.push_back(comp);
-
-	comp = new ConfigComponent(ConfigComponent::button, " Update software ",	18, 10, 15);
+	comp = new ConfigComponent(ConfigComponent::button, " Update software ",	18, 10, 16);
 	comp->setOnEnterFunction(onMainMenu_updateSoftware);
 	screen.push_back(comp);
 	
@@ -358,7 +362,7 @@ void ConfigStream::createScreen_acsiConfig(void)
 	
 	ConfigComponent *comp;
 
-	comp = new ConfigComponent(ConfigComponent::label, "ID   off   raw  tran  shar   net  conf  ", 40, 0, 3);
+	comp = new ConfigComponent(ConfigComponent::label, "ID       off   raw  tran   net", 40, 0, 3);
 	comp->setReverse(true);
 	screen.push_back(comp);
 
@@ -369,32 +373,26 @@ void ConfigStream::createScreen_acsiConfig(void)
 		comp = new ConfigComponent(ConfigComponent::label, bfr, 2, 1, row + 4);
 		screen.push_back(comp);
 
-		for(int col=0; col<6; col++) {
-			comp = new ConfigComponent(ConfigComponent::checkbox, "   ", 3, 4 + (col * 6), row + 4);			// create and place checkbox on screen
+		for(int col=0; col<4; col++) {
+			comp = new ConfigComponent(ConfigComponent::checkbox, "   ", 3, 8 + (col * 6), row + 4);			// create and place checkbox on screen
 			comp->setCheckboxGroupIds(row, col);																// set checkbox group id to row, and checbox id to col
 			comp->setOnChBEnterFunction(onCheckboxGroupEnter);													// set this as general checkbox group handler, which switched checkboxed in group
 			screen.push_back(comp);
 		}
 	}
 	
-	comp = new ConfigComponent(ConfigComponent::label, "off  - turned off, not responding here",	40, 0, 15);
+	comp = new ConfigComponent(ConfigComponent::label, "off  - turned off, not responding here",	40, 0, 16);
 	screen.push_back(comp);
 
-	comp = new ConfigComponent(ConfigComponent::label, "raw  - raw sector access (use HDDr/ICD)",	40, 0, 16);
+	comp = new ConfigComponent(ConfigComponent::label, "raw  - raw sector access (use HDDr/ICD)",	40, 0, 17);
 	screen.push_back(comp);
 
-	comp = new ConfigComponent(ConfigComponent::label, "tran - translated access on media",			40, 0, 17);
-	screen.push_back(comp);
-
-	comp = new ConfigComponent(ConfigComponent::label, "shar - shared network drive   (only one)",	40, 0, 18);
+	comp = new ConfigComponent(ConfigComponent::label, "tran - translated access      (only one)",	40, 0, 18);
 	screen.push_back(comp);
 
 	comp = new ConfigComponent(ConfigComponent::label, "net  - network card interface (only one)",	40, 0, 19);
 	screen.push_back(comp);
 
-	comp = new ConfigComponent(ConfigComponent::label, "conf - config tools image     (only one)",	40, 0, 20);
-	screen.push_back(comp);
-	
 	comp = new ConfigComponent(ConfigComponent::button, "  Save  ", 8,  9, 13);
 	comp->setOnEnterFunction(onAcsiConfig_save);
 	screen.push_back(comp);

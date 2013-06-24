@@ -7,17 +7,22 @@ void onMainMenu_acsiConfig(ConfigComponent *sender)
 	ConfigStream::instance().createScreen_acsiConfig();
 }
 
+void onMainMenu_translatedDisks(ConfigComponent *sender)
+{
+
+}
+
+void onMainMenu_sharedDrive(ConfigComponent *sender)
+{
+
+}
+
 void onMainMenu_floppyConfig(ConfigComponent *sender)
 {
 
 }
 
 void onMainMenu_networkSettings(ConfigComponent *sender)
-{
-
-}
-
-void onMainMenu_sharedDrive(ConfigComponent *sender)
 {
 
 }
@@ -33,7 +38,7 @@ void onAcsiConfig_save(ConfigComponent *sender)
 	
 	bool somethingActive = false;
 	bool somethingInvalid = false;
-	int sharCnt = 0, netCnt = 0, confCnt = 0;
+	int tranCnt = 0, netCnt = 0;
 	
 	for(int id=0; id<8; id++) {								// get all selected types from checkbox groups
 		devTypes[id] = ConfigStream::instance().checkboxGroup_getCheckedId(id);
@@ -43,9 +48,8 @@ void onAcsiConfig_save(ConfigComponent *sender)
 		}
 		
 		switch(devTypes[id]) {								// count the shared drives, network adapters, config drives
-			case DEVTYPE_SHARED_DRIVE:	sharCnt++;					break;
+			case DEVTYPE_TRANSLATED:	tranCnt++;					break;
 			case DEVTYPE_NET_ADAPTER:	netCnt++;					break;
-			case DEVTYPE_CONFIG_DRIVE:	confCnt++;					break;
 			case -1:					somethingInvalid = true;	break;
 		}
 	}
@@ -60,18 +64,13 @@ void onAcsiConfig_save(ConfigComponent *sender)
 		return;
 	}
 	
-	if(sharCnt > 1) {										// more than 1 of this type?
-		ConfigStream::instance().showMessageScreen((char *) "Warning", (char *) "You have more than 1 shared drives selected.\nUnselect some to leave only 1 active.");
+	if(tranCnt > 1) {										// more than 1 of this type?
+		ConfigStream::instance().showMessageScreen((char *) "Warning", (char *) "You have more than 1 translated drives selected.\nUnselect some to leave only 1 active.");
 		return;
 	}
 	
 	if(netCnt > 1) {										// more than 1 of this type?
 		ConfigStream::instance().showMessageScreen((char *) "Warning", (char *) "You have more than 1 network adapters selected.\nUnselect some to leave only 1 active.");
-		return;
-	}
-	
-	if(confCnt > 1) {										// more than 1 of this type?
-		ConfigStream::instance().showMessageScreen((char *) "Warning", (char *) "You have more than 1 config drives selected.\nUnselect some to leave only 1 active.");
 		return;
 	}
 	

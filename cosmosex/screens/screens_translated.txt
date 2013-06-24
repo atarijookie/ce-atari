@@ -1,0 +1,22 @@
+>> CosmosEx config tool - Jookie 2013 <<
+            Translated disk
+
+
+        Drive letters assignment
+
+          First DOS drive: [J]
+          Last  DOS drive: [M]
+
+          Shared drive:    [N]
+          Config drive:    [O]
+
+         [  Save  ]  [ Cancel ]
+
+
+To disable option, delete the letter.
+If you use also raw disks (Atari native 
+disks), you should avoid using few 
+letters from C: to leave some space for
+them.
+
+        To quit - press Ctrl + C        

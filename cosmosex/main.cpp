@@ -32,8 +32,8 @@ int main()
 		}
 	}
 	 
-	if(!somethingActive) {								// if no device is activated, activate CONFIG_DRIVE on ACSI ID 0 to avoid bricking the device
-		devTypes[0] = DEVTYPE_CONFIG_DRIVE;
+	if(!somethingActive) {								// if no device is activated, activate DEVTYPE_TRANSLATED on ACSI ID 0 to avoid bricking the device
+		devTypes[0] = DEVTYPE_TRANSLATED;
 	}
 	//-----------------
 	 
