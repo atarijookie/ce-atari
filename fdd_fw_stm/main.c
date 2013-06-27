@@ -316,6 +316,7 @@ void init_hw_sw(void)
 	
 	timerSetup_mfmWrite();
 	dma_mfmWrite_init();
+
 	//--------------
 	// DMA + SPI initialization
 	for(i=0; i<INBUFFER_SIZE; i++) {							// fill the inBuffer with CMD_MARK_READ, which will tell that every byte is empty (already read)
@@ -345,7 +346,7 @@ void init_hw_sw(void)
 
 	wrNow = &wrBuffer[0];
 	//--------------
-	// configure MFM read stream by TIM2 CH4 and DMA in circular mode
+	// configure MFM read stream by TIM1_CH1 and DMA in circular mode
 	// WARNING!!! Never let mfmReadStreamBuffer[] contain a 0! With 0 the timer update never comes and streaming stops!
 	for(i=0; i<16; i++) {
 		mfmReadStreamBuffer[i] = 7;				// by default -- all pulses 4 us

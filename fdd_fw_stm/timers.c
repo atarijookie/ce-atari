@@ -20,14 +20,14 @@ void timerSetup_index(void)
 	
   TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
 
-  // PWM1 Mode configuration: Channel1
+  // PWM1 Mode configuration: Channel4
   TIM_OCInitStructure.TIM_OCMode			= TIM_OCMode_PWM1;
   TIM_OCInitStructure.TIM_OutputState	= TIM_OutputState_Enable;
   TIM_OCInitStructure.TIM_Pulse				= 10;											// pulse will be 10 ticks == 5 ms long
   TIM_OCInitStructure.TIM_OCPolarity	= TIM_OCPolarity_Low;
 
-  TIM_OC1Init(TIM2, &TIM_OCInitStructure);
-  TIM_OC1PreloadConfig(TIM2, TIM_OCPreload_Enable);
+  TIM_OC4Init(TIM2, &TIM_OCInitStructure);
+  TIM_OC4PreloadConfig(TIM2, TIM_OCPreload_Enable);
 	
   TIM_ARRPreloadConfig(TIM2, ENABLE);
 
@@ -55,14 +55,14 @@ void timerSetup_mfmRead(void)
 	
   TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
 	
-  // PWM1 Mode configuration: Channel4
+  // PWM1 Mode configuration: Channel1
   TIM_OCInitStructure.TIM_OCMode			= TIM_OCMode_PWM1;
   TIM_OCInitStructure.TIM_OutputState	= TIM_OutputState_Enable;
   TIM_OCInitStructure.TIM_Pulse				= 1;													// pulse will be 1 tick == 0.5 us long
   TIM_OCInitStructure.TIM_OCPolarity	= TIM_OCPolarity_Low;
 
-  TIM_OC4Init(TIM1, &TIM_OCInitStructure);
-  TIM_OC4PreloadConfig(TIM1, TIM_OCPreload_Enable);
+  TIM_OC1Init(TIM1, &TIM_OCInitStructure);
+  TIM_OC1PreloadConfig(TIM1, TIM_OCPreload_Enable);
 	
   TIM_ARRPreloadConfig(TIM1, DISABLE);							// disable preloading
 
