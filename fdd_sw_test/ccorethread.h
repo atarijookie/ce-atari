@@ -48,6 +48,8 @@ private:
     void handleSendNextSector(int &side, int &track, int &sector, BYTE *oBuf, BYTE *iBuf);
     void handleSectorWasWritten(void);
 
+    void sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf);
+    int bcdToInt(int bcd);
 };
 
 #endif // CCORETHREAD_H

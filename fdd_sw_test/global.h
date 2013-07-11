@@ -2,7 +2,7 @@
 #define GLOBAL_H
 
 // commands sent from device to host
-#define ATN_FW_VERSION				0x01        		// followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
+#define ATN_FW_VERSION              0x01       		// followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
 #define ATN_SEND_NEXT_SECTOR        0x02               	// sent: 2, side, track #, current sector #, 0, 0, 0, 0 (length: 4 WORDs)
 #define ATN_SECTOR_WRITTEN          0x03               	// sent: 3, side (highest bit) + track #, current sector #
 
@@ -19,16 +19,6 @@
 #define MFM_6US     2
 #define MFM_8US     3
 
-
-#define KJUT
-#ifdef KJUT
-#include <QDebug>
-#define OUT1    qDebug() <<
-#define OUT2    ;
-#else
-#define OUT1    printf("
-#define OUT2    ");
-#endif
-
+extern "C" void outDebugString(const char *format, ...);
 
 #endif // GLOBAL_H

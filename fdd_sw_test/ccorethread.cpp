@@ -1,14 +1,15 @@
 #include <QDir>
+#include <QDebug>
+
 #include "global.h"
 #include "ccorethread.h"
-
 #include "floppyimagefactory.h"
 
 BYTE        circBfr[2048];
-int         cnt, posa, posg;
+int         cb_cnt, cb_posa, cb_posg;
 
-#define		bfr_add(X)				{ circBfr[posa] = X;     posa++;      posa &= 0x7FF;   cnt++; }
-#define		bfr_get(X)				{ X = circBfr[posg];     posg++;      posg &= 0x7FF;   cnt--; }
+#define		bfr_add(X)				{ circBfr[cb_posa] = X;     cb_posa++;      cb_posa &= 0x7FF;   cb_cnt++; }
+#define		bfr_get(X)				{ X = circBfr[cb_posg];     cb_posg++;      cb_posg &= 0x7FF;   cb_cnt--; }
 
 CCoreThread::CCoreThread()
 {
@@ -40,33 +41,34 @@ void CCoreThread::run(void)
     image = imageFactory.getImage((char *) "fcreated.msa");
 
     if(!image) {
-        OUT1 "Image file type not supported!" OUT2;
+        outDebugString("Image file type not supported!");
         return;
     }
 
     if(!image->isOpen()) {
-        OUT1 "Image is not open!" OUT2;
+        outDebugString("Image is not open!");
         return;
     }
 
 //    BYTE buffer[512];
-
-//    printf("Check start\n");
+//    outDebugString("Check start");
 //    for(int t=0; t<80; t++) {
 //        for(int si=0; si<2; si++) {
 //            for(int se=1; se<=9; se++) {
 //                image->readSector(t, si, se, buffer);
 
 //                if(buffer[0] != t || buffer[1] != si || buffer[2] != se) {
-//                    printf("Data mismatch: %d-%d-%d vs %d-%d-%d\n", t, si, se, buffer[0], buffer[1], buffer[2]);
+//                    outDebugString("Data mismatch: %d-%d-%d vs %d-%d-%d", t, si, se, buffer[0], buffer[1], buffer[2]);
 //                }
 //            }
 //        }
 //    }
-//    printf("Check end\n");
+//    outDebugString("Check end");
+
+    bool checkFwOnce = true;
 
     while(shouldRun) {
-        while(cnt >= 8) {                               // while we have enough data
+        while(cb_cnt >= 8) {                               // while we have enough data
             int val;
             bfr_get(val);
 
@@ -101,15 +103,46 @@ void CCoreThread::run(void)
         }
         lastTick = GetTickCount();
 
-        memset(outBuff, 0, 8);                          // send 8 zeros to receive any potential command
-        conUsb->txRx(8, outBuff, inBuff);
+        if(checkFwOnce) {                               // if we're connected, we should check FW version once
+            outBuff[0] = CMD_GET_FW_VERSION;
+            outBuff[1] = 0;
 
-        for(int i=0; i<8; i++) {                        // add to circular buffer
-            bfr_add(inBuff[i]);
+            sendAndReceive(2, outBuff, inBuff);
+            checkFwOnce = false;
         }
+
+        memset(outBuff, 0, 8);                          // send 8 zeros to receive any potential command
+        sendAndReceive(8, outBuff, inBuff);
     }
 
     running = false;
+}
+
+void CCoreThread::sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf)
+{
+    if(!conUsb->isConnected()) {                    // not connected? quit
+        return;
+    }
+
+    conUsb->txRx(cnt, outBuf, inBuf);               // send and receive
+
+    QString so,si;
+    int val;
+
+    for(int i=0; i<cnt; i++) {
+        val = (int) outBuf[i];
+        so = so + QString("%1 ").arg(val, 2, 16, QLatin1Char('0'));
+
+        val = (int) inBuf[i];
+        si = si + QString("%1 ").arg(val, 2, 16, QLatin1Char('0'));
+    }
+    qDebug() << "Sent: " << so;
+    qDebug() << "Got : " << si;
+
+
+    for(int i=0; i<cnt; i++) {                      // add to circular buffer
+        bfr_add(inBuf[i]);
+    }
 }
 
 void CCoreThread::handleFwVersion(void)
@@ -123,15 +156,23 @@ void CCoreThread::handleFwVersion(void)
     }
 
     if(fwVer[0] == 0xf0) {
-        OUT1 "FW: Franz " OUT2;
+        outDebugString("FW: Franz ");
     } else {
-        OUT1 "FW: Hans " OUT2;
+        outDebugString("FW: Hans ");
     }
 
-    char tmp[32];
-    int year = ((int) fwVer[1]) + 2000;
-    sprintf(tmp, "%d-%02d-%02d\n", year, fwVer[2], fwVer[3]);
-    OUT1 tmp OUT2;
+    int year = bcdToInt(fwVer[1]) + 2000;
+    outDebugString("%d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+}
+
+int CCoreThread::bcdToInt(int bcd)
+{
+    int a,b;
+
+    a = bcd >> 4;       // upper nibble
+    b = bcd &  0x0f;    // lower nibble
+
+    return ((a * 10) + b);
 }
 
 void CCoreThread::handleSendNextSector(int &side, int &track, int &sector, BYTE *oBuf, BYTE *iBuf)
@@ -158,18 +199,19 @@ void CCoreThread::handleSendNextSector(int &side, int &track, int &sector, BYTE 
         return;
     }
 
-    createMfmStream(side, track, sector, oBuf, count);
+    oBuf[0] = CMD_CURRENT_SECTOR;                           // first send the current sector #
+    oBuf[1] = sector;
+
+    createMfmStream(side, track, sector, oBuf + 2, count);  // then create the right MFM stream
+
+    count += 2;                                             // now add the 2 bytes used by CMD_CURRENT_SECTOR
 
     if((count & 0x0001) != 0) {                     // if got even number of bytes
         oBuf[count] = 0;                            // store 0 at last position and increment count
         count++;
     }
 
-    conUsb->txRx(count, oBuf, iBuf);                // send and receive data
-
-    for(int i=0; i<count; i++) {                    // add to circular buffer
-        bfr_add(iBuf[i]);
-    }
+    sendAndReceive(count, oBuf, iBuf);                // send and receive data
 }
 
 void CCoreThread::handleSectorWasWritten(void)
@@ -195,9 +237,9 @@ void CCoreThread::createConnectionObject(void)
     }
 
     if(!conUsb->init()) {               // load dll, if failed, delete object
-        OUT1 "Failed to open USB connection - .dll not loaded." OUT2;
+        outDebugString("Failed to open USB connection - .dll not loaded.");
     } else {
-        OUT1 "USB connection ready to connect to device." OUT2;
+        outDebugString("USB connection ready to connect to device.");
     }
 }
 
@@ -338,7 +380,7 @@ void CCoreThread::appendChange(BYTE chg, BYTE *bfr, int &cnt)
     case 0x11:  time = MFM_8US; break;        // 8 us - stored as 3
 
     default:
-        OUT1 "appendChange -- this shouldn't happen!" OUT2;
+        outDebugString("appendChange -- this shouldn't happen!");
         return;
     }
 
@@ -378,4 +420,21 @@ void CCoreThread::fdc_add_to_crc(WORD &crc, BYTE data)
   for (int i=0;i<8;i++){
     crc = ((crc << 1) ^ ((((crc >> 8) ^ (data << i)) & 0x0080) ? 0x1021 : 0));
   }
+}
+
+void outDebugString(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+
+#define KJUT
+#ifdef KJUT
+    char tmp[1024];
+    vsprintf(tmp, format, args);
+    qDebug() << tmp;
+#else
+    vprintf(format, args);
+#endif
+
+    va_end(args);
 }

@@ -1,4 +1,3 @@
-#include <QDebug>
 #include "cconusb.h"
 #include "global.h"
 
@@ -59,7 +58,7 @@ bool CConUsb::loadFTDIdll(void)
         return true;
     }
 
-    logString("USB: initializing library...");
+    outDebugString("USB: initializing library...");
 
     FTDIlib = new QLibrary("ftd2xx.dll");
 
@@ -88,7 +87,7 @@ bool CConUsb::loadFTDIdll(void)
         return false;
     }
 
-    logString("USB: library initialization done.");
+    outDebugString("USB: library initialization done.");
 
     // done
     isLoaded = true;
@@ -112,7 +111,7 @@ void CConUsb::tryToConnect(void)
     ftStatus = (*pFT_ListDevices)(&numDevs, NULL, FT_LIST_NUMBER_ONLY);
 
     if (ftStatus != FT_OK) {                // failed to get # of devices?
-        logString("USB: failed to get number of connected devices.");
+        outDebugString("USB: failed to get number of connected devices.");
         return;
     }
 
@@ -126,22 +125,22 @@ void CConUsb::tryToConnect(void)
        ftStatus = (*pFT_Open)(i, &ftHandle);
 
        if (ftStatus != FT_OK) {
-           logString(QString("USB: failed to open device #%1").arg(i));
+           outDebugString("USB: failed to open device...");
            continue;
        }
 
        connected = true;
-       logString(QString("USB: connected to device #%1").arg(i));
+       outDebugString("USB: connected to device.");
 
        // if it's FT232, set baud rate
 //       ftStatus = (*pFT_SetBaudRate)(ftHandle, 115200);
 //       if (ftStatus != FT_OK) {
-//           logString("USB: speed not set");
+//           outDebugString("USB: speed not set");
 //       }
 
 //       ftStatus = (*pFT_SetDataCharacteristics) (ftHandle, FT_BITS_8, FT_STOP_BITS_1, FT_PARITY_NONE);
 //       if (ftStatus != FT_OK) {
-//           logString("USB: data characteristics not set");
+//           outDebugString("USB: data characteristics not set");
 //       }
 
        break;
@@ -189,7 +188,7 @@ void CConUsb::write(int count, BYTE *buffer)
 
     while(remaining > 0) {
         if((GetTickCount() - start) > 3000) {         // timeout?
-            logString("Timeout on USB write!");
+            outDebugString("Timeout on USB write!");
             return;
         }
 
@@ -210,7 +209,7 @@ void CConUsb::read (int count, BYTE *buffer)
 
     while(remaining > 0) {
         if((GetTickCount() - start) > 3000) {         // timeout?
-            logString("Timeout on USB read!");
+            outDebugString("Timeout on USB read!");
             return;
         }
 
@@ -226,7 +225,3 @@ bool CConUsb::isConnected(void)
     return connected;
 }
 
-void CConUsb::logString(QString log)
-{
-    OUT1 log.toLatin1().data() OUT2;
-}

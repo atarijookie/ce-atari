@@ -1,3 +1,4 @@
+#include <string.h>
 #include "floppyimagemsa.h"
 
 FloppyImageMsa::FloppyImageMsa()
@@ -21,7 +22,7 @@ bool FloppyImageMsa::open(char *fileName)
     fajl = fopen(fileName, "rb");
 
     if(fajl == NULL) {
-        printf("Failed to open image file: %s\n", fileName);
+        outDebugString("Failed to open image file: %s", fileName);
         openFlag = false;
         return false;
     }
@@ -52,8 +53,8 @@ bool FloppyImageMsa::open(char *fileName)
 
     getTrackStartOffsets();
 
-    printf("MSA Image opened: %s\n", fileName);
-    printf("MSA Image params - %d tracks, %d sides, %d sectors per track\n", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
+    outDebugString("MSA Image opened: %s", fileName);
+    outDebugString("MSA Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
 
     return true;
 }

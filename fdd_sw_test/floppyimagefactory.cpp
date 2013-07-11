@@ -1,3 +1,4 @@
+#include <string.h>
 #include "floppyimagefactory.h"
 
 FloppyImageFactory::FloppyImageFactory()
@@ -39,7 +40,7 @@ IFloppyImage *FloppyImageFactory::getImage(char *fileName)
     toLowerCase(&fileName[pos+1], ext); // convert the extension to lower case
 
     if(strncmp(ext, "msa", 3) == 0) {   // msa image?
-        printf("FloppyImageFactory -- using MSA image on %s\n", fileName);
+        outDebugString("FloppyImageFactory -- using MSA image on %s", fileName);
 
         if(!msa) {                      // not created yet?
             msa = new FloppyImageMsa();
@@ -52,7 +53,7 @@ IFloppyImage *FloppyImageFactory::getImage(char *fileName)
     }
 
     if(strncmp(ext, "st", 2) == 0) {    // st image?
-        printf("FloppyImageFactory -- using ST image on %s\n", fileName);
+        outDebugString("FloppyImageFactory -- using ST image on %s", fileName);
 
         if(!st) {                       // not created yet?
             st = new FloppyImageSt();

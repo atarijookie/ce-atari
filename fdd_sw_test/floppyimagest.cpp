@@ -1,3 +1,4 @@
+#include <string.h>
 #include "floppyimagest.h"
 
 FloppyImageSt::FloppyImageSt()
@@ -21,7 +22,7 @@ bool FloppyImageSt::open(char *fileName)
     fajl = fopen(fileName, "rb");
 
     if(fajl == NULL) {
-        printf("Failed to open image file: %s\n", fileName);
+        outDebugString("Failed to open image file: %s", fileName);
         openFlag = false;
         return false;
     }
@@ -34,8 +35,8 @@ bool FloppyImageSt::open(char *fileName)
 
     calcParams();                       // calculate the params of this floppy
 
-    printf("ST Image opened: %s\n", fileName);
-    printf("ST Image params - %d tracks, %d sides, %d sectors per track\n", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
+    outDebugString("ST Image opened: %s", fileName);
+    outDebugString("ST Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
 
     return true;
 }
@@ -162,6 +163,6 @@ bool FloppyImageSt::calcParams(void)
         }
     }
 
-    printf("Couldn't guess the floppy params :(");
+    outDebugString("Couldn't guess the floppy params :(");
     return false;
 }
