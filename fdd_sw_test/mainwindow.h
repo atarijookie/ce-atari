@@ -17,6 +17,11 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
     
+private slots:
+    void on_chbDrive01_stateChanged(int arg1);
+
+    void on_chbWriteProtect_stateChanged(int arg1);
+
 private:
     Ui::MainWindow *ui;
 

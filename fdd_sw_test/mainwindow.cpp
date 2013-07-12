@@ -1,5 +1,9 @@
+#include <QDebug>
+
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+
+#include "global.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -24,4 +28,30 @@ MainWindow::~MainWindow()
     }
 
     delete ui;
+}
+
+void MainWindow::on_chbDrive01_stateChanged(int arg1)
+{
+    bool drive01 = ui->chbDrive01->isChecked();
+
+    if(drive01) {
+        qDebug() << "Drive ID: 1";
+        core.setNextCmd(CMD_SET_DRIVE_ID_1);
+    } else {
+        qDebug() << "Drive ID: 0";
+        core.setNextCmd(CMD_SET_DRIVE_ID_0);
+    }
+}
+
+void MainWindow::on_chbWriteProtect_stateChanged(int arg1)
+{
+    bool wp = ui->chbWriteProtect->isChecked();
+
+    if(wp) {
+        qDebug() << "Drive is Read Only";
+        core.setNextCmd(CMD_WRITE_PROTECT_ON);
+    } else {
+        qDebug() << "Drive is Read-Write";
+        core.setNextCmd(CMD_WRITE_PROTECT_OFF);
+    }
 }

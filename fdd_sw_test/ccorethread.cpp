@@ -19,6 +19,8 @@ CCoreThread::CCoreThread()
     conUsb      = NULL;
     createConnectionObject();
     conUsb->tryToConnect();
+
+    nextCmd = CMD_GET_FW_VERSION;
 }
 
 CCoreThread::~CCoreThread()
@@ -38,7 +40,7 @@ void CCoreThread::run(void)
     BYTE outBuff[2048], inBuff[2048];
     int side=0, track=0, sector=1;
 
-    image = imageFactory.getImage((char *) "fcreated.msa");
+    image = imageFactory.getImage((char *) "A_006.ST");
 
     if(!image) {
         outDebugString("Image file type not supported!");
@@ -65,8 +67,6 @@ void CCoreThread::run(void)
 //    }
 //    outDebugString("Check end");
 
-    bool checkFwOnce = true;
-
     while(shouldRun) {
         while(cb_cnt >= 8) {                               // while we have enough data
             int val;
@@ -85,11 +85,6 @@ void CCoreThread::run(void)
             }
         }
 
-        if(conUsb == NULL) {                            // if no connection object
-            msleep(100);
-            continue;
-        }
-
         if(!conUsb->isConnected()) {                    // if not connected?
             conUsb->tryToConnect();                     // try to connect and wait
 
@@ -103,12 +98,13 @@ void CCoreThread::run(void)
         }
         lastTick = GetTickCount();
 
-        if(checkFwOnce) {                               // if we're connected, we should check FW version once
-            outBuff[0] = CMD_GET_FW_VERSION;
+        if(nextCmd != 0) {                              // if we're connected, send this command
+            outBuff[0] = nextCmd;
             outBuff[1] = 0;
 
+            nextCmd = 0;                                // mark that there's no command to send
+
             sendAndReceive(2, outBuff, inBuff);
-            checkFwOnce = false;
         }
 
         memset(outBuff, 0, 8);                          // send 8 zeros to receive any potential command
@@ -116,6 +112,11 @@ void CCoreThread::run(void)
     }
 
     running = false;
+}
+
+void CCoreThread::setNextCmd(BYTE cmd)
+{
+    nextCmd = cmd;
 }
 
 void CCoreThread::sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf)
@@ -126,18 +127,18 @@ void CCoreThread::sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf)
 
     conUsb->txRx(cnt, outBuf, inBuf);               // send and receive
 
-    QString so,si;
-    int val;
+//    QString so,si;
+//    int val;
 
-    for(int i=0; i<cnt; i++) {
-        val = (int) outBuf[i];
-        so = so + QString("%1 ").arg(val, 2, 16, QLatin1Char('0'));
+//    for(int i=0; i<cnt; i++) {
+//        val = (int) outBuf[i];
+//        so = so + QString("%1 ").arg(val, 2, 16, QLatin1Char('0'));
 
-        val = (int) inBuf[i];
-        si = si + QString("%1 ").arg(val, 2, 16, QLatin1Char('0'));
-    }
-    qDebug() << "Sent: " << so;
-    qDebug() << "Got : " << si;
+//        val = (int) inBuf[i];
+//        si = si + QString("%1 ").arg(val, 2, 16, QLatin1Char('0'));
+//    }
+//    qDebug() << "Sent: " << so;
+//    qDebug() << "Got : " << si;
 
 
     for(int i=0; i<cnt; i++) {                      // add to circular buffer
@@ -179,6 +180,8 @@ void CCoreThread::handleSendNextSector(int &side, int &track, int &sector, BYTE 
 {
     BYTE buf[6];
     int val;
+
+    outDebugString("ATN_SEND_NEXT_SECTOR -- track %d, side %d, sector %d", track, side, sector);
 
     for(int i=0; i<6; i++) {        // get arguments from buffer
         bfr_get(val);

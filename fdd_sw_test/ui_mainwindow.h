@@ -1,8 +1,8 @@
 /********************************************************************************
 ** Form generated from reading UI file 'mainwindow.ui'
 **
-** Created: Thu 11. Jul 05:53:59 2013
-**      by: Qt User Interface Compiler version 4.7.0
+** Created: Fri 12. Jul 15:55:27 2013
+**      by: Qt User Interface Compiler version 4.8.1
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
@@ -14,6 +14,7 @@
 #include <QtGui/QAction>
 #include <QtGui/QApplication>
 #include <QtGui/QButtonGroup>
+#include <QtGui/QCheckBox>
 #include <QtGui/QHeaderView>
 #include <QtGui/QLabel>
 #include <QtGui/QMainWindow>
@@ -26,6 +27,8 @@ class Ui_MainWindow
 public:
     QWidget *centralWidget;
     QLabel *label;
+    QCheckBox *chbWriteProtect;
+    QCheckBox *chbDrive01;
 
     void setupUi(QMainWindow *MainWindow)
     {
@@ -36,7 +39,13 @@ public:
         centralWidget->setObjectName(QString::fromUtf8("centralWidget"));
         label = new QLabel(centralWidget);
         label->setObjectName(QString::fromUtf8("label"));
-        label->setGeometry(QRect(40, 30, 46, 13));
+        label->setGeometry(QRect(20, 20, 151, 16));
+        chbWriteProtect = new QCheckBox(centralWidget);
+        chbWriteProtect->setObjectName(QString::fromUtf8("chbWriteProtect"));
+        chbWriteProtect->setGeometry(QRect(20, 90, 171, 18));
+        chbDrive01 = new QCheckBox(centralWidget);
+        chbDrive01->setObjectName(QString::fromUtf8("chbDrive01"));
+        chbDrive01->setGeometry(QRect(20, 110, 161, 18));
         MainWindow->setCentralWidget(centralWidget);
 
         retranslateUi(MainWindow);
@@ -47,7 +56,9 @@ public:
     void retranslateUi(QMainWindow *MainWindow)
     {
         MainWindow->setWindowTitle(QApplication::translate("MainWindow", "MainWindow", 0, QApplication::UnicodeUTF8));
-        label->setText(QApplication::translate("MainWindow", "test app", 0, QApplication::UnicodeUTF8));
+        label->setText(QApplication::translate("MainWindow", "Floppy test app", 0, QApplication::UnicodeUTF8));
+        chbWriteProtect->setText(QApplication::translate("MainWindow", "write protection", 0, QApplication::UnicodeUTF8));
+        chbDrive01->setText(QApplication::translate("MainWindow", "drive 0 / 1 (1 when checked)", 0, QApplication::UnicodeUTF8));
     } // retranslateUi
 
 };

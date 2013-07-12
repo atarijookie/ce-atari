@@ -22,6 +22,8 @@ public:
     void stopRunning(void);
     bool isRunning(void);
 
+    void setNextCmd(BYTE cmd);
+
 public slots:
 
 
@@ -32,6 +34,8 @@ private:
     CConUsb             *conUsb;
     IFloppyImage        *image;
     FloppyImageFactory  imageFactory;
+
+    BYTE                nextCmd;
 
     void createConnectionObject(void);
     void usbConnectionCheck(void);
