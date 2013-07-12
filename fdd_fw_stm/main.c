@@ -23,11 +23,11 @@ void dma_mfmRead_init(void);
 void dma_mfmWrite_init(void);
 void dma_spi_init(void);
 
+WORD spi_TxRx(WORD out);
+
 /*
 TODO:
  - test TIM3 input capture bez DMA, potom s DMA
- - test DMA SPI
- - test TIM1, TIM2 po presune!
  - pomeranie kolko trvaju jednotlive casti kodu
 */
 
@@ -37,6 +37,8 @@ TODO:
 
 // gap byte 0x4e == 666446 us = 222112 times = 10'10'10'01'01'10 = 0xa96
 // first gap (60 * 0x4e) takes 1920 us (1.9 ms)
+
+// This ARM is little endian, e.g. 0x1234 is stored in RAM as 34 12, but when working with WORDs, it's OK
 
 #define INBUFFER_SIZE					2048
 WORD inBuffer[INBUFFER_SIZE];
@@ -72,6 +74,8 @@ WORD t1, t2, dt;
 #define CMD_DISK_CHANGE_ON			0x40
 #define CMD_CURRENT_SECTOR			0x50								// followed by sector #
 #define CMD_GET_FW_VERSION			0x60
+#define CMD_SET_DRIVE_ID_0			0x70
+#define CMD_SET_DRIVE_ID_1			0x80
 #define CMD_MARK_READ						0xF000							// this is not sent from host, but just a mark that this WORD has been read and you shouldn't continue to read further
 
 #define MFM_4US     1
@@ -104,11 +108,14 @@ WORD t1, t2, dt;
 //--------------
 
 WORD version[2] = {0xf013, 0x0527};				// this means: Franz, 2013-05-27
+WORD drive_select;
 
 int main (void) 
 {
 	BYTE prevSide = 0, outputsActive = 0;
 	WORD prevWGate = WGATE, WGate;
+	
+	drive_select = MOTOR_ENABLE | DRIVE_SELECT0;	// the drive select bits which should be LOW if the drive is selected
 	
 	init_hw_sw();																	// init GPIO pins, timers, DMA, global variables
 
@@ -122,76 +129,13 @@ int main (void)
 		WORD ints;
 		WORD inputs = GPIOB->IDR;								// read floppy inputs
 
-//		if((inputs & (MOTOR_ENABLE | DRIVE_SELECT)) != 0) {		// motor not enabled, drive not selected? do nothing
-		if(0) {
-			if(outputsActive == 1) {							// if we got outputs active
-				FloppyOut_Disable();								// all pins as inputs, drive not selected
-				outputsActive = 0;
-			}
-
-			// with the floppy disabled, drop the data from inBuffer, but process the host commands
-			while(1) {														// empty the buffer
-				WORD wval;
-				inBuffer_get_noMove(wval);					// get byte from host buffer
-
-				if(wval == CMD_MARK_READ) {					// we've hit the already read part of buffer? (underflow) quit loop
-					break;
-				}
-				
-				inBuffer_markAndmove();							// mark this word as read and move to the next one
-				
-				if((wval & 0x0f00) == 0) {					// lower nibble == 0? it's a command from host, process it; otherwise drop it
-					processHostCommand(wval);
-				}
-			}
-
-			continue;
-		}
-
-		if(outputsActive == 0) {								// if the outputs are inactive
-			FloppyOut_Enable();										// set these as outputs
-			outputsActive = 1;
-		}
-		
-		WGate = inputs & WGATE;												// get current WGATE value
-		if(prevWGate != WGate) {											// if WGate changed
-			
-			if(WGate == 0) {														// on falling edge of WGATE
-				WORD wval;
-
-				lastMfmWriteTC = TIM3->CNT;								// set lastMfmWriteTC to current TC value on WRITE start
-				wrNow->readyToSend = FALSE;								// mark this buffer as not ready to be sent yet
-				
-				wval = (ATN_SECTOR_WRITTEN << 8) | side;	// 1st byte: ATN code, 2nd byte: side 
-				wrBuffer_add(wval);
-	
-				wval = (track << 8) | sector;							// 3rd byte: track #, 4th byte: current sector #
-				wrBuffer_add(wval);									
-			} else {																		// on rising edge
-				wrBuffer_add(0);													// last word: 0
-				
-				wrNow->readyToSend = TRUE;								// mark this buffer as ready to be sent
-			}			
-			
-			prevWGate = WGate;													// store WGATE value
-		}
-		
-		if(WGate == 0) {																				// when write gate is low, the data is written to floppy
-			if((DMA1->ISR & (DMA1_IT_TC6 | DMA1_IT_HT6)) != 0) {	// MFM write stream: TC or HT interrupt? we've streamed half of circular buffer!
-				getMfmWriteTimes();
-			}
-		}
-
-		if((DMA1->ISR & (DMA1_IT_TC5 | DMA1_IT_HT5)) != 0) {		// MFM read stream: TC or HT interrupt? we've streamed half of circular buffer!
-			fillMfmTimesForDMA();																	// fill the circular DMA buffer with mfm times
-		}
-
+		// SPI TX handling - send some stuff if DMA is done and there's something to send
 		if(DMA1_Channel3->CNDTR == 0) {													// SPI TX: nothing to transfer?
 			BYTE sending = FALSE;
 			
 			if(atnNow->count > 0) {																// the current ATN buffer holds some ATNs to send?
 				sending = TRUE;
-				
+
 				DMA1_Channel3->CCR		&= 0xfffffffe;								// disable DMA1 Channel3 transfer
 				DMA1_Channel3->CMAR		= (uint32_t) atnNow->buffer;	// from this buffer located in memory
 				DMA1_Channel3->CNDTR	= atnNow->count;							// this much data
@@ -222,6 +166,76 @@ int main (void)
 				DMA1_Channel3->CCR		&= 0xfffffffe;								// disable DMA1 Channel3 transfer
 				GPIOB->BRR = ATN;																		// ATTENTION bit low  - nothing to read
 			}				 
+		}
+		
+		//-------------------------------------------------
+		// now check if the drive is ON or OFF and handle it
+//		if((inputs & drive_select) != 0) {		// motor not enabled, drive not selected? do nothing
+		if((inputs & MOTOR_ENABLE) != 0) {			// motor not enabled? do nothing
+ 			if(outputsActive == 1) {							// if we got outputs active
+				FloppyOut_Disable();								// all pins as inputs, drive not selected
+				outputsActive = 0;
+			}
+
+			// with the floppy disabled, drop the data from inBuffer, but process the host commands
+			while(1) {														// empty the buffer
+				WORD wval;
+				inBuffer_get_noMove(wval);					// get byte from host buffer
+
+				if(wval == CMD_MARK_READ) {					// we've hit the already read part of buffer? (underflow) quit loop
+					break;
+				}
+				
+				inBuffer_markAndmove();							// mark this word as read and move to the next one
+				
+				if((wval & 0x0f00) == 0) {					// lower nibble == 0? it's a command from host, process it; otherwise drop it
+					processHostCommand(wval);
+				}
+			}
+
+			continue;
+		}
+
+		if(outputsActive == 0) {								// if the outputs are inactive
+			FloppyOut_Enable();										// set these as outputs
+			outputsActive = 1;
+		}
+		//-------------------------------------------------
+		
+		// handle all the stuff when drive is ON		
+/*		
+		WGate = inputs & WGATE;												// get current WGATE value
+		if(prevWGate != WGate) {											// if WGate changed
+			
+			if(WGate == 0) {														// on falling edge of WGATE
+				WORD wval;
+
+				lastMfmWriteTC = TIM3->CNT;								// set lastMfmWriteTC to current TC value on WRITE start
+				wrNow->readyToSend = FALSE;								// mark this buffer as not ready to be sent yet
+				
+				wval = (ATN_SECTOR_WRITTEN << 8) | side;	// 1st byte: ATN code, 2nd byte: side 
+				wrBuffer_add(wval);
+	
+				wval = (track << 8) | sector;							// 3rd byte: track #, 4th byte: current sector #
+				wrBuffer_add(wval);									
+			} else {																		// on rising edge
+				wrBuffer_add(0);													// last word: 0
+				
+				wrNow->readyToSend = TRUE;								// mark this buffer as ready to be sent
+			}			
+			
+			prevWGate = WGate;													// store WGATE value
+		}
+		
+		if(WGate == 0) {																				// when write gate is low, the data is written to floppy
+			if((DMA1->ISR & (DMA1_IT_TC6 | DMA1_IT_HT6)) != 0) {	// MFM write stream: TC or HT interrupt? we've streamed half of circular buffer!
+				getMfmWriteTimes();
+			}
+		}
+*/
+
+		if((DMA1->ISR & (DMA1_IT_TC5 | DMA1_IT_HT5)) != 0) {		// MFM read stream: TC or HT interrupt? we've streamed half of circular buffer!
+			fillMfmTimesForDMA();																	// fill the circular DMA buffer with mfm times
 		}
 
 		// check for STEP pulse - should we go to a different track?
@@ -260,8 +274,7 @@ int main (void)
 
 		//------------
 		// check INDEX pulse as needed -- duration when filling with marks: 69.8 us
-// 	if((TIM2->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
-		if(0) {
+		if((TIM2->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
 			static BYTE broken4e[16] = {11,7,7,11,11,11,11,7,7,11,11,11,11,7,7,11};
 			int i;
 			TIM2->SR = 0xfffe;							// clear UIF flag
@@ -312,6 +325,7 @@ void init_hw_sw(void)
 	AFIO->MAPR |= 0x00000300;									// TIM2_REMAP -- Full remap (CH1/ETR/PA15, CH2/PB3, CH3/PB10, CH4/PB11)
 	AFIO->MAPR |= 0x00000800;									// TIM3_REMAP -- Partial remap (CH1/PB4, CH2/PB5, CH3/PB0, CH4/PB1)
 	//----------
+	
 	timerSetup_index();
 	
 	timerSetup_mfmWrite();
@@ -334,7 +348,7 @@ void init_hw_sw(void)
 	atnBuffer[1].next			= &atnBuffer[0];
 
 	atnNow = &atnBuffer[0];
-	
+
 	// now init both writeBuffers
 	wrBuffer[0].count				= 0;
 	wrBuffer[0].readyToSend	= FALSE;
@@ -367,6 +381,22 @@ void init_hw_sw(void)
 	stream4e			= 0;			// mark that we shouldn't stream any 0x4e (yet)
 	
 	lastMfmWriteTC = 0;
+}
+
+
+WORD spi_TxRx(WORD out)
+{
+	WORD in;
+
+	while((SPI1->SR & (1 << 7)) != 0);								// TXE flag: Tx buffer empty
+
+	while((SPI1->SR & 2) == 0);								// TXE flag: Tx buffer empty
+	SPI1->DR = out;														// send over SPI
+
+	while((SPI1->SR & 1) == 0);								// RXNE flag: RX buffer NOT empty
+	in = SPI1->DR;														// get data
+	
+	return in;
 }
 
 void getMfmWriteTimes(void)
@@ -524,6 +554,9 @@ void processHostCommand(WORD hostWord)
 			sector = lo;
 			addAttention(ATN_SEND_NEXT_SECTOR);		// also ask for the next sector to this one
 			break;			
+		
+		case CMD_SET_DRIVE_ID_0:			drive_select = MOTOR_ENABLE | DRIVE_SELECT0;		break;		// set drive ID pins to check like this...
+		case CMD_SET_DRIVE_ID_1:			drive_select = MOTOR_ENABLE | DRIVE_SELECT1;		break;		// ...or that!
 	}
 }
 

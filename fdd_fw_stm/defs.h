@@ -49,7 +49,8 @@ GPIOB_4  - WDATA						(using TIM3_CH1 after remap)
 GPIOB_6  - SIDE1
 GPIOB_7  - WGATE
 GPIOB_12 - MOTOR_ENABLE
-GPIOB_13 - DRIVE_SELECT
+GPIOB_13 - DRIVE_SELECT0
+GPIOB_14 - DRIVE_SELECT1
 
 
 outputs:
@@ -81,7 +82,8 @@ GPIOB_15 - ATTENTION (need more data / data available to retrieve)
 //#define	INDEX					(1 <<  11)
 
 #define	MOTOR_ENABLE	(1 <<  12)
-#define	DRIVE_SELECT	(1 <<  13)
+#define	DRIVE_SELECT0	(1 <<  13)
+#define	DRIVE_SELECT1	(1 <<  14)
 
 #define	ATN						(1 <<  15)
 
