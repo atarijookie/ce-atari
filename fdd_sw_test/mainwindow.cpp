@@ -55,3 +55,16 @@ void MainWindow::on_chbWriteProtect_stateChanged(int arg1)
         core.setNextCmd(CMD_WRITE_PROTECT_OFF);
     }
 }
+
+void MainWindow::on_chbDiskChg_stateChanged(int )
+{
+    bool dc = ui->chbDiskChg->isChecked();
+
+    if(dc) {
+        qDebug() << "Disk changed";
+        core.setNextCmd(CMD_DISK_CHANGE_ON);
+    } else {
+        qDebug() << "Disk not changed";
+        core.setNextCmd(CMD_DISK_CHANGE_OFF);
+    }
+}

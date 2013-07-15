@@ -11,6 +11,8 @@ int         cb_cnt, cb_posa, cb_posg;
 #define		bfr_add(X)				{ circBfr[cb_posa] = X;     cb_posa++;      cb_posa &= 0x7FF;   cb_cnt++; }
 #define		bfr_get(X)				{ X = circBfr[cb_posg];     cb_posg++;      cb_posg &= 0x7FF;   cb_cnt--; }
 
+QStringList dbg;
+
 CCoreThread::CCoreThread()
 {
     shouldRun       = true;
@@ -29,7 +31,16 @@ CCoreThread::~CCoreThread()
         stopRunning();
     }
 
+    CCoreThread::displayDbg();
+
     delete conUsb;
+}
+
+void CCoreThread::displayDbg(void)
+{
+    for(int i=0; i<dbg.count(); i++) {
+        qDebug() << dbg.at(i);
+    }
 }
 
 void CCoreThread::run(void)
@@ -121,6 +132,9 @@ void CCoreThread::setNextCmd(BYTE cmd)
 
 void CCoreThread::sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf)
 {
+//    outDebugString("sendAndReceive -- %d", cnt);
+//    DWORD start = GetTickCount();
+
     if(!conUsb->isConnected()) {                    // not connected? quit
         return;
     }
@@ -144,6 +158,8 @@ void CCoreThread::sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf)
     for(int i=0; i<cnt; i++) {                      // add to circular buffer
         bfr_add(inBuf[i]);
     }
+//    DWORD end = GetTickCount();
+//    outDebugString("sendAndReceive: %d ms", end - start);
 }
 
 void CCoreThread::handleFwVersion(void)
@@ -181,8 +197,6 @@ void CCoreThread::handleSendNextSector(int &side, int &track, int &sector, BYTE 
     BYTE buf[6];
     int val;
 
-    outDebugString("ATN_SEND_NEXT_SECTOR -- track %d, side %d, sector %d", track, side, sector);
-
     for(int i=0; i<6; i++) {        // get arguments from buffer
         bfr_get(val);
         buf[i] = val;
@@ -193,12 +207,12 @@ void CCoreThread::handleSendNextSector(int &side, int &track, int &sector, BYTE 
     track   = buf[1];
     sector  = buf[2];
 
+    outDebugString("ATN_SEND_NEXT_SECTOR -- track %d, side %d, sector %d", track, side, sector);
+
     int tr, si, spt;
     image->getParams(tr, si, spt);  // read the floppy image params
 
-    if(sector < spt) {              // if we're not yet at the end of the track
-        sector++;                   // move to the next sector and send data to floppy
-    } else {                        // if we're at the end of the track, don't send data and let the floppy starve
+    if(sector > spt) {              // if we're at the end of the track
         return;
     }
 
@@ -279,29 +293,18 @@ bool CCoreThread::createMfmStream(int side, int track, int sector, BYTE *buffer,
         appendByteToStream(0, buffer, count);
     }
 
-    WORD CRC = 0xffff;                                      // init CRC
+    CRC = 0xffff;                                           // init CRC
     for(i=0; i<3; i++) {                                    // GAP 2: 3 * A1 mark
         appendA1MarkToStream(buffer, count);
-        fdc_add_to_crc(CRC, 0xa1);
     }
 
     appendByteToStream( 0xfe,    buffer, count);            // ID record
-    fdc_add_to_crc(CRC, 0xfe);
-
     appendByteToStream( track,   buffer, count);
-    fdc_add_to_crc(CRC, track);
-
     appendByteToStream( side,    buffer, count);
-    fdc_add_to_crc(CRC, side);
-
     appendByteToStream( sector,  buffer, count);
-    fdc_add_to_crc(CRC, sector);
-
     appendByteToStream( 0x02,    buffer, count);            // size -- 2 == 512 B per sector
-    fdc_add_to_crc(CRC, 0x02);
-
-    appendByteToStream(HIBYTE(CRC), buffer, count);         // crc1
-    appendByteToStream(LOBYTE(CRC), buffer, count);         // crc2
+    appendByteToStream( HIBYTE(CRC), buffer, count);        // crc1
+    appendByteToStream( LOBYTE(CRC), buffer, count);        // crc2
 
     for(i=0; i<22; i++) {                                   // GAP 3a: 22 * 0x4e
         appendByteToStream(0x4e, buffer, count);
@@ -314,15 +317,12 @@ bool CCoreThread::createMfmStream(int side, int track, int sector, BYTE *buffer,
     CRC = 0xffff;                                           // init CRC
     for(i=0; i<3; i++) {                                    // GAP 3b: 3 * A1 mark
         appendA1MarkToStream(buffer, count);
-        fdc_add_to_crc(CRC, 0xa1);
     }
 
     appendByteToStream( 0xfb, buffer, count);               // DAM mark
-    fdc_add_to_crc(CRC, 0xfb);
 
     for(i=0; i<512; i++) {                                  // data
         appendByteToStream( data[i], buffer, count);
-        fdc_add_to_crc(CRC, data[i]);
     }
 
     appendByteToStream(HIBYTE(CRC), buffer, count);         // crc1
@@ -337,6 +337,8 @@ bool CCoreThread::createMfmStream(int side, int track, int sector, BYTE *buffer,
 
 void CCoreThread::appendByteToStream(BYTE val, BYTE *bfr, int &cnt)
 {
+    fdc_add_to_crc(CRC, val);
+
     static BYTE prevBit = 0;
 
     for(int i=0; i<8; i++) {                        // for all bits
@@ -416,6 +418,8 @@ void CCoreThread::appendA1MarkToStream(BYTE *bfr, int &cnt)
     appendTime(MFM_6US, bfr, cnt);        // 6 us
     appendTime(MFM_8US, bfr, cnt);        // 8 us
     appendTime(MFM_6US, bfr, cnt);        // 6 us
+
+    fdc_add_to_crc(CRC, 0xa1);
 }
 
 void CCoreThread::fdc_add_to_crc(WORD &crc, BYTE data)
@@ -423,6 +427,11 @@ void CCoreThread::fdc_add_to_crc(WORD &crc, BYTE data)
   for (int i=0;i<8;i++){
     crc = ((crc << 1) ^ ((((crc >> 8) ^ (data << i)) & 0x0080) ? 0x1021 : 0));
   }
+}
+
+void CCoreThread::appendToDbg(QString line)
+{
+    dbg.append(line);
 }
 
 void outDebugString(const char *format, ...)
@@ -434,7 +443,8 @@ void outDebugString(const char *format, ...)
 #ifdef KJUT
     char tmp[1024];
     vsprintf(tmp, format, args);
-    qDebug() << tmp;
+//    qDebug() << tmp;
+    CCoreThread::appendToDbg(QString(tmp));
 #else
     vprintf(format, args);
 #endif

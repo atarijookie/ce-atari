@@ -62,6 +62,26 @@ typedef
     UCHAR Parity
     );
 
+typedef
+    FT_STATUS WINAPI (*tFT_SetTimeouts) (
+    FT_HANDLE ftHandle,
+    ULONG ReadTimeout,
+    ULONG WriteTimeout
+    );
+
+typedef
+    FT_STATUS WINAPI (*tFT_SetLatencyTimer) (
+    FT_HANDLE ftHandle,
+    UCHAR ucLatency
+    );
+
+typedef
+    FT_STATUS WINAPI (*tFT_SetUSBParameters) (
+    FT_HANDLE ftHandle,
+    ULONG ulInTransferSize,
+    ULONG ulOutTransferSize
+    );
+
 //------------------------------------------------
 
 class CConUsb: public QObject
@@ -99,6 +119,9 @@ private:
     tFT_GetStatus               pFT_GetStatus;
     tFT_SetBaudRate             pFT_SetBaudRate;
     tFT_SetDataCharacteristics  pFT_SetDataCharacteristics;
+    tFT_SetTimeouts             pFT_SetTimeouts;
+    tFT_SetLatencyTimer         pFT_SetLatencyTimer;
+    tFT_SetUSBParameters        pFT_SetUSBParameters;
 
     bool            isLoaded;
     bool            connected;

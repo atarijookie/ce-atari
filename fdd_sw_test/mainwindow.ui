@@ -53,6 +53,19 @@
      <string>drive 0 / 1 (1 when checked)</string>
     </property>
    </widget>
+   <widget class="QCheckBox" name="chbDiskChg">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>130</y>
+      <width>171</width>
+      <height>18</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>disk change (checked means ON)</string>
+    </property>
+   </widget>
   </widget>
  </widget>
  <layoutdefault spacing="6" margin="11"/>

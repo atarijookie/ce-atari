@@ -76,9 +76,13 @@ bool CConUsb::loadFTDIdll(void)
     pFT_GetStatus               = (tFT_GetStatus)               FTDIlib->resolve("FT_GetStatus");
     pFT_SetBaudRate             = (tFT_SetBaudRate)             FTDIlib->resolve("FT_SetBaudRate");
     pFT_SetDataCharacteristics  = (tFT_SetDataCharacteristics)  FTDIlib->resolve("FT_SetDataCharacteristics");
+    pFT_SetTimeouts             = (tFT_SetTimeouts)             FTDIlib->resolve("FT_SetTimeouts");
+    pFT_SetLatencyTimer         = (tFT_SetLatencyTimer)         FTDIlib->resolve("FT_SetLatencyTimer");
+    pFT_SetUSBParameters        = (tFT_SetUSBParameters)        FTDIlib->resolve("FT_SetUSBParameters");
 
     // if functions not found, fail
-    if(!pFT_Open || !pFT_ListDevices || !pFT_Close || !pFT_Read || !pFT_Write || !pFT_GetStatus || !pFT_SetBaudRate) {
+    if(!pFT_Open || !pFT_ListDevices || !pFT_Close || !pFT_Read || !pFT_Write
+       || !pFT_GetStatus || !pFT_SetBaudRate || !pFT_SetTimeouts || !pFT_SetLatencyTimer || !pFT_SetUSBParameters) {
         FTDIlib->unload();
         delete FTDIlib;
 
@@ -142,6 +146,10 @@ void CConUsb::tryToConnect(void)
 //       if (ftStatus != FT_OK) {
 //           outDebugString("USB: data characteristics not set");
 //       }
+
+       (*pFT_SetTimeouts)(ftHandle, 10, 10);
+       (*pFT_SetLatencyTimer)(ftHandle, 5);
+       (*pFT_SetUSBParameters)(ftHandle, 64, 256);
 
        break;
     }

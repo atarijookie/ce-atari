@@ -5,6 +5,7 @@
 #include <QQueue>
 #include <QMutex>
 #include <QTimer>
+#include <QStringList>
 
 #include "global.h"
 #include "cconusb.h"
@@ -24,6 +25,9 @@ public:
 
     void setNextCmd(BYTE cmd);
 
+    static void appendToDbg(QString line);
+    static void displayDbg(void);
+
 public slots:
 
 
@@ -36,6 +40,8 @@ private:
     FloppyImageFactory  imageFactory;
 
     BYTE                nextCmd;
+
+    WORD                CRC;
 
     void createConnectionObject(void);
     void usbConnectionCheck(void);
