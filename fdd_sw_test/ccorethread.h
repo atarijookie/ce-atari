@@ -39,6 +39,8 @@ private:
     IFloppyImage        *image;
     FloppyImageFactory  imageFactory;
 
+    int                 lastSide, lastTrack;            // these are here to avoid sending the same track again
+
     BYTE                nextCmd;
 
     WORD                CRC;

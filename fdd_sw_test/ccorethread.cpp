@@ -5,11 +5,11 @@
 #include "ccorethread.h"
 #include "floppyimagefactory.h"
 
-BYTE        circBfr[2048];
+BYTE        circBfr[20480];             // 0x5000 bytes
 int         cb_cnt, cb_posa, cb_posg;
 
-#define		bfr_add(X)				{ circBfr[cb_posa] = X;     cb_posa++;      cb_posa &= 0x7FF;   cb_cnt++; }
-#define		bfr_get(X)				{ X = circBfr[cb_posg];     cb_posg++;      cb_posg &= 0x7FF;   cb_cnt--; }
+#define		bfr_add(X)				{ circBfr[cb_posa] = X;     cb_posa++;      cb_posa &= 0x4FFF;   cb_cnt++; }
+#define		bfr_get(X)				{ X = circBfr[cb_posg];     cb_posg++;      cb_posg &= 0x4FFF;   cb_cnt--; }
 
 QStringList dbg;
 
@@ -21,6 +21,9 @@ CCoreThread::CCoreThread()
     conUsb      = NULL;
     createConnectionObject();
     conUsb->tryToConnect();
+
+    lastSide = -1;
+    lastTrack = -1;
 
     nextCmd = CMD_GET_FW_VERSION;
 }
@@ -48,7 +51,7 @@ void CCoreThread::run(void)
     running = true;
     DWORD lastTick = GetTickCount();
 
-    BYTE outBuff[2048], inBuff[2048];
+    BYTE outBuff[20480], inBuff[20480];
     int side=0, track=0, sector=1;
 
     image = imageFactory.getImage((char *) "A_006.ST");
@@ -259,6 +262,15 @@ void CCoreThread::handleSendTrack(int &side, int &track, BYTE *oBuf, BYTE *iBuf)
 
     oBuf[0] = CMD_CURRENT_TRACK;                               // first send the current sector #
     oBuf[1] = track;
+
+    //---------
+    // avoid sending the same track again
+    if(lastSide == side && lastTrack == track) {                // if this track is what we've sent last time, don't send it
+        return;
+    }
+    lastSide    = side;
+    lastTrack   = track;
+    //---------
 
     int countInSect, countInTrack=2;
 
