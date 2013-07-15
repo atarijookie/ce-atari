@@ -93,6 +93,9 @@ void CCoreThread::run(void)
                 case ATN_SECTOR_WRITTEN:
                     handleSectorWasWritten();
                     break;
+                case ATN_SEND_TRACK:
+                    handleSendTrack(side, track, outBuff, inBuff);
+                    break;
             }
         }
 
@@ -229,6 +232,47 @@ void CCoreThread::handleSendNextSector(int &side, int &track, int &sector, BYTE 
     }
 
     sendAndReceive(count, oBuf, iBuf);                // send and receive data
+}
+
+void CCoreThread::handleSendTrack(int &side, int &track, BYTE *oBuf, BYTE *iBuf)
+{
+    BYTE buf[4];
+    int val;
+
+    for(int i=0; i<4; i++) {        // get arguments from buffer
+        bfr_get(val);
+        buf[i] = val;
+    }
+
+    side    = buf[0];               // now read the current floppy position
+    track   = buf[1];
+
+    outDebugString("ATN_SEND_TRACK -- track %d, side %d", track, side);
+
+    int tr, si, spt;
+    image->getParams(tr, si, spt);  // read the floppy image params
+
+    if(side < 0 || side > 1 || track < 0 || track >= tr) {
+        outDebugString("Side / Track out of range!");
+        return;
+    }
+
+    oBuf[0] = CMD_CURRENT_TRACK;                               // first send the current sector #
+    oBuf[1] = track;
+
+    int countInSect, countInTrack=2;
+
+    for(int sect=1; sect <= spt; sect++) {
+        createMfmStream(side, track, sect, oBuf + countInTrack, countInSect);  // then create the right MFM stream
+        countInTrack += countInSect;
+    }
+
+    if((countInTrack & 0x0001) != 0) {                     // if got even number of bytes
+        oBuf[countInTrack] = 0;                            // store 0 at last position and increment count
+        countInTrack++;
+    }
+
+    sendAndReceive(countInTrack, oBuf, iBuf);              // send and receive data
 }
 
 void CCoreThread::handleSectorWasWritten(void)
