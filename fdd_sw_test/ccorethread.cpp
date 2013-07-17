@@ -11,6 +11,16 @@ int         cb_cnt, cb_posa, cb_posg;
 #define		bfr_add(X)				{ circBfr[cb_posa] = X;     cb_posa++;      cb_posa &= 0x4FFF;   cb_cnt++; }
 #define		bfr_get(X)				{ X = circBfr[cb_posg];     cb_posg++;      cb_posg &= 0x4FFF;   cb_cnt--; }
 
+BYTE        cmdBuffer[16];
+int         cd_cnt, cd_posa, cd_posg;
+#define		cmd_add(X)				{ cmdBuffer[cd_posa] = X;     cd_posa++;      cd_posa &= 0x4FFF;   cd_cnt++; }
+#define		cmd_get(X)				{ X = cmdBuffer[cd_posg];     cd_posg++;      cd_posg &= 0x4FFF;   cd_cnt--; }
+
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+
+// todo:
+// set floppy parameters to device and send only the required amount of data to floppy
+
 QStringList dbg;
 
 CCoreThread::CCoreThread()
@@ -24,8 +34,6 @@ CCoreThread::CCoreThread()
 
     lastSide = -1;
     lastTrack = -1;
-
-    nextCmd = CMD_GET_FW_VERSION;
 }
 
 CCoreThread::~CCoreThread()
@@ -54,7 +62,7 @@ void CCoreThread::run(void)
     BYTE outBuff[20480], inBuff[20480];
     int side=0, track=0, sector=1;
 
-    image = imageFactory.getImage((char *) "A_006.ST");
+    image = imageFactory.getImage((char *) "A_054.ST");
 
     if(!image) {
         outDebugString("Image file type not supported!");
@@ -82,7 +90,7 @@ void CCoreThread::run(void)
 //    outDebugString("Check end");
 
     while(shouldRun) {
-        while(cb_cnt >= 8) {                               // while we have enough data
+        while(cb_cnt >= 6) {                               // while we have enough data
             int val;
             bfr_get(val);
 
@@ -90,9 +98,9 @@ void CCoreThread::run(void)
                 case ATN_FW_VERSION:
                     handleFwVersion();
                     break;
-                case ATN_SEND_NEXT_SECTOR:
-                    handleSendNextSector(side, track, sector, outBuff, inBuff);
-                    break;
+//                case ATN_SEND_NEXT_SECTOR:
+//                    handleSendNextSector(side, track, sector, outBuff, inBuff);
+//                    break;
                 case ATN_SECTOR_WRITTEN:
                     handleSectorWasWritten();
                     break;
@@ -115,17 +123,8 @@ void CCoreThread::run(void)
         }
         lastTick = GetTickCount();
 
-        if(nextCmd != 0) {                              // if we're connected, send this command
-            outBuff[0] = nextCmd;
-            outBuff[1] = 0;
-
-            nextCmd = 0;                                // mark that there's no command to send
-
-            sendAndReceive(2, outBuff, inBuff);
-        }
-
-        memset(outBuff, 0, 8);                          // send 8 zeros to receive any potential command
-        sendAndReceive(8, outBuff, inBuff);
+        memset(outBuff, 0, 6);                          // send 8 zeros to receive any potential command
+        sendAndReceive(6, outBuff, inBuff);
     }
 
     running = false;
@@ -133,7 +132,7 @@ void CCoreThread::run(void)
 
 void CCoreThread::setNextCmd(BYTE cmd)
 {
-    nextCmd = cmd;
+    cmd_add(cmd);
 }
 
 void CCoreThread::sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf)
@@ -170,10 +169,10 @@ void CCoreThread::sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf)
 
 void CCoreThread::handleFwVersion(void)
 {
-    BYTE fwVer[6];
+    BYTE fwVer[4];
     int val;
 
-    for(int i=0; i<6; i++) {
+    for(int i=0; i<4; i++) {
         bfr_get(val);
         fwVer[i] = val;
     }
@@ -186,6 +185,22 @@ void CCoreThread::handleFwVersion(void)
 
     int year = bcdToInt(fwVer[1]) + 2000;
     outDebugString("%d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+
+    // receive 6 WORDs == 12 BYTEs, while at least 3 WORDs (6 BYTEs) are received
+    int remaining = 12 - (6 + cb_cnt);
+
+    BYTE oBuf[6], iBuf[6];
+    memset(oBuf, 0, 6);
+
+    int storeCnt;
+    storeCnt = MIN(remaining, 6);           // get the minimum from sizeof(buf), remaining, cd_cnt (what we may send, what we should send, what we got)
+    storeCnt = MIN(storeCnt, cd_cnt);
+
+    for(int i=0; i<storeCnt; i++) {         // now copy all the possible bytes (commands) to buffer
+        cmd_get(oBuf[i]);
+    }
+
+    sendAndReceive(6, oBuf, iBuf);
 }
 
 int CCoreThread::bcdToInt(int bcd)
@@ -198,51 +213,51 @@ int CCoreThread::bcdToInt(int bcd)
     return ((a * 10) + b);
 }
 
-void CCoreThread::handleSendNextSector(int &side, int &track, int &sector, BYTE *oBuf, BYTE *iBuf)
-{
-    BYTE buf[6];
-    int val;
+//void CCoreThread::handleSendNextSector(int &side, int &track, int &sector, BYTE *oBuf, BYTE *iBuf)
+//{
+//    BYTE buf[6];
+//    int val;
 
-    for(int i=0; i<6; i++) {        // get arguments from buffer
-        bfr_get(val);
-        buf[i] = val;
-    }
+//    for(int i=0; i<6; i++) {        // get arguments from buffer
+//        bfr_get(val);
+//        buf[i] = val;
+//    }
 
-    int count;
-    side    = buf[0];               // now read the current floppy position
-    track   = buf[1];
-    sector  = buf[2];
+//    int count;
+//    side    = buf[0];               // now read the current floppy position
+//    track   = buf[1];
+//    sector  = buf[2];
 
-    outDebugString("ATN_SEND_NEXT_SECTOR -- track %d, side %d, sector %d", track, side, sector);
+//    outDebugString("ATN_SEND_NEXT_SECTOR -- track %d, side %d, sector %d", track, side, sector);
 
-    int tr, si, spt;
-    image->getParams(tr, si, spt);  // read the floppy image params
+//    int tr, si, spt;
+//    image->getParams(tr, si, spt);  // read the floppy image params
 
-    if(sector > spt) {              // if we're at the end of the track
-        return;
-    }
+//    if(sector > spt) {              // if we're at the end of the track
+//        return;
+//    }
 
-    oBuf[0] = CMD_CURRENT_SECTOR;                           // first send the current sector #
-    oBuf[1] = sector;
+//    oBuf[0] = CMD_CURRENT_SECTOR;                           // first send the current sector #
+//    oBuf[1] = sector;
 
-    createMfmStream(side, track, sector, oBuf + 2, count);  // then create the right MFM stream
+//    createMfmStream(side, track, sector, oBuf + 2, count);  // then create the right MFM stream
 
-    count += 2;                                             // now add the 2 bytes used by CMD_CURRENT_SECTOR
+//    count += 2;                                             // now add the 2 bytes used by CMD_CURRENT_SECTOR
 
-    if((count & 0x0001) != 0) {                     // if got even number of bytes
-        oBuf[count] = 0;                            // store 0 at last position and increment count
-        count++;
-    }
+//    if((count & 0x0001) != 0) {                     // if got even number of bytes
+//        oBuf[count] = 0;                            // store 0 at last position and increment count
+//        count++;
+//    }
 
-    sendAndReceive(count, oBuf, iBuf);                // send and receive data
-}
+//    sendAndReceive(count, oBuf, iBuf);                // send and receive data
+//}
 
 void CCoreThread::handleSendTrack(int &side, int &track, BYTE *oBuf, BYTE *iBuf)
 {
-    BYTE buf[4];
+    BYTE buf[2];
     int val;
 
-    for(int i=0; i<4; i++) {        // get arguments from buffer
+    for(int i=0; i<2; i++) {        // get arguments from buffer
         bfr_get(val);
         buf[i] = val;
     }
@@ -260,9 +275,6 @@ void CCoreThread::handleSendTrack(int &side, int &track, BYTE *oBuf, BYTE *iBuf)
         return;
     }
 
-    oBuf[0] = CMD_CURRENT_TRACK;                               // first send the current sector #
-    oBuf[1] = track;
-
     //---------
     // avoid sending the same track again
     if(lastSide == side && lastTrack == track) {                // if this track is what we've sent last time, don't send it
@@ -272,19 +284,19 @@ void CCoreThread::handleSendTrack(int &side, int &track, BYTE *oBuf, BYTE *iBuf)
     lastTrack   = track;
     //---------
 
-    int countInSect, countInTrack=2;
+    int countInSect, countInTrack=0;
 
     for(int sect=1; sect <= spt; sect++) {
         createMfmStream(side, track, sect, oBuf + countInTrack, countInSect);  // then create the right MFM stream
         countInTrack += countInSect;
     }
 
-    if((countInTrack & 0x0001) != 0) {                     // if got even number of bytes
-        oBuf[countInTrack] = 0;                            // store 0 at last position and increment count
-        countInTrack++;
-    }
+    // we want to send total 15000 bytes, while at least 3 WORDs (6 BYTEs) are received
+    int remaining   = 15000 - (4 + cb_cnt);             // this much bytes remain to send after the received ATN
+    int zeros       = remaining - countInTrack;         // this many zeros after the last track data byte will be appended
 
-    sendAndReceive(countInTrack, oBuf, iBuf);              // send and receive data
+    memset(oBuf + countInTrack, 0, zeros);              // clear buffer beyond the track data
+    sendAndReceive(countInTrack, oBuf, iBuf);           // send and receive data
 }
 
 void CCoreThread::handleSectorWasWritten(void)
@@ -343,6 +355,8 @@ bool CCoreThread::createMfmStream(int side, int track, int sector, BYTE *buffer,
     if(!res) {
         return false;
     }
+
+    appendCurrentSectorCommand(track, side, sector, buffer, count);     // append this sector mark so we would know what are we streaming out
 
     int i;
     for(i=0; i<12; i++) {                                   // GAP 2: 12 * 0x00
@@ -467,6 +481,20 @@ void CCoreThread::appendTime(BYTE time, BYTE *bfr, int &cnt)
     }
 }
 
+void CCoreThread::appendCurrentSectorCommand(int track, int side, int sector, BYTE *buffer, int &count)
+{
+    appendRawByte(CMD_CURRENT_SECTOR,   buffer, count);
+    appendRawByte(side,                 buffer, count);
+    appendRawByte(track,                buffer, count);
+    appendRawByte(sector,               buffer, count);
+}
+
+void CCoreThread::appendRawByte(BYTE val, BYTE *bfr, int &cnt)
+{
+    bfr[cnt] = val;                 // just store this byte, no processing
+    cnt++;                          // increment counter of data in buffer
+}
+
 void CCoreThread::appendA1MarkToStream(BYTE *bfr, int &cnt)
 {
     // append A1 mark in stream, which is 8-6-8-6 in MFM (normaly would been 8-6-4-4-6)
@@ -499,8 +527,8 @@ void outDebugString(const char *format, ...)
 #ifdef KJUT
     char tmp[1024];
     vsprintf(tmp, format, args);
-//    qDebug() << tmp;
-    CCoreThread::appendToDbg(QString(tmp));
+    qDebug() << tmp;
+//    CCoreThread::appendToDbg(QString(tmp));
 #else
     vprintf(format, args);
 #endif

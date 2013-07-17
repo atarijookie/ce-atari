@@ -41,13 +41,13 @@ private:
 
     int                 lastSide, lastTrack;            // these are here to avoid sending the same track again
 
-    BYTE                nextCmd;
-
     WORD                CRC;
 
     void createConnectionObject(void);
     void usbConnectionCheck(void);
 
+    void appendCurrentSectorCommand(int track, int side, int sector, BYTE *buffer, int &count);
+    void appendRawByte(BYTE val, BYTE *bfr, int &cnt);
     void appendA1MarkToStream(BYTE *bfr, int &cnt);
     void appendTime(BYTE time, BYTE *bfr, int &cnt);
     void appendChange(BYTE chg, BYTE *bfr, int &cnt);
