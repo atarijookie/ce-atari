@@ -19,7 +19,8 @@ int         cd_cnt, cd_posa, cd_posg;
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 // todo:
-// set floppy parameters to device and send only the required amount of data to floppy
+// - load and MFM encode the whole image into memory
+// - set floppy parameters to device and send only the required amount of data to floppy
 
 QStringList dbg;
 
@@ -60,7 +61,7 @@ void CCoreThread::run(void)
     DWORD lastTick = GetTickCount();
 
     BYTE outBuff[20480], inBuff[20480];
-    int side=0, track=0, sector=1;
+    int side=0, track=0;
 
     image = imageFactory.getImage((char *) "A_054.ST");
 
@@ -285,11 +286,19 @@ void CCoreThread::handleSendTrack(int &side, int &track, BYTE *oBuf, BYTE *iBuf)
     //---------
 
     int countInSect, countInTrack=0;
+	
+	// start of the track -- we should stream 60* 0x4e
+    for(int i=0; i<60; i++) {
+        appendByteToStream(0x4e, oBuf, countInTrack);
+    }
 
     for(int sect=1; sect <= spt; sect++) {
-        createMfmStream(side, track, sect, oBuf + countInTrack, countInSect);  // then create the right MFM stream
+        createMfmStream(side, track, sect, oBuf + countInTrack, countInSect);	// then create the right MFM stream
         countInTrack += countInSect;
     }
+	
+    appendRawByte(0xF0,   oBuf, countInTrack);			// append this - this is a mark of track stream end
+    appendRawByte(0x00,   oBuf, countInTrack);
 
     // we want to send total 15000 bytes, while at least 3 WORDs (6 BYTEs) are received
     int remaining   = 15000 - (4 + cb_cnt);             // this much bytes remain to send after the received ATN
@@ -350,7 +359,7 @@ bool CCoreThread::createMfmStream(int side, int track, int sector, BYTE *buffer,
     count = 0;                                              // no data yet
 
     BYTE data[512];
-    res = image->readSector(track, side, sector, buffer);
+    res = image->readSector(track, side, sector, data);     // read data into 'data'
 
     if(!res) {
         return false;
