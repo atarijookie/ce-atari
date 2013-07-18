@@ -459,8 +459,8 @@ Command Line: --debug --xref --cpu=Cortex-M3 --apcs=interwork --depend=startup_
 ARM Macro Assembler    Page 8 
 
 
-stm32f10x_ld.d -ostartup_stm32f10x_ld.o -IF:\Keil\ARM\RV31\INC -IF:\Keil\ARM\CM
-SIS\Include -IF:\Keil\ARM\Inc\ST\STM32F10x --predefine="__EVAL SETA 1" --list=s
+stm32f10x_ld.d -ostartup_stm32f10x_ld.o -IC:\Keil\ARM\RV31\INC -IC:\Keil\ARM\CM
+SIS\Include -IC:\Keil\ARM\Inc\ST\STM32F10x --predefine="__EVAL SETA 1" --list=s
 tartup_stm32f10x_ld.lst startup_stm32f10x_ld.s
 
 

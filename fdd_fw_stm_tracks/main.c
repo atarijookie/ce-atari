@@ -14,8 +14,8 @@ BYTE getNextMFMword(void);
 
 void getMfmWriteTimes(void);
 
-void requestSector(BYTE sectNo);
 void processHostCommand(WORD hostWord);
+void requestTrack(void);
 
 void spi_init(void);
 
@@ -24,12 +24,17 @@ void dma_mfmWrite_init(void);
 void dma_spi_init(void);
 
 WORD spi_TxRx(WORD out);
+void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 
 /*
 TODO:
+ - POZOR! STEP moze robit / robi ked neni drive selected, ale len MOTOR ON
+ - medzi STEP je 3 ms
+ - az ked doSTEPuje, tak zleze dole drive select
+ - pomeranie ci stihne zachytit vsetky STEP pulzy ak naplna MFM buffre
+ - pomerat ci a kolko pauzy robi floppy po seeku, dali by sa tym osetrit viacere seeky po sebe
  - test TIM3 input capture bez DMA, potom s DMA
  - pomeranie kolko trvaju jednotlive casti kodu
- - pomeranie ci stihne zachytit vsetky STEP pulzy ak naplna MFM buffre
 */
 
 // 1 sector with all headers, gaps, data and crc: 614 B of data needed to stream -> 4912 bits to stream -> with 4 bits encoded to 1 byte: 1228 of encoded data
@@ -41,20 +46,24 @@ TODO:
 
 // This ARM is little endian, e.g. 0x1234 is stored in RAM as 34 12, but when working with WORDs, it's OK
 
-#define INBUFFER_SIZE					2048
+// maximum params from .ST images seem to be: 84 tracks (0-83), 10 sectors/track
+
+#define INBUFFER_SIZE					7500
 WORD inBuffer[INBUFFER_SIZE];
 WORD inIndexGet;
-
-TAtnBuffer atnBuffer[2];							// two buffers for ATNs 
-TAtnBuffer *atnNow;
 
 TWriteBuffer wrBuffer[2];							// two buffers for written sectors
 TWriteBuffer *wrNow;
 
-BYTE side, track, sector;
+BYTE side, track;
+
+struct {
+	BYTE side;
+	BYTE track;
+	BYTE sector;
+} streamed;
 
 WORD mfmReadStreamBuffer[16];							// 16 words - 16 mfm times. Half of buffer is 8 times - at least 32 us (8 * 4us),
-BYTE stream4e;												// the count of 0x4e bytes we should stream (used for the 1st gap)
 
 WORD mfmWriteStreamBuffer[16];
 WORD lastMfmWriteTC;
@@ -62,11 +71,23 @@ WORD lastMfmWriteTC;
 // cycle measure: t1 = TIM3->CNT;	t2 = TIM3->CNT;	dt = t2 - t1; -- subtrack 0x12 because that's how much measuring takes
 WORD t1, t2, dt; 
 
+/* Franz to host communication:
+A) send   : ATN_SEND_TRACK with the track # and side # -- 2 WORDs + zeros = 3 WORDs
+   receive: track data with sector start marks, up to 15 kB -- 12 sectors + the marks
+
+B) send   : ATN_SECTOR_WRITTEN with the track, side, sector # + captured data, up to 1500 B
+   receive: nothing (or don't care)
+	 
+C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + empty WORDs
+   receive: commands possibly received -- receive 6 WORDs (3 empty, 3 with possible commands)
+*/
 
 // commands sent from device to host
 #define ATN_FW_VERSION					0x01								// followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
-#define ATN_SEND_NEXT_SECTOR    0x02               	// sent: 2, side, track #, current sector #, 0, 0, 0, 0 (length: 4 WORDs)
+//#define ATN_SEND_NEXT_SECTOR    0x02              // sent: 2, side, track #, current sector #, 0, 0, 0, 0 (length: 4 WORDs)
 #define ATN_SECTOR_WRITTEN      0x03               	// sent: 3, side (highest bit) + track #, current sector #
+#define ATN_SEND_TRACK          0x04            		// send the whole track
+
 
 // commands sent from host to device
 #define CMD_WRITE_PROTECT_OFF		0x10
@@ -77,7 +98,9 @@ WORD t1, t2, dt;
 #define CMD_GET_FW_VERSION			0x60
 #define CMD_SET_DRIVE_ID_0			0x70
 #define CMD_SET_DRIVE_ID_1			0x80
+#define CMD_CURRENT_TRACK       0x90                // followed by track #
 #define CMD_MARK_READ						0xF000							// this is not sent from host, but just a mark that this WORD has been read and you shouldn't continue to read further
+#define CMD_TRACK_STREAM_END		0xF000							// this is the mark in the track stream that we shouldn't go any further in the stream
 
 #define MFM_4US     1
 #define MFM_6US     2
@@ -103,107 +126,111 @@ WORD t1, t2, dt;
 #define		atnBuffer_add(X)				{ if(atnNow->count < 16)	{		atnNow->buffer[atnNow->count]	= X;	atnNow->count++;	}	}
 #define		wrBuffer_add(X)					{ if(wrNow->count  < 550)	{		wrNow->buffer[wrNow->count]		= X;	wrNow->count++;		}	}
 
-#define		inBuffer_get(X)					{ X = inBuffer[inIndexGet];								inIndexGet++;		inIndexGet = inIndexGet	& 0x7ff;	}
-#define		inBuffer_get_noMove(X)	{ X = inBuffer[inIndexGet];																																	}
-#define		inBuffer_markAndmove()	{ inBuffer[inIndexGet] = CMD_MARK_READ;		inIndexGet++;		inIndexGet = inIndexGet	& 0x7ff;	}
+#define		inBuffer_goToStart()				{ 																				inIndexGet = 0;																		}
+#define		inBuffer_get(X)							{ X = inBuffer[inIndexGet];								inIndexGet++;		if(inIndexGet >= INBUFFER_SIZE) { inIndexGet = 0; }; }
+#define		inBuffer_get_noMove(X)			{ X = inBuffer[inIndexGet];																																	}
+#define		inBuffer_markAndmove()			{ inBuffer[inIndexGet] = CMD_MARK_READ;		inIndexGet++;		if(inIndexGet >= INBUFFER_SIZE) { inIndexGet = 0; };	}
+#define		inBuffer_justMove()					{ 																				inIndexGet++;		if(inIndexGet >= INBUFFER_SIZE) { inIndexGet = 0; };	}
 //--------------
-
-WORD version[2] = {0xf013, 0x0527};				// this means: Franz, 2013-05-27
+WORD version[2] = {0xf013, 0x0718};				// this means: Franz, 2013-07-18
 WORD drive_select;
+
+BYTE sendFwVersion, sendTrackRequest;
+WORD atnSendFwVersion[4], atnSendTrackRequest[3], cmdBuffer[6];
 
 int main (void) 
 {
 	BYTE prevSide = 0, outputsActive = 0;
+	BYTE indexCount = 0;
 	WORD prevWGate = WGATE, WGate;
+	BYTE sending = FALSE;
 	
-	drive_select = MOTOR_ENABLE | DRIVE_SELECT0;	// the drive select bits which should be LOW if the drive is selected
+	sendFwVersion			= FALSE;
+	sendTrackRequest	= FALSE;
+	
+	atnSendFwVersion[0] = ATN_FW_VERSION;					// attention code
+	atnSendFwVersion[1] = version[0];
+	atnSendFwVersion[2] = version[1];
+	atnSendFwVersion[3] = 0;											// terminating zero
+	
+	atnSendTrackRequest[0] = ATN_SEND_TRACK;			// attention code
+	atnSendTrackRequest[2] = 0;										// terminating zero
 	
 	init_hw_sw();																	// init GPIO pins, timers, DMA, global variables
+
+	drive_select = MOTOR_ENABLE | DRIVE_SELECT0;	// the drive select bits which should be LOW if the drive is selected
 
 	// init floppy signals
 	GPIOB->BSRR = (WR_PROTECT | DISK_CHANGE);			// not write protected
 	GPIOB->BRR = TRACK0 | DISK_CHANGE;						// TRACK 0 signal to L, DISK_CHANGE to LOW		
 	GPIOB->BRR = ATN;															// ATTENTION bit low - nothing to read
 	
-	// whole loop without INDEX and MOTOR_ENABLE checking: 2.8 us (other bits), 3.7 us (when fetching new mfm byte)
+	requestTrack();																// request track 0, side 0
+
 	while(1) {
-		WORD ints;
-		WORD inputs = GPIOB->IDR;								// read floppy inputs
+		WORD ints, inputs;
 
-		// SPI TX handling - send some stuff if DMA is done and there's something to send
-		if(DMA1_Channel3->CNDTR == 0) {													// SPI TX: nothing to transfer?
-			BYTE sending = FALSE;
+		// sending and receiving data over SPI using DMA
+		if(DMA1_Channel3->CNDTR == 0 && DMA1_Channel2->CNDTR == 0) {	// SPI DMA: nothing to Tx and nothing to Rx?
+			sending = FALSE;
 			
-			if(atnNow->count > 0) {																// the current ATN buffer holds some ATNs to send?
-				sending = TRUE;
-
-				DMA1_Channel3->CCR		&= 0xfffffffe;								// disable DMA1 Channel3 transfer
-				DMA1_Channel3->CMAR		= (uint32_t) atnNow->buffer;	// from this buffer located in memory
-				DMA1_Channel3->CNDTR	= atnNow->count;							// this much data
-				DMA1_Channel3->CCR		|= 1;													// enable DMA1 Channel3 transfer
+			if(sendFwVersion) {																		// should send FW version? this is a window for receiving commands
+				spiDma_txRx(4, (BYTE *) &atnSendFwVersion[0], 6, (BYTE *) &cmdBuffer[0]);
 				
-				atnNow					= atnNow->next;											// and now we will select the next buffer as current
-				atnNow->count		= 0;
-			}
-
-			if(sending == FALSE && wrNow->readyToSend == TRUE) {		// not sending any ATN right now? and current write buffer has something?
-				sending = TRUE;
-
-				DMA1_Channel3->CCR		&= 0xfffffffe;								// disable DMA1 Channel3 transfer
-				DMA1_Channel3->CMAR		= (uint32_t) wrNow->buffer;		// from this buffer located in memory
-				DMA1_Channel3->CNDTR	= wrNow->count;								// this much data
-				DMA1_Channel3->CCR		|= 1;													// enable DMA1 Channel3 transfer
+				sendFwVersion				= FALSE;
+				sending							= TRUE;
+			} else if(sendTrackRequest) {
+				spiDma_txRx(3, (BYTE *) &atnSendTrackRequest[0], INBUFFER_SIZE, (BYTE *) &inBuffer[0]);
 				
+				sendTrackRequest		= FALSE;
+				sending							=	TRUE;
+			} else if(wrNow->readyToSend) {												// not sending any ATN right now? and current write buffer has something?
+				spiDma_txRx(wrNow->count, (BYTE *) &wrNow->buffer[0], 0, 0);
+			
 				wrNow->readyToSend	= FALSE;												// mark the current buffer as not ready to send (so we won't send this one again)
 				
 				wrNow								= wrNow->next;									// and now we will select the next buffer as current
 				wrNow->readyToSend	= FALSE;												// the next buffer is not ready to send (yet)
 				wrNow->count				= 0;														
+				
+				sending	=	TRUE;
 			}
 			
 			if(sending == TRUE) {
 				GPIOB->BSRR = ATN;																	// ATTENTION bit high - got something to read
 			} else {
-				DMA1_Channel3->CCR		&= 0xfffffffe;								// disable DMA1 Channel3 transfer
 				GPIOB->BRR = ATN;																		// ATTENTION bit low  - nothing to read
 			}				 
 		}
+		//-------------------------------------------------
+		// if we got something in the cmd buffer, we should process it
+		if(sending == FALSE && cmdBuffer[0] != CMD_MARK_READ) {	// if we're not sending (receiving) and the cmd buffer is not read
+			int i;
+			
+			for(i=0; i<6; i++) {
+				processHostCommand(cmdBuffer[i]);
+			}
+			
+			cmdBuffer[0] = CMD_MARK_READ;													// mark that this cmd buffer is already read
+		}
 		
 		//-------------------------------------------------
+		inputs = GPIOB->IDR;										// read floppy inputs
+
 		// now check if the drive is ON or OFF and handle it
-//		if((inputs & drive_select) != 0) {		// motor not enabled, drive not selected? do nothing
-		if((inputs & MOTOR_ENABLE) != 0) {			// motor not enabled? do nothing
+		if((inputs & drive_select) != 0) {			// motor not enabled, drive not selected? disable outputs
  			if(outputsActive == 1) {							// if we got outputs active
 				FloppyOut_Disable();								// all pins as inputs, drive not selected
 				outputsActive = 0;
 			}
-
-			// with the floppy disabled, drop the data from inBuffer, but process the host commands
-			while(1) {														// empty the buffer
-				WORD wval;
-				inBuffer_get_noMove(wval);					// get byte from host buffer
-
-				if(wval == CMD_MARK_READ) {					// we've hit the already read part of buffer? (underflow) quit loop
-					break;
-				}
-				
-				inBuffer_markAndmove();							// mark this word as read and move to the next one
-				
-				if((wval & 0x0f00) == 0) {					// lower nibble == 0? it's a command from host, process it; otherwise drop it
-					processHostCommand(wval);
-				}
+		} else {																// motor ON, drive selected
+			if(outputsActive == 0) {							// if the outputs are inactive
+				FloppyOut_Enable();									// set these as outputs
+				outputsActive = 1;
 			}
-
-			continue;
 		}
-
-		if(outputsActive == 0) {								// if the outputs are inactive
-			FloppyOut_Enable();										// set these as outputs
-			outputsActive = 1;
-		}
-		//-------------------------------------------------
 		
-		// handle all the stuff when drive is ON		
+		//-------------------------------------------------
 /*		
 		WGate = inputs & WGATE;												// get current WGATE value
 		if(prevWGate != WGate) {											// if WGate changed
@@ -214,10 +241,10 @@ int main (void)
 				lastMfmWriteTC = TIM3->CNT;								// set lastMfmWriteTC to current TC value on WRITE start
 				wrNow->readyToSend = FALSE;								// mark this buffer as not ready to be sent yet
 				
-				wval = (ATN_SECTOR_WRITTEN << 8) | side;	// 1st byte: ATN code, 2nd byte: side 
+				wval = (ATN_SECTOR_WRITTEN << 8) | streamed.side;		// 1st byte: ATN code, 2nd byte: side 
 				wrBuffer_add(wval);
 	
-				wval = (track << 8) | sector;							// 3rd byte: track #, 4th byte: current sector #
+				wval = (streamed.track << 8) | streamed.sector;			// 3rd byte: track #, 4th byte: current sector #
 				wrBuffer_add(wval);									
 			} else {																		// on rising edge
 				wrBuffer_add(0);													// last word: 0
@@ -239,6 +266,33 @@ int main (void)
 			fillMfmTimesForDMA();																	// fill the circular DMA buffer with mfm times
 		}
 
+		//------------
+		// check INDEX pulse as needed -- duration when filling with marks: 69.8 us
+		if((TIM2->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
+			int i;
+			TIM2->SR = 0xfffe;							// clear UIF flag
+	
+			inBuffer_goToStart();						// move the pointer in the track stream to start
+			
+			for(i=0; i<16; i++) {						// copy 'all 4 us' pulses into current streaming buffer to allow shortest possible switch to start of track
+				mfmReadStreamBuffer[i] = 7;
+			}
+			
+			// the following few lines send the FW version to host every 5 index pulses, this is used for transfer of commands from host to Franz
+			indexCount++;
+			
+			if(indexCount == 5) {
+				indexCount = 0;
+				sendFwVersion = TRUE;
+			}
+		}
+		
+		//--------
+		// NOTE! Handling of STEP and SIDE only when MOTOR is ON, but the drive doesn't have to be selected and it must handle the control anyway
+		if((inputs & MOTOR_ENABLE) != 0) {			// motor not enabled? Skip the following code.
+			continue;
+		}
+
 		// check for STEP pulse - should we go to a different track?
 		ints = EXTI->PR;										// Pending register (EXTI_PR)
 		if(ints & STEP) {										// if falling edge of STEP signal was found
@@ -248,13 +302,13 @@ int main (void)
 				if(track > 0) {
 					track--;
 
-					requestSector(sector + 1);
+					requestTrack();
 				}
 			} else {											// direction is Low? track++
-				if(track < 82) {
+				if(track < 85) {
 					track++;
 
-					requestSector(sector + 1);
+					requestTrack();
 				}
 			}
 
@@ -268,28 +322,30 @@ int main (void)
 		//------------
 		// update SIDE var
 		side = (inputs & SIDE1) ? 0 : 1;					// get the current SIDE
-//		side = (inputs & SIDE1) ? 1 : 0;					// get the current SIDE
 		if(prevSide != side) {										// side changed?
-			requestSector(sector + 1);							// we need another sector, this time from the right side!
+			requestTrack();										// we need track from the right side
 			prevSide = side;
 		}
 
-		//------------
-		// check INDEX pulse as needed -- duration when filling with marks: 69.8 us
-		if((TIM2->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
-			static BYTE broken4e[16] = {11,7,7,11,11,11,11,7,7,11,11,11,11,7,7,11};
-			int i;
-			TIM2->SR = 0xfffe;							// clear UIF flag
+	}
+}
+
+void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
+{
+	// SPI1_TX -- DMA1_CH3
+	DMA1_Channel3->CCR		&= 0xfffffffe;								// disable DMA1 Channel transfer
+	DMA1_Channel3->CMAR		= (uint32_t) txBfr;						// from this buffer located in memory
+	DMA1_Channel3->CNDTR	= txCount;										// this much data
+	DMA1_Channel3->CCR		|= 1;													// enable  DMA1 Channel transfer
 	
-			stream4e = 60;									// start of the track -- we should stream 60* 0x4e
-			sector = 1;
-			
-			for(i=0; i<16; i++) {						// copy in the 'broken' 0x4e sequence to start streaming 0x4e immediately 
-				mfmReadStreamBuffer[i] = broken4e[i];
-			}
-			
-			requestSector(1);
-		}
+	// SPI1_RX -- DMA1_CH2
+	if(rxCount != 0) {																	// want to receive something?
+		DMA1_Channel2->CCR		&= 0xfffffffe;								// disable DMA1 Channel transfer
+		DMA1_Channel2->CMAR		= (uint32_t) rxBfr;						// to this buffer located in memory
+		DMA1_Channel2->CNDTR	= rxCount;										// this much data
+		DMA1_Channel2->CCR		|= 1;													// enable  DMA1 Channel transfer
+	} else {																						// don't want to receive anything?
+		DMA1_Channel2->CCR		&= 0xfffffffe;							// just disable DMA1 Channel transfer
 	}
 }
 
@@ -342,15 +398,6 @@ void init_hw_sw(void)
 	spi_init();																		// init SPI interface
 	dma_spi_init();
 
-	// init both ATN buffers - mark them as empty, not sending, use first as current
-	atnBuffer[0].count		= 0;			
-	atnBuffer[0].next			= &atnBuffer[1];
-	
-	atnBuffer[1].count		= 0;
-	atnBuffer[1].next			= &atnBuffer[0];
-
-	atnNow = &atnBuffer[0];
-
 	// now init both writeBuffers
 	wrBuffer[0].count				= 0;
 	wrBuffer[0].readyToSend	= FALSE;
@@ -378,9 +425,10 @@ void init_hw_sw(void)
 	// init track and side vars for the floppy position
 	side					= 0;
 	track 				= 0;
-	sector				= 1;
 	
-	stream4e			= 0;			// mark that we shouldn't stream any 0x4e (yet)
+	streamed.side		= 0;
+	streamed.track	= 0;
+	streamed.sector	= 1;
 	
 	lastMfmWriteTC = 0;
 }
@@ -475,12 +523,12 @@ void fillMfmTimesForDMA(void)
 	
 	times8 = getNextMFMword();									// get next word
 	
-	for(i=0; i<8; i++) {													// convert all 8 codes to ARR values
-		time		= times8 >> 14;											// get bits 15,14 (and then 13,12 ... 1,0) 
-		time		= mfmTimes[time];										// convert to ARR value
-		times8	= times8 << 2;											// shift 2 bits higher so we would get lower bits next time
+	for(i=0; i<8; i++) {												// convert all 8 codes to ARR values
+		time		= times8 >> 14;										// get bits 15,14 (and then 13,12 ... 1,0) 
+		time		= mfmTimes[time];									// convert to ARR value
+		times8	= times8 << 2;										// shift 2 bits higher so we would get lower bits next time
 
-		mfmReadStreamBuffer[ind] = time;								// store and move to next one
+		mfmReadStreamBuffer[ind] = time;					// store and move to next one
 		ind++;
 	}
 }
@@ -491,23 +539,25 @@ BYTE getNextMFMword(void)
 	static BYTE gapIndex = 0;
 	WORD wval;
 
-	if(stream4e == 0) {
-		while(1) {														// go through inBuffer to process commands and to find some data
-			inBuffer_get_noMove(wval);					// get WORD from buffer, but don't move
+	while(1) {														// go through inBuffer to process commands and to find some data
+		inBuffer_get_noMove(wval);					// get WORD from buffer, but don't move
 		
-			if(wval == CMD_MARK_READ) {					// we've hit the already read part of buffer? (underflow) quit loop
-				break;
-			}
+		if(wval == CMD_TRACK_STREAM_END) {	// we've hit the end of track stream? quit loop
+			break;
+		}
 			
-			inBuffer_markAndmove();							// mark this word as read
+		inBuffer_justMove();								// just move to the next position
 			
-			// lower nibble == 0? it's a command from host - if we should turn on/off the write protect or disk change
-			if((wval & 0x0f00) == 0) {					// it's a command?
-				processHostCommand(wval);
-			} else {														// not a command? return it
-				gapIndex = 0;		
-				return wval;
-			}
+		if(wval == 0) {											// skip empty WORDs
+			continue;
+		}
+		
+		// lower nibble == 0? it's a command from host - if we should turn on/off the write protect or disk change
+		if((wval & 0x0f00) == 0) {					// it's a command?
+			processHostCommand(wval);
+		} else {														// not a command? return it
+			gapIndex = 0;		
+			return wval;
 		}
 	}
 
@@ -518,14 +568,6 @@ BYTE getNextMFMword(void)
 
 	if(gapIndex > 2) {						// we got only 3 gap WORD times, go back to 0
 		gapIndex = 0;
-		
-		if(stream4e > 0) {					// if we streamed 3 gap elements, we've streamed 4* 0x4e
-			if(stream4e < 4) {				// for 0...3 resize to 0
-				stream4e = 0;
-			} else {									// for higher numbers subtract 4
-				stream4e -= 4;
-			}
-		}		
 	}
 
 	return wval;
@@ -534,6 +576,8 @@ BYTE getNextMFMword(void)
 void processHostCommand(WORD hostWord)
 {
 	BYTE hi, lo;
+	WORD nextWord;
+
 	hi = hostWord >> 8;												// get upper byte
 	lo = hostWord  & 0xff;										// get lower byte
 	
@@ -543,18 +587,15 @@ void processHostCommand(WORD hostWord)
 		case CMD_DISK_CHANGE_OFF:			GPIOB->BSRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 1
 		case CMD_DISK_CHANGE_ON:			GPIOB->BRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 0
 
-		case CMD_GET_FW_VERSION:								// send FW version string
-		{
-			atnBuffer_add(ATN_FW_VERSION);				// command		(this adds 0 and ATN_FW_VERSION)
-			atnBuffer_add(version[0]);
-			atnBuffer_add(version[1]);
-			atnBuffer_add(0);											// terminating zero(s) (0, 0)
-			break;
-		}
+		case CMD_GET_FW_VERSION:			sendFwVersion = TRUE;				break;			// send FW version string and receive commands
+
+		case CMD_CURRENT_SECTOR:								// read the current streamed side, track, sector numbers (will be used for write)
+			streamed.side		= lo;									// store sector #
 		
-		case CMD_CURRENT_SECTOR:								// get the next byte, which is sector #, and store it in sector variable
-			sector = lo;
-			requestSector(sector + 1 );						// also ask for the next sector to this one
+			inBuffer_get(nextWord);								// for the next ones we need to get another WORD from inBuffer
+		
+			streamed.track	= nextWord >> 8;			// store the numbers
+			streamed.sector	= nextWord  & 0xff;
 			break;			
 		
 		case CMD_SET_DRIVE_ID_0:			drive_select = MOTOR_ENABLE | DRIVE_SELECT0;		break;		// set drive ID pins to check like this...
@@ -562,19 +603,12 @@ void processHostCommand(WORD hostWord)
 	}
 }
 
-void requestSector(BYTE sectNo)
+void requestTrack(void)
 {
-	WORD wval;
-	
-	wval = (ATN_SEND_NEXT_SECTOR << 8) | side;				// 1st byte: ATN code, 2nd byte: side 
-	atnBuffer_add(wval);
-	
-	wval = (track << 8) | ((WORD) sectNo);						// 3rd byte: track #, 4th byte: next sector #
-	atnBuffer_add(wval);									
-
-	atnBuffer_add(0);											
-	atnBuffer_add(0);																	// last word: 0
+	atnSendTrackRequest[1] = (((WORD)side) << 8) | track ;
+	sendTrackRequest = TRUE;
 }
+
 
 void spi_init(void)
 {
@@ -649,16 +683,17 @@ void dma_mfmWrite_init(void)
 
 void dma_spi_init(void)
 {
-	// SPI1_TX -- DMA1_CH3
+	BYTE fakeBuffer[2];
+	
 	DMA_InitTypeDef DMA_InitStructure;
 	
 	// DMA1 channel3 configuration -- SPI1 TX
   DMA_DeInit(DMA1_Channel3);
 	
-  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) &atnBuffer[0];					// from this buffer located in memory
+  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) fakeBuffer;						// from this buffer located in memory (now only fake)
   DMA_InitStructure.DMA_PeripheralBaseAddr	= (uint32_t) &(SPI1->DR);						// to this peripheral address
   DMA_InitStructure.DMA_DIR									= DMA_DIR_PeripheralDST;						// dir: from mem to periph
-  DMA_InitStructure.DMA_BufferSize					= 0;																// nothing to transfer now
+  DMA_InitStructure.DMA_BufferSize					= 2;																// fake buffer size
   DMA_InitStructure.DMA_PeripheralInc				= DMA_PeripheralInc_Disable;				// PINC = 0 -- don't icrement, always write to SPI1->DR register
   DMA_InitStructure.DMA_MemoryInc						= DMA_MemoryInc_Enable;							// MINC = 1 -- increment in memory -- go though buffer
   DMA_InitStructure.DMA_PeripheralDataSize	= DMA_PeripheralDataSize_HalfWord;	// each data item: 16 bits 
@@ -676,27 +711,26 @@ void dma_spi_init(void)
 //  DMA_Cmd(DMA1_Channel3, ENABLE);
 	
 	//----------------
-	// SPI1_RX -- DMA1_CH2
 	// DMA1 channel2 configuration -- SPI1 RX
   DMA_DeInit(DMA1_Channel2);
 	
   DMA_InitStructure.DMA_PeripheralBaseAddr	= (uint32_t) &(SPI1->DR);						// from this peripheral address
-  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) inBuffer;							// to this buffer located in memory
+  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) fakeBuffer;						// to this buffer located in memory (now only fake)
   DMA_InitStructure.DMA_DIR									= DMA_DIR_PeripheralSRC;						// dir: from periph to mem
-  DMA_InitStructure.DMA_BufferSize					= INBUFFER_SIZE;										// 2048 datas to transfer
+  DMA_InitStructure.DMA_BufferSize					= 2;																// fake buffer size
   DMA_InitStructure.DMA_PeripheralInc				= DMA_PeripheralInc_Disable;				// PINC = 0 -- don't icrement, always write to SPI1->DR register
   DMA_InitStructure.DMA_MemoryInc						= DMA_MemoryInc_Enable;							// MINC = 1 -- increment in memory -- go though buffer
   DMA_InitStructure.DMA_PeripheralDataSize	= DMA_PeripheralDataSize_HalfWord;	// each data item: 16 bits 
   DMA_InitStructure.DMA_MemoryDataSize			= DMA_MemoryDataSize_HalfWord;			// each data item: 16 bits 
-  DMA_InitStructure.DMA_Mode								= DMA_Mode_Circular;								// circular mode
+  DMA_InitStructure.DMA_Mode								= DMA_Mode_Normal;									// normal mode
   DMA_InitStructure.DMA_Priority						= DMA_Priority_High;
   DMA_InitStructure.DMA_M2M									= DMA_M2M_Disable;									// M2M disabled, because we move from peripheral
   DMA_Init(DMA1_Channel2, &DMA_InitStructure);
 
   // Enable DMA1 Channel2 Transfer Complete interrupt
-  DMA_ITConfig(DMA1_Channel2, DMA_IT_HT, ENABLE);			// interrupt on Half Transfer (HT)
+//  DMA_ITConfig(DMA1_Channel2, DMA_IT_HT, ENABLE);			// interrupt on Half Transfer (HT)
   DMA_ITConfig(DMA1_Channel2, DMA_IT_TC, ENABLE);			// interrupt on Transfer Complete (TC)
 
   // Enable DMA1 Channel2 transfer
-  DMA_Cmd(DMA1_Channel2, ENABLE);
+//  DMA_Cmd(DMA1_Channel2, ENABLE);
 }
