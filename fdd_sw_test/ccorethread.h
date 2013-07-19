@@ -11,6 +11,7 @@
 #include "cconusb.h"
 #include "ifloppyimage.h"
 #include "floppyimagefactory.h"
+#include "mfmcachedimage.h"
 
 class CCoreThread: public QThread
 {
@@ -36,29 +37,18 @@ private:
     bool running;
 
     CConUsb             *conUsb;
+    MfmCachedImage      encImage;
     IFloppyImage        *image;
     FloppyImageFactory  imageFactory;
 
     int                 lastSide, lastTrack;            // these are here to avoid sending the same track again
 
-    WORD                CRC;
-
     void createConnectionObject(void);
     void usbConnectionCheck(void);
 
-    void appendCurrentSectorCommand(int track, int side, int sector, BYTE *buffer, int &count);
-    void appendRawByte(BYTE val, BYTE *bfr, int &cnt);
-    void appendA1MarkToStream(BYTE *bfr, int &cnt);
-    void appendTime(BYTE time, BYTE *bfr, int &cnt);
-    void appendChange(BYTE chg, BYTE *bfr, int &cnt);
-    void appendByteToStream(BYTE val, BYTE *bfr, int &cnt);
-    bool createMfmStream(int side, int track, int sector, BYTE *buffer, int &count);
-
-    void fdc_add_to_crc(WORD &crc, BYTE data);
-
     void handleFwVersion(void);
     void handleSendNextSector(int &side, int &track, int &sector, BYTE *oBuf, BYTE *iBuf);
-    void handleSendTrack(int &side, int &track, BYTE *oBuf, BYTE *iBuf);
+    void handleSendTrack(int &side, int &track, BYTE *iBuf);
     void handleSectorWasWritten(void);
 
     void sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf);

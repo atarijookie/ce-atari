@@ -19,7 +19,6 @@ int         cd_cnt, cd_posa, cd_posg;
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 // todo:
-// - load and MFM encode the whole image into memory
 // - set floppy parameters to device and send only the required amount of data to floppy
 
 QStringList dbg;
@@ -75,6 +74,19 @@ void CCoreThread::run(void)
         return;
     }
 
+    outDebugString("Encoding image...");
+    encImage.encodeAndCacheImage(image);
+    outDebugString("...done");
+
+//    for(int i=0; i<7500; i++) {
+//        outBuff[i*2 + 0] = i >> 8;
+//        outBuff[i*2 + 1] = i  & 0xff;
+//    }
+////    sendAndReceive(64, outBuff, inBuff);
+//    sendAndReceive(15000, outBuff, inBuff);
+//    while(1);
+
+
 //    BYTE buffer[512];
 //    outDebugString("Check start");
 //    for(int t=0; t<80; t++) {
@@ -106,7 +118,7 @@ void CCoreThread::run(void)
                     handleSectorWasWritten();
                     break;
                 case ATN_SEND_TRACK:
-                    handleSendTrack(side, track, outBuff, inBuff);
+                    handleSendTrack(side, track, inBuff);
                     break;
             }
         }
@@ -201,7 +213,7 @@ void CCoreThread::handleFwVersion(void)
         cmd_get(oBuf[i]);
     }
 
-    sendAndReceive(6, oBuf, iBuf);
+    sendAndReceive(remaining, oBuf, iBuf);
 }
 
 int CCoreThread::bcdToInt(int bcd)
@@ -253,10 +265,12 @@ int CCoreThread::bcdToInt(int bcd)
 //    sendAndReceive(count, oBuf, iBuf);                // send and receive data
 //}
 
-void CCoreThread::handleSendTrack(int &side, int &track, BYTE *oBuf, BYTE *iBuf)
+void CCoreThread::handleSendTrack(int &side, int &track, BYTE *iBuf)
 {
     BYTE buf[2];
     int val;
+
+    DWORD start = GetTickCount();
 
     for(int i=0; i<2; i++) {        // get arguments from buffer
         bfr_get(val);
@@ -285,27 +299,30 @@ void CCoreThread::handleSendTrack(int &side, int &track, BYTE *oBuf, BYTE *iBuf)
     lastTrack   = track;
     //---------
 
-    int countInSect, countInTrack=0;
-	
-	// start of the track -- we should stream 60* 0x4e
-    for(int i=0; i<60; i++) {
-        appendByteToStream(0x4e, oBuf, countInTrack);
-    }
+    BYTE *encodedTrack;
+    int countInTrack;
 
-    for(int sect=1; sect <= spt; sect++) {
-        createMfmStream(side, track, sect, oBuf + countInTrack, countInSect);	// then create the right MFM stream
-        countInTrack += countInSect;
-    }
-	
-    appendRawByte(0xF0,   oBuf, countInTrack);			// append this - this is a mark of track stream end
-    appendRawByte(0x00,   oBuf, countInTrack);
+    encodedTrack = encImage.getEncodedTrack(track, side, countInTrack);
 
     // we want to send total 15000 bytes, while at least 3 WORDs (6 BYTEs) are received
-    int remaining   = 15000 - (4 + cb_cnt);             // this much bytes remain to send after the received ATN
-    int zeros       = remaining - countInTrack;         // this many zeros after the last track data byte will be appended
+    int remaining   = 15000 - (4 + cb_cnt);                 // this much bytes remain to send after the received ATN
 
-    memset(oBuf + countInTrack, 0, zeros);              // clear buffer beyond the track data
-    sendAndReceive(countInTrack, oBuf, iBuf);           // send and receive data
+    DWORD mid = GetTickCount();
+
+    sendAndReceive(remaining, encodedTrack, iBuf);          // send and receive data
+
+    DWORD end = GetTickCount();
+    outDebugString("handleSendTrack -- encode: %d, tx-rx: %d", mid-start, end-mid);
+
+//    FILE *f = fopen("f:/data.bin", "wb");
+
+//    if(!f) {
+//        qDebug() << "dafuq!";
+//        return;
+//    }
+
+//    fwrite(encodedTrack, 1, remaining, f);
+//    fclose(f);
 }
 
 void CCoreThread::handleSectorWasWritten(void)
@@ -350,176 +367,6 @@ void CCoreThread::usbConnectionCheck(void)
             createConnectionObject();
         }
     }
-}
-
-bool CCoreThread::createMfmStream(int side, int track, int sector, BYTE *buffer, int &count)
-{
-    bool res;
-
-    count = 0;                                              // no data yet
-
-    BYTE data[512];
-    res = image->readSector(track, side, sector, data);     // read data into 'data'
-
-    if(!res) {
-        return false;
-    }
-
-    appendCurrentSectorCommand(track, side, sector, buffer, count);     // append this sector mark so we would know what are we streaming out
-
-    int i;
-    for(i=0; i<12; i++) {                                   // GAP 2: 12 * 0x00
-        appendByteToStream(0, buffer, count);
-    }
-
-    CRC = 0xffff;                                           // init CRC
-    for(i=0; i<3; i++) {                                    // GAP 2: 3 * A1 mark
-        appendA1MarkToStream(buffer, count);
-    }
-
-    appendByteToStream( 0xfe,    buffer, count);            // ID record
-    appendByteToStream( track,   buffer, count);
-    appendByteToStream( side,    buffer, count);
-    appendByteToStream( sector,  buffer, count);
-    appendByteToStream( 0x02,    buffer, count);            // size -- 2 == 512 B per sector
-    appendByteToStream( HIBYTE(CRC), buffer, count);        // crc1
-    appendByteToStream( LOBYTE(CRC), buffer, count);        // crc2
-
-    for(i=0; i<22; i++) {                                   // GAP 3a: 22 * 0x4e
-        appendByteToStream(0x4e, buffer, count);
-    }
-
-    for(i=0; i<12; i++) {                                   // GAP 3b: 12 * 0x00
-        appendByteToStream(0, buffer, count);
-    }
-
-    CRC = 0xffff;                                           // init CRC
-    for(i=0; i<3; i++) {                                    // GAP 3b: 3 * A1 mark
-        appendA1MarkToStream(buffer, count);
-    }
-
-    appendByteToStream( 0xfb, buffer, count);               // DAM mark
-
-    for(i=0; i<512; i++) {                                  // data
-        appendByteToStream( data[i], buffer, count);
-    }
-
-    appendByteToStream(HIBYTE(CRC), buffer, count);         // crc1
-    appendByteToStream(LOBYTE(CRC), buffer, count);         // crc2
-
-    for(i=0; i<40; i++) {                                   // GAP 4: 40 * 0x4e
-        appendByteToStream(0x4e, buffer, count);
-    }
-
-    return true;
-}
-
-void CCoreThread::appendByteToStream(BYTE val, BYTE *bfr, int &cnt)
-{
-    fdc_add_to_crc(CRC, val);
-
-    static BYTE prevBit = 0;
-
-    for(int i=0; i<8; i++) {                        // for all bits
-        BYTE bit = val & 0x80;                      // get highest bit
-        val = val << 1;                             // shift up
-
-        if(bit == 0) {                              // current bit is 0?
-            if(prevBit == 0) {                      // append 0 after 0?
-                appendChange(1, bfr, cnt);  // R
-                appendChange(0, bfr, cnt);  // N
-            } else {                                // append 0 after 1?
-                appendChange(0, bfr, cnt);  // N
-                appendChange(0, bfr, cnt);  // N
-            }
-        } else {                                    // current bit is 1?
-            appendChange(0, bfr, cnt);              // N
-            appendChange(1, bfr, cnt);              // R
-        }
-
-        prevBit = bit;                              // store this bit for next cycle
-    }
-}
-
-void CCoreThread::appendChange(BYTE chg, BYTE *bfr, int &cnt)
-{
-    static BYTE changes = 0;
-
-    changes = changes << 1;             // shift up
-    changes = changes | chg;            // append change
-
-    if(changes == 0 || changes == 1) {  // no 1 or single 1 found, quit
-        return;
-    }
-
-    if(chg != 1) {                      // not adding 1 right now? quit
-        return;
-    }
-
-    BYTE time = 0;
-
-    switch(changes) {
-    case 0x05:  time = MFM_4US; break;        // 4 us - stored as 1
-    case 0x09:  time = MFM_6US; break;        // 6 us - stored as 2
-    case 0x11:  time = MFM_8US; break;        // 8 us - stored as 3
-
-    default:
-        outDebugString("appendChange -- this shouldn't happen!");
-        return;
-    }
-
-    changes = 0x01;                     // leave only lowest change
-
-    appendTime(time, bfr, cnt);         // append this time to stream
-}
-
-void CCoreThread::appendTime(BYTE time, BYTE *bfr, int &cnt)
-{
-    static BYTE times       = 0;
-    static BYTE timesCnt    = 0;
-
-    times = times << 2;                 // shift 2 up
-    times = times | time;               // add lowest 2 bits
-
-    timesCnt++;                         // increment the count of times we have
-    if(timesCnt == 4) {                 // we have 4 times (whole byte), store it
-        timesCnt = 0;
-
-        bfr[cnt] = times;               // store times
-        cnt++;                          // increment counter of stored times
-    }
-}
-
-void CCoreThread::appendCurrentSectorCommand(int track, int side, int sector, BYTE *buffer, int &count)
-{
-    appendRawByte(CMD_CURRENT_SECTOR,   buffer, count);
-    appendRawByte(side,                 buffer, count);
-    appendRawByte(track,                buffer, count);
-    appendRawByte(sector,               buffer, count);
-}
-
-void CCoreThread::appendRawByte(BYTE val, BYTE *bfr, int &cnt)
-{
-    bfr[cnt] = val;                 // just store this byte, no processing
-    cnt++;                          // increment counter of data in buffer
-}
-
-void CCoreThread::appendA1MarkToStream(BYTE *bfr, int &cnt)
-{
-    // append A1 mark in stream, which is 8-6-8-6 in MFM (normaly would been 8-6-4-4-6)
-    appendTime(MFM_8US, bfr, cnt);        // 8 us
-    appendTime(MFM_6US, bfr, cnt);        // 6 us
-    appendTime(MFM_8US, bfr, cnt);        // 8 us
-    appendTime(MFM_6US, bfr, cnt);        // 6 us
-
-    fdc_add_to_crc(CRC, 0xa1);
-}
-
-void CCoreThread::fdc_add_to_crc(WORD &crc, BYTE data)
-{
-  for (int i=0;i<8;i++){
-    crc = ((crc << 1) ^ ((((crc >> 8) ^ (data << i)) & 0x0080) ? 0x1021 : 0));
-  }
 }
 
 void CCoreThread::appendToDbg(QString line)
