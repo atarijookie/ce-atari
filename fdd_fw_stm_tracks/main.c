@@ -123,7 +123,6 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 // circular buffer 
 // watch out, these macros take 0.73 us for _add, and 0.83 us for _get operation!
 
-#define		atnBuffer_add(X)				{ if(atnNow->count < 16)	{		atnNow->buffer[atnNow->count]	= X;	atnNow->count++;	}	}
 #define		wrBuffer_add(X)					{ if(wrNow->count  < 550)	{		wrNow->buffer[wrNow->count]		= X;	wrNow->count++;		}	}
 
 #define		inBuffer_goToStart()				{ 																				inIndexGet = 0;																		}
@@ -137,13 +136,16 @@ WORD drive_select;
 
 BYTE sendFwVersion, sendTrackRequest;
 WORD atnSendFwVersion[4], atnSendTrackRequest[3], cmdBuffer[6];
+WORD fakeBuffer;
 
 int main (void) 
 {
 	BYTE prevSide = 0, outputsActive = 0;
 	BYTE indexCount = 0;
 	WORD prevWGate = WGATE, WGate;
-	BYTE sending = FALSE;
+	BYTE spiDmaIsIdle = TRUE, waitForSPI = FALSE;
+
+WORD i, err=0;
 	
 	sendFwVersion			= FALSE;
 	sendTrackRequest	= FALSE;
@@ -167,44 +169,77 @@ int main (void)
 	
 	requestTrack();																// request track 0, side 0
 
+/*
+	while(1) {
+		if(DMA1_Channel3->CNDTR != 0 || DMA1_Channel2->CNDTR != 0) {			// while working, wait
+			continue;
+		}
+		
+		spiDma_txRx(3, (BYTE *) &atnSendTrackRequest[0], INBUFFER_SIZE, (BYTE *) &inBuffer[0]);	// prepare for tx and rx
+
+		while(DMA1_Channel3->CNDTR != 0 || DMA1_Channel2->CNDTR != 0);		// while working, wait
+		
+		for(i=0; i<INBUFFER_SIZE; i++) {																	// check data
+			if(inBuffer[i] != i) {
+				err++;
+			}
+		}
+	}
+*/
+
 	while(1) {
 		WORD ints, inputs;
-
+		
 		// sending and receiving data over SPI using DMA
-		if(DMA1_Channel3->CNDTR == 0 && DMA1_Channel2->CNDTR == 0) {	// SPI DMA: nothing to Tx and nothing to Rx?
-			sending = FALSE;
+		if((DMA1->ISR & (DMA1_IT_TC3 | DMA1_IT_TC2)) == (DMA1_IT_TC3 | DMA1_IT_TC2)) {	// SPI DMA: nothing to Tx and nothing to Rx?
+			DMA1->IFCR = DMA1_IT_TC3 | DMA1_IT_TC2;																				// clear HTIF flags
 			
+			waitForSPI = TRUE;
+		}
+
+		if(waitForSPI == TRUE) {
+			if((SPI1->SR & SPI_SR_TXE) != 0) {										// if TXE is set
+				if((SPI1->SR & SPI_SR_BSY) == 0) {									// and BUSY not set
+					waitForSPI		= FALSE;
+					spiDmaIsIdle	= TRUE;															// mark that the SPI DMA is ready to do something
+					
+					SPI1->CR1 &= ~(1 << 6);												// disable SPI
+ 				}
+			}
+		}
+		
+		if(spiDmaIsIdle == TRUE) {															// SPI DMA: nothing to Tx and nothing to Rx?
 			if(sendFwVersion) {																		// should send FW version? this is a window for receiving commands
 				spiDma_txRx(4, (BYTE *) &atnSendFwVersion[0], 6, (BYTE *) &cmdBuffer[0]);
+				spiDmaIsIdle			= FALSE;													// SPI DMA is busy
 				
-				sendFwVersion				= FALSE;
-				sending							= TRUE;
+				sendFwVersion			= FALSE;
 			} else if(sendTrackRequest) {
 				spiDma_txRx(3, (BYTE *) &atnSendTrackRequest[0], INBUFFER_SIZE, (BYTE *) &inBuffer[0]);
+				spiDmaIsIdle			= FALSE;													// SPI DMA is busy
 				
-				sendTrackRequest		= FALSE;
-				sending							=	TRUE;
+				sendTrackRequest	= FALSE;
 			} else if(wrNow->readyToSend) {												// not sending any ATN right now? and current write buffer has something?
-				spiDma_txRx(wrNow->count, (BYTE *) &wrNow->buffer[0], 0, 0);
-			
+				spiDma_txRx(wrNow->count, (BYTE *) &wrNow->buffer[0], 1, (BYTE *) &fakeBuffer);
+				spiDmaIsIdle	= FALSE;															// SPI DMA is busy
+
 				wrNow->readyToSend	= FALSE;												// mark the current buffer as not ready to send (so we won't send this one again)
 				
 				wrNow								= wrNow->next;									// and now we will select the next buffer as current
 				wrNow->readyToSend	= FALSE;												// the next buffer is not ready to send (yet)
 				wrNow->count				= 0;														
-				
-				sending	=	TRUE;
 			}
-			
-			if(sending == TRUE) {
-				GPIOB->BSRR = ATN;																	// ATTENTION bit high - got something to read
-			} else {
-				GPIOB->BRR = ATN;																		// ATTENTION bit low  - nothing to read
-			}				 
 		}
+		
+		if(DMA1_Channel3->CNDTR != 0) {												// something to send over SPI?
+			GPIOB->BSRR = ATN;																	// ATTENTION bit high - got something to read
+		} else {
+			GPIOB->BRR = ATN;																		// ATTENTION bit low  - nothing to read
+		}				 
+		
 		//-------------------------------------------------
 		// if we got something in the cmd buffer, we should process it
-		if(sending == FALSE && cmdBuffer[0] != CMD_MARK_READ) {	// if we're not sending (receiving) and the cmd buffer is not read
+		if(spiDmaIsIdle == TRUE && cmdBuffer[0] != CMD_MARK_READ) {	// if we're not sending (receiving) and the cmd buffer is not read
 			int i;
 			
 			for(i=0; i<6; i++) {
@@ -332,21 +367,23 @@ int main (void)
 
 void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
 {
-	// SPI1_TX -- DMA1_CH3
+	// disable both TX and RX channels
 	DMA1_Channel3->CCR		&= 0xfffffffe;								// disable DMA1 Channel transfer
+	DMA1_Channel2->CCR		&= 0xfffffffe;								// disable DMA1 Channel transfer
+
+	// config SPI1_TX -- DMA1_CH3
 	DMA1_Channel3->CMAR		= (uint32_t) txBfr;						// from this buffer located in memory
 	DMA1_Channel3->CNDTR	= txCount;										// this much data
-	DMA1_Channel3->CCR		|= 1;													// enable  DMA1 Channel transfer
 	
-	// SPI1_RX -- DMA1_CH2
-	if(rxCount != 0) {																	// want to receive something?
-		DMA1_Channel2->CCR		&= 0xfffffffe;								// disable DMA1 Channel transfer
-		DMA1_Channel2->CMAR		= (uint32_t) rxBfr;						// to this buffer located in memory
-		DMA1_Channel2->CNDTR	= rxCount;										// this much data
-		DMA1_Channel2->CCR		|= 1;													// enable  DMA1 Channel transfer
-	} else {																						// don't want to receive anything?
-		DMA1_Channel2->CCR		&= 0xfffffffe;							// just disable DMA1 Channel transfer
-	}
+	// config SPI1_RX -- DMA1_CH2
+	DMA1_Channel2->CMAR		= (uint32_t) rxBfr;						// to this buffer located in memory
+	DMA1_Channel2->CNDTR	= rxCount;										// this much data
+
+	// enable both TX and RX channels
+	DMA1_Channel3->CCR		|= 1;													// enable  DMA1 Channel transfer
+	DMA1_Channel2->CCR		|= 1;													// enable  DMA1 Channel transfer
+	
+  SPI1->CR1 |= (1 << 6);															// SPI enable
 }
 
 void init_hw_sw(void)
@@ -438,7 +475,7 @@ WORD spi_TxRx(WORD out)
 {
 	WORD in;
 
-	while((SPI1->SR & (1 << 7)) != 0);								// TXE flag: Tx buffer empty
+	while((SPI1->SR & (1 << 7)) != 0);								// TXE flag: BUSY flag
 
 	while((SPI1->SR & 2) == 0);								// TXE flag: Tx buffer empty
 	SPI1->DR = out;														// send over SPI
@@ -539,7 +576,15 @@ BYTE getNextMFMword(void)
 	static BYTE gapIndex = 0;
 	WORD wval;
 
+	WORD maxLoops = 15000;
+
 	while(1) {														// go through inBuffer to process commands and to find some data
+		maxLoops--;
+		
+		if(maxLoops == 0) {									// didn't quit the loop for 15k cycles? quit now!
+			break;
+		}
+		
 		inBuffer_get_noMove(wval);					// get WORD from buffer, but don't move
 		
 		if(wval == CMD_TRACK_STREAM_END) {	// we've hit the end of track stream? quit loop
@@ -622,7 +667,7 @@ void spi_init(void)
   SPI_Init(SPI1, &spiStruct);
 	SPI1->CR2 |= (1 << 7) | (1 << 6) | SPI_I2S_DMAReq_Tx | SPI_I2S_DMAReq_Rx;		// enable TXEIE, RXNEIE, TXDMAEN, RXDMAEN
 	
-	SPI_Cmd(SPI1, ENABLE);
+//	SPI_Cmd(SPI1, ENABLE);
 }
 
 void dma_mfmRead_init(void)
@@ -683,17 +728,15 @@ void dma_mfmWrite_init(void)
 
 void dma_spi_init(void)
 {
-	BYTE fakeBuffer[2];
-	
 	DMA_InitTypeDef DMA_InitStructure;
 	
 	// DMA1 channel3 configuration -- SPI1 TX
   DMA_DeInit(DMA1_Channel3);
 	
-  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) fakeBuffer;						// from this buffer located in memory (now only fake)
+  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) 0;											// from this buffer located in memory (now only fake)
   DMA_InitStructure.DMA_PeripheralBaseAddr	= (uint32_t) &(SPI1->DR);						// to this peripheral address
   DMA_InitStructure.DMA_DIR									= DMA_DIR_PeripheralDST;						// dir: from mem to periph
-  DMA_InitStructure.DMA_BufferSize					= 2;																// fake buffer size
+  DMA_InitStructure.DMA_BufferSize					= 0;																// fake buffer size
   DMA_InitStructure.DMA_PeripheralInc				= DMA_PeripheralInc_Disable;				// PINC = 0 -- don't icrement, always write to SPI1->DR register
   DMA_InitStructure.DMA_MemoryInc						= DMA_MemoryInc_Enable;							// MINC = 1 -- increment in memory -- go though buffer
   DMA_InitStructure.DMA_PeripheralDataSize	= DMA_PeripheralDataSize_HalfWord;	// each data item: 16 bits 
@@ -715,15 +758,15 @@ void dma_spi_init(void)
   DMA_DeInit(DMA1_Channel2);
 	
   DMA_InitStructure.DMA_PeripheralBaseAddr	= (uint32_t) &(SPI1->DR);						// from this peripheral address
-  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) fakeBuffer;						// to this buffer located in memory (now only fake)
+  DMA_InitStructure.DMA_MemoryBaseAddr			= (uint32_t) 0;											// to this buffer located in memory (now only fake)
   DMA_InitStructure.DMA_DIR									= DMA_DIR_PeripheralSRC;						// dir: from periph to mem
-  DMA_InitStructure.DMA_BufferSize					= 2;																// fake buffer size
+  DMA_InitStructure.DMA_BufferSize					= 0;																// fake buffer size
   DMA_InitStructure.DMA_PeripheralInc				= DMA_PeripheralInc_Disable;				// PINC = 0 -- don't icrement, always write to SPI1->DR register
   DMA_InitStructure.DMA_MemoryInc						= DMA_MemoryInc_Enable;							// MINC = 1 -- increment in memory -- go though buffer
   DMA_InitStructure.DMA_PeripheralDataSize	= DMA_PeripheralDataSize_HalfWord;	// each data item: 16 bits 
   DMA_InitStructure.DMA_MemoryDataSize			= DMA_MemoryDataSize_HalfWord;			// each data item: 16 bits 
   DMA_InitStructure.DMA_Mode								= DMA_Mode_Normal;									// normal mode
-  DMA_InitStructure.DMA_Priority						= DMA_Priority_High;
+  DMA_InitStructure.DMA_Priority						= DMA_Priority_VeryHigh;
   DMA_InitStructure.DMA_M2M									= DMA_M2M_Disable;									// M2M disabled, because we move from peripheral
   DMA_Init(DMA1_Channel2, &DMA_InitStructure);
 
