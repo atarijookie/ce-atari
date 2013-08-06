@@ -2,6 +2,7 @@
 #include "stm32f10x_spi.h"
 #include "stm32f10x_tim.h"
 #include "stm32f10x_dma.h"
+#include "stm32f10x_exti.h"
 #include "misc.h"
 
 #include "defs.h"
@@ -107,16 +108,21 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 #define MFM_8US     3
 
 // set GPIOB as --- CNF1:0 -- 00 (push-pull output), MODE1:0 -- 11 (output 50 Mhz)
-#define 	FloppyOut_Enable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000333); FloppyIndex_Enable();	FloppyMFMread_Enable();		}
+//#define 	FloppyOut_Enable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000333); FloppyIndex_Enable();	FloppyMFMread_Enable();		}
+#define 	FloppyOut_Enable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000737); FloppyIndex_Enable();	FloppyMFMread_Enable();		}
 // set GPIOB as --- CNF1:0 -- 01 (floating input), MODE1:0 -- 00 (input)
 #define 	FloppyOut_Disable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000444); FloppyIndex_Disable();	FloppyMFMread_Disable();	}
 
 // enable / disable TIM1 CH1 output on GPIOA_8
-#define		FloppyMFMread_Enable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x0000000b); };
+// open drain
+#define		FloppyMFMread_Enable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x0000000f); };
+// push pull
+//#define		FloppyMFMread_Enable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x0000000b); };
 #define		FloppyMFMread_Disable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x00000004); };
 
 // enable / disable TIM2 CH4 output on GPIOB_11
-#define		FloppyIndex_Enable()			{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x0000b000); };
+#define		FloppyIndex_Enable()			{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x0000f000); };
+//#define		FloppyIndex_Enable()			{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x0000b000); };
 #define		FloppyIndex_Disable()			{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x00004000); };
 
 //--------------
@@ -134,29 +140,39 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 WORD version[2] = {0xf013, 0x0718};				// this means: Franz, 2013-07-18
 WORD drive_select;
 
-BYTE sendFwVersion, sendTrackRequest;
-WORD atnSendFwVersion[4], atnSendTrackRequest[3], cmdBuffer[6];
+volatile BYTE sendFwVersion, sendTrackRequest;
+WORD atnSendFwVersion[5], atnSendTrackRequest[4], cmdBuffer[6];
 WORD fakeBuffer;
+
+volatile struct {
+	BYTE track;
+	BYTE side;
+} next;
 
 int main (void) 
 {
 	BYTE prevSide = 0, outputsActive = 0;
 	BYTE indexCount = 0;
 	WORD prevWGate = WGATE, WGate;
-	BYTE spiDmaIsIdle = TRUE, waitForSPI = FALSE;
+	BYTE spiDmaIsIdle = TRUE;
 
 WORD i, err=0;
+
+	next.track	= 0;
+	next.side		= 0;
 	
 	sendFwVersion			= FALSE;
 	sendTrackRequest	= FALSE;
 	
-	atnSendFwVersion[0] = ATN_FW_VERSION;					// attention code
-	atnSendFwVersion[1] = version[0];
-	atnSendFwVersion[2] = version[1];
-	atnSendFwVersion[3] = 0;											// terminating zero
+	atnSendFwVersion[0] = 0;											// just-in-case padding
+	atnSendFwVersion[1] = ATN_FW_VERSION;					// attention code
+	atnSendFwVersion[2] = version[0];
+	atnSendFwVersion[3] = version[1];
+	atnSendFwVersion[4] = 0;											// terminating zero
 	
-	atnSendTrackRequest[0] = ATN_SEND_TRACK;			// attention code
-	atnSendTrackRequest[2] = 0;										// terminating zero
+	atnSendTrackRequest[0] = 0;										// just-in-case padding
+	atnSendTrackRequest[1] = ATN_SEND_TRACK;			// attention code
+	atnSendTrackRequest[3] = 0;										// terminating zero
 	
 	init_hw_sw();																	// init GPIO pins, timers, DMA, global variables
 
@@ -170,21 +186,41 @@ WORD i, err=0;
 	requestTrack();																// request track 0, side 0
 
 /*
-	while(1) {
-		if(DMA1_Channel3->CNDTR != 0 || DMA1_Channel2->CNDTR != 0) {			// while working, wait
-			continue;
-		}
-		
-		spiDma_txRx(3, (BYTE *) &atnSendTrackRequest[0], INBUFFER_SIZE, (BYTE *) &inBuffer[0]);	// prepare for tx and rx
+FloppyOut_Enable();
+track = 0;
+while(1);
+*/
+/*
+{
+		// check for STEP pulse - should we go to a different track?
+		i = EXTI->PR;										// Pending register (EXTI_PR)
+		err = GPIOB->IDR;										// read floppy inputs
 
-		while(DMA1_Channel3->CNDTR != 0 || DMA1_Channel2->CNDTR != 0);		// while working, wait
-		
-		for(i=0; i<INBUFFER_SIZE; i++) {																	// check data
-			if(inBuffer[i] != i) {
-				err++;
+		if(i & STEP) {										// if falling edge of STEP signal was found
+			EXTI->PR = STEP;									// clear that int
+			if((err & DIR) != 0) {								// direction is High? track--
+				if(track > 0) {
+					track--;
+
+					inBuffer[inIndexGet] = track;
+					inIndexGet++;
+				}
+			} else {											// direction is Low? track++
+				if(track < 85) {
+					track++;
+
+					inBuffer[inIndexGet] = track;
+					inIndexGet++;
+				}
 			}
-		}
-	}
+
+			if(track == 0) {									// if track is 0
+				GPIOB->BRR = TRACK0;						// TRACK 0 signal to L			
+			} else {													// if track is not 0
+				GPIOB->BSRR = TRACK0;						// TRACK 0 signal is H
+			}
+		}	
+}
 */
 
 	while(1) {
@@ -193,29 +229,19 @@ WORD i, err=0;
 		// sending and receiving data over SPI using DMA
 		if((DMA1->ISR & (DMA1_IT_TC3 | DMA1_IT_TC2)) == (DMA1_IT_TC3 | DMA1_IT_TC2)) {	// SPI DMA: nothing to Tx and nothing to Rx?
 			DMA1->IFCR = DMA1_IT_TC3 | DMA1_IT_TC2;																				// clear HTIF flags
-			
-			waitForSPI = TRUE;
+			spiDmaIsIdle	= TRUE;																	// mark that the SPI DMA is ready to do something
 		}
 
-		if(waitForSPI == TRUE) {
-			if((SPI1->SR & SPI_SR_TXE) != 0) {										// if TXE is set
-				if((SPI1->SR & SPI_SR_BSY) == 0) {									// and BUSY not set
-					waitForSPI		= FALSE;
-					spiDmaIsIdle	= TRUE;															// mark that the SPI DMA is ready to do something
-					
-					SPI1->CR1 &= ~(1 << 6);												// disable SPI
- 				}
-			}
-		}
-		
 		if(spiDmaIsIdle == TRUE) {															// SPI DMA: nothing to Tx and nothing to Rx?
 			if(sendFwVersion) {																		// should send FW version? this is a window for receiving commands
-				spiDma_txRx(4, (BYTE *) &atnSendFwVersion[0], 6, (BYTE *) &cmdBuffer[0]);
+				spiDma_txRx(5, (BYTE *) &atnSendFwVersion[0], 6, (BYTE *) &cmdBuffer[0]);
 				spiDmaIsIdle			= FALSE;													// SPI DMA is busy
 				
 				sendFwVersion			= FALSE;
 			} else if(sendTrackRequest) {
-				spiDma_txRx(3, (BYTE *) &atnSendTrackRequest[0], INBUFFER_SIZE, (BYTE *) &inBuffer[0]);
+				atnSendTrackRequest[2] = (((WORD)next.side) << 8) | (next.track);
+
+				spiDma_txRx(4, (BYTE *) &atnSendTrackRequest[0], INBUFFER_SIZE, (BYTE *) &inBuffer[0]);
 				spiDmaIsIdle			= FALSE;													// SPI DMA is busy
 				
 				sendTrackRequest	= FALSE;
@@ -328,11 +354,12 @@ WORD i, err=0;
 			continue;
 		}
 
+		/*
 		// check for STEP pulse - should we go to a different track?
 		ints = EXTI->PR;										// Pending register (EXTI_PR)
+		
 		if(ints & STEP) {										// if falling edge of STEP signal was found
 			EXTI->PR = STEP;									// clear that int
-
 			if(inputs & DIR) {								// direction is High? track--
 				if(track > 0) {
 					track--;
@@ -353,7 +380,7 @@ WORD i, err=0;
 				GPIOB->BSRR = TRACK0;						// TRACK 0 signal is H
 			}
 		}
-
+*/
 		//------------
 		// update SIDE var
 		side = (inputs & SIDE1) ? 0 : 1;					// get the current SIDE
@@ -382,13 +409,20 @@ void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
 	// enable both TX and RX channels
 	DMA1_Channel3->CCR		|= 1;													// enable  DMA1 Channel transfer
 	DMA1_Channel2->CCR		|= 1;													// enable  DMA1 Channel transfer
+
+/*	
+	if((SPI1->SR & 2) != 0) {														// TXE flag: Tx buffer empty
+		SPI1->DR = 0;																			// just send zero over SPI
+	}
+*/
 	
-  SPI1->CR1 |= (1 << 6);															// SPI enable
+//  SPI1->CR1 |= (1 << 6);															// SPI enable
 }
 
 void init_hw_sw(void)
 {
 	WORD i;
+	NVIC_InitTypeDef NVIC_InitStructure;
 	
 	RCC->AHBENR		|= (1 <<  0);																						// enable DMA1
 	RCC->APB1ENR	|= (1 <<  1) | (1 <<  0);																// enable TIM3, TIM2
@@ -414,6 +448,14 @@ void init_hw_sw(void)
 	EXTI->IMR			= STEP;											// EXTI3 -- 1 means: Interrupt from line 3 not masked
 	EXTI->EMR			= STEP;											// EXTI3 -- 1 means: Event     form line 3 not masked
 	EXTI->FTSR 		= STEP;											// Falling trigger selection register - STEP pulse
+	
+	/* Enable and set EXTI Line3 Interrupt to the lowest priority */
+	
+  NVIC_InitStructure.NVIC_IRQChannel = EXTI3_IRQn;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x01;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x01;
+  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+  NVIC_Init(&NVIC_InitStructure);
 	
 	//----------
 	AFIO->MAPR |= 0x02000000;									// SWJ_CFG[2:0] (Bits 26:24) -- 010: JTAG-DP Disabled and SW-DP Enabled
@@ -470,12 +512,52 @@ void init_hw_sw(void)
 	lastMfmWriteTC = 0;
 }
 
+void EXTI3_IRQHandler(void)
+{
+  if(EXTI_GetITStatus(EXTI_Line3) != RESET)
+  {
+		WORD inputs = GPIOB->IDR;
+		
+		if((inputs & MOTOR_ENABLE) != 0) {			// motor not enabled? Skip the following code.
+			EXTI_ClearITPendingBit(EXTI_Line3);		// Clear the EXTI line pending bit 
+			return;
+		}
+		
+		if(inputs & DIR) {								// direction is High? track--
+			if(track > 0) {
+				track--;
+
+				next.track	= track;
+				next.side		= side;
+				sendTrackRequest = TRUE;
+			}
+		} else {													// direction is Low? track++
+			if(track < 85) {
+				track++;
+
+				next.track	= track;
+				next.side		= side;
+				sendTrackRequest = TRUE;
+			}
+		}
+		
+		if(track == 0) {									// if track is 0
+			GPIOB->BRR = TRACK0;						// TRACK 0 signal to L			
+		} else {													// if track is not 0
+			GPIOB->BSRR = TRACK0;						// TRACK 0 signal is H
+		}
+		
+    // Clear the EXTI line pending bit 
+    EXTI_ClearITPendingBit(EXTI_Line3);
+  }
+}
+
 
 WORD spi_TxRx(WORD out)
 {
 	WORD in;
 
-	while((SPI1->SR & (1 << 7)) != 0);								// TXE flag: BUSY flag
+	while((SPI1->SR & (1 << 7)) != 0);				// TXE flag: BUSY flag
 
 	while((SPI1->SR & 2) == 0);								// TXE flag: Tx buffer empty
 	SPI1->DR = out;														// send over SPI
@@ -650,7 +732,9 @@ void processHostCommand(WORD hostWord)
 
 void requestTrack(void)
 {
-	atnSendTrackRequest[1] = (((WORD)side) << 8) | track ;
+	next.track	= track;
+	next.side		= side;
+	
 	sendTrackRequest = TRUE;
 }
 
@@ -667,7 +751,7 @@ void spi_init(void)
   SPI_Init(SPI1, &spiStruct);
 	SPI1->CR2 |= (1 << 7) | (1 << 6) | SPI_I2S_DMAReq_Tx | SPI_I2S_DMAReq_Rx;		// enable TXEIE, RXNEIE, TXDMAEN, RXDMAEN
 	
-//	SPI_Cmd(SPI1, ENABLE);
+	SPI_Cmd(SPI1, ENABLE);
 }
 
 void dma_mfmRead_init(void)
