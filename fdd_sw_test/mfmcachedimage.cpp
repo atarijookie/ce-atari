@@ -1,19 +1,34 @@
 #include <string.h>
+#include <stdio.h>
 
 #include "mfmcachedimage.h"
 
 #define LOBYTE(w)	((BYTE)(w))
 #define HIBYTE(w)	((BYTE)(((WORD)(w)>>8)&0xFF))
 
+#define DUMPTOFILE
+
+#ifdef DUMPTOFILE
+FILE *f;
+#endif
+
 MfmCachedImage::MfmCachedImage()
 {
     gotImage = false;
     initTracks();
+
+    #ifdef DUMPTOFILE
+    f = fopen("f:\\raw_img.txt", "wt");
+    #endif
 }
 
 MfmCachedImage::~MfmCachedImage()
 {
     deleteCachedImage();
+
+    #ifdef DUMPTOFILE
+    fclose(f);
+    #endif
 }
 
 void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img)
@@ -34,6 +49,10 @@ void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img)
 
     for(int t=0; t<tracksNo; t++) {       // go through the whole image and encode it
         for(int s=0; s<sides; s++) {
+            #ifdef DUMPTOFILE
+            fprintf(f, "Track: %d, side: %d\n", t, s);
+            #endif
+
             encodeSingleTrack(img, s, t, spt, buffer, bytesStored);
 
             int index = t * 2 + s;
@@ -46,8 +65,14 @@ void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img)
 
             memset(tracks[index].mfmStream, 0, 15000);                      // set other to 0
             memcpy(tracks[index].mfmStream, buffer, bytesStored);           // copy the memory block
+
+            #ifdef DUMPTOFILE
+            fprintf(f, "\n\n");
+            #endif
         }
     }
+
+    gotImage = true;
 }
 
 void MfmCachedImage::encodeSingleTrack(IFloppyImage *img, int side, int track, int sectorsPerTrack, BYTE *buffer, int &bytesStored)
@@ -60,9 +85,13 @@ void MfmCachedImage::encodeSingleTrack(IFloppyImage *img, int side, int track, i
     }
 
     for(int sect=1; sect <= sectorsPerTrack; sect++) {
+        appendZeroIfNeededToMakeEven(buffer, countInTrack);                             // this should make the sector start on even position (on full WORD, not in half)
+
         createMfmStream(img, side, track, sect, buffer + countInTrack, countInSect);	// then create the right MFM stream
         countInTrack += countInSect;
     }
+
+    appendZeroIfNeededToMakeEven(buffer, countInTrack);
 
     appendRawByte(0xF0, buffer, countInTrack);			// append this - this is a mark of track stream end
     appendRawByte(0x00, buffer, countInTrack);
@@ -82,6 +111,8 @@ void MfmCachedImage::deleteCachedImage(void)
         tracks[i].bytesInStream = 0;
         tracks[i].mfmStream     = NULL;
     }
+
+    gotImage = false;
 }
 
 BYTE *MfmCachedImage::getEncodedTrack(int track, int side, int &bytesInBuffer)
@@ -173,11 +204,19 @@ bool MfmCachedImage::createMfmStream(IFloppyImage *img, int side, int track, int
         appendByteToStream(0x4e, buffer, count);
     }
 
+    #ifdef DUMPTOFILE
+    fprintf(f, "\n\n");
+    #endif
+
     return true;
 }
 
 void MfmCachedImage::appendByteToStream(BYTE val, BYTE *bfr, int &cnt)
 {
+    #ifdef DUMPTOFILE
+    fprintf(f, "%02x ", val);
+    #endif
+
     fdc_add_to_crc(CRC, val);
 
     static BYTE prevBit = 0;
@@ -262,12 +301,27 @@ void MfmCachedImage::appendCurrentSectorCommand(int track, int side, int sector,
 
 void MfmCachedImage::appendRawByte(BYTE val, BYTE *bfr, int &cnt)
 {
+    #ifdef DUMPTOFILE
+    fprintf(f, "%02x ", val);
+    #endif
+
     bfr[cnt] = val;                 // just store this byte, no processing
     cnt++;                          // increment counter of data in buffer
 }
 
+void MfmCachedImage::appendZeroIfNeededToMakeEven(BYTE *bfr, int &cnt)
+{
+    if((cnt & 1) != 0) {                       // odd number of bytes in the buffer? add one to make it even!
+        appendRawByte(0x00, bfr, cnt);
+   }
+}
+
 void MfmCachedImage::appendA1MarkToStream(BYTE *bfr, int &cnt)
 {
+    #ifdef DUMPTOFILE
+    fprintf(f, "A1 ");
+    #endif
+
     // append A1 mark in stream, which is 8-6-8-6 in MFM (normaly would been 8-6-4-4-6)
     appendTime(MFM_8US, bfr, cnt);        // 8 us
     appendTime(MFM_6US, bfr, cnt);        // 6 us
@@ -283,3 +337,4 @@ void MfmCachedImage::fdc_add_to_crc(WORD &crc, BYTE data)
         crc = ((crc << 1) ^ ((((crc >> 8) ^ (data << i)) & 0x0080) ? 0x1021 : 0));
     }
 }
+

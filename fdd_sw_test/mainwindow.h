@@ -18,6 +18,7 @@ public:
     ~MainWindow();
     
 private slots:
+    void on_pushButton_clicked();
     void on_chbDiskChg_stateChanged(int );
     void on_chbDrive01_stateChanged(int arg1);
 

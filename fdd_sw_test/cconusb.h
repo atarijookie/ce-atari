@@ -95,6 +95,7 @@ public:
     virtual bool    init(void);
     virtual void    deinit(void);
     virtual DWORD   bytesToReceive(void);
+    virtual DWORD   bytesToSend(void);
     virtual void    txRx(int count, BYTE *sendBuffer, BYTE *receiveBufer);
     virtual void    write(int count, BYTE *buffer);
     virtual void    read (int count, BYTE *buffer);

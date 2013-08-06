@@ -149,7 +149,7 @@ void CConUsb::tryToConnect(void)
 
        (*pFT_SetTimeouts)(ftHandle, 10, 10);
        (*pFT_SetLatencyTimer)(ftHandle, 5);
-       (*pFT_SetUSBParameters)(ftHandle, 64, 256);
+//       (*pFT_SetUSBParameters)(ftHandle, 64, 256);
 
        break;
     }
@@ -180,6 +180,18 @@ DWORD CConUsb::bytesToReceive(void)
     return dwRxBytes;
 }
 
+DWORD CConUsb::bytesToSend(void)
+{
+    if(!connected) {
+        return 0;
+    }
+
+    DWORD dwRxBytes, dwTxBytes, dwEventDWord;
+    (*pFT_GetStatus)(ftHandle, &dwRxBytes, &dwTxBytes, &dwEventDWord);
+
+    return dwTxBytes;
+}
+
 void CConUsb::txRx(int count, BYTE *sendBuffer, BYTE *receiveBufer)
 {
     write   (count, sendBuffer);
@@ -197,6 +209,7 @@ void CConUsb::write(int count, BYTE *buffer)
     while(remaining > 0) {
         if((GetTickCount() - start) > 3000) {         // timeout?
             outDebugString("Timeout on USB write!");
+            outDebugString("remaining: %d", remaining);
             return;
         }
 

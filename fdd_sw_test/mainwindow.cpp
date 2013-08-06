@@ -68,3 +68,8 @@ void MainWindow::on_chbDiskChg_stateChanged(int )
         core.setNextCmd(CMD_DISK_CHANGE_OFF);
     }
 }
+
+void MainWindow::on_pushButton_clicked()
+{
+    core.sendHalfWord();
+}

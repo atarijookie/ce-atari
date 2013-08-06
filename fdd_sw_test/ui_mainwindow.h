@@ -1,8 +1,8 @@
 /********************************************************************************
 ** Form generated from reading UI file 'mainwindow.ui'
 **
-** Created: Fri 19. Jul 15:35:09 2013
-**      by: Qt User Interface Compiler version 4.8.1
+** Created: Tue 6. Aug 22:51:01 2013
+**      by: Qt User Interface Compiler version 4.7.0
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
@@ -18,6 +18,7 @@
 #include <QtGui/QHeaderView>
 #include <QtGui/QLabel>
 #include <QtGui/QMainWindow>
+#include <QtGui/QPushButton>
 #include <QtGui/QWidget>
 
 QT_BEGIN_NAMESPACE
@@ -30,6 +31,7 @@ public:
     QCheckBox *chbWriteProtect;
     QCheckBox *chbDrive01;
     QCheckBox *chbDiskChg;
+    QPushButton *pushButton;
 
     void setupUi(QMainWindow *MainWindow)
     {
@@ -50,6 +52,9 @@ public:
         chbDiskChg = new QCheckBox(centralWidget);
         chbDiskChg->setObjectName(QString::fromUtf8("chbDiskChg"));
         chbDiskChg->setGeometry(QRect(20, 130, 171, 18));
+        pushButton = new QPushButton(centralWidget);
+        pushButton->setObjectName(QString::fromUtf8("pushButton"));
+        pushButton->setGeometry(QRect(20, 190, 121, 23));
         MainWindow->setCentralWidget(centralWidget);
 
         retranslateUi(MainWindow);
@@ -64,6 +69,7 @@ public:
         chbWriteProtect->setText(QApplication::translate("MainWindow", "write protection", 0, QApplication::UnicodeUTF8));
         chbDrive01->setText(QApplication::translate("MainWindow", "drive 0 / 1 (1 when checked)", 0, QApplication::UnicodeUTF8));
         chbDiskChg->setText(QApplication::translate("MainWindow", "disk change (checked means ON)", 0, QApplication::UnicodeUTF8));
+        pushButton->setText(QApplication::translate("MainWindow", "Send half SPI word", 0, QApplication::UnicodeUTF8));
     } // retranslateUi
 
 };

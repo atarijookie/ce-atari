@@ -28,12 +28,16 @@ CCoreThread::CCoreThread()
     shouldRun       = true;
     running         = false;
 
+    sendSingleHalfWord = false;
+
     conUsb      = NULL;
     createConnectionObject();
     conUsb->tryToConnect();
 
-    lastSide = -1;
-    lastTrack = -1;
+    lastSide        = -1;
+    lastTrack       = -1;
+
+    prevAtnWord.got = false;
 }
 
 CCoreThread::~CCoreThread()
@@ -62,7 +66,7 @@ void CCoreThread::run(void)
     BYTE outBuff[20480], inBuff[20480];
     int side=0, track=0;
 
-    image = imageFactory.getImage((char *) "A_054.ST");
+    image = imageFactory.getImage((char *) "fcreated.st");
 
     if(!image) {
         outDebugString("Image file type not supported!");
@@ -78,11 +82,16 @@ void CCoreThread::run(void)
     encImage.encodeAndCacheImage(image);
     outDebugString("...done");
 
+//    memset(circBfr, 0, 15000);
+//    handleSendTrack(side,track,inBuff);
+//    return;
+
+
 //    for(int i=0; i<7500; i++) {
 //        outBuff[i*2 + 0] = i >> 8;
 //        outBuff[i*2 + 1] = i  & 0xff;
 //    }
-////    sendAndReceive(64, outBuff, inBuff);
+//////    sendAndReceive(64, outBuff, inBuff);
 //    sendAndReceive(15000, outBuff, inBuff);
 //    while(1);
 
@@ -102,32 +111,51 @@ void CCoreThread::run(void)
 //    }
 //    outDebugString("Check end");
 
-    while(shouldRun) {
-        while(cb_cnt >= 6) {                               // while we have enough data
-            int val;
-            bfr_get(val);
+//    for(int i=0; i<7500; i++) {
+//        outBuff[i*2 + 1] = i & 0xff;
+//        outBuff[i*2 + 0] = i >> 8;
+//    }
 
-            switch(val) {
-                case ATN_FW_VERSION:
-                    handleFwVersion();
-                    break;
-//                case ATN_SEND_NEXT_SECTOR:
-//                    handleSendNextSector(side, track, sector, outBuff, inBuff);
-//                    break;
-                case ATN_SECTOR_WRITTEN:
-                    handleSectorWasWritten();
-                    break;
-                case ATN_SEND_TRACK:
-                    handleSendTrack(side, track, inBuff);
-                    break;
-            }
+//    while(1) {
+//        conUsb->txRx(15000, outBuff, inBuff);
+//    }
+
+    while(shouldRun) {
+        if(sendSingleHalfWord) {
+            BYTE halfWord = 0, inHalf;
+            conUsb->txRx(1, &halfWord, &inHalf);
+            sendSingleHalfWord = false;
         }
 
-        if(!conUsb->isConnected()) {                    // if not connected?
-            conUsb->tryToConnect();                     // try to connect and wait
+        getAtnWord(inBuff);
 
-            msleep(100);
-            continue;
+        if(inBuff[0] != 0 || inBuff[1] != 0) {
+            logToFile((char *) "Waiting for ATN: \nOUT:\n");
+            logToFile(2, outBuff);
+            logToFile((char *) "\nIN:\n");
+            logToFile(2, inBuff);
+            logToFile((char *) "\n");
+        }
+
+        switch(inBuff[1]) {
+        case 0:                 // this is valid, just empty data, skip this
+            break;
+
+        case ATN_FW_VERSION:
+            handleFwVersion();
+            break;
+            //                case ATN_SEND_NEXT_SECTOR:
+            //                    handleSendNextSector(side, track, sector, outBuff, inBuff);
+            //                    break;
+        case ATN_SECTOR_WRITTEN:
+            handleSectorWasWritten();
+            break;
+        case ATN_SEND_TRACK:
+            handleSendTrack(side, track);
+            break;
+        default:
+            logToFile((char *) "That ^^^ shouldn't happen!\n");
+            break;
         }
 
         if(GetTickCount() - lastTick < 10) {            // less than 10 ms ago?
@@ -135,12 +163,32 @@ void CCoreThread::run(void)
             continue;
         }
         lastTick = GetTickCount();
-
-        memset(outBuff, 0, 6);                          // send 8 zeros to receive any potential command
-        sendAndReceive(6, outBuff, inBuff);
     }
 
     running = false;
+}
+
+void CCoreThread::getAtnWord(BYTE *bfr)
+{
+    if(prevAtnWord.got) {                   // got some previous ATN word? use it
+        bfr[0] = prevAtnWord.bytes[0];
+        bfr[1] = prevAtnWord.bytes[1];
+        prevAtnWord.got = false;
+
+        return;
+    }
+
+    // no previous ATN word? read it!
+    BYTE outBuff[2];
+    memset(outBuff, 0, 2);
+    conUsb->txRx(2, outBuff, bfr);
+}
+
+void CCoreThread::setAtnWord(BYTE *bfr)
+{
+    prevAtnWord.bytes[0] = bfr[0];
+    prevAtnWord.bytes[1] = bfr[1];
+    prevAtnWord.got = true;
 }
 
 void CCoreThread::setNextCmd(BYTE cmd)
@@ -148,7 +196,7 @@ void CCoreThread::setNextCmd(BYTE cmd)
     cmd_add(cmd);
 }
 
-void CCoreThread::sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf)
+void CCoreThread::sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf, bool storeInData)
 {
 //    outDebugString("sendAndReceive -- %d", cnt);
 //    DWORD start = GetTickCount();
@@ -172,48 +220,59 @@ void CCoreThread::sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf)
 //    qDebug() << "Sent: " << so;
 //    qDebug() << "Got : " << si;
 
+    if(!storeInData) {
+        return;
+    }
 
     for(int i=0; i<cnt; i++) {                      // add to circular buffer
         bfr_add(inBuf[i]);
     }
+
 //    DWORD end = GetTickCount();
 //    outDebugString("sendAndReceive: %d ms", end - start);
 }
 
+void CCoreThread::justReceive(int cnt, BYTE *inBuf)
+{
+    if(!conUsb->isConnected()) {                    // not connected? quit
+        return;
+    }
+
+    conUsb->read(cnt, inBuf);                       // receive
+
+    for(int i=0; i<cnt; i++) {                      // add to circular buffer
+        bfr_add(inBuf[i]);
+    }
+}
+
 void CCoreThread::handleFwVersion(void)
 {
-    BYTE fwVer[4];
-    int val;
-
-    for(int i=0; i<4; i++) {
-        bfr_get(val);
-        fwVer[i] = val;
-    }
-
-    if(fwVer[0] == 0xf0) {
-        outDebugString("FW: Franz ");
-    } else {
-        outDebugString("FW: Hans ");
-    }
-
-    int year = bcdToInt(fwVer[1]) + 2000;
-    outDebugString("%d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
-
-    // receive 6 WORDs == 12 BYTEs, while at least 3 WORDs (6 BYTEs) are received
-    int remaining = 12 - (6 + cb_cnt);
-
-    BYTE oBuf[6], iBuf[6];
-    memset(oBuf, 0, 6);
-
+    BYTE fwVer[10-2], oBuf[10-2];
     int storeCnt;
-    storeCnt = MIN(remaining, 6);           // get the minimum from sizeof(buf), remaining, cd_cnt (what we may send, what we should send, what we got)
-    storeCnt = MIN(storeCnt, cd_cnt);
+
+    memset(oBuf, 0, 10-2);
+    storeCnt = MIN(cd_cnt, 10-2);             // get the minimum from sizeof(buf), remaining, cd_cnt (what we may send, what we should send, what we got)
 
     for(int i=0; i<storeCnt; i++) {         // now copy all the possible bytes (commands) to buffer
         cmd_get(oBuf[i]);
     }
 
-    sendAndReceive(remaining, oBuf, iBuf);
+    conUsb->txRx(10-2, oBuf, fwVer);
+
+    logToFile((char *) "handleFwVersion: \nOUT:\n");
+    logToFile(10-2, oBuf);
+    logToFile((char *) "\nIN:\n");
+    logToFile(10-2, fwVer);
+    logToFile((char *) "\n");
+
+    int year = bcdToInt(fwVer[1]) + 2000;
+    if(fwVer[0] == 0xf0) {
+        outDebugString("FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+    } else {
+        outDebugString("FW: Hans,  %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+    }
+
+    setAtnWord(&fwVer[8]);          // add the last WORD as possible to check for the new ATN
 }
 
 int CCoreThread::bcdToInt(int bcd)
@@ -265,20 +324,22 @@ int CCoreThread::bcdToInt(int bcd)
 //    sendAndReceive(count, oBuf, iBuf);                // send and receive data
 //}
 
-void CCoreThread::handleSendTrack(int &side, int &track, BYTE *iBuf)
+void CCoreThread::handleSendTrack(int &side, int &track)
 {
-    BYTE buf[2];
-    int val;
-
+    BYTE oBuf[4], iBuf[15000];
     DWORD start = GetTickCount();
 
-    for(int i=0; i<2; i++) {        // get arguments from buffer
-        bfr_get(val);
-        buf[i] = val;
-    }
+    memset(oBuf, 0, 4);
+    conUsb->txRx(4, oBuf, iBuf);
 
-    side    = buf[0];               // now read the current floppy position
-    track   = buf[1];
+    logToFile((char *) "handleSendTrack: \nOUT:\n");
+    logToFile(4, oBuf);
+    logToFile((char *) "\nIN:\n");
+    logToFile(4, iBuf);
+    logToFile((char *) "\n");
+
+    side    = iBuf[0];               // now read the current floppy position
+    track   = iBuf[1];
 
     outDebugString("ATN_SEND_TRACK -- track %d, side %d", track, side);
 
@@ -291,12 +352,12 @@ void CCoreThread::handleSendTrack(int &side, int &track, BYTE *iBuf)
     }
 
     //---------
-    // avoid sending the same track again
-    if(lastSide == side && lastTrack == track) {                // if this track is what we've sent last time, don't send it
-        return;
-    }
-    lastSide    = side;
-    lastTrack   = track;
+//    // avoid sending the same track again
+//    if(lastSide == side && lastTrack == track) {                // if this track is what we've sent last time, don't send it
+//        return;
+//    }
+//    lastSide    = side;
+//    lastTrack   = track;
     //---------
 
     BYTE *encodedTrack;
@@ -304,25 +365,27 @@ void CCoreThread::handleSendTrack(int &side, int &track, BYTE *iBuf)
 
     encodedTrack = encImage.getEncodedTrack(track, side, countInTrack);
 
-    // we want to send total 15000 bytes, while at least 3 WORDs (6 BYTEs) are received
-    int remaining   = 15000 - (4 + cb_cnt);                 // this much bytes remain to send after the received ATN
+    int remaining   = 15000 - 6 -2;                 // this much bytes remain to send after the received ATN
 
     DWORD mid = GetTickCount();
 
-    sendAndReceive(remaining, encodedTrack, iBuf);          // send and receive data
+    conUsb->txRx(remaining, encodedTrack, iBuf);
+
+    logToFile((char *) "handleSendTrack -- rest: \nOUT:\n");
+    logToFile(remaining, encodedTrack);
+    logToFile((char *) "\nIN:\n");
+    logToFile(remaining, iBuf);
+    logToFile((char *) "\n");
 
     DWORD end = GetTickCount();
-    outDebugString("handleSendTrack -- encode: %d, tx-rx: %d", mid-start, end-mid);
+//    outDebugString("handleSendTrack -- encode: %d, tx-rx: %d", mid-start, end-mid);
 
-//    FILE *f = fopen("f:/data.bin", "wb");
+    setAtnWord(&iBuf[remaining - 2]);               // add the last WORD as possible to check for the new ATN
+}
 
-//    if(!f) {
-//        qDebug() << "dafuq!";
-//        return;
-//    }
-
-//    fwrite(encodedTrack, 1, remaining, f);
-//    fclose(f);
+void CCoreThread::sendHalfWord(void)
+{
+    sendSingleHalfWord = true;
 }
 
 void CCoreThread::handleSectorWasWritten(void)
@@ -390,4 +453,45 @@ void outDebugString(const char *format, ...)
 #endif
 
     va_end(args);
+}
+
+void CCoreThread::logToFile(char *str)
+{
+    FILE *f = fopen("f:/fddlog.txt", "at");
+
+    if(!f) {
+        qDebug() << "dafuq!";
+        return;
+    }
+
+    fprintf(f, str);
+    fclose(f);
+}
+
+void CCoreThread::logToFile(int len, BYTE *bfr)
+{
+    FILE *f = fopen("f:\\fddlog.txt", "at");
+
+    if(!f) {
+        qDebug() << "dafuq!";
+        return;
+    }
+
+    fprintf(f, "buffer -- %d bytes\n", len);
+
+    while(len > 0) {
+        for(int col=0; col<16; col++) {
+            if(len == 0) {
+                break;
+            }
+
+            fprintf(f, "%02x ", *bfr);
+
+            bfr++;
+            len--;
+        }
+        fprintf(f, "\n");
+    }
+
+    fclose(f);
 }

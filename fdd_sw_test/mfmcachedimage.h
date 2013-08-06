@@ -35,6 +35,7 @@ private:
 
     void appendCurrentSectorCommand(int track, int side, int sector, BYTE *buffer, int &count);
     void appendRawByte(BYTE val, BYTE *bfr, int &cnt);
+    void appendZeroIfNeededToMakeEven(BYTE *bfr, int &cnt);
     void appendA1MarkToStream(BYTE *bfr, int &cnt);
     void appendTime(BYTE time, BYTE *bfr, int &cnt);
     void appendChange(BYTE chg, BYTE *bfr, int &cnt);
