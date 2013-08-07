@@ -119,7 +119,32 @@ void CCoreThread::run(void)
 //    while(1) {
 //        conUsb->txRx(15000, outBuff, inBuff);
 //    }
+/*
+    qDebug() << "Waiting for data...";
 
+    WORD wprev = 0;
+    while(1) {
+        getAtnWord(inBuff);
+
+        if(inBuff[0] != 0 || inBuff[1] != 0) {
+            memset(outBuff, 0, 15000);
+            conUsb->txRx(15000, outBuff, inBuff);
+
+            for(int i=0; i<7500; i++) {
+                WORD wval, wdiff;
+
+                wval = (inBuff[i*2 + 0] << 8) | inBuff[i*2 + 1];
+                wdiff = wval - wprev;
+                wprev = wval;
+
+                logToFile(wdiff);
+            }
+
+            qDebug() << "Done!";
+            return;
+        }
+    }
+*/
     while(shouldRun) {
         if(sendSingleHalfWord) {
             BYTE halfWord = 0, inHalf;
@@ -465,6 +490,20 @@ void CCoreThread::logToFile(char *str)
     }
 
     fprintf(f, str);
+    fclose(f);
+}
+
+void CCoreThread::logToFile(WORD wval)
+{
+    FILE *f = fopen("f:/fddlog.txt", "at");
+
+    if(!f) {
+        qDebug() << "dafuq!";
+        return;
+    }
+
+//    fprintf(f, "%04x\n", wval);
+    fprintf(f, "%d\n", wval);
     fclose(f);
 }
 

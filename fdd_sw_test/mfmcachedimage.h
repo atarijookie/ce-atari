@@ -39,7 +39,7 @@ private:
     void appendA1MarkToStream(BYTE *bfr, int &cnt);
     void appendTime(BYTE time, BYTE *bfr, int &cnt);
     void appendChange(BYTE chg, BYTE *bfr, int &cnt);
-    void appendByteToStream(BYTE val, BYTE *bfr, int &cnt);
+    void appendByteToStream(BYTE val, BYTE *bfr, int &cnt, bool doCalcCrc=true);
     bool createMfmStream(IFloppyImage *img, int side, int track, int sector, BYTE *buffer, int &count);
     void fdc_add_to_crc(WORD &crc, BYTE data);
 

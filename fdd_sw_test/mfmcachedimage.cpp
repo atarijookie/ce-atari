@@ -175,8 +175,8 @@ bool MfmCachedImage::createMfmStream(IFloppyImage *img, int side, int track, int
     appendByteToStream( side,    buffer, count);
     appendByteToStream( sector,  buffer, count);
     appendByteToStream( 0x02,    buffer, count);            // size -- 2 == 512 B per sector
-    appendByteToStream( HIBYTE(CRC), buffer, count);        // crc1
-    appendByteToStream( LOBYTE(CRC), buffer, count);        // crc2
+    appendByteToStream( HIBYTE(CRC), buffer, count, false);        // crc1
+    appendByteToStream( LOBYTE(CRC), buffer, count, false);        // crc2
 
     for(i=0; i<22; i++) {                                   // GAP 3a: 22 * 0x4e
         appendByteToStream(0x4e, buffer, count);
@@ -197,8 +197,8 @@ bool MfmCachedImage::createMfmStream(IFloppyImage *img, int side, int track, int
         appendByteToStream( data[i], buffer, count);
     }
 
-    appendByteToStream(HIBYTE(CRC), buffer, count);         // crc1
-    appendByteToStream(LOBYTE(CRC), buffer, count);         // crc2
+    appendByteToStream(HIBYTE(CRC), buffer, count, false);         // crc1
+    appendByteToStream(LOBYTE(CRC), buffer, count, false);         // crc2
 
     for(i=0; i<40; i++) {                                   // GAP 4: 40 * 0x4e
         appendByteToStream(0x4e, buffer, count);
@@ -211,13 +211,15 @@ bool MfmCachedImage::createMfmStream(IFloppyImage *img, int side, int track, int
     return true;
 }
 
-void MfmCachedImage::appendByteToStream(BYTE val, BYTE *bfr, int &cnt)
+void MfmCachedImage::appendByteToStream(BYTE val, BYTE *bfr, int &cnt, bool doCalcCrc)
 {
     #ifdef DUMPTOFILE
     fprintf(f, "%02x ", val);
     #endif
 
-    fdc_add_to_crc(CRC, val);
+    if(doCalcCrc) {
+        fdc_add_to_crc(CRC, val);
+    }
 
     static BYTE prevBit = 0;
 

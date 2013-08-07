@@ -61,7 +61,7 @@ private:
 
     void logToFile(char *str);
     void logToFile(int len, BYTE *bfr);
-
+    void logToFile(WORD wval);
 
     struct {
         bool got;
