@@ -11,11 +11,12 @@
 void init_hw_sw(void);
 
 void fillMfmTimesForDMA(void);
-BYTE getNextMFMword(void);
+BYTE getNextMFMbyte(void);
 
 void getMfmWriteTimes(void);
+void getMfmWriteTimesTemp(void);
 
-void processHostCommand(WORD hostWord);
+void processHostCommand(BYTE val);
 void requestTrack(void);
 
 void spi_init(void);
@@ -30,10 +31,7 @@ void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 /*
 TODO:
  - POZOR! STEP moze robit / robi ked neni drive selected, ale len MOTOR ON
- - medzi STEP je 3 ms
- - az ked doSTEPuje, tak zleze dole drive select
  - pomeranie ci stihne zachytit vsetky STEP pulzy ak naplna MFM buffre
- - pomerat ci a kolko pauzy robi floppy po seeku, dali by sa tym osetrit viacere seeky po sebe
  - test TIM3 input capture bez DMA, potom s DMA
  - pomeranie kolko trvaju jednotlive casti kodu
 */
@@ -49,8 +47,8 @@ TODO:
 
 // maximum params from .ST images seem to be: 84 tracks (0-83), 10 sectors/track
 
-#define INBUFFER_SIZE					7500
-WORD inBuffer[INBUFFER_SIZE];
+#define INBUFFER_SIZE					15000
+BYTE inBuffer[INBUFFER_SIZE];
 WORD inIndexGet;
 
 TWriteBuffer wrBuffer[2];							// two buffers for written sectors
@@ -91,17 +89,19 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 
 
 // commands sent from host to device
-#define CMD_WRITE_PROTECT_OFF		0x10
-#define CMD_WRITE_PROTECT_ON		0x20
-#define CMD_DISK_CHANGE_OFF			0x30
-#define CMD_DISK_CHANGE_ON			0x40
-#define CMD_CURRENT_SECTOR			0x50								// followed by sector #
-#define CMD_GET_FW_VERSION			0x60
-#define CMD_SET_DRIVE_ID_0			0x70
-#define CMD_SET_DRIVE_ID_1			0x80
-#define CMD_CURRENT_TRACK       0x90                // followed by track #
-#define CMD_MARK_READ						0xF000							// this is not sent from host, but just a mark that this WORD has been read and you shouldn't continue to read further
-#define CMD_TRACK_STREAM_END		0xF000							// this is the mark in the track stream that we shouldn't go any further in the stream
+#define CMD_WRITE_PROTECT_OFF			0x10
+#define CMD_WRITE_PROTECT_ON			0x20
+#define CMD_DISK_CHANGE_OFF				0x30
+#define CMD_DISK_CHANGE_ON				0x40
+#define CMD_CURRENT_SECTOR				0x50								// followed by sector #
+#define CMD_GET_FW_VERSION				0x60
+#define CMD_SET_DRIVE_ID_0				0x70
+#define CMD_SET_DRIVE_ID_1				0x80
+#define CMD_CURRENT_TRACK       	0x90                // followed by track #
+#define CMD_MARK_READ							0xF000							// this is not sent from host, but just a mark that this WORD has been read and you shouldn't continue to read further
+#define CMD_MARK_READ_BYTE				0xF0								// this is not sent from host, but just a mark that this BYTE has been read and you shouldn't continue to read further
+#define CMD_TRACK_STREAM_END			0xF000							// this is the mark in the track stream that we shouldn't go any further in the stream
+#define CMD_TRACK_STREAM_END_BYTE	0xF0								// this is the mark in the track stream that we shouldn't go any further in the stream
 
 #define MFM_4US     1
 #define MFM_6US     2
@@ -134,14 +134,15 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 #define		inBuffer_goToStart()				{ 																				inIndexGet = 0;																		}
 #define		inBuffer_get(X)							{ X = inBuffer[inIndexGet];								inIndexGet++;		if(inIndexGet >= INBUFFER_SIZE) { inIndexGet = 0; }; }
 #define		inBuffer_get_noMove(X)			{ X = inBuffer[inIndexGet];																																	}
-#define		inBuffer_markAndmove()			{ inBuffer[inIndexGet] = CMD_MARK_READ;		inIndexGet++;		if(inIndexGet >= INBUFFER_SIZE) { inIndexGet = 0; };	}
+//#define		inBuffer_markAndmove()			{ inBuffer[inIndexGet] = CMD_MARK_READ;		inIndexGet++;		if(inIndexGet >= INBUFFER_SIZE) { inIndexGet = 0; };	}
 #define		inBuffer_justMove()					{ 																				inIndexGet++;		if(inIndexGet >= INBUFFER_SIZE) { inIndexGet = 0; };	}
 //--------------
 WORD version[2] = {0xf013, 0x0718};				// this means: Franz, 2013-07-18
 WORD drive_select;
 
 volatile BYTE sendFwVersion, sendTrackRequest;
-WORD atnSendFwVersion[5], atnSendTrackRequest[4], cmdBuffer[6];
+WORD atnSendFwVersion[5], atnSendTrackRequest[4];
+BYTE cmdBuffer[12];
 WORD fakeBuffer;
 
 volatile struct {
@@ -184,44 +185,25 @@ WORD i, err=0;
 	GPIOB->BRR = ATN;															// ATTENTION bit low - nothing to read
 	
 	requestTrack();																// request track 0, side 0
-
+////////////////////////
 /*
-FloppyOut_Enable();
-track = 0;
-while(1);
-*/
-/*
-{
-		// check for STEP pulse - should we go to a different track?
-		i = EXTI->PR;										// Pending register (EXTI_PR)
-		err = GPIOB->IDR;										// read floppy inputs
+	inIndexGet = 0;
 
-		if(i & STEP) {										// if falling edge of STEP signal was found
-			EXTI->PR = STEP;									// clear that int
-			if((err & DIR) != 0) {								// direction is High? track--
-				if(track > 0) {
-					track--;
-
-					inBuffer[inIndexGet] = track;
-					inIndexGet++;
-				}
-			} else {											// direction is Low? track++
-				if(track < 85) {
-					track++;
-
-					inBuffer[inIndexGet] = track;
-					inIndexGet++;
-				}
+	while(1) {
+			if((TIM3->SR & 2) != 0) {									// if CC1IF is set
+				inBuffer[inIndexGet] = TIM3->CCR1;			// read and store the captured value
+				inIndexGet++;
 			}
-
-			if(track == 0) {									// if track is 0
-				GPIOB->BRR = TRACK0;						// TRACK 0 signal to L			
-			} else {													// if track is not 0
-				GPIOB->BSRR = TRACK0;						// TRACK 0 signal is H
-			}
-		}	
-}
+			
+			if(inIndexGet >= (INBUFFER_SIZE-4)) {									// if captured enough, send it
+				spiDma_txRx(INBUFFER_SIZE, (BYTE *) &inBuffer[0], 0, (BYTE *) 0);
+				
+				while(1);
+			}		
+	}
 */
+////////////////////////
+// whole loop might take up to: 20.4 us
 
 	while(1) {
 		WORD ints, inputs;
@@ -241,7 +223,7 @@ while(1);
 			} else if(sendTrackRequest) {
 				atnSendTrackRequest[2] = (((WORD)next.side) << 8) | (next.track);
 
-				spiDma_txRx(4, (BYTE *) &atnSendTrackRequest[0], INBUFFER_SIZE, (BYTE *) &inBuffer[0]);
+				spiDma_txRx(4, (BYTE *) &atnSendTrackRequest[0], INBUFFER_SIZE / 2, (BYTE *) &inBuffer[0]);
 				spiDmaIsIdle			= FALSE;													// SPI DMA is busy
 				
 				sendTrackRequest	= FALSE;
@@ -265,14 +247,14 @@ while(1);
 		
 		//-------------------------------------------------
 		// if we got something in the cmd buffer, we should process it
-		if(spiDmaIsIdle == TRUE && cmdBuffer[0] != CMD_MARK_READ) {	// if we're not sending (receiving) and the cmd buffer is not read
+		if(spiDmaIsIdle == TRUE && cmdBuffer[0] != CMD_MARK_READ_BYTE) {	// if we're not sending (receiving) and the cmd buffer is not read
 			int i;
 			
-			for(i=0; i<6; i++) {
+			for(i=0; i<12; i++) {
 				processHostCommand(cmdBuffer[i]);
 			}
 			
-			cmdBuffer[0] = CMD_MARK_READ;													// mark that this cmd buffer is already read
+			cmdBuffer[0] = CMD_MARK_READ_BYTE;													// mark that this cmd buffer is already read
 		}
 		
 		//-------------------------------------------------
@@ -323,12 +305,13 @@ while(1);
 		}
 */
 
+	// fillMfmTimesForDMA -- up to 9.4 us
 		if((DMA1->ISR & (DMA1_IT_TC5 | DMA1_IT_HT5)) != 0) {		// MFM read stream: TC or HT interrupt? we've streamed half of circular buffer!
 			fillMfmTimesForDMA();																	// fill the circular DMA buffer with mfm times
 		}
 
 		//------------
-		// check INDEX pulse as needed -- duration when filling with marks: 69.8 us
+		// check INDEX pulse as needed
 		if((TIM2->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
 			int i;
 			TIM2->SR = 0xfffe;							// clear UIF flag
@@ -409,12 +392,6 @@ void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
 	// enable both TX and RX channels
 	DMA1_Channel3->CCR		|= 1;													// enable  DMA1 Channel transfer
 	DMA1_Channel2->CCR		|= 1;													// enable  DMA1 Channel transfer
-
-/*	
-	if((SPI1->SR & 2) != 0) {														// TXE flag: Tx buffer empty
-		SPI1->DR = 0;																			// just send zero over SPI
-	}
-*/
 	
 //  SPI1->CR1 |= (1 << 6);															// SPI enable
 }
@@ -471,7 +448,7 @@ void init_hw_sw(void)
 	//--------------
 	// DMA + SPI initialization
 	for(i=0; i<INBUFFER_SIZE; i++) {							// fill the inBuffer with CMD_MARK_READ, which will tell that every byte is empty (already read)
-		inBuffer[i] = CMD_MARK_READ;
+		inBuffer[i] = CMD_MARK_READ_BYTE;
 	}
 	
 	spi_init();																		// init SPI interface
@@ -618,45 +595,62 @@ void getMfmWriteTimes(void)
 	wrBuffer_add(wval);					// add to write buffer
 }
 
+void getMfmWriteTimesTemp(void)
+{
+	WORD ind2, i, tmp, val, wval;
+	
+	// check for half transfer or transfer complete IF
+	if((DMA1->ISR & DMA1_IT_HT6) != 0) {				// HTIF6 -- Half Transfer IF 6
+		DMA1->IFCR = DMA1_IT_HT6;									// clear HTIF6 flag
+		ind2 = 0;
+	} else if((DMA1->ISR & DMA1_IT_TC6) != 0) {	// TCIF6 -- Transfer Complete IF 6
+		DMA1->IFCR = DMA1_IT_TC6;									// clear TCIF6 flag
+		ind2 = 8;
+	}
+
+	for(i=0; i<8; i++) {												// now convert timer counter times to MFM times / codes
+		tmp = mfmWriteStreamBuffer[ind2];
+		ind2++;
+		
+		inBuffer[inIndexGet] = tmp;
+		inIndexGet++;
+	}
+}
+
 void fillMfmTimesForDMA(void)
 {
-	WORD ind = 0xff;
+	WORD ind = 0;
+	BYTE times4, time, i;
 
 	// code to ARR value:      ??, 4us, 6us, 8us
 	static WORD mfmTimes[4] = { 7,   7,  11,  15};
-	BYTE time, i;
-	WORD times8;
 
 	// check for half transfer or transfer complete IF
-	if((DMA1->ISR & DMA1_IT_HT5) != 0) {				// HTIF5 -- Half Transfer IF 5
-		DMA1->IFCR = DMA1_IT_HT5;									// clear HTIF5 flag
-		ind = 0;
-	} else if((DMA1->ISR & DMA1_IT_TC5) != 0) {	// TCIF5 -- Transfer Complete IF 5
-		DMA1->IFCR = DMA1_IT_TC5;									// clear TCIF5 flag
+	if((DMA1->ISR & DMA1_IT_TC5) != 0) {				// TCIF5 -- Transfer Complete IF 5
 		ind = 8;
 	}
+
+	DMA1->IFCR = DMA1_IT_TC5 | DMA1_IT_HT5;			// clear HT5 and TC5 flag
 	
-	if(ind == 0xff) {														// no IF found? this shouldn't happen! did you come here without a reason?
-		return;
-	}
-	
-	times8 = getNextMFMword();									// get next word
-	
-	for(i=0; i<8; i++) {												// convert all 8 codes to ARR values
-		time		= times8 >> 14;										// get bits 15,14 (and then 13,12 ... 1,0) 
+	for(i=0; i<8; i++) {												// convert all 4 codes to ARR values
+		if(i==0 || i==4) {
+			times4 = getNextMFMbyte();							// get next BYTE
+		}
+		
+		time		= times4 >> 6;										// get bits 15,14 (and then 13,12 ... 1,0) 
 		time		= mfmTimes[time];									// convert to ARR value
-		times8	= times8 << 2;										// shift 2 bits higher so we would get lower bits next time
+		times4	= times4 << 2;										// shift 2 bits higher so we would get lower bits next time
 
 		mfmReadStreamBuffer[ind] = time;					// store and move to next one
 		ind++;
 	}
 }
 
-BYTE getNextMFMword(void)
+BYTE getNextMFMbyte(void)
 {
-	static WORD gap[3] = {0xa96a, 0x96a9, 0x6a96};
+	static BYTE gap[3] = {0xa9, 0x6a, 0x96};
 	static BYTE gapIndex = 0;
-	WORD wval;
+	BYTE val;
 
 	WORD maxLoops = 15000;
 
@@ -667,64 +661,49 @@ BYTE getNextMFMword(void)
 			break;
 		}
 		
-		inBuffer_get_noMove(wval);					// get WORD from buffer, but don't move
+		inBuffer_get_noMove(val);						// get BYTE from buffer, but don't move
 		
-		if(wval == CMD_TRACK_STREAM_END) {	// we've hit the end of track stream? quit loop
+		if(val == CMD_TRACK_STREAM_END_BYTE) {	// we've hit the end of track stream? quit loop
 			break;
 		}
 			
 		inBuffer_justMove();								// just move to the next position
 			
-		if(wval == 0) {											// skip empty WORDs
+		if(val == 0) {											// skip empty WORDs
 			continue;
 		}
 		
 		// lower nibble == 0? it's a command from host - if we should turn on/off the write protect or disk change
-		if((wval & 0x0f00) == 0) {					// it's a command?
-			processHostCommand(wval);
+		if(val == CMD_CURRENT_SECTOR) {			// it's a command?
+			inBuffer_get(streamed.side);			// store side   #
+			inBuffer_get(streamed.track);			// store track  #
+			inBuffer_get(streamed.sector);		// store sector #
 		} else {														// not a command? return it
 			gapIndex = 0;		
-			return wval;
+			return val;
 		}
 	}
 
 	//---------
 	// if we got here, we have no data to stream
-	wval = gap[gapIndex];					// stream this GAP byte
+	val = gap[gapIndex];					// stream this GAP byte
 	gapIndex++;
 
 	if(gapIndex > 2) {						// we got only 3 gap WORD times, go back to 0
 		gapIndex = 0;
 	}
 
-	return wval;
+	return val;
 }
 
-void processHostCommand(WORD hostWord)
+void processHostCommand(BYTE val)
 {
-	BYTE hi, lo;
-	WORD nextWord;
-
-	hi = hostWord >> 8;												// get upper byte
-	lo = hostWord  & 0xff;										// get lower byte
-	
-	switch(hi) {
+	switch(val) {
 		case CMD_WRITE_PROTECT_OFF:		GPIOB->BSRR	= WR_PROTECT;		break;			// WR PROTECT to 1
 		case CMD_WRITE_PROTECT_ON:		GPIOB->BRR	= WR_PROTECT;		break;			// WR PROTECT to 0
 		case CMD_DISK_CHANGE_OFF:			GPIOB->BSRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 1
 		case CMD_DISK_CHANGE_ON:			GPIOB->BRR	= DISK_CHANGE;	break;			// DISK_CHANGE to 0
-
 		case CMD_GET_FW_VERSION:			sendFwVersion = TRUE;				break;			// send FW version string and receive commands
-
-		case CMD_CURRENT_SECTOR:								// read the current streamed side, track, sector numbers (will be used for write)
-			streamed.side		= lo;									// store sector #
-		
-			inBuffer_get(nextWord);								// for the next ones we need to get another WORD from inBuffer
-		
-			streamed.track	= nextWord >> 8;			// store the numbers
-			streamed.sector	= nextWord  & 0xff;
-			break;			
-		
 		case CMD_SET_DRIVE_ID_0:			drive_select = MOTOR_ENABLE | DRIVE_SELECT0;		break;		// set drive ID pins to check like this...
 		case CMD_SET_DRIVE_ID_1:			drive_select = MOTOR_ENABLE | DRIVE_SELECT1;		break;		// ...or that!
 	}
