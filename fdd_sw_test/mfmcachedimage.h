@@ -20,7 +20,9 @@ public:
     MfmCachedImage();
     ~MfmCachedImage();
 
-    void encodeAndCacheImage(IFloppyImage *img);
+    // bufferOfBytes -- the datas are transfered as WORDs, but are they stored as bytes?
+    // If true, swap bytes, don't append zeros. If false, no swapping, but append zeros.
+    void encodeAndCacheImage(IFloppyImage *img, bool bufferOfBytes=false);
     void deleteCachedImage(void);
     BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
 
@@ -31,7 +33,7 @@ private:
     WORD                CRC;
 
     void initTracks(void);
-    void encodeSingleTrack(IFloppyImage *img, int side, int track, int sectorsPerTrack,  BYTE *buffer, int &bytesStored);
+    void encodeSingleTrack(IFloppyImage *img, int side, int track, int sectorsPerTrack,  BYTE *buffer, int &bytesStored, bool bufferOfBytes=false);
 
     void appendCurrentSectorCommand(int track, int side, int sector, BYTE *buffer, int &count);
     void appendRawByte(BYTE val, BYTE *bfr, int &cnt);

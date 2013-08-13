@@ -17,7 +17,8 @@ SOURCES +=  main.cpp\
             floppyimagest.cpp \
             floppyimagemsa.cpp \
     floppyimagefactory.cpp \
-    mfmcachedimage.cpp
+    mfmcachedimage.cpp \
+    mfmdecoder.cpp
 
 HEADERS  += mainwindow.h \
             cconusb.h \
@@ -29,6 +30,7 @@ HEADERS  += mainwindow.h \
             global.h \
             datatypes.h \
     floppyimagefactory.h \
-    mfmcachedimage.h
+    mfmcachedimage.h \
+    mfmdecoder.h
 
 FORMS    += mainwindow.ui

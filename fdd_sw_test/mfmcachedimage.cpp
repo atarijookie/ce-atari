@@ -18,7 +18,7 @@ MfmCachedImage::MfmCachedImage()
     initTracks();
 
     #ifdef DUMPTOFILE
-    f = fopen("f:\\raw_img.txt", "wt");
+    f = fopen("C:\\raw_img.txt", "wt");
     #endif
 }
 
@@ -27,11 +27,15 @@ MfmCachedImage::~MfmCachedImage()
     deleteCachedImage();
 
     #ifdef DUMPTOFILE
-    fclose(f);
+    if(f) {
+        fclose(f);
+    }
     #endif
 }
 
-void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img)
+// bufferOfBytes -- the datas are transfered as WORDs, but are they stored as bytes?
+// If true, swap bytes, don't append zeros. If false, no swapping, but append zeros.
+void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img, bool bufferOfBytes)
 {
     if(gotImage) {                  // got some older image? delete it from memory
         deleteCachedImage();
@@ -50,10 +54,12 @@ void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img)
     for(int t=0; t<tracksNo; t++) {       // go through the whole image and encode it
         for(int s=0; s<sides; s++) {
             #ifdef DUMPTOFILE
-            fprintf(f, "Track: %d, side: %d\n", t, s);
+            if(f) {
+                fprintf(f, "Track: %d, side: %d\n", t, s);
+            }
             #endif
 
-            encodeSingleTrack(img, s, t, spt, buffer, bytesStored);
+            encodeSingleTrack(img, s, t, spt, buffer, bytesStored, bufferOfBytes);
 
             int index = t * 2 + s;
             if(index >= MAX_TRACKS) {                                       // index out of bounds?
@@ -66,8 +72,18 @@ void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img)
             memset(tracks[index].mfmStream, 0, 15000);                      // set other to 0
             memcpy(tracks[index].mfmStream, buffer, bytesStored);           // copy the memory block
 
+            if(bufferOfBytes) {                                            // if not working on buffer of bytes, swap BYTEs in WORD
+                for(int i=0; i<15000; i += 2) {
+                    BYTE tmp                        = tracks[index].mfmStream[i + 0];
+                    tracks[index].mfmStream[i + 0]  = tracks[index].mfmStream[i + 1];
+                    tracks[index].mfmStream[i + 1]  = tmp;
+                }
+            }
+
             #ifdef DUMPTOFILE
-            fprintf(f, "\n\n");
+            if(f) {
+                fprintf(f, "\n\n");
+            }
             #endif
         }
     }
@@ -75,7 +91,7 @@ void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img)
     gotImage = true;
 }
 
-void MfmCachedImage::encodeSingleTrack(IFloppyImage *img, int side, int track, int sectorsPerTrack, BYTE *buffer, int &bytesStored)
+void MfmCachedImage::encodeSingleTrack(IFloppyImage *img, int side, int track, int sectorsPerTrack, BYTE *buffer, int &bytesStored, bool bufferOfBytes)
 {
     int countInSect, countInTrack=0;
 
@@ -85,13 +101,17 @@ void MfmCachedImage::encodeSingleTrack(IFloppyImage *img, int side, int track, i
     }
 
     for(int sect=1; sect <= sectorsPerTrack; sect++) {
-        appendZeroIfNeededToMakeEven(buffer, countInTrack);                             // this should make the sector start on even position (on full WORD, not in half)
+        if(!bufferOfBytes) {                                                            // buffer of WORDs? append to WORD
+            appendZeroIfNeededToMakeEven(buffer, countInTrack);                         // this should make the sector start on even position (on full WORD, not in half)
+        }
 
         createMfmStream(img, side, track, sect, buffer + countInTrack, countInSect);	// then create the right MFM stream
         countInTrack += countInSect;
     }
 
-    appendZeroIfNeededToMakeEven(buffer, countInTrack);
+    if(!bufferOfBytes) {                                                            // buffer of WORDs? append to WORD
+        appendZeroIfNeededToMakeEven(buffer, countInTrack);
+    }
 
     appendRawByte(0xF0, buffer, countInTrack);			// append this - this is a mark of track stream end
     appendRawByte(0x00, buffer, countInTrack);
@@ -205,7 +225,9 @@ bool MfmCachedImage::createMfmStream(IFloppyImage *img, int side, int track, int
     }
 
     #ifdef DUMPTOFILE
-    fprintf(f, "\n\n");
+    if(f) {
+        fprintf(f, "\n\n");
+    }
     #endif
 
     return true;
@@ -214,7 +236,9 @@ bool MfmCachedImage::createMfmStream(IFloppyImage *img, int side, int track, int
 void MfmCachedImage::appendByteToStream(BYTE val, BYTE *bfr, int &cnt, bool doCalcCrc)
 {
     #ifdef DUMPTOFILE
-    fprintf(f, "%02x ", val);
+    if(f) {
+        fprintf(f, "%02x ", val);
+    }
     #endif
 
     if(doCalcCrc) {
@@ -304,7 +328,9 @@ void MfmCachedImage::appendCurrentSectorCommand(int track, int side, int sector,
 void MfmCachedImage::appendRawByte(BYTE val, BYTE *bfr, int &cnt)
 {
     #ifdef DUMPTOFILE
-    fprintf(f, "%02x ", val);
+    if(f) {
+        fprintf(f, "%02x ", val);
+    }
     #endif
 
     bfr[cnt] = val;                 // just store this byte, no processing
@@ -321,7 +347,9 @@ void MfmCachedImage::appendZeroIfNeededToMakeEven(BYTE *bfr, int &cnt)
 void MfmCachedImage::appendA1MarkToStream(BYTE *bfr, int &cnt)
 {
     #ifdef DUMPTOFILE
-    fprintf(f, "A1 ");
+    if(f) {
+        fprintf(f, "A1 ");
+    }
     #endif
 
     // append A1 mark in stream, which is 8-6-8-6 in MFM (normaly would been 8-6-4-4-6)

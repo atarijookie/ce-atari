@@ -4,6 +4,7 @@
 #include "global.h"
 #include "ccorethread.h"
 #include "floppyimagefactory.h"
+#include "mfmdecoder.h"
 
 BYTE        circBfr[20480];             // 0x5000 bytes
 int         cb_cnt, cb_posa, cb_posg;
@@ -79,8 +80,25 @@ void CCoreThread::run(void)
     }
 
     outDebugString("Encoding image...");
-    encImage.encodeAndCacheImage(image);
+    encImage.encodeAndCacheImage(image, true);
     outDebugString("...done");
+
+    /////////////
+//    BYTE *encodedTrack;
+//    int countInTrack;
+//    encodedTrack = encImage.getEncodedTrack(0, 0, countInTrack);
+
+//    BYTE data[15000];
+//    int cnt;
+//    memset(data, 0, 15000);
+
+//    MfmDecoder md;
+//    md.decodeStream(encodedTrack, countInTrack, data, cnt);
+
+//    FILE *g = fopen("C:\\decoded.bin", "wb");
+//    fwrite(data, 1, 15000, g);
+//    fclose(g);
+    /////////////
 
 //    memset(circBfr, 0, 15000);
 //    handleSendTrack(side,track,inBuff);
