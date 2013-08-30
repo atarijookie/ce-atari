@@ -353,10 +353,29 @@ void MfmCachedImage::appendA1MarkToStream(BYTE *bfr, int &cnt)
     #endif
 
     // append A1 mark in stream, which is 8-6-8-6 in MFM (normaly would been 8-6-4-4-6)
-    appendTime(MFM_8US, bfr, cnt);        // 8 us
-    appendTime(MFM_6US, bfr, cnt);        // 6 us
-    appendTime(MFM_8US, bfr, cnt);        // 8 us
-    appendTime(MFM_6US, bfr, cnt);        // 6 us
+    // 8 us
+    appendChange(0, bfr, cnt);  // N
+    appendChange(1, bfr, cnt);  // R
+    appendChange(0, bfr, cnt);  // N
+    appendChange(0, bfr, cnt);  // N
+    appendChange(0, bfr, cnt);  // N
+
+    // 6 us
+    appendChange(1, bfr, cnt);  // R
+    appendChange(0, bfr, cnt);  // N
+    appendChange(0, bfr, cnt);  // N
+
+    // 8 us
+    appendChange(1, bfr, cnt);  // R
+    appendChange(0, bfr, cnt);  // N
+    appendChange(0, bfr, cnt);  // N
+    appendChange(0, bfr, cnt);  // N
+
+    // 6 us
+    appendChange(1, bfr, cnt);  // R
+    appendChange(0, bfr, cnt);  // N
+    appendChange(0, bfr, cnt);  // N
+    appendChange(1, bfr, cnt);  // R
 
     fdc_add_to_crc(CRC, 0xa1);
 }
