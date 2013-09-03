@@ -70,6 +70,10 @@ WORD lastMfmWriteTC;
 // cycle measure: t1 = TIM3->CNT;	t2 = TIM3->CNT;	dt = t2 - t1; -- subtrack 0x12 because that's how much measuring takes
 WORD t1, t2, dt; 
 
+// digital osciloscope time measure on GPIO B0:
+// 			GPIOB->BSRR = 1;	// 1
+//			GPIOB->BRR = 1;		// 0			
+
 /* Franz to host communication:
 A) send   : ATN_SEND_TRACK with the track # and side # -- 2 WORDs + zeros = 3 WORDs
    receive: track data with sector start marks, up to 15 kB -- 12 sectors + the marks
@@ -145,6 +149,8 @@ WORD atnSendFwVersion[5], atnSendTrackRequest[4];
 BYTE cmdBuffer[12];
 WORD fakeBuffer;
 
+volatile WORD prevIntTime;
+
 volatile struct {
 	BYTE track;
 	BYTE side;
@@ -158,6 +164,8 @@ int main (void)
 	BYTE spiDmaIsIdle = TRUE;
 
 WORD i, err=0;
+	
+	prevIntTime = 0;
 
 	next.track	= 0;
 	next.side		= 0;
@@ -305,7 +313,8 @@ WORD i, err=0;
 		}
 */
 
-	// fillMfmTimesForDMA -- up to 9.4 us
+	// fillMfmTimesForDMA -- execution time: 7 us - 16 us (16 us rarely, at the start / end)
+	// times between two calls: 16 us - 53 us (16 us rarely, probably start / end of track)
 		if((DMA1->ISR & (DMA1_IT_TC5 | DMA1_IT_HT5)) != 0) {		// MFM read stream: TC or HT interrupt? we've streamed half of circular buffer!
 			fillMfmTimesForDMA();																	// fill the circular DMA buffer with mfm times
 		}
@@ -402,7 +411,7 @@ void init_hw_sw(void)
 	NVIC_InitTypeDef NVIC_InitStructure;
 	
 	RCC->AHBENR		|= (1 <<  0);																						// enable DMA1
-	RCC->APB1ENR	|= (1 <<  1) | (1 <<  0);																// enable TIM3, TIM2
+	RCC->APB1ENR	|= (1 << 2) | (1 <<  1) | (1 <<  0);										// enable TIM4, TIM3, TIM2
   RCC->APB2ENR	|= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     		// Enable SPI1, TIM1, GPIOA and GPIOB clock
 	
 	// set FLOATING INPUTs for GPIOB_0 ... 6
@@ -475,6 +484,8 @@ void init_hw_sw(void)
 	dma_mfmRead_init();									// and init the DMA which will feed it from circular buffer
 	//--------------
 	
+	timerSetup_stepLimiter();						// this 2 kHz timer should be used to limit step rate
+	
 	// init circular buffer for data incomming via SPI
 	inIndexGet		= 0;
 	
@@ -491,12 +502,23 @@ void init_hw_sw(void)
 
 void EXTI3_IRQHandler(void)
 {
-  if(EXTI_GetITStatus(EXTI_Line3) != RESET)
-  {
-		WORD inputs = GPIOB->IDR;
+  if(EXTI_GetITStatus(EXTI_Line3) != RESET) {
+		WORD inputs, curIntTime, difIntTIme;
+		
+		EXTI_ClearITPendingBit(EXTI_Line3);			// Clear the EXTI line pending bit 
+		inputs = GPIOB->IDR;
+		
+		//---------
+		// now check if the step pulse isn't too soon after the previous one
+		curIntTime = TIM4->CNT;									// get current time -- 2 kHz timer
+		difIntTIme = curIntTime - prevIntTime;	// calc only difference
+		if(difIntTIme < 5) {										// if the difference is less than 2.5 ms, quit
+				return;
+		}
+		prevIntTime = curIntTime;								// store as previous time
+		//---------
 		
 		if((inputs & MOTOR_ENABLE) != 0) {			// motor not enabled? Skip the following code.
-			EXTI_ClearITPendingBit(EXTI_Line3);		// Clear the EXTI line pending bit 
 			return;
 		}
 		
@@ -523,9 +545,6 @@ void EXTI3_IRQHandler(void)
 		} else {													// if track is not 0
 			GPIOB->BSRR = TRACK0;						// TRACK 0 signal is H
 		}
-		
-    // Clear the EXTI line pending bit 
-    EXTI_ClearITPendingBit(EXTI_Line3);
   }
 }
 

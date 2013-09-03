@@ -109,6 +109,24 @@ void timerSetup_mfmWrite(void)
   TIM_Cmd(TIM3, ENABLE);														// enable timer
 }
 
+void timerSetup_stepLimiter(void)					
+{
+	// TIM4
+	TIM_TimeBaseInitTypeDef		TIM_TimeBaseStructure;
+
+  // Time base configuration
+  TIM_TimeBaseStructure.TIM_Period						= 0xffff;					
+  TIM_TimeBaseStructure.TIM_Prescaler					= 35999;			// prescale 72 MHz by 36 kHz = 2 kHz
+  TIM_TimeBaseStructure.TIM_ClockDivision			= 0;
+  TIM_TimeBaseStructure.TIM_CounterMode				= TIM_CounterMode_Up;
+	TIM_TimeBaseStructure.TIM_RepetitionCounter	=	0;
+	
+  TIM_TimeBaseInit(TIM4, &TIM_TimeBaseStructure);
+  TIM_ARRPreloadConfig(TIM4, DISABLE);							// disable preloading
+
+  TIM_Cmd(TIM4, ENABLE);														// enable timer
+}
+
 
 
 

@@ -3,6 +3,7 @@
 void timerSetup_index(void);
 void timerSetup_mfmRead(void);
 void timerSetup_mfmWrite(void);
+void timerSetup_stepLimiter(void);
 
 void TIM_TimeBaseInit(TIM_TypeDef* TIMx, TIM_TimeBaseInitTypeDef* TIM_TimeBaseInitStruct);
 void TIM_OC1Init(TIM_TypeDef* TIMx, TIM_OCInitTypeDef* TIM_OCInitStruct);
