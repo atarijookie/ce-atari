@@ -7,6 +7,7 @@
 
 #include "defs.h"
 #include "timers.h"
+#include "bridge.h"
 
 void init_hw_sw(void);
 
@@ -17,6 +18,8 @@ void dma_spi_init(void);
 
 WORD spi_TxRx(WORD out);
 void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
+
+void getCmdLengthFromCmdBytes(void);
 
 #define INBUFFER_SIZE					15000
 BYTE inBuffer[INBUFFER_SIZE];
@@ -85,6 +88,7 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 //#define		inBuffer_markAndmove()			{ inBuffer[inIndexGet] = CMD_MARK_READ;		inIndexGet++;		if(inIndexGet >= INBUFFER_SIZE) { inIndexGet = 0; };	}
 #define		inBuffer_justMove()					{ 																				inIndexGet++;		if(inIndexGet >= INBUFFER_SIZE) { inIndexGet = 0; };	}
 //--------------
+
 WORD version[2] = {0xa013, 0x0718};				// this means: hAns, 2013-09-04
 
 volatile BYTE sendFwVersion, sendTrackRequest;
@@ -92,11 +96,18 @@ WORD atnSendFwVersion[5], atnSendTrackRequest[4];
 BYTE cmdBuffer[12];
 WORD fakeBuffer;
 
+BYTE cmd[14];										// received command bytes
+BYTE cmdLen;										// length of received command
+BYTE brStat;										// status from bridge
+
+BYTE enabledIDs[8];							// when 1, Hanz will react on that ACSI ID #
+
 int main (void) 
 {
+	BYTE i;
 	BYTE indexCount = 0;
 	BYTE spiDmaIsIdle = TRUE;
-
+	
 	sendFwVersion			= FALSE;
 	sendTrackRequest	= FALSE;
 	
@@ -112,14 +123,46 @@ int main (void)
 	
 	init_hw_sw();																	// init GPIO pins, timers, DMA, global variables
 
-	// init floppy signals
-	GPIOB->BSRR = (WR_PROTECT | DISK_CHANGE);			// not write protected
-	GPIOB->BRR = TRACK0 | DISK_CHANGE;						// TRACK 0 signal to L, DISK_CHANGE to LOW		
-	GPIOB->BRR = ATN;															// ATTENTION bit low - nothing to read
+	// init ACSI signals
+	ACSI_DATADIR_WRITE();													// data as inputs
+	GPIOB->BRR = aDMA | aPIO | aRNW | ATN;				// ACSI controll signals LOW, ATTENTION bit LOW - nothing to read
+//	GPIOB->BSRR = aPIO;			
+
+	EXTI->PR = aCMD | aCS | aACK;									// clear these ints 
+	//-------------
+	// by default set ID 0 as enabled and other IDs as disabled 
+	enabledIDs[0] = 1;
 	
+	for(i=1; i<8; i++) {
+		enabledIDs[i] = 0;
+	}
+	//-------------
+
 	while(1) {
-		WORD ints, inputs;
-		
+		// get 1st cmd byte
+		if(PIO_gotFirstCmdByte()) {					// if 1st CMD byte was received
+			BYTE id;
+				
+			cmd[0] = PIO_writeFirst();				// get byte from ST (waiting for the 1st byte)
+			id = (cmd[0] >> 5) & 0x07;				// get only device ID
+
+			if(enabledIDs[id]) {							// if this ID is enabled
+				cmdLen = 6;											// maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
+				
+				for(i=1; i<cmdLen; i++) {				// receive the next command bytes
+					cmd[i] = PIO_write();					// drop down IRQ, get byte
+
+					if(brStat != E_OK) {					// if something was wrong
+						break;						  
+					}
+
+					if(i == 1) {										// if we got also the 2nd byte
+						getCmdLengthFromCmdBytes();		// we set up the length of command, etc.
+					}   	  	  
+				}
+			}
+		}
+
 		// sending and receiving data over SPI using DMA
 		if((DMA1->ISR & (DMA1_IT_TC3 | DMA1_IT_TC2)) == (DMA1_IT_TC3 | DMA1_IT_TC2)) {	// SPI DMA: nothing to Tx and nothing to Rx?
 			DMA1->IFCR = DMA1_IT_TC3 | DMA1_IT_TC2;																				// clear HTIF flags
@@ -146,7 +189,7 @@ int main (void)
 		}				 
 		
 		//-------------------------------------------------
-		inputs = GPIOB->IDR;										// read floppy inputs
+//		inputs = GPIOB->IDR;										// read floppy inputs
 
 		
 		//------------
@@ -167,6 +210,23 @@ int main (void)
 		
 //		if(ints & STEP) {										// if falling edge of STEP signal was found
 //			EXTI->PR = STEP;									// clear that int
+	}
+}
+
+void getCmdLengthFromCmdBytes(void)
+{	
+	// now it's time to set up the receiver buffer and length
+	if((cmd[0] & 0x1f)==0x1f)	{		  // if the command is '0x1f'
+		switch((cmd[1] & 0xe0)>>5)	 		// get the length of the command
+		{
+			case  0: cmdLen =  7; break;
+			case  1: cmdLen = 11; break;
+			case  2: cmdLen = 11; break;
+			case  5: cmdLen = 13; break;
+			default: cmdLen =  7; break;
+		}
+	} else {		 	 	   		 						// if it isn't a ICD command
+		cmdLen   = 6;	  									// then length is 6 bytes 
 	}
 }
 
@@ -194,33 +254,23 @@ void init_hw_sw(void)
 	RCC->AHBENR		|= (1 <<  0);																						// enable DMA1
 	RCC->APB1ENR	|= (1 << 2) | (1 <<  1) | (1 <<  0);										// enable TIM4, TIM3, TIM2
   RCC->APB2ENR	|= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     		// Enable SPI1, TIM1, GPIOA and GPIOB clock
-	
-	// set FLOATING INPUTs for GPIOB_0 ... 6
-	GPIOB->CRL &= ~(0x0fffffff);						// remove bits from GPIOB
-	GPIOB->CRL |=   0x04444444;							// set GPIOB as --- CNF1:0 -- 01 (floating input), MODE1:0 -- 00 (input), PxODR -- don't care
 
-	FloppyOut_Disable();
-	
 	// SPI -- enable atlernate function for PA4, PA5, PA6, PA7
 	GPIOA->CRL &= ~(0xffff0000);						// remove bits from GPIOA
 	GPIOA->CRL |=   0xbbbb0000;							// set GPIOA as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
 
 	// ATTENTION -- set GPIOB_15 (ATTENTION) as --- CNF1:0 -- 00 (push-pull output), MODE1:0 -- 11 (output 50 Mhz)
-	GPIOB->CRH &= ~(0xf0000000); 
-	GPIOB->CRH |=  (0x30000000);
+	GPIOB->CRH	= 0x33334444;								// 4 ouputs (ATN, DMA, PIO, RNW) and 4 inputs (ACK, CS, CMD, RESET)
 
-	RCC->APB2ENR |= (1 << 0);									// enable AFIO
+	RCC->APB2ENR |= (1 << 0);								// enable AFIO
 	
-	AFIO->EXTICR[0] = 0x1000;									// EXTI3 -- source input: GPIOB_3
-	EXTI->IMR			= STEP;											// EXTI3 -- 1 means: Interrupt from line 3 not masked
-	EXTI->EMR			= STEP;											// EXTI3 -- 1 means: Event     form line 3 not masked
-	EXTI->FTSR 		= STEP;											// Falling trigger selection register - STEP pulse
+	AFIO->EXTICR[2] = 0x1110;								// source input: GPIOB for EXTI 9, 10, 11
+	EXTI->IMR			= aCMD | aCS | aACK;			// 1 means: Interrupt from these lines is not masked
+	EXTI->EMR			= aCMD | aCS | aACK;			// 1 means: Event     form these lines is not masked
+	EXTI->FTSR 		= aCMD | aCS | aACK;			// Falling trigger selection register
 	
 	//----------
 	AFIO->MAPR |= 0x02000000;									// SWJ_CFG[2:0] (Bits 26:24) -- 010: JTAG-DP Disabled and SW-DP Enabled
-	AFIO->MAPR |= 0x00000300;									// TIM2_REMAP -- Full remap (CH1/ETR/PA15, CH2/PB3, CH3/PB10, CH4/PB11)
-	AFIO->MAPR |= 0x00000800;									// TIM3_REMAP -- Partial remap (CH1/PB4, CH2/PB5, CH3/PB0, CH4/PB1)
-	//----------
 	
 	timerSetup_index();
 	
@@ -264,10 +314,12 @@ WORD spi_TxRx(WORD out)
 
 void processHostCommand(BYTE val)
 {
+	/*
 	switch(val) {
 		case CMD_WRITE_PROTECT_OFF:		GPIOB->BSRR	= WR_PROTECT;		break;			// WR PROTECT to 1
 		case CMD_WRITE_PROTECT_ON:		GPIOB->BRR	= WR_PROTECT;		break;			// WR PROTECT to 0
 	}
+	*/
 }
 
 void spi_init(void)

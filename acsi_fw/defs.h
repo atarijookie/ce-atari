@@ -33,51 +33,34 @@ GPIOA_13 - SWD -- for debugging
 GPIOA_14 - SWD -- for debugging
 
 
-inputs:
--------
-GPIOB_2  - DIRECTION
-GPIOB_3  - STEP							(using EXTI3)
-GPIOB_4  - WDATA						(using TIM3_CH1 after remap)
-GPIOB_6  - SIDE1
-GPIOB_7  - WGATE
-GPIOB_12 - MOTOR_ENABLE
-GPIOB_13 - DRIVE_SELECT0
-GPIOB_14 - DRIVE_SELECT1
+DATA1 is connected to ACSI port
+DATA2 is data latched on CS and ACK and connected to MCU
+
+ACSI interface: 
+GPIOB_0-7 - IO - DATA2 - ACSI data
+
+GPIOB_8   - I  - RESET - when ACSI is in reset state, shouldn't do anything
+GPIOB_9   - I  - CMD - this is combination of CS and A1, will go low on 1st cmd byte from ACSI port -- EXTI9
+GPIOB_10  - I  - CS  - PIO strobe                                                                   -- EXTI10
+GPIOB_11  - I  - ACK - DMA strobe                                                                   -- EXTI11
+GPIOB_12  - O  - RnW - defines data direction (1: DATA1 <- DATA2 -- READ,  0: DATA1 -> DATA2 -- WRITE)
+GPIOB_13  - O  - PIO - on rising edge will put INT to L
+GPIOB_14  - O  - DMA - on rising edge will put DRQ to L
 
 
-outputs:
----------
-GPIOA_8  - RDATA 						(using TIM1_CH1)
-
-GPIOB_8  - WRITE_PROTECT
-GPIOB_9  - DISK_CHANGE
-GPIOB_10 - TRACK0
-GPIOB_11 - INDEX 						(using TIM2_CH4)
-GPIOB_15 - ATTENTION (need more data / data available to retrieve)
+GPIOB_15  - O  - ATN for Attention
 */
 
-
-// on GPIOA
-//#define	RDATA				(1 <<   8)
-
-
 // on GPIOB
-#define	DIR						(1 <<   2)
-#define	STEP					(1 <<   3)
-#define	WDATA					(1 <<   4)
-#define	SIDE1					(1 <<   6)
-#define	WGATE					(1 <<   7)
+#define aRESET		(1 <<   8)
+#define	aCMD			(1 <<   9)
+#define	aCS				(1 <<  10)
+#define	aACK			(1 <<  11)
+#define	aRNW			(1 <<  12)
+#define	aPIO			(1 <<  13)
+#define	aDMA			(1 <<  14)
 
-#define	WR_PROTECT		(1 <<   8)
-#define	DISK_CHANGE		(1 <<   9)
-#define	TRACK0				(1 <<  10)
-//#define	INDEX					(1 <<  11)
 
-#define	MOTOR_ENABLE	(1 <<  12)
-#define	DRIVE_SELECT0	(1 <<  13)
-#define	DRIVE_SELECT1	(1 <<  14)
-
-#define	ATN						(1 <<  15)
-
+#define	ATN				(1 <<  15)
 
 #endif /* DEFS_H_ */
