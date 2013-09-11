@@ -12,12 +12,13 @@
 #define	E_RESET				4	
 
 
-// set GPIOB0-7 as --- CNF1:0 -- 01 (floating input), MODE1:0 -- 00 (input)
-#define ACSI_DATADIR_WRITE()		{	GPIOB->CRL = 0x44444444; }
-// set GPIOB0-7 as --- CNF1:0 -- 00 (push pull output), MODE1:0 -- 11 (output, max 50 MHz)
-#define ACSI_DATADIR_READ()			{	GPIOB->CRL = 0x33333333; }
+// set GPIOB0-7 as floating input, then RnW to LOW
+#define ACSI_DATADIR_WRITE()		{	GPIOB->CRL = 0x44444444; GPIOA->BRR = aRNW; }
 
+// first RnW to HIGH, then set GPIOB0-7 as push pull output
+#define ACSI_DATADIR_READ()			{	GPIOA->BSRR = aRNW; GPIOB->CRL = 0x33333333; }
 
+BYTE timeout(void);											// returns TRUE if timeout since writeFirst occured
 BYTE PIO_gotFirstCmdByte(void);					// check if we got the 1st command byte
 BYTE PIO_writeFirst(void);							// get 1st CMD byte from ST  -- without setting INT
 BYTE PIO_write(void);										// get next CMD byte from ST -- with setting INT to LOW and waiting for CS 

@@ -58,24 +58,6 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 #define CMD_TRACK_STREAM_END			0xF000							// this is the mark in the track stream that we shouldn't go any further in the stream
 #define CMD_TRACK_STREAM_END_BYTE	0xF0								// this is the mark in the track stream that we shouldn't go any further in the stream
 
-// set GPIOB as --- CNF1:0 -- 00 (push-pull output), MODE1:0 -- 11 (output 50 Mhz)
-//#define 	FloppyOut_Enable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000333); FloppyIndex_Enable();	FloppyMFMread_Enable();		}
-#define 	FloppyOut_Enable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000737); FloppyIndex_Enable();	FloppyMFMread_Enable();		}
-// set GPIOB as --- CNF1:0 -- 01 (floating input), MODE1:0 -- 00 (input)
-#define 	FloppyOut_Disable()			{GPIOB->CRH &= ~(0x00000fff); GPIOB->CRH |=  (0x00000444); FloppyIndex_Disable();	FloppyMFMread_Disable();	}
-
-// enable / disable TIM1 CH1 output on GPIOA_8
-// open drain
-#define		FloppyMFMread_Enable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x0000000f); };
-// push pull
-//#define		FloppyMFMread_Enable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x0000000b); };
-#define		FloppyMFMread_Disable()		{ GPIOA->CRH &= ~(0x0000000f); GPIOA->CRH |= (0x00000004); };
-
-// enable / disable TIM2 CH4 output on GPIOB_11
-#define		FloppyIndex_Enable()			{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x0000f000); };
-//#define		FloppyIndex_Enable()			{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x0000b000); };
-#define		FloppyIndex_Disable()			{ GPIOB->CRH &= ~(0x0000f000); GPIOB->CRH |= (0x00004000); };
-
 //--------------
 // circular buffer 
 // watch out, these macros take 0.73 us for _add, and 0.83 us for _get operation!
@@ -105,7 +87,6 @@ BYTE enabledIDs[8];							// when 1, Hanz will react on that ACSI ID #
 int main (void) 
 {
 	BYTE i;
-	BYTE indexCount = 0;
 	BYTE spiDmaIsIdle = TRUE;
 	
 	sendFwVersion			= FALSE;
@@ -125,8 +106,7 @@ int main (void)
 
 	// init ACSI signals
 	ACSI_DATADIR_WRITE();													// data as inputs
-	GPIOB->BRR = aDMA | aPIO | aRNW | ATN;				// ACSI controll signals LOW, ATTENTION bit LOW - nothing to read
-//	GPIOB->BSRR = aPIO;			
+	GPIOA->BRR = aDMA | aPIO | aRNW | ATN;				// ACSI controll signals LOW, ATTENTION bit LOW - nothing to read
 
 	EXTI->PR = aCMD | aCS | aACK;									// clear these ints 
 	//-------------
@@ -183,9 +163,9 @@ int main (void)
 		}
 		
 		if(DMA1_Channel3->CNDTR != 0) {												// something to send over SPI?
-			GPIOB->BSRR = ATN;																	// ATTENTION bit high - got something to read
+			GPIOA->BSRR = ATN;																	// ATTENTION bit high - got something to read
 		} else {
-			GPIOB->BRR = ATN;																		// ATTENTION bit low  - nothing to read
+			GPIOA->BRR = ATN;																		// ATTENTION bit low  - nothing to read
 		}				 
 		
 		//-------------------------------------------------
@@ -196,13 +176,7 @@ int main (void)
 		// the following part is here to send FW version each second
 		if((TIM2->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
 			TIM2->SR = 0xfffe;							// clear UIF flag
-	
-			indexCount++;
-			
-			if(indexCount == 5) {
-				indexCount = 0;
-				sendFwVersion = TRUE;
-			}
+			sendFwVersion = TRUE;
 		}
 		
 // check for STEP pulse - should we go to a different track?
@@ -259,8 +233,13 @@ void init_hw_sw(void)
 	GPIOA->CRL &= ~(0xffff0000);						// remove bits from GPIOA
 	GPIOA->CRL |=   0xbbbb0000;							// set GPIOA as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
 
-	// ATTENTION -- set GPIOB_15 (ATTENTION) as --- CNF1:0 -- 00 (push-pull output), MODE1:0 -- 11 (output 50 Mhz)
-	GPIOB->CRH	= 0x33334444;								// 4 ouputs (ATN, DMA, PIO, RNW) and 4 inputs (ACK, CS, CMD, RESET)
+	// ACSI input signals as floating inputs
+	GPIOB->CRH &= ~(0x0000ffff);						// clear 4 lowest bits
+	GPIOB->CRH |=   0x00004444;							// set as 4 inputs (ACK, CS, CMD, RESET)
+
+	// ACSI control signals as output, +ATN
+	GPIOA->CRL &= ~(0x0000ffff);						// remove bits from GPIOA
+	GPIOA->CRL |=   0x00003333;							// 4 ouputs (ATN, DMA, PIO, RNW) and 4 inputs (ACK, CS, CMD, RESET)
 
 	RCC->APB2ENR |= (1 << 0);								// enable AFIO
 	
@@ -270,9 +249,10 @@ void init_hw_sw(void)
 	EXTI->FTSR 		= aCMD | aCS | aACK;			// Falling trigger selection register
 	
 	//----------
-	AFIO->MAPR |= 0x02000000;									// SWJ_CFG[2:0] (Bits 26:24) -- 010: JTAG-DP Disabled and SW-DP Enabled
+	AFIO->MAPR |= 0x02000000;								// SWJ_CFG[2:0] (Bits 26:24) -- 010: JTAG-DP Disabled and SW-DP Enabled
 	
-	timerSetup_index();
+	timerSetup_sendFw();										// set TIM2 to 1 second to send FW version each second
+	timerSetup_cmdTimeout();								// set TIM4 to 1 second as a timeout for command processing
 	
 	//--------------
 	// DMA + SPI initialization
@@ -291,7 +271,6 @@ void init_hw_sw(void)
 
 	wrNow = &wrBuffer[0];
 	//--------------
-	timerSetup_stepLimiter();						// this 2 kHz timer should be used to limit step rate
 	
 	// init circular buffer for data incomming via SPI
 	inIndexGet = 0;
