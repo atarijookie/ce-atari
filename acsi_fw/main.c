@@ -11,7 +11,7 @@
 
 void init_hw_sw(void);
 
-void processHostCommand(BYTE val);
+void processHostCommands(void);
 
 void spi_init(void);
 void dma_spi_init(void);
@@ -47,36 +47,30 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 */
 
 // commands sent from device to host
-#define ATN_FW_VERSION					0x01								// followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
-#define ATN_SECTOR_WRITTEN      0x03               	// sent: 3, side (highest bit) + track #, current sector #
-#define ATN_SEND_TRACK          0x04            		// send the whole track
-
+#define ATN_FW_VERSION						0x01								// followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
+#define ATN_ACSI_COMMAND					0x02
+#define ATN_MORE_DATA							0x03
 
 // commands sent from host to device
-#define CMD_WRITE_PROTECT_OFF			0x10
-#define CMD_WRITE_PROTECT_ON			0x20
-#define CMD_TRACK_STREAM_END			0xF000							// this is the mark in the track stream that we shouldn't go any further in the stream
-#define CMD_TRACK_STREAM_END_BYTE	0xF0								// this is the mark in the track stream that we shouldn't go any further in the stream
+#define CMD_ACSI_CONFIG						0x10
+#define CMD_DATA_WRITE						0x20
+#define CMD_DATA_READ							0x30
 
-//--------------
-// circular buffer 
-// watch out, these macros take 0.73 us for _add, and 0.83 us for _get operation!
+// these states define if the device should get command or transfer data
+#define STATE_GET_COMMAND		0
+#define STATE_DATA_READ			1
+#define STATE_DATA_WRITE		2
+BYTE state;
+WORD dataCnt;
 
-#define		wrBuffer_add(X)					{ if(wrNow->count  < 550)	{		wrNow->buffer[wrNow->count]		= X;	wrNow->count++;		}	}
-
-#define		inBuffer_goToStart()				{ 																				inIndexGet = 0;																		}
-#define		inBuffer_get(X)							{ X = inBuffer[inIndexGet];								inIndexGet++;		if(inIndexGet >= INBUFFER_SIZE) { inIndexGet = 0; }; }
-#define		inBuffer_get_noMove(X)			{ X = inBuffer[inIndexGet];																																	}
-//#define		inBuffer_markAndmove()			{ inBuffer[inIndexGet] = CMD_MARK_READ;		inIndexGet++;		if(inIndexGet >= INBUFFER_SIZE) { inIndexGet = 0; };	}
-#define		inBuffer_justMove()					{ 																				inIndexGet++;		if(inIndexGet >= INBUFFER_SIZE) { inIndexGet = 0; };	}
-//--------------
 
 WORD version[2] = {0xa013, 0x0718};				// this means: hAns, 2013-09-04
 
-volatile BYTE sendFwVersion, sendTrackRequest;
-WORD atnSendFwVersion[5], atnSendTrackRequest[4];
-BYTE cmdBuffer[12];
-WORD fakeBuffer;
+volatile BYTE sendFwVersion, sendACSIcommand;
+WORD atnSendFwVersion[5], atnSendACSIcommand[10];
+
+#define CMD_BUFFER_LENGTH						12
+BYTE cmdBuffer[CMD_BUFFER_LENGTH];
 
 BYTE cmd[14];										// received command bytes
 BYTE cmdLen;										// length of received command
@@ -89,8 +83,10 @@ int main (void)
 	BYTE i;
 	BYTE spiDmaIsIdle = TRUE;
 	
-	sendFwVersion			= FALSE;
-	sendTrackRequest	= FALSE;
+	state = STATE_GET_COMMAND;
+	
+	sendFwVersion		= FALSE;
+	sendACSIcommand	= FALSE;
 	
 	atnSendFwVersion[0] = 0;											// just-in-case padding
 	atnSendFwVersion[1] = ATN_FW_VERSION;					// attention code
@@ -98,9 +94,9 @@ int main (void)
 	atnSendFwVersion[3] = version[1];
 	atnSendFwVersion[4] = 0;											// terminating zero
 	
-	atnSendTrackRequest[0] = 0;										// just-in-case padding
-	atnSendTrackRequest[1] = ATN_SEND_TRACK;			// attention code
-	atnSendTrackRequest[3] = 0;										// terminating zero
+	atnSendACSIcommand[0] = 0;										// just-in-case padding
+	atnSendACSIcommand[1] = ATN_ACSI_COMMAND;			// attention code
+	atnSendACSIcommand[9] = 0;										// terminating zero
 	
 	init_hw_sw();																	// init GPIO pins, timers, DMA, global variables
 
@@ -119,8 +115,8 @@ int main (void)
 	//-------------
 
 	while(1) {
-		// get 1st cmd byte
-		if(PIO_gotFirstCmdByte()) {					// if 1st CMD byte was received
+		// get the command from ACSI and send it to host
+		if(state == STATE_GET_COMMAND && PIO_gotFirstCmdByte()) {					// if 1st CMD byte was received
 			BYTE id;
 				
 			cmd[0] = PIO_writeFirst();				// get byte from ST (waiting for the 1st byte)
@@ -140,25 +136,41 @@ int main (void)
 						getCmdLengthFromCmdBytes();		// we set up the length of command, etc.
 					}   	  	  
 				}
+				
+				//-----
+				if(brStat == E_OK) {							// if all was well, let's send this to host
+					for(i=0; i<7; i++) {						
+						atnSendACSIcommand[2 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
+					}
+					
+					sendACSIcommand	= TRUE;
+				}
 			}
+		}
+		
+		// transfer the data 
+		if(state == STATE_DATA_READ) {
+			
 		}
 
 		// sending and receiving data over SPI using DMA
 		if((DMA1->ISR & (DMA1_IT_TC3 | DMA1_IT_TC2)) == (DMA1_IT_TC3 | DMA1_IT_TC2)) {	// SPI DMA: nothing to Tx and nothing to Rx?
 			DMA1->IFCR = DMA1_IT_TC3 | DMA1_IT_TC2;																				// clear HTIF flags
 			spiDmaIsIdle	= TRUE;																	// mark that the SPI DMA is ready to do something
+			processHostCommands();																// and process all the received commands
 		}
 
 		if(spiDmaIsIdle == TRUE) {															// SPI DMA: nothing to Tx and nothing to Rx?
 			if(sendFwVersion) {																		// should send FW version? this is a window for receiving commands
-				spiDma_txRx(5, (BYTE *) &atnSendFwVersion[0], 6, (BYTE *) &cmdBuffer[0]);
+				spiDma_txRx(5, (BYTE *) &atnSendFwVersion[0],			 6, (BYTE *) &cmdBuffer[0]);
 				spiDmaIsIdle			= FALSE;													// SPI DMA is busy
 				
 				sendFwVersion			= FALSE;
-			} else if(sendTrackRequest) {
-
+			} else if(sendACSIcommand) {
+				spiDma_txRx(10, (BYTE *) &atnSendACSIcommand[0],	12,	(BYTE *) &cmdBuffer[0]);
+				spiDmaIsIdle			= FALSE;													// SPI DMA is busy
 				
-				sendTrackRequest	= FALSE;
+				sendACSIcommand	= FALSE;
 			}
 		}
 		
@@ -166,24 +178,14 @@ int main (void)
 			GPIOA->BSRR = ATN;																	// ATTENTION bit high - got something to read
 		} else {
 			GPIOA->BRR = ATN;																		// ATTENTION bit low  - nothing to read
-		}				 
+		}
 		
 		//-------------------------------------------------
-//		inputs = GPIOB->IDR;										// read floppy inputs
-
-		
-		//------------
 		// the following part is here to send FW version each second
 		if((TIM2->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
 			TIM2->SR = 0xfffe;							// clear UIF flag
 			sendFwVersion = TRUE;
 		}
-		
-// check for STEP pulse - should we go to a different track?
-//		ints = EXTI->PR;										// Pending register (EXTI_PR)
-		
-//		if(ints & STEP) {										// if falling edge of STEP signal was found
-//			EXTI->PR = STEP;									// clear that int
 	}
 }
 
@@ -291,14 +293,44 @@ WORD spi_TxRx(WORD out)
 	return in;
 }
 
-void processHostCommand(BYTE val)
+void processHostCommands(void)
 {
-	/*
-	switch(val) {
-		case CMD_WRITE_PROTECT_OFF:		GPIOB->BSRR	= WR_PROTECT;		break;			// WR PROTECT to 1
-		case CMD_WRITE_PROTECT_ON:		GPIOB->BRR	= WR_PROTECT;		break;			// WR PROTECT to 0
+	BYTE i, j;
+	WORD ids;
+	
+	for(i=0; i<(CMD_BUFFER_LENGTH - 1); i++) {
+		switch(cmdBuffer[i]) {
+			// process configuration 
+			case CMD_ACSI_CONFIG:
+					ids = cmdBuffer[i+1];					// get enabled IDs
+			
+					for(j=0; j<8; j++) {					// 
+						if(ids & (1<<j)) {
+							enabledIDs[j] = TRUE;
+						} else {
+							enabledIDs[j] = FALSE;
+						}
+					}
+					
+					cmdBuffer[i] = 0;							// clear this command 
+					i++;
+				break;
+				
+			case CMD_DATA_WRITE:
+					dataCnt = cmdBuffer[i+1];			// store the count of bytes we should WRITE
+					cmdBuffer[i] = 0;							// clear this command 
+					state = STATE_DATA_WRITE;			// go into DATA_WRITE state
+					i++;
+				break;
+				
+			case CMD_DATA_READ:		
+					dataCnt = cmdBuffer[i+1];			// store the count of bytes we should WRITE
+					cmdBuffer[i] = 0;							// clear this command 
+					state = STATE_DATA_READ;			// go into DATA_WRITE state
+					i++;
+				break;
+		}
 	}
-	*/
 }
 
 void spi_init(void)
