@@ -99,3 +99,53 @@ void PIO_read(BYTE val)
 	EXTI->PR = aCS;																// clear int for CS
 	ACSI_DATADIR_WRITE();													// data as inputs (write)
 }
+
+void DMA_read(BYTE val)
+{
+	GPIOB->ODR = val;															// write the data to output data register
+	
+	// create rising edge on aDMA
+	GPIOB->BSRR	= aDMA;														// aDMA to HIGH
+	GPIOB->BRR	= aDMA;														// aDMA to LOW
+
+	while(1) {																		// wait for ACK or timeout
+		WORD exti = EXTI->PR;
+		
+		if(exti & aACK) {														// if ACK arrived
+			break;
+		}
+		
+		if(timeout()) {															// if timeout happened
+			brStat = E_TimeOut;												// set the bridge status
+			break;
+		}
+	}
+	
+	EXTI->PR = aACK;															// clear int for ACK
+}
+
+BYTE DMA_write(void)
+{
+	BYTE val = 0;
+	
+	// create rising edge on aDMA
+	GPIOB->BSRR	= aDMA;														// aDMA to HIGH
+	GPIOB->BRR	= aDMA;														// aDMA to LOW
+
+	while(1) {																		// wait for ACK or timeout
+		WORD exti = EXTI->PR;
+		
+		if(exti & aACK) {														// if ACK arrived
+			val = GPIOB->IDR;													// read the data
+			break;
+		}
+		
+		if(timeout()) {															// if timeout happened
+			brStat = E_TimeOut;												// set the bridge status
+			break;
+		}
+	}
+	
+	EXTI->PR = aACK;																// clear int for ACK
+	return val;
+}

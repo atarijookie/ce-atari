@@ -22,3 +22,9 @@ BYTE timeout(void);											// returns TRUE if timeout since writeFirst occure
 BYTE PIO_gotFirstCmdByte(void);					// check if we got the 1st command byte
 BYTE PIO_writeFirst(void);							// get 1st CMD byte from ST  -- without setting INT
 BYTE PIO_write(void);										// get next CMD byte from ST -- with setting INT to LOW and waiting for CS 
+
+void PIO_read(BYTE val);								// send status byte to ST 
+
+BYTE DMA_write(void);										// get byte from ST using DMA
+void DMA_read(BYTE val);								// send byte to ST using DMA
+
