@@ -20,7 +20,9 @@ WORD spi_TxRx(WORD out);
 void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 
 void getCmdLengthFromCmdBytes(void);
+void onGetCommand(void);
 void onDataRead(void);
+void onDataWrite(void);
 
 // cycle measure: t1 = TIM3->CNT;	t2 = TIM3->CNT;	dt = t2 - t1; -- subtrack 0x12 because that's how much measuring takes
 WORD t1, t2, dt; 
@@ -57,7 +59,7 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 #define STATE_DATA_WRITE		2
 BYTE state;
 WORD dataCnt;
-
+BYTE statusByte;
 
 WORD version[2] = {0xa013, 0x0904};				// this means: hAns, 2013-09-04
 
@@ -65,7 +67,10 @@ volatile BYTE sendFwVersion, sendACSIcommand;
 WORD atnSendFwVersion[5], atnSendACSIcommand[10];
 
 WORD atnMoreData[4];
-WORD dataBuffer[514 / 2];
+WORD dataBuffer[512 / 2];
+
+TWriteBuffer wrBuf1, wrBuf2;
+TWriteBuffer *wrBufNow;
 
 #define CMD_BUFFER_LENGTH						12
 BYTE cmdBuffer[CMD_BUFFER_LENGTH];
@@ -97,7 +102,18 @@ int main (void)
 	atnSendACSIcommand[9] = 0;										// terminating zero
 	
 	atnMoreData[0] = 0;
+	atnMoreData[1] = ATN_READ_MORE_DATA;					// mark that we want to read more data
 	atnMoreData[3] = 0;
+	
+	wrBuf1.buffer[0]	= 0;
+	wrBuf1.buffer[1]	= ATN_WRITE_MORE_DATA;
+	wrBuf1.next				= (void *) &wrBuf2;
+
+	wrBuf2.buffer[0]	= 0;
+	wrBuf2.buffer[1]	= ATN_WRITE_MORE_DATA;
+	wrBuf2.next				= (void *) &wrBuf1;
+
+	wrBufNow = &wrBuf1;
 	
 	init_hw_sw();																	// init GPIO pins, timers, DMA, global variables
 
@@ -118,40 +134,17 @@ int main (void)
 	while(1) {
 		// get the command from ACSI and send it to host
 		if(state == STATE_GET_COMMAND && PIO_gotFirstCmdByte()) {					// if 1st CMD byte was received
-			BYTE id;
-				
-			cmd[0] = PIO_writeFirst();				// get byte from ST (waiting for the 1st byte)
-			id = (cmd[0] >> 5) & 0x07;				// get only device ID
-
-			if(enabledIDs[id]) {							// if this ID is enabled
-				cmdLen = 6;											// maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
-				
-				for(i=1; i<cmdLen; i++) {				// receive the next command bytes
-					cmd[i] = PIO_write();					// drop down IRQ, get byte
-
-					if(brStat != E_OK) {					// if something was wrong
-						break;						  
-					}
-
-					if(i == 1) {										// if we got also the 2nd byte
-						getCmdLengthFromCmdBytes();		// we set up the length of command, etc.
-					}   	  	  
-				}
-				
-				//-----
-				if(brStat == E_OK) {							// if all was well, let's send this to host
-					for(i=0; i<7; i++) {						
-						atnSendACSIcommand[2 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
-					}
-					
-					sendACSIcommand	= TRUE;
-				}
-			}
+			onGetCommand();
 		}
 		
-		// transfer the data 
+		// transfer the data - read (to ST)
 		if(state == STATE_DATA_READ) {
 			onDataRead();
+		}
+
+		// transfer the data - write (from ST)
+		if(state == STATE_DATA_WRITE) {
+			onDataWrite();
 		}
 
 		// sending and receiving data over SPI using DMA
@@ -190,6 +183,39 @@ int main (void)
 	}
 }
 
+void onGetCommand(void)
+{
+	BYTE id, i;
+				
+	cmd[0] = PIO_writeFirst();				// get byte from ST (waiting for the 1st byte)
+	id = (cmd[0] >> 5) & 0x07;				// get only device ID
+
+	if(enabledIDs[id]) {							// if this ID is enabled
+		cmdLen = 6;											// maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
+				
+		for(i=1; i<cmdLen; i++) {				// receive the next command bytes
+			cmd[i] = PIO_write();					// drop down IRQ, get byte
+
+			if(brStat != E_OK) {					// if something was wrong
+				break;						  
+			}
+
+			if(i == 1) {										// if we got also the 2nd byte
+				getCmdLengthFromCmdBytes();		// we set up the length of command, etc.
+			}   	  	  
+		}
+				
+		//-----
+		if(brStat == E_OK) {							// if all was well, let's send this to host
+			for(i=0; i<7; i++) {						
+				atnSendACSIcommand[2 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
+			}
+					
+			sendACSIcommand	= TRUE;
+		}
+	}
+}
+
 void onDataRead(void)
 {
 	WORD seqNo = 0;
@@ -197,13 +223,13 @@ void onDataRead(void)
 	WORD index, data;
 	BYTE value;
 
-	atnMoreData[1] = ATN_READ_MORE_DATA;									// mark that we wat to read more data
-
+	state = STATE_GET_COMMAND;														// this will be the next state once this function finishes
+	
 	ACSI_DATADIR_READ();																	// data direction for reading
 	
 	while(dataCnt > 0) {			// something to read?
-		// request maximum 514 bytes from host 
-		subCount = (dataCnt > 514) ? 514 : dataCnt;
+		// request maximum 512 bytes from host 
+		subCount = (dataCnt > 512) ? 512 : dataCnt;
 		dataCnt -= subCount;
 				
 		atnMoreData[2] = seqNo;															// set the sequence # to Attention
@@ -214,6 +240,13 @@ void onDataRead(void)
 		
 		sendCount	= (recvCount > 4) ? 4 : recvCount;				// WORDs to send: maximum 4 WORDs, but could be less
 		
+		while(1) {																					// wait until DMA for SPI is available
+			if((DMA1->ISR & (DMA1_IT_TC3 | DMA1_IT_TC2)) == (DMA1_IT_TC3 | DMA1_IT_TC2)) {	// SPI DMA: nothing to Tx and nothing to Rx?
+				DMA1->IFCR = DMA1_IT_TC3 | DMA1_IT_TC2;																				// clear HTIF flags
+				break;
+			}
+		}
+		
 		spiDma_txRx(sendCount, (BYTE *) &atnMoreData[0], recvCount, (BYTE *) &dataBuffer[0]);		// set up the SPI DMA transfer
 		GPIOA->BSRR = ATN;																	// ATTENTION bit high - got something to read
 
@@ -221,16 +254,13 @@ void onDataRead(void)
 		
 		while(recvCount > 0) {															// something to receive?
 			// when at least 1 WORD was received
-			if((DMA1_Channel2->CNDTR == 0) || (DMA1_Channel2->CNDTR < recvCount)) {						
+			if((DMA1_Channel2->CNDTR == 0) || (DMA1_Channel2->CNDTR < recvCount)) {
+				recvCount--;				
 				data = dataBuffer[index];												// get data
 				index++;
 
 				// for upper byte
 				value = data >> 8;															// get upper byte
-
-				if(dataCnt == 0 && subCount == 1) {							// no more data to transfer, just last byte?
-					break;
-				}
 				subCount--;																			// decrement count
 				
 				DMA_read(value);																// send data to Atari
@@ -240,13 +270,13 @@ void onDataRead(void)
 					ACSI_DATADIR_WRITE();													// data direction for writing, and quit
 					return;
 				}
+
+				if(subCount == 0) {															// no more data to transfer (in case of odd data count)
+					break;
+				}
 				
 				// for lower byte
 				value = data & 0xff;														// get lower byte
-
-				if(dataCnt == 0 && subCount == 1) {							// no more data to transfer, just last byte?
-					break;
-				}
 				subCount--;																			// decrement count
 				
 				DMA_read(value);																// send data to Atari
@@ -266,8 +296,86 @@ void onDataRead(void)
 		GPIOA->BRR = ATN;																		// ATTENTION bit low  - nothing to read
 	}	
 	
-	PIO_read(value);																			// send the status to Atari
-	ACSI_DATADIR_WRITE();																	// data direction for writing
+	PIO_read(statusByte);																	// send the status to Atari
+}
+
+void onDataWrite(void)
+{
+	WORD seqNo = 0;
+	WORD subCount, recvCount;
+	WORD index, data, i, value;
+
+	state = STATE_GET_COMMAND;														// this will be the next state once this function finishes
+	
+	ACSI_DATADIR_WRITE();																	// data direction for reading
+	
+	while(dataCnt > 0) {			// something to write?
+		// request maximum 512 bytes from host 
+		subCount = (dataCnt > 512) ? 512 : dataCnt;
+		dataCnt -= subCount;
+				
+		wrBufNow->buffer[2] = seqNo;												// set the sequence # to Attention
+		seqNo++;
+		
+		recvCount	= subCount / 2;														// WORDs to receive: convert # of BYTEs to # of WORDs
+		recvCount	+= (subCount & 1);												// if subCount is odd number, then we need to transfer 1 WORD more
+		
+		index = 3;
+		
+		for(i=0; i<recvCount; i++) {											// write this many WORDs
+			if(DMA1_Channel3->CNDTR == 0) {										// nothing to send? clear ATN bit
+				GPIOA->BRR = ATN;																// ATTENTION bit low  - nothing to read
+			}
+			
+			value = DMA_write();														// get data from Atari
+			value = value << 8;															// store as upper byte
+				
+			if(brStat == E_TimeOut) {												// if timeout occured
+				GPIOA->BRR = ATN;															// ATTENTION bit low  - nothing to read
+				return;
+			}
+
+			subCount--;
+			if(subCount == 0) {															// in case of odd data count
+				wrBufNow->buffer[index] = value;							// store data
+				index++;
+				
+				break;
+			}
+
+			data = DMA_write();															// get data from Atari
+			value = value | data;														// store as lower byte
+				
+			if(brStat == E_TimeOut) {												// if timeout occured
+				GPIOA->BRR = ATN;															// ATTENTION bit low  - nothing to read
+				return;
+			}
+
+			subCount--;
+							
+			wrBufNow->buffer[index] = value;								// store data
+			index++;
+		}
+		
+		wrBufNow->buffer[index] = 0;											// terminating zero
+		wrBufNow->count = index + 1;											// store count
+
+		while(1) {																				// wait until DMA for SPI is available
+			if((DMA1->ISR & (DMA1_IT_TC3 | DMA1_IT_TC2)) == (DMA1_IT_TC3 | DMA1_IT_TC2)) {	// SPI DMA: nothing to Tx and nothing to Rx?
+				DMA1->IFCR = DMA1_IT_TC3 | DMA1_IT_TC2;																				// clear HTIF flags
+				break;
+			}
+		}
+
+		// set up the SPI DMA transfer
+		spiDma_txRx(wrBufNow->count, (BYTE *) &wrBufNow->buffer[0], 0, (BYTE *) &dataBuffer[0]);		
+		GPIOA->BSRR = ATN;																// ATTENTION bit high - got something to read
+		
+		wrBufNow = wrBufNow->next;												// use next write buffer
+	}
+
+	GPIOA->BRR = ATN;																		// ATTENTION bit low  - nothing to read
+	PIO_read(statusByte);																// send the status to Atari
 }
 
 void getCmdLengthFromCmdBytes(void)
@@ -378,22 +486,34 @@ void processHostCommands(void)
 						}
 					}
 					
-					cmdBuffer[i] = 0;							// clear this command 
+					cmdBuffer[i]		= 0;							// clear this command
+					cmdBuffer[i+1]	= 0;
+					
 					i++;
 				break;
 				
 			case CMD_DATA_WRITE:
-					dataCnt = (cmdBuffer[i+1] << 8) | cmdBuffer[i+2];			// store the count of bytes we should WRITE
-					cmdBuffer[i] = 0;							// clear this command 
+					dataCnt				= (cmdBuffer[i+1] << 8) | cmdBuffer[i+2];			// store the count of bytes we should WRITE
+					statusByte		= cmdBuffer[i+3];
+					
+					for(j=0; j<4; j++) {					// clear this command 
+						cmdBuffer[i + j] = 0;				
+					}
+					
 					state = STATE_DATA_WRITE;			// go into DATA_WRITE state
-					i += 2;
+					i += 3;
 				break;
 				
 			case CMD_DATA_READ:		
-					dataCnt = (cmdBuffer[i+1] << 8) | cmdBuffer[i+2];			// store the count of bytes we should READ
-					cmdBuffer[i] = 0;							// clear this command 
+					dataCnt				= (cmdBuffer[i+1] << 8) | cmdBuffer[i+2];			// store the count of bytes we should READ
+					statusByte		= cmdBuffer[i+3];
+
+					for(j=0; j<4; j++) {					// clear this command 
+						cmdBuffer[i + j] = 0;				
+					}
+
 					state = STATE_DATA_READ;			// go into DATA_READ state
-					i += 2;
+					i += 3;
 				break;
 		}
 	}
