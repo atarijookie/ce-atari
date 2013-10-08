@@ -9,9 +9,6 @@
 
 #include "global.h"
 #include "cconusb.h"
-#include "ifloppyimage.h"
-#include "floppyimagefactory.h"
-#include "mfmcachedimage.h"
 
 class CCoreThread: public QThread
 {
@@ -40,20 +37,12 @@ private:
 
     bool sendSingleHalfWord;
 
-    CConUsb             *conUsb;
-    MfmCachedImage      encImage;
-    IFloppyImage        *image;
-    FloppyImageFactory  imageFactory;
-
-    int                 lastSide, lastTrack;            // these are here to avoid sending the same track again
+    CConUsb *conUsb;
 
     void createConnectionObject(void);
     void usbConnectionCheck(void);
 
     void handleFwVersion(void);
-    void handleSendNextSector(int &side, int &track, int &sector, BYTE *oBuf, BYTE *iBuf);
-    void handleSendTrack(int &side, int &track);
-    void handleSectorWasWritten(void);
 
     void sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf, bool storeInData=true);
     void justReceive(int cnt, BYTE *inBuf);
