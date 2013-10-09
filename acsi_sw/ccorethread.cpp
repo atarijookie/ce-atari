@@ -37,7 +37,10 @@ CCoreThread::CCoreThread()
     createConnectionObject();
     conUsb->tryToConnect();
 
+    dataTrans   = new AcsiDataTrans();
 
+    scsi        = new Scsi();
+    scsi->setAcsiDataTrans(dataTrans);
 }
 
 CCoreThread::~CCoreThread()
@@ -49,6 +52,8 @@ CCoreThread::~CCoreThread()
     CCoreThread::displayDbg();
 
     delete conUsb;
+    delete dataTrans;
+    delete scsi;
 }
 
 void CCoreThread::displayDbg(void)

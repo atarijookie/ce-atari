@@ -10,6 +10,9 @@
 #include "global.h"
 #include "cconusb.h"
 
+#include "native/scsi.h"
+#include "acsidatatrans.h"
+
 class CCoreThread: public QThread
 {
     Q_OBJECT
@@ -37,7 +40,10 @@ private:
 
     bool sendSingleHalfWord;
 
-    CConUsb *conUsb;
+    CConUsb         *conUsb;
+
+    Scsi            *scsi;
+    AcsiDataTrans   *dataTrans;
 
     void createConnectionObject(void);
     void usbConnectionCheck(void);

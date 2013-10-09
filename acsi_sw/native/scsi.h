@@ -1,14 +1,21 @@
 #ifndef SCSI_H
 #define SCSI_H
 
+#include "acsidatatrans.h"
+
 #include "datatypes.h"
 
-class CScsi
+class Scsi
 {
 public:
-	
+    Scsi(void);
+
+    void setAcsiDataTrans(AcsiDataTrans *dt);
+    void processCommand(BYTE *command);
 
 private:
+    AcsiDataTrans *dataTrans;
+
     BYTE    shitHasHappened;
 
     struct {
@@ -16,8 +23,6 @@ private:
         BYTE 	Type;				// DEVICETYPE_...
         bool	IsInit;				// is initialized and working? TRUE / FALSE
         bool	MediaChanged;		// when media is changed
-
-        BYTE	InitRetries;		// how many times try to init the device */
 
         DWORD	BCapacity;			// device capacity in bytes
         DWORD	SCapacity;			// device capacity in sectors
@@ -28,18 +33,18 @@ private:
         BYTE	SCSI_SK;			// sense key
     } devInfo;
 
-    char *cmd;
+    BYTE *cmd;
+    BYTE inquiryName[10];
+
+    bool isICDcommand(void);
 
 	// for 6-byte long commands - from scsi6
-	void ProcSCSI6(void); 
+    void ProcScsi6(void);
 
 	void SCSI_RequestSense(void);
 	void SCSI_FormatUnit(void);
 
-	void SCSI_ReadWrite6(BYTE Read);
-
-	BYTE SCSI_Read6_SDMMC(DWORD sector, WORD lenX);
-	BYTE SCSI_Write6_SDMMC(DWORD sector, WORD lenX);
+    void SCSI_ReadWrite6(bool read);
 
 	void SCSI_Inquiry(void);
 	void SCSI_ModeSense6(void);
@@ -56,10 +61,15 @@ private:
 
 	void SCSI_ReadCapacity(void);
 	void ICD7_to_SCSI6(void);
-	void SCSI_ReadWrite10(char Read);
+    void SCSI_ReadWrite10(bool read);
 	void SCSI_Verify(void);
 	
 	void showCommand(WORD id, WORD length, WORD errCode);
+
+    bool readSectors(DWORD sectorNo, DWORD count);
+    bool writeSectors(DWORD sectorNo, DWORD count);
+    bool compareSectors(DWORD sectorNo, DWORD count);
+    bool eraseMedia(void);
 };
 
 #endif
