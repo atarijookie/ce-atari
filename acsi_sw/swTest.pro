@@ -13,13 +13,16 @@ TEMPLATE = app
 SOURCES +=  main.cpp\
             mainwindow.cpp \
             cconusb.cpp \
-            ccorethread.cpp 
+            ccorethread.cpp \
+            native/scsi.cpp
 
 HEADERS  += mainwindow.h \
             cconusb.h \
             ccorethread.h \
             ftd2xx.h \
             global.h \
-            datatypes.h
+            datatypes.h \
+            native/scsi.h \
+            native/scsi_defs.h
 
 FORMS    += mainwindow.ui

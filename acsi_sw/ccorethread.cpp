@@ -24,6 +24,8 @@ QStringList dbg;
 BYTE inBuff[1200];
 BYTE outBuff[1200];
 
+extern "C" void outDebugString(const char *format, ...);
+
 CCoreThread::CCoreThread()
 {
     shouldRun       = true;

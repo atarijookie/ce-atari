@@ -1,6 +1,8 @@
 #include "cconusb.h"
 #include "global.h"
 
+extern "C" void outDebugString(const char *format, ...);
+
 CConUsb::CConUsb()
 {
     zeroAllVars();

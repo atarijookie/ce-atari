@@ -1,6 +1,7 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
+// defines for Floppy part
 // commands sent from device to host
 #define ATN_FW_VERSION              0x01       		// followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
 #define ATN_SEND_NEXT_SECTOR        0x02            // sent: 2, side, track #, current sector #, 0, 0, 0, 0 (length: 4 WORDs)
@@ -23,6 +24,10 @@
 #define MFM_6US     2
 #define MFM_8US     3
 
-extern "C" void outDebugString(const char *format, ...);
+
+#define VERSION_STRING          "CosmosEx v1.00 (by Jookie)"
+#define VERSION_STRING_SHORT    "1.00"
+#define DATE_STRING             "10/09/13"
+                                // MM/DD/YY
 
 #endif // GLOBAL_H
