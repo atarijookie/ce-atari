@@ -1,11 +1,15 @@
+#include <stdio.h>
+#include <string.h>
+
 #include "acsidatatrans.h"
 #include "native/scsi_defs.h"
 
 AcsiDataTrans::AcsiDataTrans()
 {
-    buffer  = new BYTE[1024*1024];       // 1 MB buffer
-    count   = 0;
-    status  = SCSI_ST_OK;
+    buffer          = new BYTE[1024*1024];       // 1 MB buffer
+    count           = 0;
+    status          = SCSI_ST_OK;
+    statusWasSet    = false;
 }
 
 AcsiDataTrans::~AcsiDataTrans()
@@ -15,13 +19,15 @@ AcsiDataTrans::~AcsiDataTrans()
 
 void AcsiDataTrans::clear(void)
 {
-    count   = 0;
-    status  = SCSI_ST_OK;
+    count           = 0;
+    status          = SCSI_ST_OK;
+    statusWasSet    = false;
 }
 
 void AcsiDataTrans::setStatus(BYTE stat)
 {
-    status = stat;
+    status          = stat;
+    statusWasSet    = true;
 }
 
 void AcsiDataTrans::addData(BYTE val)
@@ -30,7 +36,27 @@ void AcsiDataTrans::addData(BYTE val)
     count++;
 }
 
-void AcsiDataTrans::sendAll(void)
+void AcsiDataTrans::addData(BYTE *data, DWORD cnt)
 {
+    memcpy(&buffer[count], data, cnt);
+    count += cnt;
+}
+
+// get data from Hans
+bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
+{
+
+
+    return true;
+}
+
+// send all data to Hans, including status
+void AcsiDataTrans::sendDataAndStatus(void)
+{
+    if(count == 0 && !statusWasSet) {       // if no data was added and no status was set, nothing to send then
+        return;
+    }
+
+
 
 }

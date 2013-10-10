@@ -10,6 +10,7 @@ class Scsi
 {
 public:
     Scsi(void);
+    ~Scsi();
 
     void setAcsiDataTrans(AcsiDataTrans *dt);
     void setDataMedia(DataMedia *dm);
@@ -19,6 +20,9 @@ public:
 private:
     AcsiDataTrans   *dataTrans;
     DataMedia       *dataMedia;
+
+    BYTE            *dataBuffer;
+    BYTE            *dataBuffer2;
 
     BYTE    shitHasHappened;
 

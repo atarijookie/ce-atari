@@ -5,13 +5,28 @@
 #include "scsi.h"
 #include "../global.h"
 
+// TODO:
+// read operacie budu dobre, problem bude ak pri write nastane error, pretoze momentalne je status posielany cez SPI najprv
+
 extern "C" void outDebugString(const char *format, ...);
+
+#define BUFFER_SIZE             (1024*1024)
+#define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
 
 Scsi::Scsi(void)
 {
     dataTrans = 0;
     dataMedia = 0;
     strncpy((char *) inquiryName, "CosmosEx  ", 10);
+
+    dataBuffer  = new BYTE[BUFFER_SIZE];
+    dataBuffer2 = new BYTE[BUFFER_SIZE];
+}
+
+Scsi::~Scsi()
+{
+    delete []dataBuffer;
+    delete []dataBuffer2;
 }
 
 void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
@@ -41,7 +56,7 @@ void Scsi::processCommand(BYTE *command)
         ProcScsi6();
     }
 
-    dataTrans->sendAll();               // send all the stuff after handling
+    dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
 }
 
 bool Scsi::isICDcommand(void)
@@ -385,7 +400,7 @@ void Scsi::SCSI_ModeSense6(void)
 // return the last error that occured
 void Scsi::SCSI_RequestSense(void)
 {
-    char i,xx; //, res;
+    char i,xx;
     unsigned char val;
 
     if(dataMedia->mediaChanged())   	// this command clears the unit attention state
@@ -397,13 +412,13 @@ void Scsi::SCSI_RequestSense(void)
     {
         switch(i)
         {
-        case  0:	val = 0xf0;							break;		// error code
+        case  0:	val = 0xf0;					break;		// error code
         case  2:	val = devInfo.SCSI_SK;		break;		// sense key
-        case  7:	val = xx-7;							break;		// AS length
-        case 12:	val = devInfo.SCSI_ASC;	break;		// additional sense code
+        case  7:	val = xx-7;					break;		// AS length
+        case 12:	val = devInfo.SCSI_ASC;     break;		// additional sense code
         case 13:	val = devInfo.SCSI_ASCQ;	break;		// additional sense code qualifier
 
-        default:	val = 0; 			   				break;
+        default:	val = 0; 			   		break;
         }
 
         dataTrans->addData(val);
@@ -635,25 +650,93 @@ void Scsi::SCSI_ReadWrite10(bool read)
 //----------------------------------------------
 bool Scsi::readSectors(DWORD sectorNo, DWORD count)
 {
+    bool res;
+
+    if(count > BUFFER_SIZE_SECTORS) {      // more than BUFFER_SIZE_SECTORS of data at once?
+        outDebugString("Scsi::readSectors -- tried to read more than BUFFER_SIZE_SECTORS at once, fail!");
+        return false;
+    }
+
+    res = dataMedia->readSectors(sectorNo, count, dataBuffer);
+
+    if(!res) {
+        return false;
+    }
+
+    dataTrans->addData(dataBuffer, count);
 
     return true;
 }
 
 bool Scsi::writeSectors(DWORD sectorNo, DWORD count)
 {
+    bool res;
+
+    if(count > BUFFER_SIZE_SECTORS) {      // more than BUFFER_SIZE_SECTORS of data at once?
+        outDebugString("Scsi::writeSectors -- tried to write more than BUFFER_SIZE_SECTORS at once, fail!");
+        return false;
+    }
+
+    res = dataTrans->recvData(dataBuffer, count);               // get data from Hans
+
+    if(!res) {
+        return false;
+    }
+
+    res = dataMedia->writeSectors(sectorNo, count, dataBuffer); // write to media
+
+    if(!res) {
+        return false;
+    }
 
     return true;
 }
 
 bool Scsi::compareSectors(DWORD sectorNo, DWORD count)
 {
+    bool res;
+
+    if(count > BUFFER_SIZE_SECTORS) {      // more than BUFFER_SIZE_SECTORS of data at once?
+        outDebugString("Scsi::compareSectors -- tried to compare more than BUFFER_SIZE_SECTORS at once, fail!");
+        return false;
+    }
+
+    res = dataTrans->recvData(dataBuffer, count);               // get data from Hans
+
+    if(!res) {
+        return false;
+    }
+
+    res = dataMedia->readSectors(sectorNo, count, dataBuffer2); // and get data from media
+
+    if(!res) {
+        return false;
+    }
+
+    DWORD byteCount = count * 512;
+    int iRes = memcmp(dataBuffer, dataBuffer2, byteCount);      // now compare the data
+
+    if(iRes != 0) {                                             // data is different?
+        return false;
+    }
 
     return true;
 }
 
 bool Scsi::eraseMedia(void)
 {
+    bool res;
 
-    return true;
+    memset(dataBuffer, 0, 512);                                 // create empty buffer
+
+    for(int i=0; i<100; i++) {                                  // write empty sector to position 0 .. 99
+        res = dataMedia->writeSectors(i, 1, dataBuffer);
+
+        if(!res) {                                              // failed to write?
+            return false;
+        }
+    }
+
+    return true;                                                // all good
 }
 //----------------------------------------------
