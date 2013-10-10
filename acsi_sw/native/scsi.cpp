@@ -10,6 +10,7 @@ extern "C" void outDebugString(const char *format, ...);
 Scsi::Scsi(void)
 {
     dataTrans = 0;
+    dataMedia = 0;
     strncpy((char *) inquiryName, "CosmosEx  ", 10);
 }
 
@@ -18,10 +19,15 @@ void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
     dataTrans = dt;
 }
 
+void Scsi::setDataMedia(DataMedia *dm)
+{
+    dataMedia = dm;
+}
+
 void Scsi::processCommand(BYTE *command)
 {
-    if(dataTrans == 0) {
-        outDebugString("processCommand was called without valid dataTrans!");
+    if(dataTrans == 0 || dataMedia == 0) {
+        outDebugString("processCommand was called without valid dataTrans or dataMedia!");
         return;
     }
 
@@ -69,7 +75,7 @@ void Scsi::ProcScsi6(void)
 
     //----------------
     // now to solve the not initialized device
-    if(devInfo.IsInit != true)
+    if(!dataMedia->isInit())
     {
         // for the next 3 commands the device is not ready
         if((justCmd == SCSI_C_FORMAT_UNIT) || (justCmd == SCSI_C_READ6) || (justCmd == SCSI_C_WRITE6))
@@ -80,7 +86,7 @@ void Scsi::ProcScsi6(void)
     }
     //----------------
     // if media changed, and the command is not INQUIRY and REQUEST SENSE
-    if(devInfo.MediaChanged == true)
+    if(dataMedia->mediaChanged())
     {
         if((justCmd != SCSI_C_INQUIRY) && (justCmd != SCSI_C_REQUEST_SENSE))
         {
@@ -122,26 +128,19 @@ void Scsi::ProcScsi6(void)
 //----------------------------------------------
 void Scsi::ReturnUnitAttention(void)
 {
-    devInfo.MediaChanged = false;
+    dataMedia->setMediaChanged(false);
 
     devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
     devInfo.SCSI_SK     = SCSI_E_UnitAttention;
     devInfo.SCSI_ASC	= SCSI_ASC_NOT_READY_TO_READY_TRANSITION;
     devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-#ifdef WRITEOUT
-    if(shitHasHappened)
-        showCommand(1, 6, devInfo.LastStatus);
-
-    shitHasHappened = 0;
-#endif
-
     dataTrans->setStatus(devInfo.LastStatus);   // send status byte
 }
 //----------------------------------------------
 void Scsi::ReturnStatusAccordingToIsInit(void)
 {
-    if(devInfo.IsInit == true)
+    if(dataMedia->isInit())
         SendOKstatus();
     else
     {
@@ -236,10 +235,10 @@ void Scsi::ClearTheUnitAttention(void)
 {
     devInfo.LastStatus	= SCSI_ST_OK;
     devInfo.SCSI_SK		= SCSI_E_NoSense;
-    devInfo.SCSI_ASC		= SCSI_ASC_NO_ADDITIONAL_SENSE;
+    devInfo.SCSI_ASC	= SCSI_ASC_NO_ADDITIONAL_SENSE;
     devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-    devInfo.MediaChanged = false;
+    dataMedia->setMediaChanged(false);
 }
 //----------------------------------------------
 void Scsi::SCSI_Inquiry(void)
@@ -249,7 +248,7 @@ void Scsi::SCSI_Inquiry(void)
 
     BYTE *vendor = (BYTE *) "JOOKIE  ";
 
-    if(devInfo.MediaChanged == true)                       // this command clears the unit attention state
+    if(dataMedia->mediaChanged())                                   // this command clears the unit attention state
         ClearTheUnitAttention();
 
     if(cmd[1] & 0x01)                                               // EVPD bit is set? Request for vital data?
@@ -389,10 +388,10 @@ void Scsi::SCSI_RequestSense(void)
     char i,xx; //, res;
     unsigned char val;
 
-    if(devInfo.MediaChanged == true)	// this command clears the unit attention state
+    if(dataMedia->mediaChanged())   	// this command clears the unit attention state
         ClearTheUnitAttention();
 
-    xx = cmd[4];		  // how many bytes should be sent
+    xx = cmd[4];                        // how many bytes should be sent
 
     for(i=0; i<xx; i++)
     {
@@ -463,7 +462,7 @@ void Scsi::ProcICD(void)
     }
     //----------------
     // now for the not present media
-    if(devInfo.IsInit != true)
+    if(!dataMedia->isInit())
     {
         // for the next 3 commands the device is not ready
         if((cmd[1] == SCSI_C_READ10) || (cmd[1] == SCSI_C_WRITE10) || (cmd[1] == SCSI_C_READ_CAPACITY))
@@ -474,7 +473,7 @@ void Scsi::ProcICD(void)
     }
     //----------------
     // if media changed, and the command is not INQUIRY and REQUEST SENSE
-    if(devInfo.MediaChanged == true)
+    if(dataMedia->mediaChanged())
     {
         if(cmd[1] != SCSI_C_INQUIRY)
         {
@@ -556,15 +555,17 @@ void Scsi::SCSI_ReadCapacity(void)
     DWORD cap;
     BYTE hi,midlo, midhi, lo;
 
-    cap = devInfo.SCapacity;
-    cap--;
+    DWORD scap, bcap;
+    dataMedia->getCapacity(bcap, scap);
+
+    cap = scap - 1;
 
     hi		= (cap >> 24) & 0xff;
     midhi	= (cap >> 16) & 0xff;
     midlo	= (cap >>  8) & 0xff;
     lo		=  cap        & 0xff;
 
-    if(devInfo.IsInit != true)
+    if(!dataMedia->isInit())
     {
         hi		= 0;
         midhi	= 0;

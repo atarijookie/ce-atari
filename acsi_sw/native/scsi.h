@@ -2,6 +2,7 @@
 #define SCSI_H
 
 #include "acsidatatrans.h"
+#include "datamedia.h"
 
 #include "datatypes.h"
 
@@ -11,21 +12,19 @@ public:
     Scsi(void);
 
     void setAcsiDataTrans(AcsiDataTrans *dt);
+    void setDataMedia(DataMedia *dm);
+
     void processCommand(BYTE *command);
 
 private:
-    AcsiDataTrans *dataTrans;
+    AcsiDataTrans   *dataTrans;
+    DataMedia       *dataMedia;
 
     BYTE    shitHasHappened;
 
     struct {
         BYTE 	ACSI_ID;			// ID on the ACSI bus - from 0 to 7
         BYTE 	Type;				// DEVICETYPE_...
-        bool	IsInit;				// is initialized and working? TRUE / FALSE
-        bool	MediaChanged;		// when media is changed
-
-        DWORD	BCapacity;			// device capacity in bytes
-        DWORD	SCapacity;			// device capacity in sectors
 
         BYTE	LastStatus;			// last returned SCSI status
         BYTE	SCSI_ASC;			// additional sense code

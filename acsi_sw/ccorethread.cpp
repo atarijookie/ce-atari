@@ -39,8 +39,12 @@ CCoreThread::CCoreThread()
 
     dataTrans   = new AcsiDataTrans();
 
+    dataMedia   = new DataMedia();
+    dataMedia->open((char *) "C:\\datamedia.img", true);
+
     scsi        = new Scsi();
     scsi->setAcsiDataTrans(dataTrans);
+    scsi->setDataMedia(dataMedia);
 }
 
 CCoreThread::~CCoreThread()
@@ -53,6 +57,7 @@ CCoreThread::~CCoreThread()
 
     delete conUsb;
     delete dataTrans;
+    delete dataMedia;
     delete scsi;
 }
 
