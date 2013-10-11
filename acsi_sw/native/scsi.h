@@ -3,8 +3,14 @@
 
 #include "acsidatatrans.h"
 #include "datamedia.h"
+#include "nomedia.h"
+#include "imedia.h"
 
 #include "datatypes.h"
+
+#define SCSI_TYPE_FULL          0
+#define SCSI_TYPE_READ_ONLY     1
+#define SCSI_TYPE_NO_DATA       2
 
 class Scsi
 {
@@ -14,12 +20,17 @@ public:
 
     void setAcsiDataTrans(AcsiDataTrans *dt);
     void setDataMedia(DataMedia *dm);
+    void setAcsiID(int newId);
+    void setDeviceType(int newType);
 
+    bool isScsiCommand(BYTE *command);
     void processCommand(BYTE *command);
 
 private:
     AcsiDataTrans   *dataTrans;
-    DataMedia       *dataMedia;
+    IMedia          *dataMedia;
+
+    NoMedia         noMedia;
 
     BYTE            *dataBuffer;
     BYTE            *dataBuffer2;
@@ -28,7 +39,7 @@ private:
 
     struct {
         BYTE 	ACSI_ID;			// ID on the ACSI bus - from 0 to 7
-        BYTE 	Type;				// DEVICETYPE_...
+        BYTE 	type;				// SCSI_TYPE_FULL || SCSI_TYPE_READ_ONLY || SCSI_TYPE_NO_DATA
 
         BYTE	LastStatus;			// last returned SCSI status
         BYTE	SCSI_ASC;			// additional sense code
@@ -56,6 +67,7 @@ private:
 	void ReturnStatusAccordingToIsInit(void);
 	void ReturnUnitAttention(void);
 	void ClearTheUnitAttention(void);
+    void returnInvalidCommand(void);
 
 	void SendEmptySecotrs(WORD sectors);
 

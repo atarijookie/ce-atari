@@ -21,6 +21,9 @@ Scsi::Scsi(void)
 
     dataBuffer  = new BYTE[BUFFER_SIZE];
     dataBuffer2 = new BYTE[BUFFER_SIZE];
+
+    devInfo.ACSI_ID = 0;
+    devInfo.type    = SCSI_TYPE_NO_DATA;
 }
 
 Scsi::~Scsi()
@@ -37,6 +40,43 @@ void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
 void Scsi::setDataMedia(DataMedia *dm)
 {
     dataMedia = dm;
+}
+
+void Scsi::setAcsiID(int newId)
+{
+    devInfo.ACSI_ID = newId;
+}
+
+void Scsi::setDeviceType(int newType)
+{
+    devInfo.type = newType;
+
+    if(newType == SCSI_TYPE_NO_DATA) {
+        dataMedia = &noMedia;
+    }
+}
+
+bool Scsi::isScsiCommand(BYTE *command)
+{
+    BYTE justCmd;
+    cmd = command;
+
+    if(isICDcommand()) {            // get the command only
+        justCmd = cmd[1];
+    } else {
+        justCmd = cmd[0] & 0x1f;
+    }
+
+    // is it any of the actively handled commands?
+    if( justCmd == SCSI_C_SEND_DIAGNOSTIC   || justCmd == SCSI_C_RESERVE        || justCmd == SCSI_C_RELEASE        ||
+        justCmd == SCSI_C_TEST_UNIT_READY   || justCmd == SCSI_C_MODE_SENSE6    || justCmd == SCSI_C_REQUEST_SENSE  ||
+        justCmd == SCSI_C_INQUIRY           || justCmd == SCSI_C_FORMAT_UNIT    || justCmd == SCSI_C_READ6          ||
+        justCmd == SCSI_C_WRITE6            || justCmd == SCSI_C_READ_CAPACITY  || justCmd == SCSI_C_INQUIRY        ||
+        justCmd == SCSI_C_READ10            || justCmd == SCSI_C_WRITE10        || justCmd == SCSI_C_VERIFY) {
+        return true;
+    }
+
+    return false;
 }
 
 void Scsi::processCommand(BYTE *command)
@@ -110,35 +150,50 @@ void Scsi::ProcScsi6(void)
         }
     }
     //----------------
+    // for read only devices - write and format not supported
+    if(devInfo.type == SCSI_TYPE_READ_ONLY) {
+        if(justCmd == SCSI_C_FORMAT_UNIT || justCmd == SCSI_C_WRITE6) {
+            returnInvalidCommand();
+            return;
+        }
+    }
+
+    // for no data (fake) devices - even the read is not supported
+    if(devInfo.type == SCSI_TYPE_NO_DATA) {
+        if(justCmd == SCSI_C_FORMAT_UNIT || justCmd == SCSI_C_WRITE6 || justCmd == SCSI_C_READ6) {
+            returnInvalidCommand();
+            return;
+        }
+    }
+    //----------------
     switch(justCmd)
     {
     case SCSI_C_SEND_DIAGNOSTIC:
     case SCSI_C_RESERVE:
     case SCSI_C_RELEASE:
-    case SCSI_C_TEST_UNIT_READY:    ReturnStatusAccordingToIsInit();    return;
+    case SCSI_C_TEST_UNIT_READY:    ReturnStatusAccordingToIsInit();    break;
 
-    case SCSI_C_MODE_SENSE6:        SCSI_ModeSense6();                  return;
+    case SCSI_C_MODE_SENSE6:        SCSI_ModeSense6();                  break;
 
-    case SCSI_C_REQUEST_SENSE:      SCSI_RequestSense();                return;
-    case SCSI_C_INQUIRY:            SCSI_Inquiry();                     return;
+    case SCSI_C_REQUEST_SENSE:      SCSI_RequestSense();                break;
+    case SCSI_C_INQUIRY:            SCSI_Inquiry();                     break;
 
-    case SCSI_C_FORMAT_UNIT:        SCSI_FormatUnit();                  return;
-    case SCSI_C_READ6:              SCSI_ReadWrite6(true);              return;
-    case SCSI_C_WRITE6:             SCSI_ReadWrite6(false);             return;
-        //----------------------------------------------------
-    default:
-        {
-        devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-        devInfo.SCSI_SK		= SCSI_E_IllegalRequest;
-        devInfo.SCSI_ASC	= SCSI_ASC_InvalidCommandOperationCode;
-        devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+    case SCSI_C_FORMAT_UNIT:        SCSI_FormatUnit();                  break;
+    case SCSI_C_READ6:              SCSI_ReadWrite6(true);              break;
+    case SCSI_C_WRITE6:             SCSI_ReadWrite6(false);             break;
 
-        //		showCommand(0xf0, 6, devInfo.LastStatus);
-
-        dataTrans->setStatus(devInfo.LastStatus);   // send status byte
-        break;
-        }
+    default:                        returnInvalidCommand();             break;
     }
+}
+//----------------------------------------------
+void Scsi::returnInvalidCommand(void)
+{
+    devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
+    devInfo.SCSI_SK		= SCSI_E_IllegalRequest;
+    devInfo.SCSI_ASC	= SCSI_ASC_InvalidCommandOperationCode;
+    devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+
+    dataTrans->setStatus(devInfo.LastStatus);   // send status byte
 }
 //----------------------------------------------
 void Scsi::ReturnUnitAttention(void)
@@ -238,7 +293,7 @@ void Scsi::SCSI_FormatUnit(void)
         SendOKstatus();
     } else {						   			   // if error
         devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-        devInfo.SCSI_SK	= SCSI_E_MediumError;
+        devInfo.SCSI_SK     = SCSI_E_MediumError;
         devInfo.SCSI_ASC	= SCSI_ASC_NO_ADDITIONAL_SENSE;
         devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
@@ -269,7 +324,7 @@ void Scsi::SCSI_Inquiry(void)
     if(cmd[1] & 0x01)                                               // EVPD bit is set? Request for vital data?
     {                                                               // vital data not suported
         devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-        devInfo.SCSI_SK	= SCSI_E_IllegalRequest;
+        devInfo.SCSI_SK     = SCSI_E_IllegalRequest;
         devInfo.SCSI_ASC	= SCSO_ASC_INVALID_FIELD_IN_CDB;
         devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
@@ -344,7 +399,7 @@ void Scsi::SCSI_ModeSense6(void)
     if(PageCode != 0x0a && PageCode != 0x0b && PageCode != 0x3f)
     {
         devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-        devInfo.SCSI_SK	= SCSI_E_IllegalRequest;
+        devInfo.SCSI_SK     = SCSI_E_IllegalRequest;
         devInfo.SCSI_ASC	= SCSO_ASC_INVALID_FIELD_IN_CDB;
         devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
@@ -461,8 +516,6 @@ void Scsi::ProcICD(void)
 {
     shitHasHappened = 0;
 
-#define WRITEOUT
-
     //----------------
     if((cmd[2] & 0xE0) != 0x00)   			  					// if device ID isn't ZERO
     {
@@ -497,7 +550,24 @@ void Scsi::ProcICD(void)
         }
     }
     //----------------
-    //	showCommand(0xe1, 12, 0);
+    BYTE justCmd = cmd[1];
+
+    // for read only devices - write not supported
+    if(devInfo.type == SCSI_TYPE_READ_ONLY) {
+        if(justCmd == SCSI_C_WRITE10) {
+            returnInvalidCommand();
+            return;
+        }
+    }
+
+    // for no data (fake) devices - even the read is not supported
+    if(devInfo.type == SCSI_TYPE_NO_DATA) {
+        if(justCmd == SCSI_C_WRITE10 || justCmd == SCSI_C_READ10 || justCmd == SCSI_C_VERIFY) {
+            returnInvalidCommand();
+            return;
+        }
+    }
+    //----------------
 
     switch(cmd[1])
     {
@@ -517,14 +587,7 @@ void Scsi::ProcICD(void)
 
         //----------------------------------------------------
     default:
-        devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-        devInfo.SCSI_SK		= SCSI_E_IllegalRequest;		// other devices = error
-        devInfo.SCSI_ASC		= SCSI_ASC_InvalidCommandOperationCode;
-        devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-        //		showCommand(0xf1, 12, devInfo.LastStatus);
-
-        dataTrans->setStatus(devInfo.LastStatus);   // send status byte
+        returnInvalidCommand();
         break;
     }
 } 

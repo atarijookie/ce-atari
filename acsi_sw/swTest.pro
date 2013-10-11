@@ -15,8 +15,9 @@ SOURCES +=  main.cpp\
             cconusb.cpp \
             ccorethread.cpp \
             native/scsi.cpp \
-    acsidatatrans.cpp \
-    native/datamedia.cpp
+            acsidatatrans.cpp \
+            native/datamedia.cpp \
+            native/nomedia.cpp
 
 HEADERS  += mainwindow.h \
             cconusb.h \
@@ -26,7 +27,9 @@ HEADERS  += mainwindow.h \
             datatypes.h \
             native/scsi.h \
             native/scsi_defs.h \
-    acsidatatrans.h \
-    native/datamedia.h
+            acsidatatrans.h \
+            native/datamedia.h \
+            native/nomedia.h \
+            native/imedia.h
 
 FORMS    += mainwindow.ui
