@@ -27,24 +27,28 @@ BYTE shitHasHappened;
 //----------------------------
 void ProcSCSI6(BYTE devIndex)
 {
-	BYTE justCmd;
+	BYTE justCmd, lun;
 	
 	shitHasHappened = 0;
 	
-	if((cmd[1] & 0xE0) != 0x00)   			  	// if device ID isn't ZERO
-	{
-		device[devIndex].LastStatus	= SCSI_ST_CHECK_CONDITION;
-		device[devIndex].SCSI_SK	= SCSI_E_IllegalRequest;
-		device[devIndex].SCSI_ASC	= SCSI_ASC_LU_NOT_SUPPORTED;
-		device[devIndex].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+	justCmd	= cmd[0] & 0x1f;				// get only the command part of byte
+	lun		= cmd[1] >> 5;					// get the LUN from the command.
+	
+	// The following commands support LUN in command, check if it's valid
+	// Note: INQUIRY also supports LUNs, but it should report in a different way...
+	if( justCmd == SCSI_C_READ6 || justCmd == SCSI_C_FORMAT_UNIT || 
+		justCmd == SCSI_C_TEST_UNIT_READY || justCmd == SCSI_C_REQUEST_SENSE) {
 
-		PIO_read(device[devIndex].LastStatus);   // send status byte
+		if(lun != 0) {					// LUN must be 0
+			device[devIndex].LastStatus	= SCSI_ST_CHECK_CONDITION;
+			device[devIndex].SCSI_SK	= SCSI_E_IllegalRequest;
+			device[devIndex].SCSI_ASC	= SCSI_ASC_LU_NOT_SUPPORTED;
+			device[devIndex].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-		return;
+			PIO_read(device[devIndex].LastStatus);   // send status byte
+			return;
+		}
 	}
-//----------------
-
-	justCmd = cmd[0] & 0x1f;				// get only the command part of byte
 
 	//----------------
 	// now to solve the not initialized device
@@ -68,9 +72,7 @@ void ProcSCSI6(BYTE devIndex)
 		}
 	}
 	//----------------
-//	showCommand(0xe0, 6, device[devIndex].LastStatus);	
-	
- switch(justCmd)			
+	switch(justCmd)			
 	{
 	case SCSI_C_SEND_DIAGNOSTIC:
 	case SCSI_C_RESERVE:
@@ -327,9 +329,17 @@ void ClearTheUnitAttention(BYTE devIndex)
 void SCSI_Inquiry(BYTE devIndex)
 {
 	WORD i,xx;
-	BYTE val;
-
+	BYTE val, lun, firstByte;
+	
 	BYTE vendor[8] = {"JOOKIE  "};
+	
+	lun = cmd[1] >> 5;					// get the LUN from the command.
+	
+	if(lun == 0) {						// for LUN 0
+		firstByte = 0;
+	} else {							// for other LUNs
+		firstByte = 0x7f;
+	}
 	
 	if(device[devIndex].MediaChanged == TRUE)                       // this command clears the unit attention state
 		ClearTheUnitAttention(devIndex);
@@ -353,6 +363,9 @@ void SCSI_Inquiry(BYTE devIndex)
 
 	for(i=0; i<xx; i++)			  
 	{
+		if(i == 0) {					// PERIPHERAL QUALIFIER + PERIPHERAL DEVICE TYPE
+			val = firstByte;			// depending on LUN number
+		}
 		
 		if(i >= 8 && i<=43) {           // if the returned byte is somewhere from ASCII part of data, init on 'space' character
 		    val = ' ';

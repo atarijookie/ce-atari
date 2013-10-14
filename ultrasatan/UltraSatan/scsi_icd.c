@@ -23,6 +23,7 @@ extern BYTE shitHasHappened;
 
 void ProcICD(BYTE devIndex)
 {
+	BYTE justCmd, lun;
 	shitHasHappened = 0;
 	
 	#define WRITEOUT
@@ -77,7 +78,7 @@ void ProcICD(BYTE devIndex)
 			return;			
 		}
 		//---------
-		if(!cmpn(&cmd[4], "CurntFW", 7))							// read the name of currently running FW?
+		if(!cmpn(&cmd[4], "CurntFW", 7))								// read the name of currently running FW?
 		{
 			Special_ReadCurrentFirmwareName();
 			return;			
@@ -97,23 +98,28 @@ void ProcICD(BYTE devIndex)
 		//---------
 	}
 	//----------------
- if((cmd[2] & 0xE0) != 0x00)   			  					// if device ID isn't ZERO
-	{
-	device[devIndex].LastStatus	= SCSI_ST_CHECK_CONDITION;
-	device[devIndex].SCSI_SK	= SCSI_E_IllegalRequest;		// other devices = error 
-	device[devIndex].SCSI_ASC	= SCSI_ASC_LU_NOT_SUPPORTED;
-	device[devIndex].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+	justCmd	= cmd[1];							// get the command #
+	lun		= cmd[2] >> 5;						// get the LUN from the command.
 	
-	PIO_read(device[devIndex].LastStatus);   // send status byte
-
-	return;
+	// The following commands support LUN in command, check if it's valid
+	// Note: INQUIRY also supports LUNs, but it should report in a different way...
+	if( justCmd == SCSI_C_READ_CAPACITY || justCmd == SCSI_C_READ10 ) {
+		if(lun != 0) {					// LUN must be 0
+			device[devIndex].LastStatus	= SCSI_ST_CHECK_CONDITION;
+			device[devIndex].SCSI_SK	= SCSI_E_IllegalRequest;		// other devices = error 
+			device[devIndex].SCSI_ASC	= SCSI_ASC_LU_NOT_SUPPORTED;
+			device[devIndex].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+	
+			PIO_read(device[devIndex].LastStatus);   // send status byte
+			return;
+		}
 	}
 	//----------------
 	// now for the not present media
 	if(device[devIndex].IsInit != TRUE)
 	{
 		// for the next 3 commands the device is not ready
-		if((cmd[1] == SCSI_C_READ10) || (cmd[1] == SCSI_C_WRITE10) || (cmd[1] == SCSI_C_READ_CAPACITY))
+		if((justCmd == SCSI_C_READ10) || (justCmd == SCSI_C_WRITE10) || (justCmd == SCSI_C_READ_CAPACITY))
 		{
 			ReturnStatusAccordingToIsInit(devIndex);
 			return;	
@@ -123,17 +129,14 @@ void ProcICD(BYTE devIndex)
 	// if media changed, and the command is not INQUIRY and REQUEST SENSE
 	if(device[devIndex].MediaChanged == TRUE)
 	{
-		if(cmd[1] != SCSI_C_INQUIRY)
+		if(justCmd != SCSI_C_INQUIRY)
 		{
 			ReturnUnitAttention(devIndex);
 			return;	
 		}
 	}
 	//----------------
-//	showCommand(0xe1, 12, 0);
-
-	
-	switch(cmd[1])
+	switch(justCmd)
 	{
 	case SCSI_C_READ_CAPACITY: 		
 									SCSI_ReadCapacity(devIndex); 
@@ -152,12 +155,10 @@ void ProcICD(BYTE devIndex)
 	//----------------------------------------------------
 	default: 
 		device[devIndex].LastStatus	= SCSI_ST_CHECK_CONDITION;
-		device[devIndex].SCSI_SK		= SCSI_E_IllegalRequest;		// other devices = error 
-		device[devIndex].SCSI_ASC		= SCSI_ASC_InvalidCommandOperationCode;
+		device[devIndex].SCSI_SK	= SCSI_E_IllegalRequest;		// other devices = error 
+		device[devIndex].SCSI_ASC	= SCSI_ASC_InvalidCommandOperationCode;
 		device[devIndex].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-//		showCommand(0xf1, 12, device[devIndex].LastStatus);
-		
 		PIO_read(device[devIndex].LastStatus);   // send status byte
 		break;
 	}
