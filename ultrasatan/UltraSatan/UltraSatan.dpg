@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding='ISO-8859-1'?>
+<visualdsp-project-group generated="Wed May 01 21:41:27 2013" version="1.0.0.0" active-project="UltraSatan">
+	<project name="UltraSatan" file=".\UltraSatan.dpj">
+		<dependencies>
+			<dependent-project>US_init</dependent-project>
+		</dependencies>
+	</project>
+	<project name="US_init" file="..\US_init\US_init.dpj">
+	</project>
+</visualdsp-project-group>

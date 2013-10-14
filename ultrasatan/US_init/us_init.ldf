@@ -1,0 +1,35 @@
+ARCHITECTURE(ADSP-BF531)
+
+SEARCH_DIR($ADI_DSP/Blackfin/lib)
+
+
+$OBJECTS = $COMMAND_LINE_OBJECTS;
+
+MEMORY
+{
+   PROGRAM	             { TYPE(RAM) START(0xFFA08000) END(0xFFA0BFFF) WIDTH(8) }
+}
+
+PROCESSOR p0
+{
+    OUTPUT( $COMMAND_LINE_OUTPUT_FILE )
+
+    SECTIONS
+    {
+        code
+        {
+        	// Align all code sections on 2 byte boundary
+        	INPUT_SECTION_ALIGN(2)
+        	INPUT_SECTIONS( $OBJECTS(program))
+		}>PROGRAM
+		
+		stack
+        {
+        	// The data sections shouldn't be aligned.
+        	INPUT_SECTION_ALIGN(1) 
+        	INPUT_SECTIONS( $OBJECTS(stack))
+		}>PROGRAM
+    }
+}
+
+

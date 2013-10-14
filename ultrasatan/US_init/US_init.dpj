@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding='ISO-8859-1'?>
+<visualdsp-project schema="17" name="US_init" file="US_init.dpj" version="1">
+	<!-- Project build target -->
+	<target>
+		<processor revision="Automatic">ADSP-BF531</processor>
+		<extension>.dxe</extension>
+		<type>Executable file</type>
+	</target>
+	<!-- Configurations -->
+	<configurations active="Debug">
+		<configuration name="Debug">
+			<intermediate-dir>.\Debug</intermediate-dir>
+			<output-dir>.\Debug</output-dir>
+			<changed-property-page-flags>0</changed-property-page-flags>
+			<tools>
+				<tool type="Compiler">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="Assembler">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="Linker">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="Archiver">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="Loader">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="VdkGen">
+					<option><![CDATA[]]></option>
+				</tool>
+			</tools>
+		</configuration>
+		<configuration name="Release">
+			<intermediate-dir>.\Release</intermediate-dir>
+			<output-dir>.\Release</output-dir>
+			<changed-property-page-flags>0</changed-property-page-flags>
+			<tools>
+				<tool type="Compiler">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="Assembler">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="Linker">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="Archiver">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="Loader">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="VdkGen">
+					<option><![CDATA[]]></option>
+				</tool>
+			</tools>
+		</configuration>
+	</configurations>
+	<!-- Project folders -->
+	<folders>
+		<folder name="Header Files" ext=".h,.hpp,.hxx">
+		</folder>
+		<folder name="Linker Files" ext=".ldf,.dlb">
+			<files>
+				<file name=".\us_init.ldf">
+					<file-configurations>
+						<file-configuration name="Debug">
+							<excluded-flag value="no"/>
+							<build-with-flag value="project"/>
+							<intermediate-dir>.\Debug</intermediate-dir>
+							<output-dir>.\Debug</output-dir>
+						</file-configuration>
+						<file-configuration name="Release">
+							<excluded-flag value="no"/>
+							<build-with-flag value="project"/>
+							<intermediate-dir>.\Release</intermediate-dir>
+							<output-dir>.\Release</output-dir>
+						</file-configuration>
+					</file-configurations>
+				</file>
+			</files>
+		</folder>
+		<folder name="Source Files" ext=".c,.cpp,.cxx,.asm,.dsp,.s">
+			<files>
+				<file name=".\US_init.asm">
+					<file-configurations>
+						<file-configuration name="Debug">
+							<excluded-flag value="no"/>
+							<build-with-flag value="project"/>
+							<intermediate-dir>.\Debug</intermediate-dir>
+							<output-dir>.\Debug</output-dir>
+						</file-configuration>
+						<file-configuration name="Release">
+							<excluded-flag value="no"/>
+							<build-with-flag value="project"/>
+							<intermediate-dir>.\Release</intermediate-dir>
+							<output-dir>.\Release</output-dir>
+						</file-configuration>
+					</file-configurations>
+				</file>
+			</files>
+		</folder>
+	</folders>
+	<!-- System Builder Components -->
+	<system-builder-component-tables>
+		<system-builder-plugin name="Standard application">
+			<system-builder-component name="Application Settings">
+				<property name="Add comments"><![CDATA[True]]></property>
+				<property name="Add source code"><![CDATA[True]]></property>
+				<property name="Include arguments"><![CDATA[True]]></property>
+				<property name="Output type"><![CDATA[Executable file]]></property>
+				<property name="Source language"><![CDATA[Assembly]]></property>
+			</system-builder-component>
+			<system-builder-component name="Select Processor">
+				<property name="Processor family"><![CDATA[Blackfin]]></property>
+			</system-builder-component>
+		</system-builder-plugin>
+		<system-builder-plugin name="Startup Code Wizard" version="2.0">
+			<system-builder-component name="Welcome">
+				<property name="Enabled"><![CDATA[True]]></property>
+			</system-builder-component>
+		</system-builder-plugin>
+	</system-builder-component-tables>
+</visualdsp-project>
