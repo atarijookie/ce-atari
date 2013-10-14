@@ -244,20 +244,33 @@ BYTE SCSI_Write6_SDMMC(BYTE devIndex, DWORD sector, WORD lenX)
 //----------------------------------------------
 void SCSI_ReadWrite6(BYTE devIndex, BYTE Read)
 {
- DWORD sector;
- BYTE res = 0;
- WORD lenX;
+	DWORD sector, sectorEnd;
+	BYTE res = 0;
+	WORD lenX;
  
- sector  = (cmd[1] & 0x1f);
- sector  = sector << 8;
- sector |= cmd[2];
- sector  = sector << 8;
- sector |= cmd[3];
+	sector  = (cmd[1] & 0x1f);
+	sector  = sector << 8;
+	sector |= cmd[2];
+	sector  = sector << 8;
+	sector |= cmd[3];
  
- lenX = cmd[4];	   	 	   	  // get the # of sectors to read
+	lenX = cmd[4];	   	 	   	  // get the # of sectors to read
  
- if(lenX==0)
- 	lenX=256;
+	if(lenX==0)
+		lenX=256;
+	
+	sectorEnd = sector + ((DWORD)lenX);
+	
+	// if we're trying to address a sector beyond the last one - error!
+	if(sector >= device[devIndex].SCapacity || sectorEnd >= device[devIndex].SCapacity) {	
+		device[devIndex].LastStatus	= SCSI_ST_CHECK_CONDITION;
+		device[devIndex].SCSI_SK	= SCSI_E_IllegalRequest;
+		device[devIndex].SCSI_ASC	= SCSI_ASC_LBA_OUT_OF_RANGE;
+		device[devIndex].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+
+		PIO_read(device[devIndex].LastStatus);    // send status byte, long time-out
+		return;
+	}	
 	//--------------------------------
 	if(Read==TRUE)				// if read
 		res = SCSI_Read6_SDMMC(devIndex, sector, lenX);

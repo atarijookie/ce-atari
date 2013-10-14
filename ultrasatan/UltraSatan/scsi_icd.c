@@ -285,7 +285,7 @@ cmd[5] = cmd[6];
 //---------------------------------------------
 void SCSI_ReadWrite10(BYTE devIndex, char Read)
 {
-	DWORD sector;
+	DWORD sector, sectorEnd;
 	BYTE res=0;
 	WORD lenX;
   
@@ -300,6 +300,20 @@ void SCSI_ReadWrite10(BYTE devIndex, char Read)
 	lenX  = cmd[8];	  	   		// get the # of sectors to read
 	lenX  = lenX << 8;
 	lenX |= cmd[9];	
+	
+	//--------------------------------
+	sectorEnd = sector + ((DWORD)lenX);
+	
+	// if we're trying to address a sector beyond the last one - error!
+	if(sector >= device[devIndex].SCapacity || sectorEnd >= device[devIndex].SCapacity) {	
+		device[devIndex].LastStatus	= SCSI_ST_CHECK_CONDITION;
+		device[devIndex].SCSI_SK	= SCSI_E_IllegalRequest;
+		device[devIndex].SCSI_ASC	= SCSI_ASC_LBA_OUT_OF_RANGE;
+		device[devIndex].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+
+		PIO_read(device[devIndex].LastStatus);    // send status byte, long time-out
+		return;
+	}	
 	//--------------------------------
 	if(Read==TRUE)				// if read
 		res = SCSI_Read6_SDMMC(devIndex, sector, lenX);
@@ -313,8 +327,8 @@ void SCSI_ReadWrite10(BYTE devIndex, char Read)
 	else									// if error 
 	{
 		device[devIndex].LastStatus	= SCSI_ST_CHECK_CONDITION;
-		device[devIndex].SCSI_SK		= SCSI_E_MediumError;
-		device[devIndex].SCSI_ASC		= SCSI_ASC_NO_ADDITIONAL_SENSE;
+		device[devIndex].SCSI_SK	= SCSI_E_MediumError;
+		device[devIndex].SCSI_ASC	= SCSI_ASC_NO_ADDITIONAL_SENSE;
 		device[devIndex].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
 #ifdef WRITEOUT
