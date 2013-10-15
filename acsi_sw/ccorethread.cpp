@@ -38,6 +38,7 @@ CCoreThread::CCoreThread()
     conUsb->tryToConnect();
 
     dataTrans   = new AcsiDataTrans();
+    dataTrans->setCommunicationObject(conUsb);
 
     dataMedia   = new DataMedia();
     dataMedia->open((char *) "C:\\datamedia.img", true);
