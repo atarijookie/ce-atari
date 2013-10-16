@@ -1,0 +1,32 @@
+NET ack LOC=P1;
+NET data1<2> LOC=P2;
+NET data1<1> LOC=P3;
+NET reset LOC=P5;
+NET data1<0> LOC=P6;
+NET cmd LOC=P12;
+NET data2<7> LOC=P13;
+NET data2<6> LOC=P14;
+NET data2<5> LOC=P16;
+NET data2<4> LOC=P18;
+NET data2<3> LOC=P19;
+NET data2<2> LOC=P20;
+NET data2<1> LOC=P21;
+NET data2<0> LOC=P22;
+NET rnw LOC=P23;
+NET pio LOC=P27;
+NET dma LOC=P28;
+NET txsel1n2 LOC=P29;
+NET tx_out LOC=P30;
+NET tx1_in LOC=P31;
+NET tx2_in LOC=P32;
+NET int LOC=P34;
+NET cs LOC=P36;
+NET drq LOC=P37;
+NET data1<7> LOC=P38;
+NET data1<6> LOC=P40;
+NET data1<5> LOC=P41;
+NET a1 LOC=P42;
+NET data1<4> LOC=P43;
+NET data1<3> LOC=P44;
+
+
