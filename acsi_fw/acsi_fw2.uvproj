@@ -527,6 +527,16 @@
               <FileType>5</FileType>
               <FilePath>.\stm32f10x_exti.h</FilePath>
             </File>
+            <File>
+              <FileName>bridge.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\bridge.h</FilePath>
+            </File>
+            <File>
+              <FileName>bridge.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\bridge.c</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>

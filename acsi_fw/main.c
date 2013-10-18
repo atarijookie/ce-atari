@@ -18,11 +18,15 @@ void dma_spi_init(void);
 
 WORD spi_TxRx(WORD out);
 void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
+void spiDma_waitForFinish(void);
+BYTE spiDma_hasFinished(void);
+void spiDma_clearFlags(void);
 
 void getCmdLengthFromCmdBytes(void);
 void onGetCommand(void);
 void onDataRead(void);
 void onDataWrite(void);
+void onReadStatus(void);
 
 // cycle measure: t1 = TIM3->CNT;	t2 = TIM3->CNT;	dt = t2 - t1; -- subtrack 0x12 because that's how much measuring takes
 WORD t1, t2, dt; 
@@ -47,16 +51,19 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 #define ATN_ACSI_COMMAND					0x02
 #define ATN_READ_MORE_DATA				0x03
 #define ATN_WRITE_MORE_DATA				0x04
+#define ATN_GET_STATUS						0x05
 
 // commands sent from host to device
 #define CMD_ACSI_CONFIG						0x10
 #define CMD_DATA_WRITE						0x20
 #define CMD_DATA_READ							0x30
+#define CMD_SEND_STATUS						0x40
 
 // these states define if the device should get command or transfer data
 #define STATE_GET_COMMAND		0
 #define STATE_DATA_READ			1
 #define STATE_DATA_WRITE		2
+#define STATE_READ_STATUS		3
 BYTE state;
 WORD dataCnt;
 BYTE statusByte;
@@ -69,10 +76,12 @@ WORD atnSendFwVersion[5], atnSendACSIcommand[10];
 WORD atnMoreData[4];
 WORD dataBuffer[512 / 2];
 
+WORD atnGetStatus[3];
+
 TWriteBuffer wrBuf1, wrBuf2;
 TWriteBuffer *wrBufNow;
 
-#define CMD_BUFFER_LENGTH						12
+#define CMD_BUFFER_LENGTH						28
 BYTE cmdBuffer[CMD_BUFFER_LENGTH];
 
 BYTE cmd[14];										// received command bytes
@@ -81,10 +90,11 @@ BYTE brStat;										// status from bridge
 
 BYTE enabledIDs[8];							// when 1, Hanz will react on that ACSI ID #
 
+BYTE spiDmaIsIdle = TRUE;
+
 int main (void) 
 {
 	BYTE i;
-	BYTE spiDmaIsIdle = TRUE;
 	
 	state = STATE_GET_COMMAND;
 	
@@ -114,7 +124,11 @@ int main (void)
 	wrBuf2.next				= (void *) &wrBuf1;
 
 	wrBufNow = &wrBuf1;
-	
+
+	atnGetStatus[0] = 0;
+	atnGetStatus[1] = ATN_GET_STATUS;
+	atnGetStatus[2] = 0;
+
 	init_hw_sw();																	// init GPIO pins, timers, DMA, global variables
 
 	// init ACSI signals
@@ -146,23 +160,25 @@ int main (void)
 		if(state == STATE_DATA_WRITE) {
 			onDataWrite();
 		}
+		
+		// this happens after WRITE - wait for status byte, send it to ST (read)
+		if(state == STATE_READ_STATUS) {
+			onReadStatus();
+		}
 
 		// sending and receiving data over SPI using DMA
-		if((DMA1->ISR & (DMA1_IT_TC3 | DMA1_IT_TC2)) == (DMA1_IT_TC3 | DMA1_IT_TC2)) {	// SPI DMA: nothing to Tx and nothing to Rx?
-			DMA1->IFCR = DMA1_IT_TC3 | DMA1_IT_TC2;																				// clear HTIF flags
-			spiDmaIsIdle	= TRUE;																	// mark that the SPI DMA is ready to do something
+		if(spiDma_hasFinished()) {															// SPI DMA: nothing to Tx and nothing to Rx?
+			spiDma_clearFlags();
 			processHostCommands();																// and process all the received commands
 		}
 
 		if(spiDmaIsIdle == TRUE) {															// SPI DMA: nothing to Tx and nothing to Rx?
 			if(sendFwVersion) {																		// should send FW version? this is a window for receiving commands
 				spiDma_txRx(5, (BYTE *) &atnSendFwVersion[0],			 6, (BYTE *) &cmdBuffer[0]);
-				spiDmaIsIdle			= FALSE;													// SPI DMA is busy
 				
-				sendFwVersion			= FALSE;
+				sendFwVersion	= FALSE;
 			} else if(sendACSIcommand) {
-				spiDma_txRx(10, (BYTE *) &atnSendACSIcommand[0],	12,	(BYTE *) &cmdBuffer[0]);
-				spiDmaIsIdle			= FALSE;													// SPI DMA is busy
+				spiDma_txRx(10, (BYTE *) &atnSendACSIcommand[0],	(CMD_BUFFER_LENGTH / 2),	(BYTE *) &cmdBuffer[0]);
 				
 				sendACSIcommand	= FALSE;
 			}
@@ -239,16 +255,11 @@ void onDataRead(void)
 		recvCount	+= (subCount & 1);												// if subCount is odd number, then we need to transfer 1 WORD more
 		
 		sendCount	= (recvCount > 4) ? 4 : recvCount;				// WORDs to send: maximum 4 WORDs, but could be less
-		
-		while(1) {																					// wait until DMA for SPI is available
-			if((DMA1->ISR & (DMA1_IT_TC3 | DMA1_IT_TC2)) == (DMA1_IT_TC3 | DMA1_IT_TC2)) {	// SPI DMA: nothing to Tx and nothing to Rx?
-				DMA1->IFCR = DMA1_IT_TC3 | DMA1_IT_TC2;																				// clear HTIF flags
-				break;
-			}
-		}
+
+		spiDma_waitForFinish();
+		spiDma_clearFlags();
 		
 		spiDma_txRx(sendCount, (BYTE *) &atnMoreData[0], recvCount, (BYTE *) &dataBuffer[0]);		// set up the SPI DMA transfer
-		GPIOA->BSRR = ATN;																	// ATTENTION bit high - got something to read
 
 		index = 0;
 		
@@ -305,8 +316,6 @@ void onDataWrite(void)
 	WORD subCount, recvCount;
 	WORD index, data, i, value;
 
-	state = STATE_GET_COMMAND;														// this will be the next state once this function finishes
-	
 	ACSI_DATADIR_WRITE();																	// data direction for reading
 	
 	while(dataCnt > 0) {			// something to write?
@@ -331,6 +340,7 @@ void onDataWrite(void)
 			value = value << 8;															// store as upper byte
 				
 			if(brStat == E_TimeOut) {												// if timeout occured
+				state = STATE_GET_COMMAND;										// transfer failed, don't send status, just get next command
 				GPIOA->BRR = ATN;															// ATTENTION bit low  - nothing to read
 				return;
 			}
@@ -347,6 +357,7 @@ void onDataWrite(void)
 			value = value | data;														// store as lower byte
 				
 			if(brStat == E_TimeOut) {												// if timeout occured
+				state = STATE_GET_COMMAND;										// transfer failed, don't send status, just get next command
 				GPIOA->BRR = ATN;															// ATTENTION bit low  - nothing to read
 				return;
 			}
@@ -360,22 +371,43 @@ void onDataWrite(void)
 		wrBufNow->buffer[index] = 0;											// terminating zero
 		wrBufNow->count = index + 1;											// store count
 
-		while(1) {																				// wait until DMA for SPI is available
-			if((DMA1->ISR & (DMA1_IT_TC3 | DMA1_IT_TC2)) == (DMA1_IT_TC3 | DMA1_IT_TC2)) {	// SPI DMA: nothing to Tx and nothing to Rx?
-				DMA1->IFCR = DMA1_IT_TC3 | DMA1_IT_TC2;																				// clear HTIF flags
-				break;
-			}
-		}
-
+		spiDma_waitForFinish();
+		spiDma_clearFlags();
+		
 		// set up the SPI DMA transfer
 		spiDma_txRx(wrBufNow->count, (BYTE *) &wrBufNow->buffer[0], 0, (BYTE *) &dataBuffer[0]);		
-		GPIOA->BSRR = ATN;																// ATTENTION bit high - got something to read
 		
 		wrBufNow = wrBufNow->next;												// use next write buffer
 	}
 
+	state = STATE_READ_STATUS;													// continue with sending the status
 	GPIOA->BRR = ATN;																		// ATTENTION bit low  - nothing to read
-	PIO_read(statusByte);																// send the status to Atari
+
+}
+
+void onReadStatus(void)
+{
+	BYTE i, newStatus;
+	
+	newStatus = 0xff;																	// no status received
+	
+	spiDma_waitForFinish();
+	spiDma_clearFlags();
+
+	spiDma_txRx(3, (BYTE *) &atnGetStatus[0], 5, (BYTE *) &cmdBuffer[0]);
+
+	spiDma_waitForFinish();
+	spiDma_clearFlags();
+
+	for(i=0; i<10; i++) {															// go through the received buffer
+		if(cmdBuffer[i] == CMD_SEND_STATUS) {
+			newStatus = cmdBuffer[i+1];
+			break;
+		}
+	}
+
+	PIO_read(newStatus);																// send the status to Atari
+	state = STATE_GET_COMMAND;													// get the next command
 }
 
 void getCmdLengthFromCmdBytes(void)
@@ -395,6 +427,40 @@ void getCmdLengthFromCmdBytes(void)
 	}
 }
 
+void spiDma_waitForFinish(void)
+{
+	if(spiDmaIsIdle) {							// if DMA is idle, just quit
+		return;
+	}
+	
+	while(1) {											// otherwise wait until it will become idle
+		if(spiDma_hasFinished()) {
+			return;
+		}
+	}
+}
+
+BYTE spiDma_hasFinished(void)
+{
+	if(spiDmaIsIdle) {							// if DMA is idle, then DMA has finished
+		return TRUE;
+	}
+	
+	if((DMA1->ISR & (DMA1_IT_TC3 | DMA1_IT_TC2)) == (DMA1_IT_TC3 | DMA1_IT_TC2)) {	// SPI DMA: nothing to Tx and nothing to Rx?
+		GPIOA->BRR = ATN;																			// ATTENTION bit low - nothing to read
+		return TRUE;
+	}
+	
+	return FALSE;
+}
+
+void spiDma_clearFlags(void)
+{
+	DMA1->IFCR		= DMA1_IT_TC3 | DMA1_IT_TC2;						// clear HTIF flags
+	spiDmaIsIdle	= TRUE;																	// mark that the SPI DMA is ready to do something
+	GPIOA->BRR		= ATN;																	// ATTENTION bit low - nothing to read
+}
+
 void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
 {
 	// disable both TX and RX channels
@@ -412,6 +478,15 @@ void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
 	// enable both TX and RX channels
 	DMA1_Channel3->CCR		|= 1;													// enable  DMA1 Channel transfer
 	DMA1_Channel2->CCR		|= 1;													// enable  DMA1 Channel transfer
+	
+	// now set the ATN pin accordingly
+	if(txCount != 0) {																	// something to send over SPI?
+		GPIOA->BSRR = ATN;																// ATTENTION bit high - got something to read
+	} else {
+		GPIOA->BRR = ATN;																	// ATTENTION bit low  - nothing to read
+	}
+	
+	spiDmaIsIdle = FALSE;																// SPI DMA is busy
 }
 
 void init_hw_sw(void)
@@ -555,12 +630,8 @@ void dma_spi_init(void)
   DMA_Init(DMA1_Channel3, &DMA_InitStructure);
 
   // Enable interrupts
-//  DMA_ITConfig(DMA1_Channel3, DMA_IT_HT, ENABLE);			// interrupt on Half Transfer (HT)
   DMA_ITConfig(DMA1_Channel3, DMA_IT_TC, ENABLE);			// interrupt on Transfer Complete (TC)
 
-  // Enable DMA1 Channel3 transfer
-//  DMA_Cmd(DMA1_Channel3, ENABLE);
-	
 	//----------------
 	// DMA1 channel2 configuration -- SPI1 RX
   DMA_DeInit(DMA1_Channel2);
@@ -579,9 +650,5 @@ void dma_spi_init(void)
   DMA_Init(DMA1_Channel2, &DMA_InitStructure);
 
   // Enable DMA1 Channel2 Transfer Complete interrupt
-//  DMA_ITConfig(DMA1_Channel2, DMA_IT_HT, ENABLE);			// interrupt on Half Transfer (HT)
   DMA_ITConfig(DMA1_Channel2, DMA_IT_TC, ENABLE);			// interrupt on Transfer Complete (TC)
-
-  // Enable DMA1 Channel2 transfer
-//  DMA_Cmd(DMA1_Channel2, ENABLE);
 }
