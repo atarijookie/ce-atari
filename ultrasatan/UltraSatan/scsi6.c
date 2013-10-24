@@ -36,8 +36,8 @@ void ProcSCSI6(BYTE devIndex)
 	
 	// The following commands support LUN in command, check if it's valid
 	// Note: INQUIRY also supports LUNs, but it should report in a different way...
-	if( justCmd == SCSI_C_READ6 || justCmd == SCSI_C_FORMAT_UNIT || 
-		justCmd == SCSI_C_TEST_UNIT_READY || justCmd == SCSI_C_REQUEST_SENSE) {
+	if( justCmd == SCSI_C_READ6				|| justCmd == SCSI_C_FORMAT_UNIT || 
+		justCmd == SCSI_C_TEST_UNIT_READY	|| justCmd == SCSI_C_REQUEST_SENSE ) {
 
 		if(lun != 0) {					// LUN must be 0
 		    Return_LUNnotSupported(devIndex);
@@ -381,14 +381,16 @@ void SCSI_Inquiry(BYTE devIndex)
 
 	for(i=0; i<xx; i++)			  
 	{
-		if(i == 0) {					// PERIPHERAL QUALIFIER + PERIPHERAL DEVICE TYPE
-			val = firstByte;			// depending on LUN number
-		}
-		
+		// first init the val to zero or space
 		if(i >= 8 && i<=43) {           // if the returned byte is somewhere from ASCII part of data, init on 'space' character
 		    val = ' ';
 		} else {                        // for other locations init on ZERO
     		val = 0;
+		}
+
+		// then for the appropriate position return the right value
+		if(i == 0) {					// PERIPHERAL QUALIFIER + PERIPHERAL DEVICE TYPE
+			val = firstByte;			// depending on LUN number
 		}
 		
 		if(i==1) {                      // 1st byte
@@ -438,14 +440,6 @@ void SCSI_Inquiry(BYTE devIndex)
 
 	PostDMA_read();
 
-/*
-	if(lun != 0) {                                      // for other LUNs
-    	device[devIndex].SCSI_SK	= SCSI_E_IllegalRequest;
-	    device[devIndex].SCSI_ASC	= SCSI_ASC_LU_NOT_SUPPORTED;
-	    device[devIndex].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-	}
-*/
-	
     SendOKstatus(devIndex);
 }
 //----------------------------------------------
