@@ -105,12 +105,7 @@ void ProcICD(BYTE devIndex)
 	// Note: INQUIRY also supports LUNs, but it should report in a different way...
 	if( justCmd == SCSI_C_READ_CAPACITY || justCmd == SCSI_C_READ10 ) {
 		if(lun != 0) {					// LUN must be 0
-			device[devIndex].LastStatus	= SCSI_ST_CHECK_CONDITION;
-			device[devIndex].SCSI_SK	= SCSI_E_IllegalRequest;		// other devices = error 
-			device[devIndex].SCSI_ASC	= SCSI_ASC_LU_NOT_SUPPORTED;
-			device[devIndex].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-	
-			PIO_read(device[devIndex].LastStatus);   // send status byte
+		    Return_LUNnotSupported(devIndex);
 			return;
 		}
 	}
@@ -302,7 +297,7 @@ void SCSI_ReadWrite10(BYTE devIndex, char Read)
 	lenX |= cmd[9];	
 	
 	//--------------------------------
-	sectorEnd = sector + ((DWORD)lenX);
+	sectorEnd = sector + ((DWORD)lenX) - 1;
 	
 	// if we're trying to address a sector beyond the last one - error!
 	if(sector >= device[devIndex].SCapacity || sectorEnd >= device[devIndex].SCapacity) {	

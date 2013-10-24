@@ -23,6 +23,7 @@ void SendOKstatus(BYTE devIndex);
 void ReturnStatusAccordingToIsInit(BYTE devIndex);
 void ReturnUnitAttention(BYTE devIndex);
 void ClearTheUnitAttention(BYTE devIndex);
+void Return_LUNnotSupported(BYTE devIndex);
 
 void SendEmptySecotrs(WORD sectors);
 

@@ -40,12 +40,7 @@ void ProcSCSI6(BYTE devIndex)
 		justCmd == SCSI_C_TEST_UNIT_READY || justCmd == SCSI_C_REQUEST_SENSE) {
 
 		if(lun != 0) {					// LUN must be 0
-			device[devIndex].LastStatus	= SCSI_ST_CHECK_CONDITION;
-			device[devIndex].SCSI_SK	= SCSI_E_IllegalRequest;
-			device[devIndex].SCSI_ASC	= SCSI_ASC_LU_NOT_SUPPORTED;
-			device[devIndex].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-			PIO_read(device[devIndex].LastStatus);   // send status byte
+		    Return_LUNnotSupported(devIndex);
 			return;
 		}
 	}
@@ -101,6 +96,16 @@ void ProcSCSI6(BYTE devIndex)
 		break;
 		}
 	}
+}
+//----------------------------------------------
+void Return_LUNnotSupported(BYTE devIndex)
+{
+    device[devIndex].LastStatus	= SCSI_ST_CHECK_CONDITION;
+	device[devIndex].SCSI_SK	= SCSI_E_IllegalRequest;
+	device[devIndex].SCSI_ASC	= SCSI_ASC_LU_NOT_SUPPORTED;
+	device[devIndex].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+
+	PIO_read(device[devIndex].LastStatus);   // send status byte
 }
 //----------------------------------------------
 void ReturnUnitAttention(BYTE devIndex)
@@ -259,10 +264,10 @@ void SCSI_ReadWrite6(BYTE devIndex, BYTE Read)
 	if(lenX==0)
 		lenX=256;
 	
-	sectorEnd = sector + ((DWORD)lenX);
+	sectorEnd = sector + ((DWORD)lenX) - 1;
 	
 	// if we're trying to address a sector beyond the last one - error!
-	if(sector >= device[devIndex].SCapacity || sectorEnd >= device[devIndex].SCapacity) {	
+	if( sector >= device[devIndex].SCapacity || sectorEnd >= device[devIndex].SCapacity) {   
 		device[devIndex].LastStatus	= SCSI_ST_CHECK_CONDITION;
 		device[devIndex].SCSI_SK	= SCSI_E_IllegalRequest;
 		device[devIndex].SCSI_ASC	= SCSI_ASC_LBA_OUT_OF_RANGE;
@@ -433,7 +438,15 @@ void SCSI_Inquiry(BYTE devIndex)
 
 	PostDMA_read();
 
-	SendOKstatus(devIndex);
+/*
+	if(lun != 0) {                                      // for other LUNs
+    	device[devIndex].SCSI_SK	= SCSI_E_IllegalRequest;
+	    device[devIndex].SCSI_ASC	= SCSI_ASC_LU_NOT_SUPPORTED;
+	    device[devIndex].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+	}
+*/
+	
+    SendOKstatus(devIndex);
 }
 //----------------------------------------------
 void SCSI_ModeSense6(BYTE devIndex)
