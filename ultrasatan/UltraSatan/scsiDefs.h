@@ -75,7 +75,6 @@
 
 // ASC & ASCQ
 #define SCSI_ASC_InvalidFieldInCDB              0x24
-#define SCSI_ASC_InvalidCommandOperationCode    0x20
 
 #define SCSI_ASC_INQUIRY_data_has_changed       0x3f
 #define SCSI_ASCQ_INQUIRY_data_has_changed      0x03

@@ -86,8 +86,8 @@ void ProcSCSI6(BYTE devIndex)
 	default: 
 		{
 		device[devIndex].LastStatus	= SCSI_ST_CHECK_CONDITION;
-		device[devIndex].SCSI_SK		= SCSI_E_IllegalRequest;
-		device[devIndex].SCSI_ASC		= SCSI_ASC_InvalidCommandOperationCode;
+		device[devIndex].SCSI_SK	= SCSI_E_IllegalRequest;
+		device[devIndex].SCSI_ASC	= SCSI_ASC_INVALID_COMMAND_OPERATION_CODE;
 		device[devIndex].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
 //		showCommand(0xf0, 6, device[devIndex].LastStatus);
