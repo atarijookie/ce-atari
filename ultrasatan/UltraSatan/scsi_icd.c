@@ -96,6 +96,12 @@ void ProcICD(BYTE devIndex)
 			return;			
 		}
 		//---------
+		if(!cmpn(&cmd[4], "RdLog", 5))										// read command log?
+		{
+			Special_ReadLog();
+			return;			
+		}
+		//---------
 	}
 	//----------------
 	justCmd	= cmd[1];							// get the command #

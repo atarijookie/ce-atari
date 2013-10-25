@@ -30,6 +30,8 @@ extern BYTE SectorBufer[2*512];
 extern BYTE brStat;										// status from bridge
 extern BYTE cmd[14];									// received command bytes
 extern TDevice device[MAX_DEVICES];
+
+extern BYTE logBuffer[512];								// command and status log
 //-----------------------------------------------
 void Special_ReadFW(void)
 {
@@ -471,4 +473,34 @@ void Special_WriteInquiryName(void)
 	ReadInquiryName();
 }
 //-----------------------------------------------
+void Special_ReadLog(void)
+{
+	WORD i;
+	
+	//-----------	
+	// send sector to ST
+	PreDMA_read();															// prepare bridge
+
+	for(i=0; i<512; i++)
+	{
+		DMA_read(logBuffer[i]);		
+
+		if(brStat != E_OK)		  									// if something was wrong
+			break;																	// quit
+	}
+	
+	PostDMA_read();
+	//-----------	
+	
+	// send status
+	if(brStat != E_OK)
+	{
+		PIO_read(SCSI_ST_CHECK_CONDITION);				// shit happened
+		return;
+	}
+
+	PIO_read(SCSI_ST_OK);												// everything went OK
+}
+//-----------------------------------------------
+
 

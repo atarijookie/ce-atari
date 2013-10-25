@@ -35,7 +35,7 @@ TDevice device[MAX_DEVICES];
 BYTE SectorBufer[2*512];
 
 BYTE cmd[14];										// received command bytes
-BYTE len;												// length of received command
+BYTE len;											// length of received command
 BYTE isICD;											// a flag - is the received command in ICD format? 
 BYTE brStat;										// status from bridge
 volatile DWORD timeval;		
@@ -50,6 +50,13 @@ BYTE DMA_readC(BYTE byte);
 BYTE InquiryName[11];
 
 extern BYTE shitHasHappened;
+
+// this log buffer contains 32 last commands and their return codes, each command and status is 16 bytes long
+BYTE logBuffer[512];	// place to store the commands
+WORD logIndex;			// index in the logBuffer (0 .. 31), 
+BYTE logCount;			// counter of all logged commands (0 .. 63)
+
+void addToLogBuffer(BYTE devIndex);
 //-----------------------------------------------
 void main(void)
 {
@@ -78,6 +85,14 @@ void main(void)
 	uart_prints(VERSION_STRING);
 	uart_putchar('\n');
 	
+	//-----------------------------------------------
+	// clear log buffer
+	for(i=0; i<512; i++) {
+		logBuffer[i] = 0;
+	}
+	
+	logIndex = 0;
+	logCount = 0;
 	//-----------------------------------------------
 	// initialize the Async Mem register - where some Read-Only pins are located
 	// to read the pins, read from pASYNCMEM
@@ -227,12 +242,46 @@ while(1)
 	else								  						// if it's a normal command
 		ProcSCSI6(res);
 		
+	addToLogBuffer(res);							// store this cmd in the buffer
+		
 	if(shitHasHappened)
 	{
 		uart_prints("Unhandled shit!\n");
 		shitHasHappened = 0;
 	}
  }
+}
+//-----------------------------------------------
+void addToLogBuffer(BYTE devIndex)
+{
+	BYTE special = 0, i;
+	
+	// first prepare the 0th byte, which is special:
+	// bit 7: 0 - it's a command, 1 - it's other log info
+	// bit 6: devIndex 0 or 1
+	// bits 5..0: logCount - a counter of how many times we started to log from index 0
+	if(devIndex != 0) {
+		special |= (1 << 6);			// bit 6: devIndex 
+	}
+	
+	special |= logCount;				// store logCount
+	logBuffer[logIndex++] = special;	// pos 0: special
+	//-------
+	for(i=0; i<11; i++) {				// pos 1 - 11: cmd
+		logBuffer[logIndex++] = cmd[i];
+	}
+	
+	logBuffer[logIndex++] = device[devIndex].LastStatus;		// pos 12: status
+	logBuffer[logIndex++] = device[devIndex].SCSI_SK;			// pos 13: SK
+	logBuffer[logIndex++] =	device[devIndex].SCSI_ASC;			// pos 14: ASC
+	logBuffer[logIndex++] = device[devIndex].SCSI_ASCQ;			// pos 15: ASCQ
+
+	if(logIndex >= 512) {				// end of log buffer?
+		logIndex = 0;					// reset buffer index
+		
+		logCount++;						// increment overflow / overlap counter
+		logCount = logCount & 0x3f;		// keep only 6 lowest bits
+	}
 }
 //-----------------------------------------------
 void ClearAllStorage(void)
