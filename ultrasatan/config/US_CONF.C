@@ -1,11 +1,13 @@
 /*--------------------------------------------------*/
 #include <stdio.h>
-#include <conio.h>
 #include <screen.h>
 #include <string.h>
 #include <stdlib.h>
 #include <graphics.h>
 #include <aes.h>
+
+/* #include <conio.h> */
+#include <ext.h>
 
 #include "dma.h"
 #include "system.h"
@@ -71,6 +73,7 @@ void DoOnKeyW(void);
 void DoOnKeyR(void);
 void DoOnKeyI(void);
 void DoOnKeyU(void);
+void DoOnKeyL(void);
 void DoOnKeySpace(void);
 void DoOnNumber(BYTE number);
 void UploadFirmWare(int which, char *path, char *justFile);
@@ -81,6 +84,8 @@ BYTE US_ReadInquiryName(BYTE *buffer);
 BYTE US_WriteInquiryName(BYTE *buffer);
 
 void ShowMessage(char *msg);
+
+int getCmdLength(BYTE cmd0, BYTE cmd1);
 /*--------------------------------------------------*/
 BYTE      BootBase;
 TFirmWare FirmWare[5];
@@ -221,7 +226,10 @@ void main(void)
       
       case 'i':
       case 'I': DoOnKeyI();     did = 1; break;
-    }
+
+      case 'l':
+      case 'L': DoOnKeyL();     did = 1; break;
+	}
     
     if(key>='0' && key<='9')
     {
@@ -475,6 +483,91 @@ void DoOnKeyU(void)
 
 }
 /*--------------------------------------------------*/
+void DoOnKeyL(void)
+{
+  BYTE res;
+  WORD i, index, j, len;
+  BYTE cmd[] = {0x1f, 0x20, 'U', 'S', 'R', 'd', 'L', 'o', 'g', 0, 0};
+  
+  /*---------------*/
+  memset(pBuffer, 0, 512);               /* clear the buffer */
+
+  cmd[0] = 0x1f | (UltraSatanID << 5);  
+  res = LongRW(1, cmd, pBuffer);         /* read log */
+
+  #ifndef DEBUG_VERSION
+  if(res != OK)
+  {
+    ShowMessage("Failed to read log from device!");
+	DisplayScreen();
+    return;
+  }
+  #endif
+
+	Clear_home();
+	printf("Showing device log:\n");
+
+	index = 0;
+	for(i=0; i<32; i++) {			/* go through all 32 records */
+		BYTE special = pBuffer[index++];
+
+		if(i == 16) {				/* in the middle wait for key */
+			printf("Press a key to continue...\n");
+			Cconin();
+			printf("\n");
+		}
+	
+									/* show header for command */
+		printf("di %d, lc %d, cmd: ", special >> 6, special & 0x3F);
+		Rev_on();
+
+		len = getCmdLength(pBuffer[index], pBuffer[index + 1]);		/* determine the command length */
+		
+		for(j=0; j<11; j++) {		/* show the command */
+			BYTE cmd = pBuffer[index++];
+			
+			if(j < len) {			/* still a command byte? */
+				printf("%02x ", cmd);
+			} else {				/* just a filler? */
+				printf("   ", cmd);
+			}
+		}
+
+		Rev_off();		
+		printf("- ");
+		
+		for(j=0; j<4; j++) {		/* status, SK, ASC, ASCQ */
+			BYTE stat = pBuffer[index++];
+			printf("%02x ", stat);
+		}
+		
+		printf("\n");
+	}
+	
+	printf("Press a key to continue...\n");
+	Cconin();             /* wait for a key */
+	DisplayScreen();
+}
+
+int getCmdLength(BYTE cmd0, BYTE cmd1)
+{
+	int len = 6;
+
+	if((cmd0 & 0x1f)==0x1f)			  		/* if the command is '0x1f', then it's an ICD command */
+	{
+		switch((cmd1 & 0xe0)>>5)	 		/* get the length of the command */
+		{
+			case  0: len =  7; break;
+			case  1: len = 11; break;
+			case  2: len = 11; break;
+		/*	case  5: len = 13; break;		*/
+			default: len =  7; break;
+		}
+	}
+
+	return len;
+}
+/*--------------------------------------------------*/
 void UploadFirmWare(int which, char *path, char *justFile)
 {
   WORD i, len, res;
@@ -725,7 +818,7 @@ void DisplayScreen(void)
   
   Rev_on();
   printf(">> Configuration tool for UltraSatan <<<\n");
-  printf(" By Jookie (joo@kie.sk), February 2009  ");
+  printf("  By Jookie (joo@kie.sk), October 2013  ");
   Rev_off();
   
   ListFirmwares();
