@@ -37,7 +37,7 @@ void ProcSCSI6(BYTE devIndex)
 	// The following commands support LUN in command, check if it's valid
 	// Note: INQUIRY also supports LUNs, but it should report in a different way...
 	if( justCmd == SCSI_C_READ6				|| justCmd == SCSI_C_FORMAT_UNIT || 
-		justCmd == SCSI_C_TEST_UNIT_READY	|| justCmd == SCSI_C_REQUEST_SENSE ) {
+		justCmd == SCSI_C_TEST_UNIT_READY ) {
 
 		if(lun != 0) {					// LUN must be 0
 		    Return_LUNnotSupported(devIndex);
