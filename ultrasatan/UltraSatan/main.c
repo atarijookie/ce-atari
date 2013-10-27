@@ -32,10 +32,10 @@ Load -> Boot mode   : SPI
 //-----------------------------------------------
 TDevice device[MAX_DEVICES];
 
-BYTE SectorBufer[2*512];
+BYTE SectorBufer[512];
 
-BYTE cmd[14];										// received command bytes
-BYTE len;											// length of received command
+BYTE cmd[20];										// received command bytes
+BYTE len; 											// length of received command
 BYTE isICD;											// a flag - is the received command in ICD format? 
 BYTE brStat;										// status from bridge
 volatile DWORD timeval;		
@@ -534,6 +534,7 @@ void SetUpCmd(void)
 			case  0: len =  7; break;
 			case  1: len = 11; break;
 			case  2: len = 11; break;
+			case  4: len = 17; break;
 			case  5: len = 13; break;
 			default: len =  7; break;
 		}

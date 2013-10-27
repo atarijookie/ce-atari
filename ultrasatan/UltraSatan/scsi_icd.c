@@ -15,7 +15,7 @@
 extern TDevice device[MAX_DEVICES];
 
 extern BYTE WrByte;				// byte from ST for device
-extern BYTE cmd[14];				// received command bytes
+extern BYTE cmd[20];			// received command bytes
 extern BYTE len;					// length of received command 
 //------------------------------------
 extern BYTE shitHasHappened;

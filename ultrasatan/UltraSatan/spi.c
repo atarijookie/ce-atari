@@ -5,7 +5,6 @@
 BYTE SPIstatus;
 
 volatile DWORD SPIbytesToRead;
-extern BYTE SectorBufer[512];
 
 extern volatile BYTE *bfrIn;
 extern volatile WORD GotBytes;

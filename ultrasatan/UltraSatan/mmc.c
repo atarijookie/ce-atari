@@ -8,8 +8,6 @@
 #include "bridge.h"
 
 extern TDevice device[MAX_DEVICES];
-extern BYTE SectorBufer[2*512];
-BYTE SectorFFs[512];
 
 extern BYTE SPIstatus;
 extern unsigned char brStat;
@@ -35,9 +33,6 @@ void mmcInit(void)
 	// initialize SPI interface
 	spiInit();
 	spiSetSPCKfreq(SPI_FREQ_SLOW);
-	
-	for(i=0; i<512; i++)
-		SectorFFs[i] = 0xff;
 }
 //-----------------------------------------------
 BYTE mmcReset(BYTE spiID)

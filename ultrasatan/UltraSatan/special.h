@@ -12,6 +12,8 @@ void Special_WriteRTC(void);
 
 void Special_ReadInquiryName(void);
 void Special_WriteInquiryName(void);
+
+void Special_ReadLog(void);
 //-----------------------------------------------
 
 

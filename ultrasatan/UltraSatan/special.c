@@ -26,9 +26,9 @@
 // so the complete command could look like this:
 // 0x1f, 0x20, 'USRdFW', 0x01, 0x0010  (ACSI device 0: read sector 0x0010 of firmware 1)
 //-----------------------------------------------
-extern BYTE SectorBufer[2*512];
+extern BYTE SectorBufer[512];
 extern BYTE brStat;										// status from bridge
-extern BYTE cmd[14];									// received command bytes
+extern BYTE cmd[20];									// received command bytes
 extern TDevice device[MAX_DEVICES];
 
 extern BYTE logBuffer[512];								// command and status log
