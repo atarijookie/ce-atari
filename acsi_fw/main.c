@@ -35,17 +35,6 @@ WORD t1, t2, dt;
 // 			GPIOB->BSRR = 1;	// 1
 //			GPIOB->BRR = 1;		// 0			
 
-/* Franz to host communication:
-A) send   : ATN_SEND_TRACK with the track # and side # -- 2 WORDs + zeros = 3 WORDs
-   receive: track data with sector start marks, up to 15 kB -- 12 sectors + the marks
-
-B) send   : ATN_SECTOR_WRITTEN with the track, side, sector # + captured data, up to 1500 B
-   receive: nothing (or don't care)
-	 
-C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + empty WORDs
-   receive: commands possibly received -- receive 6 WORDs (3 empty, 3 with possible commands)
-*/
-
 // commands sent from device to host
 #define ATN_FW_VERSION						0x01								// followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
 #define ATN_ACSI_COMMAND					0x02
@@ -172,18 +161,21 @@ int main (void)
 			processHostCommands();																// and process all the received commands
 		}
 
-		if(spiDmaIsIdle == TRUE) {															// SPI DMA: nothing to Tx and nothing to Rx?
-			if(sendFwVersion) {																		// should send FW version? this is a window for receiving commands
-				spiDma_txRx(5, (BYTE *) &atnSendFwVersion[0],			 6, (BYTE *) &cmdBuffer[0]);
+		// in command waiting state, nothing to do and should send FW version?
+		if(state == STATE_GET_COMMAND && spiDmaIsIdle && sendFwVersion) {
+			spiDma_txRx(5, (BYTE *) &atnSendFwVersion[0],			 6, (BYTE *) &cmdBuffer[0]);
 				
-				sendFwVersion	= FALSE;
-			} else if(sendACSIcommand) {
-				spiDma_txRx(10, (BYTE *) &atnSendACSIcommand[0],	(CMD_BUFFER_LENGTH / 2),	(BYTE *) &cmdBuffer[0]);
+			sendFwVersion	= FALSE;
+		}
+
+		// SPI is idle and we should send command to host? 
+		if(spiDmaIsIdle && sendACSIcommand) {
+			spiDma_txRx(10, (BYTE *) &atnSendACSIcommand[0],	(CMD_BUFFER_LENGTH / 2),	(BYTE *) &cmdBuffer[0]);
 				
-				sendACSIcommand	= FALSE;
-			}
+			sendACSIcommand	= FALSE;
 		}
 		
+		// set the ATN flag as appropriate
 		if(DMA1_Channel3->CNDTR != 0) {												// something to send over SPI?
 			GPIOA->BSRR = ATN;																	// ATTENTION bit high - got something to read
 		} else {
@@ -382,7 +374,6 @@ void onDataWrite(void)
 
 	state = STATE_READ_STATUS;													// continue with sending the status
 	GPIOA->BRR = ATN;																		// ATTENTION bit low  - nothing to read
-
 }
 
 void onReadStatus(void)
