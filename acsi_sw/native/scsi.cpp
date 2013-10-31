@@ -37,7 +37,7 @@ void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
     dataTrans = dt;
 }
 
-void Scsi::setDataMedia(DataMedia *dm)
+void Scsi::setDataMedia(IMedia *dm)
 {
     dataMedia = dm;
 }

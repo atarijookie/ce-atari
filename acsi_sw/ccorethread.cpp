@@ -31,7 +31,8 @@ CCoreThread::CCoreThread()
 
     scsi        = new Scsi();
     scsi->setAcsiDataTrans(dataTrans);
-    scsi->setDataMedia(dataMedia);
+//    scsi->setDataMedia(dataMedia);
+    scsi->setDataMedia(&testMedia);
 }
 
 CCoreThread::~CCoreThread()

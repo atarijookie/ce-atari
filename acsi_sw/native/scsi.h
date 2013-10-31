@@ -19,7 +19,7 @@ public:
     ~Scsi();
 
     void setAcsiDataTrans(AcsiDataTrans *dt);
-    void setDataMedia(DataMedia *dm);
+    void setDataMedia(IMedia *dm);
     void setAcsiID(int newId);
     void setDeviceType(int newType);
 

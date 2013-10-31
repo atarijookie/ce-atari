@@ -17,7 +17,8 @@ SOURCES +=  main.cpp\
             native/scsi.cpp \
             acsidatatrans.cpp \
             native/datamedia.cpp \
-            native/nomedia.cpp
+            native/nomedia.cpp \
+    native/testmedia.cpp
 
 HEADERS  += mainwindow.h \
             cconusb.h \
@@ -31,6 +32,7 @@ HEADERS  += mainwindow.h \
             native/datamedia.h \
             native/nomedia.h \
             native/imedia.h \
-    sleeper.h
+    sleeper.h \
+    native/testmedia.h
 
 FORMS    += mainwindow.ui

@@ -12,6 +12,7 @@
 
 #include "native/scsi.h"
 #include "native/datamedia.h"
+#include "native/testmedia.h"
 #include "acsidatatrans.h"
 
 class CCoreThread: public QThread
@@ -44,6 +45,8 @@ private:
     Scsi            *scsi;
     AcsiDataTrans   *dataTrans;
     DataMedia       *dataMedia;
+
+    TestMedia       testMedia;
 
     void createConnectionObject(void);
     void usbConnectionCheck(void);
