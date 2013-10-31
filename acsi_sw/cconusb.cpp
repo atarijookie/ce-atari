@@ -196,10 +196,15 @@ DWORD CConUsb::bytesToSend(void)
     return dwTxBytes;
 }
 
-void CConUsb::txRx(int count, BYTE *sendBuffer, BYTE *receiveBufer)
+void CConUsb::txRx(int count, BYTE *sendBuffer, BYTE *receiveBufer, bool addLastToAtn)
 {
     write   (count, sendBuffer);
     read    (count, receiveBufer);
+
+    // add the last WORD as possible to check for the new ATN
+    if(addLastToAtn) {
+        setAtnWord(&receiveBufer[count - 2]);
+    }
 }
 
 void CConUsb::write(int count, BYTE *buffer)
@@ -263,7 +268,7 @@ void CConUsb::getAtnWord(BYTE *bfr)
     // no previous ATN word? read it!
     BYTE outBuff[2];
     memset(outBuff, 0, 2);
-    txRx(2, outBuff, bfr);
+    txRx(2, outBuff, bfr, false);
 }
 
 void CConUsb::setAtnWord(BYTE *bfr)

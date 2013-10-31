@@ -6,23 +6,9 @@
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
-BYTE        circBfr[20480];             // 0x5000 bytes
-int         cb_cnt, cb_posa, cb_posg;
-
-#define		bfr_add(X)				{ circBfr[cb_posa] = X;     cb_posa++;      cb_posa &= 0x4FFF;   cb_cnt++; }
-#define		bfr_get(X)				{ X = circBfr[cb_posg];     cb_posg++;      cb_posg &= 0x4FFF;   cb_cnt--; }
-
-BYTE        cmdBuffer[16];
-int         cd_cnt, cd_posa, cd_posg;
-#define		cmd_add(X)				{ cmdBuffer[cd_posa] = X;     cd_posa++;      cd_posa &= 0x4FFF;   cd_cnt++; }
-#define		cmd_get(X)				{ X = cmdBuffer[cd_posg];     cd_posg++;      cd_posg &= 0x4FFF;   cd_cnt--; }
-
 #define LOGFILE "C:/acsilog.txt"
 
 QStringList dbg;
-
-BYTE inBuff[1200];
-BYTE outBuff[1200];
 
 extern "C" void outDebugString(const char *format, ...);
 
@@ -71,6 +57,8 @@ void CCoreThread::displayDbg(void)
 
 void CCoreThread::run(void)
 {
+    BYTE inBuff[2];
+
     DWORD lastTick = GetTickCount();
     running = true;
 
@@ -85,16 +73,14 @@ void CCoreThread::run(void)
 
         if(sendSingleHalfWord) {
             BYTE halfWord = 0, inHalf;
-            conUsb->txRx(1, &halfWord, &inHalf);
+            conUsb->txRx(1, &halfWord, &inHalf, false);
             sendSingleHalfWord = false;
         }
 
         conUsb->getAtnWord(inBuff);
 
         if(inBuff[0] != 0 || inBuff[1] != 0) {
-            logToFile((char *) "Waiting for ATN: \nOUT:\n");
-            logToFile(2, outBuff);
-            logToFile((char *) "\nIN:\n");
+            logToFile((char *) "Waiting for ATN: \nIN:\n");
             logToFile(2, inBuff);
             logToFile((char *) "\n");
         }
@@ -132,72 +118,17 @@ void CCoreThread::handleAcsiCommand(void)
     scsi->processCommand(bufIn);            // process the command
 }
 
-void CCoreThread::setNextCmd(BYTE cmd)
-{
-    cmd_add(cmd);
-}
-
-void CCoreThread::sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf, bool storeInData)
-{
-    if(!conUsb->isConnected()) {                    // not connected? quit
-        return;
-    }
-
-    conUsb->txRx(cnt, outBuf, inBuf);               // send and receive
-
-//    QString so,si;
-//    int val;
-
-//    for(int i=0; i<cnt; i++) {
-//        val = (int) outBuf[i];
-//        so = so + QString("%1 ").arg(val, 2, 16, QLatin1Char('0'));
-
-//        val = (int) inBuf[i];
-//        si = si + QString("%1 ").arg(val, 2, 16, QLatin1Char('0'));
-//    }
-//    qDebug() << "Sent: " << so;
-//    qDebug() << "Got : " << si;
-
-    if(!storeInData) {
-        return;
-    }
-
-    for(int i=0; i<cnt; i++) {                      // add to circular buffer
-        bfr_add(inBuf[i]);
-    }
-}
-
-void CCoreThread::justReceive(int cnt, BYTE *inBuf)
-{
-    if(!conUsb->isConnected()) {                    // not connected? quit
-        return;
-    }
-
-    conUsb->read(cnt, inBuf);                       // receive
-
-    for(int i=0; i<cnt; i++) {                      // add to circular buffer
-        bfr_add(inBuf[i]);
-    }
-}
-
 void CCoreThread::handleFwVersion(void)
 {
-    BYTE fwVer[10-2], oBuf[10-2];
-    int storeCnt;
+    BYTE fwVer[8], oBuf[8];
 
-    memset(oBuf, 0, 10-2);
-    storeCnt = MIN(cd_cnt, 10-2);             // get the minimum from sizeof(buf), remaining, cd_cnt (what we may send, what we should send, what we got)
-
-    for(int i=0; i<storeCnt; i++) {         // now copy all the possible bytes (commands) to buffer
-        cmd_get(oBuf[i]);
-    }
-
-    conUsb->txRx(10-2, oBuf, fwVer);
+    memset(oBuf, 0, 8);
+    conUsb->txRx(8, oBuf, fwVer);
 
     logToFile((char *) "handleFwVersion: \nOUT:\n");
-    logToFile(10-2, oBuf);
+    logToFile(8, oBuf);
     logToFile((char *) "\nIN:\n");
-    logToFile(10-2, fwVer);
+    logToFile(8, fwVer);
     logToFile((char *) "\n");
 
     int year = bcdToInt(fwVer[1]) + 2000;
@@ -206,8 +137,6 @@ void CCoreThread::handleFwVersion(void)
     } else {
         outDebugString("FW: Hans,  %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
     }
-
-    conUsb->setAtnWord(&fwVer[6]);          // add the last WORD as possible to check for the new ATN
 }
 
 int CCoreThread::bcdToInt(int bcd)

@@ -96,7 +96,7 @@ public:
     virtual void    deinit(void);
     virtual DWORD   bytesToReceive(void);
     virtual DWORD   bytesToSend(void);
-    virtual void    txRx(int count, BYTE *sendBuffer, BYTE *receiveBufer);
+    virtual void    txRx(int count, BYTE *sendBuffer, BYTE *receiveBufer, bool addLastToAtn=true);
     virtual void    write(int count, BYTE *buffer);
     virtual void    read (int count, BYTE *buffer);
     virtual bool    isConnected(void);

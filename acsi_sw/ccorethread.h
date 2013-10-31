@@ -25,8 +25,6 @@ public:
     void stopRunning(void);
     bool isRunning(void);
 
-    void setNextCmd(BYTE cmd);
-
     static void appendToDbg(QString line);
     static void displayDbg(void);
 
@@ -53,8 +51,6 @@ private:
     void handleFwVersion(void);
     void handleAcsiCommand(void);
 
-    void sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf, bool storeInData=true);
-    void justReceive(int cnt, BYTE *inBuf);
     int bcdToInt(int bcd);
 
     void logToFile(char *str);
