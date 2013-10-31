@@ -101,6 +101,9 @@ public:
     virtual void    read (int count, BYTE *buffer);
     virtual bool    isConnected(void);
 
+    void getAtnWord(BYTE *bfr);
+    void setAtnWord(BYTE *bfr);
+
     void tryToConnect(void);
     bool connectionWorking(void);
 
@@ -128,6 +131,11 @@ private:
     bool            connected;
 
     FT_HANDLE       ftHandle;
+
+    struct {
+        bool got;
+        BYTE bytes[2];
+    } prevAtnWord;
 };
 
 #endif // CCONUSB_H

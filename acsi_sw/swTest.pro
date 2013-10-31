@@ -30,6 +30,7 @@ HEADERS  += mainwindow.h \
             acsidatatrans.h \
             native/datamedia.h \
             native/nomedia.h \
-            native/imedia.h
+            native/imedia.h \
+    sleeper.h
 
 FORMS    += mainwindow.ui

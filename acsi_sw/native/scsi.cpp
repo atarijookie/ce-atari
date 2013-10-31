@@ -233,7 +233,7 @@ void Scsi::ReturnStatusAccordingToIsInit(void)
 void Scsi::SendOKstatus(void)
 {
     devInfo.LastStatus	= SCSI_ST_OK;
-    devInfo.SCSI_SK	= SCSI_E_NoSense;
+    devInfo.SCSI_SK     = SCSI_E_NoSense;
     devInfo.SCSI_ASC	= SCSI_ASC_NO_ADDITIONAL_SENSE;
     devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
@@ -652,8 +652,8 @@ void Scsi::SCSI_ReadCapacity(void)
     }
 
     dataTrans->addData(hi);		 	// Hi
-    dataTrans->addData(midhi);	// mid-Hi
-    dataTrans->addData(midlo);	// mid-Lo
+    dataTrans->addData(midhi);      // mid-Hi
+    dataTrans->addData(midlo);      // mid-Lo
     dataTrans->addData(lo);		 	// Lo
 
     // return sector size

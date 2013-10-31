@@ -77,13 +77,19 @@ void CCoreThread::run(void)
     outDebugString("Core thread starting...");
 
     while(shouldRun) {
+        if(GetTickCount() - lastTick < 10) {            // less than 10 ms ago?
+            msleep(1);
+            continue;
+        }
+        lastTick = GetTickCount();
+
         if(sendSingleHalfWord) {
             BYTE halfWord = 0, inHalf;
             conUsb->txRx(1, &halfWord, &inHalf);
             sendSingleHalfWord = false;
         }
 
-        getAtnWord(inBuff);
+        conUsb->getAtnWord(inBuff);
 
         if(inBuff[0] != 0 || inBuff[1] != 0) {
             logToFile((char *) "Waiting for ATN: \nOUT:\n");
@@ -101,42 +107,29 @@ void CCoreThread::run(void)
             handleFwVersion();
             break;
 
+        case ATN_ACSI_COMMAND:
+            handleAcsiCommand();
+            break;
+
         default:
             logToFile((char *) "That ^^^ shouldn't happen!\n");
             break;
         }
-
-        if(GetTickCount() - lastTick < 10) {            // less than 10 ms ago?
-            msleep(1);
-            continue;
-        }
-        lastTick = GetTickCount();
     }
 
     running = false;
 }
 
-void CCoreThread::getAtnWord(BYTE *bfr)
+void CCoreThread::handleAcsiCommand(void)
 {
-    if(prevAtnWord.got) {                   // got some previous ATN word? use it
-        bfr[0] = prevAtnWord.bytes[0];
-        bfr[1] = prevAtnWord.bytes[1];
-        prevAtnWord.got = false;
+    #define CMD_SIZE    14
 
-        return;
-    }
+    BYTE bufOut[CMD_SIZE], bufIn[CMD_SIZE];
+    memset(bufOut, 0, CMD_SIZE);
 
-    // no previous ATN word? read it!
-    BYTE outBuff[2];
-    memset(outBuff, 0, 2);
-    conUsb->txRx(2, outBuff, bfr);
-}
+    conUsb->txRx(14, bufOut, bufIn);        // get 14 cmd bytes
 
-void CCoreThread::setAtnWord(BYTE *bfr)
-{
-    prevAtnWord.bytes[0] = bfr[0];
-    prevAtnWord.bytes[1] = bfr[1];
-    prevAtnWord.got = true;
+    scsi->processCommand(bufIn);            // process the command
 }
 
 void CCoreThread::setNextCmd(BYTE cmd)
@@ -214,7 +207,7 @@ void CCoreThread::handleFwVersion(void)
         outDebugString("FW: Hans,  %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
     }
 
-    setAtnWord(&fwVer[8]);          // add the last WORD as possible to check for the new ATN
+    conUsb->setAtnWord(&fwVer[6]);          // add the last WORD as possible to check for the new ATN
 }
 
 int CCoreThread::bcdToInt(int bcd)

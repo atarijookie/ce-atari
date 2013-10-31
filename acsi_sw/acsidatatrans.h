@@ -5,16 +5,23 @@
 #include "datatypes.h"
 
 // commands sent from device to host
-
 #define ATN_FW_VERSION					0x01								// followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
 #define ATN_ACSI_COMMAND				0x02
 #define ATN_READ_MORE_DATA				0x03
 #define ATN_WRITE_MORE_DATA				0x04
+#define ATN_GET_STATUS					0x05
 
 // commands sent from host to device
 #define CMD_ACSI_CONFIG					0x10
 #define CMD_DATA_WRITE					0x20
 #define CMD_DATA_READ					0x30
+#define CMD_SEND_STATUS					0x40
+#define CMD_DATA_MARKER					0xda
+
+// data direction after command processing
+#define DATA_DIRECTION_UNKNOWN      0
+#define DATA_DIRECTION_READ         1
+#define DATA_DIRECTION_WRITE        2
 
 class AcsiDataTrans
 {
@@ -33,24 +40,23 @@ public:
 
     void setCommunicationObject(CConUsb *comIn);
 
-    void getAtnWord(BYTE *bfr);
-    void setAtnWord(BYTE *bfr);
-
 private:
     BYTE    *buffer;
     DWORD   count;
     BYTE    status;
 
     bool    statusWasSet;
+    int     dataDirection;
 
     CConUsb *com;
 
     BYTE    *recvBuffer;
 
-    struct {
-        bool got;
-        BYTE bytes[2];
-    } prevAtnWord;
+    BYTE    txBuffer[520];
+    BYTE    rxBuffer[520];
+
+    bool waitForATN(BYTE atnCode, DWORD maxLoopCount);
+    void sendStatusAfterWrite(void);
 };
 
 #endif // ACSIDATATRANS_H

@@ -52,6 +52,8 @@ void CConUsb::zeroAllVars(void)
     pFT_SetDataCharacteristics  = NULL;
 
     FTDIlib         = NULL;
+
+    prevAtnWord.got = false;
 }
 
 bool CConUsb::loadFTDIdll(void)
@@ -247,4 +249,28 @@ bool CConUsb::isConnected(void)
 {
     return connected;
 }
+
+void CConUsb::getAtnWord(BYTE *bfr)
+{
+    if(prevAtnWord.got) {                   // got some previous ATN word? use it
+        bfr[0] = prevAtnWord.bytes[0];
+        bfr[1] = prevAtnWord.bytes[1];
+        prevAtnWord.got = false;
+
+        return;
+    }
+
+    // no previous ATN word? read it!
+    BYTE outBuff[2];
+    memset(outBuff, 0, 2);
+    txRx(2, outBuff, bfr);
+}
+
+void CConUsb::setAtnWord(BYTE *bfr)
+{
+    prevAtnWord.bytes[0] = bfr[0];
+    prevAtnWord.bytes[1] = bfr[1];
+    prevAtnWord.got = true;
+}
+
 

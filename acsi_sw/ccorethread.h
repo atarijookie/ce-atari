@@ -51,6 +51,7 @@ private:
     void usbConnectionCheck(void);
 
     void handleFwVersion(void);
+    void handleAcsiCommand(void);
 
     void sendAndReceive(int cnt, BYTE *outBuf, BYTE *inBuf, bool storeInData=true);
     void justReceive(int cnt, BYTE *inBuf);
@@ -59,14 +60,6 @@ private:
     void logToFile(char *str);
     void logToFile(int len, BYTE *bfr);
     void logToFile(WORD wval);
-
-    struct {
-        bool got;
-        BYTE bytes[2];
-    } prevAtnWord;
-
-    void getAtnWord(BYTE *bfr);
-    void setAtnWord(BYTE *bfr);
 };
 
 #endif // CCORETHREAD_H

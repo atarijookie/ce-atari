@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include "sleeper.h"
 
 #include "acsidatatrans.h"
 #include "native/scsi_defs.h"
@@ -17,7 +18,7 @@ AcsiDataTrans::AcsiDataTrans()
     status          = SCSI_ST_OK;
     statusWasSet    = false;
     com             = NULL;
-    prevAtnWord.got = false;
+    dataDirection   = DATA_DIRECTION_READ;
 }
 
 AcsiDataTrans::~AcsiDataTrans()
@@ -36,6 +37,7 @@ void AcsiDataTrans::clear(void)
     count           = 0;
     status          = SCSI_ST_OK;
     statusWasSet    = false;
+    dataDirection   = DATA_DIRECTION_READ;
 }
 
 void AcsiDataTrans::setStatus(BYTE stat)
@@ -64,8 +66,37 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
         return false;
     }
 
+    dataDirection = DATA_DIRECTION_WRITE;                   // let the higher function know that we've done data write
 
+    // first send the command and tell Hans that we need WRITE data
+    BYTE devCommand[COMMAND_SIZE];
+    memset(devCommand, 0, COMMAND_SIZE);
 
+    devCommand[3] = CMD_DATA_WRITE;                         // store command - WRITE
+    devCommand[4] = cnt >> 8;                               // store data size
+    devCommand[5] = cnt  & 0xff;
+    devCommand[6] = 0xff;                                   // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
+
+    com->txRx(COMMAND_SIZE, devCommand, recvBuffer);        // transmit this command
+
+    memset(txBuffer, 0, 520);                               // nothing to transmit, really...
+
+    while(cnt > 0) {
+        // request maximum 512 bytes from host
+        DWORD subCount = (cnt > 512) ? 512 : cnt;
+        cnt -= subCount;
+
+        bool res = waitForATN(ATN_WRITE_MORE_DATA, 1000);   // wait for ATN_WRITE_MORE_DATA
+
+        if(!res) {                                          // this didn't come? fuck!
+            return false;
+        }
+
+        com->txRx(subCount + 8 - 4, txBuffer, rxBuffer);    // transmit data (size = subCount) + header and footer (size = 8) - already received 4 bytes
+        memcpy(data, rxBuffer + 2, subCount);               // copy just the data, skip sequence number
+
+        data += subCount;                                   // move in the buffer further
+    }
 
     return true;
 }
@@ -75,6 +106,12 @@ void AcsiDataTrans::sendDataAndStatus(void)
 {
     if(!com) {
         outDebugString("AcsiDataTrans::sendDataAndStatus -- no communication object, fail!");
+        return;
+    }
+
+    // for DATA write transmit just the status in a different way (on separate ATN)
+    if(dataDirection == DATA_DIRECTION_WRITE) {
+        sendStatusAfterWrite();
         return;
     }
 
@@ -96,50 +133,61 @@ void AcsiDataTrans::sendDataAndStatus(void)
     // then send the data
     BYTE *dataNow = buffer;
 
-    BYTE atnBuffer[8];
-    int loops = 100;
+    txBuffer[0] = 0;
+    txBuffer[1] = CMD_DATA_MARKER;                          // mark the start of data
 
     while(count > 0) {                                      // while there's something to send
-        while(1) {                                          // wait for ATN_READ_MORE_DATA
-            getAtnWord(atnBuffer);
+        bool res = waitForATN(ATN_READ_MORE_DATA, 1000);    // wait for ATN_READ_MORE_DATA
 
-            if(atnBuffer[1] == ATN_READ_MORE_DATA) {        // if got the requested ATN, break
-                break;
-            }
-
-            if(loops == 0) {
-                outDebugString("AcsiDataTrans::sendDataAndStatus -- this shouldn't happen!");
-                return;
-            }
-            loops--;
+        if(!res) {                                          // this didn't come? fuck!
+            return;
         }
 
         DWORD cntNow = (count > 512) ? 512 : count;         // max 512 bytes per transfer
-        com->txRx(cntNow, dataNow, recvBuffer);             // transmit this buffer
+        count -= cntNow;
+
+        memcpy(txBuffer + 2, dataNow, cntNow);              // copy the data after the header (2 bytes)
+        com->txRx(cntNow + 2, txBuffer, rxBuffer);          // transmit this buffer with header
 
         dataNow += cntNow;                                  // move the data pointer further
     }
 }
 
-void AcsiDataTrans::getAtnWord(BYTE *bfr)
+void AcsiDataTrans::sendStatusAfterWrite(void)
 {
-    if(prevAtnWord.got) {                   // got some previous ATN word? use it
-        bfr[0] = prevAtnWord.bytes[0];
-        bfr[1] = prevAtnWord.bytes[1];
-        prevAtnWord.got = false;
+    bool res = waitForATN(ATN_GET_STATUS, 1000);
 
+    if(!res) {
         return;
     }
 
-    // no previous ATN word? read it!
-    BYTE outBuff[2];
-    memset(outBuff, 0, 2);
-    com->txRx(2, outBuff, bfr);
+    memset(txBuffer, 0, 10);                                // clear the tx buffer
+    txBuffer[1] = CMD_SEND_STATUS;                          // set the command and the status
+    txBuffer[2] = status;
+
+    com->txRx(10 - 4, txBuffer, rxBuffer);                  // trasmit the status (10 bytes total, but 4 already received)
 }
 
-void AcsiDataTrans::setAtnWord(BYTE *bfr)
+bool AcsiDataTrans::waitForATN(BYTE atnCode, DWORD maxLoopCount)
 {
-    prevAtnWord.bytes[0] = bfr[0];
-    prevAtnWord.bytes[1] = bfr[1];
-    prevAtnWord.got = true;
+    DWORD lastTick = GetTickCount();
+    BYTE inBuff[2];
+
+    // wait for specific atn code, but maximum maxLoopCount times
+    while(maxLoopCount--) {
+        if(GetTickCount() - lastTick < 5) {             // less than 5 ms ago?
+            Sleeper::msleep(1);
+            continue;
+        }
+        lastTick = GetTickCount();
+
+        com->getAtnWord(inBuff);                        // try to get ATN word
+
+        if(inBuff[1] == atnCode) {                      // ATN code found?
+            return true;
+        }
+    }
+
+    return false;
 }
+
