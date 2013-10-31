@@ -10,7 +10,7 @@
 
 typedef struct 
 {
-	WORD buffer[520];					// buffer for the written data
+	WORD buffer[260];						// buffer for the written data
 	WORD count;								// count of WORDs in buffer 
 	
 	void *next;								// pointer to the next available TAtnBuffer

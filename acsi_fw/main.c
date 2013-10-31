@@ -38,21 +38,23 @@ WORD t1, t2, dt;
 // commands sent from device to host
 #define ATN_FW_VERSION						0x01								// followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
 #define ATN_ACSI_COMMAND					0x02
-#define ATN_READ_MORE_DATA				0x03
-#define ATN_WRITE_MORE_DATA				0x04
+#define ATN_READ_MORE_DATA					0x03
+#define ATN_WRITE_MORE_DATA					0x04
 #define ATN_GET_STATUS						0x05
 
 // commands sent from host to device
 #define CMD_ACSI_CONFIG						0x10
 #define CMD_DATA_WRITE						0x20
-#define CMD_DATA_READ							0x30
+#define CMD_DATA_READ						0x30
 #define CMD_SEND_STATUS						0x40
+#define CMD_DATA_MARKER						0xda
 
 // these states define if the device should get command or transfer data
 #define STATE_GET_COMMAND		0
 #define STATE_DATA_READ			1
 #define STATE_DATA_WRITE		2
 #define STATE_READ_STATUS		3
+
 BYTE state;
 WORD dataCnt;
 BYTE statusByte;
@@ -110,7 +112,7 @@ int main (void)
 
 	wrBuf2.buffer[0]	= 0;
 	wrBuf2.buffer[1]	= ATN_WRITE_MORE_DATA;
-	wrBuf2.next				= (void *) &wrBuf1;
+	wrBuf2.next			= (void *) &wrBuf1;
 
 	wrBufNow = &wrBuf1;
 
@@ -245,6 +247,7 @@ void onDataRead(void)
 		
 		recvCount	= subCount / 2;														// WORDs to receive: convert # of BYTEs to # of WORDs
 		recvCount	+= (subCount & 1);												// if subCount is odd number, then we need to transfer 1 WORD more
+		recvCount += 3;																			// receive 3 words more than just data - 2 WORDs start, 1 WORD CMD_DATA_MARKER
 		
 		sendCount	= (recvCount > 4) ? 4 : recvCount;				// WORDs to send: maximum 4 WORDs, but could be less
 
@@ -255,6 +258,21 @@ void onDataRead(void)
 
 		index = 0;
 		
+		// first wait for CMD_DATA_MARKER to appear
+		while(recvCount > 0) {															// something to receive?
+			// when at least 1 WORD was received
+			if((DMA1_Channel2->CNDTR == 0) || (DMA1_Channel2->CNDTR < recvCount)) {
+				recvCount--;				
+				index++;
+				
+				data = dataBuffer[index];												// get data
+				if(data == CMD_DATA_MARKER) {										// found data marker?
+					break;
+				}
+			}	
+		}
+		
+		// now try to trasmit the data
 		while(recvCount > 0) {															// something to receive?
 			// when at least 1 WORD was received
 			if((DMA1_Channel2->CNDTR == 0) || (DMA1_Channel2->CNDTR < recvCount)) {
