@@ -30,10 +30,10 @@ void timerSetup_cmdTimeout(void)
   TIM_TimeBaseStructure.TIM_CounterMode				= TIM_CounterMode_Up;
 	TIM_TimeBaseStructure.TIM_RepetitionCounter	=	0;
 	
-  TIM_TimeBaseInit(TIM4, &TIM_TimeBaseStructure);
-  TIM_ARRPreloadConfig(TIM4, DISABLE);							// disable preloading
+  TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
+  TIM_ARRPreloadConfig(TIM3, DISABLE);							// disable preloading
 
-  TIM_Cmd(TIM4, ENABLE);														// enable timer
-	TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);				// inable int from this timer
+  TIM_Cmd(TIM3, ENABLE);														// enable timer
+	TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);				// inable int from this timer
 }
 

@@ -18,7 +18,9 @@
 // first RnW to HIGH, then set GPIOB0-7 as push pull output
 #define ACSI_DATADIR_READ()			{	GPIOA->BSRR = aRNW; GPIOB->CRL = 0x33333333; }
 
+void timeoutStart(void);								// starts the timeout timer
 BYTE timeout(void);											// returns TRUE if timeout since writeFirst occured
+
 BYTE PIO_gotFirstCmdByte(void);					// check if we got the 1st command byte
 BYTE PIO_writeFirst(void);							// get 1st CMD byte from ST  -- without setting INT
 BYTE PIO_write(void);										// get next CMD byte from ST -- with setting INT to LOW and waiting for CS 

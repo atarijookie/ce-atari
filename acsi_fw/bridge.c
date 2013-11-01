@@ -3,10 +3,19 @@
 
 extern BYTE brStat;															// status from bridge
 
+void timeoutStart(void)
+{
+	// init the timer 4, which will serve for timeout measuring 
+  TIM_Cmd(TIM3, DISABLE);												// disable timer
+	TIM3->CNT	= 0;																// set timer value to 0
+	TIM3->SR	= 0xfffe;														// clear UIF flag
+  TIM_Cmd(TIM3, ENABLE);												// enable timer
+}	
+
 BYTE timeout(void)
 {
-	if((TIM4->SR & 0x0001) != 0) {		// overflow of TIM4 occured?
-		TIM4->SR = 0xfffe;							// clear UIF flag
+	if((TIM3->SR & 0x0001) != 0) {		// overflow of TIM4 occured?
+		TIM3->SR = 0xfffe;							// clear UIF flag
 		return TRUE;
 	}
 	
@@ -29,12 +38,7 @@ BYTE PIO_writeFirst(void)
 {
 	BYTE val;
 	
-	// init the timer 4, which will serve for timeout measuring 
-  TIM_Cmd(TIM4, DISABLE);												// disable timer
-	TIM4->CNT	= 0;																// set timer value to 0
-	TIM4->SR	= 0xfffe;														// clear UIF flag
-  TIM_Cmd(TIM4, ENABLE);												// enable timer
-
+	timeoutStart();																// start the timeout timer
 	ACSI_DATADIR_WRITE();													// data as inputs (write)
 	
 	// init vars, 
@@ -51,8 +55,8 @@ BYTE PIO_write(void)
 	BYTE val = 0;
 	
 	// create rising edge on aPIO
-	GPIOB->BSRR	= aPIO;														// aPIO to HIGH
-	GPIOB->BRR	= aPIO;														// aPIO to LOW
+	GPIOA->BSRR	= aPIO;														// aPIO to HIGH
+	GPIOA->BRR	= aPIO;														// aPIO to LOW
 
 	while(1) {																		// wait for CS or timeout
 		WORD exti = EXTI->PR;
@@ -80,8 +84,8 @@ void PIO_read(BYTE val)
 	GPIOB->ODR = val;															// write the data to output data register
 	
 	// create rising edge on aPIO
-	GPIOB->BSRR	= aPIO;														// aPIO to HIGH
-	GPIOB->BRR	= aPIO;														// aPIO to LOW
+	GPIOA->BSRR	= aPIO;														// aPIO to HIGH
+	GPIOA->BRR	= aPIO;														// aPIO to LOW
 
 	while(1) {																		// wait for CS or timeout
 		WORD exti = EXTI->PR;
@@ -105,8 +109,8 @@ void DMA_read(BYTE val)
 	GPIOB->ODR = val;															// write the data to output data register
 	
 	// create rising edge on aDMA
-	GPIOB->BSRR	= aDMA;														// aDMA to HIGH
-	GPIOB->BRR	= aDMA;														// aDMA to LOW
+	GPIOA->BSRR	= aDMA;														// aDMA to HIGH
+	GPIOA->BRR	= aDMA;														// aDMA to LOW
 
 	while(1) {																		// wait for ACK or timeout
 		WORD exti = EXTI->PR;
@@ -129,8 +133,8 @@ BYTE DMA_write(void)
 	BYTE val = 0;
 	
 	// create rising edge on aDMA
-	GPIOB->BSRR	= aDMA;														// aDMA to HIGH
-	GPIOB->BRR	= aDMA;														// aDMA to LOW
+	GPIOA->BSRR	= aDMA;														// aDMA to HIGH
+	GPIOA->BRR	= aDMA;														// aDMA to LOW
 
 	while(1) {																		// wait for ACK or timeout
 		WORD exti = EXTI->PR;
