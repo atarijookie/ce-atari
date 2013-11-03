@@ -28,7 +28,7 @@ void onDataRead(void);
 void onDataWrite(void);
 void onReadStatus(void);
 
-// cycle measure: t1 = TIM3->CNT;	t2 = TIM3->CNT;	dt = t2 - t1; -- subtrack 0x12 because that's how much measuring takes
+// cycle measure: t1 = TIM3->CNT;	t2 = TIM3->CNT;	dt = t2 - t1; -- subtract 0x12 because that's how much measuring takes
 WORD t1, t2, dt; 
 
 // digital osciloscope time measure on GPIO B0:
@@ -38,22 +38,22 @@ WORD t1, t2, dt;
 // commands sent from device to host
 #define ATN_FW_VERSION						0x01								// followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
 #define ATN_ACSI_COMMAND					0x02
-#define ATN_READ_MORE_DATA					0x03
-#define ATN_WRITE_MORE_DATA					0x04
+#define ATN_READ_MORE_DATA				0x03
+#define ATN_WRITE_MORE_DATA				0x04
 #define ATN_GET_STATUS						0x05
 
 // commands sent from host to device
 #define CMD_ACSI_CONFIG						0x10
 #define CMD_DATA_WRITE						0x20
-#define CMD_DATA_READ						0x30
+#define CMD_DATA_READ							0x30
 #define CMD_SEND_STATUS						0x40
 #define CMD_DATA_MARKER						0xda
 
 // these states define if the device should get command or transfer data
-#define STATE_GET_COMMAND		0
-#define STATE_DATA_READ			1
-#define STATE_DATA_WRITE		2
-#define STATE_READ_STATUS		3
+#define STATE_GET_COMMAND					0
+#define STATE_DATA_READ						1
+#define STATE_DATA_WRITE					2
+#define STATE_READ_STATUS					3
 
 BYTE state;
 WORD dataCnt;
@@ -72,8 +72,8 @@ WORD atnGetStatus[3];
 TWriteBuffer wrBuf1, wrBuf2;
 TWriteBuffer *wrBufNow;
 
-#define CMD_BUFFER_LENGTH						28
-BYTE cmdBuffer[CMD_BUFFER_LENGTH];
+#define CMD_BUFFER_LENGTH						14
+WORD cmdBuffer[CMD_BUFFER_LENGTH];
 
 BYTE cmd[14];										// received command bytes
 BYTE cmdLen;										// length of received command
@@ -135,7 +135,6 @@ int main (void)
 		enabledIDs[i] = 0;
 	}
 	//-------------
-
 	while(1) {
 		// get the command from ACSI and send it to host
 		if(state == STATE_GET_COMMAND && PIO_gotFirstCmdByte()) {					// if 1st CMD byte was received
@@ -165,14 +164,14 @@ int main (void)
 
 		// in command waiting state, nothing to do and should send FW version?
 		if(state == STATE_GET_COMMAND && spiDmaIsIdle && sendFwVersion) {
-			spiDma_txRx(5, (BYTE *) &atnSendFwVersion[0],			 6, (BYTE *) &cmdBuffer[0]);
+			spiDma_txRx(5, (BYTE *) &atnSendFwVersion[0],	 6, (BYTE *) &cmdBuffer[0]);
 				
 			sendFwVersion	= FALSE;
 		}
 
 		// SPI is idle and we should send command to host? 
 		if(spiDmaIsIdle && sendACSIcommand) {
-			spiDma_txRx(10, (BYTE *) &atnSendACSIcommand[0],	(CMD_BUFFER_LENGTH / 2),	(BYTE *) &cmdBuffer[0]);
+			spiDma_txRx(10, (BYTE *) &atnSendACSIcommand[0], CMD_BUFFER_LENGTH, (BYTE *) &cmdBuffer[0]);
 				
 			sendACSIcommand	= FALSE;
 		}
@@ -262,14 +261,15 @@ void onDataRead(void)
 		while(recvCount > 0) {															// something to receive?
 			// when at least 1 WORD was received
 			if((DMA1_Channel2->CNDTR == 0) || (DMA1_Channel2->CNDTR < recvCount)) {
+				data = dataBuffer[index];												// get data
+
 				recvCount--;				
 				index++;
-				
-				data = dataBuffer[index];												// get data
+
 				if(data == CMD_DATA_MARKER) {										// found data marker?
 					break;
 				}
-			}	
+			}
 		}
 		
 		// now try to trasmit the data
@@ -385,7 +385,7 @@ void onDataWrite(void)
 		spiDma_clearFlags();
 		
 		// set up the SPI DMA transfer
-		spiDma_txRx(wrBufNow->count, (BYTE *) &wrBufNow->buffer[0], 0, (BYTE *) &dataBuffer[0]);		
+		spiDma_txRx(wrBufNow->count, (BYTE *) &wrBufNow->buffer[0], 1, (BYTE *) &dataBuffer[0]);		
 		
 		wrBufNow = wrBufNow->next;												// use next write buffer
 	}
@@ -408,9 +408,9 @@ void onReadStatus(void)
 	spiDma_waitForFinish();
 	spiDma_clearFlags();
 
-	for(i=0; i<10; i++) {															// go through the received buffer
+	for(i=0; i<5; i++) {															// go through the received buffer
 		if(cmdBuffer[i] == CMD_SEND_STATUS) {
-			newStatus = cmdBuffer[i+1];
+			newStatus = cmdBuffer[i+1] >> 8;
 			break;
 		}
 	}
@@ -556,13 +556,13 @@ void processHostCommands(void)
 	BYTE i, j;
 	WORD ids;
 	
-	for(i=0; i<(CMD_BUFFER_LENGTH - 1); i++) {
+	for(i=0; i<CMD_BUFFER_LENGTH; i++) {
 		switch(cmdBuffer[i]) {
 			// process configuration 
 			case CMD_ACSI_CONFIG:
-					ids = cmdBuffer[i+1];					// get enabled IDs
+					ids = cmdBuffer[i+1] >> 8;		// get enabled IDs
 			
-					for(j=0; j<8; j++) {					// 
+					for(j=0; j<8; j++) {					// for each bit in ids set the flag in enabledIDs[]
 						if(ids & (1<<j)) {
 							enabledIDs[j] = TRUE;
 						} else {
@@ -577,27 +577,27 @@ void processHostCommands(void)
 				break;
 				
 			case CMD_DATA_WRITE:
-					dataCnt				= (cmdBuffer[i+1] << 8) | cmdBuffer[i+2];			// store the count of bytes we should WRITE
-					statusByte		= cmdBuffer[i+3];
+					dataCnt				= cmdBuffer[i+1];		// store the count of bytes we should WRITE
+					statusByte		= cmdBuffer[i+2] >> 8;
 					
-					for(j=0; j<4; j++) {					// clear this command 
+					for(j=0; j<3; j++) {							// clear this command 
 						cmdBuffer[i + j] = 0;				
 					}
 					
-					state = STATE_DATA_WRITE;			// go into DATA_WRITE state
-					i += 3;
+					state = STATE_DATA_WRITE;					// go into DATA_WRITE state
+					i += 2;
 				break;
 				
 			case CMD_DATA_READ:		
-					dataCnt				= (cmdBuffer[i+1] << 8) | cmdBuffer[i+2];			// store the count of bytes we should READ
-					statusByte		= cmdBuffer[i+3];
+					dataCnt				= cmdBuffer[i+1];		// store the count of bytes we should READ
+					statusByte		= cmdBuffer[i+2] >> 8;
 
-					for(j=0; j<4; j++) {					// clear this command 
+					for(j=0; j<3; j++) {					// clear this command 
 						cmdBuffer[i + j] = 0;				
 					}
 
 					state = STATE_DATA_READ;			// go into DATA_READ state
-					i += 3;
+					i += 2;
 				break;
 		}
 	}
