@@ -726,7 +726,8 @@ bool Scsi::readSectors(DWORD sectorNo, DWORD count)
         return false;
     }
 
-    dataTrans->addData(dataBuffer, count);
+    DWORD byteCount = count * 512;
+    dataTrans->addData(dataBuffer, byteCount);
 
     return true;
 }
@@ -740,7 +741,8 @@ bool Scsi::writeSectors(DWORD sectorNo, DWORD count)
         return false;
     }
 
-    res = dataTrans->recvData(dataBuffer, count);               // get data from Hans
+    DWORD byteCount = count * 512;
+    res = dataTrans->recvData(dataBuffer, byteCount);           // get data from Hans
 
     if(!res) {
         return false;

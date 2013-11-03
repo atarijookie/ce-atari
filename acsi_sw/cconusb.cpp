@@ -3,6 +3,8 @@
 
 extern "C" void outDebugString(const char *format, ...);
 
+#define SWAP_ENDIAN false
+
 CConUsb::CConUsb()
 {
     zeroAllVars();
@@ -198,6 +200,16 @@ DWORD CConUsb::bytesToSend(void)
 
 void CConUsb::txRx(int count, BYTE *sendBuffer, BYTE *receiveBufer, bool addLastToAtn)
 {
+    if(SWAP_ENDIAN) {       // swap endian on sending if required
+        BYTE tmp;
+
+        for(int i=0; i<count; i += 2) {
+            tmp             = sendBuffer[i+1];
+            sendBuffer[i+1] = sendBuffer[i];
+            sendBuffer[i]   = tmp;
+        }
+    }
+
     write   (count, sendBuffer);
     read    (count, receiveBufer);
 

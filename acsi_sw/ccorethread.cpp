@@ -6,7 +6,8 @@
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
-#define LOGFILE "C:/acsilog.txt"
+#define LOGFILE     "H:/acsilog.txt"
+#define MEDIAFILE   "H:/datamedia.img"
 
 QStringList dbg;
 
@@ -27,12 +28,13 @@ CCoreThread::CCoreThread()
     dataTrans->setCommunicationObject(conUsb);
 
     dataMedia   = new DataMedia();
-    dataMedia->open((char *) "C:\\datamedia.img", true);
+    dataMedia->open((char *) MEDIAFILE, true);
 
     scsi        = new Scsi();
     scsi->setAcsiDataTrans(dataTrans);
 //    scsi->setDataMedia(dataMedia);
     scsi->setDataMedia(&testMedia);
+    scsi->setDeviceType(SCSI_TYPE_FULL);
 }
 
 CCoreThread::~CCoreThread()
@@ -64,6 +66,11 @@ void CCoreThread::run(void)
     running = true;
 
     outDebugString("Core thread starting...");
+
+    if(!conUsb->isConnected()) {
+        outDebugString("USB not connected, quit.");
+        return;
+    }
 
     while(shouldRun) {
         if(GetTickCount() - lastTick < 10) {            // less than 10 ms ago?
@@ -115,6 +122,7 @@ void CCoreThread::handleAcsiCommand(void)
     memset(bufOut, 0, CMD_SIZE);
 
     conUsb->txRx(14, bufOut, bufIn);        // get 14 cmd bytes
+    outDebugString("\nhandleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
 
     scsi->processCommand(bufIn);            // process the command
 }

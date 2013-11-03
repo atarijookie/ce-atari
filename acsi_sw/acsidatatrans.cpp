@@ -98,6 +98,19 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
         data += subCount;                                   // move in the buffer further
     }
 
+    int index = 0;
+    for(int i=0; i<16; i++) {
+        char bfr[1024];
+        char *b = &bfr[0];
+
+        for(int j=0; j<32; j++) {
+            sprintf(b, "%02x ", data[index++]);
+            b += 3;
+        }
+
+        outDebugString("%s", bfr);
+    }
+
     return true;
 }
 
@@ -184,10 +197,12 @@ bool AcsiDataTrans::waitForATN(BYTE atnCode, DWORD maxLoopCount)
         com->getAtnWord(inBuff);                        // try to get ATN word
 
         if(inBuff[1] == atnCode) {                      // ATN code found?
+            outDebugString("waitForATN %02x good.", atnCode);
             return true;
         }
     }
 
+    outDebugString("waitForATN %02x fail!", atnCode);
     return false;
 }
 
