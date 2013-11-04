@@ -32,33 +32,27 @@
 #define HD_SEEK  0x0B           /* Seek */
 #define HD_MSEL  0x15           /* Mode Select */
 /* -------------------------------------- */
-#define MFP_ADDR 	0xFFFA00L      /* MFP device addres */
+typedef struct mfp_chip 
+{
+	char reg[48]; /* MFP registers are on odd bytes */
+};
 
-#define MFP     	((struct mfp_chip *) MFP_ADDR)
+typedef struct dma_chip 
+{
+	short reserved[2]; /* reserved registers */
+	short DATA;        /* controller & sector count reg */
+	short MODE;        /* mode & status register */
+	char  ADDR[6];     /* base addres. High/Mid/Low */
+};
 
 #define GPIP    	reg[1]          /* general purpose I/O (interrupt port) */
 #define IO_DINT     0x20        /* DMA interrupt (FDC or HDC) */
 
-#define BYTE		unsigned char
+#define BYTE  	unsigned char
+#define WORD  	unsigned int
+#define DWORD 	unsigned long int
 
-long wait_dma_cmpl(unsigned long t_ticks);
-long fdone(void);
-long qdone(void);
-void setdma(unsigned long int addr);
-long hdone(void);
-long endcmd(short mode);
-BYTE LongRW(BYTE ReadNotWrite, BYTE *cmd, BYTE *buffer);
 /*---------------------------------------*/
-#define DMA_ADDR 0xFF8600L      /* DMA device addres */
-#define DMA      ((struct dma_chip *) DMA_ADDR)
-
-struct dma_chip 
-{
-  short reserved[2]; /* reserved registers */
-  short DATA;        /* controller & sector count reg */
-  short MODE;        /* mode & status register */
-  char  ADDR[6];     /* base addres. High/Mid/Low */
-};
 
 /* pseudo names */
 #define SECT_CNT     DATA
@@ -84,5 +78,17 @@ struct dma_chip
 #define DMA_OK       0x0001     /* DMA transfer went OK */
 #define SC_NOT_0     0x0002     /* Sector count register not zero */
 #define DATA_REQ     0x0004     /* DRQ line state */
+
+#define FLOCK      (*(short *) 0x043E) /* Floppy lock variable */ 
+#define HZ_200     (*(unsigned long *) 0x04BA) /* 200 Hz system clock */ 
+/*---------------------------------------*/
+long wait_dma_cmpl(unsigned long t_ticks);
+long fdone(void);
+long qdone(void);
+void setdma(unsigned long int addr);
+long hdone(void);
+long endcmd(short mode);
+
+BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer);
 /*---------------------------------------*/
 
