@@ -63,7 +63,7 @@ volatile BYTE sendFwVersion, sendACSIcommand;
 WORD atnSendFwVersion[5], atnSendACSIcommand[10];
 
 WORD atnMoreData[4];
-WORD dataBuffer[512 / 2];
+WORD dataBuffer[550 / 2];				// sector buffer with some (38 bytes) reserve at the end in case of overflow
 
 WORD atnGetStatus[3];
 
@@ -382,11 +382,11 @@ void onReadStatus(void)
 	
 	newStatus = 0xff;																	// no status received
 	
-	spiDma_txRx(3, (BYTE *) &atnGetStatus[0], 5, (BYTE *) &cmdBuffer[0]);
+	spiDma_txRx(3, (BYTE *) &atnGetStatus[0], 8, (BYTE *) &cmdBuffer[0]);
 
 	spiDma_waitForFinish();
 
-	for(i=0; i<5; i++) {															// go through the received buffer
+	for(i=0; i<8; i++) {															// go through the received buffer
 		if(cmdBuffer[i] == CMD_SEND_STATUS) {
 			newStatus = cmdBuffer[i+1] >> 8;
 			break;
