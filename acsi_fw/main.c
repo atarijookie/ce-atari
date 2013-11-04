@@ -82,6 +82,8 @@ BYTE enabledIDs[8];							// when 1, Hanz will react on that ACSI ID #
 volatile BYTE spiDmaIsIdle;
 volatile BYTE spiDmaTXidle, spiDmaRXidle;		// flags set when the SPI DMA TX or RX is idle
 
+BYTE shouldProcessCommands;
+
 int main (void) 
 {
 	BYTE i;
@@ -123,6 +125,8 @@ int main (void)
 	spiDmaTXidle = TRUE;
 	spiDmaRXidle = TRUE;
 
+	shouldProcessCommands = FALSE;
+
 	init_hw_sw();																	// init GPIO pins, timers, DMA, global variables
 
 	// init ACSI signals
@@ -160,8 +164,10 @@ int main (void)
 		}
 
 		// sending and receiving data over SPI using DMA
-		if(spiDmaIsIdle) {																			// SPI DMA: nothing to Tx and nothing to Rx?
+		if(spiDmaIsIdle && shouldProcessCommands) {							// SPI DMA: nothing to Tx and nothing to Rx?
 			processHostCommands();																// and process all the received commands
+			
+			shouldProcessCommands = FALSE;												// mark that we don't need to process commands until next time
 		}
 
 		// in command waiting state, nothing to do and should send FW version?
@@ -169,6 +175,7 @@ int main (void)
 			spiDma_txRx(5, (BYTE *) &atnSendFwVersion[0],	 6, (BYTE *) &cmdBuffer[0]);
 				
 			sendFwVersion	= FALSE;
+			shouldProcessCommands = TRUE;													// mark that we should process the commands on next SPI DMA idle time
 		}
 
 		// SPI is idle and we should send command to host? 
@@ -176,6 +183,7 @@ int main (void)
 			spiDma_txRx(10, (BYTE *) &atnSendACSIcommand[0], CMD_BUFFER_LENGTH, (BYTE *) &cmdBuffer[0]);
 				
 			sendACSIcommand	= FALSE;
+			shouldProcessCommands = TRUE;													// mark that we should process the commands on next SPI DMA idle time
 		}
 		
 		//-------------------------------------------------
