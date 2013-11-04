@@ -96,19 +96,24 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
         memcpy(data, rxBuffer + 2, subCount);               // copy just the data, skip sequence number
 
         data += subCount;                                   // move in the buffer further
-    }
 
-    int index = 0;
-    for(int i=0; i<16; i++) {
-        char bfr[1024];
-        char *b = &bfr[0];
+        //----------------------
+        // just for dumping the data
+        unsigned char *src = rxBuffer + 2;
 
-        for(int j=0; j<32; j++) {
-            sprintf(b, "%02x ", data[index++]);
-            b += 3;
+        for(int i=0; i<16; i++) {
+            char bfr[1024];
+            char *b = &bfr[0];
+
+            for(int j=0; j<32; j++) {
+                int val = (int) *src;
+                src++;
+                sprintf(b, "%02x ", val);
+                b += 3;
+            }
+
+            outDebugString("%s", bfr);
         }
-
-        outDebugString("%s", bfr);
     }
 
     return true;
@@ -174,11 +179,11 @@ void AcsiDataTrans::sendStatusAfterWrite(void)
         return;
     }
 
-    memset(txBuffer, 0, 10);                                // clear the tx buffer
+    memset(txBuffer, 0, 16);                                // clear the tx buffer
     txBuffer[1] = CMD_SEND_STATUS;                          // set the command and the status
     txBuffer[2] = status;
 
-    com->txRx(10 - 4, txBuffer, rxBuffer);                  // trasmit the status (10 bytes total, but 4 already received)
+    com->txRx(16 - 4, txBuffer, rxBuffer);                  // trasmit the status (10 bytes total, but 4 already received)
 }
 
 bool AcsiDataTrans::waitForATN(BYTE atnCode, DWORD maxLoopCount)
