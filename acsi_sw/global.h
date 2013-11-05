@@ -30,4 +30,21 @@
 #define DATE_STRING             "10/09/13"
                                 // MM/DD/YY
 
+
+#define DEVTYPE_OFF					0
+#define DEVTYPE_RAW					1
+#define DEVTYPE_TRANSLATED			2
+#define DEVTYPE_NET_ADAPTER			3
+
+// typed of devices / modules we support
+#define HOSTMOD_CONFIG				1
+#define HOSTMOD_LINUX_TERMINAL		2
+#define HOSTMOD_TRANSLATED_DISK		3
+#define HOSTMOD_NETWORK_ADAPTER		4
+
+// commands for HOSTMOD_CONFIG
+#define CFG_CMD_IDENTIFY            0
+#define CFG_CMD_KEYDOWN             1
+#define CFG_CMD_GO_HOME             0xff
+								
 #endif // GLOBAL_H

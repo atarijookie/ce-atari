@@ -52,10 +52,19 @@ void AcsiDataTrans::addData(BYTE val)
     count++;
 }
 
-void AcsiDataTrans::addData(BYTE *data, DWORD cnt)
+void AcsiDataTrans::addData(BYTE *data, DWORD cnt, bool padToMul16)
 {
     memcpy(&buffer[count], data, cnt);
     count += cnt;
+
+    if(padToMul16) {                    // if should pad to multiple of 16
+        int mod = count % 16;           // how many we got in the last 1/16th part?
+        int pad = 16 - mod;             // how many we need to add to make count % 16 equal to 0?
+
+        memset(&buffer[count], 0, pad); // set the padded bytes to zero and add this count
+        count += pad;
+
+    }
 }
 
 // get data from Hans

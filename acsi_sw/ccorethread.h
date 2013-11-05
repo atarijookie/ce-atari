@@ -15,6 +15,8 @@
 #include "native/testmedia.h"
 #include "acsidatatrans.h"
 
+#include "config/configstream.h"
+
 class CCoreThread: public QThread
 {
     Q_OBJECT
@@ -53,6 +55,7 @@ private:
 
     void handleFwVersion(void);
     void handleAcsiCommand(void);
+    void handleConfigStream(BYTE *cmd);
 
     int bcdToInt(int bcd);
 

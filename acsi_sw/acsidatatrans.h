@@ -33,7 +33,7 @@ public:
 
     void setStatus(BYTE stat);
     void addData(BYTE val);
-    void addData(BYTE *data, DWORD cnt);
+    void addData(BYTE *data, DWORD cnt, bool padToMul16=false);
 
     bool recvData(BYTE *data, DWORD cnt);
     void sendDataAndStatus(void);

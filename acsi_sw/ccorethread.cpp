@@ -3,6 +3,7 @@
 
 #include "global.h"
 #include "ccorethread.h"
+#include "native/scsi_defs.h"
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
@@ -124,7 +125,67 @@ void CCoreThread::handleAcsiCommand(void)
     conUsb->txRx(14, bufOut, bufIn);        // get 14 cmd bytes
     outDebugString("\nhandleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
 
-    scsi->processCommand(bufIn);            // process the command
+    BYTE justCmd = bufIn[0] & 0x1f;
+    BYTE wasHandled = FALSE;
+
+    if(justCmd == 0) {                              // if the command is 0 (TEST UNIT READY)
+        if(bufIn[1] == 'C' && bufIn[2] == 'E') {    // and this is CosmosEx specific command
+            if(bufIn[3] == HOSTMOD_CONFIG) {        // config console command?
+                wasHandled = TRUE;
+                handleConfigStream(bufIn);
+            }
+        }
+
+    }
+
+    if(wasHandled != TRUE) {                        // if the command was not previously handled, it's probably just some SCSI command
+        scsi->processCommand(bufIn);                // process the command
+    }
+}
+
+void CCoreThread::handleConfigStream(BYTE *cmd)
+{
+    #define READ_BUFFER_SIZE    (5 * 1024)
+    static BYTE readBuffer[READ_BUFFER_SIZE];
+    int streamCount;
+
+    if(cmd[1] != 'C' || cmd[2] != 'E' || cmd[3] != HOSTMOD_CONFIG) {        // not for us?
+        return;
+    }
+
+    dataTrans->clear();                 // clean data transporter before handling
+
+    switch(cmd[4]) {
+        case CFG_CMD_IDENTIFY:          // identify?
+        dataTrans->addData((unsigned char *)"CosmosEx config console", 23, true);       // add identity string with padding
+        dataTrans->setStatus(SCSI_ST_OK);
+        break;
+
+    case CFG_CMD_KEYDOWN:
+        ConfigStream::instance().onKeyDown(cmd[5]);                                                // first send the key down signal
+        streamCount = ConfigStream::instance().getStream(false, readBuffer, READ_BUFFER_SIZE);     // then get current screen stream
+
+        dataTrans->addData(readBuffer, streamCount, true);                              // add data and status, with padding to multiple of 16 bytes
+        dataTrans->setStatus(SCSI_ST_OK);
+
+        outDebugString("handleConfigStream -- CFG_CMD_KEYDOWN -- %d bytes\n", streamCount);
+        break;
+
+    case CFG_CMD_GO_HOME:
+        streamCount = ConfigStream::instance().getStream(true, readBuffer, READ_BUFFER_SIZE);      // get homescreen stream
+
+        dataTrans->addData(readBuffer, streamCount, true);                              // add data and status, with padding to multiple of 16 bytes
+        dataTrans->setStatus(SCSI_ST_OK);
+
+        outDebugString("handleConfigStream -- CFG_CMD_GO_HOME -- %d bytes\n", streamCount);
+        break;
+
+    default:                            // other cases: error
+        dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
+        break;
+    }
+
+    dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
 }
 
 void CCoreThread::handleFwVersion(void)
