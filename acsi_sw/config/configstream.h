@@ -6,6 +6,8 @@
 
 #include "configcomponent.h"
 
+class AcsiDataTrans;
+
 void onCheckboxGroupEnter(int groupId, int checkboxId);
 
 class ConfigStream
@@ -17,24 +19,31 @@ public:
     }
 
 	~ConfigStream();
+
+    // functions which are called from the main loop
+    void processCommand(BYTE *cmd);
+    void setAcsiDataTrans(AcsiDataTrans *dt);
 	
-    void onKeyDown(BYTE key);
-    int  getStream(bool homeScreen, BYTE *bfr, int maxLen);
-	
-	int  checkboxGroup_getCheckedId(int groupId);
-	void checkboxGroup_setCheckedId(int groupId, int checkedId);
-	
-	void showMessageScreen(char *msgTitle, char *msgTxt);
-	void hideMessageScreen(void);
-	
-	void createScreen_homeScreen(void);
-	void createScreen_acsiConfig(void);
-	
+    // functions which are called from various components
+    int  checkboxGroup_getCheckedId(int groupId);
+    void checkboxGroup_setCheckedId(int groupId, int checkedId);
+
+    void showMessageScreen(char *msgTitle, char *msgTxt);
+    void hideMessageScreen(void);
+
+    void createScreen_homeScreen(void);
+    void createScreen_acsiConfig(void);
+
 private:
     ConfigStream();
 
 	std::vector<ConfigComponent *> screen;
 	std::vector<ConfigComponent *> message;
+
+    AcsiDataTrans *dataTrans;
+
+    void onKeyDown(BYTE key);
+    int  getStream(bool homeScreen, BYTE *bfr, int maxLen);
 
 	bool showingHomeScreen;
 	bool showingMessage;

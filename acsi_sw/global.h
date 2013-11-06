@@ -46,5 +46,10 @@
 #define CFG_CMD_IDENTIFY            0
 #define CFG_CMD_KEYDOWN             1
 #define CFG_CMD_GO_HOME             0xff
-								
+
+// commands for HOSTMOD_TRANSLATED_DISK
+#define TRAN_CMD_IDENTIFY           0
+// ...other commands are just function codes from gemdos.h
+
+
 #endif // GLOBAL_H

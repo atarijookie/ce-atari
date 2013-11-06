@@ -16,6 +16,7 @@
 #include "acsidatatrans.h"
 
 #include "config/configstream.h"
+#include "translated/translateddisk.h"
 
 class CCoreThread: public QThread
 {
@@ -47,6 +48,8 @@ private:
     Scsi            *scsi;
     AcsiDataTrans   *dataTrans;
     DataMedia       *dataMedia;
+
+    TranslatedDisk  *translated;
 
     TestMedia       testMedia;
 

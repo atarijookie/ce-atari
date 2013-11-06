@@ -23,7 +23,6 @@ public:
     void setAcsiID(int newId);
     void setDeviceType(int newType);
 
-    bool isScsiCommand(BYTE *command);
     void processCommand(BYTE *command);
 
 private:

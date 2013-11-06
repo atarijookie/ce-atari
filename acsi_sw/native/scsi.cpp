@@ -5,9 +5,6 @@
 #include "scsi.h"
 #include "../global.h"
 
-// TODO:
-// read operacie budu dobre, problem bude ak pri write nastane error, pretoze momentalne je status posielany cez SPI najprv
-
 extern "C" void outDebugString(const char *format, ...);
 
 #define BUFFER_SIZE             (1024*1024)
@@ -54,29 +51,6 @@ void Scsi::setDeviceType(int newType)
     if(newType == SCSI_TYPE_NO_DATA) {
         dataMedia = &noMedia;
     }
-}
-
-bool Scsi::isScsiCommand(BYTE *command)
-{
-    BYTE justCmd;
-    cmd = command;
-
-    if(isICDcommand()) {            // get the command only
-        justCmd = cmd[1];
-    } else {
-        justCmd = cmd[0] & 0x1f;
-    }
-
-    // is it any of the actively handled commands?
-    if( justCmd == SCSI_C_SEND_DIAGNOSTIC   || justCmd == SCSI_C_RESERVE        || justCmd == SCSI_C_RELEASE        ||
-        justCmd == SCSI_C_TEST_UNIT_READY   || justCmd == SCSI_C_MODE_SENSE6    || justCmd == SCSI_C_REQUEST_SENSE  ||
-        justCmd == SCSI_C_INQUIRY           || justCmd == SCSI_C_FORMAT_UNIT    || justCmd == SCSI_C_READ6          ||
-        justCmd == SCSI_C_WRITE6            || justCmd == SCSI_C_READ_CAPACITY  || justCmd == SCSI_C_INQUIRY        ||
-        justCmd == SCSI_C_READ10            || justCmd == SCSI_C_WRITE10        || justCmd == SCSI_C_VERIFY) {
-        return true;
-    }
-
-    return false;
 }
 
 void Scsi::processCommand(BYTE *command)

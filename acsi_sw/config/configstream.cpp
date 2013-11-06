@@ -2,11 +2,15 @@
 #include <string.h>
 
 #include "../global.h"
+#include "../native/scsi_defs.h"
+#include "../acsidatatrans.h"
+
 #include "settings.h"
 #include "keys.h"
 #include "configstream.h"
 #include "configscreen_main.h"
 
+extern "C" void outDebugString(const char *format, ...);
 
 ConfigStream::ConfigStream()
 {
@@ -14,7 +18,9 @@ ConfigStream::ConfigStream()
 	showingMessage		= false;
 	screenChanged		= true;
 	
-	message.clear();
+    dataTrans = NULL;
+
+    message.clear();
 	createScreen_homeScreen();
 }
 
@@ -22,6 +28,56 @@ ConfigStream::~ConfigStream()
 {
 	destroyCurrentScreen();
 	destroyScreen(message);
+}
+
+void ConfigStream::setAcsiDataTrans(AcsiDataTrans *dt)
+{
+    dataTrans = dt;
+}
+
+void ConfigStream::processCommand(BYTE *cmd)
+{
+    #define READ_BUFFER_SIZE    (5 * 1024)
+    static BYTE readBuffer[READ_BUFFER_SIZE];
+    int streamCount;
+
+    if(cmd[1] != 'C' || cmd[2] != 'E' || cmd[3] != HOSTMOD_CONFIG) {        // not for us?
+        return;
+    }
+
+    dataTrans->clear();                 // clean data transporter before handling
+
+    switch(cmd[4]) {
+        case CFG_CMD_IDENTIFY:          // identify?
+        dataTrans->addData((unsigned char *)"CosmosEx config console", 23, true);       // add identity string with padding
+        dataTrans->setStatus(SCSI_ST_OK);
+        break;
+
+    case CFG_CMD_KEYDOWN:
+        onKeyDown(cmd[5]);                                                // first send the key down signal
+        streamCount = getStream(false, readBuffer, READ_BUFFER_SIZE);     // then get current screen stream
+
+        dataTrans->addData(readBuffer, streamCount, true);                              // add data and status, with padding to multiple of 16 bytes
+        dataTrans->setStatus(SCSI_ST_OK);
+
+        outDebugString("handleConfigStream -- CFG_CMD_KEYDOWN -- %d bytes\n", streamCount);
+        break;
+
+    case CFG_CMD_GO_HOME:
+        streamCount = getStream(true, readBuffer, READ_BUFFER_SIZE);      // get homescreen stream
+
+        dataTrans->addData(readBuffer, streamCount, true);                              // add data and status, with padding to multiple of 16 bytes
+        dataTrans->setStatus(SCSI_ST_OK);
+
+        outDebugString("handleConfigStream -- CFG_CMD_GO_HOME -- %d bytes\n", streamCount);
+        break;
+
+    default:                            // other cases: error
+        dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
+        break;
+    }
+
+    dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
 }
 
 void ConfigStream::onKeyDown(BYTE key)

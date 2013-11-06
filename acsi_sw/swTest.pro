@@ -22,7 +22,8 @@ SOURCES +=  main.cpp \
             native/testmedia.cpp \
             config/configcomponent.cpp \
             config/configscreen_main.cpp \
-            config/configstream.cpp
+            config/configstream.cpp \
+            translated/translateddisk.cpp
 
 HEADERS  += mainwindow.h \
             cconusb.h \
@@ -42,6 +43,9 @@ HEADERS  += mainwindow.h \
             config/configcomponent.h \
             config/configscreen_main.h \
             config/configstream.h \
-            config/keys.h
+            config/keys.h \
+            translated/translateddisk.h \
+            translated/gemdos.h \
+            translated/gemdos_errno.h
 
 FORMS    += mainwindow.ui
