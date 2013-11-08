@@ -504,6 +504,64 @@ void ConfigStream::createScreen_translated(void)
     screenChanged		= true;			// mark that the screen has changed
     showingHomeScreen	= false;		// mark that we're NOT showing the home screen
 
+    screen_addHeaderAndFooter(screen, (char *) "Network settings");
+
+    ConfigComponent *comp;
+
+    comp = new ConfigComponent(ConfigComponent::label, "Use DHCP",	10, 12, 6);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::checkbox, " ",	1, 22, 6);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::label, "If not using DHCP, set the next params:", 40, 0, 9);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::label, "IP address", 40, 0, 11);
+    screen.push_back(comp);
+
+    // IP edit line here
+
+    comp = new ConfigComponent(ConfigComponent::label, "Mask", 40, 0, 12);
+    screen.push_back(comp);
+
+    // IP edit line here
+
+    comp = new ConfigComponent(ConfigComponent::label, "Gateway", 40, 0, 13);
+    screen.push_back(comp);
+
+    // IP edit line here
+
+    comp = new ConfigComponent(ConfigComponent::label, "DNS", 40, 0, 14);
+    screen.push_back(comp);
+
+    // IP edit line here
+
+    comp = new ConfigComponent(ConfigComponent::button, "  Save  ", 8,  9, 16);
+    comp->setOnEnterFunction(onNetwork_save);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::button, " Cancel ", 8, 20, 16);
+    comp->setOnEnterFunction(onGoToHomeScreen);
+    screen.push_back(comp);
+
+
+    // get the settings, store them to components
+    Settings s;
+
+
+
+
+    setFocusToFirstFocusable();
+}
+
+void ConfigStream::createScreen_network(void)
+{
+    // the following 3 lines should be at start of each createScreen_ method
+    destroyCurrentScreen();				// destroy current components
+    screenChanged		= true;			// mark that the screen has changed
+    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+
     screen_addHeaderAndFooter(screen, (char *) "Translated disk");
 
     ConfigComponent *comp;

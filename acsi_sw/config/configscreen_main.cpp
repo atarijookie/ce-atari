@@ -24,7 +24,7 @@ void onMainMenu_floppyConfig(ConfigComponent *sender)
 
 void onMainMenu_networkSettings(ConfigComponent *sender)
 {
-
+    ConfigStream::instance().createScreen_network();
 }
 
 void onMainMenu_updateSoftware(ConfigComponent *sender)
@@ -122,3 +122,8 @@ void onTranslated_save(ConfigComponent *sender)
     ConfigStream::instance().createScreen_homeScreen();		// now back to the home screen
 }
 
+void onNetwork_save(ConfigComponent *sender)
+{
+
+
+}

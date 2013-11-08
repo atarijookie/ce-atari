@@ -14,6 +14,7 @@ void onMainMenu_updateSoftware(ConfigComponent *sender);
 
 void onAcsiConfig_save(ConfigComponent *sender);
 void onTranslated_save(ConfigComponent *sender);
+void onNetwork_save(ConfigComponent *sender);
 
 #define COMPID_TRAN_FIRST           1
 #define COMPID_TRAN_SHARED          2
