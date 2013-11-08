@@ -16,7 +16,7 @@ BYTE ce_identify(BYTE ACSI_id);
 /*--------------------------------------------------*/
 BYTE      deviceID;
 
-BYTE myBuffer[520];
+BYTE myBuffer[4*512];
 BYTE *pBuffer;
 
 #define HOSTMOD_CONFIG				1
@@ -130,7 +130,7 @@ void sendKeyDown(BYTE key)
   
 	memset(pBuffer, 0, 512);               			/* clear the buffer */
   
-	res = acsi_cmd(1, cmd, 6, pBuffer, 1); 			/* issue the KEYDOWN command and show the screen stream */
+	res = acsi_cmd(1, cmd, 6, pBuffer, 3); 			/* issue the KEYDOWN command and show the screen stream */
     
 	if(res != OK) {									/* if failed, return FALSE */
 		printf("sendKeyDown failed!\n");
@@ -148,7 +148,7 @@ void showHomeScreen(void)
 	cmd[0] = (deviceID << 5); 						/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
 	memset(pBuffer, 0, 512);               			/* clear the buffer */
   
-	res = acsi_cmd(1, cmd, 6, pBuffer, 1); 			/* issue the GO_HOME command and show the screen stream */
+	res = acsi_cmd(1, cmd, 6, pBuffer, 3); 			/* issue the GO_HOME command and show the screen stream */
     
 	if(res != OK) {									/* if failed, return FALSE */
 		printf("showHomeScreen failed!\n");
