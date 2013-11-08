@@ -10,7 +10,7 @@
 /*--------------------------------------------------*/
 
 void showHomeScreen(void);
-void sendKeyDown(BYTE vkey, BYTE key);
+void sendKeyDown(BYTE key);
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
 BYTE ce_identify(BYTE ACSI_id);
 /*--------------------------------------------------*/
@@ -30,22 +30,27 @@ BYTE *pBuffer;
 /*--------------------------------------------------*/
 int main(void)
 {
-  DWORD scancode;
-  BYTE key, vkey, res;
-  BYTE i;
-  WORD timeNow, timePrev;
-  DWORD toEven;
- 
-  /* ---------------------- */
-  toEven = (DWORD) &myBuffer[0];
+	DWORD scancode;
+	BYTE key, vkey, res;
+	BYTE i;
+	WORD timeNow, timePrev;
+	DWORD toEven;
+	void *OldSP;
+
+	OldSP = (void *) Super((void *)0);  			/* supervisor mode */ 
+	
+	/* ---------------------- */
+	/* create buffer pointer to even address */
+	toEven = (DWORD) &myBuffer[0];
   
-  if(toEven & 0x0001)       /* not even number? */
-    toEven++;
+	if(toEven & 0x0001)       /* not even number? */
+		toEven++;
   
-  pBuffer = (BYTE *) toEven; 
-  /* ---------------------- */
-  /* search for device on the ACSI bus */
-  deviceID = 0;
+	pBuffer = (BYTE *) toEven; 
+	
+	/* ---------------------- */
+	/* search for device on the ACSI bus */
+	deviceID = 0;
 
 	Clear_home();
 	printf("Looking for CosmosEx:\n");
@@ -70,6 +75,7 @@ int main(void)
 		key = Cnecin();
     
 		if(key == 'Q' || key=='q') {
+		    Super((void *)OldSP);  			      /* user mode */
 			return 0;
 		}
 	}
@@ -90,7 +96,7 @@ int main(void)
 			if((timeNow - timePrev) > 0) {		/* check if time changed (2 seconds passed) */
 				timePrev = timeNow;
 				
-				sendKeyDown(0, 0);				/* display a new stream (if something changed) */
+				sendKeyDown(0);					/* display a new stream (if something changed) */
 			}
 			
 			continue;							/* try again */
@@ -101,21 +107,30 @@ int main(void)
 		vkey	= (scancode>>16)	& 0xff;
 		key		=  scancode			& 0xff;
 
-		sendKeyDown(vkey, key);					/* send this key to device */
+		key		= atariKeysToSingleByte(vkey, key);	/* transform BYTE pair into single BYTE */
+		
+		if(key == KEY_F10) {						/* should quit? */
+			break;
+		}
+		
+		sendKeyDown(key);							/* send this key to device */
 	}
+	
+    Super((void *)OldSP);  			      			/* user mode */
+	return 0;
 }
 /*--------------------------------------------------*/
-void sendKeyDown(BYTE vkey, BYTE key)
+void sendKeyDown(BYTE key)
 {
 	WORD res;
 	BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_KEYDOWN, 0};
 	
 	cmd[0] = (deviceID << 5); 						/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
-	cmd[5] = atariKeysToSingleByte(vkey, key);		/* store the pressed key to cmd[5] */
+	cmd[5] = key;									/* store the pressed key to cmd[5] */
   
 	memset(pBuffer, 0, 512);               			/* clear the buffer */
   
-	res = acsi_cmd(1, cmd, 6, pBuffer);    			/* issue the KEYDOWN command and show the screen stream */
+	res = acsi_cmd(1, cmd, 6, pBuffer, 1); 			/* issue the KEYDOWN command and show the screen stream */
     
 	if(res != OK) {									/* if failed, return FALSE */
 		printf("sendKeyDown failed!\n");
@@ -133,7 +148,7 @@ void showHomeScreen(void)
 	cmd[0] = (deviceID << 5); 						/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
 	memset(pBuffer, 0, 512);               			/* clear the buffer */
   
-	res = acsi_cmd(1, cmd, 6, pBuffer);    			/* issue the GO_HOME command and show the screen stream */
+	res = acsi_cmd(1, cmd, 6, pBuffer, 1); 			/* issue the GO_HOME command and show the screen stream */
     
 	if(res != OK) {									/* if failed, return FALSE */
 		printf("showHomeScreen failed!\n");
@@ -148,12 +163,12 @@ BYTE ce_identify(BYTE ACSI_id)
   WORD res;
   BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_IDENTIFY, 0};
   
-  cmd[0] = (ACSI_id << 5); 				/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
-  memset(pBuffer, 0, 512);              /* clear the buffer */
+  cmd[0] = (ACSI_id << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+  memset(pBuffer, 0, 512);              	/* clear the buffer */
   
-  res = acsi_cmd(1, cmd, 6, pBuffer);   /* issue the identify command and check the result */
+  res = acsi_cmd(1, cmd, 6, pBuffer, 1);	/* issue the identify command and check the result */
     
-  if(res != OK)                         /* if failed, return FALSE */
+  if(res != OK)                         	/* if failed, return FALSE */
     return 0;
     
   if(strncmp((char *) pBuffer, "CosmosEx config console", 23) != 0) {		/* the identity string doesn't match? */

@@ -23,15 +23,8 @@
 #define RETRY_FLAG    0x04      /* flag for read/write with retries */
 #define PHYSOP_FLAG   0x08      /* flag for physical/logical read/write */
 /* ------------------------------------------ */
+
 /* ASCI Commands */
-#define HD_TDR   0x00           /* Test Drive Ready */
-#define HD_RS    0x03           /* Request Sense */
-#define HD_FD    0x04           /* Format Drive */
-#define HD_READ  0x08           /* Read */
-#define HD_WRITE 0x0A           /* Write */
-#define HD_SEEK  0x0B           /* Seek */
-#define HD_MSEL  0x15           /* Mode Select */
-/* -------------------------------------- */
 typedef struct mfp_chip 
 {
 	char reg[48]; /* MFP registers are on odd bytes */
@@ -89,6 +82,6 @@ void setdma(unsigned long int addr);
 long hdone(void);
 long endcmd(short mode);
 
-BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer);
+BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 /*---------------------------------------*/
 
