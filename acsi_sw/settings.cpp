@@ -131,6 +131,39 @@ void Settings::setString(char *key, char *value)
 	fclose(file);
 }	
 //-------------------------
+char Settings::getChar(char *key, char defValue)
+{
+    FILE *file = open(key, true);
+    if(!file) {											// failed to open settings?
+        printf("Settings::getChar -- returning default value for %s\n", key);
+        return defValue;
+    }
+
+    int res;
+    char val;
+    res = fscanf(file, "%c", &val);						// try to read the value
+    fclose(file);
+
+    if(res != 1) {										// failed to read value?
+        printf("Settings::getChar -- returning default value for %s\n", key);
+        return defValue;
+    }
+
+    return val;											// return
+}
+
+void Settings::setChar(char *key, char value)
+{
+    FILE *file = open(key, false);
+    if(!file) {											// failed to open settings?
+        printf("Settings::setChar -- could not write key %s\n", key);
+        return;
+    }
+
+    fputc(value, file);
+    fclose(file);
+}
+//-------------------------
 
 FILE *Settings::open(char *key, bool readNotWrite)
 {

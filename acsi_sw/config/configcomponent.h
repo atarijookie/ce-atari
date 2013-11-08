@@ -6,6 +6,12 @@
 
 #include "../datatypes.h"
 
+#define TEXT_OPTION_ALLOW_ALL                   7
+#define TEXT_OPTION_ALLOW_LETTERS               1
+#define TEXT_OPTION_ALLOW_NUMBERS               2
+#define TEXT_OPTION_ALLOW_OTHER                 4
+#define TEXT_OPTION_LETTERS_ONLY_UPPERCASE      16
+
 class ConfigComponent;
 typedef void (*TFonEnter)		(ConfigComponent *sender);
 typedef void (*TFonChBEnter)	(int groupId, int checkboxId);
@@ -28,11 +34,17 @@ public:
 	void setReverse(bool isReverse);
 	void setIsChecked(bool isChecked);
     void onKeyPressed(BYTE key);
-	void setText(std::string text);
+
+    void setText(std::string text);
+    void getText(std::string &text);
+    void setTextOptions(int newOpts);
 	
 	bool isFocused(void);
 	bool isChecked(void);
 	bool canFocus(void);
+
+    void setComponentId(int newId);
+    int  getComponentId(void);
 
     void terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt);	// then add +cnt to bfr (might be 0 or 4)
 	
@@ -48,8 +60,11 @@ private:
     WORD			maxLen;
 	std::string		text;
 
+    int             componentId;
+
 	// for editline	
     WORD			cursorPos;
+    int             textOptions;
 
 	// for checkbox
 	int				checkBoxGroup;
@@ -63,6 +78,13 @@ private:
 	
     void handleEditLineKeyPress(BYTE key);
 	bool isGroupCheckBox(void);
+
+    BYTE filterTextKey(BYTE key);
+    bool textOptionSet(WORD textOption);
+    bool isLetter(BYTE key);
+    bool isSmallLetter(BYTE key);
+    bool isNumber(BYTE key);
+    bool isOther(BYTE key);
 };
 
 #endif

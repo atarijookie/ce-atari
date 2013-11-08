@@ -16,7 +16,10 @@ public:
 	
 	char *getString(char *key, char *defValue);
 	void  setString(char *key, char *value);
-	
+
+    char getChar(char *key, char defValue);
+    void setChar(char *key, char value);
+
 private:
 
 	FILE *open(char *key, bool readNotWrite);

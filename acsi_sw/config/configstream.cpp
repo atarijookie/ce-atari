@@ -277,7 +277,6 @@ void ConfigStream::destroyScreen(std::vector<ConfigComponent *> &scr)
 	scr.clear();									// now clear the list
 }
 
-
 void ConfigStream::setFocusToFirstFocusable(void)
 {
     for(WORD i=0; i<screen.size(); i++) {			// go through the current screen
@@ -288,6 +287,32 @@ void ConfigStream::setFocusToFirstFocusable(void)
 			return;
 		}
 	}
+}
+
+bool ConfigStream::getTextByComponentId(int componentId, std::string &text)
+{
+    for(WORD i=0; i<screen.size(); i++) {			// go through the current screen
+        ConfigComponent *c = screen[i];
+
+        if(c->getComponentId() == componentId) {    // found the component?
+            c->getText(text);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void ConfigStream::setTextByComponentId(int componentId, std::string &text)
+{
+    for(WORD i=0; i<screen.size(); i++) {			// go through the current screen
+        ConfigComponent *c = screen[i];
+
+        if(c->getComponentId() == componentId) {    // found the component?
+            c->setText(text);
+            return;
+        }
+    }
 }
 
 int ConfigStream::checkboxGroup_getCheckedId(int groupId) 
@@ -345,7 +370,7 @@ void ConfigStream::screen_addHeaderAndFooter(std::vector<ConfigComponent *> &scr
 	scr.push_back(comp);
 
 	// insert footer
-	comp = new ConfigComponent(ConfigComponent::label, "        To quit - press Ctrl + C        ", 40, 0, 22);
+	comp = new ConfigComponent(ConfigComponent::label, "          To quit - press F10           ", 40, 0, 22);
 	comp->setReverse(true);
 	scr.push_back(comp);
 
@@ -419,11 +444,11 @@ void ConfigStream::createScreen_acsiConfig(void)
 	
 	ConfigComponent *comp;
 
-	comp = new ConfigComponent(ConfigComponent::label, "ID       off   raw  tran   net", 40, 0, 3);
+	comp = new ConfigComponent(ConfigComponent::label, "ID          off   raw  tran   net", 40, 0, 3);
 	comp->setReverse(true);
 	screen.push_back(comp);
 
-	for(int row=0; row<8; row++) {			// now make 8 * 7 checkboxes
+	for(int row=0; row<8; row++) {			// now make 8 rows of checkboxes
 		char bfr[5];
 		sprintf(bfr, "%d", row);
 		
@@ -431,23 +456,20 @@ void ConfigStream::createScreen_acsiConfig(void)
 		screen.push_back(comp);
 
 		for(int col=0; col<4; col++) {
-			comp = new ConfigComponent(ConfigComponent::checkbox, "   ", 3, 8 + (col * 6), row + 4);			// create and place checkbox on screen
+			comp = new ConfigComponent(ConfigComponent::checkbox, "   ", 3, 11 + (col * 6), row + 4);			// create and place checkbox on screen
 			comp->setCheckboxGroupIds(row, col);																// set checkbox group id to row, and checbox id to col
 			comp->setOnChBEnterFunction(onCheckboxGroupEnter);													// set this as general checkbox group handler, which switched checkboxed in group
 			screen.push_back(comp);
 		}
 	}
 	
-	comp = new ConfigComponent(ConfigComponent::label, "off  - turned off, not responding here",	40, 0, 16);
+	comp = new ConfigComponent(ConfigComponent::label, "off  - turned off, not responding here",	40, 0, 17);
 	screen.push_back(comp);
 
-	comp = new ConfigComponent(ConfigComponent::label, "raw  - raw sector access (use HDDr/ICD)",	40, 0, 17);
+	comp = new ConfigComponent(ConfigComponent::label, "raw  - raw sector access (use HDDr/ICD)",	40, 0, 18);
 	screen.push_back(comp);
 
-	comp = new ConfigComponent(ConfigComponent::label, "tran - translated access      (only one)",	40, 0, 18);
-	screen.push_back(comp);
-
-	comp = new ConfigComponent(ConfigComponent::label, "net  - network card interface (only one)",	40, 0, 19);
+	comp = new ConfigComponent(ConfigComponent::label, "tran - translated access      (only one)",	40, 0, 19);
 	screen.push_back(comp);
 
 	comp = new ConfigComponent(ConfigComponent::button, "  Save  ", 8,  9, 13);
@@ -473,4 +495,85 @@ void ConfigStream::createScreen_acsiConfig(void)
 	}
 	
 	setFocusToFirstFocusable();
+}
+
+void ConfigStream::createScreen_translated(void)
+{
+    // the following 3 lines should be at start of each createScreen_ method
+    destroyCurrentScreen();				// destroy current components
+    screenChanged		= true;			// mark that the screen has changed
+    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+
+    screen_addHeaderAndFooter(screen, (char *) "Translated disk");
+
+    ConfigComponent *comp;
+
+    comp = new ConfigComponent(ConfigComponent::label, "Drive letters assignment", 40, 5, 8);
+    comp->setReverse(true);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::label, "First translated drive",	23, 8, 7);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::editline, " ",	1, 31, 7);
+    comp->setComponentId(COMPID_TRAN_FIRST);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::label, "Shared drive", 23, 8, 9);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::editline, " ",	1, 31, 9);
+    comp->setComponentId(COMPID_TRAN_SHARED);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::label, "Config drive", 23, 8, 10);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::editline, " ",	1, 31, 10);
+    comp->setComponentId(COMPID_TRAN_CONFDRIVE);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::label, "If you use also raw disks (Atari native ",	40, 0, 17);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::label, "disks), you should avoid using few",	40, 0, 18);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::label, "letters from C: to leave some space for",	40, 0, 19);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::label, "them.",	40, 0, 20);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::button, "  Save  ", 8,  9, 13);
+    comp->setOnEnterFunction(onTranslated_save);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(ConfigComponent::button, " Cancel ", 8, 20, 13);
+    comp->setOnEnterFunction(onGoToHomeScreen);
+    screen.push_back(comp);
+
+    // get the letters from settings, store them to components
+    Settings s;
+    char drive1, drive2, drive3;
+
+    drive1 = s.getChar((char *) "DRIVELETTER_FIRST",      0);
+    drive2 = s.getChar((char *) "DRIVELETTER_SHARED",     0);
+    drive3 = s.getChar((char *) "DRIVELETTER_CONFDRIVE",  0);
+
+    std::string driveString;
+
+    driveString = drive1;
+    setTextByComponentId(COMPID_TRAN_FIRST,     driveString);
+
+    driveString = drive2;
+    setTextByComponentId(COMPID_TRAN_SHARED,    driveString);
+
+    driveString = drive3;
+    setTextByComponentId(COMPID_TRAN_CONFDRIVE, driveString);
+
+    setFocusToFirstFocusable();
 }

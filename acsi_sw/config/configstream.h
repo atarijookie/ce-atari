@@ -33,6 +33,10 @@ public:
 
     void createScreen_homeScreen(void);
     void createScreen_acsiConfig(void);
+    void createScreen_translated(void);
+
+    bool getTextByComponentId(int componentId, std::string &text);
+    void setTextByComponentId(int componentId, std::string &text);
 
 private:
     ConfigStream();

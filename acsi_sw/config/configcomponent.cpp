@@ -33,6 +33,9 @@ ConfigComponent::ConfigComponent(ComponentType type, std::string text, WORD maxL
 	}
 	
 	changed = true;							// mark that we got new data and we should display them
+
+    componentId = -1;                       // no component id yet defined
+    textOptions = TEXT_OPTION_ALLOW_ALL;    // no restrictions on chars
 }
 
 void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
@@ -259,13 +262,18 @@ void ConfigComponent::handleEditLineKeyPress(BYTE key)
 	}
 
 	//-------
-	// now for the other chars - just add them
-    if(cursorPos < text.length()) {			// cursor IN text
+    // now for the other chars - add them after filtering
+    key = filterTextKey(key);
+
+    if(key == 0) {          // the key was filtered out??? quit
+        return;
+    }
+
+    if(cursorPos < text.length()) {                         // cursor IN text
         text.insert(cursorPos, 1, key);                     // insert somewhere in the middle
     } else {                                                // cursor BEHIND text
         text.push_back(key);                                // insert char at the end
 	}
-
 	
 	cursorPos++;
 
@@ -276,6 +284,90 @@ void ConfigComponent::handleEditLineKeyPress(BYTE key)
 	if(cursorPos >= maxLen) {								// if cursor too far
 		cursorPos = maxLen -1;
 	}
+}
+
+void ConfigComponent::setTextOptions(int newOpts)
+{
+    textOptions = newOpts;
+}
+
+BYTE ConfigComponent::filterTextKey(BYTE key)
+{
+    // if it's a letter and we have it enabled
+    if(isLetter(key) && textOptionSet(TEXT_OPTION_ALLOW_LETTERS)) {
+        // if we should allow only uppercase letters and it's a lower case letter, convert it
+        if(textOptionSet(TEXT_OPTION_LETTERS_ONLY_UPPERCASE) && isSmallLetter(key)) {
+            key = key - 32;
+        }
+
+        return key;
+    }
+
+    // if numbers are enabled, let it pass
+    if(isNumber(key) && textOptionSet(TEXT_OPTION_ALLOW_NUMBERS)) {
+        return key;
+    }
+
+    // if it's something other and we have it enabled, pass
+    if(isOther(key) && textOptionSet(TEXT_OPTION_ALLOW_OTHER)) {
+        return key;
+    }
+
+    return 0;
+}
+
+bool ConfigComponent::textOptionSet(WORD textOption)
+{
+    if((textOptions & textOption) == textOption) {
+        return true;
+    }
+
+    return false;
+}
+
+bool ConfigComponent::isLetter(BYTE key)
+{
+    if(key >= 'A' && key <= 'Z') {
+        return true;
+    }
+
+    if(key >= 'a' && key <= 'z') {
+        return true;
+    }
+
+    return false;
+}
+
+bool ConfigComponent::isSmallLetter(BYTE key)
+{
+    if(key >= 'a' && key <= 'z') {
+        return true;
+    }
+
+    return false;
+}
+
+
+bool ConfigComponent::isOther(BYTE key)
+{
+    if(isLetter(key)) {
+        return false;
+    }
+
+    if(isNumber(key)) {
+        return false;
+    }
+
+    return true;
+}
+
+bool ConfigComponent::isNumber(BYTE key)
+{
+    if(key >= '0' && key <= '9') {
+        return true;
+    }
+
+    return false;
 }
 
 void ConfigComponent::setText(std::string text)
@@ -289,6 +381,11 @@ void ConfigComponent::setText(std::string text)
     if(text.length() > maxLen) {
 		this->text.resize(maxLen);
 	}
+}
+
+void ConfigComponent::getText(std::string &text)
+{
+    text = this->text;
 }
 
 bool ConfigComponent::isFocused(void)
@@ -340,3 +437,14 @@ bool ConfigComponent::isGroupCheckBox(void)
 {
 	return (checkBoxGroup != -1);		// if the group ID is not -1, then it's a group checkbox
 }
+
+void ConfigComponent::setComponentId(int newId)
+{
+    componentId = newId;
+}
+
+int  ConfigComponent::getComponentId(void)
+{
+    return componentId;
+}
+
