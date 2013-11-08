@@ -88,7 +88,7 @@ int main(void)
 	timePrev = Tgettime();
 	
 	while(1) {
-		res = Bconstat(2);						/* see if there's something waiting from keyboard */
+		res = Cconis();						   /* see if there's something waiting from keyboard */
 		
 		if(res == 0) {							/* nothing waiting from keyboard? */
 			timeNow = Tgettime();
