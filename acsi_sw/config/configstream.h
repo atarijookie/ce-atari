@@ -84,7 +84,7 @@ private:
     void onTranslated_save(void);
     void onNetwork_save(void);
 
-    bool verifyAndFixIPaddress(std::string &in, std::string &out);
+    bool verifyAndFixIPaddress(std::string &in, std::string &out, bool emptyIsOk);
 };
 
 #endif

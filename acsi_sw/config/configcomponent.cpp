@@ -423,20 +423,39 @@ void ConfigComponent::terminal_addReverse(BYTE *bfr, bool onNotOff)
     }
 }
 
+void ConfigComponent::terminal_addCursorOn(BYTE *bfr, bool on)
+{
+    bfr[0] = 27;
+
+    if(on) {
+        bfr[1] = 'e';       // CUR_ON
+    } else {
+        bfr[1] = 'f';       // CUR_OFF
+    }
+}
+
 void ConfigComponent::terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt)
 {
     cnt = 0;
 
     if(type != editline) {			// if it's not editline, skip adding current cursor
+        terminal_addCursorOn(bfr, false);
+        cnt = 2;
         return;
     }
 
     if(!hasFocus) {					// if this editline doesn't have focus, skip adding current cursor
+        terminal_addCursorOn(bfr, false);
+        cnt = 2;
         return;
     }
 
+    terminal_addCursorOn(bfr, true);
+    cnt += 2;
+    bfr += 2;
+
     terminal_addGoto(bfr, posX + 1 + cursorPos, posY);		// add goto(x,y) at cursor position
-    cnt = 4;
+    cnt += 4;
 }
 
 bool ConfigComponent::isGroupCheckBox(void)

@@ -219,14 +219,21 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
 
     std::vector<ConfigComponent *> &scr = showingMessage ? message : screen;		// if we should show message, set reference to message, otherwise set reference to screen
 
+    // first turn off the cursor to avoid cursor blinking on the screen
+    bfr[0] = 27;
+    bfr[1] = 'f';       // CUR_OFF
+    bfr += 2;
+    totalCnt += 2;
+
     if(screenChanged) {									// if screen changed, clear screen (CLEAR_HOME) and draw it all
         bfr[0] = 27;
-        bfr[1] = 'E';
+        bfr[1] = 'E';   // CLEAR_HOME
 
         bfr += 2;
         totalCnt += 2;
     }
 
+    //--------
     int focused = -1;
 
     for(WORD i=0; i<scr.size(); i++) {				// go through all the components of screen and gather their streams
@@ -248,8 +255,8 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
         ConfigComponent *c = scr[focused];
         c->terminal_addGotoCurrentCursor(bfr, gotLen);	// position the cursor at the right place
 
-        bfr			+= gotLen;
-        totalCnt	+= gotLen;
+        bfr         += gotLen;
+        totalCnt    += gotLen;
     }
 
     screenChanged = false;
@@ -669,7 +676,7 @@ void ConfigStream::createScreen_network(void)
     std::string str;
     bool val;
 
-    s.getBool((char *) "NET_USE_DHCP", true);
+    val = s.getBool((char *) "NET_USE_DHCP", true);
     setBoolByComponentId(COMPID_NET_DHCP, val);
 
     str = s.getString((char *) "NET_IP", (char *) "");
@@ -914,10 +921,10 @@ void ConfigStream::onNetwork_save(void)
     if(!useDhcp) {          // but verify settings only when not using dhcp
         bool a,b,c,d;
 
-        a = verifyAndFixIPaddress(ip,       ip);
-        b = verifyAndFixIPaddress(mask,     mask);
-        c = verifyAndFixIPaddress(dns,      dns);
-        d = verifyAndFixIPaddress(gateway,  gateway);
+        a = verifyAndFixIPaddress(ip,       ip,         false);
+        b = verifyAndFixIPaddress(mask,     mask,       false);
+        c = verifyAndFixIPaddress(dns,      dns,        true);
+        d = verifyAndFixIPaddress(gateway,  gateway,    true);
 
         if(!a || !b || !c || !d) {
             showMessageScreen((char *) "Warning", (char *) "Some network address has invalid format.\n\rPlease fix this and try again.");
@@ -935,15 +942,21 @@ void ConfigStream::onNetwork_save(void)
         s.setString((char *) "NET_DNS",     (char *) dns.c_str());
         s.setString((char *) "NET_GATEWAY", (char *) gateway.c_str());
     }
+
+    createScreen_homeScreen();		// now back to the home screen
 }
 
-bool ConfigStream::verifyAndFixIPaddress(std::string &in, std::string &out)
+bool ConfigStream::verifyAndFixIPaddress(std::string &in, std::string &out, bool emptyIsOk)
 {
     char ip[40];
     strcpy(ip, in.c_str());
 
-    if(in.length() == 0) {      // empty string is OK
-        return true;
+    if(in.length() == 0) {      // empty string might be OK
+        if(emptyIsOk) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     // try to read the numbers

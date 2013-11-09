@@ -79,8 +79,9 @@ private:
     int	onEnter;
     int onChBEnter;
 
-    void terminal_addGoto(BYTE *bfr, int x, int y);				// then add +4 to bfr
+    void terminal_addGoto(BYTE *bfr, int x, int y);                     // then add +4 to bfr
     void terminal_addReverse(BYTE *bfr, bool onNotOff);			// then add +2 to bfr
+    void terminal_addCursorOn(BYTE *bfr, bool on);                      // then add +2 to bfr
 
     void handleEditLineKeyPress(BYTE key);
 
