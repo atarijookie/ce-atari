@@ -21,7 +21,6 @@ SOURCES +=  main.cpp \
             native/nomedia.cpp \
             native/testmedia.cpp \
             config/configcomponent.cpp \
-            config/configscreen_main.cpp \
             config/configstream.cpp \
             translated/translateddisk.cpp
 
@@ -41,7 +40,6 @@ HEADERS  += mainwindow.h \
             native/imedia.h \
             native/testmedia.h \
             config/configcomponent.h \
-            config/configscreen_main.h \
             config/configstream.h \
             config/keys.h \
             translated/translateddisk.h \

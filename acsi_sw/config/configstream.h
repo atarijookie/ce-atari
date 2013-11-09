@@ -8,22 +8,29 @@
 
 class AcsiDataTrans;
 
-void onCheckboxGroupEnter(int groupId, int checkboxId);
+enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED,
+                 CS_CREATE_FLOPPY,      CS_CREATE_NETWORK,      CS_CREATE_UPDATE,
+                 CS_SAVE_ACSI,          CS_SAVE_TRANSLATED,     CS_SAVE_NETWORK,
+                 CS_HIDE_MSG_SCREEN,    CS_GO_HOME
+                };
+
+#define COMPID_TRAN_FIRST           1
+#define COMPID_TRAN_SHARED          2
+#define COMPID_TRAN_CONFDRIVE       3
+
+#define COMPID_BTN_SAVE             0xfff0
+#define COMPID_BTN_CANCEL           0xfff1
 
 class ConfigStream
 {
 public:
-    static ConfigStream& instance(void) {
-        static ConfigStream configStream;
-        return configStream;
-    }
-
-	~ConfigStream();
+    ConfigStream();
+    ~ConfigStream();
 
     // functions which are called from the main loop
     void processCommand(BYTE *cmd);
     void setAcsiDataTrans(AcsiDataTrans *dt);
-	
+
     // functions which are called from various components
     int  checkboxGroup_getCheckedId(int groupId);
     void checkboxGroup_setCheckedId(int groupId, int checkedId);
@@ -36,29 +43,37 @@ public:
     void createScreen_translated(void);
     void createScreen_network(void);
 
+    ConfigComponent *findComponentById(int compId);
     bool getTextByComponentId(int componentId, std::string &text);
     void setTextByComponentId(int componentId, std::string &text);
+    void focusByComponentId(int componentId);
+    bool focusNextCheckboxGroup(BYTE key, int groupid, int chbid);
+
+    void enterKeyHandler(int event);
+    void onCheckboxGroupEnter(int groupId, int checkboxId);
 
 private:
-    ConfigStream();
-
-	std::vector<ConfigComponent *> screen;
-	std::vector<ConfigComponent *> message;
+    std::vector<ConfigComponent *> screen;
+    std::vector<ConfigComponent *> message;
 
     AcsiDataTrans *dataTrans;
 
     void onKeyDown(BYTE key);
     int  getStream(bool homeScreen, BYTE *bfr, int maxLen);
 
-	bool showingHomeScreen;
-	bool showingMessage;
-	bool screenChanged;
-	
-	void destroyCurrentScreen(void);
-	void setFocusToFirstFocusable(void);	
-	
-	void screen_addHeaderAndFooter(std::vector<ConfigComponent *> &scr, char *screenName);
-	void destroyScreen(std::vector<ConfigComponent *> &scr);
+    bool showingHomeScreen;
+    bool showingMessage;
+    bool screenChanged;
+
+    void destroyCurrentScreen(void);
+    void setFocusToFirstFocusable(void);
+
+    void screen_addHeaderAndFooter(std::vector<ConfigComponent *> &scr, char *screenName);
+    void destroyScreen(std::vector<ConfigComponent *> &scr);
+
+    void onAcsiConfig_save(void);
+    void onTranslated_save(void);
+    void onNetwork_save(void);
 };
 
 #endif

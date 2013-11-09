@@ -50,6 +50,7 @@ private:
     DataMedia       *dataMedia;
 
     TranslatedDisk  *translated;
+    ConfigStream    *confStream;
 
     TestMedia       testMedia;
 

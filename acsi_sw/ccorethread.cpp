@@ -40,7 +40,8 @@ CCoreThread::CCoreThread()
     translated = new TranslatedDisk();
     translated->setAcsiDataTrans(dataTrans);
 
-    ConfigStream::instance().setAcsiDataTrans(dataTrans);
+    confStream = new ConfigStream();
+    confStream->setAcsiDataTrans(dataTrans);
 }
 
 CCoreThread::~CCoreThread()
@@ -57,6 +58,7 @@ CCoreThread::~CCoreThread()
     delete scsi;
 
     delete translated;
+    delete confStream;
 }
 
 void CCoreThread::displayDbg(void)
@@ -141,7 +143,7 @@ void CCoreThread::handleAcsiCommand(void)
             switch(bufIn[3]) {
             case HOSTMOD_CONFIG:                    // config console command?
                 wasHandled = TRUE;
-                ConfigStream::instance().processCommand(bufIn);
+                confStream->processCommand(bufIn);
                 break;
 
             case HOSTMOD_TRANSLATED_DISK:
@@ -242,7 +244,7 @@ void outDebugString(const char *format, ...)
     va_list args;
     va_start(args, format);
 
-#define KJUT
+//#define KJUT
 #ifdef KJUT
     char tmp[1024];
     vsprintf(tmp, format, args);

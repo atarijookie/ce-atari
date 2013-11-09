@@ -16,68 +16,72 @@ class ConfigComponent;
 typedef void (*TFonEnter)		(ConfigComponent *sender);
 typedef void (*TFonChBEnter)	(int groupId, int checkboxId);
 
+class ConfigStream;
+
 class ConfigComponent
 {
 public:
-	enum ComponentType{ label, button, checkbox, editline };
+    enum ComponentType{ label, button, checkbox, editline };
 
-	// maxLen is maximum length of text, that means that on screen it might have 2 more ('[' and ']')
-    ConfigComponent(ComponentType type, std::string text, WORD maxLen, int x, int y);
-	void setCheckboxGroupIds(int groupId, int checkboxId);
-	void getCheckboxGroupIds(int& groupId, int& checkboxId);
+    // maxLen is maximum length of text, that means that on screen it might have 2 more ('[' and ']')
+    ConfigComponent(ConfigStream *parent, ComponentType type, std::string text, WORD maxLen, int x, int y);
+    void setCheckboxGroupIds(int groupId, int checkboxId);
+    void getCheckboxGroupIds(int& groupId, int& checkboxId);
+    bool isGroupCheckBox(void);
 
-	void setOnEnterFunction(TFonEnter onEnter);
-	void setOnChBEnterFunction(TFonChBEnter onChBEnter);
-	
+    void setOnEnterFunctionCode(int onEnter);
+    void setOnChBEnterFunctionCode(int onChBEnter);
+
     void getStream(bool fullNotChange, BYTE *bfr, int &len);
-	void setFocus(bool hasFocus);
-	void setReverse(bool isReverse);
-	void setIsChecked(bool isChecked);
+    void setFocus(bool hasFocus);
+    void setReverse(bool isReverse);
+    void setIsChecked(bool isChecked);
     void onKeyPressed(BYTE key);
 
     void setText(std::string text);
     void getText(std::string &text);
     void setTextOptions(int newOpts);
-	
-	bool isFocused(void);
-	bool isChecked(void);
-	bool canFocus(void);
+
+    bool isFocused(void);
+    bool isChecked(void);
+    bool canFocus(void);
 
     void setComponentId(int newId);
     int  getComponentId(void);
 
     void terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt);	// then add +cnt to bfr (might be 0 or 4)
-	
-private:
-	bool			changed;
 
-	bool			hasFocus;
-	bool			isReverse;
-	bool			checked;
-	
-	ComponentType	type;
-	int				posX, posY;
+private:
+    ConfigStream                *confStream;
+
+    bool			changed;
+
+    bool			hasFocus;
+    bool			isReverse;
+    bool			checked;
+
+    ComponentType	type;
+    int				posX, posY;
     WORD			maxLen;
-	std::string		text;
+    std::string		text;
 
     int             componentId;
 
-	// for editline	
+    // for editline
     WORD			cursorPos;
     int             textOptions;
 
-	// for checkbox
-	int				checkBoxGroup;
-	int				checkBoxId;
-	
-	TFonEnter		onEnter;
-	TFonChBEnter	onChBEnter;
-	
+    // for checkbox
+    int				checkBoxGroup;
+    int				checkBoxId;
+
+    int	onEnter;
+    int onChBEnter;
+
     void terminal_addGoto(BYTE *bfr, int x, int y);				// then add +4 to bfr
     void terminal_addReverse(BYTE *bfr, bool onNotOff);			// then add +2 to bfr
-	
+
     void handleEditLineKeyPress(BYTE key);
-	bool isGroupCheckBox(void);
 
     BYTE filterTextKey(BYTE key);
     bool textOptionSet(WORD textOption);
