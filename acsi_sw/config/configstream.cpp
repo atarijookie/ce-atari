@@ -348,6 +348,30 @@ void ConfigStream::setTextByComponentId(int componentId, std::string &text)
     c->setText(text);
 }
 
+bool ConfigStream::getBoolByComponentId(int componentId, bool &val)
+{
+    ConfigComponent *c = findComponentById(componentId);
+
+    if(c == NULL) {
+        return false;
+    }
+
+    val = c->isChecked();
+
+    return true;
+}
+
+void ConfigStream::setBoolByComponentId(int componentId, bool &val)
+{
+    ConfigComponent *c = findComponentById(componentId);
+
+    if(c == NULL) {
+        return;
+    }
+
+    c->setIsChecked(val);
+}
+
 void ConfigStream::focusByComponentId(int componentId)
 {
     ConfigComponent *c = findComponentById(componentId);
@@ -591,6 +615,7 @@ void ConfigStream::createScreen_network(void)
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::checkbox, " ",	1, 22, 6);
+    comp->setComponentId(COMPID_NET_DHCP);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::label, "If not using DHCP, set the next params:", 40, 0, 9);
@@ -599,22 +624,34 @@ void ConfigStream::createScreen_network(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "IP address", 40, 0, 11);
     screen.push_back(comp);
 
-    // IP edit line here
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ", 15, 16, 11);
+    comp->setComponentId(COMPID_NET_IP);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
+    screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::label, "Mask", 40, 0, 12);
     screen.push_back(comp);
 
-    // IP edit line here
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ", 15, 16, 12);
+    comp->setComponentId(COMPID_NET_MASK);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
+    screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::label, "Gateway", 40, 0, 13);
     screen.push_back(comp);
 
-    // IP edit line here
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ", 15, 16, 13);
+    comp->setComponentId(COMPID_NET_GATEWAY);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
+    screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::label, "DNS", 40, 0, 14);
     screen.push_back(comp);
 
-    // IP edit line here
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ", 15, 16, 14);
+    comp->setComponentId(COMPID_NET_DNS);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
+    screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  9, 16);
     comp->setOnEnterFunctionCode(CS_SAVE_NETWORK);
@@ -629,9 +666,23 @@ void ConfigStream::createScreen_network(void)
 
     // get the settings, store them to components
     Settings s;
+    std::string str;
+    bool val;
 
+    s.getBool((char *) "NET_USE_DHCP", true);
+    setBoolByComponentId(COMPID_NET_DHCP, val);
 
+    str = s.getString((char *) "NET_IP", (char *) "");
+    setTextByComponentId(COMPID_NET_IP, str);
 
+    str = s.getString((char *) "NET_MASK", (char *) "");
+    setTextByComponentId(COMPID_NET_MASK, str);
+
+    str = s.getString((char *) "NET_DNS", (char *) "");
+    setTextByComponentId(COMPID_NET_DNS, str);
+
+    str = s.getString((char *) "NET_GATEWAY", (char *) "");
+    setTextByComponentId(COMPID_NET_GATEWAY, str);
 
     setFocusToFirstFocusable();
 }
@@ -849,6 +900,68 @@ void ConfigStream::onTranslated_save(void)
 
 void ConfigStream::onNetwork_save(void)
 {
+    std::string ip, mask, dns, gateway;
+    bool useDhcp;
 
+    // read the settings from components
+    getBoolByComponentId(COMPID_NET_DHCP, useDhcp);
+    getTextByComponentId(COMPID_NET_IP, ip);
+    getTextByComponentId(COMPID_NET_MASK, mask);
+    getTextByComponentId(COMPID_NET_DNS, dns);
+    getTextByComponentId(COMPID_NET_GATEWAY, gateway);
 
+    // verify the settings
+    if(!useDhcp) {          // but verify settings only when not using dhcp
+        bool a,b,c,d;
+
+        a = verifyAndFixIPaddress(ip,       ip);
+        b = verifyAndFixIPaddress(mask,     mask);
+        c = verifyAndFixIPaddress(dns,      dns);
+        d = verifyAndFixIPaddress(gateway,  gateway);
+
+        if(!a || !b || !c || !d) {
+            showMessageScreen((char *) "Warning", (char *) "Some network address has invalid format.\n\rPlease fix this and try again.");
+            return;
+        }
+    }
+
+    // store the settings
+    Settings s;
+    s.setBool((char *) "NET_USE_DHCP", useDhcp);
+
+    if(!useDhcp) {          // if not using dhcp, store also the network settings
+        s.setString((char *) "NET_IP",      (char *) ip.c_str());
+        s.setString((char *) "NET_MASK",    (char *) mask.c_str());
+        s.setString((char *) "NET_DNS",     (char *) dns.c_str());
+        s.setString((char *) "NET_GATEWAY", (char *) gateway.c_str());
+    }
+}
+
+bool ConfigStream::verifyAndFixIPaddress(std::string &in, std::string &out)
+{
+    char ip[40];
+    strcpy(ip, in.c_str());
+
+    if(in.length() == 0) {      // empty string is OK
+        return true;
+    }
+
+    // try to read the numbers
+    int i1, i2, i3, i4;
+    bool res = sscanf(ip, "%d.%d.%d.%d", &i1, &i2, &i3, &i4);
+
+    if(!res) {          // couldn't read the numbers?
+        return false;
+    }
+
+    // numbers out of range?
+    if(i1 < 0 || i1 > 255 || i2 < 0 || i2 > 255 || i3 < 0 || i3 > 255 || i4 < 0 || i4 > 255) {
+        return false;
+    }
+
+    // format it back (in case there would be something extra in the field)
+    sprintf(ip, "%d.%d.%d.%d", i1, i2, i3, i4);
+    out = ip;
+
+    return true;
 }

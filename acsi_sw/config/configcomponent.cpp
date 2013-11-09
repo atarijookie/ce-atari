@@ -294,6 +294,11 @@ void ConfigComponent::setTextOptions(int newOpts)
 
 BYTE ConfigComponent::filterTextKey(BYTE key)
 {
+    // if the dot is allowed (for IP addresses)
+    if(key == '.' && textOptionSet(TEXT_OPTION_ALLOW_DOT)) {
+        return key;
+    }
+
     // if it's a letter and we have it enabled
     if(isLetter(key) && textOptionSet(TEXT_OPTION_ALLOW_LETTERS)) {
         // if we should allow only uppercase letters and it's a lower case letter, convert it

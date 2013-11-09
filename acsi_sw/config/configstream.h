@@ -21,6 +21,13 @@ enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED
 #define COMPID_BTN_SAVE             0xfff0
 #define COMPID_BTN_CANCEL           0xfff1
 
+#define COMPID_NET_DHCP             4
+#define COMPID_NET_IP               5
+#define COMPID_NET_MASK             6
+#define COMPID_NET_GATEWAY          7
+#define COMPID_NET_DNS              8
+
+
 class ConfigStream
 {
 public:
@@ -46,6 +53,8 @@ public:
     ConfigComponent *findComponentById(int compId);
     bool getTextByComponentId(int componentId, std::string &text);
     void setTextByComponentId(int componentId, std::string &text);
+    bool getBoolByComponentId(int componentId, bool &val);
+    void setBoolByComponentId(int componentId, bool &val);
     void focusByComponentId(int componentId);
     bool focusNextCheckboxGroup(BYTE key, int groupid, int chbid);
 
@@ -74,6 +83,8 @@ private:
     void onAcsiConfig_save(void);
     void onTranslated_save(void);
     void onNetwork_save(void);
+
+    bool verifyAndFixIPaddress(std::string &in, std::string &out);
 };
 
 #endif

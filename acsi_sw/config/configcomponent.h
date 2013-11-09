@@ -10,6 +10,7 @@
 #define TEXT_OPTION_ALLOW_LETTERS               1
 #define TEXT_OPTION_ALLOW_NUMBERS               2
 #define TEXT_OPTION_ALLOW_OTHER                 4
+#define TEXT_OPTION_ALLOW_DOT                   8
 #define TEXT_OPTION_LETTERS_ONLY_UPPERCASE      16
 
 class ConfigComponent;
