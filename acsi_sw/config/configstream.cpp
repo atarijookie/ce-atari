@@ -484,7 +484,7 @@ void ConfigStream::screen_addHeaderAndFooter(std::vector<ConfigComponent *> &scr
     scr.push_back(comp);
 
     // insert footer
-    comp = new ConfigComponent(this, ConfigComponent::label, "          To quit - press F10           ", 40, 0, 22);
+    comp = new ConfigComponent(this, ConfigComponent::label, "          To quit - press F10           ", 40, 0, 24);
     comp->setReverse(true);
     scr.push_back(comp);
 
@@ -787,16 +787,22 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_GO_HOME:            createScreen_homeScreen();  break;
     case CS_CREATE_ACSI:        createScreen_acsiConfig();  break;
     case CS_CREATE_TRANSLATED:  createScreen_translated();  break;
-    case CS_CREATE_SHARED:      break;
+    case CS_CREATE_SHARED:      createScreen_shared();      break;
     case CS_CREATE_FLOPPY:      break;
     case CS_CREATE_NETWORK:     createScreen_network();     break;
-    case CS_CREATE_UPDATE:      break;
+    case CS_CREATE_UPDATE:      createScreen_update();      break;
 
     case CS_HIDE_MSG_SCREEN:    hideMessageScreen();        break;
 
     case CS_SAVE_ACSI:          onAcsiConfig_save();        break;
     case CS_SAVE_TRANSLATED:    onTranslated_save();        break;
     case CS_SAVE_NETWORK:       onNetwork_save();           break;
+
+    case CS_UPDATE_CHECK:       onUpdateCheck();            break;
+    case CS_UPDATE_UPDATE:      onUpdateUpdate();           break;
+
+    case CS_SHARED_TEST:        onSharedTest();             break;
+    case CS_SHARED_SAVE:        onSharedSave();             break;
     }
 }
 
@@ -977,4 +983,167 @@ bool ConfigStream::verifyAndFixIPaddress(std::string &in, std::string &out, bool
     out = ip;
 
     return true;
+}
+
+void ConfigStream::createScreen_update(void)
+{
+    // the following 3 lines should be at start of each createScreen_ method
+    destroyCurrentScreen();			// destroy current components
+    screenChanged	= true;			// mark that the screen has changed
+    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+
+    screen_addHeaderAndFooter(screen, (char *) "Software & Firmware updates");
+
+    ConfigComponent *comp;
+
+    comp = new ConfigComponent(this, ConfigComponent::label, " part         new version available?", 40, 0, 8);
+    comp->setReverse(true);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "CosmosEx", 12, 1, 10);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 3, 24, 10);
+    comp->setComponentId(COMPID_UPDATE_COSMOSEX);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "Franz", 12, 1, 11);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 3, 24, 11);
+    comp->setComponentId(COMPID_UPDATE_FRANZ);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "Hans", 12, 1, 12);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 3, 24, 12);
+    comp->setComponentId(COMPID_UPDATE_HANZ);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "Config image", 12, 1, 13);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 3, 24, 13);
+    comp->setComponentId(COMPID_UPDATE_CONF_IMAGE);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::button, " Check  ", 8,  4, 15);
+    comp->setOnEnterFunctionCode(CS_UPDATE_CHECK);
+    comp->setComponentId(COMPID_UPDATE_BTN_CHECK);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  15, 15);
+    comp->setOnEnterFunctionCode(CS_UPDATE_UPDATE);
+    comp->setComponentId(COMPID_BTN_SAVE);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, 27, 15);
+    comp->setOnEnterFunctionCode(CS_GO_HOME);
+    comp->setComponentId(COMPID_BTN_CANCEL);
+    screen.push_back(comp);
+
+    setFocusToFirstFocusable();
+}
+
+void ConfigStream::onUpdateCheck(void)
+{
+
+}
+
+void ConfigStream::onUpdateUpdate(void)
+{
+
+}
+
+void ConfigStream::createScreen_shared(void)
+{
+    // the following 3 lines should be at start of each createScreen_ method
+    destroyCurrentScreen();			// destroy current components
+    screenChanged	= true;			// mark that the screen has changed
+    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+
+    screen_addHeaderAndFooter(screen, (char *) "Shared drive settings");
+
+    ConfigComponent *comp;
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "Define what folder on which machine will", 40, 0, 4);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "be used as drive mounted through network", 40, 0, 5);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "on CosmosEx. Works in translated mode.", 40, 0, 6);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "IP address of server", 40, 11, 10);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ", 15, 12, 11);
+    comp->setComponentId(COMPID_SHARED_IP);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "Shared folder path on server", 40, 7, 13);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ", 35, 2, 14);
+    comp->setComponentId(COMPID_SHARED_PATH);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Test  ", 8,  4, 17);
+    comp->setOnEnterFunctionCode(CS_SHARED_TEST);
+    comp->setComponentId(COMPID_SHARED_BTN_TEST);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  15, 17);
+    comp->setOnEnterFunctionCode(CS_SHARED_SAVE);
+    comp->setComponentId(COMPID_BTN_SAVE);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, 27, 17);
+    comp->setOnEnterFunctionCode(CS_GO_HOME);
+    comp->setComponentId(COMPID_BTN_CANCEL);
+    screen.push_back(comp);
+
+    Settings s;
+    std::string addr, path;
+
+    addr = s.getString((char *) "SHARED_ADDRESS",  (char *) "");
+    path = s.getString((char *) "SHARED_PATH",     (char *) "");
+
+    setTextByComponentId(COMPID_SHARED_IP,      addr);
+    setTextByComponentId(COMPID_SHARED_PATH,    path);
+
+    setFocusToFirstFocusable();
+}
+
+void ConfigStream::onSharedTest(void)
+{
+
+}
+
+void ConfigStream::onSharedSave(void)
+{
+    std::string ip, path;
+
+    getTextByComponentId(COMPID_SHARED_IP,      ip);
+    getTextByComponentId(COMPID_SHARED_PATH,    path);
+
+    if(!verifyAndFixIPaddress(ip, ip, false)) {
+        showMessageScreen((char *) "Warning", (char *) "Server address seems to be invalid.\n\rPlease fix this and try again.");
+        return;
+    }
+
+    if(path.length() < 1) {
+        showMessageScreen((char *) "Warning", (char *) "Path for server is empty.\n\rPlease fix this and try again.");
+        return;
+    }
+
+    Settings s;
+
+    s.setString((char *) "SHARED_ADDRESS",  (char *) ip.c_str());
+    s.setString((char *) "SHARED_PATH",     (char *) path.c_str());
+
+    createScreen_homeScreen();		// now back to the home screen
 }

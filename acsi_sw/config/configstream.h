@@ -11,22 +11,20 @@ class AcsiDataTrans;
 enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED,
                  CS_CREATE_FLOPPY,      CS_CREATE_NETWORK,      CS_CREATE_UPDATE,
                  CS_SAVE_ACSI,          CS_SAVE_TRANSLATED,     CS_SAVE_NETWORK,
-                 CS_HIDE_MSG_SCREEN,    CS_GO_HOME
+                 CS_HIDE_MSG_SCREEN,    CS_GO_HOME,
+                 CS_UPDATE_CHECK,       CS_UPDATE_UPDATE,       CS_SHARED_TEST,
+                 CS_SHARED_SAVE
                 };
 
-#define COMPID_TRAN_FIRST           1
-#define COMPID_TRAN_SHARED          2
-#define COMPID_TRAN_CONFDRIVE       3
 
-#define COMPID_BTN_SAVE             0xfff0
-#define COMPID_BTN_CANCEL           0xfff1
-
-#define COMPID_NET_DHCP             4
-#define COMPID_NET_IP               5
-#define COMPID_NET_MASK             6
-#define COMPID_NET_GATEWAY          7
-#define COMPID_NET_DNS              8
-
+enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_TRAN_CONFDRIVE,
+                COMPID_BTN_SAVE,            COMPID_BTN_CANCEL,
+                COMPID_NET_IP,              COMPID_NET_MASK,            COMPID_NET_GATEWAY,
+                COMPID_NET_DNS,             COMPID_NET_DHCP,            COMPID_UPDATE_COSMOSEX,
+                COMPID_UPDATE_FRANZ,        COMPID_UPDATE_HANZ,         COMPID_UPDATE_CONF_IMAGE,
+                COMPID_UPDATE_BTN_CHECK,    COMPID_SHARED_BTN_TEST,     COMPID_SHARED_IP,
+                COMPID_SHARED_PATH
+            };
 
 class ConfigStream
 {
@@ -49,6 +47,8 @@ public:
     void createScreen_acsiConfig(void);
     void createScreen_translated(void);
     void createScreen_network(void);
+    void createScreen_update(void);
+    void createScreen_shared(void);
 
     ConfigComponent *findComponentById(int compId);
     bool getTextByComponentId(int componentId, std::string &text);
@@ -83,6 +83,12 @@ private:
     void onAcsiConfig_save(void);
     void onTranslated_save(void);
     void onNetwork_save(void);
+
+    void onUpdateCheck(void);
+    void onUpdateUpdate(void);
+
+    void onSharedTest(void);
+    void onSharedSave(void);
 
     bool verifyAndFixIPaddress(std::string &in, std::string &out, bool emptyIsOk);
 };
