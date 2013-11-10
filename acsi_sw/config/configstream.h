@@ -26,6 +26,10 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
                 COMPID_SHARED_PATH
             };
 
+#define ST_RESOLUTION_LOW       0
+#define ST_RESOLUTION_MID       1
+#define ST_RESOLUTION_HIGH      2
+
 class ConfigStream
 {
 public:
@@ -64,6 +68,9 @@ public:
 private:
     std::vector<ConfigComponent *> screen;
     std::vector<ConfigComponent *> message;
+
+    int stScreenWidth;
+    int gotoOffset;
 
     AcsiDataTrans *dataTrans;
 

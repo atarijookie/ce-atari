@@ -244,7 +244,7 @@ void outDebugString(const char *format, ...)
     va_list args;
     va_start(args, format);
 
-//#define KJUT
+#define KJUT
 #ifdef KJUT
     char tmp[1024];
     vsprintf(tmp, format, args);

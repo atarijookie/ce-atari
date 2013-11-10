@@ -44,6 +44,8 @@
 // commands for HOSTMOD_CONFIG
 #define CFG_CMD_IDENTIFY            0
 #define CFG_CMD_KEYDOWN             1
+#define CFG_CMD_SET_RESOLUTION      2
+#define CFG_CMD_REFRESH             0xfe
 #define CFG_CMD_GO_HOME             0xff
 
 // commands for HOSTMOD_TRANSLATED_DISK

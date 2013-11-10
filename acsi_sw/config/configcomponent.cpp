@@ -6,26 +6,27 @@
 #include "configstream.h"
 #include "keys.h"
 
-ConfigComponent::ConfigComponent(ConfigStream *parent, ComponentType type, std::string text, WORD maxLen, int x, int y)
+ConfigComponent::ConfigComponent(ConfigStream *parent, ComponentType type, std::string text, WORD maxLen, int x, int y, int gotoOffset)
 {
     confStream = parent;
 
-    onEnter		= NULL;
+    onEnter	= NULL;
     onChBEnter	= NULL;
 
     cursorPos = 0;
 
-    checkBoxGroup	= -1;
-    checkBoxId		= -1;
+    checkBoxGroup   = -1;
+    checkBoxId      = -1;
 
     this->type	= type;
 
     hasFocus	= false;
     isReverse	= false;
-    checked		= false;
+    checked	= false;
 
     posX	= x;
     posY	= y;
+    this->gotoOffset = gotoOffset;
 
     this->maxLen = maxLen;
 
@@ -409,7 +410,7 @@ void ConfigComponent::terminal_addGoto(BYTE *bfr, int x, int y)
     bfr[0] = 27;
     bfr[1] = 'Y';
     bfr[2] = ' ' + y;
-    bfr[3] = ' ' + x;
+    bfr[3] = ' ' + x + gotoOffset;
 }
 
 void ConfigComponent::terminal_addReverse(BYTE *bfr, bool onNotOff)
