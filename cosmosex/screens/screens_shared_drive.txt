@@ -3,16 +3,15 @@
 
 Define what folder on which machine will
 be used as drive mounted through network
-on CosmosEx. 
-   This works in translated mode only.
+on CosmosEx. Works in translated mode.
 
 
 
-        IP address of NFS server
+          IP address of server
            [   .   .   .   ]
 
-             Name of share
-        [                      ]
+      Shared folder path on server
+ [                                    ]
 
 
    [  Test  ]  [  Save  ]  [ Cancel ]

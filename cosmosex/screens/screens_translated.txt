@@ -4,14 +4,14 @@
 
         Drive letters assignment
 
-          First DOS drive: [J]
-          Last  DOS drive: [M]
-
-          Shared drive:    [N]
-          Config drive:    [O]
+       First translated drive  [J]      
+          
+       Shared drive            [N]
+       Config drive            [O]
 
          [  Save  ]  [ Cancel ]
 
+		 
 
 To disable option, delete the letter.
 If you use also raw disks (Atari native 

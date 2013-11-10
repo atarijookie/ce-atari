@@ -5,15 +5,15 @@
 
 
 
+ part         new version available?
 
-part         curr vers.   new vers.
+ CosmosEx              no
+ Franz                 YES
+ Hans                  no
+ Config image          no
 
-CosmosEx     2013-06-19
-Franz        2013-06-19   2013-06-20
-Hans         2013-06-19
-Config image 2013-06-19
 
-      [ Update ]  [ Cancel ]
+   [ Check ]  [ Update ]  [ Cancel ]
 
 
 
