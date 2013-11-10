@@ -11,6 +11,10 @@
 
 void showHomeScreen(void);
 void sendKeyDown(BYTE key);
+void refreshScreen(void);							
+void setResolution(void);
+void showConnectionErrorMessage(void);
+
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
 BYTE ce_identify(BYTE ACSI_id);
 /*--------------------------------------------------*/
@@ -19,6 +23,8 @@ BYTE      deviceID;
 BYTE myBuffer[4*512];
 BYTE *pBuffer;
 
+BYTE prevCommandFailed;
+
 #define HOSTMOD_CONFIG				1
 #define HOSTMOD_LINUX_TERMINAL		2
 #define HOSTMOD_TRANSLATED_DISK		3
@@ -26,6 +32,8 @@ BYTE *pBuffer;
 
 #define CFG_CMD_IDENTIFY			0
 #define CFG_CMD_KEYDOWN				1
+#define CFG_CMD_SET_RESOLUTION      2
+#define CFG_CMD_REFRESH             0xfe
 #define CFG_CMD_GO_HOME				0xff
 /*--------------------------------------------------*/
 int main(void)
@@ -38,6 +46,8 @@ int main(void)
 	void *OldSP;
 
 	OldSP = (void *) Super((void *)0);  			/* supervisor mode */ 
+	
+	prevCommandFailed = 0;
 	
 	/* ---------------------- */
 	/* create buffer pointer to even address */
@@ -82,6 +92,8 @@ int main(void)
   
 	printf("\n\nCosmosEx ACSI ID: %d\n", (int) deviceID);
 	/* ----------------- */
+	setResolution();							/* send the current ST resolution for screen centering */
+	
 	showHomeScreen();							/* get the home screen */
 	
 	/* use Ctrl + C to quit */
@@ -113,6 +125,11 @@ int main(void)
 			break;
 		}
 		
+		if(key == KEY_F5) {							/* should refresh? */
+			refreshScreen();
+			continue;
+		}
+		
 		sendKeyDown(key);							/* send this key to device */
 	}
 	
@@ -133,8 +150,15 @@ void sendKeyDown(BYTE key)
 	res = acsi_cmd(1, cmd, 6, pBuffer, 3); 			/* issue the KEYDOWN command and show the screen stream */
     
 	if(res != OK) {									/* if failed, return FALSE */
-		printf("sendKeyDown failed!\n");
+		showConnectionErrorMessage();
 		return;
+	}
+	
+	if(prevCommandFailed != 0) {					/* if previous ACSI command failed, do some recovery */
+		prevCommandFailed = 0;
+		
+		setResolution();
+		showHomeScreen();
 	}
 	
 	Cconws((char *) pBuffer);						/* now display the buffer */
@@ -151,11 +175,47 @@ void showHomeScreen(void)
 	res = acsi_cmd(1, cmd, 6, pBuffer, 3); 			/* issue the GO_HOME command and show the screen stream */
     
 	if(res != OK) {									/* if failed, return FALSE */
-		printf("showHomeScreen failed!\n");
+		showConnectionErrorMessage();
+		return;
+	}
+	
+	if(prevCommandFailed != 0) {					/* if previous ACSI command failed, do some recovery */
+		prevCommandFailed = 0;
+		
+		setResolution();
+		showHomeScreen();
+	}
+	
+	Cconws((char *) pBuffer);						/* now display the buffer */
+}
+/*--------------------------------------------------*/
+void refreshScreen(void)							
+{
+	WORD res;
+	BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_REFRESH, 0};
+	
+	cmd[0] = (deviceID << 5); 						/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	memset(pBuffer, 0, 512);               			/* clear the buffer */
+  
+	res = acsi_cmd(1, cmd, 6, pBuffer, 3); 			/* issue the REFRESH command and show the screen stream */
+    
+	if(res != OK) {									/* if failed, return FALSE */
+		showConnectionErrorMessage();
 		return;
 	}
 	
 	Cconws((char *) pBuffer);						/* now display the buffer */
+}
+/*--------------------------------------------------*/
+void setResolution(void)							
+{
+	BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_SET_RESOLUTION, 0};
+	
+	cmd[0] = (deviceID << 5); 						/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	cmd[5] = Getrez();
+	memset(pBuffer, 0, 512);               			/* clear the buffer */
+  
+	acsi_cmd(1, cmd, 6, pBuffer, 1); 				/* issue the SET RESOLUTION command */
 }
 /*--------------------------------------------------*/
 BYTE ce_identify(BYTE ACSI_id)
@@ -176,6 +236,14 @@ BYTE ce_identify(BYTE ACSI_id)
   }
 	
   return 1;                             /* success */
+}
+/*--------------------------------------------------*/
+void showConnectionErrorMessage(void)
+{
+	Clear_home();
+	printf("Communication with CosmosEx failed.\nWill try to reconnect in a while.\n");
+	
+	prevCommandFailed = 1;
 }
 /*--------------------------------------------------*/
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
