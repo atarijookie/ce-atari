@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <io.h>
 
 #include "../global.h"
 #include "translateddisk.h"
@@ -7,9 +8,6 @@
 #include "gemdos_errno.h"
 
 extern "C" void outDebugString(const char *format, ...);
-
-#define BUFFER_SIZE             (1024*1024)
-#define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
 
 TranslatedDisk::TranslatedDisk(void)
 {
@@ -69,8 +67,8 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case GEMDOS_Dgetpath:       onDgetpath(cmd);    break;
 
         // directory & file search
-        case GEMDOS_Fsetdta:        onFsetdta(cmd);     break;
-        case GEMDOS_Fgetdta:        onFgetdta(cmd);     break;
+//        case GEMDOS_Fsetdta:        onFsetdta(cmd);     break;        // this function needs to be handled on ST only
+//        case GEMDOS_Fgetdta:        onFgetdta(cmd);     break;        // this function needs to be handled on ST only
         case GEMDOS_Fsfirst:        onFsfirst(cmd);     break;
         case GEMDOS_Fsnext:         onFsnext(cmd);      break;
 
@@ -133,169 +131,31 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-void TranslatedDisk::onDsetdrv(BYTE *cmd)
+bool TranslatedDisk::hostPathExists(BYTE *atariPath, bool relativeNotAbsolute)
 {
-    // Dsetdrv() sets the current GEMDOS drive and returns a bitmap of mounted drives.
-
-    int param = cmd[5];
-
-    if(param < 0 || param > 15) {                   // drive number out of range? not handled
-        dataTrans->setStatus(E_NOTHANDLED);
-        return;
+    if(!conf[currentDriveIndex].enabled) {      // we don't have this drive? fail
+        return false;
     }
 
-    if(param < 2) {                                 // floppy drive selected? store current drive, but don't handle
-        currentDriveLetter  = 'A' + param;          // store the current drive
-        currentDriveIndex   = param;
+    // first construct the tested path
+    std::string fullPath;
 
-        dataTrans->setStatus(E_NOTHANDLED);
-        return;
+    fullPath = conf[currentDriveIndex].hostPath + "\\";             // first add the host path
+
+    if(relativeNotAbsolute) {                                       // relative path means that you start from the currentPath
+        fullPath += conf[currentDriveIndex].currentPath + "\\";
     }
 
-    if(conf[param].enabled) {                       // if that drive is enabled in cosmosEx
-        currentDriveLetter  = 'A' + param;          // store the current drive
-        currentDriveIndex   = param;
+    fullPath += ((char *) atariPath);                               // then add the atari path
 
-        dataTrans->setStatus(getDrivesBitmap());    // return the drives bitmap
+    // now check if it exists
+    int res = _access(fullPath.c_str(), 0);
+
+    if(res != -1) {             // if it's not this error, then the file exists
+        return true;
     }
 
-    dataTrans->setStatus(E_NOTHANDLED);             // in other cases - not handled
+    return false;
 }
 
-void TranslatedDisk::onDgetdrv(BYTE *cmd)
-{
-    // Dgetdrv() returns the current GEMDOS drive code. Drive ‘A:’ is represented by
-    // a return value of 0, ‘B:’ by a return value of 1, and so on.
-
-    if(conf[currentDriveIndex].enabled) {           // if we got this drive, return the current drive
-        dataTrans->setStatus(currentDriveIndex);
-    }
-
-    dataTrans->setStatus(E_NOTHANDLED);             // if we don't have this, not handled
-}
-
-void TranslatedDisk::onDsetpath(BYTE *cmd)
-{
-    if(conf[currentDriveIndex].enabled) {           // if we got this drive
-        // TODO: check if the path on host exists, then handle the situation
-
-        dataTrans->setStatus(EPTHNF);
-
-        // if path exists, store it and return OK
-        conf[currentDriveIndex].currentPath = newPath;
-        dataTrans->setStatus(E_OK);
-    }
-
-    dataTrans->setStatus(E_NOTHANDLED);             // if we don't have this, not handled
-}
-
-void TranslatedDisk::onDgetpath(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFsetdta(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFgetdta(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFsfirst(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFsnext(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onDfree(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onDcreate(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onDdelete(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFrename(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFdatime(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFdelete(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFattrib(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFcreate(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFopen(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFclose(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFread(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFwrite(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFseek(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onTgetdate(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onTsetdate(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onTgettime(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onTsettime(BYTE *cmd)
-{
-
-}
 

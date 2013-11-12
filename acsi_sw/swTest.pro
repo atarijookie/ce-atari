@@ -23,7 +23,8 @@ SOURCES +=  main.cpp \
             config/configcomponent.cpp \
             config/configstream_general.cpp \
             config/configstream_screens.cpp \
-            translated/translateddisk.cpp
+            translated/translateddisk_general.cpp \
+            translated/translateddisk_gemdos.cpp
 
 HEADERS  += mainwindow.h \
             cconusb.h \

@@ -4,6 +4,9 @@
 #include "../acsidatatrans.h"
 #include "datatypes.h"
 
+#define BUFFER_SIZE             (1024*1024)
+#define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
+
 typedef struct {
     bool        enabled;
 
@@ -36,6 +39,8 @@ private:
 
 
     WORD getDrivesBitmap(void);
+    bool hostPathExists(BYTE *atariPath, bool relativeNotAbsolute);
+
 
     void onGetConfig(BYTE *cmd);
 
@@ -46,8 +51,8 @@ private:
     void onDgetpath(BYTE *cmd);
 
     // directory & file search
-    void onFsetdta(BYTE *cmd);
-    void onFgetdta(BYTE *cmd);
+//    void onFsetdta(BYTE *cmd);                    // this function needs to be handled on ST only
+//    void onFgetdta(BYTE *cmd);                    // this function needs to be handled on ST only
     void onFsfirst(BYTE *cmd);
     void onFsnext(BYTE *cmd);
 
