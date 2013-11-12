@@ -21,7 +21,8 @@ SOURCES +=  main.cpp \
             native/nomedia.cpp \
             native/testmedia.cpp \
             config/configcomponent.cpp \
-            config/configstream.cpp \
+            config/configstream_general.cpp \
+            config/configstream_screens.cpp \
             translated/translateddisk.cpp
 
 HEADERS  += mainwindow.h \
