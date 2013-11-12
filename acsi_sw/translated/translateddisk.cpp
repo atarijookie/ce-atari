@@ -18,10 +18,14 @@ TranslatedDisk::TranslatedDisk(void)
     dataBuffer  = new BYTE[BUFFER_SIZE];
     dataBuffer2 = new BYTE[BUFFER_SIZE];
 
-    for(int i=0; i<14; i++) {               // initialize the config structs
+    for(int i=0; i<16; i++) {               // initialize the config structs
         conf[i].enabled         = false;
         conf[i].stDriveLetter   = 'C' + i;
+        conf[i].currentPath     = "\\";
     }
+
+    currentDriveLetter  = 'C';
+    currentDriveIndex   = 0;
 }
 
 TranslatedDisk::~TranslatedDisk()
@@ -102,15 +106,26 @@ void TranslatedDisk::processCommand(BYTE *cmd)
     dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
 }
 
-void TranslatedDisk::onGetConfig(BYTE *cmd)
+WORD TranslatedDisk::getDrivesBitmap(void)
 {
     WORD drives = 0;
 
-    for(int i=0; i<14; i++) {               // create enabled drive bits
+    for(int i=0; i<16; i++) {               // create enabled drive bits
+        if(i == 0 || i == 1) {              // A and B enabled by default
+            drives |= (1 << i);
+        }
+
         if(conf[i].enabled) {
-            drives |= (1 << (i + 2));       // set the bit
+            drives |= (1 << i);             // set the bit
         }
     }
+
+    return drives;
+}
+
+void TranslatedDisk::onGetConfig(BYTE *cmd)
+{
+    WORD drives = getDrivesBitmap();
 
     dataTrans->addData(drives >>    8);     // drive bits first
     dataTrans->addData(drives &  0xff);
@@ -120,17 +135,58 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
 
 void TranslatedDisk::onDsetdrv(BYTE *cmd)
 {
+    // Dsetdrv() sets the current GEMDOS drive and returns a bitmap of mounted drives.
 
+    int param = cmd[5];
+
+    if(param < 0 || param > 15) {                   // drive number out of range? not handled
+        dataTrans->setStatus(E_NOTHANDLED);
+        return;
+    }
+
+    if(param < 2) {                                 // floppy drive selected? store current drive, but don't handle
+        currentDriveLetter  = 'A' + param;          // store the current drive
+        currentDriveIndex   = param;
+
+        dataTrans->setStatus(E_NOTHANDLED);
+        return;
+    }
+
+    if(conf[param].enabled) {                       // if that drive is enabled in cosmosEx
+        currentDriveLetter  = 'A' + param;          // store the current drive
+        currentDriveIndex   = param;
+
+        dataTrans->setStatus(getDrivesBitmap());    // return the drives bitmap
+    }
+
+    dataTrans->setStatus(E_NOTHANDLED);             // in other cases - not handled
 }
 
 void TranslatedDisk::onDgetdrv(BYTE *cmd)
 {
+    // Dgetdrv() returns the current GEMDOS drive code. Drive ‘A:’ is represented by
+    // a return value of 0, ‘B:’ by a return value of 1, and so on.
 
+    if(conf[currentDriveIndex].enabled) {           // if we got this drive, return the current drive
+        dataTrans->setStatus(currentDriveIndex);
+    }
+
+    dataTrans->setStatus(E_NOTHANDLED);             // if we don't have this, not handled
 }
 
 void TranslatedDisk::onDsetpath(BYTE *cmd)
 {
+    if(conf[currentDriveIndex].enabled) {           // if we got this drive
+        // TODO: check if the path on host exists, then handle the situation
 
+        dataTrans->setStatus(EPTHNF);
+
+        // if path exists, store it and return OK
+        conf[currentDriveIndex].currentPath = newPath;
+        dataTrans->setStatus(E_OK);
+    }
+
+    dataTrans->setStatus(E_NOTHANDLED);             // if we don't have this, not handled
 }
 
 void TranslatedDisk::onDgetpath(BYTE *cmd)

@@ -1,6 +1,8 @@
 #if !defined(__GEMDOS_ERRNO)
 #define __GEMDOS_ERRNO
 
+#define E_NOTHANDLED    0x7f        // return this if the host part didn't handle the command and we should use the original one
+
 // BIOS errors
 #define E_OK            0   // No error
 #define GENERIC_ERROR   -1  // Generic error

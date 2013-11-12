@@ -7,8 +7,9 @@
 typedef struct {
     bool        enabled;
 
-    std::string hostPath;
-    char        stDriveLetter;
+    std::string hostPath;                   // where is the root on host file system
+    char        stDriveLetter;              // what letter will be used on ST
+    std::string currentPath;                // what is the current path on this drive
 
 } TranslatedConf;
 
@@ -29,7 +30,12 @@ private:
     BYTE            *dataBuffer;
     BYTE            *dataBuffer2;
 
-    TranslatedConf  conf[14];               // 14 possible TOS drives
+    TranslatedConf  conf[16];               // 16 possible TOS drives
+    char            currentDriveLetter;
+    BYTE            currentDriveIndex;
+
+
+    WORD getDrivesBitmap(void);
 
     void onGetConfig(BYTE *cmd);
 
