@@ -52,6 +52,16 @@ void AcsiDataTrans::addData(BYTE val)
     count++;
 }
 
+void AcsiDataTrans::addDataDword(DWORD val)
+{
+    buffer[count    ] = (val >> 24) & 0xff;
+    buffer[count + 1] = (val >> 16) & 0xff;
+    buffer[count + 2] = (val >>  8) & 0xff;
+    buffer[count + 3] = (val      ) & 0xff;
+
+    count += 4;
+}
+
 void AcsiDataTrans::addData(BYTE *data, DWORD cnt, bool padToMul16)
 {
     memcpy(&buffer[count], data, cnt);

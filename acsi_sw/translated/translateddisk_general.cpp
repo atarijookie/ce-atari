@@ -24,6 +24,12 @@ TranslatedDisk::TranslatedDisk(void)
 
     currentDriveLetter  = 'C';
     currentDriveIndex   = 0;
+
+    for(int i=0; i<MAX_FILES; i++) {        // initialize host file structures
+        files[i].hostHandle     = NULL;
+        files[i].atariHandle    = EIHNDL;
+        files[i].hostPath       = "";
+    }
 }
 
 TranslatedDisk::~TranslatedDisk()

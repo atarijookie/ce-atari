@@ -33,6 +33,7 @@ public:
 
     void setStatus(BYTE stat);
     void addData(BYTE val);
+    void addDataDword(DWORD val);
     void addData(BYTE *data, DWORD cnt, bool padToMul16=false);
 
     bool recvData(BYTE *data, DWORD cnt);

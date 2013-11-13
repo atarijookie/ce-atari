@@ -138,7 +138,28 @@ void TranslatedDisk::onFsnext(BYTE *cmd)
 
 void TranslatedDisk::onDfree(BYTE *cmd)
 {
+    int whichDrive = cmd[5];
 
+    if(whichDrive == 0) {                           // current drive?
+        whichDrive = currentDriveIndex;
+    } else {                                        // the specified drive?
+        whichDrive--;
+    }
+
+    if(!conf[whichDrive].enabled) {
+        dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
+        return;
+    }
+
+    DWORD clustersTotal = 32768;
+    DWORD clustersFree  = 16384;
+
+    dataTrans->addDataDword(clustersFree);          // No. of Free Clusters
+    dataTrans->addDataDword(clustersTotal);         // Clusters per Drive
+    dataTrans->addDataDword(512);                   // Bytes per Sector
+    dataTrans->addDataDword(2);                     // Sectors per Cluster
+
+    dataTrans->setStatus(E_OK);                     // everything OK
 }
 
 void TranslatedDisk::onDcreate(BYTE *cmd)

@@ -16,6 +16,13 @@ typedef struct {
 
 } TranslatedConf;
 
+typedef struct {
+    FILE *hostHandle;                       // file handle for all the work with the file on host
+    BYTE atariHandle;                       // file handle used on Atari
+    std::string hostPath;                   // where is the file on host file system
+} TranslatedFiles;
+
+#define MAX_FILES       40                  // maximum open files count, 40 is the value from EmuTOS
 
 class TranslatedDisk
 {
@@ -37,6 +44,7 @@ private:
     char            currentDriveLetter;
     BYTE            currentDriveIndex;
 
+    TranslatedFiles files[MAX_FILES];       // open files
 
     WORD getDrivesBitmap(void);
     bool hostPathExists(std::string hostPath);
