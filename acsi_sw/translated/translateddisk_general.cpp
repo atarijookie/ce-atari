@@ -17,9 +17,9 @@ TranslatedDisk::TranslatedDisk(void)
     dataBuffer2 = new BYTE[BUFFER_SIZE];
 
     for(int i=0; i<16; i++) {               // initialize the config structs
-        conf[i].enabled         = false;
-        conf[i].stDriveLetter   = 'C' + i;
-        conf[i].currentPath     = "\\";
+        conf[i].enabled             = false;
+        conf[i].stDriveLetter       = 'C' + i;
+        conf[i].currentAtariPath    = "\\";
     }
 
     currentDriveLetter  = 'C';
@@ -131,25 +131,14 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-bool TranslatedDisk::hostPathExists(BYTE *atariPath, bool relativeNotAbsolute)
+bool TranslatedDisk::hostPathExists(std::string hostPath)
 {
     if(!conf[currentDriveIndex].enabled) {      // we don't have this drive? fail
         return false;
     }
 
-    // first construct the tested path
-    std::string fullPath;
-
-    fullPath = conf[currentDriveIndex].hostPath + "\\";             // first add the host path
-
-    if(relativeNotAbsolute) {                                       // relative path means that you start from the currentPath
-        fullPath += conf[currentDriveIndex].currentPath + "\\";
-    }
-
-    fullPath += ((char *) atariPath);                               // then add the atari path
-
     // now check if it exists
-    int res = _access(fullPath.c_str(), 0);
+    int res = _access(hostPath.c_str(), 0);
 
     if(res != -1) {             // if it's not this error, then the file exists
         return true;
@@ -158,4 +147,158 @@ bool TranslatedDisk::hostPathExists(BYTE *atariPath, bool relativeNotAbsolute)
     return false;
 }
 
+bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath)
+{
+    if(atariPath[1] == ':') {                               // if it's full path including drive letter
+        int driveIndex = 0;
+        char newDrive = atariPath[0];
 
+        if(!isValidDriveLetter(newDrive)) {                 // not a valid drive letter?
+            return false;
+        }
+
+        newDrive = toUpperCase(newDrive);                   // make sure it's upper case
+        driveIndex = newDrive - 'A';                        // calculate drive index
+
+        if(driveIndex < 2) {                                // drive A and B not handled
+            return false;
+        }
+
+        if(!conf[driveIndex].enabled) {                     // that drive is not enabled?
+            return false;
+        }
+
+        std::string atariPathWithoutDrive = atariPath.substr(2);    // skip drive and semicolon (C:)
+
+        hostPath = conf[driveIndex].hostRootPath;
+
+        if(!endsWith(hostPath, "\\")) {                             // if the host path does not end wit \\, add it
+            hostPath += "\\";
+        }
+
+        if(startsWith(atariPathWithoutDrive, "\\")) {               // if the atari path starts with \\, remove it
+            atariPathWithoutDrive = atariPathWithoutDrive.substr(1);
+        }
+
+        hostPath += atariPathWithoutDrive;                          // final path = hostPath + newPath
+        return true;
+
+    }
+
+    // need to handle with \\ at the begining, without \\ at the begining, with .. at the begining
+    hostPath = conf[currentDriveIndex].hostRootPath;
+
+    if(!endsWith(hostPath, "\\")) {                                 // should add backslash at the end?
+        hostPath += "\\";
+    }
+
+    if(atariPath[0] == '\\') {                                      // starts with \\ == starts from root
+        hostPath += atariPath.substr(1);                            // final path = hostPath + newPath
+        return true;
+    }
+
+    // starts without backslash? relative path then
+    hostPath += conf[currentDriveIndex].currentAtariPath;
+
+    if(!endsWith(hostPath, "\\")) {                         // should add backslash at the end?
+        hostPath += "\\";
+    }
+
+    hostPath += atariPath;                                  // final path = hostPath + currentPath + newPath
+    return true;
+}
+
+bool TranslatedDisk::newPathRequiresCurrentDriveChange(std::string atariPath, int &newDriveIndex)
+{
+    newDriveIndex = currentDriveIndex;                      // initialize with the current drive index
+
+    if(atariPath[1] != ':') {                               // no drive change sign?
+        return false;
+    }
+
+    int driveIndex = 0;
+    char newDrive = atariPath[0];
+
+    if(!isValidDriveLetter(newDrive)) {                     // not a valid drive letter? we're not changing drive then
+        return false;
+    }
+
+    newDrive = toUpperCase(newDrive);                       // make sure it's upper case
+    driveIndex = newDrive - 'A';                            // calculate drive index
+
+    if(driveIndex < 2) {                                    // drive A and B not handled - we're not changing drive
+        return false;
+    }
+
+    if(!conf[driveIndex].enabled) {                         // that drive is not enabled? we're not changing drive
+        return false;
+    }
+
+    if(driveIndex == currentDriveIndex) {                   // the new drive index is the same as the one we have now
+        return false;
+    }
+
+    newDriveIndex = driveIndex;                             // store the new drive index
+    return true;                                            // ok, change the drive letter
+}
+
+bool TranslatedDisk::isLetter(char a)
+{
+    if((a >= 'a' && a <= 'z') || (a >= 'A' && a <= 'Z')) {
+        return true;
+    }
+
+    return false;
+}
+
+char TranslatedDisk::toUpperCase(char a)
+{
+    if(a >= 'a' && a <= 'z') {      // if is lower case
+        return (a - 32);
+    }
+
+    return a;
+}
+
+bool TranslatedDisk::isValidDriveLetter(char a)
+{
+    if(a >= 'A' && a <= 'P') {
+        return true;
+    }
+
+    if(a >= 'a' && a <= 'p') {
+        return true;
+    }
+
+    return false;
+}
+
+void TranslatedDisk::createAtariPathFromHostPath(std::string hostPath, std::string &atariPath)
+{
+    std::string hostRoot = conf[currentDriveIndex].hostRootPath;
+
+    if(hostPath.find(hostRoot) == 0) {                          // the full host path contains host root
+        atariPath = hostPath.substr(hostRoot.length());         // atari path = hostPath - hostRoot
+    } else {                                                    // this shouldn't happen
+        outDebugString("TranslatedDisk::createAtariPathFromHostPath -- WTF, this shouldn't happen!");
+        atariPath = "";
+    }
+}
+
+bool TranslatedDisk::startsWith(std::string what, std::string subStr)
+{
+    if(what.find(subStr) == 0) {
+        return true;
+    }
+
+    return false;
+}
+
+bool TranslatedDisk::endsWith(std::string what, std::string subStr)
+{
+    if(what.rfind(subStr) == (what.length() - subStr.length())) {
+        return true;
+    }
+
+    return false;
+}

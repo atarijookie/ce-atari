@@ -10,9 +10,9 @@
 typedef struct {
     bool        enabled;
 
-    std::string hostPath;                   // where is the root on host file system
+    std::string hostRootPath;               // where is the root on host file system
     char        stDriveLetter;              // what letter will be used on ST
-    std::string currentPath;                // what is the current path on this drive
+    std::string currentAtariPath;           // what is the current path on this drive
 
 } TranslatedConf;
 
@@ -39,8 +39,16 @@ private:
 
 
     WORD getDrivesBitmap(void);
-    bool hostPathExists(BYTE *atariPath, bool relativeNotAbsolute);
+    bool hostPathExists(std::string hostPath);
+    bool createHostPath(std::string atariPath, std::string &hostPath);
+    void createAtariPathFromHostPath(std::string hostPath, std::string &atariPath);
+    bool newPathRequiresCurrentDriveChange(std::string atariPath, int &newDriveIndex);
+    bool isLetter(char a);
+    char toUpperCase(char a);
+    bool isValidDriveLetter(char a);
 
+    bool startsWith(std::string what, std::string subStr);
+    bool endsWith(std::string what, std::string subStr);
 
     void onGetConfig(BYTE *cmd);
 
