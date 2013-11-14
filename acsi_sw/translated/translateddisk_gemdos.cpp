@@ -126,12 +126,144 @@ void TranslatedDisk::onDgetpath(BYTE *cmd)
 
 void TranslatedDisk::onFsfirst(BYTE *cmd)
 {
+    bool res;
 
+    // initialize find storage in case anything goes bad
+    findStorage.count       = 0;
+    findStorage.fsnextStart = 0;
+
+    //----------
+    // first get the params
+    res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
+
+    if(!res) {                                      // failed to get data? internal error!
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    std::string atariSearchString, hostSearchString;
+
+    BYTE findAttribs    = dataBuffer[0];
+    atariSearchString   = (char *) (dataBuffer + 1);
+
+    res = createHostPath(atariSearchString, hostSearchString);   // create the host path
+
+    if(!res) {                                      // the path doesn't bellong to us?
+        dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
+        return;
+    }
+    //----------
+    // then build the found files list
+    WIN32_FIND_DATAA found;
+    HANDLE h = FindFirstFileA(hostSearchString.c_str(), &found);    // find first
+
+    if(h == INVALID_HANDLE_VALUE) {                                 // not found?
+        dataTrans->setStatus(EFILNF);                               // file not found
+        return;
+    }
+
+    appendFoundToFindStorage(&found, findAttribs);                  // append first found
+
+    while(1) {                                                  // while there are more files, store them
+        res = FindNextFileA(h, &found);
+
+        if(!res) {
+            break;
+        }
+
+        appendFoundToFindStorage(&found, findAttribs);          // append next found
+
+        if(findStorage.count >= findStorage.maxCount) {         // avoid buffer overflow
+            break;
+        }
+    }
+
+    dataTrans->setStatus(E_OK);                                 // OK!
+}
+
+void TranslatedDisk::appendFoundToFindStorage(WIN32_FIND_DATAA *found, BYTE findAttribs)
+{
+    // first verify if the file attributes are OK
+    if((found->dwFileAttributes & FILE_ATTRIBUTE_READONLY)!=0   && (findAttribs & FA_READONLY)==0)  // is read only, but not searching for that
+        return;
+
+    if((found->dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)!=0     && (findAttribs & FA_HIDDEN)==0)    // is hidden, but not searching for that
+        return;
+
+    if((found->dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)!=0     && (findAttribs & FA_SYSTEM)==0)    // is system, but not searching for that
+        return;
+
+    if((found->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)!=0  && (findAttribs & FA_DIR)==0)       // is dir, but not searching for that
+        return;
+
+    if((found->dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)!=0    && (findAttribs & FA_ARCHIVE)==0)   // is archive, but not searching for that
+        return;
+
+    //--------
+    // add this file
+    DWORD addr  = findStorage.count * 23;           // calculate offset
+    BYTE *buf   = &findStorage.buffer[addr];        // and get pointer to this location
+
+    BYTE atariAttribs;
+    attributesHostToAtari(found->dwFileAttributes, atariAttribs);
+
+    WORD atariTime = fileTimeToAtariTime(&found->ftLastWriteTime);
+    WORD atariDate = fileTimeToAtariDate(&found->ftLastWriteTime);
+
+    char *fileName = found->cFileName;              // use the original name
+
+    if(strlen(found->cAlternateFileName) != 0) {    // if original is long and this is not empty, use this short one
+        fileName = found->cAlternateFileName;
+    }
+
+    // GEMDOS File Attributes
+    buf[0] = atariAttribs;
+
+    // GEMDOS Time
+    buf[1] = atariTime >> 8;
+    buf[2] = atariTime &  0xff;
+
+    // GEMDOS Date
+    buf[3] = atariDate >> 8;
+    buf[4] = atariDate &  0xff;
+
+    // File Length
+    buf[5] = found->nFileSizeLow >>  24;
+    buf[6] = found->nFileSizeLow >>  16;
+    buf[7] = found->nFileSizeLow >>   8;
+    buf[8] = found->nFileSizeLow & 0xff;
+
+    // Filename -- d_fname[14]
+    memcpy(&buf[9], fileName, 14);
+
+    findStorage.count++;
 }
 
 void TranslatedDisk::onFsnext(BYTE *cmd)
 {
+    int sectorCount = cmd[5];
 
+    int byteCount   = (sectorCount * 512) - 2;                  // how many bytes we have on the transfered sectors? -2 because 1st WORD is count of DTAs transfered
+    int dtaSpace    = byteCount / 23;                           // how many DTAs we can fit in there?
+
+    int dtaRemaining = findStorage.count - findStorage.fsnextStart;
+
+    if(dtaRemaining == 0) {                                     // nothing more to transfer?
+        dataTrans->setStatus(ENMFIL);                           // no more files!
+        return;
+    }
+
+    int dtaToSend = (dtaRemaining < dtaSpace) ? dtaRemaining : dtaSpace;    // we can send max. dtaSpace count of DTAs
+
+    dataTrans->addDataWord(dtaToSend);                          // first word: how many DTAs we're sending
+
+    DWORD addr  = findStorage.fsnextStart * 23;                 // calculate offset from which we will start sending stuff
+    BYTE *buf   = &findStorage.buffer[addr];                    // and get pointer to this location
+    dataTrans->addData(buf, dtaToSend * 23, true);              // now add the data to buffer
+
+    dataTrans->setStatus(E_OK);
+
+    findStorage.fsnextStart += dtaToSend;                       // and move to the next position for the next fsNext
 }
 
 void TranslatedDisk::onDfree(BYTE *cmd)
@@ -149,6 +281,7 @@ void TranslatedDisk::onDfree(BYTE *cmd)
         return;
     }
 
+    // TODO: get the real drive size
     DWORD clustersTotal = 32768;
     DWORD clustersFree  = 16384;
 
@@ -498,6 +631,31 @@ void TranslatedDisk::onTsettime(BYTE *cmd)
 
 
     dataTrans->setStatus(E_OK);
+}
+
+WORD TranslatedDisk::fileTimeToAtariDate(FILETIME *ft)
+{
+    WORD atariDate = 0;
+
+    atariDate |= (2013 - 1980) << 9;            // year
+    atariDate |= (11         ) << 5;            // month
+    atariDate |= (14         );                 // day
+
+    return atariDate;
+}
+
+WORD TranslatedDisk::fileTimeToAtariTime(FILETIME *ft)
+{
+    WORD atariTime = 0;
+
+    // TODO: do the real conversion
+
+
+    atariTime |= (12                    ) << 11;        // hours
+    atariTime |= (00                    ) << 5;         // minutes
+    atariTime |= (01               / 2  );              // seconds
+
+    return atariTime;
 }
 
 void TranslatedDisk::attributesHostToAtari(DWORD attrHost, BYTE &attrAtari)

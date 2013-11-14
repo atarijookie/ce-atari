@@ -65,6 +65,14 @@ private:
         int confDrive;
     } driveLetters;
 
+    struct {
+        BYTE *buffer;
+        WORD count;             // count of items found
+
+        WORD fsnextStart;
+        WORD maxCount;          // maximum count of items that this buffer can hold
+    } findStorage;
+
     void loadSettings(void);
 
     WORD getDrivesBitmap(void);
@@ -118,6 +126,11 @@ private:
 
     void attributesHostToAtari(DWORD attrHost, BYTE &attrAtari);
     void attributesAtariToHost(BYTE attrAtari, DWORD &attrHost);
+
+    WORD fileTimeToAtariDate(FILETIME *ft);
+    WORD fileTimeToAtariTime(FILETIME *ft);
+
+    void appendFoundToFindStorage(WIN32_FIND_DATAA *found, unsigned char findAttribs);
 };
 
 #endif

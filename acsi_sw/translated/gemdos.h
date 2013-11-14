@@ -1,13 +1,6 @@
 #ifndef GEMDOS_H
 #define GEMDOS_H
 
-#define FA_READONLY     (1 << 0)
-#define FA_HIDDEN       (1 << 1)
-#define FA_SYSTEM       (1 << 2)
-#define FA_VOLUME       (1 << 3)
-#define FA_DIR          (1 << 4)
-#define FA_ARCHIVE      (1 << 5)
-
 // path functions
 #define GEMDOS_Dsetdrv    0x0e
 #define GEMDOS_Dgetdrv    0x19
@@ -42,5 +35,27 @@
 #define GEMDOS_Tsetdate   0x2B
 #define GEMDOS_Tgettime   0x2C
 #define GEMDOS_Tsettime   0x2D
+
+//////////////////////////////////////
+
+// file attributes
+#define FA_READONLY     (1 << 0)
+#define FA_HIDDEN       (1 << 1)
+#define FA_SYSTEM       (1 << 2)
+#define FA_VOLUME       (1 << 3)
+#define FA_DIR          (1 << 4)
+#define FA_ARCHIVE      (1 << 5)
+
+
+// struct used for Fsfirst and Fsnext - modified version without first 21 reserved bytes
+// now the struct has 23 bytes total, so a buffer of 512 bytes should contain 22 of these + 6 spare bytes
+typedef struct
+{
+    BYTE    d_attrib;       // GEMDOS File Attributes
+    WORD    d_time;         // GEMDOS Time
+    WORD    d_date;         // GEMDOS Date
+    DWORD   d_length;       // File Length
+    char    d_fname[14];    // Filename
+} DTAshort;
 
 #endif // GEMDOS_H

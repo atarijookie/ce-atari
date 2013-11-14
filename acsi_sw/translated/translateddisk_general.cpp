@@ -26,12 +26,18 @@ TranslatedDisk::TranslatedDisk(void)
     }
 
     loadSettings();
+
+    findStorage.buffer      = new BYTE[BUFFER_SIZE];
+    findStorage.maxCount    = BUFFER_SIZE / 23;
+    findStorage.count       = 0;
 }
 
 TranslatedDisk::~TranslatedDisk()
 {
     delete []dataBuffer;
     delete []dataBuffer2;
+
+    delete []findStorage.buffer;
 }
 
 void TranslatedDisk::loadSettings(void)
