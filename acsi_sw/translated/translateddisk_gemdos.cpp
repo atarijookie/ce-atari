@@ -35,9 +35,7 @@ void TranslatedDisk::onDsetdrv(BYTE *cmd)
         dataTrans->addData(drives >>   8);          // return the drives in data
         dataTrans->addData(drives & 0xff);
 
-        for(int i=0; i<14; i++) {                   // and pad to 16 bytes for DMA chip
-            dataTrans->addData(0);
-        }
+        dataTrans->padDataToMul16();                // and pad to 16 bytes for DMA chip
 
         dataTrans->setStatus(E_OK);                 // return OK
     }
@@ -250,12 +248,35 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
 
 void TranslatedDisk::onFrename(BYTE *cmd)
 {
+    bool res, res2;
 
-}
+    res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
 
-void TranslatedDisk::onFdatime(BYTE *cmd)
-{
+    if(!res) {                                      // failed to get data? internal error!
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
 
+    std::string oldAtariName, newAtariName;
+    oldAtariName = (char *)  dataBuffer;                                // get old name
+    newAtariName = (char *) (dataBuffer + oldAtariName.length() + 1);   // get new name
+
+    std::string oldHostName, newHostName;
+    res     = createHostPath(oldAtariName, oldHostName);            // create the host path
+    res2    = createHostPath(newAtariName, newHostName);            // create the host path
+
+    if(!res || !res2) {                                             // the path doesn't bellong to us?
+        dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
+        return;
+    }
+
+    res = MoveFileA(oldHostName.c_str(), newHostName.c_str());      // rename host file
+
+    if(res) {                                                       // good
+        dataTrans->setStatus(E_OK);
+    } else {                                                        // error
+        dataTrans->setStatus(EACCDN);
+    }
 }
 
 void TranslatedDisk::onFdelete(BYTE *cmd)
@@ -303,7 +324,55 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
 
 void TranslatedDisk::onFattrib(BYTE *cmd)
 {
+    bool res;
 
+    res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
+
+    if(!res) {                                      // failed to get data? internal error!
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    std::string atariName, hostName;
+
+    bool setNotInquire  = dataBuffer[0];
+    BYTE attrAtariNew   = dataBuffer[1];
+
+    atariName = (char *)  (dataBuffer + 2);                         // get file name
+
+    res = createHostPath(atariName, hostName);                      // create the host path
+
+    if(!res) {                                                      // the path doesn't bellong to us?
+        dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
+        return;
+    }
+
+    DWORD   attrHost;
+    BYTE    oldAttrAtari;
+
+    // first read the attributes
+    attrHost = GetFileAttributesA(hostName.c_str());
+
+    if(attrHost == INVALID_FILE_ATTRIBUTES) {   // failed to get attribs?
+        dataTrans->setStatus(EACCDN);
+        return;
+    }
+
+    attributesHostToAtari(attrHost, oldAttrAtari);
+
+    if(setNotInquire) {     // SET attribs?
+        attributesAtariToHost(attrAtariNew, attrHost);
+
+        res = SetFileAttributesA(hostName.c_str(), attrHost);
+
+        if(!res) {                              // failed to set attribs?
+            dataTrans->setStatus(EACCDN);
+            return;
+        }
+    }
+
+    // for GET: returns current attribs, for SET: returns old attribs
+    dataTrans->setStatus(oldAttrAtari);         // return attributes
 }
 
 void TranslatedDisk::onFcreate(BYTE *cmd)
@@ -317,6 +386,11 @@ void TranslatedDisk::onFopen(BYTE *cmd)
 }
 
 void TranslatedDisk::onFclose(BYTE *cmd)
+{
+
+}
+
+void TranslatedDisk::onFdatime(BYTE *cmd)
 {
 
 }
@@ -338,21 +412,136 @@ void TranslatedDisk::onFseek(BYTE *cmd)
 
 void TranslatedDisk::onTgetdate(BYTE *cmd)
 {
+    SYSTEMTIME  hostTime;
+    WORD        atariDate;
 
+    GetLocalTime(&hostTime);
+
+    atariDate = 0;
+
+    atariDate |= (hostTime.wYear - 1980) << 9;
+    atariDate |= (hostTime.wMonth      ) << 5;
+    atariDate |= (hostTime.wDay        );
+
+    dataTrans->addDataWord(atariDate);      // WORD: atari date
+    dataTrans->padDataToMul16();            // 14 bytes of padding
+
+    dataTrans->setStatus(E_OK);
 }
 
 void TranslatedDisk::onTsetdate(BYTE *cmd)
 {
+    bool res;
 
+    res = dataTrans->recvData(dataBuffer, 16);      // get data from Hans
+
+    if(!res) {                                      // failed to get data? internal error!
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    WORD newAtariDate = (((WORD) dataBuffer[0]) << 8) | dataBuffer[1];
+
+    BYTE year, month, day;
+    year    = (newAtariDate >> 9)   + 1980;
+    month   = (newAtariDate >> 5)   & 0x0f;
+    day     =  newAtariDate         & 0x1f;
+
+    // todo: setting of the new date
+
+
+
+
+    dataTrans->setStatus(E_OK);
 }
 
 void TranslatedDisk::onTgettime(BYTE *cmd)
 {
+    SYSTEMTIME  hostTime;
+    WORD        atariTime;
 
+    GetLocalTime(&hostTime);
+
+    atariTime = 0;
+
+    atariTime |= (hostTime.wHour        ) << 11;
+    atariTime |= (hostTime.wMinute      ) << 5;
+    atariTime |= (hostTime.wSecond / 2  );
+
+    dataTrans->addDataWord(atariTime);      // WORD: atari time
+    dataTrans->padDataToMul16();            // 14 bytes of padding
+
+    dataTrans->setStatus(E_OK);
 }
 
 void TranslatedDisk::onTsettime(BYTE *cmd)
 {
+    bool res;
 
+    res = dataTrans->recvData(dataBuffer, 16);      // get data from Hans
+
+    if(!res) {                                      // failed to get data? internal error!
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    WORD newAtariTime = (((WORD) dataBuffer[0]) << 8) | dataBuffer[1];
+
+    BYTE hour, minute, second;
+    hour   = (newAtariTime >> 11);
+    minute = (newAtariTime >> 5)   & 0x3f;
+    second = (newAtariTime         & 0x1f) * 2;
+
+    // todo: setting of the new time
+
+
+
+
+    dataTrans->setStatus(E_OK);
 }
 
+void TranslatedDisk::attributesHostToAtari(DWORD attrHost, BYTE &attrAtari)
+{
+    attrAtari = 0;
+
+    if(attrHost & FILE_ATTRIBUTE_READONLY)
+        attrAtari |= FA_READONLY;
+
+    if(attrHost & FILE_ATTRIBUTE_HIDDEN)
+        attrAtari |= FA_HIDDEN;
+
+    if(attrHost & FILE_ATTRIBUTE_SYSTEM)
+        attrAtari |= FA_SYSTEM;
+
+    // if(attrHost &                      )
+    //  attrAtari |= FA_VOLUME;
+
+    if(attrHost & FILE_ATTRIBUTE_DIRECTORY)
+        attrAtari |= FA_DIR;
+
+    if(attrHost & FILE_ATTRIBUTE_ARCHIVE)
+        attrAtari |= FA_ARCHIVE;
+}
+
+void TranslatedDisk::attributesAtariToHost(BYTE attrAtari, DWORD &attrHost)
+{
+    attrHost = 0;
+
+    if(attrAtari & FA_READONLY)
+        attrHost |= FILE_ATTRIBUTE_READONLY;
+
+    if(attrAtari & FA_HIDDEN)
+        attrHost |= FILE_ATTRIBUTE_HIDDEN;
+
+    if(attrAtari & FA_SYSTEM)
+        attrHost |= FILE_ATTRIBUTE_SYSTEM;
+
+    // if(attrAtari & FA_VOLUME)
+    //  attrHost |=                     ;
+
+    if(attrAtari & FA_DIR)
+        attrHost |= FILE_ATTRIBUTE_DIRECTORY;
+
+    if(attrAtari & FA_ARCHIVE)
+        attrHost |= FILE_ATTRIBUTE_ARCHIVE;
+}

@@ -1,6 +1,13 @@
 #ifndef GEMDOS_H
 #define GEMDOS_H
 
+#define FA_READONLY     (1 << 0)
+#define FA_HIDDEN       (1 << 1)
+#define FA_SYSTEM       (1 << 2)
+#define FA_VOLUME       (1 << 3)
+#define FA_DIR          (1 << 4)
+#define FA_ARCHIVE      (1 << 5)
+
 // path functions
 #define GEMDOS_Dsetdrv    0x0e
 #define GEMDOS_Dgetdrv    0x19

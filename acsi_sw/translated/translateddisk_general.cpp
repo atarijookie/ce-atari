@@ -480,3 +480,4 @@ bool TranslatedDisk::endsWith(std::string what, std::string subStr)
 
     return false;
 }
+

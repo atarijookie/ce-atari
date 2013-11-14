@@ -98,14 +98,14 @@ private:
     void onDcreate(BYTE *cmd);
     void onDdelete(BYTE *cmd);
     void onFrename(BYTE *cmd);
-    void onFdatime(BYTE *cmd);
     void onFdelete(BYTE *cmd);
     void onFattrib(BYTE *cmd);
 
-    // file content functions
+    // file content functions -- need file handle
     void onFcreate(BYTE *cmd);
     void onFopen(BYTE *cmd);
     void onFclose(BYTE *cmd);
+    void onFdatime(BYTE *cmd);
     void onFread(BYTE *cmd);
     void onFwrite(BYTE *cmd);
     void onFseek(BYTE *cmd);
@@ -115,6 +115,9 @@ private:
     void onTsetdate(BYTE *cmd);
     void onTgettime(BYTE *cmd);
     void onTsettime(BYTE *cmd);
+
+    void attributesHostToAtari(DWORD attrHost, BYTE &attrAtari);
+    void attributesAtariToHost(BYTE attrAtari, DWORD &attrHost);
 };
 
 #endif
