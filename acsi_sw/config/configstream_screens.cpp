@@ -346,7 +346,7 @@ void ConfigStream::onTranslated_save(void)
     getTextByComponentId(COMPID_TRAN_FIRST, value);
 
     if(value.length() < 1) {    // no drive letter
-        letter1 = 0;
+        letter1 = -1;
     } else {
         letter1 = value[0];
     }
@@ -354,7 +354,7 @@ void ConfigStream::onTranslated_save(void)
     getTextByComponentId(COMPID_TRAN_SHARED, value);
 
     if(value.length() < 1) {    // no drive letter
-        letter2 = 0;
+        letter2 = -1;
     } else {
         letter2 = value[0];
     }
@@ -362,12 +362,12 @@ void ConfigStream::onTranslated_save(void)
     getTextByComponentId(COMPID_TRAN_CONFDRIVE, value);
 
     if(value.length() < 1) {    // no drive letter
-        letter3 = 0;
+        letter3 = -1;
     } else {
         letter3 = value[0];
     }
 
-    if(letter1 == 0 && letter2 == 0 && letter3 == 0) {
+    if(letter1 == -1 && letter2 == -1 && letter3 == -1) {
         showMessageScreen((char *) "Info", (char *) "No drive letter assigned, this is OK,\n\rbut the translated disk will be\n\runaccessible.");
     }
 
@@ -376,7 +376,7 @@ void ConfigStream::onTranslated_save(void)
         return;
     }
 
-    if((letter1 != 0 && letter1 < 'C') || (letter2 != 0 && letter2 < 'C') || (letter3 != 0 && letter3 < 'C')) {
+    if((letter1 != -1 && letter1 < 'C') || (letter2 != -1 && letter2 < 'C') || (letter3 != -1 && letter3 < 'C')) {
         showMessageScreen((char *) "Warning", (char *) "Drive letters A and B are for floppies.\n\rPlease fix this and try again.");
         return;
     }

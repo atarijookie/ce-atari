@@ -6,6 +6,7 @@
 #include "translateddisk.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
+#include "settings.h"
 
 extern "C" void outDebugString(const char *format, ...);
 
@@ -16,20 +17,15 @@ TranslatedDisk::TranslatedDisk(void)
     dataBuffer  = new BYTE[BUFFER_SIZE];
     dataBuffer2 = new BYTE[BUFFER_SIZE];
 
-    for(int i=0; i<16; i++) {               // initialize the config structs
-        conf[i].enabled             = false;
-        conf[i].stDriveLetter       = 'C' + i;
-        conf[i].currentAtariPath    = "\\";
-    }
-
-    currentDriveLetter  = 'C';
-    currentDriveIndex   = 0;
+    dettachAll();
 
     for(int i=0; i<MAX_FILES; i++) {        // initialize host file structures
         files[i].hostHandle     = NULL;
         files[i].atariHandle    = EIHNDL;
         files[i].hostPath       = "";
     }
+
+    loadSettings();
 }
 
 TranslatedDisk::~TranslatedDisk()
@@ -38,9 +34,185 @@ TranslatedDisk::~TranslatedDisk()
     delete []dataBuffer2;
 }
 
+void TranslatedDisk::loadSettings(void)
+{
+    Settings s;
+    char drive1, drive2, drive3;
+
+    drive1 = s.getChar((char *) "DRIVELETTER_FIRST",      -1);
+    drive2 = s.getChar((char *) "DRIVELETTER_SHARED",     -1);
+    drive3 = s.getChar((char *) "DRIVELETTER_CONFDRIVE",  -1);
+
+    driveLetters.firstTranslated    = drive1 - 'A';
+    driveLetters.shared             = drive2 - 'A';
+    driveLetters.confDrive          = drive3 - 'A';
+}
+
+void TranslatedDisk::configChanged_reload(void)
+{
+    // first load the settings
+    loadSettings();
+
+    // now move the attached drives around to match the new configuration
+
+    TranslatedConf tmpConf[16];
+    for(int i=2; i<16; i++) {           // first make the copy of the current state
+        tmpConf[i] = conf[i];
+    }
+
+    dettachAll();                       // then deinit the conf structures
+
+    int good = 0, bad = 0;
+    bool res;
+
+    for(int i=2; i<16; i++) {           // and now find new places
+        if(!tmpConf[i].enabled) {       // skip the not used positions
+            continue;
+        }
+
+        res = attachToHostPath(tmpConf[i].hostRootPath, tmpConf[i].translatedType);   // now attach back
+
+        if(res) {
+            good++;
+        } else {
+            bad++;
+        }
+    }
+
+    // todo: attach shared and config disk when they weren't attached before and now should be
+    // todo: attach remainig DOS drives when they couldn't be attached before (not enough letters before)
+
+    outDebugString("TranslatedDisk::configChanged_reload -- attached again, good %d, bad %d", good, bad);
+}
+
 void TranslatedDisk::setAcsiDataTrans(AcsiDataTrans *dt)
 {
     dataTrans = dt;
+}
+
+bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedType)
+{
+    int index = -1;
+
+    if(isAlreadyAttached(hostRootPath)) {                   // if already attached, return success
+        return true;
+    }
+
+    // are we attaching shared drive?
+    if(translatedType == TRANSLATEDTYPE_SHAREDDRIVE) {
+        if(driveLetters.shared > 0) {                       // we have shared drive letter defined
+            conf[driveLetters.shared].enabled             = true;
+            conf[driveLetters.shared].hostRootPath        = hostRootPath;
+            conf[driveLetters.shared].currentAtariPath    = "\\";
+            conf[driveLetters.shared].translatedType      = translatedType;
+
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    // are we attaching config drive?
+    if(translatedType == TRANSLATEDTYPE_CONFIGDRIVE) {
+        if(driveLetters.confDrive > 0) {              // we have config drive letter defined
+            conf[driveLetters.confDrive].enabled             = true;
+            conf[driveLetters.confDrive].hostRootPath        = hostRootPath;
+            conf[driveLetters.confDrive].currentAtariPath    = "\\";
+            conf[driveLetters.confDrive].translatedType      = translatedType;
+
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    // ok, so we're attaching normal drive
+    int start = driveLetters.firstTranslated;
+
+    if(start < 0) {                                     // no first normal drive defined? fail
+        return false;
+    }
+
+    for(int i=start; i<16; i++) {                       // find the empty slot for the new drive
+        // if this letter is reserved to shared drive
+        if(i == driveLetters.shared) {
+            continue;
+        }
+
+        // if this letter is reserved to config drive
+        if(i == driveLetters.confDrive) {
+            continue;
+        }
+
+        if(!conf[i].enabled) {              // not used yet?
+            index = i;                      // found one!
+            break;
+        }
+    }
+
+    if(index == -1) {                       // no empty slot?
+        return false;
+    }
+
+    conf[index].enabled             = true;
+    conf[index].hostRootPath        = hostRootPath;
+    conf[index].currentAtariPath    = "\\";
+    conf[index].translatedType      = translatedType;
+
+    return true;
+}
+
+bool TranslatedDisk::isAlreadyAttached(std::string hostRootPath)
+{
+    for(int i=0; i<16; i++) {                       // see if the specified path is already attached
+        if(!conf[i].enabled) {                      // not used yet? skip
+            continue;
+        }
+
+        if(conf[i].hostRootPath == hostRootPath) {    // found the matching path?
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void TranslatedDisk::dettachAll(void)
+{
+    for(int i=0; i<16; i++) {               // initialize the config structs
+        conf[i].enabled             = false;
+        conf[i].stDriveLetter       = 'C' + i;
+        conf[i].currentAtariPath    = "\\";
+        conf[i].translatedType      = TRANSLATEDTYPE_NORMAL;
+    }
+
+    currentDriveLetter  = 'C';
+    currentDriveIndex   = 0;
+}
+
+void TranslatedDisk::dettachFromHostPath(std::string hostRootPath)
+{
+    int index = -1;
+
+    for(int i=2; i<16; i++) {                           // find where the storage the existing empty slot for the new drive
+        if(!conf[i].enabled) {                          // skip disabled drives
+            continue;
+        }
+
+        if(conf[i].hostRootPath == hostRootPath) {      // the host root path matches?
+            index = i;
+            break;
+        }
+    }
+
+    if(index == -1) {                                   // no empty slot?
+        return;
+    }
+
+    conf[index].enabled             = false;            // mark as empty
+    conf[index].hostRootPath        = "";
+    conf[index].currentAtariPath    = "\\";
+    conf[index].translatedType      = TRANSLATEDTYPE_NORMAL;
 }
 
 void TranslatedDisk::processCommand(BYTE *cmd)

@@ -14,6 +14,8 @@ typedef struct {
     char        stDriveLetter;              // what letter will be used on ST
     std::string currentAtariPath;           // what is the current path on this drive
 
+    int         translatedType;             // normal / shared / config
+
 } TranslatedConf;
 
 typedef struct {
@@ -24,6 +26,10 @@ typedef struct {
 
 #define MAX_FILES       40                  // maximum open files count, 40 is the value from EmuTOS
 
+#define TRANSLATEDTYPE_NORMAL           0
+#define TRANSLATEDTYPE_SHAREDDRIVE      1
+#define TRANSLATEDTYPE_CONFIGDRIVE      2
+
 class TranslatedDisk
 {
 public:
@@ -33,6 +39,13 @@ public:
     void setAcsiDataTrans(AcsiDataTrans *dt);
 
     void processCommand(BYTE *cmd);
+
+    bool attachToHostPath(std::string hostRootPath, int translatedType);
+    void dettachFromHostPath(std::string hostRootPath);
+    void dettachAll(void);
+    bool isAlreadyAttached(std::string hostRootPath);
+
+    void configChanged_reload(void);
 
 private:
     AcsiDataTrans   *dataTrans;
@@ -45,6 +58,14 @@ private:
     BYTE            currentDriveIndex;
 
     TranslatedFiles files[MAX_FILES];       // open files
+
+    struct {
+        int firstTranslated;
+        int shared;
+        int confDrive;
+    } driveLetters;
+
+    void loadSettings(void);
 
     WORD getDrivesBitmap(void);
     bool hostPathExists(std::string hostPath);
