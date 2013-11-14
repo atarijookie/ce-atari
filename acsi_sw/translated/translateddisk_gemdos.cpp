@@ -510,17 +510,152 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
 
 void TranslatedDisk::onFcreate(BYTE *cmd)
 {
+    bool res;
 
+    res = dataTrans->recvData(dataBuffer, 64);      // get data from Hans
+
+    if(!res) {                                      // failed to get data? internal error!
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    BYTE attribs = dataBuffer[0];
+
+    std::string atariName, hostName;
+    atariName = (char *) (dataBuffer + 1);                          // get file name
+
+    res = createHostPath(atariName, hostName);                      // create the host path
+
+    if(!res) {                                                      // the path doesn't bellong to us?
+        dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
+        return;
+    }
+
+    int index = findEmptyFileSlot();
+
+    if(index == -1) {                                               // no place for new file? No more handles.
+        dataTrans->setStatus(ENHNDL);
+        return;
+    }
+
+    // create file and close it
+    FILE *f = fopen(hostName.c_str(), "wb+");                       // write/update - create empty / truncate existing
+
+    if(!f) {
+        dataTrans->setStatus(EACCDN);                               // if failed to create, access error
+        return;
+    }
+
+    fclose(f);
+
+    // now set it's attributes
+    DWORD attrHost;
+    attributesAtariToHost(attribs, attrHost);
+
+    res = SetFileAttributesA(hostName.c_str(), attrHost);
+
+    if(!res) {                                                      // failed to set attribs?
+        dataTrans->setStatus(EACCDN);
+        return;
+    }
+
+    // now open the file again
+    f = fopen(hostName.c_str(), "rb+");                             // read/update - file must exist
+
+    if(!f) {
+        dataTrans->setStatus(EACCDN);                               // if failed to create, access error
+        return;
+    }
+
+    // store the params
+    files[index].hostHandle     = f;
+    files[index].atariHandle    = index + 6;                        // handles 0 - 5 are reserved
+    files[index].hostPath       = hostName;
+
+    dataTrans->setStatus(files[index].atariHandle);                 // return the handle
 }
 
 void TranslatedDisk::onFopen(BYTE *cmd)
 {
+    bool res;
 
+    res = dataTrans->recvData(dataBuffer, 64);      // get data from Hans
+
+    if(!res) {                                      // failed to get data? internal error!
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    BYTE mode = dataBuffer[0];
+
+    std::string atariName, hostName;
+    atariName = (char *) (dataBuffer + 1);                          // get file name
+
+    res = createHostPath(atariName, hostName);                      // create the host path
+
+    if(!res) {                                                      // the path doesn't bellong to us?
+        dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
+        return;
+    }
+
+    int index = findEmptyFileSlot();
+
+    if(index == -1) {                                               // no place for new file? No more handles.
+        dataTrans->setStatus(ENHNDL);
+        return;
+    }
+
+    // TODO: check if S_WRITE and S_READWRITE truncate existing file or just append to it and modify mode for following fopen
+
+    char *fopenMode;
+
+    char *mode_S_READ       = (char *) "rb";
+    char *mode_S_WRITE      = (char *) "wb";
+    char *mode_S_READWRITE  = (char *) "rb+";
+
+    mode = mode & 0x07;         // leave only lowest 3 bits
+
+    switch(mode) {
+        case 0:     fopenMode = mode_S_READ;        break;
+        case 1:     fopenMode = mode_S_WRITE;       break;
+        case 2:     fopenMode = mode_S_READWRITE;   break;
+        default:    fopenMode = mode_S_READ;        break;
+    }
+
+    // create file and close it
+    FILE *f = fopen(hostName.c_str(), fopenMode);                   // open according to required mode
+
+    if(!f) {
+        dataTrans->setStatus(EACCDN);                               // if failed to create, access error
+        return;
+    }
+
+    // store the params
+    files[index].hostHandle     = f;
+    files[index].atariHandle    = index + 6;                        // handles 0 - 5 are reserved
+    files[index].hostPath       = hostName;
+
+    dataTrans->setStatus(files[index].atariHandle);                 // return the handle
 }
 
 void TranslatedDisk::onFclose(BYTE *cmd)
 {
+    int handle = cmd[5];
 
+    int index = findFileHandleSlot(handle);
+
+    if(index == -1) {                                               // handle not found?
+        dataTrans->setStatus(EIHNDL);
+        return;
+    }
+
+    fclose(files[index].hostHandle);                                // close the file
+
+    files[index].hostHandle     = NULL;                             // clear the struct
+    files[index].atariHandle    = EIHNDL;
+    files[index].hostPath       = "";
+
+    dataTrans->setStatus(E_OK);                                     // ok!
 }
 
 void TranslatedDisk::onFdatime(BYTE *cmd)
@@ -539,6 +674,16 @@ void TranslatedDisk::onFwrite(BYTE *cmd)
 }
 
 void TranslatedDisk::onFseek(BYTE *cmd)
+{
+
+}
+
+void TranslatedDisk::onFdup(BYTE *cmd)
+{
+
+}
+
+void TranslatedDisk::onFforce(BYTE *cmd)
 {
 
 }
@@ -703,3 +848,26 @@ void TranslatedDisk::attributesAtariToHost(BYTE attrAtari, DWORD &attrHost)
     if(attrAtari & FA_ARCHIVE)
         attrHost |= FILE_ATTRIBUTE_ARCHIVE;
 }
+
+int TranslatedDisk::findEmptyFileSlot(void)
+{
+    for(int i=0; i<MAX_FILES; i++) {
+        if(files[i].hostHandle == 0) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+int TranslatedDisk::findFileHandleSlot(int atariHandle)
+{
+    for(int i=0; i<MAX_FILES; i++) {
+        if(files[i].atariHandle == atariHandle) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+

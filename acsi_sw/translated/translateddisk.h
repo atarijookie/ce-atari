@@ -118,12 +118,17 @@ private:
     void onFwrite(BYTE *cmd);
     void onFseek(BYTE *cmd);
 
+    // these are not really needed, but we need to handle them so the things don't get messy
+    void onFdup(BYTE *cmd);
+    void onFforce(BYTE *cmd);
+
     // date and time function
     void onTgetdate(BYTE *cmd);
     void onTsetdate(BYTE *cmd);
     void onTgettime(BYTE *cmd);
     void onTsettime(BYTE *cmd);
 
+    // helper functions
     void attributesHostToAtari(DWORD attrHost, BYTE &attrAtari);
     void attributesAtariToHost(BYTE attrAtari, DWORD &attrHost);
 
@@ -131,6 +136,9 @@ private:
     WORD fileTimeToAtariTime(FILETIME *ft);
 
     void appendFoundToFindStorage(WIN32_FIND_DATAA *found, unsigned char findAttribs);
+
+    int findEmptyFileSlot(void);
+    int findFileHandleSlot(int atariHandle);
 };
 
 #endif
