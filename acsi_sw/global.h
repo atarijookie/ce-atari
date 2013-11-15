@@ -50,7 +50,6 @@
 
 // commands for HOSTMOD_TRANSLATED_DISK
 #define TRAN_CMD_IDENTIFY           0
-#define TRAN_CMD_GET_CONFIG         0xf0
 // ...other commands are just function codes from gemdos.h
 
 

@@ -36,7 +36,9 @@
 #define GEMDOS_Tgettime     0x2C
 #define GEMDOS_Tsettime     0x2D
 
-#define GD_CUSTOM_ftell     0x60
+#define GD_CUSTOM_initialize    0x60
+#define GD_CUSTOM_getConfig     0x61
+#define GD_CUSTOM_ftell         0x62
 
 //////////////////////////////////////
 

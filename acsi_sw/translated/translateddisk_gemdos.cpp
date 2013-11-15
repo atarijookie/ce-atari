@@ -183,6 +183,8 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
 
 void TranslatedDisk::appendFoundToFindStorage(WIN32_FIND_DATAA *found, BYTE findAttribs)
 {
+    // TODO: verify on ST that the find attributes work like this
+
     // first verify if the file attributes are OK
     if((found->dwFileAttributes & FILE_ATTRIBUTE_READONLY)!=0   && (findAttribs & FA_READONLY)==0)  // is read only, but not searching for that
         return;
@@ -507,6 +509,12 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     // for GET: returns current attribs, for SET: returns old attribs
     dataTrans->setStatus(oldAttrAtari);         // return attributes
 }
+
+// notes to Fcreate on TOS 2.06
+// 1st  handle returned:  6
+// last handle returned: 45
+// Calling fdup eats some handles, so then the 1st handle starts at higher number, but still ends up on 45
+// On the atari side we could convert CosmosEx handles from 0-40 to 100-140 (or similar) to identify CosmosEx handles
 
 void TranslatedDisk::onFcreate(BYTE *cmd)
 {
@@ -877,16 +885,6 @@ void TranslatedDisk::onFtell(BYTE *cmd)
     dataTrans->padDataToMul16();
 
     dataTrans->setStatus(E_OK);                                     // OK!
-}
-
-void TranslatedDisk::onFdup(BYTE *cmd)
-{
-
-}
-
-void TranslatedDisk::onFforce(BYTE *cmd)
-{
-
 }
 
 void TranslatedDisk::onTgetdate(BYTE *cmd)

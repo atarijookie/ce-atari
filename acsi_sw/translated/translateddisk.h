@@ -25,6 +25,7 @@ typedef struct {
 } TranslatedFiles;
 
 #define MAX_FILES       40                  // maximum open files count, 40 is the value from EmuTOS
+#define MAX_DRIVES      16
 
 #define TRANSLATEDTYPE_NORMAL           0
 #define TRANSLATEDTYPE_SHAREDDRIVE      1
@@ -41,9 +42,8 @@ public:
     void processCommand(BYTE *cmd);
 
     bool attachToHostPath(std::string hostRootPath, int translatedType);
-    void dettachFromHostPath(std::string hostRootPath);
-    void dettachAll(void);
-    bool isAlreadyAttached(std::string hostRootPath);
+    void detachFromHostPath(std::string hostRootPath);
+    void detachAll(void);
 
     void configChanged_reload(void);
 
@@ -53,7 +53,7 @@ private:
     BYTE            *dataBuffer;
     BYTE            *dataBuffer2;
 
-    TranslatedConf  conf[16];               // 16 possible TOS drives
+    TranslatedConf  conf[MAX_DRIVES];       // 16 possible TOS drives
     char            currentDriveLetter;
     BYTE            currentDriveIndex;
 
@@ -96,8 +96,8 @@ private:
     void onDgetpath(BYTE *cmd);
 
     // directory & file search
-//    void onFsetdta(BYTE *cmd);                    // this function needs to be handled on ST only
-//    void onFgetdta(BYTE *cmd);                    // this function needs to be handled on ST only
+//  void onFsetdta(BYTE *cmd);                    // this function needs to be handled on ST only
+//  void onFgetdta(BYTE *cmd);                    // this function needs to be handled on ST only
     void onFsfirst(BYTE *cmd);
     void onFsnext(BYTE *cmd);
 
@@ -118,10 +118,6 @@ private:
     void onFwrite(BYTE *cmd);
     void onFseek(BYTE *cmd);
 
-    // these are not really needed, but we need to handle them so the things don't get messy
-    void onFdup(BYTE *cmd);
-    void onFforce(BYTE *cmd);
-
     // date and time function
     void onTgetdate(BYTE *cmd);
     void onTsetdate(BYTE *cmd);
@@ -129,8 +125,8 @@ private:
     void onTsettime(BYTE *cmd);
 
     // custom functions, which are not translated gemdos functions, but needed to do some other work
-    void onFtell(BYTE *cmd);
-
+    void onInitialize(void);            // this method is called on the startup of CosmosEx translated disk driver
+    void onFtell(BYTE *cmd);            // this is needed after Fseek
 
     // helper functions
     void attributesHostToAtari(DWORD attrHost, BYTE &attrAtari);
@@ -146,6 +142,13 @@ private:
 
     WORD  getWord(BYTE *bfr);
     DWORD getDword(BYTE *bfr);
+
+    void closeFileByIndex(int index);
+    void closeAllFiles(void);
+
+    void attachToHostPathByIndex(int index, std::string hostRootPath, int translatedType);
+    void detachByIndex(int index);
+    bool isAlreadyAttached(std::string hostRootPath);
 };
 
 #endif

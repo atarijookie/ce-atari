@@ -17,7 +17,7 @@ TranslatedDisk::TranslatedDisk(void)
     dataBuffer  = new BYTE[BUFFER_SIZE];
     dataBuffer2 = new BYTE[BUFFER_SIZE];
 
-    dettachAll();
+    detachAll();
 
     for(int i=0; i<MAX_FILES; i++) {        // initialize host file structures
         files[i].hostHandle     = NULL;
@@ -61,17 +61,17 @@ void TranslatedDisk::configChanged_reload(void)
 
     // now move the attached drives around to match the new configuration
 
-    TranslatedConf tmpConf[16];
-    for(int i=2; i<16; i++) {           // first make the copy of the current state
+    TranslatedConf tmpConf[MAX_DRIVES];
+    for(int i=2; i<MAX_DRIVES; i++) {           // first make the copy of the current state
         tmpConf[i] = conf[i];
     }
 
-    dettachAll();                       // then deinit the conf structures
+    detachAll();                                // then deinit the conf structures
 
     int good = 0, bad = 0;
     bool res;
 
-    for(int i=2; i<16; i++) {           // and now find new places
+    for(int i=2; i<MAX_DRIVES; i++) {           // and now find new places
         if(!tmpConf[i].enabled) {       // skip the not used positions
             continue;
         }
@@ -107,10 +107,7 @@ bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedTy
     // are we attaching shared drive?
     if(translatedType == TRANSLATEDTYPE_SHAREDDRIVE) {
         if(driveLetters.shared > 0) {                       // we have shared drive letter defined
-            conf[driveLetters.shared].enabled             = true;
-            conf[driveLetters.shared].hostRootPath        = hostRootPath;
-            conf[driveLetters.shared].currentAtariPath    = "\\";
-            conf[driveLetters.shared].translatedType      = translatedType;
+            attachToHostPathByIndex(driveLetters.shared, hostRootPath, translatedType);
 
             return true;
         } else {
@@ -121,10 +118,7 @@ bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedTy
     // are we attaching config drive?
     if(translatedType == TRANSLATEDTYPE_CONFIGDRIVE) {
         if(driveLetters.confDrive > 0) {              // we have config drive letter defined
-            conf[driveLetters.confDrive].enabled             = true;
-            conf[driveLetters.confDrive].hostRootPath        = hostRootPath;
-            conf[driveLetters.confDrive].currentAtariPath    = "\\";
-            conf[driveLetters.confDrive].translatedType      = translatedType;
+            attachToHostPathByIndex(driveLetters.confDrive, hostRootPath, translatedType);
 
             return true;
         } else {
@@ -139,7 +133,7 @@ bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedTy
         return false;
     }
 
-    for(int i=start; i<16; i++) {                       // find the empty slot for the new drive
+    for(int i=start; i<MAX_DRIVES; i++) {               // find the empty slot for the new drive
         // if this letter is reserved to shared drive
         if(i == driveLetters.shared) {
             continue;
@@ -160,22 +154,30 @@ bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedTy
         return false;
     }
 
+    attachToHostPathByIndex(index, hostRootPath, translatedType);
+    return true;
+}
+
+void TranslatedDisk::attachToHostPathByIndex(int index, std::string hostRootPath, int translatedType)
+{
+    if(index < 0 || index > MAX_DRIVES) {
+        return;
+    }
+
     conf[index].enabled             = true;
     conf[index].hostRootPath        = hostRootPath;
     conf[index].currentAtariPath    = "\\";
     conf[index].translatedType      = translatedType;
-
-    return true;
 }
 
 bool TranslatedDisk::isAlreadyAttached(std::string hostRootPath)
 {
-    for(int i=0; i<16; i++) {                       // see if the specified path is already attached
-        if(!conf[i].enabled) {                      // not used yet? skip
+    for(int i=0; i<MAX_DRIVES; i++) {                   // see if the specified path is already attached
+        if(!conf[i].enabled) {                          // not used yet? skip
             continue;
         }
 
-        if(conf[i].hostRootPath == hostRootPath) {    // found the matching path?
+        if(conf[i].hostRootPath == hostRootPath) {      // found the matching path?
             return true;
         }
     }
@@ -183,24 +185,33 @@ bool TranslatedDisk::isAlreadyAttached(std::string hostRootPath)
     return false;
 }
 
-void TranslatedDisk::dettachAll(void)
+void TranslatedDisk::detachByIndex(int index)
 {
-    for(int i=0; i<16; i++) {               // initialize the config structs
-        conf[i].enabled             = false;
-        conf[i].stDriveLetter       = 'C' + i;
-        conf[i].currentAtariPath    = "\\";
-        conf[i].translatedType      = TRANSLATEDTYPE_NORMAL;
+    if(index < 0 || index > MAX_DRIVES) {
+        return;
+    }
+
+    conf[index].enabled             = false;
+    conf[index].stDriveLetter       = 'A' + index;
+    conf[index].currentAtariPath    = "\\";
+    conf[index].translatedType      = TRANSLATEDTYPE_NORMAL;
+}
+
+void TranslatedDisk::detachAll(void)
+{
+    for(int i=0; i<MAX_DRIVES; i++) {               // initialize the config structs
+        detachByIndex(i);
     }
 
     currentDriveLetter  = 'C';
     currentDriveIndex   = 0;
 }
 
-void TranslatedDisk::dettachFromHostPath(std::string hostRootPath)
+void TranslatedDisk::detachFromHostPath(std::string hostRootPath)
 {
     int index = -1;
 
-    for(int i=2; i<16; i++) {                           // find where the storage the existing empty slot for the new drive
+    for(int i=2; i<MAX_DRIVES; i++) {                   // find where the storage the existing empty slot for the new drive
         if(!conf[i].enabled) {                          // skip disabled drives
             continue;
         }
@@ -219,6 +230,13 @@ void TranslatedDisk::dettachFromHostPath(std::string hostRootPath)
     conf[index].hostRootPath        = "";
     conf[index].currentAtariPath    = "\\";
     conf[index].translatedType      = TRANSLATEDTYPE_NORMAL;
+
+    // close all files which might be open on this host path
+    for(int i=0; i<MAX_FILES; i++) {
+        if(startsWith(files[i].hostPath, hostRootPath)) {       // the host path starts with this detached path
+            closeFileByIndex(i);
+        }
+    }
 }
 
 void TranslatedDisk::processCommand(BYTE *cmd)
@@ -242,8 +260,6 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         dataTrans->setStatus(E_OK);
         break;
 
-        case TRAN_CMD_GET_CONFIG:   onGetConfig(cmd);   break;
-
         // path functions
         case GEMDOS_Dsetdrv:        onDsetdrv(cmd);     break;
         case GEMDOS_Dgetdrv:        onDgetdrv(cmd);     break;
@@ -251,8 +267,8 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case GEMDOS_Dgetpath:       onDgetpath(cmd);    break;
 
         // directory & file search
-//        case GEMDOS_Fsetdta:        onFsetdta(cmd);     break;        // this function needs to be handled on ST only
-//        case GEMDOS_Fgetdta:        onFgetdta(cmd);     break;        // this function needs to be handled on ST only
+//      case GEMDOS_Fsetdta:        onFsetdta(cmd);     break;        // this function needs to be handled on ST only
+//      case GEMDOS_Fgetdta:        onFgetdta(cmd);     break;        // this function needs to be handled on ST only
         case GEMDOS_Fsfirst:        onFsfirst(cmd);     break;
         case GEMDOS_Fsnext:         onFsnext(cmd);      break;
 
@@ -279,6 +295,9 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case GEMDOS_Tgettime:       onTgettime(cmd);    break;
         case GEMDOS_Tsettime:       onTsettime(cmd);    break;
 
+        // custom functions, which are not translated gemdos functions, but needed to do some other work
+        case GD_CUSTOM_initialize:  onInitialize();     break;
+        case GD_CUSTOM_getConfig:   onGetConfig(cmd);   break;
         case GD_CUSTOM_ftell:       onFtell(cmd);       break;
 
         // in other cases
@@ -294,7 +313,7 @@ WORD TranslatedDisk::getDrivesBitmap(void)
 {
     WORD drives = 0;
 
-    for(int i=0; i<16; i++) {               // create enabled drive bits
+    for(int i=0; i<MAX_DRIVES; i++) {       // create enabled drive bits
         if(i == 0 || i == 1) {              // A and B enabled by default
             drives |= (1 << i);
         }
@@ -307,12 +326,50 @@ WORD TranslatedDisk::getDrivesBitmap(void)
     return drives;
 }
 
+void TranslatedDisk::closeAllFiles(void)
+{
+    for(int i=0; i<MAX_FILES; i++) {        // close all open files
+        if(files[i].hostHandle == NULL) {   // if file is not open, skip it
+            continue;
+        }
+
+        closeFileByIndex(i);
+    }
+}
+
+void TranslatedDisk::closeFileByIndex(int index)
+{
+    if(index < 0 || index > MAX_FILES) {
+        return;
+    }
+
+    if(files[index].hostHandle != NULL) {   // if file is open, close it
+        fclose(files[index].hostHandle);
+    }
+
+    // now init the vars
+    files[index].hostHandle     = NULL;
+    files[index].atariHandle    = EIHNDL;
+    files[index].hostPath       = "";
+}
+
+void TranslatedDisk::onInitialize(void)     // this method is called on the startup of CosmosEx translated disk driver
+{
+    closeAllFiles();
+
+    findStorage.count = 0;
+
+    dataTrans->setStatus(E_OK);
+}
+
 void TranslatedDisk::onGetConfig(BYTE *cmd)
 {
     WORD drives = getDrivesBitmap();
 
     dataTrans->addData(drives >>    8);     // drive bits first
     dataTrans->addData(drives &  0xff);
+
+    dataTrans->padDataToMul16();            // pad to multiple of 16
 
     dataTrans->setStatus(E_OK);
 }
