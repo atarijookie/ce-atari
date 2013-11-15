@@ -146,6 +146,12 @@ int main (void)
 	for(i=1; i<8; i++) {
 		enabledIDs[i] = 0;
 	}
+	
+	//-------------
+	// reset the XILINX, because it might be in a weird state on power on
+	GPIOB->BSRR	= XILINX_RESET;														// HIGH
+	GPIOB->BRR	= XILINX_RESET;														// LOW
+
 	//-------------
 	while(1) {
 		// get the command from ACSI and send it to host
@@ -514,6 +520,10 @@ void init_hw_sw(void)
 	// LEDs
 	GPIOA->CRH &= ~(0xf00ff000);						// remove bits from GPIOA
 	GPIOA->CRH |=   0x30033000;							// 3 ouputs - LED1, LED2, LED3
+
+	// XILINX reset as output
+	GPIOB->CRH &= ~(0xf0000000);						// clear 
+	GPIOB->CRH |=   0x30000000;							// set XILINX reset as output
 	
 	RCC->APB2ENR |= (1 << 0);								// enable AFIO
 	
