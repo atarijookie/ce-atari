@@ -8,7 +8,7 @@
 extern "C" void outDebugString(const char *format, ...);
 
 #define BUFFER_SIZE         (1024*1024)
-#define COMMAND_SIZE        8
+#define COMMAND_SIZE        9
 
 AcsiDataTrans::AcsiDataTrans()
 {
@@ -106,9 +106,10 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
     memset(devCommand, 0, COMMAND_SIZE);
 
     devCommand[3] = CMD_DATA_WRITE;                         // store command - WRITE
-    devCommand[4] = cnt >> 8;                               // store data size
-    devCommand[5] = cnt  & 0xff;
-    devCommand[6] = 0xff;                                   // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
+    devCommand[4] = cnt >> 16;                              // store data size
+    devCommand[5] = cnt >>  8;
+    devCommand[6] = cnt  & 0xff;
+    devCommand[7] = 0xff;                                   // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
 
     com->txRx(COMMAND_SIZE, devCommand, recvBuffer);        // transmit this command
 
@@ -175,9 +176,10 @@ void AcsiDataTrans::sendDataAndStatus(void)
     memset(devCommand, 0, COMMAND_SIZE);
 
     devCommand[3] = CMD_DATA_READ;                          // store command
-    devCommand[4] = count >> 8;                             // store data size
-    devCommand[5] = count  & 0xff;
-    devCommand[6] = status;                                 // store status
+    devCommand[4] = count >> 16;                            // store data size
+    devCommand[5] = count >>  8;
+    devCommand[6] = count  & 0xff;
+    devCommand[7] = status;                                 // store status
 
     com->txRx(COMMAND_SIZE, devCommand, recvBuffer);        // transmit this command
 

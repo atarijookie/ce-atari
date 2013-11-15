@@ -520,7 +520,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
 {
     bool res;
 
-    res = dataTrans->recvData(dataBuffer, 64);      // get data from Hans
+    res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
 
     if(!res) {                                      // failed to get data? internal error!
         dataTrans->setStatus(EINTRN);
@@ -587,7 +587,7 @@ void TranslatedDisk::onFopen(BYTE *cmd)
 {
     bool res;
 
-    res = dataTrans->recvData(dataBuffer, 64);      // get data from Hans
+    res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
 
     if(!res) {                                      // failed to get data? internal error!
         dataTrans->setStatus(EINTRN);
