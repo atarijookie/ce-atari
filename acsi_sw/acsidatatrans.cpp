@@ -97,7 +97,9 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
         return false;
     }
 
-    dataDirection = DATA_DIRECTION_WRITE;                   // let the higher function know that we've done data write
+    // TODO: change cnt in devCommand to be at least 24 bits - max sectors per transfer is 254,
+
+    dataDirection = DATA_DIRECTION_WRITE;                   // let the higher function know that we've done data write -- 130 048 Bytes
 
     // first send the command and tell Hans that we need WRITE data
     BYTE devCommand[COMMAND_SIZE];
