@@ -1,5 +1,6 @@
 #include "stm32f10x_tim.h"
 
+void timerSetup_buttonTimer(void);
 void timerSetup_sendFw(void);
 void timerSetup_cmdTimeout(void);
 

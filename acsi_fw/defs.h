@@ -50,6 +50,14 @@ GPIOA_1   - O  - PIO - on rising edge will put INT to L
 GPIOA_2   - O  - DMA - on rising edge will put DRQ to L
 GPIOA_3   - O  - ATN for Attention
 
+//------------
+
+// for the button and LEDs (floppy selection)
+GPIOB_12  - I  - BUTTON								-- EXTI12
+GPIOA_11  - O  - LED1
+GPIOA_12  - O  - LED2 
+GPIOA_15  - O  - LED3
+
 */
 
 // on GPIOB -- inputs
@@ -58,10 +66,17 @@ GPIOA_3   - O  - ATN for Attention
 #define	aCS				(1 <<  10)
 #define	aACK			(1 <<  11)
 
+#define BUTTON		(1 <<  12)
+
 // on GPIOA - for easier write to aDATA -- outputs
 #define	aRNW			(1 <<  0)
 #define	aPIO			(1 <<  1)
 #define	aDMA			(1 <<  2)
 #define	ATN				(1 <<  3)
+
+// on GPIOA - LEDs
+#define LED1			(1 << 11)
+#define LED2			(1 << 12) 
+#define LED3			(1 << 15)
 
 #endif /* DEFS_H_ */

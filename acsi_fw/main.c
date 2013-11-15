@@ -10,6 +10,7 @@
 #include "bridge.h"
 
 void init_hw_sw(void);
+void onButtonPress(void);
 
 void processHostCommands(void);
 
@@ -82,6 +83,8 @@ BYTE enabledIDs[8];							// when 1, Hanz will react on that ACSI ID #
 volatile BYTE spiDmaIsIdle;
 volatile BYTE spiDmaTXidle, spiDmaRXidle;		// flags set when the SPI DMA TX or RX is idle
 
+BYTE currentLed;
+
 BYTE shouldProcessCommands;
 
 int main (void) 
@@ -124,6 +127,8 @@ int main (void)
 	spiDmaIsIdle = TRUE;
 	spiDmaTXidle = TRUE;
 	spiDmaRXidle = TRUE;
+	
+	currentLed = 0;
 
 	shouldProcessCommands = FALSE;
 
@@ -133,7 +138,7 @@ int main (void)
 	ACSI_DATADIR_WRITE();													// data as inputs
 	GPIOA->BRR = aDMA | aPIO | aRNW | ATN;				// ACSI controll signals LOW, ATTENTION bit LOW - nothing to read
 
-	EXTI->PR = aCMD | aCS | aACK;									// clear these ints 
+	EXTI->PR = BUTTON | aCMD | aCS | aACK;				// clear these ints 
 	//-------------
 	// by default set ID 0 as enabled and other IDs as disabled 
 	enabledIDs[0] = 1;
@@ -172,6 +177,8 @@ int main (void)
 
 		// in command waiting state, nothing to do and should send FW version?
 		if(state == STATE_GET_COMMAND && spiDmaIsIdle && sendFwVersion) {
+			atnSendFwVersion[4] = ((WORD)currentLed) << 8;				// store the current LED status in the last WORD
+			
 			spiDma_txRx(5, (BYTE *) &atnSendFwVersion[0],	 6, (BYTE *) &cmdBuffer[0]);
 				
 			sendFwVersion	= FALSE;
@@ -186,12 +193,47 @@ int main (void)
 			shouldProcessCommands = TRUE;													// mark that we should process the commands on next SPI DMA idle time
 		}
 		
+		// if the button was pressed, handle it
+		if(EXTI->PR & BUTTON) {
+			onButtonPress();
+		}
+		
 		//-------------------------------------------------
 		// the following part is here to send FW version each second
-		if((TIM2->SR & 0x0001) != 0) {		// overflow of TIM1 occured?
+		if((TIM2->SR & 0x0001) != 0) {		// overflow of TIM2 occured?
 			TIM2->SR = 0xfffe;							// clear UIF flag
 			sendFwVersion = TRUE;
 		}
+	}
+}
+
+void onButtonPress(void)
+{
+	static WORD prevCnt = 0;
+	WORD cnt;
+
+	EXTI->PR = BUTTON;									// clear pending EXTI
+	
+	cnt = TIM1->CNT;										// get the current time
+	
+	if((cnt - prevCnt) < 500) {					// the previous button press happened less than 250 ms before? ignore
+		return;
+	}	
+	
+	prevCnt = cnt;											// store current time
+	
+	currentLed++;												// change LED
+	
+	if(currentLed > 2) {								// overflow?
+		currentLed = 0;
+	}
+	
+	GPIOA->BSRR = LED1 | LED2 | LED3;		// all LED pins high (LEDs OFF)
+	
+	switch(currentLed) {								// turn on the correct LED
+			case 0:	GPIOA->BRR = LED1; break;
+			case 1:	GPIOA->BRR = LED2; break;
+			case 2:	GPIOA->BRR = LED3; break;
 	}
 }
 
@@ -462,25 +504,31 @@ void init_hw_sw(void)
 	GPIOA->CRL |=   0xbbbb0000;							// set GPIOA as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
 
 	// ACSI input signals as floating inputs
-	GPIOB->CRH &= ~(0x0000ffff);						// clear 4 lowest bits
-	GPIOB->CRH |=   0x00004444;							// set as 4 inputs (ACK, CS, CMD, RESET)
+	GPIOB->CRH &= ~(0x000fffff);						// clear 5 lowest bits
+	GPIOB->CRH |=   0x00044444;							// set as 5 inputs (BUTTON, ACK, CS, CMD, RESET)
 
 	// ACSI control signals as output, +ATN
 	GPIOA->CRL &= ~(0x0000ffff);						// remove bits from GPIOA
 	GPIOA->CRL |=   0x00003333;							// 4 ouputs (ATN, DMA, PIO, RNW) and 4 inputs (ACK, CS, CMD, RESET)
 
+	// LEDs
+	GPIOA->CRH &= ~(0xf00ff000);						// remove bits from GPIOA
+	GPIOA->CRH |=   0x30033000;							// 3 ouputs - LED1, LED2, LED3
+	
 	RCC->APB2ENR |= (1 << 0);								// enable AFIO
 	
-	AFIO->EXTICR[2] = 0x1110;								// source input: GPIOB for EXTI 9, 10, 11
-	EXTI->IMR			= aCMD | aCS | aACK;			// 1 means: Interrupt from these lines is not masked
-	EXTI->EMR			= aCMD | aCS | aACK;			// 1 means: Event     form these lines is not masked
-	EXTI->FTSR 		= aCMD | aCS | aACK;			// Falling trigger selection register
-	
+	AFIO->EXTICR[2] = 0x1110;												// source input: GPIOB for EXTI 9, 10, 11
+	AFIO->EXTICR[3] = 0x0001;												// source input: GPIOB for EXTI 12 -- button
+	EXTI->IMR			= BUTTON | aCMD | aCS | aACK;			// 1 means: Interrupt from these lines is not masked
+	EXTI->EMR			= BUTTON | aCMD | aCS | aACK;			// 1 means: Event     form these lines is not masked
+	EXTI->FTSR 		= BUTTON | aCMD | aCS | aACK;			// Falling trigger selection register
+
 	//----------
 	AFIO->MAPR |= 0x02000000;								// SWJ_CFG[2:0] (Bits 26:24) -- 010: JTAG-DP Disabled and SW-DP Enabled
 	
+	timerSetup_buttonTimer();								// TIM1 counts at 2 kHz as a button timer (to not allow many buttons presses one after another)
 	timerSetup_sendFw();										// set TIM2 to 1 second to send FW version each second
-	timerSetup_cmdTimeout();								// set TIM4 to 1 second as a timeout for command processing
+	timerSetup_cmdTimeout();								// set TIM3 to 1 second as a timeout for command processing
 	
 	//--------------
 	// DMA + SPI initialization
