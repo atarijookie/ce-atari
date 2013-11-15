@@ -54,7 +54,7 @@ WORD t1, t2, dt;
 #define STATE_READ_STATUS					3
 
 BYTE state;
-WORD dataCnt;
+DWORD dataCnt;
 BYTE statusByte;
 
 WORD version[2] = {0xa013, 0x0904};				// this means: hAns, 2013-09-04
@@ -530,20 +530,26 @@ void processHostCommands(void)
 				break;
 				
 			case CMD_DATA_WRITE:
-					dataCnt				= cmdBuffer[i+1];		// store the count of bytes we should WRITE
-					statusByte		= cmdBuffer[i+2] >> 8;
+					dataCnt				= cmdBuffer[i+1];					// store the count of bytes we should WRITE - highest and middle byte
+					dataCnt				= dataCnt << 8;
+					dataCnt				|= cmdBuffer[i+2] >> 8;		// lowest byte
+			
+					statusByte		= cmdBuffer[i+2] & 0xff;
 					
-					for(j=0; j<3; j++) {							// clear this command 
+					for(j=0; j<3; j++) {										// clear this command 
 						cmdBuffer[i + j] = 0;				
 					}
 					
-					state = STATE_DATA_WRITE;					// go into DATA_WRITE state
+					state = STATE_DATA_WRITE;								// go into DATA_WRITE state
 					i += 2;
 				break;
 				
 			case CMD_DATA_READ:		
-					dataCnt				= cmdBuffer[i+1];		// store the count of bytes we should READ
-					statusByte		= cmdBuffer[i+2] >> 8;
+					dataCnt				= cmdBuffer[i+1];					// store the count of bytes we should READ - highest and middle byte
+					dataCnt				= dataCnt << 8;
+					dataCnt				|= cmdBuffer[i+2] >> 8;		// lowest byte
+
+					statusByte		= cmdBuffer[i+2] & 0xff;
 
 					for(j=0; j<3; j++) {					// clear this command 
 						cmdBuffer[i + j] = 0;				
