@@ -644,8 +644,8 @@ void TranslatedDisk::onFclose(BYTE *cmd)
 
     int index = findFileHandleSlot(handle);
 
-    if(index == -1) {                                               // handle not found?
-        dataTrans->setStatus(EIHNDL);
+    if(index == -1) {                                               // handle not found? not handled, try somewhere else
+        dataTrans->setStatus(E_NOTHANDLED);
         return;
     }
 
@@ -660,7 +660,65 @@ void TranslatedDisk::onFclose(BYTE *cmd)
 
 void TranslatedDisk::onFdatime(BYTE *cmd)
 {
+    bool res;
 
+    int param       = cmd[5];
+    int handle      = param & 0x7f;         // lowest 7 bits
+    int setNotGet   = param >> 7;           // highest bit
+
+    int index = findFileHandleSlot(handle);
+
+    if(index == -1) {                                               // handle not found? not handled, try somewhere else
+        dataTrans->setStatus(E_NOTHANDLED);
+        return;
+    }
+
+    WORD atariTime = 0, atariDate = 0;
+
+    if(setNotGet) {                         // on SET
+        res = dataTrans->recvData(dataBuffer, 16);      // get data from Hans
+
+        if(!res) {                                      // failed to get data? internal error!
+            dataTrans->setStatus(EINTRN);
+            return;
+        }
+
+        atariTime = getWord(dataBuffer);                // retrieve the time and date from ST
+        atariDate = getWord(dataBuffer + 2);
+
+        WORD year, month, day;
+        year    = (atariDate >> 9)   + 1980;
+        month   = (atariDate >> 5)   & 0x0f;
+        day     =  atariDate         & 0x1f;
+
+        WORD hours, minutes, seconds;
+        hours   =  (atariTime >> 11) & 0x1f;
+        minutes =  (atariTime >>  5) & 0x3f;
+        seconds = ((atariTime >>  5) & 0x1f) * 2;
+
+
+        // TODO: setting the date / time to the file
+
+
+    } else {                                // on GET
+
+        // TODO: retrieving date / time from the file
+
+
+        atariTime |= (12                    ) << 11;        // hours
+        atariTime |= (00                    ) << 5;         // minutes
+        atariTime |= (30               / 2  );              // seconds
+
+        atariDate |= (2013           - 1980) << 9;          // year
+        atariDate |= (11                   ) << 5;          // month
+        atariDate |= (15                   );               // day
+
+        dataTrans->addDataWord(atariTime);
+        dataTrans->addDataWord(atariDate);
+        dataTrans->padDataToMul16();
+    }
+
+    dataTrans->setStatus(E_OK);                                     // ok!
 }
 
 void TranslatedDisk::onFread(BYTE *cmd)
@@ -675,7 +733,65 @@ void TranslatedDisk::onFwrite(BYTE *cmd)
 
 void TranslatedDisk::onFseek(BYTE *cmd)
 {
+    bool res;
 
+    res = dataTrans->recvData(dataBuffer, 16);      // get data from Hans
+
+    if(!res) {                                      // failed to get data? internal error!
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    // get seek params
+    DWORD   offset      = getDword(dataBuffer);
+    BYTE    atariHandle = dataBuffer[4];
+    BYTE    seekMode    = dataBuffer[5];
+
+    int index = findFileHandleSlot(atariHandle);
+
+    if(index == -1) {                                               // handle not found? not handled, try somewhere else
+        dataTrans->setStatus(E_NOTHANDLED);
+        return;
+    }
+
+    int hostSeekMode = SEEK_SET;
+    switch(seekMode) {
+        case 0: hostSeekMode = SEEK_SET; break;
+        case 1: hostSeekMode = SEEK_CUR; break;
+        case 2: hostSeekMode = SEEK_END; break;
+    }
+
+    int iRes = fseek(files[index].hostHandle, offset, hostSeekMode);
+
+    if(iRes == 0) {                         // on OK
+        dataTrans->setStatus(E_OK);
+    } else {                                // on error
+        dataTrans->setStatus(EINTRN);
+    }
+}
+
+void TranslatedDisk::onFtell(BYTE *cmd)
+{
+    int handle = cmd[5];
+
+    int index = findFileHandleSlot(handle);
+
+    if(index == -1) {                                               // handle not found? not handled, try somewhere else
+        dataTrans->setStatus(E_NOTHANDLED);
+        return;
+    }
+
+    int pos = ftell(files[index].hostHandle);                       // get stream position
+
+    if(pos == -1) {                                                 // failed to get position?
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    dataTrans->addDataDword(pos);                                   // return the position padded with zeros
+    dataTrans->padDataToMul16();
+
+    dataTrans->setStatus(E_OK);                                     // OK!
 }
 
 void TranslatedDisk::onFdup(BYTE *cmd)
@@ -720,7 +836,7 @@ void TranslatedDisk::onTsetdate(BYTE *cmd)
 
     WORD newAtariDate = (((WORD) dataBuffer[0]) << 8) | dataBuffer[1];
 
-    BYTE year, month, day;
+    WORD year, month, day;
     year    = (newAtariDate >> 9)   + 1980;
     month   = (newAtariDate >> 5)   & 0x0f;
     day     =  newAtariDate         & 0x1f;

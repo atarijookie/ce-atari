@@ -279,6 +279,8 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case GEMDOS_Tgettime:       onTgettime(cmd);    break;
         case GEMDOS_Tsettime:       onTsettime(cmd);    break;
 
+        case GD_CUSTOM_ftell:       onFtell(cmd);       break;
+
         // in other cases
         default:                                // in other cases
         dataTrans->setStatus(EINVFN);           // invalid function
@@ -485,5 +487,35 @@ bool TranslatedDisk::endsWith(std::string what, std::string subStr)
     }
 
     return false;
+}
+
+WORD TranslatedDisk::getWord(BYTE *bfr)
+{
+    WORD val = 0;
+
+    val = bfr[0];       // get hi
+    val = val << 8;
+
+    val |= bfr[1];      // get lo
+
+    return val;
+}
+
+DWORD TranslatedDisk::getDword(BYTE *bfr)
+{
+    DWORD val = 0;
+
+    val = bfr[0];       // get hi
+    val = val << 8;
+
+    val |= bfr[1];      // get mid hi
+    val = val << 8;
+
+    val |= bfr[2];      // get mid lo
+    val = val << 8;
+
+    val |= bfr[3];      // get lo
+
+    return val;
 }
 

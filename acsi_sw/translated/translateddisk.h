@@ -128,6 +128,10 @@ private:
     void onTgettime(BYTE *cmd);
     void onTsettime(BYTE *cmd);
 
+    // custom functions, which are not translated gemdos functions, but needed to do some other work
+    void onFtell(BYTE *cmd);
+
+
     // helper functions
     void attributesHostToAtari(DWORD attrHost, BYTE &attrAtari);
     void attributesAtariToHost(BYTE attrAtari, DWORD &attrHost);
@@ -139,6 +143,9 @@ private:
 
     int findEmptyFileSlot(void);
     int findFileHandleSlot(int atariHandle);
+
+    WORD  getWord(BYTE *bfr);
+    DWORD getDword(BYTE *bfr);
 };
 
 #endif
