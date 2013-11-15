@@ -8,7 +8,7 @@
 extern "C" void outDebugString(const char *format, ...);
 
 #define BUFFER_SIZE         (1024*1024)
-#define COMMAND_SIZE        9
+#define COMMAND_SIZE        10
 
 AcsiDataTrans::AcsiDataTrans()
 {
