@@ -9,6 +9,9 @@
 #define BUFFER_SIZE             (1024*1024)
 #define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
 
+#define PATH_SEPAR_STRING       "\\"
+#define PATH_SEPAR_CHAR         '\\'
+
 typedef struct {
     bool        enabled;
 
