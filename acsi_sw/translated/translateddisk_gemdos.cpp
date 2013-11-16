@@ -122,8 +122,11 @@ void TranslatedDisk::onDgetpath(BYTE *cmd)
         return;
     }
 
+    std::string aPath = conf[whichDrive].currentAtariPath;
+    pathSeparatorHostToAtari(aPath);
+
     // return the current path for current drive
-    dataTrans->addData((BYTE *) conf[whichDrive].currentAtariPath.c_str(), conf[whichDrive].currentAtariPath.length(), true);
+    dataTrans->addData((BYTE *) aPath.c_str(), aPath.length(), true);
     dataTrans->setStatus(E_OK);
 }
 

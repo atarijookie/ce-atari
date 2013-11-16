@@ -9,8 +9,9 @@
 #define BUFFER_SIZE             (1024*1024)
 #define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
 
-#define PATH_SEPAR_STRING       "\\"
-#define PATH_SEPAR_CHAR         '\\'
+#define HOSTPATH_SEPAR_STRING       "\\"
+#define HOSTPATH_SEPAR_CHAR         '\\'
+#define ATARIPATH_SEPAR_CHAR        '/'
 
 typedef struct {
     bool        enabled;
@@ -84,6 +85,8 @@ private:
     bool hostPathExists(std::string hostPath);
     bool createHostPath(std::string atariPath, std::string &hostPath);
     void removeDoubleDots(std::string &path);
+    void pathSeparatorAtariToHost(std::string &path);
+    void pathSeparatorHostToAtari(std::string &path);
     void createAtariPathFromHostPath(std::string hostPath, std::string &atariPath);
     bool newPathRequiresCurrentDriveChange(std::string atariPath, int &newDriveIndex);
     bool isLetter(char a);

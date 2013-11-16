@@ -167,7 +167,7 @@ void TranslatedDisk::attachToHostPathByIndex(int index, std::string hostRootPath
 
     conf[index].enabled             = true;
     conf[index].hostRootPath        = hostRootPath;
-    conf[index].currentAtariPath    = PATH_SEPAR_STRING;
+    conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
     conf[index].translatedType      = translatedType;
 }
 
@@ -194,7 +194,7 @@ void TranslatedDisk::detachByIndex(int index)
 
     conf[index].enabled             = false;
     conf[index].stDriveLetter       = 'A' + index;
-    conf[index].currentAtariPath    = PATH_SEPAR_STRING;
+    conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
     conf[index].translatedType      = TRANSLATEDTYPE_NORMAL;
 }
 
@@ -229,7 +229,7 @@ void TranslatedDisk::detachFromHostPath(std::string hostRootPath)
 
     conf[index].enabled             = false;            // mark as empty
     conf[index].hostRootPath        = "";
-    conf[index].currentAtariPath    = PATH_SEPAR_STRING;
+    conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
     conf[index].translatedType      = TRANSLATEDTYPE_NORMAL;
 
     // close all files which might be open on this host path
@@ -395,6 +395,8 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 {
     hostPath = "";
 
+    pathSeparatorAtariToHost(atariPath);
+
     if(atariPath[1] == ':') {                               // if it's full path including drive letter
 
         int driveIndex = 0;
@@ -417,7 +419,7 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 
         std::string atariPathWithoutDrive = atariPath.substr(2);    // skip drive and semicolon (C:)
 
-        if(startsWith(atariPathWithoutDrive, PATH_SEPAR_STRING)) {               // if the atari path starts with \\, remove it
+        if(startsWith(atariPathWithoutDrive, HOSTPATH_SEPAR_STRING)) {               // if the atari path starts with \\, remove it
             atariPathWithoutDrive = atariPathWithoutDrive.substr(1);
         }
 
@@ -425,14 +427,14 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 
         removeDoubleDots(hostPath);                                 // search for '..' and simplify the path
 
-        if(startsWith(hostPath, PATH_SEPAR_STRING)) {                            // if host path starts with a backslash, remove it
+        if(startsWith(hostPath, HOSTPATH_SEPAR_STRING)) {                            // if host path starts with a backslash, remove it
             hostPath = hostPath.substr(1);
         }
 
         std::string root = conf[driveIndex].hostRootPath;
 
-        if(!endsWith(root, PATH_SEPAR_STRING)) {                                 // if the host path does not end wit \\, add it
-            root += PATH_SEPAR_STRING;
+        if(!endsWith(root, HOSTPATH_SEPAR_STRING)) {                                 // if the host path does not end wit \\, add it
+            root += HOSTPATH_SEPAR_STRING;
         }
 
         hostPath = root + hostPath;
@@ -447,35 +449,35 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 
     // need to handle with \\ at the begining, without \\ at the begining, with .. at the begining
 
-    if(startsWith(atariPath, PATH_SEPAR_STRING)) {                               // starts with \\ == starts from root
+    if(startsWith(atariPath, HOSTPATH_SEPAR_STRING)) {                               // starts with \\ == starts from root
         hostPath += atariPath.substr(1);                            // final path = hostPath + newPath
         return true;
     }
 
     // starts without backslash? relative path then
 
-    if(startsWith(conf[currentDriveIndex].currentAtariPath, PATH_SEPAR_STRING)) {        // add without starting backslash
+    if(startsWith(conf[currentDriveIndex].currentAtariPath, HOSTPATH_SEPAR_STRING)) {        // add without starting backslash
         hostPath += conf[currentDriveIndex].currentAtariPath.substr(1);
     } else {
         hostPath += conf[currentDriveIndex].currentAtariPath;
     }
 
-    if(!endsWith(hostPath, PATH_SEPAR_STRING)) {                             // should add backslash at the end?
-        hostPath += PATH_SEPAR_STRING;
+    if(!endsWith(hostPath, HOSTPATH_SEPAR_STRING)) {                             // should add backslash at the end?
+        hostPath += HOSTPATH_SEPAR_STRING;
     }
 
     hostPath += atariPath;                                      // final path = hostPath + currentPath + newPath
 
     removeDoubleDots(hostPath);                                 // search for '..' and simplify the path
 
-    if(startsWith(hostPath, PATH_SEPAR_STRING)) {                            // if host path starts with a backslash, remove it
+    if(startsWith(hostPath, HOSTPATH_SEPAR_STRING)) {                            // if host path starts with a backslash, remove it
         hostPath = hostPath.substr(1);
     }
 
     std::string root = conf[currentDriveIndex].hostRootPath;
 
-    if(!endsWith(root, PATH_SEPAR_STRING)) {                                 // if the host path does not end wit \\, add it
-        root += PATH_SEPAR_STRING;
+    if(!endsWith(root, HOSTPATH_SEPAR_STRING)) {                                 // if the host path does not end wit \\, add it
+        root += HOSTPATH_SEPAR_STRING;
     }
 
     hostPath = root + hostPath;
@@ -496,7 +498,7 @@ void TranslatedDisk::removeDoubleDots(std::string &path)
 
     // first split the string by separator
     while(1) {
-        pos = path.find(PATH_SEPAR_CHAR, start);
+        pos = path.find(HOSTPATH_SEPAR_CHAR, start);
 
         if(pos == -1) {                             // not found?
             strings[found] = path.substr(start);    // copy in the rest
@@ -534,7 +536,7 @@ void TranslatedDisk::removeDoubleDots(std::string &path)
 
     for(int i=0; i<found; i++) {
         if(strings[i].length() != 0) {      // not empty string?
-            final = final + PATH_SEPAR_STRING + strings[i];
+            final = final + HOSTPATH_SEPAR_STRING + strings[i];
         }
     }
 
@@ -667,3 +669,26 @@ DWORD TranslatedDisk::getDword(BYTE *bfr)
     return val;
 }
 
+void TranslatedDisk::pathSeparatorAtariToHost(std::string &path)
+{
+    int len, i;
+    len = path.length();
+
+    for(i = 0; i<len; i++) {
+        if(path[i] == ATARIPATH_SEPAR_CHAR) {   // if atari separator
+            path[i] = HOSTPATH_SEPAR_CHAR;      // change to host separator
+        }
+    }
+}
+
+void TranslatedDisk::pathSeparatorHostToAtari(std::string &path)
+{
+    int len, i;
+    len = path.length();
+
+    for(i = 0; i<len; i++) {
+        if(path[i] == HOSTPATH_SEPAR_CHAR) {    // if host separator
+            path[i] = ATARIPATH_SEPAR_CHAR;      // change to atari separator
+        }
+    }
+}
