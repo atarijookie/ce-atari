@@ -1,3 +1,4 @@
+#include <string>
 #include <string.h>
 #include <stdio.h>
 
@@ -38,6 +39,7 @@ void TranslatedDisk::onDsetdrv(BYTE *cmd)
         dataTrans->padDataToMul16();                // and pad to 16 bytes for DMA chip
 
         dataTrans->setStatus(E_OK);                 // return OK
+        return;
     }
 
     dataTrans->setStatus(E_NOTHANDLED);             // in other cases - not handled
@@ -50,6 +52,7 @@ void TranslatedDisk::onDgetdrv(BYTE *cmd)
 
     if(conf[currentDriveIndex].enabled) {           // if we got this drive, return the current drive
         dataTrans->setStatus(currentDriveIndex);
+        return;
     }
 
     dataTrans->setStatus(E_NOTHANDLED);             // if we don't have this, not handled
@@ -236,7 +239,13 @@ void TranslatedDisk::appendFoundToFindStorage(WIN32_FIND_DATAA *found, BYTE find
     buf[8] = found->nFileSizeLow & 0xff;
 
     // Filename -- d_fname[14]
-    memcpy(&buf[9], fileName, 14);
+    memset(&buf[9], 0, 14);                     // first clear the mem
+    strncpy((char *) &buf[9], fileName, 14);    // then copy only valid part of the string, max 14 chars
+
+    // filename to upper case!
+    for(int i=0; i<14; i++) {
+        buf[9 + i] = toUpperCase(buf[9 + i]);
+    }
 
     findStorage.count++;
 }

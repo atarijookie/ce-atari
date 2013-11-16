@@ -1,3 +1,4 @@
+#include <string>
 #include <string.h>
 #include <stdio.h>
 #include <io.h>
@@ -6,7 +7,7 @@
 #include "translateddisk.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
-#include "settings.h"
+#include "../settings.h"
 
 extern "C" void outDebugString(const char *format, ...);
 
@@ -435,15 +436,20 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
         hostPath += "\\";
     }
 
-    if(atariPath[0] == '\\') {                                      // starts with \\ == starts from root
+    if(startsWith(atariPath, "\\")) {                               // starts with \\ == starts from root
         hostPath += atariPath.substr(1);                            // final path = hostPath + newPath
         return true;
     }
 
     // starts without backslash? relative path then
-    hostPath += conf[currentDriveIndex].currentAtariPath;
 
-    if(!endsWith(hostPath, "\\")) {                         // should add backslash at the end?
+    if(startsWith(conf[currentDriveIndex].currentAtariPath, "\\")) {        // add without starting backslash
+        hostPath += conf[currentDriveIndex].currentAtariPath.substr(1);
+    } else {
+        hostPath += conf[currentDriveIndex].currentAtariPath;
+    }
+
+    if(!endsWith(hostPath, "\\")) {                             // should add backslash at the end?
         hostPath += "\\";
     }
 
