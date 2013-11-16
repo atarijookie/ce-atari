@@ -393,7 +393,10 @@ bool TranslatedDisk::hostPathExists(std::string hostPath)
 
 bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath)
 {
+    hostPath = "";
+
     if(atariPath[1] == ':') {                               // if it's full path including drive letter
+
         int driveIndex = 0;
         char newDrive = atariPath[0];
 
@@ -414,27 +417,35 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 
         std::string atariPathWithoutDrive = atariPath.substr(2);    // skip drive and semicolon (C:)
 
-        hostPath = conf[driveIndex].hostRootPath;
-
-        if(!endsWith(hostPath, "\\")) {                             // if the host path does not end wit \\, add it
-            hostPath += "\\";
-        }
-
         if(startsWith(atariPathWithoutDrive, "\\")) {               // if the atari path starts with \\, remove it
             atariPathWithoutDrive = atariPathWithoutDrive.substr(1);
         }
 
         hostPath += atariPathWithoutDrive;                          // final path = hostPath + newPath
+
+        removeDoubleDots(hostPath);                                 // search for '..' and simplify the path
+
+        if(startsWith(hostPath, "\\")) {                            // if host path starts with a backslash, remove it
+            hostPath = hostPath.substr(1);
+        }
+
+        std::string root = conf[driveIndex].hostRootPath;
+
+        if(!endsWith(root, "\\")) {                                 // if the host path does not end wit \\, add it
+            root += "\\";
+        }
+
+        hostPath = root + hostPath;
+
         return true;
 
     }
 
-    // need to handle with \\ at the begining, without \\ at the begining, with .. at the begining
-    hostPath = conf[currentDriveIndex].hostRootPath;
-
-    if(!endsWith(hostPath, "\\")) {                                 // should add backslash at the end?
-        hostPath += "\\";
+    if(!conf[currentDriveIndex].enabled) {              // we're trying this on disabled drive?
+        return false;
     }
+
+    // need to handle with \\ at the begining, without \\ at the begining, with .. at the begining
 
     if(startsWith(atariPath, "\\")) {                               // starts with \\ == starts from root
         hostPath += atariPath.substr(1);                            // final path = hostPath + newPath
@@ -453,8 +464,82 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
         hostPath += "\\";
     }
 
-    hostPath += atariPath;                                  // final path = hostPath + currentPath + newPath
+    hostPath += atariPath;                                      // final path = hostPath + currentPath + newPath
+
+    removeDoubleDots(hostPath);                                 // search for '..' and simplify the path
+
+    if(startsWith(hostPath, "\\")) {                            // if host path starts with a backslash, remove it
+        hostPath = hostPath.substr(1);
+    }
+
+    std::string root = conf[currentDriveIndex].hostRootPath;
+
+    if(!endsWith(root, "\\")) {                                 // if the host path does not end wit \\, add it
+        root += "\\";
+    }
+
+    hostPath = root + hostPath;
+
+//    outDebugString("host path: %s", (char *) hostPath.c_str());
+
     return true;
+}
+
+void TranslatedDisk::removeDoubleDots(std::string &path)
+{
+    #define MAX_DIR_NESTING     64
+
+//    outDebugString("removeDoubleDots before: %s", (char *) path.c_str());
+
+    std::string strings[MAX_DIR_NESTING];
+    int found = 0, start = 0, pos;
+
+    // first split the string by separator
+    while(1) {
+        pos = path.find('\\', start);
+
+        if(pos == -1) {                             // not found?
+            strings[found] = path.substr(start);    // copy in the rest
+            found++;
+            break;
+        }
+
+        strings[found] = path.substr(start, (pos - start));
+        found++;
+
+        start = pos + 1;
+
+        if(found >= MAX_DIR_NESTING) {              // sanitize possible overflow
+            outDebugString("removeDoubleDots has reached maximum dir nesting level, not removing double dost!");
+            break;
+        }
+    }
+
+    // now remove the double dots
+    for(int i=0; i<found; i++) {            // go forward to find double dot
+        if(strings[i] == "..") {            // double dot found?
+            strings[i] = "";                // remove it
+
+            for(int j=(i-1); j>=0; j--) {       // now go backward to find something what is not empty
+                if(strings[j].length() > 0) {   // found something non-empty? remove it
+                   strings[j] = "";
+                   break;
+                }
+            }
+        }
+    }
+
+    // and finally - put the string back together
+    std::string final = "";
+
+    for(int i=0; i<found; i++) {
+        if(strings[i].length() != 0) {      // not empty string?
+            final = final + "\\" + strings[i];
+        }
+    }
+
+//    outDebugString("removeDoubleDots after: %s", (char *) final.c_str());
+    path = final;
 }
 
 bool TranslatedDisk::newPathRequiresCurrentDriveChange(std::string atariPath, int &newDriveIndex)

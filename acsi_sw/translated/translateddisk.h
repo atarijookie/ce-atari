@@ -1,8 +1,10 @@
 #ifndef TRANSLATEDDISK_H
 #define TRANSLATEDDISK_H
 
+#include <windows.h>
+
 #include "../acsidatatrans.h"
-#include "datatypes.h"
+#include "../datatypes.h"
 
 #define BUFFER_SIZE             (1024*1024)
 #define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
@@ -78,6 +80,7 @@ private:
     WORD getDrivesBitmap(void);
     bool hostPathExists(std::string hostPath);
     bool createHostPath(std::string atariPath, std::string &hostPath);
+    void removeDoubleDots(std::string &path);
     void createAtariPathFromHostPath(std::string hostPath, std::string &atariPath);
     bool newPathRequiresCurrentDriveChange(std::string atariPath, int &newDriveIndex);
     bool isLetter(char a);
