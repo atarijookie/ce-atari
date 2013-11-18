@@ -37,10 +37,10 @@
 #define IO_DINT     0x20        /* DMA interrupt (FDC or HDC) */
 
 #define dmaAddrSectCnt	((WORD *) 0xFF8604)
-#define dmaAddrData		dmaAddrSectCnt
+#define dmaAddrData		((WORD *) 0xFF8604)
 
 #define dmaAddrMode		((WORD *) 0xFF8606)
-#define dmaAddrStatus	dmaAddrMode
+#define dmaAddrStatus	((WORD *) 0xFF8606)
 
 #define dmaAddrHi		((BYTE *) 0xFF8609)
 #define dmaAddrMid		((BYTE *) 0xFF860B)
@@ -64,15 +64,15 @@
 #define SC_NOT_0     0x0002     /* Sector count register not zero */
 #define DATA_REQ     0x0004     /* DRQ line state */
 
-#define FLOCK      (*(WORD *) 0x043E) /* Floppy lock variable */ 
-#define HZ_200     (*(DWORD *) 0x04BA) /* 200 Hz system clock */ 
+#define FLOCK      ((WORD  *) 0x043E) /* Floppy lock variable */ 
+#define HZ_200     ((DWORD *) 0x04BA) /* 200 Hz system clock */ 
 /*---------------------------------------*/
-long wait_dma_cmpl(DWORD t_ticks);
-long fdone(void);
-long qdone(void);
+BYTE wait_dma_cmpl(DWORD t_ticks);
+BYTE fdone(void);
+BYTE qdone(void);
 void setdma(DWORD addr);
-long hdone(void);
-long endcmd(WORD mode);
+BYTE hdone(void);
+BYTE endcmd(WORD mode);
 
 BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 /*---------------------------------------*/

@@ -13,7 +13,7 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 
 	OldSP = (void *) Super((void *)0);  	/* supervisor mode */ 
 
-	FLOCK = -1;                            	/* disable FDC operations */
+	*FLOCK = -1;                            	/* disable FDC operations */
 	setdma((DWORD) buffer);                 /* setup DMA transfer address */
 
 	/*********************************/
@@ -69,20 +69,30 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 	return status;
 }
 /****************************************************************************/
-long endcmd(WORD mode)
+BYTE endcmd(WORD mode)
 {
- if (fdone() != OK)                   /* wait for operation done ack */
-    return(ERRORL);
+	WORD val;
 
- *dmaAddrMode = mode;                    /* write mode word to mode register */
- return((long)((*dmaAddrData) & 0x00FF));  /* return completion byte */
+	if (fdone() != OK)                  /* wait for operation done ack */
+		return ERRORL;
+
+	*dmaAddrMode = mode;                /* write mode word to mode register */
+
+	val = *dmaAddrData;
+	val = val & 0x00ff;
+
+	return val;							/* return completion byte */
 }
 /****************************************************************************/
-long hdone(void)
+BYTE hdone(void)
 {
- *dmaAddrMode = NO_DMA;        /* restore DMA mode register */
- FLOCK = 0;                 /* FDC operations may get going again */
- return((long)*dmaAddrStatus); /* read and return DMA status register */
+	WORD val;
+
+	*dmaAddrMode = NO_DMA;        	/* restore DMA mode register */
+	*FLOCK = 0;                 		/* FDC operations may get going again */
+	
+	val = *dmaAddrStatus;
+	return val;						/* read and return DMA status register */
 }
 /****************************************************************************/
 void setdma(DWORD addr)
@@ -92,32 +102,32 @@ void setdma(DWORD addr)
 	*dmaAddrHi	= (BYTE)(addr >> 16);
 }
 /****************************************************************************/
-long qdone(void)
+BYTE qdone(void)
 {
-	return(wait_dma_cmpl(STIMEOUT));
+	return wait_dma_cmpl(STIMEOUT);
 }
 /****************************************************************************/
-long fdone(void)
+BYTE fdone(void)
 {
-	return(wait_dma_cmpl(LTIMEOUT));
+	return wait_dma_cmpl(LTIMEOUT);
 }
 /****************************************************************************/
-long wait_dma_cmpl(DWORD t_ticks)
+BYTE wait_dma_cmpl(DWORD t_ticks)
 {
 	DWORD to_count;
 	BYTE *mfpGpip = (BYTE *) 0xFFFA01;
 	BYTE gpip;
  
-	to_count = t_ticks + HZ_200;   /* calc value timer must get to */
+	to_count = t_ticks + (*HZ_200);   	/* calc value timer must get to */
 
 	do {
 		gpip = *mfpGpip;
 		
 		if ((gpip & IO_DINT) == 0) {	/* Poll DMA IRQ interrupt */
-			return(OK);                 /* got interrupt, then OK */
+			return OK;                 	/* got interrupt, then OK */
 		}
 
-	}  while (HZ_200 <= to_count);      /* check timer */
+	}  while ((*HZ_200) <= to_count);   /* check timer */
 
 	return(ERROR);                      /* no interrupt, and timer expired, */
 }
