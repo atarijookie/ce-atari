@@ -24,39 +24,29 @@
 #define PHYSOP_FLAG   0x08      /* flag for physical/logical read/write */
 /* ------------------------------------------ */
 
-/* ASCI Commands */
-/* typedef struct mfp_chip */
-struct mfp_chip 
-{
-	char reg[48]; /* MFP registers are on odd bytes */
-};
-
-/* typedef struct dma_chip */
-struct dma_chip 
-{
-	short reserved[2]; /* reserved registers */
-	short DATA;        /* controller & sector count reg */
-	short MODE;        /* mode & status register */
-	char  ADDR[6];     /* base addres. High/Mid/Low */
-};
-
-#define GPIP    	reg[1]          /* general purpose I/O (interrupt port) */
-#define IO_DINT     0x20        /* DMA interrupt (FDC or HDC) */
+#include <stdint.h>
 
 #define BYTE  	unsigned char
-#define WORD  	unsigned int
-#define DWORD 	unsigned long int
+//#define WORD  	unsigned int
+//#define DWORD 	unsigned long int
+#define WORD  	uint16_t
+#define DWORD 	uint32_t
+
+
+/* ASCI Commands */
+#define IO_DINT     0x20        /* DMA interrupt (FDC or HDC) */
+
+#define dmaAddrSectCnt	((WORD *) 0xFF8604)
+#define dmaAddrData		dmaAddrSectCnt
+
+#define dmaAddrMode		((WORD *) 0xFF8606)
+#define dmaAddrStatus	dmaAddrMode
+
+#define dmaAddrHi		((BYTE *) 0xFF8609)
+#define dmaAddrMid		((BYTE *) 0xFF860B)
+#define dmaAddrLo		((BYTE *) 0xFF860D)
 
 /*---------------------------------------*/
-
-/* pseudo names */
-#define SECT_CNT     DATA
-#define STATUS       MODE
-
-/* offset into addr, odd bytes used only */
-#define HIGH         1
-#define MID          3
-#define LOW          5
 
 /* Mode Register bits */
 #define NOT_USED     0x0001     /* not used bit */
@@ -74,15 +64,15 @@ struct dma_chip
 #define SC_NOT_0     0x0002     /* Sector count register not zero */
 #define DATA_REQ     0x0004     /* DRQ line state */
 
-#define FLOCK      (*(short *) 0x043E) /* Floppy lock variable */ 
-#define HZ_200     (*(unsigned long *) 0x04BA) /* 200 Hz system clock */ 
+#define FLOCK      (*(WORD *) 0x043E) /* Floppy lock variable */ 
+#define HZ_200     (*(DWORD *) 0x04BA) /* 200 Hz system clock */ 
 /*---------------------------------------*/
-long wait_dma_cmpl(unsigned long t_ticks);
+long wait_dma_cmpl(DWORD t_ticks);
 long fdone(void);
 long qdone(void);
-void setdma(unsigned long int addr);
+void setdma(DWORD addr);
 long hdone(void);
-long endcmd(short mode);
+long endcmd(WORD mode);
 
 BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 /*---------------------------------------*/
