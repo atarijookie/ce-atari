@@ -210,12 +210,12 @@ int main( int argc, char* argv[] )
 		return 0;
 	}
 	
-	ce_initialize();							/* tell the device to initialize */
+	/* tell the device to initialize */
+	ce_initialize();							
 	
 	/* ----------------------------------------- */
 	/* fill the table with pointers to functions */
 	gemdos_table[0x0e] = custom_dsetdrv;
-	gemdos_table[0x1a] = custom_fsetdta;
 	gemdos_table[0x19] = custom_dgetdrv;
 	gemdos_table[0x1a] = custom_fsetdta;
 	gemdos_table[0x2f] = custom_fgetdta;
@@ -247,9 +247,7 @@ int main( int argc, char* argv[] )
 	/* and now place the new gemdos handler */
 	old_gemdos_handler = Setexc( VEC_GEMDOS, gemdos_handler );
 		
-	
-
-		
+	/* wait for a while so the user could read the message and quit */
 	sleep(1);
 	
 	/* now terminate and stay resident */
