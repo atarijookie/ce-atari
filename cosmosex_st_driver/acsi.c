@@ -1,5 +1,7 @@
 /*--------------------------------------------------*/
-#include <tos.h>
+/* #include <tos.h> */
+#include <mint/sysbind.h>
+
 #include "acsi.h"
 
 #define MFP_ADDR 	0xFFFA00L      /* MFP device addres */
@@ -13,6 +15,9 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 {
 	DWORD status;
 	WORD i, wr1, wr2;
+	void *OldSP;
+
+	OldSP = (void *) Super((void *)0);  	/* supervisor mode */ 
 
 	FLOCK = -1;                            	/* disable FDC operations */
 	setdma((DWORD) buffer);                 /* setup DMA transfer address */
@@ -25,6 +30,8 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 
 	if (qdone() != OK) {					/* wait for ack */
 		hdone();                          	/* restore DMA device to normal */
+		
+		Super((void *)OldSP);  			    /* user mode */
 		return ERROR;
 	}
 
@@ -36,6 +43,8 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 	
 		if (qdone() != OK) {				/* wait for ack */
 			hdone();                        /* restore DMA device to normal */
+			
+			Super((void *)OldSP);  			    /* user mode */
 			return ERROR;
 		}
 	}
@@ -61,6 +70,8 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     status = endcmd(wr2 | NO_DMA | HDC | A0);   /* wait for DMA completion */
 
 	hdone();                                	/* restore DMA device to normal */
+	
+	Super((void *)OldSP);  			    		/* user mode */
 	return status;
 }
 /****************************************************************************/

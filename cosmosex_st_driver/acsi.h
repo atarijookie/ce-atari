@@ -25,12 +25,14 @@
 /* ------------------------------------------ */
 
 /* ASCI Commands */
-typedef struct mfp_chip 
+/* typedef struct mfp_chip */
+struct mfp_chip 
 {
 	char reg[48]; /* MFP registers are on odd bytes */
 };
 
-typedef struct dma_chip 
+/* typedef struct dma_chip */
+struct dma_chip 
 {
 	short reserved[2]; /* reserved registers */
 	short DATA;        /* controller & sector count reg */

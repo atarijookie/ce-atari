@@ -12,7 +12,7 @@
 | ------------------------------------------------------
 
 	.ascii	"XBRA"
-	.ascii	"MKRO"
+	.ascii	"CEDD"
 _old_gemdos_handler:
 	.long	0
 

@@ -6,7 +6,7 @@ STRIP	= m68k-atari-mint-strip
 CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 
 HDR	= xbra.h
-CSRC	= gemdos.c xbra.c
+CSRC	= gemdos.c xbra.c acsi.c
 SSRC	= gemdos_asm.S
 
 ifeq ($(SLIM),yes)
