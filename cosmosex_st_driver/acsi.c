@@ -113,7 +113,6 @@ BYTE fdone(void)
 BYTE wait_dma_cmpl(DWORD t_ticks)
 {
 	DWORD now, until;
-	volatile BYTE *mfpGpip = (volatile BYTE *) 0xFFFA01;
 	BYTE gpip;
  
 	now = *HZ_200;

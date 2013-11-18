@@ -1,39 +1,30 @@
+/* ------------------------------------------ */
+
 #define FALSE      0
 #define TRUE       1
 
 #define OK         0L           /* OK status */
 #define ERROR     -1L           /* ERROR status (timeout) */
 #define ERRORL    -2L           /* ERROR status (long timeout) */
-#define EWRITF    -10           /* GEMDOS write error code */
-#define EREADF    -11           /* GEMDOS read error code */
-#define CRITRETRY 0x00010000L   /* RETRY return code */
 
-#define NRETRIES   3            /* number of times to retry -1 */
-#define MAX_UNITS  16           /* Max number of drives attached */
 #define MAXSECTORS 254          /* Max # sectors for a DMA */
-#define MAXRETRIES 1
 
 /* Timing constants */
 #define LTIMEOUT   600L         /* long-timeout 3 sec */
 #define STIMEOUT    20L         /* short-timeout 100 msec */
 
-/* RWABS flags */
-#define RW_FLAG       0x01      /* flag for read/write */
-#define MEDIACH_FLAG  0x02      /* flag for read/write with mediachange */
-#define RETRY_FLAG    0x04      /* flag for read/write with retries */
-#define PHYSOP_FLAG   0x08      /* flag for physical/logical read/write */
 /* ------------------------------------------ */
 
 #include <stdint.h>
 
 #define BYTE  	unsigned char
-//#define WORD  	unsigned int
-//#define DWORD 	unsigned long int
 #define WORD  	uint16_t
 #define DWORD 	uint32_t
 
+/* mfp chip register */ 
+#define mfpGpip			((volatile BYTE *) 0xFFFA01)
 
-/* ASCI Commands */
+/* DMA chip registers and flag */
 #define IO_DINT     0x20        /* DMA interrupt (FDC or HDC) */
 
 #define dmaAddrSectCnt	((volatile WORD *) 0xFF8604)
