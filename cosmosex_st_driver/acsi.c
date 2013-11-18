@@ -24,11 +24,10 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 
 	if (qdone() != OK) {					/* wait for ack */
 		hdone();                          	/* restore DMA device to normal */
-		
+
 		Super((void *)OldSP);  			    /* user mode */
 		return ERROR;
 	}
-
 	/*********************************/
 	/* transfer middle cmd bytes */
 	for(i=1; i<(cmdLength-1); i++) {
@@ -62,9 +61,8 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     *dmaAddrMode = wr2;                         	/* start DMA transfer */
 
     status = endcmd(wr2 | NO_DMA | HDC | A0);   /* wait for DMA completion */
-
 	hdone();                                	/* restore DMA device to normal */
-	
+
 	Super((void *)OldSP);  			    		/* user mode */
 	return status;
 }
@@ -114,22 +112,28 @@ BYTE fdone(void)
 /****************************************************************************/
 BYTE wait_dma_cmpl(DWORD t_ticks)
 {
-	DWORD to_count;
-	BYTE *mfpGpip = (BYTE *) 0xFFFA01;
+	DWORD now, until;
+	volatile BYTE *mfpGpip = (volatile BYTE *) 0xFFFA01;
 	BYTE gpip;
  
-	to_count = t_ticks + (*HZ_200);   	/* calc value timer must get to */
+	now = *HZ_200;
+	until = t_ticks + now;   			/* calc value timer must get to */
 
-	do {
+	while(1) {
 		gpip = *mfpGpip;
 		
 		if ((gpip & IO_DINT) == 0) {	/* Poll DMA IRQ interrupt */
 			return OK;                 	/* got interrupt, then OK */
 		}
 
-	}  while ((*HZ_200) <= to_count);   /* check timer */
+		now = *HZ_200;
+		
+		if(now >= until) {
+			break;
+		}
+	}
 
-	return(ERROR);                      /* no interrupt, and timer expired, */
+	return ERROR;                      /* no interrupt, and timer expired, */
 }
 /****************************************************************************/
 
