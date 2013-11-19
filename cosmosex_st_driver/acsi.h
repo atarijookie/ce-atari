@@ -1,17 +1,16 @@
 /* ------------------------------------------ */
 
-#define FALSE      0
-#define TRUE       1
+#define FALSE		0
+#define TRUE		1
 
-#define OK         0L           /* OK status */
-#define ERROR     -1L           /* ERROR status (timeout) */
-#define ERRORL    -2L           /* ERROR status (long timeout) */
+#define OK			0           /* OK status */
+#define ERROR		0xff        /* ERROR status (timeout) */
 
-#define MAXSECTORS 254          /* Max # sectors for a DMA */
+#define MAXSECTORS	254          /* Max # sectors for a DMA */
 
 /* Timing constants */
-#define LTIMEOUT   600L         /* long-timeout 3 sec */
-#define STIMEOUT    20L         /* short-timeout 100 msec */
+#define LTIMEOUT	600L         /* long-timeout 3 sec */
+#define STIMEOUT	20L         /* short-timeout 100 msec */
 
 /* ------------------------------------------ */
 

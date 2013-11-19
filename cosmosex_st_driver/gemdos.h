@@ -42,6 +42,9 @@
 
 //////////////////////////////////////
 
+#define E_NOTHANDLED    	0x7f        // return this if the host part didn't handle the command and we should use the original one
+
+
 // file attributes
 /*
 #define FA_READONLY     (1 << 0)

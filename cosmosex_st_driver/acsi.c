@@ -1,18 +1,20 @@
 /*--------------------------------------------------*/
-/* #include <tos.h> */
 #include <mint/sysbind.h>
 
 #include "acsi.h"
 
+extern BYTE switchToSuper;
 /* -------------------------------------- */
 BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
 	DWORD status;
 	WORD i, wr1, wr2;
-	void *OldSP;
+	DWORD savessp = 0;
 
-	OldSP = (void *) Super((void *)0);  	/* supervisor mode */ 
-
+	if(switchToSuper) {
+		savessp = Super( SUP_SET );
+	}
+	
 	*FLOCK = -1;                            	/* disable FDC operations */
 	setdma((DWORD) buffer);                 /* setup DMA transfer address */
 
@@ -25,7 +27,10 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 	if (qdone() != OK) {					/* wait for ack */
 		hdone();                          	/* restore DMA device to normal */
 
-		Super((void *)OldSP);  			    /* user mode */
+		if(switchToSuper) {
+			Super( savessp );
+		}
+		
 		return ERROR;
 	}
 	/*********************************/
@@ -37,11 +42,14 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 		if (qdone() != OK) {				/* wait for ack */
 			hdone();                        /* restore DMA device to normal */
 			
-			Super((void *)OldSP);  			    /* user mode */
+			if(switchToSuper) {
+				Super( savessp );
+			}
+			
 			return ERROR;
 		}
 	}
-
+	
 	/* wr1 and wr2 are defined so we could toggle R/W bit and then setup Read / Write operation */ 
 	if(ReadNotWrite==1) {						
 		wr1 = DMA_WR;
@@ -50,7 +58,7 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 		wr1 = 0;
 		wr2 = DMA_WR;
 	}
-  
+
     *dmaAddrMode = wr1 | NO_DMA | SC_REG;  		/* clear FIFO = toggle R/W bit */
     *dmaAddrMode = wr2 | NO_DMA | SC_REG;          /* and select sector count reg */ 
 
@@ -63,7 +71,10 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     status = endcmd(wr2 | NO_DMA | HDC | A0);   /* wait for DMA completion */
 	hdone();                                	/* restore DMA device to normal */
 
-	Super((void *)OldSP);  			    		/* user mode */
+	if(switchToSuper) {
+		Super( savessp );
+	}
+	
 	return status;
 }
 /****************************************************************************/
@@ -72,7 +83,7 @@ BYTE endcmd(WORD mode)
 	WORD val;
 
 	if (fdone() != OK)                  /* wait for operation done ack */
-		return ERRORL;
+		return ERROR;
 
 	*dmaAddrMode = mode;                /* write mode word to mode register */
 
