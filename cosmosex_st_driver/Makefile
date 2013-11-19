@@ -1,12 +1,12 @@
-TARGET	= gemdos.prg
+TARGET	= cedd.prg
 SLIM	= no
 
-CC	= m68k-atari-mint-gcc
+CC		= m68k-atari-mint-gcc
 STRIP	= m68k-atari-mint-strip
 CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS	= -Wl,--traditional-format
 
-HDR	= xbra.h
+HDR		= xbra.h acsi.h gemdos.h translated.h
 CSRC	= gemdos.c xbra.c acsi.c
 SSRC	= gemdos_asm.S
 

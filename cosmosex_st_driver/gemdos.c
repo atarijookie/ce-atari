@@ -391,7 +391,7 @@ int main( int argc, char* argv[] )
 
 	/* write some header out */
 	(void) Clear_home();
-	(void) Cconws("CosmosEx disk driver, by Jookie 2013\r\n");
+	(void) Cconws("\33p[ CosmosEx disk driver ]\r\n[    by Jookie 2013    ]\33q\r\n\r\n");
 
 	/* create buffer pointer to even address */
 	pDmaBuffer = &dmaBuffer[2];
@@ -444,15 +444,15 @@ int main( int argc, char* argv[] )
 
 	/* and now place the new gemdos handler */
 	old_gemdos_handler = Setexc( VEC_GEMDOS, gemdos_handler );
-		
+
 	switchToSuper = FALSE;
-		
+
 	/* wait for a while so the user could read the message and quit */
 	sleep(1);
-	
+
 	/* now terminate and stay resident */
 	Ptermres( 0x100 + _base->p_tlen + _base->p_dlen + _base->p_blen, 0 );
-	
+
 	return 0;		/* make compiler happy, we wont return */
 }
 
