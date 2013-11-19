@@ -56,6 +56,9 @@
 
 #define FLOCK      ((volatile WORD  *) 0x043E) /* Floppy lock variable */ 
 #define HZ_200     ((volatile DWORD *) 0x04BA) /* 200 Hz system clock */ 
+
+#define ACSI_READ	1
+#define ACSI_WRITE	0
 /*---------------------------------------*/
 BYTE wait_dma_cmpl(DWORD t_ticks);
 BYTE fdone(void);

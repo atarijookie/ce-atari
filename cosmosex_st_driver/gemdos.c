@@ -25,7 +25,7 @@ typedef void  (*TrapHandlerPointer)( void );
 extern void gemdos_handler( void );
 extern TrapHandlerPointer old_gemdos_handler;
 int32_t (*gemdos_table[256])( void* sp ) = { 0 };
-int16_t gemdos_on = 0;	/* 0: use new handlers, 1: use old handlers */
+int16_t useOldHandler = 0;									/* 0: use new handlers, 1: use old handlers */
 
 /* ------------------------------------------------------------------ */
 /* CosmosEx and Gemdos part - Jookie */
@@ -33,7 +33,8 @@ BYTE ce_findId(void);
 BYTE ce_identify(BYTE ACSI_id);
 void ce_initialize(void);
 
-BYTE dmaBuffer[514];
+#define DMA_BUFFER_SIZE		512
+BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
 BYTE *pDmaBuffer;
 
 BYTE deviceID;
@@ -44,27 +45,25 @@ BYTE tempDta[45];
 
 BYTE switchToSuper;
 
-#define CLEAR_HOME      "\33E"
-#define Clear_home()    Cconws(CLEAR_HOME)
+#define Clear_home()    Cconws("\33E")
 
-#define CALL_NOT_HANDLED	0
-#define CALL_HANDLED		1
 /* ------------------------------------------------------------------ */
 /* the custom GEMDOS handlers now follow */
 
 static int32_t custom_dgetdrv( void *sp )
 {
-	BYTE res;
-
-	return CALL_NOT_HANDLED;
+	DWORD res;
 
 	command[4] = GEMDOS_Dgetdrv;						/* store GEMDOS function number */
 	command[5] = 0;										
 	
-	res = acsi_cmd(1, command, 6, pDmaBuffer, 1);		/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);	/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {			/* not handled or error? */
-		return CALL_NOT_HANDLED;
+		useOldHandler = 1;									/* call the old handler */
+		res = Dgetdrv();
+		useOldHandler = 0;
+		return res;										/* return the value returned from old handler */
 	}
 
 	return res;											/* return the result */
@@ -72,25 +71,28 @@ static int32_t custom_dgetdrv( void *sp )
 
 static int32_t custom_dsetdrv( void *sp )
 {
-	BYTE res;
-
-	return CALL_NOT_HANDLED;
+	DWORD res;
 
 	/* get the drive # from stack */
-	WORD *pDrive = (WORD *) sp;
-	WORD drive = *pDrive;
+	WORD drive = (WORD) *((WORD *) sp);
 	
 	if(drive > 15) {									/* probably invalid param */
-		return CALL_NOT_HANDLED;
+		useOldHandler = 1;									/* call the old handler */
+		res = Dsetdrv(drive);
+		useOldHandler = 0;
+		return res;										/* return the value returned from old handler */
 	}
 
 	command[4] = GEMDOS_Dsetdrv;						/* store GEMDOS function number */
 	command[5] = (BYTE) drive;							/* store drive number */
 	
-	res = acsi_cmd(1, command, 6, pDmaBuffer, 1);		/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);		/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {			/* not handled or error? */
-		return CALL_NOT_HANDLED;
+		useOldHandler = 1;									/* call the old handler */
+		res = Dsetdrv(drive);
+		useOldHandler = 0;
+		return res;										/* return the value returned from old handler */
 	}
 	
 	// TODO: replace BIOS Drvmap too!
@@ -103,17 +105,21 @@ static int32_t custom_dsetdrv( void *sp )
 
 static int32_t custom_fsetdta( void *sp )
 {
-	pDta = (_DTA *) sp;									/* just store the new DTA pointer and don't do anything */
+	pDta = (_DTA *)	*((DWORD *) sp);					/* store the new DTA pointer */
+
+	useOldHandler = 1;										/* call the old handler */
+	Fsetdta(pDta);
+	useOldHandler = 0;
 
 	// TODO: on application start set the pointer to the default position (somewhere before the app args)
 	
-	return CALL_NOT_HANDLED;
+	return 0;
 }
 
 static int32_t custom_dfree( void *sp )
 {
+	DWORD res;
 	BYTE *params = (BYTE *) sp;
-	BYTE res;
 
 	BYTE *pDiskInfo	= (BYTE *)	*((DWORD *) params);
 	params += 4;
@@ -122,16 +128,13 @@ static int32_t custom_dfree( void *sp )
 	command[4] = GEMDOS_Dfree;							/* store GEMDOS function number */
 	command[5] = drive;									
 
-/*	
-	char bfr[256];
-	sprintf( bfr, "dfree: drive %c, ptr: %x\r\n",  drive + 'A', (DWORD) pDiskInfo);
-	(void)Cconws(bfr);
-*/
-
-	res = acsi_cmd(1, command, 6, pDmaBuffer, 1);		/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);		/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {			/* not handled or error? */
-		return CALL_NOT_HANDLED;
+		useOldHandler = 1;									/* call the old handler */
+		res = Dfree(pDiskInfo, drive);
+		useOldHandler = 0;
+		return res;										/* return the value returned from old handler */
 	}
 
 	memcpy(pDiskInfo, pDmaBuffer, 16);					/* copy in the results */
@@ -140,14 +143,48 @@ static int32_t custom_dfree( void *sp )
 
 static int32_t custom_dcreate( void *sp )
 {
-	/* not handled */
-	return 0;
+	DWORD res;
+	BYTE *pPath	= (BYTE *) *((DWORD *) sp);
+	
+	command[4] = GEMDOS_Dcreate;						/* store GEMDOS function number */
+	command[5] = 0;									
+	
+	memset(pDmaBuffer, 0, 512);
+	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		/* copy in the path */
+	
+	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);		/* send command to host over ACSI */
+
+	if(res == E_NOTHANDLED || res == ERROR) {			/* not handled or error? */
+		useOldHandler = 1;									/* call the old handler */
+		res = Dcreate(pPath);
+		useOldHandler = 0;
+		return res;										/* return the value returned from old handler */
+	}
+
+	return res;
 }
 
 static int32_t custom_ddelete( void *sp )
 {
-	/* not handled */
-	return 0;
+	DWORD res;
+	BYTE *pPath	= (BYTE *) *((DWORD *) sp);
+	
+	command[4] = GEMDOS_Ddelete;						/* store GEMDOS function number */
+	command[5] = 0;									
+	
+	memset(pDmaBuffer, 0, 512);
+	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		/* copy in the path */
+	
+	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);		/* send command to host over ACSI */
+
+	if(res == E_NOTHANDLED || res == ERROR) {			/* not handled or error? */
+		useOldHandler = 1;									/* call the old handler */
+		res = Ddelete(pPath);
+		useOldHandler = 0;
+		return res;										/* return the value returned from old handler */
+	}
+
+	return res;
 }
 
 static int32_t custom_dsetpath( void *sp )
@@ -188,22 +225,25 @@ static int32_t custom_fwrite( void *sp )
 
 static int32_t custom_fdelete( void *sp )
 {
-	static char buff[256];
-	/* pretend the params are array of strings */
-	char** args = (char**)sp;
+	DWORD res;
+	BYTE *pPath	= (BYTE *) *((DWORD *) sp);
 	
-	gemdos_on = 1;
-	Fdelete( args[0] );
-	gemdos_on = 0;
+	command[4] = GEMDOS_Fdelete;						/* store GEMDOS function number */
+	command[5] = 0;									
+	
+	memset(pDmaBuffer, 0, 512);
+	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		/* copy in the path */
+	
+	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);		/* send command to host over ACSI */
 
-#ifndef SLIM
-	/* be nice on supervisor stack */
-	sprintf( buff, "arg: %s\n", args[0] );
-	(void)Cconws(buff);
-#endif
+	if(res == E_NOTHANDLED || res == ERROR) {			/* not handled or error? */
+		useOldHandler = 1;									/* call the old handler */
+		res = Fdelete(pPath);
+		useOldHandler = 0;
+		return res;										/* return the value returned from old handler */
+	}
 
-	/* not handled */
-	return 0;
+	return res;
 }
 
 static int32_t custom_fseek( void *sp )
@@ -361,7 +401,7 @@ BYTE ce_identify(BYTE ACSI_id)
   
 	memset(pDmaBuffer, 0, 512);              		/* clear the buffer */
 
-	res = acsi_cmd(1, command, 6, pDmaBuffer, 1);	/* issue the command and check the result */
+	res = acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);	/* issue the command and check the result */
 
 	if(res != OK) {                        			/* if failed, return FALSE */
 		return 0;
@@ -380,6 +420,6 @@ void ce_initialize(void)
 	command[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
 	command[4] = GD_CUSTOM_initialize;
   
-	acsi_cmd(1, command, 6, pDmaBuffer, 1);			/* issue the command and check the result */
+	acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);			/* issue the command and check the result */
 }
 

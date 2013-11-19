@@ -5,7 +5,7 @@
 	.globl	_gemdos_handler
 	.globl	_gemdos_table
 	.globl	_old_gemdos_handler
-	.globl	_gemdos_on
+	.globl	_useOldHandler
 
 | ------------------------------------------------------
 	.text
@@ -26,7 +26,7 @@ _old_gemdos_handler:
 | stack frame (word)	<--- (sp)
 
 _gemdos_handler:
-	tst.w	_gemdos_on
+	tst.w	_useOldHandler
 	bne.b	gemdos_not_handled
 	
 	lea	2+4(sp),a0				| a0 points to the function number now
