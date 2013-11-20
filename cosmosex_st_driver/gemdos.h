@@ -36,9 +36,14 @@
 #define GEMDOS_Tgettime     0x2C
 #define GEMDOS_Tsettime     0x2D
 
+// custom functions - not GEMDOS functions
 #define GD_CUSTOM_initialize    0x60
 #define GD_CUSTOM_getConfig     0x61
 #define GD_CUSTOM_ftell         0x62
+
+// BIOS functions we need to support
+#define BIOS_Drvmap				0x70
+#define BIOS_Mediach			0x71
 
 //////////////////////////////////////
 
@@ -80,5 +85,10 @@ typedef struct
 #define GSH_MIDIIN  -4
 #define GSH_MIDIOUT -5
 
+void initFunctionTable(void);
+
+WORD getDriveFromPath(char *path);
+BYTE isOurDrive(WORD drive, BYTE withCurrentDrive);
+void updateCeDrives(void);
 
 #endif // GEMDOS_H

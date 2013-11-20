@@ -1,0 +1,170 @@
+#include <mint/sysbind.h>
+#include <mint/osbind.h>
+#include <mint/basepage.h>
+#include <mint/ostruct.h>
+#include <unistd.h>
+
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "xbra.h"
+#include "acsi.h"
+#include "translated.h"
+#include "gemdos.h"
+#include "main.h"
+
+/* 
+ * CosmosEx GEMDOS driver by Jookie, 2013
+ * GEMDOS hooks part (assembler and C) by MiKRO (Miro Kropacek), 2013
+ */
+ 
+/* ------------------------------------------------------------------ */
+/* init and hooks part - MiKRO */
+typedef void  (*TrapHandlerPointer)( void );
+
+extern void gemdos_handler( void );
+extern TrapHandlerPointer old_gemdos_handler;
+int32_t (*gemdos_table[256])( void* sp ) = { 0 };
+int16_t useOldHandler = 0;									/* 0: use new handlers, 1: use old handlers */
+
+/* ------------------------------------------------------------------ */
+/* CosmosEx and Gemdos part - Jookie */
+BYTE ce_findId(void);
+BYTE ce_identify(BYTE ACSI_id);
+void ce_initialize(void);
+
+BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
+BYTE *pDmaBuffer;
+
+BYTE deviceID;
+BYTE command[6] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
+
+_DTA *pDta;
+BYTE tempDta[45];
+
+WORD ceDrives;
+BYTE currentDrive;
+DWORD lastCeDrivesUpdate;
+
+BYTE switchToSuper;
+
+/* ------------------------------------------------------------------ */
+int main( int argc, char* argv[] )
+{
+	BYTE found;
+
+	/* write some header out */
+	(void) Clear_home();
+	(void) Cconws("\33p[ CosmosEx disk driver ]\r\n[    by Jookie 2013    ]\33q\r\n\r\n");
+
+	/* create buffer pointer to even address */
+	pDmaBuffer = &dmaBuffer[2];
+	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
+
+	switchToSuper = TRUE;
+	
+	/* search for CosmosEx on ACSI bus */ 
+	found = ce_findId();
+
+	if(!found) {								/* not found? quit */
+		sleep(1);
+//		return 0;
+	}
+	
+	/* tell the device to initialize */
+	ce_initialize();							
+	
+	pDta				= (_DTA *) &tempDta[0];				/* use this buffer as temporary one for DTA - just in case */
+
+	currentDrive		= Dgetdrv();						/* get the current drive from system */
+	lastCeDrivesUpdate	= 0;
+	updateCeDrives();										/* update the ceDrives variable */
+	
+	initFunctionTable();
+
+	/* either remove the old one or do nothing, old memory isn't released */
+	if( unhook_xbra( VEC_GEMDOS, 'CEDD' ) == 0L ) {
+		(void)Cconws( "\r\nDriver installed.\r\n" );
+	} else {
+		(void)Cconws( "\r\nDriver reinstalled, some memory was lost.\r\n" );
+	}
+
+	/* and now place the new gemdos handler */
+	old_gemdos_handler = Setexc( VEC_GEMDOS, gemdos_handler );
+
+	switchToSuper = FALSE;
+
+	/* wait for a while so the user could read the message and quit */
+	sleep(1);
+
+	/* now terminate and stay resident */
+	Ptermres( 0x100 + _base->p_tlen + _base->p_dlen + _base->p_blen, 0 );
+
+	return 0;		/* make compiler happy, we wont return */
+}
+
+/* this function scans the ACSI bus for any active CosmosEx translated drive */
+BYTE ce_findId(void)
+{
+	char bfr[2], res, i;
+
+	bfr[1] = 0;
+	deviceID = 0;
+	
+	(void) Cconws("Looking for CosmosEx: ");
+
+	for(i=0; i<8; i++) {
+		bfr[0] = i + '0';
+		(void) Cconws(bfr);
+
+		res = ce_identify(i);      					/* try to read the IDENTITY string */
+		
+		if(res == 1) {                           	/* if found the CosmosEx */
+			deviceID = i;                     		/* store the ACSI ID of device */
+
+			(void) Cconws("\r\nCosmosEx found on ACSI ID: ");
+			bfr[0] = i + '0';
+			(void) Cconws(bfr);
+
+			return 1;
+		}
+	}
+
+	/* if not found */
+    (void) Cconws("\r\nCosmosEx not found on ACSI bus, not installing driver.");
+	return 0;
+}
+
+/* send an IDENTIFY command to specified ACSI ID and check if the result is as expected */
+BYTE ce_identify(BYTE ACSI_id)
+{
+	WORD res;
+  
+	command[0] = (ACSI_id << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	command[4] = TRAN_CMD_IDENTIFY;
+  
+	memset(pDmaBuffer, 0, 512);              		/* clear the buffer */
+
+	res = acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);	/* issue the command and check the result */
+
+	if(res != OK) {                        			/* if failed, return FALSE */
+		return 0;
+	}
+
+	if(strncmp((char *) pDmaBuffer, "CosmosEx translated disk", 24) != 0) {		/* the identity string doesn't match? */
+		return 0;
+	}
+	
+	return 1;                             			/* success */
+}
+
+/* send INITIALIZE command to the CosmosEx device telling it to do all the stuff it needs at start */
+void ce_initialize(void)
+{
+	command[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	command[4] = GD_CUSTOM_initialize;
+  
+	acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);			/* issue the command and check the result */
+}
+
