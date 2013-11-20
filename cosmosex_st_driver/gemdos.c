@@ -45,6 +45,18 @@ extern DWORD lastCeDrivesUpdate;
 
 extern BYTE switchToSuper;
 
+// The following macros are used to convert atari handle numbers which are WORDs
+// to CosmosEx ex handle numbers, which are only BYTEs; and back.
+// To mark the difference between normal Atari handle and handle which came 
+// from CosmosEx I've added some offset to CosmosEx handles.
+
+// CosmosEx file handle:              6 ...  46
+// Atari handle for regular files:    0 ...  90
+// Atari handle for CosmosEx files: 150 ... 200
+#define handleIsFromCE(X)		(X >= 150 && X <= 200)
+#define handleAtariToCE(X)		(X  - 150)
+#define handleCEtoAtari(X)		(X  + 150)
+
 /* ------------------------------------------------------------------ */
 /* the custom GEMDOS handlers now follow */
 
@@ -427,44 +439,127 @@ int32_t custom_fsnext( void *sp )
 
 int32_t custom_fcreate( void *sp )
 {
-	/* not handled */
-	return 0;
+	WORD handle = 0;
+	
+	
+	
+	handle = handleCEtoAtari(handle);
+	return handle;
 }
 
 int32_t custom_fopen( void *sp )
 {
-	/* not handled */
-	return 0;
+	WORD handle = 0;
+
+
+	
+	handle = handleCEtoAtari(handle);
+	return handle;
 }
 
 int32_t custom_fclose( void *sp )
 {
-	/* not handled */
-	return 0;
+	DWORD res = 0;
+	WORD handle = 0;
+
+	// insert code for func param retrieval
+	
+	if(!handleIsFromCE(handle)) {										/* not called with handle belonging to CosmosEx? */
+		useOldHandler = 1;												/* call the old handler */
+		// insert the code to call the original handler
+		useOldHandler = 0;
+		return res;
+	}
+	
+	handle = handleAtariToCE(handle);									/* convert high atari handle to little CE handle */
+	
+	// insert the code for CosmosEx communication
+	
+	return res;
 }
 
 int32_t custom_fread( void *sp )
 {
-	/* not handled */
-	return 0;
+	DWORD res = 0;
+	WORD handle = 0;
+
+	// insert code for func param retrieval
+	
+	if(!handleIsFromCE(handle)) {										/* not called with handle belonging to CosmosEx? */
+		useOldHandler = 1;												/* call the old handler */
+		// insert the code to call the original handler
+		useOldHandler = 0;
+		return res;
+	}
+	
+	handle = handleAtariToCE(handle);									/* convert high atari handle to little CE handle */
+	
+	// insert the code for CosmosEx communication
+	
+	return res;
 }
 
 int32_t custom_fwrite( void *sp )
 {
-	/* not handled */
-	return 0;
+	DWORD res = 0;
+	WORD handle = 0;
+
+	// insert code for func param retrieval
+	
+	if(!handleIsFromCE(handle)) {										/* not called with handle belonging to CosmosEx? */
+		useOldHandler = 1;												/* call the old handler */
+		// insert the code to call the original handler
+		useOldHandler = 0;
+		return res;
+	}
+	
+	handle = handleAtariToCE(handle);									/* convert high atari handle to little CE handle */
+	
+	// insert the code for CosmosEx communication
+	
+	return res;
 }
 
 int32_t custom_fseek( void *sp )
 {
-	/* not handled */
-	return 0;
+	DWORD res = 0;
+	WORD handle = 0;
+
+	// insert code for func param retrieval
+	
+	if(!handleIsFromCE(handle)) {										/* not called with handle belonging to CosmosEx? */
+		useOldHandler = 1;												/* call the old handler */
+		// insert the code to call the original handler
+		useOldHandler = 0;
+		return res;
+	}
+	
+	handle = handleAtariToCE(handle);									/* convert high atari handle to little CE handle */
+	
+	// insert the code for CosmosEx communication
+	
+	return res;
 }
 
 int32_t custom_fdatime( void *sp )
 {
-	/* not handled */
-	return 0;
+	DWORD res = 0;
+	WORD handle = 0;
+
+	// insert code for func param retrieval
+	
+	if(!handleIsFromCE(handle)) {										/* not called with handle belonging to CosmosEx? */
+		useOldHandler = 1;												/* call the old handler */
+		// insert the code to call the original handler
+		useOldHandler = 0;
+		return res;
+	}
+	
+	handle = handleAtariToCE(handle);									/* convert high atari handle to little CE handle */
+	
+	// insert the code for CosmosEx communication
+	
+	return res;
 }
 
 /* ------------------------------------------------------------------ */

@@ -48,7 +48,7 @@
 //////////////////////////////////////
 
 #define E_NOTHANDLED    	0x7f        // return this if the host part didn't handle the command and we should use the original one
-
+#define MAX_FILES       	40          // maximum open files count, 40 is the value from EmuTOS
 
 // file attributes
 /*
