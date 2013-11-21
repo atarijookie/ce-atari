@@ -652,7 +652,7 @@ int32_t custom_fseek( void *sp )
 	   This could be solved in one step if the fseek would be done using SCSI(12) command instead of SCSI(6) command. */
 	
 	command[4] = GD_CUSTOM_ftell;										/* store GEMDOS function number */
-	command[5] = 0;			
+	command[5] = ceHandle;			
 	
 	memset(pDmaBuffer, 0, 4);
 	
@@ -677,22 +677,57 @@ int32_t custom_fseek( void *sp )
 int32_t custom_fdatime( void *sp )
 {
 	DWORD res = 0;
-	WORD handle = 0;
+	BYTE *params = (BYTE *) sp;
 
-	// insert code for func param retrieval
+	/* get params */
+	BYTE *pDatetime		= (BYTE *)		*((DWORD *) params);
+	params += 4;
+	WORD atariHandle	= (WORD)		*((WORD *)  params);
+	params += 2;
+	WORD flag			= (WORD)		*((WORD *)  params);
 	
-	if(!handleIsFromCE(handle)) {										/* not called with handle belonging to CosmosEx? */
+	/* check if this handle should belong to cosmosEx */
+	if(!handleIsFromCE(atariHandle)) {									/* not called with handle belonging to CosmosEx? */
 		useOldHandler = 1;												/* call the old handler */
-		// insert the code to call the original handler
+		res = Fdatime(pDatetime, atariHandle, flag);
 		useOldHandler = 0;
 		return res;
 	}
 	
-	handle = handleAtariToCE(handle);									/* convert high atari handle to little CE handle */
+	WORD ceHandle = handleAtariToCE(atariHandle);						/* convert high atari handle to little CE handle */
 	
-	// insert the code for CosmosEx communication
+	/* set the params to buffer */
+	command[4] = GEMDOS_Fdatime;										/* store GEMDOS function number */
+	command[5] = (flag << 7) | (ceHandle & 0x7f);						/* flag on highest bit, the rest is handle */
 	
-	return res;
+	if(flag == 1) {														/* FD_SET     - set date time */
+		/* store the new date time to buffer */
+		pDmaBuffer[0] = (BYTE) *pDatetime;
+		pDatetime++;
+		pDmaBuffer[1] = (BYTE) *pDatetime;
+		pDatetime++;
+		pDmaBuffer[2] = (BYTE) *pDatetime;
+		pDatetime++;
+		pDmaBuffer[3] = (BYTE) *pDatetime;
+		pDatetime++;
+		
+		res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	} else {																/* FD_INQUIRE - get date time */
+		memset(pDmaBuffer, 0, 4);
+		res = acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	
+		memcpy(pDatetime, pDmaBuffer, 4);									/* copy in the results */
+	}
+	
+	if(res == E_OK) {														/* good? ok */
+		return E_OK;
+	}
+		
+	if(	res == E_NOTHANDLED || res == ERROR || res == EINTRN) {				/* not handled or error? */
+		return (0xffffff00 | EINTRN);										/* return internal error */
+	}
+
+	return EINTRN;															/* in other cases - Internal Error - this shouldn't happen */
 }
 
 /* ------------------------------------------------------------------ */
