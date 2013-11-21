@@ -12,6 +12,7 @@
 #include "acsi.h"
 #include "translated.h"
 #include "gemdos.h"
+#include "gemdos_errno.h"
 #include "main.h"
 
 /* 
@@ -56,6 +57,8 @@ extern BYTE switchToSuper;
 #define handleIsFromCE(X)		(X >= 150 && X <= 200)
 #define handleAtariToCE(X)		(X  - 150)
 #define handleCEtoAtari(X)		(X  + 150)
+
+// TODO: cosmosEx file handles don't need to start from 6, they will be translated anyway
 
 /* ------------------------------------------------------------------ */
 /* the custom GEMDOS handlers now follow */
@@ -440,40 +443,116 @@ int32_t custom_fsnext( void *sp )
 int32_t custom_fcreate( void *sp )
 {
 	WORD handle = 0;
+	BYTE *params = (BYTE *) sp;
+
+	/* get params */
+	char *fileName	= (char *)	*((DWORD *) params);
+	params += 4;
+	WORD attr		= (WORD)	*((WORD *)  params);
 	
+	WORD drive = getDriveFromPath((char *) fileName);
 	
+	if(!isOurDrive(drive, 0)) {											/* not our drive? */
+		useOldHandler = 1;												/* call the old handler */
+		handle = Fcreate(fileName, attr);
+		useOldHandler = 0;
+		return handle;													/* return the value returned from old handler */
+	}
 	
-	handle = handleCEtoAtari(handle);
+	/* set the params to buffer */
+	command[4] = GEMDOS_Fcreate;										/* store GEMDOS function number */
+	command[5] = 0;			
+	
+	pDmaBuffer[0] = (BYTE) attr;										/* store attributes */
+	strncpy(((char *) pDmaBuffer) + 1, fileName, DMA_BUFFER_SIZE - 1);	/* copy in the file name */
+	
+	handle = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);			/* send command to host over ACSI */
+
+	if(handle == E_NOTHANDLED || handle == ERROR) {						/* not handled or error? */
+		useOldHandler = 1;												/* call the old handler */
+		handle = Fcreate(fileName, attr);
+		useOldHandler = 0;
+		return handle;													/* return the value returned from old handler */
+	}
+	
+	if(handle == ENHNDL || handle == EACCDN || handle == EINTRN) {		/* if some other error, just return it */
+		return (0xffffff00 | handle);									/* but append lots of FFs to make negative integer out of it */
+	}
+	
+	handle = handleCEtoAtari(handle);									/* convert the CE handle (0 - 46) to Atari handle (150 - 200) */
 	return handle;
 }
 
 int32_t custom_fopen( void *sp )
 {
 	WORD handle = 0;
+	BYTE *params = (BYTE *) sp;
 
-
+	/* get params */
+	char *fileName	= (char *)	*((DWORD *) params);
+	params += 4;
+	WORD mode		= (WORD)	*((WORD *)  params);
 	
-	handle = handleCEtoAtari(handle);
+	WORD drive = getDriveFromPath((char *) fileName);
+	
+	if(!isOurDrive(drive, 0)) {											/* not our drive? */
+		useOldHandler = 1;												/* call the old handler */
+		handle = Fopen(fileName, mode);
+		useOldHandler = 0;
+		return handle;													/* return the value returned from old handler */
+	}
+	
+	/* set the params to buffer */
+	command[4] = GEMDOS_Fopen;											/* store GEMDOS function number */
+	command[5] = 0;			
+	
+	pDmaBuffer[0] = (BYTE) mode;										/* store attributes */
+	strncpy(((char *) pDmaBuffer) + 1, fileName, DMA_BUFFER_SIZE - 1);	/* copy in the file name */
+	
+	handle = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);			/* send command to host over ACSI */
+
+	if(handle == E_NOTHANDLED || handle == ERROR) {						/* not handled or error? */
+		useOldHandler = 1;												/* call the old handler */
+		handle = Fopen(fileName, mode);
+		useOldHandler = 0;
+		return handle;													/* return the value returned from old handler */
+	}
+	
+	if(handle == ENHNDL || handle == EACCDN || handle == EINTRN) {		/* if some other error, just return it */
+		return (0xffffff00 | handle);									/* but append lots of FFs to make negative integer out of it */
+	}
+	
+	handle = handleCEtoAtari(handle);									/* convert the CE handle (0 - 46) to Atari handle (150 - 200) */
 	return handle;
 }
 
 int32_t custom_fclose( void *sp )
 {
-	DWORD res = 0;
-	WORD handle = 0;
+	DWORD res			= 0;
+	WORD atariHandle	= (WORD) *((WORD *) sp);
 
-	// insert code for func param retrieval
-	
-	if(!handleIsFromCE(handle)) {										/* not called with handle belonging to CosmosEx? */
+	/* check if this handle should belong to cosmosEx */
+	if(!handleIsFromCE(atariHandle)) {									/* not called with handle belonging to CosmosEx? */
 		useOldHandler = 1;												/* call the old handler */
-		// insert the code to call the original handler
+		res = Fclose(atariHandle);
 		useOldHandler = 0;
 		return res;
 	}
 	
-	handle = handleAtariToCE(handle);									/* convert high atari handle to little CE handle */
+	WORD ceHandle = handleAtariToCE(atariHandle);						/* convert high atari handle to little CE handle */
 	
-	// insert the code for CosmosEx communication
+	/* set the params to buffer */
+	command[4] = GEMDOS_Fclose;											/* store GEMDOS function number */
+	command[5] = (BYTE) ceHandle;			
+	
+	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+
+	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+		useOldHandler = 1;												/* call the old handler */
+		res = Fclose(atariHandle);
+		useOldHandler = 0;
+		return res;													/* return the value returned from old handler */
+	}
 	
 	return res;
 }
@@ -523,20 +602,74 @@ int32_t custom_fwrite( void *sp )
 int32_t custom_fseek( void *sp )
 {
 	DWORD res = 0;
-	WORD handle = 0;
+	BYTE *params = (BYTE *) sp;
 
-	// insert code for func param retrieval
+	/* get params */
+	DWORD offset		= (DWORD)	*((DWORD *) params);
+	params += 4;
+	WORD atariHandle	= (WORD)	*((WORD *)  params);
+	params += 2;
+	WORD seekMode		= (WORD)	*((WORD *)  params);
 	
-	if(!handleIsFromCE(handle)) {										/* not called with handle belonging to CosmosEx? */
+	/* check if this handle should belong to cosmosEx */
+	if(!handleIsFromCE(atariHandle)) {									/* not called with handle belonging to CosmosEx? */
 		useOldHandler = 1;												/* call the old handler */
-		// insert the code to call the original handler
+		res = Fseek(offset, atariHandle, seekMode);
 		useOldHandler = 0;
 		return res;
 	}
 	
-	handle = handleAtariToCE(handle);									/* convert high atari handle to little CE handle */
+	WORD ceHandle = handleAtariToCE(atariHandle);						/* convert high atari handle to little CE handle */
 	
-	// insert the code for CosmosEx communication
+	/* set the params to buffer */
+	command[4] = GEMDOS_Fseek;											/* store GEMDOS function number */
+	command[5] = 0;			
+	
+	pDmaBuffer[0] = (BYTE) (offset >> 24);
+	pDmaBuffer[1] = (BYTE) (offset >> 16);
+	pDmaBuffer[2] = (BYTE) (offset >>  8);
+	pDmaBuffer[3] = (BYTE) (offset & 0xff);
+	
+	pDmaBuffer[4] = (BYTE) ceHandle;
+	pDmaBuffer[5] = (BYTE) seekMode;
+	
+	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+
+	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+		useOldHandler = 1;												/* call the old handler */
+		res = Fseek(offset, atariHandle, seekMode);
+		useOldHandler = 0;
+		return res;														/* return the value returned from old handler */
+	}
+	
+	if(res != E_OK) {													/* if some other error, make negative number out of it */
+		return (0xffffff00 | res);
+	}
+	
+	/* If we got here, the seek was succesfull and now we need to return the position in the file.
+	   Unfortunately we can't READ from CosmosEx in the first command because we used WRITE to send the params for fseek,
+	   so we make another ACSI command which will read the current file position, which we will return to calling function.
+	   This could be solved in one step if the fseek would be done using SCSI(12) command instead of SCSI(6) command. */
+	
+	command[4] = GD_CUSTOM_ftell;										/* store GEMDOS function number */
+	command[5] = 0;			
+	
+	memset(pDmaBuffer, 0, 4);
+	
+	res = acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+
+	if(	res == E_NOTHANDLED || res == ERROR || res == EINTRN) {			/* not handled or error? */
+		return (0xffffff00 | EINTRN);									/* return internal error */
+	}
+
+	/* construct the new file position from the received data */
+	res  = pDmaBuffer[0];
+	res = res << 8;
+	res |= pDmaBuffer[1];
+	res = res << 8;
+	res |= pDmaBuffer[2];
+	res = res << 8;
+	res |= pDmaBuffer[3];
 	
 	return res;
 }

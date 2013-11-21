@@ -6,7 +6,7 @@ STRIP	= m68k-atari-mint-strip
 CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS	= -Wl,--traditional-format
 
-HDR		= xbra.h acsi.h gemdos.h translated.h main.h
+HDR		= xbra.h acsi.h gemdos.h gemdos_errno.h translated.h main.h
 CSRC	= gemdos.c xbra.c acsi.c main.c
 SSRC	= gemdos_asm.S
 
