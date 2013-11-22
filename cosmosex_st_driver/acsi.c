@@ -3,18 +3,12 @@
 
 #include "acsi.h"
 
-extern BYTE switchToSuper;
 /* -------------------------------------- */
 BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
 	DWORD status;
 	WORD i, wr1, wr2;
-	DWORD savessp = 0;
 
-	if(switchToSuper) {
-		savessp = Super( SUP_SET );
-	}
-	
 	*FLOCK = -1;                            	/* disable FDC operations */
 	setdma((DWORD) buffer);                 /* setup DMA transfer address */
 
@@ -27,10 +21,6 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 	if (qdone() != OK) {					/* wait for ack */
 		hdone();                          	/* restore DMA device to normal */
 
-		if(switchToSuper) {
-			Super( savessp );
-		}
-		
 		return ERROR;
 	}
 	/*********************************/
@@ -41,10 +31,6 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 	
 		if (qdone() != OK) {				/* wait for ack */
 			hdone();                        /* restore DMA device to normal */
-			
-			if(switchToSuper) {
-				Super( savessp );
-			}
 			
 			return ERROR;
 		}
@@ -71,10 +57,6 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     status = endcmd(wr2 | NO_DMA | HDC | A0);   /* wait for DMA completion */
 	hdone();                                	/* restore DMA device to normal */
 
-	if(switchToSuper) {
-		Super( savessp );
-	}
-	
 	return status;
 }
 /****************************************************************************/

@@ -31,7 +31,7 @@ int16_t useOldHandler = 0;									/* 0: use new handlers, 1: use old handlers *
 /* ------------------------------------------------------------------ */
 /* CosmosEx and Gemdos part - Jookie */
 BYTE ce_findId(void);
-BYTE ce_identify(BYTE ACSI_id);
+BYTE ce_identify(void);
 void ce_initialize(void);
 
 BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
@@ -54,8 +54,6 @@ WORD ceDrives;
 BYTE currentDrive;
 DWORD lastCeDrivesUpdate;
 
-BYTE switchToSuper;
-
 /* ------------------------------------------------------------------ */
 int main( int argc, char* argv[] )
 {
@@ -77,8 +75,6 @@ int main( int argc, char* argv[] )
 	pDtaBuffer		= &dtaBuffer[2];
 	pDtaBuffer		= (BYTE *) (((DWORD) pDtaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
 
-	switchToSuper = TRUE;
-	
 	/* search for CosmosEx on ACSI bus */ 
 	found = ce_findId();
 
@@ -94,13 +90,15 @@ int main( int argc, char* argv[] )
 	commandLong[1] = 0xA0;								/* cmd[1] = command length group (5 << 5) + TEST UNIT READY (0) */
 	
 	/* tell the device to initialize */
-	ce_initialize();							
+	Supexec(ce_initialize);
 	
+	/* now init our internal vars */
 	pDta				= (_DTA *) &tempDta[0];				/* use this buffer as temporary one for DTA - just in case */
 
 	currentDrive		= Dgetdrv();						/* get the current drive from system */
 	lastCeDrivesUpdate	= 0;
-	updateCeDrives();										/* update the ceDrives variable */
+	
+	Supexec(updateCeDrives);								/* update the ceDrives variable */
 	
 	initFunctionTable();
 
@@ -113,8 +111,6 @@ int main( int argc, char* argv[] )
 
 	/* and now place the new gemdos handler */
 	old_gemdos_handler = Setexc( VEC_GEMDOS, gemdos_handler );
-
-	switchToSuper = FALSE;
 
 	/* wait for a while so the user could read the message and quit */
 	sleep(1);
@@ -139,11 +135,10 @@ BYTE ce_findId(void)
 		bfr[0] = i + '0';
 		(void) Cconws(bfr);
 
-		res = ce_identify(i);      					/* try to read the IDENTITY string */
+		deviceID = i;									/* store the tested ACSI ID */
+		res = Supexec(ce_identify);  					/* try to read the IDENTITY string */
 		
-		if(res == 1) {                           	/* if found the CosmosEx */
-			deviceID = i;                     		/* store the ACSI ID of device */
-
+		if(res == 1) {                           		/* if found the CosmosEx */
 			(void) Cconws("\r\nCosmosEx found on ACSI ID: ");
 			bfr[0] = i + '0';
 			(void) Cconws(bfr);
@@ -158,18 +153,18 @@ BYTE ce_findId(void)
 }
 
 /* send an IDENTIFY command to specified ACSI ID and check if the result is as expected */
-BYTE ce_identify(BYTE ACSI_id)
+BYTE ce_identify(void)
 {
 	WORD res;
   
-	commandShort[0] = (ACSI_id << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	commandShort[0] = (deviceID << 5); 											/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
 	commandShort[4] = TRAN_CMD_IDENTIFY;
   
-	memset(pDmaBuffer, 0, 512);              		/* clear the buffer */
+	memset(pDmaBuffer, 0, 512);              									/* clear the buffer */
 
 	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* issue the command and check the result */
 
-	if(res != OK) {                        			/* if failed, return FALSE */
+	if(res != OK) {                        										/* if failed, return FALSE */
 		return 0;
 	}
 
@@ -177,7 +172,7 @@ BYTE ce_identify(BYTE ACSI_id)
 		return 0;
 	}
 	
-	return 1;                             			/* success */
+	return 1;                             										/* success */
 }
 
 /* send INITIALIZE command to the CosmosEx device telling it to do all the stuff it needs at start */
