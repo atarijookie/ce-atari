@@ -32,7 +32,8 @@ extern BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
 extern BYTE *pDmaBuffer;
 
 extern BYTE deviceID;
-extern BYTE command[6];
+extern BYTE commandShort[CMD_LENGTH_SHORT];
+extern BYTE commandLong[CMD_LENGTH_LONG];
 
 extern _DTA *pDta;
 extern BYTE tempDta[45];
@@ -84,10 +85,10 @@ int32_t custom_dgetdrv( void *sp )
 		return res;
 	}
 	
-	command[4] = GEMDOS_Dgetdrv;										/* store GEMDOS function number */
-	command[5] = 0;										
+	commandShort[4] = GEMDOS_Dgetdrv;										/* store GEMDOS function number */
+	commandShort[5] = 0;										
 	
-	res = acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		useOldHandler = 1;												/* call the old handler */
@@ -119,10 +120,10 @@ int32_t custom_dsetdrv( void *sp )
 		return res;
 	}
 
-	command[4] = GEMDOS_Dsetdrv;										/* store GEMDOS function number */
-	command[5] = (BYTE) drive;											/* store drive number */
+	commandShort[4] = GEMDOS_Dsetdrv;										/* store GEMDOS function number */
+	commandShort[5] = (BYTE) drive;											/* store drive number */
 	
-	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		useOldHandler = 1;												/* call the old handler */
@@ -157,10 +158,10 @@ int32_t custom_dfree( void *sp )
 		return res;														/* return the value returned from old handler */
 	}
 	
-	command[4] = GEMDOS_Dfree;											/* store GEMDOS function number */
-	command[5] = drive;									
+	commandShort[4] = GEMDOS_Dfree;											/* store GEMDOS function number */
+	commandShort[5] = drive;									
 
-	res = acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		useOldHandler = 1;												/* call the old handler */
@@ -187,13 +188,13 @@ int32_t custom_dcreate( void *sp )
 		return res;														/* return the value returned from old handler */
 	}
 	
-	command[4] = GEMDOS_Dcreate;										/* store GEMDOS function number */
-	command[5] = 0;									
+	commandShort[4] = GEMDOS_Dcreate;										/* store GEMDOS function number */
+	commandShort[5] = 0;									
 	
 	memset(pDmaBuffer, 0, 512);
 	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		/* copy in the path */
 	
-	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		useOldHandler = 1;												/* call the old handler */
@@ -219,13 +220,13 @@ int32_t custom_ddelete( void *sp )
 		return res;														/* return the value returned from old handler */
 	}
 	
-	command[4] = GEMDOS_Ddelete;										/* store GEMDOS function number */
-	command[5] = 0;									
+	commandShort[4] = GEMDOS_Ddelete;										/* store GEMDOS function number */
+	commandShort[5] = 0;									
 	
 	memset(pDmaBuffer, 0, 512);
 	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		/* copy in the path */
 	
-	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		useOldHandler = 1;												/* call the old handler */
@@ -251,13 +252,13 @@ int32_t custom_fdelete( void *sp )
 		return res;														/* return the value returned from old handler */
 	}
 	
-	command[4] = GEMDOS_Fdelete;										/* store GEMDOS function number */
-	command[5] = 0;									
+	commandShort[4] = GEMDOS_Fdelete;										/* store GEMDOS function number */
+	commandShort[5] = 0;									
 	
 	memset(pDmaBuffer, 0, 512);
 	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		/* copy in the path */
 	
-	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		useOldHandler = 1;												/* call the old handler */
@@ -283,13 +284,13 @@ int32_t custom_dsetpath( void *sp )
 		return res;														/* return the value returned from old handler */
 	}
 	
-	command[4] = GEMDOS_Dsetpath;										/* store GEMDOS function number */
-	command[5] = 0;									
+	commandShort[4] = GEMDOS_Dsetpath;										/* store GEMDOS function number */
+	commandShort[5] = 0;									
 	
 	memset(pDmaBuffer, 0, 512);
 	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		/* copy in the path */
 	
-	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		useOldHandler = 1;												/* call the old handler */
@@ -317,10 +318,10 @@ int32_t custom_dgetpath( void *sp )
 		return res;														/* return the value returned from old handler */
 	}
 	
-	command[4] = GEMDOS_Dgetpath;										/* store GEMDOS function number */
-	command[5] = drive;									
+	commandShort[4] = GEMDOS_Dgetpath;										/* store GEMDOS function number */
+	commandShort[5] = drive;									
 
-	res = acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		useOldHandler = 1;												/* call the old handler */
@@ -352,8 +353,8 @@ int32_t custom_frename( void *sp )
 		return res;														/* return the value returned from old handler */
 	}
 	
-	command[4] = GEMDOS_Frename;										/* store GEMDOS function number */
-	command[5] = 0;									
+	commandShort[4] = GEMDOS_Frename;										/* store GEMDOS function number */
+	commandShort[5] = 0;									
 
 	memset(pDmaBuffer, 0, DMA_BUFFER_SIZE);
 	strncpy((char *) pDmaBuffer, oldName, (DMA_BUFFER_SIZE / 2) - 2);	/* copy in the old name	*/
@@ -363,7 +364,7 @@ int32_t custom_frename( void *sp )
 	char *pDmaNewName = ((char *) pDmaBuffer) + oldLen + 1;
 	strncpy(pDmaNewName, newName, (DMA_BUFFER_SIZE / 2) - 2);			/* copy in the new name	*/
 
-	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		useOldHandler = 1;												/* call the old handler */
@@ -395,8 +396,8 @@ int32_t custom_fattrib( void *sp )
 		return res;														/* return the value returned from old handler */
 	}
 	
-	command[4] = GEMDOS_Fattrib;										/* store GEMDOS function number */
-	command[5] = 0;									
+	commandShort[4] = GEMDOS_Fattrib;										/* store GEMDOS function number */
+	commandShort[5] = 0;									
 
 	memset(pDmaBuffer, 0, DMA_BUFFER_SIZE);
 	
@@ -405,7 +406,7 @@ int32_t custom_fattrib( void *sp )
 	
 	strncpy(((char *) pDmaBuffer) + 2, fileName, DMA_BUFFER_SIZE -1 );	/* copy in the file name */
 	
-	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		useOldHandler = 1;												/* call the old handler */
@@ -461,13 +462,13 @@ int32_t custom_fsfirst( void *sp )
 	fsnextIsForUs		= TRUE;
 	
 	/* set the params to buffer */
-	command[4] = GEMDOS_Fsfirst;										/* store GEMDOS function number */
-	command[5] = 0;			
+	commandShort[4] = GEMDOS_Fsfirst;										/* store GEMDOS function number */
+	commandShort[5] = 0;			
 	
 	pDmaBuffer[0] = (BYTE) attribs;										/* store attributes */
 	strncpy(((char *) pDmaBuffer) + 1, fspec, DMA_BUFFER_SIZE - 1);		/* copy in the file specification */
 	
-	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		fsnextIsForUs = FALSE;
@@ -537,10 +538,10 @@ BYTE getNextDTAsFromHost(void)
 	dtaCurrent	= 0;
 	dtaTotal	= 0;
 	
-	command[4] = GEMDOS_Fsnext;											/* store GEMDOS function number */
-	command[5] = 1;														/* transfer single sector */
+	commandShort[4] = GEMDOS_Fsnext;											/* store GEMDOS function number */
+	commandShort[5] = 1;														/* transfer single sector */
 	
-	res = acsi_cmd(ACSI_READ, command, 6, pDtaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDtaBuffer, 1);				/* send command to host over ACSI */
 	
 	if(res != E_OK) {													/* if failed to transfer data - no more files */
 		return ENMFIL;
@@ -577,13 +578,13 @@ int32_t custom_fcreate( void *sp )
 	}
 	
 	/* set the params to buffer */
-	command[4] = GEMDOS_Fcreate;										/* store GEMDOS function number */
-	command[5] = 0;			
+	commandShort[4] = GEMDOS_Fcreate;										/* store GEMDOS function number */
+	commandShort[5] = 0;			
 	
 	pDmaBuffer[0] = (BYTE) attr;										/* store attributes */
 	strncpy(((char *) pDmaBuffer) + 1, fileName, DMA_BUFFER_SIZE - 1);	/* copy in the file name */
 	
-	handle = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);			/* send command to host over ACSI */
+	handle = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* send command to host over ACSI */
 
 	if(handle == E_NOTHANDLED || handle == ERROR) {						/* not handled or error? */
 		useOldHandler = 1;												/* call the old handler */
@@ -620,13 +621,13 @@ int32_t custom_fopen( void *sp )
 	}
 	
 	/* set the params to buffer */
-	command[4] = GEMDOS_Fopen;											/* store GEMDOS function number */
-	command[5] = 0;			
+	commandShort[4] = GEMDOS_Fopen;											/* store GEMDOS function number */
+	commandShort[5] = 0;			
 	
 	pDmaBuffer[0] = (BYTE) mode;										/* store attributes */
 	strncpy(((char *) pDmaBuffer) + 1, fileName, DMA_BUFFER_SIZE - 1);	/* copy in the file name */
 	
-	handle = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);			/* send command to host over ACSI */
+	handle = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* send command to host over ACSI */
 
 	if(handle == E_NOTHANDLED || handle == ERROR) {						/* not handled or error? */
 		useOldHandler = 1;												/* call the old handler */
@@ -659,10 +660,10 @@ int32_t custom_fclose( void *sp )
 	WORD ceHandle = handleAtariToCE(atariHandle);						/* convert high atari handle to little CE handle */
 	
 	/* set the params to buffer */
-	command[4] = GEMDOS_Fclose;											/* store GEMDOS function number */
-	command[5] = (BYTE) ceHandle;			
+	commandShort[4] = GEMDOS_Fclose;											/* store GEMDOS function number */
+	commandShort[5] = (BYTE) ceHandle;			
 	
-	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		useOldHandler = 1;												/* call the old handler */
@@ -739,18 +740,18 @@ int32_t custom_fseek( void *sp )
 	WORD ceHandle = handleAtariToCE(atariHandle);						/* convert high atari handle to little CE handle */
 	
 	/* set the params to buffer */
-	command[4] = GEMDOS_Fseek;											/* store GEMDOS function number */
-	command[5] = 0;			
+	commandLong[5] = GEMDOS_Fseek;											/* store GEMDOS function number */
 	
-	pDmaBuffer[0] = (BYTE) (offset >> 24);
-	pDmaBuffer[1] = (BYTE) (offset >> 16);
-	pDmaBuffer[2] = (BYTE) (offset >>  8);
-	pDmaBuffer[3] = (BYTE) (offset & 0xff);
+	/* store params to command sequence */
+	commandLong[6] = (BYTE) (offset >> 24);				
+	commandLong[7] = (BYTE) (offset >> 16);
+	commandLong[8] = (BYTE) (offset >>  8);
+	commandLong[9] = (BYTE) (offset & 0xff);
 	
-	pDmaBuffer[4] = (BYTE) ceHandle;
-	pDmaBuffer[5] = (BYTE) seekMode;
+	commandLong[10] = (BYTE) ceHandle;
+	commandLong[11] = (BYTE) seekMode;
 	
-	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		useOldHandler = 1;												/* call the old handler */
@@ -763,29 +764,15 @@ int32_t custom_fseek( void *sp )
 		return (0xffffff00 | res);
 	}
 	
-	/* If we got here, the seek was succesfull and now we need to return the position in the file.
-	   Unfortunately we can't READ from CosmosEx in the first command because we used WRITE to send the params for fseek,
-	   so we make another ACSI command which will read the current file position, which we will return to calling function.
-	   This could be solved in one step if the fseek would be done using SCSI(12) command instead of SCSI(6) command. */
-	
-	command[4] = GD_CUSTOM_ftell;										/* store GEMDOS function number */
-	command[5] = ceHandle;			
-	
-	memset(pDmaBuffer, 0, 4);
-	
-	res = acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
-
-	if(	res == E_NOTHANDLED || res == ERROR || res == EINTRN) {			/* not handled or error? */
-		return (0xffffff00 | EINTRN);									/* return internal error */
-	}
+	/* If we got here, the seek was succesfull and now we need to return the position in the file. */
 
 	/* construct the new file position from the received data */
 	res  = pDmaBuffer[0];
-	res = res << 8;
+	res  = res << 8;
 	res |= pDmaBuffer[1];
-	res = res << 8;
+	res  = res << 8;
 	res |= pDmaBuffer[2];
-	res = res << 8;
+	res  = res << 8;
 	res |= pDmaBuffer[3];
 	
 	return res;
@@ -804,35 +791,28 @@ int32_t custom_fdatime( void *sp )
 	WORD flag			= (WORD)		*((WORD *)  params);
 	
 	/* check if this handle should belong to cosmosEx */
-	if(!handleIsFromCE(atariHandle)) {									/* not called with handle belonging to CosmosEx? */
-		useOldHandler = 1;												/* call the old handler */
+	if(!handleIsFromCE(atariHandle)) {										/* not called with handle belonging to CosmosEx? */
+		useOldHandler = 1;													/* call the old handler */
 		res = Fdatime(pDatetime, atariHandle, flag);
 		useOldHandler = 0;
 		return res;
 	}
 	
-	WORD ceHandle = handleAtariToCE(atariHandle);						/* convert high atari handle to little CE handle */
+	WORD ceHandle = handleAtariToCE(atariHandle);							/* convert high atari handle to little CE handle */
 	
 	/* set the params to buffer */
-	command[4] = GEMDOS_Fdatime;										/* store GEMDOS function number */
-	command[5] = (flag << 7) | (ceHandle & 0x7f);						/* flag on highest bit, the rest is handle */
+	commandLong[5]  = GEMDOS_Fdatime;										/* store GEMDOS function number */
+	commandLong[6]  = (flag << 7) | (ceHandle & 0x7f);						/* flag on highest bit, the rest is handle */
 	
-	if(flag == 1) {														/* FD_SET     - set date time */
-		/* store the new date time to buffer */
-		pDmaBuffer[0] = (BYTE) *pDatetime;
-		pDatetime++;
-		pDmaBuffer[1] = (BYTE) *pDatetime;
-		pDatetime++;
-		pDmaBuffer[2] = (BYTE) *pDatetime;
-		pDatetime++;
-		pDmaBuffer[3] = (BYTE) *pDatetime;
-		pDatetime++;
-		
-		res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
-	} else {																/* FD_INQUIRE - get date time */
-		memset(pDmaBuffer, 0, 4);
-		res = acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	/* store params to command sequence */
+	commandLong[7]  = (BYTE) pDatetime[0];									/* store the current date time value */
+	commandLong[8]  = (BYTE) pDatetime[1];
+	commandLong[9]  = (BYTE) pDatetime[2];
+	commandLong[10] = (BYTE) pDatetime[3];
+
+	res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);	/* send command to host over ACSI */
 	
+	if(flag != 1) {															/* not FD_SET - get date time */
 		memcpy(pDatetime, pDmaBuffer, 4);									/* copy in the results */
 	}
 	
@@ -844,7 +824,7 @@ int32_t custom_fdatime( void *sp )
 		return (0xffffff00 | EINTRN);										/* return internal error */
 	}
 
-	return EINTRN;															/* in other cases - Internal Error - this shouldn't happen */
+	return (0xffffff00 | EINTRN);											/* in other cases - Internal Error - this shouldn't happen */
 }
 
 /* ------------------------------------------------------------------ */
@@ -910,10 +890,10 @@ void updateCeDrives(void)
 	lastCeDrivesUpdate = now;											/* mark that we've just updated the ceDrives */
 	
 	/* now do the real update */
-	command[4] = BIOS_Drvmap;											/* store BIOS function number */
-	command[5] = 0;										
+	commandShort[4] = BIOS_Drvmap;											/* store BIOS function number */
+	commandShort[5] = 0;										
 	
-	res = acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 	
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		return;														

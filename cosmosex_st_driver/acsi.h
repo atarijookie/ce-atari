@@ -59,6 +59,9 @@
 
 #define ACSI_READ	1
 #define ACSI_WRITE	0
+
+#define CMD_LENGTH_SHORT	6
+#define CMD_LENGTH_LONG		13
 /*---------------------------------------*/
 BYTE wait_dma_cmpl(DWORD t_ticks);
 BYTE fdone(void);

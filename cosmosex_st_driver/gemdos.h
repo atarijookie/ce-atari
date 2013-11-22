@@ -46,6 +46,18 @@
 #define BIOS_Mediach			0x71
 
 //////////////////////////////////////
+/*
+
+Functions which require more than SCSI(6) length so they wouldn't have to be done in 2 acsi_cmd calls:
+GEMDOS_Fseek:  5 + 6
+GEMDOS_Fread:  6 + 4
+GEMDOS_Fwrite: 6 + 4
+
+Functions which can be implemented with SCSI(6) but would be nicer to do them with something more:
+GEMDOS_Fdatime: 6 + 4    -- would be ACSI_READ only then
+
+*/
+//////////////////////////////////////
 
 #define MAX_FILES       	40          // maximum open files count, 40 is the value from EmuTOS
 

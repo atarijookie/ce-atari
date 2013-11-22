@@ -38,7 +38,9 @@ BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
 BYTE *pDmaBuffer;
 
 BYTE deviceID;
-BYTE command[6] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
+
+BYTE commandShort[CMD_LENGTH_SHORT]	= {			0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
+BYTE commandLong[CMD_LENGTH_LONG]	= {0x1f,	0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0};
 
 _DTA *pDta;
 BYTE tempDta[45];
@@ -84,6 +86,12 @@ int main( int argc, char* argv[] )
 		sleep(1);
 //		return 0;
 	}
+	
+	/* now set up the acsi command bytes so we don't have to deal with this one anymore */
+	commandShort[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	
+	commandLong[0] = (deviceID << 5) | 0x1f;			/* cmd[0] = ACSI_id + ICD command marker (0x1f)	*/
+	commandLong[1] = 0xA0;								/* cmd[1] = command length group (5 << 5) + TEST UNIT READY (0) */
 	
 	/* tell the device to initialize */
 	ce_initialize();							
@@ -154,12 +162,12 @@ BYTE ce_identify(BYTE ACSI_id)
 {
 	WORD res;
   
-	command[0] = (ACSI_id << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
-	command[4] = TRAN_CMD_IDENTIFY;
+	commandShort[0] = (ACSI_id << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	commandShort[4] = TRAN_CMD_IDENTIFY;
   
 	memset(pDmaBuffer, 0, 512);              		/* clear the buffer */
 
-	res = acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);	/* issue the command and check the result */
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* issue the command and check the result */
 
 	if(res != OK) {                        			/* if failed, return FALSE */
 		return 0;
@@ -175,9 +183,9 @@ BYTE ce_identify(BYTE ACSI_id)
 /* send INITIALIZE command to the CosmosEx device telling it to do all the stuff it needs at start */
 void ce_initialize(void)
 {
-	command[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
-	command[4] = GD_CUSTOM_initialize;
+	commandShort[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	commandShort[4] = GD_CUSTOM_initialize;
   
-	acsi_cmd(ACSI_READ, command, 6, pDmaBuffer, 1);			/* issue the command and check the result */
+	acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* issue the command and check the result */
 }
 
