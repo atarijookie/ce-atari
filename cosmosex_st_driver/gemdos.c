@@ -523,6 +523,8 @@ DWORD copyNextDtaToAtari(void)
 
 	DWORD dtaOffset		= 2 + (23 * dtaCurrent);						/* calculate the offset for the DTA in buffer */
 	BYTE *pCurrentDta	= pDtaBuffer + dtaOffset;						/* and now calculate the new pointer */
+	
+	dtaCurrent++;														/* move to the next DTA */
 		
 	memcpy(pDta + 21, pCurrentDta, 23);									/* skip the reserved area of DTA and copy in the current DTA */
 	return E_OK;														/* everything went well */
