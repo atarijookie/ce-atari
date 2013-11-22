@@ -37,6 +37,14 @@ extern BYTE command[6];
 extern _DTA *pDta;
 extern BYTE tempDta[45];
 
+extern WORD dtaCurrent, dtaTotal;
+extern BYTE dtaBuffer[DTA_BUFFER_SIZE + 2];
+extern BYTE *pDtaBuffer;
+extern BYTE fsnextIsForUs, tryToGetMoreDTAs;
+
+BYTE getNextDTAsFromHost(void);
+DWORD copyNextDtaToAtari(void);
+
 // TODO: init ceDrives and currentDrive
 // TODO: vymysliet ako CE oznami ze mu prisiel / odisiel drive 
 
@@ -427,14 +435,123 @@ int32_t custom_fsetdta( void *sp )
 
 int32_t custom_fsfirst( void *sp )
 {
-	/* not handled */
-	return 0;
+	DWORD res;
+	BYTE *params = (BYTE *) sp;
+
+	/* get params */
+	char *fspec		= (char *)	*((DWORD *) params);
+	params += 4;
+	WORD attribs	= (WORD)	*((WORD *)  params);
+	
+	WORD drive = getDriveFromPath((char *) fspec);
+	
+	if(!isOurDrive(drive, 0)) {											/* not our drive? */
+		fsnextIsForUs = FALSE;
+	
+		useOldHandler = 1;												/* call the old handler */
+		res = Fsfirst(fspec, attribs);
+		useOldHandler = 0;
+		return res;														/* return the value returned from old handler */
+	}
+	
+	/* initialize internal variables */
+	dtaCurrent			= 0;
+	dtaTotal			= 0;
+	tryToGetMoreDTAs	= 1;											/* mark that when we run out of DTAs in out buffer, then we should try to get more of them from host */
+	fsnextIsForUs		= TRUE;
+	
+	/* set the params to buffer */
+	command[4] = GEMDOS_Fsfirst;										/* store GEMDOS function number */
+	command[5] = 0;			
+	
+	pDmaBuffer[0] = (BYTE) attribs;										/* store attributes */
+	strncpy(((char *) pDmaBuffer) + 1, fspec, DMA_BUFFER_SIZE - 1);		/* copy in the file specification */
+	
+	res = acsi_cmd(ACSI_WRITE, command, 6, pDmaBuffer, 1);				/* send command to host over ACSI */
+
+	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+		fsnextIsForUs = FALSE;
+	
+		useOldHandler = 1;												/* call the old handler */
+		res = Fsfirst(fspec, attribs);
+		useOldHandler = 0;
+		return res;														/* return the value returned from old handler */
+	}
+	
+	if(res != E_OK) {													/* if some other error, just return it */
+		return (0xffffff00 | res);										/* but append lots of FFs to make negative integer out of it */
+	}
+
+	res = copyNextDtaToAtari();											/* now copy the next possible DTA to atari DTA buffer */
+	return res;
 }
 
 int32_t custom_fsnext( void *sp )
 {
-	/* not handled */
-	return 0;
+	DWORD res;
+
+	if(!fsnextIsForUs) {												/* if we shouldn't handle this */
+		useOldHandler = 1;												/* call the old handler */
+		res = Fsnext();
+		useOldHandler = 0;
+		return res;														/* return the value returned from old handler */
+	}
+
+	res = copyNextDtaToAtari();											/* now copy the next possible DTA to atari DTA buffer */
+	return res;
+}
+
+DWORD copyNextDtaToAtari(void)
+{
+	DWORD res;
+
+	if(dtaCurrent >= dtaTotal) {										/* if we're out of buffered DTAs */
+		if(!tryToGetMoreDTAs) {											/* if shouldn't try to get more DTAs, quit without trying */
+			return (0xffffff00 | ENMFIL);
+		}
+	
+		res = getNextDTAsFromHost();									/* now we need to get the buffer of DTAs from host */
+		
+		if(res != E_OK) {												/* failed to get DTAs from host? */
+			tryToGetMoreDTAs = 0;										/* do not try to receive more DTAs from host */
+			return (0xffffff00 | ENMFIL);								/* return that we're out of files */
+		}
+	}
+
+	if(dtaCurrent >= dtaTotal) {										/* still no buffered DTAs? (this shouldn't happen) */
+		return (0xffffff00 | ENMFIL);									/* return that we're out of files */
+	}
+
+	DWORD dtaOffset		= 2 + (23 * dtaCurrent);						/* calculate the offset for the DTA in buffer */
+	BYTE *pCurrentDta	= pDtaBuffer + dtaOffset;						/* and now calculate the new pointer */
+		
+	memcpy(pDta + 21, pCurrentDta, 23);									/* skip the reserved area of DTA and copy in the current DTA */
+	return E_OK;														/* everything went well */
+}
+
+BYTE getNextDTAsFromHost(void)
+{
+	DWORD res;
+
+	/* initialize the interal variables */
+	dtaCurrent	= 0;
+	dtaTotal	= 0;
+	
+	command[4] = GEMDOS_Fsnext;											/* store GEMDOS function number */
+	command[5] = 1;														/* transfer single sector */
+	
+	res = acsi_cmd(ACSI_READ, command, 6, pDtaBuffer, 1);				/* send command to host over ACSI */
+	
+	if(res != E_OK) {													/* if failed to transfer data - no more files */
+		return ENMFIL;
+	}
+	
+	/* store the new total DTA number we have buffered */
+	dtaTotal  = pDtaBuffer[0];
+	dtaTotal  = dtaTotal << 8;
+	dtaTotal |= pDtaBuffer[1];
+	
+	return E_OK;
 }
 
 /* **************************************************************** */

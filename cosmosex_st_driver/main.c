@@ -43,6 +43,11 @@ BYTE command[6] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
 _DTA *pDta;
 BYTE tempDta[45];
 
+WORD dtaCurrent, dtaTotal;
+BYTE dtaBuffer[DTA_BUFFER_SIZE + 2];
+BYTE *pDtaBuffer;
+BYTE fsnextIsForUs, tryToGetMoreDTAs;
+
 WORD ceDrives;
 BYTE currentDrive;
 DWORD lastCeDrivesUpdate;
@@ -61,6 +66,14 @@ int main( int argc, char* argv[] )
 	/* create buffer pointer to even address */
 	pDmaBuffer = &dmaBuffer[2];
 	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
+
+	/* initialize internal stuff for Fsfirst and Fsnext */
+	dtaCurrent			= 0;
+	dtaTotal			= 0;
+	fsnextIsForUs		= 0;
+	tryToGetMoreDTAs	= 0;
+	pDtaBuffer		= &dtaBuffer[2];
+	pDtaBuffer		= (BYTE *) (((DWORD) pDtaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
 
 	switchToSuper = TRUE;
 	
