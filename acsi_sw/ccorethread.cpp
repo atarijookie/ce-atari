@@ -153,6 +153,18 @@ void CCoreThread::handleAcsiCommand(void)
             }
 
         }
+    } else if(justCmd == 0x1f) {                    // if the command is ICD mark
+        BYTE justCmd2 = bufIn[1] & 0x1f;
+
+        if(justCmd2 == 0 && bufIn[2] == 'C' && bufIn[3] == 'E') {    // the command is 0 (TEST UNIT READY), and this is CosmosEx specific command
+
+            switch(bufIn[4]) {
+            case HOSTMOD_TRANSLATED_DISK:
+                wasHandled = TRUE;
+                translated->processCommand(bufIn + 1);
+                break;
+            }
+        }
     }
 
     if(wasHandled != TRUE) {                        // if the command was not previously handled, it's probably just some SCSI command

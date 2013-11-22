@@ -680,11 +680,14 @@ void TranslatedDisk::onFclose(BYTE *cmd)
 
 void TranslatedDisk::onFdatime(BYTE *cmd)
 {
-    bool res;
-
     int param       = cmd[5];
-    int handle      = param & 0x7f;         // lowest 7 bits
-    int setNotGet   = param >> 7;           // highest bit
+    int handle      = param & 0x7f;             // lowest 7 bits
+    int setNotGet   = param >> 7;               // highest bit
+
+    WORD atariTime = 0, atariDate = 0;
+
+    atariTime       = getWord(cmd + 6);         // retrieve the time and date from command from ST
+    atariDate       = getWord(cmd + 8);
 
     int index = findFileHandleSlot(handle);
 
@@ -693,19 +696,7 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
         return;
     }
 
-    WORD atariTime = 0, atariDate = 0;
-
-    if(setNotGet) {                         // on SET
-        res = dataTrans->recvData(dataBuffer, 16);      // get data from Hans
-
-        if(!res) {                                      // failed to get data? internal error!
-            dataTrans->setStatus(EINTRN);
-            return;
-        }
-
-        atariTime = getWord(dataBuffer);                // retrieve the time and date from ST
-        atariDate = getWord(dataBuffer + 2);
-
+    if(setNotGet) {                             // on SET
         WORD year, month, day;
         year    = (atariDate >> 9)   + 1980;
         month   = (atariDate >> 5)   & 0x0f;
@@ -720,7 +711,7 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
         // TODO: setting the date / time to the file
 
 
-    } else {                                // on GET
+    } else {                                    // on GET
 
         // TODO: retrieving date / time from the file
 
@@ -838,19 +829,10 @@ void TranslatedDisk::onFwrite(BYTE *cmd)
 
 void TranslatedDisk::onFseek(BYTE *cmd)
 {
-    bool res;
-
-    res = dataTrans->recvData(dataBuffer, 16);      // get data from Hans
-
-    if(!res) {                                      // failed to get data? internal error!
-        dataTrans->setStatus(EINTRN);
-        return;
-    }
-
     // get seek params
-    DWORD   offset      = getDword(dataBuffer);
-    BYTE    atariHandle = dataBuffer[4];
-    BYTE    seekMode    = dataBuffer[5];
+    DWORD   offset      = getDword(cmd + 5);
+    BYTE    atariHandle = cmd[9];
+    BYTE    seekMode    = cmd[10];
 
     int index = findFileHandleSlot(atariHandle);
 
@@ -868,11 +850,22 @@ void TranslatedDisk::onFseek(BYTE *cmd)
 
     int iRes = fseek(files[index].hostHandle, offset, hostSeekMode);
 
-    if(iRes == 0) {                         // on OK
-        dataTrans->setStatus(E_OK);
-    } else {                                // on error
+    if(iRes != 0) {                         // on ERROR
         dataTrans->setStatus(EINTRN);
     }
+
+    /* now for the atari specific stuff - return current file position */
+    int pos = ftell(files[index].hostHandle);                       // get stream position
+
+    if(pos == -1) {                                                 // failed to get position?
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    dataTrans->addDataDword(pos);                                   // return the position padded with zeros
+    dataTrans->padDataToMul16();
+
+    dataTrans->setStatus(E_OK);                                     // OK!
 }
 
 void TranslatedDisk::onFtell(BYTE *cmd)
