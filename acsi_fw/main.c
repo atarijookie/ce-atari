@@ -61,7 +61,7 @@ BYTE statusByte;
 WORD version[2] = {0xa013, 0x0904};				// this means: hAns, 2013-09-04
 
 volatile BYTE sendFwVersion, sendACSIcommand;
-WORD atnSendFwVersion[5], atnSendACSIcommand[10];
+WORD atnSendFwVersion[6], atnSendACSIcommand[10];
 
 WORD atnMoreData[4];
 WORD dataBuffer[550 / 2];				// sector buffer with some (38 bytes) reserve at the end in case of overflow
@@ -85,6 +85,12 @@ volatile BYTE spiDmaTXidle, spiDmaRXidle;		// flags set when the SPI DMA TX or R
 
 BYTE currentLed;
 
+// TODO: code gets stuck if AcsiDataTrans sends ODD number of bytes 
+// TODO: have to send bit more than Multiple of 16 to receive all data ( padDataToMul16 in host SW )
+// TODO: check why the communication with host gets stuck when ST of off
+// TODO: test and fix with megafile drive
+// note: DMA transfer to ODD address in ST looses first byte
+
 BYTE shouldProcessCommands;
 
 int main (void) 
@@ -100,7 +106,7 @@ int main (void)
 	atnSendFwVersion[1] = ATN_FW_VERSION;					// attention code
 	atnSendFwVersion[2] = version[0];
 	atnSendFwVersion[3] = version[1];
-	atnSendFwVersion[4] = 0;											// terminating zero
+	atnSendFwVersion[5] = 0;											// terminating zero
 	
 	atnSendACSIcommand[0] = 0;										// just-in-case padding
 	atnSendACSIcommand[1] = ATN_ACSI_COMMAND;			// attention code
@@ -185,7 +191,7 @@ int main (void)
 		if(state == STATE_GET_COMMAND && spiDmaIsIdle && sendFwVersion) {
 			atnSendFwVersion[4] = ((WORD)currentLed) << 8;				// store the current LED status in the last WORD
 			
-			spiDma_txRx(5, (BYTE *) &atnSendFwVersion[0],	 6, (BYTE *) &cmdBuffer[0]);
+			spiDma_txRx(6, (BYTE *) &atnSendFwVersion[0],	 6, (BYTE *) &cmdBuffer[0]);
 				
 			sendFwVersion	= FALSE;
 			shouldProcessCommands = TRUE;													// mark that we should process the commands on next SPI DMA idle time
