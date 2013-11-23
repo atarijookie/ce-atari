@@ -85,6 +85,8 @@ void AcsiDataTrans::padDataToMul16(void)
     int mod = count % 16;           // how many we got in the last 1/16th part?
     int pad = 16 - mod;             // how many we need to add to make count % 16 equal to 0?
 
+    pad += 2;                       // THIS IS JUST TEST
+
     memset(&buffer[count], 0, pad); // set the padded bytes to zero and add this count
     count += pad;
 }

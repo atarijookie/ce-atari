@@ -174,15 +174,15 @@ void CCoreThread::handleAcsiCommand(void)
 
 void CCoreThread::handleFwVersion(void)
 {
-    BYTE fwVer[8], oBuf[8];
+    BYTE fwVer[10], oBuf[10];
 
-    memset(oBuf, 0, 8);
-    conUsb->txRx(8, oBuf, fwVer);
+    memset(oBuf, 0, 10);
+    conUsb->txRx(10, oBuf, fwVer);
 
     logToFile((char *) "handleFwVersion: \nOUT:\n");
-    logToFile(8, oBuf);
+    logToFile(10, oBuf);
     logToFile((char *) "\nIN:\n");
-    logToFile(8, fwVer);
+    logToFile(10, fwVer);
     logToFile((char *) "\n");
 
     int year = bcdToInt(fwVer[1]) + 2000;
