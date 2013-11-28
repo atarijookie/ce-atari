@@ -13,6 +13,7 @@
 #include "translated.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
+#include "bios.h"
 #include "main.h"
 
 /* 
@@ -23,7 +24,10 @@
 /* ------------------------------------------------------------------ */
 /* init and hooks part - MiKRO */
 extern int16_t useOldHandler;											/* 0: use new handlers, 1: use old handlers */
+extern int16_t useOldBiosHandler;										/* 0: use new handlers, 1: use old handlers */ 
+
 extern int32_t (*gemdos_table[256])( void* sp );
+extern int32_t (  *bios_table[256])( void* sp );
 
 /* ------------------------------------------------------------------ */
 /* CosmosEx and Gemdos part - Jookie */
@@ -926,4 +930,7 @@ void initFunctionTable(void)
 	gemdos_table[0x4f] = custom_fsnext;
 	gemdos_table[0x56] = custom_frename;
 	gemdos_table[0x57] = custom_fdatime;
+	
+	bios_table[0x09] = custom_mediach;
+	bios_table[0x0a] = custom_drvmap; 
 }

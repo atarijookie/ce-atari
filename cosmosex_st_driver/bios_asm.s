@@ -1,11 +1,11 @@
-| Simple GEMDOS handler.
-| 14/11/2013 Miro Kropacek
+| Simple BIOS handler.
+| 26/11/2013 Miro Kropacek
 | miro.kropacek@gmail.com
 
-	.globl	_gemdos_handler
-	.globl	_gemdos_table
-	.globl	_old_gemdos_handler
-	.globl	_useOldHandler
+	.globl	_bios_handler
+	.globl	_bios_table
+	.globl	_old_bios_handler
+	.globl	_useOldBiosHandler
 
 | ------------------------------------------------------
 	.text
@@ -13,37 +13,37 @@
 
 	.ascii	"XBRA"
 	.ascii	"CEDD"
-_old_gemdos_handler:
+_old_bios_handler:
 	.long	0
 
-| GEMDOS call looks on the stack like this:
-| param1
-| param2
-| :
+| BIOS call looks on the stack like this:
 | paramN
+| :
+| param2
+| param1
 | function number
 | return address (long)
 | stack frame (word)	<--- (sp)
 
-_gemdos_handler:
-	tst.w	_useOldHandler
-	bne.b	gemdos_not_handled
+_bios_handler:
+	tst.w	_useOldBiosHandler
+	bne.b	bios_not_handled
 	
 	lea	2+4(sp),a0				| a0 points to the function number now
 	btst.b	#5,(sp)					| check the S bit in the stack frame
-	bne.b	gemdos_call
+	bne.b	bios_call
 	move	usp,a0					| if not called from SV, take params from the user stack
-gemdos_call:
-	lea	_gemdos_table,a1
+bios_call:
+	lea	_bios_table,a1
 	move.w	(a0)+,d0				| fn
 	cmp.w	#0x100,d0				| number of entries in the function table
-	bhs.b	gemdos_not_handled			| >=0x100 are MiNT functions
+	bhs.b	bios_not_handled
 
 	add.w	d0,d0					| fn*4 because it's a function pointer table
 	add.w	d0,d0					|
 	adda.w	d0,a1
 	tst.l	(a1)
-	beq.b	gemdos_not_handled
+	beq.b	bios_not_handled
 	movea.l	(a1),a1
 
 	movem.l	d2-d7/a2-a6,-(sp)
@@ -51,11 +51,9 @@ gemdos_call:
 	jsr	(a1)					| call the handler
 	addq.l	#4,sp
 	movem.l	(sp)+,d2-d7/a2-a6
+	rte						| return from exception, d0 contains return code
 	
-	tst.l	d0					| handled?
-	beq.b	gemdos_not_handled			| no  => call the old handler
-	rte						| yes => terminate
-	
-gemdos_not_handled:
-	move.l	_old_gemdos_handler(pc),-(sp)		| Fake a return
+bios_not_handled:
+	move.l	_old_bios_handler(pc),-(sp)		| Fake a return
 	rts						| to old code.
+

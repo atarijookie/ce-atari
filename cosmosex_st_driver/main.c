@@ -28,6 +28,10 @@ extern TrapHandlerPointer old_gemdos_handler;
 int32_t (*gemdos_table[256])( void* sp ) = { 0 };
 int16_t useOldHandler = 0;									/* 0: use new handlers, 1: use old handlers */
 
+extern void bios_handler( void );
+extern TrapHandlerPointer old_bios_handler;
+int32_t (*bios_table[256])( void* sp ) = { 0 };
+int16_t useOldBiosHandler = 0;								/* 0: use new handlers, 1: use old handlers */ 
 /* ------------------------------------------------------------------ */
 /* CosmosEx and Gemdos part - Jookie */
 BYTE ce_findId(void);
@@ -103,15 +107,16 @@ int main( int argc, char* argv[] )
 	initFunctionTable();
 
 	/* either remove the old one or do nothing, old memory isn't released */
-	if( unhook_xbra( VEC_GEMDOS, 'CEDD' ) == 0L ) {
+	if( unhook_xbra( VEC_GEMDOS, 'CEDD' ) == 0L && unhook_xbra( VEC_BIOS, 'CEDD' ) == 0L ) {
 		(void)Cconws( "\r\nDriver installed.\r\n" );
 	} else {
 		(void)Cconws( "\r\nDriver reinstalled, some memory was lost.\r\n" );
 	}
 
 	/* and now place the new gemdos handler */
-	old_gemdos_handler = Setexc( VEC_GEMDOS, gemdos_handler );
-
+	old_gemdos_handler	= Setexc( VEC_GEMDOS,	gemdos_handler );
+	old_bios_handler	= Setexc( VEC_BIOS,		bios_handler ); 
+	
 	/* wait for a while so the user could read the message and quit */
 	sleep(1);
 
