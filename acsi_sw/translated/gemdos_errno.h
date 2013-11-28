@@ -1,7 +1,11 @@
 #if !defined(__GEMDOS_ERRNO)
 #define __GEMDOS_ERRNO
 
-#define E_NOTHANDLED    0x7f        // return this if the host part didn't handle the command and we should use the original one
+#define E_NOTHANDLED        0x7f    // return this if the host part didn't handle the command and we should use the original one
+
+#define RW_ALL_TRANSFERED   0       // return this is all the required data was read / written
+#define RW_PARTIAL_TRANSFER 1       // return this if not all of the required data was read / written
+
 
 // BIOS errors
 #define E_OK            0   // 00 No error

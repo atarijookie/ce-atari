@@ -589,7 +589,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
 
     // store the params
     files[index].hostHandle     = f;
-    files[index].atariHandle    = index + 6;                        // handles 0 - 5 are reserved
+    files[index].atariHandle    = index;                            // handles 0 - 5 are reserved on Atari
     files[index].hostPath       = hostName;
 
     dataTrans->setStatus(files[index].atariHandle);                 // return the handle
@@ -652,7 +652,7 @@ void TranslatedDisk::onFopen(BYTE *cmd)
 
     // store the params
     files[index].hostHandle     = f;
-    files[index].atariHandle    = index + 6;                        // handles 0 - 5 are reserved
+    files[index].atariHandle    = index;                            // handles 0 - 5 are reserved on Atari
     files[index].hostPath       = hostName;
 
     dataTrans->setStatus(files[index].atariHandle);                 // return the handle
@@ -734,9 +734,9 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
 
 void TranslatedDisk::onFread(BYTE *cmd)
 {
-    int param               = cmd[5];
-    int atariHandle         = param & 0x3f;         // lowest 6 bits
-    int transferSizeCode    = param >> 6;           // 2 highest bits
+    int atariHandle         = cmd[5];
+    DWORD byteCount         = get24bits(cmd + 6);
+    int seekOffset          = (char) cmd[9];
 
     int index = findFileHandleSlot(atariHandle);
 
@@ -745,38 +745,47 @@ void TranslatedDisk::onFread(BYTE *cmd)
         return;
     }
 
-    // transfer size:
-    //  0 -   1 sector
-    //	1 -   8 sectors ( 4 kB) [1 MB = 250 of these]
-    //	2 -  32 sectors (16 kB) [1 MB =  64 of these]
-    //	3 - 128 sectors (64 kB) [1 MB =  16 of these]
-    // Note that 1st DWORD will be the number of actual data count that was read.
-
-    int transferSizeSectors = 0;
-
-    switch(transferSizeCode) {
-        case 0: transferSizeSectors =   1; break;
-        case 1: transferSizeSectors =   8; break;
-        case 2: transferSizeSectors =  32; break;
-        case 3: transferSizeSectors = 128; break;
+    if(byteCount > (254 * 512)) {                                   // requesting to transfer more than 254 sectors at once? fail!
+        dataTrans->setStatus(EINTRN);
+        return;
     }
 
-    int transferSizeBytes   = transferSizeSectors * 512;    // calculate the size in bytes
-    transferSizeBytes       -= 4;                           // subtract 4 bytes (size of DWORD), because 1st DWORD is the actual fread size
+    if(seekOffset != 0) {                                           // if we should seek before read
+        int res = fseek(files[index].hostHandle, seekOffset, SEEK_CUR);
 
-    int cnt = fread (dataBuffer, 1, transferSizeBytes, files[index].hostHandle);
+        if(res != 0) {                                              // if seek failed
+            dataTrans->setStatus(EINTRN);
+            return;
+        }
+    }
 
-    dataTrans->addDataDword(cnt);                           // first store the count of bytes read
+    int mod = byteCount % 16;       // how many we got in the last 1/16th part?
+    int pad = 0;
+
+    if(mod != 0) {
+        pad = 16 - mod;             // how many we need to add to make count % 16 equal to 0?
+    }
+
+    DWORD transferSizeBytes = byteCount + pad;
+
+    DWORD cnt = fread (dataBuffer, 1, transferSizeBytes, files[index].hostHandle);
     dataTrans->addData(dataBuffer, transferSizeBytes);      // then store the data
+    dataTrans->padDataToMul16();
 
-    dataTrans->setStatus(E_OK);                             // and return OK status
+    files[index].lastDataCount = cnt;                       // store how much data was read
+
+    if(cnt == byteCount) {                                  // if we read data count as requested
+        dataTrans->setStatus(RW_ALL_TRANSFERED);
+        return;
+    }
+
+    dataTrans->setStatus(RW_PARTIAL_TRANSFER);
 }
 
 void TranslatedDisk::onFwrite(BYTE *cmd)
 {
-    int param               = cmd[5];
-    int atariHandle         = param & 0x3f;         // lowest 6 bits
-    int transferSizeCode    = param >> 6;           // 2 highest bits
+    int atariHandle         = cmd[5];
+    DWORD byteCount         = get24bits(cmd + 6);
 
     int index = findFileHandleSlot(atariHandle);
 
@@ -785,21 +794,19 @@ void TranslatedDisk::onFwrite(BYTE *cmd)
         return;
     }
 
-    // transfer size:
-    //  0 - partial sector - 1st word is the data size
-    //	1 -   8 sectors ( 4 kB) [1 MB = 250 of these]
-    //	2 -  32 sectors (16 kB) [1 MB =  64 of these]
-    //	3 - 128 sectors (64 kB) [1 MB =  16 of these]
-    int transferSizeSectors = 0;
-
-    switch(transferSizeCode) {
-        case 0: transferSizeSectors =   1; break;
-        case 1: transferSizeSectors =   8; break;
-        case 2: transferSizeSectors =  32; break;
-        case 3: transferSizeSectors = 128; break;
+    if(byteCount > (254 * 512)) {                                   // requesting to transfer more than 254 sectors at once? fail!
+        dataTrans->setStatus(EINTRN);
+        return;
     }
 
-    int transferSizeBytes = transferSizeSectors * 512;
+    int mod = byteCount % 16;       // how many we got in the last 1/16th part?
+    int pad = 0;
+
+    if(mod != 0) {
+        pad = 16 - mod;             // how many we need to add to make count % 16 equal to 0?
+    }
+
+    DWORD transferSizeBytes = byteCount + pad;
 
     bool res;
     res = dataTrans->recvData(dataBuffer, transferSizeBytes);   // get data from Hans
@@ -809,22 +816,32 @@ void TranslatedDisk::onFwrite(BYTE *cmd)
         return;
     }
 
-    BYTE *data = dataBuffer;                                    // this points to the start of data
+    DWORD bWritten = fwrite(dataBuffer, 1, byteCount, files[index].hostHandle);    // write the data
 
-    if(transferSizeSectors == 1) {                              // when transfering only single sector, first word is the real data size
-        transferSizeBytes = getWord(dataBuffer);                // read the real transfer size
-        data += 2;                                              // skip this word when writing to file
-    }
+    files[index].lastDataCount = bWritten;                      // store data written count
 
-    int bWritten;
-    bWritten = fwrite(data, 1, transferSizeBytes, files[index].hostHandle);    // write the data
-
-    if(bWritten != transferSizeBytes) {                         // when didn't write all the data
-        dataTrans->setStatus(EINTRN);
+    if(bWritten != byteCount) {                                 // when didn't write all the data
+        dataTrans->setStatus(RW_PARTIAL_TRANSFER);
         return;
     }
 
-    dataTrans->setStatus(E_OK);                                 // when all the data was written
+    dataTrans->setStatus(RW_ALL_TRANSFERED);                    // when all the data was written
+}
+
+void TranslatedDisk::onRWDataCount(BYTE *cmd)                   // when Fread / Fwrite doesn't process all the data, this returns the count of processed data
+{
+    int atariHandle = cmd[5];
+    int index       = findFileHandleSlot(atariHandle);
+
+    if(index == -1) {                                           // handle not found? not handled, try somewhere else
+        dataTrans->setStatus(E_NOTHANDLED);
+        return;
+    }
+
+    dataTrans->addDataDword(files[index].lastDataCount);
+    dataTrans->padDataToMul16();
+
+    dataTrans->setStatus(E_OK);
 }
 
 void TranslatedDisk::onFseek(BYTE *cmd)

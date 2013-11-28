@@ -39,6 +39,7 @@
 #define GD_CUSTOM_initialize    0x60
 #define GD_CUSTOM_getConfig     0x61
 #define GD_CUSTOM_ftell         0x62
+#define GD_CUSTOM_getRWdataCnt  0x63
 
 //////////////////////////////////////
 

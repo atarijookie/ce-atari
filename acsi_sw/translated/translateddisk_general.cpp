@@ -297,9 +297,10 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case GEMDOS_Tsettime:       onTsettime(cmd);    break;
 
         // custom functions, which are not translated gemdos functions, but needed to do some other work
-        case GD_CUSTOM_initialize:  onInitialize();     break;
-        case GD_CUSTOM_getConfig:   onGetConfig(cmd);   break;
-        case GD_CUSTOM_ftell:       onFtell(cmd);       break;
+        case GD_CUSTOM_initialize:      onInitialize();     break;
+        case GD_CUSTOM_getConfig:       onGetConfig(cmd);   break;
+        case GD_CUSTOM_ftell:           onFtell(cmd);       break;
+        case GD_CUSTOM_getRWdataCnt:    onRWDataCount(cmd); break;
 
         // in other cases
         default:                                // in other cases
@@ -665,6 +666,21 @@ DWORD TranslatedDisk::getDword(BYTE *bfr)
     val = val << 8;
 
     val |= bfr[3];      // get lo
+
+    return val;
+}
+
+DWORD TranslatedDisk::get24bits(BYTE *bfr)
+{
+    DWORD val = 0;
+
+    val  = bfr[0];       // get hi
+    val  = val << 8;
+
+    val |= bfr[1];      // get mid
+    val  = val << 8;
+
+    val |= bfr[2];      // get lo
 
     return val;
 }

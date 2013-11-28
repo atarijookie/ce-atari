@@ -28,6 +28,8 @@ typedef struct {
     FILE *hostHandle;                       // file handle for all the work with the file on host
     BYTE atariHandle;                       // file handle used on Atari
     std::string hostPath;                   // where is the file on host file system
+
+    DWORD lastDataCount;                    // stores the data count that got on the last read / write operation
 } TranslatedFiles;
 
 #define MAX_FILES       40                  // maximum open files count, 40 is the value from EmuTOS
@@ -136,6 +138,7 @@ private:
     // custom functions, which are not translated gemdos functions, but needed to do some other work
     void onInitialize(void);            // this method is called on the startup of CosmosEx translated disk driver
     void onFtell(BYTE *cmd);            // this is needed after Fseek
+    void onRWDataCount(BYTE *cmd);      // when Fread / Fwrite doesn't process all the data, this returns the count of processed data
 
     // helper functions
     void attributesHostToAtari(DWORD attrHost, BYTE &attrAtari);
@@ -149,8 +152,9 @@ private:
     int findEmptyFileSlot(void);
     int findFileHandleSlot(int atariHandle);
 
-    WORD  getWord(BYTE *bfr);
-    DWORD getDword(BYTE *bfr);
+    WORD  getWord(BYTE *bfr);           // get 16 bits
+    DWORD get24bits(BYTE *bfr);         // get 24 bits
+    DWORD getDword(BYTE *bfr);          // get 32 bits
 
     void closeFileByIndex(int index);
     void closeAllFiles(void);
