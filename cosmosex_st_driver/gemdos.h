@@ -44,6 +44,7 @@
 // BIOS functions we need to support
 #define BIOS_Drvmap				0x70
 #define BIOS_Mediach			0x71
+#define BIOS_Getbpb				0x72
 
 //////////////////////////////////////
 /*
@@ -104,4 +105,32 @@ WORD getDriveFromPath(char *path);
 BYTE isOurDrive(WORD drive, BYTE withCurrentDrive);
 void updateCeDrives(void);
 
+int32_t custom_fread ( void *sp );
+int32_t custom_fwrite( void *sp );
+
+#define CALL_OLD_GD( function, ... )	\
+		useOldGDHandler = 1;			\
+		res = function( __VA_ARGS__ );	\
+		useOldGDHandler = 0;			\
+		return res;
+
+#define CALL_OLD_GD_NORET( function, ... )	\
+		useOldGDHandler = 1;			\
+		res = function( __VA_ARGS__ );	\
+		useOldGDHandler = 0;			
+
+		
+		
+// The following macros are used to convert atari handle numbers which are WORDs
+// to CosmosEx ex handle numbers, which are only BYTEs; and back.
+// To mark the difference between normal Atari handle and handle which came 
+// from CosmosEx I've added some offset to CosmosEx handles.
+
+// CosmosEx file handle:              0 ...  40
+// Atari handle for regular files:    0 ...  90
+// Atari handle for CosmosEx files: 150 ... 200
+#define handleIsFromCE(X)		(X >= 150 && X <= 200)
+#define handleAtariToCE(X)		(X  - 150)
+#define handleCEtoAtari(X)		(X  + 150)		
+		
 #endif // GEMDOS_H

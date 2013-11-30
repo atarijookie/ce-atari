@@ -26,7 +26,7 @@ typedef void  (*TrapHandlerPointer)( void );
 extern void gemdos_handler( void );
 extern TrapHandlerPointer old_gemdos_handler;
 int32_t (*gemdos_table[256])( void* sp ) = { 0 };
-int16_t useOldHandler = 0;									/* 0: use new handlers, 1: use old handlers */
+int16_t useOldGDHandler = 0;								/* 0: use new handlers, 1: use old handlers */
 
 extern void bios_handler( void );
 extern TrapHandlerPointer old_bios_handler;
@@ -55,8 +55,8 @@ BYTE *pDtaBuffer;
 BYTE fsnextIsForUs, tryToGetMoreDTAs;
 
 WORD ceDrives;
+WORD ceMediach;
 BYTE currentDrive;
-DWORD lastCeDrivesUpdate;
 
 /* ------------------------------------------------------------------ */
 int main( int argc, char* argv[] )
@@ -100,7 +100,6 @@ int main( int argc, char* argv[] )
 	pDta				= (_DTA *) &tempDta[0];				/* use this buffer as temporary one for DTA - just in case */
 
 	currentDrive		= Dgetdrv();						/* get the current drive from system */
-	lastCeDrivesUpdate	= 0;
 	
 	Supexec(updateCeDrives);								/* update the ceDrives variable */
 	

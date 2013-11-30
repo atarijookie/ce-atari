@@ -23,7 +23,7 @@
  
 /* ------------------------------------------------------------------ */
 /* init and hooks part - MiKRO */
-extern int16_t useOldHandler;											/* 0: use new handlers, 1: use old handlers */
+extern int16_t useOldGDHandler;											/* 0: use new handlers, 1: use old handlers */
 extern int16_t useOldBiosHandler;										/* 0: use new handlers, 1: use old handlers */ 
 
 extern int32_t (*gemdos_table[256])( void* sp );
@@ -50,26 +50,9 @@ extern BYTE fsnextIsForUs, tryToGetMoreDTAs;
 BYTE getNextDTAsFromHost(void);
 DWORD copyNextDtaToAtari(void);
 
-// TODO: init ceDrives and currentDrive
-// TODO: vymysliet ako CE oznami ze mu prisiel / odisiel drive 
-
 extern WORD ceDrives;
+extern WORD ceMediach;
 extern BYTE currentDrive;
-extern DWORD lastCeDrivesUpdate;
-
-// The following macros are used to convert atari handle numbers which are WORDs
-// to CosmosEx ex handle numbers, which are only BYTEs; and back.
-// To mark the difference between normal Atari handle and handle which came 
-// from CosmosEx I've added some offset to CosmosEx handles.
-
-// CosmosEx file handle:              6 ...  46
-// Atari handle for regular files:    0 ...  90
-// Atari handle for CosmosEx files: 150 ... 200
-#define handleIsFromCE(X)		(X >= 150 && X <= 200)
-#define handleAtariToCE(X)		(X  - 150)
-#define handleCEtoAtari(X)		(X  + 150)
-
-// TODO: cosmosEx file handles don't need to start from 6, they will be translated anyway
 
 /* ------------------------------------------------------------------ */
 /* the custom GEMDOS handlers now follow */
@@ -79,9 +62,7 @@ int32_t custom_dgetdrv( void *sp )
 	DWORD res;
 
 	if(!isOurDrive(currentDrive, 0)) {									/* if the current drive is not our drive */
-		useOldHandler = 1;												/* call the old handler */
-		res = Dgetdrv();
-		useOldHandler = 0;
+		CALL_OLD_GD_NORET(Dgetdrv);
 	
 		currentDrive = res;												/* store the current drive */
 		return res;
@@ -93,9 +74,7 @@ int32_t custom_dgetdrv( void *sp )
 	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Dgetdrv();
-		useOldHandler = 0;
+		CALL_OLD_GD_NORET(Dgetdrv);
 
 		currentDrive = res;												/* store the current drive */
 		return res;														/* return the value returned from old handler */
@@ -114,9 +93,7 @@ int32_t custom_dsetdrv( void *sp )
 	currentDrive = drive;												/* store the drive - GEMDOS seems to let you set even invalid drive */
 	
 	if(!isOurDrive(drive, 0)) {											/* if the drive is not our drive */
-		useOldHandler = 1;												/* call the old handler */
-		res = Dsetdrv(drive);
-		useOldHandler = 0;
+		CALL_OLD_GD_NORET(Dsetdrv, drive);
 	
 		res = res | ceDrives;											/* mounted drives = original drives + ceDrives */	
 		return res;
@@ -128,9 +105,7 @@ int32_t custom_dsetdrv( void *sp )
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Dsetdrv(drive);
-		useOldHandler = 0;
+		CALL_OLD_GD_NORET(Dsetdrv, drive);
 
 		res = res | ceDrives;											/* mounted drives = original drives + ceDrives */	
 		return res;														/* return the value returned from old handler */
@@ -154,10 +129,7 @@ int32_t custom_dfree( void *sp )
 	WORD drive		= (WORD)	*((WORD *)  params);
 	
 	if(!isOurDrive(drive, 1)) {											/* not our drive? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Dfree(pDiskInfo, drive);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Dfree, pDiskInfo, drive);
 	}
 	
 	commandShort[4] = GEMDOS_Dfree;											/* store GEMDOS function number */
@@ -166,10 +138,7 @@ int32_t custom_dfree( void *sp )
 	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Dfree(pDiskInfo, drive);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Dfree, pDiskInfo, drive);
 	}
 
 	memcpy(pDiskInfo, pDmaBuffer, 16);									/* copy in the results */
@@ -184,10 +153,7 @@ int32_t custom_dcreate( void *sp )
 	WORD drive = getDriveFromPath((char *) pPath);
 	
 	if(!isOurDrive(drive, 0)) {											/* not our drive? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Dcreate(pPath);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Dcreate, pPath);
 	}
 	
 	commandShort[4] = GEMDOS_Dcreate;										/* store GEMDOS function number */
@@ -199,10 +165,7 @@ int32_t custom_dcreate( void *sp )
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Dcreate(pPath);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Dcreate, pPath);
 	}
 
 	return res;
@@ -216,10 +179,7 @@ int32_t custom_ddelete( void *sp )
 	WORD drive = getDriveFromPath((char *) pPath);
 	
 	if(!isOurDrive(drive, 0)) {											/* not our drive? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Ddelete(pPath);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Ddelete, pPath);
 	}
 	
 	commandShort[4] = GEMDOS_Ddelete;										/* store GEMDOS function number */
@@ -231,10 +191,7 @@ int32_t custom_ddelete( void *sp )
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Ddelete(pPath);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD(Ddelete, pPath);
 	}
 
 	return res;
@@ -248,10 +205,7 @@ int32_t custom_fdelete( void *sp )
 	WORD drive = getDriveFromPath((char *) pPath);
 	
 	if(!isOurDrive(drive, 0)) {											/* not our drive? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Fdelete(pPath);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Fdelete, pPath);
 	}
 	
 	commandShort[4] = GEMDOS_Fdelete;										/* store GEMDOS function number */
@@ -263,10 +217,7 @@ int32_t custom_fdelete( void *sp )
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Fdelete(pPath);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Fdelete, pPath);
 	}
 
 	return res;
@@ -280,10 +231,7 @@ int32_t custom_dsetpath( void *sp )
 	WORD drive = getDriveFromPath((char *) pPath);
 	
 	if(!isOurDrive(drive, 0)) {											/* not our drive? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Dsetpath(pPath);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Dsetpath, pPath);
 	}
 	
 	commandShort[4] = GEMDOS_Dsetpath;										/* store GEMDOS function number */
@@ -295,10 +243,7 @@ int32_t custom_dsetpath( void *sp )
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Dsetpath(pPath);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Dsetpath, pPath);
 	}
 
 	return res;
@@ -314,10 +259,7 @@ int32_t custom_dgetpath( void *sp )
 	WORD drive		= (WORD)	*((WORD *)  params);
 	
 	if(!isOurDrive(drive, 1)) {											/* not our drive? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Dgetpath(buffer, drive);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Dgetpath, buffer, drive);
 	}
 	
 	commandShort[4] = GEMDOS_Dgetpath;										/* store GEMDOS function number */
@@ -326,10 +268,7 @@ int32_t custom_dgetpath( void *sp )
 	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Dgetpath(buffer, drive);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Dgetpath, buffer, drive);
 	}
 
 	strncpy((char *)buffer, (char *)pDmaBuffer, DMA_BUFFER_SIZE);		/* copy in the results */
@@ -349,10 +288,7 @@ int32_t custom_frename( void *sp )
 	WORD drive = getDriveFromPath((char *) oldName);
 	
 	if(!isOurDrive(drive, 0)) {											/* not our drive? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Frename(0, oldName, newName);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Frename, 0, oldName, newName);
 	}
 	
 	commandShort[4] = GEMDOS_Frename;										/* store GEMDOS function number */
@@ -369,10 +305,7 @@ int32_t custom_frename( void *sp )
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Frename(0, oldName, newName);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Frename, 0, oldName, newName);
 	}
 
 	return res;
@@ -392,10 +325,7 @@ int32_t custom_fattrib( void *sp )
 	WORD drive = getDriveFromPath((char *) fileName);
 	
 	if(!isOurDrive(drive, 0)) {											/* not our drive? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Fattrib(fileName, flag, attr);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Fattrib, fileName, flag, attr);
 	}
 	
 	commandShort[4] = GEMDOS_Fattrib;										/* store GEMDOS function number */
@@ -411,10 +341,7 @@ int32_t custom_fattrib( void *sp )
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Fattrib(fileName, flag, attr);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Fattrib, fileName, flag, attr);
 	}
 
 	return res;
@@ -427,9 +354,9 @@ int32_t custom_fsetdta( void *sp )
 {
 	pDta = (_DTA *)	*((DWORD *) sp);									/* store the new DTA pointer */
 
-	useOldHandler = 1;													/* call the old handler */
+	useOldGDHandler = 1;
 	Fsetdta(pDta);
-	useOldHandler = 0;
+	useOldGDHandler = 0;
 
 	// TODO: on application start set the pointer to the default position (somewhere before the app args)
 	
@@ -451,10 +378,7 @@ int32_t custom_fsfirst( void *sp )
 	if(!isOurDrive(drive, 0)) {											/* not our drive? */
 		fsnextIsForUs = FALSE;
 	
-		useOldHandler = 1;												/* call the old handler */
-		res = Fsfirst(fspec, attribs);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Fsfirst, fspec, attribs);
 	}
 	
 	/* initialize internal variables */
@@ -475,10 +399,7 @@ int32_t custom_fsfirst( void *sp )
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
 		fsnextIsForUs = FALSE;
 	
-		useOldHandler = 1;												/* call the old handler */
-		res = Fsfirst(fspec, attribs);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Fsfirst, fspec, attribs);
 	}
 	
 	if(res != E_OK) {													/* if some other error, just return it */
@@ -494,10 +415,7 @@ int32_t custom_fsnext( void *sp )
 	DWORD res;
 
 	if(!fsnextIsForUs) {												/* if we shouldn't handle this */
-		useOldHandler = 1;												/* call the old handler */
-		res = Fsnext();
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Fsnext);
 	}
 
 	res = copyNextDtaToAtari();											/* now copy the next possible DTA to atari DTA buffer */
@@ -564,6 +482,8 @@ BYTE getNextDTAsFromHost(void)
 
 int32_t custom_fcreate( void *sp )
 {
+	DWORD res;
+
 	WORD handle = 0;
 	BYTE *params = (BYTE *) sp;
 
@@ -575,10 +495,7 @@ int32_t custom_fcreate( void *sp )
 	WORD drive = getDriveFromPath((char *) fileName);
 	
 	if(!isOurDrive(drive, 0)) {											/* not our drive? */
-		useOldHandler = 1;												/* call the old handler */
-		handle = Fcreate(fileName, attr);
-		useOldHandler = 0;
-		return handle;													/* return the value returned from old handler */
+		CALL_OLD_GD( Fcreate, fileName, attr);
 	}
 	
 	/* set the params to buffer */
@@ -591,10 +508,7 @@ int32_t custom_fcreate( void *sp )
 	handle = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* send command to host over ACSI */
 
 	if(handle == E_NOTHANDLED || handle == ERROR) {						/* not handled or error? */
-		useOldHandler = 1;												/* call the old handler */
-		handle = Fcreate(fileName, attr);
-		useOldHandler = 0;
-		return handle;													/* return the value returned from old handler */
+		CALL_OLD_GD( Fcreate, fileName, attr);
 	}
 	
 	if(handle == ENHNDL || handle == EACCDN || handle == EINTRN) {		/* if some other error, just return it */
@@ -607,6 +521,8 @@ int32_t custom_fcreate( void *sp )
 
 int32_t custom_fopen( void *sp )
 {
+	DWORD res;
+
 	WORD handle = 0;
 	BYTE *params = (BYTE *) sp;
 
@@ -618,10 +534,7 @@ int32_t custom_fopen( void *sp )
 	WORD drive = getDriveFromPath((char *) fileName);
 	
 	if(!isOurDrive(drive, 0)) {											/* not our drive? */
-		useOldHandler = 1;												/* call the old handler */
-		handle = Fopen(fileName, mode);
-		useOldHandler = 0;
-		return handle;													/* return the value returned from old handler */
+		CALL_OLD_GD( Fopen, fileName, mode);
 	}
 	
 	/* set the params to buffer */
@@ -634,10 +547,7 @@ int32_t custom_fopen( void *sp )
 	handle = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* send command to host over ACSI */
 
 	if(handle == E_NOTHANDLED || handle == ERROR) {						/* not handled or error? */
-		useOldHandler = 1;												/* call the old handler */
-		handle = Fopen(fileName, mode);
-		useOldHandler = 0;
-		return handle;													/* return the value returned from old handler */
+		CALL_OLD_GD( Fopen, fileName, mode);
 	}
 	
 	if(handle == ENHNDL || handle == EACCDN || handle == EINTRN) {		/* if some other error, just return it */
@@ -655,10 +565,7 @@ int32_t custom_fclose( void *sp )
 
 	/* check if this handle should belong to cosmosEx */
 	if(!handleIsFromCE(atariHandle)) {									/* not called with handle belonging to CosmosEx? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Fclose(atariHandle);
-		useOldHandler = 0;
-		return res;
+		CALL_OLD_GD(Fclose, atariHandle);
 	}
 	
 	WORD ceHandle = handleAtariToCE(atariHandle);						/* convert high atari handle to little CE handle */
@@ -670,53 +577,8 @@ int32_t custom_fclose( void *sp )
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Fclose(atariHandle);
-		useOldHandler = 0;
-		return res;													/* return the value returned from old handler */
+		CALL_OLD_GD( Fclose, atariHandle);
 	}
-	
-	return res;
-}
-
-int32_t custom_fread( void *sp )
-{
-	DWORD res = 0;
-	WORD handle = 0;
-
-	// insert code for func param retrieval
-	
-	if(!handleIsFromCE(handle)) {										/* not called with handle belonging to CosmosEx? */
-		useOldHandler = 1;												/* call the old handler */
-		// insert the code to call the original handler
-		useOldHandler = 0;
-		return res;
-	}
-	
-	handle = handleAtariToCE(handle);									/* convert high atari handle to little CE handle */
-	
-	// insert the code for CosmosEx communication
-	
-	return res;
-}
-
-int32_t custom_fwrite( void *sp )
-{
-	DWORD res = 0;
-	WORD handle = 0;
-
-	// insert code for func param retrieval
-	
-	if(!handleIsFromCE(handle)) {										/* not called with handle belonging to CosmosEx? */
-		useOldHandler = 1;												/* call the old handler */
-		// insert the code to call the original handler
-		useOldHandler = 0;
-		return res;
-	}
-	
-	handle = handleAtariToCE(handle);									/* convert high atari handle to little CE handle */
-	
-	// insert the code for CosmosEx communication
 	
 	return res;
 }
@@ -735,10 +597,7 @@ int32_t custom_fseek( void *sp )
 	
 	/* check if this handle should belong to cosmosEx */
 	if(!handleIsFromCE(atariHandle)) {									/* not called with handle belonging to CosmosEx? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Fseek(offset, atariHandle, seekMode);
-		useOldHandler = 0;
-		return res;
+		CALL_OLD_GD( Fseek, offset, atariHandle, seekMode);
 	}
 	
 	WORD ceHandle = handleAtariToCE(atariHandle);						/* convert high atari handle to little CE handle */
@@ -758,10 +617,7 @@ int32_t custom_fseek( void *sp )
 	res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);				/* send command to host over ACSI */
 
 	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
-		useOldHandler = 1;												/* call the old handler */
-		res = Fseek(offset, atariHandle, seekMode);
-		useOldHandler = 0;
-		return res;														/* return the value returned from old handler */
+		CALL_OLD_GD( Fseek, offset, atariHandle, seekMode);
 	}
 	
 	if(res != E_OK) {													/* if some other error, make negative number out of it */
@@ -796,10 +652,7 @@ int32_t custom_fdatime( void *sp )
 	
 	/* check if this handle should belong to cosmosEx */
 	if(!handleIsFromCE(atariHandle)) {										/* not called with handle belonging to CosmosEx? */
-		useOldHandler = 1;													/* call the old handler */
-		res = Fdatime(pDatetime, atariHandle, flag);
-		useOldHandler = 0;
-		return res;
+		CALL_OLD_GD( Fdatime, pDatetime, atariHandle, flag);
 	}
 	
 	WORD ceHandle = handleAtariToCE(atariHandle);							/* convert high atari handle to little CE handle */
@@ -879,33 +732,6 @@ BYTE isOurDrive(WORD drive, BYTE withCurrentDrive)
 	return FALSE;
 }
 
-/* this function updates the ceDrives variable from the status in host, 
-but does this only once per 3 seconds, so you can call it often and 
-it will quit then sooner withot updating (hoping that nothing changed within 3 seconds) */
-void updateCeDrives(void)
-{
-	DWORD res;
-	DWORD now = *HZ_200;
-
-	if((lastCeDrivesUpdate - now) < 600) {								/* if the last update was less than 3 seconds ago, don't update */
-		return;
-	}
-	
-	lastCeDrivesUpdate = now;											/* mark that we've just updated the ceDrives */
-	
-	/* now do the real update */
-	commandShort[4] = BIOS_Drvmap;											/* store BIOS function number */
-	commandShort[5] = 0;										
-	
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
-	
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
-		return;														
-	}
-	
-	WORD drives = (WORD) *((WORD *) pDmaBuffer);						/* read drives from dma buffer */
-	ceDrives = drives;	
-}
 /* ------------------------------------------------------------------ */
 void initFunctionTable(void)
 {
@@ -931,6 +757,7 @@ void initFunctionTable(void)
 	gemdos_table[0x56] = custom_frename;
 	gemdos_table[0x57] = custom_fdatime;
 	
+	bios_table[0x07] = custom_getbpb;
 	bios_table[0x09] = custom_mediach;
 	bios_table[0x0a] = custom_drvmap; 
 }
