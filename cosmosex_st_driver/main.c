@@ -62,6 +62,7 @@ BYTE currentDrive;
 int main( int argc, char* argv[] )
 {
 	BYTE found;
+	int i;
 
 	/* write some header out */
 	(void) Clear_home();
@@ -105,6 +106,10 @@ int main( int argc, char* argv[] )
 	
 	initFunctionTable();
 
+	for(i=0; i<MAX_FILES; i++) {
+		initFileBuffer(i);									/* init the file buffers */
+	}
+	
 	/* either remove the old one or do nothing, old memory isn't released */
 	if( unhook_xbra( VEC_GEMDOS, 'CEDD' ) == 0L && unhook_xbra( VEC_BIOS, 'CEDD' ) == 0L ) {
 		(void)Cconws( "\r\nDriver installed.\r\n" );

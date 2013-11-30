@@ -108,6 +108,9 @@ void updateCeDrives(void);
 int32_t custom_fread ( void *sp );
 int32_t custom_fwrite( void *sp );
 
+void commitChanges(WORD ceHandle);
+void initFileBuffer(WORD ceHandle);
+
 #define CALL_OLD_GD( function, ... )	\
 		useOldGDHandler = 1;			\
 		res = function( __VA_ARGS__ );	\

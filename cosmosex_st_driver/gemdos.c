@@ -570,6 +570,9 @@ int32_t custom_fclose( void *sp )
 	
 	WORD ceHandle = handleAtariToCE(atariHandle);						/* convert high atari handle to little CE handle */
 	
+	commitChanges(ceHandle);											/* flush write buffer if needed */
+	initFileBuffer(ceHandle);											/* init the file buffer like it was never used */
+	
 	/* set the params to buffer */
 	commandShort[4] = GEMDOS_Fclose;											/* store GEMDOS function number */
 	commandShort[5] = (BYTE) ceHandle;			
@@ -601,6 +604,8 @@ int32_t custom_fseek( void *sp )
 	}
 	
 	WORD ceHandle = handleAtariToCE(atariHandle);						/* convert high atari handle to little CE handle */
+	
+	commitChanges(ceHandle);											/* flush write buffer if needed */
 	
 	/* set the params to buffer */
 	commandLong[5] = GEMDOS_Fseek;											/* store GEMDOS function number */

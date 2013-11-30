@@ -53,6 +53,17 @@ DWORD copyNextDtaToAtari(void);
 extern WORD ceDrives;
 extern BYTE currentDrive;
 
+typedef struct 
+{
+	BYTE rBuf[512];
+	WORD rCount;
+	
+	BYTE wBuf[512];
+	WORD wCount;
+	
+} TFileBuffer;
+
+TFileBuffer fileBufs[MAX_FILES];
 
 /* ------------------------------------------------------------------ */
 int32_t custom_fread( void *sp )
@@ -72,6 +83,7 @@ int32_t custom_fread( void *sp )
 	}
 	
 	WORD ceHandle = handleAtariToCE(atariHandle);						/* convert high atari handle to little CE handle */
+	
 	
 	/* set the params to buffer */
 	commandLong[5] = GEMDOS_Fread;										/* store GEMDOS function number */
@@ -105,4 +117,37 @@ int32_t custom_fwrite( void *sp )
 	return res;
 }
 
+/* call this function on fclose, fseek to write the rest of write buffer to the file */
+void commitChanges(WORD ceHandle)
+{
+	if(ceHandle >= MAX_FILES) {											/* would be out of index? quit */
+		return;
+	}
+
+	if(fileBufs[ceHandle].wCount == 0) {								/* nothing stored in write cache? quit */
+		return;
+	}
+	
+	
+	
+	// TODO: send data to host
+
+
+	
+	
+	fileBufs[ceHandle].wCount = 0;
+}
+
+/* call this on start to init all, or on fclose / fopen / fcreate to init it */
+void initFileBuffer(WORD ceHandle) 
+{
+	if(ceHandle >= MAX_FILES) {											/* would be out of index? quit */
+		return;
+	}
+
+	fileBufs[ceHandle].rCount = 0;
+	fileBufs[ceHandle].wCount = 0;
+}
+
 /* ------------------------------------------------------------------ */
+
