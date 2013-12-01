@@ -142,38 +142,45 @@ int32_t custom_fwrite( void *sp )
 		}		
 	} else {															/* if writing more than size of our buffer */
 		DWORD dwBuffer = (DWORD) buffer;
-		BYTE  spaceLeftIsOdd = spaceLeft & 1;
+		
+		BYTE  bufferIsOdd		= dwBuffer	& 1;
+		BYTE  spaceLeftIsOdd	= spaceLeft	& 1;
 		
 		DWORD bytesWritten = 0;
 		
-		if((dwBuffer & 1) == 0) {										/* should write from EVEN address */
-			if(spaceLeftIsOdd) {										/* and space left is odd number - make it also even */
-				spaceLeft--;
-			}		
-		} else {														/* should write from ODD address */
-			if(!spaceLeftIsOdd) {										/* and space left is even number - make it also ODD, so it would cancel out the ODD shit */
-				if(spaceLeft > 0) {										/* can we make ODD number out of it? */
+		/* the code inside is needed only when: buffer contains some data || address is ODD! Otherwise should skip this. */
+		if(fb->wCount != 0 || bufferIsOdd) {								
+			
+			if(!bufferIsOdd) {												/* should write from EVEN address */
+				if(spaceLeftIsOdd) {										/* and space left is odd number - make it also even */
 					spaceLeft--;
-				} else {												/* if can't make ODD number out of 0 */
-					commitChanges(ceHandle);							/* empty the buffer - now the spaceLeft should be 512 again */
+				}		
+			} else {														/* should write from ODD address */
+				if(!spaceLeftIsOdd) {										/* and space left is even number - make it also ODD, so it would cancel out the ODD shit */
+					if(spaceLeft > 0) {										/* can we make ODD number out of it? */
+						spaceLeft--;
+					} else {												/* if can't make ODD number out of 0 */
+						commitChanges(ceHandle);							/* empty the buffer - now the spaceLeft should be 512 again */
 					
-					spaceLeft = (RW_BUFFER_SIZE - fb->wCount);			/* recalculate the space left variable */
-					spaceLeft--;										/* and make ODD number out of it */
+						spaceLeft = RW_BUFFER_SIZE;							/* recalculate the space left variable */
+						spaceLeft--;										/* and make ODD number out of it */
+					}
 				}
 			}
-		}
 	
-		memcpy(&fb->wBuf[ fb->wCount ], buffer, spaceLeft);				/* copy some data to current buffer to use it as much as possible */
-		fb->wCount	+= spaceLeft;										/* calculate the new data count */
-		buffer		+= spaceLeft;										/* and calculate the new pointer to data, which should be now an EVEN number! */
+			memcpy(&fb->wBuf[ fb->wCount ], buffer, spaceLeft);				/* copy some data to current buffer to use it as much as possible */
+			fb->wCount	+= spaceLeft;										/* calculate the new data count */
+			buffer		+= spaceLeft;										/* and calculate the new pointer to data, which should be now an EVEN number! */
 	
-		res = commitChanges(ceHandle);									/* empty the current buffer */
+			res = commitChanges(ceHandle);									/* empty the current buffer */
 
-		if(!res) {														/* failed to write data? no data written yet */
-			return 0;
+			if(!res) {														/* failed to write data? no data written yet */
+				return 0;
+			}
+		
+			bytesWritten += spaceLeft;										/* until now we've written this many bytes */
 		}
 		
-		bytesWritten += spaceLeft;										/* until now we've written this many bytes */
 		/* --------------------- */
 		/* at this point 'buffer' points to the remaining data and it should be an EVEN number! */
 		DWORD rCount = count - spaceLeft;								/* this much data is remaining to be written */
