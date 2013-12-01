@@ -108,8 +108,10 @@ void updateCeDrives(void);
 int32_t custom_fread ( void *sp );
 int32_t custom_fwrite( void *sp );
 
-void commitChanges(WORD ceHandle);
+BYTE commitChanges(WORD ceHandle);
 void initFileBuffer(WORD ceHandle);
+
+BYTE writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 
 #define CALL_OLD_GD( function, ... )	\
 		useOldGDHandler = 1;			\
