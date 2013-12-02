@@ -448,6 +448,32 @@ BYTE commitChanges(WORD ceHandle)
 	return FALSE;
 }
 
+// call this on fseek - this will either alter the pointer in current file buffer, or invalidate the whole file buffer
+void seekInFileBuffer(WORD ceHandle, int32_t offset, BYTE seekMode) 
+{
+	if(ceHandle >= MAX_FILES) {											// would be out of index? quit
+		return;
+	}
+
+	TFileBuffer *fb = &fileBufs[ceHandle];
+	
+	if(seekMode != 1) {													// if doing anything other than SEEK_CUR, just invalidate the buffer
+		fb->rCount = 0;
+		fb->rStart = 0;
+		return;
+	}
+	
+	int32_t newPos = ((int32_t) fb->rStart) + offset;					// calculate the new position
+	
+	if(newPos < 0 || newPos > fb->rCount) {								// the seek would go outsite of our buffer? invalidate it!
+		fb->rCount = 0;
+		fb->rStart = 0;
+		return;
+	}
+	
+	fb->rStart = newPos;												// store the new position in the buffer
+}
+
 // call this on start to init all, or on fclose / fopen / fcreate to init it 
 void initFileBuffer(WORD ceHandle) 
 {

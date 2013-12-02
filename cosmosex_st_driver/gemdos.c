@@ -606,6 +606,7 @@ int32_t custom_fseek( void *sp )
 	WORD ceHandle = handleAtariToCE(atariHandle);						/* convert high atari handle to little CE handle */
 	
 	commitChanges(ceHandle);											/* flush write buffer if needed */
+	seekInFileBuffer(ceHandle, offset, seekMode);						// update the file buffer by seeking if possible
 	
 	/* set the params to buffer */
 	commandLong[5] = GEMDOS_Fseek;											/* store GEMDOS function number */

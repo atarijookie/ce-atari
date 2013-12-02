@@ -114,6 +114,7 @@ void initFileBuffer(WORD ceHandle);
 
 BYTE fillReadBuffer(WORD ceHandle);
 DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset);
+void seekInFileBuffer(WORD ceHandle, int32_t offset, BYTE seekMode);
 
 DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 
