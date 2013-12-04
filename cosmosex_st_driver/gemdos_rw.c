@@ -357,7 +357,7 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
 		return 0;
 	}
 
-	DWORD count = (DWORD) *((DWORD *) pDmaBuffer);						// read how much data was written
+    DWORD count = getDword(pDmaBuffer);						// read how much data was written
 	return count;
 }
 
@@ -418,7 +418,7 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 		return 0;
 	}
 
-	DWORD count = (DWORD) *((DWORD *) pDmaBuffer);						// read how much data was read
+    DWORD count = getDword(pDmaBuffer);						// read how much data was read
 	return count;
 }
 

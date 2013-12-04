@@ -78,7 +78,7 @@ int32_t custom_getbpb( void *sp )
 	
 	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 	
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_BIOS(Getbpb, drive);
 		return res;														
 	}
@@ -110,11 +110,11 @@ void updateCeDrives(void)
 	
 	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 	
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		return;														
 	}
 	
-	ceDrives = (WORD) *((WORD *) pDmaBuffer);						/* read drives from dma buffer */
+    ceDrives = getWord(pDmaBuffer);                                         /* read drives from dma buffer */
 }
 
 void updateCeMediach(void)
@@ -135,9 +135,9 @@ void updateCeMediach(void)
 	
 	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* send command to host over ACSI */
 	
-	if(res == E_NOTHANDLED || res == ERROR) {									/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {									/* not handled or error? */
 		return;														
 	}
 	
-	ceMediach = (WORD) *((WORD *) pDmaBuffer);									/* store current media change status */
+    ceMediach = getWord(pDmaBuffer);									/* store current media change status */
 }

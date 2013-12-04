@@ -21,7 +21,7 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 	if (qdone() != OK) {					/* wait for ack */
 		hdone();                          	/* restore DMA device to normal */
 
-		return ERROR;
+		return ACSIERROR;
 	}
 	/*********************************/
 	/* transfer middle cmd bytes */
@@ -32,7 +32,7 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 		if (qdone() != OK) {				/* wait for ack */
 			hdone();                        /* restore DMA device to normal */
 			
-			return ERROR;
+			return ACSIERROR;
 		}
 	}
 	
@@ -65,7 +65,7 @@ BYTE endcmd(WORD mode)
 	WORD val;
 
 	if (fdone() != OK)                  /* wait for operation done ack */
-		return ERROR;
+		return ACSIERROR;
 
 	*dmaAddrMode = mode;                /* write mode word to mode register */
 
@@ -125,7 +125,7 @@ BYTE wait_dma_cmpl(DWORD t_ticks)
 		}
 	}
 
-	return ERROR;                      /* no interrupt, and timer expired, */
+	return ACSIERROR;                  /* no interrupt, and timer expired, */
 }
 /****************************************************************************/
 

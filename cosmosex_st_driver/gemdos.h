@@ -129,7 +129,19 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 		res = function( __VA_ARGS__ );	\
 		useOldGDHandler = 0;			
 
-		
+// if sign bit is set, extend the sign to whole DWORD
+#define extendByteToDword(X)    ( ((X & 0x80)==0) ? X : (0xffffff00 | X) )
+
+// macros for getting data from buffer - defined for big and little endian
+// big endian (atari)
+#define getWord(POINTER)        ((WORD)  *((WORD  *) POINTER))
+#define getDword(POINTER)       ((DWORD) *((DWORD *) POINTER))
+
+// little endian (pc)
+//#define getWord(POINTER)        ( (((WORD) *POINTER)<<8) | ((WORD) *(POINTER+1)))
+//#define getDword(POINTER)       ( (((DWORD) *POINTER)<<24) | (((DWORD) *(POINTER+1))<<16) | (((DWORD) *(POINTER+2))<<8) | (((DWORD) *(POINTER+3))) )
+
+
 		
 // The following macros are used to convert atari handle numbers which are WORDs
 // to CosmosEx ex handle numbers, which are only BYTEs; and back.

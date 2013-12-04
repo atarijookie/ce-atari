@@ -73,7 +73,7 @@ int32_t custom_dgetdrv( void *sp )
 	
 	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD_NORET(Dgetdrv);
 
 		currentDrive = res;												/* store the current drive */
@@ -93,28 +93,31 @@ int32_t custom_dsetdrv( void *sp )
 	currentDrive = drive;												/* store the drive - GEMDOS seems to let you set even invalid drive */
 	
 	if(!isOurDrive(drive, 0)) {											/* if the drive is not our drive */
-		CALL_OLD_GD_NORET(Dsetdrv, drive);
+        // note: even though we now know that this drive is not ours, we will let the host know that we've changed the drive
+        commandShort[4] = GEMDOS_Dsetdrv;										/* store GEMDOS function number */
+        commandShort[5] = (BYTE) drive;											/* store drive number */
+        acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* send command to host over ACSI */
+
+        CALL_OLD_GD_NORET(Dsetdrv, drive);
 	
 		res = res | ceDrives;											/* mounted drives = original drives + ceDrives */	
 		return res;
 	}
 
-	commandShort[4] = GEMDOS_Dsetdrv;										/* store GEMDOS function number */
-	commandShort[5] = (BYTE) drive;											/* store drive number */
-	
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+    // in this case the drive is ours, now we even care for the result
+    commandShort[4] = GEMDOS_Dsetdrv;										/* store GEMDOS function number */
+    commandShort[5] = (BYTE) drive;											/* store drive number */
+    res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD_NORET(Dsetdrv, drive);
 
 		res = res | ceDrives;											/* mounted drives = original drives + ceDrives */	
 		return res;														/* return the value returned from old handler */
 	}
 	
-	// TODO: replace BIOS Drvmap too!
-	
 	WORD drivesMapOrig	= Drvmap();										/* BIOS call - get drives bitmap */
-	WORD myDrivesMap	= (WORD) *pDmaBuffer;							/* read result, which is drives bitmap*/	
+    WORD myDrivesMap	= getWord(pDmaBuffer);							/* read result, which is drives bitmap*/
 	
 	return (drivesMapOrig | myDrivesMap);								/* result = original + my drives bitmap */
 }
@@ -137,18 +140,18 @@ int32_t custom_dfree( void *sp )
 
 	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Dfree, pDiskInfo, drive);
 	}
 
 	memcpy(pDiskInfo, pDmaBuffer, 16);									/* copy in the results */
-	return res;
+    return extendByteToDword(res);
 }
 
 int32_t custom_dcreate( void *sp )
 {
 	DWORD res;
-	BYTE *pPath	= (BYTE *) *((DWORD *) sp);
+    char *pPath	= (char *) *((DWORD *) sp);
 
 	WORD drive = getDriveFromPath((char *) pPath);
 	
@@ -164,17 +167,17 @@ int32_t custom_dcreate( void *sp )
 	
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Dcreate, pPath);
 	}
 
-	return res;
+    return extendByteToDword(res);
 }
 
 int32_t custom_ddelete( void *sp )
 {
 	DWORD res;
-	BYTE *pPath	= (BYTE *) *((DWORD *) sp);
+    char *pPath	= (char *) *((DWORD *) sp);
 	
 	WORD drive = getDriveFromPath((char *) pPath);
 	
@@ -190,17 +193,17 @@ int32_t custom_ddelete( void *sp )
 	
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD(Ddelete, pPath);
 	}
 
-	return res;
+    return extendByteToDword(res);
 }
 
 int32_t custom_fdelete( void *sp )
 {
 	DWORD res;
-	BYTE *pPath	= (BYTE *) *((DWORD *) sp);
+    char *pPath	= (char *) *((DWORD *) sp);
 	
 	WORD drive = getDriveFromPath((char *) pPath);
 	
@@ -216,17 +219,17 @@ int32_t custom_fdelete( void *sp )
 	
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Fdelete, pPath);
 	}
 
-	return res;
+    return extendByteToDword(res);
 }
 
 int32_t custom_dsetpath( void *sp )
 {
 	DWORD res;
-	BYTE *pPath	= (BYTE *) *((DWORD *) sp);
+    char *pPath	= (char *) *((DWORD *) sp);
 	
 	WORD drive = getDriveFromPath((char *) pPath);
 	
@@ -242,11 +245,11 @@ int32_t custom_dsetpath( void *sp )
 	
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Dsetpath, pPath);
 	}
 
-	return res;
+    return extendByteToDword(res);
 }
 
 int32_t custom_dgetpath( void *sp )
@@ -254,7 +257,7 @@ int32_t custom_dgetpath( void *sp )
 	DWORD res;
 	BYTE *params = (BYTE *) sp;
 
-	BYTE *buffer	= (BYTE *)	*((DWORD *) params);
+    char *buffer	= (char *)	*((DWORD *) params);
 	params += 4;
 	WORD drive		= (WORD)	*((WORD *)  params);
 	
@@ -267,12 +270,12 @@ int32_t custom_dgetpath( void *sp )
 
 	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Dgetpath, buffer, drive);
 	}
 
 	strncpy((char *)buffer, (char *)pDmaBuffer, DMA_BUFFER_SIZE);		/* copy in the results */
-	return res;
+    return extendByteToDword(res);
 }
 
 int32_t custom_frename( void *sp )
@@ -304,11 +307,11 @@ int32_t custom_frename( void *sp )
 
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Frename, 0, oldName, newName);
 	}
 
-	return res;
+    return extendByteToDword(res);
 }
 
 int32_t custom_fattrib( void *sp )
@@ -340,11 +343,11 @@ int32_t custom_fattrib( void *sp )
 	
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Fattrib, fileName, flag, attr);
 	}
 
-	return res;
+    return extendByteToDword(res);
 }
 
 /* **************************************************************** */
@@ -396,18 +399,18 @@ int32_t custom_fsfirst( void *sp )
 	
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		fsnextIsForUs = FALSE;
 	
 		CALL_OLD_GD( Fsfirst, fspec, attribs);
 	}
 	
 	if(res != E_OK) {													/* if some other error, just return it */
-		return (0xffffff00 | res);										/* but append lots of FFs to make negative integer out of it */
+        return extendByteToDword(res);									/* but append lots of FFs to make negative integer out of it */
 	}
 
 	res = copyNextDtaToAtari();											/* now copy the next possible DTA to atari DTA buffer */
-	return res;
+    return extendByteToDword(res);
 }
 
 int32_t custom_fsnext( void *sp )
@@ -428,19 +431,19 @@ DWORD copyNextDtaToAtari(void)
 
 	if(dtaCurrent >= dtaTotal) {										/* if we're out of buffered DTAs */
 		if(!tryToGetMoreDTAs) {											/* if shouldn't try to get more DTAs, quit without trying */
-			return (0xffffff00 | ENMFIL);
+            return extendByteToDword(ENMFIL);
 		}
 	
 		res = getNextDTAsFromHost();									/* now we need to get the buffer of DTAs from host */
 		
 		if(res != E_OK) {												/* failed to get DTAs from host? */
 			tryToGetMoreDTAs = 0;										/* do not try to receive more DTAs from host */
-			return (0xffffff00 | ENMFIL);								/* return that we're out of files */
+            return extendByteToDword(ENMFIL);								/* return that we're out of files */
 		}
 	}
 
 	if(dtaCurrent >= dtaTotal) {										/* still no buffered DTAs? (this shouldn't happen) */
-		return (0xffffff00 | ENMFIL);									/* return that we're out of files */
+        return extendByteToDword(ENMFIL);									/* return that we're out of files */
 	}
 
 	DWORD dtaOffset		= 2 + (23 * dtaCurrent);						/* calculate the offset for the DTA in buffer */
@@ -466,7 +469,7 @@ BYTE getNextDTAsFromHost(void)
 	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDtaBuffer, 1);				/* send command to host over ACSI */
 	
 	if(res != E_OK) {													/* if failed to transfer data - no more files */
-		return ENMFIL;
+        return ENMFIL;
 	}
 	
 	/* store the new total DTA number we have buffered */
@@ -507,12 +510,12 @@ int32_t custom_fcreate( void *sp )
 	
 	handle = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* send command to host over ACSI */
 
-	if(handle == E_NOTHANDLED || handle == ERROR) {						/* not handled or error? */
+    if(handle == E_NOTHANDLED || handle == ACSIERROR) {						/* not handled or error? */
 		CALL_OLD_GD( Fcreate, fileName, attr);
 	}
 	
 	if(handle == ENHNDL || handle == EACCDN || handle == EINTRN) {		/* if some other error, just return it */
-		return (0xffffff00 | handle);									/* but append lots of FFs to make negative integer out of it */
+        return extendByteToDword(handle);									/* but append lots of FFs to make negative integer out of it */
 	}
 	
 	handle = handleCEtoAtari(handle);									/* convert the CE handle (0 - 46) to Atari handle (150 - 200) */
@@ -546,12 +549,12 @@ int32_t custom_fopen( void *sp )
 	
 	handle = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* send command to host over ACSI */
 
-	if(handle == E_NOTHANDLED || handle == ERROR) {						/* not handled or error? */
+    if(handle == E_NOTHANDLED || handle == ACSIERROR) {						/* not handled or error? */
 		CALL_OLD_GD( Fopen, fileName, mode);
 	}
 	
 	if(handle == ENHNDL || handle == EACCDN || handle == EINTRN) {		/* if some other error, just return it */
-		return (0xffffff00 | handle);									/* but append lots of FFs to make negative integer out of it */
+        return extendByteToDword(handle);								/* but append lots of FFs to make negative integer out of it */
 	}
 	
 	handle = handleCEtoAtari(handle);									/* convert the CE handle (0 - 46) to Atari handle (150 - 200) */
@@ -579,11 +582,11 @@ int32_t custom_fclose( void *sp )
 	
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Fclose, atariHandle);
 	}
 	
-	return res;
+    return extendByteToDword(res);
 }
 
 int32_t custom_fseek( void *sp )
@@ -622,12 +625,12 @@ int32_t custom_fseek( void *sp )
 	
 	res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);				/* send command to host over ACSI */
 
-	if(res == E_NOTHANDLED || res == ERROR) {							/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Fseek, offset, atariHandle, seekMode);
 	}
 	
 	if(res != E_OK) {													/* if some other error, make negative number out of it */
-		return (0xffffff00 | res);
+        return extendByteToDword(res);
 	}
 	
 	/* If we got here, the seek was succesfull and now we need to return the position in the file. */
@@ -683,11 +686,11 @@ int32_t custom_fdatime( void *sp )
 		return E_OK;
 	}
 		
-	if(	res == E_NOTHANDLED || res == ERROR || res == EINTRN) {				/* not handled or error? */
-		return (0xffffff00 | EINTRN);										/* return internal error */
+    if(	res == E_NOTHANDLED || res == ACSIERROR || res == EINTRN) {				/* not handled or error? */
+        return extendByteToDword(EINTRN);										/* return internal error */
 	}
 
-	return (0xffffff00 | EINTRN);											/* in other cases - Internal Error - this shouldn't happen */
+    return extendByteToDword(EINTRN);											/* in other cases - Internal Error - this shouldn't happen */
 }
 
 /* ------------------------------------------------------------------ */

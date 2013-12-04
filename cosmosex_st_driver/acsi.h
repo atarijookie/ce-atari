@@ -1,10 +1,12 @@
 /* ------------------------------------------ */
 
-#define FALSE		0
-#define TRUE		1
+#ifndef FALSE
+    #define FALSE		0
+    #define TRUE		1
+#endif
 
 #define OK			0           /* OK status */
-#define ERROR		0xff        /* ERROR status (timeout) */
+#define ACSIERROR	0xff        /* ERROR status (timeout) */
 
 #define MAXSECTORS	254          /* Max # sectors for a DMA */
 
@@ -16,9 +18,11 @@
 
 #include <stdint.h>
 
-#define BYTE  	unsigned char
-#define WORD  	uint16_t
-#define DWORD 	uint32_t
+#ifndef BYTE
+    #define BYTE  	unsigned char
+    #define WORD  	uint16_t
+    #define DWORD 	uint32_t
+#endif
 
 /* mfp chip register */ 
 #define mfpGpip			((volatile BYTE *) 0xFFFA01)
