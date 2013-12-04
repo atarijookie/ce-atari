@@ -46,7 +46,7 @@ BYTE deviceID;
 BYTE commandShort[CMD_LENGTH_SHORT]	= {			0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
 BYTE commandLong[CMD_LENGTH_LONG]	= {0x1f,	0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0};
 
-_DTA *pDta;
+BYTE *pDta;
 BYTE tempDta[45];
 
 WORD dtaCurrent, dtaTotal;
@@ -98,7 +98,7 @@ int main( int argc, char* argv[] )
 	Supexec(ce_initialize);
 	
 	/* now init our internal vars */
-	pDta				= (_DTA *) &tempDta[0];				/* use this buffer as temporary one for DTA - just in case */
+	pDta				= (BYTE *) &tempDta[0];				/* use this buffer as temporary one for DTA - just in case */
 
 	currentDrive		= Dgetdrv();						/* get the current drive from system */
 	

@@ -39,7 +39,7 @@ extern BYTE deviceID;
 extern BYTE commandShort[CMD_LENGTH_SHORT];
 extern BYTE commandLong[CMD_LENGTH_LONG];
 
-extern _DTA *pDta;
+extern BYTE *pDta;
 extern BYTE tempDta[45];
 
 extern WORD dtaCurrent, dtaTotal;
@@ -81,7 +81,7 @@ int32_t custom_dgetdrv( void *sp )
 	}
 
 	currentDrive = res;													/* store the current drive */
-	return res;															/* return the result */
+    return res;															/* return the result */
 }
 
 int32_t custom_dsetdrv( void *sp )
@@ -355,11 +355,11 @@ int32_t custom_fattrib( void *sp )
 
 int32_t custom_fsetdta( void *sp )
 {
-	pDta = (_DTA *)	*((DWORD *) sp);									/* store the new DTA pointer */
+    pDta = (BYTE *) *((DWORD *) sp);									/* store the new DTA pointer */
 
-	useOldGDHandler = 1;
-	Fsetdta(pDta);
-	useOldGDHandler = 0;
+    useOldGDHandler = 1;
+    Fsetdta( (_DTA *) pDta );
+    useOldGDHandler = 0;
 
 	// TODO: on application start set the pointer to the default position (somewhere before the app args)
 	

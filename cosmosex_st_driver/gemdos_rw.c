@@ -37,7 +37,7 @@ extern BYTE deviceID;
 extern BYTE commandShort[CMD_LENGTH_SHORT];
 extern BYTE commandLong[CMD_LENGTH_LONG];
 
-extern _DTA *pDta;
+extern BYTE *pDta;
 extern BYTE tempDta[45];
 
 extern WORD dtaCurrent, dtaTotal;
