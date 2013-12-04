@@ -102,6 +102,7 @@ bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedTy
     int index = -1;
 
     if(isAlreadyAttached(hostRootPath)) {                   // if already attached, return success
+        outDebugString("TranslatedDisk::attachToHostPath - already attached");
         return true;
     }
 
@@ -169,6 +170,9 @@ void TranslatedDisk::attachToHostPathByIndex(int index, std::string hostRootPath
     conf[index].hostRootPath        = hostRootPath;
     conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
     conf[index].translatedType      = translatedType;
+    conf[index].mediaChanged        = true;
+
+    outDebugString("TranslatedDisk::attachToHostPath - path %s attached to index %d (letter %c)", hostRootPath.c_str(), index, 'A' + index);
 }
 
 bool TranslatedDisk::isAlreadyAttached(std::string hostRootPath)
@@ -196,6 +200,7 @@ void TranslatedDisk::detachByIndex(int index)
     conf[index].stDriveLetter       = 'A' + index;
     conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
     conf[index].translatedType      = TRANSLATEDTYPE_NORMAL;
+    conf[index].mediaChanged        = true;
 }
 
 void TranslatedDisk::detachAll(void)
@@ -231,6 +236,7 @@ void TranslatedDisk::detachFromHostPath(std::string hostRootPath)
     conf[index].hostRootPath        = "";
     conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
     conf[index].translatedType      = TRANSLATEDTYPE_NORMAL;
+    conf[index].mediaChanged        = true;
 
     // close all files which might be open on this host path
     for(int i=0; i<MAX_FILES; i++) {
@@ -302,6 +308,11 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case GD_CUSTOM_ftell:           onFtell(cmd);       break;
         case GD_CUSTOM_getRWdataCnt:    onRWDataCount(cmd); break;
 
+        // BIOS functions we need to support
+        case BIOS_Drvmap:               onDrvMap(cmd);      break;
+        case BIOS_Mediach:              onMediach(cmd);     break;
+        case BIOS_Getbpb:               onGetbpb(cmd);      break;
+
         // in other cases
         default:                                // in other cases
         dataTrans->setStatus(EINVFN);           // invalid function
@@ -368,9 +379,7 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
 {
     WORD drives = getDrivesBitmap();
 
-    dataTrans->addData(drives >>    8);     // drive bits first
-    dataTrans->addData(drives &  0xff);
-
+    dataTrans->addDataWord(drives);         // drive bits first
     dataTrans->padDataToMul16();            // pad to multiple of 16
 
     dataTrans->setStatus(E_OK);
@@ -448,10 +457,20 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
         return false;
     }
 
+    std::string root = conf[currentDriveIndex].hostRootPath;
+
     // need to handle with \\ at the begining, without \\ at the begining, with .. at the begining
 
-    if(startsWith(atariPath, HOSTPATH_SEPAR_STRING)) {                               // starts with \\ == starts from root
-        hostPath += atariPath.substr(1);                            // final path = hostPath + newPath
+    if(startsWith(atariPath, HOSTPATH_SEPAR_STRING)) {                  // starts with \\ == starts from root
+        hostPath = atariPath.substr(1);
+        removeDoubleDots(hostPath);                                     // search for '..' and simplify the path
+
+        std::string separ;
+        if(!endsWith(root, HOSTPATH_SEPAR_STRING) && !startsWith(hostPath, HOSTPATH_SEPAR_STRING)) { // if Separator should be added
+            separ = HOSTPATH_SEPAR_STRING;
+        }
+
+        hostPath = root + separ + hostPath;                             // final path = hostPath + newPath
         return true;
     }
 
@@ -474,8 +493,6 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
     if(startsWith(hostPath, HOSTPATH_SEPAR_STRING)) {                            // if host path starts with a backslash, remove it
         hostPath = hostPath.substr(1);
     }
-
-    std::string root = conf[currentDriveIndex].hostRootPath;
 
     if(!endsWith(root, HOSTPATH_SEPAR_STRING)) {                                 // if the host path does not end wit \\, add it
         root += HOSTPATH_SEPAR_STRING;

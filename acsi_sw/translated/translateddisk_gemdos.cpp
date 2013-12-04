@@ -33,9 +33,7 @@ void TranslatedDisk::onDsetdrv(BYTE *cmd)
         currentDriveIndex   = newDrive;
 
         WORD drives = getDrivesBitmap();
-        dataTrans->addData(drives >>   8);          // return the drives in data
-        dataTrans->addData(drives & 0xff);
-
+        dataTrans->addDataWord(drives);             // return the drives in data
         dataTrans->padDataToMul16();                // and pad to 16 bytes for DMA chip
 
         dataTrans->setStatus(E_OK);                 // return OK
@@ -1092,3 +1090,65 @@ int TranslatedDisk::findFileHandleSlot(int atariHandle)
     return -1;
 }
 
+// BIOS functions we need to support
+void TranslatedDisk::onDrvMap(BYTE *cmd)
+{
+    WORD drives = getDrivesBitmap();
+
+    dataTrans->addDataWord(drives);         // drive bits
+    dataTrans->padDataToMul16();            // pad to multiple of 16
+
+    dataTrans->setStatus(E_OK);
+}
+
+void TranslatedDisk::onMediach(BYTE *cmd)
+{
+    WORD mediach = 0;
+
+    for(int i=2; i<MAX_DRIVES; i++) {       // create media changed bits
+        if(conf[i].mediaChanged) {
+            mediach |= (1 << i);            // set the bit
+        }
+    }
+
+    dataTrans->addDataWord(mediach);
+    dataTrans->padDataToMul16();            // pad to multiple of 16
+
+    dataTrans->setStatus(E_OK);
+}
+
+void TranslatedDisk::onGetbpb(BYTE *cmd)
+{
+    WORD drive = cmd[5];
+
+    if(drive >= MAX_DRIVES) {                       // index would be out of range?
+        dataTrans->setStatus(E_NOTHANDLED);
+        return;
+    }
+
+    conf[drive].mediaChanged = false;               // mark as media not changed
+
+    if(!conf[drive].enabled) {                      // if drive not enabled
+        for(int i=0; i<9; i++) {                    // add empty data - just in case
+            dataTrans->addDataWord(0);
+        }
+        dataTrans->padDataToMul16();
+
+        dataTrans->setStatus(E_NOTHANDLED);
+        return;
+    }
+
+    // if we got here, we should return the BPB data for this drive
+    dataTrans->addDataWord(512);                // bytes per sector
+    dataTrans->addDataWord(4);                  // sectors per cluster - just a guess :)
+    dataTrans->addDataWord(4 * 512);            // bytes per cluster
+    dataTrans->addDataWord(32);                 // sector length of root directory - this would be 512 entries in root directory
+    dataTrans->addDataWord(8192);               // sectors per FAT - this would be just enough for 1 GB
+    dataTrans->addDataWord(1000 + 8192);        // starting sector of second FAT
+    dataTrans->addDataWord(1000 + 2*8192);      // starting sector of data
+    dataTrans->addDataWord(524288);             // clusters per disk
+    dataTrans->addDataWord(1);                  // bit 0=1 - 16 bit FAT, else 12 bit
+
+    dataTrans->padDataToMul16();
+    dataTrans->setStatus(E_OK);
+}

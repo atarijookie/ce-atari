@@ -41,6 +41,11 @@
 #define GD_CUSTOM_ftell         0x62
 #define GD_CUSTOM_getRWdataCnt  0x63
 
+// BIOS functions we need to support
+#define BIOS_Drvmap				0x70
+#define BIOS_Mediach			0x71
+#define BIOS_Getbpb				0x72
+
 //////////////////////////////////////
 
 // file attributes
@@ -51,6 +56,7 @@
 #define FA_DIR          (1 << 4)
 #define FA_ARCHIVE      (1 << 5)
 
+#define FA_ALL          (0x3f)
 
 // struct used for Fsfirst and Fsnext - modified version without first 21 reserved bytes
 // now the struct has 23 bytes total, so a buffer of 512 bytes should contain 22 of these + 6 spare bytes

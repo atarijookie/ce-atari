@@ -2,6 +2,8 @@
 #define TRANSLATEDDISK_H
 
 #include <windows.h>
+#include <stdio.h>
+#include <string>
 
 #include "../acsidatatrans.h"
 #include "../datatypes.h"
@@ -11,10 +13,11 @@
 
 #define HOSTPATH_SEPAR_STRING       "\\"
 #define HOSTPATH_SEPAR_CHAR         '\\'
-#define ATARIPATH_SEPAR_CHAR        '/'
+#define ATARIPATH_SEPAR_CHAR        '\\'
 
 typedef struct {
     bool        enabled;
+    bool        mediaChanged;
 
     std::string hostRootPath;               // where is the root on host file system
     char        stDriveLetter;              // what letter will be used on ST
@@ -139,6 +142,11 @@ private:
     void onInitialize(void);            // this method is called on the startup of CosmosEx translated disk driver
     void onFtell(BYTE *cmd);            // this is needed after Fseek
     void onRWDataCount(BYTE *cmd);      // when Fread / Fwrite doesn't process all the data, this returns the count of processed data
+
+    // BIOS functions we need to support
+    void onDrvMap(BYTE *cmd);
+    void onMediach(BYTE *cmd);
+    void onGetbpb(BYTE *cmd);
 
     // helper functions
     void attributesHostToAtari(DWORD attrHost, BYTE &attrAtari);
