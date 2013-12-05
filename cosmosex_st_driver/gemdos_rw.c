@@ -252,7 +252,8 @@ int32_t custom_fwrite( void *sp )
 		BYTE  spaceLeftIsOdd	= spaceLeft	& 1;
 		
 		DWORD bytesWritten = 0;
-		
+        DWORD remCount = 0;
+
 		// the code inside is needed only when: buffer contains some data || address is ODD! Otherwise should skip this. 
 		if(fb->wCount != 0 || bufferIsOdd) {								
 			
@@ -284,11 +285,14 @@ int32_t custom_fwrite( void *sp )
 			}
 		
 			bytesWritten += spaceLeft;										// until now we've written this many bytes 
-		}
+
+            remCount = count - spaceLeft;                                   // this much data is remaining to be written
+        } else {                                                            // if didn't go through file buffer
+            remCount = count;
+        }
 		
 		// --------------------- 
 		// at this point 'buffer' points to the remaining data and it should be an EVEN number! 
-		DWORD remCount = count - spaceLeft;								// this much data is remaining to be written 
 		
 		if(remCount < RW_BUFFER_SIZE) {									// if the remaining data count is less than what we should buffer 
 			memcpy(&fb->wBuf[ 0 ], buffer, remCount);					// copy data to current buffer 
