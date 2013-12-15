@@ -1,5 +1,5 @@
 TARGET	= cedd.prg
-SLIM	= no
+SLIM	= yes
 
 CC	= m68k-atari-mint-gcc
 STRIP	= m68k-atari-mint-strip
@@ -12,7 +12,9 @@ SSRC	= gemdos_asm.s bios_asm.s
 
 ifeq ($(SLIM),yes)
 CFLAGS	+= -nostdlib -DSLIM
-STARTUP	= startup.S
+STARTUP	= startup.s
+CSRC	+= stdlib.c
+HDR	+= stdlib.h
 endif
 
 $(TARGET): $(STARTUP) $(CSRC) $(SSRC) $(HDR)
