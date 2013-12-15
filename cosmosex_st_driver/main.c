@@ -84,8 +84,8 @@ int main( int argc, char* argv[] )
 	found = ce_findId();
 
 	if(!found) {								/* not found? quit */
-		sleep(1);
-//		return 0;
+		sleep(3);
+		return 0;
 	}
 	
 	/* now set up the acsi command bytes so we don't have to deal with this one anymore */
@@ -122,7 +122,7 @@ int main( int argc, char* argv[] )
 	old_bios_handler	= Setexc( VEC_BIOS,		bios_handler ); 
 	
 	/* wait for a while so the user could read the message and quit */
-	sleep(1);
+	sleep(2);
 
 	/* now terminate and stay resident */
 	Ptermres( 0x100 + _base->p_tlen + _base->p_dlen + _base->p_blen, 0 );

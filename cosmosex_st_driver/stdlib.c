@@ -1,5 +1,10 @@
+#include <mint/sysbind.h>
+#include <mint/osbind.h>
+
 #include "stdlib.h"
 #include "acsi.h"
+
+DWORD getTicks(void);
 
 void *memcpy ( void * destination, const void * source, int num )
 {
@@ -85,16 +90,24 @@ void sleep(int seconds)
 {
 	DWORD now, until;
 	DWORD tics = seconds * 200;
-	
-	now = *HZ_200;
-	until = now + tics;   				/* calc value timer must get to */
+
+	now = Supexec(getTicks);			// get current ticks
+	until = now + tics;   				// calc value timer must get to
 
 	while(1) {
-		now = *HZ_200;
+		now = Supexec(getTicks);		// get current ticks
 		
 		if(now >= until) {
 			break;
 		}
 	}
+}
+
+DWORD getTicks(void)
+{
+	DWORD now;
+	
+	now = *HZ_200;
+	return now;
 }
 
