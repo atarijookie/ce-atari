@@ -61,6 +61,7 @@
 #include "lenval.h"
 #include "ports.h"
 
+#include <bcm2835.h>
 
 /*============================================================================
 * XSVF #define
@@ -1769,6 +1770,22 @@ int main( int iArgc, char** ppzArgv )
 
     printf( "XSVF Player v%s, Xilinx, Inc.\n", XSVF_VERSION );
 
+	// try to init the GPIO library
+	if (!bcm2835_init()) {
+		printf( "bcm2835_init failed, can't use GPIO.\n");
+        return 1;
+	}
+	
+	// assuming we're having P1 connector in version 2 (V2)
+	// http://www.airspayce.com/mikem/bcm2835/group__constants.html
+	
+	// outputs: TDI (GPIO3), TCK (GPIO4), TMS (GPIO17)
+	bcm2835_gpio_fsel(RPI_V2_GPIO_P1_05,	BCM2835_GPIO_FSEL_OUTP);		// TDI
+	bcm2835_gpio_fsel(RPI_V2_GPIO_P1_11,	BCM2835_GPIO_FSEL_OUTP);		// TMS
+	bcm2835_gpio_fsel(RPI_V2_GPIO_P1_07,	BCM2835_GPIO_FSEL_OUTP);		// TCK
+	// inputs : TDO (GPIO2)
+	bcm2835_gpio_fsel(RPI_V2_GPIO_P1_03, BCM2835_GPIO_FSEL_INPT);
+	
     for ( i = 1; i < iArgc ; ++i )
     {
         if ( !strcmp( ppzArgv[ i ], "-v" ) )
@@ -1821,6 +1838,8 @@ int main( int iArgc, char** ppzArgv )
         }
     }
 
+	// close the GPIO library and finish
+	bcm2835_close();
     return( iErrorCode );
 }
 #endif  /* XSVF_MAIN */
