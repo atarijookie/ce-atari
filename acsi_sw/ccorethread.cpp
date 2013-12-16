@@ -194,6 +194,8 @@ void CCoreThread::reloadSettings(void)
 
 void CCoreThread::loadSettings(void)
 {
+    outDebugString("CCoreThread::loadSettings");
+
     Settings s;
     enabledIDbits = 0;                                    // no bits / IDs enabled yet
 
@@ -240,7 +242,8 @@ void CCoreThread::handleFwVersion(void)
     if(fwVer[0] == 0xf0) {
         outDebugString("FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
     } else {
-        outDebugString("FW: Hans,  %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+        int currentLed = fwVer[4];
+        outDebugString("FW: Hans,  %d-%02d-%02d, LED is: %d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed);
     }
 }
 

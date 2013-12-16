@@ -209,6 +209,8 @@ void Scsi::reloadSettings(void)
 
 void Scsi::loadSettings(void)
 {
+    outDebugString("Scsi::loadSettings");
+
     Settings s;
 
     // first read the new settings

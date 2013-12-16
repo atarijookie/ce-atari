@@ -43,6 +43,8 @@ TranslatedDisk::~TranslatedDisk()
 
 void TranslatedDisk::loadSettings(void)
 {
+    outDebugString("TranslatedDisk::loadSettings");
+
     Settings s;
     char drive1, drive2, drive3;
 
@@ -57,6 +59,8 @@ void TranslatedDisk::loadSettings(void)
 
 void TranslatedDisk::reloadSettings(void)
 {
+    outDebugString("TranslatedDisk::reloadSettings");
+
     // first load the settings
     loadSettings();
 
