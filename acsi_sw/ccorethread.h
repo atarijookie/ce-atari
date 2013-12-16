@@ -18,7 +18,9 @@
 #include "config/configstream.h"
 #include "translated/translateddisk.h"
 
-class CCoreThread: public QThread
+#include "ISettingsUser.h"
+
+class CCoreThread: public QThread, public ISettingsUser
 {
     Q_OBJECT
 public:
@@ -34,6 +36,8 @@ public:
 
     void sendHalfWord(void);
 
+    virtual void reloadSettings(void);      // from ISettingsUser
+
 public slots:
 
 
@@ -47,15 +51,20 @@ private:
 
     Scsi            *scsi;
     AcsiDataTrans   *dataTrans;
-    DataMedia       *dataMedia;
 
     TranslatedDisk  *translated;
     ConfigStream    *confStream;
 
     TestMedia       testMedia;
 
+    BYTE            acsiIDdevType[8];
+    BYTE            enabledIDbits;
+    bool            setEnabledIDbits;
+
     void createConnectionObject(void);
     void usbConnectionCheck(void);
+
+    void loadSettings(void);
 
     void handleFwVersion(void);
     void handleAcsiCommand(void);

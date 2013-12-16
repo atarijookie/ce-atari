@@ -4,11 +4,12 @@
 #include "global.h"
 #include "ccorethread.h"
 #include "native/scsi_defs.h"
+#include "settings.h"
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 #define LOGFILE     "H:/acsilog.txt"
-#define MEDIAFILE   "H:/datamedia.img"
+#define MEDIAFILE   "C:/datamedia.img"
 
 QStringList dbg;
 
@@ -16,6 +17,8 @@ extern "C" void outDebugString(const char *format, ...);
 
 CCoreThread::CCoreThread()
 {
+    setEnabledIDbits = false;
+
     shouldRun       = true;
     running         = false;
 
@@ -28,17 +31,15 @@ CCoreThread::CCoreThread()
     dataTrans   = new AcsiDataTrans();
     dataTrans->setCommunicationObject(conUsb);
 
-    dataMedia   = new DataMedia();
-    dataMedia->open((char *) MEDIAFILE, true);
-
     scsi        = new Scsi();
     scsi->setAcsiDataTrans(dataTrans);
-//    scsi->setDataMedia(dataMedia);
-    scsi->setDataMedia(&testMedia);
-    scsi->setDeviceType(SCSI_TYPE_FULL);
+    scsi->attachToHostPath(MEDIAFILE, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
 
     translated = new TranslatedDisk();
     translated->setAcsiDataTrans(dataTrans);
+
+    translated->attachToHostPath("H:\\dom", TRANSLATEDTYPE_NORMAL);
+
 
     confStream = new ConfigStream();
     confStream->setAcsiDataTrans(dataTrans);
@@ -54,7 +55,6 @@ CCoreThread::~CCoreThread()
 
     delete conUsb;
     delete dataTrans;
-    delete dataMedia;
     delete scsi;
 
     delete translated;
@@ -81,6 +81,8 @@ void CCoreThread::run(void)
         outDebugString("USB not connected, quit.");
         return;
     }
+
+    loadSettings();
 
     while(shouldRun) {
         if(GetTickCount() - lastTick < 10) {            // less than 10 ms ago?
@@ -137,6 +139,15 @@ void CCoreThread::handleAcsiCommand(void)
     BYTE justCmd = bufIn[0] & 0x1f;
     BYTE wasHandled = FALSE;
 
+    BYTE acsiId = bufIn[0] >> 5;                        // get just ACSI ID
+
+    if(acsiIDdevType[acsiId] == DEVTYPE_OFF) {          // if this ACSI ID is off, reply with error and quit
+        dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
+        dataTrans->sendDataAndStatus();
+        return;
+    }
+
+    // ok, so the ID is right, let's see what we can do
     if(justCmd == 0) {                              // if the command is 0 (TEST UNIT READY)
         if(bufIn[1] == 'C' && bufIn[2] == 'E') {    // and this is CosmosEx specific command
 
@@ -151,7 +162,6 @@ void CCoreThread::handleAcsiCommand(void)
                 translated->processCommand(bufIn);
                 break;
             }
-
         }
     } else if(justCmd == 0x1f) {                    // if the command is ICD mark
         BYTE justCmd2 = bufIn[1] & 0x1f;
@@ -172,11 +182,47 @@ void CCoreThread::handleAcsiCommand(void)
     }
 }
 
+void CCoreThread::reloadSettings(void)
+{
+    loadSettings();
+}
+
+void CCoreThread::loadSettings(void)
+{
+    Settings s;
+    enabledIDbits = 0;                                    // no bits / IDs enabled yet
+
+    char key[32];
+    for(int id=0; id<8; id++) {							// read the list of device types from settings
+        sprintf(key, "ACSI_DEVTYPE_%d", id);			// create settings KEY, e.g. ACSI_DEVTYPE_0
+        int devType = s.getInt(key, DEVTYPE_OFF);
+
+        if(devType < 0) {
+            devType = DEVTYPE_OFF;
+        }
+
+        acsiIDdevType[id] = devType;
+
+        if(devType != DEVTYPE_OFF) {                    // if ON
+            enabledIDbits |= (1 << id);                 // set the bit to 1
+        }
+    }
+
+    setEnabledIDbits = true;
+}
+
 void CCoreThread::handleFwVersion(void)
 {
     BYTE fwVer[10], oBuf[10];
 
-    memset(oBuf, 0, 10);
+    memset(oBuf, 0, 10);                    // first clear the output buffer
+
+    if(setEnabledIDbits) {                  // if we should send ACSI ID configuration
+        oBuf[3] = CMD_ACSI_CONFIG;          // CMD: send acsi config
+        oBuf[4] = enabledIDbits;            // store ACSI enabled IDs
+        setEnabledIDbits = false;           // and don't sent this anymore (until needed)
+    }
+
     conUsb->txRx(10, oBuf, fwVer);
 
     logToFile((char *) "handleFwVersion: \nOUT:\n");

@@ -4,6 +4,7 @@
 #include "scsi_defs.h"
 #include "scsi.h"
 #include "../global.h"
+#include "../settings.h"
 
 extern "C" void outDebugString(const char *format, ...);
 
@@ -13,14 +14,22 @@ extern "C" void outDebugString(const char *format, ...);
 Scsi::Scsi(void)
 {
     dataTrans = 0;
-    dataMedia = 0;
     strncpy((char *) inquiryName, "CosmosEx  ", 10);
 
     dataBuffer  = new BYTE[BUFFER_SIZE];
     dataBuffer2 = new BYTE[BUFFER_SIZE];
 
-    devInfo.ACSI_ID = 0;
-    devInfo.type    = SCSI_TYPE_NO_DATA;
+    for(int i=0; i<8; i++) {
+        devInfo[i].attachedMediaIndex   = -1;
+        devInfo[i].accessType           = SCSI_ACCESSTYPE_NO_DATA;
+    }
+
+    for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {
+        attachedMedia[i].hostSourceType = SOURCETYPE_NONE;
+        dettachByIndex(i);
+    }
+
+    loadSettings();
 }
 
 Scsi::~Scsi()
@@ -34,35 +43,217 @@ void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
     dataTrans = dt;
 }
 
-void Scsi::setDataMedia(IMedia *dm)
+bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int accessType)
 {
-    dataMedia = dm;
+    bool res;
+    DataMedia *dm;
+
+    if(hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT) {         // if we're trying to attach TRANSLATED boot image
+        dettachBySourceType(SOURCETYPE_IMAGE_TRANSLATEDBOOT);       // first remove it, if we have it
+    }
+
+    int index = findEmptyAttachSlot();                              // find where we can store it
+
+    if(index == -1) {                                               // no more place to store it?
+        outDebugString("Scsi::attachToHostPath - %s - no empty slot! Not attaching.", hostPath.c_str());
+        return false;
+    }
+
+    switch(hostSourceType) {                                        // try to open it depending on source type
+    case SOURCETYPE_NONE:
+        attachedMedia[index].hostPath       = "";
+        attachedMedia[index].hostSourceType = hostSourceType;
+        attachedMedia[index].dataMedia      = &noMedia;
+        attachedMedia[index].accessType     = SCSI_ACCESSTYPE_NO_DATA;
+        break;
+
+    case SOURCETYPE_IMAGE:
+    case SOURCETYPE_IMAGE_TRANSLATEDBOOT:
+        dm  = new DataMedia();
+        res = dm->open((char *) hostPath.c_str(), false);                   // try to open the image
+
+        if(res) {                                                           // image opened?
+            attachedMedia[index].hostPath       = hostPath;
+            attachedMedia[index].hostSourceType = hostSourceType;
+            attachedMedia[index].dataMedia      = dm;
+            attachedMedia[index].accessType     = SCSI_ACCESSTYPE_NO_DATA;
+        } else {                                                            // failed to open image?
+            outDebugString("Scsi::attachToHostPath - failed to open image %s! Not attaching.", hostPath.c_str());
+            return false;
+        }
+        break;
+
+    case SOURCETYPE_DEVICE:
+        outDebugString("Scsi::attachToHostPath - SOURCETYPE_DEVICE not supported yet, not attaching.");
+        return false;
+        break;
+    }
+
+    res = attachMediaToACSIid(index, hostSourceType, accessType);          // last step - attach media to ACSI ID
+
+    if(res) {
+        outDebugString("Scsi::attachToHostPath - %s - attached to ACSI ID %d", hostPath.c_str(), attachedMedia[index].devInfoIndex);
+    } else {
+        outDebugString("Scsi::attachToHostPath - %s - media attached, but not attached to ACSI ID!", hostPath.c_str());
+    }
+
+    return res;
 }
 
-void Scsi::setAcsiID(int newId)
+bool Scsi::attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessType)
 {
-    devInfo.ACSI_ID = newId;
+    for(int i=0; i<8; i++) {                                                // find empty and proper ACSI ID
+
+        // if we shouldn't use this ACSI ID
+        if(acsiIDdevType[i] == DEVTYPE_OFF) {
+            continue;
+        }
+
+        // if this ACSI ID is for translated drive, and we're attaching translated boot image
+        if(acsiIDdevType[i] == DEVTYPE_TRANSLATED && hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
+            devInfo[i].attachedMediaIndex   = mediaIndex;
+            devInfo[i].accessType           = accessType;
+
+            attachedMedia[mediaIndex].devInfoIndex = i;
+            return true;
+        }
+
+        // if this ACSI ID is NOT for translated drive, and we're NOT attaching translated boot image
+        if(acsiIDdevType[i] != DEVTYPE_TRANSLATED && hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
+            devInfo[i].attachedMediaIndex   = mediaIndex;
+            devInfo[i].accessType           = accessType;
+
+            attachedMedia[mediaIndex].devInfoIndex = i;
+            return true;
+        }
+    }
+
+    return false;
 }
 
-void Scsi::setDeviceType(int newType)
+void Scsi::detachMediaFromACSIidByIndex(int index)
 {
-    devInfo.type = newType;
+    if(index < 0 || index >= 8) {                       // out of index?
+        return;
+    }
 
-    if(newType == SCSI_TYPE_NO_DATA) {
-        dataMedia = &noMedia;
+    if(devInfo[index].attachedMediaIndex == -1) {       // nothing attached?
+        return;
+    }
+
+    attachedMedia[ devInfo[index].attachedMediaIndex ].devInfoIndex = -1;   // set not attached in attached media
+
+    devInfo[index].attachedMediaIndex   = -1;                               // set not attached in dev info
+    devInfo[index].accessType           = SCSI_ACCESSTYPE_NO_DATA;
+}
+
+void Scsi::dettachFromHostPath(std::string hostPath)
+{
+    for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {               // find where it's attached
+        if(attachedMedia[i].hostPath == hostPath) {         // if found
+            dettachByIndex(i);
+            return;
+        }
+    }
+}
+
+void Scsi::dettachBySourceType(int hostSourceType)
+{
+    for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {                       // find where it's attached
+        if(attachedMedia[i].hostSourceType == hostSourceType) {     // if found
+            dettachByIndex(i);
+            return;
+        }
+    }
+}
+
+void Scsi::dettachByIndex(int index)
+{
+    if(index < 0 || index >= MAX_ATTACHED_MEDIA) {
+        return;
+    }
+
+    if(attachedMedia[index].devInfoIndex != -1) {                           // if was attached to ACSI ID
+        int ind2 = attachedMedia[index].devInfoIndex;
+
+        detachMediaFromACSIidByIndex(ind2);
+    }
+
+    if(attachedMedia[index].hostSourceType != SOURCETYPE_NONE) {            // if it's not NO source
+        attachedMedia[index].dataMedia->close();                            // close it, delete it
+        delete attachedMedia[index].dataMedia;
+    }
+
+    attachedMedia[index].hostPath       = "";
+    attachedMedia[index].hostSourceType = SOURCETYPE_NONE;
+    attachedMedia[index].dataMedia      = NULL;
+    attachedMedia[index].accessType     = SCSI_ACCESSTYPE_NO_DATA;
+    attachedMedia[index].devInfoIndex   = -1;
+}
+
+int Scsi::findEmptyAttachSlot(void)
+{
+    for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {
+        if(attachedMedia[i].dataMedia == NULL) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+void Scsi::reloadSettings(void)
+{
+    loadSettings();
+}
+
+void Scsi::loadSettings(void)
+{
+    Settings s;
+
+    // first read the new settings
+    char key[32];
+    for(int id=0; id<8; id++) {							// read the list of device types from settings
+        sprintf(key, "ACSI_DEVTYPE_%d", id);			// create settings KEY, e.g. ACSI_DEVTYPE_0
+        int devType = s.getInt(key, DEVTYPE_OFF);
+
+        if(devType < 0) {
+            devType = DEVTYPE_OFF;
+        }
+
+        acsiIDdevType[id] = devType;
+    }
+
+    // then dettach everything from ACSI IDs
+    for(int i=0; i<8; i++) {
+        detachMediaFromACSIidByIndex(i);
+    }
+
+    // and now reattach everything back according to new ACSI ID settings
+    for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {
+        if(attachedMedia[i].dataMedia != NULL) {            // if there's some media to use
+            attachMediaToACSIid(i, attachedMedia[i].hostSourceType, attachedMedia[i].accessType);
+        }
     }
 }
 
 void Scsi::processCommand(BYTE *command)
 {
+    cmd     = command;
+    acsiId  = cmd[0] >> 5;
+
+    dataMedia = NULL;
+
+    if(devInfo[acsiId].attachedMediaIndex != -1) {          // if we got media attached to this ACSI ID
+        dataMedia = attachedMedia[ devInfo[acsiId].attachedMediaIndex ].dataMedia;
+    }
+
     if(dataTrans == 0 || dataMedia == 0) {
         outDebugString("processCommand was called without valid dataTrans or dataMedia!");
         return;
     }
 
     dataTrans->clear();                 // clean data transporter before handling
-
-    cmd = command;
 
     if(isICDcommand()) {	  			// if it's a ICD command
         ProcICD();
@@ -90,12 +281,12 @@ void Scsi::ProcScsi6(void)
 
     if((cmd[1] & 0xE0) != 0x00)   			  	// if device ID isn't ZERO
     {
-        devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-        devInfo.SCSI_SK     = SCSI_E_IllegalRequest;
-        devInfo.SCSI_ASC	= SCSI_ASC_LU_NOT_SUPPORTED;
-        devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+        devInfo[acsiId].LastStatus	= SCSI_ST_CHECK_CONDITION;
+        devInfo[acsiId].SCSI_SK     = SCSI_E_IllegalRequest;
+        devInfo[acsiId].SCSI_ASC	= SCSI_ASC_LU_NOT_SUPPORTED;
+        devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-        dataTrans->setStatus(devInfo.LastStatus);   // send status byte
+        dataTrans->setStatus(devInfo[acsiId].LastStatus);   // send status byte
 
         return;
     }
@@ -125,7 +316,7 @@ void Scsi::ProcScsi6(void)
     }
     //----------------
     // for read only devices - write and format not supported
-    if(devInfo.type == SCSI_TYPE_READ_ONLY) {
+    if(devInfo[acsiId].accessType == SCSI_ACCESSTYPE_READ_ONLY) {
         if(justCmd == SCSI_C_FORMAT_UNIT || justCmd == SCSI_C_WRITE6) {
             returnInvalidCommand();
             return;
@@ -133,7 +324,7 @@ void Scsi::ProcScsi6(void)
     }
 
     // for no data (fake) devices - even the read is not supported
-    if(devInfo.type == SCSI_TYPE_NO_DATA) {
+    if(devInfo[acsiId].accessType == SCSI_ACCESSTYPE_NO_DATA) {
         if(justCmd == SCSI_C_FORMAT_UNIT || justCmd == SCSI_C_WRITE6 || justCmd == SCSI_C_READ6) {
             returnInvalidCommand();
             return;
@@ -162,24 +353,24 @@ void Scsi::ProcScsi6(void)
 //----------------------------------------------
 void Scsi::returnInvalidCommand(void)
 {
-    devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-    devInfo.SCSI_SK		= SCSI_E_IllegalRequest;
-    devInfo.SCSI_ASC	= SCSI_ASC_InvalidCommandOperationCode;
-    devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+    devInfo[acsiId].LastStatus	= SCSI_ST_CHECK_CONDITION;
+    devInfo[acsiId].SCSI_SK		= SCSI_E_IllegalRequest;
+    devInfo[acsiId].SCSI_ASC	= SCSI_ASC_InvalidCommandOperationCode;
+    devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-    dataTrans->setStatus(devInfo.LastStatus);   // send status byte
+    dataTrans->setStatus(devInfo[acsiId].LastStatus);   // send status byte
 }
 //----------------------------------------------
 void Scsi::ReturnUnitAttention(void)
 {
     dataMedia->setMediaChanged(false);
 
-    devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-    devInfo.SCSI_SK     = SCSI_E_UnitAttention;
-    devInfo.SCSI_ASC	= SCSI_ASC_NOT_READY_TO_READY_TRANSITION;
-    devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+    devInfo[acsiId].LastStatus	= SCSI_ST_CHECK_CONDITION;
+    devInfo[acsiId].SCSI_SK     = SCSI_E_UnitAttention;
+    devInfo[acsiId].SCSI_ASC	= SCSI_ASC_NOT_READY_TO_READY_TRANSITION;
+    devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-    dataTrans->setStatus(devInfo.LastStatus);   // send status byte
+    dataTrans->setStatus(devInfo[acsiId].LastStatus);   // send status byte
 }
 //----------------------------------------------
 void Scsi::ReturnStatusAccordingToIsInit(void)
@@ -188,37 +379,37 @@ void Scsi::ReturnStatusAccordingToIsInit(void)
         SendOKstatus();
     else
     {
-        devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-        devInfo.SCSI_SK     = SCSI_E_NotReady;
-        devInfo.SCSI_ASC	= SCSI_ASC_MEDIUM_NOT_PRESENT;
-        devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+        devInfo[acsiId].LastStatus	= SCSI_ST_CHECK_CONDITION;
+        devInfo[acsiId].SCSI_SK     = SCSI_E_NotReady;
+        devInfo[acsiId].SCSI_ASC	= SCSI_ASC_MEDIUM_NOT_PRESENT;
+        devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
 #ifdef WRITEOUT
         if(shitHasHappened)
-            showCommand(2, 6, devInfo.LastStatus);
+            showCommand(2, 6, devInfo[acsiId].LastStatus);
 
         shitHasHappened = 0;
 #endif
 
-        dataTrans->setStatus(devInfo.LastStatus);   // send status byte
+        dataTrans->setStatus(devInfo[acsiId].LastStatus);   // send status byte
     }
 }
 //----------------------------------------------
 void Scsi::SendOKstatus(void)
 {
-    devInfo.LastStatus	= SCSI_ST_OK;
-    devInfo.SCSI_SK     = SCSI_E_NoSense;
-    devInfo.SCSI_ASC	= SCSI_ASC_NO_ADDITIONAL_SENSE;
-    devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+    devInfo[acsiId].LastStatus	= SCSI_ST_OK;
+    devInfo[acsiId].SCSI_SK     = SCSI_E_NoSense;
+    devInfo[acsiId].SCSI_ASC	= SCSI_ASC_NO_ADDITIONAL_SENSE;
+    devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
 #ifdef WRITEOUT
     if(shitHasHappened)
-        showCommand(3, 6, devInfo.LastStatus);
+        showCommand(3, 6, devInfo[acsiId].LastStatus);
 
     shitHasHappened = 0;
 #endif
 
-    dataTrans->setStatus(devInfo.LastStatus);   // send status byte, long time-out
+    dataTrans->setStatus(devInfo[acsiId].LastStatus);   // send status byte, long time-out
 }
 //----------------------------------------------
 void Scsi::SCSI_ReadWrite6(bool read)
@@ -248,12 +439,12 @@ void Scsi::SCSI_ReadWrite6(bool read)
     if(res) { 			   							// if everything was OK
         SendOKstatus();
     } else { 							   			// if error
-        devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-        devInfo.SCSI_SK		= SCSI_E_MediumError;
-        devInfo.SCSI_ASC	= SCSI_ASC_NO_ADDITIONAL_SENSE;
-        devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+        devInfo[acsiId].LastStatus	= SCSI_ST_CHECK_CONDITION;
+        devInfo[acsiId].SCSI_SK		= SCSI_E_MediumError;
+        devInfo[acsiId].SCSI_ASC	= SCSI_ASC_NO_ADDITIONAL_SENSE;
+        devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-        dataTrans->setStatus(devInfo.LastStatus);    // send status byte, long time-out
+        dataTrans->setStatus(devInfo[acsiId].LastStatus);    // send status byte, long time-out
     }
 }
 //----------------------------------------------
@@ -266,21 +457,21 @@ void Scsi::SCSI_FormatUnit(void)
     if(res) { 			   							// if everything was OK
         SendOKstatus();
     } else {						   			   // if error
-        devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-        devInfo.SCSI_SK     = SCSI_E_MediumError;
-        devInfo.SCSI_ASC	= SCSI_ASC_NO_ADDITIONAL_SENSE;
-        devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+        devInfo[acsiId].LastStatus	= SCSI_ST_CHECK_CONDITION;
+        devInfo[acsiId].SCSI_SK     = SCSI_E_MediumError;
+        devInfo[acsiId].SCSI_ASC	= SCSI_ASC_NO_ADDITIONAL_SENSE;
+        devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-        dataTrans->setStatus(devInfo.LastStatus);    // send status byte, long time-out
+        dataTrans->setStatus(devInfo[acsiId].LastStatus);    // send status byte, long time-out
     }
 }
 //----------------------------------------------
 void Scsi::ClearTheUnitAttention(void)
 {
-    devInfo.LastStatus	= SCSI_ST_OK;
-    devInfo.SCSI_SK		= SCSI_E_NoSense;
-    devInfo.SCSI_ASC	= SCSI_ASC_NO_ADDITIONAL_SENSE;
-    devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+    devInfo[acsiId].LastStatus	= SCSI_ST_OK;
+    devInfo[acsiId].SCSI_SK		= SCSI_E_NoSense;
+    devInfo[acsiId].SCSI_ASC	= SCSI_ASC_NO_ADDITIONAL_SENSE;
+    devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
     dataMedia->setMediaChanged(false);
 }
@@ -297,12 +488,12 @@ void Scsi::SCSI_Inquiry(void)
 
     if(cmd[1] & 0x01)                                               // EVPD bit is set? Request for vital data?
     {                                                               // vital data not suported
-        devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-        devInfo.SCSI_SK     = SCSI_E_IllegalRequest;
-        devInfo.SCSI_ASC	= SCSO_ASC_INVALID_FIELD_IN_CDB;
-        devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+        devInfo[acsiId].LastStatus	= SCSI_ST_CHECK_CONDITION;
+        devInfo[acsiId].SCSI_SK     = SCSI_E_IllegalRequest;
+        devInfo[acsiId].SCSI_ASC	= SCSO_ASC_INVALID_FIELD_IN_CDB;
+        devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-        dataTrans->setStatus(devInfo.LastStatus);    // send status byte, long time-out
+        dataTrans->setStatus(devInfo[acsiId].LastStatus);    // send status byte, long time-out
 
         return;
     }
@@ -340,7 +531,7 @@ void Scsi::SCSI_Inquiry(void)
         }
 
         if(i == 27) {                   // send ACSI ID # (0 .. 7)
-            val = '0' + devInfo.ACSI_ID;
+            val = '0' + acsiId;
         }
 
         if(i>=32 && i<=35) {            // version string
@@ -372,12 +563,12 @@ void Scsi::SCSI_ModeSense6(void)
     // page not supported?
     if(PageCode != 0x0a && PageCode != 0x0b && PageCode != 0x3f)
     {
-        devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-        devInfo.SCSI_SK     = SCSI_E_IllegalRequest;
-        devInfo.SCSI_ASC	= SCSO_ASC_INVALID_FIELD_IN_CDB;
-        devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+        devInfo[acsiId].LastStatus	= SCSI_ST_CHECK_CONDITION;
+        devInfo[acsiId].SCSI_SK     = SCSI_E_IllegalRequest;
+        devInfo[acsiId].SCSI_ASC	= SCSO_ASC_INVALID_FIELD_IN_CDB;
+        devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-        dataTrans->setStatus(devInfo.LastStatus);    // send status byte, long time-out
+        dataTrans->setStatus(devInfo[acsiId].LastStatus);    // send status byte, long time-out
 
         return;
     }
@@ -441,11 +632,11 @@ void Scsi::SCSI_RequestSense(void)
     {
         switch(i)
         {
-        case  0:	val = 0xf0;					break;		// error code
-        case  2:	val = devInfo.SCSI_SK;		break;		// sense key
-        case  7:	val = xx-7;					break;		// AS length
-        case 12:	val = devInfo.SCSI_ASC;     break;		// additional sense code
-        case 13:	val = devInfo.SCSI_ASCQ;	break;		// additional sense code qualifier
+        case  0:	val = 0xf0;                         break;		// error code
+        case  2:	val = devInfo[acsiId].SCSI_SK;		break;		// sense key
+        case  7:	val = xx-7;                         break;		// AS length
+        case 12:	val = devInfo[acsiId].SCSI_ASC;     break;		// additional sense code
+        case 13:	val = devInfo[acsiId].SCSI_ASCQ;	break;		// additional sense code qualifier
 
         default:	val = 0; 			   		break;
         }
@@ -493,12 +684,12 @@ void Scsi::ProcICD(void)
     //----------------
     if((cmd[2] & 0xE0) != 0x00)   			  					// if device ID isn't ZERO
     {
-        devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-        devInfo.SCSI_SK     = SCSI_E_IllegalRequest;		// other devices = error
-        devInfo.SCSI_ASC	= SCSI_ASC_LU_NOT_SUPPORTED;
-        devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+        devInfo[acsiId].LastStatus	= SCSI_ST_CHECK_CONDITION;
+        devInfo[acsiId].SCSI_SK     = SCSI_E_IllegalRequest;		// other devices = error
+        devInfo[acsiId].SCSI_ASC	= SCSI_ASC_LU_NOT_SUPPORTED;
+        devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-        dataTrans->setStatus(devInfo.LastStatus);   // send status byte
+        dataTrans->setStatus(devInfo[acsiId].LastStatus);   // send status byte
 
         return;
     }
@@ -527,7 +718,7 @@ void Scsi::ProcICD(void)
     BYTE justCmd = cmd[1];
 
     // for read only devices - write not supported
-    if(devInfo.type == SCSI_TYPE_READ_ONLY) {
+    if(devInfo[acsiId].accessType == SCSI_ACCESSTYPE_READ_ONLY) {
         if(justCmd == SCSI_C_WRITE10) {
             returnInvalidCommand();
             return;
@@ -535,7 +726,7 @@ void Scsi::ProcICD(void)
     }
 
     // for no data (fake) devices - even the read is not supported
-    if(devInfo.type == SCSI_TYPE_NO_DATA) {
+    if(devInfo[acsiId].accessType == SCSI_ACCESSTYPE_NO_DATA) {
         if(justCmd == SCSI_C_WRITE10 || justCmd == SCSI_C_READ10 || justCmd == SCSI_C_VERIFY) {
             returnInvalidCommand();
             return;
@@ -588,12 +779,12 @@ void Scsi::SCSI_Verify(void)
         res = compareSectors(sector, lenX);	// compare data
 
         if(!res) {							// problem when comparing?
-            devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-            devInfo.SCSI_SK     = SCSI_E_Miscompare;
-            devInfo.SCSI_ASC	= SCSI_ASC_VERIFY_MISCOMPARE;
-            devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+            devInfo[acsiId].LastStatus	= SCSI_ST_CHECK_CONDITION;
+            devInfo[acsiId].SCSI_SK     = SCSI_E_Miscompare;
+            devInfo[acsiId].SCSI_ASC	= SCSI_ASC_VERIFY_MISCOMPARE;
+            devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-            dataTrans->setStatus(devInfo.LastStatus);   // send status byte
+            dataTrans->setStatus(devInfo[acsiId].LastStatus);   // send status byte
         } else {									// no problem?
             SendOKstatus();
         }
@@ -676,12 +867,12 @@ void Scsi::SCSI_ReadWrite10(bool read)
     if(res) {    							// if everything was OK
         SendOKstatus();
     } else {								// if error
-        devInfo.LastStatus	= SCSI_ST_CHECK_CONDITION;
-        devInfo.SCSI_SK		= SCSI_E_MediumError;
-        devInfo.SCSI_ASC	= SCSI_ASC_NO_ADDITIONAL_SENSE;
-        devInfo.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+        devInfo[acsiId].LastStatus	= SCSI_ST_CHECK_CONDITION;
+        devInfo[acsiId].SCSI_SK		= SCSI_E_MediumError;
+        devInfo[acsiId].SCSI_ASC	= SCSI_ASC_NO_ADDITIONAL_SENSE;
+        devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-        dataTrans->setStatus(devInfo.LastStatus);    // send status byte, long time-out
+        dataTrans->setStatus(devInfo[acsiId].LastStatus);    // send status byte, long time-out
     }
 }
 //----------------------------------------------

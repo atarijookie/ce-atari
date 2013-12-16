@@ -46,6 +46,7 @@ HEADERS  += mainwindow.h \
             config/keys.h \
             translated/translateddisk.h \
             translated/gemdos.h \
-            translated/gemdos_errno.h
+            translated/gemdos_errno.h \
+    ISettingsUser.h
 
 FORMS    += mainwindow.ui

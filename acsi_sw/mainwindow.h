@@ -23,7 +23,7 @@ private slots:
 private:
     Ui::MainWindow *ui;
 
-    CCoreThread core;
+    CCoreThread *core;
 };
 
 #endif // MAINWINDOW_H

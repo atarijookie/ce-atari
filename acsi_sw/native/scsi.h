@@ -8,9 +8,38 @@
 
 #include "datatypes.h"
 
-#define SCSI_TYPE_FULL          0
-#define SCSI_TYPE_READ_ONLY     1
-#define SCSI_TYPE_NO_DATA       2
+#define SCSI_ACCESSTYPE_FULL            0
+#define SCSI_ACCESSTYPE_READ_ONLY       1
+#define SCSI_ACCESSTYPE_NO_DATA         2
+
+#define SOURCETYPE_NONE                 0
+#define SOURCETYPE_IMAGE                1
+#define SOURCETYPE_IMAGE_TRANSLATEDBOOT 2
+#define SOURCETYPE_DEVICE               3
+
+#define MAX_ATTACHED_MEDIA              9
+
+typedef struct {
+    std::string hostPath;                       // specifies host path to image file or device
+    int         hostSourceType;                 // type: image or device
+    int         accessType;                     // access type: read only, read write, no data
+
+    IMedia      *dataMedia;                     // pointer to the data provider object
+
+    int         devInfoIndex;                   // index in devInfo[]
+} TScsiConf;
+
+typedef struct {
+    int     attachedMediaIndex; // index in attachedMedia[]
+
+    BYTE 	accessType;                         // SCSI_ACCESSTYPE_FULL || SCSI_ACCESSTYPE_READ_ONLY || SCSI_ACCESSTYPE_NO_DATA
+
+    BYTE	LastStatus;			// last returned SCSI status
+    BYTE	SCSI_ASC;			// additional sense code
+    BYTE	SCSI_ASCQ;			// additional sense code qualifier
+    BYTE	SCSI_SK;			// sense key
+} TDevInfo;
+
 
 class Scsi
 {
@@ -18,33 +47,31 @@ public:
     Scsi(void);
     ~Scsi();
 
+    void reloadSettings(void);
+
     void setAcsiDataTrans(AcsiDataTrans *dt);
-    void setDataMedia(IMedia *dm);
-    void setAcsiID(int newId);
-    void setDeviceType(int newType);
+
+    bool attachToHostPath(std::string hostPath, int hostSourceType, int accessType);
+    void dettachFromHostPath(std::string hostPath);
 
     void processCommand(BYTE *command);
 
 private:
     AcsiDataTrans   *dataTrans;
-    IMedia          *dataMedia;
+
+    BYTE            acsiId;                 // current acsi ID for the command
+    IMedia          *dataMedia;             // current data media valid for current ACSI ID
 
     NoMedia         noMedia;
 
     BYTE            *dataBuffer;
     BYTE            *dataBuffer2;
 
-    BYTE    shitHasHappened;
+    BYTE            shitHasHappened;
 
-    struct {
-        BYTE 	ACSI_ID;			// ID on the ACSI bus - from 0 to 7
-        BYTE 	type;				// SCSI_TYPE_FULL || SCSI_TYPE_READ_ONLY || SCSI_TYPE_NO_DATA
-
-        BYTE	LastStatus;			// last returned SCSI status
-        BYTE	SCSI_ASC;			// additional sense code
-        BYTE	SCSI_ASCQ;			// additional sense code qualifier
-        BYTE	SCSI_SK;			// sense key
-    } devInfo;
+    TScsiConf       attachedMedia[MAX_ATTACHED_MEDIA];
+    int             acsiIDdevType[8];
+    TDevInfo        devInfo[8];
 
     BYTE *cmd;
     BYTE inquiryName[10];
@@ -84,6 +111,15 @@ private:
     bool writeSectors(DWORD sectorNo, DWORD count);
     bool compareSectors(DWORD sectorNo, DWORD count);
     bool eraseMedia(void);
+
+
+    void loadSettings(void);
+
+    int  findEmptyAttachSlot(void);
+    void dettachBySourceType(int hostSourceType);
+    void dettachByIndex(int index);
+    bool attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessType);
+    void detachMediaFromACSIidByIndex(int index);
 };
 
 #endif

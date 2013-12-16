@@ -8,6 +8,8 @@
 #include "../acsidatatrans.h"
 #include "../datatypes.h"
 
+#include "../ISettingsUser.h"
+
 #define BUFFER_SIZE             (1024*1024)
 #define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
 
@@ -42,7 +44,7 @@ typedef struct {
 #define TRANSLATEDTYPE_SHAREDDRIVE      1
 #define TRANSLATEDTYPE_CONFIGDRIVE      2
 
-class TranslatedDisk
+class TranslatedDisk: public ISettingsUser
 {
 public:
     TranslatedDisk(void);
@@ -56,7 +58,7 @@ public:
     void detachFromHostPath(std::string hostRootPath);
     void detachAll(void);
 
-    void configChanged_reload(void);
+    virtual void reloadSettings(void);      // from ISettingsUser
 
 private:
     AcsiDataTrans   *dataTrans;

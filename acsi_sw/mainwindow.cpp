@@ -11,18 +11,19 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    core.start();
+    core = new CCoreThread();
+    core->start();
 }
 
 MainWindow::~MainWindow()
 {
     DWORD start = GetTickCount();
     while(GetTickCount() - start < 1000) {
-        if(core.isRunning()) {
-            core.stopRunning();
+        if(core->isRunning()) {
+            core->stopRunning();
         }
 
-        if(!core.isRunning()) {
+        if(!core->isRunning()) {
             break;
         }
     }
@@ -32,5 +33,5 @@ MainWindow::~MainWindow()
 
 void MainWindow::on_pushButton_clicked()
 {
-    core.sendHalfWord();
+    core->sendHalfWord();
 }
