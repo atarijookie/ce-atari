@@ -52,7 +52,27 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
         dettachBySourceType(SOURCETYPE_IMAGE_TRANSLATEDBOOT);       // first remove it, if we have it
     }
 
-    int index = findEmptyAttachSlot();                              // find where we can store it
+    int index = findAttachedMediaByHostPath(hostPath);              // check if we already don't have this
+
+    if(index != -1) {                                               // if we already have this media
+        if(attachedMedia[index].devInfoIndex == -1) {               // but it's not attached to ACSI ID
+            res = attachMediaToACSIid(index, hostSourceType, accessType);          // attach media to ACSI ID
+
+            if(res) {
+                outDebugString("Scsi::attachToHostPath - %s - media was already attached, attached to ACSI ID %d", hostPath.c_str(), attachedMedia[index].devInfoIndex);
+            } else {
+                outDebugString("Scsi::attachToHostPath - %s - media was already attached, but still not attached to ACSI ID!", hostPath.c_str());
+            }
+
+            return res;
+        }
+
+        // well, we have the media attached and we're also attached to ACSI ID
+        outDebugString("Scsi::attachToHostPath - %s - media was already attached, not doing anything.", hostPath.c_str());
+        return true;
+    }
+
+    index = findEmptyAttachSlot();                              // find where we can store it
 
     if(index == -1) {                                               // no more place to store it?
         outDebugString("Scsi::attachToHostPath - %s - no empty slot! Not attaching.", hostPath.c_str());
@@ -109,6 +129,11 @@ bool Scsi::attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessTyp
             continue;
         }
 
+        // if this index is already used, skip it
+        if(devInfo[i].attachedMediaIndex != -1) {
+            continue;
+        }
+
         // if this ACSI ID is for translated drive, and we're attaching translated boot image
         if(acsiIDdevType[i] == DEVTYPE_TRANSLATED && hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
             devInfo[i].attachedMediaIndex   = mediaIndex;
@@ -149,12 +174,24 @@ void Scsi::detachMediaFromACSIidByIndex(int index)
 
 void Scsi::dettachFromHostPath(std::string hostPath)
 {
+    int index = findAttachedMediaByHostPath(hostPath);          // find media by host path
+
+    if(index == -1) {                                           // not found? quit
+        return;
+    }
+
+    dettachByIndex(index);                                      // found? detach!
+}
+
+int Scsi::findAttachedMediaByHostPath(std::string hostPath)
+{
     for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {               // find where it's attached
         if(attachedMedia[i].hostPath == hostPath) {         // if found
-            dettachByIndex(i);
-            return;
+            return i;
         }
     }
+
+    return -1;                                              // if not found
 }
 
 void Scsi::dettachBySourceType(int hostSourceType)

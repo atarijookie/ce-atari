@@ -117,6 +117,7 @@ private:
     void loadSettings(void);
 
     int  findEmptyAttachSlot(void);
+    int  findAttachedMediaByHostPath(std::string hostPath);
     void dettachBySourceType(int hostSourceType);
     void dettachByIndex(int index);
     bool attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessType);
