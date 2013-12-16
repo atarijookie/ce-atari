@@ -335,6 +335,10 @@ void ConfigStream::onAcsiConfig_save(void)
         s.setInt(key, devTypes[id]);
     }
 
+    if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
+        reloadProxy->reloadSettings(SETTINGSUSER_ACSI);
+    }
+
     createScreen_homeScreen();		// now back to the home screen
 }
 
@@ -391,6 +395,10 @@ void ConfigStream::onTranslated_save(void)
     s.setChar((char *) "DRIVELETTER_FIRST",      letter1);
     s.setChar((char *) "DRIVELETTER_SHARED",     letter2);
     s.setChar((char *) "DRIVELETTER_CONFDRIVE",  letter3);
+
+    if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
+        reloadProxy->reloadSettings(SETTINGSUSER_TRANSLATED);
+    }
 
     createScreen_homeScreen();		// now back to the home screen
 }

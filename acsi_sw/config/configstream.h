@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "configcomponent.h"
+#include "../settingsreloadproxy.h"
 
 class AcsiDataTrans;
 
@@ -39,6 +40,7 @@ public:
     // functions which are called from the main loop
     void processCommand(BYTE *cmd);
     void setAcsiDataTrans(AcsiDataTrans *dt);
+    void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
     // functions which are called from various components
     int  checkboxGroup_getCheckedId(int groupId);
@@ -72,7 +74,8 @@ private:
     int stScreenWidth;
     int gotoOffset;
 
-    AcsiDataTrans *dataTrans;
+    AcsiDataTrans       *dataTrans;
+    SettingsReloadProxy *reloadProxy;
 
     void onKeyDown(BYTE key);
     int  getStream(bool homeScreen, BYTE *bfr, int maxLen);

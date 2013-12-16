@@ -7,6 +7,7 @@
 #include "imedia.h"
 
 #include "datatypes.h"
+#include "../isettingsuser.h"
 
 #define SCSI_ACCESSTYPE_FULL            0
 #define SCSI_ACCESSTYPE_READ_ONLY       1
@@ -41,7 +42,7 @@ typedef struct {
 } TDevInfo;
 
 
-class Scsi
+class Scsi: public ISettingsUser
 {
 public:
     Scsi(void);

@@ -18,6 +18,8 @@
 #include "config/configstream.h"
 #include "translated/translateddisk.h"
 
+#include "settingsreloadproxy.h"
+
 #include "ISettingsUser.h"
 
 class CCoreThread: public QThread, public ISettingsUser
@@ -56,6 +58,8 @@ private:
     ConfigStream    *confStream;
 
     TestMedia       testMedia;
+
+    SettingsReloadProxy     settingsReloadProxy;
 
     BYTE            acsiIDdevType[8];
     BYTE            enabledIDbits;

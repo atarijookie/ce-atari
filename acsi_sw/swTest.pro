@@ -24,7 +24,8 @@ SOURCES +=  main.cpp \
             config/configstream_general.cpp \
             config/configstream_screens.cpp \
             translated/translateddisk_general.cpp \
-            translated/translateddisk_gemdos.cpp
+            translated/translateddisk_gemdos.cpp \
+    settingsreloadproxy.cpp
 
 HEADERS  += mainwindow.h \
             cconusb.h \
@@ -47,6 +48,7 @@ HEADERS  += mainwindow.h \
             translated/translateddisk.h \
             translated/gemdos.h \
             translated/gemdos_errno.h \
-    ISettingsUser.h
+    ISettingsUser.h \
+    settingsreloadproxy.h
 
 FORMS    += mainwindow.ui

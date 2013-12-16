@@ -20,7 +20,8 @@ ConfigStream::ConfigStream()
     showingMessage	= false;
     screenChanged	= true;
 
-    dataTrans = NULL;
+    dataTrans   = NULL;
+    reloadProxy = NULL;
 
     message.clear();
     createScreen_homeScreen();
@@ -35,6 +36,11 @@ ConfigStream::~ConfigStream()
 void ConfigStream::setAcsiDataTrans(AcsiDataTrans *dt)
 {
     dataTrans = dt;
+}
+
+void ConfigStream::setSettingsReloadProxy(SettingsReloadProxy *rp)
+{
+    reloadProxy = rp;
 }
 
 void ConfigStream::processCommand(BYTE *cmd)

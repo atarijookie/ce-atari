@@ -33,6 +33,7 @@ CCoreThread::CCoreThread()
 
     scsi        = new Scsi();
     scsi->setAcsiDataTrans(dataTrans);
+
     scsi->attachToHostPath(MEDIAFILE, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
 
     translated = new TranslatedDisk();
@@ -40,9 +41,13 @@ CCoreThread::CCoreThread()
 
     translated->attachToHostPath("H:\\dom", TRANSLATEDTYPE_NORMAL);
 
-
     confStream = new ConfigStream();
     confStream->setAcsiDataTrans(dataTrans);
+
+    // now register all the objects which use some settings in the proxy
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_ACSI);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) scsi,          SETTINGSUSER_ACSI);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) translated,    SETTINGSUSER_TRANSLATED);
 }
 
 CCoreThread::~CCoreThread()
