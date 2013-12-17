@@ -1,0 +1,13 @@
+TARGET	= stm32flash
+
+CC		= gcc
+HDR		= parsers/binary.h parsers/hex.h parser.h serial.h stm32.h utils.c 
+CSRC	= parsers/binary.c parsers/hex.c main.c serial_common.c serial_posix.c stm32.c utils.c
+CFLAGS	= -g -Wall
+
+$(TARGET): $(CSRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(CSRC) $(LDFLAGS)
+
+clean:
+	rm -f $(TARGET) *~ *.o
+
