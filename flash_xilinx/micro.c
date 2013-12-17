@@ -62,6 +62,7 @@
 #include "ports.h"
 
 #include <bcm2835.h>
+#include "raspberry.h"
 
 /*============================================================================
 * XSVF #define
@@ -1780,11 +1781,11 @@ int main( int iArgc, char** ppzArgv )
 	// http://www.airspayce.com/mikem/bcm2835/group__constants.html
 	
 	// outputs: TDI (GPIO3), TCK (GPIO4), TMS (GPIO17)
-	bcm2835_gpio_fsel(RPI_V2_GPIO_P1_05,	BCM2835_GPIO_FSEL_OUTP);		// TDI
-	bcm2835_gpio_fsel(RPI_V2_GPIO_P1_11,	BCM2835_GPIO_FSEL_OUTP);		// TMS
-	bcm2835_gpio_fsel(RPI_V2_GPIO_P1_07,	BCM2835_GPIO_FSEL_OUTP);		// TCK
+	bcm2835_gpio_fsel(PIN_TDI,	BCM2835_GPIO_FSEL_OUTP);		// TDI
+	bcm2835_gpio_fsel(PIN_TMS,	BCM2835_GPIO_FSEL_OUTP);		// TMS
+	bcm2835_gpio_fsel(PIN_TCK,	BCM2835_GPIO_FSEL_OUTP);		// TCK
 	// inputs : TDO (GPIO2)
-	bcm2835_gpio_fsel(RPI_V2_GPIO_P1_03, BCM2835_GPIO_FSEL_INPT);
+	bcm2835_gpio_fsel(PIN_TDO,	BCM2835_GPIO_FSEL_INPT);		// TDO
 	
     for ( i = 1; i < iArgc ; ++i )
     {
