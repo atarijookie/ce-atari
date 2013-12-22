@@ -56,6 +56,74 @@ void CConUsb::zeroAllVars(void)
     FTDIlib         = NULL;
 
     prevAtnWord.got = false;
+    remainingPacketLength    = -1;
+}
+
+void CConUsb::applyNoTxRxLimis(void)
+{
+    setRemainingTxRxLen(NO_REMAINING_LENGTH, NO_REMAINING_LENGTH);  // set no remaining length
+}
+
+void CConUsb::receiveAndApplyTxRxLimits(void)
+{
+    BYTE inBuff[4], outBuff[4];
+    memset(outBuff, 0, 4);
+
+    WORD *pwIn = (WORD *) inBuff;
+
+    // get TX LEN and RX LEN
+    txRx(4, outBuff, inBuff);
+
+    WORD txLen = swapWord(pwIn[0]);
+    WORD rxLen = swapWord(pwIn[1]);
+
+//    outDebugString("TX/RX limits: TX %d WORDs, RX %d WORDs", txLen, rxLen);
+
+    setRemainingTxRxLen(txLen, rxLen);
+}
+
+WORD CConUsb::swapWord(WORD val)
+{
+    WORD tmp = 0;
+
+    tmp  = val << 8;
+    tmp |= val >> 8;
+
+    return tmp;
+}
+
+void CConUsb::setRemainingTxRxLen(WORD txLen, WORD rxLen)
+{
+    if(txLen == NO_REMAINING_LENGTH && rxLen == NO_REMAINING_LENGTH) {    // if setting NO_REMAINING_LENGTH
+        if(remainingPacketLength != 0) {
+            outDebugString("CConUsb - didn't TX/RX enough data, padding with %d zeros! Fix this!", remainingPacketLength);
+            memset(paddingBuffer, 0, PADDINGBUFFER_SIZE);
+            txRx(remainingPacketLength, paddingBuffer, paddingBuffer, true);
+        }
+    } else {                    // if setting real limit
+        txLen *= 2;             // convert WORD count to BYTE count
+        rxLen *= 2;
+
+        if(txLen >= 8) {        // if we should TX more than 8 bytes, subtract 8 (header length)
+            txLen -= 8;
+        } else {                // shouldn't TX 8 or more bytes? Then don't TX anymore.
+            txLen = 0;
+        }
+
+        if(rxLen >= 8) {        // if we should RX more than 8 bytes, subtract 8 (header length)
+            rxLen -= 8;
+        } else {                // shouldn't RX 8 or more bytes? Then don't RX anymore.
+            rxLen = 0;
+        }
+    }
+
+    // The SPI bus is TX and RX at the same time, so we will TX/RX until both are used up.
+    // So use the greater count as the limit.
+    if(txLen >= rxLen) {
+        remainingPacketLength = txLen;
+    } else {
+        remainingPacketLength = rxLen;
+    }
 }
 
 bool CConUsb::loadFTDIdll(void)
@@ -198,6 +266,11 @@ DWORD CConUsb::bytesToSend(void)
     return dwTxBytes;
 }
 
+WORD CConUsb::getRemainingLength(void)
+{
+    return remainingPacketLength;
+}
+
 void CConUsb::txRx(int count, BYTE *sendBuffer, BYTE *receiveBufer, bool addLastToAtn)
 {
     if(SWAP_ENDIAN) {       // swap endian on sending if required
@@ -210,8 +283,24 @@ void CConUsb::txRx(int count, BYTE *sendBuffer, BYTE *receiveBufer, bool addLast
         }
     }
 
+    if(count == TXRX_COUNT_REST) {          // if should TX/RX the rest, use the remaining length
+        count = remainingPacketLength;
+    }
+
+    if(remainingPacketLength != NO_REMAINING_LENGTH) {
+        if(count > remainingPacketLength) {
+            outDebugString("CConUsb::txRx - trying to TX/RX %d more bytes then allowed! Fix this!", (count - remainingPacketLength));
+
+            count = remainingPacketLength;
+        }
+    }
+
     write   (count, sendBuffer);
     read    (count, receiveBufer);
+
+    if(remainingPacketLength != NO_REMAINING_LENGTH) {
+        remainingPacketLength -= count;             // mark that we've send this much data
+    }
 
     // add the last WORD as possible to check for the new ATN
     if(addLastToAtn) {

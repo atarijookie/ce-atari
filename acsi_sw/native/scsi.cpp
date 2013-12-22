@@ -107,6 +107,13 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
         outDebugString("Scsi::attachToHostPath - SOURCETYPE_DEVICE not supported yet, not attaching.");
         return false;
         break;
+
+    case SOURCETYPE_TESTMEDIA:
+        attachedMedia[index].hostPath       = "";
+        attachedMedia[index].hostSourceType = hostSourceType;
+        attachedMedia[index].dataMedia      = &testMedia;
+        attachedMedia[index].accessType     = SCSI_ACCESSTYPE_FULL;
+        break;
     }
 
     res = attachMediaToACSIid(index, hostSourceType, accessType);          // last step - attach media to ACSI ID

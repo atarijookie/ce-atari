@@ -4,6 +4,7 @@
 #include "acsidatatrans.h"
 #include "datamedia.h"
 #include "nomedia.h"
+#include "testmedia.h"
 #include "imedia.h"
 
 #include "datatypes.h"
@@ -17,6 +18,7 @@
 #define SOURCETYPE_IMAGE                1
 #define SOURCETYPE_IMAGE_TRANSLATEDBOOT 2
 #define SOURCETYPE_DEVICE               3
+#define SOURCETYPE_TESTMEDIA            100
 
 #define MAX_ATTACHED_MEDIA              9
 
@@ -64,6 +66,7 @@ private:
     IMedia          *dataMedia;             // current data media valid for current ACSI ID
 
     NoMedia         noMedia;
+    TestMedia       testMedia;
 
     BYTE            *dataBuffer;
     BYTE            *dataBuffer2;

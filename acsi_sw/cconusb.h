@@ -84,6 +84,10 @@ typedef
 
 //------------------------------------------------
 
+#define NO_REMAINING_LENGTH     -1
+#define TXRX_COUNT_REST         -1
+#define PADDINGBUFFER_SIZE      1024
+
 class CConUsb: public QObject
 {
     Q_OBJECT
@@ -101,6 +105,11 @@ public:
     virtual void    read (int count, BYTE *buffer);
     virtual bool    isConnected(void);
 
+    void receiveAndApplyTxRxLimits(void);
+    void applyNoTxRxLimis(void);
+    void setRemainingTxRxLen(WORD txLen, WORD rxLen);
+    WORD getRemainingLength(void);
+
     void getAtnWord(BYTE *bfr);
     void setAtnWord(BYTE *bfr);
 
@@ -114,6 +123,9 @@ private:
     void logString(QString log);
 
     QLibrary        *FTDIlib;
+
+    WORD                        remainingPacketLength;
+    BYTE                        paddingBuffer[PADDINGBUFFER_SIZE];
 
     tFT_Open                    pFT_Open;
     tFT_ListDevices             pFT_ListDevices;
@@ -136,6 +148,8 @@ private:
         bool got;
         BYTE bytes[2];
     } prevAtnWord;
+
+    WORD swapWord(WORD val);
 };
 
 #endif // CCONUSB_H

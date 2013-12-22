@@ -9,7 +9,7 @@
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 #define LOGFILE     "H:/acsilog.txt"
-#define MEDIAFILE   "C:/datamedia.img"
+#define MEDIAFILE   "H:/datamedia.img"
 
 QStringList dbg;
 
@@ -34,7 +34,8 @@ CCoreThread::CCoreThread()
     scsi        = new Scsi();
     scsi->setAcsiDataTrans(dataTrans);
 
-    scsi->attachToHostPath(MEDIAFILE, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
+    scsi->attachToHostPath(MEDIAFILE, SOURCETYPE_IMAGE, SCSI_ACCESSTYPE_FULL);
+//    scsi->attachToHostPath(MEDIAFILE, SOURCETYPE_TESTMEDIA, SCSI_ACCESSTYPE_FULL);
 
     translated = new TranslatedDisk();
     translated->setAcsiDataTrans(dataTrans);
@@ -75,7 +76,7 @@ void CCoreThread::displayDbg(void)
 
 void CCoreThread::run(void)
 {
-    BYTE inBuff[2];
+    BYTE inBuff[16];
 
     DWORD lastTick = GetTickCount();
     running = true;
@@ -102,6 +103,8 @@ void CCoreThread::run(void)
             sendSingleHalfWord = false;
         }
 
+        conUsb->applyNoTxRxLimis();             // mark that we're waiting for ATN and thus we have no TX/RX limits yet
+
         conUsb->getAtnWord(inBuff);
 
         if(inBuff[0] != 0 || inBuff[1] != 0) {
@@ -115,10 +118,13 @@ void CCoreThread::run(void)
             break;
 
         case ATN_FW_VERSION:
+            conUsb->receiveAndApplyTxRxLimits();    // receive and set the maximum bytes we can TX/RX until next ATN
+
             handleFwVersion();
             break;
 
         case ATN_ACSI_COMMAND:
+            conUsb->receiveAndApplyTxRxLimits();    // receive and set the maximum bytes we can TX/RX until next ATN
             handleAcsiCommand();
             break;
 
@@ -133,7 +139,7 @@ void CCoreThread::run(void)
 
 void CCoreThread::handleAcsiCommand(void)
 {
-    #define CMD_SIZE    14
+    #define CMD_SIZE    16
 
     BYTE bufOut[CMD_SIZE], bufIn[CMD_SIZE];
     memset(bufOut, 0, CMD_SIZE);
@@ -230,7 +236,7 @@ void CCoreThread::handleFwVersion(void)
         setEnabledIDbits = false;           // and don't sent this anymore (until needed)
     }
 
-    conUsb->txRx(10, oBuf, fwVer);
+    conUsb->txRx(TXRX_COUNT_REST, oBuf, fwVer);
 
     logToFile((char *) "handleFwVersion: \nOUT:\n");
     logToFile(10, oBuf);

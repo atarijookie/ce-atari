@@ -181,13 +181,13 @@ void AcsiDataTrans::sendDataAndStatus(void)
     BYTE devCommand[COMMAND_SIZE];
     memset(devCommand, 0, COMMAND_SIZE);
 
-    devCommand[3] = CMD_DATA_READ;                          // store command
-    devCommand[4] = count >> 16;                            // store data size
-    devCommand[5] = count >>  8;
-    devCommand[6] = count  & 0xff;
-    devCommand[7] = status;                                 // store status
+    devCommand[1] = CMD_DATA_READ;                          // store command
+    devCommand[2] = count >> 16;                            // store data size
+    devCommand[3] = count >>  8;
+    devCommand[4] = count  & 0xff;
+    devCommand[5] = status;                                 // store status
 
-    com->txRx(COMMAND_SIZE, devCommand, recvBuffer);        // transmit this command
+    com->txRx(6, devCommand, recvBuffer);                   // transmit this command
 
     // then send the data
     BYTE *dataNow = buffer;
@@ -203,10 +203,11 @@ void AcsiDataTrans::sendDataAndStatus(void)
         }
 
         DWORD cntNow = (count > 512) ? 512 : count;         // max 512 bytes per transfer
+//        DWORD cntNow = com->getRemainingLength() - 2;         // this much data, including 2 bytes for header
         count -= cntNow;
 
         memcpy(txBuffer + 2, dataNow, cntNow);              // copy the data after the header (2 bytes)
-        com->txRx(cntNow + 2, txBuffer, rxBuffer);          // transmit this buffer with header
+        com->txRx(TXRX_COUNT_REST, txBuffer, rxBuffer);     // transmit this buffer with header
 
         dataNow += cntNow;                                  // move the data pointer further
     }
@@ -224,13 +225,15 @@ void AcsiDataTrans::sendStatusAfterWrite(void)
     txBuffer[1] = CMD_SEND_STATUS;                          // set the command and the status
     txBuffer[2] = status;
 
-    com->txRx(16 - 4, txBuffer, rxBuffer);                  // trasmit the status (10 bytes total, but 4 already received)
+    com->txRx(TXRX_COUNT_REST, txBuffer, rxBuffer);         // trasmit the status
 }
 
 bool AcsiDataTrans::waitForATN(BYTE atnCode, DWORD maxLoopCount)
 {
     DWORD lastTick = GetTickCount();
     BYTE inBuff[2];
+
+    com->applyNoTxRxLimis();                                // wait for ATN means no TX/RX limits
 
     // wait for specific atn code, but maximum maxLoopCount times
     while(maxLoopCount--) {
@@ -244,6 +247,9 @@ bool AcsiDataTrans::waitForATN(BYTE atnCode, DWORD maxLoopCount)
 
         if(inBuff[1] == atnCode) {                      // ATN code found?
             outDebugString("waitForATN %02x good.", atnCode);
+
+            com->receiveAndApplyTxRxLimits();           // receive and set the maximum bytes we can TX/RX until next ATN
+
             return true;
         }
     }
