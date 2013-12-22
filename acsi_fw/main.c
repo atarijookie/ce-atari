@@ -44,7 +44,7 @@ WORD t1, t2, dt;
 // commands sent from host to device
 #define CMD_ACSI_CONFIG						0x10
 #define CMD_DATA_WRITE						0x20
-#define CMD_DATA_READ							0x30
+#define CMD_DATA_READ						0x30
 #define CMD_SEND_STATUS						0x40
 #define CMD_DATA_MARKER						0xda
 
@@ -54,6 +54,32 @@ WORD t1, t2, dt;
 #define STATE_DATA_WRITE					2
 #define STATE_READ_STATUS					3
 
+
+#define CMD_BUFFER_LENGTH					16
+
+///////////////////////////
+// The following definitions are definitions of how many WORDs are TXed and RXed for each different ATN.
+// Note that ATN_VARIABLE_LEN shouldn't be used, and is replaced by some value.
+
+#define ATN_VARIABLE_LEN						0xffff
+
+#define ATN_SENDFWVERSION_LEN_TX		8
+#define ATN_SENDFWVERSION_LEN_RX		8
+
+#define ATN_SENDACSICOMMAND_LEN_TX	12
+#define ATN_SENDACSICOMMAND_LEN_RX	CMD_BUFFER_LENGTH
+
+#define ATN_READMOREDATA_LEN_TX			6	
+#define ATN_READMOREDATA_LEN_RX			ATN_VARIABLE_LEN
+
+#define ATN_WRITEMOREDATA_LEN_TX		ATN_VARIABLE_LEN
+#define ATN_WRITEMOREDATA_LEN_RX		1
+
+#define ATN_GETSTATUS_LEN_TX				5
+#define ATN_GETSTATUS_LEN_RX				8
+
+///////////////////////////
+
 BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
@@ -61,17 +87,17 @@ BYTE statusByte;
 WORD version[2] = {0xa013, 0x0904};				// this means: hAns, 2013-09-04
 
 volatile BYTE sendFwVersion, sendACSIcommand;
-WORD atnSendFwVersion[6], atnSendACSIcommand[10];
+WORD atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
+WORD atnSendACSIcommand[ATN_SENDACSICOMMAND_LEN_TX];
 
-WORD atnMoreData[4];
+WORD atnMoreData[ATN_READMOREDATA_LEN_TX];
 WORD dataBuffer[550 / 2];				// sector buffer with some (38 bytes) reserve at the end in case of overflow
 
-WORD atnGetStatus[3];
+WORD atnGetStatus[ATN_GETSTATUS_LEN_TX];
 
 TWriteBuffer wrBuf1, wrBuf2;
 TWriteBuffer *wrBufNow;
 
-#define CMD_BUFFER_LENGTH						14
 WORD cmdBuffer[CMD_BUFFER_LENGTH];
 
 BYTE cmd[14];										// received command bytes
@@ -89,6 +115,9 @@ BYTE currentLed;
 // TODO: have to send bit more than Multiple of 16 to receive all data ( padDataToMul16 in host SW )
 // TODO: check why the communication with host gets stuck when ST of off
 // TODO: test and fix with megafile drive
+
+// TODO: CEDD downloader - read po jedinom sektore, zapis na floppy
+
 // note: DMA transfer to ODD address in ST looses first byte
 
 BYTE shouldProcessCommands;
@@ -104,31 +133,41 @@ int main (void)
 	
 	atnSendFwVersion[0] = 0;											// just-in-case padding
 	atnSendFwVersion[1] = ATN_FW_VERSION;					// attention code
-	atnSendFwVersion[2] = version[0];
-	atnSendFwVersion[3] = version[1];
-	atnSendFwVersion[5] = 0;											// terminating zero
+	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
+	atnSendFwVersion[4] = version[0];
+	atnSendFwVersion[5] = version[1];
+	// WORD 6 is reserved for current LED (floppy image) number
+	atnSendFwVersion[7] = 0;											// terminating zero
 	
 	atnSendACSIcommand[0] = 0;										// just-in-case padding
 	atnSendACSIcommand[1] = ATN_ACSI_COMMAND;			// attention code
-	atnSendACSIcommand[9] = 0;										// terminating zero
+	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
+	atnSendACSIcommand[11] = 0;										// terminating zero
 	
 	atnMoreData[0] = 0;
 	atnMoreData[1] = ATN_READ_MORE_DATA;					// mark that we want to read more data
-	atnMoreData[3] = 0;
+	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
+	// WORD 4 is sequence number of the request for this command
+	atnMoreData[5] = 0;
 	
 	wrBuf1.buffer[0]	= 0;
 	wrBuf1.buffer[1]	= ATN_WRITE_MORE_DATA;
+	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
+	// WORD 4 is sequence number of the request for this command
 	wrBuf1.next				= (void *) &wrBuf2;
 
 	wrBuf2.buffer[0]	= 0;
 	wrBuf2.buffer[1]	= ATN_WRITE_MORE_DATA;
+	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
+	// WORD 4 is sequence number of the request for this command
 	wrBuf2.next			= (void *) &wrBuf1;
 
 	wrBufNow = &wrBuf1;
 
 	atnGetStatus[0] = 0;
 	atnGetStatus[1] = ATN_GET_STATUS;
-	atnGetStatus[2] = 0;
+	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
+	atnGetStatus[4] = 0;
 
 	spiDmaIsIdle = TRUE;
 	spiDmaTXidle = TRUE;
@@ -189,9 +228,10 @@ int main (void)
 
 		// in command waiting state, nothing to do and should send FW version?
 		if(state == STATE_GET_COMMAND && spiDmaIsIdle && sendFwVersion) {
-			atnSendFwVersion[4] = ((WORD)currentLed) << 8;				// store the current LED status in the last WORD
+			atnSendFwVersion[6] = ((WORD)currentLed) << 8;				// store the current LED status in the last WORD
 			
-			spiDma_txRx(6, (BYTE *) &atnSendFwVersion[0],	 6, (BYTE *) &cmdBuffer[0]);
+			spiDma_txRx(	ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0],	 
+										ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
 				
 			sendFwVersion	= FALSE;
 			shouldProcessCommands = TRUE;													// mark that we should process the commands on next SPI DMA idle time
@@ -199,7 +239,8 @@ int main (void)
 
 		// SPI is idle and we should send command to host? 
 		if(spiDmaIsIdle && sendACSIcommand) {
-			spiDma_txRx(10, (BYTE *) &atnSendACSIcommand[0], CMD_BUFFER_LENGTH, (BYTE *) &cmdBuffer[0]);
+			spiDma_txRx(	ATN_SENDACSICOMMAND_LEN_TX, (BYTE *) &atnSendACSIcommand[0], 
+										ATN_SENDACSICOMMAND_LEN_RX, (BYTE *) &cmdBuffer[0]);
 				
 			sendACSIcommand	= FALSE;
 			shouldProcessCommands = TRUE;													// mark that we should process the commands on next SPI DMA idle time
@@ -274,7 +315,7 @@ void onGetCommand(void)
 		//-----
 		if(brStat == E_OK) {							// if all was well, let's send this to host
 			for(i=0; i<7; i++) {						
-				atnSendACSIcommand[2 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
+				atnSendACSIcommand[4 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
 			}
 					
 			sendACSIcommand	= TRUE;
@@ -287,7 +328,7 @@ void onDataRead(void)
 	WORD seqNo = 0;
 	WORD subCount, recvCount, sendCount;
 	WORD index, data;
-	BYTE value;
+	BYTE value, dataMarkerFound;
 
 	state = STATE_GET_COMMAND;														// this will be the next state once this function finishes
 	
@@ -298,20 +339,24 @@ void onDataRead(void)
 		subCount = (dataCnt > 512) ? 512 : dataCnt;
 		dataCnt -= subCount;
 				
-		atnMoreData[2] = seqNo;															// set the sequence # to Attention
+		atnMoreData[4] = seqNo;															// set the sequence # to Attention
 		seqNo++;
 		
+		// note that recvCount is good as count for how much we should receive over SPI, but not how much we should send to ST
 		recvCount	= subCount / 2;														// WORDs to receive: convert # of BYTEs to # of WORDs
 		recvCount	+= (subCount & 1);												// if subCount is odd number, then we need to transfer 1 WORD more
-		recvCount += 3;																			// receive 3 words more than just data - 2 WORDs start, 1 WORD CMD_DATA_MARKER
+		recvCount += 6;																			// receive few words more than just data - 2 WORDs start, 1 WORD CMD_DATA_MARKER
 		
-		sendCount	= (recvCount > 4) ? 4 : recvCount;				// WORDs to send: maximum 4 WORDs, but could be less
+		sendCount	= (recvCount > ATN_READMOREDATA_LEN_TX) ? ATN_READMOREDATA_LEN_TX : recvCount;				// WORDs to send: maximum ATN_READMOREDATA_LEN_TX WORDs, but could be less
 
-		spiDma_txRx(sendCount, (BYTE *) &atnMoreData[0], recvCount, (BYTE *) &dataBuffer[0]);		// set up the SPI DMA transfer
+		spiDma_txRx(	sendCount, (BYTE *) &atnMoreData[0], 
+									recvCount, (BYTE *) &dataBuffer[0]);		// set up the SPI DMA transfer
 
 		index = 0;
 		
 		// first wait for CMD_DATA_MARKER to appear
+		dataMarkerFound = FALSE;
+		
 		while(recvCount > 0) {															// something to receive?
 			// when at least 1 WORD was received
 			if((DMA1_Channel2->CNDTR == 0) || (DMA1_Channel2->CNDTR < recvCount)) {
@@ -321,11 +366,21 @@ void onDataRead(void)
 				index++;
 
 				if(data == CMD_DATA_MARKER) {										// found data marker?
+					dataMarkerFound = TRUE;
 					break;
 				}
 			}
 		}
 		
+		if(dataMarkerFound == FALSE) {										// didn't find the data marker?
+			PIO_read(0x02);																	// send status: CHECK CONDITION and quit
+			return;
+		}
+
+		// calculate again how many WORDs we should send to ST
+		recvCount	= subCount / 2;														// WORDs to receive: convert # of BYTEs to # of WORDs
+		recvCount	+= (subCount & 1);												// if subCount is odd number, then we need to transfer 1 WORD more
+
 		// now try to trasmit the data
 		while(recvCount > 0) {															// something to receive?
 			// when at least 1 WORD was received
@@ -379,13 +434,13 @@ void onDataWrite(void)
 		subCount = (dataCnt > 512) ? 512 : dataCnt;
 		dataCnt -= subCount;
 				
-		wrBufNow->buffer[2] = seqNo;												// set the sequence # to Attention
+		wrBufNow->buffer[4] = seqNo;												// set the sequence # to Attention
 		seqNo++;
 		
 		recvCount	= subCount / 2;														// WORDs to receive: convert # of BYTEs to # of WORDs
 		recvCount	+= (subCount & 1);												// if subCount is odd number, then we need to transfer 1 WORD more
 		
-		index = 3;
+		index = 5;																// length of header before data
 		
 		for(i=0; i<recvCount; i++) {											// write this many WORDs
 			value = DMA_write();														// get data from Atari
@@ -419,10 +474,11 @@ void onDataWrite(void)
 		}
 		
 		wrBufNow->buffer[index] = 0;											// terminating zero
-		wrBufNow->count = index + 1;											// store count
+		wrBufNow->count = index + 1;											// store count, +1 because we have terminating zero
 
 		// set up the SPI DMA transfer
-		spiDma_txRx(wrBufNow->count, (BYTE *) &wrBufNow->buffer[0], 1, (BYTE *) &dataBuffer[0]);		
+		spiDma_txRx(wrBufNow->count,			(BYTE *) &wrBufNow->buffer[0], 
+					ATN_WRITEMOREDATA_LEN_RX,	(BYTE *) &dataBuffer[0]);		
 		
 		wrBufNow = wrBufNow->next;												// use next write buffer
 	}
@@ -436,7 +492,8 @@ void onReadStatus(void)
 	
 	newStatus = 0xff;																	// no status received
 	
-	spiDma_txRx(3, (BYTE *) &atnGetStatus[0], 8, (BYTE *) &cmdBuffer[0]);
+	spiDma_txRx(	ATN_GETSTATUS_LEN_TX, (BYTE *) &atnGetStatus[0], 
+								ATN_GETSTATUS_LEN_RX, (BYTE *) &cmdBuffer[0]);
 
 	spiDma_waitForFinish();
 
@@ -476,6 +533,12 @@ void spiDma_waitForFinish(void)
 
 void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
 {
+	WORD *pTxBfr = (WORD *) txBfr;
+	
+	// store TX and RX count so the host will know how much he should transfer
+	pTxBfr[2] = txCount;
+	pTxBfr[3] = rxCount;
+	
 	spiDma_waitForFinish();															// make sure that the last transfer has finished
 
 	// disable both TX and RX channels
