@@ -731,6 +731,10 @@ BYTE isOurDrive(WORD drive, BYTE withCurrentDrive)
 		return FALSE;
 	}
 	
+	if(drive < 2) {														/* asking for drive A or B? not ours! */
+		return FALSE;
+	}
+	
 	updateCeDrives();													/* update ceDrives variable */
 	
 	if(ceDrives & (1 << drive)) {										/* is that bit set? */
