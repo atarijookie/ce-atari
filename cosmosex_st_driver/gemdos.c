@@ -116,10 +116,9 @@ int32_t custom_dsetdrv( void *sp )
 		return res;														/* return the value returned from old handler */
 	}
 	
-	WORD drivesMapOrig	= Drvmap();										/* BIOS call - get drives bitmap */
-    WORD myDrivesMap	= getWord(pDmaBuffer);							/* read result, which is drives bitmap*/
+	WORD drivesMap = Drvmap();											/* BIOS call - get drives bitmap - this will also communicate with CE */
 	
-	return (drivesMapOrig | myDrivesMap);								/* result = original + my drives bitmap */
+	return drivesMap;													/* result = original + my drives bitmap */
 }
 
 int32_t custom_dfree( void *sp )
