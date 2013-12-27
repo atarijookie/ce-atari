@@ -32,10 +32,6 @@ void TranslatedDisk::onDsetdrv(BYTE *cmd)
         currentDriveLetter  = 'A' + newDrive;       // store the current drive
         currentDriveIndex   = newDrive;
 
-        WORD drives = getDrivesBitmap();
-        dataTrans->addDataWord(drives);             // return the drives in data
-        dataTrans->padDataToMul16();                // and pad to 16 bytes for DMA chip
-
         dataTrans->setStatus(E_OK);                 // return OK
         return;
     }
@@ -150,6 +146,8 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     BYTE findAttribs    = dataBuffer[0];
     atariSearchString   = (char *) (dataBuffer + 1);
 
+    outDebugString("onFsfirst -- %s, findAttribs: %x", atariSearchString.c_str(), findAttribs);
+
     res = createHostPath(atariSearchString, hostSearchString);   // create the host path
 
     if(!res) {                                      // the path doesn't bellong to us?
@@ -189,6 +187,10 @@ void TranslatedDisk::appendFoundToFindStorage(WIN32_FIND_DATAA *found, BYTE find
 {
     // TODO: verify on ST that the find attributes work like this
 
+    // TOS 1.04 searches with findAttribs set to 0x10, that's INCLUDE DIRs
+
+    outDebugString("appendFoundToFindStorage zaciatok");
+
     // first verify if the file attributes are OK
     if((found->dwFileAttributes & FILE_ATTRIBUTE_READONLY)!=0   && (findAttribs & FA_READONLY)==0)  // is read only, but not searching for that
         return;
@@ -202,8 +204,9 @@ void TranslatedDisk::appendFoundToFindStorage(WIN32_FIND_DATAA *found, BYTE find
     if((found->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)!=0  && (findAttribs & FA_DIR)==0)       // is dir, but not searching for that
         return;
 
-    if((found->dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)!=0    && (findAttribs & FA_ARCHIVE)==0)   // is archive, but not searching for that
-        return;
+//    // this one is now disabled as on Win almost everything has archive bit set, and thus TOS didn't show any files
+//    if((found->dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)!=0    && (findAttribs & FA_ARCHIVE)==0)   // is archive, but not searching for that
+//        return;
 
     //--------
     // add this file
@@ -247,6 +250,8 @@ void TranslatedDisk::appendFoundToFindStorage(WIN32_FIND_DATAA *found, BYTE find
     for(int i=0; i<14; i++) {
         buf[9 + i] = toUpperCase(buf[9 + i]);
     }
+
+    outDebugString("appendFoundToFindStorage - %s", &buf[9]);
 
     findStorage.count++;
 }
