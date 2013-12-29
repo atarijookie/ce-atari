@@ -13,6 +13,17 @@
 | ------------------------------------------------------	
 	.text
 | ------------------------------------------------------
+					| the following will not be needed in the real boot sector
+					| mshrink()
+					move.l	4(sp),a5				| address to basepage
+					move.l	#10000, -(sp)			| memory size to keep 
+					move.l	a5,-(sp)				|
+					clr.w	-(sp)					|
+					move.w	#0x4a,-(sp)				|
+					trap	#1						|	
+					lea.l	12(sp),sp				|
+	
+
 	movem.l	d1-d7/a0-a6,-(sp)	| save registers content
 
 					| the following will not be needed in the real boot sector
@@ -47,7 +58,7 @@
 	
 	clr.l	d3
 	move.b	3(a2), d3			| d3 holds sector count we should transfer
-	sub.l	#-1, d3				| d3--, because the dbra loop will be executed (d3 + 1) times
+	sub.l	#1, d3				| d3--, because the dbra loop will be executed (d3 + 1) times
 	 
 	move.l	#1, d1				| d1 holds the current sector number. Bootsector is 0, so starting from 1 to (sector count + 1)
 	 
@@ -109,42 +120,42 @@ end_fail:
 |--------------------------
 | subroutine used to load single sector to memory from ACSI device
 dma_read:
-	lea		fifo,A6			| DMA control register	
-	lea		dskctl,A5		| DMA data register	
+	lea		dskctl,	A5		| DMA data register	
+	lea		fifo,	A6		| DMA control register	
 	
 	st		flock			| lock the DMA chip
 	
-	move.l	a1,-(SP)		| A1 contains the address to where the data should be transfered
-	move.b	3(SP),dmaLow	| set up DMA pointer - 
+	move.l	a1,-(SP)		| A1 contains the address to where the data should be transferred
+	move.b	3(SP),dmaLow	| set up DMA pointer - low, mid, hi
 	move.b	2(SP),dmaMid		
 	move.b	1(SP),dmaHigh		
 	addq	#4,sp			| return the SP to the original position
 	
-	move.w	#0x098,(A6)		| toggle r/w, leave at read == clear FIFO
-	move.w	#0x198,(A6)		|
-	move.w	#0x098,(A6)		|
-	
-	move.w	#1,(A5)			| write sector count reg - will transfer 1 sector
-	move.w	#0x088,(A6)		| DMA bus select (not SCR ?)
+
+	| send cmd[0]
+	move.w	#0x088,(A6)		| mode: NO_DMA | HDC;
 
 	move.w	d2, d0			| copy in the 0th cmd byte, which is SCSI READ SECTOR + ACSI ID
 	swap	D0				| push the command and acsi id to upper word of D0
-	move.w	#0x0088,D0		| push NO_DMA | HDC to lower word of D0 -- write 0th byte with A1 low
+	move.w	#0x008A,D0		| PIO write 0, with NO_DMA | HDC | A0 -- A1 high again
 
 	bsr		pioWrite		| write cmd[0] and wait for IRQ
 	tst.w	d0				
 	bne		dmr_fail		| if d0 != 0, error, exit on timeout
 
+	| send cmd[1]
 	move.l	#0x00008A,D0	| PIO write 0, with NO_DMA | HDC | A0 -- A1 high again
 	bsr		pioWrite		| write cmd[1] and wait for IRQ
 	tst.w	d0				
 	bne		dmr_fail		| if d0 != 0, error, exit on timeout
 
+	| send cmd[2]
 	move.l	#0x00008A,D0	| PIO write 0, with NO_DMA | HDC | A0 -- A1 high again
 	bsr		pioWrite		| write cmd[2] and wait for IRQ
 	tst.w	d0				
 	bne		dmr_fail		| if d0 != 0, error, exit on timeout
 
+	| send cmd[3]
 	move.w	d1, d0			| move current sector number to d0
 	swap	d0
 	move.w	#0x008A, d0		| d0 now contains curent sector number + with NO_DMA | HDC | A0 -- A1 high again
@@ -153,12 +164,24 @@ dma_read:
 	tst.w	d0				
 	bne		dmr_fail		| if d0 != 0, error, exit on timeout
 
+	| send cmd[4]
 	move.l	#0x01008A,D0	| PIO write 1 (sector count), with NO_DMA | HDC | A0 -- A1 high again
 	bsr		pioWrite		| write cmd[4] and wait for IRQ
 	tst.w	d0				
 	bne		dmr_fail		| if d0 != 0, error, exit on timeout
 
-	move.l	#0x00000A,(A5)	| write final byte -- cmd[5] -- which is 0
+	
+	| toggle r/w, leave at read == clear FIFO
+	move.w	#0x190,(A6)		| DMA_WR + NO_DMA + SC_REG
+	move.w	#0x090,(A6)		|          NO_DMA + SC_REG
+	
+	move.w	#1,(A5)			| write sector count reg - will transfer 1 sector
+
+	| send cmd[5]
+	move.w	#0x008A, (a6)	| mode: NO_DMA + HDC + A0
+	move.w	#0, (a5)		| data: 0
+	move.w	#0, (a6)		| mode: start DMA transfer
+	
 	move.w	#200, d0		| 1s timeout limit
 	bsr		waitForINT		|
 	tst.w	d0
@@ -181,7 +204,11 @@ dmr_success:
 
 | This routine writes single command byte in PIO mode and waits for ACSI INT or timeout.
 pioWrite:
-	move.l	d0, (a5)		| write disk controller data. Upper WORD goes to dskctl (8604), lower WORD goes to fifo (8606)
+	swap	d0
+	move.w	d0, (a5)		| write data
+	swap	d0
+	move.w	d0, (a6)		| write mode
+	
 	moveq	#20, d0			| wait 0.1 second
 
 waitForINT:
