@@ -13,27 +13,32 @@
 | ------------------------------------------------------	
 	.text
 | ------------------------------------------------------
-					| the following will not be needed in the real boot sector
-					| mshrink()
-					move.l	4(sp),a5				| address to basepage
-					move.l	#10000, -(sp)			| memory size to keep 
-					move.l	a5,-(sp)				|
-					clr.w	-(sp)					|
-					move.w	#0x4a,-(sp)				|
-					trap	#1						|	
-					lea.l	12(sp),sp				|
-	
+|.equ PRG,1
+
+.ifdef PRG
+	| the following will not be needed in the real boot sector
+	| mshrink()
+	move.l	4(sp),a5				| address to basepage
+	move.l	#10000, -(sp)			| memory size to keep 
+	move.l	a5,-(sp)				|
+	clr.w	-(sp)					|
+	move.w	#0x4a,-(sp)				|
+	trap	#1						|	
+	lea.l	12(sp),sp				|
+.endif	
 
 	movem.l	d1-d7/a0-a6,-(sp)	| save registers content
 
-					| the following will not be needed in the real boot sector
-					| go to supervisor mode
-					move.l #0, -(sp)
-					move.w #0x20,-(sp)
-					trap #1
-					addq.l #6,sp
-					move.l	d0, pStack
- 
+.ifdef PRG
+	| the following will not be needed in the real boot sector
+	| go to supervisor mode
+	move.l #0, -(sp)
+	move.w #0x20,-(sp)
+	trap #1
+	addq.l #6,sp
+	move.l	d0, pStack
+.endif
+					
  
 | the real stuff starts here:
 
@@ -97,25 +102,24 @@ free_end_fail:
 | jump here to finish on fail without freeing the memory
 end_fail:	
 
-
-				| the following will not be needed in the real boot sector
-				| return from supervisor mode
-				move.l #pStack, a0
-				move.l (a0), -(sp)
-				move.w #0x20,-(sp)
-				trap #1
-				addq.l #6,sp
-
-				
+.ifdef PRG
+	| the following will not be needed in the real boot sector
+	| return from supervisor mode
+	move.l #pStack, a0
+	move.l (a0), -(sp)
+	move.w #0x20,-(sp)
+	trap #1
+	addq.l #6,sp
+.endif
 				
 	movem.l	(sp)+, d1-d7/a0-a6	| restore register content
 	
-| end of code when run as normal app: terminate
-	clr.w	-(sp)				| terminate
+.ifdef PRG			| end of code when run as normal app: terminate
+	clr.w	-(sp)	| terminate
 	trap	#1
-	
-| end of code when run from boot sector: rts
-|	rts
+.else				| end of code when run from boot sector: rts
+	rts				| return to calling code
+.endif
 	
 |--------------------------
 | subroutine used to load single sector to memory from ACSI device
