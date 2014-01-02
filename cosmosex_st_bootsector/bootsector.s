@@ -42,19 +42,23 @@
  
 | the real stuff starts here:
 
-	move.l	#0xC800,-(sp)		| malloc 50 kB of RAM (should be enough for the driver)
-	move.w	#0x48,-(sp)
+	| Pexec: create basepage and allocate RAM
+	moveq	#0, d1				| d1 = 0
+	move.l	d1, -(sp)			| envstr  = 0
+	move.l	d1, -(sp)			| cmdline = 0
+	move.l	d1, -(sp)			| fname   = 0
+	move.w	#5, -(sp)			| mode    = PE_BASEPAGE
+	move.w	#0x4b, -(sp)		| Pexec()
 	trap	#1
-	addq.l	#6,sp
-	
-	tst.l	D0					| if malloc failed, jump to end
-	beq		end_fail
+	add.l	#16, sp
 
-	move.l	d0, pMemory			| store the original memory pointer
-	add.l	#2, d0				| d0 = d0 + 2
-	and.l	#0xfffffffe, d0		| remove lowest bit == make EVEN address
+	cmp.l	d1, d0				| if Pexec failed (do <= 0), jump to end
+	ble		end_fail
+
+	move.l	d0, a3				| A3 = store the original memory pointer, hoping that if will be an EVEN address
+	add.l	#(256 - 28), d0		| store the driver at this position after start of basepage
 	move.l	d0, a1				| A1 will hold the current DMA transfer address, and it will move further by sector size
-	move.l	d0, pDriver			| this is the EVEN address where the driver will be loaded
+	move.l	d0, a4				| A4 = this is hopefully EVEN address where the driver will be loaded
 	
 	move.l	#config,a2			| load the config address to A2
 	move.b	2(a2), d2			| d2 holds ACSI ID 
@@ -77,30 +81,115 @@ readSectorsLoop:
 	dbra	d3, readSectorsLoop
 
 	
-| at this point the driver should be loaded at the location pointed by pDriver, we should execute it	
-	move.l	#pDriver, a0		| retrieve the pointer to where the driver was loaded
-	move.l	(a0), a0			| read the value stored at pDriver
+| at this point the driver should be loaded at the location pointed by pDriver
+
+|--------------------------------
+| first fill the correct into in the Base Page
+	move.l	a4, a0				| read the value stored at pDriver
+	add.l	#2, a0				| a0 now points to prgHead->tsize
+	
+	move.l	a3, a1				| get pBasePage to A1, a1 now points to pBasePage->lowtpa
+	
+	move.l	(a1),d0				| d0 = pBasePage->lowtpa
+	add.l	#256,d0				| d0 += 256
+	add.l	#8, a1				| a1 now points to pBasePage->tbase
+	move.l	d0, (a1)+			| basePage->tbase = basePage->lowtpa + 256;  and a1 points now to pBasePage->tlen
+	move.l	d0, d5				| d5 = basePage->tbase, save it for the fixup loop usage
+	
+	move.l	(a0), d1			| d1 = prgHead->tsize
+	move.l	(a0)+, (a1)+		| pBasePage->tlen = prgHead->tsize;  a0 points to prgHead->dsize and a1 points to pBasePage->dbase
+	
+	add.l	d1, d0				| d0 = basePage->tbase + prgHead->tsize
+	move.l	d0, (a1)+			| basePage->dbase = basePage->tbase + prgHead->tsize; a1 points to pBasePage->dlen
+
+	move.l	(a0), d1			| d1 = prgHead->dsize
+	move.l	(a0)+, (a1)+		| basePage->dlen = prgHead->dsize;  a0 points to prgHead->bsize and a1 points to pBasePage->bbase
+
+	add.l	d1, d0				| d0 = basePage->dbase + prgHead->dsize
+	move.l	d0, (a1)+			| basePage->bbase = basePage->dbase + prgHead->dsize; a1 points to pBasePage->blen
+	move.l	d0, a2				| a2 = basePage->bbase, save it for clearing BSS section
+	
+	move.l	(a0), d1			| d1 = prgHead->bsize
+	move.l	(a0)+, (a1)			| basePage->blen = prgHead->bsize;  a0 points to prgHead->ssize
+	move.l	d1, d6				| d6 = bsize, save it for clearing BSS section
+	
+|--------------------------------
+| now do the fixup for the loaded text position	
+	move.l	(a0), d2			| d2 = prgHead->ssize
+	add.l	d2, d0				| d0 = basePage->bbase + prgHead->ssize;  == BYTE *fixups
+
+	move.l	d0, a1								
+	move.l	(a1)+, d1			| read fixupOffset, a1 now points to fixups array
+	beq.s	skipFixing			| if fixupOffset is 0, then skip fixing
+	
+	add.l	d5, d1				| d1 = basePage->tbase + first fixup offset
+	move.l	d1, a0				| a0 = fist fixup pointer
+	moveq	#0, d0				| d0 = 0
+	
+fixupLoop:
+	add.l	d5, (a0)			| a0 points to place which needs to be fixed, so add text base to that
+getNextFixup:
+	move.b	(a1)+, d0			| get next fixup to d0	
+	beq.s	skipFixing			| if next fixup is 0, then we're finished
+	
+	cmp.b	#1, d0				| if the fixup is not #1, then skip to justFixNext
+	bne.s	justFixupNext
+	
+	add.l	#0x0fe, a0			| if the fixup was #1, then we add 0x0fe to the address which needs to be fixed and see what is the next fixup
+	bra.s	getNextFixup
+	
+justFixupNext:
+	add.l	d0, a0				| new place which needs to be fixed = old place + fixup 
+	bra.s	fixupLoop
+
+| code will get here either after the fixup is done, or when the fixup was skipped	
+skipFixing:
+	
+|--------------------------------
+| now we need to clear the BSS section, because it's filled either with symbols, or fixups
+	| a2 = basePage->bbase
+	| d6 = bsize	
+	
+	tst.l	d6
+	beq.s	skipMemsetBss
+
+	sub.l	#1, d6				| d6--, because dbra will be executed (d6 + 1) times
+	move.l	#0, d0				| d0 = 0
+	
+memsetLoop:	
+	move.b	d0, (a2)+			| *A2 = 0; A2++;
+	dbra	d6, memsetLoop
+	
+skipMemsetBss:
 	
 	
+| Finally execute the code using Pexec()
+	move.l	a3, d0				| d0 = pointer to base page which was created by the 1st Pexec() call
+
+	moveq	#0, d1				| d1 = 0
+	move.l	d1, -(sp)			| envstr  = 0
+	move.l	d0, -(sp)			| cmdline = pointer to base page which should be executed
+	move.l	d1, -(sp)			| fname   = 0
+	move.w	#4, -(sp)			| mode: PE_GO -- just execute the code
+	move.w	#0x4b, -(sp)		| Pexec()
+	trap	#1
+	add.l	#16, sp
 	
+	| now in this point the program should be executed, and the cpu will return here after finishing the program
 	
-| TODO: execute the code at A0. Probably Pexec() ?	
-	
-	
-	
+	bra		end_good			| now finish with a good result
+|--------------------------------------------------------------------------------------------------------------------	
+
 	
 | jump here to free the memory and finish on fail	
 free_end_fail:
-	move.l	#pMemory, a0		| retrieve original memory pointer returned by malloc
-	move.l	(a0), d0			
-	
-	move.l	d0, -(sp)			| mfree the pMemory, we've failed
-	move.w	#0x49,-(sp)
-	trap	#1
-	addq	#6,sp
+|	move.l	a3, d0			
+
+| TODO: should we Mfree the base page allocated by Pexec(), or will that be handled by TOS?	
 
 | jump here to finish on fail without freeing the memory
-end_fail:	
+end_fail:
+end_good:	
 
 .ifdef PRG
 	| the following will not be needed in the real boot sector
@@ -121,7 +210,8 @@ end_fail:
 	rts				| return to calling code
 .endif
 	
-|--------------------------
+|--------------------------------------------------------------------------------------------------------------------	
+
 | subroutine used to load single sector to memory from ACSI device
 dma_read:
 	lea		dskctl,	A5		| DMA data register	
@@ -145,19 +235,19 @@ dma_read:
 
 	bsr		pioWrite		| write cmd[0] and wait for IRQ
 	tst.w	d0				
-	bne		dmr_fail		| if d0 != 0, error, exit on timeout
+	bne.s	dmr_fail		| if d0 != 0, error, exit on timeout
 
 	| send cmd[1]
 	move.l	#0x00008A,D0	| PIO write 0, with NO_DMA | HDC | A0 -- A1 high again
 	bsr		pioWrite		| write cmd[1] and wait for IRQ
 	tst.w	d0				
-	bne		dmr_fail		| if d0 != 0, error, exit on timeout
+	bne.s	dmr_fail		| if d0 != 0, error, exit on timeout
 
 	| send cmd[2]
 	move.l	#0x00008A,D0	| PIO write 0, with NO_DMA | HDC | A0 -- A1 high again
 	bsr		pioWrite		| write cmd[2] and wait for IRQ
 	tst.w	d0				
-	bne		dmr_fail		| if d0 != 0, error, exit on timeout
+	bne.s	dmr_fail		| if d0 != 0, error, exit on timeout
 
 	| send cmd[3]
 	move.w	d1, d0			| move current sector number to d0
@@ -166,13 +256,13 @@ dma_read:
 
 	bsr		pioWrite		| write cmd[3] and wait for IRQ
 	tst.w	d0				
-	bne		dmr_fail		| if d0 != 0, error, exit on timeout
+	bne.s	dmr_fail		| if d0 != 0, error, exit on timeout
 
 	| send cmd[4]
 	move.l	#0x01008A,D0	| PIO write 1 (sector count), with NO_DMA | HDC | A0 -- A1 high again
 	bsr		pioWrite		| write cmd[4] and wait for IRQ
 	tst.w	d0				
-	bne		dmr_fail		| if d0 != 0, error, exit on timeout
+	bne.s	dmr_fail		| if d0 != 0, error, exit on timeout
 
 	
 	| toggle r/w, leave at read == clear FIFO
@@ -189,19 +279,18 @@ dma_read:
 	move.w	#200, d0		| 1s timeout limit
 	bsr		waitForINT		|
 	tst.w	d0
-	bne		dmr_fail		| if d0 != 0, error, exit on timeout
+	bne.s	dmr_fail		| if d0 != 0, error, exit on timeout
 	
 	move.w	#0x08A,(A6)		| select status register
 	move.w	(A5), D0		| get DMA return code
 	and.w	#0x00FF, D0		| mask for error code only
-	beq		dmr_success		| if D0 == 0, success!
+	beq.s	dmr_success		| if D0 == 0, success!
 
 dmr_fail:
-	move.l	#0xffffffff,D0	| set error return (-1)
+	moveq	#-1,D0			| set error return (-1)
 
 dmr_success:		
 	move.w	#0x080,(A6)		| reset DMA chip for driver
-	tst.b	D0				| test for error return
 	sf		flock			| unlock DMA chip
 	rts
 
@@ -220,15 +309,15 @@ waitForINT:
 
 waitMore:
 	btst.b	#5,gpip			| disk finished
-	beq		gotINT			| OK return
+	beq.s	gotINT			| OK return
 	cmp.l	Hz_200, d0		| timeout yet?
-	bne		waitMore		| no? try again
+	bne.s	waitMore		| no? try again
 	
-	move.l	#0xffffffff, d0	| d0 = fail!
+	moveq	#-1, d0			| d0 = fail!
 	rts
 	
 gotINT:
-	move.l	#0, d0			| d0 = success!
+	moveq	#0, d0			| d0 = success!
 	rts
 
 
@@ -237,8 +326,5 @@ gotINT:
 | This is the configuration which will be replaced before sending the sector to ST. 
 | The format is: 'XX'  AcsiId  SectorCount 
 config:		dc.l			0x58580020			
-pMemory:	dc.l			0
-pDriver:	dc.l			0	
-	
 pStack:		dc.l			0	
 | ------------------------------------------------------	
