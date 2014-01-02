@@ -14,9 +14,11 @@
 	.text
 | ------------------------------------------------------
 |.equ PRG,		1
-.equ FROMFILE,	1
+|.equ FROMFILE,	1
 |.equ FAKEJSR,	1
 
+|	move.l	#0xfffffffe, a0
+|	move.l	#1, (a0)
 
 .ifdef PRG
 	| the following will not be needed in the real boot sector
@@ -88,7 +90,7 @@ fakeSubRoutine:
 	move.l	d0, a4				| A4 = this is hopefully EVEN address where the driver will be loaded
 
 .ifndef FROMFILE	
-	move.l	#config,a2			| load the config address to A2
+	lea		(config,pc),a2		| load the config address to A2
 	move.b	2(a2), d2			| d2 holds ACSI ID 
 	lsl.b	#5, d2				| d2 = d2 << 5
 	ori.b	#0x08, d2			| d2 now contains (ACSI ID << 5) | 0x08, which is READ SECTOR from ACSI ID device
