@@ -13,19 +13,44 @@
 | ------------------------------------------------------	
 	.text
 | ------------------------------------------------------
-|.equ PRG,1
+|.equ PRG,		1
+.equ FROMFILE,	1
+|.equ FAKEJSR,	1
+
 
 .ifdef PRG
 	| the following will not be needed in the real boot sector
 	| mshrink()
 	move.l	4(sp),a5				| address to basepage
+
+	| move the stack to end of our ram after mshrink()
+	move.l	a5,d0					| d0 = address of BP
+	add.l	#10000, d0				| d0 = end of our RAM
+	and.b	#0xf0,d0				| align stack
+	move.l	d0,sp					| new stackspace
+
+	| do the mshrink()
 	move.l	#10000, -(sp)			| memory size to keep 
 	move.l	a5,-(sp)				|
 	clr.w	-(sp)					|
 	move.w	#0x4a,-(sp)				|
 	trap	#1						|	
-	lea.l	12(sp),sp				|
+	add.l	#12,sp					
 .endif	
+
+.ifdef FAKEJSR
+	move.l	#fakeSubRoutine, a0
+	jsr		(a0)
+	
+	clr.w	-(sp)	| terminate
+	trap	#1
+
+fakeSubRoutine:
+|	nop
+|	rts
+	
+.endif
+
 
 	movem.l	d1-d7/a0-a6,-(sp)	| save registers content
 
@@ -36,6 +61,7 @@
 	move.w #0x20,-(sp)
 	trap #1
 	addq.l #6,sp
+	
 	move.l	d0, pStack
 .endif
 					
@@ -44,6 +70,7 @@
 
 	| Pexec: create basepage and allocate RAM
 	moveq	#0, d1				| d1 = 0
+	
 	move.l	d1, -(sp)			| envstr  = 0
 	move.l	d1, -(sp)			| cmdline = 0
 	move.l	d1, -(sp)			| fname   = 0
@@ -59,7 +86,8 @@
 	add.l	#(256 - 28), d0		| store the driver at this position after start of basepage
 	move.l	d0, a1				| A1 will hold the current DMA transfer address, and it will move further by sector size
 	move.l	d0, a4				| A4 = this is hopefully EVEN address where the driver will be loaded
-	
+
+.ifndef FROMFILE	
 	move.l	#config,a2			| load the config address to A2
 	move.b	2(a2), d2			| d2 holds ACSI ID 
 	lsl.b	#5, d2				| d2 = d2 << 5
@@ -79,7 +107,36 @@ readSectorsLoop:
 	add.l	#512, a1			| a1 += 512
 	add.w	#1, d1				| current_sector++
 	dbra	d3, readSectorsLoop
+.else 
+	| if - for testing purposes - we should load it from file instead of ACSI device
+	
+	| fopen
+	move.w	#0,-(sp)
+	move.l	#fname, -(sp)
+	move.w	#0x3D,-(sp)
+	trap 	#1
+	addq.l	#8,sp
+	
+	move.l	d0, handle
 
+	| fread
+	move.l	a1, -(sp)			| buffer
+	move.l	#10000, -(sp)		| size
+	move.w	d0,-(sp)			| handle
+	move.w	#0x3F,-(sp)
+	trap	#1
+	add.l	#12,sp
+	
+	| fclose
+	move.l	#handle, a0	
+	move.l	(a0), d0
+	
+	move.w	d0,-(sp)			| handle
+	move.w	#0x3E,-(sp)
+	trap	#1
+	addq.l	#4,sp
+	
+.endif
 	
 | at this point the driver should be loaded at the location pointed by pDriver
 
@@ -167,6 +224,7 @@ skipMemsetBss:
 	move.l	a3, d0				| d0 = pointer to base page which was created by the 1st Pexec() call
 
 	moveq	#0, d1				| d1 = 0
+	
 	move.l	d1, -(sp)			| envstr  = 0
 	move.l	d0, -(sp)			| cmdline = pointer to base page which should be executed
 	move.l	d1, -(sp)			| fname   = 0
@@ -195,6 +253,7 @@ end_good:
 	| the following will not be needed in the real boot sector
 	| return from supervisor mode
 	move.l #pStack, a0
+	
 	move.l (a0), -(sp)
 	move.w #0x20,-(sp)
 	trap #1
@@ -202,6 +261,12 @@ end_good:
 .endif
 				
 	movem.l	(sp)+, d1-d7/a0-a6	| restore register content
+	
+
+.ifdef FAKEJSR
+	rts
+.endif
+
 	
 .ifdef PRG			| end of code when run as normal app: terminate
 	clr.w	-(sp)	| terminate
@@ -211,6 +276,7 @@ end_good:
 .endif
 	
 |--------------------------------------------------------------------------------------------------------------------	
+.ifndef FROMFILE
 
 | subroutine used to load single sector to memory from ACSI device
 dma_read:
@@ -320,11 +386,16 @@ gotINT:
 	moveq	#0, d0			| d0 = success!
 	rts
 
-
+.endif
 | ------------------------------------------------------
 	.data
 | This is the configuration which will be replaced before sending the sector to ST. 
 | The format is: 'XX'  AcsiId  SectorCount 
 config:		dc.l			0x58580020			
 pStack:		dc.l			0	
+
+.ifdef FROMFILE	
+fname:		.ascii			"M:\\CEDD\\CEDD.PRG"
+handle:		dc.l			0
+.endif
 | ------------------------------------------------------	
