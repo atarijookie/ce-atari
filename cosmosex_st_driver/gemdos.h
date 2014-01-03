@@ -109,6 +109,9 @@ void updateCeDrives(void);
 int32_t custom_fread ( void *sp );
 int32_t custom_fwrite( void *sp );
 int32_t custom_pexec( void *sp );
+int32_t custom_pterm( void *sp );
+int32_t custom_pterm0( void *sp );
+int32_t custom_ptermres( void *sp );
 
 BYTE commitChanges(WORD ceHandle);
 void initFileBuffer(WORD ceHandle);
@@ -130,6 +133,11 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 		res = function( __VA_ARGS__ );	\
 		useOldGDHandler = 0;			
 
+#define CALL_OLD_GD_VOIDRET( function, ... )	\
+		useOldGDHandler = 1;			\
+		function( __VA_ARGS__ );	\
+		useOldGDHandler = 0;			
+		
 // if sign bit is set, extend the sign to whole DWORD
 #define extendByteToDword(X)    ( ((X & 0x80)==0) ? X : (0xffffff00 | X) )
 

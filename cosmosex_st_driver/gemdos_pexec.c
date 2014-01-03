@@ -87,6 +87,12 @@ typedef struct __attribute__ ((__packed__))
 
 void freeTheBasePage(TBasePage *basePage);
 
+// the following defines and variable will help to determine how the prog was terminated after Pexec and thus to know if should or shouldn't Mfree the RAM
+#define TERMINATEDBY_UNKNOWN	0
+#define TERMINATEDBY_PTERM		1
+#define TERMINATEDBY_PTERMRES	2
+BYTE terminatedBy;
+
 // ------------------------------------------------------------------ 
 // LONG Pexec( mode, fname, cmdline, envstr )
 int32_t custom_pexec( void *sp )
@@ -103,8 +109,8 @@ int32_t custom_pexec( void *sp )
 	params += 4;
 	char *envstr	= (char *)	*((DWORD *) params);
 
-	// for these modes don't do anything special, just call the original
-	if(mode == PE_GO || mode == PE_BASEPAGE || mode == PE_GOTHENFREE) {
+	// for any other than these modes don't do anything special, just call the original
+	if(mode != PE_LOADGO && mode != PE_LOAD) {
 		CALL_OLD_GD( Pexec, mode, fname, cmdline, envstr);
 	}
 	
@@ -125,8 +131,9 @@ int32_t custom_pexec( void *sp )
 	pPrgStart = (BYTE *) (((DWORD) pPrgStart) & 0xfffffffc);				// make temp buffer pointer to be at multiple of 4
 
 	// create base page, allocate stuff
-	pBasePage = (BYTE *) Pexec(PE_BASEPAGE, 0, cmdline, envstr);					
-
+	CALL_OLD_GD_NORET(Pexec, PE_BASEPAGE, 0, cmdline, envstr);					
+	pBasePage = (BYTE *) res;
+	
 	if((int) pBasePage < 1000) {											// Pexec seems to failed -- insufficient memory
 		return ENSMEM;
 	}
@@ -208,10 +215,14 @@ int32_t custom_pexec( void *sp )
 	
 	// do the rest depending on the mode
 	if(mode == PE_LOADGO) {											// if we should also run the program
-		res = Pexec(PE_GO, 0, pBasePage, 0);						// run the program
+		terminatedBy = TERMINATEDBY_UNKNOWN;						// mark that we don't know how the program will be / was terminated
+	
+		CALL_OLD_GD_NORET(Pexec, PE_GO, 0, pBasePage, 0);			// run the program
+
+		if(terminatedBy != TERMINATEDBY_PTERMRES) {					// if the program ended with something different than Ptermres, free the memory
+			freeTheBasePage(sBasePage);								// free the base page
+		}
 		
-		// TODO: free the stuff only if the program wasn't terminated by Ptermres() function
-		freeTheBasePage(sBasePage);									// free the base page
 		return res;													// return the result of PE_LOADGO
 	}
 
@@ -225,4 +236,36 @@ void freeTheBasePage(TBasePage *basePage)
 	Mfree(basePage);												// free the base page	
 }
 
+int32_t custom_pterm( void *sp )
+{
+	terminatedBy = TERMINATEDBY_PTERM;								// mark that Pterm was used and the memory should be freed
+	
+	WORD retCode = (WORD) *((WORD *) sp);
+	CALL_OLD_GD_VOIDRET(Pterm, retCode);
+	
+	return 0;
+}
 
+int32_t custom_pterm0( void *sp )
+{
+	terminatedBy = TERMINATEDBY_PTERM;								// mark that Pterm was used and the memory should be freed
+	
+	CALL_OLD_GD_VOIDRET(Pterm0);
+
+	return 0;
+}
+
+int32_t custom_ptermres( void *sp )
+{
+	BYTE *params = (BYTE *) sp;
+
+	terminatedBy = TERMINATEDBY_PTERMRES;							// mark that Ptermres was used and the memory should NOT be freed
+
+	DWORD keep		= *((DWORD *) params);
+	params += 4;
+	WORD retcode	= *((WORD *) params);
+	
+	CALL_OLD_GD_VOIDRET(Ptermres, keep, retcode);
+
+	return 0;
+}
