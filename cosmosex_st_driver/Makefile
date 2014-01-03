@@ -7,7 +7,7 @@ CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS	= -Wl,--traditional-format
 
 HDR	= xbra.h acsi.h gemdos.h bios.h gemdos_errno.h translated.h main.h
-CSRC	= gemdos.c gemdos_rw.c bios.c xbra.c acsi.c main.c 
+CSRC	= gemdos.c gemdos_rw.c gemdos_pexec.c bios.c xbra.c acsi.c main.c 
 SSRC	= gemdos_asm.s bios_asm.s
 
 ifeq ($(SLIM),yes)

@@ -632,7 +632,7 @@ int32_t custom_fseek( void *sp )
         return extendByteToDword(res);
 	}
 	
-	/* If we got here, the seek was succesfull and now we need to return the position in the file. */
+	/* If we got here, the seek was successful and now we need to return the position in the file. */
 
 	/* construct the new file position from the received data */
 	res  = pDmaBuffer[0];
@@ -764,6 +764,7 @@ void initFunctionTable(void)
 	gemdos_table[0x42] = custom_fseek;
 	gemdos_table[0x43] = custom_fattrib;
 	gemdos_table[0x47] = custom_dgetpath;
+	gemdos_table[0x4b] = custom_pexec;
 	gemdos_table[0x4e] = custom_fsfirst;
 	gemdos_table[0x4f] = custom_fsnext;
 	gemdos_table[0x56] = custom_frename;
