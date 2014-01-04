@@ -70,6 +70,25 @@ fakeSubRoutine:
  
 | the real stuff starts here:
 
+	
+||||||||||||||||||||||	
+| this part does Malloc() and moving the supervisor stack there
+|	move.l	#10240, d1			| size of malloc, size of supervisor stack
+|	move.l	d1,-(sp)			| malloc 10 kB
+|	move.w	#0x48,-(sp)
+|	trap	#1
+|	addq.l	#6,sp
+|	
+|	lea		(tmpSsp,pc),a0		
+|	move.l	d0, (a0)+			| save malloc()ed space do tmpSsp
+|	add.l	d1, d0				| move to the end of stack
+|	and.b	#0xf0, d0			| align stack
+|	
+|	move.l	sp, (a0)			| store the original stack pointer
+|	move.l	d0, sp				| use it
+|||||||||||||||||||||||||
+	
+
 	| Pexec: create basepage and allocate RAM
 	moveq	#0, d1				| d1 = 0
 	
@@ -102,6 +121,10 @@ fakeSubRoutine:
 	move.l	#1, d1				| d1 holds the current sector number. Bootsector is 0, so starting from 1 to (sector count + 1)
 	 
 readSectorsLoop:	 
+	lea		(acsiCmd,pc),a0		| load the address of ACSI command into a0
+	move.b	d2, (a0)			| cmd[0] = ACSI ID + SCSI READ 6 command
+	move.b	d1, 3(a0)			| cmd[3] = sector number
+	
 	bsr		dma_read			| try to read the sector
 	tst.b	d0					
 	bne		free_end_fail		| d0 != 0?
@@ -236,7 +259,18 @@ skipMemsetBss:
 	add.l	#16, sp
 
 	| now in this point the program should be executed, and the cpu will return here after finishing the program
-	
+
+||||||||||||||||||||
+| this part does Mfree() and returning of original SP address	
+|	lea		(tmpSsp,pc),a2		
+|	move.l	(a2)+, -(sp)		| get the address returned by malloc()
+|	move.w	#0x49,-(sp)
+|	trap	#1
+|	addq.l	#6,sp
+|	
+|	move.l	(a2), sp			| restore original stack
+|||||||||||||||
+
 	bra		end_good			| now finish with a good result
 |--------------------------------------------------------------------------------------------------------------------	
 
@@ -293,44 +327,21 @@ dma_read:
 	move.b	1(SP),dmaHigh		
 	addq	#4,sp			| return the SP to the original position
 	
-
 	| send cmd[0]
 	move.w	#0x088,(A6)		| mode: NO_DMA | HDC;
 
-	move.w	d2, d0			| copy in the 0th cmd byte, which is SCSI READ SECTOR + ACSI ID
-	swap	D0				| push the command and acsi id to upper word of D0
-	move.w	#0x008A,D0		| PIO write 0, with NO_DMA | HDC | A0 -- A1 high again
-
-	bsr		pioWrite		| write cmd[0] and wait for IRQ
+	lea		(acsiCmd,pc),a0	| load the address of ACSI command into a0
+	move.w	#4, d4			| loop count: 5 (dbra counts to this + 1)
+	
+sendCmdBytes:	
+	clr.l	d0				| d0 = 0
+	move.w	#0x008a, d0		| d0 = 0000 008a
+	swap	d0				| d0 = 008a 0000
+	move.b	(a0)+, d0		| d0 = 008a 00 cmd[x]  -- d0 high = mode, d0 low = data
+	bsr		pioWrite		| write cmd[x] and wait for IRQ
 	tst.w	d0				
 	bne.s	dmr_fail		| if d0 != 0, error, exit on timeout
-
-	| send cmd[1]
-	move.l	#0x00008A,D0	| PIO write 0, with NO_DMA | HDC | A0 -- A1 high again
-	bsr		pioWrite		| write cmd[1] and wait for IRQ
-	tst.w	d0				
-	bne.s	dmr_fail		| if d0 != 0, error, exit on timeout
-
-	| send cmd[2]
-	move.l	#0x00008A,D0	| PIO write 0, with NO_DMA | HDC | A0 -- A1 high again
-	bsr		pioWrite		| write cmd[2] and wait for IRQ
-	tst.w	d0				
-	bne.s	dmr_fail		| if d0 != 0, error, exit on timeout
-
-	| send cmd[3]
-	move.w	d1, d0			| move current sector number to d0
-	swap	d0
-	move.w	#0x008A, d0		| d0 now contains curent sector number + with NO_DMA | HDC | A0 -- A1 high again
-
-	bsr		pioWrite		| write cmd[3] and wait for IRQ
-	tst.w	d0				
-	bne.s	dmr_fail		| if d0 != 0, error, exit on timeout
-
-	| send cmd[4]
-	move.l	#0x01008A,D0	| PIO write 1 (sector count), with NO_DMA | HDC | A0 -- A1 high again
-	bsr		pioWrite		| write cmd[4] and wait for IRQ
-	tst.w	d0				
-	bne.s	dmr_fail		| if d0 != 0, error, exit on timeout
+	dbra	d4, sendCmdBytes
 
 	
 	| toggle r/w, leave at read == clear FIFO
@@ -365,7 +376,6 @@ dmr_success:
 
 | This routine writes single command byte in PIO mode and waits for ACSI INT or timeout.
 pioWrite:
-	swap	d0
 	move.w	d0, (a5)		| write data
 	swap	d0
 	move.w	d0, (a6)		| write mode
@@ -394,6 +404,11 @@ gotINT:
 | This is the configuration which will be replaced before sending the sector to ST. 
 | The format is: 'XX'  AcsiId  SectorCount 
 config:		dc.l			0x58580020			
+
+tmpSsp:		dc.l			0
+			dc.l			0
+			
+acsiCmd:	dc.b			0x08, 0x00, 0x00, 0x00, 0x01					
 
 .ifdef PRG
 pStack:		dc.l			0	
