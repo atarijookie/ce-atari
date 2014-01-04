@@ -234,7 +234,7 @@ skipMemsetBss:
 	move.w	#0x4b, -(sp)		| Pexec()
 	trap	#1
 	add.l	#16, sp
-	
+
 	| now in this point the program should be executed, and the cpu will return here after finishing the program
 	
 	bra		end_good			| now finish with a good result
@@ -394,7 +394,10 @@ gotINT:
 | This is the configuration which will be replaced before sending the sector to ST. 
 | The format is: 'XX'  AcsiId  SectorCount 
 config:		dc.l			0x58580020			
+
+.ifdef PRG
 pStack:		dc.l			0	
+.endif
 
 .ifdef FROMFILE	
 fname:		.ascii			"M:\\CEDD\\CEDD.PRG"
