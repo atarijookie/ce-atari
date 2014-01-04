@@ -86,16 +86,25 @@ int strncmp ( const char * str1, const char * str2, int num )
 	return 0;							// if came here, all chars matching
 }
 
+int sleepSeconds;
+static void sleepInSupervisor(void);
+
 void sleep(int seconds)
 {
-	DWORD now, until;
-	DWORD tics = seconds * 200;
+	sleepSeconds = seconds;
+	Supexec(sleepInSupervisor);
+}
 
-	now = Supexec(getTicks);			// get current ticks
-	until = now + tics;   				// calc value timer must get to
+static void sleepInSupervisor(void)
+{
+	DWORD now, until;
+	DWORD tics = sleepSeconds * 200;
+
+	now = getTicks();						// get current ticks
+	until = now + tics;   					// calc value timer must get to
 
 	while(1) {
-		now = Supexec(getTicks);		// get current ticks
+		now = getTicks();					// get current ticks
 		
 		if(now >= until) {
 			break;
