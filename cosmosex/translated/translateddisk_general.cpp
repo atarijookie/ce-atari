@@ -1,6 +1,7 @@
 #include <string>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "../global.h"
 #include "translateddisk.h"
@@ -395,7 +396,7 @@ bool TranslatedDisk::hostPathExists(std::string hostPath)
     }
 
     // now check if it exists
-    int res = _access(hostPath.c_str(), 0);
+    int res = access(hostPath.c_str(), F_OK);
 
     if(res != -1) {             // if it's not this error, then the file exists
         return true;
@@ -727,4 +728,9 @@ void TranslatedDisk::pathSeparatorHostToAtari(std::string &path)
             path[i] = ATARIPATH_SEPAR_CHAR;      // change to atari separator
         }
     }
+}
+
+void TranslatedDisk::convertLongToShortFileName(char *longName, char *shortName)
+{
+	outDebugString("TranslatedDisk::convertLongToShortFileName -- implement name shortening!!!");
 }

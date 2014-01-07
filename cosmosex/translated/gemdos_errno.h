@@ -45,7 +45,7 @@
 #define EINTRN          -65 // bf Internal error
 #define EPLFMT          -66 // be Invalid program load format
 #define EGSBF           -67 // bd Memory block growth failure
-#define ELOOP           -80 // b0 Too many symbolic links
+#define EGDLOOP         -80 // b0 Too many symbolic links
 
 #endif
 

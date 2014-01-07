@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <string>
+#include <time.h>
 
 #include "../acsidatatrans.h"
 #include "../datatypes.h"
@@ -12,8 +13,8 @@
 #define BUFFER_SIZE             (1024*1024)
 #define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
 
-#define HOSTPATH_SEPAR_STRING       "\\"
-#define HOSTPATH_SEPAR_CHAR         '\\'
+#define HOSTPATH_SEPAR_STRING       "/"
+#define HOSTPATH_SEPAR_CHAR         '/'
 #define ATARIPATH_SEPAR_CHAR        '\\'
 
 typedef struct {
@@ -150,14 +151,16 @@ private:
     void onGetbpb(BYTE *cmd);
 
     // helper functions
-    void attributesHostToAtari(DWORD attrHost, BYTE &attrAtari);
+    void attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari);
     void attributesAtariToHost(BYTE attrAtari, DWORD &attrHost);
 
-    WORD fileTimeToAtariDate(FILETIME *ft);
-    WORD fileTimeToAtariTime(FILETIME *ft);
+    WORD fileTimeToAtariDate(struct tm *ptm);
+    WORD fileTimeToAtariTime(struct tm *ptm);
 
-    void appendFoundToFindStorage(WIN32_FIND_DATAA *found, unsigned char findAttribs);
-
+    void appendFoundToFindStorage(std::string hostSearchedDir, struct dirent *de, unsigned char findAttribs);
+	void splitSearchPath(std::string &hostSearchedDirAndString, std::string &hostSearchedDir, std::string &hostEntrySearchString);
+	void convertLongToShortFileName(char *longName, char *shortName);
+	
     int findEmptyFileSlot(void);
     int findFileHandleSlot(int atariHandle);
 

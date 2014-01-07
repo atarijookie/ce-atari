@@ -2,6 +2,11 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <sys/types.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <errno.h>
+
 #include "../global.h"
 #include "translateddisk.h"
 #include "gemdos.h"
@@ -157,70 +162,105 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
         return;
     }
     //----------
-    // then build the found files list
-    WIN32_FIND_DATAA found;
-    HANDLE h = FindFirstFileA(hostSearchString.c_str(), &found);    // find first
+	std::string hostSearchedDir, hostEntrySearchString;
+	splitSearchPath(hostSearchString, hostSearchedDir, hostEntrySearchString);			// split C:/*.* to C: and *.*
 
-    if(h == INVALID_HANDLE_VALUE) {                                 // not found?
+    // then build the found files list
+	DIR *dir = opendir(hostSearchedDir.c_str());					// try to open the dir
+	
+    if(dir == NULL) {                                 				// not found?
         dataTrans->setStatus(EFILNF);                               // file not found
         return;
     }
 
-    appendFoundToFindStorage(&found, findAttribs);                  // append first found
+    while(1) {                                                  	// while there are more files, store them
+		struct dirent *de = readdir(dir);							// read the next directory entry
+	
+		if(de == NULL) {											// no more entries?
+			break;
+		}
+	
+		if(de->d_type != DT_DIR && de->d_type != DT_REG) {			// not a file, not a directory?
+			outDebugString("TranslatedDisk::onFsfirst -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
+			continue;
+		}
+		
+		// TODO: apply matching to search string - hostEntrySearchString, if not matched, skip this entry
+		
+        appendFoundToFindStorage(hostSearchedDir, de, findAttribs);	// append next found
 
-    while(1) {                                                  // while there are more files, store them
-        res = FindNextFileA(h, &found);
-
-        if(!res) {
-            break;
-        }
-
-        appendFoundToFindStorage(&found, findAttribs);          // append next found
-
-        if(findStorage.count >= findStorage.maxCount) {         // avoid buffer overflow
+        if(findStorage.count >= findStorage.maxCount) {         	// avoid buffer overflow
             break;
         }
     }
 
-    dataTrans->setStatus(E_OK);                                 // OK!
+	closedir(dir);													// close the directory stream
+    dataTrans->setStatus(E_OK);                                 	// OK!
 }
 
-void TranslatedDisk::appendFoundToFindStorage(WIN32_FIND_DATAA *found, BYTE findAttribs)
+// split C:/*.* to C: and *.*
+void TranslatedDisk::splitSearchPath(std::string &hostSearchedDirAndString, std::string &hostSearchedDir, std::string &hostEntrySearchString)
+{
+	outDebugString("TranslatedDisk::splitSearchPath -- TODO: implement spliting path+search to path and search!");
+
+	hostSearchedDir			= hostSearchedDirAndString;
+	hostEntrySearchString	= "";
+}
+
+void TranslatedDisk::appendFoundToFindStorage(std::string hostSearchedDir, struct dirent *de, BYTE findAttribs)
 {
     // TODO: verify on ST that the find attributes work like this
 
+	// create full file name
+	std::string fullEntryPath = hostSearchedDir + std::string(HOSTPATH_SEPAR_STRING) + std::string(de->d_name);
+	
     // first verify if the file attributes are OK
-    if((found->dwFileAttributes & FILE_ATTRIBUTE_READONLY)!=0   && (findAttribs & FA_READONLY)==0)  // is read only, but not searching for that
+	
+// TODO: do support for checking the READ ONLY flag on linux
+	bool isReadOnly = true;
+//    if((findAttribs & FA_READONLY) == 0) {  						
+//        return;
+//	}
+
+// hidden attribute not supported on linux
+//    if((found->dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)!=0     && (findAttribs & FA_HIDDEN)==0)    // is hidden, but not searching for that
+//        return;
+
+// system attribute not supported on linux
+//    if((found->dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)!=0     && (findAttribs & FA_SYSTEM)==0)    // is system, but not searching for that
+//        return;
+
+    if((de->d_type == DT_DIR)!=0  && (findAttribs & FA_DIR)==0)       // is dir, but not searching for that
         return;
 
-    if((found->dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)!=0     && (findAttribs & FA_HIDDEN)==0)    // is hidden, but not searching for that
-        return;
-
-    if((found->dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)!=0     && (findAttribs & FA_SYSTEM)==0)    // is system, but not searching for that
-        return;
-
-    if((found->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)!=0  && (findAttribs & FA_DIR)==0)       // is dir, but not searching for that
-        return;
-
-    if((found->dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)!=0    && (findAttribs & FA_ARCHIVE)==0)   // is archive, but not searching for that
-        return;
+// archive attribute not supported on linux
+//    if((found->dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)!=0    && (findAttribs & FA_ARCHIVE)==0)   // is archive, but not searching for that
+//        return;
 
     //--------
     // add this file
     DWORD addr  = findStorage.count * 23;           // calculate offset
     BYTE *buf   = &findStorage.buffer[addr];        // and get pointer to this location
 
-    BYTE atariAttribs;
-    attributesHostToAtari(found->dwFileAttributes, atariAttribs);
+    BYTE atariAttribs;								// convert host to atari attribs
+    attributesHostToAtari(isReadOnly, (de->d_type == DT_DIR) != 0, atariAttribs);
 
-    WORD atariTime = fileTimeToAtariTime(&found->ftLastWriteTime);
-    WORD atariDate = fileTimeToAtariDate(&found->ftLastWriteTime);
+	int res;
+	struct stat attr;
+    res = stat(fullEntryPath.c_str(), &attr);		// get the file status
+	
+	if(res != 0) {
+		outDebugString("TranslatedDisk::appendFoundToFindStorage -- stat() failed");
+		return;		
+	}
+	
+	tm *time = localtime(&attr.st_mtime);			// convert time_t to tm structure
+	
+    WORD atariTime = fileTimeToAtariTime(time);
+    WORD atariDate = fileTimeToAtariDate(time);
 
-    char *fileName = found->cFileName;              // use the original name
-
-    if(strlen(found->cAlternateFileName) != 0) {    // if original is long and this is not empty, use this short one
-        fileName = found->cAlternateFileName;
-    }
+    char fileName[14];
+	convertLongToShortFileName(de->d_name, fileName);
 
     // GEMDOS File Attributes
     buf[0] = atariAttribs;
@@ -234,10 +274,10 @@ void TranslatedDisk::appendFoundToFindStorage(WIN32_FIND_DATAA *found, BYTE find
     buf[4] = atariDate &  0xff;
 
     // File Length
-    buf[5] = found->nFileSizeLow >>  24;
-    buf[6] = found->nFileSizeLow >>  16;
-    buf[7] = found->nFileSizeLow >>   8;
-    buf[8] = found->nFileSizeLow & 0xff;
+    buf[5] = attr.st_size >>  24;
+    buf[6] = attr.st_size >>  16;
+    buf[7] = attr.st_size >>   8;
+    buf[8] = attr.st_size & 0xff;
 
     // Filename -- d_fname[14]
     memset(&buf[9], 0, 14);                     // first clear the mem
@@ -326,21 +366,14 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
         return;
     }
 
-    res = CreateDirectoryA(hostPath.c_str(), NULL);
+	int status = mkdir(hostPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
 
-    if(res) {                                       // directory created?
+    if(status == 0) {                               // directory created?
         dataTrans->setStatus(E_OK);
         return;
     }
 
-    DWORD err = GetLastError();
-
-    if(err == ERROR_PATH_NOT_FOUND) {               // path not found?
-        dataTrans->setStatus(EPTHNF);
-        return;
-    }
-
-    if(err == ERROR_ALREADY_EXISTS) {               // path already exists?
+    if(status == EEXIST || status == EACCES) {		// path already exists or other access problem?
         dataTrans->setStatus(EACCDN);
         return;
     }
@@ -506,6 +539,8 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     attributesHostToAtari(attrHost, oldAttrAtari);
 
     if(setNotInquire) {     // SET attribs?
+		outDebugString("TranslatedDisk::onFattrib -- TODO: setting attributes needs to be implemented!");
+	/*
         attributesAtariToHost(attrAtariNew, attrHost);
 
         res = SetFileAttributesA(hostName.c_str(), attrHost);
@@ -514,6 +549,7 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
             dataTrans->setStatus(EACCDN);
             return;
         }
+	*/
     }
 
     // for GET: returns current attribs, for SET: returns old attribs
@@ -567,6 +603,9 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     fclose(f);
 
     // now set it's attributes
+	outDebugString("TranslatedDisk::onFcreate -- TODO: setting attributes needs to be implemented!");
+
+/*	
     DWORD attrHost;
     attributesAtariToHost(attribs, attrHost);
 
@@ -576,6 +615,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
         dataTrans->setStatus(EACCDN);
         return;
     }
+*/
 
     // now open the file again
     f = fopen(hostName.c_str(), "rb+");                             // read/update - file must exist
@@ -997,58 +1037,69 @@ void TranslatedDisk::onTsettime(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-WORD TranslatedDisk::fileTimeToAtariDate(FILETIME *ft)
+WORD TranslatedDisk::fileTimeToAtariDate(struct tm *ptm)
 {
     WORD atariDate = 0;
+	
+	if(ptm == NULL) {
+		return 0;
+	}
 
-    atariDate |= (2013 - 1980) << 9;            // year
-    atariDate |= (11         ) << 5;            // month
-    atariDate |= (14         );                 // day
+    atariDate |= (ptm->tm_year - 1980) << 9;            // year
+    atariDate |= (ptm->tm_mon        ) << 5;            // month
+    atariDate |= (ptm->tm_mday       );                 // day
 
     return atariDate;
 }
 
-WORD TranslatedDisk::fileTimeToAtariTime(FILETIME *ft)
+WORD TranslatedDisk::fileTimeToAtariTime(struct tm *ptm)
 {
     WORD atariTime = 0;
 
-    // TODO: do the real conversion
-
-
-    atariTime |= (12                    ) << 11;        // hours
-    atariTime |= (00                    ) << 5;         // minutes
-    atariTime |= (01               / 2  );              // seconds
+	if(ptm == NULL) {
+		return 0;
+	}
+	
+    atariTime |= (ptm->tm_hour		) << 11;        // hours
+    atariTime |= (ptm->tm_min		) << 5;         // minutes
+    atariTime |= (ptm->tm_sec	/ 2	);              // seconds
 
     return atariTime;
 }
 
-void TranslatedDisk::attributesHostToAtari(DWORD attrHost, BYTE &attrAtari)
+void TranslatedDisk::attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari)
 {
     attrAtari = 0;
 
-    if(attrHost & FILE_ATTRIBUTE_READONLY)
+    if(isReadOnly)
         attrAtari |= FA_READONLY;
 
+/*
     if(attrHost & FILE_ATTRIBUTE_HIDDEN)
         attrAtari |= FA_HIDDEN;
 
     if(attrHost & FILE_ATTRIBUTE_SYSTEM)
         attrAtari |= FA_SYSTEM;
-
-    // if(attrHost &                      )
-    //  attrAtari |= FA_VOLUME;
-
-    if(attrHost & FILE_ATTRIBUTE_DIRECTORY)
+		
+    if(attrHost &                      )
+		attrAtari |= FA_VOLUME;
+*/
+	
+    if(isDir)
         attrAtari |= FA_DIR;
 
+/*
     if(attrHost & FILE_ATTRIBUTE_ARCHIVE)
         attrAtari |= FA_ARCHIVE;
+*/		
 }
 
 void TranslatedDisk::attributesAtariToHost(BYTE attrAtari, DWORD &attrHost)
 {
     attrHost = 0;
 
+/*
+// these are not supported on linux
     if(attrAtari & FA_READONLY)
         attrHost |= FILE_ATTRIBUTE_READONLY;
 
@@ -1061,11 +1112,14 @@ void TranslatedDisk::attributesAtariToHost(BYTE attrAtari, DWORD &attrHost)
     // if(attrAtari & FA_VOLUME)
     //  attrHost |=                     ;
 
-    if(attrAtari & FA_DIR)
-        attrHost |= FILE_ATTRIBUTE_DIRECTORY;
-
     if(attrAtari & FA_ARCHIVE)
         attrHost |= FILE_ATTRIBUTE_ARCHIVE;
+*/
+
+/*
+    if(attrAtari & FA_DIR)
+        attrHost |= FILE_ATTRIBUTE_DIRECTORY;
+*/		
 }
 
 int TranslatedDisk::findEmptyFileSlot(void)
