@@ -13,19 +13,15 @@ public:
     CConSpi();
     ~CConSpi();
 
-    virtual DWORD   bytesToReceive(void);
-    virtual DWORD   bytesToSend(void);
-    virtual void    txRx(int count, BYTE *sendBuffer, BYTE *receiveBufer, bool addLastToAtn=true);
-    virtual void    write(int count, BYTE *buffer);
-    virtual void    read (int count, BYTE *buffer);
+    void txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBufer, bool addLastToAtn=true);
 
-    void receiveAndApplyTxRxLimits(void);
-    void applyNoTxRxLimis(void);
-    void setRemainingTxRxLen(WORD txLen, WORD rxLen);
+    void receiveAndApplyTxRxLimits(int whichSpiCs);
+    void applyNoTxRxLimis(int whichSpiCs);
+    void setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen);
     WORD getRemainingLength(void);
 
-    void getAtnWord(BYTE *bfr);
-    void setAtnWord(BYTE *bfr);
+    void getAtnWord(int whichSpiCs, BYTE *bfr);
+    void setAtnWord(int whichSpiCs, BYTE *bfr);
 
 private:
     void zeroAllVars(void);

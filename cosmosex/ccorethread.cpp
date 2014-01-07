@@ -6,6 +6,7 @@
 #include "ccorethread.h"
 #include "native/scsi_defs.h"
 #include "settings.h"
+#include "gpio.h"
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
@@ -56,55 +57,47 @@ CCoreThread::~CCoreThread()
 
 void CCoreThread::run(void)
 {
-    BYTE inBuff[2];
-
-//    DWORD lastTick = GetTickCount();
-    DWORD lastTick = 0;						// PORT TODO
-
-    outDebugString("Core thread starting...");
-
+    BYTE inBuff[4], outBuf[4];
+	
+	memset(outBuf, 0, 4);
+	
     loadSettings();
 
     while(1) {
-	// PORT TODO
-	/*
-        if(GetTickCount() - lastTick < 10) {            // less than 10 ms ago?
-            usleep(1000);
-            continue;
-        }
-        lastTick = GetTickCount();
-	*/		
+		bool gotAtn = false;						// no ATN received yet?
+		
+		if( spi_atn(SPI_ATN_HANS) ) {				// HANS is signaling attention?
+			gotAtn = false;							// we've some ATN
 
-        if(sendSingleHalfWord) {
-            BYTE halfWord = 0, inHalf;
-            conSpi->txRx(1, &halfWord, &inHalf, false);
-            sendSingleHalfWord = false;
-        }
+			conSpi->txRx(SPI_CS_HANS, 4, inBuff, outBuf);	// receive 2 WORDs - 0 and ATN code
+			
+			switch(inBuff[3]) {
+			case 0:                 				// this is valid, just empty data, skip this
+				break;
 
-        conSpi->getAtnWord(inBuff);
+			case ATN_FW_VERSION:
+				handleFwVersion();
+				break;
 
-        if(inBuff[0] != 0 || inBuff[1] != 0) {
-            logToFile((char *) "Waiting for ATN: \nIN:\n");
-            logToFile(2, inBuff);
-            logToFile((char *) "\n");
-        }
+			case ATN_ACSI_COMMAND:
+				handleAcsiCommand();
+				break;
 
-        switch(inBuff[1]) {
-        case 0:                 // this is valid, just empty data, skip this
-            break;
+			default:
+				logToFile((char *) "That ^^^ shouldn't happen!\n");
+				break;
+			}
+		}
+		
+		if( spi_atn(SPI_ATN_FRANZ) ) {				// FRANZ is signaling attention?
+			gotAtn = false;							// we've some ATN
 
-        case ATN_FW_VERSION:
-            handleFwVersion();
-            break;
-
-        case ATN_ACSI_COMMAND:
-            handleAcsiCommand();
-            break;
-
-        default:
-            logToFile((char *) "That ^^^ shouldn't happen!\n");
-            break;
-        }
+			
+		}
+		
+		if(!gotAtn) {								// no ATN was processed?
+			usleep(1000);							// wait 1 ms...
+		}		
     }
 }
 
@@ -115,7 +108,7 @@ void CCoreThread::handleAcsiCommand(void)
     BYTE bufOut[CMD_SIZE], bufIn[CMD_SIZE];
     memset(bufOut, 0, CMD_SIZE);
 
-    conSpi->txRx(14, bufOut, bufIn);        // get 14 cmd bytes
+    conSpi->txRx(SPI_CS_HANS, 14, bufOut, bufIn);        // get 14 cmd bytes
     outDebugString("\nhandleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
 
     BYTE justCmd = bufIn[0] & 0x1f;
@@ -207,7 +200,7 @@ void CCoreThread::handleFwVersion(void)
         setEnabledIDbits = false;           // and don't sent this anymore (until needed)
     }
 
-    conSpi->txRx(10, oBuf, fwVer);
+    conSpi->txRx(SPI_CS_HANS, 10, oBuf, fwVer);
 
     logToFile((char *) "handleFwVersion: \nOUT:\n");
     logToFile(10, oBuf);

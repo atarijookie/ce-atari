@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "gpio.h"
 #include "conspi.h"
 #include "global.h"
 
@@ -19,16 +20,16 @@ CConSpi::~CConSpi()
 
 void CConSpi::zeroAllVars(void)
 {
-    prevAtnWord.got = false;
-    remainingPacketLength    = -1;
+    prevAtnWord.got			= false;
+    remainingPacketLength	= -1;
 }
 
-void CConSpi::applyNoTxRxLimis(void)
+void CConSpi::applyNoTxRxLimis(int whichSpiCs)
 {
-    setRemainingTxRxLen(NO_REMAINING_LENGTH, NO_REMAINING_LENGTH);  // set no remaining length
+    setRemainingTxRxLen(whichSpiCs, NO_REMAINING_LENGTH, NO_REMAINING_LENGTH);  // set no remaining length
 }
 
-void CConSpi::receiveAndApplyTxRxLimits(void)
+void CConSpi::receiveAndApplyTxRxLimits(int whichSpiCs)
 {
     BYTE inBuff[4], outBuff[4];
     memset(outBuff, 0, 4);
@@ -37,7 +38,7 @@ void CConSpi::receiveAndApplyTxRxLimits(void)
     WORD *pwIn = (WORD *) inBuff;
 
     // get TX LEN and RX LEN
-    txRx(4, outBuff, inBuff);
+    txRx(whichSpiCs, 4, outBuff, inBuff);
 
     WORD txLen = swapWord(pwIn[0]);
     WORD rxLen = swapWord(pwIn[1]);
@@ -56,7 +57,7 @@ void CConSpi::receiveAndApplyTxRxLimits(void)
         }
     }
 
-    setRemainingTxRxLen(txLen, rxLen);
+    setRemainingTxRxLen(whichSpiCs, txLen, rxLen);
 }
 
 WORD CConSpi::swapWord(WORD val)
@@ -69,7 +70,7 @@ WORD CConSpi::swapWord(WORD val)
     return tmp;
 }
 
-void CConSpi::setRemainingTxRxLen(WORD txLen, WORD rxLen)
+void CConSpi::setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen)
 {
 //    outDebugString("CConSpi::setRemainingTxRxLen - TX %d, RX %d", txLen, rxLen);
 
@@ -77,7 +78,7 @@ void CConSpi::setRemainingTxRxLen(WORD txLen, WORD rxLen)
         if(remainingPacketLength != 0) {
             outDebugString("CConSpi - didn't TX/RX enough data, padding with %d zeros! Fix this!", remainingPacketLength);
             memset(paddingBuffer, 0, PADDINGBUFFER_SIZE);
-            txRx(remainingPacketLength, paddingBuffer, paddingBuffer, true);
+            txRx(whichSpiCs, remainingPacketLength, paddingBuffer, paddingBuffer, true);
         }
     } else {                    // if setting real limit
         txLen *= 2;             // convert WORD count to BYTE count
@@ -110,7 +111,7 @@ WORD CConSpi::getRemainingLength(void)
     return remainingPacketLength;
 }
 
-void CConSpi::txRx(int count, BYTE *sendBuffer, BYTE *receiveBufer, bool addLastToAtn)
+void CConSpi::txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBufer, bool addLastToAtn)
 {
     if(SWAP_ENDIAN) {       // swap endian on sending if required
         BYTE tmp;
@@ -136,8 +137,7 @@ void CConSpi::txRx(int count, BYTE *sendBuffer, BYTE *receiveBufer, bool addLast
 
 //    outDebugString("CConSpi::txRx - count: %d", count);
 
-    write   (count, sendBuffer);
-    read    (count, receiveBufer);
+	spi_tx_rx(whichSpiCs, count, sendBuffer, receiveBufer);
 
     if(remainingPacketLength != NO_REMAINING_LENGTH) {
         remainingPacketLength -= count;             // mark that we've send this much data
@@ -145,64 +145,11 @@ void CConSpi::txRx(int count, BYTE *sendBuffer, BYTE *receiveBufer, bool addLast
 
     // add the last WORD as possible to check for the new ATN
     if(addLastToAtn) {
-        setAtnWord(&receiveBufer[count - 2]);
+        setAtnWord(whichSpiCs, &receiveBufer[count - 2]);
     }
 }
 
-void CConSpi::write(int count, BYTE *buffer)
-{
-    DWORD bytesWrote;
-    int remaining = count;
-    int wroteTotal = 0;
-
-	// PORT TODO -- replace this
-//    DWORD start = GetTickCount();
-    DWORD start = 0;
-
-    while(remaining > 0) {
-		// PORT TODO -- replace this
-		/*
-        if((GetTickCount() - start) > 3000) {         // timeout?
-            outDebugString("Timeout on USB write!");
-            outDebugString("remaining: %d", remaining);
-            return;
-        }
-		*/
-
-//        (*pFT_Write)(ftHandle, &buffer[wroteTotal], remaining, &bytesWrote);
-
-        remaining  -= bytesWrote;
-        wroteTotal += bytesWrote;
-    }
-}
-
-void CConSpi::read (int count, BYTE *buffer)
-{
-    DWORD bytesRead;
-    int remaining = count;
-    int readTotal = 0;
-
-	// PORT TODO -- replace this
-//    DWORD start = GetTickCount();
-	DWORD start = 0;
-
-    while(remaining > 0) {
-	// PORT TODO -- replace this
-/*	
-        if((GetTickCount() - start) > 3000) {         // timeout?
-            outDebugString("Timeout on USB read!");
-            return;
-        }
-*/
-
-//        (*pFT_Read)(ftHandle, &buffer[readTotal], remaining, &bytesRead);
-
-        remaining -= bytesRead;
-        readTotal += bytesRead;
-    }
-}
-
-void CConSpi::getAtnWord(BYTE *bfr)
+void CConSpi::getAtnWord(int whichSpiCs, BYTE *bfr)
 {
     if(prevAtnWord.got) {                   // got some previous ATN word? use it
         bfr[0] = prevAtnWord.bytes[0];
@@ -217,10 +164,10 @@ void CConSpi::getAtnWord(BYTE *bfr)
     memset(outBuff, 0, 2);
     memset(bfr, 0, 2);
 
-    txRx(2, outBuff, bfr, false);
+    txRx(whichSpiCs, 2, outBuff, bfr, false);
 }
 
-void CConSpi::setAtnWord(BYTE *bfr)
+void CConSpi::setAtnWord(int whichSpiCs, BYTE *bfr)
 {
     prevAtnWord.bytes[0] = bfr[0];
     prevAtnWord.bytes[1] = bfr[1];

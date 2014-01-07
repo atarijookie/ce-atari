@@ -14,9 +14,6 @@
 #define TEXT_OPTION_LETTERS_ONLY_UPPERCASE      16
 
 class ConfigComponent;
-typedef void (*TFonEnter)		(ConfigComponent *sender);
-typedef void (*TFonChBEnter)	(int groupId, int checkboxId);
-
 class ConfigStream;
 
 class ConfigComponent

@@ -58,7 +58,8 @@ private:
     BYTE    txBuffer[520];
     BYTE    rxBuffer[520];
 
-    bool waitForATN(BYTE atnCode, DWORD maxLoopCount);
+    bool waitForATN(BYTE atnCode, DWORD timeoutMs);
+	DWORD getTickCount(void);
     void sendStatusAfterWrite(void);
 };
 

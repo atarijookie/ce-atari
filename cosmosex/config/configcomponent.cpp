@@ -10,8 +10,8 @@ ConfigComponent::ConfigComponent(ConfigStream *parent, ComponentType type, std::
 {
     confStream = parent;
 
-    onEnter	= NULL;
-    onChBEnter	= NULL;
+    onEnter		= 0;
+    onChBEnter	= 0;
 
     cursorPos = 0;
 
