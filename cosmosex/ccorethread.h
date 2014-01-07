@@ -1,14 +1,8 @@
 #ifndef CCORETHREAD_H
 #define CCORETHREAD_H
 
-#include <QThread>
-#include <QQueue>
-#include <QMutex>
-#include <QTimer>
-#include <QStringList>
-
 #include "global.h"
-#include "cconusb.h"
+#include "conspi.h"
 
 #include "native/scsi.h"
 #include "native/datamedia.h"
@@ -22,26 +16,15 @@
 
 #include "ISettingsUser.h"
 
-class CCoreThread: public QThread, public ISettingsUser
+class CCoreThread: public ISettingsUser
 {
-    Q_OBJECT
 public:
     CCoreThread();
     ~CCoreThread();
 
     void run(void);
-    void stopRunning(void);
-    bool isRunning(void);
-
-    static void appendToDbg(QString line);
-    static void displayDbg(void);
-
     void sendHalfWord(void);
-
     virtual void reloadSettings(void);      // from ISettingsUser
-
-public slots:
-
 
 private:
     bool shouldRun;
@@ -49,7 +32,7 @@ private:
 
     bool sendSingleHalfWord;
 
-    CConUsb         *conUsb;
+    CConSpi         *conSpi;
 
     Scsi            *scsi;
     AcsiDataTrans   *dataTrans;

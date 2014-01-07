@@ -1,6 +1,8 @@
 #ifndef SCSI_H
 #define SCSI_H
 
+#include <string>
+
 #include "../acsidatatrans.h"
 #include "datamedia.h"
 #include "nomedia.h"
