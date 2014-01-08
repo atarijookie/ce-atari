@@ -32,10 +32,13 @@ public:
     void clear(void);
 
     void setStatus(BYTE stat);
-    void addData(BYTE val);
-    void addDataDword(DWORD val);
+
+    void addDataByte(BYTE val);
     void addDataWord(WORD val);
-    void addData(BYTE *data, DWORD cnt, bool padToMul16=false);
+    void addDataDword(DWORD val);
+
+    void addDataBfr(BYTE *data, DWORD cnt, bool padToMul16);
+	
     void padDataToMul16(void);
 
     bool recvData(BYTE *data, DWORD cnt);

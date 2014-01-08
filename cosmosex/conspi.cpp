@@ -78,7 +78,7 @@ void CConSpi::setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen)
         if(remainingPacketLength != 0) {
             outDebugString("CConSpi - didn't TX/RX enough data, padding with %d zeros! Fix this!", remainingPacketLength);
             memset(paddingBuffer, 0, PADDINGBUFFER_SIZE);
-            txRx(whichSpiCs, remainingPacketLength, paddingBuffer, paddingBuffer, true);
+            txRx(whichSpiCs, remainingPacketLength, paddingBuffer, paddingBuffer);
         }
     } else {                    // if setting real limit
         txLen *= 2;             // convert WORD count to BYTE count
@@ -111,7 +111,7 @@ WORD CConSpi::getRemainingLength(void)
     return remainingPacketLength;
 }
 
-void CConSpi::txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBufer, bool addLastToAtn)
+void CConSpi::txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBufer)
 {
     if(SWAP_ENDIAN) {       // swap endian on sending if required
         BYTE tmp;
@@ -142,36 +142,5 @@ void CConSpi::txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBuf
     if(remainingPacketLength != NO_REMAINING_LENGTH) {
         remainingPacketLength -= count;             // mark that we've send this much data
     }
-
-    // add the last WORD as possible to check for the new ATN
-    if(addLastToAtn) {
-        setAtnWord(whichSpiCs, &receiveBufer[count - 2]);
-    }
 }
-
-void CConSpi::getAtnWord(int whichSpiCs, BYTE *bfr)
-{
-    if(prevAtnWord.got) {                   // got some previous ATN word? use it
-        bfr[0] = prevAtnWord.bytes[0];
-        bfr[1] = prevAtnWord.bytes[1];
-        prevAtnWord.got = false;
-
-        return;
-    }
-
-    // no previous ATN word? read it!
-    BYTE outBuff[2];
-    memset(outBuff, 0, 2);
-    memset(bfr, 0, 2);
-
-    txRx(whichSpiCs, 2, outBuff, bfr, false);
-}
-
-void CConSpi::setAtnWord(int whichSpiCs, BYTE *bfr)
-{
-    prevAtnWord.bytes[0] = bfr[0];
-    prevAtnWord.bytes[1] = bfr[1];
-    prevAtnWord.got = true;
-}
-
 

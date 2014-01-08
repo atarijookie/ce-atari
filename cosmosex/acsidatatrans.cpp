@@ -48,7 +48,7 @@ void AcsiDataTrans::setStatus(BYTE stat)
     statusWasSet    = true;
 }
 
-void AcsiDataTrans::addData(BYTE val)
+void AcsiDataTrans::addDataByte(BYTE val)
 {
     buffer[count] = val;
     count++;
@@ -72,7 +72,7 @@ void AcsiDataTrans::addDataWord(WORD val)
     count += 2;
 }
 
-void AcsiDataTrans::addData(BYTE *data, DWORD cnt, bool padToMul16)
+void AcsiDataTrans::addDataBfr(BYTE *data, DWORD cnt, bool padToMul16)
 {
     memcpy(&buffer[count], data, cnt);
     count += cnt;

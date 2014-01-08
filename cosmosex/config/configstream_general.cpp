@@ -17,8 +17,8 @@ ConfigStream::ConfigStream()
     gotoOffset      = 0;
 
     showingHomeScreen	= false;
-    showingMessage	= false;
-    screenChanged	= true;
+    showingMessage		= false;
+    screenChanged		= true;
 
     dataTrans   = NULL;
     reloadProxy = NULL;
@@ -57,7 +57,7 @@ void ConfigStream::processCommand(BYTE *cmd)
 
     switch(cmd[4]) {
     case CFG_CMD_IDENTIFY:          // identify?
-        dataTrans->addData((unsigned char *)"CosmosEx config console", 23, true);       // add identity string with padding
+        dataTrans->addDataBfr((BYTE *) "CosmosEx config console", 23, true);       // add identity string with padding
         dataTrans->setStatus(SCSI_ST_OK);
         break;
 
@@ -65,7 +65,7 @@ void ConfigStream::processCommand(BYTE *cmd)
         onKeyDown(cmd[5]);                                                // first send the key down signal
         streamCount = getStream(false, readBuffer, READ_BUFFER_SIZE);     // then get current screen stream
 
-        dataTrans->addData(readBuffer, streamCount, true);                              // add data and status, with padding to multiple of 16 bytes
+        dataTrans->addDataBfr(readBuffer, streamCount, true);                              // add data and status, with padding to multiple of 16 bytes
         dataTrans->setStatus(SCSI_ST_OK);
 
         outDebugString("handleConfigStream -- CFG_CMD_KEYDOWN -- %d bytes\n", streamCount);
@@ -91,7 +91,7 @@ void ConfigStream::processCommand(BYTE *cmd)
         screenChanged = true;                                           // get full stream, not only differences
         streamCount = getStream(false, readBuffer, READ_BUFFER_SIZE);   // then get current screen stream
 
-        dataTrans->addData(readBuffer, streamCount, true);              // add data and status, with padding to multiple of 16 bytes
+        dataTrans->addDataBfr(readBuffer, streamCount, true);              // add data and status, with padding to multiple of 16 bytes
         dataTrans->setStatus(SCSI_ST_OK);
 
         outDebugString("handleConfigStream -- CFG_CMD_REFRESH -- %d bytes\n", streamCount);
@@ -100,7 +100,7 @@ void ConfigStream::processCommand(BYTE *cmd)
     case CFG_CMD_GO_HOME:
         streamCount = getStream(true, readBuffer, READ_BUFFER_SIZE);      // get homescreen stream
 
-        dataTrans->addData(readBuffer, streamCount, true);                              // add data and status, with padding to multiple of 16 bytes
+        dataTrans->addDataBfr(readBuffer, streamCount, true);                              // add data and status, with padding to multiple of 16 bytes
         dataTrans->setStatus(SCSI_ST_OK);
 
         outDebugString("handleConfigStream -- CFG_CMD_GO_HOME -- %d bytes\n", streamCount);

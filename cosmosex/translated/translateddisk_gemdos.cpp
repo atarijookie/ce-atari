@@ -3,9 +3,10 @@
 #include <stdio.h>
 
 #include <sys/types.h>
-#include <dirent.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <errno.h>
+#include <utime.h>
 
 #include "../global.h"
 #include "translateddisk.h"
@@ -129,7 +130,7 @@ void TranslatedDisk::onDgetpath(BYTE *cmd)
     pathSeparatorHostToAtari(aPath);
 
     // return the current path for current drive
-    dataTrans->addData((BYTE *) aPath.c_str(), aPath.length(), true);
+    dataTrans->addDataBfr((BYTE *) aPath.c_str(), aPath.length(), true);
     dataTrans->setStatus(E_OK);
 }
 
@@ -217,7 +218,7 @@ void TranslatedDisk::appendFoundToFindStorage(std::string hostSearchedDir, struc
     // first verify if the file attributes are OK
 	
 // TODO: do support for checking the READ ONLY flag on linux
-	bool isReadOnly = true;
+	bool isReadOnly = false;
 //    if((findAttribs & FA_READONLY) == 0) {  						
 //        return;
 //	}
@@ -311,7 +312,7 @@ void TranslatedDisk::onFsnext(BYTE *cmd)
 
     DWORD addr  = findStorage.fsnextStart * 23;                 // calculate offset from which we will start sending stuff
     BYTE *buf   = &findStorage.buffer[addr];                    // and get pointer to this location
-    dataTrans->addData(buf, dtaToSend * 23, true);              // now add the data to buffer
+    dataTrans->addDataBfr(buf, dtaToSend * 23, true);              // now add the data to buffer
 
     dataTrans->setStatus(E_OK);
 
@@ -372,6 +373,8 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
         dataTrans->setStatus(E_OK);
         return;
     }
+	
+	status = errno;
 
     if(status == EEXIST || status == EACCES) {		// path already exists or other access problem?
         dataTrans->setStatus(EACCDN);
@@ -402,24 +405,19 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
         return;
     }
 
-    res = RemoveDirectoryA(hostPath.c_str());
+	int ires = rmdir(hostPath.c_str());
 
-    if(res) {                                       // directory deleted?
+    if(ires == 0) {                                 // directory deleted?
         dataTrans->setStatus(E_OK);
         return;
     }
 
-//    DWORD err = GetLastError();
-
-//    if(err == ERROR_PATH_NOT_FOUND) {               // path not found?
-//        dataTrans->setStatus(EPTHNF);
-//        return;
-//    }
-
-//    if(err == ERROR_ALREADY_EXISTS) {               // path already exists?
-//        dataTrans->setStatus(EACCDN);
-//        return;
-//    }
+	ires = errno;
+	
+    if(ires == EACCES) {               
+        dataTrans->setStatus(EACCDN);
+        return;
+    }
 
     dataTrans->setStatus(EINTRN);                   // some other error
 }
@@ -448,9 +446,9 @@ void TranslatedDisk::onFrename(BYTE *cmd)
         return;
     }
 
-    res = MoveFileA(oldHostName.c_str(), newHostName.c_str());      // rename host file
+    int ires = rename(oldHostName.c_str(), newHostName.c_str());    // rename host file
 
-    if(res) {                                                       // good
+    if(ires == 0) {                                                 // good
         dataTrans->setStatus(E_OK);
     } else {                                                        // error
         dataTrans->setStatus(EACCDN);
@@ -478,21 +476,21 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
         return;
     }
 
-    res = DeleteFileA(hostPath.c_str());
+    res = unlink(hostPath.c_str());
 
-    if(res) {                                       // directory deleted?
+    if(res == 0) {                                  // directory deleted?
         dataTrans->setStatus(E_OK);
         return;
     }
 
-    DWORD err = GetLastError();
+    int err = errno;
 
-    if(err == ERROR_FILE_NOT_FOUND) {               // file not found?
+    if(err == ENOENT) {               				// file not found?
         dataTrans->setStatus(EFILNF);
         return;
     }
 
-    if(err == ERROR_ACCESS_DENIED) {                // access denied?
+    if(err == EPERM || err == EACCES) {             // access denied?
         dataTrans->setStatus(EACCDN);
         return;
     }
@@ -525,21 +523,27 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
         return;
     }
 
-    DWORD   attrHost;
     BYTE    oldAttrAtari;
 
     // first read the attributes
-    attrHost = GetFileAttributesA(hostName.c_str());
+	struct stat attr;
+    res = stat(hostName.c_str(), &attr);							// get the file status
+	
+	if(res != 0) {
+		outDebugString("TranslatedDisk::onFattrib() -- stat() failed");
+		dataTrans->setStatus(EINTRN);
+		return;		
+	}
+	
+	bool isDir = (S_ISDIR(attr.st_mode) != 0);						// check if it's a directory
 
-    if(attrHost == INVALID_FILE_ATTRIBUTES) {   // failed to get attribs?
-        dataTrans->setStatus(EACCDN);
-        return;
-    }
-
-    attributesHostToAtari(attrHost, oldAttrAtari);
-
+	bool isReadOnly = false;
+	// TODO: checking of read only for file
+	
+    attributesHostToAtari(isReadOnly, isDir, oldAttrAtari);
+	
     if(setNotInquire) {     // SET attribs?
-		outDebugString("TranslatedDisk::onFattrib -- TODO: setting attributes needs to be implemented!");
+		outDebugString("TranslatedDisk::onFattrib() -- TODO: setting attributes needs to be implemented!");
 	/*
         attributesAtariToHost(attrAtariNew, attrHost);
 
@@ -734,40 +738,45 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
         return;
     }
 
-    if(setNotGet) {                             // on SET
-        WORD year, month, day;
-        year    = (atariDate >> 9)   + 1980;
-        month   = (atariDate >> 5)   & 0x0f;
-        day     =  atariDate         & 0x1f;
+    if(setNotGet) {                            						// on SET
+		tm			timeStruct;
+		time_t		timeT;
+		utimbuf		uTimBuf;
+		
+		fileDateTimeToHostTime(atariDate, atariTime, &timeStruct);	// convert atari date and time to struct tm
+		timeT = timelocal(&timeStruct);								// convert tm to time_t
 
-        WORD hours, minutes, seconds;
-        hours   =  (atariTime >> 11) & 0x1f;
-        minutes =  (atariTime >>  5) & 0x3f;
-        seconds = ((atariTime >>  5) & 0x1f) * 2;
+		uTimBuf.actime	= timeT;									// store access time
+		uTimBuf.modtime	= timeT;									// store modification time
+		
+		int ires = utime(files[index].hostPath.c_str(), &uTimBuf);	// try to set the access and modification time
 
-
-        // TODO: setting the date / time to the file
-
-
-    } else {                                    // on GET
-
-        // TODO: retrieving date / time from the file
-
-
-        atariTime |= (12                    ) << 11;        // hours
-        atariTime |= (00                    ) << 5;         // minutes
-        atariTime |= (30               / 2  );              // seconds
-
-        atariDate |= (2013           - 1980) << 9;          // year
-        atariDate |= (11                   ) << 5;          // month
-        atariDate |= (15                   );               // day
+		if(ires != 0) {												// if failed to set the date and time, fail
+			dataTrans->setStatus(EINTRN);
+			return;
+		}		
+    } else {                                    					// on GET
+		int res;
+		struct stat attr;
+		res = stat(files[index].hostPath.c_str(), &attr);			// get the file status
+	
+		if(res != 0) {
+			outDebugString("TranslatedDisk::appendFoundToFindStorage -- stat() failed");
+			dataTrans->setStatus(EINTRN);
+			return;		
+		}
+	
+		tm *time = localtime(&attr.st_mtime);						// convert time_t to tm structure
+	
+		WORD atariTime = fileTimeToAtariTime(time);
+		WORD atariDate = fileTimeToAtariDate(time);
 
         dataTrans->addDataWord(atariTime);
         dataTrans->addDataWord(atariDate);
         dataTrans->padDataToMul16();
     }
 
-    dataTrans->setStatus(E_OK);                                     // ok!
+    dataTrans->setStatus(E_OK);                                // ok!
 }
 
 void TranslatedDisk::onFread(BYTE *cmd)
@@ -807,7 +816,7 @@ void TranslatedDisk::onFread(BYTE *cmd)
     DWORD transferSizeBytes = byteCount + pad;
 
     DWORD cnt = fread (dataBuffer, 1, transferSizeBytes, files[index].hostHandle);
-    dataTrans->addData(dataBuffer, transferSizeBytes);      // then store the data
+    dataTrans->addDataBfr(dataBuffer, transferSizeBytes, false);	// then store the data
     dataTrans->padDataToMul16();
 
     files[index].lastDataCount = cnt;                       // store how much data was read
@@ -949,16 +958,10 @@ void TranslatedDisk::onFtell(BYTE *cmd)
 
 void TranslatedDisk::onTgetdate(BYTE *cmd)
 {
-    SYSTEMTIME  hostTime;
-    WORD        atariDate;
-
-    GetLocalTime(&hostTime);
-
-    atariDate = 0;
-
-    atariDate |= (hostTime.wYear - 1980) << 9;
-    atariDate |= (hostTime.wMonth      ) << 5;
-    atariDate |= (hostTime.wDay        );
+	time_t t = time(NULL);
+	tm *time = localtime(&t);						// convert time_t to tm structure
+	
+	WORD atariDate = fileTimeToAtariDate(time);
 
     dataTrans->addDataWord(atariDate);      // WORD: atari date
     dataTrans->padDataToMul16();            // 14 bytes of padding
@@ -994,16 +997,10 @@ void TranslatedDisk::onTsetdate(BYTE *cmd)
 
 void TranslatedDisk::onTgettime(BYTE *cmd)
 {
-    SYSTEMTIME  hostTime;
-    WORD        atariTime;
-
-    GetLocalTime(&hostTime);
-
-    atariTime = 0;
-
-    atariTime |= (hostTime.wHour        ) << 11;
-    atariTime |= (hostTime.wMinute      ) << 5;
-    atariTime |= (hostTime.wSecond / 2  );
+	time_t t = time(NULL);
+	tm *time = localtime(&t);						// convert time_t to tm structure
+	
+	WORD atariTime = fileTimeToAtariTime(time);
 
     dataTrans->addDataWord(atariTime);      // WORD: atari time
     dataTrans->padDataToMul16();            // 14 bytes of padding
@@ -1065,6 +1062,28 @@ WORD TranslatedDisk::fileTimeToAtariTime(struct tm *ptm)
     atariTime |= (ptm->tm_sec	/ 2	);              // seconds
 
     return atariTime;
+}
+
+void TranslatedDisk::fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *ptm)
+{
+    WORD year, month, day;
+    WORD hours, minutes, seconds;
+
+    year    = (atariDate >> 9)   + 1980;
+    month   = (atariDate >> 5)   & 0x0f;
+    day     =  atariDate         & 0x1f;
+
+    hours   =  (atariTime >> 11) & 0x1f;
+    minutes =  (atariTime >>  5) & 0x3f;
+    seconds = ((atariTime >>  5) & 0x1f) * 2;
+	
+	ptm->tm_year	= year;
+	ptm->tm_mon		= month;
+	ptm->tm_mday	= day;
+	
+	ptm->tm_hour	= hours;
+	ptm->tm_min		= minutes;
+	ptm->tm_sec		= seconds;
 }
 
 void TranslatedDisk::attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari)
@@ -1200,7 +1219,7 @@ void TranslatedDisk::onGetbpb(BYTE *cmd)
     dataTrans->addDataWord(8192);               // sectors per FAT - this would be just enough for 1 GB
     dataTrans->addDataWord(1000 + 8192);        // starting sector of second FAT
     dataTrans->addDataWord(1000 + 2*8192);      // starting sector of data
-    dataTrans->addDataWord(524288);             // clusters per disk
+    dataTrans->addDataWord(65535);             	// clusters per disk
     dataTrans->addDataWord(1);                  // bit 0=1 - 16 bit FAT, else 12 bit
 
     dataTrans->padDataToMul16();

@@ -156,6 +156,7 @@ private:
 
     WORD fileTimeToAtariDate(struct tm *ptm);
     WORD fileTimeToAtariTime(struct tm *ptm);
+	void fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *ptm);
 
     void appendFoundToFindStorage(std::string hostSearchedDir, struct dirent *de, unsigned char findAttribs);
 	void splitSearchPath(std::string &hostSearchedDirAndString, std::string &hostSearchedDir, std::string &hostEntrySearchString);

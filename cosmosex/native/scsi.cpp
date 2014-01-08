@@ -581,7 +581,7 @@ void Scsi::SCSI_Inquiry(void)
             val = DATE_STRING[i-36];
         }
 
-        dataTrans->addData(val);
+        dataTrans->addDataByte(val);
     }
 
     SendOKstatus();
@@ -650,7 +650,7 @@ void Scsi::SCSI_ModeSense6(void)
                 val = page_medium[i - 12];
         }
 
-        dataTrans->addData(val);
+        dataTrans->addDataByte(val);
     }
 
     SendOKstatus();
@@ -680,7 +680,7 @@ void Scsi::SCSI_RequestSense(void)
         default:	val = 0; 			   		break;
         }
 
-        dataTrans->addData(val);
+        dataTrans->addDataByte(val);
     }
 
     SendOKstatus();
@@ -694,7 +694,7 @@ void Scsi::SendEmptySecotrs(WORD sectors)
     {
         for(i=0; i<512; i++)
         {
-            dataTrans->addData(0);
+            dataTrans->addDataByte(0);
         }
     }
 }
@@ -855,16 +855,16 @@ void Scsi::SCSI_ReadCapacity(void)
         lo		= 0;
     }
 
-    dataTrans->addData(hi);		 	// Hi
-    dataTrans->addData(midhi);      // mid-Hi
-    dataTrans->addData(midlo);      // mid-Lo
-    dataTrans->addData(lo);		 	// Lo
+    dataTrans->addDataByte(hi);		 		// Hi
+    dataTrans->addDataByte(midhi);      	// mid-Hi
+    dataTrans->addDataByte(midlo);      	// mid-Lo
+    dataTrans->addDataByte(lo);		 		// Lo
 
     // return sector size
-    dataTrans->addData(0);				 // fixed to 512 B
-    dataTrans->addData(0);
-    dataTrans->addData(2);
-    dataTrans->addData(0);
+    dataTrans->addDataByte(0);				// fixed to 512 B
+    dataTrans->addDataByte(0);
+    dataTrans->addDataByte(2);
+    dataTrans->addDataByte(0);
 
     SendOKstatus();
 }
@@ -931,7 +931,7 @@ bool Scsi::readSectors(DWORD sectorNo, DWORD count)
     }
 
     DWORD byteCount = count * 512;
-    dataTrans->addData(dataBuffer, byteCount);
+    dataTrans->addDataBfr(dataBuffer, byteCount, false);
 
     return true;
 }

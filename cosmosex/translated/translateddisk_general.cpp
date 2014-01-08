@@ -267,7 +267,7 @@ void TranslatedDisk::processCommand(BYTE *cmd)
     switch(cmd[4]) {
         // special CosmosEx commands for this module
         case TRAN_CMD_IDENTIFY:
-        dataTrans->addData((unsigned char *)"CosmosEx translated disk", 24, true);       // add identity string with padding
+        dataTrans->addDataBfr((unsigned char *)"CosmosEx translated disk", 24, true);       // add identity string with padding
         dataTrans->setStatus(E_OK);
         break;
 
