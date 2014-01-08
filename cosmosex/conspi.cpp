@@ -10,18 +10,12 @@ extern "C" void outDebugString(const char *format, ...);
 
 CConSpi::CConSpi()
 {
-    zeroAllVars();
+    remainingPacketLength = -1;
 }
 
 CConSpi::~CConSpi()
 {
 
-}
-
-void CConSpi::zeroAllVars(void)
-{
-    prevAtnWord.got			= false;
-    remainingPacketLength	= -1;
 }
 
 void CConSpi::applyNoTxRxLimis(int whichSpiCs)

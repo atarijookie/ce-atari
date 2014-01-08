@@ -10,26 +10,27 @@ HDR		=	global.h acsidatatrans.h conspi.h datatypes.h isettingsuser.h settings.h 
 			native/datamedia.h native/imedia.h native/nomedia.h native/scsi.h native/scsi_defs.h native/testmedia.h \
 			translated/gemdos.h translated/gemdos_errno.h translated/translateddisk.h
 			
-CSRC	=	acsidatatrans.cpp conspi.cpp main.cpp settings.cpp settingsreloadproxy.cpp ccorethread.cpp gpio.cpp \
-			config/configcomponent.cpp config/configstream_general.cpp config/configstream_screens.cpp \
-			native/datamedia.cpp native/nomedia.cpp native/scsi.cpp native/testmedia.cpp \
-			translated/translateddisk_gemdos.cpp translated/translateddisk_general.cpp
+OBJS	=	acsidatatrans.o conspi.o main.o settings.o settingsreloadproxy.o ccorethread.o gpio.o \
+			config/configcomponent.o config/configstream_general.o config/configstream_screens.o \
+			native/datamedia.o native/nomedia.o native/scsi.o native/testmedia.o \
+			translated/translateddisk_gemdos.o translated/translateddisk_general.o
 
+SUBDIR1	=	config
+SUBDIR2	=	native
+SUBDIR3	=	translated
+			
 all:	cosmosex
 
-$(TARGET): $(CSRC) $(HDR)
-	$(CC) $(CFLAGS) -o $@ $(CSRC) $(LDFLAGS)
+$(TARGET): $(OBJS) $(HDR)
+	$(MAKE) -C $(SUBDIR1)
+	$(MAKE) -C $(SUBDIR2)
+	$(MAKE) -C $(SUBDIR3)
+	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@
 	$(STRIP) -s $@ 
-	
-%.o: %.cpp 
-	g++ -c $<
-	
+
 clean:
+	$(MAKE) -C $(SUBDIR1) clean
+	$(MAKE) -C $(SUBDIR2) clean
+	$(MAKE) -C $(SUBDIR3) clean
 	rm -rf *.o cosmosex
 	
-	
-
-
-
-
-

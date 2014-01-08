@@ -1,16 +1,10 @@
 #ifndef DATATYPES_H
 #define DATATYPES_H
 
-#ifndef BYTE
-    #define BYTE    unsigned char
-#endif
+#include <stdint.h>
 
-#ifndef WORD
-    #define WORD	unsigned short
-#endif
-
-#ifndef DWORD
-    #define DWORD	unsigned int
-#endif
+#define BYTE	unsigned char
+#define WORD	unsigned short
+#define DWORD	unsigned int
 
 #endif // DATATYPES_H

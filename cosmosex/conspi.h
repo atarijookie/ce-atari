@@ -21,15 +21,8 @@ public:
     WORD getRemainingLength(void);
 
 private:
-    void zeroAllVars(void);
-
-    WORD                        remainingPacketLength;
-    BYTE                        paddingBuffer[PADDINGBUFFER_SIZE];
-
-    struct {
-        bool got;
-        BYTE bytes[2];
-    } prevAtnWord;
+    WORD remainingPacketLength;
+    BYTE paddingBuffer[PADDINGBUFFER_SIZE];
 
     WORD swapWord(WORD val);
 };

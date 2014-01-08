@@ -9,21 +9,26 @@
 
 #define SETTINGS_PATH		"settings"
 
+extern "C" void outDebugString(const char *format, ...);
+
 Settings::Settings(void)
 {
-	printf("Creating dir: %s\n", SETTINGS_PATH);
+	int res = mkdir(SETTINGS_PATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
 	
-	char bfr[1024];
-	strcpy(bfr, "mkdir ");
-	strcat(bfr, SETTINGS_PATH);
-	system(bfr);
+	if(res == 0) {					// dir created
+		outDebugString("Settings: directory %s was created.", SETTINGS_PATH);
+	} else {						// dir not created
+		if(errno != EEXIST) {		// and it's not because it already exists...
+			outDebugString("Settings: failed to create settings directory - %s", strerror(errno));
+		}
+	}
 }
 
 bool Settings::getBool(char *key, bool defValue)
 {
 	FILE *file = open(key, true);
 	if(!file) {											// failed to open settings?
-		printf("Settings::getBool -- returning default value for %s\n", key);
+		outDebugString("Settings::getBool -- returning default value for %s", key);
 		return defValue;
 	}
 
@@ -32,7 +37,7 @@ bool Settings::getBool(char *key, bool defValue)
 	fclose(file);
 	
 	if(res != 1) {										// failed to read value?
-		printf("Settings::getBool -- returning default value for %s\n", key);
+		outDebugString("Settings::getBool -- returning default value for %s", key);
 		return defValue;
 	}
 	
@@ -48,7 +53,7 @@ void Settings::setBool(char *key, bool value)
 {
 	FILE *file = open(key, false);
 	if(!file) {											// failed to open settings?
-		printf("Settings::setBool -- could not write key %s\n", key);
+		outDebugString("Settings::setBool -- could not write key %s", key);
 		return;
 	}
 
@@ -66,7 +71,7 @@ int Settings::getInt(char *key, int defValue)
 {
 	FILE *file = open(key, true);
 	if(!file) {											// failed to open settings?
-		printf("Settings::getInt -- returning default value for %s\n", key);
+		outDebugString("Settings::getInt -- returning default value for %s", key);
 		return defValue;
 	}
 
@@ -75,7 +80,7 @@ int Settings::getInt(char *key, int defValue)
 	fclose(file);
 	
 	if(res != 1) {										// failed to read value?
-		printf("Settings::getInt -- returning default value for %s\n", key);
+		outDebugString("Settings::getInt -- returning default value for %s", key);
 		return defValue;
 	}
 	
@@ -86,7 +91,7 @@ void Settings::setInt(char *key, int value)
 {
 	FILE *file = open(key, false);
 	if(!file) {											// failed to open settings?
-		printf("Settings::setInt -- could not write key %s\n", key);
+		outDebugString("Settings::setInt -- could not write key %s", key);
 		return;
 	}
 
@@ -101,7 +106,7 @@ char *Settings::getString(char *key, char *defValue)
 
 	FILE *file = open(key, true);
 	if(!file) {											// failed to open settings?
-		printf("Settings::getString -- returning default value for %s\n", key);
+		outDebugString("Settings::getString -- returning default value for %s", key);
 		strcpy(buffer, defValue);
 		return buffer;
 	}
@@ -111,7 +116,7 @@ char *Settings::getString(char *key, char *defValue)
 	fclose(file);
 	
 	if(res == NULL) {									// failed to read value?
-		printf("Settings::getString -- returning default value for %s\n", key);
+		outDebugString("Settings::getString -- returning default value for %s", key);
 		strcpy(buffer, defValue);
 		return buffer;
 	}
@@ -123,7 +128,7 @@ void Settings::setString(char *key, char *value)
 {
 	FILE *file = open(key, false);
 	if(!file) {											// failed to open settings?
-		printf("Settings::setString -- could not write key %s\n", key);
+		outDebugString("Settings::setString -- could not write key %s", key);
 		return;
 	}
 
@@ -135,7 +140,7 @@ char Settings::getChar(char *key, char defValue)
 {
     FILE *file = open(key, true);
     if(!file) {											// failed to open settings?
-        printf("Settings::getChar -- returning default value for %s\n", key);
+        outDebugString("Settings::getChar -- returning default value for %s", key);
         return defValue;
     }
 
@@ -145,7 +150,7 @@ char Settings::getChar(char *key, char defValue)
     fclose(file);
 
     if(res != 1) {										// failed to read value?
-        printf("Settings::getChar -- returning default value for %s\n", key);
+        outDebugString("Settings::getChar -- returning default value for %s", key);
         return defValue;
     }
 
@@ -156,7 +161,7 @@ void Settings::setChar(char *key, char value)
 {
     FILE *file = open(key, false);
     if(!file) {											// failed to open settings?
-        printf("Settings::setChar -- could not write key %s\n", key);
+        outDebugString("Settings::setChar -- could not write key %s", key);
         return;
     }
 

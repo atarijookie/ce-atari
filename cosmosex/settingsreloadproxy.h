@@ -1,7 +1,7 @@
 #ifndef SETTINGSRELOADPROXY_H
 #define SETTINGSRELOADPROXY_H
 
-#include "ISettingsUser.h"
+#include "isettingsuser.h"
 
 #define SETTINGSUSER_NONE       0
 #define SETTINGSUSER_ACSI       1

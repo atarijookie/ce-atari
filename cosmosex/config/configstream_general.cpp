@@ -68,7 +68,7 @@ void ConfigStream::processCommand(BYTE *cmd)
         dataTrans->addDataBfr(readBuffer, streamCount, true);                              // add data and status, with padding to multiple of 16 bytes
         dataTrans->setStatus(SCSI_ST_OK);
 
-        outDebugString("handleConfigStream -- CFG_CMD_KEYDOWN -- %d bytes\n", streamCount);
+        outDebugString("handleConfigStream -- CFG_CMD_KEYDOWN -- %d bytes", streamCount);
         break;
 
     case CFG_CMD_SET_RESOLUTION:
@@ -84,7 +84,7 @@ void ConfigStream::processCommand(BYTE *cmd)
         createScreen_homeScreen();
 
         dataTrans->setStatus(SCSI_ST_OK);
-        outDebugString("handleConfigStream -- CFG_CMD_SET_RESOLUTION -- %d\n", cmd[5]);
+        outDebugString("handleConfigStream -- CFG_CMD_SET_RESOLUTION -- %d", cmd[5]);
         break;
 
     case CFG_CMD_REFRESH:
@@ -94,7 +94,7 @@ void ConfigStream::processCommand(BYTE *cmd)
         dataTrans->addDataBfr(readBuffer, streamCount, true);              // add data and status, with padding to multiple of 16 bytes
         dataTrans->setStatus(SCSI_ST_OK);
 
-        outDebugString("handleConfigStream -- CFG_CMD_REFRESH -- %d bytes\n", streamCount);
+        outDebugString("handleConfigStream -- CFG_CMD_REFRESH -- %d bytes", streamCount);
         break;
 
     case CFG_CMD_GO_HOME:
@@ -103,7 +103,7 @@ void ConfigStream::processCommand(BYTE *cmd)
         dataTrans->addDataBfr(readBuffer, streamCount, true);                              // add data and status, with padding to multiple of 16 bytes
         dataTrans->setStatus(SCSI_ST_OK);
 
-        outDebugString("handleConfigStream -- CFG_CMD_GO_HOME -- %d bytes\n", streamCount);
+        outDebugString("handleConfigStream -- CFG_CMD_GO_HOME -- %d bytes", streamCount);
         break;
 
     default:                            // other cases: error

@@ -30,11 +30,11 @@
 #define PIN_MISO				RPI_V2_GPIO_P1_21
 #define PIN_SCK					RPI_V2_GPIO_P1_23
 
-#ifndef bool 
-	#define bool	int
-	#define true	1
-	#define false	0	
-#endif
+//#ifndef bool 
+//	#define bool	int
+//	#define true	1
+//	#define false	0	
+//#endif
 
 #define	SPI_CS_HANS		BCM2835_SPI_CS0
 #define	SPI_CS_FRANZ	BCM2835_SPI_CS1

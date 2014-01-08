@@ -8,7 +8,7 @@
 #include "../acsidatatrans.h"
 #include "../datatypes.h"
 
-#include "../ISettingsUser.h"
+#include "../isettingsuser.h"
 
 #define BUFFER_SIZE             (1024*1024)
 #define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)

@@ -14,7 +14,7 @@
 
 #include "settingsreloadproxy.h"
 
-#include "ISettingsUser.h"
+#include "isettingsuser.h"
 
 class CCoreThread: public ISettingsUser
 {

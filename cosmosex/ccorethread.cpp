@@ -1,6 +1,5 @@
 #include <unistd.h>
 #include <string.h>
-#include <stdarg.h>
 
 #include "global.h"
 #include "ccorethread.h"
@@ -225,16 +224,6 @@ int CCoreThread::bcdToInt(int bcd)
     b = bcd &  0x0f;    // lower nibble
 
     return ((a * 10) + b);
-}
-
-void outDebugString(const char *format, ...)
-{
-    va_list args;
-    va_start(args, format);
-
-    vprintf(format, args);
-
-    va_end(args);
 }
 
 void CCoreThread::logToFile(char *str)
