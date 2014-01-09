@@ -26,6 +26,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
+#include <stdarg.h>
 
 #include "utils.h"
 #include "serial.h"
@@ -34,6 +35,8 @@
 
 #include "parsers/binary.h"
 #include "parsers/hex.h"
+
+#include "gpio.h"
 
 /* device globals */
 serial_t	*serial		= NULL;
@@ -51,11 +54,8 @@ int		wu		= 0;
 int		npages		= 0xFF;
 char		verify		= 0;
 int		retry		= 10;
-char		exec_flag	= 0;
-uint32_t	execute		= 0;
 char		init_flag	= 1;
 char		force_binary	= 0;
-char		reset_flag	= 1;
 char		*filename;
 
 extern parser_t PARSER_HEX;
@@ -65,14 +65,51 @@ extern parser_t PARSER_BINARY;
 int  parse_options(int argc, char *argv[]);
 void show_help(char *name);
 
+bool flashHans, flashFranz;				// influenced by -x and -y
+void outDebugString(const char *format, ...);
+
 int main(int argc, char* argv[]) {
 	int ret = 1;
 	parser_err_t perr;
 
 	printf("stm32flash - http://stm32flash.googlecode.com/\n\n");
-	if (parse_options(argc, argv) != 0)
-		goto close;
+	
+	if(!gpio_open()) {							// open RPi GPIO
+		return 0;
+	}
+	
+	if (parse_options(argc, argv) != 0) {		// parse arguments
+		gpio_close();
+		return 0;
+	}
+	
+	if(!flashHans && !flashFranz) {				// user didn't specify if he wants to flash Franz or Hanz?
+		fprintf(stderr, "You didn't specify if you want to flash Hans (-x) or Franz (-y).\n");
+		gpio_close();
+		return 0;
+	}
 
+	//----------------------------
+	// this was added for CosmosEx
+	// select the right STM32 chip 
+	bcm2835_gpio_write(PIN_RESET_HANS,			LOW);		// both Hans and Frans to RESET state
+	bcm2835_gpio_write(PIN_RESET_FRANZ,			LOW); 
+
+	bcm2835_gpio_write(PIN_BOOT0_FRANZ_HANS,	HIGH);		// BOOT0: L means boot from flash, H means boot the boot loader
+
+	usleep(10000);											// 10 ms pause - hold the reset down for 10 ms
+	
+	if(flashHans) {											// flash Hans?
+		bcm2835_gpio_write(PIN_TX_SEL1N2,		LOW);		// TX_SEL1N2, HIGH means TX1, LOW means TX2; tx1 is TX FRANZ, tx2 is TX HANS
+		bcm2835_gpio_write(PIN_RESET_HANS,		HIGH);		// put Hans into RUN state
+	} else {												// flash Franz?
+		bcm2835_gpio_write(PIN_TX_SEL1N2,		HIGH);		// TX_SEL1N2, HIGH means TX1, LOW means TX2; tx1 is TX FRANZ, tx2 is TX HANS
+		bcm2835_gpio_write(PIN_RESET_FRANZ,		HIGH);		// put Franz into RUN state
+	}
+
+	usleep(100000);											// let the STM32 boot and run for 100 ms
+	//----------------------------
+	
 	if (wr) {
 		/* first try hex */
 		if (!force_binary) {
@@ -189,7 +226,6 @@ int main(int argc, char* argv[]) {
 	} else if (wu) {
 		fprintf(stdout, "Write-unprotecting flash\n");
 		/* the device automatically performs a reset after the sending the ACK */
-		reset_flag = 0;
 		stm32_wunprot_memory(stm);
 		fprintf(stdout,	"Done.\n");
 
@@ -268,26 +304,20 @@ int main(int argc, char* argv[]) {
 		ret = 0;
 
 close:
-	if (stm && exec_flag && ret == 0) {
-		if (execute == 0)
-			execute = stm->dev->fl_start;
+	//----------------------------
+	// this was added for CosmosEx
+	bcm2835_gpio_write(PIN_RESET_HANS,			LOW);		// both Hans and Frans to RESET state
+	bcm2835_gpio_write(PIN_RESET_FRANZ,			LOW); 
 
-		fprintf(stdout, "\nStarting execution at address 0x%08x... ", execute);
-		fflush(stdout);
-		if (stm32_go(stm, execute)) {
-			reset_flag = 0;
-			fprintf(stdout, "done.\n");
-		} else
-			fprintf(stdout, "failed.\n");
-	}
+	bcm2835_gpio_write(PIN_BOOT0_FRANZ_HANS,	LOW);		// BOOT0: L means boot from flash, H means boot the boot loader
 
-	if (stm && reset_flag) {
-		fprintf(stdout, "\nResetting device... ");
-		fflush(stdout);
-		if (stm32_reset_device(stm))
-			fprintf(stdout, "done.\n");
-		else	fprintf(stdout, "failed.\n");
-	}
+	usleep(10000);											// 10 ms pause to let the RESET work
+
+	bcm2835_gpio_write(PIN_RESET_HANS,			HIGH);		// both Hans and Frans to RUN state
+	bcm2835_gpio_write(PIN_RESET_FRANZ,			HIGH); 
+	
+	gpio_close();
+	//----------------------------
 
 	if (p_st  ) parser->close(p_st);
 	if (stm   ) stm32_close  (stm);
@@ -299,8 +329,18 @@ close:
 
 int parse_options(int argc, char *argv[]) {
 	int c;
-	while((c = getopt(argc, argv, "b:r:w:e:vn:g:fchu")) != -1) {
+	while((c = getopt(argc, argv, "b:r:w:e:vn:g:fchuxy")) != -1) {
 		switch(c) {
+			case 'x':		// flash Hans?
+				flashHans	= true;
+				flashFranz	= false;
+				break;
+
+			case 'y':		// flash Franz?
+				flashHans	= false;
+				flashFranz	= true;
+				break;
+				
 			case 'b':
 				baudRate = serial_get_baud(strtoul(optarg, NULL, 0));
 				if (baudRate == SERIAL_BAUD_INVALID) {
@@ -341,11 +381,6 @@ int parse_options(int argc, char *argv[]) {
 
 			case 'n':
 				retry = strtoul(optarg, NULL, 0);
-				break;
-
-			case 'g':
-				exec_flag = 1;
-				execute   = strtoul(optarg, NULL, 0);
 				break;
 
 			case 'f':
@@ -389,6 +424,8 @@ int parse_options(int argc, char *argv[]) {
 void show_help(char *name) {
 	fprintf(stderr,
 		"Usage: %s [-bvngfhc] [-[rw] filename] /dev/ttyS0\n"
+		"	-x 		flash Hans\n"
+		"	-y 		flash Franz\n"
 		"	-b rate		Baud rate (default 57600)\n"
 		"	-r filename	Read flash to file\n"
 		"	-w filename	Write flash to file\n"
@@ -396,7 +433,6 @@ void show_help(char *name) {
 		"	-e n		Only erase n pages before writing the flash\n"
 		"	-v		Verify writes\n"
 		"	-n count	Retry failed writes up to count times (default 10)\n"
-		"	-g address	Start execution at specified address (0 = flash start)\n"
 		"	-f		Force binary parser\n"
 		"	-h		Show this help\n"
 		"	-c		Resume the connection (don't send initial INIT)\n"
@@ -407,8 +443,8 @@ void show_help(char *name) {
 		"	Get device information:\n"
 		"		%s /dev/ttyS0\n"
 		"\n"
-		"	Write with verify and then start execution:\n"
-		"		%s -w filename -v -g 0x0 /dev/ttyS0\n"
+		"	Write with verify:\n"
+		"		%s -w filename -v /dev/ttyS0\n"
 		"\n"
 		"	Read flash to file:\n"
 		"		%s -r filename /dev/ttyS0\n"
@@ -423,3 +459,13 @@ void show_help(char *name) {
 	);
 }
 
+void outDebugString(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+
+    vprintf(format, args);
+	printf("\n");
+
+    va_end(args);
+}
