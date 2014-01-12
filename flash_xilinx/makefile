@@ -1,10 +1,13 @@
-all: flash_xilinx
+TARGET	= flash_xilinx
 
-flashxilinx: micro.o lenval.o ports.o
-	g++ $^ -o flashxilinx -l bcm2835 -l rt
+OBJS	= gpio.o micro.o lenval.o ports.o
+HDRS	= gpio.h micro.h lenval.h ports.h datatypes.h raspberry.h
 
-%.o: %.cpp 
-	g++ -c $<
+$(TARGET): $(OBJS) $(HDRS)
+	gcc $(OBJS) -lbcm2835 -lrt -o $(TARGET)
+
+%.o: %.c 
+	gcc -c $<
 
 clean:
 	rm -rf *.o $(TARGET)
