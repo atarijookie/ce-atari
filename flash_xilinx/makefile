@@ -7,5 +7,5 @@ flashxilinx: micro.o lenval.o ports.o
 	g++ -c $<
 
 clean:
-	rm -rf *o flashxilinx
+	rm -rf *.o $(TARGET)
 	
