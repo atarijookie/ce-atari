@@ -96,18 +96,9 @@ int main(int argc, char* argv[]) {
 	bcm2835_gpio_write(PIN_RESET_FRANZ,			LOW); 
 
 	bcm2835_gpio_write(PIN_BOOT0_FRANZ_HANS,	HIGH);		// BOOT0: L means boot from flash, H means boot the boot loader
-
-	usleep(10000);											// 10 ms pause - hold the reset down for 10 ms
 	
-	if(flashHans) {											// flash Hans?
-		bcm2835_gpio_write(PIN_TX_SEL1N2,		LOW);		// TX_SEL1N2, HIGH means TX1, LOW means TX2; tx1 is TX FRANZ, tx2 is TX HANS
-		bcm2835_gpio_write(PIN_RESET_HANS,		HIGH);		// put Hans into RUN state
-	} else {												// flash Franz?
-		bcm2835_gpio_write(PIN_TX_SEL1N2,		HIGH);		// TX_SEL1N2, HIGH means TX1, LOW means TX2; tx1 is TX FRANZ, tx2 is TX HANS
-		bcm2835_gpio_write(PIN_RESET_FRANZ,		HIGH);		// put Franz into RUN state
-	}
-
-	usleep(100000);											// let the STM32 boot and run for 100 ms
+	// Now hold reset down until the serial port is open and setup, 
+	// because that will create some pulse on TX line which confuses the STM32 bootloader.
 	//----------------------------
 	
 	if (wr) {
@@ -173,6 +164,22 @@ int main(int argc, char* argv[]) {
 		goto close;
 	}
 
+
+	//---------------------------------------------------
+	// this was added for CosmosEx
+	usleep(10000);											// this will assure the RESET line down for at least 10 ms
+	
+	if(flashHans) {											// flash Hans?
+		bcm2835_gpio_write(PIN_TX_SEL1N2,		LOW);		// TX_SEL1N2, HIGH means TX1, LOW means TX2; tx1 is TX FRANZ, tx2 is TX HANS
+		bcm2835_gpio_write(PIN_RESET_HANS,		HIGH);		// put Hans into RUN state
+	} else {												// flash Franz?
+		bcm2835_gpio_write(PIN_TX_SEL1N2,		HIGH);		// TX_SEL1N2, HIGH means TX1, LOW means TX2; tx1 is TX FRANZ, tx2 is TX HANS
+		bcm2835_gpio_write(PIN_RESET_FRANZ,		HIGH);		// put Franz into RUN state
+	}
+
+	usleep(10000);											// let the STM32 boot and run for 10 ms
+	//---------------------------------------------------	
+	
 	printf("Serial Config: %s\n", serial_get_setup_str(serial));
 	if (!(stm = stm32_init(serial, init_flag))) goto close;
 
