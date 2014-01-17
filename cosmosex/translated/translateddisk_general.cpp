@@ -509,6 +509,26 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
     return true;
 }
 
+int TranslatedDisk::getDriveIndexFromAtariPath(std::string atariPath)
+{
+	// if it's full path including drive letter - calculate the drive index
+    if(atariPath[1] == ':') {                               
+        int driveIndex = 0;
+        char newDrive = atariPath[0];
+
+        if(!isValidDriveLetter(newDrive)) {                 // not a valid drive letter?
+            return -1;
+        }
+		
+        newDrive = toUpperCase(newDrive);                   // make sure it's upper case
+        driveIndex = newDrive - 'A';                        // calculate drive index
+		return driveIndex;
+	}
+
+	// if it wasn't full path, use current drive index
+	return currentDriveIndex;
+}
+
 void TranslatedDisk::removeDoubleDots(std::string &path)
 {
     #define MAX_DIR_NESTING     64

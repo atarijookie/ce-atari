@@ -163,49 +163,25 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
         return;
     }
     //----------
-	std::string hostSearchedDir, hostEntrySearchString;
-	splitSearchPath(hostSearchString, hostSearchedDir, hostEntrySearchString);			// split C:/*.* to C: and *.*
-
-    // then build the found files list
-	DIR *dir = opendir(hostSearchedDir.c_str());					// try to open the dir
+	// now get the dir translator for the right drive
+	int driveIndex = getDriveIndexFromAtariPath(atariSearchString);
 	
-    if(dir == NULL) {                                 				// not found?
-        dataTrans->setStatus(EFILNF);                               // file not found
-        return;
-    }
-
-    while(1) {                                                  	// while there are more files, store them
-		struct dirent *de = readdir(dir);							// read the next directory entry
+	if(driveIndex == -1) {											// invalid drive? file not found
+		dataTrans->setStatus(EFILNF);
+		return;
+	}
 	
-		if(de == NULL) {											// no more entries?
-			break;
-		}
+	DirTranslator *dt = &conf[driveIndex].dirTranslator;
+
+	//now use the dir translator to get the dir content
+	res = dt->buildGemdosFindstorageData(&findStorage, hostSearchString, findAttribs);
+
+	if(!res) {
+		dataTrans->setStatus(EFILNF);                               // file not found
+		return;
+	}
 	
-		if(de->d_type != DT_DIR && de->d_type != DT_REG) {			// not a file, not a directory?
-			outDebugString("TranslatedDisk::onFsfirst -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
-			continue;
-		}
-		
-		// TODO: apply matching to search string - hostEntrySearchString, if not matched, skip this entry
-		
-        appendFoundToFindStorage(hostSearchedDir, de, findAttribs);	// append next found
-
-        if(findStorage.count >= findStorage.maxCount) {         	// avoid buffer overflow
-            break;
-        }
-    }
-
-	closedir(dir);													// close the directory stream
     dataTrans->setStatus(E_OK);                                 	// OK!
-}
-
-// split C:/*.* to C: and *.*
-void TranslatedDisk::splitSearchPath(std::string &hostSearchedDirAndString, std::string &hostSearchedDir, std::string &hostEntrySearchString)
-{
-	outDebugString("TranslatedDisk::splitSearchPath -- TODO: implement spliting path+search to path and search!");
-
-	hostSearchedDir			= hostSearchedDirAndString;
-	hostEntrySearchString	= "";
 }
 
 void TranslatedDisk::appendFoundToFindStorage(std::string hostSearchedDir, struct dirent *de, BYTE findAttribs)

@@ -5,6 +5,9 @@
 #include <string>
 #include <time.h>
 
+#include "translatedhelper.h"
+#include "dirtranslator.h"
+
 #include "../acsidatatrans.h"
 #include "../datatypes.h"
 
@@ -13,9 +16,6 @@
 #define BUFFER_SIZE             (1024*1024)
 #define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
 
-#define HOSTPATH_SEPAR_STRING       "/"
-#define HOSTPATH_SEPAR_CHAR         '/'
-#define ATARIPATH_SEPAR_CHAR        '\\'
 
 typedef struct {
     bool        enabled;
@@ -27,6 +27,7 @@ typedef struct {
 
     int         translatedType;             // normal / shared / config
 
+	DirTranslator	dirTranslator;			// used for translating long dir / file names to short ones
 } TranslatedConf;
 
 typedef struct {
@@ -78,19 +79,14 @@ private:
         int confDrive;
     } driveLetters;
 
-    struct {
-        BYTE *buffer;
-        WORD count;             // count of items found
-
-        WORD fsnextStart;
-        WORD maxCount;          // maximum count of items that this buffer can hold
-    } findStorage;
+	TFindStorage findStorage;
 
     void loadSettings(void);
 
     WORD getDrivesBitmap(void);
     bool hostPathExists(std::string hostPath);
     bool createHostPath(std::string atariPath, std::string &hostPath);
+	int  getDriveIndexFromAtariPath(std::string atariPath);
     void removeDoubleDots(std::string &path);
     void pathSeparatorAtariToHost(std::string &path);
     void pathSeparatorHostToAtari(std::string &path);
@@ -159,7 +155,6 @@ private:
 	void fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *ptm);
 
     void appendFoundToFindStorage(std::string hostSearchedDir, struct dirent *de, unsigned char findAttribs);
-	void splitSearchPath(std::string &hostSearchedDirAndString, std::string &hostSearchedDir, std::string &hostEntrySearchString);
 	void convertLongToShortFileName(char *longName, char *shortName);
 	
     int findEmptyFileSlot(void);
