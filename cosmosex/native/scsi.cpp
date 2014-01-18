@@ -5,8 +5,7 @@
 #include "scsi.h"
 #include "../global.h"
 #include "../settings.h"
-
-extern "C" void outDebugString(const char *format, ...);
+#include "../debug.h"
 
 #define BUFFER_SIZE             (1024*1024)
 #define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)

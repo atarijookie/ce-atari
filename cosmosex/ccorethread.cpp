@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "global.h"
+#include "debug.h"
 #include "ccorethread.h"
 #include "native/scsi_defs.h"
 #include "settings.h"
@@ -11,8 +12,6 @@
 
 #define LOGFILE     "H:/acsilog.txt"
 #define MEDIAFILE   "C:/datamedia.img"
-
-extern "C" void outDebugString(const char *format, ...);
 
 CCoreThread::CCoreThread()
 {

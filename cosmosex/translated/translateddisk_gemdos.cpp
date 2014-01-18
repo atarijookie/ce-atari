@@ -9,11 +9,10 @@
 #include <utime.h>
 
 #include "../global.h"
+#include "../debug.h"
 #include "translateddisk.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
-
-extern "C" void outDebugString(const char *format, ...);
 
 void TranslatedDisk::onDsetdrv(BYTE *cmd)
 {

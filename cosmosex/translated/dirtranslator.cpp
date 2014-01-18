@@ -1,6 +1,15 @@
 #include <stdio.h>
+#include <string.h>
 
+#include <fnmatch.h>
+#include <dirent.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#include "../debug.h"
 #include "dirtranslator.h"
+#include "gemdos.h"
 
 DirTranslator::DirTranslator()
 {
@@ -153,33 +162,32 @@ FilenameShortener *DirTranslator::createShortener(std::string &path)
 {
     bool res;
     FilenameShortener *fs = new FilenameShortener();
+    mapPathToShortener.insert( std::pair<std::string, FilenameShortener *>(path, fs) );
 
-    std::string searchPathString    = path;
-    std::string searchWildcard      = "*.*";
-    mergeHostPaths(searchPathString, searchWildcard);
-
-    // then build the found files list
-    WIN32_FIND_DATAA found;
-    HANDLE h = FindFirstFileA(searchPathString.c_str(), &found);    // find first
-
-    if(h == INVALID_HANDLE_VALUE) {                                 // not found?
+	DIR *dir = opendir((char *) path.c_str());						// try to open the dir
+	
+    if(dir == NULL) {                                 				// not found?
         return fs;
     }
-
+	
     char shortName[14];
-    fs->longToShortFileName(found.cFileName, shortName);
+	
+	while(1) {                                                  	// while there are more files, store them
+		struct dirent *de = readdir(dir);							// read the next directory entry
+	
+		if(de == NULL) {											// no more entries?
+			break;
+		}
+	
+		if(de->d_type != DT_DIR && de->d_type != DT_REG) {			// not 	a file, not a directory?
+			outDebugString("TranslatedDisk::createShortener -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
+			continue;
+		}
 
-    while(1) {                                                  // while there are more files, store them
-        res = FindNextFileA(h, &found);
-
-        if(!res) {
-            break;
-        }
-
-        fs->longToShortFileName(found.cFileName, shortName);
+		fs->longToShortFileName(de->d_name, shortName);
     }
 
-    mapPathToShortener.insert( std::pair<std::string, FilenameShortener *>(path, fs) );
+	closedir(dir);	
     return fs;
 }
 
@@ -198,8 +206,13 @@ void DirTranslator::splitFilenameFromPath(std::string &pathAndFile, std::string 
 
 bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, BYTE findAttribs)
 {
+	std::string hostPath, searchString;
+    bool res;
+
+    splitFilenameFromPath(hostSearchPathAndWildcards, hostPath, searchString);
+
     // then build the found files list
-	DIR *dir = opendir(hostSearchedDir.c_str());					// try to open the dir
+	DIR *dir = opendir(hostPath.c_str());							// try to open the dir
 	
     if(dir == NULL) {                                 				// not found?
         return false;
@@ -208,11 +221,6 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
     // initialize find storage in case anything goes bad
     fs->count       = 0;
     fs->fsnextStart = 0;
-
-	std::string hostPath, searchString;
-    bool res;
-
-    splitFilenameFromPath(hostSearchPathAndWildcards, hostPath, searchString);
 
 	while(1) {                                                  	// while there are more files, store them
 		struct dirent *de = readdir(dir);							// read the next directory entry
@@ -226,16 +234,23 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 			continue;
 		}
 
-		// TODO: check the current name agains searchString using fnmatch
+		// check the current name against searchString using fnmatch
+		int ires = fnmatch((char *) searchString.c_str(), (char *) hostPath.c_str(), FNM_PATHNAME);
 		
-		appendFoundToFindStorage(hostPath, fs, &found, findAttribs);
+		if(ires != 0) {
+			continue;
+		}
 
-        if(findStorage.count >= findStorage.maxCount) {         	// avoid buffer overflow
+		// finnaly append to the find storage
+		appendFoundToFindStorage(hostPath, fs, de, findAttribs);
+
+        if(fs->count >= fs->maxCount) {         					// avoid buffer overflow
             break;
         }
     }
 
-	closedir(dir);	
+	closedir(dir);
+	return true;
 }
 
 void DirTranslator::appendFoundToFindStorage(std::string &hostPath, TFindStorage *fs, struct dirent *de, BYTE findAttribs)
@@ -258,7 +273,8 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, TFindStorage
 //    if((found->dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)!=0     && (findAttribs & FA_SYSTEM)==0)    // is system, but not searching for that
 //        return;
 
-    if((de->d_type == DT_DIR)!=0  && (findAttribs & FA_DIR)==0)       // is dir, but not searching for that
+	bool isDir = (de->d_type == DT_DIR);
+    if(isDir  && (findAttribs & FA_DIR)==0)       // is dir, but not searching for that
         return;
 
 //    // this one is now disabled as on Win almost everything has archive bit set, and thus TOS didn't show any files
@@ -271,8 +287,12 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, TFindStorage
     BYTE *buf   = &(fs->buffer[addr]);          // and get pointer to this location
 
     BYTE atariAttribs;								// convert host to atari attribs
-    attributesHostToAtari(isReadOnly, (de->d_type == DT_DIR) != 0, atariAttribs);
+    attributesHostToAtari(isReadOnly, isDir, atariAttribs);
 
+	std::string fullEntryPath 	= hostPath;
+	std::string longFname		= de->d_name;
+	mergeHostPaths(fullEntryPath, longFname);
+	
 	int res;
 	struct stat attr;
     res = stat(fullEntryPath.c_str(), &attr);		// get the file status
@@ -287,9 +307,7 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, TFindStorage
     WORD atariTime = fileTimeToAtariTime(time);
     WORD atariDate = fileTimeToAtariDate(time);
 	
-    std::string longFname = found->cFileName;
     std::string shortFname;
-    bool res;
 
     res = longToShortFilename(hostPath, longFname, shortFname);
 
@@ -313,10 +331,10 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, TFindStorage
     buf[4] = atariDate &  0xff;
 
     // File Length
-    buf[5] = found->nFileSizeLow >>  24;
-    buf[6] = found->nFileSizeLow >>  16;
-    buf[7] = found->nFileSizeLow >>   8;
-    buf[8] = found->nFileSizeLow & 0xff;
+    buf[5] = attr.st_size >>  24;
+    buf[6] = attr.st_size >>  16;
+    buf[7] = attr.st_size >>   8;
+    buf[8] = attr.st_size & 0xff;
 
     // Filename -- d_fname[14]
     memset(&buf[9], 0, 14);                                         // first clear the mem

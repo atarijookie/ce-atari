@@ -3,11 +3,10 @@
 #include <unistd.h>
 #include <time.h>
 
+#include "debug.h"
 #include "gpio.h"
 #include "acsidatatrans.h"
 #include "native/scsi_defs.h"
-
-extern "C" void outDebugString(const char *format, ...);
 
 #define BUFFER_SIZE         (1024*1024)
 #define COMMAND_SIZE        10

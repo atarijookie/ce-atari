@@ -7,8 +7,7 @@
 #include "global.h"
 #include "ccorethread.h"
 #include "gpio.h"
-
-extern "C" void outDebugString(const char *format, ...);
+#include "debug.h"
 
 int main()
  {

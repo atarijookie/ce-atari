@@ -2,14 +2,13 @@
 #include <string.h>
 
 #include "../global.h"
+#include "../debug.h"
 #include "../native/scsi_defs.h"
 #include "../acsidatatrans.h"
 
 #include "../settings.h"
 #include "keys.h"
 #include "configstream.h"
-
-extern "C" void outDebugString(const char *format, ...);
 
 //--------------------------
 // screen creation methods

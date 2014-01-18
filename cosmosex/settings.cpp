@@ -8,8 +8,7 @@
 #include <stdlib.h>
 
 #define SETTINGS_PATH		"settings"
-
-extern "C" void outDebugString(const char *format, ...);
+#include "debug.h"
 
 Settings::Settings(void)
 {

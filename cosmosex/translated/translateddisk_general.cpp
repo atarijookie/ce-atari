@@ -4,12 +4,11 @@
 #include <unistd.h>
 
 #include "../global.h"
+#include "../debug.h"
 #include "translateddisk.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "../settings.h"
-
-extern "C" void outDebugString(const char *format, ...);
 
 TranslatedDisk::TranslatedDisk(void)
 {

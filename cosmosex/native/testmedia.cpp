@@ -2,8 +2,7 @@
 #include <string.h>
 
 #include "testmedia.h"
-
-extern "C" void outDebugString(const char *format, ...);
+#include "../debug.h"
 
 TestMedia::TestMedia()
 {

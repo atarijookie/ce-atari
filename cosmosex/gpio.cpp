@@ -5,8 +5,7 @@
 #include <unistd.h>
 
 #include "gpio.h"
-
-extern "C" void outDebugString(const char *format, ...);
+#include "debug.h"
 
 void spi_init(void);
 

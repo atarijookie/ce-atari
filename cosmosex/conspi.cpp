@@ -3,8 +3,7 @@
 #include "gpio.h"
 #include "conspi.h"
 #include "global.h"
-
-extern "C" void outDebugString(const char *format, ...);
+#include "debug.h"
 
 #define SWAP_ENDIAN false
 

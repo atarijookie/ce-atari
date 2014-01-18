@@ -2,8 +2,7 @@
 #include <string.h>
 
 #include "nomedia.h"
-
-extern "C" void outDebugString(const char *format, ...);
+#include "../debug.h"
 
 NoMedia::NoMedia()
 {

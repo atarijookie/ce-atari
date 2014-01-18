@@ -2,8 +2,7 @@
 #include <string.h>
 
 #include "datamedia.h"
-
-extern "C" void outDebugString(const char *format, ...);
+#include "../debug.h"
 
 DataMedia::DataMedia()
 {

@@ -8,8 +8,7 @@
 #include "../settings.h"
 #include "keys.h"
 #include "configstream.h"
-
-extern "C" void outDebugString(const char *format, ...);
+#include "../debug.h"
 
 ConfigStream::ConfigStream()
 {
