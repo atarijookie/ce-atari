@@ -37,11 +37,12 @@ public:
     static WORD fileTimeToAtariDate(struct tm *ptm);
     static WORD fileTimeToAtariTime(struct tm *ptm);
 
+	static void mergeHostPaths(std::string &dest, std::string &tail);
+	
 private:
     std::map<std::string, FilenameShortener *>  mapPathToShortener;
 
     FilenameShortener *createShortener(std::string &path);
-    void mergeHostPaths(std::string &dest, std::string &tail);
     void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
 
     void appendFoundToFindStorage(std::string &hostPath, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
