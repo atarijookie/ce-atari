@@ -5,10 +5,11 @@
 
 #include "../global.h"
 #include "../debug.h"
+#include "../settings.h"
+#include "../utils.h"
 #include "translateddisk.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
-#include "../settings.h"
 
 TranslatedDisk::TranslatedDisk(void)
 {
@@ -430,7 +431,7 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 
         std::string atariPathWithoutDrive = atariPath.substr(2);    // skip drive and semicolon (C:)
 
-		DirTranslator::mergeHostPaths(hostPath, atariPathWithoutDrive);		// final path = hostPath + newPath
+		Utils::mergeHostPaths(hostPath, atariPathWithoutDrive);		// final path = hostPath + newPath
 
         removeDoubleDots(hostPath);                                 // search for '..' and simplify the path
 
@@ -440,7 +441,7 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 		conf[driveIndex].dirTranslator.shortToLongPath(root, hostPath, longHostPath);	// now convert short to long path
 		
 		hostPath = root;
-		DirTranslator::mergeHostPaths(hostPath, longHostPath);
+		Utils::mergeHostPaths(hostPath, longHostPath);
 
         return true;
 
@@ -462,15 +463,15 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 		conf[currentDriveIndex].dirTranslator.shortToLongPath(root, hostPath, longHostPath);	// now convert short to long path
 		
 		hostPath = root;
-		DirTranslator::mergeHostPaths(hostPath, longHostPath);
+		Utils::mergeHostPaths(hostPath, longHostPath);
 		
         return true;
     }
 
     // starts without backslash? relative path then
 
-	DirTranslator::mergeHostPaths(hostPath, conf[currentDriveIndex].currentAtariPath);
-	DirTranslator::mergeHostPaths(hostPath, atariPath);
+	Utils::mergeHostPaths(hostPath, conf[currentDriveIndex].currentAtariPath);
+	Utils::mergeHostPaths(hostPath, atariPath);
 	
     removeDoubleDots(hostPath);                                 // search for '..' and simplify the path
 
@@ -478,7 +479,7 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 	conf[currentDriveIndex].dirTranslator.shortToLongPath(root, hostPath, longHostPath);	// now convert short to long path
 
 	hostPath = root;
-	DirTranslator::mergeHostPaths(hostPath, longHostPath);
+	Utils::mergeHostPaths(hostPath, longHostPath);
 	
 //    outDebugString("host path: %s", (char *) hostPath.c_str());
     return true;
@@ -723,9 +724,4 @@ void TranslatedDisk::pathSeparatorHostToAtari(std::string &path)
             path[i] = ATARIPATH_SEPAR_CHAR;      // change to atari separator
         }
     }
-}
-
-void TranslatedDisk::convertLongToShortFileName(char *longName, char *shortName)
-{
-	outDebugString("TranslatedDisk::convertLongToShortFileName -- implement name shortening!!!");
 }

@@ -10,6 +10,7 @@
 
 #include "../global.h"
 #include "../debug.h"
+#include "../utils.h"
 #include "translateddisk.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
@@ -181,90 +182,6 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
 	}
 	
     dataTrans->setStatus(E_OK);                                 	// OK!
-}
-
-void TranslatedDisk::appendFoundToFindStorage(std::string hostSearchedDir, struct dirent *de, BYTE findAttribs)
-{
-    // TODO: verify on ST that the find attributes work like this
-
-	// create full file name
-	std::string fullEntryPath = hostSearchedDir + std::string(HOSTPATH_SEPAR_STRING) + std::string(de->d_name);
-	
-    // first verify if the file attributes are OK
-	
-// TODO: do support for checking the READ ONLY flag on linux
-	bool isReadOnly = false;
-//    if((findAttribs & FA_READONLY) == 0) {  						
-//        return;
-//	}
-
-// hidden attribute not supported on linux
-//    if((found->dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)!=0     && (findAttribs & FA_HIDDEN)==0)    // is hidden, but not searching for that
-//        return;
-
-// system attribute not supported on linux
-//    if((found->dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)!=0     && (findAttribs & FA_SYSTEM)==0)    // is system, but not searching for that
-//        return;
-
-    if((de->d_type == DT_DIR)!=0  && (findAttribs & FA_DIR)==0)       // is dir, but not searching for that
-        return;
-
-// archive attribute not supported on linux
-//    if((found->dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)!=0    && (findAttribs & FA_ARCHIVE)==0)   // is archive, but not searching for that
-//        return;
-
-    //--------
-    // add this file
-    DWORD addr  = findStorage.count * 23;           // calculate offset
-    BYTE *buf   = &findStorage.buffer[addr];        // and get pointer to this location
-
-    BYTE atariAttribs;								// convert host to atari attribs
-    attributesHostToAtari(isReadOnly, (de->d_type == DT_DIR) != 0, atariAttribs);
-
-	int res;
-	struct stat attr;
-    res = stat(fullEntryPath.c_str(), &attr);		// get the file status
-	
-	if(res != 0) {
-		outDebugString("TranslatedDisk::appendFoundToFindStorage -- stat() failed");
-		return;		
-	}
-	
-	tm *time = localtime(&attr.st_mtime);			// convert time_t to tm structure
-	
-    WORD atariTime = fileTimeToAtariTime(time);
-    WORD atariDate = fileTimeToAtariDate(time);
-
-    char fileName[14];
-	convertLongToShortFileName(de->d_name, fileName);
-
-    // GEMDOS File Attributes
-    buf[0] = atariAttribs;
-
-    // GEMDOS Time
-    buf[1] = atariTime >> 8;
-    buf[2] = atariTime &  0xff;
-
-    // GEMDOS Date
-    buf[3] = atariDate >> 8;
-    buf[4] = atariDate &  0xff;
-
-    // File Length
-    buf[5] = attr.st_size >>  24;
-    buf[6] = attr.st_size >>  16;
-    buf[7] = attr.st_size >>   8;
-    buf[8] = attr.st_size & 0xff;
-
-    // Filename -- d_fname[14]
-    memset(&buf[9], 0, 14);                     // first clear the mem
-    strncpy((char *) &buf[9], fileName, 14);    // then copy only valid part of the string, max 14 chars
-
-    // filename to upper case!
-    for(int i=0; i<14; i++) {
-        buf[9 + i] = toUpperCase(buf[9 + i]);
-    }
-
-    findStorage.count++;
 }
 
 void TranslatedDisk::onFsnext(BYTE *cmd)
@@ -515,7 +432,7 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
 	bool isReadOnly = false;
 	// TODO: checking of read only for file
 	
-    attributesHostToAtari(isReadOnly, isDir, oldAttrAtari);
+    Utils::attributesHostToAtari(isReadOnly, isDir, oldAttrAtari);
 	
     if(setNotInquire) {     // SET attribs?
 		outDebugString("TranslatedDisk::onFattrib() -- TODO: setting attributes needs to be implemented!");
@@ -718,7 +635,7 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
 		time_t		timeT;
 		utimbuf		uTimBuf;
 		
-		fileDateTimeToHostTime(atariDate, atariTime, &timeStruct);	// convert atari date and time to struct tm
+		Utils::fileDateTimeToHostTime(atariDate, atariTime, &timeStruct);	// convert atari date and time to struct tm
 		timeT = timelocal(&timeStruct);								// convert tm to time_t
 
 		uTimBuf.actime	= timeT;									// store access time
@@ -743,8 +660,8 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
 	
 		tm *time = localtime(&attr.st_mtime);						// convert time_t to tm structure
 	
-		WORD atariTime = fileTimeToAtariTime(time);
-		WORD atariDate = fileTimeToAtariDate(time);
+		WORD atariTime = Utils::fileTimeToAtariTime(time);
+		WORD atariDate = Utils::fileTimeToAtariDate(time);
 
         dataTrans->addDataWord(atariTime);
         dataTrans->addDataWord(atariDate);
@@ -936,7 +853,7 @@ void TranslatedDisk::onTgetdate(BYTE *cmd)
 	time_t t = time(NULL);
 	tm *time = localtime(&t);						// convert time_t to tm structure
 	
-	WORD atariDate = fileTimeToAtariDate(time);
+	WORD atariDate = Utils::fileTimeToAtariDate(time);
 
     dataTrans->addDataWord(atariDate);      // WORD: atari date
     dataTrans->padDataToMul16();            // 14 bytes of padding
@@ -975,7 +892,7 @@ void TranslatedDisk::onTgettime(BYTE *cmd)
 	time_t t = time(NULL);
 	tm *time = localtime(&t);						// convert time_t to tm structure
 	
-	WORD atariTime = fileTimeToAtariTime(time);
+	WORD atariTime = Utils::fileTimeToAtariTime(time);
 
     dataTrans->addDataWord(atariTime);      // WORD: atari time
     dataTrans->padDataToMul16();            // 14 bytes of padding
@@ -1007,113 +924,6 @@ void TranslatedDisk::onTsettime(BYTE *cmd)
 
 
     dataTrans->setStatus(E_OK);
-}
-
-WORD TranslatedDisk::fileTimeToAtariDate(struct tm *ptm)
-{
-    WORD atariDate = 0;
-	
-	if(ptm == NULL) {
-		return 0;
-	}
-
-    atariDate |= (ptm->tm_year - 1980) << 9;            // year
-    atariDate |= (ptm->tm_mon        ) << 5;            // month
-    atariDate |= (ptm->tm_mday       );                 // day
-
-    return atariDate;
-}
-
-WORD TranslatedDisk::fileTimeToAtariTime(struct tm *ptm)
-{
-    WORD atariTime = 0;
-
-	if(ptm == NULL) {
-		return 0;
-	}
-	
-    atariTime |= (ptm->tm_hour		) << 11;        // hours
-    atariTime |= (ptm->tm_min		) << 5;         // minutes
-    atariTime |= (ptm->tm_sec	/ 2	);              // seconds
-
-    return atariTime;
-}
-
-void TranslatedDisk::fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *ptm)
-{
-    WORD year, month, day;
-    WORD hours, minutes, seconds;
-
-    year    = (atariDate >> 9)   + 1980;
-    month   = (atariDate >> 5)   & 0x0f;
-    day     =  atariDate         & 0x1f;
-
-    hours   =  (atariTime >> 11) & 0x1f;
-    minutes =  (atariTime >>  5) & 0x3f;
-    seconds = ((atariTime >>  5) & 0x1f) * 2;
-	
-	ptm->tm_year	= year;
-	ptm->tm_mon		= month;
-	ptm->tm_mday	= day;
-	
-	ptm->tm_hour	= hours;
-	ptm->tm_min		= minutes;
-	ptm->tm_sec		= seconds;
-}
-
-void TranslatedDisk::attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari)
-{
-    attrAtari = 0;
-
-    if(isReadOnly)
-        attrAtari |= FA_READONLY;
-
-/*
-    if(attrHost & FILE_ATTRIBUTE_HIDDEN)
-        attrAtari |= FA_HIDDEN;
-
-    if(attrHost & FILE_ATTRIBUTE_SYSTEM)
-        attrAtari |= FA_SYSTEM;
-		
-    if(attrHost &                      )
-		attrAtari |= FA_VOLUME;
-*/
-	
-    if(isDir)
-        attrAtari |= FA_DIR;
-
-/*
-    if(attrHost & FILE_ATTRIBUTE_ARCHIVE)
-        attrAtari |= FA_ARCHIVE;
-*/		
-}
-
-void TranslatedDisk::attributesAtariToHost(BYTE attrAtari, DWORD &attrHost)
-{
-    attrHost = 0;
-
-/*
-// these are not supported on linux
-    if(attrAtari & FA_READONLY)
-        attrHost |= FILE_ATTRIBUTE_READONLY;
-
-    if(attrAtari & FA_HIDDEN)
-        attrHost |= FILE_ATTRIBUTE_HIDDEN;
-
-    if(attrAtari & FA_SYSTEM)
-        attrHost |= FILE_ATTRIBUTE_SYSTEM;
-
-    // if(attrAtari & FA_VOLUME)
-    //  attrHost |=                     ;
-
-    if(attrAtari & FA_ARCHIVE)
-        attrHost |= FILE_ATTRIBUTE_ARCHIVE;
-*/
-
-/*
-    if(attrAtari & FA_DIR)
-        attrHost |= FILE_ATTRIBUTE_DIRECTORY;
-*/		
 }
 
 int TranslatedDisk::findEmptyFileSlot(void)

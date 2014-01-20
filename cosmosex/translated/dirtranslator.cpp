@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include "../utils.h"
 #include "../debug.h"
 #include "dirtranslator.h"
 #include "gemdos.h"
@@ -90,7 +91,7 @@ void DirTranslator::shortToLongPath(std::string &rootPath, std::string &shortPat
             strings[i] = longName;
         }
 
-        mergeHostPaths(pathPart, strings[i]);   // build the path slowly
+        Utils::mergeHostPaths(pathPart, strings[i]);   // build the path slowly
     }
 
     // and finally - put the string back together
@@ -98,7 +99,7 @@ void DirTranslator::shortToLongPath(std::string &rootPath, std::string &shortPat
 
     for(i=0; i<found; i++) {
         if(strings[i].length() != 0) {      // not empty string?
-            mergeHostPaths(final, strings[i]);
+            Utils::mergeHostPaths(final, strings[i]);
         }
     }
 
@@ -127,35 +128,6 @@ bool DirTranslator::longToShortFilename(std::string &longHostPath, std::string &
     }
 
     return res;
-}
-
-void DirTranslator::mergeHostPaths(std::string &dest, std::string &tail)
-{
-    if(dest.empty()) {      // if the 1st part is empty, then result is just the 2nd part
-        dest = tail;
-        return;
-    }
-
-    if(tail.empty()) {      // if the 2nd part is empty, don't do anything
-        return;
-    }
-
-    bool endsWithSepar      = (dest[dest.length() - 1] == HOSTPATH_SEPAR_CHAR);
-    bool startsWithSepar    = (tail[0] == HOSTPATH_SEPAR_CHAR);
-
-    if(!endsWithSepar && !startsWithSepar){     // both don't have separator char? add it between them
-        dest = dest + HOSTPATH_SEPAR_STRING + tail;
-        return;
-    }
-
-    if(endsWithSepar && startsWithSepar) {      // both have separator char? remove one
-        dest[dest.length() - 1] = 0;
-        dest = dest + tail;
-        return;
-    }
-
-    // in this case one of them has separator, so just merge them together
-    dest = dest + tail;
 }
 
 FilenameShortener *DirTranslator::createShortener(std::string &path)
@@ -191,25 +163,12 @@ FilenameShortener *DirTranslator::createShortener(std::string &path)
     return fs;
 }
 
-void DirTranslator::splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file)
-{
-    int sepPos = pathAndFile.rfind(HOSTPATH_SEPAR_STRING);
-
-    if(sepPos == ((int) std::string::npos)) {                   // not found?
-        path.clear();
-        file = pathAndFile;                                     // pretend we don't have path, just filename
-    } else {                                                    // separator found?
-        path    = pathAndFile.substr(0, sepPos + 1);            // path is before separator
-        file    = pathAndFile.substr(sepPos + 1);               // file is after separator
-    }
-}
-
 bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, BYTE findAttribs)
 {
 	std::string hostPath, searchString;
     bool res;
 
-    splitFilenameFromPath(hostSearchPathAndWildcards, hostPath, searchString);
+    Utils::splitFilenameFromPath(hostSearchPathAndWildcards, hostPath, searchString);
 
     // then build the found files list
 	DIR *dir = opendir(hostPath.c_str());							// try to open the dir
@@ -287,11 +246,11 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, TFindStorage
     BYTE *buf   = &(fs->buffer[addr]);          // and get pointer to this location
 
     BYTE atariAttribs;								// convert host to atari attribs
-    attributesHostToAtari(isReadOnly, isDir, atariAttribs);
+    Utils::attributesHostToAtari(isReadOnly, isDir, atariAttribs);
 
 	std::string fullEntryPath 	= hostPath;
 	std::string longFname		= de->d_name;
-	mergeHostPaths(fullEntryPath, longFname);
+	Utils::mergeHostPaths(fullEntryPath, longFname);
 	
 	int res;
 	struct stat attr;
@@ -304,8 +263,8 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, TFindStorage
 	
 	tm *time = localtime(&attr.st_mtime);			// convert time_t to tm structure
 	
-    WORD atariTime = fileTimeToAtariTime(time);
-    WORD atariDate = fileTimeToAtariDate(time);
+    WORD atariTime = Utils::fileTimeToAtariTime(time);
+    WORD atariDate = Utils::fileTimeToAtariDate(time);
 	
     std::string shortFname;
 
@@ -343,60 +302,4 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, TFindStorage
     fs->count++;
 }
 
-void DirTranslator::attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari)
-{
-    attrAtari = 0;
-
-    if(isReadOnly)
-        attrAtari |= FA_READONLY;
-
-/*
-    if(attrHost & FILE_ATTRIBUTE_HIDDEN)
-        attrAtari |= FA_HIDDEN;
-
-    if(attrHost & FILE_ATTRIBUTE_SYSTEM)
-        attrAtari |= FA_SYSTEM;
-		
-    if(attrHost &                      )
-		attrAtari |= FA_VOLUME;
-*/
-	
-    if(isDir)
-        attrAtari |= FA_DIR;
-
-/*
-    if(attrHost & FILE_ATTRIBUTE_ARCHIVE)
-        attrAtari |= FA_ARCHIVE;
-*/		
-}
-
-WORD DirTranslator::fileTimeToAtariDate(struct tm *ptm)
-{
-    WORD atariDate = 0;
-	
-	if(ptm == NULL) {
-		return 0;
-	}
-
-    atariDate |= (ptm->tm_year - 1980) << 9;            // year
-    atariDate |= (ptm->tm_mon        ) << 5;            // month
-    atariDate |= (ptm->tm_mday       );                 // day
-
-    return atariDate;
-}
-
-WORD DirTranslator::fileTimeToAtariTime(struct tm *ptm)
-{
-    WORD atariTime = 0;
-
-	if(ptm == NULL) {
-		return 0;
-	}
-	
-    atariTime |= (ptm->tm_hour		) << 11;        // hours
-    atariTime |= (ptm->tm_min		) << 5;         // minutes
-    atariTime |= (ptm->tm_sec	/ 2	);              // seconds
-
-    return atariTime;
-}
 

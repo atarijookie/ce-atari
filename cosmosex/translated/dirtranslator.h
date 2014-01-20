@@ -32,12 +32,6 @@ public:
 
     // call this for find first / find next for Gemdos
     bool buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, BYTE findAttribs);
-
-    static void attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari);
-    static WORD fileTimeToAtariDate(struct tm *ptm);
-    static WORD fileTimeToAtariTime(struct tm *ptm);
-
-	static void mergeHostPaths(std::string &dest, std::string &tail);
 	
 private:
     std::map<std::string, FilenameShortener *>  mapPathToShortener;

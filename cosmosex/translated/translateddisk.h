@@ -147,16 +147,6 @@ private:
     void onGetbpb(BYTE *cmd);
 
     // helper functions
-    void attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari);
-    void attributesAtariToHost(BYTE attrAtari, DWORD &attrHost);
-
-    WORD fileTimeToAtariDate(struct tm *ptm);
-    WORD fileTimeToAtariTime(struct tm *ptm);
-	void fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *ptm);
-
-    void appendFoundToFindStorage(std::string hostSearchedDir, struct dirent *de, unsigned char findAttribs);
-	void convertLongToShortFileName(char *longName, char *shortName);
-	
     int findEmptyFileSlot(void);
     int findFileHandleSlot(int atariHandle);
 
