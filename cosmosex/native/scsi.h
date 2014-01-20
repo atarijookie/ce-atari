@@ -127,6 +127,8 @@ private:
     void dettachByIndex(int index);
     bool attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessType);
     void detachMediaFromACSIidByIndex(int index);
+
+    void initializeAttachedMediaVars(int index);
 };
 
 #endif

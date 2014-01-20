@@ -13,6 +13,8 @@
 #define LOGFILE     "H:/acsilog.txt"
 #define MEDIAFILE   "C:/datamedia.img"
 
+#define DEV_CHECK_TIME_MS	3000
+
 CCoreThread::CCoreThread()
 {
     setEnabledIDbits = false;
@@ -58,12 +60,21 @@ void CCoreThread::run(void)
     BYTE inBuff[4], outBuf[4];
 	
 	memset(outBuf, 0, 4);
+    memset(inBuff, 0, 4);
 	
     loadSettings();
+
+	DWORD nextDevFindTime = Utils::getEndTime(DEV_CHECK_TIME_MS);		// create a time when the devices should be checked
 
     while(1) {
 		bool gotAtn = false;						// no ATN received yet?
 		
+		if(Utils::getCurrentMs() >= nextDevFindTime) {	// should we check for the new devices?
+			devFinder.lookForDevChanges();				// look for devices attached / detached
+			
+			nextDevFindTime = Utils::getEndTime(DEV_CHECK_TIME_MS);		// update the time when devices should be checked
+		}
+
 		if( spi_atn(SPI_ATN_HANS) ) {				// HANS is signaling attention?
 			gotAtn = false;							// we've some ATN
 

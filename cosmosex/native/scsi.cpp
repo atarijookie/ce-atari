@@ -24,8 +24,7 @@ Scsi::Scsi(void)
     }
 
     for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {
-        attachedMedia[i].hostSourceType = SOURCETYPE_NONE;
-        dettachByIndex(i);
+        initializeAttachedMediaVars(i);
     }
 
     loadSettings();
@@ -218,6 +217,15 @@ void Scsi::dettachByIndex(int index)
     if(attachedMedia[index].hostSourceType != SOURCETYPE_NONE) {            // if it's not NO source
         attachedMedia[index].dataMedia->close();                            // close it, delete it
         delete attachedMedia[index].dataMedia;
+    }
+
+    initializeAttachedMediaVars(index);
+}
+
+void Scsi::initializeAttachedMediaVars(int index)
+{
+    if(index < 0 || index >= MAX_ATTACHED_MEDIA) {
+        return;
     }
 
     attachedMedia[index].hostPath       = "";

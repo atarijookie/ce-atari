@@ -3,6 +3,8 @@
 
 #include "global.h"
 #include "conspi.h"
+#include "utils.h"
+#include "devfinder.h"
 
 #include "native/scsi.h"
 #include "native/datamedia.h"
@@ -41,6 +43,8 @@ private:
     ConfigStream    *confStream;
 
     TestMedia       testMedia;
+
+    DevFinder		devFinder;
 
     SettingsReloadProxy     settingsReloadProxy;
 
