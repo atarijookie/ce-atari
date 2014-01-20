@@ -27,7 +27,7 @@ bool Settings::getBool(char *key, bool defValue)
 {
 	FILE *file = open(key, true);
 	if(!file) {											// failed to open settings?
-		outDebugString("Settings::getBool -- returning default value for %s", key);
+//		outDebugString("Settings::getBool -- returning default value for %s", key);
 		return defValue;
 	}
 
@@ -36,7 +36,7 @@ bool Settings::getBool(char *key, bool defValue)
 	fclose(file);
 	
 	if(res != 1) {										// failed to read value?
-		outDebugString("Settings::getBool -- returning default value for %s", key);
+//		outDebugString("Settings::getBool -- returning default value for %s", key);
 		return defValue;
 	}
 	
@@ -70,7 +70,7 @@ int Settings::getInt(char *key, int defValue)
 {
 	FILE *file = open(key, true);
 	if(!file) {											// failed to open settings?
-		outDebugString("Settings::getInt -- returning default value for %s", key);
+//		outDebugString("Settings::getInt -- returning default value for %s", key);
 		return defValue;
 	}
 
@@ -79,7 +79,7 @@ int Settings::getInt(char *key, int defValue)
 	fclose(file);
 	
 	if(res != 1) {										// failed to read value?
-		outDebugString("Settings::getInt -- returning default value for %s", key);
+//		outDebugString("Settings::getInt -- returning default value for %s", key);
 		return defValue;
 	}
 	
@@ -105,7 +105,7 @@ char *Settings::getString(char *key, char *defValue)
 
 	FILE *file = open(key, true);
 	if(!file) {											// failed to open settings?
-		outDebugString("Settings::getString -- returning default value for %s", key);
+//		outDebugString("Settings::getString -- returning default value for %s", key);
 		strcpy(buffer, defValue);
 		return buffer;
 	}
@@ -115,7 +115,7 @@ char *Settings::getString(char *key, char *defValue)
 	fclose(file);
 	
 	if(res == NULL) {									// failed to read value?
-		outDebugString("Settings::getString -- returning default value for %s", key);
+//		outDebugString("Settings::getString -- returning default value for %s", key);
 		strcpy(buffer, defValue);
 		return buffer;
 	}
@@ -139,7 +139,7 @@ char Settings::getChar(char *key, char defValue)
 {
     FILE *file = open(key, true);
     if(!file) {											// failed to open settings?
-        outDebugString("Settings::getChar -- returning default value for %s", key);
+//        outDebugString("Settings::getChar -- returning default value for %s", key);
         return defValue;
     }
 
@@ -149,7 +149,7 @@ char Settings::getChar(char *key, char defValue)
     fclose(file);
 
     if(res != 1) {										// failed to read value?
-        outDebugString("Settings::getChar -- returning default value for %s", key);
+//        outDebugString("Settings::getChar -- returning default value for %s", key);
         return defValue;
     }
 

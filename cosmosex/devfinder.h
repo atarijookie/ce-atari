@@ -4,6 +4,7 @@
 #include <string>
 #include <iostream>
 #include <map>
+#include <list>
 
 #include <stdio.h>
 #include <string.h>
@@ -14,9 +15,11 @@ class DevFinder {
 public:
 	DevFinder();
 
-	void lookForDevChanges(void);
 	void setDevChangesHandler(DevChangesHandler *devChHand);
-	
+
+	void lookForDevChanges(void);
+	void getDevPartitions(std::string devName, std::list<std::string> &partitions);
+
 private:
 	DevChangesHandler *devChHandler;
 

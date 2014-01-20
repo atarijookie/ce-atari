@@ -79,9 +79,64 @@ void DevFinder::lookForDevChanges(void)
 	
 	findAndSignalDettached();										// now go through the mapDevToFound and see what disappeared
 	
-	if(!someDevChanged) {
-		printf("no change\n");
-	}
+//	if(!someDevChanged) {
+//		printf("no change\n");
+//	}
+}
+
+void DevFinder::getDevPartitions(std::string devName, std::list<std::string> &partitions)
+{
+	partitions.erase(partitions.begin(), partitions.end());		// erease list content
+	
+	char linkBuf[PATH_BUFF_SIZE];
+	char devBuf[PATH_BUFF_SIZE];
+	
+	DIR *dir = opendir(DISK_LINKS_PATH);							// try to open the dir
+	
+    if(dir == NULL) {                                 				// not found?
+        return;
+    }
+
+	while(1) {                                                  	// while there are more files, store them
+		struct dirent *de = readdir(dir);							// read the next directory entry
+	
+		if(de == NULL) {											// no more entries?
+			break;
+		}
+
+		if(de->d_type != DT_LNK) {									// if it's not a link, skip it
+			continue;
+		}
+
+		memset(linkBuf,	0, PATH_BUFF_SIZE);
+		memset(devBuf,	0, PATH_BUFF_SIZE);
+		
+		strcpy(linkBuf, DISK_LINKS_PATH);
+		strcat(linkBuf, HOSTPATH_SEPAR_STRING);
+		strcat(linkBuf, de->d_name);
+		
+		int ires = readlink(linkBuf, devBuf, PATH_BUFF_SIZE);		// try to resolve the filename from the link
+		if(ires == -1) {
+			continue;
+		}
+		
+		std::string pathAndFile = devBuf;
+		std::string path, file;
+		
+		Utils::splitFilenameFromPath(pathAndFile, path, file);		// get only file name, skip the path
+		
+		if(file.length() <= devName.length()) {						// if what we've found is shorter or equaly long as what we are looking for, skip it
+			continue;
+		}
+		
+		if(file.find(devName) == 0) {								// if the file name starts with the device
+			partitions.push_back(file);
+		}
+    }
+
+	closedir(dir);	
+	
+	partitions.sort();												// sort them alphabetically
 }
 
 void DevFinder::processFoundDev(std::string file)
@@ -96,7 +151,7 @@ void DevFinder::processFoundDev(std::string file)
 		bool atariDrive = isAtariDrive(file);
 		
 		printf("device attached: %s, is atari drive: %d\n", (char *) file.c_str(), atariDrive);		// write out
-		
+
 		if(devChHandler != NULL) {									// if got handler, notify him
 			devChHandler->onDevAttached(file, atariDrive);
 		}
