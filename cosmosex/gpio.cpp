@@ -96,7 +96,7 @@ bool spi_atn(int whichSpiAtn)
 {
 	BYTE val;
 	
-	val = bcm2835_gpio_lev(PIN_TDO); 
+	val = bcm2835_gpio_lev(whichSpiAtn); 
 	
 	return (val == HIGH);					// returns true if pin is high, returns false if pin is low
 }
