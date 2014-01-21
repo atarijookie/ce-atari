@@ -30,7 +30,7 @@ bool DataMedia::open(char *path, bool createIfNotExists)
     }
 
     if(image == NULL) {
-        outDebugString("DataMedia - failed to open %s", path);
+        Debug::out("DataMedia - failed to open %s", path);
         return false;
     }
 
@@ -53,7 +53,7 @@ bool DataMedia::open(char *path, bool createIfNotExists)
 
     mediaHasChanged = false;
 
-    outDebugString("DataMedia - open succeeded, capacity: %d, was created: %d", BCapacity, (int) imageWasCreated);
+    Debug::out("DataMedia - open succeeded, capacity: %d, was created: %d", BCapacity, (int) imageWasCreated);
 
     return true;
 }

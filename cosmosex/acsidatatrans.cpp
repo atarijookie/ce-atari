@@ -100,7 +100,7 @@ void AcsiDataTrans::padDataToMul16(void)
 bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 {
     if(!com) {
-        outDebugString("AcsiDataTrans::recvData -- no communication object, fail!");
+        Debug::out("AcsiDataTrans::recvData -- no communication object, fail!");
         return false;
     }
 
@@ -151,7 +151,7 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
                 b += 3;
             }
 
-            outDebugString("%s", bfr);
+            Debug::out("%s", bfr);
         }
     }
 
@@ -162,7 +162,7 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 void AcsiDataTrans::sendDataAndStatus(void)
 {
     if(!com) {
-        outDebugString("AcsiDataTrans::sendDataAndStatus -- no communication object, fail!");
+        Debug::out("AcsiDataTrans::sendDataAndStatus -- no communication object, fail!");
         return;
     }
 
@@ -236,7 +236,7 @@ bool AcsiDataTrans::waitForATN(BYTE atnCode, DWORD timeoutMs)
     // wait for specific atn code, but maximum maxLoopCount times
     while(1) {
 		if((getTickCount() - startTick) >= timeoutMs) {		// if it takes more than allowed timeout, fail
-			outDebugString("waitForATN %02x fail!", atnCode);
+			Debug::out("waitForATN %02x fail!", atnCode);
 			return false;
 		}
 		
@@ -248,7 +248,7 @@ bool AcsiDataTrans::waitForATN(BYTE atnCode, DWORD timeoutMs)
         com->txRx(SPI_CS_HANS, 4, inBuf, outBuf);	// receive 2 WORDs - 0 and ATN code
 
         if(inBuf[3] == atnCode) {                      // ATN code found?
-            outDebugString("waitForATN %02x good.", atnCode);
+            Debug::out("waitForATN %02x good.", atnCode);
             return true;
         }
     }

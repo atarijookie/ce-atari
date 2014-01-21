@@ -43,7 +43,7 @@ TranslatedDisk::~TranslatedDisk()
 
 void TranslatedDisk::loadSettings(void)
 {
-    outDebugString("TranslatedDisk::loadSettings");
+    Debug::out("TranslatedDisk::loadSettings");
 
     Settings s;
     char drive1, drive2, drive3;
@@ -59,7 +59,7 @@ void TranslatedDisk::loadSettings(void)
 
 void TranslatedDisk::reloadSettings(void)
 {
-    outDebugString("TranslatedDisk::reloadSettings");
+    Debug::out("TranslatedDisk::reloadSettings");
 
     // first load the settings
     loadSettings();
@@ -93,7 +93,7 @@ void TranslatedDisk::reloadSettings(void)
     // todo: attach shared and config disk when they weren't attached before and now should be
     // todo: attach remainig DOS drives when they couldn't be attached before (not enough letters before)
 
-    outDebugString("TranslatedDisk::configChanged_reload -- attached again, good %d, bad %d", good, bad);
+    Debug::out("TranslatedDisk::configChanged_reload -- attached again, good %d, bad %d", good, bad);
 }
 
 void TranslatedDisk::setAcsiDataTrans(AcsiDataTrans *dt)
@@ -106,7 +106,7 @@ bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedTy
     int index = -1;
 
     if(isAlreadyAttached(hostRootPath)) {                   // if already attached, return success
-        outDebugString("TranslatedDisk::attachToHostPath - already attached");
+        Debug::out("TranslatedDisk::attachToHostPath - already attached");
         return true;
     }
 
@@ -177,7 +177,7 @@ void TranslatedDisk::attachToHostPathByIndex(int index, std::string hostRootPath
     conf[index].translatedType      = translatedType;
     conf[index].mediaChanged        = true;
 
-    outDebugString("TranslatedDisk::attachToHostPath - path %s attached to index %d (letter %c)", hostRootPath.c_str(), index, 'A' + index);
+    Debug::out("TranslatedDisk::attachToHostPath - path %s attached to index %d (letter %c)", hostRootPath.c_str(), index, 'A' + index);
 }
 
 bool TranslatedDisk::isAlreadyAttached(std::string hostRootPath)
@@ -251,7 +251,7 @@ void TranslatedDisk::detachFromHostPath(std::string hostRootPath)
 void TranslatedDisk::processCommand(BYTE *cmd)
 {
     if(dataTrans == 0 ) {
-        outDebugString("processCommand was called without valid dataTrans!");
+        Debug::out("processCommand was called without valid dataTrans!");
         return;
     }
 
@@ -481,7 +481,7 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 	hostPath = root;
 	Utils::mergeHostPaths(hostPath, longHostPath);
 	
-//    outDebugString("host path: %s", (char *) hostPath.c_str());
+//    Debug::out("host path: %s", (char *) hostPath.c_str());
     return true;
 }
 
@@ -509,7 +509,7 @@ void TranslatedDisk::removeDoubleDots(std::string &path)
 {
     #define MAX_DIR_NESTING     64
 
-//    outDebugString("removeDoubleDots before: %s", (char *) path.c_str());
+//    Debug::out("removeDoubleDots before: %s", (char *) path.c_str());
 
     std::string strings[MAX_DIR_NESTING];
     int found = 0, start = 0, pos;
@@ -530,7 +530,7 @@ void TranslatedDisk::removeDoubleDots(std::string &path)
         start = pos + 1;
 
         if(found >= MAX_DIR_NESTING) {              // sanitize possible overflow
-            outDebugString("removeDoubleDots has reached maximum dir nesting level, not removing double dost!");
+            Debug::out("removeDoubleDots has reached maximum dir nesting level, not removing double dost!");
             break;
         }
     }
@@ -558,7 +558,7 @@ void TranslatedDisk::removeDoubleDots(std::string &path)
         }
     }
 
-//    outDebugString("removeDoubleDots after: %s", (char *) final.c_str());
+//    Debug::out("removeDoubleDots after: %s", (char *) final.c_str());
     path = final;
 }
 
@@ -634,7 +634,7 @@ void TranslatedDisk::createAtariPathFromHostPath(std::string hostPath, std::stri
     if(hostPath.find(hostRoot) == 0) {                          // the full host path contains host root
         atariPath = hostPath.substr(hostRoot.length());         // atari path = hostPath - hostRoot
     } else {                                                    // this shouldn't happen
-        outDebugString("TranslatedDisk::createAtariPathFromHostPath -- WTF, this shouldn't happen!");
+        Debug::out("TranslatedDisk::createAtariPathFromHostPath -- WTF, this shouldn't happen!");
         atariPath = "";
     }
 }

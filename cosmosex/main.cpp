@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <string.h>
-#include <stdarg.h>
 
 #include "config/configstream.h"
 #include "settings.h"
@@ -13,7 +12,7 @@ int main()
  {
 	CCoreThread *core;
 	
-    outDebugString("CosmosEx starting...");
+    Debug::out("CosmosEx starting...");
 	
 	if(!gpio_open()) {							// try to open GPIO and SPI on RPi
 		return 0;
@@ -25,17 +24,6 @@ int main()
 	delete core;
 	gpio_close();
 	
-    outDebugString("CosmosEx terminated.");
+    Debug::out("CosmosEx terminated.");
     return 0;
  }
-
-void outDebugString(const char *format, ...)
-{
-    va_list args;
-    va_start(args, format);
-
-    vprintf(format, args);
-	printf("\n");
-
-    va_end(args);
-}

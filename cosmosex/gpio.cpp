@@ -18,13 +18,13 @@ bcm2835_gpio_write doesn't influence SPI CS pins, they are controlled by SPI par
 bool gpio_open(void)
 {
 	if(geteuid() != 0) {
-		outDebugString( "The bcm2835 library requires to be run as root, try again...");
+		Debug::out( "The bcm2835 library requires to be run as root, try again...");
         return false;
 	}
 
 	// try to init the GPIO library
 	if (!bcm2835_init()) {
-		outDebugString( "bcm2835_init failed, can't use GPIO.");
+		Debug::out( "bcm2835_init failed, can't use GPIO.");
         return false;
 	}
 	

@@ -118,7 +118,7 @@ void CCoreThread::handleAcsiCommand(void)
     memset(bufOut, 0, CMD_SIZE);
 
     conSpi->txRx(SPI_CS_HANS, 14, bufOut, bufIn);        // get 14 cmd bytes
-    outDebugString("\nhandleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
+    Debug::out("\nhandleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
 
     BYTE justCmd = bufIn[0] & 0x1f;
     BYTE wasHandled = false;
@@ -173,7 +173,7 @@ void CCoreThread::reloadSettings(void)
 
 void CCoreThread::loadSettings(void)
 {
-    outDebugString("CCoreThread::loadSettings");
+    Debug::out("CCoreThread::loadSettings");
 
     Settings s;
     enabledIDbits = 0;                                    // no bits / IDs enabled yet
@@ -219,10 +219,10 @@ void CCoreThread::handleFwVersion(void)
 
     int year = bcdToInt(fwVer[1]) + 2000;
     if(fwVer[0] == 0xf0) {
-        outDebugString("FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+        Debug::out("FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
     } else {
         int currentLed = fwVer[4];
-        outDebugString("FW: Hans,  %d-%02d-%02d, LED is: %d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed);
+        Debug::out("FW: Hans,  %d-%02d-%02d, LED is: %d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed);
     }
 }
 

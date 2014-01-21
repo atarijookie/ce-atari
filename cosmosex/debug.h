@@ -1,7 +1,11 @@
 #ifndef _DEBUG_H_
 #define _DEBUG_H_
 
-extern "C" void outDebugString(const char *format, ...);
+class Debug
+{
+public:
+	static void out(const char *format, ...);
+};
 
 #endif
 

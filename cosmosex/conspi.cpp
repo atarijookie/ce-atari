@@ -36,10 +36,10 @@ void CConSpi::receiveAndApplyTxRxLimits(int whichSpiCs)
     WORD txLen = swapWord(pwIn[0]);
     WORD rxLen = swapWord(pwIn[1]);
 
-    outDebugString("TX/RX limits: TX %d WORDs, RX %d WORDs", txLen, rxLen);
+    Debug::out("TX/RX limits: TX %d WORDs, RX %d WORDs", txLen, rxLen);
 
     if(txLen > 1024 || rxLen > 1024) {
-        outDebugString("TX/RX limits above are probably wrong! Fix this!");
+        Debug::out("TX/RX limits above are probably wrong! Fix this!");
 
         if(txLen > 1024) {
             txLen = 1024;
@@ -65,11 +65,11 @@ WORD CConSpi::swapWord(WORD val)
 
 void CConSpi::setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen)
 {
-//    outDebugString("CConSpi::setRemainingTxRxLen - TX %d, RX %d", txLen, rxLen);
+//    Debug::out("CConSpi::setRemainingTxRxLen - TX %d, RX %d", txLen, rxLen);
 
     if(txLen == NO_REMAINING_LENGTH && rxLen == NO_REMAINING_LENGTH) {    // if setting NO_REMAINING_LENGTH
         if(remainingPacketLength != 0) {
-            outDebugString("CConSpi - didn't TX/RX enough data, padding with %d zeros! Fix this!", remainingPacketLength);
+            Debug::out("CConSpi - didn't TX/RX enough data, padding with %d zeros! Fix this!", remainingPacketLength);
             memset(paddingBuffer, 0, PADDINGBUFFER_SIZE);
             txRx(whichSpiCs, remainingPacketLength, paddingBuffer, paddingBuffer);
         }
@@ -122,13 +122,13 @@ void CConSpi::txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBuf
 
     if(remainingPacketLength != NO_REMAINING_LENGTH) {
         if(count > remainingPacketLength) {
-            outDebugString("CConSpi::txRx - trying to TX/RX %d more bytes then allowed! Fix this!", (count - remainingPacketLength));
+            Debug::out("CConSpi::txRx - trying to TX/RX %d more bytes then allowed! Fix this!", (count - remainingPacketLength));
 
             count = remainingPacketLength;
         }
     }
 
-//    outDebugString("CConSpi::txRx - count: %d", count);
+//    Debug::out("CConSpi::txRx - count: %d", count);
 
 	spi_tx_rx(whichSpiCs, count, sendBuffer, receiveBufer);
 
