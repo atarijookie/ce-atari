@@ -1,8 +1,12 @@
 #ifndef _UTILS_H_
 #define _UTILS_H_
 
+#include <signal.h>
 #include <string>
+
 #include "datatypes.h"
+
+extern "C" volatile sig_atomic_t sigintReceived;
 
 class Utils {
 public:

@@ -10,7 +10,7 @@
 #define ATN_READ_MORE_DATA				0x03
 #define ATN_WRITE_MORE_DATA				0x04
 #define ATN_GET_STATUS					0x05
-#define ATN_ANY							0xffff								// this is used only on host to wait for any ATN
+#define ATN_ANY							0xff								// this is used only on host to wait for any ATN
 
 
 // commands sent from host to device

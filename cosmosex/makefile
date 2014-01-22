@@ -28,7 +28,7 @@ $(TARGET): $(OBJS) $(HDR)
 	$(MAKE) -C $(SUBDIR2)
 	$(MAKE) -C $(SUBDIR3)
 	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@
-	$(STRIP) -s $@ 
+#	$(STRIP) -s $@ 
 
 clean:
 	$(MAKE) -C $(SUBDIR1) clean

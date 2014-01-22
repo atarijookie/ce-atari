@@ -74,7 +74,7 @@ void CCoreThread::run(void)
 
 	bool res;
 	
-    while(1) {
+    while(sigintReceived == 0) {
 		bool gotAtn = false;						// no ATN received yet?
 		
 		if(Utils::getCurrentMs() >= nextDevFindTime) {	// should we check for the new devices?

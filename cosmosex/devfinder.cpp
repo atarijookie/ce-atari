@@ -13,6 +13,7 @@
 #include "translated/translatedhelper.h"
 #include "devfinder.h"
 #include "utils.h"
+#include "debug.h"
 
 DevFinder::DevFinder()
 {
@@ -80,7 +81,7 @@ void DevFinder::lookForDevChanges(void)
 	findAndSignalDettached();										// now go through the mapDevToFound and see what disappeared
 	
 //	if(!someDevChanged) {
-//		printf("no change\n");
+//		Debug::out("no change");
 //	}
 }
 
@@ -150,7 +151,7 @@ void DevFinder::processFoundDev(std::string file)
 		
 		bool atariDrive = isAtariDrive(file);
 		
-		printf("device attached: %s, is atari drive: %d\n", (char *) file.c_str(), atariDrive);		// write out
+		Debug::out("device attached: %s, is atari drive: %d", (char *) file.c_str(), atariDrive);		// write out
 
 		if(devChHandler != NULL) {									// if got handler, notify him
 			devChHandler->onDevAttached(file, atariDrive);
@@ -197,7 +198,7 @@ void DevFinder::findAndSignalDettached(void)
 			del = it;														// delete dev in next step
 			someDevChanged = true;
 			
-			printf("device detached: %s\n", (char *) it->first.c_str());
+			Debug::out("device detached: %s", (char *) it->first.c_str());
 
 			if(devChHandler != NULL) {										// if got handler, notify him
 				devChHandler->onDevDetached(it->first);
@@ -213,7 +214,7 @@ void DevFinder::findAndSignalDettached(void)
 bool DevFinder::isAtariDrive(std::string file)
 {
 	if(geteuid() != 0) {
-		printf("Warning! Not running as root, won't be able to check dev partitions types!\n");
+		Debug::out("Warning! Not running as root, won't be able to check dev partitions types!");
 	}
 	
 	std::string fullPath = "/dev/" + file;
