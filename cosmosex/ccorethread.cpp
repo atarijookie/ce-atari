@@ -20,6 +20,9 @@ CCoreThread::CCoreThread()
     setEnabledIDbits = false;
 
     sendSingleHalfWord = false;
+	
+	gotDevTypeRaw			= false;
+	gotDevTypeTranslated	= false;
 
 	conSpi		= new CConSpi();
 
@@ -29,12 +32,12 @@ CCoreThread::CCoreThread()
     scsi        = new Scsi();
     scsi->setAcsiDataTrans(dataTrans);
 
-    scsi->attachToHostPath(MEDIAFILE, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
+//    scsi->attachToHostPath(MEDIAFILE, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
 
     translated = new TranslatedDisk();
     translated->setAcsiDataTrans(dataTrans);
 
-    translated->attachToHostPath("H:\\dom", TRANSLATEDTYPE_NORMAL);
+//    translated->attachToHostPath("H:\\dom", TRANSLATEDTYPE_NORMAL);
 
     confStream = new ConfigStream();
     confStream->setAcsiDataTrans(dataTrans);
@@ -43,6 +46,9 @@ CCoreThread::CCoreThread()
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_ACSI);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) scsi,          SETTINGSUSER_ACSI);
 	settingsReloadProxy.addSettingsUser((ISettingsUser *) translated,    SETTINGSUSER_TRANSLATED);
+	
+	// register this class as receiver of dev attached / detached calls
+	devFinder.setDevChangesHandler((DevChangesHandler *) this);
 }
 
 CCoreThread::~CCoreThread()
@@ -77,7 +83,7 @@ void CCoreThread::run(void)
 			nextDevFindTime = Utils::getEndTime(DEV_CHECK_TIME_MS);		// update the time when devices should be checked
 		}
 
-		res = conSpi->waitForATN(SPI_CS_HANS, ATN_ANY, 0, inBuff);		// check for any ATN code waiting from Hans
+		res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);		// check for any ATN code waiting from Hans
 
 		if(res) {									// HANS is signaling attention?
 			gotAtn = true;							// we've some ATN
@@ -95,12 +101,12 @@ void CCoreThread::run(void)
 				break;
 
 			default:
-				logToFile((char *) "That ^^^ shouldn't happen!\n");
+				Debug::out((char *) "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
 				break;
 			}
 		}
 		
-		res = conSpi->waitForATN(SPI_CS_FRANZ, ATN_ANY, 0, inBuff);		// check for any ATN code waiting from Franz
+		res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuff);		// check for any ATN code waiting from Franz
 		if(res) {									// FRANZ is signaling attention?
 			gotAtn = true;							// we've some ATN
 
@@ -128,7 +134,7 @@ void CCoreThread::handleAcsiCommand(void)
 
     BYTE acsiId = bufIn[0] >> 5;                        // get just ACSI ID
 
-    if(acsiIDdevType[acsiId] == DEVTYPE_OFF) {          // if this ACSI ID is off, reply with error and quit
+    if(acsiIDevType[acsiId] == DEVTYPE_OFF) {          	// if this ACSI ID is off, reply with error and quit
         dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
         dataTrans->sendDataAndStatus();
         return;
@@ -179,8 +185,11 @@ void CCoreThread::loadSettings(void)
     Debug::out("CCoreThread::loadSettings");
 
     Settings s;
-    enabledIDbits = 0;                                    // no bits / IDs enabled yet
+    enabledIDbits = 0;									// no bits / IDs enabled yet
 
+	gotDevTypeRaw			= false;					// no raw and translated types found yet
+	gotDevTypeTranslated	= false;
+	
     char key[32];
     for(int id=0; id<8; id++) {							// read the list of device types from settings
         sprintf(key, "ACSI_DEVTYPE_%d", id);			// create settings KEY, e.g. ACSI_DEVTYPE_0
@@ -190,11 +199,19 @@ void CCoreThread::loadSettings(void)
             devType = DEVTYPE_OFF;
         }
 
-        acsiIDdevType[id] = devType;
+        acsiIDevType[id] = devType;
 
         if(devType != DEVTYPE_OFF) {                    // if ON
             enabledIDbits |= (1 << id);                 // set the bit to 1
         }
+		
+		if(devType == DEVTYPE_RAW) {					// found at least one RAW device?
+			gotDevTypeRaw = true;
+		}
+		
+		if(devType == DEVTYPE_TRANSLATED) {				// found at least one TRANSLATED device?
+			gotDevTypeTranslated = true;
+		}
     }
 
     setEnabledIDbits = true;
@@ -213,12 +230,6 @@ void CCoreThread::handleFwVersion(void)
     }
 
     conSpi->txRx(SPI_CS_HANS, 10, oBuf, fwVer);
-
-    logToFile((char *) "handleFwVersion: \nOUT:\n");
-    logToFile(10, oBuf);
-    logToFile((char *) "\nIN:\n");
-    logToFile(10, fwVer);
-    logToFile((char *) "\n");
 
     int year = bcdToInt(fwVer[1]) + 2000;
     if(fwVer[0] == 0xf0) {
@@ -239,54 +250,45 @@ int CCoreThread::bcdToInt(int bcd)
     return ((a * 10) + b);
 }
 
-void CCoreThread::logToFile(char *str)
+void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 {
-    FILE *f = fopen(LOGFILE, "at");
+	// TODO: add logic to detach the device, if it was attached as other type (raw / tran)
 
-    if(!f) {
-        return;
-    }
+	// if have RAW enabled, but not TRANSLATED - attach all drives (atari and non-atari) as RAW
+	if(gotDevTypeRaw && !gotDevTypeTranslated) {
+		scsi->attachToHostPath(devName, SOURCETYPE_DEVICE, SCSI_ACCESSTYPE_FULL);
+	}
 
-    fprintf(f, str);
-    fclose(f);
+	// if have TRANSLATED enabled, but not RAW - can't attach atari drives, but do attach non-atari drives as TRANSLATED
+	if(!gotDevTypeRaw && gotDevTypeTranslated) {
+		if(!isAtariDrive) {			// attach non-atari drive as TRANSLATED	
+			std::string hostPath;
+			
+			// TODO: do mount of device to hostPath
+		
+			translated->attachToHostPath(hostPath, TRANSLATEDTYPE_NORMAL);
+		} else {					// can't attach atari drive
+			Debug::out("Can't attach device %s, because it's an Atari drive and no RAW device is enabled.", (char *) devName.c_str());
+		}
+	}
+
+	// if both TRANSLATED and RAW are enabled - attach non-atari as TRANSLATED, and atari as RAW
+	if(gotDevTypeRaw && gotDevTypeTranslated) {
+		if(isAtariDrive) {			// attach atari drive as RAW
+			scsi->attachToHostPath(devName, SOURCETYPE_DEVICE, SCSI_ACCESSTYPE_FULL);
+		} else {					// attach non-atari drive as TRANSLATED
+			std::string hostPath;
+			
+			// TODO: do mount of device to hostPath
+		
+			translated->attachToHostPath(hostPath, TRANSLATEDTYPE_NORMAL);
+		}
+	}
 }
 
-void CCoreThread::logToFile(WORD wval)
+void CCoreThread::onDevDetached(std::string devName)
 {
-    FILE *f = fopen(LOGFILE, "at");
-
-    if(!f) {
-        return;
-    }
-
-//    fprintf(f, "%04x\n", wval);
-    fprintf(f, "%d\n", wval);
-    fclose(f);
-}
-
-void CCoreThread::logToFile(int len, BYTE *bfr)
-{
-    FILE *f = fopen(LOGFILE, "at");
-
-    if(!f) {
-        return;
-    }
-
-    fprintf(f, "buffer -- %d bytes\n", len);
-
-    while(len > 0) {
-        for(int col=0; col<16; col++) {
-            if(len == 0) {
-                break;
-            }
-
-            fprintf(f, "%02x ", *bfr);
-
-            bfr++;
-            len--;
-        }
-        fprintf(f, "\n");
-    }
-
-    fclose(f);
+	// TODO: do detach logic
+	
+	
 }

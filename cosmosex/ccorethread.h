@@ -5,6 +5,7 @@
 #include "conspi.h"
 #include "utils.h"
 #include "devfinder.h"
+#include "devchangeshandler.h"
 
 #include "native/scsi.h"
 #include "native/datamedia.h"
@@ -18,7 +19,7 @@
 
 #include "isettingsuser.h"
 
-class CCoreThread: public ISettingsUser
+class CCoreThread: public ISettingsUser, public DevChangesHandler
 {
 public:
     CCoreThread();
@@ -26,8 +27,11 @@ public:
 
     void run(void);
     void sendHalfWord(void);
-    virtual void reloadSettings(void);      // from ISettingsUser
+    virtual void reloadSettings(void);      								// from ISettingsUser
 
+	virtual void onDevAttached(std::string devName, bool isAtariDrive);		// from DevChangesHandler
+	virtual void onDevDetached(std::string devName);						// from DevChangesHandler
+	
 private:
     bool shouldRun;
     bool running;
@@ -48,9 +52,12 @@ private:
 
     SettingsReloadProxy     settingsReloadProxy;
 
-    BYTE            acsiIDdevType[8];
+    BYTE            acsiIDevType[8];
     BYTE            enabledIDbits;
     bool            setEnabledIDbits;
+	
+	bool			gotDevTypeRaw;
+	bool			gotDevTypeTranslated;
 
     void createConnectionObject(void);
     void usbConnectionCheck(void);
@@ -62,10 +69,6 @@ private:
     void handleConfigStream(BYTE *cmd);
 
     int bcdToInt(int bcd);
-
-    void logToFile(char *str);
-    void logToFile(int len, BYTE *bfr);
-    void logToFile(WORD wval);
 };
 
 #endif // CCORETHREAD_H
