@@ -13,102 +13,34 @@
 | ------------------------------------------------------	
 	.text
 | ------------------------------------------------------
-|.equ PRG,		1
-|.equ FROMFILE,	1
-|.equ FAKEJSR,	1
-
 |	move.l	#0xfffffffe, a0
 |	move.l	#1, (a0)
 
-.ifdef PRG
-	| the following will not be needed in the real boot sector
-	| mshrink()
-	move.l	4(sp),a5				| address to basepage
-
-	| move the stack to end of our ram after mshrink()
-	move.l	a5,d0					| d0 = address of BP
-	add.l	#10000, d0				| d0 = end of our RAM
-	and.b	#0xf0,d0				| align stack
-	move.l	d0,sp					| new stackspace
-
-	| do the mshrink()
-	move.l	#10000, -(sp)			| memory size to keep 
-	move.l	a5,-(sp)				|
-	clr.w	-(sp)					|
-	move.w	#0x4a,-(sp)				|
-	trap	#1						|	
-	add.l	#12,sp					
-.endif	
-
-.ifdef FAKEJSR
-	move.l	#fakeSubRoutine, a0
-	jsr		(a0)
-	
-	clr.w	-(sp)	| terminate
-	trap	#1
-
-fakeSubRoutine:
-|	nop
-|	rts
-	
-.endif
-
-
 	movem.l	d1-d7/a0-a6,-(sp)	| save registers content
 
-.ifdef PRG
-	| the following will not be needed in the real boot sector
-	| go to supervisor mode
-	move.l #0, -(sp)
-	move.w #0x20,-(sp)
-	trap #1
-	addq.l #6,sp
-	
-	move.l	d0, pStack
-.endif
-					
- 
 | the real stuff starts here:
-
 	
-||||||||||||||||||||||	
-| this part does Malloc() and moving the supervisor stack there
-|	move.l	#10240, d1			| size of malloc, size of supervisor stack
-|	move.l	d1,-(sp)			| malloc 10 kB
-|	move.w	#0x48,-(sp)
-|	trap	#1
-|	addq.l	#6,sp
-|	
-|	lea		(tmpSsp,pc),a0		
-|	move.l	d0, (a0)+			| save malloc()ed space do tmpSsp
-|	add.l	d1, d0				| move to the end of stack
-|	and.b	#0xf0, d0			| align stack
-|	
-|	move.l	sp, (a0)			| store the original stack pointer
-|	move.l	d0, sp				| use it
-|||||||||||||||||||||||||
-	
-
-	| Pexec: create basepage and allocate RAM
-	moveq	#0, d1				| d1 = 0
-	
-	move.l	d1, -(sp)			| envstr  = 0
-	move.l	d1, -(sp)			| cmdline = 0
-	move.l	d1, -(sp)			| fname   = 0
-	move.w	#5, -(sp)			| mode    = PE_BASEPAGE
-	move.w	#0x4b, -(sp)		| Pexec()
+| this part does Malloc()
+	move.l	#60000, d1			| size of malloc - CE driver needs 55080 bytes in RAM now
+	move.l	d1,-(sp)			| malloc those bytes
+	move.w	#0x48,-(sp)
 	trap	#1
-	add.l	#16, sp
+	addq.l	#6,sp
 
-	cmp.l	d1, d0				| if Pexec failed (do <= 0), jump to end
-	ble		end_fail
+	tst.l	d0					| did malloc fail?
+	beq		end_fail			| malloc failed, jump to end
 
-	move.l	d0, a3				| A3 = store the original memory pointer, hoping that if will be an EVEN address
-	add.l	#(256 - 28), d0		| store the driver at this position after start of basepage
+	lea		(pRam,pc),a2		| load the malloc address storage pointer to A2
+	move.l	d0, (a2)			| store the original address from malloc to pRam
+	
+	add.l	#2, d0				| d0 += 2
+	andi.l	#0xfffffffe, d0		| d0 is now EVEN
+
+	move.l	d0, a3				| A3 = store the memory pointer where the driver will be loaded
 	move.l	d0, a1				| A1 will hold the current DMA transfer address, and it will move further by sector size
 	move.l	d0, a4				| A4 = this is hopefully EVEN address where the driver will be loaded
 
-.ifndef FROMFILE	
+| loading of the driver from ACSI
 	lea		(config,pc),a2		| load the config address to A2
 	move.b	2(a2), d2			| d2 holds ACSI ID 
 	lsl.b	#5, d2				| d2 = d2 << 5
@@ -117,9 +49,9 @@ fakeSubRoutine:
 	clr.l	d3
 	move.b	3(a2), d3			| d3 holds sector count we should transfer
 	sub.l	#1, d3				| d3--, because the dbra loop will be executed (d3 + 1) times
-	 
+	
 	move.l	#1, d1				| d1 holds the current sector number. Bootsector is 0, so starting from 1 to (sector count + 1)
-	 
+	
 readSectorsLoop:	 
 	lea		(acsiCmd,pc),a0		| load the address of ACSI command into a0
 	move.b	d2, (a0)			| cmd[0] = ACSI ID + SCSI READ 6 command
@@ -132,36 +64,6 @@ readSectorsLoop:
 	add.l	#512, a1			| a1 += 512
 	add.w	#1, d1				| current_sector++
 	dbra	d3, readSectorsLoop
-.else 
-	| if - for testing purposes - we should load it from file instead of ACSI device
-	
-	| fopen
-	move.w	#0,-(sp)
-	move.l	#fname, -(sp)
-	move.w	#0x3D,-(sp)
-	trap 	#1
-	addq.l	#8,sp
-	
-	move.l	d0, handle
-
-	| fread
-	move.l	a1, -(sp)			| buffer
-	move.l	#10000, -(sp)		| size
-	move.w	d0,-(sp)			| handle
-	move.w	#0x3F,-(sp)
-	trap	#1
-	add.l	#12,sp
-	
-	| fclose
-	move.l	#handle, a0	
-	move.l	(a0), d0
-	
-	move.w	d0,-(sp)			| handle
-	move.w	#0x3E,-(sp)
-	trap	#1
-	addq.l	#4,sp
-	
-.endif
 	
 | at this point the driver should be loaded at the location pointed by pDriver
 
@@ -169,36 +71,26 @@ readSectorsLoop:
 | first fill the correct into in the Base Page
 	move.l	a4, a0				| read the value stored at pDriver
 	add.l	#2, a0				| a0 now points to prgHead->tsize
-	
-	move.l	a3, a1				| get pBasePage to A1, a1 now points to pBasePage->lowtpa
-	
-	move.l	(a1),d0				| d0 = pBasePage->lowtpa
-	add.l	#256,d0				| d0 += 256
-	add.l	#8, a1				| a1 now points to pBasePage->tbase
-	move.l	d0, (a1)+			| basePage->tbase = basePage->lowtpa + 256;  and a1 points now to pBasePage->tlen
-	move.l	d0, d5				| d5 = basePage->tbase, save it for the fixup loop usage
-	
-	move.l	(a0), d1			| d1 = prgHead->tsize
-	move.l	(a0)+, (a1)+		| pBasePage->tlen = prgHead->tsize;  a0 points to prgHead->dsize and a1 points to pBasePage->dbase
-	
-	add.l	d1, d0				| d0 = basePage->tbase + prgHead->tsize
-	move.l	d0, (a1)+			| basePage->dbase = basePage->tbase + prgHead->tsize; a1 points to pBasePage->dlen
 
-	move.l	(a0), d1			| d1 = prgHead->dsize
-	move.l	(a0)+, (a1)+		| basePage->dlen = prgHead->dsize;  a0 points to prgHead->bsize and a1 points to pBasePage->bbase
-
-	add.l	d1, d0				| d0 = basePage->dbase + prgHead->dsize
-	move.l	d0, (a1)+			| basePage->bbase = basePage->dbase + prgHead->dsize; a1 points to pBasePage->blen
-	move.l	d0, a2				| a2 = basePage->bbase, save it for clearing BSS section
+	move.l	a4, d5
+	add.l	#0x1c, d5			| d5 = pointer to text segment, save it for the fixup loop usage
 	
-	move.l	(a0), d1			| d1 = prgHead->bsize
-	move.l	(a0)+, (a1)			| basePage->blen = prgHead->bsize;  a0 points to prgHead->ssize
-	move.l	d1, d6				| d6 = bsize, save it for clearing BSS section
+	move.l	(a0)+, d1			| d1 = prgHead->tsize, a0 moved to prgHead->dsize
+	move.l	(a0)+, d0			| d0 = prgHead->dsize, a0 moved to prgHead->bsize
+	add.l	d0, d1				| d1 = prgHead->tsize + prgHead->dsize
+	move.l	d1, d0				| d0 = tsize + dsize
+	add.l	d5, d0				| d0 = text segment pointer + tsize + dsize = pointer to bss
+	move.l	d0, a2				| a2 = pointer to bss, save it for clearing BSS section
+	move.l	(a0)+, d6			| d6 = prgHead->bsize, a0 moved to prgHead->ssize, save it for clearing BSS section
+	move.l	(a0), d0			| d0 = prgHead->ssize
+	add.l	d0, d1				| d1 = prgHead->tsize + prgHead->dsize + prgHead->ssize
+	
+	move.l	a4, d0				| d0 points to the start of driver file
+	add.l	#0x1c, d0			| d0 now points to start of text
+	add.l	d1, d0				| d0 now points to fixup offset (start + text offset + prgHead->tsize + prgHead->dsize + prgHead->ssize) == BYTE *fixups
 	
 |--------------------------------
 | now do the fixup for the loaded text position	
-	move.l	(a0), d2			| d2 = prgHead->ssize
-	add.l	d2, d0				| d0 = basePage->bbase + prgHead->ssize;  == BYTE *fixups
 
 	move.l	d0, a1								
 	move.l	(a1)+, d1			| read fixupOffset, a1 now points to fixups array
@@ -245,31 +137,17 @@ memsetLoop:
 skipMemsetBss:
 	
 	
-| Finally execute the code using Pexec()
-	move.l	a3, d0				| d0 = pointer to base page which was created by the 1st Pexec() call
+| Finally execute the code...
+	move.l	#0, -(sp)			| this will be 4(sp), and 0 will mean that we're running from boot sector
+	move.l	#0, -(sp)			| this is here just to create the offset for the previous line
 
-	moveq	#0, d1				| d1 = 0
+	move.l	a3, d0				| d0 = pointer to start of driver file, memory received from malloc()
+	add.l	#0x100, d0			| d0 += 256, points to start of text
+	move.l	d0, a0
 	
-	move.l	d1, -(sp)			| envstr  = 0
-	move.l	d0, -(sp)			| cmdline = pointer to base page which should be executed
-	move.l	d1, -(sp)			| fname   = 0
-	move.w	#4, -(sp)			| mode: PE_GO -- just execute the code
-	move.w	#0x4b, -(sp)		| Pexec()
-	trap	#1
-	add.l	#16, sp
-
-	| now in this point the program should be executed, and the cpu will return here after finishing the program
-
-||||||||||||||||||||
-| this part does Mfree() and returning of original SP address	
-|	lea		(tmpSsp,pc),a2		
-|	move.l	(a2)+, -(sp)		| get the address returned by malloc()
-|	move.w	#0x49,-(sp)
-|	trap	#1
-|	addq.l	#6,sp
-|	
-|	move.l	(a2), sp			| restore original stack
-|||||||||||||||
+	jmp		(a0)				| jump to the driver code... this should install the code
+	
+	add.l	#8, sp				| fix the SP after those 2 move.l #0, -(sp) up there
 
 	bra		end_good			| now finish with a good result
 |--------------------------------------------------------------------------------------------------------------------	
@@ -277,43 +155,23 @@ skipMemsetBss:
 	
 | jump here to free the memory and finish on fail	
 free_end_fail:
-|	move.l	a3, d0			
 
-| TODO: should we Mfree the base page allocated by Pexec(), or will that be handled by TOS?	
+	lea		(pRam,pc),a2		| load the malloc address storage pointer to A2
+	move.l	(a2), d0			| get the original address from malloc to pRam
+
+	move.l	d0, -(sp)
+	move.w	#0x49, -(sp)		| Mfree() on the memory from Malloc() 
+	trap	#1
+	addq	#6, sp
 
 | jump here to finish on fail without freeing the memory
 end_fail:
 end_good:	
 
-.ifdef PRG
-	| the following will not be needed in the real boot sector
-	| return from supervisor mode
-	move.l #pStack, a0
-	
-	move.l (a0), -(sp)
-	move.w #0x20,-(sp)
-	trap #1
-	addq.l #6,sp
-.endif
-				
 	movem.l	(sp)+, d1-d7/a0-a6	| restore register content
-	
-
-.ifdef FAKEJSR
-	rts
-.endif
-
-	
-.ifdef PRG			| end of code when run as normal app: terminate
-	clr.w	-(sp)	| terminate
-	trap	#1
-.else				| end of code when run from boot sector: rts
-	rts				| return to calling code
-.endif
+	rts							| return to calling code
 	
 |--------------------------------------------------------------------------------------------------------------------	
-.ifndef FROMFILE
-
 | subroutine used to load single sector to memory from ACSI device
 dma_read:
 	lea		dskctl,	A5		| DMA data register	
@@ -398,24 +256,12 @@ gotINT:
 	moveq	#0, d0			| d0 = success!
 	rts
 
-.endif
 | ------------------------------------------------------
 	.data
 | This is the configuration which will be replaced before sending the sector to ST. 
 | The format is: 'XX'  AcsiId  SectorCount 
 config:		dc.l			0x58580020			
+pRam:		dc.l			0
 
-tmpSsp:		dc.l			0
-			dc.l			0
-			
 acsiCmd:	dc.b			0x08, 0x00, 0x00, 0x00, 0x01					
-
-.ifdef PRG
-pStack:		dc.l			0	
-.endif
-
-.ifdef FROMFILE	
-fname:		.ascii			"M:\\CEDD\\CEDD.PRG"
-handle:		dc.l			0
-.endif
 | ------------------------------------------------------	
