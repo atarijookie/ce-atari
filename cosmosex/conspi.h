@@ -13,10 +13,12 @@ public:
     CConSpi();
     ~CConSpi();
 
+	bool waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *inBuf);
     void txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBufer);
 
-    void receiveAndApplyTxRxLimits(int whichSpiCs);
-    void applyNoTxRxLimis(int whichSpiCs);
+	void applyTxRxLimits(int whichSpiCs, BYTE *inBuff);
+	void applyNoTxRxLimis(int whichSpiCs);
+		
     void setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen);
     WORD getRemainingLength(void);
 

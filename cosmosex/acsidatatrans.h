@@ -10,6 +10,8 @@
 #define ATN_READ_MORE_DATA				0x03
 #define ATN_WRITE_MORE_DATA				0x04
 #define ATN_GET_STATUS					0x05
+#define ATN_ANY							0xffff								// this is used only on host to wait for any ATN
+
 
 // commands sent from host to device
 #define CMD_ACSI_CONFIG					0x10
@@ -61,8 +63,6 @@ private:
     BYTE    txBuffer[520];
     BYTE    rxBuffer[520];
 
-    bool waitForATN(BYTE atnCode, DWORD timeoutMs);
-	DWORD getTickCount(void);
     void sendStatusAfterWrite(void);
 };
 

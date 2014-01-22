@@ -8,6 +8,7 @@ class Utils {
 public:
 	static DWORD getCurrentMs(void);
 	static DWORD getEndTime(DWORD offsetFromNow);
+	static void  sleepMs(DWORD ms);
 	
 	static void attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari);
 	static void fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *ptm);

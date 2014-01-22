@@ -57,15 +57,17 @@ CCoreThread::~CCoreThread()
 
 void CCoreThread::run(void)
 {
-    BYTE inBuff[4], outBuf[4];
+    BYTE inBuff[8], outBuf[8];
 	
-	memset(outBuf, 0, 4);
-    memset(inBuff, 0, 4);
+	memset(outBuf, 0, 8);
+    memset(inBuff, 0, 8);
 	
     loadSettings();
 
-	DWORD nextDevFindTime = Utils::getEndTime(DEV_CHECK_TIME_MS);		// create a time when the devices should be checked
+	DWORD nextDevFindTime = Utils::getCurrentMs();	// create a time when the devices should be checked - and that time is now
 
+	bool res;
+	
     while(1) {
 		bool gotAtn = false;						// no ATN received yet?
 		
@@ -75,11 +77,11 @@ void CCoreThread::run(void)
 			nextDevFindTime = Utils::getEndTime(DEV_CHECK_TIME_MS);		// update the time when devices should be checked
 		}
 
-		if( spi_atn(SPI_ATN_HANS) ) {				// HANS is signaling attention?
-			gotAtn = false;							// we've some ATN
+		res = conSpi->waitForATN(SPI_CS_HANS, ATN_ANY, 0, inBuff);		// check for any ATN code waiting from Hans
 
-			conSpi->txRx(SPI_CS_HANS, 4, inBuff, outBuf);	// receive 2 WORDs - 0 and ATN code
-			
+		if(res) {									// HANS is signaling attention?
+			gotAtn = true;							// we've some ATN
+
 			switch(inBuff[3]) {
 			case 0:                 				// this is valid, just empty data, skip this
 				break;
@@ -98,14 +100,15 @@ void CCoreThread::run(void)
 			}
 		}
 		
-		if( spi_atn(SPI_ATN_FRANZ) ) {				// FRANZ is signaling attention?
-			gotAtn = false;							// we've some ATN
+		res = conSpi->waitForATN(SPI_CS_FRANZ, ATN_ANY, 0, inBuff);		// check for any ATN code waiting from Franz
+		if(res) {									// FRANZ is signaling attention?
+			gotAtn = true;							// we've some ATN
 
 			
 		}
 		
 		if(!gotAtn) {								// no ATN was processed?
-			usleep(1000);							// wait 1 ms...
+			Utils::sleepMs(1);						// wait 1 ms...
 		}		
     }
 }

@@ -1,4 +1,5 @@
 #include <time.h>
+#include <unistd.h>
 
 #include "utils.h"
 #include "translated/translatedhelper.h"
@@ -147,5 +148,12 @@ void Utils::splitFilenameFromPath(std::string &pathAndFile, std::string &path, s
         path    = pathAndFile.substr(0, sepPos + 1);            // path is before separator
         file    = pathAndFile.substr(sepPos + 1);               // file is after separator
     }
+}
+
+void Utils::sleepMs(DWORD ms)
+{
+	DWORD us = ms * 1000;
+	
+	usleep(us);
 }
 

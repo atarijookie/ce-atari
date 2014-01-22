@@ -4,6 +4,7 @@
 #include <time.h>
 
 #include "debug.h"
+#include "utils.h"
 #include "gpio.h"
 #include "acsidatatrans.h"
 #include "native/scsi_defs.h"
@@ -119,13 +120,14 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 	com->txRx(SPI_CS_HANS, COMMAND_SIZE, devCommand, recvBuffer);        // transmit this command
 
     memset(txBuffer, 0, 520);                               // nothing to transmit, really...
+	BYTE inBuf[8];
 
     while(cnt > 0) {
         // request maximum 512 bytes from host
         DWORD subCount = (cnt > 512) ? 512 : cnt;
         cnt -= subCount;
 
-        bool res = waitForATN(ATN_WRITE_MORE_DATA, 1000);   // wait for ATN_WRITE_MORE_DATA
+		bool res = com->waitForATN(SPI_CS_HANS, ATN_WRITE_MORE_DATA, 1000, inBuf);	// wait for ATN_WRITE_MORE_DATA
 
         if(!res) {                                          // this didn't come? fuck!
             return false;
@@ -193,9 +195,11 @@ void AcsiDataTrans::sendDataAndStatus(void)
 
     txBuffer[0] = 0;
     txBuffer[1] = CMD_DATA_MARKER;                          // mark the start of data
-
+	
+	BYTE inBuf[8];
+	
     while(count > 0) {                                      // while there's something to send
-        bool res = waitForATN(ATN_READ_MORE_DATA, 1000);    // wait for ATN_READ_MORE_DATA
+		bool res = com->waitForATN(SPI_CS_HANS, ATN_READ_MORE_DATA, 1000, inBuf);	// wait for ATN_READ_MORE_DATA
 
         if(!res) {                                          // this didn't come? fuck!
             return;
@@ -213,7 +217,8 @@ void AcsiDataTrans::sendDataAndStatus(void)
 
 void AcsiDataTrans::sendStatusAfterWrite(void)
 {
-    bool res = waitForATN(ATN_GET_STATUS, 1000);
+	BYTE inBuf[8];
+	bool res = com->waitForATN(SPI_CS_HANS, ATN_GET_STATUS, 1000, inBuf);	// wait for ATN_GET_STATUS
 
     if(!res) {
         return;
@@ -226,46 +231,3 @@ void AcsiDataTrans::sendStatusAfterWrite(void)
     com->txRx(SPI_CS_HANS, 16 - 4, txBuffer, rxBuffer);                  // trasmit the status (10 bytes total, but 4 already received)
 }
 
-bool AcsiDataTrans::waitForATN(BYTE atnCode, DWORD timeoutMs)
-{
-    DWORD startTick = getTickCount();
-    BYTE inBuf[4], outBuf[4];
-	
-	memset(outBuf, 0, 4);
-
-    // wait for specific atn code, but maximum maxLoopCount times
-    while(1) {
-		if((getTickCount() - startTick) >= timeoutMs) {		// if it takes more than allowed timeout, fail
-			Debug::out("waitForATN %02x fail!", atnCode);
-			return false;
-		}
-		
-		if( !spi_atn(SPI_ATN_HANS) ) {						// if Hans doesn't signal ATN yet, try later
-			usleep(1000);									// wait 1 ms
-			continue;
-		}
-		
-        com->txRx(SPI_CS_HANS, 4, inBuf, outBuf);	// receive 2 WORDs - 0 and ATN code
-
-        if(inBuf[3] == atnCode) {                      // ATN code found?
-            Debug::out("waitForATN %02x good.", atnCode);
-            return true;
-        }
-    }
-
-	// this shouldn't happen
-    return false;
-}
-
-DWORD AcsiDataTrans::getTickCount(void)
-{
-	timespec now;
-	
-	clock_gettime(CLOCK_MONOTONIC, &now);
-	
-	DWORD tics;
-	tics  = now.tv_sec * 1000;			// convert seconds to milliseconds
-	tics += now.tv_nsec / 1000000;		// convert nano to milliseconds (10e-9 -> 10e-3)
-	
-	return tics;
-}
