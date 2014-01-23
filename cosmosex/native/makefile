@@ -1,4 +1,4 @@
-all:	datamedia.o nomedia.o scsi.o testmedia.o
+all:	imagefilemedia.o devicemedia.o nomedia.o scsi.o testmedia.o
 			 
 %.o: %.cpp 
 	g++ -c $<

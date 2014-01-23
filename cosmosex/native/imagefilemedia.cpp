@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "datamedia.h"
+#include "imagefilemedia.h"
 #include "../debug.h"
 
-DataMedia::DataMedia()
+ImageFileMedia::ImageFileMedia()
 {
     BCapacity       = 0;
     SCapacity       = 0;
@@ -12,12 +12,12 @@ DataMedia::DataMedia()
     image           = NULL;
 }
 
-DataMedia::~DataMedia()
+ImageFileMedia::~ImageFileMedia()
 {
     iclose();
 }
 
-bool DataMedia::iopen(char *path, bool createIfNotExists)
+bool ImageFileMedia::iopen(char *path, bool createIfNotExists)
 {
     bool imageWasCreated = false;
     mediaHasChanged = false;
@@ -30,7 +30,7 @@ bool DataMedia::iopen(char *path, bool createIfNotExists)
     }
 
     if(image == NULL) {
-        Debug::out("DataMedia - failed to open %s", path);
+        Debug::out("ImageFileMedia - failed to open %s", path);
         return false;
     }
 
@@ -53,12 +53,12 @@ bool DataMedia::iopen(char *path, bool createIfNotExists)
 
     mediaHasChanged = false;
 
-    Debug::out("DataMedia - open succeeded, capacity: %d, was created: %d", BCapacity, (int) imageWasCreated);
+    Debug::out("ImageFileMedia - open succeeded, capacity: %d, was created: %d", BCapacity, (int) imageWasCreated);
 
     return true;
 }
 
-void DataMedia::iclose(void)
+void ImageFileMedia::iclose(void)
 {
     if(image) {
         fclose(image);
@@ -70,7 +70,7 @@ void DataMedia::iclose(void)
     image           = NULL;
 }
 
-bool DataMedia::isInit(void)
+bool ImageFileMedia::isInit(void)
 {
     if(image) {
         return true;
@@ -79,23 +79,23 @@ bool DataMedia::isInit(void)
     return false;
 }
 
-bool DataMedia::mediaChanged(void)
+bool ImageFileMedia::mediaChanged(void)
 {
     return mediaHasChanged;
 }
 
-void DataMedia::setMediaChanged(bool changed)
+void ImageFileMedia::setMediaChanged(bool changed)
 {
     mediaHasChanged = changed;
 }
 
-void DataMedia::getCapacity(DWORD &bytes, DWORD &sectors)
+void ImageFileMedia::getCapacity(DWORD &bytes, DWORD &sectors)
 {
     bytes   = BCapacity;
     sectors = SCapacity;
 }
 
-bool DataMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool ImageFileMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
         return false;
@@ -118,7 +118,7 @@ bool DataMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
     return true;
 }
 
-bool DataMedia::writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool ImageFileMedia::writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
         return false;

@@ -7,22 +7,22 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "devmedia.h"
+#include "devicemedia.h"
 #include "../debug.h"
 
-DevMedia::DevMedia()
+DeviceMedia::DeviceMedia()
 {
     BCapacity       = 0;
     SCapacity       = 0;
     mediaHasChanged = 0;
 }
 
-DevMedia::~DevMedia()
+DeviceMedia::~DeviceMedia()
 {
     iclose();
 }
 
-bool DevMedia::iopen(char *path, bool createIfNotExists)
+bool DeviceMedia::iopen(char *path, bool createIfNotExists)
 {
     mediaHasChanged = false;
 
@@ -49,12 +49,12 @@ bool DevMedia::iopen(char *path, bool createIfNotExists)
 
     mediaHasChanged = false;
 
-    Debug::out("DevMedia - open succeeded, capacity: %d bytes", BCapacity);
+    Debug::out("DeviceMedia - open succeeded, capacity: %d bytes", BCapacity);
 
     return true;
 }
 
-void DevMedia::iclose(void)
+void DeviceMedia::iclose(void)
 {
     if(fdes > 0) {
        	close(fdes);															// close device
@@ -65,7 +65,7 @@ void DevMedia::iclose(void)
     mediaHasChanged = 0;
 }
 
-bool DevMedia::isInit(void)
+bool DeviceMedia::isInit(void)
 {
     if(fdes > 0) {
         return true;
@@ -74,23 +74,23 @@ bool DevMedia::isInit(void)
     return false;
 }
 
-bool DevMedia::mediaChanged(void)
+bool DeviceMedia::mediaChanged(void)
 {
     return mediaHasChanged;
 }
 
-void DevMedia::setMediaChanged(bool changed)
+void DeviceMedia::setMediaChanged(bool changed)
 {
     mediaHasChanged = changed;
 }
 
-void DevMedia::getCapacity(DWORD &bytes, DWORD &sectors)
+void DeviceMedia::getCapacity(DWORD &bytes, DWORD &sectors)
 {
     bytes   = BCapacity;
     sectors = SCapacity;
 }
 
-bool DevMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool DeviceMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
         return false;
@@ -113,7 +113,7 @@ bool DevMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
     return true;
 }
 
-bool DevMedia::writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool DeviceMedia::writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
         return false;

@@ -4,10 +4,9 @@
 #include <string>
 
 #include "../acsidatatrans.h"
-#include "datamedia.h"
+#include "imedia.h"
 #include "nomedia.h"
 #include "testmedia.h"
-#include "imedia.h"
 
 #include "../datatypes.h"
 #include "../isettingsuser.h"

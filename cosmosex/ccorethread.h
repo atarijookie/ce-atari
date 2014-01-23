@@ -8,8 +8,6 @@
 #include "devchangeshandler.h"
 
 #include "native/scsi.h"
-#include "native/datamedia.h"
-#include "native/testmedia.h"
 #include "acsidatatrans.h"
 
 #include "config/configstream.h"
@@ -45,8 +43,6 @@ private:
 
     TranslatedDisk  *translated;
     ConfigStream    *confStream;
-
-    TestMedia       testMedia;
 
     DevFinder		devFinder;
 

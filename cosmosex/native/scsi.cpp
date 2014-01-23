@@ -6,7 +6,8 @@
 #include "../global.h"
 #include "../settings.h"
 #include "../debug.h"
-#include "devmedia.h"
+#include "devicemedia.h"
+#include "imagefilemedia.h"
 
 #define BUFFER_SIZE             (1024*1024)
 #define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
@@ -94,7 +95,7 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
 
     case SOURCETYPE_IMAGE:
     case SOURCETYPE_IMAGE_TRANSLATEDBOOT:
-        dm  = new DataMedia();
+        dm  = new ImageFileMedia();
         res = dm->iopen((char *) hostPath.c_str(), false);                   // try to open the image
 
         if(res) {                                                           // image opened?
@@ -115,7 +116,7 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
         break;
 
     case SOURCETYPE_DEVICE:
-        dm  = new DevMedia();
+        dm  = new DeviceMedia();
         res = dm->iopen((char *) hostPath.c_str(), false);                   // try to open the device
 
 		if(res) {

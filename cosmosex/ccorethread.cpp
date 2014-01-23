@@ -8,11 +8,6 @@
 #include "settings.h"
 #include "gpio.h"
 
-#define MIN(x, y) (((x) < (y)) ? (x) : (y))
-
-#define LOGFILE     "H:/acsilog.txt"
-#define MEDIAFILE   "C:/datamedia.img"
-
 #define DEV_CHECK_TIME_MS	3000
 
 CCoreThread::CCoreThread()

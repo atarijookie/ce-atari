@@ -1,15 +1,15 @@
-#ifndef _DEVMEDIA_H
-#define _DEVMEDIA_H
+#ifndef DATAMEDIA_H
+#define DATAMEDIA_H
 
 #include <stdio.h>
 #include "../datatypes.h"
 #include "imedia.h"
 
-class DevMedia: public IMedia
+class ImageFileMedia: public IMedia
 {
 public:
-    DevMedia();
-    ~DevMedia();
+    ImageFileMedia();
+    ~ImageFileMedia();
 
     virtual bool iopen(char *path, bool createIfNotExists);
     virtual void iclose(void);
@@ -29,7 +29,7 @@ private:
 
     bool    mediaHasChanged;
 
-    int		fdes;				// file descriptor for the opened device
+    FILE *image;
 };
 
 #endif // DATAMEDIA_H

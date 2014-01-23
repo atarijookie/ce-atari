@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "filenameshortener.h"
+#include "../utils.h"
 
 FilenameShortener::FilenameShortener()
 {
@@ -88,8 +89,6 @@ bool FilenameShortener::longToShortFileName(char *longFileName, char *shortFileN
 
     return true;
 }
-
-#define MIN(A, B)       ((A < B) ? A : B)
 
 void FilenameShortener::mergeFilenameAndExtension(char *shortFn, char *shortExt, bool extendWithSpaces, char *merged)
 {
