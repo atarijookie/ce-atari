@@ -7,8 +7,8 @@
 class IMedia
 {
 public:
-    virtual bool open(char *path, bool createIfNotExists) = 0;
-    virtual void close(void) = 0;
+    virtual bool iopen(char *path, bool createIfNotExists) = 0;
+    virtual void iclose(void) = 0;
 
     virtual bool isInit(void) = 0;
     virtual bool mediaChanged(void) = 0;

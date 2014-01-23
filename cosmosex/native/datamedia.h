@@ -11,8 +11,8 @@ public:
     DataMedia();
     ~DataMedia();
 
-    virtual bool open(char *path, bool createIfNotExists);
-    virtual void close(void);
+    virtual bool iopen(char *path, bool createIfNotExists);
+    virtual void iclose(void);
 
     virtual bool isInit(void);
     virtual bool mediaChanged(void);

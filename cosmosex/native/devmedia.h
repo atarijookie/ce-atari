@@ -1,15 +1,15 @@
-#ifndef NOMEDIA_H
-#define NOMEDIA_H
+#ifndef _DEVMEDIA_H
+#define _DEVMEDIA_H
 
 #include <stdio.h>
 #include "../datatypes.h"
 #include "imedia.h"
 
-class NoMedia: public IMedia
+class DevMedia: public IMedia
 {
 public:
-    NoMedia();
-    ~NoMedia();
+    DevMedia();
+    ~DevMedia();
 
     virtual bool iopen(char *path, bool createIfNotExists);
     virtual void iclose(void);
@@ -21,6 +21,15 @@ public:
 
     virtual bool readSectors(DWORD sectorNo, DWORD count, BYTE *bfr);
     virtual bool writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr);
+
+private:
+
+    DWORD	BCapacity;			// device capacity in bytes
+    DWORD	SCapacity;			// device capacity in sectors
+
+    bool    mediaHasChanged;
+
+    int		fdes;				// file descriptor for the opened device
 };
 
-#endif // NOMEDIA_H
+#endif // DATAMEDIA_H

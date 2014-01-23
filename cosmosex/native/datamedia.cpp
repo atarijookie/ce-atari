@@ -14,10 +14,10 @@ DataMedia::DataMedia()
 
 DataMedia::~DataMedia()
 {
-    close();
+    iclose();
 }
 
-bool DataMedia::open(char *path, bool createIfNotExists)
+bool DataMedia::iopen(char *path, bool createIfNotExists)
 {
     bool imageWasCreated = false;
     mediaHasChanged = false;
@@ -58,7 +58,7 @@ bool DataMedia::open(char *path, bool createIfNotExists)
     return true;
 }
 
-void DataMedia::close(void)
+void DataMedia::iclose(void)
 {
     if(image) {
         fclose(image);

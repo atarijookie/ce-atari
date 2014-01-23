@@ -6,24 +6,27 @@
 #include "../global.h"
 #include "../settings.h"
 #include "../debug.h"
+#include "devmedia.h"
 
 #define BUFFER_SIZE             (1024*1024)
 #define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
 
 Scsi::Scsi(void)
 {
+	int i;
+	
     dataTrans = 0;
     strncpy((char *) inquiryName, "CosmosEx  ", 10);
 
     dataBuffer  = new BYTE[BUFFER_SIZE];
     dataBuffer2 = new BYTE[BUFFER_SIZE];
 
-    for(int i=0; i<8; i++) {
+    for(i=0; i<8; i++) {
         devInfo[i].attachedMediaIndex   = -1;
         devInfo[i].accessType           = SCSI_ACCESSTYPE_NO_DATA;
     }
 
-    for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {
+    for(i=0; i<MAX_ATTACHED_MEDIA; i++) {
         initializeAttachedMediaVars(i);
     }
 
@@ -34,6 +37,10 @@ Scsi::~Scsi()
 {
     delete []dataBuffer;
     delete []dataBuffer2;
+	
+	for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {						// detach all attached media
+		dettachByIndex(i);
+	}
 }
 
 void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
@@ -44,7 +51,7 @@ void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
 bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int accessType)
 {
     bool res;
-    DataMedia *dm;
+    IMedia *dm;
 
     if(hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT) {         // if we're trying to attach TRANSLATED boot image
         dettachBySourceType(SOURCETYPE_IMAGE_TRANSLATEDBOOT);       // first remove it, if we have it
@@ -88,22 +95,40 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
     case SOURCETYPE_IMAGE:
     case SOURCETYPE_IMAGE_TRANSLATEDBOOT:
         dm  = new DataMedia();
-        res = dm->open((char *) hostPath.c_str(), false);                   // try to open the image
+        res = dm->iopen((char *) hostPath.c_str(), false);                   // try to open the image
 
         if(res) {                                                           // image opened?
             attachedMedia[index].hostPath       = hostPath;
             attachedMedia[index].hostSourceType = hostSourceType;
             attachedMedia[index].dataMedia      = dm;
-            attachedMedia[index].accessType     = SCSI_ACCESSTYPE_NO_DATA;
+			
+			if(hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT) {				// for normal images - full access
+				attachedMedia[index].accessType	= SCSI_ACCESSTYPE_FULL;
+			} else {															// for translated boot image - read only
+				attachedMedia[index].accessType	= SCSI_ACCESSTYPE_READ_ONLY;
+			}
         } else {                                                            // failed to open image?
             Debug::out("Scsi::attachToHostPath - failed to open image %s! Not attaching.", hostPath.c_str());
+			delete dm;
             return false;
         }
         break;
 
     case SOURCETYPE_DEVICE:
-        Debug::out("Scsi::attachToHostPath - SOURCETYPE_DEVICE not supported yet, not attaching.");
-        return false;
+        dm  = new DevMedia();
+        res = dm->iopen((char *) hostPath.c_str(), false);                   // try to open the device
+
+		if(res) {
+			attachedMedia[index].hostPath       = hostPath;
+			attachedMedia[index].hostSourceType = hostSourceType;
+			attachedMedia[index].dataMedia      = dm;
+			attachedMedia[index].accessType     = SCSI_ACCESSTYPE_FULL;
+		} else {
+            Debug::out("Scsi::attachToHostPath - failed to open device %s! Not attaching.", hostPath.c_str());
+			delete dm;
+            return false;
+		}
+
         break;
     }
 
@@ -156,17 +181,19 @@ bool Scsi::attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessTyp
 
 void Scsi::detachMediaFromACSIidByIndex(int index)
 {
-    if(index < 0 || index >= 8) {                       // out of index?
+    if(index < 0 || index >= 8) {                       			// out of index?
         return;
     }
 
-    if(devInfo[index].attachedMediaIndex == -1) {       // nothing attached?
+    if(devInfo[index].attachedMediaIndex == -1) {       			// nothing attached?
         return;
     }
 
-    attachedMedia[ devInfo[index].attachedMediaIndex ].devInfoIndex = -1;   // set not attached in attached media
+	int attMediaInd = devInfo[index].attachedMediaIndex;
+    attachedMedia[ attMediaInd ].devInfoIndex = -1;   				// set not attached in attached media
+	delete attachedMedia[ attMediaInd ].dataMedia;					// delete the data source access object
 
-    devInfo[index].attachedMediaIndex   = -1;                               // set not attached in dev info
+    devInfo[index].attachedMediaIndex   = -1;                       // set not attached in dev info
     devInfo[index].accessType           = SCSI_ACCESSTYPE_NO_DATA;
 }
 
@@ -215,7 +242,7 @@ void Scsi::dettachByIndex(int index)
     }
 
     if(attachedMedia[index].hostSourceType != SOURCETYPE_NONE) {            // if it's not NO source
-        attachedMedia[index].dataMedia->close();                            // close it, delete it
+        attachedMedia[index].dataMedia->iclose();                           // close it, delete it
         delete attachedMedia[index].dataMedia;
     }
 

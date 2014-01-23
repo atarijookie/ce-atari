@@ -11,15 +11,15 @@ TestMedia::TestMedia()
 
 TestMedia::~TestMedia()
 {
-    close();
+    iclose();
 }
 
-bool TestMedia::open(char *path, bool createIfNotExists)
+bool TestMedia::iopen(char *path, bool createIfNotExists)
 {
     return true;
 }
 
-void TestMedia::close(void)
+void TestMedia::iclose(void)
 {
 }
 
