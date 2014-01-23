@@ -66,13 +66,15 @@ void DevFinder::lookForDevChanges(void)
 		std::string pathAndFile = devBuf;
 		std::string path, file;
 		
-		Utils::splitFilenameFromPath(pathAndFile, path, file);				// get only file name, skip the path
+		Utils::splitFilenameFromPath(pathAndFile, path, file);		// get only file name, skip the path (which now is something like '../../')
 		
 		if(file.find("mmcblk") != std::string::npos) {				// and if it's SD card (the one from which RPi boots), skip it
 			continue;
 		}
 		
 		cutBeforeFirstNumber(file);									// cut before the 1st number (e.g. sda1 -> sda)
+		file = "/dev/" + file;										// create full path - /dev/sda
+		
 		processFoundDev(file);										// and do something with that file
     }
 
@@ -125,6 +127,7 @@ void DevFinder::getDevPartitions(std::string devName, std::list<std::string> &pa
 		std::string path, file;
 		
 		Utils::splitFilenameFromPath(pathAndFile, path, file);		// get only file name, skip the path
+		file = "/dev/" + file;										// create full path - /dev/sda
 		
 		if(file.length() <= devName.length()) {						// if what we've found is shorter or equaly long as what we are looking for, skip it
 			continue;

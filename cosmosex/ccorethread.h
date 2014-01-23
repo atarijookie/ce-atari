@@ -1,6 +1,8 @@
 #ifndef CCORETHREAD_H
 #define CCORETHREAD_H
 
+#include <map>
+
 #include "global.h"
 #include "conspi.h"
 #include "utils.h"
@@ -36,6 +38,8 @@ private:
 
     bool sendSingleHalfWord;
 
+	std::multimap<std::string, std::string> mapDeviceToHostPaths;
+	
     CConSpi         *conSpi;
 
     Scsi            *scsi;
@@ -65,6 +69,8 @@ private:
     void handleConfigStream(BYTE *cmd);
 
     int bcdToInt(int bcd);
+	
+	void attachDevAsTranslated(std::string devName);
 };
 
 #endif // CCORETHREAD_H

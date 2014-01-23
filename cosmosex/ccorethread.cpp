@@ -1,5 +1,9 @@
 #include <unistd.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <errno.h>
 
 #include "global.h"
 #include "debug.h"
@@ -31,8 +35,6 @@ CCoreThread::CCoreThread()
 
     translated = new TranslatedDisk();
     translated->setAcsiDataTrans(dataTrans);
-
-//    translated->attachToHostPath("H:\\dom", TRANSLATEDTYPE_NORMAL);
 
     confStream = new ConfigStream();
     confStream->setAcsiDataTrans(dataTrans);
@@ -257,11 +259,7 @@ void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 	// if have TRANSLATED enabled, but not RAW - can't attach atari drives, but do attach non-atari drives as TRANSLATED
 	if(!gotDevTypeRaw && gotDevTypeTranslated) {
 		if(!isAtariDrive) {			// attach non-atari drive as TRANSLATED	
-			std::string hostPath;
-			
-			// TODO: do mount of device to hostPath
-		
-			translated->attachToHostPath(hostPath, TRANSLATEDTYPE_NORMAL);
+			attachDevAsTranslated(devName);
 		} else {					// can't attach atari drive
 			Debug::out("Can't attach device %s, because it's an Atari drive and no RAW device is enabled.", (char *) devName.c_str());
 		}
@@ -272,18 +270,83 @@ void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 		if(isAtariDrive) {			// attach atari drive as RAW
 			scsi->attachToHostPath(devName, SOURCETYPE_DEVICE, SCSI_ACCESSTYPE_FULL);
 		} else {					// attach non-atari drive as TRANSLATED
-			std::string hostPath;
-			
-			// TODO: do mount of device to hostPath
-		
-			translated->attachToHostPath(hostPath, TRANSLATEDTYPE_NORMAL);
+			attachDevAsTranslated(devName);
 		}
+	}
+	
+	// if no device type is enabled
+	if(!gotDevTypeRaw && !gotDevTypeTranslated) {
+		Debug::out("Can't attach device %s, because no device type (RAW or TRANSLATED) is enabled on ACSI bus!", (char *) devName.c_str());
 	}
 }
 
 void CCoreThread::onDevDetached(std::string devName)
 {
-	// TODO: do detach logic
+	// try to detach the device - works if was attached as RAW, does nothing otherwise
+	scsi->dettachFromHostPath(devName);
 	
+	// and also try to detach the device from translated disk
+	std::pair <std::multimap<std::string, std::string>::iterator, std::multimap<std::string, std::string>::iterator> ret;
+	std::multimap<std::string, std::string>::iterator it;
 	
+	ret = mapDeviceToHostPaths.equal_range(devName);				// find a range of host paths which are mapped to partitions found on this device
+	
+	for (it = ret.first; it != ret.second; ++it) {					// now go through the list of device - host_path pairs and unmount them 
+		std::string hostPath = it->second;							// retrieve just the host path
+		
+		translated->detachFromHostPath(hostPath);					// now try to detach this from translated drives
+	}
+	
+	mapDeviceToHostPaths.erase(ret.first, ret.second);				// and delete the whole device items from this multimap
 }
+
+void CCoreThread::attachDevAsTranslated(std::string devName)
+{
+	bool res;
+	std::list<std::string>				partitions;
+	std::list<std::string>::iterator	it;
+	
+	if(!gotDevTypeTranslated) {													// don't have any translated device on acsi bus, don't attach
+		return;
+	}
+	
+	devFinder.getDevPartitions(devName, partitions);							// get list of partitions for that device (sda -> sda1, sda2)
+	
+	for (it = partitions.begin(); it != partitions.end(); ++it) {				// go through those partitions
+		std::string partitionDevice;
+		std::string hostPath;
+		std::string devPath, justDevName;
+		
+		partitionDevice = *it;													// get the current device, which represents single partition (e.g. sda1)
+		
+		Utils::splitFilenameFromPath(partitionDevice, devPath, justDevName);	// split path to path and device name (e.g. /dev/sda1 -> /dev + sda1)
+		hostPath = "/mnt/" + justDevName;										// create host path (e.g. /mnt/sda1)
+		
+		int ires = mkdir((char *) hostPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// try to create the host path, mod: 0x775
+	
+		if(ires != 0 && errno != EEXIST) {										// if failed to create dir, and it's not because it already exists...
+			Debug::out("attachDevAsTranslated: failed to create directory %s: %s", (char *) hostPath.c_str(), strerror(errno));
+			continue;
+		}
+
+		
+		// TODO: mount the partition to directory
+		// res = mount(partitionDevice, hostPath)
+		// if(!res) {															// if failed to mount the partition, don't try to attach
+		//		Debug::out("attachDevAsTranslated: failed to attach mount %s to %s", (char *) partitionDevice.c_str(), (char *) hostPath.c_str());
+		//		continue;
+		// }
+		
+		
+		res = translated->attachToHostPath(hostPath, TRANSLATEDTYPE_NORMAL);	// try to attach
+	
+		if(!res) {																// if didn't attach, skip the rest
+			Debug::out("attachDevAsTranslated: failed to attach %s", (char *) hostPath.c_str());
+			continue;
+		}
+		
+		mapDeviceToHostPaths.insert(std::pair<std::string, std::string>(devName, hostPath) );	// store it to multimap
+	}
+}
+
+
