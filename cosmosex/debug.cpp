@@ -5,6 +5,8 @@
 #include "debug.h"
 #include "utils.h"
 
+#define LOG_FILE		"ce.log"
+
 /*
 void Debug::out(const char *format, ...)
 {
@@ -23,8 +25,7 @@ void Debug::out(const char *format, ...)
     va_list args;
     va_start(args, format);
 
-
-	FILE *f = fopen("ce.log", "a+t");
+	FILE *f = fopen(LOG_FILE, "a+t");
 	
 	if(!f) {
 		printf("%08d: ", Utils::getCurrentMs());
@@ -36,8 +37,29 @@ void Debug::out(const char *format, ...)
 	fprintf(f, "%08d: ", Utils::getCurrentMs());
     vfprintf(f, format, args);
 	fprintf(f, "\n");
+	fclose(f);
 
     va_end(args);
+}
+
+void Debug::outBfr(BYTE *bfr, int count)
+{
+	FILE *f = fopen(LOG_FILE, "a+t");
 	
+	if(!f) {
+		return;
+	}
+
+	fprintf(f, "%08d: ", Utils::getCurrentMs());
+
+	for(int i=0; i<count; i++) {
+		if((i % 16) == 0) {
+			fprintf(f, "\n");
+		}
+
+		fprintf(f, "%02x ", bfr[i]);
+	}
+
+	fprintf(f, "\n");
 	fclose(f);
 }

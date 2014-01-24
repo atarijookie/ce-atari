@@ -66,7 +66,8 @@ void CCoreThread::run(void)
     memset(inBuff, 0, 8);
 	
     loadSettings();
-
+	resetHansAndFranz();
+	
 	DWORD nextDevFindTime = Utils::getCurrentMs();	// create a time when the devices should be checked - and that time is now
 
 	bool res;
@@ -86,8 +87,8 @@ void CCoreThread::run(void)
 			gotAtn = true;							// we've some ATN
 
 			switch(inBuff[3]) {
-			case 0:                 				// this is valid, just empty data, skip this
-				break;
+//			case 0:                 				// this is valid, just empty data, skip this
+//				break;
 
 			case ATN_FW_VERSION:
 				handleFwVersion();
@@ -172,6 +173,19 @@ void CCoreThread::handleAcsiCommand(void)
     }
 }
 
+void CCoreThread::resetHansAndFranz(void)
+{
+	bcm2835_gpio_write(PIN_RESET_HANS,			LOW);		// reset lines to RESET state
+	bcm2835_gpio_write(PIN_RESET_FRANZ,			LOW);
+
+	Utils::sleepMs(10);										// wait a while to let the reset work
+	
+	bcm2835_gpio_write(PIN_RESET_HANS,			HIGH);		// reset lines to RUN (not reset) state
+	bcm2835_gpio_write(PIN_RESET_FRANZ,			HIGH);
+	
+	Utils::sleepMs(50);										// wait a while to let the devices boot
+}
+
 void CCoreThread::reloadSettings(void)
 {
     loadSettings();
@@ -211,6 +225,14 @@ void CCoreThread::loadSettings(void)
 		}
     }
 
+	// no ACSI ID was enabled? enable ACSI ID 0
+	if(!gotDevTypeRaw && !gotDevTypeTranslated) {
+		Debug::out("CCoreThread::loadSettings -- no ACSI ID was enabled, so enabling ACSI ID 0");
+			
+		acsiIDevType[0]	= DEVTYPE_TRANSLATED;
+		enabledIDbits	= 1;
+	}
+	
     setEnabledIDbits = true;
 }
 
@@ -226,7 +248,7 @@ void CCoreThread::handleFwVersion(void)
         setEnabledIDbits = false;           // and don't sent this anymore (until needed)
     }
 
-    conSpi->txRx(SPI_CS_HANS, 10, oBuf, fwVer);
+    conSpi->txRx(SPI_CS_HANS, 8, oBuf, fwVer);
 
     int year = bcdToInt(fwVer[1]) + 2000;
     if(fwVer[0] == 0xf0) {

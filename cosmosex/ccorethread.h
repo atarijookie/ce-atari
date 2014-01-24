@@ -63,6 +63,7 @@ private:
     void usbConnectionCheck(void);
 
     void loadSettings(void);
+	void resetHansAndFranz(void);
 
     void handleFwVersion(void);
     void handleAcsiCommand(void);

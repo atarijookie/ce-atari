@@ -47,7 +47,7 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
 			return false;
 		}
 	
-		txRx(whichSpiCs, 8, inBuf, outBuf);					// receive: 0, ATN code, txLen, rxLen
+		txRx(whichSpiCs, 8, outBuf, inBuf);					// receive: 0, ATN code, txLen, rxLen
 		applyTxRxLimits(whichSpiCs, inBuf);					// now apply txLen and rxLen
 		return true;
 	}
@@ -68,7 +68,7 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
 		Utils::sleepMs(1);									// wait 1 ms
     }
 
-	txRx(whichSpiCs, 8, inBuf, outBuf);					// receive: 0, ATN code, txLen, rxLen
+	txRx(whichSpiCs, 8, outBuf, inBuf);					// receive: 0, ATN code, txLen, rxLen
 	applyTxRxLimits(whichSpiCs, inBuf);					// now apply txLen and rxLen
 
     if(inBuf[3] == atnCode) {                      		// ATN code found?
@@ -88,7 +88,7 @@ void CConSpi::applyTxRxLimits(int whichSpiCs, BYTE *inBuff)
     WORD txLen = swapWord(pwIn[2]);
     WORD rxLen = swapWord(pwIn[3]);
 
-    Debug::out("TX/RX limits: TX %d WORDs, RX %d WORDs", txLen, rxLen);
+//    Debug::out("TX/RX limits: TX %d WORDs, RX %d WORDs", txLen, rxLen);
 
     if(txLen > 1024 || rxLen > 1024) {
         Debug::out("TX/RX limits above are probably wrong! Fix this!");
