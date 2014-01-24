@@ -19,37 +19,10 @@
 // * CosmosEx GEMDOS driver by Jookie, 2013
 // * GEMDOS hooks part (assembler and C) by MiKRO (Miro Kropacek), 2013
  
-// ------------------------------------------------------------------ 
-// init and hooks part - MiKRO 
-extern int16_t useOldGDHandler;											// 0: use new handlers, 1: use old handlers 
-extern int16_t useOldBiosHandler;										// 0: use new handlers, 1: use old handlers  
-
-extern int32_t (*gemdos_table[256])( void* sp );
-extern int32_t (  *bios_table[256])( void* sp );
+#include "extern_vars.h"
 
 // ------------------------------------------------------------------ 
 // CosmosEx and Gemdos part - Jookie 
-
-extern BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
-extern BYTE *pDmaBuffer;
-
-extern BYTE deviceID;
-extern BYTE commandShort[CMD_LENGTH_SHORT];
-extern BYTE commandLong[CMD_LENGTH_LONG];
-
-extern BYTE *pDta;
-extern BYTE tempDta[45];
-
-extern WORD dtaCurrent, dtaTotal;
-extern BYTE dtaBuffer[DTA_BUFFER_SIZE + 2];
-extern BYTE *pDtaBuffer;
-extern BYTE fsnextIsForUs, tryToGetMoreDTAs;
-
-BYTE getNextDTAsFromHost(void);
-DWORD copyNextDtaToAtari(void);
-
-extern WORD ceDrives;
-extern BYTE currentDrive;
 
 #define RW_BUFFER_SIZE		512
 

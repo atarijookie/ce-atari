@@ -21,15 +21,12 @@
  
 /* ------------------------------------------------------------------ */
 /* init and hooks part - MiKRO */
-typedef void  (*TrapHandlerPointer)( void );
 
-extern void gemdos_handler( void );
-extern TrapHandlerPointer old_gemdos_handler;
+#include "extern_vars.h"
+
 int32_t (*gemdos_table[256])( void* sp ) = { 0 };
 int16_t useOldGDHandler = 0;								/* 0: use new handlers, 1: use old handlers */
 
-extern void bios_handler( void );
-extern TrapHandlerPointer old_bios_handler;
 int32_t (*bios_table[256])( void* sp ) = { 0 };
 int16_t useOldBiosHandler = 0;								/* 0: use new handlers, 1: use old handlers */ 
 /* ------------------------------------------------------------------ */
@@ -111,7 +108,7 @@ int main( int argc, char* argv[] )
 	}
 	
 	/* either remove the old one or do nothing, old memory isn't released */
-	if( unhook_xbra( VEC_GEMDOS, 'CEDD' ) == 0L && unhook_xbra( VEC_BIOS, 'CEDD' ) == 0L ) {
+	if( unhook_xbra( VEC_GEMDOS, XBRA_ID ) == 0L && unhook_xbra( VEC_BIOS, XBRA_ID ) == 0L ) {
 		(void)Cconws( "\r\nDriver installed.\r\n" );
 	} else {
 		(void)Cconws( "\r\nDriver reinstalled, some memory was lost.\r\n" );
@@ -123,10 +120,6 @@ int main( int argc, char* argv[] )
 	
 	/* wait for a while so the user could read the message and quit */
 	sleep(2);
-
-	/* now terminate and stay resident */
-	Ptermres( 0x100 + _base->p_tlen + _base->p_dlen + _base->p_blen, 0 );
-
 	return 0;		/* make compiler happy, we wont return */
 }
 

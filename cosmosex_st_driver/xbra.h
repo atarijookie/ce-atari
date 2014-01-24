@@ -5,6 +5,12 @@ typedef short WORD;
 typedef long LONG;
 typedef void VOID;
 
+// this value represents string XBRA
+#define XBRA_TAG	0x58425241
+
+// this value represents string CEDD
+#define XBRA_ID		0x43454444
+
 typedef struct xbra
 {
 	LONG xbra_id;
