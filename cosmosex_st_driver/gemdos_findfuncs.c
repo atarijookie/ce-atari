@@ -22,19 +22,27 @@
  */
 
 #include "extern_vars.h"
- 
+#include "helpers.h"
+
 BYTE getNextDTAsFromHost(void);
 DWORD copyNextDtaToAtari(void);
+ 
+BYTE fsnextIsForUs, tryToGetMoreDTAs;
+WORD dtaCurrent, dtaTotal;
+
+BYTE dtaBuffer[DTA_BUFFER_SIZE + 2];
+BYTE *pDtaBuffer;
 
 /* **************************************************************** */
 /* those next functions are used for file / dir search */
 
 int32_t custom_fsetdta( void *sp )
 {
-    pDta = (BYTE *) *((DWORD *) sp);									/* store the new DTA pointer */
-
+    BYTE *newPDta = (BYTE *) *((DWORD *) sp);									/* store the new DTA pointer */
+	getSetPDta(newPDta);
+	
     useOldGDHandler = 1;
-    Fsetdta( (_DTA *) pDta );
+    Fsetdta( (_DTA *) newPDta );
     useOldGDHandler = 0;
 
 	// TODO: on application start set the pointer to the default position (somewhere before the app args)
@@ -69,11 +77,12 @@ int32_t custom_fsfirst( void *sp )
 	/* set the params to buffer */
 	commandShort[4] = GEMDOS_Fsfirst;										/* store GEMDOS function number */
 	commandShort[5] = 0;			
+
+	BYTE *pDmaBuff = getDmaBufferPointer();	
+	pDmaBuff[0] = (BYTE) attribs;										/* store attributes */
+	strncpy(((char *) pDmaBuff) + 1, fspec, DMA_BUFFER_SIZE - 1);		/* copy in the file specification */
 	
-	pDmaBuffer[0] = (BYTE) attribs;										/* store attributes */
-	strncpy(((char *) pDmaBuffer) + 1, fspec, DMA_BUFFER_SIZE - 1);		/* copy in the file specification */
-	
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuff, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		fsnextIsForUs = FALSE;
@@ -127,7 +136,7 @@ DWORD copyNextDtaToAtari(void)
 	
 	dtaCurrent++;														/* move to the next DTA */
 		
-	memcpy(pDta + 21, pCurrentDta, 23);									/* skip the reserved area of DTA and copy in the current DTA */
+	memcpy(getSetPDta(PDTA_GET) + 21, pCurrentDta, 23);									/* skip the reserved area of DTA and copy in the current DTA */
 	return E_OK;														/* everything went well */
 }
 

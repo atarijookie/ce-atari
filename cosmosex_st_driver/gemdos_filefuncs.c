@@ -22,9 +22,7 @@
  */
 
 #include "extern_vars.h"
- 
-BYTE getNextDTAsFromHost(void);
-DWORD copyNextDtaToAtari(void);
+#include "helpers.h"
 
 /* **************************************************************** */
 /* the following functions work with files and file handles */
@@ -51,10 +49,11 @@ int32_t custom_fcreate( void *sp )
 	commandShort[4] = GEMDOS_Fcreate;										/* store GEMDOS function number */
 	commandShort[5] = 0;			
 	
-	pDmaBuffer[0] = (BYTE) attr;										/* store attributes */
-	strncpy(((char *) pDmaBuffer) + 1, fileName, DMA_BUFFER_SIZE - 1);	/* copy in the file name */
+	BYTE *pDmaBuff = getDmaBufferPointer();
+	pDmaBuff[0] = (BYTE) attr;										/* store attributes */
+	strncpy(((char *) pDmaBuff) + 1, fileName, DMA_BUFFER_SIZE - 1);	/* copy in the file name */
 	
-	handle = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* send command to host over ACSI */
+	handle = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuff, 1);			/* send command to host over ACSI */
 
     if(handle == E_NOTHANDLED || handle == ACSIERROR) {						/* not handled or error? */
 		CALL_OLD_GD( Fcreate, fileName, attr);
@@ -90,10 +89,11 @@ int32_t custom_fopen( void *sp )
 	commandShort[4] = GEMDOS_Fopen;											/* store GEMDOS function number */
 	commandShort[5] = 0;			
 	
-	pDmaBuffer[0] = (BYTE) mode;										/* store attributes */
-	strncpy(((char *) pDmaBuffer) + 1, fileName, DMA_BUFFER_SIZE - 1);	/* copy in the file name */
+	BYTE *pDmaBuff = getDmaBufferPointer();
+	pDmaBuff[0] = (BYTE) mode;										/* store attributes */
+	strncpy(((char *) pDmaBuff) + 1, fileName, DMA_BUFFER_SIZE - 1);	/* copy in the file name */
 	
-	handle = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* send command to host over ACSI */
+	handle = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuff, 1);			/* send command to host over ACSI */
 
     if(handle == E_NOTHANDLED || handle == ACSIERROR) {						/* not handled or error? */
 		CALL_OLD_GD( Fopen, fileName, mode);
@@ -126,7 +126,8 @@ int32_t custom_fclose( void *sp )
 	commandShort[4] = GEMDOS_Fclose;											/* store GEMDOS function number */
 	commandShort[5] = (BYTE) ceHandle;			
 	
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	BYTE *pDmaBuff = getDmaBufferPointer();
+	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuff, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Fclose, atariHandle);
@@ -169,7 +170,8 @@ int32_t custom_fseek( void *sp )
 	commandLong[10] = (BYTE) ceHandle;
 	commandLong[11] = (BYTE) seekMode;
 	
-	res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);				/* send command to host over ACSI */
+	BYTE *pDmaBuff = getDmaBufferPointer();
+	res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuff, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Fseek, offset, atariHandle, seekMode);
@@ -182,13 +184,13 @@ int32_t custom_fseek( void *sp )
 	/* If we got here, the seek was successful and now we need to return the position in the file. */
 
 	/* construct the new file position from the received data */
-	res  = pDmaBuffer[0];
+	res  = pDmaBuff[0];
 	res  = res << 8;
-	res |= pDmaBuffer[1];
+	res |= pDmaBuff[1];
 	res  = res << 8;
-	res |= pDmaBuffer[2];
+	res |= pDmaBuff[2];
 	res  = res << 8;
-	res |= pDmaBuffer[3];
+	res |= pDmaBuff[3];
 	
 	return res;
 }
@@ -222,10 +224,11 @@ int32_t custom_fdatime( void *sp )
 	commandLong[9]  = (BYTE) pDatetime[2];
 	commandLong[10] = (BYTE) pDatetime[3];
 
-	res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);	/* send command to host over ACSI */
+	BYTE *pDmaBuff = getDmaBufferPointer();
+	res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuff, 1);	/* send command to host over ACSI */
 	
 	if(flag != 1) {															/* not FD_SET - get date time */
-		memcpy(pDatetime, pDmaBuffer, 4);									/* copy in the results */
+		memcpy(pDatetime, pDmaBuff, 4);									/* copy in the results */
 	}
 	
 	if(res == E_OK) {														/* good? ok */
@@ -244,11 +247,11 @@ int32_t custom_fdatime( void *sp )
 WORD getDriveFromPath(char *path)
 {
 	if(strlen(path) < 3) {												/* if the path is too short to be full path, e.g. 'C:\DIR', just return currentDrive */
-		return currentDrive;
+		return getSetCurrentDrive(GET_CURRENTDRIVE);
 	}
 	
 	if(path[1] != ':') {												/* if the path isn't full path, e.g. C:\, just return currentDrive */
-		return currentDrive;
+		return getSetCurrentDrive(GET_CURRENTDRIVE);
 	}
 	
 	char letter = path[0];
@@ -261,14 +264,14 @@ WORD getDriveFromPath(char *path)
 		return (letter - 'A');
 	}
 	
-	return currentDrive;												/* other case? return currentDrive */	
+	return getSetCurrentDrive(GET_CURRENTDRIVE);						/* other case? return currentDrive */	
 }
 
 BYTE isOurDrive(WORD drive, BYTE withCurrentDrive) 
 {
 	if(withCurrentDrive) {												/* if the 0 in drive doesn't mean 'A', but 'current drive', then we have to figure out what the drive is */
 		if(drive == 0) {												/* asking for current drive? */
-			drive = currentDrive;
+			drive = getSetCurrentDrive(GET_CURRENTDRIVE);
 		} else {														/* asking for normal drive? */
 			drive--;
 		}
@@ -284,7 +287,7 @@ BYTE isOurDrive(WORD drive, BYTE withCurrentDrive)
 	
 	updateCeDrives();													/* update ceDrives variable */
 	
-	if(ceDrives & (1 << drive)) {										/* is that bit set? */
+	if(getSetCeDrives(GET_CEDRIVES) & (1 << drive)) {										/* is that bit set? */
 		return TRUE;
 	}
 

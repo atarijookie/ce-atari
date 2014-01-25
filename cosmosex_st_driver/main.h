@@ -6,5 +6,8 @@
 
 #define Clear_home()    Cconws("\33E")
 
+#define DEVICEID_GET	0xff
+BYTE getSetDeviceId(BYTE newId);
+
 
 #endif

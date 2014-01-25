@@ -23,6 +23,7 @@
 /* init and hooks part - MiKRO */
 
 #include "extern_vars.h"
+#include "helpers.h"
 
 int32_t (*gemdos_table[256])( void* sp ) = { 0 };
 int16_t useOldGDHandler = 0;								/* 0: use new handlers, 1: use old handlers */
@@ -35,25 +36,10 @@ BYTE ce_findId(void);
 BYTE ce_identify(void);
 void ce_initialize(void);
 
-BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
-BYTE *pDmaBuffer;
-
-BYTE deviceID;
+BYTE *getDmaBufferPointer(void);
 
 BYTE commandShort[CMD_LENGTH_SHORT]	= {			0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
 BYTE commandLong[CMD_LENGTH_LONG]	= {0x1f,	0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0};
-
-BYTE *pDta;
-BYTE tempDta[45];
-
-WORD dtaCurrent, dtaTotal;
-BYTE dtaBuffer[DTA_BUFFER_SIZE + 2];
-BYTE *pDtaBuffer;
-BYTE fsnextIsForUs, tryToGetMoreDTAs;
-
-WORD ceDrives;
-WORD ceMediach;
-BYTE currentDrive;
 
 /* ------------------------------------------------------------------ */
 int main( int argc, char* argv[] )
@@ -64,10 +50,6 @@ int main( int argc, char* argv[] )
 	/* write some header out */
 	(void) Clear_home();
 	(void) Cconws("\33p[ CosmosEx disk driver ]\r\n[    by Jookie 2013    ]\33q\r\n\r\n");
-
-	/* create buffer pointer to even address */
-	pDmaBuffer = &dmaBuffer[2];
-	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
 
 	/* initialize internal stuff for Fsfirst and Fsnext */
 	dtaCurrent			= 0;
@@ -86,18 +68,16 @@ int main( int argc, char* argv[] )
 	}
 	
 	/* now set up the acsi command bytes so we don't have to deal with this one anymore */
-	commandShort[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	commandShort[0] = (getSetDeviceId(DEVICEID_GET) << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
 	
-	commandLong[0] = (deviceID << 5) | 0x1f;			/* cmd[0] = ACSI_id + ICD command marker (0x1f)	*/
+	commandLong[0] = (getSetDeviceId(DEVICEID_GET) << 5) | 0x1f;			/* cmd[0] = ACSI_id + ICD command marker (0x1f)	*/
 	commandLong[1] = 0xA0;								/* cmd[1] = command length group (5 << 5) + TEST UNIT READY (0) */
 	
 	/* tell the device to initialize */
 	Supexec(ce_initialize);
 	
 	/* now init our internal vars */
-	pDta				= (BYTE *) &tempDta[0];				/* use this buffer as temporary one for DTA - just in case */
-
-	currentDrive		= Dgetdrv();						/* get the current drive from system */
+	getSetCurrentDrive(Dgetdrv());						/* get the current drive from system */
 	
 	Supexec(updateCeDrives);								/* update the ceDrives variable */
 	
@@ -129,7 +109,7 @@ BYTE ce_findId(void)
 	char bfr[2], res, i;
 
 	bfr[1] = 0;
-	deviceID = 0;
+	getSetDeviceId(0);
 	
 	(void) Cconws("Looking for CosmosEx: ");
 
@@ -137,7 +117,7 @@ BYTE ce_findId(void)
 		bfr[0] = i + '0';
 		(void) Cconws(bfr);
 
-		deviceID = i;									/* store the tested ACSI ID */
+		getSetDeviceId(i);									/* store the tested ACSI ID */
 		res = Supexec(ce_identify);  					/* try to read the IDENTITY string */
 		
 		if(res == 1) {                           		/* if found the CosmosEx */
@@ -159,18 +139,19 @@ BYTE ce_identify(void)
 {
 	WORD res;
   
-	commandShort[0] = (deviceID << 5); 											/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	commandShort[0] = (getSetDeviceId(DEVICEID_GET) << 5); 											/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
 	commandShort[4] = TRAN_CMD_IDENTIFY;
   
-	memset(pDmaBuffer, 0, 512);              									/* clear the buffer */
+	BYTE *pDmaBuff = getDmaBufferPointer();
+	memset(pDmaBuff, 0, 512);              									/* clear the buffer */
 
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* issue the command and check the result */
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuff, 1);	/* issue the command and check the result */
 
 	if(res != OK) {                        										/* if failed, return FALSE */
 		return 0;
 	}
 
-	if(strncmp((char *) pDmaBuffer, "CosmosEx translated disk", 24) != 0) {		/* the identity string doesn't match? */
+	if(strncmp((char *) pDmaBuff, "CosmosEx translated disk", 24) != 0) {		/* the identity string doesn't match? */
 		return 0;
 	}
 	
@@ -180,9 +161,61 @@ BYTE ce_identify(void)
 /* send INITIALIZE command to the CosmosEx device telling it to do all the stuff it needs at start */
 void ce_initialize(void)
 {
-	commandShort[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	commandShort[0] = (getSetDeviceId(DEVICEID_GET) << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
 	commandShort[4] = GD_CUSTOM_initialize;
   
-	acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* issue the command and check the result */
+	BYTE *pDmaBuff = getDmaBufferPointer();
+	acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuff, 1);			/* issue the command and check the result */
 }
 
+BYTE *getDmaBufferPointer(void)
+{
+	static BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];				// buffer
+	static BYTE *pDmaBuffer = 0;							// buffer pointer - first uninitialized
+
+	if(pDmaBuffer == 0) {									// if buffer pointer not initialized, initialize it
+		/* create buffer pointer to even address */
+		pDmaBuffer = &dmaBuffer[2];
+		pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
+	}
+	
+	return pDmaBuffer;
+}
+
+BYTE getSetDeviceId(BYTE newId)
+{
+	static BYTE deviceID = 0;
+	
+	if(newId != DEVICEID_GET) {
+		deviceID = newId;
+	}
+	
+	return deviceID;
+}
+
+BYTE getSetCurrentDrive(BYTE newVal)
+{
+	static BYTE currentDrive = 0;
+	
+	if(newVal != GET_CURRENTDRIVE) {
+		currentDrive = newVal;
+	}
+
+	return currentDrive;
+}
+
+BYTE *getSetPDta(BYTE *newVal) 
+{
+	static BYTE tempDta[45];
+	static BYTE *pDta = 0;
+	
+	if(pDta == 0) {								// not initialized?
+		pDta = (BYTE *) &tempDta[0];			// use this buffer as temporary one for DTA - just in case
+	}
+	
+	if(newVal != PDTA_GET) {					// if not GET
+		pDta = newVal;
+	}
+	
+	return pDta;
+}

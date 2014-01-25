@@ -20,9 +20,6 @@ extern int32_t (  *bios_table[256])( void* sp );
 /* ------------------------------------------------------------------ */
 /* CosmosEx and Gemdos part - Jookie */
 
-extern BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
-extern BYTE *pDmaBuffer;
-
 extern BYTE deviceID;
 extern BYTE commandShort[CMD_LENGTH_SHORT];
 extern BYTE commandLong[CMD_LENGTH_LONG];

@@ -20,6 +20,7 @@
 // * GEMDOS hooks part (assembler and C) by MiKRO (Miro Kropacek), 2013
  
 #include "extern_vars.h"
+#include "helpers.h"
 
 // ------------------------------------------------------------------ 
 // CosmosEx and Gemdos part - Jookie 
@@ -328,13 +329,14 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
 	commandShort[4] = GD_CUSTOM_getRWdataCnt;
 	commandShort[5] = ceHandle;										
 	
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			// send command to host over ACSI
+	BYTE *pDmaBuff = getDmaBufferPointer();
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuff, 1);			// send command to host over ACSI
 
 	if(res != E_OK) {													// failed? say that no data was transfered
 		return 0;
 	}
 
-    DWORD count = getDword(pDmaBuffer);						// read how much data was written
+    DWORD count = getDword(pDmaBuff);						// read how much data was written
 	return count;
 }
 
@@ -389,13 +391,14 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 	commandShort[4] = GD_CUSTOM_getRWdataCnt;
 	commandShort[5] = ceHandle;										
 	
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				// send command to host over ACSI
+	BYTE *pDmaBuff = getDmaBufferPointer();
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuff, 1);				// send command to host over ACSI
 
 	if(res != E_OK) {													// failed? say that no data was transfered
 		return 0;
 	}
 
-    DWORD count = getDword(pDmaBuffer);						// read how much data was read
+    DWORD count = getDword(pDmaBuff);						// read how much data was read
 	return count;
 }
 
