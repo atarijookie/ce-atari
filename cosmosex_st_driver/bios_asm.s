@@ -48,11 +48,11 @@ bios_call:
 	beq.b	bios_not_handled
 	movea.l	(a1),a1
 
-	movem.l	d2-d7/a2-a6,-(sp)
+|	movem.l	d2-d7/a2-a6,-(sp)
 	move.l	a0,-(sp)				| param #1: stack pointer with function params
 	jsr	(a1)					| call the handler
 	addq.l	#4,sp
-	movem.l	(sp)+,d2-d7/a2-a6
+|	movem.l	(sp)+,d2-d7/a2-a6
 	rte						| return from exception, d0 contains return code
 	
 bios_not_handled:
