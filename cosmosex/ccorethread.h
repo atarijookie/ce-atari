@@ -72,6 +72,7 @@ private:
     int bcdToInt(int bcd);
 	
 	void attachDevAsTranslated(std::string devName);
+	void mountAndAttachSharedDrive(void);
 };
 
 #endif // CCORETHREAD_H

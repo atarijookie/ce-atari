@@ -11,6 +11,7 @@
 #include "native/scsi_defs.h"
 #include "settings.h"
 #include "gpio.h"
+#include "mounter.h"
 
 #define DEV_CHECK_TIME_MS	3000
 
@@ -70,6 +71,8 @@ void CCoreThread::run(void)
 	
 	DWORD nextDevFindTime = Utils::getCurrentMs();	// create a time when the devices should be checked - and that time is now
 
+	mountAndAttachSharedDrive();					// if shared drive is enabled, try to mount it and attach it
+	
 	bool res;
 	
     while(sigintReceived == 0) {
@@ -204,7 +207,8 @@ void CCoreThread::loadSettings(void)
     char key[32];
     for(int id=0; id<8; id++) {							// read the list of device types from settings
         sprintf(key, "ACSI_DEVTYPE_%d", id);			// create settings KEY, e.g. ACSI_DEVTYPE_0
-        int devType = s.getInt(key, DEVTYPE_OFF);
+        
+		int devType = s.getInt(key, DEVTYPE_OFF);
 
         if(devType < 0) {
             devType = DEVTYPE_OFF;
@@ -231,6 +235,8 @@ void CCoreThread::loadSettings(void)
 			
 		acsiIDevType[0]	= DEVTYPE_TRANSLATED;
 		enabledIDbits	= 1;
+		
+		gotDevTypeTranslated = true;
 	}
 	
     setEnabledIDbits = true;
@@ -336,39 +342,70 @@ void CCoreThread::attachDevAsTranslated(std::string devName)
 	
 	for (it = partitions.begin(); it != partitions.end(); ++it) {				// go through those partitions
 		std::string partitionDevice;
-		std::string hostPath;
+		std::string mountPath;
 		std::string devPath, justDevName;
 		
 		partitionDevice = *it;													// get the current device, which represents single partition (e.g. sda1)
 		
 		Utils::splitFilenameFromPath(partitionDevice, devPath, justDevName);	// split path to path and device name (e.g. /dev/sda1 -> /dev + sda1)
-		hostPath = "/mnt/" + justDevName;										// create host path (e.g. /mnt/sda1)
+		mountPath = "/mnt/" + justDevName;										// create host path (e.g. /mnt/sda1)
 		
-		int ires = mkdir((char *) hostPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// try to create the host path, mod: 0x775
-	
-		if(ires != 0 && errno != EEXIST) {										// if failed to create dir, and it's not because it already exists...
-			Debug::out("attachDevAsTranslated: failed to create directory %s: %s", (char *) hostPath.c_str(), strerror(errno));
-			continue;
-		}
+		TMounterRequest tmr;
+		tmr.mountNorUmount	= true;												// action: mount
+		tmr.deviceNotShared	= true;												// mount as device
+		tmr.devicePath		= devName;											// e.g. /dev/sda2
+		tmr.mountDir		= mountPath;										// e.g. /mnt/sda2
+		mountAdd(tmr);
 
-		
-		// TODO: mount the partition to directory
-		// res = mount(partitionDevice, hostPath)
-		// if(!res) {															// if failed to mount the partition, don't try to attach
-		//		Debug::out("attachDevAsTranslated: failed to attach mount %s to %s", (char *) partitionDevice.c_str(), (char *) hostPath.c_str());
-		//		continue;
-		// }
-		
-		
-		res = translated->attachToHostPath(hostPath, TRANSLATEDTYPE_NORMAL);	// try to attach
+		res = translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL);	// try to attach
 	
 		if(!res) {																// if didn't attach, skip the rest
-			Debug::out("attachDevAsTranslated: failed to attach %s", (char *) hostPath.c_str());
+			Debug::out("attachDevAsTranslated: failed to attach %s", (char *) mountPath.c_str());
 			continue;
 		}
 		
-		mapDeviceToHostPaths.insert(std::pair<std::string, std::string>(devName, hostPath) );	// store it to multimap
+		mapDeviceToHostPaths.insert(std::pair<std::string, std::string>(devName, mountPath) );	// store it to multimap
 	}
 }
 
+void CCoreThread::mountAndAttachSharedDrive(void)
+{
+	std::string mountPath = "/mnt/shared";
+
+    Settings s;
+    std::string addr, path;
+	bool sharedEnabled;
+	bool nfsNotSamba;
+
+    addr			= s.getString((char *) "SHARED_ADDRESS",  (char *) "");
+    path			= s.getString((char *) "SHARED_PATH",     (char *) "");
+	
+	sharedEnabled	= s.getBool((char *) "SHARED_ENABLED", false);
+	nfsNotSamba		= s.getBool((char *) "SHARED_NFS_NOT_SAMBA", false);
+	
+	if(!sharedEnabled) {
+		Debug::out("mountAndAttachSharedDrive: shared drive not enabled, not mounting and not attaching...");
+		return;
+	}
+	
+	if(addr.empty() || path.empty()) {
+		Debug::out("mountAndAttachSharedDrive: address or path is empty, this won't work!");
+		return;
+	}
+	
+	TMounterRequest tmr;													// fill this struct to mount something somewhere
+	tmr.mountNorUmount		= true;
+	tmr.deviceNotShared		= false;
+	tmr.shared.host			= addr;
+	tmr.shared.hostDir		= path;
+	tmr.shared.nfsNotSamba	= nfsNotSamba;
+	tmr.mountDir			= mountPath;
+	mountAdd(tmr);
+
+	bool res = translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL);	// try to attach
+
+	if(!res) {																// if didn't attach, skip the rest
+		Debug::out("mountAndAttachSharedDrive: failed to attach shared drive %s", (char *) mountPath.c_str());
+	}
+}
 

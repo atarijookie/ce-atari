@@ -8,6 +8,8 @@
 #include <stdlib.h>
 
 #define SETTINGS_PATH		"settings"
+
+#include "global.h"
 #include "debug.h"
 
 Settings::Settings(void)
@@ -16,11 +18,34 @@ Settings::Settings(void)
 	
 	if(res == 0) {					// dir created
 		Debug::out("Settings: directory %s was created.", SETTINGS_PATH);
+		
+		storeDefaultValues();
 	} else {						// dir not created
 		if(errno != EEXIST) {		// and it's not because it already exists...
 			Debug::out("Settings: failed to create settings directory - %s", strerror(errno));
 		}
 	}
+}
+
+void Settings::storeDefaultValues(void)
+{
+    char key[32];
+    for(int id=0; id<8; id++) {							// read the list of device types from settings
+        sprintf(key, "ACSI_DEVTYPE_%d", id);			// create settings KEY, e.g. ACSI_DEVTYPE_0
+		
+		if(id == 0) {									// ACSI id 0 enaled by defaul
+			setInt(key, DEVTYPE_TRANSLATED);
+		} else {										// other ACSI id's disabled
+			setInt(key, DEVTYPE_OFF);
+		}
+	}
+	
+	setChar((char *) "DRIVELETTER_FIRST",      'C');
+    setChar((char *) "DRIVELETTER_SHARED",     'P');
+    setChar((char *) "DRIVELETTER_CONFDRIVE",  'O');
+	
+	setBool((char *) "SHARED_ENABLED",			false);
+	setBool((char *) "SHARED_NFS_NOT_SAMBA",	false);
 }
 
 bool Settings::getBool(char *key, bool defValue)

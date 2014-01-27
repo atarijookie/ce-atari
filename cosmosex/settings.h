@@ -23,6 +23,8 @@ public:
 private:
 
 	FILE *open(char *key, bool readNotWrite);
+	
+	void storeDefaultValues(void);
 };
 
 #endif
