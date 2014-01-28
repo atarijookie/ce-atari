@@ -1,23 +1,22 @@
 >> CosmosEx config tool - Jookie 2013 <<
             Network settings
 
-
-
-           Use DHCP  [   ]
-
-
-If not using DHCP, set the next params:
-
+Ethernet
+   Use DHCP     [   ]              
    IP address   [   .   .   .   ]
    Mask         [   .   .   .   ]
    Gateway      [   .   .   .   ]
+   
+Wifi   
+   WPA-SSID     [               ]
+   WPA-SPK      [               ]
+   Use DHCP     [   ]             
+   IP address   [   .   .   .   ]
+   Mask         [   .   .   .   ]
+   Gateway      [   .   .   .   ]
+   
    DNS          [   .   .   .   ]
 
          [  Save  ]  [ Cancel ]
-
-
-
-
-
 
         To quit - press Ctrl + C

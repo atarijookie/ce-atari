@@ -127,58 +127,123 @@ void ConfigStream::createScreen_network(void)
 
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Use DHCP",	10, 12, 6, gotoOffset);
+	int col0x = 0;
+	int col1x = 3;
+	int col2x = 16;
+	
+	int row = 4;
+	
+	// settings for ethernet
+    comp = new ConfigComponent(this, ConfigComponent::label, "Ethernet",	10,	col0x, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::checkbox, " ",	1, 22, 6, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Use DHCP",	10, col1x, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, " ",		1,	col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_NET_DHCP);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "If not using DHCP, set the next params:", 40, 0, 9, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "IP address",	40,	col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "IP address", 40, 0, 11, gotoOffset);
-    screen.push_back(comp);
-
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ", 15, 16, 11, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_NET_IP);
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Mask", 40, 0, 12, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Mask",		40, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ", 15, 16, 12, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_NET_MASK);
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Gateway", 40, 0, 13, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Gateway",		40, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ", 15, 16, 13, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row, gotoOffset);
     comp->setComponentId(COMPID_NET_GATEWAY);
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "DNS", 40, 0, 14, gotoOffset);
+	row += 2;
+	
+	// settings for wifi
+    comp = new ConfigComponent(this, ConfigComponent::label, "Wifi",		10,	col0x, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ", 15, 16, 14, gotoOffset);
-    comp->setComponentId(COMPID_NET_DNS);
+	comp = new ConfigComponent(this, ConfigComponent::label, "WPA SSID",	40,	col1x, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	40, col2x, row++, gotoOffset);
+    comp->setComponentId(COMPID_WIFI_SSID);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_ALL);
+    screen.push_back(comp);
+
+	comp = new ConfigComponent(this, ConfigComponent::label, "WPA PSK",		40,	col1x, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	40, col2x, row++, gotoOffset);
+    comp->setComponentId(COMPID_WIFI_PSK);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_ALL);
+    screen.push_back(comp);
+	
+    comp = new ConfigComponent(this, ConfigComponent::label, "Use DHCP",	10, col1x, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, " ",		1,	col2x, row++, gotoOffset);
+    comp->setComponentId(COMPID_WIFI_DHCP);
+    screen.push_back(comp);
+	
+    comp = new ConfigComponent(this, ConfigComponent::label, "IP address",	40,	col1x, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row++, gotoOffset);
+    comp->setComponentId(COMPID_WIFI_IP);
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  9, 16, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Mask",		40, col1x, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row++, gotoOffset);
+    comp->setComponentId(COMPID_WIFI_MASK);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "Gateway",		40, col1x, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row, gotoOffset);
+    comp->setComponentId(COMPID_WIFI_GATEWAY);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
+    screen.push_back(comp);
+		
+	// dns settings
+	row += 2;
+	
+    comp = new ConfigComponent(this, ConfigComponent::label, "DNS",			40, col1x, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row, gotoOffset);
+    comp->setComponentId(COMPID_NET_DNS);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
+    screen.push_back(comp);
+	
+	row += 2;
+	// buttons
+
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  9, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_SAVE_NETWORK);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, 20, 16, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, 20, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
-
 
     // get the settings, store them to components
 	NetworkSettings ns;
@@ -191,9 +256,13 @@ void ConfigStream::createScreen_network(void)
     setTextByComponentId(COMPID_NET_MASK,		ns.eth0.netmask);
     setTextByComponentId(COMPID_NET_GATEWAY,	ns.eth0.gateway);
 
-	
-	// TODO: do the wlan part!
+    setBoolByComponentId(COMPID_WIFI_DHCP,		ns.wlan0.dhcpNotStatic);
+    setTextByComponentId(COMPID_WIFI_IP,		ns.wlan0.address);
+    setTextByComponentId(COMPID_WIFI_MASK,		ns.wlan0.netmask);
+    setTextByComponentId(COMPID_WIFI_GATEWAY,	ns.wlan0.gateway);
 
+    setTextByComponentId(COMPID_WIFI_SSID,		ns.wlan0.wpaSsid);
+    setTextByComponentId(COMPID_WIFI_PSK,		ns.wlan0.wpaPsk);
 	
     setFocusToFirstFocusable();
 }
@@ -400,17 +469,30 @@ void ConfigStream::onTranslated_save(void)
 
 void ConfigStream::onNetwork_save(void)
 {
-    std::string ip, mask, dns, gateway;
+	// for eth0
+    std::string ip, mask, gateway;
     bool useDhcp;
 
-    // read the settings from components
-    getBoolByComponentId(COMPID_NET_DHCP, useDhcp);
-    getTextByComponentId(COMPID_NET_IP, ip);
-    getTextByComponentId(COMPID_NET_MASK, mask);
-    getTextByComponentId(COMPID_NET_DNS, dns);
-    getTextByComponentId(COMPID_NET_GATEWAY, gateway);
+	// for wlan0
+    std::string ip2, mask2, gateway2;
+    bool useDhcp2;
+	
+	std::string dns;
 
-    // verify the settings
+    // read the settings from components
+    getBoolByComponentId(COMPID_NET_DHCP,		useDhcp);
+    getTextByComponentId(COMPID_NET_IP,			ip);
+    getTextByComponentId(COMPID_NET_MASK,		mask);
+    getTextByComponentId(COMPID_NET_GATEWAY,	gateway);
+	
+	getBoolByComponentId(COMPID_WIFI_DHCP,		useDhcp2);
+    getTextByComponentId(COMPID_WIFI_IP,		ip2);
+    getTextByComponentId(COMPID_WIFI_MASK,		mask2);
+    getTextByComponentId(COMPID_WIFI_GATEWAY,	gateway2);
+
+    getTextByComponentId(COMPID_NET_DNS,		dns);
+
+    // verify the settings for eth0
     if(!useDhcp) {          // but verify settings only when not using dhcp
         bool a,b,c,d;
 
@@ -420,7 +502,20 @@ void ConfigStream::onNetwork_save(void)
         d = verifyAndFixIPaddress(gateway,  gateway,    true);
 
         if(!a || !b || !c || !d) {
-            showMessageScreen((char *) "Warning", (char *) "Some network address has invalid format.\n\rPlease fix this and try again.");
+            showMessageScreen((char *) "Warning", (char *) "Some ethernet network address has invalid format.\n\rPlease fix this and try again.");
+            return;
+        }
+    }
+	
+	if(!useDhcp2) {          // but verify settings only when not using dhcp
+        bool a,b,c;
+
+        a = verifyAndFixIPaddress(ip2,       ip2,         false);
+        b = verifyAndFixIPaddress(mask2,     mask2,       false);
+        c = verifyAndFixIPaddress(gateway2,  gateway2,    true);
+
+        if(!a || !b || !c) {
+            showMessageScreen((char *) "Warning", (char *) "Some wifi network address has invalid format.\n\rPlease fix this and try again.");
             return;
         }
     }
@@ -440,11 +535,19 @@ void ConfigStream::onNetwork_save(void)
         ns.eth0.gateway = gateway;
     }
 
-	
-	// TODO: do the wlan part!
-	
-	
+	getTextByComponentId(COMPID_WIFI_SSID,		ns.wlan0.wpaSsid);
+	getTextByComponentId(COMPID_WIFI_PSK,		ns.wlan0.wpaPsk);
+
+	ns.wlan0.dhcpNotStatic = useDhcp2;
+
+    if(!useDhcp2) {          		// if not using dhcp, store also the network settings
+        ns.wlan0.address = ip2;
+        ns.wlan0.netmask = mask2;
+        ns.wlan0.gateway = gateway2;
+    }
+
 	ns.save();						// store the new values
+	//-------------------------
 	
     createScreen_homeScreen();		// now back to the home screen
 }
