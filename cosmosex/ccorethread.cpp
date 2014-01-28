@@ -42,6 +42,9 @@ CCoreThread::CCoreThread()
 
     // now register all the objects which use some settings in the proxy
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_ACSI);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_TRANSLATED);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_SHARED);
+	
     settingsReloadProxy.addSettingsUser((ISettingsUser *) scsi,          SETTINGSUSER_ACSI);
 	settingsReloadProxy.addSettingsUser((ISettingsUser *) translated,    SETTINGSUSER_TRANSLATED);
 	
@@ -191,7 +194,18 @@ void CCoreThread::resetHansAndFranz(void)
 
 void CCoreThread::reloadSettings(void)
 {
+	// first dettach all the devices
+	scsi->detachAll();
+    translated->detachAll();
+
+	// then load the new settings
     loadSettings();
+
+	// and now try to attach everything back
+	devFinder.clearMap();									// make all the devices appear as new
+	devFinder.lookForDevChanges();							// and now find all the devices
+	
+	mountAndAttachSharedDrive();							// and also attach shared drive
 }
 
 void CCoreThread::loadSettings(void)

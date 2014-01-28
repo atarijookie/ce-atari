@@ -176,7 +176,12 @@ void DevFinder::cutBeforeFirstNumber(std::string &filename)
 	}
 }
 
-void DevFinder::clearFoundFlags(void)
+void DevFinder::clearMap(void)									// called to make all the devices appear as new
+{
+	mapDevToFound.clear();
+}
+
+void DevFinder::clearFoundFlags(void)							// called to clear just the found flags, so we can tell new and old devices apart
 {
 	std::map<std::string, bool>::iterator it;							// set all found flags to false
 

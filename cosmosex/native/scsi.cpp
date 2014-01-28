@@ -209,6 +209,13 @@ void Scsi::dettachFromHostPath(std::string hostPath)
     dettachByIndex(index);                                      // found? detach!
 }
 
+void Scsi::detachAll(void)
+{
+	for(int i=0; i<8; i++) {
+		detachMediaFromACSIidByIndex(i);
+	}
+}
+
 int Scsi::findAttachedMediaByHostPath(std::string hostPath)
 {
     for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {               // find where it's attached

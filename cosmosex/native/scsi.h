@@ -57,7 +57,8 @@ public:
 
     bool attachToHostPath(std::string hostPath, int hostSourceType, int accessType);
     void dettachFromHostPath(std::string hostPath);
-
+	void detachAll(void);
+	
     void processCommand(BYTE *command);
 
 private:

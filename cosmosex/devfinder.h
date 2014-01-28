@@ -20,6 +20,8 @@ public:
 	void lookForDevChanges(void);
 	void getDevPartitions(std::string devName, std::list<std::string> &partitions);
 
+	void clearMap(void);						// called to make all the devices appear as new
+	
 private:
 	DevChangesHandler *devChHandler;
 

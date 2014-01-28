@@ -602,6 +602,10 @@ void ConfigStream::onSharedSave(void)
 
     s.setString((char *) "SHARED_ADDRESS",  (char *) ip.c_str());
     s.setString((char *) "SHARED_PATH",     (char *) path.c_str());
+	
+    if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
+        reloadProxy->reloadSettings(SETTINGSUSER_SHARED);
+	}
 
     createScreen_homeScreen();		// now back to the home screen
 }
