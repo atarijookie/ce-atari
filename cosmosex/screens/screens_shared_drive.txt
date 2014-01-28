@@ -5,18 +5,18 @@ Define what folder on which machine will
 be used as drive mounted through network
 on CosmosEx. Works in translated mode.
 
+Enabled  [   ]
 
+Sharing protocol
+         [   ] NFS
+	     [   ] Samba / cifs / windows
+	   
+IP address of server
+         [   .   .   .   ]
 
-          IP address of server
-           [   .   .   .   ]
-
-      Shared folder path on server
+Shared folder path on server
  [                                    ]
-
 
    [  Test  ]  [  Save  ]  [ Cancel ]
 
-
-
-
-        To quit - press Ctrl + C
+   To quit - press Ctrl + C

@@ -641,53 +641,111 @@ void ConfigStream::createScreen_shared(void)
 
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Define what folder on which machine will", 40, 0, 4, gotoOffset);
+	int row = 4;
+	
+	int col1x = 0;
+	int col2x = 10;
+	int col3x = col2x + 6;
+	
+	// description on the top
+    comp = new ConfigComponent(this, ConfigComponent::label, "Define what folder on which machine will",	40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "be used as drive mounted through network", 40, 0, 5, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "be used as drive mounted through network",	40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "on CosmosEx. Works in translated mode.", 40, 0, 6, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "on CosmosEx. Works in translated mode.",		40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "IP address of server", 40, 11, 10, gotoOffset);
+	row++;
+	
+	// enabled checkbox
+    comp = new ConfigComponent(this, ConfigComponent::label, "Enabled",										40,	col1x, row, gotoOffset);
+    screen.push_back(comp);
+	
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ", 										3,	col2x, row++, gotoOffset);
+    comp->setComponentId(COMPID_SHARED_ENABLED);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, " ", 15, 12, 11, gotoOffset);
+	row++;
+	
+	// sharing protocol checkbox group
+    comp = new ConfigComponent(this, ConfigComponent::label, "Sharing protocol",							40, col1x, row++, gotoOffset);
+    screen.push_back(comp);
+	
+	comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",										3,	col2x, row, gotoOffset);
+    comp->setCheckboxGroupIds(COMPID_SHARED_NFS_NOT_SAMBA, 1);																// set checkbox group id COMPID_SHARED_NFS_NOT_SAMBA, and checbox id 1 for NFS (variable SHARED_NFS_NOT_SAMBA)
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "NFS",											40,	col3x, row++, gotoOffset);
+    screen.push_back(comp);
+	
+	comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",										3,	col2x, row, gotoOffset);
+    comp->setCheckboxGroupIds(COMPID_SHARED_NFS_NOT_SAMBA, 0);																// set checkbox group id COMPID_SHARED_NFS_NOT_SAMBA, and checbox id 0 for Samba (variable SHARED_NFS_NOT_SAMBA)
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "Samba / cifs / windows",						40,	col3x, row++, gotoOffset);
+    screen.push_back(comp);
+
+	row++;
+	
+	
+	// ip address edit line
+    comp = new ConfigComponent(this, ConfigComponent::label, "IP address of server", 						40, col1x, row++, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",										15, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_SHARED_IP);
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Shared folder path on server", 40, 7, 13, gotoOffset);
+	row++;
+	
+	// folder on server
+    comp = new ConfigComponent(this, ConfigComponent::label, "Shared folder path on server",				40, col1x, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, " ", 35, 2, 14, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",										35, 2, row++, gotoOffset);
     comp->setComponentId(COMPID_SHARED_PATH);
     screen.push_back(comp);
-
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Test  ", 8,  4, 17, gotoOffset);
+	
+	row++;
+	
+	// buttons
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Test  ",									8,  4, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_SHARED_TEST);
     comp->setComponentId(COMPID_SHARED_BTN_TEST);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  15, 17, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ",									8, 15, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_SHARED_SAVE);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, 27, 17, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ",									8, 27, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
 
     Settings s;
     std::string addr, path;
+	bool enabled, nfsNotSamba;
 
     addr = s.getString((char *) "SHARED_ADDRESS",  (char *) "");
     path = s.getString((char *) "SHARED_PATH",     (char *) "");
+	
+	enabled		= s.getBool((char *) "SHARED_ENABLED",			false);
+	nfsNotSamba	= s.getBool((char *) "SHARED_NFS_NOT_SAMBA",	true);
 
     setTextByComponentId(COMPID_SHARED_IP,      addr);
     setTextByComponentId(COMPID_SHARED_PATH,    path);
+	setBoolByComponentId(COMPID_SHARED_ENABLED,	enabled);
+	
+	if(nfsNotSamba) {
+		checkboxGroup_setCheckedId(COMPID_SHARED_NFS_NOT_SAMBA, 1);			// select NFS
+	} else {
+		checkboxGroup_setCheckedId(COMPID_SHARED_NFS_NOT_SAMBA, 0);			// select samba
+	}
 
     setFocusToFirstFocusable();
 }
@@ -700,25 +758,33 @@ void ConfigStream::onSharedTest(void)
 void ConfigStream::onSharedSave(void)
 {
     std::string ip, path;
+	bool enabled, nfsNotSamba;
 
     getTextByComponentId(COMPID_SHARED_IP,      ip);
     getTextByComponentId(COMPID_SHARED_PATH,    path);
+	getBoolByComponentId(COMPID_SHARED_ENABLED,	enabled);
+	nfsNotSamba = (bool) checkboxGroup_getCheckedId(COMPID_SHARED_NFS_NOT_SAMBA);
 
-    if(!verifyAndFixIPaddress(ip, ip, false)) {
-        showMessageScreen((char *) "Warning", (char *) "Server address seems to be invalid.\n\rPlease fix this and try again.");
-        return;
-    }
+	if(enabled) {										// if enabled, do validity checks, othewise let it just pass
+		if(!verifyAndFixIPaddress(ip, ip, false)) {
+			showMessageScreen((char *) "Warning", (char *) "Server address seems to be invalid.\n\rPlease fix this and try again.");
+			return;
+		}
 
-    if(path.length() < 1) {
-        showMessageScreen((char *) "Warning", (char *) "Path for server is empty.\n\rPlease fix this and try again.");
-        return;
-    }
+		if(path.length() < 1) {
+			showMessageScreen((char *) "Warning", (char *) "Path for server is empty.\n\rPlease fix this and try again.");
+			return;
+		}
+	}
 
     Settings s;
 
-    s.setString((char *) "SHARED_ADDRESS",  (char *) ip.c_str());
-    s.setString((char *) "SHARED_PATH",     (char *) path.c_str());
+	s.setBool	((char *) "SHARED_ENABLED",			enabled);
+	s.setBool	((char *) "SHARED_NFS_NOT_SAMBA",	nfsNotSamba);
+    s.setString	((char *) "SHARED_ADDRESS",  		(char *) ip.c_str());
+    s.setString	((char *) "SHARED_PATH",     		(char *) path.c_str());
 	
+
     if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
         reloadProxy->reloadSettings(SETTINGSUSER_SHARED);
 	}
