@@ -9,6 +9,7 @@
 #include "../settings.h"
 #include "keys.h"
 #include "configstream.h"
+#include "netsettings.h"
 
 //--------------------------
 // screen creation methods
@@ -180,25 +181,20 @@ void ConfigStream::createScreen_network(void)
 
 
     // get the settings, store them to components
-    Settings s;
-    std::string str;
-    bool val;
+	NetworkSettings ns;
+	ns.load();						// load the current values
 
-    val = s.getBool((char *) "NET_USE_DHCP", true);
-    setBoolByComponentId(COMPID_NET_DHCP, val);
+    setTextByComponentId(COMPID_NET_DNS,		ns.nameserver);
 
-    str = s.getString((char *) "NET_IP", (char *) "");
-    setTextByComponentId(COMPID_NET_IP, str);
+    setBoolByComponentId(COMPID_NET_DHCP,		ns.eth0.dhcpNotStatic);
+    setTextByComponentId(COMPID_NET_IP,			ns.eth0.address);
+    setTextByComponentId(COMPID_NET_MASK,		ns.eth0.netmask);
+    setTextByComponentId(COMPID_NET_GATEWAY,	ns.eth0.gateway);
 
-    str = s.getString((char *) "NET_MASK", (char *) "");
-    setTextByComponentId(COMPID_NET_MASK, str);
+	
+	// TODO: do the wlan part!
 
-    str = s.getString((char *) "NET_DNS", (char *) "");
-    setTextByComponentId(COMPID_NET_DNS, str);
-
-    str = s.getString((char *) "NET_GATEWAY", (char *) "");
-    setTextByComponentId(COMPID_NET_GATEWAY, str);
-
+	
     setFocusToFirstFocusable();
 }
 
@@ -429,17 +425,27 @@ void ConfigStream::onNetwork_save(void)
         }
     }
 
+	//-------------------------
     // store the settings
-    Settings s;
-    s.setBool((char *) "NET_USE_DHCP", useDhcp);
+	NetworkSettings ns;
+	ns.load();						// load the current values
 
-    if(!useDhcp) {          // if not using dhcp, store also the network settings
-        s.setString((char *) "NET_IP",      (char *) ip.c_str());
-        s.setString((char *) "NET_MASK",    (char *) mask.c_str());
-        s.setString((char *) "NET_DNS",     (char *) dns.c_str());
-        s.setString((char *) "NET_GATEWAY", (char *) gateway.c_str());
+    ns.nameserver = dns;			
+	
+	ns.eth0.dhcpNotStatic = useDhcp;
+
+    if(!useDhcp) {          		// if not using dhcp, store also the network settings
+        ns.eth0.address = ip;
+        ns.eth0.netmask = mask;
+        ns.eth0.gateway = gateway;
     }
 
+	
+	// TODO: do the wlan part!
+	
+	
+	ns.save();						// store the new values
+	
     createScreen_homeScreen();		// now back to the home screen
 }
 
