@@ -353,7 +353,7 @@ void CCoreThread::attachDevAsTranslated(std::string devName)
 		TMounterRequest tmr;
 		tmr.mountNorUmount	= true;												// action: mount
 		tmr.deviceNotShared	= true;												// mount as device
-		tmr.devicePath		= devName;											// e.g. /dev/sda2
+		tmr.devicePath		= partitionDevice;									// e.g. /dev/sda2
 		tmr.mountDir		= mountPath;										// e.g. /mnt/sda2
 		mountAdd(tmr);
 
