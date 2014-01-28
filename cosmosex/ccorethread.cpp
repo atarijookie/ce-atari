@@ -365,7 +365,7 @@ void CCoreThread::attachDevAsTranslated(std::string devName)
 		mountPath = "/mnt/" + justDevName;										// create host path (e.g. /mnt/sda1)
 		
 		TMounterRequest tmr;
-		tmr.mountNorUmount	= true;												// action: mount
+		tmr.action			= MOUNTER_ACTION_MOUNT;								// action: mount
 		tmr.deviceNotShared	= true;												// mount as device
 		tmr.devicePath		= partitionDevice;									// e.g. /dev/sda2
 		tmr.mountDir		= mountPath;										// e.g. /mnt/sda2
@@ -408,7 +408,7 @@ void CCoreThread::mountAndAttachSharedDrive(void)
 	}
 	
 	TMounterRequest tmr;													// fill this struct to mount something somewhere
-	tmr.mountNorUmount		= true;
+	tmr.action			= MOUNTER_ACTION_MOUNT;								// action: mount
 	tmr.deviceNotShared		= false;
 	tmr.shared.host			= addr;
 	tmr.shared.hostDir		= path;

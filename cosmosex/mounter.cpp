@@ -50,14 +50,23 @@ void *mountThreadCode(void *ptr)
 		mountQueue.pop();								// and remove it form queue
 		pthread_mutex_unlock(&mountThreadMutex);		// unlock the mutex
 
-		if(tmr.mountNorUmount) {						// should we mount this or umount this?
+		if(tmr.action == MOUNTER_ACTION_MOUNT) {		// should we mount this?
 			if(tmr.deviceNotShared) {					// mount device?
 				mounter.mountDevice((char *) tmr.devicePath.c_str(), (char *) tmr.mountDir.c_str());	
 			} else {									// mount shared?
 				mounter.mountShared((char *) tmr.shared.host.c_str(), (char *) tmr.shared.hostDir.c_str(), tmr.shared.nfsNotSamba, (char *) tmr.mountDir.c_str());
 			}
-		} else {										// on umount
+			
+			continue;
+		} 
+		
+		if(tmr.action == MOUNTER_ACTION_UMOUNT) {		// should umount?
 			mounter.umountIfMounted((char *) tmr.mountDir.c_str());
+			continue;
+		}
+		
+		if(tmr.action == MOUNTER_ACTION_RESTARTNETWORK) {
+			mounter.restartNetwork();
 		}
 	}
 	
@@ -278,5 +287,18 @@ void Mounter::umountIfMounted(char *mountDir)
 	if(isMountdirUsed(mountDir)) {				// if mountDir is used, umount
 		tryUnmount(mountDir);
 	}
+}
+
+void Mounter::restartNetwork(void)
+{
+	Debug::out("Mounter::restartNetwork - starting to restart the network\n");
+
+	system("sudo ifdown eth0");
+	system("sudo ifdown wlan0");
+
+	system("sudo ifup eth0");
+	system("sudo ifup wlan0");
+	
+	Debug::out("Mounter::restartNetwork - done\n");
 }
 

@@ -3,7 +3,12 @@
 
 #include <string>
 
+#define MOUNTER_ACTION_MOUNT			0
+#define MOUNTER_ACTION_UMOUNT			1
+#define MOUNTER_ACTION_RESTARTNETWORK	2
+
 typedef struct {
+	int			action;
 	bool		deviceNotShared;
 	
 	std::string	devicePath;				// used when deviceNotShared is true
@@ -15,7 +20,6 @@ typedef struct {
 	} shared;
 
 	std::string mountDir;				// location where it should be mounted
-	bool		mountNorUmount;			// action: true means mount, false means umount
 } TMounterRequest;
 
 extern "C" {
@@ -29,6 +33,7 @@ public:
 	bool mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mountDir);
 	bool mountDevice(char *devicePath, char *mountDir);
 	void umountIfMounted(char *mountDir);
+	void restartNetwork(void);
 	
 private:
 	bool mount(char *mountCmd, char *mountDir);

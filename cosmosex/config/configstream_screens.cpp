@@ -5,6 +5,7 @@
 #include "../debug.h"
 #include "../native/scsi_defs.h"
 #include "../acsidatatrans.h"
+#include "../mounter.h"
 
 #include "../settings.h"
 #include "keys.h"
@@ -547,8 +548,14 @@ void ConfigStream::onNetwork_save(void)
     }
 
 	ns.save();						// store the new values
-	//-------------------------
 	
+	//-------------------------
+	// now request network restart
+	TMounterRequest tmr;			
+	tmr.action	= MOUNTER_ACTION_RESTARTNETWORK;								
+	mountAdd(tmr);
+	
+	//-------------------------
     createScreen_homeScreen();		// now back to the home screen
 }
 
