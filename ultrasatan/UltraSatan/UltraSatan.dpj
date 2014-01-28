@@ -14,13 +14,13 @@
 			<changed-property-page-flags>0</changed-property-page-flags>
 			<tools>
 				<tool type="Compiler">
-					<option><![CDATA[|-Version>5.0|-O>0|-O1>0|-Ov>100|-ipa>0|-g>1|-no-annotate>0|-save-temps -path-output>0|-ED>0|-no-auto-attrs>0|-no-builtin>0|-no-extra-keywords>0|-enum-is-int>0|-no-fp-associative>0|-structs-do-not-overlap>1|-implicit-pointers>0|-eh >0|-rtti>1|-check-init-order>0|-ignore-std>0|-const-read-write>0|-const-strings>0|-no-multiline>1|-misra>0|-misra-strict>0|-misra-no-cross-module>0|-misra-no-runtime>0|-misra-testing>0|-misra-suppress-advisory>0|-no-std-inc>0|-double-size-32>1|-double-size-any>0|-Ofp>0|-full-io>0|-guard-vol-loads>0|-decls-strong>1|-no-saturation>0|-cplbs>0|-sdram>0|-multicore>0|-pguide>0|NOSWITCH>0|-flags-compiler --diag_warning,implicit_func_decl>0|-warn-protos>1|-flags-compiler --diag_warning,call_not_inlined>0|-Wremarks>0|-w>0]]></option>
+					<option><![CDATA[|-Version>5.0|-O>0|-O1>0|-Ov>100|-ipa>0|-g>1|-no-annotate>0|-save-temps -path-output>0|-ED>0|-no-auto-attrs>0|-no-builtin>0|-no-extra-keywords>0|-enum-is-int>0|-no-fp-associative>0|-structs-do-not-overlap>1|-implicit-pointers>0|-eh >0|-rtti>1|-check-init-order>0|-ignore-std>0|-const-read-write>0|-const-strings>0|-no-multiline>1|-misra>0|-misra-strict>0|-misra-no-cross-module>0|-misra-no-runtime>0|-misra-testing>0|-misra-suppress-advisory>0|-no-std-inc>0|-double-size-32>1|-double-size-any>0|-Ofp>0|-guard-vol-loads>0|-decls-strong>1|-no-saturation>0|-cplbs>0|-sdram>0|-multicore>0|-stack-detect>0|-pguide>0|NOSWITCH>0|-flags-compiler --diag_warning,implicit_func_decl>0|-warn-protos>1|-flags-compiler --diag_warning,call_not_inlined>0|-Wremarks>0|-w>0]]></option>
 				</tool>
 				<tool type="Assembler">
 					<option><![CDATA[|-Version>4.5|-v>0|-g>1|-l>0|-save-temps>0|-sp>0]]></option>
 				</tool>
 				<tool type="Linker">
-					<option><![CDATA[|-Version>5.0|-flags-link -t>0|-flags-link -S>0|-flags-link -s>0|-flags-link -meminit>0|-flags-link -warnonce>0|-map>0|-flags-link -xref>0|-flags-link -save-temps>0|-flags-link -ip>0|-MD>USER_CRT="UltraSatan_basiccrt.doj"|-flags-link -e>0|-flags-link -ev>0|-add-debug-libpaths>1|-flags-link -MD__ADI_LIBEH__>0|-multicore>0|NOSWITCH>1]]></option>
+					<option><![CDATA[|-Version>5.0|-flags-link -t>0|-flags-link -S>0|-flags-link -s>0|-mem>0|-flags-link -warnonce>0|-map>0|-flags-link -xref>0|-flags-link -save-temps>0|-flags-link -ip>0|-MD>USER_CRT="UltraSatan_basiccrt.doj"|-flags-link -e>0|-flags-link -ev>0|-add-debug-libpaths>1|-flags-link -MD__ADI_LIBEH__>0|-multicore>0|NOSWITCH>1]]></option>
 				</tool>
 				<tool type="Archiver">
 					<option><![CDATA[]]></option>
@@ -45,7 +45,7 @@
 					<option><![CDATA[]]></option>
 				</tool>
 				<tool type="Linker">
-					<option><![CDATA[|-MD>USER_CRT="UltraSatan_basiccrt.doj"|-flags-link -MDUSE_CACHE>0]]></option>
+					<option><![CDATA[|-MD>USER_CRT="UltraSatan_basiccrt.doj"|-flags-link -MDUSE_CACHE>0|-mem>0]]></option>
 				</tool>
 				<tool type="Archiver">
 					<option><![CDATA[]]></option>
@@ -359,7 +359,7 @@
 			</system-builder-component>
 			<system-builder-component name="Configuration">
 				<property name="Add startup code"><![CDATA[True]]></property>
-				<property name="Startup code template schema"><![CDATA[3]]></property>
+				<property name="Startup code template schema"><![CDATA[3.9]]></property>
 			</system-builder-component>
 			<system-builder-component name="Processor clock and power settings">
 				<property name="Clock and power settings"><![CDATA[Optimize for speed]]></property>
@@ -369,11 +369,16 @@
 			<system-builder-component name="Project Options">
 				<property name="Compiler Multicore"><![CDATA[False]]></property>
 				<property name="Configuration"><![CDATA[Debug]]></property>
+				<property name="Full IO"><![CDATA[False]]></property>
 				<property name="Intermediate Directory"><![CDATA[.\Debug]]></property>
+				<property name="Link against MT libraries"><![CDATA[False]]></property>
 				<property name="Linker Multicore"><![CDATA[False]]></property>
 				<property name="Name"><![CDATA[UltraSatan]]></property>
 				<property name="Processor"><![CDATA[ADSP-BF531]]></property>
 				<property name="Silicon Revision"><![CDATA[Automatic]]></property>
+				<property name="Strict IEEE Floating Point Compliance"><![CDATA[False]]></property>
+				<property name="Use C++ exceptions libraries"><![CDATA[False]]></property>
+				<property name="Utility ROM"><![CDATA[True]]></property>
 			</system-builder-component>
 			<system-builder-component name="Run-time Initialization">
 				<property name="I/O device initialization"><![CDATA[False]]></property>

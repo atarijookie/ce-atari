@@ -168,6 +168,8 @@ while(1)
 	{
 		*pFIO_FLAG_C = CARD_CHANGE;				// clear interrupt flag
 		
+		wait_ms(200);							// let the card initialize
+		
 		InitStorage();										// init and list storage
 		ListStorage();
 		

@@ -11,9 +11,9 @@
 #define TRUE	1
 #define FALSE	0
 /////////////////////////////////////////////////////////
-#define VERSION_STRING          "UltraSatan v1.15 (by Jookie)"
-#define VERSION_STRING_SHORT    "1.15"
-#define DATE_STRING             "10/24/13"                  // MM/DD/YY
+#define VERSION_STRING          "UltraSatan v1.20 (by Jookie)"
+#define VERSION_STRING_SHORT    "1.20"
+#define DATE_STRING             "01/28/14"                  // MM/DD/YY
 /////////////////////////////////////////////////////////
 // ACSI signals located at Async memory port
 #define pASYNCMEM 	((volatile unsigned short *)0x20000000)

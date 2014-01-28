@@ -41,6 +41,8 @@ BYTE mmcReset(BYTE spiID)
 	WORD retry;
 	BYTE isSD, buff[5], isSDHC;
 	
+	TimeOut_Start_ms(1000);
+	
 	spiSetSPCKfreq(SPI_FREQ_SLOW);
 	spiCShigh(0xff);
 	
@@ -76,6 +78,11 @@ BYTE mmcReset(BYTE spiID)
 			{
 				retry--;
 				
+				if(TimeOut_DidHappen()) {
+					retry = 0;
+					break;
+				}
+				
 				r1 = mmcSendCommand(spiID, 55, 0);		  // ACMD41 = CMD55 + CMD41
 
 				if(r1 != 1)						  // if invalid reply to CMD55, then it's MMC card
@@ -88,6 +95,11 @@ BYTE mmcReset(BYTE spiID)
 
 				if(r1 == 0)						  // if everything is OK, then it's SD card
 					break;
+					
+				if(TimeOut_DidHappen()) {
+					retry = 0;
+					break;
+				}
 			}
 			//--------------
 			if(retry)									// if not timed out
@@ -132,6 +144,11 @@ BYTE mmcReset(BYTE spiID)
 			break;
 		}
 		
+		if(TimeOut_DidHappen()) {
+			retry = 0;
+			break;
+		}
+		
 		retry--;
 	}
 	
@@ -161,16 +178,15 @@ BYTE mmcCmd(BYTE cs, BYTE cmd, DWORD arg, BYTE retry, BYTE val)
 {
  	BYTE r1;
 
-	do
-	{
-  	r1 = mmcSendCommand(cs, cmd, arg);
+	do {
+		r1 = mmcSendCommand(cs, cmd, arg);
 			  
-		if(retry==0)
+		if(retry==0 || TimeOut_DidHappen())
 			return 0xff;
 
 		// do retry counter
 		retry--;
-			
+		
 	} while(r1 != val);
 	
 	return r1;
@@ -190,14 +206,14 @@ BYTE mmcCmdLow(BYTE cs, BYTE cmd, DWORD arg, BYTE val)
 
 	  	spiTransferByte(0xff);
 
-		if(retry==0)
-			{
+		if(retry==0 || TimeOut_DidHappen()) {
+		
 			for(retry=0; retry<10; retry++)
 				spiTransferByte(0xff);
 
 			spiCShigh(cs);		   // CS to H
 			return 0xff;
-			}
+		}
 
 		// do retry counter
 		retry--;
@@ -291,7 +307,7 @@ BYTE mmcCommand(BYTE cmd, DWORD arg)
 		if(r1 != 0xff)
 			break;
 		
-		if(!retry)
+		if(retry == 0 || TimeOut_DidHappen())
 			break;
 			
 		retry--;
@@ -300,10 +316,7 @@ BYTE mmcCommand(BYTE cmd, DWORD arg)
 	// return response
 	return r1;
 }
-//--------------------------------------------------------
-//#define DEVNULL
-
-#ifndef DEVNULL
+//**********************************************************************
 BYTE mmcRead(BYTE cs, DWORD sector)
 {
 	BYTE r1;
@@ -311,15 +324,7 @@ BYTE mmcRead(BYTE cs, DWORD sector)
 	BYTE byte;
 	DWORD addr, addr2, deltaAddr;
 
-	///////////////////////////////////////
-/*	
-	DWORD a,b,c,d;
-
-	Timer0_start();
-	
-	a = *pTIMER0_COUNTER;
-*/
-	///////////////////////////////////////
+	TimeOut_Start_ms(1000);
 	
 	// assert chip select
 	spiCSlow(cs);		   // CS to L
@@ -345,7 +350,6 @@ BYTE mmcRead(BYTE cs, DWORD sector)
 	//------------------------
 	// wait for block start
 	i = 0x000fffff;				// v. 1.00
-//	i = 0x01ffffff;				// experimental
 	
 	while(i)
 	{
@@ -357,7 +361,12 @@ BYTE mmcRead(BYTE cs, DWORD sector)
 
 		if(r1 == MMC_STARTBLOCK_READ)				  // if it's the wanted byte
 			break;
-			
+		
+		if(TimeOut_DidHappen()) {
+			i = 0;
+			break;
+		}
+		
 		i--;	  									  // decrement
 	}
 	//------------------------
@@ -413,186 +422,6 @@ BYTE mmcRead(BYTE cs, DWORD sector)
 	
 #endif
 //**********************************************************************
-//#define SPI_ONREAD
-
-#ifdef SPI_ONREAD
-	WORD stat;
-
-	CLEAR(*pSPI_CTL, (1<<14));										// disable SPI
-	*pSPI_CTL = 0x1c04;														// Start transfer with read of SPI_RDBR
-	SET(*pSPI_CTL, (1<<14));											// enable SPI
-
-	*pSPI_TDBR = (WORD) 0xff;
-  byte = (BYTE) (*pSPI_RDBR);										// do one dummy read to init the transfer
-	
-	for(i=0; i<512; i++)
-	{
-		//----------------
-	  while(1)														// wait while the RX buffer is not full
-  	{
-  		stat = *pSPI_STAT;								// read status
-  		stat = stat & 0x0020;							// get only RXS bit (RX Data Buffer Status)
-
-  		if(stat==0x0020)									// if RXS==1, RX buffer is full
-  			break;
-  	}
-	
-  	if(i==511)													// if reading the last byte
-			CLEAR(*pSPI_CTL, (1<<14));				// disable SPI so the read does not trigger another transfer
-		else
-			*pSPI_TDBR = (WORD) 0xff;
-			
-	  byte = (BYTE) (*pSPI_RDBR);					// read the received data
-		//----------------
-		r1 = DMA_readFast(byte);						// send it to ST
-//		SectorBufer[i] = byte;
-		
-		if(brStat != E_OK)		  						// if something was wrong
-		{
-			shitHasHappened = 1;
-			uart_putc('m');
-
-			break;														// quit
-		}
-	}
-	
-	//---------------------------------
-	CLEAR(*pSPI_CTL, (1<<14));										// disable SPI
-	*pSPI_CTL = 0x1c05;														// Start transfer with write of SPI_TDBR
-	SET(*pSPI_CTL, (1<<14));											// enable SPI
-	//---------------------------------
-	if(i != 512)
-	{
-		while(1)														// wait while the RX buffer is not full
-  	{
-  		stat = *pSPI_STAT;								// read status
-  		stat = stat & 0x0020;							// get only RXS bit (RX Data Buffer Status)
-  	
-  		if(stat==0x0020)									// if RXS==1, RX buffer is full
-  			break;
-  	}
-	
-	  byte = (BYTE) (*pSPI_RDBR);					// read the received data
-		//-----------
-		
-		for(; i<0x200; i++)							// finish the sector
-			spiTransferByte(0xFF);
-	}
-	//---------------------------------
-	
-#endif
-//**********************************************************************
-//#define PSEUDOPARALLEL_PIO
-
-#ifdef PSEUDOPARALLEL_PIO
-	WORD stat;
-
-#ifdef USE_C_FUNCTIONS
-		byte = spiTransferByte(0xFF);					// get byte
-#else
-		byte = spiTransferByteAsm(0xff);
-#endif
-
-	for(i=0; i<512; i++)
-	{
-		//----------------
-  	while(1)														// wait while the TX buffer is full
-  	{
-  		stat = *pSPI_STAT;								// read status
-  		stat = stat & 0x0008;							// get only TXS bit (SPI_TDBR Data Buffer Status)
-  	
-  		if(stat==0)												// if TXS==0, TX buffer is not full
-  			break;
-  	}
-
-		*pSPI_TDBR = 0xfff;									// send the data
-		//----------------
-#ifdef SLOWER_DMA
-		r1 = DMA_read(byte);								// send it to ST
-#else
-		r1 = DMA_readFast(byte);						// send it to ST
-#endif		
-		
-		if(brStat != E_OK)		  						// if something was wrong
-		{
-			shitHasHappened = 1;
-			uart_putc('m');
-
-			break;														// quit
-		}
-		//----------------
-	  while(1)														// wait while the RX buffer is not full
-  	{
-  		stat = *pSPI_STAT;								// read status
-  		stat = stat & 0x0020;							// get only RXS bit (RX Data Buffer Status)
-  	
-  		if(stat==0x0020)									// if RXS==1, RX buffer is full
-  			break;
-  	}
-	
-	  byte = (BYTE) (*pSPI_RDBR);					// read the received data
-		//----------------
-	}
-
-	if(i != 512)
-	{
-		while(1)														// wait while the RX buffer is not full
-  	{
-  		stat = *pSPI_STAT;								// read status
-  		stat = stat & 0x0020;							// get only RXS bit (RX Data Buffer Status)
-  	
-  		if(stat==0x0020)									// if RXS==1, RX buffer is full
-  			break;
-  	}
-	
-	  byte = (BYTE) (*pSPI_RDBR);					// read the received data
-		//-----------
-		
-		for(; i<0x200; i++)							// finish the sector
-			spiTransferByte(0xFF);
-	}
-#endif
-//**********************************************************************
-//#define BUFFERED_PIO
-
-#ifdef BUFFERED_PIO
-
-//	b = *pTIMER0_COUNTER;
-	
-	for(i=0; i<0x200; i++)
-		SectorBufer[i] = spiTransferByteAsm(0xff);
-
-//	c = *pTIMER0_COUNTER;
-
-	for(i=0; i<0x200; i++)
-	{
-//		r1 = DMA_read(SectorBufer[i]);				
-		r1 = DMA_readFast(SectorBufer[i]);				
-		
-		if(brStat != E_OK)		  						
-		{
-			shitHasHappened = 1;
-			uart_putc('m');
-
-		 	for(; i<0x200; i++)							
-		  		spiTransferByte(0xFF);
-		  
-			break;										
-		}
-	}
-/*	
-	d = *pTIMER0_COUNTER;
-
-	uart_prints("\n");
-	uart_outhexD(b - a);
-	uart_prints(" ");
-	uart_outhexD(c - b);
-	uart_prints(" ");
-	uart_outhexD(d - c);
-	uart_prints("\n");
-*/	
-#endif 
-//**********************************************************************
 //#define SLOW_PIO
 
 #ifdef SLOW_PIO
@@ -611,13 +440,6 @@ BYTE mmcRead(BYTE cs, DWORD sector)
 	SectorBufer[i] = byte;
 #endif
 
-//#ifdef DEVNULL
-//		SectorBufer[i] = byte;
-
-//uart_outhexB(byte);
-//uart_putc(32);
-//#endif
-
 		if(brStat != E_OK)		  						// if something was wrong
 		{
 			shitHasHappened = 1;
@@ -628,10 +450,6 @@ BYTE mmcRead(BYTE cs, DWORD sector)
 		  
 			break;										// quit
 		}
-/*
-		r1 = E_OK;
-		SectorBufer[i] = byte;
-*/
 	}
 #endif 
 //**********************************************************************
@@ -665,45 +483,10 @@ BYTE mmcRead(BYTE cs, DWORD sector)
 		return 0xff;
 	}
 		
-//#ifdef DEVNULL
-//DumpBuffer();
-//#endif
-	
 	//-----------------
 	// return success
 	return 0;	
 }
-//-----------------------------------------------
-#else
-BYTE mmcRead(BYTE cs, DWORD sector)
-{
-	BYTE r1;
-	WORD i;
-	BYTE byte;
-
-	PreDMA_read();
-
-	for(i=0; i<512; i++)
-	{
-		r1 = DMA_read((BYTE) i);		
-
-		if(brStat != E_OK)		  						// if something was wrong
-		{
-			uart_outhexD(i);
-			uart_putchar('\n');
-
-			break;														// quit
-		}
-	}
-	
-	PostDMA_read();
-	
-	if(brStat != E_OK)
-		return 0xff;
-		
-	return 0;	
-}
-#endif
 //-----------------------------------------------
 BYTE mmcReadMore(BYTE cs, DWORD sector, WORD count)
 {
@@ -711,6 +494,8 @@ BYTE mmcReadMore(BYTE cs, DWORD sector, WORD count)
 	WORD i,j;
 	BYTE byte;
 
+	TimeOut_Start_ms(1000);
+	
 	// assert chip select
 	spiCSlow(cs);		   // CS to L
 
@@ -811,6 +596,8 @@ BYTE mmcWriteMore(BYTE cs, DWORD sector, WORD count)
 	BYTE byte;
 	DWORD thisSector;
 
+	TimeOut_Start_ms(1000);
+	
 	// assert chip select
 	spiCSlow(cs);		   // CS to L
 
@@ -930,6 +717,8 @@ BYTE mmcReadJustForTest(BYTE cs, DWORD sector)
 	BYTE byte;
 	DWORD addr, addr2, deltaAddr;
 
+	TimeOut_Start_ms(1000);
+	
 	// assert chip select
 	spiCSlow(cs);		   // CS to L
 
@@ -955,13 +744,18 @@ BYTE mmcReadJustForTest(BYTE cs, DWORD sector)
 	// wait for block start
 	i = 0x000fffff;
 	
-	while(i)
+	while(i != 0)
 	{
 		r1 = spiTransferByte(0xFF);					// get byte
 
 		if(r1 == MMC_STARTBLOCK_READ)				  // if it's the wanted byte
 			break;
-			
+		
+		if(TimeOut_DidHappen()) {
+			i = 0;
+			break;
+		}
+		
 		i--;	  									  // decrement
 	}
 	//------------------------
@@ -992,57 +786,12 @@ BYTE mmcReadJustForTest(BYTE cs, DWORD sector)
 	return 0;	
 }
 //-----------------------------------------------
-#ifdef DEVNULL
-BYTE mmcWrite(BYTE cs, DWORD sector)
-{
-	BYTE r1;
-	WORD i;
-
-	spiCSlow(cs);		   // CS to L
-
-	PreDMA_write();
-	
-	for(i=0; i<512; i++)
-	{
-		r1 = DMA_write();			   	   				// get it from ST
-
-		if(brStat != E_OK)	  							// if something was wrong
-		{
-			shitHasHappened = 1;
-			uart_outhexD(i);
-			uart_putchar('\n');
-
-			break;										// quit
-		}
-
-		if(r1 != ((BYTE)i))
-		{
-			*pFIO_FLAG_S = (1<<6);
-			asm("nop;\nnop;\nnop;\nnop;\nnop;\n");
-			*pFIO_FLAG_C = (1<<6);
-
-			uart_outhexB((BYTE)i);
-			uart_putc(32);
-			uart_outhexB((BYTE)r1);
-			uart_putchar('\n');
-		}
-		
-		SectorBufer[i] = r1;			
-	}
-	
-	PostDMA_write();
-	
-	spiCShigh(cs);		   	// CS to H
-	
-//	DumpBuffer();
-	
- 	return 0;
-}
-#else //-----------------------------------------------
 BYTE mmcWrite(BYTE cs, DWORD sector)
 {
 	BYTE r1;
 	DWORD i;
+	
+	TimeOut_Start_ms(1000);
 	
 	//-----------------
 	// assert chip select
@@ -1074,55 +823,6 @@ BYTE mmcWrite(BYTE cs, DWORD sector)
 	// write data
 
 	PreDMA_write();
-//==================================================
-// DO NOT USE - DOES SOME BAD SHIT!
-/*
-//#define WRITE_PSEUDOPARALLELASM
-	
-#ifdef WRITE_PSEUDOPARALLELASM
-
-	i = SPIwriteSectorAsm();
-
-	DMA_writeFastPost();
-	spiReceiveByte();											// now read the last byte received	
-	
-	if(i != 0)
-	{
-		for(; i>0; i--)							// finish the sector
-			spiTransferByte(0xFF);
-	}
-	
-#endif	
-*/
-//==================================================
-// DO NOT USE - DOES SOME BAD SHIT!
-/*
-//#define WRITE_PSEUDOPARALLEL
-	
-#ifdef WRITE_PSEUDOPARALLEL
-
-	for(i=0; i<0x200; i++)
-	{
-//		r1 = DMA_writeFast();			   	   		// get it from ST
-		r1 = DMA_write();			   	   				// get it from ST
-
-		if(brStat != E_OK)	  							// if something was wrong
-		{
-			uart_putc('g');
-		
-		 	for(; i<0x200; i++)								// finish the sector
-		  		spiTransferByte(0);
-	
-			break;														// quit
-		}  
-
-		spiSendByteAsm(r1);
-	}
-	
-//	DMA_writeFastPost();
-	spiReceiveByte();											// now read the last byte received	
-#endif	
-*/
 //==================================================
 #define WRITE_SLOW
 	
@@ -1181,12 +881,17 @@ BYTE mmcWrite(BYTE cs, DWORD sector)
 	// wait for block start
 	i = 0x000fffff;
 	
-	while(i)
+	while(i != 0)
 	{
 	 	r1 = spiTransferByte(0xFF);		   			  // receive byte
 		
 		if(r1 != 0)									   // if it's the wanted byte
 			break;
+		
+		if(TimeOut_DidHappen()) {
+			i = 0;
+			break;
+		}
 			
 		i--;	  									  // decrement
 	}
@@ -1209,7 +914,6 @@ BYTE mmcWrite(BYTE cs, DWORD sector)
 		
   return 0;							// return success
 }
-#endif
 //--------------------------------------------------------
 /** 
 *   Retrieves the CSD Register from the mmc 
@@ -1268,6 +972,8 @@ DWORD SDHC_Capacity(BYTE cs)
  DWORD sectors; 
  BYTE buff[16];
  
+	TimeOut_Start_ms(1000);
+ 
 	byte = MMC_CardType(cs, buff); 
 
 	if(byte!=0)								// if failed to get card type
@@ -1295,6 +1001,8 @@ DWORD MMC_Capacity(BYTE cs)
  DWORD c_size; 
  DWORD sectors; 
  BYTE buff[16];
+ 
+ TimeOut_Start_ms(1000);
  
  byte = MMC_CardType(cs, buff); 
 
@@ -1337,6 +1045,8 @@ BYTE EraseCard(BYTE deviceIndex)
 BYTE res;
 TDevice *dev;
 
+ TimeOut_Start_ms(5000);
+ 
  dev = &device[deviceIndex];
 
  if(dev->Type != DEVICETYPE_MMC && dev->Type != DEVICETYPE_SD 
@@ -1403,6 +1113,8 @@ BYTE mmcCompare(BYTE cs, DWORD sector)
 	DWORD i;
 	BYTE byteSD, byteST;
 
+	TimeOut_Start_ms(1000);
+	
 	// assert chip select
 	spiCSlow(cs);		   // CS to L
 
@@ -1438,6 +1150,11 @@ BYTE mmcCompare(BYTE cs, DWORD sector)
 
 		if(r1 == MMC_STARTBLOCK_READ)				  // if it's the wanted byte
 			break;
+			
+		if(TimeOut_DidHappen()) {
+			i = 0;
+			break;
+		}		
 			
 		i--;	  									  // decrement
 	}
