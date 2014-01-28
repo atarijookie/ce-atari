@@ -30,6 +30,9 @@ $(TARGET): $(OBJS) $(HDR)
 	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@
 #	$(STRIP) -s $@ 
 
+%.o: %.cpp 
+	g++ $(CFLAGS) -c $<
+
 clean:
 	$(MAKE) -C $(SUBDIR1) clean
 	$(MAKE) -C $(SUBDIR2) clean

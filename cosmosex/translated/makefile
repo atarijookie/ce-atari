@@ -1,7 +1,9 @@
-all:	translateddisk_gemdos.o translateddisk_general.o
+CFLAGS	= -Wall
+
+all:	translateddisk_gemdos.o translateddisk_general.o dirtranslator.o filenameshortener.o
 			 
 %.o: %.cpp 
-	g++ -c $<
+	g++ $(CFLAGS) -c $<
 	
 clean:
 	rm -rf *.o
