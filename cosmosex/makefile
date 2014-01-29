@@ -37,5 +37,5 @@ clean:
 	$(MAKE) -C $(SUBDIR1) clean
 	$(MAKE) -C $(SUBDIR2) clean
 	$(MAKE) -C $(SUBDIR3) clean
-	rm -rf *.o cosmosex
+	rm -f *.o cosmosex
 	

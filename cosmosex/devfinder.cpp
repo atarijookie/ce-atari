@@ -166,7 +166,7 @@ void DevFinder::processFoundDev(std::string file)
 
 void DevFinder::cutBeforeFirstNumber(std::string &filename)
 {
-	int i;
+	size_t i;
 	
 	for(i=0; i<filename.length(); i++) {						// go through the file name looking for a number
 		if(filename[i] >= '0' && filename[i] <= '9') {			// if this is a number, cut it here

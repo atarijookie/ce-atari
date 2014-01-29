@@ -71,6 +71,7 @@ void *mountThreadCode(void *ptr)
 	}
 	
 	Debug::out("Mount thread terminated.");
+	return 0;
 }
 
 bool Mounter::mountDevice(char *devicePath, char *mountDir)

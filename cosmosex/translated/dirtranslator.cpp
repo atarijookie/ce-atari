@@ -132,7 +132,6 @@ bool DirTranslator::longToShortFilename(std::string &longHostPath, std::string &
 
 FilenameShortener *DirTranslator::createShortener(std::string &path)
 {
-    bool res;
     FilenameShortener *fs = new FilenameShortener();
     mapPathToShortener.insert( std::pair<std::string, FilenameShortener *>(path, fs) );
 
@@ -166,7 +165,6 @@ FilenameShortener *DirTranslator::createShortener(std::string &path)
 bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, BYTE findAttribs)
 {
 	std::string hostPath, searchString;
-    bool res;
 
     Utils::splitFilenameFromPath(hostSearchPathAndWildcards, hostPath, searchString);
 

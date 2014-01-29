@@ -104,7 +104,7 @@ bool DeviceMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
     }
 
     size_t byteCount = count * 512;
-	ssize_t cnt = read(fdes, bfr, byteCount);	// try to read sector(s)
+	size_t cnt = read(fdes, bfr, byteCount);	// try to read sector(s)
 	
     if(cnt != byteCount) {                      // not all data was read? fail
         return false;
@@ -127,7 +127,7 @@ bool DeviceMedia::writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
     }
 
     size_t byteCount = count * 512;
-	ssize_t cnt = write(fdes, bfr, byteCount);	// try to write sector(s)
+	size_t cnt = write(fdes, bfr, byteCount);	// try to write sector(s)
 	
     if(cnt != byteCount) {                      // not all data was writen? fail
         return false;
