@@ -31,6 +31,7 @@ CCoreThread::CCoreThread()
 
     scsi        = new Scsi();
     scsi->setAcsiDataTrans(dataTrans);
+    scsi->attachToHostPath("TESTMEDIA", SOURCETYPE_TESTMEDIA, SCSI_ACCESSTYPE_FULL);
 
 //    scsi->attachToHostPath(MEDIAFILE, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
 
@@ -131,7 +132,7 @@ void CCoreThread::handleAcsiCommand(void)
     memset(bufOut, 0, CMD_SIZE);
 
     conSpi->txRx(SPI_CS_HANS, 14, bufOut, bufIn);        // get 14 cmd bytes
-    Debug::out("\nhandleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
+    Debug::out("handleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
 
     BYTE justCmd = bufIn[0] & 0x1f;
     BYTE wasHandled = false;

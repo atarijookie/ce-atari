@@ -131,6 +131,15 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
 		}
 
         break;
+	
+	case SOURCETYPE_TESTMEDIA:
+		Debug::out("Scsi::attachToHostPath - test media stored at index %d", index);
+	
+		attachedMedia[index].hostPath       = hostPath;
+		attachedMedia[index].hostSourceType = hostSourceType;
+		attachedMedia[index].dataMedia      = &testMedia;
+		attachedMedia[index].accessType     = SCSI_ACCESSTYPE_FULL;
+		break;		
     }
 
     res = attachMediaToACSIid(index, hostSourceType, accessType);          // last step - attach media to ACSI ID
@@ -192,8 +201,12 @@ void Scsi::detachMediaFromACSIidByIndex(int index)
 
 	int attMediaInd = devInfo[index].attachedMediaIndex;
     attachedMedia[ attMediaInd ].devInfoIndex = -1;   				// set not attached in attached media
-	delete attachedMedia[ attMediaInd ].dataMedia;					// delete the data source access object
 
+    if(	attachedMedia[attMediaInd].hostSourceType != SOURCETYPE_NONE && 			// if it's not NO source
+		attachedMedia[attMediaInd].hostSourceType != SOURCETYPE_TESTMEDIA) {      // and it's not TEST source
+		delete attachedMedia[ attMediaInd ].dataMedia;				// delete the data source access object
+	}
+	
     devInfo[index].attachedMediaIndex   = -1;                       // set not attached in dev info
     devInfo[index].accessType           = SCSI_ACCESSTYPE_NO_DATA;
 }
@@ -249,7 +262,8 @@ void Scsi::dettachByIndex(int index)
         detachMediaFromACSIidByIndex(ind2);
     }
 
-    if(attachedMedia[index].hostSourceType != SOURCETYPE_NONE) {            // if it's not NO source
+    if(	attachedMedia[index].hostSourceType != SOURCETYPE_NONE && 			// if it's not NO source
+		attachedMedia[index].hostSourceType != SOURCETYPE_TESTMEDIA) {      // and it's not TEST source
         attachedMedia[index].dataMedia->iclose();                           // close it, delete it
         delete attachedMedia[index].dataMedia;
     }

@@ -1,9 +1,9 @@
 TARGET	= cosmosex
 
-CC		= g++
+CC	= g++
 STRIP	= strip
-CFLAGS	= -Wall
-LDFLAGS	= -lbcm2835 -lrt -lpthread
+CFLAGS	= -Wall -g
+LDFLAGS	= -lbcm2835 -lrt -lpthread 
 
 SUBDIR1	= config
 SUBDIR2	= native
