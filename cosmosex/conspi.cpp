@@ -47,6 +47,8 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
 			return false;
 		}
 	
+//		Debug::out("\nwaitForATN single good!");
+	
 		txRx(whichSpiCs, 8, outBuf, inBuf);					// receive: 0, ATN code, txLen, rxLen
 		applyTxRxLimits(whichSpiCs, inBuf);					// now apply txLen and rxLen
 		return true;
@@ -68,11 +70,13 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
 		Utils::sleepMs(1);									// wait 1 ms
     }
 
+//	Debug::out("\nwaitForATN starting...");
+
 	txRx(whichSpiCs, 8, outBuf, inBuf);					// receive: 0, ATN code, txLen, rxLen
 	applyTxRxLimits(whichSpiCs, inBuf);					// now apply txLen and rxLen
 
     if(inBuf[3] == atnCode) {                      		// ATN code found?
-		Debug::out("waitForATN %02x good.", atnCode);
+//		Debug::out("waitForATN %02x good.", atnCode);
         return true;
 	} else {
 		Debug::out("waitForATN %02x, but received %02x! Fail!", atnCode, inBuf[3]);
@@ -117,10 +121,10 @@ WORD CConSpi::swapWord(WORD val)
 
 void CConSpi::setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen)
 {
-//    Debug::out("CConSpi::setRemainingTxRxLen - TX %d, RX %d", txLen, rxLen);
+//    Debug::out("CConSpi::setRemainingTxRxLen - TX %d, RX %d, while the remainingPacketLength is %d", txLen, rxLen, remainingPacketLength);
 
     if(txLen == NO_REMAINING_LENGTH && rxLen == NO_REMAINING_LENGTH) {    // if setting NO_REMAINING_LENGTH
-        if(remainingPacketLength != 0) {
+        if(remainingPacketLength != 0 && remainingPacketLength != NO_REMAINING_LENGTH) {
             Debug::out("CConSpi - didn't TX/RX enough data, padding with %d zeros! Fix this!", remainingPacketLength);
             memset(paddingBuffer, 0, PADDINGBUFFER_SIZE);
             txRx(whichSpiCs, remainingPacketLength, paddingBuffer, paddingBuffer);

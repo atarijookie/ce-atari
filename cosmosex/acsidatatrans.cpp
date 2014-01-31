@@ -140,6 +140,7 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 
         //----------------------
         // just for dumping the data
+/*
         unsigned char *src = rxBuffer + 2;
 
         for(int i=0; i<16; i++) {
@@ -155,6 +156,7 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 
             Debug::out("%s", bfr);
         }
+*/		
     }
 
     return true;
@@ -208,8 +210,8 @@ void AcsiDataTrans::sendDataAndStatus(void)
         DWORD cntNow = (count > 512) ? 512 : count;         // max 512 bytes per transfer
         count -= cntNow;
 
-        memcpy(txBuffer + 2, dataNow, cntNow);              // copy the data after the header (2 bytes)
-        com->txRx(SPI_CS_HANS, cntNow + 2, txBuffer, rxBuffer);          // transmit this buffer with header
+        memcpy(txBuffer + 2, dataNow, cntNow);              		// copy the data after the header (2 bytes)
+        com->txRx(SPI_CS_HANS, cntNow + 4, txBuffer, rxBuffer);     // transmit this buffer with header + terminating zero (WORD)
 
         dataNow += cntNow;                                  // move the data pointer further
     }
@@ -228,6 +230,6 @@ void AcsiDataTrans::sendStatusAfterWrite(void)
     txBuffer[1] = CMD_SEND_STATUS;                          // set the command and the status
     txBuffer[2] = status;
 
-    com->txRx(SPI_CS_HANS, 16 - 4, txBuffer, rxBuffer);                  // trasmit the status (10 bytes total, but 4 already received)
+    com->txRx(SPI_CS_HANS, 16 - 8, txBuffer, rxBuffer);		// transmit the status (16 bytes total, but 8 already received)
 }
 

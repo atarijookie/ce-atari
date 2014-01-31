@@ -103,6 +103,11 @@ bool spi_atn(int whichSpiAtn)
 
 void gpio_close(void)
 {
+	// before terminating set the RESET pins of both STM32 as inputs so we can work with them through SWD 
+	// (otherwise ST-LINK will fail to reset them)
+	bcm2835_gpio_fsel(PIN_RESET_HANS,		BCM2835_GPIO_FSEL_INPT);		
+	bcm2835_gpio_fsel(PIN_RESET_FRANZ,		BCM2835_GPIO_FSEL_INPT);
+
     bcm2835_spi_end();			// end the SPI stuff here
 	
 	bcm2835_close();			// close the GPIO library and finish

@@ -3,8 +3,8 @@
 
 #include "datatypes.h"
 
-#define NO_REMAINING_LENGTH     -1
-#define TXRX_COUNT_REST         -1
+#define NO_REMAINING_LENGTH     0xffff
+#define TXRX_COUNT_REST         0xffff
 #define PADDINGBUFFER_SIZE      1024
 
 class CConSpi
