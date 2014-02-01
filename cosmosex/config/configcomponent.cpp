@@ -224,16 +224,19 @@ void ConfigComponent::handleEditLineKeyPress(BYTE key)
         if(cursorPos > 0) {
             cursorPos--;
         }
+		return;
     }
 
     if(key == KEY_RIGHT) {			// arrow right?
         if(cursorPos < text.length()) {
             cursorPos++;
         }
+		return;
     }
 
     if(key == KEY_HOME) {			// home?
         cursorPos = 0;
+		return;
     }
 
     //-----
