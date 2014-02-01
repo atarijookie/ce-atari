@@ -230,6 +230,8 @@ int main (void)
 		if(state == STATE_GET_COMMAND && spiDmaIsIdle && sendFwVersion) {
 			atnSendFwVersion[6] = ((WORD)currentLed) << 8;				// store the current LED status in the last WORD
 			
+			timeoutStart();																				// start timeout counter so we won't get stuck somewhere
+			
 			spiDma_txRx(	ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0],	 
 										ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
 				
@@ -358,6 +360,12 @@ void onDataRead(void)
 		dataMarkerFound = FALSE;
 		
 		while(recvCount > 0) {															// something to receive?
+			if(timeout()) {																		// if the data from host doesn't come within timeout, quit
+//					spiDmaIsIdle = TRUE;
+					ACSI_DATADIR_WRITE();													// data direction for writing, and quit
+					return;
+			}
+			
 			// when at least 1 WORD was received
 			if((DMA1_Channel2->CNDTR == 0) || (DMA1_Channel2->CNDTR < recvCount)) {
 				data = dataBuffer[index];												// get data
@@ -383,6 +391,12 @@ void onDataRead(void)
 
 		// now try to trasmit the data
 		while(recvCount > 0) {															// something to receive?
+			if(timeout()) {																		// if the data from host doesn't come within timeout, quit
+//					spiDmaIsIdle = TRUE;
+					ACSI_DATADIR_WRITE();													// data direction for writing, and quit
+					return;
+			}
+
 			// when at least 1 WORD was received
 			if((DMA1_Channel2->CNDTR == 0) || (DMA1_Channel2->CNDTR < recvCount)) {
 				recvCount--;				
@@ -528,6 +542,10 @@ void getCmdLengthFromCmdBytes(void)
 void spiDma_waitForFinish(void)
 {
 	while(spiDmaIsIdle != TRUE) {		// wait until it will become idle
+		if(timeout()) {								// if timeout happened (and we got stuck here), quit
+			spiDmaIsIdle = TRUE;
+			break;
+		}
 	}
 }
 
@@ -542,8 +560,8 @@ void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
 	spiDma_waitForFinish();															// make sure that the last transfer has finished
 
 	// disable both TX and RX channels
-	DMA1_Channel3->CCR		&= 0xfffffffe;								// disable DMA1 Channel transfer
-	DMA1_Channel2->CCR		&= 0xfffffffe;								// disable DMA1 Channel transfer
+	DMA1_Channel3->CCR		&= 0xfffffffe;								// disable DMA3 Channel transfer
+	DMA1_Channel2->CCR		&= 0xfffffffe;								// disable DMA2 Channel transfer
 
 	// set the software flags of SPI DMA being idle
 	spiDmaTXidle = (txCount == 0) ? TRUE : FALSE;				// if nothing to send, then IDLE; if something to send, then FALSE
@@ -602,6 +620,7 @@ void init_hw_sw(void)
 	EXTI->EMR			= BUTTON | aCMD | aCS | aACK;			// 1 means: Event     form these lines is not masked
 	EXTI->FTSR 		= BUTTON | aCMD | aCS | aACK;			// Falling trigger selection register
 
+	GPIOA->BSRR = LED1 | LED2 | LED3;		// all LED pins high (LEDs OFF)
 	//----------
 	AFIO->MAPR |= 0x02000000;								// SWJ_CFG[2:0] (Bits 26:24) -- 010: JTAG-DP Disabled and SW-DP Enabled
 	
