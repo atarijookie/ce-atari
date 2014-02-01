@@ -241,7 +241,7 @@ BYTE ce_identify(BYTE ACSI_id)
 void showConnectionErrorMessage(void)
 {
 	Clear_home();
-	printf("Communication with CosmosEx failed.\nWill try to reconnect in a while.\n");
+	printf("Communication with CosmosEx failed.\nWill try to reconnect in a while.\n\nTo quit to desktop, press F10\n");
 	
 	prevCommandFailed = 1;
 }
