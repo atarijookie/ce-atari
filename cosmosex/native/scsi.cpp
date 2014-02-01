@@ -343,12 +343,19 @@ void Scsi::processCommand(BYTE *command)
         dataMedia = attachedMedia[ devInfo[acsiId].attachedMediaIndex ].dataMedia;
     }
 
-    if(dataTrans == 0 || dataMedia == 0) {
-        Debug::out("processCommand was called without valid dataTrans or dataMedia!");
+    if(dataTrans == 0) {
+        Debug::out("processCommand was called without valid dataTrans, can't tell ST that his went wrong...");
         return;
     }
 
     dataTrans->clear();                 // clean data transporter before handling
+
+    if(dataMedia == 0) {
+        Debug::out("processCommand was called without valid dataMedia, will return error CHECK CONDITION");
+		dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
+		dataTrans->sendDataAndStatus();
+        return;
+    }
 
     if(isICDcommand()) {	  			// if it's a ICD command
         ProcICD();

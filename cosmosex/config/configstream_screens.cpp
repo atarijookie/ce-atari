@@ -175,18 +175,18 @@ void ConfigStream::createScreen_network(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "Wifi",		10,	col0x, row++, gotoOffset);
     screen.push_back(comp);
 
-	comp = new ConfigComponent(this, ConfigComponent::label, "WPA SSID",	40,	col1x, row, gotoOffset);
+	comp = new ConfigComponent(this, ConfigComponent::label, "WPA SSID",	20,	col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	40, col2x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	20, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_WIFI_SSID);
     comp->setTextOptions(TEXT_OPTION_ALLOW_ALL);
     screen.push_back(comp);
 
-	comp = new ConfigComponent(this, ConfigComponent::label, "WPA PSK",		40,	col1x, row, gotoOffset);
+	comp = new ConfigComponent(this, ConfigComponent::label, "WPA PSK",		20,	col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	40, col2x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	20, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_WIFI_PSK);
     comp->setTextOptions(TEXT_OPTION_ALLOW_ALL);
     screen.push_back(comp);

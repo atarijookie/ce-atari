@@ -8,8 +8,8 @@ Ethernet
    Gateway      [   .   .   .   ]
    
 Wifi   
-   WPA-SSID     [               ]
-   WPA-SPK      [               ]
+   WPA-SSID     [                    ]
+   WPA-SPK      [                    ]
    Use DHCP     [   ]             
    IP address   [   .   .   .   ]
    Mask         [   .   .   .   ]

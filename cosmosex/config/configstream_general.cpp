@@ -294,6 +294,9 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
     }
 
     screenChanged = false;
+	
+	bfr[totalCnt] = 0;									// add string terminator
+	totalCnt++;
 
     return totalCnt;                                    // return the count of bytes used
 }
