@@ -17,7 +17,7 @@
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
 
-int main()
+int main(int argc, char *argv[])
  {
 	CCoreThread *core;
 	pthread_t	mountThreadInfo;
@@ -33,6 +33,18 @@ int main()
 		return 0;
 	}
 
+    core = new CCoreThread();
+
+	if(argc == 2 && strcmp(argv[1], "reset") == 0) {
+		core->resetHansAndFranz();
+		delete core;
+		gpio_close();
+		
+		printf("\nJust did reset and quit...\n");
+		
+		return 0;
+	}
+	
 	int res = pthread_create( &mountThreadInfo, NULL, mountThreadCode, NULL);	// create mount thread and run it
 	
 	if(res != 0) {
@@ -41,7 +53,6 @@ int main()
 		Debug::out("Mount thread created");
 	}
 		
-    core = new CCoreThread();
 	core->run();										// run the main thread
 
 	delete core;

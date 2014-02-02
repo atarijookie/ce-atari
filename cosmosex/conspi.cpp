@@ -47,10 +47,12 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
 			return false;
 		}
 	
-//		Debug::out("\nwaitForATN single good!");
+		Debug::out("\nwaitForATN single good!");
 	
-		txRx(whichSpiCs, 8, outBuf, inBuf);					// receive: 0, ATN code, txLen, rxLen
-		applyTxRxLimits(whichSpiCs, inBuf);					// now apply txLen and rxLen
+		if(!readHeader(whichSpiCs, outBuf, inBuf)) {		// receive: 0xcafe, ATN code, txLen, rxLen
+			return false;
+		}
+		
 		return true;
 	}
 
@@ -70,18 +72,52 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
 		Utils::sleepMs(1);									// wait 1 ms
     }
 
-//	Debug::out("\nwaitForATN starting...");
+	Debug::out("\nwaitForATN starting...");
 
-	txRx(whichSpiCs, 8, outBuf, inBuf);					// receive: 0, ATN code, txLen, rxLen
-	applyTxRxLimits(whichSpiCs, inBuf);					// now apply txLen and rxLen
+	if(!readHeader(whichSpiCs, outBuf, inBuf)) {			// receive: 0xcafe, ATN code, txLen, rxLen
+		return false;
+	}
 
     if(inBuf[3] == atnCode) {                      		// ATN code found?
-//		Debug::out("waitForATN %02x good.", atnCode);
+		Debug::out("waitForATN %02x good.", atnCode);
         return true;
 	} else {
 		Debug::out("waitForATN %02x, but received %02x! Fail!", atnCode, inBuf[3]);
         return false;
 	}
+}
+
+bool CConSpi::readHeader(int whichSpiCs, BYTE *outBuf, BYTE *inBuf)
+{
+	WORD *inWord = (WORD *) inBuf;
+	WORD marker;
+	DWORD loops = 0;
+
+	// read the first WORD, if it's not 0xcafe, then read again to synchronize
+	while(sigintReceived == 0) {
+		txRx(whichSpiCs, 2, outBuf, inBuf);					// receive: 0, ATN code, txLen, rxLen
+		marker = *inWord;
+	
+		if(marker == 0xfeca) {								// 0xcafe with reversed bytes
+			break;
+		}
+		
+		loops++;
+		
+		if(loops >= 10000) {								// if this doesn't synchronize in 10k loops, something is very wrong
+			Debug::out("readHeader couldn't synchronize!");
+			return false;
+		}
+	}
+	
+	if(loops != 0) {
+		Debug::out("readHeader took %d loops to synchronize!", loops);
+	}
+
+	txRx(whichSpiCs, 6, outBuf+2, inBuf+2);					// receive: 0, ATN code, txLen, rxLen
+	applyTxRxLimits(whichSpiCs, inBuf);						// now apply txLen and rxLen
+	
+	return true;
 }
 
 void CConSpi::applyTxRxLimits(int whichSpiCs, BYTE *inBuff)
@@ -92,7 +128,7 @@ void CConSpi::applyTxRxLimits(int whichSpiCs, BYTE *inBuff)
     WORD txLen = swapWord(pwIn[2]);
     WORD rxLen = swapWord(pwIn[3]);
 
-//    Debug::out("TX/RX limits: TX %d WORDs, RX %d WORDs", txLen, rxLen);
+    Debug::out("TX/RX limits: TX %d WORDs, RX %d WORDs", txLen, rxLen);
 
     if(txLen > 1024 || rxLen > 1024) {
         Debug::out("TX/RX limits above are probably wrong! Fix this!");
@@ -121,8 +157,10 @@ WORD CConSpi::swapWord(WORD val)
 
 void CConSpi::setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen)
 {
-//    Debug::out("CConSpi::setRemainingTxRxLen - TX %d, RX %d, while the remainingPacketLength is %d", txLen, rxLen, remainingPacketLength);
-
+    if(txLen != NO_REMAINING_LENGTH || rxLen != NO_REMAINING_LENGTH || remainingPacketLength != NO_REMAINING_LENGTH) {
+		Debug::out("CConSpi::setRemainingTxRxLen - TX %d, RX %d, while the remainingPacketLength is %d", txLen, rxLen, remainingPacketLength);
+	}
+		
     if(txLen == NO_REMAINING_LENGTH && rxLen == NO_REMAINING_LENGTH) {    // if setting NO_REMAINING_LENGTH
         if(remainingPacketLength != 0 && remainingPacketLength != NO_REMAINING_LENGTH) {
             Debug::out("CConSpi - didn't TX/RX enough data, padding with %d zeros! Fix this!", remainingPacketLength);
@@ -184,7 +222,7 @@ void CConSpi::txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBuf
         }
     }
 
-//    Debug::out("CConSpi::txRx - count: %d", count);
+    Debug::out("CConSpi::txRx - count: %d", count);
 
 	spi_tx_rx(whichSpiCs, count, sendBuffer, receiveBufer);
 

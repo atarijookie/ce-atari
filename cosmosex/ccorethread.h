@@ -25,6 +25,7 @@ public:
     CCoreThread();
     ~CCoreThread();
 
+	void resetHansAndFranz(void);
     void run(void);
     void sendHalfWord(void);
     virtual void reloadSettings(void);      								// from ISettingsUser
@@ -63,7 +64,6 @@ private:
     void usbConnectionCheck(void);
 
     void loadSettings(void);
-	void resetHansAndFranz(void);
 
     void handleFwVersion(void);
     void handleAcsiCommand(void);

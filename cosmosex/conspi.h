@@ -26,6 +26,7 @@ private:
     WORD remainingPacketLength;
     BYTE paddingBuffer[PADDINGBUFFER_SIZE];
 
+	bool readHeader(int whichSpiCs, BYTE *outBuf, BYTE *inBuf);	
     WORD swapWord(WORD val);
 };
 

@@ -130,6 +130,7 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 		bool res = com->waitForATN(SPI_CS_HANS, ATN_WRITE_MORE_DATA, 1000, inBuf);	// wait for ATN_WRITE_MORE_DATA
 
         if(!res) {                                          // this didn't come? fuck!
+			clear();										// clear all the variables
             return false;
         }
 
@@ -204,6 +205,7 @@ void AcsiDataTrans::sendDataAndStatus(void)
 		bool res = com->waitForATN(SPI_CS_HANS, ATN_READ_MORE_DATA, 1000, inBuf);	// wait for ATN_READ_MORE_DATA
 
         if(!res) {                                          // this didn't come? fuck!
+			clear();										// clear all the variables
             return;
         }
 
@@ -223,6 +225,7 @@ void AcsiDataTrans::sendStatusAfterWrite(void)
 	bool res = com->waitForATN(SPI_CS_HANS, ATN_GET_STATUS, 1000, inBuf);	// wait for ATN_GET_STATUS
 
     if(!res) {
+		clear();											// clear all the variables
         return;
     }
 
