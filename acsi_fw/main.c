@@ -131,7 +131,7 @@ int main (void)
 	sendFwVersion		= FALSE;
 	sendACSIcommand	= FALSE;
 	
-	atnSendFwVersion[0] = 0;											// just-in-case padding
+	atnSendFwVersion[0] = 0xcafe;									// starting mark
 	atnSendFwVersion[1] = ATN_FW_VERSION;					// attention code
 	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
 	atnSendFwVersion[4] = version[0];
@@ -139,24 +139,24 @@ int main (void)
 	// WORD 6 is reserved for current LED (floppy image) number
 	atnSendFwVersion[7] = 0;											// terminating zero
 	
-	atnSendACSIcommand[0] = 0;										// just-in-case padding
+	atnSendACSIcommand[0] = 0xcafe;									// starting mark
 	atnSendACSIcommand[1] = ATN_ACSI_COMMAND;			// attention code
 	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
 	atnSendACSIcommand[11] = 0;										// terminating zero
 	
-	atnMoreData[0] = 0;
+	atnMoreData[0] = 0xcafe;									// starting mark
 	atnMoreData[1] = ATN_READ_MORE_DATA;					// mark that we want to read more data
 	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
 	// WORD 4 is sequence number of the request for this command
 	atnMoreData[5] = 0;
 	
-	wrBuf1.buffer[0]	= 0;
+	wrBuf1.buffer[0]	= 0xcafe;									// starting mark
 	wrBuf1.buffer[1]	= ATN_WRITE_MORE_DATA;
 	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
 	// WORD 4 is sequence number of the request for this command
 	wrBuf1.next				= (void *) &wrBuf2;
 
-	wrBuf2.buffer[0]	= 0;
+	wrBuf2.buffer[0]	= 0xcafe;									// starting mark
 	wrBuf2.buffer[1]	= ATN_WRITE_MORE_DATA;
 	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
 	// WORD 4 is sequence number of the request for this command
@@ -164,7 +164,7 @@ int main (void)
 
 	wrBufNow = &wrBuf1;
 
-	atnGetStatus[0] = 0;
+	atnGetStatus[0] = 0xcafe;									// starting mark
 	atnGetStatus[1] = ATN_GET_STATUS;
 	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
 	atnGetStatus[4] = 0;
@@ -226,6 +226,10 @@ int main (void)
 			shouldProcessCommands = FALSE;												// mark that we don't need to process commands until next time
 		}
 
+		if(!spiDmaIsIdle && timeout()) {												// if we got stuck somewhere, do IDLE again
+			spiDmaIsIdle = TRUE;
+		}
+		
 		// in command waiting state, nothing to do and should send FW version?
 		if(state == STATE_GET_COMMAND && spiDmaIsIdle && sendFwVersion) {
 			atnSendFwVersion[6] = ((WORD)currentLed) << 8;				// store the current LED status in the last WORD
@@ -361,7 +365,7 @@ void onDataRead(void)
 		
 		while(recvCount > 0) {															// something to receive?
 			if(timeout()) {																		// if the data from host doesn't come within timeout, quit
-//					spiDmaIsIdle = TRUE;
+					spiDmaIsIdle = TRUE;
 					ACSI_DATADIR_WRITE();													// data direction for writing, and quit
 					return;
 			}
@@ -392,7 +396,7 @@ void onDataRead(void)
 		// now try to trasmit the data
 		while(recvCount > 0) {															// something to receive?
 			if(timeout()) {																		// if the data from host doesn't come within timeout, quit
-//					spiDmaIsIdle = TRUE;
+					spiDmaIsIdle = TRUE;
 					ACSI_DATADIR_WRITE();													// data direction for writing, and quit
 					return;
 			}
