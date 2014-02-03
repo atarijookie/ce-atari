@@ -27,6 +27,8 @@ void onDataRead(void);
 void onDataWrite(void);
 void onReadStatus(void);
 
+void showCurrentLED(void);
+
 // cycle measure: t1 = TIM3->CNT;	t2 = TIM3->CNT;	dt = t2 - t1; -- subtract 0x12 because that's how much measuring takes
 WORD t1, t2, dt; 
 
@@ -44,15 +46,18 @@ WORD t1, t2, dt;
 // commands sent from host to device
 #define CMD_ACSI_CONFIG						0x10
 #define CMD_DATA_WRITE						0x20
-#define CMD_DATA_READ						0x30
+#define CMD_DATA_READ							0x30
 #define CMD_SEND_STATUS						0x40
 #define CMD_DATA_MARKER						0xda
 
 // these states define if the device should get command or transfer data
-#define STATE_GET_COMMAND					0
-#define STATE_DATA_READ						1
-#define STATE_DATA_WRITE					2
-#define STATE_READ_STATUS					3
+#define STATE_GET_COMMAND						0
+#define STATE_SEND_COMMAND					1
+#define STATE_WAIT_COMMAND_RESPONSE	2
+#define STATE_DATA_READ							3
+#define STATE_DATA_WRITE						4
+#define STATE_READ_STATUS						5
+#define STATE_SEND_FW_VER						10
 
 
 #define CMD_BUFFER_LENGTH					16
@@ -80,13 +85,15 @@ WORD t1, t2, dt;
 
 ///////////////////////////
 
+#define ATN_SYNC_WORD							0xcafe
+
 BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
 WORD version[2] = {0xa013, 0x0904};				// this means: hAns, 2013-09-04
 
-volatile BYTE sendFwVersion, sendACSIcommand;
+volatile BYTE sendFwVersion;
 WORD atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
 WORD atnSendACSIcommand[ATN_SENDACSICOMMAND_LEN_TX];
 
@@ -111,12 +118,12 @@ volatile BYTE spiDmaTXidle, spiDmaRXidle;		// flags set when the SPI DMA TX or R
 
 BYTE currentLed;
 
+BYTE firstConfigReceived;										// used to turn LEDs on after first config received
+
 // TODO: code gets stuck if AcsiDataTrans sends ODD number of bytes 
 // TODO: have to send bit more than Multiple of 16 to receive all data ( padDataToMul16 in host SW )
 // TODO: check why the communication with host gets stuck when ST of off
 // TODO: test and fix with megafile drive
-
-// TODO: CEDD downloader - read po jedinom sektore, zapis na floppy
 
 // note: DMA transfer to ODD address in ST looses first byte
 
@@ -128,10 +135,10 @@ int main (void)
 	
 	state = STATE_GET_COMMAND;
 	
-	sendFwVersion		= FALSE;
-	sendACSIcommand	= FALSE;
-	
-	atnSendFwVersion[0] = 0xcafe;									// starting mark
+	sendFwVersion				= FALSE;
+	firstConfigReceived = FALSE;									// used to turn LEDs on after first config received
+		
+	atnSendFwVersion[0] = ATN_SYNC_WORD;					// starting mark
 	atnSendFwVersion[1] = ATN_FW_VERSION;					// attention code
 	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
 	atnSendFwVersion[4] = version[0];
@@ -139,24 +146,24 @@ int main (void)
 	// WORD 6 is reserved for current LED (floppy image) number
 	atnSendFwVersion[7] = 0;											// terminating zero
 	
-	atnSendACSIcommand[0] = 0xcafe;									// starting mark
+	atnSendACSIcommand[0] = ATN_SYNC_WORD;				// starting mark
 	atnSendACSIcommand[1] = ATN_ACSI_COMMAND;			// attention code
 	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
 	atnSendACSIcommand[11] = 0;										// terminating zero
 	
-	atnMoreData[0] = 0xcafe;									// starting mark
+	atnMoreData[0] = ATN_SYNC_WORD;								// starting mark
 	atnMoreData[1] = ATN_READ_MORE_DATA;					// mark that we want to read more data
 	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
 	// WORD 4 is sequence number of the request for this command
 	atnMoreData[5] = 0;
 	
-	wrBuf1.buffer[0]	= 0xcafe;									// starting mark
+	wrBuf1.buffer[0]	= ATN_SYNC_WORD;						// starting mark
 	wrBuf1.buffer[1]	= ATN_WRITE_MORE_DATA;
 	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
 	// WORD 4 is sequence number of the request for this command
 	wrBuf1.next				= (void *) &wrBuf2;
 
-	wrBuf2.buffer[0]	= 0xcafe;									// starting mark
+	wrBuf2.buffer[0]	= ATN_SYNC_WORD;						// starting mark
 	wrBuf2.buffer[1]	= ATN_WRITE_MORE_DATA;
 	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
 	// WORD 4 is sequence number of the request for this command
@@ -164,7 +171,7 @@ int main (void)
 
 	wrBufNow = &wrBuf1;
 
-	atnGetStatus[0] = 0xcafe;									// starting mark
+	atnGetStatus[0] = ATN_SYNC_WORD;							// starting mark
 	atnGetStatus[1] = ATN_GET_STATUS;
 	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
 	atnGetStatus[4] = 0;
@@ -219,6 +226,11 @@ int main (void)
 			onReadStatus();
 		}
 
+		if(state == STATE_GET_COMMAND && sendFwVersion) {
+			state = STATE_SEND_FW_VER;
+			sendFwVersion = FALSE;
+		}
+		
 		// sending and receiving data over SPI using DMA
 		if(spiDmaIsIdle && shouldProcessCommands) {							// SPI DMA: nothing to Tx and nothing to Rx?
 			processHostCommands();																// and process all the received commands
@@ -228,28 +240,33 @@ int main (void)
 
 		if(!spiDmaIsIdle && timeout()) {												// if we got stuck somewhere, do IDLE again
 			spiDmaIsIdle = TRUE;
+			state = STATE_GET_COMMAND;
 		}
 		
-		// in command waiting state, nothing to do and should send FW version?
-		if(state == STATE_GET_COMMAND && spiDmaIsIdle && sendFwVersion) {
-			atnSendFwVersion[6] = ((WORD)currentLed) << 8;				// store the current LED status in the last WORD
-			
-			timeoutStart();																				// start timeout counter so we won't get stuck somewhere
-			
-			spiDma_txRx(	ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0],	 
-										ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
+		if(spiDmaIsIdle) {
+			// in command waiting state, nothing to do and should send FW version?
+			if(state == STATE_SEND_FW_VER) {
+				state = STATE_GET_COMMAND;
 				
-			sendFwVersion	= FALSE;
-			shouldProcessCommands = TRUE;													// mark that we should process the commands on next SPI DMA idle time
-		}
+				atnSendFwVersion[6] = ((WORD)currentLed) << 8;				// store the current LED status in the last WORD
+			
+				timeoutStart();																				// start timeout counter so we won't get stuck somewhere
+			
+				spiDma_txRx(	ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0],	 
+											ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
+				
+				shouldProcessCommands = TRUE;													// mark that we should process the commands on next SPI DMA idle time
+			}
 
-		// SPI is idle and we should send command to host? 
-		if(spiDmaIsIdle && sendACSIcommand) {
-			spiDma_txRx(	ATN_SENDACSICOMMAND_LEN_TX, (BYTE *) &atnSendACSIcommand[0], 
-										ATN_SENDACSICOMMAND_LEN_RX, (BYTE *) &cmdBuffer[0]);
+			// SPI is idle and we should send command to host? 
+			if(state == STATE_SEND_COMMAND) {
+				state = STATE_WAIT_COMMAND_RESPONSE;
 				
-			sendACSIcommand	= FALSE;
-			shouldProcessCommands = TRUE;													// mark that we should process the commands on next SPI DMA idle time
+				spiDma_txRx(	ATN_SENDACSICOMMAND_LEN_TX, (BYTE *) &atnSendACSIcommand[0], 
+											ATN_SENDACSICOMMAND_LEN_RX, (BYTE *) &cmdBuffer[0]);
+				
+				shouldProcessCommands = TRUE;													// mark that we should process the commands on next SPI DMA idle time
+			}
 		}
 		
 		// if the button was pressed, handle it
@@ -287,6 +304,11 @@ void onButtonPress(void)
 		currentLed = 0;
 	}
 	
+	showCurrentLED();
+}
+
+void showCurrentLED(void)
+{
 	GPIOA->BSRR = LED1 | LED2 | LED3;		// all LED pins high (LEDs OFF)
 	
 	switch(currentLed) {								// turn on the correct LED
@@ -324,7 +346,7 @@ void onGetCommand(void)
 				atnSendACSIcommand[4 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
 			}
 					
-			sendACSIcommand	= TRUE;
+			state = STATE_SEND_COMMAND;
 		}
 	}
 }
@@ -663,6 +685,10 @@ void processHostCommands(void)
 		switch(cmdBuffer[i]) {
 			// process configuration 
 			case CMD_ACSI_CONFIG:
+					firstConfigReceived = TRUE;		// mark that we've received 1st config
+			
+					showCurrentLED();
+			
 					ids = cmdBuffer[i+1] >> 8;		// get enabled IDs
 			
 					for(j=0; j<8; j++) {					// for each bit in ids set the flag in enabledIDs[]
