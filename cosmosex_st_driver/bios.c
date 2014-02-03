@@ -15,8 +15,13 @@
 #include "bios.h"
 #include "main.h"
 
-#include "extern_vars.h"
-#include "helpers.h"
+extern int16_t useOldBiosHandler;
+extern WORD ceDrives;
+extern WORD ceMediach;
+
+extern BYTE commandShort[CMD_LENGTH_SHORT];
+extern BYTE commandLong[CMD_LENGTH_LONG];
+extern BYTE *pDmaBuffer;
 
 int32_t custom_mediach( void *sp )
 {
@@ -32,7 +37,7 @@ int32_t custom_mediach( void *sp )
 		return res;
 	}
 	
-	if((getSetCeMediach(GET_MEDIACH) & (1 << drive)) != 0) {					/* if bit is set, media changed */
+	if((ceMediach & (1 << drive)) != 0) {								/* if bit is set, media changed */
 		return 2;
 	}
 
@@ -47,7 +52,7 @@ int32_t custom_drvmap( void *sp )
 	
 	CALL_OLD_BIOS(Drvmap);		/* call the original Drvmap() */
 
-	res = res | getSetCeDrives(GET_CEDRIVES);		/* return original drives + CE drives together */
+	res = res | ceDrives;		/* return original drives + CE drives together */
 	return res;
 }
 
@@ -71,18 +76,16 @@ int32_t custom_getbpb( void *sp )
 	commandShort[4] = BIOS_Getbpb;										/* store BIOS function number */
 	commandShort[5] = (BYTE) drive;										
 	
-	BYTE *pDmaBuff = getDmaBufferPointer();
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuff, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 	
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_BIOS(Getbpb, drive);
 		return res;														
 	}
 	
-	WORD newMediach = getSetCeMediach(GET_MEDIACH) & (~(1 << drive));							/* remove this bit media changes */
-	getSetCeMediach(newMediach);
+	ceMediach = ceMediach & (~(1 << drive));							/* remove this bit media changes */
 	
-	memcpy(pBpb, pDmaBuff, 18);										/* copy in the results */
+	memcpy(pBpb, pDmaBuffer, 18);										/* copy in the results */
 	return (DWORD) pBpb;
 }
 
@@ -105,14 +108,13 @@ void updateCeDrives(void)
 	commandShort[4] = BIOS_Drvmap;											/* store BIOS function number */
 	commandShort[5] = 0;										
 	
-	BYTE *pDmaBuff = getDmaBufferPointer();
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuff, 1);				/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 	
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		return;														
 	}
 	
-    getSetCeDrives(getWord(pDmaBuff));                                         /* read drives from dma buffer */
+    ceDrives = getWord(pDmaBuffer);                                         /* read drives from dma buffer */
 }
 
 void updateCeMediach(void)
@@ -131,35 +133,11 @@ void updateCeMediach(void)
 	commandShort[4] = BIOS_Mediach;												/* store BIOS function number */
 	commandShort[5] = 0;										
 	
-	BYTE *pDmaBuff = getDmaBufferPointer();
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuff, 1);	/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* send command to host over ACSI */
 	
     if(res == E_NOTHANDLED || res == ACSIERROR) {									/* not handled or error? */
 		return;														
 	}
 	
-    getSetCeMediach(getWord(pDmaBuff));									/* store current media change status */
+    ceMediach = getWord(pDmaBuffer);									/* store current media change status */
 }
-
-WORD getSetCeMediach(WORD newVal)
-{
-	static WORD ceMediach = 0;
-
-	if(newVal != GET_MEDIACH) {											// it's not GET?
-		ceMediach = newVal;
-	}
-	
-	return ceMediach;
-}
-
-WORD getSetCeDrives(WORD newVal)
-{
-	static WORD ceDrives = 0;
-
-	if(newVal != GET_CEDRIVES) {
-		ceDrives = newVal;
-	}
-	
-	return ceDrives;
-}
-

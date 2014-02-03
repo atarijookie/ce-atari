@@ -22,7 +22,7 @@ unhook_xbra( WORD vecnum, LONG app_id )
     savessp = Super( SUP_SET );
 
     /* Special Case: Vector to remove is first in chain. */
-    if( rx->xbra_id == XBRA_TAG && rx->app_id == app_id )
+    if( rx->xbra_id == 'XBRA' && rx->app_id == app_id )
     {
 	Super( savessp );
         (void)Setexc( vecnum, rx->oldvec );
@@ -31,7 +31,7 @@ unhook_xbra( WORD vecnum, LONG app_id )
 
     stepadr = (LONG *)&rx->oldvec;
     rx = (XBRA *)((LONG)rx->oldvec - sizeof( XBRA ));
-    while( rx->xbra_id == XBRA_TAG )
+    while( rx->xbra_id == 'XBRA' )
     {
         if( rx->app_id == app_id )
         {

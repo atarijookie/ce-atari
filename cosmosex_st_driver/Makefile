@@ -3,26 +3,28 @@ SLIM	= yes
 
 CC	= m68k-atari-mint-gcc
 STRIP	= m68k-atari-mint-strip
-CFLAGS	= -m68000 -fomit-frame-pointer -Wall -Wno-multichar -mpcrel
-#-O2
+CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
+LDFLAGS	= -Wl,--traditional-format
 
-HDR	= xbra.h acsi.h gemdos.h bios.h gemdos_errno.h translated.h main.h extern_vars.h helpers.h
-OBJS	= gemdos_filefuncs.o gemdos_findfuncs.o gemdos_pathfuncs.o gemdos_rw.o gemdos_pexec.o bios.o xbra.o acsi.o main.o 
+HDR	= xbra.h acsi.h gemdos.h bios.h gemdos_errno.h translated.h main.h
+CSRC	= gemdos.c gemdos_rw.c gemdos_pexec.c bios.c xbra.c acsi.c main.c 
 SSRC	= gemdos_asm.s bios_asm.s
 
 ifeq ($(SLIM),yes)
 CFLAGS	+= -nostdlib -DSLIM
 STARTUP	= startup.s
-OBJS	+= stdlib.o
+CSRC	+= stdlib.c
 HDR	+= stdlib.h
 endif
 
-$(TARGET): $(STARTUP) $(OBJS) $(SSRC) $(HDR)
-	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(OBJS) $(SSRC)
+$(TARGET): $(STARTUP) $(CSRC) $(SSRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(CSRC) $(SSRC) $(LDFLAGS)
 	$(STRIP) -s $@
 
-%.o: %.c 
-	$(CC) $(CFLAGS) -c $<
-	
+test: $(STARTUP) test.c acsi.c $(SSRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(STARTUP) test.c acsi.c $(SSRC) $(LDFLAGS)
+	$(STRIP) -s $@
+
+
 clean:
-	rm -f $(TARGET) *~ *.o
+	rm -f $(TARGET) *~

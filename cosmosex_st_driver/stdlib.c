@@ -86,23 +86,19 @@ int strncmp ( const char * str1, const char * str2, int num )
 	return 0;							// if came here, all chars matching
 }
 
-#define SLEEPSECONDS_GET	0xffff
+int sleepSeconds;
+static void sleepInSupervisor(void);
 
-int getSetSleepSeconds(int newVal)
+void sleep(int seconds)
 {
-	static int sleepSeconds = 0;
-
-	if(newVal != SLEEPSECONDS_GET) {
-		sleepSeconds = newVal;
-	}
-	
-	return sleepSeconds;
+	sleepSeconds = seconds;
+	Supexec(sleepInSupervisor);
 }
 
 static void sleepInSupervisor(void)
 {
 	DWORD now, until;
-	DWORD tics = getSetSleepSeconds(SLEEPSECONDS_GET) * 200;
+	DWORD tics = sleepSeconds * 200;
 
 	now = getTicks();						// get current ticks
 	until = now + tics;   					// calc value timer must get to
@@ -114,12 +110,6 @@ static void sleepInSupervisor(void)
 			break;
 		}
 	}
-}
-
-void sleep(int seconds)
-{
-	getSetSleepSeconds(seconds);
-	Supexec(sleepInSupervisor);
 }
 
 DWORD getTicks(void)

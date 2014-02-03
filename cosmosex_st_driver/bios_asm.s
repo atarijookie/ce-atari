@@ -26,9 +26,7 @@ _old_bios_handler:
 | stack frame (word)	<--- (sp)
 
 _bios_handler:
-	lea	_useOldBiosHandler(pc),a0
-	tst.w	(a0)
-	
+	tst.w	_useOldBiosHandler
 	bne.b	bios_not_handled
 	
 	lea	2+4(sp),a0				| a0 points to the function number now
@@ -36,7 +34,7 @@ _bios_handler:
 	bne.b	bios_call
 	move	usp,a0					| if not called from SV, take params from the user stack
 bios_call:
-	lea	_bios_table(pc),a1
+	lea	_bios_table,a1
 	move.w	(a0)+,d0				| fn
 	cmp.w	#0x100,d0				| number of entries in the function table
 	bhs.b	bios_not_handled
@@ -48,11 +46,9 @@ bios_call:
 	beq.b	bios_not_handled
 	movea.l	(a1),a1
 
-|	movem.l	d2-d7/a2-a6,-(sp)
 	move.l	a0,-(sp)				| param #1: stack pointer with function params
 	jsr	(a1)					| call the handler
 	addq.l	#4,sp
-|	movem.l	(sp)+,d2-d7/a2-a6
 	rte						| return from exception, d0 contains return code
 	
 bios_not_handled:

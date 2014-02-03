@@ -19,11 +19,37 @@
 // * CosmosEx GEMDOS driver by Jookie, 2013
 // * GEMDOS hooks part (assembler and C) by MiKRO (Miro Kropacek), 2013
  
-#include "extern_vars.h"
-#include "helpers.h"
+// ------------------------------------------------------------------ 
+// init and hooks part - MiKRO 
+extern int16_t useOldGDHandler;											// 0: use new handlers, 1: use old handlers 
+extern int16_t useOldBiosHandler;										// 0: use new handlers, 1: use old handlers  
+
+extern int32_t (*gemdos_table[256])( void* sp );
+extern int32_t (  *bios_table[256])( void* sp );
 
 // ------------------------------------------------------------------ 
 // CosmosEx and Gemdos part - Jookie 
+
+extern BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
+extern BYTE *pDmaBuffer;
+
+extern BYTE deviceID;
+extern BYTE commandShort[CMD_LENGTH_SHORT];
+extern BYTE commandLong[CMD_LENGTH_LONG];
+
+extern BYTE *pDta;
+extern BYTE tempDta[45];
+
+extern WORD dtaCurrent, dtaTotal;
+extern BYTE dtaBuffer[DTA_BUFFER_SIZE + 2];
+extern BYTE *pDtaBuffer;
+extern BYTE fsnextIsForUs, tryToGetMoreDTAs;
+
+BYTE getNextDTAsFromHost(void);
+DWORD copyNextDtaToAtari(void);
+
+extern WORD ceDrives;
+extern BYTE currentDrive;
 
 #define RW_BUFFER_SIZE		512
 
@@ -329,14 +355,13 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
 	commandShort[4] = GD_CUSTOM_getRWdataCnt;
 	commandShort[5] = ceHandle;										
 	
-	BYTE *pDmaBuff = getDmaBufferPointer();
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuff, 1);			// send command to host over ACSI
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			// send command to host over ACSI
 
 	if(res != E_OK) {													// failed? say that no data was transfered
 		return 0;
 	}
 
-    DWORD count = getDword(pDmaBuff);						// read how much data was written
+    DWORD count = getDword(pDmaBuffer);						// read how much data was written
 	return count;
 }
 
@@ -391,14 +416,13 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 	commandShort[4] = GD_CUSTOM_getRWdataCnt;
 	commandShort[5] = ceHandle;										
 	
-	BYTE *pDmaBuff = getDmaBufferPointer();
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuff, 1);				// send command to host over ACSI
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				// send command to host over ACSI
 
 	if(res != E_OK) {													// failed? say that no data was transfered
 		return 0;
 	}
 
-    DWORD count = getDword(pDmaBuff);						// read how much data was read
+    DWORD count = getDword(pDmaBuffer);						// read how much data was read
 	return count;
 }
 
