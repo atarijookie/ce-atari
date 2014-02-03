@@ -8,7 +8,7 @@
 #include "utils.h"
 
 #define SWAP_ENDIAN false
-#define DEBUG_SPI_COMMUNICATION
+//#define DEBUG_SPI_COMMUNICATION
 
 CConSpi::CConSpi()
 {
@@ -70,8 +70,6 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
 		if( spi_atn(whichAtnSignal) ) {						// if ATN signal is up
 			break;
 		}
-		
-		Utils::sleepMs(1);									// wait 1 ms
     }
 
 #ifdef DEBUG_SPI_COMMUNICATION

@@ -71,7 +71,7 @@ void CCoreThread::run(void)
     memset(inBuff, 0, 8);
 	
     loadSettings();
-	resetHansAndFranz();
+//	resetHansAndFranz();
 	
 	DWORD nextDevFindTime = Utils::getCurrentMs();	// create a time when the devices should be checked - and that time is now
 

@@ -6,6 +6,7 @@
 #include "utils.h"
 
 #define LOG_FILE		"ce.log"
+DWORD prevLogOut;
 
 /*
 void Debug::out(const char *format, ...)
@@ -34,7 +35,11 @@ void Debug::out(const char *format, ...)
 		return;
 	}
 
-	fprintf(f, "%08d: ", Utils::getCurrentMs());
+	DWORD now = Utils::getCurrentMs();
+	DWORD diff = now - prevLogOut;
+	prevLogOut = now;
+	
+	fprintf(f, "%08d\t%08d\t ", now, diff);
     vfprintf(f, format, args);
 	fprintf(f, "\n");
 	fclose(f);
