@@ -8,6 +8,7 @@
 #include "utils.h"
 
 #define SWAP_ENDIAN false
+#define DEBUG_SPI_COMMUNICATION
 
 CConSpi::CConSpi()
 {
@@ -47,8 +48,9 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
 			return false;
 		}
 	
+#ifdef DEBUG_SPI_COMMUNICATION
 		Debug::out("\nwaitForATN single good!");
-	
+#endif	
 		if(!readHeader(whichSpiCs, outBuf, inBuf)) {		// receive: 0xcafe, ATN code, txLen, rxLen
 			return false;
 		}
@@ -72,14 +74,18 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
 		Utils::sleepMs(1);									// wait 1 ms
     }
 
+#ifdef DEBUG_SPI_COMMUNICATION
 	Debug::out("\nwaitForATN starting...");
+#endif
 
 	if(!readHeader(whichSpiCs, outBuf, inBuf)) {			// receive: 0xcafe, ATN code, txLen, rxLen
 		return false;
 	}
 
     if(inBuf[3] == atnCode) {                      		// ATN code found?
+#ifdef DEBUG_SPI_COMMUNICATION
 		Debug::out("waitForATN %02x good.", atnCode);
+#endif		
         return true;
 	} else {
 		Debug::out("waitForATN %02x, but received %02x! Fail!", atnCode, inBuf[3]);
@@ -128,7 +134,9 @@ void CConSpi::applyTxRxLimits(int whichSpiCs, BYTE *inBuff)
     WORD txLen = swapWord(pwIn[2]);
     WORD rxLen = swapWord(pwIn[3]);
 
-    Debug::out("TX/RX limits: TX %d WORDs, RX %d WORDs", txLen, rxLen);
+#ifdef DEBUG_SPI_COMMUNICATION
+	Debug::out("TX/RX limits: TX %d WORDs, RX %d WORDs", txLen, rxLen);
+#endif	
 
     if(txLen > 1024 || rxLen > 1024) {
         Debug::out("TX/RX limits above are probably wrong! Fix this!");
@@ -157,9 +165,11 @@ WORD CConSpi::swapWord(WORD val)
 
 void CConSpi::setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen)
 {
+#ifdef DEBUG_SPI_COMMUNICATION
     if(txLen != NO_REMAINING_LENGTH || rxLen != NO_REMAINING_LENGTH || remainingPacketLength != NO_REMAINING_LENGTH) {
 		Debug::out("CConSpi::setRemainingTxRxLen - TX %d, RX %d, while the remainingPacketLength is %d", txLen, rxLen, remainingPacketLength);
 	}
+#endif	
 		
     if(txLen == NO_REMAINING_LENGTH && rxLen == NO_REMAINING_LENGTH) {    // if setting NO_REMAINING_LENGTH
         if(remainingPacketLength != 0 && remainingPacketLength != NO_REMAINING_LENGTH) {
@@ -222,7 +232,9 @@ void CConSpi::txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBuf
         }
     }
 
+#ifdef DEBUG_SPI_COMMUNICATION
     Debug::out("CConSpi::txRx - count: %d", count);
+#endif	
 
 	spi_tx_rx(whichSpiCs, count, sendBuffer, receiveBufer);
 

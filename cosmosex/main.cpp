@@ -29,6 +29,8 @@ int main(int argc, char *argv[])
 		Debug::out("Cannot register SIGINT handler!");
 	}
 
+	system("sudo echo none > /sys/class/leds/led0/trigger");	// disable usage of GPIO 23 (pin 16) by LED 
+	
 	if(!gpio_open()) {									// try to open GPIO and SPI on RPi
 		return 0;
 	}

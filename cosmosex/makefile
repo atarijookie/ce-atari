@@ -1,7 +1,7 @@
 TARGET	= cosmosex
 
 CC	= g++
-STRIP	= strip
+#STRIP	= strip
 CFLAGS	= -Wall -g
 LDFLAGS	= -lbcm2835 -lrt -lpthread 
 
@@ -28,7 +28,7 @@ $(TARGET): $(OBJS) $(HDRS)
 #	$(STRIP) -s $@ 
 
 %.o: %.cpp 
-	g++ $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -f $(SUBDIR1)/*.o
