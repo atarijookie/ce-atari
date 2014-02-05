@@ -16,6 +16,15 @@ typedef struct
 	void *next;								// pointer to the next available TAtnBuffer
 } TWriteBuffer;
 
+typedef struct 
+{
+	WORD buffer[550 / 2];			// buffer for the written data - with some (38 bytes) reserve at the end in case of overflow
+	WORD count;								// count of WORDs in buffer - may include header, markers, data, terminating marker
+	WORD dataBytesCount;			// count of BYTEs of just data in buffer
+	
+	void *next;								// pointer to the next available TAtnBuffer
+} TReadBuffer;
+
 /*
 reserved:
 ---------
