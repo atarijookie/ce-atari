@@ -12,7 +12,7 @@ void timeoutStart(void)
   TIM_Cmd(TIM3, ENABLE);												// enable timer
 }	
 
-BYTE timeout(void)
+__forceinline BYTE timeout(void)
 {
 	if((TIM3->SR & 0x0001) != 0) {		// overflow of TIM4 occured?
 		TIM3->SR = 0xfffe;							// clear UIF flag
@@ -104,7 +104,7 @@ void PIO_read(BYTE val)
 	ACSI_DATADIR_WRITE();													// data as inputs (write)
 }
 
-void DMA_read(BYTE val)
+__forceinline void DMA_read(BYTE val)
 {
 	GPIOB->ODR = val;															// write the data to output data register
 	

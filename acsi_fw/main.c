@@ -395,7 +395,7 @@ void onDataRead(void)
 
 		// now try to trasmit the data
 		dataBytesCount = rdBufNow->dataBytesCount;
-		
+
 		while(dataBytesCount > 0) {
 			WORD dataWord;
 			BYTE byteHi, byteLo;
@@ -424,7 +424,7 @@ void onDataRead(void)
 			dataBytesCount--;																// decrement count
 				
 			DMA_read(byteLo);																// send data to Atari
-
+			
 			if(brStat == E_TimeOut) {												// if timeout occured
 				ACSI_DATADIR_WRITE();													// data direction for writing, and quit
 				return;
@@ -875,5 +875,42 @@ void setupAtnBuffers(void)
 	atnGetStatus[1] = ATN_GET_STATUS;
 	// WORDs 2 and 3 are reserved for TX LEN and RX LEN
 	atnGetStatus[4] = 0;
+	
+	// now set the next pointers in read buffers
+	rdBuf1.next = (void *) &rdBuf2;
+	rdBuf2.next = (void *) &rdBuf1;
 }
 
+__forceinline BYTE timeout(void)
+{
+	if((TIM3->SR & 0x0001) != 0) {		// overflow of TIM4 occured?
+		TIM3->SR = 0xfffe;							// clear UIF flag
+		return TRUE;
+	}
+	
+	return FALSE;
+}
+
+__forceinline void DMA_read(BYTE val)
+{
+	GPIOB->ODR = val;															// write the data to output data register
+	
+	// create rising edge on aDMA
+	GPIOA->BSRR	= aDMA;														// aDMA to HIGH
+	GPIOA->BRR	= aDMA;														// aDMA to LOW
+
+	while(1) {																		// wait for ACK or timeout
+		WORD exti = EXTI->PR;
+		
+		if(exti & aACK) {														// if ACK arrived
+			break;
+		}
+		
+		if(timeout()) {															// if timeout happened
+			brStat = E_TimeOut;												// set the bridge status
+			break;
+		}
+	}
+	
+	EXTI->PR = aACK;															// clear int for ACK
+}
