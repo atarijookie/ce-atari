@@ -51,7 +51,6 @@ GPIOB_9   - I  - CMD - this is combination of CS and A1, will go low on 1st cmd 
 GPIOB_10  - I  - CS  - PIO strobe                                                                   -- EXTI10
 GPIOB_11  - I  - ACK - DMA strobe                                                                   -- EXTI11
 
-GPIOB_15  - O  - XILINX reset - to get XILINX to a know state after power on
 //------------
 // the following pins have been moved from GPIOB to GPIOA, so we can to direct write to GPIOB->ODR without doing read-modify-write
 

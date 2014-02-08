@@ -134,6 +134,8 @@ BYTE firstConfigReceived;										// used to turn LEDs on after first config re
 
 BYTE shouldProcessCommands;
 
+BYTE dataReadAsm(WORD *pData, WORD dataCnt);
+
 int main (void) 
 {
 	BYTE i;
@@ -173,6 +175,17 @@ int main (void)
 	GPIOB->BSRR	= XILINX_RESET;														// HIGH
 	GPIOB->BRR	= XILINX_RESET;														// LOW
 
+//	i = EXTI->PR & aDMA;
+/*
+	DMA_read(0xab);
+	
+	rdBuf1.buffer[0] = 0x0102;
+	rdBuf1.buffer[1] = 0x0304;
+	rdBuf1.buffer[2] = 0x0506;
+	rdBuf1.buffer[3] = 0x0708;
+	
+	dataReadAsm(rdBuf1.buffer, 512);
+*/	
 	//-------------
 	while(1) {
 		// get the command from ACSI and send it to host
@@ -323,7 +336,7 @@ void onGetCommand(void)
 void onDataRead(void)
 {
 	WORD i, loopCount, l, dataBytesCount;
-	BYTE dataMarkerFound;
+	BYTE dataMarkerFound, res;
 	TReadBuffer *rdBufNow;
 	WORD *pData;
 
@@ -396,6 +409,7 @@ void onDataRead(void)
 		// now try to trasmit the data
 		dataBytesCount = rdBufNow->dataBytesCount;
 
+		/*
 		while(dataBytesCount > 0) {
 			WORD dataWord;
 			BYTE byteHi, byteLo;
@@ -429,6 +443,14 @@ void onDataRead(void)
 				ACSI_DATADIR_WRITE();													// data direction for writing, and quit
 				return;
 			}
+		}
+		*/
+		
+		res = dataReadAsm(pData, dataBytesCount);				// transfer the data to atari
+		
+		if(res == 0) {
+			ACSI_DATADIR_WRITE();													// data direction for writing, and quit
+			return;
 		}
 		
 		// one cycle finished, now swap buffers and start all over again
@@ -881,36 +903,3 @@ void setupAtnBuffers(void)
 	rdBuf2.next = (void *) &rdBuf1;
 }
 
-__forceinline BYTE timeout(void)
-{
-	if((TIM3->SR & 0x0001) != 0) {		// overflow of TIM4 occured?
-		TIM3->SR = 0xfffe;							// clear UIF flag
-		return TRUE;
-	}
-	
-	return FALSE;
-}
-
-__forceinline void DMA_read(BYTE val)
-{
-	GPIOB->ODR = val;															// write the data to output data register
-	
-	// create rising edge on aDMA
-	GPIOA->BSRR	= aDMA;														// aDMA to HIGH
-	GPIOA->BRR	= aDMA;														// aDMA to LOW
-
-	while(1) {																		// wait for ACK or timeout
-		WORD exti = EXTI->PR;
-		
-		if(exti & aACK) {														// if ACK arrived
-			break;
-		}
-		
-		if(timeout()) {															// if timeout happened
-			brStat = E_TimeOut;												// set the bridge status
-			break;
-		}
-	}
-	
-	EXTI->PR = aACK;															// clear int for ACK
-}
