@@ -89,7 +89,4 @@ GPIOA_15  - O  - LED3
 #define LED2			(1 << 12) 
 #define LED3			(1 << 15)
 
-// on GPIOB - XILINX reset
-#define XILINX_RESET		(1 << 15)
-
 #endif /* DEFS_H_ */

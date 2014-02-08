@@ -171,22 +171,6 @@ int main (void)
 	}
 	
 	//-------------
-	// reset the XILINX, because it might be in a weird state on power on
-	GPIOB->BSRR	= XILINX_RESET;														// HIGH
-	GPIOB->BRR	= XILINX_RESET;														// LOW
-
-//	i = EXTI->PR & aDMA;
-/*
-	DMA_read(0xab);
-	
-	rdBuf1.buffer[0] = 0x0102;
-	rdBuf1.buffer[1] = 0x0304;
-	rdBuf1.buffer[2] = 0x0506;
-	rdBuf1.buffer[3] = 0x0708;
-	
-	dataReadAsm(rdBuf1.buffer, 512);
-*/	
-	//-------------
 	while(1) {
 		// get the command from ACSI and send it to host
 		if(state == STATE_GET_COMMAND && PIO_gotFirstCmdByte()) {					// if 1st CMD byte was received
@@ -409,43 +393,6 @@ void onDataRead(void)
 		// now try to trasmit the data
 		dataBytesCount = rdBufNow->dataBytesCount;
 
-		/*
-		while(dataBytesCount > 0) {
-			WORD dataWord;
-			BYTE byteHi, byteLo;
-			
-			dataWord = *pData;															// get data
-			pData++;
-
-			byteHi = (BYTE) (dataWord >> 8);
-			byteLo = (BYTE)  dataWord;
-
-			// for upper byte
-			dataBytesCount--;																// decrement count
-				
-			DMA_read(byteHi);																// send data to Atari
-			
-			if(brStat == E_TimeOut) {												// if timeout occured
-				ACSI_DATADIR_WRITE();													// data direction for writing, and quit
-				return;
-			}
-
-			if(dataBytesCount == 0) {												// no more data to transfer (in case of odd data count)
-				break;
-			}
-				
-			// for lower byte
-			dataBytesCount--;																// decrement count
-				
-			DMA_read(byteLo);																// send data to Atari
-			
-			if(brStat == E_TimeOut) {												// if timeout occured
-				ACSI_DATADIR_WRITE();													// data direction for writing, and quit
-				return;
-			}
-		}
-		*/
-		
 		res = dataReadAsm(pData, dataBytesCount);				// transfer the data to atari
 		
 		if(res == 0) {
@@ -655,10 +602,6 @@ void init_hw_sw(void)
 	GPIOA->CRH &= ~(0xf00ff000);						// remove bits from GPIOA
 	GPIOA->CRH |=   0x30033000;							// 3 ouputs - LED1, LED2, LED3
 
-	// XILINX reset as output
-	GPIOB->CRH &= ~(0xf0000000);						// clear 
-	GPIOB->CRH |=   0x30000000;							// set XILINX reset as output
-	
 	RCC->APB2ENR |= (1 << 0);								// enable AFIO
 	
 	AFIO->EXTICR[2] = 0x1110;												// source input: GPIOB for EXTI 9, 10, 11
