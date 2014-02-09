@@ -87,7 +87,7 @@ onDone
 	; if timeout, continue here
 onTimeout				
 	mov		r0, #0			; return value is FALSE
-	pop		{r2-r8,pc}		; restore registers and return to the calling code
+	pop		{r2-r9,pc}		; restore registers and return to the calling code
 			ENDP
 				
 				
