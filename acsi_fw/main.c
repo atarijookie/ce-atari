@@ -8,6 +8,7 @@
 #include "defs.h"
 #include "timers.h"
 #include "bridge.h"
+#include "datatransfer.h"
 
 void init_hw_sw(void);
 void onButtonPress(void);
@@ -320,7 +321,8 @@ void onGetCommand(void)
 void onDataRead(void)
 {
 	WORD i, loopCount, l, dataBytesCount;
-	BYTE dataMarkerFound, res;
+	BYTE dataMarkerFound;
+	BYTE res;
 	TReadBuffer *rdBufNow;
 	WORD *pData;
 
@@ -393,7 +395,9 @@ void onDataRead(void)
 		// now try to trasmit the data
 		dataBytesCount = rdBufNow->dataBytesCount;
 
-		res = dataReadAsm(pData, dataBytesCount);				// transfer the data to atari
+		res = dataReadCloop(pData, dataBytesCount);
+		
+//		res = dataReadAsm(pData, dataBytesCount);				// transfer the data to atari
 		
 		if(res == 0) {
 			ACSI_DATADIR_WRITE();													// data direction for writing, and quit
