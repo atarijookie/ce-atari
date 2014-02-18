@@ -1,47 +1,95 @@
 	.text
 
-	pea	str(pc)
+	| write out title string
+	pea		str(pc)
 	move.w	#0x09,-(sp)
 	trap	#1
 	addq.l	#6,sp
 
-	move.l	#70*1024,-(sp)		| allocate 70 kB
-	move.w	#0x48,-(sp)			|
+	| malloc RAM, by default 70 kB, but is configurable
+	lea		driverRam(pc),a0
+	move.l	(a0), -(sp)			| read how much RAM we should allocate
+	move.w	#0x48,-(sp)			| Malloc()
 	trap	#1					|
 	addq.l	#6,sp				|
 	tst.l	d0
-	beq.b	fail
+	beq		fail
 
+	| store memory pointer to A1 and dma_pointer
 	movea.l	d0,a1				| a1 is the DMA address
-	lea	dma_pointer(pc),a0
+	lea		dma_pointer(pc),a0
 	move.l	d0,(a0)
 
-	lea	config(pc),a2			| load the config address to A2
+	| crate 0th cmd byte from ACSI ID (config + 2)
+	lea		config(pc),a2		| load the config address to A2
 	move.b	2(a2), d2			| d2 holds ACSI ID
 	lsl.b	#5, d2				| d2 = d2 << 5
 	ori.b	#0x08, d2			| d2 now contains (ACSI ID << 5) | 0x08, which is READ SECTOR from ACSI ID device
 
+	| get the sector count from (config + 3)
 	clr.l	d3
 	move.b	3(a2), d3			| d3 holds sector count we should transfer
 	subq.l	#1, d3				| d3--, because the dbra loop will be executed (d3 + 1) times
 
 	moveq	#1, d1				| d1 holds the current sector number. Bootsector is 0, so starting from 1 to (sector count + 1)
 
+	| trasnfer all the sectors from ACSI to RAM
 readSectorsLoop:
-	lea	acsiCmd(pc),a0			| load the address of ACSI command into a0
+	lea		acsiCmd(pc),a0		| load the address of ACSI command into a0
 	move.b	d2,(a0)				| cmd[0] = ACSI ID + SCSI READ 6 command
 	move.b	d1,3(a0)			| cmd[3] = sector number
 
-	bsr.b	dma_read			| try to read the sector
+	bsr		dma_read			| try to read the sector
 	tst.b	d0
 	bne.b	fail1				| d0 != 0?
 
-	lea	512(a1),a1				| a1 += 512
+	lea		512(a1),a1			| a1 += 512
 	addq.w	#1,d1				| current_sector++
 	dbra	d3, readSectorsLoop
 
+|--------------------------------
+
+	| now do the fixup for the loaded text position	
+
+	movea.l	dma_pointer(pc),a0	| 
+	lea		256(a0),a1			| A1 = points to text segment (prg header was skipped) 
+	move.l	a1,d5				| D5 = A1 (tbase)
+	adda.l	2(a0),a1			| A1 += text size
+	adda.l	6(a0),a1			| A1 += data size
+	adda.l	14(a0),a1			| A1 += symbol size (most probably 0) == BYTE *fixups
+								
+	move.l	(a1)+, d1			| read fixupOffset, a1 now points to fixups array
+	beq.s	skipFixing			| if fixupOffset is 0, then skip fixing
+	
+	add.l	d5, d1				| d1 = basePage->tbase + first fixup offset
+	move.l	d1, a0				| a0 = fist fixup pointer
+	moveq	#0, d0				| d0 = 0
+	
+fixupLoop:
+	add.l	d5, (a0)			| a0 points to place which needs to be fixed, so add text base to that
+getNextFixup:
+	move.b	(a1)+, d0			| get next fixup to d0	
+	beq.s	skipFixing			| if next fixup is 0, then we're finished
+	
+	cmp.b	#1, d0				| if the fixup is not #1, then skip to justFixNext
+	bne.s	justFixupNext
+	
+	add.l	#0x0fe, a0			| if the fixup was #1, then we add 0x0fe to the address which needs to be fixed and see what is the next fixup
+	bra.s	getNextFixup
+	
+justFixupNext:
+	add.l	d0, a0				| new place which needs to be fixed = old place + fixup 
+	bra.s	fixupLoop
+
+| code will get here either after the fixup is done, or when the fixup was skipped	
+skipFixing:
+	
+|--------------------------------
+
+	| clear the BSS section of prg
+
 	movea.l	dma_pointer(pc),a0	| sectors 1-N, first 256 bytes = prg header
-	lea	256(a0),a1				| skip prg header
+	lea		256(a0),a1			| skip prg header
 	movea.l	a1,a2
 	adda.l	2(a0),a1			| add text size
 	adda.l	6(a0),a1			| add data size = bss segment starts here
@@ -52,20 +100,30 @@ bss_loop:
 	subq.l	#1,d0
 	bne.b	bss_loop
 bss_done:
-	jmp	(a2)					| dont return here
 
-fail1:	move.l	dma_pointer(pc),-(sp)
-	move.w	#0x49,-(sp)
+	move.l	#0,-(sp)			| these two move.l are here to make...
+	move.l	#0,-(sp)			| ... 4(sp) [pointer to basepage] equal to 0 (meaning no base page)
+	addq.l	#8,sp				| and now return sp to previous position
+
+	jmp	(a2)					| jump to the code, but it won't return here
+	
+	|-----------------------------
+
+	| if failed....
+	
+fail1:	
+	move.l	dma_pointer(pc),-(sp)
+	move.w	#0x49,-(sp)			| Mfree - free the allocate RAM
 	trap	#1
 	addq.l	#6,sp
 
-fail:	pea	error(pc)
+fail:	
+	pea		error(pc)			| CConws() - write out error
 	move.w	#0x09,-(sp)
 	trap	#1
 	addq.l	#6,sp
 
-a:	bra	a
-	rts
+	rts							| return back
 
 	.data
 	.even
@@ -74,13 +132,16 @@ dma_pointer:
 	dc.l	0
 
 | This is the configuration which will be replaced before sending the sector to ST.
-| The format is: 'XX'  AcsiId  SectorCount
-config:	.dc.l	0x58580020
-acsiCmd:.dc.b	0x08,0x00,0x00,0x00,0x01
+| The format is : 'XX'  AcsiId  SectorCount driverRamBytes
+| default values: 'XX'       0   32 (0x20)  70 kB (0x11800 bytes)
+
+config:		.dc.l	0x58580020
+driverRam:	.dc.l	0x00011800
+acsiCmd:	.dc.b	0x08,0x00,0x00,0x00,0x01
 
 str:	.ascii	"CEDD boot loader"
 	.dc.b	13,10,0
-error:	.ascii	"Something went wrong!"
+error:	.ascii	"...failed :("
 	.dc.b	13,10,0
 
 	.text
@@ -104,7 +165,7 @@ dma_read:
 	st	flock				| lock the DMA chip
 
 	move.l	a1,-(SP)		| A1 contains the address to where the data should be transferred
-	move.b	3(SP),dmaLow		| set up DMA pointer - low, mid, hi
+	move.b	3(SP),dmaLow	| set up DMA pointer - low, mid, hi
 	move.b	2(SP),dmaMid
 	move.b	1(SP),dmaHigh
 	addq	#4,sp			| return the SP to the original position
