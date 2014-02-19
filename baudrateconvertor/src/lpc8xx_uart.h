@@ -33,16 +33,6 @@
 #ifndef __lpc8xx_UART_H
 #define __lpc8xx_UART_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
-/* Public Macros -------------------------------------------------------------- */
-/** @defgroup UART_Public_Macros  UART Public Macros
- * @{
- */
-
 #define LOOPBACK_TEST			0		/* Loopback uses polling only */
 #define TX_INTERRUPT    	1	/* 0 if TX uses polling, 1 interrupt driven. */
 #define ERROR_INTERRUPT 	0
@@ -108,28 +98,4 @@ extern "C"
 
 #define BUFSIZE       0x20
 
-//void UART_Handler( LPC_USART_TypeDef *UARTx );
-void UART0_IRQHandler(void);
-void UART1_IRQHandler(void);
-void UART2_IRQHandler(void);
-//void FlowControlInit( LPC_USART_TypeDef *UARTx );
-//void UARTInit(LPC_USART_TypeDef *UARTx, uint32_t Baudrate);
-
-//void UARTSend(LPC_USART_TypeDef *UARTx, uint8_t *BufferPtr, uint32_t Length);
-
-//void USARTInit(LPC_USART_TypeDef *UARTx, uint32_t Baudrate, uint32_t mode);
-
-/**
- * @}
- */
-
-#ifdef __cplusplus
-}
 #endif
-
-#endif /* __lpc8xx_UART_H */
-
-/**
- * @}
- */
-
