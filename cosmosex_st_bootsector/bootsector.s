@@ -52,7 +52,7 @@ readSectorsLoop:
 	| now do the fixup for the loaded text position	
 
 	movea.l	dma_pointer(pc),a0	| 
-	lea		256(a0),a1			| A1 = points to text segment (prg header was skipped) 
+	lea		28(a0),a1			| A1 = points to text segment (prg header of size 0x1c was skipped) 
 	move.l	a1,d5				| D5 = A1 (tbase)
 	adda.l	2(a0),a1			| A1 += text size
 	adda.l	6(a0),a1			| A1 += data size
@@ -88,24 +88,23 @@ skipFixing:
 
 	| clear the BSS section of prg
 
-	movea.l	dma_pointer(pc),a0	| sectors 1-N, first 256 bytes = prg header
-	lea		256(a0),a1			| skip prg header
-	movea.l	a1,a2
+	movea.l	dma_pointer(pc),a0	| sectors 1-N
+	lea		28(a0),a1			| A1 = points to text segment (prg header of size 0x1c was skipped) 
 	adda.l	2(a0),a1			| add text size
 	adda.l	6(a0),a1			| add data size = bss segment starts here
 	move.l	10(a0),d0			| d0.l = size of bss segment
 	beq.b	bss_done
 bss_loop:
-	clr.b	(a1)+				| TODO: optimize
+	clr.b	(a1)+				
 	subq.l	#1,d0
 	bne.b	bss_loop
 bss_done:
 
-	move.l	#0,-(sp)			| these two move.l are here to make...
-	move.l	#0,-(sp)			| ... 4(sp) [pointer to basepage] equal to 0 (meaning no base page)
-	addq.l	#8,sp				| and now return sp to previous position
-
-	jmp	(a2)					| jump to the code, but it won't return here
+	move.l	#0x12345678,-(sp)	| store magic number for the startup code of driver to know that there's no basepage (meaning no base page)
+	add.l	#4, sp
+	
+	lea		256(a0),a1			| A1 = points to text segment + some offset to the real start of the code
+	jmp		(a1)				| jump to the code, but it won't return here
 	
 	|-----------------------------
 
