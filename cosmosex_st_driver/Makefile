@@ -1,12 +1,12 @@
 TARGET	= cedd.prg
 SLIM	= yes
 
-CC	= m68k-atari-mint-gcc
+CC		= m68k-atari-mint-gcc
 STRIP	= m68k-atari-mint-strip
 CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS	= -Wl,--traditional-format
 
-HDR	= xbra.h acsi.h gemdos.h bios.h gemdos_errno.h translated.h main.h
+HDR		= xbra.h acsi.h gemdos.h bios.h gemdos_errno.h translated.h main.h
 CSRC	= gemdos.c gemdos_rw.c gemdos_pexec.c bios.c xbra.c acsi.c main.c 
 SSRC	= gemdos_asm.s bios_asm.s
 
@@ -14,17 +14,17 @@ ifeq ($(SLIM),yes)
 CFLAGS	+= -nostdlib -DSLIM
 STARTUP	= startup.s
 CSRC	+= stdlib.c
-HDR	+= stdlib.h
+HDR		+= stdlib.h
 endif
 
-$(TARGET): $(STARTUP) $(CSRC) $(SSRC) $(HDR)
-	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(CSRC) $(SSRC) $(LDFLAGS)
+OBJS = $(patsubst %.c,%.o,$(CSRC))
+
+$(TARGET): $(STARTUP) $(OBJS) $(SSRC) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(OBJS) $(SSRC) $(LDFLAGS)
 	$(STRIP) -s $@
 
-test: $(STARTUP) test.c acsi.c $(SSRC) $(HDR)
-	$(CC) $(CFLAGS) -o $@ $(STARTUP) test.c acsi.c $(SSRC) $(LDFLAGS)
-	$(STRIP) -s $@
-
+%.o: %.c 
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(TARGET) *~
+	rm -f $(TARGET) *~ *.o

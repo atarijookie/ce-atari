@@ -58,6 +58,7 @@ WORD ceDrives;
 WORD ceMediach;
 BYTE currentDrive;
 
+extern DWORD _runFromBootsector;			// flag meaning if we are running from TOS or bootsector
 /* ------------------------------------------------------------------ */
 int main( int argc, char* argv[] )
 {
@@ -124,10 +125,12 @@ int main( int argc, char* argv[] )
 	/* wait for a while so the user could read the message and quit */
 	sleep(2);
 
-	/* now terminate and stay resident */
-	Ptermres( 0x100 + _base->p_tlen + _base->p_dlen + _base->p_blen, 0 );
+	if(_runFromBootsector == 0) {	// if the prg was not run from boot sector, terminate and stay resident (execution ends here)
+		Ptermres( 0x100 + _base->p_tlen + _base->p_dlen + _base->p_blen, 0 );
+	}
 
-	return 0;		/* make compiler happy, we wont return */
+	// if the prg was run from bootsector, we will return and the asm code will do rts
+	return 0;		
 }
 
 /* this function scans the ACSI bus for any active CosmosEx translated drive */
