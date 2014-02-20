@@ -539,9 +539,14 @@
               <FilePath>.\bridge.c</FilePath>
             </File>
             <File>
-              <FileName>datatransfer.s</FileName>
-              <FileType>2</FileType>
-              <FilePath>.\datatransfer.s</FilePath>
+              <FileName>datatransfer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\datatransfer.c</FilePath>
+            </File>
+            <File>
+              <FileName>datatransfer.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\datatransfer.h</FilePath>
             </File>
           </Files>
         </Group>

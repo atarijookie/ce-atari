@@ -7,18 +7,28 @@
 
 #include "datatransfer.h"
 
+__forceinline BYTE timeout(void)
+{
+	if((TIM3->SR & 0x0001) != 0) {		// overflow of TIM4 occured?
+		TIM3->SR = 0xfffe;							// clear UIF flag
+		return TRUE;
+	}
+	
+	return FALSE;
+}
+
 #define READ_WORD	\
 		data = *pData;\
 		hi = data >> 8;\
 		GPIOB->ODR = hi;\
 		GPIOA->BSRR	= aDMA;\
+		__asm  { nop } \
 		GPIOA->BRR	= aDMA;\
 		lo = data & 0xff;\
 		while(1) {\
-			if(timeCnt == 0) {\
+			if(timeout()) {\
 				return 0;\
 			}\
-			timeCnt--;\
 			exti = EXTI->PR;\
 			if(exti & aACK) {\
 				EXTI->PR = aACK;\
@@ -27,13 +37,13 @@
 		}\
 		GPIOB->ODR = lo;\
 		GPIOA->BSRR	= aDMA;\
+		__asm  { nop } \
 		GPIOA->BRR	= aDMA;\
 		pData++;\
 		while(1) {\
-			if(timeCnt == 0) {\
+			if(timeout()) {\
 				return 0;\
 			}\
-			timeCnt--;\
 			exti = EXTI->PR;\
 			if(exti & aACK) {\
 				EXTI->PR = aACK;\
@@ -47,95 +57,26 @@
 		hi = data >> 8;\
 		GPIOB->ODR = hi;\
 		GPIOA->BSRR	= aDMA;\
+		__asm  { nop } \
 		GPIOA->BRR	= aDMA;\
 		while(1) {\
-			if(timeCnt == 0) {\
+			if(timeout()) {\
 				return 0;\
 			}\
-			timeCnt--;\
 			exti = EXTI->PR;\
 			if(exti & aACK) {\
 				EXTI->PR = aACK;\
 				break;\
 			}\
 		}
-		
-#define READ_DWORD	\
-		ddata = *pdData;\
-		byte = ddata >> 8;\
-		GPIOB->ODR = byte;\
-		GPIOA->BSRR	= aDMA;\
-		GPIOA->BRR	= aDMA;\
-		byte = ddata & 0xff;\
-		while(1) {\
-			if(timeCnt == 0) {\
-				return 0;\
-			}\
-			timeCnt--;\
-			exti = EXTI->PR;\
-			if(exti & aACK) {\
-				EXTI->PR = aACK;\
-				break;\
-			}\
-		}\
-		GPIOB->ODR = byte;\
-		GPIOA->BSRR	= aDMA;\
-		GPIOA->BRR	= aDMA;\
-		byte = ddata >> 24;\
-		while(1) {\
-			if(timeCnt == 0) {\
-				return 0;\
-			}\
-			timeCnt--;\
-			exti = EXTI->PR;\
-			if(exti & aACK) {\
-				EXTI->PR = aACK;\
-				break;\
-			}\
-		}	\
-		GPIOB->ODR = byte;\
-		GPIOA->BSRR	= aDMA;\
-		GPIOA->BRR	= aDMA;\
-		byte = ddata >> 16;\
-		while(1) {\
-			if(timeCnt == 0) {\
-				return 0;\
-			}\
-			timeCnt--;\
-			exti = EXTI->PR;\
-			if(exti & aACK) {\
-				EXTI->PR = aACK;\
-				break;\
-			}\
-		}\
-		GPIOB->ODR = byte;\
-		GPIOA->BSRR	= aDMA;\
-		GPIOA->BRR	= aDMA;\
-		pdData++;\
-		while(1) {\
-			if(timeCnt == 0) {\
-				return 0;\
-			}\
-			timeCnt--;\
-			exti = EXTI->PR;\
-			if(exti & aACK) {\
-				EXTI->PR = aACK;\
-				break;\
-			}\
-		}				
 
 BYTE dataReadCloop(WORD *pData, WORD dataCnt)
 {
-	DWORD timeCnt;
 	WORD exti;
-	DWORD *pdData = (DWORD *) pData;
-	
-	timeCnt = 0xfffff;
-		
+
 	while(dataCnt > 0) {
-		DWORD ddata;
 		WORD data;
-		BYTE hi,lo,byte;
+		BYTE hi,lo;
 		
 		// if got at least 16 bytes, read 16 bytes
 		if(dataCnt >= 16) {

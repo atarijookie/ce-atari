@@ -22,6 +22,7 @@ void setupAtnBuffers(void);
 WORD spi_TxRx(WORD out);
 void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 void spiDma_waitForFinish(void);
+void waitForSPIidle(void);
 
 void getCmdLengthFromCmdBytes(void);
 void onGetCommand(void);
@@ -136,6 +137,7 @@ BYTE firstConfigReceived;										// used to turn LEDs on after first config re
 BYTE shouldProcessCommands;
 
 BYTE dataReadAsm(WORD *pData, WORD dataCnt);
+DWORD isrNow, isrPrev;
 
 int main (void) 
 {
@@ -396,9 +398,7 @@ void onDataRead(void)
 		dataBytesCount = rdBufNow->dataBytesCount;
 
 		res = dataReadCloop(pData, dataBytesCount);
-		
-//		res = dataReadAsm(pData, dataBytesCount);				// transfer the data to atari
-		
+	
 		if(res == 0) {
 			ACSI_DATADIR_WRITE();													// data direction for writing, and quit
 			return;
@@ -409,6 +409,25 @@ void onDataRead(void)
 	}
 	
 	PIO_read(statusByte);																// send the status to Atari
+}
+
+void waitForSPIidle(void)
+{
+	while((SPI1->SR & SPI_SR_TXE) == 0) {								// wait while TXE flag is 0 (TX is not empty)
+		if(timeout()) {
+			return;
+		}
+	}
+
+	while((SPI1->SR & SPI_SR_BSY) != 0) {								// wait while BSY flag is 1 (SPI is busy)
+		if(timeout()) {
+			return;
+		}
+	}
+	
+	isrPrev = isrNow;
+	isrNow = SPI1->SR;
+
 }
 
 void startSpiDmaForDataRead(DWORD dataCnt, TReadBuffer *readBfr)
@@ -555,12 +574,25 @@ void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
 	pTxBfr[2] = txCount;
 	pTxBfr[3] = rxCount;
 	
-	spiDma_waitForFinish();															// make sure that the last transfer has finished
+	spiDma_waitForFinish();															// make sure that the last DMA transfer has finished
 
+	waitForSPIidle();																		// and make sure that SPI has finished, too
+	
 	// disable both TX and RX channels
 	DMA1_Channel3->CCR		&= 0xfffffffe;								// disable DMA3 Channel transfer
 	DMA1_Channel2->CCR		&= 0xfffffffe;								// disable DMA2 Channel transfer
 
+	//-------------------
+	// The next simple 'if' is here to help the last word of block loss (first word of block not present),
+	// it doesn't do much (just gets a byte from RX register if there is one waiting), but it helps the situation -
+	// without it the problem occures, with it it seems to be gone (can't reproduce). This might be caused just
+	// by the adding the delay between disabling and enabling DMA by this extra code. 
+	
+	if((SPI1->SR & SPI_SR_RXNE) != 0) {									// if there's something still in SPI DR, read it
+			WORD dummy = SPI1->DR;
+	}
+	//-------------------
+	
 	// set the software flags of SPI DMA being idle
 	spiDmaTXidle = (txCount == 0) ? TRUE : FALSE;				// if nothing to send, then IDLE; if something to send, then FALSE
 	spiDmaRXidle = (rxCount == 0) ? TRUE : FALSE;				// if nothing to receive, then IDLE; if something to receive, then FALSE
