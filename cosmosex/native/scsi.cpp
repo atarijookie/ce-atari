@@ -94,7 +94,6 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
         break;
 
     case SOURCETYPE_IMAGE:
-    case SOURCETYPE_IMAGE_TRANSLATEDBOOT:
         dm  = new ImageFileMedia();
         res = dm->iopen((char *) hostPath.c_str(), false);                   // try to open the image
 
@@ -113,6 +112,13 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
 			delete dm;
             return false;
         }
+        break;
+		
+    case SOURCETYPE_IMAGE_TRANSLATEDBOOT:
+        attachedMedia[index].hostPath       = hostPath;
+        attachedMedia[index].hostSourceType = hostSourceType;
+        attachedMedia[index].dataMedia      = &tranBootMedia;
+		attachedMedia[index].accessType		= SCSI_ACCESSTYPE_READ_ONLY;
         break;
 
     case SOURCETYPE_DEVICE:
@@ -173,6 +179,9 @@ bool Scsi::attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessTyp
             devInfo[i].accessType           = accessType;
 
             attachedMedia[mediaIndex].devInfoIndex = i;
+			
+			tranBootMedia.updateBootsectorConfigWithACSIid(i);		// and update boot sector config with ACSI ID to which this has been attached
+			
             return true;
         }
 

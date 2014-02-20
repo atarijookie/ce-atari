@@ -49,7 +49,7 @@ bool DeviceMedia::iopen(char *path, bool createIfNotExists)
 
     mediaHasChanged = false;
 
-    Debug::out("DeviceMedia - open succeeded, capacity: %d bytes", BCapacity);
+    Debug::out("DeviceMedia - open succeeded, capacity: %d MB", (int) (BCapacity / (1024 * 1024)));
 
     return true;
 }

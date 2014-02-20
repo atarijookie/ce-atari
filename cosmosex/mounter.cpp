@@ -168,11 +168,11 @@ bool Mounter::mount(char *mountCmd, char *mountDir)
 	
 	// handle the result
 	if(WIFEXITED(ret) && WEXITSTATUS(ret) == 0) {
-		Debug::out("Mounter::mount - mount succeeded!\n");
+		Debug::out("Mounter::mount - mount succeeded! (mount dir: %s)\n", mountDir);
 		return true;
 	} 
 	
-	Debug::out("Mounter::mount - mount failed.\n");
+	Debug::out("Mounter::mount - mount failed. (mount dir: %s)\n", mountDir);
 		
 	// move the logs to mount dir
 	char cmd[MAX_STR_SIZE];

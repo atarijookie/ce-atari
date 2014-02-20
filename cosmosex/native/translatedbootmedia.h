@@ -1,15 +1,17 @@
-#ifndef _IMAGEFILEMEDIA_H_
-#define _IMAGEFILEMEDIA_H_
+#ifndef __TRANSLATEDBOOTMEDIA_H_
+#define __TRANSLATEDBOOTMEDIA_H_
 
 #include <stdio.h>
 #include "../datatypes.h"
 #include "imedia.h"
 
-class ImageFileMedia: public IMedia
+#define TRANSLATEDBOOTMEDIA_SIZE	(32 * 1024)
+
+class TranslatedBootMedia: public IMedia
 {
 public:
-    ImageFileMedia();
-    ~ImageFileMedia();
+    TranslatedBootMedia();
+    ~TranslatedBootMedia();
 
     virtual bool iopen(char *path, bool createIfNotExists);
     virtual void iclose(void);
@@ -22,14 +24,22 @@ public:
     virtual bool readSectors(DWORD sectorNo, DWORD count, BYTE *bfr);
     virtual bool writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr);
 
+	void updateBootsectorConfigWithACSIid(BYTE acsiId);
+	
 private:
 
     DWORD	BCapacity;			// device capacity in bytes
     DWORD	SCapacity;			// device capacity in sectors
 
-    bool    mediaHasChanged;
-
-    FILE *image;
+	bool	gotImage;
+    BYTE	*imageBuffer;
+	
+	bool	loadDataIntoBuffer(void);
+	void 	updateBootsectorConfig(void);
+	int		getConfigPosition(void);
+	DWORD	getDword(BYTE *bfr);
+	void	setDword(BYTE *bfr, DWORD val);
 };
 
-#endif // _IMAGEFILEMEDIA_H_
+#endif // __TRANSLATEDBOOTMEDIA_H_
+

@@ -9,6 +9,7 @@
 #include "devfinder.h"
 #include "devchangeshandler.h"
 
+#include "native/translatedbootmedia.h"
 #include "native/scsi.h"
 #include "acsidatatrans.h"
 

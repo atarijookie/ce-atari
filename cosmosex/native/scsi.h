@@ -7,6 +7,7 @@
 #include "imedia.h"
 #include "nomedia.h"
 #include "testmedia.h"
+#include "translatedbootmedia.h"
 
 #include "../datatypes.h"
 #include "../isettingsuser.h"
@@ -22,6 +23,8 @@
 #define SOURCETYPE_TESTMEDIA            100
 
 #define MAX_ATTACHED_MEDIA              9
+
+#define TRANSLATEDBOOTMEDIA_FAKEPATH	"TRANSLATED BOOT MEDIA"
 
 typedef struct {
     std::string hostPath;                       // specifies host path to image file or device
@@ -67,8 +70,9 @@ private:
     BYTE            acsiId;                 // current acsi ID for the command
     IMedia          *dataMedia;             // current data media valid for current ACSI ID
 
-    NoMedia         noMedia;
-    TestMedia       testMedia;
+    NoMedia         	noMedia;
+    TestMedia       	testMedia;
+	TranslatedBootMedia	tranBootMedia;
 
     BYTE            *dataBuffer;
     BYTE            *dataBuffer2;
