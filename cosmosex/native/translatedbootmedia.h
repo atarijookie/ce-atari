@@ -39,6 +39,9 @@ private:
 	int		getConfigPosition(void);
 	DWORD	getDword(BYTE *bfr);
 	void	setDword(BYTE *bfr, DWORD val);
+	
+	void	updateBootsectorChecksum(void);
+	WORD	swapNibbles(WORD val);
 };
 
 #endif // __TRANSLATEDBOOTMEDIA_H_

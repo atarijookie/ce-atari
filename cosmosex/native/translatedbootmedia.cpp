@@ -99,11 +99,43 @@ void TranslatedBootMedia::updateBootsectorConfig(void)
 	}
 	
 	imageBuffer[pos + 3] = SCapacity - 1;				// store how many sectors we should read (without boot sector)
-	setDword(&imageBuffer[pos + 4], totalSize);						// store how many RAM we need to reserve for driver in ST
+	setDword(&imageBuffer[pos + 4], totalSize);			// store how many RAM we need to reserve for driver in ST
+	
+	updateBootsectorChecksum();							// update the checksum at the end
 	
     Debug::out("TranslatedBootMedia - bootsector will read %d sectors, the driver will take %d kB of RAM.", (int) imageBuffer[pos + 3], (int) (totalSize / 1024));
 }
 
+void TranslatedBootMedia::updateBootsectorChecksum(void)
+{
+    // create the check sum
+    WORD sum = 0, val;
+    WORD *p = (WORD *) imageBuffer;
+
+    for(int i=0; i<255; i++) {
+        val = *p;
+        val = swapNibbles(val);
+        sum += val;
+        p++;
+    }
+
+    WORD cs = 0x1234 - sum;
+    sum = sum & 0xffff;
+
+    imageBuffer[510] = cs >> 8;         // store the check sum
+    imageBuffer[511] = cs;
+}
+
+WORD TranslatedBootMedia::swapNibbles(WORD val)
+{
+    WORD a,b;
+
+    a = val >> 8;           // get upper
+    b = val &  0xff;        // get lower
+
+    return ((b << 8) | a);
+}
+	
 void TranslatedBootMedia::updateBootsectorConfigWithACSIid(BYTE acsiId)
 {
 	int pos = getConfigPosition();
@@ -113,7 +145,10 @@ void TranslatedBootMedia::updateBootsectorConfigWithACSIid(BYTE acsiId)
 		return;
 	}
 	
-	imageBuffer[pos + 2] = acsiId;				// store from which ACSI ID we should read the driver sectors
+	imageBuffer[pos + 2] = acsiId;						// store from which ACSI ID we should read the driver sectors
+	
+	updateBootsectorChecksum();							// update the checksum at the end
+	
 	Debug::out("TranslatedBootMedia - bootsector config updated with new ACSI ID set to %d", (int) acsiId);
 }
 
