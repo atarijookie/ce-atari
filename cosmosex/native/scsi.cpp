@@ -271,9 +271,10 @@ void Scsi::dettachByIndex(int index)
         detachMediaFromACSIidByIndex(ind2);
     }
 
-    if(	attachedMedia[index].hostSourceType != SOURCETYPE_NONE && 			// if it's not NO source
-		attachedMedia[index].hostSourceType != SOURCETYPE_TESTMEDIA) {      // and it's not TEST source
-        attachedMedia[index].dataMedia->iclose();                           // close it, delete it
+    if(	attachedMedia[index].hostSourceType != SOURCETYPE_NONE && 			        // if it's not NO source
+		attachedMedia[index].hostSourceType != SOURCETYPE_TESTMEDIA &&              // it's not TEST source
+        attachedMedia[index].hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT) {   // and it's not translated boot media   
+        attachedMedia[index].dataMedia->iclose();                                   // close it, delete it
         delete attachedMedia[index].dataMedia;
     }
 

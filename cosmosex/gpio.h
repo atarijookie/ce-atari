@@ -1,8 +1,12 @@
 #ifndef _GPIO_H_
 #define _GPIO_H_
 
-#include <bcm2835.h>
 #include "datatypes.h"
+
+#ifndef ONPC
+// if compiling for RPi
+
+#include <bcm2835.h>
 
 // assuming we're having P1 connector in version 2 (V2)
 // http://www.airspayce.com/mikem/bcm2835/group__constants.html
@@ -41,6 +45,53 @@
 
 #define SPI_ATN_HANS	PIN_ATN_HANS
 #define SPI_ATN_FRANZ	PIN_ATN_FRANZ
+
+#else
+// if compiling for PC
+
+#define PIN_TDO					3
+#define PIN_TDI					5
+#define PIN_TCK					7
+#define PIN_TMS					11
+
+// pins for both STM32 programming 
+#define PIN_RESET_HANS			13
+#define PIN_RESET_FRANZ			15
+#define PIN_TXD					8
+#define PIN_RXD					10
+#define PIN_TX_SEL1N2			12
+#define PIN_BOOT0_FRANZ_HANS	22
+
+// pins for communication with Franz and Hans
+#define PIN_ATN_HANS			16
+#define PIN_ATN_FRANZ			18
+#define PIN_CS_HANS				24
+#define PIN_CS_FRANZ			26
+#define PIN_MOSI				19
+#define PIN_MISO				21
+#define PIN_SCK					23
+
+#define	SPI_CS_HANS		24
+#define	SPI_CS_FRANZ	26
+
+#define SPI_ATN_HANS	PIN_ATN_HANS
+#define SPI_ATN_FRANZ	PIN_ATN_FRANZ
+
+#define LOW     0
+#define HIGH    1
+
+#define BCM2835_GPIO_FSEL_OUTP				0
+#define BCM2835_GPIO_FSEL_INPT				0
+#define BCM2835_SPI_BIT_ORDER_MSBFIRST		0
+#define BCM2835_SPI_MODE0					0
+#define BCM2835_SPI_CLOCK_DIVIDER_16		0
+#define BCM2835_SPI_CS0						0
+#define BCM2835_SPI_CS1						0
+
+void bcm2835_gpio_write(int a, int b);
+
+#endif
+
 
 bool gpio_open(void);
 void gpio_close(void);

@@ -15,6 +15,25 @@ Pins states remain the same even after bcm2835_close() and even after prog termi
 bcm2835_gpio_write doesn't influence SPI CS pins, they are controlled by SPI part of the library.
 */
 
+#ifdef ONPC
+// the following dummy functions are here for compilation on PC (not RPi)
+
+bool bcm2835_init(void) { return true; }
+void bcm2835_gpio_fsel(int a, int b) {}
+void bcm2835_gpio_write(int a, int b) {}
+void bcm2835_spi_begin() {}
+void bcm2835_spi_setBitOrder(int a) {}
+void bcm2835_spi_setDataMode(int a) {}
+void bcm2835_spi_setClockDivider(int a) {}
+void bcm2835_spi_setChipSelectPolarity(int a, int b) {}
+void bcm2835_spi_chipSelect(int a) {}
+void bcm2835_spi_transfernb(char *a, char *b, int c) {}
+int  bcm2835_gpio_lev(int a) { return 0; }
+void bcm2835_spi_end(void) {}
+void bcm2835_close(void) {}
+
+#endif
+
 bool gpio_open(void)
 {
 	if(geteuid() != 0) {

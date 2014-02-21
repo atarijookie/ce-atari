@@ -1,9 +1,17 @@
 TARGET	= cosmosex
 
+#ONPC    = yes
+
 CC	= g++
 #STRIP	= strip
 CFLAGS	= -Wall -g
-LDFLAGS	= -lbcm2835 -lrt -lpthread 
+
+ifeq ($(ONPC),yes)
+    LDFLAGS	= -lrt -lpthread 
+    CFLAGS += -DONPC
+else
+    LDFLAGS	= -lbcm2835 -lrt -lpthread 
+endif
 
 SUBDIR1	= config
 SUBDIR2	= native
