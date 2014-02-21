@@ -160,6 +160,8 @@ private:
     void attachToHostPathByIndex(int index, std::string hostRootPath, int translatedType);
     void detachByIndex(int index);
     bool isAlreadyAttached(std::string hostRootPath);
+
+    char *functionCodeToName(int code);
 };
 
 #endif

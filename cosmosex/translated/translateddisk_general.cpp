@@ -261,6 +261,9 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         return;
     }
 
+    char *functionName = functionCodeToName(cmd[4]);
+    Debug::out("TranslatedDisk function - %s (%d)", functionName, cmd[4]);
+
     // now do all the command handling
     switch(cmd[4]) {
         // special CosmosEx commands for this module
@@ -725,3 +728,44 @@ void TranslatedDisk::pathSeparatorHostToAtari(std::string &path)
         }
     }
 }
+
+char *TranslatedDisk::functionCodeToName(int code)
+{
+    switch(code) {
+        case GEMDOS_Dsetdrv:            return (char *)"GEMDOS_Dsetdrv";
+        case GEMDOS_Dgetdrv:            return (char *)"GEMDOS_Dgetdrv";
+        case GEMDOS_Dsetpath:           return (char *)"GEMDOS_Dsetpath";
+        case GEMDOS_Dgetpath:           return (char *)"GEMDOS_Dgetpath";
+        case GEMDOS_Fsetdta:            return (char *)"GEMDOS_Fsetdta";
+        case GEMDOS_Fgetdta:            return (char *)"GEMDOS_Fgetdta";
+        case GEMDOS_Fsfirst:            return (char *)"GEMDOS_Fsfirst";
+        case GEMDOS_Fsnext:             return (char *)"GEMDOS_Fsnext";
+        case GEMDOS_Dfree:              return (char *)"GEMDOS_Dfree";
+        case GEMDOS_Dcreate:            return (char *)"GEMDOS_Dcreate";
+        case GEMDOS_Ddelete:            return (char *)"GEMDOS_Ddelete";
+        case GEMDOS_Frename:            return (char *)"GEMDOS_Frename";
+        case GEMDOS_Fdatime:            return (char *)"GEMDOS_Fdatime";
+        case GEMDOS_Fdelete:            return (char *)"GEMDOS_Fdelete";
+        case GEMDOS_Fattrib:            return (char *)"GEMDOS_Fattrib";
+        case GEMDOS_Fcreate:            return (char *)"GEMDOS_Fcreate";
+        case GEMDOS_Fopen:              return (char *)"GEMDOS_Fopen";
+        case GEMDOS_Fclose:             return (char *)"GEMDOS_Fclose";
+        case GEMDOS_Fread:              return (char *)"GEMDOS_Fread";
+        case GEMDOS_Fwrite:             return (char *)"GEMDOS_Fwrite";
+        case GEMDOS_Fseek:              return (char *)"GEMDOS_Fseek";
+        case GEMDOS_Tgetdate:           return (char *)"GEMDOS_Tgetdate";
+        case GEMDOS_Tsetdate:           return (char *)"GEMDOS_Tsetdate";
+        case GEMDOS_Tgettime:           return (char *)"GEMDOS_Tgettime";
+        case GEMDOS_Tsettime:           return (char *)"GEMDOS_Tsettime";
+        case GD_CUSTOM_initialize:      return (char *)"GD_CUSTOM_initialize";
+        case GD_CUSTOM_getConfig:       return (char *)"GD_CUSTOM_getConfig";
+        case GD_CUSTOM_ftell:           return (char *)"GD_CUSTOM_ftell";
+        case GD_CUSTOM_getRWdataCnt:    return (char *)"GD_CUSTOM_getRWdataCnt";
+        case BIOS_Drvmap:               return (char *)"BIOS_Drvmap";
+        case BIOS_Mediach:              return (char *)"BIOS_Mediach";
+        case BIOS_Getbpb:               return (char *)"BIOS_Getbpb";
+        default:                        return (char *)"unknown";
+    }
+}
+
+
