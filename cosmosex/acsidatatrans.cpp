@@ -21,6 +21,8 @@ AcsiDataTrans::AcsiDataTrans()
     statusWasSet    = false;
     com             = NULL;
     dataDirection   = DATA_DIRECTION_READ;
+	
+	dumpNextData	= false;
 }
 
 AcsiDataTrans::~AcsiDataTrans()
@@ -40,6 +42,8 @@ void AcsiDataTrans::clear(void)
     status          = SCSI_ST_OK;
     statusWasSet    = false;
     dataDirection   = DATA_DIRECTION_READ;
+	
+	dumpNextData	= false;
 }
 
 void AcsiDataTrans::setStatus(BYTE stat)
@@ -163,6 +167,11 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
     return true;
 }
 
+void AcsiDataTrans::dumpDataOnce(void)
+{
+	dumpNextData = true;
+}
+
 // send all data to Hans, including status
 void AcsiDataTrans::sendDataAndStatus(void)
 {
@@ -181,6 +190,41 @@ void AcsiDataTrans::sendDataAndStatus(void)
         return;
     }
 
+	//---------------------------------------
+	if(dumpNextData) {
+		Debug::out("sendDataAndStatus: %d bytes", count);
+		BYTE *src = buffer;
+
+		WORD dumpCnt = 0;
+		
+		int lines = count / 32;
+		if((count % 32) != 0) {
+			lines++;
+		}
+	
+		for(int i=0; i<lines; i++) {
+			char bfr[1024];
+			char *b = &bfr[0];
+
+			for(int j=0; j<32; j++) {
+				int val = (int) *src;
+				src++;
+				sprintf(b, "%02x ", val);
+				b += 3;
+				
+				dumpCnt++;
+				if(dumpCnt >= count) {
+					break;
+				}
+			}
+
+			Debug::out("%s", bfr);
+		}
+		
+		dumpNextData = false;
+	}
+	//---------------------------------------
+	
     // first send the command
     BYTE devCommand[COMMAND_SIZE];
     memset(devCommand, 0, COMMAND_SIZE);

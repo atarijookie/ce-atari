@@ -1004,7 +1004,7 @@ void TranslatedDisk::onGetbpb(BYTE *cmd)
     dataTrans->addDataWord(8192);               // sectors per FAT - this would be just enough for 1 GB
     dataTrans->addDataWord(1000 + 8192);        // starting sector of second FAT
     dataTrans->addDataWord(1000 + 2*8192);      // starting sector of data
-    dataTrans->addDataWord(65535);             	// clusters per disk
+    dataTrans->addDataWord(32000);             	// clusters per disk
     dataTrans->addDataWord(1);                  // bit 0=1 - 16 bit FAT, else 12 bit
 
     dataTrans->padDataToMul16();

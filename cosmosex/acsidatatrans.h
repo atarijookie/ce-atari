@@ -48,6 +48,8 @@ public:
 
     void setCommunicationObject(CConSpi *comIn);
 
+	void dumpDataOnce(void);
+
 private:
     BYTE    *buffer;
     DWORD   count;
@@ -62,6 +64,8 @@ private:
 
     BYTE    txBuffer[520];
     BYTE    rxBuffer[520];
+	
+	bool	dumpNextData;
 
     void sendStatusAfterWrite(void);
 };
