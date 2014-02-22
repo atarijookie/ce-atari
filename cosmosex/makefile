@@ -4,7 +4,7 @@ TARGET	= cosmosex
 
 CC	= g++
 #STRIP	= strip
-CFLAGS	= -Wall -g
+CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64
 
 ifeq ($(ONPC),yes)
     LDFLAGS	= -lrt -lpthread 

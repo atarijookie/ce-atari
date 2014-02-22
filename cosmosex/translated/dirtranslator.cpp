@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 #include "../utils.h"
 #include "../debug.h"
@@ -192,7 +193,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 		}
 
 		// check the current name against searchString using fnmatch
-		int ires = fnmatch((char *) searchString.c_str(), (char *) hostPath.c_str(), FNM_PATHNAME);
+		int ires = fnmatch((char *) searchString.c_str(), (char *) de->d_name, FNM_PATHNAME);
 		
 		if(ires != 0) {
 			continue;
@@ -252,17 +253,26 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, TFindStorage
 	
 	int res;
 	struct stat attr;
-    res = stat(fullEntryPath.c_str(), &attr);		// get the file status
+	tm *timestr;
 	
-	if(res != 0) {
-		Debug::out("TranslatedDisk::appendFoundToFindStorage -- stat() failed");
-		return;		
+	if(longFname == "." || longFname == "..") {			// for this and up dirs
+		attr.st_size = 0;
+		
+		time_t t	= time(NULL);						// get current date time
+		timestr		= localtime(&t);
+	} else {											// for other files
+		res = stat(fullEntryPath.c_str(), &attr);		// get the file status
+	
+		if(res != 0) {
+			Debug::out("TranslatedDisk::appendFoundToFindStorage -- stat() failed, errno %d", errno);
+			return;		
+		}
+
+		timestr = localtime(&attr.st_mtime);			// convert time_t to tm structure
 	}
 	
-	tm *time = localtime(&attr.st_mtime);			// convert time_t to tm structure
-	
-    WORD atariTime = Utils::fileTimeToAtariTime(time);
-    WORD atariDate = Utils::fileTimeToAtariDate(time);
+    WORD atariTime = Utils::fileTimeToAtariTime(timestr);
+    WORD atariDate = Utils::fileTimeToAtariDate(timestr);
 	
     std::string shortFname;
 
