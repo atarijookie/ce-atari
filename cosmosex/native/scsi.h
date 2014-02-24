@@ -32,6 +32,7 @@ typedef struct {
     int         accessType;                     // access type: read only, read write, no data
 
     IMedia      *dataMedia;                     // pointer to the data provider object
+    bool        dataMediaDynamicallyAllocated;  // set to true if dataMedia was created by new and delete should be used, otherwise set to false and delete won't be used 
 
     int         devInfoIndex;                   // index in devInfo[]
 } TScsiConf;

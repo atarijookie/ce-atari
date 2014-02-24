@@ -85,17 +85,18 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
         return false;
     }
 
-    switch(hostSourceType) {                                        // try to open it depending on source type
+    switch(hostSourceType) {                                                // try to open it depending on source type
     case SOURCETYPE_NONE:
         attachedMedia[index].hostPath       = "";
         attachedMedia[index].hostSourceType = hostSourceType;
         attachedMedia[index].dataMedia      = &noMedia;
         attachedMedia[index].accessType     = SCSI_ACCESSTYPE_NO_DATA;
+        attachedMedia[index].dataMediaDynamicallyAllocated = false;         // didn't use new on .dataMedia
         break;
 
     case SOURCETYPE_IMAGE:
         dm  = new ImageFileMedia();
-        res = dm->iopen((char *) hostPath.c_str(), false);                   // try to open the image
+        res = dm->iopen((char *) hostPath.c_str(), false);                  // try to open the image
 
         if(res) {                                                           // image opened?
             attachedMedia[index].hostPath       = hostPath;
@@ -107,8 +108,11 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
 			} else {															// for translated boot image - read only
 				attachedMedia[index].accessType	= SCSI_ACCESSTYPE_READ_ONLY;
 			}
+
+            attachedMedia[index].dataMediaDynamicallyAllocated = true;      // did use new on .dataMedia
         } else {                                                            // failed to open image?
             Debug::out("Scsi::attachToHostPath - failed to open image %s! Not attaching.", hostPath.c_str());
+            attachedMedia[index].dataMediaDynamicallyAllocated = false;     // didn't use new on .dataMedia
 			delete dm;
             return false;
         }
@@ -119,6 +123,7 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
         attachedMedia[index].hostSourceType = hostSourceType;
         attachedMedia[index].dataMedia      = &tranBootMedia;
 		attachedMedia[index].accessType		= SCSI_ACCESSTYPE_READ_ONLY;
+        attachedMedia[index].dataMediaDynamicallyAllocated = false;         // didn't use new on .dataMedia
         break;
 
     case SOURCETYPE_DEVICE:
@@ -130,8 +135,10 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
 			attachedMedia[index].hostSourceType = hostSourceType;
 			attachedMedia[index].dataMedia      = dm;
 			attachedMedia[index].accessType     = SCSI_ACCESSTYPE_FULL;
+            attachedMedia[index].dataMediaDynamicallyAllocated = true;      // did use new on .dataMedia
 		} else {
             Debug::out("Scsi::attachToHostPath - failed to open device %s! Not attaching.", hostPath.c_str());
+            attachedMedia[index].dataMediaDynamicallyAllocated = false;     // didn't use new on .dataMedia
 			delete dm;
             return false;
 		}
@@ -145,6 +152,7 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
 		attachedMedia[index].hostSourceType = hostSourceType;
 		attachedMedia[index].dataMedia      = &testMedia;
 		attachedMedia[index].accessType     = SCSI_ACCESSTYPE_FULL;
+        attachedMedia[index].dataMediaDynamicallyAllocated = false;         // didn't use new on .dataMedia
 		break;		
     }
 
@@ -211,8 +219,7 @@ void Scsi::detachMediaFromACSIidByIndex(int index)
 	int attMediaInd = devInfo[index].attachedMediaIndex;
     attachedMedia[ attMediaInd ].devInfoIndex = -1;   				// set not attached in attached media
 
-    if(	attachedMedia[attMediaInd].hostSourceType != SOURCETYPE_NONE && 			// if it's not NO source
-		attachedMedia[attMediaInd].hostSourceType != SOURCETYPE_TESTMEDIA) {      // and it's not TEST source
+    if(	attachedMedia[attMediaInd].dataMediaDynamicallyAllocated) { // if dataMedia was creates using new, use delete
 		delete attachedMedia[ attMediaInd ].dataMedia;				// delete the data source access object
 	}
 	
@@ -271,10 +278,8 @@ void Scsi::dettachByIndex(int index)
         detachMediaFromACSIidByIndex(ind2);
     }
 
-    if(	attachedMedia[index].hostSourceType != SOURCETYPE_NONE && 			        // if it's not NO source
-		attachedMedia[index].hostSourceType != SOURCETYPE_TESTMEDIA &&              // it's not TEST source
-        attachedMedia[index].hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT) {   // and it's not translated boot media   
-        attachedMedia[index].dataMedia->iclose();                                   // close it, delete it
+    if(	attachedMedia[index].dataMediaDynamicallyAllocated) {               // if dataMedia was created using new, delete it
+        attachedMedia[index].dataMedia->iclose();                           // close it, delete it
         delete attachedMedia[index].dataMedia;
     }
 
@@ -292,6 +297,7 @@ void Scsi::initializeAttachedMediaVars(int index)
     attachedMedia[index].dataMedia      = NULL;
     attachedMedia[index].accessType     = SCSI_ACCESSTYPE_NO_DATA;
     attachedMedia[index].devInfoIndex   = -1;
+    attachedMedia[index].dataMediaDynamicallyAllocated = false;
 }
 
 int Scsi::findEmptyAttachSlot(void)
