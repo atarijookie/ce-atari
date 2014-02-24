@@ -27,10 +27,50 @@ void bcm2835_spi_setDataMode(int a) {}
 void bcm2835_spi_setClockDivider(int a) {}
 void bcm2835_spi_setChipSelectPolarity(int a, int b) {}
 void bcm2835_spi_chipSelect(int a) {}
-void bcm2835_spi_transfernb(char *a, char *b, int c) {}
-int  bcm2835_gpio_lev(int a) { return 0; }
 void bcm2835_spi_end(void) {}
 void bcm2835_close(void) {}
+
+int  spiCount  = 0;
+int  spiOffset = 0;
+char spiData[2048];
+
+void bcmSpiAddData(int count, char *data)
+{
+    memcpy(spiData, data, count);
+    spiCount    = count;
+    spiOffset   = 0;
+}
+
+int  bcm2835_gpio_lev(int a) 
+{
+    if(a == PIN_ATN_HANS && spiCount != 0) {
+        return 1;
+    }
+
+    return 0; 
+}
+
+void bcm2835_spi_transfernb(char *txBuf, char *rxBuf, int c)
+{
+    if(spiCount == 0) {
+        return;
+    }
+
+    if(c > spiCount) {
+        c = spiCount;
+    }
+
+    memcpy(rxBuf, spiData + spiOffset, c);
+
+    if(spiCount <= c) {
+        spiCount    = 0;
+        spiOffset   = 0;
+        return;
+    }
+
+    spiCount    -= c;
+    spiOffset   += c;
+}
 
 #endif
 

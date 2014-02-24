@@ -89,6 +89,7 @@
 #define BCM2835_SPI_CS1						0
 
 void bcm2835_gpio_write(int a, int b);
+void bcmSpiAddData(int count, char *data);
 
 #endif
 

@@ -32,7 +32,7 @@ CCoreThread::CCoreThread()
     scsi        = new Scsi();
     scsi->setAcsiDataTrans(dataTrans);
     scsi->attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
-    scsi->attachToHostPath("TESTMEDIA", SOURCETYPE_TESTMEDIA, SCSI_ACCESSTYPE_FULL);
+//    scsi->attachToHostPath("TESTMEDIA", SOURCETYPE_TESTMEDIA, SCSI_ACCESSTYPE_FULL);
 
     translated = new TranslatedDisk();
     translated->setAcsiDataTrans(dataTrans);
@@ -78,6 +78,11 @@ void CCoreThread::run(void)
 	
 	bool res;
 	
+#ifdef ONPC
+    char atnSendFwVer[16] = {0xca, 0xfe, 0,1, 0, 8, 0, 8, 0xa0, 0x14, 0x02, 0x05, 0, 0, 0, 0};
+    bcmSpiAddData(16, atnSendFwVer); 
+#endif
+
     while(sigintReceived == 0) {
 		bool gotAtn = false;						// no ATN received yet?
 		
