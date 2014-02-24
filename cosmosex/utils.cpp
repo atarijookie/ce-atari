@@ -64,9 +64,9 @@ WORD Utils::fileTimeToAtariDate(struct tm *ptm)
 		return 0;
 	}
 
-    atariDate |= (ptm->tm_year - 1980) << 9;            // year
-    atariDate |= (ptm->tm_mon        ) << 5;            // month
-    atariDate |= (ptm->tm_mday       );                 // day
+    atariDate |= (ptm->tm_year - 80) << 9;            // year (tm_year is 'years since 1900', we want 'years since 1980', so the difference is -80
+    atariDate |= (ptm->tm_mon  +  1) << 5;            // month
+    atariDate |= (ptm->tm_mday     );                 // day
 
     return atariDate;
 }

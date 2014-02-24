@@ -192,15 +192,8 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 			continue;
 		}
 
-		// check the current name against searchString using fnmatch
-		int ires = fnmatch((char *) searchString.c_str(), (char *) de->d_name, FNM_PATHNAME);
-		
-		if(ires != 0) {
-			continue;
-		}
-
 		// finnaly append to the find storage
-		appendFoundToFindStorage(hostPath, fs, de, findAttribs);
+		appendFoundToFindStorage(hostPath, (char *) searchString.c_str(), fs, de, findAttribs);
 
         if(fs->count >= fs->maxCount) {         					// avoid buffer overflow
             break;
@@ -211,7 +204,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 	return true;
 }
 
-void DirTranslator::appendFoundToFindStorage(std::string &hostPath, TFindStorage *fs, struct dirent *de, BYTE findAttribs)
+void DirTranslator::appendFoundToFindStorage(std::string &hostPath, char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs)
 {
     // TODO: verify on ST that the find attributes work like this
 
@@ -254,12 +247,13 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, TFindStorage
 	int res;
 	struct stat attr;
 	tm *timestr;
+    std::string shortFname;
 	
 	if(longFname == "." || longFname == "..") {			// for this and up dirs
 		attr.st_size = 0;
 		
 		time_t t	= time(NULL);						// get current date time
-		timestr		= localtime(&t);
+		timestr		= gmtime(&t);
 	} else {											// for other files
 		res = stat(fullEntryPath.c_str(), &attr);		// get the file status
 	
@@ -268,23 +262,28 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, TFindStorage
 			return;		
 		}
 
-		timestr = localtime(&attr.st_mtime);			// convert time_t to tm structure
+		timestr = gmtime(&attr.st_mtime);			    // convert time_t to tm structure
+
+        res = longToShortFilename(hostPath, longFname, shortFname); // convert long to short filename
+
+        if(!res) {
+            return;
+        }
 	}
 	
     WORD atariTime = Utils::fileTimeToAtariTime(timestr);
     WORD atariDate = Utils::fileTimeToAtariDate(timestr);
-	
-    std::string shortFname;
-
-    res = longToShortFilename(hostPath, longFname, shortFname);
-
-    if(!res) {
-        return;
-    }
 
     // now convert the short 'FILE.C' to 'FILE    .C  '
     char shortFnameExtended[14];
     FilenameShortener::extendWithSpaces((char *) shortFname.c_str(), shortFnameExtended);
+
+    // check the current name against searchString using fnmatch
+	int ires = fnmatch(searchString, (char *) shortFnameExtended, FNM_PATHNAME);
+		
+	if(ires != 0) {     // not matching? quit
+		return;
+	}
 
     // GEMDOS File Attributes
     buf[0] = atariAttribs;
@@ -305,7 +304,8 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, TFindStorage
 
     // Filename -- d_fname[14]
     memset(&buf[9], 0, 14);                                         // first clear the mem
-    strncpy((char *) &buf[9], (char *) shortFnameExtended, 14);     // then copy only valid part of the string, max 14 chars
+//  strncpy((char *) &buf[9], (char *) shortFnameExtended, 14);     // copy the filename - 'FILE    .C  '
+    strncpy((char *) &buf[9], (char *) shortFname.c_str(), 14);     // copy the filename - 'FILE.C'
 
     fs->count++;
 }

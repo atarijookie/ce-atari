@@ -658,7 +658,7 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
 			return;		
 		}
 	
-		tm *time = localtime(&attr.st_mtime);						// convert time_t to tm structure
+		tm *time = gmtime(&attr.st_mtime);						    // convert time_t to tm structure
 	
 		WORD atariTime = Utils::fileTimeToAtariTime(time);
 		WORD atariDate = Utils::fileTimeToAtariDate(time);
@@ -851,7 +851,7 @@ void TranslatedDisk::onFtell(BYTE *cmd)
 void TranslatedDisk::onTgetdate(BYTE *cmd)
 {
 	time_t t = time(NULL);
-	tm *time = localtime(&t);						// convert time_t to tm structure
+	tm *time = gmtime(&t);						    // convert time_t to tm structure
 	
 	WORD atariDate = Utils::fileTimeToAtariDate(time);
 
@@ -890,7 +890,7 @@ void TranslatedDisk::onTsetdate(BYTE *cmd)
 void TranslatedDisk::onTgettime(BYTE *cmd)
 {
 	time_t t = time(NULL);
-	tm *time = localtime(&t);						// convert time_t to tm structure
+	tm *time = gmtime(&t);					// convert time_t to tm structure
 	
 	WORD atariTime = Utils::fileTimeToAtariTime(time);
 

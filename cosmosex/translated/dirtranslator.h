@@ -39,7 +39,7 @@ private:
     FilenameShortener *createShortener(std::string &path);
     void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
 
-    void appendFoundToFindStorage(std::string &hostPath, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
+    void appendFoundToFindStorage(std::string &hostPath, char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
 };
 
 #endif // DIRTRANSLATOR_H
