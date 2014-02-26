@@ -192,6 +192,11 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 			continue;
 		}
 
+		std::string longFname = de->d_name;
+		if(longFname == "." || longFname == "..") {					// if it's this dir or up-dir, then skip this, as this is not needed
+			continue;
+		}	
+		
 		// finnaly append to the find storage
 		appendFoundToFindStorage(hostPath, (char *) searchString.c_str(), fs, de, findAttribs);
 
@@ -234,8 +239,8 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, char *search
 
     //--------
     // add this file
-    DWORD addr  = fs->count * 23;               // calculate offset
-    BYTE *buf   = &(fs->buffer[addr]);          // and get pointer to this location
+    DWORD addr  = fs->count * 23;               	// calculate offset
+    BYTE *buf   = &(fs->buffer[addr]);          	// and get pointer to this location
 
     BYTE atariAttribs;								// convert host to atari attribs
     Utils::attributesHostToAtari(isReadOnly, isDir, atariAttribs);
@@ -249,27 +254,19 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, char *search
 	tm *timestr;
     std::string shortFname;
 	
-	if(longFname == "." || longFname == "..") {			// for this and up dirs
-		attr.st_size = 0;
-		
-		time_t t	= time(NULL);						// get current date time
-		timestr		= gmtime(&t);
-	} else {											// for other files
-		res = stat(fullEntryPath.c_str(), &attr);		// get the file status
+	res = stat(fullEntryPath.c_str(), &attr);					// get the file status
 	
-		if(res != 0) {
-			Debug::out("TranslatedDisk::appendFoundToFindStorage -- stat() failed, errno %d", errno);
-			return;		
-		}
-
-		timestr = gmtime(&attr.st_mtime);			    // convert time_t to tm structure
-
-        res = longToShortFilename(hostPath, longFname, shortFname); // convert long to short filename
-
-        if(!res) {
-            return;
-        }
+	if(res != 0) {
+		Debug::out("TranslatedDisk::appendFoundToFindStorage -- stat() failed, errno %d", errno);
+		return;		
 	}
+
+	timestr = gmtime(&attr.st_mtime);			    			// convert time_t to tm structure
+
+	res = longToShortFilename(hostPath, longFname, shortFname); // convert long to short filename
+    if(!res) {
+        return;
+    }
 	
     WORD atariTime = Utils::fileTimeToAtariTime(timestr);
     WORD atariDate = Utils::fileTimeToAtariDate(timestr);

@@ -145,25 +145,28 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 
         //----------------------
         // just for dumping the data
-/*
-        unsigned char *src = rxBuffer + 2;
+		if(dumpNextData) {
+			Debug::out("recvData: %d bytes", subCount);
+			unsigned char *src = rxBuffer + 2;
 
-        for(int i=0; i<16; i++) {
-            char bfr[1024];
-            char *b = &bfr[0];
+			for(int i=0; i<16; i++) {
+				char bfr[1024];
+				char *b = &bfr[0];
 
-            for(int j=0; j<32; j++) {
-                int val = (int) *src;
-                src++;
-                sprintf(b, "%02x ", val);
-                b += 3;
-            }
+				for(int j=0; j<32; j++) {
+					int val = (int) *src;
+					src++;
+					sprintf(b, "%02x ", val);
+					b += 3;
+				}
 
-            Debug::out("%s", bfr);
+				Debug::out("%s", bfr);
+			}
         }
-*/		
-    }
+        //----------------------
+	}
 
+	dumpNextData = false;
     return true;
 }
 

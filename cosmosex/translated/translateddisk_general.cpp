@@ -261,9 +261,12 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         return;
     }
 
+/*
     char *functionName = functionCodeToName(cmd[4]);
-    Debug::out("TranslatedDisk function - %s (%d)", functionName, cmd[4]);
-
+    Debug::out("TranslatedDisk function - %s (%02x)", functionName, cmd[4]);
+*/
+//	dataTrans->dumpDataOnce();
+	
     // now do all the command handling
     switch(cmd[4]) {
         // special CosmosEx commands for this module

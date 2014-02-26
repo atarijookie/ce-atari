@@ -302,6 +302,8 @@ int CCoreThread::bcdToInt(int bcd)
 
 void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 {
+	Debug::out("CCoreThread::onDevAttached: devName %s", (char *) devName.c_str());
+
 	// TODO: add logic to detach the device, if it was attached as other type (raw / tran)
 
 	// if have RAW enabled, but not TRANSLATED - attach all drives (atari and non-atari) as RAW
@@ -427,7 +429,7 @@ void CCoreThread::mountAndAttachSharedDrive(void)
 	tmr.mountDir			= mountPath;
 	mountAdd(tmr);
 
-	bool res = translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL);	// try to attach
+	bool res = translated->attachToHostPath(mountPath, TRANSLATEDTYPE_SHAREDDRIVE);	// try to attach
 
 	if(!res) {																// if didn't attach, skip the rest
 		Debug::out("mountAndAttachSharedDrive: failed to attach shared drive %s", (char *) mountPath.c_str());

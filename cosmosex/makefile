@@ -1,6 +1,6 @@
 TARGET	= cosmosex
 
-ONPC    = yes
+#ONPC    = yes
 
 CC	= g++
 #STRIP	= strip
