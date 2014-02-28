@@ -61,6 +61,8 @@ private:
 	bool			gotDevTypeRaw;
 	bool			gotDevTypeTranslated;
 
+    bool            updateListWasProcessed;
+
     void createConnectionObject(void);
     void usbConnectionCheck(void);
 
@@ -74,6 +76,9 @@ private:
 	
 	void attachDevAsTranslated(std::string devName);
 	void mountAndAttachSharedDrive(void);
+
+    void downloadUpdateList(void);
+    void processUpdateList(void);
 };
 
 #endif // CCORETHREAD_H

@@ -12,6 +12,10 @@
 #include "settings.h"
 #include "gpio.h"
 #include "mounter.h"
+#include "downloader.h"
+
+#define UPDATE_PATH		    "update"
+#define UPDATE_LOCALLIST    "update/updatelist.csv"
 
 #define DEV_CHECK_TIME_MS	3000
 
@@ -50,6 +54,8 @@ CCoreThread::CCoreThread()
 	
 	// register this class as receiver of dev attached / detached calls
 	devFinder.setDevChangesHandler((DevChangesHandler *) this);
+
+    updateListWasProcessed = false;
 }
 
 CCoreThread::~CCoreThread()
@@ -76,6 +82,8 @@ void CCoreThread::run(void)
 
 	mountAndAttachSharedDrive();					// if shared drive is enabled, try to mount it and attach it
 	
+    downloadUpdateList();                           // download the list of components with the newest available versions
+
 	bool res;
 	
 #ifdef ONPC
@@ -96,6 +104,10 @@ void CCoreThread::run(void)
 			devFinder.lookForDevChanges();				// look for devices attached / detached
 			
 			nextDevFindTime = Utils::getEndTime(DEV_CHECK_TIME_MS);		// update the time when devices should be checked
+
+            if(!updateListWasProcessed) {               // if didn't process update list yet
+                processUpdateList();
+            }
 		}
 
 		res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);		// check for any ATN code waiting from Hans
@@ -435,4 +447,46 @@ void CCoreThread::mountAndAttachSharedDrive(void)
 		Debug::out("mountAndAttachSharedDrive: failed to attach shared drive %s", (char *) mountPath.c_str());
 	}
 }
+
+void CCoreThread::downloadUpdateList(void)
+{
+    // check for existence and possibly create update dir
+  	int res = mkdir(UPDATE_PATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
+	
+	if(res == 0) {					// dir created
+		Debug::out("Update: directory %s was created.", UPDATE_PATH);
+	} else {						// dir not created
+		if(errno != EEXIST) {		// and it's not because it already exists...
+			Debug::out("Update: failed to create settings directory - %s", strerror(errno));
+		}
+	}
+
+    // remove old update list
+    remove(UPDATE_LOCALLIST);
+
+    // add request for download of the update list
+    TDownloadRequest tdr;
+    tdr.srcUrl = "http://joo.kie.sk/cosmosex/update/updatelist.csv";
+    tdr.dstDir = "update";
+    downloadAdd(tdr);
+}
+
+void CCoreThread::processUpdateList(void)
+{
+    // check if the local update list exists
+    int res = access(UPDATE_LOCALLIST, F_OK);
+
+    if(res != 0) {                              // local update list doesn't exist, quit for now
+        return;
+    }
+
+
+    // TODO: open update list, parse versions, see if got update for each component, 
+    // TODO: set flag that there's some update, mark that the list was processed
+
+
+    // updateListWasProcessed = true;           // mark that the update list was processed and don't need to do this again
+}
+
+
 
