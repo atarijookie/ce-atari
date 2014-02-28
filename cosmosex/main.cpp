@@ -13,6 +13,7 @@
 #include "gpio.h"
 #include "debug.h"
 #include "mounter.h"
+#include "downloader.h"
 
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
@@ -21,6 +22,7 @@ int main(int argc, char *argv[])
  {
 	CCoreThread *core;
 	pthread_t	mountThreadInfo;
+    pthread_t	downloadThreadInfo;
 
     Debug::out("\n\n---------------------------------------------------");
     Debug::out("CosmosEx starting...");
@@ -34,6 +36,8 @@ int main(int argc, char *argv[])
 	if(!gpio_open()) {									// try to open GPIO and SPI on RPi
 		return 0;
 	}
+
+    downloadInitBeforeThreads();
 
     core = new CCoreThread();
 
@@ -54,14 +58,24 @@ int main(int argc, char *argv[])
 	} else {
 		Debug::out("Mount thread created");
 	}
-		
+
+    res = pthread_create(&downloadThreadInfo, NULL, downloadThreadCode, NULL);  // create download thread and run it
+	if(res != 0) {
+		Debug::out("Failed to create download thread, downloading won't work");
+	} else {
+		Debug::out("Download thread created");
+	}
+	
 	core->run();										// run the main thread
 
 	delete core;
 	gpio_close();										// close gpio and spi
 
 	pthread_join(mountThreadInfo, NULL);				// wait until mount thread finishes
+    pthread_join(downloadThreadInfo, NULL);             // wait until downloadThread finishes
 	
+    downloadCleanupBeforeQuit();
+
     Debug::out("CosmosEx terminated.");
     return 0;
  }

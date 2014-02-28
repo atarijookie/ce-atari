@@ -7,10 +7,10 @@ CC	= g++
 CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64
 
 ifeq ($(ONPC),yes)
-    LDFLAGS	= -lrt -lpthread 
+    LDFLAGS	= -lrt -lpthread -lcurl
     CFLAGS += -DONPC
 else
-    LDFLAGS	= -lbcm2835 -lrt -lpthread 
+    LDFLAGS	= -lbcm2835 -lrt -lpthread -lcurl
 endif
 
 SUBDIR1	= config
