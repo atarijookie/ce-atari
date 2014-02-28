@@ -8,14 +8,16 @@
 #define TRUE	1
 #define FALSE	0
 
+#define WRITEBUFFER_SIZE		550
+
 typedef struct 
 {
-	WORD buffer[550];					// buffer for the written data
-	WORD count;								// count of WORDs in buffer 
+	WORD buffer[WRITEBUFFER_SIZE];	// buffer for the written data
+	WORD count;											// count of WORDs in buffer 
 	
-	BYTE readyToSend;					// until we store all the data, don't 
+	BYTE readyToSend;								// until we store all the data, don't 
 	
-	void *next;								// pointer to the next available TAtnBuffer
+	void *next;											// pointer to the next available TAtnBuffer
 } TWriteBuffer;
 
 /*
