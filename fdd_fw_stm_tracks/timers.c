@@ -128,6 +128,40 @@ void timerSetup_stepLimiter(void)
 }
 
 
+void timerSetup_cmdTimeout(void)					
+{
+	TIM_TimeBaseInitTypeDef		TIM_TimeBaseStructure;
 
+  // Time base configuration
+  TIM_TimeBaseStructure.TIM_Prescaler					= 35999;			// prescale 72 MHz by 36 kHz = 2 kHz
+  TIM_TimeBaseStructure.TIM_Period						= 2000;				// with prescaler set to 2kHz, this period will be 1 second
+  TIM_TimeBaseStructure.TIM_ClockDivision			= 0;
+  TIM_TimeBaseStructure.TIM_CounterMode				= TIM_CounterMode_Up;
+	TIM_TimeBaseStructure.TIM_RepetitionCounter	=	0;
+	
+  TIM_TimeBaseInit(TIM5, &TIM_TimeBaseStructure);
+  TIM_ARRPreloadConfig(TIM5, DISABLE);							// disable preloading
 
+  TIM_Cmd(TIM5, ENABLE);														// enable timer
+	TIM_ITConfig(TIM5, TIM_IT_Update, ENABLE);				// enable int from this timer
+}
+
+void timeoutStart(void)
+{
+	// init the timer 4, which will serve for timeout measuring 
+  TIM_Cmd(TIM5, DISABLE);												// disable timer
+	TIM5->CNT	= 0;																// set timer value to 0
+	TIM5->SR	= 0xfffe;														// clear UIF flag
+  TIM_Cmd(TIM5, ENABLE);												// enable timer
+}	
+
+BYTE timeout(void)
+{
+	if((TIM5->SR & 0x0001) != 0) {		// overflow of TIM4 occured?
+		TIM5->SR = 0xfffe;							// clear UIF flag
+		return TRUE;
+	}
+	
+	return FALSE;
+}
 

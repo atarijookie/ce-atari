@@ -133,16 +133,21 @@ int main (void)
 		// sending and receiving data over SPI using DMA
 		if(spiDmaIsIdle == TRUE) {															// SPI DMA: nothing to Tx and nothing to Rx?
 			if(sendFwVersion) {																		// should send FW version? this is a window for receiving commands
+				timeoutStart();																			// start a time-out timer
+				
 				spiDma_txRx(ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0], ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
 				
 				sendFwVersion			= FALSE;
 			} else if(sendTrackRequest) {
-				atnSendTrackRequest[4] = (((WORD)next.side) << 8) | (next.track);
+				timeoutStart();																			// start a time-out timer
 
+				atnSendTrackRequest[4] = (((WORD)next.side) << 8) | (next.track);
 				spiDma_txRx(ATN_SENDTRACK_REQ_LEN_TX, (BYTE *) &atnSendTrackRequest[0], ATN_SENDTRACK_REQ_LEN_RX, (BYTE *) &readTrackData[0]);
 				
 				sendTrackRequest	= FALSE;
 			} else if(wrNow->readyToSend) {												// not sending any ATN right now? and current write buffer has something?
+				timeoutStart();																			// start a time-out timer
+
 				spiDma_txRx(wrNow->count, (BYTE *) &wrNow->buffer[0], 1, (BYTE *) &fakeBuffer);
 
 				wrNow->readyToSend	= FALSE;												// mark the current buffer as not ready to send (so we won't send this one again)
@@ -315,13 +320,6 @@ void spiDma_waitForFinish(void)
 			break;
 		}
 	}
-}
-
-BYTE timeout(void)
-{
-	// TODO: implement timeout using timer (if possible)
-	
-	return 0;
 }
 
 void waitForSPIidle(void)
@@ -679,12 +677,8 @@ void dma_spi_init(void)
   DMA_Init(DMA1_Channel3, &DMA_InitStructure);
 
   // Enable interrupts
-//  DMA_ITConfig(DMA1_Channel3, DMA_IT_HT, ENABLE);			// interrupt on Half Transfer (HT)
   DMA_ITConfig(DMA1_Channel3, DMA_IT_TC, ENABLE);			// interrupt on Transfer Complete (TC)
 
-  // Enable DMA1 Channel3 transfer
-//  DMA_Cmd(DMA1_Channel3, ENABLE);
-	
 	//----------------
 	// DMA1 channel2 configuration -- SPI1 RX
   DMA_DeInit(DMA1_Channel2);
@@ -703,11 +697,7 @@ void dma_spi_init(void)
   DMA_Init(DMA1_Channel2, &DMA_InitStructure);
 
   // Enable DMA1 Channel2 Transfer Complete interrupt
-//  DMA_ITConfig(DMA1_Channel2, DMA_IT_HT, ENABLE);			// interrupt on Half Transfer (HT)
   DMA_ITConfig(DMA1_Channel2, DMA_IT_TC, ENABLE);			// interrupt on Transfer Complete (TC)
-
-  // Enable DMA1 Channel2 transfer
-//  DMA_Cmd(DMA1_Channel2, ENABLE);
 
 	//----------------
 	// now enable interrupt on DMA1_Channel3
@@ -846,6 +836,7 @@ void init_hw_sw(void)
 	//--------------
 	
 	timerSetup_stepLimiter();						// this 2 kHz timer should be used to limit step rate
+	timerSetup_cmdTimeout();						// timer used for handling of time-out
 	
 	// init circular buffer for data incomming via SPI
 	inIndexGet		= 0;
