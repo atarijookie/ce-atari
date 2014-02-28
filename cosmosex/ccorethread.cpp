@@ -23,8 +23,6 @@ CCoreThread::CCoreThread()
 {
     setEnabledIDbits = false;
 
-    sendSingleHalfWord = false;
-	
 	gotDevTypeRaw			= false;
 	gotDevTypeTranslated	= false;
 
@@ -85,6 +83,21 @@ void CCoreThread::run(void)
     downloadUpdateList();                           // download the list of components with the newest available versions
 
 	bool res;
+//---------------------------------------------
+    image = imageFactory.getImage((char *) "spacola.st");
+
+    if(image) {
+        if(image->isOpen()) {
+            Debug::out("Encoding image...");
+            encImage.encodeAndCacheImage(image, true);
+            Debug::out("...done");
+        } else {
+            Debug::out("Image is not open!");
+        }
+    } else {
+        Debug::out("Image file type not supported!");
+    }
+//---------------------------------------------
 	
 #ifdef ONPC
 /*
@@ -116,11 +129,8 @@ void CCoreThread::run(void)
 			gotAtn = true;							// we've some ATN
 
 			switch(inBuff[3]) {
-//			case 0:                 				// this is valid, just empty data, skip this
-//				break;
-
 			case ATN_FW_VERSION:
-				handleFwVersion();
+				handleFwVersion(SPI_CS_HANS);
 				break;
 
 			case ATN_ACSI_COMMAND:
@@ -137,7 +147,23 @@ void CCoreThread::run(void)
 		if(res) {									// FRANZ is signaling attention?
 			gotAtn = true;							// we've some ATN
 
-			
+			switch(inBuff[3]) {
+			case ATN_FW_VERSION:
+				handleFwVersion(SPI_CS_FRANZ);
+				break;
+
+            case ATN_SECTOR_WRITTEN:
+
+                break;
+
+			case ATN_SEND_TRACK:
+				handleSendTrack();
+				break;
+
+			default:
+				Debug::out((char *) "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
+				break;
+			}
 		}
 		
 		if(!gotAtn) {								// no ATN was processed?
@@ -279,19 +305,23 @@ void CCoreThread::loadSettings(void)
     setEnabledIDbits = true;
 }
 
-void CCoreThread::handleFwVersion(void)
+void CCoreThread::handleFwVersion(int whichSpiCs)
 {
     BYTE fwVer[10], oBuf[10];
 
-    memset(oBuf, 0, 10);                    // first clear the output buffer
+    memset(oBuf, 0, 10);                        // first clear the output buffer
 
-    if(setEnabledIDbits) {                  // if we should send ACSI ID configuration
-        oBuf[3] = CMD_ACSI_CONFIG;          // CMD: send acsi config
-        oBuf[4] = enabledIDbits;            // store ACSI enabled IDs
-        setEnabledIDbits = false;           // and don't sent this anymore (until needed)
+    if(whichSpiCs == SPI_CS_HANS) {             // it's Hans?
+        if(setEnabledIDbits) {                  // if we should send ACSI ID configuration
+            oBuf[3] = CMD_ACSI_CONFIG;          // CMD: send acsi config
+            oBuf[4] = enabledIDbits;            // store ACSI enabled IDs
+            setEnabledIDbits = false;           // and don't sent this anymore (until needed)
+        }
+    } else {                                    // it's Franz?
+
     }
 
-    conSpi->txRx(SPI_CS_HANS, 8, oBuf, fwVer);
+    conSpi->txRx(whichSpiCs, 8, oBuf, fwVer);
 
     int year = bcdToInt(fwVer[1]) + 2000;
     if(fwVer[0] == 0xf0) {
@@ -486,6 +516,36 @@ void CCoreThread::processUpdateList(void)
 
 
     // updateListWasProcessed = true;           // mark that the update list was processed and don't need to do this again
+}
+
+void CCoreThread::handleSendTrack(void)
+{
+    BYTE oBuf[4], iBuf[15000];
+
+    memset(oBuf, 0, 4);
+    conSpi->txRx(SPI_CS_FRANZ, 4, oBuf, iBuf);
+
+    int side    = iBuf[0];               // now read the current floppy position
+    int track   = iBuf[1];
+
+    Debug::out("ATN_SEND_TRACK -- track %d, side %d", track, side);
+
+    int tr, si, spt;
+    image->getParams(tr, si, spt);      // read the floppy image params
+
+    if(side < 0 || side > 1 || track < 0 || track >= tr) {
+        Debug::out("Side / Track out of range!");
+        return;
+    }
+
+    BYTE *encodedTrack;
+    int countInTrack;
+
+    encodedTrack = encImage.getEncodedTrack(track, side, countInTrack);
+
+    int remaining   = 15000 - 6 -2;                 // this much bytes remain to send after the received ATN
+
+    conSpi->txRx(SPI_CS_FRANZ, remaining, encodedTrack, iBuf);
 }
 
 

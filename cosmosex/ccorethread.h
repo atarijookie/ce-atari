@@ -3,22 +3,26 @@
 
 #include <map>
 
+#include "utils.h"
 #include "global.h"
 #include "conspi.h"
-#include "utils.h"
+#include "acsidatatrans.h"
+
 #include "devfinder.h"
 #include "devchangeshandler.h"
 
 #include "native/translatedbootmedia.h"
 #include "native/scsi.h"
-#include "acsidatatrans.h"
-
-#include "config/configstream.h"
 #include "translated/translateddisk.h"
 
 #include "settingsreloadproxy.h"
-
 #include "isettingsuser.h"
+
+#include "config/configstream.h"
+
+#include "floppy/floppyimagefactory.h"
+#include "floppy/mfmdecoder.h"
+#include "floppy/mfmcachedimage.h"
 
 class CCoreThread: public ISettingsUser, public DevChangesHandler
 {
@@ -38,47 +42,58 @@ private:
     bool shouldRun;
     bool running;
 
-    bool sendSingleHalfWord;
-
-	std::multimap<std::string, std::string> mapDeviceToHostPaths;
-	
+    //-----------------------------------
+    // data connection to STM32 slaves over SPI
     CConSpi         *conSpi;
-
-    Scsi            *scsi;
     AcsiDataTrans   *dataTrans;
 
-    TranslatedDisk  *translated;
-    ConfigStream    *confStream;
-
-    DevFinder		devFinder;
-
+    //-----------------------------------
+    // settings and config stuff
+    ConfigStream            *confStream;
     SettingsReloadProxy     settingsReloadProxy;
-
-    BYTE            acsiIDevType[8];
-    BYTE            enabledIDbits;
-    bool            setEnabledIDbits;
-	
-	bool			gotDevTypeRaw;
-	bool			gotDevTypeTranslated;
-
-    bool            updateListWasProcessed;
-
-    void createConnectionObject(void);
-    void usbConnectionCheck(void);
 
     void loadSettings(void);
 
-    void handleFwVersion(void);
+    //-----------------------------------
+    // hard disk stuff
+    DevFinder		devFinder;
+    Scsi            *scsi;
+    TranslatedDisk  *translated;
+    BYTE            acsiIDevType[8];
+    BYTE            enabledIDbits;
+    bool            setEnabledIDbits;
+
     void handleAcsiCommand(void);
     void handleConfigStream(BYTE *cmd);
 
-    int bcdToInt(int bcd);
-	
+    //-----------------------------------
+    // mount and attach stuff
+	std::multimap<std::string, std::string> mapDeviceToHostPaths;
+	bool gotDevTypeRaw;
+	bool gotDevTypeTranslated;
+
 	void attachDevAsTranslated(std::string devName);
 	void mountAndAttachSharedDrive(void);
 
+    //-----------------------------------
+    // handle FW version
+    void handleFwVersion(int whichSpiCs);
+    int bcdToInt(int bcd);
+
+    //-----------------------------------
+    // update stuff
+    bool updateListWasProcessed;
+
     void downloadUpdateList(void);
     void processUpdateList(void);
+
+    //-----------------------------------
+    // floppy stuff
+    MfmCachedImage      encImage;
+    IFloppyImage        *image;
+    FloppyImageFactory  imageFactory;
+
+    void handleSendTrack(void);
 };
 
 #endif // CCORETHREAD_H
