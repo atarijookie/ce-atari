@@ -136,17 +136,22 @@ void CConSpi::applyTxRxLimits(int whichSpiCs, BYTE *inBuff)
 	Debug::out("TX/RX limits: TX %d WORDs, RX %d WORDs", txLen, rxLen);
 #endif	
 
-    if(txLen > 1024 || rxLen > 1024) {
-        Debug::out("TX/RX limits above are probably wrong! Fix this!");
+	// manually limit the TX and RX len
 
-        if(txLen > 1024) {
-            txLen = 1024;
-        }
+	#define ONE_KB		1024
+	#define TWENTY_KB	(20 * 1024)
+	
+    if(	whichSpiCs == SPI_CS_HANS  && (txLen > ONE_KB || rxLen > ONE_KB) ) {
+        Debug::out("applyTxRxLimits - TX/RX limits for HANS are probably wrong! Fix this!");
+		txLen = MIN(txLen, ONE_KB);
+		rxLen = MIN(rxLen, ONE_KB);
+	}
 
-        if(rxLen > 1024) {
-            rxLen = 1024;
-        }
-    }
+    if(	whichSpiCs == SPI_CS_FRANZ  && (txLen > TWENTY_KB || rxLen > TWENTY_KB) ) {
+        Debug::out("applyTxRxLimits - TX/RX limits for FRANZ are probably wrong! Fix this!");
+		txLen = MIN(txLen, TWENTY_KB);
+		rxLen = MIN(rxLen, TWENTY_KB);
+	}
 
     setRemainingTxRxLen(whichSpiCs, txLen, rxLen);
 }

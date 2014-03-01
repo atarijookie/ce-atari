@@ -520,10 +520,10 @@ void CCoreThread::processUpdateList(void)
 
 void CCoreThread::handleSendTrack(void)
 {
-    BYTE oBuf[4], iBuf[15000];
+    BYTE oBuf[2], iBuf[15000];
 
-    memset(oBuf, 0, 4);
-    conSpi->txRx(SPI_CS_FRANZ, 4, oBuf, iBuf);
+    memset(oBuf, 0, 2);
+    conSpi->txRx(SPI_CS_FRANZ, 2, oBuf, iBuf);
 
     int side    = iBuf[0];               // now read the current floppy position
     int track   = iBuf[1];
@@ -543,7 +543,7 @@ void CCoreThread::handleSendTrack(void)
 
     encodedTrack = encImage.getEncodedTrack(track, side, countInTrack);
 
-    int remaining   = 15000 - 6 -2;                 // this much bytes remain to send after the received ATN
+    int remaining   = 15000 - (4*2) - 2;		// this much bytes remain to send after the received ATN
 
     conSpi->txRx(SPI_CS_FRANZ, remaining, encodedTrack, iBuf);
 }
