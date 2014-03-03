@@ -25,10 +25,19 @@ BYTE deviceID;
 
 BYTE commandShort[CMD_LENGTH_SHORT]	= {			0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
 
+typedef struct
+{
+	short x;
+	short y;
+	short w;
+	short h;
+} WinPos;
+
 short openVdiWorkstation(void);
-void windowPaint(short wndHandle, short vdiHandle, GRECT *pRect);
+void windowPaint(short wndHandle, short vdiHandle, WinPos *wp, GRECT *pRect);
 void ce_getDrivesInfo(char *bfr);
 void getDriveLine(int index, char *lines, char *line, int maxLen);
+void storeWinPos(short x, short y, short w, short h, WinPos *wp);
 
 #define WINDOW_WIDGETS		(NAME | CLOSER | MOVER)
 #define TEXT_ROW_HEIGHT		10
@@ -61,6 +70,9 @@ int main( int argc, char* argv[] )
 	short myWndHandle = -1, event;
 	char *windowTitle = " CE mounts ";
 	DWORD windowTitleDw = (DWORD) windowTitle;
+	WinPos winPos;
+	GRECT fullWinRect; 
+	BYTE winIsTopmost = 0;
 	
 	// calculate the desired window height for the work are height of that one
 	short desiredWindowHeight;
@@ -88,7 +100,15 @@ int main( int argc, char* argv[] )
   
 		// if the event is TIMER
 		if(event == MU_TIMER && myWndHandle != -1) {						// when got window and timer occured, redraw
-			windowPaint(myWndHandle, vdiHandle, (GRECT *) &msgBuffer[4]);
+			if(winIsTopmost != 1) {											// not topmost window? don't redraw
+				continue;
+			}
+		
+			fullWinRect.g_x = winPos.x;
+			fullWinRect.g_y = winPos.y;
+			fullWinRect.g_w = winPos.w;
+			fullWinRect.g_h = winPos.h;
+			windowPaint(myWndHandle, vdiHandle, &winPos, (GRECT *) &fullWinRect);
 			continue;
 		}
   
@@ -109,9 +129,13 @@ int main( int argc, char* argv[] )
 						
 						wind_set(myWndHandle, WF_NAME, (short) (windowTitleDw >> 16), (short) windowTitleDw, 0, 0);
 						wind_open(myWndHandle, 0, 20, 160, desiredWindowHeight);
+						
+						storeWinPos(0, 20, 160, desiredWindowHeight, &winPos);
 					} else {											// our window IS created? just put it on top
 						wind_set(myWndHandle, WF_TOP, 0, 0, 0, 0);
 					}
+					
+					winIsTopmost = 1;				// is top most window
 				}
 				break;
 				
@@ -122,6 +146,7 @@ int main( int argc, char* argv[] )
 					wind_delete(myWndHandle);
 					myWndHandle = -1;
 				}
+				winIsTopmost = 0;					// NOT top most window
 				break;
 				
 			case WM_MOVED:
@@ -130,6 +155,7 @@ int main( int argc, char* argv[] )
 				}
 
 				wind_set(myWndHandle, WF_CURRXYWH, msgBuffer[4], msgBuffer[5], msgBuffer[6], msgBuffer[7]);
+				storeWinPos(msgBuffer[4], msgBuffer[5], msgBuffer[6], msgBuffer[7], &winPos);
 				break;
 			
 			case WM_REDRAW:
@@ -137,7 +163,7 @@ int main( int argc, char* argv[] )
 					break;
 				}
 			
-				windowPaint(wndHandle, vdiHandle, (GRECT *) &msgBuffer[4]);
+				windowPaint(wndHandle, vdiHandle, &winPos, (GRECT *) &msgBuffer[4]);
 				break;
 			
 			case WM_TOPPED:
@@ -146,11 +172,29 @@ int main( int argc, char* argv[] )
 				}
 
 				wind_set(wndHandle, WF_TOP, 0, 0, 0, 0);
+				winIsTopmost = 1;					// is top most window
+				break;
+				
+			case WM_ONTOP:
+				winIsTopmost = 1;					// is top most window
+				break;
+				
+			case WM_UNTOPPED:
+			case WM_BOTTOM:
+				winIsTopmost = 0;					// NOT top most window
 				break;
 		}
 	}
 	
 	return 0;		
+}
+
+void storeWinPos(short x, short y, short w, short h, WinPos *wp)
+{
+	wp->x = x; 
+	wp->y = y;
+	wp->w = w;
+	wp->h = h;
 }
 
 short openVdiWorkstation(void)
@@ -169,10 +213,14 @@ short openVdiWorkstation(void)
 	return handle;
 }
 
-void windowPaint(short wndHandle, short vdiHandle, GRECT *pRect)
+// WinPos *wp   -- the position of window, including title and borders
+// GRECT *pRect -- the dirty area - might be just a part of that window
+
+void windowPaint(short wndHandle, short vdiHandle, WinPos *wp, GRECT *pRect)
 {
 	int y, row;
 	short wax, way, waw, wah;
+	short redrawYStart;
     short rectArray[4];
 	short wchar, hchar, wcell, hcell;
 	char driveLines[1024];
@@ -185,13 +233,19 @@ void windowPaint(short wndHandle, short vdiHandle, GRECT *pRect)
 	ce_getDrivesInfo(driveLines);
 	
 	// get work area of this window
-	wind_calc(WC_WORK, WINDOW_WIDGETS, pRect->g_x, pRect->g_y, pRect->g_w, pRect->g_h, &wax, &way, &waw, &wah);
+	wind_calc(WC_WORK, WINDOW_WIDGETS, wp->x, wp->y, wp->w, wp->h, &wax, &way, &waw, &wah);
+	
+	if(pRect->g_y < way) {				// trying to redraw also window title? 
+		redrawYStart = way;				// start redrawing from work area
+	} else {							// not redrawing window title? ok...
+		redrawYStart = pRect->g_y;		
+	}
 	
 	// convert struct to array
-	rectArray[0] = wax;
-	rectArray[1] = way;
-	rectArray[2] = wax + waw - 1;
-	rectArray[3] = way + wah - 1;
+	rectArray[0] = pRect->g_x;
+	rectArray[1] = redrawYStart;
+	rectArray[2] = pRect->g_x + pRect->g_w - 1;
+	rectArray[3] = pRect->g_y + pRect->g_h - 1;
 	
 	// mouse off, window update begin
 	graf_mouse(M_OFF, 0x0L);
