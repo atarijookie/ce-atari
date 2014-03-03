@@ -146,6 +146,9 @@ private:
     void onMediach(BYTE *cmd);
     void onGetbpb(BYTE *cmd);
 
+	// other functions
+	void onGetMounts(BYTE *cmd);
+	
     // helper functions
     int findEmptyFileSlot(void);
     int findFileHandleSlot(int atariHandle);

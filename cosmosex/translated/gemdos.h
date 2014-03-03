@@ -46,6 +46,9 @@
 #define BIOS_Mediach			0x71
 #define BIOS_Getbpb				0x72
 
+// other functions
+#define ACC_GET_MOUNTS			0x80
+
 //////////////////////////////////////
 
 // file attributes

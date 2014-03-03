@@ -321,6 +321,9 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case BIOS_Mediach:              onMediach(cmd);     break;
         case BIOS_Getbpb:               onGetbpb(cmd);      break;
 
+		// other functions
+		case ACC_GET_MOUNTS:			onGetMounts(cmd);	break;
+		
         // in other cases
         default:                                // in other cases
         dataTrans->setStatus(EINVFN);           // invalid function
@@ -328,6 +331,32 @@ void TranslatedDisk::processCommand(BYTE *cmd)
     }
 
     dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
+}
+
+void TranslatedDisk::onGetMounts(BYTE *cmd)
+{
+	char tmp[256];
+	std::string mounts;
+	int index;
+	
+	char *trTypeStr[4] = {"", "USB drive", "shared drive", "config drive"};
+	char *mountStr;
+	
+    for(int i=2; i<MAX_DRIVES; i++) {       // create enabled drive bits
+        if(conf[i].enabled) {
+			index = conf[i].translatedType + 1;
+		} else {
+			index = 0;
+		}
+		
+		mountStr = trTypeStr[index];
+		sprintf(tmp, "%c: %s\n", ('A' + i), mountStr);
+		
+		mounts += tmp;
+    }
+
+	dataTrans->addDataBfr((BYTE *) mounts.c_str(), mounts.length(), true);
+	dataTrans->setStatus(E_OK);
 }
 
 WORD TranslatedDisk::getDrivesBitmap(void)
