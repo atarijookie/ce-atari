@@ -6,7 +6,7 @@
 
 DWORD getTicks(void);
 
-void strcpy(char *dest, char *src)
+char *strcpy(char *dest, char *src)
 {
 	while(1) {
 		*dest = *src;				// copy in the current char
@@ -18,6 +18,8 @@ void strcpy(char *dest, char *src)
 		dest++;						// otherwise move to the next char
 		src++;
 	}
+	
+	return dest;
 }
 
 void *memcpy ( void * destination, const void * source, int num )

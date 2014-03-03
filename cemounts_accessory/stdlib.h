@@ -1,7 +1,7 @@
 #ifndef _STDLIB_H_
 #define _STDLIB_H_
 
-void strcpy(char *dest, char *src);
+char * 	strcpy(char *dest, char *src);
 void *	memcpy ( void * destination, const void * source, int num );
 void *	memset ( void * ptr, int value, int num );
 int		strlen ( const char * str );
