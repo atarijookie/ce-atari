@@ -21,9 +21,11 @@ BYTE ce_identify(void);
 BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
 BYTE *pDmaBuffer;
 
+char driveLines[1024];
+
 BYTE deviceID;
 
-BYTE commandShort[CMD_LENGTH_SHORT]	= {			0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
+BYTE commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
 
 typedef struct
 {
@@ -35,7 +37,7 @@ typedef struct
 
 short openVdiWorkstation(void);
 void windowPaint(short wndHandle, short vdiHandle, WinPos *wp, GRECT *pRect);
-void ce_getDrivesInfo(char *bfr);
+void ce_getDrivesInfo(void);
 void getDriveLine(int index, char *lines, char *line, int maxLen);
 void storeWinPos(short x, short y, short w, short h, WinPos *wp);
 
@@ -51,7 +53,6 @@ int main( int argc, char* argv[] )
 	pDmaBuffer = &dmaBuffer[2];
 	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
 
-/*	
 	// search for CosmosEx on ACSI bus 
 	found = ce_findId();
 
@@ -59,9 +60,7 @@ int main( int argc, char* argv[] )
 		sleep(3);
 		return 0;
 	}
-*/
-	deviceID = 0;
-	
+
 	/* now set up the acsi command bytes so we don't have to deal with this one anymore */
 	commandShort[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
 	
@@ -223,14 +222,13 @@ void windowPaint(short wndHandle, short vdiHandle, WinPos *wp, GRECT *pRect)
 	short redrawYStart;
     short rectArray[4];
 	short wchar, hchar, wcell, hcell;
-	char driveLines[1024];
 	char driveLine[128];
 	
 	if(vdiHandle == 0) {							// still not good? quit
 		return;
 	}
 	
-	ce_getDrivesInfo(driveLines);
+	Supexec(ce_getDrivesInfo);
 	
 	// get work area of this window
 	wind_calc(WC_WORK, WINDOW_WIDGETS, wp->x, wp->y, wp->w, wp->h, &wax, &way, &waw, &wah);
@@ -304,9 +302,32 @@ void getDriveLine(int index, char *lines, char *line, int maxLen)
 	line[j] = 0;										// terminate the string
 }
 
-void ce_getDrivesInfo(char *bfr)
+void ce_getDrivesInfo(void)
 {
-	strcpy(bfr, "C: USB drive\nD:\nE:\nF:\nG:\nH:\nI:\nJ:\nK:\nL:\nM:\nN:\nO:\nP: shared drive\n");
+	static DWORD lastDrivesInfoUpdate = 0;
+	DWORD now = *HZ_200;
+
+	if((now - lastDrivesInfoUpdate) < 200) {	// if the last update was less than 1 second ago, don't update
+		return;
+	}
+	
+	lastDrivesInfoUpdate = now;	
+	//-------------------------
+	
+	commandShort[4] = ACC_GET_MOUNTS;
+	commandShort[5] = 0;
+	
+	// ask for new data
+	int res = acsi_cmd(ACSI_READ, commandShort, 6, pDmaBuffer, 1);
+	
+	// if failed to get data
+	if(res != OK) {
+		strcpy(driveLines, "CE connection fail\n");
+		return;
+	}
+	
+	// got data, copy them to the right buffer
+	strcpy(driveLines, (char *) pDmaBuffer);
 }
 
 /* this function scans the ACSI bus for any active CosmosEx translated drive */
@@ -336,7 +357,7 @@ BYTE ce_findId(void)
 	}
 
 	/* if not found */
-    (void) Cconws("\r\nCosmosEx not found on ACSI bus, not installing driver.");
+    (void) Cconws("\r\nCosmosEx not found on ACSI bus, accessory not loaded.");
 	return 0;
 }
 

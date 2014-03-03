@@ -8,3 +8,6 @@
 #define TRAN_CMD_IDENTIFY           0
 // ...other commands are just function codes from gemdos.h
 
+#define ACC_GET_MOUNTS			0x80
+
+

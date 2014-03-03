@@ -6,6 +6,20 @@
 
 DWORD getTicks(void);
 
+void strcpy(char *dest, char *src)
+{
+	while(1) {
+		*dest = *src;				// copy in the current char
+	
+		if(*src == 0) {				// if the current char is line terminator, quit
+			break;
+		}
+		
+		dest++;						// otherwise move to the next char
+		src++;
+	}
+}
+
 void *memcpy ( void * destination, const void * source, int num )
 {
 	BYTE *dst = (BYTE *) destination;
