@@ -219,6 +219,7 @@ void *downloadThreadCode(void *ptr)
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS,          0L);
         curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION,    my_progress_func);
         curl_easy_setopt(curl, CURLOPT_PROGRESSDATA,        &downloadCurrent);
+        curl_easy_setopt(curl, CURLOPT_FAILONERROR,         true);
  
         cres = curl_easy_perform(curl);                      // start the transfer
  
