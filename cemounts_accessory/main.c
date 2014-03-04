@@ -40,9 +40,13 @@ void windowPaint(short wndHandle, short vdiHandle, WinPos *wp, GRECT *pRect);
 void ce_getDrivesInfo(void);
 void getDriveLine(int index, char *lines, char *line, int maxLen);
 void storeWinPos(short x, short y, short w, short h, WinPos *wp);
+short mouseInWorkArea(WinPos *wp, short mouseX, short mouseY);
 
 #define WINDOW_WIDGETS		(NAME | CLOSER | MOVER)
 #define TEXT_ROW_HEIGHT		10
+
+#define MAX(X,Y)		((X > Y) ? (X) : (Y))
+#define MIN(X,Y)		((X < Y) ? (X) : (Y))
 
 /* ------------------------------------------------------------------ */
 int main( int argc, char* argv[] )
@@ -65,7 +69,7 @@ int main( int argc, char* argv[] )
 	commandShort[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
 	
 	short dummy, menuId, msgBuffer[8];
-	short pxy[4] = { 0 };
+	short mouseX, mouseY;
 	short myWndHandle = -1, event;
 	char *windowTitle = " CE mounts ";
 	DWORD windowTitleDw = (DWORD) windowTitle;
@@ -86,20 +90,24 @@ int main( int argc, char* argv[] )
 
 	while(1) {
 		// Go to sleep until an event of interest wakes us, we want menu event messages
-		// 	    evnt_multi	(short Type, short Clicks, short WhichButton, short WhichState,
-		event = evnt_multi	(MU_MESAG | MU_TIMER, 1,1,1,
+		// 	    evnt_multi	(short Type, 			short Clicks,	short WhichButton,	short WhichState,
+		event = evnt_multi	(MU_MESAG | MU_BUTTON, 	1,				LEFT_BUTTON,		1,
 				//		short EnterExit1, short In1X, short In1Y, short In1W, short In1H,
-						0, pxy[0], pxy[1], 0, 0,
+						0,0,0,0,0,
 				//		short EnterExit2, short In2X, short In2Y, short In2W, short In2H,
 						0,0,0,0,0,
 				//		short MesagBuf[], unsigned long Interval, short *OutX, short *OutY,
-						msgBuffer, 2000, &pxy[2], &pxy[3],
+						msgBuffer, 2000, &mouseX, &mouseY,
 				// 		short *ButtonState, short *KeyState, short *Key, short *ReturnCount); 
 						&dummy, &dummy, &dummy, &dummy); 
   
 		// if the event is TIMER
-		if(event == MU_TIMER && myWndHandle != -1) {						// when got window and timer occured, redraw
+		if(event == MU_BUTTON && myWndHandle != -1) {						// when got window and mouse pressed, redraw
 			if(winIsTopmost != 1) {											// not topmost window? don't redraw
+				continue;
+			}
+		
+			if(!mouseInWorkArea(&winPos, mouseX, mouseY)) {					// mouse didn't click in work area of window? do nothing
 				continue;
 			}
 		
@@ -212,6 +220,24 @@ short openVdiWorkstation(void)
 	return handle;
 }
 
+short mouseInWorkArea(WinPos *wp, short mouseX, short mouseY)
+{
+	short wax, way, waw, wah;
+
+	// calculate work area of window
+	wind_calc(WC_WORK, WINDOW_WIDGETS, wp->x, wp->y, wp->w, wp->h, &wax, &way, &waw, &wah);
+
+	if(mouseX < wax || mouseX > (wax + waw - 1)) {			// mouse X coordinate is out of work area?
+		return 0;
+	}
+	
+	if(mouseY < way || mouseY > (way + wah - 1)) {			// mouse Y coordinate is out of work area?
+		return 0;
+	}
+
+	return 1;
+}
+
 // WinPos *wp   -- the position of window, including title and borders
 // GRECT *pRect -- the dirty area - might be just a part of that window
 
@@ -219,7 +245,6 @@ void windowPaint(short wndHandle, short vdiHandle, WinPos *wp, GRECT *pRect)
 {
 	int y, row;
 	short wax, way, waw, wah;
-	short redrawYStart;
     short rectArray[4];
 	short wchar, hchar, wcell, hcell;
 	char driveLine[128];
@@ -233,17 +258,11 @@ void windowPaint(short wndHandle, short vdiHandle, WinPos *wp, GRECT *pRect)
 	// get work area of this window
 	wind_calc(WC_WORK, WINDOW_WIDGETS, wp->x, wp->y, wp->w, wp->h, &wax, &way, &waw, &wah);
 	
-	if(pRect->g_y < way) {				// trying to redraw also window title? 
-		redrawYStart = way;				// start redrawing from work area
-	} else {							// not redrawing window title? ok...
-		redrawYStart = pRect->g_y;		
-	}
-	
-	// convert struct to array
-	rectArray[0] = pRect->g_x;
-	rectArray[1] = redrawYStart;
-	rectArray[2] = pRect->g_x + pRect->g_w - 1;
-	rectArray[3] = pRect->g_y + pRect->g_h - 1;
+	// convert struct to array, and make sure we will draw only in the inside of work area of window
+	rectArray[0] = MAX(wax, pRect->g_x);
+	rectArray[1] = MAX(way, pRect->g_y);
+	rectArray[2] = MIN(wax + waw - 1, pRect->g_x + pRect->g_w - 1);
+	rectArray[3] = MIN(way + wah - 1, pRect->g_y + pRect->g_h - 1);
 	
 	// mouse off, window update begin
 	graf_mouse(M_OFF, 0x0L);
