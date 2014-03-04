@@ -75,7 +75,6 @@ int main( int argc, char* argv[] )
 	DWORD windowTitleDw = (DWORD) windowTitle;
 	WinPos winPos;
 	GRECT fullWinRect; 
-	BYTE winIsTopmost = 0;
 	
 	// calculate the desired window height for the work are height of that one
 	short desiredWindowHeight;
@@ -103,10 +102,6 @@ int main( int argc, char* argv[] )
   
 		// if the event is TIMER
 		if(event == MU_BUTTON && myWndHandle != -1) {						// when got window and mouse pressed, redraw
-			if(winIsTopmost != 1) {											// not topmost window? don't redraw
-				continue;
-			}
-		
 			if(!mouseInWorkArea(&winPos, mouseX, mouseY)) {					// mouse didn't click in work area of window? do nothing
 				continue;
 			}
@@ -141,8 +136,6 @@ int main( int argc, char* argv[] )
 					} else {											// our window IS created? just put it on top
 						wind_set(myWndHandle, WF_TOP, 0, 0, 0, 0);
 					}
-					
-					winIsTopmost = 1;				// is top most window
 				}
 				break;
 				
@@ -153,7 +146,6 @@ int main( int argc, char* argv[] )
 					wind_delete(myWndHandle);
 					myWndHandle = -1;
 				}
-				winIsTopmost = 0;					// NOT top most window
 				break;
 				
 			case WM_MOVED:
@@ -179,16 +171,13 @@ int main( int argc, char* argv[] )
 				}
 
 				wind_set(wndHandle, WF_TOP, 0, 0, 0, 0);
-				winIsTopmost = 1;					// is top most window
 				break;
 				
 			case WM_ONTOP:
-				winIsTopmost = 1;					// is top most window
 				break;
 				
 			case WM_UNTOPPED:
 			case WM_BOTTOM:
-				winIsTopmost = 0;					// NOT top most window
 				break;
 		}
 	}
