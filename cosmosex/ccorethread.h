@@ -24,6 +24,8 @@
 #include "floppy/mfmdecoder.h"
 #include "floppy/mfmcachedimage.h"
 
+#include "version.h"
+
 class CCoreThread: public ISettingsUser, public DevChangesHandler
 {
 public:
@@ -83,6 +85,25 @@ private:
     //-----------------------------------
     // update stuff
     bool updateListWasProcessed;
+    bool gotUpdate;
+
+    struct {
+        struct {
+            Version app;
+            Version hans;
+            Version xilinx;
+            Version franz;
+            Version imglist;
+        } current;
+
+        struct {
+            Version app;
+            Version hans;
+            Version xilinx;
+            Version franz;
+            Version imglist;
+        } onServer;
+    } versions;
 
     void downloadUpdateList(void);
     void processUpdateList(void);

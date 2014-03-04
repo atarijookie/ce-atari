@@ -17,10 +17,21 @@
 #define UPDATE_PATH		    "update"
 #define UPDATE_LOCALLIST    "update/updatelist.csv"
 
+#define XILINX_VERSION_FILE "update/xilinx_current.txt"
+#define IMAGELIST_FILE      "imagelist.csv"
+
 #define DEV_CHECK_TIME_MS	3000
+
+#define APP_VERSION         "2014-03-04"
 
 CCoreThread::CCoreThread()
 {
+    gotUpdate = false;
+
+    versions.current.app.fromString((char *) APP_VERSION);
+    versions.current.xilinx.fromFirstLineOfFile((char *) XILINX_VERSION_FILE);
+    versions.current.imglist.fromFirstLineOfFile((char *) IMAGELIST_FILE);
+
     setEnabledIDbits = false;
 
 	gotDevTypeRaw			= false;
@@ -325,8 +336,12 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 
     int year = bcdToInt(fwVer[1]) + 2000;
     if(fwVer[0] == 0xf0) {
+        versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
+
         Debug::out("FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
     } else {
+        versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));               // store found FW version of Hans
+
         int currentLed = fwVer[4];
         Debug::out("FW: Hans,  %d-%02d-%02d, LED is: %d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed);
     }
@@ -497,7 +512,7 @@ void CCoreThread::downloadUpdateList(void)
     // add request for download of the update list
     TDownloadRequest tdr;
     tdr.srcUrl = "http://joo.kie.sk/cosmosex/update/updatelist.csv";
-    tdr.dstDir = "update";
+    tdr.dstDir = UPDATE_PATH;
     downloadAdd(tdr);
 }
 
@@ -510,12 +525,116 @@ void CCoreThread::processUpdateList(void)
         return;
     }
 
+    Debug::out("processUpdateList - starting");
 
-    // TODO: open update list, parse versions, see if got update for each component, 
-    // TODO: set flag that there's some update, mark that the list was processed
+    // open update list, parse versions
+    FILE *f = fopen(UPDATE_LOCALLIST, "rt");
 
+    if(!f) {
+        Debug::out("processUpdateList - couldn't open file %s", UPDATE_LOCALLIST);
+        return;
+    }
 
-    // updateListWasProcessed = true;           // mark that the update list was processed and don't need to do this again
+    char line[1024];
+    char what[32], ver[32], url[256], crc[32];
+    while(!feof(f)) {
+        char *r = fgets(line, 1024, f);                 // read the update versions file by lines
+
+        if(!r) {
+            continue;
+        }
+
+        // try to separate the sub strings
+        res = sscanf(line, "%[^,\n],%[^,\n],%[^,\n],%[^,\n]", what, ver, url, crc);
+
+        if(res != 4) {
+            continue;
+        }
+
+        // now store the versions where they bellong
+        if(strncmp(what, "app", 3) == 0) {
+            versions.onServer.app.fromString(ver);
+            versions.onServer.app.setUrlAndChecksum(url, crc);
+
+            versions.onServer.app.toString(line);
+            Debug::out("processUpdateList - on server - app : %s", line);
+            continue;
+        }
+
+        if(strncmp(what, "hans", 4) == 0) {
+            versions.onServer.hans.fromString(ver);
+            versions.onServer.hans.setUrlAndChecksum(url, crc);
+
+            versions.onServer.hans.toString(line);
+            Debug::out("processUpdateList - on server - hans : %s", line);
+            continue;
+        }
+
+        if(strncmp(what, "xilinx", 6) == 0) {
+            versions.onServer.xilinx.fromString(ver);
+            versions.onServer.xilinx.setUrlAndChecksum(url, crc);
+
+            versions.onServer.xilinx.toString(line);
+            Debug::out("processUpdateList - on server - xilinx : %s", line);
+            continue;
+        }
+
+        if(strncmp(what, "franz", 5) == 0) {
+            versions.onServer.franz.fromString(ver);
+            versions.onServer.franz.setUrlAndChecksum(url, crc);
+
+            versions.onServer.franz.toString(line);
+            Debug::out("processUpdateList - on server - franz : %s", line);
+            continue;
+        }
+
+        if(strncmp(what, "imglist", 7) == 0) {
+            versions.onServer.imglist.fromString(ver);
+            versions.onServer.imglist.setUrlAndChecksum(url, crc);
+
+            versions.onServer.imglist.toString(line);
+            Debug::out("processUpdateList - on server - imglist : %s", line);
+            continue;
+        }
+    }
+
+    fclose(f);
+
+    //-------------------
+    // now compare versions - current with those on server, if anything new then set a flag
+    if(versions.current.app.isOlderThan( versions.onServer.app )) {
+        gotUpdate = true;
+        Debug::out("processUpdateList - APP is newer on server");
+    }
+
+    if(versions.current.hans.isOlderThan( versions.onServer.hans )) {
+        gotUpdate = true;
+        Debug::out("processUpdateList - HANS is newer on server");
+    }
+
+    if(versions.current.xilinx.isOlderThan( versions.onServer.xilinx )) {
+        gotUpdate = true;
+        Debug::out("processUpdateList - XILINX is newer on server");
+    }
+
+    if(versions.current.franz.isOlderThan( versions.onServer.franz )) {
+        gotUpdate = true;
+        Debug::out("processUpdateList - FRANZ is newer on server");
+    }
+
+    // check this one and if we got an update, do a silent update 
+    if(versions.current.imglist.isOlderThan( versions.onServer.imglist )) {
+        Debug::out("processUpdateList - IMAGE LIST is newer on server, doing silent update...");
+
+        TDownloadRequest tdr;
+        tdr.srcUrl = versions.onServer.imglist.getUrl();
+        tdr.dstDir = "";
+        downloadAdd(tdr);
+    }
+
+    updateListWasProcessed = true;           // mark that the update list was processed and don't need to do this again
+
+    Debug::out("processUpdateList - done");
 }
 
 void CCoreThread::handleSendTrack(void)
