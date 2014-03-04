@@ -26,7 +26,7 @@ void Version::fromString(char *str)
 
 void Version::toString(char *str)
 {
-    sprintf(str, "%d-%02d-%02d", year, month, day);
+    sprintf(str, "%04d-%02d-%02d", year, month, day);
 }
 
 void Version::fromInts(int y, int m, int d)

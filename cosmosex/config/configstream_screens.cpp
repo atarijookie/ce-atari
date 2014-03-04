@@ -8,6 +8,7 @@
 #include "../mounter.h"
 
 #include "../settings.h"
+#include "../utils.h"
 #include "keys.h"
 #include "configstream.h"
 #include "netsettings.h"
@@ -570,44 +571,44 @@ void ConfigStream::createScreen_update(void)
 
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " part         new version available?", 40, 0, 8, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " part       your version   on server", 40, 0, 8, gotoOffset);
     comp->setReverse(true);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "CosmosEx", 12, 1, 10, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Main App", 12, 1, 10, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 3, 24, 10, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 24, 10, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_COSMOSEX);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::label, "Franz", 12, 1, 11, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 3, 24, 11, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 24, 11, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_FRANZ);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::label, "Hans", 12, 1, 12, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 3, 24, 12, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 24, 12, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_HANZ);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Config image", 12, 1, 13, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Xilinx", 12, 1, 13, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 3, 24, 13, gotoOffset);
-    comp->setComponentId(COMPID_UPDATE_CONF_IMAGE);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 24, 13, gotoOffset);
+    comp->setComponentId(COMPID_UPDATE_XILINX);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Check  ", 8,  4, 15, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Check ", 8,  4, 15, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_CHECK);
     comp->setComponentId(COMPID_UPDATE_BTN_CHECK);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  15, 15, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Update ", 8,  15, 15, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_UPDATE);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
@@ -617,12 +618,59 @@ void ConfigStream::createScreen_update(void)
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
 
+    fillUpdateWithCurrentVersions();                // fill the version lines with versions, if we got them
+
     setFocusToFirstFocusable();
+}
+
+void ConfigStream::fillUpdateWithCurrentVersions(void)
+{
+    if(versions == NULL) {                          // no versions? fill with empty strings
+        std::string empty = " ";
+
+        setTextByComponentId(COMPID_UPDATE_COSMOSEX,    empty);
+        setTextByComponentId(COMPID_UPDATE_FRANZ,       empty);
+        setTextByComponentId(COMPID_UPDATE_HANZ,        empty);
+        setTextByComponentId(COMPID_UPDATE_XILINX,      empty);
+        return;
+    }
+
+    char        ver[40];
+    std::string str;    
+   
+    versions->current.app.toString(ver);        // get single version
+    str = ver;                                  // put it in string
+    str.resize(14, ' ');                        // and expand it to length of 14 with spaces
+    versions->onServer.app.toString(ver);       // get another single version
+    str += ver;                                 // append it to the previous version string
+    setTextByComponentId(COMPID_UPDATE_COSMOSEX, str);     // set it to component
+
+    versions->current.franz.toString(ver);      // get single version
+    str = ver;                                  // put it in string
+    str.resize(14, ' ');                        // and expand it to length of 14 with spaces
+    versions->onServer.franz.toString(ver);     // get another single version
+    str += ver;                                 // append it to the previous version string
+    setTextByComponentId(COMPID_UPDATE_FRANZ, str);     // set it to component
+
+    versions->current.hans.toString(ver);       // get single version
+    str = ver;                                  // put it in string
+    str.resize(14, ' ');                        // and expand it to length of 14 with spaces
+    versions->onServer.hans.toString(ver);      // get another single version
+    str += ver;                                 // append it to the previous version string
+    setTextByComponentId(COMPID_UPDATE_HANZ, str);     // set it to component
+
+    versions->current.xilinx.toString(ver);     // get single version
+    str = ver;                                  // put it in string
+    str.resize(14, ' ');                        // and expand it to length of 14 with spaces
+    versions->onServer.xilinx.toString(ver);    // get another single version
+    str += ver;                                 // append it to the previous version string
+    setTextByComponentId(COMPID_UPDATE_XILINX, str);     // set it to component
 }
 
 void ConfigStream::onUpdateCheck(void)
 {
-
+    versions->updateListWasProcessed = false;   // mark that the new update list wasn't updated
+    Utils::downloadUpdateList();                // download the list of components with the newest available versions
 }
 
 void ConfigStream::onUpdateUpdate(void)

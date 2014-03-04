@@ -3,6 +3,14 @@
 
 #include <string>
 
+#define UPDATE_REMOTEURL    "http://joo.kie.sk/cosmosex/update/updatelist.csv"
+#define UPDATE_LOCALPATH    "update"
+#define UPDATE_LOCALLIST    "update/updatelist.csv"
+
+#define XILINX_VERSION_FILE "update/xilinx_current.txt"
+#define IMAGELIST_FILE      "imagelist.csv"
+#define APP_VERSION         "2014-03-04"
+
 class Version
 {
 public:
@@ -26,6 +34,27 @@ private:
     std::string url;
     int         checksum;
 };
+
+typedef struct {
+        struct {
+            Version app;
+            Version hans;
+            Version xilinx;
+            Version franz;
+            Version imglist;
+        } current;
+
+        struct {
+            Version app;
+            Version hans;
+            Version xilinx;
+            Version franz;
+            Version imglist;
+        } onServer;
+
+        bool updateListWasProcessed;
+        bool gotUpdate;
+    } Versions;
 
 #endif
 

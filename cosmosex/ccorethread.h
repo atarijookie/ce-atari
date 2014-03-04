@@ -84,28 +84,8 @@ private:
 
     //-----------------------------------
     // update stuff
-    bool updateListWasProcessed;
-    bool gotUpdate;
+    Versions versions;
 
-    struct {
-        struct {
-            Version app;
-            Version hans;
-            Version xilinx;
-            Version franz;
-            Version imglist;
-        } current;
-
-        struct {
-            Version app;
-            Version hans;
-            Version xilinx;
-            Version franz;
-            Version imglist;
-        } onServer;
-    } versions;
-
-    void downloadUpdateList(void);
     void processUpdateList(void);
 
     //-----------------------------------

@@ -1,9 +1,18 @@
+#include <stdio.h>
 #include <time.h>
 #include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <errno.h>
 
 #include "utils.h"
 #include "translated/translatedhelper.h"
 #include "translated/gemdos.h"
+#include "debug.h"
+#include "version.h"
+#include "downloader.h"
 
 DWORD Utils::getCurrentMs(void)
 {
@@ -157,4 +166,25 @@ void Utils::sleepMs(DWORD ms)
 	usleep(us);
 }
 
+void Utils::downloadUpdateList(void)
+{
+    // check for existence and possibly create update dir
+  	int res = mkdir(UPDATE_LOCALPATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
+	
+	if(res == 0) {					// dir created
+		Debug::out("Update: directory %s was created.", UPDATE_LOCALPATH);
+	} else {						// dir not created
+		if(errno != EEXIST) {		// and it's not because it already exists...
+			Debug::out("Update: failed to create settings directory - %s", strerror(errno));
+		}
+	}
 
+    // remove old update list
+    remove(UPDATE_LOCALLIST);
+
+    // add request for download of the update list
+    TDownloadRequest tdr;
+    tdr.srcUrl = UPDATE_REMOTEURL;
+    tdr.dstDir = UPDATE_LOCALPATH;
+    downloadAdd(tdr);
+}

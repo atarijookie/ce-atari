@@ -14,23 +14,15 @@
 #include "mounter.h"
 #include "downloader.h"
 
-#define UPDATE_PATH		    "update"
-#define UPDATE_LOCALLIST    "update/updatelist.csv"
-
-#define XILINX_VERSION_FILE "update/xilinx_current.txt"
-#define IMAGELIST_FILE      "imagelist.csv"
-
 #define DEV_CHECK_TIME_MS	3000
-
-#define APP_VERSION         "2014-03-04"
 
 CCoreThread::CCoreThread()
 {
-    gotUpdate = false;
-
     versions.current.app.fromString((char *) APP_VERSION);
     versions.current.xilinx.fromFirstLineOfFile((char *) XILINX_VERSION_FILE);
     versions.current.imglist.fromFirstLineOfFile((char *) IMAGELIST_FILE);
+    versions.updateListWasProcessed = false;
+    versions.gotUpdate = false;
 
     setEnabledIDbits = false;
 
@@ -52,6 +44,7 @@ CCoreThread::CCoreThread()
 
     confStream = new ConfigStream();
     confStream->setAcsiDataTrans(dataTrans);
+    confStream->setVersionsPointer(&versions);
 
     // now register all the objects which use some settings in the proxy
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_ACSI);
@@ -63,8 +56,6 @@ CCoreThread::CCoreThread()
 	
 	// register this class as receiver of dev attached / detached calls
 	devFinder.setDevChangesHandler((DevChangesHandler *) this);
-
-    updateListWasProcessed = false;
 }
 
 CCoreThread::~CCoreThread()
@@ -91,7 +82,7 @@ void CCoreThread::run(void)
 
 	mountAndAttachSharedDrive();					// if shared drive is enabled, try to mount it and attach it
 	
-    downloadUpdateList();                           // download the list of components with the newest available versions
+    Utils::downloadUpdateList();                    // download the list of components with the newest available versions
 
 	bool res;
 //---------------------------------------------
@@ -122,22 +113,22 @@ void CCoreThread::run(void)
 #endif
 
     while(sigintReceived == 0) {
-		bool gotAtn = false;						// no ATN received yet?
+		bool gotAtn = false;						    // no ATN received yet?
 		
 		if(Utils::getCurrentMs() >= nextDevFindTime) {	// should we check for the new devices?
 			devFinder.lookForDevChanges();				// look for devices attached / detached
 			
 			nextDevFindTime = Utils::getEndTime(DEV_CHECK_TIME_MS);		// update the time when devices should be checked
 
-            if(!updateListWasProcessed) {               // if didn't process update list yet
+            if(!versions.updateListWasProcessed) {      // if didn't process update list yet
                 processUpdateList();
             }
 		}
 
 		res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);		// check for any ATN code waiting from Hans
 
-		if(res) {									// HANS is signaling attention?
-			gotAtn = true;							// we've some ATN
+		if(res) {									    // HANS is signaling attention?
+			gotAtn = true;							    // we've some ATN
 
 			switch(inBuff[3]) {
 			case ATN_FW_VERSION:
@@ -493,29 +484,6 @@ void CCoreThread::mountAndAttachSharedDrive(void)
 	}
 }
 
-void CCoreThread::downloadUpdateList(void)
-{
-    // check for existence and possibly create update dir
-  	int res = mkdir(UPDATE_PATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
-	
-	if(res == 0) {					// dir created
-		Debug::out("Update: directory %s was created.", UPDATE_PATH);
-	} else {						// dir not created
-		if(errno != EEXIST) {		// and it's not because it already exists...
-			Debug::out("Update: failed to create settings directory - %s", strerror(errno));
-		}
-	}
-
-    // remove old update list
-    remove(UPDATE_LOCALLIST);
-
-    // add request for download of the update list
-    TDownloadRequest tdr;
-    tdr.srcUrl = "http://joo.kie.sk/cosmosex/update/updatelist.csv";
-    tdr.dstDir = UPDATE_PATH;
-    downloadAdd(tdr);
-}
-
 void CCoreThread::processUpdateList(void)
 {
     // check if the local update list exists
@@ -555,45 +523,30 @@ void CCoreThread::processUpdateList(void)
         if(strncmp(what, "app", 3) == 0) {
             versions.onServer.app.fromString(ver);
             versions.onServer.app.setUrlAndChecksum(url, crc);
-
-            versions.onServer.app.toString(line);
-            Debug::out("processUpdateList - on server - app : %s", line);
             continue;
         }
 
         if(strncmp(what, "hans", 4) == 0) {
             versions.onServer.hans.fromString(ver);
             versions.onServer.hans.setUrlAndChecksum(url, crc);
-
-            versions.onServer.hans.toString(line);
-            Debug::out("processUpdateList - on server - hans : %s", line);
             continue;
         }
 
         if(strncmp(what, "xilinx", 6) == 0) {
             versions.onServer.xilinx.fromString(ver);
             versions.onServer.xilinx.setUrlAndChecksum(url, crc);
-
-            versions.onServer.xilinx.toString(line);
-            Debug::out("processUpdateList - on server - xilinx : %s", line);
             continue;
         }
 
         if(strncmp(what, "franz", 5) == 0) {
             versions.onServer.franz.fromString(ver);
             versions.onServer.franz.setUrlAndChecksum(url, crc);
-
-            versions.onServer.franz.toString(line);
-            Debug::out("processUpdateList - on server - franz : %s", line);
             continue;
         }
 
         if(strncmp(what, "imglist", 7) == 0) {
             versions.onServer.imglist.fromString(ver);
             versions.onServer.imglist.setUrlAndChecksum(url, crc);
-
-            versions.onServer.imglist.toString(line);
-            Debug::out("processUpdateList - on server - imglist : %s", line);
             continue;
         }
     }
@@ -603,22 +556,22 @@ void CCoreThread::processUpdateList(void)
     //-------------------
     // now compare versions - current with those on server, if anything new then set a flag
     if(versions.current.app.isOlderThan( versions.onServer.app )) {
-        gotUpdate = true;
+        versions.gotUpdate = true;
         Debug::out("processUpdateList - APP is newer on server");
     }
 
     if(versions.current.hans.isOlderThan( versions.onServer.hans )) {
-        gotUpdate = true;
+        versions.gotUpdate = true;
         Debug::out("processUpdateList - HANS is newer on server");
     }
 
     if(versions.current.xilinx.isOlderThan( versions.onServer.xilinx )) {
-        gotUpdate = true;
+        versions.gotUpdate = true;
         Debug::out("processUpdateList - XILINX is newer on server");
     }
 
     if(versions.current.franz.isOlderThan( versions.onServer.franz )) {
-        gotUpdate = true;
+        versions.gotUpdate = true;
         Debug::out("processUpdateList - FRANZ is newer on server");
     }
 
@@ -632,7 +585,9 @@ void CCoreThread::processUpdateList(void)
         downloadAdd(tdr);
     }
 
-    updateListWasProcessed = true;           // mark that the update list was processed and don't need to do this again
+    versions.updateListWasProcessed = true;         // mark that the update list was processed and don't need to do this again
+
+    confStream->fillUpdateWithCurrentVersions();    // if the config screen is shown, then update info on it
 
     Debug::out("processUpdateList - done");
 }

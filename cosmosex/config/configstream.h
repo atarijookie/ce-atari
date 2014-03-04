@@ -6,6 +6,7 @@
 
 #include "configcomponent.h"
 #include "../settingsreloadproxy.h"
+#include "../version.h"
 
 class AcsiDataTrans;
 
@@ -27,7 +28,7 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
 				COMPID_WIFI_DHCP,			COMPID_WIFI_SSID,			COMPID_WIFI_PSK,
 				
 				COMPID_UPDATE_COSMOSEX,
-                COMPID_UPDATE_FRANZ,        COMPID_UPDATE_HANZ,         COMPID_UPDATE_CONF_IMAGE,
+                COMPID_UPDATE_FRANZ,        COMPID_UPDATE_HANZ,         COMPID_UPDATE_XILINX,
                 COMPID_UPDATE_BTN_CHECK,    COMPID_SHARED_BTN_TEST,     
 				
 				COMPID_SHARED_IP,           COMPID_SHARED_PATH, 		COMPID_SHARED_ENABLED, 
@@ -48,6 +49,9 @@ public:
     void processCommand(BYTE *cmd);
     void setAcsiDataTrans(AcsiDataTrans *dt);
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
+
+    void setVersionsPointer(Versions *vers);
+    void fillUpdateWithCurrentVersions(void);
 
     // functions which are called from various components
     int  checkboxGroup_getCheckedId(int groupId);
@@ -83,6 +87,7 @@ private:
 
     AcsiDataTrans       *dataTrans;
     SettingsReloadProxy *reloadProxy;
+    Versions            *versions;
 
     void onKeyDown(BYTE key);
     int  getStream(bool homeScreen, BYTE *bfr, int maxLen);
