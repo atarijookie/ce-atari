@@ -11,11 +11,13 @@
 class AcsiDataTrans;
 
 enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED,
-                 CS_CREATE_FLOPPY,      CS_CREATE_NETWORK,      CS_CREATE_UPDATE,
+                 CS_CREATE_FLOPPY_CONF, CS_CREATE_FLOPPY_IMGS,
+                 CS_CREATE_NETWORK,     CS_CREATE_UPDATE,
                  CS_SAVE_ACSI,          CS_SAVE_TRANSLATED,     CS_SAVE_NETWORK,
                  CS_HIDE_MSG_SCREEN,    CS_GO_HOME,
                  CS_UPDATE_CHECK,       CS_UPDATE_UPDATE,       CS_SHARED_TEST,
-                 CS_SHARED_SAVE
+                 CS_SHARED_SAVE,
+                 CS_FLOPPY_IMAGE_SAVE,  CS_FLOPPY_CONFIG_SAVE
                 };
 
 
@@ -32,7 +34,9 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
                 COMPID_UPDATE_BTN_CHECK,    COMPID_SHARED_BTN_TEST,     
 				
 				COMPID_SHARED_IP,           COMPID_SHARED_PATH, 		COMPID_SHARED_ENABLED, 
-				COMPID_SHARED_NFS_NOT_SAMBA
+				COMPID_SHARED_NFS_NOT_SAMBA,
+
+                COMPID_FLOPCONF_ENABLED,    COMPID_FLOPCONF_ID,         COMPID_FLOPCONF_WRPROT
             };
 
 #define ST_RESOLUTION_LOW       0
@@ -66,6 +70,8 @@ public:
     void createScreen_network(void);
     void createScreen_update(void);
     void createScreen_shared(void);
+    void createScreen_floppy_config(void);
+    void createScreen_floppy_images(void);
 
     ConfigComponent *findComponentById(int compId);
     bool getTextByComponentId(int componentId, std::string &text);
@@ -111,6 +117,9 @@ private:
 
     void onSharedTest(void);
     void onSharedSave(void);
+
+    void onFloppyConfigSave(void);
+    void onFloppyImagesSave(void);
 
     bool verifyAndFixIPaddress(std::string &in, std::string &out, bool emptyIsOk);
 };

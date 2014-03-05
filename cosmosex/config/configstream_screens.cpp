@@ -26,27 +26,31 @@ void ConfigStream::createScreen_homeScreen(void)
 
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " ACSI IDs config ",	18, 10,  6, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " ACSI IDs config ",	18, 10,  5, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_ACSI);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Translated disks ",	18, 10,  8, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Translated disks ",	18, 10,  7, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_TRANSLATED);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Shared drive ",		18, 10, 10, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Shared drive ",		18, 10,  9, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_SHARED);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Floppy config ",	18, 10, 12, gotoOffset);
-    comp->setOnEnterFunctionCode(CS_CREATE_FLOPPY);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Floppy config ",	18, 10, 11, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_CREATE_FLOPPY_CONF);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Network settings ",	18, 10, 14, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Floppy images ",	18, 10, 13, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_CREATE_FLOPPY_IMGS);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::button, " Network settings ",	18, 10, 15, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_NETWORK);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Update software ",	18, 10, 16, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Update software ",	18, 10, 17, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_UPDATE);
     screen.push_back(comp);
 
@@ -671,11 +675,27 @@ void ConfigStream::onUpdateCheck(void)
 {
     versions->updateListWasProcessed = false;   // mark that the new update list wasn't updated
     Utils::downloadUpdateList();                // download the list of components with the newest available versions
+
+    showMessageScreen((char *) "Checking for updates", (char *) "Now checking for updates.\nPlease wait few seconds.");
 }
 
 void ConfigStream::onUpdateUpdate(void)
 {
+    if(versions == NULL) {                      // no versions pointer? this shouldn't happen
+        return;
+    }
 
+    if(!versions->updateListWasProcessed) {     // didn't process the update list yet? show message
+        showMessageScreen((char *) "No updates info", (char *) "No update info was downloaded,\nplease press 'Check' button and wait.");
+        return;
+    }
+
+    if(!versions->gotUpdate) {
+        showMessageScreen((char *) "No update needed", (char *) "All your components are up to date.");
+        return;
+    }
+
+    // TODO: do the update!
 }
 
 void ConfigStream::createScreen_shared(void)
@@ -839,3 +859,4 @@ void ConfigStream::onSharedSave(void)
 
     createScreen_homeScreen();		// now back to the home screen
 }
+
