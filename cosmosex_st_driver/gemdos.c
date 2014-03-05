@@ -764,12 +764,11 @@ void initFunctionTable(void)
 	gemdos_table[0x42] = custom_fseek;
 	gemdos_table[0x43] = custom_fattrib;
 	gemdos_table[0x47] = custom_dgetpath;
-	gemdos_table[0x4b] = custom_pexec;
 
-// driver stops working if pterm functions are enabled
-//	gemdos_table[0x4c] = custom_pterm;
-//	gemdos_table[0000] = custom_pterm0;
-//	gemdos_table[0x31] = custom_ptermres;	
+	gemdos_table[0x4b] = custom_pexec;
+	gemdos_table[0x4c] = custom_pterm;
+	gemdos_table[0000] = custom_pterm0;
+	gemdos_table[0x31] = custom_ptermres;	
 
 	gemdos_table[0x4e] = custom_fsfirst;
 	gemdos_table[0x4f] = custom_fsnext;

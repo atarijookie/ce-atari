@@ -1,5 +1,5 @@
 | Simple BIOS handler.
-| 26/11/2013 Miro Kropacek
+| 04/03/2014 Miro Kropacek
 | miro.kropacek@gmail.com
 
 	.globl	_bios_handler
@@ -29,12 +29,12 @@ _bios_handler:
 	tst.w	_useOldBiosHandler
 	bne.b	bios_not_handled
 	
-	lea	2+4(sp),a0				| a0 points to the function number now
+	lea		2+4(sp),a0				| a0 points to the function number now
 	btst.b	#5,(sp)					| check the S bit in the stack frame
 	bne.b	bios_call
 	move	usp,a0					| if not called from SV, take params from the user stack
 bios_call:
-	lea	_bios_table,a1
+	lea		_bios_table,a1
 	move.w	(a0)+,d0				| fn
 	cmp.w	#0x100,d0				| number of entries in the function table
 	bhs.b	bios_not_handled
@@ -47,11 +47,12 @@ bios_call:
 	movea.l	(a1),a1
 
 	move.l	a0,-(sp)				| param #1: stack pointer with function params
-	jsr	(a1)					| call the handler
+	jsr		(a1)					| call the handler
 	addq.l	#4,sp
-	rte						| return from exception, d0 contains return code
+	rte								| return from exception, d0 contains return code
 	
 bios_not_handled:
+	clr.w	_useOldBiosHandler              | ensure that is our handler still alive after the call (which may not return) 
 	move.l	_old_bios_handler(pc),-(sp)		| Fake a return
-	rts						| to old code.
+	rts								        | to old code.
 

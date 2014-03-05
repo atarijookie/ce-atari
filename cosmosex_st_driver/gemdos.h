@@ -125,18 +125,15 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 #define CALL_OLD_GD( function, ... )	\
 		useOldGDHandler = 1;			\
 		res = function( __VA_ARGS__ );	\
-		useOldGDHandler = 0;			\
 		return res;
 
 #define CALL_OLD_GD_NORET( function, ... )	\
 		useOldGDHandler = 1;			\
-		res = function( __VA_ARGS__ );	\
-		useOldGDHandler = 0;			
+		res = function( __VA_ARGS__ );
 
 #define CALL_OLD_GD_VOIDRET( function, ... )	\
 		useOldGDHandler = 1;			\
-		function( __VA_ARGS__ );	\
-		useOldGDHandler = 0;			
+		function( __VA_ARGS__ );
 		
 // if sign bit is set, extend the sign to whole DWORD
 #define extendByteToDword(X)    ( ((X & 0x80)==0) ? X : (0xffffff00 | X) )

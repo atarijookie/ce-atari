@@ -81,14 +81,14 @@ int main( int argc, char* argv[] )
 	pDtaBuffer		= &dtaBuffer[2];
 	pDtaBuffer		= (BYTE *) (((DWORD) pDtaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
 
-	/* search for CosmosEx on ACSI bus */ 
+	// search for CosmosEx on ACSI bus
 	found = ce_findId();
 
-	if(!found) {								/* not found? quit */
+	if(!found) {								        // not found? quit
 		sleep(3);
 		return 0;
 	}
-	
+    
 	/* now set up the acsi command bytes so we don't have to deal with this one anymore */
 	commandShort[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
 	
