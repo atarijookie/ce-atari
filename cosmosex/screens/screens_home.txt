@@ -3,7 +3,6 @@
 
 
 
-
           [ ACSI IDs config  ] 
 
           [ Translated disks ] 
@@ -12,12 +11,13 @@
 
           [ Floppy config    ]  
 
+          [ Floppy images    ]  
+
           [ Network settings ] 
 
           [ Update software  ]
-
-
 		  
 
 
+          
         To quit - press Ctrl + C        

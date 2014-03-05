@@ -1,23 +1,23 @@
 >> CosmosEx config tool - Jookie 2013 <<
              Floppy settings
 
-Silo:
-   1. image1
-   2. image2
-   3. image3
 
-Available images on /dev/sdd1
-Filter:    [                 ]
-    [ img                          ]
-    [                              ]
-    [                              ]
-    [                              ]
-    [                              ]
-    [                              ]
-    [                              ]
-    [                              ]
-    [                              ]
+             
+             
+             
+    Floppy enabled   [ x ]
+        
+                       0       1
+    Drive ID         [ x ]   [   ]      
+              
+              
+    Write protected  [   ] 
+
+    
+    
+    
+
         [  Save  ] [ Cancel ]
-
-Use arrows, use 1,2,3 to insert in Silo.
-        To quit - press Ctrl + C
+        
+       To quit - press Ctrl + C
+       

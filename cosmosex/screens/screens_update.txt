@@ -5,12 +5,12 @@
 
 
 
- part         new version available?
-
- CosmosEx              no
- Franz                 YES
- Hans                  no
- Config image          no
+ part       your version   on server
+                              
+ Main App    2014-02-28    2014-03-03
+ Franz       2014-02-28    2014-03-01
+ Hans        2014-02-28     the same
+ Xilinx      2014-02-28     the same
 
 
    [ Check ]  [ Update ]  [ Cancel ]
