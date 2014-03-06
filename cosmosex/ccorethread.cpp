@@ -38,6 +38,7 @@ CCoreThread::CCoreThread()
     scsi->setAcsiDataTrans(dataTrans);
     scsi->attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
 //    scsi->attachToHostPath("TESTMEDIA", SOURCETYPE_TESTMEDIA, SCSI_ACCESSTYPE_FULL);
+	scsi->attachToHostPath("sd_card_icdpro.img", SOURCETYPE_IMAGE, SCSI_ACCESSTYPE_FULL);
 
     translated = new TranslatedDisk();
     translated->setAcsiDataTrans(dataTrans);
@@ -76,7 +77,7 @@ void CCoreThread::run(void)
     memset(inBuff, 0, 8);
 	
     loadSettings();
-//	resetHansAndFranz();
+//	Utils::resetHansAndFranz();
 	
 	DWORD nextDevFindTime = Utils::getCurrentMs();	// create a time when the devices should be checked - and that time is now
 
@@ -86,7 +87,7 @@ void CCoreThread::run(void)
 
 	bool res;
 //---------------------------------------------
-    image = imageFactory.getImage((char *) "spacola.st");
+    image = imageFactory.getImage((char *) "blank.st");
 
     if(image) {
         if(image->isOpen()) {
@@ -228,19 +229,6 @@ void CCoreThread::handleAcsiCommand(void)
     if(wasHandled != true) {                        // if the command was not previously handled, it's probably just some SCSI command
         scsi->processCommand(bufIn);                // process the command
     }
-}
-
-void CCoreThread::resetHansAndFranz(void)
-{
-	bcm2835_gpio_write(PIN_RESET_HANS,			LOW);		// reset lines to RESET state
-	bcm2835_gpio_write(PIN_RESET_FRANZ,			LOW);
-
-	Utils::sleepMs(10);										// wait a while to let the reset work
-	
-	bcm2835_gpio_write(PIN_RESET_HANS,			HIGH);		// reset lines to RUN (not reset) state
-	bcm2835_gpio_write(PIN_RESET_FRANZ,			HIGH);
-	
-	Utils::sleepMs(50);										// wait a while to let the devices boot
 }
 
 void CCoreThread::reloadSettings(void)

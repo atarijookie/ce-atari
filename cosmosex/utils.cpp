@@ -13,6 +13,7 @@
 #include "debug.h"
 #include "version.h"
 #include "downloader.h"
+#include "gpio.h"
 
 DWORD Utils::getCurrentMs(void)
 {
@@ -187,4 +188,17 @@ void Utils::downloadUpdateList(void)
     tdr.srcUrl = UPDATE_REMOTEURL;
     tdr.dstDir = UPDATE_LOCALPATH;
     downloadAdd(tdr);
+}
+
+void Utils::resetHansAndFranz(void)
+{
+	bcm2835_gpio_write(PIN_RESET_HANS,			LOW);		// reset lines to RESET state
+	bcm2835_gpio_write(PIN_RESET_FRANZ,			LOW);
+
+	Utils::sleepMs(10);										// wait a while to let the reset work
+	
+	bcm2835_gpio_write(PIN_RESET_HANS,			HIGH);		// reset lines to RUN (not reset) state
+	bcm2835_gpio_write(PIN_RESET_FRANZ,			HIGH);
+	
+	Utils::sleepMs(50);										// wait a while to let the devices boot
 }

@@ -37,20 +37,19 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-    downloadInitBeforeThreads();
-
-    core = new CCoreThread();
-
 	if(argc == 2 && strcmp(argv[1], "reset") == 0) {
-		core->resetHansAndFranz();
-		delete core;
+		Utils::resetHansAndFranz();
 		gpio_close();
 		
 		printf("\nJust did reset and quit...\n");
 		
 		return 0;
 	}
-	
+
+    downloadInitBeforeThreads();
+
+    core = new CCoreThread();
+
 	int res = pthread_create( &mountThreadInfo, NULL, mountThreadCode, NULL);	// create mount thread and run it
 	
 	if(res != 0) {
