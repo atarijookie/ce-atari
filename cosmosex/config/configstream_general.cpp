@@ -22,8 +22,6 @@ ConfigStream::ConfigStream()
     dataTrans   = NULL;
     reloadProxy = NULL;
 
-    versions    = NULL;
-
     message.clear();
     createScreen_homeScreen();
 }
@@ -32,11 +30,6 @@ ConfigStream::~ConfigStream()
 {
     destroyCurrentScreen();
     destroyScreen(message);
-}
-
-void ConfigStream::setVersionsPointer(Versions *vers)
-{
-    versions = vers;
 }
 
 void ConfigStream::setAcsiDataTrans(AcsiDataTrans *dt)

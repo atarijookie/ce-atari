@@ -9,6 +9,7 @@
 
 #include "../settings.h"
 #include "../utils.h"
+#include "../update.h"
 #include "keys.h"
 #include "configstream.h"
 #include "netsettings.h"
@@ -629,28 +630,18 @@ void ConfigStream::createScreen_update(void)
 
 void ConfigStream::fillUpdateWithCurrentVersions(void)
 {
-    if(versions == NULL) {                          // no versions? fill with empty strings
-        std::string empty = " ";
-
-        setTextByComponentId(COMPID_UPDATE_COSMOSEX,    empty);
-        setTextByComponentId(COMPID_UPDATE_FRANZ,       empty);
-        setTextByComponentId(COMPID_UPDATE_HANZ,        empty);
-        setTextByComponentId(COMPID_UPDATE_XILINX,      empty);
-        return;
-    }
-
     std::string str;    
 
-    datesToStrings(versions->current.app,       versions->onServer.app,     str);
+    datesToStrings(Update::versions.current.app,       Update::versions.onServer.app,     str);
     setTextByComponentId(COMPID_UPDATE_COSMOSEX, str);      // set it to component
 
-    datesToStrings(versions->current.franz,     versions->onServer.franz,   str);
+    datesToStrings(Update::versions.current.franz,     Update::versions.onServer.franz,   str);
     setTextByComponentId(COMPID_UPDATE_FRANZ, str);         // set it to component
 
-    datesToStrings(versions->current.hans,      versions->onServer.hans,    str);
+    datesToStrings(Update::versions.current.hans,      Update::versions.onServer.hans,    str);
     setTextByComponentId(COMPID_UPDATE_HANZ, str);          // set it to component
 
-    datesToStrings(versions->current.xilinx,    versions->onServer.xilinx,  str);
+    datesToStrings(Update::versions.current.xilinx,    Update::versions.onServer.xilinx,  str);
     setTextByComponentId(COMPID_UPDATE_XILINX, str);        // set it to component
 }
 
@@ -672,29 +663,73 @@ void ConfigStream::datesToStrings(Version &v1, Version &v2, std::string &str)
 
 void ConfigStream::onUpdateCheck(void)
 {
-    versions->updateListWasProcessed = false;   // mark that the new update list wasn't updated
-    Utils::downloadUpdateList();                // download the list of components with the newest available versions
+    Update::versions.updateListWasProcessed = false;   // mark that the new update list wasn't updated
+    Update::downloadUpdateList();               // download the list of components with the newest available versions
 
     showMessageScreen((char *) "Checking for updates", (char *) "Now checking for updates.\nPlease wait few seconds.");
 }
 
 void ConfigStream::onUpdateUpdate(void)
 {
-    if(versions == NULL) {                      // no versions pointer? this shouldn't happen
-        return;
-    }
-
-    if(!versions->updateListWasProcessed) {     // didn't process the update list yet? show message
+    if(!Update::versions.updateListWasProcessed) {     // didn't process the update list yet? show message
         showMessageScreen((char *) "No updates info", (char *) "No update info was downloaded,\nplease press 'Check' button and wait.");
         return;
     }
 
-    if(!versions->gotUpdate) {
+    if(!Update::versions.gotUpdate) {
         showMessageScreen((char *) "No update needed", (char *) "All your components are up to date.");
         return;
     }
 
-    // TODO: do the update!
+    createScreen_update_download();
+}
+
+void ConfigStream::createScreen_update_download(void)
+{
+    // the following 3 lines should be at start of each createScreen_ method
+    destroyCurrentScreen();			    // destroy current components
+    screenChanged	    = true;			// mark that the screen has changed
+    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+
+    screen_addHeaderAndFooter(screen, (char *) "Updates download");
+
+    ConfigComponent *comp;
+
+    int col = 13;
+    int row = 9;
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "Downloading", 40, col + 2, row, gotoOffset);
+    comp->setReverse(true);
+    screen.push_back(comp);
+
+    row += 2;
+
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 30, col, row++, gotoOffset);
+    comp->setComponentId(COMPID_DL1);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 30, col, row++, gotoOffset);
+    comp->setComponentId(COMPID_DL2);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 30, col, row++, gotoOffset);
+    comp->setComponentId(COMPID_DL3);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 30, col, row++, gotoOffset);
+    comp->setComponentId(COMPID_DL4);
+    screen.push_back(comp);
+
+    row++;
+
+    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, col + 3, row, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_GO_HOME);
+    comp->setComponentId(COMPID_BTN_CANCEL);
+    screen.push_back(comp);
+
+    Update::downloadNewComponents();            // start the download
+
+    setFocusToFirstFocusable();
 }
 
 void ConfigStream::createScreen_shared(void)

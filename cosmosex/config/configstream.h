@@ -36,7 +36,9 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
 				COMPID_SHARED_IP,           COMPID_SHARED_PATH, 		COMPID_SHARED_ENABLED, 
 				COMPID_SHARED_NFS_NOT_SAMBA,
 
-                COMPID_FLOPCONF_ENABLED,    COMPID_FLOPCONF_ID,         COMPID_FLOPCONF_WRPROT
+                COMPID_FLOPCONF_ENABLED,    COMPID_FLOPCONF_ID,         COMPID_FLOPCONF_WRPROT,
+
+                COMPID_DL1,                 COMPID_DL2,                 COMPID_DL3,                 COMPID_DL4
             };
 
 #define ST_RESOLUTION_LOW       0
@@ -54,7 +56,6 @@ public:
     void setAcsiDataTrans(AcsiDataTrans *dt);
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
-    void setVersionsPointer(Versions *vers);
     void fillUpdateWithCurrentVersions(void);
 
     // functions which are called from various components
@@ -93,7 +94,6 @@ private:
 
     AcsiDataTrans       *dataTrans;
     SettingsReloadProxy *reloadProxy;
-    Versions            *versions;
 
     void onKeyDown(BYTE key);
     int  getStream(bool homeScreen, BYTE *bfr, int maxLen);
@@ -115,6 +115,7 @@ private:
     void onUpdateCheck(void);
     void onUpdateUpdate(void);
     void datesToStrings(Version &v1, Version &v2, std::string &str);
+    void createScreen_update_download(void);
 
     void onSharedTest(void);
     void onSharedSave(void);

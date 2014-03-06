@@ -13,7 +13,9 @@
 #include <vector>    
 
 #include <curl/curl.h>
+#include "debug.h"
 #include "downloader.h"
+#include "utils.h"
 
 // sudo apt-get install libcurl4-gnutls-dev
 // gcc main.c -lcurl
@@ -22,20 +24,6 @@ extern volatile sig_atomic_t sigintReceived;
 
 void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
 void mergeHostPaths(std::string &dest, std::string &tail);
-
-class Debug {
-public:
-    static void out(const char *format, ...)
-    {
-        va_list args;
-        va_start(args, format);
-
-        vprintf(format, args);
-	    printf("\n");
-
-        va_end(args);
-    }
-};
 
 pthread_mutex_t downloadThreadMutex = PTHREAD_MUTEX_INITIALIZER;
 std::vector<TDownloadRequest>   downloadQueue;
@@ -110,7 +98,7 @@ static void formatStatus(TDownloadRequest &tdr, std::string &line)
     char percString[16];
 
     std::string urlPath, fileName; 
-    splitFilenameFromPath(tdr.srcUrl, urlPath, fileName);
+    Utils::splitFilenameFromPath(tdr.srcUrl, urlPath, fileName);
 
     if(fileName.length() < 20) {                            // filename too short? extend to 20 chars with spaces
         fileName.resize(20, ' ');
@@ -194,12 +182,12 @@ void *downloadThreadCode(void *ptr)
         }
     
         std::string urlPath, fileName; 
-        splitFilenameFromPath(downloadCurrent.srcUrl, urlPath, fileName);
+        Utils::splitFilenameFromPath(downloadCurrent.srcUrl, urlPath, fileName);
     
         std::string tmpFile, finalFile;
 
         finalFile = downloadCurrent.dstDir;
-        mergeHostPaths(finalFile, fileName);                // create final local filename with path
+        Utils::mergeHostPaths(finalFile, fileName);         // create final local filename with path
 
         tmpFile = finalFile + "_dwnldng";                   // create temp local filename with path
         outfile = fopen((char *) tmpFile.c_str(), "wb");    // try to open the tmp file
@@ -252,52 +240,4 @@ void *downloadThreadCode(void *ptr)
 	Debug::out("Download thread finished.");
     return 0;
 }
-
-
-// Utils::
-#define HOSTPATH_SEPAR_CHAR     '/'
-#define HOSTPATH_SEPAR_STRING   "/"
-
-void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file)
-{
-    int sepPos = pathAndFile.rfind(HOSTPATH_SEPAR_STRING);
-
-    if(sepPos == ((int) std::string::npos)) {                   // not found?
-        path.clear();
-        file = pathAndFile;                                     // pretend we don't have path, just filename
-    } else {                                                    // separator found?
-        path    = pathAndFile.substr(0, sepPos + 1);            // path is before separator
-        file    = pathAndFile.substr(sepPos + 1);               // file is after separator
-    }
-}
-
-void mergeHostPaths(std::string &dest, std::string &tail)
-{
-    if(dest.empty()) {      // if the 1st part is empty, then result is just the 2nd part
-        dest = tail;
-        return;
-    }
-
-    if(tail.empty()) {      // if the 2nd part is empty, don't do anything
-        return;
-    }
-
-    bool endsWithSepar      = (dest[dest.length() - 1] == HOSTPATH_SEPAR_CHAR);
-    bool startsWithSepar    = (tail[0] == HOSTPATH_SEPAR_CHAR);
-
-    if(!endsWithSepar && !startsWithSepar){     // both don't have separator char? add it between them
-        dest = dest + HOSTPATH_SEPAR_STRING + tail;
-        return;
-    }
-
-    if(endsWithSepar && startsWithSepar) {      // both have separator char? remove one
-        dest[dest.length() - 1] = 0;
-        dest = dest + tail;
-        return;
-    }
-
-    // in this case one of them has separator, so just merge them together
-    dest = dest + tail;
-}
-
 

@@ -23,8 +23,6 @@ public:
 	static void mergeHostPaths(std::string &dest, std::string &tail);
 	static void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
 
-    static void downloadUpdateList(void);
-	
 	static void resetHansAndFranz(void);	
 };
 

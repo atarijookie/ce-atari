@@ -13,16 +13,13 @@
 #include "gpio.h"
 #include "mounter.h"
 #include "downloader.h"
+#include "update.h"
 
 #define DEV_CHECK_TIME_MS	3000
 
 CCoreThread::CCoreThread()
 {
-    versions.current.app.fromString((char *) APP_VERSION);
-    versions.current.xilinx.fromFirstLineOfFile((char *) XILINX_VERSION_FILE);
-    versions.current.imglist.fromFirstLineOfFile((char *) IMAGELIST_FILE);
-    versions.updateListWasProcessed = false;
-    versions.gotUpdate = false;
+    Update::initialize();
 
     setEnabledIDbits = false;
 
@@ -45,7 +42,6 @@ CCoreThread::CCoreThread()
 
     confStream = new ConfigStream();
     confStream->setAcsiDataTrans(dataTrans);
-    confStream->setVersionsPointer(&versions);
 
     // now register all the objects which use some settings in the proxy
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_ACSI);
@@ -83,7 +79,7 @@ void CCoreThread::run(void)
 
 	mountAndAttachSharedDrive();					// if shared drive is enabled, try to mount it and attach it
 	
-    Utils::downloadUpdateList();                    // download the list of components with the newest available versions
+    Update::downloadUpdateList();                   // download the list of components with the newest available versions
 
 	bool res;
 //---------------------------------------------
@@ -121,8 +117,12 @@ void CCoreThread::run(void)
 			
 			nextDevFindTime = Utils::getEndTime(DEV_CHECK_TIME_MS);		// update the time when devices should be checked
 
-            if(!versions.updateListWasProcessed) {      // if didn't process update list yet
-                processUpdateList();
+            if(!Update::versions.updateListWasProcessed) {         // if didn't process update list yet
+                Update::processUpdateList();
+
+                if(Update::versions.updateListWasProcessed) {      // if we processed the list, update config stream
+                    confStream->fillUpdateWithCurrentVersions();        // if the config screen is shown, then update info on it
+                }
             }
 		}
 
@@ -315,11 +315,11 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 
     int year = bcdToInt(fwVer[1]) + 2000;
     if(fwVer[0] == 0xf0) {
-        versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
+        Update::versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
 
         Debug::out("FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
     } else {
-        versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));               // store found FW version of Hans
+        Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));               // store found FW version of Hans
 
         int currentLed = fwVer[4];
         Debug::out("FW: Hans,  %d-%02d-%02d, LED is: %d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed);
@@ -470,114 +470,6 @@ void CCoreThread::mountAndAttachSharedDrive(void)
 	if(!res) {																// if didn't attach, skip the rest
 		Debug::out("mountAndAttachSharedDrive: failed to attach shared drive %s", (char *) mountPath.c_str());
 	}
-}
-
-void CCoreThread::processUpdateList(void)
-{
-    // check if the local update list exists
-    int res = access(UPDATE_LOCALLIST, F_OK);
-
-    if(res != 0) {                              // local update list doesn't exist, quit for now
-        return;
-    }
-
-    Debug::out("processUpdateList - starting");
-
-    // open update list, parse versions
-    FILE *f = fopen(UPDATE_LOCALLIST, "rt");
-
-    if(!f) {
-        Debug::out("processUpdateList - couldn't open file %s", UPDATE_LOCALLIST);
-        return;
-    }
-
-    char line[1024];
-    char what[32], ver[32], url[256], crc[32];
-    while(!feof(f)) {
-        char *r = fgets(line, 1024, f);                 // read the update versions file by lines
-
-        if(!r) {
-            continue;
-        }
-
-        // try to separate the sub strings
-        res = sscanf(line, "%[^,\n],%[^,\n],%[^,\n],%[^,\n]", what, ver, url, crc);
-
-        if(res != 4) {
-            continue;
-        }
-
-        // now store the versions where they bellong
-        if(strncmp(what, "app", 3) == 0) {
-            versions.onServer.app.fromString(ver);
-            versions.onServer.app.setUrlAndChecksum(url, crc);
-            continue;
-        }
-
-        if(strncmp(what, "hans", 4) == 0) {
-            versions.onServer.hans.fromString(ver);
-            versions.onServer.hans.setUrlAndChecksum(url, crc);
-            continue;
-        }
-
-        if(strncmp(what, "xilinx", 6) == 0) {
-            versions.onServer.xilinx.fromString(ver);
-            versions.onServer.xilinx.setUrlAndChecksum(url, crc);
-            continue;
-        }
-
-        if(strncmp(what, "franz", 5) == 0) {
-            versions.onServer.franz.fromString(ver);
-            versions.onServer.franz.setUrlAndChecksum(url, crc);
-            continue;
-        }
-
-        if(strncmp(what, "imglist", 7) == 0) {
-            versions.onServer.imglist.fromString(ver);
-            versions.onServer.imglist.setUrlAndChecksum(url, crc);
-            continue;
-        }
-    }
-
-    fclose(f);
-
-    //-------------------
-    // now compare versions - current with those on server, if anything new then set a flag
-    if(versions.current.app.isOlderThan( versions.onServer.app )) {
-        versions.gotUpdate = true;
-        Debug::out("processUpdateList - APP is newer on server");
-    }
-
-    if(versions.current.hans.isOlderThan( versions.onServer.hans )) {
-        versions.gotUpdate = true;
-        Debug::out("processUpdateList - HANS is newer on server");
-    }
-
-    if(versions.current.xilinx.isOlderThan( versions.onServer.xilinx )) {
-        versions.gotUpdate = true;
-        Debug::out("processUpdateList - XILINX is newer on server");
-    }
-
-    if(versions.current.franz.isOlderThan( versions.onServer.franz )) {
-        versions.gotUpdate = true;
-        Debug::out("processUpdateList - FRANZ is newer on server");
-    }
-
-    // check this one and if we got an update, do a silent update 
-    if(versions.current.imglist.isOlderThan( versions.onServer.imglist )) {
-        Debug::out("processUpdateList - IMAGE LIST is newer on server, doing silent update...");
-
-        TDownloadRequest tdr;
-        tdr.srcUrl = versions.onServer.imglist.getUrl();
-        tdr.dstDir = "";
-        downloadAdd(tdr);
-    }
-
-    versions.updateListWasProcessed = true;         // mark that the update list was processed and don't need to do this again
-
-    confStream->fillUpdateWithCurrentVersions();    // if the config screen is shown, then update info on it
-
-    Debug::out("processUpdateList - done");
 }
 
 void CCoreThread::handleSendTrack(void)

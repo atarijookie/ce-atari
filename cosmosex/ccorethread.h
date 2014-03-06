@@ -83,12 +83,6 @@ private:
     int bcdToInt(int bcd);
 
     //-----------------------------------
-    // update stuff
-    Versions versions;
-
-    void processUpdateList(void);
-
-    //-----------------------------------
     // floppy stuff
     MfmCachedImage      encImage;
     IFloppyImage        *image;
