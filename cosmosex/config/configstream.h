@@ -114,6 +114,7 @@ private:
 
     void onUpdateCheck(void);
     void onUpdateUpdate(void);
+    void datesToStrings(Version &v1, Version &v2, std::string &str);
 
     void onSharedTest(void);
     void onSharedSave(void);

@@ -84,6 +84,24 @@ bool Version::isOlderThan(const Version &other)
     return false;
 }
 
+bool Version::isEqualTo(const Version &other)
+{
+    if(year != other.year) {        // year doesn't match?
+        return false;
+    }
+
+    if(month != other.month) {      // month doesn't match?
+        return false;
+    }
+
+    if(day != other.day) {          // day doesn't match?
+        return false;
+    }
+
+    // everything matches
+    return true;
+}
+
 void Version::fromFirstLineOfFile(char *filePath)
 {
     clear();

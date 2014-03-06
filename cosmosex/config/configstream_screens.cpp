@@ -639,36 +639,35 @@ void ConfigStream::fillUpdateWithCurrentVersions(void)
         return;
     }
 
-    char        ver[40];
     std::string str;    
+
+    datesToStrings(versions->current.app,       versions->onServer.app,     str);
+    setTextByComponentId(COMPID_UPDATE_COSMOSEX, str);      // set it to component
+
+    datesToStrings(versions->current.franz,     versions->onServer.franz,   str);
+    setTextByComponentId(COMPID_UPDATE_FRANZ, str);         // set it to component
+
+    datesToStrings(versions->current.hans,      versions->onServer.hans,    str);
+    setTextByComponentId(COMPID_UPDATE_HANZ, str);          // set it to component
+
+    datesToStrings(versions->current.xilinx,    versions->onServer.xilinx,  str);
+    setTextByComponentId(COMPID_UPDATE_XILINX, str);        // set it to component
+}
+
+void ConfigStream::datesToStrings(Version &v1, Version &v2, std::string &str)
+{
+    char ver[40];
    
-    versions->current.app.toString(ver);        // get single version
-    str = ver;                                  // put it in string
-    str.resize(14, ' ');                        // and expand it to length of 14 with spaces
-    versions->onServer.app.toString(ver);       // get another single version
-    str += ver;                                 // append it to the previous version string
-    setTextByComponentId(COMPID_UPDATE_COSMOSEX, str);     // set it to component
+    v1.toString(ver);           // get single version
+    str = ver;                  // put it in string
+    str.resize(14, ' ');        // and expand it to length of 14 with spaces
 
-    versions->current.franz.toString(ver);      // get single version
-    str = ver;                                  // put it in string
-    str.resize(14, ' ');                        // and expand it to length of 14 with spaces
-    versions->onServer.franz.toString(ver);     // get another single version
-    str += ver;                                 // append it to the previous version string
-    setTextByComponentId(COMPID_UPDATE_FRANZ, str);     // set it to component
-
-    versions->current.hans.toString(ver);       // get single version
-    str = ver;                                  // put it in string
-    str.resize(14, ' ');                        // and expand it to length of 14 with spaces
-    versions->onServer.hans.toString(ver);      // get another single version
-    str += ver;                                 // append it to the previous version string
-    setTextByComponentId(COMPID_UPDATE_HANZ, str);     // set it to component
-
-    versions->current.xilinx.toString(ver);     // get single version
-    str = ver;                                  // put it in string
-    str.resize(14, ' ');                        // and expand it to length of 14 with spaces
-    versions->onServer.xilinx.toString(ver);    // get another single version
-    str += ver;                                 // append it to the previous version string
-    setTextByComponentId(COMPID_UPDATE_XILINX, str);     // set it to component
+    if(v1.isEqualTo(v2)) {      // if the other version is the same as the first, just write some info
+        str += "the same";
+    } else {                    // if the versions are different, write the other version
+        v2.toString(ver);       // get another single version
+        str += ver;             // append it to the previous version string
+    }
 }
 
 void ConfigStream::onUpdateCheck(void)

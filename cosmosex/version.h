@@ -26,6 +26,7 @@ public:
     void toString(char *str);
 
     bool isOlderThan(const Version &other);
+    bool isEqualTo(const Version &other);
 private:
     int year;
     int month;
