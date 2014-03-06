@@ -7,6 +7,11 @@
 #include "global.h"
 #include "version.h"
 
+#define UPDATE_STATE_IDLE           0
+#define UPDATE_STATE_DOWNLOADING    1
+#define UPDATE_STATE_DOWNLOAD_OK    2
+#define UPDATE_STATE_DOWNLOAD_FAIL  3
+
 class Update
 {
 public:
@@ -19,12 +24,16 @@ public:
     static void downloadNewComponents(void);
     static bool allNewComponentsDownloaded(void);
 
+    static int  state(void);
+    static void stateGoIdle(void);
+
 private:
     static void deleteLocalComponent(std::string url);
     static void startComponentDownloadIfNewer(Version &vLocal, Version &vServer);
     static void getLocalPathFromUrl(std::string url, std::string &localPath);
     static bool isUpToDateOrUpdateDownloaded(Version &vLocal, Version &vServer);
 
+    static int currentState;
 };
 
 #endif // CCORETHREAD_H

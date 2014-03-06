@@ -112,7 +112,7 @@ static void formatStatus(TDownloadRequest &tdr, std::string &line)
     line = fileName + percString;
 }
 
-void downloadStatus(std::string &status, int downloadType)
+void downloadStatus(std::string &status, int downloadTypeMask)
 {
 	pthread_mutex_lock(&downloadThreadMutex);				// try to lock the mutex
 
@@ -124,10 +124,8 @@ void downloadStatus(std::string &status, int downloadType)
     for(int i=0; i<cnt; i++) {
         TDownloadRequest &tdr = downloadQueue[i];
 
-        if(downloadType != DWNTYPE_ANY) {               // if we should check for type
-            if(downloadType != tdr.downloadType) {      // and the type doesn't match, skip this
-                continue;
-            }
+        if((tdr.downloadType & downloadTypeMask) == 0) {    // if the mask doesn't match the download type, skip it
+            continue;
         }
 
         formatStatus(tdr, line);
@@ -136,21 +134,43 @@ void downloadStatus(std::string &status, int downloadType)
 
     // and for the currently downloaded thing
     if(downloadCurrent.downPercent < 100) {
-        bool addCurrent = true;
-
-        if(downloadType != DWNTYPE_ANY) {                           // if we should check for type
-            if(downloadType != downloadCurrent.downloadType) {      // and the type doesn't match, skip this
-                addCurrent = false;
-            }
-        }
-
-        if(addCurrent) {                                            // if we should add current (type matches)
+        if((downloadCurrent.downloadType & downloadTypeMask) != 0) {    // if the mask matches the download type, add it
             formatStatus(downloadCurrent, line);
             status += line + "\n";
         }
     }
 
 	pthread_mutex_unlock(&downloadThreadMutex);			    // unlock the mutex
+}
+
+int downloadCount(int downloadTypeMask)
+{
+	pthread_mutex_lock(&downloadThreadMutex);				// try to lock the mutex
+
+    int typeCnt = 0;
+
+    // create status reports for things waiting to be downloaded
+    int cnt = downloadQueue.size();
+    for(int i=0; i<cnt; i++) {
+        TDownloadRequest &tdr = downloadQueue[i];
+
+        if((tdr.downloadType & downloadTypeMask) == 0) {    // if the mask doesn't match the download type, skip it
+            continue;
+        }
+
+        typeCnt++;                                          // increment count
+    }    
+
+    // and for the currently downloaded thing
+    if(downloadCurrent.downPercent < 100) {
+        if((downloadCurrent.downloadType & downloadTypeMask) != 0) {    // if the mask matches the download type, add it
+            typeCnt++;                                      // increment count
+        }
+    }
+
+	pthread_mutex_unlock(&downloadThreadMutex);			    // unlock the mutex
+
+    return typeCnt;
 }
 
 void *downloadThreadCode(void *ptr)

@@ -3,10 +3,12 @@
 
 #include <string>
 
-#define DWNTYPE_ANY         0xff
-#define DWNTYPE_UNKNOWN     0
-#define DWNTYPE_UPDATE      1
-#define DWNTYPE_FLOPPYIMG   2
+#define DWNTYPE_ANY             0xff
+#define DWNTYPE_UNKNOWN         0
+#define DWNTYPE_UPDATE_LIST     1     
+#define DWNTYPE_UPDATE_COMP     2
+#define DWNTYPE_FLOPPYIMG_LIST  4
+#define DWNTYPE_FLOPPYIMG       8
 
 typedef struct {
     std::string srcUrl;         // src url, e.g. http://whatever.com/file.zip
@@ -19,8 +21,9 @@ typedef struct {
 void downloadInitBeforeThreads(void);
 void downloadCleanupBeforeQuit(void);
 
+int  downloadCount(int downloadTypeMask);
 void downloadAdd(TDownloadRequest &tdr);
-void downloadStatus(std::string &status, int downloadType);
+void downloadStatus(std::string &status, int downloadTypeMask);
 void *downloadThreadCode(void *ptr);
 
 #endif

@@ -16,6 +16,7 @@
 #include "update.h"
 
 #define DEV_CHECK_TIME_MS	3000
+#define UPDATE_CHECK_TIME   1000
 
 CCoreThread::CCoreThread()
 {
@@ -75,7 +76,8 @@ void CCoreThread::run(void)
     loadSettings();
 //	Utils::resetHansAndFranz();
 	
-	DWORD nextDevFindTime = Utils::getCurrentMs();	// create a time when the devices should be checked - and that time is now
+	DWORD nextDevFindTime       = Utils::getCurrentMs();    // create a time when the devices should be checked - and that time is now
+    DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);  // create a time when update download status should be checked
 
 	mountAndAttachSharedDrive();					// if shared drive is enabled, try to mount it and attach it
 	
@@ -110,23 +112,54 @@ void CCoreThread::run(void)
 #endif
 
     while(sigintReceived == 0) {
-		bool gotAtn = false;						    // no ATN received yet?
+		bool gotAtn = false;						                    // no ATN received yet?
 		
-		if(Utils::getCurrentMs() >= nextDevFindTime) {	// should we check for the new devices?
-			devFinder.lookForDevChanges();				// look for devices attached / detached
+        // should we check for the new devices?
+		if(Utils::getCurrentMs() >= nextDevFindTime) {	                
+			devFinder.lookForDevChanges();				                // look for devices attached / detached
 			
 			nextDevFindTime = Utils::getEndTime(DEV_CHECK_TIME_MS);		// update the time when devices should be checked
 
-            if(!Update::versions.updateListWasProcessed) {         // if didn't process update list yet
+            if(!Update::versions.updateListWasProcessed) {              // if didn't process update list yet
                 Update::processUpdateList();
 
-                if(Update::versions.updateListWasProcessed) {      // if we processed the list, update config stream
+                if(Update::versions.updateListWasProcessed) {           // if we processed the list, update config stream
                     confStream->fillUpdateWithCurrentVersions();        // if the config screen is shown, then update info on it
                 }
             }
 		}
 
-		res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);		// check for any ATN code waiting from Hans
+        // should check the update status? 
+        if(Utils::getCurrentMs() >= nextUpdateCheckTime) {              
+            nextUpdateCheckTime   = Utils::getEndTime(UPDATE_CHECK_TIME);   // update the time when we should check update status again
+
+            int updateState = Update::state();                              // get the update state
+            switch(updateState) {  
+                case UPDATE_STATE_DOWNLOADING:
+
+                // TODO: refresh config screen with download status
+
+                break;
+
+                //-----------
+                case UPDATE_STATE_DOWNLOAD_FAIL:
+
+                // TODO: show fail message on config screen
+
+                Update::stateGoIdle();
+                break;
+
+                //-----------
+                case UPDATE_STATE_DOWNLOAD_OK:
+
+                 // TODO: quit the app and do the update
+
+                break;
+            }
+        }
+
+        // check for any ATN code waiting from Hans
+		res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);		
 
 		if(res) {									    // HANS is signaling attention?
 			gotAtn = true;							    // we've some ATN
@@ -146,7 +179,8 @@ void CCoreThread::run(void)
 			}
 		}
 		
-		res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuff);		// check for any ATN code waiting from Franz
+        // check for any ATN code waiting from Franz
+		res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuff);		
 		if(res) {									// FRANZ is signaling attention?
 			gotAtn = true;							// we've some ATN
 

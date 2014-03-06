@@ -12,6 +12,7 @@
 #include "update.h"
 
 Versions Update::versions;
+int Update::currentState = UPDATE_STATE_IDLE;
 
 void Update::initialize(void)
 {
@@ -20,6 +21,8 @@ void Update::initialize(void)
     Update::versions.current.imglist.fromFirstLineOfFile(   (char *) IMAGELIST_FILE);
     Update::versions.updateListWasProcessed = false;
     Update::versions.gotUpdate              = false;
+
+    Update::currentState = UPDATE_STATE_IDLE;
 }
 
 void Update::processUpdateList(void)
@@ -118,8 +121,9 @@ void Update::processUpdateList(void)
         Debug::out("processUpdateList - IMAGE LIST is newer on server, doing silent update...");
 
         TDownloadRequest tdr;
-        tdr.srcUrl = Update::versions.onServer.imglist.getUrl();
-        tdr.dstDir = "";
+        tdr.srcUrl          = Update::versions.onServer.imglist.getUrl();
+        tdr.dstDir          = "";
+        tdr.downloadType    = DWNTYPE_FLOPPYIMG_LIST;
         downloadAdd(tdr);
     }
 
@@ -145,8 +149,9 @@ void Update::downloadUpdateList(void)
 
     // add request for download of the update list
     TDownloadRequest tdr;
-    tdr.srcUrl = UPDATE_REMOTEURL;
-    tdr.dstDir = UPDATE_LOCALPATH;
+    tdr.srcUrl          = UPDATE_REMOTEURL;
+    tdr.dstDir          = UPDATE_LOCALPATH;
+    tdr.downloadType    = DWNTYPE_UPDATE_LIST;
     downloadAdd(tdr);
 }
 
@@ -168,6 +173,9 @@ void Update::downloadNewComponents(void)
     startComponentDownloadIfNewer(Update::versions.current.hans,    Update::versions.onServer.hans);
     startComponentDownloadIfNewer(Update::versions.current.xilinx,  Update::versions.onServer.xilinx);
     startComponentDownloadIfNewer(Update::versions.current.franz,   Update::versions.onServer.franz);
+
+    // new state - we're downloading the update
+    Update::currentState = UPDATE_STATE_DOWNLOADING;
 }
 
 bool Update::allNewComponentsDownloaded(void)
@@ -223,8 +231,9 @@ void Update::startComponentDownloadIfNewer(Version &vLocal, Version &vServer)
 
     // start the download
     TDownloadRequest tdr;
-    tdr.srcUrl = vServer.getUrl();
-    tdr.dstDir = UPDATE_LOCALPATH;
+    tdr.srcUrl          = vServer.getUrl();
+    tdr.dstDir          = UPDATE_LOCALPATH;
+    tdr.downloadType    = DWNTYPE_UPDATE_COMP;
     downloadAdd(tdr);
 }
 
@@ -238,5 +247,38 @@ void Update::getLocalPathFromUrl(std::string url, std::string &localPath)
 
     localPath = finalFile;
 }
+
+int Update::state(void)
+{
+    if(currentState == UPDATE_STATE_IDLE) {                 // when idle, just return idle
+        return UPDATE_STATE_IDLE;
+    }
+
+    if(currentState == UPDATE_STATE_DOWNLOADING) {          // when downloading, check if really still downloading
+        int cnt = downloadCount(DWNTYPE_UPDATE_COMP);       // get count of downloaded components
+
+        if(cnt == 0) {                                      // nothing is downloaded anymore?      
+            bool allOk = allNewComponentsDownloaded();      // check if everything went OK
+
+            if(allOk) {                                     // if all OK, then we're ready to apply update
+                currentState = UPDATE_STATE_DOWNLOAD_OK;
+            } else {                                        // fail? fail!
+                currentState = UPDATE_STATE_DOWNLOAD_FAIL;
+            }
+        }
+
+        return currentState;                                // return the current state (might be already updated)
+    }
+
+    // if we got here, the download was finished, return that state
+    return currentState;
+}
+
+void Update::stateGoIdle(void)
+{
+    currentState = UPDATE_STATE_IDLE;
+}
+
+
 
 
