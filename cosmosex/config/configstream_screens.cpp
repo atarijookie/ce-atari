@@ -740,7 +740,7 @@ void ConfigStream::fillUpdateDownloadWithProgress(void)
     std::string status, l1, l2, l3, l4;
 
     // get the current download status
-    downloadStatus(status, DWNTYPE_UPDATE_COMP);
+    Downloader::status(status, DWNTYPE_UPDATE_COMP);
 
     // split it to lines
     getProgressLine(0, status, l1);

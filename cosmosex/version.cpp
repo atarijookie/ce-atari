@@ -143,4 +143,10 @@ std::string Version::getUrl(void)
     return url;
 }
 
+WORD Version::getChecksum(void)
+{
+    return checksum;
+}
+
+
 

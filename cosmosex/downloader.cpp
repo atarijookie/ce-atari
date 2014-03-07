@@ -29,15 +29,138 @@ pthread_mutex_t downloadThreadMutex = PTHREAD_MUTEX_INITIALIZER;
 std::vector<TDownloadRequest>   downloadQueue;
 TDownloadRequest                downloadCurrent;
 
-void downloadInitBeforeThreads(void)
+void Downloader::initBeforeThreads(void)
 {
     curl_global_init(CURL_GLOBAL_ALL);                  // curl global init, must be called before any other threads start (not only curl threads)
     downloadCurrent.downPercent = 100;                  // mark that the current download is downloaded (shouldn't display it in status)
 }
 
-void downloadCleanupBeforeQuit(void)
+void Downloader::cleanupBeforeQuit(void)
 {
     curl_global_cleanup();                              // curl global clean up, at the end...
+}
+
+void Downloader::add(TDownloadRequest &tdr)
+{
+	pthread_mutex_lock(&downloadThreadMutex);				// try to lock the mutex
+    tdr.downPercent = 0;                                    // mark that the download didn't start
+	downloadQueue.push_back(tdr);   						// add this to queue
+	pthread_mutex_unlock(&downloadThreadMutex);			    // unlock the mutex
+}
+
+void Downloader::formatStatus(TDownloadRequest &tdr, std::string &line)
+{
+    char percString[16];
+
+    std::string urlPath, fileName; 
+    Utils::splitFilenameFromPath(tdr.srcUrl, urlPath, fileName);
+
+    if(fileName.length() < 20) {                            // filename too short? extend to 20 chars with spaces
+        fileName.resize(20, ' ');
+    } else if(fileName.length() > 20) {                     // longer than 20 chars? make it shorter, add ... at the end
+        fileName.resize(20);
+        fileName.replace(17, 3, "...");
+    }
+
+    sprintf(percString, " % 3d %%", tdr.downPercent);
+
+    line = fileName + percString;
+}
+
+void Downloader::status(std::string &status, int downloadTypeMask)
+{
+	pthread_mutex_lock(&downloadThreadMutex);				// try to lock the mutex
+
+    std::string line;
+    status.clear();
+
+    // create status reports for things waiting to be downloaded
+    int cnt = downloadQueue.size();
+    for(int i=0; i<cnt; i++) {
+        TDownloadRequest &tdr = downloadQueue[i];
+
+        if((tdr.downloadType & downloadTypeMask) == 0) {    // if the mask doesn't match the download type, skip it
+            continue;
+        }
+
+        formatStatus(tdr, line);
+        status += line + "\n";
+    }    
+
+    // and for the currently downloaded thing
+    if(downloadCurrent.downPercent < 100) {
+        if((downloadCurrent.downloadType & downloadTypeMask) != 0) {    // if the mask matches the download type, add it
+            formatStatus(downloadCurrent, line);
+            status += line + "\n";
+        }
+    }
+
+	pthread_mutex_unlock(&downloadThreadMutex);			    // unlock the mutex
+}
+
+int Downloader::count(int downloadTypeMask)
+{
+	pthread_mutex_lock(&downloadThreadMutex);				// try to lock the mutex
+
+    int typeCnt = 0;
+
+    // create status reports for things waiting to be downloaded
+    int cnt = downloadQueue.size();
+    for(int i=0; i<cnt; i++) {
+        TDownloadRequest &tdr = downloadQueue[i];
+
+        if((tdr.downloadType & downloadTypeMask) == 0) {    // if the mask doesn't match the download type, skip it
+            continue;
+        }
+
+        typeCnt++;                                          // increment count
+    }    
+
+    // and for the currently downloaded thing
+    if(downloadCurrent.downPercent < 100) {
+        if((downloadCurrent.downloadType & downloadTypeMask) != 0) {    // if the mask matches the download type, add it
+            typeCnt++;                                      // increment count
+        }
+    }
+
+	pthread_mutex_unlock(&downloadThreadMutex);			    // unlock the mutex
+
+    return typeCnt;
+}
+
+bool Downloader::verifyChecksum(char *filename, WORD checksum)
+{
+    if(checksum == 0) {                 // special case - when checksum is 0, don't check it buy say that it's OK
+        return true;
+    }
+
+    FILE *f = fopen(filename, "rb");
+
+    if(!f) {
+        return false;
+    }
+
+    WORD cs = 0;
+    WORD val, val2;
+
+    while(!feof(f)) {                       // for whole file
+        val = (BYTE) fgetc(f);              // get upper byte
+        val = val << 8;
+
+        if(!feof(f)) {                      // if not end of file
+            val2 = (BYTE) fgetc(f);         // read lowe byte from file
+        } else {
+            val2 = 0;                       // if end of file, put a 0 there
+        }
+
+        val = val | val2;                   // create a word out of it
+
+        cs += val;                          // add it to checksum
+    }
+
+    fclose(f);
+
+    return (checksum == cs);                // return if the calculated cs is equal to the provided cs
 }
 
 static size_t my_write_func(void *ptr, size_t size, size_t nmemb, FILE *stream)
@@ -81,96 +204,7 @@ static int my_progress_func(void *clientp, double downTotal, double downNow, dou
     	pthread_mutex_unlock(&downloadThreadMutex);			    // unlock the mutex
     }
     
-//    Debug::out("%d %%", percI);
     return abortTransfer;                                       // return 0 to continue transfer, or non-0 to abort transfer
-}
-
-void downloadAdd(TDownloadRequest &tdr)
-{
-	pthread_mutex_lock(&downloadThreadMutex);				// try to lock the mutex
-    tdr.downPercent = 0;                                    // mark that the download didn't start
-	downloadQueue.push_back(tdr);   						// add this to queue
-	pthread_mutex_unlock(&downloadThreadMutex);			    // unlock the mutex
-}
-
-static void formatStatus(TDownloadRequest &tdr, std::string &line)
-{
-    char percString[16];
-
-    std::string urlPath, fileName; 
-    Utils::splitFilenameFromPath(tdr.srcUrl, urlPath, fileName);
-
-    if(fileName.length() < 20) {                            // filename too short? extend to 20 chars with spaces
-        fileName.resize(20, ' ');
-    } else if(fileName.length() > 20) {                     // longer than 20 chars? make it shorter, add ... at the end
-        fileName.resize(20);
-        fileName.replace(17, 3, "...");
-    }
-
-    sprintf(percString, " % 3d %%", tdr.downPercent);
-
-    line = fileName + percString;
-}
-
-void downloadStatus(std::string &status, int downloadTypeMask)
-{
-	pthread_mutex_lock(&downloadThreadMutex);				// try to lock the mutex
-
-    std::string line;
-    status.clear();
-
-    // create status reports for things waiting to be downloaded
-    int cnt = downloadQueue.size();
-    for(int i=0; i<cnt; i++) {
-        TDownloadRequest &tdr = downloadQueue[i];
-
-        if((tdr.downloadType & downloadTypeMask) == 0) {    // if the mask doesn't match the download type, skip it
-            continue;
-        }
-
-        formatStatus(tdr, line);
-        status += line + "\n";
-    }    
-
-    // and for the currently downloaded thing
-    if(downloadCurrent.downPercent < 100) {
-        if((downloadCurrent.downloadType & downloadTypeMask) != 0) {    // if the mask matches the download type, add it
-            formatStatus(downloadCurrent, line);
-            status += line + "\n";
-        }
-    }
-
-	pthread_mutex_unlock(&downloadThreadMutex);			    // unlock the mutex
-}
-
-int downloadCount(int downloadTypeMask)
-{
-	pthread_mutex_lock(&downloadThreadMutex);				// try to lock the mutex
-
-    int typeCnt = 0;
-
-    // create status reports for things waiting to be downloaded
-    int cnt = downloadQueue.size();
-    for(int i=0; i<cnt; i++) {
-        TDownloadRequest &tdr = downloadQueue[i];
-
-        if((tdr.downloadType & downloadTypeMask) == 0) {    // if the mask doesn't match the download type, skip it
-            continue;
-        }
-
-        typeCnt++;                                          // increment count
-    }    
-
-    // and for the currently downloaded thing
-    if(downloadCurrent.downPercent < 100) {
-        if((downloadCurrent.downloadType & downloadTypeMask) != 0) {    // if the mask matches the download type, add it
-            typeCnt++;                                      // increment count
-        }
-    }
-
-	pthread_mutex_unlock(&downloadThreadMutex);			    // unlock the mutex
-
-    return typeCnt;
 }
 
 void *downloadThreadCode(void *ptr)
@@ -234,12 +268,24 @@ void *downloadThreadCode(void *ptr)
         fclose(outfile);
 
         if(cres == CURLE_OK) {                               // if download went OK
-            res = rename(tmpFile.c_str(), finalFile.c_str());
+            bool b = Downloader::verifyChecksum((char *) tmpFile.c_str(), downloadCurrent.checksum);
 
-            if(res != 0) {
-                Debug::out("Downloader - failed to rename %s to %s after download", (char *) tmpFile.c_str(), (char *) finalFile.c_str());
+            if(b) {         // checksum is OK? 
+                res = rename(tmpFile.c_str(), finalFile.c_str());
+
+                if(res != 0) {
+                    Debug::out("Downloader - failed to rename %s to %s after download", (char *) tmpFile.c_str(), (char *) finalFile.c_str());
+                } else {
+                    Debug::out("Downloader - file %s was downloaded with success.", (char *) downloadCurrent.srcUrl.c_str());
+                }
             } else {
-                Debug::out("Downloader - file %s was downloaded with success.", (char *) downloadCurrent.srcUrl.c_str());
+                res = remove(tmpFile.c_str());
+
+                if(res == 0) {
+                    Debug::out("Downloader - file %s was downloaded, but verifyChecksum() failed, so file %s was deleted.", (char *) tmpFile.c_str(), (char *) tmpFile.c_str());
+                } else {
+                    Debug::out("Downloader - file %s was downloaded, but verifyChecksum() failed, and then failed to delete that file.", (char *) tmpFile.c_str());
+                }
             }
 
             downloadCurrent.downPercent = 100;
@@ -260,4 +306,5 @@ void *downloadThreadCode(void *ptr)
 	Debug::out("Download thread finished.");
     return 0;
 }
+
 

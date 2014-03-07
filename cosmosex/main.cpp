@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-    downloadInitBeforeThreads();
+    Downloader::initBeforeThreads();
 
     core = new CCoreThread();
 
@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
 	pthread_join(mountThreadInfo, NULL);				// wait until mount thread finishes
     pthread_join(downloadThreadInfo, NULL);             // wait until downloadThread finishes
 	
-    downloadCleanupBeforeQuit();
+    Downloader::cleanupBeforeQuit();
 
     Debug::out("CosmosEx terminated.");
     return 0;

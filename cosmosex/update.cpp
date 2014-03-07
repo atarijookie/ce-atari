@@ -122,9 +122,10 @@ void Update::processUpdateList(void)
 
         TDownloadRequest tdr;
         tdr.srcUrl          = Update::versions.onServer.imglist.getUrl();
+        tdr.checksum        = Update::versions.onServer.imglist.getChecksum();
         tdr.dstDir          = "";
         tdr.downloadType    = DWNTYPE_FLOPPYIMG_LIST;
-        downloadAdd(tdr);
+        Downloader::add(tdr);
     }
 
     Update::versions.updateListWasProcessed = true;         // mark that the update list was processed and don't need to do this again
@@ -152,7 +153,8 @@ void Update::downloadUpdateList(void)
     tdr.srcUrl          = UPDATE_REMOTEURL;
     tdr.dstDir          = UPDATE_LOCALPATH;
     tdr.downloadType    = DWNTYPE_UPDATE_LIST;
-    downloadAdd(tdr);
+    tdr.checksum        = 0;                        // special case - don't check checsum
+    Downloader::add(tdr);
 }
 
 void Update::downloadNewComponents(void)
@@ -232,9 +234,10 @@ void Update::startComponentDownloadIfNewer(Version &vLocal, Version &vServer)
     // start the download
     TDownloadRequest tdr;
     tdr.srcUrl          = vServer.getUrl();
+    tdr.checksum        = vServer.getChecksum();
     tdr.dstDir          = UPDATE_LOCALPATH;
     tdr.downloadType    = DWNTYPE_UPDATE_COMP;
-    downloadAdd(tdr);
+    Downloader::add(tdr);
 }
 
 void Update::getLocalPathFromUrl(std::string url, std::string &localPath)
@@ -255,7 +258,7 @@ int Update::state(void)
     }
 
     if(currentState == UPDATE_STATE_DOWNLOADING) {          // when downloading, check if really still downloading
-        int cnt = downloadCount(DWNTYPE_UPDATE_COMP);       // get count of downloaded components
+        int cnt = Downloader::count(DWNTYPE_UPDATE_COMP);       // get count of downloaded components
 
         if(cnt == 0) {                                      // nothing is downloaded anymore?      
             bool allOk = allNewComponentsDownloaded();      // check if everything went OK

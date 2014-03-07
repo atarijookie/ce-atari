@@ -2,6 +2,7 @@
 #define _VERSION_H_
 
 #include <string>
+#include "datatypes.h"
 
 #define UPDATE_REMOTEURL    "http://joo.kie.sk/cosmosex/update/updatelist.csv"
 #define UPDATE_LOCALPATH    "update"
@@ -22,6 +23,7 @@ public:
 
     void        setUrlAndChecksum(char *pUrl, char *chs);
     std::string getUrl(void);
+    WORD        getChecksum(void);
 
     void toString(char *str);
 
@@ -34,7 +36,7 @@ private:
     int day;
 
     std::string url;
-    int         checksum;
+    WORD        checksum;
 };
 
 typedef struct {
