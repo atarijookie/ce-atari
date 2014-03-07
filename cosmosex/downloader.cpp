@@ -131,12 +131,14 @@ int Downloader::count(int downloadTypeMask)
 bool Downloader::verifyChecksum(char *filename, WORD checksum)
 {
     if(checksum == 0) {                 // special case - when checksum is 0, don't check it buy say that it's OK
+        Debug::out("Downloader::verifyChecksum - file %s -- supplied 0 as checksum, so not doing checksum and returning that checksum is OK", filename);
         return true;
     }
 
     FILE *f = fopen(filename, "rb");
 
     if(!f) {
+        Debug::out("Downloader::verifyChecksum - file %s -- failed to open file, checksum failed", filename);
         return false;
     }
 
@@ -160,7 +162,10 @@ bool Downloader::verifyChecksum(char *filename, WORD checksum)
 
     fclose(f);
 
-    return (checksum == cs);                // return if the calculated cs is equal to the provided cs
+    bool checksumIsGood = (checksum == cs);
+    Debug::out("Downloader::verifyChecksum - file %s -- checksum is good: %d", filename, (int) checksumIsGood);
+
+    return checksumIsGood;                // return if the calculated cs is equal to the provided cs
 }
 
 static size_t my_write_func(void *ptr, size_t size, size_t nmemb, FILE *stream)
