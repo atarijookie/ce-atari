@@ -307,7 +307,7 @@ bool Update::createUpdateScript(void)
         Update::getLocalPathFromUrl(Update::versions.onServer.hans.getUrl(), fwFile);
 
         fprintf(f, "# updgrade of Hans FW\n");
-        fprintf(f, "./stm32flash -x %s\n", (char *) fwFile.c_str());
+        fprintf(f, "./stm32flash -x -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());
         fprintf(f, "\n");
     }
 
@@ -325,7 +325,7 @@ bool Update::createUpdateScript(void)
         Update::getLocalPathFromUrl(Update::versions.onServer.franz.getUrl(), fwFile);
 
         fprintf(f, "# updgrade of Franz FW\n");
-        fprintf(f, "./stm32flash -y %s\n", (char *) fwFile.c_str());
+        fprintf(f, "./stm32flash -y -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());
         fprintf(f, "\n");
     }
 
