@@ -580,45 +580,47 @@ void ConfigStream::createScreen_update(void)
     comp->setReverse(true);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Main App", 12, 1, 10, gotoOffset);
+	int col1 = 1, col2 = 13;
+		
+    comp = new ConfigComponent(this, ConfigComponent::label, "Main App", 12,	col1, 10, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 24, 10, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, 10, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_COSMOSEX);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Franz", 12, 1, 11, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Franz", 12, 		col1, 11, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 24, 11, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 			col2, 11, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_FRANZ);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Hans", 12, 1, 12, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Hans", 12,		col1, 12, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 24, 12, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, 12, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_HANZ);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Xilinx", 12, 1, 13, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Xilinx", 12,		col1, 13, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 24, 13, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, 13, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_XILINX);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Check ", 8,  4, 15, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Check ", 7,  3, 15, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_CHECK);
     comp->setComponentId(COMPID_UPDATE_BTN_CHECK);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Update ", 8,  15, 15, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Update ", 8,  14, 15, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_UPDATE);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, 27, 15, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, 26, 15, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
@@ -666,13 +668,13 @@ void ConfigStream::onUpdateCheck(void)
     Update::versions.updateListWasProcessed = false;   // mark that the new update list wasn't updated
     Update::downloadUpdateList();               // download the list of components with the newest available versions
 
-    showMessageScreen((char *) "Checking for updates", (char *) "Now checking for updates.\nPlease wait few seconds.");
+    showMessageScreen((char *) "Checking for updates", (char *) "Now checking for updates.\n\rPlease wait few seconds.");
 }
 
 void ConfigStream::onUpdateUpdate(void)
 {
     if(!Update::versions.updateListWasProcessed) {     // didn't process the update list yet? show message
-        showMessageScreen((char *) "No updates info", (char *) "No update info was downloaded,\nplease press 'Check' button and wait.");
+        showMessageScreen((char *) "No updates info", (char *) "No update info was downloaded,\n\rplease press 'Check' button and wait.");
         return;
     }
 

@@ -57,7 +57,7 @@ void ConfigStream::createScreen_floppy_config(void)
     comp->setCheckboxGroupIds(COMPID_FLOPCONF_ID, 1);																// set checkbox group id to COMPID_FLOPCONF_ID, and checbox id to drive ID
     screen.push_back(comp);
 
-    row += 2;
+    row += 3;
 
     comp = new ConfigComponent(this, ConfigComponent::label, "Write protected", 15, col1, row, gotoOffset);
     screen.push_back(comp);
@@ -68,7 +68,7 @@ void ConfigStream::createScreen_floppy_config(void)
 
     row = 20;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Save ", 8,  9, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Save ", 6,  9, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_FLOPPY_CONFIG_SAVE);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
