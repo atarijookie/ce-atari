@@ -60,6 +60,7 @@ public:
     void fillUpdateDownloadWithProgress(void);
     void showUpdateDownloadFail(void);
     bool isUpdateDownloadPageShown(void);
+    void showUpdateError(void);
 
     // functions which are called from various components
     int  checkboxGroup_getCheckedId(int groupId);

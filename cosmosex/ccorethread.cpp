@@ -151,7 +151,13 @@ void CCoreThread::run(void)
                 if(!confStream->isUpdateDownloadPageShown()) {              // if user is NOT waiting on download page (cancel pressed), don't update
                     Update::stateGoIdle();
                 } else {                                                    // if user is waiting on download page, aplly update
-                    // TODO: quit the app and do the update
+                    res = Update::createUpdateScript();
+
+                    if(!res) {
+                        confStream->showUpdateError();
+                    } else {
+                        // TODO: quit the app and do the update
+                    }
                 }
 
                 break;

@@ -801,6 +801,18 @@ void ConfigStream::showUpdateDownloadFail(void)
     showMessageScreen((char *) "Update download fail", (char *) "Failed to download the update,\nplease try again later.");
 }
 
+void ConfigStream::showUpdateError(void)
+{
+    // check if we're on update download page
+    if(!isUpdateDownloadPageShown()) {
+        return;
+    }
+
+    // ok, so we're on update donload page... go back to update page and show error
+    createScreen_update();
+    showMessageScreen((char *) "Update fail", (char *) "Failed to do the update.\n");
+}
+
 bool ConfigStream::isUpdateDownloadPageShown(void)
 {
     ConfigComponent *c = findComponentById(COMPID_DL1); // find a component which is on update download page

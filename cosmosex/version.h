@@ -4,10 +4,6 @@
 #include <string>
 #include "datatypes.h"
 
-#define UPDATE_REMOTEURL    "http://joo.kie.sk/cosmosex/update/updatelist.csv"
-#define UPDATE_LOCALPATH    "update"
-#define UPDATE_LOCALLIST    "update/updatelist.csv"
-
 #define XILINX_VERSION_FILE "update/xilinx_current.txt"
 #define IMAGELIST_FILE      "imagelist.csv"
 #define APP_VERSION         "2014-03-04"

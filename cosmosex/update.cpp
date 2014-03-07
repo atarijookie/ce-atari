@@ -258,7 +258,7 @@ int Update::state(void)
     }
 
     if(currentState == UPDATE_STATE_DOWNLOADING) {          // when downloading, check if really still downloading
-        int cnt = Downloader::count(DWNTYPE_UPDATE_COMP);       // get count of downloaded components
+        int cnt = Downloader::count(DWNTYPE_UPDATE_COMP);   // get count of downloaded components
 
         if(cnt == 0) {                                      // nothing is downloaded anymore?      
             bool allOk = allNewComponentsDownloaded();      // check if everything went OK
@@ -280,6 +280,57 @@ int Update::state(void)
 void Update::stateGoIdle(void)
 {
     currentState = UPDATE_STATE_IDLE;
+}
+
+bool Update::createUpdateScript(void)
+{
+    FILE *f = fopen(UPDATE_SCRIPT, "wt");
+
+    if(!f) {
+        Debug::out("Update::createUpdateScript failed to create update script - %s", UPDATE_SCRIPT);
+        return false;
+    }
+
+    if(Update::versions.current.app.isOlderThan( Update::versions.onServer.app )) {
+        std::string appFile;
+        Update::getLocalPathFromUrl(Update::versions.onServer.app.getUrl(), appFile);
+
+        fprintf(f, "# updgrade of application\n");
+        fprintf(f, "rm -rf %s\n", (char *)              UPDATE_APP_PATH);
+        fprintf(f, "unzip %s\n", (char *)               appFile.c_str());
+        fprintf(f, "chmod 777 %s/cosmosex\n", (char *)  UPDATE_APP_PATH);
+        fprintf(f, "\n");
+    }
+
+    if(Update::versions.current.hans.isOlderThan( Update::versions.onServer.hans )) {
+        std::string fwFile;
+        Update::getLocalPathFromUrl(Update::versions.onServer.hans.getUrl(), fwFile);
+
+        fprintf(f, "# updgrade of Hans FW\n");
+        fprintf(f, "./stm32flash -x %s\n", (char *) fwFile.c_str());
+        fprintf(f, "\n");
+    }
+
+    if(Update::versions.current.xilinx.isOlderThan( Update::versions.onServer.xilinx )) {
+        std::string fwFile;
+        Update::getLocalPathFromUrl(Update::versions.onServer.xilinx.getUrl(), fwFile);
+
+        fprintf(f, "# updgrade of Xilinx FW\n");
+        fprintf(f, "./flash_xilinx %s\n", (char *) fwFile.c_str());
+        fprintf(f, "\n");
+    }
+
+    if(Update::versions.current.franz.isOlderThan( Update::versions.onServer.franz )) {
+        std::string fwFile;
+        Update::getLocalPathFromUrl(Update::versions.onServer.franz.getUrl(), fwFile);
+
+        fprintf(f, "# updgrade of Franz FW\n");
+        fprintf(f, "./stm32flash -y %s\n", (char *) fwFile.c_str());
+        fprintf(f, "\n");
+    }
+
+    fclose(f);
+    return true;
 }
 
 
