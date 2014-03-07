@@ -312,7 +312,12 @@ void ConfigStream::showMessageScreen(char *msgTitle, char *msgTxt)
 
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, msgTxt, 240, 0, 10, gotoOffset);
+    int labelX = 0, labelY = 10;
+
+    std::string msgTxt2 = msgTxt;
+    replaceNewLineWithGoto(msgTxt2, labelX + gotoOffset, labelY);           // this will replace all \n with VT52 goto command
+
+    comp = new ConfigComponent(this, ConfigComponent::label, msgTxt2.c_str(), 240, labelX, labelY, gotoOffset);
     message.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::button, " OK ", 4, 17, 20, gotoOffset);
@@ -601,6 +606,42 @@ bool ConfigStream::verifyAndFixIPaddress(std::string &in, std::string &out, bool
     out = ip;
 
     return true;
+}
+
+void ConfigStream::replaceNewLineWithGoto(std::string &line, int startX, int startY)
+{
+    char gotoCmd[5];
+    gotoCmd[0] = 27;
+    gotoCmd[1] = 'Y';
+    gotoCmd[4] = 0;
+
+    startY++;                               // first goto will be in the next line, not in the same line this started
+
+    // find \n and replace it with VT52 goto command
+    while(1) {
+        size_t pos = line.find("\n");       // find new line char
+
+        if(pos == std::string::npos) {      // not found? quit
+            break;
+        }
+
+        gotoCmd[2] = ' ' + startY;          // update the GOTO coordinates
+        gotoCmd[3] = ' ' + startX;
+        startY++;
+
+        line.replace(pos, 1, gotoCmd);      // replace this \n with GOTO 
+    }
+
+    // find \r and remove it
+    while(1) {
+        size_t pos = line.find("\r");
+
+        if(pos == std::string::npos) {      // not found? quit
+            break;
+        }
+
+        line.replace(pos, 1, "");           // replace this \r with empty string 
+    }
 }
 
 

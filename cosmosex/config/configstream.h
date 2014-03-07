@@ -57,6 +57,9 @@ public:
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
     void fillUpdateWithCurrentVersions(void);
+    void fillUpdateDownloadWithProgress(void);
+    void showUpdateDownloadFail(void);
+    bool isUpdateDownloadPageShown(void);
 
     // functions which are called from various components
     int  checkboxGroup_getCheckedId(int groupId);
@@ -116,6 +119,7 @@ private:
     void onUpdateUpdate(void);
     void datesToStrings(Version &v1, Version &v2, std::string &str);
     void createScreen_update_download(void);
+    void getProgressLine(int index, std::string &lines, std::string &line);
 
     void onSharedTest(void);
     void onSharedSave(void);
@@ -124,6 +128,8 @@ private:
     void onFloppyImagesSave(void);
 
     bool verifyAndFixIPaddress(std::string &in, std::string &out, bool emptyIsOk);
+
+    void replaceNewLineWithGoto(std::string &line, int startX, int startY);
 };
 
 #endif

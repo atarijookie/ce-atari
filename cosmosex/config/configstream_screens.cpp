@@ -10,6 +10,7 @@
 #include "../settings.h"
 #include "../utils.h"
 #include "../update.h"
+#include "../downloader.h"
 #include "keys.h"
 #include "configstream.h"
 #include "netsettings.h"
@@ -732,6 +733,84 @@ void ConfigStream::createScreen_update_download(void)
     Update::downloadNewComponents();            // start the download
 
     setFocusToFirstFocusable();
+}
+
+void ConfigStream::fillUpdateDownloadWithProgress(void)
+{
+    std::string status, l1, l2, l3, l4;
+
+    // get the current download status
+    downloadStatus(status, DWNTYPE_UPDATE_COMP);
+
+    // split it to lines
+    getProgressLine(0, status, l1);
+    getProgressLine(1, status, l2);
+    getProgressLine(2, status, l3);
+    getProgressLine(3, status, l4);
+
+    // set it to components
+    setTextByComponentId(COMPID_DL1, l1);
+    setTextByComponentId(COMPID_DL2, l2);
+    setTextByComponentId(COMPID_DL3, l3);
+    setTextByComponentId(COMPID_DL4, l4);
+}
+
+void ConfigStream::getProgressLine(int index, std::string &lines, std::string &line)
+{
+    line.clear();
+
+    int c = 0;
+    std::size_t pos = 0;
+
+    while(1) {
+        if(c == index) {                        // the current count matches the line we're looking for? good
+            break;
+        }
+
+        pos = lines.find("\n", pos);            // try to find the next \n character
+
+        if(pos == std::string::npos) {          // not found? failed to find the right line, quit
+            return;
+        }
+
+        pos++;                                  // pos was pointing to \n, the next find would return the same, so move forward
+        c++;                                    // update the count of found \n chars
+    }
+
+    std::size_t len;
+    std::size_t pos2 = lines.find("\n", pos);   // find the end of this line (might return string::npos)
+
+    if(pos2 != std::string::npos) {             // the terminating \n was found?
+        len = pos2 - pos;                       // calculate the length of the string 
+    } else {                                    // terminating \n was not found? copy until the end of string
+        len = std::string::npos;
+    }
+
+    line = lines.substr(pos, len);              // get just this line
+}
+
+void ConfigStream::showUpdateDownloadFail(void)
+{
+    // check if we're on update download page
+    if(!isUpdateDownloadPageShown()) {
+        return;
+    }
+
+    // ok, so we're on update donload page... go back to update page and show error
+    createScreen_update();
+    showMessageScreen((char *) "Update download fail", (char *) "Failed to download the update,\nplease try again later.");
+}
+
+bool ConfigStream::isUpdateDownloadPageShown(void)
+{
+    ConfigComponent *c = findComponentById(COMPID_DL1); // find a component which is on update download page
+
+    if(c == NULL) {                                     // not on update download page? 
+        return false;
+    }
+
+    // we're on that update download page
+    return true;
 }
 
 void ConfigStream::createScreen_shared(void)

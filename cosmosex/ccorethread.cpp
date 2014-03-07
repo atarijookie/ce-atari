@@ -136,23 +136,23 @@ void CCoreThread::run(void)
             int updateState = Update::state();                              // get the update state
             switch(updateState) {  
                 case UPDATE_STATE_DOWNLOADING:
-
-                // TODO: refresh config screen with download status
-
+                confStream->fillUpdateDownloadWithProgress();               // refresh config screen with download status
                 break;
 
                 //-----------
                 case UPDATE_STATE_DOWNLOAD_FAIL:
-
-                // TODO: show fail message on config screen
-
+                confStream->showUpdateDownloadFail();                       // show fail message on config screen
                 Update::stateGoIdle();
                 break;
 
                 //-----------
                 case UPDATE_STATE_DOWNLOAD_OK:
 
-                 // TODO: quit the app and do the update
+                if(!confStream->isUpdateDownloadPageShown()) {              // if user is NOT waiting on download page (cancel pressed), don't update
+                    Update::stateGoIdle();
+                } else {                                                    // if user is waiting on download page, aplly update
+                    // TODO: quit the app and do the update
+                }
 
                 break;
             }
