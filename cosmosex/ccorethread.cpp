@@ -143,6 +143,7 @@ void CCoreThread::run(void)
                 case UPDATE_STATE_DOWNLOAD_FAIL:
                 confStream->showUpdateDownloadFail();                       // show fail message on config screen
                 Update::stateGoIdle();
+				Debug::out("Update state - download failed");
                 break;
 
                 //-----------
@@ -150,13 +151,16 @@ void CCoreThread::run(void)
 
                 if(!confStream->isUpdateDownloadPageShown()) {              // if user is NOT waiting on download page (cancel pressed), don't update
                     Update::stateGoIdle();
+					Debug::out("Update state - download OK, but user is not on download page - NOT doing update");
                 } else {                                                    // if user is waiting on download page, aplly update
                     res = Update::createUpdateScript();
 
                     if(!res) {
                         confStream->showUpdateError();
+						Debug::out("Update state - download OK, failed to create update script - NOT doing update");
                     } else {
-                        // TODO: quit the app and do the update
+						Debug::out("Update state - download OK, update script created, will do update.");
+						sigintReceived = 1;
                     }
                 }
 

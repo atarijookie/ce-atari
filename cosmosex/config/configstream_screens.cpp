@@ -698,11 +698,10 @@ void ConfigStream::createScreen_update_download(void)
 
     ConfigComponent *comp;
 
-    int col = 13;
+    int col = 7;
     int row = 9;
 
     comp = new ConfigComponent(this, ConfigComponent::label, "Downloading", 40, col + 2, row, gotoOffset);
-    comp->setReverse(true);
     screen.push_back(comp);
 
     row += 2;
