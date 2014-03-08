@@ -1,3 +1,10 @@
+# todo:
+# download and chmod cesuper.sh
+# set up that cesuper.sh will be started after device start (/etc/rc.d)
+# fix flash_stm32 for franz
+# do device restart
+
+
 # delete and create dir for the cosmosex
 sudo rm -rf /ce
 sudo mkdir /ce
