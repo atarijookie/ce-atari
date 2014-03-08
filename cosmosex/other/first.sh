@@ -1,7 +1,9 @@
 # todo:
 # download and chmod cesuper.sh
 # set up that cesuper.sh will be started after device start (/etc/rc.d)
+# create xilinx version file
 # fix flash_stm32 for franz
+# delete first install files
 # do device restart
 
 
@@ -32,6 +34,7 @@ sudo ./flash_xilinx xilinx.xsvf
 sudo ./flash_stm32 -x -w hans.hex /dev/ttyAMA0
 sudo ./flash_stm32 -y -w franz.hex /dev/ttyAMA0
 
+# unzip the app
 cd /ce
 mv /ce/update/app.zip /ce
 unzip app.zip
