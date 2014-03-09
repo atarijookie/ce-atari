@@ -296,10 +296,14 @@ bool Update::createUpdateScript(void)
         Update::getLocalPathFromUrl(Update::versions.onServer.app.getUrl(), appFile);
 
         fprintf(f, "# updgrade of application\n");
-        fprintf(f, "rm -rf %s\n", (char *)              UPDATE_APP_PATH);
-        fprintf(f, "unzip %s\n", (char *)               appFile.c_str());
-        fprintf(f, "chmod 777 %s/cosmosex\n", (char *)  UPDATE_APP_PATH);
-        fprintf(f, "\n");
+        fprintf(f, "rm -rf %s\n", (char *)              UPDATE_APP_PATH);	// delete old app
+        fprintf(f, "mkdir %s\n", (char *)              	UPDATE_APP_PATH);	// create dir for new app
+        fprintf(f, "cd %s\n", (char *)              	UPDATE_APP_PATH);	// cd to that dir
+		fprintf(f, "mv /ce/update/%s /ce/app\n",		appFile.c_str());	// move the .zip file from update dir to the app dir
+        fprintf(f, "unzip %s\n", (char *)               appFile.c_str());	// unzip it
+        fprintf(f, "chmod 755 %s/cosmosex\n", (char *)  UPDATE_APP_PATH);	// change permissions
+		fprintf(f, "rm -f %s\n",						appFile.c_str());	// delete the zip
+        fprintf(f, "\n\n");
     }
 
     if(Update::versions.current.hans.isOlderThan( Update::versions.onServer.hans )) {
@@ -307,8 +311,9 @@ bool Update::createUpdateScript(void)
         Update::getLocalPathFromUrl(Update::versions.onServer.hans.getUrl(), fwFile);
 
         fprintf(f, "# updgrade of Hans FW\n");
-        fprintf(f, "./stm32flash -x -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());
-        fprintf(f, "\n");
+        fprintf(f, "sudo ./flash_stm32 -x -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());
+        fprintf(f, "rm -f %s\n", (char *) fwFile.c_str());
+        fprintf(f, "\n\n");
     }
 
     if(Update::versions.current.xilinx.isOlderThan( Update::versions.onServer.xilinx )) {
@@ -316,8 +321,9 @@ bool Update::createUpdateScript(void)
         Update::getLocalPathFromUrl(Update::versions.onServer.xilinx.getUrl(), fwFile);
 
         fprintf(f, "# updgrade of Xilinx FW\n");
-        fprintf(f, "./flash_xilinx %s\n", (char *) fwFile.c_str());
-        fprintf(f, "\n");
+        fprintf(f, "sudo ./flash_xilinx %s\n", (char *) fwFile.c_str());
+        fprintf(f, "rm -f %s\n", (char *) fwFile.c_str());
+        fprintf(f, "\n\n");
     }
 
     if(Update::versions.current.franz.isOlderThan( Update::versions.onServer.franz )) {
@@ -325,8 +331,9 @@ bool Update::createUpdateScript(void)
         Update::getLocalPathFromUrl(Update::versions.onServer.franz.getUrl(), fwFile);
 
         fprintf(f, "# updgrade of Franz FW\n");
-        fprintf(f, "./stm32flash -y -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());
-        fprintf(f, "\n");
+        fprintf(f, "sudo ./flash_stm32 -y -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());
+        fprintf(f, "rm -f %s\n", (char *) fwFile.c_str());
+        fprintf(f, "\n\n");
     }
 
     fclose(f);

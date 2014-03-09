@@ -4,9 +4,9 @@
 #include <string>
 #include "datatypes.h"
 
-#define XILINX_VERSION_FILE "update/xilinx_current.txt"
-#define IMAGELIST_FILE      "imagelist.csv"
-#define APP_VERSION         "2014-03-04"
+#define XILINX_VERSION_FILE		"/ce/update/xilinx_current.txt"
+#define IMAGELIST_FILE      	"/ce/update/imagelist.csv"
+#define APP_VERSION         	"2014-03-04"
 
 class Version
 {

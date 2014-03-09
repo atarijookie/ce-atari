@@ -8,10 +8,10 @@
 #include "version.h"
 
 #define UPDATE_REMOTEURL    "http://joo.kie.sk/cosmosex/update/updatelist.csv"
-#define UPDATE_LOCALPATH    "update"
-#define UPDATE_LOCALLIST    "update/updatelist.csv"
-#define UPDATE_SCRIPT       "update/doupdate.sh"
-#define UPDATE_APP_PATH     "app"
+#define UPDATE_LOCALPATH    "/ce/update"
+#define UPDATE_LOCALLIST    "/ce/update/updatelist.csv"
+#define UPDATE_SCRIPT       "/ce/update/doupdate.sh"
+#define UPDATE_APP_PATH     "/ce/app"
 
 #define UPDATE_STATE_IDLE           0
 #define UPDATE_STATE_DOWNLOADING    1
