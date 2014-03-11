@@ -32,6 +32,7 @@ extern WORD version[2];
 extern volatile BYTE spiDmaIsIdle;
 extern volatile BYTE spiDmaTXidle, spiDmaRXidle;		// flags set when the SPI DMA TX or RX is idle
 extern volatile TDrivePosition now, next, lastRequested, prev;
+extern volatile WORD lastRequestTime;
 
 void spi_init(void)
 {
@@ -311,6 +312,8 @@ void init_hw_sw(void)
 	lastRequested.side	= 0xff;
 	
 	lastMfmWriteTC = 0;
+	
+	lastRequestTime = 0;
 }
 
 void Exti3InterruptOn(BYTE onNotOff)

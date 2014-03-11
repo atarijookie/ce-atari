@@ -71,7 +71,7 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 #define		readTrackData_justMove()				{ 																						inIndexGet++;		if(inIndexGet >= READTRACKDATA_SIZE) { inIndexGet = 0; };	}
 //--------------
 
-#define REQUEST_TRACK	{	next.track = now.track; next.side = now.side; sendTrackRequest = TRUE; }
+#define REQUEST_TRACK	{	next.track = now.track; next.side = now.side; sendTrackRequest = TRUE; lastRequestTime = TIM4->CNT; }
 
 WORD version[2] = {0xf013, 0x0718};				// this means: Franz, 2013-07-18
 WORD drive_select;
@@ -93,6 +93,7 @@ volatile BYTE spiDmaIsIdle;
 volatile BYTE spiDmaTXidle, spiDmaRXidle;		// flags set when the SPI DMA TX or RX is idle
 
 volatile TDrivePosition now, next, lastRequested, prev;
+volatile WORD lastRequestTime;
 
 int main (void) 
 {
@@ -129,23 +130,25 @@ int main (void)
 				spiDma_txRx(ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0], ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
 				
 				sendFwVersion			= FALSE;
-			} else if(sendTrackRequest) {
-				sendTrackRequest		= FALSE;
+			} else if(sendTrackRequest) {										// if should send track request
+				// check how much time passed since the request was created
+				WORD timeNow	= TIM4->CNT;
+				WORD diff			= timeNow - lastRequestTime;
 				
-				// first check if this isn't what we've requested last time
-				if(next.track == lastRequested.track && next.side == lastRequested.side) {
-					continue;																					// we've requested this one just a while ago, don't do it again
+				if(diff >= 20) {															// and at least 10 ms passed since the request (20 / 2000 s) -- request after request limiter (when stepping through tracs)
+					sendTrackRequest		= FALSE;
+				
+					// first check if this isn't what we've requested last time
+					if(next.track != lastRequested.track || next.side != lastRequested.side) {		// if track or side changed -- same track request limiter
+						lastRequested.track = next.track;										// mark what we've requested last time
+						lastRequested.side	= next.side;
+				
+						timeoutStart();																			// start a time-out timer
+
+						atnSendTrackRequest[4] = (((WORD)next.side) << 8) | (next.track);
+						spiDma_txRx(ATN_SENDTRACK_REQ_LEN_TX, (BYTE *) &atnSendTrackRequest[0], ATN_SENDTRACK_REQ_LEN_RX, (BYTE *) &readTrackData[0]);
+					}
 				}
-
-//				Exti3InterruptOn(FALSE);														// disable EXTI3 INT for a while to avoid race hazar
-				lastRequested.track = next.track;										// mark what we've requested last time
-				lastRequested.side	= next.side;
-//				Exti3InterruptOn(TRUE);															// enable EXTI3 INT again
-				
-				timeoutStart();																			// start a time-out timer
-
-				atnSendTrackRequest[4] = (((WORD)next.side) << 8) | (next.track);
-				spiDma_txRx(ATN_SENDTRACK_REQ_LEN_TX, (BYTE *) &atnSendTrackRequest[0], ATN_SENDTRACK_REQ_LEN_RX, (BYTE *) &readTrackData[0]);
 			} else if(wrNow->readyToSend) {												// not sending any ATN right now? and current write buffer has something?
 				timeoutStart();																			// start a time-out timer
 
@@ -367,7 +370,8 @@ void DMA1_Channel2_IRQHandler(void)
 void EXTI3_IRQHandler(void)
 {
   if(EXTI_GetITStatus(EXTI_Line3) != RESET) {
-		WORD inputs, curIntTime, difIntTIme;
+		WORD inputs;
+//		WORD curIntTime, difIntTIme;
 		
 		EXTI_ClearITPendingBit(EXTI_Line3);			// Clear the EXTI line pending bit 
 		inputs = GPIOB->IDR;
