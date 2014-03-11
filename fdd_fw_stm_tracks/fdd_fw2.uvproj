@@ -47,7 +47,7 @@
           <OutputName>fdd_fw2</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
-          <CreateHexFile>0</CreateHexFile>
+          <CreateHexFile>1</CreateHexFile>
           <DebugInformation>1</DebugInformation>
           <BrowseInformation>1</BrowseInformation>
           <ListingPath>.\</ListingPath>
@@ -335,7 +335,7 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>1</Optim>
+            <Optim>0</Optim>
             <oTime>0</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>0</OneElfS>
@@ -527,6 +527,31 @@
               <FileName>stm32f10x_exti.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\stm32f10x_exti.h</FilePath>
+            </File>
+            <File>
+              <FileName>main.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\main.h</FilePath>
+            </File>
+            <File>
+              <FileName>floppyhelpers.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\floppyhelpers.c</FilePath>
+            </File>
+            <File>
+              <FileName>floppyhelpers.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\floppyhelpers.h</FilePath>
+            </File>
+            <File>
+              <FileName>init.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\init.c</FilePath>
+            </File>
+            <File>
+              <FileName>init.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\init.h</FilePath>
             </File>
           </Files>
         </Group>

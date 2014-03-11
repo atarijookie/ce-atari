@@ -2,7 +2,6 @@
 #define _MAIN_H_
 
 void setupAtnBuffers(void);
-void init_hw_sw(void);
 
 void fillMfmTimesForDMA(void);
 BYTE getNextMFMbyte(void);
@@ -13,17 +12,17 @@ void getMfmWriteTimesTemp(void);
 void processHostCommand(BYTE val);
 void requestTrack(void);
 
-void spi_init(void);
-
-void dma_mfmRead_init(void);
-void dma_mfmWrite_init(void);
-void dma_spi_init(void);
-
 void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 void spiDma_waitForFinish(void);
 void waitForSPIidle(void);
 
 BYTE timeout(void);
+
+typedef struct {
+	BYTE side;
+	BYTE track;
+	BYTE sector;
+} SStreamed;
 
 #define ATN_SYNC_WORD						0xcafe
 

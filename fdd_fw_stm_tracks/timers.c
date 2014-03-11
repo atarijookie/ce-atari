@@ -127,7 +127,7 @@ void timerSetup_stepLimiter(void)
   TIM_Cmd(TIM4, ENABLE);														// enable timer
 }
 
-
+/*
 void timerSetup_cmdTimeout(void)					
 {
 	TIM_TimeBaseInitTypeDef		TIM_TimeBaseStructure;
@@ -145,23 +145,40 @@ void timerSetup_cmdTimeout(void)
   TIM_Cmd(TIM5, ENABLE);														// enable timer
 	TIM_ITConfig(TIM5, TIM_IT_Update, ENABLE);				// enable int from this timer
 }
+*/
+
+WORD start;
 
 void timeoutStart(void)
 {
+/*	
 	// init the timer 4, which will serve for timeout measuring 
   TIM_Cmd(TIM5, DISABLE);												// disable timer
 	TIM5->CNT	= 0;																// set timer value to 0
 	TIM5->SR	= 0xfffe;														// clear UIF flag
   TIM_Cmd(TIM5, ENABLE);												// enable timer
+*/
+	start = TIM4->CNT;
 }	
+
 
 BYTE timeout(void)
 {
+	/*
 	if((TIM5->SR & 0x0001) != 0) {		// overflow of TIM4 occured?
 		TIM5->SR = 0xfffe;							// clear UIF flag
 		return TRUE;
 	}
+	*/
+
+	WORD diff, now;
+	
+	now = TIM4->CNT;
+	diff = now - start;
+	
+	if(diff > 2000) {
+		return TRUE;
+	}	
 	
 	return FALSE;
 }
-

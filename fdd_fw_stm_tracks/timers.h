@@ -5,8 +5,10 @@ void timerSetup_index(void);
 void timerSetup_mfmRead(void);
 void timerSetup_mfmWrite(void);
 void timerSetup_stepLimiter(void);
-void timerSetup_cmdTimeout(void);
 
+/*
+void timerSetup_cmdTimeout(void);
+*/
 void timeoutStart(void);
 BYTE timeout(void);
 

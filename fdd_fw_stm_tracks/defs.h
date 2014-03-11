@@ -20,6 +20,12 @@ typedef struct
 	void *next;											// pointer to the next available TAtnBuffer
 } TWriteBuffer;
 
+typedef struct {
+	BYTE track;
+	BYTE side;
+} TDrivePosition;	
+	
+
 /*
 reserved:
 ---------
