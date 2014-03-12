@@ -323,6 +323,7 @@ bool Update::createUpdateScript(void)
         fprintf(f, "# updgrade of Xilinx FW\n");
         fprintf(f, "sudo ./flash_xilinx %s\n", (char *) fwFile.c_str());
         fprintf(f, "rm -f %s\n", (char *) fwFile.c_str());
+		fprintf(f, "cat /ce/update/updatelist.csv | grep xilinx | sed -e 's/[^,]*,\\([^,]*\\).*/\\1/' > /ce/update/xilinx_current.txt \n");
         fprintf(f, "\n\n");
     }
 
