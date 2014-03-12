@@ -71,7 +71,7 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 #define		readTrackData_justMove()				{ 																						inIndexGet++;		if(inIndexGet >= READTRACKDATA_SIZE) { inIndexGet = 0; };	}
 //--------------
 
-#define REQUEST_TRACK	{	next.track = now.track; next.side = now.side; sendTrackRequest = TRUE; lastRequestTime = TIM4->CNT; }
+#define REQUEST_TRACK	{	next.track = now.track; next.side = now.side; sendTrackRequest = TRUE; lastRequestTime = TIM4->CNT; trackStreamedCount = 0; }
 
 WORD version[2] = {0xf013, 0x0718};				// this means: Franz, 2013-07-18
 WORD drive_select;
@@ -94,6 +94,8 @@ volatile BYTE spiDmaTXidle, spiDmaRXidle;		// flags set when the SPI DMA TX or R
 
 volatile TDrivePosition now, next, lastRequested, prev;
 volatile WORD lastRequestTime;
+
+WORD trackStreamedCount = 0;
 
 int main (void) 
 {
@@ -135,7 +137,7 @@ int main (void)
 				WORD timeNow	= TIM4->CNT;
 				WORD diff			= timeNow - lastRequestTime;
 				
-				if(diff >= 20) {															// and at least 10 ms passed since the request (20 / 2000 s) -- request after request limiter (when stepping through tracs)
+				if(diff >= 6) {																// and at least 3 ms passed since the request (6 / 2000 s)
 					sendTrackRequest		= FALSE;
 				
 					// first check if this isn't what we've requested last time
@@ -234,7 +236,20 @@ int main (void)
 			int i;
 			TIM2->SR = 0xfffe;							// clear UIF flag
 	
-			readTrackData_goToStart();						// move the pointer in the track stream to start
+			readTrackData_goToStart();			// move the pointer in the track stream to start
+
+			//-----------
+			// the following section of code should request track again if even after 2 rotations of floppy we're not streaming what we should
+			trackStreamedCount++;						// increment the count of how many times we've streamed this track
+			
+			if(trackStreamedCount >= 2) {		// if since the last request 2 rotations happened
+				if(streamed.track != now.track || streamed.side != now.side) {	// and we're not streaming what we really want to stream
+					REQUEST_TRACK;							// ask for track data (again?)
+				}
+			}
+			streamed.track	= (BYTE) -1;				// after the end of track mark that we're not streaming anything
+			streamed.side		= (BYTE) -1;
+			//-----------
 			
 			for(i=0; i<16; i++) {						// copy 'all 4 us' pulses into current streaming buffer to allow shortest possible switch to start of track
 				mfmReadStreamBuffer[i] = 7;

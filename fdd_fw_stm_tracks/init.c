@@ -299,9 +299,9 @@ void init_hw_sw(void)
 	now.side				= 0;
 	now.track				= 0;
 	
-	streamed.side		= 0;
-	streamed.track	= 0;
-	streamed.sector	= 1;
+	streamed.side		= (BYTE) -1;
+	streamed.track	= (BYTE) -1;
+	streamed.sector	= (BYTE) -1;
 	
 	prev.side				= 0;
 	
