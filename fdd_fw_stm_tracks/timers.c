@@ -85,8 +85,8 @@ void timerSetup_mfmWrite(void)
     TIM_ICInitTypeDef           TIM_CH1_ICInitStructure;
 
     // Time base configuration
-    TIM_TimeBaseStructure.TIM_Period            = 0xffff;                   
-    TIM_TimeBaseStructure.TIM_Prescaler         = 0;
+    TIM_TimeBaseStructure.TIM_Period            = 0xff;                     // never let it go to 0xffff
+    TIM_TimeBaseStructure.TIM_Prescaler         = 9;                        // prescale: 10, this means 7.2 MHz
     TIM_TimeBaseStructure.TIM_ClockDivision     = 0;
     TIM_TimeBaseStructure.TIM_CounterMode       = TIM_CounterMode_Up;
     TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;

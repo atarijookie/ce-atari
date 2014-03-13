@@ -191,7 +191,7 @@ void setupAtnBuffers(void)
         wrBuffer[1].buffer[i] = 0;
     }
         
-    wrBuffer[0].count       = 0;
+    wrBuffer[0].count       = 4;                            // at the start we already have 4 WORDs in buffer - SYNC, ATN code, TX len, RX len
     wrBuffer[0].readyToSend = FALSE;
     wrBuffer[0].next        = &wrBuffer[1];
     
@@ -200,7 +200,7 @@ void setupAtnBuffers(void)
     // WORDs 2 and 3 are reserved for TX LEN and RX LEN
     // WORDs 4 and 5 contain side, track, sector #
     
-    wrBuffer[1].count       = 0;
+    wrBuffer[1].count       = 4;                            // at the start we already have 4 WORDs in buffer - SYNC, ATN code, TX len, RX len
     wrBuffer[1].readyToSend = FALSE;
     wrBuffer[1].next        = &wrBuffer[0];
 
