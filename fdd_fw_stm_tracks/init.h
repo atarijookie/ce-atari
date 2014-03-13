@@ -1,5 +1,5 @@
-#ifndef  _INIT_H_
-#define  _INIT_H_
+#ifndef _INIT_H_
+#define _INIT_H_
 
 void dma_mfmRead_init(void);
 void spi_init(void);

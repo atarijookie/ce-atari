@@ -18,12 +18,6 @@ void waitForSPIidle(void);
 
 BYTE timeout(void);
 
-typedef struct {
-	BYTE side;
-	BYTE track;
-	BYTE sector;
-} SStreamed;
-
 #define ATN_SYNC_WORD						0xcafe
 
 // commands sent from device to host

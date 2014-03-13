@@ -1,30 +1,35 @@
 #ifndef DEFS_H_
 #define DEFS_H_
 
-#define BYTE	unsigned char
-#define WORD	unsigned short
-#define DWORD	unsigned int
+#define BYTE    unsigned char
+#define WORD    unsigned short
+#define DWORD   unsigned int
 
-#define TRUE	1
-#define FALSE	0
+#define TRUE    1
+#define FALSE   0
 
-#define WRITEBUFFER_SIZE		550
+#define WRITEBUFFER_SIZE        550
 
 typedef struct 
 {
-	WORD buffer[WRITEBUFFER_SIZE];	// buffer for the written data
-	WORD count;											// count of WORDs in buffer 
-	
-	BYTE readyToSend;								// until we store all the data, don't 
-	
-	void *next;											// pointer to the next available TAtnBuffer
+    WORD buffer[WRITEBUFFER_SIZE];  // buffer for the written data
+    WORD count;                                         // count of WORDs in buffer 
+    
+    BYTE readyToSend;                               // until we store all the data, don't 
+    
+    void *next;                                         // pointer to the next available TAtnBuffer
 } TWriteBuffer;
 
 typedef struct {
-	BYTE track;
-	BYTE side;
-} TDrivePosition;	
-	
+    BYTE track;
+    BYTE side;
+} TDrivePosition;   
+
+typedef struct {
+    BYTE side;
+    BYTE track;
+    BYTE sector;
+} SStreamed;    
 
 /*
 reserved:
@@ -44,8 +49,8 @@ GPIOA_14 - SWD -- for debugging
 inputs:
 -------
 GPIOB_2  - DIRECTION
-GPIOB_3  - STEP							(using EXTI3)
-GPIOB_4  - WDATA						(using TIM3_CH1 after remap)
+GPIOB_3  - STEP                         (using EXTI3)
+GPIOB_4  - WDATA                        (using TIM3_CH1 after remap)
 GPIOB_6  - SIDE1
 GPIOB_7  - WGATE
 GPIOB_12 - MOTOR_ENABLE
@@ -55,37 +60,37 @@ GPIOB_14 - DRIVE_SELECT1
 
 outputs:
 ---------
-GPIOA_8  - RDATA 						(using TIM1_CH1)
+GPIOA_8  - RDATA                        (using TIM1_CH1)
 
 GPIOB_8  - WRITE_PROTECT
 GPIOB_9  - DISK_CHANGE
 GPIOB_10 - TRACK0
-GPIOB_11 - INDEX 						(using TIM2_CH4)
+GPIOB_11 - INDEX                        (using TIM2_CH4)
 GPIOB_15 - ATTENTION (need more data / data available to retrieve)
 */
 
 
 // on GPIOA
-//#define	RDATA				(1 <<   8)
+//#define   RDATA               (1 <<   8)
 
 
 // on GPIOB
-#define	DIR						(1 <<   2)
-#define	STEP					(1 <<   3)
-#define	WDATA					(1 <<   4)
-#define	SIDE1					(1 <<   6)
-#define	WGATE					(1 <<   7)
+#define DIR             (1 <<   2)
+#define STEP            (1 <<   3)
+#define WDATA           (1 <<   4)
+#define SIDE1           (1 <<   6)
+#define WGATE           (1 <<   7)
 
-#define	WR_PROTECT		(1 <<   8)
-#define	DISK_CHANGE		(1 <<   9)
-#define	TRACK0				(1 <<  10)
-//#define	INDEX					(1 <<  11)
+#define WR_PROTECT      (1 <<   8)
+#define DISK_CHANGE     (1 <<   9)
+#define TRACK0          (1 <<  10)
+//#define   INDEX       (1 <<  11)
 
-#define	MOTOR_ENABLE	(1 <<  12)
-#define	DRIVE_SELECT0	(1 <<  13)
-#define	DRIVE_SELECT1	(1 <<  14)
+#define MOTOR_ENABLE    (1 <<  12)
+#define DRIVE_SELECT0   (1 <<  13)
+#define DRIVE_SELECT1   (1 <<  14)
 
-#define	ATN						(1 <<  15)
+#define ATN             (1 <<  15)
 
 
 #endif /* DEFS_H_ */
