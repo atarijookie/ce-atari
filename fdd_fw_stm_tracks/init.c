@@ -14,18 +14,18 @@
 extern WORD inIndexGet;
 extern SStreamed streamed;
 
-extern TWriteBuffer wrBuffer[2];                                // two buffers for written sectors
+extern TWriteBuffer wrBuffer[2];                                                    // two buffers for written sectors
 extern TWriteBuffer *wrNow;
 extern SStreamed streamed;
-extern WORD mfmReadStreamBuffer[16];                            // 16 words - 16 mfm times. Half of buffer is 8 times - at least 32 us (8 * 4us),
+extern WORD mfmReadStreamBuffer[16];                                                // 16 words - 16 mfm times. Half of buffer is 8 times - at least 32 us (8 * 4us),
 extern WORD mfmWriteStreamBuffer[16];
 extern WORD lastMfmWriteTC;
 extern WORD drive_select;
 extern volatile BYTE sendFwVersion, sendTrackRequest;
 extern WORD atnSendFwVersion        [ATN_SENDFWVERSION_LEN_TX];
-extern BYTE cmdBuffer                       [ATN_SENDFWVERSION_LEN_RX * 2];
-extern WORD atnSendTrackRequest [ATN_SENDTRACK_REQ_LEN_TX];
-extern BYTE readTrackData               [READTRACKDATA_SIZE];
+extern BYTE cmdBuffer               [ATN_SENDFWVERSION_LEN_RX * 2];
+extern WORD atnSendTrackRequest     [ATN_SENDTRACK_REQ_LEN_TX];
+extern BYTE readTrackData           [READTRACKDATA_SIZE];
 extern WORD inIndexGet;
 extern WORD fakeBuffer;
 extern WORD version[2];
@@ -70,8 +70,8 @@ void dma_mfmRead_init(void)
     DMA_Init(DMA1_Channel5, &DMA_InitStructure);
 
     // Enable DMA1 Channel5 Transfer Complete interrupt
-    DMA_ITConfig(DMA1_Channel5, DMA_IT_HT, ENABLE);           // interrupt on Half Transfer (HT)
-    DMA_ITConfig(DMA1_Channel5, DMA_IT_TC, ENABLE);           // interrupt on Transfer Complete (TC)
+    DMA_ITConfig(DMA1_Channel5, DMA_IT_HT, ENABLE);                                 // interrupt on Half Transfer (HT)
+    DMA_ITConfig(DMA1_Channel5, DMA_IT_TC, ENABLE);                                 // interrupt on Transfer Complete (TC)
 
     // Enable DMA1 Channel5 transfer
     DMA_Cmd(DMA1_Channel5, ENABLE);
@@ -98,8 +98,8 @@ void dma_mfmWrite_init(void)
     DMA_Init(DMA1_Channel6, &DMA_InitStructure);
 
     // Enable DMA1 Channel6 Transfer Complete interrupt
-    DMA_ITConfig(DMA1_Channel6, DMA_IT_HT, ENABLE);           // interrupt on Half Transfer (HT)
-    DMA_ITConfig(DMA1_Channel6, DMA_IT_TC, ENABLE);           // interrupt on Transfer Complete (TC)
+    DMA_ITConfig(DMA1_Channel6, DMA_IT_HT, ENABLE);                                 // interrupt on Half Transfer (HT)
+    DMA_ITConfig(DMA1_Channel6, DMA_IT_TC, ENABLE);                                 // interrupt on Transfer Complete (TC)
 
     // Enable DMA1 Channel6 transfer
     DMA_Cmd(DMA1_Channel6, ENABLE);
