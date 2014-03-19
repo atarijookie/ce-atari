@@ -1,0 +1,23 @@
+>> CosmosEx config tool - Jookie 2013 <<
+       Software & Firmware update
+
+
+
+       
+       
+       
+              Downloading
+        
+            app.zip     35%
+            hans.hex     0%
+            hans.xsvf    0%
+            franz.hex    0%
+      
+              [ Cancel ]
+
+              
+       
+       
+
+
+        To quit - press Ctrl + C

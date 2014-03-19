@@ -195,15 +195,15 @@ void CCoreThread::run(void)
 			gotAtn = true;							// we've some ATN
 
 			switch(inBuff[3]) {
-			case ATN_FW_VERSION:
+			case ATN_FW_VERSION:                    // device has sent FW version
 				handleFwVersion(SPI_CS_FRANZ);
 				break;
 
-            case ATN_SECTOR_WRITTEN:
-
+            case ATN_SECTOR_WRITTEN:                // device has sent written sector data
+                handleSectorWritten();
                 break;
 
-			case ATN_SEND_TRACK:
+			case ATN_SEND_TRACK:                    // device requests data of a whole track
 				handleSendTrack();
 				break;
 
@@ -546,5 +546,24 @@ void CCoreThread::handleSendTrack(void)
     conSpi->txRx(SPI_CS_FRANZ, remaining, encodedTrack, iBuf);
 }
 
+void CCoreThread::handleSectorWritten(void)
+{
+    #define BUFFSIZE    2048
+    BYTE oBuf[BUFFSIZE], iBuf[BUFFSIZE];
 
+    memset(oBuf, 0, BUFFSIZE);
+
+    WORD remainingSize = conSpi->getRemainingLength();              // get how many data we still have
+    conSpi->txRx(SPI_CS_FRANZ, remainingSize, oBuf, iBuf);          // get all the remaining data
+
+    // get the written sector, side, track number
+    int sector  = iBuf[0];
+    int track   = iBuf[1] & 0x7f;
+    int side    = (iBuf[1] & 0x80) ? 1 : 0;
+
+    Debug::out("handleSectorWritten -- track %d, side %d, sector %d -- TODO!!!", track, side, sector);
+    
+    // TODO:
+    // do the written sector processing
+}
 

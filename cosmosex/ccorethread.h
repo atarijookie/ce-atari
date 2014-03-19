@@ -89,6 +89,7 @@ private:
     FloppyImageFactory  imageFactory;
 
     void handleSendTrack(void);
+    void handleSectorWritten(void);
 };
 
 #endif // CCORETHREAD_H
