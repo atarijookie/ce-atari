@@ -432,7 +432,7 @@ void EXTI3_IRQHandler(void)
 
 void getMfmWriteTimes(void)
 {
-    WORD ind1, ind2, i, tmp, val, wval;
+    WORD ind1 = 0, ind2 = 7, i, tmp, val, wval;
     
     // check for half transfer or transfer complete IF
     if((DMA1->ISR & DMA1_IT_HT6) != 0) {                // HTIF6 -- Half Transfer IF 6

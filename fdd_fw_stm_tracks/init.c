@@ -225,9 +225,9 @@ void init_hw_sw(void)
     GPIOB->CRL &= ~(0x0fffffff);                                    // remove bits from GPIOB
     GPIOB->CRL |=   0x04444444;                                     // set GPIOB as --- CNF1:0 -- 01 (floating input), MODE1:0 -- 00 (input), PxODR -- don't care
 
-    GPIOB->CRL &= ~(0x00000f00);                                    // remove bits from GPIOB for GPIOB2
-    GPIOB->CRL |=   0x00000800;                                     // set GPIOB as --- CNF1:0 -- 10 (pull up/down input), MODE1:0 -- 00 (input)
-    GPIOB->BSRR = DIR;                                              // set DIR to 1 in ODR == pull up
+    GPIOB->CRL &= ~(0xf0000f00);                                    // remove bits from GPIOB for GPIOB2 and GPIOB7
+    GPIOB->CRL |=   0x80000800;                                     // set GPIOB as --- CNF1:0 -- 10 (pull up/down input), MODE1:0 -- 00 (input)
+    GPIOB->BSRR = DIR | WGATE;                              				// set DIR, WGATE to 1 in ODR == pull up
 
     FloppyOut_Disable();
     
