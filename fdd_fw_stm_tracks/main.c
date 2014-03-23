@@ -3,6 +3,7 @@
 #include "stm32f10x_tim.h"
 #include "stm32f10x_dma.h"
 #include "stm32f10x_exti.h"
+#include "stm32f10x_usart.h"
 #include "misc.h"
 
 #include "defs.h"
@@ -96,6 +97,11 @@ volatile WORD lastRequestTime;
 
 WORD trackStreamedCount = 0;
 
+volatile TCircBuffer buff0, buff1;
+void circularInit(volatile TCircBuffer *cb);
+void cicrularAdd(volatile TCircBuffer *cb, BYTE val);
+BYTE cicrularGet(volatile TCircBuffer *cb);
+
 int main (void) 
 {
     BYTE outputsActive  = 0;
@@ -110,6 +116,9 @@ int main (void)
     
     setupAtnBuffers();
     init_hw_sw();                                   // init GPIO pins, timers, DMA, global variables
+    
+    circularInit(&buff0);
+    circularInit(&buff1);
 
     drive_select = MOTOR_ENABLE | DRIVE_SELECT0;    // the drive select bits which should be LOW if the drive is selected
 
@@ -122,6 +131,20 @@ int main (void)
 
     while(1) {
         WORD inputs;
+        
+        if(buff0.count > 0) {                       // got something from USART1? 
+            if(USART2->SR & USART_FLAG_TXE) {       // USART2 ready to send? 
+                BYTE val = cicrularGet(&buff0);
+                USART2->DR = val;                   // send it to USART2
+            }
+        }
+        
+        if(buff1.count > 0) {                       // got something from USART2? 
+            if(USART1->SR & USART_FLAG_TXE) {       // USART1 ready to send? 
+                BYTE val = cicrularGet(&buff1);
+                USART1->DR = val;                   // send it to USART1
+            }
+        }
         
         // sending and receiving data over SPI using DMA
         if(spiDmaIsIdle == TRUE) {                                                              // SPI DMA: nothing to Tx and nothing to Rx?
@@ -574,4 +597,70 @@ void processHostCommand(BYTE val)
     }
 }
 
+void USART1_IRQHandler(void)
+{
+    if((USART1->SR & USART_FLAG_RXNE) != 0) {       // if something received
+        BYTE val = USART1->DR;
+        cicrularAdd(&buff0, val);                   // add to buffer
+    }
+}   
 
+void USART2_IRQHandler(void)
+{
+    if((USART2->SR & USART_FLAG_RXNE) != 0) {       // if something received
+        BYTE val = USART2->DR;
+        cicrularAdd(&buff1, val);                   // add to buffer
+    }
+}   
+
+void circularInit(volatile TCircBuffer *cb)
+{
+	BYTE i;
+
+	// set vars to zero
+	cb->addPos = 0;
+	cb->getPos = 0;
+	cb->count = 0;
+
+	// fill data with zeros
+	for(i=0; i<CIRCBUFFER_SIZE; i++) {
+		cb->data[i] = 0;
+	}
+}
+
+void cicrularAdd(volatile TCircBuffer *cb, BYTE val)
+{
+	// if buffer full, fail
+	if(cb->count >= CIRCBUFFER_SIZE) {
+		return;
+	}
+    cb->count++;
+
+	// store data at the right position
+	cb->data[ cb->addPos ] = val;
+
+	// increment and fix the add position
+	cb->addPos++;
+	cb->addPos = cb->addPos & CIRCBUFFER_POSMASK;
+}
+
+BYTE cicrularGet(volatile TCircBuffer *cb)
+{
+	BYTE val;
+
+	// if buffer empty, fail
+	if(cb->count == 0) {
+		return 0;
+	}
+    cb->count--;
+
+	// buffer not empty, get data
+	val = cb->data[ cb->getPos ];
+
+	// increment and fix the get position
+	cb->getPos++;
+	cb->getPos = cb->getPos & CIRCBUFFER_POSMASK;
+
+	// return value from buffer
+	return val;
+}

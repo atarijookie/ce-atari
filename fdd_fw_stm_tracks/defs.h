@@ -29,11 +29,25 @@ typedef struct {
     BYTE side;
     BYTE track;
     BYTE sector;
-} SStreamed;    
+} SStreamed;
+
+#define CIRCBUFFER_SIZE		64
+#define CIRCBUFFER_POSMASK	0x3f
+
+typedef struct {
+	BYTE addPos;
+	BYTE getPos;
+	BYTE count;
+
+	BYTE data[CIRCBUFFER_SIZE];
+} TCircBuffer;
 
 /*
 reserved:
 ---------
+GPIOA_2  - USART2_TX -- for IKBD
+GPIOA_3  - USART2_RX -- for IKBD
+
 GPIOA_4  - SPI
 GPIOA_5  - SPI
 GPIOA_6  - SPI

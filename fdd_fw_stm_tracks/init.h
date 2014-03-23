@@ -6,6 +6,7 @@ void spi_init(void);
 void dma_mfmWrite_init(void);
 void dma_spi_init(void);
 void init_hw_sw(void);
+void initUsarts(void);
 void Exti3InterruptOn(BYTE onNotOff);
 
 #endif

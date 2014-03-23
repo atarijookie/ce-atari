@@ -3,6 +3,7 @@
 #include "stm32f10x_tim.h"
 #include "stm32f10x_dma.h"
 #include "stm32f10x_exti.h"
+#include "stm32f10x_usart.h"
 #include "misc.h"
 
 #include "defs.h"
@@ -218,8 +219,8 @@ void init_hw_sw(void)
     NVIC_InitTypeDef NVIC_InitStructure;
     
     RCC->AHBENR     |= (1 <<  0);                                   // enable DMA1
-    RCC->APB1ENR    |= (1 << 2) | (1 <<  1) | (1 <<  0);            // enable TIM4, TIM3, TIM2
-    RCC->APB2ENR    |= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2); // Enable SPI1, TIM1, GPIOA and GPIOB clock
+    RCC->APB1ENR    |= (1 << 17) | (1 << 2) | (1 <<  1) | (1 <<  0);            // enable USART2, TIM4, TIM3, TIM2
+    RCC->APB2ENR    |= (1 << 14) | (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2); // Enable USART1, SPI1, TIM1, GPIOA and GPIOB clock
     
     // set FLOATING INPUTs for GPIOB_0 ... 6
     GPIOB->CRL &= ~(0x0fffffff);                                    // remove bits from GPIOB
@@ -231,9 +232,13 @@ void init_hw_sw(void)
 
     FloppyOut_Disable();
     
-    // SPI -- enable atlernate function for PA4, PA5, PA6, PA7
-    GPIOA->CRL &= ~(0xffff0000);                                    // remove bits from GPIOA
-    GPIOA->CRL |=   0xbbbb0000;                                     // set GPIOA as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
+    // SPI -- enable atlernate function for PA4, PA5, PA6, PA7, and UART2 (to IKBD) - alternate functions for PA2 and PA3
+    GPIOA->CRL &= ~(0xffffff00);                                    // remove bits from GPIOA
+    GPIOA->CRL |=   0xbbbb4b00;                                     
+
+    // UART1 (to RPi) - alternate functions for PA9 and PA10
+    GPIOA->CRH &= ~(0x00000ff0);                                    // remove bits from GPIOA
+    GPIOA->CRH |=   0x000004b0;                                     
 
     // ATTENTION -- set GPIOB_15 (ATTENTION) as --- CNF1:0 -- 00 (push-pull output), MODE1:0 -- 11 (output 50 Mhz)
     GPIOB->CRH &= ~(0xf0000000); 
@@ -314,6 +319,34 @@ void init_hw_sw(void)
     lastMfmWriteTC = 0;
     
     lastRequestTime = 0;
+    
+    initUsarts();
+}
+
+void initUsarts(void)
+{
+    USART_InitTypeDef usartStruct;
+	
+    USART_Cmd(USART1, ENABLE);
+    USART_Cmd(USART2, ENABLE);
+    
+    usartStruct.USART_BaudRate              = 19200;   
+    usartStruct.USART_WordLength            = USART_WordLength_8b;  
+    usartStruct.USART_StopBits              = USART_StopBits_1;   
+    usartStruct.USART_Parity                = USART_Parity_No;
+    usartStruct.USART_Mode                  = USART_Mode_Rx | USART_Mode_Tx;
+    usartStruct.USART_HardwareFlowControl   = USART_HardwareFlowControl_None;
+    
+    USART_Init(USART1, &usartStruct);               // Configure USART1 - 19200 baud
+
+    usartStruct.USART_BaudRate              = 7812;   
+    USART_Init(USART2, &usartStruct);               // Configure USART2 - 7812 baud
+    
+    USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);  // Enable RXNE interrupt
+    USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);  // Enable RXNE interrupt
+    
+    NVIC_EnableIRQ(USART1_IRQn);                    // Enable USART1 global interrupt
+    NVIC_EnableIRQ(USART2_IRQn);                    // Enable USART2 global interrupt
 }
 
 void Exti3InterruptOn(BYTE onNotOff)
