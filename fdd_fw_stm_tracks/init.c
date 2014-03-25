@@ -344,7 +344,7 @@ void initUsarts(void)
     
     USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);  // Enable RXNE interrupt
     USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);  // Enable RXNE interrupt
-    
+
     NVIC_EnableIRQ(USART1_IRQn);                    // Enable USART1 global interrupt
     NVIC_EnableIRQ(USART2_IRQn);                    // Enable USART2 global interrupt
 }

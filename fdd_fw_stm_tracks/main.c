@@ -132,20 +132,6 @@ int main (void)
     while(1) {
         WORD inputs;
         
-        if(buff0.count > 0) {                       // got something from USART1? 
-            if(USART2->SR & USART_FLAG_TXE) {       // USART2 ready to send? 
-                BYTE val = cicrularGet(&buff0);
-                USART2->DR = val;                   // send it to USART2
-            }
-        }
-        
-        if(buff1.count > 0) {                       // got something from USART2? 
-            if(USART1->SR & USART_FLAG_TXE) {       // USART1 ready to send? 
-                BYTE val = cicrularGet(&buff1);
-                USART1->DR = val;                   // send it to USART1
-            }
-        }
-        
         // sending and receiving data over SPI using DMA
         if(spiDmaIsIdle == TRUE) {                                                              // SPI DMA: nothing to Tx and nothing to Rx?
             if(sendFwVersion) {                                                                 // should send FW version? this is a window for receiving commands
@@ -600,17 +586,47 @@ void processHostCommand(BYTE val)
 void USART1_IRQHandler(void)
 {
     if((USART1->SR & USART_FLAG_RXNE) != 0) {       // if something received
-        BYTE val = USART1->DR;
-        cicrularAdd(&buff0, val);                   // add to buffer
+        BYTE val = USART1->DR;                      // read received value
+        
+        if(buff0.count > 0 || (USART2->SR & USART_FLAG_TXE) == 0) {     // got data in buffer or usart2 can't TX right now? 
+            cicrularAdd(&buff0, val);                                   // add to buffer
+            USART2->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
+        } else {                                                        // if no data in buffer and usart2 can TX
+            USART2->DR = val;                                           // send it to USART2
+        }
     }
+
+    if((USART1->SR & USART_FLAG_TXE) != 0) {        // if can TX
+        if(buff1.count > 0) {                       // and there is something to TX
+            BYTE val = cicrularGet(&buff1);
+            USART1->DR = val;
+        } else {                                    // and there's nothing to TX
+            USART1->CR1 &= ~USART_FLAG_TXE;         // disable interrupt on USART2 TXE
+        }
+    }  
 }   
 
 void USART2_IRQHandler(void)
 {
     if((USART2->SR & USART_FLAG_RXNE) != 0) {       // if something received
-        BYTE val = USART2->DR;
-        cicrularAdd(&buff1, val);                   // add to buffer
+        BYTE val = USART2->DR;                      // read received value
+        
+        if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) {     // got data in buffer or usart2 can't TX right now? 
+            cicrularAdd(&buff1, val);                                   // add to buffer
+            USART1->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
+        } else {                                                        // if no data in buffer and usart2 can TX
+            USART1->DR = val;                                           // send it to USART1
+        }
     }
+
+    if((USART2->SR & USART_FLAG_TXE) != 0) {        // if can TX
+        if(buff0.count > 0) {                       // and there is something to TX
+            BYTE val = cicrularGet(&buff0);
+            USART2->DR = val;
+        } else {                                    // and there's nothing to TX
+            USART2->CR1 &= ~USART_FLAG_TXE;         // disable interrupt on USART2 TXE
+        }
+    }  
 }   
 
 void circularInit(volatile TCircBuffer *cb)
