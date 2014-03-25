@@ -20,14 +20,14 @@ void timerSetup_index(void)
     
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
 
-    // PWM1 Mode configuration: Channel4
+    // PWM1 Mode configuration: Channel2
     TIM_OCInitStructure.TIM_OCMode          = TIM_OCMode_PWM1;
     TIM_OCInitStructure.TIM_OutputState     = TIM_OutputState_Enable;
     TIM_OCInitStructure.TIM_Pulse           = 10;                       // pulse will be 10 ticks == 5 ms long
     TIM_OCInitStructure.TIM_OCPolarity      = TIM_OCPolarity_Low;
 
-    TIM_OC4Init(TIM2, &TIM_OCInitStructure);
-    TIM_OC4PreloadConfig(TIM2, TIM_OCPreload_Enable);
+    TIM_OC2Init(TIM2, &TIM_OCInitStructure);
+    TIM_OC2PreloadConfig(TIM2, TIM_OCPreload_Enable);
     
     TIM_ARRPreloadConfig(TIM2, ENABLE);
 

@@ -424,7 +424,7 @@
                 <uSurpInc>2</uSurpInc>
                 <VariousControls>
                   <MiscControls></MiscControls>
-                  <Define>STM32F10X_LD</Define>
+                  <Define>STM32F10X_MD</Define>
                   <Undefine></Undefine>
                   <IncludePath></IncludePath>
                 </VariousControls>
@@ -448,11 +448,6 @@
             </GroupArmAds>
           </GroupOption>
           <Files>
-            <File>
-              <FileName>startup_stm32f10x_ld.s</FileName>
-              <FileType>2</FileType>
-              <FilePath>.\startup_stm32f10x_ld.s</FilePath>
-            </File>
             <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
@@ -572,6 +567,11 @@
               <FileName>stm32f10x_rcc.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\stm32f10x_rcc.c</FilePath>
+            </File>
+            <File>
+              <FileName>startup_stm32f10x_md.s</FileName>
+              <FileType>2</FileType>
+              <FilePath>.\startup_stm32f10x_md.s</FilePath>
             </File>
           </Files>
         </Group>

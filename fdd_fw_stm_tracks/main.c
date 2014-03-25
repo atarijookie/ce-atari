@@ -97,7 +97,7 @@ volatile WORD lastRequestTime;
 
 WORD trackStreamedCount = 0;
 
-volatile TCircBuffer buff0, buff1;
+volatile TCircBuffer buff0, buff1, buff2;
 void circularInit(volatile TCircBuffer *cb);
 void cicrularAdd(volatile TCircBuffer *cb, BYTE val);
 BYTE cicrularGet(volatile TCircBuffer *cb);
@@ -119,6 +119,7 @@ int main (void)
     
     circularInit(&buff0);
     circularInit(&buff1);
+    circularInit(&buff2);
 
     drive_select = MOTOR_ENABLE | DRIVE_SELECT0;    // the drive select bits which should be LOW if the drive is selected
 
@@ -126,7 +127,7 @@ int main (void)
     GPIOB->BSRR = (WR_PROTECT | DISK_CHANGE);       // not write protected
     GPIOB->BRR = TRACK0 | DISK_CHANGE;              // TRACK 0 signal to L, DISK_CHANGE to LOW      
     GPIOB->BRR = ATN;                               // ATTENTION bit low - nothing to read
-    
+
     REQUEST_TRACK;                                  // request track 0, side 0
 
     while(1) {
@@ -627,6 +628,28 @@ void USART2_IRQHandler(void)
             USART2->CR1 &= ~USART_FLAG_TXE;         // disable interrupt on USART2 TXE
         }
     }  
+}   
+     
+void USART3_IRQHandler(void)
+{
+    if((USART3->SR & USART_FLAG_RXNE) != 0) {       // if something received
+        BYTE val = USART3->DR;                      // read received value
+
+        cicrularAdd(&buff2, val);                                   // add to buffer
+
+        
+        /*
+TODO: the following is just c&p from other place, fix this before using!
+        
+        if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) {     // got data in buffer or usart2 can't TX right now? 
+            cicrularAdd(&buff1, val);                                   // add to buffer
+            USART1->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
+        } else {                                                        // if no data in buffer and usart2 can TX
+            USART1->DR = val;                                           // send it to USART1
+        }
+        */ 
+        
+    }
 }   
 
 void circularInit(volatile TCircBuffer *cb)

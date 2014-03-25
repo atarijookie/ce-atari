@@ -74,12 +74,14 @@ GPIOB_14 - DRIVE_SELECT1
 
 outputs:
 ---------
+GPIOA_1  - INDEX                        (using TIM2_CH2)
+
 GPIOA_8  - RDATA                        (using TIM1_CH1)
 
 GPIOB_8  - WRITE_PROTECT
 GPIOB_9  - DISK_CHANGE
 GPIOB_10 - TRACK0
-GPIOB_11 - INDEX                        (using TIM2_CH4)
+GPIOB_11 - USART3_RX -- for original ST keyboard TX
 GPIOB_15 - ATTENTION (need more data / data available to retrieve)
 */
 
@@ -98,7 +100,6 @@ GPIOB_15 - ATTENTION (need more data / data available to retrieve)
 #define WR_PROTECT      (1 <<   8)
 #define DISK_CHANGE     (1 <<   9)
 #define TRACK0          (1 <<  10)
-//#define   INDEX       (1 <<  11)
 
 #define MOTOR_ENABLE    (1 <<  12)
 #define DRIVE_SELECT0   (1 <<  13)

@@ -33,16 +33,15 @@ void FloppyMFMread_Disable(void)
     GPIOA->CRH |= (0x00000004);
 }
 
-// enable / disable TIM2 CH4 output on GPIOB_11
+// enable / disable TIM2 CH2 output on GPIOA_1
 void FloppyIndex_Enable(void)
 {
-    GPIOB->CRH &= ~(0x0000f000);
-    GPIOB->CRH |= (0x0000f000);         // open drain
-//GPIOB->CRH |= (0x0000b000);           // push pull
+    GPIOA->CRL &= ~(0x000000f0);
+    GPIOA->CRL |=  (0x000000f0);         // open drain
 }
 
 void FloppyIndex_Disable(void)
 {
-    GPIOB->CRH &= ~(0x0000f000);
-    GPIOB->CRH |= (0x00004000);
+    GPIOA->CRL &= ~(0x000000f0);
+    GPIOA->CRL |=  (0x00000040);
 }

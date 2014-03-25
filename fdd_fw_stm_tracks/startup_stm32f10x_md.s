@@ -1,10 +1,10 @@
-;******************** (C) COPYRIGHT 2011 STMicroelectronics ********************
-;* File Name          : startup_stm32f10x_ld.s
+;******************** (C) COPYRIGHT 2010 STMicroelectronics ********************
+;* File Name          : startup_stm32f10x_md.s
 ;* Author             : MCD Application Team
-;* Version            : V3.5.0
-;* Date               : 11-March-2011
-;* Description        : STM32F10x Low Density Devices vector table for MDK-ARM 
-;*                      toolchain. 
+;* Version            : V3.3.0
+;* Date               : 04/16/2010
+;* Description        : STM32F10x Medium Density Devices vector table for RVMDK 
+;*                      toolchain.  
 ;*                      This module performs:
 ;*                      - Set the initial SP
 ;*                      - Set the initial PC == Reset_Handler
@@ -106,16 +106,16 @@ __Vectors       DCD     __initial_sp               ; Top of Stack
                 DCD     TIM1_CC_IRQHandler         ; TIM1 Capture Compare
                 DCD     TIM2_IRQHandler            ; TIM2
                 DCD     TIM3_IRQHandler            ; TIM3
-                DCD     0                          ; Reserved
+                DCD     TIM4_IRQHandler            ; TIM4
                 DCD     I2C1_EV_IRQHandler         ; I2C1 Event
                 DCD     I2C1_ER_IRQHandler         ; I2C1 Error
-                DCD     0                          ; Reserved
-                DCD     0                          ; Reserved
+                DCD     I2C2_EV_IRQHandler         ; I2C2 Event
+                DCD     I2C2_ER_IRQHandler         ; I2C2 Error
                 DCD     SPI1_IRQHandler            ; SPI1
-                DCD     0                          ; Reserved
+                DCD     SPI2_IRQHandler            ; SPI2
                 DCD     USART1_IRQHandler          ; USART1
                 DCD     USART2_IRQHandler          ; USART2
-                DCD     0                          ; Reserved
+                DCD     USART3_IRQHandler          ; USART3
                 DCD     EXTI15_10_IRQHandler       ; EXTI Line 15..10
                 DCD     RTCAlarm_IRQHandler        ; RTC Alarm through EXTI Line
                 DCD     USBWakeUp_IRQHandler       ; USB Wakeup from suspend
@@ -125,7 +125,7 @@ __Vectors_Size  EQU  __Vectors_End - __Vectors
 
                 AREA    |.text|, CODE, READONLY
 
-; Reset handler routine
+; Reset handler
 Reset_Handler    PROC
                  EXPORT  Reset_Handler             [WEAK]
      IMPORT  __main
@@ -212,11 +212,16 @@ Default_Handler PROC
                 EXPORT  TIM1_CC_IRQHandler         [WEAK]
                 EXPORT  TIM2_IRQHandler            [WEAK]
                 EXPORT  TIM3_IRQHandler            [WEAK]
+                EXPORT  TIM4_IRQHandler            [WEAK]
                 EXPORT  I2C1_EV_IRQHandler         [WEAK]
                 EXPORT  I2C1_ER_IRQHandler         [WEAK]
+                EXPORT  I2C2_EV_IRQHandler         [WEAK]
+                EXPORT  I2C2_ER_IRQHandler         [WEAK]
                 EXPORT  SPI1_IRQHandler            [WEAK]
+                EXPORT  SPI2_IRQHandler            [WEAK]
                 EXPORT  USART1_IRQHandler          [WEAK]
                 EXPORT  USART2_IRQHandler          [WEAK]
+                EXPORT  USART3_IRQHandler          [WEAK]
                 EXPORT  EXTI15_10_IRQHandler       [WEAK]
                 EXPORT  RTCAlarm_IRQHandler        [WEAK]
                 EXPORT  USBWakeUp_IRQHandler       [WEAK]
@@ -251,11 +256,16 @@ TIM1_TRG_COM_IRQHandler
 TIM1_CC_IRQHandler
 TIM2_IRQHandler
 TIM3_IRQHandler
+TIM4_IRQHandler
 I2C1_EV_IRQHandler
 I2C1_ER_IRQHandler
+I2C2_EV_IRQHandler
+I2C2_ER_IRQHandler
 SPI1_IRQHandler
+SPI2_IRQHandler
 USART1_IRQHandler
 USART2_IRQHandler
+USART3_IRQHandler
 EXTI15_10_IRQHandler
 RTCAlarm_IRQHandler
 USBWakeUp_IRQHandler
@@ -269,7 +279,7 @@ USBWakeUp_IRQHandler
 ;*******************************************************************************
 ; User Stack and Heap initialization
 ;*******************************************************************************
-                 IF      :DEF:__MICROLIB
+                 IF      :DEF:__MICROLIB           
                 
                  EXPORT  __initial_sp
                  EXPORT  __heap_base
@@ -294,4 +304,4 @@ __user_initial_stackheap
 
                  END
 
-;******************* (C) COPYRIGHT 2011 STMicroelectronics *****END OF FILE*****
+;******************* (C) COPYRIGHT 2010 STMicroelectronics *****END OF FILE*****
