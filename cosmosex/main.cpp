@@ -14,6 +14,7 @@
 #include "debug.h"
 #include "mounter.h"
 #include "downloader.h"
+#include "ikbd.h"
 
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
@@ -23,6 +24,7 @@ int main(int argc, char *argv[])
 	CCoreThread *core;
 	pthread_t	mountThreadInfo;
     pthread_t	downloadThreadInfo;
+    pthread_t	ikbdThreadInfo;
 
     Debug::out("\n\n---------------------------------------------------");
     Debug::out("CosmosEx starting...");
@@ -64,15 +66,23 @@ int main(int argc, char *argv[])
 	} else {
 		Debug::out("Download thread created");
 	}
+
+    res = pthread_create(&ikbdThreadInfo, NULL, ikbdThreadCode, NULL);
+	if(res != 0) {
+		Debug::out("Failed to create IKBD thread, IKDB emulation won't work...");
+	} else {
+		Debug::out("IKBD thread created");
+	}
 	
 	core->run();										// run the main thread
 
 	delete core;
 	gpio_close();										// close gpio and spi
 
-	pthread_join(mountThreadInfo, NULL);				// wait until mount thread finishes
-    pthread_join(downloadThreadInfo, NULL);             // wait until downloadThread finishes
-	
+	pthread_join(mountThreadInfo, NULL);				// wait until mount     thread finishes
+    pthread_join(downloadThreadInfo, NULL);             // wait until download  thread finishes
+    pthread_join(ikbdThreadInfo, NULL);                 // wait until ikbd      thread finishes
+
     Downloader::cleanupBeforeQuit();
 
     Debug::out("CosmosEx terminated.");
