@@ -38,6 +38,8 @@ typedef struct {
 
 #define UARTFILE	"/dev/ttyAMA0"
 
+#define UART_RXBUF_SIZE  128
+
 void *ikbdThreadCode(void *ptr);
 
 class Ikbd
@@ -56,6 +58,8 @@ public:
     void processKeyboard(input_event *ev);
     void processJoystick(js_event *jse, int joyNumber);
 
+    void processReceivedCommands(void);
+
 private:
     TInputDevice    inDevs[4];
     int             tableKeysPcToSt[KEY_TABLE_SIZE];
@@ -64,6 +68,17 @@ private:
     int             mouseBtnNow;
 
     TJoystickState  joystick[2];
+
+    struct {
+        char buf[UART_RXBUF_SIZE];
+        int  count;
+        int  addPos;
+        int  getPos;
+    } uartRx;        
+    
+    void addToRxBuffer(BYTE val);
+    BYTE getFromRxBuffer(void);
+    BYTE peekRxBuffer(void);
 
     void initDevs(void);
     void initJoystickState(TJoystickState *joy);

@@ -41,12 +41,17 @@ void *ikbdThreadCode(void *ptr)
 	}
 
     while(sigintReceived == 0) {
+        // look for new input devices
         if(Utils::getCurrentMs() >= nextDevFindTime) {      // should we check for new devices?
             nextDevFindTime = Utils::getEndTime(3000);      // check the devices in 3 seconds
 
             ikbd.findDevices();
         }
 
+        // process the incomming data from original keyboard and from ST
+        ikbd.processReceivedCommands();
+
+        // process events from attached input devices
         struct input_event  ev;
         struct js_event     js;
 
@@ -100,6 +105,109 @@ Ikbd::Ikbd()
 
     fdUart      = -1;
     mouseBtnNow = 0;
+
+    uartRx.count    = 0;
+    uartRx.addPos   = 0;
+    uartRx.getPos   = 0;
+}
+
+void Ikbd::processReceivedCommands(void)
+{
+    if(fdUart == -1) {                          // uart not open? quit
+        return;
+    }
+
+    //-----------------
+    // receive if there is something to receive
+    char bfr[10];
+    int res = read(fdUart, bfr, 10);            // try to read data from uart
+
+    if(res > 0) {                               // if some data arrived, add it
+        for(int i=0; i<res; i++) {
+            addToRxBuffer(bfr[i]);
+        }
+    }
+
+    //-----------------
+    // send if there are enough data to be sent
+    
+    while(uartRx.count > 0) {                                   // loop while something to send
+        BYTE val = peekRxBuffer();
+
+        if(val == 0xff) {                                       // joy 1 state? 
+            if(uartRx.count >= 2) {                              // enough data?
+                for(int i=0; i<2; i++) {                            
+                    bfr[i] = getFromRxBuffer();                 // get it from buffer
+                }
+
+                write(fdUart, &bfr, 2);                         // send it to ST
+                continue;
+            } else {                                            // not enough data? quit
+                return;
+            }
+        }
+
+        if(val >= 0xf8 && val <=0xfb) {                         // joy 0 or mouse state?
+            if(uartRx.count >= 3) {                             // enough data?
+                for(int i=0; i<3; i++) {
+                    bfr[i] = getFromRxBuffer();                 // get it from buffer
+                }
+
+                write(fdUart, &bfr, 3);                         // send it to ST
+                continue;
+            } else {                                            // not enough data? quit
+                return;
+            }
+        }
+
+        // 0x80 0x01 -- reset cmd
+        // 0x07 MSS  -- set mouse button action
+        // 0x08      -- set relative mouse position reporting
+        // 0x09 XMSB XLSB YMSB YLSB -- set abtolute mouse positioning
+        // other 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12 - 0x1c, 0x20 - 0x22, 
+
+        // something other?
+        bfr[0] = getFromRxBuffer();                             // get get the byte and send it
+        write(fdUart, &bfr, 1);
+    }
+}
+
+void Ikbd::addToRxBuffer(BYTE val)
+{
+    if(uartRx.count >= UART_RXBUF_SIZE) {
+        return;
+    }
+    uartRx.count++;
+
+    uartRx.buf[uartRx.addPos] = val;
+
+    uartRx.addPos++;
+    uartRx.addPos = uartRx.addPos & 0x7f;
+}
+
+BYTE Ikbd::getFromRxBuffer(void)
+{
+    if(uartRx.count == 0) {
+        return 0;
+    }
+    uartRx.count--;
+
+    BYTE val = uartRx.buf[uartRx.getPos];
+
+    uartRx.getPos++;
+    uartRx.getPos = uartRx.getPos & 0x7f;
+
+    return val;
+}
+
+BYTE Ikbd::peekRxBuffer(void)
+{
+    if(uartRx.count == 0) {
+        return 0;
+    }
+
+    BYTE val = uartRx.buf[uartRx.getPos];
+    return val;
 }
 
 void Ikbd::processMouse(input_event *ev)
@@ -645,7 +753,7 @@ int Ikbd::serialSetup(termios *ts)
 	
     fdUart = -1;
 
-	fd = open(UARTFILE, O_RDWR | O_NOCTTY | O_NDELAY);
+	fd = open(UARTFILE, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK);
 	if(fd == -1) {
         Debug::out("Failed to open %s", UARTFILE);
         return -1;
@@ -666,7 +774,7 @@ int Ikbd::serialSetup(termios *ts)
 	ts->c_cflag |=  CS8 | CLOCAL | CREAD;			// uart: 8N1
 
 	ts->c_cc[VMIN ] = 0;
-	ts->c_cc[VTIME] = 30;
+	ts->c_cc[VTIME] = 0;
 
 	/* set the settings */
 	tcflush(fd, TCIFLUSH); 
@@ -686,6 +794,8 @@ int Ikbd::serialSetup(termios *ts)
 		close(fd);
 		return -1;
 	}
+
+    fcntl(fd, F_SETFL, FNDELAY);                    // make reading non-blocking
 
     fdUart = fd;
 	return fd;
