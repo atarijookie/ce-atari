@@ -16,6 +16,7 @@
 #include <linux/joystick.h>
 #include <errno.h>
 
+#include "debug.h"
 #include "gpio.h"
 #include "utils.h"
 #include "ikbd.h"
@@ -36,7 +37,7 @@ void *ikbdThreadCode(void *ptr)
 	// open and set up uart
 	int res = ikbd.serialSetup(&termiosStruct);
 	if(res == -1) {
-        printf("ikbd.serialSetup failed, won't be able to send IKDB data\n");
+        Debug::out("ikbd.serialSetup failed, won't be able to send IKDB data");
 	}
 
     while(sigintReceived == 0) {
@@ -108,7 +109,7 @@ void Ikbd::processMouse(input_event *ev)
 		
 	    switch(ev->code) {
 		    case BTN_LEFT:		
-		    printf("mouse LEFT button %d", ev->value); 
+		    Debug::out("mouse LEFT button %d", ev->value); 
 			
 			if(ev->value == 1) {				// on DOWN - add bit
 			    btnNew |= 2; 
@@ -119,7 +120,7 @@ void Ikbd::processMouse(input_event *ev)
 			break;
 		
     		case BTN_RIGHT:		
-			printf("mouse RIGHT button %d", ev->value); 
+			Debug::out("mouse RIGHT button %d", ev->value); 
 					
 			if(ev->value == 1) {				// on DOWN - add bit
 				btnNew |= 1; 
@@ -141,12 +142,12 @@ void Ikbd::processMouse(input_event *ev)
 		
 	if(ev->type == EV_REL) {
 		if(ev->code == REL_X) {
-			printf("mouse REL_X: %d\n", ev->value);
+			Debug::out("mouse REL_X: %d", ev->value);
 			serialSendMousePacket(fdUart, mouseBtnNow, ev->value, 0);	// send movement to ST
 		}
 
 		if(ev->code == REL_Y) {
-			printf("mouse REL_Y: %d\n", ev->value);
+			Debug::out("mouse REL_Y: %d", ev->value);
 			serialSendMousePacket(fdUart, mouseBtnNow, 0, ev->value);	// send movement to ST
 		}
 	}
@@ -170,7 +171,7 @@ void Ikbd::processKeyboard(input_event *ev)
             stKey = stKey | 0x80;
         }
 
-        printf("\nEV_KEY: code %d, value %d, stKey: %02x\n", ev->code, ev->value, stKey);
+        Debug::out("\nEV_KEY: code %d, value %d, stKey: %02x", ev->code, ev->value, stKey);
 
         if(fdUart == -1) {                          // no UART open? quit
             return;
@@ -182,7 +183,7 @@ void Ikbd::processKeyboard(input_event *ev)
     	int res = write(fdUart, &bfr, 1); 
 
     	if(res < 0) {
-	    	printf("processKeyboard - sending to ST failed, errno: %d\n", errno);
+	    	Debug::out("processKeyboard - sending to ST failed, errno: %d", errno);
 	    }
     }
 }
@@ -269,7 +270,7 @@ void Ikbd::processJoystick(js_event *jse, int joyNumber)
             res = write(fdUart, bfr, 2); 
 
         	if(res < 0) {
-        		printf("write to uart (0) failed, errno: %d\n", errno);
+        		Debug::out("write to uart (0) failed, errno: %d", errno);
             }
         }
 
@@ -319,7 +320,7 @@ void Ikbd::sendJoy0State(void)
     int res = write(fdUart, bfr, 3); 
 
     if(res < 0) {
-        printf("write to uart (1) failed, errno: %d\n", errno);
+        Debug::out("write to uart (1) failed, errno: %d", errno);
     }
 }
 
@@ -430,13 +431,13 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
     int fd = open(fullPath, O_RDONLY | O_NONBLOCK);
 
     if(fd < 0) {
-        printf("Failed to open input device (%s): %s\n", what, fullPath);
+        Debug::out("Failed to open input device (%s): %s", what, fullPath);
         return;
     }
 
     in->fd = fd;
     strcpy(in->devPath, fullPath);
-    printf("Got device (%s): %s\n", what, fullPath);
+    Debug::out("Got device (%s): %s", what, fullPath);
 }
 
 int Ikbd::getFdByIndex(int index)
@@ -612,7 +613,7 @@ void Ikbd::fillKeyTranslationTable(void)
 void Ikbd::addToTable(int pcKey, int stKey)
 {
     if(pcKey >= KEY_TABLE_SIZE) {
-        printf("addToTable -- Can't add pair %d - %d - out of range.\n", pcKey, stKey);
+        Debug::out("addToTable -- Can't add pair %d - %d - out of range.", pcKey, stKey);
         return;
     }
 
@@ -634,7 +635,7 @@ void Ikbd::serialSendMousePacket(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
 	int res = write(fd, bfr, 3); 
 
 	if(res < 0) {
-		printf("serialSendMousePacket failed, errno: %d\n", errno);
+		Debug::out("serialSendMousePacket failed, errno: %d", errno);
 	}
 }
 
@@ -646,7 +647,7 @@ int Ikbd::serialSetup(termios *ts)
 
 	fd = open(UARTFILE, O_RDWR | O_NOCTTY | O_NDELAY);
 	if(fd == -1) {
-        printf("Failed to open %s\n", UARTFILE);
+        Debug::out("Failed to open %s", UARTFILE);
         return -1;
 	}
 	fcntl(fd, F_SETFL, 0);
