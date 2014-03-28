@@ -106,9 +106,14 @@ Ikbd::Ikbd()
     fdUart      = -1;
     mouseBtnNow = 0;
 
-    uartRx.count    = 0;
-    uartRx.addPos   = 0;
-    uartRx.getPos   = 0;
+    // init uart RX cyclic buffers
+    initCyclicBuffer(&cbStCommands);
+    initCyclicBuffer(&cbKeyboardData);
+
+    gotHalfPair     = false;
+    halfPairData    = 0;
+
+    fillSpecialCodeLengthTable();
 }
 
 void Ikbd::processReceivedCommands(void)
@@ -119,94 +124,132 @@ void Ikbd::processReceivedCommands(void)
 
     //-----------------
     // receive if there is something to receive
-    char bfr[10];
-    int res = read(fdUart, bfr, 10);            // try to read data from uart
+    BYTE bfr[128];
+    BYTE *pBfr = gotHalfPair ? &bfr[1] : &bfr[0];               // if got half pair, receive to offset +1
 
-    if(res > 0) {                               // if some data arrived, add it
-        for(int i=0; i<res; i++) {
-            addToRxBuffer(bfr[i]);
+    int res = read(fdUart, pBfr, 127);                          // try to read data from uart
+
+    if(res > 0) {                                               // if some data arrived, add it
+        if(gotHalfPair) {                                       // if got half pair from previous read, use it and unmark that we got it
+            bfr[0]      = halfPairData;
+            gotHalfPair = false;
+            res++;                                              // now we got one byte more!
         }
+
+        // divide the received data to ST commands and keyboard data
+        for(int i=0; i<res; i += 2) {
+            if((i+1) < res) {                                   // there's at least this pair in buffer
+                if(bfr[i] == UARTMARK_STCMD) {                  // this is ST command byte, add it to ST command buffer
+                    addToCyclicBuffer(&cbStCommands, bfr[i + 1]);
+                } else if(bfr[i] == UARTMARK_KEYBDATA) {        // this is original keyboard data, add it to keyboard data buffer
+                    addToCyclicBuffer(&cbKeyboardData, bfr[i + 1]);
+                } else {                                        // this is not command MARK and not keyboard MARK, move half pair back (we're not in sync with pairs somehow)
+                    i--;
+                }
+            } else {                                            // there's only half of this pair in buffer (this is the last iteration)
+                gotHalfPair     = true;                         // mark that we got half pair and store the data
+                halfPairData    = bfr[i];
+            }
+        }
+    }
+
+    if(res <= 0) {                                              // no data was received, nothing to resend
+        return;
     }
 
     //-----------------
     // send if there are enough data to be sent
     
-    while(uartRx.count > 0) {                                   // loop while something to send
-        BYTE val = peekRxBuffer();
+    if(cbStCommands.count > 0) {                                // got ST commands? process them
+        processStCommands();
+    }
 
-        if(val == 0xff) {                                       // joy 1 state? 
-            if(uartRx.count >= 2) {                              // enough data?
-                for(int i=0; i<2; i++) {                            
-                    bfr[i] = getFromRxBuffer();                 // get it from buffer
-                }
-
-                write(fdUart, &bfr, 2);                         // send it to ST
-                continue;
-            } else {                                            // not enough data? quit
-                return;
-            }
-        }
-
-        if(val >= 0xf8 && val <=0xfb) {                         // joy 0 or mouse state?
-            if(uartRx.count >= 3) {                             // enough data?
-                for(int i=0; i<3; i++) {
-                    bfr[i] = getFromRxBuffer();                 // get it from buffer
-                }
-
-                write(fdUart, &bfr, 3);                         // send it to ST
-                continue;
-            } else {                                            // not enough data? quit
-                return;
-            }
-        }
-
-        // 0x80 0x01 -- reset cmd
-        // 0x07 MSS  -- set mouse button action
-        // 0x08      -- set relative mouse position reporting
-        // 0x09 XMSB XLSB YMSB YLSB -- set abtolute mouse positioning
-        // other 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12 - 0x1c, 0x20 - 0x22, 
-
-        // something other?
-        bfr[0] = getFromRxBuffer();                             // get get the byte and send it
-        write(fdUart, &bfr, 1);
+    if(cbKeyboardData.count > 0) {                              // got keyboard data? process them
+        processKeyboardData();
     }
 }
 
-void Ikbd::addToRxBuffer(BYTE val)
+void Ikbd::processStCommands(void)
 {
-    if(uartRx.count >= UART_RXBUF_SIZE) {
+
+}
+
+void Ikbd::processKeyboardData(void)
+{
+    BYTE bfr[128];
+
+    if(cbKeyboardData.count <= 0) {                             // no data? quit
         return;
     }
-    uartRx.count++;
 
-    uartRx.buf[uartRx.addPos] = val;
+    while(cbKeyboardData.count > 0) {                           // while there are some data, process
+        BYTE val = peekCyclicBuffer(&cbKeyboardData);           // get the data, but don't move the get pointer, because we might fail later
 
-    uartRx.addPos++;
-    uartRx.addPos = uartRx.addPos & 0x7f;
+        if(val >= 0xf6 && val <= 0xff) {                        // if this a special code?
+            BYTE index = val - 0xf6;                            // convert it to table index
+
+            BYTE len = specialCodeLen[index];                   // get length of the special sequence from table
+
+            if(len > cbKeyboardData.count) {                    // not enough data in buffer? Maybe next time... Quit.
+                return;
+            }
+
+            for(int i=0; i<len; i++) {                          // get the whole sequence
+                bfr[i] = getFromCyclicBuffer(&cbKeyboardData);
+            }
+
+            write(fdUart, &bfr, len);                           // send the whole sequence to ST
+            continue;
+        }
+
+        // if we got here, it's not a special code, just make / break keyboard code
+        val = getFromCyclicBuffer(&cbKeyboardData);             // get data from buffer
+        write(fdUart, &val, 1);                                 // send byte to ST
+    }
 }
 
-BYTE Ikbd::getFromRxBuffer(void)
+void Ikbd::initCyclicBuffer(TCyclicBuff *cb)
 {
-    if(uartRx.count == 0) {
+    cb->count    = 0;
+    cb->addPos   = 0;
+    cb->getPos   = 0;
+}
+
+void Ikbd::addToCyclicBuffer(TCyclicBuff *cb, BYTE val)
+{
+    if(cb->count >= UART_RXBUF_SIZE) {  // buffer full? quit
+        return;
+    }
+    cb->count++;                        // update count
+
+    cb->buf[cb->addPos] = val;          // store data
+
+    cb->addPos++;                       // update 'add' position
+    cb->addPos = cb->addPos & 0x7f;
+}
+
+BYTE Ikbd::getFromCyclicBuffer(TCyclicBuff *cb)
+{
+    if(cb->count == 0) {                // buffer empty? quit
         return 0;
     }
-    uartRx.count--;
+    cb->count--;                        // update count
 
-    BYTE val = uartRx.buf[uartRx.getPos];
+    BYTE val = cb->buf[cb->getPos];     // get data
 
-    uartRx.getPos++;
-    uartRx.getPos = uartRx.getPos & 0x7f;
+    cb->getPos++;                       // update 'get' position
+    cb->getPos = cb->getPos & 0x7f;
 
     return val;
 }
 
-BYTE Ikbd::peekRxBuffer(void)
+BYTE Ikbd::peekCyclicBuffer(TCyclicBuff *cb)
 {
-    if(uartRx.count == 0) {
+    if(cb->count == 0) {                // buffer empty? 
         return 0;
     }
 
-    BYTE val = uartRx.buf[uartRx.getPos];
+    BYTE val = cb->buf[cb->getPos];     // just get the data
     return val;
 }
 
@@ -614,6 +657,20 @@ void Ikbd::closeDevs(void)
             inDevs[i].fd = -1;          // mark it as closed
         }
     }
+}
+
+void Ikbd::fillSpecialCodeLengthTable(void)
+{
+    specialCodeLen[KEYBDATA_STATUS]     = KEYBDATA_STATUS_LEN;
+    specialCodeLen[KEYBDATA_MOUSE_ABS]  = KEYBDATA_MOUSE_ABS_LEN;
+    specialCodeLen[KEYBDATA_MOUSE_REL8] = KEYBDATA_MOUSE_REL8_LEN;
+    specialCodeLen[KEYBDATA_MOUSE_REL9] = KEYBDATA_MOUSE_REL9_LEN;
+    specialCodeLen[KEYBDATA_MOUSE_RELA] = KEYBDATA_MOUSE_RELA_LEN;
+    specialCodeLen[KEYBDATA_MOUSE_RELB] = KEYBDATA_MOUSE_RELB_LEN;
+    specialCodeLen[KEYBDATA_TIMEOFDAY]  = KEYBDATA_TIMEOFDAY_LEN;
+    specialCodeLen[KEYBDATA_JOY_BOTH]   = KEYBDATA_JOY_BOTH_LEN;
+    specialCodeLen[KEYBDATA_JOY0]       = KEYBDATA_JOY0_LEN;
+    specialCodeLen[KEYBDATA_JOY1]       = KEYBDATA_JOY1_LEN;
 }
 
 void Ikbd::fillKeyTranslationTable(void)
