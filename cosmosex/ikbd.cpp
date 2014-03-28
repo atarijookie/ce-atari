@@ -114,6 +114,9 @@ Ikbd::Ikbd()
     halfPairData    = 0;
 
     fillSpecialCodeLengthTable();
+    fillStCommandsLengthTable();
+
+    mouseMode = MOUSEMODE_REL;
 }
 
 void Ikbd::processReceivedCommands(void)
@@ -171,7 +174,59 @@ void Ikbd::processReceivedCommands(void)
 
 void Ikbd::processStCommands(void)
 {
+    BYTE bfr[512];
 
+    if(cbStCommands.count <= 0) {                               // no data? quit
+        return;
+    }
+
+    while(cbStCommands.count > 0) {                             // while there are some data, process
+        BYTE cmd = peekCyclicBuffer(&cbStCommands);             // get the data, but don't move the get pointer, because we might fail later
+        int len = 0;
+
+        if((cmd & 0x80) == 0) {                                 // highest bit is 0? SET command
+            len = stCommandLen[cmd];                            // try to get the command length
+        } else {                                                // highest bit is 1? GET command
+            BYTE setEquivalent = cmd & 0x7f;                    // get the equivalent SET command (remove higherst bit)
+            BYTE setLen = stCommandLen[setEquivalent];          // try to get the length of SET equivalent command
+
+            if(setLen != 0) {                                   // if we got the SET equivalent command length, we support this command
+                len = 1;                                        // the length of command is 1
+            }
+        }
+
+        if(len == 0) {                                          // it's not GET command and we don't have this SET command defined?
+            getFromCyclicBuffer(&cbStCommands);                 // just remove this byte and try the next byte
+            continue;
+        }
+
+        if(cmd == STCMD_MEMORY_LOAD) {                          // special case: this command has length stored on index[3]
+            if(cbStCommands.count < 4) {                        // not enough data to determine command length? quit
+                return;
+            }
+
+            len = peekCyclicBufferWithOffset(&cbStCommands, 3); // get the data at offset [3] but don't really move
+        }
+
+        if(len > cbStCommands.count) {                          // if we don't have enough data in the buffer, quit
+            return;
+        }
+
+        // if we got here, it's either GET or SET command that we support
+
+        for(int i=0; i<len; i++) {                              // get the whole sequence
+            bfr[i] = getFromCyclicBuffer(&cbStCommands);
+        }
+
+        // TODO: handle commands which need to be handled
+
+        switch(bfr[0]) {
+            case STCMD_SET_REL_MOUSE_POS_REPORTING_LEN:
+            mouseMode = MOUSEMODE_REL;
+            break;
+
+        }
+    }
 }
 
 void Ikbd::processKeyboardData(void)
@@ -217,7 +272,7 @@ void Ikbd::initCyclicBuffer(TCyclicBuff *cb)
 
 void Ikbd::addToCyclicBuffer(TCyclicBuff *cb, BYTE val)
 {
-    if(cb->count >= UART_RXBUF_SIZE) {  // buffer full? quit
+    if(cb->count >= CYCLIC_BUF_SIZE) {  // buffer full? quit
         return;
     }
     cb->count++;                        // update count
@@ -225,7 +280,7 @@ void Ikbd::addToCyclicBuffer(TCyclicBuff *cb, BYTE val)
     cb->buf[cb->addPos] = val;          // store data
 
     cb->addPos++;                       // update 'add' position
-    cb->addPos = cb->addPos & 0x7f;
+    cb->addPos = cb->addPos & CYCLIC_BUF_MASK;
 }
 
 BYTE Ikbd::getFromCyclicBuffer(TCyclicBuff *cb)
@@ -238,7 +293,7 @@ BYTE Ikbd::getFromCyclicBuffer(TCyclicBuff *cb)
     BYTE val = cb->buf[cb->getPos];     // get data
 
     cb->getPos++;                       // update 'get' position
-    cb->getPos = cb->getPos & 0x7f;
+    cb->getPos = cb->getPos & CYCLIC_BUF_MASK;
 
     return val;
 }
@@ -250,6 +305,18 @@ BYTE Ikbd::peekCyclicBuffer(TCyclicBuff *cb)
     }
 
     BYTE val = cb->buf[cb->getPos];     // just get the data
+    return val;
+}
+
+BYTE Ikbd::peekCyclicBufferWithOffset(TCyclicBuff *cb, int offset)
+{
+    if(offset >= cb->count) {                                           // not enough data in buffer? quit
+        return 0;
+    }
+
+    int getPosWithOffet = (cb->getPos + offset) & CYCLIC_BUF_MASK;      // calculate get position
+
+    BYTE val = cb->buf[getPosWithOffet];                                // get data
     return val;
 }
 
@@ -657,6 +724,38 @@ void Ikbd::closeDevs(void)
             inDevs[i].fd = -1;          // mark it as closed
         }
     }
+}
+
+void Ikbd::fillStCommandsLengthTable(void)
+{
+    memset(stCommandLen, 0, 256);       // init table with zeros
+
+    stCommandLen[STCMD_RESET]                           = STCMD_RESET_LEN;
+    stCommandLen[STCMD_SET_MOUSE_BTN_ACTION]            = STCMD_SET_MOUSE_BTN_ACTION_LEN;
+    stCommandLen[STCMD_SET_REL_MOUSE_POS_REPORTING]     = STCMD_SET_REL_MOUSE_POS_REPORTING_LEN;
+    stCommandLen[STCMD_SET_ABS_MOUSE_POS_REPORTING]     = STCMD_SET_ABS_MOUSE_POS_REPORTING_LEN;
+    stCommandLen[STCMD_SET_MOUSE_KEYCODE_MODE]          = STCMD_SET_MOUSE_KEYCODE_MODE_LEN;
+    stCommandLen[STCMD_SET_MOUSE_THRESHOLD]             = STCMD_SET_MOUSE_THRESHOLD_LEN;
+    stCommandLen[STCMD_SET_MOUSE_SCALE]                 = STCMD_SET_MOUSE_SCALE_LEN;
+    stCommandLen[STCMD_INTERROGATE_MOUSE_POS]           = STCMD_INTERROGATE_MOUSE_POS_LEN;
+    stCommandLen[STCMD_LOAD_MOUSE_POS]                  = STCMD_LOAD_MOUSE_POS_LEN;
+    stCommandLen[STCMD_SET_Y_AT_BOTTOM]                 = STCMD_SET_Y_AT_BOTTOM_LEN;
+    stCommandLen[STCMD_SET_Y_AT_TOP]                    = STCMD_SET_Y_AT_TOP_LEN;
+    stCommandLen[STCMD_RESUME]                          = STCMD_RESUME_LEN;
+    stCommandLen[STCMD_DISABLE_MOUSE]                   = STCMD_DISABLE_MOUSE_LEN;
+    stCommandLen[STCMD_PAUSE_OUTPUT]                    = STCMD_PAUSE_OUTPUT_LEN;
+    stCommandLen[STCMD_SET_JOYSTICK_EVENT_REPORTING]    = STCMD_SET_JOYSTICK_EVENT_REPORTING_LEN;
+    stCommandLen[STCMD_SET_JOYSTICK_INTERROG_MODE]      = STCMD_SET_JOYSTICK_INTERROG_MODE_LEN;
+    stCommandLen[STCMD_JOYSTICK_INTERROGATION]          = STCMD_JOYSTICK_INTERROGATION_LEN;
+    stCommandLen[STCMD_SET_JOYSTICK_MONITORING]         = STCMD_SET_JOYSTICK_MONITORING_LEN;
+    stCommandLen[STCMD_SET_FIRE_BUTTON_MONITORING]      = STCMD_SET_FIRE_BUTTON_MONITORING_LEN;
+    stCommandLen[STCMD_SET_JOYSTICK_KEYCODE_MODE]       = STCMD_SET_JOYSTICK_KEYCODE_MODE_LEN;
+    stCommandLen[STCMD_DISABLE_JOYSTICKS]               = STCMD_DISABLE_JOYSTICKS_LEN;
+    stCommandLen[STCMD_TIMEOFDAY_CLOCK_SET]             = STCMD_TIMEOFDAY_CLOCK_SET_LEN;
+    stCommandLen[STCMD_INTERROGATE_TIMEOFDAT_CLOCK]     = STCMD_INTERROGATE_TIMEOFDAT_CLOCK_LEN;
+    stCommandLen[STCMD_MEMORY_LOAD]                     = STCMD_MEMORY_LOAD_LEN;
+    stCommandLen[STCMD_MEMORY_READ]                     = STCMD_MEMORY_READ_LEN;
+    stCommandLen[STCMD_CONTROLLER_EXECUTE]              = STCMD_CONTROLLER_EXECUTE_LEN;
 }
 
 void Ikbd::fillSpecialCodeLengthTable(void)

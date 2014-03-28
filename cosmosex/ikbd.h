@@ -30,7 +30,8 @@ typedef struct {
 
 #define UARTFILE	        "/dev/ttyAMA0"
 
-#define UART_RXBUF_SIZE     128
+#define CYCLIC_BUF_SIZE     256
+#define CYCLIC_BUF_MASK     0xff;
 
 #define UARTMARK_STCMD      0xAA
 #define UARTMARK_KEYBDATA   0xBB
@@ -44,11 +45,14 @@ typedef struct {
 } TJoystickState;
 
 typedef struct {
-    BYTE buf[UART_RXBUF_SIZE];
+    BYTE buf[CYCLIC_BUF_SIZE];
     int  count;
     int  addPos;
     int  getPos;
 } TCyclicBuff;
+
+#define MOUSEMODE_REL       0
+#define MOUSEMODE_ABS       1
 
 // data sent from keyboard
 #define KEYBDATA_STATUS             0xf6
@@ -158,6 +162,7 @@ private:
     int             fdUart;
 
     int             mouseBtnNow;
+    int             mouseMode;    
 
     TJoystickState  joystick[2];
 
@@ -169,16 +174,20 @@ private:
 
     BYTE            specialCodeLen[10];
 
+    BYTE            stCommandLen[256];
+
     void initCyclicBuffer(TCyclicBuff *cb);
     void addToCyclicBuffer(TCyclicBuff *cb, BYTE val);
     BYTE getFromCyclicBuffer(TCyclicBuff *cb);
     BYTE peekCyclicBuffer(TCyclicBuff *cb);
+    BYTE peekCyclicBufferWithOffset(TCyclicBuff *cb, int offset);
 
     void initDevs(void);
     void initJoystickState(TJoystickState *joy);
     void fillKeyTranslationTable(void);
     void addToTable(int pcKey, int stKey);
     void fillSpecialCodeLengthTable(void);
+    void fillStCommandsLengthTable(void);
 
     void processFoundDev(char *linkName, char *fullPath);
 
