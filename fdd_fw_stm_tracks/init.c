@@ -332,14 +332,14 @@ void initUsarts(void)
     USART_Cmd(USART2, ENABLE);
     USART_Cmd(USART3, ENABLE);
     
-    usartStruct.USART_BaudRate              = 19200;   
+    usartStruct.USART_BaudRate              = 9600;   
     usartStruct.USART_WordLength            = USART_WordLength_8b;  
     usartStruct.USART_StopBits              = USART_StopBits_1;   
     usartStruct.USART_Parity                = USART_Parity_No;
     usartStruct.USART_Mode                  = USART_Mode_Rx | USART_Mode_Tx;
     usartStruct.USART_HardwareFlowControl   = USART_HardwareFlowControl_None;
     
-    USART_Init(USART1, &usartStruct);               // Configure USART1 - 19200 baud -- for communication with RPi
+    USART_Init(USART1, &usartStruct);               // Configure USART1 - 9600 baud -- for communication with RPi
 
     usartStruct.USART_BaudRate              = 7812;   
     USART_Init(USART2, &usartStruct);               // Configure USART2 - 7812 baud  -- for communication with ST

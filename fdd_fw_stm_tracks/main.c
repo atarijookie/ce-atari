@@ -97,7 +97,7 @@ volatile WORD lastRequestTime;
 
 WORD trackStreamedCount = 0;
 
-volatile TCircBuffer buff0, buff1, buff2;
+volatile TCircBuffer buff0, buff1;
 void circularInit(volatile TCircBuffer *cb);
 void cicrularAdd(volatile TCircBuffer *cb, BYTE val);
 BYTE cicrularGet(volatile TCircBuffer *cb);
@@ -119,7 +119,6 @@ int main (void)
     
     circularInit(&buff0);
     circularInit(&buff1);
-    circularInit(&buff2);
 
     drive_select = MOTOR_ENABLE | DRIVE_SELECT0;    // the drive select bits which should be LOW if the drive is selected
 
@@ -584,10 +583,10 @@ void processHostCommand(BYTE val)
     }
 }
 
-void USART1_IRQHandler(void)
+void USART1_IRQHandler(void)                                            // USART1 is connected to RPi
 {
-    if((USART1->SR & USART_FLAG_RXNE) != 0) {       // if something received
-        BYTE val = USART1->DR;                      // read received value
+    if((USART1->SR & USART_FLAG_RXNE) != 0) {                           // if something received
+        BYTE val = USART1->DR;                                          // read received value
         
         if(buff0.count > 0 || (USART2->SR & USART_FLAG_TXE) == 0) {     // got data in buffer or usart2 can't TX right now? 
             cicrularAdd(&buff0, val);                                   // add to buffer
@@ -597,58 +596,57 @@ void USART1_IRQHandler(void)
         }
     }
 
-    if((USART1->SR & USART_FLAG_TXE) != 0) {        // if can TX
-        if(buff1.count > 0) {                       // and there is something to TX
+    if((USART1->SR & USART_FLAG_TXE) != 0) {                            // if can TX
+        if(buff1.count > 0) {                                           // and there is something to TX
             BYTE val = cicrularGet(&buff1);
             USART1->DR = val;
-        } else {                                    // and there's nothing to TX
-            USART1->CR1 &= ~USART_FLAG_TXE;         // disable interrupt on USART2 TXE
+        } else {                                                        // and there's nothing to TX
+            USART1->CR1 &= ~USART_FLAG_TXE;                             // disable interrupt on USART2 TXE
         }
     }  
 }   
 
-void USART2_IRQHandler(void)
+#define UARTMARK_STCMD      0xAA
+#define UARTMARK_KEYBDATA   0xBB
+
+void USART2_IRQHandler(void)                                            // USART2 is connected to ST IKBD port
 {
-    if((USART2->SR & USART_FLAG_RXNE) != 0) {       // if something received
-        BYTE val = USART2->DR;                      // read received value
+    if((USART2->SR & USART_FLAG_RXNE) != 0) {                           // if something received
+        BYTE val = USART2->DR;                                          // read received value
         
-        if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) {     // got data in buffer or usart2 can't TX right now? 
-            cicrularAdd(&buff1, val);                                   // add to buffer
-            USART1->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
+        if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) {     // got data in buffer or usart1 can't TX right now? 
+            cicrularAdd(&buff1, UARTMARK_STCMD);                        // add to buffer - MARK
         } else {                                                        // if no data in buffer and usart2 can TX
-            USART1->DR = val;                                           // send it to USART1
+            USART1->DR = UARTMARK_STCMD;                                // send to USART1 - MARK
         }
+
+        cicrularAdd(&buff1, val);                                       // add to buffer - DATA
+        USART1->CR1 |= USART_FLAG_TXE;                                  // enable interrupt on USART TXE
     }
 
-    if((USART2->SR & USART_FLAG_TXE) != 0) {        // if can TX
-        if(buff0.count > 0) {                       // and there is something to TX
+    if((USART2->SR & USART_FLAG_TXE) != 0) {                            // if can TX
+        if(buff0.count > 0) {                                           // and there is something to TX
             BYTE val = cicrularGet(&buff0);
             USART2->DR = val;
-        } else {                                    // and there's nothing to TX
-            USART2->CR1 &= ~USART_FLAG_TXE;         // disable interrupt on USART2 TXE
+        } else {                                                        // and there's nothing to TX
+            USART2->CR1 &= ~USART_FLAG_TXE;                             // disable interrupt on USART2 TXE
         }
     }  
 }   
      
-void USART3_IRQHandler(void)
+void USART3_IRQHandler(void)                                            // USART3 is connected to original ST keyboard
 {
-    if((USART3->SR & USART_FLAG_RXNE) != 0) {       // if something received
-        BYTE val = USART3->DR;                      // read received value
+    if((USART3->SR & USART_FLAG_RXNE) != 0) {                           // if something received
+        BYTE val = USART3->DR;                                          // read received value
 
-        cicrularAdd(&buff2, val);                                   // add to buffer
-
-        
-        /*
-TODO: the following is just c&p from other place, fix this before using!
-        
-        if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) {     // got data in buffer or usart2 can't TX right now? 
-            cicrularAdd(&buff1, val);                                   // add to buffer
-            USART1->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
+        if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) {     // got data in buffer or usart1 can't TX right now? 
+            cicrularAdd(&buff1, UARTMARK_KEYBDATA);                     // add to buffer - MARK
         } else {                                                        // if no data in buffer and usart2 can TX
-            USART1->DR = val;                                           // send it to USART1
+            USART1->DR = UARTMARK_KEYBDATA;                             // send to USART1 - MARK
         }
-        */ 
-        
+
+        cicrularAdd(&buff1, val);                                       // add to buffer - DATA
+        USART1->CR1 |= USART_FLAG_TXE;                                  // enable interrupt on USART TXE
     }
 }   
 
