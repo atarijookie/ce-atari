@@ -78,7 +78,7 @@ begin
 
     INT <= '0' when INTstate='0' else 'Z';              -- INT - pull to L, otherwise hi-Z
     DRQ <= '0' when DRQstate='0' else 'Z';              -- DRQ - pull to L, otherwise hi-Z
-    CMD <= CS or A1;                                    -- CMD - falling edge here will tell that CS with A1 low has been found
+    CMD <= CS or A1 or (not RESET);                     -- CMD - falling edge here will tell that CS with A1 low has been found (and ACSI RESET has to be high at that time)
 
     -- DATA1 is connected to Atari ST, data goes out when going from MCU to ST (READ operation)
     DATA1 <=    "ZZZZZZZZ"  when resetCombo='0' else    -- when Atari or MCU is in reset state, don't drive this 
