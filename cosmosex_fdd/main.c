@@ -37,11 +37,12 @@ void swapImage(int index);
 void removeImage(int index);
 
 BYTE ce_acsiReadCommand(void);
-BYTE ce_acsiWrite64kBlockCommand(void);
+BYTE ce_acsiWriteBlockCommand(void);
 
 char filePath[256], fileName[256];
 
 BYTE *p64kBlock;
+BYTE sectorCount;
 
 /* ------------------------------------------------------------------ */
 int main( int argc, char* argv[] )
@@ -238,55 +239,82 @@ void uploadImage(int index)
         Cnecin();
         return;
     }
-    
+
+    //---------------
+    // these buffers will be handy in a while...
+
     #define SIZE64K     (64*1024)
     
     BYTE imgBlock[SIZE64K + 4];
     BYTE *pBfr      = (BYTE *) (((DWORD) (&imgBlock[4])) & 0xfffffffe);     // create even pointer
     BYTE *pBfrCnt   = pBfr - 2;                                             // pointer to where the 
-
     BYTE res;
+    
+    //---------------
+    // tell the device the path and filename of the source image
+    
+    commandShort[4] = FDD_CMD_UPLOADIMGBLOCK_START;             // starting image upload
+    commandShort[5] = index;                                    // for this index
+    
+    p64kBlock       = pBfr;                                     // use this buffer for writing
+    strcpy((char *) pBfr, fullPath);                            // and copy in the full path
+    
+    sectorCount     = 1;                                        // write just one sector
+    
+    res = Supexec(ce_acsiWriteBlockCommand); 
+		
+    if(res != 1) {                                              // bad? write error
+        (void) Clear_home();
+        (void) Cconws("Error in CosmosEx communication!\r\n");
+        Cnecin();
+                
+        Fclose(fh);                                             // close file and quit
+        return;
+    }
+    //---------------
+    // upload the image by 64kB blocks
+    
     BYTE good = 1;
     BYTE blockNo = 0;
+    
+    sectorCount = 128;                                          // write 128 sectors (64 kB)
     
     while(1) {
         long len = Fread(fh, SIZE64K, pBfr);
     
-        if(len < 0) {                           // error while reading the file?
-            good = 0;
+        if(len < 0) {                                           // error while reading the file?
+            good = 0;                                           // mark that upload didn't finish good
             break;
         }
         
-        if(len == SIZE64K) {                    // full block was read?
-            p64kBlock = pBfr;                   // write data to ACSI from this address
+        if(len == SIZE64K) {                                    // full block was read?
+            p64kBlock = pBfr;                                   // write data to ACSI from this address
             
             commandShort[4] = FDD_CMD_UPLOADIMGBLOCK_FULL;      // sending full block
             commandShort[5] = (index << 6) | (blockNo & 0x3f);  // for this index and block #
-            
-            res = Supexec(ce_acsiWrite64kBlockCommand); 
-		
-            if(res != 1) {                      // bad? write error
-                (void) Clear_home();
-                (void) Cconws("Error in CosmosEx communication!\r\n");
-                Cnecin();
-            }
-        } else {                                // partial block was read?
-            p64kBlock = pBfrCnt;                // write data to ACSI from this address
+        } else {                                                // partial block was read?
+            p64kBlock = pBfrCnt;                                // write data to ACSI from this address
 
             commandShort[4] = FDD_CMD_UPLOADIMGBLOCK_PART;      // sending full block
             commandShort[5] = (index << 6) | (blockNo & 0x3f);  // for this index and block #
             
             pBfrCnt[0] = len >> 8;
             pBfrCnt[1] = len & 0xff;
-            
-            res = Supexec(ce_acsiWrite64kBlockCommand); 
-		
-            if(res != 1) {                      // bad? write error
-                (void) Clear_home();
-                (void) Cconws("Error in CosmosEx communication!\r\n");
-                Cnecin();
-            }
+        }
+
+        res = Supexec(ce_acsiWriteBlockCommand);             // send the data
+
+        if(res != 1) {                                          // bad? write error
+            (void) Clear_home();
+            (void) Cconws("Error in CosmosEx communication!\r\n");
+            Cnecin();
+               
+            good = 0;                                           // mark that upload didn't finish good
+            break;
+        }
         
+        // write of block was OK, and this was the partial (last) block? 
+        if(commandShort[4] == FDD_CMD_UPLOADIMGBLOCK_PART) {
             good = 1;
             break;
         }
@@ -386,13 +414,13 @@ BYTE ce_acsiReadCommand(void)
 	return 1;                             										/* success */
 }
 
-BYTE ce_acsiWrite64kBlockCommand(void)
+BYTE ce_acsiWriteBlockCommand(void)
 {
 	WORD res;
   
 	commandShort[0] = (deviceID << 5); 											/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
   
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, 128);	/* issue the command and check the result */
+	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, sectorCount);	/* issue the command and check the result */
 
 	if(res != OK) {                        										/* if failed, return FALSE */
 		return 0;
