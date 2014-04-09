@@ -23,6 +23,7 @@
 #include "floppy/floppyimagefactory.h"
 #include "floppy/mfmdecoder.h"
 #include "floppy/mfmcachedimage.h"
+#include "floppy/floppysetup.h"
 
 #include "version.h"
 
@@ -88,8 +89,11 @@ private:
     IFloppyImage        *image;
     FloppyImageFactory  imageFactory;
 
+    FloppySetup         floppySetup;
+
     void handleSendTrack(void);
     void handleSectorWritten(void);
+
 };
 
 #endif // CCORETHREAD_H

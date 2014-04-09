@@ -254,6 +254,11 @@ void CCoreThread::handleAcsiCommand(void)
                 wasHandled = true;
                 translated->processCommand(bufIn);
                 break;
+
+            case HOSTMOD_FDD_SETUP:
+                wasHandled = true;
+                floppySetup.processCommand(bufIn);
+                break;
             }
         }
     } else if(justCmd == 0x1f) {                    // if the command is ICD mark

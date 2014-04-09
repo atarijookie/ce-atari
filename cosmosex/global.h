@@ -40,7 +40,9 @@
 #define HOSTMOD_LINUX_TERMINAL		2
 #define HOSTMOD_TRANSLATED_DISK		3
 #define HOSTMOD_NETWORK_ADAPTER		4
+#define HOSTMOD_FDD_SETUP           5
 
+//////////////////////////////////////////////////////
 // commands for HOSTMOD_CONFIG
 #define CFG_CMD_IDENTIFY            0
 #define CFG_CMD_KEYDOWN             1
@@ -48,9 +50,27 @@
 #define CFG_CMD_REFRESH             0xfe
 #define CFG_CMD_GO_HOME             0xff
 
+
+//////////////////////////////////////////////////////
 // commands for HOSTMOD_TRANSLATED_DISK
 #define TRAN_CMD_IDENTIFY           0
 // ...other commands are just function codes from gemdos.h
 
 
+//////////////////////////////////////////////////////
+// commands for HOSTMOD_FDD_SETUP
+#define FDD_CMD_IDENTIFY                    0
+#define FDD_CMD_GETSILOCONTENT              1
+
+#define FDD_CMD_UPLOADIMGBLOCK_START        10
+#define FDD_CMD_UPLOADIMGBLOCK_FULL         11
+#define FDD_CMD_UPLOADIMGBLOCK_PART         12
+#define FDD_CMD_UPLOADIMGBLOCK_DONE_OK      13
+#define FDD_CMD_UPLOADIMGBLOCK_DONE_FAIL    14
+
+#define FDD_CMD_SWAPSLOTS                   20
+#define FDD_CMD_REMOVESLOT                  21
+//////////////////////////////////////////////////////
+
 #endif // GLOBAL_H
+
