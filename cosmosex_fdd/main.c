@@ -84,6 +84,7 @@ int main( int argc, char* argv[] )
     while(1) {
     	BYTE key;
         DWORD scancode;
+        BYTE  handled = 0;
 
    		scancode = Cnecin();					                    // get char form keyboard, no echo on screen
 
@@ -95,17 +96,24 @@ int main( int argc, char* argv[] )
         
         if(key >= '1' && key <= '3') {                              // upload image
             uploadImage(key - '1');
+            handled = 1;
         }
         
         if(key >= '4' && key <= '6') {                              // swap image
             swapImage(key - '4');
+            handled = 1;
         }
 
         if(key >= '7' && key <= '9') {                              // remove image
             removeImage(key - '7');
+            handled = 1;
         }
         
-        showMenu();
+        // TODO: download, new
+
+        if(handled) {
+            showMenu();
+        }
     }
     
 
@@ -120,13 +128,11 @@ void showMenu(void)
 	(void) Cconws("\33p[CosmosEx floppy config, by Jookie 2014]\33q\r\n");
     (void) Cconws("\r\n");
 	(void) Cconws("Menu:\r\n");
-    (void) Cconws(" [1] upload image to slot 1 (remove: 7)\r\n");
-    (void) Cconws(" [2] upload image to slot 2 (remove: 8)\r\n");
-    (void) Cconws(" [3] upload image to slot 3 (remove: 9)\r\n");
-    (void) Cconws(" [4] swap slot 1 & 2\r\n");
-    (void) Cconws(" [5] swap slot 2 & 3\r\n");
-    (void) Cconws(" [6] swap slot 3 & 1\r\n");
-    (void) Cconws(" [Q] quit\r\n");
+    (void) Cconws("       upload swap remove new  download\r\n");
+    (void) Cconws("\33pslot 1\33q:    1    4    7    N    D\r\n");
+    (void) Cconws("\33pslot 2\33q:    2    5    8    O    E\r\n");
+    (void) Cconws("\33pslot 3\33q:    3    6    9    P    F\r\n");
+    (void) Cconws("\33pQ\33q quit\r\n");
     
     showImage(0);
     showImage(1);
