@@ -14,7 +14,7 @@
 #include "hostmoddefs.h"
 
        
-/* ------------------------------------------------------------------ */
+// ------------------------------------------------------------------ 
 BYTE ce_findId(void);
 BYTE ce_identify(void);
 
@@ -23,8 +23,7 @@ BYTE *pDmaBuffer;
 
 BYTE deviceID;
 
-BYTE commandShort[CMD_LENGTH_SHORT]	= {			0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
-BYTE commandLong[CMD_LENGTH_LONG]	= {0x1f,	0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0, 0, 0, 0, 0, 0, 0};
+BYTE commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
 
 BYTE siloContent[512];
 
@@ -36,6 +35,8 @@ void uploadImage(int index);
 void swapImage(int index);
 void removeImage(int index);
 
+BYTE getLowestDrive(void);
+
 BYTE ce_acsiReadCommand(void);
 BYTE ce_acsiWriteBlockCommand(void);
 
@@ -44,61 +45,63 @@ char filePath[256], fileName[256];
 BYTE *p64kBlock;
 BYTE sectorCount;
 
-/* ------------------------------------------------------------------ */
+// ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
 {
 	BYTE found;
   
-    appl_init();										// init AES 
+    appl_init();										            // init AES 
     
-    strcpy(filePath, "C:\\*.*");                            // init fileselector path
+    
+    // init fileselector path
+    strcpy(filePath, "C:\\*.*");                            
     memset(fileName, 0, 256);          
     
-	/* write some header out */
+    BYTE drive = getLowestDrive();                                  // get the lowest HDD letter and use it in the file selector
+    filePath[0] = drive;
+    
+	// write some header out
 	(void) Clear_home();
 	(void) Cconws("\33p[ CosmosEx floppy setup ]\r\n[    by Jookie 2014     ]\33q\r\n\r\n");
 
-	/* create buffer pointer to even address */
+	// create buffer pointer to even address 
 	pDmaBuffer = &dmaBuffer[2];
-	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
+	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);		// remove odd bit if the address was odd 
 
 	// search for CosmosEx on ACSI bus
 	found = ce_findId();
 
-	if(!found) {								        // not found? quit
+	if(!found) {								                    // not found? quit
 		sleep(3);
 		return 0;
 	}
     
-	/* now set up the acsi command bytes so we don't have to deal with this one anymore */
-	commandShort[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	// now set up the acsi command bytes so we don't have to deal with this one anymore 
+	commandShort[0] = (deviceID << 5); 					            // cmd[0] = ACSI_id + TEST UNIT READY (0)	
 	
-	commandLong[0] = (deviceID << 5) | 0x1f;			/* cmd[0] = ACSI_id + ICD command marker (0x1f)	*/
-	commandLong[1] = 0xA0;								/* cmd[1] = command length group (5 << 5) + TEST UNIT READY (0) */
-
     showMenu();
 
     while(1) {
     	BYTE key;
         DWORD scancode;
 
-   		scancode = Cnecin();					        // get char form keyboard, no echo on screen
+   		scancode = Cnecin();					                    // get char form keyboard, no echo on screen
 
 		key		=  scancode & 0xff;
 
-        if(key == 'q' || key == 'Q') {                  // should quit?
+        if(key == 'q' || key == 'Q') {                              // should quit?
             break;
         }
         
-        if(key >= '1' && key <= '3') {
+        if(key >= '1' && key <= '3') {                              // upload image
             uploadImage(key - '1');
         }
         
-        if(key >= '4' && key <= '6') {
+        if(key >= '4' && key <= '6') {                              // swap image
             swapImage(key - '4');
         }
 
-        if(key >= '7' && key <= '9') {
+        if(key >= '7' && key <= '9') {                              // remove image
             removeImage(key - '7');
         }
         
@@ -263,7 +266,12 @@ void uploadImage(int index)
     
     res = Supexec(ce_acsiWriteBlockCommand); 
 		
-    if(res != 1) {                                              // bad? write error
+    if(res == FDD_UPLOADSTART_RES_ONDEVICECOPY) {               // if the device returned this code, it means that it could do the image upload / copy on device, no need to upload it from ST!
+        Fclose(fh);
+        return;
+    }
+        
+    if(res != 0) {                                              // bad? write error
         (void) Clear_home();
         (void) Cconws("Error in CosmosEx communication!\r\n");
         Cnecin();
@@ -274,12 +282,19 @@ void uploadImage(int index)
     //---------------
     // upload the image by 64kB blocks
     
+    (void) Clear_home();
+    (void) Cconws("Uploading file:\r\n");
+    (void) Cconws(fullPath);
+    (void) Cconws("\r\n");
+    
     BYTE good = 1;
     BYTE blockNo = 0;
     
     sectorCount = 128;                                          // write 128 sectors (64 kB)
     
     while(1) {
+        Cconout('*');                                           // show progress...
+    
         long len = Fread(fh, SIZE64K, pBfr);
     
         if(len < 0) {                                           // error while reading the file?
@@ -302,9 +317,9 @@ void uploadImage(int index)
             pBfrCnt[1] = len & 0xff;
         }
 
-        res = Supexec(ce_acsiWriteBlockCommand);             // send the data
+        res = Supexec(ce_acsiWriteBlockCommand);                // send the data
 
-        if(res != 1) {                                          // bad? write error
+        if(res != 0) {                                          // error? write error
             (void) Clear_home();
             (void) Cconws("Error in CosmosEx communication!\r\n");
             Cnecin();
@@ -342,7 +357,7 @@ void uploadImage(int index)
     }
 }
 
-/* this function scans the ACSI bus for any active CosmosEx translated drive */
+// this function scans the ACSI bus for any active CosmosEx translated drive 
 BYTE ce_findId(void)
 {
 	char bfr[2], res, i;
@@ -356,10 +371,10 @@ BYTE ce_findId(void)
 		bfr[0] = i + '0';
 		(void) Cconws(bfr);
 
-		deviceID = i;									/* store the tested ACSI ID */
-		res = Supexec(ce_identify);  					/* try to read the IDENTITY string */
+		deviceID = i;									// store the tested ACSI ID 
+		res = Supexec(ce_identify);  					// try to read the IDENTITY string 
 		
-		if(res == 1) {                           		/* if found the CosmosEx */
+		if(res == 1) {                           		// if found the CosmosEx 
 			(void) Cconws("\r\nCosmosEx found on ACSI ID: ");
 			bfr[0] = i + '0';
 			(void) Cconws(bfr);
@@ -368,32 +383,32 @@ BYTE ce_findId(void)
 		}
 	}
 
-	/* if not found */
+	// if not found 
     (void) Cconws("\r\nCosmosEx not found on ACSI bus, not installing driver.");
 	return 0;
 }
 
-/* send an IDENTIFY command to specified ACSI ID and check if the result is as expected */
+// send an IDENTIFY command to specified ACSI ID and check if the result is as expected 
 BYTE ce_identify(void)
 {
 	WORD res;
   
-	commandShort[0] = (deviceID << 5); 											/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
 	commandShort[4] = FDD_CMD_IDENTIFY;
   
-	memset(pDmaBuffer, 0, 512);              									/* clear the buffer */
+	memset(pDmaBuffer, 0, 512);              									// clear the buffer 
 
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* issue the command and check the result */
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// issue the command and check the result 
 
-	if(res != OK) {                        										/* if failed, return FALSE */
+	if(res != OK) {                        										// if failed, return FALSE 
 		return 0;
 	}
 
-	if(strncmp((char *) pDmaBuffer, "CosmosEx floppy setup", 21) != 0) {		/* the identity string doesn't match? */
+	if(strncmp((char *) pDmaBuffer, "CosmosEx floppy setup", 21) != 0) {		// the identity string doesn't match? 
 		return 0;
 	}
 	
-	return 1;                             										/* success */
+	return 1;                             										// success 
 }
 
 // make single ACSI read command by the params set in the commandShort buffer
@@ -401,30 +416,43 @@ BYTE ce_acsiReadCommand(void)
 {
 	WORD res;
   
-	commandShort[0] = (deviceID << 5); 											/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
   
-	memset(pDmaBuffer, 0, 512);              									/* clear the buffer */
+	memset(pDmaBuffer, 0, 512);              									// clear the buffer 
 
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* issue the command and check the result */
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// issue the command and check the result 
 
-	if(res != OK) {                        										/* if failed, return FALSE */
+	if(res != OK) {                        										// if failed, return FALSE 
 		return 0;
 	}
 
-	return 1;                             										/* success */
+	return 1;                             										// success 
 }
 
 BYTE ce_acsiWriteBlockCommand(void)
 {
 	WORD res;
   
-	commandShort[0] = (deviceID << 5); 											/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
   
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, sectorCount);	/* issue the command and check the result */
+	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, sectorCount);	// issue the command and check the result 
 
-	if(res != OK) {                        										/* if failed, return FALSE */
-		return 0;
-	}
+    return res;                                                                 // just return the code
+}
 
-	return 1;                             										/* success */
+BYTE getLowestDrive(void)
+{
+    BYTE i;
+    DWORD drvs = Drvmap();
+    DWORD mask;
+    
+    for(i=2; i<16; i++) {                                                       // go through the available drives
+        mask = (1 << i);
+        
+        if((drvs & mask) != 0) {                                                // drive is available?
+            return ('A' + i);
+        }
+    }
+    
+    return 'A';
 }

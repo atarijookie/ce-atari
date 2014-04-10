@@ -21,4 +21,6 @@
 #define FDD_CMD_SWAPSLOTS                   20
 #define FDD_CMD_REMOVESLOT                  21
 
+#define FDD_UPLOADSTART_RES_ONDEVICECOPY    0xDC
+
 #endif
