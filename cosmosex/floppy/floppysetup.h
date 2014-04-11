@@ -43,7 +43,10 @@ private:
 
     void uploadStart(void);
     void uploadBlock(void);
-    void uploadEnd(void);
+    void uploadEnd(bool isOnDeviceCopy);
+
+    void newImage(void);
+    bool onDeviceCopy(std::string &src, std::string &dst);
 };
 
 #endif
