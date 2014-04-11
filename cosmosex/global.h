@@ -70,6 +70,16 @@
 
 #define FDD_CMD_SWAPSLOTS                   20
 #define FDD_CMD_REMOVESLOT                  21
+#define FDD_CMD_NEW_EMPTYIMAGE              22
+
+#define FDD_CMD_DOWNLOADIMG_START           30
+#define FDD_CMD_DOWNLOADIMG_GETBLOCK        31
+#define FDD_CMD_DOWNLOADIMG_DONE            32
+
+#define FDD_OK                              0
+#define FDD_ERROR                           2
+#define FDD_UPLOADSTART_RES_ONDEVICECOPY    0xDC
+
 //////////////////////////////////////////////////////
 
 #endif // GLOBAL_H

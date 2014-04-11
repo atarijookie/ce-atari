@@ -90,6 +90,7 @@ private:
     FloppyImageFactory  imageFactory;
 
     FloppySetup         floppySetup;
+    ImageSilo           floppyImageSilo;
 
     void handleSendTrack(void);
     void handleSectorWritten(void);

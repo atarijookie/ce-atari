@@ -61,6 +61,10 @@ public:
 
     virtual void reloadSettings(void);      // from ISettingsUser
 
+    bool hostPathExists(std::string hostPath);
+    bool createHostPath(std::string atariPath, std::string &hostPath);
+    void pathSeparatorAtariToHost(std::string &path);
+
 private:
     AcsiDataTrans   *dataTrans;
 
@@ -84,11 +88,8 @@ private:
     void loadSettings(void);
 
     WORD getDrivesBitmap(void);
-    bool hostPathExists(std::string hostPath);
-    bool createHostPath(std::string atariPath, std::string &hostPath);
 	int  getDriveIndexFromAtariPath(std::string atariPath);
     void removeDoubleDots(std::string &path);
-    void pathSeparatorAtariToHost(std::string &path);
     void pathSeparatorHostToAtari(std::string &path);
     void createAtariPathFromHostPath(std::string hostPath, std::string &atariPath);
     bool newPathRequiresCurrentDriveChange(std::string atariPath, int &newDriveIndex);

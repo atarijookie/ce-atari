@@ -54,6 +54,10 @@ CCoreThread::CCoreThread()
 	
 	// register this class as receiver of dev attached / detached calls
 	devFinder.setDevChangesHandler((DevChangesHandler *) this);
+
+    floppySetup.setAcsiDataTrans(dataTrans);
+    floppySetup.setImageSilo(&floppyImageSilo);
+    floppySetup.setTranslatedDisk(translated);
 }
 
 CCoreThread::~CCoreThread()
