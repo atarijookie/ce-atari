@@ -88,22 +88,7 @@ void CCoreThread::run(void)
     Update::downloadUpdateList();                   // download the list of components with the newest available versions
 
 	bool res;
-//---------------------------------------------
-    image = imageFactory.getImage((char *) "blank.st");
 
-    if(image) {
-        if(image->isOpen()) {
-            Debug::out("Encoding image...");
-            encImage.encodeAndCacheImage(image, true);
-            Debug::out("...done");
-        } else {
-            Debug::out("Image is not open!");
-        }
-    } else {
-        Debug::out("Image file type not supported!");
-    }
-//---------------------------------------------
-	
 #ifdef ONPC
 /*
     char atnSendFwVer[16] = {0xca, 0xfe, 0,1, 0, 8, 0, 8, 0xa0, 0x14, 0x02, 0x05, 0, 0, 0, 0};
@@ -538,7 +523,7 @@ void CCoreThread::handleSendTrack(void)
     Debug::out("ATN_SEND_TRACK -- track %d, side %d", track, side);
 
     int tr, si, spt;
-    image->getParams(tr, si, spt);      // read the floppy image params
+    floppyImageSilo.getParams(tr, si, spt);      // read the floppy image params
 
     if(side < 0 || side > 1 || track < 0 || track >= tr) {
         Debug::out("Side / Track out of range!");
@@ -548,7 +533,7 @@ void CCoreThread::handleSendTrack(void)
     BYTE *encodedTrack;
     int countInTrack;
 
-    encodedTrack = encImage.getEncodedTrack(track, side, countInTrack);
+	encodedTrack = floppyImageSilo.getEncodedTrack(track, side, countInTrack);
 
     int remaining   = 15000 - (4*2) - 2;		// this much bytes remain to send after the received ATN
 

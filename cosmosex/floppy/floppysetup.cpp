@@ -228,16 +228,8 @@ void FloppySetup::uploadEnd(bool isOnDeviceCopy)
         return;
     }
 
-    // we're here, the image upload succeeded
+    // we're here, the image upload succeeded, the following will also encode the image...
     imageSilo->add(currentUpload.slotIndex, currentUpload.file, currentUpload.hostDestinationPath, currentUpload.atariSourcePath, currentUpload.hostSourcePath);
-
-
-
-
-    // TODO: now convert the image to mfm stream so it could be used!
-
-
-
 
     // now finish with OK status
     if(isOnDeviceCopy) {                                        // for on-device-copy send special status

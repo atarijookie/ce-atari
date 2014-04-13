@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "../debug.h"
+#include "../utils.h"
 
 #include "mfmcachedimage.h"
 
@@ -21,6 +22,10 @@ MfmCachedImage::MfmCachedImage()
     #ifdef DUMPTOFILE
     f = fopen("C:\\raw_img.txt", "wt");
     #endif
+	
+	params.tracks	= 0;
+	params.sides	= 0;
+	params.spt		= 0;
 }
 
 MfmCachedImage::~MfmCachedImage()
@@ -34,7 +39,7 @@ MfmCachedImage::~MfmCachedImage()
     #endif
 }
 
-// bufferOfBytes -- the datas are transfered as WORDs, but are they stored as bytes?
+// bufferOfBytes -- the data is transferred as WORDs, but are they stored as bytes?
 // If true, swap bytes, don't append zeros. If false, no swapping, but append zeros.
 void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img, bool bufferOfBytes)
 {
@@ -49,11 +54,24 @@ void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img, bool bufferOfBytes)
     int tracksNo, sides, spt;
     img->getParams(tracksNo, sides, spt);    // read the floppy image params
 
+	// store params for later usage
+	params.tracks	= tracksNo;
+	params.sides	= sides;
+	params.spt		= spt;
+	
     BYTE buffer[20480];
     int bytesStored;
+	
+	DWORD after50ms = Utils::getEndTime(50);								// this will help to add pauses at least every 50 ms to allow other threads to do stuff
 
     for(int t=0; t<tracksNo; t++) {       // go through the whole image and encode it
         for(int s=0; s<sides; s++) {
+			
+			if(Utils::getCurrentMs() > after50ms) {							// if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
+				Utils::sleepMs(5);
+				after50ms = Utils::getEndTime(50);
+			}
+		
             #ifdef DUMPTOFILE
             if(f) {
                 fprintf(f, "Track: %d, side: %d\n", t, s);
@@ -163,6 +181,36 @@ void MfmCachedImage::initTracks(void)
     for(int i=0; i<MAX_TRACKS; i++) {
         tracks[i].bytesInStream = 0;
         tracks[i].mfmStream     = NULL;
+    }
+}
+
+void MfmCachedImage::copyFromOther(MfmCachedImage &other)
+{
+	initTracks();
+	
+	DWORD after50ms = Utils::getEndTime(50);							// this will help to add pauses at least every 50 ms to allow other threads to do stuff
+	
+    for(int side=0; side<2; side++) {
+		for(int track=0; track<85; track++) {
+		
+			if(Utils::getCurrentMs() > after50ms) {						// if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
+				Utils::sleepMs(5);
+				after50ms = Utils::getEndTime(50);
+			}
+		
+			int bytesInBuffer;
+			BYTE *src = getEncodedTrack(track, side, bytesInBuffer);	// get pointer to source track
+	
+			int index = track * 2 + side;
+			if(index >= MAX_TRACKS) {                                   // index out of bounds?
+				continue;
+			}
+			
+			BYTE *dest = tracks[index].mfmStream;						// get pointer to destination track
+			
+			memcpy(dest, src, bytesInBuffer);							// copy data and copy the data count
+			tracks[index].bytesInStream = bytesInBuffer;
+		}
     }
 }
 
@@ -386,5 +434,14 @@ void MfmCachedImage::fdc_add_to_crc(WORD &crc, BYTE data)
     for (int i=0;i<8;i++){
         crc = ((crc << 1) ^ ((((crc >> 8) ^ (data << i)) & 0x0080) ? 0x1021 : 0));
     }
+}
+
+bool MfmCachedImage::getParams(int &tracks, int &sides, int &sectorsPerTrack)
+{
+    tracks          = params.tracks;
+    sides           = params.sides;
+    sectorsPerTrack = params.spt;
+
+    return true;
 }
 

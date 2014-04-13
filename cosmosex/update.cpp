@@ -18,7 +18,6 @@ void Update::initialize(void)
 {
     Update::versions.current.app.fromString(                (char *) APP_VERSION);
     Update::versions.current.xilinx.fromFirstLineOfFile(    (char *) XILINX_VERSION_FILE);
-    Update::versions.current.imglist.fromFirstLineOfFile(   (char *) IMAGELIST_FILE);
     Update::versions.updateListWasProcessed = false;
     Update::versions.gotUpdate              = false;
 
@@ -84,12 +83,6 @@ void Update::processUpdateList(void)
             Update::versions.onServer.franz.setUrlAndChecksum(url, crc);
             continue;
         }
-
-        if(strncmp(what, "imglist", 7) == 0) {
-            Update::versions.onServer.imglist.fromString(ver);
-            Update::versions.onServer.imglist.setUrlAndChecksum(url, crc);
-            continue;
-        }
     }
 
     fclose(f);
@@ -114,18 +107,6 @@ void Update::processUpdateList(void)
     if(Update::versions.current.franz.isOlderThan( Update::versions.onServer.franz )) {
         Update::versions.gotUpdate = true;
         Debug::out("processUpdateList - FRANZ is newer on server");
-    }
-
-    // check this one and if we got an update, do a silent update 
-    if(Update::versions.current.imglist.isOlderThan( Update::versions.onServer.imglist )) {
-        Debug::out("processUpdateList - IMAGE LIST is newer on server, doing silent update...");
-
-        TDownloadRequest tdr;
-        tdr.srcUrl          = Update::versions.onServer.imglist.getUrl();
-        tdr.checksum        = Update::versions.onServer.imglist.getChecksum();
-        tdr.dstDir          = "";
-        tdr.downloadType    = DWNTYPE_FLOPPYIMG_LIST;
-        Downloader::add(tdr);
     }
 
     Update::versions.updateListWasProcessed = true;         // mark that the update list was processed and don't need to do this again

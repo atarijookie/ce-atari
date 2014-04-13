@@ -24,11 +24,21 @@ public:
     // If true, swap bytes, don't append zeros. If false, no swapping, but append zeros.
     void encodeAndCacheImage(IFloppyImage *img, bool bufferOfBytes=false);
     void deleteCachedImage(void);
-    BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
+    
+	BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
+	bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
 
+	void copyFromOther(MfmCachedImage &other);
+	
 private:
     bool gotImage;
 
+	struct {
+		int tracks;
+		int sides;
+		int spt;
+	} params;
+	
     TCachedTrack tracks[MAX_TRACKS];
     WORD                CRC;
 

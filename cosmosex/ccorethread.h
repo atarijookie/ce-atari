@@ -85,10 +85,6 @@ private:
 
     //-----------------------------------
     // floppy stuff
-    MfmCachedImage      encImage;
-    IFloppyImage        *image;
-    FloppyImageFactory  imageFactory;
-
     FloppySetup         floppySetup;
     ImageSilo           floppyImageSilo;
 

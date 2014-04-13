@@ -19,12 +19,15 @@
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
 
+void handlePthreadCreate(int res, char *what);
+
 int main(int argc, char *argv[])
  {
 	CCoreThread *core;
 	pthread_t	mountThreadInfo;
     pthread_t	downloadThreadInfo;
     pthread_t	ikbdThreadInfo;
+	pthread_t	floppyEncThreadInfo;
 
     Debug::out("\n\n---------------------------------------------------");
     Debug::out("CosmosEx starting...");
@@ -53,26 +56,16 @@ int main(int argc, char *argv[])
     core = new CCoreThread();
 
 	int res = pthread_create( &mountThreadInfo, NULL, mountThreadCode, NULL);	// create mount thread and run it
-	
-	if(res != 0) {
-		Debug::out("Failed to create mount thread, mounting won't work");
-	} else {
-		Debug::out("Mount thread created");
-	}
+	handlePthreadCreate(res, "mount");
 
     res = pthread_create(&downloadThreadInfo, NULL, downloadThreadCode, NULL);  // create download thread and run it
-	if(res != 0) {
-		Debug::out("Failed to create download thread, downloading won't work");
-	} else {
-		Debug::out("Download thread created");
-	}
+	handlePthreadCreate(res, "download");
 
-    res = pthread_create(&ikbdThreadInfo, NULL, ikbdThreadCode, NULL);
-	if(res != 0) {
-		Debug::out("Failed to create IKBD thread, IKDB emulation won't work...");
-	} else {
-		Debug::out("IKBD thread created");
-	}
+    res = pthread_create(&ikbdThreadInfo, NULL, ikbdThreadCode, NULL);			// create the keyboard emulation thread and run it
+	handlePthreadCreate(res, "ikbd");
+
+    res = pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL);	// create the floppy encoding thread and run it
+	handlePthreadCreate(res, "floppy encode");
 	
 	core->run();										// run the main thread
 
@@ -82,11 +75,21 @@ int main(int argc, char *argv[])
 	pthread_join(mountThreadInfo, NULL);				// wait until mount     thread finishes
     pthread_join(downloadThreadInfo, NULL);             // wait until download  thread finishes
     pthread_join(ikbdThreadInfo, NULL);                 // wait until ikbd      thread finishes
+    pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes
 
     Downloader::cleanupBeforeQuit();
 
     Debug::out("CosmosEx terminated.");
     return 0;
+ }
+ 
+ void handlePthreadCreate(int res, char *what)
+ {
+ 	if(res != 0) {
+		Debug::out("Failed to create %s thread, %s won't work...", what, what);
+	} else {
+		Debug::out("%s thread created", what);
+	}
  }
 
 void sigint_handler(int sig)

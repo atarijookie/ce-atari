@@ -5,7 +5,6 @@
 #include "datatypes.h"
 
 #define XILINX_VERSION_FILE		"/ce/update/xilinx_current.txt"
-#define IMAGELIST_FILE      	"/ce/update/imagelist.csv"
 #define APP_VERSION         	"2014-03-04"
 
 class Version
@@ -41,7 +40,6 @@ typedef struct {
             Version hans;
             Version xilinx;
             Version franz;
-            Version imglist;
         } current;
 
         struct {
@@ -49,7 +47,6 @@ typedef struct {
             Version hans;
             Version xilinx;
             Version franz;
-            Version imglist;
         } onServer;
 
         bool updateListWasProcessed;
