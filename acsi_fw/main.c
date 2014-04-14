@@ -52,8 +52,9 @@ WORD t1, t2, dt;
 // commands sent from host to device
 #define CMD_ACSI_CONFIG						0x10
 #define CMD_DATA_WRITE						0x20
-#define CMD_DATA_READ							0x30
+#define CMD_DATA_READ						0x30
 #define CMD_SEND_STATUS						0x40
+#define CMD_FLOPPY_CONFIG                   0x70
 #define CMD_DATA_MARKER						0xda
 
 // these states define if the device should get command or transfer data
@@ -118,12 +119,14 @@ BYTE cmd[14];										// received command bytes
 BYTE cmdLen;										// length of received command
 BYTE brStat;										// status from bridge
 
-BYTE enabledIDs[8];							// when 1, Hanz will react on that ACSI ID #
+BYTE enabledIDs[8];							    // when 1, Hanz will react on that ACSI ID #
+BYTE sdCardID;
 
 volatile BYTE spiDmaIsIdle;
 volatile BYTE spiDmaTXidle, spiDmaRXidle;		// flags set when the SPI DMA TX or RX is idle
 
 BYTE currentLed;
+BYTE enabledImgs[3];
 
 BYTE firstConfigReceived;										// used to turn LEDs on after first config received
 
@@ -139,41 +142,14 @@ BYTE shouldProcessCommands;
 BYTE dataReadAsm(WORD *pData, WORD dataCnt);
 DWORD isrNow, isrPrev;
 
+void initAllStuff(void);
+
 int main (void) 
 {
-	BYTE i;
-	
-	state = STATE_GET_COMMAND;
-	
-	sendFwVersion				= FALSE;
-	firstConfigReceived = FALSE;									// used to turn LEDs on after first config received
+    initAllStuff();         // now init everything
 
-	setupAtnBuffers();														// fill the ATN buffers with needed headers and terminators
-
-	spiDmaIsIdle = TRUE;
-	spiDmaTXidle = TRUE;
-	spiDmaRXidle = TRUE;
-	
-	currentLed = 0;
-
-	shouldProcessCommands = FALSE;
-
-	init_hw_sw();																	// init GPIO pins, timers, DMA, global variables
-
-	// init ACSI signals
-	ACSI_DATADIR_WRITE();													// data as inputs
-	GPIOA->BRR = aDMA | aPIO | aRNW | ATN;				// ACSI controll signals LOW, ATTENTION bit LOW - nothing to read
-
-	EXTI->PR = BUTTON | aCMD | aCS | aACK;				// clear these ints 
 	//-------------
-	// by default set ID 0 as enabled and other IDs as disabled 
-	enabledIDs[0] = 1;
-	
-	for(i=1; i<8; i++) {
-		enabledIDs[i] = 0;
-	}
-	
-	//-------------
+    // main loop
 	while(1) {
 		// get the command from ACSI and send it to host
 		if(state == STATE_GET_COMMAND && PIO_gotFirstCmdByte()) {					// if 1st CMD byte was received
@@ -222,7 +198,7 @@ int main (void)
 				timeoutStart();																				// start timeout counter so we won't get stuck somewhere
 			
 				spiDma_txRx(	ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0],	 
-											ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
+                                ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
 				
 				shouldProcessCommands = TRUE;													// mark that we should process the commands on next SPI DMA idle time
 			}
@@ -232,7 +208,7 @@ int main (void)
 				state = STATE_WAIT_COMMAND_RESPONSE;
 				
 				spiDma_txRx(	ATN_SENDACSICOMMAND_LEN_TX, (BYTE *) &atnSendACSIcommand[0], 
-											ATN_SENDACSICOMMAND_LEN_RX, (BYTE *) &cmdBuffer[0]);
+								ATN_SENDACSICOMMAND_LEN_RX, (BYTE *) &cmdBuffer[0]);
 				
 				shouldProcessCommands = TRUE;													// mark that we should process the commands on next SPI DMA idle time
 			}
@@ -249,6 +225,49 @@ int main (void)
 			TIM2->SR = 0xfffe;							// clear UIF flag
 			sendFwVersion = TRUE;
 		}
+	}
+}
+
+void initAllStuff(void)
+{
+	BYTE i;
+	
+	state = STATE_GET_COMMAND;
+	
+	sendFwVersion		= FALSE;
+	firstConfigReceived = FALSE;									// used to turn LEDs on after first config received
+
+	setupAtnBuffers();												// fill the ATN buffers with needed headers and terminators
+
+	spiDmaIsIdle = TRUE;
+	spiDmaTXidle = TRUE;
+	spiDmaRXidle = TRUE;
+	
+	currentLed = 0;
+
+	shouldProcessCommands = FALSE;
+
+	init_hw_sw();													// init GPIO pins, timers, DMA, global variables
+
+	// init ACSI signals
+	ACSI_DATADIR_WRITE();											// data as inputs
+	GPIOA->BRR = aDMA | aPIO | aRNW | ATN;				            // ACSI controll signals LOW, ATTENTION bit LOW - nothing to read
+
+	EXTI->PR = BUTTON | aCMD | aCS | aACK;				            // clear these ints 
+	//-------------
+	// by default set ID 0 as enabled and other IDs as disabled 
+	enabledIDs[0] = 1;
+	
+	for(i=1; i<8; i++) {
+		enabledIDs[i] = 0;
+	}
+	
+    sdCardID = 0xff;                                                // for SD card set non-existing ID for now
+    
+    // now for floppy image LEDs - enable IMG0 (even if nothing is there), disable other
+    enabledImgs[0] = TRUE;
+	for(i=1; i<3; i++) {
+		enabledImgs[i] = FALSE;
 	}
 }
 
@@ -424,10 +443,6 @@ void waitForSPIidle(void)
 			return;
 		}
 	}
-	
-	isrPrev = isrNow;
-	isrNow = SPI1->SR;
-
 }
 
 void startSpiDmaForDataRead(DWORD dataCnt, TReadBuffer *readBfr)
@@ -445,8 +460,8 @@ void startSpiDmaForDataRead(DWORD dataCnt, TReadBuffer *readBfr)
 	
 	// now transfer the 0th data buffer over SPI
 	atnMoreData[4] = seqNo++;															// set the sequence # to Attention
-	spiDma_txRx(	6,					(BYTE *) &atnMoreData[0], 
-								recvCount,	(BYTE *) &readBfr->buffer[0]);							// set up the SPI DMA transfer
+	spiDma_txRx(	6,	(BYTE *) &atnMoreData[0], 
+						recvCount,	(BYTE *) &readBfr->buffer[0]);							// set up the SPI DMA transfer
 }
 
 void onDataWrite(void)
@@ -683,27 +698,47 @@ void processHostCommands(void)
 	
 	for(i=0; i<CMD_BUFFER_LENGTH; i++) {
 		switch(cmdBuffer[i]) {
-			// process configuration 
+			// process ACSI configuration 
 			case CMD_ACSI_CONFIG:
-					firstConfigReceived = TRUE;		// mark that we've received 1st config
+					firstConfigReceived = TRUE;		                // mark that we've received 1st config
 			
 					showCurrentLED();
 			
-					ids = cmdBuffer[i+1] >> 8;		// get enabled IDs
+					ids = cmdBuffer[i+1] >> 8;		                // upper BYTE: get enabled IDs
 			
-					for(j=0; j<8; j++) {					// for each bit in ids set the flag in enabledIDs[]
+					for(j=0; j<8; j++) {					        // for each bit in ids set the flag in enabledIDs[]
 						if(ids & (1<<j)) {
 							enabledIDs[j] = TRUE;
 						} else {
 							enabledIDs[j] = FALSE;
 						}
 					}
+
+                    sdCardID = (BYTE) cmdBuffer[i+1];               // lower BYTE: SD card ACSI ID
 					
-					cmdBuffer[i]		= 0;							// clear this command
+					cmdBuffer[i]	= 0;							// clear this command
 					cmdBuffer[i+1]	= 0;
-					
+                    
 					i++;
 				break;
+
+            // to following is floppy image configuration - which FLOPPY IMG LEDs are enabled and thus how button should behave when switching
+            case CMD_FLOPPY_CONFIG:
+                ids = cmdBuffer[i+1] >> 8;                          // upper BYTE: enabled floppy images
+            
+				for(j=0; j<3; j++) {					            // for each bit in ids set the flag in enabledImgs[]
+					if(ids & (1<<j)) {
+						enabledImgs[j] = TRUE;
+					} else {
+						enabledImgs[j] = FALSE;
+					}
+                }
+
+				cmdBuffer[i]	= 0;							    // clear this command
+				cmdBuffer[i+1]	= 0;
+                    
+                i++;
+                break;
 				
 			case CMD_DATA_WRITE:
 					dataCnt				= cmdBuffer[i+1];					// store the count of bytes we should WRITE - highest and middle byte
