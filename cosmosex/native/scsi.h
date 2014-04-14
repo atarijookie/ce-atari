@@ -55,7 +55,7 @@ public:
     Scsi(void);
     ~Scsi();
 
-    void reloadSettings(void);
+    void reloadSettings(int type);
 
     void setAcsiDataTrans(AcsiDataTrans *dt);
 

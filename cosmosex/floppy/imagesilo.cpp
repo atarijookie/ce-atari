@@ -12,6 +12,7 @@
 
 #include "../utils.h"
 #include "../debug.h"
+#include "../settings.h"
 #include "imagesilo.h"
 
 pthread_mutex_t floppyEncodeThreadMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -89,9 +90,82 @@ ImageSilo::ImageSilo()
     }
 	
 	currentSlot = 0;
+    reloadProxy = NULL;
+
+    loadSettings();
 }
 
-void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostDestPath, std::string &atariSrcPath, std::string &hostSrcPath)
+void ImageSilo::loadSettings(void)
+{
+    Settings s;
+
+    char key[32];
+    for(int slot=0; slot<3; slot++) {							
+        sprintf(key, "FLOPPY_IMAGE_%d", slot);                                  // create settings key			
+        
+		char *img = s.getString(key, (char *) "");                              // try to read the value
+
+        std::string pathAndFile, path, file;
+        pathAndFile = img;
+
+        if(pathAndFile.empty()) {                                               // nothing stored? skip it
+            continue;
+        }
+
+        Utils::splitFilenameFromPath(pathAndFile, path, file);                  // split path from file
+        std::string fileInTmp = "/tmp/" + file;
+        std::string empty;
+
+        bool res = Utils::copyFile(pathAndFile, fileInTmp);                     // copy the file to /tmp/
+
+        if(!res) {                                                              // failed to copy?
+            Debug::out("ImageSilo::loadSettings - didn't load image %s", img);
+            continue;
+        }
+
+        add(slot, file, fileInTmp, empty, pathAndFile, false);                  // add this image, don't save to settings
+    }
+
+    // now tell the core thread that floppy images have changed
+    if(reloadProxy) {
+        reloadProxy->reloadSettings(SETTINGSUSER_FLOPPYIMGS);
+    }
+}
+
+void ImageSilo::saveSettings(void)
+{
+    Settings s;
+
+    bool somethingChanged = false;
+
+    char key[32];
+    for(int slot=0; slot<3; slot++) {							
+        sprintf(key, "FLOPPY_IMAGE_%d", slot);                                  // create settings key			
+
+		char *oldVal = s.getString(key, (char *) "");                           // try to read the old value
+        std::string oldValStr = oldVal;        
+
+        if(oldValStr == slots[slot].hostSrcPath) {                              // if old value matches what we would save, skip it
+            continue;
+        }
+
+		s.setString(key, (char *) slots[slot].hostSrcPath.c_str());             // store the value at that slot
+
+        somethingChanged = true;                                                // mark that something has changed
+    }
+
+    // if something changed and got settings reload proxy, invoke reload
+    if(somethingChanged && reloadProxy) {
+        reloadProxy->reloadSettings(SETTINGSUSER_FLOPPYIMGS);
+    }
+}
+
+void ImageSilo::setSettingsReloadProxy(SettingsReloadProxy *rp)
+{
+    reloadProxy = rp;
+}
+
+void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostDestPath, std::string &atariSrcPath, std::string &hostSrcPath, bool saveToSettings)
 {
     if(positionIndex < 0 || positionIndex > 2) {
         return;
@@ -111,6 +185,10 @@ void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostD
 	er.encImg		= &slots[positionIndex].encImage;
 	
 	encodeAdd(er);
+
+    if(saveToSettings) {                                    // should we save this to settings? (false when loading settings)
+        saveSettings();
+    }
 }
 
 void ImageSilo::swap(int index)
@@ -144,6 +222,9 @@ void ImageSilo::swap(int index)
 	a->hostDestPath.swap(b->hostDestPath);
 	a->atariSrcPath.swap(b->atariSrcPath);
 	a->hostSrcPath.swap(b->hostSrcPath);
+
+    // save it to settings
+    saveSettings();
 }
 
 void ImageSilo::remove(int index)                   // remove image at specified slot
@@ -160,6 +241,9 @@ void ImageSilo::remove(int index)                   // remove image at specified
 	unlink((char *) slots[index].hostDestPath.c_str());
 	
 	clearSlot(index);
+
+    // save it to settings
+    saveSettings();
 }
 
 void ImageSilo::dumpStringsToBuffer(BYTE *bfr)      // copy the strings to buffer
@@ -212,4 +296,6 @@ bool ImageSilo::getParams(int &tracks, int &sides, int &sectorsPerTrack)
 {
 	return slots[currentSlot].encImage.getParams(tracks, sides, sectorsPerTrack);
 }
+
+
 

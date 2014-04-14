@@ -179,3 +179,45 @@ void Utils::resetHansAndFranz(void)
 	
 	Utils::sleepMs(50);										// wait a while to let the devices boot
 }
+
+bool Utils::copyFile(std::string &src, std::string &dst)
+{
+    FILE *from, *to;
+
+    BYTE bfr64k[64 * 1024];
+
+    from = fopen((char *) src.c_str(), "rb");               // open source file
+
+    if(!from) {
+        Debug::out("ImageSilo::onDeviceCopy - failed to open source file %s", (char *) src.c_str());
+        return false;
+    }
+
+    to = fopen((char *) dst.c_str(), "wb");                 // open destrination file
+
+    if(!to) {
+        Debug::out("ImageSilo::onDeviceCopy - failed to open destination file %s", (char *) dst.c_str());
+        return false;
+    }
+
+    while(1) {                                              // copy the file in loop 
+        size_t read = fread(bfr64k, 1, 64 * 1024, from);
+
+        if(read == 0) {                                     // didn't read anything? quit
+            break;
+        }
+
+        fwrite(bfr64k, 1, 64 * 1024, to);
+
+        if(feof(from)) {                                    // end of file reached? quit
+            break;
+        }
+    }
+
+    fclose(from);
+    fclose(to);
+
+    return true;
+}
+
+

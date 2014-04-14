@@ -56,16 +56,16 @@ int main(int argc, char *argv[])
     core = new CCoreThread();
 
 	int res = pthread_create( &mountThreadInfo, NULL, mountThreadCode, NULL);	// create mount thread and run it
-	handlePthreadCreate(res, "mount");
+	handlePthreadCreate(res, (char *) "mount");
 
     res = pthread_create(&downloadThreadInfo, NULL, downloadThreadCode, NULL);  // create download thread and run it
-	handlePthreadCreate(res, "download");
+	handlePthreadCreate(res, (char *) "download");
 
     res = pthread_create(&ikbdThreadInfo, NULL, ikbdThreadCode, NULL);			// create the keyboard emulation thread and run it
-	handlePthreadCreate(res, "ikbd");
+	handlePthreadCreate(res, (char *) "ikbd");
 
     res = pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL);	// create the floppy encoding thread and run it
-	handlePthreadCreate(res, "floppy encode");
+	handlePthreadCreate(res, (char *) "floppy encode");
 	
 	core->run();										// run the main thread
 

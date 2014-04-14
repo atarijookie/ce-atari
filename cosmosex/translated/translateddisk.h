@@ -59,7 +59,7 @@ public:
     void detachFromHostPath(std::string hostRootPath);
     void detachAll(void);
 
-    virtual void reloadSettings(void);      // from ISettingsUser
+    virtual void reloadSettings(int type);      // from ISettingsUser
 
     bool hostPathExists(std::string hostPath);
     bool createHostPath(std::string atariPath, std::string &hostPath);

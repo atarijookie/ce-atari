@@ -22,7 +22,10 @@ CCoreThread::CCoreThread()
 {
     Update::initialize();
 
-    setEnabledIDbits = false;
+    setEnabledIDbits        = false;
+    setEnabledFloppyImgs    = false;
+
+    lastFloppyImageLed      = -1;
 
 	gotDevTypeRaw			= false;
 	gotDevTypeTranslated	= false;
@@ -48,6 +51,7 @@ CCoreThread::CCoreThread()
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_ACSI);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_TRANSLATED);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_SHARED);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPYIMGS);
 	
     settingsReloadProxy.addSettingsUser((ISettingsUser *) scsi,          SETTINGSUSER_ACSI);
 	settingsReloadProxy.addSettingsUser((ISettingsUser *) translated,    SETTINGSUSER_TRANSLATED);
@@ -55,9 +59,13 @@ CCoreThread::CCoreThread()
 	// register this class as receiver of dev attached / detached calls
 	devFinder.setDevChangesHandler((DevChangesHandler *) this);
 
+    // give floppy setup everything it needs
     floppySetup.setAcsiDataTrans(dataTrans);
     floppySetup.setImageSilo(&floppyImageSilo);
     floppySetup.setTranslatedDisk(translated);
+
+    // the floppy image silo might change settings (when images are changes), add settings reload proxy
+    floppyImageSilo.setSettingsReloadProxy(&settingsReloadProxy);
 }
 
 CCoreThread::~CCoreThread()
@@ -88,17 +96,6 @@ void CCoreThread::run(void)
     Update::downloadUpdateList();                   // download the list of components with the newest available versions
 
 	bool res;
-
-#ifdef ONPC
-/*
-    char atnSendFwVer[16] = {0xca, 0xfe, 0,1, 0, 8, 0, 8, 0xa0, 0x14, 0x02, 0x05, 0, 0, 0, 0};
-    bcmSpiAddData(16, atnSendFwVer); 
-*/
-
-    char atnSendCmd[38] = {0xca, 0xfe, 0,2, 0, 12, 0, 16, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xca, 0xfe, 0,3, 0,6, 1,0x04, 0,0, 0,0 };
-    bcmSpiAddData(38, atnSendCmd); 
-
-#endif
 
     while(sigintReceived == 0) {
 		bool gotAtn = false;						                    // no ATN received yet?
@@ -269,8 +266,14 @@ void CCoreThread::handleAcsiCommand(void)
     }
 }
 
-void CCoreThread::reloadSettings(void)
+void CCoreThread::reloadSettings(int type)
 {
+    // if just floppy image configuration changed, set that we should send new floppy images config and quit
+    if(type == SETTINGSUSER_FLOPPYIMGS) {
+        setEnabledFloppyImgs = true;
+        return;
+    }
+
 	// first dettach all the devices
 	scsi->detachAll();
     translated->detachAll();
@@ -307,6 +310,10 @@ void CCoreThread::loadSettings(void)
 
         acsiIDevType[id] = devType;
 
+        if(devType == DEVTYPE_SD) {                     // if on this ACSI ID we should have the native SD card, store this ID
+            sdCardAcsiId = id;
+        }
+
         if(devType != DEVTYPE_OFF) {                    // if ON
             enabledIDbits |= (1 << id);                 // set the bit to 1
         }
@@ -337,13 +344,22 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 {
     BYTE fwVer[10], oBuf[10];
 
-    memset(oBuf, 0, 10);                        // first clear the output buffer
+    memset(oBuf, 0, 10);                                // first clear the output buffer
 
-    if(whichSpiCs == SPI_CS_HANS) {             // it's Hans?
-        if(setEnabledIDbits) {                  // if we should send ACSI ID configuration
-            oBuf[3] = CMD_ACSI_CONFIG;          // CMD: send acsi config
-            oBuf[4] = enabledIDbits;            // store ACSI enabled IDs
-            setEnabledIDbits = false;           // and don't sent this anymore (until needed)
+    // WORD sent (bytes shown): 01 23 45 67 
+
+    if(whichSpiCs == SPI_CS_HANS) {                     // it's Hans?
+        if(setEnabledIDbits) {                          // if we should send ACSI ID configuration
+            oBuf[1] = CMD_ACSI_CONFIG;                  // CMD: send acsi config  (bytes 0 & 1)
+            oBuf[2] = enabledIDbits;                    // store ACSI enabled IDs 
+            oBuf[3] = sdCardAcsiId;                     // store which ACSI ID is used for SD card
+            setEnabledIDbits = false;                   // and don't sent this anymore (until needed)
+        }
+
+        if(setEnabledFloppyImgs) {
+            oBuf[5] = CMD_FLOPPY_CONFIG;                // CMD: send which floppy images are enabled (bytes 4 & 5)
+            oBuf[6] = floppyImageSilo.getSlotBitmap();  // store which floppy images are enabled
+            setEnabledFloppyImgs = false;               // and don't sent this anymore (until needed)
         }
     } else {                                    // it's Franz?
 
@@ -361,6 +377,14 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 
         int currentLed = fwVer[4];
         Debug::out("FW: Hans,  %d-%02d-%02d, LED is: %d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed);
+
+        if(lastFloppyImageLed != currentLed) {              // did the floppy image LED change since last time?
+            lastFloppyImageLed = currentLed;
+
+            Debug::out("Floppy image changed to %d", currentLed);
+
+            floppyImageSilo.setCurrentSlot(currentLed);     // switch the floppy image
+        }
     }
 }
 

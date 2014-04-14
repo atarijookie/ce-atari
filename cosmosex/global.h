@@ -34,6 +34,7 @@
 #define DEVTYPE_OFF					0
 #define DEVTYPE_RAW					1
 #define DEVTYPE_TRANSLATED			2
+#define DEVTYPE_SD                  3
 
 // typed of devices / modules we support
 #define HOSTMOD_CONFIG				1

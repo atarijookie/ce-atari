@@ -42,9 +42,9 @@ $(TARGET): $(OBJS) $(HDRS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(SUBDIR1)/*.o
-	rm -f $(SUBDIR2)/*.o
-	rm -f $(SUBDIR3)/*.o
-	rm -f $(SUBDIR4)/*.o
-	rm -f *.o cosmosex
+	rm -f $(SUBDIR1)/*.o $(SUBDIR1)/*~
+	rm -f $(SUBDIR2)/*.o $(SUBDIR2)/*~
+	rm -f $(SUBDIR3)/*.o $(SUBDIR3)/*~
+	rm -f $(SUBDIR4)/*.o $(SUBDIR4)/*~
+	rm -f *.o *~ cosmosex
 	

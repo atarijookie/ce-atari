@@ -163,7 +163,7 @@ void FloppySetup::uploadStart(void)
 
     // do on-device-copy if needed
     if(doOnDeviceCopy) {                                            // if doing on-device-copy...
-        res = onDeviceCopy(hostPath, path);                         // copy the file
+        res = Utils::copyFile(hostPath, path);                      // copy the file
 
         if(res) {                                                   // if file was copied
             cmd[4] = FDD_CMD_UPLOADIMGBLOCK_DONE_OK;
@@ -229,7 +229,7 @@ void FloppySetup::uploadEnd(bool isOnDeviceCopy)
     }
 
     // we're here, the image upload succeeded, the following will also encode the image...
-    imageSilo->add(currentUpload.slotIndex, currentUpload.file, currentUpload.hostDestinationPath, currentUpload.atariSourcePath, currentUpload.hostSourcePath);
+    imageSilo->add(currentUpload.slotIndex, currentUpload.file, currentUpload.hostDestinationPath, currentUpload.atariSourcePath, currentUpload.hostSourcePath, true);
 
     // now finish with OK status
     if(isOnDeviceCopy) {                                        // for on-device-copy send special status
@@ -293,49 +293,11 @@ void FloppySetup::newImage(void)
 
     // we're here, the image creation succeeded
     std::string empty;
-    imageSilo->add(index, fileStr, path, empty, empty);
+    imageSilo->add(index, fileStr, path, empty, empty, true);
 
     dataTrans->setStatus(FDD_OK);
 }
 
-bool FloppySetup::onDeviceCopy(std::string &src, std::string &dst)
-{
-    FILE *from, *to;
 
-    from = fopen((char *) src.c_str(), "rb");               // open source file
-
-    if(!from) {
-        Debug::out("FloppySetup::onDeviceCopy - failed to open source file %s", (char *) src.c_str());
-        return false;
-    }
-
-    to = fopen((char *) dst.c_str(), "wb");                 // open destrination file
-
-    if(!to) {
-        Debug::out("FloppySetup::onDeviceCopy - failed to open destination file %s", (char *) dst.c_str());
-    
-        dataTrans->setStatus(FDD_ERROR);
-        return false;
-    }
-
-    while(1) {                                              // copy the file in loop 
-        size_t read = fread(bfr64k, 1, 64 * 1024, from);
-
-        if(read == 0) {                                     // didn't read anything? quit
-            break;
-        }
-
-        fwrite(bfr64k, 1, 64 * 1024, to);
-
-        if(feof(from)) {                                    // end of file reached? quit
-            break;
-        }
-    }
-
-    fclose(from);
-    fclose(to);
-
-    return true;
-}
 
 

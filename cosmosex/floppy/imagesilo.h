@@ -3,6 +3,7 @@
 
 #include <string>
 #include "../datatypes.h"
+#include "../settingsreloadproxy.h"
 
 #include "floppyimagefactory.h"
 #include "mfmdecoder.h"
@@ -32,21 +33,26 @@ class ImageSilo
 public:
     ImageSilo();    
 
+    void loadSettings(void);
+    void saveSettings(void);
+    void setSettingsReloadProxy(SettingsReloadProxy *rp);
+
 	BYTE getSlotBitmap(void);
 	void setCurrentSlot(int index);
 	BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
 	bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
 	
-    void add(int positionIndex, std::string &filename, std::string &hostDestPath, std::string &atariSrcPath, std::string &hostSrcPath);
+    void add(int positionIndex, std::string &filename, std::string &hostDestPath, std::string &atariSrcPath, std::string &hostSrcPath, bool saveToSettings);
     void swap(int index);
     void remove(int index);
 
     void dumpStringsToBuffer(BYTE *bfr);
 
 private:
-    SiloSlot	slots[3];
-	int			currentSlot;
-	
+    SiloSlot	            slots[3];
+	int			            currentSlot;
+	SettingsReloadProxy     *reloadProxy;
+
 	void clearSlot(int index);
 };
 

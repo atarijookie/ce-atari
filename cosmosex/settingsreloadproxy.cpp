@@ -27,7 +27,7 @@ void SettingsReloadProxy::reloadSettings(int type)
     // go through all the settings users and make the right ones reload
     for(int i=0; i<MAX_SETTINGS_USERS; i++) {
         if(settUser[i].type == type) {
-            settUser[i].su->reloadSettings();
+            settUser[i].su->reloadSettings(type);
         }
     }
 }

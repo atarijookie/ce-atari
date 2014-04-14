@@ -36,7 +36,7 @@ public:
 	void resetHansAndFranz(void);
     void run(void);
     void sendHalfWord(void);
-    virtual void reloadSettings(void);      								// from ISettingsUser
+    virtual void reloadSettings(int type);    								// from ISettingsUser
 
 	virtual void onDevAttached(std::string devName, bool isAtariDrive);		// from DevChangesHandler
 	virtual void onDevDetached(std::string devName);						// from DevChangesHandler
@@ -65,6 +65,7 @@ private:
     BYTE            acsiIDevType[8];
     BYTE            enabledIDbits;
     bool            setEnabledIDbits;
+    BYTE            sdCardAcsiId;
 
     void handleAcsiCommand(void);
     void handleConfigStream(BYTE *cmd);
@@ -87,6 +88,8 @@ private:
     // floppy stuff
     FloppySetup         floppySetup;
     ImageSilo           floppyImageSilo;
+    bool                setEnabledFloppyImgs;
+    int                 lastFloppyImageLed;
 
     void handleSendTrack(void);
     void handleSectorWritten(void);

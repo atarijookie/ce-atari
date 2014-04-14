@@ -311,7 +311,7 @@ int Scsi::findEmptyAttachSlot(void)
     return -1;
 }
 
-void Scsi::reloadSettings(void)
+void Scsi::reloadSettings(int type)
 {
     loadSettings();
 }

@@ -57,7 +57,7 @@ void TranslatedDisk::loadSettings(void)
     driveLetters.confDrive          = drive3 - 'A';
 }
 
-void TranslatedDisk::reloadSettings(void)
+void TranslatedDisk::reloadSettings(int type)
 {
     Debug::out("TranslatedDisk::reloadSettings");
 
