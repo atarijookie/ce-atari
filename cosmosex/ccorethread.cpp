@@ -223,6 +223,9 @@ void CCoreThread::runOnPc(void)
         Debug::out((char *) "Couldn't open serial port %s, can't continue!", UARTFILE);
     }
 
+    loadSettings();
+	mountAndAttachSharedDrive();					// if shared drive is enabled, try to mount it and attach it
+
     while(sigintReceived == 0) {
         BYTE header[19];
 
@@ -245,6 +248,23 @@ void CCoreThread::runOnPc(void)
 int CCoreThread::readBuffer(int fd, BYTE *bfr, WORD cnt)
 {
     int rest = cnt;
+
+    while(sigintReceived == 0) {
+        int res = read(fd, bfr, 1);
+
+        if(res > 0) {
+            if(bfr[0] != 0xfe) {        // not a starting marker? try again
+                continue;
+            }
+
+            rest -= 1;
+            bfr  += 1;
+            break;
+        } else {
+            Utils::sleepMs(5);
+        }
+    }
+
 
     while(sigintReceived == 0) {
         int res = read(fd, bfr, rest);
