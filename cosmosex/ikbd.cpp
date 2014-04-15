@@ -327,7 +327,7 @@ void Ikbd::processMouse(input_event *ev)
 		
 	    switch(ev->code) {
 		    case BTN_LEFT:		
-		    Debug::out("mouse LEFT button %d", ev->value); 
+//		    Debug::out("mouse LEFT button %d", ev->value); 
 			
 			if(ev->value == 1) {				// on DOWN - add bit
 			    btnNew |= 2; 
@@ -338,7 +338,7 @@ void Ikbd::processMouse(input_event *ev)
 			break;
 		
     		case BTN_RIGHT:		
-			Debug::out("mouse RIGHT button %d", ev->value); 
+//			Debug::out("mouse RIGHT button %d", ev->value); 
 					
 			if(ev->value == 1) {				// on DOWN - add bit
 				btnNew |= 1; 
@@ -360,12 +360,12 @@ void Ikbd::processMouse(input_event *ev)
 		
 	if(ev->type == EV_REL) {
 		if(ev->code == REL_X) {
-			Debug::out("mouse REL_X: %d", ev->value);
+//			Debug::out("mouse REL_X: %d", ev->value);
 			serialSendMousePacket(fdUart, mouseBtnNow, ev->value, 0);	// send movement to ST
 		}
 
 		if(ev->code == REL_Y) {
-			Debug::out("mouse REL_Y: %d", ev->value);
+//			Debug::out("mouse REL_Y: %d", ev->value);
 			serialSendMousePacket(fdUart, mouseBtnNow, 0, ev->value);	// send movement to ST
 		}
 	}
@@ -389,7 +389,7 @@ void Ikbd::processKeyboard(input_event *ev)
             stKey = stKey | 0x80;
         }
 
-        Debug::out("\nEV_KEY: code %d, value %d, stKey: %02x", ev->code, ev->value, stKey);
+//        Debug::out("\nEV_KEY: code %d, value %d, stKey: %02x", ev->code, ev->value, stKey);
 
         if(fdUart == -1) {                          // no UART open? quit
             return;

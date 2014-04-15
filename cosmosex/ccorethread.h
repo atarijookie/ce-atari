@@ -27,6 +27,13 @@
 
 #include "version.h"
 
+#ifdef ONPC
+#include <termios.h> 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#endif
+
 class CCoreThread: public ISettingsUser, public DevChangesHandler
 {
 public:
@@ -35,6 +42,13 @@ public:
 
 	void resetHansAndFranz(void);
     void run(void);
+
+    #ifdef ONPC
+    void runOnPc(void);
+    int  serialSetup(termios *ts);
+    int  readBuffer(int fd, BYTE *bfr, WORD cnt);
+    #endif
+
     void sendHalfWord(void);
     virtual void reloadSettings(int type);    								// from ISettingsUser
 
