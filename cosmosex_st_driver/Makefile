@@ -1,6 +1,8 @@
 TARGET	= cedd.prg
 SLIM	= yes
 
+#ONPC    = yes
+
 CC		= m68k-atari-mint-gcc
 STRIP	= m68k-atari-mint-strip
 CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
@@ -16,6 +18,11 @@ STARTUP	= startup.s
 CSRC	+= stdlib.c
 HDR		+= stdlib.h
 endif
+
+ifeq ($(ONPC),yes)
+CFLAGS	+= -DONPC
+endif
+
 
 OBJS = $(patsubst %.c,%.o,$(CSRC))
 

@@ -2,9 +2,6 @@
 #include <mint/osbind.h>
 
 #include "stdlib.h"
-#include "acsi.h"
-
-DWORD getTicks(void);
 
 void *memcpy ( void * destination, const void * source, int num )
 {

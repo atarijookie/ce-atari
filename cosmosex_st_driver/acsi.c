@@ -1,11 +1,27 @@
 /*--------------------------------------------------*/
+#ifdef ONPC
+    #include <mint/osbind.h>
+    #include "stdlib.h"
+#endif
+
 #include <mint/sysbind.h>
 
 #include "acsi.h"
 
+#ifdef ONPC
+    BYTE getCharSerial(BYTE *val);
+    void sendCharSerial(BYTE val);
+
+    //#define DEVICE_ID       DEV_PRINTER
+    #define DEVICE_ID       DEV_AUX
+
+#endif
+
 /* -------------------------------------- */
 BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
+///////////////////////////////////////////////////////////////////////////////
+#ifndef ONPC
 	DWORD status;
 	WORD i, wr1, wr2;
 
@@ -58,7 +74,95 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 	hdone();                                	/* restore DMA device to normal */
 
 	return status;
+
+#else   ///////////////////////////////////////////////////////////////////////////////
+
+    // create header
+    sendCharSerial(ReadNotWrite);
+    
+    WORD i;
+    for(i=0; i<cmdLength; i++) {
+        sendCharSerial(cmd[i]);
+    }
+    
+    for(i=0; i<(14-cmdLength); i++) {
+        sendCharSerial(0);
+    }
+    
+    sendCharSerial(cmdLength);
+    sendCharSerial(sectorCount >> 8);
+    sendCharSerial(sectorCount);
+    
+    BYTE *pBfr;
+
+    // now read or write the data
+    if(ReadNotWrite) {
+        int cnt = sectorCount * 512;
+        pBfr = buffer;
+        
+        for(i=0; i<cnt; i++) {
+            BYTE res = getCharSerial(&pBfr[i]);
+
+            if(!res) {
+                return 0;
+            }
+        }
+    } else {
+        int cnt = sectorCount * 512;
+        pBfr = buffer;
+    
+        for(i=0; i<cnt; i++) {
+            sendCharSerial(pBfr[i]);
+        }
+    }
+
+    BYTE status;
+    getCharSerial(&status);
+    
+    return status;
+#endif
 }
+
+#ifdef ONPC
+
+void sendCharSerial(BYTE val)
+{
+    while(1) {
+        BYTE res = Bcostat(DEVICE_ID);
+        
+        if(res != 0) {
+            break;
+        }
+    }
+    
+    Bconout(DEVICE_ID, val);
+}
+
+BYTE getCharSerial(BYTE *val)
+{
+    DWORD start = getTicks();
+
+    while(1) {                              // wait while the device is able to provide data
+        DWORD now = getTicks();
+                
+        if((now - start) > 100) {           // if it takes more than 0.5 seconds
+            *val = 0;
+            return FALSE;                   // fail
+        }
+            
+        BYTE stat = Bconstat(DEVICE_ID);      // get device status
+            
+        if(stat != 0) {                     // can receive? break
+            break;
+        }
+    }
+          
+    *val = Bconin(DEVICE_ID);                 // get it
+    return TRUE;                               // success
+}
+
+#endif
+
 /****************************************************************************/
 BYTE endcmd(WORD mode)
 {
