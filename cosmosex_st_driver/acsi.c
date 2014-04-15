@@ -78,6 +78,7 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 #else   ///////////////////////////////////////////////////////////////////////////////
 
     // create header
+    sendCharSerial(0xfe);
     sendCharSerial(ReadNotWrite);
     
     WORD i;
