@@ -70,31 +70,38 @@ void ConfigStream::createScreen_acsiConfig(void)
 
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "ID             off   raw  tran", 40, 0, 3, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "ID        off   sd    raw  tran", 40, 0, 3, gotoOffset);
     comp->setReverse(true);
     screen.push_back(comp);
 
-    for(int row=0; row<8; row++) {			// now make 8 rows of checkboxes
+    int row;
+
+    for(row=0; row<8; row++) {			// now make 8 rows of checkboxes
         char bfr[5];
         sprintf(bfr, "%d", row);
 
         comp = new ConfigComponent(this, ConfigComponent::label, bfr, 2, 1, row + 4, gotoOffset);
         screen.push_back(comp);
 
-        for(int col=0; col<3; col++) {
-            comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ", 3, 14 + (col * 6), row + 4, gotoOffset);			// create and place checkbox on screen
+        for(int col=0; col<4; col++) {
+            comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ", 3, 10 + (col * 6), row + 4, gotoOffset);			// create and place checkbox on screen
             comp->setCheckboxGroupIds(row, col);																// set checkbox group id to row, and checbox id to col
             screen.push_back(comp);
         }
     }
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "off  - turned off, not responding here",	40, 0, 17, gotoOffset);
+    row = 17;
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "off  - turned off, not responding here",      40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "raw  - raw sector access (use HDDr/ICD)",	40, 0, 18, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "sd   - SD card                (only one)",    40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "tran - translated access      (only one)",	40, 0, 19, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "raw  - raw sector access (use HDDr/ICD)",     40, 0, row++, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "tran - translated access      (only one)",	40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  9, 13, gotoOffset);
@@ -368,7 +375,7 @@ void ConfigStream::onAcsiConfig_save(void)
 
     bool somethingActive = false;
     bool somethingInvalid = false;
-    int tranCnt = 0;
+    int tranCnt = 0, sdCnt = 0;
 
     for(int id=0; id<8; id++) {								// get all selected types from checkbox groups
         devTypes[id] = checkboxGroup_getCheckedId(id);
@@ -379,6 +386,7 @@ void ConfigStream::onAcsiConfig_save(void)
 
         switch(devTypes[id]) {								// count the shared drives, network adapters, config drives
         case DEVTYPE_TRANSLATED:	tranCnt++;					break;
+        case DEVTYPE_SD:            sdCnt++;                    break;
         case -1:					somethingInvalid = true;	break;
         }
     }
@@ -395,6 +403,11 @@ void ConfigStream::onAcsiConfig_save(void)
 
     if(tranCnt > 1) {										// more than 1 of this type?
         showMessageScreen((char *) "Warning", (char *) "You have more than 1 translated drives\n\rselected. Unselect some to leave only\n\r1 active.");
+        return;
+    }
+
+    if(sdCnt > 1) {										    // more than 1 of this type?
+        showMessageScreen((char *) "Warning", (char *) "You have more than 1 SD cards\n\rselected. Unselect some to leave only\n\r1 active.");
         return;
     }
 
