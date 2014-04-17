@@ -96,7 +96,7 @@ int32_t custom_dsetdrv( void *sp )
         // note: even though we now know that this drive is not ours, we will let the host know that we've changed the drive
         commandShort[4] = GEMDOS_Dsetdrv;										/* store GEMDOS function number */
         commandShort[5] = (BYTE) drive;											/* store drive number */
-        acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* send command to host over ACSI */
+        acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* send command to host over ACSI */
 
         CALL_OLD_GD_NORET(Dsetdrv, drive);
 	
@@ -107,7 +107,7 @@ int32_t custom_dsetdrv( void *sp )
     // in this case the drive is ours, now we even care for the result
     commandShort[4] = GEMDOS_Dsetdrv;										/* store GEMDOS function number */
     commandShort[5] = (BYTE) drive;											/* store drive number */
-    res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+    res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD_NORET(Dsetdrv, drive);

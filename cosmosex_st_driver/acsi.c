@@ -11,6 +11,7 @@
 #ifdef ONPC
     BYTE getCharSerial(BYTE *val);
     void sendCharSerial(BYTE val);
+    void waitForMarker(void);
 
     //#define DEVICE_ID       DEV_PRINTER
     #define DEVICE_ID       DEV_AUX
@@ -101,6 +102,8 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
         int cnt = sectorCount * 512;
         pBfr = buffer;
         
+        waitForMarker();
+        
         for(i=0; i<cnt; i++) {
             BYTE res = getCharSerial(&pBfr[i]);
 
@@ -115,8 +118,10 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
         for(i=0; i<cnt; i++) {
             sendCharSerial(pBfr[i]);
         }
+        
+        waitForMarker();
     }
-
+    
     BYTE status;
     getCharSerial(&status);
     
@@ -125,6 +130,18 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 }
 
 #ifdef ONPC
+
+void waitForMarker(void)
+{
+    while(1) {
+        BYTE marker = 0;
+        getCharSerial(&marker);
+        
+        if(marker == 0xfe) {
+            break;
+        }        
+    }
+}
 
 void sendCharSerial(BYTE val)
 {
@@ -144,13 +161,14 @@ BYTE getCharSerial(BYTE *val)
     DWORD start = getTicks();
 
     while(1) {                              // wait while the device is able to provide data
+/*
         DWORD now = getTicks();
                 
         if((now - start) > 100) {           // if it takes more than 0.5 seconds
             *val = 0;
             return FALSE;                   // fail
         }
-            
+*/            
         BYTE stat = Bconstat(DEVICE_ID);      // get device status
             
         if(stat != 0) {                     // can receive? break
