@@ -111,6 +111,7 @@ extern BYTE *writeData;
 bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 {
     #ifdef ONPC
+    Debug::out("PC will read data from ST: %d bytes", dataCnt);
     memcpy(data, writeData, dataCnt);
     return true;
     #endif
@@ -240,6 +241,10 @@ void AcsiDataTrans::sendDataAndStatus(void)
 	//---------------------------------------
 	
     #ifdef ONPC
+    Debug::out("PC will write data to ST: %d bytes", dataCnt);
+
+    BYTE marker = 0xfe;
+    write(fakeAcsiFd, &marker, 1);
     write(fakeAcsiFd, buffer, dataCnt);
     write(fakeAcsiFd, &status, 1);
     return;
@@ -286,6 +291,10 @@ void AcsiDataTrans::sendDataAndStatus(void)
 void AcsiDataTrans::sendStatusAfterWrite(void)
 {
     #ifdef ONPC
+    Debug::out("Write status after write to ST: just marker and status...", dataCnt);
+
+    BYTE marker = 0xfe;
+    write(fakeAcsiFd, &marker, 1);
     write(fakeAcsiFd, &status, 1);
     return;
     #endif

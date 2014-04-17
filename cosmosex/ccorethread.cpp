@@ -207,7 +207,7 @@ void CCoreThread::run(void)
 
 #ifdef ONPC
 
-#define UARTFILE        "/dev/pts/10"
+#define UARTFILE        "/dev/pts/9"
 BYTE *bufIn;
 BYTE writeData[128 * 1024];
 int fakeAcsiFd;
@@ -239,6 +239,8 @@ void CCoreThread::runOnPc(void)
         if(header[1] == 0) {        // write?
             readBuffer(fakeAcsiFd, writeData, dataCnt);
         }
+
+        Debug::out((char *) "ST will %s bytes: %d", header[1] == 0 ? "write" : "read", dataCnt);
 
         dataTrans->dumpDataOnce();
         handleAcsiCommand();
@@ -288,7 +290,7 @@ int CCoreThread::serialSetup(termios *ts)
 {
 	int fd;
 	
-	fd = open(UARTFILE, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK);
+	fd = open(UARTFILE, O_RDWR | O_NOCTTY); // | O_NDELAY | O_NONBLOCK);
 	if(fd == -1) {
         Debug::out("Failed to open %s", UARTFILE);
         return -1;
@@ -304,8 +306,8 @@ int CCoreThread::serialSetup(termios *ts)
 	ts->c_oflag &= ~(OPOST | ONLCR);
 
 	/* setup the new settings */
-	cfsetispeed(ts, B9600);
-	cfsetospeed(ts, B9600);
+	cfsetispeed(ts, B115200);
+	cfsetospeed(ts, B115200);
 	ts->c_cflag |=  CS8 | CLOCAL | CREAD;			// uart: 8N1
 
 	ts->c_cc[VMIN ] = 0;
@@ -330,7 +332,7 @@ int CCoreThread::serialSetup(termios *ts)
 		return -1;
 	}
 
-    fcntl(fd, F_SETFL, FNDELAY);                    // make reading non-blocking
+    //fcntl(fd, F_SETFL, FNDELAY);                    // make reading non-blocking
 
 	return fd;
 }
