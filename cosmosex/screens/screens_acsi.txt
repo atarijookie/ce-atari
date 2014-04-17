@@ -1,21 +1,21 @@
 >> CosmosEx config tool - Jookie 2013 <<
         ACSI IDs configuration
 
-ID          off   raw  tran      
- 0         [   ] [   ] [   ]  
- 1         [   ] [   ] [   ] 
- 2         [   ] [   ] [   ]  
- 3         [   ] [   ] [   ]  
- 4         [   ] [   ] [   ]  
- 5         [   ] [   ] [   ] 
- 6         [   ] [   ] [   ]  
- 7         [   ] [   ] [   ]  
+ID        off   sd    raw  tran      
+ 0       [   ] [   ] [   ] [   ]      
+ 1       [   ] [   ] [   ] [   ] 
+ 2       [   ] [   ] [   ] [   ] 
+ 3       [   ] [   ] [   ] [   ] 
+ 4       [   ] [   ] [   ] [   ]  
+ 5       [   ] [   ] [   ] [   ] 
+ 6       [   ] [   ] [   ] [   ]  
+ 7       [   ] [   ] [   ] [   ]  
             
          [  SAVE  ] [ Cancel ]
 
 
-		 
 off  - turned off, not responding here
+sd   - SD card               (only one)
 raw  - raw sector access (use HDDr/ICD)
 tran - translated access     (only one)
                       
