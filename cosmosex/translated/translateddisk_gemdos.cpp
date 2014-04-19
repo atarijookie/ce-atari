@@ -548,7 +548,7 @@ void TranslatedDisk::onFopen(BYTE *cmd)
     res = createHostPath(atariName, hostName);                      // create the host path
 
     if(!res) {                                                      // the path doesn't bellong to us?
-        dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
+		dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
     }
 
@@ -569,13 +569,22 @@ void TranslatedDisk::onFopen(BYTE *cmd)
 
     mode = mode & 0x07;         // leave only lowest 3 bits
 
+	bool justRead = false;
+	
     switch(mode) {
-        case 0:     fopenMode = mode_S_READ;        break;
-        case 1:     fopenMode = mode_S_WRITE;       break;
-        case 2:     fopenMode = mode_S_READWRITE;   break;
-        default:    fopenMode = mode_S_READ;        break;
+        case 0:     fopenMode = mode_S_READ;        justRead = true;	break;
+        case 1:     fopenMode = mode_S_WRITE;       					break;
+        case 2:     fopenMode = mode_S_READWRITE;   					break;
+        default:    fopenMode = mode_S_READ;        justRead = true;	break;
     }
 
+	if(justRead) {								// if we should just read from the file (not write and thus create if does not exist)
+		if(!hostPathExists(hostName)) {			// and the file does not exist, quit with FILE NOT FOUND
+			dataTrans->setStatus(EFILNF);
+			return;
+		}
+	}
+	
     // create file and close it
     FILE *f = fopen(hostName.c_str(), fopenMode);                   // open according to required mode
 
