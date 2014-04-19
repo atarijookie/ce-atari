@@ -169,6 +169,8 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 
     Utils::splitFilenameFromPath(hostSearchPathAndWildcards, hostPath, searchString);
 
+	toUpperCaseString(searchString);
+	
     // then build the found files list
 	DIR *dir = opendir(hostPath.c_str());							// try to open the dir
 	
@@ -186,7 +188,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 		if(de == NULL) {											// no more entries?
 			break;
 		}
-	
+
 		if(de->d_type != DT_DIR && de->d_type != DT_REG) {			// not a file, not a directory?
 			Debug::out("TranslatedDisk::onFsfirst -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
 			continue;
@@ -307,4 +309,12 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, char *search
     fs->count++;
 }
 
+void DirTranslator::toUpperCaseString(std::string &st)
+{
+	int i, len;
+	len = st.length();
 
+	for(i=0; i<len; i++) {
+		st[i] = toupper(st[i]);
+	}
+}

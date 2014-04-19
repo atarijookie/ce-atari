@@ -70,7 +70,7 @@ void ConfigStream::createScreen_acsiConfig(void)
 
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "ID        off   sd    raw  tran", 40, 0, 3, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "ID         off   sd    raw  tran", 40, 0, 3, gotoOffset);
     comp->setReverse(true);
     screen.push_back(comp);
 

@@ -40,6 +40,8 @@ private:
     void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
 
     void appendFoundToFindStorage(std::string &hostPath, char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
+	
+	void toUpperCaseString(std::string &st);
 };
 
 #endif // DIRTRANSLATOR_H
