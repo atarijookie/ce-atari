@@ -552,7 +552,7 @@ int32_t custom_fopen( void *sp )
 		CALL_OLD_GD( Fopen, fileName, mode);
 	}
 	
-	if(handle == ENHNDL || handle == EACCDN || handle == EINTRN) {		/* if some other error, just return it */
+	if(handle == ENHNDL || handle == EACCDN || handle == EINTRN || handle == EFILNF) {		/* if some other error, just return it */
         return extendByteToDword(handle);								/* but append lots of FFs to make negative integer out of it */
 	}
 	
