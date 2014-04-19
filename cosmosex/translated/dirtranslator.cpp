@@ -278,7 +278,7 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, char *search
     FilenameShortener::extendWithSpaces((char *) shortFname.c_str(), shortFnameExtended);
 
     // check the current name against searchString using fnmatch
-	int ires = fnmatch(searchString, (char *) shortFnameExtended, FNM_PATHNAME);
+	int ires = fnmatch(searchString, (char *) shortFname.c_str(), FNM_PATHNAME);
 		
 	if(ires != 0) {     // not matching? quit
 		return;
