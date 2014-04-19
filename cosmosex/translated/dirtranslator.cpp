@@ -232,8 +232,9 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, char *search
 //        return;
 
 	bool isDir = (de->d_type == DT_DIR);
-    if(isDir  && (findAttribs & FA_DIR)==0)       // is dir, but not searching for that
-        return;
+    if(isDir  && (findAttribs & FA_DIR)==0) {      // is dir, but not searching for that
+		return;
+	}
 
 //    // this one is now disabled as on Win almost everything has archive bit set, and thus TOS didn't show any files
 //    if((found->dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)!=0    && (findAttribs & FA_ARCHIVE)==0)   // is archive, but not searching for that
@@ -278,7 +279,7 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, char *search
     FilenameShortener::extendWithSpaces((char *) shortFname.c_str(), shortFnameExtended);
 
     // check the current name against searchString using fnmatch
-	int ires = fnmatch(searchString, (char *) shortFname.c_str(), FNM_PATHNAME);
+	int ires = compareSearchStringAndFilename(searchString, (char *) shortFname.c_str());
 		
 	if(ires != 0) {     // not matching? quit
 		return;
@@ -317,4 +318,29 @@ void DirTranslator::toUpperCaseString(std::string &st)
 	for(i=0; i<len; i++) {
 		st[i] = toupper(st[i]);
 	}
+}
+
+int DirTranslator::compareSearchStringAndFilename(char *searchString, char *filename)
+{
+	char ss1[16], ss2[16];
+	char fn1[16], fn2[16];
+	
+	FilenameShortener::splitFilenameFromExtension(searchString, ss1, ss2);
+	FilenameShortener::splitFilenameFromExtension(filename, fn1, fn2);
+
+	// check if filename matches
+	int ires = fnmatch(ss1, fn1, FNM_PATHNAME);
+
+	if(ires != 0) {
+		return -1;
+	}
+
+	// check if extension matches
+	ires = fnmatch(ss2, fn2, FNM_PATHNAME);
+
+	if(ires != 0) {
+		return -1;
+	}
+	
+	return 0;
 }

@@ -41,6 +41,7 @@ private:
 
     void appendFoundToFindStorage(std::string &hostPath, char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
 	
+	int compareSearchStringAndFilename(char *searchString, char *filename);
 	void toUpperCaseString(std::string &st);
 };
 

@@ -31,6 +31,7 @@ public:
 
     static void removeSpaceExtension(char *extendedFn, char *extRemovedFn); // 'FILE    .C  ' -> 'FILE.C'
     static void extendWithSpaces(char *normalFname, char *extendedFn);      // 'FILE.C'       -> 'FILE    .C  '
+    static void splitFilenameFromExtension(char *filenameWithExt, char *fileName, char *ext);
 
 private:
     std::map<std::string, std::string>  mapFilenameWithExt;                 // for file name conversion from long to short
@@ -44,7 +45,6 @@ private:
     static int  strCharPos(char *str, int maxLen, char ch);
     static void replaceNonLetters(char *str);
     static void extendToLenghtWithSpaces(char *str, int len);
-    static void splitFilenameFromExtension(char *filenameWithExt, char *fileName, char *ext);
     static void removeTrailingSpaces(char *str);
 };
 
