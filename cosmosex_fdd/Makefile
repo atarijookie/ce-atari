@@ -1,22 +1,22 @@
 TARGET	= ce_fdd.prg
 
-CC		= m68k-atari-mint-gcc
+CC	= m68k-atari-mint-gcc
 STRIP	= m68k-atari-mint-strip
 CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS	= -Wl,--traditional-format -lgem 
 
-HDR		= $(wildcard *.h)
+HDR	= $(wildcard *.h)
 CSRC	= $(wildcard *.c) 
-SSRC	= $(wildcard *.s) 
 
 OBJS    = $(patsubst %.c,%.o,$(CRCS))
 
 CFLAGS	+= -nostdlib -DSLIM 
+STARTUP	 = startup.s
 
-OBJS = $(patsubst %.c,%.o,$(CSRC))
+OBJS	 = $(patsubst %.c,%.o,$(CSRC))
 
-$(TARGET): $(STARTUP) $(OBJS) $(SSRC) $(HDR)
-	$(CC) $(CFLAGS) -o $@ $(OBJS) $(SSRC) $(LDFLAGS)
+$(TARGET): $(STARTUP) $(OBJS) $(HDR)
+	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(OBJS) $(LDFLAGS)
 	$(STRIP) -s $@
 
 %.o: %.c 
