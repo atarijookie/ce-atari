@@ -18,9 +18,6 @@
 BYTE ce_findId(void);
 BYTE ce_identify(void);
 
-BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
-BYTE *pDmaBuffer;
-
 BYTE deviceID;
 
 BYTE commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
@@ -54,6 +51,9 @@ BYTE sectorCount;
 
 BYTE nextMenuRedrawIsFull;
 
+#define SIZE64K     (64*1024)
+BYTE *pBfrOrig;
+BYTE *pBfr, *pBfrCnt;
 // ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
 {
@@ -61,6 +61,18 @@ int main( int argc, char* argv[] )
   
     appl_init();										            // init AES 
     
+	pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
+	
+	if(pBfrOrig == NULL) {
+		(void) Cconws("\r\nMalloc failed!\r\n");
+		sleep(3);
+		return 0;
+	}
+
+	DWORD val = (DWORD) pBfrOrig;
+	pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);     				// create even pointer
+    pBfrCnt   = pBfr - 2;											// this is previous pointer - size of WORD 
+	
     // init fileselector path
     strcpy(filePath, "C:\\*.*");                            
     memset(fileName, 0, 256);          
@@ -71,10 +83,6 @@ int main( int argc, char* argv[] )
 	// write some header out
 	(void) Clear_home();
 	(void) Cconws("\33p[ CosmosEx floppy setup ]\r\n[    by Jookie 2014     ]\33q\r\n\r\n");
-
-	// create buffer pointer to even address 
-	pDmaBuffer = &dmaBuffer[2];
-	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);		// remove odd bit if the address was odd 
 
 	// search for CosmosEx on ACSI bus
 	found = ce_findId();
@@ -144,6 +152,8 @@ int main( int argc, char* argv[] )
 	graf_mouse(M_ON, 0);
 	appl_exit();
 
+	Mfree(pBfrOrig);
+	
 	return 0;		
 }
 
@@ -232,7 +242,7 @@ void getSiloContent(void)
     BYTE res = Supexec(ce_acsiReadCommand); 
 		
 	if(res == 1) {                              // good? copy in the results
-        memcpy(siloContent, pDmaBuffer, 512);
+        memcpy(siloContent, pBfr, 512);
     } else {                                    // bad? show error
         (void) Clear_home();
         (void) Cconws("Error in CosmosEx communication!\r\n");
@@ -323,16 +333,6 @@ void uploadImage(int index)
     }
 
     //---------------
-    // these buffers will be handy in a while...
-
-    #define SIZE64K     (64*1024)
-    
-    BYTE imgBlock[SIZE64K + 4];
-    BYTE *pBfr      = (BYTE *) (((DWORD) (&imgBlock[4])) & 0xfffffffe);     // create even pointer
-    BYTE *pBfrCnt   = pBfr - 2;                                             // pointer to where the 
-    BYTE res;
-    
-    //---------------
     // tell the device the path and filename of the source image
     
     commandShort[4] = FDD_CMD_UPLOADIMGBLOCK_START;             // starting image upload
@@ -343,6 +343,7 @@ void uploadImage(int index)
     
     sectorCount     = 1;                                        // write just one sector
     
+    BYTE res;
     res = Supexec(ce_acsiWriteBlockCommand); 
 		
     if(res == FDD_UPLOADSTART_RES_ONDEVICECOPY) {               // if the device returned this code, it means that it could do the image upload / copy on device, no need to upload it from ST!
@@ -373,9 +374,9 @@ void uploadImage(int index)
     
     while(1) {
         Cconout('*');                                           // show progress...
-    
+
         long len = Fread(fh, SIZE64K, pBfr);
-    
+   
         if(len < 0) {                                           // error while reading the file?
             good = 0;                                           // mark that upload didn't finish good
             break;
@@ -397,7 +398,7 @@ void uploadImage(int index)
         }
 
         res = Supexec(ce_acsiWriteBlockCommand);                // send the data
-
+		
         if(res != 0) {                                          // error? write error
             (void) Clear_home();
             (void) Cconws("Error in CosmosEx communication!\r\n");
@@ -406,7 +407,7 @@ void uploadImage(int index)
             good = 0;                                           // mark that upload didn't finish good
             break;
         }
-        
+       
         // write of block was OK, and this was the partial (last) block? 
         if(commandShort[4] == FDD_CMD_UPLOADIMGBLOCK_PART) {
             good = 1;
@@ -490,15 +491,15 @@ BYTE ce_identify(void)
 	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
 	commandShort[4] = FDD_CMD_IDENTIFY;
   
-	memset(pDmaBuffer, 0, 512);              									// clear the buffer 
+	memset(pBfr, 0, 512);              											// clear the buffer 
 
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// issue the command and check the result 
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, 1);			// issue the command and check the result 
 
 	if(res != OK) {                        										// if failed, return FALSE 
 		return 0;
 	}
 
-	if(strncmp((char *) pDmaBuffer, "CosmosEx floppy setup", 21) != 0) {		// the identity string doesn't match? 
+	if(strncmp((char *) pBfr, "CosmosEx floppy setup", 21) != 0) {				// the identity string doesn't match? 
 		return 0;
 	}
 	
@@ -512,9 +513,9 @@ BYTE ce_acsiReadCommand(void)
   
 	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
   
-	memset(pDmaBuffer, 0, 512);              									// clear the buffer 
+	memset(pBfr, 0, 512);              											// clear the buffer 
 
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// issue the command and check the result 
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, 1);			// issue the command and check the result 
 
 	if(res != OK) {                        										// if failed, return FALSE 
 		return 0;
