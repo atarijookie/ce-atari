@@ -80,8 +80,8 @@ void FloppySetup::processCommand(BYTE *command)
         case FDD_CMD_UPLOADIMGBLOCK_DONE_OK:    
         case FDD_CMD_UPLOADIMGBLOCK_DONE_FAIL:  uploadEnd(false);           break;
 
-        case FDD_CMD_SWAPSLOTS:                 imageSilo->swap(cmd[5]);    break;
-        case FDD_CMD_REMOVESLOT:                imageSilo->remove(cmd[5]);  break;
+        case FDD_CMD_SWAPSLOTS:                 imageSilo->swap(cmd[5]);    dataTrans->setStatus(FDD_OK);	break;
+        case FDD_CMD_REMOVESLOT:                imageSilo->remove(cmd[5]);  dataTrans->setStatus(FDD_OK);	break;
 
         case FDD_CMD_NEW_EMPTYIMAGE:            newImage();                 break;
 
