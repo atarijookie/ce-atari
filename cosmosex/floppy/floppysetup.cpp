@@ -110,6 +110,7 @@ void FloppySetup::uploadStart(void)
         fclose(currentUpload.fh);
     }
 
+	memset(bfr64k, 0, 512);
     dataTrans->recvData(bfr64k, 512);                       // receive file name into this buffer
     std::string atariFilePath = (char *) bfr64k;
     std::string hostPath;
@@ -138,11 +139,11 @@ void FloppySetup::uploadStart(void)
     std::string path, file;
     Utils::splitFilenameFromPath(pathWithHostSeparators, path, file);
 
+    path = UPLOAD_PATH + file;
+	
     FILE *f = NULL;
 
     if(!doOnDeviceCopy) {                                   // if not doing on-device-copy, try to open the file
-        path = UPLOAD_PATH + file;
-
         f = fopen((char *) path.c_str(), "wb");
 
         if(!f) {                                            // failed to open file?

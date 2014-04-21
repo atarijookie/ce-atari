@@ -189,14 +189,14 @@ bool Utils::copyFile(std::string &src, std::string &dst)
     from = fopen((char *) src.c_str(), "rb");               // open source file
 
     if(!from) {
-        Debug::out("ImageSilo::onDeviceCopy - failed to open source file %s", (char *) src.c_str());
+        Debug::out("Utils::onDeviceCopy - failed to open source file %s", (char *) src.c_str());
         return false;
     }
 
     to = fopen((char *) dst.c_str(), "wb");                 // open destrination file
 
     if(!to) {
-        Debug::out("ImageSilo::onDeviceCopy - failed to open destination file %s", (char *) dst.c_str());
+        Debug::out("Utils::onDeviceCopy - failed to open destination file %s", (char *) dst.c_str());
         return false;
     }
 
@@ -207,7 +207,7 @@ bool Utils::copyFile(std::string &src, std::string &dst)
             break;
         }
 
-        fwrite(bfr64k, 1, 64 * 1024, to);
+        fwrite(bfr64k, 1, read, to);
 
         if(feof(from)) {                                    // end of file reached? quit
             break;
