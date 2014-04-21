@@ -69,6 +69,26 @@ int main( int argc, char* argv[] )
 	(void) Clear_home();
 	(void) Cconws("\33p[ CosmosEx disk driver ]\r\n[    by Jookie 2013    ]\33q\r\n\r\n");
 
+	BYTE kbshift = Kbshift(-1);
+	
+	if((kbshift & 0x0f) != 0) {
+		if((kbshift & K_ALT) != 0) {
+			(void) Cconws("ALT ");
+		}
+
+		if((kbshift & (K_RSHIFT | K_LSHIFT)) != 0) {
+			(void) Cconws("Shift ");
+		}
+
+		if((kbshift & K_CTRL) != 0) {
+			(void) Cconws("CTRL ");
+		}
+
+		(void) Cconws("key pressed, skipping!\r\n" );
+		sleep(2);
+		return 0;
+	}
+	
 	/* create buffer pointer to even address */
 	pDmaBuffer = &dmaBuffer[2];
 	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
