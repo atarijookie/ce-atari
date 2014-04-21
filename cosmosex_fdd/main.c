@@ -27,7 +27,7 @@ BYTE commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
 
 BYTE siloContent[512];
 
-void showMenu(void);
+void showMenu(char fullNotPartial);
 void showImage(int index);
 void getSiloContent(void);
 
@@ -41,10 +41,16 @@ void removeLastPartUntilBackslash(char *str);
 BYTE ce_acsiReadCommand(void);
 BYTE ce_acsiWriteBlockCommand(void);
 
+void newImage(int index);
+void downloadImage(int index);
+
 char filePath[256], fileName[256];
 
 BYTE *p64kBlock;
 BYTE sectorCount;
+
+#define GOTO_POS        "\33Y"
+#define Goto_pos(x,y)   ((void) Cconws(GOTO_POS),  (void) Cconout(' ' + y), (void) Cconout(' ' + x))
 
 // ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
@@ -79,7 +85,7 @@ int main( int argc, char* argv[] )
 	// now set up the acsi command bytes so we don't have to deal with this one anymore 
 	commandShort[0] = (deviceID << 5); 					            // cmd[0] = ACSI_id + TEST UNIT READY (0)	
 	
-    showMenu();
+    showMenu(1);
 
     while(1) {
     	BYTE key;
@@ -90,7 +96,11 @@ int main( int argc, char* argv[] )
 
 		key		=  scancode & 0xff;
 
-        if(key == 'q' || key == 'Q') {                              // should quit?
+		if(key >= 'A' && key <= 'Z') {								// upper case letter? to lower case!
+			key += 32;
+		}
+		
+        if(key == 'q') {                              				// should quit?
             break;
         }
         
@@ -108,11 +118,19 @@ int main( int argc, char* argv[] )
             removeImage(key - '7');
             handled = 1;
         }
-        
-        // TODO: download, new
+		
+		if(key >= 'n' && key <= 'p') {								// create new image
+			newImage(key - 'n');
+			handled = 1;
+		}
 
+		if(key >= 'd' && key <= 'f') {								// download image
+			downloadImage(key - 'd');
+			handled = 1;
+		}
+        
         if(handled) {
-            showMenu();
+            showMenu(0);
         }
     }
     
@@ -120,20 +138,21 @@ int main( int argc, char* argv[] )
 	return 0;		
 }
 
-void showMenu(void)
+void showMenu(char fullNotPartial)
 {
+    if(fullNotPartial) {
+		(void) Clear_home();
+		(void) Cconws("\33p[CosmosEx floppy config, by Jookie 2014]\33q\r\n");
+	    (void) Cconws("\r\n");
+		(void) Cconws("Menu:\r\n");
+    	(void) Cconws("       upload swap remove new  download\r\n");
+    	(void) Cconws("\33pslot 1\33q:   1     4     7     N     D\r\n");
+    	(void) Cconws("\33pslot 2\33q:   2     5     8     O     E\r\n");
+    	(void) Cconws("\33pslot 3\33q:   3     6     9     P     F\r\n");
+    	(void) Cconws("\r\n\33pPress Q to quit.\33q\r\n\r\n\r\n");
+    }
+	
     getSiloContent();
-    
-    (void) Clear_home();
-	(void) Cconws("\33p[CosmosEx floppy config, by Jookie 2014]\33q\r\n");
-    (void) Cconws("\r\n");
-	(void) Cconws("Menu:\r\n");
-    (void) Cconws("       upload swap remove new  download\r\n");
-    (void) Cconws("\33pslot 1\33q:   1     4     7     N     D\r\n");
-    (void) Cconws("\33pslot 2\33q:   2     5     8     O     E\r\n");
-    (void) Cconws("\33pslot 3\33q:   3     6     9     P     F\r\n");
-    (void) Cconws("\r\n\33pPress Q to quit.\33q\r\n\r\n\r\n");
-    
     showImage(0);
     showImage(1);
     showImage(2);
@@ -156,13 +175,45 @@ void showImage(int index)
     BYTE *filename  = &siloContent[(index * 160)];
 //    BYTE *content   = &siloContent[(index * 160) + 80];
     
+	Goto_pos(0, 12 + index);
+	
     (void) Cconws("Image ");
     Cconout(index + '1');
-    (void) Cconws(":    ");
+    (void) Cconws(":                        ");
+
+	Goto_pos(11, 12 + index);
     (void) Cconws(filename);
     (void) Cconws("\r\n");
+
 //    (void) Cconws(content);
 //    (void) Cconws("\r\n\r\n");
+}
+
+void newImage(int index)
+{
+    if(index < 0 || index > 2) {
+        return;
+    }
+
+    commandShort[4] = FDD_CMD_NEW_EMPTYIMAGE;
+    commandShort[5] = index;
+
+    BYTE res = Supexec(ce_acsiReadCommand); 
+		
+	if(res != 1) {                              // bad? write error
+        (void) Clear_home();
+        (void) Cconws("Error in CosmosEx communication!\r\n");
+        Cnecin();
+    }
+}
+
+void downloadImage(int index)
+{
+    if(index < 0 || index > 2) {
+        return;
+    }
+	
+	// TODO: all the code for download
 }
 
 void getSiloContent(void)
