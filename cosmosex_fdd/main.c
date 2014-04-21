@@ -36,6 +36,7 @@ void swapImage(int index);
 void removeImage(int index);
 
 BYTE getLowestDrive(void);
+void removeLastPartUntilBackslash(char *str);
 
 BYTE ce_acsiReadCommand(void);
 BYTE ce_acsiWriteBlockCommand(void);
@@ -51,7 +52,6 @@ int main( int argc, char* argv[] )
 	BYTE found;
   
     appl_init();										            // init AES 
-    
     
     // init fileselector path
     strcpy(filePath, "C:\\*.*");                            
@@ -75,7 +75,7 @@ int main( int argc, char* argv[] )
 		sleep(3);
 		return 0;
 	}
-    
+ 
 	// now set up the acsi command bytes so we don't have to deal with this one anymore 
 	commandShort[0] = (deviceID << 5); 					            // cmd[0] = ACSI_id + TEST UNIT READY (0)	
 	
@@ -129,10 +129,10 @@ void showMenu(void)
     (void) Cconws("\r\n");
 	(void) Cconws("Menu:\r\n");
     (void) Cconws("       upload swap remove new  download\r\n");
-    (void) Cconws("\33pslot 1\33q:    1    4    7    N    D\r\n");
-    (void) Cconws("\33pslot 2\33q:    2    5    8    O    E\r\n");
-    (void) Cconws("\33pslot 3\33q:    3    6    9    P    F\r\n");
-    (void) Cconws("\33pQ\33q quit\r\n");
+    (void) Cconws("\33pslot 1\33q:   1     4     7     N     D\r\n");
+    (void) Cconws("\33pslot 2\33q:   2     5     8     O     E\r\n");
+    (void) Cconws("\33pslot 3\33q:   3     6     9     P     F\r\n");
+    (void) Cconws("\r\n\33pPress Q to quit.\33q\r\n\r\n\r\n");
     
     showImage(0);
     showImage(1);
@@ -154,15 +154,15 @@ void showImage(int index)
     // offset 400: content  3
     
     BYTE *filename  = &siloContent[(index * 160)];
-    BYTE *content   = &siloContent[(index * 160) + 80];
+//    BYTE *content   = &siloContent[(index * 160) + 80];
     
     (void) Cconws("Image ");
     Cconout(index + '1');
     (void) Cconws(":    ");
     (void) Cconws(filename);
     (void) Cconws("\r\n");
-    (void) Cconws(content);
-    (void) Cconws("\r\n\r\n");
+//    (void) Cconws(content);
+//    (void) Cconws("\r\n\r\n");
 }
 
 void getSiloContent(void)
@@ -231,13 +231,24 @@ void uploadImage(int index)
         return;
     }
   
+	// fileName contains the filename
+	// filePath contains the path with search wildcards, e.g.: C:\\*.*
+  
     // create full path
     char fullPath[512];
     strcpy(fullPath, filePath);
-    strcat(fullPath, "\\");
-    strcat(fullPath, fileName);
+	
+	removeLastPartUntilBackslash(fullPath);				// remove the search wildcards from the end
+
+	if(strlen(fullPath) > 0) {							
+		if(fullPath[ strlen(fullPath) - 1] != '\\') {	// if the string doesn't end with backslash, add it
+			strcat(fullPath, "\\");
+		}
+	}
+	
+    strcat(fullPath, fileName);							// add the filename
   
-    short fh = Fopen(fullPath, 0);               // open file for reading
+    short fh = Fopen(fullPath, 0);               		// open file for reading
   
     if(fh < 0) {
         (void) Clear_home();
@@ -361,6 +372,21 @@ void uploadImage(int index)
         (void) Cconws("Failed to finish upload...\r\n");
         Cnecin();
     }
+}
+
+void removeLastPartUntilBackslash(char *str)
+{
+	int i, len;
+	
+	len = strlen(str);
+	
+	for(i=(len-1); i>= 0; i--) {
+		if(str[i] == '\\') {
+			break;
+		}
+	
+		str[i] = 0;
+	}
 }
 
 // this function scans the ACSI bus for any active CosmosEx translated drive 
