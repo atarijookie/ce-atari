@@ -52,6 +52,8 @@ BYTE sectorCount;
 #define GOTO_POS        "\33Y"
 #define Goto_pos(x,y)   ((void) Cconws(GOTO_POS),  (void) Cconout(' ' + y), (void) Cconout(' ' + x))
 
+BYTE nextMenuRedrawIsFull;
+
 // ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
 {
@@ -84,7 +86,10 @@ int main( int argc, char* argv[] )
  
 	// now set up the acsi command bytes so we don't have to deal with this one anymore 
 	commandShort[0] = (deviceID << 5); 					            // cmd[0] = ACSI_id + TEST UNIT READY (0)	
+
+	graf_mouse(M_OFF, 0);
 	
+	nextMenuRedrawIsFull = 0;
     showMenu(1);
 
     while(1) {
@@ -106,6 +111,7 @@ int main( int argc, char* argv[] )
         
         if(key >= '1' && key <= '3') {                              // upload image
             uploadImage(key - '1');
+			nextMenuRedrawIsFull = 1;
             handled = 1;
         }
         
@@ -130,10 +136,13 @@ int main( int argc, char* argv[] )
 		}
         
         if(handled) {
-            showMenu(0);
+            showMenu(nextMenuRedrawIsFull);
+			nextMenuRedrawIsFull = 0;
         }
     }
     
+	graf_mouse(M_ON, 0);
+	appl_exit();
 
 	return 0;		
 }
@@ -276,7 +285,9 @@ void uploadImage(int index)
     short button;  
   
     // open fileselector and get path
+	graf_mouse(M_ON, 0);
     fsel_input(filePath, fileName, &button);    // show file selector
+	graf_mouse(M_OFF, 0);
   
     if(button != 1) {                           // if OK was not pressed
         return;
