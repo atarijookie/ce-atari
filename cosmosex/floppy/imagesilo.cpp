@@ -136,8 +136,6 @@ void ImageSilo::saveSettings(void)
 {
     Settings s;
 
-    bool somethingChanged = false;
-
     char key[32];
     for(int slot=0; slot<3; slot++) {							
         sprintf(key, "FLOPPY_IMAGE_%d", slot);                                  // create settings key			
@@ -150,12 +148,10 @@ void ImageSilo::saveSettings(void)
         }
 
 		s.setString(key, (char *) slots[slot].hostSrcPath.c_str());             // store the value at that slot
-
-        somethingChanged = true;                                                // mark that something has changed
     }
 
     // if something changed and got settings reload proxy, invoke reload
-    if(somethingChanged && reloadProxy) {
+    if(reloadProxy) {
         reloadProxy->reloadSettings(SETTINGSUSER_FLOPPYIMGS);
     }
 }
