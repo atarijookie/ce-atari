@@ -34,6 +34,7 @@ void startSpiDmaForDataRead(DWORD dataCnt, TReadBuffer *readBfr);
 #define MIN(X,Y)		((X < Y) ? (X) : (Y))
 
 void showCurrentLED(void);
+void fixLedsByEnabledImgs(void);
 
 // cycle measure: t1 = TIM3->CNT;	t2 = TIM3->CNT;	dt = t2 - t1; -- subtract 0x12 because that's how much measuring takes
 WORD t1, t2, dt; 
@@ -141,6 +142,8 @@ BYTE shouldProcessCommands;
 
 BYTE dataReadAsm(WORD *pData, WORD dataCnt);
 DWORD isrNow, isrPrev;
+
+WORD prevBtnPressTime;
 
 void initAllStuff(void);
 
@@ -256,10 +259,10 @@ void initAllStuff(void)
 	EXTI->PR = BUTTON | aCMD | aCS | aACK;				            // clear these ints 
 	//-------------
 	// by default set ID 0 as enabled and other IDs as disabled 
-	enabledIDs[0] = 1;
+	enabledIDs[0] = TRUE;
 	
 	for(i=1; i<8; i++) {
-		enabledIDs[i] = 0;
+		enabledIDs[i] = FALSE;
 	}
 	
     sdCardID = 0xff;                                                // for SD card set non-existing ID for now
@@ -269,30 +272,54 @@ void initAllStuff(void)
 	for(i=1; i<3; i++) {
 		enabledImgs[i] = FALSE;
 	}
+    
+    prevBtnPressTime = 0;
 }
 
 void onButtonPress(void)
 {
-	static WORD prevCnt = 0;
-	WORD cnt;
+	WORD cnt, diff;
 
 	EXTI->PR = BUTTON;									// clear pending EXTI
 	
-	cnt = TIM1->CNT;										// get the current time
-	
-	if((cnt - prevCnt) < 500) {					// the previous button press happened less than 250 ms before? ignore
+	cnt = TIM1->CNT;									// get the current time
+    diff = cnt - prevBtnPressTime;
+
+	if(diff < 500) {				                    // the previous button press happened less than 250 ms before? ignore
 		return;
 	}	
 	
-	prevCnt = cnt;											// store current time
+	prevBtnPressTime = cnt; 							// store current time
 	
-	currentLed++;												// change LED
+	currentLed++;	    								// change LED
 	
 	if(currentLed > 2) {								// overflow?
 		currentLed = 0;
 	}
 	
-	showCurrentLED();
+    fixLedsByEnabledImgs();                             // if we switched to not enabled floppy image, fix this
+    
+	showCurrentLED();                                   // and show the current LED
+}
+
+void fixLedsByEnabledImgs(void)
+{
+    BYTE i;
+    
+    for(i=0; i<3; i++) {                                    // try to switch to enabled LED 3 times
+        if(enabledImgs[currentLed] == TRUE) {               // if this LED is enabled, use it
+            return;
+        }
+
+        // current LED is not enabled, switch to another one
+        currentLed++;	    								// change LED
+	
+        if(currentLed > 2) {								// overflow? fix it
+            currentLed = 0;
+        }
+    }
+
+    currentLed = 0;                                         // use led 0 as selected                                          
 }
 
 void showCurrentLED(void)
@@ -635,7 +662,7 @@ void init_hw_sw(void)
 {
 	RCC->AHBENR		|= (1 <<  0);																						// enable DMA1
 	RCC->APB1ENR	|= (1 << 2) | (1 <<  1) | (1 <<  0);										// enable TIM4, TIM3, TIM2
-  RCC->APB2ENR	|= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     		// Enable SPI1, TIM1, GPIOA and GPIOB clock
+    RCC->APB2ENR	|= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     		// Enable SPI1, TIM1, GPIOA and GPIOB clock
 
 	// SPI -- enable atlernate function for PA4, PA5, PA6, PA7
 	GPIOA->CRL &= ~(0xffff0000);						// remove bits from GPIOA
@@ -733,6 +760,9 @@ void processHostCommands(void)
 						enabledImgs[j] = FALSE;
 					}
                 }
+                
+                fixLedsByEnabledImgs();                             // if we are switched to not enabled floppy image, fix this
+                showCurrentLED();                                   // and show the current LED
 
 				cmdBuffer[i]	= 0;							    // clear this command
 				cmdBuffer[i+1]	= 0;
