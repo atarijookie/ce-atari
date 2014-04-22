@@ -297,5 +297,17 @@ bool ImageSilo::getParams(int &tracks, int &sides, int &sectorsPerTrack)
 	return slots[currentSlot].encImage.getParams(tracks, sides, sectorsPerTrack);
 }
 
+bool ImageSilo::containsImage(char *filename)	// check if image with this filename exists in silo
+{
+	std::string fnameStr = filename;
+
+	for(int i=0; i<3; i++) {
+		if(slots[i].imageFile == fnameStr) {
+			return true;
+		}
+	}
+	
+	return false;
+}
 
 

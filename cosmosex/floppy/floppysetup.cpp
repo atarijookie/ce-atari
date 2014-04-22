@@ -253,8 +253,8 @@ void FloppySetup::newImage(void)
         fclose(currentUpload.fh);
     }
 
-    char file[24];
-    sprintf(file, "newimg%d.st", index);                // create new filename
+    char file[128];
+	getNewImageName(file);
     std::string fileStr = file;
 
     std::string path = UPLOAD_PATH + fileStr;
@@ -299,6 +299,28 @@ void FloppySetup::newImage(void)
     dataTrans->setStatus(FDD_OK);
 }
 
+void FloppySetup::getNewImageName(char *nameBfr)
+{
+	char fileName[24];
 
+	for(int i=0; i<100; i++) {
+		sprintf(fileName, "newimg%d.st", i);						// create new filename 
+		
+		std::string fnameWithPath = UPLOAD_PATH;
+		fnameWithPath += fileName;									// this will be filename with path
+		
+		if(imageSilo->containsImage(fileName)) {					// if this file is already in silo, skip it
+			continue;
+		}
+		
+		if(translated->hostPathExists(fnameWithPath)) {				// if this file does exist, delete it (it's not in silo)
+			unlink(fnameWithPath.c_str());
+		}
+		
+		break;														// break this cycle and thus use this filename
+	}
+	
+	strcpy(nameBfr, fileName);
+}
 
 

@@ -46,6 +46,8 @@ public:
     void swap(int index);
     void remove(int index);
 
+	bool containsImage(char *filename);
+	
     void dumpStringsToBuffer(BYTE *bfr);
 
 private:
