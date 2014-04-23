@@ -8,10 +8,29 @@
 
 WORD swapNibbles(WORD val);
 
+bool createBootsectorFromPrg(void);
 void checkCeddSize(void);
 DWORD getValue(BYTE *p);
+void createImage(void);
 
 int main(int argc, char *argv[])
+{
+
+    bool res = createBootsectorFromPrg();
+
+    if(!res) {
+        return 0;
+    }
+
+    checkCeddSize();
+
+    createImage();
+
+    getchar();
+    return 0;
+}
+
+bool createBootsectorFromPrg(void)
 {
     char bfr[512];
 
@@ -26,7 +45,7 @@ int main(int argc, char *argv[])
     if(!bc) {
         printf("\nCould not open INPUT file!\n");
         getchar();
-        return 0;
+        return false;
     }
 
     fseek(bc, 256, SEEK_SET);       // skip TOS prog header
@@ -65,17 +84,76 @@ int main(int argc, char *argv[])
     if(!bs) {
         printf("\nCould not open OUTPUT file!\n");
         getchar();
-        return 0;
+        return false;
     }
 
     fwrite(bfr, 1, 512, bs);
 
     fclose(bs);
-    //---------------------------------------
-    checkCeddSize();
+    return true;
+}
 
-    getchar();
-    return 0;
+void createImage(void)
+{
+    BYTE bfr[1024*1024];
+
+    // open output file
+    FILE *out = fopen("ceddboot.img", "wb");
+
+    if(!out) {
+        printf("\ncreateImage - could not open OUTPUT file!\n");
+        getchar();
+        return;
+    }
+
+    DWORD cnt = 0;
+
+    //--------------------------
+    // read and write bootsector
+    FILE *in = fopen("ceddboot.001", "rb");
+    if(!in) {
+        fclose(out);
+        printf("\ncreateImage - could not open bootsector file (001)!\n");
+        getchar();
+        return;
+    }
+
+
+    int res = fread(bfr, 1, 512, in);             // read and write bootsector
+    if(res >= 0) {
+        cnt += res;
+    }
+    fclose(in);
+
+    fwrite(bfr, 1, 512, out);
+
+    //--------------------------
+    // read and write the driver
+    in = fopen("ceddboot.002", "rb");
+    if(!in) {
+        fclose(out);
+        printf("\ncreateImage - could not open driver file (002)!\n");
+        getchar();
+        return;
+    }
+
+    res = fread(bfr, 1, 1024*1024, in);             // read and write driver
+    if(res >= 0) {
+        cnt += res;
+    }
+    fclose(in);
+
+    fwrite(bfr, 1, res, out);
+
+    //--------------------------
+    // pad with zeros to make full sectors
+    int mod = cnt % 512;
+    int add = 1024 - mod;
+
+    memset(bfr, 0, add);
+    fwrite(bfr, 1, add, out);
+
+    fclose(out);
 }
 
 void checkCeddSize(void)
