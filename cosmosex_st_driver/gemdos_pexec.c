@@ -87,11 +87,8 @@ typedef struct __attribute__ ((__packed__))
 
 void freeTheBasePage(TBasePage *basePage);
 
-// the following defines and variable will help to determine how the prog was terminated after Pexec and thus to know if should or shouldn't Mfree the RAM
-#define TERMINATEDBY_UNKNOWN	0
-#define TERMINATEDBY_PTERM		1
-#define TERMINATEDBY_PTERMRES	2
-BYTE terminatedBy;
+// the following variable will help to determine how the prog was terminated after Pexec and thus to know if should or shouldn't Mfree the RAM
+WORD terminatedBy;
 
 // ------------------------------------------------------------------ 
 // LONG Pexec( mode, fname, cmdline, envstr )
@@ -215,11 +212,11 @@ int32_t custom_pexec( void *sp )
 	
 	// do the rest depending on the mode
 	if(mode == PE_LOADGO) {											// if we should also run the program
-		terminatedBy = TERMINATEDBY_UNKNOWN;						// mark that we don't know how the program will be / was terminated
+		terminatedBy = 0xffff;  				                    // mark that we don't know how the program will be / was terminated
 	
 		CALL_OLD_GD_NORET(Pexec, PE_GO, 0, pBasePage, 0);			// run the program
 
-		if(terminatedBy != TERMINATEDBY_PTERMRES) {					// if the program ended with something different than Ptermres, free the memory
+		if(terminatedBy != GEMDOS_ptermres) {					    // if the program ended with something different than Ptermres, free the memory
 			freeTheBasePage(sBasePage);								// free the base page
 		}
 		
@@ -234,38 +231,4 @@ void freeTheBasePage(TBasePage *basePage)
 {
 	Mfree(basePage->env);											// free the environment
 	Mfree(basePage);												// free the base page	
-}
-
-int32_t custom_pterm( void *sp )
-{
-	terminatedBy = TERMINATEDBY_PTERM;								// mark that Pterm was used and the memory should be freed
-	
-	WORD retCode = (WORD) *((WORD *) sp);
-	CALL_OLD_GD_VOIDRET(Pterm, retCode);
-	
-	return 0;
-}
-
-int32_t custom_pterm0( void *sp )
-{
-	terminatedBy = TERMINATEDBY_PTERM;								// mark that Pterm was used and the memory should be freed
-	
-	CALL_OLD_GD_VOIDRET(Pterm0);
-
-	return 0;
-}
-
-int32_t custom_ptermres( void *sp )
-{
-	BYTE *params = (BYTE *) sp;
-
-	terminatedBy = TERMINATEDBY_PTERMRES;							// mark that Ptermres was used and the memory should NOT be freed
-
-	DWORD keep		= *((DWORD *) params);
-	params += 4;
-	WORD retcode	= *((WORD *) params);
-	
-	CALL_OLD_GD_VOIDRET(Ptermres, keep, retcode);
-
-	return 0;
 }

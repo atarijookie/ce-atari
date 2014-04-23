@@ -6,7 +6,8 @@
 	.globl	_gemdos_table
 	.globl	_old_gemdos_handler
 	.globl	_useOldGDHandler
-
+	.globl  __terminatedBy
+    
 | ------------------------------------------------------
 	.text
 | ------------------------------------------------------
@@ -40,6 +41,18 @@ gemdos_call:
 	cmp.w	#0x100,d0				| number of entries in the function table
 	bhs.b	gemdos_not_handled		| >=0x100 are MiNT functions
 
+    |-------------------------------
+    | custom handling of Pterm* functions - needed because of custom Pexec()
+    cmp.w   #0x0000,d0              | Pterm0?
+    beq.b   customPterms
+    
+    cmp.w   #0x004c,d0              | Pterm?
+    beq.b   customPterms
+    
+    cmp.w   #0x0031,d0              | Ptermres?
+    beq.b   customPterms
+    |-------------------------------
+    
    	cmp.w	#0x004b,d0				| Pexec()?
 	bne.b	ok					    | no -> proceed as usual
 	cmpi.w	#0,(a0)					| PE_LOADGO?
@@ -64,4 +77,14 @@ gemdos_not_handled:
     clr.w   _useOldGDHandler                | ensure that is our handler still alive after the call (which may not return) 
 	move.l  _old_gemdos_handler(pc),-(sp)	| Fake a return
 	rts		                                | to old code.
+    
+| ------------------------------------------------------
+| custom Pterm handler - will mark down which Pterm* function was called to terminate this app
+customPterms:
+	lea     __terminatedBy,a1       | load address of terminatedBy to A1
+	move.w	d0,(a1)                 | store function number to address pointer by A1
+    jmp     gemdos_not_handled      | jump to original handler
 
+| ------------------------------------------------------	
+	.bss
+__terminatedBy:     .ds.w	1

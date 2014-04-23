@@ -748,34 +748,40 @@ BYTE isOurDrive(WORD drive, BYTE withCurrentDrive)
 void initFunctionTable(void)
 {
 	/* fill the table with pointers to functions */
-	gemdos_table[0x0e] = custom_dsetdrv;
-	gemdos_table[0x19] = custom_dgetdrv;
-	gemdos_table[0x1a] = custom_fsetdta;
-	gemdos_table[0x36] = custom_dfree;
-	gemdos_table[0x39] = custom_dcreate;
-	gemdos_table[0x3a] = custom_ddelete;
-	gemdos_table[0x3b] = custom_dsetpath;
-	gemdos_table[0x3c] = custom_fcreate;
-	gemdos_table[0x3d] = custom_fopen;
-	gemdos_table[0x3e] = custom_fclose;
-	gemdos_table[0x3f] = custom_fread;
-	gemdos_table[0x40] = custom_fwrite;
-	gemdos_table[0x41] = custom_fdelete;
-	gemdos_table[0x42] = custom_fseek;
-	gemdos_table[0x43] = custom_fattrib;
-	gemdos_table[0x47] = custom_dgetpath;
+    
+    // path functions
+	gemdos_table[GEMDOS_Dsetdrv]    = custom_dsetdrv;
+	gemdos_table[GEMDOS_Dgetdrv]    = custom_dgetdrv;
+	gemdos_table[GEMDOS_Dsetpath]   = custom_dsetpath;
+	gemdos_table[GEMDOS_Dgetpath]   = custom_dgetpath;
 
-	gemdos_table[0x4b] = custom_pexec;
-	gemdos_table[0x4c] = custom_pterm;
-	gemdos_table[0000] = custom_pterm0;
-	gemdos_table[0x31] = custom_ptermres;	
+    // directory & file search
+    gemdos_table[GEMDOS_Fsetdta]    = custom_fsetdta;
+	gemdos_table[GEMDOS_Fsfirst]    = custom_fsfirst;
+	gemdos_table[GEMDOS_Fsnext]     = custom_fsnext;
 
-	gemdos_table[0x4e] = custom_fsfirst;
-	gemdos_table[0x4f] = custom_fsnext;
-	gemdos_table[0x56] = custom_frename;
-	gemdos_table[0x57] = custom_fdatime;
-	
-	bios_table[0x07] = custom_getbpb;
-	bios_table[0x09] = custom_mediach;
+    // file and directory manipulation
+	gemdos_table[GEMDOS_Dfree]      = custom_dfree;
+	gemdos_table[GEMDOS_Dcreate]    = custom_dcreate;
+	gemdos_table[GEMDOS_Ddelete]    = custom_ddelete;
+	gemdos_table[GEMDOS_Frename]    = custom_frename;
+	gemdos_table[GEMDOS_Fdatime]    = custom_fdatime;
+	gemdos_table[GEMDOS_Fdelete]    = custom_fdelete;
+	gemdos_table[GEMDOS_Fattrib]    = custom_fattrib;
+
+    // file content functions
+	gemdos_table[GEMDOS_Fcreate]    = custom_fcreate;
+	gemdos_table[GEMDOS_Fopen]      = custom_fopen;
+	gemdos_table[GEMDOS_Fclose]     = custom_fclose;
+	gemdos_table[GEMDOS_Fread]      = custom_fread;
+	gemdos_table[GEMDOS_Fwrite]     = custom_fwrite;
+	gemdos_table[GEMDOS_Fseek]      = custom_fseek;
+
+    // program execution functions
+	gemdos_table[GEMDOS_pexec]      = custom_pexec;
+
+    // BIOS functions we need to support
 	bios_table[0x0a] = custom_drvmap; 
+	bios_table[0x09] = custom_mediach;
+	bios_table[0x07] = custom_getbpb;
 }

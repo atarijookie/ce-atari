@@ -36,6 +36,13 @@
 #define GEMDOS_Tgettime     	0x2C
 #define GEMDOS_Tsettime     	0x2D
 
+// program execution functions
+#define GEMDOS_pexec            0x4b
+#define GEMDOS_pterm            0x4c
+#define GEMDOS_pterm0           0x00
+#define GEMDOS_ptermres         0x31
+
+
 // custom functions - not GEMDOS functions
 #define GD_CUSTOM_initialize    0x60
 #define GD_CUSTOM_getConfig     0x61
@@ -109,9 +116,6 @@ void updateCeDrives(void);
 int32_t custom_fread ( void *sp );
 int32_t custom_fwrite( void *sp );
 int32_t custom_pexec( void *sp );
-int32_t custom_pterm( void *sp );
-int32_t custom_pterm0( void *sp );
-int32_t custom_ptermres( void *sp );
 
 BYTE commitChanges(WORD ceHandle);
 void initFileBuffer(WORD ceHandle);
