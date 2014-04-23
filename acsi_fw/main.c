@@ -9,6 +9,7 @@
 #include "timers.h"
 #include "bridge.h"
 #include "datatransfer.h"
+#include "scsi.h"
 
 void init_hw_sw(void);
 void onButtonPress(void);
@@ -335,33 +336,49 @@ void showCurrentLED(void)
 
 void onGetCommand(void)
 {
-	BYTE id, i;
+	BYTE id, i, justCmd;
 				
-	cmd[0] = PIO_writeFirst();				// get byte from ST (waiting for the 1st byte)
-	id = (cmd[0] >> 5) & 0x07;				// get only device ID
-
-	if(enabledIDs[id]) {							// if this ID is enabled
-		cmdLen = 6;											// maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
+	cmd[0]  = PIO_writeFirst();				            // get byte from ST (waiting for the 1st byte)
+	id      = (cmd[0] >> 5) & 0x07;				        // get only device ID
+    
+	if(enabledIDs[id]) {							    // if this ID is enabled
+		cmdLen = 6;										// maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
 				
-		for(i=1; i<cmdLen; i++) {				// receive the next command bytes
-			cmd[i] = PIO_write();					// drop down IRQ, get byte
+		for(i=1; i<cmdLen; i++) {				        // receive the next command bytes
+			cmd[i] = PIO_write();					    // drop down IRQ, get byte
 
-			if(brStat != E_OK) {					// if something was wrong
+			if(brStat != E_OK) {					    // if something was wrong
 				break;						  
 			}
 
-			if(i == 1) {										// if we got also the 2nd byte
-				getCmdLengthFromCmdBytes();		// we set up the length of command, etc.
+			if(i == 1) {								// if we got also the 2nd byte
+				getCmdLengthFromCmdBytes();		        // we set up the length of command, etc.
 			}   	  	  
 		}
 				
 		//-----
-		if(brStat == E_OK) {							// if all was well, let's send this to host
-			for(i=0; i<7; i++) {						
-				atnSendACSIcommand[4 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
-			}
+		if(brStat == E_OK) {							// if all was well, let's send this to host or process it here
+            if(id == sdCardID) {                        // for SD card IDs
+                justCmd = cmd[0] & 0x1f;                // get just the command
+            
+                if(justCmd == 0x1f) {                   // if it's ICD command, get the next byte as command
+                    justCmd = cmd[1];
+                }
+                
+                // check if this command for SD card is something we should handle in Hans, or should we send it to host
+                if( justCmd == SCSI_C_WRITE6 ||     justCmd == SCSI_C_READ6 || 
+                    justCmd == SCSI_C_WRITE10 ||    justCmd == SCSI_C_READ10) {
+                    processScsiLocaly();
+                    return;
+                }
+            }
+
+            // if we got here, we should handle this in host (RPi)
+            for(i=0; i<7; i++) {						
+                atnSendACSIcommand[4 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
+            }
 					
-			state = STATE_SEND_COMMAND;
+            state = STATE_SEND_COMMAND;
 		}
 	}
 }
