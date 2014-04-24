@@ -16,7 +16,8 @@ void onButtonPress(void);
 
 void processHostCommands(void);
 
-void spi_init(void);
+void spi_init1(void);
+void spi_init2(void);
 void dma_spi_init(void);
 void setupAtnBuffers(void);
 
@@ -256,6 +257,9 @@ void initAllStuff(void)
 	// init ACSI signals
 	ACSI_DATADIR_WRITE();											// data as inputs
 	GPIOA->BRR = aDMA | aPIO | aRNW | ATN;				            // ACSI controll signals LOW, ATTENTION bit LOW - nothing to read
+
+    // init SD card interface signals
+    GPIOC->BSRR = SD_DETECT | SD_CS;                                // SD card CS (output) high - card not selected; SD card detect high - pull up!
 
 	EXTI->PR = BUTTON | aCMD | aCS | aACK;				            // clear these ints 
 	//-------------
@@ -677,35 +681,43 @@ void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
 
 void init_hw_sw(void)
 {
-	RCC->AHBENR		|= (1 <<  0);																						// enable DMA1
-	RCC->APB1ENR	|= (1 << 2) | (1 <<  1) | (1 <<  0);										// enable TIM4, TIM3, TIM2
-    RCC->APB2ENR	|= (1 << 12) | (1 << 11) | (1 << 3) | (1 << 2);     		// Enable SPI1, TIM1, GPIOA and GPIOB clock
+	RCC->AHBENR		|= (1 <<  0);												// enable DMA1
+	RCC->APB1ENR	|= (1 << 14) | (1 <<  2) | (1 << 1) | (1 << 0);				// enable SPI2, TIM4, TIM3, TIM2
+    RCC->APB2ENR	|= (1 << 12) | (1 << 11) | (1 << 4) | (1 << 3) | (1 << 2);  // Enable SPI1, TIM1, GPIOC, GPIOB, GPIOA clock
 
-	// SPI -- enable atlernate function for PA4, PA5, PA6, PA7
-	GPIOA->CRL &= ~(0xffff0000);						// remove bits from GPIOA
-	GPIOA->CRL |=   0xbbbb0000;							// set GPIOA as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
+	// SPI1 -- enable atlernate function for PA4, PA5, PA6, PA7
+	GPIOA->CRL &= ~(0xffff0000);                            // remove bits from GPIOA
+	GPIOA->CRL |=   0xbbbb0000;                             // set GPIOA as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
 
 	// ACSI input signals as floating inputs
-	GPIOB->CRH &= ~(0x000fffff);						// clear 5 lowest bits
-	GPIOB->CRH |=   0x00044444;							// set as 5 inputs (BUTTON, ACK, CS, CMD, RESET)
+	GPIOB->CRH &= ~(0x000fffff);                            // clear 5 lowest bits
+	GPIOB->CRH |=   0x00044444;                             // set as 5 inputs (BUTTON, ACK, CS, CMD, RESET)
+
+   	// SPI2 -- enable atlernate function for PB13, PB14, PB15
+	GPIOB->CRH &= ~(0xfff00000);                            // remove bits from GPIOB
+	GPIOB->CRH |=   0xbbb00000;                             // set GPIOB as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
+
+    // card detect and SPI2 CS on GPIOC -- CS on PC13 is output, card detect on PC14 as input with pull up!
+   	GPIOC->CRH &= ~(0x0ff00000);                            // remove bits from GPIOC
+	GPIOC->CRH |=   0x08300000;
 
 	// ACSI control signals as output, +ATN
-	GPIOA->CRL &= ~(0x0000ffff);						// remove bits from GPIOA
-	GPIOA->CRL |=   0x00003333;							// 4 ouputs (ATN, DMA, PIO, RNW) and 4 inputs (ACK, CS, CMD, RESET)
+	GPIOA->CRL &= ~(0x0000ffff);                            // remove bits from GPIOA
+	GPIOA->CRL |=   0x00003333;                             // 4 ouputs (ATN, DMA, PIO, RNW) and 4 inputs (ACK, CS, CMD, RESET)
 
 	// LEDs
-	GPIOA->CRH &= ~(0xf00ff000);						// remove bits from GPIOA
-	GPIOA->CRH |=   0x30033000;							// 3 ouputs - LED1, LED2, LED3
+	GPIOA->CRH &= ~(0xf00ff000);                            // remove bits from GPIOA
+	GPIOA->CRH |=   0x30033000;                             // 3 ouputs - LED1, LED2, LED3
 
 	RCC->APB2ENR |= (1 << 0);								// enable AFIO
 	
-	AFIO->EXTICR[2] = 0x1110;												// source input: GPIOB for EXTI 9, 10, 11
-	AFIO->EXTICR[3] = 0x0001;												// source input: GPIOB for EXTI 12 -- button
-	EXTI->IMR			= BUTTON | aCMD | aCS | aACK;			// 1 means: Interrupt from these lines is not masked
-	EXTI->EMR			= BUTTON | aCMD | aCS | aACK;			// 1 means: Event     form these lines is not masked
-	EXTI->FTSR 		= BUTTON | aCMD | aCS | aACK;			// Falling trigger selection register
+	AFIO->EXTICR[2] = 0x1110;								// source input: GPIOB for EXTI 9, 10, 11
+	AFIO->EXTICR[3] = 0x0001;								// source input: GPIOB for EXTI 12 -- button
+	EXTI->IMR       = BUTTON | aCMD | aCS | aACK;			// 1 means: Interrupt from these lines is not masked
+	EXTI->EMR       = BUTTON | aCMD | aCS | aACK;			// 1 means: Event     form these lines is not masked
+	EXTI->FTSR      = BUTTON | aCMD | aCS | aACK;			// Falling trigger selection register
 
-	GPIOA->BSRR = LED1 | LED2 | LED3;		// all LED pins high (LEDs OFF)
+	GPIOA->BSRR = LED1 | LED2 | LED3;		                // all LED pins high (LEDs OFF)
 	//----------
 	AFIO->MAPR |= 0x02000000;								// SWJ_CFG[2:0] (Bits 26:24) -- 010: JTAG-DP Disabled and SW-DP Enabled
 	
@@ -716,8 +728,10 @@ void init_hw_sw(void)
 	//--------------
 	// DMA + SPI initialization
 	
-	spi_init();																		// init SPI interface
+	spi_init1();																		// init SPI interface - for RPi
 	dma_spi_init();
+
+	spi_init2();																		// init SPI interface - for SD card
 }
 
 WORD spi_TxRx(WORD out)
@@ -846,7 +860,7 @@ void DMA1_Channel2_IRQHandler(void)
 	}
 }
 
-void spi_init(void)
+void spi_init1(void)
 {
 	SPI_InitTypeDef spiStruct;
 
@@ -855,10 +869,30 @@ void spi_init(void)
 	SPI_StructInit(&spiStruct);
 	spiStruct.SPI_DataSize = SPI_DataSize_16b;		// use 16b data size to lower the MCU load
 	
-  SPI_Init(SPI1, &spiStruct);
+    SPI_Init(SPI1, &spiStruct);
 	SPI1->CR2 |= (1 << 7) | (1 << 6) | SPI_I2S_DMAReq_Tx | SPI_I2S_DMAReq_Rx;		// enable TXEIE, RXNEIE, TXDMAEN, RXDMAEN
 	
 	SPI_Cmd(SPI1, ENABLE);
+}
+
+void spi_init2(void)
+{
+	SPI_InitTypeDef spiStruct;
+
+	SPI_Cmd(SPI2, DISABLE);
+	
+	SPI_StructInit(&spiStruct);
+	
+    spiStruct.SPI_Mode              = SPI_Mode_Master;
+    spiStruct.SPI_DataSize			= SPI_DataSize_8b;
+    spiStruct.SPI_NSS				= SPI_NSS_Soft;
+    spiStruct.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_4;                      // 72 MHz / 4 = 18 MHz 
+    spiStruct.SPI_FirstBit			= SPI_FirstBit_MSB;
+
+    SPI_Init(SPI2, &spiStruct);
+	SPI2->CR2 |= (1 << 7) | (1 << 6) | SPI_I2S_DMAReq_Tx | SPI_I2S_DMAReq_Rx;		// enable TXEIE, RXNEIE, TXDMAEN, RXDMAEN
+	
+	SPI_Cmd(SPI2, ENABLE);
 }
 
 void dma_spi_init(void)

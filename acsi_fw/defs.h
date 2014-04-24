@@ -28,16 +28,20 @@ typedef struct
 /*
 reserved:
 ---------
-GPIOA_4  - SPI
-GPIOA_5  - SPI
-GPIOA_6  - SPI
-GPIOA_7  - SPI
+GPIOA_4  - SPI1
+GPIOA_5  - SPI1
+GPIOA_6  - SPI1
+GPIOA_7  - SPI1
 
 GPIOA_9  - USART1_TX -- for bootloader
 GPIOA_10 - USART1_RX -- for bootloader
 
 GPIOA_13 - SWD -- for debugging
 GPIOA_14 - SWD -- for debugging
+
+GPIOB_13 - SPI2 SCK
+GPIOB_14 - SPI2 MISO
+GPIOB_15 - SPI2 MOSI
 
 
 DATA1 is connected to ACSI port
@@ -67,26 +71,39 @@ GPIOA_11  - O  - LED1
 GPIOA_12  - O  - LED2 
 GPIOA_15  - O  - LED3
 
+//------------
+
+// SPI2 for SD card
+GPIOB_13 - SPI2 SCK
+GPIOB_14 - SPI2 MISO
+GPIOB_15 - SPI2 MOSI
+
+GPIOC_13 - SPI2 CS
+GPIOC_14 - card detect
 
 */
 
 // on GPIOB -- inputs
-#define aRESET		(1 <<   8)
-#define	aCMD			(1 <<   9)
-#define	aCS				(1 <<  10)
-#define	aACK			(1 <<  11)
+#define aRESET      (1 <<   8)
+#define	aCMD        (1 <<   9)
+#define	aCS         (1 <<  10)
+#define	aACK        (1 <<  11)
 
-#define BUTTON		(1 <<  12)
+#define BUTTON      (1 <<  12)
 
 // on GPIOA - for easier write to aDATA -- outputs
-#define	aRNW			(1 <<  0)
-#define	aPIO			(1 <<  1)
-#define	aDMA			(1 <<  2)
-#define	ATN				(1 <<  3)
+#define	aRNW        (1 <<  0)
+#define	aPIO        (1 <<  1)
+#define	aDMA        (1 <<  2)
+#define	ATN         (1 <<  3)
 
 // on GPIOA - LEDs
-#define LED1			(1 << 11)
-#define LED2			(1 << 12) 
-#define LED3			(1 << 15)
+#define LED1        (1 << 11)
+#define LED2        (1 << 12) 
+#define LED3        (1 << 15)
+
+// on GPIOC - SD card pins
+#define SD_CS       (1 << 13)
+#define SD_DETECT   (1 << 14)
 
 #endif /* DEFS_H_ */
