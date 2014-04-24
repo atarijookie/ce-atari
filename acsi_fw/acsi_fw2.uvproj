@@ -16,7 +16,7 @@
           <Vendor>STMicroelectronics</Vendor>
           <Cpu>IRAM(0x20000000-0x200027FF) IROM(0x8000000-0x8007FFF) CLOCK(8000000) CPUTYPE("Cortex-M3")</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
-          <StartupFile>"STARTUP\ST\STM32F10x\startup_stm32f10x_ld.s" ("STM32 Low Density Line Startup Code")</StartupFile>
+          <StartupFile>"STARTUP\ST\STM32F10x\startup_stm32f10x_md.s" ("STM32 Medium Density Line Startup Code")</StartupFile>
           <FlashDriverDll>UL2CM3(-O14 -S0 -C0 -N00("ARM Cortex-M3") -D00(1BA00477) -L00(4) -FO7 -FD20000000 -FC800 -FN1 -FF0STM32F10x_128 -FS08000000 -FL08000)</FlashDriverDll>
           <DeviceId>4236</DeviceId>
           <RegisterFile>stm32f10x.h</RegisterFile>
@@ -424,7 +424,7 @@
                 <uSurpInc>2</uSurpInc>
                 <VariousControls>
                   <MiscControls></MiscControls>
-                  <Define>STM32F10X_LD</Define>
+                  <Define>STM32F10X_MD</Define>
                   <Undefine></Undefine>
                   <IncludePath></IncludePath>
                 </VariousControls>
@@ -449,9 +449,9 @@
           </GroupOption>
           <Files>
             <File>
-              <FileName>startup_stm32f10x_ld.s</FileName>
+              <FileName>startup_stm32f10x_md.s</FileName>
               <FileType>2</FileType>
-              <FilePath>.\startup_stm32f10x_ld.s</FilePath>
+              <FilePath>.\startup_stm32f10x_md.s</FilePath>
             </File>
             <File>
               <FileName>main.c</FileName>
@@ -547,6 +547,16 @@
               <FileName>datatransfer.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\datatransfer.h</FilePath>
+            </File>
+            <File>
+              <FileName>scsi.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\scsi.h</FilePath>
+            </File>
+            <File>
+              <FileName>scsi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\scsi.c</FilePath>
             </File>
           </Files>
         </Group>

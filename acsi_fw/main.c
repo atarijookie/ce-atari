@@ -368,7 +368,7 @@ void onGetCommand(void)
                 // check if this command for SD card is something we should handle in Hans, or should we send it to host
                 if( justCmd == SCSI_C_WRITE6 ||     justCmd == SCSI_C_READ6 || 
                     justCmd == SCSI_C_WRITE10 ||    justCmd == SCSI_C_READ10) {
-                    processScsiLocaly();
+                    processScsiLocaly(justCmd);
                     return;
                 }
             }

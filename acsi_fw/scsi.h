@@ -9,6 +9,6 @@
 #define SCSI_C_WRITE10                          0x2a
 #define SCSI_C_READ10                           0x28
 
-void processScsiLocaly(void);
+void processScsiLocaly(BYTE justCmd);
 
 #endif
