@@ -65,5 +65,6 @@
 
 void processScsiLocaly(BYTE justCmd);
 void scsi_sendOKstatus(void);
+void returnStatusAccordingToIsInit(void);
 
 #endif

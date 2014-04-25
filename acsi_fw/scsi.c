@@ -16,6 +16,12 @@ void processScsiLocaly(BYTE justCmd)
     BYTE res;
     BYTE handled = FALSE;
 
+    // if the card is not init
+   	if(sdCard.IsInit != TRUE) {
+        returnStatusAccordingToIsInit();
+        return;	
+    }
+    
     // if it's 6 byte RW command
     if(justCmd == SCSI_C_WRITE6 || justCmd == SCSI_C_READ6) {
         sector  = (cmd[1] & 0x1f);      // get the starting sector
@@ -106,3 +112,16 @@ void scsi_sendOKstatus(void)
 	PIO_read(sdCard.LastStatus);                                    // send status byte, long time-out 
 }
 
+void returnStatusAccordingToIsInit(void)
+{
+    if(sdCard.IsInit == TRUE) {                                     // SD card is init?
+        scsi_sendOKstatus();
+    } else {                                                        // SD card not init?
+        sdCard.LastStatus   = SCSI_ST_CHECK_CONDITION;
+        sdCard.SCSI_SK      = SCSI_E_NotReady;
+        sdCard.SCSI_ASC     = SCSI_ASC_MEDIUM_NOT_PRESENT;
+        sdCard.SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+
+        PIO_read(sdCard.LastStatus);                                // send status byte
+    }
+}
