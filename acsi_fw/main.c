@@ -10,6 +10,7 @@
 #include "bridge.h"
 #include "datatransfer.h"
 #include "scsi.h"
+#include "mmc.h"
 
 void init_hw_sw(void);
 void onButtonPress(void);
@@ -78,7 +79,7 @@ WORD t1, t2, dt;
 
 #define ATN_VARIABLE_LEN                0xffff
 
-#define ATN_SENDFWVERSION_LEN_TX        8
+#define ATN_SENDFWVERSION_LEN_TX        10
 #define ATN_SENDFWVERSION_LEN_RX        8
 
 #define ATN_SENDACSICOMMAND_LEN_TX      12
@@ -123,7 +124,10 @@ BYTE cmdLen;                                                    // length of rec
 BYTE brStat;                                                    // status from bridge
 
 BYTE enabledIDs[8];                                             // when 1, Hanz will react on that ACSI ID #
+
 BYTE sdCardID;
+BYTE prevIsCardInserted;
+extern TDevice sdCard;
 
 volatile BYTE spiDmaIsIdle;
 volatile BYTE spiDmaTXidle, spiDmaRXidle;                       // flags set when the SPI DMA TX or RX is idle
@@ -156,6 +160,12 @@ int main (void)
     //-------------
     // main loop
     while(1) {
+        // if card insert state changed, try to init the card 
+        if(prevIsCardInserted != isCardInserted()) {
+            sdCardInit();
+            prevIsCardInserted = isCardInserted();
+        }
+        
         // get the command from ACSI and send it to host
         if(state == STATE_GET_COMMAND && PIO_gotFirstCmdByte()) {                   // if 1st CMD byte was received
             onGetCommand();
@@ -199,7 +209,10 @@ int main (void)
                 state = STATE_GET_COMMAND;
                 
                 atnSendFwVersion[6] = ((WORD)currentLed) << 8;                                  // store the current LED status in the last WORD
-            
+                
+                atnSendFwVersion[7] = (WORD) (sdCard.SCapacity >> 16);                          // store the current SD card capacity
+                atnSendFwVersion[8] = (WORD)  sdCard.SCapacity;
+                
                 timeoutStart();                                                                 // start timeout counter so we won't get stuck somewhere
             
                 spiDma_txRx(    ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0],     
@@ -279,6 +292,15 @@ void initAllStuff(void)
     }
     
     prevBtnPressTime = 0;
+    //----------------------
+    
+    // now init the card if it's inserted
+    prevIsCardInserted = isCardInserted();
+    if(prevIsCardInserted) {
+        sdCardInit();
+    } else {
+        sdCardZeroInitStruct();
+    }
 }
 
 void onButtonPress(void)
@@ -371,7 +393,8 @@ void onGetCommand(void)
                 
                 // check if this command for SD card is something we should handle in Hans, or should we send it to host
                 if( justCmd == SCSI_C_WRITE6 ||     justCmd == SCSI_C_READ6 || 
-                    justCmd == SCSI_C_WRITE10 ||    justCmd == SCSI_C_READ10) {
+                    justCmd == SCSI_C_WRITE10 ||    justCmd == SCSI_C_READ10 ||
+                    justCmd == SCSI_C_VERIFY) {
                     processScsiLocaly(justCmd);
                     return;
                 }
@@ -963,7 +986,8 @@ void setupAtnBuffers(void)
     atnSendFwVersion[4] = version[0];
     atnSendFwVersion[5] = version[1];
     // WORD 6 is reserved for current LED (floppy image) number
-    atnSendFwVersion[7] = 0;                                // terminating zero
+    // WORD 7 and 8
+    atnSendFwVersion[9] = 0;                                // terminating zero
     
     atnSendACSIcommand[0] = ATN_SYNC_WORD;                  // starting mark
     atnSendACSIcommand[1] = ATN_ACSI_COMMAND;               // attention code

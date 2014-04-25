@@ -7,7 +7,6 @@
 TDevice sdCard;
 
 extern unsigned char brStat;
-BYTE shitHasHappened;
 
 #define spiCSlow()  { GPIOC->BRR = SD_CS; }
 #define spiCShigh() { GPIOC->BSRR = SD_CS; }
@@ -42,27 +41,32 @@ void spiSetFrequency(BYTE highNotLow)
     SPI2->CR1 = tmpreg;                             // set new baudrate
 }
 
+void sdCardZeroInitStruct(void)
+{
+    sdCard.IsInit       = FALSE;                                            
+    sdCard.Type         = DEVICETYPE_NOTHING;
+    sdCard.MediaChanged = FALSE;
+    sdCard.BCapacity    = 0;
+	sdCard.SCapacity    = 0;
+}
+
 void sdCardInit(void)
 {
     WORD i;
     BYTE res, stat;
     DWORD dRes;
     
-//  *pFIO_FLAG_C = CARD_CHANGE;                 // clear interrupt flag
-
-    spiSetFrequency(SPI_FREQ_LOW);              // low SPI frequency
     //--------------------------
     // remove all not present devices
     if(isCardInserted() == FALSE) {             // card not present, then remove
-        sdCard.IsInit       = FALSE;                                            
-        sdCard.Type         = DEVICETYPE_NOTHING;
-        sdCard.MediaChanged = FALSE;
-        
+        sdCardZeroInitStruct();        
         return;
     }
 
     //--------------------------
     // and now try to init all that is not initialized
+    spiSetFrequency(SPI_FREQ_LOW);              // low SPI frequency
+
     if(sdCard.IsInit == TRUE)                   // initialized?
         return;                                 // skip it!
 
@@ -107,7 +111,6 @@ void sdCardInit(void)
         break;
     }
     
-//  *pFIO_FLAG_C = CARD_CHANGE;     // clear interrupt flag
     spiSetFrequency(SPI_FREQ_HIGH); 
 }
 //-----------------------------------------------
@@ -403,8 +406,6 @@ BYTE mmcRead(DWORD sector)
     // check for valid response
     if(r1 != 0x00)
     {
-        shitHasHappened = 1;
-
         spi2_TxRx(0xFF);
         spiCShigh();         // CS to H
 
@@ -432,8 +433,6 @@ BYTE mmcRead(DWORD sector)
     //------------------------
     if(i == 0)                                        // timeout?
     {
-        shitHasHappened = 1;
-
         spi2_TxRx(0xFF);
         spiCShigh();         // CS to H
 
@@ -449,8 +448,6 @@ BYTE mmcRead(DWORD sector)
         DMA_read(byte);                            // send it to ST
 
         if(brStat != E_OK) {                            // if something was wrong
-            shitHasHappened = 1;
-
             for(; i<0x200; i++)                         // finish the sector
                 spi2_TxRx(0xFF);
           
@@ -473,8 +470,6 @@ BYTE mmcRead(DWORD sector)
 
     if(brStat != E_OK)
     {
-        shitHasHappened = 1;
-
         return 0xff;
     }
         
@@ -502,8 +497,6 @@ BYTE mmcReadMore(DWORD sector, WORD count)
 
     // check for valid response
     if(r1 != 0x00) {
-        shitHasHappened = 1;
-        
         spi2_TxRx(0xFF);
         spiCShigh();                                        // CS to H
         return r1;
@@ -529,8 +522,6 @@ BYTE mmcReadMore(DWORD sector, WORD count)
                 for(; i<0x200; i++)                         // finish the sector
                 spi2_TxRx(0xFF);
 
-                shitHasHappened = 1;
-                
                 quit = 1;
                 break;                                      // quit
             }
@@ -549,8 +540,6 @@ BYTE mmcReadMore(DWORD sector, WORD count)
     //-------------------------------
     
     if(quit) {                                              // if error happened
-        shitHasHappened = 1;
-        
         mmcCommand(MMC_STOP_TRANSMISSION, 0);               // send command instead of CRC
 
         spi2_TxRx(0xFF);
@@ -604,8 +593,6 @@ BYTE mmcWriteMore(DWORD sector, WORD count)
     // check for valid response
     if(r1 != 0x00)
     {
-        shitHasHappened = 1;
-
         spi2_TxRx(0xFF);
         spiCShigh();                            // CS to H
         return r1;
@@ -621,8 +608,6 @@ BYTE mmcWriteMore(DWORD sector, WORD count)
     {
         if(thisSector >= sdCard.SCapacity)      // sector out of range?
         {
-            shitHasHappened = 1;
-            
             quit = 1;
             break;                              // quit
         }
@@ -638,8 +623,6 @@ BYTE mmcWriteMore(DWORD sector, WORD count)
 
             if(brStat != E_OK)                  // if something was wrong
             {
-                shitHasHappened = 1;
-
                 for(; i<0x200; i++)             // finish the sector
                 spi2_TxRx(0xFF);
 
@@ -679,7 +662,6 @@ BYTE mmcWriteMore(DWORD sector, WORD count)
     
     if(quit)                                    // if failed, return error
     {
-        shitHasHappened = 1;
         return 0xff;
     }
         
@@ -705,8 +687,6 @@ BYTE mmcReadJustForTest(DWORD sector)
     // check for valid response
     if(r1 != 0x00)
     {
-        shitHasHappened = 1;
-
         spi2_TxRx(0xFF);
         spiCShigh();                            // CS to H
 
@@ -734,8 +714,6 @@ BYTE mmcReadJustForTest(DWORD sector)
     //------------------------
     if(i == 0)                                  // timeout?
     {
-        shitHasHappened = 1;
-
         spi2_TxRx(0xFF);
         spiCShigh();                            // CS to H
 
@@ -779,8 +757,6 @@ BYTE mmcWrite(DWORD sector)
     // check for valid response
     if(r1 != 0x00)
     {
-        shitHasHappened = 1;
-        
         spi2_TxRx(0xFF);
         spiCShigh();                            // CS to H
 
@@ -802,8 +778,6 @@ BYTE mmcWrite(DWORD sector)
 
         if(brStat != E_OK)                      // if something was wrong
         {
-            shitHasHappened = 1;
-        
             for(; i<0x200; i++)                 // finish the sector
                 spi2_TxRx(0);
     
@@ -824,8 +798,6 @@ BYTE mmcWrite(DWORD sector)
     
     if( (r1&MMC_DR_MASK) != MMC_DR_ACCEPT)
     {
-        shitHasHappened = 1;
-        
         spi2_TxRx(0xFF);
         spiCShigh();                            // CS to H
         return r1;
@@ -853,8 +825,6 @@ BYTE mmcWrite(DWORD sector)
     //------------------------
     if(i == 0)                                  // timeout?
     {
-        shitHasHappened = 1;
-
         spi2_TxRx(0xFF);
         spiCShigh();                            // CS to H
         
@@ -1042,16 +1012,32 @@ BYTE EraseCard(void)
         return res;
     }
 
-    while(spi2_TxRx(0xFF) == 0);             // wait while the card is busy
+    while(spi2_TxRx(0xFF) == 0) {           // wait while the card is busy
+    }
     
     spiCShigh();                            // CS to H
 
     spi2_TxRx(0xFF);
-    //-----------------------------
     return 0;
 }
 //--------------------------------------------------------
 //////////////////////////////////////////////////////////////////
+BYTE mmcCompareMore(DWORD sector, WORD count)
+{
+    WORD i;
+    BYTE res;
+    
+    for(i=0; i<count; i++) {                // go through all required sectors
+        res = mmcCompare(sector + i);       // compare them
+        
+        if(res != 0) {                      // compare didn't go well?
+            return 0xff;
+        }
+    }
+    
+    return 0;
+}
+
 BYTE mmcCompare(DWORD sector)
 {
     BYTE r1;
@@ -1072,8 +1058,6 @@ BYTE mmcCompare(DWORD sector)
     // check for valid response
     if(r1 != 0x00)
     {
-        shitHasHappened = 1;
-
         spi2_TxRx(0xFF);
         spiCShigh();                        // CS to H
 
@@ -1101,8 +1085,6 @@ BYTE mmcCompare(DWORD sector)
     //------------------------
     if(i == 0)                              // timeout?
     {
-        shitHasHappened = 1;
-
         spi2_TxRx(0xFF);
         spiCShigh();                        // CS to H
 
@@ -1121,8 +1103,6 @@ BYTE mmcCompare(DWORD sector)
 
         if((brStat != E_OK) || (byteST != byteSD))      // if something was wrong
         {
-            shitHasHappened = 1;
-        
             for(; i<0x200; i++)                         // finish the sector
                 spi2_TxRx(0xFF);
           
@@ -1143,9 +1123,7 @@ BYTE mmcCompare(DWORD sector)
         spi2_TxRx(0xFF);
 ///////////////////////////////////
 
-    if(brStat != E_OK)
-    {
-        shitHasHappened = 1;
+    if(brStat != E_OK) {
         return 0xff;
     }
         

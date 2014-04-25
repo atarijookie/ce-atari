@@ -90,6 +90,7 @@ typedef struct _TDevice
 
 // functions
 
+void sdCardZeroInitStruct(void);
 void sdCardInit(void);
 void spiSetFrequency(BYTE highNotLow);
 BYTE isCardInserted(void);
@@ -108,6 +109,7 @@ BYTE mmcCmdLow(BYTE cmd, DWORD arg, BYTE val);
 // Returns zero if successful.
 BYTE mmcRead(DWORD sector);
 BYTE mmcCompare(DWORD sector);
+BYTE mmcCompareMore(DWORD sector, WORD count);
 BYTE mmcReadJustForTest(DWORD sector);
 
 BYTE mmcReadMore(DWORD sector, WORD count);
