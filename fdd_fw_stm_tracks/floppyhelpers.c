@@ -37,7 +37,7 @@ void FloppyMFMread_Disable(void)
 void FloppyIndex_Enable(void)
 {
     GPIOA->CRL &= ~(0x000000f0);
-    GPIOA->CRL |=  (0x000000f0);         // open drain
+    GPIOA->CRL |=  (0x000000b0);         // push-pull, because it's driving transistor
 }
 
 void FloppyIndex_Disable(void)
