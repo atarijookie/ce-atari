@@ -436,6 +436,8 @@ void CCoreThread::loadSettings(void)
 	gotDevTypeRaw			= false;					// no raw and translated types found yet
 	gotDevTypeTranslated	= false;
 	
+	sdCardAcsiId = 0xff;								// at start mark that we don't have SD card ID yet
+	
     char key[32];
     for(int id=0; id<8; id++) {							// read the list of device types from settings
         sprintf(key, "ACSI_DEVTYPE_%d", id);			// create settings KEY, e.g. ACSI_DEVTYPE_0

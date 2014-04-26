@@ -190,8 +190,11 @@ void MfmCachedImage::copyFromOther(MfmCachedImage &other)
 	
 	DWORD after50ms = Utils::getEndTime(50);							// this will help to add pauses at least every 50 ms to allow other threads to do stuff
 	
-    for(int side=0; side<2; side++) {
-		for(int track=0; track<85; track++) {
+	other.getParams(params.tracks, params.sides, params.spt);			// get the params from other image
+	gotImage = true;													// and mark that we got the image
+	
+    for(int side=0; side<2; side++) {									// copy both sides
+		for(int track=0; track<params.tracks; track++) {				// copy all the tracks
 		
 			if(Utils::getCurrentMs() > after50ms) {						// if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
 				Utils::sleepMs(5);
@@ -199,17 +202,31 @@ void MfmCachedImage::copyFromOther(MfmCachedImage &other)
 			}
 		
 			int bytesInBuffer;
-			BYTE *src = getEncodedTrack(track, side, bytesInBuffer);	// get pointer to source track
+			BYTE *src = other.getEncodedTrack(track, side, bytesInBuffer);	// get pointer to source track
 	
 			int index = track * 2 + side;
 			if(index >= MAX_TRACKS) {                                   // index out of bounds?
 				continue;
 			}
 			
-			BYTE *dest = tracks[index].mfmStream;						// get pointer to destination track
+			TCachedTrack *dest = &tracks[index];						// get pointer to destination track
+
+			if(src == NULL) {											// skip this empty SOURCE track
+				if(dest->mfmStream != NULL) {
+					memset(dest->mfmStream, 0, 15000);					// ....but clear it
+					dest->bytesInStream = 0;
+				}
+				
+				continue;
+			}
 			
-			memcpy(dest, src, bytesInBuffer);							// copy data and copy the data count
-			tracks[index].bytesInStream = bytesInBuffer;
+			if(dest->mfmStream == NULL) {								// destination not allocated? 
+				dest->mfmStream = new BYTE[15000];						// allocate memory -- we're transferring 15'000 bytes, so allocate this much
+				memset(dest->mfmStream, 0, 15000);						// set other to 0
+			}
+			
+			memcpy(dest->mfmStream, src, bytesInBuffer);				// copy data and copy the data count
+			dest->bytesInStream = bytesInBuffer;
 		}
     }
 }
