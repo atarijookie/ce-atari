@@ -11,9 +11,9 @@ extern TDevice sdCard;
 
 void processScsiLocaly(BYTE justCmd)
 {
-    DWORD sector;
-    WORD lenX;
-    BYTE res;
+    DWORD sector = 0;
+    WORD lenX = 0;
+    BYTE res = 0;
     BYTE handled = FALSE;
 
     // if the card is not init
