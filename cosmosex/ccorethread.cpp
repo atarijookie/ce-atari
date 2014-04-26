@@ -39,7 +39,7 @@ CCoreThread::CCoreThread()
     scsi->setAcsiDataTrans(dataTrans);
     scsi->attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
 //  scsi->attachToHostPath("TESTMEDIA", SOURCETYPE_TESTMEDIA, SCSI_ACCESSTYPE_FULL);
-//	scsi->attachToHostPath("sd_card_icdpro.img", SOURCETYPE_IMAGE, SCSI_ACCESSTYPE_FULL);
+	scsi->attachToHostPath("sd_card_icdpro.img", SOURCETYPE_IMAGE, SCSI_ACCESSTYPE_FULL);
 
     translated = new TranslatedDisk();
     translated->setAcsiDataTrans(dataTrans);
@@ -480,13 +480,16 @@ void CCoreThread::loadSettings(void)
 
 void CCoreThread::handleFwVersion(int whichSpiCs)
 {
-    BYTE fwVer[10], oBuf[10];
+    BYTE fwVer[14], oBuf[14];
+	int cmdLength;
 
-    memset(oBuf, 0, 10);                                // first clear the output buffer
+    memset(oBuf, 0, 14);                                // first clear the output buffer
 
     // WORD sent (bytes shown): 01 23 45 67 
 
     if(whichSpiCs == SPI_CS_HANS) {                     // it's Hans?
+		cmdLength = 12;
+	
         if(setEnabledIDbits) {                          // if we should send ACSI ID configuration
             oBuf[1] = CMD_ACSI_CONFIG;                  // CMD: send acsi config  (bytes 0 & 1)
             oBuf[2] = enabledIDbits;                    // store ACSI enabled IDs 
@@ -499,11 +502,11 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
             oBuf[6] = floppyImageSilo.getSlotBitmap();  // store which floppy images are enabled
             setEnabledFloppyImgs = false;               // and don't sent this anymore (until needed)
         }
-    } else {                                    // it's Franz?
-
+    } else {                                    		// it's Franz?
+		cmdLength = 8;
     }
 
-    conSpi->txRx(whichSpiCs, 8, oBuf, fwVer);
+    conSpi->txRx(whichSpiCs, cmdLength, oBuf, fwVer);
 
     int year = bcdToInt(fwVer[1]) + 2000;
     if(fwVer[0] == 0xf0) {
@@ -514,7 +517,11 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
         Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));               // store found FW version of Hans
 
         int currentLed = fwVer[4];
-        Debug::out("FW: Hans,  %d-%02d-%02d, LED is: %d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed);
+
+		DWORD sdCardCapacity;
+		sdCardCapacity = (fwVer[6] << 24) | (fwVer[7] << 16) | (fwVer[8] << 8) | (fwVer[9]);
+
+        Debug::out("FW: Hans,  %d-%02d-%02d, LED is: %d, SD card capacity: %08x", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed, sdCardCapacity);
 
         if(lastFloppyImageLed != currentLed) {              // did the floppy image LED change since last time?
             lastFloppyImageLed = currentLed;
