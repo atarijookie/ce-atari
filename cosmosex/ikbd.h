@@ -55,6 +55,7 @@ typedef struct {
 #define MOUSEMODE_ABS       1
 
 // data sent from keyboard
+#define KEYBDATA_SPECIAL_LOWEST		0xf6
 #define KEYBDATA_STATUS             0xf6
 #define KEYBDATA_MOUSE_ABS          0xf7
 #define KEYBDATA_MOUSE_REL8         0xf8
