@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -117,13 +118,7 @@ Ikbd::Ikbd()
     fillSpecialCodeLengthTable();
     fillStCommandsLengthTable();
 
-    mouseMode       = MOUSEMODE_REL;
-    mouseEnabled    = true;
-
-    joystickMode    = JOYMODE_EVENT;
-    joystickEnabled = true;
-
-    outputEnabled   = true;
+    resetInternalIkbdVars();
 }
 
 void Ikbd::processReceivedCommands(void)
@@ -229,46 +224,94 @@ void Ikbd::processStCommands(void)
 
         switch(bfr[0]) {
             // other commands
+            //--------------------------------------------
             case STCMD_RESET:                           // reset keyboard - set everything to default values
-            outputEnabled   = true;
-
-            mouseMode       = MOUSEMODE_REL;
-            mouseEnabled    = true;
-
-            joystickMode    = JOYMODE_EVENT;
-            joystickEnabled = true;
+            resetInternalIkbdVars();
             break;
 
+            //--------------------------------------------
             case STCMD_PAUSE_OUTPUT:                    // disable any output to IKBD
             outputEnabled = false;
             break;
 
+            //////////////////////////////////////////////
             // joystick related commands
+            //--------------------------------------------
             case STCMD_SET_JOYSTICK_EVENT_REPORTING:    // mouse mode: event reporting
             joystickMode = JOYMODE_EVENT;
             joystickEnabled = true;
             break;
 
+            //--------------------------------------------
             case STCMD_SET_JOYSTICK_INTERROG_MODE:      // mouse mode: interrogation mode
             joystickMode = JOYMODE_INTERROGATION;
             joystickEnabled = true;
             break;
 
+            //--------------------------------------------
             case STCMD_DISABLE_JOYSTICKS:               // disable joystick; any valid joystick command enabled joystick
             joystickEnabled = false;
             break;
    
+            //////////////////////////////////////////////
             // mouse related commands
+            //--------------------------------------------
             case STCMD_SET_REL_MOUSE_POS_REPORTING:     // set relative mouse reporting
             mouseMode = MOUSEMODE_REL;
             mouseEnabled = true;
             break;
 
+            //--------------------------------------------
             case STCMD_SET_ABS_MOUSE_POS_REPORTING:     // set absolute mouse reporting
             mouseMode = MOUSEMODE_ABS;
+
+            // read max X and Y max values
+            absMouse.maxX = (((WORD) bfr[1]) << 8) | ((WORD) bfr[2]);
+            absMouse.maxY = (((WORD) bfr[3]) << 8) | ((WORD) bfr[4]);
+
+            fixAbsMousePos();                           // if absolute coordinates are out of bounds, fix them
+
             mouseEnabled = true;
             break;
 
+            //--------------------------------------------
+            case STCMD_LOAD_MOUSE_POS:                  // load new absolute mouse position 
+            // read max X and Y position values
+            absMouse.x = (((WORD) bfr[2]) << 8) | ((WORD) bfr[3]);
+            absMouse.y = (((WORD) bfr[4]) << 8) | ((WORD) bfr[5]);
+
+            fixAbsMousePos();                           // if absolute coordinates are out of bounds, fix them
+
+            mouseEnabled = true;
+            break;
+
+            //--------------------------------------------
+            case STCMD_SET_MOUSE_BTN_ACTION:            // set position reporting for absolute mouse mode on mouse button press
+            mouseAbsBtnAct = MOUSEBTN_REPORT_NOTHING;
+
+            if(bfr[1] & 0x01) {                         // if should report on PRESS
+                mouseAbsBtnAct |= MOUSEBTN_REPORT_PRESS;
+            }
+
+            if(bfr[1] & 0x02) {                         // if should report on RELEASE
+                mouseAbsBtnAct |= MOUSEBTN_REPORT_RELEASE;
+            }
+            mouseEnabled = true;
+            break;
+
+            //--------------------------------------------
+            case STCMD_SET_Y_AT_TOP:                    // Y=0 at top
+            mouseY0atTop = true;
+            mouseEnabled = true;
+            break;
+
+            //--------------------------------------------
+            case STCMD_SET_Y_AT_BOTTOM:                 // Y=0 at bottom
+            mouseY0atTop = false;
+            mouseEnabled = true;
+            break;
+
+            //--------------------------------------------
             case STCMD_DISABLE_MOUSE:                   // disable mouse; any valid mouse command enables mouse
             mouseEnabled = false;
             break;
@@ -279,6 +322,43 @@ void Ikbd::processStCommands(void)
         }
 
     }
+}
+
+void Ikbd::fixAbsMousePos(void)
+{
+    if(absMouse.x < 0) {                                            // if X is out of boundary, fix it
+        absMouse.x = 0;
+    }
+
+    if(absMouse.x > absMouse.maxX) {                                // if X is out of boundary, fix it
+        absMouse.x = absMouse.maxX;
+    }
+
+    if(absMouse.y < 0) {                                            // if Y is out of boundary, fix it
+        absMouse.y = 0;
+    }
+
+    if(absMouse.y > absMouse.maxY) {                                // if Y is out of boundary, fix it
+        absMouse.y = absMouse.maxY;
+    }
+}
+
+void Ikbd::resetInternalIkbdVars(void)
+{
+    outputEnabled   = true;
+
+    mouseMode       = MOUSEMODE_REL;
+    mouseEnabled    = true;
+    mouseY0atTop    = true;
+    mouseAbsBtnAct  = MOUSEBTN_REPORT_NOTHING;
+
+    absMouse.maxX   = 640;
+    absMouse.maxY   = 400;
+    absMouse.x      = 0;
+    absMouse.y      = 0;
+
+    joystickMode    = JOYMODE_EVENT;
+    joystickEnabled = true;
 }
 
 void Ikbd::processKeyboardData(void)
@@ -377,48 +457,67 @@ void Ikbd::processMouse(input_event *ev)
     if(ev->type == EV_KEY) {		// on button press
 	    int btnNew = mouseBtnNow;
 		
+        bool down   = false;
+        bool up     = false;
+
 	    switch(ev->code) {
 		    case BTN_LEFT:		
-//		    Debug::out("mouse LEFT button %d", ev->value); 
-			
 			if(ev->value == 1) {				// on DOWN - add bit
-			    btnNew |= 2; 
-		    } else {						// on UP - remove bit
+			    btnNew |= 2;
+                down = true;
+		    } else {						    // on UP - remove bit
 		    	btnNew &= ~2; 
+                up = true;
 			}
-			
 			break;
 		
     		case BTN_RIGHT:		
-//			Debug::out("mouse RIGHT button %d", ev->value); 
-					
 			if(ev->value == 1) {				// on DOWN - add bit
 				btnNew |= 1; 
-			} else {						// on UP - remove bit
+                down = true;
+			} else {						    // on UP - remove bit
 				btnNew &= ~1; 
+                up = true;
 			}
-					
 			break;
 		}
 			
-		if(btnNew == mouseBtnNow) {							// mouse buttons didn't change? 
+		if(btnNew == mouseBtnNow) {							    // mouse buttons didn't change? 
 			return;
 		}
-			
-		mouseBtnNow = btnNew;								// store new button states
-		serialSendMousePacket(fdUart, mouseBtnNow, 0, 0);	// send them to ST
+
+		mouseBtnNow = btnNew;								    // store new button states
+
+        if(mouseMode == MOUSEMODE_ABS) {                        // for absolute mouse mode
+            if( (down   && ((mouseAbsBtnAct & MOUSEBTN_REPORT_PRESS)    != 0)) ||       // if btn was pressed and we should report abs position on press
+                (up     && ((mouseAbsBtnAct & MOUSEBTN_REPORT_RELEASE)  != 0)) ) {      // if btn was released and we should report abs position on release
+                sendMousePosAbsolute(fdUart);
+            }            
+        } else {                                                // for relative mouse mode
+            sendMousePosRelative(fdUart, mouseBtnNow, 0, 0);    // send them to ST
+        }
 		return;
 	}
 		
 	if(ev->type == EV_REL) {
 		if(ev->code == REL_X) {
-//			Debug::out("mouse REL_X: %d", ev->value);
-			serialSendMousePacket(fdUart, mouseBtnNow, ev->value, 0);	// send movement to ST
+            // update absolute position
+            absMouse.x += ev->value;
+            fixAbsMousePos();
+
+			sendMousePosRelative(fdUart, mouseBtnNow, ev->value, 0);	// send movement to ST
 		}
 
 		if(ev->code == REL_Y) {
-//			Debug::out("mouse REL_Y: %d", ev->value);
-			serialSendMousePacket(fdUart, mouseBtnNow, 0, ev->value);	// send movement to ST
+            // update absolute position
+            if(mouseY0atTop) {              // Y=0 at top - add value
+                absMouse.y += ev->value;
+            } else {                        // Y=0 at bottom - subtract value
+                absMouse.y -= ev->value;
+            }
+            fixAbsMousePos();
+                                 
+			sendMousePosRelative(fdUart, mouseBtnNow, 0, ev->value);	// send movement to ST
 		}
 	}
 }
@@ -925,18 +1024,45 @@ void Ikbd::addToTable(int pcKey, int stKey)
     tableKeysPcToSt[pcKey] = stKey;
 }
 
-void Ikbd::serialSendMousePacket(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
+void Ikbd::sendMousePosAbsolute(int fd)
 {
-    if(fd == -1) {              // no UART open? quit
+    if(fd == -1) {                      // no UART open?
         return;
     }
 
-    if(!mouseEnabled) {         // if mouse not enabled, don't send anything
+    if(!mouseEnabled) {                 // if mouse not enabled, don't send anything
+        return;
+    }
+
+    if(mouseMode != MOUSEMODE_ABS) {    // if we're not in absolute mouse mode, quit
+        return;
+    }
+
+
+}
+
+void Ikbd::sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
+{
+    if(fd == -1) {                      // no UART open? quit
+        return;
+    }
+
+    if(!mouseEnabled) {                 // if mouse not enabled, don't send anything
+        return;
+    }
+
+    if(mouseMode != MOUSEMODE_REL) {    // send relative mouse position changes only in relative mouse mode
         return;
     }
 
 	BYTE bfr[3];
 	
+    char yRelVal = yRel;
+
+    if(!mouseY0atTop) {                 // if mouse Y=0 is at bottom, invert the Y axis
+        yRelVal = yRelVal * (-1);   
+    }
+
 	bfr[0] = 0xf8 | buttons;
 	bfr[1] = xRel;
 	bfr[2] = yRel;
@@ -944,7 +1070,7 @@ void Ikbd::serialSendMousePacket(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
 	int res = fdWrite(fd, bfr, 3); 
 
 	if(res < 0) {
-		Debug::out("serialSendMousePacket failed, errno: %d", errno);
+		Debug::out("sendMousePosRelative failed, errno: %d", errno);
 	}
 }
 

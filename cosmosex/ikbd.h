@@ -52,8 +52,12 @@ typedef struct {
     int  getPos;
 } TCyclicBuff;
 
-#define MOUSEMODE_REL       0
-#define MOUSEMODE_ABS       1
+#define MOUSEMODE_REL           0
+#define MOUSEMODE_ABS           1
+
+#define MOUSEBTN_REPORT_NOTHING 0
+#define MOUSEBTN_REPORT_PRESS   1
+#define MOUSEBTN_REPORT_RELEASE 2
 
 #define JOYMODE_EVENT           0
 #define JOYMODE_INTERROGATION   1
@@ -171,6 +175,13 @@ private:
     int             mouseBtnNow;
     int             mouseMode;
     bool            mouseEnabled;
+    bool            mouseY0atTop;
+    int             mouseAbsBtnAct;
+
+    struct {
+        int x,y;
+        int maxX, maxY;
+    } absMouse;
 
     bool            swapJoys;
     int             joystickMode;
@@ -202,9 +213,12 @@ private:
 
     void processFoundDev(char *linkName, char *fullPath);
 
+    void resetInternalIkbdVars(void);
     void sendJoy0State(void);
     void sendJoyState(int joyNumber, int dirTotal);
-    void serialSendMousePacket(int fd, BYTE buttons, BYTE xRel, BYTE yRel);
+    void sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel);
+    void sendMousePosAbsolute(int fd);
+    void fixAbsMousePos(void);
 
     void processStCommands(void);
     void processKeyboardData(void);
