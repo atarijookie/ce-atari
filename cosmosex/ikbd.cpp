@@ -105,6 +105,7 @@ Ikbd::Ikbd()
 
     fdUart      = -1;
     mouseBtnNow = 0;
+    swapJoys    = false;
 
     // init uart RX cyclic buffers
     initCyclicBuffer(&cbStCommands);
@@ -410,20 +411,20 @@ void Ikbd::processJoystick(js_event *jse, int joyNumber)
 {
     TJoystickState *js;
 
-    if(joyNumber == 0 || joyNumber == 1) {      // if the index is OK, use it
+    if(joyNumber == 0 || joyNumber == 1) {          // if the index is OK, use it
         js = &joystick[joyNumber];
-    } else {                                    // index is not OK, quit
+    } else {                                        // index is not OK, quit
         return;
     }
 
     if(jse->type == JS_EVENT_AXIS) {
-        if(jse->number >= JOYAXIS) {            // if the index of axis would be out of index, quit
+        if(jse->number >= JOYAXIS) {                // if the index of axis would be out of index, quit
             return;
         } 
 
-	    js->axis[ jse->number ] = jse->value;   // store new axis value
+	    js->axis[ jse->number ] = jse->value;       // store new axis value
     } else if(jse->type == JS_EVENT_BUTTON) {
-        if(jse->number >= JOYBUTTONS) {         // if the index of button would be out of index, quit
+        if(jse->number >= JOYBUTTONS) {             // if the index of button would be out of index, quit
             return;
         } 
 
@@ -466,40 +467,49 @@ void Ikbd::processJoystick(js_event *jse, int joyNumber)
     // port 0: mouse + joystick
     // port 1: joystick
 
-    BYTE bfr[3];
-    int res;
-
-    if(joyNumber == 0) {                // for joystick in port 0 (in mouse port)
-        if((dirTotal != js->lastDir) || (button != js->lastBtn)) {  // direction or button changed?
-            js->lastDir = dirTotal;
-            js->lastBtn = button;
-
-            sendJoy0State();            // report current direction and buttons for joy0
-        }
-    }
-
-    if(joyNumber == 1) {                // for joystick in port 1 (non-mouse port)
-        if(dirTotal != js->lastDir) {   // direction changed?
-            js->lastDir = dirTotal;
-
-            bfr[0] = 0xff;
-            bfr[1] = dirTotal;
-
-            res = write(fdUart, bfr, 2); 
-
-        	if(res < 0) {
-        		Debug::out("write to uart (0) failed, errno: %d", errno);
-            }
+    if((dirTotal != js->lastDir) || (button != js->lastBtn)) {  // direction or button changed?
+        js->lastDir = dirTotal;
+        js->lastBtn = button;
+    
+        if(button != 0) {                                       // if the button is pressed, extend the dirTotal by button flag
+            dirTotal |= JOYDIR_BUTTON;
         }
 
-        if(button != js->lastBtn) {     // button state changed?
-            js->lastBtn = button;
-
-            sendJoy0State();            // report current direction and buttons for joy0, because it contains joy1 button state
-        }
+        sendJoyState(joyNumber, dirTotal);                      // report current direction and buttons
     }
 }
 
+// the following works when joystick event reporting is enabled
+void Ikbd::sendJoyState(int joyNumber, int dirTotal)
+{
+    BYTE bfr[2];
+    int res;
+
+    // first set the joystick 0 / 1 tag 
+    if(!swapJoys) {                 // joysticks NOT swapped?
+        if(joyNumber == 0) {        // joy 0
+            bfr[0] = 0xfe;
+        } else {                    // joy 1
+            bfr[0] = 0xff;
+        }
+    } else {                        // joysticks ARE swapped?
+        if(joyNumber == 0) {        // joy 0
+            bfr[0] = 0xff;
+        } else {                    // joy 1
+            bfr[0] = 0xfe;
+        }
+    }
+
+    bfr[1] = dirTotal;
+
+    res = write(fdUart, bfr, 2); 
+
+    if(res < 0) {
+        Debug::out("write to uart (0) failed, errno: %d", errno);
+    }
+}
+
+// this can be used to send joystick button states when joystick event reporting is not enabled (it reports joy buttons as mouse buttons)
 void Ikbd::sendJoy0State(void)
 {
     int bothButtons = 0xf8;     // neutral position
@@ -510,30 +520,10 @@ void Ikbd::sendJoy0State(void)
         bothButtons |= 0x01;    // right mouse button, joy1 button
     }
 
-    int dirX0, dirY0;
-
-    // convert X direction to ST format for joy0
-    if(joystick[0].lastDir & JOYDIR_LEFT) {
-        dirX0   = 0xff;
-    } else if(joystick[0].lastDir & JOYDIR_RIGHT) {
-        dirX0   = 0x01;
-    } else {
-        dirX0   = 0x00;
-    }
-
-    // convert Y direction to ST format for joy0
-    if(joystick[0].lastDir & JOYDIR_UP) {
-        dirY0   = 0xff;
-    } else if(joystick[0].lastDir & JOYDIR_DOWN) {
-        dirY0   = 0x01;
-    } else {
-        dirY0   = 0x00;
-    }
-
     char bfr[3];
     bfr[0] = bothButtons;
-    bfr[1] = dirY0;
-    bfr[2] = dirX0;
+    bfr[1] = 0;
+    bfr[2] = 0;
 
     int res = write(fdUart, bfr, 3); 
 

@@ -13,10 +13,11 @@
 #define INTYPE_JOYSTICK1    2
 #define INTYPE_JOYSTICK2    3
 
-#define JOYDIR_UP       1
-#define JOYDIR_DOWN     2
-#define JOYDIR_LEFT     4
-#define JOYDIR_RIGHT    8
+#define JOYDIR_UP       0x01
+#define JOYDIR_DOWN     0x02
+#define JOYDIR_LEFT     0x04
+#define JOYDIR_RIGHT    0x08
+#define JOYDIR_BUTTON   0x80
 
 typedef struct {
     char    devPath[256];
@@ -165,6 +166,7 @@ private:
     int             mouseBtnNow;
     int             mouseMode;    
 
+    bool            swapJoys;
     TJoystickState  joystick[2];
 
     TCyclicBuff     cbStCommands;
@@ -193,6 +195,7 @@ private:
     void processFoundDev(char *linkName, char *fullPath);
 
     void sendJoy0State(void);
+    void sendJoyState(int joyNumber, int dirTotal);
     void serialSendMousePacket(int fd, BYTE buttons, BYTE xRel, BYTE yRel);
 
     void processStCommands(void);
