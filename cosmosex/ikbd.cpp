@@ -117,7 +117,13 @@ Ikbd::Ikbd()
     fillSpecialCodeLengthTable();
     fillStCommandsLengthTable();
 
-    mouseMode = MOUSEMODE_REL;
+    mouseMode       = MOUSEMODE_REL;
+    mouseEnabled    = true;
+
+    joystickMode    = JOYMODE_EVENT;
+    joystickEnabled = true;
+
+    outputEnabled   = true;
 }
 
 void Ikbd::processReceivedCommands(void)
@@ -222,11 +228,56 @@ void Ikbd::processStCommands(void)
         // TODO: handle commands which need to be handled
 
         switch(bfr[0]) {
-            case STCMD_SET_REL_MOUSE_POS_REPORTING_LEN:
-            mouseMode = MOUSEMODE_REL;
+            // other commands
+            case STCMD_RESET:                           // reset keyboard - set everything to default values
+            outputEnabled   = true;
+
+            mouseMode       = MOUSEMODE_REL;
+            mouseEnabled    = true;
+
+            joystickMode    = JOYMODE_EVENT;
+            joystickEnabled = true;
             break;
 
+            case STCMD_PAUSE_OUTPUT:                    // disable any output to IKBD
+            outputEnabled = false;
+            break;
+
+            // joystick related commands
+            case STCMD_SET_JOYSTICK_EVENT_REPORTING:    // mouse mode: event reporting
+            joystickMode = JOYMODE_EVENT;
+            joystickEnabled = true;
+            break;
+
+            case STCMD_SET_JOYSTICK_INTERROG_MODE:      // mouse mode: interrogation mode
+            joystickMode = JOYMODE_INTERROGATION;
+            joystickEnabled = true;
+            break;
+
+            case STCMD_DISABLE_JOYSTICKS:               // disable joystick; any valid joystick command enabled joystick
+            joystickEnabled = false;
+            break;
+   
+            // mouse related commands
+            case STCMD_SET_REL_MOUSE_POS_REPORTING:     // set relative mouse reporting
+            mouseMode = MOUSEMODE_REL;
+            mouseEnabled = true;
+            break;
+
+            case STCMD_SET_ABS_MOUSE_POS_REPORTING:     // set absolute mouse reporting
+            mouseMode = MOUSEMODE_ABS;
+            mouseEnabled = true;
+            break;
+
+            case STCMD_DISABLE_MOUSE:                   // disable mouse; any valid mouse command enables mouse
+            mouseEnabled = false;
+            break;
         }
+
+        if(bfr[0] != STCMD_PAUSE_OUTPUT) {              // if this command is not PAUSE OUTPUT command, then enavle output
+            outputEnabled = true;
+        }
+
     }
 }
 
@@ -254,13 +305,13 @@ void Ikbd::processKeyboardData(void)
                 bfr[i] = getFromCyclicBuffer(&cbKeyboardData);
             }
 
-            write(fdUart, &bfr, len);                           // send the whole sequence to ST
+            fdWrite(fdUart, bfr, len);                         // send the whole sequence to ST
             continue;
         }
 
         // if we got here, it's not a special code, just make / break keyboard code
         val = getFromCyclicBuffer(&cbKeyboardData);             // get data from buffer
-        write(fdUart, &val, 1);                                 // send byte to ST
+        fdWrite(fdUart, &val, 1);                               // send byte to ST
     }
 }
 
@@ -399,7 +450,7 @@ void Ikbd::processKeyboard(input_event *ev)
         BYTE bfr;
         bfr = stKey;
     
-    	int res = write(fdUart, &bfr, 1); 
+    	int res = fdWrite(fdUart, &bfr, 1); 
 
     	if(res < 0) {
 	    	Debug::out("processKeyboard - sending to ST failed, errno: %d", errno);
@@ -502,7 +553,7 @@ void Ikbd::sendJoyState(int joyNumber, int dirTotal)
 
     bfr[1] = dirTotal;
 
-    res = write(fdUart, bfr, 2); 
+    res = fdWrite(fdUart, bfr, 2); 
 
     if(res < 0) {
         Debug::out("write to uart (0) failed, errno: %d", errno);
@@ -520,12 +571,12 @@ void Ikbd::sendJoy0State(void)
         bothButtons |= 0x01;    // right mouse button, joy1 button
     }
 
-    char bfr[3];
+    BYTE bfr[3];
     bfr[0] = bothButtons;
     bfr[1] = 0;
     bfr[2] = 0;
 
-    int res = write(fdUart, bfr, 3); 
+    int res = fdWrite(fdUart, bfr, 3); 
 
     if(res < 0) {
         Debug::out("write to uart (1) failed, errno: %d", errno);
@@ -880,13 +931,17 @@ void Ikbd::serialSendMousePacket(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
         return;
     }
 
+    if(!mouseEnabled) {         // if mouse not enabled, don't send anything
+        return;
+    }
+
 	BYTE bfr[3];
 	
 	bfr[0] = 0xf8 | buttons;
 	bfr[1] = xRel;
 	bfr[2] = yRel;
 	
-	int res = write(fd, bfr, 3); 
+	int res = fdWrite(fd, bfr, 3); 
 
 	if(res < 0) {
 		Debug::out("serialSendMousePacket failed, errno: %d", errno);
@@ -946,4 +1001,20 @@ int Ikbd::serialSetup(termios *ts)
     fdUart = fd;
 	return fd;
 }
+
+int Ikbd::fdWrite(int fd, BYTE *bfr, int cnt)
+{
+    if(fd == -1) {                                  // no fd? quit
+        return 0;
+    }
+
+    if(!outputEnabled) {                            // output not enabled? Pretend that it was sent...
+        return cnt;
+    }
+
+    int res = write(fd, bfr, cnt);                  // send content
+    return res;
+}
+
+
 

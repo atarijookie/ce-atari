@@ -55,6 +55,9 @@ typedef struct {
 #define MOUSEMODE_REL       0
 #define MOUSEMODE_ABS       1
 
+#define JOYMODE_EVENT           0
+#define JOYMODE_INTERROGATION   1
+
 // data sent from keyboard
 #define KEYBDATA_SPECIAL_LOWEST		0xf6
 #define KEYBDATA_STATUS             0xf6
@@ -163,11 +166,16 @@ private:
     int             tableKeysPcToSt[KEY_TABLE_SIZE];
     int             fdUart;
 
+    bool            outputEnabled;
+
     int             mouseBtnNow;
-    int             mouseMode;    
+    int             mouseMode;
+    bool            mouseEnabled;
 
     bool            swapJoys;
+    int             joystickMode;
     TJoystickState  joystick[2];
+    bool            joystickEnabled;
 
     TCyclicBuff     cbStCommands;
     TCyclicBuff     cbKeyboardData;
@@ -200,6 +208,8 @@ private:
 
     void processStCommands(void);
     void processKeyboardData(void);
+
+    int fdWrite(int fd, BYTE *bfr, int cnt);
 };
 
 #endif
