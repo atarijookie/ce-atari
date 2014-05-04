@@ -43,6 +43,8 @@ typedef struct {
 
     int lastDir;
     int lastBtn;
+	
+	int lastDirAndBtn;
 } TJoystickState;
 
 typedef struct {
@@ -52,15 +54,29 @@ typedef struct {
     int  getPos;
 } TCyclicBuff;
 
-#define MOUSEMODE_REL           0
-#define MOUSEMODE_ABS           1
+#define CE_IKBDMODE_SOLO		0
+#define CE_IKBDMODE_INJECT		1
 
-#define MOUSEBTN_REPORT_NOTHING 0
-#define MOUSEBTN_REPORT_PRESS   1
-#define MOUSEBTN_REPORT_RELEASE 2
+#define MOUSEMODE_REL           0x08
+#define MOUSEMODE_ABS           0x09
+#define MOUSEMODE_KEYCODE		0x0a
 
-#define JOYMODE_EVENT           0
-#define JOYMODE_INTERROGATION   1
+#define MOUSEBTN_REPORT_NOTHING 		0
+#define MOUSEBTN_REPORT_PRESS   		1
+#define MOUSEBTN_REPORT_RELEASE			2
+#define MOUSEBTN_REPORT_ACTLIKEKEYS		4
+
+#define JOYMODE_EVENT           0x14
+#define JOYMODE_INTERROGATION   0x15
+#define JOYMODE_KEYCODE			0x19
+
+#define MOUSEABS_BTN_LEFT_UP		8
+#define MOUSEABS_BTN_LEFT_DOWN		4
+#define MOUSEABS_BTN_RIGHT_UP		2
+#define MOUSEABS_BTN_RIGHT_DOWN		1
+
+#define MOUSEABS_BTN_UP				(MOUSEABS_BTN_LEFT_UP	| MOUSEABS_BTN_RIGHT_UP)
+#define MOUSEABS_BTN_DOWN			(MOUSEABS_BTN_LEFT_DOWN	| MOUSEABS_BTN_RIGHT_DOWN)
 
 // data sent from keyboard
 #define KEYBDATA_SPECIAL_LOWEST		0xf6
@@ -166,6 +182,8 @@ public:
     void processReceivedCommands(void);
 
 private:
+	int				ceIkbdMode;
+
     TInputDevice    inDevs[4];
     int             tableKeysPcToSt[KEY_TABLE_SIZE];
     int             fdUart;
@@ -178,11 +196,22 @@ private:
     bool            mouseY0atTop;
     int             mouseAbsBtnAct;
 
+	struct {
+		int		threshX, threshY;
+	} relMouse;
+	
     struct {
-        int x,y;
-        int maxX, maxY;
+        int		x,y;
+        int		maxX, maxY;
+		int		scaleX, scaleY;
+		BYTE	buttons;
     } absMouse;
 
+	struct {
+		BYTE deltaX;
+		BYTE deltaY;
+	} keycodeMouse;
+	
     bool            swapJoys;
     int             joystickMode;
     TJoystickState  joystick[2];
@@ -216,13 +245,19 @@ private:
     void resetInternalIkbdVars(void);
     void sendJoy0State(void);
     void sendJoyState(int joyNumber, int dirTotal);
+	void sendBothJoyReport(void);
     void sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel);
-    void sendMousePosAbsolute(int fd);
+    void sendMousePosAbsolute(int fd, BYTE absButtons);
     void fixAbsMousePos(void);
 
     void processStCommands(void);
+	void processGetCommand(BYTE getCmd);
     void processKeyboardData(void);
 
+	bool gotUsbMouse(void);
+	bool gotUsbJoy1(void);
+	bool gotUsbJoy2(void);
+	
     int fdWrite(int fd, BYTE *bfr, int cnt);
 };
 

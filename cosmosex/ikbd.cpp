@@ -104,6 +104,8 @@ Ikbd::Ikbd()
     initDevs();
     fillKeyTranslationTable();
 
+	ceIkbdMode = CE_IKBDMODE_SOLO;
+	
     fdUart      = -1;
     mouseBtnNow = 0;
     swapJoys    = false;
@@ -220,13 +222,29 @@ void Ikbd::processStCommands(void)
             bfr[i] = getFromCyclicBuffer(&cbStCommands);
         }
 
-        // TODO: handle commands which need to be handled
+        if(bfr[0] != STCMD_PAUSE_OUTPUT) {              		// if this command is not PAUSE OUTPUT command, then enavle output
+            outputEnabled = true;
+        }
 
+		if((cmd & 0x80) != 0) {									// is it a GET command?
+			processGetCommand(cmd);
+			continue;
+		}
+		
         switch(bfr[0]) {
             // other commands
             //--------------------------------------------
             case STCMD_RESET:                           // reset keyboard - set everything to default values
             resetInternalIkbdVars();
+			
+			if(ceIkbdMode != CE_IKBDMODE_SOLO) {		// if we're not in solo mode, don't answer
+				break;
+			}
+
+			BYTE bfr[1];
+			bfr[0] = 0xf0;
+			
+			fdWrite(fdUart, bfr, 1);					// send report that everything is OK 
             break;
 
             //--------------------------------------------
@@ -249,6 +267,21 @@ void Ikbd::processStCommands(void)
             break;
 
             //--------------------------------------------
+            case STCMD_JOYSTICK_INTERROGATION:
+			joystickEnabled = true;
+			
+			if(ceIkbdMode != CE_IKBDMODE_SOLO) {		// if we're not in solo mode, don't answer (will be handled when the data from keyboard arrive)
+				break;
+			}
+			
+			if(joystickMode != JOYMODE_INTERROGATION) {	// if we're not in joy interrogation mode, ignore
+				break;
+			}
+
+			sendBothJoyReport();
+			break;
+
+            //--------------------------------------------
             case STCMD_DISABLE_JOYSTICKS:               // disable joystick; any valid joystick command enabled joystick
             joystickEnabled = false;
             break;
@@ -262,6 +295,26 @@ void Ikbd::processStCommands(void)
             break;
 
             //--------------------------------------------
+			case STCMD_SET_MOUSE_KEYCODE_MODE:			// set keycode mouse reporting
+            mouseMode = MOUSEMODE_KEYCODE;
+            mouseEnabled = true;
+            break;
+
+            //--------------------------------------------
+			case STCMD_SET_MOUSE_THRESHOLD:
+			relMouse.threshX	= bfr[1];
+			relMouse.threshY	= bfr[2];
+            mouseEnabled = true;
+            break;
+			
+            //--------------------------------------------
+			case STCMD_SET_MOUSE_SCALE:
+			absMouse.scaleX		= bfr[1];
+			absMouse.scaleY		= bfr[2];
+            mouseEnabled = true;
+            break;			
+            
+			//--------------------------------------------
             case STCMD_SET_ABS_MOUSE_POS_REPORTING:     // set absolute mouse reporting
             mouseMode = MOUSEMODE_ABS;
 
@@ -275,6 +328,22 @@ void Ikbd::processStCommands(void)
             break;
 
             //--------------------------------------------
+			case STCMD_INTERROGATE_MOUSE_POS:			// get the current absolute mouse position
+            mouseEnabled = true;
+
+			if(mouseMode != MOUSEMODE_ABS) {			// this is only valid in absolute mouse mode
+				break;
+			}
+			
+			if(ceIkbdMode == CE_IKBDMODE_INJECT && !gotUsbMouse()) {	// when working in INJECT mode and don't have mouse, don't answer
+				break;
+			}
+			
+			sendMousePosAbsolute(fdUart, absMouse.buttons);				// send position and accumulated buttons		
+			absMouse.buttons = 0;										// no buttons for now
+			break;
+			
+            //--------------------------------------------
             case STCMD_LOAD_MOUSE_POS:                  // load new absolute mouse position 
             // read max X and Y position values
             absMouse.x = (((WORD) bfr[2]) << 8) | ((WORD) bfr[3]);
@@ -287,15 +356,7 @@ void Ikbd::processStCommands(void)
 
             //--------------------------------------------
             case STCMD_SET_MOUSE_BTN_ACTION:            // set position reporting for absolute mouse mode on mouse button press
-            mouseAbsBtnAct = MOUSEBTN_REPORT_NOTHING;
-
-            if(bfr[1] & 0x01) {                         // if should report on PRESS
-                mouseAbsBtnAct |= MOUSEBTN_REPORT_PRESS;
-            }
-
-            if(bfr[1] & 0x02) {                         // if should report on RELEASE
-                mouseAbsBtnAct |= MOUSEBTN_REPORT_RELEASE;
-            }
+            mouseAbsBtnAct = bfr[1];					// store flags what we should report
             mouseEnabled = true;
             break;
 
@@ -316,12 +377,90 @@ void Ikbd::processStCommands(void)
             mouseEnabled = false;
             break;
         }
-
-        if(bfr[0] != STCMD_PAUSE_OUTPUT) {              // if this command is not PAUSE OUTPUT command, then enavle output
-            outputEnabled = true;
-        }
-
     }
+}
+
+void Ikbd::processGetCommand(BYTE getCmd)
+{
+	if(ceIkbdMode != CE_IKBDMODE_SOLO) {							// not SOLO mode? don't reply!
+		return;
+	}
+
+	BYTE setEquivalent = getCmd & 0x7f;								// remove highest bit
+
+	bool send = false;
+	
+	BYTE bfr[8];
+	memset(bfr, 0, 8);
+	
+	bfr[0] = KEYBDATA_STATUS;
+	
+	switch(setEquivalent) {
+		case STCMD_SET_REL_MOUSE_POS_REPORTING:		// relative mouse: report mouse mode
+		bfr[1] = mouseMode;
+		send = true;
+		break;
+		
+		case STCMD_SET_ABS_MOUSE_POS_REPORTING:		// absolute mouse: report mode and maximums
+		bfr[1] = mouseMode;
+		bfr[2] = (BYTE) (absMouse.maxX >> 8);
+		bfr[3] = (BYTE)  absMouse.maxX;
+		bfr[4] = (BYTE) (absMouse.maxY >> 8);
+		bfr[5] = (BYTE)  absMouse.maxY;
+		send = true;
+		break;
+
+		case STCMD_SET_MOUSE_KEYCODE_MODE:			// keycode mouse: report mode and deltas
+		bfr[1] = mouseMode;
+		bfr[2] = keycodeMouse.deltaX;
+		bfr[3] = keycodeMouse.deltaY;
+		send = true;
+		break;
+		
+		case STCMD_SET_Y_AT_TOP:					// report mouse Y=0 location (top or bottom)
+		case STCMD_SET_Y_AT_BOTTOM:
+		bfr[1] = mouseY0atTop ? STCMD_SET_Y_AT_TOP : STCMD_SET_Y_AT_BOTTOM;
+		send = true;
+		break;
+	
+		case STCMD_DISABLE_MOUSE:					// report if mouse is disabled
+		bfr[1] = mouseEnabled ? 0 : STCMD_DISABLE_MOUSE;
+		send = true;
+		break;
+		
+		case STCMD_SET_JOYSTICK_EVENT_REPORTING:	// report joystick mode
+		case STCMD_SET_JOYSTICK_INTERROG_MODE:
+		case STCMD_SET_JOYSTICK_KEYCODE_MODE:
+		bfr[1] = joystickMode;
+		send = true;
+		break;
+		
+		case STCMD_DISABLE_JOYSTICKS:				// report if joystick is disabled
+		bfr[1] = joystickEnabled ? 0 : STCMD_DISABLE_JOYSTICKS;
+		send = true;
+		break;
+
+		case STCMD_SET_MOUSE_BTN_ACTION:			// report mouse button actions
+		bfr[1] = mouseAbsBtnAct;
+		send = true;
+		break;
+		
+		case STCMD_SET_MOUSE_THRESHOLD:				// report current mouse threshold
+		bfr[1] = relMouse.threshX;
+		bfr[2] = relMouse.threshY;
+		send = true;
+		break;
+		
+		case STCMD_SET_MOUSE_SCALE:					// report current mouse scale
+		bfr[1] = absMouse.scaleX;
+		bfr[2] = absMouse.scaleY;
+		send = true;
+		break;
+	}
+	
+	if(send) {										// if command was handled
+		fdWrite(fdUart, bfr, 8);	
+	}
 }
 
 void Ikbd::fixAbsMousePos(void)
@@ -352,11 +491,20 @@ void Ikbd::resetInternalIkbdVars(void)
     mouseY0atTop    = true;
     mouseAbsBtnAct  = MOUSEBTN_REPORT_NOTHING;
 
-    absMouse.maxX   = 640;
-    absMouse.maxY   = 400;
-    absMouse.x      = 0;
-    absMouse.y      = 0;
+    absMouse.maxX   	= 640;
+    absMouse.maxY   	= 400;
+    absMouse.x      	= 0;
+    absMouse.y      	= 0;
+	absMouse.buttons	= 0;
+	absMouse.scaleX		= 1;
+	absMouse.scaleY		= 1;
 
+	relMouse.threshX	= 1;
+	relMouse.threshY	= 1;
+	
+	keycodeMouse.deltaX	= 0;
+	keycodeMouse.deltaY	= 0;
+	
     joystickMode    = JOYMODE_EVENT;
     joystickEnabled = true;
 }
@@ -372,8 +520,8 @@ void Ikbd::processKeyboardData(void)
     while(cbKeyboardData.count > 0) {                           // while there are some data, process
         BYTE val = peekCyclicBuffer(&cbKeyboardData);           // get the data, but don't move the get pointer, because we might fail later
 
-        if(val >= 0xf6 && val <= 0xff) {                        // if this a special code?
-            BYTE index = val - 0xf6;                            // convert it to table index
+        if(val >= KEYBDATA_SPECIAL_LOWEST && val <= 0xff) {     // if this a special code?
+            BYTE index = val - KEYBDATA_SPECIAL_LOWEST;         // convert it to table index
 
             BYTE len = specialCodeLen[index];                   // get length of the special sequence from table
 
@@ -384,9 +532,51 @@ void Ikbd::processKeyboardData(void)
             for(int i=0; i<len; i++) {                          // get the whole sequence
                 bfr[i] = getFromCyclicBuffer(&cbKeyboardData);
             }
+			
+			ceIkbdMode = CE_IKBDMODE_INJECT;					// if we got at least one data sequence from original keyboard, switch to INJECT mode
+			
+			bool resendTheseData = true;						// reset this flag to not resend these data
+			
+			switch(bfr[0]) {									// handle data sent from original keyboard
+				case KEYBDATA_MOUSE_ABS:						// report of absolute mouse position?
+				if(gotUsbMouse()) {								// ...and we got USB mouse? Don't resend.
+					resendTheseData = false;
+				}
+				break;
+				
+				//----------------------------------------------
+				case KEYBDATA_JOY_BOTH:							// ST asked for both joystick states (interrogation) and this is the response
+			
+				if(gotUsbJoy1()) {								// got joy 1?
+					BYTE joy0state = joystick[0].lastDir | joystick[0].lastBtn;	// get state
+					
+					if(!swapJoys) {								// and we shouldn't swap - use it as joy 0
+						bfr[1] = joy0state;
+					} else {									// swapped? use it as joy 1
+						bfr[2] = joy0state;
+					}
+				}
 
-            fdWrite(fdUart, bfr, len);                         // send the whole sequence to ST
-            continue;
+				if(gotUsbJoy2()) {								// got joy 2?
+					BYTE joy1state = joystick[1].lastDir | joystick[1].lastBtn;	// get state
+					
+					if(!swapJoys) {								// and we shouldn't swap - use it as joy 1
+						bfr[2] = joy1state;
+					} else {									// swapped? use it as joy 0
+						bfr[1] = joy1state;
+					}
+				}
+				
+				break;
+				//----------------------------------------------
+				
+			}
+
+			if(resendTheseData) {								// if we should resend this data
+				fdWrite(fdUart, bfr, len);                      // send the whole sequence to ST
+            }
+			
+			continue;
         }
 
         // if we got here, it's not a special code, just make / break keyboard code
@@ -457,27 +647,30 @@ void Ikbd::processMouse(input_event *ev)
     if(ev->type == EV_KEY) {		// on button press
 	    int btnNew = mouseBtnNow;
 		
-        bool down   = false;
-        bool up     = false;
-
+		BYTE absButtons = 0;
+		
 	    switch(ev->code) {
 		    case BTN_LEFT:		
 			if(ev->value == 1) {				// on DOWN - add bit
 			    btnNew |= 2;
-                down = true;
+				absButtons			|= MOUSEABS_BTN_LEFT_DOWN;
+				absMouse.buttons	|= MOUSEABS_BTN_LEFT_DOWN;
 		    } else {						    // on UP - remove bit
 		    	btnNew &= ~2; 
-                up = true;
+				absButtons			|= MOUSEABS_BTN_LEFT_UP;
+				absMouse.buttons	|= MOUSEABS_BTN_LEFT_UP;
 			}
 			break;
 		
     		case BTN_RIGHT:		
 			if(ev->value == 1) {				// on DOWN - add bit
 				btnNew |= 1; 
-                down = true;
+				absButtons			|= MOUSEABS_BTN_RIGHT_DOWN;
+				absMouse.buttons	|= MOUSEABS_BTN_RIGHT_DOWN;
 			} else {						    // on UP - remove bit
 				btnNew &= ~1; 
-                up = true;
+				absButtons			|= MOUSEABS_BTN_RIGHT_UP;
+				absMouse.buttons	|= MOUSEABS_BTN_RIGHT_UP;
 			}
 			break;
 		}
@@ -489,9 +682,13 @@ void Ikbd::processMouse(input_event *ev)
 		mouseBtnNow = btnNew;								    // store new button states
 
         if(mouseMode == MOUSEMODE_ABS) {                        // for absolute mouse mode
-            if( (down   && ((mouseAbsBtnAct & MOUSEBTN_REPORT_PRESS)    != 0)) ||       // if btn was pressed and we should report abs position on press
-                (up     && ((mouseAbsBtnAct & MOUSEBTN_REPORT_RELEASE)  != 0)) ) {      // if btn was released and we should report abs position on release
-                sendMousePosAbsolute(fdUart);
+			bool wasUp		= (absButtons		& MOUSEABS_BTN_UP)			!= 0;
+			bool reportUp	= (mouseAbsBtnAct	& MOUSEBTN_REPORT_RELEASE)  != 0;
+			bool wasDown	= (absButtons		& MOUSEABS_BTN_DOWN)		!= 0;
+			bool reportDown	= (mouseAbsBtnAct	& MOUSEBTN_REPORT_PRESS)	!= 0;
+		
+            if(	(wasUp && reportUp) || (wasDown && reportDown) ) {	// if button pressed / released and we should report that
+                sendMousePosAbsolute(fdUart, absButtons);
             }            
         } else {                                                // for relative mouse mode
             sendMousePosRelative(fdUart, mouseBtnNow, 0, 0);    // send them to ST
@@ -606,7 +803,7 @@ void Ikbd::processJoystick(js_event *jse, int joyNumber)
     int button = 0;
     for(int i=0; i<JOYBUTTONS; i++) {   // check if any button is pressed
         if(js->button[i] != 0) {        // this button pressed? mark that something is pressed
-            button = 1;
+            button = JOYDIR_BUTTON;
         }
     }
 
@@ -620,12 +817,33 @@ void Ikbd::processJoystick(js_event *jse, int joyNumber)
     if((dirTotal != js->lastDir) || (button != js->lastBtn)) {  // direction or button changed?
         js->lastDir = dirTotal;
         js->lastBtn = button;
-    
-        if(button != 0) {                                       // if the button is pressed, extend the dirTotal by button flag
-            dirTotal |= JOYDIR_BUTTON;
-        }
+	
+        sendJoyState(joyNumber, button | dirTotal);				// report current direction and buttons
+    }
+}
 
-        sendJoyState(joyNumber, dirTotal);                      // report current direction and buttons
+void Ikbd::sendBothJoyReport(void)
+{
+	BYTE bfr[3];
+    int res;
+
+	BYTE joy0state = joystick[0].lastDir | joystick[0].lastBtn;	// get state
+	BYTE joy1state = joystick[1].lastDir | joystick[1].lastBtn;	// get state
+	
+	bfr[0] = KEYBDATA_JOY_BOTH;
+
+	if(!swapJoys) {
+		bfr[1] = joy0state;
+		bfr[2] = joy1state;
+	} else {
+		bfr[1] = joy1state;
+		bfr[2] = joy0state;
+	}
+	
+	res = fdWrite(fdUart, bfr, 3); 
+
+    if(res < 0) {
+        Debug::out("write to uart failed, errno: %d", errno);
     }
 }
 
@@ -638,15 +856,15 @@ void Ikbd::sendJoyState(int joyNumber, int dirTotal)
     // first set the joystick 0 / 1 tag 
     if(!swapJoys) {                 // joysticks NOT swapped?
         if(joyNumber == 0) {        // joy 0
-            bfr[0] = 0xfe;
+            bfr[0] = KEYBDATA_JOY0;
         } else {                    // joy 1
-            bfr[0] = 0xff;
+            bfr[0] = KEYBDATA_JOY1;
         }
     } else {                        // joysticks ARE swapped?
         if(joyNumber == 0) {        // joy 0
-            bfr[0] = 0xff;
+            bfr[0] = KEYBDATA_JOY1;
         } else {                    // joy 1
-            bfr[0] = 0xfe;
+            bfr[0] = KEYBDATA_JOY0;
         }
     }
 
@@ -662,7 +880,7 @@ void Ikbd::sendJoyState(int joyNumber, int dirTotal)
 // this can be used to send joystick button states when joystick event reporting is not enabled (it reports joy buttons as mouse buttons)
 void Ikbd::sendJoy0State(void)
 {
-    int bothButtons = 0xf8;     // neutral position
+    int bothButtons = KEYBDATA_MOUSE_REL8;     // neutral position
     if(joystick[0].lastBtn) {
         bothButtons |= 0x02;    // left mouse  button, joy0 button
     }
@@ -1024,7 +1242,7 @@ void Ikbd::addToTable(int pcKey, int stKey)
     tableKeysPcToSt[pcKey] = stKey;
 }
 
-void Ikbd::sendMousePosAbsolute(int fd)
+void Ikbd::sendMousePosAbsolute(int fd, BYTE absButtons)
 {
     if(fd == -1) {                      // no UART open?
         return;
@@ -1038,7 +1256,21 @@ void Ikbd::sendMousePosAbsolute(int fd)
         return;
     }
 
+	// create the absolute mouse position report
+	BYTE bfr[6];
+	
+	bfr[0] = KEYBDATA_MOUSE_ABS;
+	bfr[1] = absButtons;
+	bfr[2] = absMouse.x >> 8;
+	bfr[3] = (BYTE) absMouse.x;
+	bfr[4] = absMouse.y >> 8;
+	bfr[5] = (BYTE) absMouse.y;
 
+	int res = fdWrite(fd, bfr, 6); 
+
+	if(res < 0) {
+		Debug::out("sendMousePosAbsolute failed, errno: %d", errno);
+	}
 }
 
 void Ikbd::sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
@@ -1142,5 +1374,29 @@ int Ikbd::fdWrite(int fd, BYTE *bfr, int cnt)
     return res;
 }
 
+bool Ikbd::gotUsbMouse(void)
+{
+	if(inDevs[INTYPE_MOUSE].fd != -1) {
+		return true;
+	}
+	
+	return false;
+}
 
+bool Ikbd::gotUsbJoy1(void)
+{
+	if(inDevs[INTYPE_JOYSTICK1].fd != -1) {
+		return true;
+	}
+	
+	return false;
+}
 
+bool Ikbd::gotUsbJoy2(void)
+{
+	if(inDevs[INTYPE_JOYSTICK2].fd != -1) {
+		return true;
+	}
+	
+	return false;
+}
