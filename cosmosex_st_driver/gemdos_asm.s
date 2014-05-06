@@ -1,12 +1,11 @@
-| Simple GEMDOS handler.
-| 04/03/2014 Miro Kropacek
+| Simple GEMDOS handler
+| Miro Kropacek, 2013 & 2014
 | miro.kropacek@gmail.com
 
 	.globl	_gemdos_handler
 	.globl	_gemdos_table
 	.globl	_old_gemdos_handler
 	.globl	_useOldGDHandler
-	.globl  __terminatedBy
     
 | ------------------------------------------------------
 	.text
@@ -28,7 +27,7 @@ _old_gemdos_handler:
 
 _gemdos_handler:
 	tst.w	_useOldGDHandler
-	bne.b	gemdos_not_handled
+	bne.b	callOriginalHandler
 	
 	lea     2+4(sp),a0				| a0 points to the function number now
 	btst.b	#5,(sp)					| check the S bit in the stack frame
@@ -36,55 +35,64 @@ _gemdos_handler:
 	move	usp,a0					| if not called from SV, take params from the user stack
 
 gemdos_call:
-	lea     _gemdos_table,a1
 	move.w	(a0)+,d0				| fn
 	cmp.w	#0x100,d0				| number of entries in the function table
-	bhs.b	gemdos_not_handled		| >=0x100 are MiNT functions
+	bhs.b	callOriginalHandler		| >=0x100 are MiNT functions
 
-    |-------------------------------
-    | custom handling of Pterm* functions - needed because of custom Pexec()
-    cmp.w   #0x0000,d0              | Pterm0?
-    beq.b   customPterms
-    
-    cmp.w   #0x004c,d0              | Pterm?
-    beq.b   customPterms
-    
-    cmp.w   #0x0031,d0              | Ptermres?
-    beq.b   customPterms
-    |-------------------------------
-    
-   	cmp.w	#0x004b,d0				| Pexec()?
-	bne.b	ok					    | no -> proceed as usual
-	cmpi.w	#0,(a0)					| PE_LOADGO?
-	beq.b	ok					    | yes -> load by us, execute by the OS
-	cmpi.w	#3,(a0)					| PE_LOAD?
-	bne.b	gemdos_not_handled		| yes -> load by us, no -> all the others, don't mess with us
-    
-ok:    
-	add.w	d0,d0					| fn*4 because it's a function pointer table
-	add.w	d0,d0					|
-	adda.w	d0,a1
-	tst.l	(a1)
-	beq.b	gemdos_not_handled
-	movea.l	(a1),a1
+   	cmp.w   #0x004b,d0              | Pexec()?
+	bne.b   callCustomHandler       | not Pexec(), just call the custom handler
 
-	move.l	a0,-(sp)				| param #1: stack pointer with function params
-	jsr     (a1)					| call the handler
-	addq.l	#4,sp
-	rte                             | return from exception, d0 contains return code
+	cmpi.w  #0,(a0)                 | PE_LOADGO?
+	bne.b   not_loadgo
+    
+	addq.w  #1,pexec_flag           | for PE_LOADGO - set the flag, load by us, execute by the OS
+	bra.b   callCustomHandler
+    
+not_loadgo:
+	cmpi.w  #3,(a0)					| PE_LOAD?
+	bne.b   callOriginalHandler		| this is not PE_LOAD, call original handler
+    
+callCustomHandler:
+	lea     _gemdos_table,a1        | get the pointer to custrom handlers table
+	add.w   d0,d0                   | fn*4 because it's a function pointer table
+	add.w   d0,d0                   |
+	adda.w  d0,a1
+	tst.l   (a1)
+	beq.b   callOriginalHandler
+	movea.l (a1),a1
+
+	move.l  a0,-(sp)                | param #1: stack pointer with function params
+	jsr     (a1)                    | call the custom handler
+
+	tst.w   pexec_flag              | should we now do the post-process of PE_LOADGO?
+	beq.b   notPexecGo              | no, just skip it
 	
-gemdos_not_handled:
+    |------------------
+	| ok, so we are asked for PE_LOADGO, let's transform it into PE_GO
+	| (the basepage parameter is in d0 already) .. basically we need to transform this:
+	| int32_t Pexec (0, int8_t *name, int8_t *cmdline, int8_t *env);
+	| into this:
+	| int32_t Pexec (4, 0L, PD *basepage, 0L);
+	
+	movea.l	(sp)+,a0                | restore the SP and param pointer
+	move.w  #4,(a0)+
+	clr.l   (a0)+
+	move.l  d0,(a0)+
+	clr.l   (a0)+
+
+	clr.w   pexec_flag              | clear the PE_LOADGO flag
+
+	bra.b   callOriginalHandler     | now do the PE_GO part
+    |------------------
+
+notPexecGo:
+    addq.l  #4,sp
+    rte                             | return from exception, d0 contains return code
+	
+callOriginalHandler:
     clr.w   _useOldGDHandler                | ensure that is our handler still alive after the call (which may not return) 
 	move.l  _old_gemdos_handler(pc),-(sp)	| Fake a return
 	rts		                                | to old code.
     
-| ------------------------------------------------------
-| custom Pterm handler - will mark down which Pterm* function was called to terminate this app
-customPterms:
-	lea     __terminatedBy,a1       | load address of terminatedBy to A1
-	move.w	d0,(a1)                 | store function number to address pointer by A1
-    jmp     gemdos_not_handled      | jump to original handler
-
-| ------------------------------------------------------	
-	.bss
-__terminatedBy:     .ds.w	1
+	.data
+pexec_flag:         dc.w    0       | 1 = post-process PE_LOADGO

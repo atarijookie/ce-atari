@@ -779,6 +779,8 @@ void initFunctionTable(void)
 
     // program execution functions
 	gemdos_table[GEMDOS_pexec]      = custom_pexec;
+	gemdos_table[GEMDOS_pterm]      = custom_pterm;
+	gemdos_table[GEMDOS_pterm0]     = custom_pterm0;
 
     // BIOS functions we need to support
 	bios_table[0x0a] = custom_drvmap; 

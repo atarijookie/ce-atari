@@ -116,6 +116,8 @@ void updateCeDrives(void);
 int32_t custom_fread ( void *sp );
 int32_t custom_fwrite( void *sp );
 int32_t custom_pexec( void *sp );
+int32_t custom_pterm( void *sp );
+int32_t custom_pterm0( void *sp );
 
 BYTE commitChanges(WORD ceHandle);
 void initFileBuffer(WORD ceHandle);

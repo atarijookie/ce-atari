@@ -87,8 +87,7 @@ typedef struct __attribute__ ((__packed__))
 
 void freeTheBasePage(TBasePage *basePage);
 
-// the following variable will help to determine how the prog was terminated after Pexec and thus to know if should or shouldn't Mfree the RAM
-WORD terminatedBy;
+BYTE *pLastBasePage;
 
 // ------------------------------------------------------------------ 
 // LONG Pexec( mode, fname, cmdline, envstr )
@@ -134,7 +133,7 @@ int32_t custom_pexec( void *sp )
 	if((int) pBasePage < 1000) {											// Pexec seems to failed -- insufficient memory
 		return ENSMEM;
 	}
-
+    
 	TBasePage *sBasePage = (TBasePage *) pBasePage;							// this is now the pointer to the basePage structure
 	
 	// load the file to memory
@@ -210,21 +209,43 @@ int32_t custom_pexec( void *sp )
 	
 	memset((BYTE *) sBasePage->bbase, 0, sBasePage->blen);			// clear BSS section
 	
-	// do the rest depending on the mode
-	if(mode == PE_LOADGO) {											// if we should also run the program
-		terminatedBy = 0xffff;  				                    // mark that we don't know how the program will be / was terminated
-	
-		CALL_OLD_GD_NORET(Pexec, PE_GO, 0, pBasePage, 0);			// run the program
-
-		if(terminatedBy != GEMDOS_ptermres) {					    // if the program ended with something different than Ptermres, free the memory
-			freeTheBasePage(sBasePage);								// free the base page
-		}
-		
-		return res;													// return the result of PE_LOADGO
-	}
-
-	// for mode PE_LOAD -- return value is the starting address of the child processes' base page
+    if(mode == PE_LOADGO) {                                         // if we're doing PE_LOADGO, then we're going to freeTheBasePage()
+        pLastBasePage = pBasePage;
+    }
+    
+    // Return the pointer to basepage. 
+    // for PE_LOAD this will be used as return value.
+    // for PE_LOADGO this will be used to call Pexec(PE_GO) in gemdos_asm.s after this custom function.
 	return (DWORD) pBasePage;										// the PE_LOAD was successful 	
+}
+
+int32_t custom_pterm( void *sp )
+{
+	DWORD res = 0;
+	WORD result		= *((WORD *) sp);
+
+    if(pLastBasePage != 0) {                                        // did we allocate this? 
+        freeTheBasePage((TBasePage *) pLastBasePage);               // free the base page
+        pLastBasePage = 0;
+    }
+	
+    CALL_OLD_GD_VOIDRET(Pterm, result);
+	
+	return res;
+}
+
+int32_t custom_pterm0( void *sp )
+{
+	DWORD res = 0;
+
+    if(pLastBasePage != 0) {                                        // did we allocate this? 
+        freeTheBasePage((TBasePage *) pLastBasePage);               // free the base page
+        pLastBasePage = 0;
+    }
+	
+    CALL_OLD_GD_VOIDRET(Pterm0);
+	
+	return res;
 }
 
 void freeTheBasePage(TBasePage *basePage)
