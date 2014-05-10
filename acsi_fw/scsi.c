@@ -78,8 +78,6 @@ void processScsiLocaly(BYTE justCmd)
         } else {                                                    // if error 
             sdCard.LastStatus   = SCSI_ST_CHECK_CONDITION;
             sdCard.SCSI_SK      = SCSI_E_MediumError;
-            sdCard.SCSI_ASC     = SCSI_ASC_NO_ADDITIONAL_SENSE;
-            sdCard.SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
             PIO_read(sdCard.LastStatus);                            // send status byte, long time-out
         }
@@ -92,8 +90,6 @@ void processScsiLocaly(BYTE justCmd)
         if(res != 0) {
    			sdCard.LastStatus   = SCSI_ST_CHECK_CONDITION;
 			sdCard.SCSI_SK      = SCSI_E_Miscompare;
-			sdCard.SCSI_ASC     = SCSI_ASC_VERIFY_MISCOMPARE;
-			sdCard.SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 		
 			PIO_read(sdCard.LastStatus);                            // send status byte
         } else {
@@ -106,8 +102,6 @@ void scsi_sendOKstatus(void)
 {
 	sdCard.LastStatus   = SCSI_ST_OK;
 	sdCard.SCSI_SK      = SCSI_E_NoSense;
-	sdCard.SCSI_ASC     = SCSI_ASC_NO_ADDITIONAL_SENSE;
-	sdCard.SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
 	PIO_read(sdCard.LastStatus);                                    // send status byte, long time-out 
 }
@@ -119,8 +113,6 @@ void returnStatusAccordingToIsInit(void)
     } else {                                                        // SD card not init?
         sdCard.LastStatus   = SCSI_ST_CHECK_CONDITION;
         sdCard.SCSI_SK      = SCSI_E_NotReady;
-        sdCard.SCSI_ASC     = SCSI_ASC_MEDIUM_NOT_PRESENT;
-        sdCard.SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
         PIO_read(sdCard.LastStatus);                                // send status byte
     }

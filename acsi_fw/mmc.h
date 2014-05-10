@@ -13,10 +13,8 @@ typedef struct _TDevice
 	DWORD	BCapacity;      // device capacity in bytes
 	DWORD	SCapacity;      // device capacity in sectors
 	
-	BYTE	LastStatus;     // last returned SCSI status
-	BYTE	SCSI_ASC;       // additional sense code
-	BYTE	SCSI_ASCQ;      // additional sense code qualifier
-	BYTE	SCSI_SK;        // sense key
+	BYTE	LastStatus;     // last returned SCSI status -- returned immediately as status byte 
+	BYTE	SCSI_SK;        // sense key -- sent as last byte of ATN to host, so he can handle possible error reporting to ST
 } TDevice; 
 
 #define	DEVICETYPE_NOTHING  0x00

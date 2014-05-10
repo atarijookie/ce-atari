@@ -151,6 +151,9 @@ DWORD isrNow, isrPrev;
 
 WORD prevBtnPressTime;
 
+WORD cardDetectTime;
+BYTE cardInsertChanged;
+
 void initAllStuff(void);
 
 int main (void) 
@@ -160,10 +163,24 @@ int main (void)
     //-------------
     // main loop
     while(1) {
-        // if card insert state changed, try to init the card 
+        // if card insert state changed, mark down this event
         if(prevIsCardInserted != isCardInserted()) {
-            sdCardInit();
             prevIsCardInserted = isCardInserted();
+
+            cardInsertChanged   = TRUE;
+            cardDetectTime      = TIM1->CNT;
+        }
+        
+        if(cardInsertChanged) {                                 // if card insert changed
+            WORD cnt, diff;
+
+            cnt     = TIM1->CNT;                                // get the current time
+            diff    = cnt - cardDetectTime;
+
+            if(diff >= 1000) {                                  // if it happened at least 0.5 s ago, do it
+                cardInsertChanged = FALSE;
+                sdCardInit();
+            }
         }
         
         // get the command from ACSI and send it to host
@@ -294,6 +311,10 @@ void initAllStuff(void)
     prevBtnPressTime = 0;
     //----------------------
     
+    // init card detection delay stuff
+    cardInsertChanged   = FALSE;
+    cardDetectTime      = 0;
+    
     // now init the card if it's inserted
     prevIsCardInserted = isCardInserted();
     if(prevIsCardInserted) {
@@ -403,6 +424,13 @@ void onGetCommand(void)
             // if we got here, we should handle this in host (RPi)
             for(i=0; i<7; i++) {                        
                 atnSendACSIcommand[4 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
+            }
+            
+            if(id == sdCardID) {                                        // if it's for SD card, but not handled here, but in RPi
+                atnSendACSIcommand[4 + 6] &= 0xff00;                    // remove byte cmd[13] (longest command should be 13, that means that index [13] is free)
+                atnSendACSIcommand[4 + 6] |= ((WORD) (sdCard.SCSI_SK)); // add SCSI Sense Key  (SK)
+                
+                sdCard.SCSI_SK = SCSI_E_NoSense;                        // don't report this error again
             }
                     
             state = STATE_SEND_COMMAND;
