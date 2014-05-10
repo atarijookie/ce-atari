@@ -49,6 +49,11 @@ void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
     dataTrans = dt;
 }
 
+void Scsi::setSdCardCapacity(DWORD capInSectors)
+{
+	sdMedia.setCurrentCapacity(capInSectors);
+}
+
 bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int accessType)
 {
     bool res;
@@ -86,9 +91,17 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
     }
 
     switch(hostSourceType) {                                                // try to open it depending on source type
+	case SOURCETYPE_SD_CARD:
+        attachedMedia[index].hostPath       = "";
+        attachedMedia[index].hostSourceType = SOURCETYPE_SD_CARD;
+        attachedMedia[index].dataMedia      = &sdMedia;
+        attachedMedia[index].accessType     = SCSI_ACCESSTYPE_FULL;
+        attachedMedia[index].dataMediaDynamicallyAllocated = false;         // didn't use new on .dataMedia
+        break;
+	
     case SOURCETYPE_NONE:
         attachedMedia[index].hostPath       = "";
-        attachedMedia[index].hostSourceType = hostSourceType;
+        attachedMedia[index].hostSourceType = SOURCETYPE_NONE;
         attachedMedia[index].dataMedia      = &noMedia;
         attachedMedia[index].accessType     = SCSI_ACCESSTYPE_NO_DATA;
         attachedMedia[index].dataMediaDynamicallyAllocated = false;         // didn't use new on .dataMedia
@@ -180,7 +193,21 @@ bool Scsi::attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessTyp
         if(devInfo[i].attachedMediaIndex != -1) {
             continue;
         }
+		
+		// if this ACSI ID is for SD card and we're attaching SD card
+		if(acsiIDdevType[i] == DEVTYPE_SD && hostSourceType == SOURCETYPE_SD_CARD) {
+            devInfo[i].attachedMediaIndex   = mediaIndex;
+            devInfo[i].accessType           = accessType;
 
+            attachedMedia[mediaIndex].devInfoIndex = i;
+            return true;
+		}
+
+		// if this is SD card and it wasn't attached in previous IF, don't go further - you would attach it to wrong ACSI ID
+		if(acsiIDdevType[i] == DEVTYPE_SD) {	
+			continue;
+		}		
+		
         // if this ACSI ID is for translated drive, and we're attaching translated boot image
         if(acsiIDdevType[i] == DEVTYPE_TRANSLATED && hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
             devInfo[i].attachedMediaIndex   = mediaIndex;
@@ -192,6 +219,11 @@ bool Scsi::attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessTyp
 			
             return true;
         }
+		
+		// if this is TRANSLATED device ACSI ID and it wasn't attached in previous IF, don't go further - you would attach it to wrong ACSI ID
+		if(acsiIDdevType[i] == DEVTYPE_TRANSLATED) {
+			continue;
+		}
 
         // if this ACSI ID is NOT for translated drive, and we're NOT attaching translated boot image
         if(acsiIDdevType[i] != DEVTYPE_TRANSLATED && hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
@@ -322,6 +354,8 @@ void Scsi::loadSettings(void)
 
     Settings s;
 
+	BYTE sdCardId = 0xff;								// mark that we don't have this yet
+	
     // first read the new settings
     char key[32];
     for(int id=0; id<8; id++) {							// read the list of device types from settings
@@ -332,6 +366,10 @@ void Scsi::loadSettings(void)
             devType = DEVTYPE_OFF;
         }
 
+		if(devType == DEVTYPE_SD) {						// if found ACSI ID for SD card, store this ACSI ID
+			sdCardId = id;
+		}
+		
         acsiIDdevType[id] = devType;
     }
 
@@ -339,6 +377,11 @@ void Scsi::loadSettings(void)
     for(int i=0; i<8; i++) {
         detachMediaFromACSIidByIndex(i);
     }
+	
+	if(sdCardId != 0xff) {								// if we got ACSI ID for SD card, attach this SD card...
+		std::string empty;
+		attachToHostPath(empty, SOURCETYPE_SD_CARD, SCSI_ACCESSTYPE_FULL);
+	}
 
     // and now reattach everything back according to new ACSI ID settings
     for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {
@@ -355,8 +398,14 @@ void Scsi::processCommand(BYTE *command)
 
     dataMedia = NULL;
 
-    if(devInfo[acsiId].attachedMediaIndex != -1) {          // if we got media attached to this ACSI ID
-        dataMedia = attachedMedia[ devInfo[acsiId].attachedMediaIndex ].dataMedia;
+	BYTE attachedMediaIndex = devInfo[acsiId].attachedMediaIndex;
+	
+    if(attachedMediaIndex != -1) {          											// if we got media attached to this ACSI ID
+        dataMedia = attachedMedia[ attachedMediaIndex ].dataMedia;						// get pointer to dataMedia
+		
+		if(attachedMedia[ attachedMediaIndex ].hostSourceType == SOURCETYPE_SD_CARD) {	// if this media is SD card, fill ASC and ASCQ using Sense Key (located at cmd[13]) 
+			fillSdCardScsiStatusAccordingToSenseKey(cmd[13], acsiId);
+		}
     }
 
     if(dataTrans == 0) {
@@ -380,6 +429,42 @@ void Scsi::processCommand(BYTE *command)
     }
 
     dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
+}
+
+void Scsi::fillSdCardScsiStatusAccordingToSenseKey(BYTE senseKey, BYTE acsiId)
+{
+	BYTE asc, ascq;
+
+	if(senseKey == 0) {								// cmd[13] is SD card SCSI Sense Key value of last operation, sent only once (that's why we check against 0)
+		return;
+	}
+				
+	devInfo[acsiId].SCSI_SK = senseKey;
+
+	// set NO SENSE for not handled cases, including SCSI_E_NoSense
+	asc     	= SCSI_ASC_NO_ADDITIONAL_SENSE;
+	ascq		= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+
+	switch(senseKey) {								// now for each Sense Key set the ASC and ASCQ which weren't sent from Hans
+		case SCSI_E_MediumError:
+		asc    	= SCSI_ASC_NO_ADDITIONAL_SENSE;
+		ascq    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+		break;
+			
+		case SCSI_E_Miscompare:
+		asc     = SCSI_ASC_VERIFY_MISCOMPARE;
+		ascq    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+		break;
+			
+		case SCSI_E_NotReady:
+		asc     = SCSI_ASC_MEDIUM_NOT_PRESENT;
+		ascq    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+		break;
+	}
+				
+	// store ASC and ASCQ to devInfo
+	devInfo[acsiId].SCSI_ASC     = asc;
+	devInfo[acsiId].SCSI_ASCQ    = ascq;
 }
 
 bool Scsi::isICDcommand(void)

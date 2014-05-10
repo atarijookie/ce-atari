@@ -8,6 +8,7 @@
 #include "nomedia.h"
 #include "testmedia.h"
 #include "translatedbootmedia.h"
+#include "sdmedia.h"
 
 #include "../datatypes.h"
 #include "../isettingsuser.h"
@@ -20,6 +21,7 @@
 #define SOURCETYPE_IMAGE                1
 #define SOURCETYPE_IMAGE_TRANSLATEDBOOT 2
 #define SOURCETYPE_DEVICE               3
+#define SOURCETYPE_SD_CARD				4
 #define SOURCETYPE_TESTMEDIA            100
 
 #define MAX_ATTACHED_MEDIA              9
@@ -40,7 +42,7 @@ typedef struct {
 typedef struct {
     int     attachedMediaIndex; // index in attachedMedia[]
 
-    BYTE 	accessType;                         // SCSI_ACCESSTYPE_FULL || SCSI_ACCESSTYPE_READ_ONLY || SCSI_ACCESSTYPE_NO_DATA
+    BYTE 	accessType;         // SCSI_ACCESSTYPE_FULL || SCSI_ACCESSTYPE_READ_ONLY || SCSI_ACCESSTYPE_NO_DATA
 
     BYTE	LastStatus;			// last returned SCSI status
     BYTE	SCSI_ASC;			// additional sense code
@@ -65,6 +67,9 @@ public:
 	
     void processCommand(BYTE *command);
 
+	void setSdCardCapacity(DWORD capInSectors);
+	void fillSdCardScsiStatusAccordingToSenseKey(BYTE senseKey, BYTE acsiId);
+	
 private:
     AcsiDataTrans   *dataTrans;
 
@@ -74,6 +79,7 @@ private:
     NoMedia         	noMedia;
     TestMedia       	testMedia;
 	TranslatedBootMedia	tranBootMedia;
+	SdMedia				sdMedia;
 
     BYTE            *dataBuffer;
     BYTE            *dataBuffer2;

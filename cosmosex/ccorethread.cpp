@@ -523,6 +523,8 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 		DWORD sdCardCapacity;
 		sdCardCapacity = (fwVer[6] << 24) | (fwVer[7] << 16) | (fwVer[8] << 8) | (fwVer[9]);
 
+		scsi->setSdCardCapacity(sdCardCapacity);			// let SD card media in SCSI module know the current SD card capacity
+		
         Debug::out("FW: Hans,  %d-%02d-%02d, LED is: %d, SD card capacity: %08x", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed, sdCardCapacity);
 
         if(lastFloppyImageLed != currentLed) {              // did the floppy image LED change since last time?
