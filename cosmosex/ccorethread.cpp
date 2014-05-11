@@ -46,6 +46,7 @@ CCoreThread::CCoreThread()
 
     confStream = new ConfigStream();
     confStream->setAcsiDataTrans(dataTrans);
+	confStream->setSettingsReloadProxy(&settingsReloadProxy);
 
     // now register all the objects which use some settings in the proxy
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_ACSI);
