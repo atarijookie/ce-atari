@@ -51,11 +51,7 @@ void processScsiLocaly(BYTE justCmd)
     
     // for sector read commands
     if(justCmd == SCSI_C_READ6 || justCmd == SCSI_C_READ10) {
-        if(lenX == 1) {
-            res = mmcRead(sector);
-        } else {
-            res = mmcReadMore(sector, lenX);
-        }
+        res = mmcRead_dma(sector, lenX);
         
         handled = TRUE;
     }

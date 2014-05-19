@@ -8,12 +8,6 @@ TDevice sdCard;
 
 extern unsigned char brStat;
 
-#define spiCSlow()  { GPIOC->BRR = SD_CS; }
-#define spiCShigh() { GPIOC->BSRR = SD_CS; }
-
-#define SPI_FREQ_LOW    0
-#define SPI_FREQ_HIGH   1
-
 BYTE isCardInserted(void)
 {
     WORD inputs = GPIOC->IDR;
@@ -391,6 +385,7 @@ BYTE mmcRead(DWORD sector)
     BYTE r1;
     DWORD i;
     BYTE byte;
+    BYTE failed = 0;
 
     timeoutStart();
     
@@ -442,12 +437,19 @@ BYTE mmcRead(DWORD sector)
     // read in data
     ACSI_DATADIR_READ();
 
-    for(i=0; i<0x200; i++) {
-        byte = spi2_TxRx(0xFF);                          // get byte
+    spi2_Tx(0xff);                                      // start the SPI transfer
 
-        DMA_read(byte);                            // send it to ST
+    for(i=0; i<0x200; i++) {
+//        byte = spi2_TxRx(0xFF);                       // get byte
+        byte = spi2_Rx();                               // receive byte from previous TX part
+        spi2_Tx(0xff);                                  // and start another TX part
+        
+        DMA_read(byte);                                 // send it to ST
 
         if(brStat != E_OK) {                            // if something was wrong
+            byte = spi2_Rx();                           // dummy read, because there was one more TX than needed
+            failed = 1;
+            
             for(; i<0x200; i++)                         // finish the sector
                 spi2_TxRx(0xFF);
           
@@ -455,6 +457,10 @@ BYTE mmcRead(DWORD sector)
         }
     }
 
+    if(failed == 0) {
+        byte = spi2_Rx();                               // dummy read, because there was one more TX than needed
+    }
+        
     // read 16-bit CRC
     spi2_TxRx(0xFF);                  // get byte
     spi2_TxRx(0xFF);                  // get byte
@@ -512,13 +518,19 @@ BYTE mmcReadMore(DWORD sector, WORD count)
         // wait for block start
         while(spi2_TxRx(0xFF) != MMC_STARTBLOCK_READ);
 
+        spi2_Tx(0xff);                                      // start the SPI transfer
+
         for(i=0; i<0x200; i++)                              // read this many bytes
         {
-            byte = spi2_TxRx(0xFF);                          // get byte
+//            byte = spi2_TxRx(0xFF);                          // get byte
+            byte = spi2_Rx();                               // receive byte from previous TX part
+            spi2_Tx(0xff);                                  // and start another TX part
 
             DMA_read(byte);                                 // send it to ST
         
             if(brStat != E_OK) {                            // if something was wrong
+                byte = spi2_Rx();                           // read the extra SPI byte
+                
                 for(; i<0x200; i++)                         // finish the sector
                 spi2_TxRx(0xFF);
 
@@ -526,6 +538,10 @@ BYTE mmcReadMore(DWORD sector, WORD count)
                 break;                                      // quit
             }
         }           
+        
+        if(quit != 1) {
+            byte = spi2_Rx();                               // read the extra SPI byte
+        }
         //---------------
         if((count - j) == 1)                                // if we've read the last sector
             break;
@@ -1140,6 +1156,24 @@ WORD spi2_TxRx(WORD out)
 
     while((SPI2->SR & 2) == 0);                             // TXE flag: Tx buffer empty
     SPI2->DR = out;                                         // send over SPI
+
+    while((SPI2->SR & 1) == 0);                             // RXNE flag: RX buffer NOT empty
+    in = SPI2->DR;                                          // get data
+    
+    return in;
+}
+//-----------------------------------------------
+void spi2_Tx(WORD out)
+{
+    while((SPI2->SR & (1 << 7)) != 0);                      // TXE flag: BUSY flag
+
+    while((SPI2->SR & 2) == 0);                             // TXE flag: Tx buffer empty
+    SPI2->DR = out;                                         // send over SPI
+}
+//-----------------------------------------------
+WORD spi2_Rx(void)
+{
+    WORD in;
 
     while((SPI2->SR & 1) == 0);                             // RXNE flag: RX buffer NOT empty
     in = SPI2->DR;                                          // get data

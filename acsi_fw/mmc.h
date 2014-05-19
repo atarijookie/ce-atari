@@ -86,13 +86,25 @@ typedef struct _TDevice
 #define MMC_DR_REJECT_CRC           0x0B
 #define MMC_DR_REJECT_WRITE_ERROR   0x0D
 
+//-----------------
+// macros
+#define spiCSlow()  { GPIOC->BRR = SD_CS; }
+#define spiCShigh() { GPIOC->BSRR = SD_CS; }
+
+#define SPI_FREQ_LOW    0
+#define SPI_FREQ_HIGH   1
+
+//-----------------
 // functions
 
 void sdCardZeroInitStruct(void);
 void sdCardInit(void);
 void spiSetFrequency(BYTE highNotLow);
 BYTE isCardInserted(void);
+
 WORD spi2_TxRx(WORD out);
+void spi2_Tx(WORD out);
+WORD spi2_Rx(void);
 
 BYTE mmcReset(void);
 
@@ -111,6 +123,7 @@ BYTE mmcCompareMore(DWORD sector, WORD count);
 BYTE mmcReadJustForTest(DWORD sector);
 
 BYTE mmcReadMore(DWORD sector, WORD count);
+BYTE mmcRead_dma(DWORD sector, WORD count);
 
 //! Write 512-byte sector from buffer to card
 // Returns zero if successful.

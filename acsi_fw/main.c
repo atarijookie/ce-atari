@@ -20,12 +20,14 @@ void processHostCommands(void);
 void spi_init1(void);
 void spi_init2(void);
 void dma_spi_init(void);
+void dma_spi2_init(void);
 void setupAtnBuffers(void);
 
 WORD spi_TxRx(WORD out);
 void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 void spiDma_waitForFinish(void);
 void waitForSPIidle(void);
+void waitForSPI2idle(void);
 
 void getCmdLengthFromCmdBytes(void);
 void onGetCommand(void);
@@ -159,7 +161,7 @@ void initAllStuff(void);
 int main (void) 
 {
     initAllStuff();         // now init everything
-
+    
     //-------------
     // main loop
     while(1) {
@@ -544,6 +546,21 @@ void waitForSPIidle(void)
     }
 }
 
+void waitForSPI2idle(void)
+{
+    while((SPI2->SR & SPI_SR_TXE) == 0) {                   // wait while TXE flag is 0 (TX is not empty)
+        if(timeout()) {
+            return;
+        }
+    }
+
+    while((SPI2->SR & SPI_SR_BSY) != 0) {                   // wait while BSY flag is 1 (SPI is busy)
+        if(timeout()) {
+            return;
+        }
+    }
+}
+
 void startSpiDmaForDataRead(DWORD dataCnt, TReadBuffer *readBfr)
 {
     DWORD subCount, recvCount;
@@ -730,6 +747,37 @@ void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
     }
 }
 
+void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
+{
+    waitForSPI2idle();                                       // and make sure that SPI has finished, too
+    
+    // disable both TX and RX channels
+    DMA1_Channel5->CCR      &= 0xfffffffe;                  // disable DMA5 Channel transfer
+    DMA1_Channel4->CCR      &= 0xfffffffe;                  // disable DMA4 Channel transfer
+
+    //-------------------
+    // The next simple 'if' is here to help the last word of block loss (first word of block not present),
+    // it doesn't do much (just gets a byte from RX register if there is one waiting), but it helps the situation -
+    // without it the problem occures, with it it seems to be gone (can't reproduce). This might be caused just
+    // by the adding the delay between disabling and enabling DMA by this extra code. 
+    
+    if((SPI2->SR & SPI_SR_RXNE) != 0) {                     // if there's something still in SPI DR, read it
+        WORD dummy = SPI2->DR;
+    }
+    //-------------------
+    // config SPI2_TX -- DMA1_CH5
+    DMA1_Channel5->CMAR     = (uint32_t) txBfr;             // from this buffer located in memory
+    DMA1_Channel5->CNDTR    = txCount;                      // this much data
+    
+    // config SPI2_RX -- DMA1_CH4
+    DMA1_Channel4->CMAR     = (uint32_t) rxBfr;             // to this buffer located in memory
+    DMA1_Channel4->CNDTR    = rxCount;                      // this much data
+
+    // enable both TX and RX channels
+    DMA1_Channel4->CCR      |= 1;                           // enable  DMA1 Channel transfer
+    DMA1_Channel5->CCR      |= 1;                           // enable  DMA1 Channel transfer
+}
+
 void init_hw_sw(void)
 {
     RCC->AHBENR     |= (1 <<  0);                                               // enable DMA1
@@ -783,6 +831,7 @@ void init_hw_sw(void)
     dma_spi_init();
 
     spi_init2();                                            // init SPI interface - for SD card
+    dma_spi2_init();
 }
 
 WORD spi_TxRx(WORD out)
@@ -1004,6 +1053,68 @@ void dma_spi_init(void)
     NVIC_InitStructure.NVIC_IRQChannelSubPriority         = 0x02;
     NVIC_InitStructure.NVIC_IRQChannelCmd                 = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
+}
+
+void dma_spi2_init(void)
+{
+    DMA_InitTypeDef DMA_InitStructure;
+//    NVIC_InitTypeDef NVIC_InitStructure;
+    
+    // DMA1 channel5 configuration -- SPI2 TX
+    DMA_DeInit(DMA1_Channel5);
+    
+    DMA_InitStructure.DMA_MemoryBaseAddr      = (uint32_t) 0;                           // from this buffer located in memory (now only fake)
+    DMA_InitStructure.DMA_PeripheralBaseAddr  = (uint32_t) &(SPI2->DR);                 // to this peripheral address
+    DMA_InitStructure.DMA_DIR                 = DMA_DIR_PeripheralDST;                  // dir: from mem to periph
+    DMA_InitStructure.DMA_BufferSize          = 0;                                      // fake buffer size
+    DMA_InitStructure.DMA_PeripheralInc       = DMA_PeripheralInc_Disable;              // PINC = 0 -- don't icrement, always write to SPI1->DR register
+    DMA_InitStructure.DMA_MemoryInc           = DMA_MemoryInc_Enable;                   // MINC = 1 -- increment in memory -- go though buffer
+    DMA_InitStructure.DMA_PeripheralDataSize  = DMA_PeripheralDataSize_Byte;            // each data item: 16 bits 
+    DMA_InitStructure.DMA_MemoryDataSize      = DMA_MemoryDataSize_Byte;                // each data item: 16 bits 
+    DMA_InitStructure.DMA_Mode                = DMA_Mode_Normal;                        // normal mode
+    DMA_InitStructure.DMA_Priority            = DMA_Priority_High;
+    DMA_InitStructure.DMA_M2M                 = DMA_M2M_Disable;                        // M2M disabled, because we move to peripheral
+    DMA_Init(DMA1_Channel5, &DMA_InitStructure);
+
+    // Enable interrupts
+    DMA_ITConfig(DMA1_Channel5, DMA_IT_TC, ENABLE);                                     // interrupt on Transfer Complete (TC)
+
+    //----------------
+    // DMA1 channel4 configuration -- SPI2 RX
+    DMA_DeInit(DMA1_Channel4);
+    
+    DMA_InitStructure.DMA_PeripheralBaseAddr  = (uint32_t) &(SPI2->DR);                 // from this peripheral address
+    DMA_InitStructure.DMA_MemoryBaseAddr      = (uint32_t) 0;                           // to this buffer located in memory (now only fake)
+    DMA_InitStructure.DMA_DIR                 = DMA_DIR_PeripheralSRC;                  // dir: from periph to mem
+    DMA_InitStructure.DMA_BufferSize          = 0;                                      // fake buffer size
+    DMA_InitStructure.DMA_PeripheralInc       = DMA_PeripheralInc_Disable;              // PINC = 0 -- don't icrement, always write to SPI1->DR register
+    DMA_InitStructure.DMA_MemoryInc           = DMA_MemoryInc_Enable;                   // MINC = 1 -- increment in memory -- go though buffer
+    DMA_InitStructure.DMA_PeripheralDataSize  = DMA_PeripheralDataSize_Byte;            // each data item: 16 bits 
+    DMA_InitStructure.DMA_MemoryDataSize      = DMA_MemoryDataSize_Byte;                // each data item: 16 bits 
+    DMA_InitStructure.DMA_Mode                = DMA_Mode_Normal;                        // normal mode
+    DMA_InitStructure.DMA_Priority            = DMA_Priority_VeryHigh;
+    DMA_InitStructure.DMA_M2M                 = DMA_M2M_Disable;                        // M2M disabled, because we move from peripheral
+    DMA_Init(DMA1_Channel4, &DMA_InitStructure);
+
+    // Enable DMA1 Channel4 Transfer Complete interrupt
+    DMA_ITConfig(DMA1_Channel4, DMA_IT_TC, ENABLE);           // interrupt on Transfer Complete (TC)
+    
+    //----------------
+/*
+    // now enable interrupt on DMA1_Channel5
+    NVIC_InitStructure.NVIC_IRQChannel                    = DMA1_Channel5_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority  = 0x04;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority         = 0x04;
+    NVIC_InitStructure.NVIC_IRQChannelCmd                 = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+
+    // and also interrupt on DMA1_Channel4
+    NVIC_InitStructure.NVIC_IRQChannel                    = DMA1_Channel4_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority  = 0x05;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority         = 0x05;
+    NVIC_InitStructure.NVIC_IRQChannelCmd                 = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+*/
 }
 
 void setupAtnBuffers(void)
