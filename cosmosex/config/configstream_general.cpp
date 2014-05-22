@@ -554,7 +554,6 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_CREATE_TRANSLATED:  createScreen_translated();  break;
     case CS_CREATE_SHARED:      createScreen_shared();      break;
     case CS_CREATE_FLOPPY_CONF: createScreen_floppy_config();   break;
-    case CS_CREATE_FLOPPY_IMGS: createScreen_floppy_images();   break;
     case CS_CREATE_NETWORK:     createScreen_network();     break;
     case CS_CREATE_UPDATE:      createScreen_update();      break;
 
@@ -571,7 +570,6 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_SHARED_SAVE:        onSharedSave();             break;
 
     case CS_FLOPPY_CONFIG_SAVE: onFloppyConfigSave();       break;
-    case CS_FLOPPY_IMAGE_SAVE:  onFloppyImagesSave();       break;
     }
 }
 

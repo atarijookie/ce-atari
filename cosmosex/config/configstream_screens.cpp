@@ -28,31 +28,27 @@ void ConfigStream::createScreen_homeScreen(void)
 
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " ACSI IDs config ",	18, 10,  5, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " ACSI IDs config ",	18, 10,  6, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_ACSI);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Translated disks ",	18, 10,  7, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Translated disks ",	18, 10,  8, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_TRANSLATED);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Shared drive ",		18, 10,  9, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Shared drive ",		18, 10, 10, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_SHARED);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Floppy config ",	18, 10, 11, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Floppy config ",	18, 10, 12, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_FLOPPY_CONF);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Floppy images ",	18, 10, 13, gotoOffset);
-    comp->setOnEnterFunctionCode(CS_CREATE_FLOPPY_IMGS);
-    screen.push_back(comp);
-
-    comp = new ConfigComponent(this, ConfigComponent::button, " Network settings ",	18, 10, 15, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Network settings ",	18, 10, 14, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_NETWORK);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Update software ",	18, 10, 17, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Update software ",	18, 10, 16, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_UPDATE);
     screen.push_back(comp);
 

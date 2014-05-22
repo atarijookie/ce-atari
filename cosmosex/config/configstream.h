@@ -11,7 +11,7 @@
 class AcsiDataTrans;
 
 enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED,
-                 CS_CREATE_FLOPPY_CONF, CS_CREATE_FLOPPY_IMGS,
+                 CS_CREATE_FLOPPY_CONF, 
                  CS_CREATE_NETWORK,     CS_CREATE_UPDATE,
                  CS_SAVE_ACSI,          CS_SAVE_TRANSLATED,     CS_SAVE_NETWORK,
                  CS_HIDE_MSG_SCREEN,    CS_GO_HOME,
@@ -76,7 +76,6 @@ public:
     void createScreen_update(void);
     void createScreen_shared(void);
     void createScreen_floppy_config(void);
-    void createScreen_floppy_images(void);
 
     ConfigComponent *findComponentById(int compId);
     bool getTextByComponentId(int componentId, std::string &text);
@@ -126,7 +125,6 @@ private:
     void onSharedSave(void);
 
     void onFloppyConfigSave(void);
-    void onFloppyImagesSave(void);
 
     bool verifyAndFixIPaddress(std::string &in, std::string &out, bool emptyIsOk);
 
