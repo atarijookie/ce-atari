@@ -119,7 +119,6 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
                 quit = 1;
                 break;                                          // quit
             }
-            
         }
  
         if(quit) {                                              // if error happened
@@ -137,7 +136,13 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
         // depending on if transfered whole sector or not, then the next transfer will be whole sector or not...
         if(thisDataCount == 512) {                              // if transfered whole sector
             pData       += 2;                                   // skip CRC
-            gotDataCnt  -= 2;                                   // remove 2 CRC bytes from gotDataCnt
+            
+            if(gotDataCnt >= 2) {
+                gotDataCnt -= 2;                                // remove 2 CRC bytes from gotDataCnt
+            } else {
+                gotDataCnt = 0;
+            }
+            
             transferedWholeSector = TRUE;
         } else {                                                // if we didn't transfer whole sector
             transferedWholeSector = FALSE;
