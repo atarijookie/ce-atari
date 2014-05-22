@@ -11,7 +11,7 @@ extern TDevice sdCard;
 
 void processScsiLocaly(BYTE justCmd)
 {
-    DWORD sector = 0;
+    DWORD sector = 0, sectorEnd = 0;
     WORD lenX = 0;
     BYTE res = 0;
     BYTE handled = FALSE;
@@ -48,10 +48,22 @@ void processScsiLocaly(BYTE justCmd)
         lenX  = lenX << 8;
         lenX |= cmd[9];
     }
+
+    if(lenX != 0) {                     // for read / write / verify with length of more than 0 sectors
+        sectorEnd = sector + ((DWORD)lenX) - 1;                             // calculate ending sector
+
+        if( sector >= sdCard.SCapacity || sectorEnd >= sdCard.SCapacity ) { // are we out of range?
+            sdCard.LastStatus   = SCSI_ST_CHECK_CONDITION;
+            sdCard.SCSI_SK      = SCSI_E_IllegalRequest;
+            
+            PIO_read(sdCard.LastStatus);                                    // return error
+            return;
+        }
+    }
     
     // for sector read commands
     if(justCmd == SCSI_C_READ6 || justCmd == SCSI_C_READ10) {
-        res = mmcRead_dma(sector, lenX);
+        res = mmcRead_dma(sector, lenX);                                    // read data
         
         handled = TRUE;
     }
