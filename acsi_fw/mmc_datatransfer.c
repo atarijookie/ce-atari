@@ -18,6 +18,28 @@ void waitForSPI2idle(void);
 
 void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 
+#define READ_BYTE_BFR \
+		byte = *pData;\
+		pData++;\
+		GPIOB->ODR = byte;\
+		GPIOA->BSRR	= aDMA;\
+		__asm  { nop } \
+		GPIOA->BRR	= aDMA;\
+		while(1) {\
+			if(timeout()) {\
+                quit = 1;\
+                break;\
+			}\
+			exti = EXTI->PR;\
+			if(exti & aACK) {\
+				EXTI->PR = aACK;\
+				break;\
+			}\
+		}\
+        if(quit) {\
+            break;\
+        }
+        
 BYTE mmcRead_dma(DWORD sector, WORD count)
 {
     BYTE r1, quit;
@@ -28,8 +50,10 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
     WORD    gotDataCnt;
     DWORD   dataReadCount;
     WORD    thisDataCount, lastDataCount = 0;
+    WORD    dataCnt;
     BYTE    *rxBuffNow;
     BYTE    transferedWholeSector = TRUE;
+    WORD    exti;
     
     timeoutStart();
     
@@ -109,16 +133,11 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
         }
         
         // transfer the bytes in the loop to ST
-        for(i=0; i<thisDataCount; i++) {                        // read this many bytes
-            byte = *pData;                                      // get data
-            pData++;
-
-            DMA_read(byte);                                     // send it to ST
+        dataCnt = thisDataCount;
         
-            if(brStat != E_OK) {                                // if something was wrong
-                quit = 1;
-                break;                                          // quit
-            }
+        while(dataCnt > 0) {
+            READ_BYTE_BFR
+            dataCnt--;
         }
  
         if(quit) {                                              // if error happened
