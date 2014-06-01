@@ -43,16 +43,12 @@ void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 BYTE mmcRead_dma(DWORD sector, WORD count)
 {
     BYTE r1, quit;
-    WORD i;
+    WORD i,c, last;
     BYTE byte = 0;
     
     BYTE    *pData;
-    WORD    gotDataCnt;
-    DWORD   dataReadCount;
-    WORD    thisDataCount, lastDataCount = 0;
-    WORD    dataCnt;
+//    WORD    dataCnt;
     BYTE    *rxBuffNow;
-    BYTE    transferedWholeSector = TRUE;
     WORD    exti;
     
     timeoutStart();
@@ -82,90 +78,43 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
         spiTxBuff[i] = 0xff;
     }
     
-    dataReadCount = ((DWORD) count) << 9;                       // change sector count to byte count
-    
-    gotDataCnt  = 0;
-    pData       = spiRxBuff1;
+    pData     = spiRxBuff1;
     
     rxBuffNow = spiRxBuff1;
-    spi2Dma_txRx(SPIBUFSIZE, spiTxBuff, SPIBUFSIZE, rxBuffNow); // start first transfer
+    
+    while(spi2_TxRx(0xFF) != MMC_STARTBLOCK_READ);              // wait for STARTBLOCK
+    spi2Dma_txRx(512, spiTxBuff, 512, rxBuffNow);               // start first transfer
 
-    while(dataReadCount > 0)                                    // read this many bytes
-    {
-        // if we don't have data, we should get some using DMA
-        if(gotDataCnt == 0) {                                   // if don't have data
-            waitForSpi2Finish();                                // wait until we have data
-            
-            pData       = rxBuffNow;                            // point at start of RX buffer
-            gotDataCnt  = SPIBUFSIZE;
-            
-            if(rxBuffNow == spiRxBuff1) {                       // we were transfering to buf 1? 
-                rxBuffNow = spiRxBuff2;                         // now transfer to buf 2
-            } else {
-                rxBuffNow = spiRxBuff1;                         // if we were transfering to buf 2, transfer to buf 1
-            }
-                
-            spi2Dma_txRx(SPIBUFSIZE, spiTxBuff, SPIBUFSIZE, rxBuffNow);  // start next transfer
-        }
-        
-        // depending on the previous whole / partial sector transfer, do or don't look for data marker
-        if(transferedWholeSector) {                             // if in the previous loop we've sent the whole sector, look for new data marker
-            byte = 0;
-        
-            while(gotDataCnt > 0) {                             // search RX buffer for start of data
-                byte = *pData;                                  // get data
-                pData++;                                        // move pointer forward
-                gotDataCnt--;
-                
-                if(byte == MMC_STARTBLOCK_READ) {               // block start found?
-                    break;
-                }
-            }
-        
-            if(byte != MMC_STARTBLOCK_READ) {                   // didn't find the start of block? request a new one
-                gotDataCnt = 0;
-                continue;
-            }
+    last = count - 1;
+    
+    for(c=0; c<count; c++) {
+        waitForSpi2Finish();                                    // wait until we have data
 
-            thisDataCount = (gotDataCnt >= 512) ? 512 : gotDataCnt; // how much data to transfer
+        pData = rxBuffNow;                                      // point at start of RX buffer
+            
+        if(rxBuffNow == spiRxBuff1) {                           // we were transfering to buf 1? 
+            rxBuffNow = spiRxBuff2;                             // now transfer to buf 2
         } else {
-            thisDataCount = 512 - lastDataCount;                // transfer only the rest of sector
+            rxBuffNow = spiRxBuff1;                             // if we were transfering to buf 2, transfer to buf 1
         }
-        
+
+        if(c != last) {                                         // need to read more than this sector? start transfer of the next one
+            while(spi2_TxRx(0xFF) != MMC_STARTBLOCK_READ);      // wait for STARTBLOCK
+            spi2Dma_txRx(512, spiTxBuff, 512, rxBuffNow);       // start first transfer
+        }
+            
         // transfer the bytes in the loop to ST
-        dataCnt = thisDataCount;
-        
-        while(dataCnt > 0) {
+        for(i=0; i<512; i++) {
             READ_BYTE_BFR
-            dataCnt--;
         }
  
         if(quit) {                                              // if error happened
             break;
         }
         
-        // after one whole / partial sector, update the variables and try again
-        dataReadCount   -= thisDataCount;                       // update how many data we still need to transfer
-        gotDataCnt      -= thisDataCount;                       // update how many data we have buffered
-
-        if(transferedWholeSector == FALSE) {                    // if we transfered the rest of previous sector, continue as if transfered whole sector
-            thisDataCount = 512;
-        }
-        
-        // depending on if transfered whole sector or not, then the next transfer will be whole sector or not...
-        if(thisDataCount == 512) {                              // if transfered whole sector
-            pData       += 2;                                   // skip CRC
-            
-            if(gotDataCnt >= 2) {
-                gotDataCnt -= 2;                                // remove 2 CRC bytes from gotDataCnt
-            } else {
-                gotDataCnt = 0;
-            }
-            
-            transferedWholeSector = TRUE;
-        } else {                                                // if we didn't transfer whole sector
-            transferedWholeSector = FALSE;
-            lastDataCount = thisDataCount;                      // this will be used how much we need to transfer to transfer the rest
+        if(c != last) {                                         // if we need to read more, then just read 16-bit CRC
+            spi2_TxRx(0xFF);
+            spi2_TxRx(0xFF);
         }
     }
     //-------------------------------

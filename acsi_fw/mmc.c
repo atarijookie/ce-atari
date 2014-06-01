@@ -554,25 +554,14 @@ BYTE mmcReadMore(DWORD sector, WORD count)
         spi2_TxRx(0xFF);
     }
     //-------------------------------
-    
+    // stop the transmition of next sector
+    mmcCommand(MMC_STOP_TRANSMISSION, 0);               // send command instead of CRC
+    spi2_TxRx(0xFF);
+    spiCShigh();                                        // CS to H
+
     if(quit) {                                              // if error happened
-        mmcCommand(MMC_STOP_TRANSMISSION, 0);               // send command instead of CRC
-
-        spi2_TxRx(0xFF);
-        
-        // release chip select
-        spiCShigh();                                        // CS to H
-
         return 0xff;
     }   
-    //----------------------
-    // stop the transmition of next sector
-    mmcCommand(MMC_STOP_TRANSMISSION, 0);                   // send command instead of CRC
-
-    spi2_TxRx(0xFF);
-    
-    // release chip select
-    spiCShigh();         // CS to H
     
     return 0;   
 }
@@ -839,16 +828,12 @@ BYTE mmcWrite(DWORD sector)
         i--;                                    // decrement
     }
     //------------------------
-    if(i == 0)                                  // timeout?
-    {
-        spi2_TxRx(0xFF);
-        spiCShigh();                            // CS to H
-        
-        return 0xff;
-    }
-    //------------------------  
     spi2_TxRx(0xFF);
     spiCShigh();                                // CS to H
+
+    if(i == 0) {                                // timeout?
+        return 0xff;
+    }
     
     return 0;                                   // return success
 }
