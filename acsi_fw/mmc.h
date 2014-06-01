@@ -130,6 +130,7 @@ BYTE mmcRead_dma(DWORD sector, WORD count);
 BYTE mmcWrite(DWORD sector);
 
 BYTE mmcWriteMore(DWORD sector, WORD count);
+BYTE mmcWrite_dma(DWORD sector, WORD count);
 
 //! Internal command function.
 // Issues a generic MMC command as specified by cmd and arg.

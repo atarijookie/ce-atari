@@ -7,10 +7,11 @@
 extern TDevice sdCard;
 extern unsigned char brStat;
 
-#define SPIBUFSIZE  (3 * 512)
+#define SPIBUFSIZE  520
 BYTE spiTxBuff[SPIBUFSIZE];
 BYTE spiRxBuff1[SPIBUFSIZE];
 BYTE spiRxBuff2[SPIBUFSIZE];
+BYTE spiRxDummy[SPIBUFSIZE];
 
 void waitForSpi2Finish(void);
 void stopSpi2Dma(void);
@@ -47,7 +48,6 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
     BYTE byte = 0;
     
     BYTE    *pData;
-//    WORD    dataCnt;
     BYTE    *rxBuffNow;
     WORD    exti;
     
@@ -133,6 +133,118 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
     }
     
     return 0;                                               // OK   
+}
+
+BYTE mmcWrite_dma(DWORD sector, WORD count)
+{
+    BYTE r1, quit;
+    WORD i,j;
+    DWORD thisSector;
+    BYTE *pSend;
+    BYTE *pData;
+
+    timeoutStart();
+    
+    // assert chip select
+    spiCSlow();          // CS to L
+
+    thisSector = sector;
+    
+    if(sdCard.Type != DEVICETYPE_SDHC)          // for non SDHC cards change sector into address
+        sector = sector<<9;
+
+    //--------------------------
+    // issue command
+    r1 = mmcCommand(MMC_WRITE_MULTIPLE_BLOCKS, sector);
+
+    // check for valid response
+    if(r1 != 0x00) {
+        spi2_TxRx(0xFF);
+        spiCShigh();                            // CS to H
+        return r1;
+    }
+    
+    //--------------
+    // read in data
+    ACSI_DATADIR_WRITE();
+    
+    quit = 0;
+    
+    pData = spiRxBuff1;                         // start storing to this buffer
+    //--------------
+    for(j=0; j<count; j++) {                    // read this many sectors
+        if(thisSector >= sdCard.SCapacity) {    // sector out of range?
+            quit = 1;
+            break;                              // quit
+        }
+        //--------------    
+        *pData = MMC_STARTBLOCK_MWRITE;         // 0xfc as start write multiple blocks
+        pData++;
+
+        for(i=0; i<512; i++)                    // read this many bytes
+        {
+            r1 = DMA_write();                   // get it from ST
+            
+            *pData = r1;
+            pData++;
+            
+            if(brStat != E_OK) {                // if something was wrong
+                quit = 1;
+                break;                          // quit
+            }
+        }           
+
+        if(quit) {                              // if error happened
+            break; 
+        }
+        
+        *pData = 0xff;                          // store 16-bit CRC
+        pData++;
+        *pData = 0xff;                          // store 16-bit CRC
+        pData++;
+
+        if((j & 1) == 0) {                      // for even sectors
+            pSend   = spiRxBuff1;
+            pData   = spiRxBuff2;
+        } else {
+            pSend   = spiRxBuff2;
+            pData   = spiRxBuff1;
+        }
+
+        waitForSpi2Finish();                        // wait until DMA finishes
+        waitForSPI2idle();                          // now wait until SPI2 finishes
+        
+        while(spi2_TxRx(0xFF) != 0xff);             // wait while busy
+        spi2Dma_txRx(515, pSend, 515, spiRxDummy);  // send this data in the backgroun
+        
+        thisSector++;                               // increment real sector #
+    }
+    //-------------------------------
+    waitForSpi2Finish();                            // wait until DMA finishes
+    waitForSPI2idle();                              // now wait until SPI2 finishes
+
+    while(spi2_TxRx(0xFF) != 0xff);                 // while busy
+
+    spi2_TxRx(MMC_STOPTRAN_WRITE);                  // 0xfd to stop write multiple blocks
+
+    while(spi2_TxRx(0xFF) != 0xff);                 // while busy
+
+    //-------------------------------
+    // for the MMC cards send the STOP TRANSMISSION also
+    if(sdCard.Type == DEVICETYPE_MMC) {      
+        mmcCommand(MMC_STOP_TRANSMISSION, 0);
+
+        while(spi2_TxRx(0xFF) != 0xff);          // while busy
+    }
+    //-------------------------------
+    spi2_TxRx(0xFF);
+    spiCShigh();                                // CS to H
+    
+    if(quit) {                                  // if failed, return error
+        return 0xff;
+    }
+        
+    return 0;                                   // success
 }
 
 void waitForSpi2Finish(void)
