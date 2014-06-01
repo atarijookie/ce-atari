@@ -89,6 +89,7 @@ void freeTheBasePage(TBasePage *basePage);
 
 BYTE *pLastBasePage;
 
+extern WORD pexec_flag;
 // ------------------------------------------------------------------ 
 // LONG Pexec( mode, fname, cmdline, envstr )
 int32_t custom_pexec( void *sp )
@@ -211,6 +212,7 @@ int32_t custom_pexec( void *sp )
 	
     if(mode == PE_LOADGO) {                                         // if we're doing PE_LOADGO, then we're going to freeTheBasePage()
         pLastBasePage = pBasePage;
+		pexec_flag = 1;												// mark that after this function ends, the asm handler should do PE_GO part... 
     }
     
     // Return the pointer to basepage. 

@@ -6,6 +6,7 @@
 	.globl	_gemdos_table
 	.globl	_old_gemdos_handler
 	.globl	_useOldGDHandler
+	.globl	_pexec_flag
     
 | ------------------------------------------------------
 	.text
@@ -45,7 +46,10 @@ gemdos_call:
 	cmpi.w  #0,(a0)                 | PE_LOADGO?
 	bne.b   not_loadgo
     
-	addq.w  #1,pexec_flag           | for PE_LOADGO - set the flag, load by us, execute by the OS
+| If we came here, then it's PE_LOADGO... In the C part set the pexec_flag to non-zero 
+| at the end of the handler - !!! AFTER !!! you called any GEMDOS functions. 
+| Setting the flag before any other GEMDOS call (e.g. here) will cause that function to have this PE_GO post-processing.
+
 	bra.b   callCustomHandler
     
 not_loadgo:
@@ -64,7 +68,7 @@ callCustomHandler:
 	move.l  a0,-(sp)                | param #1: stack pointer with function params
 	jsr     (a1)                    | call the custom handler
 
-	tst.w   pexec_flag              | should we now do the post-process of PE_LOADGO?
+	tst.w   _pexec_flag             | should we now do the post-process of PE_LOADGO?
 	beq.b   notPexecGo              | no, just skip it
 	
     |------------------
@@ -80,7 +84,7 @@ callCustomHandler:
 	move.l  d0,(a0)+
 	clr.l   (a0)+
 
-	clr.w   pexec_flag              | clear the PE_LOADGO flag
+	clr.w   _pexec_flag             | clear the PE_LOADGO flag
 
 	bra.b   callOriginalHandler     | now do the PE_GO part
     |------------------
@@ -95,4 +99,4 @@ callOriginalHandler:
 	rts		                                | to old code.
     
 	.data
-pexec_flag:         dc.w    0       | 1 = post-process PE_LOADGO
+_pexec_flag:         dc.w    0      | 1 = post-process PE_LOADGO
