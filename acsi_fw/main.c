@@ -104,7 +104,11 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa014, 0x0205};                             // this means: hAns, 2014-02-05
+WORD version[2] = {0xa014, 0x0602};                             // this means: hAns, 2014-06-02
+
+char *VERSION_STRING_SHORT  = {"1.00"};
+char *DATE_STRING           = {"06/02/14"};
+                             // MM/DD/YY
 
 volatile BYTE sendFwVersion;
 WORD atnSendFwVersion[ATN_SENDFWVERSION_LEN_TX];
@@ -228,9 +232,6 @@ int main (void)
                 state = STATE_GET_COMMAND;
                 
                 atnSendFwVersion[6] = ((WORD)currentLed) << 8;                                  // store the current LED status in the last WORD
-                
-                atnSendFwVersion[7] = (WORD) (sdCard.SCapacity >> 16);                          // store the current SD card capacity
-                atnSendFwVersion[8] = (WORD)  sdCard.SCapacity;
                 
                 timeoutStart();                                                                 // start timeout counter so we won't get stuck somewhere
             
@@ -386,6 +387,7 @@ void showCurrentLED(void)
 void onGetCommand(void)
 {
     BYTE id, i, justCmd;
+    BYTE tag1, tag2, isIcd;
                 
     cmd[0]  = PIO_writeFirst();                         // get byte from ST (waiting for the 1st byte)
     id      = (cmd[0] >> 5) & 0x07;                     // get only device ID
@@ -412,13 +414,19 @@ void onGetCommand(void)
             
                 if(justCmd == 0x1f) {                   // if it's ICD command, get the next byte as command
                     justCmd = cmd[1];
+                    isIcd   = TRUE;
+                    
+                    tag1    = cmd[2];                   // CE tag ('C', 'E') can be found on position 2 and 3
+                    tag2    = cmd[3];
+                } else {                                // if it's not ICD command
+                    isIcd   = FALSE;
+
+                    tag1    = cmd[1];                   // CE tag ('C', 'E') can be found on position 1 and 2
+                    tag2    = cmd[2];
                 }
-                
-                // check if this command for SD card is something we should handle in Hans, or should we send it to host
-                if( justCmd == SCSI_C_WRITE6 ||     justCmd == SCSI_C_READ6 || 
-                    justCmd == SCSI_C_WRITE10 ||    justCmd == SCSI_C_READ10 ||
-                    justCmd == SCSI_C_VERIFY) {
-                    processScsiLocaly(justCmd);
+
+                if(justCmd != 0 || tag1 != 'C' || tag2 != 'E') {    // the command is not TEST UNIT READY and there isn't a valid CE tag? process localy
+                    processScsiLocaly(justCmd, isIcd);
                     return;
                 }
             }
@@ -426,13 +434,6 @@ void onGetCommand(void)
             // if we got here, we should handle this in host (RPi)
             for(i=0; i<7; i++) {                        
                 atnSendACSIcommand[4 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
-            }
-            
-            if(id == sdCardID) {                                        // if it's for SD card, but not handled here, but in RPi
-                atnSendACSIcommand[4 + 6] &= 0xff00;                    // remove byte cmd[13] (longest command should be 13, that means that index [13] is free)
-                atnSendACSIcommand[4 + 6] |= ((WORD) (sdCard.SCSI_SK)); // add SCSI Sense Key  (SK)
-                
-                sdCard.SCSI_SK = SCSI_E_NoSense;                        // don't report this error again
             }
                     
             state = STATE_SEND_COMMAND;

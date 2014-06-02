@@ -15,6 +15,8 @@ typedef struct _TDevice
 	
 	BYTE	LastStatus;     // last returned SCSI status -- returned immediately as status byte 
 	BYTE	SCSI_SK;        // sense key -- sent as last byte of ATN to host, so he can handle possible error reporting to ST
+	BYTE	SCSI_ASC;       // additional sense code
+	BYTE	SCSI_ASCQ;      // additional sense code qualifier
 } TDevice; 
 
 #define	DEVICETYPE_NOTHING  0x00

@@ -1,16 +1,39 @@
 #ifndef _SCSI_DEFS_H_
 #define _SCSI_DEFS_H_
 
+// MANDATORY COMMANDS ARE:
+// INQUIRY              x
+// REQUEST SENSE        x
+// SEND DIAGNOSTIC      x
+// TEST UNIT READY      x 
+// FORMAT UNIT          x
+// READ(6)              x
+// READ(10)             x              
+// READ CAPACITY        x
+// RELEASE              x
+// RESERVE              x
+
 // commands with length 6 bytes
 #define SCSI_C_WRITE6                           0x0a
 #define SCSI_C_READ6                            0x08
+#define SCSI_C_MODE_SENSE6                      0x1a
+#define SCSI_C_START_STOP_UNIT                  0x1b	
+#define SCSI_C_FORMAT_UNIT                      0x04	
+#define SCSI_C_INQUIRY                          0x12	
+#define SCSI_C_REQUEST_SENSE                    0x03	
+#define SCSI_C_TEST_UNIT_READY                  0x00	
+#define SCSI_C_SEND_DIAGNOSTIC                  0x1d
+#define SCSI_C_RESERVE                          0x16
+#define SCSI_C_RELEASE                          0x17
 
 // commands with length 10 bytes
 #define SCSI_C_WRITE10                          0x2a
 #define SCSI_C_READ10                           0x28
+#define SCSI_C_WRITE_LONG                       0x3f
+#define SCSI_C_READ_LONG                        0x3e
+#define SCSI_C_READ_CAPACITY                    0x25
 #define SCSI_C_VERIFY                           0x2f
 
-//------------------------------------------------------
 // status bytes
 #define SCSI_ST_OK                              0x00
 #define SCSI_ST_CHECK_CONDITION                 0x02
@@ -62,9 +85,20 @@
 #define SCSI_ASC_NOT_READY_TO_READY_TRANSITION  0x28
 //------------------------------------------------------
 
+void processScsiLocaly(BYTE justCmd, BYTE isIcd);
+void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun);
+void processScsiOther(BYTE justCmd, BYTE isIcd, BYTE lun);
 
-void processScsiLocaly(BYTE justCmd);
+void SCSI_FormatUnit(void);
+void SCSI_ReadCapacity(void);
+void SCSI_Inquiry(BYTE lun);
+void SCSI_RequestSense(void);
+
+void scsi_clearTheUnitAttention(void);
 void scsi_sendOKstatus(void);
-void returnStatusAccordingToIsInit(void);
+void scsi_returnStatusAccordingToIsInit(void);
+void scsi_returnLUNnotSupported(void);
+void scsi_returnUnitAttention(void);
+void ICD7_to_SCSI6(void);
 
 #endif
