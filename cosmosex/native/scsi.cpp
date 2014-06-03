@@ -402,10 +402,6 @@ void Scsi::processCommand(BYTE *command)
 	
     if(attachedMediaIndex != -1) {          											// if we got media attached to this ACSI ID
         dataMedia = attachedMedia[ attachedMediaIndex ].dataMedia;						// get pointer to dataMedia
-		
-		if(attachedMedia[ attachedMediaIndex ].hostSourceType == SOURCETYPE_SD_CARD) {	// if this media is SD card, fill ASC and ASCQ using Sense Key (located at cmd[13]) 
-			fillSdCardScsiStatusAccordingToSenseKey(cmd[13], acsiId);
-		}
     }
 
     if(dataTrans == 0) {
@@ -429,42 +425,6 @@ void Scsi::processCommand(BYTE *command)
     }
 
     dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
-}
-
-void Scsi::fillSdCardScsiStatusAccordingToSenseKey(BYTE senseKey, BYTE acsiId)
-{
-	BYTE asc, ascq;
-
-	if(senseKey == 0) {								// cmd[13] is SD card SCSI Sense Key value of last operation, sent only once (that's why we check against 0)
-		return;
-	}
-				
-	devInfo[acsiId].SCSI_SK = senseKey;
-
-	// set NO SENSE for not handled cases, including SCSI_E_NoSense
-	asc     	= SCSI_ASC_NO_ADDITIONAL_SENSE;
-	ascq		= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-	switch(senseKey) {								// now for each Sense Key set the ASC and ASCQ which weren't sent from Hans
-		case SCSI_E_MediumError:
-		asc    	= SCSI_ASC_NO_ADDITIONAL_SENSE;
-		ascq    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-		break;
-			
-		case SCSI_E_Miscompare:
-		asc     = SCSI_ASC_VERIFY_MISCOMPARE;
-		ascq    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-		break;
-			
-		case SCSI_E_NotReady:
-		asc     = SCSI_ASC_MEDIUM_NOT_PRESENT;
-		ascq    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-		break;
-	}
-				
-	// store ASC and ASCQ to devInfo
-	devInfo[acsiId].SCSI_ASC     = asc;
-	devInfo[acsiId].SCSI_ASCQ    = ascq;
 }
 
 bool Scsi::isICDcommand(void)

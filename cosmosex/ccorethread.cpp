@@ -354,54 +354,50 @@ void CCoreThread::handleAcsiCommand(void)
 
     Debug::out("handleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
 
-    BYTE justCmd = bufIn[0] & 0x1f;
+    BYTE justCmd, tag1, tag2, module;
+    BYTE *pCmd;
+    BYTE isIcd = false;
     BYTE wasHandled = false;
 
     BYTE acsiId = bufIn[0] >> 5;                        // get just ACSI ID
-
     if(acsiIDevType[acsiId] == DEVTYPE_OFF) {          	// if this ACSI ID is off, reply with error and quit
         dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
         dataTrans->sendDataAndStatus();
         return;
     }
 
+    isIcd   = ((bufIn[0] & 0x1f) == 0x1f);              // it's an ICD command, if lowest 5 bits are all set in the cmd[0]
+    pCmd    = (!isIcd) ? bufIn : (bufIn + 1);           // get the pointer to where the command starts
+
+    justCmd = pCmd[0] & 0x1f;                           // get only command
+    
+    tag1    = pCmd[1];                                  // CE tag ('C', 'E') can be found on position 2 and 3
+    tag2    = pCmd[2];
+
+    module  = pCmd[3];                                  // get the host module ID
+
     // ok, so the ID is right, let's see what we can do
-    if(justCmd == 0) {                              // if the command is 0 (TEST UNIT READY)
-        if(bufIn[1] == 'C' && bufIn[2] == 'E') {    // and this is CosmosEx specific command
+    if(justCmd == 0 && tag1 == 'C' && tag2 == 'E') {    // if the command is 0 (TEST UNIT READY) and there's this CE tag
+        switch(module) {
+        case HOSTMOD_CONFIG:                            // config console command?
+            wasHandled = true;
+            confStream->processCommand(pCmd);
+            break;
 
-            switch(bufIn[3]) {
-            case HOSTMOD_CONFIG:                    // config console command?
-                wasHandled = true;
-                confStream->processCommand(bufIn);
-                break;
+        case HOSTMOD_TRANSLATED_DISK:                   // translated disk command?
+            wasHandled = true;
+            translated->processCommand(pCmd);
+            break;
 
-            case HOSTMOD_TRANSLATED_DISK:
-                wasHandled = true;
-                translated->processCommand(bufIn);
-                break;
-
-            case HOSTMOD_FDD_SETUP:
-                wasHandled = true;
-                floppySetup.processCommand(bufIn);
-                break;
-            }
-        }
-    } else if(justCmd == 0x1f) {                    // if the command is ICD mark
-        BYTE justCmd2 = bufIn[1] & 0x1f;
-
-        if(justCmd2 == 0 && bufIn[2] == 'C' && bufIn[3] == 'E') {    // the command is 0 (TEST UNIT READY), and this is CosmosEx specific command
-
-            switch(bufIn[4]) {
-            case HOSTMOD_TRANSLATED_DISK:
-                wasHandled = true;
-                translated->processCommand(bufIn + 1);
-                break;
-            }
+        case HOSTMOD_FDD_SETUP:                         // floppy setup command?
+            wasHandled = true;
+            floppySetup.processCommand(pCmd);
+            break;
         }
     }
 
-    if(wasHandled != true) {                        // if the command was not previously handled, it's probably just some SCSI command
-        scsi->processCommand(bufIn);                // process the command
+    if(wasHandled != true) {                            // if the command was not previously handled, it's probably just some SCSI command
+        scsi->processCommand(bufIn);                    // process the command
     }
 }
 
@@ -521,12 +517,7 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 
         int currentLed = fwVer[4];
 
-		DWORD sdCardCapacity;
-		sdCardCapacity = (fwVer[6] << 24) | (fwVer[7] << 16) | (fwVer[8] << 8) | (fwVer[9]);
-
-		scsi->setSdCardCapacity(sdCardCapacity);			// let SD card media in SCSI module know the current SD card capacity
-		
-        Debug::out("FW: Hans,  %d-%02d-%02d, LED is: %d, SD card capacity: %08x", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed, sdCardCapacity);
+        Debug::out("FW: Hans,  %d-%02d-%02d, LED is: %d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed);
 
         if(lastFloppyImageLed != currentLed) {              // did the floppy image LED change since last time?
             lastFloppyImageLed = currentLed;

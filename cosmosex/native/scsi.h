@@ -68,7 +68,6 @@ public:
     void processCommand(BYTE *command);
 
 	void setSdCardCapacity(DWORD capInSectors);
-	void fillSdCardScsiStatusAccordingToSenseKey(BYTE senseKey, BYTE acsiId);
 	
 private:
     AcsiDataTrans   *dataTrans;
