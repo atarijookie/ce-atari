@@ -10,8 +10,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#define BYTE unsigned char
-#define WORD unsigned short
+#define BYTE    unsigned char
+#define WORD  	uint16_t
+#define DWORD 	uint32_t
 
 BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 
@@ -53,6 +54,11 @@ void testLoop(void)
 {
     int i, sectStart, sectCnt, j;
     BYTE cmd[6], res;
+    
+    BYTE *pRdBfr;
+    DWORD dRdBfr = (DWORD) (rBfr + 2);      // get original RAM address + 2
+    dRdBfr = dRdBfr & 0xfffffffe;           // get even version of that... 
+    pRdBfr = (BYTE *) dRdBfr;               // convert it to pointer
 
     for(i=0; i<1000; i++) {
         if((i % 10) == 0) {
@@ -85,7 +91,7 @@ void testLoop(void)
         }
 
         cmd[0] = 0x08;
-        res = acsi_cmd(1, cmd, 6, rBfr, sectCnt);             // read data
+        res = acsi_cmd(1, cmd, 6, pRdBfr, sectCnt);           // read data
 
         if(res != 0) {
             printf("\n\rRead command failed at test %d\n\r", i);
@@ -93,8 +99,10 @@ void testLoop(void)
         }
 
         for(j=0; j<(sectCnt * 512); j++) {
-            if(pWrBfr[j] != rBfr[j]) {
+            if(pWrBfr[j] != pRdBfr[j]) {
                 printf("\n\rData mismatch at test %d, index %d\n\r", i, j);
+                printf("should be: %02x %02x %02x %02x\n\r", pWrBfr[j + 0], pWrBfr[j + 1], pWrBfr[j + 2], pWrBfr[j + 3]);
+                printf("really is: %02x %02x %02x %02x\n\r", pRdBfr[j + 0], pRdBfr[j + 1], pRdBfr[j + 2], pRdBfr[j + 3]);
                 break;
             }
         }
