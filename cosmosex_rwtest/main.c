@@ -71,7 +71,7 @@ void testLoop(void)
         sectCnt     = (Random() % 124) + 1;   // count of sectors to read and write
 
         pWrBfr = wBfr + sectCnt;            // calculate the starting pointer
-        if((sectStart & 0xfffffffe) != 0) { // odd address?
+        if((sectCnt & 1) != 0) { 			// odd address?
             pWrBfr += 1;                    // make even address
         }
 
