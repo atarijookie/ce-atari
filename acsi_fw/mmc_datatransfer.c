@@ -89,6 +89,7 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
     
     for(c=0; c<count; c++) {
         waitForSpi2Finish();                                    // wait until we have data
+        waitForSPI2idle();                                      // now wait until SPI2 finishes
 
         pData = rxBuffNow;                                      // point at start of RX buffer
             
@@ -99,6 +100,9 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
         }
 
         if(c != last) {                                         // need to read more than this sector? start transfer of the next one
+            spi2_TxRx(0xFF);                                    // read out CRC
+            spi2_TxRx(0xFF);
+            
             while(spi2_TxRx(0xFF) != MMC_STARTBLOCK_READ);      // wait for STARTBLOCK
             spi2Dma_txRx(512, spiTxBuff, 512, rxBuffNow);       // start first transfer
         }
@@ -110,11 +114,6 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
  
         if(quit) {                                              // if error happened
             break;
-        }
-        
-        if(c != last) {                                         // if we need to read more, then just read 16-bit CRC
-            spi2_TxRx(0xFF);
-            spi2_TxRx(0xFF);
         }
     }
     //-------------------------------

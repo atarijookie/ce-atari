@@ -114,14 +114,12 @@ void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun)
     // for sector read commands
     if(justCmd == SCSI_C_READ6 || justCmd == SCSI_C_READ10) {
         res = mmcRead_dma(sector, lenX);                                    // read data
-
         handled = TRUE;
     }
     
     // for sector write commands
     if(justCmd == SCSI_C_WRITE6 || justCmd == SCSI_C_WRITE6) {
         res = mmcWrite_dma(sector, lenX);
-        
         handled = TRUE;
     }
     
