@@ -115,7 +115,7 @@ int32_t custom_pexec( void *sp )
 	WORD drive = getDriveFromPath((char *) fname);
 
 	if(!isOurDrive(drive, 0)) {												// not our drive? Do PE_LOAD, and if this was PE_LOADGO, then the GO part will be done in gemdos_asm.s
-		CALL_OLD_GD( Pexec, PE_LOAD, fname, cmdline, envstr);
+		CALL_OLD_GD( Pexec, mode, fname, cmdline, envstr);
 	}
 	
 	// if we got here, then it's a PRG on our drive...
