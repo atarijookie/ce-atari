@@ -6,7 +6,8 @@
 	.globl	_gemdos_table
 	.globl	_old_gemdos_handler
 	.globl	_useOldGDHandler
-	.globl	_pexec_flag
+	.globl	_pexec_postProc
+    .globl  _pexec_callOrig
     
 | ------------------------------------------------------
 	.text
@@ -68,7 +69,10 @@ callCustomHandler:
 	move.l  a0,-(sp)                | param #1: stack pointer with function params
 	jsr     (a1)                    | call the custom handler
 
-	tst.w   _pexec_flag             | should we now do the post-process of PE_LOADGO?
+    tst.w   _pexec_callOrig         | if this is set to non-zero, call original handler now...
+    bne.b   callOriginalPexec
+    
+	tst.w   _pexec_postProc         | should we now do the post-process of PE_LOADGO?
 	beq.b   notPexecGo              | no, just skip it
 	
     |------------------
@@ -84,7 +88,7 @@ callCustomHandler:
 	move.l  d0,(a0)+
 	clr.l   (a0)+
 
-	clr.w   _pexec_flag             | clear the PE_LOADGO flag
+	clr.w   _pexec_postProc         | clear the PE_LOADGO flag
 
 	bra.b   callOriginalHandler     | now do the PE_GO part
     |------------------
@@ -93,10 +97,16 @@ notPexecGo:
     addq.l  #4,sp
     rte                             | return from exception, d0 contains return code
 	
+callOriginalPexec:    
+    movea.l	(sp)+,a0                        | restore the SP and param pointer
+    clr.w   _pexec_callOrig                 | clear flag that original pexec should be called
+                                            | ...and fall through to call old handler
+
 callOriginalHandler:
     clr.w   _useOldGDHandler                | ensure that is our handler still alive after the call (which may not return) 
 	move.l  _old_gemdos_handler(pc),-(sp)	| Fake a return
 	rts		                                | to old code.
     
 	.data
-_pexec_flag:         dc.w    0      | 1 = post-process PE_LOADGO
+_pexec_postProc:    dc.w    0       | 1 = post-process PE_LOADGO
+_pexec_callOrig:    dc.w    0       | 1 = after custom handler call original Pexec (no post processing)

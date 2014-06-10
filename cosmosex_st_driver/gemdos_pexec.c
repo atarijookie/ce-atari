@@ -87,9 +87,10 @@ typedef struct __attribute__ ((__packed__))
 
 void freeTheBasePage(TBasePage *basePage);
 
-BYTE *pLastBasePage;
+BYTE *pLastBasePage = 0;
 
-extern WORD pexec_flag;
+extern WORD pexec_postProc;
+extern WORD pexec_callOrig;
 // ------------------------------------------------------------------ 
 // LONG Pexec( mode, fname, cmdline, envstr )
 int32_t custom_pexec( void *sp )
@@ -107,17 +108,21 @@ int32_t custom_pexec( void *sp )
 	char *envstr	= (char *)	*((DWORD *) params);
 
 	// for any other than these modes don't do anything special, just call the original
-	if(mode != PE_LOADGO && mode != PE_LOAD) {
-		CALL_OLD_GD( Pexec, mode, fname, cmdline, envstr);
+	if(mode != PE_LOADGO && mode != PE_LOAD) {                              // not one of 2 supported modes? Call original Pexec()
+        pexec_callOrig = 1;                                                 // will call the original Pexec() handler from asm when this finishes
+        return 0;
 	}
 	
 	// if we got here, the mode is PE_LOADGO || PE_LOAD
 	WORD drive = getDriveFromPath((char *) fname);
 
-	if(!isOurDrive(drive, 0)) {												// not our drive? Do PE_LOAD, and if this was PE_LOADGO, then the GO part will be done in gemdos_asm.s
-		CALL_OLD_GD( Pexec, mode, fname, cmdline, envstr);
+	if(!isOurDrive(drive, 0)) {												// not our drive? Call original Pexec()
+        pexec_callOrig = 1;                                                 // will call the original Pexec() handler from asm when this finishes
+        return 0;
 	}
-	
+
+    // Do PE_LOAD, and if this was PE_LOADGO, then the GO part will be done in gemdos_asm.s
+    
 	// if we got here, then it's a PRG on our drive...
 	BYTE *pBasePage;														// pointer to base page address
 
@@ -212,7 +217,7 @@ int32_t custom_pexec( void *sp )
 	
     if(mode == PE_LOADGO) {                                         // if we're doing PE_LOADGO, then we're going to freeTheBasePage()
         pLastBasePage = pBasePage;
-		pexec_flag = 1;												// mark that after this function ends, the asm handler should do PE_GO part... 
+		pexec_postProc = 1;											// mark that after this function ends, the asm handler should do PE_GO part... 
     }
     
     // Return the pointer to basepage. 
