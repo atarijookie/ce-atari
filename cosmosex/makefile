@@ -2,7 +2,7 @@ TARGET	= cosmosex
 
 #ONPC    = yes
 
-CC	= g++
+CC	    = g++
 #STRIP	= strip
 CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64
 

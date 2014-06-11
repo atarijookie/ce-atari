@@ -49,7 +49,7 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
 		}
 	
 #ifdef DEBUG_SPI_COMMUNICATION
-		Debug::out("\nwaitForATN single good!");
+		Debug::out(LOG_DEBUG, "\nwaitForATN single good!");
 #endif	
 		if(!readHeader(whichSpiCs, outBuf, inBuf)) {		// receive: 0xcafe, ATN code, txLen, rxLen
 			return false;
@@ -63,7 +63,7 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
 
     while(1) {
 		if(Utils::getCurrentMs() >= timeOut) {				// if it takes more than allowed timeout, fail
-			Debug::out("waitForATN %02x fail - timeout", atnCode);
+			Debug::out(LOG_ERROR, "waitForATN %02x fail - timeout", atnCode);
 			return false;
 		}
 		
@@ -73,7 +73,7 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
     }
 
 #ifdef DEBUG_SPI_COMMUNICATION
-	Debug::out("\nwaitForATN starting...");
+	Debug::out(LOG_DEBUG, "\nwaitForATN starting...");
 #endif
 
 	if(!readHeader(whichSpiCs, outBuf, inBuf)) {			// receive: 0xcafe, ATN code, txLen, rxLen
@@ -82,11 +82,11 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
 
     if(inBuf[3] == atnCode) {                      		// ATN code found?
 #ifdef DEBUG_SPI_COMMUNICATION
-		Debug::out("waitForATN %02x good.", atnCode);
+		Debug::out(LOG_DEBUG, "waitForATN %02x good.", atnCode);
 #endif		
         return true;
 	} else {
-		Debug::out("waitForATN %02x, but received %02x! Fail!", atnCode, inBuf[3]);
+		Debug::out(LOG_ERROR, "waitForATN %02x, but received %02x! Fail!", atnCode, inBuf[3]);
         return false;
 	}
 }
@@ -109,13 +109,13 @@ bool CConSpi::readHeader(int whichSpiCs, BYTE *outBuf, BYTE *inBuf)
 		loops++;
 		
 		if(loops >= 10000) {								// if this doesn't synchronize in 10k loops, something is very wrong
-			Debug::out("readHeader couldn't synchronize!");
+			Debug::out(LOG_ERROR, "readHeader couldn't synchronize!");
 			return false;
 		}
 	}
 	
 	if(loops != 0) {
-		Debug::out("readHeader took %d loops to synchronize!", loops);
+		Debug::out(LOG_INFO, "readHeader took %d loops to synchronize!", loops);
 	}
 
 	txRx(whichSpiCs, 6, outBuf+2, inBuf+2);					// receive: 0, ATN code, txLen, rxLen
@@ -133,7 +133,7 @@ void CConSpi::applyTxRxLimits(int whichSpiCs, BYTE *inBuff)
     WORD rxLen = swapWord(pwIn[3]);
 
 #ifdef DEBUG_SPI_COMMUNICATION
-	Debug::out("TX/RX limits: TX %d WORDs, RX %d WORDs", txLen, rxLen);
+	Debug::out(LOG_DEBUG, "TX/RX limits: TX %d WORDs, RX %d WORDs", txLen, rxLen);
 #endif	
 
 	// manually limit the TX and RX len
@@ -142,13 +142,13 @@ void CConSpi::applyTxRxLimits(int whichSpiCs, BYTE *inBuff)
 	#define TWENTY_KB	(20 * 1024)
 	
     if(	whichSpiCs == SPI_CS_HANS  && (txLen > ONE_KB || rxLen > ONE_KB) ) {
-        Debug::out("applyTxRxLimits - TX/RX limits for HANS are probably wrong! Fix this!");
+        Debug::out(LOG_ERROR, "applyTxRxLimits - TX/RX limits for HANS are probably wrong! Fix this!");
 		txLen = MIN(txLen, ONE_KB);
 		rxLen = MIN(rxLen, ONE_KB);
 	}
 
     if(	whichSpiCs == SPI_CS_FRANZ  && (txLen > TWENTY_KB || rxLen > TWENTY_KB) ) {
-        Debug::out("applyTxRxLimits - TX/RX limits for FRANZ are probably wrong! Fix this!");
+        Debug::out(LOG_ERROR, "applyTxRxLimits - TX/RX limits for FRANZ are probably wrong! Fix this!");
 		txLen = MIN(txLen, TWENTY_KB);
 		rxLen = MIN(rxLen, TWENTY_KB);
 	}
@@ -170,13 +170,13 @@ void CConSpi::setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen)
 {
 #ifdef DEBUG_SPI_COMMUNICATION
     if(txLen != NO_REMAINING_LENGTH || rxLen != NO_REMAINING_LENGTH || remainingPacketLength != NO_REMAINING_LENGTH) {
-		Debug::out("CConSpi::setRemainingTxRxLen - TX %d, RX %d, while the remainingPacketLength is %d", txLen, rxLen, remainingPacketLength);
+		Debug::out(LOG_DEBUG, "CConSpi::setRemainingTxRxLen - TX %d, RX %d, while the remainingPacketLength is %d", txLen, rxLen, remainingPacketLength);
 	}
 #endif	
 		
     if(txLen == NO_REMAINING_LENGTH && rxLen == NO_REMAINING_LENGTH) {    // if setting NO_REMAINING_LENGTH
         if(remainingPacketLength != 0 && remainingPacketLength != NO_REMAINING_LENGTH) {
-            Debug::out("CConSpi - didn't TX/RX enough data, padding with %d zeros! Fix this!", remainingPacketLength);
+            Debug::out(LOG_ERROR, "CConSpi - didn't TX/RX enough data, padding with %d zeros! Fix this!", remainingPacketLength);
             memset(paddingBuffer, 0, PADDINGBUFFER_SIZE);
             txRx(whichSpiCs, remainingPacketLength, paddingBuffer, paddingBuffer);
         }
@@ -229,14 +229,14 @@ void CConSpi::txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBuf
 
     if(remainingPacketLength != NO_REMAINING_LENGTH) {
         if(count > remainingPacketLength) {
-            Debug::out("CConSpi::txRx - trying to TX/RX %d more bytes then allowed! Fix this!", (count - remainingPacketLength));
+            Debug::out(LOG_ERROR, "CConSpi::txRx - trying to TX/RX %d more bytes then allowed! Fix this!", (count - remainingPacketLength));
 
             count = remainingPacketLength;
         }
     }
 
 #ifdef DEBUG_SPI_COMMUNICATION
-    Debug::out("CConSpi::txRx - count: %d", count);
+    Debug::out(LOG_DEBUG, "CConSpi::txRx - count: %d", count);
 #endif	
 
 	spi_tx_rx(whichSpiCs, count, sendBuffer, receiveBufer);

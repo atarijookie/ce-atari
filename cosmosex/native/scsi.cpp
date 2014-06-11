@@ -70,23 +70,23 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
             res = attachMediaToACSIid(index, hostSourceType, accessType);          // attach media to ACSI ID
 
             if(res) {
-                Debug::out("Scsi::attachToHostPath - %s - media was already attached, attached to ACSI ID %d", hostPath.c_str(), attachedMedia[index].devInfoIndex);
+                Debug::out(LOG_INFO, "Scsi::attachToHostPath - %s - media was already attached, attached to ACSI ID %d", hostPath.c_str(), attachedMedia[index].devInfoIndex);
             } else {
-                Debug::out("Scsi::attachToHostPath - %s - media was already attached, but still not attached to ACSI ID!", hostPath.c_str());
+                Debug::out(LOG_INFO, "Scsi::attachToHostPath - %s - media was already attached, but still not attached to ACSI ID!", hostPath.c_str());
             }
 
             return res;
         }
 
         // well, we have the media attached and we're also attached to ACSI ID
-        Debug::out("Scsi::attachToHostPath - %s - media was already attached, not doing anything.", hostPath.c_str());
+        Debug::out(LOG_INFO, "Scsi::attachToHostPath - %s - media was already attached, not doing anything.", hostPath.c_str());
         return true;
     }
 
     index = findEmptyAttachSlot();                              // find where we can store it
 
     if(index == -1) {                                               // no more place to store it?
-        Debug::out("Scsi::attachToHostPath - %s - no empty slot! Not attaching.", hostPath.c_str());
+        Debug::out(LOG_INFO, "Scsi::attachToHostPath - %s - no empty slot! Not attaching.", hostPath.c_str());
         return false;
     }
 
@@ -124,7 +124,7 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
 
             attachedMedia[index].dataMediaDynamicallyAllocated = true;      // did use new on .dataMedia
         } else {                                                            // failed to open image?
-            Debug::out("Scsi::attachToHostPath - failed to open image %s! Not attaching.", hostPath.c_str());
+            Debug::out(LOG_ERROR, "Scsi::attachToHostPath - failed to open image %s! Not attaching.", hostPath.c_str());
             attachedMedia[index].dataMediaDynamicallyAllocated = false;     // didn't use new on .dataMedia
 			delete dm;
             return false;
@@ -150,7 +150,7 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
 			attachedMedia[index].accessType     = SCSI_ACCESSTYPE_FULL;
             attachedMedia[index].dataMediaDynamicallyAllocated = true;      // did use new on .dataMedia
 		} else {
-            Debug::out("Scsi::attachToHostPath - failed to open device %s! Not attaching.", hostPath.c_str());
+            Debug::out(LOG_ERROR, "Scsi::attachToHostPath - failed to open device %s! Not attaching.", hostPath.c_str());
             attachedMedia[index].dataMediaDynamicallyAllocated = false;     // didn't use new on .dataMedia
 			delete dm;
             return false;
@@ -159,7 +159,7 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
         break;
 	
 	case SOURCETYPE_TESTMEDIA:
-		Debug::out("Scsi::attachToHostPath - test media stored at index %d", index);
+		Debug::out(LOG_INFO, "Scsi::attachToHostPath - test media stored at index %d", index);
 	
 		attachedMedia[index].hostPath       = hostPath;
 		attachedMedia[index].hostSourceType = hostSourceType;
@@ -172,9 +172,9 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
     res = attachMediaToACSIid(index, hostSourceType, accessType);          // last step - attach media to ACSI ID
 
     if(res) {
-        Debug::out("Scsi::attachToHostPath - %s - attached to ACSI ID %d", hostPath.c_str(), attachedMedia[index].devInfoIndex);
+        Debug::out(LOG_INFO, "Scsi::attachToHostPath - %s - attached to ACSI ID %d", hostPath.c_str(), attachedMedia[index].devInfoIndex);
     } else {
-        Debug::out("Scsi::attachToHostPath - %s - media attached, but not attached to ACSI ID!", hostPath.c_str());
+        Debug::out(LOG_INFO, "Scsi::attachToHostPath - %s - media attached, but not attached to ACSI ID!", hostPath.c_str());
     }
 
     return res;
@@ -350,7 +350,7 @@ void Scsi::reloadSettings(int type)
 
 void Scsi::loadSettings(void)
 {
-    Debug::out("Scsi::loadSettings");
+    Debug::out(LOG_INFO, "Scsi::loadSettings");
 
     Settings s;
 
@@ -405,14 +405,14 @@ void Scsi::processCommand(BYTE *command)
     }
 
     if(dataTrans == 0) {
-        Debug::out("processCommand was called without valid dataTrans, can't tell ST that his went wrong...");
+        Debug::out(LOG_ERROR, "processCommand was called without valid dataTrans, can't tell ST that his went wrong...");
         return;
     }
 
     dataTrans->clear();                 // clean data transporter before handling
 
     if(dataMedia == 0) {
-        Debug::out("processCommand was called without valid dataMedia, will return error CHECK CONDITION");
+        Debug::out(LOG_ERROR, "processCommand was called without valid dataMedia, will return error CHECK CONDITION");
 		dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
 		dataTrans->sendDataAndStatus();
         return;
@@ -1044,7 +1044,7 @@ bool Scsi::readSectors(DWORD sectorNo, DWORD count)
     bool res;
 
     if(count > BUFFER_SIZE_SECTORS) {      // more than BUFFER_SIZE_SECTORS of data at once?
-        Debug::out("Scsi::readSectors -- tried to read more than BUFFER_SIZE_SECTORS at once, fail!");
+        Debug::out(LOG_ERROR, "Scsi::readSectors -- tried to read more than BUFFER_SIZE_SECTORS at once, fail!");
         return false;
     }
 
@@ -1065,7 +1065,7 @@ bool Scsi::writeSectors(DWORD sectorNo, DWORD count)
     bool res;
 
     if(count > BUFFER_SIZE_SECTORS) {      // more than BUFFER_SIZE_SECTORS of data at once?
-        Debug::out("Scsi::writeSectors -- tried to write more than BUFFER_SIZE_SECTORS at once, fail!");
+        Debug::out(LOG_ERROR, "Scsi::writeSectors -- tried to write more than BUFFER_SIZE_SECTORS at once, fail!");
         return false;
     }
 
@@ -1090,7 +1090,7 @@ bool Scsi::compareSectors(DWORD sectorNo, DWORD count)
     bool res;
 
     if(count > BUFFER_SIZE_SECTORS) {      // more than BUFFER_SIZE_SECTORS of data at once?
-        Debug::out("Scsi::compareSectors -- tried to compare more than BUFFER_SIZE_SECTORS at once, fail!");
+        Debug::out(LOG_ERROR, "Scsi::compareSectors -- tried to compare more than BUFFER_SIZE_SECTORS at once, fail!");
         return false;
     }
 

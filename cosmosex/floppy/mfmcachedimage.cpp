@@ -357,7 +357,7 @@ void MfmCachedImage::appendChange(BYTE chg, BYTE *bfr, int &cnt)
     case 0x11:  time = MFM_8US; break;        // 8 us - stored as 3
 
     default:
-        Debug::out("appendChange -- this shouldn't happen!");
+        Debug::out(LOG_ERROR, "appendChange -- this shouldn't happen!");
         return;
     }
 

@@ -23,7 +23,7 @@ bool FloppyImageMsa::open(char *fileName)
     fajl = fopen(fileName, "rb");
 
     if(fajl == NULL) {
-        Debug::out("Failed to open image file: %s", fileName);
+        Debug::out(LOG_ERROR, "Failed to open image file: %s", fileName);
         openFlag = false;
         return false;
     }
@@ -54,8 +54,8 @@ bool FloppyImageMsa::open(char *fileName)
 
     getTrackStartOffsets();
 
-    Debug::out("MSA Image opened: %s", fileName);
-    Debug::out("MSA Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
+    Debug::out(LOG_INFO, "MSA Image opened: %s", fileName);
+    Debug::out(LOG_INFO, "MSA Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
 
     return true;
 }

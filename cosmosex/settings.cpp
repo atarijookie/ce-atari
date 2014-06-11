@@ -17,12 +17,12 @@ Settings::Settings(void)
 	int res = mkdir(SETTINGS_PATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
 	
 	if(res == 0) {					// dir created
-		Debug::out("Settings: directory %s was created.", SETTINGS_PATH);
+		Debug::out(LOG_INFO, "Settings: directory %s was created.", SETTINGS_PATH);
 		
 		storeDefaultValues();
 	} else {						// dir not created
 		if(errno != EEXIST) {		// and it's not because it already exists...
-			Debug::out("Settings: failed to create settings directory - %s", strerror(errno));
+			Debug::out(LOG_ERROR, "Settings: failed to create settings directory - %s", strerror(errno));
 		}
 	}
 }
@@ -52,7 +52,7 @@ bool Settings::getBool(char *key, bool defValue)
 {
 	FILE *file = open(key, true);
 	if(!file) {											// failed to open settings?
-//		Debug::out("Settings::getBool -- returning default value for %s", key);
+//		Debug::out(LOG_DEBUG, "Settings::getBool -- returning default value for %s", key);
 		return defValue;
 	}
 
@@ -61,7 +61,7 @@ bool Settings::getBool(char *key, bool defValue)
 	fclose(file);
 	
 	if(res != 1) {										// failed to read value?
-//		Debug::out("Settings::getBool -- returning default value for %s", key);
+//		Debug::out(LOG_DEBUG, "Settings::getBool -- returning default value for %s", key);
 		return defValue;
 	}
 	
@@ -77,7 +77,7 @@ void Settings::setBool(char *key, bool value)
 {
 	FILE *file = open(key, false);
 	if(!file) {											// failed to open settings?
-		Debug::out("Settings::setBool -- could not write key %s", key);
+		Debug::out(LOG_ERROR, "Settings::setBool -- could not write key %s", key);
 		return;
 	}
 
@@ -95,7 +95,7 @@ int Settings::getInt(char *key, int defValue)
 {
 	FILE *file = open(key, true);
 	if(!file) {											// failed to open settings?
-//		Debug::out("Settings::getInt -- returning default value for %s", key);
+//		Debug::out(LOG_DEBUG, "Settings::getInt -- returning default value for %s", key);
 		return defValue;
 	}
 
@@ -104,7 +104,7 @@ int Settings::getInt(char *key, int defValue)
 	fclose(file);
 	
 	if(res != 1) {										// failed to read value?
-//		Debug::out("Settings::getInt -- returning default value for %s", key);
+//		Debug::out(LOG_DEBUG, "Settings::getInt -- returning default value for %s", key);
 		return defValue;
 	}
 	
@@ -115,7 +115,7 @@ void Settings::setInt(char *key, int value)
 {
 	FILE *file = open(key, false);
 	if(!file) {											// failed to open settings?
-		Debug::out("Settings::setInt -- could not write key %s", key);
+		Debug::out(LOG_ERROR, "Settings::setInt -- could not write key %s", key);
 		return;
 	}
 
@@ -130,7 +130,7 @@ char *Settings::getString(char *key, char *defValue)
 
 	FILE *file = open(key, true);
 	if(!file) {											// failed to open settings?
-//		Debug::out("Settings::getString -- returning default value for %s", key);
+//		Debug::out(LOG_DEBUG, "Settings::getString -- returning default value for %s", key);
 		strcpy(buffer, defValue);
 		return buffer;
 	}
@@ -140,7 +140,7 @@ char *Settings::getString(char *key, char *defValue)
 	fclose(file);
 	
 	if(res == NULL) {									// failed to read value?
-//		Debug::out("Settings::getString -- returning default value for %s", key);
+//		Debug::out(LOG_DEBUG, "Settings::getString -- returning default value for %s", key);
 		strcpy(buffer, defValue);
 		return buffer;
 	}
@@ -152,7 +152,7 @@ void Settings::setString(char *key, char *value)
 {
 	FILE *file = open(key, false);
 	if(!file) {											// failed to open settings?
-		Debug::out("Settings::setString -- could not write key %s", key);
+		Debug::out(LOG_ERROR, "Settings::setString -- could not write key %s", key);
 		return;
 	}
 
@@ -164,7 +164,7 @@ char Settings::getChar(char *key, char defValue)
 {
     FILE *file = open(key, true);
     if(!file) {											// failed to open settings?
-//        Debug::out("Settings::getChar -- returning default value for %s", key);
+//        Debug::out(LOG_DEBUG, "Settings::getChar -- returning default value for %s", key);
         return defValue;
     }
 
@@ -174,7 +174,7 @@ char Settings::getChar(char *key, char defValue)
     fclose(file);
 
     if(res != 1) {										// failed to read value?
-//        Debug::out("Settings::getChar -- returning default value for %s", key);
+//        Debug::out(LOG_DEBUG, "Settings::getChar -- returning default value for %s", key);
         return defValue;
     }
 
@@ -185,7 +185,7 @@ void Settings::setChar(char *key, char value)
 {
     FILE *file = open(key, false);
     if(!file) {											// failed to open settings?
-        Debug::out("Settings::setChar -- could not write key %s", key);
+        Debug::out(LOG_ERROR, "Settings::setChar -- could not write key %s", key);
         return;
     }
 

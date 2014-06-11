@@ -40,8 +40,8 @@ void MfmDecoder::decodeStream(BYTE *inStream, int inCount, BYTE *outData, int &o
         appendEncodedByte(inStream[i]);
     }
 
-    Debug::out("A1 marks found: %d", a1Cnt);
-    Debug::out("C2 marks found: %d", c2Cnt);
+    Debug::out(LOG_DEBUG, "A1 marks found: %d", a1Cnt);
+    Debug::out(LOG_DEBUG, "C2 marks found: %d", c2Cnt);
 
 #ifdef LOGTOFILE
     fclose(flog);
@@ -82,7 +82,7 @@ void MfmDecoder::appendEncodedByte(BYTE val)
             break;
 
         default: 
-            Debug::out("appendEncodedByte -- something is wrong...");
+            Debug::out(LOG_ERROR, "appendEncodedByte -- something is wrong...");
             break;
         }
     }

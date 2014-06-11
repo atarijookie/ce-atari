@@ -38,7 +38,7 @@ void *ikbdThreadCode(void *ptr)
 	// open and set up uart
 	int res = ikbd.serialSetup(&termiosStruct);
 	if(res == -1) {
-        Debug::out("ikbd.serialSetup failed, won't be able to send IKDB data");
+        Debug::out(LOG_ERROR, "ikbd.serialSetup failed, won't be able to send IKDB data");
 	}
 
     while(sigintReceived == 0) {
@@ -749,7 +749,7 @@ void Ikbd::processKeyboard(input_event *ev)
     	int res = fdWrite(fdUart, &bfr, 1); 
 
     	if(res < 0) {
-	    	Debug::out("processKeyboard - sending to ST failed, errno: %d", errno);
+	    	Debug::out(LOG_ERROR, "processKeyboard - sending to ST failed, errno: %d", errno);
 	    }
     }
 }
@@ -843,7 +843,7 @@ void Ikbd::sendBothJoyReport(void)
 	res = fdWrite(fdUart, bfr, 3); 
 
     if(res < 0) {
-        Debug::out("write to uart failed, errno: %d", errno);
+        Debug::out(LOG_ERROR, "write to uart failed, errno: %d", errno);
     }
 }
 
@@ -873,7 +873,7 @@ void Ikbd::sendJoyState(int joyNumber, int dirTotal)
     res = fdWrite(fdUart, bfr, 2); 
 
     if(res < 0) {
-        Debug::out("write to uart (0) failed, errno: %d", errno);
+        Debug::out(LOG_ERROR, "write to uart (0) failed, errno: %d", errno);
     }
 }
 
@@ -896,7 +896,7 @@ void Ikbd::sendJoy0State(void)
     int res = fdWrite(fdUart, bfr, 3); 
 
     if(res < 0) {
-        Debug::out("write to uart (1) failed, errno: %d", errno);
+        Debug::out(LOG_ERROR, "write to uart (1) failed, errno: %d", errno);
     }
 }
 
@@ -1007,13 +1007,13 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
     int fd = open(fullPath, O_RDONLY | O_NONBLOCK);
 
     if(fd < 0) {
-        Debug::out("Failed to open input device (%s): %s", what, fullPath);
+        Debug::out(LOG_ERROR, "Failed to open input device (%s): %s", what, fullPath);
         return;
     }
 
     in->fd = fd;
     strcpy(in->devPath, fullPath);
-    Debug::out("Got device (%s): %s", what, fullPath);
+    Debug::out(LOG_INFO, "Got device (%s): %s", what, fullPath);
 }
 
 int Ikbd::getFdByIndex(int index)
@@ -1235,7 +1235,7 @@ void Ikbd::fillKeyTranslationTable(void)
 void Ikbd::addToTable(int pcKey, int stKey)
 {
     if(pcKey >= KEY_TABLE_SIZE) {
-        Debug::out("addToTable -- Can't add pair %d - %d - out of range.", pcKey, stKey);
+        Debug::out(LOG_ERROR, "addToTable -- Can't add pair %d - %d - out of range.", pcKey, stKey);
         return;
     }
 
@@ -1269,7 +1269,7 @@ void Ikbd::sendMousePosAbsolute(int fd, BYTE absButtons)
 	int res = fdWrite(fd, bfr, 6); 
 
 	if(res < 0) {
-		Debug::out("sendMousePosAbsolute failed, errno: %d", errno);
+		Debug::out(LOG_ERROR, "sendMousePosAbsolute failed, errno: %d", errno);
 	}
 }
 
@@ -1302,7 +1302,7 @@ void Ikbd::sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
 	int res = fdWrite(fd, bfr, 3); 
 
 	if(res < 0) {
-		Debug::out("sendMousePosRelative failed, errno: %d", errno);
+		Debug::out(LOG_ERROR, "sendMousePosRelative failed, errno: %d", errno);
 	}
 }
 
@@ -1314,7 +1314,7 @@ int Ikbd::serialSetup(termios *ts)
 
 	fd = open(UARTFILE, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK);
 	if(fd == -1) {
-        Debug::out("Failed to open %s", UARTFILE);
+        Debug::out(LOG_ERROR, "Failed to open %s", UARTFILE);
         return -1;
 	}
 	fcntl(fd, F_SETFL, 0);

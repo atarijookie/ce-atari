@@ -30,7 +30,7 @@ bool ImageFileMedia::iopen(char *path, bool createIfNotExists)
     }
 
     if(image == NULL) {
-        Debug::out("ImageFileMedia - failed to open %s", path);
+        Debug::out(LOG_ERROR, "ImageFileMedia - failed to open %s", path);
         return false;
     }
 
@@ -53,7 +53,7 @@ bool ImageFileMedia::iopen(char *path, bool createIfNotExists)
 
     mediaHasChanged = false;
 
-    Debug::out("ImageFileMedia - open succeeded, capacity: %d, was created: %d", BCapacity, (int) imageWasCreated);
+    Debug::out(LOG_INFO, "ImageFileMedia - open succeeded, capacity: %d, was created: %d", BCapacity, (int) imageWasCreated);
 
     return true;
 }

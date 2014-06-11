@@ -5,24 +5,32 @@
 #include "debug.h"
 #include "utils.h"
 
-#define LOG_FILE		"ce.log"
+#define LOG_FILE		"/var/log/ce.log"
 DWORD prevLogOut;
 
-/*
-void Debug::out(const char *format, ...)
+BYTE g_logLevel = LOG_ERROR;                // current log level 
+
+void Debug::printfLogLevelString(void)
 {
-    va_list args;
-    va_start(args, format);
+    printf("\nLog level: ");
 
-    vprintf(format, args);
-	printf("\n");
+    switch(g_logLevel) {
+        case LOG_OFF:   printf("OFF"); break;
+        case LOG_ERROR: printf("ERROR"); break;
+        case LOG_INFO:  printf("INFO"); break;
+        case LOG_DEBUG: printf("DEBUG"); break;
+        default:        printf("unknown!"); break;
+    }
 
-    va_end(args);
+    printf("\n\n");
 }
-*/
 
-void Debug::out(const char *format, ...)
+void Debug::out(int logLevel, const char *format, ...)
 {
+    if(logLevel > g_logLevel) {             // if this log is higher than allowed, don't do this
+        return;
+    }
+
     va_list args;
     va_start(args, format);
 
@@ -49,6 +57,10 @@ void Debug::out(const char *format, ...)
 
 void Debug::outBfr(BYTE *bfr, int count)
 {
+    if(g_logLevel < LOG_DEBUG) {              // if we're not in debug log level, don't do this
+        return;
+    }
+
 	FILE *f = fopen(LOG_FILE, "a+t");
 	
 	if(!f) {

@@ -131,14 +131,14 @@ int Downloader::count(int downloadTypeMask)
 bool Downloader::verifyChecksum(char *filename, WORD checksum)
 {
     if(checksum == 0) {                 // special case - when checksum is 0, don't check it buy say that it's OK
-        Debug::out("Downloader::verifyChecksum - file %s -- supplied 0 as checksum, so not doing checksum and returning that checksum is OK", filename);
+        Debug::out(LOG_INFO, "Downloader::verifyChecksum - file %s -- supplied 0 as checksum, so not doing checksum and returning that checksum is OK", filename);
         return true;
     }
 
     FILE *f = fopen(filename, "rb");
 
     if(!f) {
-        Debug::out("Downloader::verifyChecksum - file %s -- failed to open file, checksum failed", filename);
+        Debug::out(LOG_ERROR, "Downloader::verifyChecksum - file %s -- failed to open file, checksum failed", filename);
         return false;
     }
 
@@ -163,7 +163,7 @@ bool Downloader::verifyChecksum(char *filename, WORD checksum)
     fclose(f);
 
     bool checksumIsGood = (checksum == cs);
-    Debug::out("Downloader::verifyChecksum - file %s -- checksum is good: %d", filename, (int) checksumIsGood);
+    Debug::out(LOG_INFO, "Downloader::verifyChecksum - file %s -- checksum is good: %d", filename, (int) checksumIsGood);
 
     return checksumIsGood;                // return if the calculated cs is equal to the provided cs
 }
@@ -219,7 +219,7 @@ void *downloadThreadCode(void *ptr)
     int res;
     FILE *outfile;
 
-	Debug::out("Download thread starting...");
+	Debug::out(LOG_INFO, "Download thread starting...");
 
 	while(sigintReceived == 0) {
 		pthread_mutex_lock(&downloadThreadMutex);		// lock the mutex
@@ -236,7 +236,7 @@ void *downloadThreadCode(void *ptr)
 
         curl = curl_easy_init();
         if(!curl) {
-            Debug::out("CURL init failed, the file %s was not downloaded...", (char *) downloadCurrent.srcUrl.c_str());
+            Debug::out(LOG_ERROR, "CURL init failed, the file %s was not downloaded...", (char *) downloadCurrent.srcUrl.c_str());
             continue;
         }
     
@@ -252,11 +252,11 @@ void *downloadThreadCode(void *ptr)
         outfile = fopen((char *) tmpFile.c_str(), "wb");    // try to open the tmp file
 
         if(!outfile) {
-            Debug::out("Downloader - failed to create local file: %s", (char *) fileName.c_str());
+            Debug::out(LOG_ERROR, "Downloader - failed to create local file: %s", (char *) fileName.c_str());
             continue;
         }
 
-        Debug::out("Downloader - download remote file: %s to local file: %s", (char *) downloadCurrent.srcUrl.c_str(), (char *) fileName.c_str());
+        Debug::out(LOG_INFO, "Downloader - download remote file: %s to local file: %s", (char *) downloadCurrent.srcUrl.c_str(), (char *) fileName.c_str());
      
         // now configure curl
         curl_easy_setopt(curl, CURLOPT_URL,                 (char *) downloadCurrent.srcUrl.c_str());
@@ -279,28 +279,28 @@ void *downloadThreadCode(void *ptr)
                 res = rename(tmpFile.c_str(), finalFile.c_str());
 
                 if(res != 0) {
-                    Debug::out("Downloader - failed to rename %s to %s after download", (char *) tmpFile.c_str(), (char *) finalFile.c_str());
+                    Debug::out(LOG_ERROR, "Downloader - failed to rename %s to %s after download", (char *) tmpFile.c_str(), (char *) finalFile.c_str());
                 } else {
-                    Debug::out("Downloader - file %s was downloaded with success.", (char *) downloadCurrent.srcUrl.c_str());
+                    Debug::out(LOG_INFO, "Downloader - file %s was downloaded with success.", (char *) downloadCurrent.srcUrl.c_str());
                 }
             } else {
                 res = remove(tmpFile.c_str());
 
                 if(res == 0) {
-                    Debug::out("Downloader - file %s was downloaded, but verifyChecksum() failed, so file %s was deleted.", (char *) tmpFile.c_str(), (char *) tmpFile.c_str());
+                    Debug::out(LOG_ERROR, "Downloader - file %s was downloaded, but verifyChecksum() failed, so file %s was deleted.", (char *) tmpFile.c_str(), (char *) tmpFile.c_str());
                 } else {
-                    Debug::out("Downloader - file %s was downloaded, but verifyChecksum() failed, and then failed to delete that file.", (char *) tmpFile.c_str());
+                    Debug::out(LOG_INFO, "Downloader - file %s was downloaded, but verifyChecksum() failed, and then failed to delete that file.", (char *) tmpFile.c_str());
                 }
             }
 
             downloadCurrent.downPercent = 100;
         } else {                                            // if download failed
-            Debug::out("Downloader - download of %s didn't finish with success, deleting incomplete file.", (char *) downloadCurrent.srcUrl.c_str());
+            Debug::out(LOG_ERROR, "Downloader - download of %s didn't finish with success, deleting incomplete file.", (char *) downloadCurrent.srcUrl.c_str());
 
             res = remove(tmpFile.c_str());
 
             if(res != 0) {
-                Debug::out("Downloader - failed to delete file %s", (char *) tmpFile.c_str());
+                Debug::out(LOG_ERROR, "Downloader - failed to delete file %s", (char *) tmpFile.c_str());
             }
         }
 
@@ -308,7 +308,7 @@ void *downloadThreadCode(void *ptr)
         curl = NULL;
     }
 
-	Debug::out("Download thread finished.");
+	Debug::out(LOG_INFO, "Download thread finished.");
     return 0;
 }
 

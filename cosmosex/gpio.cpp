@@ -77,13 +77,13 @@ void bcm2835_spi_transfernb(char *txBuf, char *rxBuf, int c)
 bool gpio_open(void)
 {
 	if(geteuid() != 0) {
-		Debug::out( "The bcm2835 library requires to be run as root, try again...");
+		Debug::out(LOG_ERROR, "The bcm2835 library requires to be run as root, try again...");
         return false;
 	}
 
 	// try to init the GPIO library
 	if (!bcm2835_init()) {
-		Debug::out( "bcm2835_init failed, can't use GPIO.");
+		Debug::out(LOG_ERROR, "bcm2835_init failed, can't use GPIO.");
         return false;
 	}
 	

@@ -111,13 +111,13 @@ extern BYTE *writeData;
 bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 {
     #ifdef ONPC
-    Debug::out("PC will read data from ST: %d bytes", dataCnt);
+    Debug::out(LOG_DEBUG, "PC will read data from ST: %d bytes", dataCnt);
     memcpy(data, writeData, dataCnt);
     return true;
     #endif
 
     if(!com) {
-        Debug::out("AcsiDataTrans::recvData -- no communication object, fail!");
+        Debug::out(LOG_ERROR, "AcsiDataTrans::recvData -- no communication object, fail!");
         return false;
     }
 
@@ -158,7 +158,7 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
         //----------------------
         // just for dumping the data
 		if(dumpNextData) {
-			Debug::out("recvData: %d bytes", subCount);
+			Debug::out(LOG_DEBUG, "recvData: %d bytes", subCount);
 			unsigned char *src = rxBuffer + 2;
 
 			for(int i=0; i<16; i++) {
@@ -172,7 +172,7 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 					b += 3;
 				}
 
-				Debug::out("%s", bfr);
+				Debug::out(LOG_DEBUG, "%s", bfr);
 			}
         }
         //----------------------
@@ -191,7 +191,7 @@ void AcsiDataTrans::dumpDataOnce(void)
 void AcsiDataTrans::sendDataAndStatus(void)
 {
     if(!com) {
-        Debug::out("AcsiDataTrans::sendDataAndStatus -- no communication object, fail!");
+        Debug::out(LOG_ERROR, "AcsiDataTrans::sendDataAndStatus -- no communication object, fail!");
         return;
     }
 
@@ -207,7 +207,7 @@ void AcsiDataTrans::sendDataAndStatus(void)
 
 	//---------------------------------------
 	if(dumpNextData) {
-		Debug::out("sendDataAndStatus: %d bytes", count);
+		Debug::out(LOG_DEBUG, "sendDataAndStatus: %d bytes", count);
 		BYTE *src = buffer;
 
 		WORD dumpCnt = 0;
@@ -233,7 +233,7 @@ void AcsiDataTrans::sendDataAndStatus(void)
 				}
 			}
 
-			Debug::out("%s", bfr);
+			Debug::out(LOG_DEBUG, "%s", bfr);
 		}
 		
 		dumpNextData = false;
@@ -241,7 +241,7 @@ void AcsiDataTrans::sendDataAndStatus(void)
 	//---------------------------------------
 	
     #ifdef ONPC
-    Debug::out("PC will write data to ST: %d bytes", dataCnt);
+    Debug::out(LOG_DEBUG, "PC will write data to ST: %d bytes", dataCnt);
 
     BYTE marker = 0xfe;
     write(fakeAcsiFd, &marker, 1);
@@ -291,7 +291,7 @@ void AcsiDataTrans::sendDataAndStatus(void)
 void AcsiDataTrans::sendStatusAfterWrite(void)
 {
     #ifdef ONPC
-    Debug::out("Write status after write to ST: just marker and status...", dataCnt);
+    Debug::out(LOG_DEBUG, "Write status after write to ST: just marker and status...", dataCnt);
 
     BYTE marker = 0xfe;
     write(fakeAcsiFd, &marker, 1);

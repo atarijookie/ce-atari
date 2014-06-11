@@ -35,7 +35,7 @@ void *mountThreadCode(void *ptr)
 {
 	Mounter mounter;
 	
-	Debug::out("Mount thread starting...");
+	Debug::out(LOG_INFO, "Mount thread starting...");
 
 	while(sigintReceived == 0) {
 		pthread_mutex_lock(&mountThreadMutex);			// lock the mutex
@@ -70,7 +70,7 @@ void *mountThreadCode(void *ptr)
 		}
 	}
 	
-	Debug::out("Mount thread terminated.");
+	Debug::out(LOG_INFO, "Mount thread terminated.");
 	return 0;
 }
 
@@ -79,7 +79,7 @@ bool Mounter::mountDevice(char *devicePath, char *mountDir)
 	char cmd[MAX_STR_SIZE];
 
 	if(isAlreadyMounted(devicePath)) {
-		Debug::out("Mounter::mountDevice -- The device %s is already mounted, not doing anything.\n", devicePath);
+		Debug::out(LOG_INFO, "Mounter::mountDevice -- The device %s is already mounted, not doing anything.\n", devicePath);
 		return true;
 	}
 
@@ -89,7 +89,7 @@ bool Mounter::mountDevice(char *devicePath, char *mountDir)
 
 	// if the final command string did not fit in the buffer
 	if(len == MAX_STR_SIZE) {
-		Debug::out("Mounter::mountDevice - cmd string not large enough for mount!\n");
+		Debug::out(LOG_ERROR, "Mounter::mountDevice - cmd string not large enough for mount!\n");
 		return false;
 	}
 	
@@ -108,7 +108,7 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 	
 	// check if we're not trying to mount something we already have mounted
 	if(isAlreadyMounted(source)) {
-		Debug::out("Mounter::mountShared -- The source %s is already mounted, not doing anything.\n", source);
+		Debug::out(LOG_INFO, "Mounter::mountShared -- The source %s is already mounted, not doing anything.\n", source);
 		return true;
 	}
 		
@@ -118,7 +118,7 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 		passwd *psw = getpwnam("pi");
 		
 		if(psw == NULL) {
-			Debug::out("Mounter::mountShared - failed, because couldn't get uid and gid for user 'pi'\n");
+			Debug::out(LOG_ERROR, "Mounter::mountShared - failed, because couldn't get uid and gid for user 'pi'\n");
 			return false;
 		}
 		
@@ -129,7 +129,7 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 
 	// if the final command string did not fit in the buffer
 	if(len == MAX_STR_SIZE) {
-		Debug::out("Mounter::mountShared - cmd string not large enough for mount!\n");
+		Debug::out(LOG_ERROR, "Mounter::mountShared - cmd string not large enough for mount!\n");
 		return false;
 	}
 	
@@ -143,36 +143,36 @@ bool Mounter::mount(char *mountCmd, char *mountDir)
 	int ires = mkdir(mountDir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// try to create the mount dir, mod: 0x775
 	
 	if(ires != 0 && errno != EEXIST) {										// if failed to create dir, and it's not because it already exists...
-		Debug::out("Mounter::mount - failed to create directory %s", mountDir);
+		Debug::out(LOG_ERROR, "Mounter::mount - failed to create directory %s", mountDir);
 		return false;
 	}
 
 	// check if we should do unmount first
 	if(isMountdirUsed(mountDir)) {
 		if(!tryUnmount(mountDir)) {
-			Debug::out("Mounter::mount - Mount dir %s is busy, and unmount failed, not doing mount!\n", mountDir);
+			Debug::out(LOG_ERROR, "Mounter::mount - Mount dir %s is busy, and unmount failed, not doing mount!\n", mountDir);
 			return false;
 		}
 		
-		Debug::out("Mounter::mount - Mount dir %s was used and was unmounted.\n", mountDir);
+		Debug::out(LOG_INFO, "Mounter::mount - Mount dir %s was used and was unmounted.\n", mountDir);
 	}
 	
 	// delete previous log files (if there are any)
 	unlink(LOGFILE1);
 	unlink(LOGFILE2);
 
-	Debug::out("Mounter::mount - mount command:\n%s\n", mountCmd);
+	Debug::out(LOG_INFO, "Mounter::mount - mount command:\n%s\n", mountCmd);
 	
 	// build and run the command
 	int ret = system(mountCmd);
 	
 	// handle the result
 	if(WIFEXITED(ret) && WEXITSTATUS(ret) == 0) {
-		Debug::out("Mounter::mount - mount succeeded! (mount dir: %s)\n", mountDir);
+		Debug::out(LOG_INFO, "Mounter::mount - mount succeeded! (mount dir: %s)\n", mountDir);
 		return true;
 	} 
 	
-	Debug::out("Mounter::mount - mount failed. (mount dir: %s)\n", mountDir);
+	Debug::out(LOG_ERROR, "Mounter::mount - mount failed. (mount dir: %s)\n", mountDir);
 		
 	// move the logs to mount dir
 	char cmd[MAX_STR_SIZE];
@@ -239,7 +239,7 @@ bool Mounter::tryUnmount(char *mountDir)
 	
 	// handle the result
 	if(WIFEXITED(ret) && WEXITSTATUS(ret) == 0) {
-		Debug::out("Mounter::tryUnmount - umount succeeded\n");
+		Debug::out(LOG_INFO, "Mounter::tryUnmount - umount succeeded\n");
 		return true;
 	} 
 	
@@ -292,7 +292,7 @@ void Mounter::umountIfMounted(char *mountDir)
 
 void Mounter::restartNetwork(void)
 {
-	Debug::out("Mounter::restartNetwork - starting to restart the network\n");
+	Debug::out(LOG_INFO, "Mounter::restartNetwork - starting to restart the network\n");
 
 	system("sudo ifdown eth0");
 	system("sudo ifdown wlan0");
@@ -300,6 +300,6 @@ void Mounter::restartNetwork(void)
 	system("sudo ifup eth0");
 	system("sudo ifup wlan0");
 	
-	Debug::out("Mounter::restartNetwork - done\n");
+	Debug::out(LOG_INFO, "Mounter::restartNetwork - done\n");
 }
 

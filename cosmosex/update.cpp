@@ -33,13 +33,13 @@ void Update::processUpdateList(void)
         return;
     }
 
-    Debug::out("processUpdateList - starting");
+    Debug::out(LOG_DEBUG, "processUpdateList - starting");
 
     // open update list, parse Update::versions
     FILE *f = fopen(UPDATE_LOCALLIST, "rt");
 
     if(!f) {
-        Debug::out("processUpdateList - couldn't open file %s", UPDATE_LOCALLIST);
+        Debug::out(LOG_ERROR, "processUpdateList - couldn't open file %s", UPDATE_LOCALLIST);
         return;
     }
 
@@ -91,26 +91,26 @@ void Update::processUpdateList(void)
     // now compare Update::versions - current with those on server, if anything new then set a flag
     if(Update::versions.current.app.isOlderThan( Update::versions.onServer.app )) {
         Update::versions.gotUpdate = true;
-        Debug::out("processUpdateList - APP is newer on server");
+        Debug::out(LOG_DEBUG, "processUpdateList - APP is newer on server");
     }
 
     if(Update::versions.current.hans.isOlderThan( Update::versions.onServer.hans )) {
         Update::versions.gotUpdate = true;
-        Debug::out("processUpdateList - HANS is newer on server");
+        Debug::out(LOG_DEBUG, "processUpdateList - HANS is newer on server");
     }
 
     if(Update::versions.current.xilinx.isOlderThan( Update::versions.onServer.xilinx )) {
         Update::versions.gotUpdate = true;
-        Debug::out("processUpdateList - XILINX is newer on server");
+        Debug::out(LOG_DEBUG, "processUpdateList - XILINX is newer on server");
     }
 
     if(Update::versions.current.franz.isOlderThan( Update::versions.onServer.franz )) {
         Update::versions.gotUpdate = true;
-        Debug::out("processUpdateList - FRANZ is newer on server");
+        Debug::out(LOG_DEBUG, "processUpdateList - FRANZ is newer on server");
     }
 
     Update::versions.updateListWasProcessed = true;         // mark that the update list was processed and don't need to do this again
-    Debug::out("processUpdateList - done");
+    Debug::out(LOG_DEBUG, "processUpdateList - done");
 }
 
 void Update::downloadUpdateList(void)
@@ -119,10 +119,10 @@ void Update::downloadUpdateList(void)
   	int res = mkdir(UPDATE_LOCALPATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
 	
 	if(res == 0) {					// dir created
-		Debug::out("Update: directory %s was created.", UPDATE_LOCALPATH);
+		Debug::out(LOG_DEBUG, "Update: directory %s was created.", UPDATE_LOCALPATH);
 	} else {						// dir not created
 		if(errno != EEXIST) {		// and it's not because it already exists...
-			Debug::out("Update: failed to create settings directory - %s", strerror(errno));
+			Debug::out(LOG_ERROR, "Update: failed to create settings directory - %s", strerror(errno));
 		}
 	}
 
@@ -268,7 +268,7 @@ bool Update::createUpdateScript(void)
     FILE *f = fopen(UPDATE_SCRIPT, "wt");
 
     if(!f) {
-        Debug::out("Update::createUpdateScript failed to create update script - %s", UPDATE_SCRIPT);
+        Debug::out(LOG_ERROR, "Update::createUpdateScript failed to create update script - %s", UPDATE_SCRIPT);
         return false;
     }
 

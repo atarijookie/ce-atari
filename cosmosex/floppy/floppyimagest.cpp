@@ -23,7 +23,7 @@ bool FloppyImageSt::open(char *fileName)
     fajl = fopen(fileName, "rb");
 
     if(fajl == NULL) {
-        Debug::out("Failed to open image file: %s", fileName);
+        Debug::out(LOG_ERROR, "Failed to open image file: %s", fileName);
         openFlag = false;
         return false;
     }
@@ -36,8 +36,8 @@ bool FloppyImageSt::open(char *fileName)
 
     calcParams();                       // calculate the params of this floppy
 
-    Debug::out("ST Image opened: %s", fileName);
-    Debug::out("ST Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
+    Debug::out(LOG_INFO, "ST Image opened: %s", fileName);
+    Debug::out(LOG_INFO, "ST Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
 
     return true;
 }
@@ -164,7 +164,7 @@ bool FloppyImageSt::calcParams(void)
         }
     }
 
-    Debug::out("Couldn't guess the floppy params :(");
+    Debug::out(LOG_ERROR, "Couldn't guess the floppy params :(");
     return false;
 }
 

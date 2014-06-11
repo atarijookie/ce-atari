@@ -152,7 +152,7 @@ FilenameShortener *DirTranslator::createShortener(std::string &path)
 		}
 	
 		if(de->d_type != DT_DIR && de->d_type != DT_REG) {			// not 	a file, not a directory?
-			Debug::out("TranslatedDisk::createShortener -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
+			Debug::out(LOG_DEBUG, "TranslatedDisk::createShortener -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
 			continue;
 		}
 
@@ -190,7 +190,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 		}
 
 		if(de->d_type != DT_DIR && de->d_type != DT_REG) {			// not a file, not a directory?
-			Debug::out("TranslatedDisk::onFsfirst -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
+			Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
 			continue;
 		}
 
@@ -260,7 +260,7 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, char *search
 	res = stat(fullEntryPath.c_str(), &attr);					// get the file status
 	
 	if(res != 0) {
-		Debug::out("TranslatedDisk::appendFoundToFindStorage -- stat() failed, errno %d", errno);
+		Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- stat() failed, errno %d", errno);
 		return;		
 	}
 

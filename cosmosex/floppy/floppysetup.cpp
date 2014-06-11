@@ -45,14 +45,14 @@ void FloppySetup::processCommand(BYTE *command)
     cmd = command;
 
     if(dataTrans == 0) {
-        Debug::out("FloppySetup::processCommand was called without valid dataTrans, can't tell ST that his went wrong...");
+        Debug::out(LOG_ERROR, "FloppySetup::processCommand was called without valid dataTrans, can't tell ST that his went wrong...");
         return;
     }
 
     dataTrans->clear();                 // clean data transporter before handling
 
     if(imageSilo == 0) {
-        Debug::out("FloppySetup::processCommand was called without valid imageSilo, can't do image setup stuff!");
+        Debug::out(LOG_ERROR, "FloppySetup::processCommand was called without valid imageSilo, can't do image setup stuff!");
         dataTrans->setStatus(FDD_ERROR);
         dataTrans->sendDataAndStatus();
         return;
@@ -147,7 +147,7 @@ void FloppySetup::uploadStart(void)
         f = fopen((char *) path.c_str(), "wb");
 
         if(!f) {                                            // failed to open file?
-            Debug::out("FloppySetup::uploadStart - failed to open file %s", (char *) path.c_str());
+            Debug::out(LOG_ERROR, "FloppySetup::uploadStart - failed to open file %s", (char *) path.c_str());
     
             dataTrans->setStatus(FDD_ERROR);
             return;
@@ -263,7 +263,7 @@ void FloppySetup::newImage(void)
     FILE *f = fopen((char *) path.c_str(), "wb");
 
     if(!f) {                                            // failed to open file?
-        Debug::out("FloppySetup::newImage - failed to open file %s", (char *) path.c_str());
+        Debug::out(LOG_ERROR, "FloppySetup::newImage - failed to open file %s", (char *) path.c_str());
     
         dataTrans->setStatus(FDD_ERROR);
         return;

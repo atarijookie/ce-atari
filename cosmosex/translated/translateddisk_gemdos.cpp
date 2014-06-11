@@ -422,7 +422,7 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     res = stat(hostName.c_str(), &attr);							// get the file status
 	
 	if(res != 0) {
-		Debug::out("TranslatedDisk::onFattrib() -- stat() failed");
+		Debug::out(LOG_ERROR, "TranslatedDisk::onFattrib() -- stat() failed");
 		dataTrans->setStatus(EINTRN);
 		return;		
 	}
@@ -435,7 +435,7 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     Utils::attributesHostToAtari(isReadOnly, isDir, oldAttrAtari);
 	
     if(setNotInquire) {     // SET attribs?
-		Debug::out("TranslatedDisk::onFattrib() -- TODO: setting attributes needs to be implemented!");
+		Debug::out(LOG_DEBUG, "TranslatedDisk::onFattrib() -- TODO: setting attributes needs to be implemented!");
 	/*
         attributesAtariToHost(attrAtariNew, attrHost);
 
@@ -499,7 +499,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     fclose(f);
 
     // now set it's attributes
-	Debug::out("TranslatedDisk::onFcreate -- TODO: setting attributes needs to be implemented!");
+	Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate -- TODO: setting attributes needs to be implemented!");
 
 /*	
     DWORD attrHost;
@@ -662,7 +662,7 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
 		res = stat(files[index].hostPath.c_str(), &attr);			// get the file status
 	
 		if(res != 0) {
-			Debug::out("TranslatedDisk::appendFoundToFindStorage -- stat() failed");
+			Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- stat() failed");
 			dataTrans->setStatus(EINTRN);
 			return;		
 		}

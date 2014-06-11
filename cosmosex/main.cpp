@@ -21,6 +21,8 @@ void sigint_handler(int sig);
 
 void handlePthreadCreate(int res, char *what);
 
+extern BYTE g_logLevel;
+
 int main(int argc, char *argv[])
  {
 	CCoreThread *core;
@@ -29,20 +31,38 @@ int main(int argc, char *argv[])
     pthread_t	ikbdThreadInfo;
 	pthread_t	floppyEncThreadInfo;
 
-    Debug::out("\n\n---------------------------------------------------");
-    Debug::out("CosmosEx starting...");
+    if(argc == 2 && strncmp(argv[1], "ll", 2) == 0) {           // is this the log level setting? 
+        int ll;
+        
+        ll = (int) argv[1][2];
 
-	if(signal(SIGINT, sigint_handler) == SIG_ERR) {		// register SIGINT handler
-		Debug::out("Cannot register SIGINT handler!");
+        if(ll >= 48 && ll <= 57) {                              // if it's a number between 0 and 9
+            ll = ll - 48;
+    
+            if(ll > LOG_DEBUG) {                                // would be higher than highest log level? fix it
+                ll = LOG_DEBUG;
+            }
+
+            g_logLevel = ll;                                    // store log level
+        }
+    }
+
+    Debug::printfLogLevelString();
+
+    Debug::out(LOG_ERROR, "\n\n---------------------------------------------------");
+    Debug::out(LOG_ERROR, "CosmosEx starting...");
+
+	if(signal(SIGINT, sigint_handler) == SIG_ERR) {		        // register SIGINT handler
+		Debug::out(LOG_ERROR, "Cannot register SIGINT handler!");
 	}
 
 	system("sudo echo none > /sys/class/leds/led0/trigger");	// disable usage of GPIO 23 (pin 16) by LED 
 	
-	if(!gpio_open()) {									// try to open GPIO and SPI on RPi
+	if(!gpio_open()) {									        // try to open GPIO and SPI on RPi
 		return 0;
 	}
 
-	if(argc == 2 && strcmp(argv[1], "reset") == 0) {
+	if(argc == 2 && strcmp(argv[1], "reset") == 0) {            // is this a reset command? (used with STM32 ST-Link debugger)
 		Utils::resetHansAndFranz();
 		gpio_close();
 		
@@ -83,22 +103,22 @@ int main(int argc, char *argv[])
 
     Downloader::cleanupBeforeQuit();
 
-    Debug::out("CosmosEx terminated.");
+    Debug::out(LOG_INFO, "CosmosEx terminated.");
     return 0;
  }
  
  void handlePthreadCreate(int res, char *what)
  {
  	if(res != 0) {
-		Debug::out("Failed to create %s thread, %s won't work...", what, what);
+		Debug::out(LOG_ERROR, "Failed to create %s thread, %s won't work...", what, what);
 	} else {
-		Debug::out("%s thread created", what);
+		Debug::out(LOG_INFO, "%s thread created", what);
 	}
  }
 
 void sigint_handler(int sig)
 {
-    Debug::out("SIGINT signal received, terminating.");
+    Debug::out(LOG_INFO, "SIGINT signal received, terminating.");
 	sigintReceived = 1;
 } 
 

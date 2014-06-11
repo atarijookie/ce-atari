@@ -154,7 +154,7 @@ void DevFinder::processFoundDev(std::string file)
 		
 		bool atariDrive = isAtariDrive(file);
 		
-		Debug::out("device attached: %s, is atari drive: %d", (char *) file.c_str(), atariDrive);		// write out
+		Debug::out(LOG_INFO, "device attached: %s, is atari drive: %d", (char *) file.c_str(), atariDrive);		// write out
 
 		if(devChHandler != NULL) {									// if got handler, notify him
 			devChHandler->onDevAttached(file, atariDrive);
@@ -206,7 +206,7 @@ void DevFinder::findAndSignalDettached(void)
 			del = it;														// delete dev in next step
 			someDevChanged = true;
 			
-			Debug::out("device detached: %s", (char *) it->first.c_str());
+			Debug::out(LOG_INFO, "device detached: %s", (char *) it->first.c_str());
 
 			if(devChHandler != NULL) {										// if got handler, notify him
 				devChHandler->onDevDetached(it->first);
@@ -222,7 +222,7 @@ void DevFinder::findAndSignalDettached(void)
 bool DevFinder::isAtariDrive(std::string file)
 {
 	if(geteuid() != 0) {
-		Debug::out("Warning! Not running as root, won't be able to check dev partitions types!");
+		Debug::out(LOG_ERROR, "Warning! Not running as root, won't be able to check dev partitions types!");
 	}
 	
 	std::string fullPath = "/dev/" + file;

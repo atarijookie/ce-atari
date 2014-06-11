@@ -36,14 +36,14 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
 	f = fopen("/ce/app/configdrive/cedd.bs", "rb");
 
 	if(!f) {
-        Debug::out("TranslatedBootMedia - failed to open bootsector file!");
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open bootsector file!");
 		return false;
 	}
 	
 	bytesRead = fread(&imageBuffer[0], 1, 512, f);
 	
 	if(bytesRead != 512) {
-        Debug::out("TranslatedBootMedia - didn't read 512 bytes from bootsector file!");
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - didn't read 512 bytes from bootsector file!");
 		return false;
 	}
 	
@@ -53,19 +53,19 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
 	f = fopen("/ce/app/configdrive/cedd.prg", "rb");
 
 	if(!f) {
-        Debug::out("TranslatedBootMedia - failed to open cedd.prg!");
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open cedd.prg!");
 		return false;
 	}
 	
 	bytesRead = fread(&imageBuffer[512], 1, TRANSLATEDBOOTMEDIA_SIZE - 512, f);			// try to read data up to the size of buffer
 	
 	if(bytesRead < (5*1024)) {															// didn't read enough?
-        Debug::out("TranslatedBootMedia - didn't read more than 5 kB of data from driver, this is probably wrong, failing preventively :)");
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - didn't read more than 5 kB of data from driver, this is probably wrong, failing preventively :)");
 		return false;
 	}
 
 	if(!feof(f)) {
-        Debug::out("TranslatedBootMedia - didn't reach the end of driver file when loading to RAM, buffer is probably too small, failing!");
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - didn't reach the end of driver file when loading to RAM, buffer is probably too small, failing!");
 		return false;
 	}
 	
@@ -94,7 +94,7 @@ void TranslatedBootMedia::updateBootsectorConfig(void)
 	int pos = getConfigPosition();
 	
 	if(pos == -1) {
-		Debug::out("TranslatedBootMedia - didn't find the config position in bootsector.");
+		Debug::out(LOG_ERROR, "TranslatedBootMedia - didn't find the config position in bootsector.");
 		return;
 	}
 	
@@ -103,7 +103,7 @@ void TranslatedBootMedia::updateBootsectorConfig(void)
 	
 	updateBootsectorChecksum();							// update the checksum at the end
 	
-    Debug::out("TranslatedBootMedia - bootsector will read %d sectors, the driver will take %d kB of RAM.", (int) imageBuffer[pos + 3], (int) (totalSize / 1024));
+    Debug::out(LOG_INFO, "TranslatedBootMedia - bootsector will read %d sectors, the driver will take %d kB of RAM.", (int) imageBuffer[pos + 3], (int) (totalSize / 1024));
 }
 
 void TranslatedBootMedia::updateBootsectorChecksum(void)
@@ -141,7 +141,7 @@ void TranslatedBootMedia::updateBootsectorConfigWithACSIid(BYTE acsiId)
 	int pos = getConfigPosition();
 	
 	if(pos == -1) {
-		Debug::out("TranslatedBootMedia - didn't find the config position in bootsector.");
+		Debug::out(LOG_ERROR, "TranslatedBootMedia - didn't find the config position in bootsector.");
 		return;
 	}
 	
@@ -149,7 +149,7 @@ void TranslatedBootMedia::updateBootsectorConfigWithACSIid(BYTE acsiId)
 	
 	updateBootsectorChecksum();							// update the checksum at the end
 	
-	Debug::out("TranslatedBootMedia - bootsector config updated with new ACSI ID set to %d", (int) acsiId);
+	Debug::out(LOG_INFO, "TranslatedBootMedia - bootsector config updated with new ACSI ID set to %d", (int) acsiId);
 }
 
 int TranslatedBootMedia::getConfigPosition(void)

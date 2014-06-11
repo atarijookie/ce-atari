@@ -130,7 +130,7 @@ void CCoreThread::run(void)
                 case UPDATE_STATE_DOWNLOAD_FAIL:
                 confStream->showUpdateDownloadFail();                       // show fail message on config screen
                 Update::stateGoIdle();
-				Debug::out("Update state - download failed");
+				Debug::out(LOG_ERROR, "Update state - download failed");
                 break;
 
                 //-----------
@@ -138,15 +138,15 @@ void CCoreThread::run(void)
 
                 if(!confStream->isUpdateDownloadPageShown()) {              // if user is NOT waiting on download page (cancel pressed), don't update
                     Update::stateGoIdle();
-					Debug::out("Update state - download OK, but user is not on download page - NOT doing update");
+					Debug::out(LOG_INFO, "Update state - download OK, but user is not on download page - NOT doing update");
                 } else {                                                    // if user is waiting on download page, aplly update
                     res = Update::createUpdateScript();
 
                     if(!res) {
                         confStream->showUpdateError();
-						Debug::out("Update state - download OK, failed to create update script - NOT doing update");
+						Debug::out(LOG_INFO, "Update state - download OK, failed to create update script - NOT doing update");
                     } else {
-						Debug::out("Update state - download OK, update script created, will do update.");
+						Debug::out(LOG_INFO, "Update state - download OK, update script created, will do update.");
 						sigintReceived = 1;
                     }
                 }
@@ -171,7 +171,7 @@ void CCoreThread::run(void)
 				break;
 
 			default:
-				Debug::out((char *) "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
+				Debug::out(LOG_ERROR, (char *) "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
 				break;
 			}
 		}
@@ -195,7 +195,7 @@ void CCoreThread::run(void)
 				break;
 
 			default:
-				Debug::out((char *) "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
+				Debug::out(LOG_ERROR, (char *) "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
 				break;
 			}
 		}
@@ -221,7 +221,7 @@ void CCoreThread::runOnPc(void)
     fakeAcsiFd = serialSetup(&termiosStruct);
 
     if(fakeAcsiFd == -1) {
-        Debug::out((char *) "Couldn't open serial port %s, can't continue!", UARTFILE);
+        Debug::out(LOG_DEBUG, (char *) "Couldn't open serial port %s, can't continue!", UARTFILE);
     }
 
     loadSettings();
@@ -241,7 +241,7 @@ void CCoreThread::runOnPc(void)
             readBuffer(fakeAcsiFd, writeData, dataCnt);
         }
 
-        Debug::out((char *) "ST will %s bytes: %d", header[1] == 0 ? "write" : "read", dataCnt);
+        Debug::out(LOG_DEBUG, (char *) "ST will %s bytes: %d", header[1] == 0 ? "write" : "read", dataCnt);
 
         dataTrans->dumpDataOnce();
         handleAcsiCommand();
@@ -293,7 +293,7 @@ int CCoreThread::serialSetup(termios *ts)
 	
 	fd = open(UARTFILE, O_RDWR | O_NOCTTY); // | O_NDELAY | O_NONBLOCK);
 	if(fd == -1) {
-        Debug::out("Failed to open %s", UARTFILE);
+        Debug::out(LOG_ERROR, "Failed to open %s", UARTFILE);
         return -1;
 	}
 	fcntl(fd, F_SETFL, 0);
@@ -352,7 +352,7 @@ void CCoreThread::handleAcsiCommand(void)
     conSpi->txRx(SPI_CS_HANS, 14, bufOut, bufIn);        // get 14 cmd bytes
     #endif
 
-    Debug::out("handleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
+    Debug::out(LOG_DEBUG, "handleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
 
     BYTE justCmd, tag1, tag2, module;
     BYTE *pCmd;
@@ -425,7 +425,7 @@ void CCoreThread::reloadSettings(int type)
 
 void CCoreThread::loadSettings(void)
 {
-    Debug::out("CCoreThread::loadSettings");
+    Debug::out(LOG_DEBUG, "CCoreThread::loadSettings");
 
     Settings s;
     enabledIDbits = 0;									// no bits / IDs enabled yet
@@ -466,7 +466,7 @@ void CCoreThread::loadSettings(void)
 
 	// no ACSI ID was enabled? enable ACSI ID 0
 	if(!gotDevTypeRaw && !gotDevTypeTranslated) {
-		Debug::out("CCoreThread::loadSettings -- no ACSI ID was enabled, so enabling ACSI ID 0");
+		Debug::out(LOG_INFO, "CCoreThread::loadSettings -- no ACSI ID was enabled, so enabling ACSI ID 0");
 			
 		acsiIDevType[0]	= DEVTYPE_TRANSLATED;
 		enabledIDbits	= 1;
@@ -511,18 +511,18 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
     if(fwVer[0] == 0xf0) {
         Update::versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
 
-        Debug::out("FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+        Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
     } else {
         Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));               // store found FW version of Hans
 
         int currentLed = fwVer[4];
 
-        Debug::out("FW: Hans,  %d-%02d-%02d, LED is: %d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed);
+        Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed);
 
         if(lastFloppyImageLed != currentLed) {              // did the floppy image LED change since last time?
             lastFloppyImageLed = currentLed;
 
-            Debug::out("Floppy image changed to %d", currentLed);
+            Debug::out(LOG_INFO, "Floppy image changed to %d", currentLed);
 
             floppyImageSilo.setCurrentSlot(currentLed);     // switch the floppy image
         }
@@ -541,7 +541,7 @@ int CCoreThread::bcdToInt(int bcd)
 
 void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 {
-	Debug::out("CCoreThread::onDevAttached: devName %s", (char *) devName.c_str());
+	Debug::out(LOG_INFO, "CCoreThread::onDevAttached: devName %s", (char *) devName.c_str());
 
 	// TODO: add logic to detach the device, if it was attached as other type (raw / tran)
 
@@ -555,7 +555,7 @@ void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 		if(!isAtariDrive) {			// attach non-atari drive as TRANSLATED	
 			attachDevAsTranslated(devName);
 		} else {					// can't attach atari drive
-			Debug::out("Can't attach device %s, because it's an Atari drive and no RAW device is enabled.", (char *) devName.c_str());
+			Debug::out(LOG_INFO, "Can't attach device %s, because it's an Atari drive and no RAW device is enabled.", (char *) devName.c_str());
 		}
 	}
 
@@ -570,7 +570,7 @@ void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 	
 	// if no device type is enabled
 	if(!gotDevTypeRaw && !gotDevTypeTranslated) {
-		Debug::out("Can't attach device %s, because no device type (RAW or TRANSLATED) is enabled on ACSI bus!", (char *) devName.c_str());
+		Debug::out(LOG_INFO, "Can't attach device %s, because no device type (RAW or TRANSLATED) is enabled on ACSI bus!", (char *) devName.c_str());
 	}
 }
 
@@ -626,7 +626,7 @@ void CCoreThread::attachDevAsTranslated(std::string devName)
 		res = translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL);	// try to attach
 	
 		if(!res) {																// if didn't attach, skip the rest
-			Debug::out("attachDevAsTranslated: failed to attach %s", (char *) mountPath.c_str());
+			Debug::out(LOG_ERROR, "attachDevAsTranslated: failed to attach %s", (char *) mountPath.c_str());
 			continue;
 		}
 		
@@ -650,12 +650,12 @@ void CCoreThread::mountAndAttachSharedDrive(void)
 	nfsNotSamba		= s.getBool((char *) "SHARED_NFS_NOT_SAMBA", false);
 	
 	if(!sharedEnabled) {
-		Debug::out("mountAndAttachSharedDrive: shared drive not enabled, not mounting and not attaching...");
+		Debug::out(LOG_INFO, "mountAndAttachSharedDrive: shared drive not enabled, not mounting and not attaching...");
 		return;
 	}
 	
 	if(addr.empty() || path.empty()) {
-		Debug::out("mountAndAttachSharedDrive: address or path is empty, this won't work!");
+		Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: address or path is empty, this won't work!");
 		return;
 	}
 	
@@ -671,7 +671,7 @@ void CCoreThread::mountAndAttachSharedDrive(void)
 	bool res = translated->attachToHostPath(mountPath, TRANSLATEDTYPE_SHAREDDRIVE);	// try to attach
 
 	if(!res) {																// if didn't attach, skip the rest
-		Debug::out("mountAndAttachSharedDrive: failed to attach shared drive %s", (char *) mountPath.c_str());
+		Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: failed to attach shared drive %s", (char *) mountPath.c_str());
 	}
 }
 
@@ -685,13 +685,13 @@ void CCoreThread::handleSendTrack(void)
     int side    = iBuf[0];               // now read the current floppy position
     int track   = iBuf[1];
 
-    Debug::out("ATN_SEND_TRACK -- track %d, side %d", track, side);
+    Debug::out(LOG_DEBUG, "ATN_SEND_TRACK -- track %d, side %d", track, side);
 
     int tr, si, spt;
     floppyImageSilo.getParams(tr, si, spt);      // read the floppy image params
 
     if(side < 0 || side > 1 || track < 0 || track >= tr) {
-        Debug::out("Side / Track out of range!");
+        Debug::out(LOG_ERROR, "Side / Track out of range!");
         return;
     }
 
@@ -720,7 +720,7 @@ void CCoreThread::handleSectorWritten(void)
     int track   = iBuf[1] & 0x7f;
     int side    = (iBuf[1] & 0x80) ? 1 : 0;
 
-    Debug::out("handleSectorWritten -- track %d, side %d, sector %d -- TODO!!!", track, side, sector);
+    Debug::out(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d -- TODO!!!", track, side, sector);
     
     // TODO:
     // do the written sector processing
