@@ -41,6 +41,9 @@ BYTE ce_acsiWriteBlockCommand(void);
 void newImage(int index);
 void downloadImage(int index);
 
+void showComError(void);
+void createFullPath(char *fullPath, char *filePath, char *fileName);
+
 char filePath[256], fileName[256];
 
 BYTE *p64kBlock;
@@ -86,12 +89,11 @@ int main( int argc, char* argv[] )
 
 	// search for CosmosEx on ACSI bus
 	found = ce_findId();
-
 	if(!found) {								                    // not found? quit
 		sleep(3);
 		return 0;
 	}
- 
+
 	// now set up the acsi command bytes so we don't have to deal with this one anymore 
 	commandShort[0] = (deviceID << 5); 					            // cmd[0] = ACSI_id + TEST UNIT READY (0)	
 
@@ -217,12 +219,12 @@ void newImage(int index)
     commandShort[4] = FDD_CMD_NEW_EMPTYIMAGE;
     commandShort[5] = index;
 
+    sectorCount = 1;                            // read 1 sector
+    
     BYTE res = Supexec(ce_acsiReadCommand); 
 		
 	if(res != 1) {                              // bad? write error
-        (void) Clear_home();
-        (void) Cconws("Error in CosmosEx communication!\r\n");
-        Cnecin();
+        showComError();
     }
 }
 
@@ -231,22 +233,133 @@ void downloadImage(int index)
     if(index < 0 || index > 2) {
         return;
     }
-	
-	// TODO: all the code for download
+
+    // start the transfer
+    commandShort[4] = FDD_CMD_DOWNLOADIMG_START;
+    commandShort[5] = index;
+
+    sectorCount = 1;                            // read 1 sector
+    
+    BYTE res = Supexec(ce_acsiReadCommand); 
+		
+	if(res == 1) {                              // good? copy in the results
+        strcpy(fileName, (char *) pBfr);        // pBfr should contain original file name
+    } else {                                    // bad? show error
+        showComError();
+        return;
+    }
+    
+    short button;  
+  
+    // open fileselector and get path
+	graf_mouse(M_ON, 0);
+    fsel_input(filePath, fileName, &button);    // show file selector
+	graf_mouse(M_OFF, 0);
+  
+    if(button != 1) {                           // if OK was not pressed
+        commandShort[4] = FDD_CMD_DOWNLOADIMG_DONE;
+        commandShort[5] = index;
+
+        sectorCount = 1;                            // read 1 sector
+        
+        res = Supexec(ce_acsiReadCommand); 
+		
+        if(res != 1) {
+            showComError();
+        }
+        return;
+    }
+  
+	// fileName contains the filename
+	// filePath contains the path with search wildcards, e.g.: C:\\*.*
+  
+    // create full path
+    char fullPath[512];
+
+    createFullPath(fullPath, filePath, fileName);       // fullPath = filePath + fileName
+    
+    short fh = Fcreate(fullPath, 0);               		// open file for writing
+    
+    if(fh < 0) {
+        (void) Clear_home();
+        (void) Cconws("Failed to create the file:\r\n");
+        (void) Cconws(fullPath);
+        (void) Cconws("\r\n");
+    
+        Cnecin();
+        return;
+    }
+
+    // do the transfer
+    int32_t blockNo, len, ires;
+    BYTE failed = 0;
+    
+    for(blockNo=0; blockNo<64; blockNo++) {                 // try to get all blocks
+        commandShort[4] = FDD_CMD_DOWNLOADIMG_GETBLOCK;     // receiving block
+        commandShort[5] = (index << 6) | (blockNo & 0x3f);  // for this index and block #
+        
+        sectorCount = 128;                                  // read 128 sectors (64 kB)
+        
+        res = Supexec(ce_acsiReadCommand);                  // get the data
+		
+        if(res != 0) {                                      // error? write error
+            showComError();
+            
+            failed = 1;
+            break;
+        }
+        
+        len = (((WORD) pBfr[0]) << 8) | ((WORD) pBfr[1]);   // retrieve count of data in buffer
+
+        if(len > 0) {                                       // something to write?
+            ires = Fwrite(fh, len, pBfr + 2);
+            
+            if(ires < 0 || ires != len) {                   // failed to write?
+                (void) Cconws("Writing to file failed!\r\n");
+                Cnecin();
+                
+                failed = 1;
+                break;
+            }
+        }
+        
+        if(len < (65536 - 2)) {                             // if received less than full 64kB block, then this was the last block
+            break;
+        }
+    }
+    
+    // finish the transfer and close the file
+    Fclose(fh);    
+    
+    commandShort[4] = FDD_CMD_DOWNLOADIMG_DONE;
+    commandShort[5] = index;
+    
+    sectorCount = 1;                            // read 1 sector
+
+    res = Supexec(ce_acsiReadCommand); 
+		
+    if(res != 1) {
+        showComError();
+    }
+    
+    // in case of error delete the probably incomplete file
+    if(failed) {
+        Fdelete(fullPath);
+    }
 }
 
 void getSiloContent(void)
 {
     commandShort[4] = FDD_CMD_GETSILOCONTENT;
 
+    sectorCount = 1;                            // read 1 sector
+
     BYTE res = Supexec(ce_acsiReadCommand); 
 		
 	if(res == 1) {                              // good? copy in the results
         memcpy(siloContent, pBfr, 512);
     } else {                                    // bad? show error
-        (void) Clear_home();
-        (void) Cconws("Error in CosmosEx communication!\r\n");
-        Cnecin();
+        showComError();
     }
 }
 
@@ -259,12 +372,12 @@ void swapImage(int index)
     commandShort[4] = FDD_CMD_SWAPSLOTS;
     commandShort[5] = index;
 
+    sectorCount = 1;                            // read 1 sector
+    
     BYTE res = Supexec(ce_acsiReadCommand); 
 		
 	if(res != 1) {                              // bad? write error
-        (void) Clear_home();
-        (void) Cconws("Error in CosmosEx communication!\r\n");
-        Cnecin();
+        showComError();
     }
 }
 
@@ -277,12 +390,12 @@ void removeImage(int index)
     commandShort[4] = FDD_CMD_REMOVESLOT;
     commandShort[5] = index;
 
+    sectorCount = 1;                            // read 1 sector
+    
     BYTE res = Supexec(ce_acsiReadCommand); 
 		
 	if(res != 1) {                              // bad? write error
-        (void) Clear_home();
-        (void) Cconws("Error in CosmosEx communication!\r\n");
-        Cnecin();
+        showComError();
     }
 }
 
@@ -308,18 +421,8 @@ void uploadImage(int index)
   
     // create full path
     char fullPath[512];
-    strcpy(fullPath, filePath);
-	
-	removeLastPartUntilBackslash(fullPath);				// remove the search wildcards from the end
-
-	if(strlen(fullPath) > 0) {							
-		if(fullPath[ strlen(fullPath) - 1] != '\\') {	// if the string doesn't end with backslash, add it
-			strcat(fullPath, "\\");
-		}
-	}
-	
-    strcat(fullPath, fileName);							// add the filename
-  
+    createFullPath(fullPath, filePath, fileName);       // fullPath = filePath + fileName  
+    
     short fh = Fopen(fullPath, 0);               		// open file for reading
   
     if(fh < 0) {
@@ -352,9 +455,7 @@ void uploadImage(int index)
     }
         
     if(res != 0) {                                              // bad? write error
-        (void) Clear_home();
-        (void) Cconws("Error in CosmosEx communication!\r\n");
-        Cnecin();
+        showComError();
                 
         Fclose(fh);                                             // close file and quit
         return;
@@ -400,9 +501,7 @@ void uploadImage(int index)
         res = Supexec(ce_acsiWriteBlockCommand);                // send the data
 		
         if(res != 0) {                                          // error? write error
-            (void) Clear_home();
-            (void) Cconws("Error in CosmosEx communication!\r\n");
-            Cnecin();
+            showComError();
                
             good = 0;                                           // mark that upload didn't finish good
             break;
@@ -428,6 +527,8 @@ void uploadImage(int index)
     
     commandShort[5] = index;
 
+    sectorCount = 1;                            // read 1 sector
+    
     res = Supexec(ce_acsiReadCommand);     
 
     if(res != 1) {                              // bad? write error
@@ -515,7 +616,7 @@ BYTE ce_acsiReadCommand(void)
   
 	memset(pBfr, 0, 512);              											// clear the buffer 
 
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, 1);			// issue the command and check the result 
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, sectorCount);   // issue the command and check the result 
 
 	if(res != OK) {                        										// if failed, return FALSE 
 		return 0;
@@ -550,4 +651,26 @@ BYTE getLowestDrive(void)
     }
     
     return 'A';
+}
+
+void showComError(void)
+{
+    (void) Clear_home();
+    (void) Cconws("Error in CosmosEx communication!\r\n");
+    Cnecin();
+}
+
+void createFullPath(char *fullPath, char *filePath, char *fileName)
+{
+    strcpy(fullPath, filePath);
+	
+	removeLastPartUntilBackslash(fullPath);				// remove the search wildcards from the end
+
+	if(strlen(fullPath) > 0) {							
+		if(fullPath[ strlen(fullPath) - 1] != '\\') {	// if the string doesn't end with backslash, add it
+			strcat(fullPath, "\\");
+		}
+	}
+	
+    strcat(fullPath, fileName);							// add the filename
 }
