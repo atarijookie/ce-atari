@@ -398,7 +398,7 @@ void Scsi::processCommand(BYTE *command)
 
     dataMedia = NULL;
 
-	BYTE attachedMediaIndex = devInfo[acsiId].attachedMediaIndex;
+	int attachedMediaIndex = devInfo[acsiId].attachedMediaIndex;
 	
     if(attachedMediaIndex != -1) {          											// if we got media attached to this ACSI ID
         dataMedia = attachedMedia[ attachedMediaIndex ].dataMedia;						// get pointer to dataMedia

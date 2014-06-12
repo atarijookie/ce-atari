@@ -39,7 +39,6 @@ CCoreThread::CCoreThread()
     scsi->setAcsiDataTrans(dataTrans);
     scsi->attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
 //  scsi->attachToHostPath("TESTMEDIA", SOURCETYPE_TESTMEDIA, SCSI_ACCESSTYPE_FULL);
-	scsi->attachToHostPath("sd_card_icdpro.img", SOURCETYPE_IMAGE, SCSI_ACCESSTYPE_FULL);
 
     translated = new TranslatedDisk();
     translated->setAcsiDataTrans(dataTrans);
@@ -433,6 +432,8 @@ void CCoreThread::loadSettings(void)
 	gotDevTypeRaw			= false;					// no raw and translated types found yet
 	gotDevTypeTranslated	= false;
 	
+	bool gotDevTypeSd		= false;
+	
 	sdCardAcsiId = 0xff;								// at start mark that we don't have SD card ID yet
 	
     char key[32];
@@ -449,6 +450,7 @@ void CCoreThread::loadSettings(void)
 
         if(devType == DEVTYPE_SD) {                     // if on this ACSI ID we should have the native SD card, store this ID
             sdCardAcsiId = id;
+			gotDevTypeSd = true;
         }
 
         if(devType != DEVTYPE_OFF) {                    // if ON
@@ -465,7 +467,7 @@ void CCoreThread::loadSettings(void)
     }
 
 	// no ACSI ID was enabled? enable ACSI ID 0
-	if(!gotDevTypeRaw && !gotDevTypeTranslated) {
+	if(!gotDevTypeRaw && !gotDevTypeTranslated && !gotDevTypeSd) {
 		Debug::out(LOG_INFO, "CCoreThread::loadSettings -- no ACSI ID was enabled, so enabling ACSI ID 0");
 			
 		acsiIDevType[0]	= DEVTYPE_TRANSLATED;

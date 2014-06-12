@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <stdlib.h>
 
-#define SETTINGS_PATH		"settings"
+#define SETTINGS_PATH		"/ce/settings"
 
 #include "global.h"
 #include "debug.h"
