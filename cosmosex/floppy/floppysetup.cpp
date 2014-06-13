@@ -18,6 +18,8 @@ FloppySetup::FloppySetup()
     translated  = NULL;
 
     currentUpload.fh = NULL;
+
+    currentDownload.fh = NULL;
 }
 
 FloppySetup::~FloppySetup()
@@ -85,9 +87,9 @@ void FloppySetup::processCommand(BYTE *command)
 
         case FDD_CMD_NEW_EMPTYIMAGE:            newImage();                 break;
 
-        case FDD_CMD_DOWNLOADIMG_START:                                     break;
-        case FDD_CMD_DOWNLOADIMG_GETBLOCK:                                  break;
-        case FDD_CMD_DOWNLOADIMG_DONE:                                      break;
+        case FDD_CMD_DOWNLOADIMG_START:         downloadStart();            break;
+        case FDD_CMD_DOWNLOADIMG_GETBLOCK:      downloadGetBlock();         break;
+        case FDD_CMD_DOWNLOADIMG_DONE:          downloadDone();             break;
     }
 
     dataTrans->sendDataAndStatus();         // send all the stuff after handling, if we got any
@@ -321,6 +323,62 @@ void FloppySetup::getNewImageName(char *nameBfr)
 	}
 	
 	strcpy(nameBfr, fileName);
+}
+
+void FloppySetup::downloadStart(void)
+{
+    int index = cmd[5];
+
+    currentDownload.fh = NULL;
+
+    if(index < 0 || index > 2) {                        // index out of range? fail
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    SiloSlot *ss = imageSilo->getSiloSlot(index);       // get silo slot
+
+    if(ss->imageFile.empty()) {                         // silo slot is empty?
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    FILE *fh = fopen(ss->hostDestPath.c_str(), "rb");
+
+    if(fh == NULL) {                                    // couldn't open file?
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    currentDownload.fh          = fh;
+    currentDownload.imageFile   = ss->imageFile;
+
+    dataTrans->addDataBfr((BYTE *) ss->imageFile.c_str(), ss->imageFile.length() + 1, true);     // send filename to ST
+    dataTrans->setStatus(FDD_OK);
+}
+
+void FloppySetup::downloadGetBlock(void)
+{
+
+
+
+}
+
+void FloppySetup::downloadDone(void)
+{
+    int index = cmd[5];
+
+    if(index < 0 || index > 2) {                        // index out of range? fail
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    if(currentDownload.fh != NULL) {                    // if file is open, close it
+        fclose(currentDownload.fh);
+        currentDownload.fh = NULL;
+    }
+
+    dataTrans->setStatus(FDD_OK);
 }
 
 

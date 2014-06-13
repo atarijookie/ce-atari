@@ -41,12 +41,22 @@ private:
         FILE *fh;
     } currentUpload;
 
+    struct {
+        std::string hostDestPath;
+        std::string imageFile;
+        FILE *fh;
+    } currentDownload;
+
     void uploadStart(void);
     void uploadBlock(void);
     void uploadEnd(bool isOnDeviceCopy);
 
     void newImage(void);
 	void getNewImageName(char *nameBfr);
+
+    void downloadStart(void);
+    void downloadGetBlock(void);
+    void downloadDone(void);
 };
 
 #endif

@@ -50,6 +50,8 @@ public:
 	
     void dumpStringsToBuffer(BYTE *bfr);
 
+    SiloSlot *getSiloSlot(int index);
+
 private:
     SiloSlot	            slots[3];
 	int			            currentSlot;

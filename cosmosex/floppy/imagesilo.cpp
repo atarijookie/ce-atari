@@ -306,4 +306,12 @@ bool ImageSilo::containsImage(char *filename)	// check if image with this filena
 	return false;
 }
 
+SiloSlot *ImageSilo::getSiloSlot(int index)
+{
+    if(index < 0 || index > 2) {
+        return NULL;
+    }
+
+    return &slots[index];
+}
 
