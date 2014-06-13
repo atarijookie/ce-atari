@@ -91,21 +91,33 @@ BYTE *pLastBasePage = 0;
 
 extern WORD pexec_postProc;
 extern WORD pexec_callOrig;
+
+extern WORD  pexec_basepage;
+extern DWORD pexec_cmdline;
+extern DWORD pexec_envstr;
+extern DWORD pcustom_pexec2;
+
+int32_t custom_pexec2(void *res);
+
+// the following global variables are used in both custom_pexec and custom_pexec2
+static char *fname, *cmdline, *envstr;
+static BYTE *pPrgStart;
+static WORD mode;
+
 // ------------------------------------------------------------------ 
 // LONG Pexec( mode, fname, cmdline, envstr )
 int32_t custom_pexec( void *sp )
 {
-	DWORD res;
 	BYTE *params = (BYTE *) sp;
 
 	// retrieve params from stack 
-	WORD mode		= *((WORD *) params);
+	mode    = *((WORD *) params);
 	params += 2;
-	char *fname		= (char *)	*((DWORD *) params);
+	fname	= (char *)	*((DWORD *) params);
 	params += 4;
-	char *cmdline	= (char *)	*((DWORD *) params);
+	cmdline	= (char *)	*((DWORD *) params);
 	params += 4;
-	char *envstr	= (char *)	*((DWORD *) params);
+	envstr	= (char *)	*((DWORD *) params);
 
 	// for any other than these modes don't do anything special, just call the original
 	if(mode != PE_LOADGO && mode != PE_LOAD) {                              // not one of 2 supported modes? Call original Pexec()
@@ -124,17 +136,25 @@ int32_t custom_pexec( void *sp )
     // Do PE_LOAD, and if this was PE_LOADGO, then the GO part will be done in gemdos_asm.s
     
 	// if we got here, then it's a PRG on our drive...
-	BYTE *pBasePage;														// pointer to base page address
 
 	BYTE prgStart[32];
-	BYTE *pPrgStart;
 
 	pPrgStart = &prgStart[4];
 	pPrgStart = (BYTE *) (((DWORD) pPrgStart) & 0xfffffffc);				// make temp buffer pointer to be at multiple of 4
 
-	// create base page, allocate stuff
-	CALL_OLD_GD_NORET(Pexec, PE_BASEPAGE, 0, cmdline, envstr);					
-	pBasePage = (BYTE *) res;
+	// create base page in asm, allocate stuff -- this replaces Pexec(PE_BASEPAGE, 0, cmdline, envstr);
+    pcustom_pexec2  = (DWORD) custom_pexec2;
+    pexec_basepage  = 1;
+    pexec_cmdline   = (DWORD) cmdline;
+    pexec_envstr    = (DWORD) envstr;
+
+    return 0;
+}
+
+int32_t custom_pexec2( void *res )
+{
+	BYTE *pBasePage;														// pointer to base page address
+    pBasePage = (BYTE *) res;
 	
 	if((int) pBasePage < 1000) {											// Pexec seems to failed -- insufficient memory
 		return ENSMEM;

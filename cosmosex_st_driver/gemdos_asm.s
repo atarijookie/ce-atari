@@ -8,6 +8,10 @@
 	.globl	_useOldGDHandler
 	.globl	_pexec_postProc
     .globl  _pexec_callOrig
+    .globl  _pexec_basepage
+    .globl  _pexec_cmdline;
+    .globl  _pexec_envstr;
+    .globl  _pcustom_pexec2;
     
 | ------------------------------------------------------
 	.text
@@ -103,8 +107,13 @@ handleThisPexec:
 	move.l  a0,-(sp)                        | param #1: stack pointer with function params
 	jsr     (a1)                            | call the custom handler
 
+afterCustomPexecCall:
+    
     tst.w   _pexec_callOrig                 | if this is set to non-zero, call original handler now - when the C code didn't handle it and we should try it with original handler.
     bne.b   callOriginalPexec
+
+    tst.w   _pexec_basepage                 | should we call Pexec(PE_BASEPAGE)?
+    bne.b   callPexecBasepage
     
 	tst.w   _pexec_postProc                 | should we now do the post-process of PE_LOADGO by calling PE_GO?
 	bne.b   callPexecGo                     | yes, call Pexec()
@@ -127,16 +136,41 @@ callPexecGo:
 
 	clr.w   _pexec_postProc                 | clear the PE_LOADGO flag
 	bra.b   callOriginalHandler             | now do the PE_GO part
-    |------------------
-	
+
+|------------------
 callOriginalPexec:    
     movea.l	(sp)+,a0                        | restore the SP and param pointer
     clr.w   _pexec_callOrig                 | clear flag that original pexec should be called
     bra     callOriginalHandler             | ...and jump to old handler
-    
 
+|------------------    
+callPexecBasepage:
+    addq.l  #4,sp                           | fix SP after previous call
+
+    move.l  _pexec_envstr, -(sp)            | envstr
+    move.l  _pexec_cmdline, -(sp)           | cmdline
+    move.l  #0, -(sp)                       | fname
+    move.w  #5, -(sp)                       | PE_BASEPAGE
+    move.w  #0x4b, -(sp)                    | Pexec()
+    trap    #1
+    add.l   #16, sp
+
+    clr.w   _pexec_basepage                 | don't call this again until required
+    
+    move.l  d0,-(sp)                        | param #1: return value from Pexec(PE_BASEPAGE)
+    move.l  _pcustom_pexec2, a1             | A1 now contains pointer to custom_pexec2() function
+    jsr     (a1)                            | call the custom handler
+    
+    bra     afterCustomPexecCall            | after finishing custom handler jump where we would continue without this 
+    
 |============================================     
     
 	.data
 _pexec_postProc:    dc.w    0       | 1 = post-process PE_LOADGO
 _pexec_callOrig:    dc.w    0       | 1 = after custom handler call original Pexec (no post processing)
+
+_pexec_basepage:    dc.w    0       | 1 = call original Pexec(PE_BASEPAGE) and call the 2nd part of custom_pexec
+_pexec_cmdline:     dc.l    0       | pointer to cmd line string, used with pexec_basepage 
+_pexec_envstr:      dc.l    0       | pointer to env string, used with pexec_basepage 
+_pcustom_pexec2:    dc.l    0       | pointer to custom pexec2 function, which is called after basepage creation
+
