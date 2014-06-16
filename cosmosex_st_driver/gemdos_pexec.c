@@ -92,11 +92,6 @@ BYTE *pLastBasePage = 0;
 extern WORD pexec_postProc;
 extern WORD pexec_callOrig;
 
-extern WORD  pexec_basepage;
-extern DWORD pexec_cmdline;
-extern DWORD pexec_envstr;
-extern DWORD pcustom_pexec2;
-
 int32_t custom_pexec2(void *res);
 
 // the following global variables are used in both custom_pexec and custom_pexec2
@@ -142,19 +137,8 @@ int32_t custom_pexec( void *sp )
 	pPrgStart = &prgStart[4];
 	pPrgStart = (BYTE *) (((DWORD) pPrgStart) & 0xfffffffc);				// make temp buffer pointer to be at multiple of 4
 
-	// create base page in asm, allocate stuff -- this replaces Pexec(PE_BASEPAGE, 0, cmdline, envstr);
-    pcustom_pexec2  = (DWORD) custom_pexec2;
-    pexec_basepage  = 1;
-    pexec_cmdline   = (DWORD) cmdline;
-    pexec_envstr    = (DWORD) envstr;
-
-    return 0;
-}
-
-int32_t custom_pexec2( void *res )
-{
-	BYTE *pBasePage;														// pointer to base page address
-    pBasePage = (BYTE *) res;
+	// create base page 
+    BYTE *pBasePage = (BYTE *) Pexec(PE_BASEPAGE, 0, cmdline, envstr);
 	
 	if((int) pBasePage < 1000) {											// Pexec seems to failed -- insufficient memory
 		return ENSMEM;
@@ -206,30 +190,34 @@ int32_t custom_pexec2( void *res )
 	BYTE *fixups		= (BYTE *) (sBasePage->tbase + prgHead->tsize + prgHead->dsize + prgHead->ssize);
 	DWORD fixupOffset	= *((DWORD *) fixups);
 	
-	if(fixupOffset != 0) {						// if fixup needed?
+    BYTE fixup = 0;
+
+	if(fixupOffset != 0) {						                    // if fixup needed?
 		BYTE *pWhereToFix;
 
-		pWhereToFix	= (BYTE *) (sBasePage->tbase + fixupOffset);			// calculate the first DWORD position that needs to be fixed
-		fixups += 4;													// move to the fixups array
+		pWhereToFix	= (BYTE *) (sBasePage->tbase + fixupOffset);	// calculate the first DWORD position that needs to be fixed
+		fixups += 4;												// move to the fixups array
 
 		while(1) {
 			DWORD oldVal = *((DWORD *)pWhereToFix);
 			DWORD newVal = oldVal + sBasePage->tbase;
-			*((DWORD *)pWhereToFix) = newVal;
+            
+            if(fixup != 1) {                                        // fix the value only if the fixup isn't ONE
+                *((DWORD *)pWhereToFix) = newVal;
+            }
 
-			BYTE fixup = *fixups;
+			fixup = *fixups;
 			fixups++;
 	
-			if(fixup == 0) {
+			if(fixup == 0) {                                        // terminate fixup
 				break;
 			}
-			
-			if(fixup == 1) {
+
+			if(fixup == 1) {                                        // just move forward by 0xfe
 				pWhereToFix += 0xfe;
-				continue;
-			}
-			
-			pWhereToFix += (DWORD) fixup;
+			} else {                                                // move forward and fixup
+                pWhereToFix += (DWORD) fixup;
+            }
 		}
 	}
 	
