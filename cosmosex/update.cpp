@@ -292,7 +292,7 @@ bool Update::createUpdateScript(void)
         Update::getLocalPathFromUrl(Update::versions.onServer.hans.getUrl(), fwFile);
 
         fprintf(f, "# updgrade of Hans FW\n");
-        fprintf(f, "sudo ./flash_stm32 -x -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());
+        fprintf(f, "./flash_stm32 -x -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());           // was: sudo
         fprintf(f, "rm -f %s\n", (char *) fwFile.c_str());
         fprintf(f, "\n\n");
     }
@@ -302,7 +302,7 @@ bool Update::createUpdateScript(void)
         Update::getLocalPathFromUrl(Update::versions.onServer.xilinx.getUrl(), fwFile);
 
         fprintf(f, "# updgrade of Xilinx FW\n");
-        fprintf(f, "sudo ./flash_xilinx %s\n", (char *) fwFile.c_str());
+        fprintf(f, "./flash_xilinx %s\n", (char *) fwFile.c_str());                             // was: sudo
         fprintf(f, "rm -f %s\n", (char *) fwFile.c_str());
 		fprintf(f, "cat /ce/update/updatelist.csv | grep xilinx | sed -e 's/[^,]*,\\([^,]*\\).*/\\1/' > /ce/update/xilinx_current.txt \n");
         fprintf(f, "\n\n");
@@ -313,7 +313,7 @@ bool Update::createUpdateScript(void)
         Update::getLocalPathFromUrl(Update::versions.onServer.franz.getUrl(), fwFile);
 
         fprintf(f, "# updgrade of Franz FW\n");
-        fprintf(f, "sudo ./flash_stm32 -y -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());
+        fprintf(f, "./flash_stm32 -y -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());           // was: sudo
         fprintf(f, "rm -f %s\n", (char *) fwFile.c_str());
         fprintf(f, "\n\n");
     }

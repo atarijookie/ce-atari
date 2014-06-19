@@ -18,6 +18,8 @@
 #define DEV_CHECK_TIME_MS	3000
 #define UPDATE_CHECK_TIME   1000
 
+extern bool g_noReset;                      // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
+
 CCoreThread::CCoreThread()
 {
     Update::initialize();
@@ -86,7 +88,10 @@ void CCoreThread::run(void)
     memset(inBuff, 0, 8);
 	
     loadSettings();
-//	Utils::resetHansAndFranz();
+    
+    if(!g_noReset) {                                // if we should reset Hans and Franz on start, do it
+        Utils::resetHansAndFranz();
+    }
 	
 	DWORD nextDevFindTime       = Utils::getCurrentMs();    // create a time when the devices should be checked - and that time is now
     DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);  // create a time when update download status should be checked

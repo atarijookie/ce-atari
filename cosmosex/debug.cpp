@@ -8,7 +8,7 @@
 #define LOG_FILE		"/var/log/ce.log"
 DWORD prevLogOut;
 
-BYTE g_logLevel = LOG_ERROR;                // current log level 
+extern BYTE g_logLevel;                     // current log level 
 
 void Debug::printfLogLevelString(void)
 {

@@ -83,7 +83,8 @@ bool Mounter::mountDevice(char *devicePath, char *mountDir)
 		return true;
 	}
 
-	snprintf(cmd, MAX_STR_SIZE, "sudo mount -v %s %s > %s 2> %s", devicePath, mountDir, LOGFILE1, LOGFILE2);
+    // was: sudo
+	snprintf(cmd, MAX_STR_SIZE, "mount -v %s %s > %s 2> %s", devicePath, mountDir, LOGFILE1, LOGFILE2);
 
 	int len = strnlen(cmd, MAX_STR_SIZE);	// get the length
 
@@ -113,7 +114,8 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 	}
 		
 	if(nfsNotSamba) {		// for NFS
-		snprintf(cmd, MAX_STR_SIZE, "sudo mount -v -t nfs -o nolock %s %s > %s 2> %s", source, mountDir, LOGFILE1, LOGFILE2);
+        // was: sudo
+		snprintf(cmd, MAX_STR_SIZE, "mount -v -t nfs -o nolock %s %s > %s 2> %s", source, mountDir, LOGFILE1, LOGFILE2);
 	} else {				// for Samba
 		passwd *psw = getpwnam("pi");
 		
@@ -122,7 +124,8 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 			return false;
 		}
 		
-		snprintf(cmd, MAX_STR_SIZE, "sudo mount -v -t cifs -o gid=%d,uid=%d,pass=%s %s %s > %s 2> %s", psw->pw_gid, psw->pw_uid, "password", source, mountDir, LOGFILE1, LOGFILE2);
+        // was: sudo
+		snprintf(cmd, MAX_STR_SIZE, "mount -v -t cifs -o gid=%d,uid=%d,pass=%s %s %s > %s 2> %s", psw->pw_gid, psw->pw_uid, "password", source, mountDir, LOGFILE1, LOGFILE2);
 	}
 
 	len = strnlen(cmd, MAX_STR_SIZE);	// get the length
@@ -177,10 +180,12 @@ bool Mounter::mount(char *mountCmd, char *mountDir)
 	// move the logs to mount dir
 	char cmd[MAX_STR_SIZE];
 		
-	sprintf(cmd, "sudo mv %s %s/", LOGFILE1, mountDir);
+    // was: sudo
+	sprintf(cmd, "mv %s %s/", LOGFILE1, mountDir);
 	system(cmd);
 
-	sprintf(cmd, "sudo mv %s %s/", LOGFILE2, mountDir);
+    // was: sudo
+	sprintf(cmd, "mv %s %s/", LOGFILE2, mountDir);
 	system(cmd);
 
 	return false;
@@ -233,8 +238,8 @@ bool Mounter::tryUnmount(char *mountDir)
 {
 	char line[MAX_STR_SIZE];
 	
-	// build and execute the command
-	snprintf(line, MAX_STR_SIZE, "sudo umount %s", mountDir);
+	// build and execute the command - was: sudo
+	snprintf(line, MAX_STR_SIZE, "umount %s", mountDir);
 	int ret = system(line);
 	
 	// handle the result
@@ -294,11 +299,12 @@ void Mounter::restartNetwork(void)
 {
 	Debug::out(LOG_INFO, "Mounter::restartNetwork - starting to restart the network\n");
 
-	system("sudo ifdown eth0");
-	system("sudo ifdown wlan0");
+    // was: sudo
+	system("ifdown eth0");
+	system("ifdown wlan0");
 
-	system("sudo ifup eth0");
-	system("sudo ifup wlan0");
+	system("ifup eth0");
+	system("ifup wlan0");
 	
 	Debug::out(LOG_INFO, "Mounter::restartNetwork - done\n");
 }
