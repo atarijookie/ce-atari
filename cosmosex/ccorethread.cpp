@@ -20,6 +20,9 @@
 
 extern bool g_noReset;                      // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
 
+bool    g_gotHansFwVersion;
+bool    g_gotFranzFwVersion;
+
 CCoreThread::CCoreThread()
 {
     Update::initialize();
@@ -88,23 +91,52 @@ void CCoreThread::run(void)
     memset(inBuff, 0, 8);
 	
     loadSettings();
+
+    //------------------------------
+    // stuff related to checking of Franz and Hans being alive and then possibly flashing them
+    bool    shouldCheckHansFranzAlive   = true;                         // when true and the 15 second timeout since start passed, check for Hans and Franz being alive
+    DWORD   hansFranzAliveCheckTime     = Utils::getEndTime(15000);     // get the time when we should check if Hans and Franz are alive
     
-    if(!g_noReset) {                                // if we should reset Hans and Franz on start, do it
+    g_gotHansFwVersion  = false;
+    g_gotFranzFwVersion = false;
+    
+    if(g_noReset) {                                                     // if we're debugging Hans or Franz (noReset is set to true), don't do this alive check
+        shouldCheckHansFranzAlive = false;                              
+    } else {                                                            // if we should reset Hans and Franz on start, do it (and we're probably not debugging Hans or Franz)
         Utils::resetHansAndFranz();
     }
+    
+    Debug::out(LOG_DEBUG, "Will check for Hans and Franz alive: %s", (shouldCheckHansFranzAlive ? "yes" : "no") );
+    //------------------------------
 	
-	DWORD nextDevFindTime       = Utils::getCurrentMs();    // create a time when the devices should be checked - and that time is now
-    DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);  // create a time when update download status should be checked
+	DWORD nextDevFindTime       = Utils::getCurrentMs();                // create a time when the devices should be checked - and that time is now
+    DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);              // create a time when update download status should be checked
 
-	mountAndAttachSharedDrive();					// if shared drive is enabled, try to mount it and attach it
+	mountAndAttachSharedDrive();					                    // if shared drive is enabled, try to mount it and attach it
 	
-    Update::downloadUpdateList();                   // download the list of components with the newest available versions
+    Update::downloadUpdateList();                                       // download the list of components with the newest available versions
 
 	bool res;
 
     while(sigintReceived == 0) {
 		bool gotAtn = false;						                    // no ATN received yet?
 		
+        // should we check if Hans and Franz are alive? 
+        if(shouldCheckHansFranzAlive) {
+            if(Utils::getCurrentMs() >= hansFranzAliveCheckTime) {      // did enough time pass since the Hans and Franz reset?
+                if(!g_gotHansFwVersion || !g_gotFranzFwVersion) {       // if don't have version from Hans or Franz, then they're not alive
+                    Update::createFlashFirstFwScript();
+                    
+                    Debug::out(LOG_INFO, "No answer from Hans or Franz, so first firmware flash script created, will do first firmware flashing.");
+					sigintReceived = 1;
+                } else {
+                    Debug::out(LOG_INFO, "Got answers from both Hans and Franz, so not doing first firmware flashing.");
+                }
+            
+                shouldCheckHansFranzAlive = false;                      // don't check this again
+            }        
+        }
+        
         // should we check for the new devices?
 		if(Utils::getCurrentMs() >= nextDevFindTime) {	                
 			devFinder.lookForDevChanges();				                // look for devices attached / detached
@@ -517,11 +549,13 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
     int year = bcdToInt(fwVer[1]) + 2000;
     if(fwVer[0] == 0xf0) {
         Update::versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
-
+        g_gotFranzFwVersion = true;
+        
         Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
     } else {
         Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));               // store found FW version of Hans
-
+        g_gotHansFwVersion = true;
+        
         int currentLed = fwVer[4];
 
         Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed);

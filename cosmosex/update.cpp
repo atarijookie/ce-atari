@@ -322,6 +322,31 @@ bool Update::createUpdateScript(void)
     return true;
 }
 
+bool Update::createFlashFirstFwScript(void)
+{
+    FILE *f = fopen(UPDATE_SCRIPT, "wt");
+
+    if(!f) {
+        Debug::out(LOG_ERROR, "Update::createFlashFirstFwScript failed to create update script - %s", UPDATE_SCRIPT);
+        return false;
+    }
+
+    fprintf(f, "# flash first Xilinx FW \n");
+    fprintf(f, "./flash_xilinx /ce/firstfw/xilinx.xsvf \n\n");
+
+    fprintf(f, "# copy the xilinx version file \n");
+    fprintf(f, "cp /ce/firstfw/xilinx_current.txt /ce/update/ \n\n");
+    
+    fprintf(f, "# flash first Hans FW \n");
+    fprintf(f, "./flash_stm32 -x -w /ce/firstfw/hans.hex /dev/ttyAMA0 \n\n");
+
+    fprintf(f, "# flash first Franz FW \n");
+    fprintf(f, "./flash_stm32 -y -w /ce/firstfw/franz.hex /dev/ttyAMA0 \n\n");
+
+    fclose(f);
+    return true;
+}
+
 
 
 

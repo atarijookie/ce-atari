@@ -34,6 +34,7 @@ public:
     static void stateGoIdle(void);
 
     static bool createUpdateScript(void);
+    static bool createFlashFirstFwScript(void);
 
 private:
     static void deleteLocalComponent(std::string url);

@@ -21,6 +21,7 @@ void sigint_handler(int sig);
 
 void handlePthreadCreate(int res, char *what);
 void parseCmdLineArguments(int argc, char *argv[]);
+void printfPossibleCmdLineArgs(void);
 
 BYTE g_logLevel     = LOG_ERROR;                                // init current log level to LOG_ERROR
 bool g_justDoReset  = false;                                    // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
@@ -36,6 +37,7 @@ int main(int argc, char *argv[])
 
     parseCmdLineArguments(argc, argv);                          // parse cmd line arguments and set global variables
 
+    printfPossibleCmdLineArgs();
     Debug::printfLogLevelString();
 
     Debug::out(LOG_ERROR, "\n\n---------------------------------------------------");
@@ -132,6 +134,14 @@ void parseCmdLineArguments(int argc, char *argv[])
             continue;
         }    
     }
+}
+
+void printfPossibleCmdLineArgs(void)
+{
+    printf("\nPossible command line args:\n");
+    printf("reset   - reset Hans and Franz, release lines, quit\n");
+    printf("noreset - when starting, don't reset Hans and Franz\n");
+    printf("llx     - set log level to x (default is 1, max is 3)\n");
 }
  
 void handlePthreadCreate(int res, char *what)
