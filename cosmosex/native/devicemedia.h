@@ -9,7 +9,7 @@ class DeviceMedia: public IMedia
 {
 public:
     DeviceMedia();
-    ~DeviceMedia();
+    virtual ~DeviceMedia();
 
     virtual bool iopen(char *path, bool createIfNotExists);
     virtual void iclose(void);

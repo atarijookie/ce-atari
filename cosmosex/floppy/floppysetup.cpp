@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <unistd.h>
+
 #include "../global.h"
 #include "../debug.h"
 #include "../utils.h"

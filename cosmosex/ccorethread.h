@@ -38,7 +38,7 @@ class CCoreThread: public ISettingsUser, public DevChangesHandler
 {
 public:
     CCoreThread();
-    ~CCoreThread();
+    virtual ~CCoreThread();
 
 	void resetHansAndFranz(void);
     void run(void);

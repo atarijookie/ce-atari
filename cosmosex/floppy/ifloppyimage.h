@@ -7,6 +7,8 @@
 class IFloppyImage
 {
 public:
+	virtual ~IFloppyImage()	{ };
+
     virtual bool open(char *fileName) = 0;
     virtual bool isOpen(void) = 0;
     virtual void close() = 0;

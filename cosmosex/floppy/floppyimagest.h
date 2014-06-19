@@ -10,7 +10,7 @@ class FloppyImageSt: public IFloppyImage
 {
 public:
     FloppyImageSt();
-    ~FloppyImageSt();
+    virtual ~FloppyImageSt();
 
     virtual bool open(char *fileName);
     virtual bool isOpen(void);

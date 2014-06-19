@@ -55,7 +55,7 @@ class Scsi: public ISettingsUser
 {
 public:
     Scsi(void);
-    ~Scsi();
+    virtual ~Scsi();
 
     void reloadSettings(int type);
 

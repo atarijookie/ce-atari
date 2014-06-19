@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <utime.h>
+#include <unistd.h>
 
 #include "../global.h"
 #include "../debug.h"

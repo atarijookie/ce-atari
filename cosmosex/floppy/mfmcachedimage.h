@@ -18,7 +18,7 @@ class MfmCachedImage
 {
 public:
     MfmCachedImage();
-    ~MfmCachedImage();
+    virtual ~MfmCachedImage();
 
     // bufferOfBytes -- the datas are transfered as WORDs, but are they stored as bytes?
     // If true, swap bytes, don't append zeros. If false, no swapping, but append zeros.

@@ -9,7 +9,7 @@ class SdMedia: public IMedia
 {
 public:
     SdMedia();
-    ~SdMedia();
+    virtual ~SdMedia();
 
 	void setCurrentCapacity(DWORD sectors);
 	

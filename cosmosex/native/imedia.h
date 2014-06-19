@@ -7,6 +7,8 @@
 class IMedia
 {
 public:
+	virtual ~IMedia()	{ };
+
     virtual bool iopen(char *path, bool createIfNotExists) = 0;
     virtual void iclose(void) = 0;
 

@@ -10,7 +10,7 @@ class FloppyImageMsa: public IFloppyImage
 {
 public:
     FloppyImageMsa();
-    ~FloppyImageMsa();
+    virtual ~FloppyImageMsa();
 
     virtual bool open(char *fileName);
     virtual bool isOpen(void);

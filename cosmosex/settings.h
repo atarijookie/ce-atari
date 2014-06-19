@@ -7,6 +7,7 @@ class Settings
 {
 public:
 	Settings(void);
+	virtual ~Settings(void) { };
 
 	bool getBool(char *key, bool defValue);
 	void setBool(char *key, bool value);

@@ -9,7 +9,7 @@ class TestMedia: public IMedia
 {
 public:
     TestMedia();
-    ~TestMedia();
+    virtual ~TestMedia();
 
     virtual bool iopen(char *path, bool createIfNotExists);
     virtual void iclose(void);

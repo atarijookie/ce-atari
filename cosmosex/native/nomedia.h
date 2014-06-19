@@ -9,7 +9,7 @@ class NoMedia: public IMedia
 {
 public:
     NoMedia();
-    ~NoMedia();
+    virtual ~NoMedia();
 
     virtual bool iopen(char *path, bool createIfNotExists);
     virtual void iclose(void);

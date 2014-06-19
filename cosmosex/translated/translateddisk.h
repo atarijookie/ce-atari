@@ -49,7 +49,7 @@ class TranslatedDisk: public ISettingsUser
 {
 public:
     TranslatedDisk(void);
-    ~TranslatedDisk();
+    virtual ~TranslatedDisk();
 
     void setAcsiDataTrans(AcsiDataTrans *dt);
 

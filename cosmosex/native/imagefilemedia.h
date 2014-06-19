@@ -9,7 +9,7 @@ class ImageFileMedia: public IMedia
 {
 public:
     ImageFileMedia();
-    ~ImageFileMedia();
+    virtual ~ImageFileMedia();
 
     virtual bool iopen(char *path, bool createIfNotExists);
     virtual void iclose(void);

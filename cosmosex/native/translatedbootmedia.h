@@ -11,7 +11,7 @@ class TranslatedBootMedia: public IMedia
 {
 public:
     TranslatedBootMedia();
-    ~TranslatedBootMedia();
+    virtual ~TranslatedBootMedia();
 
     virtual bool iopen(char *path, bool createIfNotExists);
     virtual void iclose(void);
