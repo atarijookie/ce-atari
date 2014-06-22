@@ -112,7 +112,8 @@ void CCoreThread::run(void)
     DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);              // create a time when update download status should be checked
 
 	mountAndAttachSharedDrive();					                    // if shared drive is enabled, try to mount it and attach it
-	
+	attachConfigDrive();                                                // if config drive is enabled, attach it
+    
     Update::downloadUpdateList();                                       // download the list of components with the newest available versions
 
 	bool res;
@@ -665,6 +666,16 @@ void CCoreThread::mountAndAttachSharedDrive(void)
 
 	if(!res) {																// if didn't attach, skip the rest
 		Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: failed to attach shared drive %s", (char *) mountPath.c_str());
+	}
+}
+
+void CCoreThread::attachConfigDrive(void)
+{
+    std::string configDrivePath = "/ce/app/configdrive";
+	bool res = translated->attachToHostPath(configDrivePath, TRANSLATEDTYPE_CONFIGDRIVE);   // try to attach
+
+	if(!res) {																                // if didn't attach, skip the rest
+		Debug::out(LOG_ERROR, "attachConfigDrive: failed to attach config drive %s", (char *) configDrivePath.c_str());
 	}
 }
 

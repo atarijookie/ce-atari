@@ -125,7 +125,7 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 		}
 		
         // was: sudo
-		snprintf(cmd, MAX_STR_SIZE, "mount -v -t cifs -o gid=%d,uid=%d,pass=%s %s %s > %s 2> %s", psw->pw_gid, psw->pw_uid, "password", source, mountDir, LOGFILE1, LOGFILE2);
+		snprintf(cmd, MAX_STR_SIZE, "mount -v -t cifs -o gid=%d,uid=%d,username=%s,password=%s %s %s > %s 2> %s", psw->pw_gid, psw->pw_uid, "pi", "password", source, mountDir, LOGFILE1, LOGFILE2);
 	}
 
 	len = strnlen(cmd, MAX_STR_SIZE);	// get the length
