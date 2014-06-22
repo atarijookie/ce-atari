@@ -193,6 +193,57 @@ void Settings::setChar(char *key, char value)
     fclose(file);
 }
 //-------------------------
+void Settings::loadAcsiIDs(AcsiIDinfo *aii)
+{
+    aii->enabledIDbits = 0;									// no bits / IDs enabled yet
+
+	aii->gotDevTypeRaw			= false;					// no raw and translated types found yet
+	aii->gotDevTypeTranslated	= false;
+	aii->gotDevTypeSd			= false;
+	
+	aii->sdCardAcsiId = 0xff;								// at start mark that we don't have SD card ID yet
+	
+    char key[32];
+    for(int id=0; id<8; id++) {							// read the list of device types from settings
+        sprintf(key, "ACSI_DEVTYPE_%d", id);			// create settings KEY, e.g. ACSI_DEVTYPE_0
+        
+		int devType = getInt(key, DEVTYPE_OFF);
+
+        if(devType < 0) {
+            devType = DEVTYPE_OFF;
+        }
+
+        aii->acsiIDdevType[id] = devType;
+
+        if(devType == DEVTYPE_SD) {                     // if on this ACSI ID we should have the native SD card, store this ID
+            aii->sdCardAcsiId = id;
+			aii->gotDevTypeSd = true;
+        }
+
+        if(devType != DEVTYPE_OFF) {                    // if ON
+            aii->enabledIDbits |= (1 << id);            // set the bit to 1
+        }
+		
+		if(devType == DEVTYPE_RAW) {					// found at least one RAW device?
+			aii->gotDevTypeRaw = true;
+		}
+		
+		if(devType == DEVTYPE_TRANSLATED) {				// found at least one TRANSLATED device?
+			aii->gotDevTypeTranslated = true;
+		}
+    }
+
+	// no ACSI ID was enabled? enable ACSI ID 0
+	if(!aii->gotDevTypeRaw && !aii->gotDevTypeTranslated && !aii->gotDevTypeSd) {
+		Debug::out(LOG_INFO, "Settings::loadAcsiIDs -- no ACSI ID was enabled, so enabling ACSI ID 0");
+			
+		aii->acsiIDdevType[0]	= DEVTYPE_TRANSLATED;
+		aii->enabledIDbits	= 1;
+		
+		aii->gotDevTypeTranslated = true;
+	}
+}
+//-------------------------
 
 FILE *Settings::open(char *key, bool readNotWrite)
 {

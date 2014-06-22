@@ -4,6 +4,7 @@
 #include <string>
 
 #include "../acsidatatrans.h"
+#include "../settings.h"
 #include "imedia.h"
 #include "nomedia.h"
 #include "testmedia.h"
@@ -86,9 +87,10 @@ private:
     BYTE            shitHasHappened;
 
     TScsiConf       attachedMedia[MAX_ATTACHED_MEDIA];
-    int             acsiIDdevType[8];
     TDevInfo        devInfo[8];
 
+	AcsiIDinfo		acsiIdInfo;
+	
     BYTE *cmd;
     BYTE inquiryName[10];
 

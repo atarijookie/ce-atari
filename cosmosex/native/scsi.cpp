@@ -4,7 +4,6 @@
 #include "scsi_defs.h"
 #include "scsi.h"
 #include "../global.h"
-#include "../settings.h"
 #include "../debug.h"
 #include "devicemedia.h"
 #include "imagefilemedia.h"
@@ -185,7 +184,7 @@ bool Scsi::attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessTyp
     for(int i=0; i<8; i++) {                                                // find empty and proper ACSI ID
 
         // if we shouldn't use this ACSI ID
-        if(acsiIDdevType[i] == DEVTYPE_OFF) {
+        if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_OFF) {
             continue;
         }
 
@@ -195,7 +194,7 @@ bool Scsi::attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessTyp
         }
 		
 		// if this ACSI ID is for SD card and we're attaching SD card
-		if(acsiIDdevType[i] == DEVTYPE_SD && hostSourceType == SOURCETYPE_SD_CARD) {
+		if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_SD && hostSourceType == SOURCETYPE_SD_CARD) {
             devInfo[i].attachedMediaIndex   = mediaIndex;
             devInfo[i].accessType           = accessType;
 
@@ -204,12 +203,12 @@ bool Scsi::attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessTyp
 		}
 
 		// if this is SD card and it wasn't attached in previous IF, don't go further - you would attach it to wrong ACSI ID
-		if(acsiIDdevType[i] == DEVTYPE_SD) {	
+		if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_SD) {	
 			continue;
 		}		
 		
         // if this ACSI ID is for translated drive, and we're attaching translated boot image
-        if(acsiIDdevType[i] == DEVTYPE_TRANSLATED && hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
+        if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_TRANSLATED && hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
             devInfo[i].attachedMediaIndex   = mediaIndex;
             devInfo[i].accessType           = accessType;
 
@@ -221,12 +220,12 @@ bool Scsi::attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessTyp
         }
 		
 		// if this is TRANSLATED device ACSI ID and it wasn't attached in previous IF, don't go further - you would attach it to wrong ACSI ID
-		if(acsiIDdevType[i] == DEVTYPE_TRANSLATED) {
+		if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_TRANSLATED) {
 			continue;
 		}
 
         // if this ACSI ID is NOT for translated drive, and we're NOT attaching translated boot image
-        if(acsiIDdevType[i] != DEVTYPE_TRANSLATED && hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
+        if(acsiIdInfo.acsiIDdevType[i] != DEVTYPE_TRANSLATED && hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
             devInfo[i].attachedMediaIndex   = mediaIndex;
             devInfo[i].accessType           = accessType;
 
@@ -352,33 +351,16 @@ void Scsi::loadSettings(void)
 {
     Debug::out(LOG_INFO, "Scsi::loadSettings");
 
-    Settings s;
-
-	BYTE sdCardId = 0xff;								// mark that we don't have this yet
-	
     // first read the new settings
-    char key[32];
-    for(int id=0; id<8; id++) {							// read the list of device types from settings
-        sprintf(key, "ACSI_DEVTYPE_%d", id);			// create settings KEY, e.g. ACSI_DEVTYPE_0
-        int devType = s.getInt(key, DEVTYPE_OFF);
-
-        if(devType < 0) {
-            devType = DEVTYPE_OFF;
-        }
-
-		if(devType == DEVTYPE_SD) {						// if found ACSI ID for SD card, store this ACSI ID
-			sdCardId = id;
-		}
-		
-        acsiIDdevType[id] = devType;
-    }
+    Settings s;
+	s.loadAcsiIDs(&acsiIdInfo);
 
     // then dettach everything from ACSI IDs
     for(int i=0; i<8; i++) {
         detachMediaFromACSIidByIndex(i);
     }
 	
-	if(sdCardId != 0xff) {								// if we got ACSI ID for SD card, attach this SD card...
+	if(acsiIdInfo.sdCardAcsiId != 0xff) {				// if we got ACSI ID for SD card, attach this SD card...
 		std::string empty;
 		attachToHostPath(empty, SOURCETYPE_SD_CARD, SCSI_ACCESSTYPE_FULL);
 	}
@@ -405,14 +387,14 @@ void Scsi::processCommand(BYTE *command)
     }
 
     if(dataTrans == 0) {
-        Debug::out(LOG_ERROR, "processCommand was called without valid dataTrans, can't tell ST that his went wrong...");
+        Debug::out(LOG_ERROR, "Scsi::processCommand was called without valid dataTrans, can't tell ST that his went wrong...");
         return;
     }
 
     dataTrans->clear();                 // clean data transporter before handling
 
     if(dataMedia == 0) {
-        Debug::out(LOG_ERROR, "processCommand was called without valid dataMedia, will return error CHECK CONDITION");
+        Debug::out(LOG_ERROR, "Scsi::processCommand was called without valid dataMedia, will return error CHECK CONDITION");
 		dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
 		dataTrans->sendDataAndStatus();
         return;

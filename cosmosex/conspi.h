@@ -5,7 +5,10 @@
 
 #define NO_REMAINING_LENGTH     0xffff
 #define TXRX_COUNT_REST         0xffff
-#define PADDINGBUFFER_SIZE      1024
+
+#define ONE_KB					1024
+#define TWENTY_KB				(20 * 1024)
+#define PADDINGBUFFER_SIZE      TWENTY_KB
 
 class CConSpi
 {
@@ -24,7 +27,7 @@ public:
 
 private:
     WORD remainingPacketLength;
-    BYTE paddingBuffer[PADDINGBUFFER_SIZE];
+    BYTE *paddingBuffer;
 
 	bool readHeader(int whichSpiCs, BYTE *outBuf, BYTE *inBuf);	
     WORD swapWord(WORD val);

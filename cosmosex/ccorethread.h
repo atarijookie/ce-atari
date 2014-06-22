@@ -7,6 +7,7 @@
 #include "global.h"
 #include "conspi.h"
 #include "acsidatatrans.h"
+#include "settings.h"
 
 #include "devfinder.h"
 #include "devchangeshandler.h"
@@ -76,11 +77,9 @@ private:
     DevFinder		devFinder;
     Scsi            *scsi;
     TranslatedDisk  *translated;
-    BYTE            acsiIDevType[8];
-    BYTE            enabledIDbits;
     bool            setEnabledIDbits;
-    BYTE            sdCardAcsiId;
-
+	AcsiIDinfo		acsiIdInfo;
+	
     void handleAcsiCommand(void);
     void handleConfigStream(BYTE *cmd);
 

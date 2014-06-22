@@ -9,7 +9,6 @@
 #include "debug.h"
 #include "ccorethread.h"
 #include "native/scsi_defs.h"
-#include "settings.h"
 #include "gpio.h"
 #include "mounter.h"
 #include "downloader.h"
@@ -395,8 +394,8 @@ void CCoreThread::handleAcsiCommand(void)
     BYTE isIcd = false;
     BYTE wasHandled = false;
 
-    BYTE acsiId = bufIn[0] >> 5;                        // get just ACSI ID
-    if(acsiIDevType[acsiId] == DEVTYPE_OFF) {          	// if this ACSI ID is off, reply with error and quit
+    BYTE acsiId = bufIn[0] >> 5;                        	// get just ACSI ID
+    if(acsiIdInfo.acsiIDdevType[acsiId] == DEVTYPE_OFF) {	// if this ACSI ID is off, reply with error and quit
         dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
         dataTrans->sendDataAndStatus();
         return;
@@ -464,54 +463,7 @@ void CCoreThread::loadSettings(void)
     Debug::out(LOG_DEBUG, "CCoreThread::loadSettings");
 
     Settings s;
-    enabledIDbits = 0;									// no bits / IDs enabled yet
-
-	gotDevTypeRaw			= false;					// no raw and translated types found yet
-	gotDevTypeTranslated	= false;
-	
-	bool gotDevTypeSd		= false;
-	
-	sdCardAcsiId = 0xff;								// at start mark that we don't have SD card ID yet
-	
-    char key[32];
-    for(int id=0; id<8; id++) {							// read the list of device types from settings
-        sprintf(key, "ACSI_DEVTYPE_%d", id);			// create settings KEY, e.g. ACSI_DEVTYPE_0
-        
-		int devType = s.getInt(key, DEVTYPE_OFF);
-
-        if(devType < 0) {
-            devType = DEVTYPE_OFF;
-        }
-
-        acsiIDevType[id] = devType;
-
-        if(devType == DEVTYPE_SD) {                     // if on this ACSI ID we should have the native SD card, store this ID
-            sdCardAcsiId = id;
-			gotDevTypeSd = true;
-        }
-
-        if(devType != DEVTYPE_OFF) {                    // if ON
-            enabledIDbits |= (1 << id);                 // set the bit to 1
-        }
-		
-		if(devType == DEVTYPE_RAW) {					// found at least one RAW device?
-			gotDevTypeRaw = true;
-		}
-		
-		if(devType == DEVTYPE_TRANSLATED) {				// found at least one TRANSLATED device?
-			gotDevTypeTranslated = true;
-		}
-    }
-
-	// no ACSI ID was enabled? enable ACSI ID 0
-	if(!gotDevTypeRaw && !gotDevTypeTranslated && !gotDevTypeSd) {
-		Debug::out(LOG_INFO, "CCoreThread::loadSettings -- no ACSI ID was enabled, so enabling ACSI ID 0");
-			
-		acsiIDevType[0]	= DEVTYPE_TRANSLATED;
-		enabledIDbits	= 1;
-		
-		gotDevTypeTranslated = true;
-	}
+	s.loadAcsiIDs(&acsiIdInfo);
 	
     setEnabledIDbits = true;
 }
@@ -530,8 +482,8 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 	
         if(setEnabledIDbits) {                          // if we should send ACSI ID configuration
             oBuf[1] = CMD_ACSI_CONFIG;                  // CMD: send acsi config  (bytes 0 & 1)
-            oBuf[2] = enabledIDbits;                    // store ACSI enabled IDs 
-            oBuf[3] = sdCardAcsiId;                     // store which ACSI ID is used for SD card
+            oBuf[2] = acsiIdInfo.enabledIDbits;         // store ACSI enabled IDs 
+            oBuf[3] = acsiIdInfo.sdCardAcsiId;          // store which ACSI ID is used for SD card
             setEnabledIDbits = false;                   // and don't sent this anymore (until needed)
         }
 

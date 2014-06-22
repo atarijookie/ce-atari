@@ -13,11 +13,12 @@
 CConSpi::CConSpi()
 {
     remainingPacketLength = -1;
+	paddingBuffer = new BYTE[PADDINGBUFFER_SIZE];
 }
 
 CConSpi::~CConSpi()
 {
-
+	delete [] paddingBuffer;
 }
 
 void CConSpi::applyNoTxRxLimis(int whichSpiCs)
@@ -137,10 +138,6 @@ void CConSpi::applyTxRxLimits(int whichSpiCs, BYTE *inBuff)
 #endif	
 
 	// manually limit the TX and RX len
-
-	#define ONE_KB		1024
-	#define TWENTY_KB	(20 * 1024)
-	
     if(	whichSpiCs == SPI_CS_HANS  && (txLen > ONE_KB || rxLen > ONE_KB) ) {
         Debug::out(LOG_ERROR, "applyTxRxLimits - TX/RX limits for HANS are probably wrong! Fix this!");
 		txLen = MIN(txLen, ONE_KB);
