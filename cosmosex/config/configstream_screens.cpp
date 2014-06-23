@@ -915,17 +915,18 @@ void ConfigStream::createScreen_shared(void)
 	row++;
 	
 	// buttons
+/*
     comp = new ConfigComponent(this, ConfigComponent::button, "  Test  ",									8,  4, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_SHARED_TEST);
     comp->setComponentId(COMPID_SHARED_BTN_TEST);
     screen.push_back(comp);
-
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ",									8, 15, row, gotoOffset);
+*/
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ",									8, /*15*/ 9, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_SHARED_SAVE);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ",									8, 27, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ",									8, /*27*/ 21, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);

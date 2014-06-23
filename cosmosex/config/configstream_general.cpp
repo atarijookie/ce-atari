@@ -566,7 +566,7 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_UPDATE_CHECK:       onUpdateCheck();            break;
     case CS_UPDATE_UPDATE:      onUpdateUpdate();           break;
 
-    case CS_SHARED_TEST:        onSharedTest();             break;
+//    case CS_SHARED_TEST:        onSharedTest();             break;
     case CS_SHARED_SAVE:        onSharedSave();             break;
 
     case CS_FLOPPY_CONFIG_SAVE: onFloppyConfigSave();       break;

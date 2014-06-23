@@ -17,6 +17,6 @@ IP address of server
 Shared folder path on server
  [                                    ]
 
-   [  Test  ]  [  Save  ]  [ Cancel ]
+        [  Save  ]  [ Cancel ]
 
-   To quit - press Ctrl + C
+       To quit - press Ctrl + C        
