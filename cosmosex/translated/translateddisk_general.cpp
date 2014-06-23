@@ -7,6 +7,7 @@
 #include "../debug.h"
 #include "../settings.h"
 #include "../utils.h"
+#include "../mounter.h"
 #include "translateddisk.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
@@ -31,6 +32,9 @@ TranslatedDisk::TranslatedDisk(void)
     findStorage.buffer      = new BYTE[BUFFER_SIZE];
     findStorage.maxCount    = BUFFER_SIZE / 23;
     findStorage.count       = 0;
+    
+    mountAndAttachSharedDrive();					                    // if shared drive is enabled, try to mount it and attach it
+    attachConfigDrive();                                                // if config drive is enabled, attach it
 }
 
 TranslatedDisk::~TranslatedDisk()
@@ -97,10 +101,64 @@ void TranslatedDisk::reloadSettings(int type)
         }
     }
 
-    // todo: attach shared and config disk when they weren't attached before and now should be
+    // attach shared and config disk if they weren't attached before and now should be
+    mountAndAttachSharedDrive();                            // if shared drive is enabled, try to mount it and attach it
+    attachConfigDrive();                                    // if config drive is enabled, attach it
+    
     // todo: attach remainig DOS drives when they couldn't be attached before (not enough letters before)
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::configChanged_reload -- attached again, good %d, bad %d", good, bad);
+}
+
+void TranslatedDisk::mountAndAttachSharedDrive(void)
+{
+	std::string mountPath = SHARED_DRIVE_PATH;
+
+    Settings s;
+    std::string addr, path;
+	bool sharedEnabled;
+	bool nfsNotSamba;
+
+    addr			= s.getString((char *) "SHARED_ADDRESS",  (char *) "");
+    path			= s.getString((char *) "SHARED_PATH",     (char *) "");
+	
+	sharedEnabled	= s.getBool((char *) "SHARED_ENABLED", false);
+	nfsNotSamba		= s.getBool((char *) "SHARED_NFS_NOT_SAMBA", false);
+	
+	if(!sharedEnabled) {
+		Debug::out(LOG_INFO, "mountAndAttachSharedDrive: shared drive not enabled, not mounting and not attaching...");
+		return;
+	}
+	
+	if(addr.empty() || path.empty()) {
+		Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: address or path is empty, this won't work!");
+		return;
+	}
+	
+	TMounterRequest tmr;													// fill this struct to mount something somewhere
+	tmr.action              = MOUNTER_ACTION_MOUNT;							// action: mount
+	tmr.deviceNotShared		= false;
+	tmr.shared.host			= addr;
+	tmr.shared.hostDir		= path;
+	tmr.shared.nfsNotSamba	= nfsNotSamba;
+	tmr.mountDir			= mountPath;
+	mountAdd(tmr);
+
+	bool res = attachToHostPath(mountPath, TRANSLATEDTYPE_SHAREDDRIVE);	// try to attach
+
+	if(!res) {																// if didn't attach, skip the rest
+		Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: failed to attach shared drive %s", (char *) mountPath.c_str());
+	}
+}
+
+void TranslatedDisk::attachConfigDrive(void)
+{
+    std::string configDrivePath = CONFIG_DRIVE_PATH;
+	bool res = attachToHostPath(configDrivePath, TRANSLATEDTYPE_CONFIGDRIVE);   // try to attach
+
+	if(!res) {																                // if didn't attach, skip the rest
+		Debug::out(LOG_ERROR, "attachConfigDrive: failed to attach config drive %s", (char *) configDrivePath.c_str());
+	}
 }
 
 void TranslatedDisk::setAcsiDataTrans(AcsiDataTrans *dt)

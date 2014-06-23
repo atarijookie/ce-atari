@@ -53,12 +53,12 @@ CCoreThread::CCoreThread()
 
     // now register all the objects which use some settings in the proxy
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_ACSI);
-    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_TRANSLATED);
-    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_SHARED);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPYIMGS);
 	
     settingsReloadProxy.addSettingsUser((ISettingsUser *) scsi,          SETTINGSUSER_ACSI);
+
 	settingsReloadProxy.addSettingsUser((ISettingsUser *) translated,    SETTINGSUSER_TRANSLATED);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) translated,    SETTINGSUSER_SHARED);
 	
 	// register this class as receiver of dev attached / detached calls
 	devFinder.setDevChangesHandler((DevChangesHandler *) this);
@@ -111,9 +111,6 @@ void CCoreThread::run(void)
 	DWORD nextDevFindTime       = Utils::getCurrentMs();                // create a time when the devices should be checked - and that time is now
     DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);              // create a time when update download status should be checked
 
-	mountAndAttachSharedDrive();					                    // if shared drive is enabled, try to mount it and attach it
-	attachConfigDrive();                                                // if config drive is enabled, attach it
-    
     Update::downloadUpdateList();                                       // download the list of components with the newest available versions
 
 	bool res;
@@ -447,7 +444,6 @@ void CCoreThread::reloadSettings(int type)
 
 	// first dettach all the devices
 	scsi->detachAll();
-    translated->detachAll();
 
 	// then load the new settings
     loadSettings();
@@ -455,8 +451,6 @@ void CCoreThread::reloadSettings(int type)
 	// and now try to attach everything back
 	devFinder.clearMap();									// make all the devices appear as new
 	devFinder.lookForDevChanges();							// and now find all the devices
-	
-	mountAndAttachSharedDrive();							// and also attach shared drive
 }
 
 void CCoreThread::loadSettings(void)
@@ -625,57 +619,6 @@ void CCoreThread::attachDevAsTranslated(std::string devName)
 		}
 		
 		mapDeviceToHostPaths.insert(std::pair<std::string, std::string>(devName, mountPath) );	// store it to multimap
-	}
-}
-
-void CCoreThread::mountAndAttachSharedDrive(void)
-{
-	std::string mountPath = "/mnt/shared";
-
-    Settings s;
-    std::string addr, path;
-	bool sharedEnabled;
-	bool nfsNotSamba;
-
-    addr			= s.getString((char *) "SHARED_ADDRESS",  (char *) "");
-    path			= s.getString((char *) "SHARED_PATH",     (char *) "");
-	
-	sharedEnabled	= s.getBool((char *) "SHARED_ENABLED", false);
-	nfsNotSamba		= s.getBool((char *) "SHARED_NFS_NOT_SAMBA", false);
-	
-	if(!sharedEnabled) {
-		Debug::out(LOG_INFO, "mountAndAttachSharedDrive: shared drive not enabled, not mounting and not attaching...");
-		return;
-	}
-	
-	if(addr.empty() || path.empty()) {
-		Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: address or path is empty, this won't work!");
-		return;
-	}
-	
-	TMounterRequest tmr;													// fill this struct to mount something somewhere
-	tmr.action			= MOUNTER_ACTION_MOUNT;								// action: mount
-	tmr.deviceNotShared		= false;
-	tmr.shared.host			= addr;
-	tmr.shared.hostDir		= path;
-	tmr.shared.nfsNotSamba	= nfsNotSamba;
-	tmr.mountDir			= mountPath;
-	mountAdd(tmr);
-
-	bool res = translated->attachToHostPath(mountPath, TRANSLATEDTYPE_SHAREDDRIVE);	// try to attach
-
-	if(!res) {																// if didn't attach, skip the rest
-		Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: failed to attach shared drive %s", (char *) mountPath.c_str());
-	}
-}
-
-void CCoreThread::attachConfigDrive(void)
-{
-    std::string configDrivePath = "/ce/app/configdrive";
-	bool res = translated->attachToHostPath(configDrivePath, TRANSLATEDTYPE_CONFIGDRIVE);   // try to attach
-
-	if(!res) {																                // if didn't attach, skip the rest
-		Debug::out(LOG_ERROR, "attachConfigDrive: failed to attach config drive %s", (char *) configDrivePath.c_str());
 	}
 }
 

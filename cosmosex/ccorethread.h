@@ -90,9 +90,6 @@ private:
 	bool gotDevTypeTranslated;
 
 	void attachDevAsTranslated(std::string devName);
-	void mountAndAttachSharedDrive(void);
-	void attachConfigDrive(void);
-
     //-----------------------------------
     // handle FW version
     void handleFwVersion(int whichSpiCs);

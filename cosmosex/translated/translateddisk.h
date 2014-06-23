@@ -16,6 +16,8 @@
 #define BUFFER_SIZE             (1024*1024)
 #define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
 
+#define CONFIG_DRIVE_PATH       "/ce/app/configdrive"
+#define SHARED_DRIVE_PATH       "/mnt/shared"
 
 typedef struct {
     bool        enabled;
@@ -66,6 +68,9 @@ public:
     void pathSeparatorAtariToHost(std::string &path);
 
 private:
+	void mountAndAttachSharedDrive(void);
+	void attachConfigDrive(void);
+
     AcsiDataTrans   *dataTrans;
 
     BYTE            *dataBuffer;
