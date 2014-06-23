@@ -230,6 +230,10 @@ void TranslatedDisk::onDfree(BYTE *cmd)
     // TODO: get the real drive size
     DWORD clustersTotal = 32768;
     DWORD clustersFree  = 16384;
+    
+    if(isDriveIndexReadOnly(whichDrive)) {
+        clustersFree  = 0;
+    }
 
     dataTrans->addDataDword(clustersFree);          // No. of Free Clusters
     dataTrans->addDataDword(clustersTotal);         // Clusters per Drive
@@ -260,6 +264,11 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
         return;
     }
 
+    if(isAtariPathReadOnly(newAtariPath)) {         // if it's read only, quit
+        dataTrans->setStatus(EACCDN);
+        return;
+    }
+    
 	int status = mkdir(hostPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
 
     if(status == 0) {                               // directory created?
@@ -295,6 +304,11 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
 
     if(!res) {                                      // the path doesn't bellong to us?
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
+        return;
+    }
+    
+    if(isAtariPathReadOnly(newAtariPath)) {         // if it's read only, quit
+        dataTrans->setStatus(EACCDN);
         return;
     }
 
@@ -339,6 +353,11 @@ void TranslatedDisk::onFrename(BYTE *cmd)
         return;
     }
 
+    if(isAtariPathReadOnly(newAtariName)) {                         // if it's read only, quit
+        dataTrans->setStatus(EACCDN);
+        return;
+    }
+    
     int ires = rename(oldHostName.c_str(), newHostName.c_str());    // rename host file
 
     if(ires == 0) {                                                 // good
@@ -366,6 +385,11 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
 
     if(!res) {                                      // the path doesn't bellong to us?
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
+        return;
+    }
+    
+    if(isAtariPathReadOnly(newAtariPath)) {         // if it's read only, quit
+        dataTrans->setStatus(EACCDN);
         return;
     }
 
@@ -481,6 +505,11 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
     }
+    
+    if(isAtariPathReadOnly(atariName)) {                            // if it's read only, quit
+        dataTrans->setStatus(EACCDN);
+        return;
+    }
 
     int index = findEmptyFileSlot();
 
@@ -550,6 +579,11 @@ void TranslatedDisk::onFopen(BYTE *cmd)
 
     if(!res) {                                                      // the path doesn't bellong to us?
 		dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
+        return;
+    }
+
+    if((mode & 0x07) != 0 && isAtariPathReadOnly(atariName)) {      // if it's WRITE and read only, quit
+        dataTrans->setStatus(EACCDN);
         return;
     }
 

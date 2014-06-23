@@ -81,6 +81,8 @@ private:
         int firstTranslated;
         int shared;
         int confDrive;
+        
+        WORD readOnly;
     } driveLetters;
 
 	TFindStorage findStorage;
@@ -89,6 +91,8 @@ private:
 
     WORD getDrivesBitmap(void);
 	int  getDriveIndexFromAtariPath(std::string atariPath);
+    bool isAtariPathReadOnly(std::string atariPath);
+    bool isDriveIndexReadOnly(int driveIndex);
     void removeDoubleDots(std::string &path);
     void pathSeparatorHostToAtari(std::string &path);
     void createAtariPathFromHostPath(std::string hostPath, std::string &atariPath);

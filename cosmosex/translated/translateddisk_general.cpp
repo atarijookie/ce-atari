@@ -55,6 +55,13 @@ void TranslatedDisk::loadSettings(void)
     driveLetters.firstTranslated    = drive1 - 'A';
     driveLetters.shared             = drive2 - 'A';
     driveLetters.confDrive          = drive3 - 'A';
+    
+    // now set the read only drive flags
+    driveLetters.readOnly = 0;
+    
+    if(driveLetters.confDrive >= 0 && driveLetters.confDrive <=15) {        // if got a valid drive letter for config drive
+        driveLetters.readOnly = (1 << driveLetters.confDrive);              // make config drive read only
+    }
 }
 
 void TranslatedDisk::reloadSettings(int type)
@@ -538,6 +545,32 @@ int TranslatedDisk::getDriveIndexFromAtariPath(std::string atariPath)
 
 	// if it wasn't full path, use current drive index
 	return currentDriveIndex;
+}
+
+bool TranslatedDisk::isAtariPathReadOnly(std::string atariPath)
+{
+    int driveIndex = getDriveIndexFromAtariPath(atariPath);
+    
+    if(driveIndex == -1) {
+        return false;
+    }
+    
+    return isDriveIndexReadOnly(driveIndex);
+}
+    
+bool TranslatedDisk::isDriveIndexReadOnly(int driveIndex)
+{ 
+    if(driveIndex < 0 || driveIndex > 15) {
+        return false;
+    }
+
+    WORD mask = (1 << driveIndex);
+    
+    if((driveLetters.readOnly & mask) != 0) {               // if the bit representing the drive is set, it's read only
+        return true;
+    }
+    
+    return false;
 }
 
 void TranslatedDisk::removeDoubleDots(std::string &path)
