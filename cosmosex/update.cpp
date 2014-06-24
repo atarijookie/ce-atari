@@ -273,17 +273,20 @@ bool Update::createUpdateScript(void)
     }
 
     if(Update::versions.current.app.isOlderThan( Update::versions.onServer.app )) {
-        std::string appFile;
-        Update::getLocalPathFromUrl(Update::versions.onServer.app.getUrl(), appFile);
+        std::string appFileWithPath;
+        Update::getLocalPathFromUrl(Update::versions.onServer.app.getUrl(), appFileWithPath);
 
+        std::string appFilePath, appFileOnly;
+        Utils::splitFilenameFromPath(appFileWithPath, appFilePath, appFileOnly);
+        
         fprintf(f, "# updgrade of application\n");
-        fprintf(f, "rm -rf %s\n", (char *)              UPDATE_APP_PATH);	// delete old app
-        fprintf(f, "mkdir %s\n", (char *)              	UPDATE_APP_PATH);	// create dir for new app
-        fprintf(f, "cd %s\n", (char *)              	UPDATE_APP_PATH);	// cd to that dir
-		fprintf(f, "mv /ce/update/%s /ce/app\n",		appFile.c_str());	// move the .zip file from update dir to the app dir
-        fprintf(f, "unzip %s\n", (char *)               appFile.c_str());	// unzip it
-        fprintf(f, "chmod 755 %s/cosmosex\n", (char *)  UPDATE_APP_PATH);	// change permissions
-		fprintf(f, "rm -f %s\n",						appFile.c_str());	// delete the zip
+        fprintf(f, "rm -rf %s\n", (char *)              UPDATE_APP_PATH);	        // delete old app
+        fprintf(f, "mkdir %s\n", (char *)              	UPDATE_APP_PATH);	        // create dir for new app
+        fprintf(f, "cd %s\n", (char *)              	UPDATE_APP_PATH);	        // cd to that dir
+		fprintf(f, "mv %s /ce/app\n",		            appFileWithPath.c_str());   // move the .zip file from update dir to the app dir
+        fprintf(f, "unzip /ce/app/%s\n", (char *)       appFileOnly.c_str());	    // unzip it
+        fprintf(f, "chmod 755 %s/cosmosex\n", (char *)  UPDATE_APP_PATH);	        // change permissions
+		fprintf(f, "rm -f /ce/app/%s\n",				appFileOnly.c_str());       // delete the zip
         fprintf(f, "\n\n");
     }
 
@@ -292,7 +295,7 @@ bool Update::createUpdateScript(void)
         Update::getLocalPathFromUrl(Update::versions.onServer.hans.getUrl(), fwFile);
 
         fprintf(f, "# updgrade of Hans FW\n");
-        fprintf(f, "./flash_stm32 -x -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());           // was: sudo
+        fprintf(f, "/ce/update/flash_stm32 -x -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());
         fprintf(f, "rm -f %s\n", (char *) fwFile.c_str());
         fprintf(f, "\n\n");
     }
@@ -302,7 +305,7 @@ bool Update::createUpdateScript(void)
         Update::getLocalPathFromUrl(Update::versions.onServer.xilinx.getUrl(), fwFile);
 
         fprintf(f, "# updgrade of Xilinx FW\n");
-        fprintf(f, "./flash_xilinx %s\n", (char *) fwFile.c_str());                             // was: sudo
+        fprintf(f, "/ce/update/flash_xilinx %s\n", (char *) fwFile.c_str());
         fprintf(f, "rm -f %s\n", (char *) fwFile.c_str());
 		fprintf(f, "cat /ce/update/updatelist.csv | grep xilinx | sed -e 's/[^,]*,\\([^,]*\\).*/\\1/' > /ce/update/xilinx_current.txt \n");
         fprintf(f, "\n\n");
@@ -313,7 +316,7 @@ bool Update::createUpdateScript(void)
         Update::getLocalPathFromUrl(Update::versions.onServer.franz.getUrl(), fwFile);
 
         fprintf(f, "# updgrade of Franz FW\n");
-        fprintf(f, "./flash_stm32 -y -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());           // was: sudo
+        fprintf(f, "/ce/update/flash_stm32 -y -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());
         fprintf(f, "rm -f %s\n", (char *) fwFile.c_str());
         fprintf(f, "\n\n");
     }
@@ -332,16 +335,16 @@ bool Update::createFlashFirstFwScript(void)
     }
 
     fprintf(f, "# flash first Xilinx FW \n");
-    fprintf(f, "./flash_xilinx /ce/firstfw/xilinx.xsvf \n\n");
+    fprintf(f, "/ce/update/flash_xilinx /ce/firstfw/xilinx.xsvf \n\n");
 
     fprintf(f, "# copy the xilinx version file \n");
     fprintf(f, "cp /ce/firstfw/xilinx_current.txt /ce/update/ \n\n");
     
     fprintf(f, "# flash first Hans FW \n");
-    fprintf(f, "./flash_stm32 -x -w /ce/firstfw/hans.hex /dev/ttyAMA0 \n\n");
+    fprintf(f, "/ce/update/flash_stm32 -x -w /ce/firstfw/hans.hex /dev/ttyAMA0 \n\n");
 
     fprintf(f, "# flash first Franz FW \n");
-    fprintf(f, "./flash_stm32 -y -w /ce/firstfw/franz.hex /dev/ttyAMA0 \n\n");
+    fprintf(f, "/ce/update/flash_stm32 -y -w /ce/firstfw/franz.hex /dev/ttyAMA0 \n\n");
 
     fclose(f);
     return true;
