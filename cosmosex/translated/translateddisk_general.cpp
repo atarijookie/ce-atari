@@ -54,7 +54,7 @@ void TranslatedDisk::loadSettings(void)
 
     drive1 = s.getChar((char *) "DRIVELETTER_FIRST",      -1);
     drive2 = s.getChar((char *) "DRIVELETTER_SHARED",     -1);
-    drive3 = s.getChar((char *) "DRIVELETTER_CONFDRIVE",  -1);
+    drive3 = s.getChar((char *) "DRIVELETTER_CONFDRIVE",  'O');
 
     driveLetters.firstTranslated    = drive1 - 'A';
     driveLetters.shared             = drive2 - 'A';
@@ -77,9 +77,11 @@ void TranslatedDisk::reloadSettings(int type)
 
     // now move the attached drives around to match the new configuration
 
-    TranslatedConf tmpConf[MAX_DRIVES];
+    TranslatedConfTemp tmpConf[MAX_DRIVES];
     for(int i=2; i<MAX_DRIVES; i++) {           // first make the copy of the current state
-        tmpConf[i] = conf[i];
+        tmpConf[i].enabled          = conf[i].enabled;
+        tmpConf[i].hostRootPath     = conf[i].hostRootPath;
+        tmpConf[i].translatedType   = conf[i].translatedType;
     }
 
     detachAll();                                // then deinit the conf structures
@@ -104,7 +106,7 @@ void TranslatedDisk::reloadSettings(int type)
     // attach shared and config disk if they weren't attached before and now should be
     mountAndAttachSharedDrive();                            // if shared drive is enabled, try to mount it and attach it
     attachConfigDrive();                                    // if config drive is enabled, attach it
-    
+
     // todo: attach remainig DOS drives when they couldn't be attached before (not enough letters before)
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::configChanged_reload -- attached again, good %d, bad %d", good, bad);

@@ -33,6 +33,12 @@ typedef struct {
 } TranslatedConf;
 
 typedef struct {
+    bool        enabled;
+    std::string hostRootPath;               // where is the root on host file system
+    int         translatedType;             // normal / shared / config
+} TranslatedConfTemp;
+
+typedef struct {
     FILE *hostHandle;                       // file handle for all the work with the file on host
     BYTE atariHandle;                       // file handle used on Atari
     std::string hostPath;                   // where is the file on host file system
