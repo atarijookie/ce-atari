@@ -78,11 +78,7 @@ int main(int argc, char *argv[])
     res = pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL);	// create the floppy encoding thread and run it
 	handlePthreadCreate(res, (char *) "floppy encode");
 
-    #ifndef ONPC	
 	core->run();										// run the main thread
-    #else
-    core->runOnPc();
-    #endif
 
 	delete core;
 	gpio_close();										// close gpio and spi

@@ -239,139 +239,6 @@ void CCoreThread::run(void)
     }
 }
 
-#ifdef ONPC
-
-#define UARTFILE        "/dev/pts/9"
-BYTE *bufIn;
-BYTE writeData[128 * 1024];
-int fakeAcsiFd;
-WORD dataCnt;
-
-void CCoreThread::runOnPc(void)
-{
-    struct termios	termiosStruct;
-
-    fakeAcsiFd = serialSetup(&termiosStruct);
-
-    if(fakeAcsiFd == -1) {
-        Debug::out(LOG_DEBUG, (char *) "Couldn't open serial port %s, can't continue!", UARTFILE);
-    }
-
-    loadSettings();
-	mountAndAttachSharedDrive();					// if shared drive is enabled, try to mount it and attach it
-
-    while(sigintReceived == 0) {
-        BYTE header[19];
-
-        readBuffer(fakeAcsiFd, header, 19);
-
-        bufIn = header + 2;
-
-        dataCnt = (((WORD) header[17]) << 8) | ((WORD) header[18]);
-        dataCnt = dataCnt * 512;    // convert sector count to byte count
-
-        if(header[1] == 0) {        // write?
-            readBuffer(fakeAcsiFd, writeData, dataCnt);
-        }
-
-        Debug::out(LOG_DEBUG, (char *) "ST will %s bytes: %d", header[1] == 0 ? "write" : "read", dataCnt);
-
-        dataTrans->dumpDataOnce();
-        handleAcsiCommand();
-    }
-}
-
-int CCoreThread::readBuffer(int fd, BYTE *bfr, WORD cnt)
-{
-    int rest = cnt;
-
-    while(sigintReceived == 0) {
-        int res = read(fd, bfr, 1);
-
-        if(res > 0) {
-            if(bfr[0] != 0xfe) {        // not a starting marker? try again
-                continue;
-            }
-
-            rest -= 1;
-            bfr  += 1;
-            break;
-        } else {
-            Utils::sleepMs(5);
-        }
-    }
-
-
-    while(sigintReceived == 0) {
-        int res = read(fd, bfr, rest);
-
-        if(res > 0) {
-            rest -= res;
-            bfr  += res;
-        } else {
-            Utils::sleepMs(5);
-        }
-
-        if(rest == 0) {
-            break;
-        }
-    }
-
-    return cnt;
-}
-
-int CCoreThread::serialSetup(termios *ts) 
-{
-	int fd;
-	
-	fd = open(UARTFILE, O_RDWR | O_NOCTTY); // | O_NDELAY | O_NONBLOCK);
-	if(fd == -1) {
-        Debug::out(LOG_ERROR, "Failed to open %s", UARTFILE);
-        return -1;
-	}
-	fcntl(fd, F_SETFL, 0);
-	tcgetattr(fd, ts);
-
-	/* reset the settings */
-	cfmakeraw(ts);
-	ts->c_cflag &= ~(CSIZE | CRTSCTS);
-	ts->c_iflag &= ~(IXON | IXOFF | IXANY | IGNPAR);
-	ts->c_lflag &= ~(ECHOK | ECHOCTL | ECHOKE);
-	ts->c_oflag &= ~(OPOST | ONLCR);
-
-	/* setup the new settings */
-	cfsetispeed(ts, B115200);
-	cfsetospeed(ts, B115200);
-	ts->c_cflag |=  CS8 | CLOCAL | CREAD;			// uart: 8N1
-
-	ts->c_cc[VMIN ] = 0;
-	ts->c_cc[VTIME] = 0;
-
-	/* set the settings */
-	tcflush(fd, TCIFLUSH); 
-	
-	if (tcsetattr(fd, TCSANOW, ts) != 0) {
-		close(fd);
-		return -1;
-	}
-
-	/* confirm they were set */
-	struct termios settings;
-	tcgetattr(fd, &settings);
-	if (settings.c_iflag != ts->c_iflag ||
-		settings.c_oflag != ts->c_oflag ||
-		settings.c_cflag != ts->c_cflag ||
-		settings.c_lflag != ts->c_lflag) {
-		close(fd);
-		return -1;
-	}
-
-    //fcntl(fd, F_SETFL, FNDELAY);                    // make reading non-blocking
-
-	return fd;
-}
-#endif
-
 void CCoreThread::handleAcsiCommand(void)
 {
     #define CMD_SIZE    14
@@ -379,11 +246,9 @@ void CCoreThread::handleAcsiCommand(void)
     BYTE bufOut[CMD_SIZE];
     memset(bufOut, 0, CMD_SIZE);
 
-    #ifndef ONPC
     BYTE bufIn[CMD_SIZE];
 
     conSpi->txRx(SPI_CS_HANS, 14, bufOut, bufIn);        // get 14 cmd bytes
-    #endif
 
     Debug::out(LOG_DEBUG, "handleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
 

@@ -101,21 +101,9 @@ void AcsiDataTrans::padDataToMul16(void)
     }
 }
 
-#ifdef ONPC
-extern int   fakeAcsiFd;
-extern WORD  dataCnt;
-extern BYTE *writeData;
-#endif
-
 // get data from Hans
 bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 {
-    #ifdef ONPC
-    Debug::out(LOG_DEBUG, "PC will read data from ST: %d bytes", dataCnt);
-    memcpy(data, writeData, dataCnt);
-    return true;
-    #endif
-
     if(!com) {
         Debug::out(LOG_ERROR, "AcsiDataTrans::recvData -- no communication object, fail!");
         return false;
@@ -239,17 +227,6 @@ void AcsiDataTrans::sendDataAndStatus(void)
 		dumpNextData = false;
 	}
 	//---------------------------------------
-	
-    #ifdef ONPC
-    Debug::out(LOG_DEBUG, "PC will write data to ST: %d bytes", dataCnt);
-
-    BYTE marker = 0xfe;
-    write(fakeAcsiFd, &marker, 1);
-    write(fakeAcsiFd, buffer, dataCnt);
-    write(fakeAcsiFd, &status, 1);
-    return;
-    #endif
-
     // first send the command
     BYTE devCommand[COMMAND_SIZE];
     memset(devCommand, 0, COMMAND_SIZE);
@@ -290,15 +267,6 @@ void AcsiDataTrans::sendDataAndStatus(void)
 
 void AcsiDataTrans::sendStatusAfterWrite(void)
 {
-    #ifdef ONPC
-    Debug::out(LOG_DEBUG, "Write status after write to ST: just marker and status...", dataCnt);
-
-    BYTE marker = 0xfe;
-    write(fakeAcsiFd, &marker, 1);
-    write(fakeAcsiFd, &status, 1);
-    return;
-    #endif
-
 	BYTE inBuf[8];
 	bool res = com->waitForATN(SPI_CS_HANS, ATN_GET_STATUS, 1000, inBuf);	// wait for ATN_GET_STATUS
 
