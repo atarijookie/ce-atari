@@ -13,6 +13,9 @@ else
     LDFLAGS	= -lbcm2835 -lrt -lpthread -lcurl
 endif
 
+# uncomment following line to get map file (ce.map)
+#LDFLAGS += -Wl,-Map,ce.map
+
 SUBDIR1	= config
 SUBDIR2	= native
 SUBDIR3	= translated
