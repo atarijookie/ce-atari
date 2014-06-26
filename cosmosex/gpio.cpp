@@ -18,9 +18,10 @@ bcm2835_gpio_write doesn't influence SPI CS pins, they are controlled by SPI par
 #ifdef ONPC
 // the following dummy functions are here for compilation on PC (not RPi)
 
+#include "socks.h"
+
 bool bcm2835_init(void) { return true; }
 void bcm2835_gpio_fsel(int a, int b) {}
-void bcm2835_gpio_write(int a, int b) {}
 void bcm2835_spi_begin() {}
 void bcm2835_spi_setBitOrder(int a) {}
 void bcm2835_spi_setDataMode(int a) {}
@@ -30,52 +31,102 @@ void bcm2835_spi_chipSelect(int a) {}
 void bcm2835_spi_end(void) {}
 void bcm2835_close(void) {}
 
-int  spiCount  = 0;
-int  spiOffset = 0;
-char spiData[2048];
+int  bcm2835_gpio_lev(int a) {return 0; }
 
-void bcmSpiAddData(int count, char *data)
+void bcm2835_spi_transfernb(char *txBuf, char *rxBuf, int c) { }
+
+#define SYNC1           0xca
+#define SYNC2           0xfe
+
+#define FUN_GPIO_WRITE  1
+#define FUN_SPI_TX_RX   2
+#define FUN_SPI_ATN     3
+
+void bcm2835_gpio_write(int a, int b) 
 {
-    memcpy(spiData, data, count);
-    spiCount    = count;
-    spiOffset   = 0;
+    BYTE bfrWrite[6];
+    memset(bfrWrite, 0, 6);
+
+    bfrWrite[0] = SYNC1;
+    bfrWrite[1] = SYNC2;
+    bfrWrite[2] = FUN_GPIO_WRITE;
+    bfrWrite[3] = a;
+    bfrWrite[4] = b;
+
+    clientSocket_write(bfrWrite, 6);
 }
 
-int  bcm2835_gpio_lev(int a) 
+void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf)
 {
-    if(a == PIN_ATN_HANS && spiCount != 0) {
-        return 1;
-    }
+    BYTE bfrWrite[6];
+    memset(bfrWrite, 0, 6);
 
-    return 0; 
-}
+    bfrWrite[0] = SYNC1;
+    bfrWrite[1] = SYNC2;
+    bfrWrite[2] = FUN_SPI_TX_RX;
+    bfrWrite[3] = whichSpiCS;
+    bfrWrite[4] = (BYTE) (count >> 8);
+    bfrWrite[5] = (BYTE) (count & 0xff);
 
-void bcm2835_spi_transfernb(char *txBuf, char *rxBuf, int c)
-{
-    if(spiCount == 0) {
+    clientSocket_write(bfrWrite, 6);
+    clientSocket_write(txBuf, count);
+
+    BYTE bfrRead[2];
+    int res = clientSocket_read(bfrRead, 2);
+
+    if(bfrRead[0] != SYNC1 || bfrRead[1] != SYNC2 || res != 2) {
         return;
     }
 
-    if(c > spiCount) {
-        c = spiCount;
-    }
-
-    memcpy(rxBuf, spiData + spiOffset, c);
-
-    if(spiCount <= c) {
-        spiCount    = 0;
-        spiOffset   = 0;
-        return;
-    }
-
-    spiCount    -= c;
-    spiOffset   += c;
+    clientSocket_read(rxBuf, count);
 }
 
+bool spi_atn(int whichSpiAtn)
+{
+    BYTE bfrWrite[6];
+    memset(bfrWrite, 0, 6);
+
+    bfrWrite[0] = SYNC1;
+    bfrWrite[1] = SYNC2;
+    bfrWrite[2] = FUN_SPI_ATN;
+    bfrWrite[3] = whichSpiAtn;
+
+    clientSocket_write(bfrWrite, 6);
+
+    BYTE bfrRead[3];
+    int res = clientSocket_read(bfrRead, 3);
+
+    if(bfrRead[0] != SYNC1 || bfrRead[1] != SYNC2 || res != 3) {
+        return false;
+    }
+
+	return (bfrRead[2] == HIGH);        // returns true if pin is high, returns false if pin is low
+}
+
+#else
+void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf)
+{
+    bcm2835_spi_chipSelect(whichSpiCS);
+	bcm2835_spi_transfernb((char *) txBuf, (char *) rxBuf, count); 
+}
+
+bool spi_atn(int whichSpiAtn)
+{
+	BYTE val;
+	
+	val = bcm2835_gpio_lev(whichSpiAtn); 
+	
+	return (val == HIGH);					// returns true if pin is high, returns false if pin is low
+}
 #endif
 
 bool gpio_open(void)
 {
+    #ifdef ONPC
+    clientSocket_setParams((char *) "192.168.123.142", 1111);
+    return true;
+    #endif
+
 	if(geteuid() != 0) {
 		Debug::out(LOG_ERROR, "The bcm2835 library requires to be run as root, try again...");
         return false;
@@ -143,21 +194,6 @@ void spi_init(void)
     bcm2835_spi_setChipSelectPolarity(BCM2835_SPI_CS1, LOW);		// the default
 
     bcm2835_spi_chipSelect(BCM2835_SPI_CS0);						
-}
-
-void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf)
-{
-    bcm2835_spi_chipSelect(whichSpiCS);
-	bcm2835_spi_transfernb((char *) txBuf, (char *) rxBuf, count); 
-}
-
-bool spi_atn(int whichSpiAtn)
-{
-	BYTE val;
-	
-	val = bcm2835_gpio_lev(whichSpiAtn); 
-	
-	return (val == HIGH);					// returns true if pin is high, returns false if pin is low
 }
 
 void gpio_close(void)
