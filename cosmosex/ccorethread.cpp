@@ -208,7 +208,8 @@ void CCoreThread::run(void)
 				break;
 			}
 		}
-		
+
+#ifndef ONPC		
         // check for any ATN code waiting from Franz
 		res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuff);		
 		if(res) {									// FRANZ is signaling attention?
@@ -232,7 +233,9 @@ void CCoreThread::run(void)
 				break;
 			}
 		}
-		
+#else
+    g_gotFranzFwVersion = true;
+#endif		
 		if(!gotAtn) {								// no ATN was processed?
 			Utils::sleepMs(1);						// wait 1 ms...
 		}		

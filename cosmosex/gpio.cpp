@@ -18,6 +18,9 @@ bcm2835_gpio_write doesn't influence SPI CS pins, they are controlled by SPI par
 #ifdef ONPC
 // the following dummy functions are here for compilation on PC (not RPi)
 
+#include <signal.h>
+#include <pthread.h>
+
 #include "socks.h"
 
 bool bcm2835_init(void) { return true; }
@@ -35,15 +38,19 @@ int  bcm2835_gpio_lev(int a) {return 0; }
 
 void bcm2835_spi_transfernb(char *txBuf, char *rxBuf, int c) { }
 
-#define SYNC1           0xca
-#define SYNC2           0xfe
+#define SYNC1           0xab
+#define SYNC2           0xcd
 
 #define FUN_GPIO_WRITE  1
 #define FUN_SPI_TX_RX   2
 #define FUN_SPI_ATN     3
 
+pthread_mutex_t tcpMutex = PTHREAD_MUTEX_INITIALIZER;
+
 void bcm2835_gpio_write(int a, int b) 
 {
+    pthread_mutex_lock(&tcpMutex);
+
     BYTE bfrWrite[6];
     memset(bfrWrite, 0, 6);
 
@@ -54,10 +61,13 @@ void bcm2835_gpio_write(int a, int b)
     bfrWrite[4] = b;
 
     clientSocket_write(bfrWrite, 6);
+    pthread_mutex_unlock(&tcpMutex);
 }
 
 void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf)
 {
+    pthread_mutex_lock(&tcpMutex);
+
     BYTE bfrWrite[6];
     memset(bfrWrite, 0, 6);
 
@@ -75,14 +85,18 @@ void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf)
     int res = clientSocket_read(bfrRead, 2);
 
     if(bfrRead[0] != SYNC1 || bfrRead[1] != SYNC2 || res != 2) {
+        pthread_mutex_unlock(&tcpMutex);
         return;
     }
 
     clientSocket_read(rxBuf, count);
+    pthread_mutex_unlock(&tcpMutex);
 }
 
 bool spi_atn(int whichSpiAtn)
 {
+    pthread_mutex_lock(&tcpMutex);
+
     BYTE bfrWrite[6];
     memset(bfrWrite, 0, 6);
 
@@ -96,11 +110,15 @@ bool spi_atn(int whichSpiAtn)
     BYTE bfrRead[3];
     int res = clientSocket_read(bfrRead, 3);
 
+    pthread_mutex_unlock(&tcpMutex);
+
     if(bfrRead[0] != SYNC1 || bfrRead[1] != SYNC2 || res != 3) {
         return false;
     }
 
-	return (bfrRead[2] == HIGH);        // returns true if pin is high, returns false if pin is low
+    bool b = bfrRead[2];
+
+    return b;	// returns true if pin is high, returns false if pin is low
 }
 
 #else
@@ -124,6 +142,7 @@ bool gpio_open(void)
 {
     #ifdef ONPC
     clientSocket_setParams((char *) "192.168.123.142", 1111);
+    clientSocket_createConnection();
     return true;
     #endif
 

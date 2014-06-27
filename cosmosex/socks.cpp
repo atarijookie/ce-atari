@@ -9,10 +9,11 @@
 #include <errno.h>
 #include <arpa/inet.h> 
 
+#include "socks.h"
+
 static char gServerIp[128];
 static int  gServerPort;
 static int  clientSockFd = -1;
-static int  clientSocket_createConnection(void);
 
 static int  gServerPortForServer;
 static int  serverListenSockFd = -1;
@@ -103,18 +104,6 @@ int serverSocket_read(unsigned char *bfr, int len)
 int sockWrite(int fd, unsigned char *bfr, int len)
 {
     ssize_t n;
-    unsigned char tmp[3];
-    tmp[0] = TAG_START;
-    tmp[1] = (unsigned char) (len >>    8);
-    tmp[2] = (unsigned char) (len  & 0xff);
-
-    n = write(fd, tmp, 3);
-
-    if(n != 3) {
-        DEBUGSTR("sockWrite: sending failed...\n");
-        return 0;
-    }
-
     n = write(fd, bfr, len);
 
     if(n != len) {
@@ -127,44 +116,18 @@ int sockWrite(int fd, unsigned char *bfr, int len)
 int sockRead(int fd, unsigned char *bfr, int len)
 {
     ssize_t n;
-    unsigned char tmp[3];
-
-    n = read(fd, tmp, 3);                                   // read header with length
+    n = read(fd, bfr, len);                                // read data
 
     if(n == 0 && fd == serverConnectSockFd) {               // for server socket, when read returns 0, the client has quit
         close(serverConnectSockFd);
         serverConnectSockFd = -1;
     }
 
-    if(n != 3) {
-        DEBUGSTR("sockRead: receiving failed...\n");
-        return 0;
-    }
-
-    if(tmp[0] != TAG_START) {                               // check for TAG
-        DEBUGSTR("sockRead: no starting tag - sync issues?\n");
-        return 0;
-    }
-
-    int rlen = (((int)tmp[1]) << 8) | ((int)tmp[2]);        // reconstruct length
-
-    if(rlen > len) {                                        // if the receiving buffer isn't long enough
-        DEBUGSTR("sockRead: buffer is too small, didn't receive all the data...\n");
-        rlen = len;
-    }
-
-    n = read(fd, bfr, rlen);                                // read data
-
-    if(n == 0 && fd == serverConnectSockFd) {               // for server socket, when read returns 0, the client has quit
-        close(serverConnectSockFd);
-        serverConnectSockFd = -1;
-    }
-
-    if(n != rlen) {
+    if(n != len) {
         DEBUGSTR("sockRead: reading failed...\n");
     }
 
-    return rlen;
+    return len;
 }
 
 int clientSocket_createConnection(void)
