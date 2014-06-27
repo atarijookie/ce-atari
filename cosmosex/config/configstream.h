@@ -2,9 +2,9 @@
 #define _CONFIGSTREAM_H_
 
 #include <stdio.h>
-#include <vector>
 
 #include "configcomponent.h"
+#include "stupidvector.h"
 #include "../settingsreloadproxy.h"
 #include "../version.h"
 
@@ -89,8 +89,8 @@ public:
     void onCheckboxGroupEnter(int groupId, int checkboxId);
 
 private:
-    std::vector<ConfigComponent *> screen;
-    std::vector<ConfigComponent *> message;
+    StupidVector screen;
+    StupidVector message;
 
     int stScreenWidth;
     int gotoOffset;
@@ -108,8 +108,8 @@ private:
     void destroyCurrentScreen(void);
     void setFocusToFirstFocusable(void);
 
-    void screen_addHeaderAndFooter(std::vector<ConfigComponent *> &scr, char *screenName);
-    void destroyScreen(std::vector<ConfigComponent *> &scr);
+    void screen_addHeaderAndFooter(StupidVector &scr, char *screenName);
+    void destroyScreen(StupidVector &scr);
 
     void onAcsiConfig_save(void);
     void onTranslated_save(void);
