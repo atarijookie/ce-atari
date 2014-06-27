@@ -15,8 +15,8 @@ void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf)
 bool spi_atn(int whichSpiAtn)
 */
 
-#define SYNC1           0xca
-#define SYNC2           0xfe
+#define SYNC1           0xab
+#define SYNC2           0xcd
 
 #define FUN_GPIO_WRITE  1
 #define FUN_SPI_TX_RX   2
@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
                 count = bfrRead[4];
                 count = count << 8;
                 count = count | ((WORD) bfrRead[5]);
-            
+
                 res = serverSocket_read(bfrRead + 6, count);
             
                 if(res != count) {
@@ -79,9 +79,10 @@ int main(int argc, char *argv[])
             //----------------------------------------------------------
         
             case FUN_SPI_ATN:
+            int whichAtn = bfrRead[3];
             bfrWrite[0] = SYNC1;
             bfrWrite[1] = SYNC2;
-            bfrWrite[2] = spi_atn(bfrRead[3]);
+            bfrWrite[2] = spi_atn(whichAtn);
             
             serverSocket_write(bfrWrite, 3);
             break;
