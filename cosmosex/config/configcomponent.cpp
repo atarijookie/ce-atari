@@ -205,7 +205,7 @@ void ConfigComponent::onKeyPressed(BYTE key)
             }
 
             if(onEnter != 0) {          				// if we got onEnter function, call it
-                confStream->enterKeyHandler(onEnter);
+                confStream->enterKeyHandlerLater(onEnter);
             }
 
             changed = true;						// mark that we got new data and we should display them

@@ -15,6 +15,8 @@ ConfigStream::ConfigStream()
     stScreenWidth   = 40;
     gotoOffset      = 0;
 
+    enterKeyEventLater = 0;
+    
     showingHomeScreen	= false;
     showingMessage		= false;
     screenChanged		= true;
@@ -62,6 +64,12 @@ void ConfigStream::processCommand(BYTE *cmd)
 
     case CFG_CMD_KEYDOWN:
         onKeyDown(cmd[5]);                                                // first send the key down signal
+        
+        if(enterKeyEventLater) {                                            // if we should handle some event 
+            enterKeyHandler(enterKeyEventLater);                            // handle it
+            enterKeyEventLater = 0;                                         // and don't let it handle next time
+        }
+
         streamCount = getStream(false, readBuffer, READ_BUFFER_SIZE);     // then get current screen stream
 
         dataTrans->addDataBfr(readBuffer, streamCount, true);                              // add data and status, with padding to multiple of 16 bytes
@@ -207,7 +215,7 @@ void ConfigStream::onKeyDown(BYTE key)
     }
 
     if(key == KEY_ESC) {                        // esc as cancel
-        enterKeyHandler(CS_GO_HOME);
+        enterKeyHandlerLater(CS_GO_HOME);
         return;
     }
 
@@ -545,6 +553,10 @@ void ConfigStream::screen_addHeaderAndFooter(StupidVector &scr, char *screenName
 }
 
 //--------------------------
+void ConfigStream::enterKeyHandlerLater(int event)
+{
+    enterKeyEventLater = event;
+}
 
 void ConfigStream::enterKeyHandler(int event)
 {

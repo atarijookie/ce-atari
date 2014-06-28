@@ -85,9 +85,10 @@ public:
     void focusByComponentId(int componentId);
     bool focusNextCheckboxGroup(BYTE key, int groupid, int chbid);
 
-    void enterKeyHandler(int event);
     void onCheckboxGroupEnter(int groupId, int checkboxId);
 
+    void enterKeyHandlerLater(int event);
+    
 private:
     StupidVector screen;
     StupidVector message;
@@ -95,6 +96,8 @@ private:
     int stScreenWidth;
     int gotoOffset;
 
+    int enterKeyEventLater;
+    
     AcsiDataTrans       *dataTrans;
     SettingsReloadProxy *reloadProxy;
 
@@ -105,6 +108,8 @@ private:
     bool showingMessage;
     bool screenChanged;
 
+    void enterKeyHandler(int event);
+    
     void destroyCurrentScreen(void);
     void setFocusToFirstFocusable(void);
 
