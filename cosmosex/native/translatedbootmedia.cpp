@@ -33,7 +33,7 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
 	size_t bytesRead;
 	FILE *f;
 	
-	f = fopen("/ce/app/configdrive/cedd.bs", "rb");
+	f = fopen("/ce/app/configdrive/ce_dd.bs", "rb");
 
 	if(!f) {
         Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open bootsector file!");
@@ -50,10 +50,10 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
 	fclose(f);
 	
 	// read the CosmosEx driver into buffer
-	f = fopen("/ce/app/configdrive/cedd.prg", "rb");
+	f = fopen("/ce/app/configdrive/ce_dd.prg", "rb");
 
 	if(!f) {
-        Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open cedd.prg!");
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open ce_dd.prg!");
 		return false;
 	}
 	
@@ -71,7 +71,7 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
 	
 	fclose(f);
 	
-	// calculate the count of sectors the driver takes in buffer + 1 for boot sector + 1 for the last part of cedd.prg
+	// calculate the count of sectors the driver takes in buffer + 1 for boot sector + 1 for the last part of ce_dd.prg
 	SCapacity       = (bytesRead / 512) + 2;
     BCapacity       =  SCapacity * 512;
 
