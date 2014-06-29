@@ -1,4 +1,4 @@
-TARGET	= cedd.prg
+TARGET	= ce_dd.prg
 SLIM	= yes
 
 #ONPC    = yes
