@@ -70,6 +70,7 @@ CCoreThread::CCoreThread()
 
     // the floppy image silo might change settings (when images are changes), add settings reload proxy
     floppyImageSilo.setSettingsReloadProxy(&settingsReloadProxy);
+    settingsReloadProxy.reloadSettings(SETTINGSUSER_FLOPPYIMGS);            // mark that floppy settings changed (when imageSilo loaded the settings)
 }
 
 CCoreThread::~CCoreThread()

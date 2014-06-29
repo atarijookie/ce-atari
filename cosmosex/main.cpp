@@ -26,6 +26,7 @@ void printfPossibleCmdLineArgs(void);
 BYTE g_logLevel     = LOG_ERROR;                                // init current log level to LOG_ERROR
 bool g_justDoReset  = false;                                    // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
 bool g_noReset      = false;                                    // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
+bool g_test         = false;                                    // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
 
 int main(int argc, char *argv[])
  {
@@ -128,7 +129,14 @@ void parseCmdLineArguments(int argc, char *argv[])
         if(strcmp(argv[i], "noreset") == 0) {
             g_noReset = true;
             continue;
-        }    
+        }
+        
+        // for testing purposes: set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
+        if(strcmp(argv[i], "test") == 0) {
+            printf("Testing setup active!\n");
+            g_test = true;
+            continue;
+        }
     }
 }
 

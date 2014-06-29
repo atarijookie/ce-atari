@@ -12,6 +12,8 @@
 #include "global.h"
 #include "debug.h"
 
+extern bool g_test;                                     // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
+
 Settings::Settings(void)
 {
 	int res = mkdir(SETTINGS_PATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
@@ -213,6 +215,17 @@ void Settings::loadAcsiIDs(AcsiIDinfo *aii)
             devType = DEVTYPE_OFF;
         }
 
+        //-------------------------
+        // if we're in testing mode
+        if(g_test) {
+            switch(id) {
+            case 0:     devType = DEVTYPE_TRANSLATED;   break;
+            case 1:     devType = DEVTYPE_SD;           break;
+            default:    devType = DEVTYPE_OFF;          break;
+            }
+        }
+        //-------------------------
+        
         aii->acsiIDdevType[id] = devType;
 
         if(devType == DEVTYPE_SD) {                     // if on this ACSI ID we should have the native SD card, store this ID
