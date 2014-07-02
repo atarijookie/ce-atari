@@ -331,7 +331,10 @@ void FloppySetup::downloadStart(void)
 {
     int index = cmd[5];
 
-    currentDownload.fh = NULL;
+    if(currentDownload.fh != NULL) {                    // previous download possibly not closed? close it now
+        fclose(currentDownload.fh);
+        currentDownload.fh = NULL;
+    }
 
     if(index < 0 || index > 2) {                        // index out of range? fail
         dataTrans->setStatus(FDD_ERROR);
@@ -359,11 +362,36 @@ void FloppySetup::downloadStart(void)
     dataTrans->setStatus(FDD_OK);
 }
 
+#define DOWNLOAD_BLOCK_SIZE     (65536 - 2)
+
 void FloppySetup::downloadGetBlock(void)
 {
+    int index   = cmd[5] >> 6;
+    int blockNo = cmd[5] & 0x3f;
 
+    if(index < 0 || index > 2) {                        // index out of range? fail
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
 
+    if(currentDownload.fh == NULL) {                    // image not open? fao;
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
 
+    int offset = blockNo * DOWNLOAD_BLOCK_SIZE;         // calculate the offset
+
+    fseek(currentDownload.fh, offset, SEEK_SET);        // seek to the right position
+
+    size_t res = fread(bfr64k, 1, DOWNLOAD_BLOCK_SIZE, currentDownload.fh);     // read data into buffer
+
+    if(res < 0) {                                       // in case of negative error code (or something), set to zero
+        res = 0;
+    }
+
+    dataTrans->addDataWord((WORD) res);                         // first add the count of data that was read
+    dataTrans->addDataBfr(bfr64k, DOWNLOAD_BLOCK_SIZE, true);   // then add the actual data
+    dataTrans->setStatus(FDD_OK);                               // and return the good status
 }
 
 void FloppySetup::downloadDone(void)
