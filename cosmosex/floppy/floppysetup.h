@@ -7,6 +7,11 @@
 #include "../datatypes.h"
 #include "../translated/translateddisk.h"
 #include "imagesilo.h"
+#include "imagelist.h"
+
+#define IMG_DN_STATUS_IDLE          0
+#define IMG_DN_STATUS_DOWNLOADING   1
+#define IMG_DN_STATUS_DOWNLOADED    2
 
 class AcsiDataTrans;
 
@@ -26,11 +31,16 @@ private:
     AcsiDataTrans       *dataTrans;
     ImageSilo           *imageSilo;
     TranslatedDisk      *translated;
+    ImageList           imageList;    
 
     FILE    *up;
     BYTE    *cmd;
 
     BYTE    bfr64k[64 * 1024 + 4];
+
+    int         imgDnStatus;
+    std::string inetDnFilePath;
+    std::string inetDnFilename;
 
     struct {
         int         slotIndex;
@@ -57,6 +67,12 @@ private:
     void downloadStart(void);
     void downloadGetBlock(void);
     void downloadDone(void);
+
+    void searchInit(void);
+    void searchString(void);
+    void searchResult(void);
+    void searchMark(void);
+    void searchDownload(void);
 };
 
 #endif
