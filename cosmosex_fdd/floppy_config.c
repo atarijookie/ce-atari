@@ -171,7 +171,7 @@ void newImage(int index)
 
 void downloadImage(int index)
 {
-    if(index < 0 || index > 2) {
+    if((index < 0 || index > 2) && index != 10) {       // if it's not normal floppy index and not internet download index
         return;
     }
 
@@ -190,25 +190,32 @@ void downloadImage(int index)
         return;
     }
     
-    short button;  
+    //--------------------------------
+    if(index == 10) {                               // for internet download just use predefined destination dir
+    
+    
+    
+    
+    } else {                                        // for ordinary floppy slots open file selector
+        // open fileselector and get path
+        graf_mouse(M_ON, 0);
+        short button;  
+        fsel_input(filePath, fileName, &button);    // show file selector
+        graf_mouse(M_OFF, 0);
   
-    // open fileselector and get path
-	graf_mouse(M_ON, 0);
-    fsel_input(filePath, fileName, &button);    // show file selector
-	graf_mouse(M_OFF, 0);
-  
-    if(button != 1) {                           // if OK was not pressed
-        commandShort[4] = FDD_CMD_DOWNLOADIMG_DONE;
-        commandShort[5] = index;
+        if(button != 1) {                           // if OK was not pressed
+            commandShort[4] = FDD_CMD_DOWNLOADIMG_DONE;
+            commandShort[5] = index;
 
-        sectorCount = 1;                            // read 1 sector
+            sectorCount = 1;                            // read 1 sector
         
-        res = Supexec(ce_acsiReadCommand); 
+            res = Supexec(ce_acsiReadCommand); 
 		
-        if(res != FDD_OK) {
-            showComError();
+            if(res != FDD_OK) {
+                showComError();
+            }
+            return;
         }
-        return;
     }
   
 	// fileName contains the filename

@@ -36,6 +36,8 @@ void getResultsPage(int page);
 void showResults(BYTE showMask);
 void setSelectedRow(int row);
 void markCurrentRow(void);
+void handleImagesDownload(void);
+void selectDestinationDir(void);
 
 BYTE searchContent[2 * 512];
 
@@ -50,6 +52,10 @@ struct {
     int     row;
     int     prevRow;
 } search;
+
+BYTE destDirSet;
+
+void downloadImage(int index);
 
 // ------------------------------------------------------------------ 
 
@@ -69,6 +75,8 @@ BYTE loopForDownload(void)
     search.row          = 0;
     search.prevRow      = 0;
 
+    destDirSet = 0;
+    
     BYTE res = searchInit();                                        // try to initialize
     
     if(res == 0) {                                                  // failed to initialize? return to floppy config screen
@@ -99,6 +107,14 @@ BYTE loopForDownload(void)
         if(key == KEY_F1) {                                         // mark current row? 
             markCurrentRow();
             showMenuMask = SHOWMENU_RESULTS_ROW;
+        }
+
+        if(key == KEY_F2) {                                         // select destination directory?
+            selectDestinationDir();
+        }
+        
+        if(key == KEY_F3) {                                         // start downloading images?
+            handleImagesDownload();
         }
         
    		if(key >= 'A' && key <= 'Z') {								// upper case letter? to lower case!
@@ -164,6 +180,47 @@ BYTE loopForDownload(void)
         }
         
         showMenuDownload(showMenuMask);
+    }
+}
+
+void selectDestinationDir(void)
+{
+
+
+}
+
+void handleImagesDownload(void)
+{
+    if(destDirSet == 0) {                       // destination dir not set?
+        selectDestinationDir();
+        
+        if(destDirSet == 0) {                   // destination dir still not set?
+            return;
+        }
+    }
+
+    commandShort[4] = FDD_CMD_SEARCH_DOWNLOAD;
+    commandShort[5] = 0;
+    
+    sectorCount = 1;                            // read 1 sector
+    
+    BYTE res;
+    
+    (void) Clear_home();
+    (void) Cconws("Downloading selected images...\r\n");
+
+    while(1) {
+        res = Supexec(ce_acsiReadCommand); 
+		
+        if(res == FDD_DN_WORKING) {             // if downloading
+            (void) Cconws(pBfr);                // write out status string
+            (void) Cconws("\r\n");
+        } else if(res == FDD_DN_NOTHING_MORE) { // if nothing more to download
+            (void) Cconws("All selected images downloaded.\r\nPress any key to continue.\n\r");
+            break;
+        } else if(res == FDD_DN_DONE) {         // if this image finished downloading
+            downloadImage(10);                  // store this downloaded image
+        }        
     }
 }
 
