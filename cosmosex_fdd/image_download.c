@@ -24,6 +24,8 @@ extern BYTE sectorCount;
 
 extern BYTE *pBfr;
 
+BYTE searchInit(void);
+
 BYTE loopForDownload(void);
 void showMenuDownload(BYTE showMask);
 BYTE handleWriteSearch(BYTE key);
@@ -67,6 +69,12 @@ BYTE loopForDownload(void)
     search.row          = 0;
     search.prevRow      = 0;
 
+    BYTE res = searchInit();                                        // try to initialize
+    
+    if(res == 0) {                                                  // failed to initialize? return to floppy config screen
+        return KEY_F8;
+    }
+    
     imageSearch();
     showMenuDownload(SHOWMENU_ALL);
 
@@ -74,7 +82,7 @@ BYTE loopForDownload(void)
     BYTE gotoPrevPage, gotoNextPage;
     
     while(1) {
-        BYTE key, res;
+        BYTE key;
         BYTE kbshift;
         
         gotoPrevPage = 0;
@@ -351,4 +359,46 @@ void setSelectedRow(int row)
 {
     search.prevRow  = search.row;           // store current line as previous one
     search.row      = row;                  // store new line as the current one
+}
+
+BYTE searchInit(void)
+{
+    commandShort[4] = FDD_CMD_SEARCH_INIT;
+    commandShort[5] = 0;
+    
+    sectorCount = 1;                            // read 1 sector
+    BYTE res;
+    
+    (void) Clear_home();
+    (void) Cconws("Initializing... Press ESC to stop.\n\r\n\r");
+    
+    while(1) {
+        res = Supexec(ce_acsiReadCommand); 
+		
+        if(res == FDD_DN_LIST) {
+            (void) Cconws("Downloading list of floppy images...\n\r");
+        } else if(res == FDD_ERROR) {
+            (void) Cconws("Failed to initialize! Press any key.\n\r");
+            Cnecin();
+            return 0;
+        } else if(res == FDD_OK) {
+            (void) Cconws("Done.\n\r");
+            return 1;
+        } else {
+            (void) Cconws("CosmosEx device communication problem!\n\r");
+        }
+        
+        WORD val = Cconis();            // see if there is some char waiting
+        if(val != 0) {                  // char waiting?
+            BYTE key = getKey();
+            
+            if(key == KEY_ESC) {
+                (void) Cconws("Init terminated by user. Press any key.\n\r");
+                Cnecin();
+                return 0;
+            }
+        }
+        
+        sleep(1);
+    }
 }
