@@ -3,7 +3,7 @@ TARGET	= ce_fdd.prg
 CC	= m68k-atari-mint-gcc
 STRIP	= m68k-atari-mint-strip
 CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
-LDFLAGS	= -Wl,--traditional-format -lgem 
+LDFLAGS	= -Wl,--traditional-format -lgem -lgcc
 
 HDR	= $(wildcard *.h)
 CSRC	= $(wildcard *.c) 

@@ -12,7 +12,7 @@
 #include "acsi.h"
 #include "main.h"
 #include "hostmoddefs.h"
-
+#include "keys.h"
        
 // ------------------------------------------------------------------ 
 BYTE ce_findId(void);
@@ -23,10 +23,6 @@ BYTE deviceID;
 BYTE commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
 
 BYTE siloContent[512];
-
-void showMenu(char fullNotPartial);
-void showImage(int index);
-void getSiloContent(void);
 
 void uploadImage(int index);
 void swapImage(int index);
@@ -57,6 +53,41 @@ BYTE nextMenuRedrawIsFull;
 #define SIZE64K     (64*1024)
 BYTE *pBfrOrig;
 BYTE *pBfr, *pBfrCnt;
+
+BYTE getKey(void);
+BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
+
+BYTE loopForSetup(void);
+void showMenu(char fullNotPartial);
+void showImage(int index);
+void getSiloContent(void);
+
+BYTE loopForDownload(void);
+void showMenuDownload(BYTE showMask);
+BYTE handleWriteSearch(BYTE key);
+void showSearchString(void);
+void showPageNumber(void);
+void intToStr(int val, char *str);
+void imageSearch(void);
+void getResultsPage(int page);
+void showResults(BYTE showMask);
+void setSelectedRow(int row);
+void markCurrentRow(void);
+
+BYTE searchContent[2 * 512];
+
+#define MAX_SEARCHTEXT_LEN      20
+struct {
+    char    text[MAX_SEARCHTEXT_LEN + 1];
+    int     len;
+    
+    int     pageCurrent;
+    int     pagesCount;
+    
+    int     row;
+    int     prevRow;
+} search;
+
 // ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
 {
@@ -88,35 +119,380 @@ int main( int argc, char* argv[] )
 	(void) Cconws("\33p[ CosmosEx floppy setup ]\r\n[    by Jookie 2014     ]\33q\r\n\r\n");
 
 	// search for CosmosEx on ACSI bus
+/*    
 	found = ce_findId();
 	if(!found) {								                    // not found? quit
 		sleep(3);
 		return 0;
 	}
+*/
+deviceID=0;
 
 	// now set up the acsi command bytes so we don't have to deal with this one anymore 
 	commandShort[0] = (deviceID << 5); 					            // cmd[0] = ACSI_id + TEST UNIT READY (0)	
 
 	graf_mouse(M_OFF, 0);
 	
+
+    while(1) {
+        BYTE key;
+        
+        key = loopForSetup();
+        
+        if(key == KEY_F10) {                // should quit?
+            break;
+        }
+    
+        key = loopForDownload();
+    
+        if(key == KEY_F10) {                // should quit?
+            break;
+        }
+    }    
+    
+	graf_mouse(M_ON, 0);
+	appl_exit();
+
+	Mfree(pBfrOrig);
+	
+	return 0;		
+}
+
+#define SHOWMENU_STATICTEXT     1
+#define SHOWMENU_SEARCHSTRING   2
+#define SHOWMENU_RESULTS_ALL    4
+#define SHOWMENU_RESULTS_ROW    8
+
+#define SHOWMENU_ALL            0xff
+
+BYTE loopForDownload(void)
+{
+    search.len = 0;                                                 // clear search string
+    memset(search.text, 0, MAX_SEARCHTEXT_LEN + 1);
+    search.pageCurrent  = 0;
+    search.pagesCount   = 0;
+    search.row          = 0;
+    search.prevRow      = 0;
+
+    imageSearch();
+    showMenuDownload(SHOWMENU_ALL);
+
+    BYTE showMenuMask;
+    BYTE gotoPrevPage, gotoNextPage;
+    
+    while(1) {
+        BYTE key, res;
+        BYTE kbshift;
+        
+        gotoPrevPage = 0;
+        gotoNextPage = 0;
+        showMenuMask = 0;
+        
+        key     = getKey();
+        kbshift = Kbshift(-1);                                      // get shift status
+
+        if(key == KEY_F10 || key == KEY_F8) {                       // should quit or switch mode? 
+            return key;
+        }
+        
+        if(key == KEY_F1) {                                         // mark current row? 
+            markCurrentRow();
+            showMenuMask = SHOWMENU_RESULTS_ROW;
+        }
+        
+   		if(key >= 'A' && key <= 'Z') {								// upper case letter? to lower case!
+			key += 32;
+		}
+
+        if((key >= 'a' && key <='z') || key == ' ' || (key >= 0 && key <= 9) || key == KEY_ESC || key == KEY_BACKSP) {
+            res = handleWriteSearch(key);
+            
+            if(res) {                                               // if the search string changed, search for images
+                imageSearch();
+                
+                showMenuMask = SHOWMENU_SEARCHSTRING | SHOWMENU_RESULTS_ALL;
+            }
+        }
+        
+        if((kbshift & (K_RSHIFT | K_LSHIFT)) != 0) {                // shift pressed? 
+            if(key == KEY_UP) {                                     // shift + arrow up = page up
+                gotoPrevPage = 1;
+            }
+
+            if(key == KEY_DOWN) {                                   // shift + arrow down = page down
+                gotoNextPage = 1;
+            }
+        } else {                                                    // shift not pressed?
+            if(key == KEY_UP) {                                     // arrow up?
+                if(search.row > 0) {                                // not the top most line? move one line up
+                    setSelectedRow(search.row - 1);
+                    showMenuMask = SHOWMENU_RESULTS_ROW;            // just change the row highlighting
+                } else {                                            // this is the top most line
+                    gotoPrevPage = 1;
+                }
+            }
+
+            if(key == KEY_DOWN) {                                   // arrow up?
+                if(search.row < 14) {                               // not the bottom line? move one line down
+                    setSelectedRow(search.row + 1);
+                    showMenuMask = SHOWMENU_RESULTS_ROW;            // just change the row highlighting
+                } else {                                            // this is the top most line
+                    gotoNextPage = 1;
+                }
+            }
+        }
+        
+        if(gotoPrevPage) {
+            if(search.pageCurrent > 0) {                            // not the first page? move to previous page
+                search.pageCurrent--;                               // 
+                     
+                getResultsPage(search.pageCurrent);                 // get previous results
+                showMenuMask = SHOWMENU_RESULTS_ALL;                // redraw all results
+                setSelectedRow(14);                                 // move to last row
+            }
+        }
+        
+        if(gotoNextPage) {
+            if(search.pageCurrent < (search.pagesCount - 1)) {      // not the last page? move to next page
+                search.pageCurrent++;                               // 
+                     
+                getResultsPage(search.pageCurrent);                 // get next results
+                showMenuMask = SHOWMENU_RESULTS_ALL;                // redraw all results
+                setSelectedRow(0);                                  // move to first row
+            }
+        }
+        
+        showMenuDownload(showMenuMask);
+    }
+}
+
+void markCurrentRow(void)
+{
+    commandShort[4] = FDD_CMD_SEARCH_STRING;
+    commandShort[5] = 0;
+
+    p64kBlock = pBfr;                                           // use this buffer for writing
+    pBfr[0] = search.pageCurrent;                               // store page #
+    pBfr[1] = search.row;                                       // store item #
+    
+    sectorCount = 1;                                            // write just one sector
+    
+    BYTE res = Supexec(ce_acsiWriteBlockCommand); 
+    
+	if(res != FDD_OK) {                                         // bad? write error
+        showComError();
+        return;
+    }
+
+    getResultsPage(search.pageCurrent);                         // reload current page from host
+}
+
+void imageSearch(void)
+{
+    // first write the search string
+    commandShort[4] = FDD_CMD_SEARCH_STRING;
+    commandShort[5] = 0;
+
+    p64kBlock       = pBfr;                                     // use this buffer for writing
+    strcpy((char *) pBfr, search.text);                         // and copy in the search string
+    
+    sectorCount = 1;                                            // write just one sector
+    
+    BYTE res = Supexec(ce_acsiWriteBlockCommand); 
+    
+	if(res != FDD_OK) {                                         // bad? write error
+        showComError();
+        return;
+    }
+
+    search.row      = 0;
+    search.prevRow  = 0;
+    
+    getResultsPage(0);
+}
+
+void getResultsPage(int page)
+{
+    commandShort[4] = FDD_CMD_SEARCH_RESULTS;
+    commandShort[5] = (BYTE) page;
+
+    sectorCount = 2;                            // read 2 sectors
+    
+    BYTE res = Supexec(ce_acsiReadCommand); 
+		
+	if(res != FDD_OK) {                         // bad? write error
+        showComError();
+        return;
+    }
+
+    search.pageCurrent  = (int) pBfr[0];        // get page #
+    search.pagesCount   = (int) pBfr[1];        // get total page count
+
+    memcpy(searchContent, pBfr + 2, 15 * 68);   // copy the data
+}
+
+BYTE handleWriteSearch(BYTE key)
+{
+    if(key == KEY_ESC) {                                                // esc - delete whole string
+        search.len = 0;                                                 // clear search string
+        memset(search.text, 0, MAX_SEARCHTEXT_LEN + 1);
+        return 1;                                                       // search string changed
+    }
+    
+    if(key == KEY_BACKSP) {                                             // backspace - delete single char
+        if(search.len > 0) {
+            search.len--;
+            search.text[search.len] = 0;
+            return 1;                                                   // search string changed
+        }
+        
+        return 0;                                                       // search string NOT changed
+    }
+    
+    if(search.len >= MAX_SEARCHTEXT_LEN) {                              // if the entered string is at maximum length
+        return 0;                                                       // search string NOT changed
+    }
+    
+    search.text[search.len] = key;                                      // add this key
+    search.len++;                                                       // increase length
+    search.text[search.len] = 0;                                        // terminate with zero
+
+    return 1;                                                           // search string changed
+}
+
+void showMenuDownload(BYTE showMask)
+{
+    if(showMask & SHOWMENU_STATICTEXT) {
+        (void) Clear_home();
+        (void) Cconws("\33p[CosmosEx image download by Jookie 2014]\33q\r\n");
+    }
+	
+    if(showMask & SHOWMENU_SEARCHSTRING) {
+        showSearchString();
+    }
+    
+    if(showMask & SHOWMENU_RESULTS_ALL) {
+        showPageNumber();
+    }
+    
+    showResults(showMask);
+    
+    if(showMask & SHOWMENU_STATICTEXT) {
+        Goto_pos(0, 20);
+        (void) Cconws("\33pA..Z\33q - search, \33p(shift) arrows\33q - move\r\n");
+        (void) Cconws("\33pF1\33q   - mark,         \33pF2\33q  - dest. dir,\r\n");
+        (void) Cconws("\33pF3\33q   - download,\r\n");
+        (void) Cconws("\33pF8\33q   - setup screen, \33pF10\33q - quit\r\n");
+    }
+}
+
+void showResults(BYTE showMask)
+{
+    int i;
+    char *pRow;
+
+    if(showMask & SHOWMENU_RESULTS_ALL) {           // if should redraw all results
+        for(i=0; i<15; i++) {
+            pRow = (char *) (searchContent + (i * 68));
+
+            BYTE selected = (i == search.row);
+        
+            Goto_pos(0, 3 + i);
+        
+            if(selected) {                              // for selected row
+                (void) Cconws("\33p");
+            }   
+        
+            (void) Cconws(pRow);
+
+            if(selected) {                              // for selected row
+                (void) Cconws("\33q");
+            }
+        }
+        
+        return;
+    }
+    
+    if(showMask & SHOWMENU_RESULTS_ROW) {           // if should redraw only selected line
+        // draw previous line without inversion
+        Goto_pos(0, 3 + search.prevRow);
+
+        pRow = (char *) (searchContent + (search.prevRow * 68));
+        (void) Cconws(pRow);
+
+        // draw current line with inversion
+        Goto_pos(0, 3 + search.row);
+
+        pRow = (char *) (searchContent + (search.row * 68));
+        
+        (void) Cconws("\33p");
+        (void) Cconws(pRow);
+        (void) Cconws("\33q");
+        
+        return;
+    }
+}
+
+void showPageNumber(void)
+{
+    Goto_pos(13, 2);
+    (void) Cconws("Page:        ");
+    Goto_pos(19, 2);
+
+    char tmp[10];
+    intToStr(search.pageCurrent, tmp);
+    tmp[3] = '/';
+    intToStr(search.pagesCount, tmp + 4);
+    (void) Cconws(tmp);
+}
+
+void intToStr(int val, char *str)
+{
+    int i3, i2, i1;
+    i3 = (val / 100);               // 123 / 100 = 1
+    i2 = (val % 100) / 10;          // (123 % 100) = 23, 23 / 10 = 2
+    i1 = (val % 10);                // 123 % 10 = 3
+
+    str[0] = i3 + '0';
+    str[1] = i2 + '0';
+    str[2] = i1 + '0';
+
+    if(val < 100) {
+        str[0] = ' ';
+    }
+    
+    if(val < 10) {
+        str[1] = ' ';
+    }
+    
+    str[3] = 0;                     // terminating zero
+}
+
+void showSearchString(void)
+{
+    Goto_pos(0, 1);
+    (void) Cconws("Search:                              ");
+    Goto_pos(8, 1);
+    (void) Cconws(search.text);
+}
+
+BYTE loopForSetup(void)
+{
 	nextMenuRedrawIsFull = 0;
     showMenu(1);
 
     while(1) {
-    	BYTE key;
-        DWORD scancode;
+        BYTE key;
         BYTE  handled = 0;
 
-   		scancode = Cnecin();					                    // get char form keyboard, no echo on screen
-
-		key		=  scancode & 0xff;
+		key =  getKey();
 
 		if(key >= 'A' && key <= 'Z') {								// upper case letter? to lower case!
 			key += 32;
 		}
 		
-        if(key == 'q') {                              				// should quit?
-            break;
+        if(key == KEY_F10 || key == KEY_F9) {                       // should quit or switch mode? 
+            return key;
         }
         
         if(key >= '1' && key <= '3') {                              // upload image
@@ -150,13 +526,21 @@ int main( int argc, char* argv[] )
 			nextMenuRedrawIsFull = 0;
         }
     }
-    
-	graf_mouse(M_ON, 0);
-	appl_exit();
+}
 
-	Mfree(pBfrOrig);
-	
-	return 0;		
+BYTE getKey(void)
+{
+	DWORD scancode;
+	BYTE key, vkey;
+
+    scancode = Cnecin();					/* get char form keyboard, no echo on screen */
+
+	vkey	= (scancode>>16)	& 0xff;
+    key		=  scancode			& 0xff;
+
+    key		= atariKeysToSingleByte(vkey, key);	/* transform BYTE pair into single BYTE */
+    
+    return key;
 }
 
 void showMenu(char fullNotPartial)
@@ -170,13 +554,18 @@ void showMenu(char fullNotPartial)
     	(void) Cconws("\33pslot 1\33q:   1     4     7     N     D\r\n");
     	(void) Cconws("\33pslot 2\33q:   2     5     8     O     E\r\n");
     	(void) Cconws("\33pslot 3\33q:   3     6     9     P     F\r\n");
-    	(void) Cconws("\r\n\33pPress Q to quit.\33q\r\n\r\n\r\n");
     }
 	
     getSiloContent();
     showImage(0);
     showImage(1);
     showImage(2);
+    
+    if(fullNotPartial) {
+        Goto_pos(0, 20);
+    	(void) Cconws("\r\n\33pF9\33q  to get images from internet.");
+    	(void) Cconws("\r\n\33pF10\33q to quit.");
+    }
 }
 
 void showImage(int index)
@@ -223,7 +612,7 @@ void newImage(int index)
     
     BYTE res = Supexec(ce_acsiReadCommand); 
 		
-	if(res != 1) {                              // bad? write error
+	if(res != FDD_OK) {                         // bad? write error
         showComError();
     }
 }
@@ -242,7 +631,7 @@ void downloadImage(int index)
     
     BYTE res = Supexec(ce_acsiReadCommand); 
 		
-	if(res == 1) {                              // good? copy in the results
+	if(res == FDD_OK) {                         // good? copy in the results
         strcpy(fileName, (char *) pBfr);        // pBfr should contain original file name
     } else {                                    // bad? show error
         showComError();
@@ -264,7 +653,7 @@ void downloadImage(int index)
         
         res = Supexec(ce_acsiReadCommand); 
 		
-        if(res != 1) {
+        if(res != FDD_OK) {
             showComError();
         }
         return;
@@ -302,7 +691,7 @@ void downloadImage(int index)
         
         res = Supexec(ce_acsiReadCommand);                  // get the data
 		
-        if(res != 0) {                                      // error? write error
+        if(res != FDD_OK) {                                 // error? write error
             showComError();
             
             failed = 1;
@@ -338,7 +727,7 @@ void downloadImage(int index)
 
     res = Supexec(ce_acsiReadCommand); 
 		
-    if(res != 1) {
+    if(res != FDD_OK) {
         showComError();
     }
     
@@ -356,7 +745,7 @@ void getSiloContent(void)
 
     BYTE res = Supexec(ce_acsiReadCommand); 
 		
-	if(res == 1) {                              // good? copy in the results
+	if(res == FDD_OK) {                         // good? copy in the results
         memcpy(siloContent, pBfr, 512);
     } else {                                    // bad? show error
         showComError();
@@ -376,7 +765,7 @@ void swapImage(int index)
     
     BYTE res = Supexec(ce_acsiReadCommand); 
 		
-	if(res != 1) {                              // bad? write error
+	if(res != FDD_OK) {                         // bad? write error
         showComError();
     }
 }
@@ -394,7 +783,7 @@ void removeImage(int index)
     
     BYTE res = Supexec(ce_acsiReadCommand); 
 		
-	if(res != 1) {                              // bad? write error
+	if(res != FDD_OK) {                         // bad? write error
         showComError();
     }
 }
@@ -454,7 +843,7 @@ void uploadImage(int index)
         return;
     }
         
-    if(res != 0) {                                              // bad? write error
+    if(res != FDD_OK) {                                         // bad? write error
         showComError();
                 
         Fclose(fh);                                             // close file and quit
@@ -500,7 +889,7 @@ void uploadImage(int index)
 
         res = Supexec(ce_acsiWriteBlockCommand);                // send the data
 		
-        if(res != 0) {                                          // error? write error
+        if(res != FDD_OK) {                                     // error? write error
             showComError();
                
             good = 0;                                           // mark that upload didn't finish good
@@ -531,7 +920,7 @@ void uploadImage(int index)
     
     res = Supexec(ce_acsiReadCommand);     
 
-    if(res != 1) {                              // bad? write error
+    if(res != FDD_OK) {                         // bad? write error
         (void) Clear_home();
         (void) Cconws("Failed to finish upload...\r\n");
         Cnecin();
@@ -618,11 +1007,7 @@ BYTE ce_acsiReadCommand(void)
 
 	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, sectorCount);   // issue the command and check the result 
 
-	if(res != OK) {                        										// if failed, return FALSE 
-		return 0;
-	}
-
-	return 1;                             										// success 
+	return res;                            										// success 
 }
 
 BYTE ce_acsiWriteBlockCommand(void)
@@ -655,9 +1040,11 @@ BYTE getLowestDrive(void)
 
 void showComError(void)
 {
+/*
     (void) Clear_home();
     (void) Cconws("Error in CosmosEx communication!\r\n");
     Cnecin();
+*/    
 }
 
 void createFullPath(char *fullPath, char *filePath, char *fileName)
@@ -673,4 +1060,56 @@ void createFullPath(char *fullPath, char *filePath, char *fileName)
 	}
 	
     strcat(fullPath, fileName);							// add the filename
+}
+
+BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
+{
+	WORD vkeyKey;
+
+	if(key >= 32 && key < 127) {		/* printable ASCII key? just return it */
+		return key;
+	}
+	
+	if(key == 0) {						/* will this be some non-ASCII key? convert it */
+		switch(vkey) {
+			case 0x48: return KEY_UP;
+			case 0x50: return KEY_DOWN;
+			case 0x4b: return KEY_LEFT;
+			case 0x4d: return KEY_RIGHT;
+			case 0x52: return KEY_INSERT;
+			case 0x47: return KEY_HOME;
+			case 0x62: return KEY_HELP;
+			case 0x61: return KEY_UNDO;
+			case 0x3b: return KEY_F1;
+			case 0x3c: return KEY_F2;
+			case 0x3d: return KEY_F3;
+			case 0x3e: return KEY_F4;
+			case 0x3f: return KEY_F5;
+			case 0x40: return KEY_F6;
+			case 0x41: return KEY_F7;
+			case 0x42: return KEY_F8;
+			case 0x43: return KEY_F9;
+			case 0x44: return KEY_F10;
+			default: return 0;			/* unknown key */
+		}
+	}
+	
+	vkeyKey = (((WORD) vkey) << 8) | ((WORD) key);		/* create a WORD with vkey and key together */
+	
+	switch(vkeyKey) {					/* some other no-ASCII key, but check with vkey too */
+		case 0x011b: return KEY_ESC;
+		case 0x537f: return KEY_DELETE;
+		case 0x0e08: return KEY_BACKSP;
+		case 0x0f09: return KEY_TAB;
+		case 0x1c0d: return KEY_ENTER;
+		case 0x720d: return KEY_ENTER;
+	}
+
+	return 0;							/* unknown key */
+}
+
+void setSelectedRow(int row)
+{
+    search.prevRow  = search.row;           // store current line as previous one
+    search.row      = row;                  // store new line as the current one
 }
