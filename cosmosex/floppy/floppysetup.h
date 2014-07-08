@@ -73,6 +73,7 @@ private:
     void searchResult(void);
     void searchMark(void);
     void searchDownload(void);
+    void searchRefreshList(void);
 };
 
 #endif

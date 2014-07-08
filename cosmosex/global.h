@@ -82,6 +82,7 @@
 #define FDD_CMD_SEARCH_RESULTS              42      // retrieve one page of results
 #define FDD_CMD_SEARCH_MARK                 43      // mark one image for download
 #define FDD_CMD_SEARCH_DOWNLOAD             45      // start / check the download process
+#define FDD_CMD_SEARCH_REFRESHLIST          48      // delete old image list, download a new one
 
 #define FDD_OK                              0
 #define FDD_ERROR                           2

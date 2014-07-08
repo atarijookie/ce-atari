@@ -37,6 +37,7 @@ public:
     void getResultByIndex(int index, char *bfr);
     void markImage(int index);
     bool getFirstMarkedImage(std::string &url, int &checksum, std::string &filename);
+    void refreshList(void);
 
 private:
     std::vector<ImageListItem>      vectorOfImages;

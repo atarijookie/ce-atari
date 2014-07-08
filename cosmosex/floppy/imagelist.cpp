@@ -132,14 +132,31 @@ void ImageList::search(char *part)
 
     int cnt = vectorOfImages.size();
 
-    if(!isLoaded || cnt < 1 || strlen(part) < 2) {                  // if not loaded, or the list is empty, or search string is too short
+    // if not loaded, or the list is empty
+    if(!isLoaded || cnt < 1) {                                      
         return;
     }
 
+    // if search string is too short
+    bool searchTooShort = false;
+    if(strlen(part) < 2) {                                          
+        searchTooShort = true;
+    }
+
+    // go through the list of images, copy the right ones
     for(int i=0; i<cnt; i++) {
         size_t pos  = std::string::npos;
         std::string &games = vectorOfImages[i].games;       
         std::string game;
+        SearchResult sr;                                            
+
+        if(searchTooShort) {
+            sr.game         = games;                                // store stuff in search result structure
+            sr.imageIndex   = i;
+
+            vectorOfResults.push_back(sr);                          // store search result in vector
+            continue;                                               // skip searching of the games string
+        }
 
         while(1) {
             pos = games.find(sPart, pos);                           // search for part in games
@@ -150,8 +167,7 @@ void ImageList::search(char *part)
 
             getSingleGame(games, game, pos);                        // extract single game from list of games
 
-            SearchResult sr;                                        // store stuff in search result structure
-            sr.game         = game;
+            sr.game         = game;                                 // store stuff in search result structure
             sr.imageIndex   = i;
 
             vectorOfResults.push_back(sr);                          // store search result in vector
@@ -250,4 +266,15 @@ bool ImageList::getFirstMarkedImage(std::string &url, int &checksum, std::string
 
     return false;                                                               // not found, fail
 }
+
+void ImageList::refreshList(void)
+{
+    unlink(IMAGELIST_LOCAL);                // delete current image list
+
+    vectorOfImages.clear();                 // remove the loaded list from memory
+    isLoaded = false;
+
+    exists();                               // this should now start the new image list download
+}
+
 

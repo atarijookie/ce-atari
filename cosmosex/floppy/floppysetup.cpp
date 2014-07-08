@@ -96,11 +96,12 @@ void FloppySetup::processCommand(BYTE *command)
         case FDD_CMD_DOWNLOADIMG_GETBLOCK:      downloadGetBlock();         break;
         case FDD_CMD_DOWNLOADIMG_DONE:          downloadDone();             break;
 
-        case FDD_CMD_SEARCH_INIT:               searchInit();       break;
-        case FDD_CMD_SEARCH_STRING:             searchString();     break;
-        case FDD_CMD_SEARCH_RESULTS:            searchResult();     break;
-        case FDD_CMD_SEARCH_MARK:               searchMark();       break;
-        case FDD_CMD_SEARCH_DOWNLOAD:           searchDownload();   break;
+        case FDD_CMD_SEARCH_INIT:               searchInit();               break;
+        case FDD_CMD_SEARCH_STRING:             searchString();             break;
+        case FDD_CMD_SEARCH_RESULTS:            searchResult();             break;
+        case FDD_CMD_SEARCH_MARK:               searchMark();               break;
+        case FDD_CMD_SEARCH_DOWNLOAD:           searchDownload();           break;
+        case FDD_CMD_SEARCH_REFRESHLIST:        searchRefreshList();        break;
     }
 
     dataTrans->sendDataAndStatus();         // send all the stuff after handling, if we got any
@@ -540,6 +541,13 @@ void FloppySetup::downloadDone(void)
         unlink(inetDnFilePath.c_str());                 // delete it from RPi
         imgDnStatus = IMG_DN_STATUS_IDLE;               // the download is now idle
     }
+
+    dataTrans->setStatus(FDD_OK);
+}
+
+void FloppySetup::searchRefreshList(void)
+{
+    imageList.refreshList();
 
     dataTrans->setStatus(FDD_OK);
 }
