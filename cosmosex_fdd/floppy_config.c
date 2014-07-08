@@ -42,6 +42,8 @@ void showMenu(char fullNotPartial);
 void showImage(int index);
 void getSiloContent(void);
 
+extern TDestDir destDir;
+
 // ------------------------------------------------------------------ 
 BYTE loopForSetup(void)
 {
@@ -160,18 +162,18 @@ void newImage(int index)
     commandShort[4] = FDD_CMD_NEW_EMPTYIMAGE;
     commandShort[5] = index;
 
-    sectorCount = 1;                            // read 1 sector
+    sectorCount = 1;                                        // read 1 sector
     
     BYTE res = Supexec(ce_acsiReadCommand); 
 		
-	if(res != FDD_OK) {                         // bad? write error
+	if(res != FDD_OK) {                                     // bad? write error
         showComError();
     }
 }
 
 void downloadImage(int index)
 {
-    if((index < 0 || index > 2) && index != 10) {       // if it's not normal floppy index and not internet download index
+    if((index < 0 || index > 2) && index != 10) {           // if it's not normal floppy index and not internet download index
         return;
     }
 
@@ -179,35 +181,36 @@ void downloadImage(int index)
     commandShort[4] = FDD_CMD_DOWNLOADIMG_START;
     commandShort[5] = index;
 
-    sectorCount = 1;                            // read 1 sector
+    sectorCount = 1;                                        // read 1 sector
     
     BYTE res = Supexec(ce_acsiReadCommand); 
 		
-	if(res == FDD_OK) {                         // good? copy in the results
-        strcpy(fileName, (char *) pBfr);        // pBfr should contain original file name
-    } else {                                    // bad? show error
+	if(res == FDD_OK) {                                     // good? copy in the results
+        strcpy(fileName, (char *) pBfr);                    // pBfr should contain original file name
+    } else {                                                // bad? show error
         showComError();
         return;
     }
     
     //--------------------------------
-    if(index == 10) {                               // for internet download just use predefined destination dir
-    
-    
-    
-    
-    } else {                                        // for ordinary floppy slots open file selector
+    char fullPath[512];
+
+    if(index == 10) {                                       // for internet download just use predefined destination dir
+        strcpy(fullPath, destDir.path);                     // create path, e.g. 'C:\destdir\images\A_001.ST'
+        strcat(fullPath, "\\");
+        strcat(fullPath, fileName); 
+    } else {                                                // for ordinary floppy slots open file selector
         // open fileselector and get path
         graf_mouse(M_ON, 0);
         short button;  
-        fsel_input(filePath, fileName, &button);    // show file selector
+        fsel_input(filePath, fileName, &button);            // show file selector
         graf_mouse(M_OFF, 0);
   
-        if(button != 1) {                           // if OK was not pressed
+        if(button != 1) {                                   // if OK was not pressed
             commandShort[4] = FDD_CMD_DOWNLOADIMG_DONE;
             commandShort[5] = index;
 
-            sectorCount = 1;                            // read 1 sector
+            sectorCount = 1;                                // read 1 sector
         
             res = Supexec(ce_acsiReadCommand); 
 		
@@ -216,17 +219,15 @@ void downloadImage(int index)
             }
             return;
         }
+        
+      	// fileName contains the filename
+        // filePath contains the path with search wildcards, e.g.: C:\\*.*
+  
+        // create full path
+        createFullPath(fullPath, filePath, fileName);       // fullPath = filePath + fileName
     }
-  
-	// fileName contains the filename
-	// filePath contains the path with search wildcards, e.g.: C:\\*.*
-  
-    // create full path
-    char fullPath[512];
-
-    createFullPath(fullPath, filePath, fileName);       // fullPath = filePath + fileName
     
-    short fh = Fcreate(fullPath, 0);               		// open file for writing
+    short fh = Fcreate(fullPath, 0);               		    // open file for writing
     
     if(fh < 0) {
         (void) Clear_home();

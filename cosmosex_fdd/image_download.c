@@ -38,6 +38,7 @@ void setSelectedRow(int row);
 void markCurrentRow(void);
 void handleImagesDownload(void);
 void selectDestinationDir(void);
+BYTE refreshImageList(void);
 
 BYTE searchContent[2 * 512];
 
@@ -53,7 +54,7 @@ struct {
     int     prevRow;
 } search;
 
-BYTE destDirSet;
+TDestDir destDir;
 
 void downloadImage(int index);
 
@@ -75,7 +76,7 @@ BYTE loopForDownload(void)
     search.row          = 0;
     search.prevRow      = 0;
 
-    destDirSet = 0;
+    destDir.isSet = 0;
     
     BYTE res = searchInit();                                        // try to initialize
     
@@ -115,6 +116,14 @@ BYTE loopForDownload(void)
         
         if(key == KEY_F3) {                                         // start downloading images?
             handleImagesDownload();
+        }
+
+        if(key == KEY_F5) {                                         // refresh the list of images
+            res = refreshImageList();
+            
+            if(res == 0) {                                          // failed? switch to config screen
+                return KEY_F8;
+            }
         }
         
    		if(key >= 'A' && key <= 'Z') {								// upper case letter? to lower case!
@@ -183,18 +192,55 @@ BYTE loopForDownload(void)
     }
 }
 
+BYTE refreshImageList(void)
+{
+    commandShort[4] = FDD_CMD_SEARCH_REFRESHLIST;                   // tell the host that it should refresh image list
+    commandShort[5] = 0;
+    
+    sectorCount = 1;                                                // read 1 sector
+    
+    BYTE res = Supexec(ce_acsiReadCommand); 
+
+    if(res != FDD_OK) {
+        showComError();
+        return 0;
+    }
+
+    res = searchInit();                                             // try to initialize
+    return res;
+}
+
 void selectDestinationDir(void)
 {
+    short button;
+    char path[256], fname[256];
 
+    memset(path,    0, 256);
+    memset(fname,   0, 256);
+    
+    graf_mouse(M_ON, 0);
+    fsel_input(path, fname, &button);           // show file selector
+    graf_mouse(M_OFF, 0);
+  
+    if(button != 1) {                           // if OK was not pressed
+        return;
+    }
 
+    removeLastPartUntilBackslash(path);         // remove part behind the last separator (most probably wild card)
+
+    destDir.isSet = 1;
+    strcpy(destDir.path, path);                 // copy in the destination dir
 }
 
 void handleImagesDownload(void)
 {
-    if(destDirSet == 0) {                       // destination dir not set?
+    if(destDir.isSet == 0) {                    // destination dir not set?
         selectDestinationDir();
         
-        if(destDirSet == 0) {                   // destination dir still not set?
+        if(destDir.isSet == 0) {                // destination dir still not set?
+            (void) Clear_home();
+            (void) Cconws("You have to select destination dir!\r\nPress any key to continue.\n\r");
+            getKey();
             return;
         }
     }
@@ -217,10 +263,13 @@ void handleImagesDownload(void)
             (void) Cconws("\r\n");
         } else if(res == FDD_DN_NOTHING_MORE) { // if nothing more to download
             (void) Cconws("All selected images downloaded.\r\nPress any key to continue.\n\r");
+            getKey();
             break;
         } else if(res == FDD_DN_DONE) {         // if this image finished downloading
             downloadImage(10);                  // store this downloaded image
-        }        
+        }
+
+        sleep(1);                               // wait a second
     }
 }
 
@@ -339,7 +388,7 @@ void showMenuDownload(BYTE showMask)
         Goto_pos(0, 20);
         (void) Cconws("\33pA..Z\33q - search, \33p(shift) arrows\33q - move\r\n");
         (void) Cconws("\33pF1\33q   - mark,         \33pF2\33q  - dest. dir,\r\n");
-        (void) Cconws("\33pF3\33q   - download,\r\n");
+        (void) Cconws("\33pF3\33q   - download,     \33pF5\33q  - refresh list,\r\n");
         (void) Cconws("\33pF8\33q   - setup screen, \33pF10\33q - quit\r\n");
     }
 }
