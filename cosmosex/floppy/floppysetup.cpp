@@ -3,6 +3,8 @@
 
 #include <unistd.h>
 
+#include <algorithm>
+
 #include "../global.h"
 #include "../debug.h"
 #include "../utils.h"
@@ -192,6 +194,8 @@ void FloppySetup::searchDownload(void)
             imgDnStatus = IMG_DN_STATUS_DOWNLOADED;
             dataTrans->setStatus(FDD_DN_DONE);              // tell ST we got something to download
         } else {                                            // some image is downloading
+            std::replace( status.begin(), status.end(), '\n', ' '); // replace all new line characters with spaces
+
             dataTrans->addDataBfr((BYTE *) status.c_str(), status.length(), true);
             dataTrans->setStatus(FDD_DN_WORKING);           // tell ST we're downloading
         }
