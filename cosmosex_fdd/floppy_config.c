@@ -232,7 +232,7 @@ void downloadImage(int index)
     
     //--------------------
     // check if can do on device copy, and do it if possible
-    commandShort[4] = FDD_CMD_SEARCH_DOWNLOAD_ONDEVICE;
+    commandShort[4] = FDD_CMD_DOWNLOADIMG_ONDEVICE;
     commandShort[5] = index;
 
     sectorCount = 1;                                        // write 1 sector

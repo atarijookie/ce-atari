@@ -25,13 +25,13 @@
 #define FDD_CMD_DOWNLOADIMG_START           30
 #define FDD_CMD_DOWNLOADIMG_GETBLOCK        31
 #define FDD_CMD_DOWNLOADIMG_DONE            32
+#define FDD_CMD_DOWNLOADIMG_ONDEVICE        35
 
 #define FDD_CMD_SEARCH_INIT                 40      // call this to init the image search
 #define FDD_CMD_SEARCH_STRING               41      // search for a string, create vector of results
 #define FDD_CMD_SEARCH_RESULTS              42      // retrieve one page of results
 #define FDD_CMD_SEARCH_MARK                 43      // mark one image for download
 #define FDD_CMD_SEARCH_DOWNLOAD             45      // start / check the download process
-#define FDD_CMD_SEARCH_DOWNLOAD_ONDEVICE    46
 #define FDD_CMD_SEARCH_REFRESHLIST          48      // delete old image list, download a new one
 
 // return values from FDD module
