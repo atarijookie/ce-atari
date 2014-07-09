@@ -156,6 +156,7 @@ void FloppySetup::searchResult(void)
     int offset = 0;
     for(int i=pageStart; i<pageEnd; i++) {
         imageList.getResultByIndex(i, (char *) (bfr64k + offset));
+        offset += 68;
     }
 
     dataTrans->addDataBfr(bfr64k, 15 * 68, true);
@@ -171,6 +172,7 @@ void FloppySetup::searchMark(void)
 
     int itemIndex = (page * PAGESIZE) + item;
     
+
     imageList.markImage(itemIndex);                 // (un)mark this image
 
     dataTrans->setStatus(FDD_OK);                   // done
@@ -199,16 +201,20 @@ void FloppySetup::searchDownload(void)
         res = imageList.getFirstMarkedImage(url, checksum, filename);   // see if we got anything marked for download
 
         if(res) {                                           // if got some image to download, start the download
+            imgDnStatus     = IMG_DN_STATUS_DOWNLOADING;        // mark that we're downloading something
+            inetDnFilename  = filename;                         // just filename of downloaded file    
+            inetDnFilePath  = IMAGE_DOWNLOAD_DIR + filename;    // create full path and filename to the downloaded file
+
+            unlink(inetDnFilePath.c_str());                     // if this file exists on the drive, delete it
+            //------
+
             TDownloadRequest tdr;
             tdr.srcUrl          = url;
             tdr.checksum        = checksum;
             tdr.dstDir          = IMAGE_DOWNLOAD_DIR;
             tdr.downloadType    = DWNTYPE_FLOPPYIMG;        // we're downloading floppy image
             Downloader::add(tdr);
-
-            imgDnStatus     = IMG_DN_STATUS_DOWNLOADING;        // mark that we're downloading something
-            inetDnFilename  = IMAGE_DOWNLOAD_DIR + filename;    // create full path and filename to the downloaded file    
-
+            
             status = "Downloading: " + url;
             dataTrans->addDataBfr((BYTE *) status.c_str(), status.length(), true);
 

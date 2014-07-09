@@ -10,6 +10,7 @@
 #include "imagelist.h"
 #include "../utils.h"
 #include "../downloader.h"
+#include "../debug.h"
 
 ImageList::ImageList(void)
 {
@@ -145,7 +146,6 @@ void ImageList::search(char *part)
 
     // go through the list of images, copy the right ones
     for(int i=0; i<cnt; i++) {
-        size_t pos  = std::string::npos;
         std::string &games = vectorOfImages[i].games;       
         std::string game;
         SearchResult sr;                                            
@@ -158,6 +158,7 @@ void ImageList::search(char *part)
             continue;                                               // skip searching of the games string
         }
 
+        size_t pos = 0;                                             // start searching from start
         while(1) {
             pos = games.find(sPart, pos);                           // search for part in games
 
@@ -186,24 +187,32 @@ void ImageList::getSingleGame(std::string &games, std::string &game, size_t pos)
         return;
     }
 
-    size_t i;
+    int i;
     size_t start    = 0;
     size_t end      = (len - 1);
 
-    for(i=pos; i>=0; i--) {                                                     // find starting coma
+    for(i=pos; i>0; i--) {                                                      // find starting coma
         if(games[i] == ',') {
-            start = i;
+            start = i + 1;                                                      // store position without that coma
             break;
         }
     }
 
-    for(i=pos; i<(unsigned) len; i++) {                                         // find ending coma
+    for(i=pos; i<len; i++) {                                                    // find ending coma
         if(games[i] == ',') {
-            end = i;
+            end = i - 1;                                                        // store position without that coma
             break;
         }
     }
 
+    if(start >= (size_t) len) {                                                 // if start would be out of range, fix it
+        start = len - 1;
+    }
+    
+    if(end >= (size_t) len) {                                                   // if end would be out of range, fix it
+        end = len - 1;
+    }
+    
     game = games.substr(start, (end - start + 1));                              // get only the single game
 }
 
@@ -218,7 +227,16 @@ void ImageList::getResultByIndex(int index, char *bfr)
     int imageIndex = vectorOfResults[index].imageIndex;
 
     strncpy(bfr, vectorOfImages[imageIndex].imageName.c_str(), 64);             // copy in the name of image
-
+    
+    int len = strlen(bfr);
+    if(len < 12) {                                                              // pad the file name with spaces to 12 chars total
+        int i;
+        
+        for(i=len; i<12; i++) {
+            bfr[i] = ' ';
+        }
+    }
+    
     if(vectorOfImages[imageIndex].marked) {                                     // if image is marked for download
         strcat(bfr, " * ");                                                     // add ' * ' string
     } else {
