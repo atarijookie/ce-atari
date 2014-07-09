@@ -184,21 +184,51 @@ bool Utils::copyFile(std::string &src, std::string &dst)
 {
     FILE *from, *to;
 
-    BYTE bfr64k[64 * 1024];
-
     from = fopen((char *) src.c_str(), "rb");               // open source file
 
     if(!from) {
-        Debug::out(LOG_ERROR, "Utils::onDeviceCopy - failed to open source file %s", (char *) src.c_str());
+        Debug::out(LOG_ERROR, "Utils::copyFile - failed to open source file %s", (char *) src.c_str());
         return false;
     }
 
     to = fopen((char *) dst.c_str(), "wb");                 // open destrination file
 
     if(!to) {
-        Debug::out(LOG_ERROR, "Utils::onDeviceCopy - failed to open destination file %s", (char *) dst.c_str());
+        fclose(from);
+
+        Debug::out(LOG_ERROR, "Utils::copyFile - failed to open destination file %s", (char *) dst.c_str());
         return false;
     }
+
+    bool res = copyFileByHandles(from, to);
+
+    fclose(from);
+    fclose(to);
+
+    return res;
+}
+
+bool Utils::copyFile(FILE *from, std::string &dst)
+{
+    FILE *to;
+
+    to = fopen((char *) dst.c_str(), "wb");                 // open destrination file
+
+    if(!to) {
+        Debug::out(LOG_ERROR, "Utils::copyFile - failed to open destination file %s", (char *) dst.c_str());
+        return false;
+    }
+
+    bool res = copyFileByHandles(from, to);
+
+    fclose(to);
+
+    return res;
+}
+
+bool Utils::copyFileByHandles(FILE *from, FILE *to)
+{
+    BYTE bfr64k[64 * 1024];
 
     while(1) {                                              // copy the file in loop 
         size_t read = fread(bfr64k, 1, 64 * 1024, from);
@@ -213,9 +243,6 @@ bool Utils::copyFile(std::string &src, std::string &dst)
             break;
         }
     }
-
-    fclose(from);
-    fclose(to);
 
     return true;
 }

@@ -76,6 +76,7 @@
 #define FDD_CMD_DOWNLOADIMG_START           30
 #define FDD_CMD_DOWNLOADIMG_GETBLOCK        31
 #define FDD_CMD_DOWNLOADIMG_DONE            32
+#define FDD_CMD_DOWNLOADIMG_ONDEVICE        35
 
 #define FDD_CMD_SEARCH_INIT                 40      // call this to init the image search
 #define FDD_CMD_SEARCH_STRING               41      // search for a string, create vector of results
@@ -90,7 +91,7 @@
 #define FDD_DN_WORKING                      5
 #define FDD_DN_DONE                         6
 #define FDD_DN_NOTHING_MORE                 7
-#define FDD_UPLOADSTART_RES_ONDEVICECOPY    0xDC
+#define FDD_RES_ONDEVICECOPY                0xDC
 
 //////////////////////////////////////////////////////
 

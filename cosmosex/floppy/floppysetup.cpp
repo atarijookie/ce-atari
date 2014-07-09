@@ -95,6 +95,7 @@ void FloppySetup::processCommand(BYTE *command)
         case FDD_CMD_NEW_EMPTYIMAGE:            newImage();                 break;
 
         case FDD_CMD_DOWNLOADIMG_START:         downloadStart();            break;
+        case FDD_CMD_DOWNLOADIMG_ONDEVICE:      downloadOnDevice();         break;
         case FDD_CMD_DOWNLOADIMG_GETBLOCK:      downloadGetBlock();         break;
         case FDD_CMD_DOWNLOADIMG_DONE:          downloadDone();             break;
 
@@ -178,6 +179,38 @@ void FloppySetup::searchMark(void)
     imageList.markImage(itemIndex);                 // (un)mark this image
 
     dataTrans->setStatus(FDD_OK);                   // done
+}
+
+void FloppySetup::downloadOnDevice(void)
+{
+	memset(bfr64k, 0, 512);
+    dataTrans->recvData(bfr64k, 512);                       // receive file name into this buffer
+    std::string atariFilePath = (char *) bfr64k;
+    std::string hostPath;
+    std::string pathWithHostSeparators;
+
+    // try to convert atari path to host path (will work for translated drives, will fail for native)
+    bool res = translated->createHostPath(atariFilePath, hostPath);
+
+    if(res) {                                               // good? file is on translated drive
+        res = Utils::copyFile(currentDownload.fh, hostPath);
+
+        if(res) {                                           // on device copy -- GOOD!
+            Debug::out(LOG_DEBUG, "FloppySetup::searchDownloadOnDevice -- on device copy success!");
+
+            fclose(currentDownload.fh);                     // close the previously opened file
+            currentDownload.fh = NULL;
+
+            dataTrans->setStatus(FDD_RES_ONDEVICECOPY);
+            return;
+        } else {                                            // on device copy -- FAIL!
+            Debug::out(LOG_DEBUG, "FloppySetup::searchDownloadOnDevice -- on device copy fail!");
+        }
+    } else {
+        Debug::out(LOG_DEBUG, "FloppySetup::searchDownloadOnDevice -- can't do on device copy");
+    }
+
+    dataTrans->setStatus(FDD_ERROR);                        // if came here, on device copy didn't succeed
 }
 
 void FloppySetup::searchDownload(void)
@@ -370,7 +403,7 @@ void FloppySetup::uploadEnd(bool isOnDeviceCopy)
 
     // now finish with OK status
     if(isOnDeviceCopy) {                                        // for on-device-copy send special status
-        dataTrans->setStatus(FDD_UPLOADSTART_RES_ONDEVICECOPY);
+        dataTrans->setStatus(FDD_RES_ONDEVICECOPY);
     } else {                                                    // for normal upload send OK status
         dataTrans->setStatus(FDD_OK);                           
     }

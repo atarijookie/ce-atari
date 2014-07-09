@@ -67,6 +67,7 @@ private:
     void downloadStart(void);
     void downloadGetBlock(void);
     void downloadDone(void);
+    void downloadOnDevice(void);
 
     void searchInit(void);
     void searchString(void);

@@ -26,6 +26,11 @@ public:
 	static void resetHansAndFranz(void);
 
     static bool copyFile(std::string &src, std::string &dst);
+    static bool copyFile(FILE *from, std::string &dst);
+
+private:
+    static bool copyFileByHandles(FILE *from, FILE *to);
+
 };
 
 #endif
