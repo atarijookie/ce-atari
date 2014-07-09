@@ -230,6 +230,25 @@ void downloadImage(int index)
         (void) Clear_home();
     }
     
+    //--------------------
+    // check if can do on device copy, and do it if possible
+    commandShort[4] = FDD_CMD_SEARCH_DOWNLOAD_ONDEVICE;
+    commandShort[5] = index;
+
+    sectorCount = 1;                                        // write 1 sector
+        
+    p64kBlock   = pBfr;                                     // use this buffer for writing
+    strcpy((char *) pBfr, fullPath);                        // and copy in the full path
+    
+    res = Supexec(ce_acsiWriteBlockCommand);                // send atari path to host, so host can check if it's ON DEVICE COPY
+    
+    if(res == FDD_RES_ONDEVICECOPY) {                       // if host replied with this, the file is copied, nothing to do
+        (void) Cconws("On device copy of file from CosmosEx device:\r\n");
+        (void) Cconws(fileName);
+        return;
+    }
+    //--------------------
+    
     (void) Cconws("Downloading file from CosmosEx device:\r\n");
     (void) Cconws(fileName);
     (void) Cconws(" -> ");
@@ -407,7 +426,7 @@ void uploadImage(int index)
     BYTE res;
     res = Supexec(ce_acsiWriteBlockCommand); 
 		
-    if(res == FDD_UPLOADSTART_RES_ONDEVICECOPY) {               // if the device returned this code, it means that it could do the image upload / copy on device, no need to upload it from ST!
+    if(res == FDD_RES_ONDEVICECOPY) {                           // if the device returned this code, it means that it could do the image upload / copy on device, no need to upload it from ST!
         Fclose(fh);
         return;
     }

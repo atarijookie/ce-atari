@@ -22,7 +22,6 @@ BYTE ce_identify(void);
 BYTE deviceID;
 BYTE commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
 
-void removeLastPartUntilBackslash(char *str);
 
 void showComError(void);
 void createFullPath(char *fullPath, char *filePath, char *fileName);
@@ -73,7 +72,7 @@ int main( int argc, char* argv[] )
 	// search for CosmosEx on ACSI bus
     
 	found = ce_findId();
-	if(!found) {								                    // not found? quit
+    if(!found) {								                    // not found? quit
 		sleep(3);
 		return 0;
 	}
