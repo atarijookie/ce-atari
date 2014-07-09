@@ -26,3 +26,6 @@
 #define		KEY_F9		158
 #define		KEY_F10		159
 
+#define     KEY_PAGEUP      160
+#define     KEY_PAGEDOWN    161
+

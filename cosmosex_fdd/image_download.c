@@ -24,6 +24,8 @@ extern BYTE sectorCount;
 
 extern BYTE *pBfr;
 
+extern BYTE kbshift;
+
 BYTE searchInit(void);
 
 BYTE loopForDownload(void);
@@ -91,16 +93,15 @@ BYTE loopForDownload(void)
     BYTE gotoPrevPage, gotoNextPage;
     
     while(1) {
-        BYTE key;
-        BYTE kbshift;
+        BYTE key, kbshift;
         
         gotoPrevPage = 0;
         gotoNextPage = 0;
         showMenuMask = 0;
         
         key     = getKey();
-        kbshift = Kbshift(-1);                                      // get shift status
-
+        kbshift = Kbshift(-1);
+        
         if(key == KEY_F10 || key == KEY_F8) {                       // should quit or switch mode? 
             return key;
         }
@@ -124,6 +125,8 @@ BYTE loopForDownload(void)
             if(res == 0) {                                          // failed? switch to config screen
                 return KEY_F8;
             }
+            
+            showMenuMask = SHOWMENU_ALL;
         }
         
    		if(key >= 'A' && key <= 'Z') {								// upper case letter? to lower case!
@@ -141,11 +144,11 @@ BYTE loopForDownload(void)
         }
         
         if((kbshift & (K_RSHIFT | K_LSHIFT)) != 0) {                // shift pressed? 
-            if(key == KEY_UP) {                                     // shift + arrow up = page up
+            if(key == KEY_PAGEUP) {                                 // shift + arrow up = page up
                 gotoPrevPage = 1;
             }
 
-            if(key == KEY_DOWN) {                                   // shift + arrow down = page down
+            if(key == KEY_PAGEDOWN) {                               // shift + arrow down = page down
                 gotoNextPage = 1;
             }
         } else {                                                    // shift not pressed?
@@ -405,6 +408,7 @@ void showResults(BYTE showMask)
             BYTE selected = (i == search.row);
         
             Goto_pos(0, 3 + i);
+            (void) Cconws("\33K");                      // clear line from cursor to right
         
             if(selected) {                              // for selected row
                 (void) Cconws("\33p");

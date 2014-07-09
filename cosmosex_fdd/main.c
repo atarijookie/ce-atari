@@ -138,8 +138,8 @@ BYTE getKey(void)
 
     scancode = Cnecin();					/* get char form keyboard, no echo on screen */
 
-	vkey	= (scancode>>16)	& 0xff;
-    key		=  scancode			& 0xff;
+	vkey	= (scancode >> 16)  & 0xff;
+    key		=  scancode         & 0xff;
 
     key		= atariKeysToSingleByte(vkey, key);	/* transform BYTE pair into single BYTE */
     
@@ -282,6 +282,12 @@ void createFullPath(char *fullPath, char *filePath, char *fileName)
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
 {
 	WORD vkeyKey;
+	vkeyKey = (((WORD) vkey) << 8) | ((WORD) key);		/* create a WORD with vkey and key together */
+
+    switch(vkeyKey) {
+        case 0x5032: return KEY_PAGEDOWN;
+        case 0x4838: return KEY_PAGEUP;
+    }
 
 	if(key >= 32 && key < 127) {		/* printable ASCII key? just return it */
 		return key;
@@ -310,8 +316,6 @@ BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
 			default: return 0;			/* unknown key */
 		}
 	}
-	
-	vkeyKey = (((WORD) vkey) << 8) | ((WORD) key);		/* create a WORD with vkey and key together */
 	
 	switch(vkeyKey) {					/* some other no-ASCII key, but check with vkey too */
 		case 0x011b: return KEY_ESC;

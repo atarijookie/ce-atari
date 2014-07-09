@@ -87,6 +87,7 @@ BYTE loopForSetup(void)
 
 		if(key >= 'd' && key <= 'f') {								// download image
 			downloadImage(key - 'd');
+            nextMenuRedrawIsFull = 1;
 			handled = 1;
 		}
         
@@ -225,7 +226,13 @@ void downloadImage(int index)
   
         // create full path
         createFullPath(fullPath, filePath, fileName);       // fullPath = filePath + fileName
+
+        (void) Clear_home();
     }
+    
+    (void) Cconws("Downloading file from CosmosEx device:\r\n");
+    (void) Cconws(fileName);
+    (void) Cconws(" -> ");
     
     short fh = Fcreate(fullPath, 0);               		    // open file for writing
     
@@ -244,6 +251,8 @@ void downloadImage(int index)
     BYTE failed = 0;
     
     for(blockNo=0; blockNo<64; blockNo++) {                 // try to get all blocks
+        (void) Cconws(".");
+    
         commandShort[4] = FDD_CMD_DOWNLOADIMG_GETBLOCK;     // receiving block
         commandShort[5] = (index << 6) | (blockNo & 0x3f);  // for this index and block #
         
