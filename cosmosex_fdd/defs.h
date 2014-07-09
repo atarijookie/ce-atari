@@ -8,6 +8,7 @@ BYTE getKey(void);
 void showComError(void);
 void intToStr(int val, char *str);
 void removeLastPartUntilBackslash(char *str);
+BYTE getLowestDrive(void);
 
 #define GOTO_POS        "\33Y"
 #define Goto_pos(x,y)   ((void) Cconws(GOTO_POS),  (void) Cconout(' ' + y), (void) Cconout(' ' + x))

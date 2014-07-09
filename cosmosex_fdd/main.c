@@ -22,7 +22,6 @@ BYTE ce_identify(void);
 BYTE deviceID;
 BYTE commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
 
-BYTE getLowestDrive(void);
 void removeLastPartUntilBackslash(char *str);
 
 void showComError(void);

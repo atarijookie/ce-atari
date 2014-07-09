@@ -113,10 +113,12 @@ BYTE loopForDownload(void)
 
         if(key == KEY_F2) {                                         // select destination directory?
             selectDestinationDir();
+            showMenuMask = SHOWMENU_ALL;
         }
         
         if(key == KEY_F3) {                                         // start downloading images?
             handleImagesDownload();
+            showMenuMask = SHOWMENU_ALL;
         }
 
         if(key == KEY_F5) {                                         // refresh the list of images
@@ -221,6 +223,10 @@ void selectDestinationDir(void)
     memset(path,    0, 256);
     memset(fname,   0, 256);
     
+    strcpy(path, "C:\\*.*");                            
+    BYTE drive = getLowestDrive();              // get the lowest HDD letter and use it in the file selector
+    path[0] = drive;
+    
     graf_mouse(M_ON, 0);
     fsel_input(path, fname, &button);           // show file selector
     graf_mouse(M_OFF, 0);
@@ -248,10 +254,6 @@ void handleImagesDownload(void)
         }
     }
 
-    commandShort[4] = FDD_CMD_SEARCH_DOWNLOAD;
-    commandShort[5] = 0;
-    
-    sectorCount = 1;                            // read 1 sector
     
     BYTE res;
     
@@ -259,7 +261,10 @@ void handleImagesDownload(void)
     (void) Cconws("Downloading selected images...\r\n");
 
     while(1) {
-        res = Supexec(ce_acsiReadCommand); 
+        commandShort[4] = FDD_CMD_SEARCH_DOWNLOAD;
+        commandShort[5] = 0;
+        sectorCount = 1;                        // read 1 sector
+        res = Supexec(ce_acsiReadCommand);
 		
         if(res == FDD_DN_WORKING) {             // if downloading
             (void) Cconws(pBfr);                // write out status string
@@ -270,7 +275,7 @@ void handleImagesDownload(void)
             break;
         } else if(res == FDD_DN_DONE) {         // if this image finished downloading
             downloadImage(10);                  // store this downloaded image
-        }
+        } 
 
         sleep(1);                               // wait a second
     }
@@ -278,7 +283,7 @@ void handleImagesDownload(void)
 
 void markCurrentRow(void)
 {
-    commandShort[4] = FDD_CMD_SEARCH_STRING;
+    commandShort[4] = FDD_CMD_SEARCH_MARK;
     commandShort[5] = 0;
 
     p64kBlock = pBfr;                                           // use this buffer for writing
