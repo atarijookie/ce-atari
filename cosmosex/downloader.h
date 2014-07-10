@@ -10,6 +10,12 @@
 #define DWNTYPE_FLOPPYIMG_LIST  4
 #define DWNTYPE_FLOPPYIMG       8
 
+#define DWNSTATUS_WAITING       0              
+#define DWNSTATUS_DOWNLOADING   1 
+#define DWNSTATUS_VERIFYING     2
+#define DWNSTATUS_DOWNLOAD_OK   3              
+#define DWNSTATUS_DOWNLOAD_FAIL 4              
+
 typedef struct {
     std::string srcUrl;         // src url, e.g. http://whatever.com/file.zip
     std::string dstDir;         // dest dir, e.g. /mnt/sda1
@@ -17,6 +23,8 @@ typedef struct {
     int downloadType;           // defines what is downloaded - update, floppy image, ...
     WORD checksum;              // used to verify file integrity after download
 
+    BYTE *pStatusByte;          // if set to non-null, will be updated with the download status DWNSTATUS_*
+    
     int downPercent;            // defines progress - from 0 to 100
 } TDownloadRequest;
 

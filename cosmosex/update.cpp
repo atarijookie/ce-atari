@@ -135,6 +135,7 @@ void Update::downloadUpdateList(void)
     tdr.dstDir          = UPDATE_LOCALPATH;
     tdr.downloadType    = DWNTYPE_UPDATE_LIST;
     tdr.checksum        = 0;                        // special case - don't check checsum
+    tdr.pStatusByte     = NULL;                     // don't update this status byte
     Downloader::add(tdr);
 }
 
@@ -218,6 +219,7 @@ void Update::startComponentDownloadIfNewer(Version &vLocal, Version &vServer)
     tdr.checksum        = vServer.getChecksum();
     tdr.dstDir          = UPDATE_LOCALPATH;
     tdr.downloadType    = DWNTYPE_UPDATE_COMP;
+    tdr.pStatusByte     = NULL;                     // don't update this status byte
     Downloader::add(tdr);
 }
 

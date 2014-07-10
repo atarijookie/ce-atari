@@ -15,6 +15,8 @@
 
 #define UPLOAD_PATH "/tmp/"
 
+BYTE currentImageDownloadStatus;
+
 FloppySetup::FloppySetup()
 {
     dataTrans   = NULL;
@@ -174,7 +176,6 @@ void FloppySetup::searchMark(void)
     int item = (int) bfr64k[1];
 
     int itemIndex = (page * PAGESIZE) + item;
-    
 
     imageList.markImage(itemIndex);                 // (un)mark this image
 
@@ -225,60 +226,77 @@ void FloppySetup::searchDownload(void)
     std::string url, filename;
     int         checksum;
     bool        res;
-    std::string status;
-    static int  retries = 0;
+    std::string statusStr;
+    BYTE        statusVal;
+    
+    statusStr.clear();                                      // clear status - might contain something in case of DOWNLOAD_FAIL
     
     if(imgDnStatus == IMG_DN_STATUS_DOWNLOADING) {          // if we're downloading
-        Downloader::status(status, DWNTYPE_FLOPPYIMG);      // check if it's downloaded at this moment
+        switch(currentImageDownloadStatus) {
+            case DWNSTATUS_WAITING:                         // in this state just report we're working
+                statusStr = inetDnFilename + ": waiting for start of download";
+                statusVal = FDD_DN_WORKING;
+                break;
+                
+            case DWNSTATUS_DOWNLOADING:                     // in this state just report we're working
+                Downloader::status(statusStr, DWNTYPE_FLOPPYIMG);    
+                std::replace(statusStr.begin(), statusStr.end(), '\n', ' '); // replace all new line characters with spaces                
+                statusVal = FDD_DN_WORKING;
+                break;
+                
+            case DWNSTATUS_VERIFYING:                       // in this state just report we're working
+                statusStr = inetDnFilename + ": verifying checksum";
+                statusVal = FDD_DN_WORKING;
+                break;
+                
+            case DWNSTATUS_DOWNLOAD_OK:                     // report we've downloaded stuff, and go to DOWNLOADED state
+                statusStr = inetDnFilename + ": download OK";
+                statusVal = FDD_DN_DONE;
+                
+                imgDnStatus = IMG_DN_STATUS_DOWNLOADED;     // go to this state
+                break;
+                
+            case DWNSTATUS_DOWNLOAD_FAIL:                   // when failed, report that we've failed and go to next download
+                statusStr = inetDnFilename + ": download failed!\n\r\n\r";
+                
+                imgDnStatus = IMG_DN_STATUS_IDLE;           // go to this state                           
+                break;
 
-        if(status.empty()) {                                // if no image is now downloaded, the image is downloaded, but it still might not be available yet
-            int res = access(inetDnFilePath.c_str(), F_OK); // check if file exists
-
-            if(res == 0) {                                  // exists
-                imgDnStatus = IMG_DN_STATUS_DOWNLOADED;
-                dataTrans->setStatus(FDD_DN_DONE);              // tell ST we got something to download
-            } else {                                            // does not exist
-                if(retries > 0) {
-                    retries--;
-            
-                    status = inetDnFilename + ": verifying download";
-            
-                    dataTrans->addDataBfr((BYTE *) status.c_str(), status.length(), true);
-                    dataTrans->setStatus(FDD_DN_WORKING);           // tell ST we're downloading
-                } else {
-                    imgDnStatus = IMG_DN_STATUS_IDLE;
-                }
-            }
-        } else {                                            // some image is downloading
-            std::replace(status.begin(), status.end(), '\n', ' '); // replace all new line characters with spaces
-
-            dataTrans->addDataBfr((BYTE *) status.c_str(), status.length(), true);
-            dataTrans->setStatus(FDD_DN_WORKING);           // tell ST we're downloading
+            default:                                        // this should never happen
+                statusStr = "WTF?";
+                break;
+        }
+        
+        if(imgDnStatus != IMG_DN_STATUS_IDLE) {             // if it's not the case of failed download
+            dataTrans->addDataBfr((BYTE *) statusStr.c_str(), statusStr.length(), true);
+            dataTrans->setStatus(statusVal);
+            return;
         }
     }
 
+    // if we came here, we either haven't been downloading yet, or the previous download failed
     if(imgDnStatus == IMG_DN_STATUS_IDLE) {                 // if we're idle, start to download
         res = imageList.getFirstMarkedImage(url, checksum, filename);   // see if we got anything marked for download
 
         if(res) {                                           // if got some image to download, start the download
-            retries = 5;    
-    
             imgDnStatus     = IMG_DN_STATUS_DOWNLOADING;        // mark that we're downloading something
             inetDnFilename  = filename;                         // just filename of downloaded file    
             inetDnFilePath  = IMAGE_DOWNLOAD_DIR + filename;    // create full path and filename to the downloaded file
 
             unlink(inetDnFilePath.c_str());                     // if this file exists on the drive, delete it
             //------
-
+            currentImageDownloadStatus = DWNSTATUS_WAITING;
+            
             TDownloadRequest tdr;
             tdr.srcUrl          = url;
             tdr.checksum        = checksum;
             tdr.dstDir          = IMAGE_DOWNLOAD_DIR;
-            tdr.downloadType    = DWNTYPE_FLOPPYIMG;        // we're downloading floppy image
+            tdr.downloadType    = DWNTYPE_FLOPPYIMG;            // we're downloading floppy image
+            tdr.pStatusByte     = &currentImageDownloadStatus;  // update this variable with current status
             Downloader::add(tdr);
             
-            status = "Downloading: " + url;
-            dataTrans->addDataBfr((BYTE *) status.c_str(), status.length(), true);
+            statusStr += "Downloading: " + url;
+            dataTrans->addDataBfr((BYTE *) statusStr.c_str(), statusStr.length(), true);
 
             dataTrans->setStatus(FDD_DN_WORKING);           // tell ST we're downloading
         } else {                                            // nothing to download? say that to ST

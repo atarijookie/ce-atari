@@ -22,8 +22,7 @@
 
 extern volatile sig_atomic_t sigintReceived;
 
-void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
-void mergeHostPaths(std::string &dest, std::string &tail);
+void updateStatusByte(TDownloadRequest &tdr, BYTE newStatus);
 
 pthread_mutex_t downloadThreadMutex = PTHREAD_MUTEX_INITIALIZER;
 std::vector<TDownloadRequest>   downloadQueue;
@@ -44,6 +43,7 @@ void Downloader::add(TDownloadRequest &tdr)
 {
 	pthread_mutex_lock(&downloadThreadMutex);				// try to lock the mutex
     tdr.downPercent = 0;                                    // mark that the download didn't start
+    updateStatusByte(tdr, DWNSTATUS_WAITING);               // mark that the download didn't start
 	downloadQueue.push_back(tdr);   						// add this to queue
 	pthread_mutex_unlock(&downloadThreadMutex);			    // unlock the mutex
 }
@@ -212,6 +212,15 @@ static int my_progress_func(void *clientp, double downTotal, double downNow, dou
     return abortTransfer;                                       // return 0 to continue transfer, or non-0 to abort transfer
 }
 
+void updateStatusByte(TDownloadRequest &tdr, BYTE newStatus) 
+{
+    if(tdr.pStatusByte == NULL) {           // don't have pointer? skip this
+        return;
+    }
+    
+    *tdr.pStatusByte = newStatus;           // store the new status
+}
+
 void *downloadThreadCode(void *ptr)
 {
     CURL *curl = NULL;
@@ -245,6 +254,8 @@ void *downloadThreadCode(void *ptr)
     
         std::string tmpFile, finalFile;
 
+        updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOADING);       // mark that we're downloading
+        
         finalFile = downloadCurrent.dstDir;
         Utils::mergeHostPaths(finalFile, fileName);         // create final local filename with path
 
@@ -273,17 +284,23 @@ void *downloadThreadCode(void *ptr)
         fclose(outfile);
 
         if(cres == CURLE_OK) {                               // if download went OK
+            updateStatusByte(downloadCurrent, DWNSTATUS_VERIFYING);       // mark that we're verifying checksum
+        
             bool b = Downloader::verifyChecksum((char *) tmpFile.c_str(), downloadCurrent.checksum);
 
-            if(b) {         // checksum is OK? 
+            if(b) {             // checksum is OK? 
                 res = rename(tmpFile.c_str(), finalFile.c_str());
 
-                if(res != 0) {
+                if(res != 0) {  // download OK, checksum OK, rename BAD?
+                    updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_FAIL);
                     Debug::out(LOG_ERROR, "Downloader - failed to rename %s to %s after download", (char *) tmpFile.c_str(), (char *) finalFile.c_str());
-                } else {
+                } else {        // download OK, checksum OK, rename OK?
+                    updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_OK);
                     Debug::out(LOG_INFO, "Downloader - file %s was downloaded with success.", (char *) downloadCurrent.srcUrl.c_str());
                 }
-            } else {
+            } else {            // download OK, checksum bad?
+                updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_FAIL);
+                
                 res = remove(tmpFile.c_str());
 
                 if(res == 0) {
@@ -295,6 +312,8 @@ void *downloadThreadCode(void *ptr)
 
             downloadCurrent.downPercent = 100;
         } else {                                            // if download failed
+            updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_FAIL);
+
             Debug::out(LOG_ERROR, "Downloader - download of %s didn't finish with success, deleting incomplete file.", (char *) downloadCurrent.srcUrl.c_str());
 
             res = remove(tmpFile.c_str());

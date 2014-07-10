@@ -40,6 +40,7 @@ bool ImageList::exists(void)
     tdr.checksum        = 0;                            // don't check checksum
     tdr.dstDir          = IMAGELIST_LOCAL_DIR;
     tdr.downloadType    = DWNTYPE_FLOPPYIMG_LIST;
+    tdr.pStatusByte     = NULL;                     // don't update this status byte
     Downloader::add(tdr);
 
     return false;
@@ -251,11 +252,17 @@ void ImageList::getResultByIndex(int index, char *bfr)
 
 void ImageList::markImage(int index)
 {
-    if(index < 0 || index >= (int) vectorOfImages.size()) {                     // if out of range
+    if(index < 0 || index >= (int) vectorOfResults.size()) {                    // if out of range
         return;
     }
 
-    vectorOfImages[index].marked = !vectorOfImages[index].marked;               // toggle the marked flag
+    int imageIndex = vectorOfResults[index].imageIndex;                         // get image index for selected result
+    
+    if(imageIndex < 0 || imageIndex >= (int) vectorOfImages.size()) {           // if out of range
+        return;
+    }
+    
+    vectorOfImages[imageIndex].marked = !vectorOfImages[imageIndex].marked;     // toggle the marked flag
 }
 
 int ImageList::getSearchResultsCount(void)
