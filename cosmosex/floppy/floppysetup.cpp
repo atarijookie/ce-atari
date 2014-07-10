@@ -183,6 +183,8 @@ void FloppySetup::searchMark(void)
 
 void FloppySetup::downloadOnDevice(void)
 {
+    int index = cmd[5];
+
 	memset(bfr64k, 0, 512);
     dataTrans->recvData(bfr64k, 512);                       // receive file name into this buffer
     std::string atariFilePath = (char *) bfr64k;
@@ -201,6 +203,11 @@ void FloppySetup::downloadOnDevice(void)
             fclose(currentDownload.fh);                     // close the previously opened file
             currentDownload.fh = NULL;
 
+            if(index == 10) {                                   // if we just saved the downloaded file
+                unlink(inetDnFilePath.c_str());                 // delete it from RPi
+                imgDnStatus = IMG_DN_STATUS_IDLE;               // the download is now idle
+            }
+            
             dataTrans->setStatus(FDD_RES_ONDEVICECOPY);
             return;
         } else {                                            // on device copy -- FAIL!
@@ -219,15 +226,31 @@ void FloppySetup::searchDownload(void)
     int         checksum;
     bool        res;
     std::string status;
-
+    static int  retries = 0;
+    
     if(imgDnStatus == IMG_DN_STATUS_DOWNLOADING) {          // if we're downloading
         Downloader::status(status, DWNTYPE_FLOPPYIMG);      // check if it's downloaded at this moment
 
-        if(status.empty()) {                                // if no image is now downloaded, the image is downloaded
-            imgDnStatus = IMG_DN_STATUS_DOWNLOADED;
-            dataTrans->setStatus(FDD_DN_DONE);              // tell ST we got something to download
+        if(status.empty()) {                                // if no image is now downloaded, the image is downloaded, but it still might not be available yet
+            int res = access(inetDnFilePath.c_str(), F_OK); // check if file exists
+
+            if(res == 0) {                                  // exists
+                imgDnStatus = IMG_DN_STATUS_DOWNLOADED;
+                dataTrans->setStatus(FDD_DN_DONE);              // tell ST we got something to download
+            } else {                                            // does not exist
+                if(retries > 0) {
+                    retries--;
+            
+                    status = inetDnFilename + ": verifying download";
+            
+                    dataTrans->addDataBfr((BYTE *) status.c_str(), status.length(), true);
+                    dataTrans->setStatus(FDD_DN_WORKING);           // tell ST we're downloading
+                } else {
+                    imgDnStatus = IMG_DN_STATUS_IDLE;
+                }
+            }
         } else {                                            // some image is downloading
-            std::replace( status.begin(), status.end(), '\n', ' '); // replace all new line characters with spaces
+            std::replace(status.begin(), status.end(), '\n', ' '); // replace all new line characters with spaces
 
             dataTrans->addDataBfr((BYTE *) status.c_str(), status.length(), true);
             dataTrans->setStatus(FDD_DN_WORKING);           // tell ST we're downloading
@@ -238,6 +261,8 @@ void FloppySetup::searchDownload(void)
         res = imageList.getFirstMarkedImage(url, checksum, filename);   // see if we got anything marked for download
 
         if(res) {                                           // if got some image to download, start the download
+            retries = 5;    
+    
             imgDnStatus     = IMG_DN_STATUS_DOWNLOADING;        // mark that we're downloading something
             inetDnFilename  = filename;                         // just filename of downloaded file    
             inetDnFilePath  = IMAGE_DOWNLOAD_DIR + filename;    // create full path and filename to the downloaded file
