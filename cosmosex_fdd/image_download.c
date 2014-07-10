@@ -407,7 +407,9 @@ void showResults(BYTE showMask)
     int i;
     char *pRow;
 
-    if(showMask & SHOWMENU_RESULTS_ALL) {           // if should redraw all results
+    if(showMask & SHOWMENU_RESULTS_ALL) {               // if should redraw all results
+        (void) Cconws("\33w");                          // disable line wrap
+    
         for(i=0; i<15; i++) {
             pRow = (char *) (searchContent + (i * 68));
 
@@ -427,10 +429,13 @@ void showResults(BYTE showMask)
             }
         }
         
+        (void) Cconws("\33v");                          // enable line wrap
         return;
     }
     
-    if(showMask & SHOWMENU_RESULTS_ROW) {           // if should redraw only selected line
+    if(showMask & SHOWMENU_RESULTS_ROW) {               // if should redraw only selected line
+        (void) Cconws("\33w");                          // disable line wrap
+
         // draw previous line without inversion
         Goto_pos(0, 3 + search.prevRow);
 
@@ -446,6 +451,8 @@ void showResults(BYTE showMask)
         (void) Cconws(pRow);
         (void) Cconws("\33q");
         
+        (void) Cconws("\33v");                          // enable line wrap
+
         return;
     }
 }
