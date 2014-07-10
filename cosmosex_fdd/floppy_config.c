@@ -243,13 +243,14 @@ void downloadImage(int index)
     res = Supexec(ce_acsiWriteBlockCommand);                // send atari path to host, so host can check if it's ON DEVICE COPY
     
     if(res == FDD_RES_ONDEVICECOPY) {                       // if host replied with this, the file is copied, nothing to do
-        (void) Cconws("On device copy of file from CosmosEx device:\r\n");
+        (void) Cconws("Saving: ");
         (void) Cconws(fileName);
+        (void) Cconws("\r\n");
         return;
     }
     //--------------------
-    
-    (void) Cconws("Downloading file from CosmosEx device:\r\n");
+
+    (void) Cconws("Saving: ");
     (void) Cconws(fileName);
     (void) Cconws(" -> ");
     

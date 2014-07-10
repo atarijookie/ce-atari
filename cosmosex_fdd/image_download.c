@@ -118,6 +118,7 @@ BYTE loopForDownload(void)
         
         if(key == KEY_F3) {                                         // start downloading images?
             handleImagesDownload();
+            getResultsPage(search.pageCurrent);                     // refresh current page (will unselect the selected images)
             showMenuMask = SHOWMENU_ALL;
         }
 
@@ -253,7 +254,6 @@ void handleImagesDownload(void)
             return;
         }
     }
-
     
     BYTE res;
     
@@ -268,13 +268,14 @@ void handleImagesDownload(void)
 		
         if(res == FDD_DN_WORKING) {             // if downloading
             (void) Cconws(pBfr);                // write out status string
-            (void) Cconws("\r\n");
+            (void) Cconws("\n\r");
         } else if(res == FDD_DN_NOTHING_MORE) { // if nothing more to download
             (void) Cconws("All selected images downloaded.\r\nPress any key to continue.\n\r");
             getKey();
             break;
         } else if(res == FDD_DN_DONE) {         // if this image finished downloading
             downloadImage(10);                  // store this downloaded image
+            (void) Cconws("\n\r\n\r");
         } 
 
         sleep(1);                               // wait a second
