@@ -104,10 +104,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa014, 0x0602};                             // this means: hAns, 2014-06-02
+WORD version[2] = {0xa014, 0x0713};                             // this means: hAns, 2014-07-13
 
 char *VERSION_STRING_SHORT  = {"1.00"};
-char *DATE_STRING           = {"06/02/14"};
+char *DATE_STRING           = {"07/13/14"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
@@ -410,10 +410,10 @@ void onGetCommand(void)
         //-----
         if(brStat == E_OK) {                            // if all was well, let's send this to host or process it here
             if(id == sdCardID) {                        // for SD card IDs
-                justCmd = cmd[0] & 0x1f;                // get just the command
+                justCmd = cmd[0] & 0x1f;                // get just the command (remove ACSI ID)
             
                 if(justCmd == 0x1f) {                   // if it's ICD command, get the next byte as command
-                    justCmd = cmd[1];
+                    justCmd = cmd[1] & 0x1f;            // get just the command (remove GROUP CODE from operation code)
                     isIcd   = TRUE;
                     
                     tag1    = cmd[2];                   // CE tag ('C', 'E') can be found on position 2 and 3
