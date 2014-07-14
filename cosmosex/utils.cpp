@@ -247,4 +247,24 @@ bool Utils::copyFileByHandles(FILE *from, FILE *to)
     return true;
 }
 
+void Utils::SWAPWORD(WORD &w)
+{
+    WORD a,b;
+
+    a = w >> 8;         // get top
+    b = w  & 0xff;      // get bottom
+
+    w = (b << 8) | a;   // store swapped
+}
+
+WORD Utils::SWAPWORD2(WORD w)
+{
+    WORD a,b;
+
+    a = w >> 8;         // get top
+    b = w  & 0xff;      // get bottom
+
+    w = (b << 8) | a;   // store swapped
+    return w;
+}
 

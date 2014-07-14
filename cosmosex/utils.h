@@ -28,6 +28,9 @@ public:
     static bool copyFile(std::string &src, std::string &dst);
     static bool copyFile(FILE *from, std::string &dst);
 
+    static void SWAPWORD(WORD &w);
+    static WORD SWAPWORD2(WORD w);
+
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
 

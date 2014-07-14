@@ -1,6 +1,9 @@
+#include <stdlib.h>
 #include <string.h>
 #include "floppyimagemsa.h"
+#include "msa.h"
 #include "../debug.h"
+#include "../utils.h"
 
 FloppyImageMsa::FloppyImageMsa()
 {
@@ -30,17 +33,16 @@ bool FloppyImageMsa::open(char *fileName)
 
     // Read header
     WORD id, spt, sides, trackStart, trackEnd;
-    fread(&id,          2,1,fajl);      SWAPBYTES(id);
-    fread(&spt,         2,1,fajl);      SWAPBYTES(spt);
-    fread(&sides,       2,1,fajl);      SWAPBYTES(sides);
-    fread(&trackStart,  2,1,fajl);      SWAPBYTES(trackStart);
-    fread(&trackEnd,    2,1,fajl);      SWAPBYTES(trackEnd);
+    fread(&id,          2,1,fajl);      Utils::SWAPWORD(id);
+    fread(&spt,         2,1,fajl);      Utils::SWAPWORD(spt);
+    fread(&sides,       2,1,fajl);      Utils::SWAPWORD(sides);
+    fread(&trackStart,  2,1,fajl);      Utils::SWAPWORD(trackStart);
+    fread(&trackEnd,    2,1,fajl);      Utils::SWAPWORD(trackEnd);
 
     if(id != 0x0e0f) {          // MSA ID mismatch?
         close();
         return false;
     }
-
     params.tracksNo         = trackEnd - trackStart + 1;
     params.sidesNo          = sides + 1;
     params.sectorsPerTrack  = spt;
@@ -52,61 +54,47 @@ bool FloppyImageMsa::open(char *fileName)
         return false;
     }
 
-    getTrackStartOffsets();
-
     Debug::out(LOG_INFO, "MSA Image opened: %s", fileName);
     Debug::out(LOG_INFO, "MSA Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
 
     return true;
 }
 
-void FloppyImageMsa::getTrackStartOffsets(void)
-{
-    int pos = 10;
-
-    int totalTracks = params.tracksNo * params.sidesNo;
-
-    for(int t=0; t<totalTracks; t++) {
-        trackOffset[t] = pos + 2;
-
-        WORD *tlp = (WORD *) &image.data[pos];
-        WORD trackLength = *tlp;
-        SWAPBYTES(trackLength);
-
-        pos += trackLength + 2;
-    }
-}
-
-void FloppyImageMsa::SWAPBYTES(WORD &w)
-{
-    WORD a,b;
-
-    a = w >> 8;         // get top
-    b = w  & 0xff;      // get bottom
-
-    w = (b << 8) | a;   // store swapped
-}
-
 bool FloppyImageMsa::loadImageIntoMemory(void)
 {
     if(image.data != NULL) {
-        delete []image.data;
+        free(image.data);
         image.data = NULL;
         image.size = 0;
     }
 
-    fseek(fajl, 0, SEEK_END);           // move to the end of file
-    int cnt = ftell(fajl);              // get the file size
+    fseek(fajl, 0, SEEK_END);                   // move to the end of file
+    int cnt = ftell(fajl);                      // get the file size
+    fseek(fajl, 0, SEEK_SET);                   // move to the start of file
 
-    fseek(fajl, 0, SEEK_SET);           // move to the start of file
-
-    image.data = new BYTE[cnt];
-    int res = fread(image.data, 1, cnt, fajl);
+    image.data = (BYTE *) malloc(cnt);          // allocate memory for file reading
+    int res = fread(image.data, 1, cnt, fajl);  // read the file into memory
     image.size = cnt;
 
-    if(res != cnt) {
+    if(res != cnt) {                            // if failed to read all, quit
+        free(image.data);
+        image.data = NULL;
+        image.size = 0;
+
         return false;
     }
+
+	DWORD imageSize = 0;
+    BYTE *pDiskBuffer = MSA_UnCompress(image.data, (long int *) &imageSize);
+
+    free(image.data);                           // free the memory which was used for file reading
+
+    image.data = pDiskBuffer;                   // store pointer to buffer with decompressed image and size
+    image.size = imageSize;
+    
+    if(image.data == NULL) {                    // if the MSA_UnCompress failed, error
+        return false;
+    }       
 
     return true;
 }
@@ -128,8 +116,7 @@ void FloppyImageMsa::close()
     params.isInit = false;
 
     if(image.data != NULL) {
-        delete []image.data;
-
+        free(image.data);
         image.data = NULL;
         image.size = 0;
     }
@@ -162,11 +149,12 @@ bool FloppyImageMsa::readSector(int track, int side, int sectorNo, BYTE *buffer)
         return false;
     }
 
-    int trackIndex  = track * params.sidesNo + side;
-    int trackOfs    = trackOffset[trackIndex];
-    int totalOfs    = trackOfs + ((sectorNo - 1) * 512);
+    int offset   = track    * (params.sidesNo * params.sectorsPerTrack);    // move to the right track
+    offset      += side     * params.sectorsPerTrack;                       // then move to the right side
+    offset      += (sectorNo - 1);                                          // and move a little to the right sector
+    offset       = offset * 512;                                            // calculate ofsset in bytes
 
-    memcpy(buffer, &image.data[totalOfs], 512);
+    memcpy(buffer, &image.data[offset], 512);
     return true;
 }
 

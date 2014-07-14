@@ -29,8 +29,6 @@ private:
         bool isInit;
     } params;
 
-    void SWAPBYTES(WORD &w);
-    void getTrackStartOffsets(void);
     bool loadImageIntoMemory(void);
 
     struct {
@@ -38,7 +36,6 @@ private:
         BYTE *data;
     } image;
 
-    DWORD trackOffset[200];
     FILE *fajl;
 };
 
