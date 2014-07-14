@@ -104,10 +104,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa014, 0x0713};                             // this means: hAns, 2014-07-13
+WORD version[2] = {0xa014, 0x0714};                             // this means: hAns, 2014-07-13
 
 char *VERSION_STRING_SHORT  = {"1.00"};
-char *DATE_STRING           = {"07/13/14"};
+char *DATE_STRING           = {"07/14/14"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
@@ -281,7 +281,7 @@ void initAllStuff(void)
     spiDmaTXidle = TRUE;
     spiDmaRXidle = TRUE;
     
-    currentLed = 0;
+    currentLed = 0xff;                                              // current LED - no LED
 
     shouldProcessCommands = FALSE;
 
@@ -306,7 +306,6 @@ void initAllStuff(void)
     sdCardID = 0xff;                                                // for SD card set non-existing ID for now
     
     // now for floppy image LEDs - enable IMG0 (even if nothing is there), disable other
-    enabledImgs[0] = TRUE;
     for(i=1; i<3; i++) {
         enabledImgs[i] = FALSE;
     }
@@ -345,7 +344,7 @@ void onButtonPress(void)
     currentLed++;                                       // change LED
     
     if(currentLed > 2) {                                // overflow?
-        currentLed = 0;
+        currentLed = 0xff;
     }
     
     fixLedsByEnabledImgs();                             // if we switched to not enabled floppy image, fix this
@@ -358,6 +357,10 @@ void fixLedsByEnabledImgs(void)
     BYTE i;
     
     for(i=0; i<3; i++) {                                    // try to switch to enabled LED 3 times
+        if(currentLed == 0xff) {                            // no LED? quit
+            return;
+        }
+    
         if(enabledImgs[currentLed] == TRUE) {               // if this LED is enabled, use it
             return;
         }
@@ -366,11 +369,11 @@ void fixLedsByEnabledImgs(void)
         currentLed++;                                       // change LED
     
         if(currentLed > 2) {                                // overflow? fix it
-            currentLed = 0;
+            currentLed = 0xff;
         }
     }
 
-    currentLed = 0;                                         // use led 0 as selected                                          
+    currentLed = 0xff;                                      // use NO LED as selected                                          
 }
 
 void showCurrentLED(void)
@@ -388,6 +391,7 @@ void onGetCommand(void)
 {
     BYTE id, i, justCmd;
     BYTE tag1, tag2, isIcd;
+    BYTE cmdIsForCE;
                 
     cmd[0]  = PIO_writeFirst();                         // get byte from ST (waiting for the 1st byte)
     id      = (cmd[0] >> 5) & 0x07;                     // get only device ID
@@ -409,23 +413,33 @@ void onGetCommand(void)
                 
         //-----
         if(brStat == E_OK) {                            // if all was well, let's send this to host or process it here
+            cmdIsForCE = FALSE;
+            
             if(id == sdCardID) {                        // for SD card IDs
                 justCmd = cmd[0] & 0x1f;                // get just the command (remove ACSI ID)
             
                 if(justCmd == 0x1f) {                   // if it's ICD command, get the next byte as command
-                    justCmd = cmd[1] & 0x1f;            // get just the command (remove GROUP CODE from operation code)
+                    justCmd = cmd[1];                   // get just the command
                     isIcd   = TRUE;
+                    
+                    if(justCmd == 0xa0) {               // if it's REPORT LUNS command, it might be for CE
+                        cmdIsForCE = TRUE;                        
+                    }
                     
                     tag1    = cmd[2];                   // CE tag ('C', 'E') can be found on position 2 and 3
                     tag2    = cmd[3];
                 } else {                                // if it's not ICD command
                     isIcd   = FALSE;
 
+                    if(justCmd == 0) {                  // if just command (without ACSI ID) is TEST UNIT READY, it's for CE
+                        cmdIsForCE = TRUE;
+                    }
+                    
                     tag1    = cmd[1];                   // CE tag ('C', 'E') can be found on position 1 and 2
                     tag2    = cmd[2];
                 }
 
-                if(justCmd != 0 || tag1 != 'C' || tag2 != 'E') {    // the command is not TEST UNIT READY and there isn't a valid CE tag? process localy
+                if(cmdIsForCE != TRUE || tag1 != 'C' || tag2 != 'E') {    // the command is not TEST UNIT READY and there isn't a valid CE tag? process localy
                     processScsiLocaly(justCmd, isIcd);
                     return;
                 }
