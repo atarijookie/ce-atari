@@ -4,10 +4,12 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <dirent.h>
 #include <errno.h>
 #include <utime.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include "../global.h"
 #include "../debug.h"
@@ -227,18 +229,42 @@ void TranslatedDisk::onDfree(BYTE *cmd)
         return;
     }
 
-    // TODO: get the real drive size
-    DWORD clustersTotal = 32768;
-    DWORD clustersFree  = 16384;
+    DWORD clustersTotal     = 0;
+    DWORD clustersFree      = 0;
+    DWORD sectorsPerCluster = 0;
+
+    struct statvfs *svfs;
+    svfs = (struct statvfs *) malloc( sizeof(struct statvfs) );
+
+    std::string pathToAnyFile = conf[whichDrive].hostRootPath + "/.";       // create path to any file in that file system
+
+    int res = statvfs(pathToAnyFile.c_str(), svfs);                         // get filesystem info
     
-    if(isDriveIndexReadOnly(whichDrive)) {
+    if(res == 0) {
+        unsigned long blksize, blocks, freeblks;
+        blksize     = svfs->f_bsize;
+        blocks      = svfs->f_blocks;
+        freeblks    = svfs->f_bfree;
+
+        clustersFree        = freeblks;             // store count of free blocks
+        clustersTotal       = blocks;               // store count of all blocks
+        sectorsPerCluster   = blksize / 512;        // store count of sectors per block (cluster)
+
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDfree - free: %lu, total: %lu, spc: %d", clustersFree, clustersTotal, (int) sectorsPerCluster);
+    } else {
+        Debug::out(LOG_ERROR, "TranslatedDisk::onDfree - statvfs FAIL");
+    }
+
+    free(svfs);
+
+    if(isDriveIndexReadOnly(whichDrive)) {          // if drive is read only, then there is no free space
         clustersFree  = 0;
     }
 
     dataTrans->addDataDword(clustersFree);          // No. of Free Clusters
     dataTrans->addDataDword(clustersTotal);         // Clusters per Drive
     dataTrans->addDataDword(512);                   // Bytes per Sector
-    dataTrans->addDataDword(2);                     // Sectors per Cluster
+    dataTrans->addDataDword(sectorsPerCluster);     // Sectors per Cluster
 
     dataTrans->setStatus(E_OK);                     // everything OK
 }

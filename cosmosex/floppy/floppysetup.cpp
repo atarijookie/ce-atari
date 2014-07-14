@@ -467,18 +467,31 @@ void FloppySetup::newImage(void)
 
     char file[128];
 	getNewImageName(file);
-    std::string fileStr = file;
+    std::string justFile = file;
+    std::string pathAndFile = UPLOAD_PATH + justFile;
 
-    std::string path = UPLOAD_PATH + fileStr;
+    bool res = createNewImage(pathAndFile);             // create the new image on disk
 
-    // open the file
-    FILE *f = fopen((char *) path.c_str(), "wb");
-
-    if(!f) {                                            // failed to open file?
-        Debug::out(LOG_ERROR, "FloppySetup::newImage - failed to open file %s", (char *) path.c_str());
-    
+    if(!res) {                                          // failed to create? fail
         dataTrans->setStatus(FDD_ERROR);
         return;
+    }
+
+    // we're here, the image creation succeeded
+    std::string empty;
+    imageSilo->add(index, justFile, pathAndFile, empty, empty, true);
+
+    dataTrans->setStatus(FDD_OK);
+}
+
+bool FloppySetup::createNewImage(std::string pathAndFile)
+{
+    // open the file
+    FILE *f = fopen((char *) pathAndFile.c_str(), "wb");
+
+    if(!f) {                                            // failed to open file?
+        Debug::out(LOG_ERROR, "FloppySetup::newImage - failed to open file %s", (char *) pathAndFile.c_str());
+        return false;
     }
 
     // create default boot sector (copied from blank .st image created in Steem)
@@ -503,12 +516,7 @@ void FloppySetup::newImage(void)
     }
 
     fclose(f);
-
-    // we're here, the image creation succeeded
-    std::string empty;
-    imageSilo->add(index, fileStr, path, empty, empty, true);
-
-    dataTrans->setStatus(FDD_OK);
+    return true;
 }
 
 void FloppySetup::getNewImageName(char *nameBfr)

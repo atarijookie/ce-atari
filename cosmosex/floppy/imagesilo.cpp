@@ -14,6 +14,7 @@
 #include "../debug.h"
 #include "../settings.h"
 #include "imagesilo.h"
+#include "floppysetup.h"
 
 pthread_mutex_t floppyEncodeThreadMutex = PTHREAD_MUTEX_INITIALIZER;
 std::queue<EncodeRequest> encodeQueue;
@@ -87,12 +88,31 @@ void *floppyEncodeThreadCode(void *ptr)
 
 ImageSilo::ImageSilo()
 {
-    for(int i=0; i<3; i++) {
+    for(int i=0; i<4; i++) {
         clearSlot(i);
     }
 	
-	currentSlot = 0;
+	currentSlot = EMPTY_IMAGE_SLOT;
     reloadProxy = NULL;
+
+    //-----------
+    bool res = FloppySetup::createNewImage(EMPTY_IMAGE_PATH);                   // create empty image in /tmp/ directory
+
+    if(res) {                                                                   // if succeeded, encode this empty image
+        Debug::out(LOG_DEBUG, "ImageSilo created empty image (for no selected image)");
+
+	    EncodeRequest er;
+	
+    	er.slotIndex	= EMPTY_IMAGE_SLOT;
+	    er.filename		= EMPTY_IMAGE_PATH;
+    	er.encImg		= &slots[EMPTY_IMAGE_SLOT].encImage;
+	
+    	encodeAdd(er);
+
+    } else {
+        Debug::out(LOG_DEBUG, "ImageSilo failed to create empty image! (for no selected image)");
+    }
+    //-----------
 
     loadSettings();
 }
@@ -283,7 +303,11 @@ BYTE ImageSilo::getSlotBitmap(void)
 
 void ImageSilo::setCurrentSlot(int index)
 {
-	currentSlot = index;
+    if(index >= 0 || index <= 2) {              // index good? use it
+    	currentSlot = index;
+    } else {                                    // index bad? use slot with empty imave
+        currentSlot = EMPTY_IMAGE_SLOT;
+    }
 }
 
 BYTE *ImageSilo::getEncodedTrack(int track, int side, int &bytesInBuffer)

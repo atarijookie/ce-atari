@@ -27,6 +27,8 @@ public:
     void setImageSilo(ImageSilo *imgSilo);
     void setTranslatedDisk(TranslatedDisk *td);
 
+    static bool createNewImage(std::string pathAndFile);
+
 private:
     AcsiDataTrans       *dataTrans;
     ImageSilo           *imageSilo;

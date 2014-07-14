@@ -9,6 +9,9 @@
 #include "mfmdecoder.h"
 #include "mfmcachedimage.h"
 
+#define EMPTY_IMAGE_SLOT        3
+#define EMPTY_IMAGE_PATH        "/tmp/emptyimage.st"
+
 typedef struct 
 {
     std::string		imageFile;      // just file name:                     bla.st
@@ -53,7 +56,7 @@ public:
     SiloSlot *getSiloSlot(int index);
 
 private:
-    SiloSlot	            slots[3];
+    SiloSlot	            slots[4];
 	int			            currentSlot;
 	SettingsReloadProxy     *reloadProxy;
 
