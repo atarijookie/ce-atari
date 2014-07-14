@@ -303,7 +303,7 @@ BYTE ImageSilo::getSlotBitmap(void)
 
 void ImageSilo::setCurrentSlot(int index)
 {
-    if(index >= 0 || index <= 2) {              // index good? use it
+    if(index >= 0 && index <= 2) {              // index good? use it
     	currentSlot = index;
     } else {                                    // index bad? use slot with empty imave
         currentSlot = EMPTY_IMAGE_SLOT;
