@@ -332,7 +332,7 @@ void initUsarts(void)
     USART_Cmd(USART2, ENABLE);
     USART_Cmd(USART3, ENABLE);
     
-    usartStruct.USART_BaudRate              = 9600;   
+    usartStruct.USART_BaudRate              = 19200;   
     usartStruct.USART_WordLength            = USART_WordLength_8b;  
     usartStruct.USART_StopBits              = USART_StopBits_1;   
     usartStruct.USART_Parity                = USART_Parity_No;
