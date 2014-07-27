@@ -90,7 +90,7 @@ void *ikbdThreadCode(void *ptr)
         }
 
         if(!gotSomething) {                                         // didn't succeed with reading of any device? 
-            usleep(10000);                                          // sleep for 10 us
+            usleep(10000);                                          // sleep for 10 ms
             continue;
         }
     }
@@ -1328,8 +1328,8 @@ int Ikbd::serialSetup(termios *ts)
 	ts->c_oflag &= ~(OPOST | ONLCR);
 
 	/* setup the new settings */
-	cfsetispeed(ts, B9600);
-	cfsetospeed(ts, B9600);
+	cfsetispeed(ts, B19200);
+	cfsetospeed(ts, B19200);
 	ts->c_cflag |=  CS8 | CLOCAL | CREAD;			// uart: 8N1
 
 	ts->c_cc[VMIN ] = 0;
