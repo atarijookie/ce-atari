@@ -107,9 +107,17 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 	int len;
         
     if(strlen(username) == 0) {             // no user name? 
-        memset(auth, 0, MAX_STR_SIZE);
+        if(nfsNotSamba) {                   // for NFS - don't specify auth
+            memset(auth, 0, MAX_STR_SIZE);
+        } else {                            // for CIFS - specify guest
+            strcpy(auth, ",username=guest");
+        }
     } else {                                // got user name?
-        snprintf(auth, MAX_STR_SIZE, ",username=%s,password=%s", username, password);
+        if(strlen(password) == 0) {         // don't have password?
+            snprintf(auth, MAX_STR_SIZE, ",username=%s", username);
+        } else {                            // and got password?
+            snprintf(auth, MAX_STR_SIZE, ",username=%s,password=%s", username, password);
+        }
     }
 	
 	createSource(host, hostDir, nfsNotSamba, source);		// create source path
