@@ -17,6 +17,9 @@ typedef struct {
 		std::string host;
 		std::string hostDir;
 		bool		nfsNotSamba;
+        
+        std::string username;
+        std::string password;
 	} shared;
 
 	std::string mountDir;				// location where it should be mounted
@@ -30,7 +33,7 @@ extern "C" {
 class Mounter 
 {
 public:
-	bool mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mountDir);
+	bool mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mountDir, char *username, char *password);
 	bool mountDevice(char *devicePath, char *mountDir);
 	void umountIfMounted(char *mountDir);
 	void restartNetwork(void);

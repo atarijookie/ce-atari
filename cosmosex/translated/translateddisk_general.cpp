@@ -117,12 +117,15 @@ void TranslatedDisk::mountAndAttachSharedDrive(void)
 	std::string mountPath = SHARED_DRIVE_PATH;
 
     Settings s;
-    std::string addr, path;
+    std::string addr, path, username, password;
 	bool sharedEnabled;
 	bool nfsNotSamba;
 
     addr			= s.getString((char *) "SHARED_ADDRESS",  (char *) "");
     path			= s.getString((char *) "SHARED_PATH",     (char *) "");
+
+    username		= s.getString((char *) "SHARED_USERNAME",  (char *) "");
+    password		= s.getString((char *) "SHARED_PASSWORD",  (char *) "");
 	
 	sharedEnabled	= s.getBool((char *) "SHARED_ENABLED", false);
 	nfsNotSamba		= s.getBool((char *) "SHARED_NFS_NOT_SAMBA", false);
@@ -143,6 +146,8 @@ void TranslatedDisk::mountAndAttachSharedDrive(void)
 	tmr.shared.host			= addr;
 	tmr.shared.hostDir		= path;
 	tmr.shared.nfsNotSamba	= nfsNotSamba;
+    tmr.shared.username     = username;
+    tmr.shared.password     = password;
 	tmr.mountDir			= mountPath;
 	mountAdd(tmr);
 

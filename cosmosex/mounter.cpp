@@ -54,7 +54,7 @@ void *mountThreadCode(void *ptr)
 			if(tmr.deviceNotShared) {					// mount device?
 				mounter.mountDevice((char *) tmr.devicePath.c_str(), (char *) tmr.mountDir.c_str());	
 			} else {									// mount shared?
-				mounter.mountShared((char *) tmr.shared.host.c_str(), (char *) tmr.shared.hostDir.c_str(), tmr.shared.nfsNotSamba, (char *) tmr.mountDir.c_str());
+				mounter.mountShared((char *) tmr.shared.host.c_str(), (char *) tmr.shared.hostDir.c_str(), tmr.shared.nfsNotSamba, (char *) tmr.mountDir.c_str(), (char *) tmr.shared.username.c_str(), (char *) tmr.shared.password.c_str());
 			}
 			
 			continue;
@@ -98,12 +98,19 @@ bool Mounter::mountDevice(char *devicePath, char *mountDir)
 	return mount(cmd, mountDir);
 }
 
-bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mountDir)
+bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mountDir, char *username, char *password)
 {
 	// build and run the command
 	char cmd[MAX_STR_SIZE];
+    char auth[MAX_STR_SIZE];
 	char source[MAX_STR_SIZE];
 	int len;
+        
+    if(strlen(username) == 0) {             // no user name? 
+        memset(auth, 0, MAX_STR_SIZE);
+    } else {                                // got user name?
+        snprintf(auth, MAX_STR_SIZE, ",username=%s,password=%s", username, password);
+    }
 	
 	createSource(host, hostDir, nfsNotSamba, source);		// create source path
 	
@@ -115,7 +122,7 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 		
 	if(nfsNotSamba) {		// for NFS
         // was: sudo
-		snprintf(cmd, MAX_STR_SIZE, "mount -v -t nfs -o nolock %s %s > %s 2> %s", source, mountDir, LOGFILE1, LOGFILE2);
+		snprintf(cmd, MAX_STR_SIZE, "mount -v -t nfs -o nolock%s %s %s > %s 2> %s", auth, source, mountDir, LOGFILE1, LOGFILE2);
 	} else {				// for Samba
 		passwd *psw = getpwnam("pi");
 		
@@ -123,9 +130,9 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 			Debug::out(LOG_ERROR, "Mounter::mountShared - failed, because couldn't get uid and gid for user 'pi'\n");
 			return false;
 		}
-		
+        
         // was: sudo
-		snprintf(cmd, MAX_STR_SIZE, "mount -v -t cifs -o gid=%d,uid=%d,username=%s,password=%s %s %s > %s 2> %s", psw->pw_gid, psw->pw_uid, "pi", "password", source, mountDir, LOGFILE1, LOGFILE2);
+		snprintf(cmd, MAX_STR_SIZE, "mount -v -t cifs -o gid=%d,uid=%d%s %s %s > %s 2> %s", psw->pw_gid, psw->pw_uid, auth, source, mountDir, LOGFILE1, LOGFILE2);
 	}
 
 	len = strnlen(cmd, MAX_STR_SIZE);	// get the length

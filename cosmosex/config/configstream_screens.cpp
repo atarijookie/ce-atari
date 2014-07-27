@@ -844,7 +844,7 @@ void ConfigStream::createScreen_shared(void)
 
     ConfigComponent *comp;
 
-	int row = 4;
+	int row = 3;
 	
 	int col1x = 0;
 	int col2x = 10;
@@ -913,6 +913,25 @@ void ConfigStream::createScreen_shared(void)
     screen.push_back(comp);
 	
 	row++;
+    
+    // username and password
+    comp = new ConfigComponent(this, ConfigComponent::label, "Username",				                    40, col1x, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",										15, col2x, row, gotoOffset);
+    comp->setComponentId(COMPID_USERNAME);
+    screen.push_back(comp);
+
+	row++;
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "Password",				                    40, col1x, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",										15, col2x, row, gotoOffset);
+    comp->setComponentId(COMPID_PASSWORD);
+    screen.push_back(comp);
+
+	row += 2;
 	
 	// buttons
 /*
@@ -932,18 +951,24 @@ void ConfigStream::createScreen_shared(void)
     screen.push_back(comp);
 
     Settings s;
-    std::string addr, path;
+    std::string addr, path, username, password;
 	bool enabled, nfsNotSamba;
 
     addr = s.getString((char *) "SHARED_ADDRESS",  (char *) "");
     path = s.getString((char *) "SHARED_PATH",     (char *) "");
-	
+
+    username = s.getString((char *) "SHARED_USERNAME",  (char *) "");
+    password = s.getString((char *) "SHARED_PASSWORD",     (char *) "");
+
 	enabled		= s.getBool((char *) "SHARED_ENABLED",			false);
 	nfsNotSamba	= s.getBool((char *) "SHARED_NFS_NOT_SAMBA",	true);
 
     setTextByComponentId(COMPID_SHARED_IP,      addr);
     setTextByComponentId(COMPID_SHARED_PATH,    path);
 	setBoolByComponentId(COMPID_SHARED_ENABLED,	enabled);
+
+    setTextByComponentId(COMPID_USERNAME,       username);
+    setTextByComponentId(COMPID_PASSWORD,       password);
 	
 	if(nfsNotSamba) {
 		checkboxGroup_setCheckedId(COMPID_SHARED_NFS_NOT_SAMBA, 1);			// select NFS
@@ -961,13 +986,16 @@ void ConfigStream::onSharedTest(void)
 
 void ConfigStream::onSharedSave(void)
 {
-    std::string ip, path;
+    std::string ip, path, username, password;
 	bool enabled, nfsNotSamba;
 
     getTextByComponentId(COMPID_SHARED_IP,      ip);
     getTextByComponentId(COMPID_SHARED_PATH,    path);
 	getBoolByComponentId(COMPID_SHARED_ENABLED,	enabled);
 	nfsNotSamba = (bool) checkboxGroup_getCheckedId(COMPID_SHARED_NFS_NOT_SAMBA);
+
+    getTextByComponentId(COMPID_USERNAME,       username);
+    getTextByComponentId(COMPID_PASSWORD,       password);
 
 	if(enabled) {										// if enabled, do validity checks, othewise let it just pass
 		if(!verifyAndFixIPaddress(ip, ip, false)) {
@@ -987,7 +1015,9 @@ void ConfigStream::onSharedSave(void)
 	s.setBool	((char *) "SHARED_NFS_NOT_SAMBA",	nfsNotSamba);
     s.setString	((char *) "SHARED_ADDRESS",  		(char *) ip.c_str());
     s.setString	((char *) "SHARED_PATH",     		(char *) path.c_str());
-	
+
+    s.setString	((char *) "SHARED_USERNAME",  		(char *) username.c_str());
+    s.setString	((char *) "SHARED_PASSWORD",     	(char *) password.c_str());
 
     if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
         reloadProxy->reloadSettings(SETTINGSUSER_SHARED);
