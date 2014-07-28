@@ -14,6 +14,8 @@
 Versions Update::versions;
 int Update::currentState = UPDATE_STATE_IDLE;
 
+extern bool g_forceUpdate;                              // if set to true, won't check if the update components are newer, but will update all of them 
+
 void Update::initialize(void)
 {
     Update::versions.current.app.fromString(                (char *) APP_VERSION);
@@ -109,11 +111,25 @@ void Update::processUpdateList(void)
         Debug::out(LOG_DEBUG, "processUpdateList - FRANZ is newer on server");
     }
 
+    if(g_forceUpdate) {
+        Debug::out(LOG_DEBUG, "processUpdateList - forcing update...");
+        Update::versions.gotUpdate = true;
+    }
+    
     Update::versions.updateListWasProcessed = true;         // mark that the update list was processed and don't need to do this again
     Debug::out(LOG_DEBUG, "processUpdateList - done");
 }
 
-void Update::downloadUpdateList(void)
+void Update::deleteLocalUpdateComponents(void)
+{
+    unlink(UPDATE_LOCALLIST);
+    unlink("/ce/update/hans.hex");
+    unlink("/ce/update/franz.hex");
+    unlink("/ce/update/xilinx.xsvf");
+    unlink("/ce/update/app.zip");
+}
+
+void Update::downloadUpdateList(char *remoteUrl)
 {
     // check for existence and possibly create update dir
   	int res = mkdir(UPDATE_LOCALPATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
@@ -131,7 +147,13 @@ void Update::downloadUpdateList(void)
 
     // add request for download of the update list
     TDownloadRequest tdr;
-    tdr.srcUrl          = UPDATE_REMOTEURL;
+    
+    if(remoteUrl == NULL) {                         // no remote url specified? use default
+        tdr.srcUrl = UPDATE_REMOTEURL;
+    } else {                                        // got the remote url? use it
+        tdr.srcUrl = remoteUrl;
+    }
+        
     tdr.dstDir          = UPDATE_LOCALPATH;
     tdr.downloadType    = DWNTYPE_UPDATE_LIST;
     tdr.checksum        = 0;                        // special case - don't check checsum
@@ -181,9 +203,10 @@ bool Update::allNewComponentsDownloaded(void)
 
 bool Update::isUpToDateOrUpdateDownloaded(Version &vLocal, Version &vServer)
 {
-    // if local is not older than on server, we're up to date, don't wait for this file
-    if(!vLocal.isOlderThan(vServer)) {          
-        return true;
+    if(!g_forceUpdate) {                                    // if not forcing update
+        if(!vLocal.isOlderThan(vServer)) {                  // if local is not older than on server, we're up to date, don't wait for this file
+            return true;
+        }
     }
 
     std::string localFile;
@@ -208,9 +231,10 @@ void Update::deleteLocalComponent(std::string url)
 
 void Update::startComponentDownloadIfNewer(Version &vLocal, Version &vServer)
 {
-    // if local is not older than on server, quit
-    if(!vLocal.isOlderThan(vServer)) {          
-        return;
+    if(!g_forceUpdate) {                                    // if we're not forcing update, check if we have to download it
+        if(!vLocal.isOlderThan(vServer)) {                  // if local is not older than on server, don't download and quit
+            return;
+        }
     }
 
     // start the download
@@ -265,6 +289,11 @@ void Update::stateGoIdle(void)
     currentState = UPDATE_STATE_IDLE;
 }
 
+void Update::stateGoDownloadOK(void)
+{
+    currentState = UPDATE_STATE_DOWNLOAD_OK;
+}
+
 bool Update::createUpdateScript(void)
 {
     FILE *f = fopen(UPDATE_SCRIPT, "wt");
@@ -274,7 +303,7 @@ bool Update::createUpdateScript(void)
         return false;
     }
 
-    if(Update::versions.current.app.isOlderThan( Update::versions.onServer.app )) {
+    if(Update::versions.current.app.isOlderThan( Update::versions.onServer.app ) || g_forceUpdate) {
         std::string appFileWithPath;
         Update::getLocalPathFromUrl(Update::versions.onServer.app.getUrl(), appFileWithPath);
 
@@ -292,7 +321,7 @@ bool Update::createUpdateScript(void)
         fprintf(f, "\n\n");
     }
 
-    if(Update::versions.current.hans.isOlderThan( Update::versions.onServer.hans )) {
+    if(Update::versions.current.hans.isOlderThan( Update::versions.onServer.hans ) || g_forceUpdate) {
         std::string fwFile;
         Update::getLocalPathFromUrl(Update::versions.onServer.hans.getUrl(), fwFile);
 
@@ -302,7 +331,7 @@ bool Update::createUpdateScript(void)
         fprintf(f, "\n\n");
     }
 
-    if(Update::versions.current.xilinx.isOlderThan( Update::versions.onServer.xilinx )) {
+    if(Update::versions.current.xilinx.isOlderThan( Update::versions.onServer.xilinx ) || g_forceUpdate) {
         std::string fwFile;
         Update::getLocalPathFromUrl(Update::versions.onServer.xilinx.getUrl(), fwFile);
 
@@ -313,7 +342,7 @@ bool Update::createUpdateScript(void)
         fprintf(f, "\n\n");
     }
 
-    if(Update::versions.current.franz.isOlderThan( Update::versions.onServer.franz )) {
+    if(Update::versions.current.franz.isOlderThan( Update::versions.onServer.franz ) || g_forceUpdate) {
         std::string fwFile;
         Update::getLocalPathFromUrl(Update::versions.onServer.franz.getUrl(), fwFile);
 
@@ -352,6 +381,58 @@ bool Update::createFlashFirstFwScript(void)
     return true;
 }
 
+bool Update::checkForUpdateListOnUsb(std::string &updateFilePath)
+{
+	DIR *dir = opendir((char *) "/mnt/");						    // try to open the dir
+	
+    updateFilePath.clear();
+    
+    if(dir == NULL) {                                 				// not found?
+        Debug::out(LOG_DEBUG, "Update::checkForUpdateListOnUsb -- /mnt/ dir not found, fail");
+        return false;
+    }
+    
+    char path[512];
+    memset(path, 0, 512);
+    bool found = false;
+    
+    while(1) {                                                  	// while there are more files, store them
+		struct dirent *de = readdir(dir);							// read the next directory entry
+	
+		if(de == NULL) {											// no more entries?
+			break;
+		}
+	
+		if(de->d_type != DT_DIR && de->d_type != DT_REG) {			// not a file, not a directory?
+			continue;
+		}
 
+        if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) {
+            continue;
+        }
+        
+        // construct path
+        strcpy(path, "/mnt/");
+        strcat(path, de->d_name);
+        strcat(path, "/");
+        strcat(path, UPDATE_USBFILE);
+        
+        int res = access(path, F_OK);
 
+        if(res != -1) {                                             // if it's not this error, then the file exists
+            found = true;
+            break;
+        }
+    }
 
+	closedir(dir);	
+
+    if(found) {
+        Debug::out(LOG_DEBUG, "Update::checkForUpdateListOnUsb -- update found: %s", path);
+        updateFilePath = path;
+    } else {
+        Debug::out(LOG_DEBUG, "Update::checkForUpdateListOnUsb -- update not found on usb");
+    }
+    
+    return found;
+}

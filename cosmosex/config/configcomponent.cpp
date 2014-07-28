@@ -477,3 +477,8 @@ int  ConfigComponent::getComponentId(void)
     return componentId;
 }
 
+int ConfigComponent::getComponentType(void)
+{
+    return type;
+}
+

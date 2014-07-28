@@ -13,6 +13,8 @@
 #define UPDATE_SCRIPT       "/ce/update/doupdate.sh"
 #define UPDATE_APP_PATH     "/ce/app"
 
+#define UPDATE_USBFILE      "ce_update.zip"
+
 #define UPDATE_STATE_IDLE           0
 #define UPDATE_STATE_DOWNLOADING    1
 #define UPDATE_STATE_DOWNLOAD_OK    2
@@ -24,7 +26,8 @@ public:
     static Versions versions;
 	
     static void initialize(void);
-    static void downloadUpdateList(void);
+    static void deleteLocalUpdateComponents(void);
+    static void downloadUpdateList(char *remoteUrl);
     static void processUpdateList(void);
 
     static void downloadNewComponents(void);
@@ -32,9 +35,12 @@ public:
 
     static int  state(void);
     static void stateGoIdle(void);
+    static void stateGoDownloadOK(void);
 
     static bool createUpdateScript(void);
     static bool createFlashFirstFwScript(void);
+    
+    static bool checkForUpdateListOnUsb(std::string &updateFilePath);
 
 private:
     static void deleteLocalComponent(std::string url);

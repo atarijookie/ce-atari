@@ -109,7 +109,7 @@ void CCoreThread::run(void)
 	DWORD nextDevFindTime       = Utils::getCurrentMs();                // create a time when the devices should be checked - and that time is now
     DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);              // create a time when update download status should be checked
 
-    Update::downloadUpdateList();                                       // download the list of components with the newest available versions
+    Update::downloadUpdateList(NULL);                                   // download the list of components with the newest available versions
 
 	bool res;
 

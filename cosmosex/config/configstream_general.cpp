@@ -186,6 +186,18 @@ void ConfigStream::onKeyDown(BYTE key)
         }
     }
 
+    if(key == KEY_LEFT || key == KEY_RIGHT || key == KEY_TAB) {     // in case of left, right, tab on SAVE and CANCEL
+        if(curr->getComponentType() == ConfigComponent::button) {
+            if(key == KEY_LEFT) {
+                key = KEY_UP;
+            }
+            
+            if(key == KEY_RIGHT || key == KEY_TAB) {
+                key = KEY_DOWN;
+            }
+        }
+    }
+    
     if(key == KEY_UP) {							// arrow up
         curr->setFocus(false);					// unfocus this component
 
@@ -217,18 +229,6 @@ void ConfigStream::onKeyDown(BYTE key)
     if(key == KEY_ESC) {                        // esc as cancel
         enterKeyHandlerLater(CS_GO_HOME);
         return;
-    }
-
-    if(key == KEY_LEFT || key == KEY_RIGHT || key == KEY_TAB) {     // in case of left, right, tab on SAVE and CANCEL
-        if(curr->getComponentId() == COMPID_BTN_SAVE) {
-            curr->setFocus(false);                                  // unfocus this component
-            focusByComponentId(COMPID_BTN_CANCEL);
-        }
-
-        if(curr->getComponentId() == COMPID_BTN_CANCEL) {
-            curr->setFocus(false);                                  // unfocus this component
-            focusByComponentId(COMPID_BTN_SAVE);
-        }
     }
 
     // if it got here, we didn't handle it, let the component handle it
@@ -561,13 +561,13 @@ void ConfigStream::enterKeyHandlerLater(int event)
 void ConfigStream::enterKeyHandler(int event)
 {
     switch(event) {
-    case CS_GO_HOME:            createScreen_homeScreen();  break;
-    case CS_CREATE_ACSI:        createScreen_acsiConfig();  break;
-    case CS_CREATE_TRANSLATED:  createScreen_translated();  break;
-    case CS_CREATE_SHARED:      createScreen_shared();      break;
+    case CS_GO_HOME:            createScreen_homeScreen();      break;
+    case CS_CREATE_ACSI:        createScreen_acsiConfig();      break;
+    case CS_CREATE_TRANSLATED:  createScreen_translated();      break;
+    case CS_CREATE_SHARED:      createScreen_shared();          break;
     case CS_CREATE_FLOPPY_CONF: createScreen_floppy_config();   break;
-    case CS_CREATE_NETWORK:     createScreen_network();     break;
-    case CS_CREATE_UPDATE:      createScreen_update();      break;
+    case CS_CREATE_NETWORK:     createScreen_network();         break;
+    case CS_CREATE_UPDATE:      createScreen_update();          break;
 
     case CS_HIDE_MSG_SCREEN:    hideMessageScreen();        break;
 
@@ -576,6 +576,7 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_SAVE_NETWORK:       onNetwork_save();           break;
 
     case CS_UPDATE_CHECK:       onUpdateCheck();            break;
+    case CS_UPDATE_CHECK_USB:   onUpdateCheckUsb();         break;
     case CS_UPDATE_UPDATE:      onUpdateUpdate();           break;
 
 //    case CS_SHARED_TEST:        onSharedTest();             break;

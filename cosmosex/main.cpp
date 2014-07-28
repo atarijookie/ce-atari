@@ -27,6 +27,7 @@ BYTE g_logLevel     = LOG_ERROR;                                // init current 
 bool g_justDoReset  = false;                                    // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
 bool g_noReset      = false;                                    // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
 bool g_test         = false;                                    // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
+bool g_forceUpdate  = false;                                    // if set to true, won't check if the update components are newer, but will update all of them 
 
 int main(int argc, char *argv[])
  {
@@ -137,6 +138,13 @@ void parseCmdLineArguments(int argc, char *argv[])
             g_test = true;
             continue;
         }
+        
+        // for update testing purposes - don't check if we need update, but do update anyway
+        if(strcmp(argv[i], "forceup") == 0) {
+            printf("Forcing update all on update!\n");
+            g_forceUpdate = true;
+            continue;
+        }
     }
 }
 
@@ -146,6 +154,8 @@ void printfPossibleCmdLineArgs(void)
     printf("reset   - reset Hans and Franz, release lines, quit\n");
     printf("noreset - when starting, don't reset Hans and Franz\n");
     printf("llx     - set log level to x (default is 1, max is 3)\n");
+    printf("test    - some default config for device testing\n");
+    printf("forceup - force update - don't check component versions, update all\n");
 }
  
 void handlePthreadCreate(int res, char *what)

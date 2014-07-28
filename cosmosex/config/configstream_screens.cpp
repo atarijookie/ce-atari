@@ -584,9 +584,16 @@ void ConfigStream::createScreen_update(void)
 
     screen_addHeaderAndFooter(screen, (char *) "Software & Firmware updates");
 
+    updateFromWebNotUsb = true;         // do update from web
+    
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " part       your version   on server", 40, 0, 8, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " part       your version   ", 27, 0, 8, gotoOffset);
+    comp->setReverse(true);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "on web", 13, 27, 8, gotoOffset);
+    comp->setComponentId(COMPID_UPDATE_LOCATION);
     comp->setReverse(true);
     screen.push_back(comp);
 
@@ -620,17 +627,22 @@ void ConfigStream::createScreen_update(void)
     comp->setComponentId(COMPID_UPDATE_XILINX);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Check ", 7,  3, 15, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " From web ", 10,  6, 15, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_CHECK);
     comp->setComponentId(COMPID_UPDATE_BTN_CHECK);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Update ", 8,  14, 15, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " From USB ", 10,  22, 15, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_UPDATE_CHECK_USB);
+    comp->setComponentId(COMPID_UPDATE_BTN_CHECK_USB);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Update  ", 10,  6, 16, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_UPDATE);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, 26, 15, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Cancel  ", 10,  22, 16, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
@@ -675,16 +687,57 @@ void ConfigStream::datesToStrings(Version &v1, Version &v2, std::string &str)
 
 void ConfigStream::onUpdateCheck(void)
 {
-    Update::versions.updateListWasProcessed = false;   // mark that the new update list wasn't updated
-    Update::downloadUpdateList();               // download the list of components with the newest available versions
+    updateFromWebNotUsb = true;         // do update from web
 
-    showMessageScreen((char *) "Checking for updates", (char *) "Now checking for updates.\n\rPlease wait few seconds.");
+    // update config screen
+    std::string empty;
+    std::string location = "on web";
+    Update::deleteLocalUpdateComponents();
+    setTextByComponentId(COMPID_UPDATE_COSMOSEX,    empty);
+    setTextByComponentId(COMPID_UPDATE_FRANZ,       empty);
+    setTextByComponentId(COMPID_UPDATE_HANZ,        empty);
+    setTextByComponentId(COMPID_UPDATE_XILINX,      empty);
+    setTextByComponentId(COMPID_UPDATE_LOCATION,    location);
+
+    // download the stuff again
+    Update::versions.updateListWasProcessed = false;    // mark that the new update list wasn't updated
+    Update::downloadUpdateList(NULL);                   // download the list of components with the newest available versions
+}
+
+void ConfigStream::onUpdateCheckUsb(void)
+{
+    updateFromWebNotUsb = false;         // do update from usb
+
+    // update config screen
+    std::string empty;
+    std::string location = "on USB";
+    Update::deleteLocalUpdateComponents();
+    setTextByComponentId(COMPID_UPDATE_COSMOSEX,    empty);
+    setTextByComponentId(COMPID_UPDATE_FRANZ,       empty);
+    setTextByComponentId(COMPID_UPDATE_HANZ,        empty);
+    setTextByComponentId(COMPID_UPDATE_XILINX,      empty);
+    setTextByComponentId(COMPID_UPDATE_LOCATION,    location);
+
+    // try to find the update
+    std::string pathToUpdateFile;
+    
+    bool found = Update::checkForUpdateListOnUsb(pathToUpdateFile);
+
+    if(!found) {
+        showMessageScreen((char *) "Update from USB", (char *) "File ce_update.zip not found.\n\rCan't update from USB.\n\r");
+        return;
+    }
+    
+    // copy and unzip the update
+    Update::downloadUpdateList((char *) pathToUpdateFile.c_str());
+    
+    Update::versions.updateListWasProcessed = false;            // mark that the new update list wasn't updated
 }
 
 void ConfigStream::onUpdateUpdate(void)
 {
     if(!Update::versions.updateListWasProcessed) {     // didn't process the update list yet? show message
-        showMessageScreen((char *) "No updates info", (char *) "No update info was downloaded,\n\rplease press 'Check' button and wait.");
+        showMessageScreen((char *) "No updates info", (char *) "No update info was downloaded,\n\rplease press web / usb button and wait.");
         return;
     }
 
@@ -693,7 +746,11 @@ void ConfigStream::onUpdateUpdate(void)
         return;
     }
 
-    createScreen_update_download();
+    if(updateFromWebNotUsb) {           // if should update from web
+        createScreen_update_download();
+    } else {                            // if should update from usb
+        Update::stateGoDownloadOK();    // tell the core thread that we got the files already
+    }
 }
 
 void ConfigStream::createScreen_update_download(void)
@@ -823,6 +880,10 @@ void ConfigStream::showUpdateError(void)
 
 bool ConfigStream::isUpdateDownloadPageShown(void)
 {
+    if(!updateFromWebNotUsb) {                          // if updating from USB key, there's no download page, so say yes
+        return true;
+    }
+
     ConfigComponent *c = findComponentById(COMPID_DL1); // find a component which is on update download page
 
     if(c == NULL) {                                     // not on update download page? 

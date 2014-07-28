@@ -221,6 +221,18 @@ void updateStatusByte(TDownloadRequest &tdr, BYTE newStatus)
     *tdr.pStatusByte = newStatus;           // store the new status
 }
 
+void handleUsbUpdateFile(char *localZipFile, char *localDestDir)
+{
+    system("rm -rf /tmp/ce_update");                                        // delete ce_update folder if it exists
+    system("mkdir /tmp/ce_update");                                         // create ce_update folder
+
+    char command[1024];
+    snprintf(command, 1023, "unzip %s -d /tmp/ce_update", localZipFile);    // unzip the update file to ce_update folder
+    system(command);
+    
+    system("cp /tmp/ce_update/* /ce/update/");                              // copy the files to right place
+}
+
 void *downloadThreadCode(void *ptr)
 {
     CURL *curl = NULL;
@@ -248,6 +260,20 @@ void *downloadThreadCode(void *ptr)
             Debug::out(LOG_ERROR, "CURL init failed, the file %s was not downloaded...", (char *) downloadCurrent.srcUrl.c_str());
             continue;
         }
+    
+        //-------------------
+        // check if this isn't local file, and if it is, do the rest localy
+        res = access((char *) downloadCurrent.srcUrl.c_str(), F_OK);
+
+        if(res != -1) {                                                         // it's a local file!
+            if(downloadCurrent.downloadType == DWNTYPE_UPDATE_LIST) {           // if it's a 'update list'
+                handleUsbUpdateFile((char *) downloadCurrent.srcUrl.c_str(), (char *) downloadCurrent.dstDir.c_str());
+            }           
+            
+            continue;
+        }
+        
+        //-------------------
     
         std::string urlPath, fileName; 
         Utils::splitFilenameFromPath(downloadCurrent.srcUrl, urlPath, fileName);
@@ -330,5 +356,4 @@ void *downloadThreadCode(void *ptr)
 	Debug::out(LOG_INFO, "Download thread finished.");
     return 0;
 }
-
 

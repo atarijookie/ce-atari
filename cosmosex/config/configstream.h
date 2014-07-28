@@ -15,8 +15,8 @@ enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED
                  CS_CREATE_NETWORK,     CS_CREATE_UPDATE,
                  CS_SAVE_ACSI,          CS_SAVE_TRANSLATED,     CS_SAVE_NETWORK,
                  CS_HIDE_MSG_SCREEN,    CS_GO_HOME,
-                 CS_UPDATE_CHECK,       CS_UPDATE_UPDATE,       CS_SHARED_TEST,
-                 CS_SHARED_SAVE,
+                 CS_UPDATE_CHECK,       CS_UPDATE_CHECK_USB,    CS_UPDATE_UPDATE,       
+                 CS_SHARED_TEST,        CS_SHARED_SAVE,
                  CS_FLOPPY_IMAGE_SAVE,  CS_FLOPPY_CONFIG_SAVE
                 };
 
@@ -29,9 +29,9 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
 				COMPID_WIFI_IP,             COMPID_WIFI_MASK,           COMPID_WIFI_GATEWAY,
 				COMPID_WIFI_DHCP,			COMPID_WIFI_SSID,			COMPID_WIFI_PSK,
 				
-				COMPID_UPDATE_COSMOSEX,
-                COMPID_UPDATE_FRANZ,        COMPID_UPDATE_HANZ,         COMPID_UPDATE_XILINX,
-                COMPID_UPDATE_BTN_CHECK,    COMPID_SHARED_BTN_TEST,     
+				COMPID_UPDATE_COSMOSEX,     COMPID_UPDATE_LOCATION,
+                COMPID_UPDATE_FRANZ,        COMPID_UPDATE_HANZ,             COMPID_UPDATE_XILINX,
+                COMPID_UPDATE_BTN_CHECK,    COMPID_UPDATE_BTN_CHECK_USB,    COMPID_SHARED_BTN_TEST,     
 				
 				COMPID_SHARED_IP,           COMPID_SHARED_PATH, 		COMPID_SHARED_ENABLED, 
 				COMPID_SHARED_NFS_NOT_SAMBA,    COMPID_USERNAME,        COMPID_PASSWORD,
@@ -96,6 +96,8 @@ private:
     int stScreenWidth;
     int gotoOffset;
 
+    bool updateFromWebNotUsb;
+    
     int enterKeyEventLater;
     
     AcsiDataTrans       *dataTrans;
@@ -121,6 +123,7 @@ private:
     void onNetwork_save(void);
 
     void onUpdateCheck(void);
+    void onUpdateCheckUsb(void);
     void onUpdateUpdate(void);
     void datesToStrings(Version &v1, Version &v2, std::string &str);
     void createScreen_update_download(void);
