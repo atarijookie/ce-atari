@@ -31,9 +31,6 @@ CCoreThread::CCoreThread()
 
     lastFloppyImageLed      = -1;
 
-	gotDevTypeRaw			= false;
-	gotDevTypeTranslated	= false;
-
 	conSpi		= new CConSpi();
 
     dataTrans   = new AcsiDataTrans();
@@ -403,12 +400,12 @@ void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 	// TODO: add logic to detach the device, if it was attached as other type (raw / tran)
 
 	// if have RAW enabled, but not TRANSLATED - attach all drives (atari and non-atari) as RAW
-	if(gotDevTypeRaw && !gotDevTypeTranslated) {
+	if(acsiIdInfo.gotDevTypeRaw && !acsiIdInfo.gotDevTypeTranslated) {
 		scsi->attachToHostPath(devName, SOURCETYPE_DEVICE, SCSI_ACCESSTYPE_FULL);
 	}
 
 	// if have TRANSLATED enabled, but not RAW - can't attach atari drives, but do attach non-atari drives as TRANSLATED
-	if(!gotDevTypeRaw && gotDevTypeTranslated) {
+	if(!acsiIdInfo.gotDevTypeRaw && acsiIdInfo.gotDevTypeTranslated) {
 		if(!isAtariDrive) {			// attach non-atari drive as TRANSLATED	
 			attachDevAsTranslated(devName);
 		} else {					// can't attach atari drive
@@ -417,7 +414,7 @@ void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 	}
 
 	// if both TRANSLATED and RAW are enabled - attach non-atari as TRANSLATED, and atari as RAW
-	if(gotDevTypeRaw && gotDevTypeTranslated) {
+	if(acsiIdInfo.gotDevTypeRaw && acsiIdInfo.gotDevTypeTranslated) {
 		if(isAtariDrive) {			// attach atari drive as RAW
 			scsi->attachToHostPath(devName, SOURCETYPE_DEVICE, SCSI_ACCESSTYPE_FULL);
 		} else {					// attach non-atari drive as TRANSLATED
@@ -426,7 +423,7 @@ void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 	}
 	
 	// if no device type is enabled
-	if(!gotDevTypeRaw && !gotDevTypeTranslated) {
+	if(!acsiIdInfo.gotDevTypeRaw && !acsiIdInfo.gotDevTypeTranslated) {
 		Debug::out(LOG_INFO, "Can't attach device %s, because no device type (RAW or TRANSLATED) is enabled on ACSI bus!", (char *) devName.c_str());
 	}
 }
@@ -457,7 +454,7 @@ void CCoreThread::attachDevAsTranslated(std::string devName)
 	std::list<std::string>				partitions;
 	std::list<std::string>::iterator	it;
 	
-	if(!gotDevTypeTranslated) {													// don't have any translated device on acsi bus, don't attach
+	if(!acsiIdInfo.gotDevTypeTranslated) {										// don't have any translated device on acsi bus, don't attach
 		return;
 	}
 	

@@ -73,8 +73,6 @@ private:
     //-----------------------------------
     // mount and attach stuff
 	std::multimap<std::string, std::string> mapDeviceToHostPaths;
-	bool gotDevTypeRaw;
-	bool gotDevTypeTranslated;
 
 	void attachDevAsTranslated(std::string devName);
     //-----------------------------------
