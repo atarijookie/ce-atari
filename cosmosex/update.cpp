@@ -14,8 +14,6 @@
 Versions Update::versions;
 int Update::currentState = UPDATE_STATE_IDLE;
 
-extern bool g_forceUpdate;                              // if set to true, won't check if the update components are newer, but will update all of them 
-
 void Update::initialize(void)
 {
     Update::versions.current.app.fromString(                (char *) APP_VERSION);
@@ -28,6 +26,8 @@ void Update::initialize(void)
 
 void Update::processUpdateList(void)
 {
+    Update::versions.gotUpdate              = false;
+
     // check if the local update list exists
     int res = access(UPDATE_LOCALLIST, F_OK);
 
@@ -111,11 +111,6 @@ void Update::processUpdateList(void)
         Debug::out(LOG_DEBUG, "processUpdateList - FRANZ is newer on server");
     }
 
-    if(g_forceUpdate) {
-        Debug::out(LOG_DEBUG, "processUpdateList - forcing update...");
-        Update::versions.gotUpdate = true;
-    }
-    
     Update::versions.updateListWasProcessed = true;         // mark that the update list was processed and don't need to do this again
     Debug::out(LOG_DEBUG, "processUpdateList - done");
 }
@@ -203,12 +198,14 @@ bool Update::allNewComponentsDownloaded(void)
 
 bool Update::isUpToDateOrUpdateDownloaded(Version &vLocal, Version &vServer)
 {
-    if(!g_forceUpdate) {                                    // if not forcing update
-        if(!vLocal.isOlderThan(vServer)) {                  // if local is not older than on server, we're up to date, don't wait for this file
-            return true;
-        }
+    if(!vLocal.isOlderThan(vServer)) {                      // if local is not older than on server, we're up to date, don't wait for this file
+        return true;
     }
 
+    if(vServer.downloadStatus != DWNSTATUS_DOWNLOAD_OK) {   // if it's not downloaded OK (yet), then false
+        return false;
+    }
+    
     std::string localFile;
     getLocalPathFromUrl(vServer.getUrl(), localFile);       // convert url to local path
 
@@ -231,10 +228,9 @@ void Update::deleteLocalComponent(std::string url)
 
 void Update::startComponentDownloadIfNewer(Version &vLocal, Version &vServer)
 {
-    if(!g_forceUpdate) {                                    // if we're not forcing update, check if we have to download it
-        if(!vLocal.isOlderThan(vServer)) {                  // if local is not older than on server, don't download and quit
-            return;
-        }
+    if(!vLocal.isOlderThan(vServer)) {                      // not forcing update & local is not older than on server, don't download and quit
+        vServer.downloadStatus = DWNSTATUS_DOWNLOAD_OK;     // when not downloading, pretend that we have it :)
+        return;
     }
 
     // start the download
@@ -243,7 +239,7 @@ void Update::startComponentDownloadIfNewer(Version &vLocal, Version &vServer)
     tdr.checksum        = vServer.getChecksum();
     tdr.dstDir          = UPDATE_LOCALPATH;
     tdr.downloadType    = DWNTYPE_UPDATE_COMP;
-    tdr.pStatusByte     = NULL;                     // don't update this status byte
+    tdr.pStatusByte     = &vServer.downloadStatus;          // store download status here
     Downloader::add(tdr);
 }
 
@@ -265,23 +261,53 @@ int Update::state(void)
     }
 
     if(currentState == UPDATE_STATE_DOWNLOADING) {          // when downloading, check if really still downloading
-        int cnt = Downloader::count(DWNTYPE_UPDATE_COMP);   // get count of downloaded components
-
-        if(cnt == 0) {                                      // nothing is downloaded anymore?      
-            bool allOk = allNewComponentsDownloaded();      // check if everything went OK
-
-            if(allOk) {                                     // if all OK, then we're ready to apply update
+        Debug::out(LOG_DEBUG, "Update::state - downloading");
+    
+        if(allDownloadedOk()) {                             // if everything downloaded OK
+            if(allNewComponentsDownloaded()) {              // check if the files are on disk
+                Debug::out(LOG_DEBUG, "Update::state - downloaded and all components present");
                 currentState = UPDATE_STATE_DOWNLOAD_OK;
-            } else {                                        // fail? fail!
+            } else {                                        // some file is missing?
+                Debug::out(LOG_DEBUG, "Update::state - downloaded but some component missing");
                 currentState = UPDATE_STATE_DOWNLOAD_FAIL;
             }
         }
-
+        
+        if(someDownloadFailed()) {                          // if some download failed, fail
+            Debug::out(LOG_DEBUG, "Update::state - some download failed");
+            currentState = UPDATE_STATE_DOWNLOAD_FAIL;
+        }
+        
         return currentState;                                // return the current state (might be already updated)
     }
 
     // if we got here, the download was finished, return that state
     return currentState;
+}
+
+bool Update::allDownloadedOk(void)
+{
+    if( Update::versions.onServer.app.downloadStatus    == DWNSTATUS_DOWNLOAD_OK &&
+        Update::versions.onServer.hans.downloadStatus   == DWNSTATUS_DOWNLOAD_OK &&
+        Update::versions.onServer.xilinx.downloadStatus == DWNSTATUS_DOWNLOAD_OK &&
+        Update::versions.onServer.franz.downloadStatus  == DWNSTATUS_DOWNLOAD_OK) {
+        return true;
+    }
+    
+    return false;
+}
+
+
+bool Update::someDownloadFailed(void)
+{
+    if( Update::versions.onServer.app.downloadStatus    == DWNSTATUS_DOWNLOAD_FAIL ||
+        Update::versions.onServer.hans.downloadStatus   == DWNSTATUS_DOWNLOAD_FAIL ||
+        Update::versions.onServer.xilinx.downloadStatus == DWNSTATUS_DOWNLOAD_FAIL ||
+        Update::versions.onServer.franz.downloadStatus  == DWNSTATUS_DOWNLOAD_FAIL) {
+        return true;
+    }
+    
+    return false;
 }
 
 void Update::stateGoIdle(void)
@@ -303,7 +329,7 @@ bool Update::createUpdateScript(void)
         return false;
     }
 
-    if(Update::versions.current.app.isOlderThan( Update::versions.onServer.app ) || g_forceUpdate) {
+    if(Update::versions.current.app.isOlderThan( Update::versions.onServer.app )) {
         std::string appFileWithPath;
         Update::getLocalPathFromUrl(Update::versions.onServer.app.getUrl(), appFileWithPath);
 
@@ -318,10 +344,11 @@ bool Update::createUpdateScript(void)
         fprintf(f, "unzip /ce/app/%s\n", (char *)       appFileOnly.c_str());	    // unzip it
         fprintf(f, "chmod 755 %s/cosmosex\n", (char *)  UPDATE_APP_PATH);	        // change permissions
 		fprintf(f, "rm -f /ce/app/%s\n",				appFileOnly.c_str());       // delete the zip
+        fprintf(f, "sync");                                                         // write caches to disk
         fprintf(f, "\n\n");
     }
 
-    if(Update::versions.current.hans.isOlderThan( Update::versions.onServer.hans ) || g_forceUpdate) {
+    if(Update::versions.current.hans.isOlderThan( Update::versions.onServer.hans )) {
         std::string fwFile;
         Update::getLocalPathFromUrl(Update::versions.onServer.hans.getUrl(), fwFile);
 
@@ -331,7 +358,7 @@ bool Update::createUpdateScript(void)
         fprintf(f, "\n\n");
     }
 
-    if(Update::versions.current.xilinx.isOlderThan( Update::versions.onServer.xilinx ) || g_forceUpdate) {
+    if(Update::versions.current.xilinx.isOlderThan( Update::versions.onServer.xilinx )) {
         std::string fwFile;
         Update::getLocalPathFromUrl(Update::versions.onServer.xilinx.getUrl(), fwFile);
 
@@ -342,7 +369,7 @@ bool Update::createUpdateScript(void)
         fprintf(f, "\n\n");
     }
 
-    if(Update::versions.current.franz.isOlderThan( Update::versions.onServer.franz ) || g_forceUpdate) {
+    if(Update::versions.current.franz.isOlderThan( Update::versions.onServer.franz )) {
         std::string fwFile;
         Update::getLocalPathFromUrl(Update::versions.onServer.franz.getUrl(), fwFile);
 

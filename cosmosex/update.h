@@ -42,6 +42,9 @@ public:
     
     static bool checkForUpdateListOnUsb(std::string &updateFilePath);
 
+    static bool allDownloadedOk(void);
+    static bool someDownloadFailed(void);
+    
 private:
     static void deleteLocalComponent(std::string url);
     static void startComponentDownloadIfNewer(Version &vLocal, Version &vServer);

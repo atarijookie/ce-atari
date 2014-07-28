@@ -231,6 +231,7 @@ void handleUsbUpdateFile(char *localZipFile, char *localDestDir)
     system(command);
     
     system("cp /tmp/ce_update/* /ce/update/");                              // copy the files to right place
+    system("sync");                                                         // write caches to disk
 }
 
 void *downloadThreadCode(void *ptr)
