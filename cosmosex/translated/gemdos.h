@@ -48,6 +48,7 @@
 
 // other functions
 #define ACC_GET_MOUNTS			0x80
+#define ACC_UNMOUNT_DRIVE       0x81
 
 //////////////////////////////////////
 

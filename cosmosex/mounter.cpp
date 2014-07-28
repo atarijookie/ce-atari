@@ -253,9 +253,13 @@ bool Mounter::tryUnmount(char *mountDir)
 {
 	char line[MAX_STR_SIZE];
 	
+    system("sync");                             // sync the caches
+    
 	// build and execute the command - was: sudo
 	snprintf(line, MAX_STR_SIZE, "umount %s", mountDir);
-	int ret = system(line);
+	Debug::out(LOG_DEBUG, "Mounter::tryUnmount - umount command: %s", line);
+    
+    int ret = system(line);
 	
 	// handle the result
 	if(WIFEXITED(ret) && WEXITSTATUS(ret) == 0) {

@@ -394,7 +394,8 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case BIOS_Getbpb:               onGetbpb(cmd);      break;
 
 		// other functions
-		case ACC_GET_MOUNTS:			onGetMounts(cmd);	break;
+		case ACC_GET_MOUNTS:			onGetMounts(cmd);	    break;
+        case ACC_UNMOUNT_DRIVE:         onUnmountDrive(cmd);    break;
 		
         // in other cases
         default:                                // in other cases
@@ -403,6 +404,34 @@ void TranslatedDisk::processCommand(BYTE *cmd)
     }
 
     dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
+}
+
+void TranslatedDisk::onUnmountDrive(BYTE *cmd)
+{
+    int drive = cmd[5];
+    
+    if(drive < 2 || drive > 15) {               // index out of range?
+        dataTrans->setStatus(EDRVNR);
+        return;
+    }
+    
+    // if shared drive or config drive, don't do anything
+    if(conf[drive].translatedType == TRANSLATEDTYPE_SHAREDDRIVE || conf[drive].translatedType == TRANSLATEDTYPE_CONFIGDRIVE) {
+        dataTrans->setStatus(E_OK);
+        return;
+    }
+    
+    Debug::out(LOG_DEBUG, "onUnmountDrive -- drive: %d, hostRootPath: %s", drive, conf[drive].hostRootPath.c_str());
+    
+    // send umount request
+	TMounterRequest tmr;
+    tmr.action			= MOUNTER_ACTION_UMOUNT;							// action: umount
+	tmr.mountDir		= conf[drive].hostRootPath;							// e.g. /mnt/sda2
+	mountAdd(tmr);
+    
+    detachByIndex(drive);                                                   // detach drive from translated disk module
+    
+    dataTrans->setStatus(E_OK);
 }
 
 void TranslatedDisk::onGetMounts(BYTE *cmd)
