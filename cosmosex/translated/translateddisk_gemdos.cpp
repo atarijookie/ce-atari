@@ -620,12 +620,11 @@ void TranslatedDisk::onFopen(BYTE *cmd)
         return;
     }
 
-    // TODO: check if S_WRITE and S_READWRITE truncate existing file or just append to it and modify mode for following fopen
-
+    // opening for S_WRITE doesn't truncate file, but allows changing content (tested with PRGFLAGS.PRG)
     char *fopenMode;
 
     char *mode_S_READ       = (char *) "rb";
-    char *mode_S_WRITE      = (char *) "wb";
+    char *mode_S_WRITE      = (char *) "rb+";
     char *mode_S_READWRITE  = (char *) "rb+";
 
     mode = mode & 0x07;         // leave only lowest 3 bits
