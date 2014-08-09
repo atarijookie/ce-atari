@@ -15,6 +15,7 @@
 #include "mounter.h"
 #include "downloader.h"
 #include "ikbd.h"
+#include "version.h"
 
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
@@ -42,7 +43,7 @@ int main(int argc, char *argv[])
     Debug::printfLogLevelString();
 
     Debug::out(LOG_ERROR, "\n\n---------------------------------------------------");
-    Debug::out(LOG_ERROR, "CosmosEx starting...");
+    Debug::out(LOG_ERROR, "CosmosEx starting, version: %s", APP_VERSION);
 
 	if(signal(SIGINT, sigint_handler) == SIG_ERR) {		        // register SIGINT handler
 		Debug::out(LOG_ERROR, "Cannot register SIGINT handler!");
