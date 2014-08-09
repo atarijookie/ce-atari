@@ -198,7 +198,12 @@ void downloadImage(int index)
 
     if(index == 10) {                                       // for internet download just use predefined destination dir
         strcpy(fullPath, destDir.path);                     // create path, e.g. 'C:\destdir\images\A_001.ST'
-        strcat(fullPath, "\\");
+        
+        int len = strlen(fullPath);
+        if(fullPath[len - 1] != '\\') {                     // if the path doesn't end with \\, add it there
+            strcat(fullPath, "\\");
+        }
+        
         strcat(fullPath, fileName); 
     } else {                                                // for ordinary floppy slots open file selector
         // open fileselector and get path
