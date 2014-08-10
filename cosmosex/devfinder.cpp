@@ -141,6 +141,11 @@ void DevFinder::getDevPartitions(std::string devName, std::list<std::string> &pa
 	closedir(dir);	
 	
 	partitions.sort();												// sort them alphabetically
+    
+    if(partitions.size() == 0) {                                    // if we didn't find partitions on that device (e.g. sda1, sda2), then add the whole disk (sda) - it might be without partitions, just one partition
+        Debug::out(LOG_DEBUG, "DevFinder::getDevPartitions -- no partitions found on the device %s, using whole device...", (char *) devName.c_str()); 
+        partitions.push_back(devName);
+    }
 }
 
 void DevFinder::processFoundDev(std::string file)
