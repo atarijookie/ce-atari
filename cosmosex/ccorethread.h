@@ -43,6 +43,8 @@ public:
 	virtual void onDevAttached(std::string devName, bool isAtariDrive);		// from DevChangesHandler
 	virtual void onDevDetached(std::string devName);						// from DevChangesHandler
 	
+    void setFloppyImageLed(int ledNo);
+    
 private:
     bool shouldRun;
     bool running;
@@ -80,13 +82,24 @@ private:
     void handleFwVersion(int whichSpiCs);
     int bcdToInt(int bcd);
 
+    void responseStart(int bufferLengthInBytes);
+    void responseAdd(BYTE *bfr, WORD value);
+    
+    struct {
+        int bfrLengthInBytes;
+        int currentLength;
+    } response;
+    
     //-----------------------------------
     // floppy stuff
     FloppySetup         floppySetup;
     ImageSilo           floppyImageSilo;
     bool                setEnabledFloppyImgs;
     int                 lastFloppyImageLed;
-
+    
+    bool                setNewFloppyImageLed;
+    int                 newFloppyImageLed;
+    
     void handleSendTrack(void);
     void handleSectorWritten(void);
 

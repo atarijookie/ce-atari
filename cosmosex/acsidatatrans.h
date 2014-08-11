@@ -19,6 +19,7 @@
 #define CMD_DATA_READ					0x30
 #define CMD_SEND_STATUS					0x40
 #define CMD_FLOPPY_CONFIG               0x70
+#define CMD_FLOPPY_SWITCH               0x80
 #define CMD_DATA_MARKER					0xda
 
 // data direction after command processing

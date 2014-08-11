@@ -329,6 +329,8 @@ void CCoreThread::loadSettings(void)
     setEnabledIDbits = true;
 }
 
+#define MAKEWORD(A, B)  ( (((WORD)A)<<8) | ((WORD)B) )
+
 void CCoreThread::handleFwVersion(int whichSpiCs)
 {
     BYTE fwVer[14], oBuf[14];
@@ -338,21 +340,33 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 
     // WORD sent (bytes shown): 01 23 45 67 
 
-    if(whichSpiCs == SPI_CS_HANS) {                     // it's Hans?
+    if(whichSpiCs == SPI_CS_HANS) {                                 // it's Hans?
 		cmdLength = 12;
-	
-        if(setEnabledIDbits) {                          // if we should send ACSI ID configuration
-            oBuf[1] = CMD_ACSI_CONFIG;                  // CMD: send acsi config  (bytes 0 & 1)
-            oBuf[2] = acsiIdInfo.enabledIDbits;         // store ACSI enabled IDs 
-            oBuf[3] = acsiIdInfo.sdCardAcsiId;          // store which ACSI ID is used for SD card
-            setEnabledIDbits = false;                   // and don't sent this anymore (until needed)
-        }
+        responseStart(12);                                          // init the response struct
 
-        if(setEnabledFloppyImgs) {
-            oBuf[5] = CMD_FLOPPY_CONFIG;                // CMD: send which floppy images are enabled (bytes 4 & 5)
-            oBuf[6] = floppyImageSilo.getSlotBitmap();  // store which floppy images are enabled
-            setEnabledFloppyImgs = false;               // and don't sent this anymore (until needed)
+        static bool hansHandledOnce = false;
+        
+        if(hansHandledOnce) {                                       // don't send commands until we did receive status at least a couple of times
+            if(setEnabledIDbits) {                                  // if we should send ACSI ID configuration
+                responseAdd(oBuf, CMD_ACSI_CONFIG);                 // CMD: send acsi config
+                responseAdd(oBuf, MAKEWORD(acsiIdInfo.enabledIDbits, acsiIdInfo.sdCardAcsiId)); // store ACSI enabled IDs and which ACSI ID is used for SD card
+                setEnabledIDbits = false;                           // and don't sent this anymore (until needed)
+            }
+
+            if(setEnabledFloppyImgs) {
+                responseAdd(oBuf, CMD_FLOPPY_CONFIG);                               // CMD: send which floppy images are enabled (bytes 4 & 5)
+                responseAdd(oBuf, MAKEWORD(floppyImageSilo.getSlotBitmap(), 0));    // store which floppy images are enabled
+                setEnabledFloppyImgs = false;                                       // and don't sent this anymore (until needed)
+            }
+        
+            if(setNewFloppyImageLed) {
+                responseAdd(oBuf, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
+                responseAdd(oBuf, MAKEWORD(newFloppyImageLed, 0));  // store which floppy images LED should be on
+                setNewFloppyImageLed = false;                       // and don't sent this anymore (until needed)
+            }
         }
+        
+        hansHandledOnce = true;
     } else {                                    		// it's Franz?
 		cmdLength = 8;
     }
@@ -380,6 +394,42 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 
             floppyImageSilo.setCurrentSlot(currentLed);     // switch the floppy image
         }
+    }
+}
+
+void CCoreThread::responseStart(int bufferLengthInBytes)        // use this to start creating response (commands) to Hans or Franz
+{
+    response.bfrLengthInBytes   = bufferLengthInBytes;
+    response.currentLength      = 0;
+}
+
+void CCoreThread::responseAdd(BYTE *bfr, WORD value)            // add a WORD to the response (command) to Hans or Franz
+{
+    if(response.currentLength >= response.bfrLengthInBytes) {
+        return;
+    }
+
+    bfr[response.currentLength + 0] = (BYTE) (value >> 8);
+    bfr[response.currentLength + 1] = (BYTE) (value & 0xff);
+    response.currentLength += 2;
+}
+
+void CCoreThread::setFloppyImageLed(int ledNo)
+{
+    if(ledNo >=0 && ledNo < 3) {                    // if the LED # is within expected range
+        BYTE enabledImgs    = floppyImageSilo.getSlotBitmap();
+    
+        if(enabledImgs & (1 << ledNo)) {            // if the required LED # is enabled, set it
+            Debug::out(LOG_DEBUG, "Setting new floppy image LED to %d", ledNo);
+            newFloppyImageLed       = ledNo;
+            setNewFloppyImageLed    = true;
+        }
+    }
+    
+    if(ledNo == 0xff) {                             // if this is a request to turn the LEDs off, do it
+        Debug::out(LOG_DEBUG, "Setting new floppy image LED to 0xff (no LED)");
+        newFloppyImageLed       = ledNo;
+        setNewFloppyImageLed    = true;
     }
 }
 
