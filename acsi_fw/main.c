@@ -61,6 +61,7 @@ WORD t1, t2, dt;
 #define CMD_DATA_READ                       0x30
 #define CMD_SEND_STATUS                     0x40
 #define CMD_FLOPPY_CONFIG                   0x70
+#define CMD_FLOPPY_SWITCH                   0x80
 #define CMD_DATA_MARKER                     0xda
 
 // these states define if the device should get command or transfer data
@@ -104,10 +105,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa014, 0x0714};                             // this means: hAns, 2014-07-13
+WORD version[2] = {0xa014, 0x0812};                             // this means: hAns, 2014-08-12
 
 char *VERSION_STRING_SHORT  = {"1.00"};
-char *DATE_STRING           = {"07/14/14"};
+char *DATE_STRING           = {"08/12/14"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
@@ -321,6 +322,8 @@ void initAllStuff(void)
     prevIsCardInserted = isCardInserted();
     if(prevIsCardInserted) {
         sdCardInit();
+        
+        sdCard.MediaChanged = FALSE;                    // after first init the SD card is not not in MEDIA CHANGED state
     } else {
         sdCardZeroInitStruct();
     }
@@ -866,7 +869,7 @@ WORD spi_TxRx(WORD out)
 
 void processHostCommands(void)
 {
-    BYTE i, j;
+    BYTE i, j, newLed;
     WORD ids;
     
     for(i=0; i<CMD_BUFFER_LENGTH; i++) {
@@ -910,6 +913,28 @@ void processHostCommands(void)
                 fixLedsByEnabledImgs();                             // if we are switched to not enabled floppy image, fix this
                 showCurrentLED();                                   // and show the current LED
 
+                cmdBuffer[i]    = 0;                                // clear this command
+                cmdBuffer[i+1]  = 0;
+                    
+                i++;
+                break;
+            
+            // this command is used so the host may select the a different LED light of selected image
+            case CMD_FLOPPY_SWITCH:
+                newLed = cmdBuffer[i+1] >> 8;                       // get new selected LED
+            
+                if(newLed <3) {                                     // if the LED index is OK (0, 1, 2)
+                    if(enabledImgs[newLed] == TRUE) {               // and this LED is enabled
+                        currentLed = newLed;                        // store the new LED
+                    }
+                }
+                
+                if(newLed == 0xff) {                                // if this is a command to turn off the LED, store it
+                    currentLed = newLed;
+                }
+                
+                showCurrentLED();                                   // and light it up
+            
                 cmdBuffer[i]    = 0;                                // clear this command
                 cmdBuffer[i+1]  = 0;
                     
