@@ -15,6 +15,12 @@ typedef struct {
 	bool gotDevTypeSd;
 } AcsiIDinfo;
 
+typedef struct {
+    bool enabled;
+    int  id;
+    bool writeProtected;
+} FloppyConfig;
+
 class Settings 
 {
 public:
@@ -34,6 +40,9 @@ public:
     void setChar(char *key, char value);
 
 	void loadAcsiIDs(AcsiIDinfo *aii);
+
+    void loadFloppyConfig(FloppyConfig *fc);
+    void saveFloppyConfig(FloppyConfig *fc);
 	
 private:
 

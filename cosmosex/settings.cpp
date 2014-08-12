@@ -257,7 +257,20 @@ void Settings::loadAcsiIDs(AcsiIDinfo *aii)
 	}
 }
 //-------------------------
+void Settings::loadFloppyConfig(FloppyConfig *fc)
+{
+    fc->enabled         = getBool((char *)    "FLOPPYCONF_ENABLED",           true);
+    fc->id              = getInt((char *)     "FLOPPYCONF_DRIVEID",           0);
+    fc->writeProtected  = getBool((char *)    "FLOPPYCONF_WRITEPROTECTED",    false);
+}
 
+void Settings::saveFloppyConfig(FloppyConfig *fc)
+{
+    setBool((char *)    "FLOPPYCONF_ENABLED",           fc->enabled);
+    setInt((char *)     "FLOPPYCONF_DRIVEID",           fc->id);
+    setBool((char *)    "FLOPPYCONF_WRITEPROTECTED",    fc->writeProtected);
+}
+//-------------------------
 FILE *Settings::open(char *key, bool readNotWrite)
 {
 	char path[1024];

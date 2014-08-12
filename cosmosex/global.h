@@ -18,6 +18,8 @@
 #define CMD_SET_DRIVE_ID_0			0x70
 #define CMD_SET_DRIVE_ID_1			0x80
 #define CMD_CURRENT_TRACK           0x90                                // followed by track #
+#define CMD_DRIVE_ENABLED           0xa0
+#define CMD_DRIVE_DISABLED          0xb0
 #define CMD_MARK_READ				0xF000                              // this is not sent from host, but just a mark that this WORD has been read and you shouldn't continue to read further
 
 #define MFM_4US     1

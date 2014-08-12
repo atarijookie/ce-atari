@@ -78,36 +78,30 @@ void ConfigStream::createScreen_floppy_config(void)
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
 
-    Settings s;
-    bool floppyEnabled, floppyWriteProtected;
-    int driveId;
+    Settings        s;
+    FloppyConfig    fc;
 
-    floppyEnabled           = s.getBool((char *)    "FLOPPYCONF_ENABLED",           true);
-    driveId                 = s.getInt((char *)     "FLOPPYCONF_DRIVEID",           0);
-    floppyWriteProtected    = s.getBool((char *)    "FLOPPYCONF_WRITEPROTECTED",    false);
+    s.loadFloppyConfig(&fc);
 
-    setBoolByComponentId(COMPID_FLOPCONF_ENABLED, floppyEnabled);
-    checkboxGroup_setCheckedId(COMPID_FLOPCONF_ID, driveId);
-    setBoolByComponentId(COMPID_FLOPCONF_WRPROT, floppyWriteProtected);
+    setBoolByComponentId(COMPID_FLOPCONF_ENABLED,   fc.enabled);
+    checkboxGroup_setCheckedId(COMPID_FLOPCONF_ID,  fc.id);
+    setBoolByComponentId(COMPID_FLOPCONF_WRPROT,    fc.writeProtected);
 
     setFocusToFirstFocusable();
 }
 
 void ConfigStream::onFloppyConfigSave(void)
 {
-    Settings s;
-    bool floppyEnabled, floppyWriteProtected;
-    int driveId;
+    Settings        s;
+    FloppyConfig    fc;
 
     // retrieve settings from screen components
-    getBoolByComponentId(COMPID_FLOPCONF_ENABLED, floppyEnabled);
-    driveId = checkboxGroup_getCheckedId(COMPID_FLOPCONF_ID);
-    getBoolByComponentId(COMPID_FLOPCONF_WRPROT, floppyWriteProtected);
+    getBoolByComponentId(COMPID_FLOPCONF_ENABLED,   fc.enabled);
+    getBoolByComponentId(COMPID_FLOPCONF_WRPROT,    fc.writeProtected);
+    fc.id = checkboxGroup_getCheckedId(COMPID_FLOPCONF_ID);
 
     // store them to the settings files
-    s.setBool((char *)    "FLOPPYCONF_ENABLED",           floppyEnabled);
-    s.setInt((char *)     "FLOPPYCONF_DRIVEID",           driveId);
-    s.setBool((char *)    "FLOPPYCONF_WRITEPROTECTED",    floppyWriteProtected);
+    s.saveFloppyConfig(&fc);
 
     // if got settings reload proxy, invoke reload
     if(reloadProxy) {                                       

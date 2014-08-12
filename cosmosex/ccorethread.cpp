@@ -28,6 +28,9 @@ CCoreThread::CCoreThread()
 
     setEnabledIDbits        = false;
     setEnabledFloppyImgs    = false;
+    setFloppyConfig         = false;
+    setDiskChanged          = false;
+    diskChanged             = false;
 
     lastFloppyImageLed      = -1;
 
@@ -51,6 +54,7 @@ CCoreThread::CCoreThread()
     // now register all the objects which use some settings in the proxy
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_ACSI);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPYIMGS);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPYCONF);
 	
     settingsReloadProxy.addSettingsUser((ISettingsUser *) scsi,          SETTINGSUSER_ACSI);
 
@@ -308,6 +312,14 @@ void CCoreThread::reloadSettings(int type)
         return;
     }
 
+    if(type == SETTINGSUSER_FLOPPYCONF) {
+        Settings s;
+        s.loadFloppyConfig(&floppyConfig);
+
+        setFloppyConfig = true;
+        return;
+    }
+
 	// first dettach all the devices
 	scsi->detachAll();
 
@@ -325,8 +337,10 @@ void CCoreThread::loadSettings(void)
 
     Settings s;
 	s.loadAcsiIDs(&acsiIdInfo);
+    s.loadFloppyConfig(&floppyConfig);
 	
-    setEnabledIDbits = true;
+    setEnabledIDbits    = true;
+    setFloppyConfig     = true;
 }
 
 #define MAKEWORD(A, B)  ( (((WORD)A)<<8) | ((WORD)B) )
@@ -342,33 +356,57 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 
     if(whichSpiCs == SPI_CS_HANS) {                                 // it's Hans?
 		cmdLength = 12;
-        responseStart(12);                                          // init the response struct
+        responseStart(cmdLength);                                   // init the response struct
 
         static bool hansHandledOnce = false;
         
         if(hansHandledOnce) {                                       // don't send commands until we did receive status at least a couple of times
             if(setEnabledIDbits) {                                  // if we should send ACSI ID configuration
-                responseAdd(oBuf, CMD_ACSI_CONFIG);                 // CMD: send acsi config
-                responseAdd(oBuf, MAKEWORD(acsiIdInfo.enabledIDbits, acsiIdInfo.sdCardAcsiId)); // store ACSI enabled IDs and which ACSI ID is used for SD card
+                responseAddWord(oBuf, CMD_ACSI_CONFIG);             // CMD: send acsi config
+                responseAddWord(oBuf, MAKEWORD(acsiIdInfo.enabledIDbits, acsiIdInfo.sdCardAcsiId)); // store ACSI enabled IDs and which ACSI ID is used for SD card
                 setEnabledIDbits = false;                           // and don't sent this anymore (until needed)
             }
 
             if(setEnabledFloppyImgs) {
-                responseAdd(oBuf, CMD_FLOPPY_CONFIG);                               // CMD: send which floppy images are enabled (bytes 4 & 5)
-                responseAdd(oBuf, MAKEWORD(floppyImageSilo.getSlotBitmap(), 0));    // store which floppy images are enabled
-                setEnabledFloppyImgs = false;                                       // and don't sent this anymore (until needed)
+                responseAddWord(oBuf, CMD_FLOPPY_CONFIG);                               // CMD: send which floppy images are enabled (bytes 4 & 5)
+                responseAddWord(oBuf, MAKEWORD(floppyImageSilo.getSlotBitmap(), 0));    // store which floppy images are enabled
+                setEnabledFloppyImgs = false;                                           // and don't sent this anymore (until needed)
             }
         
             if(setNewFloppyImageLed) {
-                responseAdd(oBuf, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
-                responseAdd(oBuf, MAKEWORD(newFloppyImageLed, 0));  // store which floppy images LED should be on
-                setNewFloppyImageLed = false;                       // and don't sent this anymore (until needed)
+                responseAddWord(oBuf, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
+                responseAddWord(oBuf, MAKEWORD(newFloppyImageLed, 0));  // store which floppy images LED should be on
+                setNewFloppyImageLed = false;                           // and don't sent this anymore (until needed)
             }
         }
         
         hansHandledOnce = true;
-    } else {                                    		// it's Franz?
+    } else {                                    		            // it's Franz?
 		cmdLength = 8;
+        responseStart(cmdLength);                                   // init the response struct
+
+        static bool franzHandledOnce = false;
+
+        if(franzHandledOnce) {                                      // don't send the commands until we did receive at least one firmware message
+            if(setFloppyConfig) {                                   // should set floppy config?
+                responseAddByte(oBuf, ( floppyConfig.enabled        ? CMD_DRIVE_ENABLED     : CMD_DRIVE_DISABLED) );
+                responseAddByte(oBuf, ((floppyConfig.id == 0)       ? CMD_SET_DRIVE_ID_0    : CMD_SET_DRIVE_ID_1) );
+                responseAddByte(oBuf, ( floppyConfig.writeProtected ? CMD_WRITE_PROTECT_ON  : CMD_WRITE_PROTECT_OFF) );
+                setFloppyConfig = false;
+            }
+
+            if(setDiskChanged) {
+                responseAddByte(oBuf, ( diskChanged                 ? CMD_DISK_CHANGE_ON    : CMD_DISK_CHANGE_OFF) );
+
+                if(diskChanged) {                                   // if the disk changed, change it to not-changed and let it send a command again in a second
+                    diskChanged = false;
+                } else {                                            // if we're in the not-changed state, don't send it again
+                    setDiskChanged = false;
+                }
+            }
+        }
+
+        franzHandledOnce = true;
     }
 
     conSpi->txRx(whichSpiCs, cmdLength, oBuf, fwVer);
@@ -393,6 +431,9 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
             Debug::out(LOG_INFO, "Floppy image changed to %d", currentLed);
 
             floppyImageSilo.setCurrentSlot(currentLed);     // switch the floppy image
+
+            diskChanged     = true;                         // also tell Franz that floppy changed
+            setDiskChanged  = true;
         }
     }
 }
@@ -403,7 +444,7 @@ void CCoreThread::responseStart(int bufferLengthInBytes)        // use this to s
     response.currentLength      = 0;
 }
 
-void CCoreThread::responseAdd(BYTE *bfr, WORD value)            // add a WORD to the response (command) to Hans or Franz
+void CCoreThread::responseAddWord(BYTE *bfr, WORD value)        // add a WORD to the response (command) to Hans or Franz
 {
     if(response.currentLength >= response.bfrLengthInBytes) {
         return;
@@ -412,6 +453,16 @@ void CCoreThread::responseAdd(BYTE *bfr, WORD value)            // add a WORD to
     bfr[response.currentLength + 0] = (BYTE) (value >> 8);
     bfr[response.currentLength + 1] = (BYTE) (value & 0xff);
     response.currentLength += 2;
+}
+
+void CCoreThread::responseAddByte(BYTE *bfr, BYTE value)        // add a BYTE to the response (command) to Hans or Franz
+{
+    if(response.currentLength >= response.bfrLengthInBytes) {
+        return;
+    }
+
+    bfr[response.currentLength] = value;
+    response.currentLength++;
 }
 
 void CCoreThread::setFloppyImageLed(int ledNo)

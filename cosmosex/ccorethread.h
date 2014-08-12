@@ -83,7 +83,8 @@ private:
     int bcdToInt(int bcd);
 
     void responseStart(int bufferLengthInBytes);
-    void responseAdd(BYTE *bfr, WORD value);
+    void responseAddWord(BYTE *bfr, WORD value);
+    void responseAddByte(BYTE *bfr, BYTE value);
     
     struct {
         int bfrLengthInBytes;
@@ -96,6 +97,12 @@ private:
     ImageSilo           floppyImageSilo;
     bool                setEnabledFloppyImgs;
     int                 lastFloppyImageLed;
+
+    bool                setFloppyConfig;
+    FloppyConfig        floppyConfig;
+
+    bool                setDiskChanged;
+    bool                diskChanged;
     
     bool                setNewFloppyImageLed;
     int                 newFloppyImageLed;
