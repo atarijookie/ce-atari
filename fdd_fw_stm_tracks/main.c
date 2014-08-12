@@ -95,12 +95,17 @@ volatile BYTE spiDmaTXidle, spiDmaRXidle;       // flags set when the SPI DMA TX
 volatile TDrivePosition now, next, lastRequested, prev;
 volatile WORD lastRequestTime;
 
+BYTE driveId;
+BYTE driveEnabled;
+
 WORD trackStreamedCount = 0;
 
 volatile TCircBuffer buff0, buff1;
 void circularInit(volatile TCircBuffer *cb);
 void cicrularAdd(volatile TCircBuffer *cb, BYTE val);
 BYTE cicrularGet(volatile TCircBuffer *cb);
+
+void setupDriveSelect(void);
 
 int main (void) 
 {
@@ -120,7 +125,7 @@ int main (void)
     circularInit(&buff0);
     circularInit(&buff1);
 
-    drive_select = MOTOR_ENABLE | DRIVE_SELECT0;    // the drive select bits which should be LOW if the drive is selected
+    setupDriveSelect();                             // the drive select bits which should be LOW if the drive is selected
 
     // init floppy signals
     GPIOB->BSRR = (WR_PROTECT | DISK_CHANGE);       // not write protected
@@ -441,7 +446,7 @@ void EXTI3_IRQHandler(void)
 
 void getMfmWriteTimes(void)
 {
-    WORD ind1 = 0, ind2 = 7, i, tmp, val, wval;
+    WORD ind1 = 0, ind2 = 7, i, tmp, val = 0, wval;
     
     // check for half transfer or transfer complete IF
     if((DMA1->ISR & DMA1_IT_HT6) != 0) {                // HTIF6 -- Half Transfer IF 6
@@ -578,8 +583,10 @@ void processHostCommand(BYTE val)
         case CMD_DISK_CHANGE_OFF:       GPIOB->BSRR     = DISK_CHANGE;                  break;  // DISK_CHANGE to 1
         case CMD_DISK_CHANGE_ON:        GPIOB->BRR      = DISK_CHANGE;                  break;  // DISK_CHANGE to 0
         case CMD_GET_FW_VERSION:        sendFwVersion   = TRUE;                         break;  // send FW version string and receive commands
-        case CMD_SET_DRIVE_ID_0:        drive_select    = MOTOR_ENABLE | DRIVE_SELECT0; break;  // set drive ID pins to check like this...
-        case CMD_SET_DRIVE_ID_1:        drive_select    = MOTOR_ENABLE | DRIVE_SELECT1; break;  // ...or that!
+        case CMD_SET_DRIVE_ID_0:        driveId         = 0;        setupDriveSelect(); break;  // set drive ID pins to check like this...
+        case CMD_SET_DRIVE_ID_1:        driveId         = 1;        setupDriveSelect(); break;  // ...or that!
+        case CMD_DRIVE_ENABLED:         driveEnabled    = TRUE;     setupDriveSelect(); break;  // drive is now enabled
+        case CMD_DRIVE_DISABLED:        driveEnabled    = FALSE;    setupDriveSelect(); break;  // drive is now disabled
     }
 }
 
@@ -669,7 +676,7 @@ void cicrularAdd(volatile TCircBuffer *cb, BYTE val)
 {
 	// if buffer full, fail
 	if(cb->count >= CIRCBUFFER_SIZE) {
-		return;
+        return;
 	}
     cb->count++;
 
@@ -700,4 +707,19 @@ BYTE cicrularGet(volatile TCircBuffer *cb)
 
 	// return value from buffer
 	return val;
+}
+
+void setupDriveSelect(void)
+{
+    if(driveEnabled == FALSE) {     // if drive not enabled, set drive_select mask to everything, so it will (probably) never find out that it's selected
+        drive_select = 0xffff;
+        return;
+    }
+    
+    // if we got here, drive is enabled
+    if(driveId == 0) {              // when drive ID is 0
+        drive_select = MOTOR_ENABLE | DRIVE_SELECT0;
+    } else {                        // when drive ID is 1
+        drive_select = MOTOR_ENABLE | DRIVE_SELECT1;
+    }
 }

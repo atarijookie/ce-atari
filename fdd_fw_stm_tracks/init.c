@@ -35,6 +35,9 @@ extern volatile BYTE spiDmaTXidle, spiDmaRXidle;                                
 extern volatile TDrivePosition now, next, lastRequested, prev;
 extern volatile WORD lastRequestTime;
 
+extern BYTE driveId;
+extern BYTE driveEnabled;
+
 void spi_init(void)
 {
     SPI_InitTypeDef spiStruct;
@@ -230,6 +233,9 @@ void init_hw_sw(void)
     GPIOB->CRL |=   0x80000800;                                     // set GPIOB as --- CNF1:0 -- 10 (pull up/down input), MODE1:0 -- 00 (input)
     GPIOB->BSRR = DIR | WGATE;                              				// set DIR, WGATE to 1 in ODR == pull up
 
+    driveId         = 0;
+    driveEnabled    = TRUE;
+    
     FloppyOut_Disable();
     
     // SPI -- enable atlernate function for PA4, PA5, PA6, PA7, 

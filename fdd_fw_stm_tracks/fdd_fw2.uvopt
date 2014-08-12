@@ -145,7 +145,7 @@
         <SetRegEntry>
           <Number>0</Number>
           <Key>DLGTARM</Key>
-          <Name>(1010=708,196,1074,739,0)(1007=105,133,282,394,0)(1008=90,117,456,339,0)(1009=120,149,354,683,0)(100=281,95,917,754,0)(110=60,84,270,530,0)(111=782,333,992,779,0)(1011=674,364,1198,711,0)(180=120,149,405,432,0)(120=925,141,1336,532,0)(121=354,328,765,719,0)(122=-1,-1,-1,-1,0)(123=-1,-1,-1,-1,0)(140=75,100,753,426,0)(240=105,133,494,464,0)(190=-1,-1,-1,-1,0)(200=-1,-1,-1,-1,0)(170=120,149,395,431,0)(130=731,170,1315,850,0)(131=567,98,1151,778,0)(132=150,182,734,862,0)(133=150,182,734,862,0)(160=449,207,887,607,0)(161=757,200,1195,600,0)(162=946,191,1384,591,0)(210=885,197,1202,544,0)(211=-1,-1,-1,-1,0)(220=-1,-1,-1,-1,0)(221=-1,-1,-1,-1,0)(230=-1,-1,-1,-1,0)(231=-1,-1,-1,-1,0)(232=-1,-1,-1,-1,0)(233=-1,-1,-1,-1,0)(150=240,248,833,868,0)(151=240,248,833,868,0)</Name>
+          <Name>(1010=708,196,1074,739,0)(1007=105,133,282,394,0)(1008=90,117,456,339,0)(1009=120,149,354,683,0)(100=281,95,917,754,0)(110=60,84,270,530,0)(111=782,333,992,779,0)(1011=674,364,1198,711,0)(180=120,149,405,432,0)(120=769,322,1180,713,0)(121=354,328,765,719,0)(122=-1,-1,-1,-1,0)(123=-1,-1,-1,-1,0)(140=75,100,753,426,0)(240=105,133,494,464,0)(190=-1,-1,-1,-1,0)(200=-1,-1,-1,-1,0)(170=120,149,395,431,0)(130=731,170,1315,850,0)(131=567,98,1151,778,0)(132=150,182,734,862,0)(133=150,182,734,862,0)(160=449,207,887,607,0)(161=757,200,1195,600,0)(162=946,191,1384,591,0)(210=885,197,1202,544,0)(211=-1,-1,-1,-1,0)(220=-1,-1,-1,-1,0)(221=-1,-1,-1,-1,0)(230=-1,-1,-1,-1,0)(231=-1,-1,-1,-1,0)(232=-1,-1,-1,-1,0)(233=-1,-1,-1,-1,0)(150=240,248,833,868,0)(151=240,248,833,868,0)</Name>
         </SetRegEntry>
         <SetRegEntry>
           <Number>0</Number>
@@ -188,9 +188,6 @@
           <ItemText>readTrackData</ItemText>
         </Mm>
       </MemoryWindow1>
-      <Tracepoint>
-        <THDelay>0</THDelay>
-      </Tracepoint>
       <DebugFlag>
         <trace>0</trace>
         <periodic>1</periodic>
@@ -205,7 +202,7 @@
         <aTbox>0</aTbox>
         <AscS1>0</AscS1>
         <AscS2>0</AscS2>
-        <AscS3>0</AscS3>
+        <AscS3>1</AscS3>
         <aSer3>0</aSer3>
         <eProf>0</eProf>
         <aLa>0</aLa>
@@ -217,6 +214,9 @@
         <newCpu>0</newCpu>
         <uProt>0</uProt>
       </DebugFlag>
+      <Tracepoint>
+        <THDelay>0</THDelay>
+      </Tracepoint>
       <LintExecutable></LintExecutable>
       <LintConfigFile></LintConfigFile>
     </TargetOption>
@@ -236,8 +236,8 @@
       <Focus>0</Focus>
       <ColumnNumber>0</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>116</TopLine>
-      <CurrentLine>131</CurrentLine>
+      <TopLine>681</TopLine>
+      <CurrentLine>726</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\main.c</PathWithFileName>
       <FilenameWithoutPath>main.c</FilenameWithoutPath>
@@ -268,8 +268,8 @@
       <Focus>0</Focus>
       <ColumnNumber>32</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>7</TopLine>
-      <CurrentLine>35</CurrentLine>
+      <TopLine>0</TopLine>
+      <CurrentLine>0</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\defs.h</PathWithFileName>
       <FilenameWithoutPath>defs.h</FilenameWithoutPath>
@@ -300,8 +300,8 @@
       <Focus>0</Focus>
       <ColumnNumber>0</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>140</TopLine>
-      <CurrentLine>177</CurrentLine>
+      <TopLine>143</TopLine>
+      <CurrentLine>176</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\timers.c</PathWithFileName>
       <FilenameWithoutPath>timers.c</FilenameWithoutPath>
@@ -426,10 +426,10 @@
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <Focus>0</Focus>
-      <ColumnNumber>23</ColumnNumber>
+      <ColumnNumber>48</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>0</TopLine>
-      <CurrentLine>0</CurrentLine>
+      <TopLine>219</TopLine>
+      <CurrentLine>235</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\stm32f10x_tim.c</PathWithFileName>
       <FilenameWithoutPath>stm32f10x_tim.c</FilenameWithoutPath>
@@ -490,10 +490,10 @@
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <Focus>0</Focus>
-      <ColumnNumber>5</ColumnNumber>
+      <ColumnNumber>86</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>1</TopLine>
-      <CurrentLine>37</CurrentLine>
+      <TopLine>6</TopLine>
+      <CurrentLine>40</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\floppyhelpers.c</PathWithFileName>
       <FilenameWithoutPath>floppyhelpers.c</FilenameWithoutPath>
@@ -522,10 +522,10 @@
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <Focus>0</Focus>
-      <ColumnNumber>18</ColumnNumber>
+      <ColumnNumber>0</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>321</TopLine>
-      <CurrentLine>355</CurrentLine>
+      <TopLine>215</TopLine>
+      <CurrentLine>236</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\init.c</PathWithFileName>
       <FilenameWithoutPath>init.c</FilenameWithoutPath>
@@ -540,8 +540,8 @@
       <Focus>0</Focus>
       <ColumnNumber>15</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>1</TopLine>
-      <CurrentLine>9</CurrentLine>
+      <TopLine>0</TopLine>
+      <CurrentLine>0</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\init.h</PathWithFileName>
       <FilenameWithoutPath>init.h</FilenameWithoutPath>
@@ -556,8 +556,8 @@
       <Focus>0</Focus>
       <ColumnNumber>43</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>399</TopLine>
-      <CurrentLine>410</CurrentLine>
+      <TopLine>0</TopLine>
+      <CurrentLine>0</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\stm32f10x_usart.c</PathWithFileName>
       <FilenameWithoutPath>stm32f10x_usart.c</FilenameWithoutPath>
@@ -572,8 +572,8 @@
       <Focus>0</Focus>
       <ColumnNumber>22</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>296</TopLine>
-      <CurrentLine>322</CurrentLine>
+      <TopLine>0</TopLine>
+      <CurrentLine>0</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\stm32f10x_usart.h</PathWithFileName>
       <FilenameWithoutPath>stm32f10x_usart.h</FilenameWithoutPath>
@@ -620,7 +620,7 @@
       <Focus>0</Focus>
       <ColumnNumber>0</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>126</TopLine>
+      <TopLine>122</TopLine>
       <CurrentLine>133</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\startup_stm32f10x_md.s</PathWithFileName>
