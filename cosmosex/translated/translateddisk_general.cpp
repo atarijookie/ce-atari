@@ -517,8 +517,13 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
 {
     WORD drives = getDrivesBitmap();
 
-    dataTrans->addDataWord(drives);         // drive bits first
-    dataTrans->padDataToMul16();            // pad to multiple of 16
+    dataTrans->addDataWord(drives);                             // drive bits first
+
+    dataTrans->addDataByte(driveLetters.firstTranslated);       // first translated drive
+    dataTrans->addDataByte(driveLetters.shared);                // shared drive
+    dataTrans->addDataByte(driveLetters.confDrive);             // config drive
+
+    dataTrans->padDataToMul16();                                // pad to multiple of 16
 
     dataTrans->setStatus(E_OK);
 }
