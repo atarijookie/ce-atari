@@ -515,13 +515,42 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
 
 void TranslatedDisk::onGetConfig(BYTE *cmd)
 {
+    // 1st WORD (bytes 0, 1) - bitmap of CosmosEx translated drives
     WORD drives = getDrivesBitmap();
-
     dataTrans->addDataWord(drives);                             // drive bits first
 
+    // bytes 2,3,4 -- drive letters assignment
     dataTrans->addDataByte(driveLetters.firstTranslated);       // first translated drive
     dataTrans->addDataByte(driveLetters.shared);                // shared drive
     dataTrans->addDataByte(driveLetters.confDrive);             // config drive
+
+    //------------------
+    // this can be used to set the right date and time on ST
+    Settings s;
+    bool    setDateTime;
+    int     utcOffset;    
+    setDateTime = s.getBool((char *) "TIME_SET",        true);
+    utcOffset   = s.getInt ((char *) "TIME_UTC_OFFSET", 0);
+
+    time_t timenow      = time(NULL);
+    struct tm loctime   = *localtime(&timenow);
+
+    if(loctime.tm_year < 2014) {                                // if the retrieved date/time seems to be wrong (too old), clear it and don't set it!
+        memset(&loctime, 0, sizeof(tm));
+        setDateTime = false;
+    }
+
+    dataTrans->addDataByte(setDateTime);                        // byte 5 - if should set date/time on ST or not
+    dataTrans->addDataByte(utcOffset);                          // byte 6 - UTC offset: +- hours * 2 (+3.5 will be sent as 7, -3.5 will be sent as -7)
+
+    dataTrans->addDataWord(loctime.tm_year + 1900);             // bytes 7, 8 - year
+    dataTrans->addDataByte(loctime.tm_mon + 1);                 // byte 9     - month
+    dataTrans->addDataByte(loctime.tm_mday);                    // byte 10    - day
+
+    dataTrans->addDataByte(loctime.tm_hour);                    // byte 11 - hours
+    dataTrans->addDataByte(loctime.tm_min);                     // byte 12 - minutes
+    dataTrans->addDataByte(loctime.tm_sec);                     // byte 13 - seconds
+    //------------------
 
     dataTrans->padDataToMul16();                                // pad to multiple of 16
 
