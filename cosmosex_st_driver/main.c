@@ -3,6 +3,7 @@
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
 #include <unistd.h>
+#include <support.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -39,6 +40,10 @@ int16_t useOldBiosHandler = 0;								/* 0: use new handlers, 1: use old handler
 BYTE ce_findId(void);
 BYTE ce_identify(void);
 void ce_initialize(void);
+void getConfig(void);
+BYTE setDateTime(void);
+void showDateTime(void);
+void showInt(int value, int length);
 
 void setBootDrive(void);
 
@@ -61,7 +66,11 @@ BYTE fsnextIsForUs, tryToGetMoreDTAs;
 WORD ceDrives;
 WORD ceMediach;
 BYTE currentDrive;
-LONG driveMap;
+WORD driveMap;
+BYTE configDrive;
+
+BYTE setDate;
+int year, month, day, hours, minutes, seconds;
 
 extern DWORD _runFromBootsector;			// flag meaning if we are running from TOS or bootsector
 /* ------------------------------------------------------------------ */
@@ -132,6 +141,13 @@ int main( int argc, char* argv[] )
 	
 	driveMap	        = Drvmap();						    /* get the pre-installation drive map */
 
+    Supexec(getConfig);                                     // get translated disk configuration, including date and time
+    
+    if(setDate) {                                           // now if we should set new date/time, then set it
+        setDateTime();
+        showDateTime();
+    }
+    
 	Supexec(updateCeDrives);								/* update the ceDrives variable */
 	
 	initFunctionTable();
@@ -224,23 +240,134 @@ BYTE ce_identify(void)
 /* send INITIALIZE command to the CosmosEx device telling it to do all the stuff it needs at start */
 void ce_initialize(void)
 {
-	commandShort[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	commandShort[0] = (deviceID << 5); 					                        /* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
 	commandShort[4] = GD_CUSTOM_initialize;
   
 	acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* issue the command and check the result */
 }
 
+void getConfig(void)
+{
+    WORD res;
+    
+	commandShort[0] = (deviceID << 5); 					                        // cmd[0] = ACSI_id + TEST UNIT READY (0)
+	commandShort[4] = GD_CUSTOM_getConfig;
+  
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// issue the command and check the result
+    
+    if(res != OK) {                                                             // failed to get config?
+        return;
+    }
+    
+    configDrive = pDmaBuffer[4];                                                // store config drive letter for later use
+    
+    //------
+    // get the date/time
+    
+    setDate = pDmaBuffer[5];
+    
+    year    = getWord(pDmaBuffer + 7);
+    month   = pDmaBuffer[9];
+    day     = pDmaBuffer[10];
+    
+    hours   = pDmaBuffer[11];
+    minutes = pDmaBuffer[12];
+    seconds = pDmaBuffer[13];
+}
+
 void setBootDrive(void)
 {
-    /* are there any other drives installed besides A+B? don't change boot drive if other drives are present*/
-    if( (driveMap&0b1111111111111100)==0 ){
-		/* (void)Cconws( "No other drives detected\r\n" ); */
+    // are there any other drives installed besides A+B? don't change boot drive if other drives are present
+    if( (driveMap & 0xfffc)==0 ) {              // no other drives detected
         
-        /* do we have a drive O that is an translated drive? */
-        if( isOurDrive('O'-'A', 0) ){
-		    (void)Cconws( "Setting O as boot drive.\r\n" );
-            //yes==>simply assume that's the config drive and set O as boot drive
-            CALL_OLD_GD_VOIDRET(Dsetdrv, 'O'-'A'); 
+        // do we have this configDrive?
+        if( isOurDrive(configDrive, 0) ){
+		    (void)Cconws( "Setting boot drive to " );
+            (void)Cconout(configDrive + 'A');
+		    (void)Cconws( ".\r\n" );
+            
+            CALL_OLD_GD_VOIDRET(Dsetdrv, configDrive); 
         }
     }
 }
+
+BYTE setDateTime(void)
+{
+    WORD newDate, newTime;  
+    WORD newYear, newMonth;
+    WORD newHour, newMinute, newSecond;
+    BYTE res;
+    
+    //------------------
+    // set new date
+    newYear = year - 1980;
+    newYear = newYear << 9;
+  
+    newMonth = month;
+    newMonth = newMonth << 5;
+  
+    newDate = newYear | newMonth | (day & 0x1f);
+  
+    res = Tsetdate(newDate);
+  
+    if(res)                   /* if some error, then failed */
+        return 0;         
+    
+    //------------------
+    // set new date
+    newSecond   = ((seconds/2) & 0x1f);
+    newMinute   = minutes & 0x3f;
+    newMinute   = newMinute << 5;
+    newHour     = hours & 0x1f;
+    newHour     = newHour << 11;
+  
+    newTime = newHour | newMinute | newSecond;
+  
+    res = Tsettime(newTime);
+  
+    if(res)                   /* if some error, then failed */
+        return 0;         
+    //------------------
+    
+    return 1;
+}
+
+void showDateTime(void)
+{
+    (void) Cconws("Date: ");
+    showInt(year, 4);
+    (void) Cconout('-');
+    showInt(month, 2);
+    (void) Cconout('-');
+    showInt(day, 2);
+    (void) Cconws(" (YYYY-MM-DD)\n\r");
+
+    (void) Cconws("Time:   ");
+    showInt(hours, 2);
+    (void) Cconout(':');
+    showInt(minutes, 2);
+    (void) Cconout(':');
+    showInt(seconds, 2);
+    (void) Cconws(" (HH:MM:SS)\n\r");
+}
+
+void showInt(int value, int length)
+{
+    char tmp[10];
+    memset(tmp, 0, 10);
+    
+    int i;
+    for(i=0; i<length; i++) {               // go through the int lenght and get the digits
+        int val, mod;
+        
+        val = value / 10;
+        mod = value % 10;
+    
+        tmp[length - 1 - i] = val + 48;     // store the current digit
+        
+        value = mod;
+    }
+    
+    (void) Cconws(tmp);                     // write it out
+}
+

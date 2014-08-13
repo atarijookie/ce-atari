@@ -6,7 +6,7 @@ SLIM	= yes
 CC		= m68k-atari-mint-gcc
 STRIP	= m68k-atari-mint-strip
 CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
-LDFLAGS	= -Wl,--traditional-format
+LDFLAGS	= -Wl,--traditional-format -lgcc
 
 HDR		= xbra.h acsi.h gemdos.h bios.h gemdos_errno.h translated.h main.h
 CSRC	= gemdos.c gemdos_rw.c gemdos_pexec.c bios.c xbra.c acsi.c main.c 
