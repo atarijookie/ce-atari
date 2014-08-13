@@ -14,6 +14,8 @@
 #include "gemdos.h"
 #include "main.h"
 
+char *version = "2014-08-12";
+
 /* 
  * CosmosEx GEMDOS driver by Jookie, 2013
  * GEMDOS hooks part (assembler and C) by MiKRO (Miro Kropacek), 2013
@@ -38,6 +40,8 @@ BYTE ce_findId(void);
 BYTE ce_identify(void);
 void ce_initialize(void);
 
+void setBootDrive(void);
+
 BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
 BYTE *pDmaBuffer;
 
@@ -57,6 +61,7 @@ BYTE fsnextIsForUs, tryToGetMoreDTAs;
 WORD ceDrives;
 WORD ceMediach;
 BYTE currentDrive;
+LONG driveMap;
 
 extern DWORD _runFromBootsector;			// flag meaning if we are running from TOS or bootsector
 /* ------------------------------------------------------------------ */
@@ -67,11 +72,13 @@ int main( int argc, char* argv[] )
 
 	/* write some header out */
 	(void) Clear_home();
-	(void) Cconws("\33p[ CosmosEx disk driver  ]\r\n[ by Jookie 2013 & 2014 ]\33q\r\n\r\n");
+	(void) Cconws("\33p[ CosmosEx disk driver  ]\r\n[ by Jookie 2013 & 2014 ]\r\n[        ver ");
+    (void) Cconws(version);
+    (void) Cconws(" ]\33q\r\n\r\n");
 
 	BYTE kbshift = Kbshift(-1);
 	
-	if((kbshift & 0x0f) != 0) {
+	if((kbshift & 0x0f) != 0 && kbshift != (K_CTRL | K_LSHIFT) ) {
 		if((kbshift & K_ALT) != 0) {
 			(void) Cconws("ALT ");
 		}
@@ -123,6 +130,8 @@ int main( int argc, char* argv[] )
 
 	currentDrive		= Dgetdrv();						/* get the current drive from system */
 	
+	driveMap	        = Drvmap();						    /* get the pre-installation drive map */
+
 	Supexec(updateCeDrives);								/* update the ceDrives variable */
 	
 	initFunctionTable();
@@ -141,7 +150,12 @@ int main( int argc, char* argv[] )
 	/* and now place the new gemdos handler */
 	old_gemdos_handler	= Setexc( VEC_GEMDOS,	gemdos_handler );
 	old_bios_handler	= Setexc( VEC_BIOS,		bios_handler ); 
-	
+
+    /* only force boot drive if not cancelled by LSHIFT+CTRL */
+    if( kbshift != (K_CTRL | K_LSHIFT) ){
+    	Supexec(setBootDrive);								/* set the boot drive */
+    }
+
 	/* wait for a while so the user could read the message and quit */
 	sleep(2);
 
@@ -216,3 +230,17 @@ void ce_initialize(void)
 	acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* issue the command and check the result */
 }
 
+void setBootDrive(void)
+{
+    /* are there any other drives installed besides A+B? don't change boot drive if other drives are present*/
+    if( (driveMap&0b1111111111111100)==0 ){
+		/* (void)Cconws( "No other drives detected\r\n" ); */
+        
+        /* do we have a drive O that is an translated drive? */
+        if( isOurDrive('O'-'A', 0) ){
+		    (void)Cconws( "Setting O as boot drive.\r\n" );
+            //yes==>simply assume that's the config drive and set O as boot drive
+            CALL_OLD_GD_VOIDRET(Dsetdrv, 'O'-'A'); 
+        }
+    }
+}
