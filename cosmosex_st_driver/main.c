@@ -44,6 +44,8 @@ void getConfig(void);
 BYTE setDateTime(void);
 void showDateTime(void);
 void showInt(int value, int length);
+void showNetworkIPs(void);
+void showIpAddress(BYTE *bfr);
 
 void setBootDrive(void);
 
@@ -71,6 +73,7 @@ BYTE configDrive;
 
 BYTE setDate;
 int year, month, day, hours, minutes, seconds;
+BYTE netConfig[10];
 
 extern DWORD _runFromBootsector;			// flag meaning if we are running from TOS or bootsector
 /* ------------------------------------------------------------------ */
@@ -147,6 +150,8 @@ int main( int argc, char* argv[] )
         setDateTime();
         showDateTime();
     }
+    
+    showNetworkIPs();                                       // show IP addresses if possible
     
 	Supexec(updateCeDrives);								/* update the ceDrives variable */
 	
@@ -273,6 +278,8 @@ void getConfig(void)
     hours   = pDmaBuffer[11];
     minutes = pDmaBuffer[12];
     seconds = pDmaBuffer[13];
+    
+    memcpy(netConfig, &pDmaBuffer[14], 10);
 }
 
 void setBootDrive(void)
@@ -356,6 +363,23 @@ void showInt(int value, int length)
     char tmp[10];
     memset(tmp, 0, 10);
     
+    if(length == -1) {                      // determine length? 
+        int i, div = 10;
+        
+        for(i=1; i<6; i++) {                // try from 10 to 1000000
+            if((value / div) == 0) {        // after division the result is zero? we got the length
+                length = i;
+                break;
+            }
+            
+            div = div * 10;                 // increase the divisor by 10
+        }
+        
+        if(length == -1) {                  // length undetermined? use length 6
+            length = 6;
+        }
+    }
+    
     int i;
     for(i=0; i<length; i++) {               // go through the int lenght and get the digits
         int val, mod;
@@ -369,5 +393,36 @@ void showInt(int value, int length)
     }
     
     (void) Cconws(tmp);                     // write it out
+}
+
+void showNetworkIPs(void)
+{
+    if(netConfig[0] == 0 && netConfig[1] == 0) {                // no interface up?
+        (void) Cconws("No working network interface.\n\r");
+        return;
+    }
+    
+    if(netConfig[0] == 1) {                                     // eth0 is up
+        (void) Cconws("eth0 : ");
+        showIpAddress(netConfig + 1);
+        (void) Cconws("\n\r");
+    }
+    
+    if(netConfig[5] == 1) {                                     // wlan0 is up
+        (void) Cconws("wlan0: ");
+        showIpAddress(netConfig + 6);
+        (void) Cconws("\n\r");
+    }
+}
+
+void showIpAddress(BYTE *bfr)
+{
+    showInt((int) bfr[0], -1);
+    (void) Cconout('.');
+    showInt((int) bfr[1], -1);
+    (void) Cconout('.');
+    showInt((int) bfr[2], -1);
+    (void) Cconout('.');
+    showInt((int) bfr[3], -1);
 }
 
