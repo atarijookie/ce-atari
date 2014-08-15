@@ -565,7 +565,7 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     BYTE tmp[10];
     getIpAdds(tmp);
 
-    dataTrans->addDataBfr(tmp, 10, false);                      // store it to buffer
+    dataTrans->addDataBfr(tmp, 10, false);                      // store it to buffer - bytes 14 to 23 (byte 14 is eth0_enabled, byte 19 is wlan0_enabled)
     //------------------
 
     dataTrans->padDataToMul16();                                // pad to multiple of 16
