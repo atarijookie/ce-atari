@@ -12,6 +12,15 @@
 #include "gemdos.h"
 #include "gemdos_errno.h"
 
+//--------
+// following includes are here for the code for getting IP address of interfaces
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <ifaddrs.h>
+#include <linux/if_link.h>
+//--------
+
 TranslatedDisk::TranslatedDisk(void)
 {
     dataTrans = 0;
@@ -550,11 +559,66 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     dataTrans->addDataByte(loctime.tm_hour);                    // byte 11 - hours
     dataTrans->addDataByte(loctime.tm_min);                     // byte 12 - minutes
     dataTrans->addDataByte(loctime.tm_sec);                     // byte 13 - seconds
+
+    //------------------
+    // now get and send the IP addresses of eth0 and wlan0 (at +0 is eth0, at +5 is wlan)
+    BYTE tmp[10];
+    getIpAdds(tmp);
+
+    dataTrans->addDataBfr(tmp, 10, false);                      // store it to buffer
     //------------------
 
     dataTrans->padDataToMul16();                                // pad to multiple of 16
 
     dataTrans->setStatus(E_OK);
+}
+
+void TranslatedDisk::getIpAdds(BYTE *bfr)
+{
+    struct ifaddrs *ifaddr, *ifa;
+    int family, n;
+
+    memset(bfr, 0, 10);                                         // set to 0 - this means 'not present'
+
+    if (getifaddrs(&ifaddr) == -1) {
+        return;
+    }
+
+    // Walk through linked list, maintaining head pointer so we can free list later
+    for (ifa = ifaddr, n = 0; ifa != NULL; ifa = ifa->ifa_next, n++) {
+        if (ifa->ifa_addr == NULL)
+            continue;
+
+        family = ifa->ifa_addr->sa_family;
+
+        if (family != AF_INET) {                                // not good interface? skip it
+            continue;
+        }
+
+        sockaddr_in *sai    = (sockaddr_in *) ifa->ifa_addr;
+        DWORD ip            = sai->sin_addr.s_addr;
+
+        BYTE *p = NULL;
+        if(strcmp(ifa->ifa_name,"eth0")==0) {                   // for eth0 - store at offset 0
+            p = bfr;
+        }
+
+        if(strcmp(ifa->ifa_name,"wlan0")==0) {                  // for wlan0 - store at offset 5
+            p = bfr + 5;
+        }
+
+        if(p == NULL) {                                         // if not an interface we're interested in, skip it
+            continue;
+        }
+
+        p[0] = 1;                                               // enabled?
+        p[1] = (BYTE)  ip;                                      // store the ip
+        p[2] = (BYTE) (ip >>  8);
+        p[3] = (BYTE) (ip >> 16);
+        p[4] = (BYTE) (ip >> 24);
+    }
+
+    freeifaddrs(ifaddr);
 }
 
 bool TranslatedDisk::hostPathExists(std::string hostPath)

@@ -116,6 +116,7 @@ private:
     bool endsWith(std::string what, std::string subStr);
 
     void onGetConfig(BYTE *cmd);
+    void getIpAdds(BYTE *bfr);
 
     // path functions
     void onDsetdrv(BYTE *cmd);
