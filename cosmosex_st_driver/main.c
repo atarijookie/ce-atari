@@ -209,6 +209,7 @@ BYTE ce_findId(void)
 			(void) Cconws("\r\nCosmosEx found on ACSI ID: ");
 			bfr[0] = i + '0';
 			(void) Cconws(bfr);
+			(void) Cconws("\r\n");
 
 			return 1;
 		}
@@ -271,7 +272,7 @@ void getConfig(void)
     
     setDate = pDmaBuffer[5];
     
-    year    = getWord(pDmaBuffer + 7);
+    year    = (((int) pDmaBuffer[7]) << 8) | ((int) pDmaBuffer[8]);
     month   = pDmaBuffer[9];
     day     = pDmaBuffer[10];
     
@@ -362,36 +363,36 @@ void showInt(int value, int length)
 {
     char tmp[10];
     memset(tmp, 0, 10);
-    
-    if(length == -1) {                      // determine length? 
+
+    if(length == -1) {                      // determine length?
         int i, div = 10;
-        
+
         for(i=1; i<6; i++) {                // try from 10 to 1000000
             if((value / div) == 0) {        // after division the result is zero? we got the length
                 length = i;
                 break;
             }
-            
+
             div = div * 10;                 // increase the divisor by 10
         }
-        
+
         if(length == -1) {                  // length undetermined? use length 6
             length = 6;
         }
     }
-    
+
     int i;
     for(i=0; i<length; i++) {               // go through the int lenght and get the digits
         int val, mod;
-        
+
         val = value / 10;
         mod = value % 10;
-    
-        tmp[length - 1 - i] = val + 48;     // store the current digit
-        
-        value = mod;
+
+        tmp[length - 1 - i] = mod + 48;     // store the current digit
+
+        value = val;
     }
-    
+
     (void) Cconws(tmp);                     // write it out
 }
 
