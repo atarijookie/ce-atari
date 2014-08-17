@@ -31,6 +31,8 @@ public:
     static void SWAPWORD(WORD &w);
     static WORD SWAPWORD2(WORD w);
 
+    static void getIpAdds(BYTE *bfr);
+    
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
 
