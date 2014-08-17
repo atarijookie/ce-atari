@@ -5,7 +5,7 @@
 #include "datatypes.h"
 
 #define XILINX_VERSION_FILE		"/ce/update/xilinx_current.txt"
-#define APP_VERSION         	"2014-08-12"
+#define APP_VERSION         	"2014-08-17"
 
 class Version
 {
