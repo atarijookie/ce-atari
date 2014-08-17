@@ -31,6 +31,7 @@ extern TrapHandlerPointer old_gemdos_handler;
 int32_t (*gemdos_table[256])( void* sp ) = { 0 };
 int16_t useOldGDHandler = 0;								/* 0: use new handlers, 1: use old handlers */
 
+extern void cpudet (void);
 extern void bios_handler( void );
 extern TrapHandlerPointer old_bios_handler;
 int32_t (*bios_table[256])( void* sp ) = { 0 };
@@ -76,6 +77,7 @@ int year, month, day, hours, minutes, seconds;
 BYTE netConfig[10];
 
 extern DWORD _runFromBootsector;			// flag meaning if we are running from TOS or bootsector
+extern WORD trap_extra_offset;
 /* ------------------------------------------------------------------ */
 int main( int argc, char* argv[] )
 {
@@ -88,6 +90,8 @@ int main( int argc, char* argv[] )
     (void) Cconws(version);
     (void) Cconws(" ]\33q\r\n\r\n");
 
+	Supexec(cpudet);												/* Detect CPU and adjust GEMDOS/BIOS trap handler offsets */
+	
 	BYTE kbshift = Kbshift(-1);
 	
 	if((kbshift & 0x0f) != 0 && kbshift != (K_CTRL | K_LSHIFT) ) {
@@ -286,7 +290,8 @@ void getConfig(void)
 void setBootDrive(void)
 {
     // are there any other drives installed besides A+B? don't change boot drive if other drives are present
-    if( (driveMap & 0xfffc)==0 ) {              // no other drives detected
+    // temporary disabled for TT as for some reason it gives out 4 bombs on driver's exit (on boot)
+    if( (driveMap & 0xfffc)==0 && trap_extra_offset==0) {              // no other drives detected
         
         // do we have this configDrive?
         if( isOurDrive(configDrive, 0) ){

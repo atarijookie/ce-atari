@@ -5,12 +5,13 @@ SLIM	= yes
 
 CC		= m68k-atari-mint-gcc
 STRIP	= m68k-atari-mint-strip
+PRGFLAGS= m68k-atari-mint-flags
 CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS	= -Wl,--traditional-format -lgcc
 
 HDR		= xbra.h acsi.h gemdos.h bios.h gemdos_errno.h translated.h main.h
 CSRC	= gemdos.c gemdos_rw.c gemdos_pexec.c bios.c xbra.c acsi.c main.c 
-SSRC	= gemdos_asm.s bios_asm.s
+SSRC	= gemdos_asm.s bios_asm.s cpudet.s
 
 ifeq ($(SLIM),yes)
 CFLAGS	+= -nostdlib -DSLIM
@@ -29,7 +30,8 @@ OBJS = $(patsubst %.c,%.o,$(CSRC))
 $(TARGET): $(STARTUP) $(OBJS) $(SSRC) $(HDR)
 	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(OBJS) $(SSRC) $(LDFLAGS)
 	$(STRIP) -s $@
-
+	$(PRGFLAGS) $@ --mno-fastram --mno-fastalloc --mno-fastload
+	
 %.o: %.c 
 	$(CC) $(CFLAGS) -c $< -o $@
 

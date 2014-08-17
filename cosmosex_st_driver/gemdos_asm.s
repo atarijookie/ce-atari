@@ -1,6 +1,8 @@
 | Simple GEMDOS handler
 | Miro Kropacek, 2013 & 2014
 | miro.kropacek@gmail.com
+| Small fixes: George Nakos 2014
+| ggn.dbug@gmail.com
 
 	.globl	_gemdos_handler
 	.globl	_gemdos_table
@@ -31,7 +33,11 @@ _gemdos_handler:
 	tst.w	_useOldGDHandler
 	bne.b	callOriginalHandler
 	
-	lea     2+4(sp),a0				        | a0 points to the function number now
+	lea		6(sp),a0						| a0 points to the function number for 68000
+	add.w	_trap_extra_offset,a0			| a0 points to the function number for 68000/68030 now
+											| (we have to do this becuase the 68030 stack frame is
+											|  different than the 68000, 6 bytes vesus 8. So we add
+											|  either 0 or 2)
 	btst.b	#5,(sp)					        | check the S bit in the stack frame
 	bne.b	gemdos_call
 	move	usp,a0					        | if not called from SV, take params from the user stack
@@ -47,6 +53,7 @@ gemdos_call:
     bra     callCustomHandlerForPexec
 
 
+
 |============================================    
 | This short piece of code calls the original GEMDOS handler.    
 
@@ -60,17 +67,21 @@ callOriginalHandler:
 | Following code calls custom handler for any GEMDOS function other than Pexec() (they don't need any special processing).
 
 callCustomHandlerNotPexec:                  |    
-	lea     _gemdos_table,a1                | get the pointer to custrom handlers table
-	add.w   d0,d0                           | fn*4 because it's a function pointer table
-	add.w   d0,d0                           |
-	adda.w  d0,a1
+	add.w	d0,d0							| fn*4 because it's a function pointer table
+	add.w	d0,d0							|
+	ext.l	d0								| zero d0's upper word
+	add.l	#_gemdos_table,d0				| get the pointer to custrom handlers table
+
+	exg		a0,d0
+	tst.l	(a0)
+	beq.b   callOriginalHandler             | if A0 == NULL, we don't have custom handler and use original handler
 	
-    tst.l   (a1)
-	beq.b   callOriginalHandler             | if A1 == NULL, we don't have custom handler and use original handler
-	
-    movea.l (a1),a1                         | custom function pointer
-	move.l  a0,-(sp)                        | param #1: stack pointer with function params
-	jsr     (a1)                            | call the custom handler
+	move.l	(a0),a0							| custom function pointer
+	move.l	d0,-(sp)						| param #1: stack pointer with function params
+
+	movem.l d1/d2/a1/a2,saveregs			| save registers (required by TOS versions earlier than 2)
+	jsr     (a0)                            | call the custom handler
+	movem.l saveregs,d1/d2/a1/a2			| restore registers (required by TOS versions earlier than 2)
     addq.l  #4,sp
 
     rte                                     | return from exception, d0 contains return code
@@ -91,17 +102,20 @@ handleThisPexec:
 | In the C part set the pexec_postProc to non-zero at the end of the handler 
 | *AFTER* you called any GEMDOS functions, and it will call the original Pexec() with PE_GO param.
 
-	lea     _gemdos_table,a1                | get the pointer to custrom handlers table
 	add.w   d0,d0                           | fn*4 because it's a function pointer table
 	add.w   d0,d0                           |
-	adda.w  d0,a1
-    
-	tst.l   (a1)
+	ext.l	d0								| zero d0's upper word
+	add.l  #_gemdos_table,d0				| get the pointer to custrom handlers table
+   
+	exg		a0,d0 
+	tst.l   (a0)
 	beq.b   callOriginalHandler             | if we don't have custom (Pexec) handler, call original handler
     
-	movea.l (a1),a1
-	move.l  a0,-(sp)                        | param #1: stack pointer with function params
-	jsr     (a1)                            | call the custom handler
+	movea.l (a0),a0
+	move.l  d0,-(sp)                        | param #1: stack pointer with function params
+	movem.l d1/d2/a1/a2,saveregs			| save registers (required by TOS versions earlier than 2)
+	jsr     (a0)                            | call the custom handler
+	movem.l saveregs,d1/d2/a1/a2			| restore registers (required by TOS versions earlier than 2)
     addq.l  #4,sp
 
 afterCustomPexecCall:
@@ -123,10 +137,12 @@ callPexecGo:
 	
 	clr.w   _pexec_postProc                 | clear the pexec_postProc flag
 
+	add.w	_trap_extra_offset,sp           | adjust stack if 68030 (see comments above)
     move.w  #4, 8(sp)                       | set mode to PE_GO
     move.l  #0, 10(sp)                      | fname = 0
     move.l  d0, 14(sp)                      | cmdline = pointer to base page
     move.l  #0, 18(sp)                      | envstr
+	sub.w	_trap_extra_offset,sp           | bring stack back to normal if 68030
     bra     callOriginalHandler             | ...and jump to old handler
     
 |------------------
@@ -140,3 +156,5 @@ callOriginalPexec:
 _pexec_postProc:    dc.w    0       | 1 = post-process PE_LOADGO
 _pexec_callOrig:    dc.w    0       | 1 = after custom handler call original Pexec (no post processing)
 
+	.bss
+saveregs:			ds.l	4		| d1/d2/a1/a2 temp space
