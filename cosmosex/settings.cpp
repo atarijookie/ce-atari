@@ -125,6 +125,37 @@ void Settings::setInt(char *key, int value)
 	fclose(file);
 }
 //-------------------------	
+float Settings::getFloat(char *key, float defValue)
+{
+	FILE *file = open(key, true);
+	if(!file) {											// failed to open settings?
+		return defValue;
+	}
+
+	int res;
+    float val;
+	res = fscanf(file, "%f", &val);						// try to read the value
+	fclose(file);
+	
+	if(res != 1) {										// failed to read value?
+		return defValue;
+	}
+	
+	return val;											// return
+}
+
+void Settings::setFloat(char *key, float value)
+{
+	FILE *file = open(key, false);
+	if(!file) {											// failed to open settings?
+		Debug::out(LOG_ERROR, "Settings::setFloat -- could not write key %s", key);
+		return;
+	}
+
+	fprintf(file, "%f\n", value);
+	fclose(file);
+}
+//-------------------------	
 char *Settings::getString(char *key, char *defValue)
 {
 	static char buffer[256];

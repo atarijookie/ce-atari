@@ -537,20 +537,23 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     // this can be used to set the right date and time on ST
     Settings s;
     bool    setDateTime;
-    int     utcOffset;    
-    setDateTime = s.getBool((char *) "TIME_SET",        true);
-    utcOffset   = s.getInt ((char *) "TIME_UTC_OFFSET", 0);
-
-    time_t timenow      = time(NULL);
+    float   utcOffset;    
+    setDateTime = s.getBool ((char *) "TIME_SET",        true);
+    utcOffset   = s.getFloat((char *) "TIME_UTC_OFFSET", 0);
+    
+    int iUtcOffset = (int) (utcOffset * 10.0);
+    int secsOffset = (int) (utcOffset * (60*60));               // transform float hours to int seconds
+        
+    time_t timenow      = time(NULL) + secsOffset;              // get time with offset
     struct tm loctime   = *localtime(&timenow);
 
-    if(loctime.tm_year < 2014) {                                // if the retrieved date/time seems to be wrong (too old), clear it and don't set it!
+    if((loctime.tm_year + 1900) < 2014) {                       // if the retrieved date/time seems to be wrong (too old), clear it and don't set it!
         memset(&loctime, 0, sizeof(tm));
         setDateTime = false;
     }
 
     dataTrans->addDataByte(setDateTime);                        // byte 5 - if should set date/time on ST or not
-    dataTrans->addDataByte(utcOffset);                          // byte 6 - UTC offset: +- hours * 2 (+3.5 will be sent as 7, -3.5 will be sent as -7)
+    dataTrans->addDataByte(iUtcOffset);                         // byte 6 - UTC offset: +- hours * 10 (+3.5 will be +35, -3.5 will be -35)
 
     dataTrans->addDataWord(loctime.tm_year + 1900);             // bytes 7, 8 - year
     dataTrans->addDataByte(loctime.tm_mon + 1);                 // byte 9     - month
@@ -560,6 +563,7 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     dataTrans->addDataByte(loctime.tm_min);                     // byte 12 - minutes
     dataTrans->addDataByte(loctime.tm_sec);                     // byte 13 - seconds
 
+    Debug::out(LOG_DEBUG, "onGetConfig - setDateTime %d, utcOffset %d, %04d-%02d-%02d %02d:%02d:%02d", setDateTime, utcOffset, loctime.tm_year + 1900, loctime.tm_mon + 1, loctime.tm_mday, loctime.tm_hour, loctime.tm_min, loctime.tm_sec);
     //------------------
     // now get and send the IP addresses of eth0 and wlan0 (at +0 is eth0, at +5 is wlan)
     BYTE tmp[10];

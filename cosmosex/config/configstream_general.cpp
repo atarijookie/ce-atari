@@ -405,6 +405,76 @@ void ConfigStream::setTextByComponentId(int componentId, std::string &text)
     c->setText(text);
 }
 
+void ConfigStream::setIntByComponentId(int componentId, int value)
+{
+    ConfigComponent *c = findComponentById(componentId);
+
+    if(c == NULL) {
+        return;
+    }
+
+    char tmp[32];
+    sprintf(tmp, "%d", value);
+    
+    std::string text = tmp;
+    c->setText(text);
+}
+
+bool ConfigStream::getIntByComponentId(int componentId, int &value)
+{
+    ConfigComponent *c = findComponentById(componentId);
+
+    if(c == NULL) {
+        return false;
+    }
+
+    std::string text;
+    c->getText(text);
+    
+    int ires = sscanf((char *) text.c_str(), "%d", &value);
+    
+    if(ires != 1) {
+        return false;
+    }
+    
+    return true;
+}
+
+void ConfigStream::setFloatByComponentId(int componentId, float value)
+{
+    ConfigComponent *c = findComponentById(componentId);
+
+    if(c == NULL) {
+        return;
+    }
+
+    char tmp[32];
+    sprintf(tmp, "%f", value);
+    
+    std::string text = tmp;
+    c->setText(text);
+}
+
+bool ConfigStream::getFloatByComponentId(int componentId, float &value)
+{
+    ConfigComponent *c = findComponentById(componentId);
+
+    if(c == NULL) {
+        return false;
+    }
+
+    std::string text;
+    c->getText(text);
+    
+    int ires = sscanf((char *) text.c_str(), "%f", &value);
+    
+    if(ires != 1) {
+        return false;
+    }
+    
+    return true;
+}
+
 bool ConfigStream::getBoolByComponentId(int componentId, bool &val)
 {
     ConfigComponent *c = findComponentById(componentId);
@@ -567,6 +637,7 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_CREATE_SHARED:      createScreen_shared();          break;
     case CS_CREATE_FLOPPY_CONF: createScreen_floppy_config();   break;
     case CS_CREATE_NETWORK:     createScreen_network();         break;
+    case CS_CREATE_OTHER:       createScreen_other();           break;
     case CS_CREATE_UPDATE:      createScreen_update();          break;
 
     case CS_HIDE_MSG_SCREEN:    hideMessageScreen();        break;
@@ -578,6 +649,7 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_UPDATE_CHECK:       onUpdateCheck();            break;
     case CS_UPDATE_CHECK_USB:   onUpdateCheckUsb();         break;
     case CS_UPDATE_UPDATE:      onUpdateUpdate();           break;
+    case CS_OTHER_SAVE:         onOtherSave();              break;
 
 //    case CS_SHARED_TEST:        onSharedTest();             break;
     case CS_SHARED_SAVE:        onSharedSave();             break;

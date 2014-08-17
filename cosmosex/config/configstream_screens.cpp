@@ -48,7 +48,11 @@ void ConfigStream::createScreen_homeScreen(void)
     comp->setOnEnterFunctionCode(CS_CREATE_NETWORK);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Update software ",	18, 10, 16, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Other ",	        18, 10, 16, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_CREATE_OTHER);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::button, " Update software ",	18, 10, 18, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_UPDATE);
     screen.push_back(comp);
 
@@ -798,6 +802,95 @@ void ConfigStream::createScreen_update_download(void)
     Update::downloadNewComponents();            // start the download
 
     setFocusToFirstFocusable();
+}
+
+void ConfigStream::createScreen_other(void)
+{
+    // the following 3 lines should be at start of each createScreen_ method
+    destroyCurrentScreen();			    // destroy current components
+    screenChanged	    = true;			// mark that the screen has changed
+    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+
+    screen_addHeaderAndFooter(screen, (char *) "Other settings");
+
+    ConfigComponent *comp;
+
+    int row     = 9;
+    int col     = 7;
+    int col2    = 20;
+    
+    //----------------------
+    comp = new ConfigComponent(this, ConfigComponent::label, "Update time from internet",   40, col, row++, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "Enable",                      40, col + 2, row, gotoOffset);
+    screen.push_back(comp);
+    
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                      3,  col2, row++, gotoOffset);
+    comp->setComponentId(COMPID_TIMESYNC_ENABLE);
+    screen.push_back(comp);
+    
+    comp = new ConfigComponent(this, ConfigComponent::label, "NTP server",                  40, col + 2, row, gotoOffset);
+    screen.push_back(comp);
+    
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",					    15, col2, row++, gotoOffset);
+    comp->setComponentId(COMPID_TIMESYNC_NTP_SERVER);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "UTC offset",                  40, col + 2, row, gotoOffset);
+    screen.push_back(comp);
+    
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",					    4, col2, row++, gotoOffset);
+    comp->setComponentId(COMPID_TIMESYNC_UTC_OFFSET);
+    screen.push_back(comp);
+    //----------------------
+    
+    comp = new ConfigComponent(this, ConfigComponent::button, "   Save   ",                 10,  6, 16, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_OTHER_SAVE);
+    comp->setComponentId(COMPID_BTN_SAVE);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Cancel  ",                 10,  22, 16, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_GO_HOME);
+    comp->setComponentId(COMPID_BTN_CANCEL);
+    screen.push_back(comp);
+
+    //------------------------
+    Settings s;
+    
+    bool        setDateTime;
+    float       utcOffset;
+    std::string ntpServer;
+    
+    setDateTime = s.getBool     ((char *) "TIME_SET",        true);
+    utcOffset   = s.getFloat    ((char *) "TIME_UTC_OFFSET", 0);
+    ntpServer   = s.getString   ((char *) "TIME_NTP_SERVER", (char *) "200.20.186.76");
+    
+    setBoolByComponentId(COMPID_TIMESYNC_ENABLE, setDateTime);
+    setFloatByComponentId(COMPID_TIMESYNC_UTC_OFFSET, utcOffset);
+    setTextByComponentId(COMPID_TIMESYNC_NTP_SERVER, ntpServer);
+    //------------------------
+    
+    setFocusToFirstFocusable();
+}
+
+void ConfigStream::onOtherSave(void)
+{
+    Settings s;
+
+    bool        setDateTime = false;
+    float       utcOffset   = 0;
+    std::string ntpServer;
+    
+    getBoolByComponentId(COMPID_TIMESYNC_ENABLE, setDateTime);
+    getFloatByComponentId(COMPID_TIMESYNC_UTC_OFFSET, utcOffset);
+    getTextByComponentId(COMPID_TIMESYNC_NTP_SERVER, ntpServer);
+    
+    s.setBool     ((char *) "TIME_SET",         setDateTime);
+    s.setFloat    ((char *) "TIME_UTC_OFFSET",  utcOffset);
+    s.setString   ((char *) "TIME_NTP_SERVER", (char *) ntpServer.c_str());
+
+    createScreen_homeScreen();		// now back to the home screen
 }
 
 void ConfigStream::fillUpdateDownloadWithProgress(void)

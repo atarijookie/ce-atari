@@ -32,6 +32,9 @@ public:
 
 	int  getInt(char *key, int defValue);
 	void setInt(char *key, int value);
+
+	float getFloat(char *key, float defValue);
+	void  setFloat(char *key, float value);
 	
 	char *getString(char *key, char *defValue);
 	void  setString(char *key, char *value);

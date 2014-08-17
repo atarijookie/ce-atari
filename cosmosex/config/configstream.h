@@ -12,12 +12,13 @@ class AcsiDataTrans;
 
 enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED,
                  CS_CREATE_FLOPPY_CONF, 
-                 CS_CREATE_NETWORK,     CS_CREATE_UPDATE,
+                 CS_CREATE_NETWORK,     CS_CREATE_UPDATE,       CS_CREATE_OTHER,
                  CS_SAVE_ACSI,          CS_SAVE_TRANSLATED,     CS_SAVE_NETWORK,
                  CS_HIDE_MSG_SCREEN,    CS_GO_HOME,
                  CS_UPDATE_CHECK,       CS_UPDATE_CHECK_USB,    CS_UPDATE_UPDATE,       
                  CS_SHARED_TEST,        CS_SHARED_SAVE,
-                 CS_FLOPPY_IMAGE_SAVE,  CS_FLOPPY_CONFIG_SAVE
+                 CS_FLOPPY_IMAGE_SAVE,  CS_FLOPPY_CONFIG_SAVE,
+                 CS_OTHER_SAVE
                 };
 
 
@@ -38,7 +39,8 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
 
                 COMPID_FLOPCONF_ENABLED,    COMPID_FLOPCONF_ID,         COMPID_FLOPCONF_WRPROT,
 
-                COMPID_DL1,                 COMPID_DL2,                 COMPID_DL3,                 COMPID_DL4
+                COMPID_DL1,                 COMPID_DL2,                 COMPID_DL3,                 COMPID_DL4,
+                COMPID_TIMESYNC_ENABLE,     COMPID_TIMESYNC_NTP_SERVER, COMPID_TIMESYNC_UTC_OFFSET
             };
 
 #define ST_RESOLUTION_LOW       0
@@ -76,12 +78,18 @@ public:
     void createScreen_update(void);
     void createScreen_shared(void);
     void createScreen_floppy_config(void);
+    void createScreen_other(void);
 
     ConfigComponent *findComponentById(int compId);
     bool getTextByComponentId(int componentId, std::string &text);
     void setTextByComponentId(int componentId, std::string &text);
     bool getBoolByComponentId(int componentId, bool &val);
     void setBoolByComponentId(int componentId, bool &val);
+    void setIntByComponentId(int componentId, int value);
+    bool getIntByComponentId(int componentId, int &value);
+    void setFloatByComponentId(int componentId, float value);
+    bool getFloatByComponentId(int componentId, float &value);
+
     void focusByComponentId(int componentId);
     bool focusNextCheckboxGroup(BYTE key, int groupid, int chbid);
 
@@ -133,7 +141,8 @@ private:
     void onSharedSave(void);
 
     void onFloppyConfigSave(void);
-
+    void onOtherSave(void);
+    
     bool verifyAndFixIPaddress(std::string &in, std::string &out, bool emptyIsOk);
 
     void replaceNewLineWithGoto(std::string &line, int startX, int startY);
