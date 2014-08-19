@@ -15,6 +15,7 @@
 #include "mounter.h"
 #include "downloader.h"
 #include "ikbd.h"
+#include "timesync.h"
 #include "version.h"
 
 volatile sig_atomic_t sigintReceived = 0;
@@ -36,6 +37,7 @@ int main(int argc, char *argv[])
     pthread_t	downloadThreadInfo;
     pthread_t	ikbdThreadInfo;
 	pthread_t	floppyEncThreadInfo;
+	pthread_t	timesyncThreadInfo;
 
     parseCmdLineArguments(argc, argv);                          // parse cmd line arguments and set global variables
 
@@ -80,6 +82,9 @@ int main(int argc, char *argv[])
     res = pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL);	// create the floppy encoding thread and run it
 	handlePthreadCreate(res, (char *) "floppy encode");
 
+    res = pthread_create(&timesyncThreadInfo, NULL, timesyncThreadCode, NULL);  // create the timesync thread and run it
+	handlePthreadCreate(res, (char *) "time sync");
+
 	core->run();										// run the main thread
 
 	delete core;
@@ -89,6 +94,7 @@ int main(int argc, char *argv[])
     pthread_join(downloadThreadInfo, NULL);             // wait until download  thread finishes
     pthread_join(ikbdThreadInfo, NULL);                 // wait until ikbd      thread finishes
     pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes
+    pthread_join(timesyncThreadInfo, NULL);             // wait until timesync  thread finishes
 
     Downloader::cleanupBeforeQuit();
 

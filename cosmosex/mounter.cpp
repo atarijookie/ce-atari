@@ -20,7 +20,6 @@
 #include "mounter.h"
 #include "utils.h"
 #include "debug.h"
-#include "timesync.h"
 
 pthread_mutex_t mountThreadMutex = PTHREAD_MUTEX_INITIALIZER;
 std::queue<TMounterRequest> mountQueue;
@@ -35,12 +34,9 @@ void mountAdd(TMounterRequest &tmr)
 void *mountThreadCode(void *ptr)
 {
 	Mounter mounter;
-    TimeSync    timeSync;
 
 	Debug::out(LOG_INFO, "Mount thread starting...");
 
-    timeSync.sync();
-    
 	while(sigintReceived == 0) {
 		pthread_mutex_lock(&mountThreadMutex);			// lock the mutex
 

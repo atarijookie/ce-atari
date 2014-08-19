@@ -15,7 +15,7 @@
 
 #define UPLOAD_PATH "/tmp/"
 
-BYTE currentImageDownloadStatus;
+volatile BYTE currentImageDownloadStatus;
 
 FloppySetup::FloppySetup()
 {

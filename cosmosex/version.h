@@ -25,7 +25,7 @@ public:
     bool isOlderThan(const Version &other);
     bool isEqualTo(const Version &other);
 
-    BYTE downloadStatus;
+    volatile BYTE downloadStatus;
     
 private:
     int year;

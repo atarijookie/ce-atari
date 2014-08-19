@@ -20,6 +20,21 @@
 #include "debug.h"
 #include "timesync.h"
 #include "settings.h"
+#include "downloader.h"
+
+#define TIMESYNC_URL_WEB    "http://joo.kie.sk/cosmosex/time.php"
+volatile BYTE timeSyncStatusByte;
+
+void *timesyncThreadCode(void *ptr)
+{
+	Debug::out(LOG_INFO, "Timesync thread starting...");
+
+    TimeSync timeSync;
+    timeSync.sync();
+
+	Debug::out(LOG_INFO, "Timesync thread finished.");
+    return 0;
+}    
 
 TimeSync::TimeSync()
 {
@@ -40,13 +55,22 @@ bool TimeSync::sync(void)
  
     bool res = syncByNtp();                 // first try by NTP
     
-    if(!res) {
-        return false;
+    if(res) {                               // NTP success? ok!
+      	Debug::out(LOG_DEBUG, "TimeSync::sync -- success, NTP was used!");
+        return true;
     }
+
+   	Debug::out(LOG_DEBUG, "TimeSync::sync -- NTP failed, will try web...");
+
+    res = syncByWeb();                      // NTP failed, try sync from web
     
-    
-  	Debug::out(LOG_DEBUG, "TimeSync::sync -- success!");
-    return true;
+    if(res) {
+      	Debug::out(LOG_DEBUG, "TimeSync::sync -- success, WEB was used!");
+    } else {
+      	Debug::out(LOG_DEBUG, "TimeSync::sync -- WEB failed too...");
+    }
+
+    return res;
 }
 
 bool TimeSync::syncByNtp(void)
@@ -183,4 +207,37 @@ void TimeSync::refreshNetworkDateNtp(void)
 
   lTime=tmit;
 }
+
+bool TimeSync::syncByWeb(void)
+{
+    timeSyncStatusByte = DWNSTATUS_WAITING;
+
+    TDownloadRequest tdr;
+    tdr.srcUrl          = TIMESYNC_URL_WEB;
+    tdr.dstDir          = "/tmp/";
+    tdr.downloadType    = DWNTYPE_TIMESYNC;
+    tdr.checksum        = 0;                        // special case - don't check checsum
+    tdr.pStatusByte     = &timeSyncStatusByte;      // update status byte
+    Downloader::add(tdr);
+
+    while(1) {                                                      // waiting loop for the timesync file to download
+        if(timeSyncStatusByte == DWNSTATUS_DOWNLOAD_OK) {           // if download was OK, continue after the waiting loop
+            break;
+        }
+
+        if(timeSyncStatusByte == DWNSTATUS_DOWNLOAD_FAIL) {         // if download failed, fail
+            Debug::out(LOG_DEBUG, "TimeSync::syncByWeb -- couldn't get the time from web server...");
+            return false;
+        }
+
+        Utils::sleepMs(330);                                        // wait 1/3 of second and then check again
+    }
+
+    // if we got here, the file got downloaded to tmp
+    system("chmod 777 /tmp/time.php");                              // change permissions to executable
+    system("/tmp/time.php");                                        // execute the script
+
+    return true;                                                    // we're done
+}
+
 

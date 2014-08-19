@@ -4,11 +4,12 @@
 #include <string>
 
 #define DWNTYPE_ANY             0xff
-#define DWNTYPE_UNKNOWN         0
-#define DWNTYPE_UPDATE_LIST     1     
-#define DWNTYPE_UPDATE_COMP     2
-#define DWNTYPE_FLOPPYIMG_LIST  4
-#define DWNTYPE_FLOPPYIMG       8
+#define DWNTYPE_UNKNOWN         0x00
+#define DWNTYPE_UPDATE_LIST     0x01     
+#define DWNTYPE_UPDATE_COMP     0x02
+#define DWNTYPE_FLOPPYIMG_LIST  0x04
+#define DWNTYPE_FLOPPYIMG       0x08
+#define DWNTYPE_TIMESYNC        0x10
 
 #define DWNSTATUS_WAITING       0              
 #define DWNSTATUS_DOWNLOADING   1 
@@ -23,7 +24,7 @@ typedef struct {
     int downloadType;           // defines what is downloaded - update, floppy image, ...
     WORD checksum;              // used to verify file integrity after download
 
-    BYTE *pStatusByte;          // if set to non-null, will be updated with the download status DWNSTATUS_*
+    volatile BYTE *pStatusByte; // if set to non-null, will be updated with the download status DWNSTATUS_*
     
     int downPercent;            // defines progress - from 0 to 100
 } TDownloadRequest;

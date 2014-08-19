@@ -6,6 +6,8 @@
 #define INIT_DATE_NOT_SET   2
 #define INIT_OK             3
 
+void *timesyncThreadCode(void *ptr);
+
 class TimeSync 
 {
 public:
@@ -19,7 +21,8 @@ private:
 
     bool syncByNtp(void);
     void refreshNetworkDateNtp(void);
-    
+
+    bool syncByWeb(void);
 };
 
 #endif
