@@ -196,6 +196,10 @@ bool Mounter::mount(char *mountCmd, char *mountDir)
 	
 	Debug::out(LOG_ERROR, "Mounter::mount - mount failed. (mount dir: %s)\n", mountDir);
 		
+    // copy the content of mount output to log file so we can examine it later...
+    copyTextFileToLog((char *) LOGFILE1);
+    copyTextFileToLog((char *) LOGFILE2);
+
 	// move the logs to mount dir
 	char cmd[MAX_STR_SIZE];
 		
@@ -331,4 +335,37 @@ void Mounter::restartNetwork(void)
 	
 	Debug::out(LOG_INFO, "Mounter::restartNetwork - done\n");
 }
+
+void Mounter::copyTextFileToLog(char *path)
+{
+    FILE *f = fopen(path, "rt");
+
+    if(!f) {
+        Debug::out(LOG_DEBUG, "Mounter::copyTextFileToLog -- failed to open file %s", path);
+        return;
+    }
+
+    char line[1024];
+
+    Debug::out(LOG_DEBUG,"--------------------------------");
+    Debug::out(LOG_DEBUG,"Start of content of %s:", path);
+
+    while(!feof(f)) {
+        memset(line, 0, 1024);
+        char *res = fgets(line, 1023, f);
+
+        if(!res) {
+            break;
+        }
+
+        Debug::out(LOG_DEBUG, line);        
+    }
+
+    Debug::out(LOG_DEBUG,"End of content of %s:", path);
+    Debug::out(LOG_DEBUG,"--------------------------------");
+
+    fclose(f);
+}
+
+
 

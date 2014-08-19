@@ -48,6 +48,8 @@ private:
 	void createSource(char *host, char *hostDir, bool nfsNotSamba, char *source);
 	
 	bool mountDumpContains(char *searchedString);
+
+    void copyTextFileToLog(char *path);
 };
 
 #endif
