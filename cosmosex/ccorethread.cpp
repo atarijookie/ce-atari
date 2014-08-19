@@ -17,7 +17,11 @@
 #define DEV_CHECK_TIME_MS	3000
 #define UPDATE_CHECK_TIME   1000
 
+#define WEB_PARAMS_CHECK_TIME_MS    3000
+#define WEB_PARAMS_FILE             "/tmp/ce_startupmode"
+
 extern bool g_noReset;                      // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
+extern BYTE g_logLevel;                     // current log level
 
 bool    g_gotHansFwVersion;
 bool    g_gotFranzFwVersion;
@@ -112,6 +116,7 @@ void CCoreThread::run(void)
 	
 	DWORD nextDevFindTime       = Utils::getCurrentMs();                // create a time when the devices should be checked - and that time is now
     DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);              // create a time when update download status should be checked
+    DWORD nextWebParsCheckTime  = Utils::getEndTime(WEB_PARAMS_CHECK_TIME_MS);  // create a time when we should check for new params from the web page
 
     Update::downloadUpdateList(NULL);                                   // download the list of components with the newest available versions
 
@@ -136,6 +141,12 @@ void CCoreThread::run(void)
             }        
         }
         
+        // should we check if there are new params received from debug web page?
+        if(Utils::getCurrentMs() >= nextWebParsCheckTime) {
+            readWebStartupMode();
+            nextWebParsCheckTime  = Utils::getEndTime(WEB_PARAMS_CHECK_TIME_MS);
+        }
+
         // should we check for the new devices?
 		if(Utils::getCurrentMs() >= nextDevFindTime) {	                
 			devFinder.lookForDevChanges();				                // look for devices attached / detached
@@ -648,4 +659,41 @@ void CCoreThread::handleSectorWritten(void)
     // TODO:
     // do the written sector processing
 }
+
+void CCoreThread::readWebStartupMode(void)
+{
+    FILE *f = fopen(WEB_PARAMS_FILE, "rt");
+
+    if(!f) {                                            // couldn't open file? nothing to do
+        return;
+    }
+
+    char tmp[64];
+    memset(tmp, 0, 64);
+
+    fgets(tmp, 64, f);
+    
+    int ires, logLev;
+    ires = sscanf(tmp, "ll%d", &logLev);                // read the param
+    fclose(f);
+
+    bool res = false;
+    if(ires == 1) {                                     // got the param
+        if(logLev >= LOG_OFF && logLev <= LOG_DEBUG) {  // param is valid
+            if(g_logLevel == logLev) {                  // but logLevel won't change? 
+                return;                                 // nothing to do
+            }
+
+            g_logLevel = logLev;                        // set new log level
+            res = true;
+        } 
+    }
+
+    if(res) {           // on success
+        Debug::out(LOG_ERROR, "Log level changed from file %s to level %d", WEB_PARAMS_FILE, logLev);
+    } else {            // on failure
+        Debug::out(LOG_ERROR, "Failed to get new log level from file %s", WEB_PARAMS_FILE);
+    }
+}
+
 

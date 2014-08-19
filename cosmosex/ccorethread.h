@@ -110,6 +110,9 @@ private:
     void handleSendTrack(void);
     void handleSectorWritten(void);
 
+    //----------------------------------
+    // other
+    void readWebStartupMode(void);
 };
 
 #endif // CCORETHREAD_H
