@@ -98,6 +98,9 @@ volatile WORD lastRequestTime;
 BYTE driveId;
 BYTE driveEnabled;
 
+BYTE isDiskChanged;
+BYTE isWriteProtected;
+
 WORD trackStreamedCount = 0;
 
 volatile TCircBuffer buff0, buff1;
@@ -106,6 +109,7 @@ void cicrularAdd(volatile TCircBuffer *cb, BYTE val);
 BYTE cicrularGet(volatile TCircBuffer *cb);
 
 void setupDriveSelect(void);
+void setupDiskChangeWriteProtect(void);
 
 int main (void) 
 {
@@ -126,11 +130,13 @@ int main (void)
     circularInit(&buff1);
 
     setupDriveSelect();                             // the drive select bits which should be LOW if the drive is selected
-
+    
     // init floppy signals
     GPIOB->BSRR = (WR_PROTECT | DISK_CHANGE);       // not write protected
     GPIOB->BRR = TRACK0 | DISK_CHANGE;              // TRACK 0 signal to L, DISK_CHANGE to LOW      
     GPIOB->BRR = ATN;                               // ATTENTION bit low - nothing to read
+
+    setupDiskChangeWriteProtect();                  // init write-protect and disk-change pins
 
     REQUEST_TRACK;                                  // request track 0, side 0
 
@@ -578,15 +584,15 @@ BYTE getNextMFMbyte(void)
 void processHostCommand(BYTE val)
 {
     switch(val) {
-        case CMD_WRITE_PROTECT_OFF:     GPIOB->BSRR     = WR_PROTECT;                   break;  // WR PROTECT to 1
-        case CMD_WRITE_PROTECT_ON:      GPIOB->BRR      = WR_PROTECT;                   break;  // WR PROTECT to 0
-        case CMD_DISK_CHANGE_OFF:       GPIOB->BSRR     = DISK_CHANGE;                  break;  // DISK_CHANGE to 1
-        case CMD_DISK_CHANGE_ON:        GPIOB->BRR      = DISK_CHANGE;                  break;  // DISK_CHANGE to 0
-        case CMD_GET_FW_VERSION:        sendFwVersion   = TRUE;                         break;  // send FW version string and receive commands
-        case CMD_SET_DRIVE_ID_0:        driveId         = 0;        setupDriveSelect(); break;  // set drive ID pins to check like this...
-        case CMD_SET_DRIVE_ID_1:        driveId         = 1;        setupDriveSelect(); break;  // ...or that!
-        case CMD_DRIVE_ENABLED:         driveEnabled    = TRUE;     setupDriveSelect(); break;  // drive is now enabled
-        case CMD_DRIVE_DISABLED:        driveEnabled    = FALSE;    setupDriveSelect(); break;  // drive is now disabled
+        case CMD_WRITE_PROTECT_OFF: isWriteProtected    = FALSE;    setupDiskChangeWriteProtect();  break;  // not write protected
+        case CMD_WRITE_PROTECT_ON:  isWriteProtected    = TRUE;     setupDiskChangeWriteProtect();  break;  // is write protected
+        case CMD_DISK_CHANGE_OFF:   isDiskChanged       = FALSE;    setupDiskChangeWriteProtect();  break;  // not changed
+        case CMD_DISK_CHANGE_ON:    isDiskChanged       = TRUE;     setupDiskChangeWriteProtect();  break;  // has changed
+        case CMD_GET_FW_VERSION:    sendFwVersion       = TRUE;                                     break;  // send FW version string and receive commands
+        case CMD_SET_DRIVE_ID_0:    driveId             = 0;        setupDriveSelect();             break;  // set drive ID pins to check like this...
+        case CMD_SET_DRIVE_ID_1:    driveId             = 1;        setupDriveSelect();             break;  // ...or that!
+        case CMD_DRIVE_ENABLED:     driveEnabled        = TRUE;     setupDriveSelect();             break;  // drive is now enabled
+        case CMD_DRIVE_DISABLED:    driveEnabled        = FALSE;    setupDriveSelect();             break;  // drive is now disabled
     }
 }
 
@@ -723,3 +729,24 @@ void setupDriveSelect(void)
         drive_select = MOTOR_ENABLE | DRIVE_SELECT1;
     }
 }
+
+void setupDiskChangeWriteProtect(void)
+{
+    if(isDiskChanged) {                     // if disk HAS changed, write protect is inverted
+        if(isWriteProtected) {
+            GPIOB->BSRR     = WR_PROTECT;   // WR PROTECT to 1
+        } else {
+            GPIOB->BRR      = WR_PROTECT;   // WR PROTECT to 0
+        }
+        GPIOB->BRR          = DISK_CHANGE;  // DISK_CHANGE to 0
+    } else {                                // if disk NOT changed, write protect behaves normally
+        if(isWriteProtected) {
+            GPIOB->BRR      = WR_PROTECT;   // WR PROTECT to 0
+        } else {
+            GPIOB->BSRR     = WR_PROTECT;   // WR PROTECT to 1
+        }
+        
+        GPIOB->BSRR         = DISK_CHANGE;  // DISK_CHANGE to 1
+    }
+}
+

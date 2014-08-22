@@ -37,6 +37,8 @@ extern volatile WORD lastRequestTime;
 
 extern BYTE driveId;
 extern BYTE driveEnabled;
+extern BYTE isDiskChanged;
+extern BYTE isWriteProtected;
 
 void spi_init(void)
 {
@@ -235,6 +237,9 @@ void init_hw_sw(void)
 
     driveId         = 0;
     driveEnabled    = TRUE;
+    
+    isDiskChanged       = FALSE;
+    isWriteProtected    = FALSE;
     
     FloppyOut_Disable();
     
