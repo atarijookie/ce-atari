@@ -268,7 +268,7 @@ void showConnectionErrorMessage(void)
     if(isUpdateScreen == FALSE) {
         (void) Cconws("Communication with CosmosEx failed.\n\rWill try to reconnect in a while.\n\r\n\rTo quit to desktop, press F10\n\r");
     } else {
-        (void) Cconws("CosmosEx device is updating...\n\rPlease wait and do not turn off!\n\r");
+        (void) Cconws("\33pCosmosEx device is updating...\n\rPlease wait and do not turn off!\33q\n\r");
     }
 	
 	prevCommandFailed = 1;
