@@ -306,6 +306,9 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
 	bfr[totalCnt] = 0;									// add string terminator
 	totalCnt++;
 
+    bfr[totalCnt] = isUpdateScreen();                   // after the string store a flag if this screen is update screen, so the ST client could show good message on update
+	totalCnt++;
+
     return totalCnt;                                    // return the count of bytes used
 }
 
@@ -729,4 +732,15 @@ void ConfigStream::replaceNewLineWithGoto(std::string &line, int startX, int sta
     }
 }
 
+BYTE ConfigStream::isUpdateScreen(void)
+{
+    ConfigComponent *c1 = findComponentById(COMPID_UPDATE_COSMOSEX);    // if we have this component, then we're on update versions screen
+    ConfigComponent *c2 = findComponentById(COMPID_DL1);                // if we have this component, then we're on update download screen
+
+    if(c1 == NULL && c2 == NULL) {                                      // both update components unavailable? not update screen
+        return 0;
+    }
+
+    return 1;                                                           // one of the update components is available, so we're on the update screen
+}
 

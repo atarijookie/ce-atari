@@ -133,6 +133,7 @@ private:
     void onUpdateCheck(void);
     void onUpdateCheckUsb(void);
     void onUpdateUpdate(void);
+    BYTE isUpdateScreen(void);
     void datesToStrings(Version &v1, Version &v2, std::string &str);
     void createScreen_update_download(void);
     void getProgressLine(int index, std::string &lines, std::string &line);
