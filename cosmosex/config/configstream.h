@@ -18,7 +18,7 @@ enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED
                  CS_UPDATE_CHECK,       CS_UPDATE_CHECK_USB,    CS_UPDATE_UPDATE,       
                  CS_SHARED_TEST,        CS_SHARED_SAVE,
                  CS_FLOPPY_IMAGE_SAVE,  CS_FLOPPY_CONFIG_SAVE,
-                 CS_OTHER_SAVE
+                 CS_OTHER_SAVE,         CS_RESET_SETTINGS
                 };
 
 
@@ -141,7 +141,9 @@ private:
     void onSharedSave(void);
 
     void onFloppyConfigSave(void);
+
     void onOtherSave(void);
+    void onResetSettings(void);
     
     bool verifyAndFixIPaddress(std::string &in, std::string &out, bool emptyIsOk);
 

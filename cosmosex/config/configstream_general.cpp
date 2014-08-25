@@ -649,7 +649,9 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_UPDATE_CHECK:       onUpdateCheck();            break;
     case CS_UPDATE_CHECK_USB:   onUpdateCheckUsb();         break;
     case CS_UPDATE_UPDATE:      onUpdateUpdate();           break;
+
     case CS_OTHER_SAVE:         onOtherSave();              break;
+    case CS_RESET_SETTINGS:     onResetSettings();          break;
 
 //    case CS_SHARED_TEST:        onSharedTest();             break;
     case CS_SHARED_SAVE:        onSharedSave();             break;

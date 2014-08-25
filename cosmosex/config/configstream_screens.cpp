@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "../global.h"
 #include "../debug.h"
@@ -844,6 +845,10 @@ void ConfigStream::createScreen_other(void)
     comp->setComponentId(COMPID_TIMESYNC_UTC_OFFSET);
     screen.push_back(comp);
     //----------------------
+
+    comp = new ConfigComponent(this, ConfigComponent::button, " Reset all settings ",       19, 10, 14, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_RESET_SETTINGS);
+    screen.push_back(comp);
     
     comp = new ConfigComponent(this, ConfigComponent::button, "   Save   ",                 10,  6, 16, gotoOffset);
     comp->setOnEnterFunctionCode(CS_OTHER_SAVE);
@@ -1178,5 +1183,14 @@ void ConfigStream::onSharedSave(void)
 	}
 
     createScreen_homeScreen();		// now back to the home screen
+}
+
+void ConfigStream::onResetSettings(void)
+{
+    createScreen_homeScreen();		// now back to the home screen
+
+    showMessageScreen((char *) "Reset all settings", (char *) "All settings have been reset to default.\n\rReseting your ST might be a good idea...");
+
+    system("rm -f /ce/settings/*");
 }
 
