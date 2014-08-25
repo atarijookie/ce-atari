@@ -1,10 +1,14 @@
 /*--------------------------------------------------*/
-#include <tos.h>
-#include <stdio.h>
-#include <screen.h>
-#include <string.h>
-#include <stdlib.h>
+#include <mint/sysbind.h>
+#include <mint/osbind.h>
+#include <mint/basepage.h>
+#include <mint/ostruct.h>
+#include <support.h>
 
+#include <stdint.h>
+#include <stdio.h>
+
+#include "stdlib.h"
 #include "acsi.h"
 #include "keys.h"
 /*--------------------------------------------------*/
@@ -17,10 +21,14 @@ void showConnectionErrorMessage(void);
 
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
 BYTE ce_identify(BYTE ACSI_id);
+
+void retrieveIsUpdateScreen(char *stream);
+BYTE isUpdateScreen;
 /*--------------------------------------------------*/
 BYTE      deviceID;
 
-BYTE myBuffer[4*512];
+#define BUFFER_SIZE         (4*512)
+BYTE myBuffer[BUFFER_SIZE];
 BYTE *pBuffer;
 
 BYTE prevCommandFailed;
@@ -35,6 +43,9 @@ BYTE prevCommandFailed;
 #define CFG_CMD_SET_RESOLUTION      2
 #define CFG_CMD_REFRESH             0xfe
 #define CFG_CMD_GO_HOME				0xff
+
+#define Clear_home()    (void) Cconws("\33E")
+
 /*--------------------------------------------------*/
 int main(void)
 {
@@ -45,6 +56,8 @@ int main(void)
 	DWORD toEven;
 	void *OldSP;
 
+    isUpdateScreen = FALSE;
+    
 	OldSP = (void *) Super((void *)0);  			/* supervisor mode */ 
 	
 	prevCommandFailed = 0;
@@ -63,12 +76,16 @@ int main(void)
 	deviceID = 0;
 
 	Clear_home();
-	printf("Looking for CosmosEx:\n");
+	(void) Cconws("Looking for CosmosEx:\n\r");
 
+    char bfr[2];
+	bfr[1] = 0; 
+    
 	while(1) {
 		for(i=0; i<8; i++) {
-			printf("%d", i);
-      
+            bfr[0] = i + '0';
+            (void) Cconws(bfr); 
+        
 			res = ce_identify(i);      					/* try to read the IDENTITY string */
       
 			if(res == 1) {                           	/* if found the CosmosEx */
@@ -81,7 +98,7 @@ int main(void)
 			break;
 		}
       
-		printf(" - not found.\nPress any key to retry or 'Q' to quit.\n");
+		(void) Cconws(" - not found.\n\rPress any key to retry or 'Q' to quit.\n\r");
 		key = Cnecin();
     
 		if(key == 'Q' || key=='q') {
@@ -90,7 +107,10 @@ int main(void)
 		}
 	}
   
-	printf("\n\nCosmosEx ACSI ID: %d\n", (int) deviceID);
+	(void) Cconws("\n\r\n\rCosmosEx ACSI ID: ");
+    (void) Cconws(bfr); 
+    (void) Cconws("\n\r"); 
+    
 	/* ----------------- */
 	setResolution();							/* send the current ST resolution for screen centering */
 	
@@ -161,7 +181,8 @@ void sendKeyDown(BYTE key)
 		showHomeScreen();
 	}
 	
-	Cconws((char *) pBuffer);						/* now display the buffer */
+    retrieveIsUpdateScreen((char *) pBuffer);       // get the flag isUpdateScreen from the end of the stream
+	(void) Cconws((char *) pBuffer);				// now display the buffer
 }
 /*--------------------------------------------------*/
 void showHomeScreen(void)							
@@ -186,7 +207,8 @@ void showHomeScreen(void)
 		showHomeScreen();
 	}
 	
-	Cconws((char *) pBuffer);						/* now display the buffer */
+    retrieveIsUpdateScreen((char *) pBuffer);       // get the flag isUpdateScreen from the end of the stream
+	(void) Cconws((char *) pBuffer);				// now display the buffer
 }
 /*--------------------------------------------------*/
 void refreshScreen(void)							
@@ -204,7 +226,8 @@ void refreshScreen(void)
 		return;
 	}
 	
-	Cconws((char *) pBuffer);						/* now display the buffer */
+    retrieveIsUpdateScreen((char *) pBuffer);       // get the flag isUpdateScreen from the end of the stream
+	(void) Cconws((char *) pBuffer);				// now display the buffer
 }
 /*--------------------------------------------------*/
 void setResolution(void)							
@@ -241,7 +264,12 @@ BYTE ce_identify(BYTE ACSI_id)
 void showConnectionErrorMessage(void)
 {
 	Clear_home();
-	printf("Communication with CosmosEx failed.\nWill try to reconnect in a while.\n\nTo quit to desktop, press F10\n");
+    
+    if(isUpdateScreen == FALSE) {
+        (void) Cconws("Communication with CosmosEx failed.\n\rWill try to reconnect in a while.\n\r\n\rTo quit to desktop, press F10\n\r");
+    } else {
+        (void) Cconws("CosmosEx device is updating...\n\rPlease wait and do not turn off!\n\r");
+    }
 	
 	prevCommandFailed = 1;
 }
@@ -292,6 +320,27 @@ BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
 	return 0;							/* unknown key */
 }
 /*--------------------------------------------------*/
-
+void retrieveIsUpdateScreen(char *stream)
+{
+    WORD i;
+    
+    for(i=0; i<BUFFER_SIZE; i++) {
+        if(stream[i] == 0) {            // end of stream? good
+            break;
+        }
+    }
+    
+    if(i == BUFFER_SIZE) {              // reached end of buffer? not update screen (possibly)
+        isUpdateScreen = FALSE;
+        return;
+    }
+    
+    if(stream[i + 1] == 1) {            // if the flag after the stream is equal to 1, then it's update screen
+        isUpdateScreen = TRUE;
+    } else {                            // it's not update screen
+        isUpdateScreen = FALSE;
+    }
+}
+/*--------------------------------------------------*/
 
 
