@@ -33,6 +33,7 @@ BYTE *pBfr, *pBfrCnt;
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
 
 BYTE getCurrentSlot(void);
+BYTE setCurrentSlot(BYTE newSlot);
 BYTE currentSlot;
 
 BYTE uploadImage(int index, char *path);
@@ -45,7 +46,7 @@ BYTE getIsImageBeingEncoded(void);
 // ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
 {
-	BYTE found;
+	BYTE found, setSlot;
 
 	// write some header out
 	(void) Clear_home();
@@ -94,6 +95,12 @@ int main( int argc, char* argv[] )
         return 0;
     }
     
+    setSlot = 0;
+    if(currentSlot > 2) {                                           // current slot is out of index? (probably empty slot selected) Upload to slot #0
+        currentSlot = 0;
+        setSlot     = 1;                                            // we need to update the slot after upload and encode
+    }
+    
     // upload the image to CosmosEx
     res = uploadImage((int) currentSlot, path);                     // now try to upload
     
@@ -110,19 +117,23 @@ int main( int argc, char* argv[] )
     while(1) {
         res = getIsImageBeingEncoded();
     
-        if(res == ENCODING_DONE) {
+        if(res == ENCODING_DONE) {                                  // encoding went OK
+            if(setSlot) {                                           // if we uploaded to slot #0 when empty slot was selected, switch to slot #0
+                setCurrentSlot(currentSlot);
+            }
+        
             (void) Cconws("Done. Reset ST to boot from the uploaded floppy.\r\n");
             getKey();
             break;
         }
 
-        if(res == ENCODING_FAIL) {
+        if(res == ENCODING_FAIL) {                                  // encoding failed
             (void) Cconws("Final phase failed, press key to terminate.\r\n");
             getKey();
             break;
         }
         
-        sleep(1);
+        sleep(1);                                                   // encoding still running
         (void) Cconws(".");
     }
     
@@ -361,6 +372,24 @@ BYTE getCurrentSlot(void)
 		
 	if(res == FDD_OK) {                         // good? copy in the results
         currentSlot = pBfr[0];
+        return 1;
+    } 
+    
+    // bad? show error
+    showComError();
+    return 0;
+}
+
+BYTE setCurrentSlot(BYTE newSlot)
+{
+    commandShort[4] = FDD_CMD_SET_CURRENT_SLOT;
+    commandShort[5] = newSlot;
+    
+    sectorCount = 1;                            // read 1 sector
+
+    BYTE res = Supexec(ce_acsiReadCommand); 
+		
+	if(res == FDD_OK) {                         // good? copy in the results
         return 1;
     } 
     
