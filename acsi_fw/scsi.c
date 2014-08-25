@@ -12,6 +12,9 @@ extern BYTE sdCardID;
 extern char *VERSION_STRING_SHORT;
 extern char *DATE_STRING;
 
+ScsiLogItem scsiLogs[SCSI_LOG_LENGTH];
+BYTE scsiLogNow;
+
 void processScsiLocaly(BYTE justCmd, BYTE isIcd)
 {
     BYTE lun;
@@ -118,7 +121,7 @@ void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun)
     }
     
     // for sector write commands
-    if(justCmd == SCSI_C_WRITE6 || justCmd == SCSI_C_WRITE6) {
+    if(justCmd == SCSI_C_WRITE6 || justCmd == SCSI_C_WRITE10) {
         res = mmcWrite_dma(sector, lenX);
         handled = TRUE;
     }
@@ -423,4 +426,33 @@ void SCSI_FormatUnit(void)
 
 		PIO_read(sdCard.LastStatus);                            // send status byte
 	}
+}
+
+void scsi_log_init(void)
+{
+    BYTE i,j;
+    
+    for(i=0; i<SCSI_LOG_LENGTH; i++) {
+        
+        for(j=0; j<14; j++) {
+            scsiLogs[i].cmd[j] = 0;
+        }
+        scsiLogs[i].res = 0;
+    }
+    
+    scsiLogNow = 0;
+}
+
+void scsi_log_add(void)
+{
+    BYTE j;
+    
+    for(j=0; j<14; j++) {
+        scsiLogs[scsiLogNow].cmd[j] = cmd[j];
+    }
+    
+    scsiLogs[scsiLogNow].res = sdCard.LastStatus;
+    
+    scsiLogNow++;
+    scsiLogNow = scsiLogNow & SCSI_LOG_MASK;
 }

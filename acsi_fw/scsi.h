@@ -101,4 +101,17 @@ void scsi_returnLUNnotSupported(void);
 void scsi_returnUnitAttention(void);
 void ICD7_to_SCSI6(void);
 
+//------------------------------------------------------
+typedef struct 
+{
+    BYTE cmd[14];
+    BYTE res;
+} ScsiLogItem;
+
+#define SCSI_LOG_LENGTH     16
+#define SCSI_LOG_MASK       0x0f
+
+void scsi_log_init(void);
+void scsi_log_add(void);
+
 #endif

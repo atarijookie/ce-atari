@@ -105,10 +105,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa014, 0x0812};                             // this means: hAns, 2014-08-12
+WORD version[2] = {0xa014, 0x0825};                             // this means: hAns, 2014-08-25
 
 char *VERSION_STRING_SHORT  = {"1.00"};
-char *DATE_STRING           = {"08/12/14"};
+char *DATE_STRING           = {"08/25/14"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
@@ -327,6 +327,8 @@ void initAllStuff(void)
     } else {
         sdCardZeroInitStruct();
     }
+    
+//    scsi_log_init();
 }
 
 void onButtonPress(void)
@@ -444,6 +446,7 @@ void onGetCommand(void)
 
                 if(cmdIsForCE != TRUE || tag1 != 'C' || tag2 != 'E') {    // the command is not TEST UNIT READY and there isn't a valid CE tag? process localy
                     processScsiLocaly(justCmd, isIcd);
+//                    scsi_log_add();
                     return;
                 }
             }
