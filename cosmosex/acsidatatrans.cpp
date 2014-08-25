@@ -247,6 +247,10 @@ void AcsiDataTrans::sendDataAndStatus(void)
 	
 	BYTE inBuf[8];
 	
+    if((count & 1) != 0) {                                  // odd number of bytes? make it even, we're sending words...
+        count++;
+    }
+    
     while(count > 0) {                                      // while there's something to send
 		bool res = com->waitForATN(SPI_CS_HANS, ATN_READ_MORE_DATA, 1000, inBuf);	// wait for ATN_READ_MORE_DATA
 
