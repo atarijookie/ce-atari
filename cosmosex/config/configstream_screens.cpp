@@ -816,7 +816,7 @@ void ConfigStream::createScreen_other(void)
 
     ConfigComponent *comp;
 
-    int row     = 9;
+    int row     = 5;
     int col     = 7;
     int col2    = 20;
     
@@ -846,7 +846,7 @@ void ConfigStream::createScreen_other(void)
     screen.push_back(comp);
     //----------------------
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Reset all settings ",       19, 10, 14, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Reset all settings ",       19, 10, 13, gotoOffset);
     comp->setOnEnterFunctionCode(CS_RESET_SETTINGS);
     screen.push_back(comp);
     
