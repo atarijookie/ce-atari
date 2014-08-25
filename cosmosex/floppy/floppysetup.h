@@ -77,6 +77,9 @@ private:
     void searchMark(void);
     void searchDownload(void);
     void searchRefreshList(void);
+
+    void getCurrentSlot(void);
+    void getImageEncodingRunning(void);
 };
 
 #endif

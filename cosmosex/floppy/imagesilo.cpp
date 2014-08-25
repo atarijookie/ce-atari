@@ -21,8 +21,12 @@ std::queue<EncodeRequest> encodeQueue;
 
 extern bool g_test;                                         // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
 
+volatile bool floppyEncodingRunning;
+
 void encodeAdd(EncodeRequest &er)
 {
+    floppyEncodingRunning = true;		
+
 	pthread_mutex_lock(&floppyEncodeThreadMutex);			// try to lock the mutex
 	encodeQueue.push(er);									// add this to queue
 	pthread_mutex_unlock(&floppyEncodeThreadMutex);			// unlock the mutex
@@ -35,6 +39,8 @@ void *floppyEncodeThreadCode(void *ptr)
     MfmCachedImage      encImage;
     FloppyImageFactory  imageFactory;
 
+    floppyEncodingRunning = false;
+
 	while(sigintReceived == 0) {
 		pthread_mutex_lock(&floppyEncodeThreadMutex);		// lock the mutex
 
@@ -43,7 +49,9 @@ void *floppyEncodeThreadCode(void *ptr)
 			sleep(1);										// wait 1 second and try again
 			continue;
 		}
-		
+
+        floppyEncodingRunning = true;		
+
 		EncodeRequest er = encodeQueue.front();				// get the 'oldest' element from queue
 		encodeQueue.pop();									// and remove it form queue
 		pthread_mutex_unlock(&floppyEncodeThreadMutex);		// unlock the mutex
@@ -80,7 +88,11 @@ void *floppyEncodeThreadCode(void *ptr)
 		} else {
 			Debug::out(LOG_INFO, "Encoding of image %S - Image file type not supported!", (char *) er.filename.c_str());
 		}
+
+        floppyEncodingRunning = false;
 	}
+
+    floppyEncodingRunning = false;
 	
 	Debug::out(LOG_INFO, "Floppy encode thread terminated.");
 	return 0;
@@ -308,6 +320,11 @@ void ImageSilo::setCurrentSlot(int index)
     } else {                                    // index bad? use slot with empty imave
         currentSlot = EMPTY_IMAGE_SLOT;
     }
+}
+
+int ImageSilo::getCurrentSlot(void)
+{
+    return currentSlot;
 }
 
 BYTE *ImageSilo::getEncodedTrack(int track, int side, int &bytesInBuffer)

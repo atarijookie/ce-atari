@@ -17,6 +17,8 @@
 
 volatile BYTE currentImageDownloadStatus;
 
+extern volatile bool floppyEncodingRunning;
+
 FloppySetup::FloppySetup()
 {
     dataTrans   = NULL;
@@ -95,6 +97,8 @@ void FloppySetup::processCommand(BYTE *command)
         case FDD_CMD_REMOVESLOT:                imageSilo->remove(cmd[5]);  dataTrans->setStatus(FDD_OK);	break;
 
         case FDD_CMD_NEW_EMPTYIMAGE:            newImage();                 break;
+        case FDD_CMD_GET_CURRENT_SLOT:          getCurrentSlot();           break;
+        case FDD_CMD_GET_IMAGE_ENCODING_RUNNING: getImageEncodingRunning(); break;
 
         case FDD_CMD_DOWNLOADIMG_START:         downloadStart();            break;
         case FDD_CMD_DOWNLOADIMG_ONDEVICE:      downloadOnDevice();         break;
@@ -643,6 +647,26 @@ void FloppySetup::searchRefreshList(void)
 {
     imageList.refreshList();
 
+    dataTrans->setStatus(FDD_OK);
+}
+
+void FloppySetup::getCurrentSlot(void)
+{
+    BYTE currentSlot = imageSilo->getCurrentSlot();
+
+    dataTrans->addDataByte(currentSlot);
+    dataTrans->padDataToMul16();
+    dataTrans->setStatus(FDD_OK);
+}
+
+void FloppySetup::getImageEncodingRunning(void)
+{
+    BYTE encondingRunning;
+
+    encondingRunning = floppyEncodingRunning ? 1 : 0;
+
+    dataTrans->addDataByte(encondingRunning);
+    dataTrans->padDataToMul16();
     dataTrans->setStatus(FDD_OK);
 }
 

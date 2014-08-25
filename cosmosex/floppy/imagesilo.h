@@ -42,6 +42,7 @@ public:
 
 	BYTE getSlotBitmap(void);
 	void setCurrentSlot(int index);
+    int  getCurrentSlot(void);
 	BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
 	bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
 	

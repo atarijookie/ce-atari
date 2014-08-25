@@ -74,6 +74,8 @@
 #define FDD_CMD_SWAPSLOTS                   20
 #define FDD_CMD_REMOVESLOT                  21
 #define FDD_CMD_NEW_EMPTYIMAGE              22
+#define FDD_CMD_GET_CURRENT_SLOT            25
+#define FDD_CMD_GET_IMAGE_ENCODING_RUNNING  28
 
 #define FDD_CMD_DOWNLOADIMG_START           30
 #define FDD_CMD_DOWNLOADIMG_GETBLOCK        31
