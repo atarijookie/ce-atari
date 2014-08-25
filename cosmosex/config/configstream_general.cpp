@@ -238,7 +238,7 @@ void ConfigStream::onKeyDown(BYTE key)
 int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
 {
     int totalCnt = 0;
-
+    
     if(showingMessage) {								// if we're showing the message
         if(homeScreen) {								// but we should show home screen
             hideMessageScreen();						// hide the message
@@ -262,16 +262,13 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
     StupidVector &scr = showingMessage ? message : screen;		// if we should show message, set reference to message, otherwise set reference to screen
 
     // first turn off the cursor to avoid cursor blinking on the screen
-    bfr[0] = 27;
-    bfr[1] = 'f';       // CUR_OFF
-    bfr += 2;
+    *bfr++ = 27;
+    *bfr++ = 'f';       // CUR_OFF
     totalCnt += 2;
 
     if(screenChanged) {									// if screen changed, clear screen (CLEAR_HOME) and draw it all
-        bfr[0] = 27;
-        bfr[1] = 'E';   // CLEAR_HOME
-
-        bfr += 2;
+        *bfr++ = 27;
+        *bfr++ = 'E';   // CLEAR_HOME
         totalCnt += 2;
     }
 
@@ -303,12 +300,12 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
 
     screenChanged = false;
 	
-	bfr[totalCnt] = 0;									// add string terminator
+	*bfr++ = 0;									        // add string terminator
 	totalCnt++;
 
-    bfr[totalCnt] = isUpdateScreen();                   // after the string store a flag if this screen is update screen, so the ST client could show good message on update
+    *bfr++ = isUpdateScreen();                   // after the string store a flag if this screen is update screen, so the ST client could show good message on update
 	totalCnt++;
-
+    
     return totalCnt;                                    // return the count of bytes used
 }
 
