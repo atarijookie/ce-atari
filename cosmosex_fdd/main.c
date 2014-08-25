@@ -186,7 +186,7 @@ BYTE ce_findId(void)
 	}
 
 	// if not found 
-    (void) Cconws("\r\nCosmosEx not found on ACSI bus, not installing driver.");
+    (void) Cconws("\r\nCosmosEx not found on ACSI bus...");
 	return 0;
 }
 
