@@ -79,6 +79,7 @@ private:
     void searchRefreshList(void);
 
     void getCurrentSlot(void);
+    void setCurrentSlot(void);
     void getImageEncodingRunning(void);
 };
 

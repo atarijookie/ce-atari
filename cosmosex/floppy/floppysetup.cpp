@@ -98,6 +98,7 @@ void FloppySetup::processCommand(BYTE *command)
 
         case FDD_CMD_NEW_EMPTYIMAGE:            newImage();                 break;
         case FDD_CMD_GET_CURRENT_SLOT:          getCurrentSlot();           break;
+        case FDD_CMD_SET_CURRENT_SLOT:          setCurrentSlot();           break;
         case FDD_CMD_GET_IMAGE_ENCODING_RUNNING: getImageEncodingRunning(); break;
 
         case FDD_CMD_DOWNLOADIMG_START:         downloadStart();            break;
@@ -652,10 +653,18 @@ void FloppySetup::searchRefreshList(void)
 
 void FloppySetup::getCurrentSlot(void)
 {
-    BYTE currentSlot = imageSilo->getCurrentSlot();
+    BYTE currentSlot = imageSilo->getCurrentSlot();     // get the current slot
 
     dataTrans->addDataByte(currentSlot);
     dataTrans->padDataToMul16();
+    dataTrans->setStatus(FDD_OK);
+}
+
+void FloppySetup::setCurrentSlot(void)
+{
+    int newSlot = (int) cmd[5];
+
+    imageSilo->setCurrentSlot(newSlot);                 // set the slot for valid index, set the empty image for invalid slot
     dataTrans->setStatus(FDD_OK);
 }
 
@@ -665,7 +674,7 @@ void FloppySetup::getImageEncodingRunning(void)
 
     encondingRunning = floppyEncodingRunning ? 1 : 0;
 
-    dataTrans->addDataByte(encondingRunning);
+    dataTrans->addDataByte(encondingRunning);           // return if the encoding thread is encoding some image
     dataTrans->padDataToMul16();
     dataTrans->setStatus(FDD_OK);
 }
