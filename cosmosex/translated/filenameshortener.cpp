@@ -154,6 +154,10 @@ void FilenameShortener::removeTrailingSpaces(char *str)
 
 bool FilenameShortener::shortToLongFileName(char *shortFileName, char *longFileName)
 {
+    if(strlen(shortFileName) == 0) {                            // empty short path? fail
+        return false;
+    }
+
     // find out if we do have a long file name for this short filename
     std::map<std::string, std::string>::iterator it;
     it = mapReverseFilename.find(shortFileName);                    // try to find the string in the map

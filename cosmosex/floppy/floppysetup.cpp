@@ -25,6 +25,7 @@ FloppySetup::FloppySetup()
     up          = NULL;
     imageSilo   = NULL;
     translated  = NULL;
+    reloadProxy = NULL;
 
     currentUpload.fh = NULL;
 
@@ -36,6 +37,11 @@ FloppySetup::FloppySetup()
 FloppySetup::~FloppySetup()
 {
 
+}
+
+void FloppySetup::setSettingsReloadProxy(SettingsReloadProxy *rp)
+{
+    reloadProxy = rp;
 }
 
 void FloppySetup::setAcsiDataTrans(AcsiDataTrans *dt)
@@ -666,6 +672,10 @@ void FloppySetup::setCurrentSlot(void)
 
     imageSilo->setCurrentSlot(newSlot);                 // set the slot for valid index, set the empty image for invalid slot
     dataTrans->setStatus(FDD_OK);
+    
+    if(reloadProxy) {                                   // if got settings reload proxy, invoke reload
+        reloadProxy->reloadSettings(SETTINGSUSER_FLOPPY_SLOT);
+    }
 }
 
 void FloppySetup::getImageEncodingRunning(void)

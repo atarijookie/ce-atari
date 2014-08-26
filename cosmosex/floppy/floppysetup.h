@@ -6,6 +6,7 @@
 #include "../settingsreloadproxy.h"
 #include "../datatypes.h"
 #include "../translated/translateddisk.h"
+#include "../settingsreloadproxy.h"
 #include "imagesilo.h"
 #include "imagelist.h"
 
@@ -26,6 +27,7 @@ public:
     void setAcsiDataTrans(AcsiDataTrans *dt);
     void setImageSilo(ImageSilo *imgSilo);
     void setTranslatedDisk(TranslatedDisk *td);
+    void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
     static bool createNewImage(std::string pathAndFile);
 
@@ -33,6 +35,7 @@ private:
     AcsiDataTrans       *dataTrans;
     ImageSilo           *imageSilo;
     TranslatedDisk      *translated;
+    SettingsReloadProxy *reloadProxy;
     ImageList           imageList;    
 
     FILE    *up;

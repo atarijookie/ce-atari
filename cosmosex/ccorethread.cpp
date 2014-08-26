@@ -59,6 +59,7 @@ CCoreThread::CCoreThread()
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_ACSI);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPYIMGS);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPYCONF);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPY_SLOT);
 	
     settingsReloadProxy.addSettingsUser((ISettingsUser *) scsi,          SETTINGSUSER_ACSI);
 
@@ -72,6 +73,7 @@ CCoreThread::CCoreThread()
     floppySetup.setAcsiDataTrans(dataTrans);
     floppySetup.setImageSilo(&floppyImageSilo);
     floppySetup.setTranslatedDisk(translated);
+    floppySetup.setSettingsReloadProxy(&settingsReloadProxy);
 
     // the floppy image silo might change settings (when images are changes), add settings reload proxy
     floppyImageSilo.setSettingsReloadProxy(&settingsReloadProxy);
@@ -322,7 +324,7 @@ void CCoreThread::reloadSettings(int type)
         setEnabledFloppyImgs = true;
         return;
     }
-
+    
     if(type == SETTINGSUSER_FLOPPYCONF) {
         Settings s;
         s.loadFloppyConfig(&floppyConfig);
@@ -331,6 +333,11 @@ void CCoreThread::reloadSettings(int type)
         return;
     }
 
+    if(type == SETTINGSUSER_FLOPPY_SLOT) {
+        setFloppyImageLed(floppyImageSilo.getCurrentSlot());
+        return;
+    }
+    
 	// first dettach all the devices
 	scsi->detachAll();
 
