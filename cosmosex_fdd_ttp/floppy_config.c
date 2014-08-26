@@ -35,7 +35,6 @@ BYTE uploadImage(int index, char *path)
     short fh = Fopen(path, 0);               		// open file for reading
   
     if(fh < 0) {
-        (void) Clear_home();
         (void) Cconws("Failed to open the file:\r\n");
         (void) Cconws(path);
         (void) Cconws("\r\n");
@@ -58,7 +57,7 @@ BYTE uploadImage(int index, char *path)
 		
     if(res == FDD_RES_ONDEVICECOPY) {                           // if the device returned this code, it means that it could do the image upload / copy on device, no need to upload it from ST!
         Fclose(fh);
-        return 0;
+        return 1;
     }
         
     if(res != FDD_OK) {                                         // bad? write error
@@ -70,7 +69,6 @@ BYTE uploadImage(int index, char *path)
     //---------------
     // upload the image by 64kB blocks
     
-    (void) Clear_home();
     (void) Cconws("Uploading file:\r\n");
     (void) Cconws(path);
     (void) Cconws("\r\n");
@@ -122,7 +120,8 @@ BYTE uploadImage(int index, char *path)
         
         blockNo++;
     }    
-    
+
+    (void) Cconws("\r\n");
     Fclose(fh);                                 // close the file
 
     // now tell the device if it went good or bad
@@ -139,10 +138,9 @@ BYTE uploadImage(int index, char *path)
     res = Supexec(ce_acsiReadCommand);     
 
     if(res != FDD_OK) {                         // bad? write error
-        (void) Clear_home();
         (void) Cconws("Failed to finish upload...\r\n");
         return 0;
-    }
+    } 
     
     return 1;
 }

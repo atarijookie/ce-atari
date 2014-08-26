@@ -52,10 +52,10 @@ int main( int argc, char* argv[] )
 	(void) Clear_home();
 	(void) Cconws("\33p[  CosmosEx floppy TTP  ]\r\n[    by Jookie 2014     ]\33q\r\n\r\n");
     
-    char *params        = (char *) argv;
+    char *params        = (char *) argv;                            // get pointer to params (path to file)
     int paramsLength    = (int) params[0];
     char *path          = params + 1;
-    
+   
     if(paramsLength == 0) {
         (void) Cconws("This is a drap-and-drop, upload\r\n");
         (void) Cconws("and run floppy tool.\r\n\r\n");
@@ -65,7 +65,9 @@ int main( int argc, char* argv[] )
         getKey();
         return 0;
     }
-  
+
+    path[paramsLength]  = 0;                                        // terminate path
+    
 	pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
 	
 	if(pBfrOrig == NULL) {
@@ -94,7 +96,7 @@ int main( int argc, char* argv[] )
         Mfree(pBfrOrig);
         return 0;
     }
-    
+
     setSlot = 0;
     if(currentSlot > 2) {                                           // current slot is out of index? (probably empty slot selected) Upload to slot #0
         currentSlot = 0;
@@ -112,7 +114,7 @@ int main( int argc, char* argv[] )
     }
 
     // wait until image is being encoded
-    (void) Cconws("Image processing is running, please wait...\r\n");
+    (void) Cconws("Please wait, processing image: ");
     
     while(1) {
         res = getIsImageBeingEncoded();
@@ -122,19 +124,19 @@ int main( int argc, char* argv[] )
                 setCurrentSlot(currentSlot);
             }
         
-            (void) Cconws("Done. Reset ST to boot from the uploaded floppy.\r\n");
+            (void) Cconws("\n\rDone. Reset ST to boot from the uploaded floppy.\r\n");
             getKey();
             break;
         }
 
         if(res == ENCODING_FAIL) {                                  // encoding failed
-            (void) Cconws("Final phase failed, press key to terminate.\r\n");
+            (void) Cconws("\n\rFinal phase failed, press key to terminate.\r\n");
             getKey();
             break;
         }
         
         sleep(1);                                                   // encoding still running
-        (void) Cconws(".");
+        (void) Cconws("*");
     }
     
 	Mfree(pBfrOrig);
@@ -215,6 +217,7 @@ BYTE ce_findId(void)
 			(void) Cconws("\r\nCosmosEx found on ACSI ID: ");
 			bfr[0] = i + '0';
 			(void) Cconws(bfr);
+			(void) Cconws("\n\r\n\r");
 
 			return 1;
 		}
