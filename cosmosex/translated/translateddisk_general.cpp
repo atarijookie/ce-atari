@@ -12,9 +12,10 @@
 #include "gemdos.h"
 #include "gemdos_errno.h"
 
-TranslatedDisk::TranslatedDisk(void)
+TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs)
 {
-    dataTrans = 0;
+    dataTrans = dt;
+    configService = cs;
 
     dataBuffer  = new BYTE[BUFFER_SIZE];
     dataBuffer2 = new BYTE[BUFFER_SIZE];
@@ -32,13 +33,20 @@ TranslatedDisk::TranslatedDisk(void)
     findStorage.buffer      = new BYTE[BUFFER_SIZE];
     findStorage.maxCount    = BUFFER_SIZE / 23;
     findStorage.count       = 0;
-    
+
     mountAndAttachSharedDrive();					                    // if shared drive is enabled, try to mount it and attach it
     attachConfigDrive();                                                // if config drive is enabled, attach it
+
+    //ACSI command "date"
+    dateAcsiCommand=new DateAcsiCommand(dataTrans,configService);
+    //ACSI commands "screencast"
+	screencastAcsiCommand=new ScreencastAcsiCommand(dataTrans,scs);
 }
 
 TranslatedDisk::~TranslatedDisk()
 {
+    delete dateAcsiCommand;
+
     delete []dataBuffer;
     delete []dataBuffer2;
 
@@ -59,10 +67,10 @@ void TranslatedDisk::loadSettings(void)
     driveLetters.firstTranslated    = drive1 - 'A';
     driveLetters.shared             = drive2 - 'A';
     driveLetters.confDrive          = drive3 - 'A';
-    
+
     // now set the read only drive flags
     driveLetters.readOnly = 0;
-    
+
     if(driveLetters.confDrive >= 0 && driveLetters.confDrive <=15) {        // if got a valid drive letter for config drive
         driveLetters.readOnly = (1 << driveLetters.confDrive);              // make config drive read only
     }
@@ -126,20 +134,20 @@ void TranslatedDisk::mountAndAttachSharedDrive(void)
 
     username		= s.getString((char *) "SHARED_USERNAME",  (char *) "");
     password		= s.getString((char *) "SHARED_PASSWORD",  (char *) "");
-	
+
 	sharedEnabled	= s.getBool((char *) "SHARED_ENABLED", false);
 	nfsNotSamba		= s.getBool((char *) "SHARED_NFS_NOT_SAMBA", false);
-	
+
 	if(!sharedEnabled) {
 		Debug::out(LOG_INFO, "mountAndAttachSharedDrive: shared drive not enabled, not mounting and not attaching...");
 		return;
 	}
-	
+
 	if(addr.empty() || path.empty()) {
 		Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: address or path is empty, this won't work!");
 		return;
 	}
-	
+
 	TMounterRequest tmr;													// fill this struct to mount something somewhere
 	tmr.action              = MOUNTER_ACTION_MOUNT;							// action: mount
 	tmr.deviceNotShared		= false;
@@ -166,11 +174,6 @@ void TranslatedDisk::attachConfigDrive(void)
 	if(!res) {																                // if didn't attach, skip the rest
 		Debug::out(LOG_ERROR, "attachConfigDrive: failed to attach config drive %s", (char *) configDrivePath.c_str());
 	}
-}
-
-void TranslatedDisk::setAcsiDataTrans(AcsiDataTrans *dt)
-{
-    dataTrans = dt;
 }
 
 bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedType)
@@ -329,16 +332,18 @@ void TranslatedDisk::processCommand(BYTE *cmd)
 
     dataTrans->clear();                 // clean data transporter before handling
 
+    Debug::out(LOG_DEBUG, "processCommand");
+
     if(cmd[1] != 'C' || cmd[2] != 'E' || cmd[3] != HOSTMOD_TRANSLATED_DISK) {   // not for us?
         return;
     }
 
 /*
+*/
     char *functionName = functionCodeToName(cmd[4]);
     Debug::out(LOG_DEBUG, "TranslatedDisk function - %s (%02x)", functionName, cmd[4]);
-*/
-//	dataTrans->dumpDataOnce();
-	
+	//>dataTrans->dumpDataOnce();
+
     // now do all the command handling
     switch(cmd[4]) {
         // special CosmosEx commands for this module
@@ -346,6 +351,15 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         dataTrans->addDataBfr((unsigned char *)"CosmosEx translated disk", 24, true);       // add identity string with padding
         dataTrans->setStatus(E_OK);
         break;
+
+        case TRAN_CMD_GETDATETIME:
+        dateAcsiCommand->processCommand(cmd);
+        break;
+
+		case TRAN_CMD_SCREENCASTPALETTE:
+        case TRAN_CMD_SENDSCREENCAST:
+        	screencastAcsiCommand->processCommand(cmd);
+        	break;
 
         // path functions
         case GEMDOS_Dsetdrv:        onDsetdrv(cmd);     break;
@@ -396,7 +410,7 @@ void TranslatedDisk::processCommand(BYTE *cmd)
 		// other functions
 		case ACC_GET_MOUNTS:			onGetMounts(cmd);	    break;
         case ACC_UNMOUNT_DRIVE:         onUnmountDrive(cmd);    break;
-		
+
         // in other cases
         default:                                // in other cases
         dataTrans->setStatus(EINVFN);           // invalid function
@@ -409,28 +423,28 @@ void TranslatedDisk::processCommand(BYTE *cmd)
 void TranslatedDisk::onUnmountDrive(BYTE *cmd)
 {
     int drive = cmd[5];
-    
+
     if(drive < 2 || drive > 15) {               // index out of range?
         dataTrans->setStatus(EDRVNR);
         return;
     }
-    
+
     // if shared drive or config drive, don't do anything
     if(conf[drive].translatedType == TRANSLATEDTYPE_SHAREDDRIVE || conf[drive].translatedType == TRANSLATEDTYPE_CONFIGDRIVE) {
         dataTrans->setStatus(E_OK);
         return;
     }
-    
+
     Debug::out(LOG_DEBUG, "onUnmountDrive -- drive: %d, hostRootPath: %s", drive, conf[drive].hostRootPath.c_str());
-    
+
     // send umount request
 	TMounterRequest tmr;
     tmr.action			= MOUNTER_ACTION_UMOUNT;							// action: umount
 	tmr.mountDir		= conf[drive].hostRootPath;							// e.g. /mnt/sda2
 	mountAdd(tmr);
-    
+
     detachByIndex(drive);                                                   // detach drive from translated disk module
-    
+
     dataTrans->setStatus(E_OK);
 }
 
@@ -439,20 +453,20 @@ void TranslatedDisk::onGetMounts(BYTE *cmd)
 	char tmp[256];
 	std::string mounts;
 	int index;
-	
+
 	char *trTypeStr[4] = {(char *) "", (char *) "USB drive", (char *) "shared drive", (char *) "config drive"};
 	char *mountStr;
-	
+
     for(int i=2; i<MAX_DRIVES; i++) {       // create enabled drive bits
         if(conf[i].enabled) {
 			index = conf[i].translatedType + 1;
 		} else {
 			index = 0;
 		}
-		
+
 		mountStr = trTypeStr[index];
 		sprintf(tmp, "%c: %s\n", ('A' + i), mountStr);
-		
+
 		mounts += tmp;
     }
 
@@ -528,13 +542,13 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     // this can be used to set the right date and time on ST
     Settings s;
     bool    setDateTime;
-    float   utcOffset;    
+    float   utcOffset;
     setDateTime = s.getBool ((char *) "TIME_SET",        true);
     utcOffset   = s.getFloat((char *) "TIME_UTC_OFFSET", 0);
-    
+
     int iUtcOffset = (int) (utcOffset * 10.0);
     int secsOffset = (int) (utcOffset * (60*60));               // transform float hours to int seconds
-        
+
     time_t timenow      = time(NULL) + secsOffset;              // get time with offset
     struct tm loctime   = *localtime(&timenow);
 
@@ -562,6 +576,10 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
 
     dataTrans->addDataBfr(tmp, 10, false);                      // store it to buffer - bytes 14 to 23 (byte 14 is eth0_enabled, byte 19 is wlan0_enabled)
     //------------------
+
+	//after sending screencast skip frameSkip frames
+    int frameSkip = s.getInt ((char *) "SCREENCAST_FRAMESKIP",        20);
+    dataTrans->addDataByte(frameSkip);                     		// byte 24 - frame skip for screencast
 
     dataTrans->padDataToMul16();                                // pad to multiple of 16
 
@@ -620,7 +638,7 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 
 		std::string longHostPath;
 		conf[driveIndex].dirTranslator.shortToLongPath(root, hostPath, longHostPath);	// now convert short to long path
-		
+
 		hostPath = root;
 		Utils::mergeHostPaths(hostPath, longHostPath);
 
@@ -642,10 +660,10 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 
 		std::string longHostPath;
 		conf[currentDriveIndex].dirTranslator.shortToLongPath(root, hostPath, longHostPath);	// now convert short to long path
-		
+
 		hostPath = root;
 		Utils::mergeHostPaths(hostPath, longHostPath);
-		
+
         return true;
     }
 
@@ -653,7 +671,7 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 
 	Utils::mergeHostPaths(hostPath, conf[currentDriveIndex].currentAtariPath);
 	Utils::mergeHostPaths(hostPath, atariPath);
-	
+
     removeDoubleDots(hostPath);                                 // search for '..' and simplify the path
 
 	std::string longHostPath;
@@ -661,7 +679,7 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 
 	hostPath = root;
 	Utils::mergeHostPaths(hostPath, longHostPath);
-	
+
 //    Debug::out(LOG_DEBUG, "host path: %s", (char *) hostPath.c_str());
     return true;
 }
@@ -669,14 +687,14 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 int TranslatedDisk::getDriveIndexFromAtariPath(std::string atariPath)
 {
 	// if it's full path including drive letter - calculate the drive index
-    if(atariPath[1] == ':') {                               
+    if(atariPath[1] == ':') {
         int driveIndex = 0;
         char newDrive = atariPath[0];
 
         if(!isValidDriveLetter(newDrive)) {                 // not a valid drive letter?
             return -1;
         }
-		
+
         newDrive = toUpperCase(newDrive);                   // make sure it's upper case
         driveIndex = newDrive - 'A';                        // calculate drive index
 		return driveIndex;
@@ -689,26 +707,26 @@ int TranslatedDisk::getDriveIndexFromAtariPath(std::string atariPath)
 bool TranslatedDisk::isAtariPathReadOnly(std::string atariPath)
 {
     int driveIndex = getDriveIndexFromAtariPath(atariPath);
-    
+
     if(driveIndex == -1) {
         return false;
     }
-    
+
     return isDriveIndexReadOnly(driveIndex);
 }
-    
+
 bool TranslatedDisk::isDriveIndexReadOnly(int driveIndex)
-{ 
+{
     if(driveIndex < 0 || driveIndex > 15) {
         return false;
     }
 
     WORD mask = (1 << driveIndex);
-    
+
     if((driveLetters.readOnly & mask) != 0) {               // if the bit representing the drive is set, it's read only
         return true;
     }
-    
+
     return false;
 }
 
@@ -936,6 +954,10 @@ void TranslatedDisk::pathSeparatorHostToAtari(std::string &path)
 char *TranslatedDisk::functionCodeToName(int code)
 {
     switch(code) {
+        case TRAN_CMD_IDENTIFY:      	return (char *)"TRAN_CMD_IDENTIFY";
+        case TRAN_CMD_GETDATETIME:      return (char *)"TRAN_CMD_GETDATETIME";
+        case TRAN_CMD_SENDSCREENCAST:   return (char *)"TRAN_CMD_SENDSCREENCAST";
+        case TRAN_CMD_SCREENCASTPALETTE: return (char *)"TRAN_CMD_SCREENCASTPALETTE";
         case GEMDOS_Dsetdrv:            return (char *)"GEMDOS_Dsetdrv";
         case GEMDOS_Dgetdrv:            return (char *)"GEMDOS_Dgetdrv";
         case GEMDOS_Dsetpath:           return (char *)"GEMDOS_Dsetpath";

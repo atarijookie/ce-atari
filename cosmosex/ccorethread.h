@@ -26,12 +26,16 @@
 #include "floppy/mfmcachedimage.h"
 #include "floppy/floppysetup.h"
 
+#include "service/configservice.h"
+#include "service/floppyservice.h"
+#include "service/screencastservice.h"
+
 #include "version.h"
 
 class CCoreThread: public ISettingsUser, public DevChangesHandler
 {
 public:
-    CCoreThread();
+    CCoreThread(ConfigService* configService, FloppyService* floppyService, ScreencastService* screencastService);
     virtual ~CCoreThread();
 
 	void resetHansAndFranz(void);
@@ -42,9 +46,9 @@ public:
 
 	virtual void onDevAttached(std::string devName, bool isAtariDrive);		// from DevChangesHandler
 	virtual void onDevDetached(std::string devName);						// from DevChangesHandler
-	
+
     void setFloppyImageLed(int ledNo);
-    
+
 private:
     bool shouldRun;
     bool running;
@@ -68,7 +72,7 @@ private:
     TranslatedDisk  *translated;
     bool            setEnabledIDbits;
 	AcsiIDinfo		acsiIdInfo;
-	
+
     void handleAcsiCommand(void);
     void handleConfigStream(BYTE *cmd);
 
@@ -85,12 +89,12 @@ private:
     void responseStart(int bufferLengthInBytes);
     void responseAddWord(BYTE *bfr, WORD value);
     void responseAddByte(BYTE *bfr, BYTE value);
-    
+
     struct {
         int bfrLengthInBytes;
         int currentLength;
     } response;
-    
+
     //-----------------------------------
     // floppy stuff
     FloppySetup         floppySetup;
@@ -103,10 +107,10 @@ private:
 
     bool                setDiskChanged;
     bool                diskChanged;
-    
+
     bool                setNewFloppyImageLed;
     int                 newFloppyImageLed;
-    
+
     void handleSendTrack(void);
     void handleSectorWritten(void);
 

@@ -12,6 +12,9 @@
 #define INTYPE_KEYBOARD     1
 #define INTYPE_JOYSTICK1    2
 #define INTYPE_JOYSTICK2    3
+#define INTYPE_VDEVMOUSE    4 //virtual device for Web API
+#define INTYPE_VDEVKEYBOARD 5 //virtual device for Web API
+#define INTYPE_MAX          5 
 
 #define JOYDIR_UP       0x01
 #define JOYDIR_DOWN     0x02
@@ -169,6 +172,7 @@ public:
     Ikbd();
 
     void findDevices(void);
+    void findVirtualDevices();
     void closeDevs(void);
     int  serialSetup(termios *ts);
 
@@ -184,7 +188,7 @@ public:
 private:
 	int				ceIkbdMode;
 
-    TInputDevice    inDevs[4];
+    TInputDevice    inDevs[INTYPE_MAX+1];
     int             tableKeysPcToSt[KEY_TABLE_SIZE];
     int             fdUart;
 

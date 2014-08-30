@@ -844,6 +844,14 @@ void ConfigStream::createScreen_other(void)
     comp = new ConfigComponent(this, ConfigComponent::editline, " ",					    4, col2, row++, gotoOffset);
     comp->setComponentId(COMPID_TIMESYNC_UTC_OFFSET);
     screen.push_back(comp);
+
+    row++;
+    comp = new ConfigComponent(this, ConfigComponent::label, "Screencast Frameskip (10-255)",   40, col, row++, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",                      3,  col2, row++, gotoOffset);
+    comp->setComponentId(COMPID_SCREENCAST_FRAMESKIP);
+    screen.push_back(comp);
     //----------------------
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Reset all settings ",       19, 10, 13, gotoOffset);
@@ -866,14 +874,26 @@ void ConfigStream::createScreen_other(void)
     bool        setDateTime;
     float       utcOffset;
     std::string ntpServer;
+    int			    frameSkip;
     
-    setDateTime = s.getBool     ((char *) "TIME_SET",        true);
-    utcOffset   = s.getFloat    ((char *) "TIME_UTC_OFFSET", 0);
-    ntpServer   = s.getString   ((char *) "TIME_NTP_SERVER", (char *) "200.20.186.76");
+    setDateTime = s.getBool     ((char *) "TIME_SET",             true);
+    utcOffset   = s.getFloat    ((char *) "TIME_UTC_OFFSET",      0);
+    ntpServer   = s.getString   ((char *) "TIME_NTP_SERVER",      (char *) "200.20.186.76");
+    frameSkip   = s.getInt      ((char *) "SCREENCAST_FRAMESKIP", 20);
+
+    if( frameSkip<10 )
+    {
+        frameSkip=10;
+    }
+    if( frameSkip>255 )
+    {
+        frameSkip=255;
+    }
     
     setBoolByComponentId(COMPID_TIMESYNC_ENABLE, setDateTime);
     setFloatByComponentId(COMPID_TIMESYNC_UTC_OFFSET, utcOffset);
     setTextByComponentId(COMPID_TIMESYNC_NTP_SERVER, ntpServer);
+    setIntByComponentId(COMPID_SCREENCAST_FRAMESKIP, frameSkip);
     //------------------------
     
     setFocusToFirstFocusable();
@@ -886,14 +906,26 @@ void ConfigStream::onOtherSave(void)
     bool        setDateTime = false;
     float       utcOffset   = 0;
     std::string ntpServer;
+    int			frameSkip;
     
     getBoolByComponentId(COMPID_TIMESYNC_ENABLE, setDateTime);
     getFloatByComponentId(COMPID_TIMESYNC_UTC_OFFSET, utcOffset);
     getTextByComponentId(COMPID_TIMESYNC_NTP_SERVER, ntpServer);
+    getIntByComponentId(COMPID_SCREENCAST_FRAMESKIP, frameSkip);
     
-    s.setBool     ((char *) "TIME_SET",         setDateTime);
-    s.setFloat    ((char *) "TIME_UTC_OFFSET",  utcOffset);
-    s.setString   ((char *) "TIME_NTP_SERVER", (char *) ntpServer.c_str());
+    if( frameSkip<10 )
+    {
+        frameSkip=10;
+    }
+    if( frameSkip>255 )
+    {
+        frameSkip=255;
+    }
+    
+    s.setBool     ((char *) "TIME_SET",             setDateTime);
+    s.setFloat    ((char *) "TIME_UTC_OFFSET",      utcOffset);
+    s.setString   ((char *) "TIME_NTP_SERVER",      (char *) ntpServer.c_str());
+    s.setInt      ((char *) "SCREENCAST_FRAMESKIP", frameSkip);
 
     createScreen_homeScreen();		// now back to the home screen
 }

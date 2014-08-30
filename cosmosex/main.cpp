@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <unistd.h>
-#include <queue>          
+#include <queue>
 
 #include "config/configstream.h"
 #include "settings.h"
@@ -17,6 +17,14 @@
 #include "ikbd.h"
 #include "timesync.h"
 #include "version.h"
+
+#include "webserver/webserver.h"
+#include "webserver/api/apimodule.h"
+#include "webserver/app/appmodule.h"
+#include "service/virtualkeyboardservice.h"
+#include "service/virtualmouseservice.h"
+#include "service/configservice.h"
+#include "service/screencastservice.h"
 
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
@@ -31,12 +39,12 @@ bool g_noReset      = false;                                    // don't reset H
 bool g_test         = false;                                    // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
 
 int main(int argc, char *argv[])
- {
-	CCoreThread *core;
-	pthread_t	mountThreadInfo;
+{
+    CCoreThread *core;
+    pthread_t	mountThreadInfo;
     pthread_t	downloadThreadInfo;
     pthread_t	ikbdThreadInfo;
-	pthread_t	floppyEncThreadInfo;
+    pthread_t	floppyEncThreadInfo;
 	pthread_t	timesyncThreadInfo;
 
     parseCmdLineArguments(argc, argv);                          // parse cmd line arguments and set global variables
@@ -51,8 +59,8 @@ int main(int argc, char *argv[])
 		Debug::out(LOG_ERROR, "Cannot register SIGINT handler!");
 	}
 
-//	system("sudo echo none > /sys/class/leds/led0/trigger");	// disable usage of GPIO 23 (pin 16) by LED 
-	
+//	system("sudo echo none > /sys/class/leds/led0/trigger");	// disable usage of GPIO 23 (pin 16) by LED
+
 	if(!gpio_open()) {									        // try to open GPIO and SPI on RPi
 		return 0;
 	}
@@ -60,15 +68,39 @@ int main(int argc, char *argv[])
 	if(g_justDoReset) {                                         // is this a reset command? (used with STM32 ST-Link debugger)
 		Utils::resetHansAndFranz();
 		gpio_close();
-		
+
 		printf("\nJust did reset and quit...\n");
-		
+
 		return 0;
 	}
 
     Downloader::initBeforeThreads();
 
-    core = new CCoreThread();
+    //start up virtual devices
+    VirtualKeyboardService* pxVKbdService=new VirtualKeyboardService();
+    VirtualMouseService* pxVMouseService=new VirtualMouseService();
+    pxVKbdService->start();
+    pxVMouseService->start();
+
+    //start up date service
+    ConfigService* pxDateService=new ConfigService();
+    pxDateService->start();
+
+    //start up floppy service
+    FloppyService* pxFloppyService=new FloppyService();
+    pxFloppyService->start();
+
+    //start up screencast service
+    ScreencastService* pxScreencastService=new ScreencastService();
+    pxScreencastService->start();
+
+    //this runs its own thread
+    WebServer xServer;
+    xServer.addModule(new ApiModule(pxVKbdService,pxVMouseService,pxFloppyService));
+    xServer.addModule(new AppModule(pxDateService,pxFloppyService,pxScreencastService));
+    xServer.start();
+
+    core = new CCoreThread(pxDateService,pxFloppyService,pxScreencastService);
 
 	int res = pthread_create( &mountThreadInfo, NULL, mountThreadCode, NULL);	// create mount thread and run it
 	handlePthreadCreate(res, (char *) "mount");
@@ -86,6 +118,22 @@ int main(int argc, char *argv[])
 	handlePthreadCreate(res, (char *) "time sync");
 
 	core->run();										// run the main thread
+
+    xServer.stop();
+
+    pxScreencastService->stop();
+    delete pxScreencastService;
+
+    pxFloppyService->stop();
+    delete pxFloppyService;
+
+    pxDateService->stop();
+    delete pxDateService;
+
+    pxVKbdService->stop();
+    pxVMouseService->stop();
+    delete pxVKbdService;
+    delete pxVMouseService;
 
 	delete core;
 	gpio_close();										// close gpio and spi
@@ -110,34 +158,34 @@ void parseCmdLineArguments(int argc, char *argv[])
         // it's a LOG LEVEL change command (ll)
         if(strncmp(argv[i], "ll", 2) == 0) {
             int ll;
-        
+
             ll = (int) argv[i][2];
 
             if(ll >= 48 && ll <= 57) {                              // if it's a number between 0 and 9
                 ll = ll - 48;
-    
+
                 if(ll > LOG_DEBUG) {                                // would be higher than highest log level? fix it
                     ll = LOG_DEBUG;
                 }
 
                 g_logLevel = ll;                                    // store log level
             }
-            
+
             continue;
         }
-    
+
         // should we just reset Hans and Franz and quit? (used with STM32 ST-Link JTAG)
         if(strcmp(argv[i], "reset") == 0) {
             g_justDoReset = true;
             continue;
         }
-    
+
         // don't resetHans and Franz on start (used with STM32 ST-Link JTAG)
         if(strcmp(argv[i], "noreset") == 0) {
             g_noReset = true;
             continue;
         }
-        
+
         // for testing purposes: set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
         if(strcmp(argv[i], "test") == 0) {
             printf("Testing setup active!\n");
@@ -155,7 +203,7 @@ void printfPossibleCmdLineArgs(void)
     printf("llx     - set log level to x (default is 1, max is 3)\n");
     printf("test    - some default config for device testing\n");
 }
- 
+
 void handlePthreadCreate(int res, char *what)
 {
     if(res != 0) {
@@ -169,5 +217,5 @@ void sigint_handler(int sig)
 {
     Debug::out(LOG_INFO, "SIGINT signal received, terminating.");
 	sigintReceived = 1;
-} 
+}
 

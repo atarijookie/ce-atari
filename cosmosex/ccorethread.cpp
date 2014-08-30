@@ -26,7 +26,7 @@ extern BYTE g_logLevel;                     // current log level
 bool    g_gotHansFwVersion;
 bool    g_gotFranzFwVersion;
 
-CCoreThread::CCoreThread()
+CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
     Update::initialize();
 
@@ -48,8 +48,7 @@ CCoreThread::CCoreThread()
     scsi->attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
 //  scsi->attachToHostPath("TESTMEDIA", SOURCETYPE_TESTMEDIA, SCSI_ACCESSTYPE_FULL);
 
-    translated = new TranslatedDisk();
-    translated->setAcsiDataTrans(dataTrans);
+    translated = new TranslatedDisk(dataTrans,configService,screencastService);
 
     confStream = new ConfigStream();
     confStream->setAcsiDataTrans(dataTrans);
@@ -65,7 +64,7 @@ CCoreThread::CCoreThread()
 
 	settingsReloadProxy.addSettingsUser((ISettingsUser *) translated,    SETTINGSUSER_TRANSLATED);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) translated,    SETTINGSUSER_SHARED);
-	
+
 	// register this class as receiver of dev attached / detached calls
 	devFinder.setDevChangesHandler((DevChangesHandler *) this);
 
@@ -78,6 +77,11 @@ CCoreThread::CCoreThread()
     // the floppy image silo might change settings (when images are changes), add settings reload proxy
     floppyImageSilo.setSettingsReloadProxy(&settingsReloadProxy);
     settingsReloadProxy.reloadSettings(SETTINGSUSER_FLOPPYIMGS);            // mark that floppy settings changed (when imageSilo loaded the settings)
+
+    //Floppy Service needs access to floppysilo and this thread
+    floppyService->setImageSilo(&floppyImageSilo);
+    floppyService->setCoreThread(this);
+
 }
 
 CCoreThread::~CCoreThread()
@@ -93,29 +97,29 @@ CCoreThread::~CCoreThread()
 void CCoreThread::run(void)
 {
     BYTE inBuff[8], outBuf[8];
-	
+
 	memset(outBuf, 0, 8);
     memset(inBuff, 0, 8);
-	
+
     loadSettings();
 
     //------------------------------
     // stuff related to checking of Franz and Hans being alive and then possibly flashing them
     bool    shouldCheckHansFranzAlive   = true;                         // when true and the 15 second timeout since start passed, check for Hans and Franz being alive
     DWORD   hansFranzAliveCheckTime     = Utils::getEndTime(15000);     // get the time when we should check if Hans and Franz are alive
-    
+
     g_gotHansFwVersion  = false;
     g_gotFranzFwVersion = false;
-    
+
     if(g_noReset) {                                                     // if we're debugging Hans or Franz (noReset is set to true), don't do this alive check
-        shouldCheckHansFranzAlive = false;                              
+        shouldCheckHansFranzAlive = false;
     } else {                                                            // if we should reset Hans and Franz on start, do it (and we're probably not debugging Hans or Franz)
         Utils::resetHansAndFranz();
     }
-    
+
     Debug::out(LOG_DEBUG, "Will check for Hans and Franz alive: %s", (shouldCheckHansFranzAlive ? "yes" : "no") );
     //------------------------------
-	
+
 	DWORD nextDevFindTime       = Utils::getCurrentMs();                // create a time when the devices should be checked - and that time is now
     DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);              // create a time when update download status should be checked
     DWORD nextWebParsCheckTime  = Utils::getEndTime(WEB_PARAMS_CHECK_TIME_MS);  // create a time when we should check for new params from the web page
@@ -126,23 +130,23 @@ void CCoreThread::run(void)
 
     while(sigintReceived == 0) {
 		bool gotAtn = false;						                    // no ATN received yet?
-		
-        // should we check if Hans and Franz are alive? 
+
+        // should we check if Hans and Franz are alive?
         if(shouldCheckHansFranzAlive) {
             if(Utils::getCurrentMs() >= hansFranzAliveCheckTime) {      // did enough time pass since the Hans and Franz reset?
                 if(!g_gotHansFwVersion || !g_gotFranzFwVersion) {       // if don't have version from Hans or Franz, then they're not alive
                     Update::createFlashFirstFwScript();
-                    
+
                     Debug::out(LOG_INFO, "No answer from Hans or Franz, so first firmware flash script created, will do first firmware flashing.");
 					sigintReceived = 1;
                 } else {
                     Debug::out(LOG_INFO, "Got answers from both Hans and Franz, so not doing first firmware flashing.");
                 }
-            
+
                 shouldCheckHansFranzAlive = false;                      // don't check this again
-            }        
+            }
         }
-        
+
         // should we check if there are new params received from debug web page?
         if(Utils::getCurrentMs() >= nextWebParsCheckTime) {
             readWebStartupMode();
@@ -150,9 +154,9 @@ void CCoreThread::run(void)
         }
 
         // should we check for the new devices?
-		if(Utils::getCurrentMs() >= nextDevFindTime) {	                
+		if(Utils::getCurrentMs() >= nextDevFindTime) {
 			devFinder.lookForDevChanges();				                // look for devices attached / detached
-			
+
 			nextDevFindTime = Utils::getEndTime(DEV_CHECK_TIME_MS);		// update the time when devices should be checked
 
             if(!Update::versions.updateListWasProcessed) {              // if didn't process update list yet
@@ -164,12 +168,12 @@ void CCoreThread::run(void)
             }
 		}
 
-        // should check the update status? 
-        if(Utils::getCurrentMs() >= nextUpdateCheckTime) {              
+        // should check the update status?
+        if(Utils::getCurrentMs() >= nextUpdateCheckTime) {
             nextUpdateCheckTime   = Utils::getEndTime(UPDATE_CHECK_TIME);   // update the time when we should check update status again
 
             int updateState = Update::state();                              // get the update state
-            switch(updateState) {  
+            switch(updateState) {
                 case UPDATE_STATE_DOWNLOADING:
                 confStream->fillUpdateDownloadWithProgress();               // refresh config screen with download status
                 break;
@@ -204,7 +208,7 @@ void CCoreThread::run(void)
         }
 
         // check for any ATN code waiting from Hans
-		res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);		
+		res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);
 
 		if(res) {									    // HANS is signaling attention?
 			gotAtn = true;							    // we've some ATN
@@ -224,9 +228,9 @@ void CCoreThread::run(void)
 			}
 		}
 
-#ifndef ONPC		
+#ifndef ONPC
         // check for any ATN code waiting from Franz
-		res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuff);		
+		res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuff);
 		if(res) {									// FRANZ is signaling attention?
 			gotAtn = true;							// we've some ATN
 
@@ -250,10 +254,10 @@ void CCoreThread::run(void)
 		}
 #else
     g_gotFranzFwVersion = true;
-#endif		
+#endif
 		if(!gotAtn) {								// no ATN was processed?
 			Utils::sleepMs(1);						// wait 1 ms...
-		}		
+		}
     }
 }
 
@@ -268,7 +272,7 @@ void CCoreThread::handleAcsiCommand(void)
 
     conSpi->txRx(SPI_CS_HANS, 14, bufOut, bufIn);        // get 14 cmd bytes
 
-    Debug::out(LOG_DEBUG, "handleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
+    Debug::out(LOG_DEBUG, "handleAcsiCommand: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5], bufIn[6], bufIn[7], bufIn[8], bufIn[9], bufIn[10], bufIn[11], bufIn[12], bufIn[13]);
 
     BYTE justCmd, tag1, tag2, module;
     BYTE *pCmd;
@@ -286,11 +290,17 @@ void CCoreThread::handleAcsiCommand(void)
     pCmd    = (!isIcd) ? bufIn : (bufIn + 1);           // get the pointer to where the command starts
 
     justCmd = pCmd[0] & 0x1f;                           // get only command
-    
+
     tag1    = pCmd[1];                                  // CE tag ('C', 'E') can be found on position 2 and 3
     tag2    = pCmd[2];
 
     module  = pCmd[3];                                  // get the host module ID
+
+
+	if(isIcd){
+	    Debug::out(LOG_DEBUG, "handleAcsiCommand isIcd");
+	}
+    Debug::out(LOG_DEBUG, "handleAcsiCommand module: %02x", module);
 
     // ok, so the ID is right, let's see what we can do
     if(justCmd == 0 && tag1 == 'C' && tag2 == 'E') {    // if the command is 0 (TEST UNIT READY) and there's this CE tag
@@ -356,7 +366,7 @@ void CCoreThread::loadSettings(void)
     Settings s;
 	s.loadAcsiIDs(&acsiIdInfo);
     s.loadFloppyConfig(&floppyConfig);
-	
+
     setEnabledIDbits    = true;
     setFloppyConfig     = true;
 }
@@ -370,14 +380,14 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 
     memset(oBuf, 0, 14);                                // first clear the output buffer
 
-    // WORD sent (bytes shown): 01 23 45 67 
+    // WORD sent (bytes shown): 01 23 45 67
 
     if(whichSpiCs == SPI_CS_HANS) {                                 // it's Hans?
 		cmdLength = 12;
         responseStart(cmdLength);                                   // init the response struct
 
         static bool hansHandledOnce = false;
-        
+
         if(hansHandledOnce) {                                       // don't send commands until we did receive status at least a couple of times
             if(setEnabledIDbits) {                                  // if we should send ACSI ID configuration
                 responseAddWord(oBuf, CMD_ACSI_CONFIG);             // CMD: send acsi config
@@ -390,14 +400,14 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
                 responseAddWord(oBuf, MAKEWORD(floppyImageSilo.getSlotBitmap(), 0));    // store which floppy images are enabled
                 setEnabledFloppyImgs = false;                                           // and don't sent this anymore (until needed)
             }
-        
+
             if(setNewFloppyImageLed) {
                 responseAddWord(oBuf, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
                 responseAddWord(oBuf, MAKEWORD(newFloppyImageLed, 0));  // store which floppy images LED should be on
                 setNewFloppyImageLed = false;                           // and don't sent this anymore (until needed)
             }
         }
-        
+
         hansHandledOnce = true;
     } else {                                    		            // it's Franz?
 		cmdLength = 8;
@@ -433,12 +443,12 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
     if(fwVer[0] == 0xf0) {
         Update::versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
         g_gotFranzFwVersion = true;
-        
+
         Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
     } else {
         Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));               // store found FW version of Hans
         g_gotHansFwVersion = true;
-        
+
         int currentLed = fwVer[4];
 
         Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed);
@@ -487,14 +497,14 @@ void CCoreThread::setFloppyImageLed(int ledNo)
 {
     if(ledNo >=0 && ledNo < 3) {                    // if the LED # is within expected range
         BYTE enabledImgs    = floppyImageSilo.getSlotBitmap();
-    
+
         if(enabledImgs & (1 << ledNo)) {            // if the required LED # is enabled, set it
             Debug::out(LOG_DEBUG, "Setting new floppy image LED to %d", ledNo);
             newFloppyImageLed       = ledNo;
             setNewFloppyImageLed    = true;
         }
     }
-    
+
     if(ledNo == 0xff) {                             // if this is a request to turn the LEDs off, do it
         Debug::out(LOG_DEBUG, "Setting new floppy image LED to 0xff (no LED)");
         newFloppyImageLed       = ledNo;
@@ -520,15 +530,15 @@ void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 
 	// if have RAW enabled, but not TRANSLATED - attach all drives (atari and non-atari) as RAW
 	if(acsiIdInfo.gotDevTypeRaw && !acsiIdInfo.gotDevTypeTranslated) {
-        Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- only RAW enabled, attaching as RAW"); 
+        Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- only RAW enabled, attaching as RAW");
 		scsi->attachToHostPath(devName, SOURCETYPE_DEVICE, SCSI_ACCESSTYPE_FULL);
         return;
 	}
 
 	// if have TRANSLATED enabled, but not RAW - can't attach atari drives, but do attach non-atari drives as TRANSLATED
 	if(!acsiIdInfo.gotDevTypeRaw && acsiIdInfo.gotDevTypeTranslated) {
-		if(!isAtariDrive) {			// attach non-atari drive as TRANSLATED	
-            Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- only TRANSLATED enabled, is non-atari, attaching as TRANSLATED"); 
+		if(!isAtariDrive) {			// attach non-atari drive as TRANSLATED
+            Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- only TRANSLATED enabled, is non-atari, attaching as TRANSLATED");
 			attachDevAsTranslated(devName);
 		} else {					// can't attach atari drive
 			Debug::out(LOG_INFO, "Can't attach device %s, because it's an Atari drive and no RAW device is enabled.", (char *) devName.c_str());
@@ -539,15 +549,15 @@ void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 	// if both TRANSLATED and RAW are enabled - attach non-atari as TRANSLATED, and atari as RAW
 	if(acsiIdInfo.gotDevTypeRaw && acsiIdInfo.gotDevTypeTranslated) {
 		if(isAtariDrive) {			// attach atari drive as RAW
-            Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- RAW & TRANSLATED enabled, is atari, attaching as RAW"); 
+            Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- RAW & TRANSLATED enabled, is atari, attaching as RAW");
 			scsi->attachToHostPath(devName, SOURCETYPE_DEVICE, SCSI_ACCESSTYPE_FULL);
 		} else {					// attach non-atari drive as TRANSLATED
-            Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- RAW & TRANSLATED enabled, is non-atari, attaching as TRANSLATED"); 
+            Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- RAW & TRANSLATED enabled, is non-atari, attaching as TRANSLATED");
 			attachDevAsTranslated(devName);
 		}
         return;
 	}
-	
+
 	// if no device type is enabled
 	if(!acsiIdInfo.gotDevTypeRaw && !acsiIdInfo.gotDevTypeTranslated) {
 		Debug::out(LOG_INFO, "Can't attach device %s, because no device type (RAW or TRANSLATED) is enabled on ACSI bus!", (char *) devName.c_str());
@@ -559,19 +569,19 @@ void CCoreThread::onDevDetached(std::string devName)
 {
 	// try to detach the device - works if was attached as RAW, does nothing otherwise
 	scsi->dettachFromHostPath(devName);
-	
+
 	// and also try to detach the device from translated disk
 	std::pair <std::multimap<std::string, std::string>::iterator, std::multimap<std::string, std::string>::iterator> ret;
 	std::multimap<std::string, std::string>::iterator it;
-	
+
 	ret = mapDeviceToHostPaths.equal_range(devName);				// find a range of host paths which are mapped to partitions found on this device
-	
-	for (it = ret.first; it != ret.second; ++it) {					// now go through the list of device - host_path pairs and unmount them 
+
+	for (it = ret.first; it != ret.second; ++it) {					// now go through the list of device - host_path pairs and unmount them
 		std::string hostPath = it->second;							// retrieve just the host path
-		
+
 		translated->detachFromHostPath(hostPath);					// now try to detach this from translated drives
 	}
-	
+
 	mapDeviceToHostPaths.erase(ret.first, ret.second);				// and delete the whole device items from this multimap
 }
 
@@ -580,24 +590,24 @@ void CCoreThread::attachDevAsTranslated(std::string devName)
 	bool res;
 	std::list<std::string>				partitions;
 	std::list<std::string>::iterator	it;
-	
+
 	if(!acsiIdInfo.gotDevTypeTranslated) {										// don't have any translated device on acsi bus, don't attach
-        Debug::out(LOG_DEBUG, "CCoreThread::attachDevAsTranslated -- no translated device on ACSI bus, not attaching"); 
+        Debug::out(LOG_DEBUG, "CCoreThread::attachDevAsTranslated -- no translated device on ACSI bus, not attaching");
 		return;
 	}
-	
+
 	devFinder.getDevPartitions(devName, partitions);							// get list of partitions for that device (sda -> sda1, sda2)
-	
+
 	for (it = partitions.begin(); it != partitions.end(); ++it) {				// go through those partitions
 		std::string partitionDevice;
 		std::string mountPath;
 		std::string devPath, justDevName;
-		
+
 		partitionDevice = *it;													// get the current device, which represents single partition (e.g. sda1)
-		
+
 		Utils::splitFilenameFromPath(partitionDevice, devPath, justDevName);	// split path to path and device name (e.g. /dev/sda1 -> /dev + sda1)
 		mountPath = "/mnt/" + justDevName;										// create host path (e.g. /mnt/sda1)
-		
+
 		TMounterRequest tmr;
 		tmr.action			= MOUNTER_ACTION_MOUNT;								// action: mount
 		tmr.deviceNotShared	= true;												// mount as device
@@ -606,12 +616,12 @@ void CCoreThread::attachDevAsTranslated(std::string devName)
 		mountAdd(tmr);
 
 		res = translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL);	// try to attach
-	
+
 		if(!res) {																// if didn't attach, skip the rest
 			Debug::out(LOG_ERROR, "attachDevAsTranslated: failed to attach %s", (char *) mountPath.c_str());
 			continue;
 		}
-		
+
 		mapDeviceToHostPaths.insert(std::pair<std::string, std::string>(devName, mountPath) );	// store it to multimap
 	}
 }
@@ -662,7 +672,7 @@ void CCoreThread::handleSectorWritten(void)
     int side    = (iBuf[1] & 0x80) ? 1 : 0;
 
     Debug::out(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d -- TODO!!!", track, side, sector);
-    
+
     // TODO:
     // do the written sector processing
 }
@@ -679,7 +689,7 @@ void CCoreThread::readWebStartupMode(void)
     memset(tmp, 0, 64);
 
     fgets(tmp, 64, f);
-    
+
     int ires, logLev;
     ires = sscanf(tmp, "ll%d", &logLev);                // read the param
     fclose(f);
@@ -687,13 +697,13 @@ void CCoreThread::readWebStartupMode(void)
     bool res = false;
     if(ires == 1) {                                     // got the param
         if(logLev >= LOG_OFF && logLev <= LOG_DEBUG) {  // param is valid
-            if(g_logLevel == logLev) {                  // but logLevel won't change? 
+            if(g_logLevel == logLev) {                  // but logLevel won't change?
                 return;                                 // nothing to do
             }
 
             g_logLevel = logLev;                        // set new log level
             res = true;
-        } 
+        }
     }
 
     if(res) {           // on success

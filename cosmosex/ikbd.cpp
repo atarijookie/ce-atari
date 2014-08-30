@@ -34,7 +34,8 @@ void *ikbdThreadCode(void *ptr)
 
     nextDevFindTime = Utils::getEndTime(3000);      // check the devices in 3 seconds
     ikbd.findDevices();
-
+    ikbd.findVirtualDevices();
+    
 	// open and set up uart
 	int res = ikbd.serialSetup(&termiosStruct);
 	if(res == -1) {
@@ -47,6 +48,7 @@ void *ikbdThreadCode(void *ptr)
             nextDevFindTime = Utils::getEndTime(3000);      // check the devices in 3 seconds
 
             ikbd.findDevices();
+            ikbd.findVirtualDevices();
         }
 
         // process the incomming data from original keyboard and from ST
@@ -60,17 +62,19 @@ void *ikbdThreadCode(void *ptr)
         int i;
         bool gotSomething = false;
 
-        for(i=0; i<4; i++) {                                        // go through the input devices
+        for(i=0; i<6; i++) {                                        // go through the input devices
             if(ikbd.getFdByIndex(i) == -1) {                        // device not attached? skip the rest
                 continue;
             }
 
             if(i < 2) {     // for keyboard and mouse
                 res = read(ikbd.getFdByIndex(i), &ev, sizeof(input_event)); 
-            } else {        // for joysticks
+            } else if (i<4) {        // for joysticks
                 res = read(ikbd.getFdByIndex(i), &js, sizeof(js_event)); 
             }
-
+            if( i==4 || i==5) {     // for virtual mouse and keyboard
+                res = read(ikbd.getFdByIndex(i), &ev, sizeof(input_event)); 
+            }
             if(res < 0) {                                           // on error, skip the rest
                 if(errno == ENODEV) {                               // if device was removed, deinit it
                     ikbd.deinitDev(i);
@@ -78,14 +82,19 @@ void *ikbdThreadCode(void *ptr)
 
                 continue;
             }
+            if( res==0 ) {                                           // on error, skip the rest
+                continue;
+            }
 
             gotSomething = true;                                    // mark that reading of at least one device succeeded
 
             switch(i) {
-                case INTYPE_MOUSE:      ikbd.processMouse(&ev);          break;
-                case INTYPE_KEYBOARD:   ikbd.processKeyboard(&ev);       break;
-                case INTYPE_JOYSTICK1:  ikbd.processJoystick(&js, 0);    break;
-                case INTYPE_JOYSTICK2:  ikbd.processJoystick(&js, 1);    break;
+                case INTYPE_MOUSE:          ikbd.processMouse(&ev);          break;
+                case INTYPE_VDEVMOUSE:      ikbd.processMouse(&ev);          break;
+                case INTYPE_KEYBOARD:       ikbd.processKeyboard(&ev);       break;
+                case INTYPE_VDEVKEYBOARD:   ikbd.processKeyboard(&ev);       break;
+                case INTYPE_JOYSTICK1:      ikbd.processJoystick(&js, 0);    break;
+                case INTYPE_JOYSTICK2:      ikbd.processJoystick(&js, 1);    break;
             }
         }
 
@@ -721,6 +730,8 @@ void Ikbd::processMouse(input_event *ev)
 
 void Ikbd::processKeyboard(input_event *ev)
 {
+//    Debug::out(LOG_DEBUG,"processKeyboard");
+    
     if (ev->type == EV_KEY) {
         if(ev->code >= KEY_TABLE_SIZE) {        // key out of index? quit
             return;
@@ -737,7 +748,7 @@ void Ikbd::processKeyboard(input_event *ev)
             stKey = stKey | 0x80;
         }
 
-//        Debug::out("\nEV_KEY: code %d, value %d, stKey: %02x", ev->code, ev->value, stKey);
+        Debug::out(LOG_DEBUG,"\nEV_KEY: code %d, value %d, stKey: %02x", ev->code, ev->value, stKey);
 
         if(fdUart == -1) {                          // no UART open? quit
             return;
@@ -900,6 +911,64 @@ void Ikbd::sendJoy0State(void)
     }
 }
 
+void Ikbd::findVirtualDevices(void)
+{
+    char linkBuf[PATH_BUFF_SIZE];
+    char devBuf[PATH_BUFF_SIZE];
+
+    DIR *dir = opendir("/tmp/vdev/");							// try to open the dir
+	
+    if(dir == NULL) {                                 				// not found?
+        return;
+    }
+
+	while(1) {                                                  	// while there are more files, store them
+		struct dirent *de = readdir(dir);							// read the next directory entry
+	
+		if(de == NULL) {											// no more entries?
+			break;
+		}
+
+    if(de->d_type != DT_FIFO) {									// if it's not a fifo, skip it
+			continue;
+		}
+
+        char *pMouse  = strstr(de->d_name, "mouse");            // does the name contain 'mouse'?
+        char *pKbd    = strstr(de->d_name, "kbd");              // does the name contain 'kbd'?
+
+        if(pMouse == NULL && pKbd == NULL) {
+            continue;
+        }
+
+        memset(linkBuf,	0, PATH_BUFF_SIZE);
+        memset(devBuf,	0, PATH_BUFF_SIZE);
+
+        strcpy(linkBuf, "/tmp/vdev");                          // create path to link files, e.g. /dev/input/by-path/usb-kbd-event
+        strcat(linkBuf, HOSTPATH_SEPAR_STRING);
+        strcat(linkBuf, de->d_name);
+
+        /*
+        int ires = readlink(linkBuf, devBuf, PATH_BUFF_SIZE);		// try to resolve the filename from the link
+        if(ires == -1) {
+                continue;
+        }
+
+        std::string pathAndFile = devBuf;
+        std::string path, file;
+        */
+
+        std::string pathAndFile = linkBuf;
+        std::string path, file;
+        Utils::splitFilenameFromPath(pathAndFile, path, file);		// get only file name, skip the path (which now is something like '../../')
+        //file = "/dev/input/" + file;    							// create full path - /dev/input/event0
+        file = "/tmp/vdev/"+file;    							// create full path - /dev/input/event0
+
+        processFoundDev((char *) file.c_str(), (char *) file.c_str());    // and do something with that file
+    }
+
+    closedir(dir);	
+}
+
 void Ikbd::findDevices(void)
 {
 	char linkBuf[PATH_BUFF_SIZE];
@@ -962,7 +1031,25 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
     TInputDevice *in = NULL;
     char *what;
 
-    if(strstr(linkName, "mouse") != NULL) {             // it's a mouse
+    if(strstr(linkName, "/tmp/vdev/mouse") != NULL && in==NULL) {             // it's a mouse
+        if(inDevs[INTYPE_VDEVMOUSE].fd == -1) {             // don't have mouse?
+            in = &inDevs[INTYPE_VDEVMOUSE];
+            what = (char *) "/tmp/vdev/mouse";
+        } else {                                        // already have a mouse?
+            return;
+        }
+    }
+
+    if(strstr(linkName, "/tmp/vdev/kbd") != NULL && in==NULL) {               // it's a keyboard?
+        if(inDevs[INTYPE_VDEVKEYBOARD].fd == -1) {          // don't have keyboard?
+            in = &inDevs[INTYPE_VDEVKEYBOARD];
+            what = (char *) "/tmp/vdev/keyboard";         
+        } else {                                        // already have a keyboard?
+            return;
+        }
+    }
+
+    if(strstr(linkName, "mouse") != NULL && in==NULL) {             // it's a mouse
         if(inDevs[INTYPE_MOUSE].fd == -1) {             // don't have mouse?
             in = &inDevs[INTYPE_MOUSE];         
             what = (char *) "mouse";
@@ -971,7 +1058,7 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
         }
     }
 
-    if(strstr(linkName, "kbd") != NULL) {               // it's a keyboard?
+    if(strstr(linkName, "kbd") != NULL && in==NULL) {               // it's a keyboard?
         if(inDevs[INTYPE_KEYBOARD].fd == -1) {          // don't have keyboard?
             in = &inDevs[INTYPE_KEYBOARD];
             what = (char *) "keyboard";         
@@ -980,7 +1067,7 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
         }
     }
 
-    if(strstr(linkName, "joystick") != NULL) {                              // it's a joystick?
+    if(strstr(linkName, "joystick") != NULL && in==NULL) {                              // it's a joystick?
         if(inDevs[INTYPE_JOYSTICK1].fd == -1) {                             // don't have joystick 1?
             if(strcmp(fullPath, inDevs[INTYPE_JOYSTICK2].devPath) == 0) {   // if this device is already connected as joystick 2, skip it
                 return;
@@ -1018,7 +1105,7 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
 
 int Ikbd::getFdByIndex(int index)
 {
-    if(index < 0 || index > 3) {
+    if(index < 0 || index > 5) {
         return -1;
     }
 
@@ -1029,7 +1116,7 @@ void Ikbd::initDevs(void)
 {
     int i;
 
-    for(i=0; i<4; i++) {
+    for(i=0; i<6; i++) {
         inDevs[i].fd = -1;
 
         deinitDev(i);
@@ -1038,7 +1125,7 @@ void Ikbd::initDevs(void)
 
 void Ikbd::deinitDev(int index)
 {
-    if(index < 0 || index > 3) {            // out of index?
+    if(index < 0 || index > 5) {            // out of index?
         return;
     }
 
@@ -1076,7 +1163,7 @@ void Ikbd::closeDevs(void)
 {
     int i;
 
-    for(i=0; i<4; i++) {
+    for(i=0; i<6; i++) {
         if(inDevs[i].fd != -1) {        // if device is open
             close(inDevs[i].fd);        // close it
             inDevs[i].fd = -1;          // mark it as closed
@@ -1376,7 +1463,7 @@ int Ikbd::fdWrite(int fd, BYTE *bfr, int cnt)
 
 bool Ikbd::gotUsbMouse(void)
 {
-	if(inDevs[INTYPE_MOUSE].fd != -1) {
+	if(inDevs[INTYPE_MOUSE].fd != -1 || inDevs[INTYPE_VDEVMOUSE].fd != -1) {
 		return true;
 	}
 	

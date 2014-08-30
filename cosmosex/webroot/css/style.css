@@ -1,0 +1,57 @@
+#keyboardtrigger{
+	opacity: 0;
+	position: absolute;
+	top:-100px;
+}
+#canvas{
+	display: none;
+}
+#keyboardlayer{
+  position:fixed;
+  width: 100%;
+  height:256px;
+  padding:0px;
+  bottom:0px;
+}
+img#keyboard{
+  display: block;
+  margin-left: auto;
+  margin-right: auto; 
+}
+.alert{
+  width:90%;
+  display: block;
+  margin-top:10px;
+  margin-left: auto;
+  margin-right: auto; 
+}
+.heading{
+  padding: 10px;
+}
+.background{
+  background-image: url(../img/260520st.jpg);
+  background-size: 100%;
+}
+.hidden{
+  display:none;
+}
+.list-disc{
+  list-style:disc;
+  margin-left:1.5em;
+}
+.alert{
+  opacity:0.9;
+}
+.logo{
+    padding: 10px;
+}
+#demo_placeholder{
+	position: fixed;
+  	width: 100%;
+  	top: 40px;
+}
+#demo_placeholder canvas{
+	display: block;
+	margin-left: auto;
+	margin-right: auto;
+}

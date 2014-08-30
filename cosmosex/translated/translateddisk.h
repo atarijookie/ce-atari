@@ -13,6 +13,11 @@
 
 #include "../isettingsuser.h"
 
+#include "service/configservice.h"
+#include "service/screencastservice.h"
+#include "acsicommand/dateacsicommand.h"
+#include "acsicommand/screencastacsicommand.h"
+
 #define BUFFER_SIZE             (1024*1024)
 #define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
 
@@ -56,10 +61,8 @@ typedef struct {
 class TranslatedDisk: public ISettingsUser
 {
 public:
-    TranslatedDisk(void);
+    TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs);
     virtual ~TranslatedDisk();
-
-    void setAcsiDataTrans(AcsiDataTrans *dt);
 
     void processCommand(BYTE *cmd);
 
@@ -92,7 +95,7 @@ private:
         int firstTranslated;
         int shared;
         int confDrive;
-        
+
         WORD readOnly;
     } driveLetters;
 
@@ -166,7 +169,7 @@ private:
 	// other functions
 	void onGetMounts(BYTE *cmd);
     void onUnmountDrive(BYTE *cmd);
-	
+
     // helper functions
     int findEmptyFileSlot(void);
     int findFileHandleSlot(int atariHandle);
@@ -183,6 +186,13 @@ private:
     bool isAlreadyAttached(std::string hostRootPath);
 
     char *functionCodeToName(int code);
+
+    //-----------------------------------
+    // other ACSI command helpers
+    ConfigService* configService;
+    ScreencastService* screencastService;
+    DateAcsiCommand* dateAcsiCommand;
+    ScreencastAcsiCommand* screencastAcsiCommand;
 };
 
 #endif
