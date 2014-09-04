@@ -13,6 +13,7 @@
 #include "mounter.h"
 #include "downloader.h"
 #include "update.h"
+#include "config/netsettings.h"
 
 #define DEV_CHECK_TIME_MS	3000
 #define UPDATE_CHECK_TIME   1000
@@ -28,6 +29,9 @@ bool    g_gotFranzFwVersion;
 
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
+    NetworkSettings ns;
+    ns.updateResolvConf();    
+
     Update::initialize();
 
     setEnabledIDbits        = false;
@@ -81,7 +85,6 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     //Floppy Service needs access to floppysilo and this thread
     floppyService->setImageSilo(&floppyImageSilo);
     floppyService->setCoreThread(this);
-
 }
 
 CCoreThread::~CCoreThread()
