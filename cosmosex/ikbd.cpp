@@ -21,6 +21,7 @@
 #include "gpio.h"
 #include "utils.h"
 #include "ikbd.h"
+#include "settings.h"
 
 extern volatile sig_atomic_t sigintReceived;
 
@@ -110,6 +111,8 @@ void *ikbdThreadCode(void *ptr)
 
 Ikbd::Ikbd()
 {
+    loadSettings();
+
     initDevs();
     fillKeyTranslationTable();
 
@@ -130,6 +133,20 @@ Ikbd::Ikbd()
     fillStCommandsLengthTable();
 
     resetInternalIkbdVars();
+}
+
+void Ikbd::loadSettings(void)
+{
+    Settings s;
+    bool firstJoyIs0 = s.getBool((char *) "JOY_FIRST_IS_0", false);
+
+    if(firstJoyIs0) {
+        joy1st = INTYPE_JOYSTICK1;
+        joy2nd = INTYPE_JOYSTICK2;
+    } else {
+        joy1st = INTYPE_JOYSTICK2;
+        joy2nd = INTYPE_JOYSTICK1;
+    }
 }
 
 void Ikbd::processReceivedCommands(void)
@@ -1067,27 +1084,27 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
         }
     }
 
-    if(strstr(linkName, "joystick") != NULL && in==NULL) {                              // it's a joystick?
-        if(inDevs[INTYPE_JOYSTICK1].fd == -1) {                             // don't have joystick 1?
-            if(strcmp(fullPath, inDevs[INTYPE_JOYSTICK2].devPath) == 0) {   // if this device is already connected as joystick 2, skip it
+    if(strstr(linkName, "joystick") != NULL && in==NULL) {                  // it's a joystick?
+        if(inDevs[joy1st].fd == -1) {                                       // don't have joystick 1?
+            if(strcmp(fullPath, inDevs[joy2nd].devPath) == 0) {             // if this device is already connected as joystick 2, skip it
                 return;
             }
 
-            in = &inDevs[INTYPE_JOYSTICK1];         
+            in = &inDevs[joy1st];         
             what = (char *) "joystick1";
-        } else if(inDevs[INTYPE_JOYSTICK2].fd == -1) {                      // don't have joystick 2?
-            if(strcmp(fullPath, inDevs[INTYPE_JOYSTICK1].devPath) == 0) {   // if this device is already connected as joystick 1, skip it
+        } else if(inDevs[joy2nd].fd == -1) {                                // don't have joystick 2?
+            if(strcmp(fullPath, inDevs[joy1st].devPath) == 0) {             // if this device is already connected as joystick 1, skip it
                 return;
             }
 
-            in = &inDevs[INTYPE_JOYSTICK2];         
+            in = &inDevs[joy2nd];         
             what = (char *) "joystick2";
-        } else {                                        // already have a joystick?
+        } else {                                                            // already have a joystick?
             return;
         }
     }
 
-    if(in == NULL) {                                    // this isn't mouse, keyboard of joystick, quit!
+    if(in == NULL) {                                                        // this isn't mouse, keyboard of joystick, quit!
         return;
     }
 

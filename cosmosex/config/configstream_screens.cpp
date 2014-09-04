@@ -845,6 +845,7 @@ void ConfigStream::createScreen_other(void)
     comp->setComponentId(COMPID_TIMESYNC_UTC_OFFSET);
     screen.push_back(comp);
 
+    //-----------
     row++;
     comp = new ConfigComponent(this, ConfigComponent::label, "Screencast Frameskip (10-255)",   40, col, row++, gotoOffset);
     screen.push_back(comp);
@@ -852,6 +853,15 @@ void ConfigStream::createScreen_other(void)
     comp = new ConfigComponent(this, ConfigComponent::editline, " ",                      3,  col2, row++, gotoOffset);
     comp->setComponentId(COMPID_SCREENCAST_FRAMESKIP);
     screen.push_back(comp);
+
+    //-----------
+    comp = new ConfigComponent(this, ConfigComponent::label, "Attach 1st joy as JOY 0",     40, col, row, gotoOffset);
+    screen.push_back(comp);
+    
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                      3,  col2, row++, gotoOffset);
+    comp->setComponentId(COMPID_JOY0_FIRST);
+    screen.push_back(comp);
+
     //----------------------
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Reset all settings ",       19, 10, 13, gotoOffset);
@@ -872,14 +882,16 @@ void ConfigStream::createScreen_other(void)
     Settings s;
     
     bool        setDateTime;
+    bool        joy0First;
     float       utcOffset;
     std::string ntpServer;
-    int			    frameSkip;
+    int			frameSkip;
     
     setDateTime = s.getBool     ((char *) "TIME_SET",             true);
     utcOffset   = s.getFloat    ((char *) "TIME_UTC_OFFSET",      0);
     ntpServer   = s.getString   ((char *) "TIME_NTP_SERVER",      (char *) "200.20.186.76");
     frameSkip   = s.getInt      ((char *) "SCREENCAST_FRAMESKIP", 20);
+    joy0First   = s.getBool     ((char *) "JOY_FIRST_IS_0",       false);
 
     if( frameSkip<10 )
     {
@@ -890,10 +902,11 @@ void ConfigStream::createScreen_other(void)
         frameSkip=255;
     }
     
-    setBoolByComponentId(COMPID_TIMESYNC_ENABLE, setDateTime);
-    setFloatByComponentId(COMPID_TIMESYNC_UTC_OFFSET, utcOffset);
-    setTextByComponentId(COMPID_TIMESYNC_NTP_SERVER, ntpServer);
-    setIntByComponentId(COMPID_SCREENCAST_FRAMESKIP, frameSkip);
+    setBoolByComponentId(COMPID_TIMESYNC_ENABLE,        setDateTime);
+    setFloatByComponentId(COMPID_TIMESYNC_UTC_OFFSET,   utcOffset);
+    setTextByComponentId(COMPID_TIMESYNC_NTP_SERVER,    ntpServer);
+    setIntByComponentId(COMPID_SCREENCAST_FRAMESKIP,    frameSkip);
+    setBoolByComponentId(COMPID_JOY0_FIRST,             joy0First);
     //------------------------
     
     setFocusToFirstFocusable();
@@ -904,14 +917,16 @@ void ConfigStream::onOtherSave(void)
     Settings s;
 
     bool        setDateTime = false;
+    bool        joy0First   = false;
     float       utcOffset   = 0;
     std::string ntpServer;
     int			frameSkip;
     
-    getBoolByComponentId(COMPID_TIMESYNC_ENABLE, setDateTime);
-    getFloatByComponentId(COMPID_TIMESYNC_UTC_OFFSET, utcOffset);
-    getTextByComponentId(COMPID_TIMESYNC_NTP_SERVER, ntpServer);
-    getIntByComponentId(COMPID_SCREENCAST_FRAMESKIP, frameSkip);
+    getBoolByComponentId(COMPID_TIMESYNC_ENABLE,        setDateTime);
+    getFloatByComponentId(COMPID_TIMESYNC_UTC_OFFSET,   utcOffset);
+    getTextByComponentId(COMPID_TIMESYNC_NTP_SERVER,    ntpServer);
+    getIntByComponentId(COMPID_SCREENCAST_FRAMESKIP,    frameSkip);
+    getBoolByComponentId(COMPID_JOY0_FIRST,             joy0First);
     
     if( frameSkip<10 )
     {
@@ -926,6 +941,7 @@ void ConfigStream::onOtherSave(void)
     s.setFloat    ((char *) "TIME_UTC_OFFSET",      utcOffset);
     s.setString   ((char *) "TIME_NTP_SERVER",      (char *) ntpServer.c_str());
     s.setInt      ((char *) "SCREENCAST_FRAMESKIP", frameSkip);
+    s.setBool     ((char *) "JOY_FIRST_IS_0",       joy0First);
 
     createScreen_homeScreen();		// now back to the home screen
 }

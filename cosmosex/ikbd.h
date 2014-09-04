@@ -200,6 +200,9 @@ private:
     bool            mouseY0atTop;
     int             mouseAbsBtnAct;
 
+    int             joy1st;
+    int             joy2nd;
+
 	struct {
 		int		threshX, threshY;
 	} relMouse;
@@ -230,6 +233,8 @@ private:
     BYTE            specialCodeLen[10];
 
     BYTE            stCommandLen[256];
+
+    void loadSettings(void);
 
     void initCyclicBuffer(TCyclicBuff *cb);
     void addToCyclicBuffer(TCyclicBuff *cb, BYTE val);
