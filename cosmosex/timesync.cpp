@@ -24,6 +24,7 @@
 
 #define TIMESYNC_URL_WEB    "http://joo.kie.sk/cosmosex/time.php"
 volatile BYTE timeSyncStatusByte;
+volatile bool do_timeSync = false;
 
 void *timesyncThreadCode(void *ptr)
 {
@@ -31,6 +32,15 @@ void *timesyncThreadCode(void *ptr)
 
     TimeSync timeSync;
     timeSync.sync();
+
+    while(sigintReceived == 0) {                            // this thread does time sync when requested
+        sleep(1);
+
+        if(do_timeSync) {                                   // should do time sync? do it
+            do_timeSync = false;
+            timeSync.sync();
+        }
+    }
 
 	Debug::out(LOG_INFO, "Timesync thread finished.");
     return 0;

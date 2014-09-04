@@ -16,6 +16,9 @@
 #include "configstream.h"
 #include "netsettings.h"
 
+extern volatile bool do_timeSync;
+extern volatile bool do_loadIkbdConfig;
+
 //--------------------------
 // screen creation methods
 void ConfigStream::createScreen_homeScreen(void)
@@ -942,6 +945,9 @@ void ConfigStream::onOtherSave(void)
     s.setString   ((char *) "TIME_NTP_SERVER",      (char *) ntpServer.c_str());
     s.setInt      ((char *) "SCREENCAST_FRAMESKIP", frameSkip);
     s.setBool     ((char *) "JOY_FIRST_IS_0",       joy0First);
+
+    do_timeSync         = true;     // do time sync again
+    do_loadIkbdConfig   = true;     // reload ikbd config
 
     createScreen_homeScreen();		// now back to the home screen
 }

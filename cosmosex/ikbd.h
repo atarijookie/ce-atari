@@ -171,6 +171,8 @@ class Ikbd
 public:
     Ikbd();
 
+    void loadSettings(void);
+
     void findDevices(void);
     void findVirtualDevices();
     void closeDevs(void);
@@ -233,8 +235,6 @@ private:
     BYTE            specialCodeLen[10];
 
     BYTE            stCommandLen[256];
-
-    void loadSettings(void);
 
     void initCyclicBuffer(TCyclicBuff *cb);
     void addToCyclicBuffer(TCyclicBuff *cb, BYTE val);

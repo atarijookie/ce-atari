@@ -24,6 +24,7 @@
 #include "settings.h"
 
 extern volatile sig_atomic_t sigintReceived;
+volatile bool do_loadIkbdConfig = false;
 
 void *ikbdThreadCode(void *ptr)
 {
@@ -44,6 +45,12 @@ void *ikbdThreadCode(void *ptr)
 	}
 
     while(sigintReceived == 0) {
+        // reload config if needed
+        if(do_loadIkbdConfig) {
+            do_loadIkbdConfig = false;
+            ikbd.loadSettings();
+        }
+
         // look for new input devices
         if(Utils::getCurrentMs() >= nextDevFindTime) {      // should we check for new devices?
             nextDevFindTime = Utils::getEndTime(3000);      // check the devices in 3 seconds
