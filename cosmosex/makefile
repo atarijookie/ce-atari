@@ -7,10 +7,10 @@ CC	    = g++
 CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64
 
 ifeq ($(ONPC),yes)
-    LDFLAGS	= -lrt -lpthread -lcurl
+    LDFLAGS	= -Llib -Llib -lrt -lpthread -lcurl -lcivetweb -ldl 
     CFLAGS += -DONPC -I./
 else
-    LDFLAGS	= -Llib/ -lbcm2835 -lrt -lpthread -lcurl -lcivetweb -ldl
+    LDFLAGS	= -Llib -lbcm2835 -lrt -lpthread -lcurl -lcivetweb -ldl
     CFLAGS += -I./
 endif
 
@@ -78,25 +78,21 @@ $(TARGET): $(OBJS) $(HDRS) $(WEBCOMPONENTS)
 
 $(WEB_CSS_PATH)/combined.css.gz: ${WEB_CSS_MODULES}
 	cat > $@ $^
-	rm -f $@.gz
-	gzip $@
-	rm -f $@
-	mv $@.gz $@ 
+	gzip -f $@
+	mv $@.gz $@
     
 $(WEB_JS_PATH)/zepto-combined.js.gz: $(WEB_JS_PATH)/zepto.js $(WEB_JS_PATH)/zepto.hack.js ${WEB_JS_MODULES}
 	cat > $@ $^
-	rm -f $@.gz
-	gzip $@
-	rm -f $@
-	mv $@.gz $@ 
+	gzip -f $@
+	mv $@.gz $@
 
 $(WEB_JS_PATH)/jquery-combined.js.gz: $(WEB_JS_PATH)/jquery.js ${WEB_JS_MODULES}
 	cat > $@ $^
-	rm -f $@.gz
-	gzip $@
-	rm -f $@
-	mv $@.gz $@ 
+	gzip -f $@
+	mv $@.gz $@
 
 clean:
-	find . -name "*.o" -print0| xargs -0 rm -rf	
+	rm -f $(WEB_JS_PATH)/*.gz
+	rm -f $(WEB_CSS_PATH)/*.gz
+	find . -name "*.o" -print0| xargs -0 rm -rf
 	rm -f *.o *~ cosmosex
