@@ -858,25 +858,26 @@ void ConfigStream::createScreen_other(void)
     screen.push_back(comp);
 
     //-----------
+    row++;
     comp = new ConfigComponent(this, ConfigComponent::label, "Attach 1st joy as JOY 0",     40, col, row, gotoOffset);
     screen.push_back(comp);
     
-    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                      3,  col2, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                      3,  32, row++, gotoOffset);
     comp->setComponentId(COMPID_JOY0_FIRST);
     screen.push_back(comp);
 
     //----------------------
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Reset all settings ",       19, 10, 13, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Reset all settings ",       19, 10, 16, gotoOffset);
     comp->setOnEnterFunctionCode(CS_RESET_SETTINGS);
     screen.push_back(comp);
     
-    comp = new ConfigComponent(this, ConfigComponent::button, "   Save   ",                 10,  6, 16, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "   Save   ",                 10,  6, 18, gotoOffset);
     comp->setOnEnterFunctionCode(CS_OTHER_SAVE);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Cancel  ",                 10,  22, 16, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Cancel  ",                 10,  22, 18, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);

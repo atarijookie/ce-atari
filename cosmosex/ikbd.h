@@ -221,7 +221,6 @@ private:
 		BYTE deltaY;
 	} keycodeMouse;
 	
-    bool            swapJoys;
     int             joystickMode;
     TJoystickState  joystick[2];
     bool            joystickEnabled;

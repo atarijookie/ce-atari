@@ -127,7 +127,6 @@ Ikbd::Ikbd()
 	
     fdUart      = -1;
     mouseBtnNow = 0;
-    swapJoys    = false;
 
     // init uart RX cyclic buffers
     initCyclicBuffer(&cbStCommands);
@@ -582,22 +581,12 @@ void Ikbd::processKeyboardData(void)
 			
 				if(gotUsbJoy1()) {								// got joy 1?
 					BYTE joy0state = joystick[0].lastDir | joystick[0].lastBtn;	// get state
-					
-					if(!swapJoys) {								// and we shouldn't swap - use it as joy 0
-						bfr[1] = joy0state;
-					} else {									// swapped? use it as joy 1
-						bfr[2] = joy0state;
-					}
+					bfr[1] = joy0state;
 				}
 
 				if(gotUsbJoy2()) {								// got joy 2?
 					BYTE joy1state = joystick[1].lastDir | joystick[1].lastBtn;	// get state
-					
-					if(!swapJoys) {								// and we shouldn't swap - use it as joy 1
-						bfr[2] = joy1state;
-					} else {									// swapped? use it as joy 0
-						bfr[1] = joy1state;
-					}
+					bfr[2] = joy1state;
 				}
 				
 				break;
@@ -867,13 +856,8 @@ void Ikbd::sendBothJoyReport(void)
 	
 	bfr[0] = KEYBDATA_JOY_BOTH;
 
-	if(!swapJoys) {
-		bfr[1] = joy0state;
-		bfr[2] = joy1state;
-	} else {
-		bfr[1] = joy1state;
-		bfr[2] = joy0state;
-	}
+	bfr[1] = joy0state;
+	bfr[2] = joy1state;
 	
 	res = fdWrite(fdUart, bfr, 3); 
 
@@ -889,18 +873,10 @@ void Ikbd::sendJoyState(int joyNumber, int dirTotal)
     int res;
 
     // first set the joystick 0 / 1 tag 
-    if(!swapJoys) {                 // joysticks NOT swapped?
-        if(joyNumber == 0) {        // joy 0
-            bfr[0] = KEYBDATA_JOY0;
-        } else {                    // joy 1
-            bfr[0] = KEYBDATA_JOY1;
-        }
-    } else {                        // joysticks ARE swapped?
-        if(joyNumber == 0) {        // joy 0
-            bfr[0] = KEYBDATA_JOY1;
-        } else {                    // joy 1
-            bfr[0] = KEYBDATA_JOY0;
-        }
+    if(joyNumber == 0) {        // joy 0
+        bfr[0] = KEYBDATA_JOY0;
+    } else {                    // joy 1
+        bfr[0] = KEYBDATA_JOY1;
     }
 
     bfr[1] = dirTotal;
