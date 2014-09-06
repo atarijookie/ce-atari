@@ -66,6 +66,9 @@ typedef struct
 
 TFileBuffer fileBufs[MAX_FILES];
 
+DWORD fread_small(WORD ceHandle, DWORD countNeeded, BYTE *buffer);
+DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer);
+
 // ------------------------------------------------------------------ 
 int32_t custom_fread( void *sp )
 {
@@ -85,124 +88,140 @@ int32_t custom_fread( void *sp )
 	
 	WORD ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle 
 	
-	TFileBuffer *fb	= &fileBufs[ceHandle];								// to shorten the following operations use this pointer 
-	WORD dataLeft	= fb->rCount - fb->rStart;										
+    if(count <= 1024) {
+        res = fread_small(ceHandle, count, buffer);
+    } else {
+        res = fread_big(ceHandle, count, buffer);
+    }
+    
+    return res;
+}
+    
+// for small freads get the data through the FileBuffers
+DWORD fread_small(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
+{
+    DWORD countDone = 0;
+    WORD dataLeft, copyCount;
+    
+	TFileBuffer *fb = &fileBufs[ceHandle];								// to shorten the following operations use this pointer 
+    dataLeft        = fb->rCount - fb->rStart;	                        // see how many data we have buffered									
+    
+    while(countNeeded > 0) {
 
-	if(count <= RW_BUFFER_SIZE) {										// if reading less than buffer size 
-		if(count <= dataLeft) {											// if we want to read less (or equal) data than we have in buffer 
-			memcpy(buffer, &fb->rBuf[ fb->rStart], count);				// copy the data to buffer and quit with success 
-			fb->rStart += count;										// and more the pointer further in buffer 
-			return count;
-		} else {														// if we want to read more data than we have in buffer 
-			memcpy(buffer, &fb->rBuf[ fb->rStart], dataLeft);			// copy all the remaining data to buffer
-			buffer += dataLeft;											// update the buffer pointer to place where the remaining data should be stored
+        if(dataLeft == 0) {                                             // no data buffered?
+            fillReadBuffer(ceHandle);									// fill the read buffer with new data
+            dataLeft = fb->rCount - fb->rStart;	                        // see how many data we have buffered
+            
+            if(dataLeft == 0) {
+                return countDone;
+            }
+        }
+        
+        copyCount = (dataLeft > countNeeded) ? countNeeded : dataLeft;  // do we have more data than we need? Just use only what we need, otherwise use all data left
+		memcpy(buffer, &fb->rBuf[ fb->rStart], copyCount);
+
+        buffer      += copyCount;                                       // update pointer to where next data should be stored
+        countDone   += copyCount;                                       // add to count of bytes read
+        countNeeded -= copyCount;                                       // subtract from count of bytes needed to be read
+
+        fb->rStart  += copyCount;                                       // update pointer to first unused data
+        dataLeft    = fb->rCount - fb->rStart;	                        // see how many data we have buffered									
+    }
+
+    return countDone;
+}
+    
+// for big freads use buffered data, then do big data transfer (multiple sectors at once), then finish with buffered data
+DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
+{
+	TFileBuffer *fb	    = &fileBufs[ceHandle];					        // to shorten the following operations use this pointer 
+	WORD dataLeft	    = fb->rCount - fb->rStart;										
+    
+    DWORD countDone     = 0;
+    DWORD dwBuffer      = (DWORD) buffer;
+    BYTE bufferIsOdd	= dwBuffer	& 1;
+	BYTE dataLeftIsOdd;
+    char seekOffset     = 0;	
+
+    // First phase of BIG fread:
+    // Use all the possible buffered data, and also make the buffer pointer EVEN, as the ACSI transfer works only on EVEN addresses.
+    // This means that if the buffer pointer is EVEN, don't use too much data and don't make it ODD this way;
+    // and if the buffer pointer is ODD, then make it EVEN - either use already available buffered data, or read data to buffer.
+    
+    if(bufferIsOdd) {                                                   // if buffer address is ODD, we need to make it EVEN before the big ACSI transfer starts
+        if(dataLeft == 0) {                                             // no data buffered?
+            fillReadBuffer(ceHandle);									// fill the read buffer with new data
+            dataLeft = fb->rCount - fb->rStart;	                        // see how many data we have buffered
+            
+            if(dataLeft == 0) {                                         // no data in the file? fail
+                return 0;
+            }
+        }
+    
+        // ok, so we got some data buffered, now use only ODD number of data, so the buffer pointer after this would be EVEN
+        dataLeftIsOdd = dataLeft & 1;
+
+        if(!dataLeftIsOdd) {                                            // remaining buffered data count is EVEN? Use only ODD part
+            dataLeft    -= 1;
+            seekOffset  = -1;
+        }
+    } else {                                                            // if buffer address is EVEN, we don't need to fix the buffer to be on EVEN address
+        if(dataLeft != 0) {                                             // so use buffered data if there are some (otherwise skip this step)
+            dataLeftIsOdd = dataLeft & 1;
+
+            if(dataLeftIsOdd) {                                         // if the data left is ODD, use one byte less - to keep the buffer pointer EVEN
+                dataLeft--;
+                seekOffset = -1;
+            }
+        }    
+    }
+
+    if(dataLeft != 0) {                                                 // if should copy some remaining buffered data, do it
+  		memcpy(buffer, &fb->rBuf[ fb->rStart], dataLeft);               // copy the data
+            
+        buffer      += dataLeft;                                        // update pointer to where next data should be stored
+        countDone   += dataLeft;                                        // add to count of bytes read
+        countNeeded -= dataLeft;                                        // subtract from count of bytes needed to be read
+    }
+    
+	fb->rStart = 0;													    // mark that the buffer doesn't contain any data anymore (although it might contain 1 byte)
+    fb->rCount = 0;
+    //---------------
+    
+    // Second phase of BIG fread: transfer data by blocks of size 512 bytes, buffer must be EVEN
+	while(countNeeded >= 512) {											// while we're not at the ending sector
+		WORD sectorCount = countNeeded / 512; 
 		
-			fillReadBuffer(ceHandle);									// fill the read buffer with new data
-			
-			WORD rest	= count - dataLeft;								// calculate the rest that we should copy
-			dataLeft	= fb->rCount - fb->rStart;						// and recaulculate dataLeft variable
-			
-			if(dataLeft >= rest) {										// we have enough data to copy 
-				memcpy(buffer, &fb->rBuf[ fb->rStart ], rest);			// copy the rest of requested data
-				fb->rStart += rest;										// and move the pointer further in buffer 
-				return count;
-			} else {													// we don't have enough data to copy :(
-				WORD countMissing = rest - dataLeft;					// calculate how much data we miss
-			
-				memcpy(buffer, &fb->rBuf[ fb->rStart ], dataLeft);		// copy the data that we have
-				fb->rStart += dataLeft;									// and move the pointer further in buffer 
-				return (count - countMissing);
-			}			
-		}	
-	} else {															// if reading more than buffer size 
-		DWORD dwBuffer = (DWORD) buffer;
-		
-		BYTE  bufferIsOdd	= dwBuffer	& 1;
-		BYTE  dataLeftIsOdd	= dataLeft	& 1;
-		
-		DWORD	bytesRead = 0;
-		WORD	useCountFromBuffer = dataLeft;
-		char	seekOffset = 0;	
-	
-		// the following code tries to use as much of the data we have in buffer as possible (either dataLeft, or dataLeft-1 count), making the final buffer an EVEN pointer
-		if(bufferIsOdd) {												// if buffer is ODD
-			if(!dataLeftIsOdd) {										// and data left is EVEN
-				if(dataLeft > 0) {										// got some data left?
-					useCountFromBuffer--;								// use only ODD part, and seek -1 before read
-					seekOffset = -1;
-				} else {												// no data left?
-					fillReadBuffer(ceHandle);							// fill the read buffer with new data
-					
-					dataLeft = fb->rCount - fb->rStart;					// recalculate how much data we got
-					
-					if(dataLeft == 0) {									// no more data left? quit
-						return 0;
-					}
-					
-					dataLeftIsOdd		= dataLeft	& 1;
-					useCountFromBuffer	= dataLeft;
-					
-					if(!dataLeftIsOdd) {								// data left is EVEN
-						useCountFromBuffer--;							// use only ODD part, and seek -1 before read
-						seekOffset = -1;
-					}
-				}
-			}
-		} else {														// if buffer is EVEN
-			if(dataLeftIsOdd) {											// the data left are ODD
-				useCountFromBuffer--;									// use only EVEN part, and seek -1 before read
-				seekOffset = -1;
-			} 
+		if(sectorCount > MAXSECTORS) {								    // limit the maximum sectors read in one cycle to MAXSECTORS
+			sectorCount = MAXSECTORS;
 		}
-	
-		// at this point we should have: ODD buffer pointer and ODD data count, or EVEN buffer pointer and EVEN data count
-		memcpy(buffer, &fb->rBuf[ fb->rStart ], useCountFromBuffer);	// copy the data that we have
-		buffer		+= useCountFromBuffer;								// update the buffer pointer
-		bytesRead	+= useCountFromBuffer;								// update the count of bytes we've read
-		count		-= useCountFromBuffer;								// and update how much we have to read
-		
-		fb->rStart = 0;													// mark that the buffer doesn't contain any data anymore (although it might contain 1 byte)
-		fb->rCount = 0;
-
-		// buffer is now EVEN pointer, and the read operation must not read the last sector in the original buffer (to avoid buffer overflow)
-
-		// do big transfers now - up to MAXSECTORS size of transfers
-		while(count >= 512) {											// while we're not at the ending sector
-			WORD sectorCount = count / 512; 
-		
-			if(sectorCount > MAXSECTORS) {								// limit the maximum sectors read in one cycle to MAXSECTORS
-				sectorCount = MAXSECTORS;
-			}
 			
-			DWORD bytesCount = ((DWORD) sectorCount) * 512;				// convert sector count to byte count
+		DWORD bytesCount = ((DWORD) sectorCount) * 512;				    // convert sector count to byte count
 			
-			res = readData(ceHandle, buffer, bytesCount, seekOffset);	// try to read the data
+		DWORD res = readData(ceHandle, buffer, bytesCount, seekOffset);	// try to read the data
 			
-			bytesRead	+= res;											// update the bytes read variable
-			buffer		+= res;											// update the buffer pointer
-			count		-= res;											// update the count that we still should read
+		countDone	+= res;											    // update the bytes read variable
+		buffer		+= res;											    // update the buffer pointer
+		countNeeded -= res;											    // update the count that we still should read
 			
-			if(res != bytesCount) {										// if failed to read all the requested data?
-				return bytesRead;										// return with the count of read data 
-			}
+		if(res != bytesCount) {										    // if failed to read all the requested data?
+			return countDone;										    // return with the count of read data 
 		}
-		
-		// if we should still read something little at the end
-		if(count != 0) {												
-			fillReadBuffer(ceHandle);
-			
-			DWORD rest = (count <= fb->rCount) ? count : fb->rCount;	// see if we have enough data to read the rest, and use which is lower - either what we want to read, or what we can read
-			
-			memcpy(buffer, &fb->rBuf[ fb->rStart ], rest);				// copy the data that we have
-			fb->rStart	+= rest;										// and move the pointer further in buffer
-			bytesRead	+= rest;										// also mark that we've read this rest 
-		}
-
-		return bytesRead;												// return the total count or bytes read
 	}
-	
-	// this should never happen 
-	return EINTRN;
+    //--------------
+        
+    // Third phase of BIG fread: if the rest after reading big blocks is not 0, we need to finish it with one last buffered read    
+	if(countNeeded != 0) {												
+		fillReadBuffer(ceHandle);
+			
+		DWORD rest = (countNeeded <= fb->rCount) ? countNeeded : fb->rCount;    // see if we have enough data to read the rest, and use which is lower - either what we want to read, or what we can read
+			
+		memcpy(buffer, &fb->rBuf[ fb->rStart ], rest);				    // copy the data that we have
+		fb->rStart	+= rest;										    // and move the pointer further in buffer
+		countDone	+= rest;										    // also mark that we've read this rest 
+	}
+
+    return countDone;                                                   // return how much bytes we've read together
 }
 
 int32_t custom_fwrite( void *sp )
