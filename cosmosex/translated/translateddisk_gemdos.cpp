@@ -338,21 +338,9 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
         return;
     }
 
-	int ires = rmdir(hostPath.c_str());
+	int ires = deleteDirectory((char *) hostPath.c_str());
 
-    if(ires == 0) {                                 // directory deleted?
-        dataTrans->setStatus(E_OK);
-        return;
-    }
-
-	ires = errno;
-	
-    if(ires == EACCES) {               
-        dataTrans->setStatus(EACCDN);
-        return;
-    }
-
-    dataTrans->setStatus(EINTRN);                   // some other error
+    dataTrans->setStatus(ires);
 }
 
 void TranslatedDisk::onFrename(BYTE *cmd)

@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <dirent.h>
 
 #include "../global.h"
 #include "../debug.h"
@@ -588,10 +590,6 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
 
 bool TranslatedDisk::hostPathExists(std::string hostPath)
 {
-    if(!conf[currentDriveIndex].enabled) {      // we don't have this drive? fail
-        return false;
-    }
-
     // now check if it exists
     int res = access(hostPath.c_str(), F_OK);
 
@@ -949,6 +947,52 @@ void TranslatedDisk::pathSeparatorHostToAtari(std::string &path)
             path[i] = ATARIPATH_SEPAR_CHAR;      // change to atari separator
         }
     }
+}
+
+int TranslatedDisk::deleteDirectory(char *path)
+{
+    //---------
+    // first recursively delete the content of this dir
+    DIR *dir = opendir((char *) path);						        // try to open the dir
+	
+    if(dir == NULL) {                                 				// not found?
+        return EPTHNF;
+    }
+	
+    char fullPath[1024];
+    
+	while(1) {                                                  	// while there are more files, store them
+		struct dirent *de = readdir(dir);							// read the next directory entry
+	
+		if(de == NULL) {											// no more entries?
+			break;
+		}
+        
+        if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) {     // skip current-dir and up-dir
+            continue;
+        }
+
+        strcpy(fullPath, path);                                     // create full path out of parent path + this directory item
+        strcat(fullPath, "/");
+        strcat(fullPath, de->d_name);
+        
+        if(de->d_type == DT_DIR) {                                  // it's a dir? recursive delete
+            deleteDirectory(fullPath);
+        } else if(de->d_type == DT_REG || de->d_type == DT_LNK) {   // it's a file? unlink it
+            unlink(fullPath);
+        } 
+    }
+
+	closedir(dir);
+    //------------
+    // the dir should now be empty, delete it
+    int res = rmdir(path);
+    
+    if(res == 0) {              // on success return success
+        return E_OK;
+    }
+    
+    return EACCDN;
 }
 
 char *TranslatedDisk::functionCodeToName(int code)
