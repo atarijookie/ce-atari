@@ -328,14 +328,44 @@ void Mounter::restartNetwork(void)
 {
 	Debug::out(LOG_INFO, "Mounter::restartNetwork - starting to restart the network\n");
 
-    // was: sudo
-	system("ifdown eth0");
-	system("ifdown wlan0");
+    system("sync");                                                 // first sync the filesystem caches...
 
-	system("ifup eth0");
-	system("ifup wlan0");
+    bool gotWlan0 = wlan0IsPresent();                               // first find out if we got wlan0 or not
+
+	system("ifdown eth0");                                          // shut down ethernet
+
+    if(gotWlan0) {                                                  // if got wlan, shut it down
+    	system("ifdown wlan0");
+    }
+
+	system("ifup eth0");                                            // bring up ethernet
+
+    if(gotWlan0) {                                                  // if got wlan, bring it up
+    	system("ifup wlan0");
+    }
 	
 	Debug::out(LOG_INFO, "Mounter::restartNetwork - done\n");
+}
+
+bool Mounter::wlan0IsPresent(void)
+{
+    system("ifconfig -a | grep wlan0 > /tmp/wlan0dump.txt");                    // first check ifconfig for presence of wlan0 interface
+
+	struct stat attr;
+    int res = stat("/tmp/wlan0dump.txt", &attr);							    // get the file status
+	
+	if(res != 0) {
+    	Debug::out(LOG_DEBUG, "Mounter::wlan0IsPresent() -- stat() failed\n");
+        return false;
+    }
+
+    if(attr.st_size == 0) {                                                     // if the file is empty, ifconfig doesn't contain wlan0
+    	Debug::out(LOG_DEBUG, "Mounter::wlan0IsPresent() -- file empty, wlan0 not present\n");
+        return false;
+    }
+
+  	Debug::out(LOG_DEBUG, "Mounter::wlan0IsPresent() -- wlan0 is present\n");
+    return true;                                                                // ifconfig contains wlan0, so we got wlan0
 }
 
 void Mounter::sync(void)                        // just do sync on filesystem

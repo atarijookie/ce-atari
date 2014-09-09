@@ -334,14 +334,10 @@ void TranslatedDisk::processCommand(BYTE *cmd)
 
     dataTrans->clear();                 // clean data transporter before handling
 
-    Debug::out(LOG_DEBUG, "processCommand");
-
     if(cmd[1] != 'C' || cmd[2] != 'E' || cmd[3] != HOSTMOD_TRANSLATED_DISK) {   // not for us?
         return;
     }
 
-/*
-*/
     char *functionName = functionCodeToName(cmd[4]);
     Debug::out(LOG_DEBUG, "TranslatedDisk function - %s (%02x)", functionName, cmd[4]);
 	//>dataTrans->dumpDataOnce();
@@ -594,15 +590,19 @@ bool TranslatedDisk::hostPathExists(std::string hostPath)
     int res = access(hostPath.c_str(), F_OK);
 
     if(res != -1) {             // if it's not this error, then the file exists
+        Debug::out(LOG_DEBUG, "TranslatedDisk::hostPathExists( %s ) = FALSE", (char *) hostPath.c_str());
         return true;
     }
 
+    Debug::out(LOG_DEBUG, "TranslatedDisk::hostPathExists( %s ) = TRUE", (char *) hostPath.c_str());
     return false;
 }
 
 bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath)
 {
     hostPath = "";
+
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - atariPath: %s", (char *) atariPath.c_str());
 
     pathSeparatorAtariToHost(atariPath);
 
@@ -612,6 +612,7 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
         char newDrive = atariPath[0];
 
         if(!isValidDriveLetter(newDrive)) {                 // not a valid drive letter?
+            Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - invalid drive letter");
             return false;
         }
 
@@ -619,10 +620,12 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
         driveIndex = newDrive - 'A';                        // calculate drive index
 
         if(driveIndex < 2) {                                // drive A and B not handled
+            Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - drive A & B not handled");
             return false;
         }
 
         if(!conf[driveIndex].enabled) {                     // that drive is not enabled?
+            Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - drive not enabled");
             return false;
         }
 
@@ -640,11 +643,13 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 		hostPath = root;
 		Utils::mergeHostPaths(hostPath, longHostPath);
 
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - fill path including drive letter: atariPath: %s -> hostPath: %s", (char *) atariPath.c_str(), (char *) hostPath.c_str());
         return true;
 
     }
 
     if(!conf[currentDriveIndex].enabled) {              // we're trying this on disabled drive?
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - the current drive is not enabled (not translated drive)");
         return false;
     }
 
@@ -662,6 +667,7 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 		hostPath = root;
 		Utils::mergeHostPaths(hostPath, longHostPath);
 
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - starting from root -- atariPath: %s -> hostPath: %s", (char *) atariPath.c_str(), (char *) hostPath.c_str());
         return true;
     }
 
@@ -678,7 +684,7 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 	hostPath = root;
 	Utils::mergeHostPaths(hostPath, longHostPath);
 
-//    Debug::out(LOG_DEBUG, "host path: %s", (char *) hostPath.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - relative path -- atariPath: %s -> hostPath: %s", (char *) atariPath.c_str(), (char *) hostPath.c_str());
     return true;
 }
 
@@ -690,15 +696,19 @@ int TranslatedDisk::getDriveIndexFromAtariPath(std::string atariPath)
         char newDrive = atariPath[0];
 
         if(!isValidDriveLetter(newDrive)) {                 // not a valid drive letter?
+            Debug::out(LOG_DEBUG, "TranslatedDisk::getDriveIndexFromAtariPath -- %s -> invalid drive %c ", (char *) atariPath.c_str(), newDrive);
             return -1;
         }
 
         newDrive = toUpperCase(newDrive);                   // make sure it's upper case
         driveIndex = newDrive - 'A';                        // calculate drive index
+
+        Debug::out(LOG_DEBUG, "TranslatedDisk::getDriveIndexFromAtariPath -- %s -> drive index: %d ", (char *) atariPath.c_str(), driveIndex);
 		return driveIndex;
 	}
 
 	// if it wasn't full path, use current drive index
+    Debug::out(LOG_DEBUG, "TranslatedDisk::getDriveIndexFromAtariPath -- %s -> current drive index: %d ", (char *) atariPath.c_str(), currentDriveIndex);
 	return currentDriveIndex;
 }
 
@@ -707,6 +717,7 @@ bool TranslatedDisk::isAtariPathReadOnly(std::string atariPath)
     int driveIndex = getDriveIndexFromAtariPath(atariPath);
 
     if(driveIndex == -1) {
+        Debug::out(LOG_DEBUG, "TranslatedDisk::isAtariPathReadOnly -- %s -> can't get drive index, not READ ONLY ", (char *) atariPath.c_str());
         return false;
     }
 
@@ -716,15 +727,18 @@ bool TranslatedDisk::isAtariPathReadOnly(std::string atariPath)
 bool TranslatedDisk::isDriveIndexReadOnly(int driveIndex)
 {
     if(driveIndex < 0 || driveIndex > 15) {
+        Debug::out(LOG_DEBUG, "TranslatedDisk::isDriveIndexReadOnly -- drive index: %d -> out of index, not READ ONLY ", driveIndex);
         return false;
     }
 
     WORD mask = (1 << driveIndex);
 
     if((driveLetters.readOnly & mask) != 0) {               // if the bit representing the drive is set, it's read only
+        Debug::out(LOG_DEBUG, "TranslatedDisk::isDriveIndexReadOnly -- drive index: %d -> is READ ONLY ", driveIndex);
         return true;
     }
 
+    Debug::out(LOG_DEBUG, "TranslatedDisk::isDriveIndexReadOnly -- drive index: %d -> not READ ONLY ", driveIndex);
     return false;
 }
 

@@ -50,6 +50,7 @@ private:
 	void createSource(char *host, char *hostDir, bool nfsNotSamba, char *source);
 	
 	bool mountDumpContains(char *searchedString);
+    bool wlan0IsPresent(void);
 
     void copyTextFileToLog(char *path);
 };
