@@ -33,6 +33,8 @@ public:
 
     static void getIpAdds(BYTE *bfr);
     
+    static void forceSync(void);
+
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
 

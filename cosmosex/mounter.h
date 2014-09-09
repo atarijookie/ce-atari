@@ -6,6 +6,7 @@
 #define MOUNTER_ACTION_MOUNT			0
 #define MOUNTER_ACTION_UMOUNT			1
 #define MOUNTER_ACTION_RESTARTNETWORK	2
+#define MOUNTER_ACTION_SYNC             3
 
 typedef struct {
 	int			action;
@@ -37,7 +38,8 @@ public:
 	bool mountDevice(char *devicePath, char *mountDir);
 	void umountIfMounted(char *mountDir);
 	void restartNetwork(void);
-	
+	void sync(void);
+
 private:
 	bool mount(char *mountCmd, char *mountDir);
 

@@ -23,6 +23,7 @@
 #include "version.h"
 #include "downloader.h"
 #include "gpio.h"
+#include "mounter.h"
 
 DWORD Utils::getCurrentMs(void)
 {
@@ -324,4 +325,12 @@ void Utils::getIpAdds(BYTE *bfr)
 
     freeifaddrs(ifaddr);
 }
+
+void Utils::forceSync(void)
+{
+	TMounterRequest tmr;			
+	tmr.action	= MOUNTER_ACTION_SYNC;                          // let the mounter thread do filesystem caches sync 						
+	mountAdd(tmr);
+}
+
 

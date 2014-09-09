@@ -65,9 +65,15 @@ void *mountThreadCode(void *ptr)
 			continue;
 		}
 		
-		if(tmr.action == MOUNTER_ACTION_RESTARTNETWORK) {
+		if(tmr.action == MOUNTER_ACTION_RESTARTNETWORK) {   // restart network?
 			mounter.restartNetwork();
+            continue;
 		}
+
+        if(tmr.action == MOUNTER_ACTION_SYNC) {             // sync system caches?
+            mounter.sync();
+            continue;
+        }
 	}
 	
 	Debug::out(LOG_INFO, "Mount thread terminated.");
@@ -330,6 +336,12 @@ void Mounter::restartNetwork(void)
 	system("ifup wlan0");
 	
 	Debug::out(LOG_INFO, "Mounter::restartNetwork - done\n");
+}
+
+void Mounter::sync(void)                        // just do sync on filesystem
+{
+    system("sync");
+	Debug::out(LOG_DEBUG, "Mounter::sync - filesystem sync done\n");
 }
 
 void Mounter::copyTextFileToLog(char *path)

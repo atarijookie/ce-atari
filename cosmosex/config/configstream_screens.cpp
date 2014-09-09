@@ -428,6 +428,8 @@ void ConfigStream::onAcsiConfig_save(void)
         reloadProxy->reloadSettings(SETTINGSUSER_ACSI);
     }
 
+    Utils::forceSync();                                     // tell system to flush the filesystem caches
+
     createScreen_homeScreen();		// now back to the home screen
 }
 
@@ -488,6 +490,8 @@ void ConfigStream::onTranslated_save(void)
     if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
         reloadProxy->reloadSettings(SETTINGSUSER_TRANSLATED);
     }
+
+    Utils::forceSync();                                     // tell system to flush the filesystem caches
 
     createScreen_homeScreen();		// now back to the home screen
 }
@@ -579,6 +583,8 @@ void ConfigStream::onNetwork_save(void)
 	tmr.action	= MOUNTER_ACTION_RESTARTNETWORK;								
 	mountAdd(tmr);
 	
+    Utils::forceSync();                                     // tell system to flush the filesystem caches
+
 	//-------------------------
     createScreen_homeScreen();		// now back to the home screen
 }
@@ -950,6 +956,8 @@ void ConfigStream::onOtherSave(void)
     do_timeSync         = true;     // do time sync again
     do_loadIkbdConfig   = true;     // reload ikbd config
 
+    Utils::forceSync();             // tell system to flush the filesystem caches
+
     createScreen_homeScreen();		// now back to the home screen
 }
 
@@ -1237,6 +1245,8 @@ void ConfigStream::onSharedSave(void)
         reloadProxy->reloadSettings(SETTINGSUSER_SHARED);
 	}
 
+    Utils::forceSync();                                     // tell system to flush the filesystem caches
+
     createScreen_homeScreen();		// now back to the home screen
 }
 
@@ -1247,5 +1257,6 @@ void ConfigStream::onResetSettings(void)
     showMessageScreen((char *) "Reset all settings", (char *) "All settings have been reset to default.\n\rReseting your ST might be a good idea...");
 
     system("rm -f /ce/settings/*");
+    Utils::forceSync();                                     // tell system to flush the filesystem caches
 }
 
