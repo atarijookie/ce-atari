@@ -187,6 +187,8 @@ private:
     bool isAlreadyAttached(std::string hostRootPath);
 
     char *functionCodeToName(int code);
+    void atariFindAttribsToString(BYTE attr, std::string &out);
+    bool isRootDir(std::string hostPath);
 
     //-----------------------------------
     // other ACSI command helpers

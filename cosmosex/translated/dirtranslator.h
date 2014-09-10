@@ -31,16 +31,20 @@ public:
     void shortToLongPath(std::string &rootPath, std::string &shortPath, std::string &longPath);    // convert 'long_p~1\\sub_fo~1\\anothe~1' to 'long path/sub folder/another one'
 
     // call this for find first / find next for Gemdos
-    bool buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, BYTE findAttribs);
+    bool buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, BYTE findAttribs, bool isRootDir);
 	
 private:
     std::map<std::string, FilenameShortener *>  mapPathToShortener;
-
+    
+    TFindStorage    fsDirs;
+    TFindStorage    fsFiles;
+    
     FilenameShortener *createShortener(std::string &path);
     void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
 
     void appendFoundToFindStorage(std::string &hostPath, char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
-	
+	void appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath, char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
+
 	int compareSearchStringAndFilename(char *searchString, char *filename);
 	void toUpperCaseString(std::string &st);
 };

@@ -18,6 +18,8 @@
 #include "gemdos.h"
 #include "gemdos_errno.h"
 
+extern BYTE g_logLevel;                     // current log level 
+
 void TranslatedDisk::onDsetdrv(BYTE *cmd)
 {
     // Dsetdrv() sets the current GEMDOS drive and returns a bitmap of mounted drives.
@@ -186,8 +188,14 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     BYTE findAttribs    = dataBuffer[0];
     atariSearchString   = (char *) (dataBuffer + 1);
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s, find attribs: %02x", (char *) atariSearchString.c_str(), findAttribs);
-
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s, find attribs: 0x%02x", (char *) atariSearchString.c_str(), findAttribs);
+    
+    if(LOG_DEBUG <= g_logLevel) {                       // only when debug is enabled
+        std::string atts;
+        atariFindAttribsToString(findAttribs, atts);
+        Debug::out(LOG_DEBUG, "find attribs: 0x%02x -> %s", findAttribs, (char *) atts.c_str());
+    }
+    
     res = createHostPath(atariSearchString, hostSearchString);   // create the host path
 
     if(!res) {                                      // the path doesn't bellong to us?
@@ -209,10 +217,15 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
 		return;
 	}
 	
-	DirTranslator *dt = &conf[driveIndex].dirTranslator;
-
+    // check if this is a root directory
+    std::string justPath, justSearchString;
+    Utils::splitFilenameFromPath(hostSearchString, justPath, justSearchString); 
+    
+    bool rootDir = isRootDir(justPath);
+    
 	//now use the dir translator to get the dir content
-	res = dt->buildGemdosFindstorageData(&findStorage, hostSearchString, findAttribs);
+	DirTranslator *dt = &conf[driveIndex].dirTranslator;
+	res = dt->buildGemdosFindstorageData(&findStorage, hostSearchString, findAttribs, rootDir);
 
 	if(!res) {
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- failed to build gemdos find storage data", (char *) hostSearchString.c_str());
@@ -1032,84 +1045,6 @@ void TranslatedDisk::onFtell(BYTE *cmd)
     dataTrans->setStatus(E_OK);                                     // OK!
 }
 
-void TranslatedDisk::onTgetdate(BYTE *cmd)
-{
-	time_t t = time(NULL);
-	tm *time = gmtime(&t);						    // convert time_t to tm structure
-	
-	WORD atariDate = Utils::fileTimeToAtariDate(time);
-
-    dataTrans->addDataWord(atariDate);      // WORD: atari date
-    dataTrans->padDataToMul16();            // 14 bytes of padding
-
-    dataTrans->setStatus(E_OK);
-}
-
-void TranslatedDisk::onTsetdate(BYTE *cmd)
-{
-    bool res;
-
-    res = dataTrans->recvData(dataBuffer, 16);      // get data from Hans
-
-    if(!res) {                                      // failed to get data? internal error!
-        dataTrans->setStatus(EINTRN);
-        return;
-    }
-
-    WORD newAtariDate = (((WORD) dataBuffer[0]) << 8) | dataBuffer[1];
-
-    WORD year, month, day;
-    year    = (newAtariDate >> 9)   + 1980;
-    month   = (newAtariDate >> 5)   & 0x0f;
-    day     =  newAtariDate         & 0x1f;
-
-    // todo: setting of the new date
-
-
-
-
-    dataTrans->setStatus(E_OK);
-}
-
-void TranslatedDisk::onTgettime(BYTE *cmd)
-{
-	time_t t = time(NULL);
-	tm *time = gmtime(&t);					// convert time_t to tm structure
-	
-	WORD atariTime = Utils::fileTimeToAtariTime(time);
-
-    dataTrans->addDataWord(atariTime);      // WORD: atari time
-    dataTrans->padDataToMul16();            // 14 bytes of padding
-
-    dataTrans->setStatus(E_OK);
-}
-
-void TranslatedDisk::onTsettime(BYTE *cmd)
-{
-    bool res;
-
-    res = dataTrans->recvData(dataBuffer, 16);      // get data from Hans
-
-    if(!res) {                                      // failed to get data? internal error!
-        dataTrans->setStatus(EINTRN);
-        return;
-    }
-
-    WORD newAtariTime = (((WORD) dataBuffer[0]) << 8) | dataBuffer[1];
-
-    BYTE hour, minute, second;
-    hour   = (newAtariTime >> 11);
-    minute = (newAtariTime >> 5)   & 0x3f;
-    second = (newAtariTime         & 0x1f) * 2;
-
-    // todo: setting of the new time
-
-
-
-
-    dataTrans->setStatus(E_OK);
-}
-
 int TranslatedDisk::findEmptyFileSlot(void)
 {
     for(int i=0; i<MAX_FILES; i++) {
@@ -1193,4 +1128,20 @@ void TranslatedDisk::onGetbpb(BYTE *cmd)
 
     dataTrans->padDataToMul16();
     dataTrans->setStatus(E_OK);
+}
+
+void TranslatedDisk::atariFindAttribsToString(BYTE attr, std::string &out)
+{
+    out = "";
+
+    if(attr & FA_READONLY)  out += "FA_READONLY ";
+    if(attr & FA_HIDDEN)    out += "FA_HIDDEN ";
+    if(attr & FA_SYSTEM)    out += "FA_SYSTEM ";
+    if(attr & FA_VOLUME)    out += "FA_VOLUME ";
+    if(attr & FA_DIR)       out += "FA_DIR ";
+    if(attr & FA_ARCHIVE)   out += "FA_ARCHIVE ";
+    
+    if(out.empty()) {
+        out = "(none)";
+    }
 }

@@ -13,13 +13,22 @@
 #include "dirtranslator.h"
 #include "gemdos.h"
 
+#define BUFFER_SIZE     (1024*1024)
+
 DirTranslator::DirTranslator()
 {
-
+    fsDirs.buffer      = new BYTE[BUFFER_SIZE];
+    fsFiles.buffer     = new BYTE[BUFFER_SIZE];
+    
+    fsDirs.count    = 0;
+    fsFiles.count   = 0;
 }
 
 DirTranslator::~DirTranslator()
 {
+    delete [] fsDirs.buffer;
+    delete [] fsFiles.buffer;
+
     clear();
 }
 
@@ -163,10 +172,14 @@ FilenameShortener *DirTranslator::createShortener(std::string &path)
     return fs;
 }
 
-bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, BYTE findAttribs)
+bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, BYTE findAttribs, bool isRootDir)
 {
 	std::string hostPath, searchString;
 
+    // initialize partial find results (dirs and files separately)
+    fsDirs.count    = 0;
+    fsFiles.count   = 0;
+    
     Utils::splitFilenameFromPath(hostSearchPathAndWildcards, hostPath, searchString);
 
 	toUpperCaseString(searchString);
@@ -195,8 +208,15 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 		}
 
 		std::string longFname = de->d_name;
-		if(longFname == "." || longFname == "..") {					// if it's this dir or up-dir, then skip this, as this is not needed
-			continue;
+        
+        // special handling of '.' and '..'
+		if(longFname == "." || longFname == "..") {
+			if(isRootDir) {                             // for root dir     - don't add '.' or '..'
+                continue;
+            } else {                                    // for non-root dir - must add '.' or '..'
+                appendFoundToFindStorage_dirUpDirCurr(hostPath, (char *) searchString.c_str(), fs, de, findAttribs);
+                continue;
+            }            
 		}	
 		
 		// finnaly append to the find storage
@@ -208,6 +228,14 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
     }
 
 	closedir(dir);
+    
+    // now in the end merge found dirs and found files
+    int dirsSize    = fsDirs.count  * 23;
+    int filesSize   = fsFiles.count * 23;
+    
+    memcpy(fs->buffer,              fsDirs.buffer,  dirsSize);          // copy to total find search - first the dirs
+    memcpy(fs->buffer + dirsSize,   fsFiles.buffer, filesSize);         // copy to total find search - then the files
+    
 	return true;
 }
 
@@ -242,10 +270,12 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, char *search
 
     //--------
     // add this file
-    DWORD addr  = fs->count * 23;               	// calculate offset
-    BYTE *buf   = &(fs->buffer[addr]);          	// and get pointer to this location
+    TFindStorage *fsPart = isDir ? &fsDirs : &fsFiles;          // get the pointer to partial find storage to separate dirs from files when searching
+    
+    DWORD addr  = fsPart->count * 23;               	        // calculate offset
+    BYTE *buf   = &(fsPart->buffer[addr]);          	        // and get pointer to this location
 
-    BYTE atariAttribs;								// convert host to atari attribs
+    BYTE atariAttribs;								            // convert host to atari attribs
     Utils::attributesHostToAtari(isReadOnly, isDir, atariAttribs);
 
 	std::string fullEntryPath 	= hostPath;
@@ -307,7 +337,72 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, char *search
 //  strncpy((char *) &buf[9], (char *) shortFnameExtended, 14);     // copy the filename - 'FILE    .C  '
     strncpy((char *) &buf[9], (char *) shortFname.c_str(), 14);     // copy the filename - 'FILE.C'
 
-    fs->count++;
+    fsPart->count++;                                                // increase partial count
+    fs->count++;                                                    // increase total count
+}
+
+void DirTranslator::appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath, char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs)
+{
+    TFindStorage *fsPart = &fsDirs;                     // get the pointer to partial find storage to separate dirs from files when searching
+
+    // add this file
+    DWORD addr  = fsPart->count * 23;               	// calculate offset
+    BYTE *buf   = &(fsPart->buffer[addr]);          	// and get pointer to this location
+
+    BYTE atariAttribs;								    // convert host to atari attribs
+    Utils::attributesHostToAtari(false, true, atariAttribs);
+
+	std::string fullEntryPath 	= hostPath;
+	std::string longFname		= de->d_name;
+	Utils::mergeHostPaths(fullEntryPath, longFname);
+	
+	int res;
+	struct stat attr;
+	tm *timestr;
+    std::string shortFname;
+	
+	res = stat(fullEntryPath.c_str(), &attr);					// get the file status
+	
+	if(res != 0) {
+		Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- stat() failed, errno %d", errno);
+		return;		
+	}
+
+	timestr = gmtime(&attr.st_mtime);			    			// convert time_t to tm structure
+
+    WORD atariTime = Utils::fileTimeToAtariTime(timestr);
+    WORD atariDate = Utils::fileTimeToAtariDate(timestr);
+
+    // check the current name against searchString using fnmatch
+	int ires = compareSearchStringAndFilename(searchString, (char *) shortFname.c_str());
+		
+	if(ires != 0) {     // not matching? quit
+		return;
+	}
+
+    // GEMDOS File Attributes
+    buf[0] = atariAttribs;
+
+    // GEMDOS Time
+    buf[1] = atariTime >> 8;
+    buf[2] = atariTime &  0xff;
+
+    // GEMDOS Date
+    buf[3] = atariDate >> 8;
+    buf[4] = atariDate &  0xff;
+
+    // File Length
+    buf[5] = 0;
+    buf[6] = 0;
+    buf[7] = 0;
+    buf[8] = 0;
+
+    // Filename -- d_fname[14]
+    memset(&buf[9], 0, 14);                                         // first clear the mem
+    strncpy((char *) &buf[9], de->d_name, 14);                      // copy the filename - '.' or '..'
+
+    fsPart->count++;                                                // increment partial count
+    fs->count++;                                                    // increment total count
 }
 
 void DirTranslator::toUpperCaseString(std::string &st)

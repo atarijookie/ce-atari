@@ -388,12 +388,6 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case GEMDOS_Fwrite:         onFwrite(cmd);      break;
         case GEMDOS_Fseek:          onFseek(cmd);       break;
 
-        // date and time function
-        case GEMDOS_Tgetdate:       onTgetdate(cmd);    break;
-        case GEMDOS_Tsetdate:       onTsetdate(cmd);    break;
-        case GEMDOS_Tgettime:       onTgettime(cmd);    break;
-        case GEMDOS_Tsettime:       onTsettime(cmd);    break;
-
         // custom functions, which are not translated gemdos functions, but needed to do some other work
         case GD_CUSTOM_initialize:      onInitialize();     break;
         case GD_CUSTOM_getConfig:       onGetConfig(cmd);   break;
@@ -590,11 +584,11 @@ bool TranslatedDisk::hostPathExists(std::string hostPath)
     int res = access(hostPath.c_str(), F_OK);
 
     if(res != -1) {             // if it's not this error, then the file exists
-        Debug::out(LOG_DEBUG, "TranslatedDisk::hostPathExists( %s ) = FALSE", (char *) hostPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::hostPathExists( %s ) == TRUE (file / dir exists)", (char *) hostPath.c_str());
         return true;
     }
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::hostPathExists( %s ) = TRUE", (char *) hostPath.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::hostPathExists( %s ) == FALSE (file / dir does not exist)", (char *) hostPath.c_str());
     return false;
 }
 
@@ -1007,6 +1001,23 @@ int TranslatedDisk::deleteDirectory(char *path)
     }
     
     return EACCDN;
+}
+
+bool TranslatedDisk::isRootDir(std::string hostPath)
+{
+    for(int i=2; i<MAX_DRIVES; i++) {                   // go through all translated drives
+        if(!conf[i].enabled) {                          // skip disabled drives
+            continue;
+        }
+        
+        if(conf[i].hostRootPath == hostPath) {          // ok, this is root dir!
+            Debug::out(LOG_DEBUG, "TranslatedDisk::isRootDir - hostPath: %s -- yes, it's a root dir", (char *) hostPath.c_str());
+            return true;
+        }
+    }
+
+    Debug::out(LOG_DEBUG, "TranslatedDisk::isRootDir - hostPath: %s -- no, it's NOT a root dir", (char *) hostPath.c_str());
+    return false;                                       // this wasn't found as root dir
 }
 
 char *TranslatedDisk::functionCodeToName(int code)
