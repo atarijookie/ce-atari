@@ -58,6 +58,8 @@ typedef struct {
 #define TRANSLATEDTYPE_SHAREDDRIVE      1
 #define TRANSLATEDTYPE_CONFIGDRIVE      2
 
+#define MAX_FIND_STORAGES               32
+
 class TranslatedDisk: public ISettingsUser
 {
 public:
@@ -99,7 +101,8 @@ private:
         WORD readOnly;
     } driveLetters;
 
-	TFindStorage findStorage;
+	TFindStorage tempFindStorage;
+    TFindStorage *findStorages[MAX_FIND_STORAGES];
 
     void loadSettings(void);
 
@@ -151,16 +154,11 @@ private:
     void onFwrite(BYTE *cmd);
     void onFseek(BYTE *cmd);
 
-    // date and time function
-    void onTgetdate(BYTE *cmd);
-    void onTsetdate(BYTE *cmd);
-    void onTgettime(BYTE *cmd);
-    void onTsettime(BYTE *cmd);
-
     // custom functions, which are not translated gemdos functions, but needed to do some other work
     void onInitialize(void);            // this method is called on the startup of CosmosEx translated disk driver
     void onFtell(BYTE *cmd);            // this is needed after Fseek
     void onRWDataCount(BYTE *cmd);      // when Fread / Fwrite doesn't process all the data, this returns the count of processed data
+    void onFsnext_last(BYTE *cmd);      // after last Fsnext() call this to release the findStorage
 
     // BIOS functions we need to support
     void onDrvMap(BYTE *cmd);
@@ -189,6 +187,15 @@ private:
     char *functionCodeToName(int code);
     void atariFindAttribsToString(BYTE attr, std::string &out);
     bool isRootDir(std::string hostPath);
+
+    //-----------------------------------
+    // helpers for find storage
+    void initFindStorages(void);
+    void clearFindStorages(void);
+    void destroyFindStorages(void);
+
+    int  getEmptyFindStorageIndex(void);
+    int  getFindStorageIndexByDta(DWORD dta);
 
     //-----------------------------------
     // other ACSI command helpers

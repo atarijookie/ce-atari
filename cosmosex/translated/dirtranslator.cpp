@@ -177,8 +177,8 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 	std::string hostPath, searchString;
 
     // initialize partial find results (dirs and files separately)
-    fsDirs.count    = 0;
-    fsFiles.count   = 0;
+    fsDirs.clear();
+    fsFiles.clear();
     
     Utils::splitFilenameFromPath(hostSearchPathAndWildcards, hostPath, searchString);
 
@@ -192,8 +192,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
     }
 
     // initialize find storage in case anything goes bad
-    fs->count       = 0;
-    fs->fsnextStart = 0;
+    fs->clear();
 
 	while(1) {                                                  	// while there are more files, store them
 		struct dirent *de = readdir(dir);							// read the next directory entry
@@ -439,3 +438,35 @@ int DirTranslator::compareSearchStringAndFilename(char *searchString, char *file
 	
 	return 0;
 }
+
+TFindStorage::TFindStorage()
+{
+    buffer = new BYTE[getSize()];
+    clear();
+}
+
+TFindStorage::~TFindStorage()
+{
+    delete []buffer;
+}
+
+void TFindStorage::clear(void)
+{
+    maxCount    = getSize() / 23;
+    count       = 0;
+    dta         = 0;
+}
+
+int TFindStorage::getSize(void)
+{
+    return (1024*1024);
+}
+
+void TFindStorage::copyDataFromOther(TFindStorage *other)
+{
+    dta     = other->dta;
+    count   = other->count;
+    memcpy(buffer, other->buffer, count * 23);
+}
+
+

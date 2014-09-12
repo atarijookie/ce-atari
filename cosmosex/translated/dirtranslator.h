@@ -7,13 +7,22 @@
 #include "../datatypes.h"
 #include "filenameshortener.h"
 
-typedef struct {
+class TFindStorage {
+public:
+    TFindStorage();
+    ~TFindStorage();
+
+    int getSize(void);
+    void clear(void);
+    void copyDataFromOther(TFindStorage *other);
+
+    DWORD dta;
+
     BYTE *buffer;
     WORD count;             // count of items found
 
-    WORD fsnextStart;
     WORD maxCount;          // maximum count of items that this buffer can hold
-} TFindStorage;
+};
 
 class DirTranslator
 {

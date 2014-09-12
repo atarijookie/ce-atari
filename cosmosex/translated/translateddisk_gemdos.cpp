@@ -171,8 +171,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     bool res;
 
     // initialize find storage in case anything goes bad
-    findStorage.count       = 0;
-    findStorage.fsnextStart = 0;
+    tempFindStorage.clear();
 
     //----------
     // first get the params
@@ -185,10 +184,12 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
 
     std::string atariSearchString, hostSearchString;
 
-    BYTE findAttribs    = dataBuffer[0];
-    atariSearchString   = (char *) (dataBuffer + 1);
+    DWORD dta           = getDword(dataBuffer);         // bytes 0 to 3 contain address of DTA used on ST with this Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s, find attribs: 0x%02x", (char *) atariSearchString.c_str(), findAttribs);
+    BYTE findAttribs    = dataBuffer[4];                // get find attribs (dirs | hidden | ...)
+    atariSearchString   = (char *) (dataBuffer + 5);    // get search string, e.g.: C:\\*.*
+
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst(%08x) - atari search string: %s, find attribs: 0x%02x", dta, (char *) atariSearchString.c_str(), findAttribs);
     
     if(LOG_DEBUG <= g_logLevel) {                       // only when debug is enabled
         std::string atts;
@@ -225,7 +226,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     
 	//now use the dir translator to get the dir content
 	DirTranslator *dt = &conf[driveIndex].dirTranslator;
-	res = dt->buildGemdosFindstorageData(&findStorage, hostSearchString, findAttribs, rootDir);
+	res = dt->buildGemdosFindstorageData(&tempFindStorage, hostSearchString, findAttribs, rootDir);
 
 	if(!res) {
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- failed to build gemdos find storage data", (char *) hostSearchString.c_str());
@@ -234,22 +235,45 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
 		return;
 	}
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- found %d dir entries", (char *) hostSearchString.c_str(), findStorage.count);
-	
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- found %d dir entries", (char *) hostSearchString.c_str(), tempFindStorage.count);
+
+    //----------	
+    // now copy from temp findStorage to the some findStorages arrays
+    int index = getEmptyFindStorageIndex();
+    if(index == -1) {
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - failed to find empty storage slot!");
+		dataTrans->setStatus(EFILNF);                               // file not found
+		return;
+    }
+
+    findStorages[index]->copyDataFromOther(&tempFindStorage);
+    findStorages[index]->dta = dta;
+    //----------
+
     dataTrans->setStatus(E_OK);                                 	// OK!
 }
 
 void TranslatedDisk::onFsnext(BYTE *cmd)
 {
-    int sectorCount = cmd[5];
+    DWORD dta       = getDword(cmd + 5);                        // bytes 5 to 8   contain address of DTA used on ST with Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
+    int   dirIndex  = getWord(cmd + 9);                         // bytes 9 and 10 contain the index of the item from which we should start sending data to ST
 
-    int byteCount   = (sectorCount * 512) - 2;                  // how many bytes we have on the transfered sectors? -2 because 1st WORD is count of DTAs transfered
+    int index = getFindStorageIndexByDta(dta);                  // now see if we have findStorage for this DTA
+    if(index == -1) {                                           // not found?
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsnext(%08x) - the findBuffer for this DTA not found!", dta);
+        dataTrans->setStatus(ENMFIL);                           // no more files!
+        return;
+    }
+
+    TFindStorage *fs = findStorages[index];                     // this is the findStorage with which we will work
+
+    int byteCount   = 512 - 2;                                  // how many bytes we have on the transfered sectors? -2 because 1st WORD is count of DTAs transfered
     int dtaSpace    = byteCount / 23;                           // how many DTAs we can fit in there?
 
-    int dtaRemaining = findStorage.count - findStorage.fsnextStart;
+    int dtaRemaining = fs->count - dirIndex;                    // calculate how many we have until the end
 
     if(dtaRemaining == 0) {                                     // nothing more to transfer?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsnext - no more DTA remaining");
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsnext(%08x) - no more DTA remaining", dta);
 
         dataTrans->setStatus(ENMFIL);                           // no more files!
         return;
@@ -257,17 +281,30 @@ void TranslatedDisk::onFsnext(BYTE *cmd)
 
     int dtaToSend = (dtaRemaining < dtaSpace) ? dtaRemaining : dtaSpace;    // we can send max. dtaSpace count of DTAs
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsnext - sending %d DTAs to ST", dtaToSend);
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsnext(%08x) - sending %d DTAs to ST", dta, dtaToSend);
 
     dataTrans->addDataWord(dtaToSend);                          // first word: how many DTAs we're sending
 
-    DWORD addr  = findStorage.fsnextStart * 23;                 // calculate offset from which we will start sending stuff
-    BYTE *buf   = &findStorage.buffer[addr];                    // and get pointer to this location
-    dataTrans->addDataBfr(buf, dtaToSend * 23, true);              // now add the data to buffer
+    DWORD addr  = dirIndex * 23;                                // calculate offset from which we will start sending stuff
+    BYTE *buf   = &fs->buffer[addr];                            // and get pointer to this location
+    dataTrans->addDataBfr(buf, dtaToSend * 23, true);           // now add the data to buffer
 
     dataTrans->setStatus(E_OK);
+}
 
-    findStorage.fsnextStart += dtaToSend;                       // and move to the next position for the next fsNext
+void TranslatedDisk::onFsnext_last(BYTE *cmd)                   // after last Fsnext() call this to release the findStorage
+{
+    DWORD dta = getDword(cmd + 5);                              // bytes 5 to 8 contain address of DTA used on ST with Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
+ 
+    int index = getFindStorageIndexByDta(dta);                  // now see if we have findStorage for this DTA
+    if(index == -1) {                                           // not found?
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsnext_last(%08x) - the findBuffer for this DTA not found!", dta);
+        dataTrans->setStatus(EIHNDL);                           // invalid handle
+        return;
+    }
+
+    findStorages[index]->clear();                               // clear it
+    dataTrans->setStatus(E_OK);
 }
 
 void TranslatedDisk::onDfree(BYTE *cmd)

@@ -30,11 +30,9 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastS
         files[i].hostPath       = "";
     }
 
-    loadSettings();
+    initFindStorages();
 
-    findStorage.buffer      = new BYTE[BUFFER_SIZE];
-    findStorage.maxCount    = BUFFER_SIZE / 23;
-    findStorage.count       = 0;
+    loadSettings();
 
     mountAndAttachSharedDrive();					                    // if shared drive is enabled, try to mount it and attach it
     attachConfigDrive();                                                // if config drive is enabled, attach it
@@ -52,7 +50,7 @@ TranslatedDisk::~TranslatedDisk()
     delete []dataBuffer;
     delete []dataBuffer2;
 
-    delete []findStorage.buffer;
+    destroyFindStorages();
 }
 
 void TranslatedDisk::loadSettings(void)
@@ -393,6 +391,7 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case GD_CUSTOM_getConfig:       onGetConfig(cmd);   break;
         case GD_CUSTOM_ftell:           onFtell(cmd);       break;
         case GD_CUSTOM_getRWdataCnt:    onRWDataCount(cmd); break;
+        case GD_CUSTOM_Fsnext_last:     onFsnext_last(cmd); break;
 
         // BIOS functions we need to support
         case BIOS_Drvmap:               onDrvMap(cmd);      break;
@@ -514,7 +513,8 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
 {
     closeAllFiles();
 
-    findStorage.count = 0;
+    tempFindStorage.clear();
+    clearFindStorages();
 
     dataTrans->setStatus(E_OK);
 }
@@ -1020,6 +1020,73 @@ bool TranslatedDisk::isRootDir(std::string hostPath)
     return false;                                       // this wasn't found as root dir
 }
 
+void TranslatedDisk::initFindStorages(void)             // use once to init it on start
+{
+    for(int i=0; i<MAX_FIND_STORAGES; i++) {
+        findStorages[i] = NULL;
+    }
+}
+
+void TranslatedDisk::clearFindStorages(void)            // use it on ST reset to clear useless find storages, but don't free memory
+{
+    for(int i=0; i<MAX_FIND_STORAGES; i++) {
+        if(findStorages[i] != NULL) {
+            findStorages[i]->clear();
+        }
+    }
+}
+
+void TranslatedDisk::destroyFindStorages(void)          // use it at the end release all the memory
+{
+    for(int i=0; i<MAX_FIND_STORAGES; i++) {
+        if(findStorages[i] != NULL) {
+            delete findStorages[i];
+            findStorages[i] = NULL;
+        }
+    }
+}
+
+int TranslatedDisk::getEmptyFindStorageIndex(void)
+{
+    // search allocated findStorages, see if some of them is allocated but not used
+    for(int i=0; i<MAX_FIND_STORAGES; i++) {                    
+        if(findStorages[i] == NULL) {                           // skip not allocated findStorages
+            continue;
+        }
+
+        if(findStorages[i]->dta == 0) {                         // found one findStorage, which is not used?
+            return i;                                           // return index
+        }
+    }
+
+    // search for first non-allocated findStorage
+    for(int i=0; i<MAX_FIND_STORAGES; i++) {                    
+        if(findStorages[i] != NULL) {                           // skip the allocated findStorages
+            continue;
+        }
+
+        findStorages[i] = new TFindStorage();                   // allocated    
+        return i;                                               // return index
+    }
+
+    return -1;                                                  // not found, return -1
+}
+
+int TranslatedDisk::getFindStorageIndexByDta(DWORD dta)         // find the findStorage with the specified DTA
+{
+    for(int i=0; i<MAX_FIND_STORAGES; i++) {
+        if(findStorages[i] == NULL) {                           // skip not allocated findStorages
+            continue;
+        }
+
+        if(findStorages[i]->dta == dta) {
+            return i;                                           // found, return index
+        }
+    }
+
+    return -1;                                                  // not found, return -1
+}
+
 char *TranslatedDisk::functionCodeToName(int code)
 {
     switch(code) {
@@ -1056,6 +1123,7 @@ char *TranslatedDisk::functionCodeToName(int code)
         case GD_CUSTOM_getConfig:       return (char *)"GD_CUSTOM_getConfig";
         case GD_CUSTOM_ftell:           return (char *)"GD_CUSTOM_ftell";
         case GD_CUSTOM_getRWdataCnt:    return (char *)"GD_CUSTOM_getRWdataCnt";
+        case GD_CUSTOM_Fsnext_last:     return (char *)"GD_CUSTOM_Fsnext_last";
         case BIOS_Drvmap:               return (char *)"BIOS_Drvmap";
         case BIOS_Mediach:              return (char *)"BIOS_Mediach";
         case BIOS_Getbpb:               return (char *)"BIOS_Getbpb";
