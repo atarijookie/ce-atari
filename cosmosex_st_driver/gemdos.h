@@ -42,12 +42,12 @@
 #define GEMDOS_pterm0           0x00
 #define GEMDOS_ptermres         0x31
 
-
 // custom functions - not GEMDOS functions
 #define GD_CUSTOM_initialize    0x60
 #define GD_CUSTOM_getConfig     0x61
 #define GD_CUSTOM_ftell         0x62
 #define GD_CUSTOM_getRWdataCnt  0x63
+#define GD_CUSTOM_Fsnext_last   0x64
 
 // BIOS functions we need to support
 #define BIOS_Drvmap				0x70

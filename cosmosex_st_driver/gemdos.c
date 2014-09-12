@@ -49,8 +49,9 @@ extern BYTE fsnextIsForUs, tryToGetMoreDTAs;
 
 BYTE *dtaBufferValidForPDta;
 
-BYTE getNextDTAsFromHost(void);
+BYTE  getNextDTAsFromHost(void);
 DWORD copyNextDtaToAtari(void);
+void  onFsnext_last(void);
 
 extern WORD ceDrives;
 extern WORD ceMediach;
@@ -450,6 +451,8 @@ int32_t custom_fsnext( void *sp )
 		res = getNextDTAsFromHost();									/* now we need to get the buffer of DTAs from host */
 		
 		if(res != E_OK) {												/* failed to get DTAs from host? */
+			onFsnext_last();											// tell host that we're done with this pDTA
+		
 			tryToGetMoreDTAs = 0;										/* do not try to receive more DTAs from host */
             return extendByteToDword(ENMFIL);							/* return that we're out of files */
 		}
@@ -472,19 +475,24 @@ DWORD copyNextDtaToAtari(void)
 
 	if(dtaCurrent >= dtaTotal) {										/* if we're out of buffered DTAs */
 		if(!tryToGetMoreDTAs) {											/* if shouldn't try to get more DTAs, quit without trying */
+			onFsnext_last();											// tell host that we're done with this pDTA
+
             return extendByteToDword(ENMFIL);
 		}
 	
 		res = getNextDTAsFromHost();									/* now we need to get the buffer of DTAs from host */
 		
 		if(res != E_OK) {												/* failed to get DTAs from host? */
+			onFsnext_last();											// tell host that we're done with this pDTA
+
 			tryToGetMoreDTAs = 0;										/* do not try to receive more DTAs from host */
-            return extendByteToDword(ENMFIL);								/* return that we're out of files */
+            return extendByteToDword(ENMFIL);							/* return that we're out of files */
 		}
 	}
 
 	if(dtaCurrent >= dtaTotal) {										/* still no buffered DTAs? (this shouldn't happen) */
-        return extendByteToDword(ENMFIL);									/* return that we're out of files */
+		onFsnext_last();												// tell host that we're done with this pDTA
+        return extendByteToDword(ENMFIL);								/* return that we're out of files */
 	}
 
 	DWORD dtaOffset		= 2 + (23 * dtaCurrent);						/* calculate the offset for the DTA in buffer */
@@ -533,6 +541,18 @@ BYTE getNextDTAsFromHost(void)
 	dtaTotal |= pDtaBuffer[1];
 	
 	return E_OK;
+}
+
+void onFsnext_last(void)
+{
+	commandLong[5] = GD_CUSTOM_Fsnext_last;									/* store GEMDOS function number */
+
+	int i;
+	for(i=0; i<4; i++) {													// commandLong 6,7,8,9 are the pointer to DTA on which Fsfirst() was called
+		commandLong[6 + i] = pDta[i];
+	}
+	
+	acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDtaBuffer, 1);	// send command to host over ACSI
 }
 
 /* **************************************************************** */
