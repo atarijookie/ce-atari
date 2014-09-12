@@ -47,6 +47,8 @@ extern BYTE dtaBuffer[DTA_BUFFER_SIZE + 2];
 extern BYTE *pDtaBuffer;
 extern BYTE fsnextIsForUs, tryToGetMoreDTAs;
 
+BYTE *dtaBufferValidForPDta;
+
 BYTE getNextDTAsFromHost(void);
 DWORD copyNextDtaToAtari(void);
 
@@ -389,12 +391,31 @@ int32_t custom_fsfirst( void *sp )
 	tryToGetMoreDTAs	= 1;											/* mark that when we run out of DTAs in out buffer, then we should try to get more of them from host */
 	fsnextIsForUs		= TRUE;
 	
+    //------------
+	// initialize the reserved section of DTA, which will contain a pointer to the DTA address and index of the dir/file we returned last
+	useOldGDHandler = 1;
+    pDta = (BYTE *) Fgetdta();											// retrieve the current DTA pointer - this might have changed 
+	
+	pDta[0] = ((DWORD) pDta) >> 24;										// first store the pointer to this DTA (to enable continuing of Fsnext() in case this DTA buffer would be copied otherwise and then set with Fsetdta())
+	pDta[1] = ((DWORD) pDta) >> 16;
+	pDta[2] = ((DWORD) pDta) >>  8;
+	pDta[3] = ((DWORD) pDta)      ;
+	
+	pDta[4] = 0;														// index of the dir/file we've returned so far
+	pDta[5] = 0;
+    //------------
+	
 	/* set the params to buffer */
-	commandShort[4] = GEMDOS_Fsfirst;										/* store GEMDOS function number */
+	commandShort[4] = GEMDOS_Fsfirst;									// store GEMDOS function number
 	commandShort[5] = 0;			
 	
-	pDmaBuffer[0] = (BYTE) attribs;										/* store attributes */
-	strncpy(((char *) pDmaBuffer) + 1, fspec, DMA_BUFFER_SIZE - 1);		/* copy in the file specification */
+	int i;
+	for(i=0; i<4; i++) {
+		pDmaBuffer[i] = pDta[i];										// 1st 4 bytes will now be the pointer to DTA on which the Fsfirst() was called
+	}
+	
+	pDmaBuffer[4] = (BYTE) attribs;										/* store attributes */
+	strncpy(((char *) pDmaBuffer) + 5, fspec, DMA_BUFFER_SIZE - 1);		/* copy in the file specification */
 	
 	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
@@ -420,6 +441,21 @@ int32_t custom_fsnext( void *sp )
 		CALL_OLD_GD( Fsnext);
 	}
 
+	//-----------------
+	// the following is here because of Fsfirst() / Fsnext() nesting
+	useOldGDHandler = 1;
+    pDta = (BYTE *) Fgetdta();											// retrieve the current DTA pointer - this might have changed 
+	
+	if(dtaBufferValidForPDta != pDta) {									// if DTA changed, we need to retrieve the search results again (the current search results are for a different dir)
+		res = getNextDTAsFromHost();									/* now we need to get the buffer of DTAs from host */
+		
+		if(res != E_OK) {												/* failed to get DTAs from host? */
+			tryToGetMoreDTAs = 0;										/* do not try to receive more DTAs from host */
+            return extendByteToDword(ENMFIL);							/* return that we're out of files */
+		}
+	}
+	//----------
+
 	res = copyNextDtaToAtari();											/* now copy the next possible DTA to atari DTA buffer */
 	return res;
 }
@@ -427,6 +463,12 @@ int32_t custom_fsnext( void *sp )
 DWORD copyNextDtaToAtari(void)
 {
 	DWORD res;
+
+    //------------
+    // retrieve the current DTA pointer - this might have changed 
+	useOldGDHandler = 1;
+    pDta = (BYTE *) Fgetdta();
+    //------------
 
 	if(dtaCurrent >= dtaTotal) {										/* if we're out of buffered DTAs */
 		if(!tryToGetMoreDTAs) {											/* if shouldn't try to get more DTAs, quit without trying */
@@ -449,13 +491,15 @@ DWORD copyNextDtaToAtari(void)
 	BYTE *pCurrentDta	= pDtaBuffer + dtaOffset;						/* and now calculate the new pointer */
 	
 	dtaCurrent++;														/* move to the next DTA */
-    
-    //------------
-    // retrieve the current DTA pointer - this might have changed 
-	useOldGDHandler = 1;
-    pDta = (BYTE *) Fgetdta();
-    //------------
 		
+	//--------------
+	// update the item index in the reserved part of DTA
+	WORD itemIndex	= (((WORD) pDta[4]) << 8) | ((WORD) pDta[5]);		// get the current dir 
+	itemIndex++;
+	pDta[4]			= (BYTE) (itemIndex >> 8);
+	pDta[5]			= (BYTE) (itemIndex     );
+	//--------------
+	
 	memcpy(pDta + 21, pCurrentDta, 23);									/* skip the reserved area of DTA and copy in the current DTA */
 	return E_OK;														/* everything went well */
 }
@@ -464,16 +508,22 @@ BYTE getNextDTAsFromHost(void)
 {
 	DWORD res;
 
-	/* initialize the interal variables */
+	/* initialize the internal variables */
 	dtaCurrent	= 0;
 	dtaTotal	= 0;
 	
-	commandShort[4] = GEMDOS_Fsnext;											/* store GEMDOS function number */
-	commandShort[5] = 1;														/* transfer single sector */
+	commandLong[5] = GEMDOS_Fsnext;											/* store GEMDOS function number */
+
+	int i;
+	for(i=0; i<6; i++) {													// commandLong 6,7,8,9 are the pointer to DTA on which Fsfirst() was called, and commandLong 10,11 contain index of the dir/file we've returned so far
+		commandLong[6 + i] = pDta[i];
+	}
 	
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDtaBuffer, 1);				/* send command to host over ACSI */
+	dtaBufferValidForPDta = pDta;											// store that the current buffer will be valid for this DTA pointer
 	
-	if(res != E_OK) {													/* if failed to transfer data - no more files */
+	res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDtaBuffer, 1);	// send command to host over ACSI
+	
+	if(res != E_OK) {														// if failed to transfer data - no more files
         return ENMFIL;
 	}
 	
