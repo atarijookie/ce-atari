@@ -449,6 +449,12 @@ DWORD copyNextDtaToAtari(void)
 	BYTE *pCurrentDta	= pDtaBuffer + dtaOffset;						/* and now calculate the new pointer */
 	
 	dtaCurrent++;														/* move to the next DTA */
+    
+    //------------
+    // retrieve the current DTA pointer - this might have changed 
+	useOldGDHandler = 1;
+    pDta = (BYTE *) Fgetdta();
+    //------------
 		
 	memcpy(pDta + 21, pCurrentDta, 23);									/* skip the reserved area of DTA and copy in the current DTA */
 	return E_OK;														/* everything went well */
