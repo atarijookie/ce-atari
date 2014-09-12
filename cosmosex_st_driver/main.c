@@ -15,7 +15,7 @@
 #include "gemdos.h"
 #include "main.h"
 
-char *version = "2014-08-12";
+char *version = "2014-09-12";
 
 /* 
  * CosmosEx GEMDOS driver by Jookie, 2013
