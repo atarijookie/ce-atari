@@ -54,6 +54,7 @@
 #define BIOS_Mediach			0x71
 #define BIOS_Getbpb				0x72
 
+#define ST_LOG_TEXT             0x85
 //////////////////////////////////////
 /*
 

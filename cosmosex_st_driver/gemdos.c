@@ -53,6 +53,8 @@ BYTE  getNextDTAsFromHost(void);
 DWORD copyNextDtaToAtari(void);
 void  onFsnext_last(void);
 
+void sendStLog(char *str);
+
 extern WORD ceDrives;
 extern WORD ceMediach;
 extern BYTE currentDrive;
@@ -766,6 +768,16 @@ int32_t custom_fdatime( void *sp )
 	}
 
     return extendByteToDword(EINTRN);											/* in other cases - Internal Error - this shouldn't happen */
+}
+
+void sendStLog(char *str)
+{
+	/* set the params to buffer */
+	commandShort[4] = ST_LOG_TEXT;											    /* store GEMDOS function number */
+	commandShort[5] = 0;			
+	
+    strncpy((char *) pDmaBuffer, str, 512);
+	acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	    /* send command to host over ACSI */
 }
 
 /* ------------------------------------------------------------------ */
