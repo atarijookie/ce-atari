@@ -258,6 +258,8 @@ void TranslatedDisk::onFsnext(BYTE *cmd)
     DWORD dta       = getDword(cmd + 5);                        // bytes 5 to 8   contain address of DTA used on ST with Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
     int   dirIndex  = getWord(cmd + 9);                         // bytes 9 and 10 contain the index of the item from which we should start sending data to ST
 
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsnext -- DTA: %08x, dirIndex: %d", dta, dirIndex);
+
     int index = getFindStorageIndexByDta(dta);                  // now see if we have findStorage for this DTA
     if(index == -1) {                                           // not found?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsnext(%08x) - the findBuffer for this DTA not found!", dta);
@@ -274,7 +276,8 @@ void TranslatedDisk::onFsnext(BYTE *cmd)
 
     if(dtaRemaining == 0) {                                     // nothing more to transfer?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsnext(%08x) - no more DTA remaining", dta);
-
+        
+        fs->clear();                                            // we can clear this findStorage - you wouldn't get more from it anyway
         dataTrans->setStatus(ENMFIL);                           // no more files!
         return;
     }
@@ -287,6 +290,7 @@ void TranslatedDisk::onFsnext(BYTE *cmd)
 
     DWORD addr  = dirIndex * 23;                                // calculate offset from which we will start sending stuff
     BYTE *buf   = &fs->buffer[addr];                            // and get pointer to this location
+    
     dataTrans->addDataBfr(buf, dtaToSend * 23, true);           // now add the data to buffer
 
     dataTrans->setStatus(E_OK);

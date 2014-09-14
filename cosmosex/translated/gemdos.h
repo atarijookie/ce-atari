@@ -51,6 +51,8 @@
 #define ACC_GET_MOUNTS			0x80
 #define ACC_UNMOUNT_DRIVE       0x81
 
+#define ST_LOG_TEXT             0x85
+
 //////////////////////////////////////
 
 // file attributes

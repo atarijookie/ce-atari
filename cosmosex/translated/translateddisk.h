@@ -168,6 +168,7 @@ private:
 	// other functions
 	void onGetMounts(BYTE *cmd);
     void onUnmountDrive(BYTE *cmd);
+    void onStLog(BYTE *cmd);
 
     // helper functions
     int findEmptyFileSlot(void);

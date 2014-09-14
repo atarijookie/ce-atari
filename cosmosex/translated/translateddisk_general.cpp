@@ -401,6 +401,7 @@ void TranslatedDisk::processCommand(BYTE *cmd)
 		// other functions
 		case ACC_GET_MOUNTS:			onGetMounts(cmd);	    break;
         case ACC_UNMOUNT_DRIVE:         onUnmountDrive(cmd);    break;
+        case ST_LOG_TEXT:               onStLog(cmd);           break;
 
         // in other cases
         default:                                // in other cases
@@ -1087,6 +1088,21 @@ int TranslatedDisk::getFindStorageIndexByDta(DWORD dta)         // find the find
     return -1;                                                  // not found, return -1
 }
 
+void TranslatedDisk::onStLog(BYTE *cmd)
+{
+    DWORD res;
+    res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
+
+    if(!res) {                                      // failed to get data? internal error!
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onStLog - failed to receive data...");
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    Debug::out(LOG_DEBUG, "ST log: %s", dataBuffer);
+    dataTrans->setStatus(E_OK);
+}
+
 char *TranslatedDisk::functionCodeToName(int code)
 {
     switch(code) {
@@ -1094,6 +1110,7 @@ char *TranslatedDisk::functionCodeToName(int code)
         case TRAN_CMD_GETDATETIME:      return (char *)"TRAN_CMD_GETDATETIME";
         case TRAN_CMD_SENDSCREENCAST:   return (char *)"TRAN_CMD_SENDSCREENCAST";
         case TRAN_CMD_SCREENCASTPALETTE: return (char *)"TRAN_CMD_SCREENCASTPALETTE";
+        case ST_LOG_TEXT:               return (char *)"ST_LOG_TEXT";
         case GEMDOS_Dsetdrv:            return (char *)"GEMDOS_Dsetdrv";
         case GEMDOS_Dgetdrv:            return (char *)"GEMDOS_Dgetdrv";
         case GEMDOS_Dsetpath:           return (char *)"GEMDOS_Dsetpath";
