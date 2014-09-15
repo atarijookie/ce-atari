@@ -14,8 +14,12 @@
 
 AcsiDataTrans::AcsiDataTrans()
 {
-    buffer          = new BYTE[BUFFER_SIZE];       // 1 MB buffer
+    buffer          = new BYTE[BUFFER_SIZE];        // 1 MB buffer
     recvBuffer      = new BYTE[BUFFER_SIZE];
+    
+    memset(buffer,      0, BUFFER_SIZE);            // init buffers to zero
+    memset(recvBuffer,  0, BUFFER_SIZE);
+    
     count           = 0;
     status          = SCSI_ST_OK;
     statusWasSet    = false;

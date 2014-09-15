@@ -36,6 +36,7 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
 
     setEnabledIDbits        = false;
     setEnabledFloppyImgs    = false;
+    setNewFloppyImageLed    = false;
     setFloppyConfig         = false;
     setDiskChanged          = false;
     diskChanged             = false;
