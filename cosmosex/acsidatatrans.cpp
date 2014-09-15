@@ -20,6 +20,9 @@ AcsiDataTrans::AcsiDataTrans()
     memset(buffer,      0, BUFFER_SIZE);            // init buffers to zero
     memset(recvBuffer,  0, BUFFER_SIZE);
     
+    memset(txBuffer, 0, TX_RX_BUFF_SIZE);
+    memset(rxBuffer, 0, TX_RX_BUFF_SIZE);
+    
     count           = 0;
     status          = SCSI_ST_OK;
     statusWasSet    = false;
@@ -127,7 +130,7 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 
 	com->txRx(SPI_CS_HANS, COMMAND_SIZE, devCommand, recvBuffer);        // transmit this command
 
-    memset(txBuffer, 0, 520);                               // nothing to transmit, really...
+    memset(txBuffer, 0, TX_RX_BUFF_SIZE);                   // nothing to transmit, really...
 	BYTE inBuf[8];
 
     while(cnt > 0) {

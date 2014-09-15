@@ -27,6 +27,8 @@
 #define DATA_DIRECTION_READ         1
 #define DATA_DIRECTION_WRITE        2
 
+#define TX_RX_BUFF_SIZE             600
+
 class AcsiDataTrans
 {
 public:
@@ -64,8 +66,8 @@ private:
 
     BYTE    *recvBuffer;
 
-    BYTE    txBuffer[520];
-    BYTE    rxBuffer[520];
+    BYTE    txBuffer[TX_RX_BUFF_SIZE];
+    BYTE    rxBuffer[TX_RX_BUFF_SIZE];
 	
 	bool	dumpNextData;
 

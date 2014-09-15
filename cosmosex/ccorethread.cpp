@@ -270,9 +270,10 @@ void CCoreThread::handleAcsiCommand(void)
     #define CMD_SIZE    14
 
     BYTE bufOut[CMD_SIZE];
-    memset(bufOut, 0, CMD_SIZE);
-
     BYTE bufIn[CMD_SIZE];
+
+    memset(bufOut,  0, CMD_SIZE);
+    memset(bufIn,   0, CMD_SIZE);
 
     conSpi->txRx(SPI_CS_HANS, 14, bufOut, bufIn);        // get 14 cmd bytes
 
