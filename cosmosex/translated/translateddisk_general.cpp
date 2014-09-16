@@ -38,14 +38,16 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastS
     attachConfigDrive();                                                // if config drive is enabled, attach it
 
     //ACSI command "date"
-    dateAcsiCommand=new DateAcsiCommand(dataTrans,configService);
+    dateAcsiCommand         = new DateAcsiCommand(dataTrans,configService);
+
     //ACSI commands "screencast"
-	screencastAcsiCommand=new ScreencastAcsiCommand(dataTrans,scs);
+	screencastAcsiCommand   = new ScreencastAcsiCommand(dataTrans,scs);
 }
 
 TranslatedDisk::~TranslatedDisk()
 {
     delete dateAcsiCommand;
+    delete screencastAcsiCommand;
 
     delete []dataBuffer;
     delete []dataBuffer2;

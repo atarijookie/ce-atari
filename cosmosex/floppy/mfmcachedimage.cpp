@@ -26,6 +26,8 @@ MfmCachedImage::MfmCachedImage()
 	params.tracks	= 0;
 	params.sides	= 0;
 	params.spt		= 0;
+    
+    crc = 0;
 }
 
 MfmCachedImage::~MfmCachedImage()

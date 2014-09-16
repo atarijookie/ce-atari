@@ -200,10 +200,10 @@ private:
 
     //-----------------------------------
     // other ACSI command helpers
-    ConfigService* configService;
-    ScreencastService* screencastService;
-    DateAcsiCommand* dateAcsiCommand;
-    ScreencastAcsiCommand* screencastAcsiCommand;
+    ConfigService*          configService;
+    ScreencastService*      screencastService;
+    DateAcsiCommand*        dateAcsiCommand;
+    ScreencastAcsiCommand*  screencastAcsiCommand;
 };
 
 #endif
