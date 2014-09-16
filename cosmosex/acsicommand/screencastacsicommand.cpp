@@ -15,7 +15,7 @@ ScreencastAcsiCommand::ScreencastAcsiCommand(AcsiDataTrans *dt, ScreencastServic
 
 ScreencastAcsiCommand::~ScreencastAcsiCommand() 
 {
-	delete dataBuffer;
+	delete []dataBuffer;
 }
  
 void ScreencastAcsiCommand::processCommand(BYTE *command)

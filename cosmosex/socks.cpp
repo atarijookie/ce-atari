@@ -1,6 +1,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <string.h>
@@ -147,6 +148,9 @@ int clientSocket_createConnection(void)
         return 0;
     } 
 
+    int flag = 1;
+    setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));  // turn off Nagle's algorithm
+
     memset(&serv_addr, 0, sizeof(serv_addr)); 
 
     serv_addr.sin_family = AF_INET;
@@ -177,6 +181,9 @@ int serverSocket_createConnection(void)
     if(serverListenSockFd == -1) {                                                  // if we don't have listen socket yet, create it
         serverListenSockFd = socket(AF_INET, SOCK_STREAM, 0);                       // create socket
         memset(&serv_addr,  0, sizeof(serv_addr));
+
+        int flag = 1;
+        setsockopt(serverListenSockFd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));  // turn off Nagle's algorithm
 
         serv_addr.sin_family        = AF_INET;
         serv_addr.sin_addr.s_addr   = htonl(INADDR_ANY);

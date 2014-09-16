@@ -14,14 +14,24 @@
 AppModule::AppModule(ConfigService* pxDateService, FloppyService* pxFloppyService, ScreencastService *pxScreencastService):
     pxDateService(pxDateService),pxFloppyService(pxFloppyService),pxScreencastService(pxScreencastService)
 {
+    pCtrlRouter = NULL;
 }
 
+AppModule::~AppModule(void)
+{
+    if(pCtrlRouter != NULL) {
+        delete pCtrlRouter;
+        pCtrlRouter = NULL;
+    }
+}
 
 void AppModule::install(CivetServer *pxServer)
 {
     Debug::out(LOG_DEBUG, "Webserver installing module AppModule.");
-    pxServer->addHandler("/app/*", new ControllerRouter(pxDateService,pxFloppyService,pxScreencastService));
+    pCtrlRouter = new ControllerRouter(pxDateService,pxFloppyService,pxScreencastService);
+    pxServer->addHandler("/app/*", pCtrlRouter);
 }
+
 
 void AppModule::uninstall(CivetServer *pxServer)
 {

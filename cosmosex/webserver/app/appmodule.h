@@ -7,16 +7,22 @@
 #include "service/floppyservice.h"
 #include "service/screencastservice.h"
 
+class ControllerRouter;
+
 class AppModule : public IWebModule
 {
 public:
-	AppModule(ConfigService* pxDateService, FloppyService* pxFloppyService, ScreencastService* pxScreencastService);
+    AppModule(ConfigService* pxDateService, FloppyService* pxFloppyService, ScreencastService* pxScreencastService);
+    ~AppModule(void);    
+
     virtual void install(CivetServer *pxServer);
     virtual void uninstall(CivetServer *pxServer);
 private:
 	ConfigService* pxDateService;
 	FloppyService* pxFloppyService;
 	ScreencastService* pxScreencastService;
+
+	ControllerRouter *pCtrlRouter;
 };
 
 
