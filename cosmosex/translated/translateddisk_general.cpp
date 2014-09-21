@@ -296,6 +296,21 @@ void TranslatedDisk::detachAll(void)
     currentDriveIndex   = 0;
 }
 
+void TranslatedDisk::detachAllUsbMedia(void)
+{
+    for(int i=0; i<MAX_DRIVES; i++) {               // go through the drives
+        // if it's shared drive, or it's a config drive, don't detach
+        if(conf[i].translatedType == TRANSLATEDTYPE_SHAREDDRIVE || conf[i].translatedType == TRANSLATEDTYPE_CONFIGDRIVE) {
+            continue;
+        }
+        
+        detachByIndex(i);       // it's normal drive, detach
+    }
+
+    currentDriveLetter  = 'C';
+    currentDriveIndex   = 0;
+}
+
 void TranslatedDisk::detachFromHostPath(std::string hostRootPath)
 {
     int index = -1;

@@ -72,6 +72,7 @@ private:
     TranslatedDisk  *translated;
     bool            setEnabledIDbits;
 	AcsiIDinfo		acsiIdInfo;
+    bool            mountRawNotTrans;
 
     void handleAcsiCommand(void);
     void handleConfigStream(BYTE *cmd);

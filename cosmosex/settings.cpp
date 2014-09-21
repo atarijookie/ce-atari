@@ -45,6 +45,8 @@ void Settings::storeDefaultValues(void)
 	setChar((char *) "DRIVELETTER_FIRST",      'C');
     setChar((char *) "DRIVELETTER_SHARED",     'P');
     setChar((char *) "DRIVELETTER_CONFDRIVE",  'O');
+
+	setBool((char *) "MOUNT_RAW_NOT_TRANS",     false);
 	
 	setBool((char *) "SHARED_ENABLED",			false);
 	setBool((char *) "SHARED_NFS_NOT_SAMBA",	false);
@@ -233,7 +235,7 @@ void Settings::loadAcsiIDs(AcsiIDinfo *aii)
 	aii->gotDevTypeRaw			= false;					// no raw and translated types found yet
 	aii->gotDevTypeTranslated	= false;
 	aii->gotDevTypeSd			= false;
-	
+    
 	aii->sdCardAcsiId = 0xff;								// at start mark that we don't have SD card ID yet
 	
     char key[32];

@@ -204,9 +204,9 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 
         // special handling of '.' and '..'
 		if(longFname == "." || longFname == "..") {
-			if(isRootDir) {                             // for root dir     - don't add '.' or '..'
+			if((isRootDir)||((findAttribs&FA_DIR)==0)) {    // for root dir or when no subdirs are requested (FA_DIR) - don't add '.' or '..'
                 continue;
-            } else {                                    // for non-root dir - must add '.' or '..' (TOS does this, and it makes the TOS dir copying work)
+            } else {                                    // for non-root dir                                       - must add '.' or '..' (TOS does this, and it makes the TOS dir copying work)
                 appendFoundToFindStorage_dirUpDirCurr(hostPath, (char *) searchString.c_str(), fs, de, findAttribs);
                 continue;
             }            

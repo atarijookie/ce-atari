@@ -64,6 +64,7 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPYIMGS);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPYCONF);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPY_SLOT);
+	settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_TRANSLATED);
 	
     settingsReloadProxy.addSettingsUser((ISettingsUser *) scsi,          SETTINGSUSER_ACSI);
 
@@ -340,6 +341,26 @@ void CCoreThread::reloadSettings(int type)
         return;
     }
     
+    if(type == SETTINGSUSER_TRANSLATED) {
+        Settings s;
+        bool newMountRawNotTrans = s.getBool((char *) "MOUNT_RAW_NOT_TRANS", 0);
+        
+        if(mountRawNotTrans != newMountRawNotTrans) {       // mount strategy changed?
+            mountRawNotTrans = newMountRawNotTrans;
+
+            Debug::out(LOG_DEBUG, "CCoreThread::reloadSettings -- USB media mount strategy changed, remounting");
+        
+            translated->detachAllUsbMedia();                // detach all translated USB media
+            scsi->detachAllUsbMedia();                      // detach all RAW USB media
+
+            // and now try to attach everything back
+            devFinder.clearMap();						    // make all the devices appear as new
+            devFinder.lookForDevChanges();					// and now find all the devices
+        }
+        
+        return;   
+    }
+    
     if(type == SETTINGSUSER_FLOPPYCONF) {
         Settings s;
         s.loadFloppyConfig(&floppyConfig);
@@ -372,6 +393,8 @@ void CCoreThread::loadSettings(void)
 	s.loadAcsiIDs(&acsiIdInfo);
     s.loadFloppyConfig(&floppyConfig);
 
+    mountRawNotTrans = s.getBool((char *) "MOUNT_RAW_NOT_TRANS", 0);
+    
     setEnabledIDbits    = true;
     setFloppyConfig     = true;
 }
@@ -529,45 +552,15 @@ int CCoreThread::bcdToInt(int bcd)
 
 void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 {
-	Debug::out(LOG_INFO, "CCoreThread::onDevAttached: devName %s, gotDevTypeRaw: %d, gotDevTypeTranslated: %d", (char *) devName.c_str(), (int) acsiIdInfo.gotDevTypeRaw, (int) acsiIdInfo.gotDevTypeTranslated);
+	Debug::out(LOG_INFO, "CCoreThread::onDevAttached: devName %s", (char *) devName.c_str());
 
-	// TODO: add logic to detach the device, if it was attached as other type (raw / tran)
-
-	// if have RAW enabled, but not TRANSLATED - attach all drives (atari and non-atari) as RAW
-	if(acsiIdInfo.gotDevTypeRaw && !acsiIdInfo.gotDevTypeTranslated) {
-        Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- only RAW enabled, attaching as RAW");
+    if(mountRawNotTrans) {                  // attach as raw?
+        Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- should mount USB media as raw, attaching as RAW");
 		scsi->attachToHostPath(devName, SOURCETYPE_DEVICE, SCSI_ACCESSTYPE_FULL);
-        return;
-	}
-
-	// if have TRANSLATED enabled, but not RAW - can't attach atari drives, but do attach non-atari drives as TRANSLATED
-	if(!acsiIdInfo.gotDevTypeRaw && acsiIdInfo.gotDevTypeTranslated) {
-		if(!isAtariDrive) {			// attach non-atari drive as TRANSLATED
-            Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- only TRANSLATED enabled, is non-atari, attaching as TRANSLATED");
-			attachDevAsTranslated(devName);
-		} else {					// can't attach atari drive
-			Debug::out(LOG_INFO, "Can't attach device %s, because it's an Atari drive and no RAW device is enabled.", (char *) devName.c_str());
-		}
-        return;
-	}
-
-	// if both TRANSLATED and RAW are enabled - attach non-atari as TRANSLATED, and atari as RAW
-	if(acsiIdInfo.gotDevTypeRaw && acsiIdInfo.gotDevTypeTranslated) {
-		if(isAtariDrive) {			// attach atari drive as RAW
-            Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- RAW & TRANSLATED enabled, is atari, attaching as RAW");
-			scsi->attachToHostPath(devName, SOURCETYPE_DEVICE, SCSI_ACCESSTYPE_FULL);
-		} else {					// attach non-atari drive as TRANSLATED
-            Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- RAW & TRANSLATED enabled, is non-atari, attaching as TRANSLATED");
-			attachDevAsTranslated(devName);
-		}
-        return;
-	}
-
-	// if no device type is enabled
-	if(!acsiIdInfo.gotDevTypeRaw && !acsiIdInfo.gotDevTypeTranslated) {
-		Debug::out(LOG_INFO, "Can't attach device %s, because no device type (RAW or TRANSLATED) is enabled on ACSI bus!", (char *) devName.c_str());
-        return;
-	}
+    } else {                                // attach as translated?
+        Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- should mount USB media as translated, attaching as TRANSLATED");
+        attachDevAsTranslated(devName);
+    }
 }
 
 void CCoreThread::onDevDetached(std::string devName)
@@ -595,11 +588,6 @@ void CCoreThread::attachDevAsTranslated(std::string devName)
 	bool res;
 	std::list<std::string>				partitions;
 	std::list<std::string>::iterator	it;
-
-	if(!acsiIdInfo.gotDevTypeTranslated) {										// don't have any translated device on acsi bus, don't attach
-        Debug::out(LOG_DEBUG, "CCoreThread::attachDevAsTranslated -- no translated device on ACSI bus, not attaching");
-		return;
-	}
 
 	devFinder.getDevPartitions(devName, partitions);							// get list of partitions for that device (sda -> sda1, sda2)
 

@@ -924,7 +924,7 @@ void TranslatedDisk::onFread(BYTE *cmd)
     DWORD transferSizeBytes = byteCount + pad;
 
     DWORD cnt = fread (dataBuffer, 1, transferSizeBytes, files[index].hostHandle);
-    dataTrans->addDataBfr(dataBuffer, transferSizeBytes, false);	// then store the data
+    dataTrans->addDataBfr(dataBuffer, cnt, false);	// then store the data
     dataTrans->padDataToMul16();
 
     files[index].lastDataCount = cnt;                       // store how much data was read

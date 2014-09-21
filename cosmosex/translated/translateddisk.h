@@ -71,6 +71,7 @@ public:
     bool attachToHostPath(std::string hostRootPath, int translatedType);
     void detachFromHostPath(std::string hostRootPath);
     void detachAll(void);
+    void detachAllUsbMedia(void);
 
     virtual void reloadSettings(int type);      // from ISettingsUser
 

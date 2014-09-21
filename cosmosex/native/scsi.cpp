@@ -276,6 +276,22 @@ void Scsi::detachAll(void)
 	}
 }
 
+void Scsi::detachAllUsbMedia(void)
+{
+	for(int i=0; i<8; i++) {                                                    // go through all the devices and detach only USB devices
+        if(devInfo[i].attachedMediaIndex == -1) {       			            // nothing attached?
+            continue;
+        }
+
+        int attMediaInd = devInfo[i].attachedMediaIndex;
+        if( attachedMedia[ attMediaInd ].hostSourceType != SOURCETYPE_DEVICE) { // this is not a USB device? skip it
+            continue;
+        }
+    
+		detachMediaFromACSIidByIndex(i);
+	}
+}
+
 int Scsi::findAttachedMediaByHostPath(std::string hostPath)
 {
     for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {               // find where it's attached

@@ -295,13 +295,14 @@ void ConfigStream::createScreen_translated(void)
 
     screen_addHeaderAndFooter(screen, (char *) "Translated disk");
 
+    int col1x = 4, col2x = 23, col3x = 29;
     ConfigComponent *comp;
 
     comp = new ConfigComponent(this, ConfigComponent::label, "        Drive letters assignment", 40, 0, 5, gotoOffset);
     comp->setReverse(true);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "First translated drive", 23, 6, 7, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "First translated drive", 23, col1x, 7, gotoOffset);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::editline, " ",	1, 33, 7, gotoOffset);
@@ -309,7 +310,7 @@ void ConfigStream::createScreen_translated(void)
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Shared drive", 23, 6, 9, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Shared drive", 23, col1x, 9, gotoOffset);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::editline, " ",	1, 33, 9, gotoOffset);
@@ -317,7 +318,7 @@ void ConfigStream::createScreen_translated(void)
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Config drive", 23, 6, 10, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Config drive", 23, col1x, 10, gotoOffset);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::editline, " ",	1, 33, 10, gotoOffset);
@@ -325,6 +326,29 @@ void ConfigStream::createScreen_translated(void)
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
+    //------------
+    int row = 12;
+    
+    comp = new ConfigComponent(this, ConfigComponent::label, "Mount USB media as",							40, col1x, row, gotoOffset);
+    screen.push_back(comp);
+	
+	comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",										3,	col2x, row, gotoOffset);
+    comp->setCheckboxGroupIds(COMPID_MOUNT_RAW_NOT_TRANS, 0);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "translated",  								40,	col3x, row++, gotoOffset);
+    screen.push_back(comp);
+	
+	comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",										3,	col2x, row, gotoOffset);
+    comp->setCheckboxGroupIds(COMPID_MOUNT_RAW_NOT_TRANS, 1);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "RAW",						                    40,	col3x, row++, gotoOffset);
+    screen.push_back(comp);
+
+	row++;
+    //------------
+    
     comp = new ConfigComponent(this, ConfigComponent::label, "If you use also raw disks (Atari native ", 40, 0, 17, gotoOffset);
     screen.push_back(comp);
 
@@ -337,12 +361,12 @@ void ConfigStream::createScreen_translated(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "them.",	40, 0, 20, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  9, 13, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  9, 15, gotoOffset);
     comp->setOnEnterFunctionCode(CS_SAVE_TRANSLATED);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, 20, 13, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, 20, 15, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
@@ -350,11 +374,12 @@ void ConfigStream::createScreen_translated(void)
     // get the letters from settings, store them to components
     Settings s;
     char drive1, drive2, drive3;
+    bool mountRawNotTrans;
 
     drive1 = s.getChar((char *) "DRIVELETTER_FIRST",      0);
     drive2 = s.getChar((char *) "DRIVELETTER_SHARED",     0);
     drive3 = s.getChar((char *) "DRIVELETTER_CONFDRIVE",  0);
-
+    
     char driveStr[2] = {0, 0};
     std::string driveString;
 
@@ -369,6 +394,14 @@ void ConfigStream::createScreen_translated(void)
     driveStr[0] = drive3;
     driveString = driveStr;
     setTextByComponentId(COMPID_TRAN_CONFDRIVE, driveString);
+
+    mountRawNotTrans = s.getBool((char *) "MOUNT_RAW_NOT_TRANS", 0);
+    
+ 	if(mountRawNotTrans) {
+		checkboxGroup_setCheckedId(COMPID_MOUNT_RAW_NOT_TRANS, 1);			// select RAW
+	} else {
+		checkboxGroup_setCheckedId(COMPID_MOUNT_RAW_NOT_TRANS, 0);			// select TRANS
+	}
 
     setFocusToFirstFocusable();
 }
@@ -481,11 +514,14 @@ void ConfigStream::onTranslated_save(void)
         return;
     }
 
+    bool mountRawNotTrans = (bool) checkboxGroup_getCheckedId(COMPID_MOUNT_RAW_NOT_TRANS);
+    
     // now save the settings
     Settings s;
     s.setChar((char *) "DRIVELETTER_FIRST",      letter1);
     s.setChar((char *) "DRIVELETTER_SHARED",     letter2);
     s.setChar((char *) "DRIVELETTER_CONFDRIVE",  letter3);
+    s.setBool((char *) "MOUNT_RAW_NOT_TRANS",    mountRawNotTrans);
 
     if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
         reloadProxy->reloadSettings(SETTINGSUSER_TRANSLATED);
