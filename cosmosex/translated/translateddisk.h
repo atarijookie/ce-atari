@@ -102,6 +102,8 @@ private:
         WORD readOnly;
     } driveLetters;
 
+    char asciiAtariToPc[256];
+
 	TFindStorage tempFindStorage;
     TFindStorage *findStorages[MAX_FIND_STORAGES];
 
@@ -190,6 +192,8 @@ private:
     void atariFindAttribsToString(BYTE attr, std::string &out);
     bool isRootDir(std::string hostPath);
 
+    void initAsciiTranslationTable(void);
+    void convertAtariASCIItoPc(char *path);
     //-----------------------------------
     // helpers for find storage
     void initFindStorages(void);

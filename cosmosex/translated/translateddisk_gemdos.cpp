@@ -102,7 +102,10 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
     }
 
     std::string newAtariPath, hostPath;
-    newAtariPath = (char *) dataBuffer;
+
+    convertAtariASCIItoPc((char *) dataBuffer);     // try to fix the path with only allowed chars
+    newAtariPath =        (char *) dataBuffer;
+
     res = createHostPath(newAtariPath, hostPath);
 
     if(!res) {                                      // the path doesn't bellong to us?
@@ -187,6 +190,8 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     DWORD dta           = getDword(dataBuffer);         // bytes 0 to 3 contain address of DTA used on ST with this Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
 
     BYTE findAttribs    = dataBuffer[4];                // get find attribs (dirs | hidden | ...)
+
+    convertAtariASCIItoPc((char *) (dataBuffer + 5));   // try to fix the path with only allowed chars
     atariSearchString   = (char *) (dataBuffer + 5);    // get search string, e.g.: C:\\*.*
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst(%08x) - atari search string: %s, find attribs: 0x%02x", dta, (char *) atariSearchString.c_str(), findAttribs);
@@ -378,7 +383,9 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     }
 
     std::string newAtariPath, hostPath;
-    newAtariPath = (char *) dataBuffer;
+
+    convertAtariASCIItoPc((char *) dataBuffer);     // try to fix the path with only allowed chars
+    newAtariPath =        (char *) dataBuffer;
 
     res = createHostPath(newAtariPath, hostPath);   // create the host path
 
@@ -429,7 +436,9 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
     }
 
     std::string newAtariPath, hostPath;
-    newAtariPath = (char *) dataBuffer;
+
+    convertAtariASCIItoPc((char *) dataBuffer);     // try to fix the path with only allowed chars
+    newAtariPath =        (char *) dataBuffer;
 
     res = createHostPath(newAtariPath, hostPath);   // create the host path
 
@@ -466,8 +475,12 @@ void TranslatedDisk::onFrename(BYTE *cmd)
     }
 
     std::string oldAtariName, newAtariName;
-    oldAtariName = (char *)  dataBuffer;                                // get old name
-    newAtariName = (char *) (dataBuffer + oldAtariName.length() + 1);   // get new name
+
+    convertAtariASCIItoPc((char *) dataBuffer);                                 // try to fix the path with only allowed chars
+    oldAtariName =        (char *) dataBuffer;                                  // get old name
+
+    convertAtariASCIItoPc((char *) (dataBuffer + oldAtariName.length() + 1));   // try to fix the path with only allowed chars
+    newAtariName =        (char *) (dataBuffer + oldAtariName.length() + 1);    // get new name
 
     std::string oldHostName, newHostName;
     res     = createHostPath(oldAtariName, oldHostName);            // create the host path
@@ -510,7 +523,9 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
     }
 
     std::string newAtariPath, hostPath;
-    newAtariPath = (char *) dataBuffer;
+
+    convertAtariASCIItoPc((char *) dataBuffer);     // try to fix the path with only allowed chars
+    newAtariPath =        (char *) dataBuffer;
 
     res = createHostPath(newAtariPath, hostPath);   // create the host path
 
@@ -570,7 +585,8 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     bool setNotInquire  = dataBuffer[0];
     BYTE attrAtariNew   = dataBuffer[1];
 
-    atariName = (char *)  (dataBuffer + 2);                         // get file name
+    convertAtariASCIItoPc((char *) (dataBuffer + 2));   // try to fix the path with only allowed chars
+    atariName =           (char *) (dataBuffer + 2);    // get file name
 
     res = createHostPath(atariName, hostName);                      // create the host path
 
@@ -636,7 +652,9 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     BYTE attribs = dataBuffer[0];
 
     std::string atariName, hostName;
-    atariName = (char *) (dataBuffer + 1);                          // get file name
+
+    convertAtariASCIItoPc((char *) (dataBuffer + 1));               // try to fix the path with only allowed chars
+    atariName =           (char *) (dataBuffer + 1);                // get file name
 
     res = createHostPath(atariName, hostName);                      // create the host path
 
@@ -724,7 +742,9 @@ void TranslatedDisk::onFopen(BYTE *cmd)
     BYTE mode = dataBuffer[0];
 
     std::string atariName, hostName;
-    atariName = (char *) (dataBuffer + 1);                          // get file name
+
+    convertAtariASCIItoPc((char *) (dataBuffer + 1));               // try to fix the path with only allowed chars
+    atariName =           (char *) (dataBuffer + 1);                // get file name
 
     res = createHostPath(atariName, hostName);                      // create the host path
 
@@ -1186,3 +1206,4 @@ void TranslatedDisk::atariFindAttribsToString(BYTE attr, std::string &out)
         out = "(none)";
     }
 }
+

@@ -42,6 +42,8 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastS
 
     //ACSI commands "screencast"
 	screencastAcsiCommand   = new ScreencastAcsiCommand(dataTrans,scs);
+
+    initAsciiTranslationTable();
 }
 
 TranslatedDisk::~TranslatedDisk()
@@ -1162,6 +1164,110 @@ char *TranslatedDisk::functionCodeToName(int code)
         case BIOS_Mediach:              return (char *)"BIOS_Mediach";
         case BIOS_Getbpb:               return (char *)"BIOS_Getbpb";
         default:                        return (char *)"unknown";
+    }
+}
+
+void TranslatedDisk::initAsciiTranslationTable(void)
+{
+    memset(asciiAtariToPc, 0, 256);
+
+    asciiAtariToPc[128] = 'C';
+    asciiAtariToPc[129] = 'u';
+    asciiAtariToPc[130] = 'e';
+    asciiAtariToPc[131] = 'a';
+    asciiAtariToPc[132] = 'a';
+    asciiAtariToPc[133] = 'a';
+    asciiAtariToPc[134] = 'a';
+    asciiAtariToPc[135] = 'c';
+    asciiAtariToPc[136] = 'e';
+    asciiAtariToPc[137] = 'e';
+    asciiAtariToPc[138] = 'e';
+    asciiAtariToPc[139] = 'i';
+    asciiAtariToPc[140] = 'i';
+    asciiAtariToPc[141] = 'i';
+    asciiAtariToPc[142] = 'A';
+    asciiAtariToPc[143] = 'A';
+    asciiAtariToPc[144] = 'E';
+    asciiAtariToPc[145] = 'a';
+    asciiAtariToPc[146] = 'A';
+    asciiAtariToPc[147] = 'o';
+    asciiAtariToPc[148] = 'o';
+    asciiAtariToPc[149] = 'o';
+    asciiAtariToPc[150] = 'u';
+    asciiAtariToPc[151] = 'u';
+    asciiAtariToPc[152] = 'y';
+    asciiAtariToPc[153] = 'o';
+    asciiAtariToPc[154] = 'U';
+    asciiAtariToPc[155] = 'c';
+    asciiAtariToPc[156] = 'p';
+    asciiAtariToPc[157] = 'Y';
+    asciiAtariToPc[158] = 's';
+    asciiAtariToPc[159] = 'f';
+    asciiAtariToPc[160] = 'a';
+    asciiAtariToPc[161] = 'i';
+    asciiAtariToPc[162] = 'o';
+    asciiAtariToPc[163] = 'u';
+    asciiAtariToPc[164] = 'n';
+    asciiAtariToPc[165] = 'N';
+    asciiAtariToPc[166] = 'a';
+    asciiAtariToPc[167] = 'o';
+    asciiAtariToPc[173] = 'i';
+    asciiAtariToPc[176] = 'a';
+    asciiAtariToPc[177] = 'o';
+    asciiAtariToPc[178] = 'O';
+    asciiAtariToPc[179] = 'o';
+    asciiAtariToPc[180] = 'e';
+    asciiAtariToPc[181] = 'E';
+    asciiAtariToPc[182] = 'A';
+    asciiAtariToPc[183] = 'A';
+    asciiAtariToPc[184] = 'O';
+}
+
+void TranslatedDisk::convertAtariASCIItoPc(char *path)
+{
+    int i, len;
+
+    len = strlen(path);
+
+    if(len >= 2048) {                                                   // probably no terminating char? go only this far
+        len = 2048;
+    }
+
+    for(i=0; i<len; i++) {                                              // go through the string
+        char in = path[i];
+
+        if(in == 0) {                                                   // if it's string terminator, quit
+            return;
+        }
+
+        //------------------------
+        // check if it's one of the directly usable chars
+        if(in >= 33 && in <= 57) {                                      // printable chars, numbers? OK
+            continue;
+        }
+
+        if(in >= 64 && in <= 122) {                                     // letters, other printable chars? ok
+            continue;
+        }
+
+        if(in == '?' || in == '*') {                                    // wild cards? ok
+            continue;
+        }
+
+        if(in == '|' || in == '~') {                                    // these two? ok
+            continue;
+        }
+
+        //------------------------
+        // if it's not from the supported chars, try to convert it
+        unsigned int uin    = (unsigned char) in;
+        char conv           = asciiAtariToPc[uin];
+
+        if(conv == 0) {                                                 // we don't have a good replacement? replace with '_'
+            path[i] = '_';
+        } else {                                                        // we got a replacement, use it!
+            path[i] = conv;
+        }
     }
 }
 
