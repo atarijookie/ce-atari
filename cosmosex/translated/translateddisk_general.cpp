@@ -1242,7 +1242,7 @@ void TranslatedDisk::convertAtariASCIItoPc(char *path)
 
         //------------------------
         // check if it's one of the directly usable chars
-        if(in >= 33 && in <= 57) {                                      // printable chars, numbers? OK
+        if(in >= 33 && in <= 58) {                                      // printable chars, numbers? OK
             continue;
         }
 
