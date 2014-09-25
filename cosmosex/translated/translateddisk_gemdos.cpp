@@ -1207,3 +1207,42 @@ void TranslatedDisk::atariFindAttribsToString(BYTE attr, std::string &out)
     }
 }
 
+void TranslatedDisk::getByteCountToEndOfFile(BYTE *cmd)
+{
+    int atariHandle = cmd[5];
+
+    int index = findFileHandleSlot(atariHandle);
+
+    if(index == -1) {                               // handle not found? not handled, try somewhere else
+        Debug::out(LOG_DEBUG, "TranslatedDisk::getByteCountToEndOfFile - atari handle %d not found, not handling", atariHandle);
+
+        dataTrans->setStatus(E_NOTHANDLED);
+        return;
+    }
+
+    FILE *f = files[index].hostHandle;              // store the handle to 'f'
+
+    //-----------
+    // find out and calculate, how many bytes there are until the end of file from current position
+    DWORD posCurrent, posEnd, bytesToEnd;
+
+    posCurrent = ftell(f);                          // store current position from start
+    fseek(f, 0, SEEK_END);                          // move to the end of file
+    posEnd = ftell(f);                              // store the position of the end of file
+    fseek(f, posCurrent, SEEK_SET);                 // restore the position to what it was before
+
+    bytesToEnd = posEnd - posCurrent;               // calculate how many bytes there are until the end of file
+
+    //-----------
+    // now send it to ST
+    Debug::out(LOG_DEBUG, "TranslatedDisk::getByteCountToEndOfFile - for atari handle %d - there are %d bytes until the end of file", atariHandle, (int) bytesToEnd);
+
+    dataTrans->addDataDword(bytesToEnd);            // store the byte count to buffer
+    dataTrans->padDataToMul16();
+
+    dataTrans->setStatus(E_OK);
+}
+
+
+
+

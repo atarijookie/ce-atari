@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include <algorithm>
+
 #include "../global.h"
 #include "../debug.h"
 #include "../native/scsi_defs.h"
@@ -1266,6 +1268,8 @@ void ConfigStream::onSharedSave(void)
 			return;
 		}
 	}
+
+    std::replace( path.begin(), path.end(), '\\', '/');  // replace all slashes for the right slashes
 
     Settings s;
 

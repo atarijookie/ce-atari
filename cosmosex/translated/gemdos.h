@@ -41,6 +41,7 @@
 #define GD_CUSTOM_ftell         0x62
 #define GD_CUSTOM_getRWdataCnt  0x63
 #define GD_CUSTOM_Fsnext_last   0x64
+#define GD_CUSTOM_getBytesToEOF 0x65
 
 // BIOS functions we need to support
 #define BIOS_Drvmap				0x70

@@ -406,11 +406,12 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case GEMDOS_Fseek:          onFseek(cmd);       break;
 
         // custom functions, which are not translated gemdos functions, but needed to do some other work
-        case GD_CUSTOM_initialize:      onInitialize();     break;
-        case GD_CUSTOM_getConfig:       onGetConfig(cmd);   break;
-        case GD_CUSTOM_ftell:           onFtell(cmd);       break;
-        case GD_CUSTOM_getRWdataCnt:    onRWDataCount(cmd); break;
-        case GD_CUSTOM_Fsnext_last:     onFsnext_last(cmd); break;
+        case GD_CUSTOM_initialize:      onInitialize();                 break;
+        case GD_CUSTOM_getConfig:       onGetConfig(cmd);               break;
+        case GD_CUSTOM_ftell:           onFtell(cmd);                   break;
+        case GD_CUSTOM_getRWdataCnt:    onRWDataCount(cmd);             break;
+        case GD_CUSTOM_Fsnext_last:     onFsnext_last(cmd);             break;
+        case GD_CUSTOM_getBytesToEOF:   getByteCountToEndOfFile(cmd);   break;
 
         // BIOS functions we need to support
         case BIOS_Drvmap:               onDrvMap(cmd);      break;
@@ -1160,6 +1161,7 @@ char *TranslatedDisk::functionCodeToName(int code)
         case GD_CUSTOM_ftell:           return (char *)"GD_CUSTOM_ftell";
         case GD_CUSTOM_getRWdataCnt:    return (char *)"GD_CUSTOM_getRWdataCnt";
         case GD_CUSTOM_Fsnext_last:     return (char *)"GD_CUSTOM_Fsnext_last";
+        case GD_CUSTOM_getBytesToEOF:   return (char *)"GD_CUSTOM_getBytesToEOF";
         case BIOS_Drvmap:               return (char *)"BIOS_Drvmap";
         case BIOS_Mediach:              return (char *)"BIOS_Mediach";
         case BIOS_Getbpb:               return (char *)"BIOS_Getbpb";

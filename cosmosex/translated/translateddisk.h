@@ -162,6 +162,7 @@ private:
     void onFtell(BYTE *cmd);            // this is needed after Fseek
     void onRWDataCount(BYTE *cmd);      // when Fread / Fwrite doesn't process all the data, this returns the count of processed data
     void onFsnext_last(BYTE *cmd);      // after last Fsnext() call this to release the findStorage
+    void getByteCountToEndOfFile(BYTE *cmd);    // should be used with Fread() to know the exact count of bytes to the end of file, so the memory after the last valid byte won't get corrupted
 
     // BIOS functions we need to support
     void onDrvMap(BYTE *cmd);
