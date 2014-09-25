@@ -80,7 +80,7 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
     }
 
     //------
-    if(type == button || type == editline || type == checkbox) {
+    if(type == button || type == editline || type == editline_pass || type == checkbox) {
         terminal_addGoto(bfr, posX, posY);				// goto(x,y)
         bfr += 4;
 
@@ -96,8 +96,14 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
             bfr[i+1] = ' ';
         }
 
-        strncpy((char *) bfr+1, text.c_str(), text.length());	// copy the text
-        bfr += maxLen + 2;								// +2 because of [ and ]
+        std::string displayText = text;                 // this text will be displayed
+
+        if(type == editline_pass) {                     // if this is a password editline, then show just asterisks instead of real chars 
+            displayText = std::string(text.length(), '*');
+        }
+
+        strncpy((char *) bfr+1, displayText.c_str(), displayText.length()); // copy the text
+        bfr += maxLen + 2;								                    // +2 because of [ and ]
 
         if(hasFocus) {									// if has focus, stop reverse
             terminal_addReverse(bfr, false);
@@ -204,16 +210,16 @@ void ConfigComponent::onKeyPressed(BYTE key)
                 confStream->onCheckboxGroupEnter(checkBoxGroup, checkBoxId);
             }
 
-            if(onEnter != 0) {          				// if we got onEnter function, call it
+            if(onEnter != 0) {          			// if we got onEnter function, call it
                 confStream->enterKeyHandlerLater(onEnter);
             }
 
-            changed = true;						// mark that we got new data and we should display them
+            changed = true;						    // mark that we got new data and we should display them
         }
     }
 
-    if(type == editline) {						// for editLine better use separate function
-        changed = true;							// mark that we got new data and we should display them
+    if(type == editline || type == editline_pass) { // for editLine better use separate function
+        changed = true;							    // mark that we got new data and we should display them
         handleEditLineKeyPress(key);
     }
 }
@@ -442,13 +448,13 @@ void ConfigComponent::terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt)
 {
     cnt = 0;
 
-    if(type != editline) {			// if it's not editline, skip adding current cursor
+    if(type != editline && type != editline_pass) { // if it's not editline, skip adding current cursor
         terminal_addCursorOn(bfr, false);
         cnt = 2;
         return;
     }
 
-    if(!hasFocus) {					// if this editline doesn't have focus, skip adding current cursor
+    if(!hasFocus) {					                // if this editline doesn't have focus, skip adding current cursor
         terminal_addCursorOn(bfr, false);
         cnt = 2;
         return;

@@ -19,7 +19,7 @@ class ConfigStream;
 class ConfigComponent
 {
 public:
-    enum ComponentType{ label, button, checkbox, editline };
+    enum ComponentType{ label, button, checkbox, editline, editline_pass };
 
     // maxLen is maximum length of text, that means that on screen it might have 2 more ('[' and ']')
     ConfigComponent(ConfigStream *parent, ComponentType type, std::string text, WORD maxLen, int x, int y, int gotoOffset);
