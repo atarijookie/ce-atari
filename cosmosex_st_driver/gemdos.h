@@ -48,6 +48,7 @@
 #define GD_CUSTOM_ftell         0x62
 #define GD_CUSTOM_getRWdataCnt  0x63
 #define GD_CUSTOM_Fsnext_last   0x64
+#define GD_CUSTOM_getBytesToEOF 0x65
 
 // BIOS functions we need to support
 #define BIOS_Drvmap				0x70
@@ -126,6 +127,7 @@ void initFileBuffer(WORD ceHandle);
 BYTE fillReadBuffer(WORD ceHandle);
 DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset);
 void seekInFileBuffer(WORD ceHandle, int32_t offset, BYTE seekMode);
+void getBytesToEof(WORD ceHandle);
 
 DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 
@@ -167,5 +169,23 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 #define handleIsFromCE(X)		(X >= 150 && X <= 200)
 #define handleAtariToCE(X)		(X  - 150)
 #define handleCEtoAtari(X)		(X  + 150)		
-		
+
+//----------------------		
+// the following buffer type is used for file reading and writing
+#define RW_BUFFER_SIZE		512
+
+typedef struct 
+{
+	WORD rCount;					// how much data is buffer (specifies where the next read data could go)
+	WORD rStart;					// starting index of where we should start reading the buffer
+	BYTE rBuf[RW_BUFFER_SIZE];
+	
+    DWORD bytesToEOF;               // count of bytes until the EOF
+    BYTE  bytesToEOFinvalid;        // flag that marks that before any READ operation you should 
+    
+	WORD wCount;					// how much data we have in this buffer
+	BYTE wBuf[RW_BUFFER_SIZE];
+	
+} TFileBuffer;
+        
 #endif // GEMDOS_H

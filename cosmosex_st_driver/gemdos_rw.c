@@ -16,7 +16,7 @@
 #include "bios.h"
 #include "main.h"
 
-// * CosmosEx GEMDOS driver by Jookie, 2013
+// * CosmosEx GEMDOS driver by Jookie, 2013 & 2014
 // * GEMDOS hooks part (assembler and C) by MiKRO (Miro Kropacek), 2013
  
 // ------------------------------------------------------------------ 
@@ -51,19 +51,6 @@ DWORD copyNextDtaToAtari(void);
 extern WORD ceDrives;
 extern BYTE currentDrive;
 
-#define RW_BUFFER_SIZE		512
-
-typedef struct 
-{
-	WORD rCount;					// how much data is buffer (specifies where the next read data could go)
-	WORD rStart;					// starting index of where we should start reading the buffer
-	BYTE rBuf[RW_BUFFER_SIZE];
-	
-	WORD wCount;					// how much data we have in this buffer
-	BYTE wBuf[RW_BUFFER_SIZE];
-	
-} TFileBuffer;
-
 TFileBuffer fileBufs[MAX_FILES];
 
 DWORD fread_small(WORD ceHandle, DWORD countNeeded, BYTE *buffer);
@@ -88,6 +75,10 @@ int32_t custom_fread( void *sp )
 	
 	WORD ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle 
 	
+    if(fileBufs[ceHandle].bytesToEOFinvalid) {                          // if the bytes to EOF value is invalid, we need to re-read it
+        getBytesToEof(ceHandle);
+    }
+    
     if(count <= 1024) {
         res = fread_small(ceHandle, count, buffer);
     } else {
@@ -112,8 +103,8 @@ DWORD fread_small(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
             fillReadBuffer(ceHandle);									// fill the read buffer with new data
             dataLeft = fb->rCount - fb->rStart;	                        // see how many data we have buffered
             
-            if(dataLeft == 0) {
-                return countDone;
+            if(dataLeft == 0) {                                         // if nothing left, quit and return how many we got
+                break;
             }
         }
         
@@ -128,6 +119,7 @@ DWORD fread_small(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
         dataLeft    = fb->rCount - fb->rStart;	                        // see how many data we have buffered									
     }
 
+    fb->bytesToEOF -= countDone;                                        // update count of remaining bytes
     return countDone;
 }
     
@@ -154,6 +146,7 @@ DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
             dataLeft = fb->rCount - fb->rStart;	                        // see how many data we have buffered
             
             if(dataLeft == 0) {                                         // no data in the file? fail
+                fb->bytesToEOF = 0;                                     // update count of remaining bytes
                 return 0;
             }
         }
@@ -182,11 +175,17 @@ DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
         buffer      += dataLeft;                                        // update pointer to where next data should be stored
         countDone   += dataLeft;                                        // add to count of bytes read
         countNeeded -= dataLeft;                                        // subtract from count of bytes needed to be read
+        
+        fb->bytesToEOF -= dataLeft;                                     // update count of remaining bytes
     }
     
 	fb->rStart = 0;													    // mark that the buffer doesn't contain any data anymore (although it might contain 1 byte)
     fb->rCount = 0;
     //---------------
+    
+    if(fb->bytesToEOF < countNeeded) {                                  // if we have less data in the file than what the caller requested, update the countNeeded
+        countNeeded = fb->bytesToEOF;
+    }
     
     // Second phase of BIG fread: transfer data by blocks of size 512 bytes, buffer must be EVEN
 	while(countNeeded >= 512) {											// while we're not at the ending sector
@@ -200,11 +199,13 @@ DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
 			
 		DWORD res = readData(ceHandle, buffer, bytesCount, seekOffset);	// try to read the data
 			
-		countDone	+= res;											    // update the bytes read variable
-		buffer		+= res;											    // update the buffer pointer
-		countNeeded -= res;											    // update the count that we still should read
+		countDone	    += res;											// update the bytes read variable
+		buffer		    += res;											// update the buffer pointer
+		countNeeded     -= res;											// update the count that we still should read
+        fb->bytesToEOF  -= res;                                         // update count of remaining bytes
 			
 		if(res != bytesCount) {										    // if failed to read all the requested data?
+            fb->bytesToEOF = 0;                                         // update count of remaining bytes
 			return countDone;										    // return with the count of read data 
 		}
 	}
@@ -218,7 +219,9 @@ DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
 			
 		memcpy(buffer, &fb->rBuf[ fb->rStart ], rest);				    // copy the data that we have
 		fb->rStart	+= rest;										    // and move the pointer further in buffer
-		countDone	+= rest;										    // also mark that we've read this rest 
+		countDone	+= rest;										    // also mark that we've read this rest
+        
+        fb->bytesToEOF -= rest;                                         // update count of remaining bytes
 	}
 
     return countDone;                                                   // return how much bytes we've read together
@@ -242,6 +245,8 @@ int32_t custom_fwrite( void *sp )
 	
 	WORD ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle 
 	
+    fileBufs[ceHandle].bytesToEOFinvalid = 1;                           // mark that after this write the bytes to EOF will be invalid
+    
 	TFileBuffer *fb = &fileBufs[ceHandle];								// to shorten the following operations use this pointer 
 	WORD spaceLeft = (RW_BUFFER_SIZE - fb->wCount);						// how much space we have in the buffer left? 
 	
@@ -504,10 +509,30 @@ void initFileBuffer(WORD ceHandle)
 		return;
 	}
 
-	fileBufs[ceHandle].rCount = 0;
-	fileBufs[ceHandle].rStart = 0;
-	fileBufs[ceHandle].wCount = 0;
+	fileBufs[ceHandle].rCount               = 0;
+	fileBufs[ceHandle].rStart               = 0;
+    fileBufs[ceHandle].bytesToEOF           = 0;
+    fileBufs[ceHandle].bytesToEOFinvalid    = 1;                        // mark that the bytesToEOF is invalid
+	fileBufs[ceHandle].wCount               = 0;
 }
 
+void getBytesToEof(WORD ceHandle)
+{
+    DWORD res;
+    
+	commandShort[4] = GD_CUSTOM_getBytesToEOF;                                  // store function number
+	commandShort[5] = ceHandle;										
+	
+	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);   // send command to host over ACSI
+
+    if(res != E_OK) {							                                // failed? set 0 count of bytes to EOF and quit
+        fileBufs[ceHandle].bytesToEOF           = 0;
+        fileBufs[ceHandle].bytesToEOFinvalid    = 0;                            // mark that the bytesToEOF is valid
+		return;														
+	}
+
+    fileBufs[ceHandle].bytesToEOF           = getDword(pDmaBuffer);             // read and store the new count of bytes to EOF
+    fileBufs[ceHandle].bytesToEOFinvalid    = 0;                                // mark that the bytesToEOF is valid
+}
 // ------------------------------------------------------------------ 
 

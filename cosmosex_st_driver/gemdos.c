@@ -17,7 +17,7 @@
 #include "main.h"
 
 /* 
- * CosmosEx GEMDOS driver by Jookie, 2013
+ * CosmosEx GEMDOS driver by Jookie, 2013 & 2014
  * GEMDOS hooks part (assembler and C) by MiKRO (Miro Kropacek), 2013
  */
  
@@ -58,6 +58,8 @@ void sendStLog(char *str);
 extern WORD ceDrives;
 extern WORD ceMediach;
 extern BYTE currentDrive;
+
+extern TFileBuffer fileBufs[MAX_FILES];
 
 /* ------------------------------------------------------------------ */
 /* the custom GEMDOS handlers now follow */
@@ -603,7 +605,6 @@ int32_t custom_fopen( void *sp )
 {
 	DWORD res;
 
-	WORD handle = 0;
 	BYTE *params = (BYTE *) sp;
 
 	/* get params */
@@ -624,18 +625,23 @@ int32_t custom_fopen( void *sp )
 	pDmaBuffer[0] = (BYTE) mode;										/* store attributes */
 	strncpy(((char *) pDmaBuffer) + 1, fileName, DMA_BUFFER_SIZE - 1);	/* copy in the file name */
 	
-	handle = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* send command to host over ACSI */
+	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* send command to host over ACSI */
 
-    if(handle == E_NOTHANDLED || handle == ACSIERROR) {						/* not handled or error? */
+    if(res == E_NOTHANDLED || res == ACSIERROR) {						/* not handled or error? */
 		CALL_OLD_GD( Fopen, fileName, mode);
 	}
 	
-	if(handle == ENHNDL || handle == EACCDN || handle == EINTRN || handle == EFILNF) {		/* if some other error, just return it */
-        return extendByteToDword(handle);								/* but append lots of FFs to make negative integer out of it */
+	if(res == ENHNDL || res == EACCDN || res == EINTRN || res == EFILNF) {		/* if some other error, just return it */
+        return extendByteToDword(res);								    /* but append lots of FFs to make negative integer out of it */
 	}
+    
+    // if we got here, the result is the real ceHandle
+    WORD ceHandle       = (WORD) res;
+	WORD atariHandle    = handleCEtoAtari(ceHandle);                    // convert the CE handle (0 - 46) to Atari handle (150 - 200)
+    
+    getBytesToEof(ceHandle);                                            // retrieve the count of bytes until the end of file
 	
-	handle = handleCEtoAtari(handle);									/* convert the CE handle (0 - 46) to Atari handle (150 - 200) */
-	return handle;
+	return atariHandle;
 }
 
 int32_t custom_fclose( void *sp )
@@ -711,17 +717,12 @@ int32_t custom_fseek( void *sp )
 	}
 	
 	/* If we got here, the seek was successful and now we need to return the position in the file. */
-
-	/* construct the new file position from the received data */
-	res  = pDmaBuffer[0];
-	res  = res << 8;
-	res |= pDmaBuffer[1];
-	res  = res << 8;
-	res |= pDmaBuffer[2];
-	res  = res << 8;
-	res |= pDmaBuffer[3];
+    
+	res                                     = getDword(pDmaBuffer);     // get the new file position from the received data
+    fileBufs[ceHandle].bytesToEOF           = getDword(pDmaBuffer + 4); // also get the count of bytes until the EOF (we shouldn't read past that)
+    fileBufs[ceHandle].bytesToEOFinvalid    = 0;                        // mark that the bytesToEOF is valid
 	
-	return res;
+	return res;                                                     // return the position in file
 }
 
 int32_t custom_fdatime( void *sp )
