@@ -684,25 +684,25 @@ void CCoreThread::readWebStartupMode(void)
     fgets(tmp, 64, f);
 
     int ires, logLev;
-    ires = sscanf(tmp, "ll%d", &logLev);                // read the param
+    ires = sscanf(tmp, "ll%d", &logLev);            // read the param
     fclose(f);
 
-    bool res = false;
-    if(ires == 1) {                                     // got the param
-        if(logLev >= LOG_OFF && logLev <= LOG_DEBUG) {  // param is valid
-            if(g_logLevel == logLev) {                  // but logLevel won't change?
-                return;                                 // nothing to do
-            }
+    unlink(WEB_PARAMS_FILE);                        // remove the file so we won't read it again
 
-            g_logLevel = logLev;                        // set new log level
-            res = true;
-        }
+    if(ires != 1) {                                 // failed to read the new log level? quit
+        return;
     }
 
-    if(res) {           // on success
+    if(logLev >= LOG_OFF && logLev <= LOG_DEBUG) {  // param is valid
+        if(g_logLevel == logLev) {                  // but logLevel won't change?
+            return;                                 // nothing to do
+        }
+
+        g_logLevel = logLev;                        // set new log level
         Debug::out(LOG_ERROR, "Log level changed from file %s to level %d", WEB_PARAMS_FILE, logLev);
-    } else {            // on failure
-        Debug::out(LOG_ERROR, "Failed to get new log level from file %s", WEB_PARAMS_FILE);
+    } else {                                        // on set wrong log level - switch to lowest log level
+        g_logLevel = LOG_ERROR;
+        Debug::out(LOG_ERROR, "Log level change invalid, switching to LOG_ERROR");
     }
 }
 
