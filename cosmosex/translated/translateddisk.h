@@ -24,6 +24,10 @@
 #define CONFIG_DRIVE_PATH       "/ce/app/configdrive"
 #define SHARED_DRIVE_PATH       "/mnt/shared"
 
+// this version number should be increased whenever command, data or status part of translated disk has changed - to enable CE_DD vs. Main App pairing. 
+// The CE_DD should check this version number and it this doesn't match expectations, it should refuse to work.
+#define TRANSLATEDDISK_VERSION  0x0100
+
 typedef struct {
     bool        enabled;
     bool        mediaChanged;
@@ -195,6 +199,9 @@ private:
 
     void initAsciiTranslationTable(void);
     void convertAtariASCIItoPc(char *path);
+
+    DWORD getByteCountToEOF(FILE *f);
+
     //-----------------------------------
     // helpers for find storage
     void initFindStorages(void);

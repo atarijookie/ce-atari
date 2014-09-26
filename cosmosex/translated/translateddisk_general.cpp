@@ -594,6 +594,10 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     int frameSkip = s.getInt ((char *) "SCREENCAST_FRAMESKIP",        20);
     dataTrans->addDataByte(frameSkip);                     		// byte 24 - frame skip for screencast
 
+    //-----------------
+    dataTrans->addDataWord(TRANSLATEDDISK_VERSION);             // byte 25 & 26 - version of translated disk interface / protocol -- driver will check this, and will refuse to work in cases of mismatch
+    //-----------------
+
     dataTrans->padDataToMul16();                                // pad to multiple of 16
 
     dataTrans->setStatus(E_OK);

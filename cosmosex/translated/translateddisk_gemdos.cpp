@@ -1074,9 +1074,12 @@ void TranslatedDisk::onFseek(BYTE *cmd)
         return;
     }
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onFseek - ok, current position is %d", pos);
+    DWORD bytesToEnd = getByteCountToEOF(files[index].hostHandle);  // get count of bytes to EOF
 
-    dataTrans->addDataDword(pos);                                   // return the position padded with zeros
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFseek - ok, current position is %d, and we got %d bytes to end of file", pos, (int) bytesToEnd);
+
+    dataTrans->addDataDword(pos);                                   // return the position in file
+    dataTrans->addDataDword(bytesToEnd);                            // also byte count to end of file
     dataTrans->padDataToMul16();
 
     dataTrans->setStatus(E_OK);                                     // OK!
@@ -1222,16 +1225,7 @@ void TranslatedDisk::getByteCountToEndOfFile(BYTE *cmd)
 
     FILE *f = files[index].hostHandle;              // store the handle to 'f'
 
-    //-----------
-    // find out and calculate, how many bytes there are until the end of file from current position
-    DWORD posCurrent, posEnd, bytesToEnd;
-
-    posCurrent = ftell(f);                          // store current position from start
-    fseek(f, 0, SEEK_END);                          // move to the end of file
-    posEnd = ftell(f);                              // store the position of the end of file
-    fseek(f, posCurrent, SEEK_SET);                 // restore the position to what it was before
-
-    bytesToEnd = posEnd - posCurrent;               // calculate how many bytes there are until the end of file
+    DWORD bytesToEnd = getByteCountToEOF(f);
 
     //-----------
     // now send it to ST
@@ -1243,6 +1237,24 @@ void TranslatedDisk::getByteCountToEndOfFile(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
+DWORD TranslatedDisk::getByteCountToEOF(FILE *f)
+{
+    if(!f) {
+        return 0;
+    }
+
+    // find out and calculate, how many bytes there are until the end of file from current position
+    DWORD posCurrent, posEnd, bytesToEnd;
+
+    posCurrent = ftell(f);                          // store current position from start
+    fseek(f, 0, SEEK_END);                          // move to the end of file
+    posEnd = ftell(f);                              // store the position of the end of file
+    fseek(f, posCurrent, SEEK_SET);                 // restore the position to what it was before
+
+    bytesToEnd = posEnd - posCurrent;               // calculate how many bytes there are until the end of file
+
+    return bytesToEnd; 
+}
 
 
 
