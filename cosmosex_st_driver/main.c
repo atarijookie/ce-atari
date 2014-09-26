@@ -78,6 +78,9 @@ BYTE netConfig[10];
 
 extern DWORD _runFromBootsector;			// flag meaning if we are running from TOS or bootsector
 extern WORD trap_extra_offset;
+
+WORD transDiskProtocolVersion;              // this will hold the protocol version from Main App
+#define REQUIRED_TRANSLATEDDISK_VERSION     0x0100
 /* ------------------------------------------------------------------ */
 int main( int argc, char* argv[] )
 {
@@ -149,6 +152,16 @@ int main( int argc, char* argv[] )
 	driveMap	        = Drvmap();						    /* get the pre-installation drive map */
 
     Supexec(getConfig);                                     // get translated disk configuration, including date and time
+    
+    if(transDiskProtocolVersion != REQUIRED_TRANSLATEDDISK_VERSION) {       // the current version of and required version of translated disk protocol don't match?
+        (void) Cconws("\r\n\33pProtocol version mismatch !\33q\r\n" );
+        (void) Cconws("Please use the newest version\r\n" );
+        (void) Cconws("of \33pCE_DD.PRG\33q from config drive!\r\n" );
+        (void) Cconws("\r\nDriver not installed!\r\n" );
+		sleep(2);
+        (void) Cnecin();
+		return 0;
+    }
     
     if(setDate) {                                           // now if we should set new date/time, then set it
         setDateTime();
@@ -260,6 +273,8 @@ void getConfig(void)
 {
     WORD res;
     
+    transDiskProtocolVersion = 0;                                               // no protocol version / failed
+    
 	commandShort[0] = (deviceID << 5); 					                        // cmd[0] = ACSI_id + TEST UNIT READY (0)
 	commandShort[4] = GD_CUSTOM_getConfig;
   
@@ -285,6 +300,8 @@ void getConfig(void)
     seconds = pDmaBuffer[13];
     
     memcpy(netConfig, &pDmaBuffer[14], 10);
+    
+    transDiskProtocolVersion = (((WORD) pDmaBuffer[25]) << 8) | ((WORD) pDmaBuffer[26]);        // get the protocol version, so we can do a version matching / pairing
 }
 
 void setBootDrive(void)
