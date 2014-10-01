@@ -105,10 +105,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa014, 0x0825};                             // this means: hAns, 2014-08-25
+WORD version[2] = {0xa014, 0x1002};                             // this means: hAns, 2014-10-02
 
 char *VERSION_STRING_SHORT  = {"1.00"};
-char *DATE_STRING           = {"08/25/14"};
+char *DATE_STRING           = {"10/02/14"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
@@ -144,12 +144,16 @@ BYTE enabledImgs[3];
 
 BYTE firstConfigReceived;                                       // used to turn LEDs on after first config received
 
-// TODO: code gets stuck if AcsiDataTrans sends ODD number of bytes 
-// TODO: have to send bit more than Multiple of 16 to receive all data ( padDataToMul16 in host SW )
 // TODO: check why the communication with host gets stuck when ST of off
 // TODO: test and fix with megafile drive
 
-// note: DMA transfer to ODD address in ST looses first byte
+// Note: DMA transfer to ODD address in ST looses first byte, so only transfer to EVEN address is OK.
+
+//-------------------------
+// !!! WARNING !!!
+// When optimization for time is turned on and optimization level -o3 is set, there's a cold boot issue on ST!
+// When this is turned off and the optimization level is set to -o2 instead, it seems that the cold boot issue on ST doesn't appear anymore...
+//-------------------------
 
 BYTE shouldProcessCommands;
 
