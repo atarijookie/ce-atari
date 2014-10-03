@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
 			printf("write and read sectors\n\r");
 			
 			rwSectorsNotFiles = 1;
-			break;
+            Supexec(testLoop);
 		}
 		
 		if(key == 'F') {
@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
 			printf("write and read files\n\r");
 			
 			rwSectorsNotFiles = 0;
-			break;
+            Supexec(testLoop);
 		}
 		
 		if(key == 'E') {
@@ -99,18 +99,8 @@ int main(int argc, char *argv[])
 
 			Clear_home();
 			printf("seek and read file test\n\r");
-			break;
+            seekAndRead();
 		}		
-	}
-	
-	if(key == 'S' || key == 'F') {
-		Supexec(testLoop);
-		Cnecin();
-	}
-	
-	if(key == 'E') {
-		seekAndRead();
-		Cnecin();
 	}
 		
     // release buffers
