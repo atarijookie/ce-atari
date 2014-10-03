@@ -689,8 +689,13 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
         Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - starting from root -- atariPath: %s -> hostPath: %s", (char *) atariPath.c_str(), (char *) hostPath.c_str());
         return true;
     }
-
+    
     // starts without backslash? relative path then
+
+    if(startsWith(atariPath, "./")) {                          // if starts with current dir prefix ( ".\\" ), remove it - we're going from current dir anyway 
+        atariPath = atariPath.substr(2);
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - .\\ removed from start, now it's: %s", (char *) atariPath.c_str());
+    }
 
 	Utils::mergeHostPaths(hostPath, conf[currentDriveIndex].currentAtariPath);
 	Utils::mergeHostPaths(hostPath, atariPath);
