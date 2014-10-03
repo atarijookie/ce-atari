@@ -90,7 +90,7 @@ bool Mounter::mountDevice(char *devicePath, char *mountDir)
 	}
 
     // was: sudo
-	snprintf(cmd, MAX_STR_SIZE, "mount -v %s %s > %s 2> %s", devicePath, mountDir, LOGFILE1, LOGFILE2);
+	snprintf(cmd, MAX_STR_SIZE, "mount -v %s %s >> %s 2>> %s", devicePath, mountDir, LOGFILE1, LOGFILE2);
 
 	int len = strnlen(cmd, MAX_STR_SIZE);	// get the length
 
@@ -136,7 +136,7 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 		
 	if(nfsNotSamba) {		// for NFS
         // was: sudo
-		snprintf(cmd, MAX_STR_SIZE, "mount -v -t nfs -o nolock%s %s %s > %s 2> %s", auth, source, mountDir, LOGFILE1, LOGFILE2);
+		snprintf(cmd, MAX_STR_SIZE, "mount -v -t nfs -o nolock%s %s %s >> %s 2>> %s", auth, source, mountDir, LOGFILE1, LOGFILE2);
 	} else {				// for Samba
 		passwd *psw = getpwnam("pi");
 		
@@ -146,7 +146,7 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 		}
         
         // was: sudo
-		snprintf(cmd, MAX_STR_SIZE, "mount -v -t cifs -o gid=%d,uid=%d%s %s %s > %s 2> %s", psw->pw_gid, psw->pw_uid, auth, source, mountDir, LOGFILE1, LOGFILE2);
+		snprintf(cmd, MAX_STR_SIZE, "mount -v -t cifs -o gid=%d,uid=%d%s %s %s >> %s 2>> %s", psw->pw_gid, psw->pw_uid, auth, source, mountDir, LOGFILE1, LOGFILE2);
 	}
 
 	len = strnlen(cmd, MAX_STR_SIZE);	// get the length
@@ -184,7 +184,14 @@ bool Mounter::mount(char *mountCmd, char *mountDir)
 	// delete previous log files (if there are any)
 	unlink(LOGFILE1);
 	unlink(LOGFILE2);
-
+    
+    // now fill those log files with at least one line of something - TOS 1.02 doesn't like to show empty files (it dumps bullshit indefinitely instead of terminating)
+    char tmp[256];
+    sprintf(tmp, "echo -e \"Mount log file: \n\r\" > %s", LOGFILE1);
+    system(tmp);
+    sprintf(tmp, "echo -e \"Mount error file: \n\r\" > %s", LOGFILE2);
+    system(tmp);
+    
 	Debug::out(LOG_INFO, "Mounter::mount - mount command:\n%s\n", mountCmd);
 	
 	// build and run the command
