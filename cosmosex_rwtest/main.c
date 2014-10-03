@@ -19,6 +19,7 @@ BYTE rwFile(BYTE readNotWrite, BYTE *pBfr, WORD sectCnt);
 void seekAndRead(void);
 void bfrCompare(BYTE *a, BYTE *b, DWORD cnt, DWORD testNo);
 void getDriveForTests(void);
+void showInt(int value, int length);
 
 void testLoop(void);
 BYTE *wBfr, *pWrBfr;
@@ -32,17 +33,22 @@ BYTE rwSectorsNotFiles;
 #define BUFSIZE		(128 * 512)
 char testFile[128];
 
+BYTE wrBfr[BUFSIZE];
+BYTE rdBfr[BUFSIZE];
+
 int main(int argc, char *argv[])
 {
 	DWORD i, s, ind;
 	BYTE key, val;
 
 	// alloc buffers
-    wBfr = (BYTE *) malloc(BUFSIZE);
-    rBfr = (BYTE *) malloc(BUFSIZE);
+//    wBfr = (BYTE *) malloc(BUFSIZE);
+//    rBfr = (BYTE *) malloc(BUFSIZE);
+	wBfr = wrBfr;
+	rBfr = rdBfr;	
 
     if(!wBfr || !rBfr) {
-        printf("Malloc failed!\n\r");
+        (void) Cconws("Malloc failed!\n\r");
         return 0;
     }
 
@@ -57,11 +63,11 @@ int main(int argc, char *argv[])
     }
 	
 	Clear_home();
-    printf("RW test.\n\r");
-    printf("S - write and read sectors\n\r");
-    printf("F - write and read files\n\r");
-    printf("E - seek and read file test\n\r");
-    printf("Q - quit\n\r");
+    (void) Cconws("RW test.\n\r");
+    (void) Cconws("S - write and read sectors\n\r");
+    (void) Cconws("F - write and read files\n\r");
+    (void) Cconws("E - seek and read file test\n\r");
+    (void) Cconws("Q - quit\n\r");
 
 	rwSectorsNotFiles	= 1;
 	
@@ -78,36 +84,41 @@ int main(int argc, char *argv[])
 		
 		if(key == 'S') {
 			Clear_home();
-			printf("write and read sectors\n\r");
+			(void) Cconws("write and read sectors\n\r");
 			
 			rwSectorsNotFiles = 1;
             Supexec(testLoop);
+			
+			(void) Cconws("\n\rDone.\n\r");
 		}
 		
 		if(key == 'F') {
 			getDriveForTests();
 
 			Clear_home();
-			printf("write and read files\n\r");
+			(void) Cconws("write and read files\n\r");
 			
 			rwSectorsNotFiles = 0;
             Supexec(testLoop);
+
+			(void) Cconws("\n\rDone.\n\r");
 		}
 		
 		if(key == 'E') {
 			getDriveForTests();
 
 			Clear_home();
-			printf("seek and read file test\n\r");
+			(void) Cconws("seek and read file test\n\r");
             seekAndRead();
+
+			(void) Cconws("\n\rDone.\n\r");
 		}		
 	}
 		
     // release buffers
-    free(wBfr);
-    free(rBfr);
+//    free(wBfr);
+//    free(rBfr);
 
-    printf("\n\rDone.\n\r");
 	return 0;
 }
 
@@ -115,7 +126,7 @@ void getDriveForTests(void)
 {
 	Clear_home();
 
-	printf("Enter DRIVE LETTER on which the tests will be done: \n\r");
+	(void) Cconws("Enter DRIVE LETTER on which the tests will be done: \n\r");
 
 	BYTE drive, key;
 	while(1) {
@@ -147,13 +158,16 @@ void seekAndRead(void)
 	handle = Fopen(testFile, 0);
 
 	if(handle < 0) {
-		printf("Failed to open file %s\n\r", testFile);
+		(void) Cconws("Failed to open file ");
+		(void) Cconws(testFile);
+		(void) Cconws("\n\r");
 		return;
 	}
 	
-	for(i=0; i<1000; i++) {
+	for(i=0; i<100; i++) {
         if((i % 10) == 0) {
-            printf("\n\r% 4d ", i);
+            (void) Cconws("\n\r");
+			showInt(i, 4);
         } else {
 			Cconout('.');
 		}
@@ -168,12 +182,18 @@ void seekAndRead(void)
 		res = Fread(handle, length, rBfr);
 		
 		if(res < 0) {
-			printf("Fread() reported error %d\n\r", res);
+			(void) Cconws("Fread() reported error ");
+			showInt(res, 4),
+			(void) Cconws("\n\r");
 			continue;
 		}
 		
 		if(res < length) {
-			printf("Fread() didn't read enough (%d < %d)\n\r", res, length);
+			(void) Cconws("Fread() didn't read enough (");
+			showInt(res, 5);
+			(void) Cconws(" < ");
+			showInt(length, 5);
+			(void) Cconws("\n\r");
 			continue;
 		}
 		
@@ -193,9 +213,11 @@ void testLoop(void)
     dRdBfr = dRdBfr & 0xfffffffe;           // get even version of that... 
     pRdBfr = (BYTE *) dRdBfr;               // convert it to pointer
 
-    for(i=0; i<1000; i++) {
+    for(i=0; i<100; i++) {
         if((i % 10) == 0) {
-            printf("\n\r% 4d ", i);
+            (void) Cconws("\n\r");
+			showInt(i, 4);
+			(void) Cconws(" ");
         } else {
 			Cconout('.');
 		}
@@ -224,7 +246,9 @@ void testLoop(void)
 		}
 			
         if(res != 0) {
-            printf("\n\rWrite operation failed at test %d\n\r", i);
+            (void) Cconws("\n\rWrite operation failed at test ");
+			showInt(i, 4);
+			(void) Cconws("\n\r");
             continue;
         }
 
@@ -237,7 +261,9 @@ void testLoop(void)
 		}
 			
         if(res != 0) {
-            printf("\n\rRead operation failed at test %d\n\r", i);
+            (void) Cconws("\n\rRead operation failed at test ");
+			showInt(i, 4);
+			(void) Cconws("\n\r");
             continue;
         }
 
@@ -248,13 +274,30 @@ void testLoop(void)
 
 void bfrCompare(BYTE *a, BYTE *b, DWORD cnt, DWORD testNo)
 {
-	DWORD j;
+	DWORD j, k;
 
     for(j=0; j<cnt; j++) {
         if(a[j] != b[j]) {
-            printf("\n\rData mismatch at test %d, index %d\n\r", testNo, j);
-            printf("should be: %02x %02x %02x %02x\n\r", a[j + 0], a[j + 1], a[j + 2], a[j + 3]);
-            printf("really is: %02x %02x %02x %02x\n\r", b[j + 0], b[j + 1], b[j + 2], b[j + 3]);
+            (void) Cconws("\n\rData mismatch at test ");
+			showInt(testNo, -1);
+			(void) Cconws(", index ");
+			showInt(j, -1);
+			(void) Cconws("\n\r");
+            (void) Cconws("should be: ");
+			
+			for(k=0; k<4; k++) {
+				showInt(a[j + k], 3);
+				(void) Cconws(" ");
+			}
+			(void) Cconws("\n\r");
+
+            (void) Cconws("really is: ");
+			for(k=0; k<4; k++) {
+				showInt(b[j + k], 3);
+				(void) Cconws(" ");
+			}
+			(void) Cconws("\n\r");
+
 			(void) Cnecin();
             break;
         }
@@ -283,7 +326,13 @@ BYTE rwFile(BYTE readNotWrite, BYTE *pBfr, WORD sectCnt)
 	}
 	
 	if(handle < 0) {
-		printf("Fopen / Fcreate: to %s file %s (err: %d)\n\r", opStr, testFile, handle);
+		(void) Cconws("Fopen / Fcreate: to ");
+		(void) Cconws(opStr);
+		(void) Cconws("file ");
+		(void) Cconws(testFile);
+		(void) Cconws("(err: ");
+		showInt(handle, -1);
+		(void) Cconws(")\n\r");
 		return 0xff;
 	}
 
@@ -295,7 +344,9 @@ BYTE rwFile(BYTE readNotWrite, BYTE *pBfr, WORD sectCnt)
 	}
 	
 	if(res != length) {
-		printf("Fread / Fwrite: Failed to %s on file\n\r", opStr);
+		(void) Cconws("Fread / Fwrite: Failed to ");
+		(void) Cconws(opStr);
+		(void) Cconws(" on file\n\r");
 		res = 0xff;
 	} else {
 		res = 0;
@@ -305,3 +356,39 @@ BYTE rwFile(BYTE readNotWrite, BYTE *pBfr, WORD sectCnt)
 	return res;
 }
 
+void showInt(int value, int length)
+{
+    char tmp[10];
+    memset(tmp, 0, 10);
+
+    if(length == -1) {                      // determine length?
+        int i, div = 10;
+
+        for(i=1; i<6; i++) {                // try from 10 to 1000000
+            if((value / div) == 0) {        // after division the result is zero? we got the length
+                length = i;
+                break;
+            }
+
+            div = div * 10;                 // increase the divisor by 10
+        }
+
+        if(length == -1) {                  // length undetermined? use length 6
+            length = 6;
+        }
+    }
+
+    int i;
+    for(i=0; i<length; i++) {               // go through the int lenght and get the digits
+        int val, mod;
+
+        val = value / 10;
+        mod = value % 10;
+
+        tmp[length - 1 - i] = mod + 48;     // store the current digit
+
+        value = val;
+    }
+
+    (void) Cconws(tmp);                     // write it out
+} 
