@@ -244,11 +244,22 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
 
     //----------	
     // now copy from temp findStorage to the some findStorages arrays
-    int index = getEmptyFindStorageIndex();
-    if(index == -1) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - failed to find empty storage slot!");
-		dataTrans->setStatus(EFILNF);                               // file not found
-		return;
+    int index;
+
+    index = getFindStorageIndexByDta(dta);                              // see if we already have that DTA 
+    
+    if(index != -1) {                                                   // got the DTA, reuse it
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - DTA %08x is in findStorage, reusing...", dta);
+    } else {
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - DTA %08x not in findStorage, will try to find empty findStorage slot", dta);
+
+        index = getEmptyFindStorageIndex();
+        
+        if(index == -1) {
+            Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - failed to find empty storage slot!");
+            dataTrans->setStatus(EFILNF);                               // file not found
+            return;
+        }
     }
 
     findStorages[index]->copyDataFromOther(&tempFindStorage);
