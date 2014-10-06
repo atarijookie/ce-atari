@@ -27,7 +27,7 @@
 
 #define  NUM_LAYER   2
 
-extern int32 __base;
+extern int32 _pbase;
 
 typedef  struct drv_header {
            char     *module, *author, *version;
@@ -239,7 +239,7 @@ long  init_cookie()
    work[2] = work[0];   work[0] = 'STiK';
    work[3] = work[1];   work[1] = (long) &cookie;
 
-   cookie.basepage = (BASEPAGE *) __base;
+   cookie.basepage = (BASEPAGE *) _pbase;
 
    return (0L);
  }

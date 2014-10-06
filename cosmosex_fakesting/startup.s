@@ -1,5 +1,5 @@
 	.globl	_main
-	.globl	__base
+	.globl	__pbase
 	.globl  __pgmsize
 	.globl	___main
 
@@ -17,7 +17,7 @@
 	add.l	#0x1000+0x100,d0		| length of stack+basepage
 	move.l  d0,__pgmsize			| store the prog size
 	move.l	a5,d1					| address to basepage
-	move.l	a5,__base				|
+	move.l	a5,__pbase				|
 	add.l	d0,d1					| end of program
 	and.b	#0xf0,d1				| align stack
 	move.l	d1,sp					| new stackspace
@@ -41,6 +41,6 @@ ___main:
 | ------------------------------------------------------
 	.bss
 | ------------------------------------------------------	
-__base:					.ds.l	1
+__pbase:				.ds.l	1
 __pgmsize:				.ds.l	1
 
