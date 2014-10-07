@@ -343,6 +343,7 @@ void Mounter::restartNetwork(void)
 
     if(gotWlan0) {                                                  // if got wlan, shut it down
     	system("ifdown wlan0");
+    	system("wpa_cli reconfigure");                              // also try to reconnect to wifi AP (wifi settings might have changed)
     }
 
 	system("ifup eth0");                                            // bring up ethernet
