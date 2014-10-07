@@ -23,7 +23,9 @@
 #include <string.h>
 
 #include "globdefs.h"
-
+#include "tcp.h"
+#include "udp.h"
+#include "con_man.h"
 
 #define  NUM_LAYER   2
 
@@ -46,43 +48,61 @@ typedef  struct client_layer {
     char *     module;      /* Specific string that can be searched for     */
     char *     author;      /* Any string                                   */
     char *     version;     /* Format `00.00' Version:Revision              */
+	//-------------
+	// memory alloc / free functions
     void *     /* cdecl */  (* KRmalloc) (int32);
     void       /* cdecl */  (* KRfree) (void *);
     int32      /* cdecl */  (* KRgetfree) (int16);
     void *     /* cdecl */  (* KRrealloc) (void *, int32);
-    char *     /* cdecl */  (* get_err_text) (int16);
-    char *     /* cdecl */  (* getvstr) (char *);
-    int16      /* cdecl */  (* carrier_detect) (void);
+	//-------------
+	// misc
+    char *     /* cdecl */  (* get_err_text) (int16);							// Returns error description for a given error number.
+    char *     /* cdecl */  (* getvstr) (char *);								// Inquires about a configuration string.
+    int16      /* cdecl */  (* carrier_detect) (void);							// obsolete, just dummy
+	//-------------
+	// TCP functions
     int16      /* cdecl */  (* TCP_open) (uint32, uint16, uint16, uint16);
     int16      /* cdecl */  (* TCP_close) (int16, int16, int16 *);
     int16      /* cdecl */  (* TCP_send) (int16, void *, int16);
     int16      /* cdecl */  (* TCP_wait_state) (int16, int16, int16);
     int16      /* cdecl */  (* TCP_ack_wait) (int16, int16);
+	//-------------
+	// UDP function
     int16      /* cdecl */  (* UDP_open) (uint32, uint16);
     int16      /* cdecl */  (* UDP_close) (int16);
     int16      /* cdecl */  (* UDP_send) (int16, void *, int16);
-    int16      /* cdecl */  (* CNkick) (int16);
-    int16      /* cdecl */  (* CNbyte_count) (int16);
-    int16      /* cdecl */  (* CNget_char) (int16);
-    NDB *      /* cdecl */  (* CNget_NDB) (int16);
-    int16      /* cdecl */  (* CNget_block) (int16, void *, int16);
-    void       /* cdecl */  (* housekeep) (void);
-    int16      /* cdecl */  (* resolve) (char *, char **, uint32 *, int16);
-    void       /* cdecl */  (* ser_disable) (void);
-    void       /* cdecl */  (* ser_enable) (void);
-    int16      /* cdecl */  (* set_flag) (int16);
-    void       /* cdecl */  (* clear_flag) (int16);
-    CIB *      /* cdecl */  (* CNgetinfo) (int16);
-    int16      /* cdecl */  (* on_port) (char *);
-    void       /* cdecl */  (* off_port) (char *);
-    int16      /* cdecl */  (* setvstr) (char *, char *);
-    int16      /* cdecl */  (* query_port) (char *);
-    int16      /* cdecl */  (* CNgets) (int16, char *, int16, char);
+	//-------------
+	// Connection Manager
+    int16      /* cdecl */  (* CNkick) (int16);									// Kick a connection.
+    int16      /* cdecl */  (* CNbyte_count) (int16);							// Inquires about the number of received bytes pending.
+    int16      /* cdecl */  (* CNget_char) (int16);								// Fetch a received character or byte from a connection.
+    NDB *      /* cdecl */  (* CNget_NDB) (int16);								// Fetch a received chunk of data from a connection.
+    int16      /* cdecl */  (* CNget_block) (int16, void *, int16);				// Fetch a received block of data from a connection.
+	//-------------
+	// misc
+    void       /* cdecl */  (* housekeep) (void);								// obsolete, just dummy
+    int16      /* cdecl */  (* resolve) (char *, char **, uint32 *, int16);		// Carries out DNS queries.
+	//-------------
+	// serial port functions, just dummies
+    void       /* cdecl */  (* ser_disable) (void);								// obsolete, just dummy
+    void       /* cdecl */  (* ser_enable) (void);								// obsolete, just dummy
+	//-------------
+    int16      /* cdecl */  (* set_flag) (int16);								// Requests a semaphore.
+    void       /* cdecl */  (* clear_flag) (int16);								// Releases a semaphore.
+    CIB *      /* cdecl */  (* CNgetinfo) (int16);								// Fetch information about a connection.
+    int16      /* cdecl */  (* on_port) (char *);								// Switches a port into active mode and triggers initialisation.
+    void       /* cdecl */  (* off_port) (char *);								// Switches a port into inactive mode.
+    int16      /* cdecl */  (* setvstr) (char *, char *);						// Sets configuration strings.
+    int16      /* cdecl */  (* query_port) (char *);							// Inquires if a specified port is currently active.
+    int16      /* cdecl */  (* CNgets) (int16, char *, int16, char);			// Fetch a delimited block of data from a connection.
+	//-------------
+	// ICMP functions
     int16      /* cdecl */  (* ICMP_send) (uint32, uint8, uint8, void *, uint16);
     int16      /* cdecl */  (* ICMP_handler) (int16 /* cdecl */ (*) (IP_DGRAM *), int16);
     void       /* cdecl */  (* ICMP_discard) (IP_DGRAM *);
+	//-------------
     int16      /* cdecl */  (* TCP_info) (int16, void *);
-    int16      /* cdecl */  (* cntrl_port) (char *, uint32, int16);
+    int16      /* cdecl */  (* cntrl_port) (char *, uint32, int16);				// Inquires and sets various parameters of STinG ports.
  } CLIENT_API;
 
 typedef  struct stx_layer {
@@ -137,22 +157,6 @@ void       /* cdecl */  ICMP_discard (IP_DGRAM *datagram);
 long        			init_cookie (void);
 DRV_HDR *  /* cdecl */  get_drv_func (char *drv_name);
 int16      /* cdecl */  ETM_exec (char *module);
-int16      /* cdecl */  TCP_open (uint32 rem_host, uint16 rem_port, uint16 tos, uint16 size);
-int16      /* cdecl */  TCP_close (int16 connec, int16 mode, int16 *result);
-int16      /* cdecl */  TCP_send (int16 connec, void *buffer, int16 length);
-int16      /* cdecl */  TCP_wait_state (int16 connec, int16 state, int16 timeout);
-int16      /* cdecl */  TCP_ack_wait (int16 connec, int16 timeout);
-int16      /* cdecl */  TCP_info (int16 connec, void *tcp_info);
-int16      /* cdecl */  UDP_open (uint32 rem_host, uint16 rem_port);
-int16      /* cdecl */  UDP_close (int16 connec);
-int16      /* cdecl */  UDP_send (int16 connec, void *buffer, int16 length);
-int16      /* cdecl */  CNkick (int16 connec);
-int16      /* cdecl */  CNbyte_count (int16 connec);
-int16      /* cdecl */  CNget_char (int16 connec);
-NDB *      /* cdecl */  CNget_NDB (int16 connec);
-int16      /* cdecl */  CNget_block (int16 connec, void *buffer, int16 length);
-CIB *      /* cdecl */  CNgetinfo (int16 connec);
-int16      /* cdecl */  CNgets (int16 connec, char *buffer, int16 length, char delimiter);
 int16      /* cdecl */  resolve (char *domain, char **real, uint32 *ip_list, int16 ip_num);
 void       /* cdecl */  serial_dummy (void);
 int16      /* cdecl */  carrier_detect (void);
@@ -242,136 +246,6 @@ char  *module;
    return (0);
  }
 
-
-int16  /* cdecl */  TCP_open (uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_size)
-{
-   return (E_UNREACHABLE);
-}
-
-
-int16  /* cdecl */  TCP_close (connec, mode, result)
-
-int16  connec, mode, *result;
-
-{
-   return (E_BADHANDLE);
- }
-
-
-int16  /* cdecl */  TCP_send (connec, buffer, length)
-
-int16  connec, length;
-void   *buffer;
-
-{
-   return (E_BADHANDLE);
- }
-
-
-int16  /* cdecl */  TCP_wait_state (connec, state, timeout)
-
-int16  connec, state, timeout;
-
-{
-   return (E_BADHANDLE);
- }
-
-
-int16  /* cdecl */  TCP_ack_wait (connec, timeout)
-
-int16  connec, timeout;
-
-{
-   return (E_BADHANDLE);
- }
-
-
-int16  /* cdecl */  TCP_info (connec, tcp_info)
-
-int16  connec;
-void   *tcp_info;
-
-{
-   return (E_BADHANDLE);
- }
-
-
-int16  /* cdecl */  UDP_open (rem_host, rem_port)
-
-uint32  rem_host;
-uint16  rem_port;
-
-{
-   return (E_UNREACHABLE);
- }
-
-
-int16  /* cdecl */  UDP_close (connec)
-
-int16  connec;
-
-{
-   return (E_BADHANDLE);
- }
-
-
-int16  /* cdecl */  UDP_send (connec, buffer, length)
-
-int16  connec, length;
-void   *buffer;
-
-{
-   return (E_BADHANDLE);
- }
-
-
-int16  /* cdecl */  CNkick (int16 connec)
-{
-
-	return (E_BADHANDLE);
-}
-
-
-int16  /* cdecl */  CNbyte_count (int16 connec)
-{
-
-   return 0;
-}
-
-
-int16  /* cdecl */  CNget_char (int16 connec)
-{
-
-   return 0;
-}
-
-
-NDB *  /* cdecl */  CNget_NDB (int16 connec)
-{
-
-   return 0;
-}
-
-int16  /* cdecl */  CNget_block (int16 connec, void *buffer, int16 length)
-{
-
-	return 0;
-}
-
-CIB *  /* cdecl */  CNgetinfo (int16 connec)
-{
-
-	return 0;
-}
-
-
-int16  /* cdecl */  CNgets (int16 connec, char *buffer, int16 length, char delimiter)
-{
-
-	return 0;
-}
-
-
 int16  /* cdecl */  resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
 {
 
@@ -380,7 +254,6 @@ int16  /* cdecl */  resolve (char *domain, char **real_domain, uint32 *ip_list, 
 
 
 void  /* cdecl */  serial_dummy()
-
 {
    /* Do really nothing, as these functions are obsolete ! */
  }
@@ -390,14 +263,13 @@ int16  /* cdecl */  carrier_detect()
 
 {
    return (+1);
- }
+}
 
 
 void  /* cdecl */  house_keep()
-
 {
    /* Do really nothing, as this function is obsolete ! */
- }
+}
 
 int16 /* cdecl */ set_flag (int16 flag)
 {

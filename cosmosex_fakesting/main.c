@@ -38,22 +38,17 @@ int16          KRinitialize (int32 size);
 void *  /* cdecl */  KRmalloc (int32 size);
 void    /* cdecl */  KRfree (void *mem_block);
 
-int16   /* cdecl */  routing_table (void);
-
-void           get_path (void);
 long           get_boot_drv (void);
 int16          compare (char string_1[], char string_2[], int16 number);
 int16          init_cfg (char filename[]);
 int16   /* cdecl */  setvstr (char name[], char value[]);
-long           do_setvstr (void *array);
 char *  /* cdecl */  getvstr (char name[]);
-void           load_stx (void);
 
 
 extern CONFIG  conf;
 extern void    *memory;
 
-char  sting_path[245], semaphors[MAX_SEMAPHOR];
+char  semaphors[MAX_SEMAPHOR];
 
 extern int32 _pgmsize;
 
@@ -105,8 +100,7 @@ long  get_boot_drv()
    unsigned  int  *_bootdev = (void *) 0x446L;
 
    return ((long) ('A' + *_bootdev));
- }
-
+}
 
 int16  compare (char *string_1, char *string_2, int16 number)
 {
@@ -120,7 +114,7 @@ int16  compare (char *string_1, char *string_2, int16 number)
       }
 
    return (TRUE);
- }
+}
 
 int16  init_cfg (char *fname)
 {
@@ -135,7 +129,7 @@ int16  /* cdecl */  setvstr (char  *name, char  *value)
 {
 
    return (TRUE);
- }
+}
 
 char *  /* cdecl */  getvstr (char *name)
 {
