@@ -8,7 +8,7 @@ CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar -nostdlib
 LDFLAGS	= -Wl,--traditional-format -lgcc
 
 HDR		= acsi.h stdlib.h
-CSRC	= acsi.c stdlib.c api.c protocol.c setup.c main.c 
+CSRC	= acsi.c stdlib.c api.c setup.c icmp.c port.c main.c 
 SSRC	= 
 STARTUP	= startup.s
 

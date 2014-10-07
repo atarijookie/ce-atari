@@ -31,13 +31,7 @@ typedef  struct mem_header {
            uint32             size;
      } MEM_HDR;
 
-
-char *  /* cdecl */  getvstr (char name[]);
-
-void           install_timer (void);
-uint16         lock_exec (uint16 status);
-
-void           init_ip (void);
+uint16	lock_exec(uint16 status);
 void           init_ports (void);
 
 void           install (void);
@@ -50,12 +44,9 @@ void    /* cdecl */  KRfree (void *mem_block);
 int32   /* cdecl */  KRgetfree (int16 block_flag);
 void *  /* cdecl */  KRrealloc (void *mem_block, int32 new_size);
 
-
-extern CONFIG  conf;
-extern LAYER   icmp_desc;
-extern void    *cn_array[];
-extern int16   active, fraction;
-extern int32 _pbase;
+extern CONFIG 	conf;
+extern LAYER  	icmp_desc;
+extern int32	_pbase;
 
 char  *error_array[] = {
               "No error.", "Can't send, output buffer is full.", "No data available.", 
@@ -78,10 +69,7 @@ char  *error_array[] = {
 
 MEM_HDR  *memory = NULL, *mem_free;
 
-
-
-void  install()
-
+void  install(void)
 {
    PORT  *walk;
    char  *var;
@@ -101,60 +89,37 @@ void  install()
    conf.memory      = (void *) memory;
 
    init_ports();
-   init_ip();
-   install_timer();
 
-   var = getvstr ("THREADING");
-   if (* var != '0' || strlen (var) != 1) {
-        number = atoi (var) / 5;
-        conf.thread_rate = fraction = (number < 2) ? 2 : ((number > 199) ? 199 : number);
-      }
-   var = getvstr ("FRAG_TTL");
-   if (* var != '0' || strlen (var) != 1) {
-        number = atoi (var);
-        conf.frag_ttl = (number < 5) ? 5 : number;
-      }
+	conf.thread_rate	= 50;					// "THREADING"
+	conf.frag_ttl		= 60;					// "FRAG_TTL"
+	icmp_desc.flags		&= 0x0000fffful;   
+	icmp_desc.flags		|= (int32) (-60) << 16;	// "ICMP_GMT"
 
-   var = getvstr ("ICMP_GMT");
-   if (* var != '0' || strlen (var) != 1) {
-        number = atoi (var);
-        icmp_desc.flags &= 0x0000fffful;   icmp_desc.flags |= (int32) number << 16;
-      }
-   var = getvstr ("ICMP_AD");
-   if (* var != '0' || strlen (var) != 1) {
-        number = atoi (var);
-        icmp_desc.flags &= 0xffff00fful;   icmp_desc.flags |= (uint32) number << 8;
-      }
-   var = getvstr ("ICMP_FLAG");
-   if (* var != '0' || strlen (var) != 1) {
-        number = atoi (var);
-        icmp_desc.flags &= 0xffffff00ul;   icmp_desc.flags |= (uint32) number;
-      }
-   icmp_desc.basepage = (BASEPAGE *) _pbase;
-   conf.layers = & icmp_desc;
+	icmp_desc.flags		&= 0xffff00fful;   
+	icmp_desc.flags		|= (uint32) (10) << 8;	// "ICMP_AD"
 
-   for (walk = conf.ports; walk != NULL; walk = walk->next)
-        conf.max_num_ports++;
+	icmp_desc.flags		&= 0xffffff00ul;
+	icmp_desc.flags		|= (uint32) 0;			// "ICMP_FLAG"
 
-   for (number = 0; number < MAX_HANDLE; number++)
-        cn_array[number] = NULL;
- }
+	icmp_desc.basepage	= (BASEPAGE *) _pbase;
+	conf.layers = & icmp_desc;
+
+	for (walk = conf.ports; walk != NULL; walk = walk->next)
+		conf.max_num_ports++;
+}
 
 
-int32  /* cdecl */  set_sysvars (new_active, new_fraction)
-
-int16  new_active, new_fraction;
-
+int32  /* cdecl */  set_sysvars (int16 new_active, int16 new_fraction)
 {
    long  old_values;
 
-   old_values = ((int32) active << 16) | fraction;
+   old_values = ((int32) conf.active << 16) | conf.thread_rate;
 
    if (new_active != -1)
-        conf.active = active = new_active;
+        conf.active = new_active;
 
    if (new_fraction != -1)
-        conf.thread_rate = fraction = new_fraction;
+        conf.thread_rate = new_fraction;
 
    return (old_values);
  }
@@ -187,10 +152,7 @@ int16  error_code;
  }
 
 
-int16  KRinitialize (size)
-
-int32  size;
-
+int16  KRinitialize (int32 size)
 {
    size = (size + sizeof (MEM_HDR) - 1) / sizeof (MEM_HDR);
 
@@ -201,13 +163,9 @@ int32  size;
    memory->size = size;
 
    return (0);
- }
+}
 
-
-void *  /* cdecl */  KRmalloc (size)
-
-int32  size;
-
+void *  /* cdecl */  KRmalloc (int32 size)
 {
    MEM_HDR  *prev, *run;
    uint32   n_units;
@@ -370,3 +328,10 @@ int32  new_size;
 
    return (mem_block);
  }
+
+ uint16	lock_exec(uint16 status)
+ {
+	// lock_exec stub, implementation needed
+	return 0;
+ }
+ 

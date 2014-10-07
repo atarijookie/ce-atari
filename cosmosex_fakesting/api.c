@@ -116,8 +116,6 @@ typedef  struct stx_layer {
 int16      /* cdecl */  setvstr (char name[], char value[]);
 char *     /* cdecl */  getvstr (char name[]);
 
-int32      /* cdecl */  set_sysvars (int16 new_act, int16 new_frac);
-void       /* cdecl */  query_chains (PORT **port, DRIVER **drv, LAYER **layer);
 char *     /* cdecl */  get_error_text (int16 error_code);
 void *     /* cdecl */  KRmalloc (int32 size);
 void       /* cdecl */  KRfree (void *mem_block);
@@ -126,40 +124,17 @@ void *     /* cdecl */  KRrealloc (void *mem_block, int32 new_size);
 
 int16      /* cdecl */  set_flag (int16 flag);
 void       /* cdecl */  clear_flag (int16 flag);
-int32      /* cdecl */  protect_exec (void *parameter, int32 /* cdecl */ (* code) (void *));
 
 int16      /* cdecl */  on_port (char *port);
 void       /* cdecl */  off_port (char *port);
 int16      /* cdecl */  query_port (char *port);
 int16      /* cdecl */  cntrl_port (char *port, uint32 argument, int16 code);
 
-void       /* cdecl */  set_dgram_ttl (IP_DGRAM *datagram);
-int16      /* cdecl */  check_dgram_ttl (IP_DGRAM *datagram);
-
-int16      /* cdecl */  get_route_entry (int16 no, uint32 *tmplt, uint32 *mask, PORT **port, uint32 *gway);
-int16      /* cdecl */  set_route_entry (int16 no, uint32 tmplt, uint32 mask, PORT *port, uint32 gway);
-int16      /* cdecl */  routing_table (void);
-int16      /* cdecl */  IP_send (uint32, uint32, uint8, uint16, uint8, uint8, uint16, void *, 
-                           uint16, void *, uint16);
-IP_DGRAM * /* cdecl */  IP_fetch (int16 prtcl);
-int16      /* cdecl */  IP_handler (int16 prtcl, int16 /* cdecl */ (* hndlr) (IP_DGRAM *), int16 flag);
-void       /* cdecl */  IP_discard (IP_DGRAM *datagram, int16 all_flag);
-
 int16      /* cdecl */  ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 len);
 int16      /* cdecl */  ICMP_handler (int16 /* cdecl */ (* hndlr) (IP_DGRAM *), int16 flag);
 void       /* cdecl */  ICMP_discard (IP_DGRAM *datagram);
 
-int16             handle_lookup (int16 connec, void **anonymous, CN_FUNCS **entry);
-int16      /* cdecl */  PRTCL_announce (int16 protocol);
-int16      /* cdecl */  PRTCL_get_parameters (uint32 rem_host, uint32 *src_ip, int16 *ttl, uint16 *mtu);
-int16      /* cdecl */  PRTCL_request (void *anonymous, CN_FUNCS *cn_functions);
-void       /* cdecl */  PRTCL_release (int16 handle);
-void *     /* cdecl */  PRTCL_lookup (int16 handle, CN_FUNCS *cn_functions);
-int16      /* cdecl */  TIMER_call (void /* cdecl */ (* hndlr) (void), int16 flag);
-int32      /* cdecl */  TIMER_now (void);
-int32      /* cdecl */  TIMER_elapsed (int32 then);
-
-long              init_cookie (void);
+long        			init_cookie (void);
 DRV_HDR *  /* cdecl */  get_drv_func (char *drv_name);
 int16      /* cdecl */  ETM_exec (char *module);
 int16      /* cdecl */  TCP_open (uint32 rem_host, uint16 rem_port, uint16 tos, uint16 size);
@@ -197,11 +172,11 @@ CLIENT_API  tpl  = { "TRANSPORT_TCPIP", "Peter Rottengatter", TCP_DRIVER_VERSION
                       ICMP_send, ICMP_handler, ICMP_discard, TCP_info, cntrl_port
                };
 STX_API     stxl = { "MODULE_LAYER", "Peter Rottengatter", STX_LAYER_VERSION, 
-                      set_dgram_ttl, check_dgram_ttl, routing_table, set_sysvars, query_chains, 
-                      IP_send, IP_fetch, IP_handler, IP_discard, 
-                      PRTCL_announce, PRTCL_get_parameters, PRTCL_request, PRTCL_release, 
-                      PRTCL_lookup, TIMER_call, TIMER_now, TIMER_elapsed,
-                      protect_exec, get_route_entry, set_route_entry
+                      NULL, NULL, NULL, NULL, NULL, 
+                      NULL, NULL, NULL, NULL, 
+                      NULL, NULL, NULL, NULL, 
+                      NULL, NULL, NULL, NULL,
+                      NULL, NULL, NULL
                };
 GENERIC     cookie = { "STiKmagic", get_drv_func, ETM_exec, &conf, NULL, { (DRV_HDR *) &tpl, (DRV_HDR *) & stxl } };
 long        my_jar[8] = {  0L, 4L  };
@@ -350,122 +325,58 @@ void   *buffer;
  }
 
 
-int16  /* cdecl */  CNkick (connec)
-
-int16  connec;
-
+int16  /* cdecl */  CNkick (int16 connec)
 {
-   void      *anonymous;
-   CN_FUNCS  *entry;
 
-   if (handle_lookup (connec, & anonymous, & entry) == 0)
-        return (E_BADHANDLE);
-
-   return ((* entry->CNkick) (anonymous));
- }
+	return (E_BADHANDLE);
+}
 
 
-int16  /* cdecl */  CNbyte_count (connec)
-
-int16  connec;
-
+int16  /* cdecl */  CNbyte_count (int16 connec)
 {
-   void      *anonymous;
-   CN_FUNCS  *entry;
 
-   if (handle_lookup (connec, & anonymous, & entry) == 0)
-        return (E_BADHANDLE);
-
-   return ((* entry->CNbyte_count) (anonymous));
- }
+   return 0;
+}
 
 
-int16  /* cdecl */  CNget_char (connec)
-
-int16  connec;
-
+int16  /* cdecl */  CNget_char (int16 connec)
 {
-   void      *anonymous;
-   CN_FUNCS  *entry;
 
-   if (handle_lookup (connec, & anonymous, & entry) == 0)
-        return (E_BADHANDLE);
-
-   return ((* entry->CNget_char) (anonymous));
- }
+   return 0;
+}
 
 
-NDB *  /* cdecl */  CNget_NDB (connec)
-
-int16  connec;
-
+NDB *  /* cdecl */  CNget_NDB (int16 connec)
 {
-   void      *anonymous;
-   CN_FUNCS  *entry;
 
-   if (handle_lookup (connec, & anonymous, & entry) == 0)
-        return (NULL);
+   return 0;
+}
 
-   return ((* entry->CNget_NDB) (anonymous));
- }
-
-
-int16  /* cdecl */  CNget_block (connec, buffer, length)
-
-int16  connec, length;
-void   *buffer;
-
+int16  /* cdecl */  CNget_block (int16 connec, void *buffer, int16 length)
 {
-   void      *anonymous;
-   CN_FUNCS  *entry;
 
-   if (handle_lookup (connec, & anonymous, & entry) == 0)
-        return (E_BADHANDLE);
+	return 0;
+}
 
-   return ((* entry->CNget_block) (anonymous, buffer, length));
- }
-
-
-CIB *  /* cdecl */  CNgetinfo (connec)
-
-int16  connec;
-
+CIB *  /* cdecl */  CNgetinfo (int16 connec)
 {
-   void      *anonymous;
-   CN_FUNCS  *entry;
 
-   if (handle_lookup (connec, & anonymous, & entry) == 0)
-        return (NULL);
-
-   return ((* entry->CNgetinfo) (anonymous));
- }
+	return 0;
+}
 
 
-int16  /* cdecl */  CNgets (connec, buffer, length, delimiter)
-
-int16  connec, length;
-char   *buffer, delimiter;
-
+int16  /* cdecl */  CNgets (int16 connec, char *buffer, int16 length, char delimiter)
 {
-   void      *anonymous;
-   CN_FUNCS  *entry;
 
-   if (handle_lookup (connec, & anonymous, & entry) == 0)
-        return (E_BADHANDLE);
-
-   return ((* entry->CNgets) (anonymous, buffer, length, delimiter));
- }
+	return 0;
+}
 
 
-int16  /* cdecl */  resolve (domain, real_domain, ip_list, ip_num)
-
-char    *domain, **real_domain;
-uint32  *ip_list;
-int16   ip_num;
-
+int16  /* cdecl */  resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
 {
+
    return (E_CANTRESOLVE);
- }
+}
 
 
 void  /* cdecl */  serial_dummy()
@@ -487,3 +398,16 @@ void  /* cdecl */  house_keep()
 {
    /* Do really nothing, as this function is obsolete ! */
  }
+
+int16 /* cdecl */ set_flag (int16 flag)
+{
+
+	return 0;
+}
+
+void /* cdecl */ clear_flag (int16 flag)
+{
+
+}
+
+ 
