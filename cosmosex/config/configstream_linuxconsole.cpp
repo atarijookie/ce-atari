@@ -110,14 +110,14 @@ int ConfigStream::filterVT100(char *bfr, int cnt)
                 move = 4;
             } else if(strcmp(bfr + 2, "38;5;") == 0 || strcmp(bfr + 2, "48;5;") == 0) {     // it's 88 or 256 colors command? 
                 for(int k=7; k<14; k++) {                                                   // find the terminating 'm' character
-                    if(bfr[k] == 'm') {                                                     // found? move one beyond that
+                    if(bfr[i + k] == 'm') {                                                 // found? move one beyond that
                         move = k + 1;
                         break;
                     }
                 }
             } else {                                                                        // in other cases - it might be a color terminated by 'm'
                 for(int k=2; k<10; k++) {                                                   // find the terminating 'm' character
-                    if(bfr[k] == 'm') {                                                     // found? move one beyond that
+                    if(bfr[i + k] == 'm') {                                                 // found? move one beyond that
                         move = k + 1;
                         break;
                     }
