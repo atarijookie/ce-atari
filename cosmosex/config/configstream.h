@@ -50,6 +50,8 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
 #define ST_RESOLUTION_MID       1
 #define ST_RESOLUTION_HIGH      2
 
+#define READ_BUFFER_SIZE    (5 * 1024)
+
 class ConfigStream
 {
 public:
@@ -152,6 +154,14 @@ private:
     bool verifyAndFixIPaddress(std::string &in, std::string &out, bool emptyIsOk);
 
     void replaceNewLineWithGoto(std::string &line, int startX, int startY);
+    
+    //-------------
+    // remote console stuff
+    void linuxConsole_KeyDown(BYTE atariKey);
+    int  linuxConsole_getStream(BYTE *bfr, int maxLen);
+    
+    int  filterVT100(char *bfr, int cnt);
+    void atariKeyToConsoleKey(BYTE atariKey, char *bfr, int &cnt);
 };
 
 #endif

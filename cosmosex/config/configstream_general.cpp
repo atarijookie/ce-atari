@@ -46,7 +46,6 @@ void ConfigStream::setSettingsReloadProxy(SettingsReloadProxy *rp)
 
 void ConfigStream::processCommand(BYTE *cmd)
 {
-#define READ_BUFFER_SIZE    (5 * 1024)
     static BYTE readBuffer[READ_BUFFER_SIZE];
     int streamCount;
 
@@ -112,7 +111,18 @@ void ConfigStream::processCommand(BYTE *cmd)
 
         Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_GO_HOME -- %d bytes", streamCount);
         break;
-
+        
+    case CFG_CMD_LINUXCONSOLE_GETSTREAM:                                // get the current bash console stream
+        if(cmd[5] != 0) {                                               // if it's a real key, send it
+            linuxConsole_KeyDown(cmd[5]);
+        }
+            
+        streamCount = linuxConsole_getStream(readBuffer, 3 * 512);      // get the stream from shell
+        dataTrans->addDataBfr(readBuffer, streamCount, true);           // add data and status, with padding to multiple of 16 bytes
+        dataTrans->setStatus(SCSI_ST_OK);
+        
+        break;
+        
     default:                            // other cases: error
         dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
         break;
@@ -604,7 +614,7 @@ void ConfigStream::screen_addHeaderAndFooter(StupidVector &scr, char *screenName
     scr.push_back(comp);
 
     // insert footer
-    comp = new ConfigComponent(this, ConfigComponent::label, " Esc - cancel, F5 - refresh, F10 - quit ", 40, 0, 24, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " F5 - refresh, F8 - console, F10 - quit ", 40, 0, 24, gotoOffset);
     comp->setReverse(true);
     scr.push_back(comp);
 

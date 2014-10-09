@@ -5,7 +5,8 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <queue>
-
+ #include <pty.h>
+ 
 #include "config/configstream.h"
 #include "settings.h"
 #include "global.h"
@@ -38,6 +39,9 @@ bool g_justDoReset  = false;                                    // if shouldn't 
 bool g_noReset      = false;                                    // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
 bool g_test         = false;                                    // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
 
+int     linuxConsole_fdMaster, linuxConsole_fdSlave;            // file descriptors for pty pair
+pid_t   childPid;                                               // pid of forked child
+
 int main(int argc, char *argv[])
 {
     CCoreThread *core;
@@ -49,15 +53,38 @@ int main(int argc, char *argv[])
 
     parseCmdLineArguments(argc, argv);                          // parse cmd line arguments and set global variables
 
+	if(signal(SIGINT, sigint_handler) == SIG_ERR) {		        // register SIGINT handler
+		printf("Cannot register SIGINT handler!\n");
+	}
+
+   	if(signal(SIGHUP, sigint_handler) == SIG_ERR) {		        // register SIGHUP handler
+		printf("Cannot register SIGHUP handler!\n");
+	}
+
+    if(!g_justDoReset) {                                                // if this is not just a reset command
+        int ires = openpty(&linuxConsole_fdMaster, &linuxConsole_fdSlave, NULL, NULL, NULL);    // open PTY pair
+
+        if(ires != -1) {                                                // if openpty() was OK  
+            childPid = fork();
+
+            if(childPid == 0) {                                         // code executed only by child
+                dup2(linuxConsole_fdSlave, 0);
+                dup2(linuxConsole_fdSlave, 1);        
+                dup2(linuxConsole_fdSlave, 2);
+
+                char *shell = (char *) "/bin/sh";
+                execlp(shell, shell, (char *) NULL);
+    
+                return 0;
+            }
+        }
+    }
+    
     printfPossibleCmdLineArgs();
     Debug::printfLogLevelString();
 
     Debug::out(LOG_ERROR, "\n\n---------------------------------------------------");
     Debug::out(LOG_ERROR, "CosmosEx starting, version: %s", APP_VERSION);
-
-	if(signal(SIGINT, sigint_handler) == SIG_ERR) {		        // register SIGINT handler
-		Debug::out(LOG_ERROR, "Cannot register SIGINT handler!");
-	}
 
 //	system("sudo echo none > /sys/class/leds/led0/trigger");	// disable usage of GPIO 23 (pin 16) by LED
 
@@ -215,7 +242,12 @@ void handlePthreadCreate(int res, char *what)
 
 void sigint_handler(int sig)
 {
-    Debug::out(LOG_INFO, "SIGINT signal received, terminating.");
+    Debug::out(LOG_INFO, "Some SIGNAL received, terminating.");
 	sigintReceived = 1;
+    
+    if(childPid != 0) {             // in case we fork()ed, kill the child
+        Debug::out(LOG_INFO, "Killing child with pid %d\n", childPid);
+        kill(childPid, SIGKILL);
+    }
 }
 

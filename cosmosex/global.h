@@ -53,6 +53,11 @@
 #define CFG_CMD_REFRESH             0xfe
 #define CFG_CMD_GO_HOME             0xff
 
+#define CFG_CMD_LINUXCONSOLE_GETSTREAM  10
+
+// two values of a last byte of LINUXCONSOLE stream - more data, or no more data
+#define LINUXCONSOLE_NO_MORE_DATA   0x00
+#define LINUXCONSOLE_GET_MORE_DATA  0xda
 
 //////////////////////////////////////////////////////
 // commands for HOSTMOD_TRANSLATED_DISK
