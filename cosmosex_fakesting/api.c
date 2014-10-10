@@ -7,17 +7,15 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 #include <support.h>
 #include <stdint.h>
-
 #include <stdio.h>
-#include <string.h>
 
 #include "globdefs.h"
 #include "tcp.h"
 #include "udp.h"
 #include "con_man.h"
+#include "stdlib.h"
 
 #define  NUM_LAYER   2
 
@@ -89,9 +87,9 @@ typedef  struct client_layer {
     int16      /* cdecl */  (* CNgets) (int16, char *, int16, char);			// Fetch a delimited block of data from a connection.
 	//-------------
 	// ICMP functions
-    int16      /* cdecl */  (* ICMP_send) (uint32, uint8, uint8, void *, uint16);
-    int16      /* cdecl */  (* ICMP_handler) (int16 /* cdecl */ (*) (IP_DGRAM *), int16);
-    void       /* cdecl */  (* ICMP_discard) (IP_DGRAM *);
+    int16      /* cdecl */  (* ICMP_send)       (uint32, uint8, uint8, void *, uint16);
+    int16      /* cdecl */  (* ICMP_handler)    (int16 (*) (IP_DGRAM *), int16);
+    void       /* cdecl */  (* ICMP_discard)    (IP_DGRAM *);
 	//-------------
     int16      /* cdecl */  (* TCP_info) (int16, void *);
     int16      /* cdecl */  (* cntrl_port) (char *, uint32, int16);				// Inquires and sets various parameters of STinG ports.

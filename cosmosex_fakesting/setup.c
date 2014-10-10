@@ -7,13 +7,10 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 #include <support.h>
 #include <stdint.h>
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "globdefs.h"
 

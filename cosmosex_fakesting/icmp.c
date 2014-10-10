@@ -7,12 +7,9 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 #include <support.h>
 #include <stdint.h>
-
 #include <stdio.h>
-#include <string.h>
 
 #include "globdefs.h"
 
@@ -21,15 +18,10 @@
 #define  M_MONTH   11
 #define  M_DAY     23
 
-
-void *  /* cdecl */  KRmalloc (int32 size);
-void    /* cdecl */  KRfree (void *mem_block);
-
-int16          ICMP_reply (uint8 type, uint8 code, IP_DGRAM *dgram, uint32 supplement);
-int16   /* cdecl */  ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 length);
-int16   /* cdecl */  ICMP_handler (int16 /* cdecl */ handler (IP_DGRAM *), int16 flag);
-void    /* cdecl */  ICMP_discard (IP_DGRAM *dgram);
-
+int16 ICMP_reply (uint8 type, uint8 code, IP_DGRAM *dgram, uint32 supplement);
+int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 length);
+int16 ICMP_handler (int16 /* cdecl */ handler (IP_DGRAM *), int16 flag);
+void  ICMP_discard (IP_DGRAM *dgram);
 
 extern PORT    my_port;
 extern CONFIG  conf;
@@ -38,27 +30,52 @@ extern uint32  sting_clock;
 LAYER       icmp_desc = {  "ICMP", "01.00", 0L, (M_YEAR << 9) | (M_MONTH << 5) | M_DAY, "Peter Rottengatter", 0, NULL, NULL  };
 uint16      icmp_id = 0;
 
-int16  ICMP_reply (uint8 type, uint8 code, IP_DGRAM *dgram, uint32 supple)
+//---------------------
+// ACSI / CosmosEx stuff
+#include "acsi.h"
+#include "ce_commands.h"
+#include "stdlib.h"
+
+extern BYTE deviceID;
+extern BYTE commandShort[CMD_LENGTH_SHORT];
+extern BYTE commandLong[CMD_LENGTH_LONG];
+extern BYTE *pDmaBuffer;
+//---------------------
+
+int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_length)
 {
+    // first store command code
+    commandShort[4] = NET_CMD_ICMP_SEND;
+    commandShort[5] = 0;
+    
+    // then store the params in buffer
+    BYTE *pBfr = pDmaBuffer;
+    pBfr = storeDword   (pBfr, dest);
+    pBfr = storeByte    (pBfr, type);
+    pBfr = storeByte    (pBfr, code);
+    pBfr = storeWord    (pBfr, dat_length);
+    
+    // TODO: send the data
 
+    // send it to host
+    WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-   return (TRUE);
-}
+	if(res != OK) {                        										// if failed, return FALSE 
+		return 0;
+	}
 
-int16  /* cdecl */  ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_length)
-{
-
+    // TODO: more handling here
+    
 	return (E_NORMAL);
 }
 
-int16  /* cdecl */  ICMP_handler (int16 /* cdecl */ handler (IP_DGRAM *), int16 flag)
+int16 ICMP_handler (int16 handler (IP_DGRAM *), int16 flag)
 {
-
 
 	return (FALSE);
 }
 
-void  /* cdecl */  ICMP_discard (IP_DGRAM *dgram)
+void ICMP_discard (IP_DGRAM *dgram)
 {
 
 }

@@ -172,3 +172,38 @@ DWORD getTicks(void)
 	return now;
 }
 
+BYTE *storeByte(BYTE *bfr, BYTE value)
+{
+    *bfr = (BYTE) value;                // store byte
+    bfr++;                              // advance to next byte
+    
+    return bfr;                         // return the updated buffer address
+}
+
+BYTE *storeWord(BYTE *bfr, WORD value)
+{
+    *bfr = (BYTE) (value >> 8);         // store higher part
+    bfr++;                              // advance to next byte
+
+    *bfr = (BYTE) (value);              // store lower part
+    bfr++;                              // advance to next byte
+    
+    return bfr;                         // return the updated buffer address
+}
+
+BYTE *storeDword(BYTE *bfr, DWORD value)
+{
+    *bfr = (BYTE) (value >> 24);        // store highest part
+    bfr++;                              // advance to next byte
+
+    *bfr = (BYTE) (value >> 16);        // store mid hi part
+    bfr++;                              // advance to next byte
+
+    *bfr = (BYTE) (value >>  8);        // store mid low part
+    bfr++;                              // advance to next byte
+
+    *bfr = (BYTE) (value);              // store lowest part
+    bfr++;                              // advance to next byte
+    
+    return bfr;                         // return the updated buffer address
+}

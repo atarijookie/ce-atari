@@ -7,31 +7,92 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 #include <support.h>
 #include <stdint.h>
-
 #include <stdio.h>
-#include <string.h>
 
 #include "globdefs.h"
 #include "udp.h"
 
-int16  /* cdecl */  UDP_open (uint32 rem_host, uint16 rem_port)
+//---------------------
+// ACSI / CosmosEx stuff
+#include "acsi.h"
+#include "ce_commands.h"
+#include "stdlib.h"
+
+extern BYTE deviceID;
+extern BYTE commandShort[CMD_LENGTH_SHORT];
+extern BYTE commandLong[CMD_LENGTH_LONG];
+extern BYTE *pDmaBuffer;
+//---------------------
+
+int16 UDP_open (uint32 rem_host, uint16 rem_port)
 {
+    // first store command code
+    commandShort[4] = NET_CMD_UDP_OPEN;
+    commandShort[5] = 0;
+    
+    // then store the params in buffer
+    BYTE *pBfr = pDmaBuffer;
+    pBfr = storeDword   (pBfr, rem_host);
+    pBfr = storeWord    (pBfr, rem_port);
+
+    // send it to host
+    WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+
+	if(res != OK) {                        										// if failed, return FALSE 
+		return 0;
+	}
+
+    // TODO: more handling here
 
    return (E_UNREACHABLE);
 }
 
-int16  /* cdecl */  UDP_close (int16 connec)
+int16 UDP_close (int16 connec)
 {
+    // first store command code
+    commandShort[4] = NET_CMD_UDP_CLOSE;
+    commandShort[5] = 0;
+    
+    // then store the params in buffer
+    BYTE *pBfr = pDmaBuffer;
+    pBfr = storeWord    (pBfr, connec);
 
-   return (E_BADHANDLE);
+    // send it to host
+    WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+
+	if(res != OK) {                        										// if failed, return FALSE 
+		return 0;
+	}
+
+    // TODO: more handling here
+
+    return (E_BADHANDLE);
 }
 
-int16  /* cdecl */  UDP_send (int16 connec, void *buffer, int16 length)
+int16 UDP_send(int16 connec, void *buffer, int16 length)
 {
+    // first store command code
+    commandShort[4] = NET_CMD_UDP_SEND;
+    commandShort[5] = 0;
+    
+    // then store the params in buffer
+    BYTE *pBfr = pDmaBuffer;
+    pBfr = storeWord    (pBfr, connec);
+    pBfr = storeWord    (pBfr, length);
 
-   return (E_BADHANDLE);
+    // TODO: send the actual buffer
+    
+    // send it to host
+    WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+
+	if(res != OK) {                        										// if failed, return FALSE 
+		return 0;
+	}
+
+    // TODO: more handling here
+    
+    return (E_BADHANDLE);
 }
 
