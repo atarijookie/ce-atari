@@ -18,10 +18,10 @@
 #define  M_MONTH   11
 #define  M_DAY     23
 
-int16 ICMP_reply (uint8 type, uint8 code, IP_DGRAM *dgram, uint32 supplement);
-int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 length);
-int16 ICMP_handler (int16 /* cdecl */ handler (IP_DGRAM *), int16 flag);
-void  ICMP_discard (IP_DGRAM *dgram);
+int16 ICMP_reply    (uint8 type, uint8 code, IP_DGRAM *dgram, uint32 supplement);
+int16 ICMP_send     (uint32 dest, uint8 type, uint8 code, void *data, uint16 length);
+int16 ICMP_handler  (int16  handler (IP_DGRAM *), int16 flag);
+void  ICMP_discard  (IP_DGRAM *dgram);
 
 extern PORT    my_port;
 extern CONFIG  conf;

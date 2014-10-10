@@ -13,6 +13,7 @@
 
 #include "globdefs.h"
 #include "tcp.h"
+#include "con_man.h"
 
 //---------------------
 // ACSI / CosmosEx stuff
@@ -51,15 +52,19 @@ int16 TCP_open(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_size)
     return (E_UNREACHABLE);
 }
 
-int16 TCP_close(int16 connec, int16 mode, int16 *result)
+int16 TCP_close(int16 handle, int16 mode, int16 *result)
 {
+    if(!handles_got(handle)) {          // we don't have this handle? fail
+        return E_BADHANDLE;
+    }
+    
     // first store command code
     commandShort[4] = NET_CMD_TCP_CLOSE;
     commandShort[5] = 0;
     
     // then store the params in buffer
     BYTE *pBfr = pDmaBuffer;
-    pBfr = storeWord    (pBfr, connec);
+    pBfr = storeWord    (pBfr, handle);
     pBfr = storeWord    (pBfr, mode);
 
     // send it to host
@@ -74,15 +79,19 @@ int16 TCP_close(int16 connec, int16 mode, int16 *result)
     return (E_BADHANDLE);
 }
 
-int16 TCP_send(int16 connec, void *buffer, int16 length)
+int16 TCP_send(int16 handle, void *buffer, int16 length)
 {
+    if(!handles_got(handle)) {          // we don't have this handle? fail
+        return E_BADHANDLE;
+    }
+
     // first store command code
     commandShort[4] = NET_CMD_TCP_SEND;
     commandShort[5] = 0;
     
     // then store the params in buffer
     BYTE *pBfr = pDmaBuffer;
-    pBfr = storeWord    (pBfr, connec);
+    pBfr = storeWord    (pBfr, handle);
     pBfr = storeWord    (pBfr, length);
 
     // TODO: send the buffer
@@ -99,15 +108,19 @@ int16 TCP_send(int16 connec, void *buffer, int16 length)
     return (E_BADHANDLE);
 }
 
-int16 TCP_wait_state(int16 connec, int16 state, int16 timeout)
+int16 TCP_wait_state(int16 handle, int16 state, int16 timeout)
 {
+    if(!handles_got(handle)) {          // we don't have this handle? fail
+        return E_BADHANDLE;
+    }
+
     // first store command code
     commandShort[4] = NET_CMD_TCP_WAIT_STATE;
     commandShort[5] = 0;
     
     // then store the params in buffer
     BYTE *pBfr = pDmaBuffer;
-    pBfr = storeWord    (pBfr, connec);
+    pBfr = storeWord    (pBfr, handle);
     pBfr = storeWord    (pBfr, state);
     pBfr = storeWord    (pBfr, timeout);
 
@@ -123,15 +136,19 @@ int16 TCP_wait_state(int16 connec, int16 state, int16 timeout)
     return (E_BADHANDLE);
 }
 
-int16 TCP_ack_wait(int16 connec, int16 timeout)
+int16 TCP_ack_wait(int16 handle, int16 timeout)
 {
+    if(!handles_got(handle)) {          // we don't have this handle? fail
+        return E_BADHANDLE;
+    }
+
     // first store command code
     commandShort[4] = NET_CMD_TCP_ACK_WAIT;
     commandShort[5] = 0;
     
     // then store the params in buffer
     BYTE *pBfr = pDmaBuffer;
-    pBfr = storeWord    (pBfr, connec);
+    pBfr = storeWord    (pBfr, handle);
     pBfr = storeWord    (pBfr, timeout);
 
     // send it to host
@@ -146,15 +163,19 @@ int16 TCP_ack_wait(int16 connec, int16 timeout)
     return (E_BADHANDLE);
 }
 
-int16 TCP_info(int16 connec, void *tcp_info)
+int16 TCP_info(int16 handle, void *tcp_info)
 {
+    if(!handles_got(handle)) {          // we don't have this handle? fail
+        return E_BADHANDLE;
+    }
+
     // first store command code
     commandShort[4] = NET_CMD_TCP_INFO;
     commandShort[5] = 0;
     
     // then store the params in buffer
     BYTE *pBfr = pDmaBuffer;
-    pBfr = storeWord    (pBfr, connec);
+    pBfr = storeWord    (pBfr, handle);
 
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);

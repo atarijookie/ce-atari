@@ -24,19 +24,15 @@
 
 
 long    init_cookie (void);
-
-uint16  lock_exec (uint16 status);
-
 void    install (void);
+int16   init_cfg (void);
+
 int16   KRinitialize (int32 size);
 void *  KRmalloc (int32 size);
 void    KRfree (void *mem_block);
 
-long    get_boot_drv (void);
-int16   init_cfg (char filename[]);
 int16   setvstr (char name[], char value[]);
 char *  getvstr (char name[]);
-
 
 extern CONFIG  conf;
 extern void    *memory;
@@ -85,7 +81,7 @@ int main()
    for (count = 0; count < MAX_SEMAPHOR; count++)
         semaphors[count] = 0;
 
-   switch (init_cfg (def_conf)) {
+   switch (init_cfg()) {
       case -3 :
         (void) Cconws ("Could not allocate enough memory ! No installation ...");
         return 0;
@@ -114,14 +110,7 @@ int main()
    return 0;
  }
 
-long  get_boot_drv()
-{
-   unsigned  int  *_bootdev = (void *) 0x446L;
-
-   return ((long) ('A' + *_bootdev));
-}
-
-int16  init_cfg (char *fname)
+int16  init_cfg (void)
 {
 	if(KRinitialize(100000) < 0) {				// ALLOCMEM
 		return (-3);

@@ -22,41 +22,30 @@
 IP_DGRAM *     fetch_dgram (PORT *port);
 int16          process_dgram (IP_DGRAM *datagram);
 
-void           init_ports (void);
-int16   /* cdecl */  on_port (char *port_name);
-void    /* cdecl */  off_port (char *port_name);
-int16   /* cdecl */  query_port (char *port_name);
-int16   /* cdecl */  cntrl_port (char *port_name, uint32 argument, int16 code);
-PORT *         search_port (char *port_name);
-int16   /* cdecl */  my_set_state (PORT *port, int16 state);
-int16   /* cdecl */  my_cntrl (PORT *port, uint32 argument, int16 code);
-
+void  init_ports    (void);
+int16 on_port       (char *port_name);
+void  off_port      (char *port_name);
+int16 query_port    (char *port_name);
+int16 cntrl_port    (char *port_name, uint32 argument, int16 code);
+PORT *search_port   (char *port_name);
+int16 my_set_state  (PORT *port, int16 state);
+int16 my_cntrl      (PORT *port, uint32 argument, int16 code);
 
 extern CONFIG  conf;
 extern int32 _pbase;
 
-PORT    my_port   = {  "Internal", L_INTERNAL, TRUE, 0L, LOOPBACK, 0xffffffffUL, 32768, 
-                       32768, 0L, NULL, 0L, NULL, 0, NULL, NULL   };
-DRIVER  my_driver = {  my_set_state, my_cntrl, NULL, NULL, "Internal", "01.00",
-                       (M_YEAR << 9) | (M_MONTH << 5) | M_DAY, "Peter Rottengatter",
-                       NULL, NULL   };
+PORT    my_port   = {  "Internal", L_INTERNAL, TRUE, 0L, LOOPBACK, 0xffffffffUL, 32768, 32768, 0L, NULL, 0L, NULL, 0, NULL, NULL   };
+DRIVER  my_driver = {  my_set_state, my_cntrl, NULL, NULL, "Internal", "01.00", (M_YEAR << 9) | (M_MONTH << 5) | M_DAY, "Peter Rottengatter", NULL, NULL   };
 
-
-
-void  init_ports()
-
+void  init_ports(void)
 {
    my_driver.basepage = _pbase;
    my_port.driver = &my_driver;
 
    conf.ports = &my_port;   conf.drivers = &my_driver;
- }
+}
 
-
-int16  /* cdecl */  on_port (port_name)
-
-char  *port_name;
-
+int16 on_port (char *port_name)
 {
    PORT  *this;
 
@@ -72,13 +61,9 @@ char  *port_name;
    this->stat_sd_data = this->stat_rcv_data = this->stat_dropped = 0;
 
    return (TRUE);
- }
+}
 
-
-void  /* cdecl */  off_port (port_name)
-
-char  *port_name;
-
+void off_port (char *port_name)
 {
    PORT  *this;
 
@@ -90,13 +75,9 @@ char  *port_name;
    (*this->driver->set_state) (this, FALSE);
 
    this->active = FALSE;
- }
+}
 
-
-int16  /* cdecl */  query_port (port_name)
-
-char  *port_name;
-
+int16 query_port (char *port_name)
 {
    PORT  *this;
 
@@ -106,15 +87,9 @@ char  *port_name;
         return (FALSE);
 
    return (this->active);
- }
+}
 
-
-int16  /* cdecl */  cntrl_port (port_name, argument, code)
-
-char    *port_name;
-uint32  argument;
-int16   code;
-
+int16 cntrl_port(char *port_name, uint32 argument, int16 code)
 {
    PORT   *this;
    PNTA   *act_pnta;
@@ -178,13 +153,9 @@ int16   code;
       }
 
    return (result);
- }
+}
 
-
-PORT *  search_port (port_name)
-
-char  *port_name;
-
+PORT *search_port(char *port_name)
 {
    PORT  *walk;
 
@@ -192,26 +163,15 @@ char  *port_name;
         if (strcmp (walk->name, port_name) == 0)
              return (walk);
 
-   return (NULL);
- }
+   return NULL;
+}
 
-
-int16  /* cdecl */  my_set_state (port, state)
-
-PORT   *port;
-int16  state;
-
+int16 my_set_state (PORT *port, int16 state)
 {
-   return (TRUE);
- }
+    return TRUE;
+}
 
-
-int16  /* cdecl */  my_cntrl (port, argument, code)
-
-PORT    *port;
-uint32  argument;
-int16   code;
-
+int16 my_cntrl (PORT *port, uint32 argument, int16 code)
 {
-   return (E_FNAVAIL);
- }
+    return E_FNAVAIL;
+}

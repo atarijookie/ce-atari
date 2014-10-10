@@ -152,7 +152,7 @@ typedef  struct protocol_entry {
     int16     active;           /* Protocol is installed                    */
     IP_DGRAM  *queue;           /* Link to first entry in received queue    */
     DEFRAG    *defrag;          /* Link to defragmentation queue            */
-    int16 /* cdecl */ (* process)	(IP_DGRAM *);   /* Call to process packet     */
+    int16  (* process)	(IP_DGRAM *);   /* Call to process packet     */
  } IP_PRTCL;
 
 
@@ -202,10 +202,10 @@ typedef  struct port_desc {
  */
 
 typedef  struct drv_desc {
-    int16 /* cdecl */  (* set_state) (PORT *, int16);       /* Setup and shutdown */
-    int16 /* cdecl */  (* cntrl) (PORT *, uint32, int16);   /* Control functions  */
-    void  /* cdecl */  (* send) (PORT *);                   /* Send packets       */
-    void  /* cdecl */  (* receive) (PORT *);                /* Receive packets    */
+    int16   (* set_state) (PORT *, int16);       /* Setup and shutdown */
+    int16   (* cntrl) (PORT *, uint32, int16);   /* Control functions  */
+    void    (* send) (PORT *);                   /* Send packets       */
+    void    (* receive) (PORT *);                /* Receive packets    */
     char             *name;     /* Name of driver                           */
     char             *version;  /* Version of driver in "xx.yy" format      */
     uint16           date;      /* Compile date in GEMDOS format            */
@@ -244,7 +244,7 @@ typedef  struct lay_desc {
  */
 
 typedef  struct func_list {
-    int16    /* cdecl */    (* handler) (IP_DGRAM *);
+    int16        (* handler) (IP_DGRAM *);
     struct func_list  *next;
  } FUNC_LIST;
 
@@ -258,13 +258,13 @@ typedef  struct func_list {
  */
 
 typedef  struct cn_funcs {
-    int16  /* cdecl */  (* CNkick) (void *);
-    int16  /* cdecl */  (* CNbyte_count) (void *);
-    int16  /* cdecl */  (* CNget_char) (void *);
-    NDB *  /* cdecl */  (* CNget_NDB) (void *);
-    int16  /* cdecl */  (* CNget_block) (void *, void *, int16);
-    CIB *  /* cdecl */  (* CNgetinfo) (void *);
-    int16  /* cdecl */  (* CNgets) (void *, char *, int16, char);
+    int16    (* CNkick) (void *);
+    int16    (* CNbyte_count) (void *);
+    int16    (* CNget_char) (void *);
+    NDB *    (* CNget_NDB) (void *);
+    int16    (* CNget_block) (void *, void *, int16);
+    CIB *    (* CNgetinfo) (void *);
+    int16    (* CNgets) (void *, char *, int16, char);
  } CN_FUNCS;
 
 

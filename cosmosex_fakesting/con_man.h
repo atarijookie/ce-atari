@@ -1,12 +1,15 @@
 #ifndef _CON_MAN_H_
 #define _CON_MAN_H_
 
-int16      /* cdecl */  CNkick (int16 connec);
-int16      /* cdecl */  CNbyte_count (int16 connec);
-int16      /* cdecl */  CNget_char (int16 connec);
-NDB *      /* cdecl */  CNget_NDB (int16 connec);
-int16      /* cdecl */  CNget_block (int16 connec, void *buffer, int16 length);
-CIB *      /* cdecl */  CNgetinfo (int16 connec);
-int16      /* cdecl */  CNgets (int16 connec, char *buffer, int16 length, char delimiter);
+void handles_init(void);
+int  handles_got(int16 h);
+
+int16 CNkick        (int16 handle);
+int16 CNbyte_count  (int16 handle);
+int16 CNget_char    (int16 handle);
+NDB * CNget_NDB     (int16 handle);
+int16 CNget_block   (int16 handle, void *buffer, int16 length);
+CIB * CNgetinfo     (int16 handle);
+int16 CNgets        (int16 handle, char *buffer, int16 length, char delimiter);
 
 #endif

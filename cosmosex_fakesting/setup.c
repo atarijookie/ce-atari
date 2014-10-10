@@ -13,7 +13,7 @@
 #include <stdlib.h>
 
 #include "globdefs.h"
-
+#include "con_man.h"
 
 typedef  struct mem_header {
            struct mem_header  *mem_ptr;
@@ -24,14 +24,14 @@ uint16	lock_exec(uint16 status);
 void           init_ports (void);
 
 void           install (void);
-int32   /* cdecl */  set_sysvars (int16 new_act, int16 new_frac);
-void    /* cdecl */  query_chains (PORT **port, DRIVER **drv, LAYER **layer);
-char *  /* cdecl */  get_error_text (int16 error_code);
+int32     set_sysvars (int16 new_act, int16 new_frac);
+void      query_chains (PORT **port, DRIVER **drv, LAYER **layer);
+char *    get_error_text (int16 error_code);
 int16          KRinitialize (int32 size);
-void *  /* cdecl */  KRmalloc (int32 size);
-void    /* cdecl */  KRfree (void *mem_block);
-int32   /* cdecl */  KRgetfree (int16 block_flag);
-void *  /* cdecl */  KRrealloc (void *mem_block, int32 new_size);
+void *    KRmalloc (int32 size);
+void      KRfree (void *mem_block);
+int32     KRgetfree (int16 block_flag);
+void *    KRrealloc (void *mem_block, int32 new_size);
 
 extern CONFIG 	conf;
 extern LAYER  	icmp_desc;
@@ -58,28 +58,27 @@ char  *error_array[] = {
 
 MEM_HDR  *memory = NULL, *mem_free;
 
-void  install(void)
+void install(void)
 {
-   PORT  *walk;
-   char  *var;
-   int   count, number;
+    PORT  *walk;
 
-   conf.client_ip = LOOPBACK;
-   conf.max_num_ports = conf.active = 0;
-   conf.thread_rate = 10;
-   conf.ports = NULL;
-   conf.drivers = NULL;
-   conf.ttl = 64;
-   conf.frag_ttl = 60;
-   conf.interupt = NULL;
-   conf.stat_lo_mem = conf.stat_ttl_excd = 0L;
-   conf.stat_chksum = conf.stat_unreach  = 0L;
-   conf.stat_all    = 0L;
-   conf.memory      = (void *) memory;
+    conf.client_ip       = LOOPBACK;
+    conf.max_num_ports   = conf.active = 0;
+    conf.thread_rate     = 10;
+    conf.ports           = NULL;
+    conf.drivers         = NULL;
+    conf.ttl             = 64;
+    conf.frag_ttl        = 60;
+    conf.interupt        = NULL;
+    conf.stat_lo_mem     = conf.stat_ttl_excd = 0L;
+    conf.stat_chksum     = conf.stat_unreach  = 0L;
+    conf.stat_all        = 0L;
+    conf.memory          = (void *) memory;
 
-   init_ports();
+    init_ports();
+    handles_init();
 
-	conf.thread_rate	= 50;					// "THREADING"
+    conf.thread_rate	= 50;					// "THREADING"
 	conf.frag_ttl		= 60;					// "FRAG_TTL"
 	icmp_desc.flags		&= 0x0000fffful;   
 	icmp_desc.flags		|= (int32) (-60) << 16;	// "ICMP_GMT"
@@ -93,12 +92,13 @@ void  install(void)
 	icmp_desc.basepage	= (BASEPAGE *) _pbase;
 	conf.layers = & icmp_desc;
 
-	for (walk = conf.ports; walk != NULL; walk = walk->next)
-		conf.max_num_ports++;
+	for (walk = conf.ports; walk != NULL; walk = walk->next) {
+        conf.max_num_ports++;
+    }
 }
 
 
-int32  /* cdecl */  set_sysvars (int16 new_active, int16 new_fraction)
+int32 set_sysvars (int16 new_active, int16 new_fraction)
 {
    long  old_values;
 
@@ -114,12 +114,7 @@ int32  /* cdecl */  set_sysvars (int16 new_active, int16 new_fraction)
  }
 
 
-void  /* cdecl */  query_chains (port_ptr, drv_ptr, layer_ptr)
-
-PORT    **port_ptr;
-DRIVER  **drv_ptr;
-LAYER   **layer_ptr;
-
+void query_chains (PORT **port_ptr, DRIVER **drv_ptr, LAYER **layer_ptr)
 {
    if (port_ptr)    *port_ptr  = conf.ports;
    if (drv_ptr)     *drv_ptr   = conf.drivers;
@@ -127,10 +122,7 @@ LAYER   **layer_ptr;
  }
 
 
-char *  /* cdecl */  get_error_text (error_code)
-
-int16  error_code;
-
+char *get_error_text (int16 error_code)
 {
    error_code *= -1;
 
@@ -141,7 +133,7 @@ int16  error_code;
  }
 
 
-int16  KRinitialize (int32 size)
+int16 KRinitialize (int32 size)
 {
    size = (size + sizeof (MEM_HDR) - 1) / sizeof (MEM_HDR);
 
@@ -154,7 +146,7 @@ int16  KRinitialize (int32 size)
    return (0);
 }
 
-void *  /* cdecl */  KRmalloc (int32 size)
+void *KRmalloc (int32 size)
 {
    MEM_HDR  *prev, *run;
    uint32   n_units;
@@ -186,13 +178,9 @@ void *  /* cdecl */  KRmalloc (int32 size)
    lock_exec (status);
 
    return (NULL);
- }
+}
 
-
-void  /* cdecl */  KRfree (mem_block)
-
-void  *mem_block;
-
+void KRfree (void *mem_block)
 {
    MEM_HDR  *blk, *run;
    uint16   status;
@@ -233,13 +221,9 @@ void  *mem_block;
    mem_free = run;
 
    lock_exec (status);
- }
+}
 
-
-int32  /* cdecl */  KRgetfree (block_flag)
-
-int16  block_flag;
-
+int32  KRgetfree (int16 block_flag)
 {
    MEM_HDR  *run;
    uint32   total, largest;
@@ -260,14 +244,9 @@ int16  block_flag;
    lock_exec (status);
 
    return (((block_flag) ? largest : total) * sizeof (MEM_HDR));
- }
+}
 
-
-void *  /* cdecl */  KRrealloc (mem_block, new_size)
-
-void   *mem_block;
-int32  new_size;
-
+void *KRrealloc (void *mem_block, int32 new_size)
 {
    MEM_HDR  *blk;
    uint32   n_units, count;
@@ -321,6 +300,7 @@ int32  new_size;
  uint16	lock_exec(uint16 status)
  {
 	// lock_exec stub, implementation needed
+    
 	return 0;
  }
  

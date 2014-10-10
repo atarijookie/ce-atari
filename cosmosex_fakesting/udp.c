@@ -13,6 +13,7 @@
 
 #include "globdefs.h"
 #include "udp.h"
+#include "con_man.h"
 
 //---------------------
 // ACSI / CosmosEx stuff
@@ -49,15 +50,19 @@ int16 UDP_open (uint32 rem_host, uint16 rem_port)
    return (E_UNREACHABLE);
 }
 
-int16 UDP_close (int16 connec)
+int16 UDP_close (int16 handle)
 {
+    if(!handles_got(handle)) {          // we don't have this handle? fail
+        return E_BADHANDLE;
+    }
+
     // first store command code
     commandShort[4] = NET_CMD_UDP_CLOSE;
     commandShort[5] = 0;
     
     // then store the params in buffer
     BYTE *pBfr = pDmaBuffer;
-    pBfr = storeWord    (pBfr, connec);
+    pBfr = storeWord    (pBfr, handle);
 
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
@@ -71,15 +76,19 @@ int16 UDP_close (int16 connec)
     return (E_BADHANDLE);
 }
 
-int16 UDP_send(int16 connec, void *buffer, int16 length)
+int16 UDP_send(int16 handle, void *buffer, int16 length)
 {
+    if(!handles_got(handle)) {          // we don't have this handle? fail
+        return E_BADHANDLE;
+    }
+
     // first store command code
     commandShort[4] = NET_CMD_UDP_SEND;
     commandShort[5] = 0;
     
     // then store the params in buffer
     BYTE *pBfr = pDmaBuffer;
-    pBfr = storeWord    (pBfr, connec);
+    pBfr = storeWord    (pBfr, handle);
     pBfr = storeWord    (pBfr, length);
 
     // TODO: send the actual buffer
