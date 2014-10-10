@@ -1,15 +1,7 @@
-
-/*********************************************************************/
-/*                                                                   */
-/*     STinG : API and IP kernel package                             */
-/*                                                                   */
-/*                                                                   */
-/*      Version 1.0                         from 23. Maerz 1997      */
-/*                                                                   */
-/*      Module for Setup and Memory Allocation calls                 */
-/*                                                                   */
-/*********************************************************************/
-
+//----------------------------------------
+// CosmosEx fake STiNG - by Jookie, 2014
+// Based on sources of original STiNG
+//----------------------------------------
 
 #include <mint/sysbind.h>
 #include <mint/osbind.h>

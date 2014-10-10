@@ -12,8 +12,6 @@ char *	strncpy ( char * destination, const char * source, int num );
 int		strncmp ( const char * str1, const char * str2, int num );
 int		strcmp ( const char * str1, const char * str2);
 void	sleep(int seconds);
-char	toupper(char a);
-
 
 DWORD getTicks(void);
 

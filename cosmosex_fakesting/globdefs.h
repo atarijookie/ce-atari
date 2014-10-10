@@ -5,7 +5,7 @@
  *      Included into all STinG source code files
  */
 
- #include <mint/basepage.h>
+#include <mint/basepage.h>
  
 #define  FALSE       0
 #define  TRUE        1
@@ -15,6 +15,15 @@
 #define  CFG_NUM               100
 #define  MAX_HANDLE            32
 #define  LOOPBACK              0x7f000001L
+
+/*--------------------------------------------------------------------------*/
+// CosmosEx - types of devices / modules we support
+
+#define HOSTMOD_CONFIG				1
+#define HOSTMOD_LINUX_TERMINAL		2
+#define HOSTMOD_TRANSLATED_DISK		3
+#define HOSTMOD_NETWORK_ADAPTER		4
+#define HOSTMOD_FDD_SETUP           5
 
 /*--------------------------------------------------------------------------*/
 

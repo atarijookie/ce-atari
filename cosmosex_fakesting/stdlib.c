@@ -172,9 +172,3 @@ DWORD getTicks(void)
 	return now;
 }
 
-char toupper(char a)
-{
-	if(a >= 'a' && a <= 'z') {
-		a = a - 32;
-	}
-}

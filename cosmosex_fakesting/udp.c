@@ -1,3 +1,8 @@
+//----------------------------------------
+// CosmosEx fake STiNG - by Jookie, 2014
+// Based on sources of original STiNG
+//----------------------------------------
+
 #include <mint/sysbind.h>
 #include <mint/osbind.h>
 #include <mint/basepage.h>

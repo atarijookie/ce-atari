@@ -1,15 +1,7 @@
-
-/*********************************************************************/
-/*                                                                   */
-/*     STinG : API and IP kernel package                             */
-/*                                                                   */
-/*                                                                   */
-/*      Version 1.0                      from 23. November 1996      */
-/*                                                                   */
-/*      Module for InterNet Control Message Protocol                 */
-/*                                                                   */
-/*********************************************************************/
-
+//----------------------------------------
+// CosmosEx fake STiNG - by Jookie, 2014
+// Based on sources of original STiNG
+//----------------------------------------
 
 #include <mint/sysbind.h>
 #include <mint/osbind.h>
