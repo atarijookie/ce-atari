@@ -421,9 +421,12 @@ typedef  struct pnta {
 /*--------------------------------------------------------------------------*/
 
 
-/*
- *   Error return values.
- */
+/* 
+Error return values:
+0    - OK
+0x50 - 0x6f -- connection handle - received from device
+0xe0 - 0xff -- STiNG error codes
+*/
 
 #define  E_NORMAL         0     /* No error occured ...                     0x00 */
 #define  E_OBUFFULL      -1     /* Output buffer is full                    0xff */
@@ -462,4 +465,13 @@ typedef  struct pnta {
 
 
 /*--------------------------------------------------------------------------*/
+
+// if sign bit is set, extend the sign to whole WORD
+#define extendByteToWord(X)    ( ((X & 0x80)==0) ? X : (0xff00 | X) )
+
+#define handleIsFromCE(X)		(X >= 0x50 && X <= 0x6f)
+#define handleAtariToCE(X)		(X  + 0x50)
+#define handleCEtoAtari(X)		(X  - 0x50)
+
+
 

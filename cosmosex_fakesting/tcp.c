@@ -27,6 +27,11 @@ extern BYTE commandLong[CMD_LENGTH_LONG];
 extern BYTE *pDmaBuffer;
 //---------------------
 
+extern CIB      cibs[MAX_HANDLE];
+extern uint32   localIP;
+
+//---------------------
+
 int16 TCP_open(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_size)
 {
     // first store command code
@@ -41,15 +46,28 @@ int16 TCP_open(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_size)
     pBfr = storeWord    (pBfr, buff_size);
 
     // send it to host
-    WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+    BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                             // if failed, return FALSE 
-		return 0;
+	if(res != OK) {                                 // if failed, return FALSE 
+		return E_UNREACHABLE;
 	}
 
-    // TODO: more handling here
-    
-    return (E_UNREACHABLE);
+    if(handleIsFromCE(res)) {                       // if it's CE handle
+        int stHandle = handleCEtoAtari(res);        // convert it to ST handle
+
+        // store info to CIB and CAB structures
+        cibs[stHandle].protocol         = TCP;
+        cibs[stHandle].status           = 0;        // 0 means normal
+        cibs[stHandle].address.rport    = rem_port; // Remote machine port
+        cibs[stHandle].address.rhost    = rem_host; // Remote machine IP address
+        cibs[stHandle].address.lport    = 0;        // Local  machine port
+        cibs[stHandle].address.lhost    = localIP;  // Local  machine IP address
+        
+        return stHandle;                            // return the new handle
+    } 
+
+    // it's not a CE handle
+    return extendByteToWord(res);               // extend the BYTE error code to WORD
 }
 
 int16 TCP_close(int16 handle, int16 mode, int16 *result)
@@ -101,15 +119,15 @@ int16 TCP_send(int16 handle, void *buffer, int16 length)
     // TODO: send the buffer
     
     // send it to host
-    WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+    BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
 	if(res != OK) {                             // if failed, return FALSE 
-		return 0;
+		return E_BADHANDLE;
 	}
 
-    // TODO: more handling here
-
-    return (E_BADHANDLE);
+    // TODO: add handling 
+    
+    return E_BADHANDLE;
 }
 
 int16 TCP_wait_state(int16 handle, int16 state, int16 timeout)

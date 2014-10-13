@@ -54,6 +54,10 @@ BYTE *pDmaBuffer;
 BYTE ce_findId(void); 
 //---------------------------------------
 
+extern uint32 localIP;
+
+//---------------------------------------
+
 int main()
 {
    int   count;

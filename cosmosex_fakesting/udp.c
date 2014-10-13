@@ -27,6 +27,11 @@ extern BYTE commandLong[CMD_LENGTH_LONG];
 extern BYTE *pDmaBuffer;
 //---------------------
 
+extern CIB      cibs[MAX_HANDLE];
+extern uint32   localIP;
+
+//---------------------
+
 int16 UDP_open (uint32 rem_host, uint16 rem_port)
 {
     // first store command code
@@ -39,15 +44,28 @@ int16 UDP_open (uint32 rem_host, uint16 rem_port)
     pBfr = storeWord    (pBfr, rem_port);
 
     // send it to host
-    WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+    BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                             // if failed, return FALSE 
-		return 0;
+	if(res != OK) {                                 // if failed, return FALSE 
+		return E_UNREACHABLE;
 	}
 
-    // TODO: more handling here
+    if(handleIsFromCE(res)) {                       // if it's CE handle
+        int stHandle = handleCEtoAtari(res);        // convert it to ST handle
 
-   return (E_UNREACHABLE);
+        // store info to CIB and CAB structures
+        cibs[stHandle].protocol     = TCP;
+        cibs[stHandle].status       = 0;            // 0 means normal
+        cibs[stHandle].address.rport    = rem_port; // Remote machine port
+        cibs[stHandle].address.rhost    = rem_host; // Remote machine IP address
+        cibs[stHandle].address.lport    = 0;        // Local  machine port
+        cibs[stHandle].address.lhost    = localIP;  // Local  machine IP address
+        
+        return stHandle;                            // return the new handle
+    } 
+
+    // it's not a CE handle
+    return extendByteToWord(res);                   // extend the BYTE error code to WORD
 }
 
 int16 UDP_close (int16 handle)
