@@ -142,8 +142,8 @@ int main(void)
 			
 			continue;							                    // try again 
 		}
-	
-		scancode = Cnecin();					                    // get char form keyboard, no echo on screen 
+
+		scancode = Bconin(DEV_CONSOLE); 		                    // get char form keyboard, no echo on screen 
 
 		vkey	= (scancode>>16)	& 0xff;
 		key		=  scancode			& 0xff;
@@ -368,6 +368,10 @@ BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
 		case 0x0f09: return KEY_TAB;
 		case 0x1c0d: return KEY_ENTER;
 		case 0x720d: return KEY_ENTER;
+        case 0x2e03: return KEY_CTRL_C;
+        case 0x250b: return KEY_CTRL_K;
+        case 0x260c: return KEY_CTRL_L;
+        case 0x1615: return KEY_CTRL_U;
 	}
 
 	return 0;							// unknown key 

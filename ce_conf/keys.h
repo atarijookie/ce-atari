@@ -26,3 +26,8 @@
 #define		KEY_F9		158
 #define		KEY_F10		159
 
+#define     KEY_CTRL_C  160
+#define     KEY_CTRL_K  161
+#define     KEY_CTRL_L  162
+#define     KEY_CTRL_U  163
+
