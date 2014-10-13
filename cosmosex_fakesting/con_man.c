@@ -22,17 +22,16 @@ extern BYTE *pDmaBuffer;
 
 //--------------------------------------
 
-int16   handles[MAX_HANDLE];
-CIB     cibs[MAX_HANDLE];
+CIB cibs[MAX_HANDLE];
 
 //--------------------------------------
 // connection info function
 
 int16 CNkick (int16 handle)
 {
-    update_con_info();                      // update connections info structs (max once per 100 ms)
+    update_con_info();                  // update connections info structs (max once per 100 ms)
 
-    if(!handles_got(handle, NULL)) {        // we don't have this handle? fail
+    if(!handle_valid(handle)) {         // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -41,26 +40,22 @@ int16 CNkick (int16 handle)
 
 CIB *CNgetinfo (int16 handle)
 {
-    int index;
-
-    if(!handles_got(handle, &index)) {      // we don't have this handle? fail
+    if(!handle_valid(handle)) {         // we don't have this handle? fail
         return (CIB *) NULL;
     }
 
-    update_con_info();                      // update connections info structs (max once per 100 ms)
+    update_con_info();                  // update connections info structs (max once per 100 ms)
 
-	return &cibs[index];                    // return pointer to correct CIB
+	return &cibs[handle];               // return pointer to correct CIB
 }
 
 int16 CNbyte_count (int16 handle)
 {
-    int index;
-    
-    if(!handles_got(handle, &index)) {      // we don't have this handle? fail
+    if(!handle_valid(handle)) {         // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
-    update_con_info();                      // update connections info structs (max once per 100 ms)
+    update_con_info();                  // update connections info structs (max once per 100 ms)
 
 
     
@@ -72,9 +67,7 @@ int16 CNbyte_count (int16 handle)
 // data retrieval functions
 int16 CNget_char (int16 handle)
 {   
-    int index;
-
-    if(!handles_got(handle, &index)) {      // we don't have this handle? fail
+    if(!handle_valid(handle)) {         // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -84,9 +77,7 @@ int16 CNget_char (int16 handle)
 
 NDB *CNget_NDB (int16 handle)
 {
-    int index;
-
-    if(!handles_got(handle, &index)) {      // we don't have this handle? fail
+    if(!handle_valid(handle)) {         // we don't have this handle? fail
         return (NDB *) NULL;
     }
 
@@ -96,9 +87,7 @@ NDB *CNget_NDB (int16 handle)
 
 int16 CNget_block (int16 handle, void *buffer, int16 length)
 {
-    int index;
-
-    if(!handles_got(handle, &index)) {      // we don't have this handle? fail
+    if(!handle_valid(handle)) {         // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -108,9 +97,7 @@ int16 CNget_block (int16 handle, void *buffer, int16 length)
 
 int16 CNgets (int16 handle, char *buffer, int16 length, char delimiter)
 {
-    int index;
-
-    if(!handles_got(handle, &index)) {      // we don't have this handle? fail
+    if(!handle_valid(handle)) {         // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -121,35 +108,21 @@ int16 CNgets (int16 handle, char *buffer, int16 length, char delimiter)
 //--------------------------------------
 // helper functions
 
-void handles_init(void)
+void structs_init(void)
 {
     int i;
     
     for(i=0; i<MAX_HANDLE; i++) {
-        handles[i] = 0;
         memset(&cibs[i], 0, sizeof(CIB));
     }
 }
 
-int handles_got(int16 h, int *index)
+int handle_valid(int16 h)
 {
-    int i;
+    if(h >=0 && h <= MAX_HANDLE) {
+        return TRUE;
+    }
     
-    for(i=0; i<MAX_HANDLE; i++) {           // see if we got this handle
-        if(handles[i] == h) {               // handle is matching
-            if(index != NULL) {             // got pointer to where we could store index?
-                *index = i;
-            }
-        
-            return TRUE;
-        }
-    }
-
-    // we didn't find the handle
-    if(index != NULL) {                     // got pointer to where we could store index?
-        *index = i;
-    }
-
     return FALSE;
 }
 

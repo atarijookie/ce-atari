@@ -49,7 +49,7 @@ int16 TCP_open(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_size)
     BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
 	if(res != OK) {                                 // if failed, return FALSE 
-		return E_UNREACHABLE;
+		return E_LOSTCARRIER;
 	}
 
     if(handleIsFromCE(res)) {                       // if it's CE handle
@@ -67,14 +67,12 @@ int16 TCP_open(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_size)
     } 
 
     // it's not a CE handle
-    return extendByteToWord(res);               // extend the BYTE error code to WORD
+    return extendByteToWord(res);                   // extend the BYTE error code to WORD
 }
 
 int16 TCP_close(int16 handle, int16 mode, int16 *result)
 {
-    int index;
-
-    if(!handles_got(handle, &index)) {          // we don't have this handle? fail
+    if(!handle_valid(handle)) {                     // we don't have this handle? fail
         return E_BADHANDLE;
     }
     
@@ -90,20 +88,17 @@ int16 TCP_close(int16 handle, int16 mode, int16 *result)
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                             // if failed, return FALSE 
-		return 0;
+	if(res != OK) {                                 // if failed, return FALSE 
+		return E_LOSTCARRIER;
 	}
 
-    // TODO: more handling here
-    
-    return (E_BADHANDLE);
+    memset(&cibs[handle], 0, sizeof(CIB));          // clear the CIB structure
+    return E_NORMAL;
 }
 
 int16 TCP_send(int16 handle, void *buffer, int16 length)
 {
-    int index;
-
-    if(!handles_got(handle, &index)) {          // we don't have this handle? fail
+    if(!handle_valid(handle)) {                     // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -121,8 +116,8 @@ int16 TCP_send(int16 handle, void *buffer, int16 length)
     // send it to host
     BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                             // if failed, return FALSE 
-		return E_BADHANDLE;
+	if(res != OK) {                                  // if failed, return FALSE 
+		return E_LOSTCARRIER;
 	}
 
     // TODO: add handling 
@@ -132,9 +127,7 @@ int16 TCP_send(int16 handle, void *buffer, int16 length)
 
 int16 TCP_wait_state(int16 handle, int16 state, int16 timeout)
 {
-    int index;
-
-    if(!handles_got(handle, &index)) {          // we don't have this handle? fail
+    if(!handle_valid(handle)) {                     // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -151,8 +144,8 @@ int16 TCP_wait_state(int16 handle, int16 state, int16 timeout)
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                             // if failed, return FALSE 
-		return 0;
+	if(res != OK) {                                 // if failed, return FALSE 
+		return E_LOSTCARRIER;
 	}
 
     // TODO: more handling here
@@ -162,9 +155,7 @@ int16 TCP_wait_state(int16 handle, int16 state, int16 timeout)
 
 int16 TCP_ack_wait(int16 handle, int16 timeout)
 {
-    int index;
-
-    if(!handles_got(handle, &index)) {          // we don't have this handle? fail
+    if(!handle_valid(handle)) {                     // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -180,8 +171,8 @@ int16 TCP_ack_wait(int16 handle, int16 timeout)
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                             // if failed, return FALSE 
-		return 0;
+	if(res != OK) {                                 // if failed, return FALSE 
+		return E_LOSTCARRIER;
 	}
 
     // TODO: more handling here
@@ -191,9 +182,7 @@ int16 TCP_ack_wait(int16 handle, int16 timeout)
 
 int16 TCP_info(int16 handle, void *tcp_info)
 {
-    int index;
-
-    if(!handles_got(handle, &index)) {          // we don't have this handle? fail
+    if(!handle_valid(handle)) {                     // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -208,8 +197,8 @@ int16 TCP_info(int16 handle, void *tcp_info)
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                             // if failed, return FALSE 
-		return 0;
+	if(res != OK) {                                 // if failed, return FALSE 
+		return E_LOSTCARRIER;
 	}
 
     // TODO: more handling here

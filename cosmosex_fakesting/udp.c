@@ -47,15 +47,15 @@ int16 UDP_open (uint32 rem_host, uint16 rem_port)
     BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
 	if(res != OK) {                                 // if failed, return FALSE 
-		return E_UNREACHABLE;
+		return E_LOSTCARRIER;
 	}
 
     if(handleIsFromCE(res)) {                       // if it's CE handle
         int stHandle = handleCEtoAtari(res);        // convert it to ST handle
 
         // store info to CIB and CAB structures
-        cibs[stHandle].protocol     = TCP;
-        cibs[stHandle].status       = 0;            // 0 means normal
+        cibs[stHandle].protocol         = TCP;
+        cibs[stHandle].status           = 0;        // 0 means normal
         cibs[stHandle].address.rport    = rem_port; // Remote machine port
         cibs[stHandle].address.rhost    = rem_host; // Remote machine IP address
         cibs[stHandle].address.lport    = 0;        // Local  machine port
@@ -70,9 +70,7 @@ int16 UDP_open (uint32 rem_host, uint16 rem_port)
 
 int16 UDP_close (int16 handle)
 {
-    int index;
-        
-    if(!handles_got(handle, &index)) {          // we don't have this handle? fail
+    if(!handle_valid(handle)) {          // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -85,22 +83,19 @@ int16 UDP_close (int16 handle)
     pBfr = storeWord    (pBfr, handle);
 
     // send it to host
-    WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+    BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                             // if failed, return FALSE 
-		return 0;
+	if(res != OK) {                             // if failed
+		return E_LOSTCARRIER;
 	}
 
-    // TODO: more handling here
-
-    return (E_BADHANDLE);
+    memset(&cibs[handle], 0, sizeof(CIB));    // clear the CIB structure
+    return E_NORMAL;
 }
 
 int16 UDP_send(int16 handle, void *buffer, int16 length)
 {
-    int index;
-
-    if(!handles_got(handle, &index)) {          // we don't have this handle? fail
+    if(!handle_valid(handle)) {          // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -119,7 +114,7 @@ int16 UDP_send(int16 handle, void *buffer, int16 length)
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
 	if(res != OK) {                             // if failed, return FALSE 
-		return 0;
+		return E_LOSTCARRIER;
 	}
 
     // TODO: more handling here

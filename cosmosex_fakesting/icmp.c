@@ -60,7 +60,7 @@ int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_len
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
 	if(res != OK) {                        										// if failed, return FALSE 
-		return 0;
+		return E_LOSTCARRIER;
 	}
 
     // TODO: more handling here

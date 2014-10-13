@@ -17,8 +17,8 @@ int16 CNget_char    (int16 handle);
 // helper functions
 void update_con_info(void);
 
-void handles_init(void);
-int  handles_got(int16 h, int *index);
+void structs_init(void);
+int  handle_valid(int16 h);
 
 //-------------------------------------
 
