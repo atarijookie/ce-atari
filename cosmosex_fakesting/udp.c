@@ -41,7 +41,7 @@ int16 UDP_open (uint32 rem_host, uint16 rem_port)
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                        										// if failed, return FALSE 
+	if(res != OK) {                             // if failed, return FALSE 
 		return 0;
 	}
 
@@ -52,7 +52,9 @@ int16 UDP_open (uint32 rem_host, uint16 rem_port)
 
 int16 UDP_close (int16 handle)
 {
-    if(!handles_got(handle)) {          // we don't have this handle? fail
+    int index;
+        
+    if(!handles_got(handle, &index)) {          // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -67,7 +69,7 @@ int16 UDP_close (int16 handle)
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                        										// if failed, return FALSE 
+	if(res != OK) {                             // if failed, return FALSE 
 		return 0;
 	}
 
@@ -78,7 +80,9 @@ int16 UDP_close (int16 handle)
 
 int16 UDP_send(int16 handle, void *buffer, int16 length)
 {
-    if(!handles_got(handle)) {          // we don't have this handle? fail
+    int index;
+
+    if(!handles_got(handle, &index)) {          // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -96,7 +100,7 @@ int16 UDP_send(int16 handle, void *buffer, int16 length)
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                        										// if failed, return FALSE 
+	if(res != OK) {                             // if failed, return FALSE 
 		return 0;
 	}
 

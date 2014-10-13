@@ -175,7 +175,7 @@ STX_API     stxl = { "MODULE_LAYER", "Peter Rottengatter", STX_LAYER_VERSION,
 GENERIC     cookie = { "STiKmagic", get_drv_func, ETM_exec, &conf, NULL, { (DRV_HDR *) &tpl, (DRV_HDR *) & stxl } };
 long        my_jar[8] = {  0L, 4L  };
 
-
+extern char semaphors[MAX_SEMAPHOR];
 
 long  init_cookie()
 {
@@ -214,62 +214,63 @@ long  init_cookie()
  }
 
 
-DRV_HDR *    get_drv_func (drv_name)
-
-char  *drv_name;
+DRV_HDR *get_drv_func (char *drv_name)
 {
-   int  count;
+    int  count;
 
-   for (count = 0; count < NUM_LAYER; count++)
+    for (count = 0; count < NUM_LAYER; count++)
         if (strcmp (cookie.layer[count]->module, drv_name) == 0)
-             return (cookie.layer[count]);
+            return (cookie.layer[count]);
 
-   return ((DRV_HDR *) NULL);
- }
-
-
-int16    ETM_exec (module)
-
-char  *module;
-
-{
-   return (0);
- }
-
-int16    resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
-{
-
-   return (E_CANTRESOLVE);
+    return ((DRV_HDR *) NULL);
 }
 
-
-void    serial_dummy()
+int16 ETM_exec (char *module)
 {
-   /* Do really nothing, as these functions are obsolete ! */
- }
 
-
-int16    carrier_detect()
-
-{
-   return (+1);
+    return 0;
 }
 
-
-void    house_keep()
+int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
 {
-   /* Do really nothing, as this function is obsolete ! */
+
+    return (E_CANTRESOLVE);
 }
 
-int16  set_flag (int16 flag)
+void house_keep(void)
 {
+    update_con_info();                          // update connections info structs (max once per 100 ms)
+}
 
+int16 set_flag(int16 flag)                      // set semaphore
+{
+    if(flag >= 0 && flag < MAX_SEMAPHOR) {      // valid semaphore number?
+        if(semaphors[flag] != 0) {              // It was set ? Return TRUE
+            return 1;
+        } else {                                // It wasn't set? 
+            semaphors[flag] = 0xff;             // set the semaphore
+            return 0;                           // return FALSE
+        }        
+    } 
+    
+    // invalid semaphore number? return false
 	return 0;
 }
 
-void  clear_flag (int16 flag)
+void clear_flag (int16 flag)                    // clear semaphore
 {
-
+    if(flag >= 0 && flag < MAX_SEMAPHOR) {      // valid semaphore number?
+        semaphors[flag] = 0;
+    }
 }
 
- 
+void serial_dummy(void)
+{
+    // Do really nothing - obsolete
+}
+
+int16 carrier_detect(void)
+{
+    // Do really nothing - obsolete
+    return 1;
+} 

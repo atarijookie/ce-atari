@@ -30,6 +30,8 @@
 #define NET_CMD_CNGETINFO               0x45
 #define NET_CMD_CNGETS                  0x46
 
+#define NET_CMD_CN_UPDATE_INFO          0x47
+
 // MISC
 #define NET_CMD_RESOLVE                 0x50
 #define NET_CMD_ON_PORT                 0x51

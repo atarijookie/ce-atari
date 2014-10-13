@@ -43,7 +43,7 @@ int16 TCP_open(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_size)
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                        										// if failed, return FALSE 
+	if(res != OK) {                             // if failed, return FALSE 
 		return 0;
 	}
 
@@ -54,7 +54,9 @@ int16 TCP_open(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_size)
 
 int16 TCP_close(int16 handle, int16 mode, int16 *result)
 {
-    if(!handles_got(handle)) {          // we don't have this handle? fail
+    int index;
+
+    if(!handles_got(handle, &index)) {          // we don't have this handle? fail
         return E_BADHANDLE;
     }
     
@@ -70,7 +72,7 @@ int16 TCP_close(int16 handle, int16 mode, int16 *result)
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                        										// if failed, return FALSE 
+	if(res != OK) {                             // if failed, return FALSE 
 		return 0;
 	}
 
@@ -81,7 +83,9 @@ int16 TCP_close(int16 handle, int16 mode, int16 *result)
 
 int16 TCP_send(int16 handle, void *buffer, int16 length)
 {
-    if(!handles_got(handle)) {          // we don't have this handle? fail
+    int index;
+
+    if(!handles_got(handle, &index)) {          // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -99,7 +103,7 @@ int16 TCP_send(int16 handle, void *buffer, int16 length)
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                        										// if failed, return FALSE 
+	if(res != OK) {                             // if failed, return FALSE 
 		return 0;
 	}
 
@@ -110,7 +114,9 @@ int16 TCP_send(int16 handle, void *buffer, int16 length)
 
 int16 TCP_wait_state(int16 handle, int16 state, int16 timeout)
 {
-    if(!handles_got(handle)) {          // we don't have this handle? fail
+    int index;
+
+    if(!handles_got(handle, &index)) {          // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -127,7 +133,7 @@ int16 TCP_wait_state(int16 handle, int16 state, int16 timeout)
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                        										// if failed, return FALSE 
+	if(res != OK) {                             // if failed, return FALSE 
 		return 0;
 	}
 
@@ -138,7 +144,9 @@ int16 TCP_wait_state(int16 handle, int16 state, int16 timeout)
 
 int16 TCP_ack_wait(int16 handle, int16 timeout)
 {
-    if(!handles_got(handle)) {          // we don't have this handle? fail
+    int index;
+
+    if(!handles_got(handle, &index)) {          // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -154,7 +162,7 @@ int16 TCP_ack_wait(int16 handle, int16 timeout)
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                        										// if failed, return FALSE 
+	if(res != OK) {                             // if failed, return FALSE 
 		return 0;
 	}
 
@@ -165,7 +173,9 @@ int16 TCP_ack_wait(int16 handle, int16 timeout)
 
 int16 TCP_info(int16 handle, void *tcp_info)
 {
-    if(!handles_got(handle)) {          // we don't have this handle? fail
+    int index;
+
+    if(!handles_got(handle, &index)) {          // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -180,7 +190,7 @@ int16 TCP_info(int16 handle, void *tcp_info)
     // send it to host
     WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                        										// if failed, return FALSE 
+	if(res != OK) {                             // if failed, return FALSE 
 		return 0;
 	}
 

@@ -20,9 +20,6 @@
 #include "acsi.h"
 #include "ce_commands.h"
 
-#define  MAX_SEMAPHOR    64
-
-
 long    init_cookie (void);
 void    install (void);
 int16   init_cfg (void);

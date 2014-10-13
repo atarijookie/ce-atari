@@ -39,8 +39,8 @@ DRIVER  my_driver = {  my_set_state, my_cntrl, NULL, NULL, "Internal", "01.00", 
 
 void  init_ports(void)
 {
-   my_driver.basepage = _pbase;
-   my_port.driver = &my_driver;
+   my_driver.basepage   = (BASEPAGE *) _pbase;
+   my_port.driver       = &my_driver;
 
    conf.ports = &my_port;   conf.drivers = &my_driver;
 }

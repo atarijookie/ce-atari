@@ -14,6 +14,7 @@
 #define  STX_LAYER_VERSION     "01.05"
 #define  CFG_NUM               100
 #define  MAX_HANDLE            32
+#define  MAX_SEMAPHOR          64
 #define  LOOPBACK              0x7f000001L
 
 /*--------------------------------------------------------------------------*/
@@ -26,7 +27,6 @@
 #define HOSTMOD_FDD_SETUP           5
 
 /*--------------------------------------------------------------------------*/
-
 
 /*
  *   Protocols.
