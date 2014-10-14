@@ -14,6 +14,11 @@ int16 CNgets        (int16 handle, char *buffer, int16 length, char delimiter);
 int16 CNget_char    (int16 handle);
 
 //-------------------------------------
+// other functions
+
+int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num);
+
+//-------------------------------------
 // helper functions
 void update_con_info(void);
 

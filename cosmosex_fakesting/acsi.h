@@ -80,17 +80,4 @@ BYTE endcmd(WORD mode);
 BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 //---------------------------------------
 
-#ifdef ONPC
-
-typedef struct 
-{
-    BYTE ReadNotWrite;
-    BYTE cmd[14];
-    BYTE cmdLength;
-    BYTE sCountHi, sCountLo;
-} __attribute__((packed)) AcsiStream;
-
-#endif
-
-
 #endif

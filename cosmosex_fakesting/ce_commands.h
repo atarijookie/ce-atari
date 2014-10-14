@@ -39,5 +39,7 @@
 #define NET_CMD_QUERY_PORT              0x53
 #define NET_CMD_CNTRL_PORT              0x54
 
+#define NET_CMD_RESOLVE_GET_RESPONSE    0x55
+
 #endif
 

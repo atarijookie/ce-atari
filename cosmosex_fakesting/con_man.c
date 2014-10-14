@@ -292,3 +292,50 @@ int16 connection_send(int tcpNotUdp, int16 handle, void *buffer, int16 length)
 
 //-------------------------------------------------------------------------------
 
+int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
+{
+    BYTE res;
+    
+    commandShort[4] = NET_CMD_RESOLVE;
+    commandShort[5] = 0;
+    
+    strcpy((char *) pDmaBuffer, domain);                                // copy in the domain or dotted quad IP address
+
+    // send it to host
+    res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+
+	if(res != OK) {                                                     // if failed, return FALSE 
+		return E_CANTRESOLVE;
+	}
+
+    // now receive the response
+    memset(pDmaBuffer, 0, 512);
+    commandShort[4] = NET_CMD_RESOLVE_GET_RESPONSE;
+    
+    res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+
+	if(res != OK) {                                                     // if failed, return FALSE 
+		return E_CANTRESOLVE;
+	}
+
+    // possibly copy the real domain name
+    if(real_domain != NULL) {                                           // if got pointer to real domain
+        *real_domain = (char *) pDmaBuffer;                             // store the pointer to where the real domain should be
+    }
+    
+    // now copy the list of IPs to ip_list
+    int ipListCount = (int) pDmaBuffer[256];                            // get how many IPs we got from host
+    int ipCount     = (ip_num < ipListCount) ? ip_num : ipListCount;    // get the lower count - either what we may store (ip_num) or what we found (ipListCount)
+    
+    int i;
+    uint32 *pIPs = (uint32 *) &pDmaBuffer[258];
+    for(i=0; i<ipCount; i++) {                                          // copy all the IPs
+        ip_list[i] = pIPs[i];
+    }
+    
+    return ipCount;                                                     // Returns the number of dotted quad IP addresses filled in, or an error.
+}
+
+//-------------------------------------------------------------------------------
+
+

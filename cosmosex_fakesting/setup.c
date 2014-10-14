@@ -14,24 +14,21 @@
 
 #include "globdefs.h"
 #include "con_man.h"
+#include "setup.h"
 
 typedef  struct mem_header {
            struct mem_header  *mem_ptr;
            uint32             size;
-     } MEM_HDR;
+     } __attribute__((packed)) MEM_HDR;
 
 uint16	lock_exec(uint16 status);
 void           init_ports (void);
 
-void           install (void);
+void      install (void);
 int32     set_sysvars (int16 new_act, int16 new_frac);
 void      query_chains (PORT **port, DRIVER **drv, LAYER **layer);
 char *    get_error_text (int16 error_code);
-int16          KRinitialize (int32 size);
-void *    KRmalloc (int32 size);
-void      KRfree (void *mem_block);
-int32     KRgetfree (int16 block_flag);
-void *    KRrealloc (void *mem_block, int32 new_size);
+
 
 extern CONFIG 	conf;
 extern LAYER  	icmp_desc;
@@ -97,7 +94,6 @@ void install(void)
     }
 }
 
-
 int32 set_sysvars (int16 new_active, int16 new_fraction)
 {
    long  old_values;
@@ -111,16 +107,14 @@ int32 set_sysvars (int16 new_active, int16 new_fraction)
         conf.thread_rate = new_fraction;
 
    return (old_values);
- }
-
+}
 
 void query_chains (PORT **port_ptr, DRIVER **drv_ptr, LAYER **layer_ptr)
 {
    if (port_ptr)    *port_ptr  = conf.ports;
    if (drv_ptr)     *drv_ptr   = conf.drivers;
    if (layer_ptr)   *layer_ptr = conf.layers;
- }
-
+}
 
 char *get_error_text (int16 error_code)
 {
@@ -130,8 +124,7 @@ char *get_error_text (int16 error_code)
         return ("");
 
    return (error_array[error_code]);
- }
-
+}
 
 int16 KRinitialize (int32 size)
 {

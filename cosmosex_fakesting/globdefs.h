@@ -1,9 +1,10 @@
-/*
- *      globdefs.h          (c) Peter Rottengatter  1996
- *                              perot@pallas.amp.uni-hannover.de
- *
- *      Included into all STinG source code files
- */
+#ifndef _GLOBDEFS_H_
+#define _GLOBDEFS_H_
+
+//----------------------------------------
+// CosmosEx fake STiNG - by Jookie, 2014
+// Based on sources of original STiNG
+//----------------------------------------
 
 #include <mint/basepage.h>
  
@@ -62,7 +63,7 @@ typedef  struct ndb {
     char        *ndata;     /* Pointer to next data to deliver              */
     uint16      len;        /* Length of remaining data.                    */
     struct ndb  *next;      /* Next NDB in chain or NULL                    */
- } NDB;
+ } __attribute__((packed)) NDB;
 
 
 /*
@@ -74,7 +75,7 @@ typedef  struct cab {
     uint16      rport;      /* Remote port        (ie: remote machine)      */
     uint32      rhost;      /* Remote IP address  (ie: remote machine)      */
     uint32      lhost;      /* Local  IP address  (ie: local machine)       */
- } CAB;
+ } __attribute__((packed)) CAB;
 
 
 /*
@@ -85,7 +86,7 @@ typedef  struct cib {
     uint16      protocol;   /* TCP or UDP or ... 0 means CIB is not in use  */
     CAB         address;    /* Adress information                           */
     uint16      status;     /* Net status. 0 means normal                   */
- } CIB;
+ } __attribute__((packed)) CIB;
 
 
 
@@ -111,7 +112,7 @@ typedef  struct ip_header {
     uint16    hdr_chksum;       /* Header checksum                          */
     uint32    ip_src;           /* Source IP address                        */
     uint32    ip_dest;          /* Destination IP address                   */
- } IP_HDR;
+ } __attribute__((packed)) IP_HDR;
 
 
 /*
@@ -128,7 +129,7 @@ typedef  struct ip_packet {
     uint32    ip_gateway;       /* Gateway for forwarding this packet       */
     struct port_desc  *recvd;   /* Receiving port                           */
     struct ip_packet  *next;    /* Next IP packet in IP packet queue        */
- } IP_DGRAM;
+ } __attribute__((packed)) IP_DGRAM;
 
 
 /*
@@ -141,7 +142,7 @@ typedef  struct defrag_rsc {
     uint16    act_space;        /* Current space of reassembly buffer       */
     void      *blk_bits;        /* Fragment block bits table                */
     struct defrag_rsc  *next;   /* Next defrag resources in defrag queue    */
- } DEFRAG;
+ } __attribute__((packed)) DEFRAG;
 
 
 /*
@@ -153,7 +154,7 @@ typedef  struct protocol_entry {
     IP_DGRAM  *queue;           /* Link to first entry in received queue    */
     DEFRAG    *defrag;          /* Link to defragmentation queue            */
     int16  (* process)	(IP_DGRAM *);   /* Call to process packet     */
- } IP_PRTCL;
+ } __attribute__((packed)) IP_PRTCL;
 
 
 
@@ -180,7 +181,7 @@ typedef  struct port_desc {
     int16     stat_dropped;     /* Statistics of dropped datagrams          */
     struct drv_desc   *driver;  /* Driver program to handle this port       */
     struct port_desc  *next;    /* Next port in port chain                  */
- } PORT;
+ } __attribute__((packed)) PORT;
 
 
 /*
@@ -212,7 +213,7 @@ typedef  struct drv_desc {
     char             *author;   /* Name of programmer                       */
     struct drv_desc  *next;     /* Next driver in driver chain              */
     BASEPAGE         *basepage; /* Basepage of this module                  */
- } DRIVER;
+ } __attribute__((packed)) DRIVER;
 
 
 
@@ -232,7 +233,7 @@ typedef  struct lay_desc {
     int16            stat_dropped;   /* Statistics of dropped data units    */
     struct lay_desc  *next;          /* Next layer in driver chain          */
     BASEPAGE         *basepage;      /* Basepage of this module             */
- } LAYER;
+ } __attribute__((packed)) LAYER;
 
 
 
@@ -246,7 +247,7 @@ typedef  struct lay_desc {
 typedef  struct func_list {
     int16        (* handler) (IP_DGRAM *);
     struct func_list  *next;
- } FUNC_LIST;
+ } __attribute__((packed)) FUNC_LIST;
 
 
 
@@ -265,7 +266,7 @@ typedef  struct cn_funcs {
     int16    (* CNget_block) (void *, void *, int16);
     CIB *    (* CNgetinfo) (void *);
     int16    (* CNgets) (void *, char *, int16, char);
- } CN_FUNCS;
+ } __attribute__((packed)) CN_FUNCS;
 
 
 
@@ -298,7 +299,7 @@ typedef  struct config {
     int32      stat_unreach;    /* Dropped due to no way to deliver it      */
     void       *memory;         /* Pointer to main memory for KRcalls       */
     int16      new_cookie;      /* Flag indicating if new jar was created   */
- } CONFIG;
+ } __attribute__((packed)) CONFIG;
 
 
 
@@ -314,7 +315,7 @@ typedef  struct route_entry {
     uint32  netmask;            /* Corresponding subnet mask                */
     uint32  ip_gateway;         /* Next gateway on the way to dest. host    */
     PORT    *port;              /* Port to route the datagram to            */
- } ROUTE_ENTRY;
+ } __attribute__((packed)) ROUTE_ENTRY;
 
 
 /*
@@ -378,7 +379,7 @@ typedef  struct pnta {
     PORT    *opaque;            /* PORT for current name                    */
     int16   name_len;           /* Length of port name buffer               */
     char    *port_name;         /* Buffer address                           */
- } PNTA;
+ } __attribute__((packed)) PNTA;
 
 
 #define  CTL_KERN_FIRST_PORT    ('K' << 8 | 'F')    /* Query first port     */
@@ -473,5 +474,7 @@ Error return values:
 #define handleAtariToCE(X)		(X  + 0x50)
 #define handleCEtoAtari(X)		(X  - 0x50)
 
+
+#endif
 
 
