@@ -97,7 +97,7 @@ int16 TCP_ack_wait(int16 handle, int16 timeout)
     return (E_BADHANDLE);
 }
 
-int16 TCP_info(int16 handle, void *tcp_info)
+int16 TCP_info(int16 handle, TCPIB *tcp_info)
 {
     if(!handle_valid(handle)) {                     // we don't have this handle? fail
         return E_BADHANDLE;

@@ -73,7 +73,7 @@ typedef  struct client_layer {
     int16        (* ICMP_handler)    (int16 (*) (IP_DGRAM *), int16);
     void         (* ICMP_discard)    (IP_DGRAM *);
 	//-------------
-    int16        (* TCP_info) (int16, void *);
+    int16        (* TCP_info) (int16, TCPIB *);
     int16        (* cntrl_port) (char *, uint32, int16);				// Inquires and sets various parameters of STinG ports.
  } __attribute__((packed)) CLIENT_API;
 

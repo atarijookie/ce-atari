@@ -70,7 +70,7 @@ typedef  struct ndb {
  *   Addressing information block.
  */
 
-typedef  struct cab {
+typedef  struct {
     uint16      lport;      /* Local  port        (ie: local machine)       */
     uint16      rport;      /* Remote port        (ie: remote machine)      */
     uint32      rhost;      /* Remote IP address  (ie: remote machine)      */
@@ -82,13 +82,16 @@ typedef  struct cab {
  *   Connection information block.
  */
 
-typedef  struct cib {
+typedef  struct {
     uint16      protocol;   /* TCP or UDP or ... 0 means CIB is not in use  */
     CAB         address;    /* Adress information                           */
     uint16      status;     /* Net status. 0 means normal                   */
  } __attribute__((packed)) CIB;
 
 
+typedef struct tcpib {      /* TCP Information Block                        */
+    int16       state;      /* Connection state                             */
+ } __attribute__((packed)) TCPIB;
 
 /*--------------------------------------------------------------------------*/
 
@@ -97,7 +100,7 @@ typedef  struct cib {
  *   IP packet header.
  */
 
-typedef  struct ip_header {
+typedef struct {
     unsigned  version   : 4;    /* IP Version                               */
     unsigned  hd_len    : 4;    /* Internet Header Length                   */
     unsigned  tos       : 8;    /* Type of Service                          */
@@ -136,7 +139,7 @@ typedef  struct ip_packet {
  *   Defragmentation queue entries.
  */
 
-typedef  struct defrag_rsc {
+typedef struct defrag_rsc {
     IP_DGRAM  *dgram;           /* Datagram to be reassembled               */
     uint16    ttl_data;         /* Total data length for defragmentation    */
     uint16    act_space;        /* Current space of reassembly buffer       */
@@ -149,7 +152,7 @@ typedef  struct defrag_rsc {
  *   Protocol array entry for received data.
  */
 
-typedef  struct protocol_entry {
+typedef  struct {
     int16     active;           /* Protocol is installed                    */
     IP_DGRAM  *queue;           /* Link to first entry in received queue    */
     DEFRAG    *defrag;          /* Link to defragmentation queue            */
@@ -258,7 +261,7 @@ typedef  struct func_list {
  *   CN functions structure for TCP and UDP.
  */
 
-typedef  struct cn_funcs {
+typedef  struct {
     int16    (* CNkick) (void *);
     int16    (* CNbyte_count) (void *);
     int16    (* CNget_char) (void *);
@@ -277,7 +280,7 @@ typedef  struct cn_funcs {
  *   STinG global configuration structure.
  */
 
-typedef  struct config {
+typedef  struct {
     uint32     client_ip;       /* IP address of local machine (obsolete)   */
     uint16     ttl;             /* Default TTL for normal packets           */
     char       *cv[CFG_NUM+1];  /* Space for config variables               */
@@ -310,7 +313,7 @@ typedef  struct config {
  *   Entry for routing table.
  */
 
-typedef  struct route_entry {
+typedef  struct {
     uint32  template;           /* Net to be reached this way               */
     uint32  netmask;            /* Corresponding subnet mask                */
     uint32  ip_gateway;         /* Next gateway on the way to dest. host    */
@@ -375,7 +378,7 @@ typedef  struct route_entry {
  *   Buffer for inquiring port names.
  */
 
-typedef  struct pnta {
+typedef  struct {
     PORT    *opaque;            /* PORT for current name                    */
     int16   name_len;           /* Length of port name buffer               */
     char    *port_name;         /* Buffer address                           */
