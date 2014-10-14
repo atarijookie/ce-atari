@@ -122,11 +122,15 @@ void structs_init(void)
 
 int handle_valid(int16 h)
 {
-    if(h >=0 && h <= MAX_HANDLE) {
-        return TRUE;
+    if(h < 0 && h >= MAX_HANDLE) {                                          // handle out of range?
+        return FALSE;
     }
     
-    return FALSE;
+    if(cibs[h].address.rhost == 0 && cibs[h].address.rport == 0) {          // if connection not open 
+        return FALSE;
+    }
+    
+    return TRUE;
 }
 
 void update_con_info(void)

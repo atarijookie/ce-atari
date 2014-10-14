@@ -17,9 +17,10 @@
 #define NET_CMD_UDP_SEND                0x22
 
 // ICMP FUNCTIONS
-#define NET_CMD_ICMP_SEND               0x30
-#define NET_CMD_ICMP_HANDLER            0x31
-#define NET_CMD_ICMP_DISCARD            0x32
+#define NET_CMD_ICMP_SEND_EVEN          0x30
+#define NET_CMD_ICMP_SEND_ODD           0x31
+#define NET_CMD_ICMP_HANDLER            0x32
+#define NET_CMD_ICMP_DISCARD            0x33
 
 // CONNECTION MANAGER
 #define NET_CMD_CNKICK                  0x40
