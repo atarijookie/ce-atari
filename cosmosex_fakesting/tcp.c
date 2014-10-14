@@ -59,7 +59,7 @@ int16 TCP_wait_state(int16 handle, int16 state, int16 timeout)
     pBfr = storeWord    (pBfr, timeout);
 
     // send it to host
-    WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+    BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
 	if(res != OK) {                                 // if failed, return FALSE 
 		return E_LOSTCARRIER;
@@ -67,7 +67,7 @@ int16 TCP_wait_state(int16 handle, int16 state, int16 timeout)
 
     // TODO: more handling here
 
-    return (E_BADHANDLE);
+    return extendByteToWord(res);
 }
 
 int16 TCP_ack_wait(int16 handle, int16 timeout)
@@ -76,25 +76,8 @@ int16 TCP_ack_wait(int16 handle, int16 timeout)
         return E_BADHANDLE;
     }
 
-    // first store command code
-    commandShort[4] = NET_CMD_TCP_ACK_WAIT;
-    commandShort[5] = 0;
-    
-    // then store the params in buffer
-    BYTE *pBfr = pDmaBuffer;
-    pBfr = storeWord    (pBfr, handle);
-    pBfr = storeWord    (pBfr, timeout);
-
-    // send it to host
-    WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
-
-	if(res != OK) {                                 // if failed, return FALSE 
-		return E_LOSTCARRIER;
-	}
-
-    // TODO: more handling here
-    
-    return (E_BADHANDLE);
+    // GlueSTiK inspired -- incompatibility:  Does nothing. Linux handles this internally.
+    return E_NORMAL;
 }
 
 int16 TCP_info(int16 handle, TCPIB *tcp_info)
@@ -112,7 +95,7 @@ int16 TCP_info(int16 handle, TCPIB *tcp_info)
     pBfr = storeWord    (pBfr, handle);
 
     // send it to host
-    WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+    BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
 	if(res != OK) {                                 // if failed, return FALSE 
 		return E_LOSTCARRIER;
@@ -120,6 +103,6 @@ int16 TCP_info(int16 handle, TCPIB *tcp_info)
 
     // TODO: more handling here
     
-    return (E_BADHANDLE);
+    return extendByteToWord(res);
 }
 

@@ -25,12 +25,14 @@ extern BYTE *pDmaBuffer;
         CIB     cibs[MAX_HANDLE];
 extern  uint32  localIP;
 
+        DWORD   bytesToRead[MAX_HANDLE];                    // how many bytes we can read from this connection
+        BYTE    tcpConnectionStates[MAX_HANDLE];            // TCP connection states -- TCLOSED, TLISTEN, ...
 //---------------------
 
 //--------------------------------------
 // connection info function
 
-int16 CNkick (int16 handle)
+int16 CNkick(int16 handle)
 {
     update_con_info();                  // update connections info structs (max once per 100 ms)
 
@@ -41,7 +43,7 @@ int16 CNkick (int16 handle)
 	return E_NORMAL;
 }
 
-CIB *CNgetinfo (int16 handle)
+CIB *CNgetinfo(int16 handle)
 {
     if(!handle_valid(handle)) {         // we don't have this handle? fail
         return (CIB *) NULL;
@@ -60,10 +62,12 @@ int16 CNbyte_count (int16 handle)
 
     update_con_info();                  // update connections info structs (max once per 100 ms)
 
-
+    if(bytesToRead[handle] > 0x7FFF) {  // if we can now receive more than 0x7FFF bytes, return just 0x7FFF, because otherwise it would look like negative error
+        return 0x7FFF;
+    } 
     
-    
-    return 0;
+    // if have less than 0x7FFF, just return the value             
+    return bytesToRead[handle];
 }
 
 //-------------------------------------
@@ -74,6 +78,15 @@ int16 CNget_char (int16 handle)
         return E_BADHANDLE;
     }
 
+    update_con_info();                  // update connections info structs (max once per 100 ms)
+
+    if(bytesToRead[handle] == 0) {      // no data?
+        return E_NODATA;
+    }
+    
+    
+    
+    
 
     return 0;
 }
@@ -84,6 +97,14 @@ NDB *CNget_NDB (int16 handle)
         return (NDB *) NULL;
     }
 
+    update_con_info();                  // update connections info structs (max once per 100 ms)
+
+    if(bytesToRead[handle] == 0) {      // no data?
+        return (NDB *) E_NODATA;
+    }
+
+    
+    
     
     return 0;
 }
@@ -94,6 +115,14 @@ int16 CNget_block (int16 handle, void *buffer, int16 length)
         return E_BADHANDLE;
     }
 
+    update_con_info();                  // update connections info structs (max once per 100 ms)
+
+    if(bytesToRead[handle] == 0) {      // no data?
+        return E_NODATA;
+    }
+
+    
+    
     
     return 0;
 }
@@ -103,6 +132,15 @@ int16 CNgets (int16 handle, char *buffer, int16 length, char delimiter)
     if(!handle_valid(handle)) {         // we don't have this handle? fail
         return E_BADHANDLE;
     }
+
+    update_con_info();                  // update connections info structs (max once per 100 ms)
+
+    if(bytesToRead[handle] == 0) {      // no data?
+        return E_NODATA;
+    }
+
+
+
 
     
 	return 0;
@@ -151,13 +189,19 @@ void update_con_info(void)
 	
 	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);   // send command to host over ACSI 
 	
-    if(res == OK) {							                                // error? 
+    if(res != OK) {							                                // error? 
 		return;														
 	}
 
-
-
-        // TODO: move the data from buffer to structs
+    // now update our data from received data    
+    int i;
+    DWORD   *pBytesToRead   = (DWORD *)  pDmaBuffer;                        // offset   0: 32 * 4 bytes - bytes to read for each connection
+    BYTE    *pConnStatus    = (BYTE *)  (pDmaBuffer + 128);                 // offset 128: 32 * 1 bytes - connection status
+    
+    for(i=0; i<MAX_HANDLE; i++) {
+        bytesToRead[i]          = (DWORD)   pBytesToRead[i];
+        tcpConnectionStates[i]  = (BYTE)    pConnStatus[i];
+    }
 }
 
 //-------------------------------------------------------------------------------
