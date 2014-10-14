@@ -27,102 +27,19 @@ extern BYTE commandLong[CMD_LENGTH_LONG];
 extern BYTE *pDmaBuffer;
 //---------------------
 
-extern CIB      cibs[MAX_HANDLE];
-extern uint32   localIP;
-
-//---------------------
-
 int16 TCP_open(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_size)
 {
-    // first store command code
-    commandShort[4] = NET_CMD_TCP_OPEN;
-    commandShort[5] = 0;
-    
-    // then store the params in buffer
-    BYTE *pBfr = pDmaBuffer;
-    pBfr = storeDword   (pBfr, rem_host);
-    pBfr = storeWord    (pBfr, rem_port);
-    pBfr = storeWord    (pBfr, tos);
-    pBfr = storeWord    (pBfr, buff_size);
-
-    // send it to host
-    BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
-
-	if(res != OK) {                                 // if failed, return FALSE 
-		return E_LOSTCARRIER;
-	}
-
-    if(handleIsFromCE(res)) {                       // if it's CE handle
-        int stHandle = handleCEtoAtari(res);        // convert it to ST handle
-
-        // store info to CIB and CAB structures
-        cibs[stHandle].protocol         = TCP;
-        cibs[stHandle].status           = 0;        // 0 means normal
-        cibs[stHandle].address.rport    = rem_port; // Remote machine port
-        cibs[stHandle].address.rhost    = rem_host; // Remote machine IP address
-        cibs[stHandle].address.lport    = 0;        // Local  machine port
-        cibs[stHandle].address.lhost    = localIP;  // Local  machine IP address
-        
-        return stHandle;                            // return the new handle
-    } 
-
-    // it's not a CE handle
-    return extendByteToWord(res);                   // extend the BYTE error code to WORD
+    return connection_open(1, rem_host, rem_port, tos, buff_size);
 }
 
 int16 TCP_close(int16 handle, int16 mode, int16 *result)
 {
-    if(!handle_valid(handle)) {                     // we don't have this handle? fail
-        return E_BADHANDLE;
-    }
-    
-    // first store command code
-    commandShort[4] = NET_CMD_TCP_CLOSE;
-    commandShort[5] = 0;
-    
-    // then store the params in buffer
-    BYTE *pBfr = pDmaBuffer;
-    pBfr = storeWord    (pBfr, handle);
-    pBfr = storeWord    (pBfr, mode);
-
-    // send it to host
-    WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
-
-	if(res != OK) {                                 // if failed, return FALSE 
-		return E_LOSTCARRIER;
-	}
-
-    memset(&cibs[handle], 0, sizeof(CIB));          // clear the CIB structure
-    return E_NORMAL;
+    return connection_close(1, handle, mode, result);
 }
 
 int16 TCP_send(int16 handle, void *buffer, int16 length)
 {
-    if(!handle_valid(handle)) {                     // we don't have this handle? fail
-        return E_BADHANDLE;
-    }
-
-    // first store command code
-    commandShort[4] = NET_CMD_TCP_SEND;
-    commandShort[5] = 0;
-    
-    // then store the params in buffer
-    BYTE *pBfr = pDmaBuffer;
-    pBfr = storeWord    (pBfr, handle);
-    pBfr = storeWord    (pBfr, length);
-
-    // TODO: send the buffer
-    
-    // send it to host
-    BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
-
-	if(res != OK) {                                  // if failed, return FALSE 
-		return E_LOSTCARRIER;
-	}
-
-    // TODO: add handling 
-    
-    return E_BADHANDLE;
+    return connection_send(1, handle, buffer, length);
 }
 
 int16 TCP_wait_state(int16 handle, int16 state, int16 timeout)
@@ -205,3 +122,4 @@ int16 TCP_info(int16 handle, void *tcp_info)
     
     return (E_BADHANDLE);
 }
+

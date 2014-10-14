@@ -34,91 +34,16 @@ extern uint32   localIP;
 
 int16 UDP_open (uint32 rem_host, uint16 rem_port)
 {
-    // first store command code
-    commandShort[4] = NET_CMD_UDP_OPEN;
-    commandShort[5] = 0;
-    
-    // then store the params in buffer
-    BYTE *pBfr = pDmaBuffer;
-    pBfr = storeDword   (pBfr, rem_host);
-    pBfr = storeWord    (pBfr, rem_port);
-
-    // send it to host
-    BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
-
-	if(res != OK) {                                 // if failed, return FALSE 
-		return E_LOSTCARRIER;
-	}
-
-    if(handleIsFromCE(res)) {                       // if it's CE handle
-        int stHandle = handleCEtoAtari(res);        // convert it to ST handle
-
-        // store info to CIB and CAB structures
-        cibs[stHandle].protocol         = TCP;
-        cibs[stHandle].status           = 0;        // 0 means normal
-        cibs[stHandle].address.rport    = rem_port; // Remote machine port
-        cibs[stHandle].address.rhost    = rem_host; // Remote machine IP address
-        cibs[stHandle].address.lport    = 0;        // Local  machine port
-        cibs[stHandle].address.lhost    = localIP;  // Local  machine IP address
-        
-        return stHandle;                            // return the new handle
-    } 
-
-    // it's not a CE handle
-    return extendByteToWord(res);                   // extend the BYTE error code to WORD
+    return connection_open(0, rem_host, rem_port, 0, 0);
 }
 
 int16 UDP_close (int16 handle)
 {
-    if(!handle_valid(handle)) {          // we don't have this handle? fail
-        return E_BADHANDLE;
-    }
-
-    // first store command code
-    commandShort[4] = NET_CMD_UDP_CLOSE;
-    commandShort[5] = 0;
-    
-    // then store the params in buffer
-    BYTE *pBfr = pDmaBuffer;
-    pBfr = storeWord    (pBfr, handle);
-
-    // send it to host
-    BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
-
-	if(res != OK) {                             // if failed
-		return E_LOSTCARRIER;
-	}
-
-    memset(&cibs[handle], 0, sizeof(CIB));    // clear the CIB structure
-    return E_NORMAL;
+    return connection_close(0, handle, 0, NULL);
 }
 
 int16 UDP_send(int16 handle, void *buffer, int16 length)
 {
-    if(!handle_valid(handle)) {          // we don't have this handle? fail
-        return E_BADHANDLE;
-    }
-
-    // first store command code
-    commandShort[4] = NET_CMD_UDP_SEND;
-    commandShort[5] = 0;
-    
-    // then store the params in buffer
-    BYTE *pBfr = pDmaBuffer;
-    pBfr = storeWord    (pBfr, handle);
-    pBfr = storeWord    (pBfr, length);
-
-    // TODO: send the actual buffer
-    
-    // send it to host
-    WORD res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
-
-	if(res != OK) {                             // if failed, return FALSE 
-		return E_LOSTCARRIER;
-	}
-
-    // TODO: more handling here
-    
-    return (E_BADHANDLE);
+    return connection_send(0, handle, buffer, length);
 }
 
