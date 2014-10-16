@@ -40,10 +40,9 @@ extern BYTE commandLong[CMD_LENGTH_LONG];
 extern BYTE *pDta;
 extern BYTE tempDta[45];
 
-extern WORD dtaCurrent, dtaTotal;
 extern BYTE dtaBuffer[DTA_BUFFER_SIZE + 2];
 extern BYTE *pDtaBuffer;
-extern BYTE fsnextIsForUs, tryToGetMoreDTAs;
+extern BYTE fsnextIsForUs;
 
 BYTE getNextDTAsFromHost(void);
 DWORD copyNextDtaToAtari(void);

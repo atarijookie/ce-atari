@@ -42,10 +42,9 @@ extern BYTE commandLong[CMD_LENGTH_LONG];
 extern BYTE *pDta;
 extern BYTE tempDta[45];
 
-extern WORD dtaCurrent, dtaTotal;
 extern BYTE dtaBuffer[DTA_BUFFER_SIZE + 2];
 extern BYTE *pDtaBuffer;
-extern BYTE fsnextIsForUs, tryToGetMoreDTAs;
+extern BYTE fsnextIsForUs;
 
 BYTE *dtaBufferValidForPDta;
 
@@ -61,6 +60,9 @@ extern BYTE currentDrive;
 
 extern TFileBuffer fileBufs[MAX_FILES];
 
+#define GET_WORD(PTR)           (((WORD) (PTR)[0]) << 8) | ((WORD) (PTR)[1])
+#define SET_WORD(PTR,VALUE)     (PTR)[0] = (BYTE) (VALUE >> 8); (PTR)[1] = (BYTE) VALUE;
+    
 /* ------------------------------------------------------------------ */
 /* the custom GEMDOS handlers now follow */
 
@@ -391,9 +393,6 @@ int32_t custom_fsfirst( void *sp )
 	}
 	
 	/* initialize internal variables */
-	dtaCurrent			= 0;
-	dtaTotal			= 0;
-	tryToGetMoreDTAs	= 1;											/* mark that when we run out of DTAs in out buffer, then we should try to get more of them from host */
 	fsnextIsForUs		= TRUE;
 	
     //------------
@@ -406,8 +405,11 @@ int32_t custom_fsfirst( void *sp )
 	pDta[2] = ((DWORD) pDta) >>  8;
 	pDta[3] = ((DWORD) pDta)      ;
 	
-	pDta[4] = 0;														// index of the dir/file we've returned so far
-	pDta[5] = 0;
+    SET_WORD(pDta+4, 0);                                                // index of the dir/file we've returned so far
+    SET_WORD(pDta+6, 0);                                                // current DTA index in currently buffered DTAs (0 .. 21)
+    SET_WORD(pDta+8, 0);                                                // total DTAs there are in currently buffered DTAs (0 .. 22)
+    
+    pDta[10] = 1;                   								    /* mark that when we run out of DTAs in out buffer, then we should try to get more of them from host */
     //------------
 	
 	/* set the params to buffer */
@@ -457,7 +459,7 @@ int32_t custom_fsnext( void *sp )
 		if(res != E_OK) {												/* failed to get DTAs from host? */
 			onFsnext_last();											// tell host that we're done with this pDTA
 		
-			tryToGetMoreDTAs = 0;										/* do not try to receive more DTAs from host */
+			pDta[10] = 0;										        /* do not try to receive more DTAs from host */
             return extendByteToDword(ENMFIL);							/* return that we're out of files */
 		}
 	}
@@ -476,20 +478,26 @@ DWORD copyNextDtaToAtari(void)
 	useOldGDHandler = 1;
     pDta = (BYTE *) Fgetdta();
     //------------
-
+    WORD dtaCurrent, dtaTotal;
+    dtaCurrent  = GET_WORD(pDta + 6);                                   // restore variables from memory
+    dtaTotal    = GET_WORD(pDta + 8);                                   // restore variables from memory
+    
 	if(dtaCurrent >= dtaTotal) {										/* if we're out of buffered DTAs */
-		if(!tryToGetMoreDTAs) {											/* if shouldn't try to get more DTAs, quit without trying */
+		if(!pDta[10]) {											        /* if shouldn't try to get more DTAs, quit without trying */
 			onFsnext_last();											// tell host that we're done with this pDTA
 
             return extendByteToDword(ENMFIL);
 		}
 	
 		res = getNextDTAsFromHost();									/* now we need to get the buffer of DTAs from host */
+
+        dtaCurrent  = GET_WORD(pDta + 6);                               // restore variables from memory
+        dtaTotal    = GET_WORD(pDta + 8);                               // restore variables from memory
 		
 		if(res != E_OK) {												/* failed to get DTAs from host? */
 			onFsnext_last();											// tell host that we're done with this pDTA
 
-			tryToGetMoreDTAs = 0;										/* do not try to receive more DTAs from host */
+			pDta[10] = 0;										        /* do not try to receive more DTAs from host */
             return extendByteToDword(ENMFIL);							/* return that we're out of files */
 		}
 	}
@@ -504,12 +512,12 @@ DWORD copyNextDtaToAtari(void)
 	
 	dtaCurrent++;														/* move to the next DTA */
 		
+    SET_WORD(pDta + 6, dtaCurrent);                                     // update current DTA index in currently buffered DTAs (0 .. 21)
 	//--------------
 	// update the item index in the reserved part of DTA
-	WORD itemIndex	= (((WORD) pDta[4]) << 8) | ((WORD) pDta[5]);		// get the current dir 
+	WORD itemIndex	= GET_WORD(pDta + 4);                               // get the current dir 
 	itemIndex++;
-	pDta[4]			= (BYTE) (itemIndex >> 8);
-	pDta[5]			= (BYTE) (itemIndex     );
+    SET_WORD(pDta + 4, itemIndex);                                      // update current itemIndex
 	//--------------
 	
 	memcpy(pDta + 21, pCurrentDta, 23);									/* skip the reserved area of DTA and copy in the current DTA */
@@ -521,9 +529,9 @@ BYTE getNextDTAsFromHost(void)
 	DWORD res;
 
 	/* initialize the internal variables */
-	dtaCurrent	= 0;
-	dtaTotal	= 0;
-	
+    SET_WORD(pDta + 6, 0);                                                  // current DTA index in currently buffered DTAs (0 .. 21)
+    SET_WORD(pDta + 8, 0);                                                  // total DTAs there are in currently buffered DTAs (0 .. 22)
+    
 	commandLong[5] = GEMDOS_Fsnext;											/* store GEMDOS function number */
 
 	int i;
@@ -540,10 +548,9 @@ BYTE getNextDTAsFromHost(void)
 	}
 	
 	/* store the new total DTA number we have buffered */
-	dtaTotal  = pDtaBuffer[0];
-	dtaTotal  = dtaTotal << 8;
-	dtaTotal |= pDtaBuffer[1];
-	
+    pDta[8] = pDtaBuffer[0];                                                // total DTAs there are in currently buffered DTAs (0 .. 22)
+    pDta[9] = pDtaBuffer[1];
+    
 	return E_OK;
 }
 

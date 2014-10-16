@@ -61,10 +61,9 @@ BYTE commandLong[CMD_LENGTH_LONG]	= {0x1f,	0, 'C', 'E', HOSTMOD_TRANSLATED_DISK,
 BYTE *pDta;
 BYTE tempDta[45];
 
-WORD dtaCurrent, dtaTotal;
 BYTE dtaBuffer[DTA_BUFFER_SIZE + 2];
 BYTE *pDtaBuffer;
-BYTE fsnextIsForUs, tryToGetMoreDTAs;
+BYTE fsnextIsForUs;
 
 WORD ceDrives;
 WORD ceMediach;
@@ -120,10 +119,7 @@ int main( int argc, char* argv[] )
 	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
 
 	/* initialize internal stuff for Fsfirst and Fsnext */
-	dtaCurrent			= 0;
-	dtaTotal			= 0;
 	fsnextIsForUs		= 0;
-	tryToGetMoreDTAs	= 0;
 	pDtaBuffer		= &dtaBuffer[2];
 	pDtaBuffer		= (BYTE *) (((DWORD) pDtaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
 
