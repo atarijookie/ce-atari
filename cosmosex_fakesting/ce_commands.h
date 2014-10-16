@@ -21,6 +21,7 @@
 #define NET_CMD_ICMP_SEND_ODD           0x31
 #define NET_CMD_ICMP_HANDLER            0x32
 #define NET_CMD_ICMP_DISCARD            0x33
+#define NET_CMD_ICMP_GET_DGRAMS         0x34
 
 // CONNECTION MANAGER
 #define NET_CMD_CNKICK                  0x40

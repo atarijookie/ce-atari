@@ -8,6 +8,7 @@
 
 #include "globdefs.h"
 #include "con_man.h"
+#include "icmp.h"
 
 //---------------------
 // ACSI / CosmosEx stuff
@@ -195,12 +196,19 @@ void update_con_info(void)
 
     // now update our data from received data    
     int i;
-    DWORD   *pBytesToRead   = (DWORD *)  pDmaBuffer;                        // offset   0: 32 * 4 bytes - bytes to read for each connection
-    BYTE    *pConnStatus    = (BYTE *)  (pDmaBuffer + 128);                 // offset 128: 32 * 1 bytes - connection status
+    DWORD   *pBytesToRead       = (DWORD *)  pDmaBuffer;                        // offset   0: 32 * 4 bytes - bytes to read for each connection
+    BYTE    *pConnStatus        = (BYTE *)  (pDmaBuffer + 128);                 // offset 128: 32 * 1 bytes - connection status
+    DWORD   *pBytesToReadIcmp   = (DWORD *) (pDmaBuffer + 160);                 // offset 160:  1 * 1 DWORD - bytes that can be read from ICMP socket(s)
     
-    for(i=0; i<MAX_HANDLE; i++) {
+    for(i=0; i<MAX_HANDLE; i++) {                                               // retrieve all the data and fill the variables
         bytesToRead[i]          = (DWORD)   pBytesToRead[i];
         tcpConnectionStates[i]  = (BYTE)    pConnStatus[i];
+    }
+    
+    DWORD bytesToReadIcmp = (DWORD) *pBytesToReadIcmp;                          // get how many bytes we can read from ICMP socket(s)
+    
+    if(bytesToReadIcmp > 0) {                                                   // if we have something for ICMP to process?
+        icmp_processData(bytesToReadIcmp);
     }
 }
 

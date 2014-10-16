@@ -207,3 +207,13 @@ BYTE *storeDword(BYTE *bfr, DWORD value)
     
     return bfr;                         // return the updated buffer address
 }
+
+WORD getWord(BYTE *bfr)
+{
+    WORD val;
+    
+    val = ((WORD) bfr[0]) << 8;         // get upper part
+    val = val | ((WORD) bfr[1]);        // get lower part
+    
+    return val;
+}

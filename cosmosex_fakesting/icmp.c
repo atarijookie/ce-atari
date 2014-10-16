@@ -12,7 +12,7 @@
 #include <stdio.h>
 
 #include "globdefs.h"
-
+#include "icmp.h"
 
 #define  M_YEAR    16
 #define  M_MONTH   11
@@ -142,3 +142,59 @@ void ICMP_discard (IP_DGRAM *dgram)
     
 }
 
+void icmp_processData(uint32 bytesToReadIcmp)
+{
+    IP_DGRAM *pDgram;
+
+    // first store command code
+    commandShort[4] = NET_CMD_ICMP_GET_DGRAMS;                  // store function number
+    commandShort[5] = 0;
+    
+    // send it to host
+    BYTE res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+
+	if(res != OK) {                                             // if failed
+		return;
+	}
+
+    BYTE *pBfr = pDmaBuffer;
+    while(1) {
+        WORD cnt = getWord(pBfr);                               // get how many data is in the next DGRAM
+        
+        if(cnt == 0) {                                          // no data means end of sequence
+            break;
+        }
+        
+        pBfr += 2;                                              // advance to block of data beyond the count
+
+        pDgram              = (IP_DGRAM *) pBfr;                // first 48 bytes will be the structure IP_DGRAM, then pkt_data, then port_desc
+        pDgram->pkt_data    = (void *) pBfr + 48;
+        pDgram->pkt_length  = (cnt > 48) ? (cnt - 48) : 0;      // got more data than just the header? calculate how many data we have, otherwise just return 0
+        pDgram->next        = NULL;                             // there's no other packet queued to this one
+        
+        passDatagramToAllHandlers(pDgram);                      // now pass the datagram to all handlers
+        
+        pBfr += cnt;                                            // advance to the next count of data
+    }
+}
+
+void passDatagramToAllHandlers(IP_DGRAM *dgram)
+{
+    int i;
+    typedef int16 (* THandler) (IP_DGRAM *);                    // define type THandler, which will be a function returning int16 and accepting IP_DGRAM pointer
+    THandler hndlr;                                             // define a variable which will hold pointer to that function
+    int16 res;
+    
+    for(i=0; i<MAX_ICMP_HANDLERS; i++) {            
+        if(icmpHandlers[i] == 0) {                              // this isn't a valid handler? skip it
+            continue;
+        }
+                
+        hndlr   = (THandler) icmpHandlers[i];                   // cast DWORD to function pointer
+        res     = (*hndlr) (dgram);                             // call the function
+        
+        if(res == TRUE) {                                       // if the handler returns TRUE, then the DGRAM is processed and no other handler should process it
+            break;
+        }
+    }
+}
