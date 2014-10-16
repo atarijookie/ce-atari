@@ -16,6 +16,8 @@
 #include <ctype.h>
 #include <string.h>
 
+#include <gem.h>
+
 #include "globdefs.h"
 #include "acsi.h"
 #include "ce_commands.h"
@@ -107,6 +109,8 @@ int main()
    strcat (def_conf, ") installed ...");
    (void) Cconws(def_conf);
 
+   appl_init();                                 // init gem
+   
    Ptermres (_pgmsize, 0);
    return 0;
  }

@@ -413,6 +413,23 @@ typedef  struct {
 
 /*--------------------------------------------------------------------------*/
 
+/*
+ *   TCP connection states.
+ */
+
+#define  TCLOSED       0    /* No connection.  Null, void, absent, ...      */
+#define  TLISTEN       1    /* Wait for remote request                      */
+#define  TSYN_SENT     2    /* Connect request sent, await matching request */
+#define  TSYN_RECV     3    /* Wait for connection ack                      */
+#define  TESTABLISH    4    /* Connection established, handshake completed  */
+#define  TFIN_WAIT1    5    /* Await termination request or ack             */
+#define  TFIN_WAIT2    6    /* Await termination request                    */
+#define  TCLOSE_WAIT   7    /* Await termination request from local user    */
+#define  TCLOSING      8    /* Await termination ack from remote TCP        */
+#define  TLAST_ACK     9    /* Await ack of terminate request sent          */
+#define  TTIME_WAIT   10    /* Delay, ensures remote has received term' ack */
+
+/*--------------------------------------------------------------------------*/
 
 /*
  *   Miscellaneous Definitions.

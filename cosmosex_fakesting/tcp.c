@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include <gem.h>
+
 #include "globdefs.h"
 #include "tcp.h"
 #include "con_man.h"
@@ -25,6 +27,10 @@ extern BYTE deviceID;
 extern BYTE commandShort[CMD_LENGTH_SHORT];
 extern BYTE commandLong[CMD_LENGTH_LONG];
 extern BYTE *pDmaBuffer;
+//---------------------
+
+extern BYTE tcpConnectionStates[MAX_HANDLE];            // TCP connection states -- TCLOSED, TLISTEN, ...
+
 //---------------------
 
 int16 TCP_open(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_size)
@@ -42,32 +48,46 @@ int16 TCP_send(int16 handle, void *buffer, int16 length)
     return connection_send(1, handle, buffer, length);
 }
 
-int16 TCP_wait_state(int16 handle, int16 state, int16 timeout)
+int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
 {
-    if(!handle_valid(handle)) {                     // we don't have this handle? fail
+    if(!handle_valid(handle)) {                         // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
-    // first store command code
-    commandShort[4] = NET_CMD_TCP_WAIT_STATE;
-    commandShort[5] = 0;
+    DWORD timeStart = getTicks();
+    DWORD timeout2 = timeout * 200;    
     
-    // then store the params in buffer
-    BYTE *pBfr = pDmaBuffer;
-    pBfr = storeWord    (pBfr, handle);
-    pBfr = storeWord    (pBfr, state);
-    pBfr = storeWord    (pBfr, timeout);
+    while(1) {
+        update_con_info();                                  // update the info 
+        WORD currentState = tcpConnectionStates[handle];    // get the current state
+    
+        // if the wanted state is CLOSED or CLOSING, and the current state is similar - success
+        if(wantedState == TCLOSED || wantedState == TFIN_WAIT1 ||  wantedState == TFIN_WAIT2 ||  wantedState == TCLOSE_WAIT ||  wantedState == TCLOSING ||  wantedState == TLAST_ACK ||  wantedState == TTIME_WAIT) {
+            if(currentState == TCLOSED || currentState == TFIN_WAIT1 ||  currentState == TFIN_WAIT2 ||  currentState == TCLOSE_WAIT ||  currentState == TCLOSING ||  currentState == TLAST_ACK ||  currentState == TTIME_WAIT) {
+                break;
+            }
+        }
+    
+        // if the wanted state is CONNECTING or CONNECTED, and the current state is similar - success
+        if(wantedState == TSYN_SENT || wantedState == TSYN_RECV || wantedState == TESTABLISH) {
+            if(currentState == TSYN_SENT || currentState == TSYN_RECV || currentState == TESTABLISH) {
+                break;
+            }    
+        }
 
-    // send it to host
-    BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
-
-	if(res != OK) {                                 // if failed, return FALSE 
-		return E_LOSTCARRIER;
-	}
-
-    // TODO: more handling here
-
-    return extendByteToWord(res);
+        // for other matching cases, success
+        if(wantedState == currentState) {
+            break;
+        }
+        
+        if((getTicks() - timeStart) >= timeout2) {              // if timed out, fail 
+            return E_CNTIMEOUT;
+        }
+        
+        appl_yield();                                           // keep GEM apps responding
+    } 
+    
+    return E_NORMAL;
 }
 
 int16 TCP_ack_wait(int16 handle, int16 timeout)
@@ -85,24 +105,15 @@ int16 TCP_info(int16 handle, TCPIB *tcp_info)
     if(!handle_valid(handle)) {                     // we don't have this handle? fail
         return E_BADHANDLE;
     }
-
-    // first store command code
-    commandShort[4] = NET_CMD_TCP_INFO;
-    commandShort[5] = 0;
     
-    // then store the params in buffer
-    BYTE *pBfr = pDmaBuffer;
-    pBfr = storeWord    (pBfr, handle);
+    update_con_info();                              // update the info 
 
-    // send it to host
-    BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
-
-	if(res != OK) {                                 // if failed, return FALSE 
-		return E_LOSTCARRIER;
-	}
-
-    // TODO: more handling here
+    if(tcp_info == NULL) {                          // no pointer? fail
+        return E_BADHANDLE;
+    }
     
-    return extendByteToWord(res);
+    tcp_info->state = tcpConnectionStates[handle];  // return the connection state
+    
+    return E_NORMAL;
 }
 
