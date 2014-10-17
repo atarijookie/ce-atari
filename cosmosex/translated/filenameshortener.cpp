@@ -258,11 +258,11 @@ bool FilenameShortener::shortenExtension(char *shortFileName, char *nLongExt, ch
      char newName1[13];
      mergeFilenameAndExtension(shortFileName, nLongExt, false, newName1);
 
-     // if we don't have that filename in the list, this cut extension will work just fine
+     // if we don't have that SHORT filename in the list, this cut extension will work just fine
      std::map<std::string, std::string>::iterator it;
-     it = mapFilenameWithExt.find(newName1);                // try to find the string in the map
+     it = mapReverseFilename.find(newName1);                // try to find the string in the map
 
-     if(it == mapFilenameWithExt.end()) {                   // if we don't have this fileName already, use it!
+     if(it == mapReverseFilename.end()) {                   // if we don't have this fileName already, use it!
          strncpy(nShortExt, nLongExt, 3);                   // store the extension string
          nShortExt[3] = 0;
 
