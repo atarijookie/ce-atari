@@ -76,7 +76,7 @@ void ConfigStream::createScreen_acsiConfig(void)
 
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "ID         off   sd    raw  tran", 40, 0, 3, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "ID         off   sd    raw  ce_dd", 40, 0, 3, gotoOffset);
     comp->setReverse(true);
     screen.push_back(comp);
 
@@ -98,16 +98,16 @@ void ConfigStream::createScreen_acsiConfig(void)
 
     row = 17;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "off  - turned off, not responding here",      40, 0, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "off   - turned off, not responding here",      40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "sd   - SD card                (only one)",    40, 0, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "sd    - SD card               (only one)",    40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "raw  - raw sector access (use HDDr/ICD)",     40, 0, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "raw   - raw sector access (use HDDr/ICD)",     40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "tran - translated access      (only one)",	40, 0, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "ce_dd - for booting CE_DD driver",	40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  9, 13, gotoOffset);
@@ -441,7 +441,7 @@ void ConfigStream::onAcsiConfig_save(void)
     }
 
     if(tranCnt > 1) {										// more than 1 of this type?
-        showMessageScreen((char *) "Warning", (char *) "You have more than 1 translated drives\n\rselected. Unselect some to leave only\n\r1 active.");
+        showMessageScreen((char *) "Warning", (char *) "You have more than 1 CE_DD selected.\n\rUnselect some to leave only\n\r1 active.");
         return;
     }
 
