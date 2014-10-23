@@ -15,10 +15,10 @@ public:
     virtual bool isInit(void) = 0;
     virtual bool mediaChanged(void) = 0;
     virtual void setMediaChanged(bool changed) = 0;
-    virtual void getCapacity(DWORD &bytes, DWORD &sectors) = 0;
+    virtual void getCapacity(int64_t &bytes, int64_t &sectors) = 0;
 
-    virtual bool readSectors(DWORD sectorNo, DWORD count, BYTE *bfr) = 0;
-    virtual bool writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr) = 0;
+    virtual bool readSectors(int64_t sectorNo, DWORD count, BYTE *bfr) = 0;
+    virtual bool writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr) = 0;
 };
 
 #endif // IMEDIA_H

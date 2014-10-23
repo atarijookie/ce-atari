@@ -52,19 +52,19 @@ void SdMedia::setMediaChanged(bool changed)
 	mediaChangedFlag = changed;
 }
 
-void SdMedia::getCapacity(DWORD &bytes, DWORD &sectors)
+void SdMedia::getCapacity(int64_t &bytes, int64_t &sectors)
 {
     bytes   = capacityInSectors << 9;
     sectors = capacityInSectors;
 }
 
-bool SdMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool SdMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
 	// you should never call this, and if you do, you will fail
     return false;
 }
 
-bool SdMedia::writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool SdMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
 	// you should never call this, and if you do, you will fail
     return false;

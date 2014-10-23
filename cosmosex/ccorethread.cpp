@@ -278,8 +278,6 @@ void CCoreThread::handleAcsiCommand(void)
 
     conSpi->txRx(SPI_CS_HANS, 14, bufOut, bufIn);        // get 14 cmd bytes
 
-    Debug::out(LOG_DEBUG, "handleAcsiCommand: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5], bufIn[6], bufIn[7], bufIn[8], bufIn[9], bufIn[10], bufIn[11], bufIn[12], bufIn[13]);
-
     BYTE justCmd, tag1, tag2, module;
     BYTE *pCmd;
     BYTE isIcd = false;
@@ -302,14 +300,17 @@ void CCoreThread::handleAcsiCommand(void)
 
     module  = pCmd[3];                                  // get the host module ID
 
-
 	if(isIcd){
+        Debug::out(LOG_DEBUG, "handleAcsiCommand: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5], bufIn[6], bufIn[7], bufIn[8], bufIn[9], bufIn[10], bufIn[11], bufIn[12], bufIn[13]);
 	    Debug::out(LOG_DEBUG, "handleAcsiCommand isIcd");
-	}
-    Debug::out(LOG_DEBUG, "handleAcsiCommand module: %02x", module);
+	} else {
+        Debug::out(LOG_DEBUG, "handleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
+    }
 
     // ok, so the ID is right, let's see what we can do
     if(justCmd == 0 && tag1 == 'C' && tag2 == 'E') {    // if the command is 0 (TEST UNIT READY) and there's this CE tag
+        Debug::out(LOG_DEBUG, "handleAcsiCommand - CE specific command - module: %02x", module);
+
         switch(module) {
         case HOSTMOD_CONFIG:                            // config console command?
             wasHandled = true;

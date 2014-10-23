@@ -36,18 +36,18 @@ void NoMedia::setMediaChanged(bool changed)
 
 }
 
-void NoMedia::getCapacity(DWORD &bytes, DWORD &sectors)
+void NoMedia::getCapacity(int64_t &bytes, int64_t &sectors)
 {
     bytes   = 0;
     sectors = 0;
 }
 
-bool NoMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool NoMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
     return true;
 }
 
-bool NoMedia::writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool NoMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
     return true;
 }

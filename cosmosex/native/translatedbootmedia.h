@@ -19,17 +19,17 @@ public:
     virtual bool isInit(void);
     virtual bool mediaChanged(void);
     virtual void setMediaChanged(bool changed);
-    virtual void getCapacity(DWORD &bytes, DWORD &sectors);
+    virtual void getCapacity(int64_t &bytes, int64_t &sectors);
 
-    virtual bool readSectors(DWORD sectorNo, DWORD count, BYTE *bfr);
-    virtual bool writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr);
+    virtual bool readSectors(int64_t sectorNo, DWORD count, BYTE *bfr);
+    virtual bool writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr);
 
 	void updateBootsectorConfigWithACSIid(BYTE acsiId);
 	
 private:
 
-    DWORD	BCapacity;			// device capacity in bytes
-    DWORD	SCapacity;			// device capacity in sectors
+    int64_t	BCapacity;			// device capacity in bytes
+    int64_t	SCapacity;			// device capacity in sectors
 
 	bool	gotImage;
     BYTE	*imageBuffer;

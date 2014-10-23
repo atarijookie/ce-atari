@@ -214,13 +214,13 @@ void TranslatedBootMedia::setMediaChanged(bool changed)
     // nothing to do here
 }
 
-void TranslatedBootMedia::getCapacity(DWORD &bytes, DWORD &sectors)
+void TranslatedBootMedia::getCapacity(int64_t &bytes, int64_t &sectors)
 {
     bytes   = BCapacity;
     sectors = SCapacity;
 }
 
-bool TranslatedBootMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool TranslatedBootMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
         return false;
@@ -245,7 +245,7 @@ bool TranslatedBootMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
     return true;
 }
 
-bool TranslatedBootMedia::writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool TranslatedBootMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
 	return false;								// write not supported
 }

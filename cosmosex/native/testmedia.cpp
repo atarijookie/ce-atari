@@ -38,13 +38,13 @@ void TestMedia::setMediaChanged(bool changed)
 
 }
 
-void TestMedia::getCapacity(DWORD &bytes, DWORD &sectors)
+void TestMedia::getCapacity(int64_t &bytes, int64_t &sectors)
 {
     bytes   = 512;
     sectors = 1;
 }
 
-bool TestMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool TestMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
 	DWORD i;
     DWORD byteCount = count * 512;
@@ -56,7 +56,7 @@ bool TestMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
     return true;
 }
 
-bool TestMedia::writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool TestMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
 
     return true;

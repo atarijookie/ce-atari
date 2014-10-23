@@ -1,11 +1,14 @@
+#include <sys/types.h>
+#include <unistd.h>
+
 #include <stdio.h>
 #include <string.h>
 
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <linux/fs.h>
-#include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include "devicemedia.h"
 #include "../debug.h"
@@ -44,12 +47,14 @@ bool DeviceMedia::iopen(char *path, bool createIfNotExists)
 		return false;
 	}
 
-    BCapacity = size * 512;                		// capacity in bytes
-    SCapacity = size;              				// capacity in sectors
+    SCapacity = size;              				    // capacity in sectors
+    BCapacity = ((int64_t) size) * ((int64_t)512);  // capacity in bytes
 
     mediaHasChanged = false;
 
-    Debug::out(LOG_INFO, "DeviceMedia - open succeeded, capacity: %d MB", (int) (BCapacity / (1024 * 1024)));
+    int64_t capacityInMB = BCapacity / ((int64_t) (1024 * 1024));
+    
+    Debug::out(LOG_INFO, "DeviceMedia - open succeeded, capacity: %d MB, sectors: %08x", (int) capacityInMB, SCapacity);
 
     return true;
 }
@@ -84,22 +89,24 @@ void DeviceMedia::setMediaChanged(bool changed)
     mediaHasChanged = changed;
 }
 
-void DeviceMedia::getCapacity(DWORD &bytes, DWORD &sectors)
+void DeviceMedia::getCapacity(int64_t &bytes, int64_t &sectors)
 {
     bytes   = BCapacity;
     sectors = SCapacity;
 }
 
-bool DeviceMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool DeviceMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
+        Debug::out(LOG_DEBUG, "DeviceMedia::readSectors - not init");
         return false;
     }
 
-    off_t pos = sectorNo * 512;					// convert sector # to offset 
-	int res = lseek(fdes, pos, SEEK_SET);
+    off64_t pos = sectorNo * ((int64_t)512);    // convert sector # to offset 
+	int res = lseek64(fdes, pos, SEEK_SET);
 
     if(res < 0) {                              	// failed to lseek?
+        Debug::out(LOG_DEBUG, "DeviceMedia::readSectors - lseek64() failed, errno: %d", errno);
         return false;
     }
 
@@ -107,22 +114,25 @@ bool DeviceMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
 	size_t cnt = read(fdes, bfr, byteCount);	// try to read sector(s)
 	
     if(cnt != byteCount) {                      // not all data was read? fail
+        Debug::out(LOG_DEBUG, "DeviceMedia::readSectors - read() failed");
         return false;
     }
 
     return true;
 }
 
-bool DeviceMedia::writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool DeviceMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
+        Debug::out(LOG_DEBUG, "DeviceMedia::writeSectors - not init");
         return false;
     }
 
-    off_t pos = sectorNo * 512;					// convert sector # to offset 
-	int res = lseek(fdes, pos, SEEK_SET);
+    off64_t pos = sectorNo * ((int64_t)512);    // convert sector # to offset 
+	int res = lseek64(fdes, pos, SEEK_SET);
 
     if(res < 0) {                              	// failed to lseek?
+        Debug::out(LOG_DEBUG, "DeviceMedia::writeSectors - lseek64() failed, errno: %d", errno);
         return false;
     }
 
@@ -130,6 +140,7 @@ bool DeviceMedia::writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
 	size_t cnt = write(fdes, bfr, byteCount);	// try to write sector(s)
 	
     if(cnt != byteCount) {                      // not all data was writen? fail
+        Debug::out(LOG_DEBUG, "DeviceMedia::writeSectors - write() failed");
         return false;
     }
 	

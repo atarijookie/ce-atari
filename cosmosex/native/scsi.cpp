@@ -843,15 +843,16 @@ void Scsi::ProcICD(void)
     shitHasHappened = 0;
 
     //----------------
-    if((cmd[2] & 0xE0) != 0x00)   			  					// if device ID isn't ZERO
+    if((cmd[2] & 0xE0) != 0x00)   			  					    // if device ID isn't ZERO
     {
         devInfo[acsiId].LastStatus	= SCSI_ST_CHECK_CONDITION;
         devInfo[acsiId].SCSI_SK     = SCSI_E_IllegalRequest;		// other devices = error
         devInfo[acsiId].SCSI_ASC	= SCSI_ASC_LU_NOT_SUPPORTED;
         devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
-        dataTrans->setStatus(devInfo[acsiId].LastStatus);   // send status byte
+        dataTrans->setStatus(devInfo[acsiId].LastStatus);           // send status byte
 
+        Debug::out(LOG_DEBUG, "Scsi::ProcICD - device ID isn't zero");
         return;
     }
     //----------------
@@ -862,6 +863,8 @@ void Scsi::ProcICD(void)
         if((cmd[1] == SCSI_C_READ10) || (cmd[1] == SCSI_C_WRITE10) || (cmd[1] == SCSI_C_READ_CAPACITY))
         {
             ReturnStatusAccordingToIsInit();
+
+            Debug::out(LOG_DEBUG, "Scsi::ProcICD - dataMedia is not init, returning status according to init");
             return;
         }
     }
@@ -872,6 +875,8 @@ void Scsi::ProcICD(void)
         if(cmd[1] != SCSI_C_INQUIRY)
         {
             ReturnUnitAttention();
+            
+            Debug::out(LOG_DEBUG, "Scsi::ProcICD - media changed, and this isn't INQUIRY command, returning UNIT ATTENTION");
             return;
         }
     }
@@ -882,6 +887,7 @@ void Scsi::ProcICD(void)
     if(devInfo[acsiId].accessType == SCSI_ACCESSTYPE_READ_ONLY) {
         if(justCmd == SCSI_C_WRITE10) {
             returnInvalidCommand();
+            Debug::out(LOG_DEBUG, "Scsi::ProcICD - tried to WRITE on READ ONLY media, fail");
             return;
         }
     }
@@ -890,6 +896,7 @@ void Scsi::ProcICD(void)
     if(devInfo[acsiId].accessType == SCSI_ACCESSTYPE_NO_DATA) {
         if(justCmd == SCSI_C_WRITE10 || justCmd == SCSI_C_READ10 || justCmd == SCSI_C_VERIFY) {
             returnInvalidCommand();
+            Debug::out(LOG_DEBUG, "Scsi::ProcICD - READ / WRITE / VERIFY on empty media, fail");
             return;
         }
     }
@@ -959,18 +966,17 @@ void Scsi::SCSI_ReadCapacity(void)
     DWORD cap;
     BYTE hi,midlo, midhi, lo;
 
-    DWORD scap, bcap;
+    int64_t scap, bcap;
     dataMedia->getCapacity(bcap, scap);
 
     cap = scap - 1;
 
-    hi		= (cap >> 24) & 0xff;
-    midhi	= (cap >> 16) & 0xff;
-    midlo	= (cap >>  8) & 0xff;
-    lo		=  cap        & 0xff;
-
-    if(!dataMedia->isInit())
-    {
+    if(dataMedia->isInit()) {               // when initialized, store capacity
+        hi		= (cap >> 24) & 0xff;
+        midhi	= (cap >> 16) & 0xff;
+        midlo	= (cap >>  8) & 0xff;
+        lo		=  cap        & 0xff;
+    } else {                                // when not initialized, store zeros
         hi		= 0;
         midhi	= 0;
         midlo	= 0;
@@ -1018,6 +1024,8 @@ void Scsi::SCSI_ReadWrite10(bool read)
     lenX  = cmd[8];	  	   		// get the # of sectors to read
     lenX  = lenX << 8;
     lenX |= cmd[9];
+    
+    Debug::out(LOG_DEBUG, "Scsi::SCSI_ReadWrite10 - %s, sector: %08x, count: %02x", read ? "READ" : "WRITE", sector, lenX);
     //--------------------------------
     if(read) {                  // if read
         res = readSectors(sector, lenX);
@@ -1034,6 +1042,8 @@ void Scsi::SCSI_ReadWrite10(bool read)
         devInfo[acsiId].SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
         dataTrans->setStatus(devInfo[acsiId].LastStatus);    // send status byte, long time-out
+
+        Debug::out(LOG_DEBUG, "Scsi::SCSI_ReadWrite10 - failed, returning status %02x", devInfo[acsiId].LastStatus);
     }
 }
 //----------------------------------------------

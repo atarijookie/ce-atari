@@ -89,13 +89,13 @@ void ImageFileMedia::setMediaChanged(bool changed)
     mediaHasChanged = changed;
 }
 
-void ImageFileMedia::getCapacity(DWORD &bytes, DWORD &sectors)
+void ImageFileMedia::getCapacity(int64_t &bytes, int64_t &sectors)
 {
     bytes   = BCapacity;
     sectors = SCapacity;
 }
 
-bool ImageFileMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool ImageFileMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
         return false;
@@ -118,7 +118,7 @@ bool ImageFileMedia::readSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
     return true;
 }
 
-bool ImageFileMedia::writeSectors(DWORD sectorNo, DWORD count, BYTE *bfr)
+bool ImageFileMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
         return false;
