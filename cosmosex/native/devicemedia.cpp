@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/syscall.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -29,12 +30,12 @@ bool DeviceMedia::iopen(char *path, bool createIfNotExists)
 {
     mediaHasChanged = false;
 
-	fdes = open(path, O_RDWR);					// open device for Read / Write
+	fdes = open(path, O_RDWR | O_LARGEFILE);	    // open device for Read / Write
 
-	if (fdes < 0) {								// failed to open for R/W?
-		fdes = open(path, O_RDONLY);			// try to open the device for reading only
+	if (fdes < 0) {								    // failed to open for R/W?
+		fdes = open(path, O_RDONLY | O_LARGEFILE);  // try to open the device for reading only
 
-		if(fdes < 0) {							// failed to open as read only? damn...
+		if(fdes < 0) {							    // failed to open as read only? damn...
 			return false;
 		}
 	}
@@ -103,7 +104,8 @@ bool DeviceMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
     }
 
     off64_t pos = sectorNo * ((int64_t)512);    // convert sector # to offset 
-	int res = lseek64(fdes, pos, SEEK_SET);
+    loff_t loff;
+    int res = syscall(__NR__llseek, fdes, (unsigned long) (pos >> 32), (unsigned long) pos, &loff, SEEK_SET);
 
     if(res < 0) {                              	// failed to lseek?
         Debug::out(LOG_DEBUG, "DeviceMedia::readSectors - lseek64() failed, errno: %d", errno);
@@ -129,7 +131,8 @@ bool DeviceMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
     }
 
     off64_t pos = sectorNo * ((int64_t)512);    // convert sector # to offset 
-	int res = lseek64(fdes, pos, SEEK_SET);
+    loff_t loff;
+    int res = syscall(__NR__llseek, fdes, (unsigned long) (pos >> 32), (unsigned long) pos, &loff, SEEK_SET);
 
     if(res < 0) {                              	// failed to lseek?
         Debug::out(LOG_DEBUG, "DeviceMedia::writeSectors - lseek64() failed, errno: %d", errno);

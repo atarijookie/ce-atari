@@ -251,7 +251,10 @@ void Scsi::detachMediaFromACSIidByIndex(int index)
     attachedMedia[ attMediaInd ].devInfoIndex = -1;   				// set not attached in attached media
 
     if(	attachedMedia[attMediaInd].dataMediaDynamicallyAllocated) { // if dataMedia was creates using new, use delete
-		delete attachedMedia[ attMediaInd ].dataMedia;				// delete the data source access object
+		if(attachedMedia[ attMediaInd ].dataMedia != NULL) {
+            delete attachedMedia[ attMediaInd ].dataMedia;			// delete the data source access object
+            attachedMedia[ attMediaInd ].dataMedia = NULL;
+        }
 	}
 	
     devInfo[index].attachedMediaIndex   = -1;                       // set not attached in dev info
@@ -326,8 +329,11 @@ void Scsi::dettachByIndex(int index)
     }
 
     if(	attachedMedia[index].dataMediaDynamicallyAllocated) {               // if dataMedia was created using new, delete it
-        attachedMedia[index].dataMedia->iclose();                           // close it, delete it
-        delete attachedMedia[index].dataMedia;
+        if(attachedMedia[index].dataMedia != NULL) {
+            attachedMedia[index].dataMedia->iclose();                       // close it, delete it
+            delete attachedMedia[index].dataMedia;
+            attachedMedia[index].dataMedia = NULL;
+        }
     }
 
     initializeAttachedMediaVars(index);
