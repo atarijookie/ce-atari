@@ -1,5 +1,6 @@
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <netdb.h>
@@ -11,6 +12,7 @@
 #include <arpa/inet.h> 
 
 #include "socks.h"
+#include "datatypes.h"
 
 static char gServerIp[128];
 static int  gServerPort;
@@ -201,5 +203,47 @@ int serverSocket_createConnection(void)
 
     return 1;
 }
+
+BYTE header[16];
+BYTE *bufferRead;
+BYTE *bufferWrite;
+
+bool gotCmd(void)
+{
+    if(serverSocket_createConnection() != 1) {  // couldn't get connection? fail
+        return false;
+    } 
+
+    int count;
+    int res = ioctl(serverConnectSockFd, FIONREAD, &count);
+
+    if(res == -1) {                             // if ioctl failed, fail
+        return false;
+    }
+
+    if(count < 16) {                            // not enough data? fail
+        return false;
+    }
+    
+    res = serverSocket_read(header, 16);        // try to get header
+
+    if(res != 16) {
+        return false;
+    }
+
+    DWORD byteCount = header[15];               // read how many bytes we need to transfer
+    byteCount = byteCount * 512;                // convert sectors to bytes
+
+    if(header[14] == 0) {                       // on write - read data from ST, on read - we first have to process the command
+        res = serverSocket_read(bufferWrite, byteCount);
+
+        if(res != (int) byteCount) {
+            return false;
+        }
+    } 
+    
+    return true;
+}
+
 
 

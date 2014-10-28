@@ -12,11 +12,23 @@
 #define BUFFER_SIZE         (1024*1024)
 #define COMMAND_SIZE        10
 
+#if defined(ONPC_HIGHLEVEL)
+    extern BYTE *bufferRead;
+    extern BYTE *bufferWrite;
+
+    #include "socks.h"
+#endif
+
 AcsiDataTrans::AcsiDataTrans()
 {
     buffer          = new BYTE[BUFFER_SIZE];        // 1 MB buffer
     recvBuffer      = new BYTE[BUFFER_SIZE];
     
+#if defined(ONPC_HIGHLEVEL)
+    bufferRead      = buffer;
+    bufferWrite     = recvBuffer;
+#endif
+
     memset(buffer,      0, BUFFER_SIZE);            // init buffers to zero
     memset(recvBuffer,  0, BUFFER_SIZE);
     
@@ -115,6 +127,11 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
         Debug::out(LOG_ERROR, "AcsiDataTrans::recvData -- no communication object, fail!");
         return false;
     }
+
+#if defined(ONPC_HIGHLEVEL)
+    memcpy(data, recvBuffer, cnt);
+    return true;
+#endif
 
     dataDirection = DATA_DIRECTION_WRITE;                   // let the higher function know that we've done data write -- 130 048 Bytes
 
@@ -234,6 +251,13 @@ void AcsiDataTrans::sendDataAndStatus(void)
 		dumpNextData = false;
 	}
 	//---------------------------------------
+#if defined(ONPC_HIGHLEVEL)
+    // ACSI READ - send (write) data to other side, and also status
+    serverSocket_write(buffer, count);
+    serverSocket_write(&status, 1);
+    return;
+#endif
+	//---------------------------------------
     // first send the command
     BYTE devCommand[COMMAND_SIZE];
     memset(devCommand, 0, COMMAND_SIZE);
@@ -278,6 +302,9 @@ void AcsiDataTrans::sendDataAndStatus(void)
 
 void AcsiDataTrans::sendStatusAfterWrite(void)
 {
+#if defined(ONPC_HIGHLEVEL)
+    serverSocket_write(&status, 1);
+#else
 	BYTE inBuf[8];
 	bool res = com->waitForATN(SPI_CS_HANS, ATN_GET_STATUS, 1000, inBuf);	// wait for ATN_GET_STATUS
 
@@ -291,5 +318,6 @@ void AcsiDataTrans::sendStatusAfterWrite(void)
     txBuffer[2] = status;
 
     com->txRx(SPI_CS_HANS, 16 - 8, txBuffer, rxBuffer);		// transmit the status (16 bytes total, but 8 already received)
+#endif
 }
 

@@ -1,6 +1,7 @@
 TARGET	= cosmosex
 
 #ONPC    = yes
+# in the CFLAGS use ONPC_GPIO or ONPC_HIGHLEVEL
 
 CC	    = g++
 #STRIP	= strip
@@ -8,7 +9,7 @@ CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
 
 ifeq ($(ONPC),yes)
     LDFLAGS	= -Llib -Llib -lrt -lpthread -lcurl -lcivetweb -ldl -lutil
-    CFLAGS += -DONPC -I./
+    CFLAGS += -DONPC_HIGHLEVEL -I./
 else
     LDFLAGS	= -Llib -lbcm2835 -lrt -lpthread -lcurl -lcivetweb -ldl -lutil
     CFLAGS += -I./
@@ -96,3 +97,4 @@ clean:
 	rm -f $(WEB_CSS_PATH)/*.gz
 	find . -name "*.o" -print0| xargs -0 rm -rf
 	rm -f *.o *~ cosmosex
+

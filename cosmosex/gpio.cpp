@@ -15,7 +15,9 @@ Pins states remain the same even after bcm2835_close() and even after prog termi
 bcm2835_gpio_write doesn't influence SPI CS pins, they are controlled by SPI part of the library.
 */
 
-#ifdef ONPC
+//------------------------------------------------------------------------------------------------------------------------
+
+#ifdef ONPC_GPIO
 // the following dummy functions are here for compilation on PC (not RPi)
 
 #include <signal.h>
@@ -120,8 +122,33 @@ bool spi_atn(int whichSpiAtn)
 
     return b;	// returns true if pin is high, returns false if pin is low
 }
+#endif
 
-#else
+//------------------------------------------------------------------------------------------------------------------------
+
+#ifdef ONPC_HIGHLEVEL
+// the following dummy functions are here for compilation on PC - when HIGHLEVEL of emulation is done
+
+bool bcm2835_init(void) { return true; }
+void bcm2835_gpio_fsel(int a, int b) {}
+void bcm2835_spi_begin() {}
+void bcm2835_spi_setBitOrder(int a) {}
+void bcm2835_spi_setDataMode(int a) {}
+void bcm2835_spi_setClockDivider(int a) {}
+void bcm2835_spi_setChipSelectPolarity(int a, int b) {}
+void bcm2835_spi_chipSelect(int a) {}
+void bcm2835_spi_end(void) {}
+void bcm2835_close(void) {}
+void bcm2835_gpio_write(int a, int b) {}
+int  bcm2835_gpio_lev(int a) {return 0; }
+void bcm2835_spi_transfernb(char *txBuf, char *rxBuf, int c) { }
+void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf){}
+bool spi_atn(int whichSpiAtn) { return false; }
+#endif
+
+//------------------------------------------------------------------------------------------------------------------------
+
+#if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL)
 void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf)
 {
     bcm2835_spi_chipSelect(whichSpiCS);
@@ -138,9 +165,11 @@ bool spi_atn(int whichSpiAtn)
 }
 #endif
 
+//------------------------------------------------------------------------------------------------------------------------
+
 bool gpio_open(void)
 {
-    #ifdef ONPC
+    #ifdef ONPC_GPIO
     clientSocket_setParams((char *) "192.168.123.142", 1111);
     clientSocket_createConnection();
     return true;

@@ -15,6 +15,12 @@
 #include "update.h"
 #include "config/netsettings.h"
 
+#if defined(ONPC_HIGHLEVEL)
+    #include "socks.h"
+
+    extern BYTE *header;
+#endif
+
 #define DEV_CHECK_TIME_MS	3000
 #define UPDATE_CHECK_TIME   1000
 
@@ -122,6 +128,12 @@ void CCoreThread::run(void)
         Utils::resetHansAndFranz();
     }
 
+#if defined(ONPC_HIGHLEVEL)
+    shouldCheckHansFranzAlive = false;                                  // when running ONPC with HIGHLEVEL of emulation, don't check this
+
+    serverSocket_setParams(1111);
+#endif
+
     Debug::out(LOG_DEBUG, "Will check for Hans and Franz alive: %s", (shouldCheckHansFranzAlive ? "yes" : "no") );
     //------------------------------
 
@@ -212,6 +224,7 @@ void CCoreThread::run(void)
             }
         }
 
+#if !defined(ONPC_HIGHLEVEL)
         // check for any ATN code waiting from Hans
 		res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);
 
@@ -232,8 +245,17 @@ void CCoreThread::run(void)
 				break;
 			}
 		}
+#endif
 
-#ifndef ONPC
+#if defined(ONPC_HIGHLEVEL)
+        res = gotCmd();
+
+        if(res) {
+            handleAcsiCommand();
+        }
+#endif
+
+#if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL)
         // check for any ATN code waiting from Franz
 		res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuff);
 		if(res) {									// FRANZ is signaling attention?
@@ -276,7 +298,11 @@ void CCoreThread::handleAcsiCommand(void)
     memset(bufOut,  0, CMD_SIZE);
     memset(bufIn,   0, CMD_SIZE);
 
-    conSpi->txRx(SPI_CS_HANS, 14, bufOut, bufIn);        // get 14 cmd bytes
+#if defined(ONPC_HIGHLEVEL)
+    memcpy(bufIn, header, 14);                          // get the cmd from received header
+#else
+    conSpi->txRx(SPI_CS_HANS, 14, bufOut, bufIn);       // get 14 cmd bytes
+#endif
 
     BYTE justCmd, tag1, tag2, module;
     BYTE *pCmd;
