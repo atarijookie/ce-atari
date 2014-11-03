@@ -43,7 +43,11 @@ readSectorsLoop:
 	tst.b	d0
 	bne.b	fail1				| d0 != 0?
 
-	lea		512(a1),a1			| a1 += 512
+    bsr     verify_checksum
+    tst.b   d0
+    bne.b   readSectorsLoop
+    
+	lea		510(a1),a1			| a1 += 510     -- move only 510 bytes, because the last 2 were checksum, which we don't want
 	addq.w	#1,d1				| current_sector++
 	dbra	d3, readSectorsLoop
 
@@ -138,12 +142,13 @@ config:		.dc.l	0x58580020
 driverRam:	.dc.l	0x00011800
 acsiCmd:	.dc.b	0x08,0x00,0x00,0x00,0x01
 
-str:	.ascii	"CEDD boot loader"
-	.dc.b	13,10,0
-error:	.ascii	"...failed :("
-	.dc.b	13,10,0
+str:    .ascii	"CEDD booter"
+        .dc.b	13,10,0
+error:	.ascii	"failed"
+        .dc.b	13,10,0
 
 	.text
+    .even
 
 gpip	= 0xFFFFFA01	| .B 68901 input register
 dskctl	= 0xFFFF8604	| .W controller data access
@@ -238,3 +243,29 @@ waitMore:
 gotINT:
 	moveq	#0, d0			| d0 = success!
 	rts
+    
+|----------------------------    
+verify_checksum:
+    move.w  #0, d0          | init check sum register
+    
+    move.l  d1, -(sp)       | backup d1
+    move.w  #255, d1        | sum 256 words            
+
+verify_loop:    
+    add.w   (a1)+, d0       | add and move
+    dbra    d1, verify_loop | do one more time
+    
+    move.l  (sp)+, d1       | restore D1
+    sub.l   #512, a1        | restore A1
+    
+    cmp.w   #0x1234, d0     | if checksum is this, good!
+    beq     verify_good
+    
+    move.w  #1, d0          | fail
+    rts
+    
+verify_good:
+    move.w  #0, d0          | success
+    rts
+    
+    
