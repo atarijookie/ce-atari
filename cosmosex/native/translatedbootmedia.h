@@ -41,6 +41,7 @@ private:
 	void	setDword(BYTE *bfr, DWORD val);
 	
 	void	updateBootsectorChecksum(void);
+    void    calculateChecksum(BYTE *bfr);
 	WORD	swapNibbles(WORD val);
 };
 

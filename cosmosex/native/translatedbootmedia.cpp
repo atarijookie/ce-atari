@@ -56,24 +56,26 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
         Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open ce_dd.prg!");
 		return false;
 	}
-	
-	bytesRead = fread(&imageBuffer[512], 1, TRANSLATEDBOOTMEDIA_SIZE - 512, f);			// try to read data up to the size of buffer
-	
-	if(bytesRead < (5*1024)) {															// didn't read enough?
-        Debug::out(LOG_ERROR, "TranslatedBootMedia - didn't read more than 5 kB of data from driver, this is probably wrong, failing preventively :)");
-		return false;
-	}
 
-	if(!feof(f)) {
-        Debug::out(LOG_ERROR, "TranslatedBootMedia - didn't reach the end of driver file when loading to RAM, buffer is probably too small, failing!");
-		return false;
+    int offset = 512;
+    while(1) {
+        if(feof(f)) {                                           // end of file? break
+            break;
+        }
+    
+        memset(&imageBuffer[offset], 0, 512);                   // clear buffer
+        fread(&imageBuffer[offset], 1, 510, f);                 // read 
+        calculateChecksum(&imageBuffer[offset]);                // calculate checksum
+        offset += 512;                                          // move to next part
+        
+        bytesRead += 512;                                       // increment bytes read variable
 	}
 	
 	fclose(f);
 	
 	// calculate the count of sectors the driver takes in buffer + 1 for boot sector + 1 for the last part of ce_dd.prg
-	SCapacity       = (bytesRead / 512) + 2;
-    BCapacity       =  SCapacity * 512;
+	SCapacity       = bytesRead / 512;
+    BCapacity       = SCapacity * 512;
 
 	updateBootsectorConfig();							// now set up read sector count and malloc size in boot sector config
 	
@@ -108,9 +110,13 @@ void TranslatedBootMedia::updateBootsectorConfig(void)
 
 void TranslatedBootMedia::updateBootsectorChecksum(void)
 {
-    // create the check sum
+    calculateChecksum(imageBuffer);
+}
+
+void TranslatedBootMedia::calculateChecksum(BYTE *bfr)
+{
     WORD sum = 0, val;
-    WORD *p = (WORD *) imageBuffer;
+    WORD *p = (WORD *) bfr;
 
     for(int i=0; i<255; i++) {
         val = *p;
@@ -122,8 +128,8 @@ void TranslatedBootMedia::updateBootsectorChecksum(void)
     WORD cs = 0x1234 - sum;
     sum = sum & 0xffff;
 
-    imageBuffer[510] = cs >> 8;         // store the check sum
-    imageBuffer[511] = cs;
+    bfr[510] = cs >> 8;         // store the check sum
+    bfr[511] = cs;
 }
 
 WORD TranslatedBootMedia::swapNibbles(WORD val)
