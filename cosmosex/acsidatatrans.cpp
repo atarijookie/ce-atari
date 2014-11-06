@@ -13,9 +13,6 @@
 #define COMMAND_SIZE        10
 
 #if defined(ONPC_HIGHLEVEL)
-    extern BYTE *bufferRead;
-    extern BYTE *bufferWrite;
-
     #include "socks.h"
 #endif
 
@@ -253,6 +250,10 @@ void AcsiDataTrans::sendDataAndStatus(void)
 	//---------------------------------------
 #if defined(ONPC_HIGHLEVEL)
     // ACSI READ - send (write) data to other side, and also status
+    if(count < sockByteCount) {
+        count = sockByteCount;
+    }
+    
     serverSocket_write(buffer, count);
     serverSocket_write(&status, 1);
     return;

@@ -11,8 +11,9 @@
 #include <errno.h>
 #include <arpa/inet.h> 
 
-#include "socks.h"
 #include "datatypes.h"
+#include "socks.h"
+#include "debug.h"
 
 static char gServerIp[128];
 static int  gServerPort;
@@ -24,14 +25,6 @@ static int  serverConnectSockFd = -1;
 static int  serverSocket_createConnection(void);
 static int  sockRead(int fd, unsigned char *bfr, int len);
 static int  sockWrite(int fd, unsigned char *bfr, int len);
-
-#define TAG_START   0xab
-
-#ifdef DEBUGSTRINGS
-    #define DEBUGSTR    printf
-#else
-    #define DEBUGSTR    (void)     
-#endif
 
 void clientSocket_setParams(char *serverIp, int serverPort)
 {
@@ -51,7 +44,7 @@ int clientSocket_write(unsigned char *bfr, int len)
     int res = clientSocket_createConnection();
 
     if(!res) {
-        DEBUGSTR("clientSocket_write: Failed to create connection to server!\n");
+        Debug::out(LOG_DEBUG, "clientSocket_write: Failed to create connection to server!\n");
         return -1;
     }
 
@@ -70,7 +63,7 @@ int serverSocket_write(unsigned char *bfr, int len)
     int res = serverSocket_createConnection();
 
     if(!res) {
-        DEBUGSTR("serverSocket_write: Failed to create connection...\n");
+        Debug::out(LOG_DEBUG, "serverSocket_write: Failed to create connection...\n");
         return -1;
     }
 
@@ -83,7 +76,7 @@ int clientSocket_read(unsigned char *bfr, int len)
     int res = clientSocket_createConnection();
 
     if(!res) {
-        DEBUGSTR("clientSocket_read: Failed to create connection to server!\n");
+        Debug::out(LOG_DEBUG, "clientSocket_read: Failed to create connection to server!\n");
         return -1;
     }
 
@@ -96,7 +89,7 @@ int serverSocket_read(unsigned char *bfr, int len)
     int res = serverSocket_createConnection();
 
     if(!res) {
-        DEBUGSTR("serverSocket_read: Failed to create connection...\n");
+        Debug::out(LOG_DEBUG, "serverSocket_read: Failed to create connection...\n");
         return -1;
     }
 
@@ -110,7 +103,7 @@ int sockWrite(int fd, unsigned char *bfr, int len)
     n = write(fd, bfr, len);
 
     if(n != len) {
-        DEBUGSTR("sockWrite: sending failed...\n");
+        Debug::out(LOG_DEBUG, "sockWrite: sending failed...\n");
     }
 
     return len;
@@ -127,7 +120,7 @@ int sockRead(int fd, unsigned char *bfr, int len)
     }
 
     if(n != len) {
-        DEBUGSTR("sockRead: reading failed...\n");
+        Debug::out(LOG_DEBUG, "sockRead: reading failed...\n");
     }
 
     return len;
@@ -142,11 +135,11 @@ int clientSocket_createConnection(void)
     int s;
 
     struct sockaddr_in serv_addr; 
-    DEBUGSTR("clientSocket_createConnection\n");
+    Debug::out(LOG_DEBUG, "clientSocket_createConnection\n");
 
     s = socket(AF_INET, SOCK_STREAM, 0);
     if(s < 0) {
-        DEBUGSTR("Error: Could not create socket...\n");
+        Debug::out(LOG_DEBUG, "Error: Could not create socket...\n");
         return 0;
     } 
 
@@ -159,18 +152,18 @@ int clientSocket_createConnection(void)
     serv_addr.sin_port = htons(gServerPort); 
 
     if(inet_pton(AF_INET, gServerIp, &serv_addr.sin_addr) <= 0) {
-        DEBUGSTR("Error: inet_pton failed\n");
+        Debug::out(LOG_DEBUG, "Error: inet_pton failed\n");
         close(s);
         return 0;
     } 
 
     if(connect(s, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-        DEBUGSTR("Error: Socket connect failed\n");
+        Debug::out(LOG_DEBUG, "Error: Socket connect failed\n");
         close(s);
         return 0;
     } 
 
-    DEBUGSTR("clientSocket_createConnection success\n");
+    Debug::out(LOG_DEBUG, "clientSocket_createConnection success\n");
     clientSockFd = s;
     return 1;
 }
@@ -179,7 +172,6 @@ int serverSocket_createConnection(void)
 {
     struct sockaddr_in serv_addr; 
 
-    DEBUGSTR("serverSocket_createConnection\n");
     if(serverListenSockFd == -1) {                                                  // if we don't have listen socket yet, create it
         serverListenSockFd = socket(AF_INET, SOCK_STREAM, 0);                       // create socket
         memset(&serv_addr,  0, sizeof(serv_addr));
@@ -197,47 +189,55 @@ int serverSocket_createConnection(void)
     }
 
     if(serverConnectSockFd == -1) {                                                 // no client? wait for it...
-        DEBUGSTR("Wating for connection...\n");
+        Debug::out(LOG_DEBUG, "Wating for connection...\n");
         serverConnectSockFd = accept(serverListenSockFd, (struct sockaddr*)NULL, NULL); 
     } 
 
     return 1;
 }
 
-BYTE header[16];
-BYTE *bufferRead;
-BYTE *bufferWrite;
+BYTE    header[16];
+BYTE    *bufferRead;
+BYTE    *bufferWrite;
+DWORD   sockByteCount;
+BYTE    sockReadNotWrite;
 
 bool gotCmd(void)
 {
-    if(serverSocket_createConnection() != 1) {  // couldn't get connection? fail
+    if(serverSocket_createConnection() != 1) {      // couldn't get connection? fail
         return false;
     } 
 
     int count;
     int res = ioctl(serverConnectSockFd, FIONREAD, &count);
 
-    if(res == -1) {                             // if ioctl failed, fail
+    if(res == -1) {                                 // if ioctl failed, fail
+        Debug::out(LOG_DEBUG, "gotCmd - ioctl failed");
         return false;
     }
 
-    if(count < 16) {                            // not enough data? fail
+    if(count < 16) {                                // not enough data? fail
+//      Debug::out(LOG_DEBUG, "gotCmd - not enough data, got %d", count);
         return false;
     }
     
-    res = serverSocket_read(header, 16);        // try to get header
+    res = serverSocket_read(header, 16);            // try to get header
 
     if(res != 16) {
+        Debug::out(LOG_DEBUG, "gotCmd - failed to get header, res is %d", res);
         return false;
     }
 
-    DWORD byteCount = header[15];               // read how many bytes we need to transfer
-    byteCount = byteCount * 512;                // convert sectors to bytes
+    sockReadNotWrite = header[14];
 
-    if(header[14] == 0) {                       // on write - read data from ST, on read - we first have to process the command
-        res = serverSocket_read(bufferWrite, byteCount);
+    sockByteCount = header[15];                     // read how many bytes we need to transfer
+    sockByteCount = sockByteCount * 512;            // convert sectors to bytes
 
-        if(res != (int) byteCount) {
+    if(sockReadNotWrite == 0) {                     // on write - read data from ST, on read - we first have to process the command
+        res = serverSocket_read(bufferWrite, sockByteCount);
+
+        if(res != (int) sockByteCount) {
+            Debug::out(LOG_DEBUG, "gotCmd - res != sockByteCount -- %d != %d", res, sockByteCount);
             return false;
         }
     } 

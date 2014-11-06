@@ -1,6 +1,14 @@
 #ifndef _SOCKS_H_
 #define _SOCKS_H_
 
+#if defined(ONPC_HIGHLEVEL)
+    extern BYTE     *bufferRead;
+    extern BYTE     *bufferWrite;
+    extern DWORD    sockByteCount;
+    extern BYTE     sockReadNotWrite;
+    extern BYTE     header[16];
+#endif
+
 int  clientSocket_createConnection(void);
 
 void clientSocket_setParams(char *serverIp, int serverPort);        // set connection params, e.g. "127.0.0.1" and 12345

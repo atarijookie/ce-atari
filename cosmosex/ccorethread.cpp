@@ -17,8 +17,6 @@
 
 #if defined(ONPC_HIGHLEVEL)
     #include "socks.h"
-
-    extern BYTE *header;
 #endif
 
 #define DEV_CHECK_TIME_MS	3000
