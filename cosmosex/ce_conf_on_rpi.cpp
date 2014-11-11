@@ -31,6 +31,8 @@ static void translateVT52toVT100(BYTE *bfr, int cnt)
 {
     int i, t = 0;
 
+    memset(tmpBfr, 0, 512);
+    
     for(i=0; i<cnt; ) {
         if(bfr[i] == 27) {
             switch(bfr[i + 1]) {
@@ -41,7 +43,7 @@ static void translateVT52toVT100(BYTE *bfr, int cnt)
                     strcat((char *) tmpBfr, "\033[2J");         // clear whole screen
                     strcat((char *) tmpBfr, "\033[H");          // position cursor to 0,0
                     
-                    t += 5 + 5 + 4;
+                    t += 5 + 5 + 4 + 3;
                     i += 2;
                     break;
                 //------------------------
@@ -51,7 +53,7 @@ static void translateVT52toVT100(BYTE *bfr, int cnt)
                     x = bfr[i+3] - 32;
                     
                     char tmp[16];
-                    sprintf(tmp, "%c[%d;%df", 27, y, x);
+                    sprintf(tmp, "\033[%d;%df", y, x);
                     strcat((char *) tmpBfr, tmp);
                     t += strlen(tmp);
 
@@ -62,7 +64,7 @@ static void translateVT52toVT100(BYTE *bfr, int cnt)
                     strcat((char *) tmpBfr, "\033[30m");      // foreground black
                     strcat((char *) tmpBfr, "\033[47m");      // background white
 
-                    t += 10;
+                    t += 5 + 5;
                     i += 2;
                     break;
                 //------------------------
@@ -70,7 +72,7 @@ static void translateVT52toVT100(BYTE *bfr, int cnt)
                     strcat((char *) tmpBfr, "\033[37m");      // foreground white
                     strcat((char *) tmpBfr, "\033[40m");      // background black
 
-                    t += 10;
+                    t += 5 + 5;
                     i += 2;
                     break;
                 //------------------------
