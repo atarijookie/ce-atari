@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <queue>
- #include <pty.h>
+#include <pty.h>
  
 #include "config/configstream.h"
 #include "settings.h"
@@ -18,6 +18,7 @@
 #include "ikbd.h"
 #include "timesync.h"
 #include "version.h"
+#include "ce_conf_on_rpi.h"
 
 #include "webserver/webserver.h"
 #include "webserver/api/apimodule.h"
@@ -38,6 +39,7 @@ BYTE g_logLevel     = LOG_ERROR;                                // init current 
 bool g_justDoReset  = false;                                    // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
 bool g_noReset      = false;                                    // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
 bool g_test         = false;                                    // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
+bool g_actAsCeConf  = false;                                    // if set to true, this app will behave as ce_conf app instead of CosmosEx app
 
 int     linuxConsole_fdMaster, linuxConsole_fdSlave;            // file descriptors for pty pair
 pid_t   childPid;                                               // pid of forked child
@@ -53,13 +55,15 @@ int main(int argc, char *argv[])
 
     parseCmdLineArguments(argc, argv);                          // parse cmd line arguments and set global variables
 
-	if(signal(SIGINT, sigint_handler) == SIG_ERR) {		        // register SIGINT handler
-		printf("Cannot register SIGINT handler!\n");
-	}
+    if(!g_actAsCeConf) {                                        // if not running as ce_tool, register signal handlers
+        if(signal(SIGINT, sigint_handler) == SIG_ERR) {		    // register SIGINT handler
+            printf("Cannot register SIGINT handler!\n");
+        }
 
-   	if(signal(SIGHUP, sigint_handler) == SIG_ERR) {		        // register SIGHUP handler
-		printf("Cannot register SIGHUP handler!\n");
-	}
+        if(signal(SIGHUP, sigint_handler) == SIG_ERR) {		    // register SIGHUP handler
+            printf("Cannot register SIGHUP handler!\n");
+        }
+    }
 
     if(!g_justDoReset) {                                                // if this is not just a reset command
         int ires = openpty(&linuxConsole_fdMaster, &linuxConsole_fdSlave, NULL, NULL, NULL);    // open PTY pair
@@ -80,6 +84,13 @@ int main(int argc, char *argv[])
         }
     }
     
+    if(g_actAsCeConf) {                                         // if should run as ce_conf app, do this code instead
+        printf("CE_CONF tool - Raspberry Pi version.\nPress Ctrl+C to quit.\n");
+        
+        ce_conf_mainLoop();
+        return 0;
+    }
+    
     printfPossibleCmdLineArgs();
     Debug::printfLogLevelString();
 
@@ -87,6 +98,8 @@ int main(int argc, char *argv[])
     Debug::out(LOG_ERROR, "CosmosEx starting, version: %s", APP_VERSION);
 
 //	system("sudo echo none > /sys/class/leds/led0/trigger");	// disable usage of GPIO 23 (pin 16) by LED
+
+    ce_conf_createFifos();                                      // if should run normally, create the ce_conf FIFOs
 
 	if(!gpio_open()) {									        // try to open GPIO and SPI on RPi
 		return 0;
@@ -219,6 +232,11 @@ void parseCmdLineArguments(int argc, char *argv[])
             g_test = true;
             continue;
         }
+        
+        // for running this app as ce_conf terminal
+        if(strcmp(argv[i], "ce_conf") == 0) {
+            g_actAsCeConf = true;
+        }
     }
 }
 
@@ -229,6 +247,7 @@ void printfPossibleCmdLineArgs(void)
     printf("noreset - when starting, don't reset Hans and Franz\n");
     printf("llx     - set log level to x (default is 1, max is 3)\n");
     printf("test    - some default config for device testing\n");
+    printf("ce_conf - use this app as ce_conf on RPi (the app must be running normally, too)");
 }
 
 void handlePthreadCreate(int res, char *what)

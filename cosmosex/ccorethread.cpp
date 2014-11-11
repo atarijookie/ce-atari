@@ -2,6 +2,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <dirent.h>
 #include <errno.h>
 
@@ -14,6 +15,7 @@
 #include "downloader.h"
 #include "update.h"
 #include "config/netsettings.h"
+#include "ce_conf_on_rpi.h" 
 
 #if defined(ONPC_HIGHLEVEL)
     #include "socks.h"
@@ -280,6 +282,19 @@ void CCoreThread::run(void)
 #else
     g_gotFranzFwVersion = true;
 #endif
+        
+        int bytesAvailable;
+        if(ce_conf_fd1 > 0 && ce_conf_fd2 > 0) {                    // if we got the ce_conf FIFO handles
+            res = ioctl(ce_conf_fd1, FIONREAD, &bytesAvailable);    // how many bytes we can read?
+
+            if(res != -1 && bytesAvailable >= 3) {                  // if there are at least 3 bytes waiting
+                BYTE cmd[6] = {0, 'C', 'E', 0, 0, 0};
+                read(ce_conf_fd1, cmd + 3, 3);                          // read the byte triplet
+                
+                confStream->processCommand(cmd, ce_conf_fd2);
+            }
+        }
+
 		if(!gotAtn) {								// no ATN was processed?
 			Utils::sleepMs(1);						// wait 1 ms...
 		}

@@ -196,6 +196,17 @@ void AcsiDataTrans::dumpDataOnce(void)
 	dumpNextData = true;
 }
 
+void AcsiDataTrans::sendDataToFd(int fd)
+{
+    if(dataDirection == DATA_DIRECTION_WRITE) {
+        count = 0;
+        return;
+    }
+    
+    write(fd, buffer, count);
+    count = 0;
+}
+
 // send all data to Hans, including status
 void AcsiDataTrans::sendDataAndStatus(void)
 {

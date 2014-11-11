@@ -59,7 +59,7 @@ public:
     ~ConfigStream();
 
     // functions which are called from the main loop
-    void processCommand(BYTE *cmd);
+    void processCommand(BYTE *cmd, int writeToFd=-1);
     void setAcsiDataTrans(AcsiDataTrans *dt);
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 

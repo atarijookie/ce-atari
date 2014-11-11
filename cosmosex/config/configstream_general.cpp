@@ -44,7 +44,7 @@ void ConfigStream::setSettingsReloadProxy(SettingsReloadProxy *rp)
     reloadProxy = rp;
 }
 
-void ConfigStream::processCommand(BYTE *cmd)
+void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
 {
     static BYTE readBuffer[READ_BUFFER_SIZE];
     int streamCount;
@@ -128,7 +128,11 @@ void ConfigStream::processCommand(BYTE *cmd)
         break;
     }
 
-    dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
+    if(writeToFd == -1) {
+        dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
+    } else {
+        dataTrans->sendDataToFd(writeToFd);
+    }
 }
 
 void ConfigStream::onKeyDown(BYTE key)

@@ -49,7 +49,8 @@ public:
 
     bool recvData(BYTE *data, DWORD cnt);
     void sendDataAndStatus(void);
-
+    void sendDataToFd(int fd);
+    
     void setCommunicationObject(CConSpi *comIn);
 
 	void dumpDataOnce(void);
