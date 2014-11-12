@@ -51,6 +51,8 @@ void showIpAddress(BYTE *bfr);
 void setBootDrive(void);
 
 BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
+BYTE FastRAMBuffer[FASTRAM_BUFFER_SIZE] __attribute__((aligned (4)));
+
 BYTE *pDmaBuffer;
 
 BYTE deviceID;
