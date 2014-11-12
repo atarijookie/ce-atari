@@ -53,6 +53,7 @@ int main(int argc, char *argv[])
     pthread_t	floppyEncThreadInfo;
 	pthread_t	timesyncThreadInfo;
 
+    Debug::setDefaultLogFile();
     parseCmdLineArguments(argc, argv);                          // parse cmd line arguments and set global variables
 
     if(!g_actAsCeConf) {                                        // if not running as ce_tool, register signal handlers
@@ -87,6 +88,7 @@ int main(int argc, char *argv[])
     if(g_actAsCeConf) {                                         // if should run as ce_conf app, do this code instead
         printf("CE_CONF tool - Raspberry Pi version.\nPress Ctrl+C to quit.\n");
         
+        Debug::setLogFile("/var/log/ce_conf.log");
         ce_conf_mainLoop();
         return 0;
     }

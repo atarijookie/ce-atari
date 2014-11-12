@@ -203,6 +203,11 @@ void AcsiDataTrans::sendDataToFd(int fd)
         return;
     }
     
+    if(count == 0) {    // if there's no data to send, send single zero byte
+        buffer[0]   = 0;
+        count       = 1;
+    }
+    
     write(fd, buffer, count);
     count = 0;
 }

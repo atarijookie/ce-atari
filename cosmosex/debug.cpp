@@ -10,6 +10,18 @@ DWORD prevLogOut;
 
 extern BYTE g_logLevel;                     // current log level 
 
+char Debug::logFilePath[128];
+
+void Debug::setDefaultLogFile(void)
+{
+    setLogFile((char *) LOG_FILE);
+}
+
+void Debug::setLogFile(char *path)
+{
+    strcpy(Debug::logFilePath, path);
+}
+    
 void Debug::printfLogLevelString(void)
 {
     printf("\nLog level: ");
@@ -34,7 +46,7 @@ void Debug::out(int logLevel, const char *format, ...)
     va_list args;
     va_start(args, format);
 
-	FILE *f = fopen(LOG_FILE, "a+t");
+	FILE *f = fopen(logFilePath, "a+t");
 	
 	if(!f) {
 		printf("%08d: ", Utils::getCurrentMs());
@@ -61,21 +73,44 @@ void Debug::outBfr(BYTE *bfr, int count)
         return;
     }
 
-	FILE *f = fopen(LOG_FILE, "a+t");
+	FILE *f = fopen(logFilePath, "a+t");
 	
 	if(!f) {
 		return;
 	}
 
-	fprintf(f, "%08d: ", Utils::getCurrentMs());
+	fprintf(f, "%08d: outBfr - %d bytes\n", Utils::getCurrentMs(), count);
 
-	for(int i=0; i<count; i++) {
-		if((i % 16) == 0) {
-			fprintf(f, "\n");
-		}
+    int i, j;
+    
+    int rows = (count / 16) + (((count % 16) == 0) ? 0 : 1);
+     
+	for(i=0; i<rows; i++) {
+        int ofs = i * 16;
+        
+        for(j=0; j<16; j++) {
+            if((ofs + j) < count) {
+                fprintf(f, "%02x ", bfr[ofs + j]);
+            } else {
+                fprintf(f, "   ");
+            }
+        }
 
-		fprintf(f, "%02x ", bfr[i]);
-	}
+        fprintf(f, "| ");
+
+        for(j=0; j<16; j++) {
+            char v = bfr[ofs + j];
+            v = (v >= 32 && v <= 126) ? v : '.';
+            
+            if((ofs + j) < count) {
+                fprintf(f, "%c", v);
+            } else {
+                fprintf(f, " ");
+            }
+        }
+        
+        fprintf(f, "\n");
+    }
 
 	fprintf(f, "\n");
 	fclose(f);

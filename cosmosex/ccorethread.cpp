@@ -284,12 +284,14 @@ void CCoreThread::run(void)
 #endif
         
         int bytesAvailable;
-        if(ce_conf_fd1 > 0 && ce_conf_fd2 > 0) {                    // if we got the ce_conf FIFO handles
-            res = ioctl(ce_conf_fd1, FIONREAD, &bytesAvailable);    // how many bytes we can read?
+        if(ce_conf_fd1 > 0 && ce_conf_fd2 > 0) {                        // if we got the ce_conf FIFO handles
+            int ires = ioctl(ce_conf_fd1, FIONREAD, &bytesAvailable);   // how many bytes we can read?
 
-            if(res != -1 && bytesAvailable >= 3) {                  // if there are at least 3 bytes waiting
+            if(ires != -1 && bytesAvailable >= 3) {                     // if there are at least 3 bytes waiting
                 BYTE cmd[6] = {0, 'C', 'E', 0, 0, 0};
-                read(ce_conf_fd1, cmd + 3, 3);                          // read the byte triplet
+                ires = read(ce_conf_fd1, cmd + 3, 3);                   // read the byte triplet
+                
+                Debug::out(LOG_DEBUG, "confStream - through FIFO: %02x %02x %02x (ires = %d)", cmd[3], cmd[4], cmd[5], ires);
                 
                 confStream->processCommand(cmd, ce_conf_fd2);
             }

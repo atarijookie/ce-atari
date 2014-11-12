@@ -15,6 +15,12 @@ public:
 	static void outBfr(BYTE *bfr, int count);
 
     static void printfLogLevelString(void);
+    
+    static void setDefaultLogFile(void);
+    static void setLogFile(char *path);
+    
+private:    
+    static char logFilePath[128];
 };
 
 #endif

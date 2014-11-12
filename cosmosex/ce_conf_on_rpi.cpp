@@ -27,11 +27,11 @@ int ce_conf_fd2;
 BYTE *inBfr;
 BYTE *tmpBfr;
 
-static void translateVT52toVT100(BYTE *bfr, int cnt)
+static int translateVT52toVT100(BYTE *bfr, int cnt)
 {
     int i, t = 0;
 
-    memset(tmpBfr, 0, 512);
+    memset(tmpBfr, 0, INBFR_SIZE);
     
     for(i=0; i<cnt; ) {
         if(bfr[i] == 27) {
@@ -53,7 +53,7 @@ static void translateVT52toVT100(BYTE *bfr, int cnt)
                     x = bfr[i+3] - 32;
                     
                     char tmp[16];
-                    sprintf(tmp, "\033[%d;%df", y, x);
+                    sprintf(tmp, "\033[%d;%dH", y, x);
                     strcat((char *) tmpBfr, tmp);
                     t += strlen(tmp);
 
@@ -101,6 +101,7 @@ static void translateVT52toVT100(BYTE *bfr, int cnt)
     }
     
     memcpy(bfr, tmpBfr, t);             // copy back the converted data
+    return t;
 }
 
 static bool sendCmd(BYTE cmd, BYTE param)
@@ -127,12 +128,15 @@ static bool sendCmd(BYTE cmd, BYTE param)
 
     if(res != -1 && bytesAvailable > 0) {
         int readCount = (bytesAvailable < INBFR_SIZE) ? bytesAvailable : INBFR_SIZE;
-    
+        
+        memset(inBfr, 0, INBFR_SIZE);
         res = read(ce_conf_fd2, inBfr, readCount);
 
-        translateVT52toVT100(inBfr, readCount);
+        Debug::out(LOG_DEBUG, "sendCmd - readCount: %d", readCount);
         
-        printf("%s\n", inBfr);
+        int newCount = translateVT52toVT100(inBfr, readCount);
+        
+        write(STDOUT_FILENO, inBfr, newCount);
         return true;
     } else {
         printf("\033[2J\033[HCosmosEx app does not reply, is it running?\n");
@@ -254,12 +258,18 @@ void ce_conf_mainLoop(void)
     
     sendCmd(CFG_CMD_SET_RESOLUTION, ST_RESOLUTION_HIGH);
     
-  	struct termios old_tio, new_tio;
+  	struct termios old_tio_in, new_tio_in;
+  	struct termios old_tio_out, new_tio_out;
 
-	tcgetattr(STDIN_FILENO,&old_tio);               // get the terminal settings for stdin
-	new_tio = old_tio;                              // we want to keep the old setting to restore them a the end
-	new_tio.c_lflag &= (~ICANON & ~ECHO);           // disable canonical mode (buffered i/o) and local echo
-	tcsetattr(STDIN_FILENO,TCSANOW,&new_tio);       // set the new settings immediately
+	tcgetattr(STDIN_FILENO, &old_tio_in);           // get the terminal settings for stdin
+	new_tio_in = old_tio_in;                        // we want to keep the old setting to restore them a the end
+	new_tio_in.c_lflag &= (~ICANON & ~ECHO);        // disable canonical mode (buffered i/o) and local echo
+	tcsetattr(STDIN_FILENO, TCSANOW, &new_tio_in);  // set the new settings immediately
+
+	tcgetattr(STDOUT_FILENO,&old_tio_out);          // get the terminal settings for stdout
+	new_tio_out = old_tio_out;                      // we want to keep the old setting to restore them a the end
+	new_tio_out.c_lflag &= (~ICANON);               // disable canonical mode (buffered i/o)
+	tcsetattr(STDOUT_FILENO,TCSANOW, &new_tio_out); // set the new settings immediately
     
     DWORD lastUpdate = Utils::getCurrentMs();
     
@@ -292,10 +302,13 @@ void ce_conf_mainLoop(void)
         }
     }
     
-	tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);     // restore the former settings
+	tcsetattr(STDIN_FILENO, TCSANOW, &old_tio_in);      // restore the former settings
+	tcsetattr(STDOUT_FILENO, TCSANOW, &old_tio_out);    // restore the former settings
     
     delete []inBfr;
     delete []tmpBfr;
+    
+    system("reset");
 }
 
 void ce_conf_createFifos(void)
@@ -333,4 +346,14 @@ void ce_conf_createFifos(void)
     }
     
     Debug::out(LOG_INFO, "ce_conf FIFOs created");
+    
+    // now create the ce_conf starting script if it doesn't exist
+    res = access("/ce/ce_conf.sh", F_OK);
+
+    if(res == -1) {         // file doesn't exist? create it
+        system("echo -e '#!/bin/sh \n/ce/app/cosmosex ce_conf \nreset\n ' > /ce/ce_conf.sh");
+        system("chmod 755 /ce/ce_conf.sh");
+        
+        Utils::forceSync();
+    }
 }
