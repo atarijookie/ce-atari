@@ -41,11 +41,11 @@ readSectorsLoop:
 
 	bsr		dma_read			| try to read the sector
 	tst.b	d0
-	bne.b	fail1				| d0 != 0?
+	bne.b	readSectorsLoop		| if failed to read sector, try reading sector again
 
-    bsr     verify_checksum
+    bsr     verify_checksum     | verify the checksum
     tst.b   d0
-    bne.b   readSectorsLoop
+    bne.b   readSectorsLoop     | if checksum was bad, try reading sector again
     
 	lea		510(a1),a1			| a1 += 510     -- move only 510 bytes, because the last 2 were checksum, which we don't want
 	addq.w	#1,d1				| current_sector++
