@@ -19,6 +19,7 @@ public:
     ~ApiV1Router();
     bool handleGet(CivetServer *server, struct mg_connection *conn);
     bool handlePost(CivetServer *server, struct mg_connection *conn);
+    bool handlePut(CivetServer *server, struct mg_connection *conn);
 private:
     MouseResource *pxMouse; 
     KbdResource *pxKeyboard;

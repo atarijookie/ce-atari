@@ -27,7 +27,7 @@ int ce_conf_fd2;
 BYTE *inBfr;
 BYTE *tmpBfr;
 
-static int translateVT52toVT100(BYTE *bfr, int cnt)
+int translateVT52toVT100(BYTE *bfr, int cnt)
 {
     int i, t = 0;
 

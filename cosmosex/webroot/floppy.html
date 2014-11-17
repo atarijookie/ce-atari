@@ -1,17 +1,83 @@
-<html><body>Floppy image upload example.<br />
-Slot 1
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8">
+	    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
+        <title>CosmosEx Start Page</title>
+        <!-- 
+        -->
+        <link rel="stylesheet" type="text/css" href="css/bootstrap.light.css">
+		    <script type="text/javascript" src="js/modernizr.custom.50426.js"></script>
+        <script type="text/javascript"> 
+        var version="141116";
+        //unfortunately we have to support IE<10, so decide on zepto/jquery here
+    		document.write('<script type="text/javascript" src=js/' + ('__proto__' in {} ? 'zepto' : 'jquery') + '.js?'+version+'><\/script>');
+    		document.write('<script type="text/javascript"">var jQuery=Zepto;<\/script>');
+    		document.write('<script type="text/javascript" src=js/floppy.js?'+version+'><\/script>');
+//        document.write('<link rel="stylesheet" type="text/css" href="css/combined.css?'+version+'">');
+        document.write('<link rel="stylesheet" type="text/css" href="css/style.css?'+version+'">');
+    		</script>
+      	<script language="Javascript">
+    		$(document).ready(function () {
+    		  	CosmosEx.Floppy.init();
+    		});
+  		  </script>     
+      </head>
+    <body>
+    <div class="container">
+        <div class="row">
+            <div class="span10">
+                <ul class="nav nav-pills">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="http://joo.kie.sk/?page_id=415">Manual</a></li>
+                    <li class="active"><a href="/floppy.html">Floppy</a></li>
+                    <li><a href="/remote.html">Remote</a></li>
+                    <li><a href="/config.html">Config</a></li>
+                </ul>
+        <h3>Floppy emulation</h3>
+        <p>Select a disk image (*.ST, *.MSA) and upload it to your CosmosEx. </p>
+            </div>
+            <div class="span2">
+                <img class="logo" src="img/ce_logo.png">
+            </div>
+        </div>
+        <div class="row">
+            <div class="span4 disk" data-slot="0">
+<center>
+<h4>Slot #1</h4>
+<progress></progress>
+<span class="file name file-0 empty">empty</span>
 <form method="POST" action="/api/v1/floppy/0" enctype="multipart/form-data">
-<input type="file" name="file" /> <br/>
-<input type="submit" value="Upload" />
+<input class="input-file" type="file" name="file" /> <br/><br/>
+<input class="btn btn-primary upload vis-hidden" type="submit" value="Upload" data-slot="0"/>
+<label class="checkbox"><input type="checkbox" id="optionsCheckbox" value="option1" data-slot="0">activate Slot</label>
 </form>
-Slot 2
+</center>
+            </div>
+            <div class="span4 disk" data-slot="1">
+<center>
+<h4>Slot #2</h4>
+<progress></progress>
+<span class="file name file-1 empty">empty</span>
 <form method="POST" action="/api/v1/floppy/1" enctype="multipart/form-data">
-<input type="file" name="file" /> <br/>
-<input type="submit" value="Upload" />
+<input class="input-file" type="file" name="file" /> <br/><br/>
+<input class="btn btn-primary upload vis-hidden" type="submit" value="Upload" data-slot="1"/>
+<label class="checkbox"><input type="checkbox" id="optionsCheckbox" value="option1" data-slot="1">activate Slot</label>
 </form>
-Slot 3
+</center>
+            </div>
+            <div class="span4 disk" data-slot="2">
+<center>
+<h4>Slot #3</h4>
+<progress></progress>
+<span class="file name file-2 empty">empty</span>
 <form method="POST" action="/api/v1/floppy/2" enctype="multipart/form-data">
-<input type="file" name="file" /> <br/>
-<input type="submit" value="Upload" />
+<input class="input-file" type="file" name="file" /> <br/><br/>
+<input class="btn btn-primary upload vis-hidden" type="submit" value="Upload" data-slot="2"/>
+<label class="checkbox"><input type="checkbox" id="optionsCheckbox" value="option1" data-slot="2">activate Slot</label>
 </form>
-</body></html>
+</center>
+            </div>
+    </div>
+    </body>
+</html>

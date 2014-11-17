@@ -12,8 +12,8 @@ var keylinux=[
 56, //KEY_8                   9
 57, //KEY_9                   10
 48, //KEY_0                   11
-189,//KEY_MINUS               12
-187,//KEY_EQUAL               13
+219,//KEY_LEFTBRACE           12
+221,//KEY_RIGHTBRACE          13
 8,  //KEY_BACKSPACE           14
 9,  //KEY_TAB                 15
 81, //KEY_Q                   16
@@ -21,13 +21,13 @@ var keylinux=[
 69, //KEY_E                   18
 82, //KEY_R                   19
 84, //KEY_T                   20
-89, //KEY_Y                   21
+90, //KEY_Z                   21
 85, //KEY_U                   22
 73, //KEY_I                   23
 79, //KEY_O                   24
 80, //KEY_P                   25
-219,//KEY_LEFTBRACE           26
-221,//KEY_RIGHTBRACE          27
+186,//KEY_SEMICOLON           26
+187,//KEY_EQUAL               27
 13, //KEY_ENTER               28
 17, //KEY_LEFTCTRL            29
 65, //KEY_A                   30
@@ -39,12 +39,12 @@ var keylinux=[
 74, //KEY_J                   36
 75, //KEY_K                   37
 76, //KEY_L                   38
-186,//KEY_SEMICOLON           39
+192,//KEY_GRAVE               39
 222,//KEY_APOSTROPHE          40
-192,//KEY_GRAVE               41
+192,//KEY_SLASH               53
 16, //KEY_LEFTSHIFT           42
 220,//KEY_BACKSLASH           43
-90, //KEY_Z                   44
+89, //KEY_Y                   44
 88, //KEY_X                   45
 67, //KEY_C                   46
 86, //KEY_V                   47
@@ -53,7 +53,7 @@ var keylinux=[
 77, //KEY_M                   50
 188,//KEY_COMMA               51
 190,//KEY_DOT                 52
-192,//KEY_SLASH               53
+189,//KEY_MINUS               41
 16, //KEY_RIGHTSHIFT          54
 106,//KEY_KPASTERISK          55
 18, //KEY_LEFTALT             56

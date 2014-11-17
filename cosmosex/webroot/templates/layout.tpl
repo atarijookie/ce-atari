@@ -26,7 +26,9 @@
                 <ul class="nav nav-pills">
                     <li class="active"><a href="/">Home</a></li>
                     <li><a href="http://joo.kie.sk/?page_id=415">Manual</a></li>
+                    <li><a href="/floppy.html">Floppy</a></li>
                     <li><a href="/remote.html">Remote</a></li>
+                    <li><a href="/config.html">Config</a></li>
                 </ul>
             </div>
             <div class="span2">

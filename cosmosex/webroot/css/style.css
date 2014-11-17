@@ -55,3 +55,26 @@ img#keyboard{
 	margin-left: auto;
 	margin-right: auto;
 }
+.disk{
+  background-image:url("../img/35dd.jpg?2");
+  height: 309px;
+  width: 300px;
+  margin-bottom: 20px;
+}
+.disk center{
+  padding-top: 70px;
+}
+span.empty{
+  color: #aaaaaa;
+  font-style: italic;
+}
+div label.checkbox.empty{
+  visibility:hidden;  
+}
+progress{
+  display:none;
+  height: 1.25em;
+}
+.vis-hidden{
+  visibility:hidden;  
+}

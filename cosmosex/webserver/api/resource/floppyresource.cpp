@@ -30,14 +30,13 @@ bool FloppyResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
 {
     Debug::out(LOG_DEBUG, "FloppyResource::dispatch");
 
-    if( strstr(req_info->request_method,"GET")==0 && strstr(req_info->request_method,"POST")==0 ){
+    if( strstr(req_info->request_method,"GET")==0 && strstr(req_info->request_method,"POST")==0 && strstr(req_info->request_method,"PUT")==0 ){
         mg_printf(conn, "HTTP/1.1 405 Method Not Allowed %s\r\n",req_info->request_method);
         return true;
     }
 
     //return slot info
     if( strstr(req_info->request_method,"GET")>0 ){
-        const char *qs = req_info->query_string;
         mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n");
         mg_printf(conn, "Cache: no-cache\r\n");
         std::ostringstream stringStream;
@@ -45,7 +44,13 @@ bool FloppyResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         stringStream << "\"" << pxFloppyService->getImageName(0) << "\",";
         stringStream << "\"" << pxFloppyService->getImageName(1) << "\",";
         stringStream << "\"" << pxFloppyService->getImageName(2) << "\"";
-        stringStream << "]}"; 
+        stringStream << "],";
+        if( pxFloppyService->getActiveSlot()==EMPTY_IMAGE_SLOT ){
+          stringStream << "\"active\": null";
+        }else{
+          stringStream << "\"active\":" << pxFloppyService->getActiveSlot();
+        }
+        stringStream << "}"; 
         std::string sJson=stringStream.str();
         mg_printf(conn, "Content-Length: %d\r\n\r\n",sJson.length());        // Always set Content-Length
         mg_printf(conn, sJson.c_str());        // Always set Content-Length
@@ -57,9 +62,9 @@ bool FloppyResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         Debug::out(LOG_DEBUG, "/floppy POST");
 
         int iSlot=atoi(sResourceInfo.c_str());        
-        if( iSlot<0 || iSlot>2 )
+        if( iSlot<-1 || (iSlot>2 && iSlot!=255) )
         {
-            mg_printf(conn, "HTTP/1.1 400 Selected slot not in range 0-2\r\n");
+            mg_printf(conn, "HTTP/1.1 400 Selected slot not in range -1 to 2\r\n");
             return true;
         }
 
@@ -72,9 +77,6 @@ bool FloppyResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         }
 
         pxFloppyService->setImage(iSlot,WebServer::sLastUploadedFile);
-        
-        //just a test
-        pxFloppyService->setActiveSlot(iSlot);
 
         mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n");
         mg_printf(conn, "<html><body>\n"); 
@@ -82,6 +84,20 @@ bool FloppyResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         mg_printf(conn, "File %d %s\n",iFiles,WebServer::sLastUploadedFile.c_str()); 
         mg_printf(conn, "</body></html>\n"); 
         return true;    
+    }
+
+    //set current slot
+    if( strstr(req_info->request_method,"PUT")>0 ){
+        int iSlot=atoi(sResourceInfo.c_str());
+        //slot 3=deactivated        
+        if( iSlot<-1 || (iSlot>2 && iSlot!=255) )
+        {
+            mg_printf(conn, "HTTP/1.1 400 Selected slot not in range -1 to 2\r\n");
+            return true;
+        }
+        pxFloppyService->setActiveSlot(iSlot);
+        mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n");
+        return true;
     }
 
     return false;

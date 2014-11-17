@@ -35,6 +35,11 @@ bool ApiV1Router::handlePost(CivetServer *server, struct mg_connection *conn)
 {
     return handleGet(server, conn);
 }
+      
+bool ApiV1Router::handlePut(CivetServer *server, struct mg_connection *conn) 
+{
+    return handleGet(server, conn);
+}
                                      
 bool ApiV1Router::handleGet(CivetServer *server, struct mg_connection *conn) 
 {

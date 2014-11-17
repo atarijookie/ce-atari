@@ -88,3 +88,8 @@ bool FloppyService::setActiveSlot(int iSlot)
     pxCoreThread->setFloppyImageLed(iSlot);
     return true;
 }
+
+int FloppyService::getActiveSlot()
+{
+    return pxImageSilo->getCurrentSlot(); 
+}

@@ -466,7 +466,7 @@ CosmosEx.Remote=function(){
 						sendKey(29,"down");
 						sendKey(56,"down");
 						sendKey(111,"down");
-						setTimeOut(function(){
+						setTimeout(function(){
 							sendKey(29,"up");
 							sendKey(56,"up");
 							sendKey(111,"up");

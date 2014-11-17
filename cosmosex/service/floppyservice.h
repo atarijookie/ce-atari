@@ -19,6 +19,7 @@ public:
     std::string getImageName(int iSlot);
     bool setImage(int iSlot, std::string sLocalFileWPath);
     bool setActiveSlot(int iSlot);
+    int getActiveSlot();
 private:
     ImageSilo* pxImageSilo;
     CCoreThread* pxCoreThread;
