@@ -14,7 +14,7 @@
 #define  TCP_DRIVER_VERSION    "01.20"
 #define  STX_LAYER_VERSION     "01.05"
 #define  CFG_NUM               100
-#define  MAX_HANDLE            32
+#define  MAX_HANDLE            10
 #define  MAX_SEMAPHOR          64
 #define  LOOPBACK              0x7f000001L
 
@@ -494,6 +494,23 @@ Error return values:
 #define handleAtariToCE(X)		(X  + 0x50)
 #define handleCEtoAtari(X)		(X  - 0x50)
 
+/*--------------------------------------------------------------------------*/
+
+#ifndef BYTE
+    #include <stdint.h>
+
+    #define BYTE  	unsigned char
+    #define WORD  	uint16_t
+    #define DWORD 	uint32_t
+#endif
+
+typedef struct {
+        CIB     cib;                            // connection information block
+        DWORD   bytesToRead;                    // how many bytes we can read from this connection
+        BYTE    tcpConnectionState;             // TCP connection states -- TCLOSED, TLISTEN, ...
+        } TConInfo;
+
+/*--------------------------------------------------------------------------*/
 
 #endif
 

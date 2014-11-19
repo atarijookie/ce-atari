@@ -21,15 +21,6 @@
 #include "ce_commands.h"
 #include "stdlib.h"
 
-extern BYTE deviceID;
-extern BYTE commandShort[CMD_LENGTH_SHORT];
-extern BYTE commandLong[CMD_LENGTH_LONG];
-extern BYTE *pDmaBuffer;
-//---------------------
-
-extern CIB      cibs[MAX_HANDLE];
-extern uint32   localIP;
-
 //---------------------
 
 int16 UDP_open (uint32 rem_host, uint16 rem_port)

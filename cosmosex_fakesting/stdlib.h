@@ -19,6 +19,7 @@ BYTE *storeByte(BYTE *bfr, BYTE value);
 BYTE *storeWord(BYTE *bfr, WORD value);
 BYTE *storeDword(BYTE *bfr, DWORD value);
 
-WORD getWord(BYTE *bfr);
+WORD  getWord(BYTE *bfr);
+DWORD getDword(BYTE *bfr);
 
 #endif

@@ -7,20 +7,18 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 #include <support.h>
 #include <stdint.h>
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <ctype.h>
-#include <string.h>
 
 #include <gem.h>
 
 #include "globdefs.h"
 #include "acsi.h"
 #include "ce_commands.h"
+#include "stdlib.h"
 
 long    init_cookie (void);
 void    install (void);
@@ -56,7 +54,7 @@ BYTE *pDmaBuffer;
 BYTE ce_findId(void); 
 //---------------------------------------
 
-extern uint32 localIP;
+uint32 localIP;
 
 //---------------------------------------
 
@@ -81,41 +79,39 @@ int main()
     commandShort[0] = (deviceID << 5); 					        // cmd[0] = ACSI_id + TEST UNIT READY (0)
     commandLong[0]  = (deviceID << 5) | 0x1f;			        // cmd[0] = ACSI_id + ICD command marker (0x1f)
    
-   for (count = 0; count < MAX_SEMAPHOR; count++)
+    for (count = 0; count < MAX_SEMAPHOR; count++) {
         semaphors[count] = 0;
+    }
 
-   switch (init_cfg()) {
-      case -3 :
-        (void) Cconws ("Could not allocate enough memory ! No installation ...");
-        return 0;
-      case -2 :
-        (void) Cconws ("ALLOCMEM must be at least 1024 bytes ! No installation ...");
-        return 0;
-      case -1 :
-        (void) Cconws ("Problem finding/reading DEFAULT.CFG ! No installation ...");
-        return 0;
-      }
+    switch (init_cfg()) {
+        case -3 :   (void) Cconws ("Could not allocate enough memory ! No installation ...");       return 0;
+        case -2 :   (void) Cconws ("ALLOCMEM must be at least 1024 bytes ! No installation ...");   return 0;
+        case -1 :   (void) Cconws ("Problem finding/reading DEFAULT.CFG ! No installation ...");    return 0;
+    }
 
 	if (Supexec (init_cookie) < 0) {
         (void) Cconws ("STinG already installed ! No installation ...");
-        if (memory)   Mfree (memory);
+        if (memory) {
+            Mfree (memory);
+        }
+        
         return 0;
 	}
 
-   install();
+    install();
 
-   strcpy (def_conf, "STinG version ");   strcat (def_conf, TCP_DRIVER_VERSION);
-   strcat (def_conf, " (");               strcat (def_conf, STX_LAYER_VERSION);
-   strcat (def_conf, ") installed ...");
-   (void) Cconws(def_conf);
+    strcpy (def_conf, "STinG version ");   strcat (def_conf, TCP_DRIVER_VERSION);
+    strcat (def_conf, " (");               strcat (def_conf, STX_LAYER_VERSION);
+    strcat (def_conf, ") installed ...");
+    (void) Cconws(def_conf);
 
-   appl_init();                                 // init gem
+    appl_init();                                 // init gem
    
-   Ptermres (_pgmsize, 0);
-   return 0;
+    Ptermres (_pgmsize, 0);
+    return 0;
  }
 
-int16  init_cfg (void)
+int16 init_cfg (void)
 {
 	if(KRinitialize(100000) < 0) {				// ALLOCMEM
 		return (-3);
@@ -162,7 +158,13 @@ BYTE ce_identify(void)
 	if(strncmp((char *) pDmaBuffer, "CosmosEx network module", 23) != 0) {		// the identity string doesn't match? 
 		return 0;
 	}
-	
+    
+    //----------------
+    // if we got here, then this ACSI ID is the CosmosEx network module, so get the configuration (which starts from 32nd byte)
+    localIP = getDword(pDmaBuffer + 32);
+    
+	//----------------
+    
 	return 1;                             										// success 
 }
 

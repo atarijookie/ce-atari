@@ -217,3 +217,16 @@ WORD getWord(BYTE *bfr)
     
     return val;
 }
+
+DWORD getDword(BYTE *bfr)
+{
+    DWORD val;
+    
+    val =       ((DWORD) bfr[0]) << 24;
+    val = val | ((DWORD) bfr[1]) << 16;
+    val = val | ((DWORD) bfr[2]) <<  8;
+    val = val | ((DWORD) bfr[3]);
+    
+    return val;
+}
+

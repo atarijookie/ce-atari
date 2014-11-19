@@ -78,6 +78,12 @@ BYTE hdone(void);
 BYTE endcmd(WORD mode);
 
 BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+
+extern BYTE deviceID;
+extern BYTE commandShort[CMD_LENGTH_SHORT];
+extern BYTE commandLong[CMD_LENGTH_LONG];
+extern BYTE *pDmaBuffer;
+
 //---------------------------------------
 
 #endif

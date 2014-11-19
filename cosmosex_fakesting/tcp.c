@@ -23,13 +23,9 @@
 #include "ce_commands.h"
 #include "stdlib.h"
 
-extern BYTE deviceID;
-extern BYTE commandShort[CMD_LENGTH_SHORT];
-extern BYTE commandLong[CMD_LENGTH_LONG];
-extern BYTE *pDmaBuffer;
 //---------------------
 
-extern BYTE tcpConnectionStates[MAX_HANDLE];            // TCP connection states -- TCLOSED, TLISTEN, ...
+extern TConInfo conInfo[MAX_HANDLE];                   // this holds info about each connection
 
 //---------------------
 
@@ -58,8 +54,8 @@ int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
     DWORD timeout2 = timeout * 200;    
     
     while(1) {
-        update_con_info();                                  // update the info 
-        WORD currentState = tcpConnectionStates[handle];    // get the current state
+        update_con_info();                                          // update the info 
+        WORD currentState = conInfo[handle].tcpConnectionState;     // get the current state
     
         // if the wanted state is CLOSED or CLOSING, and the current state is similar - success
         if(wantedState == TCLOSED || wantedState == TFIN_WAIT1 ||  wantedState == TFIN_WAIT2 ||  wantedState == TCLOSE_WAIT ||  wantedState == TCLOSING ||  wantedState == TLAST_ACK ||  wantedState == TTIME_WAIT) {
@@ -92,7 +88,7 @@ int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
 
 int16 TCP_ack_wait(int16 handle, int16 timeout)
 {
-    if(!handle_valid(handle)) {                     // we don't have this handle? fail
+    if(!handle_valid(handle)) {                                 // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -102,17 +98,17 @@ int16 TCP_ack_wait(int16 handle, int16 timeout)
 
 int16 TCP_info(int16 handle, TCPIB *tcp_info)
 {
-    if(!handle_valid(handle)) {                     // we don't have this handle? fail
+    if(!handle_valid(handle)) {                                 // we don't have this handle? fail
         return E_BADHANDLE;
     }
     
-    update_con_info();                              // update the info 
+    update_con_info();                                          // update the info 
 
-    if(tcp_info == NULL) {                          // no pointer? fail
+    if(tcp_info == NULL) {                                      // no pointer? fail
         return E_BADHANDLE;
     }
     
-    tcp_info->state = tcpConnectionStates[handle];  // return the connection state
+    tcp_info->state = conInfo[handle].tcpConnectionState;       // return the connection state
     
     return E_NORMAL;
 }

@@ -16,19 +16,11 @@
 #include "ce_commands.h"
 #include "stdlib.h"
 
-extern BYTE deviceID;
-extern BYTE commandShort[CMD_LENGTH_SHORT];
-extern BYTE commandLong[CMD_LENGTH_LONG];
-extern BYTE *pDmaBuffer;
-
 //--------------------------------------
 
-        CIB     cibs[MAX_HANDLE];
 extern  uint32  localIP;
 
-        DWORD   bytesToRead[MAX_HANDLE];                    // how many bytes we can read from this connection
-        BYTE    tcpConnectionStates[MAX_HANDLE];            // TCP connection states -- TCLOSED, TLISTEN, ...
-//---------------------
+TConInfo conInfo[MAX_HANDLE];                   // this holds info about each connection
 
 //--------------------------------------
 // connection info function
@@ -52,7 +44,7 @@ CIB *CNgetinfo(int16 handle)
 
     update_con_info();                  // update connections info structs (max once per 100 ms)
 
-	return &cibs[handle];               // return pointer to correct CIB
+	return &conInfo[handle].cib;        // return pointer to correct CIB
 }
 
 int16 CNbyte_count (int16 handle)
@@ -63,12 +55,12 @@ int16 CNbyte_count (int16 handle)
 
     update_con_info();                  // update connections info structs (max once per 100 ms)
 
-    if(bytesToRead[handle] > 0x7FFF) {  // if we can now receive more than 0x7FFF bytes, return just 0x7FFF, because otherwise it would look like negative error
+    if(conInfo[handle].bytesToRead > 0x7FFF) {  // if we can now receive more than 0x7FFF bytes, return just 0x7FFF, because otherwise it would look like negative error
         return 0x7FFF;
     } 
     
     // if have less than 0x7FFF, just return the value             
-    return bytesToRead[handle];
+    return conInfo[handle].bytesToRead;
 }
 
 //-------------------------------------
@@ -81,7 +73,7 @@ int16 CNget_char (int16 handle)
 
     update_con_info();                  // update connections info structs (max once per 100 ms)
 
-    if(bytesToRead[handle] == 0) {      // no data?
+    if(conInfo[handle].bytesToRead == 0) {      // no data?
         return E_NODATA;
     }
     
@@ -100,7 +92,7 @@ NDB *CNget_NDB (int16 handle)
 
     update_con_info();                  // update connections info structs (max once per 100 ms)
 
-    if(bytesToRead[handle] == 0) {      // no data?
+    if(conInfo[handle].bytesToRead == 0) {      // no data?
         return (NDB *) E_NODATA;
     }
 
@@ -118,7 +110,7 @@ int16 CNget_block (int16 handle, void *buffer, int16 length)
 
     update_con_info();                  // update connections info structs (max once per 100 ms)
 
-    if(bytesToRead[handle] == 0) {      // no data?
+    if(conInfo[handle].bytesToRead == 0) {      // no data?
         return E_NODATA;
     }
 
@@ -136,7 +128,7 @@ int16 CNgets (int16 handle, char *buffer, int16 length, char delimiter)
 
     update_con_info();                  // update connections info structs (max once per 100 ms)
 
-    if(bytesToRead[handle] == 0) {      // no data?
+    if(conInfo[handle].bytesToRead == 0) {      // no data?
         return E_NODATA;
     }
 
@@ -155,7 +147,7 @@ void structs_init(void)
     int i;
     
     for(i=0; i<MAX_HANDLE; i++) {
-        memset(&cibs[i], 0, sizeof(CIB));
+        memset(&conInfo[i].cib, 0, sizeof(CIB));
     }
 }
 
@@ -165,7 +157,7 @@ int handle_valid(int16 h)
         return FALSE;
     }
     
-    if(cibs[h].address.rhost == 0 && cibs[h].address.rport == 0) {          // if connection not open 
+    if(conInfo[h].cib.address.rhost == 0 && conInfo[h].cib.address.rport == 0) {          // if connection not open 
         return FALSE;
     }
     
@@ -201,8 +193,8 @@ void update_con_info(void)
     DWORD   *pBytesToReadIcmp   = (DWORD *) (pDmaBuffer + 160);                 // offset 160:  1 * 1 DWORD - bytes that can be read from ICMP socket(s)
     
     for(i=0; i<MAX_HANDLE; i++) {                                               // retrieve all the data and fill the variables
-        bytesToRead[i]          = (DWORD)   pBytesToRead[i];
-        tcpConnectionStates[i]  = (BYTE)    pConnStatus[i];
+        conInfo[i].bytesToRead          = (DWORD)   pBytesToRead[i];
+        conInfo[i].tcpConnectionState   = (BYTE)    pConnStatus[i];
     }
     
     DWORD bytesToReadIcmp = (DWORD) *pBytesToReadIcmp;                          // get how many bytes we can read from ICMP socket(s)
@@ -244,16 +236,16 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
 
         // store info to CIB and CAB structures
         if(tcpNotUdp) {
-            cibs[stHandle].protocol     = TCP;
+            conInfo[stHandle].cib.protocol  = TCP;
         } else {
-            cibs[stHandle].protocol     = UDP;
+            conInfo[stHandle].cib.protocol  = UDP;
         }
         
-        cibs[stHandle].status           = 0;        // 0 means normal
-        cibs[stHandle].address.rport    = rem_port; // Remote machine port
-        cibs[stHandle].address.rhost    = rem_host; // Remote machine IP address
-        cibs[stHandle].address.lport    = 0;        // Local  machine port
-        cibs[stHandle].address.lhost    = localIP;  // Local  machine IP address
+        conInfo[stHandle].cib.status            = 0;        // 0 means normal
+        conInfo[stHandle].cib.address.rport     = rem_port; // Remote machine port
+        conInfo[stHandle].cib.address.rhost     = rem_host; // Remote machine IP address
+        conInfo[stHandle].cib.address.lport     = 0;        // Local  machine port
+        conInfo[stHandle].cib.address.lhost     = localIP;  // Local  machine IP address
         
         return stHandle;                            // return the new handle
     } 
@@ -291,7 +283,7 @@ int16 connection_close(int tcpNotUdp, int16 handle, int16 mode, int16 *result)
 		return E_LOSTCARRIER;
 	}
 
-    memset(&cibs[handle], 0, sizeof(CIB));          // clear the CIB structure
+    memset(&conInfo[handle].cib, 0, sizeof(CIB));          // clear the CIB structure
     return E_NORMAL;
 }
 

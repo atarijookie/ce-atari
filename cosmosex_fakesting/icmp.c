@@ -35,10 +35,6 @@ uint16      icmp_id = 0;
 #include "ce_commands.h"
 #include "stdlib.h"
 
-extern BYTE deviceID;
-extern BYTE commandShort[CMD_LENGTH_SHORT];
-extern BYTE commandLong[CMD_LENGTH_LONG];
-extern BYTE *pDmaBuffer;
 //---------------------
 
 #define MAX_ICMP_HANDLERS   16
