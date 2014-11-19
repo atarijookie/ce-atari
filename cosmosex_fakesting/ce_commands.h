@@ -36,6 +36,7 @@
 
 #define NET_CMD_CN_READ_DATA            0x4A
 #define NET_CMD_CN_GET_DATA_COUNT       0x4B
+#define NET_CMD_CN_LOCATE_DELIMITER     0x4C
 
 // MISC
 #define NET_CMD_RESOLVE                 0x50
@@ -48,6 +49,8 @@
 
 #define RW_ALL_TRANSFERED   0       // return this is all the required data was read / written
 #define RW_PARTIAL_TRANSFER 1       // return this if not all of the required data was read / written
+
+#define DELIMITER_NOT_FOUND             0xffffffff
 
 #endif
 

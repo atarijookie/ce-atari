@@ -193,9 +193,9 @@ int16 CNget_block(int16 handle, void *buffer, int16 length)
     return res;
 }
 
-int16 CNgets (int16 handle, char *buffer, int16 length, char delimiter)
+int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
 {
-    if(!handle_valid(handle)) {                 // we don't have this handle? fail
+    if(!handle_valid(handle)) {                                     // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
@@ -208,11 +208,53 @@ int16 CNgets (int16 handle, char *buffer, int16 length, char delimiter)
         return E_NODATA;
     }
 
-
-
-
+    //-----------------------
+    // before we do anything, we should check if the string could fit in the provided buffer
+    int32 i, realLen = -1;
     
-	return 0;
+    for(i=ci->rStart; i<ci->rCount; i++) {                          // check if the local buffer has this delimiter
+        if(ci->rBuf[i] == delimiter) {                              // delimiter found, quit the search
+            realLen = i - ci->rStart;
+            break;
+        }
+    }
+
+    if(realLen == -1) {                                                                     // we didn't find the delimiter, try to search for it in host
+    	commandLong[5] = NET_CMD_CN_LOCATE_DELIMITER;
+		commandLong[6] = handle;
+        commandLong[7] = delimiter;
+    
+		BYTE res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);      // send command to host over ACSI
+
+		if(res != E_NORMAL) {                                                               // failed? say that no data was transfered
+			return E_NODATA;
+		}
+        
+        DWORD lenOnHost = getDword(pDmaBuffer);                                             // read the position on host
+        
+        if(lenOnHost == DELIMITER_NOT_FOUND) {                                              // not found? fail
+            return E_NODATA;                                                                // not enough data in the input buffer to find the delimiter
+        }
+        
+        realLen = dataLeftLocal + lenOnHost;                                                // found on host, so real length is local length + length on host
+    }
+    
+    // now verify if the provided buffer is long enough
+    if(length < realLen) {
+        return E_BIGBUF;                                                                    // return: the buffer is not large enough to hold the whole block of data
+    }
+    
+    //-----------------------
+    // if we got here, we know that we do have that delimiter and the buffer is large enough to get it, 
+    // so get it using small buffers
+    DWORD cnt = read_small(handle, realLen, (BYTE *) buffer);
+    
+    if(cnt != realLen) {                // if failed to read all required data (shouldn't happen), fail
+        return E_NODATA;
+    }
+    
+    buffer[realLen - 1] = 0;            // terminate the string by removing the delimiter
+	return (realLen - 1);               // returns the number of bytes read until the delimiter was found, i.e. the length of the buffer contents without the final '\0' byte
 }
 
 //--------------------------------------
