@@ -18,15 +18,13 @@
 #include "globdefs.h"
 #include "acsi.h"
 #include "ce_commands.h"
+#include "con_man.h"
 #include "stdlib.h"
+#include "setup.h"
 
 long    init_cookie (void);
 void    install (void);
 int16   init_cfg (void);
-
-int16   KRinitialize (int32 size);
-void *  KRmalloc (int32 size);
-void    KRfree (void *mem_block);
 
 int16   setvstr (char name[], char value[]);
 char *  getvstr (char name[]);
@@ -52,6 +50,9 @@ BYTE dmaBuffer[512 + 2];
 BYTE *pDmaBuffer;
 
 BYTE ce_findId(void); 
+
+BYTE FastRAMBuffer[FASTRAM_BUFFER_SIZE] __attribute__((aligned (4)));    // intermediate buffer for TT
+
 //---------------------------------------
 
 uint32 localIP;
@@ -60,15 +61,17 @@ uint32 localIP;
 
 int main()
 {
-   int   count;
-   char  def_conf[255];
+    int   count;
+    char  def_conf[255];
 
-   (void) Cconws("\n\r\033p  *** Fake STinG TCP/IP InterNet Connection Layer ***  \033q");
+    (void) Cconws("\n\r\033p  *** Fake STinG TCP/IP InterNet Connection Layer ***  \033q");
+
+    init_con_info();                                            // init connection info structs
 
    	// create buffer pointer to even address
 	pDmaBuffer = &dmaBuffer[2];
 	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);  // remove odd bit if the address was odd
-    
+
 	BYTE found = ce_findId();                                   // try to find the CosmosEx device on ACSI bus
 
     if(!found) {								                // not found? quit

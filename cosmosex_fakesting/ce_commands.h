@@ -34,6 +34,9 @@
 
 #define NET_CMD_CN_UPDATE_INFO          0x47
 
+#define NET_CMD_CN_READ_DATA            0x4A
+#define NET_CMD_CN_GET_DATA_COUNT       0x4B
+
 // MISC
 #define NET_CMD_RESOLVE                 0x50
 #define NET_CMD_ON_PORT                 0x51
@@ -42,6 +45,9 @@
 #define NET_CMD_CNTRL_PORT              0x54
 
 #define NET_CMD_RESOLVE_GET_RESPONSE    0x55
+
+#define RW_ALL_TRANSFERED   0       // return this is all the required data was read / written
+#define RW_PARTIAL_TRANSFER 1       // return this if not all of the required data was read / written
 
 #endif
 

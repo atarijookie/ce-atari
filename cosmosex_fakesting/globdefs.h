@@ -504,12 +504,19 @@ Error return values:
     #define DWORD 	uint32_t
 #endif
 
-typedef struct {
-        CIB     cib;                            // connection information block
-        DWORD   bytesToRead;                    // how many bytes we can read from this connection
-        BYTE    tcpConnectionState;             // TCP connection states -- TCLOSED, TLISTEN, ...
-        } TConInfo;
+#define READ_BUFFER_SIZE    512
 
+typedef struct {
+    CIB     cib;                            // connection information block
+    DWORD   bytesToRead;                    // how many bytes we can read from this connection
+    BYTE    tcpConnectionState;             // TCP connection states -- TCLOSED, TLISTEN, ...
+        
+    WORD rCount;					        // how much data is buffer (specifies where the next read data could come from)
+    WORD rStart;					        // starting index of where we should start reading the buffer
+    BYTE rBuf[READ_BUFFER_SIZE];
+} TConInfo;
+
+#define FASTRAM_BUFFER_SIZE	4096
 /*--------------------------------------------------------------------------*/
 
 #endif
