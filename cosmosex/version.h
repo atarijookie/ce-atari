@@ -5,11 +5,12 @@
 #include "datatypes.h"
 
 #define XILINX_VERSION_FILE		"/ce/update/xilinx_current.txt"
-#define APP_VERSION         	"2014-11-12"
 
 class Version
 {
 public:
+    static void getAppVersion(char *bfr);
+
     Version();
     void fromString(char *str);
     void fromInts(int y, int m, int d);

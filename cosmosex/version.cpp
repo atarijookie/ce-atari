@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "version.h"
 
@@ -148,5 +149,27 @@ WORD Version::getChecksum(void)
     return checksum;
 }
 
+void Version::getAppVersion(char *bfr)
+{
+    char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    char const *buildDate = __DATE__;
+    
+    int year = 0, month = 0, day = 0;
+    int i;
+    for(i=0; i<12; i++) {
+        if(strncmp(months[i], buildDate, 3) == 0) {
+            month = i + 1;
+            break;
+        }
+    }
+    
+    i = sscanf(buildDate + 4, "%d %d", &day, &year);
+    
+    if(i == 2 && month > 0) {
+        sprintf(bfr, "%04d-%02d-%02d", year, month, day);
+    } else {
+        strcpy(bfr, "YYYY-MM-DD");
+    }
+}
 
 

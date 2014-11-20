@@ -448,7 +448,8 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
     BYTE fwVer[14], oBuf[14];
 	int cmdLength;
 
-    memset(oBuf, 0, 14);                                // first clear the output buffer
+    memset(oBuf,    0, 14);                                         // first clear the output buffer
+    memset(fwVer,   0, 14);
 
     // WORD sent (bytes shown): 01 23 45 67
 

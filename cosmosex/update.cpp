@@ -16,7 +16,10 @@ int Update::currentState = UPDATE_STATE_IDLE;
 
 void Update::initialize(void)
 {
-    Update::versions.current.app.fromString(                (char *) APP_VERSION);
+    char appVersion[16];
+    Version::getAppVersion(appVersion);
+    
+    Update::versions.current.app.fromString(                (char *) appVersion);
     Update::versions.current.xilinx.fromFirstLineOfFile(    (char *) XILINX_VERSION_FILE);
     Update::versions.updateListWasProcessed = false;
     Update::versions.gotUpdate              = false;
