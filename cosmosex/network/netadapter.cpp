@@ -63,49 +63,104 @@ void NetAdapter::processCommand(BYTE *command)
         case NET_CMD_IDENTIFY:              break;
 
         // TCP functions
-        case NET_CMD_TCP_OPEN:              break;
-        case NET_CMD_TCP_CLOSE:             break;
-        case NET_CMD_TCP_SEND:              break;
-        case NET_CMD_TCP_WAIT_STATE:        break;
-        case NET_CMD_TCP_ACK_WAIT:          break;
-        case NET_CMD_TCP_INFO:              break;
+        case NET_CMD_TCP_OPEN:              conOpen();          break;
+        case NET_CMD_TCP_CLOSE:             conClose();         break;
+        case NET_CMD_TCP_SEND:              conSend();          break;
+        case NET_CMD_TCP_WAIT_STATE:        break;                      // currently not used on host
+        case NET_CMD_TCP_ACK_WAIT:          break;                      // currently not used on host
+        case NET_CMD_TCP_INFO:              break;                      // currently not used on host
 
         // UDP FUNCTION
-        case NET_CMD_UDP_OPEN:              break;
-        case NET_CMD_UDP_CLOSE:             break;
-        case NET_CMD_UDP_SEND:              break;
+        case NET_CMD_UDP_OPEN:              conOpen();          break;
+        case NET_CMD_UDP_CLOSE:             conClose();         break;
+        case NET_CMD_UDP_SEND:              conSend();          break;
 
         // ICMP FUNCTIONS
-        case NET_CMD_ICMP_SEND_EVEN:        break;
-        case NET_CMD_ICMP_SEND_ODD:         break;
-        case NET_CMD_ICMP_HANDLER:          break;
-        case NET_CMD_ICMP_DISCARD:          break;
-        case NET_CMD_ICMP_GET_DGRAMS:       break;
+        case NET_CMD_ICMP_SEND_EVEN:        icmpSend();         break;
+        case NET_CMD_ICMP_SEND_ODD:         icmpSend();         break;
+        case NET_CMD_ICMP_HANDLER:          break;                      // currently not used on host
+        case NET_CMD_ICMP_DISCARD:          break;                      // currently not used on host
+        case NET_CMD_ICMP_GET_DGRAMS:       icmpGetDgrams();    break;
 
         // CONNECTION MANAGER
-        case NET_CMD_CNKICK:                break;
-        case NET_CMD_CNBYTE_COUNT:          break;
-        case NET_CMD_CNGET_CHAR:            break;
-        case NET_CMD_CNGET_NDB:             break;
-        case NET_CMD_CNGET_BLOCK:           break;
-        case NET_CMD_CNGETINFO:             break;
-        case NET_CMD_CNGETS:                break;
-        case NET_CMD_CN_UPDATE_INFO:        break;
-        case NET_CMD_CN_READ_DATA:          break;
-        case NET_CMD_CN_GET_DATA_COUNT:     break;
-        case NET_CMD_CN_LOCATE_DELIMITER:   break;
+        case NET_CMD_CNKICK:                break;                      // currently not used on host
+        case NET_CMD_CNBYTE_COUNT:          break;                      // currently not used on host
+        case NET_CMD_CNGET_CHAR:            break;                      // currently not used on host
+        case NET_CMD_CNGET_NDB:             break;                      // currently not used on host
+        case NET_CMD_CNGET_BLOCK:           break;                      // currently not used on host
+        case NET_CMD_CNGETINFO:             break;                      // currently not used on host
+        case NET_CMD_CNGETS:                break;                      // currently not used on host
+        case NET_CMD_CN_UPDATE_INFO:        conUpdateInfo();    break;
+        case NET_CMD_CN_READ_DATA:          conReadData();      break;
+        case NET_CMD_CN_GET_DATA_COUNT:     conGetDataCount();  break;
+        case NET_CMD_CN_LOCATE_DELIMITER:   conLocateDelim();   break;
 
         // MISC
-        case NET_CMD_RESOLVE:               break;
-        case NET_CMD_ON_PORT:               break;
-        case NET_CMD_OFF_PORT:              break;
-        case NET_CMD_QUERY_PORT:            break;
-        case NET_CMD_CNTRL_PORT:            break;
+        case NET_CMD_RESOLVE:               resolveStart();     break;
+        case NET_CMD_RESOLVE_GET_RESPONSE:  resolveGetResp();   break;
+        case NET_CMD_ON_PORT:               break;                      // currently not used on host
+        case NET_CMD_OFF_PORT:              break;                      // currently not used on host
+        case NET_CMD_QUERY_PORT:            break;                      // currently not used on host
+        case NET_CMD_CNTRL_PORT:            break;                      // currently not used on host
 
-        case NET_CMD_RESOLVE_GET_RESPONSE:  break;
     }
 
     dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
+}
+//----------------------------------------------
+void NetAdapter::conOpen(void)
+{
+
+}
+//----------------------------------------------
+void NetAdapter::conClose(void)
+{
+
+}
+//----------------------------------------------
+void NetAdapter::conSend(void)
+{
+
+}
+//----------------------------------------------
+void NetAdapter::conUpdateInfo(void)
+{
+
+}
+//----------------------------------------------
+void NetAdapter::conReadData(void)
+{
+
+}
+//----------------------------------------------
+void NetAdapter::conGetDataCount(void)
+{
+
+}
+//----------------------------------------------
+void NetAdapter::conLocateDelim(void)
+{
+
+}
+//----------------------------------------------
+void NetAdapter::icmpSend(void)
+{
+
+}
+//----------------------------------------------
+void NetAdapter::icmpGetDgrams(void)
+{
+
+}
+//----------------------------------------------
+void NetAdapter::resolveStart(void)
+{
+
+}
+//----------------------------------------------
+void NetAdapter::resolveGetResp(void)
+{
+
 }
 //----------------------------------------------
 
