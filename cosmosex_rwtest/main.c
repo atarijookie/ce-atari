@@ -34,19 +34,14 @@ BYTE rwSectorsNotFiles;
 #define BUFSIZE		(128 * 512)
 char testFile[128];
 
-BYTE wrBfr[BUFSIZE];
-BYTE rdBfr[BUFSIZE];
-
 int main(int argc, char *argv[])
 {
 	DWORD i, s, ind;
 	BYTE key, val;
 
 	// alloc buffers
-//    wBfr = (BYTE *) malloc(BUFSIZE);
-//    rBfr = (BYTE *) malloc(BUFSIZE);
-	wBfr = wrBfr;
-	rBfr = rdBfr;	
+    wBfr = (BYTE *) Malloc(BUFSIZE);
+    rBfr = (BYTE *) Malloc(BUFSIZE);
 
     if(!wBfr || !rBfr) {
         (void) Cconws("Malloc failed!\n\r");
@@ -117,8 +112,8 @@ int main(int argc, char *argv[])
 	}
 		
     // release buffers
-//    free(wBfr);
-//    free(rBfr);
+    Mfree(wBfr);
+    Mfree(rBfr);
 
 	return 0;
 }
@@ -310,19 +305,13 @@ BYTE rwFile(BYTE readNotWrite, BYTE *pBfr, WORD sectCnt)
 	int16_t handle;
 	BYTE mode;
 	DWORD res;
-	char *opStr;
 	
 	if(readNotWrite) {
 		mode = 0;
-		opStr = "READ";
-		
 		handle = Fopen(testFile, mode);
 	} else {
 		Fdelete(testFile);
-	
 		mode = 1;
-		opStr = "WRITE";
-
 		handle = Fcreate(testFile, 0);
 	}
 	
