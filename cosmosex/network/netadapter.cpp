@@ -6,6 +6,7 @@
 
 #include "netadapter.h"
 #include "netadapter_commands.h"
+#include "sting.h"
 
 NetAdapter::NetAdapter(void)
 {
@@ -110,57 +111,92 @@ void NetAdapter::processCommand(BYTE *command)
 //----------------------------------------------
 void NetAdapter::conOpen(void)
 {
+    bool tcpNotUdp;
 
+    if(cmd[4] == NET_CMD_TCP_OPEN) {
+        tcpNotUdp = true;
+    } else if(cmd[4] == NET_CMD_UDP_OPEN) {
+        tcpNotUdp = false;
+    } else {
+        dataTrans->setStatus(E_PARAMETER);
+        return;
+    }
+
+
+
+    dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 void NetAdapter::conClose(void)
 {
 
+    dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 void NetAdapter::conSend(void)
 {
 
+    dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 void NetAdapter::conUpdateInfo(void)
 {
 
+    dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 void NetAdapter::conReadData(void)
 {
 
+    dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 void NetAdapter::conGetDataCount(void)
 {
 
+    dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 void NetAdapter::conLocateDelim(void)
 {
 
+    dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 void NetAdapter::icmpSend(void)
 {
+    bool evenNotOdd;
 
+    if(cmd[5] == NET_CMD_ICMP_SEND_EVEN) {
+        evenNotOdd = true;
+    } else if(cmd[5] == NET_CMD_ICMP_SEND_ODD) {
+        evenNotOdd = false;
+    } else {
+        dataTrans->setStatus(E_PARAMETER);
+        return;
+    }
+
+
+
+    dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 void NetAdapter::icmpGetDgrams(void)
 {
 
+    dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 void NetAdapter::resolveStart(void)
 {
 
+    dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 void NetAdapter::resolveGetResp(void)
 {
 
+    dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 
