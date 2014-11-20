@@ -15,8 +15,6 @@
 #include "gemdos.h"
 #include "main.h"
 
-char *version = "2014-09-26";
-
 /* 
  * CosmosEx GEMDOS driver by Jookie, 2013
  * GEMDOS hooks part (assembler and C) by MiKRO (Miro Kropacek), 2013
@@ -47,6 +45,8 @@ void showDateTime(void);
 void showInt(int value, int length);
 void showNetworkIPs(void);
 void showIpAddress(BYTE *bfr);
+void showAppVersion(void);
+int getIntFromStr(const char *str, int len);
 
 void setBootDrive(void);
 
@@ -91,7 +91,7 @@ int main( int argc, char* argv[] )
 	/* write some header out */
 	(void) Clear_home();
 	(void) Cconws("\33p[ CosmosEx disk driver  ]\r\n[ by Jookie 2013 & 2014 ]\r\n[        ver ");
-    (void) Cconws(version);
+    showAppVersion();
     (void) Cconws(" ]\33q\r\n\r\n");
 
 	Supexec(cpudet);												/* Detect CPU and adjust GEMDOS/BIOS trap handler offsets */
@@ -447,3 +447,51 @@ void showIpAddress(BYTE *bfr)
     showInt((int) bfr[3], -1);
 }
 
+void showAppVersion(void)
+{
+    char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    char const *buildDate = __DATE__;
+    
+    int year = 0, month = 0, day = 0;
+    int i;
+    for(i=0; i<12; i++) {
+        if(strncmp(months[i], buildDate, 3) == 0) {
+            month = i + 1;
+            break;
+        }
+    }
+    
+    day     = getIntFromStr(buildDate + 4, 2);
+    year    = getIntFromStr(buildDate + 7, 4);
+    
+    if(day > 0 && month > 0 && year > 0) {
+        showInt(year, 4);
+        (void) Cconout('-');
+        showInt(month, 2);
+        (void) Cconout('-');
+        showInt(day, 2);
+    } else {
+        (void) Cconws("YYYY-MM-DD");
+    }
+}
+
+int getIntFromStr(const char *str, int len)
+{
+    int i;
+    int val = 0;
+    
+    for(i=0; i<len; i++) {
+        int digit;
+        
+        if(str[i] >= '0' && str[i] <= '9') {
+            digit = str[i] - '0';
+        } else {
+            digit = 0;
+        }
+    
+        val *= 10;
+        val += digit;
+    }
+    
+    return val;
+}
