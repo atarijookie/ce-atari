@@ -37,7 +37,6 @@ private:
 	bool	loadDataIntoBuffer(void);
 	void 	updateBootsectorConfig(void);
 	int		getConfigPosition(void);
-	DWORD	getDword(BYTE *bfr);
 	void	setDword(BYTE *bfr, DWORD val);
 	
 	void	updateBootsectorChecksum(void);

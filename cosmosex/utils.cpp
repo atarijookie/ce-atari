@@ -333,4 +333,48 @@ void Utils::forceSync(void)
 	mountAdd(tmr);
 }
 
+WORD Utils::getWord(BYTE *bfr)
+{
+    WORD val = 0;
+
+    val = bfr[0];       // get hi
+    val = val << 8;
+
+    val |= bfr[1];      // get lo
+
+    return val;
+}
+
+DWORD Utils::getDword(BYTE *bfr)
+{
+    DWORD val = 0;
+
+    val = bfr[0];       // get hi
+    val = val << 8;
+
+    val |= bfr[1];      // get mid hi
+    val = val << 8;
+
+    val |= bfr[2];      // get mid lo
+    val = val << 8;
+
+    val |= bfr[3];      // get lo
+
+    return val;
+}
+
+DWORD Utils::get24bits(BYTE *bfr)
+{
+    DWORD val = 0;
+
+    val  = bfr[0];       // get hi
+    val  = val << 8;
+
+    val |= bfr[1];      // get mid
+    val  = val << 8;
+
+    val |= bfr[2];      // get lo
+
+    return val;
+}
 

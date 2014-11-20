@@ -3,6 +3,7 @@
 
 #include "translatedbootmedia.h"
 #include "../debug.h"
+#include "../utils.h"
 
 TranslatedBootMedia::TranslatedBootMedia()
 {
@@ -86,9 +87,9 @@ void TranslatedBootMedia::updateBootsectorConfig(void)
 {
 	DWORD tsize, dsize, bsize, totalSize;
 	
-	tsize = getDword(imageBuffer + 512 + 2);			// get size of text
-	dsize = getDword(imageBuffer + 512 + 6);			// get size of data
-	bsize = getDword(imageBuffer + 512 + 10);			// get size of bss
+	tsize = Utils::getDword(imageBuffer + 512 + 2);		// get size of text
+	dsize = Utils::getDword(imageBuffer + 512 + 6);		// get size of data
+	bsize = Utils::getDword(imageBuffer + 512 + 10);    // get size of bss
 	
 	totalSize = tsize + dsize + bsize;					// total size of driver in RAM = size of text + data + bss
 	totalSize = ((totalSize / 1024) + 2) * 1024;		// round the size to the nearest biggest kB 
@@ -167,24 +168,6 @@ int TranslatedBootMedia::getConfigPosition(void)
 	}
 
 	return -1;
-}
-
-DWORD TranslatedBootMedia::getDword(BYTE *bfr)
-{
-    DWORD val = 0;
-
-    val = bfr[0];       // get hi
-    val = val << 8;
-
-    val |= bfr[1];      // get mid hi
-    val = val << 8;
-
-    val |= bfr[2];      // get mid lo
-    val = val << 8;
-
-    val |= bfr[3];      // get lo
-
-    return val;
 }
 
 void TranslatedBootMedia::setDword(BYTE *bfr, DWORD val)

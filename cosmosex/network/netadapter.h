@@ -8,17 +8,47 @@
 #include "../datatypes.h"
 #include "../isettingsuser.h"
 
+#include "sting.h"
+
 #define MAX_HANDLE      32
+#define BUFFER_SIZE     (1024 * 1024)
+
+//-------------------------------------
 
 class TNetConnection
 {
 public:
+    TNetConnection() {          // contructor to init stuff
+        initVars();
+    }
+
+    ~TNetConnection() {         // destructor to possibly close connection
+        closeIt();
+    }
+
+    void closeIt(void) {
+        if(fd != -1) {
+            close(fd);
+        }
+
+        initVars();
+    }
+
+    void initVars(void) {
+        fd          = -1;
+        type        = 0;
+        bytesToRead = 0;
+        status      = TCLOSED;
+    }
+
     int fd;                 // file descriptor of socket
     int type;               // TCP / UDP / ICMP
 
     int bytesToRead;        // how many bytes are waiting to be read
     int status;             // status of connection - open, closed, ...
 };
+
+//-------------------------------------
 
 class NetAdapter: public ISettingsUser
 {
@@ -34,6 +64,8 @@ public:
 private:
     AcsiDataTrans   *dataTrans;
     BYTE            *cmd;
+
+    BYTE            *dataBuffer;
 
     TNetConnection  cons[MAX_HANDLE];   // this holds the info to connections
 
@@ -54,4 +86,8 @@ private:
     void resolveGetResp(void);          // retrieve the results of resolve
 };
 
+//-------------------------------------
+
 #endif
+
+

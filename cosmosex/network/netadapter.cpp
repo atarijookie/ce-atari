@@ -3,6 +3,7 @@
 
 #include "../global.h"
 #include "../debug.h"
+#include "../utils.h"
 
 #include "netadapter.h"
 #include "netadapter_commands.h"
@@ -11,13 +12,14 @@
 NetAdapter::NetAdapter(void)
 {
     dataTrans = 0;
+    dataBuffer  = new BYTE[BUFFER_SIZE];
 
     loadSettings();
 }
 
 NetAdapter::~NetAdapter()
 {
-
+    delete []dataBuffer;
 }
 
 void NetAdapter::setAcsiDataTrans(AcsiDataTrans *dt)
@@ -113,6 +115,7 @@ void NetAdapter::conOpen(void)
 {
     bool tcpNotUdp;
 
+    // get type of connection
     if(cmd[4] == NET_CMD_TCP_OPEN) {
         tcpNotUdp = true;
     } else if(cmd[4] == NET_CMD_UDP_OPEN) {
@@ -122,6 +125,13 @@ void NetAdapter::conOpen(void)
         return;
     }
 
+    // get connection parameters
+    DWORD remoteHost    = Utils::getDword(dataBuffer);
+    WORD  remotePort    = Utils::getWord (dataBuffer + 4);
+    WORD  tos           = Utils::getWord (dataBuffer + 6);
+    WORD  buff_size     = Utils::getWord (dataBuffer + 8);
+
+
 
 
     dataTrans->setStatus(E_NORMAL);
@@ -129,6 +139,27 @@ void NetAdapter::conOpen(void)
 //----------------------------------------------
 void NetAdapter::conClose(void)
 {
+    bool res = dataTrans->recvData(dataBuffer, 512);    // get data from Hans
+
+    if(!res) {                                          // failed to get data? internal error!
+        Debug::out(LOG_DEBUG, "NetAdapter::conClose - failed to receive data...");
+        dataTrans->setStatus(E_PARAMETER);
+        return;
+    }
+
+    int handle = Utils::getWord(dataBuffer);            // retrieve handle
+
+    if(handle >= 0 && handle <= MAX_HANDLE) {           // handle out of range? fail
+        dataTrans->setStatus(E_PARAMETER);
+        return;
+    }
+
+    if(cons[handle].fd == -1) {                         // handle already closed? fail
+        dataTrans->setStatus(E_BADHANDLE);
+        return;
+    }
+
+    cons[handle].closeIt();                             // handle good, close it
 
     dataTrans->setStatus(E_NORMAL);
 }

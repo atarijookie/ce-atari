@@ -35,6 +35,10 @@ public:
     
     static void forceSync(void);
 
+    static WORD  getWord(BYTE *bfr);
+    static DWORD getDword(BYTE *bfr);
+    static DWORD get24bits(BYTE *bfr);
+
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
 

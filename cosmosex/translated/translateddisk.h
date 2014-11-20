@@ -182,10 +182,6 @@ private:
     int findEmptyFileSlot(void);
     int findFileHandleSlot(int atariHandle);
 
-    WORD  getWord(BYTE *bfr);           // get 16 bits
-    DWORD get24bits(BYTE *bfr);         // get 24 bits
-    DWORD getDword(BYTE *bfr);          // get 32 bits
-
     void closeFileByIndex(int index);
     void closeAllFiles(void);
 

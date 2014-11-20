@@ -187,7 +187,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
 
     std::string atariSearchString, hostSearchString;
 
-    DWORD dta           = getDword(dataBuffer);         // bytes 0 to 3 contain address of DTA used on ST with this Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
+    DWORD dta           = Utils::getDword(dataBuffer);  // bytes 0 to 3 contain address of DTA used on ST with this Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
 
     BYTE findAttribs    = dataBuffer[4];                // get find attribs (dirs | hidden | ...)
 
@@ -271,8 +271,8 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
 
 void TranslatedDisk::onFsnext(BYTE *cmd)
 {
-    DWORD dta       = getDword(cmd + 5);                        // bytes 5 to 8   contain address of DTA used on ST with Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
-    int   dirIndex  = getWord(cmd + 9);                         // bytes 9 and 10 contain the index of the item from which we should start sending data to ST
+    DWORD dta       = Utils::getDword(cmd + 5);                 // bytes 5 to 8   contain address of DTA used on ST with Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
+    int   dirIndex  = Utils::getWord(cmd + 9);                  // bytes 9 and 10 contain the index of the item from which we should start sending data to ST
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFsnext -- DTA: %08x, dirIndex: %d", dta, dirIndex);
 
@@ -314,7 +314,7 @@ void TranslatedDisk::onFsnext(BYTE *cmd)
 
 void TranslatedDisk::onFsnext_last(BYTE *cmd)                   // after last Fsnext() call this to release the findStorage
 {
-    DWORD dta = getDword(cmd + 5);                              // bytes 5 to 8 contain address of DTA used on ST with Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
+    DWORD dta = Utils::getDword(cmd + 5);                       // bytes 5 to 8 contain address of DTA used on ST with Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
  
     int index = getFindStorageIndexByDta(dta);                  // now see if we have findStorage for this DTA
     if(index == -1) {                                           // not found?
@@ -861,8 +861,8 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
 
     WORD atariTime = 0, atariDate = 0;
 
-    atariTime       = getWord(cmd + 6);         // retrieve the time and date from command from ST
-    atariDate       = getWord(cmd + 8);
+    atariTime       = Utils::getWord(cmd + 6);         // retrieve the time and date from command from ST
+    atariDate       = Utils::getWord(cmd + 8);
 
     int index = findFileHandleSlot(handle);
 
@@ -915,7 +915,7 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
 void TranslatedDisk::onFread(BYTE *cmd)
 {
     int atariHandle         = cmd[5];
-    DWORD byteCount         = get24bits(cmd + 6);
+    DWORD byteCount         = Utils::get24bits(cmd + 6);
     int seekOffset          = (char) cmd[9];
 
     int index = findFileHandleSlot(atariHandle);
@@ -975,7 +975,7 @@ void TranslatedDisk::onFread(BYTE *cmd)
 void TranslatedDisk::onFwrite(BYTE *cmd)
 {
     int atariHandle         = cmd[5];
-    DWORD byteCount         = get24bits(cmd + 6);
+    DWORD byteCount         = Utils::get24bits(cmd + 6);
 
     int index = findFileHandleSlot(atariHandle);
 
@@ -1046,7 +1046,7 @@ void TranslatedDisk::onRWDataCount(BYTE *cmd)                   // when Fread / 
 void TranslatedDisk::onFseek(BYTE *cmd)
 {
     // get seek params
-    DWORD   offset      = getDword(cmd + 5);
+    DWORD   offset      = Utils::getDword(cmd + 5);
     BYTE    atariHandle = cmd[9];
     BYTE    seekMode    = cmd[10];
 
