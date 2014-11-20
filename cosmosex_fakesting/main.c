@@ -22,6 +22,10 @@
 #include "stdlib.h"
 #include "setup.h"
 
+void showAppVersion(void);
+int  getIntFromStr(const char *str, int len);
+void showInt(int value, int length);
+
 long    init_cookie (void);
 void    install (void);
 int16   init_cfg (void);
@@ -64,8 +68,11 @@ int main()
     int   count;
     char  def_conf[255];
 
-    (void) Cconws("\n\r\033p  *** Fake STinG TCP/IP InterNet Connection Layer ***  \033q");
-
+    (void) Cconws("\n\r\033p|    Fake STinG for CosmosEx    |\033q");
+    (void) Cconws("\n\r\033p|   by Jookie, ver: ");
+    showAppVersion();
+    (void) Cconws("  |\033q\n\r");
+    
     init_con_info();                                            // init connection info structs
 
    	// create buffer pointer to even address
@@ -202,3 +209,74 @@ BYTE ce_findId(void)
     (void) Cconws("\r\nCosmosEx not found on ACSI bus, not installing driver.");
 	return 0;
 }
+
+void showAppVersion(void)
+{
+    char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    char const *buildDate = __DATE__;
+    
+    int year = 0, month = 0, day = 0;
+    int i;
+    for(i=0; i<12; i++) {
+        if(strncmp(months[i], buildDate, 3) == 0) {
+            month = i + 1;
+            break;
+        }
+    }
+    
+    day     = getIntFromStr(buildDate + 4, 2);
+    year    = getIntFromStr(buildDate + 7, 4);
+    
+    if(day > 0 && month > 0 && year > 0) {
+        showInt(year, 4);
+        (void) Cconout('-');
+        showInt(month, 2);
+        (void) Cconout('-');
+        showInt(day, 2);
+    } else {
+        (void) Cconws("YYYY-MM-DD");
+    }
+}
+
+int getIntFromStr(const char *str, int len)
+{
+    int i;
+    int val = 0;
+    
+    for(i=0; i<len; i++) {
+        int digit;
+        
+        if(str[i] >= '0' && str[i] <= '9') {
+            digit = str[i] - '0';
+        } else {
+            digit = 0;
+        }
+    
+        val *= 10;
+        val += digit;
+    }
+    
+    return val;
+}
+
+void showInt(int value, int length)
+{
+    char tmp[10];
+    memset(tmp, 0, 10);
+
+    int i;
+    for(i=0; i<length; i++) {               // go through the int lenght and get the digits
+        int val, mod;
+
+        val = value / 10;
+        mod = value % 10;
+
+        tmp[length - 1 - i] = mod + 48;     // store the current digit
+
+        value = val;
+    }
+
+    (void) Cconws(tmp);                     // write it out
+}
+
+
