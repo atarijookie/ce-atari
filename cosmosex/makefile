@@ -26,6 +26,7 @@ SUBDIR5	= webserver
 SUBDIR6	= lib/cjson-code-58
 SUBDIR7	= service
 SUBDIR8	= acsicommand
+SUBDIR9	= network
 
 SRCS  = $(wildcard *.cpp) 
 SRCS += $(wildcard $(SUBDIR1)/*.cpp) 
@@ -38,6 +39,7 @@ SRCS += $(wildcard $(SUBDIR5)/**/**/*.cpp)
 SRCS += $(wildcard $(SUBDIR6)/cJSON.c)
 SRCS += $(wildcard $(SUBDIR7)/*.cpp)
 SRCS += $(wildcard $(SUBDIR8)/*.cpp)
+SRCS += $(wildcard $(SUBDIR9)/*.cpp)
 
 HDRS  = $(wildcard *.h)
 HDRS += $(wildcard $(SUBDIR1)/*.h)
@@ -50,6 +52,7 @@ HDRS += $(wildcard $(SUBDIR5)/**/**/*.h)
 HDRS += $(wildcard $(SUBDIR6)/cJSON.h)
 HDRS += $(wildcard $(SUBDIR7)/*.h)
 HDRS += $(wildcard $(SUBDIR8)/*.h)
+HDRS += $(wildcard $(SUBDIR9)/*.h)
 
 OBJS = $(patsubst %.cpp,%.o,$(SRCS))
 

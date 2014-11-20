@@ -28,11 +28,13 @@ bool DebugController::indexAction(mg_connection *conn, mg_request_info *req_info
 	}
 	stringStream << "</ul>";
 
-
 	std::map<std::string, std::string> mapVariables;
 
+    char appVersion[16];
+    Version::getAppVersion(appVersion);
+
 	mapVariables["browser_headers"]=stringStream.str();
-	mapVariables["version_app"]=std::string(APP_VERSION);
+	mapVariables["version_app"]=std::string(appVersion);
 	mapVariables["date"]=pxDateService->getTimeString();
 
     std::string sOutput=replaceAll(sTemplateLayout,std::string("{{title}}"),std::string("CosmosEx debug information"));

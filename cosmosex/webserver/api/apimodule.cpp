@@ -1,6 +1,6 @@
 /**
  * Defines the resource based API ("RESTly", this ain't REST)
- * e.g. /api/v1/*, /api/v2/* etc.
+ * e.g. /api/v1/asterisk, /api/v2/asterisk etc.
  */
 
 #include "apimodule.h"

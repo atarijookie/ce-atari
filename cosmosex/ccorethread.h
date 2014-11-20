@@ -30,6 +30,8 @@
 #include "service/floppyservice.h"
 #include "service/screencastservice.h"
 
+#include "network/netadapter.h"
+
 #include "version.h"
 
 class CCoreThread: public ISettingsUser, public DevChangesHandler
@@ -114,6 +116,11 @@ private:
 
     void handleSendTrack(void);
     void handleSectorWritten(void);
+
+    //----------------------------------
+    // network adapter stuff
+
+    NetAdapter          netAdapter;
 
     //----------------------------------
     // other

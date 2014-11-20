@@ -93,6 +93,9 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     //Floppy Service needs access to floppysilo and this thread
     floppyService->setImageSilo(&floppyImageSilo);
     floppyService->setCoreThread(this);
+
+    // set up network adapter stuff
+    netAdapter.setAcsiDataTrans(dataTrans);
 }
 
 CCoreThread::~CCoreThread()
@@ -366,6 +369,11 @@ void CCoreThread::handleAcsiCommand(void)
         case HOSTMOD_FDD_SETUP:                         // floppy setup command?
             wasHandled = true;
             floppySetup.processCommand(pCmd);
+            break;
+
+        case HOSTMOD_NETWORK_ADAPTER:
+            wasHandled = true;
+            netAdapter.processCommand(pCmd);
             break;
         }
     }
