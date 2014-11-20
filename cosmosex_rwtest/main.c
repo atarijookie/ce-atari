@@ -327,13 +327,9 @@ BYTE rwFile(BYTE readNotWrite, BYTE *pBfr, WORD sectCnt)
 	}
 	
 	if(handle < 0) {
-		(void) Cconws("Fopen / Fcreate: to ");
-		(void) Cconws(opStr);
-		(void) Cconws("file ");
+		(void) Cconws("\n\rFopen / Fcreate failed for file: ");
 		(void) Cconws(testFile);
-		(void) Cconws("(err: ");
-		showInt(handle, -1);
-		(void) Cconws(")\n\r");
+		(void) Cconws("\n\r");
 		return 0xff;
 	}
 
@@ -345,9 +341,9 @@ BYTE rwFile(BYTE readNotWrite, BYTE *pBfr, WORD sectCnt)
 	}
 	
 	if(res != length) {
-		(void) Cconws("Fread / Fwrite: Failed to ");
-		(void) Cconws(opStr);
-		(void) Cconws(" on file\n\r");
+		(void) Cconws("\n\rFread / Fwrite failed for file: ");
+		(void) Cconws(testFile);
+		(void) Cconws("\n\r");
 		res = 0xff;
 	} else {
 		res = 0;
