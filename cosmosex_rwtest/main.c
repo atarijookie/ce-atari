@@ -20,6 +20,7 @@ void seekAndRead(void);
 void bfrCompare(BYTE *a, BYTE *b, DWORD cnt, DWORD testNo);
 void getDriveForTests(void);
 void showInt(int value, int length);
+void showHexByte(int val);
 
 void testLoop(void);
 BYTE *wBfr, *pWrBfr;
@@ -183,7 +184,7 @@ void seekAndRead(void)
 		
 		if(res < 0) {
 			(void) Cconws("Fread() reported error ");
-			showInt(res, 4),
+			showHexByte(res);
 			(void) Cconws("\n\r");
 			continue;
 		}
@@ -213,7 +214,7 @@ void testLoop(void)
     dRdBfr = dRdBfr & 0xfffffffe;           // get even version of that... 
     pRdBfr = (BYTE *) dRdBfr;               // convert it to pointer
 
-    for(i=0; i<100; i++) {
+    for(i=0; i<1000; i++) {
         if((i % 10) == 0) {
             (void) Cconws("\n\r");
 			showInt(i, 4);
@@ -286,14 +287,14 @@ void bfrCompare(BYTE *a, BYTE *b, DWORD cnt, DWORD testNo)
             (void) Cconws("should be: ");
 			
 			for(k=0; k<4; k++) {
-				showInt(a[j + k], 3);
+				showHexByte(a[j + k]);
 				(void) Cconws(" ");
 			}
 			(void) Cconws("\n\r");
 
             (void) Cconws("really is: ");
 			for(k=0; k<4; k++) {
-				showInt(b[j + k], 3);
+				showHexByte(b[j + k]);
 				(void) Cconws(" ");
 			}
 			(void) Cconws("\n\r");
@@ -354,6 +355,17 @@ BYTE rwFile(BYTE readNotWrite, BYTE *pBfr, WORD sectCnt)
 	
 	Fclose(handle);
 	return res;
+}
+
+void showHexByte(int val)
+{
+    int hi, lo;
+    char table[16] = {"0123456789ABCDEF"};
+    hi = (val >> 4) & 0x0f;;
+    lo = (val     ) & 0x0f;
+
+    (void) Cconout( table[hi] );
+    (void) Cconout( table[lo] );
 }
 
 void showInt(int value, int length)
