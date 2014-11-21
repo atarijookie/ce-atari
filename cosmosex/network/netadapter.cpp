@@ -9,6 +9,10 @@
 #include <errno.h>
 #include <arpa/inet.h> 
 
+#include <signal.h>
+#include <pthread.h>
+#include <queue>    
+
 #include "../global.h"
 #include "../debug.h"
 #include "../utils.h"
@@ -19,10 +23,90 @@
 
 #define REQUIRED_NETADAPTER_VERSION     0x0100
 
+//--------------------------------------------------------
+
+struct Tresolv {
+    volatile BYTE           done;
+             int            count;
+             BYTE           data[128];
+             std::string    h_name;
+} resolv;
+
+//--------------------------------------------------------
+
+pthread_mutex_t networkThreadMutex = PTHREAD_MUTEX_INITIALIZER;
+std::queue<TNetReq> netReqQueue;
+
+void netReqAdd(TNetReq &tnr)
+{
+	pthread_mutex_lock(&networkThreadMutex);            // try to lock the mutex
+	netReqQueue.push(tnr);                              // add this to queue
+	pthread_mutex_unlock(&networkThreadMutex);          // unlock the mutex
+}
+
+void *networkThreadCode(void *ptr)
+{
+	Debug::out(LOG_INFO, "Network thread starting...");
+
+	while(sigintReceived == 0) {
+		pthread_mutex_lock(&networkThreadMutex);		// lock the mutex
+
+		if(netReqQueue.size() == 0) {					// nothing to do?
+			pthread_mutex_unlock(&networkThreadMutex);	// unlock the mutex
+			Utils::sleepMs(20);  						// wait 20 ms and try again
+			continue;
+		}
+		
+		TNetReq tnr = netReqQueue.front();		        // get the 'oldest' element from queue
+		netReqQueue.pop();								// and remove it form queue
+		pthread_mutex_unlock(&networkThreadMutex);		// unlock the mutex
+
+        // resolve host name to IP addresses
+        if(tnr.type == NETREQ_TYPE_RESOLVE) {
+            struct hostent *he;
+            he = gethostbyname((char *) tnr.strParam.c_str());      // try to resolve
+
+            if (he == NULL) {
+                resolv.count    = 0;
+                resolv.done     = true;
+                continue;
+            }
+
+            resolv.h_name = (char *) he->h_name;                    // store official name
+
+            struct in_addr **addr_list;
+            addr_list = (struct in_addr **) he->h_addr_list;        // get pointer to IP addresses
+
+            int i, cnt = 0;     
+            DWORD *pIps = (DWORD *) resolv.data;
+
+            for(i=0; addr_list[i] != NULL; i++) {                   // now walk through the IP address list
+                in_addr ia = *addr_list[i];
+                pIps[cnt] = ia.s_addr;                              // store the current IP
+                cnt++;
+
+                if(cnt >= (128 / 4)) {                              // if we have the maximum possible IPs we can store, quit
+                    break;
+                }
+            }
+
+            resolv.count    = cnt;                                  // store count and we're done
+            resolv.done     = true;
+            continue;
+        }
+
+    }
+	
+	Debug::out(LOG_INFO, "Network thread terminated.");
+	return 0;
+}
+
+//--------------------------------------------------------
+
 NetAdapter::NetAdapter(void)
 {
     dataTrans = 0;
-    dataBuffer  = new BYTE[BUFFER_SIZE];
+    dataBuffer  = new BYTE[NET_BUFFER_SIZE];
 
     loadSettings();
 }
@@ -253,11 +337,11 @@ void NetAdapter::conClose(void)
 //----------------------------------------------
 void NetAdapter::conSend(void)
 {
-    int  cmdType    = cmd[5];                                   // command type: NET_CMD_TCP_SEND or NET_CMD_UDP_SEND
-    int  handle     = cmd[6];                                   // connection handle
-    int  length     = (((int) cmd[7]) << 8) | ((int) cmd[8]);   // get data length
-    bool isOdd      = cmd[9];                                   // if the data was send from odd address, this will be non-zero...
-    BYTE oddByte    = cmd[10];                                  // ...and this will contain the 0th byte
+    int  cmdType    = cmd[5];                           // command type: NET_CMD_TCP_SEND or NET_CMD_UDP_SEND
+    int  handle     = cmd[6];                           // connection handle
+    int  length     = Utils::getWord(cmd + 7);          // get data length
+    bool isOdd      = cmd[9];                           // if the data was send from odd address, this will be non-zero...
+    BYTE oddByte    = cmd[10];                          // ...and this will contain the 0th byte
 
     if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
         dataTrans->setStatus(E_BADHANDLE);
@@ -316,7 +400,25 @@ void NetAdapter::conSend(void)
 //----------------------------------------------
 void NetAdapter::conUpdateInfo(void)
 {
+    int i;
 
+    // TODO: update connections status and bytes to read
+
+    // prepare the pointers
+    DWORD *pBytesToRead     = (DWORD *) (dataBuffer      );
+    BYTE  *pConnStatus      = (BYTE  *) (dataBuffer + 128);
+    DWORD *pBytesToReadIcmp = (DWORD *) (dataBuffer + 160);
+
+    // fill the buffer
+    for(i=0; i<MAX_HANDLE; i++) {                   // store how many bytes we can read from connections, what's the connection status
+        pBytesToRead[i] = cons[i].bytesToRead;
+        pConnStatus[i]  = cons[i].status;
+    }
+
+    *pBytesToReadIcmp = 0;                          // TODO: fill the real data to be read from ICMP sock
+
+    // pass it to ACSI data transporter
+    dataTrans->addDataBfr(dataBuffer, 164, true);   // send all the data to ST, pad to be multiple of 16
     dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
@@ -351,6 +453,12 @@ void NetAdapter::icmpSend(void)
         return;
     }
 
+    DWORD destinIP  = Utils::getDword(cmd + 6);         // get destination IP address
+    int icmpType    = cmd[10] >> 3;                     // get ICMP type
+    int icmpCode    = cmd[10] & 0x07;                   // get ICMP code
+    WORD length     = Utils::getWord(cmd + 11);         // get length of data to be sent
+
+    
 
 
     dataTrans->setStatus(E_NORMAL);
@@ -363,13 +471,44 @@ void NetAdapter::icmpGetDgrams(void)
 }
 //----------------------------------------------
 void NetAdapter::resolveStart(void)
-{
+{    
+    bool res = dataTrans->recvData(dataBuffer, 512);    // get data from Hans
+
+    if(!res) {                                          // failed to get data? internal error!
+        Debug::out(LOG_DEBUG, "NetAdapter::resolveStart - failed to receive data...");
+        dataTrans->setStatus(E_PARAMETER);
+        return;
+    }
+
+    Debug::out(LOG_DEBUG, "NetAdapter::resolveStart - will resolve: %s", dataBuffer);
+    
+    // try to resolve the name asynchronously
+    resolv.done     = false;                    // mark that this hasn't finished yet
+
+    TNetReq tnr;
+    tnr.type        = NETREQ_TYPE_RESOLVE;      // request type
+    tnr.strParam    = (char *) dataBuffer;      // this is the input string param (the name)
+    netReqAdd(tnr);
 
     dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 void NetAdapter::resolveGetResp(void)
 {
+    if(!resolv.done) {                                  // if the resolve command didn't finish yet
+        dataTrans->setStatus(RES_DIDNT_FINISH_YET);     // return this special status
+        return;
+    }
+
+    // if resolve did finish
+    BYTE empty[256];
+    memset(empty, 0, 256);
+    dataTrans->addDataBfr(empty, 256, false);                               // first 256 empty for now - should be real domain name (later)
+    
+    dataTrans->addDataByte(resolv.count);                                   // data[256] = count of IP addreses resolved
+    dataTrans->addDataByte(0);                                              // data[257] = just a dummy byte
+
+    dataTrans->addDataBfr((BYTE *) resolv.data, 4 * resolv.count, true);    // now store all the resolved data, and pad to multiple of 16
 
     dataTrans->setStatus(E_NORMAL);
 }

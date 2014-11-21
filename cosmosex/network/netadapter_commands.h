@@ -52,6 +52,8 @@
 
 #define DELIMITER_NOT_FOUND             0xffffffff
 
+#define RES_DIDNT_FINISH_YET            0xdf
+
 #endif
 
 

@@ -19,6 +19,7 @@
 #include "timesync.h"
 #include "version.h"
 #include "ce_conf_on_rpi.h"
+#include "network/netadapter.h"
 
 #include "webserver/webserver.h"
 #include "webserver/api/apimodule.h"
@@ -52,6 +53,7 @@ int main(int argc, char *argv[])
     pthread_t	ikbdThreadInfo;
     pthread_t	floppyEncThreadInfo;
 	pthread_t	timesyncThreadInfo;
+    pthread_t   networkThreadInfo;
 
     Debug::setDefaultLogFile();
     parseCmdLineArguments(argc, argv);                          // parse cmd line arguments and set global variables
@@ -162,6 +164,9 @@ int main(int argc, char *argv[])
     res = pthread_create(&timesyncThreadInfo, NULL, timesyncThreadCode, NULL);  // create the timesync thread and run it
 	handlePthreadCreate(res, (char *) "time sync");
 
+    res = pthread_create(&networkThreadInfo, NULL, networkThreadCode, NULL);    // create the network thread and run it
+	handlePthreadCreate(res, (char *) "network");
+
 	core->run();										// run the main thread
 
     xServer.stop();
@@ -188,6 +193,7 @@ int main(int argc, char *argv[])
     pthread_join(ikbdThreadInfo, NULL);                 // wait until ikbd      thread finishes
     pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes
     pthread_join(timesyncThreadInfo, NULL);             // wait until timesync  thread finishes
+    pthread_join(networkThreadInfo, NULL);              // wait until network   thread finishes
 
     Downloader::cleanupBeforeQuit();
 

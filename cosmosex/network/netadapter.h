@@ -10,8 +10,24 @@
 
 #include "sting.h"
 
-#define MAX_HANDLE      32
-#define BUFFER_SIZE     (1024 * 1024)
+#define MAX_HANDLE          32
+#define NET_BUFFER_SIZE     (1024 * 1024)
+
+//-------------------------------------
+#define NETREQ_TYPE_RESOLVE     1
+
+typedef struct {
+    int type;
+    
+    std::string   strParam;
+} TNetReq;
+
+//-------------------------------------
+
+extern "C" {
+	void netReqAdd(TNetReq &tnr);
+	void *networkThreadCode(void *ptr);
+}
 
 //-------------------------------------
 
