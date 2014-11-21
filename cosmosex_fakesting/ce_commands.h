@@ -51,6 +51,7 @@
 #define RW_PARTIAL_TRANSFER 1       // return this if not all of the required data was read / written
 
 #define DELIMITER_NOT_FOUND             0xffffffff
+#define RES_DIDNT_FINISH_YET            0xdf
 
 #endif
 

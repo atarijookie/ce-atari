@@ -478,11 +478,20 @@ int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
     memset(pDmaBuffer, 0, 512);
     commandShort[4] = NET_CMD_RESOLVE_GET_RESPONSE;
     
-    res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+    while(1) {                                                          // repeat this command few times, as it might reply with 'I didn't finish yet'
+        res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                                                     // if failed, return FALSE 
-		return E_CANTRESOLVE;
-	}
+        if(res == RES_DIDNT_FINISH_YET) {                               // if not finished, try again
+            sleepMs(250);                                               // wait 250 ms before trying again
+            continue;
+        }
+    
+        if(res != OK) {                                                 // if failed, return FALSE 
+            return E_CANTRESOLVE;
+        }
+        
+        break;                                                          // if came here, success and finished, quit this loop
+    }
 
     // possibly copy the real domain name
     if(real_domain != NULL) {                                           // if got pointer to real domain

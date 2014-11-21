@@ -139,7 +139,9 @@ int strcmp ( const char * str1, const char * str2)
 }
 
 int sleepSeconds;
+int sleepMilisecs;
 static void sleepInSupervisor(void);
+static void sleepMsInSupervisor(void);
 
 void sleep(int seconds)
 {
@@ -147,10 +149,33 @@ void sleep(int seconds)
 	Supexec(sleepInSupervisor);
 }
 
+void sleepMs(int ms)
+{
+	sleepMilisecs = ms;
+	Supexec(sleepMsInSupervisor);
+}
+
 static void sleepInSupervisor(void)
 {
 	DWORD now, until;
 	DWORD tics = sleepSeconds * 200;
+
+	now = getTicks();						// get current ticks
+	until = now + tics;   					// calc value timer must get to
+
+	while(1) {
+		now = getTicks();					// get current ticks
+		
+		if(now >= until) {
+			break;
+		}
+	}
+}
+
+static void sleepMsInSupervisor(void)
+{
+	DWORD now, until;
+	DWORD tics = sleepMilisecs / 5;         // one tick is 5 ms, so /5 will convert ms to ticks
 
 	now = getTicks();						// get current ticks
 	until = now + tics;   					// calc value timer must get to
