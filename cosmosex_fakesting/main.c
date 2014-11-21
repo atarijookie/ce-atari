@@ -61,6 +61,9 @@ BYTE FastRAMBuffer[FASTRAM_BUFFER_SIZE] __attribute__((aligned (4)));    // inte
 
 uint32 localIP;
 
+#define REQUIRED_NETADAPTER_VERSION     0x0100
+WORD requiredVersion;
+
 //---------------------------------------
 
 int main()
@@ -85,6 +88,15 @@ int main()
         sleep(3);
         return 0;
     }
+    
+    if(requiredVersion != REQUIRED_NETADAPTER_VERSION) {
+        (void) Cconws("\r\n\33pProtocol version mismatch !\33q\r\n" );
+        (void) Cconws("Please use the newest version\r\n" );
+        (void) Cconws("of \33pCE_STING.PRG\33q from config drive!\r\n" );
+        (void) Cconws("\r\nDriver not installed!\r\n" ); 
+        sleep(3);
+        return 0;
+    }    
     
     commandShort[0] = (deviceID << 5); 					        // cmd[0] = ACSI_id + TEST UNIT READY (0)
     commandLong[0]  = (deviceID << 5) | 0x1f;			        // cmd[0] = ACSI_id + ICD command marker (0x1f)
@@ -171,7 +183,8 @@ BYTE ce_identify(void)
     
     //----------------
     // if we got here, then this ACSI ID is the CosmosEx network module, so get the configuration (which starts from 32nd byte)
-    localIP = getDword(pDmaBuffer + 32);
+    requiredVersion = getWord(pDmaBuffer + 32);
+    localIP         = getDword(pDmaBuffer + 34);
     
 	//----------------
     
