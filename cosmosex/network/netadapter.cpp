@@ -423,36 +423,96 @@ void NetAdapter::conUpdateInfo(void)
 {
     int i;
 
-    updateCons();                                   // update connections status and bytes to read
+    updateCons();                                           // update connections status and bytes to read
 
     // fill the buffer
-    for(i=0; i<MAX_HANDLE; i++) {                   // store how many bytes we can read from connections
+    for(i=0; i<MAX_HANDLE; i++) {                           // store how many bytes we can read from connections
         dataTrans->addDataDword(cons[i].bytesToRead);
     }
 
-    for(i=0; i<MAX_HANDLE; i++) {                   // store connection statuses
+    for(i=0; i<MAX_HANDLE; i++) {                           // store connection statuses
         dataTrans->addDataByte(cons[i].status);
     }
 
-    dataTrans->addDataDword(0);                     // TODO: fill the real data to be read from ICMP sock
+    dataTrans->addDataDword(0);                             // TODO: fill the real data to be read from ICMP sock
 
     dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 void NetAdapter::conReadData(void)
 {
+    int   handle     = cmd[6];                              // get handle
+    DWORD byteCount  = Utils::get24bits(cmd + 7);           // get how many bytes we want to read
+    int   seekOffset = (char) cmd[10];                      // get seek offset (can be 0 or -1)
 
-    dataTrans->setStatus(E_NORMAL);
+    if(handle < 0 || handle >= MAX_HANDLE) {                // handle out of range? fail
+        dataTrans->setStatus(E_BADHANDLE);
+        return;
+    }
+
+    if(cons[handle].isClosed()) {                           // connection not open? fail
+        dataTrans->setStatus(E_BADHANDLE);
+        return;
+    }
+
+    int value, res;
+    res = ioctl(cons[handle].fd, FIONREAD, &value);         // try to get how many bytes can be read
+        
+    if(res == -1) {                                         // ioctl failed? return that we don't have enough data
+        cons[handle].lastReadCount = 0;
+        dataTrans->setStatus(RW_PARTIAL_TRANSFER);
+        return;
+    }
+
+    cons[handle].bytesToRead = value;                       // store value - how many bytes we have
+                                                            // find out if you can read enough, or data would be missing
+    DWORD readCount = (byteCount <= cons[handle].bytesToRead) ? byteCount : cons[handle].bytesToRead;       
+
+    res = read(cons[handle].fd, dataBuffer, readCount);     // read the data
+
+    if(res == -1) {                                         // failed to read? 
+        cons[handle].lastReadCount = 0;
+        dataTrans->setStatus(RW_PARTIAL_TRANSFER);
+        return;
+    }
+
+    // TODO: implement seek offset -1
+
+    // read successful?
+    dataTrans->addDataBfr(dataBuffer, res, true);           // put the data in data transporter
+    cons[handle].lastReadCount = res;                       // store the last data count
+
+    if(res < byteCount) {                                   // didn't read as many as wished? partial transfer
+        dataTrans->setStatus(RW_PARTIAL_TRANSFER);
+    } else {                                                // did read everythen as wanted - all was read
+        dataTrans->setStatus(RW_ALL_TRANSFERED);
+    }
 }
 //----------------------------------------------
 void NetAdapter::conGetDataCount(void)
 {
+    int handle = cmd[5];                                    // get handle
 
+    if(handle < 0 || handle >= MAX_HANDLE) {                // handle out of range? fail
+        dataTrans->setStatus(E_BADHANDLE);
+        return;
+    }
+
+    if(cons[handle].isClosed()) {                           // connection not open? fail
+        dataTrans->setStatus(E_BADHANDLE);
+        return;
+    }
+
+    dataTrans->addDataDword(cons[handle].lastReadCount);    // store last read count
     dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 void NetAdapter::conLocateDelim(void)
 {
+    
+    
+
+
 
     dataTrans->setStatus(E_NORMAL);
 }
@@ -478,11 +538,13 @@ void NetAdapter::icmpSend(void)
     
 
 
+
     dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
 void NetAdapter::icmpGetDgrams(void)
 {
+
 
     dataTrans->setStatus(E_NORMAL);
 }
@@ -565,6 +627,13 @@ void NetAdapter::updateCons(void)
         cons[i].bytesToRead = value;                // store the value
 
         //---------
+        // if it's not TCP connection, just pretend the state is 'connected' - it's only used for TCP connections, so it doesn't matter
+        if(cons[i].type != TCP) {    
+            cons[i].status = TESTABLISH;
+            continue;
+        }
+
+        //---------
         // update connection status
         int error, len;
         len = sizeof(int);
@@ -576,7 +645,7 @@ void NetAdapter::updateCons(void)
 
         if(error == 0) {                            // no error? connection good
             cons[i].status = TESTABLISH;
-        } else {                                    // some error? close connection
+        } else {                                    // some error? close connection, this will also set the status to closed
             cons[i].closeIt();
         }
     }

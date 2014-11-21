@@ -51,10 +51,11 @@ public:
     }
 
     void initVars(void) {       // initialize the variables
-        fd          = -1;
-        type        = 0;
-        bytesToRead = 0;
-        status      = TCLOSED;
+        fd              = -1;
+        type            = 0;
+        bytesToRead     = 0;
+        status          = TCLOSED;
+        lastReadCount   = 0;
         memset(&hostAdr, '0', sizeof(hostAdr)); 
     }
 
@@ -68,6 +69,7 @@ public:
 
     int bytesToRead;            // how many bytes are waiting to be read
     int status;                 // status of connection - open, closed, ...
+    int lastReadCount;          // count of bytes that was read on the last read operation
 };
 
 //-------------------------------------
