@@ -55,17 +55,19 @@ public:
         type        = 0;
         bytesToRead = 0;
         status      = TCLOSED;
+        memset(&hostAdr, '0', sizeof(hostAdr)); 
     }
 
     bool isClosed(void) {       // check if it's closed
         return (fd == -1);
     }
 
-    int fd;                 // file descriptor of socket
-    int type;               // TCP / UDP / ICMP
+    int fd;                     // file descriptor of socket
+    struct sockaddr_in hostAdr; // this is where we send data
+    int type;                   // TCP / UDP / ICMP
 
-    int bytesToRead;        // how many bytes are waiting to be read
-    int status;             // status of connection - open, closed, ...
+    int bytesToRead;            // how many bytes are waiting to be read
+    int status;                 // status of connection - open, closed, ...
 };
 
 //-------------------------------------
@@ -110,6 +112,7 @@ private:
     //--------------
     // helper functions
     int  findEmptyConnectionSlot(void); // get index of empty connection slot, or -1 if nothing is available
+    void updateCons(void);
 };
 
 //-------------------------------------

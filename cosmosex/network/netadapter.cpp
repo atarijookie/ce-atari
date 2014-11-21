@@ -2,12 +2,14 @@
 #include <stdio.h>
 
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h> 
+#include <fcntl.h>
 
 #include <signal.h>
 #include <pthread.h>
@@ -237,6 +239,7 @@ void NetAdapter::identify(void)
 void NetAdapter::conOpen(void)
 {
     bool tcpNotUdp;
+    int  ires;
 
     // get type of connection
     if(cmd[4] == NET_CMD_TCP_OPEN) {
@@ -290,19 +293,37 @@ void NetAdapter::conOpen(void)
     serv_addr.sin_addr.s_addr   = remoteHost;
     serv_addr.sin_port          = htons(remotePort); 
 
-    if(connect(fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {        // try to connect
+    if(tcpNotUdp) {                                             // for TCP sockets
+        int flags = fcntl(fd, F_GETFL, 0);                      // get flags
+        ires = fcntl(fd, F_SETFL, flags | O_NONBLOCK);          // set it as non-blocking
+
+        if(ires == -1) {
+            Debug::out(LOG_DEBUG, "NetAdapter::conOpen - setting O_NONBLOCK failed, but continuing");
+        }
+    }
+
+    // for TCP - try to connect, for UPD - set the default address where to send data
+    ires = connect(fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr));  
+
+    if(ires < 0 && errno != EINPROGRESS) {      // if connect failed, and it's not EINPROGRESS (because it's O_NONBLOCK)
         close(fd);
 
         Debug::out(LOG_DEBUG, "NetAdapter::conOpen - connect() failed");
         dataTrans->setStatus(E_CONNECTFAIL);
         return;
-    } 
+    }
+
+    int conStatus = TESTABLISH;                 // for UDP and blocking TCP, this is 'we have connection'
+    if(ires < 0 && errno == EINPROGRESS) {      // if it's a O_NONBLOCK socket connecting, the state is connecting
+        conStatus = TSYN_SENT;                  // for non-blocking TCP, this is 'we're trying to connect'
+    }
     
     // store the info
     cons[slot].fd           = fd;
+    cons[slot].hostAdr      = serv_addr;
     cons[slot].type         = tcpNotUdp ? TCP : UDP;
     cons[slot].bytesToRead  = 0;
-    cons[slot].status       = TSYN_SENT;
+    cons[slot].status       = conStatus;
 
     // return the handle
     dataTrans->setStatus(handleAtariToCE(slot));
@@ -402,23 +423,19 @@ void NetAdapter::conUpdateInfo(void)
 {
     int i;
 
-    // TODO: update connections status and bytes to read
-
-    // prepare the pointers
-    DWORD *pBytesToRead     = (DWORD *) (dataBuffer      );
-    BYTE  *pConnStatus      = (BYTE  *) (dataBuffer + 128);
-    DWORD *pBytesToReadIcmp = (DWORD *) (dataBuffer + 160);
+    updateCons();                                   // update connections status and bytes to read
 
     // fill the buffer
-    for(i=0; i<MAX_HANDLE; i++) {                   // store how many bytes we can read from connections, what's the connection status
-        pBytesToRead[i] = cons[i].bytesToRead;
-        pConnStatus[i]  = cons[i].status;
+    for(i=0; i<MAX_HANDLE; i++) {                   // store how many bytes we can read from connections
+        dataTrans->addDataDword(cons[i].bytesToRead);
     }
 
-    *pBytesToReadIcmp = 0;                          // TODO: fill the real data to be read from ICMP sock
+    for(i=0; i<MAX_HANDLE; i++) {                   // store connection statuses
+        dataTrans->addDataByte(cons[i].status);
+    }
 
-    // pass it to ACSI data transporter
-    dataTrans->addDataBfr(dataBuffer, 164, true);   // send all the data to ST, pad to be multiple of 16
+    dataTrans->addDataDword(0);                     // TODO: fill the real data to be read from ICMP sock
+
     dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
@@ -526,4 +543,45 @@ int NetAdapter::findEmptyConnectionSlot(void)
     return -1;                                      // no empty slot?
 }
 //----------------------------------------------
+void NetAdapter::updateCons(void)
+{
+    int i, res;
+    int value;
+
+    for(i=0; i<MAX_HANDLE; i++) {                   // update connection info                
+        if(cons[i].isClosed()) {                    // if connection closed, skip it
+            continue;
+        }
+
+        //---------
+        // update how many bytes we can read from this sock
+        res = ioctl(cons[i].fd, FIONREAD, &value);  // try to get how many bytes can be read
+        
+        if(res == -1) {                             // ioctl failed? 
+            cons[i].bytesToRead = 0;
+            continue;
+        }
+
+        cons[i].bytesToRead = value;                // store the value
+
+        //---------
+        // update connection status
+        int error, len;
+        len = sizeof(int);
+        res = getsockopt(cons[i].fd, SOL_SOCKET, SO_ERROR, &error, (socklen_t *) &len);
+
+        if(res == -1) {                             // getsockopt failed? don't update status
+            continue;
+        }
+
+        if(error == 0) {                            // no error? connection good
+            cons[i].status = TESTABLISH;
+        } else {                                    // some error? close connection
+            cons[i].closeIt();
+        }
+    }
+}
+//----------------------------------------------
+
+
 
