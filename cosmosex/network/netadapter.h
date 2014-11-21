@@ -26,7 +26,7 @@ public:
         closeIt();
     }
 
-    void closeIt(void) {
+    void closeIt(void) {        // close the socket
         if(fd != -1) {
             close(fd);
         }
@@ -34,11 +34,15 @@ public:
         initVars();
     }
 
-    void initVars(void) {
+    void initVars(void) {       // initialize the variables
         fd          = -1;
         type        = 0;
         bytesToRead = 0;
         status      = TCLOSED;
+    }
+
+    bool isClosed(void) {       // check if it's closed
+        return (fd == -1);
     }
 
     int fd;                 // file descriptor of socket
@@ -71,6 +75,8 @@ private:
 
     void loadSettings(void);
 
+    void identify(void);
+
     void conOpen(void);                 // open connection
     void conClose(void);                // close connection            
     void conSend(void);                 // send data
@@ -84,6 +90,10 @@ private:
 
     void resolveStart(void);            // resolve name to ip
     void resolveGetResp(void);          // retrieve the results of resolve
+
+    //--------------
+    // helper functions
+    int  findEmptyConnectionSlot(void); // get index of empty connection slot, or -1 if nothing is available
 };
 
 //-------------------------------------
