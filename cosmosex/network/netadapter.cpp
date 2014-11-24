@@ -324,7 +324,7 @@ void NetAdapter::conOpen(void)
     cons[slot].fd                   = fd;
     cons[slot].hostAdr              = serv_addr;
     cons[slot].type                 = tcpNotUdp ? TCP : UDP;
-    cons[slot].bytesToReadInSocket  = 0;
+    cons[slot].bytesInSocket  = 0;
     cons[slot].status               = conStatus;
 
     // return the handle
@@ -429,7 +429,7 @@ void NetAdapter::conUpdateInfo(void)
 
     // fill the buffer
     for(i=0; i<MAX_HANDLE; i++) {                           // store how many bytes we can read from connections
-        dataTrans->addDataDword(cons[i].bytesToReadInSocket + cons[i].bytesToReadInBuffer);
+        dataTrans->addDataDword(cons[i].bytesInSocket + cons[i].bytesInBuffer);
     }
 
     for(i=0; i<MAX_HANDLE; i++) {                           // store connection statuses
@@ -447,99 +447,69 @@ void NetAdapter::conReadData(void)
     DWORD byteCountStRequested  = Utils::get24bits(cmd + 7);    // get how many bytes we want to read
     int   seekOffset            = (char) cmd[10];               // get seek offset (can be 0 or -1)
 
-    if(handle < 0 || handle >= MAX_HANDLE) {                // handle out of range? fail
+    if(handle < 0 || handle >= MAX_HANDLE) {                    // handle out of range? fail
         dataTrans->setStatus(E_BADHANDLE);
         return;
     }
 
-    TNetConnection *nc = &cons[handle];                     // will use this nc instead of longer cons[handle] in the next lines
+    TNetConnection *nc = &cons[handle];                         // will use this nc instead of longer cons[handle] in the next lines
 
-    if(nc->isClosed()) {                                    // connection not open? fail
+    if(nc->isClosed()) {                                        // connection not open? fail
         dataTrans->setStatus(E_BADHANDLE);
         return;
     }
 
-    int byteCountThatCanBeRead;
-    nc->bytesToReadInSocket = howManyWeCanReadFromFd(nc->fd);                       // update how many bytes we have waiting in socket
-    byteCountThatCanBeRead  = nc->bytesToReadInSocket + nc->bytesToReadInBuffer;    // byte count that can be read = bytes in socket + bytes in local buffer
+    int totalCnt    = 0;
+    int toRead      = byteCountStRequested;
 
-    if(byteCountThatCanBeRead == 0) {                                               // nothing to read? return that we don't have enough data
-        nc->lastReadCount = 0;
-        dataTrans->setStatus(RW_PARTIAL_TRANSFER);
-        return;
-    }
+    //--------------
+    // first handle negative seek offset
+    if(seekOffset == -1 && nc->gotPrevLastByte) {               // if we want to seek one byte back, and we do have that byte, do seek
+        dataTrans->addDataByte(nc->prevLastByte);               // add this byte as first
+        nc->gotPrevLastByte = false;
 
-    DWORD readCount = MIN(byteCountStRequested, byteCountThatCanBeRead);        // find out if you can read enough, or data would be missing
+        totalCnt++;
+        toRead--;
 
-    // TODO: simplify the following code :)
-
-    //-----------------
-    // first use the data we already have in local buffer
-    int dataCountFromLocalBuffer = MIN(readCount, nc->bytesToReadInBuffer);     // get the count that we will use from local buffer
-
-    if(dataCountFromLocalBuffer > 0) {                                          // if there is something in local buffer
-
-        if(seekOffset == -1 && nc->gotPrevLastByte) {                           // if we want to seek one byte back, and we do have that byte, do seek
-            dataTrans->addDataByte(nc->prevLastByte);                           // add this byte as first
-            nc->gotPrevLastByte = false;
-        }
-
-        dataTrans->addDataBfr(nc->rBfr, dataCountFromLocalBuffer + seekOffset, false);  // add data from local buffer
-
-        int lastByteOffset = dataCountFromLocalBuffer + seekOffset - 1;
-        if(lastByteOffset >= 0 && lastByteOffset < CON_BFR_SIZE) {
-            nc->prevLastByte    = nc->rBfr[lastByteOffset];                     // store the last byte of buffer
-            nc->gotPrevLastByte = true;
-        }
-
-        int i;
-        int restOfBuffer = nc->bytesToReadInBuffer - dataCountFromLocalBuffer + seekOffset; // count of bytes there are after the bytes we just transfered
-        for(i=0; i<restOfBuffer; i++) {
-            nc->rBfr[i] = nc->rBfr[i + dataCountFromLocalBuffer];               // move the not used data to the start of the local buffer
-        }        
-
-        nc->bytesToReadInBuffer = restOfBuffer;                                 // store the new count of bytes we still have in local buffer
-
-        if(dataCountFromLocalBuffer == byteCountStRequested) {                  // if this was all what ST wanted, fine, let's quit
-            nc->lastReadCount = dataCountFromLocalBuffer;
-
-            dataTrans->padDataToMul16();
-            dataTrans->setStatus(RW_ALL_TRANSFERED);
+        if(toRead == 0) {                                       // if this is what ST wanted to read, quit
+            finishDataRead(nc, totalCnt, RW_ALL_TRANSFERED);    // update variables, set status
             return;
         }
-
-        readCount = readCount - dataCountFromLocalBuffer;                       // what we want to read now is the rest - the whole count without what we already read from local buffer
     }
 
-    //-----------------
-    // now try to read the rest from socket
-    if(seekOffset == -1 && nc->gotPrevLastByte) {           // if we want to seek one byte back, and we do have that byte, do seek
-        dataTrans->addDataByte(nc->prevLastByte);           // add this byte as first
-        nc->gotPrevLastByte = false;
-        readCount--;
-    }
+    //--------------
+    // now find out if we can read anything
+    nc->bytesInSocket           = howManyWeCanReadFromFd(nc->fd);           // update how many bytes we have waiting in socket
+    int byteCountThatCanBeRead  = nc->bytesInSocket + nc->bytesInBuffer;    // byte count that can be read = bytes in socket + bytes in local buffer
 
-    int res = read(nc->fd, dataBuffer, readCount);          // read the data
-
-    if(res == -1) {                                         // failed to read? 
-        nc->lastReadCount = dataCountFromLocalBuffer;
-        dataTrans->setStatus(RW_PARTIAL_TRANSFER);
+    if(byteCountThatCanBeRead == 0) {                                       // nothing to read? return that we don't have enough data
+        finishDataRead(nc, totalCnt, RW_PARTIAL_TRANSFER);                  // update variables, set status
         return;
     }
 
-    if(res > 0) {                                           // if some bytes have been read
-        nc->prevLastByte    = dataBuffer[res - 1];          // store the last byte of buffer
-        nc->gotPrevLastByte = true;
+    //-----------------
+    // now use the data we already have in local buffer
+    int cntLoc = readFromLocalBuffer(nc, toRead);
+
+    toRead      -= cntLoc;
+    totalCnt    += cntLoc;
+
+    if(toRead == 0) {                                               // we don't need to read more? quit with success
+        finishDataRead(nc, totalCnt, RW_ALL_TRANSFERED);            // update variables, set status
+        return;
     }
 
-    // read successful?
-    dataTrans->addDataBfr(dataBuffer, res, true);                       // put the data in data transporter
-    nc->lastReadCount = dataCountFromLocalBuffer + res - seekOffset;    // store the last data count
+    //-----------------
+    // and try to read the rest from socket
+    int cntSck = readFromSocket(nc, toRead);
 
-    if(nc->lastReadCount < byteCountStRequested) {          // didn't read as many as wished? partial transfer
-        dataTrans->setStatus(RW_PARTIAL_TRANSFER);
-    } else {                                                // did read everythen as wanted - all was read
-        dataTrans->setStatus(RW_ALL_TRANSFERED);
+    toRead      -= cntSck;
+    totalCnt    += cntSck;
+
+    if(toRead == 0) {                                               // we don't need to read more? quit with success
+        finishDataRead(nc, totalCnt, RW_ALL_TRANSFERED);            // transfered all that was wanted
+    } else {
+        finishDataRead(nc, totalCnt, RW_PARTIAL_TRANSFER);          // transfer was just partial
     }
 }
 //----------------------------------------------
@@ -580,23 +550,23 @@ void NetAdapter::conLocateDelim(void)
 
     //-----------------
     // try to fill the local read buffer, if there's space
-    if(nc->bytesToReadInBuffer < CON_BFR_SIZE) {                // ok, we got some space, let's try to fill it
-        int emptyCnt = CON_BFR_SIZE - nc->bytesToReadInBuffer;  // we have this many bytes free in buffer
+    if(nc->bytesInBuffer < CON_BFR_SIZE) {                // ok, we got some space, let's try to fill it
+        int emptyCnt = CON_BFR_SIZE - nc->bytesInBuffer;  // we have this many bytes free in buffer
         int canRead  = howManyWeCanReadFromFd(nc->fd);          // find out how many bytes we can read
 
         int readCount = MIN(canRead, emptyCnt);                 // get the smaller number out of these two
 
-        int res = read(nc->fd, nc->rBfr + nc->bytesToReadInBuffer, readCount);  // read the data to the end of the previous data
+        int res = read(nc->fd, nc->rBfr + nc->bytesInBuffer, readCount);  // read the data to the end of the previous data
 
         if(res > 0) {                                           // read succeeded? Increment count in local read buffer
-            nc->bytesToReadInBuffer += res;
+            nc->bytesInBuffer += res;
         }
     }
     //-----------------
     // now try to find the delimiter
     int i;
     bool found = false;
-    for(i=0; i<nc->bytesToReadInBuffer; i++) {          // go through the buffer and find delimiter
+    for(i=0; i<nc->bytesInBuffer; i++) {          // go through the buffer and find delimiter
         if(nc->rBfr[i] == delim) {                      // delimiter found?
             found = true;
             break;
@@ -704,7 +674,6 @@ int NetAdapter::findEmptyConnectionSlot(void)
 void NetAdapter::updateCons(void)
 {
     int i, res;
-    int value;
 
     for(i=0; i<MAX_HANDLE; i++) {                   // update connection info                
         if(cons[i].isClosed()) {                    // if connection closed, skip it
@@ -713,7 +682,7 @@ void NetAdapter::updateCons(void)
 
         //---------
         // update how many bytes we can read from this sock
-        cons[i].bytesToReadInSocket = howManyWeCanReadFromFd(cons[i].fd);       // try to get how many bytes can be read
+        cons[i].bytesInSocket = howManyWeCanReadFromFd(cons[i].fd);       // try to get how many bytes can be read
 
         //---------
         // if it's not TCP connection, just pretend the state is 'connected' - it's only used for TCP connections, so it doesn't matter
@@ -733,9 +702,12 @@ void NetAdapter::updateCons(void)
                     case EALREADY:      cons[i].status = TESTABLISH;    break;  // ok, we're connected!
                     case EINPROGRESS:   cons[i].status = TSYN_SENT;     break;  // still trying to connect
 
+                     // on failures
                     case ETIMEDOUT:
                     case ENETUNREACH:
-                    case ECONNREFUSED:  cons[i].status = TCLOSED;       break;  // on failures
+                    case ECONNREFUSED:  cons[i].status = TCLOSED;       
+                                        cons[i].closeIt();
+                                        break; 
                 }
             }
         } else {                                        // if it's not TCP socket in connecting state, try to find out the state
@@ -769,6 +741,59 @@ int NetAdapter::howManyWeCanReadFromFd(int fd)
     return value;
 }
 //----------------------------------------------
+int NetAdapter::readFromLocalBuffer(TNetConnection *nc, int cnt)
+{
+    int countFromBuffer = MIN(cnt, nc->bytesInBuffer);          // get the count that we will use from local buffer
+
+    if(countFromBuffer == 0) {                                  // nothing to read? quit
+        return 0;
+    }
+
+    dataTrans->addDataBfr(nc->rBfr, countFromBuffer, false);    // add data from local buffer
+
+    nc->prevLastByte    = nc->rBfr[countFromBuffer - 1];        // store the last byte of buffer
+    nc->gotPrevLastByte = true;
+
+    int i;
+    int restOfBuffer = nc->bytesInBuffer - countFromBuffer;     // count of bytes there are after the bytes we just transfered
+
+    for(i=0; i<restOfBuffer; i++) {
+        nc->rBfr[i] = nc->rBfr[i + countFromBuffer];            // move the not used data to the start of the local buffer
+    }        
+
+    nc->bytesInBuffer = restOfBuffer;                           // store the new count of bytes we still have in local buffer
+    return countFromBuffer;                                     // return that we've read this many bytes
+}
+//----------------------------------------------
+int NetAdapter::readFromSocket(TNetConnection *nc, int cnt)
+{
+    int countFromSocket = MIN(cnt, nc->bytesInSocket);      // how much can we read from socket?
+
+    int res = read(nc->fd, dataBuffer, countFromSocket);    // read the data
+
+    if(res == -1) {                                         // failed to read? 
+        return 0;
+    }
+
+    if(res > 0) {                                           // if some bytes have been read
+        nc->prevLastByte    = dataBuffer[res - 1];          // store the last byte of buffer
+        nc->gotPrevLastByte = true;
+
+        dataTrans->addDataBfr(dataBuffer, res, false);          // put the data in data transporter
+    }
+
+    return res;                                             // return count
+}
+//----------------------------------------------
+void NetAdapter::finishDataRead(TNetConnection *nc, int totalCnt, BYTE status)
+{
+    nc->lastReadCount = totalCnt;                               // store how many we have read
+
+    dataTrans->padDataToMul16();                                // pad to multiple of 16
+    dataTrans->setStatus(status);
+}
+//----------------------------------------------
+
 
 
 

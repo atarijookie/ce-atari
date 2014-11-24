@@ -2,6 +2,9 @@
 #define _NETADAPTER_H_
 
 #include <string>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/ip.h>
 
 #include "../acsidatatrans.h"
 #include "../settings.h"
@@ -58,7 +61,7 @@ public:
     void initVars(void) {               // initialize the variables
         fd                  = -1;
         type                = 0;
-        bytesToReadInSocket = 0;
+        bytesInSocket = 0;
         status              = TCLOSED;
         lastReadCount       = 0;
         memset(&hostAdr, '0', sizeof(hostAdr)); 
@@ -66,7 +69,7 @@ public:
         gotPrevLastByte     = false;
         prevLastByte        = 0;
 
-        bytesToReadInBuffer = 0;
+        bytesInBuffer = 0;
     }
 
     bool isClosed(void) {       // check if it's closed
@@ -77,7 +80,7 @@ public:
     struct sockaddr_in hostAdr; // this is where we send data
     int type;                   // TCP / UDP / ICMP
 
-    int bytesToReadInSocket;    // how many bytes are waiting to be read from socket
+    int bytesInSocket;    // how many bytes are waiting to be read from socket
     int status;                 // status of connection - open, closed, ...
     int lastReadCount;          // count of bytes that was read on the last read operation
 
@@ -85,7 +88,7 @@ public:
     BYTE prevLastByte;          // this is the last byte from previous transfer
 
     BYTE *rBfr;                 // pointer to 100 kB read buffer - used when conLocateDelim() is called
-    int  bytesToReadInBuffer;   // how many data there is in bfr[]
+    int  bytesInBuffer;   // how many data there is in bfr[]
 };
 
 //-------------------------------------
@@ -131,7 +134,11 @@ private:
     // helper functions
     int  findEmptyConnectionSlot(void); // get index of empty connection slot, or -1 if nothing is available
     void updateCons(void);
-    int howManyWeCanReadFromFd(int fd);
+    int  howManyWeCanReadFromFd(int fd);
+
+    int  readFromLocalBuffer(TNetConnection *nc, int cnt);
+    int  readFromSocket(TNetConnection *nc, int cnt);
+    void finishDataRead(TNetConnection *nc, int totalCnt, BYTE status);
 };
 
 //-------------------------------------
