@@ -15,7 +15,6 @@ public:
 private:
     int sendTerminalCommand(unsigned char cmd, unsigned char param);
     unsigned char *inbfr;
-    unsigned char *tmpbfr;
 };
 
 #endif

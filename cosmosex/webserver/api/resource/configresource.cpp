@@ -28,7 +28,6 @@ extern BYTE *tmpBfr;
 ConfigResource::ConfigResource()  
 {
     inbfr   = new BYTE[INBFR_SIZE];
-    tmpBfr  = new BYTE[INBFR_SIZE];
 
     ce_conf_fd1 = open(FIFO_PATH1, O_RDWR);             // will be used for writing only
     ce_conf_fd2 = open(FIFO_PATH2, O_RDWR);             // will be used for reading only
@@ -41,8 +40,10 @@ ConfigResource::ConfigResource()
 
 ConfigResource::~ConfigResource() 
 {
+    close(ce_conf_fd1);
+    close(ce_conf_fd2);
+
     delete[] inbfr;
-    delete[] tmpbfr;
 }
 
 bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo /*=""*/ ) 
