@@ -1,10 +1,18 @@
 #ifndef _NETADAPTER_H_
 #define _NETADAPTER_H_
 
+#include <stdlib.h>
 #include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <linux/icmp.h>
+#include <unistd.h>
 
 #include "../acsidatatrans.h"
 #include "../settings.h"
@@ -15,6 +23,8 @@
 
 #define MAX_HANDLE          32
 #define NET_BUFFER_SIZE     (1024 * 1024)
+
+#define CON_BFR_SIZE        (100 * 1024)
 
 //-------------------------------------
 #define NETREQ_TYPE_RESOLVE     1
@@ -34,7 +44,82 @@ extern "C" {
 
 //-------------------------------------
 
-#define CON_BFR_SIZE        (100 * 1024)
+class TRawSocks{
+public:
+    TRawSocks() {
+        ip_reply    = (struct iphdr*)    new BYTE[ sizeof(struct iphdr) ];
+        packet      = (char*)            new BYTE[ sizeof(struct iphdr) + sizeof(struct icmphdr) + CON_BFR_SIZE];
+        buffer      = (char*)            new BYTE[ sizeof(struct iphdr) + sizeof(struct icmphdr) ];
+
+        ip          = (struct iphdr*)    packet;                                                    // pointer to IP   header (start of packet)
+        icmp        = (struct icmphdr*) (packet + sizeof(struct iphdr));                            // pointer to ICMP header (that is just beyond IP header)
+        data        = (BYTE *)          (packet + sizeof(struct iphdr) + sizeof(struct icmphdr));   // pointer to ICMP data   (located beyond ICMP header)
+    }
+
+    ~TRawSocks() {
+        delete []ip_reply;
+        delete []packet;
+        delete []buffer;
+    }
+
+    void setIpHeader(DWORD src_addr, DWORD dst_addr, WORD dataLength) {
+        ip->ihl         = 5;
+        ip->version     = 4;        // IPv4
+        ip->tos         = 0;
+        ip->tot_len     = sizeof(struct iphdr) + sizeof(struct icmphdr) + dataLength;
+        ip->id          = htons(random());
+        ip->ttl         = 255;
+        ip->protocol    = IPPROTO_ICMP;
+        ip->saddr       = src_addr;
+        ip->daddr       = dst_addr;
+
+        ip->check       = 0;                                                // first set checksum to zero
+        ip->check       = checksum((WORD *) ip, sizeof(struct iphdr));      // then calculate real checksum and store it
+    }
+
+    void setIcmpHeader(int type, int code) {
+        icmp->type              = type;
+        icmp->code              = code;
+        icmp->un.echo.id        = 0;
+        icmp->un.echo.sequence  = 0;
+
+        icmp->checksum = 0;                                                 // first set checksum to zero
+        icmp->checksum = checksum((WORD *) icmp, sizeof(struct icmphdr));   // then calculate real checksum and store it
+    }
+
+    WORD checksum(WORD *addr, int len) {
+        int sum         = 0;
+        WORD answer  = 0;
+        WORD *w      = addr;
+        int nleft       = len;
+
+        while (nleft > 1) {     // sum WORDs in a loop
+            sum += *w++;
+            nleft -= 2;
+        }
+
+        /* mop up an odd byte, if necessary */
+        if (nleft == 1) {
+            *(u_char *) (&answer) = *(u_char *) w;
+            sum += answer;
+        }
+
+        /* add back carry outs from top 16 bits to low 16 bits */
+        sum = (sum >> 16) + (sum & 0xffff); // add hi 16 to low 16
+        sum += (sum >> 16);                 // add carry
+        answer = ~sum;                      // truncate to 16 bits
+        return (answer);
+    }
+
+    struct iphdr*   ip;
+    struct iphdr*   ip_reply;
+    struct icmphdr* icmp;
+    char*           packet;
+    char*           buffer;
+    BYTE*           data;
+};
+
+//-------------------------------------
 
 class TNetConnection
 {
@@ -110,7 +195,10 @@ private:
 
     BYTE            *dataBuffer;
 
-    TNetConnection  cons[MAX_HANDLE];   // this holds the info to connections
+    TNetConnection  cons[MAX_HANDLE];   // this holds the info about connections
+    TNetConnection  rawSock;            // this is info about RAW socket - used for ICMP
+    TRawSocks       rawSockHeads;       // this holds the headers for RAW socket
+    DWORD           localIp;
 
     void loadSettings(void);
 

@@ -107,8 +107,9 @@ void *networkThreadCode(void *ptr)
 
 NetAdapter::NetAdapter(void)
 {
-    dataTrans = 0;
+    dataTrans   = 0;
     dataBuffer  = new BYTE[NET_BUFFER_SIZE];
+    localIp     = 0;
 
     loadSettings();
 }
@@ -223,11 +224,14 @@ void NetAdapter::identify(void)
 
     if(bfr[0] == 1) {                               // eth0 enabled? add its IP                         
         dataTrans->addDataBfr(bfr + 1, 4, false);
+        localIp = Utils::getDword(bfr + 1);         // store eth0 as local ip
     } else if(bfr[5] == 1) {                        // wlan0 enabled? add its IP
         dataTrans->addDataBfr(bfr + 6, 4, false);
+        localIp = Utils::getDword(bfr + 6);         // store wlan0 as local ip
     } else {                                        // eth0 and wlan0 disabled? send zeros
         memset(bfr, 0, 4);
         dataTrans->addDataBfr(bfr, 4, false);
+        localIp = 0;                                // no local IP
     }
 
     //--------
@@ -270,8 +274,12 @@ void NetAdapter::conOpen(void)
     // get connection parameters
     DWORD remoteHost    = Utils::getDword(dataBuffer);
     WORD  remotePort    = Utils::getWord (dataBuffer + 4);
+
+/*
+    // following 2 params can be received, but are not used for now
     WORD  tos           = Utils::getWord (dataBuffer + 6);
     WORD  buff_size     = Utils::getWord (dataBuffer + 8);
+*/
 
     int fd;
     if(tcpNotUdp) {     // TCP connection
@@ -596,16 +604,54 @@ void NetAdapter::icmpSend(void)
         return;
     }
 
-    DWORD destinIP  = Utils::getDword(cmd + 6);         // get destination IP address
-    int icmpType    = cmd[10] >> 3;                     // get ICMP type
-    int icmpCode    = cmd[10] & 0x07;                   // get ICMP code
-    WORD length     = Utils::getWord(cmd + 11);         // get length of data to be sent
+    DWORD destinIP  = Utils::getDword(cmd + 6);             // get destination IP address
+    int   icmpType  = cmd[10] >> 3;                         // get ICMP type
+    int   icmpCode  = cmd[10] & 0x07;                       // get ICMP code
+    WORD  length    = Utils::getWord(cmd + 11);             // get length of data to be sent
 
-    
+    bool res = dataTrans->recvData(dataBuffer, length);     // get data from Hans
 
+    if(!res) {                                              // failed to get data? internal error!
+        Debug::out(LOG_DEBUG, "NetAdapter::icmpSend - failed to receive data...");
+        dataTrans->setStatus(E_PARAMETER);
+        return;
+    }
 
+    if(rawSock.isClosed()) {                                // we don't have RAW socket yet? create it
+        int rawFd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+        
+        if(rawFd == -1) {                                   // failed to create RAW socket? 
+            Debug::out(LOG_DEBUG, "NetAdapter::icmpSend - failed to create RAW socket");
+            dataTrans->setStatus(E_FNAVAIL);
+            return;
+        }
 
-    dataTrans->setStatus(E_NORMAL);
+        // IP_HDRINCL must be set on the socket so that the kernel does not attempt to automatically add a default ip header to the packet
+        int optval = 0;
+        setsockopt(rawFd, IPPROTO_IP, IP_HDRINCL, &optval, sizeof(int));
+
+        rawSock.fd = rawFd;                                 // RAW socket created
+    }
+
+    rawSockHeads.setIpHeader(localIp, destinIP, length);    // source IP, destination IP, data length
+    rawSockHeads.setIcmpHeader(icmpType, icmpCode);         // ICMP ToS, ICMP code
+
+    rawSock.hostAdr.sin_family      = AF_INET;
+    rawSock.hostAdr.sin_addr.s_addr = destinIP;
+
+    BYTE *pData = dataBuffer;                               // pointer to where data starts
+    if(!evenNotOdd) {                                       // if data is odd, it starts one byte further
+        pData++;
+    }
+
+    memcpy(rawSockHeads.data, pData, length);               // copy the data from received buffer to raw packet data
+    int ires = sendto(rawSock.fd, rawSockHeads.packet, rawSockHeads.ip->tot_len, 0, (struct sockaddr *) &rawSock.hostAdr, sizeof(struct sockaddr));
+
+    if(ires == -1) {                                        // on failure
+        dataTrans->setStatus(E_BADDNAME);
+    } else {                                                // on success
+        dataTrans->setStatus(E_NORMAL);
+    }
 }
 //----------------------------------------------
 void NetAdapter::icmpGetDgrams(void)
@@ -648,8 +694,11 @@ void NetAdapter::resolveGetResp(void)
     // if resolve did finish
     BYTE empty[256];
     memset(empty, 0, 256);
-    dataTrans->addDataBfr(empty, 256, false);                               // first 256 empty for now - should be real domain name (later)
-    
+
+    int domLen = resolv.h_name.length();                                    // length of real domain name
+    dataTrans->addDataBfr((BYTE *) resolv.h_name.c_str(), domLen, false);   // store real domain name
+    dataTrans->addDataBfr(empty, 256 - domLen, false);                      // add zeros to pad to 256 bytes
+
     dataTrans->addDataByte(resolv.count);                                   // data[256] = count of IP addreses resolved
     dataTrans->addDataByte(0);                                              // data[257] = just a dummy byte
 
