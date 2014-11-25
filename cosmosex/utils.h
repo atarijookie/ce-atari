@@ -39,6 +39,9 @@ public:
     static DWORD getDword(BYTE *bfr);
     static DWORD get24bits(BYTE *bfr);
 
+    static void storeWord(BYTE *bfr, WORD val);
+    static void storeDword(BYTE *bfr, DWORD val);
+
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
 

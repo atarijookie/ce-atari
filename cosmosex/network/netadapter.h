@@ -43,13 +43,38 @@ extern "C" {
 }
 
 //-------------------------------------
+#define STING_DGRAM_MAXSIZE     512
+
+class TStringDgram {
+public:
+    TStringDgram() {
+        data = new BYTE[STING_DGRAM_MAXSIZE];
+        clear();
+    }
+
+    ~TStringDgram() {
+        delete []data;
+    }
+
+    void clear(void) {
+        memset(data, 0, STING_DGRAM_MAXSIZE);
+        count = 0;
+    }
+
+    bool isEmpty(void) {
+        return (count == 0);
+    }
+
+    BYTE *data;
+    BYTE count;
+};
+
+//-------------------------------------
 
 class TRawSocks{
 public:
     TRawSocks() {
-        ip_reply    = (struct iphdr*)    new BYTE[ sizeof(struct iphdr) ];
-        packet      = (char*)            new BYTE[ sizeof(struct iphdr) + sizeof(struct icmphdr) + CON_BFR_SIZE];
-        buffer      = (char*)            new BYTE[ sizeof(struct iphdr) + sizeof(struct icmphdr) ];
+        packet      = (char*) new BYTE[ sizeof(struct iphdr) + sizeof(struct icmphdr) + CON_BFR_SIZE];
 
         ip          = (struct iphdr*)    packet;                                                    // pointer to IP   header (start of packet)
         icmp        = (struct icmphdr*) (packet + sizeof(struct iphdr));                            // pointer to ICMP header (that is just beyond IP header)
@@ -57,9 +82,7 @@ public:
     }
 
     ~TRawSocks() {
-        delete []ip_reply;
         delete []packet;
-        delete []buffer;
     }
 
     void setIpHeader(DWORD src_addr, DWORD dst_addr, WORD dataLength) {
@@ -70,24 +93,24 @@ public:
         ip->id          = htons(random());
         ip->ttl         = 255;
         ip->protocol    = IPPROTO_ICMP;
-        ip->saddr       = src_addr;
-        ip->daddr       = dst_addr;
+        ip->saddr       = htonl(src_addr);
+        ip->daddr       = htonl(dst_addr);
 
         ip->check       = 0;                                                // first set checksum to zero
         ip->check       = checksum((WORD *) ip, sizeof(struct iphdr));      // then calculate real checksum and store it
     }
 
-    void setIcmpHeader(int type, int code) {
+    void setIcmpHeader(int type, int code, int id, int sequence) {
         icmp->type              = type;
         icmp->code              = code;
-        icmp->un.echo.id        = 0;
-        icmp->un.echo.sequence  = 0;
+        icmp->un.echo.id        = id;
+        icmp->un.echo.sequence  = sequence;
 
         icmp->checksum = 0;                                                 // first set checksum to zero
         icmp->checksum = checksum((WORD *) icmp, sizeof(struct icmphdr));   // then calculate real checksum and store it
     }
 
-    WORD checksum(WORD *addr, int len) {
+    static WORD checksum(WORD *addr, int len) {
         int sum         = 0;
         WORD answer  = 0;
         WORD *w      = addr;
@@ -111,11 +134,9 @@ public:
         return (answer);
     }
 
-    struct iphdr*   ip;
-    struct iphdr*   ip_reply;
-    struct icmphdr* icmp;
     char*           packet;
-    char*           buffer;
+    struct iphdr*   ip;
+    struct icmphdr* icmp;
     BYTE*           data;
 };
 
@@ -189,7 +210,7 @@ public:
 
     void processCommand(BYTE *command);
 	
-private:
+//private:
     AcsiDataTrans   *dataTrans;
     BYTE            *cmd;
 
@@ -198,7 +219,6 @@ private:
     TNetConnection  cons[MAX_HANDLE];   // this holds the info about connections
     TNetConnection  rawSock;            // this is info about RAW socket - used for ICMP
     TRawSocks       rawSockHeads;       // this holds the headers for RAW socket
-    DWORD           localIp;
 
     void loadSettings(void);
 

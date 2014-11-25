@@ -16,6 +16,7 @@ public:
 
     static void printfLogLevelString(void);
     
+    static void setOutputToConsole(void);
     static void setDefaultLogFile(void);
     static void setLogFile(char *path);
     

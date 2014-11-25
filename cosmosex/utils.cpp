@@ -378,3 +378,18 @@ DWORD Utils::get24bits(BYTE *bfr)
     return val;
 }
 
+void Utils::storeWord(BYTE *bfr, WORD val)
+{
+    bfr[0] = val >> 8;  // store hi
+    bfr[1] = val;       // store lo
+}
+
+void Utils::storeDword(BYTE *bfr, DWORD val)
+{
+    bfr[0] = val >> 24; // store hi
+    bfr[1] = val >> 16; // store mid hi
+    bfr[2] = val >>  8; // store mid lo
+    bfr[3] = val;       // store lo
+}
+
+

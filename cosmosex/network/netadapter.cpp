@@ -15,9 +15,9 @@
 #include <pthread.h>
 #include <queue>    
 
+#include "../utils.h"
 #include "../global.h"
 #include "../debug.h"
-#include "../utils.h"
 
 #include "netadapter.h"
 #include "netadapter_commands.h"
@@ -39,6 +39,51 @@ struct Tresolv {
 pthread_mutex_t networkThreadMutex = PTHREAD_MUTEX_INITIALIZER;
 std::queue<TNetReq> netReqQueue;
 
+DWORD localIp;
+int   rawSockFd = -1;
+bool  tryIcmpRecv(BYTE *bfr);
+
+#define RECV_BFR_SIZE   (64 * 1024)
+
+#define MAX_STING_DGRAMS    32
+TStringDgram dgrams[MAX_STING_DGRAMS];
+volatile DWORD icmpDataCount;
+
+int dgram_getEmpty(void) {
+    int i; 
+    for(i=0; i<MAX_STING_DGRAMS; i++) {
+        if(dgrams[i].isEmpty()) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+int dgram_getNonEmpty(void) {
+    int i; 
+    for(i=0; i<MAX_STING_DGRAMS; i++) {
+        if(!dgrams[i].isEmpty()) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+int dgram_calcIcmpDataCount(void) {
+    DWORD sum = 0;
+    int i; 
+
+    for(i=0; i<MAX_STING_DGRAMS; i++) {     // go through received DGRAMs
+        if(!dgrams[i].isEmpty()) {          // not empty?
+            sum += dgrams[i].count;         // add size of this DGRAM
+        }
+    }
+
+    return sum;
+}
+
 void netReqAdd(TNetReq &tnr)
 {
 	pthread_mutex_lock(&networkThreadMutex);            // try to lock the mutex
@@ -49,8 +94,16 @@ void netReqAdd(TNetReq &tnr)
 void *networkThreadCode(void *ptr)
 {
 	Debug::out(LOG_INFO, "Network thread starting...");
+    BYTE *recvBfr = new BYTE[RECV_BFR_SIZE];            // 64 kB receive buffer    
 
 	while(sigintReceived == 0) {
+        while(1) {                                      // receive all available ICMP data 
+            bool r = tryIcmpRecv(recvBfr);              // this will cause 100 ms delay when no data is there
+            if(!r) {                                    // if receiving failed, quit; otherwise do another receiving!
+                break;
+            }
+        }                           
+
 		pthread_mutex_lock(&networkThreadMutex);		// lock the mutex
 
 		if(netReqQueue.size() == 0) {					// nothing to do?
@@ -98,6 +151,8 @@ void *networkThreadCode(void *ptr)
         }
 
     }
+
+    delete []recvBfr;
 	
 	Debug::out(LOG_INFO, "Network thread terminated.");
 	return 0;
@@ -105,11 +160,99 @@ void *networkThreadCode(void *ptr)
 
 //--------------------------------------------------------
 
+bool tryIcmpRecv(BYTE *bfr)
+{
+    if(rawSockFd == -1) {                                   // ICMP socket closed? quit, no data
+        return false;
+    }
+
+    //-----------------------
+    // wait for data for 100 ms, and quit if there is no data
+    struct timeval  timeout = {0, 100000};                  // receive timeout - 100 ms
+    fd_set          read_set;
+
+    memset(&read_set, 0, sizeof(read_set));
+    FD_SET(rawSockFd, &read_set);
+
+    int res = select(rawSockFd + 1, &read_set, NULL, NULL, &timeout);     //wait for a reply with a timeout
+
+    if(res == 0) {                  // no fd? timeout, quit
+        return false;
+    }
+    
+    if(res < 0) {                   // select failed
+        return false;
+    }
+
+    //-----------------------
+    // receive the data
+    // recvfrom will receive only one ICMP packet, even if there are more than 1 packets waiting in socket
+    struct sockaddr src_addr;
+    int addrlen = sizeof(struct sockaddr);
+
+    res = recvfrom(rawSockFd, bfr, RECV_BFR_SIZE, 0, (struct sockaddr *) &src_addr, (socklen_t *) &addrlen);
+
+    if(res == -1) {                 // if recvfrom failed, no data
+        return false;
+    }
+
+    // res now contains length of ICMP packet (header + data)
+
+    //-----------------------
+    // parse response to the right structs
+    pthread_mutex_lock(&networkThreadMutex);
+
+    int i = dgram_getEmpty();       // now find space for the datagram
+    if(i == -1) {                   // no space? fail, but return that we were able to receive data
+        pthread_mutex_unlock(&networkThreadMutex);
+        return true;
+    }
+
+    TStringDgram *d = &dgrams[i];
+    d->clear();
+
+    //-------------
+    // fill IP header
+    d->data[0] = 0x45;                          // IP ver, IHL
+    Utils::storeWord(d->data + 2, 20 + res);    // data[2 .. 3] = TOTAL LENGTH = IP header lenght (20) + ICMP header & data length (res)
+    d->data[8] = 128;                           // TTL
+    d->data[9] = ICMP;                          // protocol
+
+    struct sockaddr_in *sa_in = (struct sockaddr_in *) &src_addr;       // cast sockaddr to sockaddr_in
+    Utils::storeDword(d->data + 12, ntohl(sa_in->sin_addr.s_addr));     // data[12 .. 15] - source IP
+    Utils::storeDword(d->data + 16, localIp);                           // data[16 .. 19] - destination IP 
+
+    WORD checksum = TRawSocks::checksum((WORD *) d->data, 20);
+    Utils::storeWord(d->data + 10, checksum);                           // calculate chekcsum, store to data[10 .. 11]
+    //-------------
+    // fill IP_DGRAM header
+    Utils::storeWord(d->data + 30, res);                                // data[30 .. 31] - pkt_length - length of IP packet data block (res)
+    Utils::storeDword(d->data + 32, 128);                               // data[32 .. 35] - timeout - timeout of packet life
+
+    //-------------
+    // now append ICMP packet
+
+    int rest = MIN(STING_DGRAM_MAXSIZE - 48 - 2, res);                  // we can store only (STING_DGRAM_MAXSIZE - 48 - 2) = 462 bytes of ICMP packets to fit 512 B
+    memcpy(d->data + 48, bfr, rest);                                    // copy whole ICMP packet beyond the IP_DGRAM structure
+
+    //--------------
+    // epilogue - update stuff, unlock mutex, success!
+    d->count = 48 + rest;                                               // update how many bytes this gram contains all together
+
+    icmpDataCount = dgram_calcIcmpDataCount();                          // update icmpDataCount
+
+    pthread_mutex_unlock(&networkThreadMutex);
+    return true;
+}
+
+//--------------------------------------------------------
+
 NetAdapter::NetAdapter(void)
 {
-    dataTrans   = 0;
-    dataBuffer  = new BYTE[NET_BUFFER_SIZE];
-    localIp     = 0;
+    dataTrans       = 0;
+    dataBuffer      = new BYTE[NET_BUFFER_SIZE];
+    localIp         = 0;
+    icmpDataCount   = 0;
 
     loadSettings();
 }
@@ -202,7 +345,6 @@ void NetAdapter::processCommand(BYTE *command)
         case NET_CMD_OFF_PORT:              break;                      // currently not used on host
         case NET_CMD_QUERY_PORT:            break;                      // currently not used on host
         case NET_CMD_CNTRL_PORT:            break;                      // currently not used on host
-
     }
 
     dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
@@ -444,7 +586,9 @@ void NetAdapter::conUpdateInfo(void)
         dataTrans->addDataByte(cons[i].status);
     }
 
-    dataTrans->addDataDword(0);                             // TODO: fill the real data to be read from ICMP sock
+    pthread_mutex_lock(&networkThreadMutex);
+    dataTrans->addDataDword(icmpDataCount);                 // fill the data to be read from ICMP sock
+    pthread_mutex_unlock(&networkThreadMutex);
 
     dataTrans->setStatus(E_NORMAL);
 }
@@ -593,6 +737,8 @@ void NetAdapter::conLocateDelim(void)
 //----------------------------------------------
 void NetAdapter::icmpSend(void)
 {
+    // is this needed? sysctl -w net.ipv4.ping_group_range="0 0" 
+
     bool evenNotOdd;
 
     if(cmd[5] == NET_CMD_ICMP_SEND_EVEN) {
@@ -604,60 +750,119 @@ void NetAdapter::icmpSend(void)
         return;
     }
 
-    DWORD destinIP  = Utils::getDword(cmd + 6);             // get destination IP address
-    int   icmpType  = cmd[10] >> 3;                         // get ICMP type
-    int   icmpCode  = cmd[10] & 0x07;                       // get ICMP code
-    WORD  length    = Utils::getWord(cmd + 11);             // get length of data to be sent
+    DWORD destinIP  = Utils::getDword(cmd + 6);                     // get destination IP address
+    int   icmpType  = cmd[10] >> 3;                                 // get ICMP type
+    int   icmpCode  = cmd[10] & 0x07;                               // get ICMP code
+    WORD  length    = Utils::getWord(cmd + 11);                     // get length of data to be sent
 
-    bool res = dataTrans->recvData(dataBuffer, length);     // get data from Hans
+    bool res = dataTrans->recvData(dataBuffer, length);             // get data from Hans
 
-    if(!res) {                                              // failed to get data? internal error!
+    if(!res) {                                                      // failed to get data? internal error!
         Debug::out(LOG_DEBUG, "NetAdapter::icmpSend - failed to receive data...");
         dataTrans->setStatus(E_PARAMETER);
         return;
     }
 
-    if(rawSock.isClosed()) {                                // we don't have RAW socket yet? create it
-        int rawFd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+    if(rawSock.isClosed()) {                                        // we don't have RAW socket yet? create it
+        int rawFd = socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP);
         
-        if(rawFd == -1) {                                   // failed to create RAW socket? 
+        if(rawFd == -1) {                                           // failed to create RAW socket? 
             Debug::out(LOG_DEBUG, "NetAdapter::icmpSend - failed to create RAW socket");
             dataTrans->setStatus(E_FNAVAIL);
             return;
+        } else {
+            Debug::out(LOG_DEBUG, "NetAdapter::icmpSend - RAW socket created");
         }
 
+/*
         // IP_HDRINCL must be set on the socket so that the kernel does not attempt to automatically add a default ip header to the packet
         int optval = 0;
         setsockopt(rawFd, IPPROTO_IP, IP_HDRINCL, &optval, sizeof(int));
+*/
 
-        rawSock.fd = rawFd;                                 // RAW socket created
+        rawSock.fd  = rawFd;                                        // RAW socket created
+        rawSockFd   = rawFd;
     }
 
-    rawSockHeads.setIpHeader(localIp, destinIP, length);    // source IP, destination IP, data length
-    rawSockHeads.setIcmpHeader(icmpType, icmpCode);         // ICMP ToS, ICMP code
-
-    rawSock.hostAdr.sin_family      = AF_INET;
-    rawSock.hostAdr.sin_addr.s_addr = destinIP;
-
-    BYTE *pData = dataBuffer;                               // pointer to where data starts
-    if(!evenNotOdd) {                                       // if data is odd, it starts one byte further
+    BYTE *pData = dataBuffer;                                       // pointer to where data starts
+    if(!evenNotOdd) {                                               // if data is odd, it starts one byte further
         pData++;
     }
 
-    memcpy(rawSockHeads.data, pData, length);               // copy the data from received buffer to raw packet data
-    int ires = sendto(rawSock.fd, rawSockHeads.packet, rawSockHeads.ip->tot_len, 0, (struct sockaddr *) &rawSock.hostAdr, sizeof(struct sockaddr));
+    WORD id         = Utils::getWord(pData);                        // get ID 
+    WORD sequence   = Utils::getWord(pData + 2);                    // get sequence
 
-    if(ires == -1) {                                        // on failure
+    length = (length >= 4) ? (length - 4) : 0;                      // as 4 bytes have been already used, subtract 4 if possible, otherwise set to 0
+
+    rawSockHeads.setIpHeader(localIp, destinIP, length);            // source IP, destination IP, data length
+    rawSockHeads.setIcmpHeader(icmpType, icmpCode, id, sequence);   // ICMP ToS, ICMP code, ID, sequence
+    
+    rawSock.hostAdr.sin_family      = AF_INET;
+    rawSock.hostAdr.sin_addr.s_addr = htonl(destinIP);
+
+    if(length > 0) {
+        memcpy(rawSockHeads.data, pData + 4, length);               // copy the rest of data from received buffer to raw packet data
+    }
+
+    int ires = sendto(rawSock.fd, rawSockHeads.icmp, sizeof(struct icmphdr) + length, 0, (struct sockaddr *) &rawSock.hostAdr, sizeof(struct sockaddr));
+
+    if(ires == -1) {                                                // on failure
+        Debug::out(LOG_DEBUG, "NetAdapter::icmpSend -- sendto() failed, errno: %d", errno);
         dataTrans->setStatus(E_BADDNAME);
-    } else {                                                // on success
+    } else {                                                        // on success
         dataTrans->setStatus(E_NORMAL);
     }
 }
 //----------------------------------------------
 void NetAdapter::icmpGetDgrams(void)
 {
+    pthread_mutex_lock(&networkThreadMutex);
+    
+    if(icmpDataCount <= 0) {                                // nothing to read? fail, no data
+        pthread_mutex_unlock(&networkThreadMutex);
 
+        Debug::out(LOG_DEBUG, "NetAdapter::icmpGetDgrams -- no data, quit");
+        dataTrans->setStatus(E_NODATA);
+        return;
+    }
 
+    //--------------
+    // find out how many dgrams we can fit into this transfer
+    int sectorCount = cmd[5];                               // get sector count and byte count
+    int byteCount   = sectorCount * 512;
+
+    int gotCount    = 0;
+    int gotBytes    = 2;
+
+    int i; 
+    for(i=0; i<MAX_STING_DGRAMS; i++) {                         // now count how many dgrams we can send before we run out of sectors
+        if(!dgrams[i].isEmpty()) {
+            if((gotBytes + dgrams[i].count + 2) > byteCount) {  // if adding this dgram would cause buffer overflow, quit
+                break;
+            }
+
+            gotCount++;                                         // will fit into requested sectors, add it
+            gotBytes += 2 + dgrams[i].count;                    // size of a datagram + WORD for its size
+        }
+    }
+
+    //------------
+    // now will the data transporter with dgrams
+    for(i=0; i<gotCount; i++) {
+        int index = dgram_getNonEmpty();
+        if(index == -1) {                               // no more dgrams? quit
+            break;
+        }
+
+        dataTrans->addDataWord(dgrams[index].count);                                        // add size of this dgram
+        dataTrans->addDataBfr((BYTE *) dgrams[index].data, dgrams[index].count, false);     // add the dgram
+        dgrams[index].clear();                                                              // empty it
+    }   
+
+    dataTrans->addDataWord(0);                          // terminate with a zero, that means no other DGRAM
+    dataTrans->padDataToMul16();                        // pad to multiple of 16
+
+    pthread_mutex_unlock(&networkThreadMutex);
     dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------

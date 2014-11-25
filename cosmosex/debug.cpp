@@ -9,8 +9,14 @@
 DWORD prevLogOut;
 
 extern BYTE g_logLevel;                     // current log level 
+       BYTE g_outToConsole;
 
 char Debug::logFilePath[128];
+
+void Debug::setOutputToConsole(void)
+{
+    g_outToConsole = 1;
+}
 
 void Debug::setDefaultLogFile(void)
 {
@@ -46,7 +52,13 @@ void Debug::out(int logLevel, const char *format, ...)
     va_list args;
     va_start(args, format);
 
-	FILE *f = fopen(logFilePath, "a+t");
+	FILE *f;
+
+    if(g_outToConsole) {                    // should log to console? f is null
+        f = NULL;
+    } else {                                // log to file? open the file
+        f = fopen(logFilePath, "a+t");
+    }
 	
 	if(!f) {
 		printf("%08d: ", Utils::getCurrentMs());
@@ -115,3 +127,4 @@ void Debug::outBfr(BYTE *bfr, int count)
 	fprintf(f, "\n");
 	fclose(f);
 }
+
