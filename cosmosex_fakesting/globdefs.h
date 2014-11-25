@@ -18,6 +18,7 @@
 #define  MAX_SEMAPHOR          64
 #define  LOOPBACK              0x7f000001L
 
+#define DMA_BUFFER_SIZE         (8 * 512)
 /*--------------------------------------------------------------------------*/
 // CosmosEx - types of devices / modules we support
 

@@ -142,12 +142,19 @@ void icmp_processData(uint32 bytesToReadIcmp)
 {
     IP_DGRAM *pDgram;
 
+    bytesToReadIcmp = (bytesToReadIcmp <= DMA_BUFFER_SIZE) ? bytesToReadIcmp : DMA_BUFFER_SIZE;     // will the whole data fit in out DMA buffer? If not, make it shorter
+    
+    DWORD sectors = bytesToReadIcmp / 512;                      // calculate how many sectors we need for the whole transfer
+    if((bytesToReadIcmp % 512) != 0) {                          // if the byte count is not multiple of 512, add one more sector
+        sectors++;
+    }
+    
     // first store command code
     commandShort[4] = NET_CMD_ICMP_GET_DGRAMS;                  // store function number
-    commandShort[5] = 0;
+    commandShort[5] = (BYTE) sectors;                           // and sector count
     
     // send it to host
-    BYTE res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+    BYTE res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, sectors);
 
 	if(res != OK) {                                             // if failed
 		return;

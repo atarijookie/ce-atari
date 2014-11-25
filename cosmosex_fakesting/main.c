@@ -50,7 +50,7 @@ BYTE deviceID;
 BYTE commandShort[CMD_LENGTH_SHORT]	= {      0x00, 'C', 'E', HOSTMOD_NETWORK_ADAPTER, 0, 0};
 BYTE commandLong[CMD_LENGTH_LONG]	= {0x1f, 0xA0, 'C', 'E', HOSTMOD_NETWORK_ADAPTER, 0, 0, 0, 0, 0, 0, 0, 0};
 
-BYTE dmaBuffer[512 + 2]; 
+BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];  
 BYTE *pDmaBuffer;
 
 BYTE ce_findId(void); 
