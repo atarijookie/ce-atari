@@ -62,9 +62,9 @@ bool FloppyResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         Debug::out(LOG_DEBUG, "/floppy POST");
 
         int iSlot=atoi(sResourceInfo.c_str());        
-        if( iSlot<-1 || (iSlot>2 && iSlot!=255) )
+        if( iSlot<0 || iSlot>2 )
         {
-            mg_printf(conn, "HTTP/1.1 400 Selected slot not in range -1 to 2\r\n");
+            mg_printf(conn, "HTTP/1.1 400 Selected slot not in range 0 to 2\r\n");
             return true;
         }
 
@@ -90,9 +90,9 @@ bool FloppyResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
     if( strstr(req_info->request_method,"PUT")>0 ){
         int iSlot=atoi(sResourceInfo.c_str());
         //slot 3=deactivated        
-        if( iSlot<-1 || (iSlot>2 && iSlot!=255) )
+        if( iSlot<0 || iSlot>3 )
         {
-            mg_printf(conn, "HTTP/1.1 400 Selected slot not in range -1 to 2\r\n");
+            mg_printf(conn, "HTTP/1.1 400 Selected slot not in range 0 to 3\r\n");
             return true;
         }
         pxFloppyService->setActiveSlot(iSlot);

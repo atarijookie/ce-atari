@@ -21,19 +21,19 @@
 #include "../../../config/configstream.h"
 #include "../../../ce_conf_on_rpi.h"
 
-extern int translateVT52toVT100(BYTE *bfr, int cnt);
-extern BYTE *tmpBfr;
-#define INBFR_SIZE  (10 * 1024)
+extern int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt);
+#define INBFR_SIZE  (100 * 1024)
 
 ConfigResource::ConfigResource()  
 {
-    inbfr   = new BYTE[INBFR_SIZE];
+    in_bfr   = new BYTE[INBFR_SIZE];
+    tmp_bfr  = new BYTE[INBFR_SIZE];
 
     ce_conf_fd1 = open(FIFO_PATH1, O_RDWR);             // will be used for writing only
     ce_conf_fd2 = open(FIFO_PATH2, O_RDWR);             // will be used for reading only
 
     if(ce_conf_fd1 == -1 || ce_conf_fd2 == -1) {
-        printf("ce_conf_mainLoop -- open() failed\n");
+        printf("ConfigResource -- open() failed\n");
         return;
     }
 }
@@ -43,7 +43,8 @@ ConfigResource::~ConfigResource()
     close(ce_conf_fd1);
     close(ce_conf_fd2);
 
-    delete[] inbfr;
+    delete[] in_bfr;
+    delete[] tmp_bfr;
 }
 
 bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo /*=""*/ ) 
@@ -86,7 +87,7 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
             mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n");
             mg_printf(conn, "Cache: no-cache\r\n");
             mg_printf(conn, "Content-Length: %d\r\n\r\n",iReadLen);        // Always set Content-Length
-            mg_write(conn, inbfr,iReadLen );
+            mg_write(conn, in_bfr,iReadLen );
             return true;
         } else{
             Debug::out(LOG_ERROR, "oould not send config command");
@@ -142,7 +143,7 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
                     mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n");
                     mg_printf(conn, "Cache: no-cache\r\n");
                     mg_printf(conn, "Content-Length: %d\r\n\r\n",iReadLen);        // Always set Content-Length
-                    mg_write(conn, inbfr,iReadLen );
+                    mg_write(conn, in_bfr,iReadLen );
                     return true;
                 } else{
                     Debug::out(LOG_ERROR, "oould not send config command");
@@ -188,12 +189,12 @@ int ConfigResource::sendTerminalCommand(unsigned char cmd, unsigned char param)
     if(res != -1 && bytesAvailable > 0) {
         int readCount = (bytesAvailable < INBFR_SIZE) ? bytesAvailable : INBFR_SIZE;
         
-        memset(inbfr, 0, INBFR_SIZE);
-        res = read(ce_conf_fd2, inbfr, readCount);
+        memset(in_bfr, 0, INBFR_SIZE);
+        res = read(ce_conf_fd2, in_bfr, readCount);
 
         Debug::out(LOG_DEBUG, "sendCmd - readCount: %d", readCount);
 
-        int newCount = translateVT52toVT100(inbfr, readCount);
+        int newCount = translateVT52toVT100(in_bfr, tmp_bfr, readCount);
         
         //write(STDOUT_FILENO, inBfr, newCount);
         return newCount;

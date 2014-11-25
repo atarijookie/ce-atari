@@ -27,21 +27,21 @@ int ce_conf_fd2;
 BYTE *inBfr;
 BYTE *tmpBfr;
 
-int translateVT52toVT100(BYTE *bfr, int cnt)
+int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt)
 {
     int i, t = 0;
 
-    memset(tmpBfr, 0, INBFR_SIZE);
+    memset(tmp, 0, INBFR_SIZE);
     
     for(i=0; i<cnt; ) {
         if(bfr[i] == 27) {
             switch(bfr[i + 1]) {
                 case 'E':               // clear screen
                     // set non-inverted colors
-                    strcat((char *) tmpBfr, "\033[37m");        // foreground white
-                    strcat((char *) tmpBfr, "\033[40m");        // background black
-                    strcat((char *) tmpBfr, "\033[2J");         // clear whole screen
-                    strcat((char *) tmpBfr, "\033[H");          // position cursor to 0,0
+                    strcat((char *) tmp, "\033[37m");        // foreground white
+                    strcat((char *) tmp, "\033[40m");        // background black
+                    strcat((char *) tmp, "\033[2J");         // clear whole screen
+                    strcat((char *) tmp, "\033[H");          // position cursor to 0,0
                     
                     t += 5 + 5 + 4 + 3;
                     i += 2;
@@ -52,39 +52,39 @@ int translateVT52toVT100(BYTE *bfr, int cnt)
                     y = bfr[i+2] - 32;
                     x = bfr[i+3] - 32;
                     
-                    char tmp[16];
-                    sprintf(tmp, "\033[%d;%dH", y, x);
-                    strcat((char *) tmpBfr, tmp);
-                    t += strlen(tmp);
+                    char tmp2[16];
+                    sprintf(tmp2, "\033[%d;%dH", y, x);
+                    strcat((char *) tmp, tmp2);
+                    t += strlen(tmp2);
 
                     i += 4;
                     break;
                 //------------------------
                 case 'p':                           // inverse on
-                    strcat((char *) tmpBfr, "\033[30m");      // foreground black
-                    strcat((char *) tmpBfr, "\033[47m");      // background white
+                    strcat((char *) tmp, "\033[30m");      // foreground black
+                    strcat((char *) tmp, "\033[47m");      // background white
 
                     t += 5 + 5;
                     i += 2;
                     break;
                 //------------------------
                 case 'q':                           // inverse off
-                    strcat((char *) tmpBfr, "\033[37m");      // foreground white
-                    strcat((char *) tmpBfr, "\033[40m");      // background black
+                    strcat((char *) tmp, "\033[37m");      // foreground white
+                    strcat((char *) tmp, "\033[40m");      // background black
 
                     t += 5 + 5;
                     i += 2;
                     break;
                 //------------------------
                 case 'e':               // cursor on
-                    strcat((char *) tmpBfr, "\033[?25h");
+                    strcat((char *) tmp, "\033[?25h");
                     
                     t += 6;
                     i += 2;
                     break;
                 //------------------------
                 case 'f':               // cursor off
-                    strcat((char *) tmpBfr, "\033[?25l");
+                    strcat((char *) tmp, "\033[?25l");
                     
                     t += 6;
                     i += 2;
@@ -96,11 +96,11 @@ int translateVT52toVT100(BYTE *bfr, int cnt)
                     break;
             }            
         } else {
-            tmpBfr[t++] = bfr[i++];
+            tmp[t++] = bfr[i++];
         }
     }
     
-    memcpy(bfr, tmpBfr, t);             // copy back the converted data
+    memcpy(bfr, tmp, t);             // copy back the converted data
     return t;
 }
 
@@ -134,7 +134,7 @@ static bool sendCmd(BYTE cmd, BYTE param)
 
         Debug::out(LOG_DEBUG, "sendCmd - readCount: %d", readCount);
         
-        int newCount = translateVT52toVT100(inBfr, readCount);
+        int newCount = translateVT52toVT100(inBfr, tmpBfr, readCount);
         
         write(STDOUT_FILENO, inBfr, newCount);
         return true;

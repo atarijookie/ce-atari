@@ -85,7 +85,11 @@ bool FloppyService::setActiveSlot(int iSlot)
         return false;
     }
     pxImageSilo->setCurrentSlot(iSlot);                 // set the slot for valid index, set the empty image for invalid slot
-    pxCoreThread->setFloppyImageLed(iSlot);
+    if( iSlot==3 ){
+        pxCoreThread->setFloppyImageLed(0xff);
+    }else{
+        pxCoreThread->setFloppyImageLed(iSlot);
+    }
     return true;
 }
 

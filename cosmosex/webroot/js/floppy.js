@@ -76,7 +76,7 @@ CosmosEx.Floppy=function(){
   var onActivate=function(e){
     var slotid=$(this).data("slot");
     if(!$(this).is(":checked")){
-        slotid=255;
+        slotid=3;
     }
 
     $.ajax({

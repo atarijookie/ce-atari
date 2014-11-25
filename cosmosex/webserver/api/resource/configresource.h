@@ -14,7 +14,7 @@ public:
     bool dispatch(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo="" );
 private:
     int sendTerminalCommand(unsigned char cmd, unsigned char param);
-    unsigned char *inbfr;
+    unsigned char *in_bfr,*tmp_bfr;
 };
 
 #endif
