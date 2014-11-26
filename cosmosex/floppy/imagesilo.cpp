@@ -100,6 +100,20 @@ void *floppyEncodeThreadCode(void *ptr)
 
 ImageSilo::ImageSilo()
 {
+    //-----------
+    // create empty track, which can be used when the equested track is out of range (or image doesn't exist)
+    emptyTrack = new BYTE[15000];
+    memset(emptyTrack, 0, 15000);
+
+    BYTE *p = emptyTrack;
+    for(int i=0; i<(15000/3); i++) {        // fill the empty track with 0x4e sync bytes
+        *p++ = 0xa9;
+        *p++ = 0x6a;
+        *p++ = 0x96;
+    }
+        
+    //-----------
+    // init slots
     for(int i=0; i<4; i++) {
         clearSlot(i);
     }
@@ -108,6 +122,7 @@ ImageSilo::ImageSilo()
     reloadProxy = NULL;
 
     //-----------
+    // create empty image and encode it (will be used when no slot is selected)
     bool res = FloppySetup::createNewImage(EMPTY_IMAGE_PATH);                   // create empty image in /tmp/ directory
 
     if(res) {                                                                   // if succeeded, encode this empty image
@@ -127,6 +142,16 @@ ImageSilo::ImageSilo()
     //-----------
 
     loadSettings();
+}
+
+ImageSilo::~ImageSilo()
+{
+    delete []emptyTrack;
+}
+
+BYTE *ImageSilo::getEmptyTrack(void)
+{
+    return emptyTrack;
 }
 
 void ImageSilo::loadSettings(void)
@@ -315,11 +340,13 @@ BYTE ImageSilo::getSlotBitmap(void)
 
 void ImageSilo::setCurrentSlot(int index)
 {
-    if(index >= 0 && index <= 2) {              // index good? use it
+    if(index >= 0 && index <= 2) {                      // index good? use it
     	currentSlot = index;
-    } else {                                    // index bad? use slot with empty imave
+    } else {                                            // index bad? use slot with empty image
         currentSlot = EMPTY_IMAGE_SLOT;
     }
+    
+    slots[currentSlot].encImage.newContent = false;     // current slot content not changed
 }
 
 int ImageSilo::getCurrentSlot(void)
@@ -354,6 +381,16 @@ bool ImageSilo::containsImage(char *filename)	// check if image with this filena
 	}
 	
 	return false;
+}
+
+bool ImageSilo::currentSlotHasNewContent(void)
+{
+    if(slots[currentSlot].encImage.newContent) {            // if the current slot has new content
+        slots[currentSlot].encImage.newContent = false;     // set flag to false
+        return true;                                        // return that the content is new
+    }
+    
+    return false;                                           // otherwise no new content
 }
 
 SiloSlot *ImageSilo::getSiloSlot(int index)

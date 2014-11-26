@@ -34,7 +34,8 @@ void *floppyEncodeThreadCode(void *ptr);
 class ImageSilo
 {
 public:
-    ImageSilo();    
+    ImageSilo();
+    ~ImageSilo();
 
     void loadSettings(void);
     void saveSettings(void);
@@ -45,12 +46,14 @@ public:
     int  getCurrentSlot(void);
 	BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
 	bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
-	
+    BYTE *getEmptyTrack(void);
+    
     void add(int positionIndex, std::string &filename, std::string &hostDestPath, std::string &atariSrcPath, std::string &hostSrcPath, bool saveToSettings);
     void swap(int index);
     void remove(int index);
 
 	bool containsImage(char *filename);
+    bool currentSlotHasNewContent(void);
 	
     void dumpStringsToBuffer(BYTE *bfr);
 
@@ -60,6 +63,8 @@ private:
     SiloSlot	            slots[4];
 	int			            currentSlot;
 	SettingsReloadProxy     *reloadProxy;
+    
+    BYTE                    *emptyTrack;
 
 	void clearSlot(int index);
 };

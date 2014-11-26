@@ -28,6 +28,8 @@ MfmCachedImage::MfmCachedImage()
 	params.spt		= 0;
     
     CRC = 0;
+    
+    newContent = false;         // no new content (yet)
 }
 
 MfmCachedImage::~MfmCachedImage()
@@ -109,7 +111,8 @@ void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img, bool bufferOfBytes)
         }
     }
 
-    gotImage = true;
+    newContent  = true;      // we got new content!
+    gotImage    = true;
 }
 
 void MfmCachedImage::encodeSingleTrack(IFloppyImage *img, int side, int track, int sectorsPerTrack, BYTE *buffer, int &bytesStored, bool bufferOfBytes)
@@ -231,6 +234,8 @@ void MfmCachedImage::copyFromOther(MfmCachedImage &other)
 			dest->bytesInStream = bytesInBuffer;
 		}
     }
+    
+    newContent  = true;      // we got new content!
 }
 
 bool MfmCachedImage::createMfmStream(IFloppyImage *img, int side, int track, int sector, BYTE *buffer, int &count)

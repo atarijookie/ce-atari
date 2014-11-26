@@ -30,6 +30,8 @@ public:
 
 	void copyFromOther(MfmCachedImage &other);
 	
+    bool newContent;
+    
 private:
     bool gotImage;
 

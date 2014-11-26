@@ -532,10 +532,17 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 
         Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed);
 
+        if(floppyImageSilo.currentSlotHasNewContent()) {    // the content of current slot changed? 
+            Debug::out(LOG_INFO, "Content of current floppy image slot changed, forcing disk change", currentLed);
+
+            diskChanged     = true;                         // tell Franz that floppy changed
+            setDiskChanged  = true;
+        }
+        
         if(lastFloppyImageLed != currentLed) {              // did the floppy image LED change since last time?
             lastFloppyImageLed = currentLed;
 
-            Debug::out(LOG_INFO, "Floppy image changed to %d", currentLed);
+            Debug::out(LOG_INFO, "Floppy image changed to %d, forcing disk change", currentLed);
 
             floppyImageSilo.setCurrentSlot(currentLed);     // switch the floppy image
 
@@ -677,25 +684,26 @@ void CCoreThread::handleSendTrack(void)
     memset(oBuf, 0, 2);
     conSpi->txRx(SPI_CS_FRANZ, 2, oBuf, iBuf);
 
-    int side    = iBuf[0];               // now read the current floppy position
+    int side    = iBuf[0];                      // now read the current floppy position
     int track   = iBuf[1];
+
+    int remaining   = 15000 - (4*2) - 2;		// this much bytes remain to send after the received ATN
 
     Debug::out(LOG_DEBUG, "ATN_SEND_TRACK -- track %d, side %d", track, side);
 
     int tr, si, spt;
     floppyImageSilo.getParams(tr, si, spt);      // read the floppy image params
 
-    if(side < 0 || side > 1 || track < 0 || track >= tr) {
-        Debug::out(LOG_ERROR, "Side / Track out of range!");
-        return;
-    }
-
     BYTE *encodedTrack;
     int countInTrack;
 
-	encodedTrack = floppyImageSilo.getEncodedTrack(track, side, countInTrack);
-
-    int remaining   = 15000 - (4*2) - 2;		// this much bytes remain to send after the received ATN
+    if(side < 0 || side > 1 || track < 0 || track >= tr) {      // side / track out of range? use empty track
+        Debug::out(LOG_ERROR, "Side / Track out of range, returning empty track");
+        
+        encodedTrack = floppyImageSilo.getEmptyTrack();
+    } else {                                                    // side + track within range? use encoded track
+        encodedTrack = floppyImageSilo.getEncodedTrack(track, side, countInTrack);
+    }
 
     conSpi->txRx(SPI_CS_FRANZ, remaining, encodedTrack, iBuf);
 }
