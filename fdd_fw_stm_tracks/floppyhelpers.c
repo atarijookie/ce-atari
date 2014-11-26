@@ -5,7 +5,7 @@
 void FloppyOut_Enable(void )
 {
     GPIOB->CRH &= ~(0x00000fff); 
-    GPIOB->CRH |=  (0x00000737);            // (0x00000333)
+    GPIOB->CRH |=  (0x00000777);            // (0x00000333)
     FloppyIndex_Enable();
     FloppyMFMread_Enable();     
 }

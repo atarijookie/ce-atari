@@ -72,8 +72,9 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 //--------------
 
 #define REQUEST_TRACK                       {   next.track = now.track; next.side = now.side; sendTrackRequest = TRUE; lastRequestTime = TIM4->CNT; trackStreamedCount = 0; }
+#define FORCE_REQUEST_TRACK                 {   REQUEST_TRACK;      lastRequestTime -= 10;      lastRequested.track = 0xff;     lastRequested.side = 0xff;                  }
 
-WORD version[2] = {0xf014, 0x0817};             // this means: Franz, 2014-08-17
+WORD version[2] = {0xf014, 0x1126};             // this means: Franz, 2014-11-26
 WORD drive_select;
 
 volatile BYTE sendFwVersion, sendTrackRequest;
@@ -146,6 +147,11 @@ int main (void)
         // sending and receiving data over SPI using DMA
         if(spiDmaIsIdle == TRUE) {                                                              // SPI DMA: nothing to Tx and nothing to Rx?
             if(sendFwVersion) {                                                                 // should send FW version? this is a window for receiving commands
+                if(isDiskChanged) {                                                             // if it was held for a while, take it down
+                    isDiskChanged = FALSE;
+                    setupDiskChangeWriteProtect();
+                }
+                
                 timeoutStart();                                                                 // start a time-out timer
                 
                 spiDma_txRx(ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0], ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
@@ -586,8 +592,8 @@ void processHostCommand(BYTE val)
     switch(val) {
         case CMD_WRITE_PROTECT_OFF: isWriteProtected    = FALSE;    setupDiskChangeWriteProtect();  break;  // not write protected
         case CMD_WRITE_PROTECT_ON:  isWriteProtected    = TRUE;     setupDiskChangeWriteProtect();  break;  // is write protected
-        case CMD_DISK_CHANGE_OFF:   isDiskChanged       = FALSE;    setupDiskChangeWriteProtect();  break;  // not changed
-        case CMD_DISK_CHANGE_ON:    isDiskChanged       = TRUE;     setupDiskChangeWriteProtect();  break;  // has changed
+        case CMD_DISK_CHANGE_OFF:   isDiskChanged       = FALSE;    setupDiskChangeWriteProtect();                          break;  // not changed
+        case CMD_DISK_CHANGE_ON:    isDiskChanged       = TRUE;     setupDiskChangeWriteProtect();  FORCE_REQUEST_TRACK;    break;  // has changed
         case CMD_GET_FW_VERSION:    sendFwVersion       = TRUE;                                     break;  // send FW version string and receive commands
         case CMD_SET_DRIVE_ID_0:    driveId             = 0;        setupDriveSelect();             break;  // set drive ID pins to check like this...
         case CMD_SET_DRIVE_ID_1:    driveId             = 1;        setupDriveSelect();             break;  // ...or that!
