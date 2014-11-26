@@ -86,7 +86,7 @@ int strncmp ( const char * str1, const char * str2, int num )
 {
 	int i;
 
-	for(i=0; i<num; i++) {			
+	for(i=0; i<num; i++) {	
 		if(str1[i] == str2[i]) {			// chars matching? continue
 			continue;
 		}
@@ -111,9 +111,15 @@ int strncmp ( const char * str1, const char * str2, int num )
 
 int strcmp ( const char * str1, const char * str2)
 {
+    int len1 = strlen(str1);
+    int len2 = strlen(str2);
+    
+    if(len1 != len2) {
+        return ((len1 > len2) ? 1 : -1);
+    }
+    
 	int i = 0;
-
-	while(1) {
+	for(i=0; i<len1; i++) {
 		if(str1[i] == str2[i]) {			// chars matching? continue
 			continue;
 		}
@@ -131,8 +137,6 @@ int strcmp ( const char * str1, const char * str2)
 		} else {
 			return -1;
 		}
-		
-		i++;
 	}
 	
 	return 0;							// if came here, all chars matching

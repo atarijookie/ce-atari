@@ -112,23 +112,25 @@ int main()
     }
 
 	if (Supexec (init_cookie) < 0) {
-        (void) Cconws ("STinG already installed ! No installation ...");
+        (void) Cconws ("Already installed, just quitting.");
         if (memory) {
             Mfree (memory);
         }
         
+        sleep(2);
         return 0;
 	}
 
     install();
 
-    strcpy (def_conf, "STinG version ");   strcat (def_conf, TCP_DRIVER_VERSION);
-    strcat (def_conf, " (");               strcat (def_conf, STX_LAYER_VERSION);
-    strcat (def_conf, ") installed ...");
+    strcpy (def_conf, "STinG version ");   
+    strcat (def_conf, TCP_DRIVER_VERSION);
+    strcat (def_conf, " installed ...");
     (void) Cconws(def_conf);
 
     appl_init();                                 // init gem
-   
+    sleep(2);
+    
     Ptermres (_pgmsize, 0);
     return 0;
  }

@@ -93,12 +93,11 @@ long  init_cookie()
 
 DRV_HDR *get_drv_func (char *drv_name)
 {
-    int  count;
-
-    for (count = 0; count < NUM_LAYER; count++)
-        if (strcmp (cookie.layer[count]->module, drv_name) == 0)
-            return (cookie.layer[count]);
-
+    int val = strcmp(drv_name, "TRANSPORT_TCPIP");
+    if(val == 0) {
+        return (DRV_HDR *) &tpl;
+    }
+    
     return ((DRV_HDR *) NULL);
 }
 
