@@ -32,7 +32,7 @@ int16        set_flag (int16 flag);
 void         clear_flag (int16 flag);
 
 CONFIG      conf;
-CLIENT_API  tpl  = { "TRANSPORT_TCPIP", "Peter Rottengatter", TCP_DRIVER_VERSION, 
+CLIENT_API  tpl  = { "TRANSPORT_TCPIP", "Jookie", TCP_DRIVER_VERSION, 
                       KRmalloc, KRfree, KRgetfree, KRrealloc, 
                       get_error_text, getvstr, carrier_detect, 
                       TCP_open, TCP_close, TCP_send, TCP_wait_state, TCP_ack_wait, 
@@ -43,7 +43,7 @@ CLIENT_API  tpl  = { "TRANSPORT_TCPIP", "Peter Rottengatter", TCP_DRIVER_VERSION
                       on_port, off_port, setvstr, query_port, CNgets, 
                       ICMP_send, ICMP_handler, ICMP_discard, TCP_info, cntrl_port
                };
-STX_API     stxl = { "MODULE_LAYER", "Peter Rottengatter", STX_LAYER_VERSION, 
+STX_API     stxl = { "MODULE_LAYER", "Jookie", STX_LAYER_VERSION, 
                       NULL, NULL, NULL, NULL, NULL, 
                       NULL, NULL, NULL, NULL, 
                       NULL, NULL, NULL, NULL, 

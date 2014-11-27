@@ -69,7 +69,6 @@ WORD requiredVersion;
 int main()
 {
     int   count;
-    char  def_conf[255];
 
     (void) Cconws("\n\r\033p|    Fake STinG for CosmosEx    |\033q");
     (void) Cconws("\n\r\033p|   by Jookie, ver: ");
@@ -88,7 +87,7 @@ int main()
         sleep(3);
         return 0;
     }
-    
+
     if(requiredVersion != REQUIRED_NETADAPTER_VERSION) {
         (void) Cconws("\r\n\33pProtocol version mismatch !\33q\r\n" );
         (void) Cconws("Please use the newest version\r\n" );
@@ -123,10 +122,7 @@ int main()
 
     install();
 
-    strcpy (def_conf, "STinG version ");   
-    strcat (def_conf, TCP_DRIVER_VERSION);
-    strcat (def_conf, " installed ...");
-    (void) Cconws(def_conf);
+    (void) Cconws("Fake STinG installed...");
 
     appl_init();                                 // init gem
     sleep(2);
