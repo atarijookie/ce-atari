@@ -247,6 +247,9 @@ public:
     int  readFromLocalBuffer(TNetConnection *nc, int cnt);
     int  readFromSocket(TNetConnection *nc, int cnt);
     void finishDataRead(TNetConnection *nc, int totalCnt, BYTE status);
+    
+    void logFunctionName(BYTE cmd);
+    void closeAndCleanAll(void);
 };
 
 //-------------------------------------
