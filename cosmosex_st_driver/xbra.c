@@ -21,6 +21,13 @@ unhook_xbra( WORD vecnum, LONG app_id )
     /* Set supervisor mode for search just in case. */
     savessp = Super( SUP_SET );
 
+    /* do we have an XBRA-structure? */
+    if( rx->xbra_id != 'XBRA' )
+    {
+    	Super( savessp );
+    	return 0L;
+    }
+
     /* Special Case: Vector to remove is first in chain. */
     if( rx->xbra_id == 'XBRA' && rx->app_id == app_id )
     {
