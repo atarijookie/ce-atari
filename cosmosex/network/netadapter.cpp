@@ -48,7 +48,7 @@ void resolveNameToIp(TNetReq &tnr);
 #define RECV_BFR_SIZE   (64 * 1024)
 
 #define MAX_STING_DGRAMS    32
-TStringDgram dgrams[MAX_STING_DGRAMS];
+TStingDgram dgrams[MAX_STING_DGRAMS];
 volatile DWORD icmpDataCount;
 
 int dgram_getEmpty(void) {
@@ -229,7 +229,7 @@ bool tryIcmpRecv(BYTE *bfr)
         return true;
     }
 
-    TStringDgram *d = &dgrams[i];
+    TStingDgram *d = &dgrams[i];
     d->clear();
 
     //-------------
@@ -423,7 +423,7 @@ void NetAdapter::closeAndCleanAll(void)
     rawSock.closeIt();                              // close raw / icmp socket
     
     for(i=0; i<MAX_STING_DGRAMS; i++) {             // clear received icmp dgrams
-        dgrams[MAX_STING_DGRAMS].clear();
+        dgrams[i].clear();
     }
     
     resolv.count    = 0;                            // clear the resolver thing
@@ -566,11 +566,11 @@ void NetAdapter::conClose(void)
 //----------------------------------------------
 void NetAdapter::conSend(void)
 {
-    int  cmdType    = cmd[5];                           // command type: NET_CMD_TCP_SEND or NET_CMD_UDP_SEND
-    int  handle     = cmd[6];                           // connection handle
-    int  length     = Utils::getWord(cmd + 7);          // get data length
-    bool isOdd      = cmd[9];                           // if the data was send from odd address, this will be non-zero...
-    BYTE oddByte    = cmd[10];                          // ...and this will contain the 0th byte
+    int  cmdType    = cmd[4];                           // command type: NET_CMD_TCP_SEND or NET_CMD_UDP_SEND
+    int  handle     = cmd[5];                           // connection handle
+    int  length     = Utils::getWord(cmd + 6);          // get data length
+    bool isOdd      = cmd[8];                           // if the data was send from odd address, this will be non-zero...
+    BYTE oddByte    = cmd[9];                           // ...and this will contain the 0th byte
 
     if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conSend() -- bad handle: %d", handle);
@@ -669,9 +669,9 @@ void NetAdapter::conUpdateInfo(void)
 //----------------------------------------------
 void NetAdapter::conReadData(void)
 {
-    int   handle                = cmd[6];                       // get handle
-    DWORD byteCountStRequested  = Utils::get24bits(cmd + 7);    // get how many bytes we want to read
-    int   seekOffset            = (char) cmd[10];               // get seek offset (can be 0 or -1)
+    int   handle                = cmd[5];                       // get handle
+    DWORD byteCountStRequested  = Utils::get24bits(cmd + 6);    // get how many bytes we want to read
+    int   seekOffset            = (char) cmd[9];                // get seek offset (can be 0 or -1)
 
     if(handle < 0 || handle >= MAX_HANDLE) {                    // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- bad handle: %d", handle);
@@ -761,8 +761,8 @@ void NetAdapter::conGetDataCount(void)
 //----------------------------------------------
 void NetAdapter::conLocateDelim(void)
 {
-    int  handle = cmd[6];                               // get connection handle
-    BYTE delim  = cmd[7];                               // get string delimiter
+    int  handle = cmd[5];                               // get connection handle
+    BYTE delim  = cmd[6];                               // get string delimiter
     
     if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conLocateDelim -- bad handle: %d", handle);
@@ -821,19 +821,20 @@ void NetAdapter::icmpSend(void)
 
     bool evenNotOdd;
 
-    if(cmd[5] == NET_CMD_ICMP_SEND_EVEN) {
+    if(cmd[4] == NET_CMD_ICMP_SEND_EVEN) {
         evenNotOdd = true;
-    } else if(cmd[5] == NET_CMD_ICMP_SEND_ODD) {
+    } else if(cmd[4] == NET_CMD_ICMP_SEND_ODD) {
         evenNotOdd = false;
     } else {
+        Debug::out(LOG_DEBUG, "NetAdapter::icmpSend() called for unknown cmd[5]=%02x", cmd[5]);
         dataTrans->setStatus(E_PARAMETER);
         return;
     }
 
-    DWORD destinIP  = Utils::getDword(cmd + 6);                     // get destination IP address
-    int   icmpType  = cmd[10] >> 3;                                 // get ICMP type
-    int   icmpCode  = cmd[10] & 0x07;                               // get ICMP code
-    WORD  length    = Utils::getWord(cmd + 11);                     // get length of data to be sent
+    DWORD destinIP  = Utils::getDword(cmd + 5);                     // get destination IP address
+    int   icmpType  = cmd[9] >> 3;                                  // get ICMP type
+    int   icmpCode  = cmd[9] & 0x07;                                // get ICMP code
+    WORD  length    = Utils::getWord(cmd + 10);                     // get length of data to be sent
     
     bool res = dataTrans->recvData(dataBuffer, length);             // get data from Hans
 

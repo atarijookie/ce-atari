@@ -45,14 +45,14 @@ extern "C" {
 //-------------------------------------
 #define STING_DGRAM_MAXSIZE     512
 
-class TStringDgram {
+class TStingDgram {
 public:
-    TStringDgram() {
+    TStingDgram() {
         data = new BYTE[STING_DGRAM_MAXSIZE];
         clear();
     }
 
-    ~TStringDgram() {
+    ~TStingDgram() {
         delete []data;
     }
 
