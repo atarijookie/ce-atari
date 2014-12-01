@@ -35,6 +35,12 @@ void  init_ports(void)
 
 int16 on_port (char *port_name)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    port_name = getVoidPFromSP();
+    //------------------------------
+    
    PORT  *this;
 
    if ((this = search_port (port_name)) == NULL)
@@ -53,6 +59,12 @@ int16 on_port (char *port_name)
 
 void off_port (char *port_name)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    port_name = getVoidPFromSP();
+    //------------------------------
+
    PORT  *this;
 
    if ((this = search_port (port_name)) == NULL)
@@ -67,6 +79,12 @@ void off_port (char *port_name)
 
 int16 query_port (char *port_name)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    port_name = getVoidPFromSP();
+    //------------------------------
+
    PORT  *this;
 
    if (port_name == NULL)   return (FALSE);
@@ -79,6 +97,14 @@ int16 query_port (char *port_name)
 
 int16 cntrl_port(char *port_name, uint32 argument, int16 code)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    port_name   = getVoidPFromSP();
+    argument    = getDwordFromSP();
+    code        = getWordFromSP();
+    //------------------------------
+
    PORT   *this;
    PNTA   *act_pnta;
    int16  result = E_NORMAL;
@@ -145,6 +171,12 @@ int16 cntrl_port(char *port_name, uint32 argument, int16 code)
 
 PORT *search_port(char *port_name)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    port_name = getVoidPFromSP();
+    //------------------------------
+    
    PORT  *walk;
 
    for (walk = conf.ports; walk; walk = walk->next)

@@ -519,6 +519,14 @@ typedef struct {
 
 #define FASTRAM_BUFFER_SIZE	4096
 /*--------------------------------------------------------------------------*/
+// for retrieving real params from stack, as gcc calling convention doesn't match the Pure C cdecl calling convention
+#define getStackPointer()   BYTE *sp = __builtin_frame_address(0) + 8;
+
+#define getDwordFromSP()  ({ DWORD a = (DWORD)  *((DWORD *) sp);    sp += 4;    a; })
+#define getWordFromSP()   ({  WORD a = (WORD)   *(( WORD *) sp);    sp += 2;    a; })
+#define getByteFromSP()   ({  BYTE a = (BYTE)   *(( BYTE *) sp);    sp += 2;    a; })
+#define getVoidPFromSP()  ({ void *p = (void *) *((DWORD *) sp);    sp += 4;    p; })
+/*--------------------------------------------------------------------------*/
 
 #endif
 

@@ -42,6 +42,16 @@ DWORD icmpHandlers[MAX_ICMP_HANDLERS];
 
 int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_length)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    dest        = getDwordFromSP();
+    type        = getByteFromSP();
+    code        = getByteFromSP();
+    data        = getVoidPFromSP();
+    dat_length  = getWordFromSP();
+    //------------------------------
+    
     commandLong[5] = NET_CMD_ICMP_SEND_EVEN;                    // cmd[5]       = command code
 
     commandLong[6] = (BYTE) (dest >> 24);                       // cmd[6 .. 9]  = destination address
@@ -84,6 +94,13 @@ int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_len
 
 int16 ICMP_handler (int16 (* handler) (IP_DGRAM *), int16 flag)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    handler = getVoidPFromSP();
+    flag    = getWordFromSP();
+    //------------------------------
+
     int i;
     int existing = -1, empty = -1;
     

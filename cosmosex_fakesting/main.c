@@ -96,7 +96,7 @@ int main()
         sleep(3);
         return 0;
     }    
-    
+
     commandShort[0] = (deviceID << 5); 					        // cmd[0] = ACSI_id + TEST UNIT READY (0)
     commandLong[0]  = (deviceID << 5) | 0x1f;			        // cmd[0] = ACSI_id + ICD command marker (0x1f)
    
@@ -142,12 +142,26 @@ int16 init_cfg (void)
 
 int16 setvstr (char  *name, char  *value)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    name    = getVoidPFromSP();
+    value   = getVoidPFromSP();
+    //------------------------------
 
-   return (TRUE);
+    
+    
+    return (TRUE);
 }
 
 char *getvstr (char *name)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    name = getVoidPFromSP();
+    //------------------------------
+    
 	int i;
 	
 	for(i=0; i<CONFIGVAR_COUNT; i++) {					// search the values

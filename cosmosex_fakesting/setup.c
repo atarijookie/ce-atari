@@ -27,7 +27,6 @@ void           init_ports (void);
 void      install (void);
 int32     set_sysvars (int16 new_act, int16 new_frac);
 void      query_chains (PORT **port, DRIVER **drv, LAYER **layer);
-char *    get_error_text (int16 error_code);
 
 
 extern CONFIG 	conf;
@@ -118,12 +117,18 @@ void query_chains (PORT **port_ptr, DRIVER **drv_ptr, LAYER **layer_ptr)
 
 char *get_error_text (int16 error_code)
 {
-   error_code *= -1;
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    error_code = getWordFromSP();
+    //------------------------------
 
-   if (error_code < 0 || E_LASTERROR < error_code)
+    error_code *= -1;
+
+    if (error_code < 0 || E_LASTERROR < error_code)
         return ("");
 
-   return (error_array[error_code]);
+    return (error_array[error_code]);
 }
 
 int16 KRinitialize (int32 size)
@@ -139,7 +144,18 @@ int16 KRinitialize (int32 size)
    return (0);
 }
 
-void *KRmalloc (int32 size)
+void *KRmalloc(int32 size)                  // this should be only called from ST apps
+{
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    size = getDwordFromSP();
+    //------------------------------
+
+    return KRmalloc_internal(size);
+}
+
+void *KRmalloc_internal (int32 size)        // this should be only called from this driver
 {
    MEM_HDR  *prev, *run;
    uint32   n_units;
@@ -173,7 +189,18 @@ void *KRmalloc (int32 size)
    return (NULL);
 }
 
-void KRfree (void *mem_block)
+void KRfree(void *mem_block)
+{
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    mem_block = getVoidPFromSP();
+    //------------------------------
+    
+    return KRfree_internal(mem_block);
+}
+
+void KRfree_internal (void *mem_block)
 {
    MEM_HDR  *blk, *run;
    uint16   status;
@@ -216,7 +243,18 @@ void KRfree (void *mem_block)
    lock_exec (status);
 }
 
-int32  KRgetfree (int16 block_flag)
+int32 KRgetfree (int16 block_flag)
+{
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    block_flag = getWordFromSP();
+    //------------------------------
+    
+    return KRgetfree_internal(block_flag);
+}
+
+int32 KRgetfree_internal (int16 block_flag)
 {
    MEM_HDR  *run;
    uint32   total, largest;
@@ -241,6 +279,18 @@ int32  KRgetfree (int16 block_flag)
 
 void *KRrealloc (void *mem_block, int32 new_size)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    mem_block   = getVoidPFromSP();
+    new_size    = getDwordFromSP();
+    //------------------------------
+
+    return KRrealloc_internal(mem_block, new_size);
+}
+
+void *KRrealloc_internal (void *mem_block, int32 new_size)
+{
    MEM_HDR  *blk;
    uint32   n_units, count;
    char     *wrk, *run, *new_block;
@@ -249,12 +299,12 @@ void *KRrealloc (void *mem_block, int32 new_size)
         return (NULL);
 
    if (new_size == 0) {
-        KRfree (mem_block);
+        KRfree_internal (mem_block);
         return (NULL);
       }
 
    if (mem_block == NULL) {
-        if ((new_block = KRmalloc (new_size)) == NULL)
+        if ((new_block = KRmalloc_internal (new_size)) == NULL)
              return (NULL);
         for (run = new_block; new_size > 0; run++, --new_size)
              *run = '\0';
@@ -269,7 +319,7 @@ void *KRrealloc (void *mem_block, int32 new_size)
    n_units = (new_size + sizeof (MEM_HDR) - 1) / sizeof (MEM_HDR) + 1;
 
    if (n_units > blk->size) {
-        if ((new_block = KRmalloc (new_size)) == NULL)
+        if ((new_block = KRmalloc_internal (new_size)) == NULL)
              return (NULL);
         count =  (blk->size - 1) * sizeof (MEM_HDR);
         new_size = (n_units - 1) * sizeof (MEM_HDR);
@@ -277,14 +327,14 @@ void *KRrealloc (void *mem_block, int32 new_size)
              *run++ = *wrk++;
         for (; new_size > 0; --new_size)
              *run++ = '\0';
-        KRfree (mem_block);   return (new_block);
+        KRfree_internal (mem_block);   return (new_block);
       }
 
    if (n_units < blk->size) {
         n_units = blk->size - n_units;   blk->size -= n_units;
         blk += blk->size;
         blk->size = n_units;   blk->mem_ptr = (MEM_HDR *) 'STiM';
-        KRfree (blk + 1);
+        KRfree_internal (blk + 1);
       }
 
    return (mem_block);

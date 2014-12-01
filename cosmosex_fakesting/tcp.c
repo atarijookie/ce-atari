@@ -31,21 +31,54 @@ extern TConInfo conInfo[MAX_HANDLE];                   // this holds info about 
 
 int16 TCP_open(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_size)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    rem_host    = getDwordFromSP();
+    rem_port    = getWordFromSP();
+    tos         = getWordFromSP();
+    buff_size   = getWordFromSP();
+    //------------------------------
+
     return connection_open(1, rem_host, rem_port, tos, buff_size);
 }
 
 int16 TCP_close(int16 handle, int16 mode, int16 *result)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    handle      = getWordFromSP();
+    mode        = getWordFromSP();
+    result      = getVoidPFromSP();
+    //------------------------------
+    
     return connection_close(1, handle, mode, result);
 }
 
 int16 TCP_send(int16 handle, void *buffer, int16 length)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    handle      = getWordFromSP();
+    buffer      = getVoidPFromSP();
+    length      = getWordFromSP();
+    //------------------------------
+    
     return connection_send(1, handle, buffer, length);
 }
 
 int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    handle      = getWordFromSP();
+    wantedState = getWordFromSP();
+    timeout     = getWordFromSP();
+    //------------------------------
+    
     if(!handle_valid(handle)) {                         // we don't have this handle? fail
         return E_BADHANDLE;
     }
@@ -88,6 +121,13 @@ int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
 
 int16 TCP_ack_wait(int16 handle, int16 timeout)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    handle      = getWordFromSP();
+    timeout     = getWordFromSP();
+    //------------------------------
+    
     if(!handle_valid(handle)) {                                 // we don't have this handle? fail
         return E_BADHANDLE;
     }
@@ -98,6 +138,13 @@ int16 TCP_ack_wait(int16 handle, int16 timeout)
 
 int16 TCP_info(int16 handle, TCPIB *tcp_info)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    handle      = getWordFromSP();
+    tcp_info    = getVoidPFromSP();
+    //------------------------------
+
     if(!handle_valid(handle)) {                                 // we don't have this handle? fail
         return E_BADHANDLE;
     }

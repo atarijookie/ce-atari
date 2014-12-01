@@ -114,6 +114,12 @@ void house_keep(void)
 
 int16 set_flag(int16 flag)                      // set semaphore
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    flag = getWordFromSP();
+    //------------------------------
+    
     if(flag >= 0 && flag < MAX_SEMAPHOR) {      // valid semaphore number?
         if(semaphors[flag] != 0) {              // It was set ? Return TRUE
             return 1;
@@ -127,8 +133,14 @@ int16 set_flag(int16 flag)                      // set semaphore
 	return 0;
 }
 
-void clear_flag (int16 flag)                    // clear semaphore
+void clear_flag(int16 flag)                     // clear semaphore
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    flag = getWordFromSP();
+    //------------------------------
+
     if(flag >= 0 && flag < MAX_SEMAPHOR) {      // valid semaphore number?
         semaphors[flag] = 0;
     }

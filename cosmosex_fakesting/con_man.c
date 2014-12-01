@@ -28,6 +28,12 @@ TConInfo conInfo[MAX_HANDLE];                                                // 
 
 int16 CNkick(int16 handle)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    handle = getWordFromSP();
+    //------------------------------
+
     update_con_info();                  // update connections info structs (max once per 100 ms)
 
     if(!handle_valid(handle)) {         // we don't have this handle? fail
@@ -39,6 +45,12 @@ int16 CNkick(int16 handle)
 
 CIB *CNgetinfo(int16 handle)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    handle = getWordFromSP();
+    //------------------------------
+
     if(!handle_valid(handle)) {         // we don't have this handle? fail
         return (CIB *) NULL;
     }
@@ -50,6 +62,12 @@ CIB *CNgetinfo(int16 handle)
 
 int16 CNbyte_count (int16 handle)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    handle = getWordFromSP();
+    //------------------------------
+
     if(!handle_valid(handle)) {                 // we don't have this handle? fail
         return E_BADHANDLE;
     }
@@ -75,6 +93,12 @@ int16 CNbyte_count (int16 handle)
 // data retrieval functions
 int16 CNget_char(int16 handle)
 {   
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    handle = getWordFromSP();
+    //------------------------------
+
     if(!handle_valid(handle)) {                 // we don't have this handle? fail
         return E_BADHANDLE;
     }
@@ -107,6 +131,12 @@ int16 CNget_char(int16 handle)
 
 NDB *CNget_NDB (int16 handle)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    handle = getWordFromSP();
+    //------------------------------
+
     if(!handle_valid(handle)) {                                             // we don't have this handle? fail
         return (NDB *) NULL;
     }
@@ -122,21 +152,21 @@ NDB *CNget_NDB (int16 handle)
 
     // if we got here, then there's some data to retrieve...
     DWORD readCount, freeSize;
-    freeSize    = KRgetfree(TRUE);                                          // get size of largest free block
+    freeSize    = KRgetfree_internal(TRUE);                                 // get size of largest free block
     readCount   = (dataLeftTotal    <= 0xffff)   ? dataLeftTotal : 0xffff;  // Do we have less than 64kB of data? Retrieve all, otherwise retrieve just 64kB.
     readCount   = (readCount        <= freeSize) ? readCount : freeSize;    // Do we have less data to read, then what we can KRmalloc()? If yes, read all, otherwise read just what we can KRmalloc()
     
     // allocate buffer for structure and the data
-    BYTE *bfr = KRmalloc(readCount);                                        // try to malloc() RAM for data
+    BYTE *bfr = KRmalloc_internal(readCount);                               // try to malloc() RAM for data
     
     if(bfr == NULL) {                                                       // malloc() failed, return NULL
         return (NDB *) NULL;
     }
     
-    NDB *pNdb = KRmalloc(sizeof(NDB));                                     // try to malloc() RAM for the containing NDB struct 
+    NDB *pNdb = KRmalloc_internal(sizeof(NDB));                             // try to malloc() RAM for the containing NDB struct 
     
     if(pNdb == NULL) {                                                      // malloc() failed, return NULL
-        KRfree(bfr);                                                        // free the data buffer
+        KRfree_internal(bfr);                                               // free the data buffer
         return (NDB *) NULL;
     }
 
@@ -155,8 +185,8 @@ NDB *CNget_NDB (int16 handle)
     }
 
     if(res == 0) {                                                          // if failed, fail
-        KRfree(bfr);
-        KRfree(pNdb);
+        KRfree_internal(bfr);
+        KRfree_internal(pNdb);
         return (NDB *) NULL;
     }
     
@@ -166,6 +196,14 @@ NDB *CNget_NDB (int16 handle)
 
 int16 CNget_block(int16 handle, void *buffer, int16 length)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    handle  = getWordFromSP();
+    buffer  = getVoidPFromSP();
+    length  = getWordFromSP();
+    //------------------------------
+
     if(!handle_valid(handle)) {                 // we don't have this handle? fail
         return E_BADHANDLE;
     }
@@ -195,6 +233,15 @@ int16 CNget_block(int16 handle, void *buffer, int16 length)
 
 int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    handle      = getWordFromSP();
+    buffer      = getVoidPFromSP();
+    length      = getWordFromSP();
+    delimiter   = getByteFromSP();
+    //------------------------------
+
     if(!handle_valid(handle)) {                                     // we don't have this handle? fail
         return E_BADHANDLE;
     }
@@ -460,6 +507,15 @@ int16 connection_send(int tcpNotUdp, int16 handle, void *buffer, int16 length)
 
 int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
 {
+    //------------------------------
+    // retrieve real params from stack
+    getStackPointer();
+    domain      = getVoidPFromSP();
+    real_domain = getVoidPFromSP();
+    ip_list     = getVoidPFromSP();
+    ip_num      = getWordFromSP();
+    //------------------------------
+    
     BYTE res;
     
     commandShort[4] = NET_CMD_RESOLVE;
@@ -585,14 +641,19 @@ DWORD readData(int16 handle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 			else
 				bytes_to_read=cnt_remain;
 
-			commandLong[7] = bytes_to_read >> 16;											// store byte count 
+			commandLong[7] = bytes_to_read >> 16;											                // store byte count 
 			commandLong[8] = bytes_to_read >>  8;
 			commandLong[9] = bytes_to_read  & 0xff;
 
-			BYTE res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, bytes_to_read/512);	// Read as much as we can to ST RAM first - send command to host over ACSI 
+            sectorCount = bytes_to_read / 512;                                                              // calculate how many sectors should we transfer 
+            if((bytes_to_read % 512) != 0) {                                                                // and if we have more than full sector(s) in buffer, send one more! 
+                sectorCount++;
+            }
+            
+			BYTE res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // Read as much as we can to ST RAM first - send command to host over ACSI 
 
 			if(res == RW_ALL_TRANSFERED) {
-				memcpy(bfr, FastRAMBuffer, bytes_to_read);                                  // Yup, so copy data to its rightful place
+				memcpy(bfr, FastRAMBuffer, bytes_to_read);                                                  // Yup, so copy data to its rightful place
 				bfr=bfr+FASTRAM_BUFFER_SIZE;
 				actual_bytes_read = actual_bytes_read + bytes_to_read;
 				cnt_remain=cnt_remain-bytes_to_read;
