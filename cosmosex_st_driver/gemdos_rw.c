@@ -358,9 +358,9 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
 	
 	if ((int)bfr>=0x1000000)													// Oh dear, are we out of ST RAM boundaries? The ACSI DMA won't read past 0xffffff
 	{
-		DWORD cnt_remain=cnt;												
-		DWORD actual_bytes_written=0;
-		DWORD bytes_to_copy=FASTRAM_BUFFER_SIZE;
+		DWORD cnt_remain            = cnt;												
+		DWORD actual_bytes_written  = 0;
+		DWORD bytes_to_copy         = FASTRAM_BUFFER_SIZE;
 
 		// In the case of writing from outside ST RAM, we need to copy the
 		// data to ST RAM and then write it normally. 
@@ -370,16 +370,21 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
 		
 		while (cnt_remain>0)
 		{
-			if (cnt_remain<FASTRAM_BUFFER_SIZE)
-				bytes_to_copy=cnt_remain;
+			if (cnt_remain < FASTRAM_BUFFER_SIZE)
+				bytes_to_copy = cnt_remain;
 
-			commandLong[7] = (DWORD)bytes_to_copy >> 16;											// store byte count 
+			commandLong[7] = (DWORD)bytes_to_copy >> 16;											        // store byte count 
 			commandLong[8] = (DWORD)bytes_to_copy >>  8;
 			commandLong[9] = (DWORD)bytes_to_copy  & 0xff;
 
-			memcpy(FastRAMBuffer, bfr, bytes_to_copy);							// Yup, so copy data to its rightful place
+            WORD sectorCount = bytes_to_copy / 512;                                                         // calculate how many sectors should we transfer 
+            if((bytes_to_copy % 512) != 0) {                                                                // and if we have more than full sector(s) in buffer, send one more! 
+                sectorCount++;
+            }
+            
+			memcpy(FastRAMBuffer, bfr, bytes_to_copy);							                            // Yup, so copy data to its rightful place
 			bfr=bfr+FASTRAM_BUFFER_SIZE;
-			BYTE res = acsi_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, bytes_to_copy/512);	// send command to host over ACSI 
+			BYTE res = acsi_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // send command to host over ACSI 
 			
 			// if all data in this chunk transfered, update counter
 			if(res == RW_ALL_TRANSFERED) {
@@ -504,10 +509,15 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 			commandLong[8] = bytes_to_read >>  8;
 			commandLong[9] = bytes_to_read  & 0xff;
 
-			BYTE res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, bytes_to_read/512);	// Read as much as we can to ST RAM first - send command to host over ACSI 
+            sectorCount = bytes_to_read / 512;                                                              // calculate how many sectors should we transfer 
+            if((bytes_to_read % 512) != 0) {                                                                // and if we have more than full sector(s) in buffer, send one more! 
+                sectorCount++;
+            }
+            
+			BYTE res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // Read as much as we can to ST RAM first - send command to host over ACSI 
 
 			if(res == RW_ALL_TRANSFERED) {
-				memcpy(bfr, FastRAMBuffer, bytes_to_read);							// Yup, so copy data to its rightful place
+				memcpy(bfr, FastRAMBuffer, bytes_to_read);							                        // Yup, so copy data to its rightful place
 				bfr=bfr+FASTRAM_BUFFER_SIZE;
 				actual_bytes_read = actual_bytes_read + bytes_to_read;
 				cnt_remain=cnt_remain-bytes_to_read;
