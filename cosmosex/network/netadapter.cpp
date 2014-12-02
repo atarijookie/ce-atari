@@ -96,7 +96,11 @@ void netReqAdd(TNetReq &tnr)
 void *networkThreadCode(void *ptr)
 {
 	Debug::out(LOG_INFO, "Network thread starting...");
-    BYTE *recvBfr = new BYTE[RECV_BFR_SIZE];            // 64 kB receive buffer    
+    BYTE *recvBfr = new BYTE[RECV_BFR_SIZE];                // 64 kB receive buffer    
+
+    // The following line is needed to allow root to create raw sockets for ICMP echo... 
+    // The problem with this is it allows only ICMP echo to be done.
+    system("sysctl -w net.ipv4.ping_group_range=\"0 0\"");  
 
 	while(sigintReceived == 0) {
         while(1) {                                      // receive all available ICMP data 
@@ -817,8 +821,6 @@ void NetAdapter::conLocateDelim(void)
 //----------------------------------------------
 void NetAdapter::icmpSend(void)
 {
-    // is this needed? sysctl -w net.ipv4.ping_group_range="0 0" 
-
     bool evenNotOdd;
 
     if(cmd[4] == NET_CMD_ICMP_SEND_EVEN) {
