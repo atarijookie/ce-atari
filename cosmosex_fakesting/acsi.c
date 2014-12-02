@@ -3,6 +3,7 @@
 #include "stdlib.h"
 
 #include "acsi.h"
+#include "stdlib.h"
 
 // -------------------------------------- 
 // the following variables are globale ones, because the acsi_cmd() could be called from user mode, so the params will be stored to these global vars and then the acsi_cmd_supervisor() will handle that...
@@ -37,7 +38,7 @@ static BYTE acsi_cmd_supervisor(void)
 	DWORD status;
 	WORD i, wr1, wr2;
 
-    DWORD end = getTicks() + 200;               // calculate the terminating tick count, where we should stop looking for unlocked FLOCK
+    DWORD end = getTicks_fromSupervisor() + 200;    // calculate the terminating tick count, where we should stop looking for unlocked FLOCK
     
     WORD locked;
     while(1) {                                  // while not time out, try again
@@ -48,7 +49,7 @@ static BYTE acsi_cmd_supervisor(void)
             break;
         }
         
-        if(getTicks() >= end) {                 // on time out - fail, return ACSIERROR
+        if(getTicks_fromSupervisor() >= end) {  // on time out - fail, return ACSIERROR
             return ACSIERROR;
         }
     }

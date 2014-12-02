@@ -333,7 +333,7 @@ void update_con_info(void)
 {
 	DWORD res;
 	static DWORD lastUpdate = 0;
-	DWORD now = *HZ_200;
+	DWORD now = getTicks();
 
 	if((now - lastUpdate) < 20) {								            // if the last update was less than 100 ms ago, don't update
 		return;

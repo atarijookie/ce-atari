@@ -14,6 +14,7 @@ int		strcmp ( const char * str1, const char * str2);
 void	sleep(int seconds);
 void    sleepMs(int ms);
 
+DWORD getTicks_fromSupervisor(void);
 DWORD getTicks(void);
 
 BYTE *storeByte(BYTE *bfr, BYTE value);

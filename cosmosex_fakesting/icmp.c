@@ -13,6 +13,7 @@
 
 #include "globdefs.h"
 #include "icmp.h"
+#include "con_man.h"
 
 #define  M_YEAR    16
 #define  M_MONTH   11
@@ -42,6 +43,8 @@ DWORD icmpHandlers[MAX_ICMP_HANDLERS];
 
 int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_length)
 {
+    update_con_info();
+
     //------------------------------
     // retrieve real params from stack
     getStackPointer();

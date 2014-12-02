@@ -164,11 +164,11 @@ static void sleepInSupervisor(void)
 	DWORD now, until;
 	DWORD tics = sleepSeconds * 200;
 
-	now = getTicks();						// get current ticks
-	until = now + tics;   					// calc value timer must get to
+	now = getTicks_fromSupervisor();        // get current ticks
+	until = now + tics;                     // calc value timer must get to
 
 	while(1) {
-		now = getTicks();					// get current ticks
+		now = getTicks_fromSupervisor();    // get current ticks
 		
 		if(now >= until) {
 			break;
@@ -181,11 +181,11 @@ static void sleepMsInSupervisor(void)
 	DWORD now, until;
 	DWORD tics = sleepMilisecs / 5;         // one tick is 5 ms, so /5 will convert ms to ticks
 
-	now = getTicks();						// get current ticks
+	now = getTicks_fromSupervisor();        // get current ticks
 	until = now + tics;   					// calc value timer must get to
 
 	while(1) {
-		now = getTicks();					// get current ticks
+		now = getTicks_fromSupervisor();    // get current ticks
 		
 		if(now >= until) {
 			break;
@@ -194,6 +194,12 @@ static void sleepMsInSupervisor(void)
 }
 
 DWORD getTicks(void)
+{
+    DWORD res = Supexec(getTicks_fromSupervisor);
+    return res;
+}
+
+DWORD getTicks_fromSupervisor(void)
 {
 	DWORD now;
 	
