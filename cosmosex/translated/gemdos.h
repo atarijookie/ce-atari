@@ -54,6 +54,9 @@
 
 #define ST_LOG_TEXT             0x85
 
+#define TEST_READ               0x90
+#define TEST_WRITE              0x91
+
 //////////////////////////////////////
 
 // file attributes

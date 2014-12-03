@@ -1267,5 +1267,65 @@ DWORD TranslatedDisk::getByteCountToEOF(FILE *f)
     return bytesToEnd; 
 }
 
+void TranslatedDisk::onTestRead(BYTE *cmd)
+{
+    int     byteCount   = Utils::get24bits(cmd + 5);    // 5,6,7 -- byte count
+    WORD    xorVal      = Utils::getWord(cmd + 8);      // 8,9   -- xor value
+
+    int i;
+    WORD counter = 0;
+    for(i=0; i<byteCount; i += 2) {
+        dataTrans->addDataWord(counter ^ xorVal);       // store word
+        counter++;
+    }
+
+    if(byteCount & 1) {                                 // odd number of bytes? add last byte
+        BYTE lastByte = (counter ^ xorVal) >> 8;
+        dataTrans->addDataByte(lastByte);
+    }
+
+    dataTrans->padDataToMul16();
+    dataTrans->setStatus(E_OK);
+}
+
+void TranslatedDisk::onTestWrite(BYTE *cmd)
+{
+    int     byteCount   = Utils::get24bits(cmd + 5);    // 5,6,7 -- byte count
+    WORD    xorVal      = Utils::getWord(cmd + 8);      // 8,9   -- xor value
+
+    bool res = dataTrans->recvData(dataBuffer, byteCount);   // get data from Hans
+
+    if(!res) {
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onTestWrite - failed to receive data...");
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    int i;
+    WORD counter = 0;
+    for(i=0; i<byteCount; i += 2) {                     // verify all data words
+        WORD valSt  = Utils::getWord(dataBuffer + i);
+
+        WORD valGen = counter ^ xorVal;
+        counter++;
+
+        if(valSt != valGen) {                           // data mismatch? fail
+            dataTrans->setStatus(E_CRC);
+            return;
+        }
+    }
+
+    if(byteCount & 1) {                                 // odd number of bytes? verify last byte
+        BYTE lastByteGen = (counter ^ xorVal) >> 8;
+        BYTE lastByteSt  = dataBuffer[i];
+
+        if(lastByteSt != lastByteGen) {                 // data mismatch? fail
+            dataTrans->setStatus(E_CRC);
+            return;
+        }
+    }
+
+    dataTrans->setStatus(E_OK);
+}
 
 

@@ -414,14 +414,16 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case GD_CUSTOM_getBytesToEOF:   getByteCountToEndOfFile(cmd);   break;
 
         // BIOS functions we need to support
-        case BIOS_Drvmap:               onDrvMap(cmd);      break;
-        case BIOS_Mediach:              onMediach(cmd);     break;
-        case BIOS_Getbpb:               onGetbpb(cmd);      break;
+        case BIOS_Drvmap:               onDrvMap(cmd);                  break;
+        case BIOS_Mediach:              onMediach(cmd);                 break;
+        case BIOS_Getbpb:               onGetbpb(cmd);                  break;
 
 		// other functions
-		case ACC_GET_MOUNTS:			onGetMounts(cmd);	    break;
-        case ACC_UNMOUNT_DRIVE:         onUnmountDrive(cmd);    break;
-        case ST_LOG_TEXT:               onStLog(cmd);           break;
+		case ACC_GET_MOUNTS:			onGetMounts(cmd);	            break;
+        case ACC_UNMOUNT_DRIVE:         onUnmountDrive(cmd);            break;
+        case ST_LOG_TEXT:               onStLog(cmd);                   break;
+        case TEST_READ:                 onTestRead(cmd);                break;
+        case TEST_WRITE:                onTestWrite(cmd);               break;
 
         // in other cases
         default:                                // in other cases
@@ -1129,6 +1131,8 @@ char *TranslatedDisk::functionCodeToName(int code)
         case BIOS_Drvmap:               return (char *)"BIOS_Drvmap";
         case BIOS_Mediach:              return (char *)"BIOS_Mediach";
         case BIOS_Getbpb:               return (char *)"BIOS_Getbpb";
+        case TEST_READ:                 return (char *)"TEST_READ";
+        case TEST_WRITE:                return (char *)"TEST_WRITE";
         default:                        return (char *)"unknown";
     }
 }
