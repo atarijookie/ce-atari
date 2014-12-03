@@ -43,8 +43,6 @@ DWORD icmpHandlers[MAX_ICMP_HANDLERS];
 
 int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_length)
 {
-    update_con_info();
-
     //------------------------------
     // retrieve real params from stack
     getStackPointer();

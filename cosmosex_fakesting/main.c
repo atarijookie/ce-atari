@@ -22,6 +22,8 @@
 #include "stdlib.h"
 #include "setup.h"
 
+void install_vbl(void);
+
 void showAppVersion(void);
 int  getIntFromStr(const char *str, int len);
 void showInt(int value, int length);
@@ -121,7 +123,8 @@ int main()
 	}
 
     install();
-
+    Supexec(install_vbl);
+    
     (void) Cconws("Fake STinG installed...");
 
     appl_init();                                 // init gem

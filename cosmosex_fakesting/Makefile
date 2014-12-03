@@ -9,7 +9,7 @@ LDFLAGS	= -Wl,--traditional-format -lgcc -lgem -Wl,-Map=output.map
 
 HDR		= acsi.h stdlib.h setup.h tcp.h udp.h con_man.h icmp.h api.h port.h
 CSRC	= acsi.c stdlib.c setup.c tcp.c udp.c con_man.c icmp.c api.c port.c main.c 
-SSRC	= 
+SSRC	= vbl.s
 STARTUP	= startup.s
 
 OBJS = $(patsubst %.c,%.o,$(CSRC))

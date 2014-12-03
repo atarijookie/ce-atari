@@ -87,7 +87,8 @@ int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
     DWORD timeout2 = timeout * 200;    
     
     while(1) {
-        update_con_info();                                          // update the info 
+        // the connection info should be updated in VBL using update_con_info()
+        
         WORD currentState = conInfo[handle].tcpConnectionState;     // get the current state
     
         // if the wanted state is CLOSED or CLOSING, and the current state is similar - success
