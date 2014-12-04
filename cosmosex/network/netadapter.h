@@ -66,7 +66,7 @@ public:
     }
 
     BYTE *data;
-    BYTE count;
+    WORD count;
 };
 
 //-------------------------------------

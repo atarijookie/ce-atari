@@ -667,7 +667,8 @@ void NetAdapter::conUpdateInfo(void)
     pthread_mutex_unlock(&networkThreadMutex);
 
     Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo - icmpDataCount: %d", icmpDataCount);
-    
+
+    dataTrans->padDataToMul16();
     dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
