@@ -265,3 +265,28 @@ DWORD getDword(BYTE *bfr)
     return val;
 }
 
+void showHexByte(int val)
+{
+    int hi, lo;
+    char table[16] = {"0123456789ABCDEF"};
+    hi = (val >> 4) & 0x0f;;
+    lo = (val     ) & 0x0f;
+
+    (void) Cconout( table[hi] );
+    (void) Cconout( table[lo] );
+}
+
+void showHexDword(DWORD val)
+{
+    BYTE a,b,c,d;
+    a = val >> 24;
+    b = val >> 16;
+    c = val >>  8;
+    d = val;
+    
+    showHexByte(a);
+    showHexByte(b);
+    showHexByte(c);
+    showHexByte(d);
+}
+

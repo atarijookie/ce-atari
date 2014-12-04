@@ -158,8 +158,6 @@ void ICMP_discard (IP_DGRAM *dgram)
 
 void icmp_processData(uint32 bytesToReadIcmp)
 {
-    IP_DGRAM *pDgram;
-
     bytesToReadIcmp = (bytesToReadIcmp <= DMA_BUFFER_SIZE) ? bytesToReadIcmp : DMA_BUFFER_SIZE;     // will the whole data fit in out DMA buffer? If not, make it shorter
     
     DWORD sectors = bytesToReadIcmp / 512;                      // calculate how many sectors we need for the whole transfer
@@ -188,12 +186,12 @@ void icmp_processData(uint32 bytesToReadIcmp)
         
         pBfr += 2;                                              // advance to block of data beyond the count
 
-        pDgram              = (IP_DGRAM *) pBfr;                // first 48 bytes will be the structure IP_DGRAM, then pkt_data, then port_desc
-        pDgram->pkt_data    = (void *) pBfr + 48;
-        pDgram->pkt_length  = (cnt > 48) ? (cnt - 48) : 0;      // got more data than just the header? calculate how many data we have, otherwise just return 0
-        pDgram->next        = NULL;                             // there's no other packet queued to this one
+        // pBfr now points to the Dgram structure, but we won't access it as a structure because of different gcc vs Pure C packing
+        storeDword(pBfr + 26, (DWORD) (pBfr + 48));             // store data pointer - right after the header
+        storeWord (pBfr + 30, (cnt > 48) ? (cnt - 48) : 0);     // got more data than just the header? calculate how many data we have, otherwise just return 0
+        storeDword(pBfr + 44, 0);                               // store NEXT pointer - no next
         
-        passDatagramToAllHandlers(pDgram);                      // now pass the datagram to all handlers
+        passDatagramToAllHandlers((IP_DGRAM *) pBfr);           // now pass the datagram to all handlers
         
         pBfr += cnt;                                            // advance to the next count of data
     }

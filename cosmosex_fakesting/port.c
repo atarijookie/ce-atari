@@ -25,6 +25,8 @@ extern int32 _pbase;
 PORT    my_port   = {  "Internal", L_INTERNAL, TRUE, 0L, LOOPBACK, 0xffffffffUL, 32768, 32768, 0L, NULL, 0L, NULL, 0, NULL, NULL   };
 DRIVER  my_driver = {  my_set_state, my_cntrl, NULL, NULL, "Internal", "01.00", (M_YEAR << 9) | (M_MONTH << 5) | M_DAY, "Peter Rottengatter", NULL, NULL   };
 
+#pragma message "!!! port.c needs a lot of fixing - PORT * structure is accessed as a structure, this will fail because of gcc alignment !!!"
+
 void  init_ports(void)
 {
    my_driver.basepage   = (BASEPAGE *) _pbase;

@@ -24,4 +24,7 @@ BYTE *storeDword(BYTE *bfr, DWORD value);
 WORD  getWord(BYTE *bfr);
 DWORD getDword(BYTE *bfr);
 
+void showHexByte(int val);
+void showHexDword(DWORD val);
+
 #endif

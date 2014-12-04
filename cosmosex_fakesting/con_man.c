@@ -170,11 +170,11 @@ NDB *CNget_NDB (int16 handle)
         return (NDB *) NULL;
     }
 
-    // setup the NDB structure
-    pNdb->ptr   = (char *) bfr;     // pointer to data
-    pNdb->len   = readCount;        // length of data in buffer
-    pNdb->ndata = NULL;             // pointer to next data to deliver
-    pNdb->next  = NULL;             // next NDB in chain or NULL
+    // setup the NDB structure - but using direct access, as calling code uses different packing than gcc
+    storeDword(((BYTE *)pNdb) +  0, (DWORD) pNdb);          // pointer block start - for free()
+    storeDword(((BYTE *)pNdb) +  4, (DWORD) bfr);           // pointer to data
+    storeWord (((BYTE *)pNdb) +  8, (WORD)  readCount);     // length of data in buffer
+    storeDword(((BYTE *)pNdb) + 10, (DWORD) 0);             // pointer to next NDB
     
     // now do the actual transfer
     DWORD res = 0;
@@ -190,7 +190,7 @@ NDB *CNget_NDB (int16 handle)
         return (NDB *) NULL;
     }
     
-    pNdb->len = res;                                                        // store how many bytes we actually did read
+    storeWord (((BYTE *)pNdb) +  8, (WORD) res);            // store how many bytes we actually did read
     return pNdb;                                                            // return the pointer to NDB structure
 }
 

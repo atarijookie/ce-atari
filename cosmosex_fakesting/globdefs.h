@@ -60,10 +60,10 @@ typedef  unsigned long  uint32;       /* Unsigned 32 bit (longword)         */
  */
 
 typedef  struct ndb {
-    char        *ptr;       /* Pointer to base of block. (For free() ;-)    */
-    char        *ndata;     /* Pointer to next data to deliver              */
-    uint16      len;        /* Length of remaining data.                    */
-    struct ndb  *next;      /* Next NDB in chain or NULL                    */
+    char        *ptr;       /*  +0: Pointer to base of block. (For free() ;-)    */
+    char        *ndata;     /*  +4: Pointer to next data to deliver              */
+    uint16      len;        /*  +8: Length of remaining data.                    */
+    struct ndb  *next;      /* +10: Next NDB in chain or NULL                    */
  } __attribute__((packed)) NDB;
 
 
@@ -102,20 +102,20 @@ typedef struct tcpib {      /* TCP Information Block                        */
  */
 
 typedef struct {
-    unsigned  version   : 4;    /* IP Version                               */
-    unsigned  hd_len    : 4;    /* Internet Header Length                   */
-    unsigned  tos       : 8;    /* Type of Service                          */
-    uint16    length;           /* Total of all header, options and data    */
-    uint16    ident;            /* Identification for fragmentation         */
-    unsigned  reserved  : 1;    /* Reserved : Must be zero                  */
-    unsigned  dont_frg  : 1;    /* Don't fragment flag                      */
-    unsigned  more_frg  : 1;    /* More fragments flag                      */
-    unsigned  frag_ofst : 13;   /* Fragment offset                          */
-    uint8     ttl;              /* Time to live                             */
-    uint8     protocol;         /* Protocol                                 */
-    uint16    hdr_chksum;       /* Header checksum                          */
-    uint32    ip_src;           /* Source IP address                        */
-    uint32    ip_dest;          /* Destination IP address                   */
+    unsigned  version   : 4;    /*  +0: IP Version                               */
+    unsigned  hd_len    : 4;    /*      Internet Header Length                   */
+    unsigned  tos       : 8;    /*  +1: Type of Service                          */
+    uint16    length;           /*  +2: Total of all header, options and data    */
+    uint16    ident;            /*  +4: Identification for fragmentation         */
+    unsigned  reserved  : 1;    /*  +6: Reserved : Must be zero                  */
+    unsigned  dont_frg  : 1;    /*      Don't fragment flag                      */
+    unsigned  more_frg  : 1;    /*      More fragments flag                      */
+    unsigned  frag_ofst : 13;   /*      Fragment offset                          */
+    uint8     ttl;              /*  +8: Time to live                             */
+    uint8     protocol;         /*  +9: Protocol                                 */
+    uint16    hdr_chksum;       /* +10: Header checksum                          */
+    uint32    ip_src;           /* +12: Source IP address                        */
+    uint32    ip_dest;          /* +16: Destination IP address                   */
  } __attribute__((packed)) IP_HDR;
 
 
@@ -124,15 +124,15 @@ typedef struct {
  */
 
 typedef  struct ip_packet {
-    IP_HDR    hdr;              /* Header of IP packet                      */
-    void      *options;         /* Options data block                       */
-    int16     opt_length;       /* Length of options data block             */
-    void      *pkt_data;        /* IP packet data block                     */
-    int16     pkt_length;       /* Length of IP packet data block           */
-    uint32    timeout;          /* Timeout of packet life                   */
-    uint32    ip_gateway;       /* Gateway for forwarding this packet       */
-    struct port_desc  *recvd;   /* Receiving port                           */
-    struct ip_packet  *next;    /* Next IP packet in IP packet queue        */
+    IP_HDR    hdr;              /*  +0: Header of IP packet                      */
+    void      *options;         /* +20: Options data block                       */
+    int16     opt_length;       /* +24: Length of options data block             */
+    void      *pkt_data;        /* +26: IP packet data block                     */
+    int16     pkt_length;       /* +30: Length of IP packet data block           */
+    uint32    timeout;          /* +32: Timeout of packet life                   */
+    uint32    ip_gateway;       /* +36: Gateway for forwarding this packet       */
+    struct port_desc  *recvd;   /* +40: Receiving port                           */
+    struct ip_packet  *next;    /* +44: Next IP packet in IP packet queue        */
  } __attribute__((packed)) IP_DGRAM;
 
 

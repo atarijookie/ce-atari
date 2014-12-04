@@ -156,8 +156,7 @@ int16 TCP_info(int16 handle, TCPIB *tcp_info)
         return E_BADHANDLE;
     }
     
-    tcp_info->state = conInfo[handle].tcpConnectionState;       // return the connection state
-    
+    storeWord((BYTE *) tcp_info, conInfo[handle].tcpConnectionState);       // return the connection state
     return E_NORMAL;
 }
 
