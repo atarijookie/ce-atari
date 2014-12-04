@@ -290,3 +290,40 @@ void showHexDword(DWORD val)
     showHexByte(d);
 }
 
+WORD getWordByByteOffset(void *base, int ofs)
+{
+    BYTE *pByte     = (BYTE *) base;
+    WORD *pWord     = (WORD *) (pByte + ofs);
+    WORD val        = *pWord;
+    return val;
+}
+
+DWORD getDwordByByteOffset(void *base, int ofs)
+{
+    BYTE  *pByte    = (BYTE  *)  base;
+    DWORD *pDword   = (DWORD *) (pByte + ofs);
+    DWORD val       = *pDword;     
+    return val;
+}
+
+void *getVoidpByByteOffset(void *base, int ofs)
+{
+    void *p = (void *) getDwordByByteOffset(base, ofs);
+    return p;
+}
+
+
+void setWordByByteOffset(void *base, int ofs, WORD val)
+{
+    BYTE *pByte  = (BYTE *)  base;
+    WORD *pWord     = (WORD *) (pByte + ofs);
+    *pWord          = val;
+}
+
+void setDwordByByteOffset(void *base, int ofs, DWORD val)
+{
+    BYTE *pByte     = (BYTE *) base;
+    DWORD *pDword   = (DWORD *) (pByte + ofs);
+    *pDword         = val;
+}
+

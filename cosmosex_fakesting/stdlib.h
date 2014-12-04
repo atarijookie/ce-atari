@@ -27,4 +27,10 @@ DWORD getDword(BYTE *bfr);
 void showHexByte(int val);
 void showHexDword(DWORD val);
 
+WORD   getWordByByteOffset (void *base, int ofs);
+DWORD  getDwordByByteOffset(void *base, int ofs);
+void  *getVoidpByByteOffset(void *base, int ofs);
+void   setWordByByteOffset (void *base, int ofs, WORD val);
+void   setDwordByByteOffset(void *base, int ofs, DWORD val);
+
 #endif

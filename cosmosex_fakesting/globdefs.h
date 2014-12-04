@@ -170,23 +170,38 @@ typedef  struct {
  */
 
 typedef  struct port_desc {
-    char      *name;            /* Name of port                             */
-    int16     type;             /* Type of port                             */
-    int16     active;           /* Flag for port active or not              */
-    uint32    flags;            /* Type dependent operational flags         */
-    uint32    ip_addr;          /* IP address of this network adapter       */
-    uint32    sub_mask;         /* Subnet mask of attached network          */
-    int16     mtu;              /* Maximum packet size to go through        */
-    int16     max_mtu;          /* Maximum allowed value for mtu            */
-    int32     stat_sd_data;     /* Statistics of sent data                  */
-    IP_DGRAM  *send;            /* Link to first entry in send queue        */
-    int32     stat_rcv_data;    /* Statistics of received data              */
-    IP_DGRAM  *receive;         /* Link to first entry in receive queue     */
-    int16     stat_dropped;     /* Statistics of dropped datagrams          */
-    struct drv_desc   *driver;  /* Driver program to handle this port       */
-    struct port_desc  *next;    /* Next port in port chain                  */
+    char      *name;            /*  +0: Name of port                             */
+    int16     type;             /*  +4: Type of port                             */
+    int16     active;           /*  +6: Flag for port active or not              */
+    uint32    flags;            /*  +8: Type dependent operational flags         */
+    uint32    ip_addr;          /* +12: IP address of this network adapter       */
+    uint32    sub_mask;         /* +16: Subnet mask of attached network          */
+    int16     mtu;              /* +20: Maximum packet size to go through        */
+    int16     max_mtu;          /* +22: Maximum allowed value for mtu            */
+    int32     stat_sd_data;     /* +24: Statistics of sent data                  */
+    IP_DGRAM  *send;            /* +28: Link to first entry in send queue        */
+    int32     stat_rcv_data;    /* +32: Statistics of received data              */
+    IP_DGRAM  *receive;         /* +36: Link to first entry in receive queue     */
+    int16     stat_dropped;     /* +40: Statistics of dropped datagrams          */
+    struct drv_desc   *driver;  /* +42: Driver program to handle this port       */
+    struct port_desc  *next;    /* +46: Next port in port chain                  */
  } __attribute__((packed)) PORT;
 
+#define PO_name             0
+#define PO_type             4
+#define PO_active           6
+#define PO_flags            8
+#define PO_ip_addr          12
+#define PO_sub_mask         16
+#define PO_mtu              20
+#define PO_max_mtu          22
+#define PO_stat_sd_data     24
+#define PO_send             28
+#define PO_stat_rcv_data    32
+#define PO_receive          36
+#define PO_stat_dropped     40
+#define PO_driver           42
+#define PO_next             46
 
 /*
  *   Link Type Definitions.
@@ -380,11 +395,14 @@ typedef  struct {
  */
 
 typedef  struct {
-    PORT    *opaque;            /* PORT for current name                    */
-    int16   name_len;           /* Length of port name buffer               */
-    char    *port_name;         /* Buffer address                           */
+    PORT    *opaque;            /* +0: PORT for current name                    */
+    int16   name_len;           /* +4: Length of port name buffer               */
+    char    *port_name;         /* +6: Buffer address                           */
  } __attribute__((packed)) PNTA;
 
+#define PO_opaque       0
+#define PO_name_len     4 
+#define PO_port_name    6
 
 #define  CTL_KERN_FIRST_PORT    ('K' << 8 | 'F')    /* Query first port     */
 #define  CTL_KERN_NEXT_PORT     ('K' << 8 | 'N')    /* Query following port */
@@ -526,6 +544,7 @@ typedef struct {
 #define getWordFromSP()   ({  WORD a = (WORD)   *(( WORD *) sp);    sp += 2;    a; })
 #define getByteFromSP()   ({  BYTE a = (BYTE)   *(( BYTE *) sp);    sp += 2;    a; })
 #define getVoidPFromSP()  ({ void *p = (void *) *((DWORD *) sp);    sp += 4;    p; })
+
 /*--------------------------------------------------------------------------*/
 
 #endif
