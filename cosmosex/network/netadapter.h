@@ -103,11 +103,13 @@ public:
     void setIcmpHeader(int type, int code, int id, int sequence) {
         icmp->type              = type;
         icmp->code              = code;
-        icmp->un.echo.id        = id;
-        icmp->un.echo.sequence  = sequence;
+        icmp->un.echo.id        = htons(id);
+        icmp->un.echo.sequence  = htons(sequence);
 
         icmp->checksum = 0;                                                 // first set checksum to zero
         icmp->checksum = checksum((WORD *) icmp, sizeof(struct icmphdr));   // then calculate real checksum and store it
+        
+        echoId = id;
     }
 
     static WORD checksum(WORD *addr, int len) {
@@ -138,6 +140,8 @@ public:
     struct iphdr*   ip;
     struct icmphdr* icmp;
     BYTE*           data;
+    
+    WORD            echoId;
 };
 
 //-------------------------------------

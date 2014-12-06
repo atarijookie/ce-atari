@@ -946,6 +946,8 @@ void NetAdapter::icmpGetDgrams(void)
             break;
         }
 
+        Utils::storeWord(dgrams[index].data + 52, rawSockHeads.echoId);                     // fake this ECHO ID, because linux replaced the ECHO ID when sending ECHO packet
+        
         dataTrans->addDataWord(dgrams[index].count);                                        // add size of this dgram
         dataTrans->addDataBfr((BYTE *) dgrams[index].data, dgrams[index].count, false);     // add the dgram
         
