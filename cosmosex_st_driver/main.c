@@ -418,7 +418,7 @@ void showInt(int value, int length)
 
 void showNetworkIPs(void)
 {
-    if(netConfig[0] == 0 && netConfig[1] == 0) {                // no interface up?
+    if(netConfig[0] == 0 && netConfig[5] == 0) {                // no interface up?
         (void) Cconws("No working network interface.\n\r");
         return;
     }
