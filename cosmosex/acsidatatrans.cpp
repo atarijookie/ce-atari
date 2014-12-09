@@ -125,12 +125,12 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
         return false;
     }
 
+    dataDirection = DATA_DIRECTION_WRITE;                   // let the higher function know that we've done data write -- 130 048 Bytes
+
 #if defined(ONPC_HIGHLEVEL)
     memcpy(data, recvBuffer, cnt);
     return true;
 #endif
-
-    dataDirection = DATA_DIRECTION_WRITE;                   // let the higher function know that we've done data write -- 130 048 Bytes
 
     // first send the command and tell Hans that we need WRITE data
     BYTE devCommand[COMMAND_SIZE];
@@ -219,6 +219,12 @@ void AcsiDataTrans::sendDataAndStatus(void)
         Debug::out(LOG_ERROR, "AcsiDataTrans::sendDataAndStatus -- no communication object, fail!");
         return;
     }
+    
+#if defined(ONPC_HIGHLEVEL) 
+    if((sockReadNotWrite == 0 && dataDirection != DATA_DIRECTION_WRITE) || (sockReadNotWrite != 0 && dataDirection == DATA_DIRECTION_WRITE)) {
+        Debug::out(LOG_ERROR, "!!!!!!!!! AcsiDataTrans::sendDataAndStatus -- DATA DIRECTION DISCREPANCY !!!!! sockReadNotWrite: %d, dataDirection: %d", sockReadNotWrite, dataDirection);
+    }
+#endif    
 
     // for DATA write transmit just the status in a different way (on separate ATN)
     if(dataDirection == DATA_DIRECTION_WRITE) {
@@ -229,7 +235,24 @@ void AcsiDataTrans::sendDataAndStatus(void)
     if(count == 0 && !statusWasSet) {       // if no data was added and no status was set, nothing to send then
         return;
     }
+	//---------------------------------------
+#if defined(ONPC_HIGHLEVEL)
+    if(dataDirection == DATA_DIRECTION_READ) {
+        // ACSI READ - send (write) data to other side, and also status
+        if(count < sockByteCount) {
+            count = sockByteCount;
+        }
 
+//        Debug::out(LOG_ERROR, "AcsiDataTrans::sendDataAndStatus -- sending %d bytes and status %02x", count, status);
+//        Debug::out(LOG_DEBUG, "AcsiDataTrans::sendDataAndStatus -- %02x %02x %02x %02x %02x %02x %02x %02x ", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7]);
+    
+        BYTE padding = 0xff;
+        serverSocket_write(&padding, 1);
+        serverSocket_write(buffer, count);
+        serverSocket_write(&status, 1);
+        return;
+    }
+#endif
 	//---------------------------------------
 	if(dumpNextData) {
 		Debug::out(LOG_DEBUG, "sendDataAndStatus: %d bytes", count);
@@ -263,17 +286,6 @@ void AcsiDataTrans::sendDataAndStatus(void)
 		
 		dumpNextData = false;
 	}
-	//---------------------------------------
-#if defined(ONPC_HIGHLEVEL)
-    // ACSI READ - send (write) data to other side, and also status
-    if(count < sockByteCount) {
-        count = sockByteCount;
-    }
-    
-    serverSocket_write(buffer, count);
-    serverSocket_write(&status, 1);
-    return;
-#endif
 	//---------------------------------------
     // first send the command
     BYTE devCommand[COMMAND_SIZE];
@@ -319,7 +331,9 @@ void AcsiDataTrans::sendDataAndStatus(void)
 
 void AcsiDataTrans::sendStatusAfterWrite(void)
 {
-#if defined(ONPC_HIGHLEVEL)
+#if defined(ONPC_HIGHLEVEL)        
+//    Debug::out(LOG_ERROR, "AcsiDataTrans::sendStatusAfterWrite -- sending status %02x", status);
+
     serverSocket_write(&status, 1);
 #else
 	BYTE inBuf[8];

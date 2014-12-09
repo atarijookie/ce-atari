@@ -102,6 +102,8 @@ int sockWrite(int fd, unsigned char *bfr, int len)
     ssize_t n;
     n = write(fd, bfr, len);
 
+//    Debug::out(LOG_DEBUG, "sockWrite: sending %d bytes\n", len);
+
     if(n != len) {
         Debug::out(LOG_DEBUG, "sockWrite: sending failed...\n");
     }
@@ -113,6 +115,8 @@ int sockRead(int fd, unsigned char *bfr, int len)
 {
     ssize_t n;
     n = read(fd, bfr, len);                                // read data
+
+//    Debug::out(LOG_DEBUG, "sockRead: receiving %d bytes\n", len);
 
     if(n == 0 && fd == serverConnectSockFd) {               // for server socket, when read returns 0, the client has quit
         close(serverConnectSockFd);
@@ -232,6 +236,8 @@ bool gotCmd(void)
 
     sockByteCount = header[15];                     // read how many bytes we need to transfer
     sockByteCount = sockByteCount * 512;            // convert sectors to bytes
+
+//    Debug::out(LOG_DEBUG, "gotCmd - got header (16 bytes), sockByteCount: %d, sockReadNotWrite: %d", sockByteCount, sockReadNotWrite);
 
     if(sockReadNotWrite == 0) {                     // on write - read data from ST, on read - we first have to process the command
         res = serverSocket_read(bufferWrite, sockByteCount);

@@ -310,6 +310,8 @@ void CCoreThread::handleAcsiCommand(void)
 {
     #define CMD_SIZE    14
 
+    Debug::out(LOG_DEBUG, "\n");
+    
     BYTE bufOut[CMD_SIZE];
     BYTE bufIn[CMD_SIZE];
 

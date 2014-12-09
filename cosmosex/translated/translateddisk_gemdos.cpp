@@ -27,7 +27,7 @@ void TranslatedDisk::onDsetdrv(BYTE *cmd)
     int newDrive = cmd[5];
 
     if(newDrive > 15) {                             // drive number out of range? not handled
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetdrv -- new drive index: %d -> out of range, FAIL", newDrive);
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetdrv -- new drive index: %d (letter %c) -> out of range, FAIL", newDrive, newDrive + 'A');
 
         dataTrans->setStatus(E_NOTHANDLED);
         return;
@@ -37,13 +37,18 @@ void TranslatedDisk::onDsetdrv(BYTE *cmd)
         currentDriveLetter  = 'A' + newDrive;       // store the current drive
         currentDriveIndex   = newDrive;
 
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetdrv -- new drive index: %d -> it's a floppy, not handled, current drive changed", newDrive);
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetdrv -- new drive index: %d (letter %c) -> it's a floppy, not handled, current drive changed", newDrive, currentDriveLetter);
 
         dataTrans->setStatus(E_NOTHANDLED);
         return;
     }
 
     if(conf[newDrive].enabled) {                    // if that drive is enabled in cosmosEx
+        bool changed = false;
+        if(currentDriveIndex != newDrive) {         // if the previous drive was different, mark that really changed
+            changed = true;
+        }
+    
         currentDriveLetter  = 'A' + newDrive;       // store the current drive
         currentDriveIndex   = newDrive;
 
@@ -51,13 +56,13 @@ void TranslatedDisk::onDsetdrv(BYTE *cmd)
         dataTrans->addDataWord(drives);             // return the drives in data
         dataTrans->padDataToMul16();                // and pad to 16 bytes for DMA chip
 
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetdrv -- new drive index: %d -> is enabled, current drive changed", newDrive);
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetdrv -- new drive index: %d (letter %c) -> is enabled, current drive: %s", newDrive, currentDriveLetter, (changed ? "really changed" : "was already it, not changed"));
 
         dataTrans->setStatus(E_OK);                 // return OK
         return;
     }
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetdrv -- new drive index: %d -> not handled", newDrive);
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetdrv -- new drive index: %d (letter %c) -> not handled", newDrive, newDrive + 'A');
     dataTrans->setStatus(E_NOTHANDLED);             // in other cases - not handled
 }
 
@@ -841,6 +846,14 @@ void TranslatedDisk::onFclose(BYTE *cmd)
         dataTrans->setStatus(E_NOTHANDLED);
         return;
     }
+    
+    bool res = dataTrans->recvData(dataBuffer, 16);                 // get data from Hans -- this is now here just to tell the whole software chain that this is a DMA WRITE operation (no real data needed)
+
+    if(!res) {                                                      // failed to get data? internal error!
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFclose - failed to receive data...");
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFclose - closing handle %d (index %d)", handle, index);
 
@@ -1147,6 +1160,22 @@ void TranslatedDisk::onDrvMap(BYTE *cmd)
 {
     WORD drives = getDrivesBitmap();
 
+    if(g_logLevel >= LOG_DEBUG) {
+        char tmp2[3];
+        memset(tmp2, 0, 3);
+
+        char tmp[128];
+        strcpy(tmp, (char *) "TranslatedDisk::onDrvMap -- translated drives: ");
+        for(int i=2; i<16; i++) {
+            if(drives & (1 << i)) {
+                tmp2[0] = 'A' + i;
+                strcat(tmp, tmp2);
+            }
+        }
+
+        Debug::out(LOG_DEBUG, tmp);
+    }
+    
     dataTrans->addDataWord(drives);         // drive bits
     dataTrans->padDataToMul16();            // pad to multiple of 16
 
