@@ -119,8 +119,12 @@ int sockRead(int fd, unsigned char *bfr, int len)
 //    Debug::out(LOG_DEBUG, "sockRead: receiving %d bytes\n", len);
 
     if(n == 0 && fd == serverConnectSockFd) {               // for server socket, when read returns 0, the client has quit
+        Debug::out(LOG_DEBUG, "sockRead: closing socked\n");
+        
         close(serverConnectSockFd);
         serverConnectSockFd = -1;
+        
+        return 0;
     }
 
     if(n != len) {
@@ -237,19 +241,52 @@ bool gotCmd(void)
     sockByteCount = header[15];                     // read how many bytes we need to transfer
     sockByteCount = sockByteCount * 512;            // convert sectors to bytes
 
-//    Debug::out(LOG_DEBUG, "gotCmd - got header (16 bytes), sockByteCount: %d, sockReadNotWrite: %d", sockByteCount, sockReadNotWrite);
+    Debug::out(LOG_DEBUG, "gotCmd - got header (16 bytes)[%02x %02x %02x %02x %02x %02x], sockByteCount: %d, sockReadNotWrite: %d", header[0], header[1], header[2], header[3], header[4], header[5], sockByteCount, sockReadNotWrite);
 
     if(sockReadNotWrite == 0) {                     // on write - read data from ST, on read - we first have to process the command
+        memset(bufferWrite, 0, sockByteCount);
+        
         res = serverSocket_read(bufferWrite, sockByteCount);
 
         if(res != (int) sockByteCount) {
             Debug::out(LOG_DEBUG, "gotCmd - res != sockByteCount -- %d != %d", res, sockByteCount);
             return false;
         }
+        
+        // now calculate and verify checksum
+        WORD sum = dataChecksum(bufferWrite, sockByteCount);
+        
+        WORD cs = 0;
+        res = serverSocket_read((BYTE *) &cs, 2);
+        
+        if(res != 2) {          // didn't receive data? 
+            Debug::out(LOG_DEBUG, "gotCmd - failed to get checksum!");
+        }
+        
+        if(cs != sum) {         // checksum mismatch? 
+            Debug::out(LOG_DEBUG, "gotCmd - checksum fail -- %04x != %04x", cs, sum);
+            BYTE *p = bufferWrite;
+            Debug::out(LOG_DEBUG, "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x", p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9]);
+        } else {                // checksum ok?
+//            Debug::out(LOG_DEBUG, "gotCmd - checksum good");
+        }
     } 
     
     return true;
 }
 
-
+WORD dataChecksum(BYTE *data, int byteCount)
+{
+    int i;
+    WORD sum = 0;
+    WORD *wp = (WORD *) data;
+    WORD wordCount = byteCount/2;
+        
+    for(i=0; i<wordCount; i++) {                // calculate checksum
+        sum += *wp;
+        wp++;
+    }
+    
+    return sum;
+}
 

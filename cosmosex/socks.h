@@ -19,6 +19,7 @@ void serverSocket_setParams(int serverPort);                        // set conne
 int  serverSocket_write(unsigned char *bfr, int len);               // params: pointer to buffer, length of data to send. Returns length of sent data.
 int  serverSocket_read(unsigned char *bfr, int len);                // params: pointer to buffer, maximum received length. Returns length of read data.
 
+WORD dataChecksum(BYTE *data, int byteCount);
 bool gotCmd(void);
 
 #endif

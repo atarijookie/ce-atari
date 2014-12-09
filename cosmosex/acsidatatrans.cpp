@@ -249,6 +249,10 @@ void AcsiDataTrans::sendDataAndStatus(void)
         BYTE padding = 0xff;
         serverSocket_write(&padding, 1);
         serverSocket_write(buffer, count);
+        
+        WORD sum = dataChecksum(buffer, count);     // calculate and send checksum
+        serverSocket_write((BYTE *) &sum, 2);
+        
         serverSocket_write(&status, 1);
         return;
     }
