@@ -53,6 +53,7 @@ BYTE cmd[24];
 
 void handleCmd(BYTE *cmd, DWORD addr, bool readNotWrite, int sectorCount, struct pastiIOINFO *pio);
 void dumpPio(int mode, struct pastiIOINFO *pio);
+WORD dataChecksum(BYTE *data, int byteCount);
 
 BOOL haveReadXfer;
 pastiDMAXFERINFO xferInfoRead;
@@ -382,12 +383,32 @@ void handleCmd(BYTE *cmd, DWORD addr, bool readNotWrite, int sectorCount, struct
 		sprintf(tmp, "xferBuf - %02x %02x %02x %02x %02x %02x %02x %02x ...\n", p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
 		log(tmp);
 
+		WORD csReceived, csCalculated;
+		clientSocket_read((BYTE *) &csReceived, 2);
+		csCalculated = dataChecksum(xferInfoRead.xferBuf, byteCount);
+
+		if(csReceived != csCalculated) {
+			log("READ - checksum fail!\n");
+		} else {
+//			log("READ - checksum good\n");
+		}
+
 		haveReadXfer = TRUE;
 	} else {								// on WRITE
-		sprintf(tmp, "handleCmd - WRITE:%02x %02x %02x %02x %02x %02x - byteCount: %d\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], byteCount);
+		sprintf(tmp, "handleCmd - WRITE: %02x %02x %02x %02x %02x %02x - byteCount: %d\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], byteCount);
 		log(tmp);
 
+		//BYTE *p = xferInfoWrite.xferBuf;
+		//sprintf(tmp, "data      -       %02x %02x %02x %02x %02x %02x\n", p[0], p[1], p[2], p[3], p[4], p[5]);
+		//log(tmp);
+
 		clientSocket_write(xferInfoWrite.xferBuf, byteCount);			// send the data	
+
+		WORD csCalculated = dataChecksum(xferInfoWrite.xferBuf, byteCount);
+		clientSocket_write((BYTE *) &csCalculated, 2);					
+
+		//sprintf(tmp, "checksum  - %04x\n",csCalculated);
+		//log(tmp);
 	}
 
 	//------------
@@ -399,6 +420,21 @@ void handleCmd(BYTE *cmd, DWORD addr, bool readNotWrite, int sectorCount, struct
 	log(tmp);
 
 	statusByte = inBuf;
+}
+
+WORD dataChecksum(BYTE *data, int byteCount)
+{
+    int i;
+    WORD sum = 0;
+    WORD *wp = (WORD *) data;
+    WORD wordCount = byteCount/2;
+
+    for(i=0; i<wordCount; i++) {                // calculate checksum
+		sum += *wp;
+        wp++;
+    }
+    
+    return sum;
 }
 
 CE_PASTI_API BOOL pastiWritePorta( unsigned data, long cycles)
