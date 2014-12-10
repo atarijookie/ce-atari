@@ -98,9 +98,9 @@ int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
             }
         }
     
-        // if the wanted state is CONNECTING or CONNECTED, and the current state is similar - success
-        if(wantedState == TSYN_SENT || wantedState == TSYN_RECV || wantedState == TESTABLISH) {
-            if(currentState == TSYN_SENT || currentState == TSYN_RECV || currentState == TESTABLISH) {
+        // if the wanted state is CONNECTING, and the current state is similar - success
+        if(wantedState == TSYN_SENT || wantedState == TSYN_RECV) {
+            if(currentState == TSYN_SENT || currentState == TSYN_RECV) {
                 break;
             }    
         }

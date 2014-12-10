@@ -392,10 +392,6 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
     // send it to host
     BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                                 // if failed, return FALSE 
-		return E_LOSTCARRIER;
-	}
-
     if(handleIsFromCE(res)) {                       // if it's CE handle
         int stHandle = handleCEtoAtari(res);        // convert it to ST handle
 
