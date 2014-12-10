@@ -53,13 +53,25 @@ volatile DWORD icmpDataCount;
 
 int dgram_getEmpty(void) {
     int i; 
-    for(i=0; i<MAX_STING_DGRAMS; i++) {
-        if(dgrams[i].isEmpty()) {
+    DWORD oldestTime    = 0xffffffff;
+    int   oldestIndex   = 0;
+    
+    for(i=0; i<MAX_STING_DGRAMS; i++) {     // try to find empty slot
+        if(dgrams[i].time < oldestTime) {   // found older item than we had found before? store index
+            oldestTime  = dgrams[i].time;
+            oldestIndex = i;
+        }
+    
+        if(dgrams[i].isEmpty()) {           // found empty? return it
             return i;
         }
     }
 
-    return -1;
+    // no empty slot found, clear and return the oldest - to avoid filling up the dgrams array (at the cost of loosing oldest items)
+    Debug::out(LOG_DEBUG, "dgram_getEmpty() - no empty slot, returning oldest slot - #%d", oldestIndex);
+    
+    dgrams[oldestIndex].clear();
+    return oldestIndex;
 }
 
 int dgram_getNonEmpty(void) {
@@ -160,15 +172,10 @@ void resolveNameToIp(TNetReq &tnr)
 
     for(i=0; addr_list[i] != NULL; i++) {                   // now walk through the IP address list
         in_addr ia = *addr_list[i];
-        pIps[cnt] = ia.s_addr;                              // store the current IP
+        pIps[cnt] = ia.s_addr;                              // store the current IP, network order is OK for ST
 
-        BYTE a,b,c,d;
-        a = pIps[cnt] >> 24;
-        b = pIps[cnt] >> 16;
-        c = pIps[cnt] >>  8;
-        d = pIps[cnt];
-        
-        Debug::out(LOG_DEBUG, "resolveNameToIp - gethostbyname() for %s returned IP %d.%d.%d.%d", (char *) tnr.strParam.c_str(), a, b, c, d);
+        BYTE *ip = (BYTE *) &pIps[cnt];
+        Debug::out(LOG_DEBUG, "resolveNameToIp - gethostbyname() for %s returned IP %d.%d.%d.%d", (char *) tnr.strParam.c_str(), (int) ip[0], (int) ip[1], (int) ip[2], (int) ip[3]);
 
         cnt++;
         if(cnt >= (128 / 4)) {                              // if we have the maximum possible IPs we can store, quit
@@ -235,7 +242,8 @@ bool tryIcmpRecv(BYTE *bfr)
 
     TStingDgram *d = &dgrams[i];
     d->clear();
-
+    d->time = Utils::getCurrentMs();
+    
     //-------------
     // fill IP header
     d->data[0] = 0x45;                          // IP ver, IHL
@@ -959,6 +967,9 @@ void NetAdapter::icmpGetDgrams(void)
     dataTrans->addDataWord(0);                          // terminate with a zero, that means no other DGRAM
     dataTrans->padDataToMul16();                        // pad to multiple of 16
 
+    icmpDataCount = dgram_calcIcmpDataCount();
+    Debug::out(LOG_DEBUG, "NetAdapter::icmpGetDgrams -- updated icmpDataCount to %d bytes", icmpDataCount);
+    
     pthread_mutex_unlock(&networkThreadMutex);
     dataTrans->setStatus(E_NORMAL);
 }

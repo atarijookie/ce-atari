@@ -58,15 +58,17 @@ public:
 
     void clear(void) {
         memset(data, 0, STING_DGRAM_MAXSIZE);
-        count = 0;
+        count   = 0;
+        time    = 0;
     }
 
     bool isEmpty(void) {
         return (count == 0);
     }
 
-    BYTE *data;
-    WORD count;
+    BYTE  *data;
+    WORD  count;
+    DWORD time;
 };
 
 //-------------------------------------
