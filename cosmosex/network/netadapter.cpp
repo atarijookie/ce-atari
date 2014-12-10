@@ -504,7 +504,7 @@ void NetAdapter::conOpen(void)
     struct sockaddr_in serv_addr;
     memset(&serv_addr, '0', sizeof(serv_addr)); 
     serv_addr.sin_family        = AF_INET;
-    serv_addr.sin_addr.s_addr   = remoteHost;
+    serv_addr.sin_addr.s_addr   = htonl(remoteHost);
     serv_addr.sin_port          = htons(remotePort); 
 
     if(tcpNotUdp) {                                             // for TCP sockets
@@ -1047,10 +1047,12 @@ void NetAdapter::updateCons(void)
         //---------
         // update how many bytes we can read from this sock
         cons[i].bytesInSocket = howManyWeCanReadFromFd(cons[i].fd);       // try to get how many bytes can be read
-
+        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- cons[%d].bytesInSocket: %d", i, cons[i].bytesInSocket);
+        
         //---------
         // if it's not TCP connection, just pretend the state is 'connected' - it's only used for TCP connections, so it doesn't matter
         if(cons[i].type != TCP) {    
+            Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- non-TCP connection %d -- now TESTABLISH", i);
             cons[i].status = TESTABLISH;
             continue;
         }
@@ -1063,14 +1065,20 @@ void NetAdapter::updateCons(void)
 
             if(res < 0) {                               // error occured on connect, check what it was
                 switch(errno) {
-                    case EALREADY:      cons[i].status = TESTABLISH;    break;  // ok, we're connected!
-                    case EINPROGRESS:   cons[i].status = TSYN_SENT;     break;  // still trying to connect
+                    case EALREADY:      cons[i].status = TESTABLISH;    
+                                        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TESTABLISH", i);
+                                        break;  // ok, we're connected!
+                                        
+                    case EINPROGRESS:   cons[i].status = TSYN_SENT;     
+                                        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TSYN_SENT", i);
+                                        break;  // still trying to connect
 
                      // on failures
                     case ETIMEDOUT:
                     case ENETUNREACH:
                     case ECONNREFUSED:  cons[i].status = TCLOSED;       
                                         cons[i].closeIt();
+                                        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TCLOSED", i);
                                         break; 
                 }
             }
@@ -1080,12 +1088,14 @@ void NetAdapter::updateCons(void)
             res = getsockopt(cons[i].fd, SOL_SOCKET, SO_ERROR, &error, (socklen_t *) &len);
 
             if(res == -1) {                             // getsockopt failed? don't update status
+                Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- getsockopt() failed for connection %d", i);
                 continue;
             }
 
             if(error == 0) {                            // no error? connection good
                 cons[i].status = TESTABLISH;
             } else {                                    // some error? close connection, this will also set the status to closed
+                Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d -- some error, will close!", i);
                 cons[i].closeIt();
             }
         }
