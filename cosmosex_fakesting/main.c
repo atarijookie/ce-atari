@@ -125,7 +125,7 @@ int main()
     install();
     Supexec(install_vbl);
     
-    (void) Cconws("Fake STinG installed...");
+    (void) Cconws("Driver was installed...");
 
     appl_init();                                 // init gem
     sleep(2);
@@ -224,9 +224,7 @@ BYTE ce_findId(void)
 		res = Supexec(ce_identify);  					// try to read the IDENTITY string 
 		
 		if(res == 1) {                           		// if found the CosmosEx 
-			(void) Cconws("\r\nCosmosEx found on ACSI ID: ");
-			bfr[0] = i + '0';
-			(void) Cconws(bfr);
+			(void) Cconws(" <- got it");
 			(void) Cconws("\r\n");
 
 			return 1;
