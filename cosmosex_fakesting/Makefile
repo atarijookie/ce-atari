@@ -7,8 +7,8 @@ PRGFLAGS= m68k-atari-mint-flags
 CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar -nostdlib
 LDFLAGS	= -Wl,--traditional-format -lgcc -lgem -Wl,-Map=output.map
 
-HDR		= acsi.h stdlib.h setup.h tcp.h udp.h con_man.h icmp.h api.h port.h
-CSRC	= acsi.c stdlib.c setup.c tcp.c udp.c con_man.c icmp.c api.c port.c main.c 
+HDR		= acsi.h stdlib.h setup.h tcp.h udp.h con_man.h icmp.h api.h port.h tpl_middle.h 
+CSRC	= acsi.c stdlib.c setup.c tcp.c udp.c con_man.c icmp.c api.c port.c tpl_middle.c main.c 
 SSRC	= vbl.s
 STARTUP	= startup.s
 

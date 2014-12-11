@@ -28,12 +28,6 @@ TConInfo conInfo[MAX_HANDLE];                                                // 
 
 int16 CNkick(int16 handle)
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    handle = getWordFromSP();
-    //------------------------------
-
     update_con_info();                  // update connections info structs (max once per 100 ms)
 
     if(!handle_valid(handle)) {         // we don't have this handle? fail
@@ -45,12 +39,6 @@ int16 CNkick(int16 handle)
 
 CIB *CNgetinfo(int16 handle)
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    handle = getWordFromSP();
-    //------------------------------
-
     if(!handle_valid(handle)) {         // we don't have this handle? fail
         return (CIB *) NULL;
     }
@@ -62,12 +50,6 @@ CIB *CNgetinfo(int16 handle)
 
 int16 CNbyte_count (int16 handle)
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    handle = getWordFromSP();
-    //------------------------------
-
     if(!handle_valid(handle)) {                 // we don't have this handle? fail
         return E_BADHANDLE;
     }
@@ -93,12 +75,6 @@ int16 CNbyte_count (int16 handle)
 // data retrieval functions
 int16 CNget_char(int16 handle)
 {   
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    handle = getWordFromSP();
-    //------------------------------
-
     if(!handle_valid(handle)) {                 // we don't have this handle? fail
         return E_BADHANDLE;
     }
@@ -131,12 +107,6 @@ int16 CNget_char(int16 handle)
 
 NDB *CNget_NDB (int16 handle)
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    handle = getWordFromSP();
-    //------------------------------
-
     if(!handle_valid(handle)) {                                             // we don't have this handle? fail
         return (NDB *) NULL;
     }
@@ -196,14 +166,6 @@ NDB *CNget_NDB (int16 handle)
 
 int16 CNget_block(int16 handle, void *buffer, int16 length)
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    handle  = getWordFromSP();
-    buffer  = getVoidPFromSP();
-    length  = getWordFromSP();
-    //------------------------------
-
     if(!handle_valid(handle)) {                 // we don't have this handle? fail
         return E_BADHANDLE;
     }
@@ -233,15 +195,6 @@ int16 CNget_block(int16 handle, void *buffer, int16 length)
 
 int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    handle      = getWordFromSP();
-    buffer      = getVoidPFromSP();
-    length      = getWordFromSP();
-    delimiter   = getByteFromSP();
-    //------------------------------
-
     if(!handle_valid(handle)) {                                     // we don't have this handle? fail
         return E_BADHANDLE;
     }
@@ -503,15 +456,6 @@ int16 connection_send(int tcpNotUdp, int16 handle, void *buffer, int16 length)
 
 int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    domain      = getVoidPFromSP();
-    real_domain = getVoidPFromSP();
-    ip_list     = getVoidPFromSP();
-    ip_num      = getWordFromSP();
-    //------------------------------
-    
     BYTE res;
     
     commandShort[4] = NET_CMD_RESOLVE;

@@ -117,12 +117,6 @@ void query_chains (PORT **port_ptr, DRIVER **drv_ptr, LAYER **layer_ptr)
 
 char *get_error_text (int16 error_code)
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    error_code = getWordFromSP();
-    //------------------------------
-
     error_code *= -1;
 
     if (error_code < 0 || E_LASTERROR < error_code)
@@ -142,17 +136,6 @@ int16 KRinitialize (int32 size)
    memory->size = size;
 
    return (0);
-}
-
-void *KRmalloc(int32 size)                  // this should be only called from ST apps
-{
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    size = getDwordFromSP();
-    //------------------------------
-
-    return KRmalloc_internal(size);
 }
 
 void *KRmalloc_internal (int32 size)        // this should be only called from this driver
@@ -187,17 +170,6 @@ void *KRmalloc_internal (int32 size)        // this should be only called from t
    lock_exec (status);
 
    return (NULL);
-}
-
-void KRfree(void *mem_block)
-{
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    mem_block = getVoidPFromSP();
-    //------------------------------
-    
-    return KRfree_internal(mem_block);
 }
 
 void KRfree_internal (void *mem_block)
@@ -243,17 +215,6 @@ void KRfree_internal (void *mem_block)
    lock_exec (status);
 }
 
-int32 KRgetfree (int16 block_flag)
-{
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    block_flag = getWordFromSP();
-    //------------------------------
-    
-    return KRgetfree_internal(block_flag);
-}
-
 int32 KRgetfree_internal (int16 block_flag)
 {
    MEM_HDR  *run;
@@ -275,18 +236,6 @@ int32 KRgetfree_internal (int16 block_flag)
    lock_exec (status);
 
    return (((block_flag) ? largest : total) * sizeof (MEM_HDR));
-}
-
-void *KRrealloc (void *mem_block, int32 new_size)
-{
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    mem_block   = getVoidPFromSP();
-    new_size    = getDwordFromSP();
-    //------------------------------
-
-    return KRrealloc_internal(mem_block, new_size);
 }
 
 void *KRrealloc_internal (void *mem_block, int32 new_size)

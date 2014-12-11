@@ -145,26 +145,12 @@ int16 init_cfg (void)
 
 int16 setvstr (char  *name, char  *value)
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    name    = getVoidPFromSP();
-    value   = getVoidPFromSP();
-    //------------------------------
-
     
-    
-    return (TRUE);
+    return TRUE;
 }
 
 char *getvstr (char *name)
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    name = getVoidPFromSP();
-    //------------------------------
-    
 	int i;
 	
 	for(i=0; i<CONFIGVAR_COUNT; i++) {					// search the values

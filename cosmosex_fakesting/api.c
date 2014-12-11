@@ -20,6 +20,7 @@
 #include "con_man.h"
 #include "setup.h"
 #include "port.h"
+#include "tpl_middle.h"
 
 extern int32 _pbase;
 
@@ -32,17 +33,19 @@ int16        set_flag (int16 flag);
 void         clear_flag (int16 flag);
 
 CONFIG      conf;
+
 CLIENT_API  tpl  = { "TRANSPORT_TCPIP", "Jookie", TCP_DRIVER_VERSION, 
-                      KRmalloc, KRfree, KRgetfree, KRrealloc, 
-                      get_error_text, getvstr, carrier_detect, 
-                      TCP_open, TCP_close, TCP_send, TCP_wait_state, TCP_ack_wait, 
-                      UDP_open, UDP_close, UDP_send, 
-                      CNkick, CNbyte_count, CNget_char, CNget_NDB, CNget_block, 
-                      house_keep, resolve, serial_dummy, serial_dummy, 
-                      set_flag, clear_flag, CNgetinfo, 
-                      on_port, off_port, setvstr, query_port, CNgets, 
-                      ICMP_send, ICMP_handler, ICMP_discard, TCP_info, cntrl_port
+                      KRmalloc_mid, KRfree_mid, KRgetfree_mid, KRrealloc_mid, 
+                      get_error_text_mid, getvstr_mid, carrier_detect_mid, 
+                      TCP_open_mid, TCP_close_mid, TCP_send_mid, TCP_wait_state_mid, TCP_ack_wait_mid, 
+                      UDP_open_mid, UDP_close_mid, UDP_send_mid, 
+                      CNkick_mid, CNbyte_count_mid, CNget_char_mid, CNget_NDB_mid, CNget_block_mid, 
+                      house_keep_mid, resolve_mid, serial_dummy_mid, serial_dummy_mid, 
+                      set_flag_mid, clear_flag_mid, CNgetinfo_mid, 
+                      on_port_mid, off_port_mid, setvstr_mid, query_port_mid, CNgets_mid, 
+                      ICMP_send_mid, ICMP_handler_mid, ICMP_discard_mid, TCP_info_mid, cntrl_port_mid
                };
+               
 STX_API     stxl = { "MODULE_LAYER", "Jookie", STX_LAYER_VERSION, 
                       NULL, NULL, NULL, NULL, NULL, 
                       NULL, NULL, NULL, NULL, 
@@ -114,12 +117,6 @@ void house_keep(void)
 
 int16 set_flag(int16 flag)                      // set semaphore
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    flag = getWordFromSP();
-    //------------------------------
-    
     if(flag >= 0 && flag < MAX_SEMAPHOR) {      // valid semaphore number?
         if(semaphors[flag] != 0) {              // It was set ? Return TRUE
             return 1;
@@ -135,12 +132,6 @@ int16 set_flag(int16 flag)                      // set semaphore
 
 void clear_flag(int16 flag)                     // clear semaphore
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    flag = getWordFromSP();
-    //------------------------------
-
     if(flag >= 0 && flag < MAX_SEMAPHOR) {      // valid semaphore number?
         semaphors[flag] = 0;
     }

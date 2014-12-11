@@ -25,37 +25,16 @@
 
 int16 UDP_open (uint32 rem_host, uint16 rem_port)
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    rem_host    = getDwordFromSP();
-    rem_port    = getWordFromSP();
-    //------------------------------
-    
     return connection_open(0, rem_host, rem_port, 0, 0);
 }
 
 int16 UDP_close (int16 handle)
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    handle      = getWordFromSP();
-    //------------------------------
-    
     return connection_close(0, handle, 0, NULL);
 }
 
 int16 UDP_send(int16 handle, void *buffer, int16 length)
 {
-    //------------------------------
-    // retrieve real params from stack
-    getStackPointer();
-    handle      = getWordFromSP();
-    buffer      = getVoidPFromSP();
-    length      = getWordFromSP();
-    //------------------------------
-    
     return connection_send(0, handle, buffer, length);
 }
 
