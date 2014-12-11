@@ -191,6 +191,8 @@ CE_PASTI_API BOOL pastiIo( int mode, struct pastiIOINFO *pio)
 		pModeStr = mode_str[3];
 	}
 
+//	dumpPio(mode,pio);
+
 	//////////////////////////
 	// log calls, expect PASTI_IOUPD
 	if(mode != PASTI_IOUPD) {
@@ -239,29 +241,41 @@ CE_PASTI_API BOOL pastiIo( int mode, struct pastiIOINFO *pio)
 
 			if(pio->addr == dmaAddrSectCnt && selectedRegister == SC_REG) {				// write to SC_REG - setting sector count for DMA chip before transfer
 				sectorCount = pio->data;
+//>log("Sector set\n");
 			}
 
 			if(pio->addr == dmaAddrHi) {												// setting DMA hi address
 				hi = pio->data;
+//>log("DMA high\n");
 			}
 
 			if(pio->addr == dmaAddrMid) {												// setting DMA mid address
 				mid = pio->data;
+//>log("DMA mid\n");
 			}
 
 			if(pio->addr == dmaAddrLo) {												// setting DMA lo address
 				lo = pio->data;
+//>log("DMA low\n");
 			}
 		}
 	
 	}
 
-	if((mode == PASTI_IOWRITE || mode == PASTI_IOREAD) && selectedRegister == HDC) {	// read or write to ACSI bus resets INT back to inactive state
-		if(pio->addr == dmaAddrData) {						
+	//////////////////////////
+	/* Pasti seems to know best in irq matters - resetting brings timeout hell
+	if ((mode == PASTI_IOWRITE || mode == PASTI_IOREAD) && selectedRegister == HDC) {	// read or write to ACSI bus resets INT back to inactive state
+		if (pio->addr == dmaAddrData) {
 			intrqState = 0;
 		}
 	}
-	//////////////////////////
+	*/
+
+	//FIXME:we really shouldn't work with 0 sectors
+	//this means we are missing some sector count writes above
+	if( sectorCount==0 ){
+		sectorCount=1;
+	}
 
 	if(origFuncs.Io != NULL) {
 		BOOL res = origFuncs.Io(mode, pio);
@@ -298,9 +312,14 @@ CE_PASTI_API BOOL pastiIo( int mode, struct pastiIOINFO *pio)
 			pio->xferInfo.xferBuf		= xferInfoWrite.xferBuf;
 			pio->xferInfo.xferLen		= ((int) sectorCount) * 512;
 			pio->xferInfo.xferSTaddr	= dmaAddr;
+			pio->intrqState = 1;
 		}
 
-		if(mode == PASTI_IOUPD && haveReadXfer) {											// if we should send 
+		//just a test for an immediate response; response on IOUPD seems to hang in certain cases
+		if (mode == PASTI_IOUPD ) {											// if we should send #
+			pio->intrqState = 1;
+		}
+		if (haveReadXfer) {											// if we should send #
 			haveReadXfer				= false;
 
 			pio->haveXfer				= true;
@@ -310,10 +329,12 @@ CE_PASTI_API BOOL pastiIo( int mode, struct pastiIOINFO *pio)
 			pio->xferInfo.xferBuf		= xferInfoRead.xferBuf;
 			pio->xferInfo.xferLen		= ((int) sectorCount) * 512;
 			pio->xferInfo.xferSTaddr	= dmaAddr;
+			//intrqState = 1;
+			pio->intrqState = 1;
 		}
+		//pio->intrqState = intrqState;
 
-//		pio->intrqState = intrqState;
-
+		//>	dumpPio(mode,pio);
 		cntr++;
 		return res;
 	} else {
@@ -358,13 +379,17 @@ void handleCmd(BYTE *cmd, DWORD addr, bool readNotWrite, int sectorCount, struct
 	int byteCount = sectorCount * 512;
 
 	if(readNotWrite) {						// on READ
-		sprintf(tmp, "handleCmd - READ: %02x %02x %02x %02x %02x %02x - byteCount: %d\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], byteCount);
+		sprintf(tmp, "handleCmd - READ: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x - byteCount: %d\n", 
+			cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11], byteCount);
 		log(tmp);
 
 		int skip = 0;
 		while(1) {
 			BYTE a = 0;
-			clientSocket_read(&a, 1);
+			if (!clientSocket_read(&a, 1)){
+				statusByte = 0xff;
+				return;
+			}
 
 			if(a == 0xff) {
 				break;
@@ -377,7 +402,10 @@ void handleCmd(BYTE *cmd, DWORD addr, bool readNotWrite, int sectorCount, struct
 			log(tmp);
 		}
 
-		clientSocket_read(xferInfoRead.xferBuf, byteCount);				// receive the data	
+		if (!clientSocket_read(xferInfoRead.xferBuf, byteCount)){
+			statusByte = 0xff;
+			return;
+		}
 		BYTE *p = xferInfoRead.xferBuf;
 
 		sprintf(tmp, "xferBuf - %02x %02x %02x %02x %02x %02x %02x %02x ...\n", p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
@@ -395,12 +423,13 @@ void handleCmd(BYTE *cmd, DWORD addr, bool readNotWrite, int sectorCount, struct
 
 		haveReadXfer = TRUE;
 	} else {								// on WRITE
-		sprintf(tmp, "handleCmd - WRITE: %02x %02x %02x %02x %02x %02x - byteCount: %d\n", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], byteCount);
+		sprintf(tmp, "handleCmd - WRITE: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x - byteCount: %d\n", 
+			cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11], byteCount);
 		log(tmp);
 
-		//BYTE *p = xferInfoWrite.xferBuf;
-		//sprintf(tmp, "data      -       %02x %02x %02x %02x %02x %02x\n", p[0], p[1], p[2], p[3], p[4], p[5]);
-		//log(tmp);
+		BYTE *p = xferInfoWrite.xferBuf;
+		sprintf(tmp, "data      -       %02x %02x %02x %02x %02x %02x\n", p[0], p[1], p[2], p[3], p[4], p[5]);
+		log(tmp);
 
 		clientSocket_write(xferInfoWrite.xferBuf, byteCount);			// send the data	
 
@@ -507,7 +536,7 @@ CE_PASTI_API BOOL pastiGetBootSector( int drive, struct pastiBOOTSECTINFO *pbsi)
 
 CE_PASTI_API BOOL pastiPeek( struct pastiPEEKINFO *ppi)
 {
-	log("pastiPeek\n");
+//>	log("pastiPeek\n");
 
 	if(origFuncs.Peek != NULL) {
 		return origFuncs.Peek(ppi);
@@ -628,7 +657,8 @@ CE_PASTI_API BOOL pastiExtra( unsigned code, void *ptr)
 
 void log(char *str)
 {
-	FILE *f = fopen("c:\\!nohaj\\apps\\steem_v3_2\\log.txt", "at");
+	return;
+	FILE *f = fopen("c:\\emus\\steem\\ce_log.txt", "at");
 
 	if(!f) {
 		return;
