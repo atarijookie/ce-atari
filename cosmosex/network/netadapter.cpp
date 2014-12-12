@@ -1047,7 +1047,7 @@ void NetAdapter::updateCons(void)
         //---------
         // update how many bytes we can read from this sock
         cons[i].bytesInSocket = howManyWeCanReadFromFd(cons[i].fd);       // try to get how many bytes can be read
-        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- cons[%d].bytesInSocket: %d", i, cons[i].bytesInSocket);
+        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- cons[%d].bytesInSocket: %d, status: cons[%d].status: %d", i, cons[i].bytesInSocket, i, cons[i].status);
         
         //---------
         // if it's not TCP connection, just pretend the state is 'connected' - it's only used for TCP connections, so it doesn't matter
@@ -1063,8 +1063,9 @@ void NetAdapter::updateCons(void)
         if(cons[i].status == TSYN_SENT) {               // if this is TCP connection and it's in the 'connecting' state
             res = connect(cons[i].fd, (struct sockaddr *) &cons[i].hostAdr, sizeof(cons[i].hostAdr));   // try to connect again
 
-            if(res < 0) {                               // error occured on connect, check what it was
+            if(res < 0) {                           // error occured on connect, check what it was
                 switch(errno) {
+                    case EISCONN:
                     case EALREADY:      cons[i].status = TESTABLISH;    
                                         Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TESTABLISH", i);
                                         break;  // ok, we're connected!
@@ -1079,8 +1080,15 @@ void NetAdapter::updateCons(void)
                     case ECONNREFUSED:  cons[i].status = TCLOSED;       
                                         cons[i].closeIt();
                                         Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TCLOSED", i);
-                                        break; 
+                                        break;
+                                        
+                    default:
+                                        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connect() returned error %d", errno);
+                                        break;
                 }
+            } else if(res == 0) {                   // no error occured? 
+                cons[i].status = TESTABLISH;
+                Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TESTABLISH - because no error", i);
             }
         } else {                                        // if it's not TCP socket in connecting state, try to find out the state
             int error, len;
