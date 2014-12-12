@@ -43,7 +43,8 @@ CLIENT_API  tpl  = { "TRANSPORT_TCPIP", "Jookie", TCP_DRIVER_VERSION,
                       house_keep_mid, resolve_mid, serial_dummy_mid, serial_dummy_mid, 
                       set_flag_mid, clear_flag_mid, CNgetinfo_mid, 
                       on_port_mid, off_port_mid, setvstr_mid, query_port_mid, CNgets_mid, 
-                      ICMP_send_mid, ICMP_handler_mid, ICMP_discard_mid, TCP_info_mid, cntrl_port_mid
+                      ICMP_send_mid, ICMP_handler_mid, ICMP_discard_mid, TCP_info_mid, cntrl_port_mid,
+                      UDP_info_mid, RAW_open_mid, RAW_close_mid, RAW_out_mid, CN_setopt_mid, CN_getopt_mid, CNfree_NDB_mid
                };
                
 STX_API     stxl = { "MODULE_LAYER", "Jookie", STX_LAYER_VERSION, 

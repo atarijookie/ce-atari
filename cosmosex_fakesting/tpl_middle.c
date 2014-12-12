@@ -135,7 +135,9 @@ int16 TCP_open_mid(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_siz
     int16 res = TCP_open(rem_host, rem_port, tos, buff_size);
     
     #ifdef DEBUG_STRING
-    logStr("TCP_open\n\r");
+    logStr("TCP_open - res: ");
+    showHexDword((DWORD) res);
+    logStr("\n\r");
     #endif
     
     return res;
@@ -392,7 +394,9 @@ CIB *CNgetinfo_mid(int16 handle)
     CIB *res = CNgetinfo(handle);
 
     #ifdef DEBUG_STRING
-    logStr("CNgetinfo\n\r");
+    logStr("CNgetinfo - res: ");
+    showHexDword((DWORD) res);
+    logStr("\n\r");
     #endif
 
     return res;
@@ -530,6 +534,68 @@ int16 cntrl_port_mid(char *port_name, uint32 argument, int16 code)
 
     return res;
 }
+
+int16 UDP_info_mid(int16 handle, UDPIB *pUdpIb)
+{
+    #ifdef DEBUG_STRING
+    logStr("UDP_info - not implemented\n\r");
+    #endif
+
+    return E_FNAVAIL;
+}
+
+int16 RAW_open_mid(uint32 param)
+{
+    #ifdef DEBUG_STRING
+    logStr("RAW_open - not implemented\n\r");
+    #endif
+
+    return E_FNAVAIL;
+}
+
+int16 RAW_close_mid(int16 handle)
+{
+    #ifdef DEBUG_STRING
+    logStr("RAW_close - not implemented\n\r");
+    #endif
+
+    return E_FNAVAIL;
+}
+
+int16 RAW_out_mid(int16 handle, void *pAParam, int16 bParam, uint32 cParam)
+{
+    #ifdef DEBUG_STRING
+    logStr("RAW_out - not implemented\n\r");
+    #endif
+    
+    return E_FNAVAIL;
+}
+
+int16 CN_setopt_mid(int16 handle, int16 aParam, const void *pBParam, int16 cParam)
+{
+    #ifdef DEBUG_STRING
+    logStr("CN_setopt - not implemented\n\r");
+    #endif
+    
+    return E_FNAVAIL;
+}
+
+int16 CN_getopt_mid(int16 handle, int16 aParam, void *pBParam, int16 *pCParam)
+{
+    #ifdef DEBUG_STRING
+    logStr("CN_getopt - not implemented\n\r");
+    #endif
+    
+    return E_FNAVAIL;
+}
+
+void CNfree_NDB_mid(int16 aParam, NDB *pNdb)
+{
+    #ifdef DEBUG_STRING
+    logStr("CNfree_NDB - not implemented\n\r");
+    #endif
+}
+    
 //-------------------
 void logStr(char *str)
 {

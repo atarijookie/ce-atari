@@ -16,6 +16,13 @@ typedef  struct driver {
            DRV_HDR  *layer[NUM_LAYER];
      } __attribute__((packed)) GENERIC;
 
+typedef struct udpib
+{	uint32	request;	/* 32 bit flags requesting various info (following)	*/
+	uint16	state;		/* current UDP pseudo state 						*/
+	uint32	reserve1;	/* reserved */
+	uint32	reserve2;	/* reserved */
+}	UDPIB;
+     
 typedef  struct client_layer {
     char *     module;      /* Specific string that can be searched for     */
     char *     author;      /* Any string                                   */
@@ -75,6 +82,16 @@ typedef  struct client_layer {
 	//-------------
     int16        (* TCP_info) (int16, TCPIB *);
     int16        (* cntrl_port) (char *, uint32, int16);				// Inquires and sets various parameters of STinG ports.
+    
+	//-------------
+    // part of the newer STiNG API? 
+	int16       (* UDP_info) (int16, UDPIB *);
+	int16       (* RAW_open)(uint32);
+	int16       (* RAW_close)(int16);
+	int16       (* RAW_out)(int16, void *, int16, uint32);
+	int16       (* CN_setopt)(int16, int16, const void *, int16);
+	int16       (* CN_getopt)(int16, int16, void *, int16 *);
+	void        (* CNfree_NDB)(int16, NDB *);    
  } __attribute__((packed)) CLIENT_API;
 
 typedef  struct stx_layer {

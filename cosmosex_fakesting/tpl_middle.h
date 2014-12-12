@@ -1,6 +1,8 @@
 #ifndef _TPL_MIDDLE_H_
 #define _TPL_MIDDLE_H_
 
+#include "api.h"
+
 	//-------------
 	// memory alloc / free functions
     void *       KRmalloc_mid (int32);
@@ -60,5 +62,15 @@
     char        *get_error_text_mid(int16 error_code);
     void        house_keep_mid(void);
     void        serial_dummy_mid(void);
+	
+    //-------------
+    // part of the newer STiNG API? 
+	int16       UDP_info_mid(int16, UDPIB *);
+	int16       RAW_open_mid(uint32);
+	int16       RAW_close_mid(int16);
+	int16       RAW_out_mid(int16, void *, int16, uint32);
+	int16       CN_setopt_mid(int16, int16, const void *, int16);
+	int16       CN_getopt_mid(int16, int16, void *, int16 *);
+	void        CNfree_NDB_mid(int16, NDB *);        
     
 #endif    
