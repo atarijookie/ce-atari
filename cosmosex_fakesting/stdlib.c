@@ -276,6 +276,16 @@ void showHexByte(int val)
     (void) Cconout( table[lo] );
 }
 
+void showHexWord(WORD val)
+{
+    BYTE a,b;
+    a = val >>  8;
+    b = val;
+    
+    showHexByte(a);
+    showHexByte(b);
+}
+
 void showHexDword(DWORD val)
 {
     BYTE a,b,c,d;

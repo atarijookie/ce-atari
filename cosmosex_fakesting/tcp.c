@@ -52,9 +52,14 @@ int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
 
     DWORD timeStart = getTicks();
     DWORD timeout2 = timeout * 200;    
+    DWORD nextConUpdate = getTicks() + 100;
     
     while(1) {
         // the connection info should be updated in VBL using update_con_info()
+        if(getTicks() >= nextConUpdate) {                           // if half a second passed since last connection state check
+            update_con_info();
+            nextConUpdate = getTicks() + 100;
+        }
         
         WORD currentState = conInfo[handle].tcpConnectionState;     // get the current state
     
@@ -81,7 +86,7 @@ int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
             return E_CNTIMEOUT;
         }
         
-        appl_yield();                                           // keep GEM apps responding
+        //appl_yield();                                           // keep GEM apps responding -- commented out, because causes 'Bad Function #' error
     } 
     
     return E_NORMAL;

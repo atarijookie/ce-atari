@@ -34,11 +34,11 @@ void *KRmalloc_mid(int32 size)
     getStackPointer();
     size = getDwordFromSP();
 
-    void *res = KRmalloc_internal(size);
-    
     #ifdef DEBUG_STRING
     logStr("KRmalloc\n\r");
     #endif
+
+    void *res = KRmalloc_internal(size);
     
     return res;
 }
@@ -48,11 +48,11 @@ void KRfree_mid(void *mem_block)
     getStackPointer();
     mem_block = getVoidPFromSP();
     
-    KRfree_internal(mem_block);
-    
     #ifdef DEBUG_STRING
     logStr("KRfree\n\r");
     #endif
+
+    KRfree_internal(mem_block);
 }
 
 int32 KRgetfree_mid (int16 block_flag)
@@ -60,13 +60,13 @@ int32 KRgetfree_mid (int16 block_flag)
     getStackPointer();
     block_flag = getWordFromSP();
 
-    int32 res;
-    res =  KRgetfree_internal(block_flag);
-
     #ifdef DEBUG_STRING
     logStr("KRgetfree\n\r");
     #endif
-    
+
+    int32 res;
+    res =  KRgetfree_internal(block_flag);
+
     return res;
 }
 
@@ -76,11 +76,11 @@ void *KRrealloc_mid (void *mem_block, int32 new_size)
     mem_block   = getVoidPFromSP();
     new_size    = getDwordFromSP();
 
-    void *res =  KRrealloc_internal(mem_block, new_size);
-    
     #ifdef DEBUG_STRING
     logStr("KRrealloc\n\r");
     #endif
+    
+    void *res =  KRrealloc_internal(mem_block, new_size);
     
     return res;
 }
@@ -90,11 +90,11 @@ char *get_error_text_mid(int16 error_code)
     getStackPointer();
     error_code = getWordFromSP();
 
-    char *res = get_error_text(error_code);
-    
     #ifdef DEBUG_STRING
     logStr("get_error_text\n\r");
     #endif
+
+    char *res = get_error_text(error_code);
     
     return res;
 }
@@ -104,12 +104,12 @@ char *getvstr_mid(char *name)
     getStackPointer();
     name = getVoidPFromSP();
 
-    char *res = getvstr(name);
-
     #ifdef DEBUG_STRING
     logStr("getvstr\n\r");
     #endif
     
+    char *res = getvstr(name);
+
     return res;
 }
 
@@ -132,10 +132,13 @@ int16 TCP_open_mid(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_siz
     tos         = getWordFromSP();
     buff_size   = getWordFromSP();
 
+    #ifdef DEBUG_STRING
+    logStr("TCP_open - res: ");
+    #endif
+
     int16 res = TCP_open(rem_host, rem_port, tos, buff_size);
     
     #ifdef DEBUG_STRING
-    logStr("TCP_open - res: ");
     showHexDword((DWORD) res);
     logStr("\n\r");
     #endif
@@ -150,11 +153,11 @@ int16 TCP_close_mid(int16 handle, int16 mode, int16 *result)
     mode        = getWordFromSP();
     result      = getVoidPFromSP();
 
-    int16 res = TCP_close(handle, mode, result);
-    
     #ifdef DEBUG_STRING
     logStr("TCP_close\n\r");
     #endif
+
+    int16 res = TCP_close(handle, mode, result);
     
     return res;
 }
@@ -166,11 +169,11 @@ int16 TCP_send_mid(int16 handle, void *buffer, int16 length)
     buffer      = getVoidPFromSP();
     length      = getWordFromSP();
 
-    int16 res = TCP_send(handle, buffer, length);
-    
     #ifdef DEBUG_STRING
     logStr("TCP_send\n\r");
     #endif
+    
+    int16 res = TCP_send(handle, buffer, length);
     
     return res;
 }
@@ -182,11 +185,14 @@ int16 TCP_wait_state_mid(int16 handle, int16 wantedState, int16 timeout)
     wantedState = getWordFromSP();
     timeout     = getWordFromSP();
 
-    int16 res = TCP_wait_state(handle, wantedState, timeout);
-    
     #ifdef DEBUG_STRING
-    logStr("TCP_wait_state\n\r");
+    logStr("TCP_wait_state - wantedState: \n\r");
+    showHexByte(wantedState);
+    logStr(", timeout: ");
+    showHexByte(timeout);
     #endif
+    
+    int16 res = TCP_wait_state(handle, wantedState, timeout);
     
     return res;
 }
@@ -197,11 +203,11 @@ int16 TCP_ack_wait_mid(int16 handle, int16 timeout)
     handle      = getWordFromSP();
     timeout     = getWordFromSP();
 
-    int16 res = TCP_ack_wait(handle, timeout);
-
     #ifdef DEBUG_STRING
     logStr("TCP_ack_wait\n\r");
     #endif
+
+    int16 res = TCP_ack_wait(handle, timeout);
 
     return res;
 }
@@ -212,12 +218,12 @@ int16 TCP_info_mid(int16 handle, TCPIB *tcp_info)
     handle      = getWordFromSP();
     tcp_info    = getVoidPFromSP();
 
-    int16 res = TCP_info(handle, tcp_info);
-
     #ifdef DEBUG_STRING
     logStr("TCP_info\n\r");
     #endif
     
+    int16 res = TCP_info(handle, tcp_info);
+
     return res;
 }    
 
@@ -227,11 +233,11 @@ int16 UDP_open_mid (uint32 rem_host, uint16 rem_port)
     rem_host    = getDwordFromSP();
     rem_port    = getWordFromSP();
 
-    int16 res = UDP_open(rem_host, rem_port);
-    
     #ifdef DEBUG_STRING
     logStr("UDP_open\n\r");
     #endif
+
+    int16 res = UDP_open(rem_host, rem_port);
     
     return res;
 }
@@ -241,11 +247,11 @@ int16 UDP_close_mid(int16 handle)
     getStackPointer();
     handle      = getWordFromSP();
 
-    int16 res = UDP_close(handle);
-    
     #ifdef DEBUG_STRING
     logStr("UDP_close\n\r");
     #endif
+    
+    int16 res = UDP_close(handle);
     
     return res;
 }
@@ -256,12 +262,12 @@ int16 UDP_send_mid(int16 handle, void *buffer, int16 length)
     handle      = getWordFromSP();
     buffer      = getVoidPFromSP();
     length      = getWordFromSP();
-    
-    int16 res = UDP_send(handle, buffer, length);
-    
+
     #ifdef DEBUG_STRING
     logStr("UDP_send\n\r");
     #endif
+    
+    int16 res = UDP_send(handle, buffer, length);
     
     return res;
 }
@@ -271,12 +277,12 @@ int16 CNkick_mid(int16 handle)
     getStackPointer();
     handle = getWordFromSP();
 
-    int16 res = CNkick(handle);
-
     #ifdef DEBUG_STRING
     logStr("CNkick\n\r");
     #endif
     
+    int16 res = CNkick(handle);
+
     return res;
 }
     
@@ -285,10 +291,17 @@ int16 CNbyte_count_mid(int16 handle)
     getStackPointer();
     handle = getWordFromSP();
 
+    #ifdef DEBUG_STRING
+    logStr("CNbyte - handle: ");
+    showHexByte((BYTE) handle);
+    logStr(", res: ");
+    #endif
+
     int16 res = CNbyte_count(handle);
 
     #ifdef DEBUG_STRING
-    logStr("CNbyte\n\r");
+    showHexWord((DWORD) res);
+    logStr("\n\r");
     #endif
 
     return res;
@@ -299,12 +312,12 @@ int16 CNget_char_mid(int16 handle)
     getStackPointer();
     handle = getWordFromSP();
 
-    int16 res = CNget_char(handle);
-
     #ifdef DEBUG_STRING
     logStr("CNget_char\n\r");
     #endif
     
+    int16 res = CNget_char(handle);
+
     return res;
 }
 
@@ -313,12 +326,12 @@ NDB *CNget_NDB_mid(int16 handle)
     getStackPointer();
     handle = getWordFromSP();
 
-    NDB *res = CNget_NDB (handle);
-
     #ifdef DEBUG_STRING
     logStr("CNget_NDB\n\r");
     #endif
     
+    NDB *res = CNget_NDB (handle);
+
     return res;
 }    
 
@@ -329,11 +342,11 @@ int16 CNget_block_mid(int16 handle, void *buffer, int16 length)
     buffer  = getVoidPFromSP();
     length  = getWordFromSP();
 
-    int16 res = CNget_block(handle, buffer, length);
-
     #ifdef DEBUG_STRING
     logStr("CNget_block\n\r");
     #endif
+
+    int16 res = CNget_block(handle, buffer, length);
 
     return res;
 }
@@ -351,12 +364,12 @@ int16 resolve_mid(char *domain, char **real_domain, uint32 *ip_list, int16 ip_nu
     ip_list     = getVoidPFromSP();
     ip_num      = getWordFromSP();
 
-    int16 res = resolve (domain, real_domain, ip_list, ip_num);
-
     #ifdef DEBUG_STRING
     logStr("resolve\n\r");
     #endif
     
+    int16 res = resolve (domain, real_domain, ip_list, ip_num);
+
     return res;
 }
     
@@ -365,12 +378,12 @@ int16 set_flag_mid(int16 flag)
     getStackPointer();
     flag = getWordFromSP();
 
-    int16 res = set_flag(flag);
-
     #ifdef DEBUG_STRING
     logStr("set_flag\n\r");
     #endif
     
+    int16 res = set_flag(flag);
+
     return res;
 }    
 
@@ -379,11 +392,11 @@ void clear_flag_mid(int16 flag)
     getStackPointer();
     flag = getWordFromSP();
 
-    clear_flag(flag);
-
     #ifdef DEBUG_STRING
     logStr("clear_flag\n\r");
     #endif
+
+    clear_flag(flag);
 }    
     
 CIB *CNgetinfo_mid(int16 handle)
@@ -391,10 +404,13 @@ CIB *CNgetinfo_mid(int16 handle)
     getStackPointer();
     handle = getWordFromSP();
 
+    #ifdef DEBUG_STRING
+    logStr("CNgetinfo - res: ");
+    #endif
+
     CIB *res = CNgetinfo(handle);
 
     #ifdef DEBUG_STRING
-    logStr("CNgetinfo - res: ");
     showHexDword((DWORD) res);
     logStr("\n\r");
     #endif
@@ -407,11 +423,11 @@ int16 on_port_mid(char *port_name)
     getStackPointer();
     port_name = getVoidPFromSP();
 
-    int16 res = on_port(port_name);
-    
     #ifdef DEBUG_STRING
     logStr("on_port\n\r");
     #endif
+    
+    int16 res = on_port(port_name);
     
     return res;
 }
@@ -434,12 +450,12 @@ int16 setvstr_mid(char *name, char *value)
     name    = getVoidPFromSP();
     value   = getVoidPFromSP();
 
-    int16 res = setvstr(name, value);
-
     #ifdef DEBUG_STRING
     logStr("setvstr\n\r");
     #endif
     
+    int16 res = setvstr(name, value);
+
     return res;
 }
 
@@ -448,12 +464,12 @@ int16 query_port_mid(char *port_name)
     getStackPointer();
     port_name = getVoidPFromSP();
 
-    int16 res = query_port(port_name);
-
     #ifdef DEBUG_STRING
     logStr("query_port\n\r");
     #endif
     
+    int16 res = query_port(port_name);
+
     return res;
 }
 
@@ -465,11 +481,11 @@ int16 CNgets_mid(int16 handle, char *buffer, int16 length, char delimiter)
     length      = getWordFromSP();
     delimiter   = getByteFromSP();
 
-    int16 res = CNgets(handle, buffer, length, delimiter);
-
     #ifdef DEBUG_STRING
     logStr("CNgets\n\r");
     #endif
+
+    int16 res = CNgets(handle, buffer, length, delimiter);
 
     return res;
 }
@@ -483,11 +499,11 @@ int16 ICMP_send_mid(uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_
     data        = getVoidPFromSP();
     dat_length  = getWordFromSP();
 
-    int16 res = ICMP_send(dest, type, code, data, dat_length);
-
     #ifdef DEBUG_STRING
     logStr("ICMP_send\n\r");
     #endif
+    
+    int16 res = ICMP_send(dest, type, code, data, dat_length);
 
     return res;
 }
@@ -498,12 +514,12 @@ int16 ICMP_handler_mid(int16 (* handler) (IP_DGRAM *), int16 flag)
     handler = getVoidPFromSP();
     flag    = getWordFromSP();
 
-    int16 res = ICMP_handler (handler, flag);
-
     #ifdef DEBUG_STRING
     logStr("ICMP_handler\n\r");
     #endif
     
+    int16 res = ICMP_handler (handler, flag);
+
     return res;
 }
 
@@ -512,11 +528,11 @@ void ICMP_discard_mid(IP_DGRAM *dgram)
     getStackPointer();
     dgram = getVoidPFromSP();
 
-    ICMP_discard(dgram);
-
     #ifdef DEBUG_STRING
     logStr("ICMP_discard\n\r");
     #endif
+
+    ICMP_discard(dgram);
 }
 
 int16 cntrl_port_mid(char *port_name, uint32 argument, int16 code)
@@ -526,11 +542,11 @@ int16 cntrl_port_mid(char *port_name, uint32 argument, int16 code)
     argument    = getDwordFromSP();
     code        = getWordFromSP();
 
-    int16 res = cntrl_port(port_name, argument, code);
-
     #ifdef DEBUG_STRING
     logStr("cntrl_port\n\r");
     #endif
+
+    int16 res = cntrl_port(port_name, argument, code);
 
     return res;
 }
