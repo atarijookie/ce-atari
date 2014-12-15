@@ -200,7 +200,7 @@ sendCmdBytes:
 	| send cmd[5]
 	move.w	#0x008A, (a6)	| mode: NO_DMA + HDC + A0
 	move.w	#0, (a5)		| data: 0
-	move.w	#0, (a6)		| mode: start DMA transfer
+	move.w	#0x0A, (a6)		| mode: HDC + A0 start DMA transfer
 
 	move.w	#200, d0		| 1s timeout limit
 	bsr	waitForINT			|
