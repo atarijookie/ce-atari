@@ -71,8 +71,19 @@ void DevFinder::lookForDevChanges(void)
 		if(file.find("mmcblk") != std::string::npos) {				// and if it's SD card (the one from which RPi boots), skip it
 			continue;
 		}
+
+#ifdef ONPC_HIGHLEVEL //enable mounting of loop devices in PC build
+		if(file.substr(0,2)=="sd" ) {				// don't mount SCSI device on PC
+			continue;
+		}
 		
-		cutBeforeFirstNumber(file);									// cut before the 1st number (e.g. sda1 -> sda)
+                //enable loop device mounting (e.g. loop0) on PC)
+		if(file.find("loop") == std::string::npos) {	
+                    cutBeforeFirstNumber(file);									// cut before the 1st number (e.g. sda1 -> sda)
+		}
+#else
+                cutBeforeFirstNumber(file);									// cut before the 1st number (e.g. sda1 -> sda)
+#endif                
 		file = "/dev/" + file;										// create full path - /dev/sda
 		
 		processFoundDev(file);										// and do something with that file

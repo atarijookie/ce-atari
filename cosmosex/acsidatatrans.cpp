@@ -239,9 +239,9 @@ void AcsiDataTrans::sendDataAndStatus(void)
 #if defined(ONPC_HIGHLEVEL)
     if(dataDirection == DATA_DIRECTION_READ) {
         // ACSI READ - send (write) data to other side, and also status
-        if(count < sockByteCount) {
-            count = sockByteCount;
-        }
+        count = sockByteCount;
+
+        Debug::out(LOG_DEBUG, "sendDataAndStatus: %d bytes status: %02x (%d)", count, status, statusWasSet);
 
 //        Debug::out(LOG_ERROR, "AcsiDataTrans::sendDataAndStatus -- sending %d bytes and status %02x", count, status);
 //        Debug::out(LOG_DEBUG, "AcsiDataTrans::sendDataAndStatus -- %02x %02x %02x %02x %02x %02x %02x %02x ", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7]);
