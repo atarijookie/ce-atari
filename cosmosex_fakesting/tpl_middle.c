@@ -292,7 +292,7 @@ int16 CNbyte_count_mid(int16 handle)
     handle = getWordFromSP();
 
     #ifdef DEBUG_STRING
-    logStr("CNbyte - handle: ");
+    logStr("CNbyte_count - handle: ");
     showHexByte((BYTE) handle);
     logStr(", res: ");
     #endif
@@ -343,10 +343,28 @@ int16 CNget_block_mid(int16 handle, void *buffer, int16 length)
     length  = getWordFromSP();
 
     #ifdef DEBUG_STRING
-    logStr("CNget_block\n\r");
+    logStr("CNget_block - handle: ");
+    showHexByte(handle);
+    logStr(", length: ");
+    showHexWord(length);
+    logStr(", res: ");
     #endif
 
     int16 res = CNget_block(handle, buffer, length);
+
+    #ifdef DEBUG_STRING
+    showHexWord(res);
+    logStr("\n\r");
+
+    // show last 4 bytes
+    BYTE *p = (BYTE *) buffer;
+
+    if(res >= 4) { showHexByte(p[res - 4]); Cconout(' '); }
+    if(res >= 3) { showHexByte(p[res - 3]); Cconout(' '); }
+    if(res >= 2) { showHexByte(p[res - 2]); Cconout(' '); }
+    if(res >= 1) { showHexByte(p[res - 1]); Cconout(' '); }
+    logStr("\n\r");
+    #endif
 
     return res;
 }

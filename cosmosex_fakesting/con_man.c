@@ -59,6 +59,10 @@ int16 CNbyte_count (int16 handle)
     DWORD       dataLeftLocal   = ci->rCount - ci->rStart;          // calculate how much data we have in local buffer
     DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;  // total data left = local data count + host data count
     
+    if(dataLeftTotal == 0 && ci->tcpConnectionState == TCLOSED) {   // no data to read, and connection closed? return E_EOF
+        return E_EOF;
+    }
+    
     if(dataLeftTotal == 0) {                                        // no data in host and in local buffer?
         return 0;
     }
@@ -174,6 +178,10 @@ int16 CNget_block(int16 handle, void *buffer, int16 length)
     TConInfo    *ci             = &conInfo[handle];                 // we're working with this connection
     DWORD       dataLeftLocal   = ci->rCount - ci->rStart;          // calculate how much data we have in local buffer
     DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;  // total data left = local data count + host data count
+    
+    if(dataLeftTotal == 0 && ci->tcpConnectionState == TCLOSED) {   // no data to read, and connection closed? return E_EOF
+        return E_EOF;
+    }
     
     if(dataLeftTotal == 0) {                                        // no data in host and in local buffer?
         return E_NODATA;
@@ -384,7 +392,7 @@ int16 connection_close(int tcpNotUdp, int16 handle, int16 mode, int16 *result)
     }
     
     commandShort[5] = 0;
-    
+
     // then store the params in buffer
     BYTE *pBfr = pDmaBuffer;
     pBfr = storeWord    (pBfr, handle);
@@ -539,12 +547,20 @@ BYTE fillReadBuffer(int16 handle)
 		return FALSE;
 	}
 
-	conInfo[handle].rCount = 0;
-	conInfo[handle].rStart = 0;
+    TConInfo *ci = &conInfo[handle];
+	ci->rCount = 0;
+	ci->rStart = 0;
 	
-	res = readData(handle, conInfo[handle].rBuf, 512, 0);          // try to read 512 bytes
+	res = readData(handle, ci->rBuf, 512, 0);                       // try to read 512 bytes
 
-	conInfo[handle].rCount = res;                                   // store how much data we've read
+	ci->rCount = res;                                               // store how much data we've read
+    
+    if(res <= ci->bytesToRead) {                                    // update how many bytes there are on host to read, if the result is >= 0
+        ci->bytesToRead -= res;
+    } else {                                                        // update how many bytes there are on host - the result is 0
+        ci->bytesToRead = 0;
+    }
+    
 	return TRUE;
 }
 //-------------------------------------------------------------------------------
@@ -748,12 +764,11 @@ DWORD read_big(int16 handle, DWORD countNeeded, BYTE *buffer)
 	ci->rStart = 0;													    // mark that the buffer doesn't contain any data anymore (although it might contain 1 byte)
     ci->rCount = 0;
     //---------------
-    DWORD       dataLeftLocal   = ci->rCount - ci->rStart;          // calculate how much data we have in local buffer
-    DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;  // total data left = local data count + host data count
-
-    if(dataLeftTotal < countNeeded) {                                  // if we have less data in the file than what the caller requested, update the countNeeded
-        countNeeded = dataLeftTotal;
+    if(ci->bytesToRead < countNeeded) {                                 // if we have less data in the file than what the caller requested, update the countNeeded
+        countNeeded = ci->bytesToRead;
     }
+    
+    ci->bytesToRead -= countNeeded;                                     // subtract the amount we will use from host buffer / socket
     
     // Second phase of BIG fread: transfer data by blocks of size 512 bytes, buffer must be EVEN
 	while(countNeeded >= 512) {											// while we're not at the ending sector
