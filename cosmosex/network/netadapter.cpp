@@ -700,6 +700,8 @@ void NetAdapter::conReadData(void)
         return;
     }
 
+    Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- handle: %d, byteCountStRequested: %d, seekOffset: %d", handle, byteCountStRequested, seekOffset);
+    
     int totalCnt    = 0;
     int toRead      = byteCountStRequested;
 
@@ -713,6 +715,8 @@ void NetAdapter::conReadData(void)
         toRead--;
 
         if(toRead == 0) {                                       // if this is what ST wanted to read, quit
+            Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- finished with SINGLE byte returned, totalCnt: %d bytes", totalCnt);
+            
             finishDataRead(nc, totalCnt, RW_ALL_TRANSFERED);    // update variables, set status
             return;
         }
@@ -724,6 +728,8 @@ void NetAdapter::conReadData(void)
     int byteCountThatCanBeRead  = nc->bytesInSocket + nc->bytesInBuffer;    // byte count that can be read = bytes in socket + bytes in local buffer
 
     if(byteCountThatCanBeRead == 0) {                                       // nothing to read? return that we don't have enough data
+        Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- not enough data, RW_PARTIAL_TRANSFER, totalCnt: %d bytes", totalCnt);
+
         finishDataRead(nc, totalCnt, RW_PARTIAL_TRANSFER);                  // update variables, set status
         return;
     }
@@ -736,6 +742,8 @@ void NetAdapter::conReadData(void)
     totalCnt    += cntLoc;
 
     if(toRead == 0) {                                               // we don't need to read more? quit with success
+        Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- finishing after readFromLocalBuffer(), totalCnt: %d bytes", totalCnt);
+
         finishDataRead(nc, totalCnt, RW_ALL_TRANSFERED);            // update variables, set status
         return;
     }
@@ -748,8 +756,12 @@ void NetAdapter::conReadData(void)
     totalCnt    += cntSck;
 
     if(toRead == 0) {                                               // we don't need to read more? quit with success
+        Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- finishing after readFromSocked() with RW_ALL_TRANSFERED, totalCnt: %d bytes", totalCnt);
+        
         finishDataRead(nc, totalCnt, RW_ALL_TRANSFERED);            // transfered all that was wanted
     } else {
+        Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- finishing after readFromSocked() with RW_PARTIAL_TRANSFER, totalCnt: %d bytes", totalCnt);
+
         finishDataRead(nc, totalCnt, RW_PARTIAL_TRANSFER);          // transfer was just partial
     }
 }
@@ -1058,7 +1070,7 @@ void NetAdapter::updateCons(void)
         }
 
         //---------
-        // update connection status
+        // update connection status of TCP socket
         
         if(cons[i].status == TSYN_SENT) {               // if this is TCP connection and it's in the 'connecting' state
             res = connect(cons[i].fd, (struct sockaddr *) &cons[i].hostAdr, sizeof(cons[i].hostAdr));   // try to connect again
@@ -1090,7 +1102,23 @@ void NetAdapter::updateCons(void)
                 cons[i].status = TESTABLISH;
                 Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TESTABLISH - because no error", i);
             }
-        } else {                                        // if it's not TCP socket in connecting state, try to find out the state
+        } else {                                        // not connecting state? try to find out the state
+            char bfr[4];
+            res = recv(cons[i].fd, bfr, 4, MSG_PEEK | MSG_DONTWAIT);       // try to peek data without waiting
+            
+            if(res == 0) {                  // should return 0 on connection closed
+                Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d - recv returned 0, socket probably closed, so closing", i);
+                
+                cons[i].status = TCLOSED;   // mark the state as TCLOSED
+                cons[i].closeIt();
+                
+                continue;
+            } else if(res == -1) {
+                if(errno != EAGAIN) {       // if it's not EAGAIN, log errno
+                    Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d - recv returned -1, errno: %d", i, errno);
+                }
+            }
+        
             int error, len;
             len = sizeof(int);
             res = getsockopt(cons[i].fd, SOL_SOCKET, SO_ERROR, &error, (socklen_t *) &len);
@@ -1151,17 +1179,22 @@ int NetAdapter::readFromSocket(TNetConnection *nc, int cnt)
 {
     int countFromSocket = MIN(cnt, nc->bytesInSocket);      // how much can we read from socket?
 
-    int res = read(nc->fd, dataBuffer, countFromSocket);    // read the data
+    int res = recv(nc->fd, dataBuffer, countFromSocket, MSG_DONTWAIT);      // read the data
 
+    Debug::out(LOG_DEBUG, "NetAdapter::readFromSocket -- cnt: %d, res: %d", cnt, res);
+    
     if(res == -1) {                                         // failed to read? 
+    
         return 0;
     }
 
     if(res > 0) {                                           // if some bytes have been read
+//        Debug::outBfr(dataBuffer, res);
+
         nc->prevLastByte    = dataBuffer[res - 1];          // store the last byte of buffer
         nc->gotPrevLastByte = true;
 
-        dataTrans->addDataBfr(dataBuffer, res, false);          // put the data in data transporter
+        dataTrans->addDataBfr(dataBuffer, res, false);      // put the data in data transporter
     }
 
     return res;                                             // return count
