@@ -565,8 +565,8 @@ void NetAdapter::conClose(void)
     }
 
     if(cons[handle].isClosed()) {                       // handle already closed? fail
-        Debug::out(LOG_DEBUG, "NetAdapter::conClose() -- handle %d is already closed", handle);
-        dataTrans->setStatus(E_BADHANDLE);
+        Debug::out(LOG_DEBUG, "NetAdapter::conClose() -- handle %d is already closed, pretending that it was closed :)", handle);
+        dataTrans->setStatus(E_NORMAL);
         return;
     }
 
