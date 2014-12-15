@@ -5,6 +5,7 @@
 #include <sys/ioctl.h>
 #include <dirent.h>
 #include <errno.h>
+#include <net/if.h>
 
 #include "global.h"
 #include "debug.h"
@@ -23,6 +24,7 @@
 
 #define DEV_CHECK_TIME_MS	3000
 #define UPDATE_CHECK_TIME   1000
+#define INET_IFACE_CHECK_TIME   1000
 
 #define WEB_PARAMS_CHECK_TIME_MS    3000
 #define WEB_PARAMS_FILE             "/tmp/ce_startupmode"
@@ -143,6 +145,12 @@ void CCoreThread::run(void)
 	DWORD nextDevFindTime       = Utils::getCurrentMs();                // create a time when the devices should be checked - and that time is now
     DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);              // create a time when update download status should be checked
     DWORD nextWebParsCheckTime  = Utils::getEndTime(WEB_PARAMS_CHECK_TIME_MS);  // create a time when we should check for new params from the web page
+    DWORD nextInetIfaceCheckTime= Utils::getEndTime(1000);  			// create a time when we should check for inet interfaces that got ready
+
+	//up/running state of inet interfaces
+	bool  state_eth0 	= false;
+	bool  state_wlan0 	= false;
+
 
     Update::downloadUpdateList(NULL);                                   // download the list of components with the newest available versions
 
@@ -227,6 +235,23 @@ void CCoreThread::run(void)
             }
         }
 
+        // should we check for inet interfaces that might came up?
+        if(Utils::getCurrentMs() >= nextInetIfaceCheckTime) {
+		    nextInetIfaceCheckTime  = Utils::getEndTime(INET_IFACE_CHECK_TIME);   // update the time when we should interfaces again
+
+            bool state_temp 		= 	inetIfaceReady("eth0"); 
+			bool change_to_enabled	= 	(state_eth0!=state_temp)&&!state_eth0; 	//was this iface disabled and current state changed to enabled?
+			state_eth0 				= 	state_temp; 
+
+            state_temp 				= 	inetIfaceReady("wlan0"); 
+			change_to_enabled 		|= 	(state_wlan0!=state_temp)&&!state_wlan0;
+			state_wlan0 			= 	state_temp; 
+			
+			if( change_to_enabled ){ 
+				Debug::out(LOG_DEBUG, "Internet interface comes up: reload network mount settings");
+				translated->reloadSettings(SETTINGSUSER_TRANSLATED);
+			}
+		}
 #if !defined(ONPC_HIGHLEVEL)
         // check for any ATN code waiting from Hans
 		res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);
@@ -767,4 +792,42 @@ void CCoreThread::readWebStartupMode(void)
     }
 }
 
+/*
+	Is a particular internet interface up, running and has an IP address?
+*/
+bool CCoreThread::inetIfaceReady(const char*ifrname){
+	struct ifreq ifr;
+	bool up_and_running;
 
+	//temporary socket
+	int socketfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+    if (socketfd == -1){
+        return false;
+	}
+			
+	memset( &ifr, 0, sizeof(ifr) );
+	strcpy( ifr.ifr_name, ifrname );
+	
+	if( ioctl( socketfd, SIOCGIFFLAGS, &ifr ) != -1 ) {
+	    up_and_running = (ifr.ifr_flags & ( IFF_UP | IFF_RUNNING )) == ( IFF_UP | IFF_RUNNING );
+	    
+		//it's only ready and usable if it has an IP address
+        if( up_and_running && ioctl(socketfd, SIOCGIFADDR, &ifr) != -1 ){
+	        if( ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr==0 ){
+			    up_and_running = false;
+			} 
+		} else {
+		    up_and_running = false;
+		}
+	    //Debug::out(LOG_DEBUG, "inetIfaceReady ip: %s %s", ifrname, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
+	} else {
+	    up_and_running = false;
+	}
+
+	int result=0;
+	do {
+        result = close(socketfd);
+    } while (result == -1 && errno == EINTR);	
+
+	return up_and_running; 
+}

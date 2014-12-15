@@ -203,10 +203,10 @@ void ConfigStream::createScreen_network(void)
     comp->setTextOptions(TEXT_OPTION_ALLOW_ALL);
     screen.push_back(comp);
 
-	comp = new ConfigComponent(this, ConfigComponent::label, "WPA PSK",		20,	col1x, row, gotoOffset);
+	comp = new ConfigComponent(this, ConfigComponent::label, "WPA PSK",		20,	col1x, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline_pass, "      ",	20, col2x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline_pass, "      ",	40, col1x, row++, gotoOffset);
     comp->setComponentId(COMPID_WIFI_PSK);
     comp->setTextOptions(TEXT_OPTION_ALLOW_ALL);
     screen.push_back(comp);

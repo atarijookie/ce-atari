@@ -125,6 +125,7 @@ private:
     //----------------------------------
     // other
     void readWebStartupMode(void);
+	bool inetIfaceReady(const char* ifrname);
 };
 
 #endif // CCORETHREAD_H
