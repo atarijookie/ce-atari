@@ -10,6 +10,11 @@
 #include <stdlib.h>
 
 void log(char *str);
+void log2(char *str);
+
+//#define PASTI_PASSTHROUGH
+#define PASTI_LOGCALLBACKS
+#define PASTI_LOGONESHOT
 
 #define dmaAddrSectCnt	0xFF8604
 #define dmaAddrData		0xFF8604
@@ -49,6 +54,7 @@ BYTE lo,mid,hi;
 BYTE selectedRegister;
 BYTE sectorCount;
 int index;
+int xferBufOffset;
 BYTE cmd[24];
 
 void handleCmd(BYTE *cmd, DWORD addr, bool readNotWrite, int sectorCount, struct pastiIOINFO *pio);
@@ -65,6 +71,10 @@ CE_PASTI_API BOOL pastiInit( struct pastiINITINFO *pii)
 
 	xferInfoRead.xferBuf	= (BYTE *) malloc(256 * 1024);
 	xferInfoWrite.xferBuf	= (BYTE *) malloc(256 * 1024);
+
+#ifdef PASTI_LOGONESHOT
+	remove("c:\\emus\\steem\\ce_log.txt");
+#endif
 
 	log("\n---------------------------------\n");
 	log("pastiInit\n");
@@ -169,6 +179,23 @@ BYTE statusByte;
 
 CE_PASTI_API BOOL pastiIo( int mode, struct pastiIOINFO *pio)
 {
+#ifdef PASTI_LOGCALLBACKS
+	log2("---\n");
+#else
+	if (mode != 0){
+		log2("---\n");
+	}
+#endif
+#ifdef _DEBUG
+	dumpPio(mode, pio);
+#endif
+#ifdef PASTI_PASSTHROUGH
+	BOOL res = origFuncs.Io(mode, pio);
+	dumpPio(mode, pio);
+	return res;
+#endif
+
+
 	static DWORD cntr = 0;
 	static BYTE intrqState = 0;
 
@@ -180,6 +207,8 @@ CE_PASTI_API BOOL pastiIo( int mode, struct pastiIOINFO *pio)
 	static bool shouldHandleCmd			= false;
 	static bool shouldRequestWriteData	= false;
 	
+	bool triggerirq = false;
+
 	char tmp[1024];
 
 	char *pModeStr;
@@ -201,11 +230,13 @@ CE_PASTI_API BOOL pastiIo( int mode, struct pastiIOINFO *pio)
 				readStatusByte = true;
 			}
 		} else {						// on PASTI_IOWRITE
+			if (pio->addr == dmaAddrHi){
+				index = 0;
+			}
 			if(pio->addr == dmaAddrMode) {												// handle WRITE to DMA MODE register
 				BYTE val = pio->data & (NO_DMA | HDC | A0 | SC_REG);
 				
 				if(val == (NO_DMA | HDC)) {												// select HDC register - before 1st PIO byte (A1 low)
-					index = 0;
 					selectedRegister = HDC;
 
 					gotWriteData	= false;
@@ -214,9 +245,10 @@ CE_PASTI_API BOOL pastiIo( int mode, struct pastiIOINFO *pio)
 
 				if(val == (NO_DMA | HDC | A0)) {										// select HDC register, after 1st PIO byte (A1 high again)
 					selectedRegister = HDC;
-				} 
+					//triggerirq = true;
+				}
 
-				if(val == (NO_DMA | SC_REG)) {											// select sector count register
+				if( (val&(NO_DMA | SC_REG)) == (NO_DMA | SC_REG) ) {											// select sector count register
 					selectedRegister = SC_REG;
 				}
 
@@ -237,11 +269,15 @@ CE_PASTI_API BOOL pastiIo( int mode, struct pastiIOINFO *pio)
 					cmd[index] = pio->data;
 					index++;
 				}
+				//triggerirq = true;
+
 			}
 
 			if(pio->addr == dmaAddrSectCnt && selectedRegister == SC_REG) {				// write to SC_REG - setting sector count for DMA chip before transfer
 				sectorCount = pio->data;
-//>log("Sector set\n");
+				xferBufOffset = 0;
+				sprintf(tmp, "Sector set: %d\n", sectorCount );
+				log2(tmp);
 			}
 
 			if(pio->addr == dmaAddrHi) {												// setting DMA hi address
@@ -263,19 +299,6 @@ CE_PASTI_API BOOL pastiIo( int mode, struct pastiIOINFO *pio)
 	}
 
 	//////////////////////////
-	/* Pasti seems to know best in irq matters - resetting brings timeout hell
-	if ((mode == PASTI_IOWRITE || mode == PASTI_IOREAD) && selectedRegister == HDC) {	// read or write to ACSI bus resets INT back to inactive state
-		if (pio->addr == dmaAddrData) {
-			intrqState = 0;
-		}
-	}
-	*/
-
-	//FIXME:we really shouldn't work with 0 sectors
-	//this means we are missing some sector count writes above
-	if( sectorCount==0 ){
-		sectorCount=1;
-	}
 
 	if(origFuncs.Io != NULL) {
 		BOOL res = origFuncs.Io(mode, pio);
@@ -286,7 +309,7 @@ CE_PASTI_API BOOL pastiIo( int mode, struct pastiIOINFO *pio)
 			readStatusByte	= false;
 		}
 
-		if(shouldRequestWriteData) {														// Did request data update in previous step? Got the data, don't need to request again
+		if(shouldRequestWriteData) { 														// Did request data update in previous step? Got the data, don't need to request again
 			gotWriteData			= true;
 			shouldRequestWriteData	= false;
 		}
@@ -295,46 +318,78 @@ CE_PASTI_API BOOL pastiIo( int mode, struct pastiIOINFO *pio)
 		bool readyForWrite		= shouldHandleCmd && !dmaReadNotWrite && gotWriteData;		// ready for write, if got command, it's a write and got the data
 		shouldRequestWriteData	= shouldHandleCmd && !dmaReadNotWrite && !gotWriteData;		// ready for write, if got command, but don't have the data
 		DWORD dmaAddr			= (hi << 16) | (mid << 8) | lo;
-
-		if(readyForRead || readyForWrite) {													// if read for read or write
-			handleCmd(cmd, dmaAddr, dmaReadNotWrite, sectorCount, pio);
-
-			shouldHandleCmd = false;
+		
+		//pio->intrqState = intrqState;
+		if ((mode == PASTI_IOWRITE || mode == PASTI_IOREAD) ) {	// read or write to ACSI bus resets INT back to inactive state
+			if (pio->addr == dmaAddrData) {
+				pio->intrqState = 0;
+			}
 		}
 
+		if (readyForRead || readyForWrite) {													// if read for read or write
+			handleCmd(cmd, dmaAddr, dmaReadNotWrite, sectorCount, pio);
+			shouldHandleCmd = false;
+			if (readyForRead){
+				pio->intrqState = 0;
+			}
+			if (readyForWrite){
+				pio->intrqState = 1;
+			}
+//			pio->intrqState = 1;
+		}
 		if(shouldRequestWriteData) {														// should request write data?
 			memset(xferInfoWrite.xferBuf, 0, 256*1024);
 
 			pio->haveXfer				= true;
-			pio->updateCycles			= 0x200;
+			pio->updateCycles			= 0x1fa * ((int)sectorCount);
 
 			pio->xferInfo.memToDisk		= 1;
 			pio->xferInfo.xferBuf		= xferInfoWrite.xferBuf;
 			pio->xferInfo.xferLen		= ((int) sectorCount) * 512;
 			pio->xferInfo.xferSTaddr	= dmaAddr;
-			pio->intrqState = 1;
+			pio->intrqState = 0;
 		}
 
 		//just a test for an immediate response; response on IOUPD seems to hang in certain cases
-		if (mode == PASTI_IOUPD ) {											// if we should send #
-			pio->intrqState = 1;
+//		if () {											// if we should send #
+//			pio->intrqState = 1;
+//		}
+		//Send data one Sector at a time
+		if (mode != PASTI_IOUPD && haveReadXfer) {
+			pio->intrqState = 0;
 		}
-		if (haveReadXfer) {											// if we should send #
-			haveReadXfer				= false;
+		if (mode == PASTI_IOUPD && haveReadXfer) {
+			sectorCount--;
+			pio->intrqState = 0;
+			if (sectorCount == 0){
+				haveReadXfer	= false;
+				pio->intrqState = 1;
+			}
 
 			pio->haveXfer				= true;
-			pio->updateCycles			= 0x200;
+			pio->updateCycles			= 0x1fa;
 
 			pio->xferInfo.memToDisk		= 0;
-			pio->xferInfo.xferBuf		= xferInfoRead.xferBuf;
-			pio->xferInfo.xferLen		= ((int) sectorCount) * 512;
+			pio->xferInfo.xferBuf		= xferInfoRead.xferBuf + (xferBufOffset);
+			pio->xferInfo.xferLen		= 512;
 			pio->xferInfo.xferSTaddr	= dmaAddr;
+
+			xferBufOffset				+= 512;
+			dmaAddr						+= 512;
+
+			hi = (dmaAddr >> 16) & 0xff;
+			mid = (dmaAddr >> 8) & 0xff;
+			lo = (dmaAddr)&0xff;
 			//intrqState = 1;
+		}
+
+		if (triggerirq){
 			pio->intrqState = 1;
 		}
-		//pio->intrqState = intrqState;
 
-		//>	dumpPio(mode,pio);
+#ifdef _DEBUG
+		dumpPio(mode,pio);
+#endif
 		cntr++;
 		return res;
 	} else {
@@ -344,19 +399,25 @@ CE_PASTI_API BOOL pastiIo( int mode, struct pastiIOINFO *pio)
 
 void dumpPio(int mode, struct pastiIOINFO *pio)
 {
+#ifndef PASTI_LOGCALLBACKS
+	if (mode == 0){
+		return;
+	}
+#endif
+
 	char tmp[1024];
 
 	if(pio->haveXfer) {
 		sprintf(tmp, "dumpPio -- mode: %d, addr: %08x, data: %06x, cycles: %08x, updateCycles: %08x, intrqState: %02x, haveXfer: %d, memToDisk: %d, xferLen: %d, xferBuf: %08x, xferSTaddr: %08x\n", 
 								 mode, pio->addr,  pio->data,	 pio->cycles,  pio->updateCycles,  pio->intrqState,  pio->haveXfer, pio->xferInfo.memToDisk, pio->xferInfo.xferLen, (DWORD) pio->xferInfo.xferBuf, pio->xferInfo.xferSTaddr);
-		log(tmp);
+		log2(tmp);
 
-		sprintf(tmp, "data: %02x %02x %02x %02x\n", ((BYTE *) pio->xferInfo.xferBuf)[0], ((BYTE *) pio->xferInfo.xferBuf)[1], ((BYTE *) pio->xferInfo.xferBuf)[2], ((BYTE *) pio->xferInfo.xferBuf)[3]);
-		log(tmp);
+		//sprintf(tmp, "data: %02x %02x %02x %02x\n", ((BYTE *) pio->xferInfo.xferBuf)[0], ((BYTE *) pio->xferInfo.xferBuf)[1], ((BYTE *) pio->xferInfo.xferBuf)[2], ((BYTE *) pio->xferInfo.xferBuf)[3]);
+		//log(tmp);
 	} else {
 		sprintf(tmp, "dumpPio -- mode: %d, addr: %08x, data: %06x, cycles: %08x, updateCycles: %08x, intrqState: %02x, haveXfer: %d\n", 
 								 mode, pio->addr,  pio->data,	 pio->cycles,  pio->updateCycles,  pio->intrqState,  pio->haveXfer);
-		log(tmp);
+		log2(tmp);
 	}
 }
 
@@ -373,7 +434,7 @@ void handleCmd(BYTE *cmd, DWORD addr, bool readNotWrite, int sectorCount, struct
 	clientSocket_write(outBuf, 16);			// send the common header for read and write part
 
 	sprintf(tmp, "\nhandleCmd - write 16 bytes header, haveReadXfer: %d\n", haveReadXfer);
-	log(tmp);
+	log2(tmp);
 	//------------
 	// now send or receive the data
 	int byteCount = sectorCount * 512;
@@ -381,13 +442,13 @@ void handleCmd(BYTE *cmd, DWORD addr, bool readNotWrite, int sectorCount, struct
 	if(readNotWrite) {						// on READ
 		sprintf(tmp, "handleCmd - READ: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x - byteCount: %d\n", 
 			cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11], byteCount);
-		log(tmp);
+		log2(tmp);
 
 		int skip = 0;
 		while(1) {
 			BYTE a = 0;
 			if (!clientSocket_read(&a, 1)){
-				statusByte = 0xff;
+				statusByte = 0x02;
 				return;
 			}
 
@@ -400,23 +461,27 @@ void handleCmd(BYTE *cmd, DWORD addr, bool readNotWrite, int sectorCount, struct
 		if(skip != 0) {
 			sprintf(tmp, "handleCmd - had to skip %d bytes\n", skip);
 			log(tmp);
-		}
+		} 
 
 		if (!clientSocket_read(xferInfoRead.xferBuf, byteCount)){
-			statusByte = 0xff;
+			statusByte = 0x02;
 			return;
-		}
+		} 
 		BYTE *p = xferInfoRead.xferBuf;
 
 		sprintf(tmp, "xferBuf - %02x %02x %02x %02x %02x %02x %02x %02x ...\n", p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
-		log(tmp);
+		log2(tmp);
 
 		WORD csReceived, csCalculated;
 		clientSocket_read((BYTE *) &csReceived, 2);
 		csCalculated = dataChecksum(xferInfoRead.xferBuf, byteCount);
 
+		if (cmd[0] == 0x1f && cmd[1] == 0xa0 && cmd[2] == 0x43 && cmd[3] == 0x45 && cmd[4] == 0x03 && cmd[5] == 0x3f){
+			log2("fread!\n");
+		}
+
 		if(csReceived != csCalculated) {
-			log("READ - checksum fail!\n");
+			log2("READ - checksum fail!\n");
 		} else {
 //			log("READ - checksum good\n");
 		}
@@ -425,11 +490,11 @@ void handleCmd(BYTE *cmd, DWORD addr, bool readNotWrite, int sectorCount, struct
 	} else {								// on WRITE
 		sprintf(tmp, "handleCmd - WRITE: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x - byteCount: %d\n", 
 			cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11], byteCount);
-		log(tmp);
+		log2(tmp);
 
 		BYTE *p = xferInfoWrite.xferBuf;
 		sprintf(tmp, "data      -       %02x %02x %02x %02x %02x %02x\n", p[0], p[1], p[2], p[3], p[4], p[5]);
-		log(tmp);
+		log2(tmp);
 
 		clientSocket_write(xferInfoWrite.xferBuf, byteCount);			// send the data	
 
@@ -446,7 +511,7 @@ void handleCmd(BYTE *cmd, DWORD addr, bool readNotWrite, int sectorCount, struct
 	clientSocket_read(&inBuf, 1);
 
 	sprintf(tmp, "handleCmd - status byte: %02x\n", (int) inBuf);
-	log(tmp);
+	log2(tmp);
 
 	statusByte = inBuf;
 }
@@ -658,6 +723,7 @@ CE_PASTI_API BOOL pastiExtra( unsigned code, void *ptr)
 void log(char *str)
 {
 	return;
+#ifdef _DEBUG
 	FILE *f = fopen("c:\\emus\\steem\\ce_log.txt", "at");
 
 	if(!f) {
@@ -666,5 +732,25 @@ void log(char *str)
 
 	fputs(str, f);
 
+	fclose(f); 
+#else
+	return;
+#endif
+}
+
+void log2(char *str)
+{
+#ifdef _DEBUG
+	FILE *f = fopen("c:\\emus\\steem\\ce_log.txt", "at");
+
+	if (!f) {
+		return;
+	}
+
+	fputs(str, f);
+
 	fclose(f);
+#else
+	return;
+#endif
 }
