@@ -30,7 +30,7 @@ int16 UDP_open (uint32 rem_host, uint16 rem_port)
 
 int16 UDP_close (int16 handle)
 {
-    return connection_close(0, handle, 0, NULL);
+    return connection_close(0, handle, 0);
 }
 
 int16 UDP_send(int16 handle, void *buffer, int16 length)

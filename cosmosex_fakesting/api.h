@@ -41,7 +41,7 @@ typedef  struct client_layer {
 	//-------------
 	// TCP functions
     int16        (* TCP_open) (uint32, uint16, uint16, uint16);
-    int16        (* TCP_close) (int16, int16, int16 *);
+    int16        (* TCP_close) (int16, int16);
     int16        (* TCP_send) (int16, void *, int16);
     int16        (* TCP_wait_state) (int16, int16, int16);
     int16        (* TCP_ack_wait) (int16, int16);

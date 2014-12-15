@@ -378,7 +378,7 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
 
 //-------------------------------------------------------------------------------
 
-int16 connection_close(int tcpNotUdp, int16 handle, int16 mode, int16 *result)
+int16 connection_close(int tcpNotUdp, int16 handle, int16 timeout)
 {
     if(!handle_valid(handle)) {                     // we don't have this handle? fail
         return E_BADHANDLE;
@@ -396,14 +396,12 @@ int16 connection_close(int tcpNotUdp, int16 handle, int16 mode, int16 *result)
     // then store the params in buffer
     BYTE *pBfr = pDmaBuffer;
     pBfr = storeWord    (pBfr, handle);
-    pBfr = storeWord    (pBfr, mode);
+    pBfr = storeWord    (pBfr, timeout);
 
     // send it to host
-    BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+    acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                                 // if failed, return FALSE 
-		return E_LOSTCARRIER;
-	}
+    // don't handle failures, just pretend it's always closed just fine
 
     memset(&conInfo[handle].cib, 0, sizeof(CIB));          // clear the CIB structure
     return E_NORMAL;

@@ -17,7 +17,7 @@
 	//-------------
 	// TCP functions
     int16        TCP_open_mid (uint32, uint16, uint16, uint16);
-    int16        TCP_close_mid (int16, int16, int16 *);
+    int16        TCP_close_mid (int16, int16);
     int16        TCP_send_mid (int16, void *, int16);
     int16        TCP_wait_state_mid (int16, int16, int16);
     int16        TCP_ack_wait_mid (int16, int16);

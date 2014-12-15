@@ -139,25 +139,31 @@ int16 TCP_open_mid(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_siz
     int16 res = TCP_open(rem_host, rem_port, tos, buff_size);
     
     #ifdef DEBUG_STRING
-    showHexDword((DWORD) res);
+    showHexWord((WORD) res);
     logStr("\n\r");
     #endif
     
     return res;
 }
 
-int16 TCP_close_mid(int16 handle, int16 mode, int16 *result)
+int16 TCP_close_mid(int16 handle, int16 timeout)
 {
     getStackPointer();
     handle      = getWordFromSP();
-    mode        = getWordFromSP();
-    result      = getVoidPFromSP();
+    timeout     = getWordFromSP();
 
     #ifdef DEBUG_STRING
-    logStr("TCP_close\n\r");
+    logStr("TCP_close - handle: ");
+    showHexByte(handle);
+    logStr(", res: ");
     #endif
 
-    int16 res = TCP_close(handle, mode, result);
+    int16 res = TCP_close(handle, timeout);
+
+    #ifdef DEBUG_STRING
+    showHexWord((WORD) res);
+    logStr("\n\r");
+    #endif
     
     return res;
 }
@@ -345,6 +351,8 @@ int16 CNget_block_mid(int16 handle, void *buffer, int16 length)
     #ifdef DEBUG_STRING
     logStr("CNget_block - handle: ");
     showHexByte(handle);
+    logStr(", buffer: ");
+    showHexDword((DWORD) buffer);
     logStr(", length: ");
     showHexWord(length);
     logStr(", res: ");
