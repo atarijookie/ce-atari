@@ -88,6 +88,10 @@ int16 CNget_char(int16 handle)
     DWORD       dataLeftLocal   = ci->rCount - ci->rStart;          // calculate how much data we have in local buffer
     DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;  // total data left = local data count + host data count
     
+    if(dataLeftTotal == 0 && ci->tcpConnectionState == TCLOSED) {   // no data to read, and connection closed? return E_EOF
+        return E_EOF;
+    }
+    
     if(dataLeftTotal == 0) {                                        // no data in host and in local buffer?
         return E_NODATA;
     }
@@ -120,6 +124,10 @@ NDB *CNget_NDB (int16 handle)
     DWORD       dataLeftLocal   = ci->rCount - ci->rStart;                  // calculate how much data we have in local buffer
     DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;          // total data left = local data count + host data count
     
+    if(dataLeftTotal == 0 && ci->tcpConnectionState == TCLOSED) {   // no data to read, and connection closed? return E_EOF
+        return (NDB *) E_EOF;
+    }
+
     if(dataLeftTotal == 0) {                                                // no data in host and in local buffer?
         return (NDB *) E_NODATA;
     }
@@ -211,6 +219,10 @@ int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
     TConInfo    *ci             = &conInfo[handle];                 // we're working with this connection
     DWORD       dataLeftLocal   = ci->rCount - ci->rStart;          // calculate how much data we have in local buffer
     DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;  // total data left = local data count + host data count
+    
+    if(dataLeftTotal == 0 && ci->tcpConnectionState == TCLOSED) {   // no data to read, and connection closed? return E_EOF
+        return E_EOF;
+    }
     
     if(dataLeftTotal == 0) {                                        // no data in host and in local buffer?
         return E_NODATA;
