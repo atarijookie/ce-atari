@@ -10,9 +10,10 @@
 void showMenu(void);
 
 void jumpReadTest(void);
+void makeFloppy(void);
 
 void readSector(int sector, int track, int side);
-void writeSector(int sector, int track, int side);
+void writeSector(int sector, int track, int side, int doPrint);
 
 void showBiosError(int errorNo);
 void showDecimal(int num);
@@ -52,6 +53,11 @@ int main(void)
 		
         if(req == 'c' || req == 'C') {              // continuous jump + read test
             jumpReadTest();
+            continue;
+        }
+
+        if(req == 'p' || req == 'P') {              // make floppy for jump + read test
+            makeFloppy();
             continue;
         }
         
@@ -96,7 +102,7 @@ int main(void)
         if(readNotWrite == 1) {                     // 1 means READ, 0 means WRITE
             readSector(sector, track, side);
         } else {
-            writeSector(sector, track, side);
+            writeSector(sector, track, side, 1);
         }
 	}
 }
@@ -107,8 +113,26 @@ void showMenu(void)
     printf("Commands: 'q' to quit, set sector: 's1',\n");
     printf("set side: 'i0', set track: 't5'\n");
     printf("'j' - jump up, 'k' - jump down, 'r' - go to track 0\n");
-    printf("'c' - continuous jump + read test\n");
+    printf("'c' - continuous jump + read test, 'p' - write the jump + read floppy\n");
     printf("'w' - write currently set sector, 'm' - this menu\n\n");
+}
+
+void makeFloppy(void)
+{
+    int sector, track, side;
+    
+    printf("Writing whole floppy...\n");
+    
+    for(track=0; track<80; track++) {
+        printf("\nTrack %02d: ", track);
+
+        for(side=0; side<2; side++) {
+            for(sector=0; sector<10; sector++) {
+                writeSector(sector, track, side, 0);
+                printf(".");
+            }
+        }
+    }
 }
 
 void jumpReadTest(void)
@@ -161,7 +185,7 @@ void readSector(int sector, int track, int side)
 	}
 }
 
-void writeSector(int sector, int track, int side)
+void writeSector(int sector, int track, int side, int doPrint)
 {
 	int res;
 
@@ -173,14 +197,16 @@ void writeSector(int sector, int track, int side)
     // issue write command
 	res = Flopwr(writeBfr, 0, 0, sector, track, side, 1);
                 
-    printf("WRITE Tr %d, Si %d, Se %d -- ", track, side, sector);
+    if(doPrint) {
+        printf("WRITE Tr %d, Si %d, Se %d -- ", track, side, sector);
 
-	if(res != 0) {
-		printf("FAIL -- res = %d\n", res);
-		showBiosError(res);
-	} else {
-        printf("GOOD\n");
-	}
+        if(res != 0) {
+            printf("FAIL -- res = %d\n", res);
+            showBiosError(res);
+        } else {
+            printf("GOOD\n");
+        }
+    }
 }
 
 void showBiosError(int errorNo)
