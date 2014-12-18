@@ -1,21 +1,21 @@
 TARGET	= fuser.prg
 SLIM	= no
 
-CC		= m68k-atari-mint-gcc
-STRIP	= m68k-atari-mint-strip
-CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
-LDFLAGS	= -Wl,--traditional-format
+CC      = m68k-atari-mint-gcc
+STRIP   = m68k-atari-mint-strip
+CFLAGS  = -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
+LDFLAGS = -Wl,--traditional-format
 
-HDR		= 
-CSRC	= main.c 
-SSRC	= 
+HDR     = 
+CSRC    = main.c 
+SSRC    = 
 
-ifeq ($(SLIM),yes)
-CFLAGS	+= -nostdlib -DSLIM
-STARTUP	= startup.s
-CSRC	+= stdlib.c
-HDR		+= stdlib.h
-endif
+#ifeq ($(SLIM),yes)
+#CFLAGS  += -nostdlib -DSLIM
+#STARTUP  = startup.s
+#CSRC    += stdlib.c
+#HDR     += stdlib.h
+#endif
 
 OBJS = $(patsubst %.c,%.o,$(CSRC))
 

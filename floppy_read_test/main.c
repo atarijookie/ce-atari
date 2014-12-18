@@ -1,9 +1,15 @@
 #include <stdio.h>
 #include <osbind.h>
+#include <stdlib.h>
+#include <stdint.h>
 
-#include "stdlib.h"
+#define BYTE  	unsigned char
+#define WORD  	uint16_t
+#define DWORD 	uint32_t
 
 void showMenu(void);
+
+void jumpReadTest(void);
 
 void readSector(int sector, int track, int side);
 void writeSector(int sector, int track, int side);
@@ -44,6 +50,11 @@ int main(void)
             continue;
         }
 		
+        if(req == 'c' || req == 'C') {              // continuous jump + read test
+            jumpReadTest();
+            continue;
+        }
+        
 		if(req == 't' || req == 'T') {				/* set track # */
 			no = ((BYTE) Cnecin()) - 48;
 			if(no >= 0 && no < 85) {
@@ -96,7 +107,37 @@ void showMenu(void)
     printf("Commands: 'q' to quit, set sector: 's1',\n");
     printf("set side: 'i0', set track: 't5'\n");
     printf("'j' - jump up, 'k' - jump down, 'r' - go to track 0\n");
+    printf("'c' - continuous jump + read test\n");
     printf("'w' - write currently set sector, 'm' - this menu\n\n");
+}
+
+void jumpReadTest(void)
+{
+  	BYTE bfr[512];
+	int res;
+    int sector, track, side;
+    
+    printf("\nContinuous read + jump test\n");
+
+    while(1) {
+        sector  = rand() % 10;
+        side    = rand() % 2;
+        track   = rand() % 80;
+        
+        res = Floprd(bfr, 0, 0, sector, track, side, 1);
+        printf("READ Track %02d, Side %d, Sector %d -- ", track, side, sector);
+
+        if(res != 0) {
+            printf("FAIL -- res = %d\n", res);
+            showBiosError(res);
+        } else {
+            if(bfr[0] == track && bfr[1] == side && bfr[2] == sector) {
+                printf("GOOD, TrSiSe GOOD\n");
+            } else {
+                printf("GOOD, TrSiSe BAD\n");
+            }
+        }
+    }
 }
 
 void readSector(int sector, int track, int side)
