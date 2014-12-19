@@ -2,6 +2,7 @@
 #include <osbind.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
 #define BYTE  	unsigned char
 #define WORD  	uint16_t
@@ -17,6 +18,7 @@ void writeSector(int sector, int track, int side, int doPrint);
 
 void showBiosError(int errorNo);
 void showDecimal(int num);
+void showDiff(BYTE* bfr, int track, int side, int sector, char*range);
 
 BYTE writeBfr[512];
 
@@ -127,7 +129,7 @@ void makeFloppy(void)
         printf("\nTrack %02d: ", track);
 
         for(side=0; side<2; side++) {
-            for(sector=0; sector<10; sector++) {
+            for(sector=1; sector<=10; sector++) {
                 writeSector(sector, track, side, 0);
                 printf(".");
             }
@@ -140,16 +142,21 @@ void jumpReadTest(void)
   	BYTE bfr[512];
 	int res;
     int sector, track, side;
-    
+    char range[]="#123456789ABCDEFG";
+    BYTE initval=0;
+
     printf("\nContinuous read + jump test\n");
 
     while(1) {
-        sector  = rand() % 10;
+        sector  = (rand() % 10)+1;
         side    = rand() % 2;
         track   = rand() % 80;
-        
+     
+     	//just to make sure we are not looking at data from the last read attempt on a failure
+        memset(bfr,initval++,512);
+
         res = Floprd(bfr, 0, 0, sector, track, side, 1);
-        printf("READ Track %02d, Side %d, Sector %d -- ", track, side, sector);
+	    printf("READ Track %02d, Side %d, Sector %d -- ", track, side, sector);
 
         if(res != 0) {
             printf("FAIL -- res = %d\n", res);
@@ -158,10 +165,42 @@ void jumpReadTest(void)
             if(bfr[0] == track && bfr[1] == side && bfr[2] == sector) {
                 printf("GOOD, TrSiSe GOOD\n");
             } else {
-                printf("GOOD, TrSiSe BAD\n");
+                printf("GOOD, TrSiSe BAD Tr%dSi%dSe%d\n",bfr[0],bfr[1],bfr[2]);
+                showDiff(bfr, track, side, sector, range);
+                Cnecin();
             }
         }
     }
+}
+
+void showDiff(BYTE* bfr, int track, int side, int sector, char*range)
+{
+	int diffcnt=0;
+	int blockcnt=0;
+	int i=0;
+
+	if(bfr[0] != track) {
+		diffcnt++;
+	}
+	if(bfr[1] != side) {
+		diffcnt++;
+	}
+	if(bfr[2] != sector) {
+		diffcnt++;
+	}
+	blockcnt=3;
+	for( i=3; i<512; i++ ){
+		if( bfr[i] != (BYTE)i) {
+			diffcnt++;
+		}
+		blockcnt++;
+		if( blockcnt==16 ){
+			blockcnt=0;
+			printf("%c",range[diffcnt]);
+			diffcnt=0;
+		}
+	}
+	printf("\n");
 }
 
 void readSector(int sector, int track, int side)
