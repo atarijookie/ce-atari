@@ -144,11 +144,15 @@ void jumpReadTest(void)
     int sector, track, side;
     char range[]="#123456789ABCDEFG";
     BYTE initval=0;
+    
+    int errs = 0, runs = 0;
 
     printf("\nContinuous read + jump test\n");
 
     while(1) {
-        sector  = (rand() % 10)+1;
+        runs++;
+    
+        sector  = (rand() % 9) + 1;
         side    = rand() % 2;
         track   = rand() % 80;
      
@@ -158,18 +162,35 @@ void jumpReadTest(void)
         res = Floprd(bfr, 0, 0, sector, track, side, 1);
 	    printf("READ Track %02d, Side %d, Sector %d -- ", track, side, sector);
 
-        if(res != 0) {
+        if(res != 0) {      // fail because Floprd failed
+            errs++;
+
             printf("FAIL -- res = %d\n", res);
             showBiosError(res);
         } else {
-            if(bfr[0] == track && bfr[1] == side && bfr[2] == sector) {
+            if(bfr[0] == track && bfr[1] == side && bfr[2] == sector) { // good
                 printf("GOOD, TrSiSe GOOD\n");
-            } else {
+            } else {        // fail because data invalid
+                errs++;
+            
                 printf("GOOD, TrSiSe BAD Tr%dSi%dSe%d\n",bfr[0],bfr[1],bfr[2]);
                 showDiff(bfr, track, side, sector, range);
-                Cnecin();
+                // Cnecin();
             }
         }
+        
+        Cconout(27);
+        Cconout('j');       // save cursor position
+
+        Cconout(27);
+        Cconout('H');       // cursor home
+        
+        float err = (((float) errs) * 100.0f) / ((float) runs);
+        printf("Runs: %03d, Errors: %02d (%.1f %%)                \n", runs, errs, err);
+        printf("Runs: %03d, Errors: %02d (%.1f %%)                \n", runs, errs, err);
+        
+        Cconout(27);
+        Cconout('k');       // restore cursor position
     }
 }
 
