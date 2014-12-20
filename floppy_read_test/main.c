@@ -10,7 +10,7 @@
 
 void showMenu(void);
 
-void jumpReadTest(void);
+void jumpReadTest(int stopOnError);
 void makeFloppy(void);
 
 void readSector(int sector, int track, int side);
@@ -56,7 +56,12 @@ int main(void)
         }
 		
         if(req == 'c' || req == 'C') {              // continuous jump + read test
-            jumpReadTest();
+            jumpReadTest(0);
+            continue;
+        }
+
+        if(req == 'd' || req == 'D') {              // continuous jump + read test
+            jumpReadTest(1);
             continue;
         }
 
@@ -118,6 +123,7 @@ void showMenu(void)
     printf("set side: 'i0', set track: 't5'\n");
     printf("'j' - jump up, 'k' - jump down, 'r' - go to track 0\n");
     printf("'c' - continuous jump + read test, 'p' - write the jump + read floppy\n");
+    printf("'d' - continuous jump + read test with STOP after each error\n");
     printf("'w' - write currently set sector, 'm' - this menu\n\n");
 }
 
@@ -139,7 +145,7 @@ void makeFloppy(void)
     }
 }
 
-void jumpReadTest(void)
+void jumpReadTest(int stopOnError)
 {
   	BYTE bfr[512];
 	int res;
@@ -147,11 +153,16 @@ void jumpReadTest(void)
     char range[]="#123456789ABCDEFG";
     BYTE initval=0;
     
-    int errs = 0, runs = 0;
-
+    int errs = 0, runs = 0;             // counter of errors, counter of all runs
+    BYTE didStop;                       // this is a flag to avoid stopping because long operation time, when it already stopped because of some other error
+    int runsAfterStop = 0;              // this is a counter of reads after the last stop, so we won't stop after 0th read operation, because that might take longer because of floppy spin up
+    int lazy = 0;
+    
     printf("\nContinuous read + jump test\n");
 
     while(1) {
+        didStop = 0;
+    
         runs++;
     
         sector  = (rand() % 9) + 1;
@@ -175,6 +186,12 @@ void jumpReadTest(void)
 
             printf("FAIL -- res = %d\n", res);
             showBiosError(res);
+            
+            if(stopOnError) {
+                Cnecin();
+                didStop = 1;
+                runsAfterStop = -1;
+            }
         } else {
             if(bfr[0] == track && bfr[1] == side && bfr[2] == sector) { // good
                 printf("GOOD, TrSiSe GOOD\n");
@@ -183,7 +200,24 @@ void jumpReadTest(void)
             
                 printf("GOOD, TrSiSe BAD Tr%dSi%dSe%d\n",bfr[0],bfr[1],bfr[2]);
                 showDiff(bfr, track, side, sector, range);
-                // Cnecin();
+
+                if(stopOnError) {
+                    Cnecin();
+                    didStop = 1;
+                    runsAfterStop = -1;
+                }
+            }
+        }
+        
+        if(ms > 500 && runsAfterStop > 0) { // operation was taking too much time? wait for key
+            if(stopOnError && !didStop) {
+                printf("Operation longer than 500 ms, press any key to continue.\n");
+                Cnecin();
+                runsAfterStop = -1;
+            }
+            
+            if(!didStop) {                  // long operation, didn't stop because of other error, and it's not the 0th read in a row? lazy read!
+                lazy++;
             }
         }
         
@@ -194,11 +228,15 @@ void jumpReadTest(void)
         Cconout('H');       // cursor home
 
         float err = (((float) errs) * 100.0f) / ((float) runs);
-        printf("Runs: %03d, Errors: %02d (%.1f %%)                \n", runs, errs, err);
-        printf("Runs: %03d, Errors: %02d (%.1f %%)                \n", runs, errs, err);
+        float laz = (((float) lazy) * 100.0f) / ((float) runs);
+        
+        printf("Runs: %03d, Errors: %02d (%.1f %%), Lazy: %02d (%0.1f %%)            \n", runs, errs, err, lazy, laz);
+        printf("Runs: %03d, Errors: %02d (%.1f %%), Lazy: %02d (%0.1f %%)            \n", runs, errs, err, lazy, laz);
         
         Cconout(27);
         Cconout('k');       // restore cursor position
+        
+        runsAfterStop++;
     }
 }
 
