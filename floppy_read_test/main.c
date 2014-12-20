@@ -20,6 +20,8 @@ void showBiosError(int errorNo);
 void showDecimal(int num);
 void showDiff(BYTE* bfr, int track, int side, int sector, char*range);
 
+DWORD getTicks(void);
+
 BYTE writeBfr[512];
 
 int main(void)
@@ -159,8 +161,14 @@ void jumpReadTest(void)
      	//just to make sure we are not looking at data from the last read attempt on a failure
         memset(bfr,initval++,512);
 
-        res = Floprd(bfr, 0, 0, sector, track, side, 1);
-	    printf("READ Track %02d, Side %d, Sector %d -- ", track, side, sector);
+        DWORD start, end;
+        
+        start   = getTicks();
+        res     = Floprd(bfr, 0, 0, sector, track, side, 1);
+        end     = getTicks();
+        
+        DWORD ms = (end - start) * 5;
+	    printf("READ Track %02d, Side %d, Sector %d -- (took %04d ms) -- ", track, side, sector, ms);
 
         if(res != 0) {      // fail because Floprd failed
             errs++;
@@ -184,7 +192,7 @@ void jumpReadTest(void)
 
         Cconout(27);
         Cconout('H');       // cursor home
-        
+
         float err = (((float) errs) * 100.0f) / ((float) runs);
         printf("Runs: %03d, Errors: %02d (%.1f %%)                \n", runs, errs, err);
         printf("Runs: %03d, Errors: %02d (%.1f %%)                \n", runs, errs, err);
@@ -200,6 +208,8 @@ void showDiff(BYTE* bfr, int track, int side, int sector, char*range)
 	int blockcnt=0;
 	int i=0;
 
+    printf("Block diff: ");
+    
 	if(bfr[0] != track) {
 		diffcnt++;
 	}
@@ -293,4 +303,20 @@ void showBiosError(int errorNo)
 	}
 }
 
+// 200 Hz system clock
+#define HZ_200     ((volatile DWORD *) 0x04BA) 
+
+DWORD getTicks_super(void)
+{
+    DWORD now;
+	
+	now = *HZ_200;
+	return now;
+}
+
+DWORD getTicks(void)
+{
+    DWORD now = Supexec(getTicks_super);
+    return now;
+}
 
