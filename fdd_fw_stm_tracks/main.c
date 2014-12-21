@@ -72,9 +72,9 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 //--------------
 
 #define REQUEST_TRACK                       {   next.track = now.track; next.side = now.side; sendTrackRequest = TRUE; lastRequestTime = TIM4->CNT; trackStreamedCount = 0; }
-#define FORCE_REQUEST_TRACK                 {   REQUEST_TRACK;      lastRequestTime -= 10;      lastRequested.track = 0xff;     lastRequested.side = 0xff;                  }
+#define FORCE_REQUEST_TRACK                 {   REQUEST_TRACK;      lastRequestTime -= 25;      lastRequested.track = 0xff;     lastRequested.side = 0xff;                  }
 
-WORD version[2] = {0xf014, 0x1126};             // this means: Franz, 2014-11-26
+WORD version[2] = {0xf014, 0x1221};             // this means: Franz, 2014-12-21
 WORD drive_select;
 
 volatile BYTE sendFwVersion, sendTrackRequest;
@@ -162,7 +162,7 @@ int main (void)
                 WORD timeNow    = TIM4->CNT;
                 WORD diff       = timeNow - lastRequestTime;
                 
-                if(diff >= 6) {                                                                 // and at least 3 ms passed since the request (6 / 2000 s)
+                if(diff >= 20) {                                                                // and at least 10 ms passed since the request (20 / 2000 s)
                     sendTrackRequest    = FALSE;
                 
                     // first check if this isn't what we've requested last time
@@ -413,21 +413,26 @@ void EXTI3_IRQHandler(void)
 {
   if(EXTI_GetITStatus(EXTI_Line3) != RESET) {
         WORD inputs;
-//      WORD curIntTime, difIntTIme;
+        WORD curIntTime, difIntTime;
+        static WORD prevIntTime = 0;
         
         EXTI_ClearITPendingBit(EXTI_Line3);             // Clear the EXTI line pending bit 
         inputs = GPIOB->IDR;
         
         //---------
-/*      
         // now check if the step pulse isn't too soon after the previous one
         curIntTime = TIM4->CNT;                         // get current time -- 2 kHz timer
-        difIntTIme = curIntTime - prevIntTime;          // calc only difference
-        if(difIntTIme < 5) {                            // if the difference is less than 2.5 ms, quit
+        difIntTime = curIntTime - prevIntTime;          // calc only difference
+      
+        if(difIntTime > 255) {
+            difIntTime = 255;
+        }
+
+        if(difIntTime < 2) {                            // if the difference is less than 1 ms, quit
                 return;
         }
+        
         prevIntTime = curIntTime;                       // store as previous time
-*/      
         //---------
         
         if((inputs & MOTOR_ENABLE) != 0) {              // motor not enabled? Skip the following code.
