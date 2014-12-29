@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "acsi.h"
+
 #define BYTE    unsigned char
 #define WORD  	uint16_t
 #define DWORD 	uint32_t
@@ -23,34 +25,41 @@ void showInt(int value, int length);
 void showHexByte(int val);
 
 void testLoop(void);
-BYTE *wBfr, *pWrBfr;
-BYTE *rBfr;
+BYTE *wBfrOrig, *rBfrOrig;
+BYTE *wBfr,     *rBfr;
 
 #define TESTFILE		"C:\\testfile.bin"
 
 #define Clear_home()    (void) Cconws("\33E")
 BYTE rwSectorsNotFiles;
 
-#define BUFSIZE		(128 * 512)
+#define BUFSIZE		(MAXSECTORS * 512)
 char testFile[128];
+
+extern BYTE acsiBufferClear;        // should clear FIFO buffer on each acsi_cmd() call? 
 
 int main(int argc, char *argv[])
 {
 	DWORD i, s, ind;
 	BYTE key, val;
 
+    acsiBufferClear = 1;            // DO clear FIFO buffer on each acsi_cmd() call
+    
 	// alloc buffers
-    wBfr = (BYTE *) Malloc(BUFSIZE);
-    rBfr = (BYTE *) Malloc(BUFSIZE);
+    wBfrOrig = (BYTE *) Malloc(BUFSIZE + 2);
+    rBfrOrig = (BYTE *) Malloc(BUFSIZE + 2);
 
-    if(!wBfr || !rBfr) {
+    if(!wBfrOrig || !rBfrOrig) {
         (void) Cconws("Malloc failed!\n\r");
         return 0;
     }
 
+    wBfr = (BYTE *) ((((DWORD) wBfrOrig) + 2) & 0xfffffffe);
+    rBfr = (BYTE *) ((((DWORD) rBfrOrig) + 2) & 0xfffffffe);
+    
     // fill write buffer
 	ind = 0;
-	for(s=0; s<128; s++) {
+	for(s=0; s<MAXSECTORS; s++) {
 		for(i=0; i<512; i++) {
 			val			= ((BYTE) i) ^ ((BYTE) s);
 			wBfr[ind]	= val;
@@ -112,8 +121,8 @@ int main(int argc, char *argv[])
 	}
 		
     // release buffers
-    Mfree(wBfr);
-    Mfree(rBfr);
+    Mfree(wBfrOrig);
+    Mfree(rBfrOrig);
 
 	return 0;
 }
@@ -202,13 +211,53 @@ void seekAndRead(void)
 void testLoop(void)
 {
     int i, sectStart, sectCnt;
-    BYTE cmd[6], res;
+    BYTE cmd[11], res;
     
-    BYTE *pRdBfr;
-    DWORD dRdBfr = (DWORD) (rBfr + 2);      // get original RAM address + 2
-    dRdBfr = dRdBfr & 0xfffffffe;           // get even version of that... 
-    pRdBfr = (BYTE *) dRdBfr;               // convert it to pointer
+    acsiBufferClear = 0;                    // DON'T clear FIFO buffer on each acsi_cmd() call
+    
+    cmd[0] = 0x3f;                          // ICD cmd marker
+    cmd[1] = 0x25;                          // SCSI_C_READ_CAPACITY                    
+    res = acsi_cmd(ACSI_READ, cmd, 11, rBfr, 1);
+    
+    if(res != 0) {
+        acsiBufferClear = 1;                // DO clear FIFO buffer on each acsi_cmd() call
 
+        (void) Cconws("\n\rFailed to get capacity of ACSI device 1.\n\r");
+        Cnecin();
+        return;
+    }
+
+    res = acsi_cmd(ACSI_READ, cmd, 11, rBfr, 1);
+    acsiBufferClear = 1;                // DO clear FIFO buffer on each acsi_cmd() call
+    
+    if(res != 0) {
+        (void) Cconws("\n\rFailed to get capacity of ACSI device 1.\n\r");
+        Cnecin();
+        return;
+    }
+    
+    DWORD capacity;
+    capacity  = rBfr[0];
+    capacity  = capacity << 8;
+    capacity |= rBfr[1];
+    capacity  = capacity << 8;
+    capacity |= rBfr[2];
+    capacity  = capacity << 8;
+    capacity |= rBfr[3];
+    
+    (void) Cconws("Capacity: ");
+    showHexByte(rBfr[0]);
+    showHexByte(rBfr[1]);
+    showHexByte(rBfr[2]);
+    showHexByte(rBfr[3]);
+    (void) Cconws("\n\r");
+    
+    if(capacity == 0) {
+        (void) Cconws("\n\rGET CAPACITY returned 0, can't continue.\n\r");
+        Cnecin();
+        return;
+    }
+    
     for(i=0; i<1000; i++) {
         if((i % 10) == 0) {
             (void) Cconws("\n\r");
@@ -218,12 +267,11 @@ void testLoop(void)
 			Cconout('.');
 		}
 
-        sectStart   = Random() % 10000;       // starting sector - 0 .. 10'000
-        sectCnt     = (Random() % 124) + 1;   // count of sectors to read and write
-
-        pWrBfr = wBfr + sectCnt;            // calculate the starting pointer
-        if((sectCnt & 1) != 0) { 			// odd address?
-            pWrBfr += 1;                    // make even address
+        sectCnt     = (Random() % MAXSECTORS) + 1;      // count of sectors to read and write
+        sectStart   = (Random() % capacity  );          // starting sector - 0 .. capacity
+        
+        if(sectStart + sectCnt >= capacity) {           // would we go out of capacity range? 
+            sectStart = capacity - sectCnt;             // read the last sectors 
         }
 
         cmd[1] = (BYTE) (sectStart >> 16);
@@ -233,12 +281,12 @@ void testLoop(void)
         cmd[4] = (BYTE) sectCnt;
         cmd[5] = 0;
 
-        cmd[0] = 0x0a;
+        cmd[0] = 0x2a;
 
 		if(rwSectorsNotFiles == 0) {								// test on files
-			res = rwFile(0, pWrBfr, sectCnt);
+			res = rwFile(0, wBfr, sectCnt);
 		} else {													// test on sectors
-			res = acsi_cmd(0, cmd, 6, pWrBfr, sectCnt);           	// write data
+			res = acsi_cmd(ACSI_WRITE, cmd, 6, wBfr, sectCnt);      // write data
 		}
 			
         if(res != 0) {
@@ -248,23 +296,32 @@ void testLoop(void)
             continue;
         }
 
-        cmd[0] = 0x08;
+        cmd[0] = 0x28;
 		
 		if(rwSectorsNotFiles == 0) {								// test on files
-			res = rwFile(1, pRdBfr, sectCnt);
+			res = rwFile(1, rBfr, sectCnt);
 		} else {													// test on sectors
-			res = acsi_cmd(1, cmd, 6, pRdBfr, sectCnt);           	// read data		
+			res = acsi_cmd(ACSI_READ, cmd, 6, rBfr, sectCnt);       // read data		
 		}
 			
         if(res != 0) {
             (void) Cconws("\n\rRead operation failed at test ");
 			showInt(i, 4);
+			(void) Cconws("\n\rsectStart: ");
+            showHexByte(cmd[1]);
+            showHexByte(cmd[2]);
+            showHexByte(cmd[3]);
+			(void) Cconws("\n\rsectCnt  : ");
+            showHexByte(sectCnt >> 8);
+            showHexByte(sectCnt     );
+			(void) Cconws("\n\rres      : ");
+            showHexByte(res);
 			(void) Cconws("\n\r");
             continue;
         }
 
 		DWORD cnt = sectCnt * 512;
-		bfrCompare(pWrBfr, pRdBfr, cnt, i);
+		bfrCompare(wBfr, rBfr, cnt, i);
     }
 }
 
@@ -389,3 +446,4 @@ void showInt(int value, int length)
 
     (void) Cconws(tmp);                     // write it out
 } 
+
