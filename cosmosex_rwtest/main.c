@@ -18,6 +18,7 @@
 
 BYTE  acsiRW(BYTE readNotWrite, DWORD sectStart, BYTE sectCnt, BYTE *bfr);
 DWORD getDriveCapacity(void);
+void showRWerror(BYTE rwSectorsNotFiles, int i, BYTE readNotWrite, DWORD sectStart, WORD sectCnt, BYTE res);
 
 BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 BYTE rwFile(BYTE readNotWrite, BYTE *pBfr, WORD sectCnt);
@@ -216,13 +217,21 @@ void testLoop(void)
     int i, sectStart, sectCnt;
     BYTE res;
     
-    DWORD capacity = getDriveCapacity();
+    DWORD capacity;
+
+    if(rwSectorsNotFiles) {                             // sector level test? get drive capacity using SCSI command
+        capacity = getDriveCapacity();
     
-    if(capacity == 0) {
-        return;
+        if(capacity == 0) {
+            return;
+        }
+    } else {                                            // file level test? just fake some capacity (we will be reading just 128 kB at once)
+        capacity = 15 * 1024 * 1024;
     }
     
     for(i=0; i<1000; i++) {
+        //----------
+        // show some progress to user 
         if((i % 10) == 0) {
             (void) Cconws("\n\r");
 			showInt(i, 4);
@@ -231,6 +240,8 @@ void testLoop(void)
 			Cconout('.');
 		}
 
+        //----------
+        // make up operation params
         sectCnt     = (Random() % MAXSECTORS) + 1;      // count of sectors to read and write
         sectStart   = (Random() % capacity  );          // starting sector - 0 .. capacity
         
@@ -238,47 +249,70 @@ void testLoop(void)
             sectStart = capacity - sectCnt;             // read the last sectors 
         }
 
+        //----------
+        // write data
 		if(rwSectorsNotFiles == 0) {								// test on files
 			res = rwFile(0, wBfr, sectCnt);
 		} else {													// test on sectors
             res = acsiRW(ACSI_WRITE, sectStart, sectCnt, wBfr);
 		}
 			
-        if(res != 0) {
-            (void) Cconws("\n\rWrite operation failed at test ");
-			showInt(i, 4);
-			(void) Cconws("\n\r");
+        if(res != 0) {                                              // on WRITE error
+            showRWerror(rwSectorsNotFiles, i, ACSI_WRITE, sectStart, sectCnt, res);
             continue;
         }
 
+        //----------
+        // read data
+        DWORD byteCount = sectCnt * 512;
+        memset(rBfr, 0, byteCount);                                 // clean the buffer before reading
+        
 		if(rwSectorsNotFiles == 0) {								// test on files
 			res = rwFile(1, rBfr, sectCnt);
 		} else {													// test on sectors
             res = acsiRW(ACSI_READ, sectStart, sectCnt, rBfr);
 		}
 			
-        if(res != 0) {
-            (void) Cconws("\n\rRead operation failed at test ");
-			showInt(i, 4);
-			(void) Cconws("\n\rsectStart: ");
-            showHexByte(sectStart >> 24);
-            showHexByte(sectStart >> 16);
-            showHexByte(sectStart >>  8);
-            showHexByte(sectStart      );
-			(void) Cconws("\n\rsectCnt  : ");
-            showHexByte(sectCnt >> 8);
-            showHexByte(sectCnt     );
-			(void) Cconws("\n\rres      : ");
-            showHexByte(res);
-			(void) Cconws("\n\r");
-            
-            Cnecin();
+        if(res != 0) {                                              // on READ error
+            showRWerror(rwSectorsNotFiles, i, ACSI_READ, sectStart, sectCnt, res);
             continue;
         }
 
+        //----------
+        // verify data
 		DWORD cnt = sectCnt * 512;
-		bfrCompare(wBfr, rBfr, cnt, i);
+		bfrCompare(wBfr, rBfr, cnt, i);                             // check data validity, possibly display error
     }
+}
+
+void showRWerror(BYTE rwSectorsNotFiles, int i, BYTE readNotWrite, DWORD sectStart, WORD sectCnt, BYTE res)
+{
+    if(readNotWrite) {
+        (void) Cconws("\n\rREAD  ");
+    } else {
+        (void) Cconws("\n\rWRITE ");
+    }
+
+    (void) Cconws("operation failed at test ");
+    showInt(i, 4);
+    
+    if(rwSectorsNotFiles) {                                 // for sector level test also write starting sector
+        (void) Cconws("\n\rsectStart: ");
+        showHexByte(sectStart >> 24);
+        showHexByte(sectStart >> 16);
+        showHexByte(sectStart >>  8);
+        showHexByte(sectStart      );
+    }
+    
+    (void) Cconws("\n\rsectCnt  : ");
+    showHexByte(sectCnt >> 8);
+    showHexByte(sectCnt     );
+    
+    (void) Cconws("\n\rres      : ");
+    showHexByte(res);
+    (void) Cconws("\n\r");
+    
+    Cnecin();
 }
 
 DWORD getDriveCapacity(void)
