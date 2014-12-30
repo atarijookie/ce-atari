@@ -2,15 +2,55 @@
 #include <mint/sysbind.h>
 
 #include "acsi.h"
+#include "stdlib.h"
 
 /* -------------------------------------- */
 BYTE acsiBufferClear;
+
+BYTE cmdLog[5 * 12];
+
+void showCmdLog(void)
+{
+    int i, j, len;
+    (void) Cconws("\n\r\n\rCMD log:\n\r");
+    
+    for(i=0; i<5; i++) {
+        if((cmdLog[i * 12] & 0x1f) == 0x1f) {
+            len = 11;
+        } else {
+            len = 6;
+        }
+    
+        for(j=0; j<len; j++) {
+            showHexByte(cmdLog[i * 12 + j]);        // show cmd
+            Cconout(' ');
+        }
+        
+        for(j=0; j<(11 - len); j++) {               // pad with spaces
+            (void) Cconws("   ");
+        }
+        
+        (void) Cconws(" - ");
+        showHexByte(cmdLog[i * 12 + 11]);           // show res
+        (void) Cconws("\n\r");
+    }
+}
 
 BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
 	DWORD status;
 	WORD i, wr1, wr2;
 
+    //---------------------
+    for(i=0; i<4*12; i++) {             // copy cmd1 to cmd0, cmd2 to cmd1, and so on
+        cmdLog[i] = cmdLog[i + 12];
+    }
+    
+    for(i=0; i<cmdLength; i++) {        // copy the new command to the end of cmdLog
+        cmdLog[48 + i] = cmd[i];
+    }
+    //---------------------
+        
 	*FLOCK = -1;                            	/* disable FDC operations */
 	setdma((DWORD) buffer);                 /* setup DMA transfer address */
 
@@ -23,6 +63,7 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 	if (qdone() != OK) {					/* wait for ack */
 		hdone();                          	/* restore DMA device to normal */
 
+        cmdLog[59] = ACSIERROR;
 		return ACSIERROR;
 	}
 	/*********************************/
@@ -34,6 +75,7 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 		if (qdone() != OK) {				/* wait for ack */
 			hdone();                        /* restore DMA device to normal */
 			
+            cmdLog[59] = ACSIERROR;
 			return ACSIERROR;
 		}
 	}
@@ -61,6 +103,7 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     status = endcmd(wr2 | NO_DMA | HDC | A0);   /* wait for DMA completion */
 	hdone();                                	/* restore DMA device to normal */
 
+    cmdLog[59] = status;
 	return status;
 }
 

@@ -32,6 +32,8 @@ void testLoop(void);
 BYTE *wBfrOrig, *rBfrOrig;
 BYTE *wBfr,     *rBfr;
 
+void showCmdLog(void);
+
 #define TESTFILE		"C:\\testfile.bin"
 
 #define Clear_home()    (void) Cconws("\33E")
@@ -312,6 +314,10 @@ void showRWerror(BYTE rwSectorsNotFiles, int i, BYTE readNotWrite, DWORD sectSta
     showHexByte(res);
     (void) Cconws("\n\r");
     
+    if(rwSectorsNotFiles) {
+        showCmdLog();
+    }
+    
     Cnecin();
 }
 
@@ -493,51 +499,4 @@ BYTE rwFile(BYTE readNotWrite, BYTE *pBfr, WORD sectCnt)
 	return res;
 }
 
-void showHexByte(int val)
-{
-    int hi, lo;
-    char table[16] = {"0123456789ABCDEF"};
-    hi = (val >> 4) & 0x0f;;
-    lo = (val     ) & 0x0f;
-
-    (void) Cconout( table[hi] );
-    (void) Cconout( table[lo] );
-}
-
-void showInt(int value, int length)
-{
-    char tmp[10];
-    memset(tmp, 0, 10);
-
-    if(length == -1) {                      // determine length?
-        int i, div = 10;
-
-        for(i=1; i<6; i++) {                // try from 10 to 1000000
-            if((value / div) == 0) {        // after division the result is zero? we got the length
-                length = i;
-                break;
-            }
-
-            div = div * 10;                 // increase the divisor by 10
-        }
-
-        if(length == -1) {                  // length undetermined? use length 6
-            length = 6;
-        }
-    }
-
-    int i;
-    for(i=0; i<length; i++) {               // go through the int lenght and get the digits
-        int val, mod;
-
-        val = value / 10;
-        mod = value % 10;
-
-        tmp[length - 1 - i] = mod + 48;     // store the current digit
-
-        value = val;
-    }
-
-    (void) Cconws(tmp);                     // write it out
-} 
 
