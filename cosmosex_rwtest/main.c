@@ -16,6 +16,9 @@
 #define WORD  	uint16_t
 #define DWORD 	uint32_t
 
+BYTE  acsiRW(BYTE readNotWrite, DWORD sectStart, BYTE sectCnt, BYTE *bfr);
+DWORD getDriveCapacity(void);
+
 BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 BYTE rwFile(BYTE readNotWrite, BYTE *pBfr, WORD sectCnt);
 void seekAndRead(void);
@@ -211,50 +214,11 @@ void seekAndRead(void)
 void testLoop(void)
 {
     int i, sectStart, sectCnt;
-    BYTE cmd[11], res;
+    BYTE res;
     
-    acsiBufferClear = 0;                    // DON'T clear FIFO buffer on each acsi_cmd() call
-    
-    cmd[0] = 0x3f;                          // ICD cmd marker
-    cmd[1] = 0x25;                          // SCSI_C_READ_CAPACITY                    
-    res = acsi_cmd(ACSI_READ, cmd, 11, rBfr, 1);
-    
-    if(res != 0) {
-        acsiBufferClear = 1;                // DO clear FIFO buffer on each acsi_cmd() call
-
-        (void) Cconws("\n\rFailed to get capacity of ACSI device 1.\n\r");
-        Cnecin();
-        return;
-    }
-
-    res = acsi_cmd(ACSI_READ, cmd, 11, rBfr, 1);
-    acsiBufferClear = 1;                // DO clear FIFO buffer on each acsi_cmd() call
-    
-    if(res != 0) {
-        (void) Cconws("\n\rFailed to get capacity of ACSI device 1.\n\r");
-        Cnecin();
-        return;
-    }
-    
-    DWORD capacity;
-    capacity  = rBfr[0];
-    capacity  = capacity << 8;
-    capacity |= rBfr[1];
-    capacity  = capacity << 8;
-    capacity |= rBfr[2];
-    capacity  = capacity << 8;
-    capacity |= rBfr[3];
-    
-    (void) Cconws("Capacity: ");
-    showHexByte(rBfr[0]);
-    showHexByte(rBfr[1]);
-    showHexByte(rBfr[2]);
-    showHexByte(rBfr[3]);
-    (void) Cconws("\n\r");
+    DWORD capacity = getDriveCapacity();
     
     if(capacity == 0) {
-        (void) Cconws("\n\rGET CAPACITY returned 0, can't continue.\n\r");
-        Cnecin();
         return;
     }
     
@@ -274,19 +238,10 @@ void testLoop(void)
             sectStart = capacity - sectCnt;             // read the last sectors 
         }
 
-        cmd[1] = (BYTE) (sectStart >> 16);
-        cmd[2] = (BYTE) (sectStart >>  8);
-        cmd[3] = (BYTE) (sectStart);
-
-        cmd[4] = (BYTE) sectCnt;
-        cmd[5] = 0;
-
-        cmd[0] = 0x2a;
-
 		if(rwSectorsNotFiles == 0) {								// test on files
 			res = rwFile(0, wBfr, sectCnt);
 		} else {													// test on sectors
-			res = acsi_cmd(ACSI_WRITE, cmd, 6, wBfr, sectCnt);      // write data
+            res = acsiRW(ACSI_WRITE, sectStart, sectCnt, wBfr);
 		}
 			
         if(res != 0) {
@@ -296,33 +251,138 @@ void testLoop(void)
             continue;
         }
 
-        cmd[0] = 0x28;
-		
 		if(rwSectorsNotFiles == 0) {								// test on files
 			res = rwFile(1, rBfr, sectCnt);
 		} else {													// test on sectors
-			res = acsi_cmd(ACSI_READ, cmd, 6, rBfr, sectCnt);       // read data		
+            res = acsiRW(ACSI_READ, sectStart, sectCnt, rBfr);
 		}
 			
         if(res != 0) {
             (void) Cconws("\n\rRead operation failed at test ");
 			showInt(i, 4);
 			(void) Cconws("\n\rsectStart: ");
-            showHexByte(cmd[1]);
-            showHexByte(cmd[2]);
-            showHexByte(cmd[3]);
+            showHexByte(sectStart >> 24);
+            showHexByte(sectStart >> 16);
+            showHexByte(sectStart >>  8);
+            showHexByte(sectStart      );
 			(void) Cconws("\n\rsectCnt  : ");
             showHexByte(sectCnt >> 8);
             showHexByte(sectCnt     );
 			(void) Cconws("\n\rres      : ");
             showHexByte(res);
 			(void) Cconws("\n\r");
+            
+            Cnecin();
             continue;
         }
 
 		DWORD cnt = sectCnt * 512;
 		bfrCompare(wBfr, rBfr, cnt, i);
     }
+}
+
+DWORD getDriveCapacity(void)
+{
+    BYTE cmd[11];
+    BYTE res;
+
+    acsiBufferClear = 0;                    // DON'T clear FIFO buffer on each acsi_cmd() call
+    
+    memset(cmd, 0, 11);
+    cmd[0] = 0x3f;                          // ICD cmd marker
+    cmd[1] = 0x25;                          // SCSI_C_READ_CAPACITY                    
+    
+    res = acsi_cmd(ACSI_READ, cmd, 11, rBfr, 1);
+    
+    if(res != 0) {
+        acsiBufferClear = 1;                // DO clear FIFO buffer on each acsi_cmd() call
+
+        (void) Cconws("\n\rFailed to get capacity of ACSI device 1. (1st GET CAPACITY failed)\n\r");
+        Cnecin();
+        return 0;
+    }
+
+    res = acsi_cmd(ACSI_READ, cmd, 11, rBfr, 1);
+    acsiBufferClear = 1;                // DO clear FIFO buffer on each acsi_cmd() call
+    
+    if(res != 0) {
+        (void) Cconws("\n\rFailed to get capacity of ACSI device 1. (2nd GET CAPACITY failed)\n\r");
+        Cnecin();
+        return 0;
+    }
+
+    (void) Cconws("Capacity: ");
+    showHexByte(rBfr[0]);
+    showHexByte(rBfr[1]);
+    showHexByte(rBfr[2]);
+    showHexByte(rBfr[3]);
+    (void) Cconws("\n\r");
+    
+    DWORD capacity;
+    capacity  = rBfr[0];
+    capacity  = capacity << 8;
+    capacity |= rBfr[1];
+    capacity  = capacity << 8;
+    capacity |= rBfr[2];
+    capacity  = capacity << 8;
+    capacity |= rBfr[3];
+    
+    if(capacity == 0) {
+        (void) Cconws("\n\rGET CAPACITY returned 0, can't continue.\n\r");
+        Cnecin();
+    }    
+    
+    return capacity;
+}
+
+BYTE acsiRW(BYTE readNotWrite, DWORD sectStart, BYTE sectCnt, BYTE *bfr)
+{
+    BYTE cmd[11];
+    BYTE cmdLength;
+
+    if(sectStart <= 0x1fffff) {             // less than 1 GB address?
+        cmdLength = 6;
+    
+        if(readNotWrite == ACSI_READ) {     // on read
+            cmd[0] = 0x28;                  // SCSI READ 6  + ACSI ID 1
+        } else {                            // on write
+            cmd[0] = 0x2a;                  // SCSI WRITE 6 + ACSI ID 1
+        }
+    
+        cmd[1] = (BYTE) (sectStart >> 16);  // address
+        cmd[2] = (BYTE) (sectStart >>  8);
+        cmd[3] = (BYTE) (sectStart);
+
+        cmd[4] = (BYTE) sectCnt;            // length
+        cmd[5] = 0;                         // control
+    } else {                                // more than 1 GB address?
+        cmdLength = 11;
+        
+        cmd[0] = 0x3f;                      // ACSI ID 1 + ICD command flag (0x1f)
+        
+        if(readNotWrite == ACSI_READ) {     // on read
+            cmd[1] = 0x28;                  // SCSI READ 10
+        } else {                            // on write
+            cmd[1] = 0x2a;                  // SCSI WRITE 10
+        }
+        
+        cmd[2] = 0;
+    
+        cmd[3] = (BYTE) (sectStart >> 24);  // address
+        cmd[4] = (BYTE) (sectStart >> 16);
+        cmd[5] = (BYTE) (sectStart >>  8);
+        cmd[6] = (BYTE) (sectStart);
+
+        cmd[7] = 0;                         // group number
+
+        cmd[8] = 0;                         // length hi
+        cmd[9] = (BYTE) sectCnt;            // length lo
+        
+        cmd[10] = 0;                        // control
+    }
+
+    BYTE res = acsi_cmd(readNotWrite, cmd, cmdLength, bfr, sectCnt);
+    return res;
 }
 
 void bfrCompare(BYTE *a, BYTE *b, DWORD cnt, DWORD testNo)
