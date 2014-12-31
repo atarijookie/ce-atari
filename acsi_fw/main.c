@@ -105,10 +105,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa014, 0x1002};                             // this means: hAns, 2014-10-02
+WORD version[2] = {0xa014, 0x1231};                             // this means: hAns, 2014-12-31
 
 char *VERSION_STRING_SHORT  = {"1.00"};
-char *DATE_STRING           = {"10/02/14"};
+char *DATE_STRING           = {"12/31/14"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
@@ -414,7 +414,7 @@ void onGetCommand(void)
             if(brStat != E_OK) {                        // if something was wrong
                 break;                        
             }
-
+            
             if(i == 1) {                                // if we got also the 2nd byte
                 getCmdLengthFromCmdBytes();             // we set up the length of command, etc.
             }             

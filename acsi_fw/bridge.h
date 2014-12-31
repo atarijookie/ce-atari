@@ -5,11 +5,12 @@
 
 
 // bridge functions return value
-#define	E_TimeOut			0
-#define	E_OK					1
-#define	E_OK_A1				2
-#define	E_CARDCHANGE	3	
-#define	E_RESET				4	
+#define	E_TimeOut           0
+#define	E_OK                1
+#define	E_OK_A1             2
+#define	E_CARDCHANGE        3	
+#define	E_RESET             4	
+#define E_FAIL_CMD_AGAIN    5
 
 
 // set GPIOB0-7 as floating input, then RnW to LOW

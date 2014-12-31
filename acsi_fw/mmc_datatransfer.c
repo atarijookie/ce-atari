@@ -41,34 +41,29 @@ void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
             break;\
         }
         
+// the following macro waits until the card is busy, and when it's not busy, it continues        
+#define WAIT_FOR_CARD_NOT_BUSY              \
+        while(spi2_TxRx(0xFF) != 0xff) {    \
+            if(timeout()) {                 \
+                quit = 1;                   \
+                break;                      \
+            }                               \
+        }
+        
 BYTE mmcRead_dma(DWORD sector, WORD count)
 {
-    BYTE r1, quit;
+    BYTE r1, quit, good;
     WORD i,c, last;
     BYTE byte = 0;
     
     BYTE    *pData;
     BYTE    *rxBuffNow;
     WORD    exti;
-    
-    timeoutStart();
-    
-    // assert chip select
-    spiCSlow();                                             // CS to L
+    WORD    waits, retries;
 
     if(sdCard.Type != DEVICETYPE_SDHC)                      // for non SDHC cards change sector into address
         sector = sector<<9;
-
-    // issue command
-    r1 = mmcCommand(MMC_READ_MULTIPLE_BLOCKS, sector);
-
-    // check for valid response
-    if(r1 != 0x00) {
-        spi2_TxRx(0xFF);
-        spiCShigh();                                        // CS to H
-        return r1;
-    }
-
+    
     // read in data
     ACSI_DATADIR_READ();
     
@@ -79,10 +74,53 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
     }
     
     pData     = spiRxBuff1;
-    
     rxBuffNow = spiRxBuff1;
+
+    timeoutStart();
     
-    while(spi2_TxRx(0xFF) != MMC_STARTBLOCK_READ);              // wait for STARTBLOCK
+    //---------------
+    // try to start READ MULTIPLE BLOCKS with couple of retries
+    for(retries=0; retries<5; retries++) {
+        if(timeout()) {                                         // timeout through timer? quit with fail
+            return 0xff;
+        }
+        
+        spiCSlow();                                             // CS to L
+
+        // issue command
+        r1 = mmcCommand(MMC_READ_MULTIPLE_BLOCKS, sector);
+
+        // check for valid response
+        if(r1 != 0x00) {
+            spi2_TxRx(0xFF);
+            spiCShigh();                                        // CS to H
+            return r1;
+        }
+    
+        good = 0;
+        for(waits=0; waits < 0xffff; waits++) {                 // wait for STARTBLOCK
+            r1 = spi2_TxRx(0xFF);
+            
+            if(r1 == MMC_STARTBLOCK_READ) {                     // if received STARTBLOCK, then we're good, quit this loop
+                good = 1;
+                break;
+            }
+        }
+        
+        if(good) {                                              // good? also quit this loop
+            break;
+        }
+        
+        spiCShigh();                                            // CS to H
+        spi2_TxRx(0xFF);
+        spi2_TxRx(0xFF);
+    }
+
+    if(!good) {                                                 // not good? READ FAILED :(
+        return 0xff;
+    }
+    //---------------
+    
     spi2Dma_txRx(512, spiTxBuff, 512, rxBuffNow);               // start first transfer
 
     last = count - 1;
@@ -103,7 +141,13 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
             spi2_TxRx(0xFF);                                    // read out CRC
             spi2_TxRx(0xFF);
             
-            while(spi2_TxRx(0xFF) != MMC_STARTBLOCK_READ);      // wait for STARTBLOCK
+            while(spi2_TxRx(0xFF) != MMC_STARTBLOCK_READ) {     // wait for STARTBLOCK
+                if(timeout()) {
+                    quit = 1;
+                    break;
+                }
+            }
+            
             spi2Dma_txRx(512, spiTxBuff, 512, rxBuffNow);       // start first transfer
         }
             
@@ -212,8 +256,14 @@ BYTE mmcWrite_dma(DWORD sector, WORD count)
 
         waitForSpi2Finish();                        // wait until DMA finishes
         waitForSPI2idle();                          // now wait until SPI2 finishes
+ 
+        // wait while busy
+        WAIT_FOR_CARD_NOT_BUSY
+            
+        if(quit) {
+            break;
+        }
         
-        while(spi2_TxRx(0xFF) != 0xff);             // wait while busy
         spi2Dma_txRx(515, pSend, 515, spiRxDummy);  // send this data in the backgroun
         
         thisSector++;                               // increment real sector #
@@ -222,18 +272,21 @@ BYTE mmcWrite_dma(DWORD sector, WORD count)
     waitForSpi2Finish();                            // wait until DMA finishes
     waitForSPI2idle();                              // now wait until SPI2 finishes
 
-    while(spi2_TxRx(0xFF) != 0xff);                 // while busy
+    // wait while busy
+    WAIT_FOR_CARD_NOT_BUSY
 
     spi2_TxRx(MMC_STOPTRAN_WRITE);                  // 0xfd to stop write multiple blocks
 
-    while(spi2_TxRx(0xFF) != 0xff);                 // while busy
+    // wait while busy
+    WAIT_FOR_CARD_NOT_BUSY
 
     //-------------------------------
     // for the MMC cards send the STOP TRANSMISSION also
     if(sdCard.Type == DEVICETYPE_MMC) {      
         mmcCommand(MMC_STOP_TRANSMISSION, 0);
 
-        while(spi2_TxRx(0xFF) != 0xff);          // while busy
+        // wait while busy
+        WAIT_FOR_CARD_NOT_BUSY
     }
     //-------------------------------
     spi2_TxRx(0xFF);
