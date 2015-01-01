@@ -149,5 +149,7 @@ DWORD SDHC_Capacity(void);
 
 BYTE EraseCard(void);
 
+void tryToEmptySdCardBuffer(void);
+
 #endif
 

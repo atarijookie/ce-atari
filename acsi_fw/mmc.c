@@ -8,6 +8,8 @@ TDevice sdCard;
 
 extern unsigned char brStat;
 
+void waitForSPI2idle(void);
+
 BYTE isCardInserted(void)
 {
     WORD inputs = GPIOC->IDR;
@@ -102,12 +104,41 @@ void sdCardInit(void)
         sdCard.IsInit       = TRUE;             // set the flag
                 
         sdCard.MediaChanged = TRUE;
+        
+        tryToEmptySdCardBuffer();               // try to empty the internal buffer of SD card
+        
         break;
     }
     
     spiSetFrequency(SPI_FREQ_HIGH); 
 }
 //-----------------------------------------------
+// It seems that on some cards the init sequence (or something from it) might cause the card
+// to want to talk a little bit more than expected, and thus the 1st command issued to this 
+// specific card might fail. For this situation just sending FFs and reading back the results
+// might cure the situation. (Happened to me on 1 out of 5 cards, other 4 were working fine). 
+
+void tryToEmptySdCardBuffer(void)
+{
+    WORD j;
+    
+    spi2_TxRx(0xFF);
+    spi2_TxRx(0xFF);
+    waitForSPI2idle();
+    spiCSlow();
+    
+    for(j=0; j<1024; j++) {
+        spi2_TxRx(0xFF);
+    }
+    waitForSPI2idle();
+
+    spiCShigh();
+    
+    spi2_TxRx(0xFF);
+    spi2_TxRx(0xFF);
+    waitForSPI2idle();
+}
+
 BYTE mmcReset(void)
 {
     BYTE r1;
