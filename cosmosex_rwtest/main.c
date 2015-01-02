@@ -23,7 +23,7 @@ void showRWerror(BYTE rwSectorsNotFiles, int i, BYTE readNotWrite, DWORD sectSta
 BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 BYTE rwFile(BYTE readNotWrite, BYTE *pBfr, WORD sectCnt);
 void seekAndRead(void);
-void bfrCompare(BYTE *a, BYTE *b, DWORD cnt, DWORD testNo);
+void bfrCompare(BYTE *a, BYTE *b, DWORD cnt, DWORD testNo, DWORD sectStart, DWORD sectCnt, BYTE res);
 void getDriveForTests(void);
 void showInt(int value, int length);
 void showHexByte(int val);
@@ -208,7 +208,7 @@ void seekAndRead(void)
 			continue;
 		}
 		
-		bfrCompare(wBfr + offset, rBfr, length, i);
+		bfrCompare(wBfr + offset, rBfr, length, i, 0, length / 512, res);
 	}
 	
 	Fclose(handle);
@@ -283,7 +283,7 @@ void testLoop(void)
         //----------
         // verify data
 		DWORD cnt = sectCnt * 512;
-		bfrCompare(wBfr, rBfr, cnt, i);                             // check data validity, possibly display error
+		bfrCompare(wBfr, rBfr, cnt, i, sectStart, sectCnt, res);        // check data validity, possibly display error
     }
 }
 
@@ -425,7 +425,7 @@ BYTE acsiRW(BYTE readNotWrite, DWORD sectStart, BYTE sectCnt, BYTE *bfr)
     return res;
 }
 
-void bfrCompare(BYTE *a, BYTE *b, DWORD cnt, DWORD testNo)
+void bfrCompare(BYTE *a, BYTE *b, DWORD cnt, DWORD testNo, DWORD sectStart, DWORD sectCnt, BYTE res)
 {
 	DWORD j, k;
 
@@ -450,6 +450,8 @@ void bfrCompare(BYTE *a, BYTE *b, DWORD cnt, DWORD testNo)
 				(void) Cconws(" ");
 			}
 			(void) Cconws("\n\r");
+
+            showRWerror(1, testNo, ACSI_READ, sectStart, sectCnt, res);
 
 			(void) Cnecin();
             break;
