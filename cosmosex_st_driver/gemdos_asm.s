@@ -79,9 +79,7 @@ callCustomHandlerNotPexec:                  |
 	move.l	(a0),a0							| custom function pointer
 	move.l	d0,-(sp)						| param #1: stack pointer with function params
 
-	movem.l d1/d2/a1/a2,saveregs			| save registers (required by TOS versions earlier than 2)
 	jsr     (a0)                            | call the custom handler
-	movem.l saveregs,d1/d2/a1/a2			| restore registers (required by TOS versions earlier than 2)
     addq.l  #4,sp
 
     rte                                     | return from exception, d0 contains return code
@@ -113,9 +111,7 @@ handleThisPexec:
     
 	movea.l (a0),a0
 	move.l  d0,-(sp)                        | param #1: stack pointer with function params
-	movem.l d1/d2/a1/a2,saveregs			| save registers (required by TOS versions earlier than 2)
 	jsr     (a0)                            | call the custom handler
-	movem.l saveregs,d1/d2/a1/a2			| restore registers (required by TOS versions earlier than 2)
     addq.l  #4,sp
 
 afterCustomPexecCall:
@@ -156,5 +152,3 @@ callOriginalPexec:
 _pexec_postProc:    dc.w    0       | 1 = post-process PE_LOADGO
 _pexec_callOrig:    dc.w    0       | 1 = after custom handler call original Pexec (no post processing)
 
-	.bss
-saveregs:			ds.l	4		| d1/d2/a1/a2 temp space

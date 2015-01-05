@@ -29,7 +29,6 @@ extern TrapHandlerPointer old_gemdos_handler;
 int32_t (*gemdos_table[256])( void* sp ) = { 0 };
 int16_t useOldGDHandler = 0;								/* 0: use new handlers, 1: use old handlers */
 
-extern void cpudet (void);
 extern void bios_handler( void );
 extern TrapHandlerPointer old_bios_handler;
 int32_t (*bios_table[256])( void* sp ) = { 0 };
@@ -48,10 +47,10 @@ void showIpAddress(BYTE *bfr);
 void showAppVersion(void);
 int getIntFromStr(const char *str, int len);
 
+void set_longframe(void);
 void setBootDrive(void);
 
 BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
-BYTE FastRAMBuffer[FASTRAM_BUFFER_SIZE] __attribute__((aligned (4)));
 
 BYTE *pDmaBuffer;
 
@@ -78,7 +77,7 @@ int year, month, day, hours, minutes, seconds;
 BYTE netConfig[10];
 
 extern DWORD _runFromBootsector;			// flag meaning if we are running from TOS or bootsector
-extern WORD trap_extra_offset;
+WORD trap_extra_offset=0;                   // Offset for GEMDOS/BIOS handler stack adjustment (should be 0 or 2)
 
 WORD transDiskProtocolVersion;              // this will hold the protocol version from Main App
 #define REQUIRED_TRANSLATEDDISK_VERSION     0x0100
@@ -94,8 +93,8 @@ int main( int argc, char* argv[] )
     showAppVersion();
     (void) Cconws(" ]\33q\r\n\r\n");
 
-	Supexec(cpudet);												/* Detect CPU and adjust GEMDOS/BIOS trap handler offsets */
-	
+    Supexec(set_longframe);
+		
 	BYTE kbshift = Kbshift(-1);
 	
 	if((kbshift & 0x0f) != 0 && kbshift != (K_CTRL | K_LSHIFT) ) {
@@ -495,3 +494,14 @@ int getIntFromStr(const char *str, int len)
     
     return val;
 }
+
+// Adjust GEMDOS/BIOS trap handler offsets
+void set_longframe(void)
+{
+    WORD longFrame = *_longframe;
+
+	if(longFrame != 0) {                // If != 0 then the cpu isn't 68000, so stack frame adjustment required
+		trap_extra_offset=2;
+    }
+}
+
