@@ -604,7 +604,7 @@ int32_t custom_fcreate( void *sp )
         return extendByteToDword(handle);									/* but append lots of FFs to make negative integer out of it */
 	}
 	
-	handle = handleCEtoAtari(handle);									/* convert the CE handle (0 - 46) to Atari handle (150 - 200) */
+	handle = handleCEtoAtari(handle);									/* convert the CE handle (0 - 46) to Atari handle (80 - 120) */
 	return handle;
 }
 
@@ -644,7 +644,7 @@ int32_t custom_fopen( void *sp )
     
     // if we got here, the result is the real ceHandle
     WORD ceHandle       = (WORD) res;
-	WORD atariHandle    = handleCEtoAtari(ceHandle);                    // convert the CE handle (0 - 46) to Atari handle (150 - 200)
+	WORD atariHandle    = handleCEtoAtari(ceHandle);                    // convert the CE handle (0 - 40) to Atari handle (80 - 120)
     
     getBytesToEof(ceHandle);                                            // retrieve the count of bytes until the end of file
 	

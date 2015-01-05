@@ -163,12 +163,12 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 // To mark the difference between normal Atari handle and handle which came 
 // from CosmosEx I've added some offset to CosmosEx handles.
 
-// CosmosEx file handle:              0 ...  40
-// Atari handle for regular files:    0 ...  90
-// Atari handle for CosmosEx files: 150 ... 200
-#define handleIsFromCE(X)		(X >= 150 && X <= 200)
-#define handleAtariToCE(X)		(X  - 150)
-#define handleCEtoAtari(X)		(X  + 150)		
+// CosmosEx file handle (internally): 0 ...  40
+// Atari handle for regular files:    0 ...  79
+// Atari handle for CosmosEx files:  80 ... 120
+#define handleIsFromCE(X)		(X >= 80 && X <= 120)
+#define handleAtariToCE(X)		(X  - 80)
+#define handleCEtoAtari(X)		(X  + 80)		
 
 //----------------------		
 // the following buffer type is used for file reading and writing
