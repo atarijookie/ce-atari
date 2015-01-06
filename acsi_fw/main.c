@@ -11,6 +11,7 @@
 #include "datatransfer.h"
 #include "scsi.h"
 #include "mmc.h"
+#include "eeprom.h"
 
 void init_hw_sw(void);
 void onButtonPress(void);
@@ -148,12 +149,6 @@ BYTE firstConfigReceived;                                       // used to turn 
 // TODO: test and fix with megafile drive
 
 // Note: DMA transfer to ODD address in ST looses first byte, so only transfer to EVEN address is OK.
-
-//-------------------------
-// !!! WARNING !!!
-// When optimization for time is turned on and optimization level -o3 is set, there's a cold boot issue on ST!
-// When this is turned off and the optimization level is set to -o2 instead, it seems that the cold boot issue on ST doesn't appear anymore...
-//-------------------------
 
 BYTE shouldProcessCommands;
 
@@ -316,8 +311,14 @@ void initAllStuff(void)
     }
     
     prevBtnPressTime = 0;
-    //----------------------
     
+    //----------------------
+    // get the SD card ID from faked EEPROM, so this could work solo if needed
+    EE_Init();
+    
+    sdCardID = EE_ReadVariable(EEPROM_OFFSET_SDCARD_ID, 0);     // get SD card ID, with default value of 0
+    
+    //----------------------
     // init card detection delay stuff
     cardInsertChanged   = FALSE;
     cardDetectTime      = 0;
@@ -448,6 +449,10 @@ void onGetCommand(void)
                     tag2    = cmd[2];
                 }
 
+                if(firstConfigReceived == FALSE) {      // no config received from host? Then process it localy.
+                    cmdIsForCE = FALSE;
+                }
+                
                 if(cmdIsForCE != TRUE || tag1 != 'C' || tag2 != 'E') {    // the command is not TEST UNIT READY and there isn't a valid CE tag? process localy
                     processScsiLocaly(justCmd, isIcd);
 //                    scsi_log_add();
@@ -897,9 +902,10 @@ void processHostCommands(void)
                         }
                     }
 
-                    sdCardID = (BYTE) cmdBuffer[i+1];               // lower BYTE: SD card ACSI ID
+                    sdCardID = (BYTE) cmdBuffer[i+1];                       // lower BYTE: SD card ACSI ID
+                    EE_WriteVariable(EEPROM_OFFSET_SDCARD_ID, sdCardID);    // store the new SD card ID to fake EEPROM
                     
-                    cmdBuffer[i]    = 0;                            // clear this command
+                    cmdBuffer[i]    = 0;                                    // clear this command
                     cmdBuffer[i+1]  = 0;
                     
                     i++;

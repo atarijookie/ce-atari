@@ -12,6 +12,8 @@ extern BYTE sdCardID;
 extern char *VERSION_STRING_SHORT;
 extern char *DATE_STRING;
 
+extern BYTE firstConfigReceived;
+
 ScsiLogItem scsiLogs[SCSI_LOG_LENGTH];
 BYTE scsiLogNow;
 
@@ -326,7 +328,16 @@ void SCSI_Inquiry(BYTE lun)
 	BYTE val, firstByte;
 	
 	BYTE vendor[8]          = {"JOOKIE  "};
-    BYTE inquiryName[10]    = {"CosmosEx  "};
+
+    BYTE *inquiryName;
+    BYTE inquiryNameWithRpi[10] = {"CosmosEx  "};
+    BYTE inquiryNameSolo[10]    = {"CosmoSolo "};
+        
+    if(firstConfigReceived) {
+        inquiryName = inquiryNameWithRpi;
+    } else {
+        inquiryName = inquiryNameSolo;
+    }
 	
 	if(lun == 0) {						// for LUN 0
 		firstByte = 0;
