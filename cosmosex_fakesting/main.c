@@ -57,8 +57,6 @@ BYTE *pDmaBuffer;
 
 BYTE ce_findId(void); 
 
-BYTE FastRAMBuffer[FASTRAM_BUFFER_SIZE] __attribute__((aligned (4)));    // intermediate buffer for TT
-
 //---------------------------------------
 
 uint32 localIP;
@@ -132,7 +130,7 @@ int main(void)
 
     showHex_toLogNotScreen = 1;                                 // showHex* to log
 
-    appl_init();                                                // init gem
+//    appl_init();                                                // init gem
     sleep(2);
     
     Ptermres (_pgmsize, 0);

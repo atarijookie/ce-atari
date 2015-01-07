@@ -26,7 +26,7 @@ void   house_keep(void);
 int16  set_flag (int16 flag);
 void   clear_flag (int16 flag);
 
-//#define DEBUG_STRING
+#define DEBUG_STRING
 
 void *KRmalloc_mid(int32 size)
 {
@@ -383,10 +383,11 @@ int16 CNget_block_mid(int16 handle, void *buffer, int16 length)
     // show last 4 bytes
     BYTE *p = (BYTE *) buffer;
 
-    if(res >= 4) { showHexByte(p[res - 4]); Cconout(' '); }
-    if(res >= 3) { showHexByte(p[res - 3]); Cconout(' '); }
-    if(res >= 2) { showHexByte(p[res - 2]); Cconout(' '); }
-    if(res >= 1) { showHexByte(p[res - 1]); Cconout(' '); }
+    logStr("last 4 bytes: ");
+    if(res >= 4) { showHexByte(p[res - 4]); logStr(" "); }
+    if(res >= 3) { showHexByte(p[res - 3]); logStr(" "); }
+    if(res >= 2) { showHexByte(p[res - 2]); logStr(" "); }
+    if(res >= 1) { showHexByte(p[res - 1]); logStr(" "); }
     logStr("\n");
     #endif
 

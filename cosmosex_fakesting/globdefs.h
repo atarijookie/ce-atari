@@ -535,7 +535,25 @@ typedef struct {
     BYTE rBuf[READ_BUFFER_SIZE];
 } TConInfo;
 
+/*--------------------------------------------------------------------------*/
+// Note by ggn / KUA:
+// If you intend to change FASTRAM_BUFFER_SIZE,
+// also change the .comm FastRAMBuffer value directly below
+//
+// (thanks C for not not providing a clear interface between
+// header files and assembly ;))
+//
+// (You might wonder "why use .balign and not define a buffer
+// somewhere using the aligned((2)) attribute? Well, then gcc
+// during compiling will give a friendly message like this:
+// warning: alignment of 'FastRAMBuffer' is greater than maximum object file alignment.  Using 2 [enabled by default]
+// So, .balign then. But wait, this only works with assembly
+// source code! You can guess the rest :))
+
 #define FASTRAM_BUFFER_SIZE	4096
+__asm__ (".balign 4\n\t"
+		 ".comm _FastRAMBuffer,4096");
+
 /*--------------------------------------------------------------------------*/
 // for retrieving real params from stack, as gcc calling convention doesn't match the Pure C cdecl calling convention
 #define getStackPointer()   BYTE *sp = __builtin_frame_address(0) + 8;

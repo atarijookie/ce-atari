@@ -4,12 +4,12 @@ SLIM	= yes
 CC		= m68k-atari-mint-gcc
 STRIP	= m68k-atari-mint-strip
 PRGFLAGS= m68k-atari-mint-flags
-CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar -nostdlib
-LDFLAGS	= -Wl,--traditional-format -lgcc -lgem -Wl,-Map=output.map
+CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar -nostdlib -fcall-saved-a1 -fcall-saved-d1
+LDFLAGS	= -Wl,--traditional-format -Wl,-Map=output.map
 
 HDR		= acsi.h stdlib.h setup.h tcp.h udp.h con_man.h icmp.h api.h port.h tpl_middle.h 
 CSRC	= acsi.c stdlib.c setup.c tcp.c udp.c con_man.c icmp.c api.c port.c tpl_middle.c main.c 
-SSRC	= vbl.s
+SSRC	= vbl.s math.s
 STARTUP	= startup.s
 
 OBJS = $(patsubst %.c,%.o,$(CSRC))
