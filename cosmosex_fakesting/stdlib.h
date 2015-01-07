@@ -34,4 +34,6 @@ void  *getVoidpByByteOffset(void *base, int ofs);
 void   setWordByByteOffset (void *base, int ofs, WORD val);
 void   setDwordByByteOffset(void *base, int ofs, DWORD val);
 
+void logStr(char *str);
+
 #endif

@@ -67,11 +67,14 @@ uint32 localIP;
 WORD requiredVersion;
 
 //---------------------------------------
+extern BYTE showHex_toLogNotScreen;
 
-int main()
+int main(void)
 {
     int   count;
 
+    showHex_toLogNotScreen = 0;                                 // showHex* to screen
+    
     (void) Cconws("\n\r\033p|    Fake STinG for CosmosEx    |\033q");
     (void) Cconws("\n\r\033p|   by Jookie, ver: ");
     showAppVersion();
@@ -123,11 +126,13 @@ int main()
 	}
 
     install();
-    Supexec(install_vbl);
+//    Supexec(install_vbl);
     
     (void) Cconws("Driver was installed...");
 
-    appl_init();                                 // init gem
+    showHex_toLogNotScreen = 1;                                 // showHex* to log
+
+    appl_init();                                                // init gem
     sleep(2);
     
     Ptermres (_pgmsize, 0);

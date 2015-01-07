@@ -546,6 +546,9 @@ typedef struct {
 #define getVoidPFromSP()  ({ void *p = (void *) *((DWORD *) sp);    sp += 4;    p; })
 
 /*--------------------------------------------------------------------------*/
+#define extendByteToDword(X)    ( ((X &   0x80)==0) ? X : (0xffffff00 | X) )
+#define extendWordToDword(X)    ( ((X & 0x8000)==0) ? X : (0xffff0000 | X) )
+
 
 #endif
 

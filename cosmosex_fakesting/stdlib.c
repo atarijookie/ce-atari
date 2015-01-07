@@ -3,6 +3,8 @@
 
 #include "stdlib.h"
 
+BYTE showHex_toLogNotScreen;
+
 void *memcpy ( void * destination, const void * source, int num )
 {
 	BYTE *dst = (BYTE *) destination;
@@ -268,12 +270,21 @@ DWORD getDword(BYTE *bfr)
 void showHexByte(int val)
 {
     int hi, lo;
+    char tmp[3];
     char table[16] = {"0123456789ABCDEF"};
+    
     hi = (val >> 4) & 0x0f;;
     lo = (val     ) & 0x0f;
 
-    (void) Cconout( table[hi] );
-    (void) Cconout( table[lo] );
+    tmp[0] = table[hi];
+    tmp[1] = table[lo];
+    tmp[2] = 0;
+    
+    if(showHex_toLogNotScreen) {            // showHex* functions output to log, not to screen? 
+        logStr(tmp);
+    } else {                                // showHex* functions ouptut to screen, not to log? 
+        (void) Cconws(tmp);
+    }
 }
 
 void showHexWord(WORD val)
@@ -337,3 +348,26 @@ void setDwordByByteOffset(void *base, int ofs, DWORD val)
     *pDword         = val;
 }
 
+//-------------------
+void logStr(char *str)
+{
+//    (void) Cconws(str);
+
+    int len; 
+    int f = Fopen("C:\\ce_sting.log", 1);       // open file for writing
+    
+    if(f < 0) {                                 // if failed to open existing file
+        f = Fcreate("C:\\ce_sting.log", 0);     // create file
+        
+        if(f < 0) {                             // if failed to create new file
+            return;
+        }
+    }
+    
+    len = strlen(str);                          // get length
+
+    Fseek(0, f, 2);                             // move to the end of file
+    Fwrite(f, len, str);                        // write it to file
+    Fclose(f);                                  // close it
+}
+//-------------------
