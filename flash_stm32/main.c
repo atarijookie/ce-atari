@@ -177,7 +177,7 @@ int main(int argc, char* argv[]) {
 		bcm2835_gpio_write(PIN_RESET_FRANZ,		HIGH);		// put Franz into RUN state
 	}
 
-	usleep(10000);											// let the STM32 boot and run for 10 ms
+	usleep(260000);											// let the STM32 boot and run for 250 + 10 ms (because DS1818 might cause 250 ms RESET signal)
 	//---------------------------------------------------	
 	
 	printf("Serial Config: %s\n", serial_get_setup_str(serial));
