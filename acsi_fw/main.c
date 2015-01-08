@@ -162,6 +162,9 @@ BYTE cardInsertChanged;
 
 void initAllStuff(void);
 
+BYTE timeOutCount   = 0;
+BYTE soloMode       = FALSE;
+
 int main (void) 
 {
     initAllStuff();         // now init everything
@@ -224,6 +227,19 @@ int main (void)
         if(!spiDmaIsIdle && timeout()) {                                                        // if we got stuck somewhere, do IDLE again
             spiDmaIsIdle = TRUE;
             state = STATE_GET_COMMAND;
+            
+            timeOutCount++;                 // increase count of how many times we must have timed out to keep working
+        }
+        
+        if(timeOutCount >= 3) {             // if we had to use timeout 3 times consequently to make this work, then we're probably in SOLO mode
+            GPIOA->BRR      = LED1 | LED2 | LED3;
+            soloMode        = TRUE;
+            state           = STATE_GET_COMMAND;
+            sendFwVersion   = FALSE;
+        }
+        
+        if(soloMode == TRUE) {              // solo mode? Skip the rest of the loop.
+            continue;
         }
         
         if(spiDmaIsIdle) {
@@ -997,7 +1013,8 @@ void DMA1_Channel3_IRQHandler(void)
     spiDmaTXidle = TRUE;                                            // SPI DMA TX now idle
     
     if(spiDmaRXidle == TRUE) {                                      // and if even the SPI DMA RX is idle, SPI is idle completely
-        spiDmaIsIdle = TRUE;                                        // SPI DMA is busy
+        spiDmaIsIdle = TRUE;                                        // SPI DMA is idle
+        timeOutCount = 0;                                           // reset count of how many times we must have timed out to keep working
     }
 }
 
@@ -1009,7 +1026,8 @@ void DMA1_Channel2_IRQHandler(void)
     spiDmaRXidle = TRUE;                                            // SPI DMA RX now idle
     
     if(spiDmaTXidle == TRUE) {                                      // and if even the SPI DMA TX is idle, SPI is idle completely
-        spiDmaIsIdle = TRUE;                                        // SPI DMA is busy
+        spiDmaIsIdle = TRUE;                                        // SPI DMA is idle
+        timeOutCount = 0;                                           // reset count of how many times we must have timed out to keep working
     }
 }
 
