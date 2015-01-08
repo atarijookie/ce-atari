@@ -6,8 +6,8 @@ PRGFLAGS= m68k-atari-mint-flags
 CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS	= -Wl,--traditional-format -lgcc
 
-HDR		= acsi.h keys.h stdlib.h
-CSRC	= acsi.c main.c stdlib.c
+HDR		= acsi.h find_ce.h keys.h stdlib.h
+CSRC	= acsi.c find_ce.c main.c stdlib.c
 
 CFLAGS	+= -nostdlib
 STARTUP	= startup.s

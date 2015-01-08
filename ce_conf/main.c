@@ -11,6 +11,8 @@
 #include "stdlib.h"
 #include "acsi.h"
 #include "keys.h"
+#include "global.h"
+#include "find_ce.h"
 //--------------------------------------------------
 
 void showHomeScreen(void);
@@ -25,8 +27,13 @@ BYTE ce_identify(BYTE ACSI_id);
 
 void retrieveIsUpdateScreen(char *stream);
 BYTE isUpdateScreen;
+
+void cosmoSoloConfig(void);
 //--------------------------------------------------
-BYTE      deviceID;
+BYTE busTypeACSInotSCSI;                // 0 means SCSI, non-0 means ACSI
+BYTE deviceID;                          // bus ID from 0 to 7
+BYTE cosmosExNotCosmoSolo;              // 0 means CosmoSolo, 1 means CosmosEx
+//--------------------------------------------------
 
 #define BUFFER_SIZE         (4*512)
 BYTE myBuffer[BUFFER_SIZE];
@@ -34,32 +41,11 @@ BYTE *pBuffer;
 
 BYTE prevCommandFailed;
 
-#define HOSTMOD_CONFIG				1
-#define HOSTMOD_LINUX_TERMINAL		2
-#define HOSTMOD_TRANSLATED_DISK		3
-#define HOSTMOD_NETWORK_ADAPTER		4
-
-#define CFG_CMD_IDENTIFY			0
-#define CFG_CMD_KEYDOWN				1
-#define CFG_CMD_SET_RESOLUTION      2
-#define CFG_CMD_REFRESH             0xfe
-#define CFG_CMD_GO_HOME				0xff
-
-#define CFG_CMD_LINUXCONSOLE_GETSTREAM  10
-
-// two values of a last byte of LINUXCONSOLE stream - more data, or no more data
-#define LINUXCONSOLE_NO_MORE_DATA   0x00
-#define LINUXCONSOLE_GET_MORE_DATA  0xda
-
-#define Clear_home()    (void) Cconws("\33E")
-#define Cursor_on()     (void) Cconws("\33e")
-
 //--------------------------------------------------
 int main(void)
 {
 	DWORD scancode;
 	BYTE key, vkey, res;
-	BYTE i;
 	WORD timeNow, timePrev;
 	DWORD toEven;
 	void *OldSP;
@@ -81,46 +67,27 @@ int main(void)
 	pBuffer = (BYTE *) toEven; 
 	
 	// ---------------------- 
-	// search for device on the ACSI bus 
+	// search for device on the ACSI / SCSI bus 
 	deviceID = 0;
 
 	Clear_home();
-	(void) Cconws("Looking for CosmosEx:\n\r");
+    res = findDevice();
 
-    char bfr[2];
-	bfr[1] = 0; 
+    if(res != TRUE) {
+        Super((void *)OldSP);  			      			            // user mode 
+        return 0;
+    }
     
-	while(1) {
-		for(i=0; i<8; i++) {
-            bfr[0] = i + '0';
-            (void) Cconws(bfr); 
-        
-			res = ce_identify(i);      					            // try to read the IDENTITY string 
-      
-			if(res == 1) {                           	            // if found the CosmosEx 
-				deviceID = i;                     		            // store the ACSI ID of device 
-				break;
-			}
-		}
-  
-		if(res == 1) {                             		            // if found, break 
-			break;
-		}
-      
-		(void) Cconws(" - not found.\n\rPress any key to retry or 'Q' to quit.\n\r");
-		key = Cnecin();
-    
-		if(key == 'Q' || key=='q') {
-		    Super((void *)OldSP);  			                        // user mode 
-			return 0;
-		}
-	}
-  
-	(void) Cconws("\n\r\n\rCosmosEx ACSI ID: ");
-    (void) Cconws(bfr); 
-    (void) Cconws("\n\r"); 
-    
-	// ----------------- 
+    //------------------
+    // if the device is CosmoSolo, go this way
+    if(cosmosExNotCosmoSolo == FALSE) {
+        cosmoSoloConfig();
+        Super((void *)OldSP);  			      			            // user mode 
+        return 0;
+    }
+	
+    // ----------------- 
+    // if the device is CosmosEx, do the remote console config
 	setResolution();							                    // send the current ST resolution for screen centering 
 	
 	showHomeScreen();							                    // get the home screen 
@@ -294,26 +261,6 @@ void setResolution(void)
 	acsi_cmd(1, cmd, 6, pBuffer, 1); 				// issue the SET RESOLUTION command 
 }
 //--------------------------------------------------
-BYTE ce_identify(BYTE ACSI_id)
-{
-  WORD res;
-  BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_IDENTIFY, 0};
-  
-  cmd[0] = (ACSI_id << 5); 					// cmd[0] = ACSI_id + TEST UNIT READY (0)	
-  memset(pBuffer, 0, 512);              	// clear the buffer 
-  
-  res = acsi_cmd(1, cmd, 6, pBuffer, 1);	// issue the identify command and check the result 
-    
-  if(res != OK)                         	// if failed, return FALSE 
-    return 0;
-    
-  if(strncmp((char *) pBuffer, "CosmosEx config console", 23) != 0) {		// the identity string doesn't match? 
-	return 0;
-  }
-	
-  return 1;                             // success 
-}
-//--------------------------------------------------
 void showConnectionErrorMessage(void)
 {
 	Clear_home();
@@ -397,6 +344,35 @@ void retrieveIsUpdateScreen(char *stream)
     } else {                            // it's not update screen
         isUpdateScreen = FALSE;
     }
+}
+//--------------------------------------------------
+void cosmoSoloConfig(void)
+{
+    (void) Cconws("\n\rCurrent device ID is: ");
+    Cconout('0' + deviceID);
+    (void) Cconws("\n\rPlease enter new device ID (0 - 7)\n\ror any other key to quit.");
+    (void) Cconws("\n\rEnter new device ID : ");
+    
+    BYTE key = Cnecin();
+    
+    if(key >= '0' && key <= '7') {
+        BYTE newId = key - '0';
+        BYTE cmd[] = {0, 'C', 'S', deviceID, newId, 0};
+        
+        cmd[0] = (deviceID << 5); 						    // cmd[0] = ACSI_id + TEST UNIT READY (0)	
+  
+        BYTE res = acsi_cmd(ACSI_READ, cmd, 6, pBuffer, 1);
+        
+        if(res == OK) {
+            (void) Cconws("\n\rNew ID was successfully set.\n\r");
+        } else {
+            (void) Cconws("\n\rFailed to set new ID.\n\r");
+        }
+    } else {
+        (void) Cconws("\n\rTerminating without setting device ID.\n\r");
+    }
+    
+    sleep(3);
 }
 //--------------------------------------------------
 

@@ -3,11 +3,6 @@
 
 /* ------------------------------------------ */
 
-#ifndef FALSE
-    #define FALSE		0
-    #define TRUE		1
-#endif
-
 #define OK			0           /* OK status */
 #define ACSIERROR	0xff        /* ERROR status (timeout) */
 
@@ -66,6 +61,8 @@
 
 #define ACSI_READ	1
 #define ACSI_WRITE	0
+
+#define SCSI_CMD_INQUIRY	0x12
 
 #define CMD_LENGTH_SHORT	6
 #define CMD_LENGTH_LONG		13
