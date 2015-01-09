@@ -362,6 +362,8 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
     pBfr = storeWord    (pBfr, tos);
     pBfr = storeWord    (pBfr, buff_size);
 
+    // TODO: rem_host can be 0, then should listen for connection instead of making active connection (this is used for ACTIVE MODE of FTP)
+    
     // send it to host
     BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 

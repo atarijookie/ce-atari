@@ -25,7 +25,7 @@ void   house_keep(void);
 int16  set_flag (int16 flag);
 void   clear_flag (int16 flag);
 
-#define DEBUG_STRING
+//#define DEBUG_STRING
 
 void *KRmalloc_mid(int32 size)
 {
@@ -131,7 +131,11 @@ int16 TCP_open_mid(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_siz
     buff_size   = getWordFromSP();
 
     #ifdef DEBUG_STRING
-    logStr("TCP_open - res: ");
+    logStr("TCP_open - rem_host: ");
+    showHexDword(rem_host);
+    logStr(", rem_port: ");
+    showHexWord(rem_port);
+    logStr(", res: ");
     #endif
 
     int16 res = connection_open(1, rem_host, rem_port, tos, buff_size);
@@ -453,7 +457,9 @@ CIB *CNgetinfo_mid(int16 handle)
     handle = getWordFromSP();
 
     #ifdef DEBUG_STRING
-    logStr("CNgetinfo - res: ");
+    logStr("CNgetinfo - handle: ");
+    showHexWord(handle);
+    logStr(", res: ");
     #endif
 
     CIB *res = CNgetinfo(handle);
