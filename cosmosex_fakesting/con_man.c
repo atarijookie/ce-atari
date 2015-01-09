@@ -426,7 +426,7 @@ int16 connection_send(int tcpNotUdp, int16 handle, void *buffer, int16 length)
     if(!handle_valid(handle)) {                     // we don't have this handle? fail
         return E_BADHANDLE;
     }
-
+    
     // first store command code
     if(tcpNotUdp) {                         // for TCP
         commandLong[5] = NET_CMD_TCP_SEND;

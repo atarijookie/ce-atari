@@ -15,7 +15,6 @@
 #include "stdlib.h"
 #include "api.h"
 #include "tcp.h"
-#include "udp.h"
 #include "icmp.h"
 #include "con_man.h"
 #include "setup.h"

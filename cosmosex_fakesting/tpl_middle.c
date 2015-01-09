@@ -10,7 +10,6 @@
 #include "tpl_middle.h"
 #include "setup.h"
 #include "tcp.h"
-#include "udp.h"
 #include "icmp.h"
 #include "con_man.h"
 #include "port.h"
@@ -79,7 +78,7 @@ void *KRrealloc_mid (void *mem_block, int32 new_size)
     logStr("KRrealloc\n");
     #endif
     
-    void *res =  KRrealloc_internal(mem_block, new_size);
+    void *res = KRrealloc_internal(mem_block, new_size);
     
     return res;
 }
@@ -135,7 +134,7 @@ int16 TCP_open_mid(uint32 rem_host, uint16 rem_port, uint16 tos, uint16 buff_siz
     logStr("TCP_open - res: ");
     #endif
 
-    int16 res = TCP_open(rem_host, rem_port, tos, buff_size);
+    int16 res = connection_open(1, rem_host, rem_port, tos, buff_size);
     
     #ifdef DEBUG_STRING
     showHexWord((WORD) res);
@@ -157,7 +156,7 @@ int16 TCP_close_mid(int16 handle, int16 timeout)
     logStr(", res: ");
     #endif
 
-    int16 res = TCP_close(handle, timeout);
+    int16 res = connection_close(1, handle, timeout);
 
     #ifdef DEBUG_STRING
     showHexWord((WORD) res);
@@ -175,10 +174,16 @@ int16 TCP_send_mid(int16 handle, void *buffer, int16 length)
     length      = getWordFromSP();
 
     #ifdef DEBUG_STRING
-    logStr("TCP_send\n");
+    logStr("TCP_send -- handle: ");
+    showHexWord(handle);
+    logStr(", buffer: ");
+    showHexDword((DWORD) buffer);
+    logStr(", length: ");
+    showHexWord(length);
+    logStr("\n");
     #endif
     
-    int16 res = TCP_send(handle, buffer, length);
+    int16 res = connection_send(1, handle, buffer, length);
     
     return res;
 }
@@ -243,7 +248,7 @@ int16 UDP_open_mid (uint32 rem_host, uint16 rem_port)
     logStr("UDP_open\n");
     #endif
 
-    int16 res = UDP_open(rem_host, rem_port);
+    int16 res = connection_open(0, rem_host, rem_port, 0, 0);
     
     return res;
 }
@@ -257,7 +262,7 @@ int16 UDP_close_mid(int16 handle)
     logStr("UDP_close\n");
     #endif
     
-    int16 res = UDP_close(handle);
+    int16 res = connection_close(0, handle, 0);
     
     return res;
 }
@@ -273,7 +278,7 @@ int16 UDP_send_mid(int16 handle, void *buffer, int16 length)
     logStr("UDP_send\n");
     #endif
     
-    int16 res = UDP_send(handle, buffer, length);
+    int16 res = connection_send(0, handle, buffer, length);
     
     return res;
 }
@@ -323,7 +328,7 @@ int16 CNget_char_mid(int16 handle)
     #ifdef DEBUG_STRING
     logStr("CNget_char: ");
     #endif
-    
+
     int16 res = CNget_char(handle);
 
     #ifdef DEBUG_STRING
@@ -411,8 +416,8 @@ int16 resolve_mid(char *domain, char **real_domain, uint32 *ip_list, int16 ip_nu
     logStr("resolve\n");
     #endif
     
-    int16 res = resolve (domain, real_domain, ip_list, ip_num);
-
+    int16 res = resolve(domain, real_domain, ip_list, ip_num);
+    
     return res;
 }
     
