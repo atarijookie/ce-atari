@@ -28,6 +28,12 @@
 extern TConInfo conInfo[MAX_HANDLE];                   // this holds info about each connection
 
 //---------------------
+int16 TCP_send(int16 handle, void *buffer, int16 length)
+{
+    int16 res = connection_send(1, handle, buffer, length);
+    return res;
+}
+
 int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
 {
     if(!handle_valid(handle)) {                         // we don't have this handle? fail

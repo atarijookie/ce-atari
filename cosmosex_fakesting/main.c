@@ -64,6 +64,8 @@ uint32 localIP;
 #define REQUIRED_NETADAPTER_VERSION     0x0100
 WORD requiredVersion;
 
+void initJumpTable(void);
+
 //---------------------------------------
 extern BYTE showHex_toLogNotScreen;
 
@@ -72,6 +74,7 @@ int main(void)
     int   count;
 
     showHex_toLogNotScreen = 0;                                 // showHex* to screen
+    initJumpTable();                                            // fill the jump table with addresses of functions
     
     (void) Cconws("\n\r\033p|    Fake STinG for CosmosEx    |\033q");
     (void) Cconws("\n\r\033p|   by Jookie, ver: ");
@@ -129,7 +132,7 @@ int main(void)
     (void) Cconws("Driver was installed...");
 
     showHex_toLogNotScreen = 1;                                 // showHex* to log
-
+    
 //    appl_init();                                                // init gem
     sleep(2);
     

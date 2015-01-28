@@ -33,18 +33,16 @@ void         clear_flag (int16 flag);
 
 CONFIG      conf;
 
+int32 fun00(void); int32 fun01(void); int32 fun02(void); int32 fun03(void); int32 fun04(void); int32 fun05(void); int32 fun06(void); int32 fun07(void); int32 fun08(void); int32 fun09(void); 
+int32 fun10(void); int32 fun11(void); int32 fun12(void); int32 fun13(void); int32 fun14(void); int32 fun15(void); int32 fun16(void); int32 fun17(void); int32 fun18(void); int32 fun19(void); 
+int32 fun20(void); int32 fun21(void); int32 fun22(void); int32 fun23(void); int32 fun24(void); int32 fun25(void); int32 fun26(void); int32 fun27(void); int32 fun28(void); int32 fun29(void); 
+int32 fun30(void); int32 fun31(void); int32 fun32(void); int32 fun33(void); int32 fun34(void); int32 fun35(void); int32 fun36(void); int32 fun37(void); int32 fun38(void); int32 fun39(void); 
+
 CLIENT_API  tpl  = { "TRANSPORT_TCPIP", "Jookie", TCP_DRIVER_VERSION, 
-                      KRmalloc_mid, KRfree_mid, KRgetfree_mid, KRrealloc_mid, 
-                      get_error_text_mid, getvstr_mid, carrier_detect_mid, 
-                      TCP_open_mid, TCP_close_mid, TCP_send_mid, TCP_wait_state_mid, TCP_ack_wait_mid, 
-                      UDP_open_mid, UDP_close_mid, UDP_send_mid, 
-                      CNkick_mid, CNbyte_count_mid, CNget_char_mid, CNget_NDB_mid, CNget_block_mid, 
-                      house_keep_mid, resolve_mid, serial_dummy_mid, serial_dummy_mid, 
-                      set_flag_mid, clear_flag_mid, CNgetinfo_mid, 
-                      on_port_mid, off_port_mid, setvstr_mid, query_port_mid, CNgets_mid, 
-                      ICMP_send_mid, ICMP_handler_mid, ICMP_discard_mid, TCP_info_mid, cntrl_port_mid,
-                      UDP_info_mid, RAW_open_mid, RAW_close_mid, RAW_out_mid, CN_setopt_mid, CN_getopt_mid, CNfree_NDB_mid
-               };
+                      fun00, fun01, fun02, fun03, fun04, fun05, fun06, fun07, fun08, fun09,
+                      fun10, fun11, fun12, fun13, fun14, fun15, fun16, fun17, fun18, fun19,
+                      fun20, fun21, fun22, fun23, fun24, fun25, fun26, fun27, fun28, fun29,
+                      fun30, fun31, fun32, fun33, fun34, fun35, fun36 };
                
 STX_API     stxl = { "MODULE_LAYER", "Jookie", STX_LAYER_VERSION, 
                       NULL, NULL, NULL, NULL, NULL, 

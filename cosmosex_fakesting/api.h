@@ -27,71 +27,62 @@ typedef  struct client_layer {
     char *     module;      /* Specific string that can be searched for     */
     char *     author;      /* Any string                                   */
     char *     version;     /* Format `00.00' Version:Revision              */
-	//-------------
-	// memory alloc / free functions
-    void *       (* KRmalloc) (int32);
-    void         (* KRfree) (void *);
-    int32        (* KRgetfree) (int16);
-    void *       (* KRrealloc) (void *, int32);
-	//-------------
-	// misc
-    char *       (* get_err_text) (int16);							// Returns error description for a given error number.
-    char *       (* getvstr) (char *);								// Inquires about a configuration string.
-    int16        (* carrier_detect) (void);							// obsolete, just dummy
-	//-------------
-	// TCP functions
-    int16        (* TCP_open) (uint32, uint16, uint16, uint16);
-    int16        (* TCP_close) (int16, int16);
-    int16        (* TCP_send) (int16, void *, int16);
-    int16        (* TCP_wait_state) (int16, int16, int16);
-    int16        (* TCP_ack_wait) (int16, int16);
-	//-------------
-	// UDP function
-    int16        (* UDP_open) (uint32, uint16);
-    int16        (* UDP_close) (int16);
-    int16        (* UDP_send) (int16, void *, int16);
-	//-------------
-	// Connection Manager
-    int16        (* CNkick) (int16);									// Kick a connection.
-    int16        (* CNbyte_count) (int16);							// Inquires about the number of received bytes pending.
-    int16        (* CNget_char) (int16);								// Fetch a received character or byte from a connection.
-    NDB *        (* CNget_NDB) (int16);								// Fetch a received chunk of data from a connection.
-    int16        (* CNget_block) (int16, void *, int16);				// Fetch a received block of data from a connection.
-	//-------------
-	// misc
-    void         (* housekeep) (void);								// obsolete, just dummy
-    int16        (* resolve) (char *, char **, uint32 *, int16);		// Carries out DNS queries.
-	//-------------
-	// serial port functions, just dummies
-    void         (* ser_disable) (void);								// obsolete, just dummy
-    void         (* ser_enable) (void);								// obsolete, just dummy
-	//-------------
-    int16        (* set_flag) (int16);								// Requests a semaphore.
-    void         (* clear_flag) (int16);								// Releases a semaphore.
-    CIB *        (* CNgetinfo) (int16);								// Fetch information about a connection.
-    int16        (* on_port) (char *);								// Switches a port into active mode and triggers initialisation.
-    void         (* off_port) (char *);								// Switches a port into inactive mode.
-    int16        (* setvstr) (char *, char *);						// Sets configuration strings.
-    int16        (* query_port) (char *);							// Inquires if a specified port is currently active.
-    int16        (* CNgets) (int16, char *, int16, char);			// Fetch a delimited block of data from a connection.
-	//-------------
-	// ICMP functions
-    int16        (* ICMP_send)       (uint32, uint8, uint8, void *, uint16);
-    int16        (* ICMP_handler)    (int16 (*) (IP_DGRAM *), int16);
-    void         (* ICMP_discard)    (IP_DGRAM *);
-	//-------------
-    int16        (* TCP_info) (int16, TCPIB *);
-    int16        (* cntrl_port) (char *, uint32, int16);				// Inquires and sets various parameters of STinG ports.
     
 	//-------------
-    // part of the newer STiNG API? 
-	int16       (* UDP_info) (int16, UDPIB *);
-	int16       (* RAW_open)(uint32);
-	int16       (* RAW_close)(int16);
-	int16       (* RAW_out)(int16, void *, int16, uint32);
-	int16       (* CN_setopt)(int16, int16, const void *, int16);
-	int16       (* CN_getopt)(int16, int16, void *, int16 *);
-	void        (* CNfree_NDB)(int16, NDB *);    
+	// memory alloc / free functions
+    int32 (* KRmalloc)      (void);
+    int32 (* KRfree)        (void);
+    int32 (* KRgetfree)     (void);
+    int32 (* KRrealloc)     (void);
+	//-------------
+	// misc
+    int32 (* get_err_text)  (void);
+    int32 (* getvstr)       (void);
+    int32 (* carrier_detect)(void);
+	//-------------
+	// TCP functions
+    int32 (* TCP_open)      (void);
+    int32 (* TCP_close)     (void);
+    int32 (* TCP_send)      (void);
+    int32 (* TCP_wait_state)(void);
+    int32 (* TCP_ack_wait)  (void);
+	//-------------
+	// UDP function
+    int32 (* UDP_open)      (void);
+    int32 (* UDP_close)     (void);
+    int32 (* UDP_send)      (void);
+	//-------------
+	// Connection Manager
+    int32 (* CNkick)        (void);
+    int32 (* CNbyte_count)  (void);
+    int32 (* CNget_char)    (void);
+    int32 (* CNget_NDB)     (void);
+    int32 (* CNget_block)   (void);
+	//-------------
+	// misc
+    int32 (* housekeep)     (void);
+    int32 (* resolve)       (void);
+	//-------------
+	// serial port functions, just dummies
+    int32 (* ser_disable)   (void);
+    int32 (* ser_enable)    (void);
+	//-------------
+    int32 (* set_flag)      (void);
+    int32 (* clear_flag)    (void);
+    int32 (* CNgetinfo)     (void);
+    int32 (* on_port)       (void);
+    int32 (* off_port)      (void);
+    int32 (* setvstr)       (void);
+    int32 (* query_port)    (void);
+    int32 (* CNgets)        (void);
+	//-------------
+	// ICMP functions
+    int32 (* ICMP_send)     (void);
+    int32 (* ICMP_handler)  (void);
+    int32 (* ICMP_discard)  (void);
+	//-------------
+    int32 (* TCP_info)      (void);
+    int32 (* cntrl_port)    (void);
  } __attribute__((packed)) CLIENT_API;
 
 typedef  struct stx_layer {
