@@ -458,12 +458,13 @@ int16 connection_send(int tcpNotUdp, int16 handle, void *buffer, int16 length)
     // calculate sector count
     WORD sectorCount = length / 512;                // get number of sectors we need to send
     
-    if((length % 512) == 0) {                       // if the number of bytes is not multiple of 512, then we need to send one sector more
+    if((length % 512) != 0) {                       // if the number of bytes is not multiple of 512, then we need to send one sector more
         sectorCount++;
     }
     
     // send it to host
-    BYTE res = acsi_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBfr, 1);
+    BYTE res = acsi_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBfr, sectorCount);
+
 
 	if(res != OK) {                                 // if failed, return FALSE 
 		return E_LOSTCARRIER;

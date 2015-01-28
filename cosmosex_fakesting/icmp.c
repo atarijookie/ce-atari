@@ -69,12 +69,12 @@ int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_len
     // calculate sector count
     WORD sectorCount = dat_length / 512;            // get number of sectors we need to send
     
-    if((dat_length % 512) == 0) {                   // if the number of bytes is not multiple of 512, then we need to send one sector more
+    if((dat_length % 512) != 0) {                   // if the number of bytes is not multiple of 512, then we need to send one sector more
         sectorCount++;
     }
     
     // send it to host
-    BYTE res = acsi_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBfr, 1);
+    BYTE res = acsi_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBfr, sectorCount);
 
 	if(res != OK) {                                 // if failed, return FALSE 
 		return E_LOSTCARRIER;
