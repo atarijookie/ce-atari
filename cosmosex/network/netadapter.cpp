@@ -632,7 +632,7 @@ void NetAdapter::conSend(void)
     }
 
     Debug::out(LOG_DEBUG, "NetAdapter::conSend() -- sending %d bytes through connection %d", length, handle);
-    int ires = write(cons[handle].fd, pData, length);   // try to send the data
+    int ires = write(cons[handle].fd, dataBuffer, length);  // try to send the data
 
     if(ires < length) {                                 // if written less than should, fail
         Debug::out(LOG_DEBUG, "NetAdapter::conSend - failed to write() all data");
