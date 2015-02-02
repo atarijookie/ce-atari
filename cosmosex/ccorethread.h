@@ -126,6 +126,8 @@ private:
     // other
     void readWebStartupMode(void);
 	bool inetIfaceReady(const char* ifrname);
+
+    void showHwVersion(void);
 };
 
 #endif // CCORETHREAD_H

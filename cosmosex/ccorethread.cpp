@@ -31,9 +31,13 @@
 
 extern bool g_noReset;                      // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
 extern BYTE g_logLevel;                     // current log level
+extern bool g_getHwInfo;                    // if set to true, wait for HW info from Hans, and then quit and report it
 
 bool    g_gotHansFwVersion;
 bool    g_gotFranzFwVersion;
+
+int hwVersion   = 1;                        // returned from Hans: HW version (1 for HW from 2014, 2 for new HW from 2015)
+int hwHddIface  = HDD_IF_ACSI;              // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
 
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
@@ -147,10 +151,11 @@ void CCoreThread::run(void)
     DWORD nextWebParsCheckTime  = Utils::getEndTime(WEB_PARAMS_CHECK_TIME_MS);  // create a time when we should check for new params from the web page
     DWORD nextInetIfaceCheckTime= Utils::getEndTime(1000);  			// create a time when we should check for inet interfaces that got ready
 
+    DWORD getHwInfoTimeout      = Utils::getEndTime(3000);              // create a time when we already should have info about HW, and if we don't have that by that time, then fail
+
 	//up/running state of inet interfaces
 	bool  state_eth0 	= false;
 	bool  state_wlan0 	= false;
-
 
     Update::downloadUpdateList(NULL);                                   // download the list of components with the newest available versions
 
@@ -158,6 +163,12 @@ void CCoreThread::run(void)
 
     while(sigintReceived == 0) {
 		bool gotAtn = false;						                    // no ATN received yet?
+
+        // if should just get the HW version and HDD interface, but timeout passed, quit
+        if(g_getHwInfo && Utils::getCurrentMs() >= getHwInfoTimeout) {
+            showHwVersion();                                            // show the default HW version
+            sigintReceived = 1;                                         // quit
+        }
 
         // should we check if Hans and Franz are alive?
         if(shouldCheckHansFranzAlive) {
@@ -576,7 +587,24 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
             diskChanged     = true;                         // also tell Franz that floppy changed
             setDiskChanged  = true;
         }
+
+        // if should get the HW info and should quit
+        if(g_getHwInfo) {
+            showHwVersion();                                // show what HW version we have found
+
+            Debug::out(LOG_ERROR, "Terminating app, because it was used as HW INFO tool");
+            sigintReceived = 1;
+        }
     }
+}
+
+void CCoreThread::showHwVersion(void)
+{
+    // HW version is 1 or 2, and in other cases defaults to 1
+    printf("\nHW_VER: %d\n", (hwVersion == 1 || hwVersion == 2) ? hwVersion : 1);
+
+    // HDD interface is either SCSI, or defaults to ACSI
+    printf("\nHDD_IF: %s\n", (hwHddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI");
 }
 
 void CCoreThread::responseStart(int bufferLengthInBytes)        // use this to start creating response (commands) to Hans or Franz

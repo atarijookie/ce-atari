@@ -107,6 +107,11 @@
 #define FDD_RES_ONDEVICECOPY                0xDC
 
 //////////////////////////////////////////////////////
+// HDD interface types
+#define HDD_IF_ACSI     1
+#define HDD_IF_SCSI     2
+
+//////////////////////////////////////////////////////
 
 #endif // GLOBAL_H
 

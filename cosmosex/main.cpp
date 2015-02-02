@@ -41,6 +41,7 @@ bool g_justDoReset  = false;                                    // if shouldn't 
 bool g_noReset      = false;                                    // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
 bool g_test         = false;                                    // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
 bool g_actAsCeConf  = false;                                    // if set to true, this app will behave as ce_conf app instead of CosmosEx app
+bool g_getHwInfo    = false;                                    // if set to true, wait for HW info from Hans, and then quit and report it
 
 int     linuxConsole_fdMaster, linuxConsole_fdSlave;            // file descriptors for pty pair
 pid_t   childPid;                                               // pid of forked child
@@ -248,6 +249,11 @@ void parseCmdLineArguments(int argc, char *argv[])
         if(strcmp(argv[i], "ce_conf") == 0) {
             g_actAsCeConf = true;
         }
+
+        // get hardware version and HDD interface type
+        if(strcmp(argv[i], "hwinfo") == 0) {
+            g_getHwInfo = true;
+        }
     }
 }
 
@@ -258,7 +264,8 @@ void printfPossibleCmdLineArgs(void)
     printf("noreset - when starting, don't reset Hans and Franz\n");
     printf("llx     - set log level to x (default is 1, max is 3)\n");
     printf("test    - some default config for device testing\n");
-    printf("ce_conf - use this app as ce_conf on RPi (the app must be running normally, too)");
+    printf("ce_conf - use this app as ce_conf on RPi (the app must be running normally, too)\n");
+    printf("hwinfo  - get HW version and HDD interface type\n");
 }
 
 void handlePthreadCreate(int res, char *what)
