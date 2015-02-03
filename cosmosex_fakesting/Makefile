@@ -4,7 +4,7 @@ SLIM	= yes
 CC		= m68k-atari-mint-gcc
 STRIP	= m68k-atari-mint-strip
 PRGFLAGS= m68k-atari-mint-flags
-CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar -nostdlib 
+CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar -nostdlib # -DDEBUG_STRING
 LDFLAGS	= -Wl,--traditional-format -Wl,-Map=output.map -lgcc
 
 HDR		= acsi.h stdlib.h setup.h tcp.h con_man.h icmp.h api.h port.h tpl_middle.h 

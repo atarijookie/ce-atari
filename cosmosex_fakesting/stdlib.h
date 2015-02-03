@@ -2,6 +2,7 @@
 #define _STDLIB_H_
 
 #include "acsi.h"
+#include "globdefs.h"
 
 void *	memcpy ( void * destination, const void * source, int num );
 void *	memset ( void * ptr, int value, int num );
@@ -34,6 +35,8 @@ void  *getVoidpByByteOffset(void *base, int ofs);
 void   setWordByByteOffset (void *base, int ofs, WORD val);
 void   setDwordByByteOffset(void *base, int ofs, DWORD val);
 
-void logStr(char *str);
+    #ifdef DEBUG_STRING
+    void logStr(char *str);
+    #endif
 
 #endif

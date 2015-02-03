@@ -25,8 +25,6 @@ void   house_keep(void);
 int16  set_flag (int16 flag);
 void   clear_flag (int16 flag);
 
-//#define DEBUG_STRING
-
 DWORD jumptable[40];
 
 void initJumpTable(void)

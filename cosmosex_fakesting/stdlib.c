@@ -281,7 +281,9 @@ void showHexByte(int val)
     tmp[2] = 0;
     
     if(showHex_toLogNotScreen) {            // showHex* functions output to log, not to screen? 
+        #ifdef DEBUG_STRING
         logStr(tmp);
+        #endif
     } else {                                // showHex* functions ouptut to screen, not to log? 
         (void) Cconws(tmp);
     }
@@ -349,6 +351,7 @@ void setDwordByByteOffset(void *base, int ofs, DWORD val)
 }
 
 //-------------------
+#ifdef DEBUG_STRING
 void logStr(char *str)
 {
 //    (void) Cconws(str);
@@ -370,4 +373,5 @@ void logStr(char *str)
     Fwrite(f, len, str);                        // write it to file
     Fclose(f);                                  // close it
 }
+#endif    
 //-------------------
