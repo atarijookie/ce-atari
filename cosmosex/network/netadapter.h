@@ -159,33 +159,47 @@ public:
         closeIt();
     }
 
-    void closeIt(void) {                // close the socket
+    void closeIt(void) {                // close the data socket
         if(fd != -1) {
             close(fd);
+        }
+        
+        if(listenFd != -1) {            // close the listen socket
+            close(listenFd);
         }
 
         initVars();
     }
 
     void initVars(void) {               // initialize the variables
+        activeNotPassive    = true;
         fd                  = -1;
+        listenFd            = -1;
+
         type                = 0;
-        bytesInSocket = 0;
+        bytesInSocket       = 0;
         status              = TCLOSED;
         lastReadCount       = 0;
         memset(&hostAdr, '0', sizeof(hostAdr)); 
 
         gotPrevLastByte     = false;
         prevLastByte        = 0;
+        
     }
 
-    bool isClosed(void) {       // check if it's closed
-        return (fd == -1);
+    bool isClosed(void) {                       // check if it's closed
+        if(fd == -1 && listenFd == -1) {        // normal and listen socket closed? is closed
+            return true;
+        }
+        
+        return false;                           // something is open
     }
 
-    int fd;                     // file descriptor of socket
-    struct sockaddr_in hostAdr; // this is where we send data
-    int type;                   // TCP / UDP / ICMP
+    bool    activeNotPassive;       // socket type: active (outgoing) or passive (listening)
+    int     fd;                     // file descriptor of socket
+    int     listenFd;               // fd of listening socket
+    struct  sockaddr_in hostAdr;    // this is where we send data
+    int     type;                   // TCP / UDP / ICMP
 
     int bytesInSocket;          // how many bytes are waiting to be read from socket
     int status;                 // status of connection - open, closed, ...
@@ -238,6 +252,13 @@ public:
     void resolveStart(void);            // resolve name to ip
     void resolveGetResp(void);          // retrieve the results of resolve
 
+    void conOpen_connect(int slot, bool tcpNotUdp, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size);
+    void conOpen_listen(int slot, bool tcpNotUdp, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size);
+
+    void updateCons_active(int i);
+    void updateCons_passive(int i);
+    bool didSocketHangUp(int i);
+    
     //--------------
     // helper functions
     int  findEmptyConnectionSlot(void); // get index of empty connection slot, or -1 if nothing is available

@@ -452,7 +452,6 @@ void NetAdapter::closeAndCleanAll(void)
 void NetAdapter::conOpen(void)
 {
     bool tcpNotUdp;
-    int  ires;
 
     // get type of connection
     if(cmd[4] == NET_CMD_TCP_OPEN) {
@@ -486,13 +485,72 @@ void NetAdapter::conOpen(void)
 
     Debug::out(LOG_DEBUG, "NetAdapter::conOpen() -- remoteHost: %d.%d.%d.%d, remotePort: %d", (BYTE) (remoteHost >> 24), (BYTE) (remoteHost >> 16), (BYTE) (remoteHost >> 8), (BYTE) (remoteHost), remotePort);
     
-/*
     // following 2 params can be received, but are not used for now
     WORD  tos           = Utils::getWord (dataBuffer + 6);
     WORD  buff_size     = Utils::getWord (dataBuffer + 8);
-*/
+    
+    if(remoteHost != 0) {       // remote host specified? Open by connecting to remote host
+        conOpen_connect(slot, tcpNotUdp, remoteHost, remotePort, tos, buff_size);
+    } else {                    // remote host not specified? Open by listening for connection
+        conOpen_listen(slot, tcpNotUdp, remoteHost, remotePort, tos, buff_size);
+    }
+}
 
+void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size)
+{
+    int ires;
     int fd;
+    
+    if(tcpNotUdp) {     // TCP connection
+        fd = socket(AF_INET, SOCK_STREAM, 0);
+    } else {            // UDP connection
+        fd = socket(AF_INET, SOCK_DGRAM, 0);
+    }
+    
+    if(fd < 0) {        // failed? quit
+        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - socket() failed");
+        dataTrans->setStatus(E_CONNECTFAIL);
+        return;
+    }
+    
+    if(tcpNotUdp) {                                                 // for TCP sockets
+        int flags = fcntl(fd, F_GETFL, 0);                          // get flags
+        ires = fcntl(fd, F_SETFL, flags | O_NONBLOCK);              // set it as non-blocking
+
+        if(ires == -1) {
+            Debug::out(LOG_DEBUG, "NetAdapter::conOpen - setting O_NONBLOCK failed, but continuing");
+        }
+    }
+
+    // fill the local address info
+    struct sockaddr_in serv_addr;
+    memset(&serv_addr, '0', sizeof(serv_addr)); 
+    serv_addr.sin_family        = AF_INET;
+    serv_addr.sin_addr.s_addr   = htonl(INADDR_ANY);
+    serv_addr.sin_port          = htons(remotePort); 
+    
+    bind(fd, (struct sockaddr*) &serv_addr, sizeof(serv_addr));     // bind IP & port to this socket
+    listen(fd, 1);                                                  // mark this socket as listening, with queue length of 1
+    
+    cons[slot].initVars();                                          // init vars
+
+    // store the info
+    cons[slot].activeNotPassive = false;                            // it's passive (listening) socket
+    cons[slot].listenFd         = fd;
+    cons[slot].hostAdr          = serv_addr;
+    cons[slot].type             = tcpNotUdp ? TCP : UDP;
+    cons[slot].bytesInSocket    = 0;
+    cons[slot].status           = E_LISTEN;
+
+    // return the handle
+    dataTrans->setStatus(handleAtariToCE(slot));
+}
+
+void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size)
+{
+    int ires;
+    int fd;
+    
     if(tcpNotUdp) {     // TCP connection
         fd = socket(AF_INET, SOCK_STREAM, 0);
     } else {            // UDP connection
@@ -500,7 +558,7 @@ void NetAdapter::conOpen(void)
     }
 
     if(fd < 0) {        // failed? quit
-        Debug::out(LOG_DEBUG, "NetAdapter::conOpen - socket() failed");
+        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_connect - socket() failed");
         dataTrans->setStatus(E_CONNECTFAIL);
         return;
     }
@@ -541,11 +599,12 @@ void NetAdapter::conOpen(void)
     cons[slot].initVars();                      // init vars
 
     // store the info
-    cons[slot].fd                   = fd;
-    cons[slot].hostAdr              = serv_addr;
-    cons[slot].type                 = tcpNotUdp ? TCP : UDP;
-    cons[slot].bytesInSocket  = 0;
-    cons[slot].status               = conStatus;
+    cons[slot].activeNotPassive = true;         // it's active (outgoing) socket
+    cons[slot].fd               = fd;
+    cons[slot].hostAdr          = serv_addr;
+    cons[slot].type             = tcpNotUdp ? TCP : UDP;
+    cons[slot].bytesInSocket    = 0;
+    cons[slot].status           = conStatus;
 
     // return the handle
     dataTrans->setStatus(handleAtariToCE(slot));
@@ -1045,79 +1104,132 @@ int NetAdapter::findEmptyConnectionSlot(void)
 
 void NetAdapter::updateCons(void)
 {
-    int i, res;
+    int i;
 
     for(i=0; i<MAX_HANDLE; i++) {                   // update connection info                
         if(cons[i].isClosed()) {                    // if connection closed, skip it
             continue;
         }
 
-        //---------
-        // update how many bytes we can read from this sock
-        cons[i].bytesInSocket = howManyWeCanReadFromFd(cons[i].fd);       // try to get how many bytes can be read
-        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- cons[%d].bytesInSocket: %d, status: cons[%d].status: %d", i, cons[i].bytesInSocket, i, cons[i].status);
+        if(cons[i].activeNotPassive) {              // active? 
+            updateCons_active(i);
+        } else {                                    // passive?
+            updateCons_passive(i);
+        }      
+    }
+}
+
+//----------------------------------------------
+void NetAdapter::updateCons_passive(int i)
+{
+    if(cons[i].fd == -1 && cons[i].listenFd == -1) {                        // both sockets closed? quit
+        return;
+    }
+
+    if(cons[i].fd == -1 && cons[i].listenFd != -1) {                        // got listening socket, but not normal socket? 
+        int fd = accept(cons[i].listenFd, (struct sockaddr*)NULL, NULL);    // try to accept
         
-        //---------
-        // if it's not TCP connection, just pretend the state is 'connected' - it's only used for TCP connections, so it doesn't matter
-        if(cons[i].type != TCP) {    
-            Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- non-TCP connection %d -- now TESTABLISH", i);
-            cons[i].status = TESTABLISH;
-            continue;
+        if(fd == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {         // failed, because nothing waiting? quit
+            return;
         }
-
-        //---------
-        // update connection status of TCP socket
         
-        if(cons[i].status == TSYN_SENT) {               // if this is TCP connection and it's in the 'connecting' state
-            res = connect(cons[i].fd, (struct sockaddr *) &cons[i].hostAdr, sizeof(cons[i].hostAdr));   // try to connect again
+        // ok, got the connection
+        cons[i].fd      = fd;
+        cons[i].status  = TESTABLISH;
+        return;
+    }
+    
+    // ok, so we have both sockets? did the data socket HUP?
+    if(didSocketHangUp(i)) {
+        Debug::out(LOG_DEBUG, "NetAdapter::updateCons_passive() -- connection %d - poll returned POLLRDHUP, so closing", i);
+    
+        cons[i].status = TCLOSED;   // mark the state as TCLOSED
+        cons[i].closeIt();
+    }
+}
+//----------------------------------------------
+void NetAdapter::updateCons_active(int i)
+{
+    int res;
 
-            if(res < 0) {                           // error occured on connect, check what it was
-                switch(errno) {
-                    case EISCONN:
-                    case EALREADY:      cons[i].status = TESTABLISH;    
-                                        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TESTABLISH", i);
-                                        break;  // ok, we're connected!
-                                        
-                    case EINPROGRESS:   cons[i].status = TSYN_SENT;     
-                                        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TSYN_SENT", i);
-                                        break;  // still trying to connect
+    //---------
+    // update how many bytes we can read from this sock
+    cons[i].bytesInSocket = howManyWeCanReadFromFd(cons[i].fd);       // try to get how many bytes can be read
+    Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- cons[%d].bytesInSocket: %d, status: cons[%d].status: %d", i, cons[i].bytesInSocket, i, cons[i].status);
+    
+    //---------
+    // if it's not TCP connection, just pretend the state is 'connected' - it's only used for TCP connections, so it doesn't matter
+    if(cons[i].type != TCP) {    
+        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- non-TCP connection %d -- now TESTABLISH", i);
+        cons[i].status = TESTABLISH;
+        return;
+    }
 
-                     // on failures
-                    case ETIMEDOUT:
-                    case ENETUNREACH:
-                    case ECONNREFUSED:  cons[i].status = TCLOSED;       
-                                        cons[i].closeIt();
-                                        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TCLOSED", i);
-                                        break;
-                                        
-                    default:
-                                        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connect() returned error %d", errno);
-                                        break;
-                }
-            } else if(res == 0) {                   // no error occured? 
-                cons[i].status = TESTABLISH;
-                Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TESTABLISH - because no error", i);
+    //---------
+    // update connection status of TCP socket
+    
+    if(cons[i].status == TSYN_SENT) {               // if this is TCP connection and it's in the 'connecting' state
+        res = connect(cons[i].fd, (struct sockaddr *) &cons[i].hostAdr, sizeof(cons[i].hostAdr));   // try to connect again
+
+        if(res < 0) {                           // error occured on connect, check what it was
+            switch(errno) {
+                case EISCONN:
+                case EALREADY:      cons[i].status = TESTABLISH;    
+                                    Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TESTABLISH", i);
+                                    break;  // ok, we're connected!
+                                    
+                case EINPROGRESS:   cons[i].status = TSYN_SENT;     
+                                    Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TSYN_SENT", i);
+                                    break;  // still trying to connect
+
+                 // on failures
+                case ETIMEDOUT:
+                case ENETUNREACH:
+                case ECONNREFUSED:  cons[i].status = TCLOSED;       
+                                    cons[i].closeIt();
+                                    Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TCLOSED", i);
+                                    break;
+                                    
+                default:
+                                    Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connect() returned error %d", errno);
+                                    break;
             }
-        } else {                                            // not connecting state? try to find out the state
-            if(cons[i].bytesInSocket == 0) {                // nothing to read? try to find out if it's closed
-                struct pollfd pfd;
-                pfd.fd      = cons[i].fd;
-                pfd.events  = POLLRDHUP | POLLERR | POLLHUP;
-                pfd.revents = 0;
-
-                int ires = poll(&pfd, 1, 0);                // see if this connection is closed
-
-                if(ires != 0) {
-                    if((pfd.revents & POLLRDHUP) != 0) {
-                        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d - poll returned POLLRDHUP, so closing", i);
-                
-                        cons[i].status = TCLOSED;   // mark the state as TCLOSED
-                        cons[i].closeIt();
-                    }
-                }
-            }
+        } else if(res == 0) {                   // no error occured? 
+            cons[i].status = TESTABLISH;
+            Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TESTABLISH - because no error", i);
+        }
+    } else {                                            // not connecting state? try to find out the state
+        if(didSocketHangUp(i)) {
+            Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d - poll returned POLLRDHUP, so closing", i);
+    
+            cons[i].status = TCLOSED;   // mark the state as TCLOSED
+            cons[i].closeIt();
         }
     }
+}
+
+//----------------------------------------------
+bool NetAdapter::didSocketHangUp(int i)
+{
+    if(cons[i].bytesInSocket != 0) {                // something to read? didn't HUP then!
+        return false;
+    }
+
+    // nothing to read? see if it closed
+    struct pollfd pfd;
+    pfd.fd      = cons[i].fd;
+    pfd.events  = POLLRDHUP | POLLERR | POLLHUP;
+    pfd.revents = 0;
+
+    int ires = poll(&pfd, 1, 0);                    // see if this connection is closed
+
+    if(ires != 0) {
+        if((pfd.revents & POLLRDHUP) != 0) {        // got POLLRDHUP event? it did HUP
+            return true;
+        }
+    }
+
+    return false;
 }
 //----------------------------------------------
 
