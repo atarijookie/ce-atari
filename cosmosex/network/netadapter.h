@@ -153,13 +153,10 @@ class TNetConnection
 public:
     TNetConnection() {                  // contructor to init stuff
         initVars();
-        rBfr = new BYTE[CON_BFR_SIZE];
-        memset(rBfr, 0, CON_BFR_SIZE);
     }
 
     ~TNetConnection() {                 // destructor to possibly close connection
         closeIt();
-        delete []rBfr;
     }
 
     void closeIt(void) {                // close the socket
@@ -180,8 +177,6 @@ public:
 
         gotPrevLastByte     = false;
         prevLastByte        = 0;
-
-        bytesInBuffer = 0;
     }
 
     bool isClosed(void) {       // check if it's closed
@@ -192,15 +187,12 @@ public:
     struct sockaddr_in hostAdr; // this is where we send data
     int type;                   // TCP / UDP / ICMP
 
-    int bytesInSocket;    // how many bytes are waiting to be read from socket
+    int bytesInSocket;          // how many bytes are waiting to be read from socket
     int status;                 // status of connection - open, closed, ...
     int lastReadCount;          // count of bytes that was read on the last read operation
 
     bool gotPrevLastByte;       // flag that we do have a last byte from the previous transfer
     BYTE prevLastByte;          // this is the last byte from previous transfer
-
-    BYTE *rBfr;                 // pointer to 100 kB read buffer - used when conLocateDelim() is called
-    int  bytesInBuffer;   // how many data there is in bfr[]
 };
 
 //-------------------------------------
@@ -226,6 +218,8 @@ public:
     TNetConnection  rawSock;            // this is info about RAW socket - used for ICMP
     TRawSocks       rawSockHeads;       // this holds the headers for RAW socket
 
+    BYTE *rBfr;                         // pointer to 100 kB read buffer - used when conLocateDelim() is called
+    
     void loadSettings(void);
 
     void identify(void);
@@ -250,7 +244,6 @@ public:
     void updateCons(void);
     int  howManyWeCanReadFromFd(int fd);
 
-    int  readFromLocalBuffer(TNetConnection *nc, int cnt);
     int  readFromSocket(TNetConnection *nc, int cnt);
     void finishDataRead(TNetConnection *nc, int totalCnt, BYTE status);
     

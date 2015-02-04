@@ -289,12 +289,16 @@ NetAdapter::NetAdapter(void)
     localIp         = 0;
     icmpDataCount   = 0;
 
+    rBfr = new BYTE[CON_BFR_SIZE];
+    memset(rBfr, 0, CON_BFR_SIZE);
+    
     loadSettings();
 }
 
 NetAdapter::~NetAdapter()
 {
     delete []dataBuffer;
+    delete []rBfr;
 }
 
 void NetAdapter::setAcsiDataTrans(AcsiDataTrans *dt)
@@ -654,7 +658,7 @@ void NetAdapter::conUpdateInfo(void)
     
     // fill the buffer
     for(i=0; i<MAX_HANDLE; i++) {                           // store how many bytes we can read from connections
-        DWORD bytesToBeRead = cons[i].bytesInSocket + cons[i].bytesInBuffer;
+        DWORD bytesToBeRead = cons[i].bytesInSocket;
         dataTrans->addDataDword(bytesToBeRead);
         
         if(bytesToBeRead > 0) {
@@ -725,10 +729,9 @@ void NetAdapter::conReadData(void)
 
     //--------------
     // now find out if we can read anything
-    nc->bytesInSocket           = howManyWeCanReadFromFd(nc->fd);           // update how many bytes we have waiting in socket
-    int byteCountThatCanBeRead  = nc->bytesInSocket + nc->bytesInBuffer;    // byte count that can be read = bytes in socket + bytes in local buffer
+    nc->bytesInSocket = howManyWeCanReadFromFd(nc->fd);                     // update how many bytes we have waiting in socket
 
-    if(byteCountThatCanBeRead == 0) {                                       // nothing to read? return that we don't have enough data
+    if(nc->bytesInSocket == 0) {                                            // nothing to read? return that we don't have enough data
         Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- not enough data, RW_PARTIAL_TRANSFER, totalCnt: %d bytes", totalCnt);
 
         finishDataRead(nc, totalCnt, RW_PARTIAL_TRANSFER);                  // update variables, set status
@@ -736,21 +739,7 @@ void NetAdapter::conReadData(void)
     }
 
     //-----------------
-    // now use the data we already have in local buffer
-    int cntLoc = readFromLocalBuffer(nc, toRead);
-
-    toRead      -= cntLoc;
-    totalCnt    += cntLoc;
-
-    if(toRead == 0) {                                               // we don't need to read more? quit with success
-        Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- finishing after readFromLocalBuffer(), totalCnt: %d bytes", totalCnt);
-
-        finishDataRead(nc, totalCnt, RW_ALL_TRANSFERED);            // update variables, set status
-        return;
-    }
-
-    //-----------------
-    // and try to read the rest from socket
+    // try to read the data from socket
     int cntSck = readFromSocket(nc, toRead);
 
     toRead      -= cntSck;
@@ -798,32 +787,37 @@ void NetAdapter::conLocateDelim(void)
 
     TNetConnection *nc = &cons[handle];
 
-    if(nc->isClosed()) {                                // connection not open? fail
+    if(nc->isClosed()) {                                        // connection not open? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conLocateDelim -- connection %d closed", handle);
         dataTrans->setStatus(E_BADHANDLE);
         return;
     }
 
     //-----------------
-    // try to fill the local read buffer, if there's space
-    if(nc->bytesInBuffer < CON_BFR_SIZE) {                // ok, we got some space, let's try to fill it
-        int emptyCnt = CON_BFR_SIZE - nc->bytesInBuffer;  // we have this many bytes free in buffer
-        int canRead  = howManyWeCanReadFromFd(nc->fd);          // find out how many bytes we can read
+    // if there's some data we can read, PEEK data (leave it in socket for next real read)
+    int canRead     = howManyWeCanReadFromFd(nc->fd);                   // find out how many bytes we can read
+    
+    if(canRead <= 0) {
+        Debug::out(LOG_DEBUG, "NetAdapter::conLocateDelim -- delimiter NOT found, because no data to recv");
+        dataTrans->addDataDword(DELIMITER_NOT_FOUND);
+        return;
+    }
+    
+    int readCount   = MIN(canRead, CON_BFR_SIZE);                       // get the smaller number out of these two
 
-        int readCount = MIN(canRead, emptyCnt);                 // get the smaller number out of these two
+    int res = recv(nc->fd, rBfr, readCount, MSG_DONTWAIT | MSG_PEEK);   // PEEK read the data
 
-        int res = recv(nc->fd, nc->rBfr + nc->bytesInBuffer, readCount, MSG_DONTWAIT);  // read the data to the end of the previous data
-
-        if(res > 0) {                                           // read succeeded? Increment count in local read buffer
-            nc->bytesInBuffer += res;
-        }
+    if(res <= 0) {                                                      // read failed? quit
+        Debug::out(LOG_DEBUG, "NetAdapter::conLocateDelim -- delimiter NOT found, because recv failed");
+        dataTrans->addDataDword(DELIMITER_NOT_FOUND);
+        return;
     }
     //-----------------
     // now try to find the delimiter
     int i;
     bool found = false;
-    for(i=0; i<nc->bytesInBuffer; i++) {          // go through the buffer and find delimiter
-        if(nc->rBfr[i] == delim) {                      // delimiter found?
+    for(i=0; i<res; i++) {                              // go through the buffer and find delimiter
+        if(rBfr[i] == delim) {                          // delimiter found?
             found = true;
             break;
         }
@@ -1134,34 +1128,10 @@ int NetAdapter::howManyWeCanReadFromFd(int fd)
     res = ioctl(fd, FIONREAD, &value);          // try to get how many bytes can be read
         
     if(res == -1) {                             // ioctl failed? 
-        return 0;
+        value = 0;
     }
 
     return value;
-}
-//----------------------------------------------
-int NetAdapter::readFromLocalBuffer(TNetConnection *nc, int cnt)
-{
-    int countFromBuffer = MIN(cnt, nc->bytesInBuffer);          // get the count that we will use from local buffer
-
-    if(countFromBuffer == 0) {                                  // nothing to read? quit
-        return 0;
-    }
-
-    dataTrans->addDataBfr(nc->rBfr, countFromBuffer, false);    // add data from local buffer
-
-    nc->prevLastByte    = nc->rBfr[countFromBuffer - 1];        // store the last byte of buffer
-    nc->gotPrevLastByte = true;
-
-    int i;
-    int restOfBuffer = nc->bytesInBuffer - countFromBuffer;     // count of bytes there are after the bytes we just transfered
-
-    for(i=0; i<restOfBuffer; i++) {
-        nc->rBfr[i] = nc->rBfr[i + countFromBuffer];            // move the not used data to the start of the local buffer
-    }        
-
-    nc->bytesInBuffer = restOfBuffer;                           // store the new count of bytes we still have in local buffer
-    return countFromBuffer;                                     // return that we've read this many bytes
 }
 //----------------------------------------------
 int NetAdapter::readFromSocket(TNetConnection *nc, int cnt)
@@ -1178,8 +1148,6 @@ int NetAdapter::readFromSocket(TNetConnection *nc, int cnt)
     }
 
     if(res > 0) {                                           // if some bytes have been read
-//        Debug::outBfr(dataBuffer, res);
-
         nc->prevLastByte    = dataBuffer[res - 1];          // store the last byte of buffer
         nc->gotPrevLastByte = true;
 
