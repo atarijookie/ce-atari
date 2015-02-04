@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <arpa/inet.h> 
 #include <fcntl.h>
+#include <poll.h>
 
 #include <signal.h>
 #include <pthread.h>
@@ -811,7 +812,7 @@ void NetAdapter::conLocateDelim(void)
 
         int readCount = MIN(canRead, emptyCnt);                 // get the smaller number out of these two
 
-        int res = read(nc->fd, nc->rBfr + nc->bytesInBuffer, readCount);  // read the data to the end of the previous data
+        int res = recv(nc->fd, nc->rBfr + nc->bytesInBuffer, readCount, MSG_DONTWAIT);  // read the data to the end of the previous data
 
         if(res > 0) {                                           // read succeeded? Increment count in local read buffer
             nc->bytesInBuffer += res;
@@ -1047,6 +1048,7 @@ int NetAdapter::findEmptyConnectionSlot(void)
     return -1;                                      // no empty slot?
 }
 //----------------------------------------------
+
 void NetAdapter::updateCons(void)
 {
     int i, res;
@@ -1102,42 +1104,29 @@ void NetAdapter::updateCons(void)
                 cons[i].status = TESTABLISH;
                 Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TESTABLISH - because no error", i);
             }
-        } else {                                        // not connecting state? try to find out the state
-            char bfr[4];
-            res = recv(cons[i].fd, bfr, 4, MSG_PEEK | MSG_DONTWAIT);       // try to peek data without waiting
-            
-            if(res == 0) {                  // should return 0 on connection closed
-                Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d - recv returned 0, socket probably closed, so closing", i);
+        } else {                                            // not connecting state? try to find out the state
+            if(cons[i].bytesInSocket == 0) {                // nothing to read? try to find out if it's closed
+                struct pollfd pfd;
+                pfd.fd      = cons[i].fd;
+                pfd.events  = POLLRDHUP | POLLERR | POLLHUP;
+                pfd.revents = 0;
+
+                int ires = poll(&pfd, 1, 0);                // see if this connection is closed
+
+                if(ires != 0) {
+                    if((pfd.revents & POLLRDHUP) != 0) {
+                        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d - poll returned POLLRDHUP, so closing", i);
                 
-                cons[i].status = TCLOSED;   // mark the state as TCLOSED
-                cons[i].closeIt();
-                
-                continue;
-            } else if(res == -1) {
-                if(errno != EAGAIN) {       // if it's not EAGAIN, log errno
-                    Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d - recv returned -1, errno: %d", i, errno);
+                        cons[i].status = TCLOSED;   // mark the state as TCLOSED
+                        cons[i].closeIt();
+                    }
                 }
-            }
-        
-            int error, len;
-            len = sizeof(int);
-            res = getsockopt(cons[i].fd, SOL_SOCKET, SO_ERROR, &error, (socklen_t *) &len);
-
-            if(res == -1) {                             // getsockopt failed? don't update status
-                Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- getsockopt() failed for connection %d", i);
-                continue;
-            }
-
-            if(error == 0) {                            // no error? connection good
-                cons[i].status = TESTABLISH;
-            } else {                                    // some error? close connection, this will also set the status to closed
-                Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d -- some error, will close!", i);
-                cons[i].closeIt();
             }
         }
     }
 }
 //----------------------------------------------
+
 int NetAdapter::howManyWeCanReadFromFd(int fd)
 {
     int res, value;
