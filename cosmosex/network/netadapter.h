@@ -180,7 +180,9 @@ public:
         bytesInSocket       = 0;
         status              = TCLOSED;
         lastReadCount       = 0;
-        memset(&hostAdr, '0', sizeof(hostAdr)); 
+        
+        memset(&remote_adr, '0', sizeof(remote_adr)); 
+        memset(&local_adr, '0', sizeof(local_adr)); 
 
         gotPrevLastByte     = false;
         prevLastByte        = 0;
@@ -198,7 +200,8 @@ public:
     bool    activeNotPassive;       // socket type: active (outgoing) or passive (listening)
     int     fd;                     // file descriptor of socket
     int     listenFd;               // fd of listening socket
-    struct  sockaddr_in hostAdr;    // this is where we send data
+    struct  sockaddr_in remote_adr; // remote address
+    struct  sockaddr_in local_adr;  // local  address
     int     type;                   // TCP / UDP / ICMP
 
     int bytesInSocket;          // how many bytes are waiting to be read from socket
@@ -253,7 +256,7 @@ public:
     void resolveGetResp(void);          // retrieve the results of resolve
 
     void conOpen_connect(int slot, bool tcpNotUdp, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size);
-    void conOpen_listen(int slot, bool tcpNotUdp, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size);
+    void conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, WORD tos, WORD buff_size);
 
     void updateCons_active(int i);
     void updateCons_passive(int i);

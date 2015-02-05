@@ -492,11 +492,11 @@ void NetAdapter::conOpen(void)
     if(remoteHost != 0) {       // remote host specified? Open by connecting to remote host
         conOpen_connect(slot, tcpNotUdp, remoteHost, remotePort, tos, buff_size);
     } else {                    // remote host not specified? Open by listening for connection
-        conOpen_listen(slot, tcpNotUdp, remoteHost, remotePort, tos, buff_size);
+        conOpen_listen(slot, tcpNotUdp, remotePort, tos, buff_size);
     }
 }
 
-void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size)
+void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, WORD tos, WORD buff_size)
 {
     int ires;
     int fd;
@@ -518,18 +518,46 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, DWORD remoteHost, WORD
         ires = fcntl(fd, F_SETFL, flags | O_NONBLOCK);              // set it as non-blocking
 
         if(ires == -1) {
-            Debug::out(LOG_DEBUG, "NetAdapter::conOpen - setting O_NONBLOCK failed, but continuing");
+            Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - setting O_NONBLOCK failed, but continuing");
         }
     }
 
     // fill the local address info
-    struct sockaddr_in serv_addr;
-    memset(&serv_addr, '0', sizeof(serv_addr)); 
-    serv_addr.sin_family        = AF_INET;
-    serv_addr.sin_addr.s_addr   = htonl(INADDR_ANY);
-    serv_addr.sin_port          = htons(remotePort); 
+    struct sockaddr_in local_addr;
+    memset(&local_addr, '0', sizeof(local_addr)); 
+    local_addr.sin_family        = AF_INET;
+    local_addr.sin_addr.s_addr   = htonl(INADDR_ANY);
+    local_addr.sin_port          = htons(localPort); 
     
-    bind(fd, (struct sockaddr*) &serv_addr, sizeof(serv_addr));     // bind IP & port to this socket
+    ires = bind(fd, (struct sockaddr*) &local_addr, sizeof(local_addr));  // bind IP & port to this socket
+    
+    if(ires == -1) {                                                    // if bind failed, quit
+        close(fd);
+        
+        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - bind() failed with error: %d", errno);
+        dataTrans->setStatus(E_CONNECTFAIL);
+        return;
+    }
+    
+    if(localPort == 0) {                                                // should listen on 1st free port?
+        struct sockaddr_in real_addr;
+        memset(&real_addr, '0', sizeof(local_addr)); 
+
+        socklen_t len = (socklen_t) sizeof(real_addr);
+        ires = getsockname(fd, (struct sockaddr*) &real_addr, &len);    // try to find out real local port number that was open / used
+        
+        if(ires == -1) {
+            close(fd);
+
+            Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - getsockname() failed with error: %d", errno);
+            dataTrans->setStatus(E_CONNECTFAIL);
+            return;
+        }
+        
+        local_addr.sin_port = real_addr.sin_port;                   // store port
+        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - now listening on port %d", local_addr.sin_port);
+    }
+    
     listen(fd, 1);                                                  // mark this socket as listening, with queue length of 1
     
     cons[slot].initVars();                                          // init vars
@@ -537,10 +565,10 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, DWORD remoteHost, WORD
     // store the info
     cons[slot].activeNotPassive = false;                            // it's passive (listening) socket
     cons[slot].listenFd         = fd;
-    cons[slot].hostAdr          = serv_addr;
+    cons[slot].local_adr        = local_addr;
     cons[slot].type             = tcpNotUdp ? TCP : UDP;
     cons[slot].bytesInSocket    = 0;
-    cons[slot].status           = E_LISTEN;
+    cons[slot].status           = TLISTEN;
 
     // return the handle
     dataTrans->setStatus(handleAtariToCE(slot));
@@ -575,7 +603,7 @@ void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, DWORD remoteHost, WOR
         ires = fcntl(fd, F_SETFL, flags | O_NONBLOCK);          // set it as non-blocking
 
         if(ires == -1) {
-            Debug::out(LOG_DEBUG, "NetAdapter::conOpen - setting O_NONBLOCK failed, but continuing");
+            Debug::out(LOG_DEBUG, "NetAdapter::conOpen_connect - setting O_NONBLOCK failed, but continuing");
         }
     }
 
@@ -585,7 +613,7 @@ void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, DWORD remoteHost, WOR
     if(ires < 0 && errno != EINPROGRESS) {      // if connect failed, and it's not EINPROGRESS (because it's O_NONBLOCK)
         close(fd);
 
-        Debug::out(LOG_DEBUG, "NetAdapter::conOpen - connect() failed");
+        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_connect - connect() failed");
         dataTrans->setStatus(E_CONNECTFAIL);
         return;
     }
@@ -593,7 +621,7 @@ void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, DWORD remoteHost, WOR
     int conStatus = TESTABLISH;                 // for UDP and blocking TCP, this is 'we have connection'
     if(ires < 0 && errno == EINPROGRESS) {      // if it's a O_NONBLOCK socket connecting, the state is connecting
         conStatus = TSYN_SENT;                  // for non-blocking TCP, this is 'we're trying to connect'
-        Debug::out(LOG_DEBUG, "NetAdapter::conOpen() - non-blocking TCP is connecting, going to TSYN_SENT status");
+        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_connect() - non-blocking TCP is connecting, going to TSYN_SENT status");
     }
     
     cons[slot].initVars();                      // init vars
@@ -601,7 +629,7 @@ void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, DWORD remoteHost, WOR
     // store the info
     cons[slot].activeNotPassive = true;         // it's active (outgoing) socket
     cons[slot].fd               = fd;
-    cons[slot].hostAdr          = serv_addr;
+    cons[slot].remote_adr       = serv_addr;
     cons[slot].type             = tcpNotUdp ? TCP : UDP;
     cons[slot].bytesInSocket    = 0;
     cons[slot].status           = conStatus;
@@ -726,12 +754,20 @@ void NetAdapter::conUpdateInfo(void)
         }
     }
 
-    if(found == 0) {
-        Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo - no connection has no data to be read");
-    }
-    
     for(i=0; i<MAX_HANDLE; i++) {                           // store connection statuses
         dataTrans->addDataByte(cons[i].status);
+    }
+
+    for(i=0; i<MAX_HANDLE; i++) {                           // store local ports (LPort)
+        dataTrans->addDataWord(ntohs(cons[i].local_adr.sin_port));
+    }
+
+    for(i=0; i<MAX_HANDLE; i++) {                           // store remote addresses (RHost)
+        dataTrans->addDataDword(ntohl(cons[i].remote_adr.sin_addr.s_addr));
+    }
+
+    for(i=0; i<MAX_HANDLE; i++) {                           // store remote ports (RPort)
+        dataTrans->addDataWord(ntohs(cons[i].remote_adr.sin_port));
     }
 
     pthread_mutex_lock(&networkThreadMutex);
@@ -962,14 +998,14 @@ void NetAdapter::icmpSend(void)
     rawSockHeads.setIpHeader(localIp, destinIP, length);            // source IP, destination IP, data length
     rawSockHeads.setIcmpHeader(icmpType, icmpCode, id, sequence);   // ICMP ToS, ICMP code, ID, sequence
     
-    rawSock.hostAdr.sin_family      = AF_INET;
-    rawSock.hostAdr.sin_addr.s_addr = htonl(destinIP);
+    rawSock.remote_adr.sin_family       = AF_INET;
+    rawSock.remote_adr.sin_addr.s_addr  = htonl(destinIP);
 
     if(length > 0) {
         memcpy(rawSockHeads.data, pData + 4, length);               // copy the rest of data from received buffer to raw packet data
     }
 
-    int ires = sendto(rawSock.fd, rawSockHeads.icmp, sizeof(struct icmphdr) + length, 0, (struct sockaddr *) &rawSock.hostAdr, sizeof(struct sockaddr));
+    int ires = sendto(rawSock.fd, rawSockHeads.icmp, sizeof(struct icmphdr) + length, 0, (struct sockaddr *) &rawSock.remote_adr, sizeof(struct sockaddr));
 
     if(ires == -1) {                                                // on failure
         Debug::out(LOG_DEBUG, "NetAdapter::icmpSend -- sendto() failed, errno: %d", errno);
@@ -1127,15 +1163,33 @@ void NetAdapter::updateCons_passive(int i)
     }
 
     if(cons[i].fd == -1 && cons[i].listenFd != -1) {                        // got listening socket, but not normal socket? 
-        int fd = accept(cons[i].listenFd, (struct sockaddr*)NULL, NULL);    // try to accept
+        struct sockaddr_storage remoteAddress;                              // this struct will receive the remote address if accept() succeeds
+        socklen_t               addrSize;
+        addrSize = sizeof(sockaddr);
+        memset(&remoteAddress, 0, addrSize);
+        
+        int fd = accept(cons[i].listenFd, (struct sockaddr*) &remoteAddress, &addrSize);    // try to accept
         
         if(fd == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {         // failed, because nothing waiting? quit
             return;
         }
+
+        Debug::out(LOG_DEBUG, "NetAdapter::updateCons_passive() -- connection %d - accept() succeeded, client connected", i);
         
-        // ok, got the connection
+        // ok, got the connection, store file descriptor and new state
         cons[i].fd      = fd;
         cons[i].status  = TESTABLISH;
+        
+        // also store the remote address that just connected to us
+        if (remoteAddress.ss_family == AF_INET) {               // if it's IPv4
+            struct sockaddr_in *s = (struct sockaddr_in *) &remoteAddress;
+        
+            cons[i].remote_adr.sin_addr.s_addr  = s->sin_addr.s_addr;
+            cons[i].remote_adr.sin_port         = s->sin_port;
+
+            Debug::out(LOG_DEBUG, "NetAdapter::updateCons_passive() -- connection %d - got IP & port of remote host", i);
+        }
+        
         return;
     }
     
@@ -1155,12 +1209,12 @@ void NetAdapter::updateCons_active(int i)
     //---------
     // update how many bytes we can read from this sock
     cons[i].bytesInSocket = howManyWeCanReadFromFd(cons[i].fd);       // try to get how many bytes can be read
-    Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- cons[%d].bytesInSocket: %d, status: cons[%d].status: %d", i, cons[i].bytesInSocket, i, cons[i].status);
+    Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- cons[%d].bytesInSocket: %d, status: cons[%d].status: %d", i, cons[i].bytesInSocket, i, cons[i].status);
     
     //---------
     // if it's not TCP connection, just pretend the state is 'connected' - it's only used for TCP connections, so it doesn't matter
     if(cons[i].type != TCP) {    
-        Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- non-TCP connection %d -- now TESTABLISH", i);
+        Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- non-TCP connection %d -- now TESTABLISH", i);
         cons[i].status = TESTABLISH;
         return;
     }
@@ -1169,17 +1223,17 @@ void NetAdapter::updateCons_active(int i)
     // update connection status of TCP socket
     
     if(cons[i].status == TSYN_SENT) {               // if this is TCP connection and it's in the 'connecting' state
-        res = connect(cons[i].fd, (struct sockaddr *) &cons[i].hostAdr, sizeof(cons[i].hostAdr));   // try to connect again
+        res = connect(cons[i].fd, (struct sockaddr *) &cons[i].remote_adr, sizeof(cons[i].remote_adr));   // try to connect again
 
         if(res < 0) {                           // error occured on connect, check what it was
             switch(errno) {
                 case EISCONN:
                 case EALREADY:      cons[i].status = TESTABLISH;    
-                                    Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TESTABLISH", i);
+                                    Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d is now TESTABLISH", i);
                                     break;  // ok, we're connected!
                                     
                 case EINPROGRESS:   cons[i].status = TSYN_SENT;     
-                                    Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TSYN_SENT", i);
+                                    Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d is now TSYN_SENT", i);
                                     break;  // still trying to connect
 
                  // on failures
@@ -1187,20 +1241,20 @@ void NetAdapter::updateCons_active(int i)
                 case ENETUNREACH:
                 case ECONNREFUSED:  cons[i].status = TCLOSED;       
                                     cons[i].closeIt();
-                                    Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TCLOSED", i);
+                                    Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d is now TCLOSED", i);
                                     break;
                                     
                 default:
-                                    Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connect() returned error %d", errno);
+                                    Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connect() returned error %d", errno);
                                     break;
             }
         } else if(res == 0) {                   // no error occured? 
             cons[i].status = TESTABLISH;
-            Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d is now TESTABLISH - because no error", i);
+            Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d is now TESTABLISH - because no error", i);
         }
     } else {                                            // not connecting state? try to find out the state
         if(didSocketHangUp(i)) {
-            Debug::out(LOG_DEBUG, "NetAdapter::updateCons() -- connection %d - poll returned POLLRDHUP, so closing", i);
+            Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d - poll returned POLLRDHUP, so closing", i);
     
             cons[i].status = TCLOSED;   // mark the state as TCLOSED
             cons[i].closeIt();
