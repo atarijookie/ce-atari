@@ -181,8 +181,8 @@ public:
         status              = TCLOSED;
         lastReadCount       = 0;
         
-        memset(&remote_adr, '0', sizeof(remote_adr)); 
-        memset(&local_adr, '0', sizeof(local_adr)); 
+        memset(&remote_adr, 0, sizeof(remote_adr)); 
+        memset(&local_adr,  0, sizeof(local_adr)); 
 
         gotPrevLastByte     = false;
         prevLastByte        = 0;

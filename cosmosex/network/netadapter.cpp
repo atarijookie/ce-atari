@@ -555,7 +555,8 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, WORD t
         }
         
         local_addr.sin_port = real_addr.sin_port;                   // store port
-        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - now listening on port %d", local_addr.sin_port);
+        WORD port = ntohs(local_addr.sin_port);
+        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - now listening on port %d (hex: 0x%04x, dec: %d, %d)", port, port, port >> 8, port & 0xff);
     }
     
     listen(fd, 1);                                                  // mark this socket as listening, with queue length of 1
