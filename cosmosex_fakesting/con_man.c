@@ -23,6 +23,21 @@ extern  uint32  localIP;
 extern  BYTE    FastRAMBuffer[]; 
 
 TConInfo conInfo[MAX_HANDLE];                                                // this holds info about each connection
+
+//--------------------------------------
+#define NO_CHANGE_W     0xfffe
+#define NO_CHANGE_DW    0xfffffffe
+
+void setCIB(BYTE *cib, WORD protocol, WORD lPort, WORD rPort, DWORD rHost, DWORD lHost, WORD status);
+
+#define CIB_PROTO   0
+#define CIB_LPORT   1
+#define CIB_RPORT   2
+#define CIB_RHOST   3
+#define CIB_LHOST   4
+#define CIB_STATUS  5
+
+DWORD getCIBitem(BYTE *cib, BYTE item);
 //--------------------------------------
 // connection info function
 
@@ -39,7 +54,9 @@ int16 CNkick(int16 handle)
 
 CIB *CNgetinfo(int16 handle)
 {
-    if(!handle_valid(handle)) {         // we don't have this handle? fail
+    // Note: do return valid CIB* even for closed handles, the client app might expect this to be not NULL even if the connection is opening / closing / whatever
+
+    if(handle < 0 || handle >= MAX_HANDLE) {    // handle out of range? fail
         return (CIB *) NULL;
     }
 
@@ -295,7 +312,9 @@ int handle_valid(int16 h)
         return FALSE;
     }
     
-    if(conInfo[h].cib.address.rhost == 0 && conInfo[h].cib.address.rport == 0) {          // if connection not open 
+    WORD proto = getCIBitem((BYTE *) &conInfo[h].cib, CIB_PROTO);
+    
+    if(proto == 0) {                // if connection not used
         return FALSE;
     }
     
@@ -323,16 +342,29 @@ void update_con_info(void)
     if(res != OK) {							                                // error? 
 		return;														
 	}
-
+    
     // now update our data from received data    
     int i;
     DWORD   *pBytesToRead       = (DWORD *)  pDmaBuffer;                        // offset   0: 32 * 4 bytes - bytes to read for each connection
-    BYTE    *pConnStatus        = (BYTE *)  (pDmaBuffer + 128);                 // offset 128: 32 * 1 bytes - connection status
-    DWORD   *pBytesToReadIcmp   = (DWORD *) (pDmaBuffer + 160);                 // offset 160:  1 * 1 DWORD - bytes that can be read from ICMP socket(s)
+    BYTE    *pConnStatus        = (BYTE  *) (pDmaBuffer + 128);                 // offset 128: 32 * 1 bytes - connection status
+    WORD    *pLPort             = (WORD  *) (pDmaBuffer + 160);                 // offset 160: 32 * 2 bytes - local port
+    DWORD   *pRHost             = (DWORD *) (pDmaBuffer + 224);                 // offset 224: 32 * 4 bytes - remote host
+    WORD    *pRPort             = (WORD  *) (pDmaBuffer + 352);                 // offset 352: 32 * 2 bytes - remote port
+    DWORD   *pBytesToReadIcmp   = (DWORD *) (pDmaBuffer + 416);                 // offset 416:  1 * 1 DWORD - bytes that can be read from ICMP socket(s)
     
     for(i=0; i<MAX_HANDLE; i++) {                                               // retrieve all the data and fill the variables
+        // retrieve and update internal vars
         conInfo[i].bytesToRead          = (DWORD)   pBytesToRead[i];
         conInfo[i].tcpConnectionState   = (BYTE)    pConnStatus[i];
+        
+        WORD  lPort = (WORD )   pLPort[i];
+        DWORD rHost = (DWORD)   pRHost[i];
+        WORD  rPort = (WORD)    pRPort[i];
+        
+        // CIB update through helper functions because of Pure C vs gcc packing of structs
+        // Update      : local port, remote port, remote host, status
+        // Don't update: protocol, local host
+        setCIB((BYTE *) &conInfo[i].cib, NO_CHANGE_W, lPort, rPort, rHost, NO_CHANGE_DW, pConnStatus[i]);
     }
     
     DWORD bytesToReadIcmp = (DWORD) *pBytesToReadIcmp;                          // get how many bytes we can read from ICMP socket(s)
@@ -362,26 +394,28 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
     pBfr = storeWord    (pBfr, tos);
     pBfr = storeWord    (pBfr, buff_size);
 
-    // TODO: rem_host can be 0, then should listen for connection instead of making active connection (this is used for ACTIVE MODE of FTP)
-    
     // send it to host
     BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
     if(handleIsFromCE(res)) {                       // if it's CE handle
         int stHandle = handleCEtoAtari(res);        // convert it to ST handle
-
+        int proto, status;
+        
         // store info to CIB and CAB structures
         if(tcpNotUdp) {
-            conInfo[stHandle].cib.protocol  = TCP;
+            proto = TCP;
         } else {
-            conInfo[stHandle].cib.protocol  = UDP;
+            proto = UDP;
         }
         
-        conInfo[stHandle].cib.status            = 0;        // 0 means normal
-        conInfo[stHandle].cib.address.rport     = rem_port; // Remote machine port
-        conInfo[stHandle].cib.address.rhost     = rem_host; // Remote machine IP address
-        conInfo[stHandle].cib.address.lport     = 0;        // Local  machine port
-        conInfo[stHandle].cib.address.lhost     = localIP;  // Local  machine IP address
+        if(rem_host == 0) {                         // if no remote host specified, it's a passive (listening) socket - listening for connection
+            status = TLISTEN;
+        } else {                                    // if remote host was specified, it's an active (outgoing) socket - trying to connect
+            status = TSYN_SENT;
+        }
+
+        // local port to 0 - we currently don't know that (yet)
+        setCIB((BYTE *) &conInfo[stHandle].cib, proto, 0, rem_port, rem_host, localIP, status);
         
         return stHandle;                            // return the new handle
     } 
@@ -819,3 +853,45 @@ DWORD read_big(int16 handle, DWORD countNeeded, BYTE *buffer)
     return countDone;                                                   // return how much bytes we've read together
 }
 //-------------------------------------------------------------------------------
+void setCIB(BYTE *cib, WORD protocol, WORD lPort, WORD rPort, DWORD rHost, DWORD lHost, WORD status)
+{
+    // first create pointers to the right addresses
+    WORD  *pProto   = (WORD  *) (cib +  0);
+    WORD  *plPort   = (WORD  *) (cib +  2);
+    WORD  *prPort   = (WORD  *) (cib +  4);
+    DWORD *prHost   = (DWORD *) (cib +  6);
+    DWORD *plHost   = (DWORD *) (cib + 10);
+    WORD  *pStatus  = (WORD  *) (cib + 14);
+    
+    // now if we should set the new value, set it
+    if(protocol != NO_CHANGE_W)     *pProto     = protocol;
+    if(lPort    != NO_CHANGE_W)     *plPort     = lPort;
+    if(rPort    != NO_CHANGE_W)     *prPort     = rPort;
+    if(rHost    != NO_CHANGE_DW)    *prHost     = rHost;
+    if(lHost    != NO_CHANGE_DW)    *plHost     = lHost;
+    if(status   != NO_CHANGE_W)     *pStatus    = status;
+}
+//-------------------------------------------------------------------------------
+DWORD getCIBitem(BYTE *cib, BYTE item)
+{
+    // first create pointers to the right addresses
+    WORD  *pProto   = (WORD  *) (cib +  0);
+    WORD  *plPort   = (WORD  *) (cib +  2);
+    WORD  *prPort   = (WORD  *) (cib +  4);
+    DWORD *prHost   = (DWORD *) (cib +  6);
+    DWORD *plHost   = (DWORD *) (cib + 10);
+    WORD  *pStatus  = (WORD  *) (cib + 14);
+    
+    switch(item) {
+        case CIB_PROTO:     return *pProto; 
+        case CIB_LPORT:     return *plPort;
+        case CIB_RPORT:     return *prPort;
+        case CIB_RHOST:     return *prHost;
+        case CIB_LHOST:     return *plHost;
+        case CIB_STATUS:    return *pStatus;
+    }
+    
+    return 0;
+}
+//-------------------------------------------------------------------------------
+

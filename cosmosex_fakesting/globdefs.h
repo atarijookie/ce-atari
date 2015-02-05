@@ -457,6 +457,15 @@ typedef  struct {
 #define  MAX_CLOCK    86400000L      /* Maximum value for sting_clock       */
 
 
+/*--------------------------------------------------------------------------*/
+
+/*
+ *   TCP and UDP port escape flags.
+ */
+
+#define  TCP_ACTIVE        0x0000     /* Initiate active  (outgoing)  connection  */
+#define  TCP_PASSIVE       0xffff     /* Initiate passive (listening) connection  */
+#define  UDP_EXTEND        0x0000     /* Extended addressing scheme         */
 
 /*--------------------------------------------------------------------------*/
 
