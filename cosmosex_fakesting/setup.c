@@ -72,7 +72,6 @@ void install(void)
     conf.memory          = (void *) memory;
 
     init_ports();
-    structs_init();
 
     conf.thread_rate	= 50;					// "THREADING"
 	conf.frag_ttl		= 60;					// "FRAG_TTL"

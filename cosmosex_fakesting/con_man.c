@@ -80,6 +80,10 @@ int16 CNbyte_count (int16 handle)
         return E_EOF;
     }
     
+    if(ci->tcpConnectionState == TLISTEN) {                         // if connection is still listening, return error E_LISTEN
+        return E_LISTEN;
+    }
+    
     if(dataLeftTotal == 0) {                                        // no data in host and in local buffer?
         return 0;
     }
@@ -297,15 +301,6 @@ int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
 //--------------------------------------
 // helper functions
 
-void structs_init(void)
-{
-    int i;
-    
-    for(i=0; i<MAX_HANDLE; i++) {
-        memset(&conInfo[i].cib, 0, sizeof(CIB));
-    }
-}
-
 int handle_valid(int16 h)
 {
     if(h < 0 && h >= MAX_HANDLE) {                                          // handle out of range?
@@ -451,7 +446,7 @@ int16 connection_close(int tcpNotUdp, int16 handle, int16 timeout)
 
     // don't handle failures, just pretend it's always closed just fine
 
-    memset(&conInfo[handle].cib, 0, sizeof(CIB));          // clear the CIB structure
+    setCIB((BYTE *) &conInfo[handle].cib, 0, 0, 0, 0, 0, 0);     // clear the CIB structure
     return E_NORMAL;
 }
 
@@ -573,7 +568,7 @@ static void initConInfoStruct(int i)
     conInfo[i].tcpConnectionState   = TCLOSED;
     conInfo[i].rCount               = 0;
     conInfo[i].rStart               = 0;
-    memset(&conInfo[i].cib, 0, sizeof(CIB));
+    setCIB((BYTE *) &conInfo[i].cib, 0, 0, 0, 0, 0, 0);     // clear the CIB structure
     memset(conInfo[i].rBuf, 0, READ_BUFFER_SIZE);
 }
 //-------------------------------------------------------------------------------
