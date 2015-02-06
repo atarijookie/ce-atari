@@ -43,7 +43,7 @@ DWORD getCIBitem(BYTE *cib, BYTE item);
 
 int16 CNkick(int16 handle)
 {
-    update_con_info();                  // update connections info structs (max once per 100 ms)
+    update_con_info(FALSE);             // update connections info structs (max once per 100 ms)
 
     if(!handle_valid(handle)) {         // we don't have this handle? fail
         return E_BADHANDLE;
@@ -60,7 +60,7 @@ CIB *CNgetinfo(int16 handle)
         return (CIB *) NULL;
     }
 
-    update_con_info();                  // update connections info structs (max once per 100 ms)
+    update_con_info(FALSE);                     // update connections info structs (max once per 100 ms)
 
 	return &conInfo[handle].cib;        // return pointer to correct CIB
 }
@@ -71,7 +71,7 @@ int16 CNbyte_count (int16 handle)
         return E_BADHANDLE;
     }
 
-    update_con_info();                                              // update connections info structs (max once per 100 ms)
+    update_con_info(FALSE);                                         // update connections info structs (max once per 100 ms)
     TConInfo    *ci             = &conInfo[handle];                 // we're working with this connection
     DWORD       dataLeftLocal   = ci->rCount - ci->rStart;          // calculate how much data we have in local buffer
     DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;  // total data left = local data count + host data count
@@ -104,7 +104,7 @@ int16 CNget_char(int16 handle)
         return E_BADHANDLE;
     }
 
-    update_con_info();                                              // update connections info structs (max once per 100 ms)
+    update_con_info(FALSE);                                         // update connections info structs (max once per 100 ms)
     TConInfo    *ci             = &conInfo[handle];                 // we're working with this connection
     DWORD       dataLeftLocal   = ci->rCount - ci->rStart;          // calculate how much data we have in local buffer
     DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;  // total data left = local data count + host data count
@@ -140,7 +140,7 @@ NDB *CNget_NDB (int16 handle)
         return (NDB *) NULL;
     }
 
-    update_con_info();                                                      // update connections info structs (max once per 100 ms)
+    update_con_info(FALSE);                                                 // update connections info structs (max once per 100 ms)
     TConInfo    *ci             = &conInfo[handle];                         // we're working with this connection
     DWORD       dataLeftLocal   = ci->rCount - ci->rStart;                  // calculate how much data we have in local buffer
     DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;          // total data left = local data count + host data count
@@ -203,7 +203,7 @@ int16 CNget_block(int16 handle, void *buffer, int16 length)
         return E_BADHANDLE;
     }
 
-    update_con_info();                                              // update connections info structs (max once per 100 ms)
+    update_con_info(FALSE);                                         // update connections info structs (max once per 100 ms)
     TConInfo    *ci             = &conInfo[handle];                 // we're working with this connection
     DWORD       dataLeftLocal   = ci->rCount - ci->rStart;          // calculate how much data we have in local buffer
     DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;  // total data left = local data count + host data count
@@ -236,7 +236,7 @@ int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
         return E_BADHANDLE;
     }
 
-    update_con_info();                                              // update connections info structs (max once per 100 ms)
+    update_con_info(FALSE);                                         // update connections info structs (max once per 100 ms)
     TConInfo    *ci             = &conInfo[handle];                 // we're working with this connection
     DWORD       dataLeftLocal   = ci->rCount - ci->rStart;          // calculate how much data we have in local buffer
     DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;  // total data left = local data count + host data count
@@ -316,15 +316,17 @@ int handle_valid(int16 h)
     return TRUE;
 }
 
-void update_con_info(void)
+void update_con_info(BYTE forceUpdate)
 {
 	DWORD res;
 	static DWORD lastUpdate = 0;
 	DWORD now = getTicks();
 
-	if((now - lastUpdate) < 20) {								            // if the last update was less than 100 ms ago, don't update
-		return;
-	}
+    if(!forceUpdate) {                                                      // if shouldn't force update, check last update time, and possibly ignore update
+        if((now - lastUpdate) < 20) {								        // if the last update was less than 100 ms ago, don't update
+            return;
+        }
+    }
 	
 	lastUpdate = now;											            // mark that we've just updated the ceDrives 
 	
@@ -411,6 +413,8 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
 
         // local port to 0 - we currently don't know that (yet)
         setCIB((BYTE *) &conInfo[stHandle].cib, proto, 0, rem_port, rem_host, localIP, status);
+        
+        update_con_info(TRUE);                      // let's FORCE update connection info - CIB should be updated with real local port after this (e.g. aFTP relies on the info when using active ftp connection)
         
         return stHandle;                            // return the new handle
     } 

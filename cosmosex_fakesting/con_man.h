@@ -21,7 +21,7 @@ int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num);
 //-------------------------------------
 // helper functions
 void init_con_info(void);
-void update_con_info(void);
+void update_con_info(BYTE forceUpdate);
 
 void structs_init(void);
 int  handle_valid(int16 h);

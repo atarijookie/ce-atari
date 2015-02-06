@@ -37,6 +37,7 @@ void   setDwordByByteOffset(void *base, int ofs, DWORD val);
 
     #ifdef DEBUG_STRING
     void logStr(char *str);
+    void logBfr(BYTE *bfr, int len);
     #endif
 
 #endif

@@ -373,5 +373,19 @@ void logStr(char *str)
     Fwrite(f, len, str);                        // write it to file
     Fclose(f);                                  // close it
 }
+
+void logBfr(BYTE *bfr, int len)
+{
+    int i;
+
+    logStr("\n");
+    
+    for(i=0; i<len; i++) {
+        showHexByte(bfr[i]);
+        logStr(" ");
+    }
+
+    logStr("\n");
+}
 #endif    
 //-------------------
