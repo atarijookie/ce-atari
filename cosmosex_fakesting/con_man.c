@@ -383,6 +383,20 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
     }
     
     commandShort[5] = 0;
+
+    WORD  lPort = 0;
+    DWORD lHost = 0;
+    
+    if(rem_port == TCP_ACTIVE || rem_port == TCP_PASSIVE) {     // if the remote port is special flag (passive or active), then remote host contains pointer to CAB structure
+        if(rem_host != 0) {                                     // it's not a NULL pointer
+            BYTE *pCAB = (BYTE *) rem_host;                     // convert int to pointer and retrieve struct values
+            
+            lPort       = *((WORD  *) (pCAB + 0));
+            rem_port    = *((WORD  *) (pCAB + 2));
+            rem_host    = *((DWORD *) (pCAB + 4));
+            lHost       = *((DWORD *) (pCAB + 8));
+        }
+    }
     
     // then store the params in buffer
     BYTE *pBfr = pDmaBuffer;
@@ -390,6 +404,8 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
     pBfr = storeWord    (pBfr, rem_port);
     pBfr = storeWord    (pBfr, tos);
     pBfr = storeWord    (pBfr, buff_size);
+    pBfr = storeDword   (pBfr, lHost);
+    pBfr = storeWord    (pBfr, lPort);
 
     // send it to host
     BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
@@ -413,7 +429,6 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
 
         // local port to 0 - we currently don't know that (yet)
         setCIB((BYTE *) &conInfo[stHandle].cib, proto, 0, rem_port, rem_host, localIP, status);
-        
         update_con_info(TRUE);                      // let's FORCE update connection info - CIB should be updated with real local port after this (e.g. aFTP relies on the info when using active ftp connection)
         
         return stHandle;                            // return the new handle
