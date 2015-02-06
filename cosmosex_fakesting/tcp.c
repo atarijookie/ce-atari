@@ -47,7 +47,7 @@ int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
     while(1) {
         // the connection info should be updated in VBL using update_con_info()
         if(getTicks() >= nextConUpdate) {                           // if half a second passed since last connection state check
-            update_con_info();
+            update_con_info(FALSE);
             nextConUpdate = getTicks() + 100;
         }
         
@@ -98,7 +98,7 @@ int16 TCP_info(int16 handle, TCPIB *tcp_info)
         return E_BADHANDLE;
     }
     
-    update_con_info();                                          // update the info 
+    update_con_info(FALSE);                                     // update the info 
 
     if(tcp_info == NULL) {                                      // no pointer? fail
         return E_BADHANDLE;

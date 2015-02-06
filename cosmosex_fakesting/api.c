@@ -110,7 +110,7 @@ int16 ETM_exec (char *module)
 
 void house_keep(void)
 {
-    update_con_info();                          // update connections info structs (max once per 100 ms)
+    update_con_info(FALSE);                     // update connections info structs (max once per 100 ms)
 }
 
 int16 set_flag(int16 flag)                      // set semaphore
