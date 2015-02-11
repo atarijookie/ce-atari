@@ -6,7 +6,7 @@
 #include "stdlib.h"
 
 // -------------------------------------- 
-// the following variables are globale ones, because the acsi_cmd() could be called from user mode, so the params will be stored to these global vars and then the acsi_cmd_supervisor() will handle that...
+// the following variables are global ones, because the acsi_cmd() could be called from user mode, so the params will be stored to these global vars and then the acsi_cmd_supervisor() will handle that...
 BYTE  gl_ReadNotWrite;
 BYTE *gl_cmd;
 BYTE  gl_cmdLength;
@@ -14,6 +14,8 @@ BYTE *gl_buffer;
 WORD  gl_sectorCount;
 
 static BYTE acsi_cmd_supervisor(void);
+
+extern WORD fromVbl;                    // this is non-zero when acsi_cmd is called from VBL (no need for Supexec() then)
 // -------------------------------------- 
 // call this from user mode
 BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
@@ -25,8 +27,13 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     gl_buffer       = buffer;
     gl_sectorCount  = sectorCount;
 
-    // call the routine which needs to be in supervisor
-    BYTE ret = Supexec(acsi_cmd_supervisor);
+    BYTE ret;
+    if(fromVbl) {
+        ret = acsi_cmd_supervisor();
+    } else {
+        // call the routine which needs to be in supervisor
+        ret = Supexec(acsi_cmd_supervisor);
+    }
     
     return ret;
 }

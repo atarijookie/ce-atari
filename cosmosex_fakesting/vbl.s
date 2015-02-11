@@ -2,6 +2,8 @@
 
     .globl  _install_vbl
     .globl  _update_con_info
+    .globl  _update_con_info_vbl
+    .globl  _fromVbl
 
 |-------------------------------------------------
 
@@ -13,14 +15,17 @@ _install_vbl:
     movem.l D0-A6,-(SP)
 
     move.l  0x70, __oldVbl
-    move.l  #update_con_info_vbl,0x70           | install VBL   
+    move.l  #_update_con_info_vbl,0x70      | install VBL   
 
     movem.l (SP)+,D0-A6
     rts
 
 |-------------------------------------------------    
     
-update_con_info_vbl:
+_update_con_info_vbl:
+    move.w  sr,-(SP)                | save Status Register
+    move    #0x2700,sr              | protect this from interrupts, making it almost atomic  
+
     movem.l D0-A6,-(SP)             | back up registers
 
     lea     __vbl_counter, a0       | get address of conter variable
@@ -38,12 +43,16 @@ update_con_info_vbl:
     tst.w   _flock                  | is flock set? if so, don't update
     bne.s   dontUpdateConInfo       | don't do anything if flock is set - we can't use the DMA then, anyways
     
+    move.w  #1, _fromVbl            | set flag: we're in VBL
     jsr     _update_con_info        | call the update function
+    move.w  #0, _fromVbl            | clear flag: we're not in VBL
     |--------------
     
 dontUpdateConInfo:
     
     movem.l (SP)+,D0-A6             | restore registers
+    move.w  (SP)+,sr                | restore Status Register
+    
     move.l  __oldVbl,-(SP)          | call original VBL routine   
     rts
     
@@ -52,4 +61,4 @@ dontUpdateConInfo:
     
 __vbl_counter:          .ds.w   1
 __oldVbl:               .ds.l   1
-
+_fromVbl:               .ds.w   1
