@@ -44,7 +44,11 @@ _update_con_info_vbl:
     bne.s   dontUpdateConInfo       | don't do anything if flock is set - we can't use the DMA then, anyways
     
     move.w  #1, _fromVbl            | set flag: we're in VBL
+    move.l  #0, -(sp)               | forceUpdate = 0
+    
     jsr     _update_con_info        | call the update function
+    
+    add.l   #4, sp
     move.w  #0, _fromVbl            | clear flag: we're not in VBL
     |--------------
     

@@ -127,7 +127,7 @@ int main(void)
 	}
 
     install();
-//    Supexec(install_vbl);
+    Supexec(install_vbl);
     
     (void) Cconws("Driver was installed...");
 

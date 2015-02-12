@@ -28,10 +28,10 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     gl_sectorCount  = sectorCount;
 
     BYTE ret;
-    if(fromVbl) {
+    
+    if(fromVbl) {                       // if we're running from VBL, we're in supervisor mode, no need for Supexec()
         ret = acsi_cmd_supervisor();
-    } else {
-        // call the routine which needs to be in supervisor
+    } else {                            // not called from VBL? Call through Supexec()
         ret = Supexec(acsi_cmd_supervisor);
     }
     

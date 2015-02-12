@@ -4,6 +4,7 @@
 #include "stdlib.h"
 
 BYTE showHex_toLogNotScreen;
+extern WORD fromVbl;                    // this is non-zero when acsi_cmd is called from VBL (no need for Supexec() then)
 
 void *memcpy ( void * destination, const void * source, int num )
 {
@@ -197,7 +198,14 @@ static void sleepMsInSupervisor(void)
 
 DWORD getTicks(void)
 {
-    DWORD res = Supexec(getTicks_fromSupervisor);
+    DWORD res;
+
+    if(fromVbl) {                           // if called from vbl, call directly
+        res = getTicks_fromSupervisor();
+    } else {                                // if not called from vbl, call through Supexec()
+        res = Supexec(getTicks_fromSupervisor);
+    }
+
     return res;
 }
 
