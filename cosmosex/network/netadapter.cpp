@@ -52,6 +52,25 @@ void resolveNameToIp(TNetReq &tnr);
 TStingDgram dgrams[MAX_STING_DGRAMS];
 volatile DWORD icmpDataCount;
 
+void dgram_clearOld(void) 
+{
+    DWORD now = Utils::getCurrentMs();
+    
+    for(int i=0; i<MAX_STING_DGRAMS; i++) {     // find non-empty slot, and if it's old, clear it
+        if(dgrams[i].isEmpty()) {               // found empty? skip it
+            continue;
+        }
+        
+        DWORD diff = now - dgrams[i].time;      // calculate how old is this dgram
+        if(diff < 10000) {                      // dgram is younger than 10 seconds? skip it
+            continue;
+        }
+
+        dgrams[i].clear();                      // it's too old, clear it
+        Debug::out(LOG_DEBUG, "dgram_clearOld() - dgram #%d was too old and it was cleared", i);
+    }
+}
+
 int dgram_getEmpty(void) {
     int i; 
     DWORD oldestTime    = 0xffffffff;
@@ -116,6 +135,8 @@ void *networkThreadCode(void *ptr)
     system("sysctl -w net.ipv4.ping_group_range=\"0 0\"");  
 
 	while(sigintReceived == 0) {
+        dgram_clearOld();                               // clear old dgrams that are probably stuck in the queue 
+    
         while(1) {                                      // receive all available ICMP data 
             bool r = tryIcmpRecv(recvBfr);              // this will cause 100 ms delay when no data is there
             if(!r) {                                    // if receiving failed, quit; otherwise do another receiving!
