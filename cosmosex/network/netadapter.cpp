@@ -501,10 +501,11 @@ void NetAdapter::conOpen(void)
     }
 
     // get connection parameters
-    DWORD remoteHost    = Utils::getDword(dataBuffer);
-    WORD  remotePort    = Utils::getWord (dataBuffer + 4);
-
-    Debug::out(LOG_DEBUG, "NetAdapter::conOpen() -- remoteHost: %d.%d.%d.%d, remotePort: %d", (BYTE) (remoteHost >> 24), (BYTE) (remoteHost >> 16), (BYTE) (remoteHost >> 8), (BYTE) (remoteHost), remotePort);
+    DWORD remoteHost        = Utils::getDword(dataBuffer);
+    WORD  remotePort        = Utils::getWord (dataBuffer + 4);
+    bool  connectNotListen  = (remoteHost != 0);
+        
+    Debug::out(LOG_DEBUG, "NetAdapter::conOpen() -- remoteHost: %d.%d.%d.%d, remotePort: %d -- will %s", (BYTE) (remoteHost >> 24), (BYTE) (remoteHost >> 16), (BYTE) (remoteHost >> 8), (BYTE) (remoteHost), remotePort, (connectNotListen ? "connect to host" : "listen for connection"));
     
     // following 2 params can be received, but are not used for now
     WORD  tos           = Utils::getWord (dataBuffer + 6);
@@ -577,7 +578,9 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, WORD t
         
         local_addr.sin_port = real_addr.sin_port;                   // store port
         WORD port = ntohs(local_addr.sin_port);
-        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - now listening on port %d (hex: 0x%04x, dec: %d, %d)", port, port, port >> 8, port & 0xff);
+        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - now listening on first free port %d (hex: 0x%04x, dec: %d, %d)", port, port, port >> 8, port & 0xff);
+    } else {
+        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - now listening on specified port %d (hex: 0x%04x, dec: %d, %d)", localPort, localPort, localPort >> 8, localPort & 0xff);
     }
     
     listen(fd, 1);                                                  // mark this socket as listening, with queue length of 1
@@ -745,7 +748,9 @@ void NetAdapter::conSend(void)
         return;
     }
 
-    Debug::out(LOG_DEBUG, "NetAdapter::conSend() -- sending %d bytes through connection %d", length, handle);
+    Debug::out(LOG_DEBUG, "NetAdapter::conSend() -- sending %d bytes through connection %d (received %d from ST, isOdd: %d)", length, handle, lenRoundUp, isOdd);
+    Debug::outBfr(pData, length);
+    
     int ires = write(cons[handle].fd, dataBuffer, length);  // try to send the data
 
     if(ires < length) {                                 // if written less than should, fail
