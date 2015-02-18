@@ -1,6 +1,8 @@
 #ifndef _ACSI_H_
 #define _ACSI_H_
 
+#include "global.h" 
+
 /* ------------------------------------------ */
 
 #define OK			0           /* OK status */
@@ -13,14 +15,6 @@
 #define STIMEOUT	20L         /* short-timeout 100 msec */
 
 /* ------------------------------------------ */
-
-#include <stdint.h>
-
-#ifndef BYTE
-    #define BYTE  	unsigned char
-    #define WORD  	uint16_t
-    #define DWORD 	uint32_t
-#endif
 
 /* mfp chip register */ 
 #define mfpGpip			((volatile BYTE *) 0xFFFA01)
@@ -57,7 +51,6 @@
 #define DATA_REQ     0x0004     /* DRQ line state */
 
 #define FLOCK      ((volatile WORD  *) 0x043E) /* Floppy lock variable */ 
-#define HZ_200     ((volatile DWORD *) 0x04BA) /* 200 Hz system clock */ 
 
 #define ACSI_READ	1
 #define ACSI_WRITE	0
