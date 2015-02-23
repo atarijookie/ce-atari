@@ -50,8 +50,10 @@ private:
     static void startComponentDownloadIfNewer(Version &vLocal, Version &vServer);
     static void getLocalPathFromUrl(std::string url, std::string &localPath);
     static bool isUpToDateOrUpdateDownloaded(Version &vLocal, Version &vServer);
-
+    
     static int currentState;
+    
+    static const char *getPropperXilinxTag(void);
 };
 
 #endif // CCORETHREAD_H

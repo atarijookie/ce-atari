@@ -14,6 +14,9 @@
 Versions Update::versions;
 int Update::currentState = UPDATE_STATE_IDLE;
 
+extern int hwVersion;           // HW version is 1 or 2, and in other cases defaults to 1
+extern int hwHddIface;          // HDD interface is either SCSI (HDD_IF_SCSI), or defaults to ACSI (HDD_IF_ACSI)
+
 void Update::initialize(void)
 {
     char appVersion[16];
@@ -77,7 +80,19 @@ void Update::processUpdateList(void)
             continue;
         }
 
-        if(strncmp(what, "xilinx", 6) == 0) {
+        if(hwVersion == 1 && strncmp(what, "xilinx", 6) == 0) {                                     // HW version 1: use original xilinx version
+            Update::versions.onServer.xilinx.fromString(ver);
+            Update::versions.onServer.xilinx.setUrlAndChecksum(url, crc);
+            continue;
+        }
+
+        if(hwVersion == 2 && hwHddIface == HDD_IF_ACSI && strncmp(what, "xlnx2a", 6) == 0) {        // HW ver 2 + ACSI IF: use xlnx2a
+            Update::versions.onServer.xilinx.fromString(ver);
+            Update::versions.onServer.xilinx.setUrlAndChecksum(url, crc);
+            continue;
+        } 
+
+        if(hwVersion == 2 && hwHddIface == HDD_IF_SCSI && strncmp(what, "xlnx2s", 6) == 0) {        // HW ver 2 + SCSI IF: use xlnx2s
             Update::versions.onServer.xilinx.fromString(ver);
             Update::versions.onServer.xilinx.setUrlAndChecksum(url, crc);
             continue;
@@ -123,7 +138,9 @@ void Update::deleteLocalUpdateComponents(void)
     unlink(UPDATE_LOCALLIST);
     unlink("/ce/update/hans.hex");
     unlink("/ce/update/franz.hex");
-    unlink("/ce/update/xilinx.xsvf");
+    unlink("/ce/update/xilinx.xsvf");       // xilinx - v.1
+    unlink("/ce/update/xlnx2a.xsvf");       // xilinx - v.2 ACSI
+    unlink("/ce/update/xlnx2s.xsvf");       // xilinx - v.2 SCSI
     unlink("/ce/update/app.zip");
 }
 
@@ -365,10 +382,12 @@ bool Update::createUpdateScript(void)
         std::string fwFile;
         Update::getLocalPathFromUrl(Update::versions.onServer.xilinx.getUrl(), fwFile);
 
+        const char *xlnxTag = getPropperXilinxTag();
+        
         fprintf(f, "# updgrade of Xilinx FW\n");
         fprintf(f, "/ce/update/flash_xilinx %s\n", (char *) fwFile.c_str());
         fprintf(f, "rm -f %s\n", (char *) fwFile.c_str());
-		fprintf(f, "cat /ce/update/updatelist.csv | grep xilinx | sed -e 's/[^,]*,\\([^,]*\\).*/\\1/' > /ce/update/xilinx_current.txt \n");
+		fprintf(f, "cat /ce/update/updatelist.csv | grep %s | sed -e 's/[^,]*,\\([^,]*\\).*/\\1/' > /ce/update/xilinx_current.txt \n", xlnxTag);
         fprintf(f, "\n\n");
     }
 
@@ -395,8 +414,10 @@ bool Update::createFlashFirstFwScript(void)
         return false;
     }
 
+    const char *xlnxTag = getPropperXilinxTag();
+        
     fprintf(f, "# flash first Xilinx FW \n");
-    fprintf(f, "/ce/update/flash_xilinx /ce/firstfw/xilinx.xsvf \n\n");
+    fprintf(f, "/ce/update/flash_xilinx /ce/firstfw/%s.xsvf \n\n", xlnxTag);
 
     fprintf(f, "# copy the xilinx version file \n");
     fprintf(f, "cp /ce/firstfw/xilinx_current.txt /ce/update/ \n\n");
@@ -465,4 +486,19 @@ bool Update::checkForUpdateListOnUsb(std::string &updateFilePath)
     }
     
     return found;
+}
+
+const char *Update::getPropperXilinxTag(void)
+{
+    if(hwVersion == 1) {                    // v.1 ? it's xilinx
+        return "xilinx";
+    } else {                                // v.2 ?
+        if(hwHddIface == HDD_IF_ACSI) {     // v.2 and ACSI? it's xlnx2a
+            return "xlnx2a";
+        } else {                            // v.2 and SCSI? it's xlnx2s
+            return "xlnx2s";
+        }
+    }
+    
+    return "??wtf??";
 }

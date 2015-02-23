@@ -21,6 +21,9 @@
 extern volatile bool do_timeSync;
 extern volatile bool do_loadIkbdConfig;
 
+extern int hwVersion;           // HW version is 1 or 2, and in other cases defaults to 1
+extern int hwHddIface;          // HDD interface is either SCSI (HDD_IF_SCSI), or defaults to ACSI (HDD_IF_ACSI)
+
 //--------------------------
 // screen creation methods
 void ConfigStream::createScreen_homeScreen(void)
@@ -640,6 +643,22 @@ void ConfigStream::createScreen_update(void)
     
     ConfigComponent *comp;
 
+    comp = new ConfigComponent(this, ConfigComponent::label, "Hardware version  : ", 22, 7, 4, gotoOffset);
+    screen.push_back(comp);
+
+    const char *hwVer = (hwVersion == 2) ? "v. 2" : "v. 1";
+
+    comp = new ConfigComponent(this, ConfigComponent::label, hwVer, 10, 29, 4, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "HDD interface type: ", 22, 7, 5, gotoOffset);
+    screen.push_back(comp);
+
+    const char *hddIf = (hwHddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI";
+
+    comp = new ConfigComponent(this, ConfigComponent::label, hddIf, 10, 29, 5, gotoOffset);
+    screen.push_back(comp);
+    
     comp = new ConfigComponent(this, ConfigComponent::label, " part       your version   ", 27, 0, 8, gotoOffset);
     comp->setReverse(true);
     screen.push_back(comp);
