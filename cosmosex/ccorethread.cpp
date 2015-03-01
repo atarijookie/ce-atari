@@ -566,9 +566,12 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
         Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));               // store found FW version of Hans
         g_gotHansFwVersion = true;
 
-        int currentLed = fwVer[4];
+        int  currentLed = fwVer[4];
+        BYTE xilinxInfo = fwVer[5];
 
-        Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed);
+        convertXilinxInfo(xilinxInfo);
+        
+        Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d, XI: 0x%02x", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed, xilinxInfo);
 
         if(floppyImageSilo.currentSlotHasNewContent()) {    // the content of current slot changed? 
             Debug::out(LOG_INFO, "Content of current floppy image slot changed, forcing disk change", currentLed);
@@ -595,6 +598,25 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
             Debug::out(LOG_ERROR, "Terminating app, because it was used as HW INFO tool");
             sigintReceived = 1;
         }
+    }
+}
+
+void CCoreThread::convertXilinxInfo(BYTE xilinxInfo)
+{
+    switch(xilinxInfo) {
+        case 0x21:  hwVersion   = 2;                        // v.2
+                    hwHddIface  = HDD_IF_ACSI;              // HDD int: ACSI
+                    break;
+
+        case 0x22:  hwVersion   = 2;                        // v.2
+                    hwHddIface  = HDD_IF_SCSI;              // HDD int: SCSI
+                    break;
+                    
+        case 0x11:  // use this for v.1 
+        default:    // and also for all other cases
+                    hwVersion   = 1;
+                    hwHddIface  = HDD_IF_ACSI;
+                    break;
     }
 }
 

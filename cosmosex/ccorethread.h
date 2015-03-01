@@ -98,6 +98,8 @@ private:
         int currentLength;
     } response;
 
+    void convertXilinxInfo(BYTE xilinxInfo);
+    
     //-----------------------------------
     // floppy stuff
     FloppySetup         floppySetup;
