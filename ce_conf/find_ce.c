@@ -25,10 +25,7 @@ BYTE cs_inquiry (BYTE id, BYTE acsiNotScsi);
 //--------------------------------------------------
 
 BYTE getMachineType(void);
-
-#define MACHINE_ST      0
-#define MACHINE_TT      2
-#define MACHINE_FALCON  3
+BYTE machine;
 
 //--------------------------------------------------
 
@@ -45,7 +42,7 @@ BYTE findDevice(void)
     BYTE found = 0;
     BYTE key;
 
-    BYTE machine = getMachineType();
+    machine = getMachineType();
     
     while(1) {
         for(devAndBus = FIND_CE_ACSI; devAndBus <= FIND_CS_SCSI; devAndBus++) { // go through all the buses and devices

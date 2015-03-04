@@ -20,7 +20,7 @@
 #define mfpGpip			((volatile BYTE *) 0xFFFA01)
 
 /* DMA chip registers and flag */
-#define IO_DINT     0x20        /* DMA interrupt (FDC or HDC) */
+#define IO_DINT     0x20        // DMA interrupt (FDC or HDC)
 
 #define dmaAddrSectCnt	((volatile WORD *) 0xFF8604)
 #define dmaAddrData		((volatile WORD *) 0xFF8604)
