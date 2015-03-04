@@ -154,7 +154,5 @@
 #define TCR_PHASE_CMD           2
 #define TCR_PHASE_STATUS        3
 
-BYTE scsi_cmd(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-
 #endif
 

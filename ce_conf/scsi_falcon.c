@@ -21,7 +21,7 @@ BYTE  wait_dma_cmpl(DWORD t_ticks);
 
 void clearCache(void);
 
-BYTE scsi_cmd_falcon(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+BYTE scsi_cmd_Falcon(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
     int i;
     BYTE res;

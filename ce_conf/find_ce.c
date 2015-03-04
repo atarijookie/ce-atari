@@ -12,15 +12,16 @@
 #include "acsi.h"
 #include "find_ce.h"
 #include "global.h"
+#include "hdd_if.h"
 
-extern BYTE  busTypeACSInotSCSI;
+extern BYTE  whichHddIf;
 extern BYTE  deviceID;
 extern BYTE  cosmosExNotCosmoSolo;
 extern BYTE *pBuffer;
 
-BYTE findCE(BYTE devAndBus);
-BYTE ce_identify(BYTE id, BYTE acsiNotScsi);
-BYTE cs_inquiry (BYTE id, BYTE acsiNotScsi);
+BYTE findCE(BYTE device, BYTE hddIf);
+BYTE ce_identify(BYTE id, BYTE hddIf);
+BYTE cs_inquiry (BYTE id, BYTE hddIf);
 
 //--------------------------------------------------
 
@@ -29,41 +30,54 @@ BYTE machine;
 
 //--------------------------------------------------
 
-#define FIND_CE_ACSI    0
-#define FIND_CE_SCSI    1
-#define FIND_CS_ACSI    2
-#define FIND_CS_SCSI    3
+#define DEVICE_CE     1
+#define DEVICE_CS     0     
 
 //--------------------------------------------------
 
 BYTE findDevice(void)
 {
-    int  devAndBus;
     BYTE found = 0;
     BYTE key;
 
     machine = getMachineType();
     
     while(1) {
-        for(devAndBus = FIND_CE_ACSI; devAndBus <= FIND_CS_SCSI; devAndBus++) { // go through all the buses and devices
-            
-            // if it's ST, don't check SCSI bus
-            if(machine == MACHINE_ST        && (devAndBus == FIND_CE_SCSI || devAndBus == FIND_CS_SCSI)) {
-                continue;
+        if(machine == MACHINE_ST) {                             // for ST
+            found = findCE(DEVICE_CE, HDD_IF_ACSI);               // CE on ACSI
+        
+            if(!found) {
+                found = findCE(DEVICE_CS, HDD_IF_ACSI);           // CS on ACSI
+            }
+        }
+
+        if(machine == MACHINE_TT) {                             // for TT
+            found = findCE(DEVICE_CE, HDD_IF_ACSI);               // CE on ACSI
+        
+            if(!found) {
+                found = findCE(DEVICE_CE, HDD_IF_SCSI_TT);        // CE on SCSI TT
+            }
+
+            if(!found) {
+                found = findCE(DEVICE_CS, HDD_IF_ACSI);           // CS on ACSI
             }
         
-            // if it's Falcon, don't check ACSI bus
-            if(machine == MACHINE_FALCON    && (devAndBus == FIND_CE_ACSI || devAndBus == FIND_CS_ACSI)) {
-                continue;
+            if(!found) {
+                found = findCE(DEVICE_CS, HDD_IF_SCSI_TT);        // CS on SCSI TT
             }
-        
-            found = findCE(devAndBus);          // try to find the device
-        
-            if(found) {
-                return TRUE;
+        }
+
+        if(machine == MACHINE_FALCON) {                         // for Falcon
+            found = findCE(DEVICE_CE, HDD_IF_SCSI_FALCON);        // CE on SCSI FALCON
+
+            if(!found) {
+                found = findCE(DEVICE_CS, HDD_IF_SCSI_FALCON);    // CS on SCSI FALCON
             }
         }
         
+        if(found) {
+            return TRUE;
+        }
         //---------------------
   		(void) Cconws("\n\rDevice not found.\n\rPress any key to retry or 'Q' to quit.\n\r");
 		key = Cnecin();
@@ -77,47 +91,41 @@ BYTE findDevice(void)
 }
 
 //--------------------------------------------------
-BYTE findCE(BYTE devAndBus)
+BYTE findCE(BYTE device, BYTE hddIf)
 {
     BYTE id, res;
-    BYTE cosmosExNotSolo;
-    BYTE acsiNotScsi;
     
 	(void) Cconws("\n\rLooking for ");
     
-    if(devAndBus == FIND_CE_ACSI || devAndBus == FIND_CE_SCSI) {        // looking for CosmosEx?
+    if(device == DEVICE_CE) {                             // looking for CosmosEx?
         (void) Cconws("CosmosEx ");
-        cosmosExNotSolo = TRUE;
-    } else {                                                            // looking for CosmoSolo
+    } else {                                            // looking for CosmoSolo
         (void) Cconws("CosmoSolo");
-        cosmosExNotSolo = FALSE;
     }
     
     (void) Cconws(" on ");
     
-    if(devAndBus == FIND_CE_ACSI || devAndBus == FIND_CS_ACSI) {        // ACSI?
+    if(hddIf == HDD_IF_ACSI) {                          // ACSI?
         (void) Cconws("ACSI: ");
-        acsiNotScsi = TRUE;
-    } else {                                                            // SCSI?
+    } else {                                            // SCSI?
         (void) Cconws("SCSI: ");
-        acsiNotScsi = FALSE;
     }
 
-    for(id=0; id<8; id++) {                     // try to talk to all ACSI devices
-        Cconout('0' + id);                      // write out BUS ID
+    for(id=0; id<8; id++) {                             // try to talk to all ACSI devices
+        Cconout('0' + id);                              // write out BUS ID
     
-        if(cosmosExNotSolo) {                   // looking for CosmosEx? 
-            res = ce_identify(id, acsiNotScsi); // try to read the IDENTITY string 
-        } else {                                // looking for CosmoSolo?
-            res = cs_inquiry (id, acsiNotScsi); // try to read INQUIRY string
+        if(device == DEVICE_CE) {                         // looking for CosmosEx? 
+            res = ce_identify(id, hddIf);               // try to read the IDENTITY string 
+        } else {                                        // looking for CosmoSolo?
+            res = cs_inquiry (id, hddIf);               // try to read INQUIRY string
         }
   
         if(res == 1) {                                  // if found the CosmosEx 
             (void) Cconws(" <-- found!\n\r");
             
             deviceID                = id;               // store the BUS ID of device
-            busTypeACSInotSCSI      = acsiNotScsi;      // store BUS TYPE
-            cosmosExNotCosmoSolo    = cosmosExNotSolo;  // store device type
+            whichHddIf              = hddIf;            // store HDD IF TYPE
+            cosmosExNotCosmoSolo    = device;           // store device type
 
             return TRUE;
         }
@@ -126,7 +134,7 @@ BYTE findCE(BYTE devAndBus)
     return FALSE;
 }
 //--------------------------------------------------
-BYTE ce_identify(BYTE id, BYTE acsiNotScsi)
+BYTE ce_identify(BYTE id, BYTE hddIf)
 {
     WORD res;
     BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_IDENTIFY, 0};
@@ -134,11 +142,8 @@ BYTE ce_identify(BYTE id, BYTE acsiNotScsi)
     cmd[0] = (id << 5); 					    // cmd[0] = ACSI_id + TEST UNIT READY (0)
     memset(pBuffer, 0, 512);              	    // clear the buffer 
   
-    if(acsiNotScsi) {                           // for ACSI
-        res = acsi_cmd(1, cmd, 6, pBuffer, 1);	// issue the identify command and check the result 
-    } else {                                    // for SCSI
-        res = ACSIERROR;                        // TODO: for now only error
-    }
+    whichHddIf = hddIf;                         // set which hdd IF it should use
+    res = hdd_if_cmd(1, cmd, 6, pBuffer, 1);	// issue the identify command and check the result 
     
     if(res != OK) {                        	    // if failed, return FALSE 
         return FALSE;
@@ -151,7 +156,7 @@ BYTE ce_identify(BYTE id, BYTE acsiNotScsi)
     return TRUE;                                // success 
 }
 //--------------------------------------------------
-BYTE cs_inquiry(BYTE id, BYTE acsiNotScsi)
+BYTE cs_inquiry(BYTE id, BYTE hddIf)
 {
 	int res;
     BYTE cmd[6];
@@ -160,11 +165,8 @@ BYTE cs_inquiry(BYTE id, BYTE acsiNotScsi)
     cmd[0] = (id << 5) | (SCSI_CMD_INQUIRY & 0x1f);
     cmd[4] = 32;                                // count of bytes we want from inquiry command to be returned
     
-    if(acsiNotScsi) {                           // for ACSI
-        res = acsi_cmd(1, cmd, 6, pBuffer, 1);	// issue the identify command and check the result 
-    } else {                                    // for SCSI
-        res = ACSIERROR;                        // TODO: for now only error
-    }
+    whichHddIf = hddIf;                         // set which hdd IF it should use
+    res = hdd_if_cmd(1, cmd, 6, pBuffer, 1);	// issue the inquiry command and check the result 
     
     if(res != OK) {                        	    // if failed, return FALSE 
         return FALSE;

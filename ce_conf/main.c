@@ -10,6 +10,7 @@
 
 #include "stdlib.h"
 #include "acsi.h"
+#include "hdd_if.h"
 #include "keys.h"
 #include "global.h"
 #include "find_ce.h"
@@ -30,7 +31,6 @@ BYTE isUpdateScreen;
 
 void cosmoSoloConfig(void);
 //--------------------------------------------------
-BYTE busTypeACSInotSCSI;                // 0 means SCSI, non-0 means ACSI
 BYTE deviceID;                          // bus ID from 0 to 7
 BYTE cosmosExNotCosmoSolo;              // 0 means CosmoSolo, 1 means CosmosEx
 //--------------------------------------------------
@@ -158,7 +158,7 @@ void sendKeyDown(BYTE key, BYTE keyDownCommand)
   
 	memset(pBuffer, 0, 512);               			// clear the buffer 
   
-	res = acsi_cmd(1, cmd, 6, pBuffer, 3); 			// issue the KEYDOWN command and show the screen stream 
+	res = hdd_if_cmd(1, cmd, 6, pBuffer, 3);        // issue the KEYDOWN command and show the screen stream 
     
 	if(res != OK) {									// if failed, return FALSE 
 		showConnectionErrorMessage();
@@ -195,7 +195,7 @@ void showMoreStreamIfNeeded(void)
     
         memset(pBuffer, 0, 3 * 512);               	    // clear the buffer 
   
-        res = acsi_cmd(1, cmd, 6, pBuffer, 3); 			// issue the KEYDOWN command and show the screen stream 
+        res = hdd_if_cmd(1, cmd, 6, pBuffer, 3);        // issue the KEYDOWN command and show the screen stream 
     
         if(res != OK) {									// if failed, return FALSE 
             return;
@@ -213,7 +213,7 @@ void showHomeScreen(void)
 	cmd[0] = (deviceID << 5); 						// cmd[0] = ACSI_id + TEST UNIT READY (0)	
 	memset(pBuffer, 0, 512);               			// clear the buffer 
   
-	res = acsi_cmd(1, cmd, 6, pBuffer, 3); 			// issue the GO_HOME command and show the screen stream 
+	res = hdd_if_cmd(1, cmd, 6, pBuffer, 3);        // issue the GO_HOME command and show the screen stream 
     
 	if(res != OK) {									// if failed, return FALSE 
 		showConnectionErrorMessage();
@@ -239,7 +239,7 @@ void refreshScreen(void)
 	cmd[0] = (deviceID << 5); 						// cmd[0] = ACSI_id + TEST UNIT READY (0)	
 	memset(pBuffer, 0, 512);               			// clear the buffer 
   
-	res = acsi_cmd(1, cmd, 6, pBuffer, 3); 			// issue the REFRESH command and show the screen stream 
+	res = hdd_if_cmd(1, cmd, 6, pBuffer, 3);        // issue the REFRESH command and show the screen stream 
     
 	if(res != OK) {									// if failed, return FALSE 
 		showConnectionErrorMessage();
@@ -258,7 +258,7 @@ void setResolution(void)
 	cmd[5] = Getrez();
 	memset(pBuffer, 0, 512);               			// clear the buffer 
   
-	acsi_cmd(1, cmd, 6, pBuffer, 1); 				// issue the SET RESOLUTION command 
+	hdd_if_cmd(1, cmd, 6, pBuffer, 1);              // issue the SET RESOLUTION command 
 }
 //--------------------------------------------------
 void showConnectionErrorMessage(void)
@@ -361,7 +361,7 @@ void cosmoSoloConfig(void)
         
         cmd[0] = (deviceID << 5); 						    // cmd[0] = ACSI_id + TEST UNIT READY (0)	
   
-        BYTE res = acsi_cmd(ACSI_READ, cmd, 6, pBuffer, 1);
+        BYTE res = hdd_if_cmd(ACSI_READ, cmd, 6, pBuffer, 1);
         
         if(res == OK) {
             (void) Cconws("\n\rNew ID was successfully set.\n\r");

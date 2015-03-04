@@ -35,7 +35,7 @@ void  scsi_clrBit_TT(int whichReg, DWORD bitMask);
 void  scsi_setBit_TT(int whichReg, DWORD bitMask);
 //-----------------
 
-BYTE scsi_cmd(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
     BYTE res = sblkscsi(cmd, cmdLength, buffer, sectorCount * 512);      // send command block
 
