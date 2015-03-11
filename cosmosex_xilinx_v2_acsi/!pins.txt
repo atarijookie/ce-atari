@@ -1,0 +1,86 @@
+ 4,  6 -- D12_DB5
+ 8,  9 -- ARESET_DB4
+10, 11 -- D11_DB3
+12, 13 -- D10_DB2
+14, 15 -- DB1
+16, 17 -- DB0
+18     -- TX_FRANZ
+25     -- XACK
+27     -- TXSEL_1N2
+29     -- XDMA
+30     -- XPIO
+32     -- XRNW
+33     -- RESET_HANS
+35     -- TX_OUT
+36     -- XCMD
+37     -- D27
+39     -- D26
+40     -- D25
+41     -- D24
+42     -- D23
+49     -- XRESET
+50     -- XATN
+54     -- XCS
+55     -- D22
+56     -- D21
+58     -- D20
+59     -- TX_HANS
+67, 68 -- AINT_I/O
+70, 71 -- ACS_SREQ
+72, 74 -- ADRQ_C/D
+76, 77 -- D17_SEL
+79, 81 -- ARNW_SMSG
+82, 85 -- D16_SRST
+86, 87 -- AA1_SACK
+89, 90 -- D15_BSY
+91, 92 -- ATN
+93, 94 -- D14_DBP
+95, 96 -- D13_DB7
+97, 99 -- AACK_DB6
+
+
+
+
+32     -- XRNW
+30     -- XPIO
+29     -- XDMA
+36     -- XCMD
+35     -- TX_OUT
+59     -- TX_HANS
+18     -- TX_FRANZ
+27     -- TXSEL_1N2
+33     -- RESET_HANS   -- STM32 reset signal, driven by RPi
+
+49     -- XRESET    - OUT - just a copy of ARESET
+54     -- XCS       - OUT - just a copy of ACS
+25     -- XACK      - OUT - just a copy of AACK
+79, 81 -- ARNW_SMSG - IN  - on ACSI, OUT - on SCSI
+
+14, 15 -- DB1       - INOUT for SCSI
+16, 17 -- DB0       - INOUT for SCSI
+50     -- XATN      - OUT - just a copy of ATN
+91, 92 -- ATN       - IN  - SCSI signal for reading, no use for having it on 2 pins
+
+37     -- D27
+39     -- D26
+40     -- D25
+41     -- D24
+42     -- D23
+55     -- D22
+56     -- D21
+58     -- D20
+76, 77 -- D17_SEL
+82, 85 -- D16_SRST
+89, 90 -- D15_BSY
+93, 94 -- D14_DBP
+95, 96 -- D13_DB7
+ 4,  6 -- D12_DB5
+10, 11 -- D11_DB3
+12, 13 -- D10_DB2
+ 8,  9 -- ARESET_DB4
+67, 68 -- AINT_I/O
+72, 74 -- ADRQ_C/D
+70, 71 -- ACS_SREQ
+86, 87 -- AA1_SACK
+97, 99 -- AACK_DB6
+
