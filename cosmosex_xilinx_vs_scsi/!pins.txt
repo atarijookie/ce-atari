@@ -1,0 +1,43 @@
+32     -- XRNW
+30     -- XPIO
+29     -- XDMA
+36     -- XCMD
+35     -- TX_OUT
+59     -- TX_HANS
+18     -- TX_FRANZ
+27     -- TXSEL_1N2
+33     -- RESET_HANS   -- STM32 reset signal, driven by RPi
+
+49     -- XRESET    - OUT - just a copy of ARESET
+54     -- XCS       - OUT - just a copy of ACS
+25     -- XACK      - OUT - just a copy of AACK
+79, 81 -- SMSG - IN  - on ACSI, OUT - on SCSI
+
+14, 15 -- DB1  D11
+16, 17 -- DB0  D10
+50     -- XATN      - OUT - just a copy of ATN
+91, 92 -- ATN       - IN  - SCSI signal for reading, no use for having it on 2 pins
+
+37     -- D27
+39     -- D26
+40     -- D25
+41     -- D24
+42     -- D23
+55     -- D22
+56     -- D21
+58     -- D20
+76, 77 -- SEL
+82, 85 -- SRST
+89, 90 -- BSY
+93, 94 -- DBP
+95, 96 -- DB7  D17
+ 4,  6 -- DB5  D15
+10, 11 -- DB3  D13
+12, 13 -- DB2  D12
+ 8,  9 -- DB4  D14
+67, 68 -- I/O
+72, 74 -- C/D
+70, 71 -- SREQ
+86, 87 -- SACK
+97, 99 -- DB6  D16
+
