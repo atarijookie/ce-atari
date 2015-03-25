@@ -474,7 +474,7 @@ BYTE tryProcessLocally(void)
 {
     BYTE justCmd;
     BYTE tag1, tag2, isIcd;
-    BYTE cmdIsForCE;
+    BYTE cmdIsForCE = FALSE;
     
     //----------------------
     // figure out it this has CosmosEx custom command format
