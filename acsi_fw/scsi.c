@@ -2,6 +2,7 @@
 #include "scsi.h"
 #include "mmc.h"
 #include "bridge.h"
+#include "eeprom.h"
 
 extern BYTE cmd[14];									// received command bytes
 extern BYTE cmdLen;										// length of received command
@@ -17,9 +18,17 @@ extern BYTE firstConfigReceived;
 ScsiLogItem scsiLogs[SCSI_LOG_LENGTH];
 BYTE scsiLogNow;
 
+void processCosmoSoloCommands(void);
+void updateEnabledIDsInSoloMode(void);
+
 void processScsiLocaly(BYTE justCmd, BYTE isIcd)
 {
     BYTE lun;
+    
+    if(cmd[1] == 'C' && cmd[2] == 'S') {    // it's a Cosmo Solo command?
+        processCosmoSoloCommands();
+        return;
+    }
     
     // get the LUN from the command
     if(isIcd) {                             // for ICD commands
@@ -466,4 +475,28 @@ void scsi_log_add(void)
     
     scsiLogNow++;
     scsiLogNow = scsiLogNow & SCSI_LOG_MASK;
+}
+
+void processCosmoSoloCommands(void)
+{
+    BYTE good = FALSE;
+    
+    if(cmd[3] == sdCardID) {            // if the ID we want to change matches our sdCardID
+        BYTE newId = cmd[4];
+        
+        if(newId <= 7) {                // new ID must be between 0 and 7
+            sdCardID = newId;
+            EE_WriteVariable(EEPROM_OFFSET_SDCARD_ID, sdCardID);    // store the new SD card ID to fake EEPROM
+            
+            updateEnabledIDsInSoloMode();
+            
+            good = TRUE;                // mark success
+        }
+    }
+    
+    if(good) {                  // good?
+        scsi_sendOKstatus();
+    } else {                    // bad?
+        PIO_read(SCSI_ST_CHECK_CONDITION);
+    }    
 }

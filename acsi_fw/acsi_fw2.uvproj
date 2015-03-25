@@ -335,8 +335,8 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>4</Optim>
-            <oTime>1</oTime>
+            <Optim>1</Optim>
+            <oTime>0</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>0</OneElfS>
             <Strict>0</Strict>
@@ -572,6 +572,26 @@
               <FileName>mmc_datatransfer.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\mmc_datatransfer.c</FilePath>
+            </File>
+            <File>
+              <FileName>eeprom.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\eeprom.c</FilePath>
+            </File>
+            <File>
+              <FileName>eeprom.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\eeprom.h</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f10x_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\stm32f10x_flash.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f10x_flash.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\stm32f10x_flash.h</FilePath>
             </File>
           </Files>
         </Group>

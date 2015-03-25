@@ -106,10 +106,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa015, 0x0102};                             // this means: hAns, 2015-01-02
+WORD version[2] = {0xa015, 0x0325};                             // this means: hAns, 2015-03-25
 
-char *VERSION_STRING_SHORT  = {"1.00"};
-char *DATE_STRING           = {"01/02/15"};
+char *VERSION_STRING_SHORT  = {"1.10"};
+char *DATE_STRING           = {"03/25/15"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
@@ -162,13 +162,20 @@ BYTE cardInsertChanged;
 
 void initAllStuff(void);
 
+void getXilinxInfoByte(void);
+BYTE xilinxInfoByte;
+
 BYTE timeOutCount   = 0;
 BYTE soloMode       = FALSE;
+void updateEnabledIDsInSoloMode(void);
+
+BYTE tryProcessLocally(void);
 
 int main (void) 
 {
     initAllStuff();         // now init everything
     
+    getXilinxInfoByte();
     //-------------
     // main loop
     while(1) {
@@ -228,7 +235,14 @@ int main (void)
             spiDmaIsIdle = TRUE;
             state = STATE_GET_COMMAND;
             
-            timeOutCount++;                 // increase count of how many times we must have timed out to keep working
+            timeOutCount++;                     // increase count of how many times we must have timed out to keep working
+            
+            GPIOA->BSRR = LED1 | LED2 | LED3;   // clear LEDs
+            switch(timeOutCount) {
+                case 1: GPIOA->BRR = LED1; break;
+                case 2: GPIOA->BRR = LED2; break;
+                case 3: GPIOA->BRR = LED3; break;
+            }
         }
         
         if(timeOutCount >= 3) {             // if we had to use timeout 3 times consequently to make this work, then we're probably in SOLO mode
@@ -236,6 +250,9 @@ int main (void)
             soloMode        = TRUE;
             state           = STATE_GET_COMMAND;
             sendFwVersion   = FALSE;
+            
+            sdCardID = EE_ReadVariable(EEPROM_OFFSET_SDCARD_ID, 0);     // get SD card ID, with default value of 0
+            updateEnabledIDsInSoloMode();   // update enabled IDs
         }
         
         if(soloMode == TRUE) {              // solo mode? Skip the rest of the loop.
@@ -247,7 +264,7 @@ int main (void)
             if(state == STATE_SEND_FW_VER) {
                 state = STATE_GET_COMMAND;
                 
-                atnSendFwVersion[6] = ((WORD)currentLed) << 8;                                  // store the current LED status in the last WORD
+                atnSendFwVersion[6] = (((WORD)currentLed) << 8) | xilinxInfoByte;               // store the current LED status in the last WORD, and also XILINX info byte value
                 
                 timeoutStart();                                                                 // start timeout counter so we won't get stuck somewhere
             
@@ -311,11 +328,10 @@ void initAllStuff(void)
     GPIOC->BSRR = SD_DETECT | SD_CS;                                // SD card CS (output) high - card not selected; SD card detect high - pull up!
 
     EXTI->PR = BUTTON | aCMD | aCS | aACK;                          // clear these ints 
-    //-------------
-    // by default set ID 0 as enabled and other IDs as disabled 
-    enabledIDs[0] = TRUE;
     
-    for(i=1; i<8; i++) {
+    //-------------
+    // by default disable all ACSI IDs 
+    for(i=0; i<8; i++) {
         enabledIDs[i] = FALSE;
     }
     
@@ -327,13 +343,7 @@ void initAllStuff(void)
     }
     
     prevBtnPressTime = 0;
-    
-    //----------------------
-    // get the SD card ID from faked EEPROM, so this could work solo if needed
-    EE_Init();
-    
-    sdCardID = EE_ReadVariable(EEPROM_OFFSET_SDCARD_ID, 0);     // get SD card ID, with default value of 0
-    
+
     //----------------------
     // init card detection delay stuff
     cardInsertChanged   = FALSE;
@@ -415,9 +425,7 @@ void showCurrentLED(void)
 
 void onGetCommand(void)
 {
-    BYTE id, i, justCmd;
-    BYTE tag1, tag2, isIcd;
-    BYTE cmdIsForCE;
+    BYTE id, i;
                 
     cmd[0]  = PIO_writeFirst();                         // get byte from ST (waiting for the 1st byte)
     id      = (cmd[0] >> 5) & 0x07;                     // get only device ID
@@ -439,43 +447,19 @@ void onGetCommand(void)
                 
         //-----
         if(brStat == E_OK) {                            // if all was well, let's send this to host or process it here
-            cmdIsForCE = FALSE;
-            
             if(id == sdCardID) {                        // for SD card IDs
-                justCmd = cmd[0] & 0x1f;                // get just the command (remove ACSI ID)
-            
-                if(justCmd == 0x1f) {                   // if it's ICD command, get the next byte as command
-                    justCmd = cmd[1];                   // get just the command
-                    isIcd   = TRUE;
-                    
-                    if(justCmd == 0xa0) {               // if it's REPORT LUNS command, it might be for CE
-                        cmdIsForCE = TRUE;                        
-                    }
-                    
-                    tag1    = cmd[2];                   // CE tag ('C', 'E') can be found on position 2 and 3
-                    tag2    = cmd[3];
-                } else {                                // if it's not ICD command
-                    isIcd   = FALSE;
-
-                    if(justCmd == 0) {                  // if just command (without ACSI ID) is TEST UNIT READY, it's for CE
-                        cmdIsForCE = TRUE;
-                    }
-                    
-                    tag1    = cmd[1];                   // CE tag ('C', 'E') can be found on position 1 and 2
-                    tag2    = cmd[2];
-                }
-
-                if(firstConfigReceived == FALSE) {      // no config received from host? Then process it localy.
-                    cmdIsForCE = FALSE;
-                }
+                BYTE processedLocally;
+                processedLocally = tryProcessLocally(); // try to process command locally
                 
-                if(cmdIsForCE != TRUE || tag1 != 'C' || tag2 != 'E') {    // the command is not TEST UNIT READY and there isn't a valid CE tag? process localy
-                    processScsiLocaly(justCmd, isIcd);
-//                    scsi_log_add();
+                if(processedLocally) {                  // if it was processed locally, quit
                     return;
                 }
             }
 
+            if(soloMode) {                              // if in solo mode, don't send ACSI command to host
+                return;
+            }
+            
             // if we got here, we should handle this in host (RPi)
             for(i=0; i<7; i++) {                        
                 atnSendACSIcommand[4 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
@@ -484,6 +468,70 @@ void onGetCommand(void)
             state = STATE_SEND_COMMAND;
         }
     }
+}
+
+BYTE tryProcessLocally(void)
+{
+    BYTE justCmd;
+    BYTE tag1, tag2, isIcd;
+    BYTE cmdIsForCE;
+    
+    //----------------------
+    // figure out it this has CosmosEx custom command format
+    justCmd = cmd[0] & 0x1f;                // get just the command (remove ACSI ID)
+
+    if(justCmd == 0x1f) {                   // if it's ICD command, get the next byte as command
+        justCmd = cmd[1];                   // get just the command
+        isIcd   = TRUE;
+        
+        if(justCmd == 0xa0) {               // if it's REPORT LUNS command, it might be for CE
+            cmdIsForCE = TRUE;                        
+        }
+        
+        tag1    = cmd[2];                   // CE tag ('C', 'E') can be found on position 2 and 3
+        tag2    = cmd[3];
+    } else {                                // if it's not ICD command
+        isIcd   = FALSE;
+
+        if(justCmd == 0) {                  // if just command (without ACSI ID) is TEST UNIT READY, it's for CE
+            cmdIsForCE = TRUE;
+        }
+        
+        tag1    = cmd[1];                   // CE tag ('C', 'E') can be found on position 1 and 2
+        tag2    = cmd[2];
+    }
+
+    if(firstConfigReceived == FALSE) {      // no config received from host? Then process it localy.
+        cmdIsForCE = FALSE;
+    }
+
+    if(cmdIsForCE == TRUE && tag1 == 'C' && tag2 == 'E') {  // this is a Cosmos Ex specific command? Don't process locally!
+        return FALSE;                                       // didn't process local
+    }
+    
+    //---------
+    // if it's not CosmosEx custom command, process it locally
+    processScsiLocaly(justCmd, isIcd);
+//  scsi_log_add();
+    return TRUE;                        // did process locally
+}
+
+// when in SOLO mode, eable and disable IDs according to sdCardID
+void updateEnabledIDsInSoloMode(void)
+{
+    BYTE i;
+    
+    if(!soloMode) {             // not solo mode? quit
+        return;
+    }
+    
+    for(i=0; i<8; i++) {        // enable ID for SD card, disable others
+        if(i == sdCardID) {
+            enabledIDs[i] = 1;
+        } else {
+            enabledIDs[i] = 0;
+        }
+   }
 }
 
 void onDataRead(void)
@@ -1230,5 +1278,16 @@ void setupAtnBuffers(void)
     // now set the next pointers in read buffers
     rdBuf1.next = (void *) &rdBuf2;
     rdBuf2.next = (void *) &rdBuf1;
+}
+
+void getXilinxInfoByte(void)
+{
+    ACSI_DATADIR_WRITE();
+    GPIOA->BSRR	= aPIO | aDMA;          // aPIO and aDMA now HIGH -- we can read the XILINX info byte afer that
+
+    xilinxInfoByte = GPIOB->IDR;        // read in the value
+    
+    GPIOA->BRR	= aPIO | aDMA;          // aPIO and aDMA now LOW -- back to normal state
+    EXTI->PR    = aCMD | aCS | aACK;    // also clear possible EXTI flags
 }
 

@@ -3,24 +3,6 @@
 #include "eeprom.h"
 #include "defs.h"
 
-WORD EE_Init(void)
-{
-    uint16_t PageStatus0 = 6;
-    uint16_t FlashStatus;
-
-    // Get Page0 status
-    PageStatus0 = (*(__IO uint16_t*) PAGE0_BASE_ADDRESS);
-
-    // page erased or already used? good!
-    if(PageStatus0 == VALID_PAGE || PageStatus0 == ERASED) {    // valid page or erased page? good
-        return FLASH_COMPLETE;
-    }
-    
-    // page in some other state? format it
-    FlashStatus = FLASH_ErasePage(PAGE0_BASE_ADDRESS);
-    return FlashStatus;
-}
-
 WORD EE_ReadVariable(WORD offset, WORD defVal)
 {
     WORD PageStatus0 = (*(__IO uint16_t*) PAGE0_BASE_ADDRESS);
@@ -37,26 +19,37 @@ WORD EE_ReadVariable(WORD offset, WORD defVal)
 
 WORD EE_WriteVariable(WORD offset, WORD newValue)
 {
-    WORD curValue;
-    FLASH_Status FlashStatus = FLASH_COMPLETE;
-    
-    WORD PageStatus0 = (*(__IO uint16_t*) PAGE0_BASE_ADDRESS);
-    __IO uint16_t* adr = (__IO uint16_t*) (PAGE0_BASE_ADDRESS + 2 + (offset * 2));        // pointer to WORD = page address + WORD of PageStatus + Offset in bytes
+    FLASH_Status stat = FLASH_COMPLETE;
 
-    if(PageStatus0 != VALID_PAGE) {             // not valid page? make it valid
-        FlashStatus = FLASH_ProgramHalfWord(PAGE0_BASE_ADDRESS, VALID_PAGE);
-        
-        if(FlashStatus != FLASH_COMPLETE) {     // write failed? fail
-            return FlashStatus;
-        }
-    }
-    
-    curValue = *adr;                            // read current value
-    
-    if(curValue != newValue) {                  // current value isn't the same as new one? 
-        FlashStatus = FLASH_ProgramHalfWord((uint32_t) adr, newValue);
+    volatile WORD *pCurrentValue =   (__IO uint16_t*) (PAGE0_BASE_ADDRESS + 2 + (offset * 2));
+    WORD PageStatus0             = *((__IO uint16_t*)  PAGE0_BASE_ADDRESS);
+    WORD currentValue            = *pCurrentValue;
+
+    // first check is page is valid, and if the value did change
+    if(PageStatus0 == VALID_PAGE && (currentValue == newValue)) {   // page is valid, value didn't change? Good, quit
+        return FLASH_COMPLETE;
     }
 
-    return FlashStatus;
+    // if we got here, then either page is not valid, or the value changed
+    FLASH_Unlock();
+    FLASH_ClearFlag(FLASH_FLAG_BSY | FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR); 
+
+    stat = FLASH_ErasePage(PAGE0_BASE_ADDRESS);                         // erase page
+    if(stat != FLASH_COMPLETE) {
+        return stat;
+    }
+    
+    stat = FLASH_ProgramHalfWord(PAGE0_BASE_ADDRESS, VALID_PAGE);       // write VALID_PAGE marker
+    if(stat != FLASH_COMPLETE) {
+        return stat;
+    }
+
+    stat = FLASH_ProgramHalfWord((uint32_t) pCurrentValue, newValue);   // wite new vale
+    if(stat != FLASH_COMPLETE) {
+        return stat;
+    }
+
+    FLASH_Lock();
+    return stat;
 }
 

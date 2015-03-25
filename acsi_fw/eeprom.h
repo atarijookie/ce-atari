@@ -63,7 +63,6 @@
 /* Variables' number */
 #define NumbOfVar               ((uint8_t)0x03)
 
-WORD EE_Init(void);
 WORD EE_ReadVariable (WORD offset, WORD defVal);
 WORD EE_WriteVariable(WORD offset, WORD newValue);
 
