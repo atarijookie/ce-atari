@@ -267,6 +267,8 @@ private:
 	bool gotUsbJoy2(void);
 	
     int fdWrite(int fd, BYTE *bfr, int cnt);
+    
+    void dumpBuffer(bool fromStNotKeyboard);
 };
 
 #endif

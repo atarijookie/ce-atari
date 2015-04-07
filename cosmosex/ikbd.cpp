@@ -17,14 +17,22 @@
 #include <linux/joystick.h>
 #include <errno.h>
 
+#include <stdarg.h>
+
 #include "debug.h"
 #include "gpio.h"
 #include "utils.h"
 #include "ikbd.h"
 #include "settings.h"
+#include "datatypes.h"
 
 extern volatile sig_atomic_t sigintReceived;
 volatile bool do_loadIkbdConfig = false;
+
+//#define SPYIKBD
+//#define IKBDLOG
+
+void ikbdLog(const char *format, ...);
 
 void *ikbdThreadCode(void *ptr)
 {
@@ -123,7 +131,7 @@ Ikbd::Ikbd()
     initDevs();
     fillKeyTranslationTable();
 
-	ceIkbdMode = CE_IKBDMODE_SOLO;
+    ceIkbdMode = CE_IKBDMODE_SOLO;
 	
     fdUart      = -1;
     mouseBtnNow = 0;
@@ -198,14 +206,52 @@ void Ikbd::processReceivedCommands(void)
 
     //-----------------
     // send if there are enough data to be sent
-    
-    if(cbStCommands.count > 0) {                                // got ST commands? process them
-        processStCommands();
-    }
+    #ifndef SPYIKBD                                             // if not spying on IKBD, process this normaly
+        if(cbStCommands.count > 0) {                            // got ST commands? process them
+            processStCommands();
+        }
 
-    if(cbKeyboardData.count > 0) {                              // got keyboard data? process them
-        processKeyboardData();
+        if(cbKeyboardData.count > 0) {                          // got keyboard data? process them
+            processKeyboardData();
+        }
+    #else                                                       // if spying on IKBD, just resend data
+        if(cbStCommands.count > 0) {                            // got ST commands? process them
+            dumpBuffer(true);
+        }
+
+        if(cbKeyboardData.count > 0) {                          // got keyboard data? process them
+            dumpBuffer(false);
+        }
+    #endif
+}
+
+void Ikbd::dumpBuffer(bool fromStNotKeyboard)
+{
+    std::string text;
+    TCyclicBuff *cb;
+    
+    if(fromStNotKeyboard) {
+        text = "ST says      : ";
+        cb = &cbStCommands;
+    } else {
+        text = "Keyboard says: ";
+        cb = &cbKeyboardData;
     }
+    
+    char bfr[16];
+
+    while(cb->count > 0) {                      // if there's some data
+        BYTE val = getFromCyclicBuffer(cb);     // get data
+        
+        sprintf(bfr, "%02x ", val);             // add hex dump of this data
+        text += bfr;
+        
+        if(!fromStNotKeyboard) {                // if it's from keyboard, send it to ST
+            fdWrite(fdUart, &val, 1);
+        }
+    }
+    
+    ikbdLog(text.c_str());                      // show the hex dump of data
 }
 
 void Ikbd::processStCommands(void)
@@ -237,7 +283,7 @@ void Ikbd::processStCommands(void)
         }
 
         if(cmd == STCMD_MEMORY_LOAD) {                          // special case: this command has length stored on index[3]
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_MEMORY_LOAD");
+            ikbdLog("Ikbd::processStCommands -- ST says: STCMD_MEMORY_LOAD");
             
             if(cbStCommands.count < 4) {                        // not enough data to determine command length? quit
                 return;
@@ -257,7 +303,7 @@ void Ikbd::processStCommands(void)
         }
 
         if(bfr[0] != STCMD_PAUSE_OUTPUT) {              		// if this command is not PAUSE OUTPUT command, then enavle output
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_PAUSE_OUTPUT");
+            ikbdLog("Ikbd::processStCommands -- ST says: STCMD_PAUSE_OUTPUT");
 
             outputEnabled = true;
         }
@@ -271,7 +317,7 @@ void Ikbd::processStCommands(void)
             // other commands
             //--------------------------------------------
             case STCMD_RESET:                           // reset keyboard - set everything to default values
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_RESET");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_RESET");
 
             resetInternalIkbdVars();
 			
@@ -287,7 +333,7 @@ void Ikbd::processStCommands(void)
 
             //--------------------------------------------
             case STCMD_PAUSE_OUTPUT:                    // disable any output to IKBD
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_PAUSE_OUTPUT");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_PAUSE_OUTPUT");
 
             outputEnabled = false;
             break;
@@ -296,7 +342,7 @@ void Ikbd::processStCommands(void)
             // joystick related commands
             //--------------------------------------------
             case STCMD_SET_JOYSTICK_EVENT_REPORTING:    // mouse mode: event reporting
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_SET_JOYSTICK_EVENT_REPORTING");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_JOYSTICK_EVENT_REPORTING");
 
             joystickMode = JOYMODE_EVENT;
             joystickEnabled = true;
@@ -304,7 +350,7 @@ void Ikbd::processStCommands(void)
 
             //--------------------------------------------
             case STCMD_SET_JOYSTICK_INTERROG_MODE:      // mouse mode: interrogation mode
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_SET_JOYSTICK_INTERROG_MODE");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_JOYSTICK_INTERROG_MODE");
 
             joystickMode = JOYMODE_INTERROGATION;
             joystickEnabled = true;
@@ -312,7 +358,7 @@ void Ikbd::processStCommands(void)
 
             //--------------------------------------------
             case STCMD_JOYSTICK_INTERROGATION:
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_JOYSTICK_INTERROGATION");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_JOYSTICK_INTERROGATION");
             
 			joystickEnabled = true;
 			
@@ -329,7 +375,7 @@ void Ikbd::processStCommands(void)
 
             //--------------------------------------------
             case STCMD_DISABLE_JOYSTICKS:               // disable joystick; any valid joystick command enabled joystick
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_DISABLE_JOYSTICKS");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_DISABLE_JOYSTICKS");
             
             joystickEnabled = false;
             break;
@@ -338,7 +384,7 @@ void Ikbd::processStCommands(void)
             // mouse related commands
             //--------------------------------------------
             case STCMD_SET_REL_MOUSE_POS_REPORTING:     // set relative mouse reporting
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_SET_REL_MOUSE_POS_REPORTING");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_REL_MOUSE_POS_REPORTING");
             
             mouseMode = MOUSEMODE_REL;
             mouseEnabled = true;
@@ -346,7 +392,7 @@ void Ikbd::processStCommands(void)
 
             //--------------------------------------------
 			case STCMD_SET_MOUSE_KEYCODE_MODE:			// set keycode mouse reporting
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_SET_MOUSE_KEYCODE_MODE");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_MOUSE_KEYCODE_MODE");
 
             mouseMode = MOUSEMODE_KEYCODE;
             mouseEnabled = true;
@@ -354,7 +400,7 @@ void Ikbd::processStCommands(void)
 
             //--------------------------------------------
 			case STCMD_SET_MOUSE_THRESHOLD:
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_SET_MOUSE_THRESHOLD");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_MOUSE_THRESHOLD");
                         
 			relMouse.threshX	= bfr[1];
 			relMouse.threshY	= bfr[2];
@@ -363,7 +409,7 @@ void Ikbd::processStCommands(void)
 			
             //--------------------------------------------
 			case STCMD_SET_MOUSE_SCALE:
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_SET_MOUSE_SCALE");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_MOUSE_SCALE");
             
 			absMouse.scaleX		= bfr[1];
 			absMouse.scaleY		= bfr[2];
@@ -372,7 +418,7 @@ void Ikbd::processStCommands(void)
             
 			//--------------------------------------------
             case STCMD_SET_ABS_MOUSE_POS_REPORTING:     // set absolute mouse reporting
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_SET_ABS_MOUSE_POS_REPORTING");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_ABS_MOUSE_POS_REPORTING");
             
             mouseMode = MOUSEMODE_ABS;
 
@@ -387,7 +433,7 @@ void Ikbd::processStCommands(void)
 
             //--------------------------------------------
 			case STCMD_INTERROGATE_MOUSE_POS:			// get the current absolute mouse position
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_INTERROGATE_MOUSE_POS");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_INTERROGATE_MOUSE_POS");
         
             mouseEnabled = true;
 
@@ -405,7 +451,7 @@ void Ikbd::processStCommands(void)
 			
             //--------------------------------------------
             case STCMD_LOAD_MOUSE_POS:                  // load new absolute mouse position 
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_LOAD_MOUSE_POS");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_LOAD_MOUSE_POS");
             
             // read max X and Y position values
             absMouse.x = (((WORD) bfr[2]) << 8) | ((WORD) bfr[3]);
@@ -418,7 +464,7 @@ void Ikbd::processStCommands(void)
 
             //--------------------------------------------
             case STCMD_SET_MOUSE_BTN_ACTION:            // set position reporting for absolute mouse mode on mouse button press
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_SET_MOUSE_BTN_ACTION");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_MOUSE_BTN_ACTION");
             
             mouseAbsBtnAct = bfr[1];					// store flags what we should report
             mouseEnabled = true;
@@ -426,7 +472,7 @@ void Ikbd::processStCommands(void)
 
             //--------------------------------------------
             case STCMD_SET_Y_AT_TOP:                    // Y=0 at top
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_SET_Y_AT_TOP");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_Y_AT_TOP");
             
             mouseY0atTop = true;
             mouseEnabled = true;
@@ -434,7 +480,7 @@ void Ikbd::processStCommands(void)
 
             //--------------------------------------------
             case STCMD_SET_Y_AT_BOTTOM:                 // Y=0 at bottom
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_SET_Y_AT_BOTTOM");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_Y_AT_BOTTOM");
 
             mouseY0atTop = false;
             mouseEnabled = true;
@@ -442,7 +488,7 @@ void Ikbd::processStCommands(void)
 
             //--------------------------------------------
             case STCMD_DISABLE_MOUSE:                   // disable mouse; any valid mouse command enables mouse
-            Debug::out(LOG_DEBUG, "Ikbd::processStCommands -- STCMD_DISABLE_MOUSE");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_DISABLE_MOUSE");
 
             mouseEnabled = false;
             break;
@@ -467,14 +513,14 @@ void Ikbd::processGetCommand(BYTE getCmd)
 	
 	switch(setEquivalent) {
 		case STCMD_SET_REL_MOUSE_POS_REPORTING:		// relative mouse: report mouse mode
-        Debug::out(LOG_DEBUG, "Ikbd::processGetCommand -- STCMD_SET_REL_MOUSE_POS_REPORTING");
+        ikbdLog( "Ikbd::processGetCommand -- STCMD_SET_REL_MOUSE_POS_REPORTING");
 
 		bfr[1] = mouseMode;
 		send = true;
 		break;
 		
 		case STCMD_SET_ABS_MOUSE_POS_REPORTING:		// absolute mouse: report mode and maximums
-        Debug::out(LOG_DEBUG, "Ikbd::processGetCommand -- STCMD_SET_ABS_MOUSE_POS_REPORTING");
+        ikbdLog( "Ikbd::processGetCommand -- STCMD_SET_ABS_MOUSE_POS_REPORTING");
 
 		bfr[1] = mouseMode;
 		bfr[2] = (BYTE) (absMouse.maxX >> 8);
@@ -485,7 +531,7 @@ void Ikbd::processGetCommand(BYTE getCmd)
 		break;
 
 		case STCMD_SET_MOUSE_KEYCODE_MODE:			// keycode mouse: report mode and deltas
-        Debug::out(LOG_DEBUG, "Ikbd::processGetCommand -- STCMD_SET_MOUSE_KEYCODE_MODE");
+        ikbdLog( "Ikbd::processGetCommand -- STCMD_SET_MOUSE_KEYCODE_MODE");
 
 		bfr[1] = mouseMode;
 		bfr[2] = keycodeMouse.deltaX;
@@ -495,14 +541,14 @@ void Ikbd::processGetCommand(BYTE getCmd)
 		
 		case STCMD_SET_Y_AT_TOP:					// report mouse Y=0 location (top or bottom)
 		case STCMD_SET_Y_AT_BOTTOM:
-        Debug::out(LOG_DEBUG, "Ikbd::processGetCommand -- STCMD_SET_Y_AT_TOP or STCMD_SET_Y_AT_BOTTOM");
+        ikbdLog( "Ikbd::processGetCommand -- STCMD_SET_Y_AT_TOP or STCMD_SET_Y_AT_BOTTOM");
 
 		bfr[1] = mouseY0atTop ? STCMD_SET_Y_AT_TOP : STCMD_SET_Y_AT_BOTTOM;
 		send = true;
 		break;
 	
 		case STCMD_DISABLE_MOUSE:					// report if mouse is disabled
-        Debug::out(LOG_DEBUG, "Ikbd::processGetCommand -- STCMD_DISABLE_MOUSE");
+        ikbdLog( "Ikbd::processGetCommand -- STCMD_DISABLE_MOUSE");
         
 		bfr[1] = mouseEnabled ? 0 : STCMD_DISABLE_MOUSE;
 		send = true;
@@ -511,28 +557,28 @@ void Ikbd::processGetCommand(BYTE getCmd)
 		case STCMD_SET_JOYSTICK_EVENT_REPORTING:	// report joystick mode
 		case STCMD_SET_JOYSTICK_INTERROG_MODE:
 		case STCMD_SET_JOYSTICK_KEYCODE_MODE:
-        Debug::out(LOG_DEBUG, "Ikbd::processGetCommand -- STCMD_SET_JOYSTICK _EVENT_REPORTING or _INTERROG_MODE or _KEYCODE_MODE");
+        ikbdLog( "Ikbd::processGetCommand -- STCMD_SET_JOYSTICK _EVENT_REPORTING or _INTERROG_MODE or _KEYCODE_MODE");
         
 		bfr[1] = joystickMode;
 		send = true;
 		break;
 		
 		case STCMD_DISABLE_JOYSTICKS:				// report if joystick is disabled
-        Debug::out(LOG_DEBUG, "Ikbd::processGetCommand -- STCMD_DISABLE_JOYSTICK");
+        ikbdLog( "Ikbd::processGetCommand -- STCMD_DISABLE_JOYSTICK");
 
 		bfr[1] = joystickEnabled ? 0 : STCMD_DISABLE_JOYSTICKS;
 		send = true;
 		break;
 
 		case STCMD_SET_MOUSE_BTN_ACTION:			// report mouse button actions
-        Debug::out(LOG_DEBUG, "Ikbd::processGetCommand -- STCMD_SET_MOUSE_BTN_ACTION");
+        ikbdLog( "Ikbd::processGetCommand -- STCMD_SET_MOUSE_BTN_ACTION");
 
 		bfr[1] = mouseAbsBtnAct;
 		send = true;
 		break;
 		
 		case STCMD_SET_MOUSE_THRESHOLD:				// report current mouse threshold
-        Debug::out(LOG_DEBUG, "Ikbd::processGetCommand -- STCMD_SET_MOUSE_THRESHOLD");
+        ikbdLog( "Ikbd::processGetCommand -- STCMD_SET_MOUSE_THRESHOLD");
 
 		bfr[1] = relMouse.threshX;
 		bfr[2] = relMouse.threshY;
@@ -540,7 +586,7 @@ void Ikbd::processGetCommand(BYTE getCmd)
 		break;
 		
 		case STCMD_SET_MOUSE_SCALE:					// report current mouse scale
-        Debug::out(LOG_DEBUG, "Ikbd::processGetCommand -- STCMD_SET_MOUSE_SCALE");
+        ikbdLog( "Ikbd::processGetCommand -- STCMD_SET_MOUSE_SCALE");
         
 		bfr[1] = absMouse.scaleX;
 		bfr[2] = absMouse.scaleY;
@@ -629,7 +675,7 @@ void Ikbd::processKeyboardData(void)
 			
 			switch(bfr[0]) {									// handle data sent from original keyboard
 				case KEYBDATA_MOUSE_ABS:						// report of absolute mouse position?
-                Debug::out(LOG_DEBUG, "Ikbd::processKeyboardData -- KEYBDATA_MOUSE_ABS");
+                ikbdLog( "Ikbd::processKeyboardData - keyboard says: KEYBDATA_MOUSE_ABS");
 
 				if(gotUsbMouse()) {								// ...and we got USB mouse? Don't resend.
 					resendTheseData = false;
@@ -638,7 +684,7 @@ void Ikbd::processKeyboardData(void)
 				
 				//----------------------------------------------
 				case KEYBDATA_JOY_BOTH:							// ST asked for both joystick states (interrogation) and this is the response
-                Debug::out(LOG_DEBUG, "Ikbd::processKeyboardData -- KEYBDATA_JOY_BOTH");
+                ikbdLog( "Ikbd::processKeyboardData - keyboard says: KEYBDATA_JOY_BOTH");
             
 				if(gotUsbJoy1()) {								// got joy 1?
 					BYTE joy0state = joystick[0].lastDir | joystick[0].lastBtn;	// get state
@@ -804,7 +850,7 @@ void Ikbd::processMouse(input_event *ev)
 
 void Ikbd::processKeyboard(input_event *ev)
 {
-//    Debug::out(LOG_DEBUG,"processKeyboard");
+//    ikbdLog("processKeyboard");
     
     if (ev->type == EV_KEY) {
         if(ev->code >= KEY_TABLE_SIZE) {        // key out of index? quit
@@ -822,7 +868,7 @@ void Ikbd::processKeyboard(input_event *ev)
             stKey = stKey | 0x80;
         }
 
-        Debug::out(LOG_DEBUG,"\nEV_KEY: code %d, value %d, stKey: %02x", ev->code, ev->value, stKey);
+        ikbdLog("\nEV_KEY: code %d, value %d, stKey: %02x", ev->code, ev->value, stKey);
 
         if(fdUart == -1) {                          // no UART open? quit
             return;
@@ -1510,6 +1556,17 @@ int Ikbd::serialSetup(termios *ts)
 
 int Ikbd::fdWrite(int fd, BYTE *bfr, int cnt)
 {
+#ifdef IKBDLOG
+    std::string text = "sending to ST: ";
+    char tmp[16];
+    
+    for(int i=0; i<cnt; i++) {
+        sprintf(tmp, "%02x ", bfr[i]);
+        text += tmp;
+    }    
+    ikbdLog(text.c_str());
+#endif
+
     if(fd == -1) {                                  // no fd? quit
         return 0;
     }
@@ -1547,4 +1604,37 @@ bool Ikbd::gotUsbJoy2(void)
 	}
 	
 	return false;
+}
+
+void ikbdLog(const char *format, ...)
+{
+#ifndef IKBDLOG
+    return;
+#endif    
+    static DWORD prevLogOutIkbd = 0;
+
+    va_list args;
+    va_start(args, format);
+
+	FILE *f;
+
+    f = fopen("/var/log/ikbdlog.txt", "a+t");
+	
+	if(!f) {
+		printf("%08d: ", Utils::getCurrentMs());
+		vprintf(format, args);
+		printf("\n");
+		return;
+	}
+
+	DWORD now = Utils::getCurrentMs();
+	DWORD diff = now - prevLogOutIkbd;
+	prevLogOutIkbd = now;
+	
+	fprintf(f, "%08d\t%08d\t ", now, diff);
+    vfprintf(f, format, args);
+	fprintf(f, "\n");
+	fclose(f);
+
+    va_end(args);
 }
