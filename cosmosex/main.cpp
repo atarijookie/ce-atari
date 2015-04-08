@@ -59,7 +59,9 @@ int main(int argc, char *argv[])
     Debug::setDefaultLogFile();
     parseCmdLineArguments(argc, argv);                          // parse cmd line arguments and set global variables
 
-    if(!g_actAsCeConf) {                                        // if not running as ce_tool, register signal handlers
+    //------------------------------------
+    // if not running as ce_conf, register signal handlers
+    if(!g_actAsCeConf) {                                        
         if(signal(SIGINT, sigint_handler) == SIG_ERR) {		    // register SIGINT handler
             printf("Cannot register SIGINT handler!\n");
         }
@@ -69,7 +71,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    if(!g_justDoReset) {                                                // if this is not just a reset command
+    //------------------------------------
+    // if this is not just a reset command AND not a get HW info command
+    if(!g_justDoReset && !g_getHwInfo) {                                
         int ires = openpty(&linuxConsole_fdMaster, &linuxConsole_fdSlave, NULL, NULL, NULL);    // open PTY pair
 
         if(ires != -1) {                                                // if openpty() was OK  
@@ -88,7 +92,9 @@ int main(int argc, char *argv[])
         }
     }
     
-    if(g_actAsCeConf) {                                         // if should run as ce_conf app, do this code instead
+    //------------------------------------
+    // if should run as ce_conf app, do this code instead
+    if(g_actAsCeConf) {                                         
         printf("CE_CONF tool - Raspberry Pi version.\nPress Ctrl+C to quit.\n");
         
         Debug::setLogFile((char *) "/var/log/ce_conf.log");
@@ -96,6 +102,26 @@ int main(int argc, char *argv[])
         return 0;
     }
     
+    //------------------------------------
+    // if should just get HW info, do a shorter / simpler version of app run
+    if(g_getHwInfo) {                                           
+    	if(!gpio_open()) {									    // try to open GPIO and SPI on RPi
+            printf("\nHW_VER: UNKNOWN\n");
+            printf("\nHDD_IF: UNKNOWN\n");
+            return 0;
+        }
+
+        Debug::out(LOG_ERROR, ">>> Starting app as HW INFO tool <<<\n");
+
+        core = new CCoreThread(NULL, NULL, NULL);               // create main thread
+        core->run();										    // run the main thread
+        
+		gpio_close();
+		return 0;
+    }
+    
+    //------------------------------------
+    // normal app run follows
     printfPossibleCmdLineArgs();
     Debug::printfLogLevelString();
 

@@ -97,8 +97,10 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     settingsReloadProxy.reloadSettings(SETTINGSUSER_FLOPPYIMGS);            // mark that floppy settings changed (when imageSilo loaded the settings)
 
     //Floppy Service needs access to floppysilo and this thread
-    floppyService->setImageSilo(&floppyImageSilo);
-    floppyService->setCoreThread(this);
+    if(floppyService) {
+        floppyService->setImageSilo(&floppyImageSilo);
+        floppyService->setCoreThread(this);
+    }
 
     // set up network adapter stuff
     netAdapter.setAcsiDataTrans(dataTrans);
@@ -595,7 +597,7 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
         if(g_getHwInfo) {
             showHwVersion();                                // show what HW version we have found
 
-            Debug::out(LOG_ERROR, "Terminating app, because it was used as HW INFO tool");
+            Debug::out(LOG_ERROR, ">>> Terminating app, because it was used as HW INFO tool <<<\n");
             sigintReceived = 1;
         }
     }
@@ -622,11 +624,19 @@ void CCoreThread::convertXilinxInfo(BYTE xilinxInfo)
 
 void CCoreThread::showHwVersion(void)
 {
-    // HW version is 1 or 2, and in other cases defaults to 1
-    printf("\nHW_VER: %d\n", (hwVersion == 1 || hwVersion == 2) ? hwVersion : 1);
+    char tmp[256];
 
+    Debug::out(LOG_ERROR, "Reporting this as HW INFO...");     // show in log file
+
+    // HW version is 1 or 2, and in other cases defaults to 1
+    sprintf(tmp, "HW_VER: %d", (hwVersion == 1 || hwVersion == 2) ? hwVersion : 1);
+    printf("\n%s\n", tmp);                  // show on stdout
+    Debug::out(LOG_ERROR, "   %s", tmp);    // show in log file
+    
     // HDD interface is either SCSI, or defaults to ACSI
-    printf("\nHDD_IF: %s\n", (hwHddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI");
+    sprintf(tmp, "HDD_IF: %s", (hwHddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI");
+    printf("\n%s\n", tmp);                  // show on stdout
+    Debug::out(LOG_ERROR, "   %s", tmp);    // show in log file
 }
 
 void CCoreThread::responseStart(int bufferLengthInBytes)        // use this to start creating response (commands) to Hans or Franz
