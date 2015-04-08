@@ -106,7 +106,12 @@ void *ikbdThreadCode(void *ptr)
 
             switch(i) {
                 case INTYPE_MOUSE:          ikbd.processMouse(&ev);          break;
-                case INTYPE_VDEVMOUSE:      ikbd.processMouse(&ev);          break;
+
+                case INTYPE_VDEVMOUSE:
+                    ikbd.markVirtualMouseEvenTime();                // first mark the event time
+                    ikbd.processMouse(&ev);                         // then process the event
+                    break;
+
                 case INTYPE_KEYBOARD:       ikbd.processKeyboard(&ev);       break;
                 case INTYPE_VDEVKEYBOARD:   ikbd.processKeyboard(&ev);       break;
                 case INTYPE_JOYSTICK1:      ikbd.processJoystick(&js, 0);    break;
@@ -1236,6 +1241,8 @@ void Ikbd::initDevs(void)
 {
     int i;
 
+    lastVDevMouseEventTime = 0;
+    
     for(i=0; i<6; i++) {
         inDevs[i].fd = -1;
 
@@ -1594,11 +1601,19 @@ int Ikbd::fdWrite(int fd, BYTE *bfr, int cnt)
 
 bool Ikbd::gotUsbMouse(void)
 {
-	if(inDevs[INTYPE_MOUSE].fd != -1 || inDevs[INTYPE_VDEVMOUSE].fd != -1) {
+	if(inDevs[INTYPE_MOUSE].fd != -1 ) {            // got real USB mouse? return true
 		return true;
 	}
 	
-	return false;
+    if(inDevs[INTYPE_VDEVMOUSE].fd != -1) {                             // got virtual mouse? 
+        DWORD diff = Utils::getCurrentMs() - lastVDevMouseEventTime;    // calculate how much time has passed since last VDevMouse event
+        
+        if(diff < 10000) {                                              // if virtual mouse moved in the last 10 seconds, we got it (otherwise we don't have it)
+            return true;
+        }
+    }
+    
+	return false;                                   // no mouse present
 }
 
 bool Ikbd::gotUsbJoy1(void)
@@ -1618,6 +1633,14 @@ bool Ikbd::gotUsbJoy2(void)
 	
 	return false;
 }
+
+void Ikbd::markVirtualMouseEvenTime(void)
+{
+    // store time when we received VDevMouse event -- for telling that 
+    // the virtual mouse is not here when it doesn't move for a longer time
+    lastVDevMouseEventTime = Utils::getCurrentMs();         
+}
+
 
 void ikbdLog(const char *format, ...)
 {

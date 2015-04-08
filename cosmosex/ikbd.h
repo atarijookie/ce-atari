@@ -184,6 +184,7 @@ public:
     void processMouse(input_event *ev);
     void processKeyboard(input_event *ev);
     void processJoystick(js_event *jse, int joyNumber);
+	void markVirtualMouseEvenTime(void);
 
     void processReceivedCommands(void);
 
@@ -221,6 +222,8 @@ private:
 		BYTE deltaY;
 	} keycodeMouse;
 	
+    DWORD           lastVDevMouseEventTime;
+    
     int             joystickMode;
     TJoystickState  joystick[2];
     bool            joystickEnabled;
@@ -265,7 +268,7 @@ private:
 	bool gotUsbMouse(void);
 	bool gotUsbJoy1(void);
 	bool gotUsbJoy2(void);
-	
+    
     int fdWrite(int fd, BYTE *bfr, int cnt);
     
     void dumpBuffer(bool fromStNotKeyboard);
