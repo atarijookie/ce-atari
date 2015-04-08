@@ -277,7 +277,10 @@ void Ikbd::processStCommands(void)
             }
         }
 
+        //ikbdLog( "Ikbd::processStCommands -- got command %02x, len: %d, cb contains %d bytes", cmd, len, cbStCommands.count);
+        
         if(len == 0) {                                          // it's not GET command and we don't have this SET command defined?
+            ikbdLog( "Ikbd::processStCommands -- not GET cmd, and we don't know what to do");
             getFromCyclicBuffer(&cbStCommands);                 // just remove this byte and try the next byte
             continue;
         }
@@ -293,6 +296,7 @@ void Ikbd::processStCommands(void)
         }
 
         if(len > cbStCommands.count) {                          // if we don't have enough data in the buffer, quit
+            //ikbdLog( "Ikbd::processStCommands -- not enough data in buffer, quitting (%d > %d)", len, cbStCommands.count);
             return;
         }
 
@@ -302,9 +306,7 @@ void Ikbd::processStCommands(void)
             bfr[i] = getFromCyclicBuffer(&cbStCommands);
         }
 
-        if(bfr[0] != STCMD_PAUSE_OUTPUT) {              		// if this command is not PAUSE OUTPUT command, then enavle output
-            ikbdLog("Ikbd::processStCommands -- ST says: STCMD_PAUSE_OUTPUT");
-
+        if(bfr[0] != STCMD_PAUSE_OUTPUT) {              		// if this command is not PAUSE OUTPUT command, then enable output
             outputEnabled = true;
         }
 
@@ -325,10 +327,10 @@ void Ikbd::processStCommands(void)
 				break;
 			}
 
-			BYTE bfr[1];
-			bfr[0] = 0xf0;
+			BYTE derp[2];
+			derp[0] = 0xf0;
 			
-			fdWrite(fdUart, bfr, 1);					// send report that everything is OK 
+			fdWrite(fdUart, derp, 1);					// send report that everything is OK 
             break;
 
             //--------------------------------------------
@@ -426,6 +428,8 @@ void Ikbd::processStCommands(void)
             absMouse.maxX = (((WORD) bfr[1]) << 8) | ((WORD) bfr[2]);
             absMouse.maxY = (((WORD) bfr[3]) << 8) | ((WORD) bfr[4]);
 
+            ikbdLog( "new mouse max: [%04x, %04x]", absMouse.maxX, absMouse.maxY);
+
             fixAbsMousePos();                           // if absolute coordinates are out of bounds, fix them
 
             mouseEnabled = true;
@@ -438,12 +442,16 @@ void Ikbd::processStCommands(void)
             mouseEnabled = true;
 
 			if(mouseMode != MOUSEMODE_ABS) {			// this is only valid in absolute mouse mode
+                ikbdLog( "Ikbd::processStCommands -- STCMD_INTERROGATE_MOUSE_POS -- not sending anything because not in ABS mouse mode");
 				break;
 			}
 			
 			if(ceIkbdMode == CE_IKBDMODE_INJECT && !gotUsbMouse()) {	// when working in INJECT mode and don't have mouse, don't answer
+                ikbdLog( "Ikbd::processStCommands -- STCMD_INTERROGATE_MOUSE_POS -- not sending anything because we're in INJECT mode and we don't have USB mouse");
 				break;
-			}
+			} else {
+                ikbdLog( "Ikbd::processStCommands -- STCMD_INTERROGATE_MOUSE_POS -- will send USB mouse position (either we're in SOLO mode and / or we gotUsbMouse() )");
+            }
 			
 			sendMousePosAbsolute(fdUart, absMouse.buttons);				// send position and accumulated buttons		
 			absMouse.buttons = 0;										// no buttons for now
@@ -457,8 +465,9 @@ void Ikbd::processStCommands(void)
             absMouse.x = (((WORD) bfr[2]) << 8) | ((WORD) bfr[3]);
             absMouse.y = (((WORD) bfr[4]) << 8) | ((WORD) bfr[5]);
 
-            fixAbsMousePos();                           // if absolute coordinates are out of bounds, fix them
+            ikbdLog( "new mouse pos  : [%04x, %04x]", absMouse.x, absMouse.y);
 
+            fixAbsMousePos();                           // if absolute coordinates are out of bounds, fix them
             mouseEnabled = true;
             break;
 
@@ -678,8 +687,12 @@ void Ikbd::processKeyboardData(void)
                 ikbdLog( "Ikbd::processKeyboardData - keyboard says: KEYBDATA_MOUSE_ABS");
 
 				if(gotUsbMouse()) {								// ...and we got USB mouse? Don't resend.
+                    ikbdLog( "Ikbd::processKeyboardData - KEYBDATA_MOUSE_ABS -- got USB mouse, won't resend ABS pos from ST");
 					resendTheseData = false;
-				}
+				} else {
+                    ikbdLog( "Ikbd::processKeyboardData - KEYBDATA_MOUSE_ABS -- no USB mouse, will resend ABS pos from ST");
+                }
+                
 				break;
 				
 				//----------------------------------------------
@@ -1556,7 +1569,7 @@ int Ikbd::serialSetup(termios *ts)
 
 int Ikbd::fdWrite(int fd, BYTE *bfr, int cnt)
 {
-#ifdef IKBDLOG
+#if defined(IKBDLOG) && !defined(IKBDSPY)
     std::string text = "sending to ST: ";
     char tmp[16];
     
@@ -1624,7 +1637,9 @@ void ikbdLog(const char *format, ...)
 		printf("%08d: ", Utils::getCurrentMs());
 		vprintf(format, args);
 		printf("\n");
-		return;
+
+        va_end(args);
+        return;
 	}
 
 	DWORD now = Utils::getCurrentMs();
