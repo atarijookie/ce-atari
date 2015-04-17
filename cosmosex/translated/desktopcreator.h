@@ -25,7 +25,8 @@ typedef struct {
 
 class DesktopCreator {
 public: 
-    static int   create(char *bfr, int bfrSize, DesktopConfig *dc);
+    static void  createToFile(DesktopConfig *dc);
+    static int   createToBuffer(char *bfr, int bfrSize, DesktopConfig *dc);
 
 private:    
     static char *storeHeader         (char *bfr, DesktopConfig *dc);

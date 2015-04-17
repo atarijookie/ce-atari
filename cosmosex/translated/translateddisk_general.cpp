@@ -13,6 +13,7 @@
 #include "translateddisk.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
+#include "desktopcreator.h"
 
 TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs)
 {
@@ -538,6 +539,34 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
 
     tempFindStorage.clear();
     clearFindStorages();
+    
+    DWORD res;
+    res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
+
+    if(!res) {                                      // failed to get data? internal error!
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onInitialize - failed to receive data...");
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    // get the current machine info and generate DESKTOP.INF file
+    WORD tosVersion, resolution, drives;
+    
+    tosVersion  = Utils::getWord(dataBuffer + 0);
+    resolution  = Utils::getWord(dataBuffer + 2);
+    drives      = Utils::getWord(dataBuffer + 4);
+    
+    WORD translatedDrives = getDrivesBitmap();          // get bitmap of all translated drives we got
+    
+    DesktopConfig dc;
+    dc.tosVersion       = tosVersion;                   // TOS version as reported in TOS
+    dc.resolution       = resolution;                   // screen resolution as reported by Getrez()
+    dc.drivesAll        = drives | translatedDrives;    // all drives = drives reported by Drvmap() + all translated drives
+    dc.translatedDrives = translatedDrives;             // just translated drives
+    dc.configDrive      = driveLetters.confDrive;       // index of config drive
+    dc.sharedDrive      = driveLetters.shared;          // index of shared drive
+    
+    DesktopCreator::createToFile(&dc);                  // create the DESKTOP.INF file
 
     dataTrans->setStatus(E_OK);
 }

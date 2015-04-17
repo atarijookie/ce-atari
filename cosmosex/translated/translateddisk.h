@@ -26,7 +26,7 @@
 
 // this version number should be increased whenever command, data or status part of translated disk has changed - to enable CE_DD vs. Main App pairing. 
 // The CE_DD should check this version number and it this doesn't match expectations, it should refuse to work.
-#define TRANSLATEDDISK_VERSION  0x0100
+#define TRANSLATEDDISK_VERSION  0x0101
 
 typedef struct {
     bool        enabled;

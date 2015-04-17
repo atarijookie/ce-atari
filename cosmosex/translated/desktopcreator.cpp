@@ -1,10 +1,34 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "desktopcreator.h"
 
-int DesktopCreator::create(char *bfr, int bfrSize, DesktopConfig *dc)
+void DesktopCreator::createToFile(DesktopConfig *dc)
+{
+    char tmp[10240];
+    int len = createToBuffer(tmp, 10240, dc);
+    
+    unlink("/tmp/DESKTOP.INF");                 // delete old files
+    unlink("/tmp/NEWDESK.INF");
+    
+    FILE *f;
+    if(dc->tosVersion < TOSVER205) {            // for TOS 1.xx
+        f = fopen("/tmp/DESKTOP.INF", "wt");
+    } else {                                    // for TOS 2.xx and up
+        f = fopen("/tmp/NEWDESK.INF", "wt");
+    }
+    
+    if(!f) {                                    // if failed to create file, quit
+        return;
+    }
+    
+    fwrite(tmp, 1, len, f);                     // write content and close file    
+    fclose(f);
+}
+
+int DesktopCreator::createToBuffer(char *bfr, int bfrSize, DesktopConfig *dc)
 {
     char b[10240];
     memset(b, 0, 10240);                                    // clear temp buffer
