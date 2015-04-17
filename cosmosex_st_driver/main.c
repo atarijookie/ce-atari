@@ -80,7 +80,7 @@ extern DWORD _runFromBootsector;			// flag meaning if we are running from TOS or
 WORD trap_extra_offset=0;                   // Offset for GEMDOS/BIOS handler stack adjustment (should be 0 or 2)
 
 WORD transDiskProtocolVersion;              // this will hold the protocol version from Main App
-#define REQUIRED_TRANSLATEDDISK_VERSION     0x0100
+#define REQUIRED_TRANSLATEDDISK_VERSION     0x0101
 /* ------------------------------------------------------------------ */
 int main( int argc, char* argv[] )
 {
