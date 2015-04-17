@@ -60,9 +60,6 @@ extern BYTE currentDrive;
 
 extern TFileBuffer fileBufs[MAX_FILES];
 
-#define GET_WORD(PTR)           (((WORD) (PTR)[0]) << 8) | ((WORD) (PTR)[1])
-#define SET_WORD(PTR,VALUE)     (PTR)[0] = (BYTE) (VALUE >> 8); (PTR)[1] = (BYTE) VALUE;
-    
 /* ------------------------------------------------------------------ */
 /* the custom GEMDOS handlers now follow */
 

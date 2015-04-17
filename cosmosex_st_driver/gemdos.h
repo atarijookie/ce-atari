@@ -156,7 +156,8 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 //#define getWord(POINTER)        ( (((WORD) *POINTER)<<8) | ((WORD) *(POINTER+1)))
 //#define getDword(POINTER)       ( (((DWORD) *POINTER)<<24) | (((DWORD) *(POINTER+1))<<16) | (((DWORD) *(POINTER+2))<<8) | (((DWORD) *(POINTER+3))) )
 
-
+#define GET_WORD(PTR)           (((WORD) (PTR)[0]) << 8) | ((WORD) (PTR)[1])
+#define SET_WORD(PTR,VALUE)     (PTR)[0] = (BYTE) (VALUE >> 8); (PTR)[1] = (BYTE) VALUE; 
 		
 // The following macros are used to convert atari handle numbers which are WORDs
 // to CosmosEx ex handle numbers, which are only BYTEs; and back.

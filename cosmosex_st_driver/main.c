@@ -16,7 +16,7 @@
 #include "main.h"
 
 /* 
- * CosmosEx GEMDOS driver by Jookie, 2013
+ * CosmosEx GEMDOS driver by Jookie, 2013-2015
  * GEMDOS hooks part (assembler and C) by MiKRO (Miro Kropacek), 2013
  */
  
@@ -263,7 +263,18 @@ void ce_initialize(void)
 	commandShort[0] = (deviceID << 5); 					                        /* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
 	commandShort[4] = GD_CUSTOM_initialize;
   
-	acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* issue the command and check the result */
+    BYTE  *pSysBase     = (BYTE *) 0x000004F2;
+    BYTE  *ppSysBase    = (BYTE *)  ((DWORD )  *pSysBase);                      // get pointer to TOS address
+    WORD  tosVersion    = (WORD  ) *(( WORD *) (ppSysBase + 2));                // TOS +2: TOS version
+    SET_WORD(pDmaBuffer + 0, tosVersion);                                       // store tos version
+
+    WORD resolution     = Getrez();
+    SET_WORD(pDmaBuffer + 2, resolution);                                       // store current screen resolution
+  
+    WORD drives         = Drvmap();
+    SET_WORD(pDmaBuffer + 4, drives);                                           // store existing drives
+  
+	acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);        /* issue the command and check the result */
 }
 
 void getConfig(void)
