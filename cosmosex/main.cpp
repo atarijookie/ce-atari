@@ -194,6 +194,13 @@ int main(int argc, char *argv[])
     res = pthread_create(&networkThreadInfo, NULL, networkThreadCode, NULL);    // create the network thread and run it
 	handlePthreadCreate(res, (char *) "network");
 
+    //-------------
+    // copy the configdrive to /tmp so we can change the content as needed
+    system("rm -rf /tmp/configdrive");                      // remove any old content
+    system("mkdir /tmp/configdrive");                       // create dir
+    system("cp /ce/app/configdrive/* /tmp/configdrive");    // copy new content
+    //-------------
+
 	core->run();										// run the main thread
 
     xServer.stop();

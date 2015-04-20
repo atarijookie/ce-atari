@@ -21,7 +21,7 @@
 #define BUFFER_SIZE             (1024*1024)
 #define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
 
-#define CONFIG_DRIVE_PATH       "/ce/app/configdrive"
+#define CONFIG_DRIVE_PATH       "/tmp/configdrive"
 #define SHARED_DRIVE_PATH       "/mnt/shared"
 
 // this version number should be increased whenever command, data or status part of translated disk has changed - to enable CE_DD vs. Main App pairing. 

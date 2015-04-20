@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <stdlib.h>
 
 #include "../global.h"
 #include "../debug.h"
@@ -565,8 +566,11 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     dc.translatedDrives = translatedDrives;             // just translated drives
     dc.configDrive      = driveLetters.confDrive;       // index of config drive
     dc.sharedDrive      = driveLetters.shared;          // index of shared drive
+
+    system("rm -f /tmp/configdrive/*.inf");             // remove any *.inf file
+    system("rm -f /tmp/configdrive/*.INF");             // remove any *.INF file, too
     
-    DesktopCreator::createToFile(&dc);                  // create the DESKTOP.INF file
+    DesktopCreator::createToFile(&dc);                  // create the DESKTOP.INF / NEWDESK.INF file
 
     dataTrans->setStatus(E_OK);
 }

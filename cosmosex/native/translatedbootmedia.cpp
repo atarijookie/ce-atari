@@ -34,7 +34,7 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
 	size_t bytesRead;
 	FILE *f;
 	
-	f = fopen("/ce/app/configdrive/ce_dd.bs", "rb");
+	f = fopen("/tmp/configdrive/ce_dd.bs", "rb");
 
 	if(!f) {
         Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open bootsector file!");
@@ -51,7 +51,7 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
 	fclose(f);
 	
 	// read the CosmosEx driver into buffer
-	f = fopen("/ce/app/configdrive/ce_dd.prg", "rb");
+	f = fopen("/tmp/configdrive/ce_dd.prg", "rb");
 
 	if(!f) {
         Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open ce_dd.prg!");
