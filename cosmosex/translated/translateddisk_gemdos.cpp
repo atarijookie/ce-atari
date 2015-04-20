@@ -245,6 +245,14 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
 		return;
 	}
 
+	if (tempFindStorage.count==0)
+	{
+		Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s 0 entries found", (char *) hostSearchString.c_str());
+
+		dataTrans->setStatus(EFILNF);                               // file not found
+		return;
+	}
+	
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- found %d dir entries", (char *) hostSearchString.c_str(), tempFindStorage.count);
 
     //----------	
