@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "../debug.h"
 #include "desktopcreator.h"
 
 void DesktopCreator::createToFile(DesktopConfig *dc)
@@ -10,17 +11,20 @@ void DesktopCreator::createToFile(DesktopConfig *dc)
     char tmp[10240];
     int len = createToBuffer(tmp, 10240, dc);
     
-    unlink("/tmp/DESKTOP.INF");                 // delete old files
-    unlink("/tmp/NEWDESK.INF");
+    unlink("/tmp/configdrive/DESKTOP.INF");                 // delete old files
+    unlink("/tmp/configdrive/NEWDESK.INF");
     
     FILE *f;
     if(dc->tosVersion < TOSVER205) {            // for TOS 1.xx
-        f = fopen("/tmp/DESKTOP.INF", "wt");
+        Debug::out(LOG_DEBUG, "DesktopCreator::createToFile() -- will create /tmp/configdrive/DESKTOP.INF");
+        f = fopen("/tmp/configdrive/DESKTOP.INF", "wt");
     } else {                                    // for TOS 2.xx and up
-        f = fopen("/tmp/NEWDESK.INF", "wt");
+        Debug::out(LOG_DEBUG, "DesktopCreator::createToFile() -- will create /tmp/configdrive/NEWDESK.INF");
+        f = fopen("/tmp/configdrive/NEWDESK.INF", "wt");
     }
     
     if(!f) {                                    // if failed to create file, quit
+        Debug::out(LOG_DEBUG, "DesktopCreator::createToFile() -- failed to create file .INF file!");
         return;
     }
     
@@ -30,6 +34,8 @@ void DesktopCreator::createToFile(DesktopConfig *dc)
 
 int DesktopCreator::createToBuffer(char *bfr, int bfrSize, DesktopConfig *dc)
 {
+    Debug::out(LOG_DEBUG, "DesktopCreator::createToBuffer() -- creating DESKTOP.INF / NEWDESK.INF for TOS %d.%02x", dc->tosVersion >> 8, dc->tosVersion & 0xff);
+
     char b[10240];
     memset(b, 0, 10240);                                    // clear temp buffer
     
