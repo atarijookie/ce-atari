@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
 #include <string.h>
@@ -24,6 +25,7 @@
 #include "downloader.h"
 #include "gpio.h"
 #include "mounter.h"
+#include "settings.h"
 
 DWORD Utils::getCurrentMs(void)
 {
@@ -392,4 +394,36 @@ void Utils::storeDword(BYTE *bfr, DWORD val)
     bfr[3] = val;       // store lo
 }
 
+void Utils::setTimezoneVariable(void)
+{
+    Settings  s;
+    float     utcOffset;
+    utcOffset = s.getFloat((char *) "TIME_UTC_OFFSET", 0);          // read UTC offset from settings
 
+    char  signChar;
+    int   ofsHours, ofsMinutes;
+    float fOfsHours;
+    
+    if(utcOffset >= 0.0f) {         // is UTC offset positive? (e.g. Berlin is +1 / +2) TZ should have '-' because it's east of Prime Meridian
+        signChar = '-';
+    } else {                        // is UTC offset negative? (e.g. New York is -5 / -4) TZ should have '+' because it's west of Prime Meridian
+        signChar = '+';
+    }
+    
+    ofsHours    = (int)   utcOffset;                            // int  : hours only    (including sign)
+    fOfsHours   = (float) ofsHours;                             // float: hours only    (including sign)
+    ofsHours    = abs(ofsHours);                                // int  : hours only    (without   sign)
+    ofsMinutes  = abs((int) ((utcOffset - fOfsHours) * 60.0f)); // not get only minutes (without   sign)
+    
+    char tzString[64];
+    
+    if(ofsHours != 0 && ofsMinutes != 0) {                      // got offset - both hours and minutes?
+        sprintf(tzString, "export TZ=\"UTC%c%02d:%02d\"", signChar, ofsHours, ofsMinutes);
+    } else if(ofsHours != 0 && ofsMinutes == 0) {               // got offset - only hours (no minutes)
+        sprintf(tzString, "export TZ=\"UTC%c%02d\"", signChar, ofsHours);
+    } else {                                                    // no offset?
+        sprintf(tzString, "export TZ=\"UTC\"");
+    }
+    
+    system(tzString);                                           // execute the export command
+}

@@ -41,6 +41,8 @@ public:
 
     static void storeWord(BYTE *bfr, WORD val);
     static void storeDword(BYTE *bfr, DWORD val);
+    
+    static void setTimezoneVariable(void);
 
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
