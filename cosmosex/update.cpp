@@ -366,7 +366,7 @@ bool Update::createUpdateScript(void)
         fprintf(f, "unzip /ce/app/%s\n", (char *)       appFileOnly.c_str());	    // unzip it
         fprintf(f, "chmod 755 %s/cosmosex\n", (char *)  UPDATE_APP_PATH);	        // change permissions
 		fprintf(f, "rm -f /ce/app/%s\n",				appFileOnly.c_str());       // delete the zip
-        fprintf(f, "sync");                                                         // write caches to disk
+        fprintf(f, "sync\n");                                                       // write caches to disk
         fprintf(f, "echo -e \"\\n>>> Updating Main App - END\"\n");
         fprintf(f, "\n\n");
     }
