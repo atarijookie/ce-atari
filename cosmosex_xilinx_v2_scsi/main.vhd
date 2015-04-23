@@ -48,7 +48,10 @@ entity main is
            TXSEL1n2: in std_logic;         -- TX select -    1: TX_out <- TX_Franz,    0: TX_out <- TX_Hans
            TX_Franz: in  std_logic;        -- TX from Franz
            TX_Hans : in  std_logic;        -- TX from Hans
-           TX_out  : out std_logic         -- muxed TX
+           TX_out  : out std_logic;        -- muxed TX
+
+        -- used for real HW type identification
+           HDD_IF  : in std_logic          -- 0 when ACSI, 1 when SCSI 
         ) ;
 end main;
 
@@ -76,12 +79,18 @@ architecture Behavioral of main is
 
     signal d1out     : std_logic;
 
+    signal identifyA : std_logic;
+    signal identifyS : std_logic;
+
 begin
 
     REQtrig    <= XPIO xor XDMA;				-- trigger REQ if one of these goes high, but not both! (that would be identify cmd)
-    identify   <= XPIO and XDMA and TXSEL1n2;     -- when TXSEL1n2 selects Franz (='1') and you have PIO and DMA pins high, then you can read the identification byte from DATA2
     resetCombo <= SRST and reset_hans;            -- when at least one of those 2 reset signals is low, the result is low
     XCMD       <= SEL;                  		-- falling edge means target selection 
+
+    identify   <= XPIO and XDMA and TXSEL1n2;     -- when TXSEL1n2 selects Franz (='1') and you have PIO and DMA pins high, then you can read the identification byte from DATA2
+    identifyA  <= identify and (not HDD_IF);      -- active when IDENTIFY and it's ACSI hardware
+    identifyS  <= identify and HDD_IF;            -- active when IDENTIFY and it's SCSI hardware
 
     phaseReset <= SRST and reset_hans and sel;	-- when one of these goes low, reset phase to FREE
     phaseClock <= XPIO xor XDMA;				-- if one of these (but not both) go high, it's time to change the phase
@@ -186,7 +195,8 @@ begin
 
     -- DATA2 is connected to Hans (STM32 mcu), data goes out when going from ST to MCU (WRITE operation)
     DATA2 <=    "ZZZZZ0ZZ"  when TXSEL1n2='0'    else   -- when TXSEL1n2 selects Hans, we're writing to Hans's flash, we need bit DATA2.2 (bit #2) to be 0 (it's BOOT1 bit on STM32 MCU)
-                "00100010"  when identify='1'    else   -- when identify condition met, this identifies the XILINX and HW revision (0010 - HW rev 2, 0010 - SCSI version)
+                "00100010"  when identifyS='1'   else   -- GOOD: when identify condition met, this identifies the XILINX and HW revision (0010 - HW rev 2, 0 - it's SCSI HW, 010 - SCSI Xilinx FW)
+                "00101010"  when identifyA='1'   else   -- BAD : when identify condition met, this identifies the XILINX and HW revision (0010 - HW rev 2, 1 - it's ACSI HW, 010 - SCSI Xilinx FW)
                 DATA1latch  when XRnW='0'        else   -- when set in WRITE direction, output latched DATA1 to DATA2 
                 "ZZZZZZZZ";                             -- otherwise don't drive this
 

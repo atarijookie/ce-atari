@@ -32,6 +32,7 @@ NET "DATA2<6>"  LOC = "P39"  ;
 NET "DATA2<7>"  LOC = "P37"  ;
 NET "DBPa"  LOC = "P94"  ;
 NET "DBPb"  LOC = "P93"  ;
+NET "HDD_IF"  LOC = "P52"  ;
 NET "IOa"  LOC = "P68"  ;
 NET "IOb"  LOC = "P67"  ;
 NET "reset_hans"  LOC = "P33"  ;
