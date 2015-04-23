@@ -6,52 +6,52 @@ use IEEE.STD_LOGIC_UNSIGNED.ALL;
 entity main is
     Port ( 
         -- signals connected to MCU
-           XPIO        : in  std_logic;        -- on rising edge will put INT to L
-           XDMA        : in  std_logic;        -- on rising edge will put DRQ to L
-           XRnW        : in  std_logic;        -- defines data direction (1: DATA1 <- DATA2,  0: DATA1 -> DATA2)
-           XCMD        : out std_logic;        -- this is combination of CS and A1, will go low on 1st cmd byte from ACSI port
-           reset_hans  : in  std_logic;        -- this is the signal which resets Hans, and it will reset this CPLD too to init it
-           XATN        : out std_logic;        -- just a copy of ATN signal
+        XPIO        : in  std_logic;        -- on rising edge will put INT to L
+        XDMA        : in  std_logic;        -- on rising edge will put DRQ to L
+        XRnW        : in  std_logic;        -- defines data direction (1: DATA1 <- DATA2,  0: DATA1 -> DATA2)
+        XCMD        : out std_logic;        -- this is combination of CS and A1, will go low on 1st cmd byte from ACSI port
+        reset_hans  : in  std_logic;        -- this is the signal which resets Hans, and it will reset this CPLD too to init it
+        XATN        : out std_logic;        -- just a copy of ATN signal
 
         -- signals connected to MCU, which should be just copies of SCSI port states
-           XRESET  : out std_logic;
-		 XCS     : out std_logic;
-		 XACK    : out std_logic;
+        XRESET  : out std_logic;
+        XCS     : out std_logic;
+        XACK    : out std_logic;
 
         -- signals connected to SCSI port
-		 SRST : in    std_logic;			-- RESET device
-		 ATN  : in    std_logic;			-- ATN - when MSG OUT phase should start
-		 SEL  : in    std_logic;           -- target selection is marked with this signal
-		 BSYa : out   std_logic;			-- when device is listening
-		 BSYb : out   std_logic;			-- when device is listening
-		 DBPa : out   std_logic;			-- odd parity bit for data
-		 DBPb : out   std_logic;			-- odd parity bit for data
+        SRST : in    std_logic;            -- RESET device
+        ATN  : in    std_logic;            -- ATN - when MSG OUT phase should start
+        SEL  : in    std_logic;            -- target selection is marked with this signal
+        BSYa : out   std_logic;            -- when device is listening
+        BSYb : out   std_logic;            -- when device is listening
+        DBPa : out   std_logic;            -- odd parity bit for data
+        DBPb : out   std_logic;            -- odd parity bit for data
 
-		 IOa  : out   std_logic;			-- I/O - input / output
-		 IOb  : out   std_logic;			-- I/O - input / output
-		 CDa  : out   std_logic;			-- C/D - command / data
-		 CDb  : out   std_logic;			-- C/D - command / data
-	   	 SMSGa: out   std_logic;			-- MSG - message phase
-	   	 SMSGb: out   std_logic;			-- MSG - message phase
+        IOa  : out   std_logic;            -- I/O - input / output
+        IOb  : out   std_logic;            -- I/O - input / output
+        CDa  : out   std_logic;            -- C/D - command / data
+        CDb  : out   std_logic;            -- C/D - command / data
+        SMSGa: out   std_logic;            -- MSG - message phase
+        SMSGb: out   std_logic;            -- MSG - message phase
 
-		 SREQa: out   std_logic;			-- REQ goes from device...
-		 SREQb: out   std_logic;			-- REQ goes from device...
-		 SACK : in    std_logic;			-- ...and initiator answers with ACK
+        SREQa: out   std_logic;            -- REQ goes from device...
+        SREQb: out   std_logic;            -- REQ goes from device...
+        SACK : in    std_logic;            -- ...and initiator answers with ACK
 
         -- DATA1 is connected to SCSI port, DATA2 is data latched on CS and ACK and connected to MCU
-           DATA1a    : inout std_logic_vector(7 downto 0);
-		 DATA1b    : out   std_logic_vector(7 downto 0);
+        DATA1a    : inout std_logic_vector(7 downto 0);
+        DATA1b    : out   std_logic_vector(7 downto 0);
 
-           DATA2     : inout std_logic_vector(7 downto 0);
+        DATA2     : inout std_logic_vector(7 downto 0);
 
         -- the following is 2-to-1 Multiplexer for connecting both MCUs to single RX pin (used for FW update)
-           TXSEL1n2: in std_logic;         -- TX select -    1: TX_out <- TX_Franz,    0: TX_out <- TX_Hans
-           TX_Franz: in  std_logic;        -- TX from Franz
-           TX_Hans : in  std_logic;        -- TX from Hans
-           TX_out  : out std_logic;        -- muxed TX
+        TXSEL1n2: in std_logic;         -- TX select -    1: TX_out <- TX_Franz,    0: TX_out <- TX_Hans
+        TX_Franz: in  std_logic;        -- TX from Franz
+        TX_Hans : in  std_logic;        -- TX from Hans
+        TX_out  : out std_logic;        -- muxed TX
 
         -- used for real HW type identification
-           HDD_IF  : in std_logic          -- 0 when ACSI, 1 when SCSI 
+        HDD_IF  : in std_logic          -- 0 when ACSI, 1 when SCSI 
         ) ;
 end main;
 
@@ -86,26 +86,26 @@ architecture Behavioral of main is
 
 begin
 
-    REQtrig    <= XPIO xor XDMA;				-- trigger REQ if one of these goes high, but not both! (that would be identify cmd)
-    resetCombo <= SRST and reset_hans;            -- when at least one of those 2 reset signals is low, the result is low
-    XCMD       <= SEL;                  		-- falling edge means target selection 
+    REQtrig    <= XPIO xor XDMA;                -- trigger REQ if one of these goes high, but not both! (that would be identify cmd)
+    resetCombo <= SRST and reset_hans;          -- when at least one of those 2 reset signals is low, the result is low
+    XCMD       <= SEL;                          -- falling edge means target selection 
 
-    identify   <= XPIO and XDMA and TXSEL1n2;     -- when TXSEL1n2 selects Franz (='1') and you have PIO and DMA pins high, then you can read the identification byte from DATA2
-    identifyA  <= identify and (not HDD_IF);      -- active when IDENTIFY and it's ACSI hardware
-    identifyS  <= identify and HDD_IF;            -- active when IDENTIFY and it's SCSI hardware
+    identify   <= XPIO and XDMA and TXSEL1n2;   -- when TXSEL1n2 selects Franz (='1') and you have PIO and DMA pins high, then you can read the identification byte from DATA2
+    identifyA  <= identify and (not HDD_IF);    -- active when IDENTIFY and it's ACSI hardware
+    identifyS  <= identify and HDD_IF;          -- active when IDENTIFY and it's SCSI hardware
 
-    phaseReset <= SRST and reset_hans and sel;	-- when one of these goes low, reset phase to FREE
-    phaseClock <= XPIO xor XDMA;				-- if one of these (but not both) go high, it's time to change the phase
+    phaseReset <= SRST and reset_hans and sel;  -- when one of these goes low, reset phase to FREE
+    phaseClock <= XPIO xor XDMA;                -- if one of these (but not both) go high, it's time to change the phase
 
 -- TODO: message phase is totally skipped - is it needed, will it work?
    
     -- this process is here to determine the state when the status byte has been read
     statPhases: process(busState, SACK) is
     begin
-        if (busState /= STATUS) then              -- if it's not STATUS state of bus, it's before reading of the status byte
-	       statusState <= S_BEFORE;
-        elsif (rising_edge(SACK)) then            -- it's STATUS state of bus, and SACK is rising - it's the moment after reading of status byte -- this will trigger busState going to FREE
-	       statusState <= S_AFTER;
+        if (busState /= STATUS) then            -- if it's not STATUS state of bus, it's before reading of the status byte
+           statusState <= S_BEFORE;
+        elsif (rising_edge(SACK)) then          -- it's STATUS state of bus, and SACK is rising - it's the moment after reading of status byte -- this will trigger busState going to FREE
+           statusState <= S_AFTER;
         end if;
     end process;
 
@@ -113,11 +113,11 @@ begin
     phases: process(phaseReset, phaseClock, busState, SACK, statusState) is
     begin
         -- BUS STATE reset - when there's SCSI reset, Hans reset, or when status byte was already read (S_AFTER state)
-	   if ((phaseReset = '0') or (statusState = S_AFTER)) then
-	       busState <= FREE;
-	   elsif (rising_edge(phaseClock)) then
+        if ((phaseReset = '0') or (statusState = S_AFTER)) then
+            busState <= FREE;
+        elsif (rising_edge(phaseClock)) then
         -- BUS STATE change - depending on XPIO and XDMA read/write requests
-	       if    ((XRnW = '1') and (XPIO = '1') and (XDMA = '0')) then
+            if    ((XRnW = '1') and (XPIO = '1') and (XDMA = '0')) then
                 busState <= STATUS;
             elsif ((XRnW = '0') and (XPIO = '1') and (XDMA = '0')) then
                 busState <= COMMAND;
@@ -132,10 +132,10 @@ begin
     -- setting of C/D, MSG, I/O states depending on BUS STATE
     phaseSignals: process(busState) is
     begin
-	   if    (busState = FREE) then
-		  CDsignal  <= '1';
-		  MSGsignal <= '1';
-		  IOsignal  <= '1';
+        if    (busState = FREE) then
+            CDsignal  <= '1';
+            MSGsignal <= '1';
+            IOsignal  <= '1';
         elsif (busState = STATUS) then
             CDsignal  <= '0';
             MSGsignal <= '1';
@@ -152,9 +152,9 @@ begin
             CDsignal  <= '1';
             MSGsignal <= '1';
             IOsignal  <= '1';
-        else        
-	   -- This last 'else' is here to avoid using latches for C/D, MSG, I/O signals 
-	   -- They shouldn't be latched, just display the BUS STATE to these signals. 
+        else
+            -- This last 'else' is here to avoid using latches for C/D, MSG, I/O signals 
+            -- They shouldn't be latched, just display the BUS STATE to these signals. 
             CDsignal  <= '1';
             MSGsignal <= '1';
             IOsignal  <= '1';
@@ -185,9 +185,9 @@ begin
     end process;
 
     -- d1out says whether should output DATA1 -- only when XRnW is 1 (read) and resetCombo is 1 (not in reset state), otherwise don't drive DATA1 pins
-    d1out     <= '1' when ((XRnW='1' ) and (resetCombo='1')) else '0';	
+    d1out <= '1' when ((XRnW='1' ) and (resetCombo='1')) else '0';  
 
-	-- DATA1a and DATA1b are connected to SCSI bus, data goes out when going from MCU to ST (READ operation) and it's not reset state (this means d1out is 1)
+    -- DATA1a and DATA1b are connected to SCSI bus, data goes out when going from MCU to ST (READ operation) and it's not reset state (this means d1out is 1)
     DATA1a(7) <= '0' when ((d1out='1') and (DATA2(7)='0')) else 'Z';
     DATA1b(7) <= '0' when ((d1out='1') and (DATA2(7)='0')) else 'Z';
     DATA1a(6) <= '0' when ((d1out='1') and (DATA2(6)='0')) else 'Z';
@@ -233,12 +233,12 @@ begin
 
     -- odd parity output for IN direction
     oddParity <= ( (DATA2(0) xor DATA2(1)) xor (DATA2(2) xor DATA2(3)) ) xor ( (DATA2(4) xor DATA2(5)) xor (DATA2(6) xor DATA2(7)) );
-    DBPa      <= '0' when ((IOsignal='0') and (oddParity='0')) else 'Z';		-- when in *_IN phase and parity is 0, then set it to 0; otherwise let it in 'Z'
-    DBPb      <= '0' when ((IOsignal='0') and (oddParity='0')) else 'Z';		-- when in *_IN phase and parity is 0, then set it to 0; otherwise let it in 'Z'
+    DBPa      <= '0' when ((IOsignal='0') and (oddParity='0')) else 'Z';        -- when in *_IN phase and parity is 0, then set it to 0; otherwise let it in 'Z'
+    DBPb      <= '0' when ((IOsignal='0') and (oddParity='0')) else 'Z';        -- when in *_IN phase and parity is 0, then set it to 0; otherwise let it in 'Z'
 
     -- pull BSY low when needed, otherwise just let it in Hi-Z
     -- setting BSY signal depending on BUS STATE
-    BSYsignal <= '1' when busState=FREE else '0';		-- when in FREE phase, don't pull BSY low, in other phases - pull BSY low
+    BSYsignal <= '1' when busState=FREE else '0';       -- when in FREE phase, don't pull BSY low, in other phases - pull BSY low
     BSYa      <= '0' when BSYsignal='0' else 'Z';
     BSYb      <= '0' when BSYsignal='0' else 'Z';
 
