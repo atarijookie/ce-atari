@@ -56,7 +56,8 @@ entity main is
 end main;
 
 architecture Behavioral of main is
-    type SCSI_states is (FREE, DATA_OUT, DATA_IN, COMMAND, STATUS, MESSAGE_OUT, MESSAGE_IN);
+    type SCSI_states   is (FREE, DATA_OUT, DATA_IN, COMMAND, STATUS, MESSAGE_OUT, MESSAGE_IN);
+    type STATUS_states is (S_BEFORE, S_AFTER);
 
     signal phaseReset: std_logic;
     signal phaseClock: std_logic;
@@ -68,7 +69,8 @@ architecture Behavioral of main is
     signal resetCombo: std_logic;
     signal identify  : std_logic;
 
-    signal busState  : SCSI_states;
+    signal busState   : SCSI_states;
+    signal statusState: STATUS_states;
 
     signal CDsignal  : std_logic;
     signal MSGsignal : std_logic;
@@ -95,13 +97,23 @@ begin
     phaseReset <= SRST and reset_hans and sel;	-- when one of these goes low, reset phase to FREE
     phaseClock <= XPIO xor XDMA;				-- if one of these (but not both) go high, it's time to change the phase
 
--- TODO: busState to FREE on status byte reading is too soon
 -- TODO: message phase is totally skipped - is it needed, will it work?
-
-    phases: process(phaseReset, phaseClock, busState, SACK) is
+   
+    -- this process is here to determine the state when the status byte has been read
+    statPhases: process(busState, SACK) is
     begin
-        -- BUS STATE reset - when there's SCSI reset, Hans reset, or when status byte is being read
-	   if ((phaseReset = '0') or ((busState = STATUS) and (SACK = '0')) ) then
+        if (busState /= STATUS) then              -- if it's not STATUS state of bus, it's before reading of the status byte
+	       statusState <= S_BEFORE;
+        elsif (rising_edge(SACK)) then            -- it's STATUS state of bus, and SACK is rising - it's the moment after reading of status byte -- this will trigger busState going to FREE
+	       statusState <= S_AFTER;
+        end if;
+    end process;
+
+    -- this is a BUS STATE / PHASE changing process
+    phases: process(phaseReset, phaseClock, busState, SACK, statusState) is
+    begin
+        -- BUS STATE reset - when there's SCSI reset, Hans reset, or when status byte was already read (S_AFTER state)
+	   if ((phaseReset = '0') or (statusState = S_AFTER)) then
 	       busState <= FREE;
 	   elsif (rising_edge(phaseClock)) then
         -- BUS STATE change - depending on XPIO and XDMA read/write requests
