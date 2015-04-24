@@ -148,8 +148,6 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-    Utils::setTimezoneVariable();                               // this should set the TZ system variable, so the files should have correct time (according to time zone)
-    
     Downloader::initBeforeThreads();
 
     //start up virtual devices

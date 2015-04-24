@@ -1014,7 +1014,8 @@ void ConfigStream::onOtherSave(void)
     do_loadIkbdConfig   = true;     // reload ikbd config
 
     Utils::forceSync();             // tell system to flush the filesystem caches
-
+    Utils::setTimezoneVariable();   // create the timezone setting script, because TIME_UTC_OFFSET could possibly change
+    
     createScreen_homeScreen();		// now back to the home screen
 }
 
