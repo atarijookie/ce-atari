@@ -72,7 +72,9 @@ int main(int argc, char* argv[]) {
 	int ret = 1;
 	parser_err_t perr;
 
-	printf("stm32flash - http://stm32flash.googlecode.com/\n\n");
+    printf("\n");
+	printf("stm32flash - http://stm32flash.googlecode.com/\n");
+	printf("           - with the fix for DS1818\n\n");             // show this message to identify as the new version of this flash tool
 	
 	if(!gpio_open()) {							// open RPi GPIO
 		return 0;
@@ -89,6 +91,12 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 
+    if(flashHans) {                                             // show that flashing Hans
+        fprintf(stderr, ">>> Will flash HANS <<<\n\n");
+    } else {                                                    // show that flashing Franz
+        fprintf(stderr, ">>> Will flash FRANZ <<<\n\n");
+    }
+    
 	//----------------------------
 	// this was added for CosmosEx
 	// select the right STM32 chip 
