@@ -920,7 +920,7 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
 			return;		
 		}
 	
-		tm *time = gmtime(&attr.st_mtime);						    // convert time_t to tm structure
+		tm *time = localtime(&attr.st_mtime);						// convert time_t to tm structure
 	
 		WORD atariTime = Utils::fileTimeToAtariTime(time);
 		WORD atariDate = Utils::fileTimeToAtariDate(time);

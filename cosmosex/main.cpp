@@ -148,6 +148,8 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
+    Utils::setTimezoneVariable_inThisContext();
+    
     Downloader::initBeforeThreads();
 
     //start up virtual devices

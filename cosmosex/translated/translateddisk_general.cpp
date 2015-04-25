@@ -595,9 +595,8 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     utcOffset   = s.getFloat((char *) "TIME_UTC_OFFSET", 0);
 
     int iUtcOffset = (int) (utcOffset * 10.0);
-    int secsOffset = (int) (utcOffset * (60*60));               // transform float hours to int seconds
 
-    time_t timenow      = time(NULL) + secsOffset;              // get time with offset
+    time_t timenow      = time(NULL);                           // get time -- the UTC offset / timezone will be applied in localtime()
     struct tm loctime   = *localtime(&timenow);
 
     if((loctime.tm_year + 1900) < 2014) {                       // if the retrieved date/time seems to be wrong (too old), clear it and don't set it!

@@ -41,8 +41,10 @@ public:
 
     static void storeWord(BYTE *bfr, WORD val);
     static void storeDword(BYTE *bfr, DWORD val);
-    
-    static void setTimezoneVariable(void);
+
+    static void createTimezoneString(char *str);
+    static void setTimezoneVariable_inProfileScript(void);
+    static void setTimezoneVariable_inThisContext(void);
 
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);

@@ -287,7 +287,7 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, char *search
 		return;		
 	}
 
-	timestr = gmtime(&attr.st_mtime);			    			// convert time_t to tm structure
+	timestr = localtime(&attr.st_mtime);			    	    // convert time_t to tm structure
 
 	res = longToShortFilename(hostPath, longFname, shortFname); // convert long to short filename
     if(!res) {
@@ -361,7 +361,7 @@ void DirTranslator::appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath,
 		return;		
 	}
 
-	timestr = gmtime(&attr.st_mtime);			    			// convert time_t to tm structure
+	timestr = localtime(&attr.st_mtime);			    		// convert time_t to tm structure
 
     WORD atariTime = Utils::fileTimeToAtariTime(timestr);
     WORD atariDate = Utils::fileTimeToAtariDate(timestr);

@@ -394,7 +394,7 @@ void Utils::storeDword(BYTE *bfr, DWORD val)
     bfr[3] = val;       // store lo
 }
 
-void Utils::setTimezoneVariable(void)
+void Utils::createTimezoneString(char *str)
 {
     Settings  s;
     float     utcOffset;
@@ -415,21 +415,38 @@ void Utils::setTimezoneVariable(void)
     ofsHours    = abs(ofsHours);                                // int  : hours only    (without   sign)
     ofsMinutes  = abs((int) ((utcOffset - fOfsHours) * 60.0f)); // not get only minutes (without   sign)
     
-    char tzString[128];
-    
     if(ofsHours != 0 && ofsMinutes != 0) {                      // got offset - both hours and minutes?
-        sprintf(tzString, "echo 'export TZ=\"UTC%c%02d:%02d\"' > /etc/profile.d/set_timezone.sh", signChar, ofsHours, ofsMinutes);
+        sprintf(str, "UTC%c%02d:%02d", signChar, ofsHours, ofsMinutes);
     } else if(ofsHours != 0 && ofsMinutes == 0) {               // got offset - only hours (no minutes)
-        sprintf(tzString, "echo 'export TZ=\"UTC%c%02d\"' > /etc/profile.d/set_timezone.sh", signChar, ofsHours);
+        sprintf(str, "UTC%c%02d", signChar, ofsHours);
     } else {                                                    // no offset?
-        sprintf(tzString, "echo 'export TZ=\"UTC\"' > /etc/profile.d/set_timezone.sh");
+        sprintf(str, "UTC");
     }
+}
+
+void Utils::setTimezoneVariable_inProfileScript(void)
+{
+    char utcOfsset[64];
+    createTimezoneString(utcOfsset);
     
-    Debug::out(LOG_DEBUG, "Utils::setTimezoneVariable() -- creating timezone setting script like this: %s\n", tzString);
+    char tzString[128];
+    sprintf(tzString, "echo 'export TZ=\"%s\"' > /etc/profile.d/set_timezone.sh", utcOfsset);
+    
+    Debug::out(LOG_DEBUG, "Utils::setTimezoneVariable_inProfileScript() -- creating timezone setting script like this: %s\n", tzString);
     
     system("mkdir -p /etc/profile.d");                          // if this dir doesn't exist, create it
     system(tzString);                                           // now create the script in the dir above
     system("chmod 755 /etc/profile.d/set_timezone.sh");         // make it executable
     
     forceSync();                                                // make sure it does to disk
+}
+
+void Utils::setTimezoneVariable_inThisContext(void)
+{
+    char utcOfsset[64];
+    createTimezoneString(utcOfsset);
+
+    Debug::out(LOG_DEBUG, "Utils::setTimezoneVariable_inThisContext() -- setting TZ variable to: %s\n", utcOfsset);
+    
+    setenv("TZ", utcOfsset, 1);
 }
