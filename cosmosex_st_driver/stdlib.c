@@ -83,22 +83,33 @@ int strncmp ( const char * str1, const char * str2, int num )
 	return 0;							// if came here, all chars matching
 }
 
-int sleepSeconds;
+DWORD sleepTics;
 static void sleepInSupervisor(void);
+
+void msleep(int ms)
+{
+    DWORD fiveMsCount = ms / 5;         // convert mili-seconds to 5-milisecond intervals (because 200 HZ timer has a 5 ms resolution)
+    
+    if(fiveMsCount == 0) {              // for less than 5 ms sleep - do at least 5 ms sleep
+        fiveMsCount++;
+    }
+    
+    sleepTics = fiveMsCount;
+	Supexec(sleepInSupervisor);         // wait
+}
 
 void sleep(int seconds)
 {
-	sleepSeconds = seconds;
+    sleepTics = seconds * 200; 
 	Supexec(sleepInSupervisor);
 }
 
 static void sleepInSupervisor(void)
 {
 	DWORD now, until;
-	DWORD tics = sleepSeconds * 200;
 
 	now = getTicks();						// get current ticks
-	until = now + tics;   					// calc value timer must get to
+	until = now + sleepTics;    			// calc value timer must get to
 
 	while(1) {
 		now = getTicks();					// get current ticks

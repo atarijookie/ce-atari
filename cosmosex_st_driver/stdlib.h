@@ -9,6 +9,7 @@ int		strlen ( const char * str );
 char *	strncpy ( char * destination, const char * source, int num );
 int		strncmp ( const char * str1, const char * str2, int num );
 void	sleep(int seconds);
+void    msleep(int ms);
 
 DWORD getTicks(void);
 

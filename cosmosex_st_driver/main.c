@@ -48,7 +48,9 @@ void showAppVersion(void);
 int getIntFromStr(const char *str, int len);
 
 void set_longframe(void);
-void setBootDrive(void);
+void setBootDriveAutomatic(void);
+int  setBootDriveManual(int seconds);
+void msleep(int ms);
 
 BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
 
@@ -94,26 +96,36 @@ int main( int argc, char* argv[] )
     (void) Cconws(" ]\33q\r\n\r\n");
 
     Supexec(set_longframe);
-		
+
+    //--------------------------------
+    // don't install the driver is CTRL, ALT or SHIFT is pressed
 	BYTE kbshift = Kbshift(-1);
-	
-	if((kbshift & 0x0f) != 0 && kbshift != (K_CTRL | K_LSHIFT) ) {
-		if((kbshift & K_ALT) != 0) {
+    
+	if((kbshift & 0x0f) != 0) {
+		if((kbshift & K_ALT) != 0) {        // if ALT pressed, don't load driver
 			(void) Cconws("ALT ");
 		}
 
-		if((kbshift & (K_RSHIFT | K_LSHIFT)) != 0) {
-			(void) Cconws("Shift ");
-		}
-
-		if((kbshift & K_CTRL) != 0) {
-			(void) Cconws("CTRL ");
-		}
-
-		(void) Cconws("key pressed, skipping!\r\n" );
+        (void) Cconws("key pressed, not installing!\r\n" );
 		sleep(2);
 		return 0;
 	}
+    
+    //--------------------------------    
+    // set boot drive and quit if requested by user -- but only if running from bootsector -- purpose: allow games to be launched from floppy
+    if(_runFromBootsector) {
+        int didSet;
+        
+        (void) Cconws("Set boot drive WITHOUT CE_DD: \33p" );
+        didSet = setBootDriveManual(2);
+    
+        if(didSet) {
+            sleep(1);
+            return 0;
+        }
+    }
+    //--------------------------------    
+    (void) Cconws("\33q\r\n" );
 	
 	/* create buffer pointer to even address */
 	pDmaBuffer = &dmaBuffer[2];
@@ -127,26 +139,26 @@ int main( int argc, char* argv[] )
 	// search for CosmosEx on ACSI bus
 	found = ce_findId();
 
-	if(!found) {								        // not found? quit
+	if(!found) {								            // not found? quit
 		sleep(3);
 		return 0;
 	}
-    
-	/* now set up the acsi command bytes so we don't have to deal with this one anymore */
-	commandShort[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+
+	// now set up the acsi command bytes so we don't have to deal with this one anymore
+	commandShort[0] = (deviceID << 5); 					    // cmd[0] = ACSI_id + TEST UNIT READY (0)
 	
-	commandLong[0] = (deviceID << 5) | 0x1f;			/* cmd[0] = ACSI_id + ICD command marker (0x1f)	*/
-	commandLong[1] = 0xA0;								/* cmd[1] = command length group (5 << 5) + TEST UNIT READY (0) */
+	commandLong[0] = (deviceID << 5) | 0x1f;			    // cmd[0] = ACSI_id + ICD command marker (0x1f)	
+	commandLong[1] = 0xA0;								    // cmd[1] = command length group (5 << 5) + TEST UNIT READY (0) 
 	
-	/* tell the device to initialize */
+	// tell the device to initialize
 	Supexec(ce_initialize);
 	
-	/* now init our internal vars */
-	pDta				= (BYTE *) &tempDta[0];				/* use this buffer as temporary one for DTA - just in case */
+	// now init our internal vars
+	pDta				= (BYTE *) &tempDta[0];				// use this buffer as temporary one for DTA - just in case
 
-	currentDrive		= Dgetdrv();						/* get the current drive from system */
+	currentDrive		= Dgetdrv();						// get the current drive from system
 	
-	driveMap	        = Drvmap();						    /* get the pre-installation drive map */
+	driveMap	        = Drvmap();						    // get the pre-installation drive map
 
     Supexec(getConfig);                                     // get translated disk configuration, including date and time
     
@@ -186,10 +198,25 @@ int main( int argc, char* argv[] )
 	old_gemdos_handler	= Setexc( VEC_GEMDOS,	gemdos_handler );
 	old_bios_handler	= Setexc( VEC_BIOS,		bios_handler ); 
 
-    /* only force boot drive if not cancelled by LSHIFT+CTRL */
-    if( kbshift != (K_CTRL | K_LSHIFT) ){
-    	Supexec(setBootDrive);								/* set the boot drive */
+    //-------------------------------------
+    // allow setting boot drive after driver being loaded -- purpose: allow to boot from USB drive / config drive / shared drive
+    {                                                       
+        int didSet;
+        
+        (void) Cconws("Set boot drive WITH    CE_DD: \33p" );
+        didSet = setBootDriveManual(1);
+    
+        if(didSet) {                                        // if boot drive was set, wait a little
+            msleep(500);
+        } else {                                            // boot drive was not set, set to config drive if not pressing CTRL SHIFT
+            kbshift = Kbshift(-1);
+        
+            if( kbshift != (K_CTRL | K_LSHIFT) ){           // not holding CTRL + SHIFT? Set boot drive
+                Supexec(setBootDriveAutomatic);
+            }
+        }
     }
+    //-------------------------------------
 
 	/* wait for a while so the user could read the message and quit */
 	sleep(2);
@@ -230,7 +257,7 @@ BYTE ce_findId(void)
 	}
 
 	/* if not found */
-    (void) Cconws("\r\nCosmosEx not found on ACSI bus, not installing driver.");
+    (void) Cconws("\r\nCosmosEx not found, not installing.");
 	return 0;
 }
 
@@ -312,7 +339,7 @@ void getConfig(void)
     transDiskProtocolVersion = (((WORD) pDmaBuffer[25]) << 8) | ((WORD) pDmaBuffer[26]);        // get the protocol version, so we can do a version matching / pairing
 }
 
-void setBootDrive(void)
+void setBootDriveAutomatic(void)
 {
     // are there any other drives installed besides A+B? don't change boot drive if other drives are present
     // temporary disabled for TT as for some reason it gives out 4 bombs on driver's exit (on boot)
@@ -516,3 +543,42 @@ void set_longframe(void)
     }
 }
 
+int setBootDriveManual(int seconds)
+{
+    int i, to;
+    to = seconds * 5;
+
+    for(i=0; i<to; i++) {
+        DWORD gotChar;
+        char  key, bootDrive;
+        
+        Cconout(' ');
+        gotChar = Cconis();
+        
+        if(gotChar) {
+            key = Cnecin();
+            bootDrive = -1;
+            
+            if(key >= 'A' && key <= 'P') {
+                bootDrive = key - 'A';
+            }
+
+            if(key >= 'a' && key <= 'p') {
+                bootDrive = key - 'a';
+            }
+            
+            if(bootDrive != -1) {
+                (void) Cconws("\33q\r\nBoot drive: " );
+                Cconout(bootDrive + 'A');
+                (void) Cconws("\r\n" );
+                CALL_OLD_GD_VOIDRET(Dsetdrv, bootDrive);
+                sleep(2);
+                return 1;
+            }
+        }
+        
+        msleep(200);
+    }
+    
+    return 0;
+}
