@@ -42,6 +42,7 @@ bool g_noReset      = false;                                    // don't reset H
 bool g_test         = false;                                    // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
 bool g_actAsCeConf  = false;                                    // if set to true, this app will behave as ce_conf app instead of CosmosEx app
 bool g_getHwInfo    = false;                                    // if set to true, wait for HW info from Hans, and then quit and report it
+bool g_noFranz      = false;                                    // if set to true, won't communicate with Franz
 
 int     linuxConsole_fdMaster, linuxConsole_fdSlave;            // file descriptors for pty pair
 pid_t   childPid;                                               // pid of forked child
@@ -289,6 +290,11 @@ void parseCmdLineArguments(int argc, char *argv[])
         // get hardware version and HDD interface type
         if(strcmp(argv[i], "hwinfo") == 0) {
             g_getHwInfo = true;
+        }
+
+        // run the device without communicating with Franz
+        if(strcmp(argv[i], "nofranz") == 0) {
+            g_noFranz = true;
         }
     }
 }

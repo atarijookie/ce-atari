@@ -32,6 +32,7 @@
 extern bool g_noReset;                      // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
 extern BYTE g_logLevel;                     // current log level
 extern bool g_getHwInfo;                    // if set to true, wait for HW info from Hans, and then quit and report it
+extern bool g_noFranz;                      // if set to true, won't communicate with Franz
 
 bool    g_gotHansFwVersion;
 bool    g_gotFranzFwVersion;
@@ -133,6 +134,10 @@ void CCoreThread::run(void)
     g_gotHansFwVersion  = false;
     g_gotFranzFwVersion = false;
 
+    if(g_noFranz) {                                                     // if running without Franz, pretend we got his FW version
+        g_gotFranzFwVersion = true;
+    }
+    
     if(g_noReset) {                                                     // if we're debugging Hans or Franz (noReset is set to true), don't do this alive check
         shouldCheckHansFranzAlive = false;
     } else {                                                            // if we should reset Hans and Franz on start, do it (and we're probably not debugging Hans or Franz)
@@ -298,7 +303,12 @@ void CCoreThread::run(void)
 
 #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL)
         // check for any ATN code waiting from Franz
-		res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuff);
+        if(g_noFranz) {                             // if running without Franz, don't communicate
+            res = false;
+        } else {                                    // running with Franz - check for any ATN
+            res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuff);
+        }
+        
 		if(res) {									// FRANZ is signaling attention?
 			gotAtn = true;							// we've some ATN
 
