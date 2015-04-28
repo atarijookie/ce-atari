@@ -37,8 +37,9 @@ extern bool g_noFranz;                      // if set to true, won't communicate
 bool    g_gotHansFwVersion;
 bool    g_gotFranzFwVersion;
 
-int hwVersion   = 1;                        // returned from Hans: HW version (1 for HW from 2014, 2 for new HW from 2015)
-int hwHddIface  = HDD_IF_ACSI;              // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
+int  hwVersion      = 1;                    // returned from Hans: HW version (1 for HW from 2014, 2 for new HW from 2015)
+int  hwHddIface     = HDD_IF_ACSI;          // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
+bool hwFwMismatch   = 0;                    // when HW and FW types don't match (e.g. SCSI HW + ACSI FW, or ACSI HW + SCSI FW)
 
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
@@ -616,18 +617,36 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 void CCoreThread::convertXilinxInfo(BYTE xilinxInfo)
 {
     switch(xilinxInfo) {
-        case 0x21:  hwVersion   = 2;                        // v.2
-                    hwHddIface  = HDD_IF_ACSI;              // HDD int: ACSI
+        // GOOD
+        case 0x21:  hwVersion       = 2;                        // v.2
+                    hwHddIface      = HDD_IF_ACSI;              // HDD int: ACSI
+                    hwFwMismatch    = false;
                     break;
 
-        case 0x22:  hwVersion   = 2;                        // v.2
-                    hwHddIface  = HDD_IF_SCSI;              // HDD int: SCSI
+        // GOOD
+        case 0x22:  hwVersion       = 2;                        // v.2
+                    hwHddIface      = HDD_IF_SCSI;              // HDD int: SCSI
+                    hwFwMismatch    = false;
+                    break;
+
+        // BAD: SCSI HW, ACSI FW
+        case 0x29:  hwVersion       = 2;                        // v.2
+                    hwHddIface      = HDD_IF_SCSI;              // HDD int: SCSI
+                    hwFwMismatch    = true;                     // HW + FW mismatch!
+                    break;
+
+        // BAD: ACSI HW, SCSI FW
+        case 0x2a:  hwVersion       = 2;                        // v.2
+                    hwHddIface      = HDD_IF_ACSI;              // HDD int: ACSI
+                    hwFwMismatch    = true;                     // HW + FW mismatch!
                     break;
                     
+        // GOOD
         case 0x11:  // use this for v.1 
         default:    // and also for all other cases
-                    hwVersion   = 1;
-                    hwHddIface  = HDD_IF_ACSI;
+                    hwVersion       = 1;
+                    hwHddIface      = HDD_IF_ACSI;
+                    hwFwMismatch    = false;
                     break;
     }
 }
@@ -645,6 +664,10 @@ void CCoreThread::showHwVersion(void)
     
     // HDD interface is either SCSI, or defaults to ACSI
     sprintf(tmp, "HDD_IF: %s", (hwHddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI");
+    printf("\n%s\n", tmp);                  // show on stdout
+    Debug::out(LOG_ERROR, "   %s", tmp);    // show in log file
+    
+    sprintf(tmp, "HWFWMM: %s", hwFwMismatch ? "MISMATCH" : "OK");
     printf("\n%s\n", tmp);                  // show on stdout
     Debug::out(LOG_ERROR, "   %s", tmp);    // show in log file
 }
