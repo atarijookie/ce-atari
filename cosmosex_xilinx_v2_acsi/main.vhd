@@ -14,19 +14,35 @@ entity main is
 
         -- signals connected to MCU, which should be just copies of ACSI port states
            XRESET  : out std_logic;
-		 XCS     : out std_logic;
-		 XACK    : out std_logic;
+           XCS     : out std_logic;
+           XACK    : out std_logic;
 
         -- signals connected to ACSI port
-           AINT    : out std_logic;
-           ADRQ    : out std_logic;
-           ACS     : in std_logic;
-           AA1     : in std_logic;
-           AACK    : in std_logic;
-           ARESET  : in std_logic;
+           AINTa   : out std_logic;
+           AINTb   : out std_logic;
+
+           ADRQa   : out std_logic;
+           ADRQb   : out std_logic;
+
+           ACSa    : in std_logic;
+           ACSb    : in std_logic;
+           
+           AA1a    : in std_logic;
+           AA1b    : in std_logic;
+           
+           AACKa   : in std_logic;
+           AACKb   : in std_logic;
+
+           ARESETa : in std_logic;
+           ARESETb : in std_logic;
+
+           ARNWa   : in std_logic;
+           ARNWb   : in std_logic;
 
         -- DATA1 is connected to ACSI port, DATA2 is data latched on CS and ACK and connected to MCU
-           DATA1   : inout std_logic_vector(7 downto 0);
+           DATA1a  : inout std_logic_vector(7 downto 0);
+           DATA1b  :   out std_logic_vector(7 downto 0);
+           
            DATA2   : inout std_logic_vector(7 downto 0);
 
         -- the following is 2-to-1 Multiplexer for connecting both MCUs to single RX pin (used for FW update)
@@ -49,8 +65,23 @@ architecture Behavioral of main is
     signal identify  : std_logic;
     signal identifyA : std_logic;
     signal identifyS : std_logic;
+    
+    signal ACS       : std_logic;
+    signal AA1       : std_logic;
+    signal AACK      : std_logic;
+    signal ARESET    : std_logic;
+    signal ARNW      : std_logic;
 
+    signal DATA1rnw  : std_logic;
+    
 begin
+           
+    -- these are here to create single signal from double input pins, which should have the same value
+    ACS     <= ACSa    and ACSb;
+    AA1     <= AA1a    and AA1b;
+    AACK    <= AACKa   and AACKb;
+    ARESET  <= ARESETa and ARESETb; 
+    ARNW    <= ARNWa   and ARNWb;
            
     -- D flip-flop with asynchronous reset 
     -- pull INT low after rising edge of PIO, let it in hi-Z after reset or low on CS
@@ -81,7 +112,7 @@ begin
     dataLatch: process(latchClock) is
     begin 
         if (falling_edge(latchClock)) then
-            DATA1latch <= DATA1;
+            DATA1latch <= DATA1a;
         end if;
     end process;
 
@@ -92,13 +123,23 @@ begin
     identifyA  <= identify and (not HDD_IF);            -- active when IDENTIFY and it's ACSI hardware
     identifyS  <= identify and HDD_IF;                  -- active when IDENTIFY and it's SCSI hardware
 
-    AINT <= '0' when INTstate='0' else 'Z';             -- INT - pull to L, otherwise hi-Z
-    ADRQ <= '0' when DRQstate='0' else 'Z';             -- DRQ - pull to L, otherwise hi-Z
+    AINTa <= '0' when INTstate='0' else 'Z';            -- INT - pull to L, otherwise hi-Z
+    AINTb <= '0' when INTstate='0' else 'Z';            -- INT - pull to L, otherwise hi-Z
+
+    ADRQa <= '0' when DRQstate='0' else 'Z';            -- DRQ - pull to L, otherwise hi-Z
+    ADRQb <= '0' when DRQstate='0' else 'Z';            -- DRQ - pull to L, otherwise hi-Z
+
     XCMD <= ACS or AA1 or (not ARESET);                 -- CMD - falling edge here will tell that CS with A1 low has been found (and ACSI RESET has to be high at that time)
 
+    DATA1rnw <= XRnW and ARNW;                          -- output data only when XILINX and ST want to read data, otherwise don't
+
     -- DATA1 is connected to Atari ST, data goes out when going from MCU to ST (READ operation)
-    DATA1 <=    "ZZZZZZZZ"  when resetCombo='0' else    -- when Atari or MCU is in reset state, don't drive this 
-                DATA2       when XRnW='1'       else    -- when set in READ direction, transparently bridge data from DATA2 to DATA1
+    DATA1a <=   "ZZZZZZZZ"  when resetCombo='0' else    -- when Atari or MCU is in reset state, don't drive this 
+                DATA2       when DATA1rnw='1'   else    -- when set in READ direction, transparently bridge data from DATA2 to DATA1
+                "ZZZZZZZZ";                             -- otherwise don't drive this
+
+    DATA1b <=   "ZZZZZZZZ"  when resetCombo='0' else    -- when Atari or MCU is in reset state, don't drive this 
+                DATA2       when DATA1rnw='1'   else    -- when set in READ direction, transparently bridge data from DATA2 to DATA1
                 "ZZZZZZZZ";                             -- otherwise don't drive this
 
     -- DATA2 is connected to Hans (STM32 mcu), data goes out when going from ST to MCU (WRITE operation)
@@ -115,5 +156,5 @@ begin
     XRESET <= ARESET;
     XCS    <= ACS;
     XACK   <= AACK;
-
+    
 end Behavioral;
