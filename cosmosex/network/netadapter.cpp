@@ -132,7 +132,7 @@ void *networkThreadCode(void *ptr)
 
     // The following line is needed to allow root to create raw sockets for ICMP echo... 
     // The problem with this is it allows only ICMP echo to be done.
-    system("sysctl -w net.ipv4.ping_group_range=\"0 0\"");  
+    system("sysctl -w net.ipv4.ping_group_range=\"0 0\" > /dev/null");  
 
 	while(sigintReceived == 0) {
         dgram_clearOld();                               // clear old dgrams that are probably stuck in the queue 
