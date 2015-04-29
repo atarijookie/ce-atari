@@ -389,7 +389,7 @@ void Update::createNewScripts(void)
     system("mkdir -p /tmp/newscripts");                                     // create dir
     system("unzip -o /tmp/newscripts.zip -d /tmp/newscripts > /dev/null");  // extract script there
     system("chmod 755 /tmp/newscripts/copynewscripts.sh");                  // make the copying script executable
-    system("/tmp/newscripts/copynewscripts.sh  > /dev/null");               // execute the copying script
+    system("/tmp/newscripts/copynewscripts.sh ");                           // execute the copying script
 }
 
 void Update::startPackageDownloadIfAnyComponentNewer(void)

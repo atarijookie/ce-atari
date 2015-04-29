@@ -177,7 +177,7 @@ void CCoreThread::run(void)
         // possibly update scripts - but after some time after app start
         if(Utils::getCurrentMs() >= updateScriptsTime) {
             Update::createNewScripts_async();       // put a request to update the scripts
-            updateScriptsTime = 0;                  // don't do it again (until next app run)
+            updateScriptsTime = 0xffffffff;         // don't do it again (until next app run)
         }
         
         // if should just get the HW version and HDD interface, but timeout passed, quit
