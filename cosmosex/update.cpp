@@ -4,12 +4,16 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <errno.h>
+#include <stdlib.h>
 
 #include "global.h"
 #include "debug.h"
 #include "settings.h"
 #include "downloader.h"
 #include "update.h"
+#include "mounter.h"
+
+#include "newscripts_zip.h"
 
 Versions Update::versions;
 int Update::currentState = UPDATE_STATE_IDLE;
@@ -142,6 +146,8 @@ void Update::deleteLocalUpdateComponents(void)
     unlink("/ce/update/xlnx2a.xsvf");       // xilinx - v.2 ACSI
     unlink("/ce/update/xlnx2s.xsvf");       // xilinx - v.2 SCSI
     unlink("/ce/update/app.zip");
+
+    system("rm -f /tmp/*.hex /tmp/*.zip /tmp/*.xsvf");
 }
 
 void Update::downloadUpdateList(char *remoteUrl)
@@ -350,67 +356,19 @@ bool Update::createUpdateScript(void)
     }
 
     if(Update::versions.current.app.isOlderThan( Update::versions.onServer.app )) {
-        std::string appFileWithPath;
-        Update::getLocalPathFromUrl(Update::versions.onServer.app.getUrl(), appFileWithPath);
-
-        std::string appFilePath, appFileOnly;
-        Utils::splitFilenameFromPath(appFileWithPath, appFilePath, appFileOnly);
-        
-        fprintf(f, "# updgrade of application\n");
-        fprintf(f, "echo -e \"\\n----------------------------------\"\n");
-        fprintf(f, "echo -e \">>> Updating Main App - START\"\n");
-        fprintf(f, "rm -rf %s\n", (char *)              UPDATE_APP_PATH);	        // delete old app
-        fprintf(f, "mkdir %s\n", (char *)              	UPDATE_APP_PATH);	        // create dir for new app
-        fprintf(f, "cd %s\n", (char *)              	UPDATE_APP_PATH);	        // cd to that dir
-		fprintf(f, "mv %s /ce/app\n",		            appFileWithPath.c_str());   // move the .zip file from update dir to the app dir
-        fprintf(f, "unzip /ce/app/%s\n", (char *)       appFileOnly.c_str());	    // unzip it
-        fprintf(f, "chmod 755 %s/cosmosex\n", (char *)  UPDATE_APP_PATH);	        // change permissions
-		fprintf(f, "rm -f /ce/app/%s\n",				appFileOnly.c_str());       // delete the zip
-        fprintf(f, "sync\n");                                                       // write caches to disk
-        fprintf(f, "echo -e \"\\n>>> Updating Main App - END\"\n");
-        fprintf(f, "\n\n");
+        fprintf(f, "/ce/update/update_app.sh\n");
     }
 
     if(Update::versions.current.xilinx.isOlderThan( Update::versions.onServer.xilinx )) {
-        std::string fwFile;
-        Update::getLocalPathFromUrl(Update::versions.onServer.xilinx.getUrl(), fwFile);
-
-        const char *xlnxTag = getPropperXilinxTag();
-        
-        fprintf(f, "# updgrade of Xilinx FW\n");
-        fprintf(f, "echo -e \"\\n----------------------------------\"\n");
-        fprintf(f, "echo -e \">>> Updating Xilinx - START\"\n");
-        fprintf(f, "/ce/update/flash_xilinx %s\n", (char *) fwFile.c_str());
-        fprintf(f, "rm -f %s\n", (char *) fwFile.c_str());
-		fprintf(f, "cat /ce/update/updatelist.csv | grep %s | sed -e 's/[^,]*,\\([^,]*\\).*/\\1/' > /ce/update/xilinx_current.txt \n", xlnxTag);
-        fprintf(f, "echo -e \">>> Updating Xilinx - END\"\n");
-        fprintf(f, "\n\n");
+        fprintf(f, "/ce/update/update_xilinx.sh\n");
     }
 
     if(Update::versions.current.hans.isOlderThan( Update::versions.onServer.hans )) {
-        std::string fwFile;
-        Update::getLocalPathFromUrl(Update::versions.onServer.hans.getUrl(), fwFile);
-
-        fprintf(f, "# updgrade of Hans FW\n");
-        fprintf(f, "echo -e \"\\n----------------------------------\"\n");
-        fprintf(f, "echo -e \">>> Updating Hans - START\"\n");
-        fprintf(f, "/ce/update/flash_stm32 -x -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());
-        fprintf(f, "rm -f %s\n", (char *) fwFile.c_str());
-        fprintf(f, "echo -e \">>> Updating Hans - END\"\n");
-        fprintf(f, "\n\n");
+        fprintf(f, "/ce/update/update_hans.sh\n");
     }
 
     if(Update::versions.current.franz.isOlderThan( Update::versions.onServer.franz )) {
-        std::string fwFile;
-        Update::getLocalPathFromUrl(Update::versions.onServer.franz.getUrl(), fwFile);
-
-        fprintf(f, "# updgrade of Franz FW\n");
-        fprintf(f, "echo -e \"\\n----------------------------------\"\n");
-        fprintf(f, "echo -e \">>> Updating Franz - START\"\n");
-        fprintf(f, "/ce/update/flash_stm32 -y -w %s /dev/ttyAMA0\n", (char *) fwFile.c_str());
-        fprintf(f, "rm -f %s\n", (char *) fwFile.c_str());
-        fprintf(f, "echo -e \">>> Updating Franz - END\"\n");
-        fprintf(f, "\n\n");
+        fprintf(f, "/ce/update/update_franz.sh\n");
     }
 
     fclose(f);
@@ -426,26 +384,9 @@ bool Update::createFlashFirstFwScript(void)
         return false;
     }
 
-    const char *xlnxTag = getPropperXilinxTag();
-        
-    fprintf(f, "# flash first Xilinx FW \n");
-    fprintf(f, "echo -e \"\\n----------------------------------\"\n");
-    fprintf(f, "echo -e \">>> Writing first FW for Xilinx - START\"\n");
-    fprintf(f, "/ce/update/flash_xilinx /ce/firstfw/%s.xsvf \n\n", xlnxTag);
-    fprintf(f, "cp /ce/firstfw/xilinx_current.txt /ce/update/ \n\n");
-    fprintf(f, "echo -e \">>> Writing first FW for Xilinx - END\"\n");
-    
-    fprintf(f, "# flash first Hans FW \n");
-    fprintf(f, "echo -e \"\\n----------------------------------\"\n");
-    fprintf(f, "echo -e \">>> Writing first FW for Hans - START\"\n");
-    fprintf(f, "/ce/update/flash_stm32 -x -w /ce/firstfw/hans.hex /dev/ttyAMA0 \n\n");
-    fprintf(f, "echo -e \">>> Writing first FW for Hans - END\"\n");
-
-    fprintf(f, "# flash first Franz FW \n");
-    fprintf(f, "echo -e \"\\n----------------------------------\"\n");
-    fprintf(f, "echo -e \">>> Writing first FW for Franz - START\"\n");
-    fprintf(f, "/ce/update/flash_stm32 -y -w /ce/firstfw/franz.hex /dev/ttyAMA0 \n\n");
-    fprintf(f, "echo -e \">>> Writing first FW for Franz - END\"\n");
+    fprintf(f, "/ce/update/update_xilinx.sh\n");        // first write new xilinx fw
+    fprintf(f, "/ce/update/update_hans.sh\n");          // after that we can write hans (other order would fail)
+    fprintf(f, "/ce/update/update_franz.sh\n");
 
     fclose(f);
     return true;
@@ -520,4 +461,35 @@ const char *Update::getPropperXilinxTag(void)
     }
     
     return "??wtf??";
+}
+
+void Update::createNewScripts_async(void)
+{
+	TMounterRequest tmr;			
+	tmr.action = MOUNTER_ACTION_NEWSCRIPTS;                          // let the mounter thread update the scripts
+	mountAdd(tmr);
+}
+
+void Update::createNewScripts(void)
+{
+    Debug::out(LOG_DEBUG, "Update::createNewScripts() - will try to update scripts");
+    
+    // write the data to file
+    FILE *f = fopen("/tmp/newscripts.zip", "wb");
+    
+    if(!f) {
+        Debug::out(LOG_ERROR, "Update::createNewScripts() - failed to open output file!");
+        return;
+    }
+
+    fwrite(newscripts_zip, 1, newscripts_zip_len, f);
+    fclose(f);
+    
+    system("sync");
+    
+    // run the script
+    system("mkdir -p /tmp/newscripts");                                     // create dir
+    system("unzip -o /tmp/newscripts.zip -d /tmp/newscripts > /dev/null");  // extract script there
+    system("chmod 755 /tmp/newscripts/copynewscripts.sh");                  // make the copying script executable
+    system("/tmp/newscripts/copynewscripts.sh  > /dev/null");               // execute the copying script
 }

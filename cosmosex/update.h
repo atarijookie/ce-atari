@@ -8,8 +8,8 @@
 #include "version.h"
 
 #define UPDATE_REMOTEURL    "http://joo.kie.sk/cosmosex/update/updatelist.csv"
-#define UPDATE_LOCALPATH    "/ce/update"
-#define UPDATE_LOCALLIST    "/ce/update/updatelist.csv"
+#define UPDATE_LOCALPATH    "/tmp"
+#define UPDATE_LOCALLIST    "/tmp/updatelist.csv"
 #define UPDATE_SCRIPT       "/ce/update/doupdate.sh"
 #define UPDATE_APP_PATH     "/ce/app"
 
@@ -44,7 +44,10 @@ public:
 
     static bool allDownloadedOk(void);
     static bool someDownloadFailed(void);
-    
+
+    static void createNewScripts_async(void);           // this just creates mounter action, which will be handled in a separate (mounter) thread
+    static void createNewScripts(void);                 // this does script update - blocking other processing
+
 private:
     static void deleteLocalComponent(std::string url);
     static void startComponentDownloadIfNewer(Version &vLocal, Version &vServer);

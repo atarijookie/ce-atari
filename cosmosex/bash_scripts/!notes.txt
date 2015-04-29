@@ -1,0 +1,5 @@
+1. take all the *.sh and other files you want to update on device
+2. zip those files to newscripts.zip
+3. xxd -i newscripts.zip > newscripts_zip.h
+4. copy that newscripts_zip.h file to project
+

@@ -106,6 +106,9 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
 
     // set up network adapter stuff
     netAdapter.setAcsiDataTrans(dataTrans);
+    
+    // possibly update scripts
+    Update::createNewScripts_async();
 }
 
 CCoreThread::~CCoreThread()

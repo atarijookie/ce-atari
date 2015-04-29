@@ -7,6 +7,7 @@
 #define MOUNTER_ACTION_UMOUNT			1
 #define MOUNTER_ACTION_RESTARTNETWORK	2
 #define MOUNTER_ACTION_SYNC             3
+#define MOUNTER_ACTION_NEWSCRIPTS       4
 
 typedef struct {
 	int			action;

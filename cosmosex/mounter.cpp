@@ -20,6 +20,7 @@
 #include "mounter.h"
 #include "utils.h"
 #include "debug.h"
+#include "update.h"
 
 pthread_mutex_t mountThreadMutex = PTHREAD_MUTEX_INITIALIZER;
 std::queue<TMounterRequest> mountQueue;
@@ -72,6 +73,11 @@ void *mountThreadCode(void *ptr)
 
         if(tmr.action == MOUNTER_ACTION_SYNC) {             // sync system caches?
             mounter.sync();
+            continue;
+        }
+        
+        if(tmr.action == MOUNTER_ACTION_NEWSCRIPTS) {       // should update scripts?
+            Update::createNewScripts();
             continue;
         }
 	}
