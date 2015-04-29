@@ -488,6 +488,7 @@ void Update::createNewScripts(void)
     system("sync");
     
     // run the script
+    system("rm -rf /tmp/newscripts");                                       // remove dir if it exists
     system("mkdir -p /tmp/newscripts");                                     // create dir
     system("unzip -o /tmp/newscripts.zip -d /tmp/newscripts > /dev/null");  // extract script there
     system("chmod 755 /tmp/newscripts/copynewscripts.sh");                  // make the copying script executable

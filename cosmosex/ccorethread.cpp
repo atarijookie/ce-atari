@@ -22,9 +22,10 @@
     #include "socks.h"
 #endif
 
-#define DEV_CHECK_TIME_MS	3000
-#define UPDATE_CHECK_TIME   1000
+#define DEV_CHECK_TIME_MS	    3000
+#define UPDATE_CHECK_TIME       1000
 #define INET_IFACE_CHECK_TIME   1000
+#define UPDATE_SCRIPTS_TIME     10000
 
 #define WEB_PARAMS_CHECK_TIME_MS    3000
 #define WEB_PARAMS_FILE             "/tmp/ce_startupmode"
@@ -106,9 +107,6 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
 
     // set up network adapter stuff
     netAdapter.setAcsiDataTrans(dataTrans);
-    
-    // possibly update scripts
-    Update::createNewScripts_async();
 }
 
 CCoreThread::~CCoreThread()
@@ -157,13 +155,14 @@ void CCoreThread::run(void)
     Debug::out(LOG_DEBUG, "Will check for Hans and Franz alive: %s", (shouldCheckHansFranzAlive ? "yes" : "no") );
     //------------------------------
 
-	DWORD nextDevFindTime       = Utils::getCurrentMs();                // create a time when the devices should be checked - and that time is now
-    DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);              // create a time when update download status should be checked
+	DWORD nextDevFindTime       = Utils::getCurrentMs();                    // create a time when the devices should be checked - and that time is now
+    DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);                  // create a time when update download status should be checked
     DWORD nextWebParsCheckTime  = Utils::getEndTime(WEB_PARAMS_CHECK_TIME_MS);  // create a time when we should check for new params from the web page
-    DWORD nextInetIfaceCheckTime= Utils::getEndTime(1000);  			// create a time when we should check for inet interfaces that got ready
+    DWORD nextInetIfaceCheckTime= Utils::getEndTime(1000);  			    // create a time when we should check for inet interfaces that got ready
 
-    DWORD getHwInfoTimeout      = Utils::getEndTime(3000);              // create a time when we already should have info about HW, and if we don't have that by that time, then fail
-
+    DWORD getHwInfoTimeout      = Utils::getEndTime(3000);                  // create a time when we already should have info about HW, and if we don't have that by that time, then fail
+    DWORD updateScriptsTime     = Utils::getEndTime(UPDATE_SCRIPTS_TIME);
+    
 	//up/running state of inet interfaces
 	bool  state_eth0 	= false;
 	bool  state_wlan0 	= false;
@@ -175,6 +174,12 @@ void CCoreThread::run(void)
     while(sigintReceived == 0) {
 		bool gotAtn = false;						                    // no ATN received yet?
 
+        // possibly update scripts - but after some time after app start
+        if(Utils::getCurrentMs() >= updateScriptsTime) {
+            Update::createNewScripts_async();       // put a request to update the scripts
+            updateScriptsTime = 0;                  // don't do it again (until next app run)
+        }
+        
         // if should just get the HW version and HDD interface, but timeout passed, quit
         if(g_getHwInfo && Utils::getCurrentMs() >= getHwInfoTimeout) {
             showHwVersion();                                            // show the default HW version
