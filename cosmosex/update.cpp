@@ -21,6 +21,8 @@ int Update::currentState = UPDATE_STATE_IDLE;
 extern int hwVersion;           // HW version is 1 or 2, and in other cases defaults to 1
 extern int hwHddIface;          // HDD interface is either SCSI (HDD_IF_SCSI), or defaults to ACSI (HDD_IF_ACSI)
 
+volatile BYTE packageDownloadStatus = DWNSTATUS_WAITING;
+
 void Update::initialize(void)
 {
     char appVersion[16];
@@ -140,13 +142,12 @@ void Update::processUpdateList(void)
 void Update::deleteLocalUpdateComponents(void)
 {
     unlink(UPDATE_LOCALLIST);
-    unlink("/ce/update/hans.hex");
-    unlink("/ce/update/franz.hex");
+    
     unlink("/ce/update/xilinx.xsvf");       // xilinx - v.1
     unlink("/ce/update/xlnx2a.xsvf");       // xilinx - v.2 ACSI
     unlink("/ce/update/xlnx2s.xsvf");       // xilinx - v.2 SCSI
-    unlink("/ce/update/app.zip");
 
+    system("rm -f /ce/update/*.hex /ce/update/*.zip");
     system("rm -f /tmp/*.hex /tmp/*.zip /tmp/*.xsvf");
 }
 
@@ -189,95 +190,11 @@ void Update::downloadNewComponents(void)
         return;
     }
 
-    // delete local versions of components (which might be already downloaded)
-    deleteLocalComponent(Update::versions.onServer.app.getUrl());
-    deleteLocalComponent(Update::versions.onServer.hans.getUrl());
-    deleteLocalComponent(Update::versions.onServer.xilinx.getUrl());
-    deleteLocalComponent(Update::versions.onServer.franz.getUrl());
-
-    // start the download of newer components
-    startComponentDownloadIfNewer(Update::versions.current.app,     Update::versions.onServer.app);
-    startComponentDownloadIfNewer(Update::versions.current.hans,    Update::versions.onServer.hans);
-    startComponentDownloadIfNewer(Update::versions.current.xilinx,  Update::versions.onServer.xilinx);
-    startComponentDownloadIfNewer(Update::versions.current.franz,   Update::versions.onServer.franz);
+    // delete local versions of components (which might be already downloaded) and start the download of newer components
+    startPackageDownloadIfAnyComponentNewer();
 
     // new state - we're downloading the update
     Update::currentState = UPDATE_STATE_DOWNLOADING;
-}
-
-bool Update::allNewComponentsDownloaded(void)
-{
-    int a,b,c,d;
-
-    // check if the components are either up to date, or downloaded
-    a = isUpToDateOrUpdateDownloaded(Update::versions.current.app,     Update::versions.onServer.app);
-    b = isUpToDateOrUpdateDownloaded(Update::versions.current.hans,    Update::versions.onServer.hans);
-    c = isUpToDateOrUpdateDownloaded(Update::versions.current.xilinx,  Update::versions.onServer.xilinx);
-    d = isUpToDateOrUpdateDownloaded(Update::versions.current.franz,   Update::versions.onServer.franz);
-
-    if(a && b && c && d) {      // everything up to date or downloaded? 
-        return true;
-    }
-
-    return false;               // not everything up to date or downloaded
-}
-
-bool Update::isUpToDateOrUpdateDownloaded(Version &vLocal, Version &vServer)
-{
-    if(!vLocal.isOlderThan(vServer)) {                      // if local is not older than on server, we're up to date, don't wait for this file
-        return true;
-    }
-
-    if(vServer.downloadStatus != DWNSTATUS_DOWNLOAD_OK) {   // if it's not downloaded OK (yet), then false
-        return false;
-    }
-    
-    std::string localFile;
-    getLocalPathFromUrl(vServer.getUrl(), localFile);       // convert url to local path
-
-    int res = access(localFile.c_str(), F_OK);              // check if file exists
-
-    if(res == 0) {                                          // file exists, so it's downloaded
-        return true;
-    }
-
-    return false;                                           // file doesn't exist
-}
-
-void Update::deleteLocalComponent(std::string url)
-{
-    std::string finalFile;
-
-    getLocalPathFromUrl(url, finalFile);                    // convert remove path to local path
-    remove(finalFile.c_str());                              // try to delete it, don't care if it succeeded (it might not exist)
-}
-
-void Update::startComponentDownloadIfNewer(Version &vLocal, Version &vServer)
-{
-    if(!vLocal.isOlderThan(vServer)) {                      // not forcing update & local is not older than on server, don't download and quit
-        vServer.downloadStatus = DWNSTATUS_DOWNLOAD_OK;     // when not downloading, pretend that we have it :)
-        return;
-    }
-
-    // start the download
-    TDownloadRequest tdr;
-    tdr.srcUrl          = vServer.getUrl();
-    tdr.checksum        = vServer.getChecksum();
-    tdr.dstDir          = UPDATE_LOCALPATH;
-    tdr.downloadType    = DWNTYPE_UPDATE_COMP;
-    tdr.pStatusByte     = &vServer.downloadStatus;          // store download status here
-    Downloader::add(tdr);
-}
-
-void Update::getLocalPathFromUrl(std::string url, std::string &localPath)
-{
-    std::string urlPath, fileName, finalFile;
-    Utils::splitFilenameFromPath(url, urlPath, fileName);   // get just the filename from url
-    
-    finalFile = UPDATE_LOCALPATH;
-    Utils::mergeHostPaths(finalFile, fileName);             // create final local filename with path
-
-    localPath = finalFile;
 }
 
 int Update::state(void)
@@ -286,21 +203,16 @@ int Update::state(void)
         return UPDATE_STATE_IDLE;
     }
 
-    if(currentState == UPDATE_STATE_DOWNLOADING) {          // when downloading, check if really still downloading
+    if(currentState == UPDATE_STATE_DOWNLOADING) {              // when downloading, check if really still downloading
         Debug::out(LOG_DEBUG, "Update::state - downloading");
     
-        if(allDownloadedOk()) {                             // if everything downloaded OK
-            if(allNewComponentsDownloaded()) {              // check if the files are on disk
-                Debug::out(LOG_DEBUG, "Update::state - downloaded and all components present");
-                currentState = UPDATE_STATE_DOWNLOAD_OK;
-            } else {                                        // some file is missing?
-                Debug::out(LOG_DEBUG, "Update::state - downloaded but some component missing");
-                currentState = UPDATE_STATE_DOWNLOAD_FAIL;
-            }
+        if(packageDownloadStatus == DWNSTATUS_DOWNLOAD_OK) {    // if everything downloaded OK
+            Debug::out(LOG_DEBUG, "Update::state - package downloaded OK");
+            currentState = UPDATE_STATE_DOWNLOAD_OK;
         }
         
-        if(someDownloadFailed()) {                          // if some download failed, fail
-            Debug::out(LOG_DEBUG, "Update::state - some download failed");
+        if(packageDownloadStatus == DWNSTATUS_DOWNLOAD_FAIL) { // if failed to download
+            Debug::out(LOG_DEBUG, "Update::state - failed to download package");
             currentState = UPDATE_STATE_DOWNLOAD_FAIL;
         }
         
@@ -309,31 +221,6 @@ int Update::state(void)
 
     // if we got here, the download was finished, return that state
     return currentState;
-}
-
-bool Update::allDownloadedOk(void)
-{
-    if( Update::versions.onServer.app.downloadStatus    == DWNSTATUS_DOWNLOAD_OK &&
-        Update::versions.onServer.hans.downloadStatus   == DWNSTATUS_DOWNLOAD_OK &&
-        Update::versions.onServer.xilinx.downloadStatus == DWNSTATUS_DOWNLOAD_OK &&
-        Update::versions.onServer.franz.downloadStatus  == DWNSTATUS_DOWNLOAD_OK) {
-        return true;
-    }
-    
-    return false;
-}
-
-
-bool Update::someDownloadFailed(void)
-{
-    if( Update::versions.onServer.app.downloadStatus    == DWNSTATUS_DOWNLOAD_FAIL ||
-        Update::versions.onServer.hans.downloadStatus   == DWNSTATUS_DOWNLOAD_FAIL ||
-        Update::versions.onServer.xilinx.downloadStatus == DWNSTATUS_DOWNLOAD_FAIL ||
-        Update::versions.onServer.franz.downloadStatus  == DWNSTATUS_DOWNLOAD_FAIL) {
-        return true;
-    }
-    
-    return false;
 }
 
 void Update::stateGoIdle(void)
@@ -355,6 +242,9 @@ bool Update::createUpdateScript(void)
         return false;
     }
 
+    fprintf(f, "cd /tmp/\n");
+    fprintf(f, "unzip -o /tmp/ce_update.zip\n");
+    
     if(Update::versions.current.app.isOlderThan( Update::versions.onServer.app )) {
         fprintf(f, "/ce/update/update_app.sh\n");
     }
@@ -384,8 +274,15 @@ bool Update::createFlashFirstFwScript(void)
         return false;
     }
 
-    fprintf(f, "/ce/update/update_xilinx.sh\n");        // first write new xilinx fw
-    fprintf(f, "/ce/update/update_hans.sh\n");          // after that we can write hans (other order would fail)
+    fprintf(f, "cd /tmp/\n");
+    fprintf(f, "rm -f /tmp/*.zip /tmp/*.hex /tmp/*.xsvf\n");    // delete old files
+    
+    fprintf(f, "cp /ce/firstfw/*.zip /tmp/\n");                 // copy new files
+    fprintf(f, "cp /ce/firstfw/*.hex /tmp/\n");
+    fprintf(f, "cp /ce/firstfw/*.xsvf /tmp/\n");
+
+    fprintf(f, "/ce/update/update_xilinx.sh\n");                // first write new xilinx fw
+    fprintf(f, "/ce/update/update_hans.sh\n");                  // after that we can write hans (other order would fail)
     fprintf(f, "/ce/update/update_franz.sh\n");
 
     fclose(f);
@@ -494,3 +391,26 @@ void Update::createNewScripts(void)
     system("chmod 755 /tmp/newscripts/copynewscripts.sh");                  // make the copying script executable
     system("/tmp/newscripts/copynewscripts.sh  > /dev/null");               // execute the copying script
 }
+
+void Update::startPackageDownloadIfAnyComponentNewer(void)
+{
+    unlink("/tmp/ce_update.zip");
+    system("rm -f /tmp/*.zip /tmp/*.hex /tmp/*.xsvf" );
+
+    bool a,b,c,d;
+    a = Update::versions.current.app.isOlderThan   (Update::versions.onServer.app);
+    b = Update::versions.current.hans.isOlderThan  (Update::versions.onServer.hans);
+    c = Update::versions.current.xilinx.isOlderThan(Update::versions.onServer.xilinx);
+    d = Update::versions.current.franz.isOlderThan (Update::versions.onServer.franz);
+    
+    if(a || b || c || d) {                                      // if some component is older than the newest on server, 
+        TDownloadRequest tdr;
+        tdr.srcUrl          = "http://joo.kie.sk/cosmosex/update/ce_update.zip";
+        tdr.checksum        = 0;                                // special case - don't check checsum
+        tdr.dstDir          = UPDATE_LOCALPATH;
+        tdr.downloadType    = DWNTYPE_UPDATE_COMP;
+        tdr.pStatusByte     = &packageDownloadStatus;           // store download status here
+        Downloader::add(tdr);
+    }
+}
+

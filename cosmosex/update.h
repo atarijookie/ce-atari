@@ -31,7 +31,6 @@ public:
     static void processUpdateList(void);
 
     static void downloadNewComponents(void);
-    static bool allNewComponentsDownloaded(void);
 
     static int  state(void);
     static void stateGoIdle(void);
@@ -42,20 +41,13 @@ public:
     
     static bool checkForUpdateListOnUsb(std::string &updateFilePath);
 
-    static bool allDownloadedOk(void);
-    static bool someDownloadFailed(void);
-
     static void createNewScripts_async(void);           // this just creates mounter action, which will be handled in a separate (mounter) thread
     static void createNewScripts(void);                 // this does script update - blocking other processing
 
+    static void startPackageDownloadIfAnyComponentNewer(void);
+    
 private:
-    static void deleteLocalComponent(std::string url);
-    static void startComponentDownloadIfNewer(Version &vLocal, Version &vServer);
-    static void getLocalPathFromUrl(std::string url, std::string &localPath);
-    static bool isUpToDateOrUpdateDownloaded(Version &vLocal, Version &vServer);
-    
     static int currentState;
-    
     static const char *getPropperXilinxTag(void);
 };
 
