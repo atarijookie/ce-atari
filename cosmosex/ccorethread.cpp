@@ -192,6 +192,8 @@ void CCoreThread::run(void)
                 if(!g_gotHansFwVersion || !g_gotFranzFwVersion) {       // if don't have version from Hans or Franz, then they're not alive
                     Update::createFlashFirstFwScript();
 
+                    Update::createNewScripts();                         // make sure that all the scripts are up to date before running the update
+
                     Debug::out(LOG_INFO, "No answer from Hans or Franz, so first firmware flash script created, will do first firmware flashing.");
 					sigintReceived = 1;
                 } else {
@@ -253,6 +255,8 @@ void CCoreThread::run(void)
                         confStream->showUpdateError();
 						Debug::out(LOG_INFO, "Update state - download OK, failed to create update script - NOT doing update");
                     } else {
+                        Update::createNewScripts();                         // make sure that all the scripts are up to date before running the update
+                    
 						Debug::out(LOG_INFO, "Update state - download OK, update script created, will do update.");
 						sigintReceived = 1;
                     }
