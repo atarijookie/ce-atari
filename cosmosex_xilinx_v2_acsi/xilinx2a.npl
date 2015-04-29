@@ -20,5 +20,9 @@ DEVGENERATEDSIMULATIONMODEL VHDL
 GENERATEDSIMULATIONMODELTIME 0
 SOURCE main.vhd
 DEPASSOC main package_pins.ucf
+[Normal]
+xcpldUseGlobalClocks=xstvhd, 9500xl, VHDL.t_go, 1430272295, False
+xcpldUseGlobalOutputEnables=xstvhd, 9500xl, VHDL.t_go, 1430272295, False
+xcpldUseGlobalSetReset=xstvhd, 9500xl, VHDL.t_go, 1430272295, False
 [STRATEGY-LIST]
 Normal=True
