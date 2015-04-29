@@ -242,9 +242,6 @@ bool Update::createUpdateScript(void)
         return false;
     }
 
-    fprintf(f, "cd /tmp/\n");
-    fprintf(f, "unzip -o /tmp/ce_update.zip\n");
-    
     if(Update::versions.current.app.isOlderThan( Update::versions.onServer.app )) {
         fprintf(f, "/ce/update/update_app.sh\n");
     }

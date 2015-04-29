@@ -18,7 +18,7 @@ then
 	exit 0
 fi
 
-unzip ./ce_update.zip
+unzip -o /tmp/ce_update.zip -d /tmp
 
 # update the app
 /ce/update/update_app.sh
