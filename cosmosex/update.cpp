@@ -356,6 +356,14 @@ void Update::createNewScripts_async(void)
 
 void Update::createNewScripts(void)
 {
+    static bool wasRunOnce = false;         // make sure this runs only once - not needed to run it more times
+
+    if(wasRunOnce) {                        // if it was already runned, quit
+        Debug::out(LOG_DEBUG, "Update::createNewScripts() - won't try to update scripts, already tried that once during this app run");
+        return;
+    }
+    
+    wasRunOnce = true;                      // mark that we've runned this once
     Debug::out(LOG_DEBUG, "Update::createNewScripts() - will try to update scripts");
     
     // write the data to file
