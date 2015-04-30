@@ -20,6 +20,9 @@ cp /ce/firstfw/* /tmp/
 # update hans
 /ce/update/update_hans.sh
 
+# now update xilinx again -- without programmed Hans the HW reporting from app could be wrong, and thus this one is needed to fix the situation
+/ce/update/update_xilinx.sh
+
 # update franz
 /ce/update/update_franz.sh
 

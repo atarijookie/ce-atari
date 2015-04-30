@@ -271,17 +271,7 @@ bool Update::createFlashFirstFwScript(void)
         return false;
     }
 
-    fprintf(f, "cd /tmp/\n");
-    fprintf(f, "rm -f /tmp/*.zip /tmp/*.hex /tmp/*.xsvf\n");    // delete old files
-    
-    fprintf(f, "cp /ce/firstfw/*.zip /tmp/\n");                 // copy new files
-    fprintf(f, "cp /ce/firstfw/*.hex /tmp/\n");
-    fprintf(f, "cp /ce/firstfw/*.xsvf /tmp/\n");
-
-    fprintf(f, "/ce/update/update_xilinx.sh\n");                // first write new xilinx fw
-    fprintf(f, "/ce/update/update_hans.sh\n");                  // after that we can write hans (other order would fail)
-    fprintf(f, "/ce/update/update_franz.sh\n");
-
+    fprintf(f, "/ce/ce_firstfw.sh\n");                              // only thing needed is to run this first FW writing script
     fclose(f);
     return true;
 }
