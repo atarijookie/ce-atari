@@ -46,7 +46,6 @@ if [[ "$is36" -eq "1" ]]; then
     echo "Detected XC9536 chip, will write firmware"
     /ce/update/flash_xilinx /tmp/xilinx.xsvf
     cat /tmp/updatelist.csv | grep 'xilinx' | awk -F ',' '{print $2}' > /ce/update/xilinx_current.txt 
-    rm -f /tmp/*.xsvf
     exit
 fi
 
@@ -63,7 +62,6 @@ if [[ "$is72" -eq "1" ]]; then
         echo "Detected XC9572 chip and ACSI interface, will write firmware"
         /ce/update/flash_xilinx /tmp/xlnx2a.xsvf
         cat /tmp/updatelist.csv | grep 'xlnx2a' | awk -F ',' '{print $2}' > /ce/update/xilinx_current.txt 
-        rm -f /tmp/*.xsvf
         exit
     fi
 
@@ -72,7 +70,6 @@ if [[ "$is72" -eq "1" ]]; then
         echo "Detected XC9572 chip and SCSI interface, will write firmware"
         /ce/update/flash_xilinx /tmp/xlnx2s.xsvf
         cat /tmp/updatelist.csv | grep 'xlnx2s' | awk -F ',' '{print $2}' > /ce/update/xilinx_current.txt 
-        rm -f /tmp/*.xsvf
         exit
     fi
     
