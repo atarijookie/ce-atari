@@ -1760,6 +1760,7 @@ int xsvfExecute()
 * Returns:      int      - Legacy return value:  1 = success; 0 = error.
 *****************************************************************************/
 void outDebugString(const char *format, ...); 
+unsigned int getCurrentMs(void);
 
 #ifdef XSVF_MAIN
 int main( int iArgc, char** ppzArgv )
@@ -1767,8 +1768,8 @@ int main( int iArgc, char** ppzArgv )
     int     iErrorCode;
     char*   pzXsvfFileName;
     int     i;
-    clock_t startClock;
-    clock_t endClock;
+    unsigned int startClock;
+    unsigned int endClock;
 
     iErrorCode          = XSVF_ERRORCODE( XSVF_ERROR_NONE );
     pzXsvfFileName      = 0;
@@ -1823,12 +1824,12 @@ int main( int iArgc, char** ppzArgv )
             setPort( TMS, 1 );
 
             /* Execute the XSVF in the file */
-            startClock  = clock();
+            startClock  = getCurrentMs();
             iErrorCode  = xsvfExecute();
-            endClock    = clock();
+            endClock    = getCurrentMs();
             fclose( in );
-            printf( "Execution Time = %.3f seconds\n",
-                    (((double)(endClock - startClock))/CLOCKS_PER_SEC) );
+            float duration = ((float) (endClock - startClock)) / 1000.0f;
+            printf( "Execution Time = %.1f seconds\n", duration);
         }
     }
 
@@ -1849,4 +1850,18 @@ void outDebugString(const char *format, ...)
     va_end(args);
 } 
 
+unsigned int getCurrentMs(void)
+{
+	struct timespec tp;
+	int res;
+	
+	res = clock_gettime(CLOCK_MONOTONIC, &tp);					// get current time
+	
+	if(res != 0) {												// if failed, fail
+		return 0;
+	}
+	
+	unsigned int val = (tp.tv_sec * 1000) + (tp.tv_nsec / 1000000);	// convert to milli seconds
+	return val;
+}
 

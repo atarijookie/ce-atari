@@ -31,8 +31,11 @@ void setPort(short p,short val)
 	
 	switch(p) {
 		case TMS:	bcm2835_gpio_write(PIN_TMS, value);	break;
-		case TDI:	bcm2835_gpio_write(PIN_TDI, value);	break;
-		case TCK:	bcm2835_gpio_write(PIN_TCK, value);	break;
+		case TDI:	bcm2835_gpio_write(PIN_TDI, value); break;
+		
+        case TCK:	usleep(1);  
+                    bcm2835_gpio_write(PIN_TCK, value);	
+                    break;
     }
 }
 
