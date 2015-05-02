@@ -478,7 +478,7 @@ void Ikbd::processStCommands(void)
 
             //--------------------------------------------
             case STCMD_SET_MOUSE_BTN_ACTION:            // set position reporting for absolute mouse mode on mouse button press
-            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_MOUSE_BTN_ACTION");
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_MOUSE_BTN_ACTION - param: %02X", (int) bfr[1]);
             
             mouseAbsBtnAct = bfr[1];					// store flags what we should report
             mouseEnabled = true;
@@ -828,6 +828,17 @@ void Ikbd::processMouse(input_event *ev)
 
 		mouseBtnNow = btnNew;								    // store new button states
 
+        if(mouseAbsBtnAct & MOUSEBTN_REPORT_ACTLIKEKEYS) {      // if should report mouse clicks as keys
+            BYTE bfr;
+            
+            switch(absButtons) {
+                case MOUSEABS_BTN_LEFT_DOWN:    bfr = 0x74; fdWrite(fdUart, &bfr, 1); break;
+                case MOUSEABS_BTN_LEFT_UP:      bfr = 0xf4; fdWrite(fdUart, &bfr, 1); break;
+                case MOUSEABS_BTN_RIGHT_DOWN:   bfr = 0x75; fdWrite(fdUart, &bfr, 1); break;
+                case MOUSEABS_BTN_RIGHT_UP:     bfr = 0xf5; fdWrite(fdUart, &bfr, 1); break;
+            }
+        }
+        
         if(mouseMode == MOUSEMODE_ABS) {                        // for absolute mouse mode
 			bool wasUp		= (absButtons		& MOUSEABS_BTN_UP)			!= 0;
 			bool reportUp	= (mouseAbsBtnAct	& MOUSEBTN_REPORT_RELEASE)  != 0;
