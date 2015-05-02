@@ -963,11 +963,18 @@ void Ikbd::processJoystick(js_event *jse, int joyNumber)
     // port 0: mouse + joystick
     // port 1: joystick
 
-    if((dirTotal != js->lastDir) || (button != js->lastBtn)) {  // direction or button changed?
+    bool dirChanged = (dirTotal != js->lastDir);            // dir changed flag
+    bool btnChanged = (button != js->lastBtn);              // btn changed flag
+    
+    if(dirChanged || btnChanged) {                          // direction or button changed?
         js->lastDir = dirTotal;
         js->lastBtn = button;
-	
-        sendJoyState(joyNumber, button | dirTotal);				// report current direction and buttons
+
+        if(joyNumber == 1 && (mouseMode == MOUSEMODE_REL) && btnChanged) {  // if button state changed, send it as mouse packet
+            sendJoy0State();
+        } else {
+            sendJoyState(joyNumber, button | dirTotal);			            // report current direction and buttons
+        }
     }
 }
 
