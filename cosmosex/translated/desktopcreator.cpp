@@ -104,13 +104,33 @@ char *DesktopCreator::storeExecutables(char *bfr, DesktopConfig *dc)
         strcpy(bfr, "#F FF 04   @ *.*@ \r\n#D FF 01   @ *.*@ \r\n#G 03 FF   *.APP@ @ \r\n#G 03 FF   *.PRG@ @ \r\n#F 03 04   *.TOS@ @ \r\n#P 03 04   *.TTP@ @ \r\n");
         bfr += strlen(bfr);
         
+        bfr = storeFloppyImageLauncher(bfr, dc);
+        
         *bfr = 0x1a;
         bfr++;
     } else {
         strcpy(bfr, "#N FF 04 000 @ *.*@ @ \r\n#D FF 01 000 @ *.*@ @ \r\n#G 03 FF 000 *.APP@ @ @ \r\n#G 03 FF 000 *.PRG@ @ @ \r\n#F 03 04 000 *.TOS@ @ @ \r\n#P 03 04 000 *.TTP@ @ @ \r\n#Y 03 04 000 *.GTP@ @ @ \r\n");
         bfr += strlen(bfr);
+
+        bfr = storeFloppyImageLauncher(bfr, dc);
     }   
     
+    return bfr;
+}
+
+char *DesktopCreator::storeFloppyImageLauncher(char *bfr, DesktopConfig *dc)
+{
+    char tmp[64];
+    // add app for opening .ST images
+    sprintf(tmp, "#G 03 04   %c:\\CE_FDD.TTP@ *.ST@ \r\n", 'A' + dc->configDrive);
+    strcpy(bfr, tmp);
+    bfr += strlen(bfr);
+
+    // add app for opening .MSA images
+    sprintf(tmp, "#G 03 04   %c:\\CE_FDD.TTP@ *.MSA@ \r\n", 'A' + dc->configDrive);
+    strcpy(bfr, tmp);
+    bfr += strlen(bfr);
+
     return bfr;
 }
 

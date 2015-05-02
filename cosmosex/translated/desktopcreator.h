@@ -33,7 +33,8 @@ private:
     static char *storeExecutables    (char *bfr, DesktopConfig *dc);
     static char *storeWindowPositions(char *bfr, DesktopConfig *dc);
     static char *storeExistingDrives (char *bfr, DesktopConfig *dc);
-
+    
+    static char *storeFloppyImageLauncher(char *bfr, DesktopConfig *dc);
 };
 
 #endif
