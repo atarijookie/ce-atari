@@ -78,6 +78,7 @@ BYTE setDate;
 int year, month, day, hours, minutes, seconds;
 BYTE netConfig[10];
 
+extern DWORD _driverInstalled;              // when the driver is installed, set this variable to non-zero, otherwise the driver RAM will be freed by Mfree()
 extern DWORD _runFromBootsector;			// flag meaning if we are running from TOS or bootsector
 WORD trap_extra_offset=0;                   // Offset for GEMDOS/BIOS handler stack adjustment (should be 0 or 2)
 
@@ -198,6 +199,8 @@ int main( int argc, char* argv[] )
 	old_gemdos_handler	= Setexc( VEC_GEMDOS,	gemdos_handler );
 	old_bios_handler	= Setexc( VEC_BIOS,		bios_handler ); 
 
+    driverInstalled = 1;                                   	// mark that the driver was installed (and we don't want to Mfree() this RAM)
+    
     //-------------------------------------
     // allow setting boot drive after driver being loaded -- purpose: allow to boot from USB drive / config drive / shared drive
     {                                                       
@@ -219,7 +222,7 @@ int main( int argc, char* argv[] )
     //-------------------------------------
 
 	/* wait for a while so the user could read the message and quit */
-	sleep(2);
+	sleep(1);
 
 	if(_runFromBootsector == 0) {	// if the prg was not run from boot sector, terminate and stay resident (execution ends here)
 		Ptermres( 0x100 + _base->p_tlen + _base->p_dlen + _base->p_blen, 0 );
