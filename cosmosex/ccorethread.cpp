@@ -40,7 +40,7 @@ bool    g_gotFranzFwVersion;
 
 int  hwVersion      = 1;                    // returned from Hans: HW version (1 for HW from 2014, 2 for new HW from 2015)
 int  hwHddIface     = HDD_IF_ACSI;          // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
-bool hwFwMismatch   = 0;                    // when HW and FW types don't match (e.g. SCSI HW + ACSI FW, or ACSI HW + SCSI FW)
+bool hwFwMismatch   = false;                // when HW and FW types don't match (e.g. SCSI HW + ACSI FW, or ACSI HW + SCSI FW)
 
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
@@ -622,6 +622,17 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 
             Debug::out(LOG_ERROR, ">>> Terminating app, because it was used as HW INFO tool <<<\n");
             sigintReceived = 1;
+            return;
+        }
+
+        // if Xilinx HW vs FW mismatching, flash Xilinx again to fix the situation
+        if(hwFwMismatch) {
+            Update::createFlashFirstFwScript();
+            Update::createNewScripts();
+        
+            Debug::out(LOG_ERROR, ">>> Terminating app, because there's Xilinx HW vs FW mismatch! <<<\n");
+            sigintReceived = 1;
+            return;
         }
     }
 }

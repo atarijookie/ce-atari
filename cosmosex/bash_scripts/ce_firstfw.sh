@@ -20,8 +20,14 @@ cp /ce/firstfw/* /tmp/
 # update hans
 /ce/update/update_hans.sh
 
-# now update xilinx again -- without programmed Hans the HW reporting from app could be wrong, and thus this one is needed to fix the situation
-/ce/update/update_xilinx.sh
+# detect Xilinx HW vs FW mismatch
+out=$( /ce/app/cosmosex hwinfo )
+mm=$( echo "$out" | grep 'HWFWMM' )
+
+# if MISMATCH detected, flash xilinx again -- without programmed Hans the HW reporting from app could be wrong, and thus this one is needed to fix the situation
+if [ "$mm" = "HWFWMM: MISMATCH" ]; then
+    /ce/update/update_xilinx.sh
+fi
 
 # update franz
 /ce/update/update_franz.sh
