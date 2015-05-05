@@ -1,0 +1,72 @@
+acronyms: 
+VEC - validate error code
+TU  - test using
+
+
+On start: 
+- choose drive on which it should perform tests (to avoid testing on wrong (non-translated) drive)
+- choose if just want to retrieve error codes for good / bad cases (to create valid codes for each TOS version), or want to run the tests comparing to valid values (possibly choosing TOS version)
+          
+
+GEMDOS_Dsetdrv
+--------------
+PREP: get valid drives using BIOS_Drvmap, exclude floppies
+- to existing drive     - VEC, TU GEMDOS_Dgetdrv
+- to non existing drive - VEC, TU GEMDOS_Dgetdrv
+- to drive out of range - VEC, TU GEMDOS_Dgetdrv
+
+
+GEMDOS_Dsetpath
+---------------
+PREP: create some dir struct using GEMDOS_Dcreate                        
+- few up and down to existing relative - VEC, verify using GEMDOS_Dgetpath
+- few up and down using absolute       - VEC, verify using GEMDOS_Dgetpath
+
+
+GEMDOS_Fsfirst, GEMDOS_Fsnext, GEMDOS_Fsetdta
+------------------------------
+PREP: create dir struct using GEMDOS_Dcreate and GEMDOS_Fcreate
+- test wildcards in current dir                         - when count of matches is: 0, 1, 10, 50
+- test exact match (no wildcards) in current dir        - when count of matches is: 0, 1
+- test attribs - match files, dirs, no flags, all flags - count how many it has found
+- test nesting - using GEMDOS_Fsetdta - up to 8 levels of nesting? VEC, count how many it has found
+
+
+GEMDOS_Dcreate, GEMDOS_Ddelete, GEMDOS_Frename, GEMDOS_Fdelete
+--------------------------------------------------------------
+- create dir, test dir existence using GEMDOS_Dsetpath
+- create sub dirs, create sub files
+- GEMDOS_Ddelete empty dir, VEC, test dir non/existence using GEMDOS_Dsetpath
+- GEMDOS_Ddelete non empty dir, VEC, test dir non/existence using GEMDOS_Dsetpath
+- GEMDOS_Ddelete non existing dir, VEC
+- GEMDOS_Ddelete a file, VEC
+
+- GEMDOS_Dcreate with valid name   - VEC
+- GEMDOS_Dcreate with invalid name - VEC
+- GEMDOS_Dcreate with already existing name - VEC
+
+- GEMDOS_Frename existing file, VEC, validate existence
+- GEMDOS_Frename non-existing file, VEC
+- GEMDOS_Frename a dir
+
+- GEMDOS_Fdelete existing file, VEC, validate non-existance
+- GEMDOS_Fdelete non-existing file, VEC
+- GEMDOS_Fdelete a dir
+
+
+GEMDOS_Fcreate, GEMDOS_Fopen, GEMDOS_Fclose, GEMDOS_Fread, GEMDOS_Fwrite, GEMDOS_Fseek
+--------------------------------------------------------------------------------------
+- GEMDOS_Fcreate non-existing
+- GEMDOS_Fcreate existing
+- GEMDOS_Fopen non-existing
+- GEMDOS_Fopen existing
+- GEMDOS_Fclose valid handle
+- GEMDOS_Fclose invalid handle
+- GEMDOS_Fread po malych kusoch, po velkych kusoch, za koniec suboru, nulovu velkost 
+- GEMDOS_Fread na neexistujuci handle
+- GEMDOS_Fseek na zaciatok, na stred, na koniec
+- GEMDOS_Fseek na neexistujuci handle
+- GEMDOS_Fwrite na neexistujuci handle
+- GEMDOS_Fwrite na subor, ktory nebol otvoreny na zapis
+- GEMDOS_Fwrite po malych kuskoch, po velkych kusoch, nulovu velkost 
+
