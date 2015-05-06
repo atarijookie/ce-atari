@@ -104,6 +104,19 @@ void out_swsw(char *str1, WORD w1, char *str2, WORD w2)
     outString("\n\r");
 }
 
+void out_s(char *str1)
+{
+    outString(str1);
+    outString("\n\r");
+}
+
+void out_ss(char *str1, char *str2)
+{
+    outString(str1);
+    outString(str2);
+    outString("\n\r");
+}
+
 void out_sw(char *str1, WORD w1)
 {
     char tmp[16];

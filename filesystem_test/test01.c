@@ -15,11 +15,14 @@ void test0104(void);
 
 void test01(void)
 {
+    out_s("Dsetdrv and Dgetdrv");
+    
     test0101();                 // switch to selected drive
     test010203();               // switch to existing and non-existing drive
     test0104();                 // switch to drive which is out of range (> 15)
 
     Dsetdrv(drive);             // back to selected drive
+    out_s("");
 }
 
 void test0101(void)

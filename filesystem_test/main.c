@@ -14,10 +14,11 @@ int  drive;
 WORD tosVersion;
 
 void test01(void);
+void test02(void);
 
 int main(void)
 {
-    (void) Cconws("\33E\33pFilesystem Test - by Jookie, 2015\33q\r\n");
+    out_s("\33E\33pFilesystem Test - by Jookie, 2015\33q");
 
     initBuffer();
 
@@ -27,12 +28,14 @@ int main(void)
     selectDrive();
     out_sc("Tested drive    : ", 'A' + drive);
     
+    out_s("");
     test01();
+    test02();
     
     writeBufferToFile();
     deinitBuffer();
     
-    (void) Cconws("Done.\r\n");
+    out_s("Done.");
     sleep(3);
     return 0;
 }
