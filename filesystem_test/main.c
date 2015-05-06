@@ -10,9 +10,10 @@
 WORD getTosVersion(void);
 void selectDrive(void);
 
-extern BYTE showHex_toLogNotScreen;
 int  drive;
 WORD tosVersion;
+
+void test01(void);
 
 int main(void)
 {
@@ -26,6 +27,7 @@ int main(void)
     selectDrive();
     out_sc("Tested drive    : ", 'A' + drive);
     
+    test01();
     
     writeBufferToFile();
     deinitBuffer();

@@ -20,34 +20,117 @@ int   curSize;
 extern int  drive;
 extern WORD tosVersion;
 
+void outString(char *str);
+
+void fixTestName(char *before, char *after)
+{
+    int len = strlen(before);
+
+    memset(after, ' ', 40);
+    after[40] = 0;
+    
+    if(len <= 40) {
+        memcpy(after, before, len);
+    } else {
+        memcpy(after, before, 40);
+    }
+}
+
+char *resultToString(BYTE result)
+{
+    static char *testResults[2] = {"[ OK ]", "[fail]"};
+    char *resStr = result ? testResults[0] : testResults[1];
+
+    return resStr;
+}
+
+// output Test Result - bool
+void out_tr_b(WORD testNo, char *testName, BYTE result)
+{
+    char testNoStr[16];
+    wordToHex(testNo, testNoStr);
+
+    char testNameFixed[41];
+    fixTestName(testName, testNameFixed);
+    
+    char *resultString = resultToString(result);
+    
+    outString("[");
+    outString(testNoStr);
+    outString("] [");
+    outString(testNameFixed);
+    outString("] ");
+    outString(resultString);
+    outString("\n\r");
+}
+
+// output Test Result - bool, word
+void out_tr_bw(WORD testNo, char *testName, BYTE result, WORD errorCode)
+{
+    char testNoStr[16];
+    wordToHex(testNo, testNoStr);
+
+    char testNameFixed[41];
+    fixTestName(testName, testNameFixed);
+    
+    char *resultString = resultToString(result);
+    
+    char errCodeStr[16];
+    wordToHex(errorCode, errCodeStr);
+    
+    outString("[");
+    outString(testNoStr);
+    outString("] [");
+    outString(testNameFixed);
+    outString("] ");
+    outString(resultString);
+    outString(" [");
+    outString(errCodeStr);
+    outString("]\n\r");
+}
+
+void out_swsw(char *str1, WORD w1, char *str2, WORD w2)
+{
+    char tmp[16];
+    
+    outString(str1);
+    wordToHex(w1, tmp);
+    outString(tmp);
+
+    outString(str2);
+    wordToHex(w2, tmp);
+    outString(tmp);
+
+    outString("\n\r");
+}
+
 void out_sw(char *str1, WORD w1)
 {
     char tmp[16];
     
-    (void) Cconws(str1);
-           wordToHex(w1, tmp);
-    (void) Cconws(tmp);
-    (void) Cconws("\n\r");
+    wordToHex(w1, tmp);
     
-    appendToBuf(str1);
-    appendToBuf(tmp);
-    appendToBuf("\n\r");
+    outString(str1);
+    outString(tmp);
+    outString("\n\r");
 }
 
 void out_sc(char *str1, char c)
 {
     char tmp[16];
-    
-    (void) Cconws(str1);
-    (void) Cconout(c);
-    (void) Cconws("\n\r");
 
     tmp[0] = c;
     tmp[1] = 0;
     
-    appendToBuf(str1);
-    appendToBuf(tmp);
-    appendToBuf("\n\r");
+    outString(str1);
+    outString(tmp);
+    outString("\n\r");
+}
+
+void outString(char *str)
+{
+    (void) Cconws(str);         // to screen
+    appendToBuf(str);           // to buffer
 }
 
 void appendToBuf(char *str)
