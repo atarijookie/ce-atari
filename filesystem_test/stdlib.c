@@ -269,52 +269,6 @@ DWORD getDword(BYTE *bfr)
     return val;
 }
 
-void showHexByte(int val)
-{
-    int hi, lo;
-    char tmp[3];
-    char table[16] = {"0123456789ABCDEF"};
-    
-    hi = (val >> 4) & 0x0f;;
-    lo = (val     ) & 0x0f;
-
-    tmp[0] = table[hi];
-    tmp[1] = table[lo];
-    tmp[2] = 0;
-    
-    if(showHex_toLogNotScreen) {            // showHex* functions output to log, not to screen? 
-        #ifdef DEBUG_STRING
-        logStr(tmp);
-        #endif
-    } else {                                // showHex* functions ouptut to screen, not to log? 
-        (void) Cconws(tmp);
-    }
-}
-
-void showHexWord(WORD val)
-{
-    BYTE a,b;
-    a = val >>  8;
-    b = val;
-    
-    showHexByte(a);
-    showHexByte(b);
-}
-
-void showHexDword(DWORD val)
-{
-    BYTE a,b,c,d;
-    a = val >> 24;
-    b = val >> 16;
-    c = val >>  8;
-    d = val;
-    
-    showHexByte(a);
-    showHexByte(b);
-    showHexByte(c);
-    showHexByte(d);
-}
-
 WORD getWordByByteOffset(void *base, int ofs)
 {
     BYTE *pByte     = (BYTE *) base;
