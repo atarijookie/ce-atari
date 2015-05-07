@@ -7,10 +7,6 @@
 #include "stdlib.h"
 #include "out.h"
 
-void byteToHex ( BYTE val, char *bfr);
-void wordToHex ( WORD val, char *bfr);
-void dwordToHex(DWORD val, char *bfr);
-
 int   bufferSize;
 char *buffer;
 

@@ -1,6 +1,10 @@
 #ifndef _OUT_H_
 #define _OUT_H_
 
+void byteToHex ( BYTE val, char *bfr);
+void wordToHex ( WORD val, char *bfr);
+void dwordToHex(DWORD val, char *bfr);
+
 void out_tr_b (WORD testNo, char *testName, BYTE result);
 void out_tr_bw(WORD testNo, char *testName, BYTE result, WORD errorCode);
 

@@ -15,6 +15,7 @@ WORD tosVersion;
 
 void test01(void);
 void test02(void);
+void test03(void);
 
 int main(void)
 {
@@ -31,6 +32,7 @@ int main(void)
     out_s("");
     test01();
     test02();
+    test03();
     
     writeBufferToFile();
     deinitBuffer();
