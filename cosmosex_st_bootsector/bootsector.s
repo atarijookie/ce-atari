@@ -154,7 +154,7 @@ config:     .dc.l   0x58580020
 driverRam:  .dc.l   0x00011800
 acsiCmd:    .dc.b   0x08,0x00,0x00,0x00,0x01
 
-str:    .ascii  "CEDD bs"
+str:    .ascii  "\n\rCE bs"
         .dc.b   13,10,0
 error:  .ascii  "fail"
         .dc.b   13,10,0
