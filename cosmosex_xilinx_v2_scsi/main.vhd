@@ -22,7 +22,7 @@ entity main is
         SRST : in    std_logic;            -- RESET device
         ATN  : in    std_logic;            -- ATN - when MSG OUT phase should start
         SEL  : in    std_logic;            -- target selection is marked with this signal
-        BSYa : out   std_logic;            -- when device is listening
+        BSYa : inout std_logic;            -- when device is listening
         BSYb : out   std_logic;            -- when device is listening
         DBPa : out   std_logic;            -- odd parity bit for data
         DBPb : out   std_logic;            -- odd parity bit for data
@@ -84,11 +84,13 @@ architecture Behavioral of main is
     signal identifyA : std_logic;
     signal identifyS : std_logic;
 
+    signal nSelection: std_logic;
+    signal lathClock : std_logic;
+
 begin
 
     REQtrig    <= XPIO xor XDMA;                -- trigger REQ if one of these goes high, but not both! (that would be identify cmd)
     resetCombo <= SRST and reset_hans;          -- when at least one of those 2 reset signals is low, the result is low
-    XCMD       <= SEL;                          -- falling edge means target selection 
 
     identify   <= XPIO and XDMA and TXSEL1n2;   -- when TXSEL1n2 selects Franz (='1') and you have PIO and DMA pins high, then you can read the identification byte from DATA2
     identifyA  <= identify and (not HDD_IF);    -- active when IDENTIFY and it's ACSI hardware
@@ -96,6 +98,9 @@ begin
 
     phaseReset <= SRST and reset_hans and sel;  -- when one of these goes low, reset phase to FREE
     phaseClock <= XPIO xor XDMA;                -- if one of these (but not both) go high, it's time to change the phase
+
+    nSelection <= not ((not SEL) and BSYa);     -- selection is when SEL is 0 and BSY is 1. nSelection is inverted selection, because DATA1latch is captured on falling edge
+    XCMD       <= nSelection or (not SRST);     -- falling edge means target selection (SRST must be 1, otherwise ignored)
 
 -- TODO: message phase is totally skipped - is it needed, will it work?
    
@@ -176,10 +181,12 @@ begin
     SREQb <= '0' when REQstate='0' else 'Z';             -- REQ - pull to L, otherwise hi-Z
 
     -- 8-bit latch register
-    -- latch data from ST on falling edge of ACK
-    dataLatch: process(SACK) is
+    -- latch data from ST on falling edge of lathClock (that means either on falling nSelection, or falling SACK)
+    lathClock <= SACK and nSelection;
+
+    dataLatch: process(lathClock) is
     begin 
-        if (falling_edge(SACK)) then
+        if (falling_edge(lathClock)) then
             DATA1latch <= DATA1a;
         end if;
     end process;
