@@ -558,30 +558,32 @@ int setBootDriveManual(int seconds)
         Cconout(' ');
         gotChar = Cconis();
         
-        if(gotChar) {
+        if(gotChar) {                                       // if some key pressed
             key = Cnecin();
             bootDrive = -1;
             
-            if(key >= 'A' && key <= 'P') {
+            if(key >= 'A' && key <= 'P') {                  // check if it's upper case letter
                 bootDrive = key - 'A';
             }
 
-            if(key >= 'a' && key <= 'p') {
+            if(key >= 'a' && key <= 'p') {                  // check if it's lower case letter
                 bootDrive = key - 'a';
             }
             
-            if(bootDrive != -1) {
+            if(bootDrive != -1) {                           // got a valid drive letter?
                 (void) Cconws("\33q\r\nBoot drive: " );
                 Cconout(bootDrive + 'A');
                 (void) Cconws("\r\n" );
-                CALL_OLD_GD_VOIDRET(Dsetdrv, bootDrive);
+                
+                CALL_OLD_GD_VOIDRET(Dsetdrv, bootDrive);    // set the drive to the selected drive
                 sleep(2);
                 return 1;
             }
         }
         
-        msleep(200);
+        msleep(200);                                        // no key, wait a while
     }
     
+    (void) Cconws("\33q\r\n" );                             // when nothing (valid) was pressed, turn on inversion and go to new line
     return 0;
 }
