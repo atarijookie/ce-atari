@@ -199,7 +199,7 @@ int main( int argc, char* argv[] )
 	old_gemdos_handler	= Setexc( VEC_GEMDOS,	gemdos_handler );
 	old_bios_handler	= Setexc( VEC_BIOS,		bios_handler ); 
 
-    driverInstalled = 1;                                   	// mark that the driver was installed (and we don't want to Mfree() this RAM)
+    _driverInstalled = 1;                                   // mark that the driver was installed (and we don't want to Mfree() this RAM)
     
     //-------------------------------------
     // allow setting boot drive after driver being loaded -- purpose: allow to boot from USB drive / config drive / shared drive
