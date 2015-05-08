@@ -70,8 +70,8 @@ char *DesktopCreator::storeHeader(char *bfr, DesktopConfig *dc)
     strcpy(bfr, "#a000000\r\n#b000000\r\n#c7770007000600070055200505552220770557075055507703111103\r\n#d                                             \r\n");
     bfr += strlen(bfr);
 
-    // then some config with dc->resolution settings
-    sprintf(tmp, "#E 98 %02X\r\n", dc->resolution);
+    // then some config with dc->settingsResolution settings
+    sprintf(tmp, "#E 98 %02X\r\n", dc->settingsResolution);
     strcpy(bfr, tmp);
     bfr += strlen(bfr);
     
@@ -138,8 +138,8 @@ char *DesktopCreator::storeExistingDrives(char *bfr, DesktopConfig *dc)
 {
     char tmp[128];
     int x = 0, y = 0;
-    int cols = (dc->resolution == 1) ? 4 : 8;               // LOW res: 4 cols for icons, MID & HI res: 8 cols for icons
-    int rows = (dc->resolution <  3) ? 4 : 8;               // LOW and MID res: 4 rows, HI res: 8 rows for icons
+    int cols = (dc->settingsResolution == 1) ? 4 : 8;       // LOW res: 4 cols for icons, MID & HI res: 8 cols for icons
+    int rows = (dc->settingsResolution <  3) ? 4 : 8;       // LOW and MID res: 4 rows, HI res: 8 rows for icons
     
     int   driveIcon = 0;
     const char *driveName = "derp";

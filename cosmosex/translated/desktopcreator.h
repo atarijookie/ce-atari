@@ -15,7 +15,8 @@
 
 typedef struct {
     WORD tosVersion;
-    WORD resolution;            // ST video resolution
+    WORD currentResolution;     // ST video resolution -- what ST says it currently has
+    WORD settingsResolution;    // ST video resolution -- what is in the user settings
 
     DWORD drivesAll;            // bitmap of all drives available
     DWORD translatedDrives;     // bitmap of drives which are translated

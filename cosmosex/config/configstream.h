@@ -43,7 +43,7 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
                 COMPID_DL1,                 COMPID_DL2,                 COMPID_DL3,                 COMPID_DL4,
                 COMPID_TIMESYNC_ENABLE,     COMPID_TIMESYNC_NTP_SERVER, COMPID_TIMESYNC_UTC_OFFSET,
                 COMPID_SCREENCAST_FRAMESKIP,    
-                COMPID_JOY0_FIRST
+                COMPID_JOY0_FIRST,          COMPID_SCREEN_RESOLUTION
             };
 
 #define ST_RESOLUTION_LOW       0

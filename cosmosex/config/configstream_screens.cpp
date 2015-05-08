@@ -930,17 +930,38 @@ void ConfigStream::createScreen_other(void)
     screen.push_back(comp);
 
     //----------------------
+    row++;
+    comp = new ConfigComponent(this, ConfigComponent::label, "Screen res in DESKTOP.INF",  40, col, row++, gotoOffset);
+    screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Reset all settings ",       19, 10, 16, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Low",                         40, col + 2, row, gotoOffset);
+    screen.push_back(comp);
+    
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                       3, col2, row++, gotoOffset);
+    comp->setCheckboxGroupIds(COMPID_SCREEN_RESOLUTION, 1);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "mid",                         40, col + 2, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                       3, col2, row++, gotoOffset);
+    comp->setCheckboxGroupIds(COMPID_SCREEN_RESOLUTION, 2);
+    screen.push_back(comp);
+
+    //----------------------
+    row++;
+    
+    comp = new ConfigComponent(this, ConfigComponent::button, " Reset all settings ",       19, 10, row++, gotoOffset);
     comp->setOnEnterFunctionCode(CS_RESET_SETTINGS);
     screen.push_back(comp);
     
-    comp = new ConfigComponent(this, ConfigComponent::button, "   Save   ",                 10,  6, 18, gotoOffset);
+    row++;
+    comp = new ConfigComponent(this, ConfigComponent::button, "   Save   ",                 10,  6, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_OTHER_SAVE);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Cancel  ",                 10,  22, 18, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Cancel  ",                 10,  22, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
@@ -953,13 +974,15 @@ void ConfigStream::createScreen_other(void)
     float       utcOffset;
     std::string ntpServer;
     int			frameSkip;
+    int         screenRes;
     
     setDateTime = s.getBool     ((char *) "TIME_SET",             true);
     utcOffset   = s.getFloat    ((char *) "TIME_UTC_OFFSET",      0);
     ntpServer   = s.getString   ((char *) "TIME_NTP_SERVER",      (char *) "200.20.186.76");
     frameSkip   = s.getInt      ((char *) "SCREENCAST_FRAMESKIP", 20);
     joy0First   = s.getBool     ((char *) "JOY_FIRST_IS_0",       false);
-
+    screenRes   = s.getInt      ((char *) "SCREEN_RESOLUTION",    1);
+    
     if( frameSkip<10 )
     {
         frameSkip=10;
@@ -974,6 +997,7 @@ void ConfigStream::createScreen_other(void)
     setTextByComponentId(COMPID_TIMESYNC_NTP_SERVER,    ntpServer);
     setIntByComponentId(COMPID_SCREENCAST_FRAMESKIP,    frameSkip);
     setBoolByComponentId(COMPID_JOY0_FIRST,             joy0First);
+    checkboxGroup_setCheckedId(COMPID_SCREEN_RESOLUTION, screenRes);
     //------------------------
     
     setFocusToFirstFocusable();
@@ -988,12 +1012,14 @@ void ConfigStream::onOtherSave(void)
     float       utcOffset   = 0;
     std::string ntpServer;
     int			frameSkip;
+    int         screenRes;
     
     getBoolByComponentId(COMPID_TIMESYNC_ENABLE,        setDateTime);
     getFloatByComponentId(COMPID_TIMESYNC_UTC_OFFSET,   utcOffset);
     getTextByComponentId(COMPID_TIMESYNC_NTP_SERVER,    ntpServer);
     getIntByComponentId(COMPID_SCREENCAST_FRAMESKIP,    frameSkip);
     getBoolByComponentId(COMPID_JOY0_FIRST,             joy0First);
+    screenRes = checkboxGroup_getCheckedId(COMPID_SCREEN_RESOLUTION);
     
     if( frameSkip<10 )
     {
@@ -1009,6 +1035,7 @@ void ConfigStream::onOtherSave(void)
     s.setString   ((char *) "TIME_NTP_SERVER",      (char *) ntpServer.c_str());
     s.setInt      ((char *) "SCREENCAST_FRAMESKIP", frameSkip);
     s.setBool     ((char *) "JOY_FIRST_IS_0",       joy0First);
+    s.setInt      ((char *) "SCREEN_RESOLUTION",    screenRes);
 
     do_timeSync         = true;     // do time sync again
     do_loadIkbdConfig   = true;     // reload ikbd config

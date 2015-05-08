@@ -551,22 +551,25 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     }
 
     // get the current machine info and generate DESKTOP.INF file
-    WORD tosVersion, resolution, drives;
+    WORD tosVersion, curRes, drives;
     
     tosVersion  = Utils::getWord(dataBuffer + 0);
-    resolution  = Utils::getWord(dataBuffer + 2);
+    curRes      = Utils::getWord(dataBuffer + 2);
     drives      = Utils::getWord(dataBuffer + 4);
     
     WORD translatedDrives = getDrivesBitmap();          // get bitmap of all translated drives we got
     
     DesktopConfig dc;
-    dc.tosVersion       = tosVersion;                   // TOS version as reported in TOS
-    dc.resolution       = resolution;                   // screen resolution as reported by Getrez()
-    dc.drivesAll        = drives | translatedDrives;    // all drives = drives reported by Drvmap() + all translated drives
-    dc.translatedDrives = translatedDrives;             // just translated drives
-    dc.configDrive      = driveLetters.confDrive;       // index of config drive
-    dc.sharedDrive      = driveLetters.shared;          // index of shared drive
-
+    dc.tosVersion        = tosVersion;                   // TOS version as reported in TOS
+    dc.currentResolution = curRes;                       // screen resolution as reported by Getrez()
+    dc.drivesAll         = drives | translatedDrives;    // all drives = drives reported by Drvmap() + all translated drives
+    dc.translatedDrives  = translatedDrives;             // just translated drives
+    dc.configDrive       = driveLetters.confDrive;       // index of config drive
+    dc.sharedDrive       = driveLetters.shared;          // index of shared drive
+    
+    Settings s;
+    dc.settingsResolution   = s.getInt((char *) "SCREEN_RESOLUTION", 1);
+    
     system("rm -f /tmp/configdrive/*.inf");             // remove any *.inf file
     system("rm -f /tmp/configdrive/*.INF");             // remove any *.INF file, too
     
