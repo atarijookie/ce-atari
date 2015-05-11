@@ -90,7 +90,6 @@ architecture Behavioral of main is
 begin
 
     REQtrig    <= XPIO xor XDMA;                -- trigger REQ if one of these goes high, but not both! (that would be identify cmd)
-    resetCombo <= SRST and reset_hans;          -- when at least one of those 2 reset signals is low, the result is low
 
     identify   <= XPIO and XDMA and TXSEL1n2;   -- when TXSEL1n2 selects Franz (='1') and you have PIO and DMA pins high, then you can read the identification byte from DATA2
     identifyA  <= identify and (not HDD_IF);    -- active when IDENTIFY and it's ACSI hardware
@@ -101,6 +100,8 @@ begin
 
     nSelection <= not ((not SEL) and BSYa);     -- selection is when SEL is 0 and BSY is 1. nSelection is inverted selection, because DATA1latch is captured on falling edge
     XCMD       <= nSelection or (not SRST);     -- falling edge means target selection (SRST must be 1, otherwise ignored)
+
+    resetCombo <= SRST and reset_hans and (not identify);   -- when one of these reset signals is low, the result is low
 
 -- TODO: message phase is totally skipped - is it needed, will it work?
    
