@@ -8,7 +8,7 @@ CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar -nostdlib
 LDFLAGS	= -Wl,--traditional-format -lgcc
 
 HDR		= stdlib.h out.h
-CSRC	= stdlib.c out.c main.c test01.c test02.c test03.c
+CSRC	= stdlib.c out.c main.c test01.c test02.c test03.c test04.c
 SSRC	= 
 STARTUP	= startup.s
 

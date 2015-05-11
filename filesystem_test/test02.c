@@ -221,6 +221,14 @@ void deleteRecursive(char *subPath)
     }
     
     Dsetpath("..");                             // go out of that dir
+    
+    char curPath[128];
+    Dgetpath(curPath, 0);
+    
+    if(strcmp(curPath, "\\") == 0 || curPath[0] == 0) { // if we're in the root of drive, don't delete this
+        return;
+    }
+    
     Ddelete(subPath);
 }
 

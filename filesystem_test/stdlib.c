@@ -111,6 +111,31 @@ int strncmp ( const char * str1, const char * str2, int num )
 	return 0;							// if came here, all chars matching
 }
 
+int strcmpi( const char * str1, const char * str2)
+{
+    char tmp1[256], tmp2[256];
+    toUpper(str1, tmp1);
+    toUpper(str2, tmp2);
+    
+    return strcmp(tmp1, tmp2);    
+}
+
+void toUpper(const char *src, char *dst)
+{
+    int i, len;
+    len = strlen(src);
+    
+    for(i=0; i<len; i++) {
+        if(src[i] >='a' && src[i]<='z') {       // if it's lower case, switch to upper
+            dst[i] = src[i] - 32;
+        } else {                                // otherwise just copy
+            dst[i] = src[i];
+        }
+    }
+    
+    dst[len] = 0;                               // terminate string
+}
+
 int strcmp ( const char * str1, const char * str2)
 {
     int len1 = strlen(str1);

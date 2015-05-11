@@ -24,8 +24,11 @@ char *	strcat( char * destination, const char * source);
 char *	strncpy ( char * destination, const char * source, int num );
 int		strncmp ( const char * str1, const char * str2, int num );
 int		strcmp ( const char * str1, const char * str2);
+int		strcmpi( const char * str1, const char * str2);
 void	sleep(int seconds);
 void    sleepMs(int ms);
+
+void toUpper(const char *src, char *dst);
 
 DWORD getTicks_fromSupervisor(void);
 DWORD getTicks(void);
