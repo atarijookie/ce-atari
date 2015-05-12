@@ -95,7 +95,7 @@ begin
     identifyA  <= identify and (not HDD_IF);    -- active when IDENTIFY and it's ACSI hardware
     identifyS  <= identify and HDD_IF;          -- active when IDENTIFY and it's SCSI hardware
 
-    phaseReset <= SRST and reset_hans and sel and (not identify);  -- when one of these goes low, reset phase to FREE
+    phaseReset <= SRST and reset_hans and (not identify);  -- when one of these goes low, reset phase to FREE
     phaseClock <= XPIO xor XDMA;                -- if one of these (but not both) go high, it's time to change the phase
 
     nSelection <= not ((not SEL) and BSYa);     -- selection is when SEL is 0 and BSY is 1. nSelection is inverted selection, because DATA1latch is captured on falling edge
