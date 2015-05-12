@@ -18,19 +18,25 @@ void test02(void);
 void test03(void);
 void test04(void);
 
+WORD fromDrive = 0;
+
 int main(void)
 {
+    fromDrive = Dgetdrv();
+
     out_s("\33E\33pFilesystem Test - by Jookie, 2015\33q");
 
     initBuffer();
 
     tosVersion = Supexec(getTosVersion);
     out_sw("TOS version     : ", tosVersion);
+    out_sc("Running from drv: ", fromDrive + 'A');
     
     selectDrive();
     out_sc("Tested drive    : ", 'A' + drive);
     
     out_s("");
+
     test01();
     test02();
     test03();

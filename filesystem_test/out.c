@@ -15,6 +15,7 @@ int   curSize;
 
 extern int  drive;
 extern WORD tosVersion;
+extern WORD fromDrive;
 
 void outString(char *str);
 
@@ -186,7 +187,7 @@ void writeBufferToFile(void)
     }
 
     char path[32] = {"X:\\cet_TTTT.txt"};
-    path[0] = 'A' + drive;                      // place drive letter
+    path[0] = 'A' + fromDrive;                  // place drive letter
     
     char tmp[16];
     wordToHex(tosVersion, tmp);

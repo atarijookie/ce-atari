@@ -91,21 +91,9 @@ void test041x(void)
 
 void test043x(void)
 {
-    testSingleInvalidChar(0x0301, "\"", 0xffdc);
-    testSingleInvalidChar(0x0302, "*", 0xffdc);
-    testSingleInvalidChar(0x0303, "+", 0xffdc);
-    testSingleInvalidChar(0x0304, ",", 0xffdc);
-    testSingleInvalidChar(0x0305, "/", 0xffdc);
-    testSingleInvalidChar(0x0306, ":", 0xffdc);
-    testSingleInvalidChar(0x0307, ";", 0xffdc);
-    testSingleInvalidChar(0x0308, "<", 0xffdc);
-    testSingleInvalidChar(0x0309, "=", 0xffdc);
-    testSingleInvalidChar(0x0310, ">", 0xffdc);
-    testSingleInvalidChar(0x0311, "?", 0xffdc);
-    testSingleInvalidChar(0x0312, "\\", 0xffdc);
-    testSingleInvalidChar(0x0313, "[", 0xffdc);
-    testSingleInvalidChar(0x0314, "]", 0xffdc);
-    testSingleInvalidChar(0x0315, "|", 0xffdc);
+    testSingleInvalidChar(0x0431, "*", 0xffdc);
+    testSingleInvalidChar(0x0432, "?", 0xffdc);
+    testSingleInvalidChar(0x0433, "\\", 0xffde);        // steem returns 0xffdc (access denied), native drive returns 0xffde (folder not found)
 }
 
 void testSingleValidChar(WORD testCaseNo, char *fname)
