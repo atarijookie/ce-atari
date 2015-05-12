@@ -17,6 +17,7 @@ void test01(void);
 void test02(void);
 void test03(void);
 void test04(void);
+void test05(void);
 
 WORD fromDrive = 0;
 
@@ -36,11 +37,11 @@ int main(void)
     out_sc("Tested drive    : ", 'A' + drive);
     
     out_s("");
-
     test01();
     test02();
     test03();
     test04();
+    test05();
 
     writeBufferToFile();
     deinitBuffer();
