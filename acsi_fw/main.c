@@ -164,6 +164,8 @@ void initAllStuff(void);
 
 void getXilinxInfoByte(void);
 BYTE xilinxInfoByte;
+BYTE isAcsiNotScsi;
+void resetXilinx(void);
 
 BYTE timeOutCount   = 0;
 BYTE soloMode       = FALSE;
@@ -171,7 +173,7 @@ void updateEnabledIDsInSoloMode(void);
 
 BYTE tryProcessLocally(void);
 
-int main (void) 
+int main (void)
 {
     initAllStuff();         // now init everything
     
@@ -245,7 +247,7 @@ int main (void)
             }
         }
         
-        if(timeOutCount >= 3) {             // if we had to use timeout 3 times consequently to make this work, then we're probably in SOLO mode
+        if(soloMode == FALSE && timeOutCount >= 3) {                    // if we had to use timeout 3 times consequently to make this work, then we're probably in SOLO mode
             GPIOA->BRR      = LED1 | LED2 | LED3;
             soloMode        = TRUE;
             state           = STATE_GET_COMMAND;
@@ -426,48 +428,72 @@ void showCurrentLED(void)
 void onGetCommand(void)
 {
     BYTE id, i;
+    BYTE sel;
                 
-    cmd[0]  = PIO_writeFirst();                         // get byte from ST (waiting for the 1st byte)
-    id      = (cmd[0] >> 5) & 0x07;                     // get only device ID
-    
-    if(enabledIDs[id]) {                                // if this ID is enabled
-        cmdLen = 6;                                     // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
-                
-        for(i=1; i<cmdLen; i++) {                       // receive the next command bytes
-            cmd[i] = PIO_write();                       // drop down IRQ, get byte
-
-            if(brStat != E_OK) {                        // if something was wrong
-                break;                        
-            }
-            
-            if(i == 1) {                                // if we got also the 2nd byte
-                getCmdLengthFromCmdBytes();             // we set up the length of command, etc.
-            }             
-        }
-                
-        //-----
-        if(brStat == E_OK) {                            // if all was well, let's send this to host or process it here
-            if(id == sdCardID) {                        // for SD card IDs
-                BYTE processedLocally;
-                processedLocally = tryProcessLocally(); // try to process command locally
-                
-                if(processedLocally) {                  // if it was processed locally, quit
-                    return;
+    //----------------------
+    if(isAcsiNotScsi) {                             // for ACSI
+        cmd[0]  = PIO_writeFirst();                 // get byte from ST (waiting for the 1st byte)
+        id      = (cmd[0] >> 5) & 0x07;             // get only device ID
+    } else {                                        // for SCSI
+        sel     = PIO_writeFirst();                 // get SELection byte
+        id      = 0xff;                             // mark that ID hasn't been found yet
+        
+        for(i=0; i<8; i++) {
+            if((sel & (1 << i)) == 0) {             // if bit is zero, this ID is selected 
+                if(enabledIDs[i]) {                 // if that ID is enabled
+                    id = i;                         // store this ID and quit loop
+                    break;
                 }
             }
-
-            if(soloMode) {                              // if in solo mode, don't send ACSI command to host
-                return;
-            }
-            
-            // if we got here, we should handle this in host (RPi)
-            for(i=0; i<7; i++) {                        
-                atnSendACSIcommand[4 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
-            }
-                    
-            state = STATE_SEND_COMMAND;
+        }
+        
+        if(id == 0xff) {                            // ID not found? quit
+            return;
         }
     }
+    //----------------------
+    if(!enabledIDs[id]) {                           // if this ID is not enabled, quit
+        return;
+    }
+    
+    cmdLen = 6;                                     // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
+            
+    for(i=1; i<cmdLen; i++) {                       // receive the next command bytes
+        cmd[i] = PIO_write();                       // drop down IRQ, get byte
+
+        if(brStat != E_OK) {                        // if something was wrong, quit, failed
+            if(!isAcsiNotScsi) {                    // if it's SCSI, reset xilinx
+                resetXilinx();
+            }
+            return;                        
+        }
+        
+        if(i == 1) {                                // if we got also the 2nd byte
+            getCmdLengthFromCmdBytes();             // we set up the length of command, etc.
+        }             
+    }
+            
+    //-----
+    // if we came here, everything went OK
+    if(id == sdCardID) {                        // for SD card IDs
+        BYTE processedLocally;
+        processedLocally = tryProcessLocally(); // try to process command locally
+        
+        if(processedLocally) {                  // if it was processed locally, quit
+            return;
+        }
+    }
+
+    if(soloMode) {                              // if in solo mode, don't send ACSI command to host
+        return;
+    }
+    
+    // if we got here, we should handle this in host (RPi)
+    for(i=0; i<7; i++) {                        
+        atnSendACSIcommand[4 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
+    }
+            
+    state = STATE_SEND_COMMAND;
 }
 
 BYTE tryProcessLocally(void)
@@ -1282,6 +1308,8 @@ void setupAtnBuffers(void)
 
 void getXilinxInfoByte(void)
 {
+    isAcsiNotScsi = 1;                  // assume ACSI
+    
     ACSI_DATADIR_WRITE();
     GPIOA->BSRR	= aPIO | aDMA;          // aPIO and aDMA now HIGH -- we can read the XILINX info byte afer that
 
@@ -1289,5 +1317,19 @@ void getXilinxInfoByte(void)
     
     GPIOA->BRR	= aPIO | aDMA;          // aPIO and aDMA now LOW -- back to normal state
     EXTI->PR    = aCMD | aCS | aACK;    // also clear possible EXTI flags
+    
+    if(xilinxInfoByte == 0x22) {        // if it's HW v. 2, and configured as SCSI, then it's SCSI
+        isAcsiNotScsi = 0;
+    } else {                            // other cases - it's ACSI
+        isAcsiNotScsi = 1;
+    }
 }
 
+void resetXilinx(void)
+{
+    ACSI_DATADIR_WRITE();
+    GPIOA->BSRR	= aPIO | aDMA;          // aPIO and aDMA now HIGH -- we can read the XILINX info byte afer that, also does BUS phase reset on SCSI Xilinx
+    ACSI_DATADIR_WRITE();
+    GPIOA->BRR	= aPIO | aDMA;          // aPIO and aDMA now LOW -- back to normal state
+    EXTI->PR    = aCMD | aCS | aACK;    // also clear possible EXTI flags
+}
