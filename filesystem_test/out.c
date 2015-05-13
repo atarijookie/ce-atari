@@ -86,6 +86,31 @@ void out_tr_bw(WORD testNo, char *testName, BYTE result, WORD errorCode)
     outString("]\n\r");
 }
 
+// output Test Result - bool, dword
+void out_tr_bd(WORD testNo, char *testName, BYTE result, DWORD errorCode)
+{
+    char testNoStr[16];
+    wordToHex(testNo, testNoStr);
+
+    char testNameFixed[41];
+    fixTestName(testName, testNameFixed);
+    
+    char *resultString = resultToString(result);
+    
+    char errCodeStr[16];
+    dwordToHex(errorCode, errCodeStr);
+    
+    outString("[");
+    outString(testNoStr);
+    outString("] [");
+    outString(testNameFixed);
+    outString("] ");
+    outString(resultString);
+    outString(" [");
+    outString(errCodeStr);
+    outString("]\n\r");
+}
+
 void out_swsw(char *str1, WORD w1, char *str2, WORD w2)
 {
     char tmp[16];

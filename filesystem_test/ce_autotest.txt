@@ -62,7 +62,7 @@ GEMDOS_Fcreate, GEMDOS_Fopen, GEMDOS_Fclose, GEMDOS_Fread, GEMDOS_Fwrite, GEMDOS
 - GEMDOS_Fopen existing
 - GEMDOS_Fclose valid handle
 - GEMDOS_Fclose invalid handle
-- GEMDOS_Fread po malych kusoch, po velkych kusoch, za koniec suboru, nulovu velkost 
+- GEMDOS_Fread po malych kusoch, po velkych kusoch, za koniec suboru, nulovu velkost, verifikacia neznicenych data za citanym bufferom
 - GEMDOS_Fread na neexistujuci handle
 - GEMDOS_Fseek na zaciatok, na stred, na koniec
 - GEMDOS_Fseek na neexistujuci handle

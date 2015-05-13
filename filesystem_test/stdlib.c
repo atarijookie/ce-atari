@@ -30,6 +30,29 @@ void *memset ( void * ptr, int value, int num )
 	return ptr;
 }
 
+int memcmp(const void *str1, const void *str2, int n)
+{
+    BYTE *p1 = (BYTE *) str1;
+    BYTE *p2 = (BYTE *) str2;
+    
+    int i;
+    for(i=0; i<n; i++) {
+        if(p1[i] == p2[i]) {        // match? continue
+            continue;
+        }
+        
+        if(p1[i] < p2[i]) {         // lower? -1
+            return -1;
+        }
+        
+        if(p1[i] > p2[i]) {         // greater? +1
+            return 1;
+        }
+    }
+    
+    return 0;                       // good!
+}
+
 int strlen ( const char * str )
 {
 	int i;
