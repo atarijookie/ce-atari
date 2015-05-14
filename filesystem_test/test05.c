@@ -16,6 +16,8 @@ void test054x(void);                                // tests 054x, 055x, 056x
 void test057x(void);
 void test058x(void);
 void test05ax(void);
+void test05bx(void);
+void test05dx(void);
 
 BYTE filenameExists(char *filename);
 void deleteIfExists(char *fname);
@@ -28,6 +30,9 @@ void fillBuffer(DWORD size, WORD xorVal, BYTE *bfr);
 BYTE testFreadByBlockSize(DWORD size, WORD xorVal, DWORD blockSize, BYTE *rdBfr);
 BYTE testFreadByBlockSizeArray(DWORD size, WORD xorVal, DWORD *blockSizeArray, WORD blockSizeCount, BYTE *rdBfr);
 BYTE verifySeek(DWORD offset, int handle);
+
+BYTE testFwriteByBlockSizeArray(DWORD size, DWORD *blockSizeArray, WORD blockSizeCount, BYTE *wrBfr);
+void testFileWrite(WORD tcOffs, BYTE *wrBfr);
 
 BYTE *buf1, *buf2;
 #define TEST051XFILESIZE    (200 * 1024)
@@ -56,8 +61,6 @@ void test05(void)
         return;
     }
     
-    test050x();                 // Fopen, Fcreate, Fclose
-
     out_s("Creating test file...");
     int res = createFile(TEST051XFILESIZE, 0xABCD);
     if(!res) {
@@ -65,11 +68,14 @@ void test05(void)
         return;
     }
 
+    test050x();                 // Fopen, Fcreate, Fclose
     test051x(0, buf2);          // read by different block sizes into ST RAM - tests 051x, 052x, 053x
     test054x();                 // read by different block sizes into TT RAM - tests 054x, 055x, 056x 
     test057x();                 // Fread - various cases
     test058x();                 // Fseek
-    test05ax();
+    test05ax();                 // Fread - 10 files open and read
+    test05bx();                 // Fwrite - tests 05Bx, 05Cx
+    test05dx();                 // Fwrite - various cases
     
     deleteFile(0xABCD);
     
@@ -77,6 +83,139 @@ void test05(void)
     Mfree(buf2);
     
     out_s("");
+}
+
+#define TEST05DCFILE    "DERP"
+void test05dx(void)
+{
+    WORD res;
+    BYTE ok;
+    int f;
+    
+    char bfr[27] = {"Herpy derpy this is a test"};
+    
+    res = Fwrite(100, 27, bfr);
+    (res == 0xffdb) ? (ok = 1) : (ok = 0);
+    out_tr_bw(0x05d1, "Fwrite - to invalid handle (100)", ok, res);
+
+    Fdelete(TEST05DCFILE);
+    f   = Fcreate(TEST05DCFILE, 0);
+    res = Fwrite(f, 27, bfr);
+    Fclose(f);
+    (res == 27) ? (ok = 1) : (ok = 0);
+    out_tr_bw(0x05d2, "Fwrite - to newly created file", ok, res);
+    
+    f = Fopen(TEST05DCFILE, 1);
+    res = Fwrite(f, 27, bfr);
+    Fclose(f);
+    (res == 27) ? (ok = 1) : (ok = 0);
+    out_tr_bw(0x05d3, "Fwrite - to file opened as WRITE-ONLY", ok, res);
+    
+    f = Fopen(TEST05DCFILE, 2);
+    res = Fwrite(f, 27, bfr);
+    Fclose(f);
+    (res == 27) ? (ok = 1) : (ok = 0);
+    out_tr_bw(0x05d4, "Fwrite - to file opened as READ-WRITE", ok, res);
+    
+    f = Fopen(TEST05DCFILE, 3);
+    res = Fwrite(f, 27, bfr);
+    Fclose(f);
+    (res == 27) ? (ok = 1) : (ok = 0);                  // TOS bug? Fwrite returns that the data was written, even though the file should be READ-ONLY  
+    out_tr_bw(0x05d5, "Fwrite - to file opened as READ-ONLY", ok, res);
+
+    res = Fwrite(f, 27, bfr);
+    Fclose(f);
+    (res == 0xffdb) ? (ok = 1) : (ok = 0);
+    out_tr_bw(0x05d6, "Fwrite - to file which was closed", ok, res);
+    
+    Fdelete(TEST05DCFILE);
+}
+
+void test05bx(void)
+{
+    out_s("Tests 05Bx - Fwrite() from ST RAM");
+    testFileWrite(0x0000, buf1);        // do the write tests in ST RAM
+    
+    //-------------------------
+    if((tosVersion >> 8) < 3) {         // if TOS version is less than 3 (it's and ST, not TT or Falcon)
+        out_s("Tests 05Cx will be skipped as they are for TT RAM.");
+        return;
+    } else {
+        out_s("Tests 05Cx - Fwrite() from TT RAM");
+    }
+    
+    BYTE *bufTT = (BYTE *) Mxalloc(BUFFERSIZE, 1);
+    
+    if(bufTT == 0) {
+        out_s("Tests 05Cx will be skipped - failed to allocate TT RAM.");
+        return;
+    }
+
+    memcpy(buf1, bufTT, BUFFERSIZE);    // copy the generated data from ST RAM to TT RAM
+    testFileWrite(0x0010, bufTT);
+    Mfree(bufTT);    
+}
+
+void testFileWrite(WORD tcOffs, BYTE *wrBfr)
+{
+    DWORD sz;
+    BYTE ok;
+    WORD res;
+
+    //-----------------
+    // test file write - single block size
+    sz = 127;
+    res = testFwriteByBlockSizeArray(TEST051XFILESIZE, &sz, 1, wrBfr);
+    (res == 1) ? (ok = 1) : (ok = 0);
+    out_tr_b(0x05b1 + tcOffs, "Fwrite - block size:    127", ok);
+    
+    sz = 511;
+    res = testFwriteByBlockSizeArray(TEST051XFILESIZE, &sz, 1, wrBfr);
+    (res == 1) ? (ok = 1) : (ok = 0);
+    out_tr_b(0x05b2 + tcOffs, "Fwrite - block size:    511", ok);
+    
+    sz = 512;
+    res = testFwriteByBlockSizeArray(TEST051XFILESIZE, &sz, 1, wrBfr);
+    (res == 1) ? (ok = 1) : (ok = 0);
+    out_tr_b(0x05b3 + tcOffs, "Fwrite - block size:    512", ok);
+    
+    sz = 15000;
+    res = testFwriteByBlockSizeArray(TEST051XFILESIZE, &sz, 1, wrBfr);
+    (res == 1) ? (ok = 1) : (ok = 0);
+    out_tr_b(0x05b4 + tcOffs, "Fwrite - block size:  15000", ok);
+    
+    sz = 25000;
+    res = testFwriteByBlockSizeArray(TEST051XFILESIZE, &sz, 1, wrBfr);
+    (res == 1) ? (ok = 1) : (ok = 0);
+    out_tr_b(0x05b5 + tcOffs, "Fwrite - block size:  25000", ok);
+    
+    //----------------
+    // test file write - different block sizes
+    
+    DWORD arr1[2] = {5, 127};
+    res = testFwriteByBlockSizeArray(TEST051XFILESIZE, arr1, 2, wrBfr);
+    (res == 1) ? (ok = 1) : (ok = 0);
+    out_tr_b(0x05b6 + tcOffs, "Fwrite - var. bl.: 5, 127", ok);
+
+    DWORD arr2[3] = {127, 256, 512};
+    res = testFwriteByBlockSizeArray(TEST051XFILESIZE, arr2, 3, wrBfr);
+    (res == 1) ? (ok = 1) : (ok = 0);
+    out_tr_b(0x05b7 + tcOffs, "Fwrite - var. bl.: 127, 256, 512", ok);
+
+    DWORD arr3[3] = {250, 512, 513};
+    res = testFwriteByBlockSizeArray(TEST051XFILESIZE, arr3, 3, wrBfr);
+    (res == 1) ? (ok = 1) : (ok = 0);
+    out_tr_b(0x05b8 + tcOffs, "Fwrite - var. bl.: 250, 512, 513", ok);
+
+    DWORD arr4[4] = {250, 550, 10, 1023};
+    res = testFwriteByBlockSizeArray(TEST051XFILESIZE, arr4, 4, wrBfr);
+    (res == 1) ? (ok = 1) : (ok = 0);
+    out_tr_b(0x05b9 + tcOffs, "Fwrite - var. bl.: 250, 550, 10, 1023", ok);
+
+    DWORD arr5[4] = {1023, 2048, 5000, 100};
+    res = testFwriteByBlockSizeArray(TEST051XFILESIZE, arr5, 4, wrBfr);
+    (res == 1) ? (ok = 1) : (ok = 0);
+    out_tr_b(0x05ba + tcOffs, "Fwrite - var. bl.: 1023, 2048, 5000, 100", ok);
 }
 
 void test05ax(void)
@@ -517,6 +656,66 @@ BYTE testFreadByBlockSizeArray(DWORD size, WORD xorVal, DWORD *blockSizeArray, W
     }
  
     Fclose(f);
+    return good;
+}
+
+BYTE testFwriteByBlockSizeArray(DWORD size, DWORD *blockSizeArray, WORD blockSizeCount, BYTE *wrBfr)
+{
+    int i, f, res;
+    Fdelete("WRITETST");
+    f = Fcreate("WRITETST", 0);
+    
+    if(f < 0) {
+        return 0;
+    }
+    
+    int bIndex = 0;
+    int good = 1;
+    
+    for(i=0; i<size; ) {
+        int blockSize = blockSizeArray[bIndex];                     // get next block size
+        bIndex++;                                                   // move to next block size
+        if(bIndex >= blockSizeCount) {                              // if we're out of block sizes, then wrap around to 0th 
+            bIndex = 0;
+        }
+    
+        int writeBlockSize = ((i + blockSize) <= size) ? blockSize : (size - i);     // block would go out of valid data? if not, use the block size, otherwise use the remaining size
+        
+        res = Fwrite(f, writeBlockSize, wrBfr + i);                   // try to write
+        
+        if(res != writeBlockSize) {                                  // didn't read everything? fail
+            good = 0;
+            break;
+        }
+        
+        i += blockSize;                                             // move forward in tested file
+    }
+    Fclose(f);
+    f = -1;
+    
+    //---------------
+    // verify the file by reading it back
+    if(good) {
+        f = Fopen("WRITETST", 0);
+        
+        if(f < 0) {                                                 // failed to open the file?
+            good = 0;
+        } else {
+            res = Fread(f, size, buf2);                                 
+            if(res != size) {                                       // if didn't read enough, fail
+                good = 0;
+            }
+            
+            res = memcmp(wrBfr, buf2, size);                        // compare the original and read buffer
+            if(res != 0) {                                          // data mismatch? fail
+                good = 0;
+            }
+            
+            Fclose(f);
+        }
+    }
+    
+    Fdelete("WRITETST");
     return good;
 }
 
