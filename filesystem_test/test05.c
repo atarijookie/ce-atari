@@ -7,12 +7,15 @@
 #include "stdlib.h"
 #include "out.h"
 
-extern int drive;
+extern int  drive;
+extern WORD tosVersion;
 
 void test050x(void);
-void test051x(void);
-void test054x(void);
-void test055x(void);
+void test051x(WORD testCaseOffset, BYTE *rdBfr);    // tests 051x, 052x, 053x
+void test054x(void);                                // tests 054x, 055x, 056x 
+void test057x(void);
+void test058x(void);
+void test05ax(void);
 
 BYTE filenameExists(char *filename);
 void deleteIfExists(char *fname);
@@ -22,12 +25,13 @@ BYTE createFile(DWORD size, WORD xorVal);
 void deleteFile(WORD xorVal);
 void fillBuffer(DWORD size, WORD xorVal, BYTE *bfr);
 
-BYTE testFreadByBlockSize(DWORD size, WORD xorVal, DWORD blockSize);
-BYTE testFreadByBlockSizeArray(DWORD size, WORD xorVal, DWORD *blockSizeArray, WORD blockSizeCount);
+BYTE testFreadByBlockSize(DWORD size, WORD xorVal, DWORD blockSize, BYTE *rdBfr);
+BYTE testFreadByBlockSizeArray(DWORD size, WORD xorVal, DWORD *blockSizeArray, WORD blockSizeCount, BYTE *rdBfr);
 BYTE verifySeek(DWORD offset, int handle);
 
 BYTE *buf1, *buf2;
 #define TEST051XFILESIZE    (200 * 1024)
+#define BUFFERSIZE          (220 * 1024)
 
 void test05(void)
 {
@@ -36,8 +40,8 @@ void test05(void)
     Dsetdrv(drive);
     Dsetpath("\\");
 
-    buf1 = (BYTE *) Malloc(220 * 1024);
-    buf2 = (BYTE *) Malloc(220 * 1024);
+    buf1 = (BYTE *) Malloc(BUFFERSIZE);
+    buf2 = (BYTE *) Malloc(BUFFERSIZE);
     if(!buf1 || !buf2) {
         out_s("Failed to allocate buffers, terminating.");
         
@@ -52,7 +56,7 @@ void test05(void)
         return;
     }
     
-    test050x();
+    test050x();                 // Fopen, Fcreate, Fclose
 
     out_s("Creating test file...");
     int res = createFile(TEST051XFILESIZE, 0xABCD);
@@ -61,10 +65,12 @@ void test05(void)
         return;
     }
 
-    test051x();
-    test054x();
-    test055x();
-
+    test051x(0, buf2);          // read by different block sizes into ST RAM - tests 051x, 052x, 053x
+    test054x();                 // read by different block sizes into TT RAM - tests 054x, 055x, 056x 
+    test057x();                 // Fread - various cases
+    test058x();                 // Fseek
+    test05ax();
+    
     deleteFile(0xABCD);
     
     Mfree(buf1);
@@ -73,14 +79,114 @@ void test05(void)
     out_s("");
 }
 
-void test055x(void)
+void test05ax(void)
+{
+    int res;
+    int i, f[10];
+    int rdCnt[10];
+
+    out_s("Testing reading of 10 open files at the same time...");
+    
+    for(i=0; i<10; i++) {               // open files
+        f[i]        = openFile(0xABCD);
+        rdCnt[i]    = 0;
+    }
+    
+    int order[10] = {5,1,7,4,8,0,2,9,6,3};
+    int size[8] = {10,520,2500,2,15000,20000,480,100};
+    int oInd = 0, sInd = 0;
+    
+    int idx, sz, allOk, found;
+    int dataOk = 1;
+    while(1) {
+        //------------------
+        // first check if at least one open file needs to be read... If everything is fully read, quit
+        allOk = 1;
+        
+        for(i=0; i<10; i++) {
+            if(f[i] <= 0) {                                     // file not open? skip it
+                continue;
+            }
+            
+            if(rdCnt[i] < TEST051XFILESIZE) {
+                allOk = 0;
+                break;
+            }
+        }
+        if(allOk) {
+            break;
+        }
+    
+        //------------------
+        // find a file which needs to be read next
+        found = 0;
+        for(i=0; i<10; i++) {                                   // go through all the files
+            idx = order[oInd];                                  // get the index of file
+
+            oInd++;
+            if(oInd >= 10) {                                    // update the order index
+                oInd = 0;
+            }
+            
+            if(rdCnt[idx] >= TEST051XFILESIZE || f[idx] <= 0) { // if reading of this file is done, skip it
+                continue;
+            }
+            
+            found = 1;
+            break;
+        }
+    
+        if(!found) {                                            // if didn't find the file, try the whole loop once again (and possibly quit)
+            continue;
+        }
+    
+        //------------------
+        // do the reading of that file
+        sz = size[sInd];                                        // get size of read whe should do
+        sInd++;
+        if(sInd >= 8) {
+            sInd = 0;
+        }
+    
+        int offset = rdCnt[idx];
+        
+        memset(buf2 + offset, 0, sz);                           // clear the RAM to make sure the data was really read
+        res = Fread(f[idx], sz, buf2 + offset);                 // try to read from the file
+        
+        if(res > 0) {                                           // reading success?
+            rdCnt[idx] += res;
+        }
+        
+        res = memcmp(buf1 + offset, buf2 + offset, sz);         // compare data
+        if(res != 0) {                                          // some difference in data?
+            dataOk = 0;
+        }
+    }
+    
+    allOk = 1;
+    for(i=0; i<10; i++) {                                       // close files
+        if(f[i] > 0) {
+            Fclose(f[i]);
+        }
+        
+        if(rdCnt[i] < TEST051XFILESIZE) {                       // check if the file is fully read
+            allOk = 0;
+            break;
+        }
+    }
+    
+    out_tr_b(0x05A1, "Fread - 10 files reading - total length", allOk);
+    out_tr_b(0x05A2, "Fread - 10 files reading - data validity",dataOk);
+}
+
+void test058x(void)
 {
     int f, res1, res2, ok;
 
     f = openFile(0xABCD);
     
     if(f < 0) {
-        out_s("055x - Failed to open file");
+        out_s("058x - Failed to open file");
         return;
     }
     
@@ -89,44 +195,44 @@ void test055x(void)
     res1 = Fseek(0, f, 0);
     res2 = verifySeek(0, f);
     (res1 == 0 && res2 == 1) ? (ok = 1) : (ok = 0);
-    out_tr_bd(0x0551, "Fseek - SEEK_SET to start while at start", ok, res1);
+    out_tr_bd(0x0581, "Fseek - SEEK_SET to start while at start", ok, res1);
     
     res1 = Fseek(TEST051XFILESIZE/2, f, 0);
     res2 = verifySeek(TEST051XFILESIZE/2, f);
     (res1 == (TEST051XFILESIZE/2) && res2 == 1) ? (ok = 1) : (ok = 0);
-    out_tr_bd(0x0552, "Fseek - SEEK_SET to half", ok, res1);
+    out_tr_bd(0x0582, "Fseek - SEEK_SET to half", ok, res1);
 
     res1 = Fseek(TEST051XFILESIZE, f, 0);
     res2 = Fread(f, 16, buf2);
     (res1 == TEST051XFILESIZE && res2 == 0) ? (ok = 1) : (ok = 0);
-    out_tr_bd(0x0553, "Fseek - SEEK_SET to end", ok, res1);
+    out_tr_bd(0x0583, "Fseek - SEEK_SET to end", ok, res1);
 
     res1 = Fseek(0, f, 0);
     res2 = verifySeek(0, f);
     (res1 == 0 && res2 == 1) ? (ok = 1) : (ok = 0);
-    out_tr_bd(0x0554, "Fseek - SEEK_SET back to start", ok, res1);
+    out_tr_bd(0x0584, "Fseek - SEEK_SET back to start", ok, res1);
     
     //---------
     // test SEEK_CUR
     res1 = Fseek(TEST051XFILESIZE/2, f, 1);
     res2 = verifySeek(TEST051XFILESIZE/2, f);
     (res1 == (TEST051XFILESIZE/2) && res2 == 1) ? (ok = 1) : (ok = 0);    
-    out_tr_bd(0x0555, "Fseek - SEEK_CUR to half  (+half)", ok, res1);
+    out_tr_bd(0x0585, "Fseek - SEEK_CUR to half  (+half)", ok, res1);
 
     res1 = Fseek(TEST051XFILESIZE/2, f, 1);
     res2 = Fread(f, 16, buf2);
     (res1 == TEST051XFILESIZE && res2 == 0) ? (ok = 1) : (ok = 0);    
-    out_tr_bd(0x0556, "Fseek - SEEK_CUR to end   (+half)", ok, res1);
+    out_tr_bd(0x0586, "Fseek - SEEK_CUR to end   (+half)", ok, res1);
 
     res1 = Fseek(-(TEST051XFILESIZE/2), f, 1);
     res2 = verifySeek(TEST051XFILESIZE/2, f);
     (res1 == (TEST051XFILESIZE/2) && res2 == 1) ? (ok = 1) : (ok = 0);    
-    out_tr_bd(0x0557, "Fseek - SEEK_CUR to half  (-half)", ok, res1);
+    out_tr_bd(0x0587, "Fseek - SEEK_CUR to half  (-half)", ok, res1);
     
     res1 = Fseek(-(TEST051XFILESIZE/2), f, 1);
     res2 = verifySeek(0, f);
     (res1 == 0 && res2 == 1) ? (ok = 1) : (ok = 0);    
-    out_tr_bd(0x0558, "Fseek - SEEK_CUR to start (-half)", ok, res1);
+    out_tr_bd(0x0588, "Fseek - SEEK_CUR to start (-half)", ok, res1);
     
     //---------
     // test SEEK_END
@@ -135,23 +241,23 @@ void test055x(void)
     res1 = Fseek(TEST051XFILESIZE, f, 2);
     res2 = verifySeek(0, f);
     (res1 == 0 && res2 == 1) ? (ok = 1) : (ok = 0);    
-    out_tr_bd(0x0559, "Fseek - SEEK_END to start", ok, res1);
+    out_tr_bd(0x0589, "Fseek - SEEK_END to start", ok, res1);
 
     res1 = Fseek(TEST051XFILESIZE/2, f, 2);
     res2 = verifySeek(TEST051XFILESIZE/2, f);
     (res1 == (TEST051XFILESIZE/2) && res2 == 1) ? (ok = 1) : (ok = 0);    
-    out_tr_bd(0x0560, "Fseek - SEEK_END to half", ok, res1);
+    out_tr_bd(0x0590, "Fseek - SEEK_END to half", ok, res1);
     
     res1 = Fseek(0, f, 2);
     res2 = Fread(f, 16, buf2);
     (res1 == TEST051XFILESIZE && res2 == 0) ? (ok = 1) : (ok = 0);    
-    out_tr_bd(0x0561, "Fseek - SEEK_END to end", ok, res1);
+    out_tr_bd(0x0591, "Fseek - SEEK_END to end", ok, res1);
 */    
     
     Fclose(f);    
 }
 
-void test054x(void)
+void test057x(void)
 {
     int f, res1, res2, ok;
 
@@ -165,10 +271,10 @@ void test054x(void)
         Fclose(f);
     }
     (f > 0 && res1 == TEST051XFILESIZE) ? (ok = 1) : (ok = 0);
-    out_tr_bd(0x0541, "Fread - exact file size", ok, res1);
+    out_tr_bd(0x0571, "Fread - exact file size", ok, res1);
 
     (f > 0 && res2 == 0) ? (ok = 1) : (ok = 0);
-    out_tr_bd(0x0542, "Fread - beyond file size", ok, res2);
+    out_tr_bd(0x0572, "Fread - beyond file size", ok, res2);
 
     //--------------
     res1 = -1;
@@ -180,96 +286,116 @@ void test054x(void)
         Fclose(f);
     }
     (f > 0 && res1 == 0) ? (ok = 1) : (ok = 0);
-    out_tr_bd(0x0543, "Fread - zero size of read", ok, res1);
+    out_tr_bd(0x0573, "Fread - zero size of read", ok, res1);
 
     (f > 0 && res2 == TEST051XFILESIZE) ? (ok = 1) : (ok = 0);
-    out_tr_bd(0x0544, "Fread - more than what is in the file", ok, res2);
+    out_tr_bd(0x0574, "Fread - more than what is in the file", ok, res2);
 
     //--------------
     WORD w = Fread(f, TEST051XFILESIZE, buf2);
     (w == 0xffdb) ? (ok = 1) : (ok = 0);
-    out_tr_bw(0x0545, "Fread - on invalid handle", ok, w);
+    out_tr_bw(0x0575, "Fread - on invalid handle", ok, w);
 }
 
-void test051x(void)
+void test051x(WORD testCaseOffset, BYTE *rdBfr)
 {
     int res;
 
     //---------------------------
     // test by fixed block read size
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 15);
-    out_tr_b(0x0511, "Fread - test block size:      15 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 15, rdBfr);
+    out_tr_b(0x0511 + testCaseOffset, "Fread - test block size:      15 B", res);
 
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 126);
-    out_tr_b(0x0512, "Fread - test block size:     126 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 126, rdBfr);
+    out_tr_b(0x0512 + testCaseOffset, "Fread - test block size:     126 B", res);
  
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 511);
-    out_tr_b(0x0513, "Fread - test block size:     511 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 511, rdBfr);
+    out_tr_b(0x0513 + testCaseOffset, "Fread - test block size:     511 B", res);
 
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 512);
-    out_tr_b(0x0514, "Fread - test block size:     512 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 512, rdBfr);
+    out_tr_b(0x0514 + testCaseOffset, "Fread - test block size:     512 B", res);
     
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 750);
-    out_tr_b(0x0515, "Fread - test block size:     750 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 750, rdBfr);
+    out_tr_b(0x0515 + testCaseOffset, "Fread - test block size:     750 B", res);
  
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 1023);
-    out_tr_b(0x0516, "Fread - test block size:    1023 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 1023, rdBfr);
+    out_tr_b(0x0516 + testCaseOffset, "Fread - test block size:    1023 B", res);
     
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 1024);
-    out_tr_b(0x0517, "Fread - test block size:    1024 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 1024, rdBfr);
+    out_tr_b(0x0517 + testCaseOffset, "Fread - test block size:    1024 B", res);
  
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 1025);
-    out_tr_b(0x0518, "Fread - test block size:    1025 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 1025, rdBfr);
+    out_tr_b(0x0518 + testCaseOffset, "Fread - test block size:    1025 B", res);
  
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 63000);
-    out_tr_b(0x0519, "Fread - test block size:   63000 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 63000, rdBfr);
+    out_tr_b(0x0519 + testCaseOffset, "Fread - test block size:   63000 B", res);
  
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 65536);
-    out_tr_b(0x0520, "Fread - test block size:   65536 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 65536, rdBfr);
+    out_tr_b(0x0520 + testCaseOffset, "Fread - test block size:   65536 B", res);
 
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 130047);       // ACSI MAX_SECTORS - 1
-    out_tr_b(0x0521, "Fread - test block size:  130047 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 130047, rdBfr);       // ACSI MAX_SECTORS - 1
+    out_tr_b(0x0521 + testCaseOffset, "Fread - test block size:  130047 B", res);
 
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 130048);       // ACSI MAX_SECTORS
-    out_tr_b(0x0522, "Fread - test block size:  130048 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 130048, rdBfr);       // ACSI MAX_SECTORS
+    out_tr_b(0x0522 + testCaseOffset, "Fread - test block size:  130048 B", res);
 
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 130049);       // ACSI MAX_SECTORS + 1
-    out_tr_b(0x0523, "Fread - test block size:  130049 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 130049, rdBfr);       // ACSI MAX_SECTORS + 1
+    out_tr_b(0x0523 + testCaseOffset, "Fread - test block size:  130049 B", res);
 
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 150000);
-    out_tr_b(0x0524, "Fread - test block size:  150000 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, 150000, rdBfr);
+    out_tr_b(0x0524 + testCaseOffset, "Fread - test block size:  150000 B", res);
 
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, TEST051XFILESIZE);
-    out_tr_b(0x0525, "Fread - test block size:  204800 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, TEST051XFILESIZE, rdBfr);
+    out_tr_b(0x0525 + testCaseOffset, "Fread - test block size:  204800 B", res);
 
-    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, TEST051XFILESIZE + 1024);
-    out_tr_b(0x0526, "Fread - test block size:  205824 B", res);
+    res = testFreadByBlockSize(TEST051XFILESIZE, 0xABCD, TEST051XFILESIZE + 1024, rdBfr);
+    out_tr_b(0x0526 + testCaseOffset, "Fread - test block size:  205824 B", res);
     
     //---------------------------
     // test by predefined various block sizes
     DWORD arr1[2] = {5, 127};
-    res = testFreadByBlockSizeArray(TEST051XFILESIZE, 0xABCD, arr1, 2);
-    out_tr_b(0x0531, "Fread - v. bl.: 5, 127", res);
+    res = testFreadByBlockSizeArray(TEST051XFILESIZE, 0xABCD, arr1, 2, rdBfr);
+    out_tr_b(0x0531 + testCaseOffset, "Fread - v. bl.: 5, 127", res);
 
     DWORD arr2[3] = {127, 256, 512};
-    res = testFreadByBlockSizeArray(TEST051XFILESIZE, 0xABCD, arr2, 3);
-    out_tr_b(0x0532, "Fread - v. bl.: 127, 256, 512", res);
+    res = testFreadByBlockSizeArray(TEST051XFILESIZE, 0xABCD, arr2, 3, rdBfr);
+    out_tr_b(0x0532 + testCaseOffset, "Fread - v. bl.: 127, 256, 512", res);
 
     DWORD arr3[3] = {250, 512, 513};
-    res = testFreadByBlockSizeArray(TEST051XFILESIZE, 0xABCD, arr3, 3);
-    out_tr_b(0x0533, "Fread - v. bl.: 250, 512, 513", res);
+    res = testFreadByBlockSizeArray(TEST051XFILESIZE, 0xABCD, arr3, 3, rdBfr);
+    out_tr_b(0x0533 + testCaseOffset, "Fread - v. bl.: 250, 512, 513", res);
 
     DWORD arr4[4] = {250, 550, 10, 1023};
-    res = testFreadByBlockSizeArray(TEST051XFILESIZE, 0xABCD, arr4, 4);
-    out_tr_b(0x0534, "Fread - v. bl.: 250, 550, 10, 1023", res);
+    res = testFreadByBlockSizeArray(TEST051XFILESIZE, 0xABCD, arr4, 4, rdBfr);
+    out_tr_b(0x0534 + testCaseOffset, "Fread - v. bl.: 250, 550, 10, 1023", res);
 
     DWORD arr5[4] = {1023, 2048, 5000, 100};
-    res = testFreadByBlockSizeArray(TEST051XFILESIZE, 0xABCD, arr5, 4);
-    out_tr_b(0x0535, "Fread - v. bl.: 1023, 2048, 5000, 100", res);
+    res = testFreadByBlockSizeArray(TEST051XFILESIZE, 0xABCD, arr5, 4, rdBfr);
+    out_tr_b(0x0535 + testCaseOffset, "Fread - v. bl.: 1023, 2048, 5000, 100", res);
 
     DWORD arr6[4] = {15000, 2000, 10, 2000};
-    res = testFreadByBlockSizeArray(TEST051XFILESIZE, 0xABCD, arr6, 4);
-    out_tr_b(0x0536, "Fread - v. bl.: 15000, 2000, 10, 2000", res);
+    res = testFreadByBlockSizeArray(TEST051XFILESIZE, 0xABCD, arr6, 4, rdBfr);
+    out_tr_b(0x0536 + testCaseOffset, "Fread - v. bl.: 15000, 2000, 10, 2000", res);
+}
+
+void test054x(void)
+{
+    if((tosVersion >> 8) < 3) {     // if TOS version is less than 3 (it's and ST, not TT or Falcon)
+        out_s("Tests 054x, 055x, 056x will be skipped as they are for TT RAM.");
+        return;
+    } else {
+        out_s("Tests 054x, 055x, 056x - Fread() into TT RAM");
+    }
+    
+    BYTE *bufTT = (BYTE *) Mxalloc(BUFFERSIZE, 1);
+    
+    if(bufTT == 0) {
+        out_s("Tests 054x, 055x, 056x will be skipped - failed to allocate TT RAM.");
+        return;
+    }
+    
+    test051x(0x0030, bufTT);
+    Mfree(bufTT);
 }
 
 void test050x(void)
@@ -340,7 +466,7 @@ void test050x(void)
     }
 }
 
-BYTE testFreadByBlockSizeArray(DWORD size, WORD xorVal, DWORD *blockSizeArray, WORD blockSizeCount)
+BYTE testFreadByBlockSizeArray(DWORD size, WORD xorVal, DWORD *blockSizeArray, WORD blockSizeCount, BYTE *rdBfr)
 {
     int i, f, res;
     f = openFile(0xABCD);
@@ -363,24 +489,24 @@ BYTE testFreadByBlockSizeArray(DWORD size, WORD xorVal, DWORD *blockSizeArray, W
     
         int readBlockSize = ((i + blockSize) <= size) ? blockSize : (size - i);     // block would go out of valid data? if not, use the block size, otherwise use the remaining size
         
-        memset(buf2 + i, 0, readBlockSize);                         // clear the memory
-        memcpy(buf2 + i + readBlockSize, canaries, 32);             // copy canaries beyond the expected end
+        memset(rdBfr + i, 0, readBlockSize);                        // clear the memory
+        memcpy(rdBfr + i + readBlockSize, canaries, 32);            // copy canaries beyond the expected end
 
-        res = Fread(f, readBlockSize, buf2 + i);                    // try to read
+        res = Fread(f, readBlockSize, rdBfr + i);                   // try to read
         
         if(res != readBlockSize) {                                  // didn't read everything? fail
             good = 0;
             break;
         }
         
-        res = memcmp(buf1 + i, buf2 + i, readBlockSize);            // compare buffers
+        res = memcmp(buf1 + i, rdBfr + i, readBlockSize);           // compare buffers
         
         if(res != 0) {                                              // not matching? fail
             good = 0;
             break;
         }
         
-        res = memcmp(buf2 + i + readBlockSize, canaries, 32);       // check if canaries are alive
+        res = memcmp(rdBfr + i + readBlockSize, canaries, 32);      // check if canaries are alive
 
         if(res != 0) {                                              // not matching? fail
             good = 0;
@@ -394,9 +520,9 @@ BYTE testFreadByBlockSizeArray(DWORD size, WORD xorVal, DWORD *blockSizeArray, W
     return good;
 }
 
-BYTE testFreadByBlockSize(DWORD size, WORD xorVal, DWORD blockSize)
+BYTE testFreadByBlockSize(DWORD size, WORD xorVal, DWORD blockSize, BYTE *rdBfr)
 {
-    return testFreadByBlockSizeArray(size, xorVal, &blockSize, 1);
+    return testFreadByBlockSizeArray(size, xorVal, &blockSize, 1, rdBfr);
 }
 
 BYTE verifySeek(DWORD offset, int handle)
