@@ -2,20 +2,21 @@
 #include "timers.h"
 
 extern BYTE brStat;															// status from bridge
+extern BYTE isAcsiNotScsi;
 
 void timeoutStart(void)
 {
-	// init the timer 4, which will serve for timeout measuring 
-  TIM_Cmd(TIM3, DISABLE);												// disable timer
-	TIM3->CNT	= 0;																// set timer value to 0
-	TIM3->SR	= 0xfffe;														// clear UIF flag
-  TIM_Cmd(TIM3, ENABLE);												// enable timer
+    // init the timer 4, which will serve for timeout measuring 
+    TIM_Cmd(TIM3, DISABLE);     // disable timer
+    TIM3->CNT	= 0;            // set timer value to 0
+    TIM3->SR	= 0xfffe;       // clear UIF flag
+    TIM_Cmd(TIM3, ENABLE);      // enable timer
 }	
 
 BYTE timeout(void)
 {
-	if((TIM3->SR & 0x0001) != 0) {		// overflow of TIM4 occured?
-		TIM3->SR = 0xfffe;							// clear UIF flag
+	if((TIM3->SR & 0x0001) != 0) {  // overflow of TIM4 occured?
+		TIM3->SR = 0xfffe;          // clear UIF flag
 		return TRUE;
 	}
 	
@@ -46,6 +47,11 @@ BYTE PIO_writeFirst(void)
 	EXTI->PR = aCMD | aCS;												// clear int for 1st CMD byte (aCMD) and also int for CS, because also that one will be set
 
 	val = GPIOB->IDR;															// read the data
+    
+    if(!isAcsiNotScsi) {        // SCSI? Invert data!
+        val = ~val;
+    }
+    
 	return val;
 }
 
@@ -73,6 +79,11 @@ BYTE PIO_write(void)
 	}
 	
 	EXTI->PR = aCS;																// clear int for CS
+    
+    if(!isAcsiNotScsi) {        // SCSI? Invert data!
+        val = ~val;
+    }
+
 	return val;
 }
 
@@ -80,6 +91,10 @@ BYTE PIO_write(void)
 void PIO_read(BYTE val)
 {
 	ACSI_DATADIR_READ();													// data as outputs (read)
+
+    if(!isAcsiNotScsi) {        // SCSI? Invert data!
+        val = ~val;
+    }
 
 	GPIOB->ODR = val;															// write the data to output data register
 	
@@ -106,6 +121,10 @@ void PIO_read(BYTE val)
 
 void DMA_read(BYTE val)
 {
+    if(!isAcsiNotScsi) {        // SCSI? Invert data!
+        val = ~val;
+    }
+
 	GPIOB->ODR = val;															// write the data to output data register
 	
 	// create rising edge on aDMA
@@ -151,5 +170,10 @@ BYTE DMA_write(void)
 	}
 	
 	EXTI->PR = aACK;																// clear int for ACK
+    
+    if(!isAcsiNotScsi) {        // SCSI? Invert data!
+        val = ~val;
+    }
+    
 	return val;
 }

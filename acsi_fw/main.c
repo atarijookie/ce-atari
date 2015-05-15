@@ -427,19 +427,23 @@ void showCurrentLED(void)
 
 void onGetCommand(void)
 {
-    BYTE id, i;
+    BYTE id, i, start;
     BYTE sel;
                 
     //----------------------
     if(isAcsiNotScsi) {                             // for ACSI
+        start   = 1;                                // start storing to cmd[] at this index
+        
         cmd[0]  = PIO_writeFirst();                 // get byte from ST (waiting for the 1st byte)
         id      = (cmd[0] >> 5) & 0x07;             // get only device ID
     } else {                                        // for SCSI
+        start   = 0;                                // start storing to cmd[] at this index
+        
         sel     = PIO_writeFirst();                 // get SELection byte
         id      = 0xff;                             // mark that ID hasn't been found yet
         
         for(i=0; i<8; i++) {
-            if((sel & (1 << i)) == 0) {             // if bit is zero, this ID is selected 
+            if((sel & (1 << i)) != 0) {             // if bit is one, this ID is selected 
                 if(enabledIDs[i]) {                 // if that ID is enabled
                     id = i;                         // store this ID and quit loop
                     break;
@@ -458,7 +462,7 @@ void onGetCommand(void)
     
     cmdLen = 6;                                     // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
             
-    for(i=1; i<cmdLen; i++) {                       // receive the next command bytes
+    for(i=start; i<cmdLen; i++) {                   // receive the next command bytes
         cmd[i] = PIO_write();                       // drop down IRQ, get byte
 
         if(brStat != E_OK) {                        // if something was wrong, quit, failed
