@@ -188,7 +188,7 @@ begin
     dataLatch: process(lathClock) is
     begin 
         if (falling_edge(lathClock)) then
-            DATA1latch <= DATA1a;
+            DATA1latch <= not DATA1a;                    -- store inverted value to latch - SCSI SE has inverted data
         end if;
     end process;
 
@@ -196,22 +196,23 @@ begin
     d1out <= '1' when ((XRnW='1' ) and (resetCombo='1')) else '0';  
 
     -- DATA1a and DATA1b are connected to SCSI bus, data goes out when going from MCU to ST (READ operation) and it's not reset state (this means d1out is 1)
-    DATA1a(7) <= '0' when ((d1out='1') and (DATA2(7)='0')) else 'Z';
-    DATA1b(7) <= '0' when ((d1out='1') and (DATA2(7)='0')) else 'Z';
-    DATA1a(6) <= '0' when ((d1out='1') and (DATA2(6)='0')) else 'Z';
-    DATA1b(6) <= '0' when ((d1out='1') and (DATA2(6)='0')) else 'Z';
-    DATA1a(5) <= '0' when ((d1out='1') and (DATA2(5)='0')) else 'Z';
-    DATA1b(5) <= '0' when ((d1out='1') and (DATA2(5)='0')) else 'Z';
-    DATA1a(4) <= '0' when ((d1out='1') and (DATA2(4)='0')) else 'Z';
-    DATA1b(4) <= '0' when ((d1out='1') and (DATA2(4)='0')) else 'Z';
-    DATA1a(3) <= '0' when ((d1out='1') and (DATA2(3)='0')) else 'Z';
-    DATA1b(3) <= '0' when ((d1out='1') and (DATA2(3)='0')) else 'Z';
-    DATA1a(2) <= '0' when ((d1out='1') and (DATA2(2)='0')) else 'Z';
-    DATA1b(2) <= '0' when ((d1out='1') and (DATA2(2)='0')) else 'Z';
-    DATA1a(1) <= '0' when ((d1out='1') and (DATA2(1)='0')) else 'Z';
-    DATA1b(1) <= '0' when ((d1out='1') and (DATA2(1)='0')) else 'Z';
-    DATA1a(0) <= '0' when ((d1out='1') and (DATA2(0)='0')) else 'Z';
-    DATA1b(0) <= '0' when ((d1out='1') and (DATA2(0)='0')) else 'Z';
+    -- Also output inverted version of DATA2, because SCSI SE has inverted data
+    DATA1a(7) <= '0' when ((d1out='1') and (DATA2(7)='1')) else 'Z';
+    DATA1b(7) <= '0' when ((d1out='1') and (DATA2(7)='1')) else 'Z';
+    DATA1a(6) <= '0' when ((d1out='1') and (DATA2(6)='1')) else 'Z';
+    DATA1b(6) <= '0' when ((d1out='1') and (DATA2(6)='1')) else 'Z';
+    DATA1a(5) <= '0' when ((d1out='1') and (DATA2(5)='1')) else 'Z';
+    DATA1b(5) <= '0' when ((d1out='1') and (DATA2(5)='1')) else 'Z';
+    DATA1a(4) <= '0' when ((d1out='1') and (DATA2(4)='1')) else 'Z';
+    DATA1b(4) <= '0' when ((d1out='1') and (DATA2(4)='1')) else 'Z';
+    DATA1a(3) <= '0' when ((d1out='1') and (DATA2(3)='1')) else 'Z';
+    DATA1b(3) <= '0' when ((d1out='1') and (DATA2(3)='1')) else 'Z';
+    DATA1a(2) <= '0' when ((d1out='1') and (DATA2(2)='1')) else 'Z';
+    DATA1b(2) <= '0' when ((d1out='1') and (DATA2(2)='1')) else 'Z';
+    DATA1a(1) <= '0' when ((d1out='1') and (DATA2(1)='1')) else 'Z';
+    DATA1b(1) <= '0' when ((d1out='1') and (DATA2(1)='1')) else 'Z';
+    DATA1a(0) <= '0' when ((d1out='1') and (DATA2(0)='1')) else 'Z';
+    DATA1b(0) <= '0' when ((d1out='1') and (DATA2(0)='1')) else 'Z';
 
     -- DATA2 is connected to Hans (STM32 mcu), data goes out when going from ST to MCU (WRITE operation)
     DATA2 <=    "ZZZZZ0ZZ"  when TXSEL1n2='0'    else   -- when TXSEL1n2 selects Hans, we're writing to Hans's flash, we need bit DATA2.2 (bit #2) to be 0 (it's BOOT1 bit on STM32 MCU)
