@@ -30,7 +30,11 @@ void spiDma_waitForFinish(void);
 void waitForSPIidle(void);
 void waitForSPI2idle(void);
 
-void getCmdLengthFromCmdBytes(void);
+BYTE onGetCommandAcsi(void);
+BYTE onGetCommandScsi(void);
+void getCmdLengthFromCmdBytesAcsi(void);
+void getCmdLengthFromCmdBytesScsi(BYTE cmd);
+
 void onGetCommand(void);
 void onDataRead(void);
 void onDataWrite(void);
@@ -427,56 +431,24 @@ void showCurrentLED(void)
 
 void onGetCommand(void)
 {
-    BYTE id, i, start;
-    BYTE sel;
-                
-    //----------------------
-    if(isAcsiNotScsi) {                             // for ACSI
-        start   = 1;                                // start storing to cmd[] at this index
-        
-        cmd[0]  = PIO_writeFirst();                 // get byte from ST (waiting for the 1st byte)
-        id      = (cmd[0] >> 5) & 0x07;             // get only device ID
-    } else {                                        // for SCSI
-        start   = 0;                                // start storing to cmd[] at this index
-        
-        sel     = PIO_writeFirst();                 // get SELection byte
-        id      = 0xff;                             // mark that ID hasn't been found yet
-        
-        for(i=0; i<8; i++) {
-            if((sel & (1 << i)) != 0) {             // if bit is one, this ID is selected 
-                if(enabledIDs[i]) {                 // if that ID is enabled
-                    id = i;                         // store this ID and quit loop
-                    break;
-                }
-            }
-        }
-        
-        if(id == 0xff) {                            // ID not found? quit
-            return;
-        }
+    BYTE i, id;
+    
+    //---------
+    // retrieve the command. There are some slight differences between ACSI and SCSI part, 
+    // but the resulting commands should be the same (to make the rest of app work without further changes).
+    BYTE good;
+    
+    if(isAcsiNotScsi) {                         // for ACSI
+        good = onGetCommandAcsi();
+    } else {                                    // for SCSI
+        good = onGetCommandScsi();
     }
-    //----------------------
-    if(!enabledIDs[id]) {                           // if this ID is not enabled, quit
+
+    if(!good) {                                 // if failed to get the cmd, quit
         return;
     }
     
-    cmdLen = 6;                                     // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
-            
-    for(i=start; i<cmdLen; i++) {                   // receive the next command bytes
-        cmd[i] = PIO_write();                       // drop down IRQ, get byte
-
-        if(brStat != E_OK) {                        // if something was wrong, quit, failed
-            if(!isAcsiNotScsi) {                    // if it's SCSI, reset xilinx
-                resetXilinx();
-            }
-            return;                        
-        }
-        
-        if(i == 1) {                                // if we got also the 2nd byte
-            getCmdLengthFromCmdBytes();             // we set up the length of command, etc.
-        }             
-    }
-            
+    id = (cmd[0] >> 5) & 0x07;                  // get only device ID
     //-----
     // if we came here, everything went OK
     if(id == sdCardID) {                        // for SD card IDs
@@ -492,12 +464,101 @@ void onGetCommand(void)
         return;
     }
     
+    //-----
     // if we got here, we should handle this in host (RPi)
     for(i=0; i<7; i++) {                        
         atnSendACSIcommand[4 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
     }
             
     state = STATE_SEND_COMMAND;
+}
+
+BYTE onGetCommandAcsi(void)
+{
+    BYTE id, i;
+
+    //----------------------
+    cmd[0]  = PIO_writeFirst();                     // get byte from ST (waiting for the 1st byte)
+    id      = (cmd[0] >> 5) & 0x07;                 // get only device ID
+
+    //----------------------
+    if(!enabledIDs[id]) {                           // if this ID is not enabled, quit
+        return 0;
+    }
+    
+    cmdLen = 6;                                     // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
+            
+    for(i=1; i<cmdLen; i++) {                       // receive the next command bytes
+        cmd[i] = PIO_write();                       // drop down IRQ, get byte
+
+        if(brStat != E_OK) {                        // if something was wrong, quit, failed
+            resetXilinx();
+            return 0;
+        }
+        
+        if(i == 1) {                                // if we got also the 2nd byte
+            getCmdLengthFromCmdBytesAcsi();         // we set up the length of command, etc.
+        }             
+    }
+    
+    return 1;
+}
+
+BYTE onGetCommandScsi(void)
+{
+    BYTE id;
+    BYTE sel;
+    int i;
+
+    //----------------------
+    sel     = PIO_writeFirst();                 // get SELection byte
+    id      = 0xff;                             // mark that ID hasn't been found yet
+    
+    for(i=0; i<8; i++) {
+        if((sel & (1 << i)) != 0) {             // if bit is one, this ID is selected 
+            if(enabledIDs[i]) {                 // if that ID is enabled
+                id = i;                         // store this ID and quit loop
+                break;
+            }
+        }
+    }
+    
+    if(id == 0xff) {                            // ID not found? quit
+        return 0;
+    }
+    //----------------------
+    if(!enabledIDs[id]) {                           // if this ID is not enabled, quit
+        return 0;
+    }
+    
+    cmdLen = 6;                                     // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
+            
+    for(i=0; i<cmdLen; i++) {                       // receive the next command bytes
+        cmd[i] = PIO_write();                       // drop down IRQ, get byte
+
+        if(brStat != E_OK) {                        // if something was wrong, quit, failed
+            resetXilinx();
+            return 0;
+        }
+        
+        if(i == 0) {                                // if we got also the 2nd byte
+            getCmdLengthFromCmdBytesScsi(cmd[0]);   // we set up the length of command, etc.
+        }             
+    }
+    
+    // now fix the command if the length is more than 6 bytes
+    if(cmdLen > 6) {
+        for(i=13; i>0; i--) {                       // move the cmd one byte further (to make cmd[0] unused)
+            cmd[i] = cmd[i - 1];
+        }
+        cmd[0] = 0x1f;                              // store ICD command marker
+        
+        cmdLen++;                                   // now the command is one byte longer
+    }
+    
+    // for all commands add fake ACSI ID on top of the 0th byte
+    cmd[0] = cmd[0] | (id << 5);                    // add ID on the top 3 bits
+    return 1;
 }
 
 BYTE tryProcessLocally(void)
@@ -794,7 +855,7 @@ void onReadStatus(void)
     state = STATE_GET_COMMAND;                              // get the next command
 }
 
-void getCmdLengthFromCmdBytes(void)
+void getCmdLengthFromCmdBytesAcsi(void)
 {   
     // now it's time to set up the receiver buffer and length
     if((cmd[0] & 0x1f)==0x1f)   {                           // if the command is '0x1f'
@@ -808,6 +869,19 @@ void getCmdLengthFromCmdBytes(void)
         }
     } else {                                                // if it isn't a ICD command
         cmdLen   = 6;                                       // then length is 6 bytes 
+    }
+}
+
+void getCmdLengthFromCmdBytesScsi(BYTE cmd)
+{   
+    switch((cmd & 0xe0)>>5)                                 // get the length of the command
+    {
+        case  0: cmdLen =  6; break;
+        case  1: cmdLen = 10; break;
+        case  2: cmdLen = 10; break;
+        case  4: cmdLen = 16; break;
+        case  5: cmdLen = 12; break;
+        default: cmdLen =  6; break;
     }
 }
 
