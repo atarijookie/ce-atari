@@ -904,6 +904,8 @@ void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
 
 void init_hw_sw(void)
 {
+    DWORD a;
+    
     RCC->AHBENR     |= (1 <<  0);                                               // enable DMA1
     RCC->APB1ENR    |= (1 << 14) | (1 <<  2) | (1 << 1) | (1 << 0);             // enable SPI2, TIM4, TIM3, TIM2
     RCC->APB2ENR    |= (1 << 12) | (1 << 11) | (1 << 4) | (1 << 3) | (1 << 2);  // Enable SPI1, TIM1, GPIOC, GPIOB, GPIOA clock
@@ -929,8 +931,8 @@ void init_hw_sw(void)
     GPIOA->CRL |=   0x00003333;                             // 4 ouputs (ATN, DMA, PIO, RNW) and 4 inputs (ACK, CS, CMD, RESET)
 
     // LEDs
-    GPIOA->CRH &= ~(0xf00ff000);                            // remove bits from GPIOA
-    GPIOA->CRH |=   0x30033000;                             // 3 ouputs - LED1, LED2, LED3
+    GPIOA->CRH &= ~(0xf00ff00f);                            // remove bits from GPIOA
+    GPIOA->CRH |=   0x3003300b;                             // 3 ouputs - LED1, LED2, LED3, PA8 as ALT output (MCO)
 
     RCC->APB2ENR |= (1 << 0);                               // enable AFIO
     
@@ -956,6 +958,12 @@ void init_hw_sw(void)
 
     spi_init2();                                            // init SPI interface - for SD card
     dma_spi2_init();
+    
+	// enable clock output on PA8 pin
+    a = RCC->CFGR;
+    a = a & 0xf8ffffff;         // remove MCO bits
+    a = a | 0x04000000;         // MCO (micro clock output): SYSCLK (72 MHz)
+    RCC->CFGR = a;
 }
 
 WORD spi_TxRx(WORD out)
