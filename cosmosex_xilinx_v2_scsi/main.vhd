@@ -11,7 +11,6 @@ entity main is
         XRnW        : in  std_logic;        -- defines data direction (1: DATA1 <- DATA2,  0: DATA1 -> DATA2)
         XCMD        : out std_logic;        -- this is combination of CS and A1, will go low on 1st cmd byte from ACSI port
         reset_hans  : in  std_logic;        -- this is the signal which resets Hans, and it will reset this CPLD too to init it
-        XATN        : out std_logic;        -- just a copy of ATN signal
 
         -- signals connected to MCU, which should be just copies of SCSI port states
         XRESET  : out std_logic;
@@ -20,7 +19,6 @@ entity main is
 
         -- signals connected to SCSI port
         SRST : in    std_logic;            -- RESET device
-        ATN  : in    std_logic;            -- ATN - when MSG OUT phase should start
         SEL  : in    std_logic;            -- target selection is marked with this signal
         BSYa : inout std_logic;            -- when device is listening
         BSYb : out   std_logic;            -- when device is listening
@@ -58,10 +56,9 @@ entity main is
 end main;
 
 architecture Behavioral of main is
-    type SCSI_states   is (FREE, DATA_OUT, DATA_IN, COMMAND, STATUS, MESSAGE_OUT, MESSAGE_IN);
+    type REQACKstates   is (IDLE, WAITCLK, WAITACK, FINISH);
 
     signal phaseReset    : std_logic;
-    signal phaseClock    : std_logic;
 
     signal REQtrig       : std_logic;
     signal REQtrigPrev   : std_logic;
@@ -71,7 +68,7 @@ architecture Behavioral of main is
     signal resetCombo    : std_logic;
     signal identify      : std_logic;
 
-    signal busState      : SCSI_states;
+    signal ReqAckState   : REQACKstates;
 
     signal CDsignal      : std_logic;
     signal MSGsignal     : std_logic;
@@ -81,17 +78,18 @@ architecture Behavioral of main is
     signal BSYsignal     : std_logic;
 
     signal d1out         : std_logic;
-
+    
     signal identifyA     : std_logic;
     signal identifyS     : std_logic;
 
     signal nSelection    : std_logic;
     signal lathClock     : std_logic;
 
-    signal doPhaseStatus : std_logic;
-    signal doPhaseCommand: std_logic;
-    signal doPhaseDataOut: std_logic;
-    signal doPhaseDataIn : std_logic;
+    signal readingStatus : std_logic;
+
+    signal dXRnW         : std_logic;
+    signal dXPIO         : std_logic;
+    signal dACK          : std_logic;
 
 begin
 
@@ -100,73 +98,89 @@ begin
     identifyS  <= identify and HDD_IF;          -- active when IDENTIFY and it's SCSI hardware
 
     phaseReset <= SRST and reset_hans and (not identify);  -- when one of these goes low, reset phase to FREE
-    phaseClock <= XPIO xor XDMA;                -- if one of these (but not both) go high, it's time to change the phase
 
     nSelection <= not ((not SEL) and BSYa);     -- selection is when SEL is 0 and BSY is 1. nSelection is inverted selection, because DATA1latch is captured on falling edge
     XCMD       <= nSelection or (not SRST);     -- falling edge means target selection (SRST must be 1, otherwise ignored)
 
     resetCombo <= SRST and reset_hans and (not identify);   -- when one of these reset signals is low, the result is low
 
-    doPhaseCommand  <= (phaseClock and XPIO and (not XRnW));
-    doPhaseStatus   <= (phaseClock and XPIO and (    XRnW));
-    doPhaseDataOut  <= (phaseClock and XDMA and (not XRnW));
-    doPhaseDataIn   <= (phaseClock and XDMA and (    XRnW));
-
 -- TODO: message phase is totally skipped - is it needed, will it work?
    
     fsm: process(clk, phaseReset) is
-        variable doReq        : boolean := false;
-        variable statusWasRead: boolean := false;
     begin
-        if(rising_edge(clk)) then
+        if (phaseReset = '0') then 
+            ReqAckState     <= IDLE;                        -- FSM starts in IDLE state
+            REQstate        <= '1';                         -- REQ line is hi
+            readingStatus   <= '0';                         -- not reading status
+            BSYsignal       <= '1';                         -- not busy
+            IOsignal        <= '1';                         -- controls are idle
+            CDsignal        <= '1';                         -- controls are idle
+
+        elsif (rising_edge(clk)) then
             REQtrigPrev <= REQtrig;             -- store previous state
             REQtrig     <= XPIO xor XDMA;       -- current trigger state - trigger REQ if one of these goes high, but not both! (that would be identify cmd)
-        end if;
 
-        if (phaseReset = '0') then
-            busState      <= FREE;
-            REQstate      <= '1';
-            doReq         := false;
-            statusWasRead := false;
-        elsif(rising_edge(clk)) then
-            if    (doPhaseStatus = '1'  and (busState /= STATUS))     then      -- if need to change phase, don't do anything else in this cycle
-                busState <= STATUS;
-                doReq    := true;
-                REQstate <= '1';
-            elsif (doPhaseCommand = '1' and (busState /= COMMAND))    then      -- if need to change phase, don't do anything else in this cycle
-                busState <= COMMAND;
-                doReq    := true;
-                REQstate <= '1';
-            elsif (doPhaseDataIn = '1'  and (busState /= DATA_IN))    then      -- if need to change phase, don't do anything else in this cycle
-                busState <= DATA_IN;
-                doReq    := true;
-                REQstate <= '1';
-            elsif (doPhaseDataOut = '1' and (busState /= DATA_OUT))   then      -- if need to change phase, don't do anything else in this cycle
-                busState <= DATA_OUT;
-                doReq    := true;
-                REQstate <= '1';
-            else                                                                -- no need to change phase? 
-                if(SACK = '0' or resetCombo = '0') then                         -- if we're reseting REQ, do it
-                    REQstate <= '1';
-                elsif ((REQtrigPrev = '0' and REQtrig = '1') or doReq = true) then  -- on rising edge or REQtrig (on XPIO / XDMA, or from previous phase change), or when should do REQtrig because it was triggered by phase change
-                    doReq    := false;
-                    REQstate <= '0';
-                end if;
+            -- latch signals on clock
+            dXRnW       <= XRnW;                
+            dXPIO       <= XPIO;
+            dACK        <= SACK;
 
-                if (busState = STATUS) then                     -- in STATUS state
-                    if (SACK = '0') then                        -- when currently reading status (when ACK is 0), mark that status was read
-                        statusWasRead := true;
-                    elsif (SACK = '1' and statusWasRead) then   -- if ACK is back to 1, and status was read (it was 0 for a while), go to FREE state
-                        busState      <= FREE;
-                        REQstate      <= '1';
-                        doReq         := false;
-                        statusWasRead := false;
+            case ReqAckState is
+                when IDLE =>
+                    if(REQtrigPrev = '0' and REQtrig = '1') then    -- REQ trig rising edge
+                        BSYsignal <= '0';                           -- pull BSY low - we're responding to SCSI selection
+
+                        if( dXRnW = '1' and dXPIO = '1') then       -- if it's reading status byte
+                            readingStatus   <= '1';
+                        else                                        -- not reading status
+                            readingStatus   <= '0';
+                        end if;
+
+                        if( (dXRnW = (not IOsignal)) and (dXPIO = (not CDsignal)) ) then
+                            -- if control signals are OK
+                            REQstate    <= '0';             -- pull REQ low
+                            ReqAckState <= WAITACK;         -- next state: wait for ACK
+                        else 
+                            -- if control signals are wrong
+                            IOsignal    <= not dXRnW;       -- set I/O
+                            CDsignal    <= not dXPIO;       -- set C/D
+
+                            ReqAckState <= WAITCLK;         -- next state: wait 1 clk before doing anything else
+                        end if;
                     end if;
-                end if;    
-            end if;
-            
+                
+                when WAITCLK =>
+                    REQstate    <= '0';                     -- pull REQ to low
+                    ReqAckState <= WAITACK;                 -- next state: wait 1 clk before doing anything else
+                
+                when WAITACK =>
+                    if(dACK = '0') then                     -- if ACK is low
+                        REQstate    <= '1';                 -- put REQ back to hi
+                        ReqAckState <= FINISH;              -- next state: wait until ACK goes back to hi
+                    end if;
+                                    
+                when FINISH =>
+                    if(dACK = '1') then                     -- when the ACK line is released back to hi
+                        ReqAckState <= IDLE;                -- go to idle state
+
+                        if( readingStatus = '1' ) then      -- if it was reading of status byte
+                            readingStatus   <= '0';
+                            BSYsignal       <= '1';         -- release BSY signal back to hi 
+                            IOsignal        <= '1';         -- controls are idle
+                            CDsignal        <= '1';         -- controls are idle
+                        end if;
+
+                    end if;
+
+                when others =>
+                    ReqAckState <= IDLE;
+
+            end case;
         end if;
+
     end process;
+
+    MSGsignal <= '1';
 
     SREQa <= '0' when REQstate='0' else 'Z';             -- REQ - pull to L, otherwise hi-Z
     SREQb <= '0' when REQstate='0' else 'Z';             -- REQ - pull to L, otherwise hi-Z
@@ -218,39 +232,6 @@ begin
     XCS    <= SACK;
     XACK   <= SACK;
     XRESET <= SRST;
-    XATN   <= ATN;
-
-    -- setting of C/D, MSG, I/O states depending on BUS STATE
-    phaseSignals: process(busState) is
-    begin
-        if    (busState = FREE) then
-            CDsignal  <= '1';
-            MSGsignal <= '1';
-            IOsignal  <= '1';
-        elsif (busState = STATUS) then
-            CDsignal  <= '0';
-            MSGsignal <= '1';
-            IOsignal  <= '0';
-        elsif (busState = COMMAND) then
-            CDsignal  <= '0';
-            MSGsignal <= '1';
-            IOsignal  <= '1';
-        elsif (busState = DATA_IN) then
-            CDsignal  <= '1';
-            MSGsignal <= '1';
-            IOsignal  <= '0';
-        elsif (busState = DATA_OUT) then
-            CDsignal  <= '1';
-            MSGsignal <= '1';
-            IOsignal  <= '1';
-        else
-            -- This last 'else' is here to avoid using latches for C/D, MSG, I/O signals 
-            -- They shouldn't be latched, just display the BUS STATE to these signals. 
-            CDsignal  <= '1';
-            MSGsignal <= '1';
-            IOsignal  <= '1';
-        end if;    
-    end process;
 
     -- these should be set according to the current SCSI phase
     CDa   <= '0' when CDsignal ='0' else 'Z';
@@ -269,7 +250,6 @@ begin
 
     -- pull BSY low when needed, otherwise just let it in Hi-Z
     -- setting BSY signal depending on BUS STATE
-    BSYsignal <= '1' when busState=FREE else '0';       -- when in FREE phase, don't pull BSY low, in other phases - pull BSY low
     BSYa      <= '0' when BSYsignal='0' else 'Z';
     BSYb      <= '0' when BSYsignal='0' else 'Z';
 
