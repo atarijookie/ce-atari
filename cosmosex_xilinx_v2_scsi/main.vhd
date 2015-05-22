@@ -56,7 +56,7 @@ entity main is
 end main;
 
 architecture Behavioral of main is
-    type REQACKstates   is (IDLE, WAITCLK, WAITACK, FINISH);
+    type REQACKstates   is (IDLE, WAITCLK1, WAITCLK2, WAITACK, FINISH);
 
     signal phaseReset    : std_logic;
 
@@ -145,11 +145,14 @@ begin
                             IOsignal    <= not dXRnW;       -- set I/O
                             CDsignal    <= not dXPIO;       -- set C/D
 
-                            ReqAckState <= WAITCLK;         -- next state: wait 1 clk before doing anything else
+                            ReqAckState <= WAITCLK1;        -- next state: wait 1 clk before doing anything else
                         end if;
                     end if;
                 
-                when WAITCLK =>
+                when WAITCLK1 =>
+                    ReqAckState <= WAITCLK2;                -- next state: wait 1 clk before doing anything else
+
+                when WAITCLK2 =>
                     REQstate    <= '0';                     -- pull REQ to low
                     ReqAckState <= WAITACK;                 -- next state: wait 1 clk before doing anything else
                 
@@ -182,8 +185,8 @@ begin
 
     MSGsignal <= '1';
 
-    SREQa <= '0' when REQstate='0' else 'Z';             -- REQ - pull to L, otherwise hi-Z
-    SREQb <= '0' when REQstate='0' else 'Z';             -- REQ - pull to L, otherwise hi-Z
+    SREQa <= '0' when (REQstate='0' and SACK='1') else 'Z';             -- REQ - pull to L, otherwise hi-Z
+    SREQb <= '0' when (REQstate='0' and SACK='1') else 'Z';             -- REQ - pull to L, otherwise hi-Z
 
     -- 8-bit latch register
     -- latch data from ST on falling edge of lathClock (that means either on falling nSelection, or falling SACK)
