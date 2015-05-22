@@ -63,6 +63,7 @@ architecture Behavioral of main is
     signal REQtrig       : std_logic;
     signal REQtrigPrev   : std_logic;
     signal REQstate      : std_logic;
+    signal REQstate2     : std_logic;
 
     signal DATA1latch    : std_logic_vector(7 downto 0);
     signal resetCombo    : std_logic;
@@ -185,8 +186,17 @@ begin
 
     MSGsignal <= '1';
 
-    SREQa <= '0' when (REQstate='0' and SACK='1') else 'Z';             -- REQ - pull to L, otherwise hi-Z
-    SREQb <= '0' when (REQstate='0' and SACK='1') else 'Z';             -- REQ - pull to L, otherwise hi-Z
+    reqAsync: process(REQstate, phaseReset, SACK) is
+    begin
+        if (phaseReset = '0' or SACK = '0') then
+            REQstate2 <= '1';
+        elsif (falling_edge(REQstate)) then
+            REQstate2 <= '0';
+        end if;
+    end process;
+
+    SREQa <= '0' when (REQstate2 = '0' and SACK = '1') else 'Z';             -- REQ - pull to L, otherwise hi-Z
+    SREQb <= '0' when (REQstate2 = '0' and SACK = '1') else 'Z';             -- REQ - pull to L, otherwise hi-Z
 
     -- 8-bit latch register
     -- latch data from ST on falling edge of lathClock (that means either on falling nSelection, or falling SACK)
@@ -232,8 +242,8 @@ begin
     TX_out <=   TX_Franz when TXSEL1n2='1' else TX_Hans;   -- depending on TXSEL1n2 switch TX_out to TX_Franz or TX_Hans
 
     -- just copy state from one signal to another
-    XCS    <= SACK;
-    XACK   <= SACK;
+    XCS    <= SACK or (    CDsignal);
+    XACK   <= SACK or (not CDsignal);
     XRESET <= SRST;
 
     -- these should be set according to the current SCSI phase
