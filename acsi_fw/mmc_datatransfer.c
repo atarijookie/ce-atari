@@ -28,6 +28,7 @@ void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 		GPIOA->BRR	= aDMA;\
 		while(1) {\
 			if(timeout()) {\
+                brStat = E_TimeOut; \
                 quit = 1;\
                 break;\
 			}\

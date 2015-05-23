@@ -7,6 +7,9 @@
 
 #include "datatransfer.h"
 
+#include "bridge.h"
+extern BYTE brStat;                     // status from bridge
+
 __forceinline BYTE timeout(void)
 {
 	if((TIM3->SR & 0x0001) != 0) {		// overflow of TIM4 occured?
@@ -27,6 +30,7 @@ __forceinline BYTE timeout(void)
 		lo = data & 0xff;\
 		while(1) {\
 			if(timeout()) {\
+                brStat = E_TimeOut; \
 				return 0;\
 			}\
 			exti = EXTI->PR;\
@@ -42,6 +46,7 @@ __forceinline BYTE timeout(void)
 		pData++;\
 		while(1) {\
 			if(timeout()) {\
+                brStat = E_TimeOut; \
 				return 0;\
 			}\
 			exti = EXTI->PR;\
@@ -61,6 +66,7 @@ __forceinline BYTE timeout(void)
 		GPIOA->BRR	= aDMA;\
 		while(1) {\
 			if(timeout()) {\
+                brStat = E_TimeOut; \
 				return 0;\
 			}\
 			exti = EXTI->PR;\

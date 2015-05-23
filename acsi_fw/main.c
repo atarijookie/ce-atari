@@ -185,6 +185,11 @@ int main (void)
     //-------------
     // main loop
     while(1) {
+        // if something was wrong, reset XILINX so it won't get stuck 
+        if(brStat != E_OK) {
+            resetXilinx();
+        }
+        
         // if card insert state changed, mark down this event
         if(prevIsCardInserted != isCardInserted()) {
             prevIsCardInserted = isCardInserted();
@@ -603,6 +608,7 @@ BYTE tryProcessLocally(void)
     //---------
     // if it's not CosmosEx custom command, process it locally
     processScsiLocaly(justCmd, isIcd);
+    
 //  scsi_log_add();
     return TRUE;                        // did process locally
 }
@@ -1418,4 +1424,6 @@ void resetXilinx(void)
     ACSI_DATADIR_WRITE();
     GPIOA->BRR	= aPIO | aDMA;          // aPIO and aDMA now LOW -- back to normal state
     EXTI->PR    = aCMD | aCS | aACK;    // also clear possible EXTI flags
+    
+    brStat = E_OK;                      // everything is fine now
 }
