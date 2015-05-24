@@ -2,6 +2,8 @@
 #include "debug.h"
 #include "utils.h"
 #include "ccorethread.h" 
+
+extern volatile bool floppyEncodingRunning;
  
 FloppyService::FloppyService():pxImageSilo(NULL),pxCoreThread(NULL),iInitState(INIT_NONE) 
 {
@@ -76,6 +78,20 @@ bool FloppyService::setImage(int iSlot, std::string sLocalFileWPath)
     pxImageSilo->add(iSlot, sFile, sLocalFileWPath, sEmpty, sEmpty, true); 
         
     return true;
+}
+
+int FloppyService::getImageState()
+{
+ 	if( floppyEncodingRunning ){
+ 		return IMAGE_NOTREADY;
+	}else{
+ 		return IMAGE_OK;
+	}
+}
+
+bool FloppyService::isImageReady()
+{
+    return getImageState()==IMAGE_OK;
 }
 
 bool FloppyService::setActiveSlot(int iSlot)

@@ -12,7 +12,7 @@
   Activate slot - all others are deactivated
 
   api/v1/floppy/ 	GET
-	{"slots":["filename_slot1.msa","filename_slot2.msa","filename_slot3.msa"]}
+	{"slots":["filename_slot1.msa","filename_slot2.msa","filename_slot3.msa"],"active":null|0|1|2,"encoding_ready":true|false}
 
   ----------------------------------------------------------------*/
 //TODO:
@@ -27,7 +27,7 @@ CosmosEx.Floppy=function(){
       success: function(data){
         for( var i=0; i<3; i++){
           $("input[type=checkbox][data-slot='"+i+"']").prop('checked', false);
-          if( typeof data.slots[i]!="undefined" ){
+          if( typeof data.slots!="undefined" && typeof data.slots[i]!="undefined" ){
             var file=data.slots[i];
             $("span.file-"+i).removeClass("empty");
             $("div[data-slot='"+i+"'] label.checkbox").removeClass("empty");
@@ -93,10 +93,33 @@ CosmosEx.Floppy=function(){
         processData: false
     });    
   }
+  //check if image is converted
+  var onTimer=function(e){
+  	$.ajax({
+  		type: 'GET',
+  		url: '/api/v1/floppy',
+      success: function(data){
+		if( typeof(data.encoding_ready)!=='undefined' ){
+	        if( data.encoding_ready ){
+			  $(".overlay").hide();	
+	        }else{
+	          setTimeout(onTimer, 1000);
+	        }
+		}else{
+			//there's no information about encoding status, so give user UI access again
+			$(".overlay").hide();
+		}
+      },
+      error: function(){
+		$overlay.hide();	
+      }
+  	});
+  }
   var onSubmit=function(e){
     var $form=$(this).parent("form");
     var $progress=$form.siblings("progress");
     var $filename=$form.siblings(".file.name");
+    var $overlay=$(".overlay");
     var $button=$(this);
     var slotid=$(this).data("slot");
     var formData = new FormData($form[0]);
@@ -123,8 +146,10 @@ CosmosEx.Floppy=function(){
         success: function(){
           $progress.hide();
           $button.addClass("vis-hidden");  
-          refreshFilenames();  
-          $filename.show();  
+          refreshFilenames();
+	      $filename.show();
+		  $overlay.show(); 
+	      setTimeout(onTimer, 1000);
         },
         error: function(){
           $progress.hide();  

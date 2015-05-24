@@ -18,12 +18,15 @@ public:
     int getInitState();
     std::string getImageName(int iSlot);
     bool setImage(int iSlot, std::string sLocalFileWPath);
+    int getImageState();
+	bool isImageReady();
     bool setActiveSlot(int iSlot);
     int getActiveSlot();
 private:
     ImageSilo* pxImageSilo;
     CCoreThread* pxCoreThread;
     enum eInitState {INIT_NONE=0, INIT_OK=1};
+    enum eImageState {IMAGE_NOTREADY=0, IMAGE_OK=1};
     int iInitState;
 };
 #endif

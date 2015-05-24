@@ -50,6 +50,13 @@ bool FloppyResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         }else{
           stringStream << "\"active\":" << pxFloppyService->getActiveSlot();
         }
+        stringStream << ","; 
+        stringStream << "\"encoding_ready\":"; 
+        if( pxFloppyService->isImageReady() ){
+          stringStream << "true";
+        }else{
+          stringStream << "false";
+        }
         stringStream << "}"; 
         std::string sJson=stringStream.str();
         mg_printf(conn, "Content-Length: %d\r\n\r\n",sJson.length());        // Always set Content-Length
