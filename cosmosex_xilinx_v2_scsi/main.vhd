@@ -56,20 +56,15 @@ entity main is
 end main;
 
 architecture Behavioral of main is
-    type REQACKstates   is (IDLE, WAITCLK1, WAITCLK2, WAITACK, FINISH);
-
     signal phaseReset    : std_logic;
 
     signal REQtrig       : std_logic;
-    signal REQtrigPrev   : std_logic;
     signal REQstate      : std_logic;
-    signal REQstate2     : std_logic;
+    signal REQtrigDelayed: std_logic;
 
     signal DATA1latch    : std_logic_vector(7 downto 0);
     signal resetCombo    : std_logic;
     signal identify      : std_logic;
-
-    signal ReqAckState   : REQACKstates;
 
     signal CDsignal      : std_logic;
     signal MSGsignal     : std_logic;
@@ -86,12 +81,8 @@ architecture Behavioral of main is
     signal nSelection    : std_logic;
     signal lathClock     : std_logic;
 
-    signal readingStatus : std_logic;
-
-    signal dXRnW         : std_logic;
-    signal dXPIO         : std_logic;
-    signal dACK          : std_logic;
-
+    signal statRead      : std_logic_vector(1 downto 0);
+    signal delay         : std_logic_vector(1 downto 0);
 begin
 
     identify   <= XPIO and XDMA and TXSEL1n2;   -- when TXSEL1n2 selects Franz (='1') and you have PIO and DMA pins high, then you can read the identification byte from DATA2
@@ -107,96 +98,82 @@ begin
 
 -- TODO: message phase is totally skipped - is it needed, will it work?
    
-    fsm: process(clk, phaseReset) is
-    begin
-        if (phaseReset = '0') then 
-            ReqAckState     <= IDLE;                        -- FSM starts in IDLE state
-            REQstate        <= '1';                         -- REQ line is hi
-            readingStatus   <= '0';                         -- not reading status
-            BSYsignal       <= '1';                         -- not busy
-            IOsignal        <= '1';                         -- controls are idle
-            CDsignal        <= '1';                         -- controls are idle
-
-        elsif (rising_edge(clk)) then
-            REQtrigPrev <= REQtrig;             -- store previous state
-            REQtrig     <= XPIO xor XDMA;       -- current trigger state - trigger REQ if one of these goes high, but not both! (that would be identify cmd)
-
-            -- latch signals on clock
-            dXRnW       <= XRnW;                
-            dXPIO       <= XPIO;
-            dACK        <= SACK;
-
-            case ReqAckState is
-                when IDLE =>
-                    if(REQtrigPrev = '0' and REQtrig = '1') then    -- REQ trig rising edge
-                        BSYsignal <= '0';                           -- pull BSY low - we're responding to SCSI selection
-
-                        if( dXRnW = '1' and dXPIO = '1') then       -- if it's reading status byte
-                            readingStatus   <= '1';
-                        else                                        -- not reading status
-                            readingStatus   <= '0';
-                        end if;
-
-                        if( (dXRnW = (not IOsignal)) and (dXPIO = (not CDsignal)) ) then
-                            -- if control signals are OK
-                            REQstate    <= '0';             -- pull REQ low
-                            ReqAckState <= WAITACK;         -- next state: wait for ACK
-                        else 
-                            -- if control signals are wrong
-                            IOsignal    <= not dXRnW;       -- set I/O
-                            CDsignal    <= not dXPIO;       -- set C/D
-
-                            ReqAckState <= WAITCLK1;        -- next state: wait 1 clk before doing anything else
-                        end if;
-                    end if;
-                
-                when WAITCLK1 =>
-                    ReqAckState <= WAITCLK2;                -- next state: wait 1 clk before doing anything else
-
-                when WAITCLK2 =>
-                    REQstate    <= '0';                     -- pull REQ to low
-                    ReqAckState <= WAITACK;                 -- next state: wait 1 clk before doing anything else
-                
-                when WAITACK =>
-                    if(dACK = '0') then                     -- if ACK is low
-                        REQstate    <= '1';                 -- put REQ back to hi
-                        ReqAckState <= FINISH;              -- next state: wait until ACK goes back to hi
-                    end if;
-                                    
-                when FINISH =>
-                    if(dACK = '1') then                     -- when the ACK line is released back to hi
-                        ReqAckState <= IDLE;                -- go to idle state
-
-                        if( readingStatus = '1' ) then      -- if it was reading of status byte
-                            readingStatus   <= '0';
-                            BSYsignal       <= '1';         -- release BSY signal back to hi 
-                            IOsignal        <= '1';         -- controls are idle
-                            CDsignal        <= '1';         -- controls are idle
-                        end if;
-
-                    end if;
-
-                when others =>
-                    ReqAckState <= IDLE;
-
-            end case;
-        end if;
-
-    end process;
-
     MSGsignal <= '1';
 
-    reqAsync: process(REQstate, phaseReset, SACK) is
+    REQtrig  <= XPIO xor XDMA;
+
+    delayedReq: process(clk, phaseReset, REQtrigDelayed, REQtrig) is    -- delaying process, which creates REQtrigDelayed as 1-0-1 after REQtrig going hi
     begin
-        if (phaseReset = '0' or SACK = '0') then
-            REQstate2 <= '1';
-        elsif (falling_edge(REQstate)) then
-            REQstate2 <= '0';
+        if(phaseReset = '0') then
+            delay          <= "11";
+            REQtrigDelayed <= '1';
+        elsif (REQtrig = '1' )   then
+            delay          <= "00";
+            REQtrigDelayed <= '1';
+        elsif (rising_edge(clk)) then
+            case delay is
+                when "00" =>
+                    REQtrigDelayed <= '1';
+                    delay          <= "01";
+
+                when "01" =>
+                    REQtrigDelayed <= '0';
+                    delay          <= "10";
+
+                when "10" =>
+                    REQtrigDelayed <= '1';
+                    delay          <= "11";
+
+                when "11" =>
+                    delay          <= "11";
+
+                when others =>
+                    delay          <= "11";
+
+            end case;
+
         end if;
     end process;
 
-    SREQa <= '0' when (REQstate2 = '0' and SACK = '1') else 'Z';             -- REQ - pull to L, otherwise hi-Z
-    SREQb <= '0' when (REQstate2 = '0' and SACK = '1') else 'Z';             -- REQ - pull to L, otherwise hi-Z
+    stateAsync: process(REQtrig, phaseReset, SACK, delay, statRead, REQtrigDelayed) is
+    begin
+        if (phaseReset = '0' or SACK = '0')  then
+            REQstate <= '1';
+        elsif (falling_edge(REQtrigDelayed)) then 
+            REQstate <= '0';
+        end if;
+
+        if(phaseReset = '0') then
+            BSYsignal   <= '1';                         -- not BSY
+            IOsignal    <= '1';
+            CDsignal    <= '1';
+        elsif (rising_edge(REQtrig)) then
+            BSYsignal   <= '0';                         -- is BSY
+            IOsignal    <= not XRnW;                    -- set I/O
+            CDsignal    <= not XPIO;                    -- set C/D
+
+            if( XRnW = '1' and XPIO = '1') then         -- if it's reading status byte
+                statRead <= "01";
+            else                                        -- not reading status
+                statRead <= "00";
+            end if;
+        end if;
+
+        if(statRead = "01" and SACK = '0') then
+            statRead <= "10";
+        end if;
+    
+        if(statRead = "10" and SACK = '1') then    -- if it was reading of status byte
+            statRead        <= "00";
+
+            BSYsignal       <= '1';         -- release BSY signal back to hi 
+            IOsignal        <= '1';         -- controls are idle
+            CDsignal        <= '1';         -- controls are idle
+        end if;        
+    end process;
+
+    SREQa <= '0' when (REQstate = '0' and SACK = '1') else 'Z';             -- REQ - pull to L, otherwise hi-Z
+    SREQb <= '0' when (REQstate = '0' and SACK = '1') else 'Z';             -- REQ - pull to L, otherwise hi-Z
 
     -- 8-bit latch register
     -- latch data from ST on falling edge of lathClock (that means either on falling nSelection, or falling SACK)
