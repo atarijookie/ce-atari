@@ -104,7 +104,7 @@ begin
 
     delayedReq: process(clk, phaseReset, REQtrigDelayed, REQtrig) is    -- delaying process, which creates REQtrigDelayed as 1-0-1 after REQtrig going hi
     begin
-        if(phaseReset = '0') then
+        if(phaseReset = '0')     then
             delay          <= "11";
             REQtrigDelayed <= '1';
         elsif (REQtrig = '1' )   then
@@ -143,10 +143,12 @@ begin
             REQstate <= '0';
         end if;
 
-        if(phaseReset = '0') then
+        if ((phaseReset = '0') or (statRead = "10" and SACK = '1')) then	-- if phase reset, or if it was reading of status byte
             BSYsignal   <= '1';                         -- not BSY
             IOsignal    <= '1';
             CDsignal    <= '1';
+
+			statRead    <= "00";
         elsif (rising_edge(REQtrig)) then
             BSYsignal   <= '0';                         -- is BSY
             IOsignal    <= not XRnW;                    -- set I/O
@@ -162,14 +164,6 @@ begin
         if(statRead = "01" and SACK = '0') then
             statRead <= "10";
         end if;
-    
-        if(statRead = "10" and SACK = '1') then    -- if it was reading of status byte
-            statRead        <= "00";
-
-            BSYsignal       <= '1';         -- release BSY signal back to hi 
-            IOsignal        <= '1';         -- controls are idle
-            CDsignal        <= '1';         -- controls are idle
-        end if;        
     end process;
 
     SREQa <= '0' when (REQstate = '0' and SACK = '1') else 'Z';             -- REQ - pull to L, otherwise hi-Z
