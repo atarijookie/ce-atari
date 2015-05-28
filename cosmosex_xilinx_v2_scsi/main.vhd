@@ -81,7 +81,6 @@ architecture Behavioral of main is
     signal nSelection    : std_logic;
     signal lathClock     : std_logic;
 
-    signal statRead      : std_logic_vector(1 downto 0);
     signal delay         : std_logic_vector(1 downto 0);
 begin
 
@@ -104,70 +103,64 @@ begin
 
     delayedReq: process(clk, phaseReset, REQtrigDelayed, REQtrig) is    -- delaying process, which creates REQtrigDelayed as 1-0-1 after REQtrig going hi
     begin
-        if(phaseReset = '0')     then
-            delay          <= "11";
-            REQtrigDelayed <= '1';
-        elsif (REQtrig = '1' )   then
-            delay          <= "00";
-            REQtrigDelayed <= '1';
+        if(phaseReset = '0')     then           -- phase reset makes this go to state 00
+            delay <= "00";
         elsif (rising_edge(clk)) then
             case delay is
-                when "00" =>
-                    REQtrigDelayed <= '1';
-                    delay          <= "01";
+                when "00" =>                    -- state 00
+                    REQtrigDelayed <= '1';      -- delayed REQ trig hi
 
-                when "01" =>
-                    REQtrigDelayed <= '0';
+                    if(REQtrig = '1') then      -- when REQ trig is high, go to next state
+                        delay <= "01";
+                    else                        -- REQ tris is low, stay in this state
+                        delay <= "00";
+                    end if;
+
+                when "01" =>                    -- this state here is just to make at least one CLK delay between REQtrig and REQtrigDelayed (in a corner case it could be just a ns before CLK)
                     delay          <= "10";
 
-                when "10" =>
-                    REQtrigDelayed <= '1';
+                when "10" =>                    -- put REQtriDelayed low, as it was high for at least 1 CLK after REQtrig going low, and go to next state
+                    REQtrigDelayed <= '0';      -- delayed REQ trig low
                     delay          <= "11";
 
-                when "11" =>
-                    delay          <= "11";
+                when "11" =>                    -- last state - wait until REQtrig goes possibly low (or is already there in the mean time), then go to start
+                    REQtrigDelayed <= '1';      -- delayed REQ trig hi
 
-                when others =>
-                    delay          <= "11";
+                    if(REQtrig = '0' ) then     -- if REQ trig is low, we can go to start
+                        delay      <= "00";
+                    else                        -- if REQ trig is hi, stay here, otherwise it would trigger another REQtrigDelayed cycle
+                        delay      <= "11";
+                    end if;
+
+                when others =>                  -- in other cases - go to start
+                    delay          <= "00";
 
             end case;
 
         end if;
     end process;
 
-    stateAsync: process(REQtrig, phaseReset, SACK, delay, statRead, REQtrigDelayed) is
+    stateAsync: process(REQtrig, phaseReset, SACK, REQtrigDelayed) is
     begin
-        if (phaseReset = '0' or SACK = '0')  then
+        if (phaseReset = '0' or SACK = '0')  then       -- if phase reset, or ACK is low, REQ state back to hi
             REQstate <= '1';
-        elsif (falling_edge(REQtrigDelayed)) then 
+        elsif (falling_edge(REQtrigDelayed)) then       -- when rising edge of delayed REQ trig, let REQ go low
             REQstate <= '0';
         end if;
 
-        if ((phaseReset = '0') or (statRead = "10" and SACK = '1')) then	-- if phase reset, or if it was reading of status byte
+        if (phaseReset = '0') then	                    -- if phase reset
             BSYsignal   <= '1';                         -- not BSY
-            IOsignal    <= '1';
-            CDsignal    <= '1';
-
-			statRead    <= "00";
-        elsif (rising_edge(REQtrig)) then
-            BSYsignal   <= '0';                         -- is BSY
-            IOsignal    <= not XRnW;                    -- set I/O
-            CDsignal    <= not XPIO;                    -- set C/D
-
-            if( XRnW = '1' and XPIO = '1') then         -- if it's reading status byte
-                statRead <= "01";
-            else                                        -- not reading status
-                statRead <= "00";
-            end if;
-        end if;
-
-        if(statRead = "01" and SACK = '0') then
-            statRead <= "10";
+            IOsignal    <= '1';                         -- release I/O
+            CDsignal    <= '1';                         -- release C/D
+        elsif (rising_edge(REQtrig)) then               -- if REQ trig goes hi
+            BSYsignal   <= '0';                         -- we're BSY
+            IOsignal    <= not XRnW;                    -- set I/O - low on IN, hi on OUT
+            CDsignal    <= not XPIO;                    -- set C/D - low on CMD, hi on DATA
         end if;
     end process;
 
-    SREQa <= '0' when (REQstate = '0' and SACK = '1') else 'Z';             -- REQ - pull to L, otherwise hi-Z
-    SREQb <= '0' when (REQstate = '0' and SACK = '1') else 'Z';             -- REQ - pull to L, otherwise hi-Z
+    SREQa <= '0' when REQstate = '0' else 'Z';          -- REQ - pull to L, otherwise hi-Z
+    SREQb <= '0' when REQstate = '0' else 'Z';          -- REQ - pull to L, otherwise hi-Z
 
     -- 8-bit latch register
     -- latch data from ST on falling edge of lathClock (that means either on falling nSelection, or falling SACK)
