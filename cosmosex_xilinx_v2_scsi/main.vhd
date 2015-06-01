@@ -60,7 +60,6 @@ architecture Behavioral of main is
 
     signal REQtrig       : std_logic;
     signal REQstate      : std_logic;
-    signal REQtrigDelayed: std_logic;
 
     signal DATA1latch    : std_logic_vector(7 downto 0);
     signal resetCombo    : std_logic;
@@ -81,7 +80,12 @@ architecture Behavioral of main is
     signal nSelection    : std_logic;
     signal lathClock     : std_logic;
 
-    signal delay         : std_logic_vector(1 downto 0);
+    signal REQtrigD1     : std_logic;
+    signal REQtrigD2     : std_logic;    
+
+    signal SACKD1        : std_logic;
+    signal SACKD2        : std_logic;    
+
 begin
 
     identify   <= XPIO and XDMA and TXSEL1n2;   -- when TXSEL1n2 selects Franz (='1') and you have PIO and DMA pins high, then you can read the identification byte from DATA2
@@ -101,53 +105,28 @@ begin
 
     REQtrig  <= XPIO xor XDMA;
 
-    delayedReq: process(clk, phaseReset, REQtrigDelayed, REQtrig) is    -- delaying process, which creates REQtrigDelayed as 1-0-1 after REQtrig going hi
+    captureAndDelay: process(clk, REQtrig, SACK) is  -- delaying process
     begin
-        if(phaseReset = '0')     then           -- phase reset makes this go to state 00
-            delay <= "00";
-        elsif (rising_edge(clk)) then
-            case delay is
-                when "00" =>                    -- state 00
-                    REQtrigDelayed <= '1';      -- delayed REQ trig hi
+        if(rising_edge(clk)) then
+            REQtrigD2 <= REQtrigD1;             -- previous state of REQtrig
+            REQtrigD1 <= REQtrig;               -- current  state in REQtrig
 
-                    if(REQtrig = '1') then      -- when REQ trig is high, go to next state
-                        delay <= "01";
-                    else                        -- REQ tris is low, stay in this state
-                        delay <= "00";
-                    end if;
-
-                when "01" =>                    -- this state here is just to make at least one CLK delay between REQtrig and REQtrigDelayed (in a corner case it could be just a ns before CLK)
-                    delay          <= "10";
-
-                when "10" =>                    -- put REQtriDelayed low, as it was high for at least 1 CLK after REQtrig going low, and go to next state
-                    REQtrigDelayed <= '0';      -- delayed REQ trig low
-                    delay          <= "11";
-
-                when "11" =>                    -- last state - wait until REQtrig goes possibly low (or is already there in the mean time), then go to start
-                    REQtrigDelayed <= '1';      -- delayed REQ trig hi
-
-                    if(REQtrig = '0' ) then     -- if REQ trig is low, we can go to start
-                        delay      <= "00";
-                    else                        -- if REQ trig is hi, stay here, otherwise it would trigger another REQtrigDelayed cycle
-                        delay      <= "11";
-                    end if;
-
-                when others =>                  -- in other cases - go to start
-                    delay          <= "00";
-
-            end case;
-
+            SACKD2    <= SACKD1;                -- previous state of SACK
+            SACKD1    <= SACK;                  -- current  state of SACK
         end if;
     end process;
 
-    stateAsync: process(REQtrig, phaseReset, SACK, REQtrigDelayed) is
+    REQstateDflipflop: process(REQtrigD2, phaseReset, SACKD2) is
     begin
-        if (phaseReset = '0' or SACK = '0')  then       -- if phase reset, or ACK is low, REQ state back to hi
+        if (phaseReset = '0' or SACKD2 = '0')  then     -- if phase reset, or ACK is low, REQ state back to hi
             REQstate <= '1';
-        elsif (falling_edge(REQtrigDelayed)) then       -- when rising edge of delayed REQ trig, let REQ go low
+        elsif (rising_edge(REQtrigD2)) then             -- when rising edge of delayed REQ trig, let REQ go low
             REQstate <= '0';
         end if;
+    end process;
 
+    busStateSignals: process(REQtrig, phaseReset) is
+    begin
         if (phaseReset = '0') then	                    -- if phase reset
             BSYsignal   <= '1';                         -- not BSY
             IOsignal    <= '1';                         -- release I/O
@@ -206,8 +185,8 @@ begin
     TX_out <=   TX_Franz when TXSEL1n2='1' else TX_Hans;   -- depending on TXSEL1n2 switch TX_out to TX_Franz or TX_Hans
 
     -- just copy state from one signal to another
-    XCS    <= SACK or (    CDsignal);
-    XACK   <= SACK or (not CDsignal);
+    XCS    <= SACKD2 or (    CDsignal);
+    XACK   <= SACKD2 or (not CDsignal);
     XRESET <= SRST;
 
     -- these should be set according to the current SCSI phase
