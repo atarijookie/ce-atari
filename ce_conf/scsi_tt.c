@@ -1,7 +1,15 @@
 // based on AHDI 6.061 sources
 
+#include <mint/sysbind.h>
+#include <mint/osbind.h>
+#include <mint/basepage.h>
+#include <mint/ostruct.h>
+#include <support.h>
+
+#include <stdint.h>
+#include <stdio.h>
+
 #include "scsi.h"
-#include "find_ce.h"
 
 extern BYTE deviceID;
 
@@ -23,6 +31,9 @@ static DWORD setscltmout(void);
 static BYTE dmaDataTransfer(BYTE readNotWrite, BYTE cmdLength);
 static BYTE w4int(DWORD timeOutTime);
 static DWORD setscxltmout(void);
+void   setDmaAddr_TT(DWORD addr);
+DWORD  getDmaAddr_TT(void);
+void   setDmaCnt_TT(DWORD dataCount); 
 #else 
 static WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount);
 #endif
@@ -35,11 +46,16 @@ void  scsi_clrBit_TT(int whichReg, DWORD bitMask);
 void  scsi_setBit_TT(int whichReg, DWORD bitMask);
 //-----------------
 
+void clearCache030(void);
+
 BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
+    cmd[0] = cmd[0] & 0x1f;         // remove ID from here
+
     BYTE res = sblkscsi(cmd, cmdLength, buffer, sectorCount * 512);      // send command block
 
     if(res) {
+        resetscsi();
         return -1;
     }
     
@@ -48,6 +64,7 @@ BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
         WORD wres = dataTransfer(readNotWrite, buffer, byteCount, cmdLength);
         
         if(wres) {
+            resetscsi();
             return -1;
         }
     }
@@ -116,16 +133,8 @@ BYTE dmaDataTransfer(BYTE readNotWrite, BYTE cmdLength)
 
     //--------------------------
     // the rest is only for the case of DMA read 
-    
-//----------
-// TODO: drop instruction and data cache
-//	move	sr,-(sp)		// go to IPL 7
-//	ori	#$700,sr		// no interrupts right now kudasai
-//	movecacrd0			// d0 = (cache control register)
-//	ori.w	#$808,d0		// dump both the D and I cache
-//	moved0cacr			// update cache control register
-//	move	(sp)+,sr		// restore interrupt state
-//----------
+
+	clearCache030();
 
     BYTE rest = *bSDMAPTR_lo;   // see if this was an odd transfer
     rest = rest & 0x03;         // get only 2 lowest bits
@@ -185,7 +194,7 @@ WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount)
             scsi_setReg_TT(REG_DB, val);
         }
         
-        doack(timeOutTime);         // do ACK the byte
+        res = doack(timeOutTime);   // do ACK the byte
         if(res) {
             return -1;              // fail
         }
