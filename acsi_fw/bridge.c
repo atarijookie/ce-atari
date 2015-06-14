@@ -3,6 +3,8 @@
 
 extern BYTE brStat;                                                         // status from bridge
 
+void resetXilinx(void);
+
 void timeoutStart(void)
 {
     // init the timer 4, which will serve for timeout measuring 
@@ -53,9 +55,24 @@ BYTE PIO_writeFirst(void)
 BYTE PIO_write(void)
 {
     BYTE val = 0;
+
+    // first wait while aCS is still low
+    while(1) {
+        WORD wVal = GPIOB->IDR;           // read the signals
+            
+        if((wVal & aCS) != 0) {      // if aCS is high, we can continue
+            break;
+        }
+        
+        if(timeout()) {             // if timeout happened
+            brStat = E_TimeOut;     // set the bridge status
+            return 0;
+        }
+    }
     
     // create rising edge on aPIO
     GPIOA->BSRR = aPIO;                                                     // aPIO to HIGH
+    __asm  { nop }
     GPIOA->BRR  = aPIO;                                                     // aPIO to LOW
 
     while(1) {                                                              // wait for CS or timeout
@@ -79,11 +96,26 @@ BYTE PIO_write(void)
 // send status byte to ST 
 void PIO_read(BYTE val)
 {
+    // first wait while aCS is still low
+    while(1) {
+        WORD wVal = GPIOB->IDR;           // read the signals
+            
+        if((wVal & aCS) != 0) {      // if aCS is high, we can continue
+            break;
+        }
+        
+        if(timeout()) {             // if timeout happened
+            brStat = E_TimeOut;     // set the bridge status
+            return;
+        }
+    }
+    
     ACSI_DATADIR_READ();                                                    // data as outputs (read)
     GPIOB->ODR = val;                                                       // write the data to output data register
     
     // create rising edge on aPIO
     GPIOA->BSRR = aPIO;                                                     // aPIO to HIGH
+    __asm  { nop }
     GPIOA->BRR  = aPIO;                                                     // aPIO to LOW
 
     while(1) {                                                              // wait for CS or timeout
@@ -101,14 +133,43 @@ void PIO_read(BYTE val)
     
     EXTI->PR = aCS;                                                         // clear int for CS
     ACSI_DATADIR_WRITE();                                                   // data as inputs (write)
+    
+    while(1) {
+        WORD wVal = GPIOB->IDR;      // read the signals
+            
+        if((wVal & aCS) != 0) {      // if aCS is high, we can continue
+            break;
+        }
+        
+        if(timeout()) {             // if timeout happened, pretend nothing serious happened
+            break;
+        }
+    }
+    
+    resetXilinx();                                                          //reset XILINX - put BSY, C/D, I/O in released states
 }
 
 void DMA_read(BYTE val)
 {
+    // first wait until aACK is still low
+    while(1) {
+        WORD wVal = GPIOB->IDR;           // read the signals
+            
+        if((wVal & aACK) != 0) {      // if aACK is high, we can continue
+            break;
+        }
+        
+        if(timeout()) {             // if timeout happened
+            brStat = E_TimeOut;     // set the bridge status
+            return;
+        }
+    }
+
     GPIOB->ODR = val;                                                       // write the data to output data register
     
     // create rising edge on aDMA
     GPIOA->BSRR = aDMA;                                                     // aDMA to HIGH
+    __asm  { nop }
     GPIOA->BRR  = aDMA;                                                     // aDMA to LOW
 
     while(1) {                                                              // wait for ACK or timeout
@@ -129,14 +190,37 @@ void DMA_read(BYTE val)
 
 BYTE DMA_write(void)
 {
+    WORD exti;
     BYTE val = 0;
+    WORD cnt=0;
+    
+    // first wait until aACK is still low
+    while(1) {
+        WORD wVal = GPIOB->IDR;           // read the signals
+            
+        if((wVal & aACK) != 0) {      // if aACK is high, we can continue
+            break;
+        }
+        
+        if(timeout()) {             // if timeout happened
+            brStat = E_TimeOut;     // set the bridge status
+            return 0;
+        }
+    }
     
     // create rising edge on aDMA
     GPIOA->BSRR = aDMA;                                                     // aDMA to HIGH
+    __asm  { nop }
     GPIOA->BRR  = aDMA;                                                     // aDMA to LOW
 
     while(1) {                                                              // wait for ACK or timeout
-        WORD exti = EXTI->PR;
+        cnt++;
+        
+        if(cnt > 3) {
+            GPIOB->BSRR = (1 << 12); // hi
+        }
+        
+        exti = EXTI->PR;
         
         if(exti & aACK) {                                                   // if ACK arrived
             val = GPIOB->IDR;                                               // read the data

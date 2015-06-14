@@ -1042,7 +1042,8 @@ void init_hw_sw(void)
 	// enable clock output on PA8 pin
     a = RCC->CFGR;
     a = a & 0xf8ffffff;         // remove MCO bits
-    a = a | 0x04000000;         // MCO (micro clock output): SYSCLK (72 MHz)
+    a = a | 0x07000000;         // MCO (micro clock output): PLL/2 (36 MHz)
+//  a = a | 0x06000000;         // MCO (micro clock output): ext (8 MHz)
     RCC->CFGR = a;
 }
 
