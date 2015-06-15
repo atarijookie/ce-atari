@@ -82,9 +82,13 @@ architecture Behavioral of main is
 
     signal REQtrigD1     : std_logic;
     signal REQtrigD2     : std_logic;    
+    signal REQtrigD3     : std_logic;    
+    signal REQtrigShort  : std_logic;    
 
     signal SACKD1        : std_logic;
     signal SACKD2        : std_logic;    
+    signal SACKD3        : std_logic;    
+    signal SACKshort     : std_logic;    
 
 begin
 
@@ -99,30 +103,33 @@ begin
 
     resetCombo <= SRST and reset_hans and (not identify);   -- when one of these reset signals is low, the result is low
 
--- TODO: message phase is totally skipped - is it needed, will it work?
-   
     MSGsignal <= '1';
 
-    REQtrig  <= XPIO xor XDMA;
+    REQtrig   <= XPIO xor XDMA;
 
     captureAndDelay: process(clk, REQtrig, SACK) is  -- delaying process
     begin
         if(rising_edge(clk)) then
+            REQtrigD3 <= REQtrigD2;
             REQtrigD2 <= REQtrigD1;             -- previous state of REQtrig
             REQtrigD1 <= REQtrig;               -- current  state in REQtrig
 
+            SACKD3    <= SACKD2;
             SACKD2    <= SACKD1;                -- previous state of SACK
             SACKD1    <= SACK;                  -- current  state of SACK
         end if;
     end process;
 
-    REQstateDflipflop: process(REQtrigD2, phaseReset, SACKD2) is
+	REQtrigShort <= '1' when (REQtrigD3 = '0' and REQtrigD2 = '1') else '0';
+	SACKshort    <= '0' when (SACKD3    = '1' and SACKD2    = '0') else '1';
+
+    REQstateDflipflop: process(phaseReset, SACKshort, REQtrigShort) is
     begin
-        if (phaseReset = '0' or SACKD2 = '0')  then     -- if phase reset, or ACK is low, REQ state back to hi
+		if   (phaseReset = '0' or SACKshort = '0')  then	-- if phase reset or ACK is low, REQ state back to hi
             REQstate <= '1';
-        elsif (rising_edge(REQtrigD2)) then             -- when rising edge of delayed REQ trig, let REQ go low
-            REQstate <= '0';
-        end if;
+		elsif(rising_edge(REQtrigShort)) then
+	        REQstate <= '0';
+		end if;
     end process;
 
     busStateSignals: process(REQtrig, phaseReset) is
@@ -138,8 +145,8 @@ begin
         end if;
     end process;
 
-    SREQa <= '0' when REQstate = '0' else 'Z';          -- REQ - pull to L, otherwise hi-Z
-    SREQb <= '0' when REQstate = '0' else 'Z';          -- REQ - pull to L, otherwise hi-Z
+    SREQa <= '0' when (REQstate = '0' and SACKD2 = '1') else 'Z';          -- REQ - pull to L, otherwise hi-Z
+    SREQb <= '0' when (REQstate = '0' and SACKD2 = '1') else 'Z';          -- REQ - pull to L, otherwise hi-Z
 
     -- 8-bit latch register
     -- latch data from ST on falling edge of lathClock (that means either on falling nSelection, or falling SACK)
