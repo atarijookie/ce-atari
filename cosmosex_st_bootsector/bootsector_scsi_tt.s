@@ -1,12 +1,15 @@
     .text
+|----------------------------------------------------------------
+| CosmosEx bootsector Level 1 for TT through its SCSI interface
+|----------------------------------------------------------------
 
-    | write out title string
+| write out title string
     pea     str(pc)
     move.w  #0x09,-(sp)
     trap    #1
     addq.l  #6,sp
 
-    | malloc RAM, by default 70 kB, but is configurable
+| malloc RAM, by default 70 kB, but is configurable
     lea     driverRam(pc),a0
     move.l  (a0), -(sp)         | read how much RAM we should allocate
     move.w  #0x48,-(sp)         | Malloc()
@@ -15,30 +18,23 @@
     tst.l   d0
     beq     fail
 
-    | store memory pointer to A1 and dma_pointer
+| store memory pointer to A1 and dma_pointer
     movea.l d0,a1               | a1 is the DMA address
     lea     dma_pointer(pc),a0
     move.l  d0,(a0)
-
-    | crate 0th cmd byte from ACSI ID (config + 2)
-    lea     config(pc),a2       | load the config address to A2
-    move.b  2(a2), d2           | d2 holds ACSI ID
-    lsl.b   #5, d2              | d2 = d2 << 5
-    ori.b   #0x08, d2           | d2 now contains (ACSI ID << 5) | 0x08, which is READ SECTOR from ACSI ID device
-
-    | get the sector count from (config + 3)
-    clr.l   d3
-    move.b  3(a2), d3           | d3 holds sector count we should transfer
-    subq.l  #1, d3              | d3--, because the dbra loop will be executed (d3 + 1) times
-
-    moveq   #1, d1              | d1 holds the current sector number. Bootsector is 0, so starting from 1 to (sector count + 1)
-
-    jsr     dma_read            | trasnfer all the sectors from SCSI to RAM
+    
+    jsr     dma_read            | transfer all the sectors from SCSI to RAM - address A1
 
 |--------------------------------
+| driver is loaded in RAM, now to do the rest
 
-    jmp     (a1)                | jump to the code which will do fixup and clearing BSS
+    lea     dma_pointer(pc),a0
+    move.l  (a0), a1            | restore pointer to allocated RAM in A1
 
+    move.l  a1,   a2            | A2 points to Level 2 bootsector
+    add.l   #512, a2            | A2 now points to driver (512 bytes after L2 bootsector)
+    
+    jmp     (a1)                | jump to Level 2 bootsector, which will do fixup and clearing BSS
     
     |-----------------------------
     | if failed....
@@ -71,7 +67,7 @@ config:     .dc.l   0x58580020
 driverRam:  .dc.l   0x00011800
 acsiCmd:    .dc.b   0x08,0x00,0x00,0x00,0x01
 
-str:    .ascii  "\n\rCE TT bs"
+str:    .ascii  "\n\rCE TT SCSI bs"
         .dc.b   13,10,0
 error:  .ascii  "fail"
         .dc.b   13,10,0
@@ -114,17 +110,15 @@ dma_read:
 |----------------------    
 | SCSI SELECTION: START  
 
-    move.l  #0xFFFF8783, a6                 | REG_ICR
-  
-    move.b  #TCR_PHASE_DATA_OUT, REG_TCR       | REG_TCR = data out phase
+    move.b  #TCR_PHASE_DATA_OUT, REG_TCR    | REG_TCR = data out phase
     move.b  #0, REG_ISR                     | REG_ISR = no interrupt from selection
-    move.b  #0x0c,REG_ICR                      | REG_ICR = assert BSY and SEL 
+    move.b  #0x0c,REG_ICR                   | REG_ICR = assert BSY and SEL 
     
     lea     config(pc),a2       | load the config address to A2
     move.b  2(a2), d2           | d2 holds SCSI ID
     move.b  #1, d0
     lsl.b   d2, d0              | d0 = d0 << d2
-    move.b  d2, REG_DB         | set dest SCSI IDs
+    move.b  d2, REG_DB          | set dest SCSI IDs
     
     move.b  #0x0d, REG_ICR      | assert BUSY, SEL and data bus
     
@@ -151,19 +145,21 @@ waitForSelEnd:
     move.b  #1, REG_ICR             | assert data bus
     
     move.b  #0x08, d0
-    jsr     pioWrite        | 0x08
+    jsr     pioWrite        | cmd[0]: 0x08 -- SCSI CMD: READ(8)
 
-    jsr     pioWrite        | 0x00
-    jsr     pioWrite        | 0x00
-    jsr     pioWrite        | 0x00
+    jsr     pioWrite        | cmd[1]: 0x00
+    jsr     pioWrite        | cmd[2]: 0x00
+    
+    move.b  #0x01, d0       
+    jsr     pioWrite        | cmd[3]: 0x01 -- start reading from sector 0x000001
 
     lea     config(pc),a2   | load the config address to A2
     clr.l   d3
     move.b  3(a2), d3       | d3 holds sector count we should transfer
     move.b  d3, d0
-    jsr     pioWrite        | sector count
+    jsr     pioWrite        | cmd[4]: sector count
 
-    jsr     pioWrite        | 0x00
+    jsr     pioWrite        | cmd[5]: 0x00
     
 | SCSI COMMAND: END
 |----------------------
@@ -186,7 +182,7 @@ dataInLoop:
 |------------------------    
 | SCSI STATUS: START
 
-    move.b  #TCR_PHASE_STATUS, REG_TCR         | set STATUS phase
+    move.b  #TCR_PHASE_STATUS, REG_TCR      | set STATUS phase
     move.b  REG_REI, d0                     | clear potential interrupt
 
     jsr     pioRead
@@ -224,7 +220,7 @@ doAck:
     jsr     wait4req0       | wait until REQ bit disppears
     
     move.b  REG_ICR, d0
-    andi.b   #0xef, d0
+    andi.b  #0xef, d0
     move.b  d0, REG_ICR     | clear ACK 
     
     rts

@@ -54,7 +54,7 @@ skipFixing:
 
     | clear the BSS section of prg
 
-    movea.l a2,a0               | sectors 1-N
+    movea.l a2,a0               | A0 points to start of driver 
     lea     28(a0),a1           | A1 = points to text segment (prg header of size 0x1c was skipped) 
     adda.l  2(a0),a1            | add text size
     adda.l  6(a0),a1            | add data size = bss segment starts here
@@ -68,7 +68,8 @@ bss_done:
 
     move.l  #0x12345678,-(sp)   | store magic number for the startup code of driver to know that there's no basepage (meaning no base page)
 
-    move.l  a2,a1               | get pointer to pointer to allocated RAM
+    move.l  a2, a1              | A2 and A1 now point to driver
+    sub.l   #512, a1            | A1 points to start of this level 2 bootsector (512 bellow the driver) - start of allocated RAM
     move.l  (a1),-(sp)          | store pointer to allocated RAM on stack
 
     add.l   #8, sp
@@ -80,7 +81,7 @@ bss_done:
 
     .data
     .even
-str:    .ascii  "\n\rCE BS - level 2"
+str:    .ascii  "\n\rCE - LEVEL 2 bootsector"
         .dc.b   13,10,0
 
 
