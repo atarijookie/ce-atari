@@ -8,48 +8,66 @@
 
 WORD swapNibbles(WORD val);
 
-bool createBootsectorFromPrg(void);
+bool createBootsectorFromPrg(char *path, char *inFile, char *outFile, bool bootsectorNotRaw);
 void checkCeddSize(void);
 DWORD getValue(BYTE *p);
 void createImage(void);
 
 int main(int argc, char *argv[])
 {
-
-    bool res = createBootsectorFromPrg();
-
-    if(!res) {
-        return 0;
-    }
+    createBootsectorFromPrg((char *) "c:\\!nohaj\\tmp\\assembla_atarijookie\\trunk\\cosmosex_st_bootsector", (char *) "bs_st.prg", (char *) "ce_dd_st.bs", true);
+    createBootsectorFromPrg((char *) "c:\\!nohaj\\tmp\\assembla_atarijookie\\trunk\\cosmosex_st_bootsector", (char *) "bs_tt.prg", (char *) "ce_dd_tt.bs", true);
+    createBootsectorFromPrg((char *) "c:\\!nohaj\\tmp\\assembla_atarijookie\\trunk\\cosmosex_st_bootsector", (char *) "bs_l2.prg", (char *) "ce_dd_l2.bs", false);
 
     checkCeddSize();
-
     createImage();
 
     getchar();
     return 0;
 }
 
-bool createBootsectorFromPrg(void)
+//----------------------------------------------------------------------------------------------
+bool createBootsectorFromPrg(char *path, char *inFile, char *outFile, bool bootsectorNotRaw)
 {
-    char bfr[512];
+    printf("\nConvert: %s -> %s\n", inFile, outFile);
 
+    char bfr[512];
     memset(bfr, 0, 512);
 
     bfr[0] = 0x60;              // store magic word
     bfr[1] = 0x1c;
 
+    char fullInFile [256];
+    char fullOutFile[256];
+    memset(fullInFile, 0, 256);
+    memset(fullOutFile, 0, 256);
+
+    strcpy(fullInFile, path);
+    strcat(fullInFile, "\\");
+    strcat(fullInFile, inFile);
+
+    strcpy(fullOutFile, path);
+    strcat(fullOutFile, "\\");
+    strcat(fullOutFile, outFile);
+
     //---------------------------------------
     // read the boot code to buffer
-    FILE *bc = fopen("bootsect.prg", "rb");
+    FILE *bc = fopen(fullInFile, "rb");
     if(!bc) {
-        printf("\nCould not open INPUT file!\n");
-        getchar();
+        printf("\nCould not open INPUT file: %s\n", fullInFile);
         return false;
     }
 
     fseek(bc, 256, SEEK_SET);       // skip TOS prog header
-    fread(&bfr[0x1e], 1, 512 - 32, bc);
+
+    int offset  = 0x1e;
+    int len     = 512 - 32;
+    if(!bootsectorNotRaw) {         // if it's raw sector, the offset and length are different
+        offset  = 0;
+        len     = 512;
+    }
+
+    fread(&bfr[offset], 1, len, bc);
 
     if(!feof(bc)) {
         printf("\nDidn't hit the EOF when reading input file! Is the bootcode too long?\n");
@@ -68,31 +86,32 @@ bool createBootsectorFromPrg(void)
         p++;
     }
 
-    WORD cs = 0x1234 - sum;
-    sum = sum & 0xffff;
+    if(bootsectorNotRaw) {          // do checksum only if not raw
+        WORD cs = 0x1234 - sum;
+        sum = sum & 0xffff;
 
+        printf("sum %04x, check-sum is %04x, check is %04x\n", sum, cs, (cs + sum) & 0xffff);
 
-    printf("sum %04x, check-sum is %04x, check is %04x", sum, cs, (cs + sum) & 0xffff);
-
-    bfr[510] = cs >> 8;         // store the check sum
-    bfr[511] = cs;
+        bfr[510] = cs >> 8;         // store the check sum
+        bfr[511] = cs;
+    }
 
     //---------------------------------------
     // now write it to file
-    FILE *bs = fopen("ceddboot.001", "wb");
+    FILE *bs = fopen(fullOutFile, "wb");
 
     if(!bs) {
-        printf("\nCould not open OUTPUT file!\n");
-        getchar();
+        printf("\nCould not open OUTPUT file: %s\n", fullOutFile);
         return false;
     }
 
     fwrite(bfr, 1, 512, bs);
-
     fclose(bs);
+
+    printf("Done   : %s -> %s\n", inFile, outFile);
     return true;
 }
-
+//----------------------------------------------------------------------------------------------
 void createImage(void)
 {
     BYTE bfr[1024*1024];

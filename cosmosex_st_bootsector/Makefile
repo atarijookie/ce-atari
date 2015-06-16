@@ -24,4 +24,4 @@ bs_l2.prg: bootsector_level2.s
 	$(STRIP) -s $@
     
 clean:
-	rm -f *.prg *~
+	rm -f *.prg *.bs *~

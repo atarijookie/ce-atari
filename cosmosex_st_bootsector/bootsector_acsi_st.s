@@ -29,99 +29,28 @@
     | get the sector count from (config + 3)
     clr.l   d3
     move.b  3(a2), d3           | d3 holds sector count we should transfer
-    subq.l  #1, d3              | d3--, because the dbra loop will be executed (d3 + 1) times
 
-    moveq   #1, d1              | d1 holds the current sector number. Bootsector is 0, so starting from 1 to (sector count + 1)
-
-    | trasnfer all the sectors from ACSI to RAM
+    | transfer all the sectors from ACSI to RAM
 readSectorsLoop:
     lea     acsiCmd(pc),a0      | load the address of ACSI command into a0
     move.b  d2,(a0)             | cmd[0] = ACSI ID + SCSI READ 6 command
-    move.b  d1,3(a0)            | cmd[3] = sector number
+    move.b  d3,4(a0)            | cmd[4] = sector sount we should transfer
 
     bsr     dma_read            | try to read the sector
     tst.b   d0
     bne.b   readSectorsLoop     | if failed to read sector, try reading sector again
 
-|----------------
-| SAFE BOOT START -- last 2 bytes are checksum, so sector contains only 510 bytes of usefull data
-    bsr     verify_checksum     | verify the checksum
-    tst.b   d0
-    bne.b   readSectorsLoop     | if checksum was bad, try reading sector again
-   
-    lea     510(a1),a1          | a1 += 510     -- move only 510 bytes, because the last 2 were checksum, which we don't want
-| SAFE BOOT END    
-|----------------
-| SIMPLE BOOT -- sectors are just data, no checksum verification
-|   lea     512(a1),a1          | a1 += 512
-|----------------
-
-    addq.w  #1,d1               | current_sector++
-    dbra    d3, readSectorsLoop
-
 |--------------------------------
+| driver is loaded in RAM, now to do the rest
 
-    | now do the fixup for the loaded text position 
+    lea     dma_pointer(pc),a0
+    move.l  (a0), a1            | restore pointer to allocated RAM in A1
 
-    movea.l dma_pointer(pc),a0  | 
-    lea     28(a0),a1           | A1 = points to text segment (prg header of size 0x1c was skipped) 
-    move.l  a1,d5               | D5 = A1 (tbase)
-    adda.l  2(a0),a1            | A1 += text size
-    adda.l  6(a0),a1            | A1 += data size
-    adda.l  14(a0),a1           | A1 += symbol size (most probably 0) == BYTE *fixups
-                                
-    move.l  (a1)+, d1           | read fixupOffset, a1 now points to fixups array
-    beq.s   skipFixing          | if fixupOffset is 0, then skip fixing
+    move.l  a1,   a2            | A2 points to Level 2 bootsector
+    add.l   #512, a2            | A2 now points to driver (512 bytes after L2 bootsector)
     
-    add.l   d5, d1              | d1 = basePage->tbase + first fixup offset
-    move.l  d1, a0              | a0 = fist fixup pointer
-    moveq   #0, d0              | d0 = 0
+    jmp     (a1)                | jump to Level 2 bootsector, which will do fixup and clearing BSS
     
-fixupLoop:
-    add.l   d5, (a0)            | a0 points to place which needs to be fixed, so add text base to that
-getNextFixup:
-    move.b  (a1)+, d0           | get next fixup to d0  
-    beq.s   skipFixing          | if next fixup is 0, then we're finished
-    
-    cmp.b   #1, d0              | if the fixup is not #1, then skip to justFixNext
-    bne.s   justFixupNext
-    
-    add.l   #0x0fe, a0          | if the fixup was #1, then we add 0x0fe to the address which needs to be fixed and see what is the next fixup
-    bra.s   getNextFixup
-    
-justFixupNext:
-    add.l   d0, a0              | new place which needs to be fixed = old place + fixup 
-    bra.s   fixupLoop
-
-| code will get here either after the fixup is done, or when the fixup was skipped  
-skipFixing:
-    
-|--------------------------------
-
-    | clear the BSS section of prg
-
-    movea.l dma_pointer(pc),a0  | sectors 1-N
-    lea     28(a0),a1           | A1 = points to text segment (prg header of size 0x1c was skipped) 
-    adda.l  2(a0),a1            | add text size
-    adda.l  6(a0),a1            | add data size = bss segment starts here
-    move.l  10(a0),d0           | d0.l = size of bss segment
-    beq.b   bss_done
-bss_loop:
-    clr.b   (a1)+               
-    subq.l  #1,d0
-    bne.b   bss_loop
-bss_done:
-
-    move.l  #0x12345678,-(sp)   | store magic number for the startup code of driver to know that there's no basepage (meaning no base page)
-
-    lea     dma_pointer(pc),a1  | get pointer to pointer to allocated RAM
-    move.l  (a1),-(sp)          | store pointer to allocated RAM on stack
-
-    add.l   #8, sp
-
-    lea     256(a0),a1          | A1 = points to text segment + some offset to the real start of the code
-    jmp     (a1)                | jump to the code, but it won't return here
-
     |-----------------------------
 
     | if failed....
@@ -152,9 +81,9 @@ dma_pointer:
 
 config:     .dc.l   0x58580020
 driverRam:  .dc.l   0x00011800
-acsiCmd:    .dc.b   0x08,0x00,0x00,0x00,0x01
+acsiCmd:    .dc.b   0x08,0x00,0x00,0x01,0x20
 
-str:    .ascii  "\n\rCE bs"
+str:    .ascii  "\n\rCE ST ACSI bs"
         .dc.b   13,10,0
 error:  .ascii  "fail"
         .dc.b   13,10,0
@@ -202,12 +131,14 @@ sendCmdBytes:
     bne.s   dmr_fail        | if d0 != 0, error, exit on timeout
     dbra    d4, sendCmdBytes
 
-
     | toggle r/w, leave at read == clear FIFO
     move.w  #0x190,(A6)     | DMA_WR + NO_DMA + SC_REG
     move.w  #0x090,(A6)     |          NO_DMA + SC_REG
 
-    move.w  #1,(A5)         | write sector count reg - will transfer 1 sector
+    lea     (acsiCmd,pc),a0 | load the address of ACSI command into a0
+    clr.l   d0
+    move.b  4(a0), d0       | retrieve sector count to D0 register
+    move.w  d0,(A5)         | write sector count reg - will transfer THIS MANY sector
 
     | send cmd[5]
     move.w  #0x008A, (a6)   | mode: NO_DMA + HDC + A0
