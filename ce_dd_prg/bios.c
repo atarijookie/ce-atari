@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "acsi.h"
+#include "hdd_if.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
@@ -76,7 +77,7 @@ int32_t custom_getbpb( void *sp )
 	commandShort[4] = BIOS_Getbpb;										/* store BIOS function number */
 	commandShort[5] = (BYTE) drive;										
 	
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 	
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_BIOS(Getbpb, drive);
@@ -108,7 +109,7 @@ void updateCeDrives(void)
 	commandShort[4] = BIOS_Drvmap;											/* store BIOS function number */
 	commandShort[5] = 0;										
 	
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 	
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		return;														
@@ -133,7 +134,7 @@ void updateCeMediach(void)
 	commandShort[4] = BIOS_Mediach;												/* store BIOS function number */
 	commandShort[5] = 0;										
 	
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* send command to host over ACSI */
 	
     if(res == E_NOTHANDLED || res == ACSIERROR) {									/* not handled or error? */
 		return;														

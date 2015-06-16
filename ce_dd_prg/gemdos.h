@@ -59,7 +59,7 @@
 //////////////////////////////////////
 /*
 
-Functions which require more than SCSI(6) length so they wouldn't have to be done in 2 acsi_cmd calls:
+Functions which require more than SCSI(6) length so they wouldn't have to be done in 2 hdd_if_cmd calls:
 GEMDOS_Fseek:  5 + 6
 GEMDOS_Fread:  6 + 4
 GEMDOS_Fwrite: 6 + 4

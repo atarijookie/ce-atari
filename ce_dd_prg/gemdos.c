@@ -10,6 +10,7 @@
 
 #include "xbra.h"
 #include "acsi.h"
+#include "hdd_if.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
@@ -77,7 +78,7 @@ int32_t custom_dgetdrv( void *sp )
 	commandShort[4] = GEMDOS_Dgetdrv;										/* store GEMDOS function number */
 	commandShort[5] = 0;										
 	
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD_NORET(Dgetdrv);
@@ -102,7 +103,7 @@ int32_t custom_dsetdrv( void *sp )
         // note: even though we now know that this drive is not ours, we will let the host know that we've changed the drive
         commandShort[4] = GEMDOS_Dsetdrv;										/* store GEMDOS function number */
         commandShort[5] = (BYTE) drive;											/* store drive number */
-        acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* send command to host over ACSI */
+        hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* send command to host over ACSI */
 
         CALL_OLD_GD_NORET(Dsetdrv, drive);
 	
@@ -113,7 +114,7 @@ int32_t custom_dsetdrv( void *sp )
     // in this case the drive is ours, now we even care for the result
     commandShort[4] = GEMDOS_Dsetdrv;										/* store GEMDOS function number */
     commandShort[5] = (BYTE) drive;											/* store drive number */
-    res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+    res = hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD_NORET(Dsetdrv, drive);
@@ -143,7 +144,7 @@ int32_t custom_dfree( void *sp )
 	commandShort[4] = GEMDOS_Dfree;											/* store GEMDOS function number */
 	commandShort[5] = drive;									
 
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Dfree, pDiskInfo, drive);
@@ -170,7 +171,7 @@ int32_t custom_dcreate( void *sp )
 	memset(pDmaBuffer, 0, 512);
 	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		/* copy in the path */
 	
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Dcreate, pPath);
@@ -196,7 +197,7 @@ int32_t custom_ddelete( void *sp )
 	memset(pDmaBuffer, 0, 512);
 	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		/* copy in the path */
 	
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD(Ddelete, pPath);
@@ -222,7 +223,7 @@ int32_t custom_fdelete( void *sp )
 	memset(pDmaBuffer, 0, 512);
 	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		/* copy in the path */
 	
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Fdelete, pPath);
@@ -248,7 +249,7 @@ int32_t custom_dsetpath( void *sp )
 	memset(pDmaBuffer, 0, 512);
 	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		/* copy in the path */
 	
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Dsetpath, pPath);
@@ -273,7 +274,7 @@ int32_t custom_dgetpath( void *sp )
 	commandShort[4] = GEMDOS_Dgetpath;										/* store GEMDOS function number */
 	commandShort[5] = drive;									
 
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Dgetpath, buffer, drive);
@@ -310,7 +311,7 @@ int32_t custom_frename( void *sp )
 	char *pDmaNewName = ((char *) pDmaBuffer) + oldLen + 1;
 	strncpy(pDmaNewName, newName, (DMA_BUFFER_SIZE / 2) - 2);			/* copy in the new name	*/
 
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Frename, 0, oldName, newName);
@@ -346,7 +347,7 @@ int32_t custom_fattrib( void *sp )
 	
 	strncpy(((char *) pDmaBuffer) + 2, fileName, DMA_BUFFER_SIZE -1 );	/* copy in the file name */
 	
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Fattrib, fileName, flag, attr);
@@ -421,7 +422,7 @@ int32_t custom_fsfirst( void *sp )
 	pDmaBuffer[4] = (BYTE) attribs;										/* store attributes */
 	strncpy(((char *) pDmaBuffer) + 5, fspec, DMA_BUFFER_SIZE - 1);		/* copy in the file specification */
 	
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		fsnextIsForUs = FALSE;
@@ -538,7 +539,7 @@ BYTE getNextDTAsFromHost(void)
 	
 	dtaBufferValidForPDta = pDta;											// store that the current buffer will be valid for this DTA pointer
 	
-	res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDtaBuffer, 1);	// send command to host over ACSI
+	res = hdd_if_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDtaBuffer, 1);	// send command to host over ACSI
 	
 	if(res != E_OK) {														// if failed to transfer data - no more files
         return ENMFIL;
@@ -560,7 +561,7 @@ void onFsnext_last(void)
 		commandLong[6 + i] = pDta[i];
 	}
 	
-	acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDtaBuffer, 1);	// send command to host over ACSI
+	hdd_if_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDtaBuffer, 1);	// send command to host over ACSI
 }
 
 /* **************************************************************** */
@@ -591,7 +592,7 @@ int32_t custom_fcreate( void *sp )
 	pDmaBuffer[0] = (BYTE) attr;										/* store attributes */
 	strncpy(((char *) pDmaBuffer) + 1, fileName, DMA_BUFFER_SIZE - 1);	/* copy in the file name */
 	
-	handle = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* send command to host over ACSI */
+	handle = hdd_if_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* send command to host over ACSI */
 
     if(handle == E_NOTHANDLED || handle == ACSIERROR) {						/* not handled or error? */
 		CALL_OLD_GD( Fcreate, fileName, attr);
@@ -629,7 +630,7 @@ int32_t custom_fopen( void *sp )
 	pDmaBuffer[0] = (BYTE) mode;										/* store attributes */
 	strncpy(((char *) pDmaBuffer) + 1, fileName, DMA_BUFFER_SIZE - 1);	/* copy in the file name */
 	
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {						/* not handled or error? */
 		CALL_OLD_GD( Fopen, fileName, mode);
@@ -667,7 +668,7 @@ int32_t custom_fclose( void *sp )
 	commandShort[4] = GEMDOS_Fclose;											/* store GEMDOS function number */
 	commandShort[5] = (BYTE) ceHandle;			
 	
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Fclose, atariHandle);
@@ -710,7 +711,7 @@ int32_t custom_fseek( void *sp )
 	commandLong[10] = (BYTE) ceHandle;
 	commandLong[11] = (BYTE) seekMode;
 	
-	res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);				/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);				/* send command to host over ACSI */
 
     if(res == E_NOTHANDLED || res == ACSIERROR) {							/* not handled or error? */
 		CALL_OLD_GD( Fseek, offset, atariHandle, seekMode);
@@ -758,7 +759,7 @@ int32_t custom_fdatime( void *sp )
 	commandLong[9]  = (BYTE) pDatetime[2];
 	commandLong[10] = (BYTE) pDatetime[3];
 
-	res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);	/* send command to host over ACSI */
+	res = hdd_if_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);	/* send command to host over ACSI */
 	
 	if(flag != 1) {															/* not FD_SET - get date time */
 		memcpy(pDatetime, pDmaBuffer, 4);									/* copy in the results */
@@ -782,7 +783,7 @@ void sendStLog(char *str)
 	commandShort[5] = 0;			
 	
     strncpy((char *) pDmaBuffer, str, 512);
-	acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	    /* send command to host over ACSI */
+	hdd_if_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	    /* send command to host over ACSI */
 }
 
 /* ------------------------------------------------------------------ */

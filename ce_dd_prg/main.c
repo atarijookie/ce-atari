@@ -11,6 +11,7 @@
 
 #include "xbra.h"
 #include "acsi.h"
+#include "hdd_if.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "main.h"
@@ -35,8 +36,9 @@ int32_t (*bios_table[256])( void* sp ) = { 0 };
 int16_t useOldBiosHandler = 0;								/* 0: use new handlers, 1: use old handlers */ 
 /* ------------------------------------------------------------------ */
 /* CosmosEx and Gemdos part - Jookie */
+BYTE findDevice(void);
+
 BYTE ce_findId(void);
-BYTE ce_identify(void);
 void ce_initialize(void);
 void getConfig(void);
 BYTE setDateTime(void);
@@ -138,7 +140,7 @@ int main( int argc, char* argv[] )
 	pDtaBuffer		= (BYTE *) (((DWORD) pDtaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
 
 	// search for CosmosEx on ACSI bus
-	found = ce_findId();
+	found = findDevice();
 
 	if(!found) {								            // not found? quit
 		sleep(3);
@@ -232,61 +234,6 @@ int main( int argc, char* argv[] )
 	return 0;		
 }
 
-/* this function scans the ACSI bus for any active CosmosEx translated drive */
-BYTE ce_findId(void)
-{
-	char bfr[2], res, i;
-
-	bfr[1] = 0;
-	deviceID = 0;
-	
-	(void) Cconws("Looking for CosmosEx: ");
-
-	for(i=0; i<8; i++) {
-		bfr[0] = i + '0';
-		(void) Cconws(bfr);
-
-		deviceID = i;									/* store the tested ACSI ID */
-		res = Supexec(ce_identify);  					/* try to read the IDENTITY string */
-		
-		if(res == 1) {                           		/* if found the CosmosEx */
-			(void) Cconws("\r\nCosmosEx found on ACSI ID: ");
-			bfr[0] = i + '0';
-			(void) Cconws(bfr);
-			(void) Cconws("\r\n");
-
-			return 1;
-		}
-	}
-
-	/* if not found */
-    (void) Cconws("\r\nCosmosEx not found, not installing.");
-	return 0;
-}
-
-/* send an IDENTIFY command to specified ACSI ID and check if the result is as expected */
-BYTE ce_identify(void)
-{
-	WORD res;
-  
-	commandShort[0] = (deviceID << 5); 											/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
-	commandShort[4] = TRAN_CMD_IDENTIFY;
-  
-	memset(pDmaBuffer, 0, 512);              									/* clear the buffer */
-
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	/* issue the command and check the result */
-
-	if(res != OK) {                        										/* if failed, return FALSE */
-		return 0;
-	}
-
-	if(strncmp((char *) pDmaBuffer, "CosmosEx translated disk", 24) != 0) {		/* the identity string doesn't match? */
-		return 0;
-	}
-	
-	return 1;                             										/* success */
-}
-
 /* send INITIALIZE command to the CosmosEx device telling it to do all the stuff it needs at start */
 void ce_initialize(void)
 {
@@ -304,7 +251,7 @@ void ce_initialize(void)
     WORD drives         = Drvmap();
     SET_WORD(pDmaBuffer + 4, drives);                                           // store existing drives
   
-	acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);        /* issue the command and check the result */
+	hdd_if_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);        /* issue the command and check the result */
 }
 
 void getConfig(void)
@@ -316,7 +263,7 @@ void getConfig(void)
 	commandShort[0] = (deviceID << 5); 					                        // cmd[0] = ACSI_id + TEST UNIT READY (0)
 	commandShort[4] = GD_CUSTOM_getConfig;
   
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// issue the command and check the result
+	res = hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// issue the command and check the result
     
     if(res != OK) {                                                             // failed to get config?
         return;

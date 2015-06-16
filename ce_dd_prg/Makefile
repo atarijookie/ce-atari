@@ -6,11 +6,12 @@ SLIM    = yes
 CC       = m68k-atari-mint-gcc
 STRIP    = m68k-atari-mint-strip
 PRGFLAGS = m68k-atari-mint-flags
-CFLAGS   = -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
+CFLAGS      = -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
+CFLAGS030   = -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS  = -Wl,--traditional-format -lgcc
 
-HDR      = xbra.h acsi.h gemdos.h bios.h gemdos_errno.h translated.h main.h
-CSRC     = gemdos.c gemdos_rw.c gemdos_pexec.c bios.c xbra.c acsi.c main.c 
+HDR      = xbra.h acsi.h scsi.h                  gemdos.h gemdos_errno.h translated.h bios.h main.h find_ce.h hdd_if.h
+CSRC     = xbra.c acsi.c scsi_falcon.c scsi_tt.c gemdos.c gemdos_rw.c gemdos_pexec.c  bios.c main.c find_ce.c hdd_if.c
 SSRC     = gemdos_asm.s bios_asm.s
 
 ifeq ($(SLIM),yes)
@@ -24,14 +25,21 @@ ifeq ($(ONPC),yes)
     CFLAGS    += -DONPC
 endif
 
-OBJS = $(patsubst %.c,%.o,$(CSRC))
+OBJS    = $(patsubst %.c,%.o,$(CSRC))
+OBJS030 = cache030.o
 
-$(TARGET): $(STARTUP) $(OBJS) $(SSRC) $(HDR)
-	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(OBJS) $(SSRC) $(LDFLAGS)
+$(TARGET): $(STARTUP) $(OBJS) $(OBJS030) $(SSRC) $(HDR)
+	@echo [Compiling final app] $(@:.o=.c)
+	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(OBJS) $(OBJS030) $(SSRC) $(LDFLAGS)
 	$(STRIP) -s $@
 	$(PRGFLAGS) $@ --mno-fastram --mno-fastalloc --mno-fastload
 	
+cache030.o: cache030.s
+	@echo [Compiling 030 code] $(@:.o=.c)
+	$(CC) $(CFLAGS030) -c $< -o $@
+    
 %.o: %.c 
+	@echo [Compiling 68k code] $(@:.o=.c)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

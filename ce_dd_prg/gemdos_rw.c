@@ -10,6 +10,7 @@
 
 #include "xbra.h"
 #include "acsi.h"
+#include "hdd_if.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
@@ -384,7 +385,7 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
             
 			memcpy(FastRAMBuffer, bfr, bytes_to_copy);							                            // Yup, so copy data to its rightful place
 			bfr=bfr+FASTRAM_BUFFER_SIZE;
-			BYTE res = acsi_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // send command to host over ACSI 
+			BYTE res = hdd_if_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // send command to host over ACSI 
 			
 			// if all data in this chunk transfered, update counter
 			if(res == RW_ALL_TRANSFERED) {
@@ -402,7 +403,7 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
 				commandShort[4] = GD_CUSTOM_getRWdataCnt;
 				commandShort[5] = ceHandle;										
 				
-				res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			// send command to host over ACSI
+				res = hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			// send command to host over ACSI
 			
 				if(res != E_OK) {													// failed? say that no data was transfered
 					return 0;
@@ -427,7 +428,7 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
 		commandLong[8] = cnt >>  8;
 		commandLong[9] = cnt  & 0xff;
 
-		BYTE res = acsi_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// send command to host over ACSI 
+		BYTE res = hdd_if_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// send command to host over ACSI 
 		
 		// if all data transfered, return count of all data
 		if(res == RW_ALL_TRANSFERED) {
@@ -443,7 +444,7 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
 		commandShort[4] = GD_CUSTOM_getRWdataCnt;
 		commandShort[5] = ceHandle;										
 		
-		res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			// send command to host over ACSI
+		res = hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			// send command to host over ACSI
 	
 		if(res != E_OK) {													// failed? say that no data was transfered
 			return 0;
@@ -514,7 +515,7 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
                 sectorCount++;
             }
             
-			BYTE res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // Read as much as we can to ST RAM first - send command to host over ACSI 
+			BYTE res = hdd_if_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // Read as much as we can to ST RAM first - send command to host over ACSI 
 
 			if(res == RW_ALL_TRANSFERED) {
 				memcpy(bfr, FastRAMBuffer, bytes_to_read);							                        // Yup, so copy data to its rightful place
@@ -532,7 +533,7 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 				// if we got here, then partial transfer happened, see how much data we got
 				commandShort[4] = GD_CUSTOM_getRWdataCnt;
 				commandShort[5] = ceHandle;										
-				res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				// send command to host over ACSI
+				res = hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				// send command to host over ACSI
 		
 				if(res != E_OK) {													// failed? say that no data was transfered
 					return 0;
@@ -553,7 +554,7 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 		commandLong[8] = cnt >>  8;
 		commandLong[9] = cnt  & 0xff;
 	
-		BYTE res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// Normal read to ST RAM - send command to host over ACSI 
+		BYTE res = hdd_if_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// Normal read to ST RAM - send command to host over ACSI 
 	
 		// if all data transfered, return count of all data
 		if(res == RW_ALL_TRANSFERED) {
@@ -569,7 +570,7 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 		commandShort[4] = GD_CUSTOM_getRWdataCnt;
 		commandShort[5] = ceHandle;										
 	
-		res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				// send command to host over ACSI
+		res = hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				// send command to host over ACSI
 
 		if(res != E_OK) {													// failed? say that no data was transfered
 			return 0;
@@ -653,7 +654,7 @@ void getBytesToEof(WORD ceHandle)
 	commandShort[4] = GD_CUSTOM_getBytesToEOF;                                  // store function number
 	commandShort[5] = ceHandle;										
 	
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);   // send command to host over ACSI
+	res = hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);   // send command to host over ACSI
 
     if(res != E_OK) {							                                // failed? set 0 count of bytes to EOF and quit
         fileBufs[ceHandle].bytesToEOF           = 0;
