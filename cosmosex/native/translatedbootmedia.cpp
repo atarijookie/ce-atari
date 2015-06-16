@@ -4,6 +4,9 @@
 #include "translatedbootmedia.h"
 #include "../debug.h"
 #include "../utils.h"
+#include "../global.h"
+
+extern int hwHddIface;      // returned from Hans: HDD interface type - HDD_IF_ACSI / HDD_IF_SCSI
 
 TranslatedBootMedia::TranslatedBootMedia()
 {
@@ -34,22 +37,51 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
 	size_t bytesRead;
 	FILE *f;
 	
-	f = fopen("/tmp/configdrive/ce_dd.bs", "rb");
+	//-------------
+    // load Level 1 bootsector
+    const char *bootsectorPath = NULL;
+    
+    if(hwHddIface == HDD_IF_ACSI) {     // for ACSI IF
+        bootsectorPath = "/tmp/configdrive/ce_dd_st.bs";
+    } else {                            // for SCSI IF
+        bootsectorPath = "/tmp/configdrive/ce_dd_tt.bs";
+    }
+    f = fopen(bootsectorPath, "rb");
 
 	if(!f) {
-        Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open bootsector file!");
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open Level 1 bootsector file: %s", bootsectorPath);
 		return false;
 	}
+    Debug::out(LOG_ERROR, "TranslatedBootMedia - loaded Level 1 bootsector file: %s", bootsectorPath);
 	
 	bytesRead = fread(&imageBuffer[0], 1, 512, f);
 	
 	if(bytesRead != 512) {
-        Debug::out(LOG_ERROR, "TranslatedBootMedia - didn't read 512 bytes from bootsector file!");
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - didn't read 512 bytes from Level 1 bootsector file: %s", bootsectorPath);
 		return false;
 	}
 	
 	fclose(f);
+    
+    hwHddIfaceCurrent = hwHddIface;     // store for which HDD IF it was prepared
+	//-------------
+    // load Level 2 bootsector
+    f = fopen("/tmp/configdrive/ce_dd_l2.bs", "rb");
+
+	if(!f) {
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open Level 2 bootsector file");
+		return false;
+	}
 	
+	bytesRead = fread(&imageBuffer[512], 1, 512, f);
+	
+	if(bytesRead != 512) {
+        Debug::out(LOG_ERROR, "TranslatedBootMedia - didn't read 512 bytes from Level 2 bootsector file!");
+		return false;
+	}
+	
+	fclose(f);
+	//-------------
 	// read the CosmosEx driver into buffer
 	f = fopen("/tmp/configdrive/ce_dd.prg", "rb");
 
@@ -58,15 +90,21 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
 		return false;
 	}
 
-    int offset = 512;
+    bytesRead   = 1024;
+    int offset  = 1024;
     while(1) {
         if(feof(f)) {                                           // end of file? break
             break;
         }
     
         memset(&imageBuffer[offset], 0, 512);                   // clear buffer
+
+#ifdef SAFEBOOT
         fread(&imageBuffer[offset], 1, 510, f);                 // read 
         calculateChecksum(&imageBuffer[offset]);                // calculate checksum
+#else
+        fread(&imageBuffer[offset], 1, 512, f);                 // read 
+#endif        
         offset += 512;                                          // move to next part
         
         bytesRead += 512;                                       // increment bytes read variable
@@ -87,9 +125,11 @@ void TranslatedBootMedia::updateBootsectorConfig(void)
 {
 	DWORD tsize, dsize, bsize, totalSize;
 	
-	tsize = Utils::getDword(imageBuffer + 512 + 2);		// get size of text
-	dsize = Utils::getDword(imageBuffer + 512 + 6);		// get size of data
-	bsize = Utils::getDword(imageBuffer + 512 + 10);    // get size of bss
+    int driverOffset = 1024;
+    
+	tsize = Utils::getDword(imageBuffer + driverOffset + 2);        // get size of text
+	dsize = Utils::getDword(imageBuffer + driverOffset + 6);        // get size of data
+	bsize = Utils::getDword(imageBuffer + driverOffset + 10);       // get size of bss
 	
 	totalSize = tsize + dsize + bsize;					// total size of driver in RAM = size of text + data + bss
 	totalSize = ((totalSize / 1024) + 2) * 1024;		// round the size to the nearest biggest kB 
@@ -219,6 +259,12 @@ bool TranslatedBootMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 		return false;
 	}
 
+    if(sectorNo == 0) {                         // if loading boot sector
+        if(hwHddIfaceCurrent != hwHddIface) {   // if HDD IF changed (e.g. it was first loaded when Franz didn't respond yet, and then Franz responded that it's SCSI)
+            loadDataIntoBuffer();               // reload data from disk to virtual config drive image
+        }
+    }
+    
 	memset(bfr, 0, count * 512);				// clear the buffer
 	
 	DWORD sectsRemaining = SCapacity - sectorNo;	// how many sectors we have left, if we start reading from position 'sectorNo'?

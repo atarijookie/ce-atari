@@ -5,7 +5,7 @@
 #include "../datatypes.h"
 #include "imedia.h"
 
-#define TRANSLATEDBOOTMEDIA_SIZE	(32 * 1024)
+#define TRANSLATEDBOOTMEDIA_SIZE	(128 * 1024)
 
 class TranslatedBootMedia: public IMedia
 {
@@ -21,12 +21,13 @@ public:
     virtual void setMediaChanged(bool changed);
     virtual void getCapacity(int64_t &bytes, int64_t &sectors);
 
-    virtual bool readSectors(int64_t sectorNo, DWORD count, BYTE *bfr);
+    virtual bool readSectors (int64_t sectorNo, DWORD count, BYTE *bfr);
     virtual bool writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr);
 
 	void updateBootsectorConfigWithACSIid(BYTE acsiId);
 	
 private:
+    int     hwHddIfaceCurrent;  // this is the hwHddIface for which the bootsector was loaded, reload on mismatch
 
     int64_t	BCapacity;			// device capacity in bytes
     int64_t	SCapacity;			// device capacity in sectors
