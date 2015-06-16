@@ -43,40 +43,6 @@ void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
             break;\
         }
         
-#define READ_BYTE_BFR_SCSI \
-		byte = *pData;\
-		pData++;\
-        while(1) { \
-            WORD wVal = GPIOB->IDR; \
-            if((wVal & aACK) != 0) { \
-                break; \
-            } \
-            if(timeout()) { \
-                brStat = E_TimeOut; \
-                quit = 1; \
-                break; \
-            } \
-        } \
-		GPIOB->ODR = byte;\
-		GPIOA->BSRR	= aDMA;\
-		__asm  { nop } \
-		GPIOA->BRR	= aDMA;\
-		while(1) {\
-			if(timeout()) {\
-                brStat = E_TimeOut; \
-                quit = 1;\
-                break;\
-			}\
-			exti = EXTI->PR;\
-			if(exti & aACK) {\
-				EXTI->PR = aACK;\
-				break;\
-			}\
-		}\
-        if(quit) {\
-            break;\
-        }        
-        
 // the following macro waits until the card is busy, and when it's not busy, it continues        
 #define WAIT_FOR_CARD_NOT_BUSY              \
         while(spi2_TxRx(0xFF) != 0xff) {    \
@@ -188,14 +154,8 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
         }
             
         // transfer the bytes in the loop to ST
-        if(isAcsiNotScsi) {                         // for ACSI
-            for(i=0; i<512; i++) {
-                READ_BYTE_BFR
-            }
-        } else {                                    // for SCSI
-            for(i=0; i<512; i++) {
-                READ_BYTE_BFR_SCSI
-            }
+        for(i=0; i<512; i++) {
+            READ_BYTE_BFR
         }
         
         if(quit) {                                              // if error happened
