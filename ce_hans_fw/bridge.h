@@ -31,3 +31,4 @@ void PIO_read(BYTE val);								// send status byte to ST
 BYTE DMA_write(void);										// get byte from ST using DMA
 void DMA_read(BYTE val);								// send byte to ST using DMA
 
+void MSG_read(BYTE val);

@@ -336,6 +336,7 @@ void initAllStuff(void)
     GPIOA->BRR = aDMA | aPIO | aRNW | ATN;                          // ACSI controll signals LOW, ATTENTION bit LOW - nothing to read
 
     // init SD card interface signals
+    GPIOC->BRR  = XMSG;
     GPIOC->BSRR = SD_DETECT | SD_CS;                                // SD card CS (output) high - card not selected; SD card detect high - pull up!
 
     EXTI->PR = BUTTON | aCMD | aCS | aACK;                          // clear these ints 
@@ -1002,9 +1003,9 @@ void init_hw_sw(void)
     GPIOB->CRH &= ~(0xfff00000);                            // remove bits from GPIOB
     GPIOB->CRH |=   0xbbb00000;                             // set GPIOB as --- CNF1:0 -- 10 (push-pull), MODE1:0 -- 11, PxODR -- don't care
 
-    // card detect and SPI2 CS on GPIOC -- CS on PC13 is output, card detect on PC14 as input with pull up!
-    GPIOC->CRH &= ~(0x0ff00000);                            // remove bits from GPIOC
-    GPIOC->CRH |=   0x08300000;
+    // card detect and SPI2 CS on GPIOC -- CS on PC13 is output, card detect on PC14 as input with pull up! XMSG as OUTPUT
+    GPIOC->CRH &= ~(0xfff00000);                            // remove bits from GPIOC
+    GPIOC->CRH |=   0x38300000;
 
     // ACSI control signals as output, +ATN
     GPIOA->CRL &= ~(0x0000ffff);                            // remove bits from GPIOA

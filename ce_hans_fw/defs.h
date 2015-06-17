@@ -62,6 +62,7 @@ GPIOA_0   - O  - RnW - defines data direction (1: DATA1 <- DATA2 -- READ,  0: DA
 GPIOA_1   - O  - PIO - on rising edge will put INT to L
 GPIOA_2   - O  - DMA - on rising edge will put DRQ to L
 GPIOA_3   - O  - ATN for Attention
+GPIOC_15  - O  - XMSG - on rising edge create REQ ACK sequence for MESSAGE IN/OUT 
 
 //------------
 
@@ -105,5 +106,7 @@ GPIOC_14 - card detect
 // on GPIOC - SD card pins
 #define SD_CS       (1 << 13)
 #define SD_DETECT   (1 << 14)
+
+#define XMSG        (1 << 15)
 
 #endif /* DEFS_H_ */

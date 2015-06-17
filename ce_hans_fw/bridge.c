@@ -2,6 +2,7 @@
 #include "timers.h"
 
 extern BYTE brStat;                                                         // status from bridge
+extern BYTE isAcsiNotScsi;
 
 void resetXilinx(void);
 
@@ -106,6 +107,10 @@ void PIO_read(BYTE val)
     EXTI->PR = aCS;                                                         // clear int for CS
     ACSI_DATADIR_WRITE();                                                   // data as inputs (write)
     
+    if(!isAcsiNotScsi) {            // if it's SCSI, send MSG to computer
+        MSG_read(0);
+    }
+    
     while(1) {
         WORD wVal = GPIOB->IDR;      // read the signals
             
@@ -119,6 +124,34 @@ void PIO_read(BYTE val)
     }
     
     resetXilinx();                                                          //reset XILINX - put BSY, C/D, I/O in released states
+}
+
+// send MESSAGE IN byte to ST 
+void MSG_read(BYTE val)
+{
+    ACSI_DATADIR_READ();                                                    // data as outputs (read)
+    GPIOB->ODR = val;                                                       // write the data to output data register
+    
+    // create rising edge on XMSG
+    GPIOC->BSRR = XMSG;                                                     // XMSG to HIGH
+    __asm  { nop }
+    GPIOC->BRR  = XMSG;                                                     // XMSG to LOW
+
+    while(1) {                                                              // wait for CS or timeout
+        WORD exti = EXTI->PR;
+        
+        if(exti & aCS) {                                                    // if CS arrived
+            break;
+        }
+        
+        if(timeout()) {                                                     // if timeout happened
+            brStat = E_TimeOut;                                             // set the bridge status
+            break;
+        }
+    }
+    
+    EXTI->PR = aCS;                                                         // clear int for CS
+    ACSI_DATADIR_WRITE();                                                   // data as inputs (write)
 }
 
 void DMA_read(BYTE val)
