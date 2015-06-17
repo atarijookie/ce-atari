@@ -6,8 +6,9 @@ use IEEE.STD_LOGIC_UNSIGNED.ALL;
 entity main is
     Port ( 
         -- signals connected to MCU
-        XPIO        : in  std_logic;        -- on rising edge will put INT to L
-        XDMA        : in  std_logic;        -- on rising edge will put DRQ to L
+        XPIO        : in  std_logic;        -- on rising edge start CMD     / STATUS   transfer (SREQ to L, wait for SACK)
+        XDMA        : in  std_logic;        -- on rising edge start DATA IN / DATA OUT transfer (SREQ to L, wait for SACK)
+        XMSG        : in  std_logic;        -- on rising edge start MSG  IN / MSG  OUT transfer (SREQ to L, wait for SACK)
         XRnW        : in  std_logic;        -- defines data direction (1: DATA1 <- DATA2,  0: DATA1 -> DATA2)
         XCMD        : out std_logic;        -- this is combination of CS and A1, will go low on 1st cmd byte from ACSI port
         reset_hans  : in  std_logic;        -- this is the signal which resets Hans, and it will reset this CPLD too to init it
@@ -56,8 +57,6 @@ entity main is
 end main;
 
 architecture Behavioral of main is
-    signal phaseReset    : std_logic;
-
     signal REQtrig       : std_logic;
     signal REQstate      : std_logic;
 
@@ -82,8 +81,6 @@ architecture Behavioral of main is
 
     signal REQtrigD1     : std_logic;
     signal REQtrigD2     : std_logic;    
-    signal REQtrigD3     : std_logic;    
-    signal REQtrigShort  : std_logic;    
 
     signal SACKD1        : std_logic;
     signal SACKD2        : std_logic;    
@@ -96,52 +93,48 @@ begin
     identifyA  <= identify and (not HDD_IF);    -- active when IDENTIFY and it's ACSI hardware
     identifyS  <= identify and HDD_IF;          -- active when IDENTIFY and it's SCSI hardware
 
-    phaseReset <= SRST and reset_hans and (not identify);  -- when one of these goes low, reset phase to FREE
-
     nSelection <= not ((not SEL) and BSYa);     -- selection is when SEL is 0 and BSY is 1. nSelection is inverted selection, because DATA1latch is captured on falling edge
     XCMD       <= nSelection or (not SRST);     -- falling edge means target selection (SRST must be 1, otherwise ignored)
 
     resetCombo <= SRST and reset_hans and (not identify);   -- when one of these reset signals is low, the result is low
 
-    MSGsignal <= '1';
-
-    REQtrig   <= XPIO xor XDMA;
+    REQtrig    <= XPIO xor XDMA xor XMSG;       -- REQ trig should go hi only when one of these (not 2, not 3) go hi
 
     captureAndDelay: process(clk, REQtrig, SACK) is  -- delaying process
     begin
         if(rising_edge(clk)) then
-            REQtrigD3 <= REQtrigD2;
             REQtrigD2 <= REQtrigD1;             -- previous state of REQtrig
             REQtrigD1 <= REQtrig;               -- current  state in REQtrig
 
-            SACKD3    <= SACKD2;
+            SACKD3    <= SACKD2;                -- previous previous state of SACK
             SACKD2    <= SACKD1;                -- previous state of SACK
             SACKD1    <= SACK;                  -- current  state of SACK
         end if;
     end process;
 
-	REQtrigShort <= '1' when (REQtrigD3 = '0' and REQtrigD2 = '1') else '0';
 	SACKshort    <= '0' when (SACKD3    = '1' and SACKD2    = '0') else '1';
 
-    REQstateDflipflop: process(phaseReset, SACKshort, REQtrigShort) is
+    REQstateDflipflop: process(resetCombo, SACKshort, REQtrigD2) is
     begin
-		if   (phaseReset = '0' or SACKshort = '0')  then	-- if phase reset or ACK is low, REQ state back to hi
+		if   (resetCombo = '0' or SACKshort = '0')  then	-- if phase reset or ACK is low, REQ state back to hi
             REQstate <= '1';
-		elsif(rising_edge(REQtrigShort)) then
+		elsif(rising_edge(REQtrigD2)) then
 	        REQstate <= '0';
 		end if;
     end process;
 
-    busStateSignals: process(REQtrig, phaseReset) is
+    busStateSignals: process(REQtrig, resetCombo) is
     begin
-        if (phaseReset = '0') then	                    -- if phase reset
+        if (resetCombo = '0') then	                    -- if phase reset
             BSYsignal   <= '1';                         -- not BSY
             IOsignal    <= '1';                         -- release I/O
             CDsignal    <= '1';                         -- release C/D
+            MSGsignal   <= '1';                         -- release MSG
         elsif (rising_edge(REQtrig)) then               -- if REQ trig goes hi
             BSYsignal   <= '0';                         -- we're BSY
             IOsignal    <= not XRnW;                    -- set I/O - low on IN, hi on OUT
-            CDsignal    <= not XPIO;                    -- set C/D - low on CMD, hi on DATA
+            CDsignal    <= XDMA;                        -- set C/D - low on CMD and MSG, hi on DATA
+            MSGsignal   <= not XMSG;                    -- set MSG - low on MSG IN/OUT, otherwise hi
         end if;
     end process;
 
@@ -192,8 +185,8 @@ begin
     TX_out <=   TX_Franz when TXSEL1n2='1' else TX_Hans;   -- depending on TXSEL1n2 switch TX_out to TX_Franz or TX_Hans
 
     -- just copy state from one signal to another
-    XCS    <= SACKD2 or (    CDsignal);
-    XACK   <= SACKD2 or (not CDsignal);
+    XCS    <= SACKshort or (    CDsignal);
+    XACK   <= SACKshort or (not CDsignal);
     XRESET <= SRST;
 
     -- these should be set according to the current SCSI phase

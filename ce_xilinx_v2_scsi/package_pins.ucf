@@ -51,6 +51,7 @@ NET "XACK"  LOC = "P25"  ;
 NET "XCMD"  LOC = "P36"  ;
 NET "XCS"  LOC = "P54"  ;
 NET "XDMA"  LOC = "P29"  ;
+NET "XMSG"  LOC = "P28"  ;
 NET "XPIO"  LOC = "P30"  ;
 NET "XRESET"  LOC = "P49"  ;
 NET "XRnW"  LOC = "P32"  ;
