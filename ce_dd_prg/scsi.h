@@ -153,6 +153,8 @@
 #define TCR_PHASE_DATA_IN       1
 #define TCR_PHASE_CMD           2
 #define TCR_PHASE_STATUS        3
+#define TCR_PHASE_MESSAGE_OUT   6
+#define TCR_PHASE_MESSAGE_IN    7
 
 #endif
 

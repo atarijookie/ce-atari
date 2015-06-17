@@ -1,4 +1,5 @@
 // based on AHDI 6.061 sources
+
 #include "scsi.h"
 
 extern BYTE deviceID;
@@ -245,7 +246,7 @@ BYTE selscsi(void)
     scsi_setReg_TT(REG_ISR, 0);                            // no interrupt from selection
     scsi_setReg_TT(REG_ICR, 0x0c);                         // assert BSY and SEL
 
-    BYTE selId  = (1 << deviceID);                      // convert number of device to bit 
+    BYTE selId  = (1 << deviceID);                         // convert number of device to bit 
     scsi_setReg_TT(REG_ODR, selId);                        // set dest SCSI IDs
     
     scsi_setReg_TT(REG_ICR, 0x0d);                         // assert BUSY, SEL and data bus
@@ -367,8 +368,8 @@ WORD w4stat(void)
 
     //-----------------
     // receive message byte
-    
-    // TODO:   SCSITCR = ???;       // message in phase 
+	scsi_setReg_TT(REG_TCR, TCR_PHASE_MESSAGE_IN);     // MESSAGE IN phase
+	res = scsi_getReg_TT(REG_REI);                 // clear potential interrupt
     
     timeOutTime = setscstmout();    // set up time-out for REQ and ACK
 
@@ -438,10 +439,7 @@ BYTE doack(DWORD timeOutTime)
         }
     }
 
-    icr         = scsi_getReg_TT(REG_ICR);
-    icr         = icr & 0xef;           // clear ACK
-    scsi_setReg_TT(REG_ICR, icr);
-    
+    scsi_clrBit_TT(REG_ICR, ICR_ACK);   // clear ACK
     return res;
 }
 
