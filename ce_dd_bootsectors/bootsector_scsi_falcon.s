@@ -20,16 +20,30 @@
     beq     fail
 
 | store memory pointer to A1 and dma_pointer
-    movea.l d0, a1              | A1 is the DMA address
-    movea.l d0, a0              | A0 is also the pointer to DMA address
+    movea.l d0, a1                  | A1 is the DMA address
+    movea.l d0, a0                  | A0 is also the pointer to DMA address
     
-    lea     getReg(pc), a4 
-    lea     setReg(pc), a5 
+|------------
+| fill A4 and A5 with pointers to getReg() and setReg() functions for the correct machine 
+    lea     getReg_TT(pc), a4       | pointer to getReg for TT
+    lea     setReg_TT(pc), a5       | pointer to setReg for TT
 
-| for TT    
-    movea.w #0x8780, a3         | pointer to base of TT SCSI register
+    move.l  0x04f2.w, a3            | get pointer to TOS
+    move.w  2(a3), d0               | TOS +2: TOS version
+
+    lsr.w   #8, d0                  | TOS major version to lowest byte
+    cmp.b   #4, d0                  | TOS major 4 means Falcon TOS
+    bne     notFalcon               | if it's not TOS version 4, it's not Falcon
+
+itsAFalcon:
+    lea     getReg_Falcon(pc), a4   | pointer to getReg for Falcon
+    lea     setReg_Falcon(pc), a5   | pointer to setReg for Falcon
+notFalcon:
+|------------
     
-    bsr.b   dma_read            | transfer all the sectors from SCSI to RAM - address A1, status to D5
+    movea.w #0x8780, a3             | pointer to base of TT SCSI register
+    
+    bsr.b   dma_read                | transfer all the sectors from SCSI to RAM - address A1, status to D5
 
 |--------------------------------
 | driver is loaded in RAM, now to do the rest
@@ -273,7 +287,6 @@ clrBit:
     
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
-setReg:
 setReg_Falcon:
     bsr.b   selectNcrReg    | select NCR register by writing to WDC register
 
@@ -281,23 +294,14 @@ setReg_Falcon:
     move.w  d0, 0x8606.w    | WDL = value which should go to NCR register
     rts
     
-|----------------------------    
-|setReg_TT:
-   clr.l   d1
-   move.b  d0, d1          | D1 - lowest byte contains register offset
-   lsr     #8, d0          | D0 - lowest byte contains value which should go to register
-   move.b  d0, (d1, a3)    | store value to register
-   rts
-
-||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
-    
-getReg:    
+|----------------------------        
 getReg_Falcon:
     bsr.b   selectNcrReg    | select NCR register by writing to WDC register
 
     move.w  0x8606.w, d0    | read from WDL = get value from NCR register
     rts
 
+|----------------------------        
 | convert the register offset to value which should go to WDC register to select the right NCR register    
 selectNcrReg:
     clr.l   d1
@@ -308,12 +312,22 @@ selectNcrReg:
     move.w  d1, 0x8604.w    | WDC = select which NCR register to access
     rts
 
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    
+setReg_TT:
+   clr.l   d1
+   move.b  d0, d1          | D1 - lowest byte contains register offset
+   lsr     #8, d0          | D0 - lowest byte contains value which should go to register
+   move.b  d0, (d1, a3)    | store value to register
+   rts
+
 |----------------------------    
 
-|getReg_TT:
+getReg_TT:
    clr.l   d1
    move.b  d0, d1           | D1 - lowest byte contains register offset
    move.b  (d1, a3), d0     | get value from register
    rts
-|----------------------------    
+
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 

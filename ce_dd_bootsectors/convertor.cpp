@@ -15,12 +15,15 @@ void createImage(void);
 
 int main(int argc, char *argv[])
 {
-    createBootsectorFromPrg((char *) "c:\\!nohaj\\tmp\\assembla_atarijookie\\trunk\\cosmosex_st_bootsector", (char *) "bs_st.prg", (char *) "ce_dd_st.bs", true);
-    createBootsectorFromPrg((char *) "c:\\!nohaj\\tmp\\assembla_atarijookie\\trunk\\cosmosex_st_bootsector", (char *) "bs_tt.prg", (char *) "ce_dd_tt.bs", true);
-    createBootsectorFromPrg((char *) "c:\\!nohaj\\tmp\\assembla_atarijookie\\trunk\\cosmosex_st_bootsector", (char *) "bs_l2.prg", (char *) "ce_dd_l2.bs", false);
+    char *path = "c:\\!nohaj\\tmp\\assembla_atarijookie\\trunk\\ce_dd_bootsectors";
+    
+    createBootsectorFromPrg(path, (char *) "bs_st.prg", (char *) "ce_dd_st.bs", true);
+    createBootsectorFromPrg(path, (char *) "bs_tt.prg", (char *) "ce_dd_tt.bs", true);
+    createBootsectorFromPrg(path, (char *) "bs_fn.prg", (char *) "ce_dd_fn.bs", true);
+    createBootsectorFromPrg(path, (char *) "bs_l2.prg", (char *) "ce_dd_l2.bs", false);
 
-    checkCeddSize();
-    createImage();
+//    checkCeddSize();
+//    createImage();
 
     getchar();
     return 0;
