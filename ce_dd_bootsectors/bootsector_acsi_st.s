@@ -22,13 +22,13 @@
 
     | crate 0th cmd byte from ACSI ID (config + 2)
     lea     config(pc),a2       | load the config address to A2
-    move.b  2(a2), d2           | d2 holds ACSI ID
+    move.b  (a2), d2            | d2 holds ACSI ID
     lsl.b   #5, d2              | d2 = d2 << 5
     ori.b   #0x08, d2           | d2 now contains (ACSI ID << 5) | 0x08, which is READ SECTOR from ACSI ID device
 
     | get the sector count from (config + 3)
     clr.l   d3
-    move.b  3(a2), d3           | d3 holds sector count we should transfer
+    move.b  1(a2), d3           | d3 holds sector count we should transfer
 
     | transfer all the sectors from ACSI to RAM
 readSectorsLoop:
@@ -76,11 +76,12 @@ dma_pointer:
     dc.l    0
 
 | This is the configuration which will be replaced before sending the sector to ST.
-| The format is : 'XX'  AcsiId  SectorCount driverRamBytes
-| default values: 'XX'       0   32 (0x20)  70 kB (0x11800 bytes)
+| The format is : 'XX'  driverRamBytes          AcsiId     SectorCount 
+| default values: 'XX'  70 kB (0x11800 bytes)      0        32 (0x20)  
 
-config:     .dc.l   0x58580020
+configTag:  .dc.w   0x5858
 driverRam:  .dc.l   0x00011800
+config:     .dc.b   0x00,0x20
 acsiCmd:    .dc.b   0x08,0x00,0x00,0x01,0x20
 
 str:    .ascii  "\n\rCE ST ACSI bs"
