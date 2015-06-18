@@ -101,7 +101,7 @@ TCR_PHASE_DATA_OUT  = 0
 TCR_PHASE_DATA_IN   = 1
 TCR_PHASE_CMD       = 2
 TCR_PHASE_STATUS    = 3
-
+TCR_PHASE_MESSAGE_IN = 7
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 | subroutine used to sectors to memory from SCSI device
 dma_read:
@@ -118,7 +118,7 @@ dma_read:
     move.b  2(a2), d2           | d2 holds SCSI ID
     move.b  #1, d0
     lsl.b   d2, d0              | d0 = d0 << d2
-    move.b  d2, REG_DB          | set dest SCSI IDs
+    move.b  d0, REG_DB          | set dest SCSI IDs
     
     move.b  #0x0d, REG_ICR      | assert BUSY, SEL and data bus
     
@@ -132,14 +132,14 @@ dma_read:
 
 waitForSelEnd:    
     move.b  REG_CR, d0
-    andi.b  #0x40, d0           | get only ICR_BUSY
+    andi.b  #0x08, d0           | get only ICR_BUSY
     tst.b   d0
     beq     waitForSelEnd       | wait until ICR_BUSY is set (loop if zero)
 
     move.b  #0, REG_ICR         | clear SEL and data bus assertion
     
 | SCSI SELECTION: END
-|----------------------    
+|----------------------
 | SCSI COMMAND: START    
     move.b  #TCR_PHASE_CMD, REG_TCR | set COMMAND PHASE (assert C/D)
     move.b  #1, REG_ICR             | assert data bus
@@ -179,15 +179,22 @@ dataInLoop:
     dbra    d3, dataInLoop
     
 | SCSI DATA IN: END
-|------------------------    
+|----------------------
 | SCSI STATUS: START
 
     move.b  #TCR_PHASE_STATUS, REG_TCR      | set STATUS phase
     move.b  REG_REI, d0                     | clear potential interrupt
 
     jsr     pioRead
+
+    move.b  #TCR_PHASE_MESSAGE_IN, REG_TCR  | set MSG IN phase
+    move.b  REG_REI, d0                     | clear potential interrupt
+
+    jsr     pioRead
+    
 | SCSI STATUS: END
-|------------------------    
+|----------------------
+    
     sf      flock                           | unlock DMA chip
     rts
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
