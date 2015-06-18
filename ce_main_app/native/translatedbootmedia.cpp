@@ -141,8 +141,8 @@ void TranslatedBootMedia::updateBootsectorConfig(void)
 		return;
 	}
 	
-	imageBuffer[pos + 3] = SCapacity - 1;				// store how many sectors we should read (without boot sector)
-	setDword(&imageBuffer[pos + 4], totalSize);			// store how many RAM we need to reserve for driver in ST
+	imageBuffer[pos + 7] = SCapacity - 1;				// store how many sectors we should read (without boot sector)
+	setDword(&imageBuffer[pos + 2], totalSize);			// store how many RAM we need to reserve for driver in ST
 	
 	updateBootsectorChecksum();							// update the checksum at the end
 	
@@ -192,9 +192,16 @@ void TranslatedBootMedia::updateBootsectorConfigWithACSIid(BYTE acsiId)
 		return;
 	}
 	
-	imageBuffer[pos + 2] = acsiId;						// store from which ACSI ID we should read the driver sectors
+    BYTE id;
+    if(hwHddIface == HDD_IF_ACSI) {     // for ACSI - it's the ID (0 .. 7)
+        id = acsiId;
+    } else {                            // for SCSI - it's the ID bit (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)
+        id = (1 << acsiId);
+    }
+    
+	imageBuffer[pos + 6] = id;          // store from which ID we should read the driver sectors
 	
-	updateBootsectorChecksum();							// update the checksum at the end
+	updateBootsectorChecksum();         // update the checksum at the end
 	
 	Debug::out(LOG_INFO, "TranslatedBootMedia - bootsector config updated with new ACSI ID set to %d", (int) acsiId);
 }
