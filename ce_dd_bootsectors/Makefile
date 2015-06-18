@@ -9,7 +9,7 @@ $(TARGET): $(STARTUP) $(SSRC)
 	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(CSRC) $(SSRC) $(LDFLAGS)
 	$(STRIP) -s $@
 
-all: bs_st.prg bs_tt.prg bs_l2.prg
+all: bs_st.prg bs_tt.prg bs_fn.prg bs_l2.prg
     
 bs_st.prg: bootsector_acsi_st.s
 	$(CC) $(CFLAGS) -o $@ bootsector_acsi_st.s $(LDFLAGS)
@@ -19,6 +19,10 @@ bs_tt.prg: bootsector_scsi_tt.s
 	$(CC) $(CFLAGS) -o $@ bootsector_scsi_tt.s $(LDFLAGS)
 	$(STRIP) -s $@
 
+bs_fn.prg: bootsector_scsi_falcon.s
+	$(CC) $(CFLAGS) -o $@ bootsector_scsi_falcon.s $(LDFLAGS)
+	$(STRIP) -s $@
+    
 bs_l2.prg: bootsector_level2.s
 	$(CC) $(CFLAGS) -o $@ bootsector_level2.s $(LDFLAGS)
 	$(STRIP) -s $@
