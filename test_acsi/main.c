@@ -11,6 +11,7 @@
 #include "gemdos_errno.h"
 #include "VT52.h"
 #include "Cookiejar.h"
+#include "version.h"
 
 /*--------------------------------------------------*/
 
@@ -20,6 +21,9 @@ void getDriveConfig(void);
 int getConfig(void); 
 int readHansTest( int byteCount, WORD xorVal );
 int writeHansTest( int byteCount, WORD xorVal );
+
+void print_head(void);
+void print_status(int runcnt, int errcnt_crc_r, int errcnt_crc_w, int errcnt_timeout_r, int errcnt_timeout_w);
 
 BYTE ce_identify(BYTE ACSI_id);
 /*--------------------------------------------------*/
@@ -46,20 +50,24 @@ BYTE prevCommandFailed;
 #define DATE_ERROR                           2
 #define DATE_DATETIME_UNKNOWN                4
 
-#define Clear_home()    Cconws("\33E")
+#define Clear_home()    (void) Cconws("\33E")
 
 WORD ceTranslatedDriveMap;
 
+BYTE acsi_cmd           (BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+BYTE scsi_cmd_TT        (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+BYTE scsi_cmd_Falcon    (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+
+typedef BYTE (*THddIfCmd)(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+
+THddIfCmd hddIfCmd = NULL;
 /*--------------------------------------------------*/
 int main(void)
 {
-	
-	DWORD scancode;
-	BYTE key, vkey, res;
+    BYTE key;
 	DWORD toEven;
 	void *OldSP;
 	WORD xorVal=0xC0DE;
-	WORD testGlobalCount=0;
 	int charcnt=0;
 	int linecnt=0;
 	int errcnt_crc_r=0,errcnt_crc_w=0;
@@ -92,7 +100,7 @@ int main(void)
 	(void) Cconws(" http://goo.gl/23AqXk for infos+fixes.\r\n"); 		
 	
 	unsigned long *cescreencast_cookie=0;
-	if( CookieJarRead(0x43455343,&cescreencast_cookie)!=0 ) /* Cookie "CESC" */
+	if( CookieJarRead(0x43455343,(unsigned long *) &cescreencast_cookie)!=0 ) /* Cookie "CESC" */
 	{ 
 		(void) Cconws("\r\n");
 		(void) Cconws(" CosmosEx Screencast is active. Please\r\n");
@@ -105,10 +113,21 @@ int main(void)
 		return 0;
 	}
 	
-	(void) Cconws("\r\n Press any key to start.\r\n\r\n"); 		
-	Cnecin();
-	  
-	print_status(0,0,0);
+	(void) Cconws("\r\nPress 'any key' to start through ACSI.\r\n"); 		
+	(void) Cconws("Press 'T' to start through TT SCSI.\r\n"); 		
+	(void) Cconws("Press 'F' to start through Falcon SCSI.\r\n\r\n"); 		
+
+    key = Cnecin();        
+    
+	if(key == 't' || key == 'T') {              // if T pressed, use TT SCSI
+        hddIfCmd = (THddIfCmd) scsi_cmd_TT;
+	} else if(key == 'f' || key == 'F') {       // if F pressed, use Falcon SCSI
+        hddIfCmd = (THddIfCmd) scsi_cmd_Falcon;
+	} else {                                    // otherwise use ACSI
+        hddIfCmd = (THddIfCmd) acsi_cmd;
+    }
+    
+	print_status(0,0,0,0,0);
 	VT52_Clear_down();
 
 	/* ---------------------- */
@@ -131,18 +150,17 @@ int main(void)
 	commandLong[0] = (deviceID << 5) | 0x1f;			/* cmd[0] = ACSI_id + ICD command marker (0x1f)	*/
 	commandLong[1] = 0xA0;								/* cmd[1] = command length group (5 << 5) + TEST UNIT READY (0) */ 	
 
-    WORD currentDrive		= Dgetdrv();						/* get the current drive from system */ 
     getDriveConfig();                                     /* get translated disk configuration */ 
 
     (void) Cconws("Testing (*=OK,C=Crc,_=Timeout):\r\n"); 		
 
    	//FIXME: check key the TOS way        
-	BYTE* ikbd=0xfffffc02;     
+	BYTE* ikbd = (BYTE *) 0xfffffc02;     
   	while( *ikbd==0x39 ){
   	}
 
   	VT52_Goto_pos(0,24);
-	Cconws("R:");
+	(void) Cconws("R:");
   	while(*ikbd!=0x39)
   	{
         int res=0;
@@ -155,7 +173,7 @@ int main(void)
     	switch( res )
 		{
 			case -1:
-				Cconws("_");
+				(void) Cconws("_");
 				if( linecnt&1 ){
 					errcnt_timeout_w++;
 				}else{
@@ -163,7 +181,7 @@ int main(void)
 				}
 				break;
 			case -2:
-				Cconws("C");
+				(void) Cconws("C");
 				if( linecnt&1 ){
 					errcnt_crc_w++;
 				}else{
@@ -171,10 +189,10 @@ int main(void)
 				}
 				break;
 			case 0:
-				Cconws("*");
+				(void) Cconws("*");
 				break;
 			default:
-				Cconws(".");
+				(void) Cconws(".");
 				break;
 	    }
 		charcnt++;
@@ -192,11 +210,11 @@ int main(void)
 			charcnt=0;
 			linecnt++;
 			if( linecnt&1 ){
-			    Cconws("W:");
+			    (void) Cconws("W:");
 			    xorVal++;  /* change eorval after R/W run */
 			}else{
 				runcnt++;
-				Cconws("R:");
+				(void) Cconws("R:");
 			}
 		}
 	}
@@ -266,7 +284,7 @@ BYTE ce_identify(BYTE ACSI_id)
   cmd[0] = (ACSI_id << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
   memset(pBuffer, 0, 512);              	/* clear the buffer */
 
-  res = acsi_cmd(1, cmd, 6, pBuffer, 1);	/* issue the identify command and check the result */
+  res = (*hddIfCmd) (1, cmd, 6, pBuffer, 1);	/* issue the identify command and check the result */
     
   if(res != OK)                         	/* if failed, return FALSE */
     return 0;
@@ -281,7 +299,7 @@ BYTE ce_identify(BYTE ACSI_id)
 void showConnectionErrorMessage(void)
 {
 //	Clear_home();
-	Cconws("Communication with CosmosEx failed.\nWill try to reconnect in a while.\n\nTo quit to desktop, press F10\n");
+	(void) Cconws("Communication with CosmosEx failed.\nWill try to reconnect in a while.\n\nTo quit to desktop, press F10\n");
 	
 	prevCommandFailed = 1;
 }
@@ -289,12 +307,12 @@ void showConnectionErrorMessage(void)
 BYTE findDevice()
 {
 	BYTE i;
-	BYTE key, vkey, res;
+	BYTE key, res;
 	BYTE deviceID = 0;
 	char bfr[2];
 
 	bfr[1] = 0; 
-	Cconws("Looking for CosmosEx: ");
+	(void) Cconws("Looking for CosmosEx: ");
 
 	while(1) {
 		for(i=0; i<8; i++) {
@@ -313,7 +331,7 @@ BYTE findDevice()
 			break;
 		}
       
-		Cconws(" - not found.\r\nPress any key to retry or 'Q' to quit.\r\n");
+		(void) Cconws(" - not found.\r\nPress any key to retry or 'Q' to quit.\r\n");
 		key = Cnecin();        
     
 		if(key == 'Q' || key=='q') {
@@ -322,9 +340,9 @@ BYTE findDevice()
 	}
   
 	bfr[0] = deviceID + '0';
-	Cconws("\r\nCosmosEx ACSI ID: ");
-	Cconws(bfr);
-	Cconws("\r\n\r\n");
+	(void) Cconws("\r\nCosmosEx ACSI ID: ");
+	(void) Cconws(bfr);
+	(void) Cconws("\r\n\r\n");
 	return deviceID;
 }
 
@@ -347,7 +365,7 @@ int getConfig(void)
 	commandShort[0] = (deviceID << 5); 					                        // cmd[0] = ACSI_id + TEST UNIT READY (0)
 	commandShort[4] = GD_CUSTOM_getConfig;
   
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBuffer, 1);		// issue the command and check the result
+	res = (*hddIfCmd) (ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBuffer, 1);		// issue the command and check the result
     
     if(res != OK) {                                                             // failed to get config?
         return -1;
@@ -371,7 +389,7 @@ int readHansTest( int byteCount, WORD xorVal ){
 	commandLong[8+1] = (xorVal>>8)&0xFF;
 	commandLong[9+1] = (xorVal)&0xFF;
 
-	res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, (byteCount+511)>>9 );		// issue the command and check the result
+	res = (*hddIfCmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, (byteCount+511)>>9 );		// issue the command and check the result
     
     if(res != OK) {                                                             // ACSI ERROR?
         return -1;
@@ -430,7 +448,7 @@ int writeHansTest( int byteCount, WORD xorVal ){
         pBuffer[byteCount-1]=lastByte;
     }
 
-	res = acsi_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBuffer, (byteCount+511)>>9 );		// issue the command and check the result
+	res = (*hddIfCmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBuffer, (byteCount+511)>>9 );		// issue the command and check the result
     
     if(res == E_CRC) {                                                            
         return -2;
