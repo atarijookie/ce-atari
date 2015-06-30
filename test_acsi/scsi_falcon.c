@@ -28,12 +28,15 @@ void clearCache030(void);
 
 BYTE scsi_cmd_Falcon(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
-    int i;
-    BYTE res;
+    cmd[0] = cmd[0] & 0x1f;             // remove possible drive ID bits
+    if((cmd[0] & 0x1f) == 0x1f) {       // if it's ICD format of command, skip the 0th byte
+        cmd++;
+        cmdLength--;
+    }
     
     //---------
     // select device
-    res = selscsi_falcon();                             // do device selection
+    BYTE res = selscsi_falcon();                             // do device selection
     if(res) {
         return -1;
     }
@@ -43,6 +46,7 @@ BYTE scsi_cmd_Falcon(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer,
     scsi_setReg_Falcon(REG_TCR, TCR_PHASE_CMD);         // set COMMAND PHASE (assert C/D)
     scsi_setReg_Falcon(REG_ICR, 1);                     // data bus as output
 
+    int i;
     for(i=0; i<cmdLength; i++) {                        // try to send all cmd bytes
         res = pio_write(cmd[i]);
         

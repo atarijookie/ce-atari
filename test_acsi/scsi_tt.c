@@ -48,6 +48,12 @@ void clearCache030(void);
 
 BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
+    cmd[0] = cmd[0] & 0x1f;             // remove possible drive ID bits
+    if((cmd[0] & 0x1f) == 0x1f) {       // if it's ICD format of command, skip the 0th byte
+        cmd++;
+        cmdLength--;
+    }
+
     BYTE res = sblkscsi(cmd, cmdLength, buffer, sectorCount * 512);      // send command block
 
     if(res) {
@@ -457,9 +463,7 @@ BYTE w4req(DWORD timeOutTime)
 // doack() - assert ACK
 BYTE doack(DWORD timeOutTime)
 {
-    BYTE icr    = scsi_getReg_TT(REG_ICR);
-    icr         = icr | 0x11;           // assert ACK (and data bus)
-    scsi_setReg_TT(REG_ICR, icr);
+    scsi_setBit_TT(REG_ICR, ICR_ACK | ICR_DBUS);      // assert ACK (and data bus)
 
     BYTE res;
     
