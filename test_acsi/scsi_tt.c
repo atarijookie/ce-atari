@@ -21,7 +21,6 @@ static WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmd
 static void resetscsi(void);
 static int  w4stat(void);
 static BYTE doack(DWORD timeOutTime);
-static DWORD setscltmout(void);
        DWORD setscstmout(void);
        BYTE  w4req(DWORD timeOutTime);
 
@@ -49,6 +48,7 @@ void clearCache030(void);
 BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
     cmd[0] = cmd[0] & 0x1f;             // remove possible drive ID bits
+    
     if((cmd[0] & 0x1f) == 0x1f) {       // if it's ICD format of command, skip the 0th byte
         cmd++;
         cmdLength--;
@@ -120,16 +120,12 @@ BYTE dmaDataTransfer(BYTE readNotWrite, BYTE cmdLength)
     }
     
     DWORD timeOutTime;
-
-    if(cmdLength == 6) {                // short command -> short time out
-        timeOutTime = setscstmout();
-    } else {                            // long command  -> long timeout
-        timeOutTime = setscxltmout();
-    }
+    timeOutTime = setscstmout();
     
     BYTE res;
     res = w4int(timeOutTime);           // wait for int
     if(res) {
+        (void) Cconws(" dmaDataTansfer() failed - w4int() timeout\r\n");
         return -1;
     }
     
@@ -313,7 +309,7 @@ void resetscsi(void)
     
     scsi_setReg_TT(REG_ICR, 0);
     
-    timeOutTime = setscltmout();        
+    timeOutTime = setscstmout();        
 
     while(1) {                          // wait 1000 ms
         now = *HZ_200;
@@ -324,14 +320,14 @@ void resetscsi(void)
     }
 }
     
-// w4int - wait for interrupts from 5380 or DMAC during DMA tranfers
+// w4int - wait for interrupts from 5380 or DMAC during DMA transfer
 // Comments:
 //	When 5380 is interrupted, it indicates a change of data to status phase (i.e., DMA is done), or ...
 //	When DMAC is interrupted, it indicates either DMA count is zero, or there is an internal bus error.
 BYTE w4int(DWORD timeOutTime)
 {
     BYTE res;
-    timeOutTime += rcaltm;              // add time for recalibration
+
 
     while(1) {
         res = *MFP2;
@@ -489,21 +485,7 @@ BYTE doack(DWORD timeOutTime)
 DWORD setscstmout(void)
 {
     DWORD now = *HZ_200;
-    return (now + scstmout);
-}
-
-// setscltmout - set up a timeout count for the SCSI for SCLTMOUT long
-DWORD setscltmout(void)
-{
-    DWORD now = *HZ_200;
     return (now + scltmout);
-}
-
-// setscxltmout - set up a timeout count for the SCSI for SCXLTMOUT long
-DWORD setscxltmout(void)
-{
-    DWORD now = *HZ_200;
-    return (now + scxltmout);
 }
 
 void setDmaAddr_TT(DWORD addr)
