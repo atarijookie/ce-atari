@@ -37,6 +37,8 @@ DWORD  getDmaAddr_TT(void);
 void   setDmaCnt_TT(DWORD dataCount); 
 #else 
 static WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount);
+static WORD pioDataTransfer_read(BYTE *bfr, DWORD byteCount);
+static WORD pioDataTransfer_write(BYTE *bfr, DWORD byteCount);
 #endif
 
 extern BYTE machine;
@@ -176,41 +178,64 @@ BYTE dmaDataTransfer(BYTE readNotWrite, BYTE cmdLength)
 }
 #endif
 
+#ifndef SCDMA
+
 WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount)
 {
-    int   res;
+    WORD res;
     
-    int i;
-    for(i=0; i<byteCount; i++) {
-        if(readNotWrite) {          // read?
-            res = PIO_read();
-            
-            if(res == -2) {         // phase changed? pretend no error
-                (void) Cconws("pioDataTransfer - phase changed while read\n\r");
-                return 0;
-            }            
-            
-            if(res < 0) {           // other error? quit
-                return -1;
-            }
-            
-            bfr[i] = (BYTE) res;
-        } else {                    // write?
-            res = PIO_write(bfr[i]);
+    if(readNotWrite) {          // read?
+        res = pioDataTransfer_read(bfr, byteCount);
+    } else {                    // write?
+        res = pioDataTransfer_write(bfr, byteCount);
+    }
+    
+    return res;                 // good
+}
 
-            if(res == -2) {         // phase changed? pretend no error
-                (void) Cconws("pioDataTransfer - phase changed while write\n\r");
-                return 0;
-            }            
+WORD pioDataTransfer_read(BYTE *bfr, DWORD byteCount)
+{
+    int i, res;
+    
+    for(i=0; i<byteCount; i++) {
+        res = PIO_read();
             
-            if(res) {
-                return -1;
-            }
+        if(res == -2) {         // phase changed? pretend no error
+            (void) Cconws("pioDataTransfer - phase changed while read\n\r");
+            return 0;
+        }            
+        
+        if(res < 0) {           // other error? quit
+            return -1;
+        }
+        
+        bfr[i] = (BYTE) res;
+    }
+    
+    return 0;                       // good
+}
+
+WORD pioDataTransfer_write(BYTE *bfr, DWORD byteCount)
+{
+    int i, res;
+    
+    for(i=0; i<byteCount; i++) {
+        res = PIO_write(bfr[i]);
+
+        if(res == -2) {         // phase changed? pretend no error
+            (void) Cconws("pioDataTransfer - phase changed while write\n\r");
+            return 0;
+        }            
+        
+        if(res) {
+            return -1;
         }
     }
     
     return 0;                       // good
 }
+
+#endif    
     
 // sblkscsi() - set DMA pointer and count and send command block
 BYTE sblkscsi(BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataCount)

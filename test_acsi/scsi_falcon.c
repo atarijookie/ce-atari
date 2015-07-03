@@ -1,33 +1,38 @@
 #include "scsi.h"
 
-extern BYTE deviceID;
-
 void delay(void);
 void stopDmaFalcon(void);
 
-static BYTE selscsi_falcon(void);
+static BYTE selscsi_falcon(BYTE scsiId);
 static BYTE dmaDataWrite_Falcon(BYTE *buffer, WORD sectorCount);
 static BYTE dmaDataRead_Falcon(BYTE *buffer, WORD sectorCount);
+static WORD getStatusByte(void);
 static BYTE pio_write(BYTE val);
 static WORD pio_read(void);
+static BYTE w4req_Falcon(void); 
+static BYTE doack_Falcon(void);
+
 static BYTE getCurrentScsiPhase(void);
-static WORD getStatusByte(void);
+
+static void setDmaAddr_Falcon(DWORD addr);
+
 static void scsi_setReg_Falcon(int whichReg, DWORD value);
 static BYTE scsi_getReg_Falcon(int whichReg);
 static void scsi_setBit_Falcon(int whichReg, DWORD bitMask);
 static void scsi_clrBit_Falcon(int whichReg, DWORD bitMask);
-static void setDmaAddr_Falcon(DWORD addr);
-
-BYTE w4req_Falcon(DWORD timeOutTime); 
-BYTE doack_Falcon(DWORD timeOutTime);
 
 DWORD setscstmout(void);
 BYTE  wait_dma_cmpl(DWORD t_ticks);
 
 void clearCache030(void);
+static DWORD falconCmdTimeOut;
 
 BYTE scsi_cmd_Falcon(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
+    //------------
+    // first we start by extracting ID and fixing the cmd[] array because there's different format of this for ACSI and SCSI
+    BYTE scsiId = (cmd[0] >> 5);        // get only drive ID bits
+
     cmd[0] = cmd[0] & 0x1f;             // remove possible drive ID bits
     if((cmd[0] & 0x1f) == 0x1f) {       // if it's ICD format of command, skip the 0th byte
         cmd++;
@@ -35,8 +40,10 @@ BYTE scsi_cmd_Falcon(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer,
     }
     
     //---------
+    falconCmdTimeOut = setscstmout();       // set up a short timeout
+    
     // select device
-    BYTE res = selscsi_falcon();                             // do device selection
+    BYTE res = selscsi_falcon(scsiId);                  // do device selection
     if(res) {
         return -1;
     }
@@ -75,14 +82,13 @@ BYTE scsi_cmd_Falcon(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer,
     return res;
 }
 
-BYTE selscsi_falcon(void)
+BYTE selscsi_falcon(BYTE scsiId)
 {
     BYTE res;
-    DWORD timeOutTime = setscstmout();      // set up a short timeout
 
     scsi_setReg_Falcon(REG_ICR, 0x0d);      // assert BUSY, SEL and data bus
 
-    BYTE selId  = (1 << deviceID);          // convert number of device to bit 
+    BYTE selId  = (1 << scsiId);            // convert number of device to bit 
     scsi_setReg_Falcon(REG_ODR, selId);     // output SCSI ID which we want to select
     
     scsi_setReg_Falcon(REG_TCR, 0);         // I/O=0, MSG=0, C/D=0 (wichtig!)
@@ -93,8 +99,6 @@ BYTE selscsi_falcon(void)
     scsi_setReg_Falcon(REG_CR,  0);         // clear BSY, set ATN
     scsi_setReg_Falcon(REG_ICR, 0x05);      // clear BSY
 
-    timeOutTime = setscstmout();            // set up a short timeout
-    
     while(1) {                              // wait for busy bit to appear
         BYTE icr = scsi_getReg_Falcon(REG_CR);
         
@@ -104,13 +108,13 @@ BYTE selscsi_falcon(void)
         }
         
         DWORD now = *HZ_200;
-        if(now >= timeOutTime) {            // if time out, fail
+        if(now >= falconCmdTimeOut) {       // if time out, fail
             res = -1;
             break;
         }        
     }
     
-    scsi_setReg_Falcon(REG_ICR, 0);             // clear SEL and data bus assertion
+    scsi_setReg_Falcon(REG_ICR, 0);         // clear SEL and data bus assertion
     return res;
 }
 
@@ -133,33 +137,31 @@ WORD getStatusByte(void)
 
 BYTE pio_write(BYTE val)
 {
-    DWORD timeOutTime = setscstmout();              // set up time-out for REQ and ACK
     BYTE res;
     
-    res = w4req_Falcon(timeOutTime);                // wait for REQ
+    res = w4req_Falcon();                           // wait for REQ
     if(res) {                                       // if timed-out, fail
         return -1;
     }
 
     scsi_setReg_Falcon(REG_ODR, val);               // write cmd byte to ODR
 
-    res = doack_Falcon(timeOutTime);                // assert ACK
+    res = doack_Falcon();                           // assert ACK
     return res;
 }
 
 WORD pio_read(void)
 {
-    DWORD timeOutTime = setscstmout();              // set up time-out for REQ and ACK
     BYTE res, val;
     
-    res = w4req_Falcon(timeOutTime);                // wait for REQ
+    res = w4req_Falcon();                           // wait for REQ
     if(res) {                                       // if timed-out, fail
         return -1;
     }
 
     val = scsi_getReg_Falcon(REG_ODR);              // read byte from bus
     
-    res = doack_Falcon(timeOutTime);                // assert ACK
+    res = doack_Falcon();                           // assert ACK
     if(res) {
         return -1;
     }
@@ -167,41 +169,39 @@ WORD pio_read(void)
     return val;
 }
 
-BYTE w4req_Falcon(DWORD timeOutTime) 
+BYTE w4req_Falcon(void) 
 {
-    while(1) {                      // wait for REQ
+    while(1) {                          // wait for REQ
         BYTE icr = scsi_getReg_Falcon(REG_CR);
-        if(icr & ICR_REQ) {         // if REQ appeared, good
+        if(icr & ICR_REQ) {             // if REQ appeared, good
             return 0;
         }
         
         DWORD now = *HZ_200;
-        if(now >= timeOutTime) {    // if time out, fail
+        if(now >= falconCmdTimeOut) {   // if time out, fail
             break;
         }
     }
     
-    return -1;                      // time out
+    return -1;                          // time out
 }
 
 // doack() - assert ACK
-BYTE doack_Falcon(DWORD timeOutTime)
+BYTE doack_Falcon(void)
 {
-    BYTE icr    = scsi_getReg_Falcon(REG_ICR);
-    icr         = icr | 0x11;           // assert ACK (and data bus)
-    scsi_setReg_Falcon(REG_ICR, icr);
+    scsi_setBit_Falcon(REG_ICR, ICR_ACK | ICR_DBUS);    // assert ACK (and data bus)
 
     BYTE res;
     
     while(1) {
         BYTE icr = scsi_getReg_Falcon(REG_ICR);
-        if((icr & ICR_REQ) == 0) {      // if REQ gone, good
+        if((icr & ICR_REQ) == 0) {          // if REQ gone, good
             res = 0;
             break;
         }
         
         DWORD now = *HZ_200;
-        if(now >= timeOutTime) {        // if time out, fail
+        if(now >= falconCmdTimeOut) {       // if time out, fail
             res = -1;
             break;
         }
