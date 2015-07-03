@@ -11,26 +11,30 @@
 #include <stdint.h>
 #include <stdio.h>
 
-extern BYTE deviceID;
+
 
 //-----------------
 // local function definitions
-static BYTE sblkscsi(BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataCount);
-static BYTE selscsi(void);
+static BYTE sblkscsi(BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataCount);
+static BYTE selscsi(BYTE scsiId);
 static WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength);
 static void resetscsi(void);
 static int  w4stat(void);
-static BYTE doack(DWORD timeOutTime);
+static BYTE doack(void);
        DWORD setscstmout(void);
-       BYTE  w4req(DWORD timeOutTime);
+       BYTE  w4req(void);
 
 int PIO_read(void);
 int PIO_write(BYTE data);
+
+#define SCDMA 
        
 #ifdef SCDMA
 static BYTE dmaDataTransfer(BYTE readNotWrite, BYTE cmdLength);
-static BYTE w4int(DWORD timeOutTime);
-static DWORD setscxltmout(void);
+static BYTE w4int(void);
+void   setDmaAddr_TT(DWORD addr);
+DWORD  getDmaAddr_TT(void);
+void   setDmaCnt_TT(DWORD dataCount); 
 #else 
 static WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount);
 #endif
@@ -45,16 +49,22 @@ void  scsi_setBit_TT(int whichReg, DWORD bitMask);
 
 void clearCache030(void);
 
+static DWORD ttCmdTimeOut;              // timeout time for scsi_cmd_TT() from start to end
 BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
+    //------------
+    // first we start by extracting ID and fixing the cmd[] array because there's different format of this for ACSI and SCSI
+    BYTE scsiId = (cmd[0] >> 5);        // get only drive ID bits
+
     cmd[0] = cmd[0] & 0x1f;             // remove possible drive ID bits
     
     if((cmd[0] & 0x1f) == 0x1f) {       // if it's ICD format of command, skip the 0th byte
         cmd++;
         cmdLength--;
     }
-
-    BYTE res = sblkscsi(cmd, cmdLength, buffer, sectorCount * 512);      // send command block
+    //------------
+    ttCmdTimeOut = setscstmout();       // set up a short timeout
+    BYTE res = sblkscsi(scsiId, cmd, cmdLength, buffer, sectorCount * 512);      // send command block
 
     if(res) {
         (void) Cconws("scsi_cmd_tt failed on sblkscsi \r\n");
@@ -119,11 +129,8 @@ BYTE dmaDataTransfer(BYTE readNotWrite, BYTE cmdLength)
         scsi_setReg_TT(REG_DMACTL, DMAOUT+DMAENA); // turn on DMAC
     }
     
-    DWORD timeOutTime;
-    timeOutTime = setscstmout();
-    
     BYTE res;
-    res = w4int(timeOutTime);           // wait for int
+    res = w4int();                                  // wait for int
     if(res) {
         (void) Cconws(" dmaDataTansfer() failed - w4int() timeout\r\n");
         return -1;
@@ -206,11 +213,11 @@ WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount)
 }
     
 // sblkscsi() - set DMA pointer and count and send command block
-BYTE sblkscsi(BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataCount)
+BYTE sblkscsi(BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataCount)
 {
     BYTE res;
     
-    res = selscsi();        // select required device
+    res = selscsi(scsiId);  // select required device
     
     if(res) {               // if failed, quit with failure
         (void) Cconws("sblkscsi failed on selscsi\r\n");
@@ -242,11 +249,10 @@ BYTE sblkscsi(BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataCount)
     return 0;
 }
 
-// Selects the SCSI device with ID stored in deviceID
-BYTE selscsi(void)
+// Selects the SCSI device with specified SCSI ID
+BYTE selscsi(BYTE scsiId)
 {
     BYTE res;
-    DWORD timeOutTime = setscstmout();                  // set up a short timeout
 
     while(1) {                                          // STILL busy from last time?
         BYTE icr = scsi_getReg_TT(REG_CR);
@@ -255,7 +261,7 @@ BYTE selscsi(void)
         }
         
         DWORD now = *HZ_200;
-        if(now >= timeOutTime) {                        // if time out, fail
+        if(now >= ttCmdTimeOut) {                        // if time out, fail
             return -1;
         }        
     }
@@ -264,14 +270,12 @@ BYTE selscsi(void)
     scsi_setReg_TT(REG_ISR, 0);                            // no interrupt from selection
     scsi_setReg_TT(REG_ICR, 0x0c);                         // assert BSY and SEL
 
-    BYTE selId  = (1 << deviceID);                         // convert number of device to bit 
+    BYTE selId  = (1 << scsiId);                           // convert number of device to bit 
     scsi_setReg_TT(REG_ODR, selId);                        // set dest SCSI IDs
     
     scsi_setReg_TT(REG_ICR, 0x0d);                         // assert BUSY, SEL and data bus
     scsi_clrBit_TT(REG_MR, MR_ARBIT);                      // clear arbitrate bit
     scsi_clrBit_TT(REG_ICR, (1 << 3));                     // clear BUSY
-    
-    timeOutTime = setscstmout();        // set up for timeout
     
     while(1) {                          // wait for busy bit to appear
         BYTE icr = scsi_getReg_TT(REG_CR);
@@ -282,7 +286,7 @@ BYTE selscsi(void)
         }
         
         DWORD now = *HZ_200;
-        if(now >= timeOutTime) {        // if time out, fail
+        if(now >= ttCmdTimeOut) {                       // if time out, fail
             res = -1;
             break;
         }        
@@ -296,25 +300,25 @@ void resetscsi(void)
 {
     scsi_setReg_TT(REG_ICR, 0x80);                     // assert RST
 
-    DWORD timeOutTime = setscstmout();
+    ttCmdTimeOut = setscstmout();
     
     DWORD now;
     while(1) {                          // wait 500 ms
         now = *HZ_200;
         
-        if(now >= timeOutTime) {        
+        if(now >= ttCmdTimeOut) {        
             break;
         }        
     }
     
     scsi_setReg_TT(REG_ICR, 0);
     
-    timeOutTime = setscstmout();        
+    ttCmdTimeOut = setscstmout();        
 
     while(1) {                          // wait 1000 ms
         now = *HZ_200;
         
-        if(now >= timeOutTime) {        
+        if(now >= ttCmdTimeOut) {        
             break;
         }        
     }
@@ -324,11 +328,10 @@ void resetscsi(void)
 // Comments:
 //	When 5380 is interrupted, it indicates a change of data to status phase (i.e., DMA is done), or ...
 //	When DMAC is interrupted, it indicates either DMA count is zero, or there is an internal bus error.
-BYTE w4int(DWORD timeOutTime)
+BYTE w4int(void)
 {
     BYTE res;
-
-
+    
     while(1) {
         res = *MFP2;
         if(res & GPIP2SCSI) {           // NCR 5380 interrupt? 
@@ -338,18 +341,17 @@ BYTE w4int(DWORD timeOutTime)
         if((res & GPIP25) == 0) {       // DMAC interrupt? 
             WORD wres = scsi_getReg_TT(REG_DMACTL);    // get the DMAC status
             if(wres & 0x80) {           // check for bus err/ignore cntout ints
-                resetscsi();            // reset SCSI and exit with failure
                 return -1;
             }            
         }
     
         DWORD now = *HZ_200;
-        if(now >= timeOutTime) {        // time out? fail   
+        if(now >= ttCmdTimeOut) {           // time out? fail
             return -1;
         }
     }
     
-    res = scsi_getReg_TT(REG_REI);         // clear potential interrupt
+    scsi_getReg_TT(REG_REI);                // clear potential interrupt
     scsi_setReg_TT(REG_DMACTL, DMADIS);    // disable DMA
     scsi_setReg_TT(REG_MR,  0);            // disable DMA mode
     scsi_setReg_TT(REG_ICR, 0);            // make sure data bus is not asserted
@@ -391,9 +393,8 @@ int w4stat(void)
 int PIO_read(void)
 {
     BYTE res;
-    DWORD timeOutTime = setscstmout();  // set up time-out for REQ and ACK
 
-    res = w4req(timeOutTime);           // wait for status byte
+    res = w4req();                      // wait for status byte
     if(res) {                           // if timed-out, fail
         return -1;
     }
@@ -405,7 +406,7 @@ int PIO_read(void)
    
     BYTE data = scsi_getReg_TT(REG_DB); // get the status byte
 
-    res = doack(timeOutTime);           // signal that status byte is here
+    res = doack();                      // signal that status byte is here
     if(res) {                           // if timed-out, fail
         return -1;
     }
@@ -416,9 +417,8 @@ int PIO_read(void)
 int PIO_write(BYTE data)
 {
     BYTE res;
-    DWORD timeOutTime = setscstmout();  // set up time-out for REQ and ACK
 
-    res = w4req(timeOutTime);           // wait for status byte
+    res = w4req();                      // wait for status byte
     if(res) {                           // if timed-out, fail
         return -1;
     }
@@ -430,7 +430,7 @@ int PIO_write(BYTE data)
     
     scsi_setReg_TT(REG_DB, data);
 
-    res = doack(timeOutTime);           // signal that status byte is here
+    res = doack();                      // signal that status byte is here
     if(res) {                           // if timed-out, fail
         return -1;
     }
@@ -439,7 +439,7 @@ int PIO_write(BYTE data)
 } 
             
 // w4req() - wait for REQ to come during hand shake of non-data bytes
-BYTE w4req(DWORD timeOutTime) 
+BYTE w4req(void) 
 {
     while(1) {                      // wait for REQ
         BYTE icr = scsi_getReg_TT(REG_CR);
@@ -448,7 +448,7 @@ BYTE w4req(DWORD timeOutTime)
         }
         
         DWORD now = *HZ_200;
-        if(now >= timeOutTime) {    // if time out, fail
+        if(now >= ttCmdTimeOut) {   // if time out, fail
             break;
         }
     }
@@ -457,7 +457,7 @@ BYTE w4req(DWORD timeOutTime)
 }
 
 // doack() - assert ACK
-BYTE doack(DWORD timeOutTime)
+BYTE doack(void)
 {
     scsi_setBit_TT(REG_ICR, ICR_ACK | ICR_DBUS);      // assert ACK (and data bus)
 
@@ -471,7 +471,7 @@ BYTE doack(DWORD timeOutTime)
         }
         
         DWORD now = *HZ_200;
-        if(now >= timeOutTime) {        // if time out, fail
+        if(now >= ttCmdTimeOut) {       // if time out, fail
             res = -1;
             break;
         }

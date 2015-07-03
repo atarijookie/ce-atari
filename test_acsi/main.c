@@ -17,10 +17,10 @@
 
 void showConnectionErrorMessage(void);
 BYTE findDevice(void);
-void getDriveConfig(void);
 int getConfig(void); 
 int readHansTest( int byteCount, WORD xorVal );
 int writeHansTest( int byteCount, WORD xorVal );
+void sleep(int seconds);
 
 void print_head(void);
 void print_status(int runcnt, int errcnt_crc_r, int errcnt_crc_w, int errcnt_timeout_r, int errcnt_timeout_w);
@@ -52,8 +52,6 @@ BYTE prevCommandFailed;
 
 #define Clear_home()    (void) Cconws("\33E")
 
-WORD ceTranslatedDriveMap;
-
 BYTE acsi_cmd           (BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 BYTE scsi_cmd_TT        (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 BYTE scsi_cmd_Falcon    (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
@@ -61,6 +59,12 @@ BYTE scsi_cmd_Falcon    (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buf
 typedef BYTE (*THddIfCmd)(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 
 THddIfCmd hddIfCmd = NULL;
+
+#define IF_ACSI         0
+#define IF_SCSI_TT      1
+#define IF_SCSI_FALCON  2
+
+BYTE ifUsed;
 /*--------------------------------------------------*/
 int main(void)
 {
@@ -120,19 +124,23 @@ int main(void)
     key = Cnecin();        
     
 	if(key == 't' || key == 'T') {              // if T pressed, use TT SCSI
-        hddIfCmd = (THddIfCmd) scsi_cmd_TT;
+        hddIfCmd    = (THddIfCmd) scsi_cmd_TT;
+        ifUsed      = IF_SCSI_TT;
 	} else if(key == 'f' || key == 'F') {       // if F pressed, use Falcon SCSI
-        hddIfCmd = (THddIfCmd) scsi_cmd_Falcon;
+        hddIfCmd    = (THddIfCmd) scsi_cmd_Falcon;
+        ifUsed      = IF_SCSI_FALCON;
 	} else {                                    // otherwise use ACSI
-        hddIfCmd = (THddIfCmd) acsi_cmd;
+        hddIfCmd    = (THddIfCmd) acsi_cmd;
+        ifUsed      = IF_ACSI;
     }
-    
+
 	print_status(0,0,0,0,0);
 	VT52_Clear_down();
 
 	/* ---------------------- */
 	/* search for device on the ACSI bus */
-	deviceID=findDevice();
+	deviceID = findDevice();
+
 	if( deviceID == (BYTE)-1 )
 	{
     	(void) Cconws("Quit."); 		
@@ -149,8 +157,6 @@ int main(void)
 	
 	commandLong[0] = (deviceID << 5) | 0x1f;			/* cmd[0] = ACSI_id + ICD command marker (0x1f)	*/
 	commandLong[1] = 0xA0;								/* cmd[1] = command length group (5 << 5) + TEST UNIT READY (0) */ 	
-
-    getDriveConfig();                                     /* get translated disk configuration */ 
 
     (void) Cconws("Testing (*=OK,C=Crc,_=Timeout):\r\n"); 		
 
@@ -312,7 +318,13 @@ BYTE findDevice()
 	char bfr[2];
 
 	bfr[1] = 0; 
-	(void) Cconws("Looking for CosmosEx: ");
+	(void) Cconws("Looking for CosmosEx on ");
+    
+    switch(ifUsed) {
+        case IF_ACSI:           (void) Cconws("ACSI: ");        break;
+        case IF_SCSI_TT:        (void) Cconws("TT SCSI: ");     break;
+        case IF_SCSI_FALCON:    (void) Cconws("Falcon SCSI: "); break;
+    }
 
 	while(1) {
 		for(i=0; i<8; i++) {
@@ -340,38 +352,12 @@ BYTE findDevice()
 	}
   
 	bfr[0] = deviceID + '0';
-	(void) Cconws("\r\nCosmosEx ACSI ID: ");
+	(void) Cconws("\r\nCosmosEx ID: ");
 	(void) Cconws(bfr);
 	(void) Cconws("\r\n\r\n");
+    
 	return deviceID;
 }
-
-/*--------------------------------------------------*/
-
-void getDriveConfig(void)
-{
-    getConfig();
- 
-    ceTranslatedDriveMap = pBuffer[0]<<8|pBuffer[1];
-
-}
-
-/*--------------------------------------------------*/
-
-int getConfig(void)
-{
-    WORD res;
-    
-	commandShort[0] = (deviceID << 5); 					                        // cmd[0] = ACSI_id + TEST UNIT READY (0)
-	commandShort[4] = GD_CUSTOM_getConfig;
-  
-	res = (*hddIfCmd) (ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBuffer, 1);		// issue the command and check the result
-    
-    if(res != OK) {                                                             // failed to get config?
-        return -1;
-    }
-	return 0;
-} 
 
 /*--------------------------------------------------*/
 
