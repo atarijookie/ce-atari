@@ -10,6 +10,7 @@
 
 #include "stdlib.h"
 #include "acsi.h"
+#include "scsi.h"
 #include "global.h"
 #include "translated.h"
 #include "gemdos.h"
@@ -43,13 +44,11 @@ void showMenu(void);
 
 //--------------------------------------------------
 
-BYTE scsi_cmd_TT        (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-BYTE scsi_cmd_Falcon    (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-
-typedef BYTE (*THddIfCmd)(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-
 THddIfCmd hddIfCmd = NULL;
 int ifUsed;
+
+TsetReg pSetReg = NULL;
+TgetReg pGetReg = NULL;
 
 #define IF_ACSI         0
 #define IF_SCSI_TT      1
@@ -111,12 +110,20 @@ int main(void)
         case 't':
             (void) Cconws("Using TT SCSI...\r\n"); 		
             hddIfCmd    = (THddIfCmd) scsi_cmd_TT;
+
+            pSetReg     = (TsetReg) scsi_getReg_TT;
+            pGetReg     = (TgetReg) scsi_setReg_TT;
+
             ifUsed      = IF_SCSI_TT;
             break;
 
         case 'f':
             (void) Cconws("Using Falcon SCSI...\r\n"); 		
             hddIfCmd    = (THddIfCmd) scsi_cmd_Falcon;
+
+            pSetReg     = (TsetReg) scsi_getReg_Falcon;
+            pGetReg     = (TgetReg) scsi_setReg_Falcon;
+
             ifUsed      = IF_SCSI_FALCON;
             break;
 	} 
