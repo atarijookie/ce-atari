@@ -12,8 +12,6 @@ static WORD pio_read(void);
 static BYTE w4req_Falcon(void); 
 static BYTE doack_Falcon(void);
 
-static BYTE getCurrentScsiPhase(void);
-
 static void setDmaAddr_Falcon(DWORD addr);
 
 static void scsi_setReg_Falcon(int whichReg, DWORD value);
@@ -211,14 +209,6 @@ BYTE doack_Falcon(void)
     return res;
 }
 
-BYTE getCurrentScsiPhase(void)
-{
-    BYTE val = scsi_getReg_Falcon(REG_CR);
-    
-    val = (val >> 2) & 0x07;                // get only bits 4,3,2 (MSG, CD, IO)
-    return val;
-}
-
 BYTE dmaDataRead_Falcon(BYTE *buffer, WORD sectorCount)
 {
     scsi_setReg_Falcon(REG_ICR, 0);                    // data bus as input
@@ -253,7 +243,7 @@ BYTE dmaDataRead_Falcon(BYTE *buffer, WORD sectorCount)
         return -1;
     }
     
-    res = scsi_getReg_Falcon(REG_DS);       // get DMA STATUS
+    res = scsi_getReg_Falcon(REG_SDS);      // get DMA STATUS
     
     stopDmaFalcon();
 
@@ -273,7 +263,7 @@ BYTE dmaDataWrite_Falcon(BYTE *buffer, WORD sectorCount)
 
     scsi_setBit_Falcon(REG_MR, MR_DMA);    // DMA mode ON
 
-    scsi_setReg_Falcon(REG_DS, 0);
+    scsi_setReg_Falcon(REG_SDS, 0);
     
     setDmaAddr_Falcon((DWORD) buffer);      // set DMA adress
 
@@ -301,7 +291,7 @@ BYTE dmaDataWrite_Falcon(BYTE *buffer, WORD sectorCount)
         return -1;
     }
     
-    res = scsi_getReg_Falcon(REG_DS);   // get DMA STATUS
+    res = scsi_getReg_Falcon(REG_SDS);   // get DMA STATUS
     
     stopDmaFalcon();
 
@@ -345,7 +335,7 @@ void scsi_setReg_Falcon(int whichReg, DWORD value)
         case REG_MR :   which = SPMR2; break;
         case REG_TCR:   which = SPTCR; break;
         case REG_CR :   which = SPCSB; break;   // for REG_CR  and REG_ISR
-        case REG_DS :   which = SPBSR; break;   // for REG_DSR and REG_DS
+        case REG_SDS:   which = SPBSR; break;   // for REG_DSR and REG_DS
         case REG_DTR:   which = SPIDR; break;   // for REG_DTR and REG_IDR
         case REG_DIR:   which = SPRPI; break;   // for REG_DIR and REG_REI
         default     :   return;                 // fail, not found
@@ -365,7 +355,7 @@ BYTE scsi_getReg_Falcon(int whichReg)
         case REG_MR :   which = SPMR2; break;
         case REG_TCR:   which = SPTCR; break;
         case REG_CR :   which = SPCSB; break;   // for REG_CR  and REG_ISR
-        case REG_DS :   which = SPBSR; break;   // for REG_DSR and REG_DS
+        case REG_SDS:   which = SPBSR; break;   // for REG_DSR and REG_DS
         case REG_DTR:   which = SPIDR; break;   // for REG_DTR and REG_IDR
         case REG_DIR:   which = SPRPI; break;   // for REG_DIR and REG_REI
         default     :   return 0;               // fail, not found

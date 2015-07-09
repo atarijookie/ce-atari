@@ -31,7 +31,7 @@
 // TT BYTE regs for writing
 #define REG_ODR     0x1
 #define REG_ISR     0x9
-#define REG_DS      0xb
+#define REG_SDS     0xb
 #define REG_DTR     0xd
 #define REG_DIR     0xf
 

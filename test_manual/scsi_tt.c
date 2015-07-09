@@ -98,12 +98,12 @@ WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength)
 {
     WORD res;
 
-    scsi_setReg_TT(REG_ICR, 0);                // deassert the data bus
-    
-    if(readNotWrite) {                              // read
-        scsi_setReg_TT(REG_TCR, TCR_PHASE_DATA_IN);    // set DATA IN  phase
-    } else {                                        // write
-        scsi_setReg_TT(REG_TCR, TCR_PHASE_DATA_OUT);   // set DATA OUT phase
+    if(readNotWrite) {                                  // read
+        scsi_setReg_TT(REG_ICR, 0);                     // deassert the data bus
+        scsi_setReg_TT(REG_TCR, TCR_PHASE_DATA_IN);     // set DATA IN  phase
+    } else {                                            // write
+        scsi_setReg_TT(REG_ICR, ICR_DBUS);              // assert data bus
+        scsi_setReg_TT(REG_TCR, TCR_PHASE_DATA_OUT);    // set DATA OUT phase
     }
     
     res = scsi_getReg_TT(REG_REI);             // clear potential interrupt
@@ -121,15 +121,16 @@ WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength)
 BYTE dmaDataTransfer(BYTE readNotWrite, BYTE cmdLength)
 {
     // Set up the DMAC for data transfer
-    scsi_setReg_TT(REG_MR, 2);             // enable DMA mode
-    scsi_setReg_TT(REG_DIR, 0);            // start the DMA receive
+    scsi_setReg_TT(REG_MR, 2);                      // enable DMA mode
     
-    if(readNotWrite) {                          // on read
-        scsi_setReg_TT(REG_DMACTL, DMAIN);         // set the DMAC direction to IN
-        scsi_setReg_TT(REG_DMACTL, DMAIN+DMAENA);  // turn on DMAC
-    } else {                                    // on write
-        scsi_setReg_TT(REG_DMACTL, DMAOUT);        // set the DMAC direction to IN
-        scsi_setReg_TT(REG_DMACTL, DMAOUT+DMAENA); // turn on DMAC
+    if(readNotWrite) {                              // on read
+        scsi_setReg_TT(REG_DIR, 0);                 // start the DMA receive
+        scsi_setReg_TT(REG_DMACTL, DMAIN);          // set the DMAC direction to IN
+        scsi_setReg_TT(REG_DMACTL, DMAIN+DMAENA);   // turn on DMAC
+    } else {                                        // on write
+        scsi_setReg_TT(REG_SDS, 0);                 // start the DMA send -- WrSCSI  #0,SDS
+        scsi_setReg_TT(REG_DMACTL, DMAOUT);         // set the DMAC direction to OUT
+        scsi_setReg_TT(REG_DMACTL, DMAOUT+DMAENA);  // turn on DMAC
     }
     
     BYTE res;
@@ -269,7 +270,7 @@ BYTE sblkscsi(BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD data
 #endif
     
     scsi_setReg_TT(REG_TCR, TCR_PHASE_CMD);                // set COMMAND PHASE (assert C/D)
-    scsi_setReg_TT(REG_ICR, 1);                            // assert data bus
+    scsi_setReg_TT(REG_ICR, ICR_DBUS);                     // assert data bus
 
     int i;
     
@@ -388,7 +389,7 @@ BYTE w4int(void)
         }
     }
     
-    scsi_getReg_TT(REG_REI);                // clear potential interrupt
+    scsi_getReg_TT(REG_REI);               // clear potential interrupt
     scsi_setReg_TT(REG_DMACTL, DMADIS);    // disable DMA
     scsi_setReg_TT(REG_MR,  0);            // disable DMA mode
     scsi_setReg_TT(REG_ICR, 0);            // make sure data bus is not asserted
@@ -430,6 +431,7 @@ int w4stat(void)
 int PIO_read(void)
 {
     BYTE res;
+    scsi_setReg_TT(REG_ICR, 0);         // deassert data bus (disable data output)
 
     res = w4req();                      // wait for status byte
     if(res) {                           // if timed-out, fail
@@ -470,6 +472,7 @@ int PIO_write(BYTE data)
         return -2;
     }
     
+    scsi_setReg_TT(REG_ICR, ICR_DBUS);  // assert data bus (enable data output)
     scsi_setReg_TT(REG_DB, data);
 
     res = doack();                      // signal that status byte is here
@@ -502,7 +505,7 @@ BYTE w4req(void)
 // doack() - assert ACK
 BYTE doack(void)
 {
-    scsi_setBit_TT(REG_ICR, ICR_ACK | ICR_DBUS);      // assert ACK (and data bus)
+    scsi_setBit_TT(REG_ICR, ICR_ACK);   // assert ACK 
 
     BYTE res;
     
