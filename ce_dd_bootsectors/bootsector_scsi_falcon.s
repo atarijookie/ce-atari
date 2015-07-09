@@ -43,8 +43,15 @@ notFalcon:
     
     movea.w #0x8780, a3             | pointer to base of TT SCSI register
     
-    bsr.b   dma_read                | transfer all the sectors from SCSI to RAM - address A1, status to D5
+    clr.l   d4
+    move.b  1(a6), d4               | d4 holds sector count we should transfer (e.g. 0x20)
+    subq.l  #1, d4                  | dbra branches +1 more than specified
 
+    move.b  #1, 1(a6)
+    
+readNextSector:                     | transfer all the sectors from SCSI to RAM - address A1, status to D5
+    bsr.b   dma_read                
+    dbra    d4, readNextSector
 |--------------------------------
 | driver is loaded in RAM, now to do the rest
 
@@ -81,10 +88,8 @@ configTag:  .dc.w   0x5858
 config:     .dc.l   0x00011800
             .dc.b   0x01, 0x20
 
-str:    .ascii  "\n\rCE SCSI"
-        .dc.b   13,10,0
-error:  .ascii  "fail"
-        .dc.b   13,10,0
+str:    .ascii  "\n\rCE SCSI\0"
+error:  .ascii  ":(\n\r\0"
 
     .text
     .even
@@ -111,7 +116,7 @@ dma_read:
     move.w  #0x0c03, d0         | REG_ICR = assert BSY and SEL 
     jsr     (a5)                | jsr setReg
     
-    move.b  (a6)+, d0           | D0 = 0x00ID
+    move.b  (a6), d0            | D0 = 0x00ID
     lsl.w   #8, d0              | d0 = d0 << 8      -- 0xID00
     ori.b   #1, d0              | d0 = d0 | 0x01    -- 0xID01
     jsr     (a5)                | jsr setReg -- set dest SCSI IDs
@@ -150,22 +155,20 @@ waitForSelEnd:
     bsr.b   pioWrite            | cmd[1]: 0x00
     bsr.b   pioWrite            | cmd[2]: 0x00
     
+    move.b  1(a6),d6            | starting sector to d6
+    addq    #1, 1(a6)           | starting_sector++
+    bsr.b   pioWrite            | cmd[3]: start reading from sector D6
+
     moveq   #1, d6
-    bsr.b   pioWrite            | cmd[3]: 0x01 -- start reading from sector 0x000001
-
-    clr.l   d3
-    move.b  (a6)+, d3           | d3 holds sector count we should transfer
-    move.b  d3, d6
     bsr.b   pioWrite            | cmd[4]: sector count
-
+    
     bsr.b   pioWrite            | cmd[5]: 0x00
     
 | SCSI COMMAND: END
 |----------------------
 | SCSI DATA IN: START    
-    lsl.l   #8, d3              
-    lsl.l   #1, d3              | d3 = d3 * 512 (d3 = d3 << 9) -- convert sector count to byte count
-    
+    moveq   #2, d3  
+    lsl.l   #8, d3              | d3 = 0x200 - count of bytes we want to transfer
     subq.l  #1, d3              | d3--, because the dbra loop will be executed (d3 + 1) times
     
     moveq   #0x03, d0           | REG_ICR: deassert the data bus

@@ -16,20 +16,20 @@ void createImage(void);
 int main(int argc, char *argv[])
 {
     char *path = "c:\\!nohaj\\tmp\\assembla_atarijookie\\trunk\\ce_dd_bootsectors";
-    
     createBootsectorFromPrg(path, (char *) "bs_st.prg", (char *) "ce_dd_st.bs", true);
     createBootsectorFromPrg(path, (char *) "bs_tt.prg", (char *) "ce_dd_tt.bs", true);
     createBootsectorFromPrg(path, (char *) "bs_fn.prg", (char *) "ce_dd_fn.bs", true);
     createBootsectorFromPrg(path, (char *) "bs_l2.prg", (char *) "ce_dd_l2.bs", false);
 
-//    checkCeddSize();
-//    createImage();
+/*
+    checkCeddSize();
+    createImage();
+*/
 
     getchar();
     return 0;
 }
 
-//----------------------------------------------------------------------------------------------
 bool createBootsectorFromPrg(char *path, char *inFile, char *outFile, bool bootsectorNotRaw)
 {
     printf("\nConvert: %s -> %s\n", inFile, outFile);
@@ -61,6 +61,9 @@ bool createBootsectorFromPrg(char *path, char *inFile, char *outFile, bool boots
         return false;
     }
 
+    fseek (bc, 0, SEEK_END);        // move to end
+    int fsize = ftell(bc) - 256;    // get file size
+
     fseek(bc, 256, SEEK_SET);       // skip TOS prog header
 
     int offset  = 0x1e;
@@ -70,10 +73,10 @@ bool createBootsectorFromPrg(char *path, char *inFile, char *outFile, bool boots
         len     = 512;
     }
 
-    fread(&bfr[offset], 1, len, bc);
+    int cnt = fread(&bfr[offset], 1, len, bc);
 
-    if(!feof(bc)) {
-        printf("\nDidn't hit the EOF when reading input file! Is the bootcode too long?\n");
+    if(fsize > len) {
+        printf("\nFile is bigger than what we can use! Is the bootcode too long? (usable space: %d, this file size: %d)\n", len, fsize);
     }
 
     fclose(bc);
@@ -93,7 +96,7 @@ bool createBootsectorFromPrg(char *path, char *inFile, char *outFile, bool boots
         WORD cs = 0x1234 - sum;
         sum = sum & 0xffff;
 
-        printf("sum %04x, check-sum is %04x, check is %04x\n", sum, cs, (cs + sum) & 0xffff);
+        printf("sum %04x, check-sum is %04x, check is %04x, free space: %d bytes\n", sum, cs, (cs + sum) & 0xffff, len - cnt);
 
         bfr[510] = cs >> 8;         // store the check sum
         bfr[511] = cs;
@@ -114,7 +117,7 @@ bool createBootsectorFromPrg(char *path, char *inFile, char *outFile, bool boots
     printf("Done   : %s -> %s\n", inFile, outFile);
     return true;
 }
-//----------------------------------------------------------------------------------------------
+
 void createImage(void)
 {
     BYTE bfr[1024*1024];
@@ -132,7 +135,7 @@ void createImage(void)
 
     //--------------------------
     // read and write bootsector
-    FILE *in = fopen("ceddboot.001", "rb");
+    FILE *in = fopen("bootsect.bin", "rb");
     if(!in) {
         fclose(out);
         printf("\ncreateImage - could not open bootsector file (001)!\n");
@@ -151,7 +154,7 @@ void createImage(void)
 
     //--------------------------
     // read and write the driver
-    in = fopen("ceddboot.002", "rb");
+    in = fopen("ce_dd.prg", "rb");
     if(!in) {
         fclose(out);
         printf("\ncreateImage - could not open driver file (002)!\n");
@@ -175,15 +178,25 @@ void createImage(void)
     memset(bfr, 0, add);
     fwrite(bfr, 1, add, out);
 
+    //--------------------------
+    // pad to 5MB for STEEM Pasti
+    memset(bfr, 0, 1024*1024);
+
+    for(int i=0; i<5; i++) {
+        fwrite(bfr, 1, 1024*1024, out);
+    }
+
     fclose(out);
+
+    printf("\nCEDDBOOT.IMG created.\n");
 }
 
 void checkCeddSize(void)
 {
-    FILE *f = fopen("ceddboot.002", "rb");
+    FILE *f = fopen("ce_dd.prg", "rb");
 
     if(!f) {
-        printf("\nCould not open ceddboot.002 file!\n");
+        printf("\nCould not open ce_dd.prg file!\n");
         getchar();
         return;
     }
