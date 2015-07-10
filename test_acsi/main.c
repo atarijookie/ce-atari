@@ -12,6 +12,7 @@
 #include "VT52.h"
 #include "Cookiejar.h"
 #include "version.h"
+#include "hdd_if.h"
 
 /*--------------------------------------------------*/
 
@@ -51,18 +52,6 @@ BYTE prevCommandFailed;
 #define DATE_DATETIME_UNKNOWN                4
 
 #define Clear_home()    (void) Cconws("\33E")
-
-BYTE acsi_cmd           (BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-BYTE scsi_cmd_TT        (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-BYTE scsi_cmd_Falcon    (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-
-typedef BYTE (*THddIfCmd)(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-
-THddIfCmd hddIfCmd = NULL;
-
-#define IF_ACSI         0
-#define IF_SCSI_TT      1
-#define IF_SCSI_FALCON  2
 
 BYTE ifUsed;
 /*--------------------------------------------------*/
@@ -124,13 +113,13 @@ int main(void)
     key = Cnecin();        
     
 	if(key == 't' || key == 'T') {              // if T pressed, use TT SCSI
-        hddIfCmd    = (THddIfCmd) scsi_cmd_TT;
+        hdd_if_select(IF_SCSI_TT);
         ifUsed      = IF_SCSI_TT;
 	} else if(key == 'f' || key == 'F') {       // if F pressed, use Falcon SCSI
-        hddIfCmd    = (THddIfCmd) scsi_cmd_Falcon;
+        hdd_if_select(IF_SCSI_FALCON);
         ifUsed      = IF_SCSI_FALCON;
 	} else {                                    // otherwise use ACSI
-        hddIfCmd    = (THddIfCmd) acsi_cmd;
+        hdd_if_select(IF_ACSI);
         ifUsed      = IF_ACSI;
     }
 
@@ -444,6 +433,20 @@ int writeHansTest( int byteCount, WORD xorVal ){
     }
     
 	return 0;
-  
 }
 
+void logMsg(char *logMsg)
+{
+//    if(showLogs) {
+//        (void) Cconws(logMsg);
+//    }
+}
+
+void logMsgProgress(DWORD current, DWORD total)
+{
+//    (void) Cconws("Progress: ");
+//    showHexDword(current);
+//    (void) Cconws(" out of ");
+//    showHexDword(total);
+//    (void) Cconws("\n\r");
+}

@@ -1,3 +1,4 @@
+#include "hdd_if.h"
 #include "scsi.h"
 
 void delay(void);
@@ -12,14 +13,10 @@ static WORD pio_read(void);
 static BYTE w4req_Falcon(void); 
 static BYTE doack_Falcon(void);
 
-static BYTE getCurrentScsiPhase(void);
-
 static void setDmaAddr_Falcon(DWORD addr);
 
-static void scsi_setReg_Falcon(int whichReg, DWORD value);
-static BYTE scsi_getReg_Falcon(int whichReg);
-static void scsi_setBit_Falcon(int whichReg, DWORD bitMask);
-static void scsi_clrBit_Falcon(int whichReg, DWORD bitMask);
+void  scsi_setReg_Falcon(int whichReg, DWORD value);
+DWORD scsi_getReg_Falcon(int whichReg);
 
 DWORD setscstmout(void);
 BYTE  wait_dma_cmpl(DWORD t_ticks);
@@ -50,8 +47,8 @@ BYTE scsi_cmd_Falcon(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer,
     
     //---------
     // send command
-    scsi_setReg_Falcon(REG_TCR, TCR_PHASE_CMD);         // set COMMAND PHASE (assert C/D)
-    scsi_setReg_Falcon(REG_ICR, 1);                     // data bus as output
+    (*pSetReg)(REG_TCR, TCR_PHASE_CMD);         // set COMMAND PHASE (assert C/D)
+    (*pSetReg)(REG_ICR, 1);                     // data bus as output
 
     int i;
     for(i=0; i<cmdLength; i++) {                        // try to send all cmd bytes
@@ -86,21 +83,21 @@ BYTE selscsi_falcon(BYTE scsiId)
 {
     BYTE res;
 
-    scsi_setReg_Falcon(REG_ICR, 0x0d);      // assert BUSY, SEL and data bus
+    (*pSetReg)(REG_ICR, 0x0d);      // assert BUSY, SEL and data bus
 
     BYTE selId  = (1 << scsiId);            // convert number of device to bit 
-    scsi_setReg_Falcon(REG_ODR, selId);     // output SCSI ID which we want to select
+    (*pSetReg)(REG_ODR, selId);     // output SCSI ID which we want to select
     
-    scsi_setReg_Falcon(REG_TCR, 0);         // I/O=0, MSG=0, C/D=0 (wichtig!)
-    scsi_setReg_Falcon(REG_ICR, 0x0d);      // assert BUSY, SEL and data bus
+    (*pSetReg)(REG_TCR, 0);         // I/O=0, MSG=0, C/D=0 (wichtig!)
+    (*pSetReg)(REG_ICR, 0x0d);      // assert BUSY, SEL and data bus
     
-    scsi_clrBit_Falcon(REG_MR, MR_ARBIT);   // finish arbitration
+    scsi_clrBit(REG_MR, MR_ARBIT);   // finish arbitration
 
-    scsi_setReg_Falcon(REG_CR,  0);         // clear BSY, set ATN
-    scsi_setReg_Falcon(REG_ICR, 0x05);      // clear BSY
+    (*pSetReg)(REG_CR,  0);         // clear BSY, set ATN
+    (*pSetReg)(REG_ICR, 0x05);      // clear BSY
 
     while(1) {                              // wait for busy bit to appear
-        BYTE icr = scsi_getReg_Falcon(REG_CR);
+        BYTE icr = (*pGetReg)(REG_CR);
         
         if(icr & ICR_BUSY) {                // if bit set, good
             res = 0;
@@ -114,7 +111,7 @@ BYTE selscsi_falcon(BYTE scsiId)
         }        
     }
     
-    scsi_setReg_Falcon(REG_ICR, 0);         // clear SEL and data bus assertion
+    (*pSetReg)(REG_ICR, 0);         // clear SEL and data bus assertion
     return res;
 }
 
@@ -122,13 +119,13 @@ WORD getStatusByte(void)
 {
     BYTE status, __attribute__((unused)) msg;
     
-   	scsi_setReg_Falcon(REG_TCR, TCR_PHASE_STATUS);      // STATUS IN phase
-	scsi_getReg_Falcon(REG_REI);                        // clear potential interrupt
+   	(*pSetReg)(REG_TCR, TCR_PHASE_STATUS);      // STATUS IN phase
+	(*pGetReg)(REG_REI);                        // clear potential interrupt
 
     status = pio_read();                                // read status byte
     
-   	scsi_setReg_Falcon(REG_TCR, TCR_PHASE_MESSAGE_IN);  // MESSAGE IN phase
-	scsi_getReg_Falcon(REG_REI);                        // clear potential interrupt
+   	(*pSetReg)(REG_TCR, TCR_PHASE_MESSAGE_IN);  // MESSAGE IN phase
+	(*pGetReg)(REG_REI);                        // clear potential interrupt
 
     msg = pio_read();                                   // read message byte
     
@@ -144,7 +141,7 @@ BYTE pio_write(BYTE val)
         return -1;
     }
 
-    scsi_setReg_Falcon(REG_ODR, val);               // write cmd byte to ODR
+    (*pSetReg)(REG_ODR, val);               // write cmd byte to ODR
 
     res = doack_Falcon();                           // assert ACK
     return res;
@@ -159,7 +156,7 @@ WORD pio_read(void)
         return -1;
     }
 
-    val = scsi_getReg_Falcon(REG_ODR);              // read byte from bus
+    val = (*pGetReg)(REG_ODR);              // read byte from bus
     
     res = doack_Falcon();                           // assert ACK
     if(res) {
@@ -172,7 +169,7 @@ WORD pio_read(void)
 BYTE w4req_Falcon(void) 
 {
     while(1) {                          // wait for REQ
-        BYTE icr = scsi_getReg_Falcon(REG_CR);
+        BYTE icr = (*pGetReg)(REG_CR);
         if(icr & ICR_REQ) {             // if REQ appeared, good
             return 0;
         }
@@ -189,12 +186,12 @@ BYTE w4req_Falcon(void)
 // doack() - assert ACK
 BYTE doack_Falcon(void)
 {
-    scsi_setBit_Falcon(REG_ICR, ICR_ACK | ICR_DBUS);    // assert ACK (and data bus)
+    scsi_setBit(REG_ICR, ICR_ACK | ICR_DBUS);    // assert ACK (and data bus)
 
     BYTE res;
     
     while(1) {
-        BYTE icr = scsi_getReg_Falcon(REG_ICR);
+        BYTE icr = (*pGetReg)(REG_ICR);
         if((icr & ICR_REQ) == 0) {          // if REQ gone, good
             res = 0;
             break;
@@ -207,26 +204,18 @@ BYTE doack_Falcon(void)
         }
     }
 
-    scsi_clrBit_Falcon(REG_ICR, ICR_ACK);   // clear ACK
+    scsi_clrBit(REG_ICR, ICR_ACK);   // clear ACK
     return res;
-}
-
-BYTE getCurrentScsiPhase(void)
-{
-    BYTE val = scsi_getReg_Falcon(REG_CR);
-    
-    val = (val >> 2) & 0x07;                // get only bits 4,3,2 (MSG, CD, IO)
-    return val;
 }
 
 BYTE dmaDataRead_Falcon(BYTE *buffer, WORD sectorCount)
 {
-    scsi_setReg_Falcon(REG_ICR, 0);                    // data bus as input
-    scsi_setReg_Falcon(REG_TCR, TCR_PHASE_DATA_IN);    // set DATA IN  phase
+    (*pSetReg)(REG_ICR, 0);                    // data bus as input
+    (*pSetReg)(REG_TCR, TCR_PHASE_DATA_IN);    // set DATA IN  phase
 
-    scsi_getReg_Falcon(REG_REI);                       // clear interrupts by reading REG_REI
+    (*pGetReg)(REG_REI);                       // clear interrupts by reading REG_REI
 
-    scsi_setBit_Falcon(REG_MR, MR_DMA);                // DMA mode ON
+    scsi_setBit(REG_MR, MR_DMA);                // DMA mode ON
 
     setDmaAddr_Falcon((DWORD) buffer);                  // set DMA adress
 
@@ -245,7 +234,7 @@ BYTE dmaDataRead_Falcon(BYTE *buffer, WORD sectorCount)
     }
     delay();
 
-    scsi_setReg_Falcon(REG_DIR, 0);         // start DMA receive
+    (*pSetReg)(REG_DIR, 0);         // start DMA receive
     *WDL = 0;
     
     BYTE res = wait_dma_cmpl(200);          // wait for DMA completetion
@@ -253,7 +242,7 @@ BYTE dmaDataRead_Falcon(BYTE *buffer, WORD sectorCount)
         return -1;
     }
     
-    res = scsi_getReg_Falcon(REG_DS);       // get DMA STATUS
+    res = (*pGetReg)(REG_SDS);      // get DMA STATUS
     
     stopDmaFalcon();
 
@@ -266,14 +255,14 @@ BYTE dmaDataRead_Falcon(BYTE *buffer, WORD sectorCount)
 
 BYTE dmaDataWrite_Falcon(BYTE *buffer, WORD sectorCount)
 {
-    scsi_setReg_Falcon(REG_TCR, TCR_PHASE_DATA_OUT);   // set DATA OUT phase
-    scsi_setReg_Falcon(REG_ICR, 1);        // data bus as output
+    (*pSetReg)(REG_TCR, TCR_PHASE_DATA_OUT);   // set DATA OUT phase
+    (*pSetReg)(REG_ICR, 1);        // data bus as output
 
-    scsi_getReg_Falcon(REG_REI);           // clear interrupts by reading REG_REI
+    (*pGetReg)(REG_REI);           // clear interrupts by reading REG_REI
 
-    scsi_setBit_Falcon(REG_MR, MR_DMA);    // DMA mode ON
+    scsi_setBit(REG_MR, MR_DMA);    // DMA mode ON
 
-    scsi_setReg_Falcon(REG_DS, 0);
+    (*pSetReg)(REG_SDS, 0);
     
     setDmaAddr_Falcon((DWORD) buffer);      // set DMA adress
 
@@ -301,7 +290,7 @@ BYTE dmaDataWrite_Falcon(BYTE *buffer, WORD sectorCount)
         return -1;
     }
     
-    res = scsi_getReg_Falcon(REG_DS);   // get DMA STATUS
+    res = (*pGetReg)(REG_SDS);   // get DMA STATUS
     
     stopDmaFalcon();
 
@@ -321,9 +310,9 @@ void delay(void)
 
 void stopDmaFalcon(void)
 {
-    scsi_getReg_Falcon(REG_REI);           // reset ints by reading register
-    scsi_clrBit_Falcon(REG_MR, MR_DMA);    // DMA mode off
-    scsi_setReg_Falcon(REG_ICR, 0);        
+    (*pGetReg)(REG_REI);           // reset ints by reading register
+    scsi_clrBit(REG_MR, MR_DMA);    // DMA mode off
+    (*pSetReg)(REG_ICR, 0);        
     
     clearCache030();
 }
@@ -345,7 +334,7 @@ void scsi_setReg_Falcon(int whichReg, DWORD value)
         case REG_MR :   which = SPMR2; break;
         case REG_TCR:   which = SPTCR; break;
         case REG_CR :   which = SPCSB; break;   // for REG_CR  and REG_ISR
-        case REG_DS :   which = SPBSR; break;   // for REG_DSR and REG_DS
+        case REG_SDS:   which = SPBSR; break;   // for REG_DSR and REG_DS
         case REG_DTR:   which = SPIDR; break;   // for REG_DTR and REG_IDR
         case REG_DIR:   which = SPRPI; break;   // for REG_DIR and REG_REI
         default     :   return;                 // fail, not found
@@ -355,7 +344,7 @@ void scsi_setReg_Falcon(int whichReg, DWORD value)
     *WDC    = value;    // write reg value by writing to WDC
 }
 
-BYTE scsi_getReg_Falcon(int whichReg)
+DWORD scsi_getReg_Falcon(int whichReg)
 {
     BYTE which = 0;
    
@@ -365,7 +354,7 @@ BYTE scsi_getReg_Falcon(int whichReg)
         case REG_MR :   which = SPMR2; break;
         case REG_TCR:   which = SPTCR; break;
         case REG_CR :   which = SPCSB; break;   // for REG_CR  and REG_ISR
-        case REG_DS :   which = SPBSR; break;   // for REG_DSR and REG_DS
+        case REG_SDS:   which = SPBSR; break;   // for REG_DSR and REG_DS
         case REG_DTR:   which = SPIDR; break;   // for REG_DTR and REG_IDR
         case REG_DIR:   which = SPRPI; break;   // for REG_DIR and REG_REI
         default     :   return 0;               // fail, not found
@@ -376,22 +365,4 @@ BYTE scsi_getReg_Falcon(int whichReg)
     val     = *WDC;     // read reg value by reading from WDC
 
     return val;
-}
-
-void scsi_setBit_Falcon(int whichReg, DWORD bitMask)
-{
-    DWORD val;
-    val = scsi_getReg_Falcon(whichReg); // read
-    val = val | bitMask;                // modify (set bits)
-    scsi_setReg_Falcon(whichReg, val);  // write
-}
-
-void scsi_clrBit_Falcon(int whichReg, DWORD bitMask)
-{
-    DWORD val;
-    DWORD invMask = ~bitMask;
-    
-    val = scsi_getReg_Falcon(whichReg); // read
-    val = val & invMask;                // modify (clear bits)
-    scsi_setReg_Falcon(whichReg, val);  // write
 }
