@@ -111,8 +111,8 @@ int main(void)
             (void) Cconws("Using TT SCSI...\r\n"); 		
             hddIfCmd    = (THddIfCmd) scsi_cmd_TT;
 
-            pSetReg     = (TsetReg) scsi_getReg_TT;
-            pGetReg     = (TgetReg) scsi_setReg_TT;
+            pSetReg     = (TsetReg) scsi_setReg_TT;
+            pGetReg     = (TgetReg) scsi_getReg_TT;
 
             ifUsed      = IF_SCSI_TT;
             break;
@@ -121,8 +121,8 @@ int main(void)
             (void) Cconws("Using Falcon SCSI...\r\n"); 		
             hddIfCmd    = (THddIfCmd) scsi_cmd_Falcon;
 
-            pSetReg     = (TsetReg) scsi_getReg_Falcon;
-            pGetReg     = (TgetReg) scsi_setReg_Falcon;
+            pSetReg     = (TsetReg) scsi_setReg_Falcon;
+            pGetReg     = (TgetReg) scsi_getReg_Falcon;
 
             ifUsed      = IF_SCSI_FALCON;
             break;
