@@ -15,6 +15,8 @@
 #include "translated.h"
 #include "gemdos.h"
 
+#include "hdd_if.h"
+
 //--------------------------------------------------
 
 #define E_OK                0   	// 00 No error
@@ -41,18 +43,6 @@ int  writeHansTest(int byteCount, WORD xorVal);
 
 BYTE showLogs = 1;
 void showMenu(void);
-
-//--------------------------------------------------
-
-THddIfCmd hddIfCmd = NULL;
-int ifUsed;
-
-TsetReg pSetReg = NULL;
-TgetReg pGetReg = NULL;
-
-#define IF_ACSI         0
-#define IF_SCSI_TT      1
-#define IF_SCSI_FALCON  2
 
 //--------------------------------------------------
 int main(void)
@@ -101,30 +91,19 @@ int main(void)
     showMenu();
 
     switch(key) {
-        case 'a':
+        case 'a':   
             (void) Cconws("Using ACSI...\r\n"); 		
-            hddIfCmd    = (THddIfCmd) acsi_cmd;
-            ifUsed      = IF_ACSI;
+            hdd_if_select(IF_ACSI);
             break;
 
         case 't':
             (void) Cconws("Using TT SCSI...\r\n"); 		
-            hddIfCmd    = (THddIfCmd) scsi_cmd_TT;
-
-            pSetReg     = (TsetReg) scsi_setReg_TT;
-            pGetReg     = (TgetReg) scsi_getReg_TT;
-
-            ifUsed      = IF_SCSI_TT;
+            hdd_if_select(IF_SCSI_TT);
             break;
 
         case 'f':
             (void) Cconws("Using Falcon SCSI...\r\n"); 		
-            hddIfCmd    = (THddIfCmd) scsi_cmd_Falcon;
-
-            pSetReg     = (TsetReg) scsi_setReg_Falcon;
-            pGetReg     = (TgetReg) scsi_getReg_Falcon;
-
-            ifUsed      = IF_SCSI_FALCON;
+            hdd_if_select(IF_SCSI_FALCON);
             break;
 	} 
 

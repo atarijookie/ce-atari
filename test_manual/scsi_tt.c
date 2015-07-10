@@ -1,5 +1,6 @@
 // based on AHDI 6.061 sources
 
+#include "hdd_if.h"
 #include "scsi.h"
 
 #include <mint/sysbind.h>
@@ -47,8 +48,6 @@ extern BYTE machine;
 DWORD scsi_getReg_TT(int whichReg);
 void  scsi_setReg_TT(int whichReg, DWORD value);
 
-extern TsetReg pSetReg;
-extern TgetReg pGetReg;
 //-----------------
 
 void clearCache030(void);

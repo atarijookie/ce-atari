@@ -153,24 +153,5 @@
 
 //----------------------------------
 
-BYTE scsi_cmd_TT          (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-BYTE scsi_cmd_Falcon      (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-
-typedef BYTE (*THddIfCmd) (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-
-typedef void  (*TsetReg)  (int whichReg, DWORD value);
-typedef DWORD (*TgetReg)  (int whichReg);
-
-DWORD scsi_getReg_TT(int whichReg);
-void  scsi_setReg_TT(int whichReg, DWORD value);
-
-DWORD scsi_getReg_Falcon(int whichReg);
-void  scsi_setReg_Falcon(int whichReg, DWORD value);
-
-void  scsi_clrBit(int whichReg, DWORD bitMask);
-void  scsi_setBit(int whichReg, DWORD bitMask);
-
-//----------------------------------
-
 #endif
 

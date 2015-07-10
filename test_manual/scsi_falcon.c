@@ -1,3 +1,4 @@
+#include "hdd_if.h"
 #include "scsi.h"
 
 void delay(void);
@@ -22,9 +23,6 @@ BYTE  wait_dma_cmpl(DWORD t_ticks);
 
 void clearCache030(void);
 static DWORD falconCmdTimeOut;
-
-extern TsetReg pSetReg;
-extern TgetReg pGetReg;
 
 BYTE scsi_cmd_Falcon(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {

@@ -7,8 +7,8 @@ CFLAGS    = -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 CFLAGS030 = -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS   = -Wl,--traditional-format -lgcc
 
-HDR       = acsi.h scsi.h stdlib.h
-CSRC      = acsi.c scsi_falcon.c scsi_tt.c main.c stdlib.c
+HDR       = hdd_if.h acsi.h scsi.h stdlib.h
+CSRC      = hdd_if.c acsi.c scsi_falcon.c scsi_tt.c main.c stdlib.c
 
 CFLAGS  += -nostdlib
 STARTUP = startup.s
