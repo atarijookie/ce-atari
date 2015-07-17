@@ -429,7 +429,45 @@
 <gate name="G$1" symbol="AS6C1008" x="0" y="0"/>
 </gates>
 <devices>
-<device name="" package="SOP32L">
+<device name="SOP32L" package="SOP32L">
+<connects>
+<connect gate="G$1" pin="!CE" pad="P$22"/>
+<connect gate="G$1" pin="!OE" pad="P$24"/>
+<connect gate="G$1" pin="!WE" pad="P$29"/>
+<connect gate="G$1" pin="A0" pad="P$12"/>
+<connect gate="G$1" pin="A1" pad="P$11"/>
+<connect gate="G$1" pin="A10" pad="P$23"/>
+<connect gate="G$1" pin="A11" pad="P$25"/>
+<connect gate="G$1" pin="A12" pad="P$4"/>
+<connect gate="G$1" pin="A13" pad="P$28"/>
+<connect gate="G$1" pin="A14" pad="P$3"/>
+<connect gate="G$1" pin="A15" pad="P$31"/>
+<connect gate="G$1" pin="A16" pad="P$2"/>
+<connect gate="G$1" pin="A2" pad="P$10"/>
+<connect gate="G$1" pin="A3" pad="P$9"/>
+<connect gate="G$1" pin="A4" pad="P$8"/>
+<connect gate="G$1" pin="A5" pad="P$7"/>
+<connect gate="G$1" pin="A6" pad="P$6"/>
+<connect gate="G$1" pin="A7" pad="P$5"/>
+<connect gate="G$1" pin="A8" pad="P$27"/>
+<connect gate="G$1" pin="A9" pad="P$26"/>
+<connect gate="G$1" pin="CE2" pad="P$30"/>
+<connect gate="G$1" pin="D0" pad="P$13"/>
+<connect gate="G$1" pin="D1" pad="P$14"/>
+<connect gate="G$1" pin="D2" pad="P$15"/>
+<connect gate="G$1" pin="D3" pad="P$17"/>
+<connect gate="G$1" pin="D4" pad="P$18"/>
+<connect gate="G$1" pin="D5" pad="P$19"/>
+<connect gate="G$1" pin="D6" pad="P$20"/>
+<connect gate="G$1" pin="D7" pad="P$21"/>
+<connect gate="G$1" pin="GND" pad="P$16"/>
+<connect gate="G$1" pin="VCC" pad="P$32"/>
+</connects>
+<technologies>
+<technology name=""/>
+</technologies>
+</device>
+<device name="DIP32" package="DIP32">
 <connects>
 <connect gate="G$1" pin="!CE" pad="P$22"/>
 <connect gate="G$1" pin="!OE" pad="P$24"/>
