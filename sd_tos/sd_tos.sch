@@ -15844,6 +15844,9 @@ Source: www.kingbright.com</description>
 <part name="R4" library="rcl" deviceset="R-EU_" device="R0603" value="470 R"/>
 <part name="P+9" library="supply1" deviceset="VCC" device=""/>
 <part name="SV2" library="con-lstb" deviceset="MA07-1" device=""/>
+<part name="LED_ACT" library="led" deviceset="LED" device="CHIP-LED0805"/>
+<part name="R5" library="rcl" deviceset="R-EU_" device="R0603" value="470 R"/>
+<part name="P+10" library="supply1" deviceset="VCC" device=""/>
 </parts>
 <sheets>
 <sheet>
@@ -15856,6 +15859,7 @@ Source: www.kingbright.com</description>
 <text x="137.16" y="167.64" size="1.778" layer="91">Connect this to ST reset with wire.</text>
 <text x="137.16" y="165.1" size="1.778" layer="91">The other board will have this signal</text>
 <text x="137.16" y="162.56" size="1.778" layer="91">from this board through SV2 connector.</text>
+<text x="77.724" y="108.458" size="1.778" layer="91">AS6C1008</text>
 </plain>
 <instances>
 <instance part="P+2" gate="VCC" x="68.58" y="101.6"/>
@@ -15878,8 +15882,8 @@ Source: www.kingbright.com</description>
 <instance part="IC3" gate="P" x="276.86" y="40.64"/>
 <instance part="P+5" gate="VCC" x="180.34" y="-7.62" rot="MR90"/>
 <instance part="GND4" gate="1" x="152.4" y="124.46"/>
-<instance part="R1" gate="G$1" x="124.46" y="139.7" rot="R90"/>
-<instance part="P+7" gate="VCC" x="124.46" y="149.86"/>
+<instance part="R1" gate="G$1" x="124.46" y="154.94" rot="R90"/>
+<instance part="P+7" gate="VCC" x="124.46" y="165.1"/>
 <instance part="DBG" gate="A" x="81.28" y="-7.62" rot="MR270"/>
 <instance part="GND6" gate="1" x="86.36" y="-15.24"/>
 <instance part="ST_RESET_WIRE" gate="G$1" x="143.256" y="158.75" rot="R270"/>
@@ -15895,6 +15899,9 @@ Source: www.kingbright.com</description>
 <instance part="R4" gate="G$1" x="208.28" y="35.56" rot="R270"/>
 <instance part="P+9" gate="VCC" x="208.28" y="45.72"/>
 <instance part="SV2" gate="1" x="162.56" y="137.16" rot="R180"/>
+<instance part="LED_ACT" gate="G$1" x="111.76" y="142.24"/>
+<instance part="R5" gate="G$1" x="111.76" y="154.94" rot="R90"/>
+<instance part="P+10" gate="VCC" x="111.76" y="165.1"/>
 </instances>
 <busses>
 </busses>
@@ -15973,7 +15980,7 @@ Source: www.kingbright.com</description>
 <segment>
 <pinref part="R1" gate="G$1" pin="2"/>
 <pinref part="P+7" gate="VCC" pin="VCC"/>
-<wire x1="124.46" y1="144.78" x2="124.46" y2="147.32" width="0.1524" layer="91"/>
+<wire x1="124.46" y1="160.02" x2="124.46" y2="162.56" width="0.1524" layer="91"/>
 </segment>
 <segment>
 <pinref part="U$3" gate="G$1" pin="VCC"/>
@@ -15985,6 +15992,11 @@ Source: www.kingbright.com</description>
 <pinref part="P+9" gate="VCC" pin="VCC"/>
 <pinref part="R4" gate="G$1" pin="1"/>
 <wire x1="208.28" y1="43.18" x2="208.28" y2="40.64" width="0.1524" layer="91"/>
+</segment>
+<segment>
+<pinref part="P+10" gate="VCC" pin="VCC"/>
+<pinref part="R5" gate="G$1" pin="2"/>
+<wire x1="111.76" y1="162.56" x2="111.76" y2="160.02" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="GND" class="0">
@@ -16698,10 +16710,14 @@ Source: www.kingbright.com</description>
 <label x="137.16" y="132.08" size="1.778" layer="95"/>
 <wire x1="154.94" y1="132.08" x2="124.46" y2="132.08" width="0.1524" layer="91"/>
 <pinref part="R1" gate="G$1" pin="1"/>
-<wire x1="124.46" y1="132.08" x2="114.3" y2="132.08" width="0.1524" layer="91"/>
-<wire x1="124.46" y1="134.62" x2="124.46" y2="132.08" width="0.1524" layer="91"/>
+<wire x1="124.46" y1="132.08" x2="111.76" y2="132.08" width="0.1524" layer="91"/>
+<wire x1="124.46" y1="149.86" x2="124.46" y2="132.08" width="0.1524" layer="91"/>
 <junction x="124.46" y="132.08"/>
 <pinref part="SV2" gate="1" pin="6"/>
+<pinref part="LED_ACT" gate="G$1" pin="C"/>
+<wire x1="111.76" y1="137.16" x2="111.76" y2="132.08" width="0.1524" layer="91"/>
+<wire x1="111.76" y1="132.08" x2="104.14" y2="132.08" width="0.1524" layer="91"/>
+<junction x="111.76" y="132.08"/>
 </segment>
 <segment>
 <pinref part="IC1" gate="G$1" pin="(SS)PB4"/>
@@ -16745,6 +16761,13 @@ Source: www.kingbright.com</description>
 <pinref part="R4" gate="G$1" pin="2"/>
 <wire x1="208.28" y1="27.94" x2="208.28" y2="30.48" width="0.1524" layer="91"/>
 <label x="210.82" y="27.94" size="1.778" layer="95"/>
+</segment>
+</net>
+<net name="N$2" class="0">
+<segment>
+<pinref part="R5" gate="G$1" pin="1"/>
+<pinref part="LED_ACT" gate="G$1" pin="A"/>
+<wire x1="111.76" y1="149.86" x2="111.76" y2="144.78" width="0.1524" layer="91"/>
 </segment>
 </net>
 </nets>
