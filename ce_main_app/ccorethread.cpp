@@ -41,6 +41,7 @@ bool    g_gotFranzFwVersion;
 int  hwVersion      = 1;                    // returned from Hans: HW version (1 for HW from 2014, 2 for new HW from 2015)
 int  hwHddIface     = HDD_IF_ACSI;          // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
 bool hwFwMismatch   = false;                // when HW and FW types don't match (e.g. SCSI HW + ACSI FW, or ACSI HW + SCSI FW)
+int  hwScsiMachine  = SCSI_MACHINE_UNKNOWN; // when HwHddIface is HDD_IF_SCSI, this specifies what machine (TT or Falcon) is using this device
 
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
@@ -68,7 +69,8 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     scsi->attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
 //  scsi->attachToHostPath("TESTMEDIA", SOURCETYPE_TESTMEDIA, SCSI_ACCESSTYPE_FULL);
 
-    translated = new TranslatedDisk(dataTrans,configService,screencastService);
+    translated = new TranslatedDisk(dataTrans, configService, screencastService);
+	translated->setSettingsReloadProxy(&settingsReloadProxy);
 
     confStream = new ConfigStream();
     confStream->setAcsiDataTrans(dataTrans);
@@ -80,7 +82,8 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPYCONF);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPY_SLOT);
 	settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_TRANSLATED);
-	
+	settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_SCSI_IDS);
+    
     settingsReloadProxy.addSettingsUser((ISettingsUser *) scsi,          SETTINGSUSER_ACSI);
 
 	settingsReloadProxy.addSettingsUser((ISettingsUser *) translated,    SETTINGSUSER_TRANSLATED);
@@ -448,6 +451,14 @@ void CCoreThread::handleAcsiCommand(void)
 
 void CCoreThread::reloadSettings(int type)
 {
+    // if just SCSI IDs changed (
+    if(type == SETTINGSUSER_SCSI_IDS) {
+        Debug::out(LOG_DEBUG, "CCoreThread::reloadSettings() - received SETTINGSUSER_SCSI_IDS, will resend enabled SCSI IDs");
+        
+        setEnabledIDbits = true;
+        return;
+    }
+
     // if just floppy image configuration changed, set that we should send new floppy images config and quit
     if(type == SETTINGSUSER_FLOPPYIMGS) {
         setEnabledFloppyImgs = true;
@@ -532,8 +543,11 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 
         if(hansHandledOnce) {                                       // don't send commands until we did receive status at least a couple of times
             if(setEnabledIDbits) {                                  // if we should send ACSI ID configuration
+                BYTE enabledIDbits, sdCardAcsiId;
+                getIdBits(enabledIDbits, sdCardAcsiId);             // get the enabled IDs 
+                
                 responseAddWord(oBuf, CMD_ACSI_CONFIG);             // CMD: send acsi config
-                responseAddWord(oBuf, MAKEWORD(acsiIdInfo.enabledIDbits, acsiIdInfo.sdCardAcsiId)); // store ACSI enabled IDs and which ACSI ID is used for SD card
+                responseAddWord(oBuf, MAKEWORD(enabledIDbits, sdCardAcsiId)); // store ACSI enabled IDs and which ACSI ID is used for SD card
                 setEnabledIDbits = false;                           // and don't sent this anymore (until needed)
             }
 
@@ -637,8 +651,55 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
     }
 }
 
+void CCoreThread::getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId)
+{
+    // get the bits from struct
+    enabledIDbits  = acsiIdInfo.enabledIDbits;
+    sdCardAcsiId   = acsiIdInfo.sdCardAcsiId;
+    
+    if(hwHddIface != HDD_IF_SCSI) {                 // not SCSI? Don't change anything
+        Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on ACSI");
+        return;
+    }
+    
+    // if we're on SCSI bus, remove ID bits if they are used for SCSI Initiator on that machine (ID 7 on TT, ID 0 on Falcon)
+    switch(hwScsiMachine) {
+        case SCSI_MACHINE_TT:                       // TT? remove bit 7 
+            Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on TT, will remove ID 7 from enabled ID bits");
+        
+            enabledIDbits = enabledIDbits & 0x7F;
+            if(sdCardAcsiId == 7) {
+                sdCardAcsiId = 0xff;
+            }
+            break;
+
+        //------------
+        case SCSI_MACHINE_FALCON:                   // Falcon? remove bit 0
+            Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on Falcon, will remove ID 0 from enabled ID bits");
+
+            enabledIDbits = enabledIDbits & 0xFE;
+            if(sdCardAcsiId == 0) {
+                sdCardAcsiId = 0xff;
+            }
+            break;
+
+        //------------
+        default:
+        case SCSI_MACHINE_UNKNOWN:                  // unknown machine? remove both bits 7 and 0
+            Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on unknown machine, will remove ID 7 and ID 0 from enabled ID bits");
+
+            enabledIDbits = enabledIDbits & 0x7E;
+            if(sdCardAcsiId == 0 || sdCardAcsiId == 7) {
+                sdCardAcsiId = 0xff;
+            }
+            break;
+    }
+}
+
 void CCoreThread::convertXilinxInfo(BYTE xilinxInfo)
 {
+    int prevHwHddIface = hwHddIface; 
+
     switch(xilinxInfo) {
         // GOOD
         case 0x21:  hwVersion       = 2;                        // v.2
@@ -671,6 +732,12 @@ void CCoreThread::convertXilinxInfo(BYTE xilinxInfo)
                     hwHddIface      = HDD_IF_ACSI;
                     hwFwMismatch    = false;
                     break;
+    }
+    
+    // if the HD IF changed (received the 1st HW info) and we're on SCSI bus, we need to send the new (limited) SCSI IDs to Hans, so he won't answer on Initiator SCSI ID
+    if((prevHwHddIface != hwHddIface) && hwHddIface == HDD_IF_SCSI) {
+        Debug::out(LOG_DEBUG, "Found out that we're running on SCSI bus - will resend the ID bits configuration to Hans");
+        setEnabledIDbits = true;
     }
 }
 

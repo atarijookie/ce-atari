@@ -18,6 +18,8 @@
 #include "acsicommand/dateacsicommand.h"
 #include "acsicommand/screencastacsicommand.h"
 
+#include "../settingsreloadproxy.h"
+
 #define BUFFER_SIZE             (1024*1024)
 #define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
 
@@ -78,6 +80,8 @@ public:
     void detachAllUsbMedia(void);
 
     virtual void reloadSettings(int type);      // from ISettingsUser
+    
+    void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
     bool hostPathExists(std::string hostPath);
     bool createHostPath(std::string atariPath, std::string &hostPath);
@@ -87,7 +91,8 @@ private:
 	void mountAndAttachSharedDrive(void);
 	void attachConfigDrive(void);
 
-    AcsiDataTrans   *dataTrans;
+    AcsiDataTrans       *dataTrans;
+    SettingsReloadProxy *reloadProxy;
 
     BYTE            *dataBuffer;
     BYTE            *dataBuffer2;

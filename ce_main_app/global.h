@@ -111,6 +111,10 @@
 #define HDD_IF_ACSI     1
 #define HDD_IF_SCSI     2
 
+#define SCSI_MACHINE_UNKNOWN    0
+#define SCSI_MACHINE_TT         1
+#define SCSI_MACHINE_FALCON     2
+
 //////////////////////////////////////////////////////
 
 #endif // GLOBAL_H

@@ -453,6 +453,12 @@ void ConfigStream::onAcsiConfig_save(void)
         return;
     }
 
+    if(hwHddIface == HDD_IF_SCSI) {                         // running on SCSI? Show warning if ID 0 or 7 is used
+        if(devTypes[0] != DEVTYPE_OFF || devTypes[7] != DEVTYPE_OFF) {
+            showMessageScreen((char *) "Warning", (char *) "You assigned something to ID 0 or ID 7.\n\rThey might not work as they might be\n\rused by SCSI controller.\n\r");
+        }
+    }
+    
     // if we got here, everything seems to be fine and we can write values to settings
     Settings s;
     char key[32];

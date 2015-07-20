@@ -16,11 +16,15 @@
 #include "gemdos_errno.h"
 #include "desktopcreator.h"
 
+extern int hwScsiMachine;          // when HwHddIface is HDD_IF_SCSI, this specifies what machine (TT or Falcon) is using this device
+
 TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs)
 {
     dataTrans = dt;
     configService = cs;
 
+    reloadProxy = NULL;
+    
     dataBuffer  = new BYTE[BUFFER_SIZE];
     dataBuffer2 = new BYTE[BUFFER_SIZE];
 
@@ -57,6 +61,11 @@ TranslatedDisk::~TranslatedDisk()
     delete []dataBuffer2;
 
     destroyFindStorages();
+}
+
+void TranslatedDisk::setSettingsReloadProxy(SettingsReloadProxy *rp)
+{
+    reloadProxy = rp;
 }
 
 void TranslatedDisk::loadSettings(void)
@@ -556,6 +565,28 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     tosVersion  = Utils::getWord(dataBuffer + 0);
     curRes      = Utils::getWord(dataBuffer + 2);
     drives      = Utils::getWord(dataBuffer + 4);
+    
+    //------------------------------------
+    // depending on TOS major version determine the machine, on which this SCSI device is used, and limit the available SCSI IDs depending on that
+    BYTE tosVersionMajor = tosVersion >> 8;
+    
+    int oldHwScsiMachine = hwScsiMachine;                       // store the old value
+    
+    if(tosVersionMajor == 3) {                                  // TOS 3 == TT
+        hwScsiMachine = SCSI_MACHINE_TT;
+    } else if(tosVersionMajor == 4) {                           // TOS 4 == Falcon
+        hwScsiMachine = SCSI_MACHINE_FALCON;
+    } else {                                                    // other TOSes - probably not SCSI
+        hwScsiMachine = SCSI_MACHINE_UNKNOWN;
+    }
+    
+    if(oldHwScsiMachine != hwScsiMachine) {                     // SCSI machine changed? resend SCSI IDs to Hans
+        if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
+            Debug::out(LOG_DEBUG, "TranslatedDisk::onInitialize() - SCSI machine changed, will resend new SCSI IDs");
+            reloadProxy->reloadSettings(SETTINGSUSER_SCSI_IDS);
+        }
+    }
+    //------------------------------------
     
     WORD translatedDrives = getDrivesBitmap();          // get bitmap of all translated drives we got
     

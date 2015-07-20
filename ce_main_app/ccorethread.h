@@ -99,6 +99,7 @@ private:
     } response;
 
     void convertXilinxInfo(BYTE xilinxInfo);
+    void getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId);
     
     //-----------------------------------
     // floppy stuff

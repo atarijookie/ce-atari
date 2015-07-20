@@ -10,8 +10,9 @@
 #define SETTINGSUSER_FLOPPYCONF     4
 #define SETTINGSUSER_FLOPPYIMGS     5
 #define SETTINGSUSER_FLOPPY_SLOT    6
+#define SETTINGSUSER_SCSI_IDS       7
 
-#define MAX_SETTINGS_USERS      10
+#define MAX_SETTINGS_USERS      16
 
 typedef struct {
     ISettingsUser   *su;
