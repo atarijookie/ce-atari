@@ -8,7 +8,7 @@
 </settings>
 <grid distance="0.1" unitdist="mm" unit="mm" style="lines" multiple="1" display="yes" altdistance="0.01" altunitdist="mm" altunit="mm"/>
 <layers>
-<layer number="1" name="Top" color="4" fill="1" visible="no" active="yes"/>
+<layer number="1" name="Top" color="4" fill="1" visible="yes" active="yes"/>
 <layer number="2" name="Route2" color="1" fill="3" visible="no" active="no"/>
 <layer number="3" name="Route3" color="4" fill="3" visible="no" active="no"/>
 <layer number="4" name="Route4" color="1" fill="4" visible="no" active="no"/>
@@ -90,6 +90,7 @@
 <text x="32.75" y="60.25" size="1.778" layer="1" font="vector" ratio="20">x</text>
 <text x="14.75" y="0.5" size="1.778" layer="1" font="vector" ratio="20">x - drill through vias to remove connection</text>
 <text x="21.25" y="-2" size="1.778" layer="1" font="vector" ratio="20">between top and bottom layer</text>
+<text x="29" y="74.7" size="1.27" layer="1" font="vector" ratio="20">For machines with 32 pin chips.</text>
 </plain>
 <libraries>
 <library name="sd_tos">
