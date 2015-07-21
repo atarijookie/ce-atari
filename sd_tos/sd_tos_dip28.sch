@@ -83,14 +83,14 @@
 <smd name="P3" x="1.1" y="0" dx="1.3" dy="0.8" layer="1" rot="R90"/>
 <smd name="P2" x="2.2" y="0" dx="1.3" dy="0.8" layer="1" rot="R90"/>
 <smd name="P1" x="3.3" y="0" dx="1.3" dy="0.8" layer="1" rot="R90"/>
-<smd name="GND1" x="-5" y="9" dx="2.4" dy="1.5" layer="1" rot="R90"/>
-<smd name="GND2" x="5.3" y="9" dx="2.4" dy="1.5" layer="1" rot="R90"/>
+<smd name="GND1" x="-5.9525" y="9" dx="2.4" dy="1.5" layer="1" rot="R90"/>
+<smd name="GND2" x="5.6175" y="9" dx="2.4" dy="1.5" layer="1" rot="R90"/>
 <wire x1="-5" y1="11" x2="-5" y2="0.6" width="0.127" layer="51"/>
 <wire x1="-5" y1="0.6" x2="6.7" y2="0.6" width="0.127" layer="51"/>
 <wire x1="6.7" y1="0.6" x2="6.7" y2="3" width="0.127" layer="51"/>
-<wire x1="6.7" y1="3" x2="5.5" y2="4.2" width="0.127" layer="51"/>
-<wire x1="5.5" y1="4.2" x2="5.5" y2="11" width="0.127" layer="51"/>
-<wire x1="5.5" y1="11" x2="-5" y2="11" width="0.127" layer="51"/>
+<wire x1="6.7" y1="3" x2="4.865" y2="4.835" width="0.127" layer="51"/>
+<wire x1="4.865" y1="4.835" x2="4.865" y2="11" width="0.127" layer="51"/>
+<wire x1="4.865" y1="11" x2="-5" y2="11" width="0.127" layer="51"/>
 </package>
 <package name="SOP32L">
 <smd name="P$1" x="-7.62" y="12.7" dx="0.5" dy="1.6" layer="1" rot="R90"/>
