@@ -8,7 +8,7 @@
 </settings>
 <grid distance="0.1" unitdist="mm" unit="mm" style="dots" multiple="1" display="yes" altdistance="0.01" altunitdist="mm" altunit="mm"/>
 <layers>
-<layer number="1" name="Top" color="4" fill="1" visible="yes" active="yes"/>
+<layer number="1" name="Top" color="4" fill="1" visible="no" active="yes"/>
 <layer number="2" name="Route2" color="1" fill="3" visible="no" active="no"/>
 <layer number="3" name="Route3" color="4" fill="3" visible="no" active="no"/>
 <layer number="4" name="Route4" color="1" fill="4" visible="no" active="no"/>
@@ -28,10 +28,10 @@
 <layer number="18" name="Vias" color="2" fill="1" visible="yes" active="yes"/>
 <layer number="19" name="Unrouted" color="6" fill="1" visible="yes" active="yes"/>
 <layer number="20" name="Dimension" color="15" fill="1" visible="yes" active="yes"/>
-<layer number="21" name="tPlace" color="7" fill="1" visible="yes" active="yes"/>
-<layer number="22" name="bPlace" color="7" fill="1" visible="yes" active="yes"/>
-<layer number="23" name="tOrigins" color="15" fill="1" visible="yes" active="yes"/>
-<layer number="24" name="bOrigins" color="15" fill="1" visible="yes" active="yes"/>
+<layer number="21" name="tPlace" color="7" fill="1" visible="no" active="yes"/>
+<layer number="22" name="bPlace" color="7" fill="1" visible="no" active="yes"/>
+<layer number="23" name="tOrigins" color="15" fill="1" visible="no" active="yes"/>
+<layer number="24" name="bOrigins" color="15" fill="1" visible="no" active="yes"/>
 <layer number="25" name="tNames" color="7" fill="1" visible="no" active="yes"/>
 <layer number="26" name="bNames" color="7" fill="1" visible="no" active="yes"/>
 <layer number="27" name="tValues" color="7" fill="1" visible="no" active="yes"/>
@@ -58,8 +58,8 @@
 <layer number="48" name="Document" color="7" fill="1" visible="yes" active="yes"/>
 <layer number="49" name="Reference" color="7" fill="1" visible="yes" active="yes"/>
 <layer number="50" name="dxf" color="7" fill="1" visible="no" active="yes"/>
-<layer number="51" name="tDocu" color="7" fill="1" visible="yes" active="yes"/>
-<layer number="52" name="bDocu" color="7" fill="1" visible="yes" active="yes"/>
+<layer number="51" name="tDocu" color="7" fill="1" visible="no" active="yes"/>
+<layer number="52" name="bDocu" color="7" fill="1" visible="no" active="yes"/>
 <layer number="91" name="Nets" color="2" fill="1" visible="no" active="no"/>
 <layer number="92" name="Busses" color="1" fill="1" visible="no" active="no"/>
 <layer number="93" name="Pins" color="2" fill="1" visible="no" active="no"/>
@@ -82,7 +82,6 @@
 <text x="56.3" y="57.7" size="1.778" layer="16" font="vector" ratio="20" rot="MR0">x</text>
 <text x="56.3" y="55.2" size="1.778" layer="16" font="vector" ratio="20" rot="MR0">x</text>
 <text x="56.3" y="52.7" size="1.778" layer="16" font="vector" ratio="20" rot="MR0">x</text>
-<text x="49.7" y="65.2" size="1.778" layer="16" font="vector" ratio="20" rot="MR0">SD TOS</text>
 <text x="34.25" y="68.25" size="1.778" layer="1" font="vector" ratio="20">19.5 x 63.5 mm</text>
 <text x="55" y="57.75" size="1.778" layer="1" font="vector" ratio="20">x</text>
 <text x="55" y="55.25" size="1.778" layer="1" font="vector" ratio="20">x</text>
@@ -91,6 +90,8 @@
 <text x="14.75" y="0.5" size="1.778" layer="1" font="vector" ratio="20">x - drill through vias to remove connection</text>
 <text x="21.25" y="-2" size="1.778" layer="1" font="vector" ratio="20">between top and bottom layer</text>
 <text x="29" y="74.7" size="1.27" layer="1" font="vector" ratio="20">For machines with 32 pin chips.</text>
+<text x="35.6" y="66.1" size="0.8128" layer="1" font="vector" ratio="20">SD TOS 32 pin - top</text>
+<text x="51.2" y="66.1" size="0.8128" layer="16" font="vector" ratio="20" rot="MR0">SD TOS 32 pin - bottom</text>
 </plain>
 <libraries>
 <library name="sd_tos">
