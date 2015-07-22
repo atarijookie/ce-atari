@@ -19,7 +19,7 @@
 pthread_mutex_t floppyEncodeThreadMutex = PTHREAD_MUTEX_INITIALIZER;
 std::queue<EncodeRequest> encodeQueue;
 
-extern bool g_test;                                         // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
+extern TFlags flags;
 
 volatile bool floppyEncodingRunning;
 
@@ -169,7 +169,7 @@ void ImageSilo::loadSettings(void)
 
         //-----------------------------
         // if we're in the testing mode
-        if(g_test) {
+        if(flags.test) {
             pathAndFile = "/ce/app/ce_conf.st";
         }
         //-----------------------------

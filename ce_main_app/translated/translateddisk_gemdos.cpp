@@ -18,7 +18,7 @@
 #include "gemdos.h"
 #include "gemdos_errno.h"
 
-extern BYTE g_logLevel;                     // current log level 
+extern TFlags flags;
 
 void TranslatedDisk::onDsetdrv(BYTE *cmd)
 {
@@ -201,7 +201,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst(%08x) - atari search string: %s, find attribs: 0x%02x", dta, (char *) atariSearchString.c_str(), findAttribs);
     
-    if(LOG_DEBUG <= g_logLevel) {                       // only when debug is enabled
+    if(LOG_DEBUG <= flags.logLevel) {                   // only when debug is enabled
         std::string atts;
         atariFindAttribsToString(findAttribs, atts);
         Debug::out(LOG_DEBUG, "find attribs: 0x%02x -> %s", findAttribs, (char *) atts.c_str());
@@ -1168,7 +1168,7 @@ void TranslatedDisk::onDrvMap(BYTE *cmd)
 {
     WORD drives = getDrivesBitmap();
 
-    if(g_logLevel >= LOG_DEBUG) {
+    if(flags.logLevel >= LOG_DEBUG) {
         char tmp2[3];
         memset(tmp2, 0, 3);
 

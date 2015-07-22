@@ -36,16 +36,14 @@ void handlePthreadCreate(int res, char *what);
 void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
 
-BYTE g_logLevel     = LOG_ERROR;                                // init current log level to LOG_ERROR
-bool g_justDoReset  = false;                                    // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
-bool g_noReset      = false;                                    // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
-bool g_test         = false;                                    // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
-bool g_actAsCeConf  = false;                                    // if set to true, this app will behave as ce_conf app instead of CosmosEx app
-bool g_getHwInfo    = false;                                    // if set to true, wait for HW info from Hans, and then quit and report it
-bool g_noFranz      = false;                                    // if set to true, won't communicate with Franz
-
 int     linuxConsole_fdMaster, linuxConsole_fdSlave;            // file descriptors for pty pair
 pid_t   childPid;                                               // pid of forked child
+
+void loadLastHwConfig(void);
+THwConfig hwConfig;                                             // info about the current HW setup
+
+TFlags flags;                                                   // global flags from command line
+void initializeFlags(void);
 
 int main(int argc, char *argv[])
 {
@@ -57,12 +55,15 @@ int main(int argc, char *argv[])
 	pthread_t	timesyncThreadInfo;
     pthread_t   networkThreadInfo;
 
+    initializeFlags();                                          // initialize flags 
+    
     Debug::setDefaultLogFile();
     parseCmdLineArguments(argc, argv);                          // parse cmd line arguments and set global variables
 
+    loadLastHwConfig();                                         // load last found HW IF, HW version, SCSI machine
     //------------------------------------
     // if not running as ce_conf, register signal handlers
-    if(!g_actAsCeConf) {                                        
+    if(!flags.actAsCeConf) {                                        
         if(signal(SIGINT, sigint_handler) == SIG_ERR) {		    // register SIGINT handler
             printf("Cannot register SIGINT handler!\n");
         }
@@ -74,7 +75,7 @@ int main(int argc, char *argv[])
 
     //------------------------------------
     // if this is not just a reset command AND not a get HW info command
-    if(!g_justDoReset && !g_getHwInfo) {                                
+    if(!flags.justDoReset && !flags.getHwInfo) {                                
         int ires = openpty(&linuxConsole_fdMaster, &linuxConsole_fdSlave, NULL, NULL, NULL);    // open PTY pair
 
         if(ires != -1) {                                                // if openpty() was OK  
@@ -95,7 +96,7 @@ int main(int argc, char *argv[])
     
     //------------------------------------
     // if should run as ce_conf app, do this code instead
-    if(g_actAsCeConf) {                                         
+    if(flags.actAsCeConf) {                                         
         printf("CE_CONF tool - Raspberry Pi version.\nPress Ctrl+C to quit.\n");
         
         Debug::setLogFile((char *) "/var/log/ce_conf.log");
@@ -105,7 +106,7 @@ int main(int argc, char *argv[])
     
     //------------------------------------
     // if should just get HW info, do a shorter / simpler version of app run
-    if(g_getHwInfo) {                                           
+    if(flags.getHwInfo) {                                           
     	if(!gpio_open()) {									    // try to open GPIO and SPI on RPi
             printf("\nHW_VER: UNKNOWN\n");
             printf("\nHDD_IF: UNKNOWN\n");
@@ -140,7 +141,7 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-	if(g_justDoReset) {                                         // is this a reset command? (used with STM32 ST-Link debugger)
+	if(flags.justDoReset) {                                         // is this a reset command? (used with STM32 ST-Link debugger)
 		Utils::resetHansAndFranz();
 		gpio_close();
 
@@ -237,7 +238,31 @@ int main(int argc, char *argv[])
 
     Debug::out(LOG_INFO, "CosmosEx terminated.");
     return 0;
- }
+}
+
+void loadLastHwConfig(void)
+{
+    Settings s;
+    
+    hwConfig.version        = s.getInt((char *) "HW_VERSION",       1);
+    hwConfig.hddIface       = s.getInt((char *) "HW_HDD_IFACE",     HDD_IF_ACSI);
+    hwConfig.scsiMachine    = s.getInt((char *) "HW_SCSI_MACHINE",  SCSI_MACHINE_UNKNOWN);
+    hwConfig.fwMismatch     = false;
+}
+
+void initializeFlags(void)
+{
+    flags.logLevel     = LOG_ERROR;     // init current log level to LOG_ERROR
+    flags.justDoReset  = false;         // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
+    flags.noReset      = false;         // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
+    flags.test         = false;         // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
+    flags.actAsCeConf  = false;         // if set to true, this app will behave as ce_conf app instead of CosmosEx app
+    flags.getHwInfo    = false;         // if set to true, wait for HW info from Hans, and then quit and report it
+    flags.noFranz      = false;         // if set to true, won't communicate with Franz
+    
+    flags.gotHansFwVersion  = false;
+    flags.gotFranzFwVersion = false;
+}
 
 void parseCmdLineArguments(int argc, char *argv[])
 {
@@ -257,7 +282,7 @@ void parseCmdLineArguments(int argc, char *argv[])
                     ll = LOG_DEBUG;
                 }
 
-                g_logLevel = ll;                                    // store log level
+                flags.logLevel = ll;                                // store log level
             }
 
             continue;
@@ -265,36 +290,36 @@ void parseCmdLineArguments(int argc, char *argv[])
 
         // should we just reset Hans and Franz and quit? (used with STM32 ST-Link JTAG)
         if(strcmp(argv[i], "reset") == 0) {
-            g_justDoReset = true;
+            flags.justDoReset = true;
             continue;
         }
 
         // don't resetHans and Franz on start (used with STM32 ST-Link JTAG)
         if(strcmp(argv[i], "noreset") == 0) {
-            g_noReset = true;
+            flags.noReset = true;
             continue;
         }
 
         // for testing purposes: set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
         if(strcmp(argv[i], "test") == 0) {
             printf("Testing setup active!\n");
-            g_test = true;
+            flags.test = true;
             continue;
         }
         
         // for running this app as ce_conf terminal
         if(strcmp(argv[i], "ce_conf") == 0) {
-            g_actAsCeConf = true;
+            flags.actAsCeConf = true;
         }
 
         // get hardware version and HDD interface type
         if(strcmp(argv[i], "hwinfo") == 0) {
-            g_getHwInfo = true;
+            flags.getHwInfo = true;
         }
 
         // run the device without communicating with Franz
         if(strcmp(argv[i], "nofranz") == 0) {
-            g_noFranz = true;
+            flags.noFranz = true;
         }
     }
 }

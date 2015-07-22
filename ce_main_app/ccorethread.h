@@ -99,6 +99,7 @@ private:
     } response;
 
     void convertXilinxInfo(BYTE xilinxInfo);
+    void saveHwConfig(void);
     void getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId);
     
     //-----------------------------------

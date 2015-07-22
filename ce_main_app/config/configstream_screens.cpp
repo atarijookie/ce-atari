@@ -21,8 +21,7 @@
 extern volatile bool do_timeSync;
 extern volatile bool do_loadIkbdConfig;
 
-extern int hwVersion;           // HW version is 1 or 2, and in other cases defaults to 1
-extern int hwHddIface;          // HDD interface is either SCSI (HDD_IF_SCSI), or defaults to ACSI (HDD_IF_ACSI)
+extern THwConfig hwConfig;
 
 //--------------------------
 // screen creation methods
@@ -453,7 +452,7 @@ void ConfigStream::onAcsiConfig_save(void)
         return;
     }
 
-    if(hwHddIface == HDD_IF_SCSI) {                         // running on SCSI? Show warning if ID 0 or 7 is used
+    if(hwConfig.hddIface == HDD_IF_SCSI) {                         // running on SCSI? Show warning if ID 0 or 7 is used
         if(devTypes[0] != DEVTYPE_OFF || devTypes[7] != DEVTYPE_OFF) {
             showMessageScreen((char *) "Warning", (char *) "You assigned something to ID 0 or ID 7.\n\rThey might not work as they might be\n\rused by SCSI controller.\n\r");
         }
@@ -652,7 +651,7 @@ void ConfigStream::createScreen_update(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "Hardware version  : ", 22, 7, 4, gotoOffset);
     screen.push_back(comp);
 
-    const char *hwVer = (hwVersion == 2) ? "v. 2" : "v. 1";
+    const char *hwVer = (hwConfig.version == 2) ? "v. 2" : "v. 1";
 
     comp = new ConfigComponent(this, ConfigComponent::label, hwVer, 10, 29, 4, gotoOffset);
     screen.push_back(comp);
@@ -660,7 +659,7 @@ void ConfigStream::createScreen_update(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "HDD interface type: ", 22, 7, 5, gotoOffset);
     screen.push_back(comp);
 
-    const char *hddIf = (hwHddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI";
+    const char *hddIf = (hwConfig.hddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI";
 
     comp = new ConfigComponent(this, ConfigComponent::label, hddIf, 10, 29, 5, gotoOffset);
     screen.push_back(comp);

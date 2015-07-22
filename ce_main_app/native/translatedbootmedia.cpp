@@ -6,7 +6,7 @@
 #include "../utils.h"
 #include "../global.h"
 
-extern int hwHddIface;      // returned from Hans: HDD interface type - HDD_IF_ACSI / HDD_IF_SCSI
+extern THwConfig hwConfig;
 
 TranslatedBootMedia::TranslatedBootMedia()
 {
@@ -41,7 +41,7 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
     // load Level 1 bootsector
     const char *bootsectorPath = NULL;
     
-    if(hwHddIface == HDD_IF_ACSI) {     // for ACSI IF
+    if(hwConfig.hddIface == HDD_IF_ACSI) {     // for ACSI IF
         bootsectorPath = "/tmp/configdrive/ce_dd_st.bs";
     } else {                            // for SCSI IF
         bootsectorPath = "/tmp/configdrive/ce_dd_tt.bs";
@@ -63,7 +63,7 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
 	
 	fclose(f);
     
-    hwHddIfaceCurrent = hwHddIface;     // store for which HDD IF it was prepared
+    hwHddIfaceCurrent = hwConfig.hddIface;     // store for which HDD IF it was prepared
 	//-------------
     // load Level 2 bootsector
     f = fopen("/tmp/configdrive/ce_dd_l2.bs", "rb");
@@ -193,7 +193,7 @@ void TranslatedBootMedia::updateBootsectorConfigWithACSIid(BYTE acsiId)
 	}
 	
     BYTE id;
-    if(hwHddIface == HDD_IF_ACSI) {     // for ACSI - it's the ID (0 .. 7)
+    if(hwConfig.hddIface == HDD_IF_ACSI) {     // for ACSI - it's the ID (0 .. 7)
         id = acsiId;
     } else {                            // for SCSI - it's the ID bit (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)
         id = (1 << acsiId);
@@ -267,7 +267,7 @@ bool TranslatedBootMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 	}
 
     if(sectorNo == 0) {                         // if loading boot sector
-        if(hwHddIfaceCurrent != hwHddIface) {   // if HDD IF changed (e.g. it was first loaded when Franz didn't respond yet, and then Franz responded that it's SCSI)
+        if(hwHddIfaceCurrent != hwConfig.hddIface) {   // if HDD IF changed (e.g. it was first loaded when Franz didn't respond yet, and then Franz responded that it's SCSI)
             loadDataIntoBuffer();               // reload data from disk to virtual config drive image
         }
     }

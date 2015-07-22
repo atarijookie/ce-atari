@@ -2,14 +2,15 @@
 #include <string.h>
 #include <stdarg.h>
 
+#include "global.h"
 #include "debug.h"
 #include "utils.h"
 
 #define LOG_FILE		"/var/log/ce.log"
 DWORD prevLogOut;
 
-extern BYTE g_logLevel;                     // current log level 
-       BYTE g_outToConsole;
+extern TFlags   flags;
+       BYTE     g_outToConsole;
 
 char Debug::logFilePath[128];
 
@@ -32,7 +33,7 @@ void Debug::printfLogLevelString(void)
 {
     printf("\nLog level: ");
 
-    switch(g_logLevel) {
+    switch(flags.logLevel) {
         case LOG_OFF:   printf("OFF"); break;
         case LOG_ERROR: printf("ERROR"); break;
         case LOG_INFO:  printf("INFO"); break;
@@ -45,7 +46,7 @@ void Debug::printfLogLevelString(void)
 
 void Debug::out(int logLevel, const char *format, ...)
 {
-    if(logLevel > g_logLevel) {             // if this log is higher than allowed, don't do this
+    if(logLevel > flags.logLevel) {         // if this log is higher than allowed, don't do this
         return;
     }
 
@@ -81,7 +82,7 @@ void Debug::out(int logLevel, const char *format, ...)
 
 void Debug::outBfr(BYTE *bfr, int count)
 {
-    if(g_logLevel < LOG_DEBUG) {              // if we're not in debug log level, don't do this
+    if(flags.logLevel < LOG_DEBUG) {            // if we're not in debug log level, don't do this
         return;
     }
 

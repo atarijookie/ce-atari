@@ -117,5 +117,27 @@
 
 //////////////////////////////////////////////////////
 
+typedef struct {
+    int  version;               // returned from Hans: HW version (1 for HW from 2014, 2 for new HW from 2015)
+    int  hddIface;              // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
+    int  scsiMachine;           // when HwHddIface is HDD_IF_SCSI, this specifies what machine (TT or Falcon) is using this device
+    bool fwMismatch;            // when HW and FW types don't match (e.g. SCSI HW + ACSI FW, or ACSI HW + SCSI FW)
+} THwConfig;
+
+typedef struct {
+    int  logLevel;              // init current log level to LOG_ERROR
+    bool justDoReset;           // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
+    bool noReset;               // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
+    bool test;                  // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
+    bool actAsCeConf;           // if set to true, this app will behave as ce_conf app instead of CosmosEx app
+    bool getHwInfo;             // if set to true, wait for HW info from Hans, and then quit and report it
+    bool noFranz;               // if set to true, won't communicate with Franz
+    
+    bool gotHansFwVersion;
+    bool gotFranzFwVersion;
+} TFlags;
+
+//////////////////////////////////////////////////////
+
 #endif // GLOBAL_H
 

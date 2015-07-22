@@ -12,7 +12,8 @@
 #include "global.h"
 #include "debug.h"
 
-extern bool g_test;                                     // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
+extern TFlags       flags;
+extern THwConfig    hwConfig;
 
 Settings::Settings(void)
 {
@@ -250,7 +251,7 @@ void Settings::loadAcsiIDs(AcsiIDinfo *aii)
 
         //-------------------------
         // if we're in testing mode
-        if(g_test) {
+        if(flags.test) {
             switch(id) {
             case 0:     devType = DEVTYPE_TRANSLATED;   break;
             case 1:     devType = DEVTYPE_SD;           break;
@@ -281,10 +282,17 @@ void Settings::loadAcsiIDs(AcsiIDinfo *aii)
 
 	// no ACSI ID was enabled? enable ACSI ID 0
 	if(!aii->gotDevTypeRaw && !aii->gotDevTypeTranslated && !aii->gotDevTypeSd) {
-		Debug::out(LOG_INFO, "Settings::loadAcsiIDs -- no ACSI ID was enabled, so enabling ACSI ID 0");
+        if(hwConfig.hddIface == HDD_IF_ACSI) {      // for ACSI
+            Debug::out(LOG_INFO, "Settings::loadAcsiIDs -- no ACSI ID was enabled, so enabling ACSI ID 0");
 			
-		aii->acsiIDdevType[0]	= DEVTYPE_TRANSLATED;
-		aii->enabledIDbits	= 1;
+            aii->acsiIDdevType[0]   = DEVTYPE_TRANSLATED;
+            aii->enabledIDbits      = 1;
+        } else {                                    // for SCSI - enable ID 1
+            Debug::out(LOG_INFO, "Settings::loadAcsiIDs -- no SCSI ID was enabled, so enabling SCSI ID 1");
+			
+            aii->acsiIDdevType[1]   = DEVTYPE_TRANSLATED;
+            aii->enabledIDbits      = 2;
+        }
 		
 		aii->gotDevTypeTranslated = true;
 	}

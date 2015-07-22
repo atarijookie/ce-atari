@@ -30,18 +30,8 @@
 #define WEB_PARAMS_CHECK_TIME_MS    3000
 #define WEB_PARAMS_FILE             "/tmp/ce_startupmode"
 
-extern bool g_noReset;                      // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
-extern BYTE g_logLevel;                     // current log level
-extern bool g_getHwInfo;                    // if set to true, wait for HW info from Hans, and then quit and report it
-extern bool g_noFranz;                      // if set to true, won't communicate with Franz
-
-bool    g_gotHansFwVersion;
-bool    g_gotFranzFwVersion;
-
-int  hwVersion      = 1;                    // returned from Hans: HW version (1 for HW from 2014, 2 for new HW from 2015)
-int  hwHddIface     = HDD_IF_ACSI;          // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
-bool hwFwMismatch   = false;                // when HW and FW types don't match (e.g. SCSI HW + ACSI FW, or ACSI HW + SCSI FW)
-int  hwScsiMachine  = SCSI_MACHINE_UNKNOWN; // when HwHddIface is HDD_IF_SCSI, this specifies what machine (TT or Falcon) is using this device
+extern THwConfig    hwConfig;
+extern TFlags       flags;
 
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
@@ -136,14 +126,14 @@ void CCoreThread::run(void)
     bool    shouldCheckHansFranzAlive   = true;                         // when true and the 15 second timeout since start passed, check for Hans and Franz being alive
     DWORD   hansFranzAliveCheckTime     = Utils::getEndTime(15000);     // get the time when we should check if Hans and Franz are alive
 
-    g_gotHansFwVersion  = false;
-    g_gotFranzFwVersion = false;
+    flags.gotHansFwVersion  = false;
+    flags.gotFranzFwVersion = false;
 
-    if(g_noFranz) {                                                     // if running without Franz, pretend we got his FW version
-        g_gotFranzFwVersion = true;
+    if(flags.noFranz) {                                                     // if running without Franz, pretend we got his FW version
+        flags.gotFranzFwVersion = true;
     }
     
-    if(g_noReset) {                                                     // if we're debugging Hans or Franz (noReset is set to true), don't do this alive check
+    if(flags.noReset) {                                                     // if we're debugging Hans or Franz (noReset is set to true), don't do this alive check
         shouldCheckHansFranzAlive = false;
     } else {                                                            // if we should reset Hans and Franz on start, do it (and we're probably not debugging Hans or Franz)
         Utils::resetHansAndFranz();
@@ -184,7 +174,7 @@ void CCoreThread::run(void)
         }
         
         // if should just get the HW version and HDD interface, but timeout passed, quit
-        if(g_getHwInfo && Utils::getCurrentMs() >= getHwInfoTimeout) {
+        if(flags.getHwInfo && Utils::getCurrentMs() >= getHwInfoTimeout) {
             showHwVersion();                                            // show the default HW version
             sigintReceived = 1;                                         // quit
         }
@@ -192,7 +182,7 @@ void CCoreThread::run(void)
         // should we check if Hans and Franz are alive?
         if(shouldCheckHansFranzAlive) {
             if(Utils::getCurrentMs() >= hansFranzAliveCheckTime) {      // did enough time pass since the Hans and Franz reset?
-                if(!g_gotHansFwVersion || !g_gotFranzFwVersion) {       // if don't have version from Hans or Franz, then they're not alive
+                if(!flags.gotHansFwVersion || !flags.gotFranzFwVersion) {       // if don't have version from Hans or Franz, then they're not alive
                     Update::createFlashFirstFwScript();
 
                     Update::createNewScripts();                         // make sure that all the scripts are up to date before running the update
@@ -319,7 +309,7 @@ void CCoreThread::run(void)
 
 #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL)
         // check for any ATN code waiting from Franz
-        if(g_noFranz) {                             // if running without Franz, don't communicate
+        if(flags.noFranz) {                         // if running without Franz, don't communicate
             res = false;
         } else {                                    // running with Franz - check for any ATN
             res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuff);
@@ -347,7 +337,7 @@ void CCoreThread::run(void)
 			}
 		}
 #else
-    g_gotFranzFwVersion = true;
+    flags.gotFranzFwVersion = true;
 #endif
         
         int bytesAvailable;
@@ -598,12 +588,12 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
     int year = bcdToInt(fwVer[1]) + 2000;
     if(fwVer[0] == 0xf0) {
         Update::versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
-        g_gotFranzFwVersion = true;
+        flags.gotFranzFwVersion = true;
 
         Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
     } else {
         Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));               // store found FW version of Hans
-        g_gotHansFwVersion = true;
+        flags.gotHansFwVersion = true;
 
         int  currentLed = fwVer[4];
         BYTE xilinxInfo = fwVer[5];
@@ -631,7 +621,7 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
         }
 
         // if should get the HW info and should quit
-        if(g_getHwInfo) {
+        if(flags.getHwInfo) {
             showHwVersion();                                // show what HW version we have found
 
             Debug::out(LOG_ERROR, ">>> Terminating app, because it was used as HW INFO tool <<<\n");
@@ -640,7 +630,7 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
         }
 
         // if Xilinx HW vs FW mismatching, flash Xilinx again to fix the situation
-        if(hwFwMismatch) {
+        if(hwConfig.fwMismatch) {
             Update::createFlashFirstFwScript();
             Update::createNewScripts();
         
@@ -657,13 +647,13 @@ void CCoreThread::getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId)
     enabledIDbits  = acsiIdInfo.enabledIDbits;
     sdCardAcsiId   = acsiIdInfo.sdCardAcsiId;
     
-    if(hwHddIface != HDD_IF_SCSI) {                 // not SCSI? Don't change anything
+    if(hwConfig.hddIface != HDD_IF_SCSI) {          // not SCSI? Don't change anything
         Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on ACSI");
         return;
     }
     
     // if we're on SCSI bus, remove ID bits if they are used for SCSI Initiator on that machine (ID 7 on TT, ID 0 on Falcon)
-    switch(hwScsiMachine) {
+    switch(hwConfig.scsiMachine) {
         case SCSI_MACHINE_TT:                       // TT? remove bit 7 
             Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on TT, will remove ID 7 from enabled ID bits");
         
@@ -698,46 +688,73 @@ void CCoreThread::getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId)
 
 void CCoreThread::convertXilinxInfo(BYTE xilinxInfo)
 {
-    int prevHwHddIface = hwHddIface; 
+    int prevHwHddIface = hwConfig.hddIface; 
 
     switch(xilinxInfo) {
         // GOOD
-        case 0x21:  hwVersion       = 2;                        // v.2
-                    hwHddIface      = HDD_IF_ACSI;              // HDD int: ACSI
-                    hwFwMismatch    = false;
+        case 0x21:  hwConfig.version        = 2;                        // v.2
+                    hwConfig.hddIface       = HDD_IF_ACSI;              // HDD int: ACSI
+                    hwConfig.fwMismatch     = false;
                     break;
 
         // GOOD
-        case 0x22:  hwVersion       = 2;                        // v.2
-                    hwHddIface      = HDD_IF_SCSI;              // HDD int: SCSI
-                    hwFwMismatch    = false;
+        case 0x22:  hwConfig.version        = 2;                        // v.2
+                    hwConfig.hddIface       = HDD_IF_SCSI;              // HDD int: SCSI
+                    hwConfig.fwMismatch     = false;
                     break;
 
         // BAD: SCSI HW, ACSI FW
-        case 0x29:  hwVersion       = 2;                        // v.2
-                    hwHddIface      = HDD_IF_SCSI;              // HDD int: SCSI
-                    hwFwMismatch    = true;                     // HW + FW mismatch!
+        case 0x29:  hwConfig.version        = 2;                        // v.2
+                    hwConfig.hddIface       = HDD_IF_SCSI;              // HDD int: SCSI
+                    hwConfig.fwMismatch     = true;                     // HW + FW mismatch!
                     break;
 
         // BAD: ACSI HW, SCSI FW
-        case 0x2a:  hwVersion       = 2;                        // v.2
-                    hwHddIface      = HDD_IF_ACSI;              // HDD int: ACSI
-                    hwFwMismatch    = true;                     // HW + FW mismatch!
+        case 0x2a:  hwConfig.version        = 2;                        // v.2
+                    hwConfig.hddIface       = HDD_IF_ACSI;              // HDD int: ACSI
+                    hwConfig.fwMismatch     = true;                     // HW + FW mismatch!
                     break;
                     
         // GOOD
         case 0x11:  // use this for v.1 
         default:    // and also for all other cases
-                    hwVersion       = 1;
-                    hwHddIface      = HDD_IF_ACSI;
-                    hwFwMismatch    = false;
+                    hwConfig.version        = 1;
+                    hwConfig.hddIface       = HDD_IF_ACSI;
+                    hwConfig.fwMismatch     = false;
                     break;
     }
     
     // if the HD IF changed (received the 1st HW info) and we're on SCSI bus, we need to send the new (limited) SCSI IDs to Hans, so he won't answer on Initiator SCSI ID
-    if((prevHwHddIface != hwHddIface) && hwHddIface == HDD_IF_SCSI) {
+    if((prevHwHddIface != hwConfig.hddIface) && hwConfig.hddIface == HDD_IF_SCSI) {
         Debug::out(LOG_DEBUG, "Found out that we're running on SCSI bus - will resend the ID bits configuration to Hans");
         setEnabledIDbits = true;
+    }
+    
+    saveHwConfig();
+}
+
+void CCoreThread::saveHwConfig(void)
+{
+    Settings s;
+    
+    int ver, hddIf, scsiMch;
+    
+    // get current values for these configs
+    ver     = s.getInt((char *) "HW_VERSION",       1);
+    hddIf   = s.getInt((char *) "HW_HDD_IFACE",     HDD_IF_ACSI);
+    scsiMch = s.getInt((char *) "HW_SCSI_MACHINE",  SCSI_MACHINE_UNKNOWN);
+
+    // store value only if it has changed
+    if(ver != hwConfig.version) {
+        s.setInt((char *) "HW_VERSION", ver);
+    }
+    
+    if(hddIf != hwConfig.hddIface) {
+        s.setInt((char *) "HW_HDD_IFACE", hddIf);
+    }
+    
+    if(scsiMch != hwConfig.scsiMachine) {
+        s.setInt((char *) "HW_SCSI_MACHINE", scsiMch);
     }
 }
 
@@ -748,16 +765,16 @@ void CCoreThread::showHwVersion(void)
     Debug::out(LOG_ERROR, "Reporting this as HW INFO...");     // show in log file
 
     // HW version is 1 or 2, and in other cases defaults to 1
-    sprintf(tmp, "HW_VER: %d", (hwVersion == 1 || hwVersion == 2) ? hwVersion : 1);
+    sprintf(tmp, "HW_VER: %d", (hwConfig.version == 1 || hwConfig.version == 2) ? hwConfig.version : 1);
     printf("\n%s\n", tmp);                  // show on stdout
     Debug::out(LOG_ERROR, "   %s", tmp);    // show in log file
     
     // HDD interface is either SCSI, or defaults to ACSI
-    sprintf(tmp, "HDD_IF: %s", (hwHddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI");
+    sprintf(tmp, "HDD_IF: %s", (hwConfig.hddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI");
     printf("\n%s\n", tmp);                  // show on stdout
     Debug::out(LOG_ERROR, "   %s", tmp);    // show in log file
     
-    sprintf(tmp, "HWFWMM: %s", hwFwMismatch ? "MISMATCH" : "OK");
+    sprintf(tmp, "HWFWMM: %s", hwConfig.fwMismatch ? "MISMATCH" : "OK");
     printf("\n%s\n", tmp);                  // show on stdout
     Debug::out(LOG_ERROR, "   %s", tmp);    // show in log file
 }
@@ -963,14 +980,14 @@ void CCoreThread::readWebStartupMode(void)
     }
 
     if(logLev >= LOG_OFF && logLev <= LOG_DEBUG) {  // param is valid
-        if(g_logLevel == logLev) {                  // but logLevel won't change?
+        if(flags.logLevel == logLev) {              // but logLevel won't change?
             return;                                 // nothing to do
         }
 
-        g_logLevel = logLev;                        // set new log level
+        flags.logLevel = logLev;                    // set new log level
         Debug::out(LOG_ERROR, "Log level changed from file %s to level %d", WEB_PARAMS_FILE, logLev);
     } else {                                        // on set wrong log level - switch to lowest log level
-        g_logLevel = LOG_ERROR;
+        flags.logLevel = LOG_ERROR;
         Debug::out(LOG_ERROR, "Log level change invalid, switching to LOG_ERROR");
     }
 }

@@ -18,8 +18,7 @@
 Versions Update::versions;
 int Update::currentState = UPDATE_STATE_IDLE;
 
-extern int hwVersion;           // HW version is 1 or 2, and in other cases defaults to 1
-extern int hwHddIface;          // HDD interface is either SCSI (HDD_IF_SCSI), or defaults to ACSI (HDD_IF_ACSI)
+extern THwConfig hwConfig;
 
 volatile BYTE packageDownloadStatus = DWNSTATUS_WAITING;
 
@@ -86,19 +85,19 @@ void Update::processUpdateList(void)
             continue;
         }
 
-        if(hwVersion == 1 && strncmp(what, "xilinx", 6) == 0) {                                     // HW version 1: use original xilinx version
+        if(hwConfig.version == 1 && strncmp(what, "xilinx", 6) == 0) {                                      // HW version 1: use original xilinx version
             Update::versions.onServer.xilinx.fromString(ver);
             Update::versions.onServer.xilinx.setUrlAndChecksum(url, crc);
             continue;
         }
 
-        if(hwVersion == 2 && hwHddIface == HDD_IF_ACSI && strncmp(what, "xlnx2a", 6) == 0) {        // HW ver 2 + ACSI IF: use xlnx2a
+        if(hwConfig.version == 2 && hwConfig.hddIface == HDD_IF_ACSI && strncmp(what, "xlnx2a", 6) == 0) {  // HW ver 2 + ACSI IF: use xlnx2a
             Update::versions.onServer.xilinx.fromString(ver);
             Update::versions.onServer.xilinx.setUrlAndChecksum(url, crc);
             continue;
         } 
 
-        if(hwVersion == 2 && hwHddIface == HDD_IF_SCSI && strncmp(what, "xlnx2s", 6) == 0) {        // HW ver 2 + SCSI IF: use xlnx2s
+        if(hwConfig.version == 2 && hwConfig.hddIface == HDD_IF_SCSI && strncmp(what, "xlnx2s", 6) == 0) {  // HW ver 2 + SCSI IF: use xlnx2s
             Update::versions.onServer.xilinx.fromString(ver);
             Update::versions.onServer.xilinx.setUrlAndChecksum(url, crc);
             continue;
@@ -336,12 +335,12 @@ bool Update::checkForUpdateListOnUsb(std::string &updateFilePath)
 
 const char *Update::getPropperXilinxTag(void)
 {
-    if(hwVersion == 1) {                    // v.1 ? it's xilinx
+    if(hwConfig.version == 1) {                 // v.1 ? it's xilinx
         return "xilinx";
-    } else {                                // v.2 ?
-        if(hwHddIface == HDD_IF_ACSI) {     // v.2 and ACSI? it's xlnx2a
+    } else {                                    // v.2 ?
+        if(hwConfig.hddIface == HDD_IF_ACSI) {  // v.2 and ACSI? it's xlnx2a
             return "xlnx2a";
-        } else {                            // v.2 and SCSI? it's xlnx2s
+        } else {                                // v.2 and SCSI? it's xlnx2s
             return "xlnx2s";
         }
     }
