@@ -29,7 +29,7 @@ static BYTE doack(void);
 int PIO_read(void);
 int PIO_write(BYTE data);
 
-#define SCDMA 
+//#define SCDMA 
        
 #ifdef SCDMA
 static BYTE dmaDataTransfer(BYTE readNotWrite, BYTE cmdLength);
@@ -38,9 +38,9 @@ void   setDmaAddr_TT(DWORD addr);
 DWORD  getDmaAddr_TT(void);
 void   setDmaCnt_TT(DWORD dataCount); 
 #else 
-static WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount);
-static WORD pioDataTransfer_read(BYTE *bfr, DWORD byteCount);
-static WORD pioDataTransfer_write(BYTE *bfr, DWORD byteCount);
+WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount);
+WORD pioDataTransfer_read(BYTE *bfr, DWORD byteCount);
+WORD pioDataTransfer_write(BYTE *bfr, DWORD byteCount);
 #endif
 
 extern BYTE machine;
@@ -64,6 +64,10 @@ BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
     if((cmd[0] & 0x1f) == 0x1f) {       // if it's ICD format of command, skip the 0th byte
         cmd++;
         cmdLength--;
+    }
+    
+    if(scsiId == 7) {                   // Trying to access SCSI ID 7 on TT? Fail, this is reserved for SCSI adapter
+        return -1;
     }
     //------------
     ttCmdTimeOut = setscstmout();       // set up a short timeout
@@ -438,13 +442,13 @@ int PIO_read(void)
         logMsg("PIO_read() - fail on w4req() \r\n");
         return -1;
     }
-    
+
     res = (*pGetReg)(REG_DSR);
     if((res & (1 << 3)) == 0) {         // PHASE MATCH bit from BUS AND STATUS REGISTER is low? SCSI phase changed
         logMsg("PIO_read() - phase change \r\n");
         return -2;
     }
-   
+
     BYTE data = (*pGetReg)(REG_DB); // get the status byte
 
     res = doack();                      // signal that status byte is here

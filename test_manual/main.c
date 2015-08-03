@@ -19,8 +19,8 @@
 
 //--------------------------------------------------
 
-#define E_OK                0   	// 00 No error
-#define E_CRC               0xfc	// -4  // fc CRC error
+#define E_OK                0   	    // 00 No error
+#define E_CRC               0xfc	    // -4  // fc CRC error
 
 BYTE deviceID;                          // bus ID from 0 to 7
 
@@ -43,6 +43,8 @@ int  writeHansTest(int byteCount, WORD xorVal);
 
 BYTE showLogs = 1;
 void showMenu(void);
+
+void logMsg(char *logMsg);
 
 //--------------------------------------------------
 int main(void)
@@ -94,16 +96,19 @@ int main(void)
         case 'a':   
             (void) Cconws("Using ACSI...\r\n"); 		
             hdd_if_select(IF_ACSI);
+            deviceID = 0;           // ACSI ID 0
             break;
 
         case 't':
             (void) Cconws("Using TT SCSI...\r\n"); 		
             hdd_if_select(IF_SCSI_TT);
+            deviceID = 0;           // SCSI ID 0
             break;
 
         case 'f':
             (void) Cconws("Using Falcon SCSI...\r\n"); 		
             hdd_if_select(IF_SCSI_FALCON);
+            deviceID = 1;           // SCSI ID 1
             break;
 	} 
 
@@ -126,7 +131,7 @@ int main(void)
         }
         
         if(key == 'i') {
-            cs_inquiry(0);
+            cs_inquiry(deviceID);
             continue;
         }
 
@@ -141,10 +146,13 @@ int main(void)
         }
 
         if(key == 'f') {
+            BYTE devId = deviceID;  // store the device ID to some temp var
+        
             showLogs = 0;           // turn off logs - there will be errors on findDevice when device doesn't exist 
             Supexec(findDevice);
             showLogs = 1;           // turn on logs
-            deviceID = 0;           // put device ID back to normal
+
+            deviceID = devId;       // put device ID back to normal
             continue;
         }
         
@@ -175,8 +183,8 @@ int readHansTest( int byteCount, WORD xorVal);
 
 void CEread(void)
 {
-  	commandLong[0] = (deviceID << 5) | 0x1f;			/* cmd[0] = ACSI_id + ICD command marker (0x1f)	*/
-	commandLong[1] = 0xA0;								/* cmd[1] = command length group (5 << 5) + TEST UNIT READY (0) */ 	
+  	commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
+	commandLong[1] = 0xA0;								// cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)  	
 
     WORD xorVal=0xC0DE;
     
@@ -315,20 +323,20 @@ BYTE ce_identify(BYTE bus_id)
   WORD res;
   BYTE cmd[] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TRAN_CMD_IDENTIFY, 0};
   
-  cmd[0] = (bus_id << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
-  memset(pBuffer, 0, 512);              	/* clear the buffer */
+  cmd[0] = (bus_id << 5); 					// cmd[0] = ACSI_id + TEST UNIT READY (0)	
+  memset(pBuffer, 0, 512);              	// clear the buffer 
 
-//  deviceID = bus_id;
-  res = (*hddIfCmd)(1, cmd, 6, pBuffer, 1);	/* issue the identify command and check the result */
+  res = (*hddIfCmd)(1, cmd, 6, pBuffer, 1);	// issue the identify command and check the result 
     
-  if(res != OK)                         	/* if failed, return FALSE */
+  if(res != OK) {                        	// if failed, return FALSE 
     return 0;
+  }
     
-  if(strncmp((char *) pBuffer, "CosmosEx translated disk", 24) != 0) {		/* the identity string doesn't match? */
+  if(strncmp((char *) pBuffer, "CosmosEx translated disk", 24) != 0) {		// the identity string doesn't match? 
 	 return 0;
   }
 	
-  return 1;                             /* success */
+  return 1;                             // success 
 }
 
 void findDevice(void)
@@ -347,7 +355,7 @@ void findDevice(void)
 		(void) Cconws(bfr);
         (void) Cconws("] : ");
         		      
-		res = ce_identify(i);      					/* try to read the IDENTITY string */
+		res = ce_identify(i);      					// try to read the IDENTITY string 
         if(res) {
             (void) Cconws("OK\n\r");
         } else {
@@ -358,8 +366,8 @@ void findDevice(void)
 
 void CEwrite(void)
 {
-  	commandLong[0] = (deviceID << 5) | 0x1f;			/* cmd[0] = ACSI_id + ICD command marker (0x1f)	*/
-	commandLong[1] = 0xA0;								/* cmd[1] = command length group (5 << 5) + TEST UNIT READY (0) */ 	
+  	commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
+	commandLong[1] = 0xA0;								// cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)  	
 
     WORD xorVal=0xC0DE;
     
@@ -426,6 +434,10 @@ void logMsg(char *logMsg)
 
 void logMsgProgress(DWORD current, DWORD total)
 {
+    if(!showLogs) {
+        return;
+    }
+
     (void) Cconws("Progress: ");
     showHexDword(current);
     (void) Cconws(" out of ");

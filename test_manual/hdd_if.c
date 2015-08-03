@@ -30,7 +30,8 @@ void hdd_if_select(int ifType)
             break;
 
         case IF_SCSI_FALCON:    // for Falcon SCSI
-            hddIfCmd    = (THddIfCmd) scsi_cmd_Falcon;
+            hddIfCmd    = (THddIfCmd) scsi_cmd_TT;
+//          hddIfCmd    = (THddIfCmd) scsi_cmd_Falcon;
             pSetReg     = (TsetReg) scsi_setReg_Falcon;
             pGetReg     = (TgetReg) scsi_getReg_Falcon;
             break;
