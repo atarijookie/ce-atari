@@ -6,9 +6,9 @@
 #include "global.h"
 
 // GPIP2 BIT ASSIGNMENTS
-#define GPIP2SCSI       (1 << 7)    // SCSI xIRQ
+#define GPIP2_NCR       (1 << 7)    // NCR /SCSI interrupt
 #define GPIP2RTC        (1 << 6)    // RTC IRQ
-#define GPIP25          (1 << 5)    // 
+#define GPIP2_DMA       (1 << 5)    // DMA interrupt
 #define GPIP2CHGL       (1 << 4)    // ChangeLine
 #define GPIP2RI         (1 << 3)    // Ring Indicator (SCC Port B)
 #define GPIP2DBE        (1 << 2)    // DMA Bus Error

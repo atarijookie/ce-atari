@@ -32,7 +32,7 @@ int PIO_write(BYTE data);
 #define USE_DMA
        
 #ifdef USE_DMA
-static BYTE w4int(void);
+BYTE   w4int(void);
 void   setDmaAddr_TT(DWORD addr);
 DWORD  getDmaAddr_TT(void);
 void   setDmaCnt_TT(DWORD dataCount); 
@@ -53,7 +53,7 @@ BYTE dmaDataTx_do_TT      (BYTE readNotWrite);
 
 void clearCache030(void);
 
-static DWORD ttCmdTimeOut;              // timeout time for scsi_cmd_TT() from start to end
+DWORD _cmdTimeOut;                      // timeout time for scsi_cmd() from start to end
 BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
     //------------
@@ -71,7 +71,7 @@ BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
         return -1;
     }
     //------------
-    ttCmdTimeOut = setscstmout();       // set up a short timeout
+    _cmdTimeOut = setscstmout();        // set up a short timeout
     BYTE res = sblkscsi(readNotWrite, scsiId, cmd, cmdLength, buffer, sectorCount << 9);      // send command block
 
     if(res) {
@@ -230,14 +230,14 @@ BYTE selscsi(BYTE scsiId)
 {
     BYTE res;
 
-    while(1) {                                          // STILL busy from last time?
+    while(1) {                                              // STILL busy from last time?
         BYTE icr = (*hdIf.pGetReg)(REG_CR);
-        if((icr & ICR_BUSY) == 0) {                     // if not, it's available
+        if((icr & ICR_BUSY) == 0) {                         // if not, it's available
             break;
         }
         
         DWORD now = *HZ_200;
-        if(now >= ttCmdTimeOut) {                        // if time out, fail
+        if(now >= _cmdTimeOut) {                            // if time out, fail
             return -1;
         }        
     }
@@ -246,12 +246,12 @@ BYTE selscsi(BYTE scsiId)
     (*hdIf.pSetReg)(REG_ISR, 0);                            // no interrupt from selection
     (*hdIf.pSetReg)(REG_ICR, 0x0c);                         // assert BSY and SEL
 
-    BYTE selId  = (1 << scsiId);                           // convert number of device to bit 
+    BYTE selId  = (1 << scsiId);                            // convert number of device to bit 
     (*hdIf.pSetReg)(REG_ODR, selId);                        // set dest SCSI IDs
     
     (*hdIf.pSetReg)(REG_ICR, 0x0d);                         // assert BUSY, SEL and data bus
-    scsi_clrBit(REG_MR, MR_ARBIT);                      // clear arbitrate bit
-    scsi_clrBit(REG_ICR, (1 << 3));                     // clear BUSY
+    scsi_clrBit(REG_MR, MR_ARBIT);                          // clear arbitrate bit
+    scsi_clrBit(REG_ICR, (1 << 3));                         // clear BUSY
     
     while(1) {                          // wait for busy bit to appear
         BYTE icr = (*hdIf.pGetReg)(REG_CR);
@@ -262,39 +262,39 @@ BYTE selscsi(BYTE scsiId)
         }
         
         DWORD now = *HZ_200;
-        if(now >= ttCmdTimeOut) {                       // if time out, fail
+        if(now >= _cmdTimeOut) {                            // if time out, fail
             res = -1;
             break;
         }        
     }
     
-    (*hdIf.pSetReg)(REG_ICR, 0);                        // clear SEL and data bus assertion
+    (*hdIf.pSetReg)(REG_ICR, 0);                            // clear SEL and data bus assertion
     return res;
 }    
 
 void TTresetscsi(void)
 {
-    (*hdIf.pSetReg)(REG_ICR, 0x80);                     // assert RST
+    (*hdIf.pSetReg)(REG_ICR, 0x80);                         // assert RST
 
-    ttCmdTimeOut = setscstmout();
+    _cmdTimeOut = setscstmout();
     
     DWORD now;
-    while(1) {                          // wait 500 ms
+    while(1) {                                              // wait 500 ms
         now = *HZ_200;
         
-        if(now >= ttCmdTimeOut) {        
+        if(now >= _cmdTimeOut) {        
             break;
         }        
     }
     
     (*hdIf.pSetReg)(REG_ICR, 0);
     
-    ttCmdTimeOut = setscstmout();        
+    _cmdTimeOut = setscstmout();        
 
-    while(1) {                          // wait 1000 ms
+    while(1) {                                              // wait 1000 ms
         now = *HZ_200;
         
-        if(now >= ttCmdTimeOut) {        
+        if(now >= _cmdTimeOut) {        
             break;
         }        
     }
@@ -310,11 +310,11 @@ BYTE w4int(void)
     
     while(1) {
         res = *MFP2;
-        if(res & GPIP2SCSI) {           // NCR 5380 interrupt? 
+        if(res & GPIP2_NCR) {           // NCR 5380 interrupt? 
             break;
         }
         
-        if((res & GPIP25) == 0) {       // DMAC interrupt? 
+        if((res & GPIP2_DMA) == 0) {    // DMA interrupt? 
             WORD wres = (*hdIf.pGetReg)(REG_DMACTL);    // get the DMAC status
             if(wres & 0x80) {           // check for bus err/ignore cntout ints
                 return -1;
@@ -322,7 +322,7 @@ BYTE w4int(void)
         }
     
         DWORD now = *HZ_200;
-        if(now >= ttCmdTimeOut) {           // time out? fail
+        if(now >= _cmdTimeOut) {            // time out? fail
             return -1;
         }
     }
@@ -432,7 +432,7 @@ BYTE w4req(void)
         }
         
         DWORD now = *HZ_200;
-        if(now >= ttCmdTimeOut) {   // if time out, fail
+        if(now >= _cmdTimeOut) {    // if time out, fail
             break;
         }
     }
@@ -455,13 +455,13 @@ BYTE doack(void)
         }
         
         DWORD now = *HZ_200;
-        if(now >= ttCmdTimeOut) {       // if time out, fail
+        if(now >= _cmdTimeOut) {        // if time out, fail
             res = -1;
             break;
         }
     }
 
-    scsi_clrBit(REG_ICR, ICR_ACK);   // clear ACK
+    scsi_clrBit(REG_ICR, ICR_ACK);      // clear ACK
     return res;
 }
 
