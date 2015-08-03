@@ -215,7 +215,7 @@ int readHansTest(int byteCount, WORD xorVal)
 	commandLong[9+1] = (xorVal     ) & 0xFF;
 
     (void) Cconws("CE READ: ");
-    res = (*hddIfCmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, (byteCount+511)>>9 );		// issue the command and check the result
+    res = (*hdIf.hddIfCmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, (byteCount+511)>>9 );		// issue the command and check the result
     
     if(res != OK) {                                                             // ACSI ERROR?
         return -1;
@@ -253,7 +253,7 @@ void cs_inquiry(BYTE id)
     
     // issue the inquiry command and check the result 
     (void) Cconws("SCSI Inquiry: ");
-    res = (*hddIfCmd) (1, cmd, 6, pBuffer, 1);
+    res = (*hdIf.hddIfCmd) (1, cmd, 6, pBuffer, 1);
     
     showHexByte(res);
     (void) Cconws("\r\nINQUIRY HEXA: ");
@@ -326,7 +326,7 @@ BYTE ce_identify(BYTE bus_id)
   cmd[0] = (bus_id << 5); 					// cmd[0] = ACSI_id + TEST UNIT READY (0)	
   memset(pBuffer, 0, 512);              	// clear the buffer 
 
-  res = (*hddIfCmd)(1, cmd, 6, pBuffer, 1);	// issue the identify command and check the result 
+  res = (*hdIf.hddIfCmd)(1, cmd, 6, pBuffer, 1);	// issue the identify command and check the result 
     
   if(res != OK) {                        	// if failed, return FALSE 
     return 0;
@@ -413,7 +413,7 @@ int writeHansTest(int byteCount, WORD xorVal)
     }
 
     (void) Cconws("CE WRITE: ");
-    res = (*hddIfCmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBuffer, (byteCount+511)>>9 );		// issue the command and check the result
+    res = (*hdIf.hddIfCmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBuffer, (byteCount+511)>>9 );		// issue the command and check the result
     
     if(res == E_CRC) {                                                            
         return -2;

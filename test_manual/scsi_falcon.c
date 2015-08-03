@@ -60,8 +60,8 @@ BYTE scsi_cmd_Falcon(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer,
 
     //---------
     // send command
-    (*pSetReg)(REG_TCR, TCR_PHASE_CMD);                 // set COMMAND PHASE (assert C/D)
-    (*pSetReg)(REG_ICR, 1);                             // data bus as output
+    (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_CMD);                 // set COMMAND PHASE (assert C/D)
+    (*hdIf.pSetReg)(REG_ICR, 1);                             // data bus as output
 
     int i;
     for(i=0; i<cmdLength; i++) {                        // try to send all cmd bytes
@@ -76,14 +76,14 @@ BYTE scsi_cmd_Falcon(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer,
     // transfer data
     if(sectorCount > 0) {
         if(readNotWrite) {                                  // read
-            (*pSetReg)(REG_ICR, 0);                         // deassert the data bus
-            (*pSetReg)(REG_TCR, TCR_PHASE_DATA_IN);         // set DATA IN  phase
+            (*hdIf.pSetReg)(REG_ICR, 0);                         // deassert the data bus
+            (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_DATA_IN);         // set DATA IN  phase
         } else {                                            // write
-            (*pSetReg)(REG_ICR, ICR_DBUS);                  // assert data bus
-            (*pSetReg)(REG_TCR, TCR_PHASE_DATA_OUT);        // set DATA OUT phase
+            (*hdIf.pSetReg)(REG_ICR, ICR_DBUS);                  // assert data bus
+            (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_DATA_OUT);        // set DATA OUT phase
         }
 
-        res = (*pGetReg)(REG_REI);             // clear potential interrupt
+        res = (*hdIf.pGetReg)(REG_REI);             // clear potential interrupt
 
 #ifdef USE_DMA
         res = dmaDataTx_do_Falcon(readNotWrite);
@@ -108,21 +108,21 @@ BYTE selscsi_falcon(BYTE scsiId)
 {
     BYTE res;
 
-    (*pSetReg)(REG_ICR, 0x0d);      // assert BUSY, SEL and data bus
+    (*hdIf.pSetReg)(REG_ICR, 0x0d);      // assert BUSY, SEL and data bus
 
     BYTE selId  = (1 << scsiId);            // convert number of device to bit 
-    (*pSetReg)(REG_ODR, selId);     // output SCSI ID which we want to select
+    (*hdIf.pSetReg)(REG_ODR, selId);     // output SCSI ID which we want to select
     
-    (*pSetReg)(REG_TCR, 0);         // I/O=0, MSG=0, C/D=0 (wichtig!)
-    (*pSetReg)(REG_ICR, 0x0d);      // assert BUSY, SEL and data bus
+    (*hdIf.pSetReg)(REG_TCR, 0);         // I/O=0, MSG=0, C/D=0 (wichtig!)
+    (*hdIf.pSetReg)(REG_ICR, 0x0d);      // assert BUSY, SEL and data bus
     
     scsi_clrBit(REG_MR, MR_ARBIT);   // finish arbitration
 
-    (*pSetReg)(REG_CR,  0);         // clear BSY, set ATN
-    (*pSetReg)(REG_ICR, 0x05);      // clear BSY
+    (*hdIf.pSetReg)(REG_CR,  0);         // clear BSY, set ATN
+    (*hdIf.pSetReg)(REG_ICR, 0x05);      // clear BSY
 
     while(1) {                              // wait for busy bit to appear
-        BYTE icr = (*pGetReg)(REG_CR);
+        BYTE icr = (*hdIf.pGetReg)(REG_CR);
         
         if(icr & ICR_BUSY) {                // if bit set, good
             res = 0;
@@ -136,7 +136,7 @@ BYTE selscsi_falcon(BYTE scsiId)
         }        
     }
     
-    (*pSetReg)(REG_ICR, 0);         // clear SEL and data bus assertion
+    (*hdIf.pSetReg)(REG_ICR, 0);         // clear SEL and data bus assertion
     return res;
 }
 
@@ -144,13 +144,13 @@ WORD getStatusByte(void)
 {
     BYTE status, __attribute__((unused)) msg;
     
-   	(*pSetReg)(REG_TCR, TCR_PHASE_STATUS);      // STATUS IN phase
-	(*pGetReg)(REG_REI);                        // clear potential interrupt
+   	(*hdIf.pSetReg)(REG_TCR, TCR_PHASE_STATUS);      // STATUS IN phase
+	(*hdIf.pGetReg)(REG_REI);                        // clear potential interrupt
 
     status = pio_read();                                // read status byte
     
-   	(*pSetReg)(REG_TCR, TCR_PHASE_MESSAGE_IN);  // MESSAGE IN phase
-	(*pGetReg)(REG_REI);                        // clear potential interrupt
+   	(*hdIf.pSetReg)(REG_TCR, TCR_PHASE_MESSAGE_IN);  // MESSAGE IN phase
+	(*hdIf.pGetReg)(REG_REI);                        // clear potential interrupt
 
     msg = pio_read();                                   // read message byte
     
@@ -166,7 +166,7 @@ BYTE pio_write(BYTE val)
         return -1;
     }
 
-    (*pSetReg)(REG_ODR, val);               // write cmd byte to ODR
+    (*hdIf.pSetReg)(REG_ODR, val);               // write cmd byte to ODR
 
     res = doack_Falcon();                           // assert ACK
     return res;
@@ -181,7 +181,7 @@ WORD pio_read(void)
         return -1;
     }
 
-    val = (*pGetReg)(REG_ODR);              // read byte from bus
+    val = (*hdIf.pGetReg)(REG_ODR);              // read byte from bus
     
     res = doack_Falcon();                           // assert ACK
     if(res) {
@@ -194,7 +194,7 @@ WORD pio_read(void)
 BYTE w4req_Falcon(void) 
 {
     while(1) {                          // wait for REQ
-        BYTE icr = (*pGetReg)(REG_CR);
+        BYTE icr = (*hdIf.pGetReg)(REG_CR);
         if(icr & ICR_REQ) {             // if REQ appeared, good
             return 0;
         }
@@ -216,7 +216,7 @@ BYTE doack_Falcon(void)
     BYTE res;
     
     while(1) {
-        BYTE icr = (*pGetReg)(REG_ICR);
+        BYTE icr = (*hdIf.pGetReg)(REG_ICR);
         if((icr & ICR_REQ) == 0) {          // if REQ gone, good
             res = 0;
             break;
@@ -237,10 +237,10 @@ BYTE dmaDataRead_Falcon(BYTE *buffer, WORD sectorCount)
 {
 logMsg("dmaDataRead_Falcon - A\n\r");
 
-    (*pSetReg)(REG_ICR, 0);                    // data bus as input
-    (*pSetReg)(REG_TCR, TCR_PHASE_DATA_IN);    // set DATA IN  phase
+    (*hdIf.pSetReg)(REG_ICR, 0);                    // data bus as input
+    (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_DATA_IN);    // set DATA IN  phase
 
-    (*pGetReg)(REG_REI);                       // clear interrupts by reading REG_REI
+    (*hdIf.pGetReg)(REG_REI);                       // clear interrupts by reading REG_REI
 
     scsi_setBit(REG_MR, MR_DMA);                // DMA mode ON
 
@@ -267,7 +267,7 @@ logMsg("dmaDataRead_Falcon - D\n\r");
     }
     delay();
 
-    (*pSetReg)(REG_DIR, 0);         // start DMA receive
+    (*hdIf.pSetReg)(REG_DIR, 0);         // start DMA receive
     *WDL = 0;
 
 logMsg("dmaDataRead_Falcon - E\n\r");
@@ -279,7 +279,7 @@ logMsg("dmaDataRead_Falcon - E\n\r");
     
 logMsg("dmaDataRead_Falcon - F\n\r");
     
-    res = (*pGetReg)(REG_SDS);      // get DMA STATUS
+    res = (*hdIf.pGetReg)(REG_SDS);      // get DMA STATUS
     
     stopDmaFalcon();
 
@@ -294,14 +294,14 @@ logMsg("dmaDataRead_Falcon - G\n\r");
 
 BYTE dmaDataWrite_Falcon(BYTE *buffer, WORD sectorCount)
 {
-    (*pSetReg)(REG_TCR, TCR_PHASE_DATA_OUT);   // set DATA OUT phase
-    (*pSetReg)(REG_ICR, 1);        // data bus as output
+    (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_DATA_OUT);   // set DATA OUT phase
+    (*hdIf.pSetReg)(REG_ICR, 1);        // data bus as output
 
-    (*pGetReg)(REG_REI);           // clear interrupts by reading REG_REI
+    (*hdIf.pGetReg)(REG_REI);           // clear interrupts by reading REG_REI
 
     scsi_setBit(REG_MR, MR_DMA);    // DMA mode ON
 
-    (*pSetReg)(REG_SDS, 0);
+    (*hdIf.pSetReg)(REG_SDS, 0);
     
     setDmaAddr_Falcon((DWORD) buffer);      // set DMA adress
 
@@ -329,7 +329,7 @@ BYTE dmaDataWrite_Falcon(BYTE *buffer, WORD sectorCount)
         return -1;
     }
     
-    res = (*pGetReg)(REG_SDS);   // get DMA STATUS
+    res = (*hdIf.pGetReg)(REG_SDS);   // get DMA STATUS
     
     stopDmaFalcon();
 
@@ -349,9 +349,9 @@ void delay(void)
 
 void stopDmaFalcon(void)
 {
-    (*pGetReg)(REG_REI);           // reset ints by reading register
+    (*hdIf.pGetReg)(REG_REI);           // reset ints by reading register
     scsi_clrBit(REG_MR, MR_DMA);    // DMA mode off
-    (*pSetReg)(REG_ICR, 0);        
+    (*hdIf.pSetReg)(REG_ICR, 0);        
     
     clearCache030();
 }
@@ -406,34 +406,53 @@ DWORD scsi_getReg_Falcon(int whichReg)
     return val;
 }
 
-void dmaDataTx_prepare_Falcon(BYTE *buffer, DWORD dataByteCount)
+void dmaDataTx_prepare_Falcon(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
 {
     // set DMA pointer to buffer address
     setDmaAddr_Falcon((DWORD) buffer);
 
+    WORD wdl1, wdl2;
+
+    if(readNotWrite) {                      // on read
+        wdl1 = 0x190;
+        wdl2 = 0x090;
+    } else {                                // for write
+        wdl1 = 0x090;
+        wdl2 = 0x190;
+    }
+    
     // set DMA count
-    *WDL = 0x090;                           // toggle DMA chip for "send"
+    *WDL = wdl1;                           // toggle DMA chip 
     delay();
-    *WDL = 0x190;
+    *WDL = wdl2;
     delay();
     
     *WDC = (dataByteCount >> 9);           // write sector count (not byte count)
-
+    
+    while(1) {                              // wait till it's safe to access the DMA channel
+        BYTE sr = *WDSR;
+        if(sr & (1 << 3)) {
+            break;
+        }
+    }
+    delay();
 }
 
 BYTE dmaDataTx_do_Falcon(BYTE readNotWrite)
 {
-    // Set up the DMAC for data transfer
-    (*pSetReg)(REG_MR, MR_DMA);                 // enable DMA mode
+    // Set up the DMA for data transfer
+    (*hdIf.pSetReg)(REG_MR, MR_DMA);                // enable DMA mode
     
-    if(readNotWrite) {                          // on read
-        (*pSetReg)(REG_DIR, 0);                 // start the DMA receive
-        (*pSetReg)(REG_DMACTL, DMAIN);          // set the DMAC direction to IN
-        (*pSetReg)(REG_DMACTL, DMAIN+DMAENA);   // turn on DMAC
-    } else {                                    // on write
-        (*pSetReg)(REG_SDS, 0);                 // start the DMA send -- WrSCSI  #0,SDS
-        (*pSetReg)(REG_DMACTL, DMAOUT);         // set the DMAC direction to OUT
-        (*pSetReg)(REG_DMACTL, DMAOUT+DMAENA);  // turn on DMAC
+    if(readNotWrite) {                              // on read
+        (*hdIf.pSetReg)(REG_DIR, 0);                // start the DMA receive
+        
+        *WDL = 0;
+    } else {                                        // on write
+        (*hdIf.pSetReg)(REG_SDS, 0);                // start the DMA send -- WrSCSI  #0,SDS
+
+        *WDL = 0x18d;
+        *WDC = 0;
+        *WDL = 0x100;
     }
     
     BYTE res = wait_dma_cmpl(200);              // wait for DMA completetion
@@ -442,7 +461,7 @@ BYTE dmaDataTx_do_Falcon(BYTE readNotWrite)
         return -1;
     }
     
-    res = (*pGetReg)(REG_SDS);                  // get DMA STATUS
+    res = (*hdIf.pGetReg)(REG_SDS);             // get DMA STATUS
     
     stopDmaFalcon();
 
