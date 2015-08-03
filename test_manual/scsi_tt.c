@@ -18,7 +18,7 @@ void logMsgProgress(DWORD current, DWORD total);
 void TTresetscsi(void);
 //-----------------
 // local function definitions
-static BYTE sblkscsi(BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataCount);
+static BYTE sblkscsi(BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataByteCount);
 static BYTE selscsi(BYTE scsiId);
 static WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength);
 static int  w4stat(void);
@@ -29,10 +29,9 @@ static BYTE doack(void);
 int PIO_read(void);
 int PIO_write(BYTE data);
 
-//#define SCDMA 
+#define USE_DMA
        
-#ifdef SCDMA
-static BYTE dmaDataTransfer(BYTE readNotWrite, BYTE cmdLength);
+#ifdef USE_DMA
 static BYTE w4int(void);
 void   setDmaAddr_TT(DWORD addr);
 DWORD  getDmaAddr_TT(void);
@@ -48,6 +47,8 @@ extern BYTE machine;
 DWORD scsi_getReg_TT(int whichReg);
 void  scsi_setReg_TT(int whichReg, DWORD value);
 
+void dmaDataTx_prepare_TT (BYTE *buffer, DWORD dataByteCount);
+BYTE dmaDataTx_do_TT      (BYTE readNotWrite);
 //-----------------
 
 void clearCache030(void);
@@ -112,8 +113,8 @@ WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength)
     
     res = (*pGetReg)(REG_REI);             // clear potential interrupt
     
-#ifdef SCDMA                    // if using DMA for data transfer
-    res = dmaDataTransfer(readNotWrite, cmdLength);
+#ifdef USE_DMA                    // if using DMA for data transfer
+    res = (*pDmaDataTx_do) (readNotWrite);
 #else                           // if using PIO for data transfer
     res = pioDataTransfer(readNotWrite, bfr, byteCount);
 #endif
@@ -121,70 +122,7 @@ WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength)
     return res;
 }    
 
-#ifdef SCDMA     
-BYTE dmaDataTransfer(BYTE readNotWrite, BYTE cmdLength)
-{
-    // Set up the DMAC for data transfer
-    (*pSetReg)(REG_MR, 2);                      // enable DMA mode
-    
-    if(readNotWrite) {                          // on read
-        (*pSetReg)(REG_DIR, 0);                 // start the DMA receive
-        (*pSetReg)(REG_DMACTL, DMAIN);          // set the DMAC direction to IN
-        (*pSetReg)(REG_DMACTL, DMAIN+DMAENA);   // turn on DMAC
-    } else {                                    // on write
-        (*pSetReg)(REG_SDS, 0);                 // start the DMA send -- WrSCSI  #0,SDS
-        (*pSetReg)(REG_DMACTL, DMAOUT);         // set the DMAC direction to OUT
-        (*pSetReg)(REG_DMACTL, DMAOUT+DMAENA);  // turn on DMAC
-    }
-    
-    BYTE res;
-    res = w4int();                                  // wait for int
-    if(res) {
-        logMsg(" dmaDataTansfer() failed - w4int() timeout\r\n");
-        return -1;
-    }
-    
-    if(!readNotWrite) {                 // for WRITE the code end here, nothing more to do, just return good result
-        return 0;
-    }
-
-    //--------------------------
-    // the rest is only for the case of DMA read 
-
-	clearCache030();
-
-    BYTE rest = *bSDMAPTR_lo;   // see if this was an odd transfer
-    rest = rest & 0x03;         // get only 2 lowest bits
-    
-    if(rest == 0) {             // transfer size was multiple of 4? Great, finish.
-        return 0;
-    }
-    
-    //----------------
-    // the following code is only for case if the DMA read size (count) was not multiple of 4
-    DWORD dmaPtr;
-    BYTE *pData;
-    dmaPtr  = getDmaAddr_TT();
-    dmaPtr  = dmaPtr & 0xfffffffc;  // where does data go to?
-    pData   = (BYTE *) dmaPtr;      // int to pointer
-
-    DWORD residue = (*pGetReg)(REG_DMARES);    // get the remaining bytes
-
-    int i;
-    for(i=0; i<rest; i++) {
-        BYTE val;
-        val     = residue >> 24;        // get highest byte
-        residue = residue << 8;         // shift next byte to highest byte
-        
-        *pData = val;                   // store byte and move to next position
-        pData++;
-    }
-    
-    return 0;                   
-}
-#endif
-
-#ifndef SCDMA
+#ifndef USE_DMA
 
 WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount)
 {
@@ -254,7 +192,7 @@ WORD pioDataTransfer_write(BYTE *bfr, DWORD byteCount)
 #endif    
     
 // sblkscsi() - set DMA pointer and count and send command block
-BYTE sblkscsi(BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataCount)
+BYTE sblkscsi(BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataByteCount)
 {
     BYTE res;
     
@@ -265,12 +203,8 @@ BYTE sblkscsi(BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD data
         return -1;
     }
 
-#ifdef SCDMA    
-    // set DMA pointer to buffer address
-    setDmaAddr_TT((DWORD) dataAddr);
-
-    // set DMA count
-    setDmaCnt_TT(dataCount);
+#ifdef USE_DMA    
+    (*pDmaDataTx_prepare)(dataAddr, dataByteCount);
 #endif
     
     (*pSetReg)(REG_TCR, TCR_PHASE_CMD);                // set COMMAND PHASE (assert C/D)
@@ -610,5 +544,73 @@ void scsi_clrBit(int whichReg, DWORD bitMask)
     (*pSetReg)(whichReg, val);              // write
 }
 //----------------------
+void dmaDataTx_prepare_TT(BYTE *buffer, DWORD dataByteCount)
+{
+    // set DMA pointer to buffer address
+    setDmaAddr_TT((DWORD) buffer);
 
+    // set DMA count
+    setDmaCnt_TT(dataByteCount);
+}
+//----------------------
+BYTE dmaDataTx_do_TT(BYTE readNotWrite)
+{
+    // Set up the DMAC for data transfer
+    (*pSetReg)(REG_MR, 2);                      // enable DMA mode
+    
+    if(readNotWrite) {                          // on read
+        (*pSetReg)(REG_DIR, 0);                 // start the DMA receive
+        (*pSetReg)(REG_DMACTL, DMAIN);          // set the DMAC direction to IN
+        (*pSetReg)(REG_DMACTL, DMAIN+DMAENA);   // turn on DMAC
+    } else {                                    // on write
+        (*pSetReg)(REG_SDS, 0);                 // start the DMA send -- WrSCSI  #0,SDS
+        (*pSetReg)(REG_DMACTL, DMAOUT);         // set the DMAC direction to OUT
+        (*pSetReg)(REG_DMACTL, DMAOUT+DMAENA);  // turn on DMAC
+    }
+    
+    BYTE res;
+    res = w4int();                                  // wait for int
+    if(res) {
+        logMsg(" dmaDataTansfer() failed - w4int() timeout\r\n");
+        return -1;
+    }
+    
+    if(!readNotWrite) {                 // for WRITE the code end here, nothing more to do, just return good result
+        return 0;
+    }
 
+    //--------------------------
+    // the rest is only for the case of DMA read 
+
+	clearCache030();
+
+    BYTE rest = *bSDMAPTR_lo;   // see if this was an odd transfer
+    rest = rest & 0x03;         // get only 2 lowest bits
+    
+    if(rest == 0) {             // transfer size was multiple of 4? Great, finish.
+        return 0;
+    }
+    
+    //----------------
+    // the following code is only for case if the DMA read size (count) was not multiple of 4
+    DWORD dmaPtr;
+    BYTE *pData;
+    dmaPtr  = getDmaAddr_TT();
+    dmaPtr  = dmaPtr & 0xfffffffc;  // where does data go to?
+    pData   = (BYTE *) dmaPtr;      // int to pointer
+
+    DWORD residue = (*pGetReg)(REG_DMARES);    // get the remaining bytes
+
+    int i;
+    for(i=0; i<rest; i++) {
+        BYTE val;
+        val     = residue >> 24;        // get highest byte
+        residue = residue << 8;         // shift next byte to highest byte
+        
+        *pData = val;                   // store byte and move to next position
+        pData++;
+    }
+    
+    return 0;                   
+}
+//----------------------

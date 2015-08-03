@@ -10,6 +10,9 @@ typedef BYTE  (*THddIfCmd) (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *
 typedef void  (*TsetReg)   (int whichReg, DWORD value);
 typedef DWORD (*TgetReg)   (int whichReg);
 
+typedef void  (*TdmaDataTx_prepare) (BYTE *buffer, WORD sectorCount);
+typedef BYTE  (*TdmaDataTx_do)      (BYTE readNotWrite);
+
 DWORD scsi_getReg_TT(int whichReg);
 void  scsi_setReg_TT(int whichReg, DWORD value);
 
@@ -19,10 +22,19 @@ void  scsi_setReg_Falcon(int whichReg, DWORD value);
 void  scsi_clrBit(int whichReg, DWORD bitMask);
 void  scsi_setBit(int whichReg, DWORD bitMask);
 
+void dmaDataTx_prepare_TT (BYTE *buffer, DWORD dataByteCount);
+BYTE dmaDataTx_do_TT      (BYTE readNotWrite);
+
+void dmaDataTx_prepare_Falcon (BYTE *buffer, DWORD dataByteCount);
+BYTE dmaDataTx_do_Falcon      (BYTE readNotWrite);
+
 extern THddIfCmd hddIfCmd;
 
 extern TsetReg pSetReg;
 extern TgetReg pGetReg;
+
+extern TdmaDataTx_prepare  pDmaDataTx_prepare;
+extern TdmaDataTx_do       pDmaDataTx_do;
 
 //--------------------------------
 #define IF_NONE         0

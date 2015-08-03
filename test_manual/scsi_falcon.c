@@ -11,9 +11,9 @@ static WORD pio_read(void);
 static BYTE w4req_Falcon(void); 
 static BYTE doack_Falcon(void);
 
-//#define FALCON_DMA
+#define USE_DMA
 
-#ifdef FALCON_DMA
+#ifdef USE_DMA
 static BYTE dmaDataWrite_Falcon(BYTE *buffer, WORD sectorCount);
 static BYTE dmaDataRead_Falcon (BYTE *buffer, WORD sectorCount);
 #else 
@@ -85,12 +85,8 @@ BYTE scsi_cmd_Falcon(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer,
 
         res = (*pGetReg)(REG_REI);             // clear potential interrupt
 
-#ifdef FALCON_DMA
-        if(readNotWrite) {
-            res = dmaDataRead_Falcon(buffer, sectorCount);
-        } else {
-            res = dmaDataWrite_Falcon(buffer, sectorCount);
-        }
+#ifdef USE_DMA
+        res = dmaDataTx_do_Falcon(readNotWrite);
 #else
         DWORD byteCount = sectorCount * 512;
         res = pioDataTransfer(readNotWrite, buffer, byteCount);
@@ -409,3 +405,55 @@ DWORD scsi_getReg_Falcon(int whichReg)
 
     return val;
 }
+
+void dmaDataTx_prepare_Falcon(BYTE *buffer, DWORD dataByteCount)
+{
+    // set DMA pointer to buffer address
+    setDmaAddr_Falcon((DWORD) buffer);
+
+    // set DMA count
+    *WDL = 0x090;                           // toggle DMA chip for "send"
+    delay();
+    *WDL = 0x190;
+    delay();
+    
+    *WDC = (dataByteCount >> 9);           // write sector count (not byte count)
+
+}
+
+BYTE dmaDataTx_do_Falcon(BYTE readNotWrite)
+{
+    // Set up the DMAC for data transfer
+    (*pSetReg)(REG_MR, MR_DMA);                 // enable DMA mode
+    
+    if(readNotWrite) {                          // on read
+        (*pSetReg)(REG_DIR, 0);                 // start the DMA receive
+        (*pSetReg)(REG_DMACTL, DMAIN);          // set the DMAC direction to IN
+        (*pSetReg)(REG_DMACTL, DMAIN+DMAENA);   // turn on DMAC
+    } else {                                    // on write
+        (*pSetReg)(REG_SDS, 0);                 // start the DMA send -- WrSCSI  #0,SDS
+        (*pSetReg)(REG_DMACTL, DMAOUT);         // set the DMAC direction to OUT
+        (*pSetReg)(REG_DMACTL, DMAOUT+DMAENA);  // turn on DMAC
+    }
+    
+    BYTE res = wait_dma_cmpl(200);              // wait for DMA completetion
+    if(res) {                                   // failed?
+        logMsg(" dmaDataTansfer() failed - w4int() timeout\r\n");
+        return -1;
+    }
+    
+    res = (*pGetReg)(REG_SDS);                  // get DMA STATUS
+    
+    stopDmaFalcon();
+
+    if(res & (BSR_PARIERR | BSR_BUSYERR)) {     // parity error or busy? fail
+        return -1;
+    }
+
+    if(readNotWrite) {                          // if read, clear cache
+    	clearCache030();
+    }
+    
+    return 0;
+}
+
