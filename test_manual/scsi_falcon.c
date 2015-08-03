@@ -46,7 +46,7 @@ BYTE scsi_cmd_Falcon(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer,
         cmdLength--;
     }
     
-    if(scsiId == 0) {                               // Trying to access SCSI ID 0 on Falcon? Fail, this is reserved for SCSI adapter
+    if(scsiId == hdIf.scsiHostId) {                 // Trying to access reserved SCSI ID? Fail... (skip)
         return -1;
     }
     

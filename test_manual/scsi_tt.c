@@ -67,7 +67,7 @@ BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
         cmdLength--;
     }
     
-    if(scsiId == 7) {                   // Trying to access SCSI ID 7 on TT? Fail, this is reserved for SCSI adapter
+    if(scsiId == hdIf.scsiHostId) {                 // Trying to access reserved SCSI ID? Fail... (skip)
         return -1;
     }
     //------------

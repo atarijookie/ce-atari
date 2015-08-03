@@ -36,6 +36,8 @@ typedef struct {
 
     TdmaDataTx_prepare  pDmaDataTx_prepare;
     TdmaDataTx_do       pDmaDataTx_do;
+    
+    BYTE                scsiHostId;
 } THDif;
 
 extern THDif hdIf;
