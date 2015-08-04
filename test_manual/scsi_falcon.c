@@ -260,12 +260,14 @@ logMsg("dmaDataRead_Falcon - C\n\r");
 
 logMsg("dmaDataRead_Falcon - D\n\r");
     
+/*
     while(1) {                              // wait till it's safe to access the DMA channel
         BYTE sr = *WDSR;
         if(sr & (1 << 3)) {
             break;
         }
     }
+*/    
     delay();
 
     (*hdIf.pSetReg)(REG_DIR, 0);            // start DMA receive
@@ -273,7 +275,7 @@ logMsg("dmaDataRead_Falcon - D\n\r");
 
 logMsg("dmaDataRead_Falcon - E\n\r");
     
-    BYTE res = w4int();                     // wait for DMA completetion
+    BYTE res = wait_dma_cmpl(200);                     // wait for DMA completetion
     if(res) {                               // failed?
         return -1;
     }
@@ -313,19 +315,21 @@ BYTE dmaDataWrite_Falcon(BYTE *buffer, WORD sectorCount)
     
     *WDC = sectorCount;                     // write sector count, instead of using 'bsr setacnt'
 
+/*    
     while(1) {                              // wait till it's safe to access the DMA channel
         BYTE sr = *WDSR;
         if(sr & (1 << 3)) {
             break;
         }
     }
+*/    
     delay();
 
     *WDL = 0x18d;
     *WDC = 0;
     *WDL = 0x100;
     
-    BYTE res = w4int();                 // wait for DMA completetion
+    BYTE res = wait_dma_cmpl(200);                 // wait for DMA completetion
     if(res) {                           // failed?
         return -1;
     }
@@ -343,9 +347,11 @@ BYTE dmaDataWrite_Falcon(BYTE *buffer, WORD sectorCount)
 
 void delay(void)
 {
-    (void) *MFP2;
-    (void) *MFP2;
-    (void) *MFP2;
+    WORD tmp;
+    
+    tmp = *WDL;
+    tmp = *WDL;
+    tmp = *WDL;
 }
 
 void stopDmaFalcon(void)
@@ -429,13 +435,15 @@ void dmaDataTx_prepare_Falcon(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCou
     delay();
     
     *WDC = (dataByteCount >> 9);           // write sector count (not byte count)
-    
+  
+/*  
     while(1) {                              // wait till it's safe to access the DMA channel
         BYTE sr = *WDSR;
         if(sr & (1 << 3)) {
             break;
         }
     }
+*/    
     delay();
 }
 
@@ -456,9 +464,9 @@ BYTE dmaDataTx_do_Falcon(BYTE readNotWrite)
         *WDL = 0x100;
     }
     
-    BYTE res = w4int();                             // wait for DMA completetion
+    BYTE res = wait_dma_cmpl(200);                             // wait for DMA completetion
     if(res) {                                       // failed?
-        logMsg(" dmaDataTansfer() failed - w4int() timeout\r\n");
+        logMsg(" dmaDataTansfer() failed - wait_dma_cmpl() timeout\r\n");
         return -1;
     }
     
