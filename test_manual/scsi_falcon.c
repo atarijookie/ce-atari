@@ -1,21 +1,26 @@
 #include "hdd_if.h"
 #include "scsi.h"
+#include "acsi.h"
 
 void delay(void);
 void stopDmaFalcon(void);
 
+/*
 static BYTE selscsi_falcon(BYTE scsiId);
 static WORD getStatusByte(void);
 static BYTE pio_write(BYTE val);
 static WORD pio_read(void);
 static BYTE w4req_Falcon(void); 
 static BYTE doack_Falcon(void);
+*/
 
 #define USE_DMA
 
 #ifdef USE_DMA
+/*
 static BYTE dmaDataWrite_Falcon(BYTE *buffer, WORD sectorCount);
 static BYTE dmaDataRead_Falcon (BYTE *buffer, WORD sectorCount);
+*/
 #else 
 extern WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount);
 #endif
@@ -30,10 +35,13 @@ DWORD scsi_getReg_Falcon(int whichReg);
 DWORD setscstmout(void);
 
 void clearCache030(void);
+void delay(void);
+
 extern DWORD _cmdTimeOut;                           // timeout time for scsi_cmd() from start to end
 
 BYTE w4int(void);
 
+/*
 BYTE scsi_cmd_Falcon(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
     //------------
@@ -233,7 +241,9 @@ BYTE doack_Falcon(void)
     scsi_clrBit(REG_ICR, ICR_ACK);   // clear ACK
     return res;
 }
+*/
 
+/*
 BYTE dmaDataRead_Falcon(BYTE *buffer, WORD sectorCount)
 {
 logMsg("dmaDataRead_Falcon - A\n\r");
@@ -260,14 +270,14 @@ logMsg("dmaDataRead_Falcon - C\n\r");
 
 logMsg("dmaDataRead_Falcon - D\n\r");
     
-/*
-    while(1) {                              // wait till it's safe to access the DMA channel
-        BYTE sr = *WDSR;
-        if(sr & (1 << 3)) {
-            break;
-        }
-    }
-*/    
+
+//    while(1) {                              // wait till it's safe to access the DMA channel
+//        BYTE sr = *WDSR;
+//        if(sr & (1 << 3)) {
+//            break;
+//        }
+//    }
+    
     delay();
 
     (*hdIf.pSetReg)(REG_DIR, 0);            // start DMA receive
@@ -294,7 +304,9 @@ logMsg("dmaDataRead_Falcon - G\n\r");
         
     return 0;
 }
+*/
 
+/*
 BYTE dmaDataWrite_Falcon(BYTE *buffer, WORD sectorCount)
 {
     (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_DATA_OUT);   // set DATA OUT phase
@@ -315,14 +327,14 @@ BYTE dmaDataWrite_Falcon(BYTE *buffer, WORD sectorCount)
     
     *WDC = sectorCount;                     // write sector count, instead of using 'bsr setacnt'
 
-/*    
-    while(1) {                              // wait till it's safe to access the DMA channel
-        BYTE sr = *WDSR;
-        if(sr & (1 << 3)) {
-            break;
-        }
-    }
-*/    
+    
+//    while(1) {                              // wait till it's safe to access the DMA channel
+//        BYTE sr = *WDSR;
+//        if(sr & (1 << 3)) {
+//            break;
+//        }
+//    }
+    
     delay();
 
     *WDL = 0x18d;
@@ -344,20 +356,12 @@ BYTE dmaDataWrite_Falcon(BYTE *buffer, WORD sectorCount)
         
     return 0;
 }
-
-void delay(void)
-{
-    WORD tmp;
-    
-    tmp = *WDL;
-    tmp = *WDL;
-    tmp = *WDL;
-}
+*/
 
 void stopDmaFalcon(void)
 {
     (*hdIf.pGetReg)(REG_REI);           // reset ints by reading register
-    scsi_clrBit(REG_MR, MR_DMA);    // DMA mode off
+    scsi_clrBit(REG_MR, MR_DMA);        // DMA mode off
     (*hdIf.pSetReg)(REG_ICR, 0);        
     
     clearCache030();
@@ -413,7 +417,7 @@ DWORD scsi_getReg_Falcon(int whichReg)
     return val;
 }
 
-void dmaDataTx_prepare_Falcon(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
+BYTE dmaDataTx_prepare_Falcon(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
 {
     // set DMA pointer to buffer address
     setDmaAddr_Falcon((DWORD) buffer);
@@ -435,16 +439,21 @@ void dmaDataTx_prepare_Falcon(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCou
     delay();
     
     *WDC = (dataByteCount >> 9);           // write sector count (not byte count)
+    delay();
   
-/*  
     while(1) {                              // wait till it's safe to access the DMA channel
         BYTE sr = *WDSR;
         if(sr & (1 << 3)) {
             break;
         }
+        
+        DWORD now = *HZ_200;
+        if(now >= _cmdTimeOut) {   // if time out, fail
+            return -1;
+        }
     }
-*/    
-    delay();
+    
+    return 0;
 }
 
 BYTE dmaDataTx_do_Falcon(BYTE readNotWrite)
@@ -458,14 +467,16 @@ BYTE dmaDataTx_do_Falcon(BYTE readNotWrite)
         *WDL = 0;
     } else {                                        // on write
         (*hdIf.pSetReg)(REG_SDS, 0);                // start the DMA send -- WrSCSI  #0,SDS
-
-        *WDL = 0x18d;
+        
+        *WDL = 0x18D;
         *WDC = 0;
         *WDL = 0x100;
     }
     
     BYTE res = wait_dma_cmpl(200);                             // wait for DMA completetion
     if(res) {                                       // failed?
+        stopDmaFalcon();
+        
         logMsg(" dmaDataTansfer() failed - wait_dma_cmpl() timeout\r\n");
         return -1;
     }

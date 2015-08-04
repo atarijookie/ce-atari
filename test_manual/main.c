@@ -46,6 +46,9 @@ void showMenu(void);
 
 void logMsg(char *logMsg);
 
+#define RW_TEST_SIZE    50
+//#define RW_TEST_SIZE    MAXSECTORS
+
 //--------------------------------------------------
 int main(void)
 {
@@ -179,7 +182,7 @@ void showMenu(void)
 }
 
 BYTE commandLong[CMD_LENGTH_LONG] = {0x1f,	0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
-int readHansTest( int byteCount, WORD xorVal);
+int readHansTest(int byteCount, WORD xorVal);
 
 void CEread(void)
 {
@@ -188,7 +191,7 @@ void CEread(void)
 
     WORD xorVal=0xC0DE;
     
-    int res = readHansTest(512*255, xorVal);
+    int res = readHansTest(RW_TEST_SIZE * 512, xorVal);
     
     switch( res )
     {
@@ -205,19 +208,19 @@ int readHansTest(int byteCount, WORD xorVal)
     
 	commandLong[4+1] = TEST_READ;
 
-  //size to read
-	commandLong[5+1] = (byteCount >>16) & 0xFF;
-	commandLong[6+1] = (byteCount >> 8) & 0xFF;
-	commandLong[7+1] = (byteCount    )  & 0xFF;
+    //size to read
+	commandLong[5+1] = (byteCount >> 16) & 0xFF;
+	commandLong[6+1] = (byteCount >>  8) & 0xFF;
+	commandLong[7+1] = (byteCount      ) & 0xFF;
 
-  //Word to XOR with data on CE side
+    //Word to XOR with data on CE side
 	commandLong[8+1] = (xorVal >> 8) & 0xFF;
 	commandLong[9+1] = (xorVal     ) & 0xFF;
 
     (void) Cconws("CE READ: ");
-    res = (*hdIf.hddIfCmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, (byteCount+511)>>9 );		// issue the command and check the result
+    res = (*hdIf.hddIfCmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, byteCount >> 9);      // issue the command and check the result
     
-    if(res != OK) {                                                             // ACSI ERROR?
+    if(res != OK) {                                                                                 // ACSI ERROR?
         return -1;
     }
     
@@ -371,7 +374,7 @@ void CEwrite(void)
 
     WORD xorVal=0xC0DE;
     
-  	int res = writeHansTest(512*255, xorVal);
+  	int res = writeHansTest(RW_TEST_SIZE * 512, xorVal);
     
     switch( res )
     {
@@ -389,13 +392,13 @@ int writeHansTest(int byteCount, WORD xorVal)
 	commandLong[4+1] = TEST_WRITE;
 
   //size to read
-	commandLong[5+1] = (byteCount>>16)&0xFF;
-	commandLong[6+1] = (byteCount>>8)&0xFF;
-	commandLong[7+1] = (byteCount)&0xFF;
+	commandLong[5+1] = (byteCount >> 16) & 0xFF;
+	commandLong[6+1] = (byteCount >>  8) & 0xFF;
+	commandLong[7+1] = (byteCount      ) & 0xFF;
 
   //Word to XOR with data on CE side
-	commandLong[8+1] = (xorVal>>8)&0xFF;
-	commandLong[9+1] = (xorVal)&0xFF;
+	commandLong[8+1] = (xorVal >> 8) & 0xFF;
+	commandLong[9+1] = (xorVal     ) & 0xFF;
 
     int i;
     WORD counter = 0;
@@ -413,7 +416,7 @@ int writeHansTest(int byteCount, WORD xorVal)
     }
 
     (void) Cconws("CE WRITE: ");
-    res = (*hdIf.hddIfCmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBuffer, (byteCount+511)>>9 );		// issue the command and check the result
+    res = (*hdIf.hddIfCmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBuffer, byteCount >> 9);     // issue the command and check the result
     
     if(res == E_CRC) {                                                            
         return -2;

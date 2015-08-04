@@ -1,6 +1,7 @@
 | ------------------------------------------------------	
 
 	.globl  _clearCache030
+    .globl  _delay
 	.text
 
 _clearCache030:
@@ -10,6 +11,12 @@ _clearCache030:
     ori.w	#0x808,d0       | dump both the D and I cache
     movec   d0, CACR        | update cache control register
     move	(sp)+,sr        | restore interrupt state
+    rts
+
+_delay:
+    nop
+    nop
+    nop
     rts
 	
 | ------------------------------------------------------

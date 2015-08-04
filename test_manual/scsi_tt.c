@@ -18,7 +18,7 @@ void logMsgProgress(DWORD current, DWORD total);
 void TTresetscsi(void);
 //-----------------
 // local function definitions
-static BYTE sblkscsi(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataByteCount);
+static BYTE scsi_select_and_cmd(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataByteCount);
 static BYTE selscsi(BYTE scsiId);
 static WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength);
 static int  w4stat(void);
@@ -47,7 +47,7 @@ extern BYTE machine;
 DWORD scsi_getReg_TT(int whichReg);
 void  scsi_setReg_TT(int whichReg, DWORD value);
 
-void dmaDataTx_prepare_TT (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
+BYTE dmaDataTx_prepare_TT (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
 BYTE dmaDataTx_do_TT      (BYTE readNotWrite);
 //-----------------
 
@@ -72,10 +72,10 @@ BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
     }
     //------------
     _cmdTimeOut = setscstmout();        // set up a short timeout
-    BYTE res = sblkscsi(readNotWrite, scsiId, cmd, cmdLength, buffer, sectorCount << 9);      // send command block
+    BYTE res = scsi_select_and_cmd(readNotWrite, scsiId, cmd, cmdLength, buffer, sectorCount << 9);      // send command block
 
     if(res) {
-        logMsg("scsi_cmd_tt failed on sblkscsi \r\n");
+        logMsg("scsi_cmd_tt failed on scsi_select_and_cmd() \r\n");
         return -1;
     }
     
@@ -191,20 +191,25 @@ WORD pioDataTransfer_write(BYTE *bfr, DWORD byteCount)
 
 #endif    
     
-// sblkscsi() - set DMA pointer and count and send command block
-BYTE sblkscsi(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataByteCount)
+// scsi_select_and_cmd() - set DMA pointer and count and send command block
+BYTE scsi_select_and_cmd(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataByteCount)
 {
     BYTE res;
     
     res = selscsi(scsiId);  // select required device
     
     if(res) {               // if failed, quit with failure
-        logMsg("sblkscsi failed on selscsi\r\n");
+        logMsg("scsi_select_and_cmd() failed on selscsi\r\n");
         return -1;
     }
 
 #ifdef USE_DMA    
-    (*hdIf.pDmaDataTx_prepare)(readNotWrite, dataAddr, dataByteCount);
+    res = (*hdIf.pDmaDataTx_prepare)(readNotWrite, dataAddr, dataByteCount);
+    
+    if(res) {
+        logMsg("scsi_select_and_cmd() failed on DmaDataTx_prepare()\r\n");
+        return -1;
+    }
 #endif
     
     (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_CMD);                // set COMMAND PHASE (assert C/D)
@@ -216,7 +221,7 @@ BYTE sblkscsi(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *d
         res = PIO_write(cmd[i]);
         
         if(res) {                                       // if time out happened, fail
-            logMsg("sblkscsi failed on PIO_write()\r\n");
+            logMsg("scsi_select_and_cmd() failed on PIO_write()\r\n");
             logMsgProgress(i, cmdLength);
             return -1;
         }
@@ -544,13 +549,15 @@ void scsi_clrBit(int whichReg, DWORD bitMask)
     (*hdIf.pSetReg)(whichReg, val);              // write
 }
 //----------------------
-void dmaDataTx_prepare_TT(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
+BYTE dmaDataTx_prepare_TT(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
 {
     // set DMA pointer to buffer address
     setDmaAddr_TT((DWORD) buffer);
 
     // set DMA count
     setDmaCnt_TT(dataByteCount);
+    
+    return 0;
 }
 //----------------------
 BYTE dmaDataTx_do_TT(BYTE readNotWrite)

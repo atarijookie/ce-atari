@@ -88,7 +88,7 @@
 
 #define WDC                 ((volatile WORD *)  0xFFFF8604)
 #define WDL                 ((volatile WORD *)  0xFFFF8606)
-#define WDSR                ((volatile WORD *)  0xFFFF860F)       // STATUS Register
+#define WDSR                ((volatile BYTE *)  0xFFFF860F)       // STATUS Register
 
 // Falcon regs for READing
 #define SPCSD           0x88    // SPCSD      - R  Current SCSI Data           
