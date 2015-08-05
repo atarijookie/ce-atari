@@ -3,6 +3,7 @@
 #include "hdd_if.h"
 #include "scsi.h"
 #include "acsi.h"
+#include "stdlib.h"
 
 #include <mint/sysbind.h>
 #include <mint/osbind.h>
@@ -57,15 +58,23 @@ void clearCache030(void);
 DWORD _cmdTimeOut;                      // timeout time for scsi_cmd() from start to end
 BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
+    //-------------
+    // create local copy of cmd[]
+    BYTE tmpCmd[32];
+    BYTE tmpCmdLen = (cmdLength < 32) ? cmdLength : 32;
+    memcpy(tmpCmd, cmd, tmpCmdLen);     
+
     //------------
     // first we start by extracting ID and fixing the cmd[] array because there's different format of this for ACSI and SCSI
-    BYTE scsiId = (cmd[0] >> 5);        // get only drive ID bits
+    BYTE scsiId = (tmpCmd[0] >> 5);     // get only drive ID bits
 
-    cmd[0] = cmd[0] & 0x1f;             // remove possible drive ID bits
+    tmpCmd[0] = tmpCmd[0] & 0x1f;       // remove possible drive ID bits
     
-    if((cmd[0] & 0x1f) == 0x1f) {       // if it's ICD format of command, skip the 0th byte
-        cmd++;
+    if((tmpCmd[0] & 0x1f) == 0x1f) {    // if it's ICD format of command, skip the 0th byte
+        cmd = &tmpCmd[1];
         cmdLength--;
+    } else {                            // not ICD command, start from 0th byte
+        cmd = &tmpCmd[0];
     }
     
     if(scsiId == hdIf.scsiHostId) {     // Trying to access reserved SCSI ID? Fail... (skip)
