@@ -10,8 +10,8 @@ typedef BYTE  (*THddIfCmd) (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *
 typedef void  (*TsetReg)   (int whichReg, DWORD value);
 typedef DWORD (*TgetReg)   (int whichReg);
 
-typedef BYTE  (*TdmaDataTx_prepare) (BYTE readNotWrite, BYTE *buffer, WORD sectorCount);
-typedef BYTE  (*TdmaDataTx_do)      (BYTE readNotWrite);
+typedef BYTE  (*TdmaDataTx_prepare) (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
+typedef BYTE  (*TdmaDataTx_do)      (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
 
 DWORD scsi_getReg_TT(int whichReg);
 void  scsi_setReg_TT(int whichReg, DWORD value);
@@ -23,10 +23,10 @@ void  scsi_clrBit(int whichReg, DWORD bitMask);
 void  scsi_setBit(int whichReg, DWORD bitMask);
 
 BYTE dmaDataTx_prepare_TT       (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
-BYTE dmaDataTx_do_TT            (BYTE readNotWrite);
+BYTE dmaDataTx_do_TT            (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
 
 BYTE dmaDataTx_prepare_Falcon   (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
-BYTE dmaDataTx_do_Falcon        (BYTE readNotWrite);
+BYTE dmaDataTx_do_Falcon        (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
 
 typedef struct {
     THddIfCmd           hddIfCmd;

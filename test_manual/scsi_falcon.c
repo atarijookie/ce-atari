@@ -419,58 +419,61 @@ DWORD scsi_getReg_Falcon(int whichReg)
 
 BYTE dmaDataTx_prepare_Falcon(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
 {
+    
+    return 0;
+}
+
+BYTE dmaDataTx_do_Falcon(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
+{
+    // Set up the DMA for data transfer
+    (*hdIf.pSetReg)(REG_MR, MR_DMA);                // enable DMA mode
+    
+    if(!readNotWrite) {                             // on write
+        (*hdIf.pSetReg)(REG_SDS, 0);                // start the DMA send -- WrSCSI  #0,SDS
+    }
+    
     // set DMA pointer to buffer address
     setDmaAddr_Falcon((DWORD) buffer);
-
+   
     WORD wdl1, wdl2;
-
-    if(readNotWrite) {                      // on read
+    if(readNotWrite) {                              // on read
         wdl1 = 0x190;
         wdl2 = 0x090;
-    } else {                                // for write
+    } else {                                        // for write
         wdl1 = 0x090;
         wdl2 = 0x190;
     }
     
     // set DMA count
-    *WDL = wdl1;                           // toggle DMA chip 
+    *WDL = wdl1;                                    // toggle DMA chip 
     delay();
     *WDL = wdl2;
     delay();
     
-    *WDC = (dataByteCount >> 9);           // write sector count (not byte count)
-    delay();
-  
-    while(1) {                              // wait till it's safe to access the DMA channel
+    *WDC = (dataByteCount >> 9);                    // write sector count (not byte count)
+    
+    while(1) {                                      // wait till it's safe to access the DMA channel
         BYTE sr = *WDSR;
-        if(sr & (1 << 3)) {
+        if((sr & (1 << 3)) == 0) {         // ??? NEMAM TOTO OPACNE ???
             break;
         }
         
         DWORD now = *HZ_200;
-        if(now >= _cmdTimeOut) {   // if time out, fail
+        if(now >= _cmdTimeOut) {                    // if time out, fail
             return -1;
         }
     }
-    
-    return 0;
-}
-
-BYTE dmaDataTx_do_Falcon(BYTE readNotWrite)
-{
-    // Set up the DMA for data transfer
-    (*hdIf.pSetReg)(REG_MR, MR_DMA);                // enable DMA mode
+    delay();
     
     if(readNotWrite) {                              // on read
         (*hdIf.pSetReg)(REG_DIR, 0);                // start the DMA receive
         
-        *WDL = 0;
+        *WDL = 0;                                   // turn on DMA read
     } else {                                        // on write
-        (*hdIf.pSetReg)(REG_SDS, 0);                // start the DMA send -- WrSCSI  #0,SDS
-        
         *WDL = 0x18D;
-        *WDC = 0;
-        *WDL = 0x100;
+        *WDC = 0;                   // ??? Podobne ako (*hdIf.pSetReg)(REG_SDS, 0);
+        
+        *WDL = 0x100;               // DMA_WR, DMA enable
     }
     
     BYTE res = wait_dma_cmpl(200);                             // wait for DMA completetion

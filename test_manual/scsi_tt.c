@@ -48,7 +48,7 @@ DWORD scsi_getReg_TT(int whichReg);
 void  scsi_setReg_TT(int whichReg, DWORD value);
 
 BYTE dmaDataTx_prepare_TT (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
-BYTE dmaDataTx_do_TT      (BYTE readNotWrite);
+BYTE dmaDataTx_do_TT      (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
 //-----------------
 
 void clearCache030(void);
@@ -114,7 +114,7 @@ WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength)
     res = (*hdIf.pGetReg)(REG_REI);             // clear potential interrupt
     
 #ifdef USE_DMA                    // if using DMA for data transfer
-    res = (*hdIf.pDmaDataTx_do) (readNotWrite);
+    res = (*hdIf.pDmaDataTx_do) (readNotWrite, bfr, byteCount);
 #else                           // if using PIO for data transfer
     res = pioDataTransfer(readNotWrite, bfr, byteCount);
 #endif
@@ -560,7 +560,7 @@ BYTE dmaDataTx_prepare_TT(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
     return 0;
 }
 //----------------------
-BYTE dmaDataTx_do_TT(BYTE readNotWrite)
+BYTE dmaDataTx_do_TT(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
 {
     // Set up the DMAC for data transfer
     (*hdIf.pSetReg)(REG_MR, 2);                      // enable DMA mode
