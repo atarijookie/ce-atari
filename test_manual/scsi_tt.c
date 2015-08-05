@@ -2,6 +2,7 @@
 
 #include "hdd_if.h"
 #include "scsi.h"
+#include "acsi.h"
 
 #include <mint/sysbind.h>
 #include <mint/osbind.h>
@@ -15,7 +16,7 @@
 void logMsg(char *logMsg);
 void logMsgProgress(DWORD current, DWORD total);
 
-void TTresetscsi(void);
+void scsi_reset(void);
 //-----------------
 // local function definitions
 static BYTE scsi_select_and_cmd(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataByteCount);
@@ -67,15 +68,19 @@ BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
         cmdLength--;
     }
     
-    if(scsiId == hdIf.scsiHostId) {                 // Trying to access reserved SCSI ID? Fail... (skip)
+    if(scsiId == hdIf.scsiHostId) {     // Trying to access reserved SCSI ID? Fail... (skip)
         return -1;
     }
+    
     //------------
+    *FLOCK = 0xffff;                    // set FLOCK to disable FDC operations
+    
     _cmdTimeOut = setscstmout();        // set up a short timeout
     BYTE res = scsi_select_and_cmd(readNotWrite, scsiId, cmd, cmdLength, buffer, sectorCount << 9);      // send command block
 
     if(res) {
         logMsg("scsi_cmd_tt failed on scsi_select_and_cmd() \r\n");
+        *FLOCK = 0;                     // clear FLOCK to enable FDC operations
         return -1;
     }
     
@@ -85,17 +90,19 @@ BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
         
         if(wres) {
             logMsg("scsi_cmd_tt failed on dataTransfer \r\n");
+            *FLOCK = 0;                 // clear FLOCK to enable FDC operations
             return -1;
         }
     }
     
     BYTE status;
-    status = w4stat();          // wait for status byte
+    status = w4stat();                  // wait for status byte
 
     if(status) {
         logMsg("scsi_cmd_tt failed on w4stat \r\n");
     }
     
+    *FLOCK = 0;                         // clear FLOCK to enable FDC operations
     return status;
 }
 
@@ -249,14 +256,14 @@ BYTE selscsi(BYTE scsiId)
     
     (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_DATA_OUT);           // data out phase
     (*hdIf.pSetReg)(REG_ISR, 0);                            // no interrupt from selection
-    (*hdIf.pSetReg)(REG_ICR, 0x0c);                         // assert BSY and SEL
+    (*hdIf.pSetReg)(REG_ICR, ICR_BSY | ICR_SEL);            // assert BSY and SEL
 
     BYTE selId  = (1 << scsiId);                            // convert number of device to bit 
     (*hdIf.pSetReg)(REG_ODR, selId);                        // set dest SCSI IDs
     
-    (*hdIf.pSetReg)(REG_ICR, 0x0d);                         // assert BUSY, SEL and data bus
+    (*hdIf.pSetReg)(REG_ICR, ICR_BSY | ICR_SEL | ICR_DBUS); // assert BUSY, SEL and data bus
     scsi_clrBit(REG_MR, MR_ARBIT);                          // clear arbitrate bit
-    scsi_clrBit(REG_ICR, (1 << 3));                         // clear BUSY
+    scsi_clrBit(REG_ICR, ICR_BSY);                          // clear BUSY
     
     while(1) {                          // wait for busy bit to appear
         BYTE icr = (*hdIf.pGetReg)(REG_CR);
@@ -277,14 +284,14 @@ BYTE selscsi(BYTE scsiId)
     return res;
 }    
 
-void TTresetscsi(void)
+void scsi_reset(void)
 {
-    (*hdIf.pSetReg)(REG_ICR, 0x80);                         // assert RST
+    (*hdIf.pSetReg)(REG_ICR, ICR_RST);                      // assert RST
 
-    _cmdTimeOut = setscstmout();
+    _cmdTimeOut = *HZ_200 + 100;                            // wait 0.5 s 
     
     DWORD now;
-    while(1) {                                              // wait 500 ms
+    while(1) {
         now = *HZ_200;
         
         if(now >= _cmdTimeOut) {        
@@ -292,11 +299,11 @@ void TTresetscsi(void)
         }        
     }
     
-    (*hdIf.pSetReg)(REG_ICR, 0);
+    (*hdIf.pSetReg)(REG_ICR, 0);                            // back to normal
     
-    _cmdTimeOut = setscstmout();        
+    _cmdTimeOut = *HZ_200 + 100;                            // wait 0.5 s
 
-    while(1) {                                              // wait 1000 ms
+    while(1) {
         now = *HZ_200;
         
         if(now >= _cmdTimeOut) {        

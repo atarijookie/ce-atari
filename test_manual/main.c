@@ -32,7 +32,7 @@ void showHexByte (BYTE val);
 void showHexWord (WORD val);
 void showHexDword(DWORD val);
 
-void TTresetscsi(void);
+void scsi_reset(void);
 
 void cs_inquiry(BYTE id);
 void CEread(void);
@@ -46,8 +46,8 @@ void showMenu(void);
 
 void logMsg(char *logMsg);
 
-#define RW_TEST_SIZE    50
-//#define RW_TEST_SIZE    MAXSECTORS
+//#define RW_TEST_SIZE    50
+#define RW_TEST_SIZE    MAXSECTORS
 
 //--------------------------------------------------
 int main(void)
@@ -92,6 +92,8 @@ int main(void)
         }
     }
 
+    //-----------------
+    // interface selection...    
   	Clear_home();
     showMenu();
 
@@ -115,6 +117,8 @@ int main(void)
             break;
 	} 
 
+    //-----------------
+    // main menu loop
     while(1) {
         scancode = Bconin(DEV_CONSOLE); 		                    // get char form keyboard, no echo on screen 
 
@@ -125,15 +129,19 @@ int main(void)
         }
 
         if(key == 'q') {
+            (void) Cconws("Terminating...\r\n");
+            sleep(1);
             break;
         }
 
         if(key == 'x') {
-            TTresetscsi();
+            (void) Cconws("SCSI reset...");
+            scsi_reset();
+            (void) Cconws("done\r\n");
             continue;
         }
         
-        if(key == 'i') {
+        if(key == 'i') {            // INQUIRY command
             cs_inquiry(deviceID);
             continue;
         }
@@ -159,7 +167,7 @@ int main(void)
             continue;
         }
         
-        if(key == 'c') {
+        if(key == 'c') {            // clear screen and show menu again
             Clear_home();
             showMenu();
             continue;
@@ -258,8 +266,17 @@ void cs_inquiry(BYTE id)
     (void) Cconws("SCSI Inquiry: ");
     res = (*hdIf.hddIfCmd) (1, cmd, 6, pBuffer, 1);
     
+    (void) Cconws("SCSI result : ");
     showHexByte(res);
-    (void) Cconws("\r\nINQUIRY HEXA: ");
+    (void) Cconws("\r\n");
+    
+    if(res != 0) {          // if failed, don't dump anything, it would be just garbage
+        return;
+    }
+    
+    //----------------------------
+    // hex dump of data
+    (void) Cconws("INQUIRY HEXA: ");
 
     for(i=0; i<32; i++) {
         showHexByte(pBuffer[i]);
@@ -267,6 +284,8 @@ void cs_inquiry(BYTE id)
     }
     (void) Cconws("\r\n");
     
+    //----------------------------
+    // char dump of data
     (void) Cconws("INQUIRY CHAR: ");
     for(i=0; i<32; i++) {
         if(pBuffer[i] >= 32) {
@@ -278,6 +297,7 @@ void cs_inquiry(BYTE id)
         Cconout(' ');
         Cconout(' ');
     }
+    
     (void) Cconws("\r\n");
 }
 //--------------------------------------------------
