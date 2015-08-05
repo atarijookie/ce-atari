@@ -6,9 +6,9 @@
 #include "global.h"
 
 // GPIP2 BIT ASSIGNMENTS
-#define GPIP2SCSI       (1 << 7)    // SCSI xIRQ
+#define GPIP2_NCR       (1 << 7)    // NCR /SCSI interrupt
 #define GPIP2RTC        (1 << 6)    // RTC IRQ
-#define GPIP25          (1 << 5)    // 
+#define GPIP2_DMA       (1 << 5)    // DMA interrupt
 #define GPIP2CHGL       (1 << 4)    // ChangeLine
 #define GPIP2RI         (1 << 3)    // Ring Indicator (SCC Port B)
 #define GPIP2DBE        (1 << 2)    // DMA Bus Error
@@ -31,7 +31,7 @@
 // TT BYTE regs for writing
 #define REG_ODR     0x1
 #define REG_ISR     0x9
-#define REG_DS      0xb
+#define REG_SDS     0xb
 #define REG_DTR     0xd
 #define REG_DIR     0xf
 
@@ -79,12 +79,7 @@
 
 #define MFP2            ((volatile BYTE *)  0xFFFFFA81)
 
-#define scxltmout   12001   // SCSI extra long-timeout (>1 min)
-#define slwsclto    5000    // SCSI long-timeout (>25 S) for stunit()
-#define slwscsto    42      // SCSI short-timeout (>205 mS) for stunit()
-#define scltmout    201     // SCSI long-timeout (>1000 ms)
-#define scstmout    51      // SCSI short-timeout (>500 ms)
-#define rcaltm      801     // time for drive recalibration (>4s)
+#define scltmout    201     // SCSI long-timeout  (>1000 ms)
 
 // Falcon DMA controller
 #define falconDmaAddrHi     ((volatile BYTE *)  0xFFFF8609)
@@ -93,7 +88,7 @@
 
 #define WDC                 ((volatile WORD *)  0xFFFF8604)
 #define WDL                 ((volatile WORD *)  0xFFFF8606)
-#define WDSR                ((volatile WORD *)  0xFFFF860F)       // Select Register
+#define WDSR                ((volatile BYTE *)  0xFFFF860F)       // STATUS Register
 
 // Falcon regs for READing
 #define SPCSD           0x88    // SPCSD      - R  Current SCSI Data           
@@ -153,6 +148,10 @@
 #define TCR_PHASE_DATA_IN       1
 #define TCR_PHASE_CMD           2
 #define TCR_PHASE_STATUS        3
+#define TCR_PHASE_MESSAGE_OUT   6
+#define TCR_PHASE_MESSAGE_IN    7
+
+//----------------------------------
 
 #endif
 

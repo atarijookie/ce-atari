@@ -14,7 +14,6 @@
 #include "global.h"
 #include "hdd_if.h"
 
-extern BYTE  whichHddIf;
 extern BYTE  deviceID;
 extern BYTE  cosmosExNotCosmoSolo;
 extern BYTE *pBuffer;
@@ -44,34 +43,34 @@ BYTE findDevice(void)
     
     while(1) {
         if(machine == MACHINE_ST) {                             // for ST
-            found = findCE(DEVICE_CE, HDD_IF_ACSI);               // CE on ACSI
+            found = findCE(DEVICE_CE, IF_ACSI);               // CE on ACSI
         
             if(!found) {
-                found = findCE(DEVICE_CS, HDD_IF_ACSI);           // CS on ACSI
+                found = findCE(DEVICE_CS, IF_ACSI);           // CS on ACSI
             }
         }
 
         if(machine == MACHINE_TT) {                             // for TT
-            found = findCE(DEVICE_CE, HDD_IF_ACSI);               // CE on ACSI
+            found = findCE(DEVICE_CE, IF_ACSI);               // CE on ACSI
         
             if(!found) {
-                found = findCE(DEVICE_CE, HDD_IF_SCSI_TT);        // CE on SCSI TT
+                found = findCE(DEVICE_CE, IF_SCSI_TT);        // CE on SCSI TT
             }
 
             if(!found) {
-                found = findCE(DEVICE_CS, HDD_IF_ACSI);           // CS on ACSI
+                found = findCE(DEVICE_CS, IF_ACSI);           // CS on ACSI
             }
         
             if(!found) {
-                found = findCE(DEVICE_CS, HDD_IF_SCSI_TT);        // CS on SCSI TT
+                found = findCE(DEVICE_CS, IF_SCSI_TT);        // CS on SCSI TT
             }
         }
 
         if(machine == MACHINE_FALCON) {                         // for Falcon
-            found = findCE(DEVICE_CE, HDD_IF_SCSI_FALCON);        // CE on SCSI FALCON
+            found = findCE(DEVICE_CE, IF_SCSI_FALCON);        // CE on SCSI FALCON
 
             if(!found) {
-                found = findCE(DEVICE_CS, HDD_IF_SCSI_FALCON);    // CS on SCSI FALCON
+                found = findCE(DEVICE_CS, IF_SCSI_FALCON);    // CS on SCSI FALCON
             }
         }
         
@@ -105,12 +104,14 @@ BYTE findCE(BYTE device, BYTE hddIf)
     
     (void) Cconws(" on ");
     
-    if(hddIf == HDD_IF_ACSI) {                          // ACSI?
+    if(hddIf == IF_ACSI) {                              // ACSI?
         (void) Cconws("ACSI: ");
     } else {                                            // SCSI?
         (void) Cconws("SCSI: ");
     }
 
+    hdd_if_select(hddIf);                               // select HDD IF
+    
     for(id=0; id<8; id++) {                             // try to talk to all ACSI devices
         Cconout('0' + id);                              // write out BUS ID
     
@@ -124,7 +125,6 @@ BYTE findCE(BYTE device, BYTE hddIf)
             (void) Cconws(" <-- found!\n\r");
             
             deviceID                = id;               // store the BUS ID of device
-            whichHddIf              = hddIf;            // store HDD IF TYPE
             cosmosExNotCosmoSolo    = device;           // store device type
 
             return TRUE;
@@ -142,8 +142,7 @@ BYTE ce_identify(BYTE id, BYTE hddIf)
     cmd[0] = (id << 5); 					    // cmd[0] = ACSI_id + TEST UNIT READY (0)
     memset(pBuffer, 0, 512);              	    // clear the buffer 
   
-    whichHddIf = hddIf;                         // set which hdd IF it should use
-    res = hdd_if_cmd(1, cmd, 6, pBuffer, 1);	// issue the identify command and check the result 
+    res = (*hdIf.cmd)(1, cmd, 6, pBuffer, 1);	// issue the identify command and check the result 
     
     if(res != OK) {                        	    // if failed, return FALSE 
         return FALSE;
@@ -165,8 +164,7 @@ BYTE cs_inquiry(BYTE id, BYTE hddIf)
     cmd[0] = (id << 5) | (SCSI_CMD_INQUIRY & 0x1f);
     cmd[4] = 32;                                // count of bytes we want from inquiry command to be returned
     
-    whichHddIf = hddIf;                         // set which hdd IF it should use
-    res = hdd_if_cmd(1, cmd, 6, pBuffer, 1);	// issue the inquiry command and check the result 
+    res = (*hdIf.cmd)(1, cmd, 6, pBuffer, 1);	// issue the inquiry command and check the result 
     
     if(res != OK) {                        	    // if failed, return FALSE 
         return FALSE;

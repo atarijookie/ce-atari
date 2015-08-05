@@ -158,7 +158,7 @@ void sendKeyDown(BYTE key, BYTE keyDownCommand)
   
 	memset(pBuffer, 0, 512);               			// clear the buffer 
   
-	res = hdd_if_cmd(1, cmd, 6, pBuffer, 3);        // issue the KEYDOWN command and show the screen stream 
+	res = (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);        // issue the KEYDOWN command and show the screen stream 
     
 	if(res != OK) {									// if failed, return FALSE 
 		showConnectionErrorMessage();
@@ -195,7 +195,7 @@ void showMoreStreamIfNeeded(void)
     
         memset(pBuffer, 0, 3 * 512);               	    // clear the buffer 
   
-        res = hdd_if_cmd(1, cmd, 6, pBuffer, 3);        // issue the KEYDOWN command and show the screen stream 
+        res = (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);        // issue the KEYDOWN command and show the screen stream 
     
         if(res != OK) {									// if failed, return FALSE 
             return;
@@ -213,7 +213,7 @@ void showHomeScreen(void)
 	cmd[0] = (deviceID << 5); 						// cmd[0] = ACSI_id + TEST UNIT READY (0)	
 	memset(pBuffer, 0, 512);               			// clear the buffer 
   
-	res = hdd_if_cmd(1, cmd, 6, pBuffer, 3);        // issue the GO_HOME command and show the screen stream 
+	res = (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);        // issue the GO_HOME command and show the screen stream 
     
 	if(res != OK) {									// if failed, return FALSE 
 		showConnectionErrorMessage();
@@ -239,7 +239,7 @@ void refreshScreen(void)
 	cmd[0] = (deviceID << 5); 						// cmd[0] = ACSI_id + TEST UNIT READY (0)	
 	memset(pBuffer, 0, 512);               			// clear the buffer 
   
-	res = hdd_if_cmd(1, cmd, 6, pBuffer, 3);        // issue the REFRESH command and show the screen stream 
+	res = (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);        // issue the REFRESH command and show the screen stream 
     
 	if(res != OK) {									// if failed, return FALSE 
 		showConnectionErrorMessage();
@@ -258,7 +258,7 @@ void setResolution(void)
 	cmd[5] = Getrez();
 	memset(pBuffer, 0, 512);               			// clear the buffer 
   
-	hdd_if_cmd(1, cmd, 6, pBuffer, 1);              // issue the SET RESOLUTION command 
+	(*hdIf.cmd)(1, cmd, 6, pBuffer, 1);              // issue the SET RESOLUTION command 
 }
 //--------------------------------------------------
 void showConnectionErrorMessage(void)
@@ -361,7 +361,7 @@ void cosmoSoloConfig(void)
         
         cmd[0] = (deviceID << 5); 						    // cmd[0] = ACSI_id + TEST UNIT READY (0)	
   
-        BYTE res = hdd_if_cmd(ACSI_READ, cmd, 6, pBuffer, 1);
+        BYTE res = (*hdIf.cmd)(ACSI_READ, cmd, 6, pBuffer, 1);
         
         if(res == OK) {
             (void) Cconws("\n\rNew ID was successfully set.\n\r");
@@ -373,6 +373,22 @@ void cosmoSoloConfig(void)
     }
     
     sleep(3);
+}
+//--------------------------------------------------
+void logMsg(char *logMsg)
+{
+//    if(showLogs) {
+//        (void) Cconws(logMsg);
+//    }
+}
+//--------------------------------------------------
+void logMsgProgress(DWORD current, DWORD total)
+{
+//    (void) Cconws("Progress: ");
+//    showHexDword(current);
+//    (void) Cconws(" out of ");
+//    showHexDword(total);
+//    (void) Cconws("\n\r");
 }
 //--------------------------------------------------
 
