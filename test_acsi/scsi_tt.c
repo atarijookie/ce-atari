@@ -2,6 +2,7 @@
 
 #include "hdd_if.h"
 #include "scsi.h"
+#include "acsi.h"
 
 #include <mint/sysbind.h>
 #include <mint/osbind.h>
@@ -15,10 +16,10 @@
 void logMsg(char *logMsg);
 void logMsgProgress(DWORD current, DWORD total);
 
-void TTresetscsi(void);
+void scsi_reset(void);
 //-----------------
 // local function definitions
-static BYTE sblkscsi(BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataCount);
+static BYTE scsi_select_and_cmd(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataByteCount);
 static BYTE selscsi(BYTE scsiId);
 static WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength);
 static int  w4stat(void);
@@ -29,18 +30,17 @@ static BYTE doack(void);
 int PIO_read(void);
 int PIO_write(BYTE data);
 
-#define SCDMA 
+#define USE_DMA
        
-#ifdef SCDMA
-static BYTE dmaDataTransfer(BYTE readNotWrite, BYTE cmdLength);
-static BYTE w4int(void);
+#ifdef USE_DMA
+BYTE   w4int(void);
 void   setDmaAddr_TT(DWORD addr);
 DWORD  getDmaAddr_TT(void);
 void   setDmaCnt_TT(DWORD dataCount); 
 #else 
-static WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount);
-static WORD pioDataTransfer_read(BYTE *bfr, DWORD byteCount);
-static WORD pioDataTransfer_write(BYTE *bfr, DWORD byteCount);
+WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount);
+WORD pioDataTransfer_read(BYTE *bfr, DWORD byteCount);
+WORD pioDataTransfer_write(BYTE *bfr, DWORD byteCount);
 #endif
 
 extern BYTE machine;
@@ -48,11 +48,13 @@ extern BYTE machine;
 DWORD scsi_getReg_TT(int whichReg);
 void  scsi_setReg_TT(int whichReg, DWORD value);
 
+BYTE dmaDataTx_prepare_TT (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
+BYTE dmaDataTx_do_TT      (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
 //-----------------
 
 void clearCache030(void);
 
-static DWORD ttCmdTimeOut;              // timeout time for scsi_cmd_TT() from start to end
+DWORD _cmdTimeOut;                      // timeout time for scsi_cmd() from start to end
 BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
     //------------
@@ -65,32 +67,42 @@ BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
         cmd++;
         cmdLength--;
     }
+    
+    if(scsiId == hdIf.scsiHostId) {     // Trying to access reserved SCSI ID? Fail... (skip)
+        return -1;
+    }
+    
     //------------
-    ttCmdTimeOut = setscstmout();       // set up a short timeout
-    BYTE res = sblkscsi(scsiId, cmd, cmdLength, buffer, sectorCount * 512);      // send command block
+    *FLOCK = 0xffff;                    // set FLOCK to disable FDC operations
+    
+    _cmdTimeOut = setscstmout();        // set up a short timeout
+    BYTE res = scsi_select_and_cmd(readNotWrite, scsiId, cmd, cmdLength, buffer, sectorCount << 9);      // send command block
 
     if(res) {
-        logMsg("scsi_cmd_tt failed on sblkscsi \r\n");
+        logMsg("scsi_cmd_tt failed on scsi_select_and_cmd() \r\n");
+        *FLOCK = 0;                     // clear FLOCK to enable FDC operations
         return -1;
     }
     
     if(sectorCount != 0) {
-        DWORD byteCount = sectorCount * 512;
+        DWORD byteCount = sectorCount << 9;
         WORD wres = dataTransfer(readNotWrite, buffer, byteCount, cmdLength);
         
         if(wres) {
             logMsg("scsi_cmd_tt failed on dataTransfer \r\n");
+            *FLOCK = 0;                 // clear FLOCK to enable FDC operations
             return -1;
         }
     }
     
     BYTE status;
-    status = w4stat();          // wait for status byte
+    status = w4stat();                  // wait for status byte
 
     if(status) {
         logMsg("scsi_cmd_tt failed on w4stat \r\n");
     }
     
+    *FLOCK = 0;                         // clear FLOCK to enable FDC operations
     return status;
 }
 
@@ -99,17 +111,17 @@ WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength)
     WORD res;
 
     if(readNotWrite) {                                  // read
-        (*pSetReg)(REG_ICR, 0);                         // deassert the data bus
-        (*pSetReg)(REG_TCR, TCR_PHASE_DATA_IN);         // set DATA IN  phase
+        (*hdIf.pSetReg)(REG_ICR, 0);                         // deassert the data bus
+        (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_DATA_IN);         // set DATA IN  phase
     } else {                                            // write
-        (*pSetReg)(REG_ICR, ICR_DBUS);                  // assert data bus
-        (*pSetReg)(REG_TCR, TCR_PHASE_DATA_OUT);        // set DATA OUT phase
+        (*hdIf.pSetReg)(REG_ICR, ICR_DBUS);                  // assert data bus
+        (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_DATA_OUT);        // set DATA OUT phase
     }
     
-    res = (*pGetReg)(REG_REI);             // clear potential interrupt
+    res = (*hdIf.pGetReg)(REG_REI);             // clear potential interrupt
     
-#ifdef SCDMA                    // if using DMA for data transfer
-    res = dmaDataTransfer(readNotWrite, cmdLength);
+#ifdef USE_DMA                    // if using DMA for data transfer
+    res = (*hdIf.pDmaDataTx_do) (readNotWrite, bfr, byteCount);
 #else                           // if using PIO for data transfer
     res = pioDataTransfer(readNotWrite, bfr, byteCount);
 #endif
@@ -117,70 +129,7 @@ WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength)
     return res;
 }    
 
-#ifdef SCDMA     
-BYTE dmaDataTransfer(BYTE readNotWrite, BYTE cmdLength)
-{
-    // Set up the DMAC for data transfer
-    (*pSetReg)(REG_MR, 2);                      // enable DMA mode
-    
-    if(readNotWrite) {                          // on read
-        (*pSetReg)(REG_DIR, 0);                 // start the DMA receive
-        (*pSetReg)(REG_DMACTL, DMAIN);          // set the DMAC direction to IN
-        (*pSetReg)(REG_DMACTL, DMAIN+DMAENA);   // turn on DMAC
-    } else {                                    // on write
-        (*pSetReg)(REG_SDS, 0);                 // start the DMA send -- WrSCSI  #0,SDS
-        (*pSetReg)(REG_DMACTL, DMAOUT);         // set the DMAC direction to OUT
-        (*pSetReg)(REG_DMACTL, DMAOUT+DMAENA);  // turn on DMAC
-    }
-    
-    BYTE res;
-    res = w4int();                                  // wait for int
-    if(res) {
-        logMsg(" dmaDataTansfer() failed - w4int() timeout\r\n");
-        return -1;
-    }
-    
-    if(!readNotWrite) {                 // for WRITE the code end here, nothing more to do, just return good result
-        return 0;
-    }
-
-    //--------------------------
-    // the rest is only for the case of DMA read 
-
-	clearCache030();
-
-    BYTE rest = *bSDMAPTR_lo;   // see if this was an odd transfer
-    rest = rest & 0x03;         // get only 2 lowest bits
-    
-    if(rest == 0) {             // transfer size was multiple of 4? Great, finish.
-        return 0;
-    }
-    
-    //----------------
-    // the following code is only for case if the DMA read size (count) was not multiple of 4
-    DWORD dmaPtr;
-    BYTE *pData;
-    dmaPtr  = getDmaAddr_TT();
-    dmaPtr  = dmaPtr & 0xfffffffc;  // where does data go to?
-    pData   = (BYTE *) dmaPtr;      // int to pointer
-
-    DWORD residue = (*pGetReg)(REG_DMARES);    // get the remaining bytes
-
-    int i;
-    for(i=0; i<rest; i++) {
-        BYTE val;
-        val     = residue >> 24;        // get highest byte
-        residue = residue << 8;         // shift next byte to highest byte
-        
-        *pData = val;                   // store byte and move to next position
-        pData++;
-    }
-    
-    return 0;                   
-}
-#endif
-
-#ifndef SCDMA
+#ifndef USE_DMA
 
 WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount)
 {
@@ -249,28 +198,29 @@ WORD pioDataTransfer_write(BYTE *bfr, DWORD byteCount)
 
 #endif    
     
-// sblkscsi() - set DMA pointer and count and send command block
-BYTE sblkscsi(BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataCount)
+// scsi_select_and_cmd() - set DMA pointer and count and send command block
+BYTE scsi_select_and_cmd(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataByteCount)
 {
     BYTE res;
     
     res = selscsi(scsiId);  // select required device
     
     if(res) {               // if failed, quit with failure
-        logMsg("sblkscsi failed on selscsi\r\n");
+        logMsg("scsi_select_and_cmd() failed on selscsi\r\n");
         return -1;
     }
 
-#ifdef SCDMA    
-    // set DMA pointer to buffer address
-    setDmaAddr_TT((DWORD) dataAddr);
-
-    // set DMA count
-    setDmaCnt_TT(dataCount);
+#ifdef USE_DMA    
+    res = (*hdIf.pDmaDataTx_prepare)(readNotWrite, dataAddr, dataByteCount);
+    
+    if(res) {
+        logMsg("scsi_select_and_cmd() failed on DmaDataTx_prepare()\r\n");
+        return -1;
+    }
 #endif
     
-    (*pSetReg)(REG_TCR, TCR_PHASE_CMD);                // set COMMAND PHASE (assert C/D)
-    (*pSetReg)(REG_ICR, ICR_DBUS);                     // assert data bus
+    (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_CMD);                // set COMMAND PHASE (assert C/D)
+    (*hdIf.pSetReg)(REG_ICR, ICR_DBUS);                     // assert data bus
 
     int i;
     
@@ -278,7 +228,7 @@ BYTE sblkscsi(BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD data
         res = PIO_write(cmd[i]);
         
         if(res) {                                       // if time out happened, fail
-            logMsg("sblkscsi failed on PIO_write()\r\n");
+            logMsg("scsi_select_and_cmd() failed on PIO_write()\r\n");
             logMsgProgress(i, cmdLength);
             return -1;
         }
@@ -292,31 +242,31 @@ BYTE selscsi(BYTE scsiId)
 {
     BYTE res;
 
-    while(1) {                                          // STILL busy from last time?
-        BYTE icr = (*pGetReg)(REG_CR);
-        if((icr & ICR_BUSY) == 0) {                     // if not, it's available
+    while(1) {                                              // STILL busy from last time?
+        BYTE icr = (*hdIf.pGetReg)(REG_CR);
+        if((icr & ICR_BUSY) == 0) {                         // if not, it's available
             break;
         }
         
         DWORD now = *HZ_200;
-        if(now >= ttCmdTimeOut) {                        // if time out, fail
+        if(now >= _cmdTimeOut) {                            // if time out, fail
             return -1;
         }        
     }
     
-    (*pSetReg)(REG_TCR, TCR_PHASE_DATA_OUT);           // data out phase
-    (*pSetReg)(REG_ISR, 0);                            // no interrupt from selection
-    (*pSetReg)(REG_ICR, 0x0c);                         // assert BSY and SEL
+    (*hdIf.pSetReg)(REG_TCR, TCR_PHASE_DATA_OUT);           // data out phase
+    (*hdIf.pSetReg)(REG_ISR, 0);                            // no interrupt from selection
+    (*hdIf.pSetReg)(REG_ICR, ICR_BSY | ICR_SEL);            // assert BSY and SEL
 
-    BYTE selId  = (1 << scsiId);                           // convert number of device to bit 
-    (*pSetReg)(REG_ODR, selId);                        // set dest SCSI IDs
+    BYTE selId  = (1 << scsiId);                            // convert number of device to bit 
+    (*hdIf.pSetReg)(REG_ODR, selId);                        // set dest SCSI IDs
     
-    (*pSetReg)(REG_ICR, 0x0d);                         // assert BUSY, SEL and data bus
-    scsi_clrBit(REG_MR, MR_ARBIT);                      // clear arbitrate bit
-    scsi_clrBit(REG_ICR, (1 << 3));                     // clear BUSY
+    (*hdIf.pSetReg)(REG_ICR, ICR_BSY | ICR_SEL | ICR_DBUS); // assert BUSY, SEL and data bus
+    scsi_clrBit(REG_MR, MR_ARBIT);                          // clear arbitrate bit
+    scsi_clrBit(REG_ICR, ICR_BSY);                          // clear BUSY
     
     while(1) {                          // wait for busy bit to appear
-        BYTE icr = (*pGetReg)(REG_CR);
+        BYTE icr = (*hdIf.pGetReg)(REG_CR);
         
         if(icr & ICR_BUSY) {            // if bit set, good
             res = 0;
@@ -324,39 +274,39 @@ BYTE selscsi(BYTE scsiId)
         }
         
         DWORD now = *HZ_200;
-        if(now >= ttCmdTimeOut) {                       // if time out, fail
+        if(now >= _cmdTimeOut) {                            // if time out, fail
             res = -1;
             break;
         }        
     }
     
-    (*pSetReg)(REG_ICR, 0);                        // clear SEL and data bus assertion
+    (*hdIf.pSetReg)(REG_ICR, 0);                            // clear SEL and data bus assertion
     return res;
 }    
 
-void TTresetscsi(void)
+void scsi_reset(void)
 {
-    (*pSetReg)(REG_ICR, 0x80);                     // assert RST
+    (*hdIf.pSetReg)(REG_ICR, ICR_RST);                      // assert RST
 
-    ttCmdTimeOut = setscstmout();
+    _cmdTimeOut = *HZ_200 + 100;                            // wait 0.5 s 
     
     DWORD now;
-    while(1) {                          // wait 500 ms
+    while(1) {
         now = *HZ_200;
         
-        if(now >= ttCmdTimeOut) {        
+        if(now >= _cmdTimeOut) {        
             break;
         }        
     }
     
-    (*pSetReg)(REG_ICR, 0);
+    (*hdIf.pSetReg)(REG_ICR, 0);                            // back to normal
     
-    ttCmdTimeOut = setscstmout();        
+    _cmdTimeOut = *HZ_200 + 100;                            // wait 0.5 s
 
-    while(1) {                          // wait 1000 ms
+    while(1) {
         now = *HZ_200;
         
-        if(now >= ttCmdTimeOut) {        
+        if(now >= _cmdTimeOut) {        
             break;
         }        
     }
@@ -372,27 +322,27 @@ BYTE w4int(void)
     
     while(1) {
         res = *MFP2;
-        if(res & GPIP2SCSI) {           // NCR 5380 interrupt? 
+        if(res & GPIP2_NCR) {           // NCR 5380 interrupt? 
             break;
         }
         
-        if((res & GPIP25) == 0) {       // DMAC interrupt? 
-            WORD wres = (*pGetReg)(REG_DMACTL);    // get the DMAC status
+        if((res & GPIP2_DMA) == 0) {    // DMA interrupt? 
+            WORD wres = (*hdIf.pGetReg)(REG_DMACTL);    // get the DMAC status
             if(wres & 0x80) {           // check for bus err/ignore cntout ints
                 return -1;
             }            
         }
     
         DWORD now = *HZ_200;
-        if(now >= ttCmdTimeOut) {           // time out? fail
+        if(now >= _cmdTimeOut) {            // time out? fail
             return -1;
         }
     }
     
-    (*pGetReg)(REG_REI);               // clear potential interrupt
-    (*pSetReg)(REG_DMACTL, DMADIS);    // disable DMA
-    (*pSetReg)(REG_MR,  0);            // disable DMA mode
-    (*pSetReg)(REG_ICR, 0);            // make sure data bus is not asserted
+    (*hdIf.pGetReg)(REG_REI);               // clear potential interrupt
+    (*hdIf.pSetReg)(REG_DMACTL, DMADIS);    // disable DMA
+    (*hdIf.pSetReg)(REG_MR,  0);            // disable DMA mode
+    (*hdIf.pSetReg)(REG_ICR, 0);            // make sure data bus is not asserted
 
     return 0;
 }
@@ -402,8 +352,8 @@ int w4stat(void)
 {
     int  iRes;
     
-	(*pSetReg)(REG_TCR, TCR_PHASE_STATUS);     // STATUS IN phase
-	(*pGetReg)(REG_REI);                 // clear potential interrupt
+	(*hdIf.pSetReg)(REG_TCR, TCR_PHASE_STATUS);     // STATUS IN phase
+	(*hdIf.pGetReg)(REG_REI);                 // clear potential interrupt
 
     //-----------------
     // receive status byte
@@ -416,8 +366,8 @@ int w4stat(void)
 
     //-----------------
     // receive message byte
-	(*pSetReg)(REG_TCR, TCR_PHASE_MESSAGE_IN);     // MESSAGE IN phase
-	(*pGetReg)(REG_REI);                 // clear potential interrupt
+	(*hdIf.pSetReg)(REG_TCR, TCR_PHASE_MESSAGE_IN);     // MESSAGE IN phase
+	(*hdIf.pGetReg)(REG_REI);                 // clear potential interrupt
 
     iRes = PIO_read();
     if(iRes < 0) {
@@ -431,21 +381,21 @@ int w4stat(void)
 int PIO_read(void)
 {
     BYTE res;
-    (*pSetReg)(REG_ICR, 0);         // deassert data bus (disable data output)
+    (*hdIf.pSetReg)(REG_ICR, 0);         // deassert data bus (disable data output)
 
     res = w4req();                      // wait for status byte
     if(res) {                           // if timed-out, fail
         logMsg("PIO_read() - fail on w4req() \r\n");
         return -1;
     }
-    
-    res = (*pGetReg)(REG_DSR);
+
+    res = (*hdIf.pGetReg)(REG_DSR);
     if((res & (1 << 3)) == 0) {         // PHASE MATCH bit from BUS AND STATUS REGISTER is low? SCSI phase changed
         logMsg("PIO_read() - phase change \r\n");
         return -2;
     }
-   
-    BYTE data = (*pGetReg)(REG_DB); // get the status byte
+
+    BYTE data = (*hdIf.pGetReg)(REG_DB); // get the status byte
 
     res = doack();                      // signal that status byte is here
     if(res) {                           // if timed-out, fail
@@ -466,14 +416,14 @@ int PIO_write(BYTE data)
         return -1;
     }
 
-    res = (*pGetReg)(REG_DSR);
+    res = (*hdIf.pGetReg)(REG_DSR);
     if((res & (1 << 3)) == 0) {         // PHASE MATCH bit from BUS AND STATUS REGISTER is low? SCSI phase changed
         logMsg("PIO_write() - phase change \r\n");
         return -2;
     }
     
-    (*pSetReg)(REG_ICR, ICR_DBUS);  // assert data bus (enable data output)
-    (*pSetReg)(REG_DB, data);
+    (*hdIf.pSetReg)(REG_ICR, ICR_DBUS);  // assert data bus (enable data output)
+    (*hdIf.pSetReg)(REG_DB, data);
 
     res = doack();                      // signal that status byte is here
     if(res) {                           // if timed-out, fail
@@ -488,13 +438,13 @@ int PIO_write(BYTE data)
 BYTE w4req(void) 
 {
     while(1) {                      // wait for REQ
-        BYTE icr = (*pGetReg)(REG_CR);
+        BYTE icr = (*hdIf.pGetReg)(REG_CR);
         if(icr & ICR_REQ) {         // if REQ appeared, good
             return 0;
         }
         
         DWORD now = *HZ_200;
-        if(now >= ttCmdTimeOut) {   // if time out, fail
+        if(now >= _cmdTimeOut) {    // if time out, fail
             break;
         }
     }
@@ -510,20 +460,20 @@ BYTE doack(void)
     BYTE res;
     
     while(1) {
-        BYTE icr = (*pGetReg)(REG_ICR);
+        BYTE icr = (*hdIf.pGetReg)(REG_ICR);
         if((icr & ICR_REQ) == 0) {      // if REQ gone, good
             res = 0;
             break;
         }
         
         DWORD now = *HZ_200;
-        if(now >= ttCmdTimeOut) {       // if time out, fail
+        if(now >= _cmdTimeOut) {        // if time out, fail
             res = -1;
             break;
         }
     }
 
-    scsi_clrBit(REG_ICR, ICR_ACK);   // clear ACK
+    scsi_clrBit(REG_ICR, ICR_ACK);      // clear ACK
     return res;
 }
 
@@ -591,9 +541,9 @@ DWORD scsi_getReg_TT(int whichReg)
 void scsi_setBit(int whichReg, DWORD bitMask)
 {
     DWORD val;
-    val = (*pGetReg)(whichReg);         // read
+    val = (*hdIf.pGetReg)(whichReg);         // read
     val = val | bitMask;                    // modify (set bits)
-    (*pSetReg)(whichReg, val);              // write
+    (*hdIf.pSetReg)(whichReg, val);              // write
 }
 
 void scsi_clrBit(int whichReg, DWORD bitMask)
@@ -601,10 +551,80 @@ void scsi_clrBit(int whichReg, DWORD bitMask)
     DWORD val;
     DWORD invMask = ~bitMask;
     
-    val = (*pGetReg)(whichReg);         // read
+    val = (*hdIf.pGetReg)(whichReg);         // read
     val = val & invMask;                    // modify (clear bits)
-    (*pSetReg)(whichReg, val);              // write
+    (*hdIf.pSetReg)(whichReg, val);              // write
 }
 //----------------------
+BYTE dmaDataTx_prepare_TT(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
+{
+    // set DMA pointer to buffer address
+    setDmaAddr_TT((DWORD) buffer);
 
+    // set DMA count
+    setDmaCnt_TT(dataByteCount);
+    
+    return 0;
+}
+//----------------------
+BYTE dmaDataTx_do_TT(BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
+{
+    // Set up the DMAC for data transfer
+    (*hdIf.pSetReg)(REG_MR, 2);                      // enable DMA mode
+    
+    if(readNotWrite) {                          // on read
+        (*hdIf.pSetReg)(REG_DIR, 0);                 // start the DMA receive
+        (*hdIf.pSetReg)(REG_DMACTL, DMAIN);          // set the DMAC direction to IN
+        (*hdIf.pSetReg)(REG_DMACTL, DMAIN+DMAENA);   // turn on DMAC
+    } else {                                    // on write
+        (*hdIf.pSetReg)(REG_SDS, 0);                 // start the DMA send -- WrSCSI  #0,SDS
+        (*hdIf.pSetReg)(REG_DMACTL, DMAOUT);         // set the DMAC direction to OUT
+        (*hdIf.pSetReg)(REG_DMACTL, DMAOUT+DMAENA);  // turn on DMAC
+    }
+    
+    BYTE res;
+    res = w4int();                                  // wait for int
+    if(res) {
+        logMsg(" dmaDataTansfer() failed - w4int() timeout\r\n");
+        return -1;
+    }
+    
+    if(!readNotWrite) {                 // for WRITE the code end here, nothing more to do, just return good result
+        return 0;
+    }
 
+    //--------------------------
+    // the rest is only for the case of DMA read 
+
+	clearCache030();
+
+    BYTE rest = *bSDMAPTR_lo;   // see if this was an odd transfer
+    rest = rest & 0x03;         // get only 2 lowest bits
+    
+    if(rest == 0) {             // transfer size was multiple of 4? Great, finish.
+        return 0;
+    }
+    
+    //----------------
+    // the following code is only for case if the DMA read size (count) was not multiple of 4
+    DWORD dmaPtr;
+    BYTE *pData;
+    dmaPtr  = getDmaAddr_TT();
+    dmaPtr  = dmaPtr & 0xfffffffc;  // where does data go to?
+    pData   = (BYTE *) dmaPtr;      // int to pointer
+
+    DWORD residue = (*hdIf.pGetReg)(REG_DMARES);    // get the remaining bytes
+
+    int i;
+    for(i=0; i<rest; i++) {
+        BYTE val;
+        val     = residue >> 24;        // get highest byte
+        residue = residue << 8;         // shift next byte to highest byte
+        
+        *pData = val;                   // store byte and move to next position
+        pData++;
+    }
+    
+    return 0;                   
+}
+//----------------------
