@@ -54,6 +54,8 @@ BYTE prevCommandFailed;
 
 BYTE ifUsed;
 
+// Warning! Don't use VT52_Save_pos() and VT52_Load_pos(), because they don't work on Falcon! (They work fine on ST and TT.)
+
 //--------------------------------------------------
 int main(void)
 {
@@ -123,7 +125,7 @@ int main(void)
         ifUsed      = IF_ACSI;
     }
 
-	print_status(0,0,0,0,0);
+    print_status(0,0,0,0,0);
 	VT52_Clear_down();
 
 	// ---------------------- 
@@ -151,8 +153,12 @@ int main(void)
   	while( *ikbd==0x39 ){
   	}
 
-  	VT52_Goto_pos(0,24);
-	(void) Cconws("R:");
+    int x = 0;                          // this variable will store current X position of carret, so we can return to the right position after some VT52_Goto_pos()
+  	VT52_Goto_pos(0, 24);
+
+    (void) Cconws("R:");
+    x += 2;
+    
   	while(*ikbd!=0x39)
   	{
         int res=0;
@@ -166,6 +172,7 @@ int main(void)
 		{
 			case -1:
 				(void) Cconws("_");
+                x++;
 				if( linecnt&1 ){
 					errcnt_timeout_w++;
 				}else{
@@ -174,6 +181,7 @@ int main(void)
 				break;
 			case -2:
 				(void) Cconws("C");
+                x++;
 				if( linecnt&1 ){
 					errcnt_crc_w++;
 				}else{
@@ -182,31 +190,35 @@ int main(void)
 				break;
 			case 0:
 				(void) Cconws("*");
+                x++;
 				break;
 			default:
 				(void) Cconws(".");
+                x++;
 				break;
 	    }
 		charcnt++;
-		VT52_Save_pos();
 		print_status(runcnt,errcnt_crc_r,errcnt_crc_w,errcnt_timeout_r,errcnt_timeout_w);
 		print_head();
-		VT52_Load_pos();
+        VT52_Goto_pos(x, 24);
 		
 		if( charcnt>=40-2 ){
-			VT52_Save_pos();
 			VT52_Goto_pos(0,3);
 			VT52_Del_line();
-			VT52_Load_pos();
-			VT52_Goto_pos(0,24);
+            
+			VT52_Goto_pos(0, 24);
+            x = 0;
+            
 			charcnt=0;
 			linecnt++;
 			if( linecnt&1 ){
 			    (void) Cconws("W:");
+                x += 2;
 			    xorVal++;  // change eorval after R/W run 
 			}else{
 				runcnt++;
 				(void) Cconws("R:");
+                x += 2;
 			}
 		}
 	}
@@ -363,6 +375,7 @@ int readHansTest(DWORD byteCount, WORD xorVal ){
 	commandLong[8+1] = (xorVal >> 8) & 0xFF;
 	commandLong[9+1] = (xorVal     ) & 0xFF;
 
+    memset(pBuffer, 0, 8);      // clear first few bytes so we can detect if the data was really read, or it was only retained from last write in the buffer    
 	res = (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, (byteCount+511)>>9 );		// issue the command and check the result
     
     if(res != OK) {                                                             // ACSI ERROR?
