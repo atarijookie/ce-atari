@@ -93,7 +93,7 @@ int main( int argc, char* argv[] )
 	int i;
 
 	/* write some header out */
-	(void) Clear_home();
+	Clear_home();
 	(void) Cconws("\33p[ CosmosEx disk driver  ]\r\n[ by Jookie 2013 - 2015 ]\r\n[        ver ");
     showAppVersion();
     (void) Cconws(" ]\33q\r\n\r\n");
@@ -251,7 +251,7 @@ void ce_initialize(void)
     WORD drives         = Drvmap();
     SET_WORD(pDmaBuffer + 4, drives);                                           // store existing drives
   
-	hdd_if_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);        /* issue the command and check the result */
+	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);        /* issue the command and check the result */
 }
 
 void getConfig(void)
@@ -263,7 +263,7 @@ void getConfig(void)
 	commandShort[0] = (deviceID << 5); 					                        // cmd[0] = ACSI_id + TEST UNIT READY (0)
 	commandShort[4] = GD_CUSTOM_getConfig;
   
-	res = hdd_if_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// issue the command and check the result
+	res = (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// issue the command and check the result
     
     if(res != OK) {                                                             // failed to get config?
         return;
@@ -533,4 +533,24 @@ int setBootDriveManual(int seconds)
     
     (void) Cconws("\33q\r\n" );                             // when nothing (valid) was pressed, turn on inversion and go to new line
     return 0;
+}
+
+void logMsg(char *logMsg)
+{
+//    if(showLogs) {
+//        (void) Cconws(logMsg);
+//    }
+}
+
+void logMsgProgress(DWORD current, DWORD total)
+{
+//    if(!showLogs) {
+//        return;
+//    }
+
+//    (void) Cconws("Progress: ");
+//    showHexDword(current);
+//    (void) Cconws(" out of ");
+//    showHexDword(total);
+//    (void) Cconws("\n\r");
 }

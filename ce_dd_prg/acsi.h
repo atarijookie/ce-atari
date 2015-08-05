@@ -2,11 +2,7 @@
 #define _ACSI_H_
 
 /* ------------------------------------------ */
-
-#ifndef FALSE
-    #define FALSE		0
-    #define TRUE		1
-#endif
+#include "global.h"
 
 #define OK			0           /* OK status */
 #define ACSIERROR	0xff        /* ERROR status (timeout) */
@@ -18,14 +14,6 @@
 #define STIMEOUT	20L         /* short-timeout 100 msec */
 
 /* ------------------------------------------ */
-
-#include <stdint.h>
-
-#ifndef BYTE
-    #define BYTE  	unsigned char
-    #define WORD  	uint16_t
-    #define DWORD 	uint32_t
-#endif
 
 /* mfp chip register */ 
 #define mfpGpip			((volatile BYTE *) 0xFFFA01)

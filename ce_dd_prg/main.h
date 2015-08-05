@@ -20,7 +20,6 @@
 __asm__ (".balign 4\n\t"
 		 ".comm _FastRAMBuffer,4096");
 
-#define Clear_home()    Cconws("\33E")
 #define _longframe      ((volatile WORD *) 0x59e)
 
 

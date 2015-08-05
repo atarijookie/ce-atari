@@ -39,7 +39,7 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 	*dmaAddrMode = NO_DMA | HDC | A0;           // A1 high again 
 
 	if (qdone() != OK) {					    // wait for ack 
-		hdone();                          	    // restore DMA device to normal 
+		hdone();                                // restore DMA device to normal 
 
 		return ACSIERROR;
 	}
@@ -100,11 +100,11 @@ BYTE hdone(void)
 {
 	WORD val;
 
-	*dmaAddrMode = NO_DMA;        	// restore DMA mode register 
-	*FLOCK = 0;                 		// FDC operations may get going again 
+	*dmaAddrMode = NO_DMA;              // restore DMA mode register 
+	*FLOCK = 0;                         // FDC operations may get going again 
 	
 	val = *dmaAddrStatus;
-	return val;						// read and return DMA status register 
+	return val;                         // read and return DMA status register 
 }
 //**************************************************************************
 void setdma(DWORD addr)
@@ -130,12 +130,12 @@ BYTE wait_dma_cmpl(DWORD t_ticks)
 	BYTE gpip;
  
 	now = *HZ_200;
-	until = t_ticks + now;   			// calc value timer must get to 
+	until = t_ticks + now;              // calc value timer must get to 
 
 	while(1) {
 		gpip = *mfpGpip;
 		
-		if ((gpip & IO_DINT) == 0) {	// Poll DMA IRQ interrupt 
+		if ((gpip & IO_DINT) == 0) {    // Poll DMA IRQ interrupt 
 			return OK;                 	// got interrupt, then OK 
 		}
 
@@ -146,7 +146,7 @@ BYTE wait_dma_cmpl(DWORD t_ticks)
 		}
 	}
 
-	return ACSIERROR;                  // no interrupt, and timer expired, 
+	return ACSIERROR;                   // no interrupt, and timer expired, 
 }
 //**************************************************************************
 

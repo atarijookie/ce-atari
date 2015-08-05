@@ -14,7 +14,6 @@
 #include "hdd_if.h"
 #include "translated.h"
 
-extern BYTE  whichHddIf;
 extern BYTE  deviceID;
 extern BYTE  cosmosExNotCosmoSolo;
 extern BYTE *pDmaBuffer;
@@ -38,19 +37,19 @@ BYTE findDevice(void)
     
     while(1) {
         if(machine == MACHINE_ST) {                     // for ST
-            found = findCE(HDD_IF_ACSI);                // CE on ACSI
+            found = findCE(IF_ACSI);                // CE on ACSI
         }
 
         if(machine == MACHINE_TT) {                     // for TT
-            found = findCE(HDD_IF_ACSI);                // CE on ACSI
+            found = findCE(IF_ACSI);                // CE on ACSI
         
             if(!found) {
-                found = findCE(HDD_IF_SCSI_TT);         // CE on SCSI TT
+                found = findCE(IF_SCSI_TT);         // CE on SCSI TT
             }
         }
 
         if(machine == MACHINE_FALCON) {                 // for Falcon
-            found = findCE(HDD_IF_SCSI_FALCON);         // CE on SCSI FALCON
+            found = findCE(IF_SCSI_FALCON);         // CE on SCSI FALCON
         }
         
         if(found) {
@@ -75,11 +74,13 @@ BYTE findCE(BYTE hddIf)
     
 	(void) Cconws("\n\rLooking for CosmosEx on ");
 
-    if(hddIf == HDD_IF_ACSI) {                          // ACSI?
+    if(hddIf == IF_ACSI) {                          // ACSI?
         (void) Cconws("ACSI: ");
     } else {                                            // SCSI?
         (void) Cconws("SCSI: ");
     }
+
+    hdd_if_select(hddIf);                               // select HDD IF
 
     for(id=0; id<8; id++) {                             // try to talk to all ACSI devices
         Cconout('0' + id);                              // write out BUS ID
@@ -90,8 +91,6 @@ BYTE findCE(BYTE hddIf)
             (void) Cconws(" <-- found!\n\r");
             
             deviceID                = id;               // store the BUS ID of device
-            whichHddIf              = hddIf;            // store HDD IF TYPE
-
             return TRUE;
         }
     }
@@ -107,8 +106,7 @@ BYTE ce_identify(BYTE id, BYTE hddIf)
     cmd[0] = (id << 5); 					        // cmd[0] = ACSI_id + TEST UNIT READY (0)
     memset(pDmaBuffer, 0, 512);              	    // clear the buffer 
   
-    whichHddIf = hddIf;                             // set which hdd IF it should use
-    res = hdd_if_cmd(1, cmd, 6, pDmaBuffer, 1);     // issue the identify command and check the result 
+    res = (*hdIf.cmd)(1, cmd, 6, pDmaBuffer, 1);    // issue the identify command and check the result 
     
 	if(res != OK) {                        			// if failed, return FALSE
 		return 0;
