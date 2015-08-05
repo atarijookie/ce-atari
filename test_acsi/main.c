@@ -19,8 +19,8 @@
 void showConnectionErrorMessage(void);
 BYTE findDevice(void);
 int getConfig(void); 
-int readHansTest( int byteCount, WORD xorVal );
-int writeHansTest( int byteCount, WORD xorVal );
+int readHansTest (DWORD byteCount, WORD xorVal );
+int writeHansTest(DWORD byteCount, WORD xorVal );
 void sleep(int seconds);
 
 void print_head(void);
@@ -30,7 +30,6 @@ BYTE ce_identify(BYTE ACSI_id);
 //--------------------------------------------------
 BYTE deviceID;
 
-BYTE commandShort[CMD_LENGTH_SHORT] = {         0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
 BYTE commandLong [CMD_LENGTH_LONG ] = {0x1f, 0xA0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
 
 BYTE myBuffer[256 * 512];
@@ -143,7 +142,6 @@ int main(void)
 	// ----------------- 
 
 	// now set up the acsi command bytes so we don't have to deal with this one anymore 
-	commandShort[0] = (deviceID << 5); 					// cmd[0] = ACSI_id + TEST UNIT READY (0)	
 	commandLong [0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
 
     (void) Cconws("Testing (*=OK,C=Crc,_=Timeout):\r\n"); 		
@@ -160,9 +158,9 @@ int main(void)
         int res=0;
   
       	if( linecnt&1 ){
-    		res=writeHansTest(MAXSECTORS * 512, xorVal);
+    		res = writeHansTest(MAXSECTORS * 512, xorVal);
       	}else{
-    		res=readHansTest (MAXSECTORS * 512, xorVal);
+    		res = readHansTest (MAXSECTORS * 512, xorVal);
       	}
     	switch( res )
 		{
@@ -351,9 +349,9 @@ BYTE findDevice(void)
 
 //--------------------------------------------------
 
-int readHansTest( int byteCount, WORD xorVal ){
+int readHansTest(DWORD byteCount, WORD xorVal ){
     WORD res;
-    
+
 	commandLong[4+1] = TEST_READ;
 
     // size to read
@@ -371,9 +369,9 @@ int readHansTest( int byteCount, WORD xorVal ){
         return -1;
     }
     
-    int i;
     WORD counter = 0;
     WORD data = 0;
+    DWORD i;
     for(i=0; i<byteCount; i += 2) {
         data = counter ^ xorVal;       // create word
         if( !(pBuffer[i]==(data>>8) && pBuffer[i+1]==(data&0xFF)) ){
@@ -390,12 +388,11 @@ int readHansTest( int byteCount, WORD xorVal ){
     }
     
 	return 0;
-  
 }
 
 //--------------------------------------------------
 
-int writeHansTest( int byteCount, WORD xorVal ){
+int writeHansTest(DWORD byteCount, WORD xorVal){
     BYTE res;
     
 	commandLong[4+1] = TEST_WRITE;
@@ -409,9 +406,9 @@ int writeHansTest( int byteCount, WORD xorVal ){
 	commandLong[8+1] = (xorVal >> 8) & 0xFF;
 	commandLong[9+1] = (xorVal     ) & 0xFF;
 
-    int i;
     WORD counter = 0;
     WORD data = 0;
+    DWORD i;
     for(i=0; i<byteCount; i += 2) {
         data = counter ^ xorVal;       // create word
         pBuffer[i  ]    = (data >> 8);
@@ -450,4 +447,20 @@ void logMsgProgress(DWORD current, DWORD total)
 //    (void) Cconws(" out of ");
 //    showHexDword(total);
 //    (void) Cconws("\n\r");
+}
+
+void showHexByte(BYTE val)
+{
+    int hi, lo;
+    char tmp[3];
+    char table[16] = {"0123456789ABCDEF"};
+    
+    hi = (val >> 4) & 0x0f;;
+    lo = (val     ) & 0x0f;
+
+    tmp[0] = table[hi];
+    tmp[1] = table[lo];
+    tmp[2] = 0;
+    
+    (void) Cconws(tmp);
 }
