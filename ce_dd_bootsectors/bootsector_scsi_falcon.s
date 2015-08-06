@@ -47,7 +47,7 @@ notFalcon:
     move.b  1(a6), d4               | d4 holds sector count we should transfer (e.g. 0x20)
     subq.l  #1, d4                  | dbra branches +1 more than specified
 
-    move.b  #1, 1(a6)
+    move.b  #1, 1(a6)               | 1(a6) now holds starting sector (and later the current sector)
     
 readNextSector:                     | transfer all the sectors from SCSI to RAM - address A1, status to D5
     bsr.b   dma_read                
@@ -107,7 +107,7 @@ dma_read:
 |----------------------    
 | SCSI SELECTION: START  
 
-    moveq   #0x07, d0           | REG_TCR = data out phase
+    moveq   #0x07, d0           | REG_TCR: data out phase
     jsr     (a5)                | jsr setReg
     
     moveq   #0x09, d0           | REG_ISR = no interrupt from selection
@@ -133,8 +133,7 @@ dma_read:
 waitForSelEnd:    
     moveq   #0x09, d0           | get REG_CR
     jsr     (a4)                | jsr getReg
-    andi.b  #0x08, d0           | get only ICR_BUSY
-    tst.b   d0
+    andi.b  #0x40, d0           | get only ICR_BUSY
     beq     waitForSelEnd       | wait until ICR_BUSY is set (loop if zero)
 
     moveq   #0x03, d0           | REG_ICR: clear SEL and data bus assertion
@@ -143,7 +142,7 @@ waitForSelEnd:
 | SCSI SELECTION: END
 |----------------------    
 | SCSI COMMAND: START
-    move.w  #0x0207, d0         | set COMMAND PHASE (assert C/D)
+    move.w  #0x0207, d0         | REG_TCR: set COMMAND PHASE (assert C/D)
     jsr     (a5)                | jsr setReg
 
     move.w  #0x0103, d0         | REG_ICR: assert data bus
@@ -253,7 +252,6 @@ wait4req1:
     jsr     (a4)            | jsr getReg
     
     andi.b  #0x20, d0       | get only REQ bit
-    tst.b   d0
     beq     wait4req1       | if REQ is not there, wait
     rts
 |------------------------    
@@ -263,7 +261,6 @@ wait4req0:
     jsr     (a4)            | jsr getReg
 
     andi.b  #0x20, d0       | get only REQ bit
-    tst.b   d0
     bne     wait4req0       | while REQ is still there, wait
     rts
 
@@ -294,14 +291,14 @@ setReg_Falcon:
     bsr.b   selectNcrReg    | select NCR register by writing to WDC register
 
     lsr     #8, d0          | D0 - lowest byte contains value which should go to register
-    move.w  d0, 0x8606.w    | WDL = value which should go to NCR register
+    move.w  d0, 0x8604.w    | WDC = value which should go to NCR register
     rts
     
 |----------------------------        
 getReg_Falcon:
     bsr.b   selectNcrReg    | select NCR register by writing to WDC register
 
-    move.w  0x8606.w, d0    | read from WDL = get value from NCR register
+    move.w  0x8604.w, d0    | read from WDC = get value from NCR register
     rts
 
 |----------------------------        
@@ -312,7 +309,7 @@ selectNcrReg:
     lsr.b   #1, d1          | D1 = D1 / 2, because Falcon offset is half of TT offset
     move.b  #0x88, d2       | D2 = 0x88 = base of register switch value
     add.b   d2, d1          | D1 = 0x88 + (register_offset / 2)
-    move.w  d1, 0x8604.w    | WDC = select which NCR register to access
+    move.w  d1, 0x8606.w    | WDL = select which NCR register to access
     rts
 
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
