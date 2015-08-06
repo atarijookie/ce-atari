@@ -348,15 +348,10 @@ const char *Update::getPropperXilinxTag(void)
     return "??wtf??";
 }
 
-void Update::createNewScripts_async(void)
-{
-	TMounterRequest tmr;			
-	tmr.action = MOUNTER_ACTION_NEWSCRIPTS;                          // let the mounter thread update the scripts
-	mountAdd(tmr);
-}
-
 void Update::createNewScripts(void)
 {
+    //------------
+    // avoid running more than once by a simple bool
     static bool wasRunOnce = false;         // make sure this runs only once - not needed to run it more times
 
     if(wasRunOnce) {                        // if it was already runned, quit
@@ -365,6 +360,23 @@ void Update::createNewScripts(void)
     }
     
     wasRunOnce = true;                      // mark that we've runned this once
+
+    //------------
+    // avoid running if not needed by a version check
+    char appVerThis[12];
+    Version::getAppVersion(appVerThis);                             // get version of this app (and these scripts)
+
+    Settings s;
+    char *scriptsVer = s.getString((char *) "SCRIPTS_VER", (char *) "XXXX-XX-XX");    // get version of scripts we have on disk
+
+    if(strcmp(appVerThis, scriptsVer) == 0) {                       // app version matches the current scripts version? Don't update scripts.
+        wasRunOnce = true;                      // mark that we've runned this once
+        Debug::out(LOG_DEBUG, "Update::createNewScripts() - won't try to update scripts, because we already got the scripts in this version");
+        return;
+    }
+    
+    //------------
+    // ok, it seems that we should update the scripts, so update them
     Debug::out(LOG_DEBUG, "Update::createNewScripts() - will try to update scripts");
     
     // write the data to file
@@ -386,6 +398,11 @@ void Update::createNewScripts(void)
     system("unzip -o /tmp/newscripts.zip -d /tmp/newscripts > /dev/null");  // extract script there
     system("chmod 755 /tmp/newscripts/copynewscripts.sh");                  // make the copying script executable
     system("/tmp/newscripts/copynewscripts.sh ");                           // execute the copying script
+    
+    //------------
+    // last step: mark the version of the scripts we now have
+    s.setString((char *) "SCRIPTS_VER", appVerThis);                                 // store version of scripts we now have on disk
+    Debug::out(LOG_DEBUG, "Update::createNewScripts() - scripts updated to version %s", appVerThis);
 }
 
 void Update::startPackageDownloadIfAnyComponentNewer(void)

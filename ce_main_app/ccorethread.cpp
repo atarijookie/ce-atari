@@ -154,7 +154,6 @@ void CCoreThread::run(void)
     DWORD nextInetIfaceCheckTime= Utils::getEndTime(1000);  			    // create a time when we should check for inet interfaces that got ready
 
     DWORD getHwInfoTimeout      = Utils::getEndTime(3000);                  // create a time when we already should have info about HW, and if we don't have that by that time, then fail
-    DWORD updateScriptsTime     = Utils::getEndTime(UPDATE_SCRIPTS_TIME);
     
 	//up/running state of inet interfaces
 	bool  state_eth0 	= false;
@@ -166,12 +165,6 @@ void CCoreThread::run(void)
 
     while(sigintReceived == 0) {
 		bool gotAtn = false;						                    // no ATN received yet?
-
-        // possibly update scripts - but after some time after app start
-        if(Utils::getCurrentMs() >= updateScriptsTime) {
-            Update::createNewScripts_async();       // put a request to update the scripts
-            updateScriptsTime = 0xffffffff;         // don't do it again (until next app run)
-        }
         
         // if should just get the HW version and HDD interface, but timeout passed, quit
         if(flags.getHwInfo && Utils::getCurrentMs() >= getHwInfoTimeout) {
@@ -184,8 +177,6 @@ void CCoreThread::run(void)
             if(Utils::getCurrentMs() >= hansFranzAliveCheckTime) {      // did enough time pass since the Hans and Franz reset?
                 if(!flags.gotHansFwVersion || !flags.gotFranzFwVersion) {       // if don't have version from Hans or Franz, then they're not alive
                     Update::createFlashFirstFwScript();
-
-                    Update::createNewScripts();                         // make sure that all the scripts are up to date before running the update
 
                     Debug::out(LOG_INFO, "No answer from Hans or Franz, so first firmware flash script created, will do first firmware flashing.");
 					sigintReceived = 1;
@@ -248,8 +239,6 @@ void CCoreThread::run(void)
                         confStream->showUpdateError();
 						Debug::out(LOG_INFO, "Update state - download OK, failed to create update script - NOT doing update");
                     } else {
-                        Update::createNewScripts();                         // make sure that all the scripts are up to date before running the update
-                    
 						Debug::out(LOG_INFO, "Update state - download OK, update script created, will do update.");
 						sigintReceived = 1;
                     }
@@ -632,7 +621,6 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
         // if Xilinx HW vs FW mismatching, flash Xilinx again to fix the situation
         if(hwConfig.fwMismatch) {
             Update::createFlashFirstFwScript();
-            Update::createNewScripts();
         
             Debug::out(LOG_ERROR, ">>> Terminating app, because there's Xilinx HW vs FW mismatch! <<<\n");
             sigintReceived = 1;

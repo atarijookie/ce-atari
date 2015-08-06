@@ -17,6 +17,7 @@
 #include "downloader.h"
 #include "ikbd.h"
 #include "timesync.h"
+#include "update.h"
 #include "version.h"
 #include "ce_conf_on_rpi.h"
 #include "network/netadapter.h"
@@ -133,11 +134,13 @@ int main(int argc, char *argv[])
     Debug::out(LOG_ERROR, "\n\n---------------------------------------------------");
     Debug::out(LOG_ERROR, "CosmosEx starting, version: %s", appVersion);
 
-//	system("sudo echo none > /sys/class/leds/led0/trigger");	// disable usage of GPIO 23 (pin 16) by LED
+    Update::createNewScripts();                                     // update the scripts if needed
+    
+//	system("sudo echo none > /sys/class/leds/led0/trigger");	    // disable usage of GPIO 23 (pin 16) by LED
 
-    ce_conf_createFifos();                                      // if should run normally, create the ce_conf FIFOs
+    ce_conf_createFifos();                                          // if should run normally, create the ce_conf FIFOs
 
-	if(!gpio_open()) {									        // try to open GPIO and SPI on RPi
+	if(!gpio_open()) {									            // try to open GPIO and SPI on RPi
 		return 0;
 	}
 

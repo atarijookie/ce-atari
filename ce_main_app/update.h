@@ -41,7 +41,6 @@ public:
     
     static bool checkForUpdateListOnUsb(std::string &updateFilePath);
 
-    static void createNewScripts_async(void);           // this just creates mounter action, which will be handled in a separate (mounter) thread
     static void createNewScripts(void);                 // this does script update - blocking other processing
 
     static void startPackageDownloadIfAnyComponentNewer(void);

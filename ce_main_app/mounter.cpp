@@ -75,11 +75,6 @@ void *mountThreadCode(void *ptr)
             mounter.sync();
             continue;
         }
-        
-        if(tmr.action == MOUNTER_ACTION_NEWSCRIPTS) {       // should update scripts?
-            Update::createNewScripts();
-            continue;
-        }
 	}
 	
 	Debug::out(LOG_INFO, "Mount thread terminated.");
