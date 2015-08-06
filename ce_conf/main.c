@@ -71,7 +71,7 @@ int main(void)
 	deviceID = 0;
 
 	Clear_home();
-    res = findDevice();
+    res = Supexec(findDevice);
 
     if(res != TRUE) {
         Super((void *)OldSP);  			      			            // user mode 

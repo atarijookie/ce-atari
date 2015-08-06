@@ -140,7 +140,7 @@ int main( int argc, char* argv[] )
 	pDtaBuffer		= (BYTE *) (((DWORD) pDtaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
 
 	// search for CosmosEx on ACSI bus
-	found = findDevice();
+	found = Supexec(findDevice);
 
 	if(!found) {								            // not found? quit
 		sleep(3);
