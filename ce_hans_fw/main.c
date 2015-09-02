@@ -171,8 +171,12 @@ BYTE xilinxInfoByte;
 BYTE isAcsiNotScsi;
 void resetXilinx(void);
 
+#define MODE_UNKNOWN    0
+#define MODE_WITH_RPI   1
+#define MODE_SOLO       2
+
 BYTE timeOutCount   = 0;
-BYTE soloMode       = FALSE;
+BYTE mode           = MODE_UNKNOWN;
 void updateEnabledIDsInSoloMode(void);
 
 BYTE tryProcessLocally(void);
@@ -246,19 +250,21 @@ int main (void)
             spiDmaIsIdle = TRUE;
             state = STATE_GET_COMMAND;
             
-            timeOutCount++;                     // increase count of how many times we must have timed out to keep working
-            
-            GPIOA->BSRR = LED1 | LED2 | LED3;   // clear LEDs
-            switch(timeOutCount) {
-                case 1: GPIOA->BRR = LED1; break;
-                case 2: GPIOA->BRR = LED2; break;
-                case 3: GPIOA->BRR = LED3; break;
+            if(mode == MODE_UNKNOWN) {              // if we're in an uknown mode, move step further to SOLO mode, but not yet
+                timeOutCount++;                     // increase count of how many times we must have timed out to keep working
+                
+                GPIOA->BSRR = LED1 | LED2 | LED3;   // clear LEDs
+                switch(timeOutCount) {
+                    case 1: GPIOA->BRR = LED1; break;
+                    case 2: GPIOA->BRR = LED2; break;
+                    case 3: GPIOA->BRR = LED3; break;
+                }
             }
         }
         
-        if(soloMode == FALSE && timeOutCount >= 3) {                    // if we had to use timeout 3 times consequently to make this work, then we're probably in SOLO mode
+        if(mode == MODE_UNKNOWN && timeOutCount >= 3) {                 // if we had to use timeout 3 times consequently to make this work, then we're probably in SOLO mode
             GPIOA->BRR      = LED1 | LED2 | LED3;
-            soloMode        = TRUE;
+            mode            = MODE_SOLO;
             state           = STATE_GET_COMMAND;
             sendFwVersion   = FALSE;
             
@@ -266,7 +272,7 @@ int main (void)
             updateEnabledIDsInSoloMode();   // update enabled IDs
         }
         
-        if(soloMode == TRUE) {              // solo mode? Skip the rest of the loop.
+        if(mode == MODE_SOLO) {             // solo mode? Skip the rest of the loop.
             continue;
         }
         
@@ -466,7 +472,7 @@ void onGetCommand(void)
         }
     }
 
-    if(soloMode) {                              // if in solo mode, don't send ACSI command to host
+    if(mode == MODE_SOLO) {                     // if in solo mode, don't send ACSI command to host
         return;
     }
     
@@ -619,7 +625,7 @@ void updateEnabledIDsInSoloMode(void)
 {
     BYTE i;
     
-    if(!soloMode) {             // not solo mode? quit
+    if(mode != MODE_SOLO) {             // not solo mode? quit
         return;
     }
     
@@ -1073,6 +1079,7 @@ void processHostCommands(void)
             // process ACSI configuration 
             case CMD_ACSI_CONFIG:
                     firstConfigReceived = TRUE;                     // mark that we've received 1st config
+                    mode = MODE_WITH_RPI;                           // now that we got config, we're in 'with RPi' mode
             
                     showCurrentLED();
             
