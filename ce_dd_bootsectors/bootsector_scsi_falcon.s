@@ -3,6 +3,15 @@
 | CosmosEx bootsector Level 1 for TT through its SCSI interface
 |----------------------------------------------------------------
 
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+| switch to super
+|   clr.l		-(sp)
+|   move.w		#0x20,-(sp)
+|   trap		#1
+|   addq.l		#4,sp
+
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
 | write out title string
     pea     str(pc)
     move.w  #0x09,-(sp)
@@ -16,6 +25,11 @@
     move.w  #0x48,-(sp)         | Malloc()
     trap    #1                  |
     addq.l  #6,sp               |
+
+|    addq.l  #4, sp
+|    lea     fakeRam(pc),a0
+|    move.l  a0,d0
+    
     tst.l   d0
     beq     fail
 
@@ -82,11 +96,11 @@ fail:
 
 | This is the configuration which will be replaced before sending the sector to ST.
 | The format is : 'XX'  driverRamBytes        ScsiIdBits  SectorCount 
-| default values: 'XX'  70 kB (0x11800 bytes)      1        32 (0x20)  
+| default values: 'XX'  70 kB (0x11800 bytes)      2        32 (0x20)  
 
 configTag:  .dc.w   0x5858
 config:     .dc.l   0x00011800
-            .dc.b   0x01, 0x20
+            .dc.b   0x02, 0x20
 
 str:    .ascii  "\n\rCE SCSI\0"
 error:  .ascii  ":(\n\r\0"
@@ -155,7 +169,7 @@ waitForSelEnd:
     bsr.b   pioWrite            | cmd[2]: 0x00
     
     move.b  1(a6),d6            | starting sector to d6
-    addq    #1, 1(a6)           | starting_sector++
+    addq.b  #1, 1(a6)           | starting_sector++
     bsr.b   pioWrite            | cmd[3]: start reading from sector D6
 
     moveq   #1, d6
@@ -270,7 +284,7 @@ setBit:
     move.b  d7, d0          | get register offset into D0 (D7 is: OR_BITS REG_OFFSET)
     jsr     (a4)            | jsr getReg
     lsl.w   #8, d0          | d0 = d0 << 8    -- original register value to upper nibble (D0 is: ORIGINAL_VALUE 00)
-    or.b    d7, d0          | d0 = d7 | d0    -- D0 is NEW_VALUE REG_OFFSET
+    or.w    d7, d0          | d0 = d7 | d0    -- D0 is NEW_VALUE REG_OFFSET
     jsr     (a5)            | jsr setReg -- write new value to register
     rts
 
@@ -330,4 +344,8 @@ getReg_TT:
    rts
 
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+|.bss
+|.even
+|fakeRam:        .ds.l       128000
 

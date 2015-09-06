@@ -81,8 +81,7 @@ bss_done:
 
     .data
     .even
-str:    .ascii  "CE Level 2 bootsector"
-        .dc.b   13,10,0
+str:    .ascii  "\n\rCE Level 2 bootsector\n\r\0"
 
 
 
