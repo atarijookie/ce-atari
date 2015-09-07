@@ -44,7 +44,7 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
     if(hwConfig.hddIface == HDD_IF_ACSI) {     // for ACSI IF
         bootsectorPath = "/tmp/configdrive/ce_dd_st.bs";
     } else {                            // for SCSI IF
-        bootsectorPath = "/tmp/configdrive/ce_dd_tt.bs";
+        bootsectorPath = "/tmp/configdrive/ce_dd_fn.bs";
     }
     f = fopen(bootsectorPath, "rb");
 
@@ -146,7 +146,7 @@ void TranslatedBootMedia::updateBootsectorConfig(void)
 	
 	updateBootsectorChecksum();							// update the checksum at the end
 	
-    Debug::out(LOG_INFO, "TranslatedBootMedia - bootsector will read %d sectors, the driver will take %d kB of RAM.", (int) imageBuffer[pos + 3], (int) (totalSize / 1024));
+    Debug::out(LOG_INFO, "TranslatedBootMedia - bootsector will read %d sectors, the driver will take %d kB of RAM.", (int) imageBuffer[pos + 7], (int) (totalSize / 1024));
 }
 
 void TranslatedBootMedia::updateBootsectorChecksum(void)
