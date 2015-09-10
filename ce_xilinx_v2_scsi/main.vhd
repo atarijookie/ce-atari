@@ -74,7 +74,6 @@ architecture Behavioral of main is
     signal d1out         : std_logic;
     
     signal identifyA     : std_logic;
-    signal identifyS     : std_logic;
 
     signal nSelection    : std_logic;
     signal lathClock     : std_logic;
@@ -87,16 +86,19 @@ architecture Behavioral of main is
     signal SACKD3        : std_logic;    
     signal SACKshort     : std_logic;    
 
+    signal statusReg     : std_logic_vector(7 downto 0);
+    signal softReset     : std_logic;
+
 begin
 
     identify   <= XPIO and XDMA and TXSEL1n2;   -- when TXSEL1n2 selects Franz (='1') and you have PIO and DMA pins high, then you can read the identification byte from DATA2
     identifyA  <= identify and (not HDD_IF);    -- active when IDENTIFY and it's ACSI hardware
-    identifyS  <= identify and HDD_IF;          -- active when IDENTIFY and it's SCSI hardware
+    softReset  <= identify and XRnW;            -- soft reset is done when it's IDENTIFY, but in READ direction (normally should be in WRITE direction)
 
     nSelection <= not ((not SEL) and BSYa);     -- selection is when SEL is 0 and BSY is 1. nSelection is inverted selection, because DATA1latch is captured on falling edge
     XCMD       <= nSelection or (not SRST);     -- falling edge means target selection (SRST must be 1, otherwise ignored)
 
-    resetCombo <= SRST and reset_hans and (not identify);   -- when one of these reset signals is low, the result is low
+    resetCombo <= SRST and reset_hans and (not softReset);   -- when one of these reset signals is low, the result is low
 
     REQtrig    <= XPIO xor XDMA xor XMSG;       -- REQ trig should go hi only when one of these (not 2, not 3) go hi
 
@@ -174,11 +176,20 @@ begin
     DATA1a(0) <= '0' when ((d1out='1') and (DATA2(0)='1')) else 'Z';
     DATA1b(0) <= '0' when ((d1out='1') and (DATA2(0)='1')) else 'Z';
 
+    -- create status register, which consists of fixed values (HW ver 2, SCSI Xilinx FW), and current values - HW/FW mismatch, BSY low or high
+    statusReg(7) <= BSYsignal;      -- BSY signal - 0 means we're still busy!
+    statusReg(6) <= '0';
+    statusReg(5) <= '1';            -- - 10 means HW v.2
+    statusReg(4) <= '0';            -- / 
+    statusReg(3) <= identifyA;      -- when this is '1' -- BAD : when identify condition met, this identifies the XILINX and HW revision (0010 - HW rev 2, 1 - it's ACSI HW, 010 - SCSI Xilinx FW)
+    statusReg(2) <= '0';            -- \
+    statusReg(1) <= '1';            -- --- 010 = SCSI Xilinx FW
+    statusReg(0) <= '0';            -- / 
+
     -- DATA2 is connected to Hans (STM32 mcu), data goes out when going from ST to MCU (WRITE operation)
-    DATA2 <=    "ZZZZZ0ZZ"  when TXSEL1n2='0'    else   -- when TXSEL1n2 selects Hans, we're writing to Hans's flash, we need bit DATA2.2 (bit #2) to be 0 (it's BOOT1 bit on STM32 MCU)
-                "00100010"  when identifyS='1'   else   -- GOOD: when identify condition met, this identifies the XILINX and HW revision (0010 - HW rev 2, 0 - it's SCSI HW, 010 - SCSI Xilinx FW)
-                "00101010"  when identifyA='1'   else   -- BAD : when identify condition met, this identifies the XILINX and HW revision (0010 - HW rev 2, 1 - it's ACSI HW, 010 - SCSI Xilinx FW)
-                DATA1latch  when XRnW='0'        else   -- when set in WRITE direction, output latched DATA1 to DATA2 
+    DATA2 <=    "ZZZZZ0ZZ"  when TXSEL1n2='0'   else   -- when TXSEL1n2 selects Hans, we're writing to Hans's flash, we need bit DATA2.2 (bit #2) to be 0 (it's BOOT1 bit on STM32 MCU)
+                statusReg   when identify='1'   else   -- when doing IDENTIFY, return STATUS REGISTER - BSY signal value, HW version, FW type (ACSI or SCSI), HW / FW mismatch bit
+                DATA1latch  when XRnW='0'       else   -- when set in WRITE direction, output latched DATA1 to DATA2 
                 "ZZZZZZZZ";                             -- otherwise don't drive this
 
     -- TX_out is connected to RPi, and this is multiplexed TX pin from two MCUs
