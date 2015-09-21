@@ -166,10 +166,13 @@ BYTE cardInsertChanged;
 
 void initAllStuff(void);
 
-void getXilinxInfoByte(void);
-BYTE xilinxInfoByte;
-BYTE isAcsiNotScsi;
+void getXilinxStatus(void);
 void resetXilinx(void);
+BYTE isBusIdle(void);
+
+BYTE xilinxHwFw;
+BYTE isAcsiNotScsi;
+BYTE xilinxBusIdle;
 
 #define MODE_UNKNOWN    0
 #define MODE_WITH_RPI   1
@@ -181,17 +184,24 @@ void updateEnabledIDsInSoloMode(void);
 
 BYTE tryProcessLocally(void);
 
-int main (void)
+int main(void)
 {
     initAllStuff();         // now init everything
     
-    getXilinxInfoByte();
+    getXilinxStatus();
+    resetXilinx();
     //-------------
     // main loop
     while(1) {
         // if something was wrong, reset XILINX so it won't get stuck 
         if(brStat != E_OK) {
             resetXilinx();
+        }
+        
+        if(state == STATE_GET_COMMAND && !isAcsiNotScsi) {  // on GET COMMAND on SCSI device
+            if(!isBusIdle()) {                              // if the bus is not idle, do the reset
+                resetXilinx();
+            }
         }
         
         // if card insert state changed, mark down this event
@@ -281,7 +291,7 @@ int main (void)
             if(state == STATE_SEND_FW_VER) {
                 state = STATE_GET_COMMAND;
                 
-                atnSendFwVersion[6] = (((WORD)currentLed) << 8) | xilinxInfoByte;               // store the current LED status in the last WORD, and also XILINX info byte value
+                atnSendFwVersion[6] = (((WORD)currentLed) << 8) | xilinxHwFw;                   // store the current LED status in the last WORD, and also XILINX info byte value
                 
                 timeoutStart();                                                                 // start timeout counter so we won't get stuck somewhere
             
@@ -1407,32 +1417,53 @@ void setupAtnBuffers(void)
     rdBuf2.next = (void *) &rdBuf1;
 }
 
-void getXilinxInfoByte(void)
+void getXilinxStatus(void)
 {
-    isAcsiNotScsi = 1;                  // assume ACSI
+    BYTE val;
     
     ACSI_DATADIR_WRITE();
     GPIOA->BSRR	= aPIO | aDMA;          // aPIO and aDMA now HIGH -- we can read the XILINX info byte afer that
 
-    xilinxInfoByte = GPIOB->IDR;        // read in the value
-    
+    val         = GPIOB->IDR;           // read in the value
+
     GPIOA->BRR	= aPIO | aDMA;          // aPIO and aDMA now LOW -- back to normal state
-    EXTI->PR    = aCMD | aCS | aACK;    // also clear possible EXTI flags
-    
-    if(xilinxInfoByte == 0x22) {        // if it's HW v. 2, and configured as SCSI, then it's SCSI
-        isAcsiNotScsi = 0;
+
+    xilinxHwFw      = val & 0x7f;       // store part as Info Byte
+
+    if(xilinxHwFw == 0x22) {            // if it's HW v. 2, and configured as SCSI, then it's SCSI
+        isAcsiNotScsi   = 0;
+        xilinxBusIdle   = val >> 7;     // highest bit to position of bit 0 - when 0 then SCSI is busy, when 1 then SCSI is idle
     } else {                            // other cases - it's ACSI
-        isAcsiNotScsi = 1;
+        isAcsiNotScsi   = 1;
+        xilinxBusIdle   = 1;            // if it's ACSI, it's always idle (this state is not returned yet from Xilinx)
     }
 }
 
 void resetXilinx(void)
 {
+    BYTE tmp;
+    
+    if(isAcsiNotScsi) {                 // is ACSI? Don't do anything.
+        return;
+    }
+    
     ACSI_DATADIR_WRITE();
-    GPIOA->BSRR	= aPIO | aDMA;          // aPIO and aDMA now HIGH -- we can read the XILINX info byte afer that, also does BUS phase reset on SCSI Xilinx
-    ACSI_DATADIR_WRITE();
+    GPIOA->BSRR = aRNW;                 // aRNW must go H for soft reset
+    
+    GPIOA->BSRR	= aPIO | aDMA;          // aPIO and aDMA now HIGH -- we can read the XILINX info byte afer that
+    
+    tmp         = GPIOB->IDR;           // read in the value -- just to make the reset / identify pulse longer
+    
+    GPIOA->BRR  = aRNW;                 // aRNW back to L, to match the rest of the bus direction
     GPIOA->BRR	= aPIO | aDMA;          // aPIO and aDMA now LOW -- back to normal state
+
     EXTI->PR    = aCMD | aCS | aACK;    // also clear possible EXTI flags
     
-    brStat = E_OK;                      // everything is fine now
+    brStat      = E_OK;                 // set bridge status to OK
+}
+
+BYTE isBusIdle(void)                    // get if the SCSI bus is idle (BSY high, REQ high) or busy
+{
+    getXilinxStatus();
+    return xilinxBusIdle;
 }
