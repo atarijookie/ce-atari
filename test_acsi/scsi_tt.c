@@ -165,7 +165,7 @@ WORD pioDataTransfer_read(BYTE *bfr, DWORD byteCount)
         res = PIO_read();
             
         if(res == -2) {         // phase changed? pretend no error
-            logMsg("pioDataTransfer_read() - phase changed while read\n\r");
+//            logMsg("pioDataTransfer_read() - phase changed while read\n\r");
             logMsgProgress(i, byteCount);
             return 0;
         }            
@@ -190,7 +190,7 @@ WORD pioDataTransfer_write(BYTE *bfr, DWORD byteCount)
         res = PIO_write(bfr[i]);
 
         if(res == -2) {         // phase changed? pretend no error
-            logMsg("pioDataTransfer_write - phase changed while write\n\r");
+//            logMsg("pioDataTransfer_write - phase changed while write\n\r");
             logMsgProgress(i, byteCount);
             return 0;
         }            
@@ -215,7 +215,7 @@ BYTE scsi_select_and_cmd(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLeng
     res = selscsi(scsiId);  // select required device
     
     if(res) {               // if failed, quit with failure
-        logMsg("scsi_select_and_cmd() failed on selscsi\r\n");
+        logMsg("scsi_select_and_cmd() failed on SELECT\r\n");
         return -1;
     }
 
@@ -237,7 +237,7 @@ BYTE scsi_select_and_cmd(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLeng
         res = PIO_write(cmd[i]);
         
         if(res) {                                       // if time out happened, fail
-            logMsg("scsi_select_and_cmd() failed on PIO_write()\r\n");
+            logMsg("scsi_select_and_cmd() - CMD phase failed on PIO_write()\r\n");
             logMsgProgress(i, cmdLength);
             return -1;
         }
@@ -400,7 +400,7 @@ int PIO_read(void)
 
     res = (*hdIf.pGetReg)(REG_DSR);
     if((res & (1 << 3)) == 0) {         // PHASE MATCH bit from BUS AND STATUS REGISTER is low? SCSI phase changed
-        logMsg("PIO_read() - phase change \r\n");
+//        logMsg("PIO_read() - phase change \r\n");
         return -2;
     }
 
@@ -427,7 +427,7 @@ int PIO_write(BYTE data)
 
     res = (*hdIf.pGetReg)(REG_DSR);
     if((res & (1 << 3)) == 0) {         // PHASE MATCH bit from BUS AND STATUS REGISTER is low? SCSI phase changed
-        logMsg("PIO_write() - phase change \r\n");
+//        logMsg("PIO_write() - phase change \r\n");
         return -2;
     }
     

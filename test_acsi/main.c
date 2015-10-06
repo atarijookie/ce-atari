@@ -26,6 +26,10 @@ void sleep(int seconds);
 void print_head(void);
 void print_status(int runcnt, int errcnt_crc_r, int errcnt_crc_w, int errcnt_timeout_r, int errcnt_timeout_w);
 
+void showHexDword(DWORD val);
+void logMsg(char *logMsg);
+void deleteErrorLines(void);
+
 BYTE ce_identify(BYTE ACSI_id);
 //--------------------------------------------------
 BYTE deviceID;
@@ -52,9 +56,14 @@ BYTE prevCommandFailed;
 
 #define Clear_home()    (void) Cconws("\33E")
 
+#define ERROR_LINE_START        10
+
 BYTE ifUsed;
 
 // Warning! Don't use VT52_Save_pos() and VT52_Load_pos(), because they don't work on Falcon! (They work fine on ST and TT.)
+
+int errorLine = 0;
+BYTE simpleNotDetailed = 1;
 
 //--------------------------------------------------
 int main(void)
@@ -112,7 +121,7 @@ int main(void)
 	(void) Cconws("Press 'T' to start through TT SCSI.\r\n"); 		
 	(void) Cconws("Press 'F' to start through Falcon SCSI.\r\n\r\n"); 		
 
-    key = Cnecin();        
+    key = Cnecin();
     
 	if(key == 't' || key == 'T') {              // if T pressed, use TT SCSI
         hdd_if_select(IF_SCSI_TT);
@@ -125,9 +134,18 @@ int main(void)
         ifUsed      = IF_ACSI;
     }
 
+	// ---------------------- 
+	(void) Cconws("\r\n\r\n[S]imple or [D]etailed error report?\r\n");
+    
+    key = Cnecin();
+    if(key == 'D' || key == 'd') {      // detailed?
+        simpleNotDetailed = 0;
+    } else {                            // simple!
+        simpleNotDetailed = 1;
+    }
+	// ---------------------- 
     print_status(0,0,0,0,0);
 	VT52_Clear_down();
-
 	// ---------------------- 
 	// search for device on the ACSI bus 
 	deviceID = findDevice();
@@ -163,11 +181,15 @@ int main(void)
   	{
         int res=0;
   
+        errorLine = ERROR_LINE_START;
+  
       	if( linecnt&1 ){
     		res = writeHansTest(MAXSECTORS * 512, xorVal);
       	}else{
     		res = readHansTest (MAXSECTORS * 512, xorVal);
       	}
+        
+        VT52_Goto_pos(x, 24);
     	switch( res )
 		{
 			case -1:
@@ -200,6 +222,25 @@ int main(void)
 		charcnt++;
 		print_status(runcnt,errcnt_crc_r,errcnt_crc_w,errcnt_timeout_r,errcnt_timeout_w);
 		print_head();
+
+        //--------------
+        if(!simpleNotDetailed) {                                    // if detailed error report with wait
+            if(errorLine != ERROR_LINE_START) {                     // if some error happened, wait for key
+                logMsg("Shit happened, press 'C' to continue.");    // show message
+                
+                while(1) {                                          // wait for 'c' key
+                    key = Cnecin();
+                    
+                    if(key == 'C' || key == 'c') {
+                        break;
+                    }
+                }
+            }
+            
+            deleteErrorLines();
+        }
+        //--------------
+
         VT52_Goto_pos(x, 24);
 		
 		if( charcnt>=40-2 ){
@@ -448,18 +489,34 @@ int writeHansTest(DWORD byteCount, WORD xorVal){
 
 void logMsg(char *logMsg)
 {
-//    if(showLogs) {
-//        (void) Cconws(logMsg);
-//    }
+    if(simpleNotDetailed) {             // if simple, don't show these SCSI log messages
+        return;
+    }
+
+    VT52_Goto_pos(0, errorLine++);
+    
+    (void) Cconws(logMsg);
+}
+
+void deleteErrorLines(void)
+{
+    int line;
+    
+    for(line=ERROR_LINE_START; line<errorLine; line++) {
+        VT52_Goto_pos(0, line);
+        (void) Cconws("                                        ");
+    }
 }
 
 void logMsgProgress(DWORD current, DWORD total)
 {
-//    (void) Cconws("Progress: ");
-//    showHexDword(current);
-//    (void) Cconws(" out of ");
-//    showHexDword(total);
-//    (void) Cconws("\n\r");
+    VT52_Goto_pos(0, errorLine++);
+    
+    (void) Cconws("Progress: ");
+    showHexDword(current);
+    (void) Cconws(" out of ");
+    showHexDword(total);
+    (void) Cconws("\n\r");
 }
 
 void showHexByte(BYTE val)
@@ -477,3 +534,13 @@ void showHexByte(BYTE val)
     
     (void) Cconws(tmp);
 }
+
+void showHexDword(DWORD val)
+{
+    showHexByte((BYTE) (val >> 24));
+    showHexByte((BYTE) (val >> 16));
+    showHexByte((BYTE) (val >>  8));
+    showHexByte((BYTE)  val);
+}
+
+
