@@ -36,6 +36,7 @@ __forceinline BYTE timeout(void)
 		lo = data & 0xff;\
 		while(1) {\
 			if(timeout()) {\
+                LOG_ERROR(30); \
                 brStat = E_TimeOut; \
 				return 0;\
 			}\
@@ -52,6 +53,7 @@ __forceinline BYTE timeout(void)
 		pData++;\
 		while(1) {\
 			if(timeout()) {\
+                LOG_ERROR(31); \
                 brStat = E_TimeOut; \
 				return 0;\
 			}\
@@ -72,6 +74,7 @@ __forceinline BYTE timeout(void)
 		GPIOA->BRR	= aDMA;\
 		while(1) {\
 			if(timeout()) {\
+                LOG_ERROR(32); \
                 brStat = E_TimeOut; \
 				return 0;\
 			}\

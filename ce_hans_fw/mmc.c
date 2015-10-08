@@ -178,6 +178,7 @@ BYTE mmcReset(void)
                 retry--;
                 
                 if(timeout()) {
+                    LOG_ERROR(20);
                     retry = 0;
                     break;
                 }
@@ -196,6 +197,7 @@ BYTE mmcReset(void)
                     break;
                     
                 if(timeout()) {
+                    LOG_ERROR(21);
                     retry = 0;
                     break;
                 }
@@ -240,6 +242,7 @@ BYTE mmcReset(void)
         }
         
         if(timeout()) {
+            LOG_ERROR(22);
             retry = 0;
             break;
         }
@@ -278,8 +281,10 @@ BYTE mmcCmd(BYTE cmd, DWORD arg, BYTE retry, BYTE val)
     do {
         r1 = mmcSendCommand(cmd, arg);
               
-        if(retry==0 || timeout())
+        if(retry==0 || timeout()) {
+            LOG_ERROR(23);
             return 0xff;
+        }
 
         // do retry counter
         retry--;
@@ -304,6 +309,7 @@ BYTE mmcCmdLow(BYTE cmd, DWORD arg, BYTE val)
         spi2_TxRx(0xff);
 
         if(retry==0 || timeout()) {
+            LOG_ERROR(24);
         
             for(retry=0; retry<10; retry++)
                 spi2_TxRx(0xff);
@@ -401,8 +407,10 @@ BYTE mmcCommand(BYTE cmd, DWORD arg)
         if(r1 != 0xff)
             break;
         
-        if(retry == 0 || timeout())
+        if(retry == 0 || timeout()) {
+            LOG_ERROR(25);
             break;
+        }
             
         retry--;
     }
@@ -450,6 +458,7 @@ BYTE mmcRead(DWORD sector)
             break;
         
         if(timeout()) {
+            LOG_ERROR(26);
             i = 0;
             break;
         }
@@ -741,6 +750,7 @@ BYTE mmcReadJustForTest(DWORD sector)
             break;
         
         if(timeout()) {
+            LOG_ERROR(27);
             i = 0;
             break;
         }
@@ -852,6 +862,7 @@ BYTE mmcWrite(DWORD sector)
             break;
         
         if(timeout()) {
+            LOG_ERROR(28);
             i = 0;
             break;
         }
@@ -1108,6 +1119,7 @@ BYTE mmcCompare(DWORD sector)
             break;
             
         if(timeout()) {
+            LOG_ERROR(29);
             i = 0;
             break;
         }       

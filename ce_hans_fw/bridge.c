@@ -71,6 +71,7 @@ BYTE PIO_write(void)
         }
         
         if(timeout()) {                                                     // if timeout happened
+            LOG_ERROR(40);
             brStat = E_TimeOut;                                             // set the bridge status
             break;
         }
@@ -99,6 +100,7 @@ void PIO_read(BYTE val)
         }
         
         if(timeout()) {                                                     // if timeout happened
+            LOG_ERROR(41);
             brStat = E_TimeOut;                                             // set the bridge status
             break;
         }
@@ -119,6 +121,7 @@ void PIO_read(BYTE val)
         }
         
         if(timeout()) {             // if timeout happened, pretend nothing serious happened
+            LOG_ERROR(42);
             break;
         }
     }
@@ -145,6 +148,7 @@ void MSG_read(BYTE val)
         }
         
         if(timeout()) {                                                     // if timeout happened
+            LOG_ERROR(43);
             brStat = E_TimeOut;                                             // set the bridge status
             break;
         }
@@ -171,6 +175,7 @@ void DMA_read(BYTE val)
         }
         
         if(timeout()) {                                                     // if timeout happened
+            LOG_ERROR(44);
             brStat = E_TimeOut;                                             // set the bridge status
             break;
         }
@@ -205,6 +210,7 @@ BYTE DMA_write(void)
         }
         
         if(timeout()) {                                                     // if timeout happened
+            LOG_ERROR(45);
             brStat = E_TimeOut;                                             // set the bridge status
             break;
         }

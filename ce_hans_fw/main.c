@@ -184,8 +184,12 @@ void updateEnabledIDsInSoloMode(void);
 
 BYTE tryProcessLocally(void);
 
+BYTE lastErr;
+
 int main(void)
 {
+    LOG_ERROR(0);           // no error
+    
     initAllStuff();         // now init everything
     
     getXilinxStatus();
@@ -257,6 +261,8 @@ int main(void)
         }
 
         if(!spiDmaIsIdle && timeout()) {                                                        // if we got stuck somewhere, do IDLE again
+            LOG_ERROR(1);
+            
             spiDmaIsIdle = TRUE;
             state = STATE_GET_COMMAND;
             
@@ -685,6 +691,7 @@ void onDataRead(void)
         // first wait until all data arrives in SPI DMA transfer
         while(!spiDmaIsIdle) {
             if(timeout()) {                                                             // if the data from host doesn't come within timeout, quit
+                LOG_ERROR(2);
                 spiDmaIsIdle = TRUE;
                 ACSI_DATADIR_WRITE();                                                   // data direction for writing, and quit
                 return;
@@ -743,12 +750,14 @@ void waitForSPIidle(void)
 {
     while((SPI1->SR & SPI_SR_TXE) == 0) {                   // wait while TXE flag is 0 (TX is not empty)
         if(timeout()) {
+            LOG_ERROR(3);
             return;
         }
     }
 
     while((SPI1->SR & SPI_SR_BSY) != 0) {                   // wait while BSY flag is 1 (SPI is busy)
         if(timeout()) {
+            LOG_ERROR(4);
             return;
         }
     }
@@ -758,12 +767,14 @@ void waitForSPI2idle(void)
 {
     while((SPI2->SR & SPI_SR_TXE) == 0) {                   // wait while TXE flag is 0 (TX is not empty)
         if(timeout()) {
+            LOG_ERROR(5);
             return;
         }
     }
 
     while((SPI2->SR & SPI_SR_BSY) != 0) {                   // wait while BSY flag is 1 (SPI is busy)
         if(timeout()) {
+            LOG_ERROR(6);
             return;
         }
     }
@@ -912,6 +923,7 @@ void spiDma_waitForFinish(void)
 {
     while(spiDmaIsIdle != TRUE) {                           // wait until it will become idle
         if(timeout()) {                                     // if timeout happened (and we got stuck here), quit
+            LOG_ERROR(7);
             spiDmaIsIdle = TRUE;
             break;
         }

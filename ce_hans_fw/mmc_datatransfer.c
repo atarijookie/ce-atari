@@ -29,6 +29,7 @@ void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 		GPIOA->BRR	= aDMA;\
 		while(1) {\
 			if(timeout()) {\
+                LOG_ERROR(10);\
                 brStat = E_TimeOut; \
                 quit = 1;\
                 break;\
@@ -47,6 +48,7 @@ void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 #define WAIT_FOR_CARD_NOT_BUSY              \
         while(spi2_TxRx(0xFF) != 0xff) {    \
             if(timeout()) {                 \
+                LOG_ERROR(11);              \
                 quit = 1;                   \
                 break;                      \
             }                               \
@@ -84,6 +86,7 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
     // try to start READ MULTIPLE BLOCKS with couple of retries
     for(retries=0; retries<5; retries++) {
         if(timeout()) {                                         // timeout through timer? quit with fail
+            LOG_ERROR(12);
             return 0xff;
         }
         
@@ -145,6 +148,7 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
             
             while(spi2_TxRx(0xFF) != MMC_STARTBLOCK_READ) {     // wait for STARTBLOCK
                 if(timeout()) {
+                    LOG_ERROR(13);
                     quit = 1;
                     break;
                 }
