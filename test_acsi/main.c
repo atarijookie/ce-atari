@@ -29,6 +29,7 @@ void print_status(int runcnt, int errcnt_crc_r, int errcnt_crc_w, int errcnt_tim
 void showHexDword(DWORD val);
 void logMsg(char *logMsg);
 void deleteErrorLines(void);
+void speedTest(void);
 
 BYTE ce_identify(BYTE ACSI_id);
 //--------------------------------------------------
@@ -144,9 +145,6 @@ int main(void)
         simpleNotDetailed = 1;
     }
 	// ---------------------- 
-    print_status(0,0,0,0,0);
-	VT52_Clear_down();
-	// ---------------------- 
 	// search for device on the ACSI bus 
 	deviceID = findDevice();
 
@@ -160,16 +158,20 @@ int main(void)
 	}
   
 	// ----------------- 
-
-	// now set up the acsi command bytes so we don't have to deal with this one anymore 
+    // now set up the acsi command bytes so we don't have to deal with this one anymore 
 	commandLong [0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
 
-    (void) Cconws("Testing (*=OK,C=Crc,_=Timeout):\r\n"); 		
+	// ----------------- 
+    // do a simple speed test
+    speedTest();
 
-   	//FIXME: check key the TOS way        
-	BYTE* ikbd = (BYTE *) 0xfffffc02;     
-  	while( *ikbd==0x39 ){
-  	}
+	// ----------------- 
+    print_status(0,0,0,0,0);
+	VT52_Clear_down();
+
+  	VT52_Goto_pos(0, 22);
+    (void) Cconws("Press 'Q' to quit the test...\r\n"); 		
+    (void) Cconws("Testing (*=OK,C=Crc,_=Timeout):\r\n"); 		
 
     int x = 0;                          // this variable will store current X position of carret, so we can return to the right position after some VT52_Goto_pos()
   	VT52_Goto_pos(0, 24);
@@ -177,8 +179,16 @@ int main(void)
     (void) Cconws("R:");
     x += 2;
     
-  	while(*ikbd!=0x39)
+  	while(1)
   	{
+        if(Cconis() != 0) {             // if some key is waiting
+            key = Cnecin();
+            
+            if(key == 'q' || key == 'Q') {
+                break;
+            }
+        }
+    
         int res=0;
   
         errorLine = ERROR_LINE_START;
@@ -395,8 +405,6 @@ BYTE findDevice(void)
 	(void) Cconws(bfr);
 	(void) Cconws("\r\n\r\n");
     
-    sleep(1);
-    
 	return id;
 }
 
@@ -543,4 +551,58 @@ void showHexDword(DWORD val)
     showHexByte((BYTE)  val);
 }
 
+void speedTest(void)
+{
+    DWORD byteCount = ((DWORD) MAXSECTORS) << 9;     // convert sector count to byte count ( sc * 512 )
 
+	commandLong[4+1] = TEST_READ;
+
+    // size to read
+	commandLong[5+1] = (byteCount >> 16) & 0xFF;
+	commandLong[6+1] = (byteCount >>  8) & 0xFF;
+	commandLong[7+1] = (byteCount      ) & 0xFF;
+
+    // Word to XOR with data on CE side
+	commandLong[8+1] = 0;
+	commandLong[9+1] = 0;
+
+  	VT52_Goto_pos(0, 23);
+    (void) Cconws("Read speed: ");
+    
+  	DWORD now, until, diff;
+	now = *HZ_200;
+    
+    int i;
+    BYTE res;
+    
+    for(i=0; i<20; i++) {
+        res = (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, MAXSECTORS );  // issue the command and check the result
+
+        if(res != OK) {                                                                     // ACSI ERROR?
+            (void) Cconws("fail -- on ");
+            showInt(i, 2);
+            (void) Cconws("out of ");
+            showInt(20, 2);
+            (void) Cconws("\n\r");
+
+            (void) Cnecin();
+            return;
+        }
+    }
+    
+  	until   = *HZ_200;
+    diff    = until - now;
+
+    int timeMs  = (diff * 1000) / 200;
+    int kbps    = ((20 * MAXSECTORS) * 500) / timeMs;
+    
+    showInt(kbps, -1);
+    (void) Cconws(" kB/s\n\r");
+    
+    (void) Cconws("Press any key to continue...\n\r");
+    (void) Cnecin();
+}
+
+
+ 
+ 
