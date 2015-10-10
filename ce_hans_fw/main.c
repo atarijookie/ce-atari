@@ -235,16 +235,22 @@ int main(void)
         
         // transfer the data - read (to ST)
         if(state == STATE_DATA_READ) {
+            timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
+            
             onDataRead();
         }
 
         // transfer the data - write (from ST)
         if(state == STATE_DATA_WRITE) {
+            timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
+            
             onDataWrite();
         }
         
         // this happens after WRITE - wait for status byte, send it to ST (read)
         if(state == STATE_READ_STATUS) {
+            timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
+            
             onReadStatus();
         }
 
@@ -309,6 +315,8 @@ int main(void)
 
             // SPI is idle and we should send command to host? 
             if(state == STATE_SEND_COMMAND) {
+                timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
+                
                 state = STATE_WAIT_COMMAND_RESPONSE;
                 
                 spiDma_txRx(    ATN_SENDACSICOMMAND_LEN_TX, (BYTE *) &atnSendACSIcommand[0], 

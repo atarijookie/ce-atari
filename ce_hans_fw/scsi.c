@@ -24,6 +24,8 @@ void updateEnabledIDsInSoloMode(void);
 void processScsiLocaly(BYTE justCmd, BYTE isIcd)
 {
     BYTE lun;
+
+    timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
     
     if(cmd[1] == 'C' && cmd[2] == 'S') {    // it's a Cosmo Solo command?
         processCosmoSoloCommands();
