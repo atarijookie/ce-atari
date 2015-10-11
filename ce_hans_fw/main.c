@@ -188,12 +188,23 @@ BYTE lastErr;
 
 int main(void)
 {
+    BYTE hwVersion;
+    
     LOG_ERROR(0);           // no error
     
     initAllStuff();         // now init everything
     
     getXilinxStatus();
     resetXilinx();
+    
+    hwVersion = xilinxHwFw >> 4;            // get only HW version -- should be 2 for v.2, or 1 for v.1
+    if(hwVersion != 2) {                    // for v.1 -- turn off MCO output
+        GPIOA->CRH &= ~(0x0000000f);        // remove bits from GPIOA
+        GPIOA->CRH |=   0x00000004;         // turn off MCO output on PA8 - leave it as floating input
+    } else {                                // for v.2 -- turn on  MCO output
+        GPIOA->CRH &= ~(0x0000000f);        // remove bits from GPIOA
+        GPIOA->CRH |=   0x0000000b;         // turn on MCO output on PA8 - alternate function
+    }
     //-------------
     // main loop
     while(1) {

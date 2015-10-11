@@ -81,8 +81,20 @@ BYTE PIO_write(void)
     return val;
 }
 
-// send status byte to ST 
+// send status byte to host, and on SCSI also to MSG IN byte
 void PIO_read(BYTE val)
+{
+    PIO_read_solely(val);       // this sends only STATUS byte to host - both in ACSI and SCSI
+    
+    if(!isAcsiNotScsi) {        // if it's SCSI, send also MSG IN to host
+        MSG_read(0);
+    }
+    
+    resetXilinx();              //reset XILINX - put BSY, C/D, I/O in released states
+    ACSI_DATADIR_WRITE();       // data as inputs (write)
+}
+
+void PIO_read_solely(BYTE val)
 {
     ACSI_DATADIR_READ();                                                    // data as outputs (read)
     GPIOB->ODR = val;                                                       // write the data to output data register
@@ -107,26 +119,6 @@ void PIO_read(BYTE val)
     }
     
     EXTI->PR = aCS;                                                         // clear int for CS
-    ACSI_DATADIR_WRITE();                                                   // data as inputs (write)
-    
-    if(!isAcsiNotScsi) {            // if it's SCSI, send MSG to computer
-        MSG_read(0);
-    }
-    
-    while(1) {
-        WORD wVal = GPIOB->IDR;      // read the signals
-            
-        if((wVal & aCS) != 0) {      // if aCS is high, we can continue
-            break;
-        }
-        
-        if(timeout()) {             // if timeout happened, pretend nothing serious happened
-            LOG_ERROR(42);
-            break;
-        }
-    }
-    
-    resetXilinx();                                                          //reset XILINX - put BSY, C/D, I/O in released states
 }
 
 // send MESSAGE IN byte to ST 
@@ -155,7 +147,6 @@ void MSG_read(BYTE val)
     }
     
     EXTI->PR = aCS;                                                         // clear int for CS
-    ACSI_DATADIR_WRITE();                                                   // data as inputs (write)
 }
 
 void DMA_read(BYTE val)
