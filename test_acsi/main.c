@@ -64,7 +64,8 @@ BYTE ifUsed;
 // Warning! Don't use VT52_Save_pos() and VT52_Load_pos(), because they don't work on Falcon! (They work fine on ST and TT.)
 
 int errorLine = 0;
-BYTE simpleNotDetailed = 1;
+BYTE simpleNotDetailedErrReport = 1;
+BYTE simpleNotDetailedBfrCheck = 1;
 
 //--------------------------------------------------
 int main(void)
@@ -140,9 +141,18 @@ int main(void)
     
     key = Cnecin();
     if(key == 'D' || key == 'd') {      // detailed?
-        simpleNotDetailed = 0;
+        simpleNotDetailedErrReport = 0;
     } else {                            // simple!
-        simpleNotDetailed = 1;
+        simpleNotDetailedErrReport = 1;
+    }
+	// ---------------------- 
+	(void) Cconws("\r\n\r\n[S]imple or [D]etailed (slower) READ buffer check?\r\n");
+    
+    key = Cnecin();
+    if(key == 'D' || key == 'd') {      // detailed?
+        simpleNotDetailedBfrCheck = 0;
+    } else {                            // simple!
+        simpleNotDetailedBfrCheck = 1;
     }
 	// ---------------------- 
 	// search for device on the ACSI bus 
@@ -234,16 +244,27 @@ int main(void)
 		print_head();
 
         //--------------
-        if(!simpleNotDetailed) {                                    // if detailed error report with wait
+        if(!simpleNotDetailedErrReport) {                           // if detailed error report with wait
             if(errorLine != ERROR_LINE_START) {                     // if some error happened, wait for key
-                logMsg("Shit happened, press 'C' to continue.");    // show message
+                BYTE quitIt = 0;
                 
-                while(1) {                                          // wait for 'c' key
+                logMsg("Shit happened, press 'C' to continue or 'Q' to quit.");    // show message
+                
+                while(1) {                                          // wait for 'c' key or 'q' key
                     key = Cnecin();
                     
                     if(key == 'C' || key == 'c') {
                         break;
                     }
+                    
+                    if(key == 'Q' || key == 'q') {
+                        quitIt = 1;
+                        break;
+                    }
+                }
+                
+                if(quitIt) {                                        // should quit app?
+                    break;
                 }
             }
             
@@ -424,11 +445,24 @@ int readHansTest(DWORD byteCount, WORD xorVal ){
 	commandLong[8+1] = (xorVal >> 8) & 0xFF;
 	commandLong[9+1] = (xorVal     ) & 0xFF;
 
-    memset(pBuffer, 0, 8);      // clear first few bytes so we can detect if the data was really read, or it was only retained from last write in the buffer    
+    if(simpleNotDetailedBfrCheck) {     // if simple bfr check
+        memset(pBuffer, 0, 8);          // clear first few bytes so we can detect if the data was really read, or it was only retained from last write in the buffer    
+    } else {                            // if detailed bfr check
+        memset(pBuffer, 0, byteCount);  // clear the whole buffer - this is slower, but it's able to find the problem in any part of the read buffer
+    }
+        
 	res = (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, (byteCount+511)>>9 );		// issue the command and check the result
     
-    if(res != OK) {                                                             // ACSI ERROR?
+    if(res != OK && simpleNotDetailedBfrCheck) {    // xCSI ERROR and simple check mean QUIT, xCSI ERROR + detailed check mean - check the buffer anyway!
         return -1;
+    }
+    
+    // if we came here, then either there's no error, or there's error but we still want to compare the buffers
+    BYTE retVal;
+    if(res == OK) {     // no error - at the end just return 0
+        retVal = 0;
+    } else {            // some error - at the end return -1
+        retVal = -1;
     }
     
     WORD counter = 0;
@@ -437,7 +471,13 @@ int readHansTest(DWORD byteCount, WORD xorVal ){
     for(i=0; i<byteCount; i += 2) {
         data = counter ^ xorVal;       // create word
         if( !(pBuffer[i]==(data>>8) && pBuffer[i+1]==(data&0xFF)) ){
-          return -2;
+        
+            if(!simpleNotDetailedBfrCheck) {            // if detailed bfr check
+                logMsg("First mismatched byte at pos: ");
+                showHexDword(i);
+            }
+        
+            return -2;
         }  
         counter++;
     }
@@ -445,11 +485,19 @@ int readHansTest(DWORD byteCount, WORD xorVal ){
     if(byteCount & 1) {                                 // odd number of bytes? add last byte
         BYTE lastByte = (counter ^ xorVal) >> 8;
         if( pBuffer[byteCount-1]!=lastByte ){
-          return -2;
+            if(!simpleNotDetailedBfrCheck) {            // if detailed bfr check
+                logMsg("First mismatched byte at last byte!");
+            }
+
+            return -2;
         }  
     }
     
-	return 0;
+    if(retVal != 0) {       // if we came here, then either there's no xCSI error, or there was xCSI error but the received buffer is still OK
+        logMsg("xCSI cmd failed, but the READ buffer seems to be OK, wtf?!");
+    }
+    
+	return retVal;
 }
 
 //--------------------------------------------------
@@ -497,7 +545,7 @@ int writeHansTest(DWORD byteCount, WORD xorVal){
 
 void logMsg(char *logMsg)
 {
-    if(simpleNotDetailed) {             // if simple, don't show these SCSI log messages
+    if(simpleNotDetailedErrReport && simpleNotDetailedBfrCheck) {   // if simple, don't show these SCSI log messages
         return;
     }
 
