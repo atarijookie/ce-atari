@@ -34,12 +34,13 @@ void showHexDword(DWORD val);
 
 void scsi_reset(void);
 
-void cs_inquiry(BYTE id);
-void CEread(void);
+void cs_inquiry(BYTE id, BYTE verbose);
+void CEread(BYTE verbose);
 void findDevice(void);
 
 void CEwrite(void);
 int  writeHansTest(int byteCount, WORD xorVal);
+void showInt(int value, int length);
 
 BYTE showLogs = 1;
 void showMenu(void);
@@ -124,10 +125,6 @@ int main(void)
 
         key		=  scancode & 0xff;
         
-        if(key >= 'A' && key <= 'Z') {
-            key += 32;
-        }
-
         if(key == 'q') {
             (void) Cconws("Terminating...\r\n");
             sleep(1);
@@ -142,15 +139,61 @@ int main(void)
         }
         
         if(key == 'i') {            // INQUIRY command
-            cs_inquiry(deviceID);
+            cs_inquiry(deviceID, 1);
             continue;
         }
 
+        if(key == 'I') {
+            int i;
+            DWORD start, end, diff;
+        
+            start = getTicks();
+            for(i=0; i<10; i++) {
+                cs_inquiry(deviceID, 0);
+            }
+            end = getTicks();
+            diff = end - start;
+            int timeMs  = (diff * 1000) / 200;
+            
+            (void) Cconws("\n\rINQUIRY x 10 took: ");
+            showInt(timeMs, -1);
+            (void) Cconws(" ms\n\r");
+            
+            continue;
+        }
+        
         if(key == 'r') {            // read 
-            CEread();
+            CEread(1);
             continue;
         }
+        
+        if(key == 'R') {
+            int i;
+            DWORD start, end, diff;
+        
+            start = getTicks();
+            for(i=0; i<10; i++) {
+                CEread(0);
+            }
+            end = getTicks();
+            diff = end - start;
+            
+            diff    = end - start;
 
+            int timeMs  = (diff * 1000) / 200;
+            int kbps    = ((10 * MAXSECTORS) * 500) / timeMs;
+
+            (void) Cconws("\n\rREAD x 10 time : ");
+            showInt(timeMs, -1);
+            (void) Cconws(" ms\n\r");
+
+            (void) Cconws("\n\rREAD x 10 speed: ");
+            showInt(kbps, -1);
+            (void) Cconws(" kB/s\n\r");
+    
+            continue;
+        }
+        
         if(key == 'w') {            // write
             CEwrite();
             continue;
@@ -190,27 +233,27 @@ void showMenu(void)
 }
 
 BYTE commandLong[CMD_LENGTH_LONG] = {0x1f,	0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
-int readHansTest(int byteCount, WORD xorVal);
+int readHansTest(int byteCount, WORD xorVal, BYTE verbose);
 
-void CEread(void)
+void CEread(BYTE verbose)
 {
   	commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
 	commandLong[1] = 0xA0;								// cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)  	
 
     WORD xorVal=0xC0DE;
     
-    int res = readHansTest(RW_TEST_SIZE * 512, xorVal);
+    int res = readHansTest(RW_TEST_SIZE * 512, xorVal, verbose);
     
     switch( res )
     {
         case -1:    (void) Cconws("TIMEOUT\r\n");   break;
         case -2:    (void) Cconws("CRC FAIL\r\n");  break;
-        case 0:     (void) Cconws("GOOD\r\n");      break;
+        case 0:     if(verbose) { (void) Cconws("GOOD\r\n"); }  break;
         default:    (void) Cconws("ERROR\r\n");     break;
     }
 }
 
-int readHansTest(int byteCount, WORD xorVal)
+int readHansTest(int byteCount, WORD xorVal, BYTE verbose)
 {
     WORD res;
     
@@ -225,11 +268,18 @@ int readHansTest(int byteCount, WORD xorVal)
 	commandLong[8+1] = (xorVal >> 8) & 0xFF;
 	commandLong[9+1] = (xorVal     ) & 0xFF;
 
-    (void) Cconws("CE READ: ");
+    if(verbose) {
+        (void) Cconws("CE READ: ");
+    }
+    
     res = (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, byteCount >> 9);      // issue the command and check the result
     
     if(res != OK) {                                                                                 // ACSI ERROR?
         return -1;
+    }
+    
+    if(!verbose) {
+        return 0;
     }
     
     int i;
@@ -253,7 +303,7 @@ int readHansTest(int byteCount, WORD xorVal)
 	return 0;
 }
 
-void cs_inquiry(BYTE id)
+void cs_inquiry(BYTE id, BYTE verbose)
 {
 	int res, i;
     BYTE cmd[6];
@@ -261,19 +311,27 @@ void cs_inquiry(BYTE id)
     memset(cmd, 0, 6);
     cmd[0] = (id << 5) | (SCSI_CMD_INQUIRY & 0x1f);
     cmd[4] = 32;                                // count of bytes we want from inquiry command to be returned
+
+    if(verbose) {
+        (void) Cconws("SCSI Inquiry: ");
+    }    
     
     // issue the inquiry command and check the result 
-    (void) Cconws("SCSI Inquiry: ");
     res = (*hdIf.cmd) (1, cmd, 6, pBuffer, 1);
-    
-    (void) Cconws("SCSI result : ");
-    showHexByte(res);
-    (void) Cconws("\r\n");
+
+    if(res != 0 || verbose) {               // if fail or verbose, show result
+        (void) Cconws("SCSI result : ");
+        showHexByte(res);
+        (void) Cconws("\r\n");
+    }
     
     if(res != 0) {          // if failed, don't dump anything, it would be just garbage
         return;
     }
     
+    if(!verbose) {          // not verbose? quit, because the rest is just being verbose...
+        return;
+    }    
     //----------------------------
     // hex dump of data
     (void) Cconws("INQUIRY HEXA: ");
@@ -466,4 +524,41 @@ void logMsgProgress(DWORD current, DWORD total)
     (void) Cconws(" out of ");
     showHexDword(total);
     (void) Cconws("\n\r");
+}
+
+void showInt(int value, int length)
+{
+    char tmp[10];
+    memset(tmp, 0, 10);
+
+    if(length == -1) {                      // determine length?
+        int i, div = 10;
+
+        for(i=1; i<6; i++) {                // try from 10 to 1000000
+            if((value / div) == 0) {        // after division the result is zero? we got the length
+                length = i;
+                break;
+            }
+
+            div = div * 10;                 // increase the divisor by 10
+        }
+
+        if(length == -1) {                  // length undetermined? use length 6
+            length = 6;
+        }
+    }
+
+    int i;
+    for(i=0; i<length; i++) {               // go through the int lenght and get the digits
+        int val, mod;
+
+        val = value / 10;
+        mod = value % 10;
+
+        tmp[length - 1 - i] = mod + 48;     // store the current digit
+
+        value = val;
+    }
+
+    (void) Cconws(tmp);                     // write it out
 }
