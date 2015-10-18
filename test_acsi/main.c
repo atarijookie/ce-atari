@@ -26,6 +26,7 @@ void sleep(int seconds);
 void print_head(void);
 void print_status(int runcnt, int errcnt_crc_r, int errcnt_crc_w, int errcnt_timeout_r, int errcnt_timeout_w);
 
+void showHexByte(BYTE val);
 void showHexDword(DWORD val);
 void logMsg(char *logMsg);
 void deleteErrorLines(void);
@@ -37,8 +38,9 @@ BYTE deviceID;
 
 BYTE commandLong [CMD_LENGTH_LONG ] = {0x1f, 0xA0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
 
-BYTE myBuffer[256 * 512];
-BYTE *pBuffer;
+BYTE readBuffer [256 * 512];
+BYTE writeBuffer[256 * 512];
+BYTE *rBuffer, *wBuffer;
 
 BYTE prevCommandFailed;
 
@@ -65,7 +67,11 @@ BYTE ifUsed;
 
 int errorLine = 0;
 BYTE simpleNotDetailedErrReport = 1;
-BYTE simpleNotDetailedBfrCheck = 1;
+
+#define BFR_CHECK_NONE      0
+#define BFR_CHECK_SIMPLE    1
+#define BFR_CHECK_DETAILED  2
+BYTE bfrCheckType = BFR_CHECK_SIMPLE;
 
 //--------------------------------------------------
 int main(void)
@@ -87,12 +93,20 @@ int main(void)
 	
 	// ---------------------- 
 	// create buffer pointer to even address 
-	toEven = (DWORD) &myBuffer[0];
+	toEven = (DWORD) &readBuffer[0];
   
 	if(toEven & 0x0001)       // not even number? 
 		toEven++;
   
-	pBuffer = (BYTE *) toEven; 
+	rBuffer = (BYTE *) toEven; 
+
+    //----------
+  	toEven = (DWORD) &writeBuffer[0];
+  
+	if(toEven & 0x0001)       // not even number? 
+		toEven++;
+  
+	wBuffer = (BYTE *) toEven; 
 
 	Clear_home();
 
@@ -146,13 +160,15 @@ int main(void)
         simpleNotDetailedErrReport = 1;
     }
 	// ---------------------- 
-	(void) Cconws("\r\n\r\n[S]imple or [D]etailed (slower) READ buffer check?\r\n");
+	(void) Cconws("\r\n\r\n[S]imple, [D]etailed (slower) or [N]o READ buffer check?\r\n");
     
     key = Cnecin();
-    if(key == 'D' || key == 'd') {      // detailed?
-        simpleNotDetailedBfrCheck = 0;
-    } else {                            // simple!
-        simpleNotDetailedBfrCheck = 1;
+    if(key == 'D' || key == 'd') {          // detailed?
+        bfrCheckType = BFR_CHECK_DETAILED;
+    } else if(key == 'N' || key == 'n') {   // no check?
+        bfrCheckType = BFR_CHECK_NONE;
+    } else {                                // simple!
+        bfrCheckType = BFR_CHECK_SIMPLE;
     }
 	// ---------------------- 
 	// search for device on the ACSI bus 
@@ -358,14 +374,14 @@ BYTE ce_identify(BYTE ACSI_id)
   BYTE cmd[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TRAN_CMD_IDENTIFY, 0};
   
   cmd[0] = (ACSI_id << 5); 					// cmd[0] = ACSI_id + TEST UNIT READY (0)	
-  memset(pBuffer, 0, 512);              	// clear the buffer 
+  memset(rBuffer, 0, 512);              	// clear the buffer 
 
-  res = (*hdIf.cmd) (ACSI_READ, cmd, CMD_LENGTH_SHORT, pBuffer, 1);    // issue the identify command and check the result 
+  res = (*hdIf.cmd) (ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);    // issue the identify command and check the result 
     
   if(res != OK)                         	// if failed, return FALSE 
     return 0;
     
-  if(strncmp((char *) pBuffer, "CosmosEx translated disk", 24) != 0) {		// the identity string doesn't match? 
+  if(strncmp((char *) rBuffer, "CosmosEx translated disk", 24) != 0) {		// the identity string doesn't match? 
 	 return 0;
   }
 	
@@ -431,7 +447,8 @@ BYTE findDevice(void)
 
 //--------------------------------------------------
 
-int readHansTest(DWORD byteCount, WORD xorVal ){
+int readHansTest(DWORD byteCount, WORD xorVal )
+{
     WORD res;
 
 	commandLong[4+1] = TEST_READ;
@@ -445,15 +462,19 @@ int readHansTest(DWORD byteCount, WORD xorVal ){
 	commandLong[8+1] = (xorVal >> 8) & 0xFF;
 	commandLong[9+1] = (xorVal     ) & 0xFF;
 
-    if(simpleNotDetailedBfrCheck) {     // if simple bfr check
-        memset(pBuffer, 0, 8);          // clear first few bytes so we can detect if the data was really read, or it was only retained from last write in the buffer    
-    } else {                            // if detailed bfr check
-        memset(pBuffer, 0, byteCount);  // clear the whole buffer - this is slower, but it's able to find the problem in any part of the read buffer
+    if(bfrCheckType == BFR_CHECK_DETAILED) {    // if detailed bfr check
+        memset(rBuffer, 0, byteCount);          // clear the whole buffer - this is slower, but it's able to find the problem in any part of the read buffer
+    } else {                                    // if simple bfr check
+        memset(rBuffer, 0, 8);                  // clear first few bytes so we can detect if the data was really read, or it was only retained from last write in the buffer    
     }
         
-	res = (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, (byteCount+511)>>9 );		// issue the command and check the result
+	res = (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, (byteCount+511)>>9 );		// issue the command and check the result
     
-    if(res != OK && simpleNotDetailedBfrCheck) {    // xCSI ERROR and simple check mean QUIT, xCSI ERROR + detailed check mean - check the buffer anyway!
+    if(res == OK && bfrCheckType == BFR_CHECK_NONE) {        // if success and NO BFR CHECK, return success
+        return 0;
+    }
+    
+    if(res != OK && bfrCheckType != BFR_CHECK_DETAILED) {   // FAIL + simple/no check mean QUIT, FAIL + detailed check mean - check the buffer anyway!
         return -1;
     }
     
@@ -470,11 +491,25 @@ int readHansTest(DWORD byteCount, WORD xorVal ){
     DWORD i;
     for(i=0; i<byteCount; i += 2) {
         data = counter ^ xorVal;       // create word
-        if( !(pBuffer[i]==(data>>8) && pBuffer[i+1]==(data&0xFF)) ){
+        if( !(rBuffer[i]==(data>>8) && rBuffer[i+1]==(data&0xFF)) ){
         
-            if(!simpleNotDetailedBfrCheck) {            // if detailed bfr check
+            if(!bfrCheckType) {            // if detailed bfr check
                 logMsg("First mismatched byte at pos: ");
                 showHexDword(i);
+                (void) Cconws("   ");
+                logMsg("Data really is: ");
+                showHexByte(rBuffer[i+0]);
+                showHexByte(rBuffer[i+1]);
+                showHexByte(rBuffer[i+2]);
+                showHexByte(rBuffer[i+3]);
+                (void) Cconws("   ");
+                logMsg("Data should be: ");
+                showHexByte(data >> 8);
+                showHexByte(data & 0xff);
+                data = (counter+1) ^ xorVal;       // create word
+                showHexByte(data >> 8);
+                showHexByte(data & 0xff);
+                (void) Cconws("   ");
             }
         
             return -2;
@@ -484,8 +519,8 @@ int readHansTest(DWORD byteCount, WORD xorVal ){
 
     if(byteCount & 1) {                                 // odd number of bytes? add last byte
         BYTE lastByte = (counter ^ xorVal) >> 8;
-        if( pBuffer[byteCount-1]!=lastByte ){
-            if(!simpleNotDetailedBfrCheck) {            // if detailed bfr check
+        if( rBuffer[byteCount-1]!=lastByte ){
+            if(!bfrCheckType) {            // if detailed bfr check
                 logMsg("First mismatched byte at last byte!");
             }
 
@@ -502,7 +537,9 @@ int readHansTest(DWORD byteCount, WORD xorVal ){
 
 //--------------------------------------------------
 
-int writeHansTest(DWORD byteCount, WORD xorVal){
+int writeHansTest(DWORD byteCount, WORD xorVal)
+{
+    static WORD prevXorVal = 0xffff;
     BYTE res;
     
 	commandLong[4+1] = TEST_WRITE;
@@ -516,22 +553,26 @@ int writeHansTest(DWORD byteCount, WORD xorVal){
 	commandLong[8+1] = (xorVal >> 8) & 0xFF;
 	commandLong[9+1] = (xorVal     ) & 0xFF;
 
-    WORD counter = 0;
-    WORD data = 0;
-    DWORD i;
-    for(i=0; i<byteCount; i += 2) {
-        data = counter ^ xorVal;       // create word
-        pBuffer[i  ]    = (data >> 8);
-        pBuffer[i+1]    = (data &  0xFF);
-        counter++;
+    if(prevXorVal != xorVal) {              // if xorVal changed since last call, generate buffer (otherwise skip that)
+        prevXorVal = xorVal;
+    
+        WORD counter = 0;
+        WORD data = 0;
+        DWORD i;
+        for(i=0; i<byteCount; i += 2) {
+            data = counter ^ xorVal;       // create word
+            wBuffer[i  ]    = (data >> 8);
+            wBuffer[i+1]    = (data &  0xFF);
+            counter++;
+        }
+
+        if(byteCount & 1) {                                 // odd number of bytes? add last byte
+            BYTE lastByte           = (counter ^ xorVal) >> 8;
+            wBuffer[byteCount-1]    = lastByte;
+        }
     }
 
-    if(byteCount & 1) {                                 // odd number of bytes? add last byte
-        BYTE lastByte           = (counter ^ xorVal) >> 8;
-        pBuffer[byteCount-1]    = lastByte;
-    }
-
-	res = (*hdIf.cmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBuffer, (byteCount+511)>>9 );		// issue the command and check the result
+	res = (*hdIf.cmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, wBuffer, (byteCount+511)>>9 );		// issue the command and check the result
     
     if(res == E_CRC) {                                                            
         return -2;
@@ -545,7 +586,7 @@ int writeHansTest(DWORD byteCount, WORD xorVal){
 
 void logMsg(char *logMsg)
 {
-    if(simpleNotDetailedErrReport && simpleNotDetailedBfrCheck) {   // if simple, don't show these SCSI log messages
+    if(simpleNotDetailedErrReport && bfrCheckType) {   // if simple, don't show these SCSI log messages
         return;
     }
 
@@ -624,7 +665,7 @@ void speedTest(void)
     BYTE res;
     
     for(i=0; i<20; i++) {
-        res = (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, MAXSECTORS );  // issue the command and check the result
+        res = (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, MAXSECTORS );  // issue the command and check the result
 
         if(res != OK) {                                                                     // ACSI ERROR?
             (void) Cconws("fail -- on ");
@@ -650,7 +691,3 @@ void speedTest(void)
     (void) Cconws("Press any key to continue...\n\r");
     (void) Cnecin();
 }
-
-
- 
- 
