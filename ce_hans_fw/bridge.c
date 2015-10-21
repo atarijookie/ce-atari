@@ -84,10 +84,14 @@ BYTE PIO_write(void)
 // send status byte to host, and on SCSI also to MSG IN byte
 void PIO_read(BYTE val)
 {
-    PIO_read_solely(val);       // this sends only STATUS byte to host - both in ACSI and SCSI
+    if(brStat != E_TimeOut) {       // if we didn't have bridge timeout, we can try to send STATUS byte
+        PIO_read_solely(val);       // this sends only STATUS byte to host - both in ACSI and SCSI
+    }
     
-    if(!isAcsiNotScsi) {        // if it's SCSI, send also MSG IN to host
-        MSG_read(0);
+    if(!isAcsiNotScsi) {            // if it's SCSI, send also MSG IN to host
+        if(brStat != E_TimeOut) {   // if we didn't have bridge timeout, we can try to send MSG IN
+            MSG_read(0);
+        }
     }
     
     resetXilinx();              //reset XILINX - put BSY, C/D, I/O in released states

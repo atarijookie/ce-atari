@@ -169,6 +169,7 @@ void initAllStuff(void);
 void getXilinxStatus(void);
 void resetXilinx(void);
 BYTE isBusIdle(void);
+void handleAcsiCommand(void);
 
 BYTE xilinxHwFw;
 BYTE isAcsiNotScsi;
@@ -185,6 +186,9 @@ void updateEnabledIDsInSoloMode(void);
 BYTE tryProcessLocally(void);
 
 BYTE lastErr;
+
+DWORD toStart;
+DWORD lastStart, lastEnd;
 
 int main(void)
 {
@@ -205,20 +209,12 @@ int main(void)
         GPIOA->CRH &= ~(0x0000000f);        // remove bits from GPIOA
         GPIOA->CRH |=   0x0000000b;         // turn on MCO output on PA8 - alternate function
     }
+    
     //-------------
     // main loop
     while(1) {
-        // if something was wrong, reset XILINX so it won't get stuck 
-        if(brStat != E_OK) {
-            resetXilinx();
-        }
-        
-        if(state == STATE_GET_COMMAND && !isAcsiNotScsi) {  // on GET COMMAND on SCSI device
-            if(!isBusIdle()) {                              // if the bus is not idle, do the reset
-                resetXilinx();
-            }
-        }
-        
+        //---------------------------
+        // START: SD card insertion / removal handling
         // if card insert state changed, mark down this event
         if(prevIsCardInserted != isCardInserted()) {
             prevIsCardInserted = isCardInserted();
@@ -238,45 +234,15 @@ int main(void)
                 sdCardInit();
             }
         }
-        
+        // END: SD card insertion / removal handling
+        //---------------------------
         // get the command from ACSI and send it to host
-        if(state == STATE_GET_COMMAND && PIO_gotFirstCmdByte()) {                   // if 1st CMD byte was received
-            onGetCommand();
-        }
-        
-        // transfer the data - read (to ST)
-        if(state == STATE_DATA_READ) {
-            timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
-            
-            onDataRead();
+        if(PIO_gotFirstCmdByte()) {                             // if 1st CMD byte was received
+            handleAcsiCommand();
         }
 
-        // transfer the data - write (from ST)
-        if(state == STATE_DATA_WRITE) {
-            timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
-            
-            onDataWrite();
-        }
-        
-        // this happens after WRITE - wait for status byte, send it to ST (read)
-        if(state == STATE_READ_STATUS) {
-            timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
-            
-            onReadStatus();
-        }
-
-        if(state == STATE_GET_COMMAND && sendFwVersion) {
-            state = STATE_SEND_FW_VER;
-            sendFwVersion = FALSE;
-        }
-        
-        // sending and receiving data over SPI using DMA
-        if(spiDmaIsIdle && shouldProcessCommands) {                                             // SPI DMA: nothing to Tx and nothing to Rx?
-            processHostCommands();                                                              // and process all the received commands
-            
-            shouldProcessCommands = FALSE;                                                      // mark that we don't need to process commands until next time
-        }
-
+        //---------------------------
+        // START: SOLO / SLAVE mode checking and handling
         if(!spiDmaIsIdle && timeout()) {                                                        // if we got stuck somewhere, do IDLE again
             LOG_ERROR(1);
             
@@ -309,44 +275,113 @@ int main(void)
             continue;
         }
         
-        if(spiDmaIsIdle) {
-            // in command waiting state, nothing to do and should send FW version?
-            if(state == STATE_SEND_FW_VER) {
-                state = STATE_GET_COMMAND;
-                
-                atnSendFwVersion[6] = (((WORD)currentLed) << 8) | xilinxHwFw;                   // store the current LED status in the last WORD, and also XILINX info byte value
-                
-                timeoutStart();                                                                 // start timeout counter so we won't get stuck somewhere
+        // END: SOLO / SLAVE mode checking and handling
+        //---------------------------
+        // sending and receiving data over SPI using DMA
+        if(spiDmaIsIdle && shouldProcessCommands) {                                             // SPI DMA: nothing to Tx and nothing to Rx?
+            processHostCommands();                                                              // and process all the received commands
             
-                spiDma_txRx(    ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0],     
-                                ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
-                
-                shouldProcessCommands = TRUE;                                                   // mark that we should process the commands on next SPI DMA idle time
-            }
+            shouldProcessCommands = FALSE;                                                      // mark that we don't need to process commands until next time
+        }
 
-            // SPI is idle and we should send command to host? 
-            if(state == STATE_SEND_COMMAND) {
-                timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
-                
-                state = STATE_WAIT_COMMAND_RESPONSE;
-                
-                spiDma_txRx(    ATN_SENDACSICOMMAND_LEN_TX, (BYTE *) &atnSendACSIcommand[0], 
-                                ATN_SENDACSICOMMAND_LEN_RX, (BYTE *) &cmdBuffer[0]);
-                
-                shouldProcessCommands = TRUE;                                                   // mark that we should process the commands on next SPI DMA idle time
-            }
+        // in command waiting state, nothing to do and should send FW version?
+        if(spiDmaIsIdle && sendFwVersion) {
+            sendFwVersion = FALSE;
+            
+            timeoutStart();                                                                 // start timeout counter so we won't get stuck somewhere
+            atnSendFwVersion[6] = (((WORD)currentLed) << 8) | xilinxHwFw;                   // store the current LED status in the last WORD, and also XILINX info byte value
+        
+            spiDma_txRx(    ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0],     
+                            ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
+            
+            shouldProcessCommands = TRUE;                                                   // mark that we should process the commands on next SPI DMA idle time
         }
         
+        //---------------------------
         // if the button was pressed, handle it
         if(EXTI->PR & BUTTON) {
             onButtonPress();
         }
         
-        //-------------------------------------------------
+        //---------------------------
         // the following part is here to send FW version each second
         if((TIM2->SR & 0x0001) != 0) {                          // overflow of TIM2 occured?
             TIM2->SR = 0xfffe;                                  // clear UIF flag
             sendFwVersion = TRUE;
+        }
+    }
+}
+
+void handleAcsiCommand(void)
+{
+    // this is the loop which should go through the whole command processing (cmd phase, data phase, status phase) without other stuff
+    while(1) {
+        // get the command from ACSI and send it to host
+        // IN  STATE: STATE_GET_COMMAND
+        // OUT STATE: WAIT_COMMAND_RESPONSE when GOOD, STATE_GET_COMMAND when FAIL
+        if(state == STATE_GET_COMMAND && PIO_gotFirstCmdByte()) {                   // if 1st CMD byte was received
+            onGetCommand();
+        }
+        
+        // transfer the data - read (to ST)
+        // IN  STATE: STATE_DATA_READ
+        // OUT STATE: always STATE_GET_COMMAND, but if everything is well, it also does PIO_read()
+        if(state == STATE_DATA_READ) {
+            timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
+            
+            onDataRead();
+            break;                                  // at this point it's either success or fail, but we're finished here
+        }
+
+        // transfer the data - write (from ST)
+        // IN  STATE: STATE_DATA_WRITE
+        // OUT STATE: STATE_READ_STATUS on success, STATE_GET_COMMAND on FAIL
+        if(state == STATE_DATA_WRITE) {
+            timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
+            
+            onDataWrite();
+        }
+        
+        // this happens after WRITE - wait for status byte, send it to ST (read)
+        // IN  STATE: STATE_READ_STATUS
+        // OUT STATE: always STATE_GET_COMMAND
+        if(state == STATE_READ_STATUS) {
+            timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
+            
+            onReadStatus();
+            break;                                  // at this point it's either success or fail, but we're finished here
+        }
+
+        // sending and receiving data over SPI using DMA
+        // IN  STATE: any
+        // OUT STATE: STATE_DATA_WRITE, STATE_DATA_READ, or unchanged
+        if(spiDmaIsIdle && shouldProcessCommands) {                                             // SPI DMA: nothing to Tx and nothing to Rx?
+            processHostCommands();                                                              // and process all the received commands
+            
+            shouldProcessCommands = FALSE;                                                      // mark that we don't need to process commands until next time
+        }
+        
+        if(timeout()) {         // if the data from host doesn't come within timeout, quit
+            LOG_ERROR(50);
+            state = STATE_GET_COMMAND;
+            break;
+        }
+        
+        // if we came here and we are in the basic state, go to the outside loop to do the rest of the code
+        if(state == STATE_GET_COMMAND) {
+            break;
+        }
+    }
+
+    //---------------
+    // if something was wrong, reset XILINX so it won't get stuck 
+    if(brStat != E_OK) {
+        resetXilinx();
+    }
+    
+    if(!isAcsiNotScsi) {        // on SCSI device
+        if(!isBusIdle()) {      // if the bus is not idle, do the reset
+            resetXilinx();
         }
     }
 }
@@ -511,13 +546,19 @@ void onGetCommand(void)
         return;
     }
     
-    //-----
+    //----------------
     // if we got here, we should handle this in host (RPi)
-    for(i=0; i<7; i++) {                        
+    for(i=0; i<7; i++) {                // fill the command to array
         atnSendACSIcommand[4 + i] = (((WORD)cmd[i*2 + 0]) << 8) | cmd[i*2 + 1];
     }
-            
-    state = STATE_SEND_COMMAND;
+
+    timeoutStart();                     // start the timeout timer to give the rest of code full timeout time
+    
+    spiDma_txRx(    ATN_SENDACSICOMMAND_LEN_TX, (BYTE *) &atnSendACSIcommand[0], 
+                    ATN_SENDACSICOMMAND_LEN_RX, (BYTE *) &cmdBuffer[0]);
+    
+    state = STATE_WAIT_COMMAND_RESPONSE;
+    shouldProcessCommands = TRUE;       // mark that we should process the commands on next SPI DMA idle time
 }
 
 BYTE onGetCommandAcsi(void)
