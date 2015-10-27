@@ -2,12 +2,20 @@
 #include <mint/sysbind.h>
 #include "acsi.h"
 
+#include "hdd_if.h"
+
 // -------------------------------------- 
-BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
-	DWORD status;
 	WORD i, wr1, wr2;
 
+    //--------
+    // init result to fail codes
+    hdIf.success        = FALSE;
+    hdIf.statusByte     = ACSIERROR;
+    hdIf.phaseChanged   = FALSE;
+    //--------
+    
 	*FLOCK = -1;                                // disable FDC operations 
 	setdma((DWORD) buffer);                     // setup DMA transfer address 
 
@@ -20,7 +28,8 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 	if (qdone() != OK) {					    // wait for ack 
 		hdone();                                // restore DMA device to normal 
 
-		return ACSIERROR;
+        hdIf.success = FALSE;
+		return;
 	}
 	//*******************************
 	// transfer middle cmd bytes 
@@ -31,7 +40,8 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 		if (qdone() != OK) {				    // wait for ack 
 			hdone();                            // restore DMA device to normal 
 			
-			return ACSIERROR;
+            hdIf.success = FALSE;
+            return;
 		}
 	}
 	
@@ -53,26 +63,28 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     *dmaAddrData = cmd[cmdLength - 1];          // transfer the last command byte              
     *dmaAddrMode = wr2;                         // start DMA transfer 
 
-    status = endcmd(wr2 | NO_DMA | HDC | A0);   // wait for DMA completion 
+    endcmd(wr2 | NO_DMA | HDC | A0);            // wait for DMA completion 
 	hdone();                                    // restore DMA device to normal 
-
-	return status;
 }
 
 //**************************************************************************
-BYTE endcmd(WORD mode)
+void endcmd(WORD mode)
 {
 	WORD val;
 
-	if (fdone() != OK)                  // wait for operation done ack 
-		return ACSIERROR;
+	if (fdone() != OK) {                // wait for operation done ack 
+        hdIf.success = FALSE;           // failed?
+
+		return;
+    }
 
 	*dmaAddrMode = mode;                // write mode word to mode register 
 
 	val = *dmaAddrData;
 	val = val & 0x00ff;
 
-	return val;							// return completion byte 
+    hdIf.success        = TRUE;         // success!
+    hdIf.statusByte     = val;          // store status byte
 }
 //**************************************************************************
 BYTE hdone(void)

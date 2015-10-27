@@ -370,16 +370,16 @@ void print_status(int runcnt, int errcnt_crc_r, int errcnt_crc_w, int errcnt_tim
 //--------------------------------------------------
 BYTE ce_identify(BYTE ACSI_id)
 {
-  WORD res;
   BYTE cmd[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TRAN_CMD_IDENTIFY, 0};
   
   cmd[0] = (ACSI_id << 5); 					// cmd[0] = ACSI_id + TEST UNIT READY (0)	
   memset(rBuffer, 0, 512);              	// clear the buffer 
 
-  res = (*hdIf.cmd) (ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);    // issue the identify command and check the result 
+  (*hdIf.cmd) (ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);   // issue the identify command and check the result 
     
-  if(res != OK)                         	// if failed, return FALSE 
+  if(!hdIf.success || hdIf.statusByte != 0) {                   // if failed, return FALSE 
     return 0;
+  }
     
   if(strncmp((char *) rBuffer, "CosmosEx translated disk", 24) != 0) {		// the identity string doesn't match? 
 	 return 0;
@@ -449,8 +449,6 @@ BYTE findDevice(void)
 
 int readHansTest(DWORD byteCount, WORD xorVal )
 {
-    WORD res;
-
 	commandLong[4+1] = TEST_READ;
 
     // size to read
@@ -468,19 +466,19 @@ int readHansTest(DWORD byteCount, WORD xorVal )
         memset(rBuffer, 0, 8);                  // clear first few bytes so we can detect if the data was really read, or it was only retained from last write in the buffer    
     }
         
-	res = (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, (byteCount+511)>>9 );		// issue the command and check the result
+	(*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, (byteCount+511)>>9 );		// issue the command and check the result
     
-    if(res == OK && bfrCheckType == BFR_CHECK_NONE) {        // if success and NO BFR CHECK, return success
+    if(hdIf.success && bfrCheckType == BFR_CHECK_NONE) {        // if success and NO BFR CHECK, return success
         return 0;
     }
     
-    if(res != OK && bfrCheckType != BFR_CHECK_DETAILED) {   // FAIL + simple/no check mean QUIT, FAIL + detailed check mean - check the buffer anyway!
+    if(!hdIf.success && bfrCheckType != BFR_CHECK_DETAILED) {   // FAIL + simple/no check mean QUIT, FAIL + detailed check mean - check the buffer anyway!
         return -1;
     }
     
     // if we came here, then either there's no error, or there's error but we still want to compare the buffers
     BYTE retVal;
-    if(res == OK) {     // no error - at the end just return 0
+    if(hdIf.success && hdIf.statusByte == OK) { // no error - at the end just return 0
         retVal = 0;
     } else {            // some error - at the end return -1
         retVal = -1;
@@ -540,7 +538,6 @@ int readHansTest(DWORD byteCount, WORD xorVal )
 int writeHansTest(DWORD byteCount, WORD xorVal)
 {
     static WORD prevXorVal = 0xffff;
-    BYTE res;
     
 	commandLong[4+1] = TEST_WRITE;
 
@@ -572,13 +569,18 @@ int writeHansTest(DWORD byteCount, WORD xorVal)
         }
     }
 
-	res = (*hdIf.cmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, wBuffer, (byteCount+511)>>9 );		// issue the command and check the result
+	(*hdIf.cmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, wBuffer, (byteCount+511)>>9 );		// issue the command and check the result
     
-    if(res == E_CRC) {                                                            
+    if(!hdIf.success) {                 // fail?
+        return -1;
+    }
+    
+    if(hdIf.statusByte == E_CRC) {      // status byte: CRC error?
         return -2;
     }
-    if(res != E_OK) {                                                             
-        return -1;
+    
+    if(hdIf.statusByte != 0) {          // some other error?
+        return -3;
     }
     
 	return 0;
@@ -662,12 +664,11 @@ void speedTest(void)
 	now = *HZ_200;
     
     int i;
-    BYTE res;
     
     for(i=0; i<20; i++) {
-        res = (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, MAXSECTORS );  // issue the command and check the result
+        (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, MAXSECTORS );  // issue the command and check the result
 
-        if(res != OK) {                                                                     // ACSI ERROR?
+        if(!hdIf.success) {                     // ACSI ERROR?
             (void) Cconws("fail -- on ");
             showInt(i, 2);
             (void) Cconws("out of ");

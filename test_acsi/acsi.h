@@ -65,9 +65,9 @@ BYTE fdone(void);
 BYTE qdone(void);
 void setdma(DWORD addr);
 BYTE hdone(void);
-BYTE endcmd(WORD mode);
+void endcmd(WORD mode);
 
-BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 //---------------------------------------
 
 #endif
