@@ -34,7 +34,7 @@ void encodeAdd(EncodeRequest &er)
 
 void *floppyEncodeThreadCode(void *ptr)
 {
-	Debug::out(LOG_INFO, "Floppy encode thread starting...");
+	Debug::out(LOG_DEBUG, "Floppy encode thread starting...");
 
     MfmCachedImage      encImage;
     FloppyImageFactory  imageFactory;
@@ -66,11 +66,11 @@ void *floppyEncodeThreadCode(void *ptr)
 				// encode image - convert it from file to preprocessed stream for Franz
 				start = Utils::getCurrentMs();
 			
-				Debug::out(LOG_INFO, "Encoding image: %s", (char *) er.filename.c_str());
+				Debug::out(LOG_DEBUG, "Encoding image: %s", (char *) er.filename.c_str());
 				encImage.encodeAndCacheImage(image, true);
 
 				end = Utils::getCurrentMs();
-				Debug::out(LOG_INFO, "Encoding of image %s done, took %d ms", (char *) er.filename.c_str(), (int) (end - start));
+				Debug::out(LOG_DEBUG, "Encoding of image %s done, took %d ms", (char *) er.filename.c_str(), (int) (end - start));
 
 				//----------------
 				// copy the image from encode thread to main thread				
@@ -81,12 +81,12 @@ void *floppyEncodeThreadCode(void *ptr)
 				pthread_mutex_unlock(&floppyEncodeThreadMutex);		// unlock the mutex
 
 				end = Utils::getCurrentMs();
-				Debug::out(LOG_INFO, "Copying between threads took %d ms", (int) (end - start));
+				Debug::out(LOG_DEBUG, "Copying between threads took %d ms", (int) (end - start));
 			} else {
-				Debug::out(LOG_INFO, "Encoding of image %s failed - image is not open", (char *) er.filename.c_str());
+				Debug::out(LOG_DEBUG, "Encoding of image %s failed - image is not open", (char *) er.filename.c_str());
 			}
 		} else {
-			Debug::out(LOG_INFO, "Encoding of image %S - Image file type not supported!", (char *) er.filename.c_str());
+			Debug::out(LOG_DEBUG, "Encoding of image %S - Image file type not supported!", (char *) er.filename.c_str());
 		}
 
         floppyEncodingRunning = false;
@@ -94,7 +94,7 @@ void *floppyEncodeThreadCode(void *ptr)
 
     floppyEncodingRunning = false;
 	
-	Debug::out(LOG_INFO, "Floppy encode thread terminated.");
+	Debug::out(LOG_DEBUG, "Floppy encode thread terminated.");
 	return 0;
 }
 
@@ -185,7 +185,7 @@ void ImageSilo::loadSettings(void)
         bool res = Utils::copyFile(pathAndFile, fileInTmp);                     // copy the file to /tmp/
 
         if(!res) {                                                              // failed to copy?
-            Debug::out(LOG_INFO, "ImageSilo::loadSettings - didn't load image %s", img);
+            Debug::out(LOG_ERROR, "ImageSilo::loadSettings - didn't load image %s", img);
             continue;
         }
 

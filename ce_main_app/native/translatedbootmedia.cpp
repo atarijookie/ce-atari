@@ -146,7 +146,7 @@ void TranslatedBootMedia::updateBootsectorConfig(void)
 	
 	updateBootsectorChecksum();							// update the checksum at the end
 	
-    Debug::out(LOG_INFO, "TranslatedBootMedia - bootsector will read %d sectors, the driver will take %d kB of RAM.", (int) imageBuffer[pos + 7], (int) (totalSize / 1024));
+    Debug::out(LOG_DEBUG, "TranslatedBootMedia - bootsector will read %d sectors, the driver will take %d kB of RAM.", (int) imageBuffer[pos + 7], (int) (totalSize / 1024));
 }
 
 void TranslatedBootMedia::updateBootsectorChecksum(void)
@@ -203,7 +203,7 @@ void TranslatedBootMedia::updateBootsectorConfigWithACSIid(BYTE acsiId)
 	
 	updateBootsectorChecksum();         // update the checksum at the end
 	
-	Debug::out(LOG_INFO, "TranslatedBootMedia - bootsector config updated with new ACSI ID set to %d", (int) acsiId);
+	Debug::out(LOG_DEBUG, "TranslatedBootMedia - bootsector config updated with new ACSI ID set to %d", (int) acsiId);
 }
 
 int TranslatedBootMedia::getConfigPosition(void)

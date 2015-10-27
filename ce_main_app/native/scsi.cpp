@@ -69,23 +69,23 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
             res = attachMediaToACSIid(index, hostSourceType, accessType);          // attach media to ACSI ID
 
             if(res) {
-                Debug::out(LOG_INFO, "Scsi::attachToHostPath - %s - media was already attached, attached to ACSI ID %d", hostPath.c_str(), attachedMedia[index].devInfoIndex);
+                Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s - media was already attached, attached to ACSI ID %d", hostPath.c_str(), attachedMedia[index].devInfoIndex);
             } else {
-                Debug::out(LOG_INFO, "Scsi::attachToHostPath - %s - media was already attached, but still not attached to ACSI ID!", hostPath.c_str());
+                Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s - media was already attached, but still not attached to ACSI ID!", hostPath.c_str());
             }
 
             return res;
         }
 
         // well, we have the media attached and we're also attached to ACSI ID
-        Debug::out(LOG_INFO, "Scsi::attachToHostPath - %s - media was already attached, not doing anything.", hostPath.c_str());
+        Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s - media was already attached, not doing anything.", hostPath.c_str());
         return true;
     }
 
     index = findEmptyAttachSlot();                              // find where we can store it
 
     if(index == -1) {                                               // no more place to store it?
-        Debug::out(LOG_INFO, "Scsi::attachToHostPath - %s - no empty slot! Not attaching.", hostPath.c_str());
+        Debug::out(LOG_ERROR, "Scsi::attachToHostPath - %s - no empty slot! Not attaching.", hostPath.c_str());
         return false;
     }
 
@@ -158,7 +158,7 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
         break;
 	
 	case SOURCETYPE_TESTMEDIA:
-		Debug::out(LOG_INFO, "Scsi::attachToHostPath - test media stored at index %d", index);
+		Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - test media stored at index %d", index);
 	
 		attachedMedia[index].hostPath       = hostPath;
 		attachedMedia[index].hostSourceType = hostSourceType;
@@ -171,9 +171,9 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
     res = attachMediaToACSIid(index, hostSourceType, accessType);          // last step - attach media to ACSI ID
 
     if(res) {
-        Debug::out(LOG_INFO, "Scsi::attachToHostPath - %s - attached to ACSI ID %d", hostPath.c_str(), attachedMedia[index].devInfoIndex);
+        Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s - attached to ACSI ID %d", hostPath.c_str(), attachedMedia[index].devInfoIndex);
     } else {
-        Debug::out(LOG_INFO, "Scsi::attachToHostPath - %s - media attached, but not attached to ACSI ID!", hostPath.c_str());
+        Debug::out(LOG_ERROR, "Scsi::attachToHostPath - %s - media attached, but not attached to ACSI ID!", hostPath.c_str());
     }
 
     return res;
@@ -371,7 +371,7 @@ void Scsi::reloadSettings(int type)
 
 void Scsi::loadSettings(void)
 {
-    Debug::out(LOG_INFO, "Scsi::loadSettings");
+    Debug::out(LOG_DEBUG, "Scsi::loadSettings");
 
     // first read the new settings
     Settings s;

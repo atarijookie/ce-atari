@@ -36,7 +36,7 @@ void *mountThreadCode(void *ptr)
 {
 	Mounter mounter;
 
-	Debug::out(LOG_INFO, "Mount thread starting...");
+	Debug::out(LOG_DEBUG, "Mount thread starting...");
 
 	while(sigintReceived == 0) {
 		pthread_mutex_lock(&mountThreadMutex);			// lock the mutex
@@ -77,7 +77,7 @@ void *mountThreadCode(void *ptr)
         }
 	}
 	
-	Debug::out(LOG_INFO, "Mount thread terminated.");
+	Debug::out(LOG_DEBUG, "Mount thread terminated.");
 	return 0;
 }
 
@@ -86,7 +86,7 @@ bool Mounter::mountDevice(char *devicePath, char *mountDir)
 	char cmd[MAX_STR_SIZE];
 
 	if(isAlreadyMounted(devicePath)) {
-		Debug::out(LOG_INFO, "Mounter::mountDevice -- The device %s is already mounted, not doing anything.\n", devicePath);
+		Debug::out(LOG_DEBUG, "Mounter::mountDevice -- The device %s is already mounted, not doing anything.\n", devicePath);
 		return true;
 	}
 
@@ -131,7 +131,7 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 	
 	// check if we're not trying to mount something we already have mounted
 	if(isAlreadyMounted(source)) {
-		Debug::out(LOG_INFO, "Mounter::mountShared -- The source %s is already mounted, not doing anything.\n", source);
+		Debug::out(LOG_DEBUG, "Mounter::mountShared -- The source %s is already mounted, not doing anything.\n", source);
 		return true;
 	}
 		
@@ -179,7 +179,7 @@ bool Mounter::mount(char *mountCmd, char *mountDir)
 			return false;
 		}
 		
-		Debug::out(LOG_INFO, "Mounter::mount - Mount dir %s was used and was unmounted.\n", mountDir);
+		Debug::out(LOG_DEBUG, "Mounter::mount - Mount dir %s was used and was unmounted.\n", mountDir);
 	}
 	
 	// delete previous log files (if there are any)
@@ -193,14 +193,14 @@ bool Mounter::mount(char *mountCmd, char *mountDir)
     sprintf(tmp, "echo -e \"Mount error file: \n\r\" > %s", LOGFILE2);
     system(tmp);
     
-	Debug::out(LOG_INFO, "Mounter::mount - mount command:\n%s\n", mountCmd);
+	Debug::out(LOG_DEBUG, "Mounter::mount - mount command:\n%s\n", mountCmd);
 	
 	// build and run the command
 	int ret = system(mountCmd);
 	
 	// handle the result
 	if(WIFEXITED(ret) && WEXITSTATUS(ret) == 0) {
-		Debug::out(LOG_INFO, "Mounter::mount - mount succeeded! (mount dir: %s)\n", mountDir);
+		Debug::out(LOG_DEBUG, "Mounter::mount - mount succeeded! (mount dir: %s)\n", mountDir);
 		return true;
 	} 
 	
@@ -281,7 +281,7 @@ bool Mounter::tryUnmount(char *mountDir)
 	
 	// handle the result
 	if(WIFEXITED(ret) && WEXITSTATUS(ret) == 0) {
-		Debug::out(LOG_INFO, "Mounter::tryUnmount - umount succeeded\n");
+		Debug::out(LOG_DEBUG, "Mounter::tryUnmount - umount succeeded\n");
 		return true;
 	} 
 	
@@ -334,7 +334,7 @@ void Mounter::umountIfMounted(char *mountDir)
 
 void Mounter::restartNetwork(void)
 {
-	Debug::out(LOG_INFO, "Mounter::restartNetwork - starting to restart the network\n");
+	Debug::out(LOG_DEBUG, "Mounter::restartNetwork - starting to restart the network\n");
 
     system("sync");                                                 // first sync the filesystem caches...
 
@@ -353,7 +353,7 @@ void Mounter::restartNetwork(void)
     	system("ifup wlan0");
     }
 	
-	Debug::out(LOG_INFO, "Mounter::restartNetwork - done\n");
+	Debug::out(LOG_DEBUG, "Mounter::restartNetwork - done\n");
 }
 
 bool Mounter::wlan0IsPresent(void)

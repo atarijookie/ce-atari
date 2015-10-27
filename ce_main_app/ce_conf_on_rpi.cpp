@@ -345,7 +345,7 @@ void ce_conf_createFifos(void)
         return;
     }
     
-    Debug::out(LOG_INFO, "ce_conf FIFOs created");
+    Debug::out(LOG_DEBUG, "ce_conf FIFOs created");
     
     // now create the ce_conf starting script if it doesn't exist
     res = access("/ce/ce_conf.sh", F_OK);

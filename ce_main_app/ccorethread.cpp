@@ -33,6 +33,8 @@
 extern THwConfig    hwConfig;
 extern TFlags       flags;
 
+extern DebugVars    dbgVars;
+
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
     NetworkSettings ns;
@@ -181,7 +183,7 @@ void CCoreThread::run(void)
                     Debug::out(LOG_INFO, "No answer from Hans or Franz, so first firmware flash script created, will do first firmware flashing.");
 					sigintReceived = 1;
                 } else {
-                    Debug::out(LOG_INFO, "Got answers from both Hans and Franz, so not doing first firmware flashing.");
+                    Debug::out(LOG_DEBUG, "Got answers from both Hans and Franz, so not doing first firmware flashing.");
                 }
 
                 shouldCheckHansFranzAlive = false;                      // don't check this again
@@ -231,13 +233,13 @@ void CCoreThread::run(void)
 
                 if(!confStream->isUpdateDownloadPageShown()) {              // if user is NOT waiting on download page (cancel pressed), don't update
                     Update::stateGoIdle();
-					Debug::out(LOG_INFO, "Update state - download OK, but user is not on download page - NOT doing update");
+					Debug::out(LOG_DEBUG, "Update state - download OK, but user is not on download page - NOT doing update");
                 } else {                                                    // if user is waiting on download page, aplly update
                     res = Update::createUpdateScript();
 
                     if(!res) {
                         confStream->showUpdateError();
-						Debug::out(LOG_INFO, "Update state - download OK, failed to create update script - NOT doing update");
+						Debug::out(LOG_ERROR, "Update state - download OK, failed to create update script - NOT doing update");
                     } else {
 						Debug::out(LOG_INFO, "Update state - download OK, update script created, will do update.");
 						sigintReceived = 1;
@@ -278,7 +280,11 @@ void CCoreThread::run(void)
 				break;
 
 			case ATN_ACSI_COMMAND:
-				handleAcsiCommand();
+                dbgVars.isInHandleAcsiCommand = 1;
+				
+                handleAcsiCommand();
+                
+                dbgVars.isInHandleAcsiCommand = 0;
 				break;
 
 			default:
@@ -361,6 +367,9 @@ void CCoreThread::handleAcsiCommand(void)
     memset(bufOut,  0, CMD_SIZE);
     memset(bufIn,   0, CMD_SIZE);
 
+    dbgVars.prevAcsiCmdTime = dbgVars.thisAcsiCmdTime;
+    dbgVars.thisAcsiCmdTime = Utils::getCurrentMs();
+    
 #if defined(ONPC_HIGHLEVEL)
     memcpy(bufIn, header, 14);                          // get the cmd from received header
 #else
@@ -592,7 +601,7 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
         Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d, XI: 0x%02x", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed, xilinxInfo);
 
         if(floppyImageSilo.currentSlotHasNewContent()) {    // the content of current slot changed? 
-            Debug::out(LOG_INFO, "Content of current floppy image slot changed, forcing disk change", currentLed);
+            Debug::out(LOG_DEBUG, "Content of current floppy image slot changed, forcing disk change", currentLed);
 
             diskChanged     = true;                         // tell Franz that floppy changed
             setDiskChanged  = true;
@@ -601,7 +610,7 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
         if(lastFloppyImageLed != currentLed) {              // did the floppy image LED change since last time?
             lastFloppyImageLed = currentLed;
 
-            Debug::out(LOG_INFO, "Floppy image changed to %d, forcing disk change", currentLed);
+            Debug::out(LOG_DEBUG, "Floppy image changed to %d, forcing disk change", currentLed);
 
             floppyImageSilo.setCurrentSlot(currentLed);     // switch the floppy image
 
@@ -613,7 +622,7 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
         if(flags.getHwInfo) {
             showHwVersion();                                // show what HW version we have found
 
-            Debug::out(LOG_ERROR, ">>> Terminating app, because it was used as HW INFO tool <<<\n");
+            Debug::out(LOG_INFO, ">>> Terminating app, because it was used as HW INFO tool <<<\n");
             sigintReceived = 1;
             return;
         }
@@ -750,21 +759,21 @@ void CCoreThread::showHwVersion(void)
 {
     char tmp[256];
 
-    Debug::out(LOG_ERROR, "Reporting this as HW INFO...");     // show in log file
+    Debug::out(LOG_INFO, "Reporting this as HW INFO...");     // show in log file
 
     // HW version is 1 or 2, and in other cases defaults to 1
     sprintf(tmp, "HW_VER: %d", (hwConfig.version == 1 || hwConfig.version == 2) ? hwConfig.version : 1);
     printf("\n%s\n", tmp);                  // show on stdout
-    Debug::out(LOG_ERROR, "   %s", tmp);    // show in log file
+    Debug::out(LOG_INFO, "   %s", tmp);    // show in log file
     
     // HDD interface is either SCSI, or defaults to ACSI
     sprintf(tmp, "HDD_IF: %s", (hwConfig.hddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI");
     printf("\n%s\n", tmp);                  // show on stdout
-    Debug::out(LOG_ERROR, "   %s", tmp);    // show in log file
+    Debug::out(LOG_INFO, "   %s", tmp);    // show in log file
     
     sprintf(tmp, "HWFWMM: %s", hwConfig.fwMismatch ? "MISMATCH" : "OK");
     printf("\n%s\n", tmp);                  // show on stdout
-    Debug::out(LOG_ERROR, "   %s", tmp);    // show in log file
+    Debug::out(LOG_INFO, "   %s", tmp);    // show in log file
 }
 
 void CCoreThread::responseStart(int bufferLengthInBytes)        // use this to start creating response (commands) to Hans or Franz
@@ -825,7 +834,7 @@ int CCoreThread::bcdToInt(int bcd)
 
 void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 {
-	Debug::out(LOG_INFO, "CCoreThread::onDevAttached: devName %s", (char *) devName.c_str());
+	Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached: devName %s", (char *) devName.c_str());
 
     if(mountRawNotTrans) {                  // attach as raw?
         Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- should mount USB media as raw, attaching as RAW");
@@ -973,10 +982,10 @@ void CCoreThread::readWebStartupMode(void)
         }
 
         flags.logLevel = logLev;                    // set new log level
-        Debug::out(LOG_ERROR, "Log level changed from file %s to level %d", WEB_PARAMS_FILE, logLev);
+        Debug::out(LOG_INFO, "Log level changed from file %s to level %d", WEB_PARAMS_FILE, logLev);
     } else {                                        // on set wrong log level - switch to lowest log level
         flags.logLevel = LOG_ERROR;
-        Debug::out(LOG_ERROR, "Log level change invalid, switching to LOG_ERROR");
+        Debug::out(LOG_INFO, "Log level change invalid, switching to LOG_ERROR");
     }
 }
 

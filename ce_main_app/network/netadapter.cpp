@@ -127,7 +127,7 @@ void netReqAdd(TNetReq &tnr)
 
 void *networkThreadCode(void *ptr)
 {
-	Debug::out(LOG_INFO, "Network thread starting...");
+	Debug::out(LOG_DEBUG, "Network thread starting...");
     BYTE *recvBfr = new BYTE[RECV_BFR_SIZE];                // 64 kB receive buffer    
 
     // The following line is needed to allow root to create raw sockets for ICMP echo... 
@@ -166,7 +166,7 @@ void *networkThreadCode(void *ptr)
 
     delete []recvBfr;
 	
-	Debug::out(LOG_INFO, "Network thread terminated.");
+	Debug::out(LOG_DEBUG, "Network thread terminated.");
 	return 0;
 }
 
@@ -334,7 +334,7 @@ void NetAdapter::reloadSettings(int type)
 
 void NetAdapter::loadSettings(void)
 {
-    Debug::out(LOG_INFO, "NetAdapter::loadSettings");
+    Debug::out(LOG_DEBUG, "NetAdapter::loadSettings");
 
     // first read the new settings
     Settings s;

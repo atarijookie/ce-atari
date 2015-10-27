@@ -116,7 +116,7 @@ bool CConSpi::readHeader(int whichSpiCs, BYTE *outBuf, BYTE *inBuf)
 	}
 	
 	if(loops != 0) {
-		Debug::out(LOG_INFO, "readHeader took %d loops to synchronize!", loops);
+		Debug::out(LOG_DEBUG, "readHeader took %d loops to synchronize!", loops);
 	}
 
 	txRx(whichSpiCs, 6, outBuf+2, inBuf+2);					// receive: 0, ATN code, txLen, rxLen

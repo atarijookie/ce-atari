@@ -1243,7 +1243,7 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
 
     in->fd = fd;
     strcpy(in->devPath, fullPath);
-    Debug::out(LOG_INFO, "Got device (%s): %s", what, fullPath);
+    Debug::out(LOG_DEBUG, "Got device (%s): %s", what, fullPath);
 }
 
 int Ikbd::getFdByIndex(int index)

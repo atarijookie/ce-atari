@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
             return 0;
         }
 
-        Debug::out(LOG_ERROR, ">>> Starting app as HW INFO tool <<<\n");
+        Debug::out(LOG_INFO, ">>> Starting app as HW INFO tool <<<\n");
 
         core = new CCoreThread(NULL, NULL, NULL);               // create main thread
         core->run();										    // run the main thread
@@ -131,8 +131,8 @@ int main(int argc, char *argv[])
     char appVersion[16];
     Version::getAppVersion(appVersion);
     
-    Debug::out(LOG_ERROR, "\n\n---------------------------------------------------");
-    Debug::out(LOG_ERROR, "CosmosEx starting, version: %s", appVersion);
+    Debug::out(LOG_INFO, "\n\n---------------------------------------------------");
+    Debug::out(LOG_INFO, "CosmosEx starting, version: %s", appVersion);
 
     Update::createNewScripts();                                     // update the scripts if needed
     
@@ -343,17 +343,17 @@ void handlePthreadCreate(int res, char *what)
     if(res != 0) {
         Debug::out(LOG_ERROR, "Failed to create %s thread, %s won't work...", what, what);
 	} else {
-		Debug::out(LOG_INFO, "%s thread created", what);
+		Debug::out(LOG_DEBUG, "%s thread created", what);
 	}
 }
 
 void sigint_handler(int sig)
 {
-    Debug::out(LOG_INFO, "Some SIGNAL received, terminating.");
+    Debug::out(LOG_DEBUG, "Some SIGNAL received, terminating.");
 	sigintReceived = 1;
     
     if(childPid != 0) {             // in case we fork()ed, kill the child
-        Debug::out(LOG_INFO, "Killing child with pid %d\n", childPid);
+        Debug::out(LOG_DEBUG, "Killing child with pid %d\n", childPid);
         kill(childPid, SIGKILL);
     }
 }

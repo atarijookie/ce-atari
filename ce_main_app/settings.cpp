@@ -20,7 +20,7 @@ Settings::Settings(void)
 	int res = mkdir(SETTINGS_PATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
 	
 	if(res == 0) {					// dir created
-		Debug::out(LOG_INFO, "Settings: directory %s was created.", SETTINGS_PATH);
+		Debug::out(LOG_DEBUG, "Settings: directory %s was created.", SETTINGS_PATH);
 		
 		storeDefaultValues();
 	} else {						// dir not created
@@ -283,12 +283,12 @@ void Settings::loadAcsiIDs(AcsiIDinfo *aii)
 	// no ACSI ID was enabled? enable ACSI ID 0
 	if(!aii->gotDevTypeRaw && !aii->gotDevTypeTranslated && !aii->gotDevTypeSd) {
         if(hwConfig.hddIface == HDD_IF_ACSI) {      // for ACSI
-            Debug::out(LOG_INFO, "Settings::loadAcsiIDs -- no ACSI ID was enabled, so enabling ACSI ID 0");
+            Debug::out(LOG_DEBUG, "Settings::loadAcsiIDs -- no ACSI ID was enabled, so enabling ACSI ID 0");
 			
             aii->acsiIDdevType[0]   = DEVTYPE_TRANSLATED;
             aii->enabledIDbits      = 1;
         } else {                                    // for SCSI - enable ID 1
-            Debug::out(LOG_INFO, "Settings::loadAcsiIDs -- no SCSI ID was enabled, so enabling SCSI ID 1");
+            Debug::out(LOG_DEBUG, "Settings::loadAcsiIDs -- no SCSI ID was enabled, so enabling SCSI ID 1");
 			
             aii->acsiIDdevType[1]   = DEVTYPE_TRANSLATED;
             aii->enabledIDbits      = 2;

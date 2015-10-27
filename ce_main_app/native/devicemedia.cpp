@@ -55,7 +55,7 @@ bool DeviceMedia::iopen(char *path, bool createIfNotExists)
 
     int64_t capacityInMB = BCapacity / ((int64_t) (1024 * 1024));
     
-    Debug::out(LOG_INFO, "DeviceMedia - open succeeded, capacity: %d MB, sectors: %08x", (int) capacityInMB, SCapacity);
+    Debug::out(LOG_DEBUG, "DeviceMedia - open succeeded, capacity: %d MB, sectors: %08x", (int) capacityInMB, SCapacity);
 
     return true;
 }

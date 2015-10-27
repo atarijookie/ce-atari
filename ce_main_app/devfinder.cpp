@@ -170,7 +170,7 @@ void DevFinder::processFoundDev(std::string file)
 		
 		bool atariDrive = isAtariDrive(file);
 		
-		Debug::out(LOG_INFO, "device attached: %s, is atari drive: %d", (char *) file.c_str(), atariDrive);		// write out
+		Debug::out(LOG_DEBUG, "device attached: %s, is atari drive: %d", (char *) file.c_str(), atariDrive);		// write out
 
 		if(devChHandler != NULL) {									// if got handler, notify him
 			devChHandler->onDevAttached(file, atariDrive);
@@ -222,7 +222,7 @@ void DevFinder::findAndSignalDettached(void)
 			del = it;														// delete dev in next step
 			someDevChanged = true;
 			
-			Debug::out(LOG_INFO, "device detached: %s", (char *) it->first.c_str());
+			Debug::out(LOG_DEBUG, "device detached: %s", (char *) it->first.c_str());
 
 			if(devChHandler != NULL) {										// if got handler, notify him
 				devChHandler->onDevDetached(it->first);

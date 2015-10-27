@@ -53,7 +53,7 @@ bool ImageFileMedia::iopen(char *path, bool createIfNotExists)
 
     mediaHasChanged = false;
 
-    Debug::out(LOG_INFO, "ImageFileMedia - open succeeded, capacity: %d, was created: %d", BCapacity, (int) imageWasCreated);
+    Debug::out(LOG_DEBUG, "ImageFileMedia - open succeeded, capacity: %d, was created: %d", BCapacity, (int) imageWasCreated);
 
     return true;
 }

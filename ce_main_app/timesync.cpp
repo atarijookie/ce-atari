@@ -28,7 +28,7 @@ volatile bool do_timeSync = false;
 
 void *timesyncThreadCode(void *ptr)
 {
-	Debug::out(LOG_INFO, "Timesync thread starting...");
+	Debug::out(LOG_DEBUG, "Timesync thread starting...");
 
     TimeSync timeSync;
     timeSync.sync();
@@ -42,7 +42,7 @@ void *timesyncThreadCode(void *ptr)
         }
     }
 
-	Debug::out(LOG_INFO, "Timesync thread finished.");
+	Debug::out(LOG_DEBUG, "Timesync thread finished.");
     return 0;
 }    
 

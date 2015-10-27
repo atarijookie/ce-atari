@@ -4,9 +4,15 @@
 #include "datatypes.h"
 
 #define LOG_OFF         0
-#define LOG_ERROR       1
-#define LOG_INFO        2
-#define LOG_DEBUG       3
+#define LOG_INFO        1       // info         - info which can be displayed when running at user's place
+#define LOG_ERROR       2       // errors       - should be always visible, even to users
+#define LOG_DEBUG       3       // debug info   - useful only to developers
+
+typedef struct {
+    BYTE    isInHandleAcsiCommand;
+    DWORD   prevAcsiCmdTime;
+    DWORD   thisAcsiCmdTime;   
+} DebugVars;
 
 class Debug
 {

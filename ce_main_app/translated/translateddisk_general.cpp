@@ -154,7 +154,7 @@ void TranslatedDisk::mountAndAttachSharedDrive(void)
 	nfsNotSamba		= s.getBool((char *) "SHARED_NFS_NOT_SAMBA", false);
 
 	if(!sharedEnabled) {
-		Debug::out(LOG_INFO, "mountAndAttachSharedDrive: shared drive not enabled, not mounting and not attaching...");
+		Debug::out(LOG_DEBUG, "mountAndAttachSharedDrive: shared drive not enabled, not mounting and not attaching...");
 		return;
 	}
 
@@ -267,7 +267,7 @@ void TranslatedDisk::attachToHostPathByIndex(int index, std::string hostRootPath
     conf[index].translatedType      = translatedType;
     conf[index].mediaChanged        = true;
 
-    Debug::out(LOG_INFO, "TranslatedDisk::attachToHostPath - path %s attached to index %d (letter %c)", hostRootPath.c_str(), index, 'A' + index);
+    Debug::out(LOG_DEBUG, "TranslatedDisk::attachToHostPath - path %s attached to index %d (letter %c)", hostRootPath.c_str(), index, 'A' + index);
 }
 
 bool TranslatedDisk::isAlreadyAttached(std::string hostRootPath)

@@ -131,7 +131,7 @@ int Downloader::count(int downloadTypeMask)
 bool Downloader::verifyChecksum(char *filename, WORD checksum)
 {
     if(checksum == 0) {                 // special case - when checksum is 0, don't check it buy say that it's OK
-        Debug::out(LOG_INFO, "Downloader::verifyChecksum - file %s -- supplied 0 as checksum, so not doing checksum and returning that checksum is OK", filename);
+        Debug::out(LOG_DEBUG, "Downloader::verifyChecksum - file %s -- supplied 0 as checksum, so not doing checksum and returning that checksum is OK", filename);
         return true;
     }
 
@@ -163,7 +163,7 @@ bool Downloader::verifyChecksum(char *filename, WORD checksum)
     fclose(f);
 
     bool checksumIsGood = (checksum == cs);
-    Debug::out(LOG_INFO, "Downloader::verifyChecksum - file %s -- checksum is good: %d", filename, (int) checksumIsGood);
+    Debug::out(LOG_DEBUG, "Downloader::verifyChecksum - file %s -- checksum is good: %d", filename, (int) checksumIsGood);
 
     return checksumIsGood;                // return if the calculated cs is equal to the provided cs
 }
@@ -241,7 +241,7 @@ void *downloadThreadCode(void *ptr)
     int res;
     FILE *outfile;
 
-	Debug::out(LOG_INFO, "Download thread starting...");
+	Debug::out(LOG_DEBUG, "Download thread starting...");
 
 	while(sigintReceived == 0) {
 		pthread_mutex_lock(&downloadThreadMutex);		// lock the mutex
@@ -294,7 +294,7 @@ void *downloadThreadCode(void *ptr)
             continue;
         }
 
-        Debug::out(LOG_INFO, "Downloader - download remote file: %s to local file: %s", (char *) downloadCurrent.srcUrl.c_str(), (char *) fileName.c_str());
+        Debug::out(LOG_DEBUG, "Downloader - download remote file: %s to local file: %s", (char *) downloadCurrent.srcUrl.c_str(), (char *) fileName.c_str());
      
         // now configure curl
         curl_easy_setopt(curl, CURLOPT_URL,                 (char *) downloadCurrent.srcUrl.c_str());
@@ -323,7 +323,7 @@ void *downloadThreadCode(void *ptr)
                     Debug::out(LOG_ERROR, "Downloader - failed to rename %s to %s after download", (char *) tmpFile.c_str(), (char *) finalFile.c_str());
                 } else {        // download OK, checksum OK, rename OK?
                     updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_OK);
-                    Debug::out(LOG_INFO, "Downloader - file %s was downloaded with success.", (char *) downloadCurrent.srcUrl.c_str());
+                    Debug::out(LOG_DEBUG, "Downloader - file %s was downloaded with success.", (char *) downloadCurrent.srcUrl.c_str());
                 }
             } else {            // download OK, checksum bad?
                 updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_FAIL);
@@ -333,7 +333,7 @@ void *downloadThreadCode(void *ptr)
                 if(res == 0) {
                     Debug::out(LOG_ERROR, "Downloader - file %s was downloaded, but verifyChecksum() failed, so file %s was deleted.", (char *) tmpFile.c_str(), (char *) tmpFile.c_str());
                 } else {
-                    Debug::out(LOG_INFO, "Downloader - file %s was downloaded, but verifyChecksum() failed, and then failed to delete that file.", (char *) tmpFile.c_str());
+                    Debug::out(LOG_DEBUG, "Downloader - file %s was downloaded, but verifyChecksum() failed, and then failed to delete that file.", (char *) tmpFile.c_str());
                 }
             }
 
@@ -354,7 +354,7 @@ void *downloadThreadCode(void *ptr)
         curl = NULL;
     }
 
-	Debug::out(LOG_INFO, "Download thread finished.");
+	Debug::out(LOG_DEBUG, "Download thread finished.");
     return 0;
 }
 
