@@ -3,6 +3,7 @@
 #define HOSTMOD_LINUX_TERMINAL		2
 #define HOSTMOD_TRANSLATED_DISK		3
 #define HOSTMOD_NETWORK_ADAPTER		4
+#define HOSTMOD_RETRY               0xea            // code is from word repEAt 
 
 // commands for HOSTMOD_TRANSLATED_DISK
 #define TRAN_CMD_IDENTIFY           0

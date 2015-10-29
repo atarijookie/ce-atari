@@ -225,10 +225,12 @@ int main(void)
     		res = readHansTest (MAXSECTORS * 512, xorVal);
       	}
         
+        xorVal++;  // change XOR value every time, so the data will be different every time (better for detecting errors)
+        
         VT52_Goto_pos(x, 24);
     	switch( res )
 		{
-			case -1:
+			case -1:        // test failed with communication error
 				(void) Cconws("_");
                 x++;
 				if( linecnt&1 ){
@@ -237,7 +239,7 @@ int main(void)
 					errcnt_timeout_r++;
 				}
 				break;
-			case -2:
+			case -2:        // test failed with CRC error
 				(void) Cconws("C");
                 x++;
 				if( linecnt&1 ){
@@ -246,8 +248,15 @@ int main(void)
 					errcnt_crc_r++;
 				}
 				break;
-			case 0:
-				(void) Cconws("*");
+			case 0:         // test succeeded
+                if(hdIf.retriesDoneCount == 0) {        // success without retries
+                    (void) Cconws("*");
+                } else {                                // success, but had to do some retries
+                    // if it's less than 10 retries, write out the retries number (1 ... 9). If it's 10 or more, write 'X'.
+                    char retryCountChar = (hdIf.retriesDoneCount <= 9) ? ('0' + hdIf.retriesDoneCount) : 'X';
+                    Cconout(retryCountChar);
+                }
+                
                 x++;
 				break;
 			default:
@@ -302,7 +311,6 @@ int main(void)
 			if( linecnt&1 ){
 			    (void) Cconws("W:");
                 x += 2;
-			    xorVal++;  // change eorval after R/W run 
 			}else{
 				runcnt++;
 				(void) Cconws("R:");

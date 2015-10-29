@@ -30,10 +30,13 @@ BYTE dmaDataTx_do_Falcon        (BYTE readNotWrite, BYTE *buffer, DWORD dataByte
 
 typedef struct {
     THddIfCmd           cmd;
+    THddIfCmd           cmd_intern;
 
     BYTE                success;
     BYTE                statusByte;
     BYTE                phaseChanged;
+    
+    int                 retriesDoneCount;
     
     TsetReg             pSetReg;
     TgetReg             pGetReg;
