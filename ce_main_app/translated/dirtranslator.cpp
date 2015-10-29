@@ -13,8 +13,6 @@
 #include "dirtranslator.h"
 #include "gemdos.h"
 
-#define BUFFER_SIZE     (1024*1024)
-
 DirTranslator::DirTranslator()
 {
     fsDirs.count    = 0;

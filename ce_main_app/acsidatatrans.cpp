@@ -9,25 +9,22 @@
 #include "acsidatatrans.h"
 #include "native/scsi_defs.h"
 
-#define BUFFER_SIZE         (1024*1024)
-#define COMMAND_SIZE        10
-
 #if defined(ONPC_HIGHLEVEL)
     #include "socks.h"
 #endif
 
 AcsiDataTrans::AcsiDataTrans()
 {
-    buffer          = new BYTE[BUFFER_SIZE];        // 1 MB buffer
-    recvBuffer      = new BYTE[BUFFER_SIZE];
+    buffer          = new BYTE[ACSI_BUFFER_SIZE];        // 1 MB buffer
+    recvBuffer      = new BYTE[ACSI_BUFFER_SIZE];
     
 #if defined(ONPC_HIGHLEVEL)
     bufferRead      = buffer;
     bufferWrite     = recvBuffer;
 #endif
 
-    memset(buffer,      0, BUFFER_SIZE);            // init buffers to zero
-    memset(recvBuffer,  0, BUFFER_SIZE);
+    memset(buffer,      0, ACSI_BUFFER_SIZE);            // init buffers to zero
+    memset(recvBuffer,  0, ACSI_BUFFER_SIZE);
     
     memset(txBuffer, 0, TX_RX_BUFF_SIZE);
     memset(rxBuffer, 0, TX_RX_BUFF_SIZE);
@@ -50,6 +47,11 @@ AcsiDataTrans::~AcsiDataTrans()
 void AcsiDataTrans::setCommunicationObject(CConSpi *comIn)
 {
     com = comIn;
+}
+
+void AcsiDataTrans::setRetryObject(RetryModule *retryModule)
+{
+    retryMod = retryModule;
 }
 
 void AcsiDataTrans::clear(void)
@@ -213,11 +215,17 @@ void AcsiDataTrans::sendDataToFd(int fd)
 }
 
 // send all data to Hans, including status
-void AcsiDataTrans::sendDataAndStatus(void)
+void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
 {
     if(!com) {
         Debug::out(LOG_ERROR, "AcsiDataTrans::sendDataAndStatus -- no communication object, fail!");
         return;
+    }
+
+    if(fromRetryModule) {   // if it's a RETRY, get the copy of data and proceed like it would be from real module
+        retryMod->restoreDataAndStatus  (dataDirection, count, buffer, statusWasSet, status);
+    } else {                // if it's normal run (not a RETRY), let the retry module do a copy of data
+        retryMod->copyDataAndStatus     (dataDirection, count, buffer, statusWasSet, status);
     }
     
 #if defined(ONPC_HIGHLEVEL) 
@@ -355,4 +363,5 @@ void AcsiDataTrans::sendStatusAfterWrite(void)
     com->txRx(SPI_CS_HANS, 16 - 8, txBuffer, rxBuffer);		// transmit the status (16 bytes total, but 8 already received)
 #endif
 }
+
 

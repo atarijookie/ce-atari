@@ -8,8 +8,8 @@
 #include "devicemedia.h"
 #include "imagefilemedia.h"
 
-#define BUFFER_SIZE             (1024*1024)
-#define BUFFER_SIZE_SECTORS     (BUFFER_SIZE / 512)
+#define SCSI_BUFFER_SIZE             (1024*1024)
+#define BUFFER_SIZE_SECTORS         (SCSI_BUFFER_SIZE / 512)
 
 Scsi::Scsi(void)
 {
@@ -18,8 +18,8 @@ Scsi::Scsi(void)
     dataTrans = 0;
     strncpy((char *) inquiryName, "CosmosEx  ", 10);
 
-    dataBuffer  = new BYTE[BUFFER_SIZE];
-    dataBuffer2 = new BYTE[BUFFER_SIZE];
+    dataBuffer  = new BYTE[SCSI_BUFFER_SIZE];
+    dataBuffer2 = new BYTE[SCSI_BUFFER_SIZE];
 
     for(i=0; i<8; i++) {
         devInfo[i].attachedMediaIndex   = -1;

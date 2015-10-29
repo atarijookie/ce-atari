@@ -52,10 +52,12 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     lastFloppyImageLed      = -1;
 
 	conSpi		= new CConSpi();
+    retryMod    = new RetryModule();
 
     dataTrans   = new AcsiDataTrans();
     dataTrans->setCommunicationObject(conSpi);
-
+    dataTrans->setRetryObject(retryMod);
+    
     scsi        = new Scsi();
     scsi->setAcsiDataTrans(dataTrans);
     scsi->attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
@@ -109,6 +111,7 @@ CCoreThread::~CCoreThread()
     delete conSpi;
     delete dataTrans;
     delete scsi;
+    delete retryMod;
 
     delete translated;
     delete confStream;
@@ -357,15 +360,13 @@ void CCoreThread::run(void)
 
 void CCoreThread::handleAcsiCommand(void)
 {
-    #define CMD_SIZE    14
-
     Debug::out(LOG_DEBUG, "\n");
     
-    BYTE bufOut[CMD_SIZE];
-    BYTE bufIn[CMD_SIZE];
+    BYTE bufOut[ACSI_CMD_SIZE];
+    BYTE bufIn[ACSI_CMD_SIZE];
 
-    memset(bufOut,  0, CMD_SIZE);
-    memset(bufIn,   0, CMD_SIZE);
+    memset(bufOut,  0, ACSI_CMD_SIZE);
+    memset(bufIn,   0, ACSI_CMD_SIZE);
 
     dbgVars.prevAcsiCmdTime = dbgVars.thisAcsiCmdTime;
     dbgVars.thisAcsiCmdTime = Utils::getCurrentMs();
@@ -405,10 +406,30 @@ void CCoreThread::handleAcsiCommand(void)
         Debug::out(LOG_DEBUG, "handleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
     }
 
+    // if it's the retry module, let it go before the big switch for modules, 
+    // because it will change the command and let it possibly run trough the correct module
+    if(module == HOSTMOD_RETRY) {                   
+        retryMod->restoreCmdFromCopy(bufIn, isIcd, justCmd, tag1, tag2, module);
+        pCmd = (!isIcd) ? bufIn : (bufIn + 1);          // get the pointer to where the command starts
+
+        Debug::out(LOG_DEBUG, "handleAcsiCommand -- doing retry for cmd: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
+
+        int dataDir = retryMod->getDataDirection();
+        if(dataDir == DATA_DIRECTION_READ) {            // if it's READ operation, retry using stored data and don't let the right module to handle it
+            dataTrans->sendDataAndStatus(true);         // send data and status using data stored in RETRY module
+            wasHandled = true;
+            return;
+        }
+        
+        // if it got here, it's a WRITE operation, let the right module to handle it
+    } else {            // if it's not retry module, make copy of everything
+        retryMod->makeCmdCopy(bufIn, isIcd, justCmd, tag1, tag2, module);
+    }
+
     // ok, so the ID is right, let's see what we can do
     if(justCmd == 0 && tag1 == 'C' && tag2 == 'E') {    // if the command is 0 (TEST UNIT READY) and there's this CE tag
         Debug::out(LOG_DEBUG, "handleAcsiCommand - CE specific command - module: %02x", module);
-
+        
         switch(module) {
         case HOSTMOD_CONFIG:                            // config console command?
             wasHandled = true;

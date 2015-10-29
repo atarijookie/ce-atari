@@ -29,11 +29,21 @@
 
 #define TX_RX_BUFF_SIZE             600
 
+#define ACSI_CMD_SIZE               14
+
+#define ACSI_BUFFER_SIZE            (1024*1024)
+#define COMMAND_SIZE                10
+
+#include "retrymodule.h"
+
 class AcsiDataTrans
 {
 public:
     AcsiDataTrans();
     ~AcsiDataTrans();
+
+    void setCommunicationObject(CConSpi *comIn);
+    void setRetryObject(RetryModule *retryModule);
 
     void clear(void);
 
@@ -48,11 +58,9 @@ public:
     void padDataToMul16(void);
 
     bool recvData(BYTE *data, DWORD cnt);
-    void sendDataAndStatus(void);
+    void sendDataAndStatus(bool fromRetryModule = false);       // by default it's not a retry
     void sendDataToFd(int fd);
     
-    void setCommunicationObject(CConSpi *comIn);
-
 	void dumpDataOnce(void);
 
 private:
@@ -63,7 +71,8 @@ private:
     bool    statusWasSet;
     int     dataDirection;
 
-    CConSpi *com;
+    CConSpi     *com;
+    RetryModule *retryMod;
 
     BYTE    *recvBuffer;
 

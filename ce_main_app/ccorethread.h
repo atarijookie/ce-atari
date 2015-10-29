@@ -8,6 +8,7 @@
 #include "conspi.h"
 #include "acsidatatrans.h"
 #include "settings.h"
+#include "retrymodule.h"
 
 #include "devfinder.h"
 #include "devchangeshandler.h"
@@ -75,7 +76,8 @@ private:
     bool            setEnabledIDbits;
 	AcsiIDinfo		acsiIdInfo;
     bool            mountRawNotTrans;
-
+    RetryModule     *retryMod;
+    
     void handleAcsiCommand(void);
     void handleConfigStream(BYTE *cmd);
 

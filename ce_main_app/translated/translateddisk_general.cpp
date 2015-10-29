@@ -25,8 +25,8 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastS
 
     reloadProxy = NULL;
     
-    dataBuffer  = new BYTE[BUFFER_SIZE];
-    dataBuffer2 = new BYTE[BUFFER_SIZE];
+    dataBuffer  = new BYTE[ACSI_BUFFER_SIZE];
+    dataBuffer2 = new BYTE[ACSI_BUFFER_SIZE];
 
     detachAll();
 

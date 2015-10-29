@@ -44,6 +44,7 @@
 #define HOSTMOD_TRANSLATED_DISK		3
 #define HOSTMOD_NETWORK_ADAPTER		4
 #define HOSTMOD_FDD_SETUP           5
+#define HOSTMOD_RETRY               0xea            // code is from word repEAt
 
 //////////////////////////////////////////////////////
 // commands for HOSTMOD_CONFIG
