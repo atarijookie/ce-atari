@@ -27,12 +27,27 @@ RetryModule::~RetryModule(void)
     delete []buffer;
 }
 
-void RetryModule::makeCmdCopy(BYTE *fullCmd, BYTE isIcd, BYTE justCmd, BYTE tag1, BYTE tag2, BYTE module)
+bool RetryModule::gotThisCmd(BYTE *fullCmd, BYTE isIcd) 
 {
-    if(module == HOSTMOD_RETRY) {       // if it's this module, don't make copy of anything
-        return;
+    int cmdMismatch, commandLength;
+    
+    if(isIcd) {             // for ICD commands - compare the first 11 bytes 
+        commandLength = 11;
+    } else {                // for non-ICD commads - compare the first 6 bytes
+        commandLength = 6;
     }
     
+    cmdMismatch = memcmp(this->fullCmd, fullCmd, commandLength);    // do the compression of previous and current command
+    
+    if(cmdMismatch == 0) {      // the commands match? we got this
+        return true;
+    }
+    
+    return false;               // commands mismatch, we don't have this
+}
+
+void RetryModule::makeCmdCopy(BYTE *fullCmd, BYTE isIcd, BYTE justCmd, BYTE tag1, BYTE tag2, BYTE module)
+{
     // make copy of every input param
     memcpy(this->fullCmd, fullCmd, ACSI_CMD_SIZE);
     this->isIcd   = isIcd;

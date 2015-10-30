@@ -30,6 +30,8 @@ public:
     RetryModule(void);
     ~RetryModule(void);
     
+    bool gotThisCmd(BYTE *fullCmd, BYTE isIcd);
+    
     void makeCmdCopy            (BYTE *fullCmd, BYTE  isIcd, BYTE  justCmd, BYTE  tag1, BYTE  tag2, BYTE  module);
     void restoreCmdFromCopy     (BYTE *fullCmd, BYTE &isIcd, BYTE &justCmd, BYTE &tag1, BYTE &tag2, BYTE &module);
 

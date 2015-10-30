@@ -406,22 +406,37 @@ void CCoreThread::handleAcsiCommand(void)
         Debug::out(LOG_DEBUG, "handleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
     }
 
-    // if it's the retry module, let it go before the big switch for modules, 
+    // if it's the retry module (highest bit in HOSTMOD is set), let it go before the big switch for modules, 
     // because it will change the command and let it possibly run trough the correct module
-    if(module == HOSTMOD_RETRY) {                   
-        retryMod->restoreCmdFromCopy(bufIn, isIcd, justCmd, tag1, tag2, module);
-        pCmd = (!isIcd) ? bufIn : (bufIn + 1);          // get the pointer to where the command starts
-
-        Debug::out(LOG_DEBUG, "handleAcsiCommand -- doing retry for cmd: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
-
-        int dataDir = retryMod->getDataDirection();
-        if(dataDir == DATA_DIRECTION_READ) {            // if it's READ operation, retry using stored data and don't let the right module to handle it
-            dataTrans->sendDataAndStatus(true);         // send data and status using data stored in RETRY module
-            wasHandled = true;
-            return;
-        }
+    if(module & 0x80) {                         // if it's a RETRY attempt...
+        module = module & 0x7f;                 // remove RETRY bit from module
         
-        // if it got here, it's a WRITE operation, let the right module to handle it
+        if(!isIcd) {                            // short command?
+            bufIn[3] = bufIn[3] & 0x7f;         // remove RETRY bit from HOSTMOD_ code
+        } else {                                // long command?
+            bufIn[4] = bufIn[4] & 0x7f;         // remove RETRY bit from HOSTMOD_ code
+        }
+    
+        bool gotThisCmd = retryMod->gotThisCmd(bufIn, isIcd);       // first check if we got this command buffered, or not
+    
+        if(gotThisCmd) {                                    // if got this command buffered
+            retryMod->restoreCmdFromCopy(bufIn, isIcd, justCmd, tag1, tag2, module);
+            pCmd = (!isIcd) ? bufIn : (bufIn + 1);          // get the pointer to where the command starts
+
+            Debug::out(LOG_DEBUG, "handleAcsiCommand -- doing retry for cmd: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
+
+            int dataDir = retryMod->getDataDirection();
+            if(dataDir == DATA_DIRECTION_READ) {            // if it's READ operation, retry using stored data and don't let the right module to handle it
+                dataTrans->sendDataAndStatus(true);         // send data and status using data stored in RETRY module
+                wasHandled = true;
+                return;
+            }
+            
+            // if it got here, it's a WRITE operation, let the right module to handle it
+        } else {                                            // if this command was not buffered, we have received it for the first time and we need to process it like usually
+            // as we didn't process it yet, make copy of it
+            retryMod->makeCmdCopy(bufIn, isIcd, justCmd, tag1, tag2, module);
+        }
     } else {            // if it's not retry module, make copy of everything
         retryMod->makeCmdCopy(bufIn, isIcd, justCmd, tag1, tag2, module);
     }
