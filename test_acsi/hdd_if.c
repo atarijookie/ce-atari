@@ -10,6 +10,7 @@
 #include "acsi.h"
 #include "hdd_if.h"
 #include "translated.h"
+#include "stdlib.h"
 
 THDif hdIf;
 
@@ -36,13 +37,20 @@ void hddIfCmd_withRetries(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *bu
     
     //--------------
     // if we got here, the original / normal command failed, so it's time to do the retries...
-    BYTE cmdRetry[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_RETRY, 0, 0};
-    cmdRetry[0] = (cmd[0] & 0xe0);          // cmd[0] = ACSI_id + TEST UNIT READY (0)	
-
+    BYTE retryCmd[32];
+    BYTE retryCmdLen = (cmdLength < 32) ? cmdLength : 32;
+    memcpy(retryCmd, cmd, retryCmdLen);     // make copy of the original command
+    
+    if(cmdLength == 6) {                    // short command?
+        retryCmd[3] = retryCmd[3] | 0x80;   // add highest bit to HOSTMOD_* to let device know it's a retry
+    } else {                                // long command?
+        retryCmd[4] = retryCmd[4] | 0x80;   // add highest bit to HOSTMOD_* to let device know it's a retry
+    }
+    
     while(1) {
         hdIf.retriesDoneCount++;            // increment the count of retries we have done
     
-        (*hdIf.cmd_intern)(readNotWrite, cmdRetry, CMD_LENGTH_SHORT, buffer, sectorCount);      // try the retry command until we succeed
+        (*hdIf.cmd_intern)(readNotWrite, retryCmd, CMD_LENGTH_SHORT, buffer, sectorCount);      // try the retry command until we succeed
         
         if(hdIf.success) {                  // if succeeded, quit
             return;
