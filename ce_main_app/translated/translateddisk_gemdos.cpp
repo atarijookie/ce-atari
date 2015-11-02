@@ -1309,6 +1309,8 @@ void TranslatedDisk::onTestRead(BYTE *cmd)
     int     byteCount   = Utils::get24bits(cmd + 5);    // 5,6,7 -- byte count
     WORD    xorVal      = Utils::getWord(cmd + 8);      // 8,9   -- xor value
 
+    byteCount = (byteCount < ACSI_MAX_TRANSFER_SIZE_BYTES) ? byteCount : ACSI_MAX_TRANSFER_SIZE_BYTES;      // if would try to send too much data (that would cause a crash), limit it
+
     int i;
     WORD counter = 0;
     for(i=0; i<byteCount; i += 2) {
@@ -1329,6 +1331,8 @@ void TranslatedDisk::onTestWrite(BYTE *cmd)
 {
     int     byteCount   = Utils::get24bits(cmd + 5);    // 5,6,7 -- byte count
     WORD    xorVal      = Utils::getWord(cmd + 8);      // 8,9   -- xor value
+
+    byteCount = (byteCount < ACSI_MAX_TRANSFER_SIZE_BYTES) ? byteCount : ACSI_MAX_TRANSFER_SIZE_BYTES;      // if would try to send too much data (that would cause a crash), limit it
 
     bool res = dataTrans->recvData(dataBuffer, byteCount);   // get data from Hans
 

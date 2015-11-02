@@ -34,6 +34,8 @@
 #define ACSI_BUFFER_SIZE            (1024*1024)
 #define COMMAND_SIZE                10
 
+#define ACSI_MAX_TRANSFER_SIZE_BYTES    (254 * 512)
+
 #include "retrymodule.h"
 
 class AcsiDataTrans
