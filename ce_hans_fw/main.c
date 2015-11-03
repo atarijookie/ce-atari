@@ -25,9 +25,9 @@ void dma_spi2_init(void);
 void setupAtnBuffers(void);
 
 WORD spi_TxRx(WORD out);
-void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
-void spiDma_waitForFinish(void);
-void waitForSPIidle(void);
+BYTE spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
+BYTE spiDma_waitForFinish(void);        // returns if everything went well or timeout occured while waiting for that
+BYTE waitForSPIidle(void);
 void waitForSPI2idle(void);
 
 BYTE onGetCommandAcsi(void);
@@ -806,21 +806,23 @@ void onDataRead(void)
     PIO_read(statusByte);                                   // send the status to Atari
 }
 
-void waitForSPIidle(void)
+BYTE waitForSPIidle(void)
 {
     while((SPI1->SR & SPI_SR_TXE) == 0) {                   // wait while TXE flag is 0 (TX is not empty)
         if(timeout()) {
             LOG_ERROR(3);
-            return;
+            return FALSE;                                   // exit - timeout!
         }
     }
 
     while((SPI1->SR & SPI_SR_BSY) != 0) {                   // wait while BSY flag is 1 (SPI is busy)
         if(timeout()) {
             LOG_ERROR(4);
-            return;
+            return FALSE;                                   // exit - timeout!
         }
     }
+    
+    return TRUE;                                            // exit - success (no timeout)
 }
 
 void waitForSPI2idle(void)
@@ -861,6 +863,7 @@ void startSpiDmaForDataRead(DWORD dataCnt, TReadBuffer *readBfr)
 
 void onDataWrite(void)
 {
+    BYTE firstLoop, previousSpiSuccess;
     WORD subCount, recvCount;
     WORD index, data, i, value;
     TWriteBuffer *wrBufNow;
@@ -869,6 +872,8 @@ void onDataWrite(void)
     wrBufNow    = &wrBuf1;
     
     ACSI_DATADIR_WRITE();                                   // data direction for reading
+    
+    firstLoop = TRUE;
     
     while(dataCnt > 0) {            // something to write?
         // request maximum 512 bytes from host 
@@ -917,9 +922,19 @@ void onDataWrite(void)
         wrBufNow->buffer[index] = 0;                        // terminating zero
         wrBufNow->count = index + 1;                        // store count, +1 because we have terminating zero
 
+        //----------
         // set up the SPI DMA transfer
-        spiDma_txRx(wrBufNow->count,                        (BYTE *) &wrBufNow->buffer[0], 
-                                ATN_WRITEMOREDATA_LEN_RX,   (BYTE *) &smallDataBuffer[0]);  
+        previousSpiSuccess = spiDma_txRx(wrBufNow->count,                        (BYTE *) &wrBufNow->buffer[0], 
+                                                     ATN_WRITEMOREDATA_LEN_RX,   (BYTE *) &smallDataBuffer[0]);
+
+        // if this is not the first loop and the previous SPI transfer failed (something from this WRITE command was not transfered to host), fail
+        if(!firstLoop && !previousSpiSuccess) {
+            state = STATE_GET_COMMAND;
+            return;
+        }
+        
+        firstLoop = FALSE;
+        //----------
         
         wrBufNow = wrBufNow->next;                          // use next write buffer
     }
@@ -979,28 +994,31 @@ void getCmdLengthFromCmdBytesScsi(BYTE cmd)
     }
 }
 
-void spiDma_waitForFinish(void)
+BYTE spiDma_waitForFinish(void)
 {
     while(spiDmaIsIdle != TRUE) {                           // wait until it will become idle
         if(timeout()) {                                     // if timeout happened (and we got stuck here), quit
             LOG_ERROR(7);
             spiDmaIsIdle = TRUE;
-            break;
+            return FALSE;               // exit - timeout fail!
         }
     }
+    
+    return TRUE;                        // exit - everything OK (no timeout)
 }
 
-void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
+BYTE spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
 {
+    BYTE waitForFinishOk, waitForSpiIdleOk;
+    
     WORD *pTxBfr = (WORD *) txBfr;
     
     // store TX and RX count so the host will know how much he should transfer
     pTxBfr[2] = txCount;
     pTxBfr[3] = rxCount;
     
-    spiDma_waitForFinish();                                 // make sure that the last DMA transfer has finished
-
-    waitForSPIidle();                                       // and make sure that SPI has finished, too
+    waitForFinishOk     = spiDma_waitForFinish();           // make sure that the last DMA transfer has finished
+    waitForSpiIdleOk    = waitForSPIidle();                 // and make sure that SPI has finished, too
     
     // disable both TX and RX channels
     DMA1_Channel3->CCR      &= 0xfffffffe;                  // disable DMA3 Channel transfer
@@ -1013,7 +1031,7 @@ void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
     // by the adding the delay between disabling and enabling DMA by this extra code. 
     
     if((SPI1->SR & SPI_SR_RXNE) != 0) {                     // if there's something still in SPI DR, read it
-            WORD dummy = SPI1->DR;
+        WORD dummy = SPI1->DR;
     }
     //-------------------
     
@@ -1038,6 +1056,12 @@ void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
     if(txCount != 0) {                                      // something to send over SPI?
         GPIOA->BSRR = ATN;                                  // ATTENTION bit high - got something to read
     }
+    
+    if(waitForFinishOk && waitForSpiIdleOk) {               // both SPI waiting functions without error? Then this SPI transfer was stared without any previous error
+        return TRUE;
+    }
+    
+    return FALSE;                                           // some of the SPI idle waiting functions failed, previous transfer probably failed
 }
 
 void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
