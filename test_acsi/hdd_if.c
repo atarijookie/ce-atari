@@ -38,8 +38,7 @@ void hddIfCmd_withRetries(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *bu
     //--------------
     // if we got here, the original / normal command failed, so it's time to do the retries...
     BYTE retryCmd[32];
-    BYTE retryCmdLen = (cmdLength < 32) ? cmdLength : 32;
-    memcpy(retryCmd, cmd, retryCmdLen);     // make copy of the original command
+    memcpy(retryCmd, cmd, cmdLength);       // make copy of the original command
     
     if(cmdLength == 6) {                    // short command?
         retryCmd[3] = retryCmd[3] | 0x80;   // add highest bit to HOSTMOD_* to let device know it's a retry
@@ -50,7 +49,7 @@ void hddIfCmd_withRetries(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *bu
     while(1) {
         hdIf.retriesDoneCount++;            // increment the count of retries we have done
     
-        (*hdIf.cmd_intern)(readNotWrite, retryCmd, CMD_LENGTH_SHORT, buffer, sectorCount);      // try the retry command until we succeed
+        (*hdIf.cmd_intern)(readNotWrite, retryCmd, cmdLength, buffer, sectorCount);      // try the retry command until we succeed
         
         if(hdIf.success) {                  // if succeeded, quit
             return;
