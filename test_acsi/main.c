@@ -230,24 +230,6 @@ int main(void)
         VT52_Goto_pos(x, 24);
     	switch( res )
 		{
-			case -1:        // test failed with communication error
-				(void) Cconws("_");
-                x++;
-				if( linecnt&1 ){
-					errcnt_timeout_w++;
-				}else{
-					errcnt_timeout_r++;
-				}
-				break;
-			case -2:        // test failed with CRC error
-				(void) Cconws("C");
-                x++;
-				if( linecnt&1 ){
-					errcnt_crc_w++;
-				}else{
-					errcnt_crc_r++;
-				}
-				break;
 			case 0:         // test succeeded
                 if(hdIf.retriesDoneCount == 0) {        // success without retries
                     (void) Cconws("*");
@@ -259,9 +241,26 @@ int main(void)
                 
                 x++;
 				break;
-			default:
-				(void) Cconws(".");
+            //------------------
+            default:        // other problems?
+			case -1:        // test failed with communication error?
+				(void) Cconws("_");
                 x++;
+				if( linecnt&1 ){
+					errcnt_timeout_w++;
+				}else{
+					errcnt_timeout_r++;
+				}
+				break;
+            //------------------
+			case -2:        // test failed with CRC error?
+				(void) Cconws("C");
+                x++;
+				if( linecnt&1 ){
+					errcnt_crc_w++;
+				}else{
+					errcnt_crc_r++;
+				}
 				break;
 	    }
 		charcnt++;
