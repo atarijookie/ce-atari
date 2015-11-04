@@ -24,7 +24,7 @@ int writeHansTest(DWORD byteCount, WORD xorVal );
 void sleep(int seconds);
 
 void print_head(void);
-void print_status(int runcnt, int errcnt_crc_r, int errcnt_crc_w, int errcnt_timeout_r, int errcnt_timeout_w);
+void print_status(void);
 
 void showHexByte(BYTE val);
 void showHexDword(DWORD val);
@@ -73,6 +73,24 @@ BYTE simpleNotDetailedErrReport = 1;
 #define BFR_CHECK_DETAILED  2
 BYTE bfrCheckType = BFR_CHECK_SIMPLE;
 
+typedef struct {
+    DWORD goodPlain;
+    DWORD goodWithRetry;
+    DWORD errorTimeout;
+    DWORD errorCrc;
+    DWORD errorOther;
+} Tresults;
+
+struct {
+    DWORD run;
+    DWORD singleOps;
+    
+    Tresults read;
+    Tresults write;
+} counts;
+
+void updateCounts(BYTE doingWriteNotRead, int res);
+void printOpResult(int res);
 //--------------------------------------------------
 int main(void)
 {
@@ -82,9 +100,6 @@ int main(void)
 	WORD xorVal=0xC0DE;
 	int charcnt=0;
 	int linecnt=0;
-	int errcnt_crc_r=0,errcnt_crc_w=0;
-	int errcnt_timeout_r=0,errcnt_timeout_w=0;
-	int runcnt=0;
 
 	OldSP = (void *) Super((void *)0);  			// supervisor mode 
 	lineaa();	// hide mouse    
@@ -192,7 +207,7 @@ int main(void)
     speedTest();
 
 	// ----------------- 
-    print_status(0,0,0,0,0);
+    print_status();
 	VT52_Clear_down();
 
   	VT52_Goto_pos(0, 22);
@@ -204,6 +219,8 @@ int main(void)
 
     (void) Cconws("R:");
     x += 2;
+    
+    BYTE doingWriteNotRead;
     
   	while(1)
   	{
@@ -219,7 +236,9 @@ int main(void)
   
         errorLine = ERROR_LINE_START;
   
-      	if( linecnt&1 ){
+        doingWriteNotRead = linecnt & 1;
+  
+      	if( doingWriteNotRead ){
     		res = writeHansTest(MAXSECTORS * 512, xorVal);
       	}else{
     		res = readHansTest (MAXSECTORS * 512, xorVal);
@@ -227,44 +246,15 @@ int main(void)
         
         xorVal++;  // change XOR value every time, so the data will be different every time (better for detecting errors)
         
+        updateCounts(doingWriteNotRead, res);           // update the results count
+        
         VT52_Goto_pos(x, 24);
-    	switch( res )
-		{
-			case 0:         // test succeeded
-                if(hdIf.retriesDoneCount == 0) {        // success without retries
-                    (void) Cconws("*");
-                } else {                                // success, but had to do some retries
-                    // if it's less than 10 retries, write out the retries number (1 ... 9). If it's 10 or more, write 'X'.
-                    char retryCountChar = (hdIf.retriesDoneCount <= 9) ? ('0' + hdIf.retriesDoneCount) : 'X';
-                    Cconout(retryCountChar);
-                }
-                
-                x++;
-				break;
-            //------------------
-            default:        // other problems?
-			case -1:        // test failed with communication error?
-				(void) Cconws("_");
-                x++;
-				if( linecnt&1 ){
-					errcnt_timeout_w++;
-				}else{
-					errcnt_timeout_r++;
-				}
-				break;
-            //------------------
-			case -2:        // test failed with CRC error?
-				(void) Cconws("C");
-                x++;
-				if( linecnt&1 ){
-					errcnt_crc_w++;
-				}else{
-					errcnt_crc_r++;
-				}
-				break;
-	    }
+        printOpResult(res);                             // show the result as a single characted ( * _ c ? )
+        
+        x++;
 		charcnt++;
-		print_status(runcnt,errcnt_crc_r,errcnt_crc_w,errcnt_timeout_r,errcnt_timeout_w);
+        
+		print_status();
 		print_head();
 
         //--------------
@@ -307,14 +297,16 @@ int main(void)
             
 			charcnt=0;
 			linecnt++;
-			if( linecnt&1 ){
+            
+            doingWriteNotRead = linecnt & 1;
+            
+			if( doingWriteNotRead ){
 			    (void) Cconws("W:");
-                x += 2;
 			}else{
-				runcnt++;
 				(void) Cconws("R:");
-                x += 2;
-			}
+                counts.run++;
+ 			}
+            x += 2;
 		}
 	}
 	
@@ -324,54 +316,131 @@ int main(void)
 	return 0;
 }
 
+void updateCounts(BYTE doingWriteNotRead, int res)
+{
+    counts.singleOps++;
+
+    // get the pointer to the right structure
+    Tresults *pResults = doingWriteNotRead ? &counts.write : &counts.read;
+    
+  	switch( res )
+	{
+		case 0:                                 // test succeeded
+            if(hdIf.retriesDoneCount == 0) {    // success without retries
+                pResults->goodPlain++;
+            } else {                            // success with some retries
+                pResults->goodWithRetry++;
+            }
+            break;
+        //---------------
+        case -1:                                // test failed with communication error
+            pResults->errorTimeout++;
+            break;
+        //---------------
+        case -2:                                // test failed with CRC error
+            pResults->errorCrc++;
+            break;
+        //---------------
+        default:                                // some other error?
+            pResults->errorOther++;
+            break;
+    }    
+}
+
+void printOpResult(int res) 
+{
+  	switch( res )
+	{
+		case 0:                                 // test succeeded
+            if(hdIf.retriesDoneCount == 0) {    // success without retries
+                Cconout('*');
+            } else {                            // success with some retries
+                char retryCountChar = (hdIf.retriesDoneCount < 9) ? ('0' + hdIf.retriesDoneCount) : '9';
+                Cconout(retryCountChar);
+            }
+            break;
+        //---------------
+        case -1:                                // test failed with communication error
+            Cconout('_');
+            break;
+        //---------------
+        case -2:                                // test failed with CRC error
+            Cconout('c');
+            break;
+        //---------------
+        default:                                // some other error?
+            Cconout('?');
+            break;
+    }    
+}
+
 void print_head()
 {
   	VT52_Goto_pos(0,0);
 
-	(void) Cconws("\33p[ CosmosEx ACSI Test    ver "); 
+	(void) Cconws("\33p[ CosmosEx HDD IF test  ver "); 
     showAppVersion();
     (void) Cconws(" ]\33q\r\n"); 		
 }
 
-void print_status(int runcnt, int errcnt_crc_r, int errcnt_crc_w, int errcnt_timeout_r, int errcnt_timeout_w)
+void print_status(void)
 {
-	int failcnt=0;
-	failcnt=errcnt_crc_r+errcnt_crc_w+errcnt_timeout_r+errcnt_timeout_w;
-	if(failcnt>9999){
-		failcnt=9999;
-	}
-	if(runcnt>9999){
-		runcnt=9999;
-	}
-	if(errcnt_crc_r>9999){
-		errcnt_crc_r=9999;
-	}
-	if(errcnt_crc_w>9999){
-		errcnt_crc_w=9999;
-	}
-	if(errcnt_timeout_r>9999){
-		errcnt_timeout_r=9999;
-	}
-	if(errcnt_timeout_w>9999){
-		errcnt_timeout_w=9999;
-	}
-	
+    //-------------
+    // 2nd row - general info
 	VT52_Goto_pos(0,1);
 	(void) Cconws("\33p[ Run:");
-	showInt(runcnt, 4);
-	(void) Cconws(" C=Crc(r:");
-	  showInt(errcnt_crc_r, 4);
-	(void) Cconws(") _=T/O(r:");
-	  showInt(errcnt_timeout_r, 4);
-	(void) Cconws(") ]\33q\r\n");
+	showInt(counts.run, 3);
 	
-	(void) Cconws("\33p[Fail:");
-	  showInt(failcnt, 4);
-	(void) Cconws("      (w:");
-	  showInt(errcnt_crc_w, 4);
-	(void) Cconws(")      (w:");
-	  showInt(errcnt_timeout_w, 4);
-	(void) Cconws(") ]\33q\r\n");
+    (void) Cconws("  Ops: ");
+	showInt(counts.singleOps, 5);
+    
+    (void) Cconws("  Data: ");
+
+    // calculate and show transfered data capacity
+    DWORD kilobytes     = 127 * counts.singleOps;       // 127 kB per operation * operations count
+    int megsInteger     = kilobytes / 1024;             // get integer part of mega_bytes
+    int megsFraction    = (kilobytes % 1024) / 100;     // get mega_bytes_after_decimal_point part
+    
+    showIntWithPrepadding(megsInteger, 4, ' ');
+    Cconout('.');
+    showInt(megsFraction, 1);
+	(void) Cconws(" MB ]\33q\r\n");
+
+    //-------------
+    // 3rd row - read statistics
+	(void) Cconws("\33p[ R \33c2Gp:");
+	showInt(counts.read.goodPlain,      4);
+    
+	(void) Cconws(" Gr:");
+	showInt(counts.read.goodWithRetry,  3);
+    
+	(void) Cconws(" \33c1T/O:");
+	showInt(counts.read.errorTimeout,   2);
+
+	(void) Cconws(" CRC:");
+	showInt(counts.read.errorCrc,       2);
+
+	(void) Cconws(" Oth:");
+	showInt(counts.read.errorOther,     2);
+	(void) Cconws("\33c0 ]\33q\r\n");
+    
+    //-------------
+    // 4rd row - write statistics
+	(void) Cconws("\33p[ W \33c2Gp:");
+	showInt(counts.write.goodPlain,     4);
+    
+	(void) Cconws(" Gr:");
+	showInt(counts.write.goodWithRetry, 3);
+    
+	(void) Cconws(" \33c1T/O:");
+	showInt(counts.write.errorTimeout,  2);
+
+	(void) Cconws(" CRC:");
+	showInt(counts.write.errorCrc,      2);
+
+	(void) Cconws(" Oth:");
+	showInt(counts.write.errorOther,    2);
+	(void) Cconws("\33c0 ]\33q\r\n");
 }
 
 //--------------------------------------------------
