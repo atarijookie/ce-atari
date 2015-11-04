@@ -68,11 +68,6 @@ BYTE ifUsed;
 int errorLine = 0;
 BYTE simpleNotDetailedErrReport = 1;
 
-#define BFR_CHECK_NONE      0
-#define BFR_CHECK_SIMPLE    1
-#define BFR_CHECK_DETAILED  2
-BYTE bfrCheckType = BFR_CHECK_SIMPLE;
-
 typedef struct {
     DWORD goodPlain;
     DWORD goodWithRetry;
@@ -101,6 +96,17 @@ int main(void)
 	int charcnt=0;
 	int linecnt=0;
 
+    //----------------------
+    // read all the keys which are waiting, so we can ignore them
+    while(1) {
+        if(Cconis() != 0) {             // if some key is waiting, read it
+            Cnecin();
+        } else {                        // no key is waiting, quit the loop
+            break;
+        }
+    }
+    //----------------------
+    
 	OldSP = (void *) Super((void *)0);  			// supervisor mode 
 	lineaa();	// hide mouse    
 	
@@ -132,7 +138,7 @@ int main(void)
 	(void) Cconws(" Helpful to detect possible DMA problems\r\n"); 		
 	(void) Cconws(" your ST hardware might have. See:\r\n"); 		
 	(void) Cconws(" http://joo.kie.sk/?page_id=250 and \r\n");
-	(void) Cconws(" http://goo.gl/23AqXk for infos+fixes.\r\n"); 		
+	(void) Cconws(" http://goo.gl/23AqXk for infos+fixes.\r\n\r\n"); 		
 	
 	unsigned long *cescreencast_cookie=0;
 	if( CookieJarRead(0x43455343,(unsigned long *) &cescreencast_cookie)!=0 ) // Cookie "CESC" 
@@ -147,22 +153,44 @@ int main(void)
 		Super((void *)OldSP);  			      // user mode 
 		return 0;
 	}
-	
-	(void) Cconws("\r\nPress 'any key' to start through ACSI.\r\n"); 		
-	(void) Cconws("Press 'T' to start through TT SCSI.\r\n"); 		
-	(void) Cconws("Press 'F' to start through Falcon SCSI.\r\n\r\n"); 		
-
-    key = Cnecin();
     
-	if(key == 't' || key == 'T') {              // if T pressed, use TT SCSI
-        hdd_if_select(IF_SCSI_TT);
-        ifUsed      = IF_SCSI_TT;
-	} else if(key == 'f' || key == 'F') {       // if F pressed, use Falcon SCSI
-        hdd_if_select(IF_SCSI_FALCON);
-        ifUsed      = IF_SCSI_FALCON;
-	} else {                                    // otherwise use ACSI
+    //----------------------
+    // detect TOS version and try to automatically choose the interface
+    BYTE  *pSysBase     = (BYTE *) 0x000004F2;
+    BYTE  *ppSysBase    = (BYTE *)  ((DWORD )  *pSysBase);                      // get pointer to TOS address
+    WORD  tosVersion    = (WORD  ) *(( WORD *) (ppSysBase + 2));                // TOS +2: TOS version
+    BYTE  tosMajor      = tosVersion >> 8;
+    
+    if(tosMajor == 1 || tosMajor == 2) {                // TOS 1.xx or TOS 2.xx -- running on ST
+        (void) Cconws("Running on ST, choosing ACSI interface.");
+    
         hdd_if_select(IF_ACSI);
         ifUsed      = IF_ACSI;
+    } else if(tosMajor == 4) {                          // TOS 4.xx -- running on Falcon
+        (void) Cconws("Running on Falcon, choosing SCSI interface.");
+    
+        hdd_if_select(IF_SCSI_FALCON);
+        ifUsed      = IF_SCSI_FALCON;
+    } else {                                            // TOS 3.xx -- running on TT
+        (void) Cconws("Running on TT, plase choose [A]CSI or [S]CSI:");
+        
+        while(1) {
+            key = Cnecin();
+            
+            if(key == 'a' || key == 'A') {      // A pressed, choosing ACSI
+                (void) Cconws("\n\rACSI selected.\n\r");
+                hdd_if_select(IF_ACSI);
+                ifUsed      = IF_ACSI;
+                break;
+            }
+            
+            if(key == 's' || key == 'S') {      // S pressed, choosing SCSI
+                (void) Cconws("\n\rSCSI selected.\n\r");
+                hdd_if_select(IF_SCSI_TT);
+                ifUsed      = IF_SCSI_TT;
+                break;
+            }
+        }
     }
 
 	// ---------------------- 
@@ -174,17 +202,7 @@ int main(void)
     } else {                            // simple!
         simpleNotDetailedErrReport = 1;
     }
-	// ---------------------- 
-	(void) Cconws("\r\n\r\n[S]imple, [D]etailed (slower) or [N]o READ buffer check?\r\n");
     
-    key = Cnecin();
-    if(key == 'D' || key == 'd') {          // detailed?
-        bfrCheckType = BFR_CHECK_DETAILED;
-    } else if(key == 'N' || key == 'n') {   // no check?
-        bfrCheckType = BFR_CHECK_NONE;
-    } else {                                // simple!
-        bfrCheckType = BFR_CHECK_SIMPLE;
-    }
 	// ---------------------- 
 	// search for device on the ACSI bus 
 	deviceID = findDevice();
@@ -479,6 +497,8 @@ BYTE findDevice(void)
 	BYTE id = 0xff;
 	char bfr[2];
 
+    hdIf.retriesDoneCount = 0;          // disable retries - we are expecting that the devices won't answer on every ID
+    
 	bfr[1] = 0; 
 	(void) Cconws("Looking for CosmosEx on ");
     
@@ -509,10 +529,13 @@ BYTE findDevice(void)
 		key = Cnecin();        
     
 		if(key == 'Q' || key=='q') {
+            hdIf.retriesDoneCount = 16;                 // enable retries
 			return 0xff;
 		}
 	}
   
+    hdIf.retriesDoneCount = 16;                         // enable retries
+    
 	bfr[0] = id + '0';
 	(void) Cconws("\r\nCosmosEx ID: ");
 	(void) Cconws(bfr);
@@ -536,19 +559,11 @@ int readHansTest(DWORD byteCount, WORD xorVal )
 	commandLong[8+1] = (xorVal >> 8) & 0xFF;
 	commandLong[9+1] = (xorVal     ) & 0xFF;
 
-    if(bfrCheckType == BFR_CHECK_DETAILED) {    // if detailed bfr check
-        memset(rBuffer, 0, byteCount);          // clear the whole buffer - this is slower, but it's able to find the problem in any part of the read buffer
-    } else {                                    // if simple bfr check
-        memset(rBuffer, 0, 8);                  // clear first few bytes so we can detect if the data was really read, or it was only retained from last write in the buffer    
-    }
+    memset(rBuffer, 0, 8);                  // clear first few bytes so we can detect if the data was really read, or it was only retained from last write in the buffer    
         
 	(*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, (byteCount+511)>>9 );		// issue the command and check the result
     
-    if(hdIf.success && bfrCheckType == BFR_CHECK_NONE) {        // if success and NO BFR CHECK, return success
-        return 0;
-    }
-    
-    if(!hdIf.success && bfrCheckType != BFR_CHECK_DETAILED) {   // FAIL + simple/no check mean QUIT, FAIL + detailed check mean - check the buffer anyway!
+    if(!hdIf.success) {                     // FAIL? quit...
         return -1;
     }
     
@@ -566,26 +581,6 @@ int readHansTest(DWORD byteCount, WORD xorVal )
     for(i=0; i<byteCount; i += 2) {
         data = counter ^ xorVal;       // create word
         if( !(rBuffer[i]==(data>>8) && rBuffer[i+1]==(data&0xFF)) ){
-        
-            if(!bfrCheckType) {            // if detailed bfr check
-                logMsg("First mismatched byte at pos: ");
-                showHexDword(i);
-                (void) Cconws("   ");
-                logMsg("Data really is: ");
-                showHexByte(rBuffer[i+0]);
-                showHexByte(rBuffer[i+1]);
-                showHexByte(rBuffer[i+2]);
-                showHexByte(rBuffer[i+3]);
-                (void) Cconws("   ");
-                logMsg("Data should be: ");
-                showHexByte(data >> 8);
-                showHexByte(data & 0xff);
-                data = (counter+1) ^ xorVal;       // create word
-                showHexByte(data >> 8);
-                showHexByte(data & 0xff);
-                (void) Cconws("   ");
-            }
-        
             return -2;
         }  
         counter++;
@@ -594,10 +589,6 @@ int readHansTest(DWORD byteCount, WORD xorVal )
     if(byteCount & 1) {                                 // odd number of bytes? add last byte
         BYTE lastByte = (counter ^ xorVal) >> 8;
         if( rBuffer[byteCount-1]!=lastByte ){
-            if(!bfrCheckType) {            // if detailed bfr check
-                logMsg("First mismatched byte at last byte!");
-            }
-
             return -2;
         }  
     }
@@ -664,7 +655,7 @@ int writeHansTest(DWORD byteCount, WORD xorVal)
 
 void logMsg(char *logMsg)
 {
-    if(simpleNotDetailedErrReport && bfrCheckType) {   // if simple, don't show these SCSI log messages
+    if(simpleNotDetailedErrReport) {    // if simple, don't show these SCSI log messages
         return;
     }
 

@@ -35,6 +35,10 @@ void hddIfCmd_withRetries(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *bu
         return;
     }
     
+    if(hdIf.maxRetriesCount < 1) {          // retries are disabled? quit
+        return;
+    }
+    
     //--------------
     // if we got here, the original / normal command failed, so it's time to do the retries...
     BYTE retryCmd[32];
@@ -47,6 +51,10 @@ void hddIfCmd_withRetries(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *bu
     }
     
     while(1) {
+        if(hdIf.retriesDoneCount >= hdIf.maxRetriesCount) {     // did we reach the maximum number of retries? quit
+            return;
+        }
+    
         hdIf.retriesDoneCount++;            // increment the count of retries we have done
     
         (*hdIf.cmd_intern)(readNotWrite, retryCmd, cmdLength, buffer, sectorCount);      // try the retry command until we succeed

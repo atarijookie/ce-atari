@@ -37,6 +37,7 @@ typedef struct {
     BYTE                phaseChanged;
     
     int                 retriesDoneCount;
+    int                 maxRetriesCount;
     
     TsetReg             pSetReg;
     TgetReg             pGetReg;
