@@ -33,26 +33,29 @@ BYTE findDevice(void)
     BYTE found = 0;
     BYTE key;
 
+    hdIf.retriesDoneCount = 0;                          // disable retries - we are expecting that the devices won't answer on every ID
+    
     machine = getMachineType();
     
     while(1) {
         if(machine == MACHINE_ST) {                     // for ST
-            found = findCE(IF_ACSI);                // CE on ACSI
+            found = findCE(IF_ACSI);                    // CE on ACSI
         }
 
         if(machine == MACHINE_TT) {                     // for TT
-            found = findCE(IF_ACSI);                // CE on ACSI
+            found = findCE(IF_ACSI);                    // CE on ACSI
         
             if(!found) {
-                found = findCE(IF_SCSI_TT);         // CE on SCSI TT
+                found = findCE(IF_SCSI_TT);             // CE on SCSI TT
             }
         }
 
         if(machine == MACHINE_FALCON) {                 // for Falcon
-            found = findCE(IF_SCSI_FALCON);         // CE on SCSI FALCON
+            found = findCE(IF_SCSI_FALCON);             // CE on SCSI FALCON
         }
         
         if(found) {
+            hdIf.retriesDoneCount = 16;                 // enable retries
             return TRUE;
         }
         //---------------------
@@ -60,11 +63,13 @@ BYTE findDevice(void)
 		key = Cnecin();
     
 		if(key == 'Q' || key=='q') {
+            hdIf.retriesDoneCount = 16;                 // enable retries
 			return FALSE;
 		}
     }
     
-    return FALSE;                   // this should never happen
+    hdIf.retriesDoneCount = 16;                         // enable retries
+    return FALSE;                                       // this should never happen
 }
 
 //--------------------------------------------------
