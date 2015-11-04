@@ -3,6 +3,7 @@
 #include "acsi.h"
 
 #include "hdd_if.h"
+#include "stdlib.h"
 
 // -------------------------------------- 
 void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
@@ -14,9 +15,28 @@ void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     hdIf.success        = FALSE;
     hdIf.statusByte     = ACSIERROR;
     hdIf.phaseChanged   = FALSE;
-    //--------
     
-	*FLOCK = -1;                                // disable FDC operations 
+    //------------------
+    // try to acquire FLOCK if possible
+    DWORD end = getTicks() + 200;               // calculate the terminating tick count, where we should stop looking for unlocked FLOCK
+    
+    WORD locked;
+    while(1) {                                  // while not time out, try again
+        locked = *FLOCK;                        // read current lock value
+        
+        if(!locked) {                           // if not locked, lock and continue
+            *FLOCK = -1;                        // disable FDC operations 
+            break;
+        }
+        
+        if(getTicks() >= end) {                 // on time out - fail, return ACSIERROR
+            hdIf.success = FALSE;
+            return;
+        }
+    }
+    
+    //------------------
+    
 	setdma((DWORD) buffer);                     // setup DMA transfer address 
 
 	//*******************************
