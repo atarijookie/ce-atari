@@ -39,42 +39,45 @@ BYTE findDevice(void)
     BYTE found = 0;
     BYTE key;
 
+    hdIf.retriesDoneCount = 0;                                  // disable retries - we are expecting that the devices won't answer on every ID
+    
     machine = getMachineType();
     
     while(1) {
         if(machine == MACHINE_ST) {                             // for ST
-            found = findCE(DEVICE_CE, IF_ACSI);               // CE on ACSI
+            found = findCE(DEVICE_CE, IF_ACSI);                 // CE on ACSI
         
             if(!found) {
-                found = findCE(DEVICE_CS, IF_ACSI);           // CS on ACSI
+                found = findCE(DEVICE_CS, IF_ACSI);             // CS on ACSI
             }
         }
 
         if(machine == MACHINE_TT) {                             // for TT
-            found = findCE(DEVICE_CE, IF_ACSI);               // CE on ACSI
+            found = findCE(DEVICE_CE, IF_ACSI);                 // CE on ACSI
         
             if(!found) {
-                found = findCE(DEVICE_CE, IF_SCSI_TT);        // CE on SCSI TT
+                found = findCE(DEVICE_CE, IF_SCSI_TT);          // CE on SCSI TT
             }
 
             if(!found) {
-                found = findCE(DEVICE_CS, IF_ACSI);           // CS on ACSI
+                found = findCE(DEVICE_CS, IF_ACSI);             // CS on ACSI
             }
         
             if(!found) {
-                found = findCE(DEVICE_CS, IF_SCSI_TT);        // CS on SCSI TT
+                found = findCE(DEVICE_CS, IF_SCSI_TT);          // CS on SCSI TT
             }
         }
 
         if(machine == MACHINE_FALCON) {                         // for Falcon
-            found = findCE(DEVICE_CE, IF_SCSI_FALCON);        // CE on SCSI FALCON
+            found = findCE(DEVICE_CE, IF_SCSI_FALCON);          // CE on SCSI FALCON
 
             if(!found) {
-                found = findCE(DEVICE_CS, IF_SCSI_FALCON);    // CS on SCSI FALCON
+                found = findCE(DEVICE_CS, IF_SCSI_FALCON);      // CS on SCSI FALCON
             }
         }
         
         if(found) {
+            hdIf.retriesDoneCount = 16;                         // enable retries
             return TRUE;
         }
         //---------------------
@@ -82,11 +85,13 @@ BYTE findDevice(void)
 		key = Cnecin();
     
 		if(key == 'Q' || key=='q') {
+            hdIf.retriesDoneCount = 16;                     // enable retries
 			return FALSE;
 		}
     }
     
-    return FALSE;                   // this should never happen
+    hdIf.retriesDoneCount = 16;                             // enable retries
+    return FALSE;                                           // this should never happen
 }
 
 //--------------------------------------------------
@@ -96,36 +101,36 @@ BYTE findCE(BYTE device, BYTE hddIf)
     
 	(void) Cconws("\n\rLooking for ");
     
-    if(device == DEVICE_CE) {                             // looking for CosmosEx?
+    if(device == DEVICE_CE) {                       // looking for CosmosEx?
         (void) Cconws("CosmosEx ");
-    } else {                                            // looking for CosmoSolo
+    } else {                                        // looking for CosmoSolo
         (void) Cconws("CosmoSolo");
     }
     
     (void) Cconws(" on ");
     
-    if(hddIf == IF_ACSI) {                              // ACSI?
+    if(hddIf == IF_ACSI) {                          // ACSI?
         (void) Cconws("ACSI: ");
-    } else {                                            // SCSI?
+    } else {                                        // SCSI?
         (void) Cconws("SCSI: ");
     }
 
-    hdd_if_select(hddIf);                               // select HDD IF
+    hdd_if_select(hddIf);                           // select HDD IF
     
-    for(id=0; id<8; id++) {                             // try to talk to all ACSI devices
-        Cconout('0' + id);                              // write out BUS ID
+    for(id=0; id<8; id++) {                         // try to talk to all ACSI devices
+        Cconout('0' + id);                          // write out BUS ID
     
-        if(device == DEVICE_CE) {                         // looking for CosmosEx? 
-            res = ce_identify(id, hddIf);               // try to read the IDENTITY string 
-        } else {                                        // looking for CosmoSolo?
-            res = cs_inquiry (id, hddIf);               // try to read INQUIRY string
+        if(device == DEVICE_CE) {                   // looking for CosmosEx? 
+            res = ce_identify(id, hddIf);           // try to read the IDENTITY string 
+        } else {                                    // looking for CosmoSolo?
+            res = cs_inquiry (id, hddIf);           // try to read INQUIRY string
         }
   
-        if(res == 1) {                                  // if found the CosmosEx 
+        if(res == 1) {                              // if found the CosmosEx 
             (void) Cconws(" <-- found!\n\r");
             
-            deviceID                = id;               // store the BUS ID of device
-            cosmosExNotCosmoSolo    = device;           // store device type
+            deviceID                = id;           // store the BUS ID of device
+            cosmosExNotCosmoSolo    = device;       // store device type
 
             return TRUE;
         }
@@ -136,41 +141,39 @@ BYTE findCE(BYTE device, BYTE hddIf)
 //--------------------------------------------------
 BYTE ce_identify(BYTE id, BYTE hddIf)
 {
-    WORD res;
     BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_IDENTIFY, 0};
   
-    cmd[0] = (id << 5); 					    // cmd[0] = ACSI_id + TEST UNIT READY (0)
-    memset(pBuffer, 0, 512);              	    // clear the buffer 
+    cmd[0] = (id << 5); 					                    // cmd[0] = ACSI_id + TEST UNIT READY (0)
+    memset(pBuffer, 0, 512);              	                    // clear the buffer 
   
-    res = (*hdIf.cmd)(1, cmd, 6, pBuffer, 1);	// issue the identify command and check the result 
+    (*hdIf.cmd)(1, cmd, 6, pBuffer, 1);                         // issue the identify command and check the result 
     
-    if(res != OK) {                        	    // if failed, return FALSE 
+    if(!hdIf.success || hdIf.statusByte != OK) {                // if failed, return FALSE 
         return FALSE;
     }
     
-    if(strncmp((char *) pBuffer, "CosmosEx config console", 23) != 0) {		// the identity string doesn't match? 
+    if(strncmp((char *) pBuffer, "CosmosEx config console", 23) != 0) { // the identity string doesn't match? 
         return FALSE;
     }
 	
-    return TRUE;                                // success 
+    return TRUE;                                                // success 
 }
 //--------------------------------------------------
 BYTE cs_inquiry(BYTE id, BYTE hddIf)
 {
-	int res;
     BYTE cmd[6];
     
     memset(cmd, 0, 6);
     cmd[0] = (id << 5) | (SCSI_CMD_INQUIRY & 0x1f);
-    cmd[4] = 32;                                // count of bytes we want from inquiry command to be returned
+    cmd[4] = 32;                                                // count of bytes we want from inquiry command to be returned
     
-    res = (*hdIf.cmd)(1, cmd, 6, pBuffer, 1);	// issue the inquiry command and check the result 
+    (*hdIf.cmd)(1, cmd, 6, pBuffer, 1);	                        // issue the inquiry command and check the result 
     
-    if(res != OK) {                        	    // if failed, return FALSE 
+    if(!hdIf.success || hdIf.statusByte != OK) {                // if failed, return FALSE 
         return FALSE;
     }
 
-    if(strncmp(((char *) pBuffer) + 16, "CosmoSolo", 9) != 0) {     // the inquiry string doesn't match? fail
+    if(strncmp(((char *) pBuffer) + 16, "CosmoSolo", 9) != 0) { // the inquiry string doesn't match? fail
         return FALSE;
     }
 

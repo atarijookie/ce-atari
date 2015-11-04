@@ -23,13 +23,13 @@ void scsi_reset(void);
 static BYTE scsi_select_and_cmd(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLength, BYTE *dataAddr, DWORD dataByteCount);
 static BYTE selscsi(BYTE scsiId);
 static WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength);
-static int  w4stat(void);
+static void w4stat(void);
 static BYTE doack(void);
        DWORD setscstmout(void);
        BYTE  w4req(void);
 
-int PIO_read(void);
-int PIO_write(BYTE data);
+BYTE PIO_read(void);
+void PIO_write(BYTE data);
 
 #define USE_DMA
        
@@ -56,8 +56,14 @@ BYTE dmaDataTx_do_TT      (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount)
 void clearCache030(void);
 
 DWORD _cmdTimeOut;                      // timeout time for scsi_cmd() from start to end
-BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+void scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
+    //--------
+    // init result to fail codes
+    hdIf.success        = FALSE;
+    hdIf.statusByte     = ACSIERROR;
+    hdIf.phaseChanged   = FALSE;
+
     //-------------
     // create local copy of cmd[]
     BYTE tmpCmd[32];
@@ -78,7 +84,8 @@ BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
     }
     
     if(scsiId == hdIf.scsiHostId) {     // Trying to access reserved SCSI ID? Fail... (skip)
-        return -1;
+        hdIf.success = FALSE;
+        return;
     }
     
     //------------
@@ -90,7 +97,9 @@ BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
     if(res) {
         logMsg("scsi_cmd_tt failed on scsi_select_and_cmd() \r\n");
         *FLOCK = 0;                     // clear FLOCK to enable FDC operations
-        return -1;
+
+        hdIf.success = FALSE;
+        return;
     }
     
     if(sectorCount != 0) {
@@ -100,19 +109,19 @@ BYTE scsi_cmd_TT(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WOR
         if(wres) {
             logMsg("scsi_cmd_tt failed on dataTransfer \r\n");
             *FLOCK = 0;                 // clear FLOCK to enable FDC operations
-            return -1;
+
+            hdIf.success = FALSE;
+            return;
         }
     }
     
-    BYTE status;
-    status = w4stat();                  // wait for status byte
+    w4stat();                           // wait for status byte
 
-    if(status) {
+    if(!hdIf.success) {
         logMsg("scsi_cmd_tt failed on w4stat \r\n");
     }
     
     *FLOCK = 0;                         // clear FLOCK to enable FDC operations
-    return status;
 }
 
 WORD dataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount, BYTE cmdLength)
@@ -159,24 +168,27 @@ WORD pioDataTransfer(BYTE readNotWrite, BYTE *bfr, DWORD byteCount)
 
 WORD pioDataTransfer_read(BYTE *bfr, DWORD byteCount)
 {
-    int i, res;
+    int i;
+    BYTE data;
+    
+    hdIf.phaseChanged = FALSE;
     
     for(i=0; i<byteCount; i++) {
-        res = PIO_read();
+        data = PIO_read();
             
-        if(res == -2) {         // phase changed? pretend no error
-            logMsg("pioDataTransfer_read() - phase changed while read\n\r");
+        if(hdIf.phaseChanged) {         // phase changed? pretend no error
+//            logMsg("pioDataTransfer_read() - phase changed while read\n\r");
             logMsgProgress(i, byteCount);
             return 0;
         }            
         
-        if(res < 0) {           // other error? quit
+        if(!hdIf.success) {           // other error? quit
             logMsg("pioDataTransfer_read() - other error\n\r");
             logMsgProgress(i, byteCount);
             return -1;
         }
         
-        bfr[i] = (BYTE) res;
+        bfr[i] = data;
     }
     
     return 0;                       // good
@@ -184,18 +196,18 @@ WORD pioDataTransfer_read(BYTE *bfr, DWORD byteCount)
 
 WORD pioDataTransfer_write(BYTE *bfr, DWORD byteCount)
 {
-    int i, res;
+    int i;
     
     for(i=0; i<byteCount; i++) {
-        res = PIO_write(bfr[i]);
+        PIO_write(bfr[i]);
 
-        if(res == -2) {         // phase changed? pretend no error
-            logMsg("pioDataTransfer_write - phase changed while write\n\r");
+        if(hdIf.phaseChanged) {         // phase changed? pretend no error
+//            logMsg("pioDataTransfer_write - phase changed while write\n\r");
             logMsgProgress(i, byteCount);
             return 0;
         }            
         
-        if(res) {
+        if(!hdIf.success) {
             logMsg("pioDataTransfer_write - other error\n\r");
             logMsgProgress(i, byteCount);
             return -1;
@@ -215,7 +227,7 @@ BYTE scsi_select_and_cmd(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLeng
     res = selscsi(scsiId);  // select required device
     
     if(res) {               // if failed, quit with failure
-        logMsg("scsi_select_and_cmd() failed on selscsi\r\n");
+        logMsg("scsi_select_and_cmd() failed on SELECT\r\n");
         return -1;
     }
 
@@ -233,11 +245,11 @@ BYTE scsi_select_and_cmd(BYTE readNotWrite, BYTE scsiId, BYTE *cmd, BYTE cmdLeng
 
     int i;
     
-    for(i=0; i<cmdLength; i++) {                        // send all the cmd bytes using PIO
-        res = PIO_write(cmd[i]);
+    for(i=0; i<cmdLength; i++) {                            // send all the cmd bytes using PIO
+        PIO_write(cmd[i]);
         
-        if(res) {                                       // if time out happened, fail
-            logMsg("scsi_select_and_cmd() failed on PIO_write()\r\n");
+        if(!hdIf.success) {                                 // if time out happened, fail
+            logMsg("scsi_select_and_cmd() - CMD phase failed on PIO_write()\r\n");
             logMsgProgress(i, cmdLength);
             return -1;
         }
@@ -357,51 +369,55 @@ BYTE w4int(void)
 }
 
 // w4stat - wait for status byte and message byte.
-int w4stat(void)
+void w4stat(void)
 {
-    int  iRes;
-    
 	(*hdIf.pSetReg)(REG_TCR, TCR_PHASE_STATUS);     // STATUS IN phase
-	(*hdIf.pGetReg)(REG_REI);                 // clear potential interrupt
+	(*hdIf.pGetReg)(REG_REI);                       // clear potential interrupt
 
     //-----------------
     // receive status byte
-    iRes = PIO_read();
-    if(iRes < 0) {
+    BYTE status = PIO_read();
+    
+    if(!hdIf.success) {                             // failed?
         logMsg("w4stat failed on reading status byte \r\n");
-        return -1;
-    }
-    BYTE status = iRes;
-
-    //-----------------
-    // receive message byte
-	(*hdIf.pSetReg)(REG_TCR, TCR_PHASE_MESSAGE_IN);     // MESSAGE IN phase
-	(*hdIf.pGetReg)(REG_REI);                 // clear potential interrupt
-
-    iRes = PIO_read();
-    if(iRes < 0) {
-        logMsg("w4stat failed on reading message in \r\n");
-        return -1;
+        return;
     }
     
-    return status;
+    //-----------------
+    // receive message byte
+	(*hdIf.pSetReg)(REG_TCR, TCR_PHASE_MESSAGE_IN); // MESSAGE IN phase
+	(*hdIf.pGetReg)(REG_REI);                       // clear potential interrupt
+
+    (void) PIO_read();
+    if(!hdIf.success) {
+        logMsg("w4stat failed on reading message in \r\n");
+        return;
+    }
+    
+    hdIf.success        = TRUE;                     // success!
+    hdIf.statusByte     = status;                   // store status byte
 }
 
-int PIO_read(void)
+BYTE PIO_read(void)
 {
     BYTE res;
     (*hdIf.pSetReg)(REG_ICR, 0);         // deassert data bus (disable data output)
 
+    hdIf.phaseChanged   = FALSE;
+    hdIf.success        = FALSE;
+
     res = w4req();                      // wait for status byte
     if(res) {                           // if timed-out, fail
         logMsg("PIO_read() - fail on w4req() \r\n");
-        return -1;
+        return 0;
     }
 
     res = (*hdIf.pGetReg)(REG_DSR);
     if((res & (1 << 3)) == 0) {         // PHASE MATCH bit from BUS AND STATUS REGISTER is low? SCSI phase changed
-        logMsg("PIO_read() - phase change \r\n");
-        return -2;
+//        logMsg("PIO_read() - phase change \r\n");
+
+        hdIf.phaseChanged   = TRUE;
+        return 0;
     }
 
     BYTE data = (*hdIf.pGetReg)(REG_DB); // get the status byte
@@ -409,26 +425,32 @@ int PIO_read(void)
     res = doack();                      // signal that status byte is here
     if(res) {                           // if timed-out, fail
         logMsg("PIO_read() - fail on doack() \r\n");
-        return -1;
+        return 0;
     }
 
+    hdIf.success = TRUE;
     return data;
 } 
 
-int PIO_write(BYTE data)
+void PIO_write(BYTE data)
 {
     BYTE res;
+
+    hdIf.phaseChanged   = FALSE;
+    hdIf.success        = FALSE;
 
     res = w4req();                      // wait for status byte
     if(res) {                           // if timed-out, fail
         logMsg("PIO_write() - fail on w4req() \r\n");
-        return -1;
+        return;
     }
 
     res = (*hdIf.pGetReg)(REG_DSR);
     if((res & (1 << 3)) == 0) {         // PHASE MATCH bit from BUS AND STATUS REGISTER is low? SCSI phase changed
-        logMsg("PIO_write() - phase change \r\n");
-        return -2;
+//        logMsg("PIO_write() - phase change \r\n");
+
+        hdIf.phaseChanged = FALSE;
+        return;
     }
     
     (*hdIf.pSetReg)(REG_ICR, ICR_DBUS);  // assert data bus (enable data output)
@@ -437,10 +459,10 @@ int PIO_write(BYTE data)
     res = doack();                      // signal that status byte is here
     if(res) {                           // if timed-out, fail
         logMsg("PIO_write() - fail on doack() \r\n");
-        return -1;
+        return;
     }
 
-    return 0;
+    hdIf.success = TRUE;
 } 
             
 // w4req() - wait for REQ to come during hand shake of non-data bytes

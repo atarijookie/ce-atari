@@ -150,7 +150,6 @@ int main(void)
 //--------------------------------------------------
 void sendKeyDown(BYTE key, BYTE keyDownCommand)
 {
-	WORD res;
 	BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, keyDownCommand, 0};
 	
 	cmd[0] = (deviceID << 5); 						// cmd[0] = ACSI_id + TEST UNIT READY (0)	
@@ -158,9 +157,9 @@ void sendKeyDown(BYTE key, BYTE keyDownCommand)
   
 	memset(pBuffer, 0, 512);               			// clear the buffer 
   
-	res = (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);        // issue the KEYDOWN command and show the screen stream 
+	(*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the KEYDOWN command and show the screen stream 
     
-	if(res != OK) {									// if failed, return FALSE 
+	if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
 		showConnectionErrorMessage();
 		return;
 	}
@@ -182,7 +181,6 @@ void sendKeyDown(BYTE key, BYTE keyDownCommand)
 //--------------------------------------------------
 void showMoreStreamIfNeeded(void)
 {
-	WORD res;
 	BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_LINUXCONSOLE_GETSTREAM, 0};
 	
 	cmd[0] = (deviceID << 5); 						    // cmd[0] = ACSI_id + TEST UNIT READY (0)	
@@ -195,9 +193,9 @@ void showMoreStreamIfNeeded(void)
     
         memset(pBuffer, 0, 3 * 512);               	    // clear the buffer 
   
-        res = (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);        // issue the KEYDOWN command and show the screen stream 
+        (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the KEYDOWN command and show the screen stream 
     
-        if(res != OK) {									// if failed, return FALSE 
+        if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
             return;
         }
 
@@ -207,15 +205,14 @@ void showMoreStreamIfNeeded(void)
 
 void showHomeScreen(void)							
 {
-	WORD res;
 	BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_GO_HOME, 0};
 	
 	cmd[0] = (deviceID << 5); 						// cmd[0] = ACSI_id + TEST UNIT READY (0)	
 	memset(pBuffer, 0, 512);               			// clear the buffer 
   
-	res = (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);        // issue the GO_HOME command and show the screen stream 
+	(*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the GO_HOME command and show the screen stream 
     
-	if(res != OK) {									// if failed, return FALSE 
+	if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
 		showConnectionErrorMessage();
 		return;
 	}
@@ -233,15 +230,14 @@ void showHomeScreen(void)
 //--------------------------------------------------
 void refreshScreen(void)							
 {
-	WORD res;
 	BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_REFRESH, 0};
 	
 	cmd[0] = (deviceID << 5); 						// cmd[0] = ACSI_id + TEST UNIT READY (0)	
 	memset(pBuffer, 0, 512);               			// clear the buffer 
   
-	res = (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);        // issue the REFRESH command and show the screen stream 
+	(*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the REFRESH command and show the screen stream 
     
-	if(res != OK) {									// if failed, return FALSE 
+	if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
 		showConnectionErrorMessage();
 		return;
 	}
@@ -361,9 +357,9 @@ void cosmoSoloConfig(void)
         
         cmd[0] = (deviceID << 5); 						    // cmd[0] = ACSI_id + TEST UNIT READY (0)	
   
-        BYTE res = (*hdIf.cmd)(ACSI_READ, cmd, 6, pBuffer, 1);
+        (*hdIf.cmd)(ACSI_READ, cmd, 6, pBuffer, 1);
         
-        if(res == OK) {
+        if(!hdIf.success || hdIf.statusByte == OK) {
             (void) Cconws("\n\rNew ID was successfully set.\n\r");
         } else {
             (void) Cconws("\n\rFailed to set new ID.\n\r");
