@@ -106,7 +106,7 @@ BYTE findCE(BYTE hddIf)
 //--------------------------------------------------
 BYTE ce_identify(BYTE id, BYTE hddIf)
 {
-    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, FDD_CMD_IDENTIFY, 0};
+    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_FDD_SETUP, FDD_CMD_IDENTIFY, 0};
   
     cmd[0] = (id << 5); 					        // cmd[0] = ACSI_id + TEST UNIT READY (0)
     memset(pDmaBuffer, 0, 512);              	    // clear the buffer 
