@@ -497,7 +497,7 @@ BYTE findDevice(void)
 	BYTE id = 0xff;
 	char bfr[2];
 
-    hdIf.retriesDoneCount = 0;          // disable retries - we are expecting that the devices won't answer on every ID
+    hdIf.maxRetriesCount = 0;           // disable retries - we are expecting that the devices won't answer on every ID
     
 	bfr[1] = 0; 
 	(void) Cconws("Looking for CosmosEx on ");
@@ -529,12 +529,12 @@ BYTE findDevice(void)
 		key = Cnecin();        
     
 		if(key == 'Q' || key=='q') {
-            hdIf.retriesDoneCount = 16;                 // enable retries
+            hdIf.maxRetriesCount = 16;                  // enable retries
 			return 0xff;
 		}
 	}
   
-    hdIf.retriesDoneCount = 16;                         // enable retries
+    hdIf.maxRetriesCount = 16;                          // enable retries
     
 	bfr[0] = id + '0';
 	(void) Cconws("\r\nCosmosEx ID: ");
