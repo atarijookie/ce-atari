@@ -385,17 +385,21 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
             
 			memcpy(FastRAMBuffer, bfr, bytes_to_copy);							                            // Yup, so copy data to its rightful place
 			bfr=bfr+FASTRAM_BUFFER_SIZE;
-			BYTE res = (*hdIf.cmd)(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // send command to host over ACSI 
+			(*hdIf.cmd)(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // send command to host over ACSI 
 			
+            if(!hdIf.success) {     // failed?
+                return 0;
+            }
+            
 			// if all data in this chunk transfered, update counter
-			if(res == RW_ALL_TRANSFERED) {
+			if(hdIf.statusByte == RW_ALL_TRANSFERED) {
 				actual_bytes_written=actual_bytes_written+bytes_to_copy;
 				cnt_remain=cnt_remain-bytes_to_copy;
 			}
 			else
 			{
 				// if the result is also not partial transfer, then some other error happened, return that no data was transfered
-				if(res != RW_PARTIAL_TRANSFER ) {
+				if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
 					return 0;	
 				}
 				
@@ -403,9 +407,9 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
 				commandShort[4] = GD_CUSTOM_getRWdataCnt;
 				commandShort[5] = ceHandle;										
 				
-				res = (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			// send command to host over ACSI
+				(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			// send command to host over ACSI
 			
-				if(res != E_OK) {													// failed? say that no data was transfered
+				if(!hdIf.success || hdIf.statusByte != E_OK) {									// failed? say that no data was transfered
 					return 0;
 				}
 			
@@ -428,15 +432,19 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
 		commandLong[8] = cnt >>  8;
 		commandLong[9] = cnt  & 0xff;
 
-		BYTE res = (*hdIf.cmd)(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// send command to host over ACSI 
+		(*hdIf.cmd)(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// send command to host over ACSI 
 		
+        if(!hdIf.success) {     // failed?
+            return 0;
+        }
+        
 		// if all data transfered, return count of all data
-		if(res == RW_ALL_TRANSFERED) {
+		if(hdIf.statusByte == RW_ALL_TRANSFERED) {
 			return cnt;
 		}
 	
 		// if the result is also not partial transfer, then some other error happened, return that no data was transfered
-		if(res != RW_PARTIAL_TRANSFER ) {
+		if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
 			return 0;	
 		}
 		
@@ -444,9 +452,9 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
 		commandShort[4] = GD_CUSTOM_getRWdataCnt;
 		commandShort[5] = ceHandle;										
 		
-		res = (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			// send command to host over ACSI
+		(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			// send command to host over ACSI
 	
-		if(res != E_OK) {													// failed? say that no data was transfered
+		if(!hdIf.success || hdIf.statusByte != E_OK) {									// failed? say that no data was transfered
 			return 0;
 		}
 	
@@ -515,9 +523,13 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
                 sectorCount++;
             }
             
-			BYTE res = (*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // Read as much as we can to ST RAM first - send command to host over ACSI 
+			(*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // Read as much as we can to ST RAM first - send command to host over ACSI 
 
-			if(res == RW_ALL_TRANSFERED) {
+            if(!hdIf.success) {     // failed?
+                return 0;
+            }
+            
+			if(hdIf.statusByte == RW_ALL_TRANSFERED) {
 				memcpy(bfr, FastRAMBuffer, bytes_to_read);							                        // Yup, so copy data to its rightful place
 				bfr=bfr+FASTRAM_BUFFER_SIZE;
 				actual_bytes_read = actual_bytes_read + bytes_to_read;
@@ -526,16 +538,20 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 			else
 			{
 				// if the result is also not partial transfer, then some other error happened, return that no data was transfered
-				if(res != RW_PARTIAL_TRANSFER ) {
+				if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
 					return 0;	
 				}
 
 				// if we got here, then partial transfer happened, see how much data we got
 				commandShort[4] = GD_CUSTOM_getRWdataCnt;
 				commandShort[5] = ceHandle;										
-				res = (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				// send command to host over ACSI
+				(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				// send command to host over ACSI
 		
-				if(res != E_OK) {													// failed? say that no data was transfered
+                if(!hdIf.success) {     // failed?
+                    return 0;
+                }
+
+				if(!hdIf.success || hdIf.statusByte != E_OK) {													// failed? say that no data was transfered
 					return 0;
 				}
 		
@@ -554,15 +570,19 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 		commandLong[8] = cnt >>  8;
 		commandLong[9] = cnt  & 0xff;
 	
-		BYTE res = (*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// Normal read to ST RAM - send command to host over ACSI 
+		(*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// Normal read to ST RAM - send command to host over ACSI 
 	
+        if(!hdIf.success) {     // failed?
+            return 0;
+        }
+    
 		// if all data transfered, return count of all data
-		if(res == RW_ALL_TRANSFERED) {
+		if(hdIf.statusByte == RW_ALL_TRANSFERED) {
 			return cnt;
 		}
 
 		// if the result is also not partial transfer, then some other error happened, return that no data was transfered
-		if(res != RW_PARTIAL_TRANSFER ) {
+		if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
 			return 0;	
 		}
 	
@@ -570,9 +590,9 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 		commandShort[4] = GD_CUSTOM_getRWdataCnt;
 		commandShort[5] = ceHandle;										
 	
-		res = (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				// send command to host over ACSI
+		(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				// send command to host over ACSI
 
-		if(res != E_OK) {													// failed? say that no data was transfered
+		if(!hdIf.success || hdIf.statusByte != E_OK) {      // failed? say that no data was transfered
 			return 0;
 		}
 
@@ -649,14 +669,12 @@ void initFileBuffer(WORD ceHandle)
 
 void getBytesToEof(WORD ceHandle)
 {
-    DWORD res;
-    
 	commandShort[4] = GD_CUSTOM_getBytesToEOF;                                  // store function number
 	commandShort[5] = ceHandle;										
 	
-	res = (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);   // send command to host over ACSI
+	(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);      // send command to host over ACSI
 
-    if(res != E_OK) {							                                // failed? set 0 count of bytes to EOF and quit
+    if(!hdIf.success || hdIf.statusByte != E_OK) {							    // failed? set 0 count of bytes to EOF and quit
         fileBufs[ceHandle].bytesToEOF           = 0;
         fileBufs[ceHandle].bytesToEOFinvalid    = 0;                            // mark that the bytesToEOF is valid
 		return;														

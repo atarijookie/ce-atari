@@ -21,21 +21,21 @@
  * GEMDOS hooks part (assembler and C) by MiKRO (Miro Kropacek), 2013
  */
  
-/* ------------------------------------------------------------------ */
-/* init and hooks part - MiKRO */
+// ------------------------------------------------------------------ 
+// init and hooks part - MiKRO 
 typedef void  (*TrapHandlerPointer)( void );
 
 extern void gemdos_handler( void );
 extern TrapHandlerPointer old_gemdos_handler;
 int32_t (*gemdos_table[256])( void* sp ) = { 0 };
-int16_t useOldGDHandler = 0;								/* 0: use new handlers, 1: use old handlers */
+int16_t useOldGDHandler = 0;								// 0: use new handlers, 1: use old handlers 
 
 extern void bios_handler( void );
 extern TrapHandlerPointer old_bios_handler;
 int32_t (*bios_table[256])( void* sp ) = { 0 };
-int16_t useOldBiosHandler = 0;								/* 0: use new handlers, 1: use old handlers */ 
-/* ------------------------------------------------------------------ */
-/* CosmosEx and Gemdos part - Jookie */
+int16_t useOldBiosHandler = 0;								// 0: use new handlers, 1: use old handlers  
+// ------------------------------------------------------------------ 
+// CosmosEx and Gemdos part - Jookie 
 BYTE findDevice(void);
 
 BYTE ce_findId(void);
@@ -86,13 +86,13 @@ WORD trap_extra_offset=0;                   // Offset for GEMDOS/BIOS handler st
 
 WORD transDiskProtocolVersion;              // this will hold the protocol version from Main App
 #define REQUIRED_TRANSLATEDDISK_VERSION     0x0101
-/* ------------------------------------------------------------------ */
+// ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
 {
 	BYTE found;
 	int i;
 
-	/* write some header out */
+	// write some header out 
 	Clear_home();
 	(void) Cconws("\33p[ CosmosEx disk driver  ]\r\n[ by Jookie 2013 - 2015 ]\r\n[        ver ");
     showAppVersion();
@@ -130,14 +130,14 @@ int main( int argc, char* argv[] )
     //--------------------------------    
     (void) Cconws("\33q\r\n" );
 	
-	/* create buffer pointer to even address */
+	// create buffer pointer to even address 
 	pDmaBuffer = &dmaBuffer[2];
-	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
+	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);		// remove odd bit if the address was odd 
 
-	/* initialize internal stuff for Fsfirst and Fsnext */
+	// initialize internal stuff for Fsfirst and Fsnext 
 	fsnextIsForUs		= 0;
 	pDtaBuffer		= &dtaBuffer[2];
-	pDtaBuffer		= (BYTE *) (((DWORD) pDtaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
+	pDtaBuffer		= (BYTE *) (((DWORD) pDtaBuffer) & 0xfffffffe);		// remove odd bit if the address was odd 
 
 	// search for CosmosEx on ACSI bus
 	found = Supexec(findDevice);
@@ -182,22 +182,22 @@ int main( int argc, char* argv[] )
     
     showNetworkIPs();                                       // show IP addresses if possible
     
-	Supexec(updateCeDrives);								/* update the ceDrives variable */
+	Supexec(updateCeDrives);								// update the ceDrives variable 
 	
 	initFunctionTable();
 
 	for(i=0; i<MAX_FILES; i++) {
-		initFileBuffer(i);									/* init the file buffers */
+		initFileBuffer(i);									// init the file buffers 
 	}
 	
-	/* either remove the old one or do nothing, old memory isn't released */
+	// either remove the old one or do nothing, old memory isn't released 
 	if( unhook_xbra( VEC_GEMDOS, 'CEDD' ) == 0L && unhook_xbra( VEC_BIOS, 'CEDD' ) == 0L ) {
 		(void)Cconws( "\r\nDriver installed.\r\n" );
 	} else {
 		(void)Cconws( "\r\nDriver reinstalled, some memory was lost.\r\n" );
 	}
 
-	/* and now place the new gemdos handler */
+	// and now place the new gemdos handler 
 	old_gemdos_handler	= Setexc( VEC_GEMDOS,	gemdos_handler );
 	old_bios_handler	= Setexc( VEC_BIOS,		bios_handler ); 
 
@@ -223,7 +223,7 @@ int main( int argc, char* argv[] )
     }
     //-------------------------------------
 
-	/* wait for a while so the user could read the message and quit */
+	// wait for a while so the user could read the message and quit 
 	sleep(1);
 
 	if(_runFromBootsector == 0) {	// if the prg was not run from boot sector, terminate and stay resident (execution ends here)
@@ -234,10 +234,10 @@ int main( int argc, char* argv[] )
 	return 0;		
 }
 
-/* send INITIALIZE command to the CosmosEx device telling it to do all the stuff it needs at start */
+// send INITIALIZE command to the CosmosEx device telling it to do all the stuff it needs at start 
 void ce_initialize(void)
 {
-	commandShort[0] = (deviceID << 5); 					                        /* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+	commandShort[0] = (deviceID << 5); 					                        // cmd[0] = ACSI_id + TEST UNIT READY (0)	
 	commandShort[4] = GD_CUSTOM_initialize;
   
     BYTE  *pSysBase     = (BYTE *) 0x000004F2;
@@ -251,21 +251,19 @@ void ce_initialize(void)
     WORD drives         = Drvmap();
     SET_WORD(pDmaBuffer + 4, drives);                                           // store existing drives
   
-	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);        /* issue the command and check the result */
+	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);        // issue the command and check the result 
 }
 
 void getConfig(void)
 {
-    WORD res;
-    
     transDiskProtocolVersion = 0;                                               // no protocol version / failed
     
 	commandShort[0] = (deviceID << 5); 					                        // cmd[0] = ACSI_id + TEST UNIT READY (0)
 	commandShort[4] = GD_CUSTOM_getConfig;
   
-	res = (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// issue the command and check the result
+	(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	    // issue the command and check the result
     
-    if(res != OK) {                                                             // failed to get config?
+    if(!hdIf.success || hdIf.statusByte != OK) {                                // failed to get config?
         return;
     }
     
@@ -325,7 +323,7 @@ BYTE setDateTime(void)
   
     res = Tsetdate(newDate);
   
-    if(res)                   /* if some error, then failed */
+    if(res)                   // if some error, then failed 
         return 0;         
     
     //------------------
@@ -340,7 +338,7 @@ BYTE setDateTime(void)
   
     res = Tsettime(newTime);
   
-    if(res)                   /* if some error, then failed */
+    if(res)                   // if some error, then failed 
         return 0;         
     //------------------
     

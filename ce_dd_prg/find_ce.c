@@ -74,7 +74,7 @@ BYTE findCE(BYTE hddIf)
     
 	(void) Cconws("\n\rLooking for CosmosEx on ");
 
-    if(hddIf == IF_ACSI) {                          // ACSI?
+    if(hddIf == IF_ACSI) {                              // ACSI?
         (void) Cconws("ACSI: ");
     } else {                                            // SCSI?
         (void) Cconws("SCSI: ");
@@ -85,7 +85,7 @@ BYTE findCE(BYTE hddIf)
     for(id=0; id<8; id++) {                             // try to talk to all ACSI devices
         Cconout('0' + id);                              // write out BUS ID
     
-        res = ce_identify(id, hddIf);               // try to read the IDENTITY string 
+        res = ce_identify(id, hddIf);                   // try to read the IDENTITY string 
   
         if(res == 1) {                                  // if found the CosmosEx 
             (void) Cconws(" <-- found!\n\r");
@@ -100,15 +100,14 @@ BYTE findCE(BYTE hddIf)
 //--------------------------------------------------
 BYTE ce_identify(BYTE id, BYTE hddIf)
 {
-    WORD res;
     BYTE cmd[] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TRAN_CMD_IDENTIFY, 0};
   
     cmd[0] = (id << 5); 					        // cmd[0] = ACSI_id + TEST UNIT READY (0)
     memset(pDmaBuffer, 0, 512);              	    // clear the buffer 
   
-    res = (*hdIf.cmd)(1, cmd, 6, pDmaBuffer, 1);    // issue the identify command and check the result 
+    (*hdIf.cmd)(1, cmd, 6, pDmaBuffer, 1);          // issue the identify command and check the result 
     
-	if(res != OK) {                        			// if failed, return FALSE
+	if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE
 		return 0;
 	}
 

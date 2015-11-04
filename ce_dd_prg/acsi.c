@@ -1,14 +1,21 @@
 //--------------------------------------------------
-
+#include <mint/sysbind.h>
 #include "acsi.h"
+
+#include "hdd_if.h"
 #include "stdlib.h"
 
 // -------------------------------------- 
-BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
-	DWORD status;
 	WORD i, wr1, wr2;
 
+    //--------
+    // init result to fail codes
+    hdIf.success        = FALSE;
+    hdIf.statusByte     = ACSIERROR;
+    hdIf.phaseChanged   = FALSE;
+    
     //------------------
     // try to acquire FLOCK if possible
     DWORD end = getTicks() + 200;               // calculate the terminating tick count, where we should stop looking for unlocked FLOCK
@@ -23,7 +30,8 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
         }
         
         if(getTicks() >= end) {                 // on time out - fail, return ACSIERROR
-            return ACSIERROR;
+            hdIf.success = FALSE;
+            return;
         }
     }
     
@@ -41,7 +49,8 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 	if (qdone() != OK) {					    // wait for ack 
 		hdone();                                // restore DMA device to normal 
 
-		return ACSIERROR;
+        hdIf.success = FALSE;
+		return;
 	}
 	//*******************************
 	// transfer middle cmd bytes 
@@ -52,17 +61,18 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 		if (qdone() != OK) {				    // wait for ack 
 			hdone();                            // restore DMA device to normal 
 			
-			return ACSIERROR;
+            hdIf.success = FALSE;
+            return;
 		}
 	}
 	
 	// wr1 and wr2 are defined so we could toggle R/W bit and then setup Read / Write operation  
 	if(ReadNotWrite==1) {						
 		wr1 = DMA_WR;
-		wr2 = HDC | A0;
+		wr2 = 0;
 	} else {
 		wr1 = 0;
-		wr2 = DMA_WR | HDC | A0;
+		wr2 = DMA_WR;
 	}
 
     *dmaAddrMode = wr1 | NO_DMA | SC_REG;       // clear FIFO = toggle R/W bit 
@@ -74,26 +84,28 @@ BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     *dmaAddrData = cmd[cmdLength - 1];          // transfer the last command byte              
     *dmaAddrMode = wr2;                         // start DMA transfer 
 
-    status = endcmd(wr2 | NO_DMA | HDC | A0);   // wait for DMA completion 
+    endcmd(wr2 | NO_DMA | HDC | A0);            // wait for DMA completion 
 	hdone();                                    // restore DMA device to normal 
-
-	return status;
 }
 
 //**************************************************************************
-BYTE endcmd(WORD mode)
+void endcmd(WORD mode)
 {
 	WORD val;
 
-	if (fdone() != OK)                  // wait for operation done ack 
-		return ACSIERROR;
+	if (fdone() != OK) {                // wait for operation done ack 
+        hdIf.success = FALSE;           // failed?
+
+		return;
+    }
 
 	*dmaAddrMode = mode;                // write mode word to mode register 
 
 	val = *dmaAddrData;
 	val = val & 0x00ff;
 
-	return val;							// return completion byte 
+    hdIf.success        = TRUE;         // success!
+    hdIf.statusByte     = val;          // store status byte
 }
 //**************************************************************************
 BYTE hdone(void)
