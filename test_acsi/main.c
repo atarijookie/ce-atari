@@ -289,7 +289,7 @@ int main(void)
         VT52_Goto_pos(x, 24);
 		
 		if( charcnt>=40-2 ){
-			VT52_Goto_pos(0,3);
+			VT52_Goto_pos(0,4);
 			VT52_Del_line();
             
 			VT52_Goto_pos(0, 24);
