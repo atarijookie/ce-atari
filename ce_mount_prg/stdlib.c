@@ -6,7 +6,7 @@
 
 DWORD getTicks(void);
 
-char *strcpy(char *dest, char *src)
+char *strcpy(char *dest, const char *src)
 {
 	while(1) {
 		*dest = *src;				// copy in the current char
