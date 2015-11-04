@@ -14,10 +14,10 @@
 #include "hostmoddefs.h"
 #include "keys.h"
 #include "defs.h"
+#include "hdd_if.h"
+#include "find_ce.h"
        
 // ------------------------------------------------------------------ 
-BYTE ce_findId(void);
-BYTE ce_identify(void);
 
 BYTE deviceID;
 BYTE commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
@@ -29,6 +29,7 @@ BYTE sectorCount;
 
 BYTE *pBfrOrig;
 BYTE *pBfr, *pBfrCnt;
+BYTE *pDmaBuffer;
 
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
 
@@ -80,13 +81,16 @@ int main( int argc, char* argv[] )
 	pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);     				// create even pointer
     pBfrCnt   = pBfr - 2;											// this is previous pointer - size of WORD 
 	
+    pDmaBuffer = pBfr;
+    
 	// search for CosmosEx on ACSI bus
-	found = ce_findId();
-    if(!found) {								                    // not found? quit
+	found = Supexec(findDevice);
+
+	if(!found) {								            // not found? quit
 		sleep(3);
 		return 0;
 	}
-
+ 
 	// now set up the acsi command bytes so we don't have to deal with this one anymore 
 	commandShort[0] = (deviceID << 5); 					            // cmd[0] = ACSI_id + TEST UNIT READY (0)	
 
@@ -196,84 +200,33 @@ void removeLastPartUntilBackslash(char *str)
 	}
 }
 
-// this function scans the ACSI bus for any active CosmosEx translated drive 
-BYTE ce_findId(void)
-{
-	char bfr[2], res, i;
-
-	bfr[1] = 0;
-	deviceID = 0;
-	
-	(void) Cconws("Looking for CosmosEx: ");
-
-	for(i=0; i<8; i++) {
-		bfr[0] = i + '0';
-		(void) Cconws(bfr);
-
-		deviceID = i;									// store the tested ACSI ID 
-		res = Supexec(ce_identify);  					// try to read the IDENTITY string 
-		
-		if(res == 1) {                           		// if found the CosmosEx 
-			(void) Cconws("\r\nCosmosEx found on ACSI ID: ");
-			bfr[0] = i + '0';
-			(void) Cconws(bfr);
-			(void) Cconws("\n\r\n\r");
-
-			return 1;
-		}
-	}
-
-	// if not found 
-    (void) Cconws("\r\nCosmosEx not found on ACSI bus...");
-	return 0;
-}
-
-// send an IDENTIFY command to specified ACSI ID and check if the result is as expected 
-BYTE ce_identify(void)
-{
-	WORD res;
-  
-	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
-	commandShort[4] = FDD_CMD_IDENTIFY;
-  
-	memset(pBfr, 0, 512);              											// clear the buffer 
-
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, 1);			// issue the command and check the result 
-
-	if(res != OK) {                        										// if failed, return FALSE 
-		return 0;
-	}
-
-	if(strncmp((char *) pBfr, "CosmosEx floppy setup", 21) != 0) {				// the identity string doesn't match? 
-		return 0;
-	}
-	
-	return 1;                             										// success 
-}
-
 // make single ACSI read command by the params set in the commandShort buffer
 BYTE ce_acsiReadCommand(void)
 {
-	WORD res;
-  
 	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
   
 	memset(pBfr, 0, 512);              											// clear the buffer 
 
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, sectorCount);   // issue the command and check the result 
+	(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, sectorCount);   // issue the command and check the result 
 
-	return res;                            										// success 
+    if(!hdIf.success) {
+        return 0xff;
+    }
+    
+	return hdIf.statusByte;
 }
 
 BYTE ce_acsiWriteBlockCommand(void)
 {
-	WORD res;
-  
 	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
   
-	res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, sectorCount);	// issue the command and check the result 
+	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, sectorCount);	// issue the command and check the result 
 
-    return res;                                                                 // just return the code
+    if(!hdIf.success) {
+        return 0xff;
+    }
+    
+	return hdIf.statusByte;
 }
 
 BYTE getLowestDrive(void)
@@ -418,5 +371,25 @@ BYTE getIsImageBeingEncoded(void)
     // fail?
     showComError();                             // show error
     return ENCODING_FAIL;
+}
+
+void logMsg(char *logMsg)
+{
+//    if(showLogs) {
+//        (void) Cconws(logMsg);
+//    }
+}
+
+void logMsgProgress(DWORD current, DWORD total)
+{
+//    if(!showLogs) {
+//        return;
+//    }
+
+//    (void) Cconws("Progress: ");
+//    showHexDword(current);
+//    (void) Cconws(" out of ");
+//    showHexDword(total);
+//    (void) Cconws("\n\r");
 }
 
