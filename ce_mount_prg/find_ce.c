@@ -34,7 +34,7 @@ BYTE findDevice(void)
     BYTE found = 0;
     BYTE key;
 
-    hdIf.retriesDoneCount = 0;                          // disable retries - we are expecting that the devices won't answer on every ID
+    hdIf.maxRetriesCount = 0;                           // disable retries - we are expecting that the devices won't answer on every ID
     
     machine = getMachineType();
     
@@ -56,7 +56,7 @@ BYTE findDevice(void)
         }
         
         if(found) {
-            hdIf.retriesDoneCount = 16;                 // enable retries
+            hdIf.maxRetriesCount = 16;                  // enable retries
             return TRUE;
         }
         //---------------------
@@ -64,12 +64,12 @@ BYTE findDevice(void)
 		key = Cnecin();
     
 		if(key == 'Q' || key=='q') {
-            hdIf.retriesDoneCount = 16;                 // enable retries
+            hdIf.maxRetriesCount = 16;                  // enable retries
 			return FALSE;
 		}
     }
     
-    hdIf.retriesDoneCount = 16;                         // enable retries
+    hdIf.maxRetriesCount = 16;                          // enable retries
     return FALSE;                                       // this should never happen
 }
 
