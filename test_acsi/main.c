@@ -440,7 +440,7 @@ void print_status(void)
 
 	(void) Cconws(" Oth:");
 	showInt(counts.read.errorOther,     2);
-	(void) Cconws("\33c0 ]\33q\r\n");
+	(void) Cconws("\33c0]\33q\r\n");
     
     //-------------
     // 4rd row - write statistics
@@ -458,7 +458,7 @@ void print_status(void)
 
 	(void) Cconws(" Oth:");
 	showInt(counts.write.errorOther,    2);
-	(void) Cconws("\33c0 ]\33q\r\n");
+	(void) Cconws("\33c0]\33q\r\n");
 }
 
 //--------------------------------------------------
