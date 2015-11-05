@@ -47,7 +47,7 @@ public:
     void setCommunicationObject(CConSpi *comIn);
     void setRetryObject(RetryModule *retryModule);
 
-    void clear(void);
+    void clear(bool clearAlsoDataDirection=true);
 
     void setStatus(BYTE stat);
 

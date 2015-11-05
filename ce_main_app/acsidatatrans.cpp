@@ -54,12 +54,15 @@ void AcsiDataTrans::setRetryObject(RetryModule *retryModule)
     retryMod = retryModule;
 }
 
-void AcsiDataTrans::clear(void)
+void AcsiDataTrans::clear(bool clearAlsoDataDirection)
 {
     count           = 0;
     status          = SCSI_ST_OK;
     statusWasSet    = false;
-    dataDirection   = DATA_DIRECTION_READ;
+    
+    if(clearAlsoDataDirection) {
+        dataDirection   = DATA_DIRECTION_READ;
+    }
 	
 	dumpNextData	= false;
 }
@@ -157,7 +160,7 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 		bool res = com->waitForATN(SPI_CS_HANS, ATN_WRITE_MORE_DATA, 1000, inBuf);	// wait for ATN_WRITE_MORE_DATA
 
         if(!res) {                                          // this didn't come? fuck!
-			clear();										// clear all the variables
+			clear(false);								    // clear all the variables - except dataDirection, which will be used for retry
             return false;
         }
 
