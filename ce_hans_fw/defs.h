@@ -110,7 +110,7 @@ GPIOC_14 - card detect
 #define XMSG        (1 << 15)
 
 //------------------------------
-// #define DO_LOG_ERROR
+//#define DO_LOG_ERROR
 
 #ifdef DO_LOG_ERROR
     extern BYTE lastErr;
