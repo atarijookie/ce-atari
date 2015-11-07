@@ -1,16 +1,13 @@
 #!/bin/sh
 
-# See if cesuper.sh is running, and start it if it doesn't
-cesuper_pid=$(ps | grep 'cesuper.sh' | grep -v 'grep' | awk '{print $1}' )
+# kill previously running script and app
+killall -9 cesuper.sh > /dev/null 2> /dev/null
+killall -9 cosmosex > /dev/null 2> /dev/null
 
-if [ -z $cesuper_pid]
-then
-	# remove leftover update script (if any)
-	rm -f /ce/update/doupdate.sh
+# remove doupdate script
+rm -f /ce/update/doupdate.sh
 
-	echo "Starting cesuper.sh..."
-	/ce/cesuper.sh &
-else
-	echo "cesuper.sh is running, not doing anything"
-fi
+# run the cesuper script on background
+echo "Starting CosmosEx supervisor script and CosmosEx app"
+/ce/cesuper.sh &
 

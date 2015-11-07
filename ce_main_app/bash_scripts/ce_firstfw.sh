@@ -1,7 +1,10 @@
 #!/bin/sh
 
 # first stop any cosmosex process (script or app)
-/ce/ce_stop.sh
+if [ "$1" != "nokill" ]; then
+    echo "Stopping CosmosEx app and supervisor script."
+    /ce/ce_stop.sh
+fi
 
 echo -e "\nReverting to first firmware, this will take a while.\nDO NOT POWER OFF THE DEVICE!!!\n\n"
 

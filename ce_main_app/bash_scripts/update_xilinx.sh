@@ -1,4 +1,5 @@
 #!/bin/sh
+
 echo "XILINX firmware writing script."
 
 if [ ! -f /tmp/xilinx.xsvf ]; then          # if this file doesn't exist, try to extract it from ZIP package
@@ -8,6 +9,11 @@ if [ ! -f /tmp/xilinx.xsvf ]; then          # if this file doesn't exist, try to
         echo "/tmp/xilinx.xsvf and /tmp/ce_update.zip don't exist, can't update!"
         exit
     fi
+fi
+
+# if the updatelist.csv file exists, make a copy of it, because running '/ce/app/cosmosex hwinfo' will delete it, and we need it!
+if [ -f /tmp/updatelist.csv ]; then
+    cp -f /tmp/updatelist.csv /tmp/updatelist_copy.csv
 fi
 
 # initialize variables
@@ -45,7 +51,7 @@ if [[ "$is36" -eq "1" ]]; then
     # write the XC9536 firmware
     echo "Detected XC9536 chip, will write firmware"
     /ce/update/flash_xilinx /tmp/xilinx.xsvf
-    cat /tmp/updatelist.csv | grep 'xilinx' | awk -F ',' '{print $2}' > /ce/update/xilinx_current.txt 
+    cat /tmp/updatelist_copy.csv | grep 'xilinx' | awk -F ',' '{print $2}' > /ce/update/xilinx_current.txt 
     exit
 fi
 
@@ -61,7 +67,7 @@ if [[ "$is72" -eq "1" ]]; then
     if [[ -n "$isAcsi" ]]; then
         echo "Detected XC9572 chip and ACSI interface, will write firmware"
         /ce/update/flash_xilinx /tmp/xlnx2a.xsvf
-        cat /tmp/updatelist.csv | grep 'xlnx2a' | awk -F ',' '{print $2}' > /ce/update/xilinx_current.txt 
+        cat /tmp/updatelist_copy.csv | grep 'xlnx2a' | awk -F ',' '{print $2}' > /ce/update/xilinx_current.txt 
         exit
     fi
 
@@ -69,7 +75,7 @@ if [[ "$is72" -eq "1" ]]; then
     if [[ -n "$isScsi" ]]; then
         echo "Detected XC9572 chip and SCSI interface, will write firmware"
         /ce/update/flash_xilinx /tmp/xlnx2s.xsvf
-        cat /tmp/updatelist.csv | grep 'xlnx2s' | awk -F ',' '{print $2}' > /ce/update/xilinx_current.txt 
+        cat /tmp/updatelist_copy.csv | grep 'xlnx2s' | awk -F ',' '{print $2}' > /ce/update/xilinx_current.txt 
         exit
     fi
     

@@ -270,9 +270,7 @@ bool Update::createFlashFirstFwScript(void)
         return false;
     }
 
-    fprintf(f, "/ce/ce_firstfw.sh\n");                              // only thing needed is to run this first FW writing script
-    fprintf(f, "rm -f %s\n", UPDATE_SCRIPT);                        // delete the update script, so we won't get stuck in the updating loop
-    fprintf(f, "/ce/cesuper.sh &\n");                               // start the CE supervisor script, which will start CE app - it was killed at the beggining of ce_firstfw.sh
+    fprintf(f, "/ce/ce_firstfw.sh nokill \n");                      // only thing needed is to run this first FW writing script
     fclose(f);
     return true;
 }

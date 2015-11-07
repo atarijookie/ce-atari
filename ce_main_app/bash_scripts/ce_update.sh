@@ -32,6 +32,17 @@ unzip -o /tmp/ce_update.zip -d /tmp
 # update franz
 /ce/update/update_franz.sh
 
+#--------------
+# check if it's now HW vs FW mismatch, which might need another Xilinx flashing
+out=$( /ce/app/cosmosex hwinfo )
+mm=$( echo "$out" | grep 'HWFWMM' )
+
+# if MISMATCH detected, flash xilinx again -- without programmed Hans the HW reporting from app could be wrong, and thus this one is needed to fix the situation
+if [ "$mm" = "HWFWMM: MISMATCH" ]; then
+    /ce/update/update_xilinx.sh
+fi 
+#--------------
+
 rm -f /tmp/*.zip /tmp/*.hex /tmp/*.csv /tmp/*.xsvf
 sync
 
