@@ -164,11 +164,15 @@ void CCoreThread::run(void)
         DWORD hans;
         DWORD franz;
         DWORD nextDisplay;
+        
+        int     progress;
     } lastFwInfoTime;
+    char progChars[4] = {'|', '/', '-', '\\'};
     
     lastFwInfoTime.hans         = 0;
     lastFwInfoTime.franz        = 0;
     lastFwInfoTime.nextDisplay  = Utils::getEndTime(1000);
+    lastFwInfoTime.progress     = 0;
     
 	//up/running state of inet interfaces
 	bool  state_eth0 	= false;
@@ -197,7 +201,9 @@ void CCoreThread::run(void)
             hansTime    = (hansTime  < 15.0f) ? hansTime  : 15.0f;
             franzTime   = (franzTime < 15.0f) ? franzTime : 15.0f;
             
-            printf("\033[2K    Hans: %.1f s (%s), Franz: %.1f s, (%s)\033[A\n", hansTime, (hansTime < 3.0f) ? "LIVE" : "DEAD", franzTime, (franzTime < 3.0f) ? "LIVE" : "DEAD");
+            printf("\033[2K  [ %c ]  Hans: %.1f s (%s), Franz: %.1f s, (%s)\033[A\n", progChars[lastFwInfoTime.progress], hansTime, (hansTime < 3.0f) ? "LIVE" : "DEAD", franzTime, (franzTime < 3.0f) ? "LIVE" : "DEAD");
+        
+            lastFwInfoTime.progress = (lastFwInfoTime.progress + 1) % 4;
         }
         
         // should we check if Hans and Franz are alive?
@@ -293,6 +299,7 @@ void CCoreThread::run(void)
 				translated->reloadSettings(SETTINGSUSER_TRANSLATED);
 			}
 		}
+
 #if !defined(ONPC_HIGHLEVEL)
         // check for any ATN code waiting from Hans
 		res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);

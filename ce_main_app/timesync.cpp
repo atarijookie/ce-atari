@@ -63,6 +63,11 @@ bool TimeSync::sync(void)
         return false;
     }
  
+    if(sigintReceived) {
+        Debug::out(LOG_DEBUG, "TimeSync::sync -- SIGINT received at line %d, exiting", __LINE__);
+        return false;
+    }
+ 
     bool res = syncByNtp();                 // first try by NTP
     
     if(res) {                               // NTP success? ok!
@@ -71,6 +76,11 @@ bool TimeSync::sync(void)
     }
 
    	Debug::out(LOG_DEBUG, "TimeSync::sync -- NTP failed, will try web...");
+
+    if(sigintReceived) {
+        Debug::out(LOG_DEBUG, "TimeSync::sync -- SIGINT received at line %d, exiting", __LINE__);
+        return false;
+    }
 
     res = syncByWeb();                      // NTP failed, try sync from web
     
@@ -159,8 +169,8 @@ void TimeSync::refreshNetworkDateNtp(void)
   // send the data
   Debug::out(LOG_DEBUG, "TimeSync: requesting date from NTP %s:%d", ntpServer.c_str(),123);
   struct timeval tv;
-  tv.tv_sec = 10;
-  tv.tv_usec = 0;
+  tv.tv_sec     = 5;        // 5 second timeout
+  tv.tv_usec    = 0;
   i=setsockopt(s, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv));
   if( i<0 ) {
     iInitState=INIT_NTP_FAILED;
@@ -231,6 +241,11 @@ bool TimeSync::syncByWeb(void)
     Downloader::add(tdr);
 
     while(1) {                                                      // waiting loop for the timesync file to download
+        if(sigintReceived) {
+            Debug::out(LOG_DEBUG, "TimeSync::syncByWeb -- SIGINT received at line %d, exiting", __LINE__);
+            return false;
+        }
+    
         if(timeSyncStatusByte == DWNSTATUS_DOWNLOAD_OK) {           // if download was OK, continue after the waiting loop
             break;
         }
