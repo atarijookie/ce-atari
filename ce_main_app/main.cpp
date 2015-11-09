@@ -33,7 +33,7 @@
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
 
-void handlePthreadCreate(int res, char *what);
+void handlePthreadCreate(int res, char *threadName, pthread_t *pThread);
 void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
 
@@ -198,56 +198,74 @@ int main(int argc, char *argv[])
     //-------------
     core = new CCoreThread(pxDateService,pxFloppyService,pxScreencastService);
 
-	int res = pthread_create( &mountThreadInfo, NULL, mountThreadCode, NULL);	// create mount thread and run it
-	handlePthreadCreate(res, (char *) "mount");
+	int res = pthread_create(&mountThreadInfo, NULL, mountThreadCode, NULL);	// create mount thread and run it
+	handlePthreadCreate(res, (char *) "ce mount", &mountThreadInfo);
 
     res = pthread_create(&downloadThreadInfo, NULL, downloadThreadCode, NULL);  // create download thread and run it
-	handlePthreadCreate(res, (char *) "download");
+	handlePthreadCreate(res, (char *) "ce download", &downloadThreadInfo);
 
     res = pthread_create(&ikbdThreadInfo, NULL, ikbdThreadCode, NULL);			// create the keyboard emulation thread and run it
-	handlePthreadCreate(res, (char *) "ikbd");
+	handlePthreadCreate(res, (char *) "ce ikbd", &ikbdThreadInfo);
 
     res = pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL);	// create the floppy encoding thread and run it
-	handlePthreadCreate(res, (char *) "floppy encode");
+	handlePthreadCreate(res, (char *) "ce floppy encode", &floppyEncThreadInfo);
 
     res = pthread_create(&timesyncThreadInfo, NULL, timesyncThreadCode, NULL);  // create the timesync thread and run it
-	handlePthreadCreate(res, (char *) "time sync");
+	handlePthreadCreate(res, (char *) "ce time sync", &timesyncThreadInfo);
 
     res = pthread_create(&networkThreadInfo, NULL, networkThreadCode, NULL);    // create the network thread and run it
-	handlePthreadCreate(res, (char *) "network");
+	handlePthreadCreate(res, (char *) "ce network", &networkThreadInfo);
 
     printf("Entering main loop...\n");
     
 	core->run();										// run the main thread
 
-    printf("Exit from main loop, stoping services\n");
+    printf("Exit from main loop\n");
 
     xServer.stop();
 
+    printf("Stoping screecast service\n");
     pxScreencastService->stop();
     delete pxScreencastService;
 
+    printf("Stoping floppy service\n");
     pxFloppyService->stop();
     delete pxFloppyService;
 
+    printf("Stoping date service\n");
     pxDateService->stop();
     delete pxDateService;
 
+    printf("Stoping virtual keyboard service\n");
     pxVKbdService->stop();
-    pxVMouseService->stop();
     delete pxVKbdService;
+    
+    printf("Stoping virtual mouse service\n");
+    pxVMouseService->stop();
     delete pxVMouseService;
 
 	delete core;
 	gpio_close();										// close gpio and spi
 
+    printf("Stoping mount thread\n");
 	pthread_join(mountThreadInfo, NULL);				// wait until mount     thread finishes
+
+    printf("Stoping download thread\n");
     pthread_join(downloadThreadInfo, NULL);             // wait until download  thread finishes
+
+    printf("Stoping ikbd thread\n");
     pthread_join(ikbdThreadInfo, NULL);                 // wait until ikbd      thread finishes
+
+    printf("Stoping floppy encoder thread\n");
     pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes
+
+    printf("Stoping time sync thread\n");
     pthread_join(timesyncThreadInfo, NULL);             // wait until timesync  thread finishes
+
+    printf("Stoping network thread\n");
     pthread_join(networkThreadInfo, NULL);              // wait until network   thread finishes
 
+    printf("Downloader clean up before quit\n");
     Downloader::cleanupBeforeQuit();
 
     Debug::out(LOG_INFO, "CosmosEx terminated.");
@@ -357,12 +375,13 @@ void printfPossibleCmdLineArgs(void)
     printf("hwinfo  - get HW version and HDD interface type\n");
 }
 
-void handlePthreadCreate(int res, char *what)
+void handlePthreadCreate(int res, char *threadName, pthread_t *pThread)
 {
     if(res != 0) {
-        Debug::out(LOG_ERROR, "Failed to create %s thread, %s won't work...", what, what);
+        Debug::out(LOG_ERROR, "Failed to create %s thread, %s won't work...", threadName, threadName);
 	} else {
-		Debug::out(LOG_DEBUG, "%s thread created", what);
+		Debug::out(LOG_DEBUG, "%s thread created", threadName);
+        pthread_setname_np(*pThread, threadName);
 	}
 }
 
