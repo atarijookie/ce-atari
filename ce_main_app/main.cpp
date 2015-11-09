@@ -61,7 +61,14 @@ int main(int argc, char *argv[])
     Debug::setDefaultLogFile();
     parseCmdLineArguments(argc, argv);                          // parse cmd line arguments and set global variables
 
+    if(flags.justShowHelp) {
+        printfPossibleCmdLineArgs();
+        return 0;
+    }
+    
     loadLastHwConfig();                                         // load last found HW IF, HW version, SCSI machine
+    
+    printf("\033[H\033[2JCosmosEx main app starting...\n");
     //------------------------------------
     // if not running as ce_conf, register signal handlers
     if(!flags.actAsCeConf) {                                        
@@ -125,7 +132,6 @@ int main(int argc, char *argv[])
     
     //------------------------------------
     // normal app run follows
-    printfPossibleCmdLineArgs();
     Debug::printfLogLevelString();
 
     char appVersion[16];
@@ -152,6 +158,8 @@ int main(int argc, char *argv[])
 
 		return 0;
 	}
+
+    printf("Starting threads\n");
 
     Utils::setTimezoneVariable_inThisContext();
     
@@ -188,7 +196,6 @@ int main(int argc, char *argv[])
     system("mkdir /tmp/configdrive");                       // create dir
     system("cp /ce/app/configdrive/* /tmp/configdrive");    // copy new content
     //-------------
-
     core = new CCoreThread(pxDateService,pxFloppyService,pxScreencastService);
 
 	int res = pthread_create( &mountThreadInfo, NULL, mountThreadCode, NULL);	// create mount thread and run it
@@ -209,7 +216,11 @@ int main(int argc, char *argv[])
     res = pthread_create(&networkThreadInfo, NULL, networkThreadCode, NULL);    // create the network thread and run it
 	handlePthreadCreate(res, (char *) "network");
 
+    printf("Entering main loop...\n");
+    
 	core->run();										// run the main thread
+
+    printf("Exit from main loop, stoping services\n");
 
     xServer.stop();
 
@@ -240,6 +251,7 @@ int main(int argc, char *argv[])
     Downloader::cleanupBeforeQuit();
 
     Debug::out(LOG_INFO, "CosmosEx terminated.");
+    printf("Terminated\n");
     return 0;
 }
 
@@ -255,6 +267,7 @@ void loadLastHwConfig(void)
 
 void initializeFlags(void)
 {
+    flags.justShowHelp = false;
     flags.logLevel     = LOG_ERROR;     // init current log level to LOG_ERROR
     flags.justDoReset  = false;         // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
     flags.noReset      = false;         // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
@@ -291,6 +304,12 @@ void parseCmdLineArguments(int argc, char *argv[])
             continue;
         }
 
+        if(strcmp(argv[i], "help") == 0 || strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "/?") == 0 || strcmp(argv[i], "?") == 0) {
+            flags.justShowHelp = true;
+            continue;
+        }
+
+        
         // should we just reset Hans and Franz and quit? (used with STM32 ST-Link JTAG)
         if(strcmp(argv[i], "reset") == 0) {
             flags.justDoReset = true;

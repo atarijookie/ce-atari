@@ -125,6 +125,7 @@ typedef struct {
 } THwConfig;
 
 typedef struct {
+    bool justShowHelp;          // show possible command line arguments and quit
     int  logLevel;              // init current log level to LOG_ERROR
     bool justDoReset;           // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
     bool noReset;               // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG

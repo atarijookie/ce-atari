@@ -159,6 +159,16 @@ void CCoreThread::run(void)
     DWORD nextInetIfaceCheckTime= Utils::getEndTime(1000);  			    // create a time when we should check for inet interfaces that got ready
 
     DWORD getHwInfoTimeout      = Utils::getEndTime(3000);                  // create a time when we already should have info about HW, and if we don't have that by that time, then fail
+
+    struct {
+        DWORD hans;
+        DWORD franz;
+        DWORD nextDisplay;
+    } lastFwInfoTime;
+    
+    lastFwInfoTime.hans         = 0;
+    lastFwInfoTime.franz        = 0;
+    lastFwInfoTime.nextDisplay  = Utils::getEndTime(1000);
     
 	//up/running state of inet interfaces
 	bool  state_eth0 	= false;
@@ -177,6 +187,19 @@ void CCoreThread::run(void)
             sigintReceived = 1;                                         // quit
         }
 
+        DWORD now = Utils::getCurrentMs();
+        if(now >= lastFwInfoTime.nextDisplay) {
+            lastFwInfoTime.nextDisplay  = Utils::getEndTime(1000);
+            
+            float hansTime  = ((float)(now - lastFwInfoTime.hans))  / 1000.0f;
+            float franzTime = ((float)(now - lastFwInfoTime.franz)) / 1000.0f;
+            
+            hansTime    = (hansTime  < 15.0f) ? hansTime  : 15.0f;
+            franzTime   = (franzTime < 15.0f) ? franzTime : 15.0f;
+            
+            printf("\033[2K    Hans: %.1f s (%s), Franz: %.1f s, (%s)\033[A\n", hansTime, (hansTime < 3.0f) ? "LIVE" : "DEAD", franzTime, (franzTime < 3.0f) ? "LIVE" : "DEAD");
+        }
+        
         // should we check if Hans and Franz are alive?
         if(shouldCheckHansFranzAlive) {
             if(Utils::getCurrentMs() >= hansFranzAliveCheckTime) {      // did enough time pass since the Hans and Franz reset?
@@ -279,7 +302,8 @@ void CCoreThread::run(void)
 
 			switch(inBuff[3]) {
 			case ATN_FW_VERSION:
-				handleFwVersion(SPI_CS_HANS);
+                lastFwInfoTime.hans = Utils::getCurrentMs();
+    			handleFwVersion(SPI_CS_HANS);
 				break;
 
 			case ATN_ACSI_COMMAND:
@@ -318,6 +342,7 @@ void CCoreThread::run(void)
 
 			switch(inBuff[3]) {
 			case ATN_FW_VERSION:                    // device has sent FW version
+                lastFwInfoTime.franz = Utils::getCurrentMs();
 				handleFwVersion(SPI_CS_FRANZ);
 				break;
 
