@@ -192,6 +192,22 @@ void Utils::resetHansAndFranz(void)
 	Utils::sleepMs(50);										// wait a while to let the devices boot
 }
 
+void Utils::resetHans(void)
+{
+	bcm2835_gpio_write(PIN_RESET_HANS,			LOW);		// reset lines to RESET state
+	Utils::sleepMs(10);										// wait a while to let the reset work
+	bcm2835_gpio_write(PIN_RESET_HANS,			HIGH);		// reset lines to RUN (not reset) state
+	Utils::sleepMs(50);										// wait a while to let the devices boot
+}
+
+void Utils::resetFranz(void)
+{
+	bcm2835_gpio_write(PIN_RESET_FRANZ,			LOW);
+	Utils::sleepMs(10);										// wait a while to let the reset work
+	bcm2835_gpio_write(PIN_RESET_FRANZ,			HIGH);
+	Utils::sleepMs(50);										// wait a while to let the devices boot
+}
+
 bool Utils::copyFile(std::string &src, std::string &dst)
 {
     FILE *from, *to;

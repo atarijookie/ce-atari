@@ -24,6 +24,8 @@ public:
 	static void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
 
 	static void resetHansAndFranz(void);
+    static void resetHans(void);
+    static void resetFranz(void);
 
     static bool copyFile(std::string &src, std::string &dst);
     static bool copyFile(FILE *from, std::string &dst);

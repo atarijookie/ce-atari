@@ -220,7 +220,7 @@ int main(int argc, char *argv[])
     
 	core->run();										// run the main thread
 
-    printf("Exit from main loop\n");
+    printf("\n\nExit from main loop\n");
 
     xServer.stop();
 

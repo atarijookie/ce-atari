@@ -165,6 +165,9 @@ void CCoreThread::run(void)
         DWORD franz;
         DWORD nextDisplay;
         
+        DWORD hansResetTime;
+        DWORD franzResetTime;
+        
         int     progress;
     } lastFwInfoTime;
     char progChars[4] = {'|', '/', '-', '\\'};
@@ -173,6 +176,9 @@ void CCoreThread::run(void)
     lastFwInfoTime.franz        = 0;
     lastFwInfoTime.nextDisplay  = Utils::getEndTime(1000);
     lastFwInfoTime.progress     = 0;
+    
+    lastFwInfoTime.hansResetTime    = Utils::getCurrentMs();
+    lastFwInfoTime.franzResetTime   = Utils::getCurrentMs();
     
 	//up/running state of inet interfaces
 	bool  state_eth0 	= false;
@@ -201,9 +207,24 @@ void CCoreThread::run(void)
             hansTime    = (hansTime  < 15.0f) ? hansTime  : 15.0f;
             franzTime   = (franzTime < 15.0f) ? franzTime : 15.0f;
             
-            printf("\033[2K  [ %c ]  Hans: %.1f s (%s), Franz: %.1f s, (%s)\033[A\n", progChars[lastFwInfoTime.progress], hansTime, (hansTime < 3.0f) ? "LIVE" : "DEAD", franzTime, (franzTime < 3.0f) ? "LIVE" : "DEAD");
+            bool hansAlive  = (hansTime < 3.0f);
+            bool franzAlive = (franzTime < 3.0f);
+            
+            printf("\033[2K  [ %c ]  Hans: %.1f s (%s), Franz: %.1f s, (%s)\033[A\n", progChars[lastFwInfoTime.progress], hansTime, hansAlive ? "LIVE" : "DEAD", franzTime, franzAlive ? "LIVE" : "DEAD");
         
             lastFwInfoTime.progress = (lastFwInfoTime.progress + 1) % 4;
+            
+            if(!hansAlive && !flags.noReset && (now - lastFwInfoTime.hansResetTime) >= 3000) {
+                printf("\033[2KHans not alive, resetting Hans.\n");
+                lastFwInfoTime.hansResetTime = now;
+                Utils::resetHans();
+            }
+
+            if(!franzAlive && !flags.noReset && (now - lastFwInfoTime.franzResetTime) >= 3000) {
+                printf("\033[2KFranz not alive, resetting Franz.\n");
+                lastFwInfoTime.franzResetTime = now;
+                Utils::resetFranz();
+            }
         }
         
         // should we check if Hans and Franz are alive?
