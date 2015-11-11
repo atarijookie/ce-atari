@@ -63,7 +63,6 @@ architecture Behavioral of main is
     signal latchClock: std_logic;
     signal resetCombo: std_logic;
     signal identify  : std_logic;
-    signal identifyA : std_logic;
     signal identifyS : std_logic;
     
     signal ACS       : std_logic;
@@ -74,7 +73,18 @@ architecture Behavioral of main is
 
     signal DATA1rnw  : std_logic;
     
+    signal statusReg : std_logic_vector(7 downto 0);
+    signal softReset : std_logic;
+    
 begin
+    identify   <= XPIO and XDMA and TXSEL1n2;           -- when TXSEL1n2 selects Franz (='1') and you have PIO and DMA pins high, then you can read the identification byte from DATA2
+    identifyS  <= identify and HDD_IF;                  -- active when IDENTIFY and it's SCSI hardware
+    softReset  <= identify and XRnW;                    -- soft reset is done when it's IDENTIFY, but in READ direction (normally should be in WRITE direction)
+      
+
+    XCMD <= ACS or AA1 or (not ARESET);                 -- CMD - falling edge here will tell that CS with A1 low has been found (and ACSI RESET has to be high at that time)
+      
+    resetCombo <= ARESET and reset_hans and (not softReset);    -- when one of these reset signals is low, the result is low
            
     -- these are here to create single signal from double input pins, which should have the same value
     ACS     <= ACSa    and ACSb;
@@ -86,9 +96,9 @@ begin
     -- D flip-flop with asynchronous reset 
     -- pull INT low after rising edge of PIO, let it in hi-Z after reset or low on CS
     -- DMA pin has to be low when toggling PIO hi and low
-    PIOrequest: process(XPIO, XDMA, latchClock, ARESET, reset_hans) is
+    PIOrequest: process(XPIO, XDMA, latchClock, resetCombo) is
     begin
-        if ((latchClock = '0') or (ARESET = '0') or (reset_hans = '0')) then
+        if (latchClock = '0' or resetCombo = '0') then
             INTstate <= '1';
         elsif (rising_edge(XPIO) and (XDMA = '0')) then
             INTstate <= '0';
@@ -98,9 +108,9 @@ begin
     -- D flip-flop with asynchronous reset 
     -- pull DRQ low after rising edge of DMA, let it in hi-Z after reset or low on ACK
     -- PIO pin has to be low when toggling DMA hi and low
-    DMArequest: process(XDMA, XPIO, latchClock, ARESET, reset_hans) is
+    DMArequest: process(XDMA, XPIO, latchClock, resetCombo) is
     begin
-        if ((latchClock = '0') or (ARESET = '0') or (reset_hans = '0')) then
+        if (latchClock = '0' or resetCombo = '0') then
             DRQstate <= '1';
         elsif (rising_edge(XDMA) and (XPIO = '0')) then
             DRQstate <= '0';
@@ -117,11 +127,6 @@ begin
     end process;
 
     latchClock <= ACS and AACK;                         -- need this only to be able to react on falling edge of both CS and ACK
-    resetCombo <= ARESET and reset_hans;                -- when at least one of those 2 reset signals is low, the result is low
-
-    identify   <= XPIO and XDMA and TXSEL1n2;           -- when TXSEL1n2 selects Franz (='1') and you have PIO and DMA pins high, then you can read the identification byte from DATA2
-    identifyA  <= identify and (not HDD_IF);            -- active when IDENTIFY and it's ACSI hardware
-    identifyS  <= identify and HDD_IF;                  -- active when IDENTIFY and it's SCSI hardware
 
     AINTa <= '0' when INTstate='0' else 'Z';            -- INT - pull to L, otherwise hi-Z
     AINTb <= '0' when INTstate='0' else 'Z';            -- INT - pull to L, otherwise hi-Z
@@ -129,10 +134,18 @@ begin
     ADRQa <= '0' when DRQstate='0' else 'Z';            -- DRQ - pull to L, otherwise hi-Z
     ADRQb <= '0' when DRQstate='0' else 'Z';            -- DRQ - pull to L, otherwise hi-Z
 
-    XCMD <= ACS or AA1 or (not ARESET);                 -- CMD - falling edge here will tell that CS with A1 low has been found (and ACSI RESET has to be high at that time)
-
     DATA1rnw <= XRnW and ARNW;                          -- output data only when XILINX and ST want to read data, otherwise don't
 
+    -- create status register, which consists of fixed values (HW ver 2, SCSI Xilinx FW), and current values - HW/FW mismatch, BSY low or high
+    statusReg(7) <= DRQstate and INTstate;  -- if one of these is 0, then resulting 0 means we're still busy!
+    statusReg(6) <= '0';
+    statusReg(5) <= '1';            -- - 10 means HW v.2
+    statusReg(4) <= '0';            -- / 
+    statusReg(3) <= identifyS;      -- when this is '1' -- BAD : when identify condition met, this identifies the XILINX and HW revision (0010 - HW rev 2, 1 - it's ACSI HW, 001 - ACSI Xilinx FW)
+    statusReg(2) <= '0';            -- \
+    statusReg(1) <= '0';            -- --- 001 = ACSI Xilinx FW
+    statusReg(0) <= '1';            -- / 
+    
     -- DATA1 is connected to Atari ST, data goes out when going from MCU to ST (READ operation)
     DATA1a <=   "ZZZZZZZZ"  when resetCombo='0' else    -- when Atari or MCU is in reset state, don't drive this 
                 DATA2       when DATA1rnw='1'   else    -- when set in READ direction, transparently bridge data from DATA2 to DATA1
@@ -143,11 +156,10 @@ begin
                 "ZZZZZZZZ";                             -- otherwise don't drive this
 
     -- DATA2 is connected to Hans (STM32 mcu), data goes out when going from ST to MCU (WRITE operation)
-    DATA2 <=    "ZZZZZ0ZZ"  when TXSEL1n2='0'    else   -- when TXSEL1n2 selects Hans, we're writing to Hans's flash, we need bit DATA2.2 (bit #2) to be 0 (it's BOOT1 bit on STM32 MCU)
-                "00100001"  when identifyA='1'   else   -- GOOD: when identify condition met, this identifies the XILINX and HW revision (0010 - HW rev 2, 0 - it's ACSI HW, 001 - ACSI XILINX FW)
-                "00101001"  when identifyS='1'   else   -- BAD : when identify condition met, this identifies the XILINX and HW revision (0010 - HW rev 2, 1 - it's SCSI HW, 001 - ACSI XILINX FW)
-                DATA1latch  when XRnW='0'        else   -- when set in WRITE direction, output latched DATA1 to DATA2 
-                "ZZZZZZZZ";                             -- otherwise don't drive this
+    DATA2 <=    "ZZZZZ0ZZ"  when TXSEL1n2='0'   else   -- when TXSEL1n2 selects Hans, we're writing to Hans's flash, we need bit DATA2.2 (bit #2) to be 0 (it's BOOT1 bit on STM32 MCU)
+                statusReg   when identify='1'   else   -- when doing IDENTIFY, return STATUS REGISTER - BSY signal value, HW version, FW type (ACSI or SCSI), HW / FW mismatch bit
+                DATA1latch  when XRnW='0'       else   -- when set in WRITE direction, output latched DATA1 to DATA2 
+                "ZZZZZZZZ";                            -- otherwise don't drive this
 
     -- TX_out is connected to RPi, and this is multiplexed TX pin from two MCUs
     TX_out <=   TX_Franz when TXSEL1n2='1' else TX_Hans;   -- depending on TXSEL1n2 switch TX_out to TX_Franz or TX_Hans
