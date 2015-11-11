@@ -38,6 +38,7 @@ public:
 
     static bool createUpdateScript(void);
     static bool createFlashFirstFwScript(void);
+    static bool createUpdateXilinxScript(void);
     
     static bool checkForUpdateListOnUsb(std::string &updateFilePath);
 

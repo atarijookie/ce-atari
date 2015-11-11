@@ -718,7 +718,7 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 
         // if Xilinx HW vs FW mismatching, flash Xilinx again to fix the situation
         if(hwConfig.fwMismatch) {
-            Update::createFlashFirstFwScript();
+            Update::createUpdateXilinxScript();
         
             Debug::out(LOG_ERROR, ">>> Terminating app, because there's Xilinx HW vs FW mismatch! <<<\n");
             sigintReceived = 1;

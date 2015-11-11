@@ -261,6 +261,29 @@ bool Update::createUpdateScript(void)
     return true;
 }
 
+bool Update::createUpdateXilinxScript(void)
+{
+    FILE *f = fopen(UPDATE_SCRIPT, "wt");
+
+    if(!f) {
+        Debug::out(LOG_ERROR, "Update::createUpdateXilinxScript() failed to create update script - %s", UPDATE_SCRIPT);
+        return false;
+    }
+
+    // copy files needed for xilinx update to tmp
+    fprintf(f, "cp -f /ce/firstfw/updatelist.csv /tmp/ \n");
+    fprintf(f, "cp -f /ce/firstfw/ce_update.zip /tmp/ \n");
+    fprintf(f, "cp -f /ce/firstfw/xilinx.xsvf /tmp/ \n");
+    fprintf(f, "cp -f /ce/firstfw/xlnx2a.xsvf /tmp/ \n");
+    fprintf(f, "cp -f /ce/firstfw/xlnx2s.xsvf /tmp/ \n");
+    
+    // execute the xilinx update script
+    fprintf(f, "/ce/update/update_xilinx.sh \n");
+    
+    fclose(f);
+    return true;
+}
+
 bool Update::createFlashFirstFwScript(void)
 {
     FILE *f = fopen(UPDATE_SCRIPT, "wt");
