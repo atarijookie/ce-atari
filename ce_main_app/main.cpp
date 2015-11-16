@@ -21,6 +21,7 @@
 #include "version.h"
 #include "ce_conf_on_rpi.h"
 #include "network/netadapter.h"
+#include "periodicthread.h"
 
 #include "webserver/webserver.h"
 #include "webserver/api/apimodule.h"
@@ -55,6 +56,7 @@ int main(int argc, char *argv[])
     pthread_t	floppyEncThreadInfo;
 	pthread_t	timesyncThreadInfo;
     pthread_t   networkThreadInfo;
+    pthread_t   periodicThreadInfo;
 
     initializeFlags();                                          // initialize flags 
     
@@ -216,6 +218,9 @@ int main(int argc, char *argv[])
     res = pthread_create(&networkThreadInfo, NULL, networkThreadCode, NULL);    // create the network thread and run it
 	handlePthreadCreate(res, (char *) "ce network", &networkThreadInfo);
 
+    res = pthread_create(&periodicThreadInfo, NULL, periodicThreadCode, NULL);  // create the periodic thread and run it
+	handlePthreadCreate(res, (char *) "periodic", &periodicThreadInfo);
+    
     printf("Entering main loop...\n");
     
 	core->run();										// run the main thread
@@ -264,6 +269,9 @@ int main(int argc, char *argv[])
 
     printf("Stoping network thread\n");
     pthread_join(networkThreadInfo, NULL);              // wait until network   thread finishes
+
+    printf("Stoping periodic thread\n");
+    pthread_join(periodicThreadInfo, NULL);             // wait until periodic  thread finishes
 
     printf("Downloader clean up before quit\n");
     Downloader::cleanupBeforeQuit();

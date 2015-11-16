@@ -18,6 +18,8 @@
 #include "config/netsettings.h"
 #include "ce_conf_on_rpi.h" 
 
+#include "periodicthread.h"
+
 #if defined(ONPC_HIGHLEVEL)
     #include "socks.h"
 #endif
@@ -27,13 +29,12 @@
 #define INET_IFACE_CHECK_TIME   1000
 #define UPDATE_SCRIPTS_TIME     10000
 
-#define WEB_PARAMS_CHECK_TIME_MS    3000
-#define WEB_PARAMS_FILE             "/tmp/ce_startupmode"
-
 extern THwConfig    hwConfig;
 extern TFlags       flags;
 
 extern DebugVars    dbgVars;
+
+SharedObjects shared;
 
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
@@ -57,15 +58,9 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     dataTrans   = new AcsiDataTrans();
     dataTrans->setCommunicationObject(conSpi);
     dataTrans->setRetryObject(retryMod);
+
+    sharedObjects_create(configService, floppyService, screencastService);
     
-    scsi        = new Scsi();
-    scsi->setAcsiDataTrans(dataTrans);
-    scsi->attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
-//  scsi->attachToHostPath("TESTMEDIA", SOURCETYPE_TESTMEDIA, SCSI_ACCESSTYPE_FULL);
-
-    translated = new TranslatedDisk(dataTrans, configService, screencastService);
-	translated->setSettingsReloadProxy(&settingsReloadProxy);
-
     confStream = new ConfigStream();
     confStream->setAcsiDataTrans(dataTrans);
 	confStream->setSettingsReloadProxy(&settingsReloadProxy);
@@ -78,10 +73,10 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
 	settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_TRANSLATED);
 	settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_SCSI_IDS);
     
-    settingsReloadProxy.addSettingsUser((ISettingsUser *) scsi,          SETTINGSUSER_ACSI);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.scsi,          SETTINGSUSER_ACSI);
 
-	settingsReloadProxy.addSettingsUser((ISettingsUser *) translated,    SETTINGSUSER_TRANSLATED);
-    settingsReloadProxy.addSettingsUser((ISettingsUser *) translated,    SETTINGSUSER_SHARED);
+	settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.translated,    SETTINGSUSER_TRANSLATED);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.translated,    SETTINGSUSER_SHARED);
 
 	// register this class as receiver of dev attached / detached calls
 	devFinder.setDevChangesHandler((DevChangesHandler *) this);
@@ -89,7 +84,7 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     // give floppy setup everything it needs
     floppySetup.setAcsiDataTrans(dataTrans);
     floppySetup.setImageSilo(&floppyImageSilo);
-    floppySetup.setTranslatedDisk(translated);
+    floppySetup.setTranslatedDisk(shared.translated);
     floppySetup.setSettingsReloadProxy(&settingsReloadProxy);
 
     // the floppy image silo might change settings (when images are changes), add settings reload proxy
@@ -110,11 +105,30 @@ CCoreThread::~CCoreThread()
 {
     delete conSpi;
     delete dataTrans;
-    delete scsi;
     delete retryMod;
 
-    delete translated;
     delete confStream;
+    
+    sharedObjects_destroy();
+}
+
+void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
+{
+    shared.scsi        = new Scsi();
+    shared.scsi->setAcsiDataTrans(dataTrans);
+    shared.scsi->attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
+
+    shared.translated = new TranslatedDisk(dataTrans, configService, screencastService);
+	shared.translated->setSettingsReloadProxy(&settingsReloadProxy);
+}
+
+void CCoreThread::sharedObjects_destroy(void)
+{
+    delete shared.scsi;
+    shared.scsi = NULL;
+    
+    delete shared.translated;
+    shared.translated = NULL;
 }
 
 void CCoreThread::run(void)
@@ -155,8 +169,6 @@ void CCoreThread::run(void)
 
 	DWORD nextDevFindTime       = Utils::getCurrentMs();                    // create a time when the devices should be checked - and that time is now
     DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);                  // create a time when update download status should be checked
-    DWORD nextWebParsCheckTime  = Utils::getEndTime(WEB_PARAMS_CHECK_TIME_MS);  // create a time when we should check for new params from the web page
-    DWORD nextInetIfaceCheckTime= Utils::getEndTime(1000);  			    // create a time when we should check for inet interfaces that got ready
 
     DWORD getHwInfoTimeout      = Utils::getEndTime(3000);                  // create a time when we already should have info about HW, and if we don't have that by that time, then fail
 
@@ -179,12 +191,6 @@ void CCoreThread::run(void)
     
     lastFwInfoTime.hansResetTime    = Utils::getCurrentMs();
     lastFwInfoTime.franzResetTime   = Utils::getCurrentMs();
-    
-	//up/running state of inet interfaces
-	bool  state_eth0 	= false;
-	bool  state_wlan0 	= false;
-
-    Update::downloadUpdateList(NULL);                                   // download the list of components with the newest available versions
 
 	bool res;
 
@@ -243,12 +249,6 @@ void CCoreThread::run(void)
             }
         }
 
-        // should we check if there are new params received from debug web page?
-        if(Utils::getCurrentMs() >= nextWebParsCheckTime) {
-            readWebStartupMode();
-            nextWebParsCheckTime  = Utils::getEndTime(WEB_PARAMS_CHECK_TIME_MS);
-        }
-
         // should we check for the new devices?
 		if(Utils::getCurrentMs() >= nextDevFindTime) {
 			devFinder.lookForDevChanges();				                // look for devices attached / detached
@@ -302,24 +302,6 @@ void CCoreThread::run(void)
                 break;
             }
         }
-
-        // should we check for inet interfaces that might came up?
-        if(Utils::getCurrentMs() >= nextInetIfaceCheckTime) {
-		    nextInetIfaceCheckTime  = Utils::getEndTime(INET_IFACE_CHECK_TIME);   // update the time when we should interfaces again
-
-            bool state_temp 		= 	inetIfaceReady("eth0"); 
-			bool change_to_enabled	= 	(state_eth0!=state_temp)&&!state_eth0; 	//was this iface disabled and current state changed to enabled?
-			state_eth0 				= 	state_temp; 
-
-            state_temp 				= 	inetIfaceReady("wlan0"); 
-			change_to_enabled 		|= 	(state_wlan0!=state_temp)&&!state_wlan0;
-			state_wlan0 			= 	state_temp; 
-			
-			if( change_to_enabled ){ 
-				Debug::out(LOG_DEBUG, "Internet interface comes up: reload network mount settings");
-				translated->reloadSettings(SETTINGSUSER_TRANSLATED);
-			}
-		}
 
 #if !defined(ONPC_HIGHLEVEL)
         // check for any ATN code waiting from Hans
@@ -506,7 +488,7 @@ void CCoreThread::handleAcsiCommand(void)
 
         case HOSTMOD_TRANSLATED_DISK:                   // translated disk command?
             wasHandled = true;
-            translated->processCommand(pCmd);
+            shared.translated->processCommand(pCmd);
             break;
 
         case HOSTMOD_FDD_SETUP:                         // floppy setup command?
@@ -522,7 +504,7 @@ void CCoreThread::handleAcsiCommand(void)
     }
 
     if(wasHandled != true) {                            // if the command was not previously handled, it's probably just some SCSI command
-        scsi->processCommand(bufIn);                    // process the command
+        shared.scsi->processCommand(bufIn);                    // process the command
     }
 }
 
@@ -551,8 +533,8 @@ void CCoreThread::reloadSettings(int type)
 
             Debug::out(LOG_DEBUG, "CCoreThread::reloadSettings -- USB media mount strategy changed, remounting");
         
-            translated->detachAllUsbMedia();                // detach all translated USB media
-            scsi->detachAllUsbMedia();                      // detach all RAW USB media
+            shared.translated->detachAllUsbMedia();                // detach all translated USB media
+            shared.scsi->detachAllUsbMedia();                      // detach all RAW USB media
 
             // and now try to attach everything back
             devFinder.clearMap();						    // make all the devices appear as new
@@ -576,7 +558,7 @@ void CCoreThread::reloadSettings(int type)
     }
     
 	// first dettach all the devices
-	scsi->detachAll();
+	shared.scsi->detachAll();
 
 	// then load the new settings
     loadSettings();
@@ -927,7 +909,7 @@ void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 
     if(mountRawNotTrans) {                  // attach as raw?
         Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- should mount USB media as raw, attaching as RAW");
-		scsi->attachToHostPath(devName, SOURCETYPE_DEVICE, SCSI_ACCESSTYPE_FULL);
+		shared.scsi->attachToHostPath(devName, SOURCETYPE_DEVICE, SCSI_ACCESSTYPE_FULL);
     } else {                                // attach as translated?
         Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- should mount USB media as translated, attaching as TRANSLATED");
         attachDevAsTranslated(devName);
@@ -937,7 +919,7 @@ void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
 void CCoreThread::onDevDetached(std::string devName)
 {
 	// try to detach the device - works if was attached as RAW, does nothing otherwise
-	scsi->dettachFromHostPath(devName);
+	shared.scsi->dettachFromHostPath(devName);
 
 	// and also try to detach the device from translated disk
 	std::pair <std::multimap<std::string, std::string>::iterator, std::multimap<std::string, std::string>::iterator> ret;
@@ -948,7 +930,7 @@ void CCoreThread::onDevDetached(std::string devName)
 	for (it = ret.first; it != ret.second; ++it) {					// now go through the list of device - host_path pairs and unmount them
 		std::string hostPath = it->second;							// retrieve just the host path
 
-		translated->detachFromHostPath(hostPath);					// now try to detach this from translated drives
+		shared.translated->detachFromHostPath(hostPath);		    // now try to detach this from translated drives
 	}
 
 	mapDeviceToHostPaths.erase(ret.first, ret.second);				// and delete the whole device items from this multimap
@@ -979,7 +961,7 @@ void CCoreThread::attachDevAsTranslated(std::string devName)
 		tmr.mountDir		= mountPath;										// e.g. /mnt/sda2
 		mountAdd(tmr);
 
-		res = translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL);	// try to attach
+		res = shared.translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL);	// try to attach
 
 		if(!res) {																// if didn't attach, skip the rest
 			Debug::out(LOG_ERROR, "attachDevAsTranslated: failed to attach %s", (char *) mountPath.c_str());
@@ -1040,80 +1022,4 @@ void CCoreThread::handleSectorWritten(void)
 
     // TODO:
     // do the written sector processing
-}
-
-void CCoreThread::readWebStartupMode(void)
-{
-    FILE *f = fopen(WEB_PARAMS_FILE, "rt");
-
-    if(!f) {                                            // couldn't open file? nothing to do
-        return;
-    }
-
-    char tmp[64];
-    memset(tmp, 0, 64);
-
-    fgets(tmp, 64, f);
-
-    int ires, logLev;
-    ires = sscanf(tmp, "ll%d", &logLev);            // read the param
-    fclose(f);
-
-    unlink(WEB_PARAMS_FILE);                        // remove the file so we won't read it again
-
-    if(ires != 1) {                                 // failed to read the new log level? quit
-        return;
-    }
-
-    if(logLev >= LOG_OFF && logLev <= LOG_DEBUG) {  // param is valid
-        if(flags.logLevel == logLev) {              // but logLevel won't change?
-            return;                                 // nothing to do
-        }
-
-        flags.logLevel = logLev;                    // set new log level
-        Debug::out(LOG_INFO, "Log level changed from file %s to level %d", WEB_PARAMS_FILE, logLev);
-    } else {                                        // on set wrong log level - switch to lowest log level
-        flags.logLevel = LOG_ERROR;
-        Debug::out(LOG_INFO, "Log level change invalid, switching to LOG_ERROR");
-    }
-}
-
-/*
-	Is a particular internet interface up, running and has an IP address?
-*/
-bool CCoreThread::inetIfaceReady(const char*ifrname){
-	struct ifreq ifr;
-	bool up_and_running;
-
-	//temporary socket
-	int socketfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
-    if (socketfd == -1){
-        return false;
-	}
-			
-	memset( &ifr, 0, sizeof(ifr) );
-	strcpy( ifr.ifr_name, ifrname );
-	
-	if( ioctl( socketfd, SIOCGIFFLAGS, &ifr ) != -1 ) {
-	    up_and_running = (ifr.ifr_flags & ( IFF_UP | IFF_RUNNING )) == ( IFF_UP | IFF_RUNNING );
-	    
-		//it's only ready and usable if it has an IP address
-        if( up_and_running && ioctl(socketfd, SIOCGIFADDR, &ifr) != -1 ){
-	        if( ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr==0 ){
-			    up_and_running = false;
-			} 
-		} else {
-		    up_and_running = false;
-		}
-	    //Debug::out(LOG_DEBUG, "inetIfaceReady ip: %s %s", ifrname, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
-	} else {
-	    up_and_running = false;
-	}
-
-	int result=0;
-	do {
-        result = close(socketfd);
-    } while (result == -1 && errno == EINTR);	
-
-	return up_and_running; 
 }

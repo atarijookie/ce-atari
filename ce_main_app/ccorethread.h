@@ -71,8 +71,6 @@ private:
     //-----------------------------------
     // hard disk stuff
     DevFinder		devFinder;
-    Scsi            *scsi;
-    TranslatedDisk  *translated;
     bool            setEnabledIDbits;
 	AcsiIDinfo		acsiIdInfo;
     bool            mountRawNotTrans;
@@ -134,6 +132,9 @@ private:
 	bool inetIfaceReady(const char* ifrname);
 
     void showHwVersion(void);
+    
+    void sharedObjects_create(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService);
+    void sharedObjects_destroy(void);
 };
 
 #endif // CCORETHREAD_H
