@@ -29,25 +29,36 @@ static int webFd2;
 
 ConfigResource::ConfigResource()  
 {
-    in_bfr   = new BYTE[INBFR_SIZE];
-    tmp_bfr  = new BYTE[INBFR_SIZE];
-
-    webFd1 = open(FIFO_WEB_PATH1, O_RDWR);      // will be used for writing only
-    webFd2 = open(FIFO_WEB_PATH2, O_RDWR);      // will be used for reading only
-
-    if(webFd1 == -1 || webFd2 == -1) {
-        printf("ConfigResource -- open() failed\n");
-        return;
-    }
+    in_bfr  = new BYTE[INBFR_SIZE];
+    tmp_bfr = new BYTE[INBFR_SIZE];
+    
+    webFd1  = -1;
+    webFd2  = -1;
 }
 
 ConfigResource::~ConfigResource() 
 {
-    close(webFd1);
-    close(webFd2);
+    if(webFd1 > 0) {
+        close(webFd1);
+    }
+    
+    if(webFd2 > 0) {
+        close(webFd2);
+    }        
 
     delete[] in_bfr;
     delete[] tmp_bfr;
+}
+
+void ConfigResource::openFIFOsIfNeeded(void)
+{
+    if(webFd1 <= 0) {
+        webFd1 = open(FIFO_WEB_PATH1, O_RDWR);      // will be used for writing only
+    }
+    
+    if(webFd2 <= 0) {
+        webFd2 = open(FIFO_WEB_PATH2, O_RDWR);      // will be used for reading only
+    }
 }
 
 bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo /*=""*/ ) 
@@ -93,8 +104,8 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
             mg_write(conn, in_bfr,iReadLen );
             return true;
         } else{
-            Debug::out(LOG_ERROR, "oould not send config command");
-            mg_printf(conn, "HTTP/1.1 500 Server Error - oould not send config command\r\n\r\n");
+            Debug::out(LOG_ERROR, "could not send config command");
+            mg_printf(conn, "HTTP/1.1 500 Server Error - could not send config command\r\n\r\n");
             return true;
         }                
     }
@@ -149,8 +160,8 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
                     mg_write(conn, in_bfr,iReadLen );
                     return true;
                 } else{
-                    Debug::out(LOG_ERROR, "oould not send config command");
-                    mg_printf(conn, "HTTP/1.1 500 Server Error - oould not send config command\r\n\r\n");
+                    Debug::out(LOG_ERROR, "could not send config command");
+                    mg_printf(conn, "HTTP/1.1 500 Server Error - could not send config command\r\n\r\n");
                     return true;
                 }                
             } else{
@@ -170,8 +181,27 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
 int ConfigResource::sendTerminalCommand(unsigned char cmd, unsigned char param)
 {
     char bfr[3];
-    int  res;
-    static int noReplies = 0;
+    int  res, bytesAvailable;
+    
+    openFIFOsIfNeeded();
+    
+    if(webFd1 <= 0 || webFd2 <= 0) {
+        Debug::out(LOG_DEBUG, "ConfigResource::sendTerminalCommand() -- FIFOs not open");
+        return -1;
+    }
+
+    //------------
+    // first check if there isn't something stuck in the fifo, and if there is, just read it to discard it
+    while(1) {
+        res = ioctl(webFd2, FIONREAD, &bytesAvailable); // how many bytes we can read?
+
+        if(res != -1 && bytesAvailable > 0) {           // ioctl success and something to read? read it, ignore it
+            read(webFd2, in_bfr, bytesAvailable);
+        } else {                                        // nothing more to read, quit this loop and continue with the rest
+            break;
+        }
+    }
+    //------------
     
     bfr[0] = HOSTMOD_CONFIG;
     bfr[1] = cmd;
@@ -180,37 +210,31 @@ int ConfigResource::sendTerminalCommand(unsigned char cmd, unsigned char param)
     res = write(webFd1, bfr, 3);
     
     if(res != 3) {
-        printf("sendCmd -- write failed!\n");
+        Debug::out(LOG_DEBUG, "ConfigResource::sendTerminalCommand() -- sendCmd - write failed!");
         return -1;
     }
     
-    Utils::sleepMs(50);
-    
-    int bytesAvailable;
-    res = ioctl(webFd2, FIONREAD, &bytesAvailable);         // how many bytes we can read?
+    DWORD timeOutTime = Utils::getEndTime(1000);
 
-    if(res != -1 && bytesAvailable > 0) {
-        int readCount = (bytesAvailable < INBFR_SIZE) ? bytesAvailable : INBFR_SIZE;
-        
-        memset(in_bfr, 0, INBFR_SIZE);
-        res = read(webFd2, in_bfr, readCount);
-
-        Debug::out(LOG_DEBUG, "sendCmd - readCount: %d", readCount);
-
-        int newCount = translateVT52toVT100(in_bfr, tmp_bfr, readCount);
-        
-        //write(STDOUT_FILENO, inBfr, newCount);
-        return newCount;
-        return readCount;
-    } else {
-        printf("\033[2J\033[HCosmosEx app does not reply, is it running?\n");
-        noReplies++;
-        
-        if(noReplies >= 5) {
-            printf("No response from CosmosEx app in 5 attempts, terminating.\nThe CosmosEx app must be running for CE_CONF to work.\n");
+    while(1) {                                          // wait up to 1 second to receive something... 
+        if(Utils::getCurrentMs() >= timeOutTime) {      // time out happened, nothing received within specified timeout? fail
             return -1;
         }
+    
+        res = ioctl(webFd2, FIONREAD, &bytesAvailable);                         // how many bytes we can read?
+
+        if(res != -1 && bytesAvailable > 0) {                                   // ioctl success and something to read?
+            int readCount = (bytesAvailable < INBFR_SIZE) ? bytesAvailable : INBFR_SIZE;
+
+            memset(in_bfr, 0, readCount + 1);
+            read(webFd2, in_bfr, readCount);                                    // get the stream
+
+            Debug::out(LOG_DEBUG, "sendCmd - readCount: %d", readCount);
+
+            int newCount = translateVT52toVT100(in_bfr, tmp_bfr, readCount);    // translate VT52 stream to VT100 stream
+            return newCount;
+        }
         
-        return -1;
+        Utils::sleepMs(50);     // sleep a little
     }
 }

@@ -4,6 +4,7 @@
 #include <string>
 
 #include "../../CivetServer.h"
+#include "../../../datatypes.h"
 
 #include "iapiresource.h"
 
@@ -15,6 +16,8 @@ public:
 private:
     int sendTerminalCommand(unsigned char cmd, unsigned char param);
     unsigned char *in_bfr,*tmp_bfr;
+    
+    void openFIFOsIfNeeded(void);
 };
 
 #endif
