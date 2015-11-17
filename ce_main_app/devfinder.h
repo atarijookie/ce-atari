@@ -9,13 +9,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "devchangeshandler.h"
-
 class DevFinder {
 public:
 	DevFinder();
-
-	void setDevChangesHandler(DevChangesHandler *devChHand);
 
 	void lookForDevChanges(void);
 	void getDevPartitions(std::string devName, std::list<std::string> &partitions);
@@ -23,10 +19,9 @@ public:
 	void clearMap(void);						// called to make all the devices appear as new
 	
 private:
-	DevChangesHandler *devChHandler;
-
 	std::map<std::string, bool>  mapDevToFound;
 	bool someDevChanged;
+    std::multimap<std::string, std::string> mapDeviceToHostPaths;
 
 	void cutBeforeFirstNumber(std::string &filename);
 
@@ -36,6 +31,10 @@ private:
 	
 	bool isAtariDrive(std::string file);
 	bool isAtariPartitionType(char *bfr);
+    
+    void onDevAttached(std::string devName, bool isAtariDrive);
+    void onDevDetached(std::string devName);
+    void attachDevAsTranslated(std::string devName);
 };
 	
 #endif

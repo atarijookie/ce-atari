@@ -14,15 +14,15 @@
 #include "devfinder.h"
 #include "utils.h"
 #include "debug.h"
+#include "mounter.h"
+
+#include "periodicthread.h"
+
+extern SharedObjects shared;
 
 DevFinder::DevFinder()
 {
-	devChHandler = NULL;
-}
 
-void DevFinder::setDevChangesHandler(DevChangesHandler *devChHand)
-{
-	devChHandler = devChHand;
 }
 
 void DevFinder::lookForDevChanges(void)
@@ -172,9 +172,7 @@ void DevFinder::processFoundDev(std::string file)
 		
 		Debug::out(LOG_DEBUG, "device attached: %s, is atari drive: %d", (char *) file.c_str(), atariDrive);		// write out
 
-		if(devChHandler != NULL) {									// if got handler, notify him
-			devChHandler->onDevAttached(file, atariDrive);
-		}
+		onDevAttached(file, atariDrive);
 	} else {														// have this device? just mark it as found again
 		it->second = true;
 	}	
@@ -224,9 +222,7 @@ void DevFinder::findAndSignalDettached(void)
 			
 			Debug::out(LOG_DEBUG, "device detached: %s", (char *) it->first.c_str());
 
-			if(devChHandler != NULL) {										// if got handler, notify him
-				devChHandler->onDevDetached(it->first);
-			}
+			onDevDetached(it->first);
 		}
 	}
 	
@@ -295,6 +291,87 @@ bool DevFinder::isAtariPartitionType(char *bfr)
 	}
 	
 	return false;							// no atari partition found
+}
+
+void DevFinder::onDevAttached(std::string devName, bool isAtariDrive)
+{
+	Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached: devName %s", (char *) devName.c_str());
+
+    pthread_mutex_lock(&shared.mtxScsi);
+    pthread_mutex_lock(&shared.mtxTranslated);
+   
+    if(shared.mountRawNotTrans) {           // attach as raw?
+        Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- should mount USB media as raw, attaching as RAW");
+		shared.scsi->attachToHostPath(devName, SOURCETYPE_DEVICE, SCSI_ACCESSTYPE_FULL);
+    } else {                                // attach as translated?
+        Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- should mount USB media as translated, attaching as TRANSLATED");
+        attachDevAsTranslated(devName);
+    }
+    
+    pthread_mutex_unlock(&shared.mtxScsi);
+    pthread_mutex_unlock(&shared.mtxTranslated);
+}
+
+void DevFinder::onDevDetached(std::string devName)
+{
+    pthread_mutex_lock(&shared.mtxScsi);
+    pthread_mutex_lock(&shared.mtxTranslated);
+
+	// try to detach the device - works if was attached as RAW, does nothing otherwise
+	shared.scsi->dettachFromHostPath(devName);
+
+	// and also try to detach the device from translated disk
+	std::pair <std::multimap<std::string, std::string>::iterator, std::multimap<std::string, std::string>::iterator> ret;
+	std::multimap<std::string, std::string>::iterator it;
+
+	ret = mapDeviceToHostPaths.equal_range(devName);				// find a range of host paths which are mapped to partitions found on this device
+
+	for (it = ret.first; it != ret.second; ++it) {					// now go through the list of device - host_path pairs and unmount them
+		std::string hostPath = it->second;							// retrieve just the host path
+
+		shared.translated->detachFromHostPath(hostPath);		    // now try to detach this from translated drives
+	}
+
+	mapDeviceToHostPaths.erase(ret.first, ret.second);				// and delete the whole device items from this multimap
+    
+    pthread_mutex_unlock(&shared.mtxScsi);
+    pthread_mutex_unlock(&shared.mtxTranslated);
+}
+
+void DevFinder::attachDevAsTranslated(std::string devName)
+{
+	bool res;
+	std::list<std::string>				partitions;
+	std::list<std::string>::iterator	it;
+
+	getDevPartitions(devName, partitions);							            // get list of partitions for that device (sda -> sda1, sda2)
+
+	for (it = partitions.begin(); it != partitions.end(); ++it) {				// go through those partitions
+		std::string partitionDevice;
+		std::string mountPath;
+		std::string devPath, justDevName;
+
+		partitionDevice = *it;													// get the current device, which represents single partition (e.g. sda1)
+
+		Utils::splitFilenameFromPath(partitionDevice, devPath, justDevName);	// split path to path and device name (e.g. /dev/sda1 -> /dev + sda1)
+		mountPath = "/mnt/" + justDevName;										// create host path (e.g. /mnt/sda1)
+
+		TMounterRequest tmr;
+		tmr.action			= MOUNTER_ACTION_MOUNT;								// action: mount
+		tmr.deviceNotShared	= true;												// mount as device
+		tmr.devicePath		= partitionDevice;									// e.g. /dev/sda2
+		tmr.mountDir		= mountPath;										// e.g. /mnt/sda2
+		mountAdd(tmr);
+
+		res = shared.translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL);	// try to attach
+
+		if(!res) {																// if didn't attach, skip the rest
+			Debug::out(LOG_ERROR, "attachDevAsTranslated: failed to attach %s", (char *) mountPath.c_str());
+			continue;
+		}
+
+		mapDeviceToHostPaths.insert(std::pair<std::string, std::string>(devName, mountPath) );	// store it to multimap
+	}
 }
 
 

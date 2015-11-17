@@ -1,17 +1,12 @@
 #ifndef CCORETHREAD_H
 #define CCORETHREAD_H
 
-#include <map>
-
 #include "utils.h"
 #include "global.h"
 #include "conspi.h"
 #include "acsidatatrans.h"
 #include "settings.h"
 #include "retrymodule.h"
-
-#include "devfinder.h"
-#include "devchangeshandler.h"
 
 #include "native/translatedbootmedia.h"
 #include "native/scsi.h"
@@ -35,7 +30,7 @@
 
 #include "version.h"
 
-class CCoreThread: public ISettingsUser, public DevChangesHandler
+class CCoreThread: public ISettingsUser
 {
 public:
     CCoreThread(ConfigService* configService, FloppyService* floppyService, ScreencastService* screencastService);
@@ -46,9 +41,6 @@ public:
 
     void sendHalfWord(void);
     virtual void reloadSettings(int type);    								// from ISettingsUser
-
-	virtual void onDevAttached(std::string devName, bool isAtariDrive);		// from DevChangesHandler
-	virtual void onDevDetached(std::string devName);						// from DevChangesHandler
 
     void setFloppyImageLed(int ledNo);
 
@@ -63,27 +55,19 @@ private:
 
     //-----------------------------------
     // settings and config stuff
-    ConfigStream            *confStream;
     SettingsReloadProxy     settingsReloadProxy;
 
     void loadSettings(void);
 
     //-----------------------------------
     // hard disk stuff
-    DevFinder		devFinder;
     bool            setEnabledIDbits;
 	AcsiIDinfo		acsiIdInfo;
-    bool            mountRawNotTrans;
     RetryModule     *retryMod;
     
     void handleAcsiCommand(void);
     void handleConfigStream(BYTE *cmd);
 
-    //-----------------------------------
-    // mount and attach stuff
-	std::multimap<std::string, std::string> mapDeviceToHostPaths;
-
-	void attachDevAsTranslated(std::string devName);
     //-----------------------------------
     // handle FW version
     void handleFwVersion(int whichSpiCs);

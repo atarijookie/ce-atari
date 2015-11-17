@@ -36,6 +36,8 @@ AcsiDataTrans::AcsiDataTrans()
     dataDirection   = DATA_DIRECTION_READ;
 	
 	dumpNextData	= false;
+    
+    retryMod        = NULL;
 }
 
 AcsiDataTrans::~AcsiDataTrans()
@@ -225,6 +227,10 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
         return;
     }
 
+    if(!retryMod) {         // no retry module?
+        return;
+    }
+    
     if(fromRetryModule) {   // if it's a RETRY, get the copy of data and proceed like it would be from real module
         retryMod->restoreDataAndStatus  (dataDirection, count, buffer, statusWasSet, status);
     } else {                // if it's normal run (not a RETRY), let the retry module do a copy of data

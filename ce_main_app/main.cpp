@@ -146,8 +146,6 @@ int main(int argc, char *argv[])
     
 //	system("sudo echo none > /sys/class/leds/led0/trigger");	    // disable usage of GPIO 23 (pin 16) by LED
 
-    ce_conf_createFifos();                                          // if should run normally, create the ce_conf FIFOs
-
 	if(!gpio_open()) {									            // try to open GPIO and SPI on RPi
 		return 0;
 	}

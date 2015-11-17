@@ -61,10 +61,6 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
 
     sharedObjects_create(configService, floppyService, screencastService);
     
-    confStream = new ConfigStream();
-    confStream->setAcsiDataTrans(dataTrans);
-	confStream->setSettingsReloadProxy(&settingsReloadProxy);
-
     // now register all the objects which use some settings in the proxy
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_ACSI);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPYIMGS);
@@ -77,9 +73,6 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
 
 	settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.translated,    SETTINGSUSER_TRANSLATED);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.translated,    SETTINGSUSER_SHARED);
-
-	// register this class as receiver of dev attached / detached calls
-	devFinder.setDevChangesHandler((DevChangesHandler *) this);
 
     // give floppy setup everything it needs
     floppySetup.setAcsiDataTrans(dataTrans);
@@ -106,20 +99,39 @@ CCoreThread::~CCoreThread()
     delete conSpi;
     delete dataTrans;
     delete retryMod;
-
-    delete confStream;
     
     sharedObjects_destroy();
 }
 
 void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
+    shared.devFinder_detachAndLook  = false;
+    shared.devFinder_look           = false;
+
     shared.scsi        = new Scsi();
     shared.scsi->setAcsiDataTrans(dataTrans);
     shared.scsi->attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
 
     shared.translated = new TranslatedDisk(dataTrans, configService, screencastService);
 	shared.translated->setSettingsReloadProxy(&settingsReloadProxy);
+
+    //-----------
+    // create config stream for ACSI interface
+    shared.configStream.acsi = new ConfigStream();
+    shared.configStream.acsi->setAcsiDataTrans(dataTrans);
+    shared.configStream.acsi->setSettingsReloadProxy(&settingsReloadProxy);
+    
+    // create config stream for web interface
+    shared.configStream.dataTransWeb    = new AcsiDataTrans();
+    shared.configStream.web             = new ConfigStream();
+    shared.configStream.web->setAcsiDataTrans(shared.configStream.dataTransWeb);
+    shared.configStream.web->setSettingsReloadProxy(&settingsReloadProxy);
+
+    // create config stream for linux terminal
+    shared.configStream.dataTransTerm   = new AcsiDataTrans();
+    shared.configStream.term            = new ConfigStream();
+    shared.configStream.term->setAcsiDataTrans(shared.configStream.dataTransTerm);
+    shared.configStream.term->setSettingsReloadProxy(&settingsReloadProxy);
 }
 
 void CCoreThread::sharedObjects_destroy(void)
@@ -129,6 +141,21 @@ void CCoreThread::sharedObjects_destroy(void)
     
     delete shared.translated;
     shared.translated = NULL;
+    
+    delete shared.configStream.acsi;
+    shared.configStream.acsi = NULL;
+
+    delete shared.configStream.web;
+    shared.configStream.web = NULL;
+
+    delete shared.configStream.dataTransWeb;
+    shared.configStream.dataTransWeb = NULL;
+
+    delete shared.configStream.term;
+    shared.configStream.term = NULL;
+
+    delete shared.configStream.dataTransTerm;
+    shared.configStream.dataTransTerm = NULL;
 }
 
 void CCoreThread::run(void)
@@ -166,9 +193,6 @@ void CCoreThread::run(void)
 
     Debug::out(LOG_DEBUG, "Will check for Hans and Franz alive: %s", (shouldCheckHansFranzAlive ? "yes" : "no") );
     //------------------------------
-
-	DWORD nextDevFindTime       = Utils::getCurrentMs();                    // create a time when the devices should be checked - and that time is now
-    DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);                  // create a time when update download status should be checked
 
     DWORD getHwInfoTimeout      = Utils::getEndTime(3000);                  // create a time when we already should have info about HW, and if we don't have that by that time, then fail
 
@@ -249,60 +273,6 @@ void CCoreThread::run(void)
             }
         }
 
-        // should we check for the new devices?
-		if(Utils::getCurrentMs() >= nextDevFindTime) {
-			devFinder.lookForDevChanges();				                // look for devices attached / detached
-
-			nextDevFindTime = Utils::getEndTime(DEV_CHECK_TIME_MS);		// update the time when devices should be checked
-
-            if(!Update::versions.updateListWasProcessed) {              // if didn't process update list yet
-                Update::processUpdateList();
-
-                if(Update::versions.updateListWasProcessed) {           // if we processed the list, update config stream
-                    confStream->fillUpdateWithCurrentVersions();        // if the config screen is shown, then update info on it
-                }
-            }
-		}
-
-        // should check the update status?
-        if(Utils::getCurrentMs() >= nextUpdateCheckTime) {
-            nextUpdateCheckTime   = Utils::getEndTime(UPDATE_CHECK_TIME);   // update the time when we should check update status again
-
-            int updateState = Update::state();                              // get the update state
-            switch(updateState) {
-                case UPDATE_STATE_DOWNLOADING:
-                confStream->fillUpdateDownloadWithProgress();               // refresh config screen with download status
-                break;
-
-                //-----------
-                case UPDATE_STATE_DOWNLOAD_FAIL:
-                confStream->showUpdateDownloadFail();                       // show fail message on config screen
-                Update::stateGoIdle();
-				Debug::out(LOG_ERROR, "Update state - download failed");
-                break;
-
-                //-----------
-                case UPDATE_STATE_DOWNLOAD_OK:
-
-                if(!confStream->isUpdateDownloadPageShown()) {              // if user is NOT waiting on download page (cancel pressed), don't update
-                    Update::stateGoIdle();
-					Debug::out(LOG_DEBUG, "Update state - download OK, but user is not on download page - NOT doing update");
-                } else {                                                    // if user is waiting on download page, aplly update
-                    res = Update::createUpdateScript();
-
-                    if(!res) {
-                        confStream->showUpdateError();
-						Debug::out(LOG_ERROR, "Update state - download OK, failed to create update script - NOT doing update");
-                    } else {
-						Debug::out(LOG_INFO, "Update state - download OK, update script created, will do update.");
-						sigintReceived = 1;
-                    }
-                }
-
-                break;
-            }
-        }
-
 #if !defined(ONPC_HIGHLEVEL)
         // check for any ATN code waiting from Hans
 		res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);
@@ -372,20 +342,6 @@ void CCoreThread::run(void)
 #else
     flags.gotFranzFwVersion = true;
 #endif
-        
-        int bytesAvailable;
-        if(ce_conf_fd1 > 0 && ce_conf_fd2 > 0) {                        // if we got the ce_conf FIFO handles
-            int ires = ioctl(ce_conf_fd1, FIONREAD, &bytesAvailable);   // how many bytes we can read?
-
-            if(ires != -1 && bytesAvailable >= 3) {                     // if there are at least 3 bytes waiting
-                BYTE cmd[6] = {0, 'C', 'E', 0, 0, 0};
-                ires = read(ce_conf_fd1, cmd + 3, 3);                   // read the byte triplet
-                
-                Debug::out(LOG_DEBUG, "confStream - through FIFO: %02x %02x %02x (ires = %d)", cmd[3], cmd[4], cmd[5], ires);
-                
-                confStream->processCommand(cmd, ce_conf_fd2);
-            }
-        }
 
 		if(!gotAtn) {								// no ATN was processed?
 			Utils::sleepMs(1);						// wait 1 ms...
@@ -483,12 +439,18 @@ void CCoreThread::handleAcsiCommand(void)
         switch(module) {
         case HOSTMOD_CONFIG:                            // config console command?
             wasHandled = true;
-            confStream->processCommand(pCmd);
+            
+            pthread_mutex_lock(&shared.mtxConfigStreams);
+            shared.configStream.acsi->processCommand(pCmd);
+            pthread_mutex_unlock(&shared.mtxConfigStreams);
             break;
 
         case HOSTMOD_TRANSLATED_DISK:                   // translated disk command?
             wasHandled = true;
+            
+            pthread_mutex_lock(&shared.mtxTranslated);
             shared.translated->processCommand(pCmd);
+            pthread_mutex_unlock(&shared.mtxTranslated);
             break;
 
         case HOSTMOD_FDD_SETUP:                         // floppy setup command?
@@ -504,7 +466,9 @@ void CCoreThread::handleAcsiCommand(void)
     }
 
     if(wasHandled != true) {                            // if the command was not previously handled, it's probably just some SCSI command
+        pthread_mutex_lock(&shared.mtxScsi);
         shared.scsi->processCommand(bufIn);                    // process the command
+        pthread_mutex_unlock(&shared.mtxScsi);
     }
 }
 
@@ -528,17 +492,12 @@ void CCoreThread::reloadSettings(int type)
         Settings s;
         bool newMountRawNotTrans = s.getBool((char *) "MOUNT_RAW_NOT_TRANS", 0);
         
-        if(mountRawNotTrans != newMountRawNotTrans) {       // mount strategy changed?
-            mountRawNotTrans = newMountRawNotTrans;
+        if(shared.mountRawNotTrans != newMountRawNotTrans) {       // mount strategy changed?
+            shared.mountRawNotTrans = newMountRawNotTrans;
 
             Debug::out(LOG_DEBUG, "CCoreThread::reloadSettings -- USB media mount strategy changed, remounting");
-        
-            shared.translated->detachAllUsbMedia();                // detach all translated USB media
-            shared.scsi->detachAllUsbMedia();                      // detach all RAW USB media
 
-            // and now try to attach everything back
-            devFinder.clearMap();						    // make all the devices appear as new
-            devFinder.lookForDevChanges();					// and now find all the devices
+            shared.devFinder_detachAndLook = true;
         }
         
         return;   
@@ -558,14 +517,15 @@ void CCoreThread::reloadSettings(int type)
     }
     
 	// first dettach all the devices
+    pthread_mutex_lock(&shared.mtxScsi);
 	shared.scsi->detachAll();
-
+    pthread_mutex_unlock(&shared.mtxScsi);
+    
 	// then load the new settings
     loadSettings();
 
 	// and now try to attach everything back
-	devFinder.clearMap();									// make all the devices appear as new
-	devFinder.lookForDevChanges();							// and now find all the devices
+    shared.devFinder_look = true;
 }
 
 void CCoreThread::loadSettings(void)
@@ -576,7 +536,7 @@ void CCoreThread::loadSettings(void)
 	s.loadAcsiIDs(&acsiIdInfo);
     s.loadFloppyConfig(&floppyConfig);
 
-    mountRawNotTrans = s.getBool((char *) "MOUNT_RAW_NOT_TRANS", 0);
+    shared.mountRawNotTrans = s.getBool((char *) "MOUNT_RAW_NOT_TRANS", 0);
     
     setEnabledIDbits    = true;
     setFloppyConfig     = true;
@@ -901,75 +861,6 @@ int CCoreThread::bcdToInt(int bcd)
     b = bcd &  0x0f;    // lower nibble
 
     return ((a * 10) + b);
-}
-
-void CCoreThread::onDevAttached(std::string devName, bool isAtariDrive)
-{
-	Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached: devName %s", (char *) devName.c_str());
-
-    if(mountRawNotTrans) {                  // attach as raw?
-        Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- should mount USB media as raw, attaching as RAW");
-		shared.scsi->attachToHostPath(devName, SOURCETYPE_DEVICE, SCSI_ACCESSTYPE_FULL);
-    } else {                                // attach as translated?
-        Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- should mount USB media as translated, attaching as TRANSLATED");
-        attachDevAsTranslated(devName);
-    }
-}
-
-void CCoreThread::onDevDetached(std::string devName)
-{
-	// try to detach the device - works if was attached as RAW, does nothing otherwise
-	shared.scsi->dettachFromHostPath(devName);
-
-	// and also try to detach the device from translated disk
-	std::pair <std::multimap<std::string, std::string>::iterator, std::multimap<std::string, std::string>::iterator> ret;
-	std::multimap<std::string, std::string>::iterator it;
-
-	ret = mapDeviceToHostPaths.equal_range(devName);				// find a range of host paths which are mapped to partitions found on this device
-
-	for (it = ret.first; it != ret.second; ++it) {					// now go through the list of device - host_path pairs and unmount them
-		std::string hostPath = it->second;							// retrieve just the host path
-
-		shared.translated->detachFromHostPath(hostPath);		    // now try to detach this from translated drives
-	}
-
-	mapDeviceToHostPaths.erase(ret.first, ret.second);				// and delete the whole device items from this multimap
-}
-
-void CCoreThread::attachDevAsTranslated(std::string devName)
-{
-	bool res;
-	std::list<std::string>				partitions;
-	std::list<std::string>::iterator	it;
-
-	devFinder.getDevPartitions(devName, partitions);							// get list of partitions for that device (sda -> sda1, sda2)
-
-	for (it = partitions.begin(); it != partitions.end(); ++it) {				// go through those partitions
-		std::string partitionDevice;
-		std::string mountPath;
-		std::string devPath, justDevName;
-
-		partitionDevice = *it;													// get the current device, which represents single partition (e.g. sda1)
-
-		Utils::splitFilenameFromPath(partitionDevice, devPath, justDevName);	// split path to path and device name (e.g. /dev/sda1 -> /dev + sda1)
-		mountPath = "/mnt/" + justDevName;										// create host path (e.g. /mnt/sda1)
-
-		TMounterRequest tmr;
-		tmr.action			= MOUNTER_ACTION_MOUNT;								// action: mount
-		tmr.deviceNotShared	= true;												// mount as device
-		tmr.devicePath		= partitionDevice;									// e.g. /dev/sda2
-		tmr.mountDir		= mountPath;										// e.g. /mnt/sda2
-		mountAdd(tmr);
-
-		res = shared.translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL);	// try to attach
-
-		if(!res) {																// if didn't attach, skip the rest
-			Debug::out(LOG_ERROR, "attachDevAsTranslated: failed to attach %s", (char *) mountPath.c_str());
-			continue;
-		}
-
-		mapDeviceToHostPaths.insert(std::pair<std::string, std::string>(devName, mountPath) );	// store it to multimap
-	}
 }
 
 void CCoreThread::handleSendTrack(void)

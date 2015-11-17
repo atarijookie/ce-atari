@@ -24,15 +24,18 @@
 extern int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt);
 #define INBFR_SIZE  (100 * 1024)
 
+static int webFd1;
+static int webFd2;
+
 ConfigResource::ConfigResource()  
 {
     in_bfr   = new BYTE[INBFR_SIZE];
     tmp_bfr  = new BYTE[INBFR_SIZE];
 
-    ce_conf_fd1 = open(FIFO_PATH1, O_RDWR);             // will be used for writing only
-    ce_conf_fd2 = open(FIFO_PATH2, O_RDWR);             // will be used for reading only
+    webFd1 = open(FIFO_WEB_PATH1, O_RDWR);      // will be used for writing only
+    webFd2 = open(FIFO_WEB_PATH2, O_RDWR);      // will be used for reading only
 
-    if(ce_conf_fd1 == -1 || ce_conf_fd2 == -1) {
+    if(webFd1 == -1 || webFd2 == -1) {
         printf("ConfigResource -- open() failed\n");
         return;
     }
@@ -40,8 +43,8 @@ ConfigResource::ConfigResource()
 
 ConfigResource::~ConfigResource() 
 {
-    close(ce_conf_fd1);
-    close(ce_conf_fd2);
+    close(webFd1);
+    close(webFd2);
 
     delete[] in_bfr;
     delete[] tmp_bfr;
@@ -174,7 +177,7 @@ int ConfigResource::sendTerminalCommand(unsigned char cmd, unsigned char param)
     bfr[1] = cmd;
     bfr[2] = param;
     
-    res = write(ce_conf_fd1, bfr, 3);
+    res = write(webFd1, bfr, 3);
     
     if(res != 3) {
         printf("sendCmd -- write failed!\n");
@@ -184,13 +187,13 @@ int ConfigResource::sendTerminalCommand(unsigned char cmd, unsigned char param)
     Utils::sleepMs(50);
     
     int bytesAvailable;
-    res = ioctl(ce_conf_fd2, FIONREAD, &bytesAvailable);         // how many bytes we can read?
+    res = ioctl(webFd2, FIONREAD, &bytesAvailable);         // how many bytes we can read?
 
     if(res != -1 && bytesAvailable > 0) {
         int readCount = (bytesAvailable < INBFR_SIZE) ? bytesAvailable : INBFR_SIZE;
         
         memset(in_bfr, 0, INBFR_SIZE);
-        res = read(ce_conf_fd2, in_bfr, readCount);
+        res = read(webFd2, in_bfr, readCount);
 
         Debug::out(LOG_DEBUG, "sendCmd - readCount: %d", readCount);
 

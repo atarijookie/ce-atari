@@ -19,9 +19,9 @@
 #include "config/keys.h"
 
 #include "ce_conf_on_rpi.h" 
+#include "periodicthread.h"
 
-int ce_conf_fd1;
-int ce_conf_fd2;
+extern SharedObjects shared;
 
 #define INBFR_SIZE  (10 * 1024)
 BYTE *inBfr;
@@ -104,51 +104,26 @@ int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt)
     return t;
 }
 
+static int termFd1;
+static int termFd2;
+
 static bool sendCmd(BYTE cmd, BYTE param)
 {
     char bfr[3];
     int  res;
-    static int noReplies = 0;
     
     bfr[0] = HOSTMOD_CONFIG;
     bfr[1] = cmd;
     bfr[2] = param;
     
-    res = write(ce_conf_fd1, bfr, 3);
+    res = write(termFd1, bfr, 3);
     
     if(res != 3) {
         printf("sendCmd -- write failed!\n");
         return false;
     }
     
-    Utils::sleepMs(50);
-    
-    int bytesAvailable;
-    res = ioctl(ce_conf_fd2, FIONREAD, &bytesAvailable);         // how many bytes we can read?
-
-    if(res != -1 && bytesAvailable > 0) {
-        int readCount = (bytesAvailable < INBFR_SIZE) ? bytesAvailable : INBFR_SIZE;
-        
-        memset(inBfr, 0, INBFR_SIZE);
-        res = read(ce_conf_fd2, inBfr, readCount);
-
-        Debug::out(LOG_DEBUG, "sendCmd - readCount: %d", readCount);
-        
-        int newCount = translateVT52toVT100(inBfr, tmpBfr, readCount);
-        
-        write(STDOUT_FILENO, inBfr, newCount);
-        return true;
-    } else {
-        printf("\033[2J\033[HCosmosEx app does not reply, is it running?\n");
-        noReplies++;
-        
-        if(noReplies >= 5) {
-            printf("No response from CosmosEx app in 5 attempts, terminating.\nThe CosmosEx app must be running for CE_CONF to work.\n");
-            return false;
-        }
-        
-        return true;
-    }
+    return true;
 }
 
 static BYTE getKey(int count)
@@ -248,11 +223,11 @@ void ce_conf_mainLoop(void)
     inBfr   = new BYTE[INBFR_SIZE];
     tmpBfr  = new BYTE[INBFR_SIZE];
     
-    ce_conf_fd1 = open(FIFO_PATH1, O_RDWR);             // will be used for writing only
-    ce_conf_fd2 = open(FIFO_PATH2, O_RDWR);             // will be used for reading only
+    termFd1 = open(FIFO_TERM_PATH1, O_RDWR);             // will be used for writing only
+    termFd2 = open(FIFO_TERM_PATH2, O_RDWR);             // will be used for reading only
 
-    if(ce_conf_fd1 == -1 || ce_conf_fd2 == -1) {
-        printf("ce_conf_mainLoop -- open() failed\n");
+    if(termFd1 == -1 || termFd2 == -1) {
+        printf("ce_conf_mainLoop -- open() failed: %s\n", strerror(errno));
         return;
     }
     
@@ -274,30 +249,58 @@ void ce_conf_mainLoop(void)
     DWORD lastUpdate = Utils::getCurrentMs();
     
     while(sigintReceived == 0) {
+        bool didSomething = false;
+    
+        // check if something waiting from keyboard, and if so, read it
         int bytesAvailable;
-        int res = ioctl(STDIN_FILENO, FIONREAD, &bytesAvailable);           // how many bytes we can read?
+        int res = ioctl(STDIN_FILENO, FIONREAD, &bytesAvailable);   // how many bytes we can read from keyboard?
     
         if(res != -1 && bytesAvailable > 0) {
-            BYTE key = getKey(bytesAvailable);                              // get the key in format valid for config components
+            didSomething = true;
             
-            if(key == KEY_F10) {                                            // should quit? do it
+            BYTE key = getKey(bytesAvailable);                      // get the key in format valid for config components
+            
+            if(key == KEY_F10) {                                    // should quit? do it
                 break;
             }
             
-            if(key != 0) {                                                  // if got the key, send key down event
+            if(key != 0) {                                          // if got the key, send key down event
                 sendCmd(CFG_CMD_KEYDOWN, key);
-                lastUpdate = Utils::getCurrentMs();                         // store current time as we just updated
+                lastUpdate = Utils::getCurrentMs();                 // store current time as we just updated
             }
         }
         
-        if(Utils::getCurrentMs() - lastUpdate >= 1000) {                    // last update more than 1 second ago? refresh
+            Utils::sleepMs(50);
+    
+        //-----------
+        // is something comming from the incomming pipe?
+        res = ioctl(termFd2, FIONREAD, &bytesAvailable);            // how many bytes we can read from pipe?
+
+        if(res != -1 && bytesAvailable > 0) {
+            didSomething = true;
+        
+            int readCount = (bytesAvailable < INBFR_SIZE) ? bytesAvailable : INBFR_SIZE;
+            
+            memset(inBfr, 0, INBFR_SIZE);
+            res = read(termFd2, inBfr, readCount);                  // read data
+
+            int newCount = translateVT52toVT100(inBfr, tmpBfr, readCount);
+            write(STDOUT_FILENO, inBfr, newCount);                  // show it on screen
+        }
+        //-----------
+        // should do refresh or nothing?
+        if(Utils::getCurrentMs() - lastUpdate >= 1000) {            // last update more than 1 second ago? refresh
+            didSomething = true;
+        
             bool res = sendCmd(CFG_CMD_REFRESH, 0);
-            lastUpdate = Utils::getCurrentMs();                             // store current time as we just updated
+            lastUpdate = Utils::getCurrentMs();                     // store current time as we just updated
         
             if(!res) {  
                 break;
             }
-        } else {                                                            // if we updated less than 1 second ago, sleep 50 ms
+        } 
+        
+        if(!didSomething) {         // if nothing happened in this loop, wait a little
             Utils::sleepMs(50);
         }
     }
@@ -310,45 +313,15 @@ void ce_conf_mainLoop(void)
     
     system("reset");
 }
+void ce_conf_createFifos(ConfigPipes *cp, char *path1, char *path2);
 
 void ce_conf_createFifos(void)
 {
-    int res, res2;
+    ce_conf_createFifos(&shared.configPipes.web,    (char *) FIFO_WEB_PATH1,     (char *) FIFO_WEB_PATH2);
+    ce_conf_createFifos(&shared.configPipes.term,   (char *) FIFO_TERM_PATH1,    (char *) FIFO_TERM_PATH2);
 
-    res = mkfifo(FIFO_PATH1, 0666);
-
-    if(res != 0 && errno != EEXIST) {                   // if mkfifo failed, and it's not 'file exists' error
-        Debug::out(LOG_ERROR, "ce_conf_createFifos -- mkfifo() failed, errno: %d", errno);
-        return;
-    }
-
-    res = mkfifo(FIFO_PATH2, 0666);
-
-    if(res != 0 && errno != EEXIST) {                   // if mkfifo failed, and it's not 'file exists' error
-        Debug::out(LOG_ERROR, "ce_conf_createFifos -- mkfifo() failed, errno: %d", errno);
-        return;
-    }
-
-    ce_conf_fd1 = open(FIFO_PATH1, O_RDWR);             // will be used for reading only
-    ce_conf_fd2 = open(FIFO_PATH2, O_RDWR);             // will be used for writing only
-
-    if(ce_conf_fd1 == -1 || ce_conf_fd2 == -1) {
-        Debug::out(LOG_ERROR, "ce_conf_createFifos -- open() failed");
-        return;
-    }
-
-    res     = fcntl(ce_conf_fd1, F_SETFL, O_NONBLOCK);
-    res2    = fcntl(ce_conf_fd2, F_SETFL, O_NONBLOCK);
-
-    if(res == -1 || res2 == -1) {
-        Debug::out(LOG_ERROR, "ce_conf_createFifos -- fcntl() failed");
-        return;
-    }
-    
-    Debug::out(LOG_DEBUG, "ce_conf FIFOs created");
-    
     // now create the ce_conf starting script if it doesn't exist
-    res = access("/ce/ce_conf.sh", F_OK);
+    int res = access("/ce/ce_conf.sh", F_OK);
 
     if(res == -1) {         // file doesn't exist? create it
         system("echo -e '#!/bin/sh \n/ce/app/cosmosex ce_conf \nreset\n ' > /ce/ce_conf.sh");
@@ -356,4 +329,41 @@ void ce_conf_createFifos(void)
         
         Utils::forceSync();
     }
+}
+
+void ce_conf_createFifos(ConfigPipes *cp, char *path1, char *path2)
+{
+    int res, res2;
+
+    res = mkfifo(path1, 0666);
+
+    if(res != 0 && errno != EEXIST) {               // if mkfifo failed, and it's not 'file exists' error
+        Debug::out(LOG_ERROR, "ce_conf_createFifos -- mkfifo() failed, errno: %d", errno);
+        return;
+    }
+
+    res = mkfifo(path2, 0666);
+
+    if(res != 0 && errno != EEXIST) {               // if mkfifo failed, and it's not 'file exists' error
+        Debug::out(LOG_ERROR, "ce_conf_createFifos -- mkfifo() failed, errno: %d", errno);
+        return;
+    }
+
+    cp->fd1 = open(path1, O_RDWR);              // will be used for reading only
+    cp->fd2 = open(path2, O_RDWR);              // will be used for writing only
+
+    if(cp->fd1 == -1 || cp->fd2 == -1) {
+        Debug::out(LOG_ERROR, "ce_conf_createFifos -- open() failed");
+        return;
+    }
+
+    res     = fcntl(cp->fd1, F_SETFL, O_NONBLOCK);
+    res2    = fcntl(cp->fd2, F_SETFL, O_NONBLOCK);
+
+    if(res == -1 || res2 == -1) {
+        Debug::out(LOG_ERROR, "ce_conf_createFifos -- fcntl() failed");
+        return;
+    }
+    
+    Debug::out(LOG_DEBUG, "ce_conf FIFOs created");
 }
