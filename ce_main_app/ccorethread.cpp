@@ -259,14 +259,17 @@ void CCoreThread::run(void)
         
         // should we check if Hans and Franz are alive?
         if(shouldCheckHansFranzAlive) {
-            if(Utils::getCurrentMs() >= hansFranzAliveCheckTime) {      // did enough time pass since the Hans and Franz reset?
-                if(!flags.gotHansFwVersion || !flags.gotFranzFwVersion) {       // if don't have version from Hans or Franz, then they're not alive
-                    Update::createFlashFirstFwScript();
-
-                    Debug::out(LOG_INFO, "No answer from Hans or Franz, so first firmware flash script created, will do first firmware flashing.");
+            if(Utils::getCurrentMs() >= hansFranzAliveCheckTime) {          // did enough time pass since the Hans and Franz reset?
+                if(!flags.gotHansFwVersion || !flags.gotFranzFwVersion) {   // if don't have version from Hans or Franz, then they're not alive
+                    // Removed flashing first FW when the chips don't reply -- something this detection goes bad, 
+                    // and this resulted in writing FW to chips even if it was not needed. Now this possible action will be left for
+                    // user manual launch (to avoid automatic writing FW over and over again if it won't help). 
+                
+                    Debug::out(LOG_INFO, "No answer from Hans or Franz, will quit app, hopefully app restart will solve this.");
+                    Debug::out(LOG_INFO, "If not, and this will happen in a loop, consider writing chips firmware again.");
 					sigintReceived = 1;
                 } else {
-                    Debug::out(LOG_DEBUG, "Got answers from both Hans and Franz, so not doing first firmware flashing.");
+                    Debug::out(LOG_DEBUG, "Got answers from both Hans and Franz :)");
                 }
 
                 shouldCheckHansFranzAlive = false;                      // don't check this again
@@ -558,18 +561,18 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 		cmdLength = 12;
         responseStart(cmdLength);                                   // init the response struct
 
+        //--------------
+        // always send the ACSI + SD config
+        BYTE enabledIDbits, sdCardAcsiId;
+        getIdBits(enabledIDbits, sdCardAcsiId);             // get the enabled IDs 
+        
+        responseAddWord(oBuf, CMD_ACSI_CONFIG);             // CMD: send acsi config
+        responseAddWord(oBuf, MAKEWORD(enabledIDbits, sdCardAcsiId)); // store ACSI enabled IDs and which ACSI ID is used for SD card
+        //--------------
+
         static bool hansHandledOnce = false;
 
         if(hansHandledOnce) {                                       // don't send commands until we did receive status at least a couple of times
-            if(setEnabledIDbits) {                                  // if we should send ACSI ID configuration
-                BYTE enabledIDbits, sdCardAcsiId;
-                getIdBits(enabledIDbits, sdCardAcsiId);             // get the enabled IDs 
-                
-                responseAddWord(oBuf, CMD_ACSI_CONFIG);             // CMD: send acsi config
-                responseAddWord(oBuf, MAKEWORD(enabledIDbits, sdCardAcsiId)); // store ACSI enabled IDs and which ACSI ID is used for SD card
-                setEnabledIDbits = false;                           // and don't sent this anymore (until needed)
-            }
-
             if(setEnabledFloppyImgs) {
                 responseAddWord(oBuf, CMD_FLOPPY_CONFIG);                               // CMD: send which floppy images are enabled (bytes 4 & 5)
                 responseAddWord(oBuf, MAKEWORD(floppyImageSilo.getSlotBitmap(), 0));    // store which floppy images are enabled
