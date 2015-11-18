@@ -107,23 +107,108 @@ int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt)
 static int termFd1;
 static int termFd2;
 
-static bool sendCmd(BYTE cmd, BYTE param)
+static void emptyFd(int fd, BYTE *bfr);
+static bool receiveStream(int byteCount, BYTE *data, int fd);
+
+bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BYTE *tempBuffer, int &vt100byteCount)
 {
     char bfr[3];
     int  res;
-    
+
+    vt100byteCount = 0;
+
+    emptyFd(fd2, inBfr);                                        // first check if there isn't something stuck in the fifo, and if there is, just read it to discard it
+
     bfr[0] = HOSTMOD_CONFIG;
     bfr[1] = cmd;
     bfr[2] = param;
     
-    res = write(termFd1, bfr, 3);
+    res = write(fd1, bfr, 3);                                   // send command
     
     if(res != 3) {
         printf("sendCmd -- write failed!\n");
         return false;
     }
+
+    WORD howManyBytes;
     
-    return true;
+    bool bRes = receiveStream(2, (BYTE *) &howManyBytes, fd2);  // first receive byte count that we should read
+
+    if(!bRes) {
+        printf("sendCmd -- failed to receive byte count\n");
+        
+        Debug::out(LOG_DEBUG, "sendCmd fail on receiving howManyBytes");
+        return false;
+    }
+
+    if(howManyBytes < 1) {
+        Debug::out(LOG_DEBUG, "sendCmd success because didn't need any other data");
+        return true;
+    }
+    
+    bRes = receiveStream(howManyBytes, dataBuffer, fd2);        // then receive the stream
+
+    if(bRes) {
+        vt100byteCount = translateVT52toVT100(dataBuffer, tempBuffer, howManyBytes);    // translate VT52 stream to VT100 stream
+        
+        Debug::out(LOG_DEBUG, "sendCmd success, %d bytes of VT52 translated to %d bytes of VT100", howManyBytes, vt100byteCount);
+    } else {
+        Debug::out(LOG_DEBUG, "sendCmd fail on getting VT52 stream");
+    }
+
+    return bRes;
+}
+
+static void emptyFd(int fd, BYTE *bfr)
+{
+    while(1) {
+        int bytesAvailable;
+        int res = ioctl(fd, FIONREAD, &bytesAvailable); // how many bytes we can read?
+
+        if(res != -1 && bytesAvailable > 0) {           // ioctl success and something to read? read it, ignore it
+            read(fd, bfr, bytesAvailable);
+            Debug::out(LOG_DEBUG, "emptyFd - read %d bytes", bytesAvailable);
+        } else {                                        // nothing more to read, quit this loop and continue with the rest
+            break;
+        }
+    }
+}
+
+static bool receiveStream(int byteCount, BYTE *data, int fd)
+{
+    DWORD timeOutTime = Utils::getEndTime(1000);
+
+    int recvCount = 0;          // how many VT52  chars we already got
+    
+    BYTE *ptr = data;
+    
+    while(recvCount < byteCount) {                                          // receive all the data, wait up to 1 second to receive it
+        if(Utils::getCurrentMs() >= timeOutTime) {                          // time out happened, nothing received within specified timeout? fail
+            Debug::out(LOG_DEBUG, "receiveStream - fail, wanted %d and got only %d bytes", byteCount, recvCount);
+            return false;
+        }
+    
+        int bytesAvailable;
+        int res = ioctl(fd, FIONREAD, &bytesAvailable);                     // how many bytes we can read?
+
+        if(res != -1 && bytesAvailable > 0) {                               // ioctl success and something to read?
+            int restOfBytes = byteCount - recvCount;                        // calculate how many we still have to receive to match specified byteCount
+            int readCount   = (bytesAvailable < restOfBytes) ? bytesAvailable : restOfBytes;        // read everything if it's less of what we need; read just restOfBytes if we need less than what's available
+
+            memset(ptr, 0, readCount + 1);
+            read(fd, ptr, readCount);                                      // get the stream
+
+            recvCount   += readCount;
+            ptr             += readCount;
+            
+            Debug::out(LOG_DEBUG, "receiveStream - readCount: %d", readCount);
+        }
+        
+        Utils::sleepMs(10);     // sleep a little
+    }
+    
+    Debug::out(LOG_DEBUG, "receiveStream - success, %d bytes", byteCount);
+    return true;    
 }
 
 static BYTE getKey(int count)
@@ -231,7 +316,13 @@ void ce_conf_mainLoop(void)
         return;
     }
     
-    sendCmd(CFG_CMD_SET_RESOLUTION, ST_RESOLUTION_HIGH);
+    bool res;
+    int vt100count;
+    res = sendCmd(CFG_CMD_SET_RESOLUTION, ST_RESOLUTION_HIGH, termFd1, termFd2, inBfr, tmpBfr, vt100count);
+    
+    if(res) {
+        write(STDOUT_FILENO, (char *) inBfr, vt100count);
+    }
     
   	struct termios old_tio_in, new_tio_in;
   	struct termios old_tio_out, new_tio_out;
@@ -265,43 +356,32 @@ void ce_conf_mainLoop(void)
             }
             
             if(key != 0) {                                          // if got the key, send key down event
-                sendCmd(CFG_CMD_KEYDOWN, key);
+                res = sendCmd(CFG_CMD_KEYDOWN, key, termFd1, termFd2, inBfr, tmpBfr, vt100count);
+                
+                if(res) {
+                    write(STDOUT_FILENO, (char *) inBfr, vt100count);
+                }
+                
                 lastUpdate = Utils::getCurrentMs();                 // store current time as we just updated
             }
         }
         
-            Utils::sleepMs(50);
-    
-        //-----------
-        // is something comming from the incomming pipe?
-        res = ioctl(termFd2, FIONREAD, &bytesAvailable);            // how many bytes we can read from pipe?
-
-        if(res != -1 && bytesAvailable > 0) {
-            didSomething = true;
-        
-            int readCount = (bytesAvailable < INBFR_SIZE) ? bytesAvailable : INBFR_SIZE;
-            
-            memset(inBfr, 0, INBFR_SIZE);
-            res = read(termFd2, inBfr, readCount);                  // read data
-
-            int newCount = translateVT52toVT100(inBfr, tmpBfr, readCount);
-            write(STDOUT_FILENO, inBfr, newCount);                  // show it on screen
-        }
         //-----------
         // should do refresh or nothing?
         if(Utils::getCurrentMs() - lastUpdate >= 1000) {            // last update more than 1 second ago? refresh
             didSomething = true;
         
-            bool res = sendCmd(CFG_CMD_REFRESH, 0);
-            lastUpdate = Utils::getCurrentMs();                     // store current time as we just updated
+            res = sendCmd(CFG_CMD_REFRESH, 0, termFd1, termFd2, inBfr, tmpBfr, vt100count);
         
-            if(!res) {  
-                break;
+            if(res) {
+                write(STDOUT_FILENO, (char *) inBfr, vt100count);
             }
+
+            lastUpdate = Utils::getCurrentMs();                     // store current time as we just updated
         } 
         
         if(!didSomething) {         // if nothing happened in this loop, wait a little
-            Utils::sleepMs(50);
+            Utils::sleepMs(10);
         }
     }
     
@@ -319,16 +399,6 @@ void ce_conf_createFifos(void)
 {
     ce_conf_createFifos(&shared.configPipes.web,    (char *) FIFO_WEB_PATH1,     (char *) FIFO_WEB_PATH2);
     ce_conf_createFifos(&shared.configPipes.term,   (char *) FIFO_TERM_PATH1,    (char *) FIFO_TERM_PATH2);
-
-    // now create the ce_conf starting script if it doesn't exist
-    int res = access("/ce/ce_conf.sh", F_OK);
-
-    if(res == -1) {         // file doesn't exist? create it
-        system("echo -e '#!/bin/sh \n/ce/app/cosmosex ce_conf \nreset\n ' > /ce/ce_conf.sh");
-        system("chmod 755 /ce/ce_conf.sh");
-        
-        Utils::forceSync();
-    }
 }
 
 void ce_conf_createFifos(ConfigPipes *cp, char *path1, char *path2)

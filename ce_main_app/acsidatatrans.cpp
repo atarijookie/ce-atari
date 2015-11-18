@@ -215,7 +215,10 @@ void AcsiDataTrans::sendDataToFd(int fd)
         count       = 1;
     }
     
-    write(fd, buffer, count);
+    WORD length = count;
+    write(fd, &length, 2);      // first word - length of data to be received
+    
+    write(fd, buffer, count);   // then the data...
     count = 0;
 }
 

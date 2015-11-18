@@ -22,6 +22,8 @@
 #include "../../../ce_conf_on_rpi.h"
 
 extern int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt);
+extern bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BYTE *tempBuffer, int &vt100byteCount);
+
 #define INBFR_SIZE  (100 * 1024)
 
 static int webFd1;
@@ -95,9 +97,15 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
     //get configterminal screen
     if( strstr(req_info->request_method,"GET")>0 && sResourceInfo=="terminal" ){
         Debug::out(LOG_DEBUG, "/config/terminal GET");
-        int iReadLen=sendTerminalCommand(CFG_CMD_SET_RESOLUTION, ST_RESOLUTION_HIGH);
-        iReadLen=sendTerminalCommand(CFG_CMD_REFRESH, 0);
-        if( iReadLen>=0 ){
+        
+        openFIFOsIfNeeded();
+
+        int iReadLen;
+        sendCmd(CFG_CMD_SET_RESOLUTION, ST_RESOLUTION_HIGH, webFd1, webFd2, in_bfr, tmp_bfr, iReadLen);
+        
+        bool res = sendCmd(CFG_CMD_REFRESH, 0, webFd1, webFd2, in_bfr, tmp_bfr, iReadLen);
+        
+        if( res ){
             mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n");
             mg_printf(conn, "Cache: no-cache\r\n");
             mg_printf(conn, "Content-Length: %d\r\n\r\n",iReadLen);        // Always set Content-Length
@@ -152,8 +160,12 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
                     mg_printf(conn, "HTTP/1.1 400 Bad Request - invalid key code\r\n\r\n");
                     return true;
                 }
-                int iReadLen=sendTerminalCommand(CFG_CMD_KEYDOWN, iCode);
-                if( iReadLen>=0 ){
+                
+                openFIFOsIfNeeded();
+
+                int iReadLen;
+                bool res = sendCmd(CFG_CMD_KEYDOWN, iCode, webFd1, webFd2, in_bfr, tmp_bfr, iReadLen);
+                if( res ){
                     mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n");
                     mg_printf(conn, "Cache: no-cache\r\n");
                     mg_printf(conn, "Content-Length: %d\r\n\r\n",iReadLen);        // Always set Content-Length
@@ -178,63 +190,3 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
     return false;
 }
 
-int ConfigResource::sendTerminalCommand(unsigned char cmd, unsigned char param)
-{
-    char bfr[3];
-    int  res, bytesAvailable;
-    
-    openFIFOsIfNeeded();
-    
-    if(webFd1 <= 0 || webFd2 <= 0) {
-        Debug::out(LOG_DEBUG, "ConfigResource::sendTerminalCommand() -- FIFOs not open");
-        return -1;
-    }
-
-    //------------
-    // first check if there isn't something stuck in the fifo, and if there is, just read it to discard it
-    while(1) {
-        res = ioctl(webFd2, FIONREAD, &bytesAvailable); // how many bytes we can read?
-
-        if(res != -1 && bytesAvailable > 0) {           // ioctl success and something to read? read it, ignore it
-            read(webFd2, in_bfr, bytesAvailable);
-        } else {                                        // nothing more to read, quit this loop and continue with the rest
-            break;
-        }
-    }
-    //------------
-    
-    bfr[0] = HOSTMOD_CONFIG;
-    bfr[1] = cmd;
-    bfr[2] = param;
-    
-    res = write(webFd1, bfr, 3);
-    
-    if(res != 3) {
-        Debug::out(LOG_DEBUG, "ConfigResource::sendTerminalCommand() -- sendCmd - write failed!");
-        return -1;
-    }
-    
-    DWORD timeOutTime = Utils::getEndTime(1000);
-
-    while(1) {                                          // wait up to 1 second to receive something... 
-        if(Utils::getCurrentMs() >= timeOutTime) {      // time out happened, nothing received within specified timeout? fail
-            return -1;
-        }
-    
-        res = ioctl(webFd2, FIONREAD, &bytesAvailable);                         // how many bytes we can read?
-
-        if(res != -1 && bytesAvailable > 0) {                                   // ioctl success and something to read?
-            int readCount = (bytesAvailable < INBFR_SIZE) ? bytesAvailable : INBFR_SIZE;
-
-            memset(in_bfr, 0, readCount + 1);
-            read(webFd2, in_bfr, readCount);                                    // get the stream
-
-            Debug::out(LOG_DEBUG, "sendCmd - readCount: %d", readCount);
-
-            int newCount = translateVT52toVT100(in_bfr, tmp_bfr, readCount);    // translate VT52 stream to VT100 stream
-            return newCount;
-        }
-        
-        Utils::sleepMs(50);     // sleep a little
-    }
-}
