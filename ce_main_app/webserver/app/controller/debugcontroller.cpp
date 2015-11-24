@@ -62,42 +62,70 @@ bool DebugController::indexAction(mg_connection *conn, mg_request_info *req_info
 
 bool DebugController::getlogAction(mg_connection *conn, mg_request_info *req_info)
 {
-	std::string sFileName="ce_log.txt";
+    std::string sDownloadedFileName = "ce_log.txt";
+    std::string sFileType           = "text/plain";
+    std::string sCeFilePath         = "/var/log/ce.log";
+    
+    // don't send content length, filesize changes as we read
+    return getFile(conn, sDownloadedFileName, sFileType, sCeFilePath, false);
+}
 
+bool DebugController::action_get_ceconf(mg_connection *conn, mg_request_info *req_info)
+{
+    std::string sDownloadedFileName = "ce_conf.prg";
+    std::string sFileType           = "application/octet-stream";
+    std::string sCeFilePath         = "/ce/app/configdrive/ce_conf.prg";
+    
+    return getFile(conn, sDownloadedFileName, sFileType, sCeFilePath, true);
+}
+
+bool DebugController::action_get_cedd(mg_connection *conn, mg_request_info *req_info)
+{
+    std::string sDownloadedFileName = "ce_dd.prg";
+    std::string sFileType           = "application/octet-stream";
+    std::string sCeFilePath         = "/ce/app/configdrive/ce_dd.prg";
+    
+    return getFile(conn, sDownloadedFileName, sFileType, sCeFilePath, true);
+}
+
+bool DebugController::getFile(mg_connection *conn, std::string &sDownloadedFileName, std::string &sContentType, std::string &sCeFilePath, bool sendFileSize)
+{
     mg_printf(conn, "HTTP/1.1 200 OK\r\n");
-	mg_printf(conn, "Content-Type: text/plain\r\n");
+    
+    std::string sContent="Content-Type: " + sContentType + "\r\n";
+	mg_printf(conn, sContent.c_str());
+    
     mg_printf(conn, "Cache: no-cache\r\n");
-    std::string sHeader="Content-Disposition: attachment; filename=\""+sFileName+"\"\r\n";
+    
+    std::string sHeader="Content-Disposition: attachment; filename=\"" + sDownloadedFileName + "\"\r\n";
     mg_printf(conn, sHeader.c_str());
 
-	std::ifstream fileCeLog;
-    fileCeLog.open("/var/log/ce.log", std::ios::in|std::ios::binary); //open a file in read only mode
+	std::ifstream file;
+    file.open(sCeFilePath.c_str(), std::ios::in|std::ios::binary); //open a file in read only mode
 
-	/*
-	don't send content length, filesize changes as we read
-    fileCeLog.seekg( 0, std::ios::end );
-    int iFileSize=fileCeLog.tellg();
-    fileCeLog.seekg( 0, std::ios::beg );
-    mg_printf(conn, "Content-Length: %d\r\n",iFileSize);
-	*/
+	if(sendFileSize) {
+        file.seekg( 0, std::ios::end );
+        int iFileSize=file.tellg();
+        file.seekg( 0, std::ios::beg );
+        mg_printf(conn, "Content-Length: %d\r\n",iFileSize);
+	}
 
     mg_printf(conn, "\r\n");
 
     char* pcBuffer = new char[1024];
 
 	//send 1024 byte chunks (note: file is being appended by other thread while we read)
-    while( fileCeLog.read( pcBuffer, 1024 ) )
+    while( file.read( pcBuffer, 1024 ) )
 	{
-        mg_write(conn,pcBuffer,fileCeLog.gcount());
+        mg_write(conn,pcBuffer,file.gcount());
 	}
-    if( fileCeLog.gcount()>0 )
+    if( file.gcount()>0 )
     {
-        mg_write(conn,pcBuffer,fileCeLog.gcount());
+        mg_write(conn,pcBuffer,file.gcount());
     }
-    fileCeLog.close();
+    file.close();
 
     return true;
-
 }
 
 //based on javascript encodeURIComponent()

@@ -42,6 +42,20 @@ bool ControllerRouter::handleGet(CivetServer *server, struct mg_connection *conn
         delete pxController;
         return processed;
     }
+    if( controllerAction=="debug/get_ceconf" )
+    {
+        DebugController *pxController=new DebugController(pxDateService,pxFloppyService);
+        bool processed=pxController->action_get_ceconf(conn,req_info);
+        delete pxController;
+        return processed;
+    }
+    if( controllerAction=="debug/get_cedd" )
+    {
+        DebugController *pxController=new DebugController(pxDateService,pxFloppyService);
+        bool processed=pxController->action_get_cedd(conn,req_info);
+        delete pxController;
+        return processed;
+    }
     if( controllerAction=="screencast/getscreen" )
     {
         ScreencastController *pxController=new ScreencastController(pxScreencastService);
