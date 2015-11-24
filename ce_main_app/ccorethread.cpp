@@ -917,3 +917,52 @@ void CCoreThread::handleSectorWritten(void)
     // TODO:
     // do the written sector processing
 }
+
+void CCoreThread::handleRecoveryCommands(int recoveryLevel)
+{
+    switch(recoveryLevel) {
+        case 1: // just insert config floppy image into slot 1
+        
+                break;
+
+        //----------------------------------------------------
+        case 2: // delete settings, set network to DHCP
+                Debug::out(LOG_INFO, ">>> CCoreThread::handleRecoveryCommands -- LEVEL 2 - removing settings, restarting whole linux <<<\n");
+
+                deleteSettingAndSetNetworkToDhcp();         // delete all settings, set network to DHCP 
+
+                Debug::out(LOG_INFO, ">>> Terminating app and will reboot device, because app settings and network settings changed <<<\n");
+                
+                system("reboot");                           // reboot device
+                sigintReceived = 1;                         // turn off app (probably not needed)
+                break;
+
+        //----------------------------------------------------
+        case 3: // like 2, but also flash first firmware
+                Debug::out(LOG_INFO, ">>> CCoreThread::handleRecoveryCommands -- LEVEL 3 - removing settings, flashing first FW <<<\n");
+
+                deleteSettingAndSetNetworkToDhcp();         // delete all settings, set network to DHCP 
+        
+                Update::createFlashFirstFwScript(true);     // create flash first fw script -- with linux reboot
+        
+                Debug::out(LOG_INFO, ">>> Terminating app, because will do flashFirstFw as a part of handleRecoveryCommands() ! <<<\n");
+                sigintReceived = 1;                         // turn off app
+                break;
+    }
+}
+
+void CCoreThread::deleteSettingAndSetNetworkToDhcp(void)
+{
+    // delete settings
+    system("rm -f /ce/settings/*");
+    
+    // get the network settings
+	NetworkSettings ns;
+	ns.load();						// load the current values     
+    ns.eth0.dhcpNotStatic   = true; // force DHCP on eth0
+    ns.wlan0.dhcpNotStatic  = true; // force DHCP on wlan0
+    ns.save();                      // save those settings
+
+    // sync to write stuff to card
+    system("sync");
+}

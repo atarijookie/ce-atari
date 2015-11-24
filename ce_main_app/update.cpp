@@ -284,7 +284,7 @@ bool Update::createUpdateXilinxScript(void)
     return true;
 }
 
-bool Update::createFlashFirstFwScript(void)
+bool Update::createFlashFirstFwScript(bool withLinuxRestart)
 {
     FILE *f = fopen(UPDATE_SCRIPT, "wt");
 
@@ -293,7 +293,12 @@ bool Update::createFlashFirstFwScript(void)
         return false;
     }
 
-    fprintf(f, "/ce/ce_firstfw.sh nokill \n");                      // only thing needed is to run this first FW writing script
+    fprintf(f, "/ce/ce_firstfw.sh nokill \n");  // only thing needed is to run this first FW writing script
+    
+    if(withLinuxRestart) {                      // if should also restart linux, add reboot
+        fprintf(f, "reboot \n");
+    }
+    
     fclose(f);
     return true;
 }

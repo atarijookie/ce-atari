@@ -37,7 +37,7 @@ public:
     static void stateGoDownloadOK(void);
 
     static bool createUpdateScript(void);
-    static bool createFlashFirstFwScript(void);
+    static bool createFlashFirstFwScript(bool withLinuxRestart);
     static bool createUpdateXilinxScript(void);
     
     static bool checkForUpdateListOnUsb(std::string &updateFilePath);

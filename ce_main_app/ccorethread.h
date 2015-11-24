@@ -111,6 +111,11 @@ private:
     NetAdapter          netAdapter;
 
     //----------------------------------
+    // recovery stuff
+    void handleRecoveryCommands(int recoveryLevel);
+    void deleteSettingAndSetNetworkToDhcp(void);
+
+    //----------------------------------
     // other
     void readWebStartupMode(void);
 	bool inetIfaceReady(const char* ifrname);
@@ -119,6 +124,7 @@ private:
     
     void sharedObjects_create(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService);
     void sharedObjects_destroy(void);
+
 };
 
 #endif // CCORETHREAD_H
