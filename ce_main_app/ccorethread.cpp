@@ -920,8 +920,20 @@ void CCoreThread::handleSectorWritten(void)
 
 void CCoreThread::handleRecoveryCommands(int recoveryLevel)
 {
+    std::string ceConfFilename = CE_CONF_FDD_IMAGE_JUST_FILENAME;
+    std::string ceConfFullPath = CE_CONF_FDD_IMAGE_PATH_AND_FILENAME;
+    std::string dummy;
+    
     switch(recoveryLevel) {
         case 1: // just insert config floppy image into slot 1
+
+                // encode MSA config image to MFM stream - in slot #0
+                floppyImageSilo.add(0, ceConfFilename, ceConfFullPath, dummy, dummy, false);
+                
+                // set the current to slot #0
+                floppyImageSilo.setCurrentSlot(0);
+        
+                // TODO: when done, activate slot #0
         
                 break;
 

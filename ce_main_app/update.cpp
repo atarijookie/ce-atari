@@ -12,6 +12,7 @@
 #include "downloader.h"
 #include "update.h"
 #include "mounter.h"
+#include "dir2fdd/cdirectory.h"
 
 #include "newscripts_zip.h"
 
@@ -402,7 +403,14 @@ void Update::createNewScripts(void)
     }
     
     //------------
+    // create config drive floppy image
+    
+    printf("Creating config floppy image from config drive.\n");
+    CDirectory::dir2fdd((char *) "/ce/app/configdrive", (char *) CE_CONF_FDD_IMAGE_PATH_AND_FILENAME);
+    
+    //------------
     // ok, it seems that we should update the scripts, so update them
+    printf("Will try to update scripts\n");
     Debug::out(LOG_DEBUG, "Update::createNewScripts() - will try to update scripts");
     
     // write the data to file

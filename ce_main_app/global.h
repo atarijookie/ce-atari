@@ -140,5 +140,8 @@ typedef struct {
 
 //////////////////////////////////////////////////////
 
+#define CE_CONF_FDD_IMAGE_PATH_AND_FILENAME "/ce/app/ce_conf.msa"
+#define CE_CONF_FDD_IMAGE_JUST_FILENAME     "ce_conf.msa"
+
 #endif // GLOBAL_H
 

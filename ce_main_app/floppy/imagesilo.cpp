@@ -170,7 +170,7 @@ void ImageSilo::loadSettings(void)
         //-----------------------------
         // if we're in the testing mode
         if(flags.test) {
-            pathAndFile = "/ce/app/ce_conf.st";
+            pathAndFile = CE_CONF_FDD_IMAGE_PATH_AND_FILENAME;
         }
         //-----------------------------
         
