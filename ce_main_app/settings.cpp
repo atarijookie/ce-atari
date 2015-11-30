@@ -32,11 +32,13 @@ Settings::Settings(void)
 
 void Settings::storeDefaultValues(void)
 {
+    Debug::out(LOG_DEBUG, "Settings::storeDefaultValues() - storing default settings, because it seems we miss those setting...");
+    
     char key[32];
     for(int id=0; id<8; id++) {							// read the list of device types from settings
         sprintf(key, "ACSI_DEVTYPE_%d", id);			// create settings KEY, e.g. ACSI_DEVTYPE_0
 		
-		if(id == 0) {									// ACSI id 0 enaled by defaul
+		if(id == 1) {									// ACSI id 0 enaled by defaul
 			setInt(key, DEVTYPE_TRANSLATED);
 		} else {										// other ACSI id's disabled
 			setInt(key, DEVTYPE_OFF);
@@ -229,7 +231,7 @@ void Settings::setChar(char *key, char value)
     fclose(file);
 }
 //-------------------------
-void Settings::loadAcsiIDs(AcsiIDinfo *aii)
+void Settings::loadAcsiIDs(AcsiIDinfo *aii, bool useDefaultsIfNoSettings)
 {
     aii->enabledIDbits = 0;									// no bits / IDs enabled yet
 
@@ -282,19 +284,10 @@ void Settings::loadAcsiIDs(AcsiIDinfo *aii)
 
 	// no ACSI ID was enabled? enable ACSI ID 0
 	if(!aii->gotDevTypeRaw && !aii->gotDevTypeTranslated && !aii->gotDevTypeSd) {
-        if(hwConfig.hddIface == HDD_IF_ACSI) {      // for ACSI
-            Debug::out(LOG_DEBUG, "Settings::loadAcsiIDs -- no ACSI ID was enabled, so enabling ACSI ID 0");
-			
-            aii->acsiIDdevType[0]   = DEVTYPE_TRANSLATED;
-            aii->enabledIDbits      = 1;
-        } else {                                    // for SCSI - enable ID 1
-            Debug::out(LOG_DEBUG, "Settings::loadAcsiIDs -- no SCSI ID was enabled, so enabling SCSI ID 1");
-			
-            aii->acsiIDdevType[1]   = DEVTYPE_TRANSLATED;
-            aii->enabledIDbits      = 2;
-        }
-		
-		aii->gotDevTypeTranslated = true;
+        if(useDefaultsIfNoSettings) {                   // if should use defaults if no settings found, store those defaults and call this function again
+            storeDefaultValues();
+            loadAcsiIDs(aii, false);                    // ...but call this function without storing defaults next time - to avoid endless loop in some weird case
+        }     
 	}
 }
 //-------------------------

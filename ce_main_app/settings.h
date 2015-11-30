@@ -42,7 +42,7 @@ public:
     char getChar(char *key, char defValue);
     void setChar(char *key, char value);
 
-	void loadAcsiIDs(AcsiIDinfo *aii);
+	void loadAcsiIDs(AcsiIDinfo *aii, bool useDefaultsIfNoSettings=true);
 
     void loadFloppyConfig(FloppyConfig *fc);
     void saveFloppyConfig(FloppyConfig *fc);

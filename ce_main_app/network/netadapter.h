@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <string>
+#include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
