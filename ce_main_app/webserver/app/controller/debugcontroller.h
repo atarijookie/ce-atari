@@ -14,7 +14,9 @@ public:
     bool indexAction(mg_connection *conn, mg_request_info *req_info);
 
     bool getlogAction(mg_connection *conn, mg_request_info *req_info);
-    bool action_get_ceconf(mg_connection *conn, mg_request_info *req_info);
+    bool action_get_ceconf_prg(mg_connection *conn, mg_request_info *req_info);
+    bool action_get_ceconf_msa(mg_connection *conn, mg_request_info *req_info);
+    bool action_get_ceconf_tar(mg_connection *conn, mg_request_info *req_info);
     bool action_get_cedd(mg_connection *conn, mg_request_info *req_info);
     
     bool getFile(mg_connection *conn, std::string &sDownloadedFileName, std::string &sContentType, std::string &sCeFilePath, bool sendFileSize);

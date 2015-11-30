@@ -405,8 +405,15 @@ void Update::createNewScripts(void)
     //------------
     // create config drive floppy image
     
+    Debug::out(LOG_INFO, "Update::createNewScripts() - creating config floppy image from config drive");
     printf("Creating config floppy image from config drive.\n");
     CDirectory::dir2fdd((char *) "/ce/app/configdrive", (char *) CE_CONF_FDD_IMAGE_PATH_AND_FILENAME);
+    
+    //------------
+    Debug::out(LOG_INFO, "Update::createNewScripts() - creating config floppy tar archive");
+    printf("Creating config floppy tar archive.\n");
+    system("rm -f /ce/app/ce_conf.tar");
+    system("tar cf /ce/app/ce_conf.tar /ce/app/configdrive/");
     
     //------------
     // ok, it seems that we should update the scripts, so update them

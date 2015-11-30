@@ -70,11 +70,29 @@ bool DebugController::getlogAction(mg_connection *conn, mg_request_info *req_inf
     return getFile(conn, sDownloadedFileName, sFileType, sCeFilePath, false);
 }
 
-bool DebugController::action_get_ceconf(mg_connection *conn, mg_request_info *req_info)
+bool DebugController::action_get_ceconf_prg(mg_connection *conn, mg_request_info *req_info)
 {
     std::string sDownloadedFileName = "ce_conf.prg";
     std::string sFileType           = "application/octet-stream";
     std::string sCeFilePath         = "/ce/app/configdrive/ce_conf.prg";
+    
+    return getFile(conn, sDownloadedFileName, sFileType, sCeFilePath, true);
+}
+
+bool DebugController::action_get_ceconf_msa(mg_connection *conn, mg_request_info *req_info)
+{
+    std::string sDownloadedFileName = "ce_conf.msa";
+    std::string sFileType           = "application/octet-stream";
+    std::string sCeFilePath         = "/ce/app/ce_conf.msa";
+    
+    return getFile(conn, sDownloadedFileName, sFileType, sCeFilePath, true);
+}
+
+bool DebugController::action_get_ceconf_tar(mg_connection *conn, mg_request_info *req_info)
+{
+    std::string sDownloadedFileName = "ce_conf.tar";
+    std::string sFileType           = "application/octet-stream";
+    std::string sCeFilePath         = "/ce/app/ce_conf.tar";
     
     return getFile(conn, sDownloadedFileName, sFileType, sCeFilePath, true);
 }
