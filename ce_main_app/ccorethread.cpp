@@ -286,7 +286,7 @@ void CCoreThread::run(void)
 			switch(inBuff[3]) {
 			case ATN_FW_VERSION:
                 lastFwInfoTime.hans = Utils::getCurrentMs();
-    			handleFwVersion(SPI_CS_HANS);
+    			handleFwVersion_hans();
 				break;
 
 			case ATN_ACSI_COMMAND:
@@ -326,7 +326,7 @@ void CCoreThread::run(void)
 			switch(inBuff[3]) {
 			case ATN_FW_VERSION:                    // device has sent FW version
                 lastFwInfoTime.franz = Utils::getCurrentMs();
-				handleFwVersion(SPI_CS_FRANZ);
+				handleFwVersion_franz();
 				break;
 
             case ATN_SECTOR_WRITTEN:                // device has sent written sector data
@@ -547,7 +547,7 @@ void CCoreThread::loadSettings(void)
 
 #define MAKEWORD(A, B)  ( (((WORD)A)<<8) | ((WORD)B) )
 
-void CCoreThread::handleFwVersion(int whichSpiCs)
+void CCoreThread::handleFwVersion_hans(void)
 {
     BYTE fwVer[14], oBuf[14];
 	int cmdLength;
@@ -557,119 +557,130 @@ void CCoreThread::handleFwVersion(int whichSpiCs)
 
     // WORD sent (bytes shown): 01 23 45 67
 
-    if(whichSpiCs == SPI_CS_HANS) {                                 // it's Hans?
-		cmdLength = 12;
-        responseStart(cmdLength);                                   // init the response struct
+    cmdLength = 12;
+    responseStart(cmdLength);                                       // init the response struct
 
-        //--------------
-        // always send the ACSI + SD config
-        BYTE enabledIDbits, sdCardAcsiId;
-        getIdBits(enabledIDbits, sdCardAcsiId);             // get the enabled IDs 
-        
-        responseAddWord(oBuf, CMD_ACSI_CONFIG);             // CMD: send acsi config
-        responseAddWord(oBuf, MAKEWORD(enabledIDbits, sdCardAcsiId)); // store ACSI enabled IDs and which ACSI ID is used for SD card
-        //--------------
+    //--------------
+    // always send the ACSI + SD config
+    BYTE enabledIDbits, sdCardAcsiId;
+    getIdBits(enabledIDbits, sdCardAcsiId);                         // get the enabled IDs 
+    
+    responseAddWord(oBuf, CMD_ACSI_CONFIG);                         // CMD: send acsi config
+    responseAddWord(oBuf, MAKEWORD(enabledIDbits, sdCardAcsiId));   // store ACSI enabled IDs and which ACSI ID is used for SD card
+    //--------------
 
-        static bool hansHandledOnce = false;
+    static bool hansHandledOnce = false;
 
-        if(hansHandledOnce) {                                       // don't send commands until we did receive status at least a couple of times
-            if(setEnabledFloppyImgs) {
-                responseAddWord(oBuf, CMD_FLOPPY_CONFIG);                               // CMD: send which floppy images are enabled (bytes 4 & 5)
-                responseAddWord(oBuf, MAKEWORD(floppyImageSilo.getSlotBitmap(), 0));    // store which floppy images are enabled
-                setEnabledFloppyImgs = false;                                           // and don't sent this anymore (until needed)
-            }
-
-            if(setNewFloppyImageLed) {
-                responseAddWord(oBuf, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
-                responseAddWord(oBuf, MAKEWORD(newFloppyImageLed, 0));  // store which floppy images LED should be on
-                setNewFloppyImageLed = false;                           // and don't sent this anymore (until needed)
-            }
+    if(hansHandledOnce) {                                           // don't send commands until we did receive status at least a couple of times
+        if(setEnabledFloppyImgs) {
+            responseAddWord(oBuf, CMD_FLOPPY_CONFIG);                               // CMD: send which floppy images are enabled (bytes 4 & 5)
+            responseAddWord(oBuf, MAKEWORD(floppyImageSilo.getSlotBitmap(), 0));    // store which floppy images are enabled
+            setEnabledFloppyImgs = false;                                           // and don't sent this anymore (until needed)
         }
 
-        hansHandledOnce = true;
-    } else {                                    		            // it's Franz?
-		cmdLength = 8;
-        responseStart(cmdLength);                                   // init the response struct
-
-        static bool franzHandledOnce = false;
-
-        if(franzHandledOnce) {                                      // don't send the commands until we did receive at least one firmware message
-            if(setFloppyConfig) {                                   // should set floppy config?
-                responseAddByte(oBuf, ( floppyConfig.enabled        ? CMD_DRIVE_ENABLED     : CMD_DRIVE_DISABLED) );
-                responseAddByte(oBuf, ((floppyConfig.id == 0)       ? CMD_SET_DRIVE_ID_0    : CMD_SET_DRIVE_ID_1) );
-                responseAddByte(oBuf, ( floppyConfig.writeProtected ? CMD_WRITE_PROTECT_ON  : CMD_WRITE_PROTECT_OFF) );
-                setFloppyConfig = false;
-            }
-
-            if(setDiskChanged) {
-                responseAddByte(oBuf, ( diskChanged                 ? CMD_DISK_CHANGE_ON    : CMD_DISK_CHANGE_OFF) );
-
-                if(diskChanged) {                                   // if the disk changed, change it to not-changed and let it send a command again in a second
-                    diskChanged = false;
-                } else {                                            // if we're in the not-changed state, don't send it again
-                    setDiskChanged = false;
-                }
-            }
+        if(setNewFloppyImageLed) {
+            responseAddWord(oBuf, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
+            responseAddWord(oBuf, MAKEWORD(newFloppyImageLed, 0));  // store which floppy images LED should be on
+            setNewFloppyImageLed = false;                           // and don't sent this anymore (until needed)
         }
-
-        franzHandledOnce = true;
     }
 
-    conSpi->txRx(whichSpiCs, cmdLength, oBuf, fwVer);
+    hansHandledOnce = true;
+
+    conSpi->txRx(SPI_CS_HANS, cmdLength, oBuf, fwVer);
 
     int year = bcdToInt(fwVer[1]) + 2000;
-    if(fwVer[0] == 0xf0) {
-        Update::versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
-        flags.gotFranzFwVersion = true;
 
-        Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
-    } else {
-        Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));               // store found FW version of Hans
-        flags.gotHansFwVersion = true;
+    Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));       // store found FW version of Hans
+    flags.gotHansFwVersion = true;
 
-        int  currentLed = fwVer[4];
-        BYTE xilinxInfo = fwVer[5];
+    int  currentLed = fwVer[4];
+    BYTE xilinxInfo = fwVer[5];
 
-        convertXilinxInfo(xilinxInfo);
-        
-        Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d, XI: 0x%02x", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed, xilinxInfo);
+    convertXilinxInfo(xilinxInfo);
+    
+    Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d, XI: 0x%02x", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed, xilinxInfo);
 
-        if(floppyImageSilo.currentSlotHasNewContent()) {    // the content of current slot changed? 
-            Debug::out(LOG_DEBUG, "Content of current floppy image slot changed, forcing disk change", currentLed);
+    if(floppyImageSilo.currentSlotHasNewContent()) {    // the content of current slot changed? 
+        Debug::out(LOG_DEBUG, "Content of current floppy image slot changed, forcing disk change", currentLed);
 
-            diskChanged     = true;                         // tell Franz that floppy changed
-            setDiskChanged  = true;
+        diskChanged     = true;                         // tell Franz that floppy changed
+        setDiskChanged  = true;
+    }
+    
+    if(lastFloppyImageLed != currentLed) {              // did the floppy image LED change since last time?
+        lastFloppyImageLed = currentLed;
+
+        Debug::out(LOG_DEBUG, "Floppy image changed to %d, forcing disk change", currentLed);
+
+        floppyImageSilo.setCurrentSlot(currentLed);     // switch the floppy image
+
+        diskChanged     = true;                         // also tell Franz that floppy changed
+        setDiskChanged  = true;
+    }
+
+    // if should get the HW info and should quit
+    if(flags.getHwInfo) {
+        showHwVersion();                                // show what HW version we have found
+
+        Debug::out(LOG_INFO, ">>> Terminating app, because it was used as HW INFO tool <<<\n");
+        sigintReceived = 1;
+        return;
+    }
+
+    // if Xilinx HW vs FW mismatching, flash Xilinx again to fix the situation
+    if(hwConfig.fwMismatch) {
+        Update::createUpdateXilinxScript();
+    
+        Debug::out(LOG_ERROR, ">>> Terminating app, because there's Xilinx HW vs FW mismatch! <<<\n");
+        sigintReceived = 1;
+        return;
+    }
+}
+
+void CCoreThread::handleFwVersion_franz(void)
+{
+    BYTE fwVer[14], oBuf[14];
+	int cmdLength;
+
+    memset(oBuf,    0, 14);                                         // first clear the output buffer
+    memset(fwVer,   0, 14);
+
+    // WORD sent (bytes shown): 01 23 45 67
+
+    cmdLength = 8;
+    responseStart(cmdLength);                                   // init the response struct
+
+    static bool franzHandledOnce = false;
+
+    if(franzHandledOnce) {                                      // don't send the commands until we did receive at least one firmware message
+        if(setFloppyConfig) {                                   // should set floppy config?
+            responseAddByte(oBuf, ( floppyConfig.enabled        ? CMD_DRIVE_ENABLED     : CMD_DRIVE_DISABLED) );
+            responseAddByte(oBuf, ((floppyConfig.id == 0)       ? CMD_SET_DRIVE_ID_0    : CMD_SET_DRIVE_ID_1) );
+            responseAddByte(oBuf, ( floppyConfig.writeProtected ? CMD_WRITE_PROTECT_ON  : CMD_WRITE_PROTECT_OFF) );
+            setFloppyConfig = false;
         }
-        
-        if(lastFloppyImageLed != currentLed) {              // did the floppy image LED change since last time?
-            lastFloppyImageLed = currentLed;
 
-            Debug::out(LOG_DEBUG, "Floppy image changed to %d, forcing disk change", currentLed);
+        if(setDiskChanged) {
+            responseAddByte(oBuf, ( diskChanged                 ? CMD_DISK_CHANGE_ON    : CMD_DISK_CHANGE_OFF) );
 
-            floppyImageSilo.setCurrentSlot(currentLed);     // switch the floppy image
-
-            diskChanged     = true;                         // also tell Franz that floppy changed
-            setDiskChanged  = true;
-        }
-
-        // if should get the HW info and should quit
-        if(flags.getHwInfo) {
-            showHwVersion();                                // show what HW version we have found
-
-            Debug::out(LOG_INFO, ">>> Terminating app, because it was used as HW INFO tool <<<\n");
-            sigintReceived = 1;
-            return;
-        }
-
-        // if Xilinx HW vs FW mismatching, flash Xilinx again to fix the situation
-        if(hwConfig.fwMismatch) {
-            Update::createUpdateXilinxScript();
-        
-            Debug::out(LOG_ERROR, ">>> Terminating app, because there's Xilinx HW vs FW mismatch! <<<\n");
-            sigintReceived = 1;
-            return;
+            if(diskChanged) {                                   // if the disk changed, change it to not-changed and let it send a command again in a second
+                diskChanged = false;
+            } else {                                            // if we're in the not-changed state, don't send it again
+                setDiskChanged = false;
+            }
         }
     }
+
+    franzHandledOnce = true;
+
+    conSpi->txRx(SPI_CS_FRANZ, cmdLength, oBuf, fwVer);
+
+    int year = bcdToInt(fwVer[1]) + 2000;
+    Update::versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
+    flags.gotFranzFwVersion = true;
+
+    Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
 }
 
 void CCoreThread::getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId)
