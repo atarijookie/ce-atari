@@ -110,10 +110,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa015, 0x1106};                             // this means: hAns, 2015-03-25
+WORD version[2] = {0xa015, 0x1204};                             // this means: hAns, 2015-12-04
 
 char *VERSION_STRING_SHORT  = {"2.00"};
-char *DATE_STRING           = {"11/06/15"};
+char *DATE_STRING           = {"12/04/15"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
@@ -171,7 +171,10 @@ void resetXilinx(void);
 BYTE isBusIdle(void);
 void handleAcsiCommand(void);
 
+void serveButtonForRecoveryCmd(void);
+
 BYTE xilinxHwFw;
+BYTE hwVersion;
 BYTE isAcsiNotScsi;
 BYTE xilinxBusIdle;
 
@@ -190,10 +193,33 @@ BYTE lastErr;
 DWORD toStart;
 DWORD lastStart, lastEnd;
 
+//--------------------------
+#define LEDMODE_GOING_SOLO          1
+#define LEDMODE_SHOWING_FDD_IMG     2
+#define LEDMODE_STARTING_RECOVERY   3
+
+struct {
+    WORD goingSolo;
+    WORD showingSelectedFddImage;
+    WORD startingRecoveryCommand;
+    
+    BYTE currentMode;
+    
+    WORD nev;
+    WORD prev;
+} LEDs;
+
+void updateLEDs(void);
+//--------------------------
+
+BYTE btnDownTime;
+BYTE recoveryLevel_current;
+BYTE recoveryLevel_toHost;
+
+//--------------------------
+
 int main(void)
 {
-    BYTE hwVersion;
-    
     LOG_ERROR(0);           // no error
     
     initAllStuff();         // now init everything
@@ -201,7 +227,6 @@ int main(void)
     getXilinxStatus();
     resetXilinx();
     
-    hwVersion = xilinxHwFw >> 4;            // get only HW version -- should be 2 for v.2, or 1 for v.1
     if(hwVersion != 2) {                    // for v.1 -- turn off MCO output
         GPIOA->CRH &= ~(0x0000000f);        // remove bits from GPIOA
         GPIOA->CRH |=   0x00000004;         // turn off MCO output on PA8 - leave it as floating input
@@ -213,6 +238,10 @@ int main(void)
     //-------------
     // main loop
     while(1) {
+        //---------------------------
+        // set LEDs as needed
+        
+        updateLEDs();
         //---------------------------
         // START: SD card insertion / removal handling
         // if card insert state changed, mark down this event
@@ -251,18 +280,17 @@ int main(void)
             
             if(mode == MODE_UNKNOWN) {              // if we're in an uknown mode, move step further to SOLO mode, but not yet
                 timeOutCount++;                     // increase count of how many times we must have timed out to keep working
-                
-                GPIOA->BSRR = LED1 | LED2 | LED3;   // clear LEDs
+    
                 switch(timeOutCount) {
-                    case 1: GPIOA->BRR = LED1; break;
-                    case 2: GPIOA->BRR = LED2; break;
-                    case 3: GPIOA->BRR = LED3; break;
+                    case 1: LEDs.goingSolo = LED1; break;
+                    case 2: LEDs.goingSolo = LED2; break;
+                    case 3: LEDs.goingSolo = LED3; break;
                 }
             }
         }
         
         if(mode == MODE_UNKNOWN && timeOutCount >= 3) {                 // if we had to use timeout 3 times consequently to make this work, then we're probably in SOLO mode
-            GPIOA->BRR      = LED1 | LED2 | LED3;
+            LEDs.goingSolo  = LED1 | LED2 | LED3;
             mode            = MODE_SOLO;
             state           = STATE_GET_COMMAND;
             sendFwVersion   = FALSE;
@@ -286,11 +314,20 @@ int main(void)
 
         // in command waiting state, nothing to do and should send FW version?
         if(spiDmaIsIdle && sendFwVersion) {
+            serveButtonForRecoveryCmd();                                                    // handle long btn press for issuing recovery cmd
+
             sendFwVersion = FALSE;
             
             timeoutStart();                                                                 // start timeout counter so we won't get stuck somewhere
-            atnSendFwVersion[6] = (((WORD)currentLed) << 8) | xilinxHwFw;                   // store the current LED status in the last WORD, and also XILINX info byte value
-        
+            atnSendFwVersion[6] = (((WORD) currentLed) << 8) | xilinxHwFw;                  // store the current LED status in the last WORD, and also XILINX info byte value
+            
+            if(recoveryLevel_toHost != 0) {     // got some recovery code?
+                atnSendFwVersion[7] = (((WORD) recoveryLevel_toHost + 'Q') << 8);           // recovery code will be R, S or T
+                recoveryLevel_toHost = 0;
+            } else {
+                atnSendFwVersion[7] = 0;
+            }
+            
             spiDma_txRx(    ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0],     
                             ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
             
@@ -310,6 +347,65 @@ int main(void)
             sendFwVersion = TRUE;
         }
     }
+}
+
+void updateLEDs(void)
+{
+    if(mode == MODE_WITH_RPI) {                         // when in RPI mode
+        if(btnDownTime >= 2) {                          // when BTN is down, starting recovery
+            LEDs.currentMode    = LEDMODE_STARTING_RECOVERY;
+            LEDs.nev            = LEDs.startingRecoveryCommand;
+        } else {                                        // when BTN not down, just showing FDD IMG
+            LEDs.currentMode    = LEDMODE_SHOWING_FDD_IMG;
+            LEDs.nev            = LEDs.showingSelectedFddImage;
+        }        
+    } else {                                            // when going solo
+        LEDs.currentMode        = LEDMODE_GOING_SOLO;
+        LEDs.nev                = LEDs.goingSolo;
+    }
+
+    if(LEDs.prev != LEDs.nev) {             // LEDs changed?
+        LEDs.prev = LEDs.nev;
+        
+        GPIOA->BSRR = LED1 | LED2 | LED3;   // clear LEDs
+        GPIOA->BRR  = LEDs.nev;             // set new LEDs
+    }
+}
+
+void serveButtonForRecoveryCmd(void)
+{
+    WORD val;
+    val = GPIOB->IDR;
+
+    if(val & BUTTON) {          // button not pressed?
+        if(btnDownTime >= 5) {  // the button was pressed long enough?
+            if(btnDownTime >= 15) {
+                recoveryLevel_current = 3;
+            } else if(btnDownTime >= 10) {
+                recoveryLevel_current = 2;
+            } else if(btnDownTime >= 5) {
+                recoveryLevel_current = 1;
+            }
+            
+            LEDs.startingRecoveryCommand = 0;                   // turn off LEDs
+            
+            recoveryLevel_toHost    = recoveryLevel_current;    // send this recovery level to host
+            recoveryLevel_current   = 0;                        // set the current recovery level back to 0
+        }
+        
+        btnDownTime = 0;
+    } else {            // button is pressed
+        btnDownTime++;
+        btnDownTime = btnDownTime & 0x0f;    
+
+        if(btnDownTime >= 15) {
+            LEDs.startingRecoveryCommand = LED1 | LED2 | LED3;
+        } else if(btnDownTime >= 10) {
+            LEDs.startingRecoveryCommand = LED1 | LED2;
+        } else if(btnDownTime >= 5) {
+            LEDs.startingRecoveryCommand = LED1;
+        }
+    }                
 }
 
 void handleAcsiCommand(void)
@@ -379,7 +475,7 @@ void handleAcsiCommand(void)
         resetXilinx();
     }
     
-    if(!isAcsiNotScsi) {        // on SCSI device
+    if(hwVersion == 2) {        // on HW v.2 device
         if(!isBusIdle()) {      // if the bus is not idle, do the reset
             resetXilinx();
         }
@@ -502,12 +598,11 @@ void fixLedsByEnabledImgs(void)
 
 void showCurrentLED(void)
 {
-    GPIOA->BSRR = LED1 | LED2 | LED3;                       // all LED pins high (LEDs OFF)
-    
     switch(currentLed) {                                    // turn on the correct LED
-            case 0: GPIOA->BRR = LED1; break;
-            case 1: GPIOA->BRR = LED2; break;
-            case 2: GPIOA->BRR = LED3; break;
+        case 0:     LEDs.showingSelectedFddImage = LED1;    break;
+        case 1:     LEDs.showingSelectedFddImage = LED2;    break;
+        case 2:     LEDs.showingSelectedFddImage = LED3;    break;
+        default:    LEDs.showingSelectedFddImage = 0;       break;
     }
 }
 
@@ -1525,11 +1620,17 @@ void getXilinxStatus(void)
     GPIOA->BRR	= aPIO | aDMA;          // aPIO and aDMA now LOW -- back to normal state
 
     xilinxHwFw      = val & 0x7f;       // store part as Info Byte
-
-    if(xilinxHwFw == 0x22) {            // if it's HW v. 2, and configured as SCSI, then it's SCSI
-        isAcsiNotScsi   = 0;
+    hwVersion       = xilinxHwFw >> 4;  // get only HW version -- should be 2 for v.2, or 1 for v.1
+    
+    if(hwVersion == 2) {                // if it's HW v. 2
+        if((xilinxHwFw & 0x03) == 2) {  // FW type: SCSI? 
+            isAcsiNotScsi   = 0;
+        } else {                        // FW type: ACSI
+            isAcsiNotScsi   = 1;
+        }
+        
         xilinxBusIdle   = val >> 7;     // highest bit to position of bit 0 - when 0 then SCSI is busy, when 1 then SCSI is idle
-    } else {                            // other cases - it's ACSI
+    } else {                            // if it's HW v. 1 - it's ACSI
         isAcsiNotScsi   = 1;
         xilinxBusIdle   = 1;            // if it's ACSI, it's always idle (this state is not returned yet from Xilinx)
     }
@@ -1539,7 +1640,7 @@ void resetXilinx(void)
 {
     BYTE tmp;
     
-    if(isAcsiNotScsi) {                 // is ACSI? Don't do anything.
+    if(hwVersion != 2) {                // not HW v. 2? Do nothing.
         return;
     }
     
