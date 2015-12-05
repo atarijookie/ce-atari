@@ -102,7 +102,8 @@ private:
 
     bool                setNewFloppyImageLed;
     int                 newFloppyImageLed;
-
+    int                 newFloppyImageLedAfterEncode;
+    
     void handleSendTrack(void);
     void handleSectorWritten(void);
 

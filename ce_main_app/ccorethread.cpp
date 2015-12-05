@@ -35,6 +35,7 @@ extern TFlags       flags;
 extern DebugVars    dbgVars;
 
 SharedObjects shared;
+extern volatile bool floppyEncodingRunning;
 
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
@@ -51,7 +52,8 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     diskChanged             = false;
 
     lastFloppyImageLed      = -1;
-
+    newFloppyImageLedAfterEncode = -2;
+    
 	conSpi		= new CConSpi();
     retryMod    = new RetryModule();
 
@@ -217,7 +219,10 @@ void CCoreThread::run(void)
     lastFwInfoTime.franzResetTime   = Utils::getCurrentMs();
 
 	bool res;
-
+    
+    DWORD nextFloppyEncodingCheck   = Utils::getEndTime(1000);
+    bool prevFloppyEncodingRunning  = false;
+    
     while(sigintReceived == 0) {
 		bool gotAtn = false;						                    // no ATN received yet?
         
@@ -276,6 +281,22 @@ void CCoreThread::run(void)
             }
         }
 
+        if(now >= nextFloppyEncodingCheck) {
+            nextFloppyEncodingCheck = Utils::getEndTime(1000);
+            
+            if(prevFloppyEncodingRunning == true && floppyEncodingRunning == false) {   // if floppy encoding was running, but not it's not running
+                if(newFloppyImageLedAfterEncode != -2) {                                // if we should set the new newFloppyImageLed after encoding is done
+                    setEnabledFloppyImgs    = true;
+                    setNewFloppyImageLed    = true;
+                    newFloppyImageLed       = newFloppyImageLedAfterEncode;
+                
+                    newFloppyImageLedAfterEncode = -2;
+                } 
+            } 
+            
+            prevFloppyEncodingRunning = floppyEncodingRunning;
+        }
+        
 #if !defined(ONPC_HIGHLEVEL)
         // check for any ATN code waiting from Hans
 		res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);
@@ -561,26 +582,21 @@ void CCoreThread::handleFwVersion_hans(void)
     responseStart(cmdLength);                                       // init the response struct
 
     //--------------
-    // always send the ACSI + SD config
+    // always send the ACSI + SD config + FDD enabled images
     BYTE enabledIDbits, sdCardAcsiId;
-    getIdBits(enabledIDbits, sdCardAcsiId);                         // get the enabled IDs 
+    getIdBits(enabledIDbits, sdCardAcsiId);                                 // get the enabled IDs 
     
-    responseAddWord(oBuf, CMD_ACSI_CONFIG);                         // CMD: send acsi config
-    responseAddWord(oBuf, MAKEWORD(enabledIDbits, sdCardAcsiId));   // store ACSI enabled IDs and which ACSI ID is used for SD card
+    responseAddWord(oBuf, CMD_ACSI_CONFIG);                                 // CMD: send acsi config
+    responseAddWord(oBuf, MAKEWORD(enabledIDbits, sdCardAcsiId));           // store ACSI enabled IDs and which ACSI ID is used for SD card
+    responseAddWord(oBuf, MAKEWORD(floppyImageSilo.getSlotBitmap(), 0));    // store which floppy images are enabled
     //--------------
 
     static bool hansHandledOnce = false;
 
     if(hansHandledOnce) {                                           // don't send commands until we did receive status at least a couple of times
-        if(setEnabledFloppyImgs) {
-            responseAddWord(oBuf, CMD_FLOPPY_CONFIG);                               // CMD: send which floppy images are enabled (bytes 4 & 5)
-            responseAddWord(oBuf, MAKEWORD(floppyImageSilo.getSlotBitmap(), 0));    // store which floppy images are enabled
-            setEnabledFloppyImgs = false;                                           // and don't sent this anymore (until needed)
-        }
-
         if(setNewFloppyImageLed) {
             responseAddWord(oBuf, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
-            responseAddWord(oBuf, MAKEWORD(newFloppyImageLed, 0));  // store which floppy images LED should be on
+            responseAddWord(oBuf, MAKEWORD(floppyImageSilo.getSlotBitmap(), newFloppyImageLed));  // store which floppy images LED should be on
             setNewFloppyImageLed = false;                           // and don't sent this anymore (until needed)
         }
     }
@@ -597,6 +613,13 @@ void CCoreThread::handleFwVersion_hans(void)
     int  currentLed = fwVer[4];
     BYTE xilinxInfo = fwVer[5];
 
+    char recoveryLevel = fwVer[6];
+    if(recoveryLevel != 0) {                                                        // if the recovery level is not empty
+        if(recoveryLevel == 'R' || recoveryLevel == 'S' || recoveryLevel == 'T') {  // and it's a valid recovery level 
+            handleRecoveryCommands(recoveryLevel - 'Q');                            // handle recovery action
+        }
+    }
+    
     convertXilinxInfo(xilinxInfo);
     
     Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d, XI: 0x%02x", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed, xilinxInfo);
@@ -944,8 +967,8 @@ void CCoreThread::handleRecoveryCommands(int recoveryLevel)
                 // set the current to slot #0
                 floppyImageSilo.setCurrentSlot(0);
         
-                // TODO: when done, activate slot #0
-        
+                // when encoding stops, set this FDD image LED
+                newFloppyImageLedAfterEncode = 0;
                 break;
 
         //----------------------------------------------------
