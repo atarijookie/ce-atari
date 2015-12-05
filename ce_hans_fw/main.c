@@ -113,10 +113,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa015, 0x1204};                             // this means: hAns, 2015-12-04
+WORD version[2] = {0xa015, 0x1205};                             // this means: hAns, 2015-12-05
 
 char *VERSION_STRING_SHORT  = {"2.00"};
-char *DATE_STRING           = {"12/04/15"};
+char *DATE_STRING           = {"12/05/15"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
@@ -218,6 +218,11 @@ void updateLEDs(void);
 BYTE btnDownTime;
 BYTE recoveryLevel_current;
 BYTE recoveryLevel_toHost;
+
+struct {
+    WORD acsi;
+    WORD fdd;
+} configWords;
 
 //--------------------------
 
@@ -324,12 +329,9 @@ int main(void)
             timeoutStart();                                                                 // start timeout counter so we won't get stuck somewhere
             atnSendFwVersion[6] = (((WORD) currentLed) << 8) | xilinxHwFw;                  // store the current LED status in the last WORD, and also XILINX info byte value
             
-            if(recoveryLevel_toHost != 0) {     // got some recovery code?
-                atnSendFwVersion[7] = (((WORD) recoveryLevel_toHost + 'Q') << 8);           // recovery code will be R, S or T
-                recoveryLevel_toHost = 0;
-            } else {
-                atnSendFwVersion[7] = 0;
-            }
+            atnSendFwVersion[7] = (configWords.acsi        );
+            atnSendFwVersion[8] = (configWords.fdd & 0xff00) | ((WORD) recoveryLevel_toHost);   // recovery code will be R, S or T
+            recoveryLevel_toHost = 0;
             
             spiDma_txRx(    ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0],     
                             ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
@@ -390,10 +392,10 @@ void serveButtonForRecoveryCmd(void)
                 recoveryLevel_current = 1;
             }
             
-            LEDs.startingRecoveryCommand = 0;                   // turn off LEDs
+            LEDs.startingRecoveryCommand = 0;                       // turn off LEDs
             
-            recoveryLevel_toHost    = recoveryLevel_current;    // send this recovery level to host
-            recoveryLevel_current   = 0;                        // set the current recovery level back to 0
+            recoveryLevel_toHost    = recoveryLevel_current + 'Q';  // send this recovery level to host (R, S or T for level 1, 2 or 3)
+            recoveryLevel_current   = 0;                            // set the current recovery level back to 0
         }
         
         btnDownTime = 0;
@@ -1287,6 +1289,9 @@ void processHostCommands(void)
                 handleAcsiConfig((BYTE) (cmdBuffer[i+1] >> 8), (BYTE) cmdBuffer[i+1]);
                 handleFddConfig ((BYTE) (cmdBuffer[i+2] >> 8));
         
+                configWords.acsi    = cmdBuffer[i+1];                   // store config words
+                configWords.fdd     = cmdBuffer[i+2] & 0xff00;
+            
                 cmdBuffer[i]    = 0;                                    // clear this command
                 cmdBuffer[i+1]  = 0;
                 cmdBuffer[i+2]  = 0;
@@ -1298,6 +1303,8 @@ void processHostCommands(void)
             case CMD_FLOPPY_SWITCH:
                 handleFddConfig((BYTE) (cmdBuffer[i+1] >> 8));      // upper byte - enabled images
                 handleFddSwitch((BYTE) (cmdBuffer[i+1]     ));      // lower byte - selected image
+
+                configWords.fdd = cmdBuffer[i+1] & 0xff00;          // store this config word
             
                 cmdBuffer[i]    = 0;                                // clear this command
                 cmdBuffer[i+1]  = 0;
