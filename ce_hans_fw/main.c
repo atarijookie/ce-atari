@@ -17,6 +17,9 @@ void init_hw_sw(void);
 void onButtonPress(void);
 
 void processHostCommands(void);
+void handleAcsiConfig(BYTE acsiIds, BYTE sdId);
+void handleFddConfig(BYTE enabledFddImages);
+void handleFddSwitch(BYTE toWhichImage);
 
 void spi_init1(void);
 void spi_init2(void);
@@ -1275,73 +1278,26 @@ WORD spi_TxRx(WORD out)
 
 void processHostCommands(void)
 {
-    BYTE i, j, newLed;
-    WORD ids;
+    BYTE i, j;
     
     for(i=0; i<CMD_BUFFER_LENGTH; i++) {
         switch(cmdBuffer[i]) {
             // process ACSI configuration 
             case CMD_ACSI_CONFIG:
-                    firstConfigReceived = TRUE;                     // mark that we've received 1st config
-                    mode = MODE_WITH_RPI;                           // now that we got config, we're in 'with RPi' mode
-            
-                    showCurrentLED();
-            
-                    ids = cmdBuffer[i+1] >> 8;                      // upper BYTE: get enabled IDs
-            
-                    for(j=0; j<8; j++) {                            // for each bit in ids set the flag in enabledIDs[]
-                        if(ids & (1<<j)) {
-                            enabledIDs[j] = TRUE;
-                        } else {
-                            enabledIDs[j] = FALSE;
-                        }
-                    }
-
-                    sdCardID = (BYTE) cmdBuffer[i+1];                       // lower BYTE: SD card ACSI ID
-                    EE_WriteVariable(EEPROM_OFFSET_SDCARD_ID, sdCardID);    // store the new SD card ID to fake EEPROM
-                    
-                    cmdBuffer[i]    = 0;                                    // clear this command
-                    cmdBuffer[i+1]  = 0;
-                    
-                    i++;
-                break;
-
-            // to following is floppy image configuration - which FLOPPY IMG LEDs are enabled and thus how button should behave when switching
-            case CMD_FLOPPY_CONFIG:
-                ids = cmdBuffer[i+1] >> 8;                          // upper BYTE: enabled floppy images
-            
-                for(j=0; j<3; j++) {                                // for each bit in ids set the flag in enabledImgs[]
-                    if(ids & (1<<j)) {
-                        enabledImgs[j] = TRUE;
-                    } else {
-                        enabledImgs[j] = FALSE;
-                    }
-                }
-                
-                fixLedsByEnabledImgs();                             // if we are switched to not enabled floppy image, fix this
-                showCurrentLED();                                   // and show the current LED
-
-                cmdBuffer[i]    = 0;                                // clear this command
+                handleAcsiConfig((BYTE) (cmdBuffer[i+1] >> 8), (BYTE) cmdBuffer[i+1]);
+                handleFddConfig ((BYTE) (cmdBuffer[i+2] >> 8));
+        
+                cmdBuffer[i]    = 0;                                    // clear this command
                 cmdBuffer[i+1]  = 0;
-                    
-                i++;
+                cmdBuffer[i+2]  = 0;
+                
+                i += 2;
                 break;
             
             // this command is used so the host may select the a different LED light of selected image
             case CMD_FLOPPY_SWITCH:
-                newLed = cmdBuffer[i+1] >> 8;                       // get new selected LED
-            
-                if(newLed <3) {                                     // if the LED index is OK (0, 1, 2)
-                    if(enabledImgs[newLed] == TRUE) {               // and this LED is enabled
-                        currentLed = newLed;                        // store the new LED
-                    }
-                }
-                
-                if(newLed == 0xff) {                                // if this is a command to turn off the LED, store it
-                    currentLed = newLed;
-                }
-                
-                showCurrentLED();                                   // and light it up
+                handleFddConfig((BYTE) (cmdBuffer[i+1] >> 8));      // upper byte - enabled images
+                handleFddSwitch((BYTE) (cmdBuffer[i+1]     ));      // lower byte - selected image
             
                 cmdBuffer[i]    = 0;                                // clear this command
                 cmdBuffer[i+1]  = 0;
@@ -1380,6 +1336,58 @@ void processHostCommands(void)
                 break;
         }
     }
+}
+
+void handleAcsiConfig(BYTE acsiIds, BYTE sdId)
+{
+    int j;
+    
+    firstConfigReceived = TRUE;                     // mark that we've received 1st config
+    mode = MODE_WITH_RPI;                           // now that we got config, we're in 'with RPi' mode
+
+    showCurrentLED();
+
+    for(j=0; j<8; j++) {                            // for each bit in ids set the flag in enabledIDs[]
+        if(acsiIds & (1<<j)) {
+            enabledIDs[j] = TRUE;
+        } else {
+            enabledIDs[j] = FALSE;
+        }
+    }
+
+    sdCardID = sdId;                                        // lower BYTE: SD card ACSI ID
+    EE_WriteVariable(EEPROM_OFFSET_SDCARD_ID, sdCardID);    // store the new SD card ID to fake EEPROM
+}
+
+void handleFddConfig(BYTE enabledFddImages)
+{
+    int j;
+    
+    for(j=0; j<3; j++) {                                // for each bit in ids set the flag in enabledImgs[]
+        if(enabledFddImages & (1<<j)) {
+            enabledImgs[j] = TRUE;
+        } else {
+            enabledImgs[j] = FALSE;
+        }
+    }
+    
+    fixLedsByEnabledImgs();                             // if we are switched to not enabled floppy image, fix this
+    showCurrentLED();                                   // and show the current LED
+}
+
+void handleFddSwitch(BYTE toWhichImage)
+{
+    if(toWhichImage <3) {                               // if the LED index is OK (0, 1, 2)
+        if(enabledImgs[toWhichImage] == TRUE) {         // and this LED is enabled
+            currentLed = toWhichImage;                  // store the new LED
+        }
+    }
+
+    if(toWhichImage == 0xff) {                           // if this is a command to turn off the LED, store it
+        currentLed = toWhichImage;
+    }
+
+    showCurrentLED();                                   // and light it up
 }
 
 // the interrupt on DMA SPI TX finished should minimize the need for checking and reseting ATN pin
