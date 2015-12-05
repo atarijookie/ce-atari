@@ -87,6 +87,20 @@ private:
     void saveHwConfig(void);
     void getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId);
     
+    struct {
+        struct {
+            WORD acsi;
+            WORD fdd;
+        } current;
+        
+        struct {
+            WORD acsi;
+            WORD fdd;
+        } next;
+        
+        bool skipNextSet;
+    } hansConfigWords;
+
     //-----------------------------------
     // floppy stuff
     FloppySetup         floppySetup;

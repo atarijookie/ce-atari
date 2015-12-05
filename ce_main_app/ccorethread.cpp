@@ -51,6 +51,8 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     setDiskChanged          = false;
     diskChanged             = false;
 
+    memset(&hansConfigWords, 0, sizeof(hansConfigWords));
+    
     lastFloppyImageLed      = -1;
     newFloppyImageLedAfterEncode = -2;
     
@@ -582,26 +584,35 @@ void CCoreThread::handleFwVersion_hans(void)
     responseStart(cmdLength);                                       // init the response struct
 
     //--------------
-    // always send the ACSI + SD config + FDD enabled images
+    // send the ACSI + SD config + FDD enabled images, when they changed from current values to something new
     BYTE enabledIDbits, sdCardAcsiId;
     getIdBits(enabledIDbits, sdCardAcsiId);                                 // get the enabled IDs 
     
-    responseAddWord(oBuf, CMD_ACSI_CONFIG);                                 // CMD: send acsi config
-    responseAddWord(oBuf, MAKEWORD(enabledIDbits, sdCardAcsiId));           // store ACSI enabled IDs and which ACSI ID is used for SD card
-    responseAddWord(oBuf, MAKEWORD(floppyImageSilo.getSlotBitmap(), 0));    // store which floppy images are enabled
-    //--------------
-
-    static bool hansHandledOnce = false;
-
-    if(hansHandledOnce) {                                           // don't send commands until we did receive status at least a couple of times
-        if(setNewFloppyImageLed) {
-            responseAddWord(oBuf, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
-            responseAddWord(oBuf, MAKEWORD(floppyImageSilo.getSlotBitmap(), newFloppyImageLed));  // store which floppy images LED should be on
-            setNewFloppyImageLed = false;                           // and don't sent this anymore (until needed)
+    hansConfigWords.next.acsi   = MAKEWORD(enabledIDbits,                   sdCardAcsiId);
+    hansConfigWords.next.fdd    = MAKEWORD(floppyImageSilo.getSlotBitmap(), 0);
+    
+    if( (hansConfigWords.next.acsi  != hansConfigWords.current.acsi) || 
+        (hansConfigWords.next.fdd   != hansConfigWords.current.fdd )) {
+        
+        // hansConfigWords.skipNextSet - it's a flag used for skipping one config sending, because we send the new config now, but receive it processed in the next (not this) fw version packet
+        
+        if(!hansConfigWords.skipNextSet) {                      
+            responseAddWord(oBuf, CMD_ACSI_CONFIG);             // CMD: send acsi config
+            responseAddWord(oBuf, hansConfigWords.next.acsi);   // store ACSI enabled IDs and which ACSI ID is used for SD card
+            responseAddWord(oBuf, hansConfigWords.next.fdd);    // store which floppy images are enabled
+            
+            hansConfigWords.skipNextSet = true;                 // we have just sent the config, skip the next sending, so we won't send it twice in a row
+        } else {                                                // if we should skip sending config this time, then don't skip it next time (if needed)
+            hansConfigWords.skipNextSet = false;
         }
     }
+    //--------------
 
-    hansHandledOnce = true;
+    if(setNewFloppyImageLed) {
+        responseAddWord(oBuf, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
+        responseAddWord(oBuf, MAKEWORD(floppyImageSilo.getSlotBitmap(), newFloppyImageLed));  // store which floppy images LED should be on
+        setNewFloppyImageLed = false;                           // and don't sent this anymore (until needed)
+    }
 
     conSpi->txRx(SPI_CS_HANS, cmdLength, oBuf, fwVer);
 
@@ -613,7 +624,10 @@ void CCoreThread::handleFwVersion_hans(void)
     int  currentLed = fwVer[4];
     BYTE xilinxInfo = fwVer[5];
 
-    char recoveryLevel = fwVer[6];
+    hansConfigWords.current.acsi    = MAKEWORD(fwVer[6], fwVer[7]);
+    hansConfigWords.current.fdd     = MAKEWORD(fwVer[8],        0);
+    
+    char recoveryLevel = fwVer[9];
     if(recoveryLevel != 0) {                                                        // if the recovery level is not empty
         if(recoveryLevel == 'R' || recoveryLevel == 'S' || recoveryLevel == 'T') {  // and it's a valid recovery level 
             handleRecoveryCommands(recoveryLevel - 'Q');                            // handle recovery action
