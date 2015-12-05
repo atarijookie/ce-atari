@@ -88,7 +88,7 @@ WORD t1, t2, dt;
 #define ATN_VARIABLE_LEN                0xffff
 
 #define ATN_SENDFWVERSION_LEN_TX        10
-#define ATN_SENDFWVERSION_LEN_RX        8
+#define ATN_SENDFWVERSION_LEN_RX        12
 
 #define ATN_SENDACSICOMMAND_LEN_TX      12
 #define ATN_SENDACSICOMMAND_LEN_RX      CMD_BUFFER_LENGTH
@@ -394,9 +394,12 @@ void serveButtonForRecoveryCmd(void)
         }
         
         btnDownTime = 0;
-    } else {            // button is pressed
+    } else {                    // button is pressed
         btnDownTime++;
-        btnDownTime = btnDownTime & 0x0f;    
+        
+        if(btnDownTime > 15) {  // presset too long? it's the longest press possible
+            btnDownTime = 15;
+        }
 
         if(btnDownTime >= 15) {
             LEDs.startingRecoveryCommand = LED1 | LED2 | LED3;
