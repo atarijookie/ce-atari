@@ -91,7 +91,7 @@ WORD t1, t2, dt;
 #define ATN_VARIABLE_LEN                0xffff
 
 #define ATN_SENDFWVERSION_LEN_TX        10
-#define ATN_SENDFWVERSION_LEN_RX        12
+#define ATN_SENDFWVERSION_LEN_RX        10
 
 #define ATN_SENDACSICOMMAND_LEN_TX      12
 #define ATN_SENDACSICOMMAND_LEN_RX      CMD_BUFFER_LENGTH
