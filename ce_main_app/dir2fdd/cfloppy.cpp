@@ -57,8 +57,8 @@ bool CFloppy::Create(int nbSide,int nbSectorPerTrack,int nbCylinder)
 
 	if (m_pRawImage) {
 		// Fill the raw image
-//		memset(m_pRawImage, 0xe5, m_rawSize);
-		memset(m_pRawImage, 0, m_rawSize);
+		memset(m_pRawImage, 0xe5, m_rawSize);
+//		memset(m_pRawImage, 0, m_rawSize);
 
 		// Build the bootsector
 		w16(0xb,512);				// byte per sector
@@ -75,7 +75,7 @@ bool CFloppy::Create(int nbSide,int nbSectorPerTrack,int nbCylinder)
 		// atari specific
 		w16(0x0,0xe9);
 		w16(0x1c,0);
-//		memset(m_pRawImage + 0x1e,0x4e,30);
+		memset(m_pRawImage + 0x1e,0x4e,30);
 
 		int nbFsSector      = 1 + SECTOR_PER_FAT * 2 + ROOTDIR_NBSECTOR;
 		int nbDataSector    = nbSide * nbSectorPerTrack * nbCylinder - nbFsSector;
@@ -94,6 +94,8 @@ unsigned short CFloppy::SWAP16(unsigned short d)
 {
 	return ((d>>8) | (d<<8));
 }
+
+//#define COMPRESSED_MSA
 
 bool CFloppy::WriteImage(const char *pName)
 {
@@ -119,6 +121,7 @@ bool CFloppy::WriteImage(const char *pName)
 
     for (int t=0;t<m_nbCylinder * m_nbSide;t++)
     {
+#ifdef COMPRESSED_MSA        
         unsigned char *pR = (unsigned char*)m_pRawImage + t * rawSize;
         unsigned char *pTemp = pTempBuffer;
         int todo = rawSize;
@@ -155,10 +158,15 @@ bool CFloppy::WriteImage(const char *pName)
         }
         else
         {
+#endif      
+  
             fputc(rawSize>>8,h);
             fputc(rawSize&255,h);
             fwrite((unsigned char*)m_pRawImage + t * rawSize,1,rawSize,h);
+            
+#ifdef COMPRESSED_MSA            
         }
+#endif        
     }
 
     delete [] pTempBuffer;

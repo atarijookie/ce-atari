@@ -36,7 +36,9 @@ void ConfigStream::createScreen_homeScreen(void)
 
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " ACSI IDs config ",	18, 10,  6, gotoOffset);
+    const char *idConfigLabel = (hwConfig.hddIface == HDD_IF_SCSI) ? " SCSI IDs config " : " ACSI IDs config ";
+    
+    comp = new ConfigComponent(this, ConfigComponent::button, idConfigLabel,	    18, 10,  6, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_ACSI);
     screen.push_back(comp);
 
@@ -154,8 +156,19 @@ void ConfigStream::createScreen_network(void)
 	int col1x = 3;
 	int col2x = 16;
 	
-	int row = 4;
+    // hostname setting
+	int row = 3;
 	
+	comp = new ConfigComponent(this, ConfigComponent::label, "Hostname",	10,	col0x, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	10, col2x, row++, gotoOffset);
+    comp->setComponentId(COMPID_HOSTNAME);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_ALLOW_NUMBERS);
+    screen.push_back(comp);
+    
+    row++;
+    
 	// settings for ethernet
     comp = new ConfigComponent(this, ConfigComponent::label, "Ethernet",	10,	col0x, row++, gotoOffset);
     screen.push_back(comp);
@@ -272,6 +285,7 @@ void ConfigStream::createScreen_network(void)
 	NetworkSettings ns;
 	ns.load();						// load the current values
 
+    setTextByComponentId(COMPID_HOSTNAME,       ns.hostname);
     setTextByComponentId(COMPID_NET_DNS,		ns.nameserver);
 
     setBoolByComponentId(COMPID_NET_DHCP,		ns.eth0.dhcpNotStatic);
@@ -552,7 +566,7 @@ void ConfigStream::onNetwork_save(void)
     std::string ip2, mask2, gateway2;
     bool useDhcp2;
 	
-	std::string dns;
+	std::string dns, hostname;
 
     // read the settings from components
     getBoolByComponentId(COMPID_NET_DHCP,		useDhcp);
@@ -566,6 +580,11 @@ void ConfigStream::onNetwork_save(void)
     getTextByComponentId(COMPID_WIFI_GATEWAY,	gateway2);
 
     getTextByComponentId(COMPID_NET_DNS,		dns);
+    getTextByComponentId(COMPID_HOSTNAME,       hostname);
+    
+    if(hostname.empty()) {
+        hostname = "CosmosEx";
+    }
 
     // verify the settings for eth0
     if(!useDhcp) {          // but verify settings only when not using dhcp
@@ -600,7 +619,8 @@ void ConfigStream::onNetwork_save(void)
 	NetworkSettings ns;
 	ns.load();						// load the current values
 
-    ns.nameserver = dns;			
+    ns.nameserver   = dns;
+    ns.hostname     = hostname;
 	
 	ns.eth0.dhcpNotStatic = useDhcp;
 

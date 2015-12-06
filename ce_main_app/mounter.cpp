@@ -340,17 +340,17 @@ void Mounter::restartNetwork(void)
 
     bool gotWlan0 = wlan0IsPresent();                               // first find out if we got wlan0 or not
 
-	system("ifdown eth0");                                          // shut down ethernet
+	system("ifconfig eth0 down");                                   // shut down ethernet
 
     if(gotWlan0) {                                                  // if got wlan, shut it down
-    	system("ifdown wlan0");
+    	system("ifconfig wlan0 down");
     	system("wpa_cli reconfigure");                              // also try to reconnect to wifi AP (wifi settings might have changed)
     }
 
-	system("ifup eth0");                                            // bring up ethernet
+	system("ifconfig eth0 up");                                     // bring up ethernet
 
     if(gotWlan0) {                                                  // if got wlan, bring it up
-    	system("ifup wlan0");
+    	system("ifconfig wlan0 up");
     }
 	
 	Debug::out(LOG_DEBUG, "Mounter::restartNetwork - done\n");
