@@ -113,10 +113,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa015, 0x1205};                             // this means: hAns, 2015-12-05
+WORD version[2] = {0xa015, 0x1206};                             // this means: hAns, 2015-12-06
 
 char *VERSION_STRING_SHORT  = {"2.00"};
-char *DATE_STRING           = {"12/05/15"};
+char *DATE_STRING           = {"12/06/15"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
@@ -483,10 +483,8 @@ void handleAcsiCommand(void)
         resetXilinx();
     }
     
-    if(hwVersion == 2) {        // on HW v.2 device
-        if(!isBusIdle()) {      // if the bus is not idle, do the reset
-            resetXilinx();
-        }
+    if(!isBusIdle()) {      // if the bus is not idle, do the reset
+        resetXilinx();
     }
 }
 
@@ -1657,10 +1655,6 @@ void getXilinxStatus(void)
 void resetXilinx(void)
 {
     BYTE tmp;
-    
-    if(hwVersion != 2) {                // not HW v. 2? Do nothing.
-        return;
-    }
     
     ACSI_DATADIR_WRITE();
     GPIOA->BSRR = aRNW;                 // aRNW must go H for soft reset
