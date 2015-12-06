@@ -28,10 +28,10 @@ NET "PIO"  LOC = "P13"  ;
 NET "RESET"  LOC = "P5"  ;
 NET "reset_hans"  LOC = "P7"  ;
 NET "RnW"  LOC = "P14"  ;
-NET "TX1_in"  LOC = "P31"  ;
-NET "TX2_in"  LOC = "P32"  ;
+NET "TX_Franz"  LOC = "P31"  ;
+NET "TX_Hans"  LOC = "P32"  ;
 NET "TX_out"  LOC = "P16"  ;
-NET "TXSEL1n2"  LOC = "P12"  ;
+NET "TXSELFnH"  LOC = "P12"  ;
 
 #PACE: Start of PACE Area Constraints
 
