@@ -225,9 +225,11 @@ int main(void)
     speedTest();
 
 	// ----------------- 
-    print_status();
-	VT52_Clear_down();
+	VT52_Clear_home();
 
+    print_head();
+    print_status();
+   
   	VT52_Goto_pos(0, 22);
     (void) Cconws("Press 'Q' to quit the test...\r\n"); 		
     (void) Cconws("Testing (*=OK,C=Crc,_=Timeout):\r\n"); 		
@@ -403,6 +405,8 @@ void print_head()
 
 void print_status(void)
 {
+    char colorOrBw = 0;
+
     //-------------
     // 2nd row - general info
 	VT52_Goto_pos(0,1);
@@ -426,13 +430,23 @@ void print_status(void)
 
     //-------------
     // 3rd row - read statistics
-	(void) Cconws("\33p[ R \33c2Gp:");
+    if(colorOrBw) {
+        (void) Cconws("\33p[ R \33c2Gp:");
+    } else {
+        (void) Cconws("\33p[ R Gp:");
+    }
+        
 	showInt(counts.read.goodPlain,      4);
     
 	(void) Cconws(" Gr:");
 	showInt(counts.read.goodWithRetry,  3);
     
-	(void) Cconws(" \33c1T/O:");
+    if(colorOrBw) {
+        (void) Cconws(" \33c1T/O:");
+    } else {
+        (void) Cconws(" T/O:");
+    }
+    
 	showInt(counts.read.errorTimeout,   2);
 
 	(void) Cconws(" CRC:");
@@ -440,17 +454,31 @@ void print_status(void)
 
 	(void) Cconws(" Oth:");
 	showInt(counts.read.errorOther,     2);
-	(void) Cconws("\33c0]\33q\r\n");
+
+    if(colorOrBw) {
+        (void) Cconws("\33c0]\33q\r\n");
+    } else {
+        (void) Cconws("]\33q\r\n");
+    }
     
     //-------------
     // 4rd row - write statistics
-	(void) Cconws("\33p[ W \33c2Gp:");
+    if(colorOrBw) {
+        (void) Cconws("\33p[ W \33c2Gp:");
+    } else {
+        (void) Cconws("\33p[ W Gp:");
+    }
+    
 	showInt(counts.write.goodPlain,     4);
     
 	(void) Cconws(" Gr:");
 	showInt(counts.write.goodWithRetry, 3);
     
-	(void) Cconws(" \33c1T/O:");
+    if(colorOrBw) {
+        (void) Cconws(" \33c1T/O:");
+    } else {
+        (void) Cconws(" T/O:");
+    }
 	showInt(counts.write.errorTimeout,  2);
 
 	(void) Cconws(" CRC:");
@@ -458,7 +486,12 @@ void print_status(void)
 
 	(void) Cconws(" Oth:");
 	showInt(counts.write.errorOther,    2);
-	(void) Cconws("\33c0]\33q\r\n");
+
+    if(colorOrBw) {
+        (void) Cconws("\33c0]\33q\r\n");
+    } else {
+        (void) Cconws("]\33q\r\n");
+    }
 }
 
 //--------------------------------------------------
@@ -639,14 +672,18 @@ int writeHansTest(DWORD byteCount, WORD xorVal)
 	(*hdIf.cmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, wBuffer, (byteCount+511)>>9 );		// issue the command and check the result
     
     if(!hdIf.success) {                 // fail?
+logMsg("writeHansTest: not success");
         return -1;
     }
     
     if(hdIf.statusByte == E_CRC) {      // status byte: CRC error?
+logMsg("writeHansTest: E_CRC");
         return -2;
     }
     
     if(hdIf.statusByte != 0) {          // some other error?
+logMsg("writeHansTest: status byte is ");
+showHexByte(hdIf.statusByte);
         return -3;
     }
     
