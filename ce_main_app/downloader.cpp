@@ -223,15 +223,10 @@ void updateStatusByte(TDownloadRequest &tdr, BYTE newStatus)
 
 void handleUsbUpdateFile(char *localZipFile, char *localDestDir)
 {
-    system("rm -rf /tmp/ce_update");                                        // delete ce_update folder if it exists
-    system("mkdir /tmp/ce_update");                                         // create ce_update folder
 
     char command[1024];
-    snprintf(command, 1023, "unzip %s -d /tmp/ce_update", localZipFile);    // unzip the update file to ce_update folder
+    snprintf(command, 1023, "unzip -o %s -d /tmp/", localZipFile);          // unzip the update file to ce_update folder
     system(command);
-    
-    system("cp /tmp/ce_update/* /ce/update/");                              // copy the files to right place
-    system("sync");                                                         // write caches to disk
 }
 
 void *downloadThreadCode(void *ptr)

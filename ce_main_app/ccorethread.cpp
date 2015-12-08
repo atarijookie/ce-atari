@@ -727,14 +727,14 @@ void CCoreThread::getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId)
     sdCardAcsiId   = acsiIdInfo.sdCardAcsiId;
     
     if(hwConfig.hddIface != HDD_IF_SCSI) {          // not SCSI? Don't change anything
-        Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on ACSI");
+//        Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on ACSI");
         return;
     }
     
     // if we're on SCSI bus, remove ID bits if they are used for SCSI Initiator on that machine (ID 7 on TT, ID 0 on Falcon)
     switch(hwConfig.scsiMachine) {
         case SCSI_MACHINE_TT:                       // TT? remove bit 7 
-            Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on TT, will remove ID 7 from enabled ID bits");
+//            Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on TT, will remove ID 7 from enabled ID bits");
         
             enabledIDbits = enabledIDbits & 0x7F;
             if(sdCardAcsiId == 7) {
@@ -744,7 +744,7 @@ void CCoreThread::getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId)
 
         //------------
         case SCSI_MACHINE_FALCON:                   // Falcon? remove bit 0
-            Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on Falcon, will remove ID 0 from enabled ID bits");
+//            Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on Falcon, will remove ID 0 from enabled ID bits");
 
             enabledIDbits = enabledIDbits & 0xFE;
             if(sdCardAcsiId == 0) {
@@ -755,7 +755,7 @@ void CCoreThread::getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId)
         //------------
         default:
         case SCSI_MACHINE_UNKNOWN:                  // unknown machine? remove both bits 7 and 0
-            Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on unknown machine, will remove ID 7 and ID 0 from enabled ID bits");
+//            Debug::out(LOG_DEBUG, "CCoreThread::getIdBits() -- we're running on unknown machine, will remove ID 7 and ID 0 from enabled ID bits");
 
             enabledIDbits = enabledIDbits & 0x7E;
             if(sdCardAcsiId == 0 || sdCardAcsiId == 7) {
@@ -971,6 +971,8 @@ void CCoreThread::handleRecoveryCommands(int recoveryLevel)
     std::string ceConfFilename = CE_CONF_FDD_IMAGE_JUST_FILENAME;
     std::string ceConfFullPath = CE_CONF_FDD_IMAGE_PATH_AND_FILENAME;
     std::string dummy;
+    
+    Debug::out(LOG_DEBUG, "CCoreThread::handleRecoveryCommands() -- recoveryLevel is %d", recoveryLevel);
     
     switch(recoveryLevel) {
         case 1: // just insert config floppy image into slot 1
