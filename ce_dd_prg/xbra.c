@@ -37,8 +37,9 @@ unhook_xbra( WORD vecnum, LONG app_id )
     }
 
     stepadr = (LONG *)&rx->oldvec;
+
     rx = (XBRA *)((LONG)rx->oldvec - sizeof( XBRA ));
-    while( rx->xbra_id == 'XBRA' )
+    while( rx!=0 && rx->oldvec!=0 && rx->xbra_id == 'XBRA' )
     {
         if( rx->app_id == app_id )
         {
