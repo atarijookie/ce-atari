@@ -54,6 +54,8 @@ void setBootDriveAutomatic(void);
 int  setBootDriveManual(int seconds);
 void msleep(int ms);
 
+void possiblyFixCurrentDrive(void);
+
 BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
 
 BYTE *pDmaBuffer;
@@ -105,11 +107,7 @@ int main( int argc, char* argv[] )
 	BYTE kbshift = Kbshift(-1);
     
 	if((kbshift & 0x0f) != 0) {
-		if((kbshift & K_ALT) != 0) {        // if ALT pressed, don't load driver
-			(void) Cconws("ALT ");
-		}
-
-        (void) Cconws("key pressed, not installing!\r\n" );
+        (void) Cconws("CTRL / ALT / SHIFT key pressed, not installing!\r\n" );
 		sleep(2);
 		return 0;
 	}
@@ -216,8 +214,10 @@ int main( int argc, char* argv[] )
         } else {                                            // boot drive was not set, set to config drive if not pressing CTRL SHIFT
             kbshift = Kbshift(-1);
         
-            if( kbshift != (K_CTRL | K_LSHIFT) ){           // not holding CTRL + SHIFT? Set boot drive
+            if( (kbshift & (K_CTRL | K_LSHIFT)) == 0){      // not holding CTRL + SHIFT? Set boot drive
                 Supexec(setBootDriveAutomatic);
+            } else {
+                (void) Cconws("\33q\r\nCTRL / SHIFT key pressed, not setting boot drive.\r\n" );
             }
         }
     }
@@ -531,6 +531,31 @@ int setBootDriveManual(int seconds)
     
     (void) Cconws("\33q\r\n" );                             // when nothing (valid) was pressed, turn on inversion and go to new line
     return 0;
+}
+
+void possiblyFixCurrentDrive(void)
+{
+    DWORD bd = Dgetdrv();               // get current drive
+    DWORD mask = (1 << bd);             // make mask out of it
+    
+    DWORD drives = Drvmap();            // get available drives
+    
+    if((drives & mask) != 0) {          // if the current drive exists, do nothing
+        return;
+    }
+
+    // if the current drive does not exist, find existing drive and set it
+    WORD i, drv;
+    for(i=0; i<16; i++) {               // go from A: to P:
+        drv = (1 << i);                 // create mask out of it
+        
+        if((drives & drv) != 0) {       // if drive exists
+            Dsetdrv(i);                 // set it
+            return;
+        }
+        
+        Dsetdrv(0);                     // no valid drive found, set A: just in case
+    }        
 }
 
 void logMsg(char *logMsg)
