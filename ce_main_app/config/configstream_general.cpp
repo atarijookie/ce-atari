@@ -666,6 +666,8 @@ void ConfigStream::enterKeyHandler(int event)
 
     case CS_OTHER_SAVE:         onOtherSave();              break;
     case CS_RESET_SETTINGS:     onResetSettings();          break;
+    
+    case CS_SEND_SETTINGS:      onSendSettings();           break;
 
 //    case CS_SHARED_TEST:        onSharedTest();             break;
     case CS_SHARED_SAVE:        onSharedSave();             break;
@@ -755,3 +757,146 @@ BYTE ConfigStream::isUpdateScreen(void)
     return 1;                                                           // one of the update components is available, so we're on the update screen
 }
 
+void ConfigStream::createConfigDump(void)
+{
+    stScreenWidth = 80;
+    gotoOffset = (stScreenWidth - 40) / 2;
+
+    FILE *f = fopen(CONFIG_TEXT_FILE, "wt");
+
+    if(!f) {
+        return;
+    }
+    
+    createScreen_homeScreen();
+    dumpScreenToFile(f);
+    
+    createScreen_acsiConfig();
+    dumpScreenToFile(f);
+
+    createScreen_translated();
+    dumpScreenToFile(f);
+
+    createScreen_network();
+    dumpScreenToFile(f);
+
+    createScreen_update();
+    dumpScreenToFile(f);
+
+    createScreen_shared();
+    dumpScreenToFile(f);
+
+    createScreen_floppy_config();
+    dumpScreenToFile(f);
+
+    createScreen_other();
+    dumpScreenToFile(f);
+
+    fclose(f);
+}
+
+void ConfigStream::dumpScreenToFile(FILE *f)
+{
+    BYTE vt52stream[READ_BUFFER_SIZE];
+    int vt52count;
+
+    #define RAW_CONSOLE_SIZE        (81 * 24)
+    char rawConsole[RAW_CONSOLE_SIZE];
+    
+    vt52count = getStream(false, vt52stream, READ_BUFFER_SIZE);
+    translateVT52rawConsole(vt52stream, vt52count, rawConsole, RAW_CONSOLE_SIZE);
+
+    fputs("\n--------------------------------------------------------------------------------\n", f);
+    fputs(rawConsole, f);    
+    fputs("\n--------------------------------------------------------------------------------\n", f);
+}
+
+void ConfigStream::translateVT52rawConsole(BYTE *vt52stream, int vt52cnt, char *rawConsole, int rawConsoleSize)
+{
+    int i;
+
+    memset(rawConsole, ' ', rawConsoleSize);        // clear whole raw console
+    
+    class Ccursor {
+        public:
+    
+        int x;
+        int y;
+        
+        Ccursor() {
+            home();
+        }
+        
+        void home(void) {                                       // cursor to 0,0
+            x = 0;
+            y = 0;
+        }
+    };
+    
+    Ccursor cursor;
+    
+    for(i=0; i<vt52cnt; ) {
+        if(vt52stream[i] == 27) {
+            switch(vt52stream[i + 1]) {
+                case 'E':               // clear screen
+                    memset(rawConsole, ' ', rawConsoleSize);    // clear whole raw console
+                    cursor.home();                              // cursor to 0,0
+                    i += 2;
+                    break;
+                //------------------------
+                case 'Y':               // goto position
+                    cursor.y = vt52stream[i+2] - 32;
+                    cursor.x = vt52stream[i+3] - 32;
+                    i += 4;
+                    break;
+                //------------------------
+                case 'p':               // inverse on
+                    // not implemented
+                    i += 2;
+                    break;
+                //------------------------
+                case 'q':               // inverse off
+                    // not implemented
+                    i += 2;
+                    break;
+                //------------------------
+                case 'e':               // cursor on
+                    // not implemented
+                    i += 2;
+                    break;
+                //------------------------
+                case 'f':               // cursor off
+                    // not implemented
+                    i += 2;
+                    break;
+                //------------------------
+                default:
+                    i += 2;
+                    break;
+            }            
+        } else {                                                    // plain char? store it
+            int offset = cursor.y * 81 + cursor.x;
+            
+            if(vt52stream[i] != 0 && offset < rawConsoleSize) {     // does it fit in the buffer? store it
+                char val = vt52stream[i++];
+                val = (val < 32) ? 32 : val;                        // only printable chars
+                
+                rawConsole[offset] = val;                           // store the char
+                
+                if(cursor.x < 79) {                                 // if not at the end of line, move one char to right
+                    cursor.x++;
+                }
+            } else {                                                // buffer index out of range? skip it
+                i++;
+            }
+        }
+    }
+    
+    //-------------------
+    // now terminate lines with new_line chars
+    for(int y=0; y<24; y++) {
+        int offset = 80 + (y * 81);
+        rawConsole[offset] = '\n';
+    }
+    rawConsole[rawConsoleSize - 1] = 0;     // terminate stream with zero
+}

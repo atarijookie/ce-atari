@@ -10,6 +10,7 @@
 #define DWNTYPE_FLOPPYIMG_LIST  0x04
 #define DWNTYPE_FLOPPYIMG       0x08
 #define DWNTYPE_TIMESYNC        0x10
+#define DWNTYPE_SEND_CONFIG     0x20
 
 #define DWNSTATUS_WAITING       0              
 #define DWNSTATUS_DOWNLOADING   1 

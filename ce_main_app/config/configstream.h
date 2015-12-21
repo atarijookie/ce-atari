@@ -8,6 +8,8 @@
 #include "../settingsreloadproxy.h"
 #include "../version.h"
 
+#define CONFIG_TEXT_FILE        "/tmp/ce_config.txt"
+
 class AcsiDataTrans;
 
 enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED,
@@ -18,7 +20,7 @@ enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED
                  CS_UPDATE_CHECK,       CS_UPDATE_CHECK_USB,    CS_UPDATE_UPDATE,       
                  CS_SHARED_TEST,        CS_SHARED_SAVE,
                  CS_FLOPPY_IMAGE_SAVE,  CS_FLOPPY_CONFIG_SAVE,
-                 CS_OTHER_SAVE,         CS_RESET_SETTINGS
+                 CS_OTHER_SAVE,         CS_RESET_SETTINGS,      CS_SEND_SETTINGS
                 };
 
 
@@ -78,6 +80,8 @@ public:
     void showMessageScreen(char *msgTitle, char *msgTxt);
     void hideMessageScreen(void);
 
+    void createConfigDump(void);
+    
     void createScreen_homeScreen(void);
     void createScreen_acsiConfig(void);
     void createScreen_translated(void);
@@ -152,11 +156,14 @@ private:
 
     void onOtherSave(void);
     void onResetSettings(void);
+    void onSendSettings(void);
     
     bool verifyAndFixIPaddress(std::string &in, std::string &out, bool emptyIsOk);
 
     void replaceNewLineWithGoto(std::string &line, int startX, int startY);
     
+    void translateVT52rawConsole(BYTE *vt52stream, int vt52cnt, char *rawConsole, int rawConsoleSize);
+    void dumpScreenToFile(FILE *f);
     //-------------
     // remote console stuff
     void linuxConsole_KeyDown(BYTE atariKey);

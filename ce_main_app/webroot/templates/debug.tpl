@@ -2,6 +2,8 @@
 <b>HTTP Headers:</b>{{browser_headers}}
 <b>CosmosEx date (DD.MM.YYYY): </b>{{date}}<br />
 <br /><br />
+Download <a href="/app/debug/getconfig">config of your CosmosEx</a> device as text file.
+<br /><br />
 Download <a href="/app/debug/getlog">app log</a>.
 <br /><br />
 <label for="loglevel">Set log level</label>

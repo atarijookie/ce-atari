@@ -6,6 +6,7 @@
 #include "../controller/configcontroller.h"
 #include "../controller/debugcontroller.h"
 #include "../controller/screencastcontroller.h"
+#include "../../../config/configstream.h"
 
 ControllerRouter::ControllerRouter(ConfigService* pxDateService, FloppyService* pxFloppyService, ScreencastService *pxScreencastService):
     pxDateService(pxDateService),pxFloppyService(pxFloppyService),pxScreencastService(pxScreencastService)
@@ -39,6 +40,16 @@ bool ControllerRouter::handleGet(CivetServer *server, struct mg_connection *conn
     {
         DebugController *pxController=new DebugController(pxDateService,pxFloppyService);
         bool processed=pxController->getlogAction(conn,req_info);
+        delete pxController;
+        return processed;
+    }
+    if( controllerAction=="debug/getconfig" )
+    {
+        ConfigStream cs;
+        cs.createConfigDump();
+
+        DebugController *pxController=new DebugController(pxDateService,pxFloppyService);
+        bool processed=pxController->getConfigAction(conn,req_info);
         delete pxController;
         return processed;
     }

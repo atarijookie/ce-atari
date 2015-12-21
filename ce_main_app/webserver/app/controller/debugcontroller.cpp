@@ -4,6 +4,7 @@
 #include <fstream>
 #include <streambuf>
 #include "version.h"
+#include "../../../config/configstream.h"
 
 DebugController::DebugController(ConfigService* pxDateService, FloppyService* pxFloppyService):pxDateService(pxDateService),pxFloppyService(pxFloppyService)
 {
@@ -68,6 +69,15 @@ bool DebugController::getlogAction(mg_connection *conn, mg_request_info *req_inf
     
     // don't send content length, filesize changes as we read
     return getFile(conn, sDownloadedFileName, sFileType, sCeFilePath, false);
+}
+
+bool DebugController::getConfigAction(mg_connection *conn, mg_request_info *req_info)
+{
+    std::string sDownloadedFileName = "ce_config.txt";
+    std::string sFileType           = "text/plain";
+    std::string sCeFilePath         = CONFIG_TEXT_FILE;
+    
+    return getFile(conn, sDownloadedFileName, sFileType, sCeFilePath, true);
 }
 
 bool DebugController::action_get_ceconf_prg(mg_connection *conn, mg_request_info *req_info)

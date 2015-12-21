@@ -907,7 +907,7 @@ void ConfigStream::createScreen_other(void)
 
     ConfigComponent *comp;
 
-    int row     = 5;
+    int row     = 3;
     int col     = 7;
     int col2    = 20;
     
@@ -976,9 +976,14 @@ void ConfigStream::createScreen_other(void)
     //----------------------
     row++;
     
+    comp = new ConfigComponent(this, ConfigComponent::button, " Send your settings to Jookie ", 30, 5, row++, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_SEND_SETTINGS);
+    screen.push_back(comp);
+
     comp = new ConfigComponent(this, ConfigComponent::button, " Reset all settings ",       19, 10, row++, gotoOffset);
     comp->setOnEnterFunctionCode(CS_RESET_SETTINGS);
     screen.push_back(comp);
+    //----------------------
     
     row++;
     comp = new ConfigComponent(this, ConfigComponent::button, "   Save   ",                 10,  6, row, gotoOffset);
@@ -1372,4 +1377,23 @@ void ConfigStream::onResetSettings(void)
     system("rm -f /ce/settings/*");
     Utils::forceSync();                                     // tell system to flush the filesystem caches
 }
+
+void ConfigStream::onSendSettings(void)
+{
+    ConfigStream cs;
+    cs.createConfigDump();
+    
+    // add request for download of the update list
+    TDownloadRequest tdr;
+    
+    tdr.srcUrl          = CONFIG_TEXT_FILE;
+    tdr.dstDir          = "http://joo.kie.sk/cosmosex/sendconfig/sendconfig.php";
+    tdr.downloadType    = DWNTYPE_SEND_CONFIG;
+    tdr.checksum        = 0;                        // special case - don't check checsum
+    tdr.pStatusByte     = NULL;                     // don't update this status byte
+    Downloader::add(tdr);
+    
+    showMessageScreen((char *) "Send config", (char *) "Sending your configuration to Jookie.\n\rThis will take a while.\n\rInternet connection needed.");    
+}
+
 

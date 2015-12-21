@@ -1,4 +1,5 @@
 #include <string>
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -223,15 +224,79 @@ void updateStatusByte(TDownloadRequest &tdr, BYTE newStatus)
 
 void handleUsbUpdateFile(char *localZipFile, char *localDestDir)
 {
-
     char command[1024];
     snprintf(command, 1023, "unzip -o %s -d /tmp/", localZipFile);          // unzip the update file to ce_update folder
     system(command);
 }
 
+void handleSendConfig(char *localConfigFile, char *remoteUrl)
+{
+    CURL       *curl = curl_easy_init();
+    CURLcode    res;
+    
+    if(!curl) {
+        Debug::out(LOG_ERROR, "CURL init failed, config was not sent to Jookie!");
+        return;
+    }
+
+    //-------------
+    FILE *f = fopen(localConfigFile, "rt");
+    
+    if(!f) {
+        Debug::out(LOG_ERROR, "Could not open localConfigFile!");
+        curl_easy_cleanup(curl); 
+        return;
+    }
+    
+    fseek(f, 0, SEEK_END);              // seek to end of file
+    int sz = ftell(f);                  // get current file pointer
+    fseek(f, 0, SEEK_SET);              // seek back to beginning of file
+    
+    if(sz < 1) {                        // empty / non-existing file?
+        Debug::out(LOG_ERROR, "Could not see the size of localConfigFile!");
+        curl_easy_cleanup(curl); 
+        fclose(f);
+        return;
+    }
+    
+    sz = (sz < 50*1024) ? sz : (50 * 1024);                 // limit content to 50 kB
+    
+    char *bfrRaw = new char[3 * sz];                        // allocate memory
+    fread(bfrRaw, 1, sz, f);                                // read whole file
+    fclose(f);
+    
+    char *bfrEscaped = curl_easy_escape(curl, bfrRaw, sz);  // escape chars
+    
+    if(!bfrEscaped) {
+        Debug::out(LOG_ERROR, "Could not escape config file!");
+        curl_easy_cleanup(curl); 
+        delete []bfrRaw;                                    // free raw buffer
+        return;
+    }
+    
+    strcpy(bfrRaw, "action=sendconfig&config=");            // fill action and config tag
+    strcat(bfrRaw, bfrEscaped);                             // append escaped config
+    curl_free(bfrEscaped);                                  // free the escaped config
+    
+    //-------------
+    // now fill curl stuff and do post
+    curl_easy_setopt(curl, CURLOPT_URL,             remoteUrl);         // POST will go to this URL
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS,      bfrRaw);            // this is the data that will be sent
+ 
+    res = curl_easy_perform(curl);          // Perform the request, res will get the return code
+
+    if(res != CURLE_OK) {
+        Debug::out(LOG_ERROR, "CURL curl_easy_perform failed: %s", curl_easy_strerror(res));
+    } else {
+        Debug::out(LOG_DEBUG, "Config was sent to Jookie.");
+    }
+
+    delete []bfrRaw;                                    // free raw buffer
+    curl_easy_cleanup(curl);              
+}
+
 void *downloadThreadCode(void *ptr)
 {
-    CURL *curl = NULL;
     CURLcode cres;
     int res;
     FILE *outfile;
@@ -250,12 +315,6 @@ void *downloadThreadCode(void *ptr)
 		downloadCurrent = downloadQueue.front();	    // get the 'oldest' element from queue
 		downloadQueue.erase(downloadQueue.begin());		// and remove it from queue
 		pthread_mutex_unlock(&downloadThreadMutex);		// unlock the mutex
-
-        curl = curl_easy_init();
-        if(!curl) {
-            Debug::out(LOG_ERROR, "CURL init failed, the file %s was not downloaded...", (char *) downloadCurrent.srcUrl.c_str());
-            continue;
-        }
     
         //-------------------
         // check if this isn't local file, and if it is, do the rest localy
@@ -266,9 +325,20 @@ void *downloadThreadCode(void *ptr)
                 handleUsbUpdateFile((char *) downloadCurrent.srcUrl.c_str(), (char *) downloadCurrent.dstDir.c_str());
             }           
             
+            if(downloadCurrent.downloadType== DWNTYPE_SEND_CONFIG) {            // if it should be local config upload / post
+                handleSendConfig((char *) downloadCurrent.srcUrl.c_str(), (char *) downloadCurrent.dstDir.c_str());
+            }
+            
             continue;
         }
         
+        //-------------------
+        CURL *curl = curl_easy_init();
+        
+        if(!curl) {
+            Debug::out(LOG_ERROR, "CURL init failed, the file %s was not downloaded...", (char *) downloadCurrent.srcUrl.c_str());
+            continue;
+        }
         //-------------------
     
         std::string urlPath, fileName; 
