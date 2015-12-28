@@ -46,7 +46,6 @@ extern SharedObjects shared;
 #define WEB_PARAMS_CHECK_TIME_MS    3000
 #define WEB_PARAMS_FILE             "/tmp/ce_startupmode"
 
-void readWebStartupMode(void);
 bool inetIfaceReady(const char* ifrname);
 
 void handleConfigStreams(ConfigStream *cs, int fd1, int fd2);
@@ -59,7 +58,6 @@ void *periodicThreadCode(void *ptr)
 
 	DWORD nextDevFindTime       = Utils::getCurrentMs();                    // create a time when the devices should be checked - and that time is now
     DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);                  // create a time when update download status should be checked
-    DWORD nextWebParsCheckTime  = Utils::getEndTime(WEB_PARAMS_CHECK_TIME_MS);  // create a time when we should check for new params from the web page
     DWORD nextInetIfaceCheckTime= Utils::getEndTime(1000);  			    // create a time when we should check for inet interfaces that got ready
     
     Update::downloadUpdateList(NULL);                                       // download the list of components with the newest available versions
@@ -69,13 +67,6 @@ void *periodicThreadCode(void *ptr)
     DevFinder devFinder;
 
 	while(sigintReceived == 0) {
-        //------------------------------------
-        // should we check if there are new params received from debug web page?
-        if(Utils::getCurrentMs() >= nextWebParsCheckTime) {
-            readWebStartupMode();
-            nextWebParsCheckTime  = Utils::getEndTime(WEB_PARAMS_CHECK_TIME_MS);
-        }
-
         //------------------------------------
         // should we check for inet interfaces that might came up?
         if(Utils::getCurrentMs() >= nextInetIfaceCheckTime) {
@@ -262,42 +253,6 @@ void handleConfigStreams(ConfigStream *cs, int fd1, int fd2)
         pthread_mutex_lock(&shared.mtxConfigStreams);
         cs->processCommand(cmd, fd2);
         pthread_mutex_unlock(&shared.mtxConfigStreams);
-    }
-}
-
-void readWebStartupMode(void)
-{
-    FILE *f = fopen(WEB_PARAMS_FILE, "rt");
-
-    if(!f) {                                            // couldn't open file? nothing to do
-        return;
-    }
-
-    char tmp[64];
-    memset(tmp, 0, 64);
-
-    fgets(tmp, 64, f);
-
-    int ires, logLev;
-    ires = sscanf(tmp, "ll%d", &logLev);            // read the param
-    fclose(f);
-
-    unlink(WEB_PARAMS_FILE);                        // remove the file so we won't read it again
-
-    if(ires != 1) {                                 // failed to read the new log level? quit
-        return;
-    }
-
-    if(logLev >= LOG_OFF && logLev <= LOG_DEBUG) {  // param is valid
-        if(flags.logLevel == logLev) {              // but logLevel won't change?
-            return;                                 // nothing to do
-        }
-
-        flags.logLevel = logLev;                    // set new log level
-        Debug::out(LOG_INFO, "Log level changed from file %s to level %d", WEB_PARAMS_FILE, logLev);
-    } else {                                        // on set wrong log level - switch to lowest log level
-        flags.logLevel = LOG_ERROR;
-        Debug::out(LOG_INFO, "Log level change invalid, switching to LOG_ERROR");
     }
 }
 

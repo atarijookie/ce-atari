@@ -29,6 +29,8 @@ extern bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BY
 static int webFd1;
 static int webFd2;
 
+extern TFlags flags;
+
 ConfigResource::ConfigResource()  
 {
     in_bfr  = new BYTE[INBFR_SIZE];
@@ -88,8 +90,17 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
             return true;
         }
 
-        std::ofstream fileLogLevel("/tmp/ce_startupmode");
-        fileLogLevel << sLogLevel;
+        if(sLogLevel == "ll1" || sLogLevel == "") {     // LOG_INFO
+            flags.logLevel = 1;
+        } else if(sLogLevel == "ll2") {                 // LOG_ERROR
+            flags.logLevel = 2;
+        } else if(sLogLevel == "ll3") {                 // LOG_DEBUG
+            flags.logLevel = 3;
+        } else {
+            flags.logLevel = 1;
+        }        
+     
+        Debug::out(LOG_INFO, "Log level changed from web to level %d", flags.logLevel);
 
         mg_printf(conn, "HTTP/1.1 200 OK\r\n\r\n");
         return true;    
