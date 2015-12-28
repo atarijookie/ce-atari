@@ -133,9 +133,6 @@ private:
 
     //----------------------------------
     // other
-    void readWebStartupMode(void);
-	bool inetIfaceReady(const char* ifrname);
-
     void showHwVersion(void);
     
     void sharedObjects_create(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService);

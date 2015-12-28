@@ -43,9 +43,6 @@ extern SharedObjects shared;
 #define INET_IFACE_CHECK_TIME       1000
 #define UPDATE_SCRIPTS_TIME         10000
 
-#define WEB_PARAMS_CHECK_TIME_MS    3000
-#define WEB_PARAMS_FILE             "/tmp/ce_startupmode"
-
 bool inetIfaceReady(const char* ifrname);
 
 void handleConfigStreams(ConfigStream *cs, int fd1, int fd2);
