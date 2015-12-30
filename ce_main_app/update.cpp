@@ -408,6 +408,12 @@ void Update::createNewScripts(void)
     Debug::out(LOG_INFO, "Update::createNewScripts() - creating config floppy image from config drive");
     printf("Creating config floppy image from config drive.\n");
     CDirectory::dir2fdd((char *) "/ce/app/configdrive", (char *) CE_CONF_FDD_IMAGE_PATH_AND_FILENAME);
+
+    //------------
+    // create floppy test image
+    Debug::out(LOG_INFO, "Update::createNewScripts() - creating floppy test image");
+    printf("Creating floppy test image\n");
+    createFloppyTestImage();
     
     //------------
     Debug::out(LOG_INFO, "Update::createNewScripts() - creating config floppy tar archive");
@@ -466,5 +472,42 @@ void Update::startPackageDownloadIfAnyComponentNewer(void)
         tdr.pStatusByte     = &packageDownloadStatus;           // store download status here
         Downloader::add(tdr);
     }
+}
+
+void Update::createFloppyTestImage(void)
+{
+    // open the file and write to it
+    FILE *f = fopen(FDD_TEST_IMAGE_PATH_AND_FILENAME, "wb");
+    
+    if(!f) {
+        Debug::out(LOG_ERROR, "Failed to create floppy test image!");
+        printf("Failed to create floppy test image!\n");
+        return;
+    }
+    
+    // first fill the write buffer with simple counter
+    BYTE writeBfr[512];
+    int i;
+    for(i=0; i<512; i++) {              
+        writeBfr[i] = (BYTE) i;
+    }
+    
+    // write one sector after another...
+    int sector, track, side;
+    for(track=0; track<80; track++) {   
+        for(side=0; side<2; side++) {
+            for(sector=1; sector<10; sector++) {
+                // customize write data
+                writeBfr[0] = track;
+                writeBfr[1] = side;
+                writeBfr[2] = sector;
+    
+                fwrite(writeBfr, 1, 512, f);
+            }
+        }
+    }
+    
+    // close file and we're done
+    fclose(f);
 }
 

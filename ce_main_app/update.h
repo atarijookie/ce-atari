@@ -43,6 +43,7 @@ public:
     static bool checkForUpdateListOnUsb(std::string &updateFilePath);
 
     static void createNewScripts(void);                 // this does script update - blocking other processing
+    static void createFloppyTestImage(void);
 
     static void startPackageDownloadIfAnyComponentNewer(void);
     

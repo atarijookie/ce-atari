@@ -147,7 +147,7 @@ typedef struct {
 #define CE_CONF_FDD_IMAGE_JUST_FILENAME     "ce_conf.msa"
 
 #define FDD_TEST_IMAGE_PATH_AND_FILENAME    "/ce/app/fdd_test.st"
-#define FDD_TEST_IMAGE_JUST_FILENAME        "fdd_test.msa"
+#define FDD_TEST_IMAGE_JUST_FILENAME        "fdd_test.st"
 
 #endif // GLOBAL_H
 

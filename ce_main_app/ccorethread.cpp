@@ -1020,8 +1020,8 @@ void CCoreThread::insertSpecialFloppyImage(int specialImageId)
         
         Debug::out(LOG_INFO, "Will insert special FDD image: CE_CONF image");
     } else if(specialImageId == SPECIAL_FDD_IMAGE_FDD_TEST) {       // FDD TEST image
-        ceConfFilename = FDD_TEST_IMAGE_PATH_AND_FILENAME;
-        ceConfFullPath = FDD_TEST_IMAGE_JUST_FILENAME;
+        ceConfFilename = FDD_TEST_IMAGE_JUST_FILENAME;
+        ceConfFullPath = FDD_TEST_IMAGE_PATH_AND_FILENAME;
 
         Debug::out(LOG_INFO, "Will insert special FDD image: FDD TEST image");
     } else {
