@@ -1,4 +1,4 @@
-TARGET	= ce_test.prg
+TARGET	= cetst_hd.prg
 
 CC	= m68k-atari-mint-gcc
 AS	= m68k-atari-mint-as
