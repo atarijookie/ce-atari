@@ -17,6 +17,12 @@ void showInt(int value, int length);
 BYTE readSector(int sector, int track, int side, BYTE checkData);       // 0 means good, 1 means failed READ operation, 2 means READ good but DATA bad
 void writeSector(int sector, int track, int side);
 
+void deleteOneProgressLine(void);
+void calcCheckSum(BYTE *bfr, int sector, int track, int side);
+WORD getWholeCheckSum(void);
+void showHexByte(int val);
+void showHexWord(WORD val);
+
 void showDecimal(int num);
 void showDiff(BYTE* bfr, int track, int side, int sector, char*range);
 
@@ -48,6 +54,9 @@ struct {
     int track;
     int side;
 } fl;
+
+//             TRACK SIDE SECTOR
+BYTE checksums[80][2][9];
 
 void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnce);
 
@@ -113,6 +122,8 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
     counts.errRead  = 0;
     counts.errData  = 0;
 
+    memset(checksums, 0, SECTORS_PER_FLOPPY);
+    
     VT52_Clear_home();
     print_status();
     
@@ -188,11 +199,18 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
         updateFloppyPosition(sequentialNotRandom, endlessNotOnce);
         
         if(fl.finish) {                         // if should quit after this
-            VT52_Goto_pos(0,4);
-            VT52_Del_line();
-            VT52_Goto_pos(0, 24);
+            deleteOneProgressLine();
 
             (void) Cconws("Finished.");
+            
+            if(sequentialNotRandom) {
+                WORD cs = getWholeCheckSum();
+                (void)Cconws("\r\nImage checksum: ");
+                showHexWord(cs);
+                (void)Cconws("\r\n");
+            }
+            
+            print_status();
             Cnecin();
             return;
         }
@@ -200,10 +218,7 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
         if(fl.newLine) {                        // should start new line?
             fl.newLine = 0;
         
-			VT52_Goto_pos(0,4);
-			VT52_Del_line();
-			VT52_Goto_pos(0, 24);
-
+            deleteOneProgressLine();
             x = 11;
             
             showLineStart(sequentialNotRandom, fl.track);
@@ -216,6 +231,13 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
             x++;
         }
     }
+}
+
+void deleteOneProgressLine(void)
+{
+    VT52_Goto_pos(0,4);
+    VT52_Del_line();
+    VT52_Goto_pos(0, 24);
 }
 
 void showLineStart(BYTE sequentialNotRandom, int trNo) 
@@ -292,6 +314,8 @@ BYTE readSector(int sector, int track, int side, BYTE checkData)    // 0 means g
 	if(res != 0) {                  // failed?
         return 1;                   // 1 means READ operation failed
 	} 
+
+    calcCheckSum(bfr, sector, track, side);
     
     if(!checkData) {                // shouldn't check data? quit with success
         return 0;
@@ -308,6 +332,44 @@ BYTE readSector(int sector, int track, int side, BYTE checkData)    // 0 means g
     }
         
     return 0;                       // if came here, everything is OK
+}
+
+void calcCheckSum(BYTE *bfr, int sector, int track, int side)
+{
+    if(track < 0 || track > 79) {
+        return;
+    }
+    
+    if(sector < 1 || sector > 9) {
+        return;
+    }
+    
+    if(side < 0 || side > 1) {
+        return;
+    }
+
+    BYTE cs = 0;
+    int i;
+    
+    for(i=0; i<512; i++) {
+        cs += bfr[i];                           // add this value to checksum
+    }
+    
+    checksums[track][side][sector - 1] = cs;    // store the whole checksum
+}
+
+WORD getWholeCheckSum(void)
+{
+    WORD cs = 0;
+    
+    BYTE *csc = &checksums[0][0][0];
+    
+    int i;
+    for(i=0; i<SECTORS_PER_FLOPPY; i++) {
+        cs += (WORD) csc[i];
+    }
+
+    return cs;
 }
 
 void writeSector(int sector, int track, int side)
@@ -455,4 +517,30 @@ int getIntFromStr(const char *str, int len)
     }
     
     return val;
+}
+
+void showHexByte(int val)
+{
+    int hi, lo;
+    char tmp[3];
+    char table[16] = {"0123456789ABCDEF"};
+    
+    hi = (val >> 4) & 0x0f;;
+    lo = (val     ) & 0x0f;
+
+    tmp[0] = table[hi];
+    tmp[1] = table[lo];
+    tmp[2] = 0;
+    
+    (void) Cconws(tmp);
+}
+
+void showHexWord(WORD val)
+{
+    BYTE a,b;
+    a = val >>  8;
+    b = val;
+    
+    showHexByte(a);
+    showHexByte(b);
 }
