@@ -130,6 +130,7 @@ private:
     // recovery stuff
     void handleRecoveryCommands(int recoveryLevel);
     void deleteSettingAndSetNetworkToDhcp(void);
+    void insertSpecialFloppyImage(int specialImageId);
 
     //----------------------------------
     // other

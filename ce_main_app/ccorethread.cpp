@@ -37,6 +37,8 @@ extern DebugVars    dbgVars;
 SharedObjects shared;
 extern volatile bool floppyEncodingRunning;
 
+volatile BYTE insertSpecialFloppyImageId;
+
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
     NetworkSettings ns;
@@ -326,6 +328,11 @@ void CCoreThread::run(void)
 			}
 		}
 #endif
+
+        if(insertSpecialFloppyImageId != 0) {                       // very stupid way of letting web IF to insert special image
+            insertSpecialFloppyImage(insertSpecialFloppyImageId);
+            insertSpecialFloppyImageId = 0;
+        }
 
 #if defined(ONPC_HIGHLEVEL)
         res = gotCmd();
@@ -968,23 +975,11 @@ void CCoreThread::handleSectorWritten(void)
 
 void CCoreThread::handleRecoveryCommands(int recoveryLevel)
 {
-    std::string ceConfFilename = CE_CONF_FDD_IMAGE_JUST_FILENAME;
-    std::string ceConfFullPath = CE_CONF_FDD_IMAGE_PATH_AND_FILENAME;
-    std::string dummy;
-    
     Debug::out(LOG_DEBUG, "CCoreThread::handleRecoveryCommands() -- recoveryLevel is %d", recoveryLevel);
     
     switch(recoveryLevel) {
         case 1: // just insert config floppy image into slot 1
-
-                // encode MSA config image to MFM stream - in slot #0
-                floppyImageSilo.add(0, ceConfFilename, ceConfFullPath, dummy, dummy, false);
-                
-                // set the current to slot #0
-                floppyImageSilo.setCurrentSlot(0);
-        
-                // when encoding stops, set this FDD image LED
-                newFloppyImageLedAfterEncode = 0;
+                insertSpecialFloppyImage(SPECIAL_FDD_IMAGE_CE_CONF);
                 break;
 
         //----------------------------------------------------
@@ -1013,6 +1008,37 @@ void CCoreThread::handleRecoveryCommands(int recoveryLevel)
     }
 }
 
+void CCoreThread::insertSpecialFloppyImage(int specialImageId)
+{
+    std::string ceConfFilename;
+    std::string ceConfFullPath;
+    std::string dummy;
+
+    if(specialImageId == SPECIAL_FDD_IMAGE_CE_CONF) {               // CE CONF image
+        ceConfFilename = CE_CONF_FDD_IMAGE_JUST_FILENAME;
+        ceConfFullPath = CE_CONF_FDD_IMAGE_PATH_AND_FILENAME;
+        
+        Debug::out(LOG_INFO, "Will insert special FDD image: CE_CONF image");
+    } else if(specialImageId == SPECIAL_FDD_IMAGE_FDD_TEST) {       // FDD TEST image
+        ceConfFilename = FDD_TEST_IMAGE_PATH_AND_FILENAME;
+        ceConfFullPath = FDD_TEST_IMAGE_JUST_FILENAME;
+
+        Debug::out(LOG_INFO, "Will insert special FDD image: FDD TEST image");
+    } else {
+        Debug::out(LOG_INFO, "Unknown special image: %d, doing nothing.", specialImageId);
+        return;
+    }
+    
+    // encode MSA config image to MFM stream - in slot #0
+    floppyImageSilo.add(0, ceConfFilename, ceConfFullPath, dummy, dummy, false);
+    
+    // set the current to slot #0
+    floppyImageSilo.setCurrentSlot(0);
+
+    // when encoding stops, set this FDD image LED
+    newFloppyImageLedAfterEncode = 0;
+}
+                
 void CCoreThread::deleteSettingAndSetNetworkToDhcp(void)
 {
     // delete settings

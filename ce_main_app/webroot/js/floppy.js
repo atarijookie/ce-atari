@@ -123,6 +123,28 @@ CosmosEx.Floppy=function(){
     var $button=$(this);
     var slotid=$(this).data("slot");
     var formData = new FormData($form[0]);
+    
+    if(slotid == 100 || slotid == 101) {    // special case: insert config image or insert floppy test image
+        $.ajax({
+            url: '/api/v1/floppy/'+slotid,  //Server script to process data
+            type: 'PUT',
+            success: function(){
+                refreshFilenames();
+                $overlay.show(); 
+                setTimeout(onTimer, 1000);
+            },
+            error: function(){
+                $filename.show();
+            },
+            //Options to tell jQuery not to process data or worry about content-type.
+            cache: false,
+            contentType: false,
+            processData: false
+        });    
+    
+        return false;
+    }
+    
     function progressHandlingFunction(e){
       if(e.lengthComputable){
         $progress.attr({value:e.loaded,max:e.total});
@@ -167,6 +189,7 @@ CosmosEx.Floppy=function(){
     e.preventDefault();
     return false;
   };
+  
   return {
     init:function(){
         refreshFilenames();
