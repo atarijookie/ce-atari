@@ -407,21 +407,21 @@ void print_status(void)
 {
   	VT52_Goto_pos(0,0);
 
-	(void) Cconws("\33p[ CosmosEx FDD test.       Reads: ");
+	(void) Cconws("\33p[ CosmosEx FDD test.     Reads: ");
 	showInt(counts.runs, 4);
-    (void) Cconws(" ]\33q\r\n");
+    (void) Cconws("   ]\33q\r\n");
 	
-	(void) Cconws("\33p[       Good: ");
+	(void) Cconws("\33p[         Good: ");
 	showInt(counts.good, 4);
 	(void) Cconws("      Lazy: ");
 	showInt(counts.lazy, 4);
-    (void) Cconws("     ]\33q\r\n");
+    (void) Cconws("   ]\33q\r\n");
 
-	(void) Cconws("\33p[ Err Floprd: ");
+	(void) Cconws("\33p[   Err Floprd: ");
 	showInt(counts.errRead, 4);
 	(void) Cconws("  Err DATA: ");
 	showInt(counts.errData, 4);
-    (void) Cconws("     ]\33q\r\n");
+    (void) Cconws("   ]\33q\r\n");
 }
 
 void showMenu(void)
