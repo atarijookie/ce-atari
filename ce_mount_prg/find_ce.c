@@ -117,7 +117,7 @@ BYTE ce_identify(BYTE id, BYTE hddIf)
 		return FALSE;
 	}
 
-	if(strncmp((char *) pDmaBuffer, "CosmosEx floppy setup", 21) != 0) {     // the identity string doesn't match?
+	if(strncmp((char *) pDmaBuffer, "CosmosEx translated disk", 24) != 0) {     // the identity string doesn't match?
 		return FALSE;
 	}
 	

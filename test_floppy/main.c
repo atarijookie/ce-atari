@@ -415,13 +415,13 @@ void print_status(void)
 	showInt(counts.good, 4);
 	(void) Cconws("      Lazy: ");
 	showInt(counts.lazy, 4);
-    (void) Cconws("      ]\33q\r\n");
+    (void) Cconws("     ]\33q\r\n");
 
 	(void) Cconws("\33p[ Err Floprd: ");
 	showInt(counts.errRead, 4);
 	(void) Cconws("  Err DATA: ");
 	showInt(counts.errData, 4);
-    (void) Cconws("       ]\33q\r\n");
+    (void) Cconws("     ]\33q\r\n");
 }
 
 void showMenu(void)

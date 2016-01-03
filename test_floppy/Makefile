@@ -1,4 +1,4 @@
-TARGET	= cetst_fd.prg
+TARGET	= ce_tstfd.prg
 
 CC       = m68k-atari-mint-gcc
 STRIP    = m68k-atari-mint-strip
