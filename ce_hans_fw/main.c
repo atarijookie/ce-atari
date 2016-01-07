@@ -113,10 +113,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa015, 0x1206};                             // this means: hAns, 2015-12-06
+WORD version[2] = {0xa016, 0x0108};                             // this means: hAns, 2016-01-08
 
 char *VERSION_STRING_SHORT  = {"2.00"};
-char *DATE_STRING           = {"12/06/15"};
+char *DATE_STRING           = {"01/08/16"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
@@ -483,8 +483,13 @@ void handleAcsiCommand(void)
         resetXilinx();
     }
     
-    if(!isBusIdle()) {      // if the bus is not idle, do the reset
-        resetXilinx();
+    // The following goes only for SCSI interface, because current getXilinxStatus() (which is called from isBusIdle())
+    // triggers INT going low, and thus blocks FDD. The issue is somewhere in the Xilinx code or in the idea to use 
+    // both XPIO & XDMA going high for this getXilinxStatus(). 
+    if(!isAcsiNotScsi) {        // only for SCSI interface!
+        if(!isBusIdle()) {      // if the bus is not idle, do the reset
+            resetXilinx();
+        }
     }
 }
 
@@ -1635,6 +1640,7 @@ void getXilinxStatus(void)
 
     GPIOA->BRR	= aPIO | aDMA;          // aPIO and aDMA now LOW -- back to normal state
 
+    xilinxBusIdle   = val >> 7;         // highest bit to position of bit 0 - when 0 then SCSI is busy, when 1 then SCSI is idle
     xilinxHwFw      = val & 0x7f;       // store part as Info Byte
     hwVersion       = xilinxHwFw >> 4;  // get only HW version -- should be 2 for v.2, or 1 for v.1
     
@@ -1644,11 +1650,8 @@ void getXilinxStatus(void)
         } else {                        // FW type: ACSI
             isAcsiNotScsi   = 1;
         }
-        
-        xilinxBusIdle   = val >> 7;     // highest bit to position of bit 0 - when 0 then SCSI is busy, when 1 then SCSI is idle
     } else {                            // if it's HW v. 1 - it's ACSI
         isAcsiNotScsi   = 1;
-        xilinxBusIdle   = 1;            // if it's ACSI, it's always idle (this state is not returned yet from Xilinx)
     }
 }
 

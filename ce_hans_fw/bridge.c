@@ -94,7 +94,7 @@ void PIO_read(BYTE val)
         }
     }
     
-    resetXilinx();              //reset XILINX - put BSY, C/D, I/O in released states
+    resetXilinx();              // reset XILINX - put BSY, C/D, I/O in released states - needed for SCSI, doesn't harm anything in ACSI
     ACSI_DATADIR_WRITE();       // data as inputs (write)
 }
 
