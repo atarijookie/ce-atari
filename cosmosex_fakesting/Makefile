@@ -1,22 +1,23 @@
 TARGET	= ce_sting.prg
-SLIM	= yes
 
 CC		  = m68k-atari-mint-gcc
 STRIP	  = m68k-atari-mint-strip
 PRGFLAGS  = m68k-atari-mint-flags
-CFLAGS	  = -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar -nostdlib # -DDEBUG_STRING
-CFLAGS030 = -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar -nostdlib # -DDEBUG_STRING
+CFLAGS	  = -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar -nostdlib -DSLIM # -DDEBUG_STRING
+CFLAGS030 = -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar -nostdlib -DSLIM
 LDFLAGS	  = -Wl,--traditional-format -lgcc
 
 HDR     = $(wildcard *.h)
 CSRC    = $(wildcard *.c)
-SSRC    = startup.s tpl_middle.s vbl.s
+SSRC    = tpl_middle.s vbl.s
+STARTUP = startup.s
 
 OBJS = $(patsubst %.c,%.o,$(CSRC))
 OBJS030 = cache030.o
 
-$(TARGET): $(OBJS) $(OBJS030) $(SSRC) $(HDR)
-	$(CC) $(CFLAGS) -o $@ $(OBJS) $(OBJS030) $(SSRC) $(LDFLAGS)
+$(TARGET): $(STARTUP) $(OBJS) $(OBJS030) $(SSRC) $(HDR)
+	@echo [Compiling final app] $(@:.o=.c)
+	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(OBJS) $(OBJS030) $(SSRC) $(LDFLAGS)
 	$(STRIP) -s $@
 	$(PRGFLAGS) $@ --mno-fastram --mno-fastalloc --mno-fastload
 	
