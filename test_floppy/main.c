@@ -29,6 +29,7 @@ void showDiff(BYTE* bfr, int track, int side, int sector, char*range);
 DWORD getTicks(void);
 
 void print_status(void);
+void setImageGeometry(int tracks, int sides, int sectors);
 
 BYTE writeBfr[512];
 
@@ -42,8 +43,6 @@ struct {
     DWORD errData;
 } counts;
 
-#define SECTORS_PER_FLOPPY  (80 * 2 * 9 )
-
 struct {
     int  randCount;
     BYTE finish;
@@ -56,7 +55,15 @@ struct {
 } fl;
 
 //             TRACK SIDE SECTOR
-BYTE checksums[80][2][9];
+BYTE checksums[90][2][15];
+
+struct {
+    int sectors;
+    int tracks;
+    int sides;
+    
+    int totalSectors;
+} imgGeometry;
 
 void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnce);
 
@@ -85,27 +92,33 @@ int main(void)
 
         //---------------------
         if(req == 'r') {        // random     on TEST image ONCE
+            setImageGeometry(80, 2, 9);
             readTest(0, 1, 0);
         }
 
         if(req == 'n') {        // random     on TEST image ENDLESS
+            setImageGeometry(80, 2, 9);
             readTest(0, 1, 1);
         }
         
         if(req == 's') {        // sequential on TEST image ONCE
+            setImageGeometry(80, 2, 9);
             readTest(1, 1, 0);
         }
         //---------------------
         
         if(req == 'a') {        // random     on ANY image ONCE
+            setImageGeometry(82, 2, 10);
             readTest(0, 0, 0);
         }
 
         if(req == 'd') {        // random     on ANY image ENDLESS
+            setImageGeometry(82, 2, 10);
             readTest(0, 0, 1);
         }
         
         if(req == 'e') {        // sequential on ANY image ONCE
+            setImageGeometry(82, 2, 10);
             readTest(1, 0, 0);
         }
 	}
@@ -122,7 +135,14 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
     counts.errRead  = 0;
     counts.errData  = 0;
 
-    memset(checksums, 0, SECTORS_PER_FLOPPY);
+    int sect,tr,si;
+    for(si=0; si<imgGeometry.sides; si++) {
+        for(tr=0; tr<imgGeometry.tracks; tr++) {
+            for(sect=0; sect<imgGeometry.sectors; sect++) {
+                checksums[tr][si][sect] = 0;
+            }
+        }
+    }
     
     VT52_Clear_home();
     print_status();
@@ -135,7 +155,7 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
     fl.track    = 0;
     fl.sector   = 1;
     
-    fl.randCount = SECTORS_PER_FLOPPY - 1;
+    fl.randCount = imgGeometry.totalSectors - 1;
     
     VT52_Goto_pos(0, 24);
     int x = 11;
@@ -256,9 +276,9 @@ void updateFloppyPosition(BYTE sequentialNotRandom, BYTE endlessNotOnce)
     //-----------------
     // for random order
     if(!sequentialNotRandom) {      
-        fl.sector  = (Random() %  9) + 1;
-        fl.side    = (Random() %  2);
-        fl.track   = (Random() % 80);
+        fl.sector  = (Random() % imgGeometry.sectors) + 1;
+        fl.side    = (Random() % imgGeometry.sides);
+        fl.track   = (Random() % imgGeometry.tracks);
 
         if((fl.randCount % 20) == 0) {
             fl.newLine = 1;         // make new line after this
@@ -267,7 +287,7 @@ void updateFloppyPosition(BYTE sequentialNotRandom, BYTE endlessNotOnce)
         if(fl.randCount > 0) {      // more than 0 runs to go? 
             fl.randCount--;
         } else {                    // we did all the runs
-            fl.randCount = SECTORS_PER_FLOPPY - 1;
+            fl.randCount = imgGeometry.totalSectors - 1;
 
             if(!endlessNotOnce) {   // if once, quit
                 fl.finish = 1;      // quit after this
@@ -279,21 +299,21 @@ void updateFloppyPosition(BYTE sequentialNotRandom, BYTE endlessNotOnce)
     
     //-----------------
     // for sequential order
-    if(fl.sector < 9) {                 // not last sector? next sector
+    if(fl.sector < imgGeometry.sectors) {   // not last sector? next sector
         fl.sector++;
     } else {                            // last sector?
         fl.sector = 1;
         
         if(fl.side < 1) {               // side 0? 
-            fl.side = 1;
+            fl.side     = 1;
             fl.space    = 1;            // add space between sides
         } else {                        // side 1?
             fl.side     = 0;
             fl.newLine  = 1;            // make new line after this, because next track
             
-            if(fl.track < 79) {         // track 0 .. 78? next track!
+            if(fl.track < (imgGeometry.tracks - 1)) {   // Not the last track? Next track!
                 fl.track++;
-            } else {                    // track 79? restart or quit
+            } else {                                    // It's the last track? restart or quit
                 fl.track = 0;
                 
                 if(!endlessNotOnce) {   // if once, quit
@@ -336,11 +356,11 @@ BYTE readSector(int sector, int track, int side, BYTE checkData)    // 0 means g
 
 void calcCheckSum(BYTE *bfr, int sector, int track, int side)
 {
-    if(track < 0 || track > 79) {
+    if(track < 0 || track > 85) {
         return;
     }
     
-    if(sector < 1 || sector > 9) {
+    if(sector < 1 || sector > 15) {
         return;
     }
     
@@ -362,11 +382,13 @@ WORD getWholeCheckSum(void)
 {
     WORD cs = 0;
     
-    BYTE *csc = &checksums[0][0][0];
-    
-    int i;
-    for(i=0; i<SECTORS_PER_FLOPPY; i++) {
-        cs += (WORD) csc[i];
+    int sect,tr,si;
+    for(si=0; si<imgGeometry.sides; si++) {
+        for(tr=0; tr<imgGeometry.tracks; tr++) {
+            for(sect=0; sect<imgGeometry.sectors; sect++) {
+                cs += (WORD) checksums[tr][si][sect];
+            }
+        }
     }
 
     return cs;
@@ -543,4 +565,13 @@ void showHexWord(WORD val)
     
     showHexByte(a);
     showHexByte(b);
+}
+
+void setImageGeometry(int tracks, int sides, int sectors)
+{
+    imgGeometry.sectors = sectors;
+    imgGeometry.tracks  = tracks;
+    imgGeometry.sides   = sides;
+    
+    imgGeometry.totalSectors = sectors * tracks * sides;
 }
