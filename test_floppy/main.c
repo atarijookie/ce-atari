@@ -225,12 +225,11 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
 
             (void) Cconws("Finished.");
             
-            if(sequentialNotRandom) {
-                WORD cs = getWholeCheckSum();
-                (void)Cconws("\r\nImage checksum: ");
-                showHexWord(cs);
-                (void)Cconws("\r\n");
-            }
+            (void) Cconws("\r\n");
+            WORD cs = getWholeCheckSum();
+            (void)Cconws("\r\nImage checksum: ");
+            showHexWord(cs);
+            (void)Cconws("\r\n");
             
             print_status();
             Cnecin();
@@ -383,12 +382,24 @@ void calcCheckSum(BYTE *bfr, int sector, int track, int side)
 WORD getWholeCheckSum(void)
 {
     WORD cs = 0;
+    int rest = 0;
     
     int sect,tr,si;
     for(si=0; si<imgGeometry.sides; si++) {
         for(tr=0; tr<imgGeometry.tracks; tr++) {
             for(sect=0; sect<imgGeometry.sectors; sect++) {
-                cs += (WORD) checksums[tr][si][sect];
+                if(checksums[tr][si][sect] == 0) {  // no checksum for this sector? read and calculate it now
+                    readSector(sect + 1, tr, si, 0);
+                    Cconout('.');
+                    
+                    rest++;
+                    if(rest >= 40) {                // if would go out of screen, add new line
+                        (void) Cconws("\r\n");
+                        rest = 0;
+                    }
+                }
+            
+                cs += (WORD) checksums[tr][si][sect];   // add to the whole checksum
             }
         }
     }
