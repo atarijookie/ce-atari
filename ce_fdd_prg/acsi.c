@@ -36,6 +36,7 @@ void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     }
     
     //------------------
+    // FLOCK acquired, continue with rest
     
 	setdma((DWORD) buffer);                     // setup DMA transfer address 
 
@@ -68,10 +69,10 @@ void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 	// wr1 and wr2 are defined so we could toggle R/W bit and then setup Read / Write operation  
 	if(ReadNotWrite==1) {						
 		wr1 = DMA_WR;
-		wr2 = 0;
+		wr2 = HDC | A0;
 	} else {
 		wr1 = 0;
-		wr2 = DMA_WR;
+		wr2 = DMA_WR | HDC | A0;
 	}
 
     *dmaAddrMode = wr1 | NO_DMA | SC_REG;       // clear FIFO = toggle R/W bit 
