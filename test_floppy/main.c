@@ -29,7 +29,9 @@ void showDiff(BYTE* bfr, int track, int side, int sector, char*range);
 DWORD getTicks(void);
 
 void print_status(void);
+
 void setImageGeometry(int tracks, int sides, int sectors);
+void guessImageGeometry(void);
 
 BYTE writeBfr[512];
 
@@ -108,17 +110,17 @@ int main(void)
         //---------------------
         
         if(req == 'a') {        // random     on ANY image ONCE
-            setImageGeometry(82, 2, 10);
+            guessImageGeometry();
             readTest(0, 0, 0);
         }
 
         if(req == 'd') {        // random     on ANY image ENDLESS
-            setImageGeometry(82, 2, 10);
+            guessImageGeometry();
             readTest(0, 0, 1);
         }
         
         if(req == 'e') {        // sequential on ANY image ONCE
-            setImageGeometry(82, 2, 10);
+            guessImageGeometry();
             readTest(1, 0, 0);
         }
 	}
@@ -575,3 +577,51 @@ void setImageGeometry(int tracks, int sides, int sectors)
     
     imgGeometry.totalSectors = sectors * tracks * sides;
 }
+
+void guessImageGeometry(void)
+{
+    BYTE res;
+
+    int spt, tracks;
+    
+    VT52_Clear_home();
+    (void) Cconws("Estimating floppy geometry");
+    
+    for(spt=9; spt<15; spt++) {
+        res = readSector(spt, 0, 0, 0);
+        
+        if(res != 0) {                          // if failed to read this sector, than it has this many sectors per track
+            imgGeometry.sectors = spt - 1;
+            break;
+        }
+        
+        Cconout('.');
+    }
+    
+    for(tracks=78; tracks<85; tracks++) {
+        res = readSector(1, tracks, 0, 0);
+        
+        if(res != 0) {                          // if failed to read this track, than it has this many tracks
+            imgGeometry.tracks = tracks;
+            break;
+        }        
+        Cconout('.');
+    }
+    
+    imgGeometry.sides = 2;
+
+    // show the geometry to user
+    (void) Cconws("\r\nEstimated geometry: ");
+    showInt(imgGeometry.tracks, 2);
+    (void) Cconws(",");
+    int decimals = (imgGeometry.sectors < 10) ? 1 : 2;
+    showInt(imgGeometry.sectors, decimals);
+    (void) Cconws(",");
+    showInt(imgGeometry.sides, 1);
+    (void) Cconws("\r\n");
+    
+    imgGeometry.totalSectors = imgGeometry.sectors * imgGeometry.tracks * imgGeometry.sides;        // calculate how many sectors there are on this floppy
+    
+    Cnecin();
+}
+
