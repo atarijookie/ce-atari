@@ -1,37 +1,26 @@
 #ifndef _ACSI_H_
 #define _ACSI_H_
 
-// ------------------------------------------ 
+#include "global.h" 
 
-#ifndef FALSE
-    #define FALSE		0
-    #define TRUE		1
-#endif
+// ------------------------------------------ 
 
 #define OK			0           // OK status 
 #define ACSIERROR	0xff        // ERROR status (timeout) 
 
-#define MAXSECTORS	254          // Max # sectors for a DMA 
+#define MAXSECTORS	254         // Max # sectors for a DMA 
 
 // Timing constants 
-#define LTIMEOUT	600L         // long-timeout 3 sec 
+#define LTIMEOUT	600L        // long-timeout 3 sec 
 #define STIMEOUT	20L         // short-timeout 100 msec 
 
 // ------------------------------------------ 
-
-#include <stdint.h>
-
-#ifndef BYTE
-    #define BYTE  	unsigned char
-    #define WORD  	uint16_t
-    #define DWORD 	uint32_t
-#endif
 
 // mfp chip register  
 #define mfpGpip			((volatile BYTE *) 0xFFFA01)
 
 // DMA chip registers and flag 
-#define IO_DINT     0x20        // DMA interrupt (FDC or HDC) 
+#define IO_DINT     0x20        // DMA interrupt (FDC or HDC)
 
 #define dmaAddrSectCnt	((volatile WORD *) 0xFF8604)
 #define dmaAddrData		((volatile WORD *) 0xFF8604)
@@ -62,28 +51,33 @@
 #define DATA_REQ     0x0004     // DRQ line state 
 
 #define FLOCK      ((volatile WORD  *) 0x043E) // Floppy lock variable  
-#define HZ_200     ((volatile DWORD *) 0x04BA) // 200 Hz system clock  
 
 #define ACSI_READ	1
 #define ACSI_WRITE	0
 
-#define CMD_LENGTH_SHORT	6
-#define CMD_LENGTH_LONG		13
+#define SCSI_CMD_INQUIRY	0x12
+
 //---------------------------------------
 BYTE wait_dma_cmpl(DWORD t_ticks);
 BYTE fdone(void);
 BYTE qdone(void);
 void setdma(DWORD addr);
 BYTE hdone(void);
-BYTE endcmd(WORD mode);
+void endcmd(WORD mode);
 
-BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-
-extern BYTE deviceID;
-extern BYTE commandShort[CMD_LENGTH_SHORT];
-extern BYTE commandLong[CMD_LENGTH_LONG];
-extern BYTE *pDmaBuffer;
-
+void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 //---------------------------------------
+#ifdef ONPC
+
+typedef struct 
+{
+    BYTE ReadNotWrite;
+    BYTE cmd[14];
+    BYTE cmdLength;
+    BYTE sCountHi, sCountLo;
+} __attribute__((packed)) AcsiStream;
+//---------------------------------------
+
+#endif
 
 #endif

@@ -21,6 +21,7 @@
 #include "con_man.h"
 #include "stdlib.h"
 #include "setup.h"
+#include "find_ce.h"
 
 void install_vbl(void);
 
@@ -55,14 +56,10 @@ BYTE commandLong[CMD_LENGTH_LONG]	= {0x1f, 0xA0, 'C', 'E', HOSTMOD_NETWORK_ADAPT
 BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];  
 BYTE *pDmaBuffer;
 
-BYTE ce_findId(void); 
-
 //---------------------------------------
 
-uint32 localIP;
-
-#define REQUIRED_NETADAPTER_VERSION     0x0100
-WORD requiredVersion;
+DWORD localIP;
+WORD  requiredVersion;
 
 void initJumpTable(void);
 
@@ -87,7 +84,7 @@ int main(void)
 	pDmaBuffer = &dmaBuffer[2];
 	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);  // remove odd bit if the address was odd
 
-	BYTE found = ce_findId();                                   // try to find the CosmosEx device on ACSI bus
+	BYTE found = findDevice();                                  // try to find the CosmosEx device on ACSI bus
 
     if(!found) {								                // not found? quit
         sleep(3);
@@ -168,66 +165,6 @@ char *getvstr (char *name)
 	return "0";
 }
 
-// send an IDENTIFY command to specified ACSI ID and check if the result is as expected
-BYTE ce_identify(void)
-{
-	WORD res;
-  
-	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
-	commandShort[4] = NET_CMD_IDENTIFY;
-  
-	memset(pDmaBuffer, 0, 512);              									// clear the buffer 
-
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// issue the command and check the result 
-
-	if(res != OK) {                        										// if failed, return FALSE 
-		return 0;
-	}
-
-	if(strncmp((char *) pDmaBuffer, "CosmosEx network module", 23) != 0) {		// the identity string doesn't match? 
-		return 0;
-	}
-    
-    //----------------
-    // if we got here, then this ACSI ID is the CosmosEx network module, so get the configuration (which starts from 32nd byte)
-    requiredVersion = getWord(pDmaBuffer + 32);
-    localIP         = getDword(pDmaBuffer + 34);
-    
-	//----------------
-    
-	return 1;                             										// success 
-}
-
-// this function scans the ACSI bus for any active CosmosEx translated drive
-BYTE ce_findId(void)
-{
-	char bfr[2], res, i;
-
-	bfr[1] = 0;
-	deviceID = 0;
-	
-	(void) Cconws("Looking for CosmosEx: ");
-
-	for(i=0; i<8; i++) {
-		bfr[0] = i + '0';
-		(void) Cconws(bfr);
-
-		deviceID = i;									// store the tested ACSI ID 
-		res = Supexec(ce_identify);  					// try to read the IDENTITY string 
-		
-		if(res == 1) {                           		// if found the CosmosEx 
-			(void) Cconws(" <- got it");
-			(void) Cconws("\r\n");
-
-			return 1;
-		}
-	}
-
-	// if not found 
-    (void) Cconws("\r\nCosmosEx not found on ACSI bus, not installing driver.");
-	return 0;
-}
-
 void showAppVersion(void)
 {
     char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
@@ -297,4 +234,23 @@ void showInt(int value, int length)
     (void) Cconws(tmp);                     // write it out
 }
 
+void logMsg(char *logMsg)
+{
+//    if(showLogs) {
+//        (void) Cconws(logMsg);
+//    }
+}
+
+void logMsgProgress(DWORD current, DWORD total)
+{
+//    if(!showLogs) {
+//        return;
+//    }
+
+//    (void) Cconws("Progress: ");
+//    showHexDword(current);
+//    (void) Cconws(" out of ");
+//    showHexDword(total);
+//    (void) Cconws("\n\r");
+}
 

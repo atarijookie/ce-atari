@@ -1,51 +1,23 @@
 //--------------------------------------------------
-#include <mint/osbind.h>
-#include "stdlib.h"
-
+#include <mint/sysbind.h>
 #include "acsi.h"
+
+#include "hdd_if.h"
 #include "stdlib.h"
 
-// -------------------------------------- 
-// the following variables are global ones, because the acsi_cmd() could be called from user mode, so the params will be stored to these global vars and then the acsi_cmd_supervisor() will handle that...
-BYTE  gl_ReadNotWrite;
-BYTE *gl_cmd;
-BYTE  gl_cmdLength;
-BYTE *gl_buffer;
-WORD  gl_sectorCount;
-
-static BYTE acsi_cmd_supervisor(void);
-
-extern WORD fromVbl;                    // this is non-zero when acsi_cmd is called from VBL (no need for Supexec() then)
-// -------------------------------------- 
-// call this from user mode
-BYTE acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
-    // store params to global variables
-    gl_ReadNotWrite = ReadNotWrite;
-    gl_cmd          = cmd;
-    gl_cmdLength    = cmdLength;
-    gl_buffer       = buffer;
-    gl_sectorCount  = sectorCount;
-
-    BYTE ret;
-    
-    if(fromVbl) {                       // if we're running from VBL, we're in supervisor mode, no need for Supexec()
-        ret = acsi_cmd_supervisor();
-    } else {                            // not called from VBL? Call through Supexec()
-        ret = Supexec(acsi_cmd_supervisor);
-    }
-    
-    return ret;
-}
-
-// -------------------------------------- 
-// call the following from supervisor, with all the gl_ vars set
-static BYTE acsi_cmd_supervisor(void)
-{
-	DWORD status;
 	WORD i, wr1, wr2;
 
-    DWORD end = getTicks_fromSupervisor() + 200;    // calculate the terminating tick count, where we should stop looking for unlocked FLOCK
+    //--------
+    // init result to fail codes
+    hdIf.success        = FALSE;
+    hdIf.statusByte     = ACSIERROR;
+    hdIf.phaseChanged   = FALSE;
+    
+    //------------------
+    // try to acquire FLOCK if possible
+    DWORD end = getTicks() + 200;               // calculate the terminating tick count, where we should stop looking for unlocked FLOCK
     
     WORD locked;
     while(1) {                                  // while not time out, try again
@@ -56,85 +28,94 @@ static BYTE acsi_cmd_supervisor(void)
             break;
         }
         
-        if(getTicks_fromSupervisor() >= end) {  // on time out - fail, return ACSIERROR
-            return ACSIERROR;
+        if(getTicks() >= end) {                 // on time out - fail, return ACSIERROR
+            hdIf.success = FALSE;
+            return;
         }
     }
     
-	setdma((DWORD) gl_buffer);                  // setup DMA transfer address 
+    //------------------
+    // FLOCK acquired, continue with rest
+    
+	setdma((DWORD) buffer);                     // setup DMA transfer address 
 
 	//*******************************
 	// transfer 0th cmd byte 
-	*dmaAddrMode = NO_DMA | HDC;              	// write 1st byte (0) with A1 low 
-	*dmaAddrData = gl_cmd[0];
-	*dmaAddrMode = NO_DMA | HDC | A0;         	// A1 high again 
+	*dmaAddrMode = NO_DMA | HDC;                // write 1st byte (0) with A1 low 
+	*dmaAddrData = cmd[0];
+	*dmaAddrMode = NO_DMA | HDC | A0;           // A1 high again 
 
 	if (qdone() != OK) {					    // wait for ack 
-		hdone();                          	    // restore DMA device to normal 
+		hdone();                                // restore DMA device to normal 
 
-		return ACSIERROR;
+        hdIf.success = FALSE;
+		return;
 	}
 	//*******************************
 	// transfer middle cmd bytes 
-	for(i=1; i<(gl_cmdLength-1); i++) {
-		*dmaAddrData = gl_cmd[i];
+	for(i=1; i<(cmdLength-1); i++) {
+		*dmaAddrData = cmd[i];
 		*dmaAddrMode = NO_DMA | HDC | A0;
 	
 		if (qdone() != OK) {				    // wait for ack 
 			hdone();                            // restore DMA device to normal 
 			
-			return ACSIERROR;
+            hdIf.success = FALSE;
+            return;
 		}
 	}
 	
 	// wr1 and wr2 are defined so we could toggle R/W bit and then setup Read / Write operation  
-	if(gl_ReadNotWrite==1) {						
+	if(ReadNotWrite==1) {						
 		wr1 = DMA_WR;
-		wr2 = 0;
+		wr2 = HDC | A0;
 	} else {
 		wr1 = 0;
-		wr2 = DMA_WR;
+		wr2 = DMA_WR | HDC | A0;
 	}
 
-    *dmaAddrMode = wr1 | NO_DMA | SC_REG;           // clear FIFO = toggle R/W bit 
-    *dmaAddrMode = wr2 | NO_DMA | SC_REG;           // and select sector count reg  
+    *dmaAddrMode = wr1 | NO_DMA | SC_REG;       // clear FIFO = toggle R/W bit 
+    *dmaAddrMode = wr2 | NO_DMA | SC_REG;       // and select sector count reg  
 
-    *dmaAddrSectCnt = gl_sectorCount;               // write sector cnt to DMA device 
-    *dmaAddrMode = wr2 | NO_DMA | HDC | A0;         // select DMA data register again 
+    *dmaAddrSectCnt = sectorCount;              // write sector cnt to DMA device 
+    *dmaAddrMode = wr2 | NO_DMA | HDC | A0;     // select DMA data register again 
 
-    *dmaAddrData = gl_cmd[gl_cmdLength - 1];        // transfer the last command byte              
-    *dmaAddrMode = wr2;                             // start DMA transfer 
+    *dmaAddrData = cmd[cmdLength - 1];          // transfer the last command byte              
+    *dmaAddrMode = wr2;                         // start DMA transfer 
 
-    status = endcmd(wr2 | NO_DMA | HDC | A0);       // wait for DMA completion 
-	hdone();                                        // restore DMA device to normal 
-
-	return status;
+    endcmd(wr2 | NO_DMA | HDC | A0);            // wait for DMA completion 
+	hdone();                                    // restore DMA device to normal 
 }
+
 //**************************************************************************
-BYTE endcmd(WORD mode)
+void endcmd(WORD mode)
 {
 	WORD val;
 
-	if (fdone() != OK)                  // wait for operation done ack 
-		return ACSIERROR;
+	if (fdone() != OK) {                // wait for operation done ack 
+        hdIf.success = FALSE;           // failed?
+
+		return;
+    }
 
 	*dmaAddrMode = mode;                // write mode word to mode register 
 
 	val = *dmaAddrData;
 	val = val & 0x00ff;
 
-	return val;							// return completion byte 
+    hdIf.success        = TRUE;         // success!
+    hdIf.statusByte     = val;          // store status byte
 }
 //**************************************************************************
 BYTE hdone(void)
 {
 	WORD val;
 
-	*dmaAddrMode = NO_DMA;        	// restore DMA mode register 
-	*FLOCK = 0;                 		// FDC operations may get going again 
+	*dmaAddrMode = NO_DMA;              // restore DMA mode register 
+	*FLOCK = 0;                         // FDC operations may get going again 
 	
 	val = *dmaAddrStatus;
-	return val;						// read and return DMA status register 
+	return val;                         // read and return DMA status register 
 }
 //**************************************************************************
 void setdma(DWORD addr)
@@ -160,12 +141,12 @@ BYTE wait_dma_cmpl(DWORD t_ticks)
 	BYTE gpip;
  
 	now = *HZ_200;
-	until = t_ticks + now;   			// calc value timer must get to 
+	until = t_ticks + now;              // calc value timer must get to 
 
 	while(1) {
 		gpip = *mfpGpip;
 		
-		if ((gpip & IO_DINT) == 0) {	// Poll DMA IRQ interrupt 
+		if ((gpip & IO_DINT) == 0) {    // Poll DMA IRQ interrupt 
 			return OK;                 	// got interrupt, then OK 
 		}
 
@@ -176,7 +157,7 @@ BYTE wait_dma_cmpl(DWORD t_ticks)
 		}
 	}
 
-	return ACSIERROR;                  // no interrupt, and timer expired, 
+	return ACSIERROR;                   // no interrupt, and timer expired, 
 }
 //**************************************************************************
 

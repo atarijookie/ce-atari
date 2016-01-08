@@ -14,6 +14,7 @@
 #include "globdefs.h"
 #include "icmp.h"
 #include "con_man.h"
+#include "hdd_if.h"
 
 #define  M_YEAR    16
 #define  M_MONTH   11
@@ -74,13 +75,13 @@ int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_len
     }
     
     // send it to host
-    BYTE res = acsi_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBfr, sectorCount);
+    hdIf.cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBfr, sectorCount);
 
-	if(res != OK) {                                 // if failed, return FALSE 
+	if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // if failed, return FALSE 
 		return E_LOSTCARRIER;
 	}
 
-    return extendByteToWord(res);                   // return the status, possibly extended to int16
+    return extendByteToWord(hdIf.statusByte);           // return the status, possibly extended to int16
 }
 
 int16 ICMP_handler (int16 (* handler) (IP_DGRAM *), int16 flag)
@@ -153,9 +154,9 @@ void icmp_processData(uint32 bytesToReadIcmp)
     commandShort[5] = (BYTE) sectors;                           // and sector count
     
     // send it to host
-    BYTE res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, sectors);
+    hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, sectors);
 
-	if(res != OK) {                                             // if failed
+	if(!hdIf.success || hdIf.statusByte != E_NORMAL) {          // if failed
 		return;
 	}
 

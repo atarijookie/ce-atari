@@ -7,6 +7,7 @@
 #include <stdio.h>
 
 #include "globdefs.h"
+#include "hdd_if.h"
 #include "con_man.h"
 #include "icmp.h"
 #include "setup.h"
@@ -265,9 +266,9 @@ int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
 		commandLong[6] = handle;
         commandLong[7] = delimiter;
     
-		BYTE res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);      // send command to host over ACSI
+		hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);      // send command to host over ACSI
 
-		if(res != E_NORMAL) {                                                               // failed? say that no data was transfered
+		if(!hdIf.success || hdIf.statusByte != E_NORMAL) {                                  // failed? say that no data was transfered
 			return E_NODATA;
 		}
         
@@ -318,7 +319,6 @@ int handle_valid(int16 h)
 
 void update_con_info(BYTE forceUpdate)
 {
-	DWORD res;
 	static DWORD lastUpdate = 0;
 	DWORD now = getTicks();
 
@@ -334,9 +334,9 @@ void update_con_info(BYTE forceUpdate)
 	commandShort[4] = NET_CMD_CN_UPDATE_INFO;								// store function number 
 	commandShort[5] = 0;										
 	
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);   // send command to host over ACSI 
+	hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);   // send command to host over ACSI 
 	
-    if(res != OK) {							                                // error? 
+    if(!hdIf.success || hdIf.statusByte != E_NORMAL) {							                                // error? 
 		return;														
 	}
     
@@ -408,10 +408,10 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
     pBfr = storeWord    (pBfr, lPort);
 
     // send it to host
-    BYTE res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+    hdIf.cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-    if(handleIsFromCE(res)) {                       // if it's CE handle
-        int stHandle = handleCEtoAtari(res);        // convert it to ST handle
+    if(handleIsFromCE(hdIf.statusByte)) {                   // if it's CE handle
+        int stHandle = handleCEtoAtari(hdIf.statusByte);    // convert it to ST handle
         int proto, status;
         
         // store info to CIB and CAB structures
@@ -435,7 +435,7 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
     } 
 
     // it's not a CE handle
-    return extendByteToWord(res);                   // extend the BYTE error code to WORD
+    return extendByteToWord(hdIf.statusByte);       // extend the BYTE error code to WORD
 }
 
 //-------------------------------------------------------------------------------
@@ -461,7 +461,7 @@ int16 connection_close(int tcpNotUdp, int16 handle, int16 timeout)
     pBfr = storeWord    (pBfr, timeout);
 
     // send it to host
-    acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+    hdIf.cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
     // don't handle failures, just pretend it's always closed just fine
 
@@ -511,31 +511,28 @@ int16 connection_send(int tcpNotUdp, int16 handle, void *buffer, int16 length)
     }
     
     // send it to host
-    BYTE res = acsi_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBfr, sectorCount);
+    hdIf.cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBfr, sectorCount);
 
-
-	if(res != OK) {                                 // if failed, return FALSE 
+	if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // if failed, return FALSE 
 		return E_LOSTCARRIER;
 	}
 
-    return extendByteToWord(res);                   // return the status, possibly extended to int16
+    return extendByteToWord(hdIf.statusByte);           // return the status, possibly extended to int16
 }
 
 //-------------------------------------------------------------------------------
 
 int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
 {
-    BYTE res;
-    
     commandShort[4] = NET_CMD_RESOLVE;
     commandShort[5] = 0;
     
     strcpy((char *) pDmaBuffer, domain);                                // copy in the domain or dotted quad IP address
 
     // send it to host
-    res = acsi_cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+    hdIf.cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(res != OK) {                                                     // if failed, return FALSE 
+	if(!hdIf.success || hdIf.statusByte != E_NORMAL) {
 		return E_CANTRESOLVE;
 	}
 
@@ -544,14 +541,14 @@ int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
     commandShort[4] = NET_CMD_RESOLVE_GET_RESPONSE;
     
     while(1) {                                                          // repeat this command few times, as it might reply with 'I didn't finish yet'
-        res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+        hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-        if(res == RES_DIDNT_FINISH_YET) {                               // if not finished, try again
+        if(hdIf.statusByte == RES_DIDNT_FINISH_YET) {                   // if not finished, try again
             sleepMs(250);                                               // wait 250 ms before trying again
             continue;
         }
     
-        if(res != OK) {                                                 // if failed, return FALSE 
+        if(hdIf.statusByte != OK) {                                     // if failed, return FALSE 
             return E_CANTRESOLVE;
         }
         
@@ -667,9 +664,9 @@ DWORD readData(int16 handle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
                 sectorCount++;
             }
             
-			BYTE res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // Read as much as we can to ST RAM first - send command to host over ACSI 
+			hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // Read as much as we can to ST RAM first - send command to host over ACSI 
 
-			if(res == RW_ALL_TRANSFERED) {
+			if(hdIf.statusByte == RW_ALL_TRANSFERED) {
 				memcpy(bfr, FastRAMBuffer, bytes_to_read);                                                  // Yup, so copy data to its rightful place
 				bfr=bfr+FASTRAM_BUFFER_SIZE;
 				actual_bytes_read = actual_bytes_read + bytes_to_read;
@@ -678,16 +675,16 @@ DWORD readData(int16 handle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 			else
 			{
 				// if the result is also not partial transfer, then some other error happened, return that no data was transfered
-				if(res != RW_PARTIAL_TRANSFER ) {
+				if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
 					return 0;	
 				}
 
 				// if we got here, then partial transfer happened, see how much data we got
 				commandShort[4] = NET_CMD_CN_GET_DATA_COUNT;
 				commandShort[5] = handle;										
-				res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);   // send command to host over ACSI
+				hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);   // send command to host over ACSI
 		
-				if(res != E_NORMAL) {                                                       // failed? say that no data was transfered
+				if(!hdIf.success || hdIf.statusByte != E_NORMAL) {                                                       // failed? say that no data was transfered
 					return 0;
 				}
 		
@@ -706,15 +703,19 @@ DWORD readData(int16 handle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 		commandLong[8] = cnt >>  8;
 		commandLong[9] = cnt  & 0xff;
 	
-		BYTE res = acsi_cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);     // Normal read to ST RAM - send command to host over ACSI 
+		hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);     // Normal read to ST RAM - send command to host over ACSI 
 	
+        if(!hdIf.success) {
+            return 0;
+        }
+    
 		// if all data transfered, return count of all data
-		if(res == RW_ALL_TRANSFERED) {
+		if(hdIf.statusByte == RW_ALL_TRANSFERED) {
 			return cnt;
 		}
 
 		// if the result is also not partial transfer, then some other error happened, return that no data was transfered
-		if(res != RW_PARTIAL_TRANSFER ) {
+		if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
 			return 0;	
 		}
 	
@@ -722,13 +723,13 @@ DWORD readData(int16 handle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 		commandShort[4] = NET_CMD_CN_GET_DATA_COUNT;
 		commandShort[5] = handle;										
 	
-		res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);           // send command to host over ACSI
+		hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);         // send command to host over ACSI
 
-		if(res != E_NORMAL) {                                                               // failed? say that no data was transfered
+		if(!hdIf.success || hdIf.statusByte != E_NORMAL) {                          // failed? say that no data was transfered
 			return 0;
 		}
 
-    	count = getDword(pDmaBuffer);                                                       // read how much data was read
+    	count = getDword(pDmaBuffer);                                               // read how much data was read
 	}
 	return count;
 }
