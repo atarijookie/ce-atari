@@ -587,8 +587,9 @@ void guessImageGeometry(void)
     VT52_Clear_home();
     (void) Cconws("Estimating floppy geometry");
     
+    imgGeometry.sectors = 9;
     for(spt=9; spt<15; spt++) {
-        res = readSector(spt, 0, 0, 0);
+        res = readSector(spt, 1, 0, 0);
         
         if(res != 0) {                          // if failed to read this sector, than it has this many sectors per track
             imgGeometry.sectors = spt - 1;
@@ -598,6 +599,7 @@ void guessImageGeometry(void)
         Cconout('.');
     }
     
+    imgGeometry.tracks = 80;
     for(tracks=78; tracks<85; tracks++) {
         res = readSector(1, tracks, 0, 0);
         
