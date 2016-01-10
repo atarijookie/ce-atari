@@ -164,6 +164,8 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
     
     showLineStart(sequentialNotRandom, fl.track);
     
+    BYTE isAfterStartOrError = 1;
+    
     while(1) {
         //---------------------------------
         // code for termination of test by keyboard
@@ -194,24 +196,30 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
 
         //---------------------------------
         // evaluate the result
-        counts.runs++;          // increment the count of runs
+        counts.runs++;                      // increment the count of runs
         
         VT52_Goto_pos(x, 24);
         
-        if(bRes == 0) {         // read and DATA good
-            if(ms > 500) {      // operation was taking too much time? Too lazy!
+        if(bRes == 0) {                     // read and DATA good
+            if(ms > 500 && !isAfterStartOrError) {  // operation was taking too much time? Too lazy! (but only if it's not after error or start, that way lazy is expected)
                 counts.lazy++;
                 Cconout('L');
-            } else {            // operation was fast enough
+            } else {                        // operation was fast enough
                 counts.good++;
                 Cconout('*');
             }
-        } else if(bRes == 1) {  // operation failed - Floprd failed
+            
+            isAfterStartOrError = 0;        // mark that error didn't happen, so next lazy read is really lazy read
+        } else if(bRes == 1) {              // operation failed - Floprd failed
             counts.errRead++;
             Cconout('!');
-        } else if(bRes == 2) {  // operation failed - data mismatch
+            
+            isAfterStartOrError = 1;        // mark that error happened, next read might be lazy and it will be OK (floppy needs some time to get back to normal)
+        } else if(bRes == 2) {              // operation failed - data mismatch
             counts.errData++;
             Cconout('D');
+            
+            isAfterStartOrError = 0;        // mark that error didn't happen, so next lazy read is really lazy read
         }
 
         print_status();
