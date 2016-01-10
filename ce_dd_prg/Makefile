@@ -10,8 +10,8 @@ CFLAGS      = -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 CFLAGS030   = -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS  = -Wl,--traditional-format -lgcc
 
-HDR      = xbra.h acsi.h scsi.h                  gemdos.h gemdos_errno.h translated.h bios.h main.h find_ce.h hdd_if.h global.h
-CSRC     = xbra.c acsi.c scsi_falcon.c scsi_tt.c gemdos.c gemdos_rw.c gemdos_pexec.c  bios.c main.c find_ce.c hdd_if.c
+HDR      = xbra.h acsi.h scsi.h                  gemdos.h gemdos_errno.h translated.h bios.h main.h find_ce.h hdd_if.h global.h screen.h
+CSRC     = xbra.c acsi.c scsi_falcon.c scsi_tt.c gemdos.c gemdos_rw.c gemdos_pexec.c  bios.c main.c find_ce.c hdd_if.c          screen.c
 SSRC     = gemdos_asm.s bios_asm.s
 
 ifeq ($(SLIM),yes)
