@@ -255,12 +255,14 @@ void CCoreThread::run(void)
             
             if(!hansAlive && !flags.noReset && (now - lastFwInfoTime.hansResetTime) >= 3000) {
                 printf("\033[2KHans not alive, resetting Hans.\n");
+                Debug::out(LOG_INFO, "Hans not alive, resetting Hans.");
                 lastFwInfoTime.hansResetTime = now;
                 Utils::resetHans();
             }
 
             if(!franzAlive && !flags.noReset && (now - lastFwInfoTime.franzResetTime) >= 3000) {
                 printf("\033[2KFranz not alive, resetting Franz.\n");
+                Debug::out(LOG_INFO, "Franz not alive, resetting Franz.");
                 lastFwInfoTime.franzResetTime = now;
                 Utils::resetFranz();
             }
@@ -933,16 +935,16 @@ void CCoreThread::handleSendTrack(void)
 
     int remaining   = 15000 - (4*2) - 2;		// this much bytes remain to send after the received ATN
 
-    Debug::out(LOG_DEBUG, "ATN_SEND_TRACK -- track %d, side %d", track, side);
-
     int tr, si, spt;
     floppyImageSilo.getParams(tr, si, spt);      // read the floppy image params
+
+    Debug::out(LOG_DEBUG, "ATN_SEND_TRACK -- Franz wants: [track %d, side %d]. Current image has: [track %d, side %d, sectors/track: %d]", track, side, tr, si, spt);
 
     BYTE *encodedTrack;
     int countInTrack;
 
     if(side < 0 || side > 1 || track < 0 || track >= tr) {      // side / track out of range? use empty track
-        Debug::out(LOG_ERROR, "Side / Track out of range, returning empty track");
+        Debug::out(LOG_ERROR, "Side / Track out of range, returning empty track. Franz wants: [track %d, side %d], but current image has only: [track %d, side %d, sectors/track: %d]", track, side, tr, si, spt);
         
         encodedTrack = floppyImageSilo.getEmptyTrack();
     } else {                                                    // side + track within range? use encoded track

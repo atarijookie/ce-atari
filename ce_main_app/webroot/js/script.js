@@ -483,6 +483,16 @@ CosmosEx.Remote=function(){
 					}
                 });
 
+            //Start recievibg screencast from ST
+            bindClickHelper("button#screenshot", function(e){		
+                $.ajax({
+                    type: 'POST',
+                    url: '/app/screencast/do_screenshot',
+                    data: JSON.stringify({ "action":"do_screenshot" }),
+                    contentType: 'application/json'
+                });
+            });
+
             //close feature bubble on x
             bindClickHelper("#info-features a.close",closeAlert);
             //close help

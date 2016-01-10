@@ -19,6 +19,7 @@
 #include "gemdos_errno.h"
 
 extern TFlags flags;
+volatile bool doScreenShot;
 
 void TranslatedDisk::onDsetdrv(BYTE *cmd)
 {
@@ -1185,6 +1186,12 @@ void TranslatedDisk::onDrvMap(BYTE *cmd)
     }
     
     dataTrans->addDataWord(drives);         // drive bits
+    dataTrans->addDataWord(0);              // add empty WORD - for future extension to 32 drives
+
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onDrvMap - doScreenShot: %d", (int) doScreenShot);
+    dataTrans->addDataWord(doScreenShot); // should we send one screen shot?
+    doScreenShot = false;
+    
     dataTrans->padDataToMul16();            // pad to multiple of 16
 
     dataTrans->setStatus(E_OK);

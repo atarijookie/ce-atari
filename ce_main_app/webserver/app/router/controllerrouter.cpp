@@ -7,6 +7,9 @@
 #include "../controller/debugcontroller.h"
 #include "../controller/screencastcontroller.h"
 #include "../../../config/configstream.h"
+#include "../../../debug.h"
+
+extern volatile bool doScreenShot;
 
 ControllerRouter::ControllerRouter(ConfigService* pxDateService, FloppyService* pxFloppyService, ScreencastService *pxScreencastService):
     pxDateService(pxDateService),pxFloppyService(pxFloppyService),pxScreencastService(pxScreencastService)
@@ -85,6 +88,13 @@ bool ControllerRouter::handleGet(CivetServer *server, struct mg_connection *conn
         delete pxController;
         return processed;
     }
+    
+    if( controllerAction=="screencast/do_screenshot" ) {
+        Debug::out(LOG_DEBUG, "ScreenCast - request for screenshot");
+        doScreenShot = true;
+        return true;
+    }
+    
     if( controllerAction=="screencast/getscreen" )
     {
         ScreencastController *pxController=new ScreencastController(pxScreencastService);
