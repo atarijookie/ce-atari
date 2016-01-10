@@ -149,8 +149,8 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 
 // macros for getting data from buffer - defined for big and little endian
 // big endian (atari)
-#define getWord(POINTER)        ((WORD)  *((WORD  *) POINTER))
-#define getDword(POINTER)       ((DWORD) *((DWORD *) POINTER))
+#define getWord(POINTER)        ((WORD)  *((WORD  *) (POINTER)))
+#define getDword(POINTER)       ((DWORD) *((DWORD *) (POINTER)))
 
 // little endian (pc)
 //#define getWord(POINTER)        ( (((WORD) *POINTER)<<8) | ((WORD) *(POINTER+1)))

@@ -1,5 +1,5 @@
 #include <mint/osbind.h> 
-#include "acsi.h"
+#include "hdd_if.h"
 #include "stdlib.h"
 #include "translated.h"
 
@@ -40,5 +40,5 @@ void writeScreen(BYTE command, BYTE screenmode, BYTE *bfr, DWORD cnt)
 		sectorCount++;
 	}
 	
-	acsi_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// send command to host over ACSI 
+	(*hdIf.cmd)(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// send command to host over ACSI 
 } 
