@@ -8,8 +8,7 @@
 #include "../controller/screencastcontroller.h"
 #include "../../../config/configstream.h"
 #include "../../../debug.h"
-
-extern volatile bool doScreenShot;
+#include "../../../global.h"
 
 ControllerRouter::ControllerRouter(ConfigService* pxDateService, FloppyService* pxFloppyService, ScreencastService *pxScreencastService):
     pxDateService(pxDateService),pxFloppyService(pxFloppyService),pxScreencastService(pxScreencastService)
@@ -89,9 +88,21 @@ bool ControllerRouter::handleGet(CivetServer *server, struct mg_connection *conn
         return processed;
     }
     
+    if( controllerAction=="screencast/screenshot_vbl_enable" ) {
+        Debug::out(LOG_DEBUG, "ScreenCast - enabling screenshot VBL in CE_DD");
+        events.screenShotVblEnabled = true;
+        return true;
+    }
+    
+    if( controllerAction=="screencast/screenshot_vbl_disable" ) {
+        Debug::out(LOG_DEBUG, "ScreenCast - disabling screenshot VBL in CE_DD");
+        events.screenShotVblEnabled = false;
+        return true;
+    }
+
     if( controllerAction=="screencast/do_screenshot" ) {
         Debug::out(LOG_DEBUG, "ScreenCast - request for screenshot");
-        doScreenShot = true;
+        events.doScreenShot = true;
         return true;
     }
     

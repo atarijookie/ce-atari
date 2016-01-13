@@ -15,10 +15,9 @@
 
 #include "../../../lib/cjson-code-58/cJSON.h"
 #include "../../../debug.h"
+#include "../../../global.h"
 
 #include "service/floppyservice.h"
-
-extern volatile BYTE insertSpecialFloppyImageId;
 
 FloppyResource::FloppyResource(FloppyService *pxFloppyService) : pxFloppyService(pxFloppyService)  
 {
@@ -100,14 +99,14 @@ bool FloppyResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         int iSlot=atoi(sResourceInfo.c_str());
         
         if(iSlot == 100) {      // special case -- slot 100 == INSERT CONFIG IMAGE
-            insertSpecialFloppyImageId = SPECIAL_FDD_IMAGE_CE_CONF;
+            events.insertSpecialFloppyImageId = SPECIAL_FDD_IMAGE_CE_CONF;
 
             mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n");
             return true;
         }
 
         if(iSlot == 101) {      // special case -- slot 101 == INSERT FLOPPY TEST IMAGE
-            insertSpecialFloppyImageId = SPECIAL_FDD_IMAGE_FDD_TEST;
+            events.insertSpecialFloppyImageId = SPECIAL_FDD_IMAGE_FDD_TEST;
 
             mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n");
             return true;

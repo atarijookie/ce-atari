@@ -1,6 +1,8 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
+#include "datatypes.h"
+
 // defines for Floppy part
 // commands sent from device to host
 #define ATN_FW_VERSION              0x01       		// followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
@@ -137,6 +139,15 @@ typedef struct {
     bool gotHansFwVersion;
     bool gotFranzFwVersion;
 } TFlags;
+
+typedef struct {
+    volatile BYTE insertSpecialFloppyImageId;
+    
+    volatile bool screenShotVblEnabled;
+    volatile bool doScreenShot;
+} InterProcessEvents;
+
+extern InterProcessEvents events;
 
 //////////////////////////////////////////////////////
 

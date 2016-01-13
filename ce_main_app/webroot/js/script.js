@@ -473,7 +473,7 @@ CosmosEx.Remote=function(){
 						},100);
 					}
                 });
-            //Start recievibg screencast from ST
+            //Start recieving screencast from ST
             bindClickHelper("button#screencast",function(e){
 					if( typeof CosmosEx.Screencast!="undefined" && !$(this).hasClass("disabled") ){
 						$(this).attr("disabled", "disabled");
@@ -483,12 +483,32 @@ CosmosEx.Remote=function(){
 					}
                 });
 
-            //Start recievibg screencast from ST
+            //Do a single screenshot on ST
             bindClickHelper("button#screenshot", function(e){		
                 $.ajax({
                     type: 'POST',
                     url: '/app/screencast/do_screenshot',
                     data: JSON.stringify({ "action":"do_screenshot" }),
+                    contentType: 'application/json'
+                });
+            });
+
+            // enable screenshot VBL in CE_DD on ST
+            bindClickHelper("button#sc_vbl_enable", function(e){		
+                $.ajax({
+                    type: 'POST',
+                    url: '/app/screencast/screenshot_vbl_enable',
+                    data: JSON.stringify({ "action":"screenshot_vbl_enable" }),
+                    contentType: 'application/json'
+                });
+            });
+
+            // disable screenshot VBL in CE_DD on ST
+            bindClickHelper("button#sc_vbl_disable", function(e){		
+                $.ajax({
+                    type: 'POST',
+                    url: '/app/screencast/screenshot_vbl_disable',
+                    data: JSON.stringify({ "action":"screenshot_vbl_disable" }),
                     contentType: 'application/json'
                 });
             });

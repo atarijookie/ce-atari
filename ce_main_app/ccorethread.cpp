@@ -37,8 +37,6 @@ extern DebugVars    dbgVars;
 SharedObjects shared;
 extern volatile bool floppyEncodingRunning;
 
-volatile BYTE insertSpecialFloppyImageId;
-
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
     NetworkSettings ns;
@@ -227,7 +225,20 @@ void CCoreThread::run(void)
     DWORD nextFloppyEncodingCheck   = Utils::getEndTime(1000);
     bool prevFloppyEncodingRunning  = false;
     
+    DWORD cycleStart    = Utils::getCurrentMs();
+    DWORD cycleEnd      = Utils::getCurrentMs();
+    DWORD cycleTime;
+    
     while(sigintReceived == 0) {
+        cycleEnd    = Utils::getCurrentMs();
+        cycleTime   = cycleEnd - cycleStart;
+        
+        if(cycleTime > 30) {
+//            printf("\ncycleTime: %d\n", cycleTime);
+        }
+        
+        cycleStart  = Utils::getCurrentMs();
+    
 		bool gotAtn = false;						                    // no ATN received yet?
         
         // if should just get the HW version and HDD interface, but timeout passed, quit
@@ -331,9 +342,9 @@ void CCoreThread::run(void)
 		}
 #endif
 
-        if(insertSpecialFloppyImageId != 0) {                       // very stupid way of letting web IF to insert special image
-            insertSpecialFloppyImage(insertSpecialFloppyImageId);
-            insertSpecialFloppyImageId = 0;
+        if(events.insertSpecialFloppyImageId != 0) {                       // very stupid way of letting web IF to insert special image
+            insertSpecialFloppyImage(events.insertSpecialFloppyImageId);
+            events.insertSpecialFloppyImageId = 0;
         }
 
 #if defined(ONPC_HIGHLEVEL)

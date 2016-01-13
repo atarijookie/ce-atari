@@ -47,6 +47,8 @@ THwConfig hwConfig;                                             // info about th
 TFlags flags;                                                   // global flags from command line
 void initializeFlags(void);
 
+InterProcessEvents events;
+
 int main(int argc, char *argv[])
 {
     CCoreThread *core;

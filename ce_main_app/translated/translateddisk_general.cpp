@@ -664,6 +664,8 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
 
     //-----------------
     dataTrans->addDataWord(TRANSLATEDDISK_VERSION);             // byte 25 & 26 - version of translated disk interface / protocol -- driver will check this, and will refuse to work in cases of mismatch
+    
+    dataTrans->addDataWord((WORD) events.screenShotVblEnabled); // flag that we should (or shouldn't) add screenshot 
     //-----------------
 
     dataTrans->padDataToMul16();                                // pad to multiple of 16
