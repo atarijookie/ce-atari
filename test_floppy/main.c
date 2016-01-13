@@ -464,6 +464,11 @@ WORD getWholeCheckSum(BYTE sequentialNotRandom)
     WORD cs = 0;
     int rest = 0;
     
+    if(!sequentialNotRandom) {
+        (void)Cconws("\r\nAfter random test will read");
+        (void)Cconws("\r\nall the missed sectors:\r\n");
+    }
+    
     int sect,tr,si;
     for(si=0; si<imgGeometry.sides; si++) {
         for(tr=0; tr<imgGeometry.tracks; tr++) {
