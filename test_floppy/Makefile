@@ -11,7 +11,7 @@ CFLAGS  += -nostdlib -DSLIM
 HDR      = stdlib.h
 CSRC     = stdlib.c main.c 
 STARTUP  = startup.s
-SSRC     = 
+SSRC     = fdc_rout.s
 
 OBJS = $(patsubst %.c,%.o,$(CSRC))
 

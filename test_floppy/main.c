@@ -19,7 +19,7 @@ void writeSector(int sector, int track, int side);
 
 void deleteOneProgressLine(void);
 void calcCheckSum(BYTE *bfr, int sector, int track, int side);
-WORD getWholeCheckSum(void);
+WORD getWholeCheckSum(BYTE sequentialNotRandom);
 void showHexByte(int val);
 void showHexWord(WORD val);
 
@@ -34,6 +34,41 @@ void setImageGeometry(int tracks, int sides, int sectors);
 void guessImageGeometry(void);
 
 BYTE writeBfr[512];
+
+void removeAllWaitingKeys(void);
+
+//----------------------------------
+// floppy API 'polymorphism'
+
+void floppy_on  (BYTE *buf, WORD dev);
+void floppy_off (BYTE *buf, WORD dev);
+int  floppy_read(BYTE *buf, WORD dev, WORD sector, WORD track, WORD side, WORD count);
+BYTE fddViaTos = 1;
+
+//----------------------------------
+// asm fdc floppy interface
+extern DWORD argFuncId;
+extern DWORD argDrive;
+extern DWORD argTrack;
+extern DWORD argSide;
+extern DWORD argSector;
+extern DWORD argLeaveOn;
+extern DWORD argBufferPtr;
+extern DWORD argSuccess;
+        
+void runFdcAsm(void);
+
+#define FDC_FUN_RESTORE     0
+#define FDC_FUN_SEEK        1
+#define FDC_FUN_STEP        2
+#define FDC_FUN_STEPIN      3
+#define FDC_FUN_STEPOUT     4
+#define FDC_FUN_READ        5
+#define FDC_FUN_WRITE       6
+#define FDC_FUN_READID      7
+#define FDC_FUN_READTRK     8
+#define FDC_FUN_WRITETRK    9
+//----------------------------------
 
 struct {
     DWORD runs;
@@ -71,10 +106,14 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
 
 int main(void)
 {
+    DWORD oldSp = Super(0);
+
     int i;
     for(i=0; i<512; i++) {
         writeBfr[i] = (BYTE) i;
     }
+    
+    removeAllWaitingKeys();     // read all the possibly waiting keys, so we can ignore them...
 	
 	while(1) {
         showMenu();
@@ -85,13 +124,21 @@ int main(void)
         }
         
 		if(req == 'q') {        // quit?
-			return 0;
+			break;
 		}
         
         if(req == 'w') {        // write test floppy image
             makeFloppy();
         }
 
+        if(req == 't') {
+            fddViaTos = 1;
+        }
+        
+        if(req == 'f') {
+            fddViaTos = 0;
+        }
+        
         //---------------------
         if(req == 'r') {        // random     on TEST image ONCE
             setImageGeometry(80, 2, 9);
@@ -123,7 +170,27 @@ int main(void)
             guessImageGeometry();
             readTest(1, 0, 0);
         }
+        
+        removeAllWaitingKeys(); // read all the possibly waiting keys, so we can ignore them...
 	}
+    
+    Super(oldSp);
+    return 0;
+}
+
+void removeAllWaitingKeys(void)
+{
+    // read all the possibly waiting keys, so we can ignore them...
+    BYTE res;
+    while(1) {
+        res = Cconis();                 // see if there's something waiting from keyboard 
+		
+		if(res != 0) {                  // something waiting? read it
+            Cnecin();
+        } else {                        // nothing waiting, continue with the app
+            break;
+        }
+    }    
 }
 
 void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnce)
@@ -166,20 +233,23 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
     
     BYTE isAfterStartOrError = 1;
     
+    floppy_on(bfr, 0);
+    
     while(1) {
         //---------------------------------
         // code for termination of test by keyboard
-        BYTE res = Cconis();        // see if there's something waiting from keyboard 
+        BYTE res = Cconis();                // see if there's something waiting from keyboard 
 		
-		if(res != 0) {              // something waiting?
+		if(res != 0) {                      // something waiting?
             char req = Cnecin();
             
             if(req  >= 'A' && req <= 'Z') {
-                req = req + 32;     // upper to lower case
+                req = req + 32;             // upper to lower case
             }
             
             if(req == 'q' || req == 'c') {  // quit?
-                return;
+                floppy_off(bfr, 0);         // turn floppy off
+                break;
             }
 		}    
 
@@ -234,14 +304,16 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
             (void) Cconws("Finished.");
             
             (void) Cconws("\r\n");
-            WORD cs = getWholeCheckSum();
+            WORD cs = getWholeCheckSum(sequentialNotRandom);
             (void)Cconws("\r\nImage checksum: ");
             showHexWord(cs);
             (void)Cconws("\r\n");
             
             print_status();
+            
+            floppy_off(bfr, 0);                 // turn floppy off
             Cnecin();
-            return;
+            break;
         }
         
         if(fl.newLine) {                        // should start new line?
@@ -282,7 +354,7 @@ void showLineStart(BYTE sequentialNotRandom, int trNo)
 
 void updateFloppyPosition(BYTE sequentialNotRandom, BYTE endlessNotOnce)
 {
-    //-----------------
+    //----------------- 
     // for random order
     if(!sequentialNotRandom) {      
         fl.sector  = (Random() % imgGeometry.sectors) + 1;
@@ -338,12 +410,12 @@ BYTE readSector(int sector, int track, int side, BYTE checkData)    // 0 means g
 	BYTE bfr[512];
 	int res, i;
 
-	res = Floprd(bfr, 0, 0, sector, track, side, 1);
+    res = floppy_read(bfr, 0, sector, track, side, 1);
 				
 	if(res != 0) {                  // failed?
         return 1;                   // 1 means READ operation failed
 	} 
-
+    
     calcCheckSum(bfr, sector, track, side);
     
     if(!checkData) {                // shouldn't check data? quit with success
@@ -387,7 +459,7 @@ void calcCheckSum(BYTE *bfr, int sector, int track, int side)
     checksums[track][side][sector - 1] = cs;    // store the whole checksum
 }
 
-WORD getWholeCheckSum(void)
+WORD getWholeCheckSum(BYTE sequentialNotRandom)
 {
     WORD cs = 0;
     int rest = 0;
@@ -396,14 +468,16 @@ WORD getWholeCheckSum(void)
     for(si=0; si<imgGeometry.sides; si++) {
         for(tr=0; tr<imgGeometry.tracks; tr++) {
             for(sect=0; sect<imgGeometry.sectors; sect++) {
-                if(checksums[tr][si][sect] == 0) {  // no checksum for this sector? read and calculate it now
-                    readSector(sect + 1, tr, si, 0);
-                    Cconout('.');
-                    
-                    rest++;
-                    if(rest >= 40) {                // if would go out of screen, add new line
-                        (void) Cconws("\r\n");
-                        rest = 0;
+                if(!sequentialNotRandom) {              // if random test, read the missing sectors
+                    if(checksums[tr][si][sect] == 0) {  // no checksum for this sector? read and calculate it now
+                        readSector(sect + 1, tr, si, 0);
+                        Cconout('.');
+                        
+                        rest++;
+                        if(rest >= 40) {                // if would go out of screen, add new line
+                            (void) Cconws("\r\n");
+                            rest = 0;
+                        }
                     }
                 }
             
@@ -485,6 +559,17 @@ void showMenu(void)
 	(void)Cconws(" \33p[ A ]\33q - random     read test ONCE\r\n");
 	(void)Cconws(" \33p[ D ]\33q - random     read test ENDLESS\r\n");
 	(void)Cconws(" \33p[ E ]\33q - sequential read test ONCE\r\n");
+    (void)Cconws("\r\n");
+	(void)Cconws(" \33p[ T ]\33q - use TOS function Floprd\r\n");
+	(void)Cconws(" \33p[ F ]\33q - use custom FDC function\r\n");
+    
+    (void)Cconws("Floppy funtion: ");
+    if(fddViaTos) {
+        (void)Cconws("\33pFloprd() from TOS\33q\r\n");
+    } else {
+        (void)Cconws("\33pcustom FDC function\33q\r\n");
+    }
+    
     (void)Cconws("\r\n");
 	(void)Cconws(" \33p[ W ]\33q - write TEST floppy image\r\n");
 	(void)Cconws(" \33p[ Q ]\33q - quit this app\r\n");
@@ -644,5 +729,68 @@ void guessImageGeometry(void)
     imgGeometry.totalSectors = imgGeometry.sectors * imgGeometry.tracks * imgGeometry.sides;        // calculate how many sectors there are on this floppy
     
     Cnecin();
+}
+
+int floppy_read(BYTE *buf, WORD dev, WORD sector, WORD track, WORD side, WORD count)
+{
+    int res;
+    
+    if(fddViaTos) {
+        res = Floprd(buf, 0, dev, sector, track, side, count);
+    } else {
+        //-------------
+        // first seek
+        argFuncId       = FDC_FUN_SEEK; // seek to the right track
+        argDrive        = dev;
+        argTrack        = track;
+        argSide         = side;
+        argSector       = sector;
+        argLeaveOn      = 1;
+        argBufferPtr    = (DWORD) buf;
+        
+        runFdcAsm();                    // do the requested action
+        
+        if(argSuccess != 0) {           // failed?
+            return argSuccess;          // return that error
+        }
+        
+        //-------------
+        // then read
+        argFuncId       = FDC_FUN_READ; // now read the sector
+        runFdcAsm();                    // do the requested action
+        res = argSuccess;               // return success / failure
+    }
+    
+    return res;
+}
+
+void floppy_on(BYTE *buf, WORD dev)
+{
+    if(!fddViaTos) {                        // for asm functions only
+        argFuncId       = FDC_FUN_RESTORE;  // go to TRACK #0
+        argDrive        = dev;
+        argTrack        = 0;
+        argSide         = 0;
+        argSector       = 1;
+        argLeaveOn      = 1;                // leave MOTOR ON
+        argBufferPtr    = (DWORD) buf;
+        
+        runFdcAsm();                        // do the requested action    
+    }
+}
+
+void floppy_off(BYTE *buf, WORD dev)
+{
+    if(!fddViaTos) {                        // for asm functions only
+        argFuncId       = FDC_FUN_RESTORE;  // go to TRACK #0
+        argDrive        = dev;
+        argTrack        = 0;
+        argSide         = 0;
+        argSector       = 1;
+        argLeaveOn      = 0;                // turn MOTOR OFF
+        argBufferPtr    = (DWORD) buf;
+        
+        runFdcAsm();                        // do the requested action    
+    }
 }
 
