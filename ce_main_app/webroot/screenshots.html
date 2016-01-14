@@ -22,6 +22,7 @@
         }
     </script>
     
+    <script type="text/javascript" src="js/screen.js"></script> 
     <script>
         $(document).ready(function() {
             $.ajax({
@@ -45,6 +46,8 @@
                     // alert('VBL ON - ERROR');
                 }
             });
+            
+            CosmosEx.Screencast();
         });
     
         function vblOn(onNotOff) {
@@ -62,13 +65,33 @@
                 contentType: 'application/json'
             });
         }
-    </script>
-
-    <script type="text/javascript" src="js/screen.js"></script> 
-    <script>
-        CosmosEx.Screencast();
+        
+        function doScreenShot() {
+            $.ajax({
+                type: 'POST',
+                url: '/app/screencast/do_screenshot',
+                data: JSON.stringify({ "action":"do_screenshot" }),
+                contentType: 'application/json'
+            });        
+        }
+        
     </script>
     
+    <style>
+        #info {
+            position: fixed;
+            top: 500px;
+            width: 500px;
+            
+            left: 50%;
+            margin-left: -250px;
+            
+            background-color: #ffffff;
+            padding: 20px 20px 20px 20px;
+            border-radius: 15px;
+        }
+    </style>
+
     </head>
     <!-- -------------------------------------------------------------------- -->
     
@@ -87,43 +110,52 @@
     <div id="content">
         <div>
             <div>
+                <center>
                 <table border=0 cellspacing=20 cellpadding=20>
-                    <tr><td>
+                <tr><td>
 
                     <a href="/" id="back" class="btn" title="Back to CosmosEx main page">&lt;</a>
                 
-                    </td><td>
-                    
+                </td><td>
+                
                     <strong class="heading">CosmosEx Screenshots interface</strong>
 
-                    </td><td>
-                    
-                    <table border=0 cellspacing=0 cellpadding=5>
-                        <tr>
-                            <td>
-                                Screenshot VBL in CE_DD.PRG<br>
-                                &nbsp;
-                            </td>
-                            <td>
-                                <form>
-                                    <input type="radio" name="vbl_onoff" id="vbl_on"  value="on"  onclick="vblOn(1);">ON<br>  
-                                    <input type="radio" name="vbl_onoff" id="vbl_off" value="off" onclick="vblOn(0);">OFF
-                                </form>
-                            </td>
-                        </tr>
-                    </table>
-
-                    </td><td>
-
-                    <button id="screenshot" class="btn">Make screenshot</button>
+                </td><td>
                 
-                    </td></tr>
+                <table border=0 cellspacing=0 cellpadding=5>
+                    <tr>
+                        <td>
+                            Screenshot VBL in CE_DD.PRG<br>
+                            &nbsp;
+                        </td>
+                        <td>
+                            <form>
+                                <input type="radio" name="vbl_onoff" id="vbl_on"  value="on"  onclick="vblOn(1);">ON<br>  
+                                <input type="radio" name="vbl_onoff" id="vbl_off" value="off" onclick="vblOn(0);">OFF
+                            </form>
+                        </td>
+                    </tr>
                 </table>
+
+                </td><td>
+
+                <button id="screenshot" class="btn" onclick="doScreenShot();">Take screenshot</button>
+            
+                </td></tr>
+            </table>
+            </center>
+            
             </div>
         </div>
 
         <div id="demo_placeholder"></div>
 
+        <div id="info">
+        By default this functionality is disabled, so it won't interfere with disk transfers in most cases. <br><br>
+        For the screenshot functionality you have to have CE_DD driver loaded. <br><br>
+        If you enable or disable this feature, your ST needs a restart and/or the CE_DD has to be reloaded.
+        </div>
+        
     </div>
     
     </body>
