@@ -16,7 +16,8 @@
     .globl  _argSuccess
     
     .globl  _runFdcAsm
-    
+
+    .globl  _seekRate
 | ------------------------------------------------------
 restore     = 0   | reset drive to track zero
 seek        = 1   | goto track
@@ -102,8 +103,12 @@ functiontable:
 |  -1 = time out  0 = ok
 | ------------------------------------------------------
 Restore:
+    clr.l   d6
+    move.b  _seekRate,d6        | get seek rate
+    or.b    #0,d6               | add command RESTORE (0) to seek rate (I know this is useless, this is just to make this more readable)
+    
     move    #0x80,(a2)          | select command register
-    move    #0x01,(a1)          | do restore
+    move    d6,(a1)             | do restore - with desired seek rate
     bsr     wfeoc               | wait for end of command
     move.l  d6,d7
     rts
@@ -112,8 +117,13 @@ Seek:
     move    #0x86,(a2)          | select data register
     move    d1,(a1)             | write track to it
     move    (a2),stat
+    
+    clr.l   d6
+    move.b  _seekRate,d6        | get seek rate
+    or.b    #0x10,d6            | add command SEEK (0x10) to seek rate
+    
     move    #0x80,(a2)          | select command register
-    move    #0x11,(a1)          | perform seek
+    move    d6,(a1)             | perform seek - with desired seek rate
     bsr     wfeoc               | wait for end of command
     move.l  d6,d7
     rts

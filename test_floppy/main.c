@@ -43,7 +43,18 @@ void removeAllWaitingKeys(void);
 void floppy_on  (BYTE *buf, WORD dev);
 void floppy_off (BYTE *buf, WORD dev);
 int  floppy_read(BYTE *buf, WORD dev, WORD sector, WORD track, WORD side, WORD count);
+void floppy_seekRate(WORD dev, WORD rate);
+
 BYTE fddViaTos = 1;
+
+//----------------------------------
+#define RATE_2      2
+#define RATE_3      3
+#define RATE_6      0
+#define RATE_12     1
+
+BYTE seekRate   = RATE_3;
+int  seekRateMs = 3;
 
 //----------------------------------
 // asm fdc floppy interface
@@ -136,7 +147,18 @@ int main(void)
         if(req == 'w') {        // write test floppy image
             makeFloppy();
         }
-
+        
+        //---------------------
+        // set floppy seek rate
+        switch(req) {
+            case '2': seekRate = RATE_2;  seekRateMs = 2;  break;
+            case '3': seekRate = RATE_3;  seekRateMs = 3;  break;
+            case '6': seekRate = RATE_6;  seekRateMs = 6;  break;
+            case 'c': seekRate = RATE_12; seekRateMs = 12; break;
+        }
+        
+        //---------------------
+        // select floppy routine
         if(req == 't') {
             fddViaTos = 1;
         }
@@ -243,7 +265,9 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
     
     BYTE isAfterStartOrError = 1;
     
-    floppy_on(bfr, 0);
+    floppy_seekRate(0, seekRate);           // set SEEK RATE
+    floppy_on(bfr, 0);                      // seek to TRACK #0, leave motor on
+    int prevTrack = 0;                      // previous track is now 0
     
     while(1) {
         //---------------------------------
@@ -274,9 +298,19 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
         
         DWORD ms = (end - start) * 5;
     
-        if(times.max < ms) times.max = ms;
-        if(times.min > ms) times.min = ms;
-        times.avg = (times.avg + ms) / 2;
+        //---------------------------------
+        // update min / max / avg time, but only if it's not after start (spin up) or error
+        if(!isAfterStartOrError) {
+            if(times.max < ms) times.max = ms;
+            if(times.min > ms) times.min = ms;
+            times.avg = (times.avg + ms) / 2;
+        }
+        
+        //---------------------------------
+        // calculate lazy seek time treshold
+        int howManyTracksSeeked = (prevTrack > fl.track) ? (prevTrack - fl.track) : (fl.track - prevTrack); // calculate how many sectors we had to seek
+        DWORD lazyTime = (howManyTracksSeeked * seekRateMs) + 400;  // calculate how many time will be considered as lazy seek - if it's more than SEEK TO TRACK time + 2 floppy spin times, it's too lazy
+        
         //---------------------------------
         // evaluate the result
         counts.runs++;                      // increment the count of runs
@@ -284,7 +318,7 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
         VT52_Goto_pos(x, 24);
         
         if(bRes == 0) {                     // read and DATA good
-            if(ms > 500 && !isAfterStartOrError) {  // operation was taking too much time? Too lazy! (but only if it's not after error or start, that way lazy is expected)
+            if(ms > lazyTime && !isAfterStartOrError) { // operation was taking too much time? Too lazy! (but only if it's not after error or start, that way lazy is expected)
                 counts.lazy++;
                 Cconout('L');
             } else {                        // operation was fast enough
@@ -595,6 +629,17 @@ void showMenu(void)
     } else {
         (void)Cconws("\33pcustom FDC function\33q\r\n");
     }
+
+    (void)Cconws("\r\n");
+	(void)Cconws(" \33p[ 236c ]\33q - set seek rate: 2/3/6/12 ms\r\n");
+    (void)Cconws("Current seek rate: \33p");
+    switch(seekRate) {
+        case RATE_2 : (void) Cconws("2 ms"); break;
+        case RATE_3 : (void) Cconws("3 ms"); break;
+        case RATE_6 : (void) Cconws("6 ms"); break;
+        case RATE_12: (void) Cconws("12 ms"); break;
+    }
+    (void)Cconws("\33q\r\n");
     
     (void)Cconws("\r\n");
 	(void)Cconws(" \33p[ W ]\33q - write TEST floppy image\r\n");
@@ -787,6 +832,15 @@ int floppy_read(BYTE *buf, WORD dev, WORD sector, WORD track, WORD side, WORD co
     }
     
     return res;
+}
+
+void floppy_seekRate(WORD dev, WORD rate)
+{
+    if(fddViaTos) {     // for TOS functions
+        (void) Floprate(dev, rate);
+    } else {            // for asm functions
+    
+    }
 }
 
 void floppy_on(BYTE *buf, WORD dev)
