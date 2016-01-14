@@ -88,6 +88,9 @@ WORD trap_extra_offset=0;                   // Offset for GEMDOS/BIOS handler st
 
 WORD transDiskProtocolVersion;              // this will hold the protocol version from Main App
 #define REQUIRED_TRANSLATEDDISK_VERSION     0x0101
+
+volatile ScreenShots screenShots;           // screenshots config
+void init_screencapture(void);
 // ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
 {
@@ -221,8 +224,16 @@ int main( int argc, char* argv[] )
             }
         }
     }
+    
     //-------------------------------------
-
+    // if screenshots functionality was enabled
+    if(screenShots.enabled) {
+        (void) Cconws(">>> ScreenShots VBL installed. <<<\r\n" );
+        init_screencapture();
+    }
+    
+    
+    //-------------------------------------
 	// wait for a while so the user could read the message and quit 
 	sleep(1);
 
@@ -284,7 +295,10 @@ void getConfig(void)
     
     memcpy(netConfig, &pDmaBuffer[14], 10);
     
-    transDiskProtocolVersion = (((WORD) pDmaBuffer[25]) << 8) | ((WORD) pDmaBuffer[26]);        // get the protocol version, so we can do a version matching / pairing
+    transDiskProtocolVersion = getWord(pDmaBuffer + 25);    // 25, 26: get the protocol version, so we can do a version matching / pairing
+    
+    screenShots.enabled = pDmaBuffer[27];                   // 27: screenshots VBL enabled?
+    screenShots.take    = pDmaBuffer[28];                   // 28: take screenshot?
 }
 
 void setBootDriveAutomatic(void)

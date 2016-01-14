@@ -17,21 +17,25 @@ void acsi_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     hdIf.phaseChanged   = FALSE;
     
     //------------------
-    // try to acquire FLOCK if possible
-    DWORD end = getTicks() + 200;               // calculate the terminating tick count, where we should stop looking for unlocked FLOCK
-    
-    WORD locked;
-    while(1) {                                  // while not time out, try again
-        locked = *FLOCK;                        // read current lock value
+    if(hdIf.forceFlock) {                           // should force FLOCK? just set it
+        *FLOCK = -1;                                // disable FDC operations 
+    } else {                                        // should wait before acquiring FLOCK? wait...
+        // try to acquire FLOCK if possible
+        DWORD end = getTicks() + 200;               // calculate the terminating tick count, where we should stop looking for unlocked FLOCK
         
-        if(!locked) {                           // if not locked, lock and continue
-            *FLOCK = -1;                        // disable FDC operations 
-            break;
-        }
-        
-        if(getTicks() >= end) {                 // on time out - fail, return ACSIERROR
-            hdIf.success = FALSE;
-            return;
+        WORD locked;
+        while(1) {                                  // while not time out, try again
+            locked = *FLOCK;                        // read current lock value
+            
+            if(!locked) {                           // if not locked, lock and continue
+                *FLOCK = -1;                        // disable FDC operations 
+                break;
+            }
+            
+            if(getTicks() >= end) {                 // on time out - fail, return ACSIERROR
+                hdIf.success = FALSE;
+                return;
+            }
         }
     }
     

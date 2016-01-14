@@ -16,6 +16,21 @@ void *memcpy ( void * destination, const void * source, int num )
 	return destination;
 }
 
+int memcmp(const void *a, const void *b, int num)
+{
+	BYTE *aa = (BYTE *) a;
+	BYTE *bb = (BYTE *) b;
+	int i;
+	
+	for(i=0; i<num; i++) {				// copy all from src to dst
+		if(aa[i] != bb[i]) {
+            return 1;                   // difference detected!
+        }
+	}
+	
+	return 0;                           // no difference, they are equal
+}
+
 void *memset ( void * ptr, int value, int num )
 {
 	BYTE *p = (BYTE *) ptr;

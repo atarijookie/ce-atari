@@ -9,6 +9,7 @@
 #define TRAN_CMD_GETDATETIME        1
 #define TRAN_CMD_SENDSCREENCAST     2
 #define TRAN_CMD_SCREENCASTPALETTE  3
+#define TRAN_CMD_SCREENSHOT_CONFIG  4
 
 // ...other commands are just function codes from gemdos.h
 

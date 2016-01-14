@@ -39,6 +39,8 @@ typedef struct {
     int                 retriesDoneCount;
     int                 maxRetriesCount;
     
+    BYTE                forceFlock;
+    
     TsetReg             pSetReg;
     TgetReg             pGetReg;
 

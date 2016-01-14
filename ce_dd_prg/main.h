@@ -22,5 +22,9 @@ __asm__ (".balign 4\n\t"
 
 #define _longframe      ((volatile WORD *) 0x59e)
 
+typedef struct {
+    BYTE enabled;
+    BYTE take;
+} ScreenShots;
 
 #endif
