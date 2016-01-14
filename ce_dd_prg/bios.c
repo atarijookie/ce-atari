@@ -15,7 +15,6 @@
 #include "gemdos_errno.h"
 #include "bios.h"
 #include "main.h"
-#include "screen.h"
 
 extern int16_t useOldBiosHandler;
 extern WORD ceDrives;
@@ -118,13 +117,6 @@ void updateCeDrives(void)
     }
     
     ceDrives = getWord(pDmaBuffer);                                         // read drives from dma buffer 
-    
-    //--------------------------
-    // the following code will send a single screen shot when requested by host
-    WORD sendScreenShotFlag = getWord(pDmaBuffer + 4);
-    if(sendScreenShotFlag) {
-        sendScreenShot();
-    }    
 }
 
 void updateCeMediach(void)
