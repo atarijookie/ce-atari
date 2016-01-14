@@ -81,6 +81,12 @@ struct {
 } counts;
 
 struct {
+    WORD min;
+    WORD max;
+    WORD avg;
+} times;
+
+struct {
     int  randCount;
     BYTE finish;
     BYTE newLine;
@@ -204,6 +210,10 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
     counts.errRead  = 0;
     counts.errData  = 0;
 
+    times.min   = 32000;
+    times.max   = 0;
+    times.avg   = 0;
+    
     int sect,tr,si;
     for(si=0; si<imgGeometry.sides; si++) {
         for(tr=0; tr<imgGeometry.tracks; tr++) {
@@ -263,7 +273,10 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
         end         = getTicks();
         
         DWORD ms = (end - start) * 5;
-
+    
+        if(times.max < ms) times.max = ms;
+        if(times.min > ms) times.min = ms;
+        times.avg = (times.avg + ms) / 2;
         //---------------------------------
         // evaluate the result
         counts.runs++;                      // increment the count of runs
@@ -309,8 +322,16 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
             showHexWord(cs);
             (void)Cconws("\r\n");
             
+            (void) Cconws("\r\nTime min: ");
+            showInt(times.min, 4);
+            (void) Cconws("\r\nTime max: ");
+            showInt(times.max, 4);
+            (void) Cconws("\r\nTime avg: ");
+            showInt(times.avg, 4);
+            (void) Cconws("\r\n");
+
             print_status();
-            
+
             floppy_off(bfr, 0);                 // turn floppy off
             Cnecin();
             break;
@@ -752,13 +773,12 @@ int floppy_read(BYTE *buf, WORD dev, WORD sector, WORD track, WORD side, WORD co
         argSector       = sector;
         argLeaveOn      = 1;
         argBufferPtr    = (DWORD) buf;
-        
+    
         runFdcAsm();                    // do the requested action
         
         if(argSuccess != 0) {           // failed?
             return argSuccess;          // return that error
         }
-        
         //-------------
         // then read
         argFuncId       = FDC_FUN_READ; // now read the sector
