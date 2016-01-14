@@ -28,6 +28,7 @@
                     <li><a href="http://joo.kie.sk/?page_id=415">Manual</a></li>
                     <li><a href="/floppy.html">Floppy</a></li>
                     <li><a href="/remote.html">Remote</a></li>
+                    <li><a href="/screenshots.html">Screenshots</a></li>
                     <li><a href="/config.html">Config</a></li>
                 </ul>
             </div>

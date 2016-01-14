@@ -87,6 +87,23 @@ bool ControllerRouter::handleGet(CivetServer *server, struct mg_connection *conn
         delete pxController;
         return processed;
     }
+
+    if( controllerAction=="screencast/screenshot_query_vbl" ) {
+        // create JSON
+        std::string sJson;
+        sJson  = "{\"screenShotVblEnabled\":";
+        sJson += events.screenShotVblEnabled ? "true" : "false";
+        sJson += "}"; 
+
+        // send HTTP header
+        mg_printf(conn, "HTTP/1.1 200 OK\r\n");
+        mg_printf(conn, "Cache: no-cache\r\n");
+        mg_printf(conn, "Content-Type: application/json\r\n");
+        mg_printf(conn, "Content-Length: %d\r\n\r\n", sJson.length());  // Always set Content-Length
+        mg_printf(conn, sJson.c_str());                                 // add the content
+
+        return true;
+    }
     
     if( controllerAction=="screencast/screenshot_vbl_enable" ) {
         Debug::out(LOG_DEBUG, "ScreenCast - enabling screenshot VBL in CE_DD");
