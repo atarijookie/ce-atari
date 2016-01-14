@@ -295,7 +295,7 @@ void getConfig(void)
     
     memcpy(netConfig, &pDmaBuffer[14], 10);
     
-    transDiskProtocolVersion = getWord(pDmaBuffer + 25);    // 25, 26: get the protocol version, so we can do a version matching / pairing
+    transDiskProtocolVersion = GET_WORD(pDmaBuffer + 25);   // 25, 26: get the protocol version, so we can do a version matching / pairing
     
     screenShots.enabled = pDmaBuffer[27];                   // 27: screenshots VBL enabled?
     screenShots.take    = pDmaBuffer[28];                   // 28: take screenshot?

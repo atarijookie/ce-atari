@@ -162,7 +162,7 @@ int main (void)
                 WORD timeNow    = TIM4->CNT;
                 WORD diff       = timeNow - lastRequestTime;
                 
-                if(diff >= 20) {                                                                // and at least 10 ms passed since the request (20 / 2000 s)
+                if(diff >= 30) {                                                                // and at least 15 ms passed since the request (30 / 2000 s)
                     sendTrackRequest    = FALSE;
                 
                     // first check if this isn't what we've requested last time
