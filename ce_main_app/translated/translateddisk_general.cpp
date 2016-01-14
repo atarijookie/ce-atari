@@ -17,6 +17,7 @@
 #include "desktopcreator.h"
 
 extern THwConfig hwConfig;
+extern InterProcessEvents events;
 
 TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs)
 {
@@ -387,6 +388,8 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         	screencastAcsiCommand->processCommand(cmd);
         	break;
 
+        case TRAN_CMD_SCREENSHOT_CONFIG:    getScreenShotConfig(cmd);   break;
+            
         // path functions
         case GEMDOS_Dsetdrv:        onDsetdrv(cmd);     break;
         case GEMDOS_Dgetdrv:        onDgetdrv(cmd);     break;
@@ -665,7 +668,10 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     //-----------------
     dataTrans->addDataWord(TRANSLATEDDISK_VERSION);             // byte 25 & 26 - version of translated disk interface / protocol -- driver will check this, and will refuse to work in cases of mismatch
     
-    dataTrans->addDataWord((WORD) events.screenShotVblEnabled); // flag that we should (or shouldn't) add screenshot 
+    //-----------------
+    dataTrans->addDataByte(events.screenShotVblEnabled);        // byte 27: enable screenshot VBL?
+    dataTrans->addDataByte(events.doScreenShot);                // byte 28: take screenshot?
+    events.doScreenShot = false;                                // unset this flag so we will send only one screenshot
     //-----------------
 
     dataTrans->padDataToMul16();                                // pad to multiple of 16
@@ -1160,11 +1166,13 @@ void TranslatedDisk::onStLog(BYTE *cmd)
 char *TranslatedDisk::functionCodeToName(int code)
 {
     switch(code) {
-        case TRAN_CMD_IDENTIFY:      	return (char *)"TRAN_CMD_IDENTIFY";
-        case TRAN_CMD_GETDATETIME:      return (char *)"TRAN_CMD_GETDATETIME";
-        case TRAN_CMD_SENDSCREENCAST:   return (char *)"TRAN_CMD_SENDSCREENCAST";
-        case TRAN_CMD_SCREENCASTPALETTE: return (char *)"TRAN_CMD_SCREENCASTPALETTE";
-        case ST_LOG_TEXT:               return (char *)"ST_LOG_TEXT";
+        case TRAN_CMD_IDENTIFY:      	    return (char *)"TRAN_CMD_IDENTIFY";
+        case TRAN_CMD_GETDATETIME:          return (char *)"TRAN_CMD_GETDATETIME";
+        case TRAN_CMD_SENDSCREENCAST:       return (char *)"TRAN_CMD_SENDSCREENCAST";
+        case TRAN_CMD_SCREENCASTPALETTE:    return (char *)"TRAN_CMD_SCREENCASTPALETTE";
+        case TRAN_CMD_SCREENSHOT_CONFIG:    return (char *)"TRAN_CMD_SCREENSHOT_CONFIG";
+        case ST_LOG_TEXT:                   return (char *)"ST_LOG_TEXT";
+        
         case GEMDOS_Dsetdrv:            return (char *)"GEMDOS_Dsetdrv";
         case GEMDOS_Dgetdrv:            return (char *)"GEMDOS_Dgetdrv";
         case GEMDOS_Dsetpath:           return (char *)"GEMDOS_Dsetpath";
@@ -1199,6 +1207,7 @@ char *TranslatedDisk::functionCodeToName(int code)
         case BIOS_Drvmap:               return (char *)"BIOS_Drvmap";
         case BIOS_Mediach:              return (char *)"BIOS_Mediach";
         case BIOS_Getbpb:               return (char *)"BIOS_Getbpb";
+        
         case TEST_READ:                 return (char *)"TEST_READ";
         case TEST_WRITE:                return (char *)"TEST_WRITE";
         default:                        return (char *)"unknown";
@@ -1309,4 +1318,13 @@ void TranslatedDisk::convertAtariASCIItoPc(char *path)
     }
 }
 
+void TranslatedDisk::getScreenShotConfig(BYTE *cmd)
+{
+    dataTrans->addDataByte(events.screenShotVblEnabled);
 
+    dataTrans->addDataByte(events.doScreenShot);
+    events.doScreenShot = false;                                        // unset this flag so we will send only one screenshot
+    
+    dataTrans->padDataToMul16();
+    dataTrans->setStatus(E_OK);
+}

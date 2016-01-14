@@ -181,7 +181,8 @@ private:
     void onStLog(BYTE *cmd);
     void onTestRead(BYTE *cmd);
     void onTestWrite(BYTE *cmd);
-
+    void getScreenShotConfig(BYTE *cmd);
+    
     // helper functions
     int findEmptyFileSlot(void);
     int findFileHandleSlot(int atariHandle);

@@ -1186,11 +1186,7 @@ void TranslatedDisk::onDrvMap(BYTE *cmd)
     
     dataTrans->addDataWord(drives);         // drive bits
     dataTrans->addDataWord(0);              // add empty WORD - for future extension to 32 drives
-
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onDrvMap - doScreenShot: %d", (int) events.doScreenShot);
-    dataTrans->addDataWord(events.doScreenShot); // should we send one screen shot?
-    events.doScreenShot = false;
-    
+   
     dataTrans->padDataToMul16();            // pad to multiple of 16
 
     dataTrans->setStatus(E_OK);
