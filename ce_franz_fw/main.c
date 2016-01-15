@@ -72,9 +72,9 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 //--------------
 
 #define REQUEST_TRACK                       {   next.track = now.track; next.side = now.side; sendTrackRequest = TRUE; lastRequestTime = TIM4->CNT; trackStreamedCount = 0; }
-#define FORCE_REQUEST_TRACK                 {   REQUEST_TRACK;      lastRequestTime -= 25;      lastRequested.track = 0xff;     lastRequested.side = 0xff;                  }
+#define FORCE_REQUEST_TRACK                 {   REQUEST_TRACK;      lastRequestTime -= 35;      lastRequested.track = 0xff;     lastRequested.side = 0xff;                  }
 
-WORD version[2] = {0xf014, 0x1221};             // this means: Franz, 2014-12-21
+WORD version[2] = {0xf016, 0x0115};             // this means: Franz, 2016-01-15
 WORD drive_select;
 
 volatile BYTE sendFwVersion, sendTrackRequest;
@@ -118,6 +118,8 @@ int main (void)
     BYTE indexCount     = 0;
     WORD prevWGate      = WGATE, WGate;
     BYTE spiDmaIsIdle   = TRUE;
+
+    BYTE outputsTempDisabled = 0;
     
     prevIntTime = 0;
     
@@ -143,6 +145,22 @@ int main (void)
 
     while(1) {
         WORD inputs;
+
+/*        
+        if(outputsActive == 1) {                            // when outputs should be active
+            BYTE streamingWanted = (streamed.track == now.track && streamed.side == now.side);
+            
+            if(!streamingWanted && !outputsTempDisabled) {  // not streaming what we wanted, and outputs are not disabled for now?
+                FloppyOut_Disable();
+                outputsTempDisabled = 1;
+            } 
+            
+            if(streamingWanted && outputsTempDisabled) {    // already streaming what we wanted, but outputs are disabled for now?
+                FloppyOut_Enable();
+                outputsTempDisabled = 0;
+            } 
+        }
+*/
         
         // sending and receiving data over SPI using DMA
         if(spiDmaIsIdle == TRUE) {                                                              // SPI DMA: nothing to Tx and nothing to Rx?
