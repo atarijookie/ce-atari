@@ -112,15 +112,16 @@ BYTE cicrularGet(volatile TCircBuffer *cb);
 void setupDriveSelect(void);
 void setupDiskChangeWriteProtect(void);
 
+void fillReadStreamBufferWithDummyData(void);
+void fillMfmTimesWithDummy(void);
+TOutputFlags outFlags;
+
 int main (void) 
 {
-    BYTE outputsActive  = 0;
     BYTE indexCount     = 0;
     WORD prevWGate      = WGATE, WGate;
     BYTE spiDmaIsIdle   = TRUE;
 
-    BYTE outputsTempDisabled = 0;
-    
     prevIntTime = 0;
     
     sendFwVersion       = FALSE;
@@ -145,22 +146,24 @@ int main (void)
 
     while(1) {
         WORD inputs;
-
-/*        
-        if(outputsActive == 1) {                            // when outputs should be active
-            BYTE streamingWanted = (streamed.track == now.track && streamed.side == now.side);
-            
-            if(!streamingWanted && !outputsTempDisabled) {  // not streaming what we wanted, and outputs are not disabled for now?
-                FloppyOut_Disable();
-                outputsTempDisabled = 1;
-            } 
-            
-            if(streamingWanted && outputsTempDisabled) {    // already streaming what we wanted, but outputs are disabled for now?
-                FloppyOut_Enable();
-                outputsTempDisabled = 0;
-            } 
+        
+        if(sendTrackRequest) {                          // if we're already waiting for the new TRACK to be sent, consider this as we are already receiving new track data
+            fillReadStreamBufferWithDummyData();        // fill MFM stream with dummy data so we won't stream any junk
+            outFlags.weAreReceivingTrack = TRUE;        // mark that we are receiving TRACK data, and thus shouldn't stream
         }
-*/
+        
+        // ST wants the stream and we are not receiving TRACK data? ENABLE stream
+        if(outFlags.stWantsTheStream && !outFlags.weAreReceivingTrack) {
+            if(!outFlags.outputsAreEnabled) {           // the outputs are not enabled yet? 
+                FloppyOut_Enable();                     // enable them
+                outFlags.outputsAreEnabled = TRUE;      // mark that we enabled them
+            }
+        } else {    // other cases? DISABLE stream
+            if(outFlags.outputsAreEnabled) {            // the outputs are enabled? 
+                FloppyOut_Disable();                    // disable them
+                outFlags.outputsAreEnabled = FALSE;     // mark that we disabled them
+            }
+        }
         
         // sending and receiving data over SPI using DMA
         if(spiDmaIsIdle == TRUE) {                                                              // SPI DMA: nothing to Tx and nothing to Rx?
@@ -192,6 +195,8 @@ int main (void)
 
                         atnSendTrackRequest[4] = (((WORD)next.side) << 8) | (next.track);
                         spiDma_txRx(ATN_SENDTRACK_REQ_LEN_TX, (BYTE *) &atnSendTrackRequest[0], ATN_SENDTRACK_REQ_LEN_RX, (BYTE *) &readTrackData[0]);
+
+                        outFlags.weAreReceivingTrack = TRUE;                                    // mark that we started to receive TRACK data
                     }
                 }
             } else if(wrNow->readyToSend) {                                                     // not sending any ATN right now? and current write buffer has something?
@@ -223,17 +228,7 @@ int main (void)
         inputs = GPIOB->IDR;                                        // read floppy inputs
 
         // now check if the drive is ON or OFF and handle it
-        if((inputs & drive_select) != 0) {                          // motor not enabled, drive not selected? disable outputs
-            if(outputsActive == 1) {                                // if we got outputs active
-                FloppyOut_Disable();                                // all pins as inputs, drive not selected
-                outputsActive = 0;
-            }
-        } else {                                                    // motor ON, drive selected
-            if(outputsActive == 0) {                                // if the outputs are inactive
-                FloppyOut_Enable();                                 // set these as outputs
-                outputsActive = 1;
-            }
-        }
+        outFlags.stWantsTheStream = ((inputs & drive_select) == 0); // if motor is enabled and drive is selected, ST wants the stream
         
         //-------------------------------------------------
       
@@ -278,7 +273,6 @@ int main (void)
         //------------
         // check INDEX pulse as needed
         if((TIM2->SR & 0x0001) != 0) {          // overflow of TIM1 occured?
-            int i;
             TIM2->SR = 0xfffe;                  // clear UIF flag
     
             readTrackData_goToStart();          // move the pointer in the track stream to start
@@ -296,9 +290,7 @@ int main (void)
             streamed.side   = (BYTE) -1;
             //-----------
             
-            for(i=0; i<16; i++) {               // copy 'all 4 us' pulses into current streaming buffer to allow shortest possible switch to start of track
-                mfmReadStreamBuffer[i] = 7;
-            }
+            fillReadStreamBufferWithDummyData();
             
             // the following few lines send the FW version to host every 5 index pulses, this is used for transfer of commands from host to Franz
             indexCount++;
@@ -326,6 +318,15 @@ int main (void)
     }
 }
 
+void fillReadStreamBufferWithDummyData(void)
+{
+    int i=0;
+    
+    for(i=0; i<16; i++) {               // copy 'all 4 us' pulses into current streaming buffer to allow shortest possible switch to start of track
+        mfmReadStreamBuffer[i] = 7;
+    }
+}
+
 void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
 {
     WORD *pTxBfr = (WORD *) txBfr;
@@ -349,7 +350,7 @@ void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
     // by the adding the delay between disabling and enabling DMA by this extra code. 
     
     if((SPI1->SR & SPI_SR_RXNE) != 0) {                                 // if there's something still in SPI DR, read it
-            WORD dummy = SPI1->DR;
+        WORD dummy = SPI1->DR;
     }
     //-------------------
     
@@ -381,6 +382,7 @@ void spiDma_waitForFinish(void)
     while(spiDmaIsIdle != TRUE) {                                       // wait until it will become idle
         if(timeout()) {                                                 // if timeout happened (and we got stuck here), quit
             spiDmaIsIdle = TRUE;
+            outFlags.weAreReceivingTrack = FALSE;                       // if we were receiving TRACK data, we're not receiving it anymore
             break;
         }
     }
@@ -412,6 +414,7 @@ void DMA1_Channel3_IRQHandler(void)
     
     if(spiDmaRXidle == TRUE) {                                          // and if even the SPI DMA RX is idle, SPI is idle completely
         spiDmaIsIdle = TRUE;                                            // SPI DMA is busy
+        outFlags.weAreReceivingTrack = FALSE;                           // if we were receiving TRACK data, we're not receiving it anymore
     }
 }
 
@@ -424,6 +427,7 @@ void DMA1_Channel2_IRQHandler(void)
     
     if(spiDmaTXidle == TRUE) {                                          // and if even the SPI DMA TX is idle, SPI is idle completely
         spiDmaIsIdle = TRUE;                                            // SPI DMA is busy
+        outFlags.weAreReceivingTrack = FALSE;                           // if we were receiving TRACK data, we're not receiving it anymore
     }
 }
 
@@ -558,6 +562,12 @@ void fillMfmTimesForDMA(void)
         mfmReadStreamBuffer[ind] = time;            // store and move to next one
         ind++;
     }
+}
+
+void fillMfmTimesWithDummy(void)
+{
+    DMA1->IFCR = DMA1_IT_TC5 | DMA1_IT_HT5;         // clear HT5 and TC5 flag
+    fillReadStreamBufferWithDummyData();
 }
 
 BYTE getNextMFMbyte(void)

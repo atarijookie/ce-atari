@@ -42,6 +42,13 @@ typedef struct {
 	BYTE data[CIRCBUFFER_SIZE];
 } TCircBuffer;
 
+typedef struct {
+    BYTE stWantsTheStream;          // based on floppy SELECT0/1 signal and MOTOR ON signal
+    BYTE weAreReceivingTrack;       // based on if STEP pulse happened, if SPI is receiving the track or not
+    
+    BYTE outputsAreEnabled;         // this says whether currently the output pins are streaming the MFM stream or not    
+} TOutputFlags;
+
 /*
 reserved:
 ---------
