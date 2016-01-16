@@ -36,6 +36,7 @@ void guessImageGeometry(void);
 BYTE writeBfr[512];
 
 void removeAllWaitingKeys(void);
+BYTE showDebugInfoFunc(BYTE resultChar, int ms, int howManyTracksSeeked, int lazyTime);
 
 //----------------------------------
 // floppy API 'polymorphism'
@@ -55,6 +56,8 @@ BYTE fddViaTos = 1;
 
 BYTE seekRate   = RATE_3;
 int  seekRateMs = 3;
+
+WORD fdcStatus;
 
 //----------------------------------
 // asm fdc floppy interface
@@ -120,6 +123,7 @@ struct {
 } imgGeometry;
 
 void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnce);
+BYTE stopAfterError = 0;
 
 int main(void)
 {
@@ -165,6 +169,15 @@ int main(void)
         
         if(req == 'f') {
             fddViaTos = 0;
+        }
+        
+        //---------------------
+        if(req == 'y') {
+            if(stopAfterError == 0) {
+                stopAfterError = 1;
+            } else {
+                stopAfterError = 0;
+            }
         }
         
         //---------------------
@@ -317,28 +330,53 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
         
         VT52_Goto_pos(x, 24);
         
+        BYTE showDebugInfo = 0;
+        BYTE resultChar;
+        
         if(bRes == 0) {                     // read and DATA good
             if(ms > lazyTime && !isAfterStartOrError) { // operation was taking too much time? Too lazy! (but only if it's not after error or start, that way lazy is expected)
                 counts.lazy++;
                 Cconout('L');
+                
+                resultChar      = 'L';
+                showDebugInfo   = 1;
             } else {                        // operation was fast enough
                 counts.good++;
                 Cconout('*');
+
+                resultChar      = '*';
+                showDebugInfo   = 0;
             }
             
             isAfterStartOrError = 0;        // mark that error didn't happen, so next lazy read is really lazy read
         } else if(bRes == 1) {              // operation failed - Floprd failed
             counts.errRead++;
             Cconout('!');
+
+            resultChar      = '!';
+            showDebugInfo   = 1;
             
             isAfterStartOrError = 1;        // mark that error happened, next read might be lazy and it will be OK (floppy needs some time to get back to normal)
         } else if(bRes == 2) {              // operation failed - data mismatch
             counts.errData++;
             Cconout('D');
-            
+
+            resultChar      = 'D';
+            showDebugInfo   = 1;
+
             isAfterStartOrError = 0;        // mark that error didn't happen, so next lazy read is really lazy read
         }
 
+        if(showDebugInfo && stopAfterError) {
+            BYTE quit = showDebugInfoFunc(resultChar, ms, howManyTracksSeeked, lazyTime);
+            isAfterStartOrError = 1;
+            
+            if(quit) {
+                break;
+            }
+        }
+        prevTrack = fl.track;
+        
         print_status();
         
         //---------------------------------
@@ -388,6 +426,49 @@ void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnc
         }
     }
 }
+
+BYTE showDebugInfoFunc(BYTE resultChar, int ms, int howManyTracksSeeked, int lazyTime)
+{
+    VT52_Goto_pos(0, 5);
+    
+    (void) Cconws("Sector    : ");
+    showInt(fl.track, 2);
+    (void) Cconws(",");
+    showInt(fl.sector, 2);
+    (void) Cconws(",");
+    showInt(fl.side, 1);
+    
+    (void) Cconws("  \r\nOp result :    ");
+    Cconout(resultChar);
+    (void) Cconws("  \r\nFDC status:   ");
+    showHexByte(fdcStatus);
+    (void) Cconws("  \r\nOp time   : ");
+    showInt(ms, 4);
+    (void) Cconws("  \r\nSeek count:   ");
+    showInt(howManyTracksSeeked, 2);
+    (void) Cconws("  \r\nLazy thres: ");
+    showInt(lazyTime, 4);
+    (void) Cconws("  \r\n");
+    
+    char req = Cnecin();
+    
+    if(req  >= 'A' && req <= 'Z') {
+        req = req + 32;     // upper to lower case
+    }
+    
+    VT52_Goto_pos(0, 5);
+    int i;
+    for(i=0; i<6; i++) {
+        (void) Cconws("                      \r\n");
+    }
+    
+    if(req == 'q' || req == 'c') {
+        return 1;
+    }
+    
+    return 0;
+}            
+
 
 void deleteOneProgressLine(void)
 {
@@ -623,7 +704,7 @@ void showMenu(void)
 	(void)Cconws(" \33p[ T ]\33q - use TOS function Floprd\r\n");
 	(void)Cconws(" \33p[ F ]\33q - use custom FDC function\r\n");
     
-    (void)Cconws("Floppy funtion: ");
+    (void)Cconws(" Floppy funtion: ");
     if(fddViaTos) {
         (void)Cconws("\33pFloprd() from TOS\33q\r\n");
     } else {
@@ -632,7 +713,7 @@ void showMenu(void)
 
     (void)Cconws("\r\n");
 	(void)Cconws(" \33p[ 236c ]\33q - set seek rate: 2/3/6/12 ms\r\n");
-    (void)Cconws("Current seek rate: \33p");
+    (void)Cconws(" Current seek rate: \33p");
     switch(seekRate) {
         case RATE_2 : (void) Cconws("2 ms"); break;
         case RATE_3 : (void) Cconws("3 ms"); break;
@@ -640,6 +721,15 @@ void showMenu(void)
         case RATE_12: (void) Cconws("12 ms"); break;
     }
     (void)Cconws("\33q\r\n");
+    
+    (void)Cconws("\r\n");
+	(void)Cconws(" \33p[ Y ]\33q - stop after error - toggle YES/NO\r\n");
+    (void)Cconws(" Stop after error: ");
+    if(stopAfterError) {
+        (void)Cconws("\33pYES\33q\r\n");
+    } else {
+        (void)Cconws("\33pNO\33q\r\n");
+    }
     
     (void)Cconws("\r\n");
 	(void)Cconws(" \33p[ W ]\33q - write TEST floppy image\r\n");

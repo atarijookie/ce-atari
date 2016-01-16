@@ -14,6 +14,7 @@
     .globl  _argLeaveOn
     .globl  _argBufferPtr
     .globl  _argSuccess
+    .globl  _fdcStatus
     
     .globl  _runFdcAsm
 
@@ -73,6 +74,9 @@ RunFDC:
     lsl.l   #2,d7               | function number times 4
     move.l  functiontable(pc,d7),a6
     jsr     (a6)
+
+    move    #0x180,(a2)         | select status reg
+    move.w  (a1),_fdcStatus     | read & store status
 
     tst     d4
     bne     notoff
