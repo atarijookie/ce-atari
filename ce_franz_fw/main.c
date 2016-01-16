@@ -64,7 +64,7 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 
 #define     wrBuffer_add(X)                 { if(wrNow->count  < 550)   {       wrNow->buffer[wrNow->count]     = X;    wrNow->count++;     }   }
 
-#define     readTrackData_goToStart()       {                                                                                                           inIndexGet = 0;                                                                     }
+#define     readTrackData_goToStart()       {                                                                                                           inIndexGet = 0;    }
 #define     readTrackData_get(X)            { X = readTrackData[inIndexGet];                inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) {  inIndexGet = 0; }; }
 #define     readTrackData_get_noMove(X)     { X = readTrackData[inIndexGet];                                                                                                                                    }
 //#define       readTrackData_markAndmove() { readTrackData[inIndexGet] = CMD_MARK_READ;    inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) {  inIndexGet = 0; };   }
@@ -74,7 +74,7 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 #define REQUEST_TRACK                       {   next.track = now.track; next.side = now.side; sendTrackRequest = TRUE; lastRequestTime = TIM4->CNT; trackStreamedCount = 0; }
 #define FORCE_REQUEST_TRACK                 {   REQUEST_TRACK;      lastRequestTime -= 35;      lastRequested.track = 0xff;     lastRequested.side = 0xff;                  }
 
-WORD version[2] = {0xf016, 0x0115};             // this means: Franz, 2016-01-15
+WORD version[2] = {0xf016, 0x0117};             // this means: Franz, 2016-01-17
 WORD drive_select;
 
 volatile BYTE sendFwVersion, sendTrackRequest;
@@ -116,6 +116,8 @@ void fillReadStreamBufferWithDummyData(void);
 void fillMfmTimesWithDummy(void);
 TOutputFlags outFlags;
 
+void updateStreamPositionByFloppyPosition(void);
+
 int main (void) 
 {
     BYTE indexCount     = 0;
@@ -150,6 +152,11 @@ int main (void)
         if(sendTrackRequest) {                          // if we're already waiting for the new TRACK to be sent, consider this as we are already receiving new track data
             fillReadStreamBufferWithDummyData();        // fill MFM stream with dummy data so we won't stream any junk
             outFlags.weAreReceivingTrack = TRUE;        // mark that we are receiving TRACK data, and thus shouldn't stream
+        }
+        
+        if(outFlags.updatePosition) {
+            outFlags.updatePosition = FALSE;
+            updateStreamPositionByFloppyPosition();     // place the read marker on the right place in the stream
         }
         
         // ST wants the stream and we are not receiving TRACK data? ENABLE stream
@@ -382,7 +389,12 @@ void spiDma_waitForFinish(void)
     while(spiDmaIsIdle != TRUE) {                                       // wait until it will become idle
         if(timeout()) {                                                 // if timeout happened (and we got stuck here), quit
             spiDmaIsIdle = TRUE;
-            outFlags.weAreReceivingTrack = FALSE;                       // if we were receiving TRACK data, we're not receiving it anymore
+
+            if(outFlags.weAreReceivingTrack) {                          // if we were receiving a track
+                outFlags.weAreReceivingTrack    = FALSE;                // mark that we're not receiving it anymore
+                outFlags.updatePosition         = TRUE;
+            }
+                
             break;
         }
     }
@@ -414,7 +426,11 @@ void DMA1_Channel3_IRQHandler(void)
     
     if(spiDmaRXidle == TRUE) {                                          // and if even the SPI DMA RX is idle, SPI is idle completely
         spiDmaIsIdle = TRUE;                                            // SPI DMA is busy
-        outFlags.weAreReceivingTrack = FALSE;                           // if we were receiving TRACK data, we're not receiving it anymore
+
+        if(outFlags.weAreReceivingTrack) {                              // if we were receiving a track
+            outFlags.weAreReceivingTrack    = FALSE;                    // mark that we're not receiving it anymore
+            outFlags.updatePosition         = TRUE;
+        }
     }
 }
 
@@ -427,7 +443,11 @@ void DMA1_Channel2_IRQHandler(void)
     
     if(spiDmaTXidle == TRUE) {                                          // and if even the SPI DMA TX is idle, SPI is idle completely
         spiDmaIsIdle = TRUE;                                            // SPI DMA is busy
-        outFlags.weAreReceivingTrack = FALSE;                           // if we were receiving TRACK data, we're not receiving it anymore
+
+        if(outFlags.weAreReceivingTrack) {                              // if we were receiving a track
+            outFlags.weAreReceivingTrack    = FALSE;                    // mark that we're not receiving it anymore
+            outFlags.updatePosition         = TRUE;
+        }
     }
 }
 
@@ -618,6 +638,27 @@ BYTE getNextMFMbyte(void)
     }
 
     return val;
+}
+
+void updateStreamPositionByFloppyPosition(void)
+{
+    DWORD i, mediaPosition, pos;
+    
+    // find end of stream, i will hold the last index where we can go (= LENGTH OF STREAM in bytes)
+    for(i=0; i<READTRACKDATA_SIZE; i++) {                   
+        if(readTrackData[i] == CMD_TRACK_STREAM_END_BYTE) {
+            break;
+        }
+    }
+    
+    // read the current position - from 0 to 400
+    mediaPosition   = TIM2->CNT;        
+    
+    // calculate index where we should place sream reading index - 
+    // current position is between 0 and 400, that is from 0 to 100%, so place it between 0 and LENGTH OF STREAM position
+    pos             = (i * mediaPosition) / 400;
+    
+    inIndexGet = pos;
 }
 
 void processHostCommand(BYTE val)

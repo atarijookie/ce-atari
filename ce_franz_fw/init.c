@@ -284,8 +284,8 @@ void init_hw_sw(void)
 
     //--------------
     // DMA + SPI initialization
-    for(i=0; i<READTRACKDATA_SIZE; i++) {                           // fill the readTrackData with CMD_MARK_READ, which will tell that every byte is empty (already read)
-        readTrackData[i] = CMD_MARK_READ_BYTE;
+    for(i=0; i<READTRACKDATA_SIZE; i++) {                           // fill the readTrackData with CMD_TRACK_STREAM_END_BYTE, which will tell that every byte is END OF STREAM (shouldn't read further)
+        readTrackData[i] = CMD_TRACK_STREAM_END_BYTE;
     }
     
     spiDmaIsIdle = TRUE;
