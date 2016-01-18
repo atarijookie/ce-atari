@@ -21,8 +21,13 @@ void test05(void);
 
 WORD fromDrive = 0;
 
+void showMenu(void);
+void removeAllWaitingKeys(void);
+
 int main(void)
 {
+    removeAllWaitingKeys();     // read all the possibly waiting keys, so we can ignore them...
+
     fromDrive = Dgetdrv();
 
     out_s("\33E\33pFilesystem Test - by Jookie, 2015\33q");
@@ -36,12 +41,40 @@ int main(void)
     selectDrive();
     out_sc("Tested drive    : ", 'A' + drive);
     
+    WORD whichTests = 0;
+    
+    while(1) {
+        showMenu();
+        
+   		char req = Cnecin();
+        
+        if(req  >= 'A' && req <= 'Z') {
+            req = req + 32;     // upper to lower case
+        }
+        
+		if(req == 'q') {        // quit?
+			break;
+		}
+        
+        if(req == 'a') {
+            whichTests = 0xffff;
+            break;
+        }
+        
+        if(req >= '1' && req <= '5') {          // if it's valid test choice, convert ascii number to bit
+            int which = req - '1';
+            whichTests = (1 << which);
+            break;
+        }
+    }
+    
     out_s("");
-    test01();
-    test02();
-    test03();
-    test04();
-    test05();
+    
+    if(whichTests & 0x01)   test01();
+    if(whichTests & 0x02)   test02();
+    if(whichTests & 0x04)   test03();
+    if(whichTests & 0x08)   test04();
+    if(whichTests & 0x10)   test05();
 
     writeBufferToFile();
     deinitBuffer();
@@ -49,6 +82,34 @@ int main(void)
     out_s("Done.");
     sleep(3);
     return 0;
+}
+
+void showMenu(void)
+{
+    (void) Cconws("\33E");
+    (void) Cconws("Select which tests to run:\r\n");
+    (void) Cconws(" \33p[ 1 ]\33q Dsetdrv and Dgetdrv\r\n");
+    (void) Cconws(" \33p[ 2 ]\33q Dsetpath and Dgetpath\r\n");
+    (void) Cconws(" \33p[ 3 ]\33q Fsfirst, Fsnext, Fsetdta, Fgetdta\r\n");
+    (void) Cconws(" \33p[ 4 ]\33q Dcreate, Ddelete, Frename, Fdelete\r\n");
+    (void) Cconws(" \33p[ 5 ]\33q Fcreate, Fopen, Fclose, Fread, Fseek, Fwrite\r\n");
+    (void) Cconws(" \33p[ A ]\33q ALL TESTS\r\n");
+    (void) Cconws(" \33p[ Q ]\33q QUIT\r\n");
+}
+
+void removeAllWaitingKeys(void)
+{
+    // read all the possibly waiting keys, so we can ignore them...
+    BYTE res;
+    while(1) {
+        res = Cconis();                 // see if there's something waiting from keyboard 
+		
+		if(res != 0) {                  // something waiting? read it
+            Cnecin();
+        } else {                        // nothing waiting, continue with the app
+            break;
+        }
+    }    
 }
 
 WORD getTosVersion(void)
