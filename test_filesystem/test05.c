@@ -38,7 +38,7 @@ BYTE *buf1, *buf2;
 #define TEST051XFILESIZE    (200 * 1024)
 #define BUFFERSIZE          (220 * 1024)
 
-void test05(void)
+void test05(WORD whichTests)
 {
     out_s("Fcreate, Fopen, Fclose, Fread, Fwrite, Fseek");
     
@@ -68,14 +68,31 @@ void test05(void)
         return;
     }
 
-    test050x();                 // Fopen, Fcreate, Fclose
-    test051x(0, buf2);          // read by different block sizes into ST RAM - tests 051x, 052x, 053x
-    test054x();                 // read by different block sizes into TT RAM - tests 054x, 055x, 056x 
-    test057x();                 // Fread - various cases
-    test058x();                 // Fseek
-    test05ax();                 // Fread - 10 files open and read
-    test05bx();                 // Fwrite - tests 05Bx, 05Cx
-    test05dx();                 // Fwrite - various cases
+    if(whichTests & 0x01) {         // O
+        test050x();                 // Fopen, Fcreate, Fclose
+    }
+
+    if(whichTests & 0x02) {         // R
+        test051x(0, buf2);          // read by different block sizes into ST RAM - tests 051x, 052x, 053x
+        test054x();                 // read by different block sizes into TT RAM - tests 054x, 055x, 056x 
+        test057x();                 // Fread - various cases
+    }
+     
+    if(whichTests & 0x04) {         // S
+        test058x();                 // Fseek
+    }
+    
+    if(whichTests & 0x08) {         // X
+        test05ax();                 // Fread - 10 files open and read
+    }
+     
+    if(whichTests & 0x10) {         // W
+        test05bx();                 // Fwrite - tests 05Bx, 05Cx
+    }
+    
+    if(whichTests & 0x20) {         // V
+        test05dx();                 // Fwrite - various cases
+    }
     
     deleteFile(0xABCD);
     
