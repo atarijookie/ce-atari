@@ -92,6 +92,31 @@ char *strcpy ( char * destination, const char * source)
 	return destination;
 }
 
+char *strcpy_switch_rn ( char * destination, const char * source)
+{
+	int i = 0;
+	
+	while(1){
+        if(source[i] != '\n' && source[i] != '\r') {             // if it's not \r, just copy it
+            destination[i] = source[i];
+        } else {                            // if it's \r, replace it with space
+            if(source[i] == '\n') {
+                destination[i] = '\r';
+            } else {
+                destination[i] = '\n';
+            }
+        }
+		
+		if(source[i] == 0) {			// terminating zero found?
+			break;
+		}
+		
+		i++;
+	}
+	
+	return destination;
+}
+
 char *strncpy ( char * destination, const char * source, int num )
 {
 	int i;

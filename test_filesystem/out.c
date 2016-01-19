@@ -180,7 +180,7 @@ void appendToBuf(char *str)
         return;
     }
     
-    strcpy(bfrCur, str);                        // copy in the data
+    strcpy_switch_rn(bfrCur, str);              // copy in the data
     
     bfrCur  += len;                             // move the pointer, update the counter
     curSize += len;

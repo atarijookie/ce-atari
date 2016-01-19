@@ -21,6 +21,7 @@ void *  memset ( void * ptr, int value, int num );
 int     memcmp(const void *str1, const void *str2, int n);
 int     strlen ( const char * str );
 char *  strcpy ( char * destination, const char * source);
+char *  strcpy_switch_rn ( char * destination, const char * source);
 char *  strcat( char * destination, const char * source);
 char *  strncpy ( char * destination, const char * source, int num );
 int     strncmp ( const char * str1, const char * str2, int num );

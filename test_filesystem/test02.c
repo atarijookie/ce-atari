@@ -192,6 +192,8 @@ void deleteTestDirs(void)
         if(res == -36) {         // access denied? dir not empty!
             deleteRecursive(testDirs[i]);
         }
+
+        Ddelete(testDirs[i]);   // try to delete again, it should be empty now
     }
 }
 
