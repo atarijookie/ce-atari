@@ -17,17 +17,21 @@ void test0210(void);
 
 char *testDirs[10] = {"AMSTERDA.M", "BERLIN", "COLOGNE", "DUSSELDO.RF", "ESPOO", "GLASGOW.001", "HELSINKI", "MADRID", "ROME", "WARSAW"};
 
-void test02(void)
+void test02(WORD whichSkip)
 {
     out_s("Dsetpath and Dgetpath");
-    Dsetdrv(drive);             // switch to selected drive
+    Dsetdrv(drive);                 // switch to selected drive
     
-    createTestDirs(0);
+    if((whichSkip & 0x01) == 0) {   // if shouldn't skip dir creation
+        createTestDirs(0);
+    }
     
     test0210();
     
+    if((whichSkip & 0x02) == 0) {   // if shouldn't skip dir deletion
+        deleteTestDirs();
+    }
     
-    deleteTestDirs();
     out_s("");
 }
 
