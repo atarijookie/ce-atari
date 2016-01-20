@@ -171,6 +171,9 @@ void TranslatedDisk::onDgetpath(BYTE *cmd)
 
     // return the current path for current drive
     dataTrans->addDataBfr((BYTE *) aPath.c_str(), aPath.length(), true);
+    
+    dataTrans->addDataByte(0);                      // add terminating zero, just in case
+    dataTrans->padDataToMul16();                    // and pad to 16 bytes for DMA chip
     dataTrans->setStatus(E_OK);
 }
 
