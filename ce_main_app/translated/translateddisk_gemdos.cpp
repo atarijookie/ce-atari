@@ -406,6 +406,11 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
         return;
     }
 
+    if(pathContainsWildCards((char *) dataBuffer)) {    // if the new directory name contains ? or *, fail with EACCDN
+        dataTrans->setStatus(EACCDN);
+        return;    
+    }
+    
     std::string newAtariPath, hostPath;
 
     convertAtariASCIItoPc((char *) dataBuffer);     // try to fix the path with only allowed chars
@@ -480,7 +485,7 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
         return;
     }
 
-	int ires = deleteDirectory((char *) hostPath.c_str());
+	int ires = deleteDirectoryPlain((char *) hostPath.c_str());
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - deleting directory hostPath: %s, result is %d", (char *) hostPath.c_str(), ires);
 
@@ -526,6 +531,11 @@ void TranslatedDisk::onFrename(BYTE *cmd)
         return;
     }
     
+    if(!hostPathExists(oldHostName)) {                              // old path does not exist? fail, NOT FOUND
+        dataTrans->setStatus(EFILNF);
+        return;
+    }
+    
     int ires = rename(oldHostName.c_str(), newHostName.c_str());    // rename host file
 
     if(ires == 0) {                                                 // good
@@ -567,6 +577,33 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
         return;
     }
 
+    //----------
+    // File does not exist? fail, NOT FOUND
+    if(!hostPathExists(hostPath)) {                              
+        dataTrans->setStatus(EFILNF);
+        return;
+    }
+
+    //----------
+    // check if not trying to delete directory using Fdelete
+	struct stat attr;
+    res = stat(hostPath.c_str(), &attr);							// get the file status
+	
+	if(res != 0) {
+		Debug::out(LOG_ERROR, "TranslatedDisk::onFdelete() -- stat() failed");
+		dataTrans->setStatus(EINTRN);
+		return;		
+	}
+	
+	bool isDir = (S_ISDIR(attr.st_mode) != 0);						// check if it's a directory
+
+    if(isDir) {                                                     // if it's a directory, return FILE NOT FOUND
+		Debug::out(LOG_ERROR, "TranslatedDisk::onFdelete() -- can't use Fdelete() to delete a directory!");
+		dataTrans->setStatus(EFILNF);
+		return;		
+    }
+    
+    //----------
     res = unlink(hostPath.c_str());
 
     if(res == 0) {                                  // file deleted?
@@ -673,6 +710,11 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
         return;
     }
 
+    if(pathContainsWildCards((char *) (dataBuffer + 1))) {          // if the new filename name contains ? or *, fail with EACCDN
+        dataTrans->setStatus(EACCDN);
+        return;    
+    }
+    
     BYTE attribs = dataBuffer[0];
 
     std::string atariName, hostName;

@@ -306,8 +306,8 @@ void FilenameShortener::replaceNonLetters(char *str)
     int i, len, j;
     len = strlen(str);
 
-    char *allowed = (char *) "!#$%&'()~^@-_";
-    #define ALLOWED_COUNT   13
+    char *allowed = (char *) "!#$%&'()~^@-_{}";
+    #define ALLOWED_COUNT   15
 
     for(i=0; i<len; i++) {
         if(str[i] >= '0' && str[i] <= '9') {    // numbers are OK

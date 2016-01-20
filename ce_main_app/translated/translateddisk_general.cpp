@@ -1018,7 +1018,7 @@ void TranslatedDisk::pathSeparatorHostToAtari(std::string &path)
     }
 }
 
-int TranslatedDisk::deleteDirectory(char *path)
+int TranslatedDisk::deleteDirectoryRecursive(char *path)
 {
     //---------
     // first recursively delete the content of this dir
@@ -1046,7 +1046,7 @@ int TranslatedDisk::deleteDirectory(char *path)
         strcat(fullPath, de->d_name);
         
         if(de->d_type == DT_DIR) {                                  // it's a dir? recursive delete
-            deleteDirectory(fullPath);
+            deleteDirectoryRecursive(fullPath);
         } else if(de->d_type == DT_REG || de->d_type == DT_LNK) {   // it's a file? unlink it
             unlink(fullPath);
         } 
@@ -1055,6 +1055,18 @@ int TranslatedDisk::deleteDirectory(char *path)
 	closedir(dir);
     //------------
     // the dir should now be empty, delete it
+    int res = rmdir(path);
+    
+    if(res == 0) {              // on success return success
+        return E_OK;
+    }
+    
+    return EACCDN;
+}
+
+int TranslatedDisk::deleteDirectoryPlain(char *path)
+{
+    // if the dir is empty, it will delete it, otherwise it will fail
     int res = rmdir(path);
     
     if(res == 0) {              // on success return success
@@ -1270,10 +1282,37 @@ void TranslatedDisk::initAsciiTranslationTable(void)
     asciiAtariToPc[184] = 'O';
 }
 
+bool TranslatedDisk::pathContainsWildCards(char *path)
+{
+    int i, len;
+    len = strlen(path);
+
+    if(len >= 2048) {                   // probably no terminating char? go only this far
+        len = 2048;
+    }
+
+    for(i=0; i<len; i++) {              // go through the string
+        char in = path[i];
+
+        if(in == 0) {                   // if it's string terminator, quit
+            return false;
+        }
+
+        if(in == '?' || in == '*') {    // it's a wild card? return true
+            return true;
+        }
+    }
+    
+    return false;                       // no wild card found
+}
+
 void TranslatedDisk::convertAtariASCIItoPc(char *path)
 {
     int i, len;
 
+    char *allowed = (char *) "!#$%&'()~^@-_{}";
+    #define ALLOWED_COUNT   15
+    
     len = strlen(path);
 
     if(len >= 2048) {                                                   // probably no terminating char? go only this far
@@ -1301,9 +1340,18 @@ void TranslatedDisk::convertAtariASCIItoPc(char *path)
             continue;
         }
 
-        if(in == '|' || in == '~') {                                    // these two? ok
-            continue;
+        //------------------------
+        bool isAllowed = false;
+        for(int j=0; j<ALLOWED_COUNT; j++) {    // try to find this char in allowed characters array
+            if(in == allowed[j]) {
+                isAllowed = true;
+                break;
+            }
         }
+
+        if(isAllowed) {                         // it's allowed char, let it be
+            continue;
+        }        
 
         //------------------------
         // if it's not from the supported chars, try to convert it

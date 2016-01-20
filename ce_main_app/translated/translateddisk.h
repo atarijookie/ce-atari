@@ -126,7 +126,9 @@ private:
     bool isLetter(char a);
     char toUpperCase(char a);
     bool isValidDriveLetter(char a);
-    int deleteDirectory(char *path);
+    bool pathContainsWildCards(char *path);
+    int  deleteDirectoryRecursive(char *path);
+    int  deleteDirectoryPlain(char *path);
 
     bool startsWith(std::string what, std::string subStr);
     bool endsWith(std::string what, std::string subStr);
