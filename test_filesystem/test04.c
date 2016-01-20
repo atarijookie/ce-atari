@@ -22,9 +22,10 @@ void deleteRecursive(char *subPath);
 void deleteIfExists(char *fname);
 
 WORD testDcreate(char *fname);
+WORD testDcreate2(char *createPath, char *testPath);
 
 void testSingleValidChar(WORD testCaseNo, char *fname);
-void testSingleInvalidChar(WORD testCaseNo, char *fname, WORD goodErrorCode);
+void testSingleInvalidChar(WORD testCaseNo, char *fname, WORD goodErrorCode1, WORD goodErrorCode2);
 
 void test04(void)
 {
@@ -100,15 +101,55 @@ void test041x(void)
 
 void test043x(void)
 {
-    testSingleInvalidChar(0x0431, "*", 0xffdc);
-    testSingleInvalidChar(0x0432, "?", 0xffdc);
-    testSingleInvalidChar(0x0433, "\\", 0xffde);        // steem returns 0xffdc (access denied), native drive returns 0xffde (folder not found)
+    testSingleInvalidChar(0x0431, "*",  0xffdc, 0xffdc);
+    testSingleInvalidChar(0x0432, "?",  0xffdc, 0xffdc);
+    testSingleInvalidChar(0x0433, "\\", 0xffde, 0xffdc);        // steem returns 0xffdc (access denied), native drive returns 0xffde (folder not found)
+ 
+    BYTE ok;
+    WORD res;
+
+    // relative EXISTDIR\\NEWDIR -- creates \\TEST04\\SUBDIR1 
+    Ddelete("\\TEST04\\SUBDIR1");
+    Dsetpath("\\");
+    res = testDcreate2("TEST04\\SUBDIR1", "\\TEST04\\SUBDIR1");
+    (res == 0 ) ? (ok = 1) : (ok = 0);
+    out_tr_bw(0x0435, "Dcreate - Relative EXISTDIR\\NEWDIR", ok, res);
+
+    // absolute EXISTDIR\\NEWDIR -- creates \\TEST04\\SUBDIR2 
+    Ddelete("\\TEST04\\SUBDIR2");
+    res = testDcreate2("\\TEST04\\SUBDIR2", "\\TEST04\\SUBDIR2");
+    (res == 0 ) ? (ok = 1) : (ok = 0);
+    out_tr_bw(0x0436, "Dcreate - Absolute \\EXISTDIR\\NEWDIR", ok, res);
+
+    // NEWDIR3\\NEWDIR4 - doesn't create anything in \\TEST04 dir, returns 0xffde
+    Ddelete ("\\TEST04\\SUBDIR3\\SUBDIR4");
+    Ddelete ("\\TEST04\\SUBDIR3");
+    Dsetpath("\\TEST04");
+    res = testDcreate2("SUBDIR3\\SUBDIR4", "\\TEST04\\SUBDIR3");
+    (res == 0xffde) ? (ok = 1) : (ok = 0);
+    out_tr_bw(0x0437, "Dcreate - NEWDIR\\NEWDIR", ok, res);
+
+    // SUBDIR5\\ - creates \\TEST04\\SUBDIR5
+    Dsetpath("\\TEST04");
+    res = testDcreate2("SUBDIR5\\", "\\TEST04\\SUBDIR5");
+    // (res == 0) ? (ok = 1) : (ok = 0);                    // STEEM      creates subdir, returns error 0
+    (res == 0xffde) ? (ok = 1) : (ok = 0);                  // TOS doesn't create subdir, returns error 0xffde
+    out_tr_bw(0x0438, "Dcreate - trailing backslash: NEWDIR\\", ok, res);
+  
+    // \\SUBDIR6 - creates \\SUBDIR6 in root
+    Dsetpath("\\TEST04");
+    res = testDcreate2("\\SUBDIR6", "\\SUBDIR6");
+    (res == 0) ? (ok = 1) : (ok = 0);
+    out_tr_bw(0x0439, "Dcreate - absolute, to root: \\NEWDIR", ok, res);
+    Ddelete("\\SUBDIR6");   
+    Dsetpath("\\TEST04");
 }
 
 void test044x(void)
 {
     WORD res1, res2, ok;
-
+    Dsetpath("\\TEST04");
+    
     (void) Dcreate("TOBEDELE");
     res1 = Ddelete("TOBEDELE");
     res2 = filenameExists("TOBEDELE");
@@ -225,12 +266,12 @@ void testSingleValidChar(WORD testCaseNo, char *fname)
     out_tr_bw(testCaseNo, tmp, ok, res);
 }
 
-void testSingleInvalidChar(WORD testCaseNo, char *fname, WORD goodErrorCode)
+void testSingleInvalidChar(WORD testCaseNo, char *fname, WORD goodErrorCode1, WORD goodErrorCode2)
 {
     WORD res, ok;
     res = Dcreate(fname);
     
-    (res == goodErrorCode) ? (ok = 1) : (ok = 0);
+    (res == goodErrorCode1 || res == goodErrorCode2) ? (ok = 1) : (ok = 0);
     
     char tmp[64] = {"Dcreate - single invalid char: 'A'"};
     tmp[32] = fname[0];
@@ -263,6 +304,17 @@ WORD testDcreate(char *fname)
     return 0;
 }
 
+WORD testDcreate2(char *createPath, char *testPath)
+{
+    int res = Dcreate(createPath);  // try to create dir
+    
+    if(res != 0) {                  // if failed to create, return its error code
+        return (WORD) res;
+    }
+
+    res = Dsetpath(testPath);
+    return res;
+}
 void deleteIfExists(char *fname)
 {
     if(filenameExists(fname)) {
