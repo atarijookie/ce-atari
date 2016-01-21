@@ -78,7 +78,7 @@ int32_t custom_fread( void *sp )
 	WORD ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle 
 
 	if(!fileBufs[ceHandle].isOpen) {                                    // file not open? fail - INVALID HANDLE
-        return EIHNDL;
+        return extendByteToDword(EIHNDL);
     }
     
     if(fileBufs[ceHandle].bytesToEOFinvalid) {                          // if the bytes to EOF value is invalid, we need to re-read it
@@ -252,7 +252,7 @@ int32_t custom_fwrite( void *sp )
 	WORD ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle 
 
 	if(!fileBufs[ceHandle].isOpen) {                                    // file not open? fail - INVALID HANDLE
-        return EIHNDL;
+        return extendByteToDword(EIHNDL);
     }
     
     fileBufs[ceHandle].bytesToEOFinvalid = 1;                           // mark that after this write the bytes to EOF will be invalid

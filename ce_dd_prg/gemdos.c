@@ -666,7 +666,7 @@ int32_t custom_fclose( void *sp )
 	WORD ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle 
 	
     if(!fileBufs[ceHandle].isOpen) {                                    // file not open? fail - INVALID HANDLE
-        return EIHNDL;
+        return extendByteToDword(EIHNDL);
     }
     
 	commitChanges(ceHandle);											// flush write buffer if needed 
@@ -705,7 +705,7 @@ int32_t custom_fseek( void *sp )
 	WORD ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle 
 
     if(!fileBufs[ceHandle].isOpen) {                                    // file not open? fail - INVALID HANDLE
-        return EIHNDL;
+        return extendByteToDword(EIHNDL);
     }
 	
 	commitChanges(ceHandle);											// flush write buffer if needed 
@@ -762,7 +762,7 @@ int32_t custom_fdatime( void *sp )
 	WORD ceHandle = handleAtariToCE(atariHandle);							// convert high atari handle to little CE handle 
 	
     if(!fileBufs[ceHandle].isOpen) {                                    // file not open? fail - INVALID HANDLE
-        return EIHNDL;
+        return extendByteToDword(EIHNDL);
     }
     
 	// set the params to buffer 
