@@ -597,9 +597,17 @@ int32_t custom_fcreate( void *sp )
 	if(hdIf.statusByte == ENHNDL || hdIf.statusByte == EACCDN || hdIf.statusByte == EINTRN) {   // if some other error, just return it 
         return extendByteToDword(hdIf.statusByte);									            // but append lots of FFs to make negative integer out of it 
 	}
+    
+    WORD ceHandle = hdIf.statusByte;                    // this is CE handle (0 - 40)
+    
+    if(ceHandle >= MAX_FILES) {                         // if it's out of range, internal error!
+        return EINTRN;
+    }
 	
-	WORD handle = handleCEtoAtari(hdIf.statusByte);					        // convert the CE handle (0 - 46) to Atari handle (80 - 120) 
-	return handle;
+    fileBufs[ceHandle].isOpen = TRUE;                   // it's now OPEN
+    
+	WORD atariHandle = handleCEtoAtari(ceHandle);       // convert the CE handle (0 - 40) to Atari handle (80 - 120)
+	return atariHandle;
 }
 
 int32_t custom_fopen( void *sp )
@@ -639,6 +647,7 @@ int32_t custom_fopen( void *sp )
     WORD ceHandle       = (WORD) hdIf.statusByte;
 	WORD atariHandle    = handleCEtoAtari(ceHandle);                    // convert the CE handle (0 - 40) to Atari handle (80 - 120)
     
+    fileBufs[ceHandle].isOpen = TRUE;                                   // file is open!
     getBytesToEof(ceHandle);                                            // retrieve the count of bytes until the end of file
 	
 	return atariHandle;
@@ -656,8 +665,12 @@ int32_t custom_fclose( void *sp )
 	
 	WORD ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle 
 	
+    if(!fileBufs[ceHandle].isOpen) {                                    // file not open? fail - INVALID HANDLE
+        return EIHNDL;
+    }
+    
 	commitChanges(ceHandle);											// flush write buffer if needed 
-	initFileBuffer(ceHandle);											// init the file buffer like it was never used 
+	initFileBuffer(ceHandle);											// init the file buffer like it was never used (and closed)
 	
 	// set the params to buffer 
 	commandShort[4] = GEMDOS_Fclose;										// store GEMDOS function number 
@@ -690,6 +703,10 @@ int32_t custom_fseek( void *sp )
 	}
 	
 	WORD ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle 
+
+    if(!fileBufs[ceHandle].isOpen) {                                    // file not open? fail - INVALID HANDLE
+        return EIHNDL;
+    }
 	
 	commitChanges(ceHandle);											// flush write buffer if needed 
 	seekInFileBuffer(ceHandle, offset, seekMode);						// update the file buffer by seeking if possible
@@ -744,6 +761,10 @@ int32_t custom_fdatime( void *sp )
 	
 	WORD ceHandle = handleAtariToCE(atariHandle);							// convert high atari handle to little CE handle 
 	
+    if(!fileBufs[ceHandle].isOpen) {                                    // file not open? fail - INVALID HANDLE
+        return EIHNDL;
+    }
+    
 	// set the params to buffer 
 	commandLong[5]  = GEMDOS_Fdatime;										// store GEMDOS function number 
 	commandLong[6]  = (flag << 7) | (ceHandle & 0x7f);						// flag on highest bit, the rest is handle 

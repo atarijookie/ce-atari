@@ -177,6 +177,8 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 
 typedef struct 
 {
+    BYTE isOpen;                    // if non-zero, the file is open
+
 	WORD rCount;					// how much data is buffer (specifies where the next read data could go)
 	WORD rStart;					// starting index of where we should start reading the buffer
 	BYTE rBuf[RW_BUFFER_SIZE];
