@@ -15,6 +15,11 @@ void deleteRecursive(char *subPath);
 
 void test0210(void);
 
+/*
+    It seems that current directory '.' in the middle of Dsetpath() can be ignored, 
+    because it looks like TOS is slowly changing current path during the Dsetpath() call.
+*/
+
 void test02(void)
 {
     out_s("Dsetpath and Dgetpath");
@@ -30,7 +35,7 @@ void test02(void)
 void test0210(void)
 {
     int a,b,c,d,e,f,g,h;
-     
+    
     //------------
     // do relative path changes down
     a = Dsetpath("\\");
@@ -145,6 +150,60 @@ void test0210(void)
         ok = 1;
     }
     out_tr_b (0x0208, "Dsetpath to current dir", ok);
+    
+    //-------------
+    // Dsetpath - current and deeper
+    a = Dsetpath("\\AMSTERDA.M\\DUSSELDO.RF\\COLOGNE");
+    b = Dsetpath(".\\BERLIN\\AMSTERDA.M");
+    c = Dgetpath(curPath, 0);
+    d = strcmp(curPath, "\\AMSTERDA.M\\DUSSELDO.RF\\COLOGNE\\BERLIN\\AMSTERDA.M");
+
+    ok = 0;
+    if(!a && !b && !c && !d) {
+        ok = 1;
+    }
+    out_tr_b(0x0210, "Dsetpath - deeper from current", ok);
+
+    //-------------
+    // Dsetpath - current in the middle
+    Dsetpath("\\");
+    a = Dsetpath("\\AMSTERDA.M\\DUSSELDO.RF");
+    b = Dsetpath("COLOGNE\\.\\BERLIN");
+    c = Dgetpath(curPath, 0);
+    d = strcmp(curPath, "\\AMSTERDA.M\\DUSSELDO.RF\\COLOGNE\\BERLIN");
+
+    ok = 0;
+    if(!a && !b && !c && !d) {
+        ok = 1;
+    }
+    out_tr_b(0x0211, "Dsetpath - current in the middle", ok);
+
+    //-------------
+    // Dsetpath - current at the end
+    Dsetpath("\\");
+    a = Dsetpath("\\AMSTERDA.M\\DUSSELDO.RF");
+    b = Dsetpath("COLOGNE\\BERLIN\\.");
+    c = Dgetpath(curPath, 0);
+    d = strcmp(curPath, "\\AMSTERDA.M\\DUSSELDO.RF\\COLOGNE\\BERLIN");          // '.' at the end is ignored, or means that it switched to the same (current) dir at the end
+
+    ok = 0;
+    if(!a && !b && !c && !d) {
+        ok = 1;
+    }
+    out_tr_b(0x0212, "Dsetpath - current at the end", ok);
+
+    //-------------
+    // Dsetpath - current and up
+    a = Dsetpath("\\AMSTERDA.M\\DUSSELDO.RF");
+    b = Dsetpath(".\\..");
+    c = Dgetpath(curPath, 0);
+    d = strcmp(curPath, "\\AMSTERDA.M");
+    
+    ok = 0;
+    if(!a && !b && !c && !d) {
+        ok = 1;
+    }
+    out_tr_b(0x0213, "Dsetpath - current and up", ok);
 }
 
 void createTestDirs(int level)
