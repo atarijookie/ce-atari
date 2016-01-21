@@ -14,7 +14,7 @@ int  drive;
 WORD tosVersion;
 
 void test01(void);
-void test02(WORD whichSkip);
+void test02(void);
 void test03(void);
 void test04(void);
 void test05(WORD whichTests);
@@ -43,7 +43,6 @@ int main(void)
     
     WORD whichTests     = 0;
     WORD which05Tests   = 0xffff;       // all 05 tests
-    WORD which02skip    = 0;            // don't skip anything
     
     while(1) {
         showMenu();
@@ -69,16 +68,6 @@ int main(void)
             break;
         }
         
-        if(req == 'c' || req == 'd' || req == 'b') {
-            whichTests = 0x02;                  // test02
-            switch(req) {
-                case 'c':   which02skip = 0x01; break;      // skip dir creation
-                case 'd':   which02skip = 0x02; break;      // skip dir deletion
-                case 'b':   which02skip = 0x03; break;      // skip both dir creation and deletion
-            }
-            break;
-        }
-        
         if(req == 'o' || req == 'r' || req == 's' || req == 'x' || req == 'w' || req == 'v') {
             whichTests = 0x10;                  // test05
             switch(req) {
@@ -97,7 +86,7 @@ int main(void)
     out_s("");
     
     if(whichTests & 0x01)   test01();
-    if(whichTests & 0x02)   test02(which02skip);
+    if(whichTests & 0x02)   test02();
     if(whichTests & 0x04)   test03();
     if(whichTests & 0x08)   test04();
     if(whichTests & 0x10)   test05(which05Tests);
@@ -116,9 +105,6 @@ void showMenu(void)
     (void) Cconws("Select which tests to run:\r\n");
     (void) Cconws(" \33p[ 1 ]\33q Dsetdrv and Dgetdrv\r\n");
     (void) Cconws(" \33p[ 2 ]\33q Dsetpath and Dgetpath\r\n");
-    (void) Cconws("       \33p[ C ]\33q skip creating dirs\r\n");
-    (void) Cconws("       \33p[ D ]\33q skip deleting dirs\r\n");
-    (void) Cconws("       \33p[ B ]\33q skip creating & deleting\r\n");
     (void) Cconws(" \33p[ 3 ]\33q Fsfirst, Fsnext, Fsetdta, Fgetdta\r\n");
     (void) Cconws(" \33p[ 4 ]\33q Dcreate, Ddelete, Frename, Fdelete\r\n");
     (void) Cconws(" \33p[ 5 ]\33q Fcreate, Fopen, Fclose, Fread, Fseek, Fwrite\r\n");

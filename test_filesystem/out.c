@@ -211,18 +211,28 @@ void writeBufferToFile(void)
         return;
     }
 
-    char path[32] = {"X:\\cet_TTTT.txt"};
-    path[0] = 'A' + fromDrive;                  // place drive letter
+    char path[32] = {"X:\\FSYS_TTT.txt"};       // filename string template
     
     char tmp[16];
     wordToHex(tosVersion, tmp);
-    memcpy(path + 7, tmp, 4);                   // place TOS version
-    
+    memcpy(path + 8, tmp+1, 3);                 // place TOS version
+
+    path[0] = 'A' + fromDrive;                  // place drive letter - of drive where the test was runned from 
     int f = Fcreate(path, 0);                   // create file
+    
     if(f < 0) {
-        (void) Cconws("Failed to create log file.\r\n");
-        return;
+        path[0] = 'A' + drive;                  // place drive letter - of drive which was tested
+        f = Fcreate(path, 0);                   // create file
+
+        if(f < 0) {
+            (void) Cconws("\r\nFailed to create log file.\r\n");
+            return;
+        } 
     }
+    
+    (void) Cconws("\r\n\33pSaved log file: ");
+    (void) Cconws(path);
+    (void) Cconws(" \33q\r\n");
     
     Fwrite(f, curSize, buffer);
     Fclose(f);

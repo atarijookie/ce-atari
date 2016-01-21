@@ -15,22 +15,14 @@ void deleteRecursive(char *subPath);
 
 void test0210(void);
 
-char *testDirs[10] = {"AMSTERDA.M", "BERLIN", "COLOGNE", "DUSSELDO.RF", "ESPOO", "GLASGOW.001", "HELSINKI", "MADRID", "ROME", "WARSAW"};
-
-void test02(WORD whichSkip)
+void test02(void)
 {
     out_s("Dsetpath and Dgetpath");
     Dsetdrv(drive);                 // switch to selected drive
     
-    if((whichSkip & 0x01) == 0) {   // if shouldn't skip dir creation
-        createTestDirs(0);
-    }
-    
+    createTestDirs(0);
     test0210();
-    
-    if((whichSkip & 0x02) == 0) {   // if shouldn't skip dir deletion
-        deleteTestDirs();
-    }
+    deleteTestDirs();
     
     out_s("");
 }
@@ -144,7 +136,7 @@ void test0210(void)
     char curPath2[128];
     
     a = Dgetpath(curPath, 0);
-    b = Dsetpath(".");
+    b = Dsetpath(".");                  
     c = Dgetpath(curPath2, 0);
     d = strcmp(curPath, curPath2);
 
@@ -157,48 +149,27 @@ void test0210(void)
 
 void createTestDirs(int level)
 {
-    if(level == 0) {
-        out_s("Creating test dirs...");
-        Dsetpath("\\");
-    }
+    out_s("Creating test dirs...");
+    Dsetpath("\\");
 
-    if(level >= 8) {
-        return;
-    }
-    
+    char *testDirs[6] = {"AMSTERDA.M", "DUSSELDO.RF", "COLOGNE", "BERLIN", "AMSTERDA.M", "BERLIN"};
     int i;
-    for(i=0; i<10; i++) {
+    
+    for(i=0; i<6; i++) {
         (void) Dcreate(testDirs[i]);
-        
-        if(i > (4 - level)) {
-            continue;
-        }
-        
         Dsetpath(testDirs[i]);
-        createTestDirs(level + 1);
-        Dsetpath("..");
     }
+    Dsetpath("\\");
 }
 
 void deleteTestDirs(void)
 {
-    int i;
     out_s("Deleting test dirs...");
     Dsetpath("\\");
+    deleteRecursive("AMSTERDA.M");
 
-    for(i=0; i<10; i++) {
-        int res = Ddelete(testDirs[i]);
-    
-        if(res == -34) {         // path not found? dir doesn't exist, skip it
-            continue;
-        }
-    
-        if(res == -36) {         // access denied? dir not empty!
-            deleteRecursive(testDirs[i]);
-        }
-
-        Ddelete(testDirs[i]);   // try to delete again, it should be empty now
-    }
+    Dsetpath("\\");
+    Ddelete("AMSTERDA.M");
 }
 
 void deleteRecursive(char *subPath)

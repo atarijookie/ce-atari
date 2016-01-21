@@ -1,4 +1,4 @@
-TARGET	= fs_test.prg
+TARGET	= tst_fsys.prg
 SLIM	= yes
 
 CC		= m68k-atari-mint-gcc
