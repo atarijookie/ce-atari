@@ -872,8 +872,13 @@ void TranslatedDisk::removeDoubleDots(std::string &path)
         }
     }
 
-    // now remove the double dots
+    // now remove the double dots and single dots
     for(int i=0; i<found; i++) {            // go forward to find double dot
+        if(strings[i] == ".") {             // single dot found?
+            strings[i] = "";                // remove it
+            continue;
+        }
+    
         if(strings[i] == "..") {            // double dot found?
             strings[i] = "";                // remove it
 
