@@ -409,11 +409,26 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
         return;
     }
 
-    if(pathContainsWildCards((char *) dataBuffer)) {    // if the new directory name contains ? or *, fail with EACCDN
+    //---------------
+    // find out if it's not ending with \ and thus having empty new dir name
+    int len = strlen((char *) dataBuffer);
+    
+    if(len > 0) {                                           // there is some path specified?
+        if(dataBuffer[len - 1] == ATARIPATH_SEPAR_CHAR) {   // if the path ends with \, then it's invalid (no new dir name specified), return PATH NOT FOUND
+            dataTrans->setStatus(EPTHNF);
+            return;    
+        }
+    }
+    
+    //---------------
+    // if the new directory name contains ? or *, fail with EACCDN
+    if(pathContainsWildCards((char *) dataBuffer)) {    
         dataTrans->setStatus(EACCDN);
         return;    
     }
     
+    //---------------
+    // create absolute host path from relative atari path
     std::string newAtariPath, hostPath;
 
     convertAtariASCIItoPc((char *) dataBuffer);     // try to fix the path with only allowed chars
@@ -428,13 +443,36 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
         return;
     }
 
-    if(isAtariPathReadOnly(newAtariPath)) {         // if it's read only, quit
+    //---------------
+    // if it's read only, quit
+    if(isAtariPathReadOnly(newAtariPath)) {         
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- path is read only", (char *) newAtariPath.c_str());
 
         dataTrans->setStatus(EACCDN);
         return;
     }
+
+    //---------------
+    // if the new dir already exists, return ACCESS DENIED
+    bool newPathAlreadyExists = hostPathExists(hostPath.c_str());
+    if(newPathAlreadyExists) {                      
+        dataTrans->setStatus(EACCDN);
+        return;
+    }
     
+    //---------------
+    // check if the specified new path doesn't contain some path, which doesn't exist
+    std::string path, file;
+    Utils::splitFilenameFromPath(hostPath, path, file);
+    
+    bool subPathForNewDirExists = hostPathExists(path);
+    if(!subPathForNewDirExists) {                   // if the path before the name of new dir doesn't exist, return PATH NOT FOUND
+        dataTrans->setStatus(EPTHNF);
+        return;
+    }
+    
+    //---------------
+    // now try to create the dir
 	int status = mkdir(hostPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
 
     if(status == 0) {                               // directory created?
