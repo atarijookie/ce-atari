@@ -363,46 +363,50 @@ void test058x(void)
         return;
     }
     
+    #define SEEK_SET    0
+    #define SEEK_CUR    1
+    #define SEEK_END    2
+    
     //---------
     // test SEEK_SET
-    res1 = Fseek(0, f, 0);
+    res1 = Fseek(0, f, SEEK_SET);
     res2 = verifySeek(0, f);
     (res1 == 0 && res2 == 1) ? (ok = 1) : (ok = 0);
     out_tr_bd(0x0581, "Fseek - SEEK_SET to start while at start", ok, res1);
     
-    res1 = Fseek(TEST051XFILESIZE/2, f, 0);
+    res1 = Fseek(TEST051XFILESIZE/2, f, SEEK_SET);
     res2 = verifySeek(TEST051XFILESIZE/2, f);
     (res1 == (TEST051XFILESIZE/2) && res2 == 1) ? (ok = 1) : (ok = 0);
     out_tr_bd(0x0582, "Fseek - SEEK_SET to half", ok, res1);
 
-    res1 = Fseek(TEST051XFILESIZE, f, 0);
+    res1 = Fseek(TEST051XFILESIZE, f, SEEK_SET);
     res2 = Fread(f, 16, buf2);
     (res1 == TEST051XFILESIZE && res2 == 0) ? (ok = 1) : (ok = 0);
     out_tr_bd(0x0583, "Fseek - SEEK_SET to end", ok, res1);
 
-    res1 = Fseek(0, f, 0);
+    res1 = Fseek(0, f, SEEK_SET);
     res2 = verifySeek(0, f);
     (res1 == 0 && res2 == 1) ? (ok = 1) : (ok = 0);
     out_tr_bd(0x0584, "Fseek - SEEK_SET back to start", ok, res1);
     
     //---------
     // test SEEK_CUR
-    res1 = Fseek(TEST051XFILESIZE/2, f, 1);
+    res1 = Fseek(TEST051XFILESIZE/2, f, SEEK_CUR);
     res2 = verifySeek(TEST051XFILESIZE/2, f);
     (res1 == (TEST051XFILESIZE/2) && res2 == 1) ? (ok = 1) : (ok = 0);    
     out_tr_bd(0x0585, "Fseek - SEEK_CUR to half  (+half)", ok, res1);
 
-    res1 = Fseek(TEST051XFILESIZE/2, f, 1);
+    res1 = Fseek(TEST051XFILESIZE/2, f, SEEK_CUR);
     res2 = Fread(f, 16, buf2);
     (res1 == TEST051XFILESIZE && res2 == 0) ? (ok = 1) : (ok = 0);    
     out_tr_bd(0x0586, "Fseek - SEEK_CUR to end   (+half)", ok, res1);
 
-    res1 = Fseek(-(TEST051XFILESIZE/2), f, 1);
+    res1 = Fseek(-(TEST051XFILESIZE/2), f, SEEK_CUR);
     res2 = verifySeek(TEST051XFILESIZE/2, f);
     (res1 == (TEST051XFILESIZE/2) && res2 == 1) ? (ok = 1) : (ok = 0);    
     out_tr_bd(0x0587, "Fseek - SEEK_CUR to half  (-half)", ok, res1);
     
-    res1 = Fseek(-(TEST051XFILESIZE/2), f, 1);
+    res1 = Fseek(-(TEST051XFILESIZE/2), f, SEEK_CUR);
     res2 = verifySeek(0, f);
     (res1 == 0 && res2 == 1) ? (ok = 1) : (ok = 0);    
     out_tr_bd(0x0588, "Fseek - SEEK_CUR to start (-half)", ok, res1);
@@ -411,17 +415,17 @@ void test058x(void)
     // test SEEK_END
 /*
 // these seem to fail all the time :-(    
-    res1 = Fseek(TEST051XFILESIZE, f, 2);
+    res1 = Fseek(TEST051XFILESIZE, f, SEEK_END);
     res2 = verifySeek(0, f);
     (res1 == 0 && res2 == 1) ? (ok = 1) : (ok = 0);    
     out_tr_bd(0x0589, "Fseek - SEEK_END to start", ok, res1);
 
-    res1 = Fseek(TEST051XFILESIZE/2, f, 2);
+    res1 = Fseek(TEST051XFILESIZE/2, f, SEEK_END);
     res2 = verifySeek(TEST051XFILESIZE/2, f);
     (res1 == (TEST051XFILESIZE/2) && res2 == 1) ? (ok = 1) : (ok = 0);    
     out_tr_bd(0x0590, "Fseek - SEEK_END to half", ok, res1);
     
-    res1 = Fseek(0, f, 2);
+    res1 = Fseek(0, f, SEEK_END);
     res2 = Fread(f, 16, buf2);
     (res1 == TEST051XFILESIZE && res2 == 0) ? (ok = 1) : (ok = 0);    
     out_tr_bd(0x0591, "Fseek - SEEK_END to end", ok, res1);
