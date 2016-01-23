@@ -254,7 +254,20 @@ void test05ax(void)
     
     int idx, sz, allOk, found;
     int dataOk = 1;
+    
+    DWORD tLast = 0, tNow, tDiff;
+    
     while(1) {
+        //------------------
+        // show progress every second
+        tNow    = getTicks();
+        tDiff   = tNow - tLast;
+        
+        if(tDiff > 200) {           // if at least second passed since last output, show something
+            tLast = tNow;
+            Cconout('*');
+        }
+    
         //------------------
         // first check if at least one open file needs to be read... If everything is fully read, quit
         allOk = 1;
@@ -309,11 +322,13 @@ void test05ax(void)
         memset(buf2 + offset, 0, sz);                           // clear the RAM to make sure the data was really read
         res = Fread(f[idx], sz, buf2 + offset);                 // try to read from the file
         
+        int rCnt = 0;                                           // how many bytes was really read? (e.g. when end of file is hit, you might read less than what you wanted)
         if(res > 0) {                                           // reading success?
             rdCnt[idx] += res;
+            rCnt = res;
         }
         
-        res = memcmp(buf1 + offset, buf2 + offset, sz);         // compare data
+        res = memcmp(buf1 + offset, buf2 + offset, rCnt);       // compare data
         if(res != 0) {                                          // some difference in data?
             dataOk = 0;
         }
@@ -330,6 +345,8 @@ void test05ax(void)
             break;
         }
     }
+    
+    (void) Cconws("\r\n");
     
     out_tr_b(0x05A1, "Fread - 10 files reading - total length", allOk);
     out_tr_b(0x05A2, "Fread - 10 files reading - data validity",dataOk);
