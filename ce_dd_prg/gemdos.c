@@ -61,6 +61,10 @@ extern BYTE currentDrive;
 
 extern TFileBuffer fileBufs[MAX_FILES];
 
+BYTE fseek_cur(int32_t offset, BYTE ceHandle, TFileBuffer *fb);
+void fseek_invalSeekStore(int32_t offset, BYTE ceHandle, BYTE seekMode, TFileBuffer *fb);
+void fseek_hdif_command(int32_t offset, BYTE ceHandle, BYTE seekMode);
+
 // ------------------------------------------------------------------ 
 // the custom GEMDOS handlers now follow 
 
@@ -604,7 +608,8 @@ int32_t custom_fcreate( void *sp )
         return EINTRN;
     }
 	
-    fileBufs[ceHandle].isOpen = TRUE;                   // it's now OPEN
+    fileBufs[ceHandle].isOpen       = TRUE;             // it's now OPEN
+    fileBufs[ceHandle].currentPos   = 0;                // current position - file start
     
 	WORD atariHandle = handleCEtoAtari(ceHandle);       // convert the CE handle (0 - 40) to Atari handle (80 - 120)
 	return atariHandle;
@@ -647,7 +652,8 @@ int32_t custom_fopen( void *sp )
     WORD ceHandle       = (WORD) hdIf.statusByte;
 	WORD atariHandle    = handleCEtoAtari(ceHandle);                    // convert the CE handle (0 - 40) to Atari handle (80 - 120)
     
-    fileBufs[ceHandle].isOpen = TRUE;                                   // file is open!
+    fileBufs[ceHandle].isOpen       = TRUE;                             // file is open!
+    fileBufs[ceHandle].currentPos   = 0;                                // current position - file start
     getBytesToEof(ceHandle);                                            // retrieve the count of bytes until the end of file
 	
 	return atariHandle;
@@ -702,16 +708,73 @@ int32_t custom_fseek( void *sp )
 		CALL_OLD_GD( Fseek, offset, atariHandle, seekMode);
 	}
 	
-	WORD ceHandle = handleAtariToCE(atariHandle);						// convert high atari handle to little CE handle 
+	WORD        ceHandle    = handleAtariToCE(atariHandle);             // convert high atari handle to little CE handle 
+	TFileBuffer *fb         = &fileBufs[ceHandle];
 
-    if(!fileBufs[ceHandle].isOpen) {                                    // file not open? fail - INVALID HANDLE
+    if(!fb->isOpen) {                                                   // file not open? fail - INVALID HANDLE
         return extendByteToDword(EIHNDL);
     }
 	
 	commitChanges(ceHandle);											// flush write buffer if needed 
-	seekInFileBuffer(ceHandle, offset, seekMode);						// update the file buffer by seeking if possible
+    
+    if(seekMode == SEEK_CUR) {                                          // SEEK_CUR -- try seek in local buffer, and it that's not enough, do real seek
+        BYTE doRealSeek = fseek_cur(offset, ceHandle, fb);
+        
+        if(doRealSeek) {                                                // if seek in local buffer didn't work, do real seek
+            fseek_invalSeekStore(offset, ceHandle, seekMode, fb);
+        }
+    } else {                                                            // SEEK_SET and SEEK_END - just invalidate local buffer and to real seek
+        fseek_invalSeekStore(offset, ceHandle, seekMode, fb);
+    }
+        
+	if(hdIf.statusByte != E_OK) {				    					// if some other error, make negative number out of it 
+        return extendByteToDword(hdIf.statusByte);
+	}
 	
-	// set the params to buffer 
+	return fb->currentPos;                                              // return the position in file
+}
+
+BYTE fseek_cur(int32_t offset, BYTE ceHandle, TFileBuffer *fb)
+{
+	int32_t newPos = ((int32_t) fb->rStart) + offset;					// calculate the new position
+	
+	if(newPos < 0 || newPos >= fb->rCount) {						    // the seek would go outside of local buffer?
+        fseek_hdif_command(fb->currentPos, ceHandle, SEEK_SET);         // tell the host where we are - synchronize local pointer with host pointer
+        return TRUE;                                                    // do fseek_invalSeekStore() after this
+	} 
+    
+    // seek fits in the local buffer?
+    fb->currentPos  += offset;                                          // update absolute position in stream
+    fb->rStart       = newPos;                                          // store the new position in the buffer	
+    return FALSE;                                                       // don't do fseek_invalSeekStore() after this
+}
+
+// fseek - invalidate local buffer, then do real seek, then store current position
+void fseek_invalSeekStore(int32_t offset, BYTE ceHandle, BYTE seekMode, TFileBuffer *fb)
+{
+    // invalidate local buffer - now we don't have any data left
+    fb->rCount = 0;
+    fb->rStart = 0;
+    
+    fseek_hdif_command(offset, ceHandle, seekMode);
+    
+    if(!hdIf.success || hdIf.statusByte == E_NOTHANDLED) {			        // not handled or error? fail
+		return;
+	}
+	
+	if(hdIf.statusByte != E_OK) {				    					    // if some other error, fail
+        return;
+	}
+	
+	// If we got here, the seek was successful and now we need to return the position in the file. 
+	fb->currentPos          = getDword(pDmaBuffer);     // get the new file position from the received data
+    fb->bytesToEOF          = getDword(pDmaBuffer + 4); // also get the count of bytes until the EOF (we shouldn't read past that)
+    fb->bytesToEOFinvalid   = 0;                        // mark that the bytesToEOF is valid    
+}
+
+void fseek_hdif_command(int32_t offset, BYTE ceHandle, BYTE seekMode)
+{
+    // set the params to buffer 
 	commandLong[5] = GEMDOS_Fseek;											// store GEMDOS function number 
 	
 	// store params to command sequence 
@@ -724,22 +787,6 @@ int32_t custom_fseek( void *sp )
 	commandLong[11] = (BYTE) seekMode;
 	
 	(*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);    // send command to host over ACSI 
-
-    if(!hdIf.success || hdIf.statusByte == E_NOTHANDLED) {			        // not handled or error? 
-		CALL_OLD_GD( Fseek, offset, atariHandle, seekMode);
-	}
-	
-	if(hdIf.statusByte != E_OK) {				    					    // if some other error, make negative number out of it 
-        return extendByteToDword(hdIf.statusByte);
-	}
-	
-	// If we got here, the seek was successful and now we need to return the position in the file. 
-    
-	res                                     = getDword(pDmaBuffer);     // get the new file position from the received data
-    fileBufs[ceHandle].bytesToEOF           = getDword(pDmaBuffer + 4); // also get the count of bytes until the EOF (we shouldn't read past that)
-    fileBufs[ceHandle].bytesToEOFinvalid    = 0;                        // mark that the bytesToEOF is valid
-	
-	return res;                                                         // return the position in file
 }
 
 int32_t custom_fdatime( void *sp )

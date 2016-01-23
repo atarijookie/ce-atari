@@ -58,10 +58,12 @@ TFileBuffer fileBufs[MAX_FILES];
 DWORD fread_small(WORD ceHandle, DWORD countNeeded, BYTE *buffer);
 DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer);
 
+void invalidateFileBuffer(TFileBuffer *fb, WORD ceHandle, BYTE seekMode);
+
 // ------------------------------------------------------------------ 
 int32_t custom_fread( void *sp )
 {
-	DWORD res = 0;
+	int32_t res = 0;
 	BYTE *params = (BYTE *) sp;
 
 	WORD atariHandle	= (WORD)	*((WORD *) params);
@@ -89,6 +91,10 @@ int32_t custom_fread( void *sp )
         res = fread_small(ceHandle, count, buffer);
     } else {
         res = fread_big(ceHandle, count, buffer);
+    }
+    
+    if(res > 0) {       // if the result is count of bytes read (not error code), update current stream position
+        fileBufs[ceHandle].currentPos += res;
     }
     
     return res;
@@ -635,32 +641,6 @@ BYTE commitChanges(WORD ceHandle)
 	return FALSE;
 }
 
-// call this on fseek - this will either alter the pointer in current file buffer, or invalidate the whole file buffer
-void seekInFileBuffer(WORD ceHandle, int32_t offset, BYTE seekMode) 
-{
-	if(ceHandle >= MAX_FILES) {											// would be out of index? quit
-		return;
-	}
-
-	TFileBuffer *fb = &fileBufs[ceHandle];
-	
-	if(seekMode != 1) {													// if doing anything other than SEEK_CUR, just invalidate the buffer
-		fb->rCount = 0;
-		fb->rStart = 0;
-		return;
-	}
-	
-	int32_t newPos = ((int32_t) fb->rStart) + offset;					// calculate the new position
-	
-	if(newPos < 0 || newPos > fb->rCount) {								// the seek would go outsite of our buffer? invalidate it!
-		fb->rCount = 0;
-		fb->rStart = 0;
-		return;
-	}
-	
-	fb->rStart = newPos;												// store the new position in the buffer
-}
-
 // call this on start to init all, or on fclose / fopen / fcreate to init it 
 void initFileBuffer(WORD ceHandle) 
 {
@@ -669,6 +649,7 @@ void initFileBuffer(WORD ceHandle)
 	}
 
     fileBufs[ceHandle].isOpen               = FALSE;                    // NOT open
+    fileBufs[ceHandle].currentPos           = 0;                        // start of the file
 	fileBufs[ceHandle].rCount               = 0;
 	fileBufs[ceHandle].rStart               = 0;
     fileBufs[ceHandle].bytesToEOF           = 0;

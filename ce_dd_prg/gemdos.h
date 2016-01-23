@@ -182,7 +182,8 @@ typedef struct
 	WORD rCount;					// how much data is buffer (specifies where the next read data could go)
 	WORD rStart;					// starting index of where we should start reading the buffer
 	BYTE rBuf[RW_BUFFER_SIZE];
-	
+
+    DWORD currentPos;               // current position in the stream, from the start of the file
     DWORD bytesToEOF;               // count of bytes until the EOF
     BYTE  bytesToEOFinvalid;        // flag that marks that before any READ operation you should 
     
