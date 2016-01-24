@@ -200,23 +200,26 @@ DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
     }
     
     // Second phase of BIG fread: transfer data by blocks of size 512 bytes, buffer must be EVEN
+    BYTE  toFastRam = (((int)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
+    DWORD blockSize = toFastRam ? FASTRAM_BUFFER_SIZE : (MAXSECTORS * 512); // size of block, which we will read
+    
+    DWORD res;
 	while(countNeeded >= 512) {											// while we're not at the ending sector
-		WORD sectorCount = countNeeded / 512; 
-		
-		if(sectorCount > MAXSECTORS) {								    // limit the maximum sectors read in one cycle to MAXSECTORS
-			sectorCount = MAXSECTORS;
-		}
+        DWORD thisReadSizeBytes = (countNeeded < blockSize) ? countNeeded : blockSize; // will the needed read size with in the blockSize, or not?
 			
-		DWORD bytesCount = ((DWORD) sectorCount) * 512;				    // convert sector count to byte count
-			
-		DWORD res = readData(ceHandle, buffer, bytesCount, seekOffset);	// try to read the data
+        if(toFastRam) {     // if reading to FAST RAM, first read to fastRamBuffer, and then copy to the correct buffer
+            res = readData(ceHandle, FastRAMBuffer, thisReadSizeBytes, seekOffset);
+            memcpy(buffer, FastRAMBuffer, thisReadSizeBytes);
+        } else {            // if reading to ST RAM, just read directly there
+            res = readData(ceHandle, buffer, thisReadSizeBytes, seekOffset);
+        }
 			
 		countDone	    += res;											// update the bytes read variable
 		buffer		    += res;											// update the buffer pointer
 		countNeeded     -= res;											// update the count that we still should read
         fb->bytesToEOF  -= res;                                         // update count of remaining bytes
 			
-		if(res != bytesCount) {										    // if failed to read all the requested data?
+		if(res != thisReadSizeBytes) {                                  // if failed to read all the requested data?
             fb->bytesToEOF = 0;                                         // update count of remaining bytes
 			return countDone;										    // return with the count of read data 
 		}
@@ -341,17 +344,25 @@ int32_t custom_fwrite( void *sp )
 			return count;												
 		} else {														// if the remaining data count is more that we can buffer 
 			// transfer the remaining data in a loop 
+            BYTE  toFastRam = (((int)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
+            DWORD blockSize = toFastRam ? FASTRAM_BUFFER_SIZE : (MAXSECTORS * 512); // size of block, which we will read
+            
 			while(remCount > 0) {										// while there's something to send 
 				// calculate how much data we should transfer in this loop - with respect to MAX SECTORS we can transfer at once 
-				DWORD dataNow = (remCount <= (MAXSECTORS*512)) ? remCount : (MAXSECTORS*512);
+                DWORD thisWriteSizeBytes = (remCount < blockSize) ? remCount : blockSize; // will the needed write size within the blockSize, or not?
 			
-				res = writeData(ceHandle, buffer, dataNow);				// send the data 
+                if(toFastRam) {     // if writing from FAST RAM, first cop to fastRamBuffer, and then write using DMA
+                    memcpy(FastRAMBuffer, buffer, thisWriteSizeBytes);
+                    res = writeData(ceHandle, FastRAMBuffer, thisWriteSizeBytes);
+                } else {            // if writing from ST RAM, just writing directly there
+                    res = writeData(ceHandle, buffer, thisWriteSizeBytes);
+                }
 
 				bytesWritten	+= res;									// update bytes written variable 
 				buffer			+= res;									// and move pointer in buffer further 
 				remCount		-= res;									// decrease the count that is remaining 
 
-				if(res != dataNow) {									// failed to write more data? return the count of data written 
+				if(res != thisWriteSizeBytes) {                         // failed to write more data? return the count of data written 
 					return bytesWritten;
 				}
 			}		
@@ -364,116 +375,49 @@ int32_t custom_fwrite( void *sp )
 	return EINTRN;
 }
 
+// BEWARE! BYTE *bfr must point to ST RAM, because DMA chip can't transfer data from/to FAST RAM!
 DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
 {
 	commandLong[5] = GEMDOS_Fwrite;										// store GEMDOS function number 
 	commandLong[6] = ceHandle;											// store file handle 
 
-	DWORD count = 0;
-	
-	if ((int)bfr>=0x1000000)													// Oh dear, are we out of ST RAM boundaries? The ACSI DMA won't read past 0xffffff
-	{
-		DWORD cnt_remain            = cnt;												
-		DWORD actual_bytes_written  = 0;
-		DWORD bytes_to_copy         = FASTRAM_BUFFER_SIZE;
+    WORD sectorCount = cnt / 512;										// calculate how many sectors should we transfer 
 
-		// In the case of writing from outside ST RAM, we need to copy the
-		// data to ST RAM and then write it normally. 
-		// But we can't afford to copy all data in one go because we
-		// would need an equal sized buffer. Instead, copy the data in
-		// chunks and then write it.
-		
-		while (cnt_remain>0)
-		{
-			if (cnt_remain < FASTRAM_BUFFER_SIZE)
-				bytes_to_copy = cnt_remain;
+    if((cnt % 512) != 0) {												// and if we have more than full sector(s) in buffer, send one more! 
+        sectorCount++;
+    }
 
-			commandLong[7] = (DWORD)bytes_to_copy >> 16;											        // store byte count 
-			commandLong[8] = (DWORD)bytes_to_copy >>  8;
-			commandLong[9] = (DWORD)bytes_to_copy  & 0xff;
+    commandLong[7] = cnt >> 16;											// store byte count 
+    commandLong[8] = cnt >>  8;
+    commandLong[9] = cnt  & 0xff;
 
-            WORD sectorCount = bytes_to_copy / 512;                                                         // calculate how many sectors should we transfer 
-            if((bytes_to_copy % 512) != 0) {                                                                // and if we have more than full sector(s) in buffer, send one more! 
-                sectorCount++;
-            }
-            
-			memcpy(FastRAMBuffer, bfr, bytes_to_copy);							                            // Yup, so copy data to its rightful place
-			bfr=bfr+FASTRAM_BUFFER_SIZE;
-			(*hdIf.cmd)(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // send command to host over ACSI 
-			
-            if(!hdIf.success) {     // failed?
-                return 0;
-            }
-            
-			// if all data in this chunk transfered, update counter
-			if(hdIf.statusByte == RW_ALL_TRANSFERED) {
-				actual_bytes_written=actual_bytes_written+bytes_to_copy;
-				cnt_remain=cnt_remain-bytes_to_copy;
-			}
-			else
-			{
-				// if the result is also not partial transfer, then some other error happened, return that no data was transfered
-				if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
-					return 0;	
-				}
-				
-				// if we got here, then partial transfer happened, see how much data we got
-				commandShort[4] = GD_CUSTOM_getRWdataCnt;
-				commandShort[5] = ceHandle;										
-				
-				(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			// send command to host over ACSI
-			
-				if(!hdIf.success || hdIf.statusByte != E_OK) {									// failed? say that no data was transfered
-					return 0;
-				}
-			
-			    count = getDword(pDmaBuffer);						// read how much data was written
-				return count+actual_bytes_written;
-			}
-		}
-		count=actual_bytes_written;
+    (*hdIf.cmd)(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// send command to host over ACSI 
+    
+    if(!hdIf.success) {     // failed?
+        return 0;
+    }
+    
+    // if all data transfered, return count of all data
+    if(hdIf.statusByte == RW_ALL_TRANSFERED) {
+        return cnt;
+    }
 
-	}
-	else
-	{
-		WORD sectorCount = cnt / 512;										// calculate how many sectors should we transfer 
+    // if the result is also not partial transfer, then some other error happened, return that no data was transfered
+    if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
+        return 0;	
+    }
+    
+    // if we got here, then partial transfer happened, see how much data we got
+    commandShort[4] = GD_CUSTOM_getRWdataCnt;
+    commandShort[5] = ceHandle;										
+    
+    (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			// send command to host over ACSI
 
-		if((cnt % 512) != 0) {												// and if we have more than full sector(s) in buffer, send one more! 
-			sectorCount++;
-		}
+    if(!hdIf.success || hdIf.statusByte != E_OK) {									// failed? say that no data was transfered
+        return 0;
+    }
 
-		commandLong[7] = cnt >> 16;											// store byte count 
-		commandLong[8] = cnt >>  8;
-		commandLong[9] = cnt  & 0xff;
-
-		(*hdIf.cmd)(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// send command to host over ACSI 
-		
-        if(!hdIf.success) {     // failed?
-            return 0;
-        }
-        
-		// if all data transfered, return count of all data
-		if(hdIf.statusByte == RW_ALL_TRANSFERED) {
-			return cnt;
-		}
-	
-		// if the result is also not partial transfer, then some other error happened, return that no data was transfered
-		if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
-			return 0;	
-		}
-		
-		// if we got here, then partial transfer happened, see how much data we got
-		commandShort[4] = GD_CUSTOM_getRWdataCnt;
-		commandShort[5] = ceHandle;										
-		
-		(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);			// send command to host over ACSI
-	
-		if(!hdIf.success || hdIf.statusByte != E_OK) {									// failed? say that no data was transfered
-			return 0;
-		}
-	
-	    count = getDword(pDmaBuffer);						// read how much data was written
-	}
+    DWORD count = getDword(pDmaBuffer);						// read how much data was written
 	return count;
 }
 
@@ -495,6 +439,7 @@ BYTE fillReadBuffer(WORD ceHandle)
 	return TRUE;
 }
 
+// BEWARE! BYTE *bfr must point to ST RAM, because DMA chip can't transfer data to FAST RAM!
 DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 {
 	commandLong[5] = GEMDOS_Fread;										// store GEMDOS function number 
@@ -509,109 +454,37 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 		sectorCount++;
 	}
 
-	if ((int)bfr>=0x1000000)													// Oh dear, are we out of ST RAM boundaries? The ACSI DMA won't read past 0xffffff
-	{
-		DWORD cnt_remain=cnt;												
-		DWORD actual_bytes_read=0;
-		DWORD bytes_to_read;
+    commandLong[7] = cnt >> 16;											// store byte count 
+    commandLong[8] = cnt >>  8;
+    commandLong[9] = cnt  & 0xff;
 
-		// In the case of reading outside ST RAM, we need to read the 
-		// data in an inbetween buffer and the copy it over.
-		// But we can't afford to read all data in one go because we
-		// would need an equal sized buffer. Instead, read the data in
-		// chunks and copy it over.
-		
-		while (cnt_remain>0)
-		{
-			if (cnt_remain>FASTRAM_BUFFER_SIZE)
-				bytes_to_read=FASTRAM_BUFFER_SIZE;
-			else
-				bytes_to_read=cnt_remain;
+    (*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// Normal read to ST RAM - send command to host over ACSI 
 
-			commandLong[7] = bytes_to_read >> 16;											// store byte count 
-			commandLong[8] = bytes_to_read >>  8;
-			commandLong[9] = bytes_to_read  & 0xff;
+    if(!hdIf.success) {     // failed?
+        return 0;
+    }
 
-            sectorCount = bytes_to_read / 512;                                                              // calculate how many sectors should we transfer 
-            if((bytes_to_read % 512) != 0) {                                                                // and if we have more than full sector(s) in buffer, send one more! 
-                sectorCount++;
-            }
-            
-			(*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // Read as much as we can to ST RAM first - send command to host over ACSI 
+    // if all data transfered, return count of all data
+    if(hdIf.statusByte == RW_ALL_TRANSFERED) {
+        return cnt;
+    }
 
-            if(!hdIf.success) {     // failed?
-                return 0;
-            }
-            
-			if(hdIf.statusByte == RW_ALL_TRANSFERED) {
-				memcpy(bfr, FastRAMBuffer, bytes_to_read);							                        // Yup, so copy data to its rightful place
-				bfr=bfr+FASTRAM_BUFFER_SIZE;
-				actual_bytes_read = actual_bytes_read + bytes_to_read;
-				cnt_remain=cnt_remain-bytes_to_read;
-			}
-			else
-			{
-				// if the result is also not partial transfer, then some other error happened, return that no data was transfered
-				if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
-					return 0;	
-				}
+    // if the result is also not partial transfer, then some other error happened, return that no data was transfered
+    if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
+        return 0;	
+    }
 
-				// if we got here, then partial transfer happened, see how much data we got
-				commandShort[4] = GD_CUSTOM_getRWdataCnt;
-				commandShort[5] = ceHandle;										
-				(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				// send command to host over ACSI
-		
-                if(!hdIf.success) {     // failed?
-                    return 0;
-                }
+    // if we got here, then partial transfer happened, see how much data we got
+    commandShort[4] = GD_CUSTOM_getRWdataCnt;
+    commandShort[5] = ceHandle;										
 
-				if(!hdIf.success || hdIf.statusByte != E_OK) {													// failed? say that no data was transfered
-					return 0;
-				}
-		
-		    	count = getDword(pDmaBuffer);						// read how much data was read
-				memcpy(bfr, FastRAMBuffer, count);					// Yup, so copy data to its rightful place
-				return actual_bytes_read+count;
-			}
-		}
-		count= actual_bytes_read;
-	}
-	else
-	{
-		// We're inside ST RAM, so proceed normally (i.e. get the ASCI to DMA the data from the disk to RAM)
-	
-		commandLong[7] = cnt >> 16;											// store byte count 
-		commandLong[8] = cnt >>  8;
-		commandLong[9] = cnt  & 0xff;
-	
-		(*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// Normal read to ST RAM - send command to host over ACSI 
-	
-        if(!hdIf.success) {     // failed?
-            return 0;
-        }
-    
-		// if all data transfered, return count of all data
-		if(hdIf.statusByte == RW_ALL_TRANSFERED) {
-			return cnt;
-		}
+    (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				// send command to host over ACSI
 
-		// if the result is also not partial transfer, then some other error happened, return that no data was transfered
-		if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
-			return 0;	
-		}
-	
-		// if we got here, then partial transfer happened, see how much data we got
-		commandShort[4] = GD_CUSTOM_getRWdataCnt;
-		commandShort[5] = ceHandle;										
-	
-		(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);				// send command to host over ACSI
+    if(!hdIf.success || hdIf.statusByte != E_OK) {      // failed? say that no data was transfered
+        return 0;
+    }
 
-		if(!hdIf.success || hdIf.statusByte != E_OK) {      // failed? say that no data was transfered
-			return 0;
-		}
-
-    	count = getDword(pDmaBuffer);						// read how much data was read
-	}
+    count = getDword(pDmaBuffer);						// read how much data was read
 	return count;
 }
 
