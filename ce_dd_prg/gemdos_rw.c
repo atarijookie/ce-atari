@@ -205,7 +205,11 @@ DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
     
     DWORD res;
 	while(countNeeded >= 512) {											// while we're not at the ending sector
-        DWORD thisReadSizeBytes = (countNeeded < blockSize) ? countNeeded : blockSize; // will the needed read size with in the blockSize, or not?
+        // To avoid corruption of data beyond the border of buffer, read LESS than what's needed - rounded to nearest lower sector count
+        DWORD countNeededRoundedDown = countNeeded & 0xfffffe00;        // round to multiple of 512 (sector size)
+    
+        // If the needed count is bigger that what we can fit in maximum transfer size, limit it to that maximum; otherwise just use it.
+        DWORD thisReadSizeBytes = (countNeededRoundedDown < blockSize) ? countNeededRoundedDown : blockSize;    
 			
         if(toFastRam) {     // if reading to FAST RAM, first read to fastRamBuffer, and then copy to the correct buffer
             res = readData(ceHandle, FastRAMBuffer, thisReadSizeBytes, seekOffset);
