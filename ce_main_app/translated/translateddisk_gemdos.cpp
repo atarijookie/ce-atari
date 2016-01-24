@@ -1020,10 +1020,12 @@ void TranslatedDisk::onFread(BYTE *cmd)
 {
     int atariHandle         = cmd[5];
     DWORD byteCount         = Utils::get24bits(cmd + 6);
-    int seekOffset          = (char) cmd[9];
-
+    int seekOffset          = (signed char) cmd[9];
+    
     int index = findFileHandleSlot(atariHandle);
 
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFread - atariHandle: %d, byteCount: %d, seekOffset: %d", (int) atariHandle, (int) byteCount, (int) seekOffset);
+    
     if(index == -1) {                                               // handle not found? not handled, try somewhere else
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFread - atari handle %d not found, not handling", atariHandle);
 
@@ -1156,6 +1158,8 @@ void TranslatedDisk::onFseek(BYTE *cmd)
 
     int index = findFileHandleSlot(atariHandle);
 
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFseek - atariHandle: %d, offset: %d, seekMode: %d", (int) atariHandle, (int) offset, (int) seekMode);
+    
     if(index == -1) {                                               // handle not found? not handled, try somewhere else
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFseek - atariHandle %d not found, not handled", atariHandle);
 
