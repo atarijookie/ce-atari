@@ -37,6 +37,7 @@ void sigint_handler(int sig);
 void handlePthreadCreate(int res, char *threadName, pthread_t *pThread);
 void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
+void loadDefaultArgumentsFromFile(void);
 
 int     linuxConsole_fdMaster, linuxConsole_fdSlave;            // file descriptors for pty pair
 pid_t   childPid;                                               // pid of forked child
@@ -60,10 +61,14 @@ int main(int argc, char *argv[])
     pthread_t   networkThreadInfo;
     pthread_t   periodicThreadInfo;
 
+    printf("\033[H\033[2J\n");
+
     initializeFlags();                                          // initialize flags 
     
     Debug::setDefaultLogFile();
-    parseCmdLineArguments(argc, argv);                          // parse cmd line arguments and set global variables
+    
+    loadDefaultArgumentsFromFile();                             // first parse default arguments from file
+    parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
 
     if(flags.justShowHelp) {
         printfPossibleCmdLineArgs();
@@ -72,7 +77,7 @@ int main(int argc, char *argv[])
     
     loadLastHwConfig();                                         // load last found HW IF, HW version, SCSI machine
     
-    printf("\033[H\033[2JCosmosEx main app starting...\n");
+    printf("CosmosEx main app starting...\n");
     //------------------------------------
     // if not running as ce_conf, register signal handlers
     if(!flags.actAsCeConf) {                                        
@@ -196,7 +201,7 @@ int main(int argc, char *argv[])
     // This must be done before new CCoreThread because it reads the data from /tmp/configdrive 
     system("rm -rf /tmp/configdrive");                      // remove any old content
     system("mkdir /tmp/configdrive");                       // create dir
-    system("cp /ce/app/configdrive/* /tmp/configdrive");    // copy new content
+    system("cp -r /ce/app/configdrive/* /tmp/configdrive"); // copy new content
     //-------------
     core = new CCoreThread(pxDateService,pxFloppyService,pxScreencastService);
 
@@ -306,11 +311,59 @@ void initializeFlags(void)
     flags.gotFranzFwVersion = false;
 }
 
+void loadDefaultArgumentsFromFile(void)
+{
+    FILE *f = fopen("/ce/default_args", "rt");  // try to open default args file
+    
+    if(!f) {
+        printf("No default app arguments.\n");
+        return;
+    }
+    
+    char args[1024];
+    memset(args, 0, 1024);
+    fgets(args, 1024, f);                       // read line from file
+    fclose(f);
+    
+    int argc = 0;
+    char *argv[64];
+    memset(argv, 0, 64 * 4);                    // clear the future argv field
+
+    argv[0] = (char *) "fake.exe";              // 0th argument is skipped, as it's usualy file name (when passed to main())
+    argc    = 1;
+    argv[1] = &args[0];                         // 1st argument starts at the start of the line
+    
+    int len = strlen(args);
+    for(int i=0; i<len; i++) {                  // go through the arguments line
+        if(args[i] == ' ' || args[i]=='\n' || args[i] == '\r') {    // if found space or new line...
+            args[i] = 0;                        // convert space to string terminator
+            
+            argc++;
+            if(argc >= 64) {                    // would be out of bondaries? quit
+                break;
+            }
+
+            argv[argc] = &args[i + 1];          // store pointer to next string, increment count
+        }
+    }
+    
+    if(len > 0) {                               // the alg above can't detect last argument, so just increment argument count
+        argc++;
+    }
+    
+    parseCmdLineArguments(argc, argv);
+}
+
 void parseCmdLineArguments(int argc, char *argv[])
 {
     int i;
 
     for(i=1; i<argc; i++) {                                         // go through all params (when i=0, it's app name, not param)
+        int len = strlen(argv[i]);
+        if(len < 1) {                                               // argument too short? skip it
+            continue;
+        }
+    
         // it's a LOG LEVEL change command (ll)
         if(strncmp(argv[i], "ll", 2) == 0) {
             int ll;
@@ -334,7 +387,6 @@ void parseCmdLineArguments(int argc, char *argv[])
             flags.justShowHelp = true;
             continue;
         }
-
         
         // should we just reset Hans and Franz and quit? (used with STM32 ST-Link JTAG)
         if(strcmp(argv[i], "reset") == 0) {

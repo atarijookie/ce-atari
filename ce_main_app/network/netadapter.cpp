@@ -811,7 +811,7 @@ void NetAdapter::conReadData(void)
 {
     int   handle                = cmd[5];                       // get handle
     DWORD byteCountStRequested  = Utils::get24bits(cmd + 6);    // get how many bytes we want to read
-    int   seekOffset            = (char) cmd[9];                // get seek offset (can be 0 or -1)
+    int   seekOffset            = (signed char) cmd[9];         // get seek offset (can be 0 or -1)
 
     if(handle < 0 || handle >= MAX_HANDLE) {                    // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- bad handle: %d", handle);
