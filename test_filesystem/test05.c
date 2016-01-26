@@ -412,15 +412,13 @@ void test058x(void)
     out_tr_bd(0x0588, "Fseek - SEEK_CUR to start (-half)", ok, res1);
     
     //---------
-    // test SEEK_END
-/*
-// these seem to fail all the time :-(    
-    res1 = Fseek(TEST051XFILESIZE, f, SEEK_END);
+    // test SEEK_END -- offset is a NEGATIVE number
+    res1 = Fseek(-TEST051XFILESIZE, f, SEEK_END);
     res2 = verifySeek(0, f);
     (res1 == 0 && res2 == 1) ? (ok = 1) : (ok = 0);    
     out_tr_bd(0x0589, "Fseek - SEEK_END to start", ok, res1);
 
-    res1 = Fseek(TEST051XFILESIZE/2, f, SEEK_END);
+    res1 = Fseek(-(TEST051XFILESIZE/2), f, SEEK_END);
     res2 = verifySeek(TEST051XFILESIZE/2, f);
     (res1 == (TEST051XFILESIZE/2) && res2 == 1) ? (ok = 1) : (ok = 0);    
     out_tr_bd(0x0590, "Fseek - SEEK_END to half", ok, res1);
@@ -429,7 +427,6 @@ void test058x(void)
     res2 = Fread(f, 16, buf2);
     (res1 == TEST051XFILESIZE && res2 == 0) ? (ok = 1) : (ok = 0);    
     out_tr_bd(0x0591, "Fseek - SEEK_END to end", ok, res1);
-*/    
     
     Fclose(f);    
 }
