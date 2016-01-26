@@ -25,6 +25,7 @@ extern  BYTE    FastRAMBuffer[];
 
 TConInfo conInfo[MAX_HANDLE];                                                // this holds info about each connection
 
+static void connection_send_block(BYTE netCmd, BYTE handle, WORD length, BYTE *buffer);
 //--------------------------------------
 #define NO_CHANGE_W     0xfffe
 #define NO_CHANGE_DW    0xfffffffe
@@ -478,21 +479,50 @@ int16 connection_send(int tcpNotUdp, int16 handle, void *buffer, int16 length)
     }
     
     // first store command code
+    BYTE netCmd;
     if(tcpNotUdp) {                         // for TCP
-        commandLong[5] = NET_CMD_TCP_SEND;
+        netCmd = NET_CMD_TCP_SEND;
     } else {                                // for UDP
-        commandLong[5] = NET_CMD_UDP_SEND;
+        netCmd = NET_CMD_UDP_SEND;
     }
+    
+    // transfer the remaining data in a loop 
+    BYTE  toFastRam = (((int)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
+    DWORD blockSize = toFastRam ? FASTRAM_BUFFER_SIZE : (MAXSECTORS * 512); // size of block, which we will read
+    
+    while(length > 0) {										    // while there's something to send 
+        // calculate how much data we should transfer in this loop - with respect to MAX SECTORS we can transfer at once 
+        DWORD thisWriteSizeBytes = (length < blockSize) ? length : blockSize; // will the needed write size within the blockSize, or not?
+    
+        if(toFastRam) {     // if writing from FAST RAM, first cop to fastRamBuffer, and then write using DMA
+            memcpy(FastRAMBuffer, buffer, thisWriteSizeBytes);
+            connection_send_block(netCmd, handle, thisWriteSizeBytes, FastRAMBuffer);
+        } else {            // if writing from ST RAM, just writing directly there
+            connection_send_block(netCmd, handle, thisWriteSizeBytes, buffer);
+        }
 
-    // then store the params in command part
-    commandLong[6] = (BYTE) handle;                 // cmd[6]       = handle
+        buffer			+= thisWriteSizeBytes;					// and move pointer in buffer further 
+        length		    -= thisWriteSizeBytes;					// decrease the count that is remaining 
+
+        if(!hdIf.success || hdIf.statusByte != E_NORMAL) {      // if failed, return FALSE 
+            return E_LOSTCARRIER;
+        }
+    }		
+    
+    return extendByteToWord(hdIf.statusByte);           // return the status, possibly extended to int16
+}
+
+void connection_send_block(BYTE netCmd, BYTE handle, WORD length, BYTE *buffer)
+{
+    commandLong[5] = netCmd;                        // store command code
+    commandLong[6] = handle;                        // store handle
 
     commandLong[7] = (BYTE) (length >> 8);          // cmd[7 .. 8]  = length
     commandLong[8] = (BYTE) (length     );
 
     // prepare the command for buffer sending - add flag 'buffer address is odd' and possible byte #0, in case the buffer address was odd
     BYTE *pBfr  = (BYTE *) buffer;
-    DWORD dwBfr = (DWORD) buffer;
+    DWORD dwBfr = (DWORD)  buffer;
 
     if(dwBfr & 1) {                                 // buffer pointer is ODD
         commandLong[9]  = TRUE;                     // buffer is odd
@@ -512,12 +542,6 @@ int16 connection_send(int tcpNotUdp, int16 handle, void *buffer, int16 length)
     
     // send it to host
     hdIf.cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBfr, sectorCount);
-
-	if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // if failed, return FALSE 
-		return E_LOSTCARRIER;
-	}
-
-    return extendByteToWord(hdIf.statusByte);           // return the status, possibly extended to int16
 }
 
 //-------------------------------------------------------------------------------
@@ -622,6 +646,7 @@ BYTE fillReadBuffer(int16 handle)
 	return TRUE;
 }
 //-------------------------------------------------------------------------------
+// BEWARE! BYTE *bfr must point to ST RAM, because DMA chip can't transfer data to FAST RAM!
 DWORD readData(int16 handle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 {
 	commandLong[5] = NET_CMD_CN_READ_DATA;      // store function number 
@@ -636,101 +661,37 @@ DWORD readData(int16 handle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 		sectorCount++;
 	}
 
-	if ((int)bfr>=0x1000000)                    // Oh dear, are we out of ST RAM boundaries? The ACSI DMA won't read past 0xffffff
-	{
-		DWORD cnt_remain=cnt;												
-		DWORD actual_bytes_read=0;
-		DWORD bytes_to_read;
+    commandLong[7] = cnt >> 16;                                                         // store byte count 
+    commandLong[8] = cnt >>  8;
+    commandLong[9] = cnt  & 0xff;
 
-		// In the case of reading outside ST RAM, we need to read the 
-		// data in an inbetween buffer and the copy it over.
-		// But we can't afford to read all data in one go because we
-		// would need an equal sized buffer. Instead, read the data in
-		// chunks and copy it over.
-		
-		while (cnt_remain>0)
-		{
-			if (cnt_remain>FASTRAM_BUFFER_SIZE)
-				bytes_to_read=FASTRAM_BUFFER_SIZE;
-			else
-				bytes_to_read=cnt_remain;
+    hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);     // Normal read to ST RAM - send command to host over ACSI 
 
-			commandLong[7] = bytes_to_read >> 16;											                // store byte count 
-			commandLong[8] = bytes_to_read >>  8;
-			commandLong[9] = bytes_to_read  & 0xff;
+    if(!hdIf.success) {
+        return 0;
+    }
 
-            sectorCount = bytes_to_read / 512;                                                              // calculate how many sectors should we transfer 
-            if((bytes_to_read % 512) != 0) {                                                                // and if we have more than full sector(s) in buffer, send one more! 
-                sectorCount++;
-            }
-            
-			hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, FastRAMBuffer, sectorCount);	    // Read as much as we can to ST RAM first - send command to host over ACSI 
+    // if all data transfered, return count of all data
+    if(hdIf.statusByte == RW_ALL_TRANSFERED) {
+        return cnt;
+    }
 
-			if(hdIf.statusByte == RW_ALL_TRANSFERED) {
-				memcpy(bfr, FastRAMBuffer, bytes_to_read);                                                  // Yup, so copy data to its rightful place
-				bfr=bfr+FASTRAM_BUFFER_SIZE;
-				actual_bytes_read = actual_bytes_read + bytes_to_read;
-				cnt_remain=cnt_remain-bytes_to_read;
-			}
-			else
-			{
-				// if the result is also not partial transfer, then some other error happened, return that no data was transfered
-				if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
-					return 0;	
-				}
+    // if the result is also not partial transfer, then some other error happened, return that no data was transfered
+    if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
+        return 0;	
+    }
 
-				// if we got here, then partial transfer happened, see how much data we got
-				commandShort[4] = NET_CMD_CN_GET_DATA_COUNT;
-				commandShort[5] = handle;										
-				hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);   // send command to host over ACSI
-		
-				if(!hdIf.success || hdIf.statusByte != E_NORMAL) {                                                       // failed? say that no data was transfered
-					return 0;
-				}
-		
-		    	count = getDword(pDmaBuffer);                                               // read how much data was read
-				memcpy(bfr, FastRAMBuffer, count);                                          // Yup, so copy data to its rightful place
-				return actual_bytes_read+count;
-			}
-		}
-		count= actual_bytes_read;
-	}
-	else
-	{
-		// We're inside ST RAM, so proceed normally (i.e. get the ASCI to DMA the data from the disk to RAM)
-	
-		commandLong[7] = cnt >> 16;                                                         // store byte count 
-		commandLong[8] = cnt >>  8;
-		commandLong[9] = cnt  & 0xff;
-	
-		hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);     // Normal read to ST RAM - send command to host over ACSI 
-	
-        if(!hdIf.success) {
-            return 0;
-        }
-    
-		// if all data transfered, return count of all data
-		if(hdIf.statusByte == RW_ALL_TRANSFERED) {
-			return cnt;
-		}
+    // if we got here, then partial transfer happened, see how much data we got
+    commandShort[4] = NET_CMD_CN_GET_DATA_COUNT;
+    commandShort[5] = handle;										
 
-		// if the result is also not partial transfer, then some other error happened, return that no data was transfered
-		if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
-			return 0;	
-		}
-	
-		// if we got here, then partial transfer happened, see how much data we got
-		commandShort[4] = NET_CMD_CN_GET_DATA_COUNT;
-		commandShort[5] = handle;										
-	
-		hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);         // send command to host over ACSI
+    hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);         // send command to host over ACSI
 
-		if(!hdIf.success || hdIf.statusByte != E_NORMAL) {                          // failed? say that no data was transfered
-			return 0;
-		}
+    if(!hdIf.success || hdIf.statusByte != E_NORMAL) {                          // failed? say that no data was transfered
+        return 0;
+    }
 
-    	count = getDword(pDmaBuffer);                                               // read how much data was read
-	}
+    count = getDword(pDmaBuffer);                                               // read how much data was read
 	return count;
 }
 
@@ -833,22 +794,29 @@ DWORD read_big(int16 handle, DWORD countNeeded, BYTE *buffer)
     ci->bytesToRead -= countNeeded;                                     // subtract the amount we will use from host buffer / socket
     
     // Second phase of BIG fread: transfer data by blocks of size 512 bytes, buffer must be EVEN
+    BYTE  toFastRam = (((int)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
+    DWORD blockSize = toFastRam ? FASTRAM_BUFFER_SIZE : (MAXSECTORS * 512); // size of block, which we will read
+    DWORD res;
+    
 	while(countNeeded >= 512) {											// while we're not at the ending sector
-		WORD sectorCount = countNeeded / 512; 
-		
-		if(sectorCount > MAXSECTORS) {								    // limit the maximum sectors read in one cycle to MAXSECTORS
-			sectorCount = MAXSECTORS;
-		}
+        // To avoid corruption of data beyond the border of buffer, read LESS than what's needed - rounded to nearest lower sector count
+        DWORD countNeededRoundedDown = countNeeded & 0xfffffe00;        // round to multiple of 512 (sector size)
+    
+        // If the needed count is bigger that what we can fit in maximum transfer size, limit it to that maximum; otherwise just use it.
+        DWORD thisReadSizeBytes = (countNeededRoundedDown < blockSize) ? countNeededRoundedDown : blockSize;    
 			
-		DWORD bytesCount = ((DWORD) sectorCount) * 512;				    // convert sector count to byte count
-			
-		DWORD res = readData(handle, buffer, bytesCount, seekOffset);	// try to read the data
+        if(toFastRam) {     // if reading to FAST RAM, first read to fastRamBuffer, and then copy to the correct buffer
+            res = readData(handle, FastRAMBuffer, thisReadSizeBytes, seekOffset);
+            memcpy(buffer, FastRAMBuffer, thisReadSizeBytes);
+        } else {            // if reading to ST RAM, just read directly there
+            res = readData(handle, buffer, thisReadSizeBytes, seekOffset);
+        }
 			
 		countDone	    += res;											// update the bytes read variable
 		buffer		    += res;											// update the buffer pointer
 		countNeeded     -= res;											// update the count that we still should read
 			
-		if(res != bytesCount) {										    // if failed to read all the requested data?
+		if(res != thisReadSizeBytes) {                                  // if failed to read all the requested data?
 			return countDone;										    // return with the count of read data 
 		}
 	}
