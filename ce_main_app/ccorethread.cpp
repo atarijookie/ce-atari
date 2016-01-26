@@ -225,20 +225,9 @@ void CCoreThread::run(void)
     DWORD nextFloppyEncodingCheck   = Utils::getEndTime(1000);
     bool prevFloppyEncodingRunning  = false;
     
-    DWORD cycleStart    = Utils::getCurrentMs();
-    DWORD cycleEnd      = Utils::getCurrentMs();
-    DWORD cycleTime;
-    
+    LoadTracker load;
+
     while(sigintReceived == 0) {
-        cycleEnd    = Utils::getCurrentMs();
-        cycleTime   = cycleEnd - cycleStart;
-        
-        if(cycleTime > 30) {
-//            printf("\ncycleTime: %d\n", cycleTime);
-        }
-        
-        cycleStart  = Utils::getCurrentMs();
-    
 		bool gotAtn = false;						                    // no ATN received yet?
         
         // if should just get the HW version and HDD interface, but timeout passed, quit
@@ -251,6 +240,16 @@ void CCoreThread::run(void)
         if(now >= lastFwInfoTime.nextDisplay) {
             lastFwInfoTime.nextDisplay  = Utils::getEndTime(1000);
             
+            //-------------
+            // calculate load, show message if needed
+            load.calculate();                                           // calculate load
+            
+            if(load.suspicious) {                                       // load is suspiciously high?
+                Debug::out(LOG_DEBUG, ">>> Suspicious core cycle load -- cycle time: %4d ms, load: %3d %%", load.cycle.total, load.loadPercents);
+                printf(">>> Suspicious core cycle load -- cycle time: %4d ms, load: %3d %%\n", load.cycle.total, load.loadPercents);
+            }
+            //-------------
+            
             float hansTime  = ((float)(now - lastFwInfoTime.hans))  / 1000.0f;
             float franzTime = ((float)(now - lastFwInfoTime.franz)) / 1000.0f;
             
@@ -260,7 +259,7 @@ void CCoreThread::run(void)
             bool hansAlive  = (hansTime < 3.0f);
             bool franzAlive = (franzTime < 3.0f);
             
-            printf("\033[2K  [ %c ]  Hans: %.1f s (%s), Franz: %.1f s, (%s)\033[A\n", progChars[lastFwInfoTime.progress], hansTime, hansAlive ? "LIVE" : "DEAD", franzTime, franzAlive ? "LIVE" : "DEAD");
+            printf("\033[2K  [ %c ]  Hans: %s, Franz: %s\033[A\n", progChars[lastFwInfoTime.progress], hansAlive ? "LIVE" : "DEAD", franzAlive ? "LIVE" : "DEAD");
         
             lastFwInfoTime.progress = (lastFwInfoTime.progress + 1) % 4;
             
@@ -277,6 +276,8 @@ void CCoreThread::run(void)
                 lastFwInfoTime.franzResetTime = now;
                 Utils::resetFranz();
             }
+            
+            load.clear();                       // clear load counter
         }
         
         // should we check if Hans and Franz are alive?
@@ -313,6 +314,8 @@ void CCoreThread::run(void)
             
             prevFloppyEncodingRunning = floppyEncodingRunning;
         }
+        
+        load.busy.markStart();                          // mark the start of the busy part of the code
         
 #if !defined(ONPC_HIGHLEVEL)
         // check for any ATN code waiting from Hans
@@ -388,6 +391,7 @@ void CCoreThread::run(void)
 #else
     flags.gotFranzFwVersion = true;
 #endif
+        load.busy.markEnd();                        // mark the end of the busy part of the code
 
 		if(!gotAtn) {								// no ATN was processed?
 			Utils::sleepMs(1);						// wait 1 ms...

@@ -138,7 +138,54 @@ private:
     
     void sharedObjects_create(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService);
     void sharedObjects_destroy(void);
+};
 
+class LoadTracker {
+public: 
+    struct {
+        DWORD start;
+        DWORD total;
+    } cycle;
+
+    struct {
+        void markStart(void) {                          // call on start of block where the work is done (exclude idle sleep())
+            start  = Utils::getCurrentMs();
+        }
+
+        void markEnd(void) {                            // call on end of block where the work is done (exclude idle sleep())
+            total += Utils::getCurrentMs() - start;
+        }
+
+        DWORD start;
+        DWORD total;
+    } busy;
+    
+    int     loadPercents;                               // contains 0 .. 100, meaning percentage of load
+    bool    suspicious;                                 // if the last load percentage was high or cycle time was long, this will be true
+    
+    LoadTracker(void) {
+        clear();
+    }
+
+    void calculate(void) {  // call this on the end of 1 second interval to calculate load 
+        cycle.total     = Utils::getCurrentMs() - cycle.start;
+        loadPercents    = (busy.total * 100) / cycle.total;
+        
+        suspicious      = false;
+        
+        if(cycle.total > 1050 || loadPercents > 90) {
+            suspicious  = true;
+        }
+    }
+    
+    void clear(void) {      // call this on the start of new 1 second interval to clear everything
+        loadPercents= 0;
+        suspicious  = false;
+
+        cycle.total = 0;
+        cycle.start = Utils::getCurrentMs();
+        busy.total  = 0;
+    }
 };
 
 #endif // CCORETHREAD_H
