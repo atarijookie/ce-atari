@@ -150,3 +150,12 @@ progress{
     box-shadow: 0 2.5em 0 0 #FFF;
   }
 }
+form#frmInsertConfig {
+    margin-bottom: 0px;
+}
+form.form-floppy-upload {
+    margin-bottom: 10px;
+}
+#optionsCheckbox0 {
+    margin-top: 10px;
+}

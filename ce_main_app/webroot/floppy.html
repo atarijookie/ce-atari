@@ -9,7 +9,7 @@
         <link rel="stylesheet" type="text/css" href="css/bootstrap.light.css">
 		    <script type="text/javascript" src="js/modernizr.custom.50426.js"></script>
         <script type="text/javascript"> 
-        var version="150911";
+        var version="160125";
         //unfortunately we have to support IE<10, so decide on zepto/jquery here
     		document.write('<script type="text/javascript" src=js/' + ('__proto__' in {} ? 'zepto' : 'jquery') + '.js?'+version+'><\/script>');
     		document.write('<script type="text/javascript"">var jQuery=Zepto;<\/script>');
@@ -28,12 +28,12 @@
         <div class="row">
             <div class="span10">
                 <ul class="nav nav-pills">
-                    <li><a href="/?v=2">Home</a></li>
+                    <li><a href="/?v=3">Home</a></li>
                     <li><a href="http://joo.kie.sk/?page_id=415">Manual</a></li>
-                    <li class="active"><a href="/floppy.html?v=2">Floppy</a></li>
-                    <li><a href="/remote.html?v=2">Remote</a></li>
-                    <li><a href="/screenshots.html?v=2">Screenshots</a></li>
-                    <li><a href="/config.html?v=2">Config</a></li>
+                    <li class="active"><a href="/floppy.html?v=3">Floppy</a></li>
+                    <li><a href="/remote.html?v=3">Remote</a></li>
+                    <li><a href="/screenshots.html?v=3">Screenshots</a></li>
+                    <li><a href="/config.html?v=3">Config</a></li>
                 </ul>
         <h3>Floppy emulation</h3>
         <p>Select a disk image (*.ST, *.MSA) and upload it to your CosmosEx. </p>
@@ -53,27 +53,20 @@
 <progress></progress>
 <span class="file name file-0 empty">empty</span>
 
-<form method="POST" action="/api/v1/floppy/0" enctype="multipart/form-data">
-<input class="input-file" type="file" name="file" /> <br/><br/>
+<form method="POST" action="/api/v1/floppy/0" enctype="multipart/form-data" class="form-floppy-upload">
+<input class="input-file" type="file" name="file" /> 
 <input class="btn btn-primary upload vis-hidden" type="submit" name="upload0" value="Upload" data-slot="0"/>
-<label class="checkbox"><input  type="checkbox" id="optionsCheckbox" value="option1" data-slot="0">activate Slot</label>
+<label title="Activate this slot" class="checkbox"><input  type="checkbox" id="optionsCheckbox0" value="option1" data-slot="0">activate slot</label>
 </form>
-
-<!-- --------------------- -->
- 
-<div class="" data-slot="100">
-<form method="PUT" action="/api/v1/floppy/100">
-    <input class="btn btn-primary" type="submit" name="btnInsertConfig"  value="Insert CONFIG tools" data-slot="100"/>
+<label alt="Insert predifined floppy images">Insert</label>
+<form id="frmInsertConfig" method="POST" action="/api/v1/floppy/100" enctype="multipart/form-data">
+<input title="Insert CosmosEx Configuration Tools as Floppy Image" class="btn" type="submit" name="btnInsertConfig"  value="CONFIG tools" data-slot="100"/>
 </form>
-</div>
-
-<div class="" data-slot="101">
-<form method="PUT" action="/api/v1/floppy/101">
-    <input class="btn btn-primary" type="submit" name="btnInsertTestImg" value="Insert FLOPPY TEST image" data-slot="101"/>
+<div>
+<form id="frmInsertTestImg" method="POST" action="/api/v1/floppy/101" enctype="multipart/form-data">
+<input title="Insert special Test Image for CE_TSTFD.PRG Floppy Disk Test" class="btn" type="submit" name="btnInsertTestImg" value="TEST image" data-slot="101"/>
 </form>
 </div>
-
-<!-- --------------------- -->
 
 </center>
 </div>
@@ -85,10 +78,10 @@
 <h4>Slot #2</h4>
 <progress></progress>
 <span class="file name file-1 empty">empty</span>
-<form method="POST" action="/api/v1/floppy/1" enctype="multipart/form-data">
-<input class="input-file" type="file" name="file" /> <br/><br/>
+<form method="POST" action="/api/v1/floppy/1" enctype="multipart/form-data" class="form-floppy-upload">
+<input class="input-file" type="file" name="file" /> 
 <input class="btn btn-primary upload vis-hidden" type="submit" name="upload1" value="Upload" data-slot="1"/>
-<label class="checkbox"><input type="checkbox" id="optionsCheckbox" value="option1" data-slot="1">activate Slot</label>
+<label title="Activate this slot" class="checkbox"><input type="checkbox" id="optionsCheckbox1" value="option1" data-slot="1">activate slot</label>
 </form>
 </center>
             </div>
@@ -97,10 +90,10 @@
 <h4>Slot #3</h4>
 <progress></progress>
 <span class="file name file-2 empty">empty</span>
-<form method="POST" action="/api/v1/floppy/2" enctype="multipart/form-data">
-<input class="input-file" type="file" name="file" /> <br/><br/>
+<form method="POST" action="/api/v1/floppy/2" enctype="multipart/form-data" class="form-floppy-upload">
+<input class="input-file" type="file" name="file" /> 
 <input class="btn btn-primary upload vis-hidden" type="submit" name="upload2" value="Upload" data-slot="2"/>
-<label class="checkbox"><input type="checkbox" id="optionsCheckbox" value="option1" data-slot="2">activate Slot</label>
+<label title="Activate this slot" class="checkbox"><input type="checkbox" id="optionsCheckbox2" value="option1" data-slot="2">activate slot</label>
 </form>
 </center>
             </div>
