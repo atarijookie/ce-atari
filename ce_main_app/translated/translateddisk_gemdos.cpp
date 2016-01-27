@@ -687,6 +687,9 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     bool setNotInquire  = dataBuffer[0];
     BYTE attrAtariNew   = dataBuffer[1];
 
+    (void) attrAtariNew;
+    #warning TranslatedDisk::onFattrib -- setting new file attribute not implemented!
+
     convertAtariASCIItoPc((char *) (dataBuffer + 2));   // try to fix the path with only allowed chars
     atariName =           (char *) (dataBuffer + 2);    // get file name
 
@@ -757,6 +760,8 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     }
     
     BYTE attribs = dataBuffer[0];
+    (void) attribs;
+    #warning TranslatedDisk::onFcreate -- setting file attribute not implemented!
 
     std::string atariName, hostName;
 

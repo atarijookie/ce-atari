@@ -139,8 +139,8 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         stringStream << "{\"config\":[";
         stringStream << "]}"; 
         std::string sJson=stringStream.str();
-        mg_printf(conn, "Content-Length: %d\r\n\r\n",sJson.length());        // Always set Content-Length
-        mg_printf(conn, sJson.c_str());        // Always set Content-Length
+        mg_printf(conn, "Content-Length: %d\r\n\r\n",sJson.length());   // Always set Content-Length
+        mg_write(conn, sJson.c_str(), sJson.length());                  // now send content
         return true;
     }
 

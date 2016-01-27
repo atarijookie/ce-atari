@@ -50,7 +50,7 @@ bool DebugController::indexAction(mg_connection *conn, mg_request_info *req_info
     mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n");
     mg_printf(conn, "Cache: no-cache\r\n");
     mg_printf(conn, "Content-Length: %d\r\n\r\n",sOutput.length());        // Always set Content-Length
-    mg_printf(conn, sOutput.c_str());
+    mg_write(conn, sOutput.c_str(), sOutput.length());
     return true;
 
     mg_printf(conn, "<html><body>");
@@ -121,12 +121,12 @@ bool DebugController::getFile(mg_connection *conn, std::string &sDownloadedFileN
     mg_printf(conn, "HTTP/1.1 200 OK\r\n");
     
     std::string sContent="Content-Type: " + sContentType + "\r\n";
-	mg_printf(conn, sContent.c_str());
+	mg_write(conn, sContent.c_str(), sContent.length());
     
     mg_printf(conn, "Cache: no-cache\r\n");
     
     std::string sHeader="Content-Disposition: attachment; filename=\"" + sDownloadedFileName + "\"\r\n";
-    mg_printf(conn, sHeader.c_str());
+    mg_write(conn, sHeader.c_str(), sHeader.length());
 
 	std::ifstream file;
     file.open(sCeFilePath.c_str(), std::ios::in|std::ios::binary); //open a file in read only mode

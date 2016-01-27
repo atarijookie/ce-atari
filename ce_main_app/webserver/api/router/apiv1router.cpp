@@ -89,7 +89,7 @@ bool ApiV1Router::handleGet(CivetServer *server, struct mg_connection *conn)
     mg_printf(conn, "<html><body>");
     mg_printf(conn, "<h2>This is the Api handler</h2>");
     mg_printf(conn, "Resource: GET ");
-    mg_printf(conn, (const char*)sResource.c_str());
+    mg_write (conn, sResource.c_str(), sResource.length());
     mg_printf(conn, "<p>The request was:<br><pre>%s %s HTTP/%s</pre></p>",
               req_info->request_method, req_info->uri, req_info->http_version);
     mg_printf(conn, "</body></html>\n");

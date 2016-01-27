@@ -100,7 +100,7 @@ bool ControllerRouter::handleGet(CivetServer *server, struct mg_connection *conn
         mg_printf(conn, "Cache: no-cache\r\n");
         mg_printf(conn, "Content-Type: application/json\r\n");
         mg_printf(conn, "Content-Length: %d\r\n\r\n", sJson.length());  // Always set Content-Length
-        mg_printf(conn, sJson.c_str());                                 // add the content
+        mg_write(conn, sJson.c_str(), sJson.length());                  // add the content
 
         return true;
     }
@@ -143,7 +143,7 @@ bool ControllerRouter::handleGet(CivetServer *server, struct mg_connection *conn
     mg_printf(conn, "<html><body>");
     mg_printf(conn, "<h2>This is the Api handler</h2>");
     mg_printf(conn, "Resource: GET ");
-    mg_printf(conn, (const char*)controllerAction.c_str());
+    mg_write(conn, controllerAction.c_str(), controllerAction.length());
     mg_printf(conn, "<p>The request was:<br><pre>%s %s HTTP/%s</pre></p>",
               req_info->request_method, req_info->uri, req_info->http_version);
     mg_printf(conn, "</body></html>\n");
