@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 
+#include "global.h"
 #include "../utils.h"
 #include "../debug.h"
 #include "dirtranslator.h"
@@ -204,12 +205,37 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 		if(longFname == "." || longFname == "..") {
 			if((isRootDir)||((findAttribs&FA_DIR)==0)) {    // for root dir or when no subdirs are requested (FA_DIR) - don't add '.' or '..'
                 continue;
-            } else {                                    // for non-root dir                                       - must add '.' or '..' (TOS does this, and it makes the TOS dir copying work)
+            } else {                                        // for non-root dir                                       - must add '.' or '..' (TOS does this, and it makes the TOS dir copying work)
                 appendFoundToFindStorage_dirUpDirCurr(hostPath, (char *) searchString.c_str(), fs, de, findAttribs);
                 continue;
             }            
 		}	
 		
+        #ifdef ZIPDIRS
+        // if ZIP directories are supported
+        
+        if(de->d_type == DT_REG) {                                          // if it's a file
+            int len = strlen(de->d_name);                                   // get filename length
+            
+            if(len > 4) {                                                   // if filename is at least 5 chars long
+                char *found = strcasestr(de->d_name + len - 4, (char *) ".ZIP");    // see if it ends with .ZIP
+
+                if(found != NULL) {                                         // if filename ends with .ZIP
+                    std::string fullZipPath = hostPath + "/" + longFname;   // create full path to that zip file
+                
+                    struct stat attr;
+                    int res = stat((char *) fullZipPath.c_str(), &attr);    // get the status of the possible zip file
+
+                    if(res == 0) {                                          // if stat() succeeded
+                        if(attr.st_size <= MAX_ZIPDIR_ZIPFILE_SIZE) {       // file not too big? change flags from file to dir
+                            de->d_type = DT_DIR;
+                        }
+                    }
+                }
+            }
+        }
+        #endif
+        
 		// finnaly append to the find storage
 		appendFoundToFindStorage(hostPath, (char *) searchString.c_str(), fs, de, findAttribs);
 

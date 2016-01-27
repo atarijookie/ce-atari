@@ -7,6 +7,7 @@
 #define MOUNTER_ACTION_UMOUNT			1
 #define MOUNTER_ACTION_RESTARTNETWORK	2
 #define MOUNTER_ACTION_SYNC             3
+#define MOUNTER_ACTION_MOUNT_ZIP        4
 
 typedef struct {
 	int			action;
@@ -36,6 +37,7 @@ class Mounter
 public:
 	bool mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mountDir, char *username, char *password);
 	bool mountDevice(char *devicePath, char *mountDir);
+    void mountZipFile(char *zipFilePath, char *mountDir);
 	void umountIfMounted(char *mountDir);
 	void restartNetwork(void);
 	void sync(void);

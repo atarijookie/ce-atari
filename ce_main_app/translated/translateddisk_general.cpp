@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <errno.h>
 
 #include "../global.h"
 #include "../debug.h"
@@ -51,6 +53,10 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastS
 	screencastAcsiCommand   = new ScreencastAcsiCommand(dataTrans,scs);
 
     initAsciiTranslationTable();
+ 
+    for(int i=0; i<MAX_ZIP_DIRS; i++) {                 // init the ZIP dirs
+        zipDirs[i] = new ZipDirEntry();
+    }
 }
 
 TranslatedDisk::~TranslatedDisk()
@@ -62,6 +68,10 @@ TranslatedDisk::~TranslatedDisk()
     delete []dataBuffer2;
 
     destroyFindStorages();
+    
+    for(int i=0; i<MAX_ZIP_DIRS; i++) {                 // init the ZIP dirs
+        delete zipDirs[i];
+    }
 }
 
 void TranslatedDisk::setSettingsReloadProxy(SettingsReloadProxy *rp)
@@ -737,8 +747,12 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 
 		hostPath = root;
 		Utils::mergeHostPaths(hostPath, longHostPath);
-
         Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - fill path including drive letter: atariPath: %s -> hostPath: %s", (char *) atariPath.c_str(), (char *) hostPath.c_str());
+        
+        #ifdef ZIPDIRS
+        replaceHostPathWithZipDirPath(hostPath);
+        #endif
+        
         return true;
 
     }
@@ -763,6 +777,11 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 		Utils::mergeHostPaths(hostPath, longHostPath);
 
         Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - starting from root -- atariPath: %s -> hostPath: %s", (char *) atariPath.c_str(), (char *) hostPath.c_str());
+        
+        #ifdef ZIPDIRS
+        replaceHostPathWithZipDirPath(hostPath);
+        #endif
+        
         return true;
     }
     
@@ -785,6 +804,11 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 	Utils::mergeHostPaths(hostPath, longHostPath);
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - relative path -- atariPath: %s -> hostPath: %s", (char *) atariPath.c_str(), (char *) hostPath.c_str());
+    
+    #ifdef ZIPDIRS
+    replaceHostPathWithZipDirPath(hostPath);
+    #endif
+    
     return true;
 }
 
@@ -1380,4 +1404,119 @@ void TranslatedDisk::getScreenShotConfig(BYTE *cmd)
     
     dataTrans->padDataToMul16();
     dataTrans->setStatus(E_OK);
+}
+
+void TranslatedDisk::getZipDirMountPoint(int index, std::string &mountPoint)
+{
+    char path[128];
+    sprintf(path, "/tmp/zipdir%d", index);          // generate mount point, e.g. /tmp/zipdir5
+    mountPoint = path;
+}
+
+bool TranslatedDisk::zipDirAlreadyMounted(char *zipFile, int &zipDirIndex)
+{
+    DWORD minAccessTime     = 0xffffffff;
+    int   minAccessIndex    = 0;
+
+    for(int i=0; i<MAX_ZIP_DIRS; i++) {                         // find the mount point
+        const char *mountedFile = zipDirs[i]->realHostPath.c_str();
+        if(strcmp(mountedFile, zipFile) == 0) {                 // found the mount point? return true, zipDirIndex contains index to info
+            zipDirIndex = i;
+            return true;
+        }
+        
+        if(minAccessTime > zipDirs[i]->lastAccessTime) {        // if found something that is younger than the currently youngest access time, store it
+            minAccessTime   = zipDirs[i]->lastAccessTime;
+            minAccessIndex  = i;
+        }
+    }
+    
+    zipDirIndex = minAccessIndex;                               // mount point not found, return false and zipDirIndex contains place where mount info should be stored
+    return false;
+}
+
+void TranslatedDisk::replaceHostPathWithZipDirPath(std::string &hostPath)
+{
+    char *pHostPath = (char *) hostPath.c_str();
+
+    //----------
+    // first check if the host path contains '*.ZIP' part
+    char *pZip = strcasestr(pHostPath, (char *) ".ZIP");
+    
+    if(pZip == NULL) {                                  // didn't find .ZIP string? just a normal path
+        Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath -- no ZIP file in hostPath: %s", pHostPath);
+        return;
+    }
+
+    int zipFilePathLen = (pZip - pHostPath) + 4;        // calculate the length of the full path to ZIP file
+    
+    char zipFilePath[1024];
+    strncpy(zipFilePath, pHostPath, zipFilePathLen);    // copy the path to ZIP file
+    zipFilePath[zipFilePathLen] = 0;                    // terminate the string
+    
+    Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath -- hostPath: %s -> ZIP file: %s", pHostPath, zipFilePath);
+    
+    //----------
+    // check if there's a real .ZIP file at the place of where the pretended ZIP DIR is
+    struct stat attr;
+    int res = stat(zipFilePath, &attr);                 // get the status of the possible zip file
+	
+	if(res != 0) {
+		Debug::out(LOG_ERROR, "TranslatedDisk::replaceHostPathWithZipDirPath() -- stat() failed, file / dir doesn't exist?");
+		return;		
+	}
+	
+	bool isDir  = (S_ISDIR(attr.st_mode) != 0);         // check if it's a directory
+    bool isFile = (S_ISREG(attr.st_mode) != 0);         // check if it's a file
+
+    if(isDir) {                                         // if it's a dir, quit
+        Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath -- %s is a normal dir, path not replaced", zipFilePath);
+        return;
+    }
+    
+    if(!isFile) {                                       // if it's not a file, quit
+        Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath -- %s is a NOT a file, WTF, path not replaced", zipFilePath);
+        return;
+    }
+    
+    if(attr.st_size > MAX_ZIPDIR_ZIPFILE_SIZE) {        // file too big? quit
+        Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath -- file %s is too big, only files smaller than 5 MB are mounted, path not replaced", zipFilePath);
+        return;
+    }
+    
+    //----------
+    // check if the ZIP file is already mounted
+    bool isMounted;
+    int  zipDirIndex;
+    isMounted = zipDirAlreadyMounted(zipFilePath, zipDirIndex);     // see if the file is already mounted
+
+    std::string mountPoint;
+    getZipDirMountPoint(zipDirIndex, mountPoint);       // get mount point for this ZIP DIR 
+    
+    if(!isMounted) {                                    // if ZIP file not mounted yet, mount it
+        Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath -- mounting file %s to dir %s", zipFilePath, (char *) mountPoint.c_str());
+        
+        //----------
+        // issue mount request
+        TMounterRequest tmr;
+        tmr.action      = MOUNTER_ACTION_MOUNT_ZIP; // action: mount ZIP file
+        tmr.devicePath  = zipFilePath;              // e.g. /mnt/shared/normal/archive.zip
+        tmr.mountDir    = mountPoint;               // e.g. /tmp/zipdir2
+        mountAdd(tmr);
+        
+        //----------
+        // mark this ZIP file as mounted
+        zipDirs[zipDirIndex]->realHostPath = zipFilePath;  // store path to zip file - this will be marker that this zip file is mounted
+    } else {
+        Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath -- file %s already mounted to %s, reusing and not mounting", zipFilePath, (char *) mountPoint.c_str());
+    }
+    
+    //----------
+    // now replace the part of the host path with the alternative ZIP DIR path
+    std::string pathInsideZipFile = hostPath.substr(zipFilePathLen);
+    hostPath = mountPoint + pathInsideZipFile;                      // create new host path inside zip mount point
+
+    zipDirs[zipDirIndex]->lastAccessTime = Utils::getCurrentMs();   // mark the current time as the time of last access
+    
+    Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath -- new path now is %s", (char *) hostPath.c_str());
 }

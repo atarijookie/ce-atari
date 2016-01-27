@@ -63,6 +63,23 @@ typedef struct {
 
 #define MAX_FIND_STORAGES               32
 
+#define MAX_ZIP_DIRS                    5
+class ZipDirEntry {
+    public:
+
+    ZipDirEntry(void) {
+        clear();
+    }
+    
+    std::string realHostPath;           // real path to ZIP file on host dir struct, e.g. /mnt/shared/normal/archive.zip
+    DWORD       lastAccessTime;         // Utils::getCurrentMs() time which is stored on each access to this folder - will be used to unmount oldest ZIP files, so new ZIP files can be mounted / accessed
+    
+    void clear(void) {
+        realHostPath    = "";
+        lastAccessTime  = 0;
+    }
+};
+
 class TranslatedDisk: public ISettingsUser
 {
 public:
@@ -83,6 +100,8 @@ public:
     bool hostPathExists(std::string hostPath);
     bool createHostPath(std::string atariPath, std::string &hostPath);
     void pathSeparatorAtariToHost(std::string &path);
+
+    void replaceHostPathWithZipDirPath(std::string &hostPath);
 
 private:
 	void mountAndAttachSharedDrive(void);
@@ -204,7 +223,13 @@ private:
     void convertAtariASCIItoPc(char *path);
 
     DWORD getByteCountToEOF(FILE *f);
+    
+    //-----------------------------------
+    // ZIP DIR stuff
+    ZipDirEntry *zipDirs[MAX_ZIP_DIRS];
 
+    void getZipDirMountPoint(int index, std::string &mountPoint);
+    bool zipDirAlreadyMounted(char *zipFile, int &zipDirIndex);
     //-----------------------------------
     // helpers for find storage
     void initFindStorages(void);

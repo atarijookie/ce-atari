@@ -161,5 +161,7 @@ extern InterProcessEvents events;
 #define FDD_TEST_IMAGE_PATH_AND_FILENAME    "/ce/app/fdd_test.st"
 #define FDD_TEST_IMAGE_JUST_FILENAME        "fdd_test.st"
 
+#define MAX_ZIPDIR_ZIPFILE_SIZE         (5*1024*1024)
+
 #endif // GLOBAL_H
 
