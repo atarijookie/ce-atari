@@ -48,6 +48,8 @@ THwConfig hwConfig;                                             // info about th
 TFlags flags;                                                   // global flags from command line
 void initializeFlags(void);
 
+extern SharedObjects shared;
+
 InterProcessEvents events;
 
 int main(int argc, char *argv[])
@@ -61,6 +63,10 @@ int main(int argc, char *argv[])
     pthread_t   networkThreadInfo;
     pthread_t   periodicThreadInfo;
 
+    pthread_mutex_init(&shared.mtxScsi,             NULL);
+    pthread_mutex_init(&shared.mtxTranslated,       NULL);
+    pthread_mutex_init(&shared.mtxConfigStreams,    NULL);
+    
     printf("\033[H\033[2J\n");
 
     initializeFlags();                                          // initialize flags 

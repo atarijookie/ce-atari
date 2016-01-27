@@ -16,10 +16,10 @@ typedef struct {
 
 typedef struct {
     Scsi            *scsi;
-    pthread_mutex_t mtxScsi         = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t mtxScsi;
     
     TranslatedDisk  *translated;
-    pthread_mutex_t mtxTranslated   = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t mtxTranslated;
 
     struct {
         ConfigStream    *acsi;
@@ -35,7 +35,7 @@ typedef struct {
         ConfigPipes term;
     } configPipes;
     
-    pthread_mutex_t mtxConfigStreams = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t mtxConfigStreams;
     
     bool mountRawNotTrans;
     
