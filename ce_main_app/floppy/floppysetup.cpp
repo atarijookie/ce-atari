@@ -204,7 +204,8 @@ void FloppySetup::downloadOnDevice(void)
     std::string pathWithHostSeparators;
 
     // try to convert atari path to host path (will work for translated drives, will fail for native)
-    bool res = translated->createHostPath(atariFilePath, hostPath);
+    bool waitingForMount;
+    bool res = translated->createHostPath(atariFilePath, hostPath, waitingForMount);
 
     if(res) {                                               // good? file is on translated drive
         res = Utils::copyFile(currentDownload.fh, hostPath);
@@ -343,7 +344,8 @@ void FloppySetup::uploadStart(void)
     bool doOnDeviceCopy = false;
 
     // try to convert atari path to host path (will work for translated drives, will fail for native)
-    bool res = translated->createHostPath(atariFilePath, hostPath);
+    bool waitingForMount;
+    bool res = translated->createHostPath(atariFilePath, hostPath, waitingForMount);
 
     if(res) {                                               // good? file is on translated drive
         if(translated->hostPathExists(hostPath)) {          // file exists? do on-device-copy of file

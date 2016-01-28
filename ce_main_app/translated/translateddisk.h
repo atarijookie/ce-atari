@@ -75,6 +75,7 @@ class ZipDirEntry {
     DWORD       lastAccessTime;         // Utils::getCurrentMs() time which is stored on each access to this folder - will be used to unmount oldest ZIP files, so new ZIP files can be mounted / accessed
     
     int         mountActionStateId;     // this is TMountActionState.id, which you can use to find out if the mount action did already finish
+    bool        isMounted;              // if this is set to true, don't have to check mount action state, but just consider this to be mounted
     
     void clear(void) {
         realHostPath        = "";
@@ -101,10 +102,10 @@ public:
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
     bool hostPathExists(std::string hostPath);
-    bool createHostPath(std::string atariPath, std::string &hostPath);
+    bool createHostPath(std::string atariPath, std::string &hostPath, bool &waitingForMount);
     void pathSeparatorAtariToHost(std::string &path);
 
-    void replaceHostPathWithZipDirPath(std::string &hostPath);
+    void replaceHostPathWithZipDirPath(std::string &hostPath, bool &waitingForMount);
 
 private:
 	void mountAndAttachSharedDrive(void);

@@ -69,6 +69,17 @@ void mas_setState(int id, int state)
     }
 }
 
+int mas_getState(int id)
+{
+    int masIndex = mas_getIndexOfId(id);    // get index of mount action state structure
+    
+    if(masIndex != -1) {                    // if index found, return that status
+        return mas[masIndex].state;
+    } else {                                // if index not found, the mount action state was probably pushed out by newer request, so return it's DONE
+        return MOUNTACTION_STATE_DONE;
+    }
+}
+
 int mountAdd(TMounterRequest &tmr)
 {
 	pthread_mutex_lock(&mountThreadMutex);				                // try to lock the mutex

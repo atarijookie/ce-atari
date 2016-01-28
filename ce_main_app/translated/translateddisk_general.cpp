@@ -703,14 +703,15 @@ bool TranslatedDisk::hostPathExists(std::string hostPath)
     return false;
 }
 
-bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath)
+bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath, bool &waitingForMount)
 {
-    hostPath = "";
+    hostPath        = "";
+    waitingForMount = false;
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - atariPath: %s", (char *) atariPath.c_str());
 
     pathSeparatorAtariToHost(atariPath);
-
+    
     if(atariPath[1] == ':') {                               // if it's full path including drive letter
 
         int driveIndex = 0;
@@ -750,7 +751,7 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
         Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - fill path including drive letter: atariPath: %s -> hostPath: %s", (char *) atariPath.c_str(), (char *) hostPath.c_str());
         
         #ifdef ZIPDIRS
-        replaceHostPathWithZipDirPath(hostPath);
+        replaceHostPathWithZipDirPath(hostPath, waitingForMount);
         #endif
         
         return true;
@@ -779,7 +780,7 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
         Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - starting from root -- atariPath: %s -> hostPath: %s", (char *) atariPath.c_str(), (char *) hostPath.c_str());
         
         #ifdef ZIPDIRS
-        replaceHostPathWithZipDirPath(hostPath);
+        replaceHostPathWithZipDirPath(hostPath, waitingForMount);
         #endif
         
         return true;
@@ -806,7 +807,7 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
     Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - relative path -- atariPath: %s -> hostPath: %s", (char *) atariPath.c_str(), (char *) hostPath.c_str());
     
     #ifdef ZIPDIRS
-    replaceHostPathWithZipDirPath(hostPath);
+    replaceHostPathWithZipDirPath(hostPath, waitingForMount);
     #endif
     
     return true;
@@ -1435,10 +1436,11 @@ bool TranslatedDisk::zipDirAlreadyMounted(char *zipFile, int &zipDirIndex)
     return false;
 }
 
-void TranslatedDisk::replaceHostPathWithZipDirPath(std::string &hostPath)
+void TranslatedDisk::replaceHostPathWithZipDirPath(std::string &hostPath, bool &waitingForMount)
 {
     char *pHostPath = (char *) hostPath.c_str();
-
+    waitingForMount = false;
+    
     //----------
     // first check if the host path contains '*.ZIP' part
     char *pZip = strcasestr(pHostPath, (char *) ".ZIP");
@@ -1504,12 +1506,29 @@ void TranslatedDisk::replaceHostPathWithZipDirPath(std::string &hostPath)
         tmr.mountDir    = mountPoint;               // e.g. /tmp/zipdir2
         int masId       = mountAdd(tmr);            // add mounter action, get mount action state id
         
-        zipDirs[zipDirIndex]->mountActionStateId = masId;   // store the mounter action state id, for future mount state query
+        zipDirs[zipDirIndex]->mountActionStateId    = masId;    // store the mounter action state id, for future mount state query
+        zipDirs[zipDirIndex]->isMounted             = false;    // not mounted yet
         //----------
         // mark this ZIP file as mounted
-        zipDirs[zipDirIndex]->realHostPath = zipFilePath;  // store path to zip file - this will be marker that this zip file is mounted
+        zipDirs[zipDirIndex]->realHostPath = zipFilePath;   // store path to zip file - this will be marker that this zip file is mounted
+        
+        waitingForMount = true;                             // return that we're waiting for mount to finish
+        return;
     } else {
         Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath -- file %s already mounted to %s, reusing and not mounting", zipFilePath, (char *) mountPoint.c_str());
+        
+        if(!zipDirs[zipDirIndex]->isMounted) {                                      // if not mounted yet
+            int state = mas_getState(zipDirs[zipDirIndex]->mountActionStateId);     // get state of this mount action
+            
+            if(state == MOUNTACTION_STATE_DONE) {                                   // if state is DONE, mark that it's mounted and continue
+                zipDirs[zipDirIndex]->isMounted = true;
+            } else {                                                                // state is NOT DONE yet
+                waitingForMount = true;                                             // return that we're waiting for mount to finish
+                return;
+            }
+        }
+        
+        // if mounted, it continues here
     }
     
     //----------

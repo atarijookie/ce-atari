@@ -111,7 +111,8 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
     convertAtariASCIItoPc((char *) dataBuffer);     // try to fix the path with only allowed chars
     newAtariPath =        (char *) dataBuffer;
 
-    res = createHostPath(newAtariPath, hostPath);
+    bool waitingForMount;
+    res = createHostPath(newAtariPath, hostPath, waitingForMount);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, createHostPath failed!", (char *) newAtariPath.c_str());
@@ -120,6 +121,13 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
         return;
     }
 
+    if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
+        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+    
+        dataTrans->setStatus(E_WAITING_FOR_MOUNT);
+        return;
+    }
+    
     if(!hostPathExists(hostPath)) {                 // path doesn't exists?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, hostPathExist failed for %s", (char *) newAtariPath.c_str(), (char *) hostPath.c_str());
 
@@ -210,7 +218,8 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
         Debug::out(LOG_DEBUG, "find attribs: 0x%02x -> %s", findAttribs, (char *) atts.c_str());
     }
     
-    res = createHostPath(atariSearchString, hostSearchString);   // create the host path
+    bool waitingForMount;
+    res = createHostPath(atariSearchString, hostSearchString, waitingForMount);   // create the host path
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s -- failed to create host path", (char *) atariSearchString.c_str());
@@ -218,6 +227,14 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
     }
+    
+    if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
+        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+    
+        dataTrans->setStatus(E_WAITING_FOR_MOUNT);
+        return;
+    }
+    
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s, host search string: %s", (char *) atariSearchString.c_str(), (char *) hostSearchString.c_str());
 
     //----------
@@ -434,7 +451,8 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     convertAtariASCIItoPc((char *) dataBuffer);     // try to fix the path with only allowed chars
     newAtariPath =        (char *) dataBuffer;
 
-    res = createHostPath(newAtariPath, hostPath);   // create the host path
+    bool waitingForMount;
+    res = createHostPath(newAtariPath, hostPath, waitingForMount);   // create the host path
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- createHostPath failed", (char *) newAtariPath.c_str());
@@ -443,6 +461,13 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
         return;
     }
 
+    if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
+        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+    
+        dataTrans->setStatus(E_WAITING_FOR_MOUNT);
+        return;
+    }
+    
     //---------------
     // if it's read only, quit
     if(isAtariPathReadOnly(newAtariPath)) {         
@@ -510,7 +535,8 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
     convertAtariASCIItoPc((char *) dataBuffer);     // try to fix the path with only allowed chars
     newAtariPath =        (char *) dataBuffer;
 
-    res = createHostPath(newAtariPath, hostPath);   // create the host path
+    bool waitingForMount;
+    res = createHostPath(newAtariPath, hostPath, waitingForMount);   // create the host path
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -- createHostPath failed, the path doesn't bellong to us", (char *) newAtariPath.c_str());
@@ -518,7 +544,14 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
     }
+
+    if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
+        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
     
+        dataTrans->setStatus(E_WAITING_FOR_MOUNT);
+        return;
+    }
+
     if(isAtariPathReadOnly(newAtariPath)) {         // if it's read only, quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -> hostPath: %s -- path is read only", (char *) newAtariPath.c_str(), (char *) hostPath.c_str());
 
@@ -553,9 +586,17 @@ void TranslatedDisk::onFrename(BYTE *cmd)
     newAtariName =        (char *) (dataBuffer + oldAtariName.length() + 1);    // get new name
 
     std::string oldHostName, newHostName;
-    res     = createHostPath(oldAtariName, oldHostName);            // create the host path
-    res2    = createHostPath(newAtariName, newHostName);            // create the host path
+    bool wfm1, wfm2;
+    res     = createHostPath(oldAtariName, oldHostName, wfm1);          // create the host path
+    res2    = createHostPath(newAtariName, newHostName, wfm2);          // create the host path
 
+    if(wfm1) {                                                          // if the path will be available in a while, but we're waiting for mount to finish now
+        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+    
+        dataTrans->setStatus(E_WAITING_FOR_MOUNT);
+        return;
+    }
+    
     if(!res || !res2) {                                             // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - failed to createHostPath for %s or %s", (char *) oldAtariName.c_str(), (char *) newAtariName.c_str());
 
@@ -602,7 +643,8 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
     convertAtariASCIItoPc((char *) dataBuffer);     // try to fix the path with only allowed chars
     newAtariPath =        (char *) dataBuffer;
 
-    res = createHostPath(newAtariPath, hostPath);   // create the host path
+    bool waitingForMount;
+    res = createHostPath(newAtariPath, hostPath, waitingForMount);   // create the host path
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - createHostPath failed", (char *) newAtariPath.c_str());
@@ -610,7 +652,14 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
     }
+
+    if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
+        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
     
+        dataTrans->setStatus(E_WAITING_FOR_MOUNT);
+        return;
+    }
+
     if(isAtariPathReadOnly(newAtariPath)) {         // if it's read only, quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - it's read only", (char *) newAtariPath.c_str());
 
@@ -693,13 +742,21 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     convertAtariASCIItoPc((char *) (dataBuffer + 2));   // try to fix the path with only allowed chars
     atariName =           (char *) (dataBuffer + 2);    // get file name
 
-    res = createHostPath(atariName, hostName);                      // create the host path
+    bool waitingForMount;
+    res = createHostPath(atariName, hostName, waitingForMount);     // create the host path
 
     if(!res) {                                                      // the path doesn't bellong to us?
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
     }
 
+    if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
+        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+    
+        dataTrans->setStatus(E_WAITING_FOR_MOUNT);
+        return;
+    }
+    
     BYTE    oldAttrAtari;
 
     // first read the attributes
@@ -768,12 +825,20 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     convertAtariASCIItoPc((char *) (dataBuffer + 1));               // try to fix the path with only allowed chars
     atariName =           (char *) (dataBuffer + 1);                // get file name
 
-    res = createHostPath(atariName, hostName);                      // create the host path
+    bool waitingForMount;
+    res = createHostPath(atariName, hostName, waitingForMount);     // create the host path
 
     if(!res) {                                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - createHostPath failed", (char *) atariName.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
+        return;
+    }
+    
+    if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
+        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+    
+        dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
     }
     
@@ -858,7 +923,8 @@ void TranslatedDisk::onFopen(BYTE *cmd)
     convertAtariASCIItoPc((char *) (dataBuffer + 1));               // try to fix the path with only allowed chars
     atariName =           (char *) (dataBuffer + 1);                // get file name
 
-    res = createHostPath(atariName, hostName);                      // create the host path
+    bool waitingForMount;
+    res = createHostPath(atariName, hostName, waitingForMount);     // create the host path
 
     if(!res) {                                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - createHostPath failed", (char *) atariName.c_str());
@@ -867,6 +933,13 @@ void TranslatedDisk::onFopen(BYTE *cmd)
         return;
     }
 
+    if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
+        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+    
+        dataTrans->setStatus(E_WAITING_FOR_MOUNT);
+        return;
+    }
+    
     if((mode & 0x07) != 0 && isAtariPathReadOnly(atariName)) {      // if it's WRITE and read only, quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is write, but file is read only, fail! ", (char *) atariName.c_str());
 

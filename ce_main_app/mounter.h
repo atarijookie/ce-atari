@@ -42,6 +42,7 @@ typedef struct {
 
 extern "C" {
 	int   mountAdd(TMounterRequest &tmr);
+    int   mas_getState(int id);
 	void *mountThreadCode(void *ptr);
 }
 
