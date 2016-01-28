@@ -1502,8 +1502,9 @@ void TranslatedDisk::replaceHostPathWithZipDirPath(std::string &hostPath)
         tmr.action      = MOUNTER_ACTION_MOUNT_ZIP; // action: mount ZIP file
         tmr.devicePath  = zipFilePath;              // e.g. /mnt/shared/normal/archive.zip
         tmr.mountDir    = mountPoint;               // e.g. /tmp/zipdir2
-        mountAdd(tmr);
+        int masId       = mountAdd(tmr);            // add mounter action, get mount action state id
         
+        zipDirs[zipDirIndex]->mountActionStateId = masId;   // store the mounter action state id, for future mount state query
         //----------
         // mark this ZIP file as mounted
         zipDirs[zipDirIndex]->realHostPath = zipFilePath;  // store path to zip file - this will be marker that this zip file is mounted

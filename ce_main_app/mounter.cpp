@@ -25,11 +25,71 @@
 pthread_mutex_t mountThreadMutex = PTHREAD_MUTEX_INITIALIZER;
 std::queue<TMounterRequest> mountQueue;
 
-void mountAdd(TMounterRequest &tmr)
+#define MAS_CNT         10
+TMountActionState mas[MAS_CNT];
+
+int mas_getEmptySlot(int &highestId)
 {
-	pthread_mutex_lock(&mountThreadMutex);				// try to lock the mutex
-	mountQueue.push(tmr);								// add this to queue
-	pthread_mutex_unlock(&mountThreadMutex);			// unlock the mutex
+    int i, lowestId = 0xffffff, lowestIdIndex = 0;
+    highestId = 0;
+
+    for(i=0; i<MAS_CNT; i++) {
+        if(lowestId > mas[i].id) {          // current ID is lower than what we already found? store it
+            lowestId        = mas[i].id;
+            lowestIdIndex   = i;
+        }
+        
+        if(highestId < mas[i].id) {         // current ID is higher than what we already found? store it
+            highestId = mas[i].id;
+        }
+    }
+    
+    return lowestIdIndex;
+}
+
+int mas_getIndexOfId(int searchedId)
+{
+    int i;
+
+    for(i=0; i<MAS_CNT; i++) {
+        if(mas[i].id == searchedId) {
+            return i;
+        }
+    }
+    
+    return -1;
+}
+
+void mas_setState(int id, int state)
+{
+    int masIndex = mas_getIndexOfId(id);    // get index of mount action state structure
+    
+    if(masIndex != -1) {                    // if index found, set status
+        mas[masIndex].state = state;
+    }
+}
+
+int mountAdd(TMounterRequest &tmr)
+{
+	pthread_mutex_lock(&mountThreadMutex);				                // try to lock the mutex
+    
+    //------------
+    // following block here is for status tracking - if mount already finished or not
+    int highestId, lowestIdIndex;
+    lowestIdIndex = mas_getEmptySlot(highestId);                        // find a slot where we should store the next mount state id
+    int newId = highestId + 1;                                          // new ID is higher than the last highest
+    
+    mas[lowestIdIndex].id           = newId;                    
+    mas[lowestIdIndex].state        = MOUNTACTION_STATE_NOT_STARTED;    // mount did not start yet
+    mas[lowestIdIndex].changeTime   = Utils::getCurrentMs();            // this happened now
+    
+    tmr.mountActionStateId          = newId;                            // store the ID, so we can track it later
+    //------------
+    
+	mountQueue.push(tmr);								                // add this to queue
+	pthread_mutex_unlock(&mountThreadMutex);			                // unlock the mutex
+    
+    return newId;
 }
 
 void *mountThreadCode(void *ptr)
@@ -51,35 +111,37 @@ void *mountThreadCode(void *ptr)
 		mountQueue.pop();								// and remove it form queue
 		pthread_mutex_unlock(&mountThreadMutex);		// unlock the mutex
 
+        //---------
+        // mark the mount action state as IN PROGRESS
+        mas_setState(tmr.mountActionStateId, MOUNTACTION_STATE_IN_PROGRESS);
+        //---------
+        
 		if(tmr.action == MOUNTER_ACTION_MOUNT) {		// should we mount this?
 			if(tmr.deviceNotShared) {					// mount device?
 				mounter.mountDevice((char *) tmr.devicePath.c_str(), (char *) tmr.mountDir.c_str());	
 			} else {									// mount shared?
 				mounter.mountShared((char *) tmr.shared.host.c_str(), (char *) tmr.shared.hostDir.c_str(), tmr.shared.nfsNotSamba, (char *) tmr.mountDir.c_str(), (char *) tmr.shared.username.c_str(), (char *) tmr.shared.password.c_str());
 			}
-			
-			continue;
 		} 
 		
 		if(tmr.action == MOUNTER_ACTION_UMOUNT) {		// should umount?
 			mounter.umountIfMounted((char *) tmr.mountDir.c_str());
-			continue;
 		}
 		
 		if(tmr.action == MOUNTER_ACTION_RESTARTNETWORK) {   // restart network?
 			mounter.restartNetwork();
-            continue;
 		}
 
         if(tmr.action == MOUNTER_ACTION_SYNC) {             // sync system caches?
             mounter.sync();
-            continue;
         }
         
         if(tmr.action == MOUNTER_ACTION_MOUNT_ZIP) {        // mount ZIP file?
             mounter.mountZipFile((char *) tmr.devicePath.c_str(), (char *) tmr.mountDir.c_str());	
-            continue;
         }
+        
+        // mark the mount action state as DONE
+        mas_setState(tmr.mountActionStateId, MOUNTACTION_STATE_DONE);
 	}
 	
 	Debug::out(LOG_DEBUG, "Mount thread terminated.");

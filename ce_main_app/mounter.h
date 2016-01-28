@@ -2,12 +2,23 @@
 #define _MOUNTER_H_
 
 #include <string>
+#include "datatypes.h"
 
 #define MOUNTER_ACTION_MOUNT			0
 #define MOUNTER_ACTION_UMOUNT			1
 #define MOUNTER_ACTION_RESTARTNETWORK	2
 #define MOUNTER_ACTION_SYNC             3
 #define MOUNTER_ACTION_MOUNT_ZIP        4
+
+#define MOUNTACTION_STATE_NOT_STARTED   0
+#define MOUNTACTION_STATE_IN_PROGRESS   1
+#define MOUNTACTION_STATE_DONE          2
+
+typedef struct {
+    int     id;
+    BYTE    state;
+    DWORD   changeTime;
+} TMountActionState;
 
 typedef struct {
 	int			action;
@@ -25,10 +36,12 @@ typedef struct {
 	} shared;
 
 	std::string mountDir;				// location where it should be mounted
+    
+    int     mountActionStateId;         // TMountActionState.id, which should be updated on change in this mount action
 } TMounterRequest;
 
 extern "C" {
-	void mountAdd(TMounterRequest &tmr);
+	int   mountAdd(TMounterRequest &tmr);
 	void *mountThreadCode(void *ptr);
 }
 

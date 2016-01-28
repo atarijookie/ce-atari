@@ -74,9 +74,12 @@ class ZipDirEntry {
     std::string realHostPath;           // real path to ZIP file on host dir struct, e.g. /mnt/shared/normal/archive.zip
     DWORD       lastAccessTime;         // Utils::getCurrentMs() time which is stored on each access to this folder - will be used to unmount oldest ZIP files, so new ZIP files can be mounted / accessed
     
+    int         mountActionStateId;     // this is TMountActionState.id, which you can use to find out if the mount action did already finish
+    
     void clear(void) {
-        realHostPath    = "";
-        lastAccessTime  = 0;
+        realHostPath        = "";
+        lastAccessTime      = 0;
+        mountActionStateId  = 0;
     }
 };
 
