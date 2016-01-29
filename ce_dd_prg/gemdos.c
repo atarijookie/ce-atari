@@ -65,6 +65,9 @@ BYTE fseek_cur(int32_t offset, BYTE ceHandle, TFileBuffer *fb);
 void fseek_invalSeekStore(int32_t offset, BYTE ceHandle, BYTE seekMode, TFileBuffer *fb);
 void fseek_hdif_command(int32_t offset, BYTE ceHandle, BYTE seekMode);
 
+void showWaitSymbol(BYTE showNotHide);
+void msleepInSuper(int ms);
+
 // ------------------------------------------------------------------ 
 // the custom GEMDOS handlers now follow 
 
@@ -253,12 +256,25 @@ int32_t custom_dsetpath( void *sp )
 	memset(pDmaBuffer, 0, 512);
 	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		    // copy in the path 
 	
-	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1); // send command to host over ACSI 
+    while(1) {
+        (*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1); // send command to host over ACSI 
 
-    if(!hdIf.success || hdIf.statusByte == E_NOTHANDLED) {				    // not handled or error? 
-		CALL_OLD_GD( Dsetpath, pPath);
-	}
+        if(hdIf.success && hdIf.statusByte == E_WAITING_FOR_MOUNT) {            // if waiting for mount
+            showWaitSymbol(1);
+        
+            msleepInSuper(500);
+            continue;
+        }
+        
+        if(!hdIf.success || hdIf.statusByte == E_NOTHANDLED) {				    // not handled or error? 
+            showWaitSymbol(0);
+            CALL_OLD_GD( Dsetpath, pPath);
+        }
+        
+        break;
+    }
 
+    showWaitSymbol(0);
     return extendByteToDword(hdIf.statusByte);
 }
 
@@ -899,6 +915,23 @@ BYTE isOurDrive(WORD drive, BYTE withCurrentDrive)
 	}
 
 	return FALSE;
+}
+
+void showWaitSymbol(BYTE showNotHide)
+{
+    static BYTE isShown = 0;
+
+    if(showNotHide) {   // show wait symbol
+        if(!isShown) {
+            isShown = 1;
+            (void) Cconws("\33Y  \33p*\33q");
+        }
+    } else {            // hide wait symbol
+        if(isShown) {
+            isShown = 0;
+            (void) Cconws("\33Y  \33q ");
+        }
+    }
 }
 
 // ------------------------------------------------------------------ 
