@@ -228,6 +228,9 @@ private:
 
     DWORD getByteCountToEOF(FILE *f);
     
+    int  driveLetterToDriveIndex(char pathDriveLetter);
+    void createHostPath_finish(std::string &hostPath, int driveIndex, bool &waitingForMount);
+
     //-----------------------------------
     // ZIP DIR stuff
     ZipDirEntry *zipDirs[MAX_ZIP_DIRS];
