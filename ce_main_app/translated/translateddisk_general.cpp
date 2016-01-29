@@ -746,6 +746,8 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 		std::string longHostPath;
 		conf[driveIndex].dirTranslator.shortToLongPath(root, hostPath, longHostPath);	// now convert short to long path
 
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath : shortToLongPath(root: %s, hostPath: %s, longHostPath: %s)", (char *) root.c_str(), (char *) hostPath.c_str(), (char *) longHostPath.c_str());
+
 		hostPath = root;
 		Utils::mergeHostPaths(hostPath, longHostPath);
         Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - fill path including drive letter: atariPath: %s -> hostPath: %s", (char *) atariPath.c_str(), (char *) hostPath.c_str());
@@ -774,6 +776,8 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 		std::string longHostPath;
 		conf[currentDriveIndex].dirTranslator.shortToLongPath(root, hostPath, longHostPath);	// now convert short to long path
 
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath : shortToLongPath(root: %s, hostPath: %s, longHostPath: %s)", (char *) root.c_str(), (char *) hostPath.c_str(), (char *) longHostPath.c_str());
+
 		hostPath = root;
 		Utils::mergeHostPaths(hostPath, longHostPath);
 
@@ -800,6 +804,8 @@ bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath
 
 	std::string longHostPath;
 	conf[currentDriveIndex].dirTranslator.shortToLongPath(root, hostPath, longHostPath);	// now convert short to long path
+
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath : shortToLongPath(root: %s, hostPath: %s, longHostPath: %s)", (char *) root.c_str(), (char *) hostPath.c_str(), (char *) longHostPath.c_str());
 
 	hostPath = root;
 	Utils::mergeHostPaths(hostPath, longHostPath);
@@ -1000,8 +1006,12 @@ void TranslatedDisk::createAtariPathFromHostPath(std::string hostPath, std::stri
 
     if(hostPath.find(hostRoot) == 0) {                          // the full host path contains host root
         atariPath = hostPath.substr(hostRoot.length());         // atari path = hostPath - hostRoot
-    } else {                                                    // this shouldn't happen
-        Debug::out(LOG_ERROR, "TranslatedDisk::createAtariPathFromHostPath -- WTF, this shouldn't happen!");
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createAtariPathFromHostPath - hostPath: %s -> atariPath: %s", (char *) hostPath.c_str(), (char *) atariPath.c_str());
+    } else {                                                    // this shouldn't happen for normal dirs, might happen for ZIP DIRs
+
+        // special handling for ZIP DIRs here?
+    
+        Debug::out(LOG_ERROR, "TranslatedDisk::createAtariPathFromHostPath - hostPath: %s, hostRoot: %s -- WTF, this shouldn't happen!", (char *) hostPath.c_str(), (char *) hostRoot.c_str());
         atariPath = "";
     }
 }

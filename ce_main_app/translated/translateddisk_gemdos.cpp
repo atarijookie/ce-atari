@@ -122,7 +122,7 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
     }
 
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
-        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath -- waiting for mount, call this function again to succeed later.");
     
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
@@ -229,7 +229,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     }
     
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
-        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst -- waiting for mount, call this function again to succeed later.");
     
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
@@ -462,7 +462,7 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     }
 
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
-        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate -- waiting for mount, call this function again to succeed later.");
     
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
@@ -546,7 +546,7 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
     }
 
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
-        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete -- waiting for mount, call this function again to succeed later.");
     
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
@@ -591,7 +591,7 @@ void TranslatedDisk::onFrename(BYTE *cmd)
     res2    = createHostPath(newAtariName, newHostName, wfm2);          // create the host path
 
     if(wfm1) {                                                          // if the path will be available in a while, but we're waiting for mount to finish now
-        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename -- waiting for mount, call this function again to succeed later.");
     
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
@@ -654,7 +654,7 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
     }
 
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
-        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete  -- waiting for mount, call this function again to succeed later.");
     
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
@@ -751,7 +751,7 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     }
 
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
-        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFattrib -- waiting for mount, call this function again to succeed later.");
     
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
@@ -836,7 +836,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     }
     
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
-        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate -- waiting for mount, call this function again to succeed later.");
     
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
@@ -934,7 +934,7 @@ void TranslatedDisk::onFopen(BYTE *cmd)
     }
 
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
-        Debug::out(LOG_DEBUG, "TranslatedDisk::  -- waiting for mount, call this function again to succeed later.");
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen -- waiting for mount, call this function again to succeed later.");
     
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
