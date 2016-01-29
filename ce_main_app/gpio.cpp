@@ -167,6 +167,16 @@ bool spi_atn(int whichSpiAtn)
 
 //------------------------------------------------------------------------------------------------------------------------
 
+#ifdef ONPC_NOTHING
+
+bool gpio_open(void) { return true; }
+void spi_init(void)  {              }
+void gpio_close(void){              }
+
+#endif
+
+#ifndef ONPC_NOTHING
+
 bool gpio_open(void)
 {
     #ifdef ONPC_GPIO
@@ -256,5 +266,6 @@ void gpio_close(void)
 	bcm2835_close();			// close the GPIO library and finish
 }
 
+#endif
 
 
