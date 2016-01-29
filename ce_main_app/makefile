@@ -5,7 +5,7 @@ TARGET	= cosmosex
 
 CC	    = g++
 #STRIP	= strip
-CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE #-DZIPDIRS
+CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -DZIPDIRS
 
 ifeq ($(ONPC),yes)
     LDFLAGS	= -Llib -Llib -lrt -lpthread -lcurl -lcivetweb -ldl -lutil

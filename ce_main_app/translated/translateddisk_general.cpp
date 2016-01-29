@@ -55,7 +55,7 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastS
     initAsciiTranslationTable();
  
     for(int i=0; i<MAX_ZIP_DIRS; i++) {                 // init the ZIP dirs
-        zipDirs[i] = new ZipDirEntry();
+        zipDirs[i] = new ZipDirEntry(i);
     }
 }
 
@@ -100,6 +100,8 @@ void TranslatedDisk::loadSettings(void)
     if(driveLetters.confDrive >= 0 && driveLetters.confDrive <=15) {        // if got a valid drive letter for config drive
         driveLetters.readOnly = (1 << driveLetters.confDrive);              // make config drive read only
     }
+    
+    useZipdirNotFile = s.getBool((char *) "USE_ZIP_DIR", 1);
 }
 
 void TranslatedDisk::reloadSettings(int type)
@@ -784,6 +786,16 @@ int TranslatedDisk::driveLetterToDriveIndex(char pathDriveLetter)
     return driveIndex;
 }
 
+/* 
+  params:
+    hostPath - at start  it contains absolute atari path
+             - at finish it contains absolute host path
+             
+    driveIndex - contains index number of drive, on which this should be attempter (0=A, 15=P)
+    
+    waitingForMount - will contain true on finish, if the caller should wait because this will first be just mounted, and then it can be accessed
+*/
+
 void TranslatedDisk::createHostPath_finish(std::string &hostPath, int driveIndex, bool &waitingForMount)
 {
     std::string root = conf[driveIndex].hostRootPath;       // get root path
@@ -797,7 +809,9 @@ void TranslatedDisk::createHostPath_finish(std::string &hostPath, int driveIndex
     Utils::mergeHostPaths(hostPath, longHostPath);          // merge 
     
     #ifdef ZIPDIRS
-    replaceHostPathWithZipDirPath(hostPath, waitingForMount);
+    if(useZipdirNotFile) {                                  // if ZIP DIRs are enabled
+        replaceHostPathWithZipDirPath(hostPath, waitingForMount);
+    }
     #endif
 }
 
@@ -984,18 +998,52 @@ bool TranslatedDisk::isValidDriveLetter(char a)
 
 void TranslatedDisk::createAtariPathFromHostPath(std::string hostPath, std::string &atariPath)
 {
-    std::string hostRoot = conf[currentDriveIndex].hostRootPath;
+    std::string hostRoot = conf[currentDriveIndex].hostRootPath;            // get root of current drive
 
+    //-----------
+    // first check if the path has ZIP DIR prefix, and if it does, try to replace it
+    #ifdef ZIPDIRS
+    if(useZipdirNotFile) {                                                      // if ZIP DIRs are enabled
+    
+        std::string zipDirPrefix = ZIPDIR_PATH_PREFIX;
+        while(startsWith(hostPath, zipDirPrefix)) {                             // if the host path starts with ZIP DIR path prefix, replace it with real path (in loop, at this might be nested ZIP DIR)
+            std::string zipDirPath = hostPath.substr(0, ZIPDIR_PATH_LENGTH);    // get just ZIP DIR path
+            std::string restOfPath = hostPath.substr(ZIPDIR_PATH_LENGTH);       // get the rest of the path after ZIP DIR
+            
+            int zipDirIndex = getZipDirByMountPoint(zipDirPath);                // find the zip dir path
+            
+            if(zipDirIndex != -1) {                                             // zip dir mount point found? replace it in host path with real path
+                Debug::out(LOG_DEBUG, "TranslatedDisk::createAtariPathFromHostPath -> will replace ZIP DIR prefix on this path: %s", (char *) hostPath.c_str());
+                hostPath = zipDirs[zipDirIndex]->realHostPath + restOfPath;
+                Debug::out(LOG_DEBUG, "TranslatedDisk::createAtariPathFromHostPath -> path after ZIP DIR prefix replacement   : %s", (char *) hostPath.c_str());
+            } else {
+                Debug::out(LOG_DEBUG, "TranslatedDisk::createAtariPathFromHostPath -> couldn't find realHostPath for this ZIP DIR prefixed path: %s", (char *) hostPath.c_str());
+                break;
+            }
+        }
+    
+    }
+    #endif
+    //-----------
+    // now try to convert full host path to atari path
     if(hostPath.find(hostRoot) == 0) {                          // the full host path contains host root
         atariPath = hostPath.substr(hostRoot.length());         // atari path = hostPath - hostRoot
         Debug::out(LOG_DEBUG, "TranslatedDisk::createAtariPathFromHostPath - hostPath: %s -> atariPath: %s", (char *) hostPath.c_str(), (char *) atariPath.c_str());
-    } else {                                                    // this shouldn't happen for normal dirs, might happen for ZIP DIRs
-
-        // special handling for ZIP DIRs here?
-    
+    } else {                                                    // this shouldn't happen...
         Debug::out(LOG_ERROR, "TranslatedDisk::createAtariPathFromHostPath - hostPath: %s, hostRoot: %s -- WTF, this shouldn't happen!", (char *) hostPath.c_str(), (char *) hostRoot.c_str());
         atariPath = "";
     }
+}
+
+int  TranslatedDisk::getZipDirByMountPoint(std::string &searchedMountPoint)
+{
+    for(int i=0; i<MAX_ZIP_DIRS; i++) {                         // find the mount point
+        if(zipDirs[i]->mountPoint == searchedMountPoint) {      // mount point found? return index
+            return i;
+        }
+    }
+    
+    return -1;                                                  // mount point not found
 }
 
 bool TranslatedDisk::startsWith(std::string what, std::string subStr)
@@ -1399,13 +1447,6 @@ void TranslatedDisk::getScreenShotConfig(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-void TranslatedDisk::getZipDirMountPoint(int index, std::string &mountPoint)
-{
-    char path[128];
-    sprintf(path, "/tmp/zipdir%d", index);          // generate mount point, e.g. /tmp/zipdir5
-    mountPoint = path;
-}
-
 bool TranslatedDisk::zipDirAlreadyMounted(char *zipFile, int &zipDirIndex)
 {
     DWORD minAccessTime     = 0xffffffff;
@@ -1484,19 +1525,16 @@ void TranslatedDisk::replaceHostPathWithZipDirPath(std::string &hostPath, bool &
     int  zipDirIndex;
     isMounted = zipDirAlreadyMounted(zipFilePath, zipDirIndex);     // see if the file is already mounted
 
-    std::string mountPoint;
-    getZipDirMountPoint(zipDirIndex, mountPoint);       // get mount point for this ZIP DIR 
-    
     if(!isMounted) {                                    // if ZIP file not mounted yet, mount it
-        Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath -- mounting file %s to dir %s", zipFilePath, (char *) mountPoint.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath -- mounting file %s to dir %s", zipFilePath, (char *) zipDirs[zipDirIndex]->mountPoint.c_str());
         
         //----------
         // issue mount request
         TMounterRequest tmr;
-        tmr.action      = MOUNTER_ACTION_MOUNT_ZIP; // action: mount ZIP file
-        tmr.devicePath  = zipFilePath;              // e.g. /mnt/shared/normal/archive.zip
-        tmr.mountDir    = mountPoint;               // e.g. /tmp/zipdir2
-        int masId       = mountAdd(tmr);            // add mounter action, get mount action state id
+        tmr.action      = MOUNTER_ACTION_MOUNT_ZIP;         // action: mount ZIP file
+        tmr.devicePath  = zipFilePath;                      // e.g. /mnt/shared/normal/archive.zip
+        tmr.mountDir    = zipDirs[zipDirIndex]->mountPoint; // e.g. /tmp/zipdir2
+        int masId       = mountAdd(tmr);                    // add mounter action, get mount action state id
         
         zipDirs[zipDirIndex]->mountActionStateId    = masId;    // store the mounter action state id, for future mount state query
         zipDirs[zipDirIndex]->isMounted             = false;    // not mounted yet
@@ -1507,7 +1545,7 @@ void TranslatedDisk::replaceHostPathWithZipDirPath(std::string &hostPath, bool &
         waitingForMount = true;                             // return that we're waiting for mount to finish
         return;
     } else {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath -- file %s already mounted to %s, reusing and not mounting", zipFilePath, (char *) mountPoint.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath -- file %s already mounted to %s, reusing and not mounting", zipFilePath, (char *) zipDirs[zipDirIndex]->mountPoint.c_str());
         
         if(!zipDirs[zipDirIndex]->isMounted) {                                      // if not mounted yet
             int state = mas_getState(zipDirs[zipDirIndex]->mountActionStateId);     // get state of this mount action
@@ -1526,9 +1564,9 @@ void TranslatedDisk::replaceHostPathWithZipDirPath(std::string &hostPath, bool &
     //----------
     // now replace the part of the host path with the alternative ZIP DIR path
     std::string pathInsideZipFile = hostPath.substr(zipFilePathLen);
-    hostPath = mountPoint + pathInsideZipFile;                      // create new host path inside zip mount point
+    hostPath = zipDirs[zipDirIndex]->mountPoint + pathInsideZipFile;                // create new host path inside zip mount point
 
-    zipDirs[zipDirIndex]->lastAccessTime = Utils::getCurrentMs();   // mark the current time as the time of last access
+    zipDirs[zipDirIndex]->lastAccessTime = Utils::getCurrentMs();                   // mark the current time as the time of last access
     
     Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath -- new path now is %s", (char *) hostPath.c_str());
 }

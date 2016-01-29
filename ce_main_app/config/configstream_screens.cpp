@@ -313,40 +313,47 @@ void ConfigStream::createScreen_translated(void)
 
     screen_addHeaderAndFooter(screen, (char *) "Translated disk");
 
-    int col1x = 4, col2x = 23, col3x = 29;
+    int col1x = 4, col2x = 24, col3x = 30;
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "        Drive letters assignment", 40, 0, 5, gotoOffset);
+    int row = 3;
+    comp = new ConfigComponent(this, ConfigComponent::label, "        Drive letters assignment", 40, 0, row++, gotoOffset);
     comp->setReverse(true);
     screen.push_back(comp);
+    row++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "First translated drive", 23, col1x, 7, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "First translated drive",  23, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	1, 33, 7, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                1, col3x + 3, row++, gotoOffset);
     comp->setComponentId(COMPID_TRAN_FIRST);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
+    row++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Shared drive", 23, col1x, 9, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Shared drive",            23, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	1, 33, 9, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                1, col3x + 3, row++, gotoOffset);
     comp->setComponentId(COMPID_TRAN_SHARED);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Config drive", 23, col1x, 10, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Config drive",            23, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	1, 33, 10, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                1, col3x + 3, row++, gotoOffset);
     comp->setComponentId(COMPID_TRAN_CONFDRIVE);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
-
-    //------------
-    int row = 12;
+    row++;
     
+    //------------
+    comp = new ConfigComponent(this, ConfigComponent::label, "                 Options", 40, 0, row++, gotoOffset);
+    comp->setReverse(true);
+    screen.push_back(comp);
+    row++;
+
     comp = new ConfigComponent(this, ConfigComponent::label, "Mount USB media as",							40, col1x, row, gotoOffset);
     screen.push_back(comp);
 	
@@ -367,27 +374,51 @@ void ConfigStream::createScreen_translated(void)
 	row++;
     //------------
     
-    comp = new ConfigComponent(this, ConfigComponent::label, "If you use also raw disks (Atari native ", 40, 0, 17, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Access ZIP files as",							40, col1x, row, gotoOffset);
+    screen.push_back(comp);
+	
+	comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",										3,	col2x, row, gotoOffset);
+    comp->setCheckboxGroupIds(COMPID_USE_ZIP_DIR_NOT_FILE, 0);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "disks), you should avoid using few", 40, 0, 18, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "files",  								        40,	col3x, row++, gotoOffset);
+    screen.push_back(comp);
+	
+	comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",										3,	col2x, row, gotoOffset);
+    comp->setCheckboxGroupIds(COMPID_USE_ZIP_DIR_NOT_FILE, 1);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "letters from C: to leave some space for", 40, 0, 19, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "dirs", 			                            40,	col3x, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "them.",	40, 0, 20, gotoOffset);
-    screen.push_back(comp);
-
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  9, 15, gotoOffset);
+	row++;
+    //------------
+    
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  9, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_SAVE_TRANSLATED);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, 20, 15, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, 20, row++, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
+	row++;
+
+    //------------
+    comp = new ConfigComponent(this, ConfigComponent::label, "If you use also raw disks (Atari native ",    40, 0, row++, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "disks), you should avoid using few",          40, 0, row++, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "letters from C: to leave some space for",     40, 0, row++, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "them.",	40, 0, row++, gotoOffset);
+    screen.push_back(comp);
+    row++;
+    //------------
 
     // get the letters from settings, store them to components
     Settings s;
@@ -413,13 +444,24 @@ void ConfigStream::createScreen_translated(void)
     driveString = driveStr;
     setTextByComponentId(COMPID_TRAN_CONFDRIVE, driveString);
 
+    //---------
     mountRawNotTrans = s.getBool((char *) "MOUNT_RAW_NOT_TRANS", 0);
-    
+
  	if(mountRawNotTrans) {
 		checkboxGroup_setCheckedId(COMPID_MOUNT_RAW_NOT_TRANS, 1);			// select RAW
 	} else {
 		checkboxGroup_setCheckedId(COMPID_MOUNT_RAW_NOT_TRANS, 0);			// select TRANS
 	}
+    
+    //---------
+    bool useZipdirNotFile = s.getBool((char *) "USE_ZIP_DIR", 1);           // use ZIP DIRs, enabled by default
+
+ 	if(useZipdirNotFile) {
+		checkboxGroup_setCheckedId(COMPID_USE_ZIP_DIR_NOT_FILE, 1);			// ZIP DIRs enabled
+	} else {
+		checkboxGroup_setCheckedId(COMPID_USE_ZIP_DIR_NOT_FILE, 0);			// ZIP DIRs disabled
+	}
+    //---------
 
     setFocusToFirstFocusable();
 }
@@ -539,13 +581,16 @@ void ConfigStream::onTranslated_save(void)
     }
 
     bool mountRawNotTrans = (bool) checkboxGroup_getCheckedId(COMPID_MOUNT_RAW_NOT_TRANS);
-    
+    bool useZipdirNotFile = (bool) checkboxGroup_getCheckedId(COMPID_USE_ZIP_DIR_NOT_FILE);
+
+    //---------
     // now save the settings
     Settings s;
     s.setChar((char *) "DRIVELETTER_FIRST",      letter1);
     s.setChar((char *) "DRIVELETTER_SHARED",     letter2);
     s.setChar((char *) "DRIVELETTER_CONFDRIVE",  letter3);
     s.setBool((char *) "MOUNT_RAW_NOT_TRANS",    mountRawNotTrans);
+    s.setBool((char *) "USE_ZIP_DIR",            useZipdirNotFile); // use ZIP DIRs, enabled by default
 
     if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
         reloadProxy->reloadSettings(SETTINGSUSER_TRANSLATED);

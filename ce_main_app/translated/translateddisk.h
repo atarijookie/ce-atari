@@ -63,24 +63,41 @@ typedef struct {
 
 #define MAX_FIND_STORAGES               32
 
+//---------------------------------------
 #define MAX_ZIP_DIRS                    5
+
+#define ZIPDIR_PATH_PREFIX              "/tmp/zipdir"
+#define ZIPDIR_PATH_LENGTH              12              // length of ZIP DIR path, including the number which is generated in getZipDirMountPoint()
+
 class ZipDirEntry {
     public:
 
-    ZipDirEntry(void) {
-        clear();
+    ZipDirEntry(int index) {
+        clear(index);
     }
     
     std::string realHostPath;           // real path to ZIP file on host dir struct, e.g. /mnt/shared/normal/archive.zip
+    std::string mountPoint;             // contains path, where the ZIP file will be mounted, and where createHostPath() will redirect host path
     DWORD       lastAccessTime;         // Utils::getCurrentMs() time which is stored on each access to this folder - will be used to unmount oldest ZIP files, so new ZIP files can be mounted / accessed
     
     int         mountActionStateId;     // this is TMountActionState.id, which you can use to find out if the mount action did already finish
     bool        isMounted;              // if this is set to true, don't have to check mount action state, but just consider this to be mounted
     
-    void clear(void) {
+    void clear(int index) {
         realHostPath        = "";
         lastAccessTime      = 0;
         mountActionStateId  = 0;
+        
+        getZipDirMountPoint(index, mountPoint);
+    }
+    
+    void getZipDirMountPoint(int index, std::string &aMountPoint)
+    {
+        char indexNoStr[128];
+        sprintf(indexNoStr, "%d", index);       // generate mount point number string, e.g. "5"
+        
+        aMountPoint  = ZIPDIR_PATH_PREFIX;      // e.g. /tmp/zipdir
+        aMountPoint += indexNoStr;
     }
 };
 
@@ -230,11 +247,14 @@ private:
     
     int  driveLetterToDriveIndex(char pathDriveLetter);
     void createHostPath_finish(std::string &hostPath, int driveIndex, bool &waitingForMount);
-
+    int  getZipDirByMountPoint(std::string &searchedMountPoint);
+    
     //-----------------------------------
     // ZIP DIR stuff
     ZipDirEntry *zipDirs[MAX_ZIP_DIRS];
 
+    bool useZipdirNotFile;
+    
     void getZipDirMountPoint(int index, std::string &mountPoint);
     bool zipDirAlreadyMounted(char *zipFile, int &zipDirIndex);
     //-----------------------------------
