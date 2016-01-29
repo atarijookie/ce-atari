@@ -359,6 +359,8 @@ void AcsiDataTrans::sendStatusAfterWrite(void)
 //    Debug::out(LOG_ERROR, "AcsiDataTrans::sendStatusAfterWrite -- sending status %02x", status);
 
     serverSocket_write(&status, 1);
+#elif defined(ONPC_NOTHING) 
+    // nothing here
 #else
 	BYTE inBuf[8];
 	bool res = com->waitForATN(SPI_CS_HANS, ATN_GET_STATUS, 1000, inBuf);	// wait for ATN_GET_STATUS

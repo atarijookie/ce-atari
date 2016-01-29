@@ -217,8 +217,10 @@ int main(int argc, char *argv[])
     res = pthread_create(&downloadThreadInfo, NULL, downloadThreadCode, NULL);  // create download thread and run it
 	handlePthreadCreate(res, (char *) "ce download", &downloadThreadInfo);
 
+#ifndef ONPC_NOTHING
     res = pthread_create(&ikbdThreadInfo, NULL, ikbdThreadCode, NULL);			// create the keyboard emulation thread and run it
 	handlePthreadCreate(res, (char *) "ce ikbd", &ikbdThreadInfo);
+#endif
 
     res = pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL);	// create the floppy encoding thread and run it
 	handlePthreadCreate(res, (char *) "ce floppy encode", &floppyEncThreadInfo);
@@ -269,8 +271,10 @@ int main(int argc, char *argv[])
     printf("Stoping download thread\n");
     pthread_join(downloadThreadInfo, NULL);             // wait until download  thread finishes
 
+#ifndef ONPC_NOTHING
     printf("Stoping ikbd thread\n");
     pthread_join(ikbdThreadInfo, NULL);                 // wait until ikbd      thread finishes
+#endif
 
     printf("Stoping floppy encoder thread\n");
     pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes

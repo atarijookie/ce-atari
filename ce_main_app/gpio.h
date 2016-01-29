@@ -3,7 +3,7 @@
 
 #include "datatypes.h"
 
-#if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL)
+#if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
 // if compiling for RPi
 
 #include <bcm2835.h>

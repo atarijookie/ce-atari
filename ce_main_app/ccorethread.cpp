@@ -189,6 +189,11 @@ void CCoreThread::run(void)
         Utils::resetHansAndFranz();
     }
 
+#ifdef ONPC_NOTHING
+    shouldCheckHansFranzAlive   = false;
+    flags.noReset               = true;
+#endif
+
 #if defined(ONPC_HIGHLEVEL)
     shouldCheckHansFranzAlive = false;                                  // when running ONPC with HIGHLEVEL of emulation, don't check this
 
@@ -317,7 +322,7 @@ void CCoreThread::run(void)
         
         load.busy.markStart();                          // mark the start of the busy part of the code
         
-#if !defined(ONPC_HIGHLEVEL)
+#if !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
         // check for any ATN code waiting from Hans
 		res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);
 
@@ -358,7 +363,7 @@ void CCoreThread::run(void)
         }
 #endif
 
-#if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL)
+#if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
         // check for any ATN code waiting from Franz
         if(flags.noFranz) {                         // if running without Franz, don't communicate
             res = false;

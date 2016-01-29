@@ -126,7 +126,7 @@ bool spi_atn(int whichSpiAtn)
 
 //------------------------------------------------------------------------------------------------------------------------
 
-#ifdef ONPC_HIGHLEVEL
+#if defined(ONPC_HIGHLEVEL) || defined(ONPC_NOTHING)
 // the following dummy functions are here for compilation on PC - when HIGHLEVEL of emulation is done
 
 bool bcm2835_init(void) { return true; }
@@ -148,7 +148,7 @@ bool spi_atn(int whichSpiAtn) { return false; }
 
 //------------------------------------------------------------------------------------------------------------------------
 
-#if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL)
+#if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
 void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf)
 {
     bcm2835_spi_chipSelect(whichSpiCS);
