@@ -237,15 +237,6 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
 
     //----------
 	// now get the dir translator for the right drive
-	int driveIndex = getDriveIndexFromAtariPath(atariSearchString);
-	
-	if(driveIndex == -1) {											// invalid drive? file not found
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s -- failed to get drive index from atari path", (char *) atariSearchString.c_str());
-
-		dataTrans->setStatus(EFILNF);
-		return;
-	}
-	
     // check if this is a root directory
     std::string justPath, justSearchString;
     Utils::splitFilenameFromPath(hostSearchString, justPath, justSearchString); 
@@ -253,7 +244,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     bool rootDir = isRootDir(justPath);
     
 	//now use the dir translator to get the dir content
-	DirTranslator *dt = &conf[driveIndex].dirTranslator;
+	DirTranslator *dt = &conf[atariDriveIndex].dirTranslator;
 	res = dt->buildGemdosFindstorageData(&tempFindStorage, hostSearchString, findAttribs, rootDir);
 
 	if(!res) {
@@ -471,7 +462,7 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     
     //---------------
     // if it's read only, quit
-    if(isAtariPathReadOnly(newAtariPath)) {         
+    if(isDriveIndexReadOnly(atariDriveIndex)) {
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- path is read only", (char *) newAtariPath.c_str());
 
         dataTrans->setStatus(EACCDN);
@@ -556,7 +547,7 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
         return;
     }
 
-    if(isAtariPathReadOnly(newAtariPath)) {         // if it's read only, quit
+    if(isDriveIndexReadOnly(atariDriveIndex)) {     // if it's read only, quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -> hostPath: %s -- path is read only", (char *) newAtariPath.c_str(), (char *) hostPath.c_str());
 
         dataTrans->setStatus(EACCDN);
@@ -615,7 +606,7 @@ void TranslatedDisk::onFrename(BYTE *cmd)
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - rename %s to %s", (char *) oldHostName.c_str(), (char *) newHostName.c_str());
 
-    if(isAtariPathReadOnly(newAtariName)) {                         // if it's read only, quit
+    if(isDriveIndexReadOnly(atariDriveIndexOld)) {                  // if it's read only, quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - it's read only");
 
         dataTrans->setStatus(EACCDN);
@@ -672,7 +663,7 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
         return;
     }
 
-    if(isAtariPathReadOnly(newAtariPath)) {         // if it's read only, quit
+    if(isDriveIndexReadOnly(atariDriveIndex)) {     // if it's read only, quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - it's read only", (char *) newAtariPath.c_str());
 
         dataTrans->setStatus(EACCDN);
@@ -860,7 +851,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
         return;
     }
     
-    if(isAtariPathReadOnly(atariName)) {                            // if it's read only, quit
+    if(isDriveIndexReadOnly(atariDriveIndex)) {                     // if it's read only, quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - it's read only", (char *) atariName.c_str());
 
         dataTrans->setStatus(EACCDN);
@@ -961,7 +952,7 @@ void TranslatedDisk::onFopen(BYTE *cmd)
         return;
     }
     
-    if((mode & 0x07) != 0 && isAtariPathReadOnly(atariName)) {      // if it's WRITE and read only, quit
+    if((mode & 0x07) != 0 && isDriveIndexReadOnly(atariDriveIndex)) {      // if it's WRITE and read only, quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is write, but file is read only, fail! ", (char *) atariName.c_str());
 
         dataTrans->setStatus(EACCDN);

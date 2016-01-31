@@ -158,8 +158,6 @@ private:
     void loadSettings(void);
 
     WORD getDrivesBitmap(void);
-	int  getDriveIndexFromAtariPath(std::string atariPath);
-    bool isAtariPathReadOnly(std::string atariPath);
     bool isDriveIndexReadOnly(int driveIndex);
     void removeDoubleDots(std::string &path);
     void pathSeparatorHostToAtari(std::string &path);

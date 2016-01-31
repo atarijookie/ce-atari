@@ -804,42 +804,6 @@ int TranslatedDisk::driveLetterToDriveIndex(char pathDriveLetter)
     return driveIndex;
 }
 
-int TranslatedDisk::getDriveIndexFromAtariPath(std::string atariPath)
-{
-	// if it's full path including drive letter - calculate the drive index
-    if(atariPath[1] == ':') {
-        int driveIndex = 0;
-        char newDrive = atariPath[0];
-
-        if(!isValidDriveLetter(newDrive)) {                 // not a valid drive letter?
-            Debug::out(LOG_DEBUG, "TranslatedDisk::getDriveIndexFromAtariPath -- %s -> invalid drive %c ", (char *) atariPath.c_str(), newDrive);
-            return -1;
-        }
-
-        newDrive = toUpperCase(newDrive);                   // make sure it's upper case
-        driveIndex = newDrive - 'A';                        // calculate drive index
-
-        Debug::out(LOG_DEBUG, "TranslatedDisk::getDriveIndexFromAtariPath -- %s -> drive index: %d ", (char *) atariPath.c_str(), driveIndex);
-		return driveIndex;
-	}
-
-	// if it wasn't full path, use current drive index
-    Debug::out(LOG_DEBUG, "TranslatedDisk::getDriveIndexFromAtariPath -- %s -> current drive index: %d ", (char *) atariPath.c_str(), currentDriveIndex);
-	return currentDriveIndex;
-}
-
-bool TranslatedDisk::isAtariPathReadOnly(std::string atariPath)
-{
-    int driveIndex = getDriveIndexFromAtariPath(atariPath);
-
-    if(driveIndex == -1) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::isAtariPathReadOnly -- %s -> can't get drive index, not READ ONLY ", (char *) atariPath.c_str());
-        return false;
-    }
-
-    return isDriveIndexReadOnly(driveIndex);
-}
-
 bool TranslatedDisk::isDriveIndexReadOnly(int driveIndex)
 {
     if(driveIndex < 0 || driveIndex > 15) {
