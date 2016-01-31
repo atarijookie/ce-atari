@@ -705,60 +705,78 @@ bool TranslatedDisk::hostPathExists(std::string hostPath)
     return false;
 }
 
-bool TranslatedDisk::createHostPath(std::string atariPath, std::string &hostPath, bool &waitingForMount)
+bool TranslatedDisk::createFullAtariPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex)
 {
-    hostPath            = "";
-    waitingForMount     = false;
-    int atariDriveIndex = -1;
+    outAtariDriveIndex = -1;
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - atariPath: %s", (char *) atariPath.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - inPartialAtariPath: %s", (char *) inPartialAtariPath.c_str());
 
-    pathSeparatorAtariToHost(atariPath);
+    pathSeparatorAtariToHost(inPartialAtariPath);
     
     //---------------------
-    // if it's full path including drive letter, atariDriveIndex is in the path
-    if(atariPath[1] == ':') {                                       
-        atariDriveIndex = driveLetterToDriveIndex(atariPath[0]);     // check if we have this drive or not
+    // if it's full path including drive letter, outAtariDriveIndex is in the path
+    if(inPartialAtariPath[1] == ':') {                                       
+        outAtariDriveIndex = driveLetterToDriveIndex(inPartialAtariPath[0]);   // check if we have this drive or not
 
-        if(atariDriveIndex == -1) {
-            Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - invalid drive letter");
+        if(outAtariDriveIndex == -1) {
+            Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - invalid drive letter");
             return false;
         }
 
-        hostPath = atariPath.substr(2);                             // required atari path is absolute path, without drive letter and ':' 
+        outFullAtariPath = inPartialAtariPath.substr(2);                             // required atari path is absolute path, without drive letter and ':' 
         
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - with    drive letter, absolute path -- %s, drive index: %d", hostPath.c_str(), atariDriveIndex);
-        goto createHostPathFinish;
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - with    drive letter, absolute path -- %s, drive index: %d", outFullAtariPath.c_str(), outAtariDriveIndex);
+        goto createFullAtariPath_finish;
     }
 
     //---------------------
     // if it's a path without drive letter, it's for current drive
-    atariDriveIndex = currentDriveIndex;
+    outAtariDriveIndex = currentDriveIndex;
 
     if(!conf[currentDriveIndex].enabled) {                          // we're trying this on disabled drive?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - the current drive is not enabled (not translated drive)");
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - the current drive is not enabled (not translated drive)");
         return false;
     }
     
-    if(startsWith(atariPath, HOSTPATH_SEPAR_STRING)) {              // starts with    backslash? absolute path on current drive
-        hostPath = atariPath.substr(1);
+    if(startsWith(inPartialAtariPath, HOSTPATH_SEPAR_STRING)) {              // starts with    backslash? absolute path on current drive
+        outFullAtariPath = inPartialAtariPath.substr(1);
         
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - without drive letter, absolute path -- %s", hostPath.c_str());
-        goto createHostPathFinish;
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - without drive letter, absolute path -- %s", inPartialAtariPath.c_str());
+        goto createFullAtariPath_finish;
     } else {                                                        // starts without backslash? relative path on current drive
-        hostPath = conf[currentDriveIndex].currentAtariPath;
-        Utils::mergeHostPaths(hostPath, atariPath);
+        outFullAtariPath = conf[currentDriveIndex].currentAtariPath;
+        Utils::mergeHostPaths(outFullAtariPath, inPartialAtariPath);
         
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - without drive letter, relative path -- %s", hostPath.c_str());
-        goto createHostPathFinish;
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - without drive letter, relative path -- %s", inPartialAtariPath.c_str());
+        goto createFullAtariPath_finish;
     }
     
     //------------
-createHostPathFinish:
+createFullAtariPath_finish:
 
-    createHostPath_finish(hostPath, atariDriveIndex, waitingForMount);
-    Debug::out(LOG_DEBUG, "TranslatedDisk::createHostPath - hostPath is: %s", (char *) hostPath.c_str());
+    removeDoubleDots(outFullAtariPath);                             // search for '..' and simplify the path
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - outFullAtariPath is: %s", (char *) outFullAtariPath.c_str());
     return true;
+}
+
+void TranslatedDisk::createFullHostPath(std::string inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount)
+{
+    std::string root = conf[inAtariDriveIndex].hostRootPath;       // get root path
+    
+    std::string partialLongHostPath;
+    conf[inAtariDriveIndex].dirTranslator.shortToLongPath(root, inFullAtariPath, partialLongHostPath);	// now convert short to long path
+
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - dirTranslator.shortToLongPath -- root: %s, inFullAtariPath: %s -> partialLongHostPath: %s", (char *) root.c_str(), (char *) inFullAtariPath.c_str(), (char *) partialLongHostPath.c_str());
+    
+    outFullHostPath = root;
+    Utils::mergeHostPaths(outFullHostPath, partialLongHostPath);          // merge 
+    
+    #ifdef ZIPDIRS
+    if(useZipdirNotFile) {                                  // if ZIP DIRs are enabled
+        replaceHostPathWithZipDirPath(outFullHostPath, waitingForMount);
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - replaceHostPathWithZipDirPath -- new outFullHostPath: %s , waitingForMount: %d", (char *) outFullHostPath.c_str(), (int) waitingForMount);
+    }
+    #endif
 }
 
 int TranslatedDisk::driveLetterToDriveIndex(char pathDriveLetter)
@@ -784,35 +802,6 @@ int TranslatedDisk::driveLetterToDriveIndex(char pathDriveLetter)
     }
 
     return driveIndex;
-}
-
-/* 
-  params:
-    hostPath - at start  it contains absolute atari path
-             - at finish it contains absolute host path
-             
-    driveIndex - contains index number of drive, on which this should be attempter (0=A, 15=P)
-    
-    waitingForMount - will contain true on finish, if the caller should wait because this will first be just mounted, and then it can be accessed
-*/
-
-void TranslatedDisk::createHostPath_finish(std::string &hostPath, int driveIndex, bool &waitingForMount)
-{
-    std::string root = conf[driveIndex].hostRootPath;       // get root path
-    
-    removeDoubleDots(hostPath);                             // search for '..' and simplify the path
-
-    std::string longHostPath;
-    conf[driveIndex].dirTranslator.shortToLongPath(root, hostPath, longHostPath);	// now convert short to long path
-
-    hostPath = root;
-    Utils::mergeHostPaths(hostPath, longHostPath);          // merge 
-    
-    #ifdef ZIPDIRS
-    if(useZipdirNotFile) {                                  // if ZIP DIRs are enabled
-        replaceHostPathWithZipDirPath(hostPath, waitingForMount);
-    }
-    #endif
 }
 
 int TranslatedDisk::getDriveIndexFromAtariPath(std::string atariPath)
@@ -931,40 +920,6 @@ void TranslatedDisk::removeDoubleDots(std::string &path)
     path = final;
 }
 
-bool TranslatedDisk::newPathRequiresCurrentDriveChange(std::string atariPath, int &newDriveIndex)
-{
-    newDriveIndex = currentDriveIndex;                      // initialize with the current drive index
-
-    if(atariPath[1] != ':') {                               // no drive change sign?
-        return false;
-    }
-
-    int driveIndex = 0;
-    char newDrive = atariPath[0];
-
-    if(!isValidDriveLetter(newDrive)) {                     // not a valid drive letter? we're not changing drive then
-        return false;
-    }
-
-    newDrive = toUpperCase(newDrive);                       // make sure it's upper case
-    driveIndex = newDrive - 'A';                            // calculate drive index
-
-    if(driveIndex < 2) {                                    // drive A and B not handled - we're not changing drive
-        return false;
-    }
-
-    if(!conf[driveIndex].enabled) {                         // that drive is not enabled? we're not changing drive
-        return false;
-    }
-
-    if(driveIndex == currentDriveIndex) {                   // the new drive index is the same as the one we have now
-        return false;
-    }
-
-    newDriveIndex = driveIndex;                             // store the new drive index
-    return true;                                            // ok, change the drive letter
-}
-
 bool TranslatedDisk::isLetter(char a)
 {
     if((a >= 'a' && a <= 'z') || (a >= 'A' && a <= 'Z')) {
@@ -994,45 +949,6 @@ bool TranslatedDisk::isValidDriveLetter(char a)
     }
 
     return false;
-}
-
-void TranslatedDisk::createAtariPathFromHostPath(std::string hostPath, std::string &atariPath)
-{
-    std::string hostRoot = conf[currentDriveIndex].hostRootPath;            // get root of current drive
-
-    //-----------
-    // first check if the path has ZIP DIR prefix, and if it does, try to replace it
-    #ifdef ZIPDIRS
-    if(useZipdirNotFile) {                                                      // if ZIP DIRs are enabled
-    
-        std::string zipDirPrefix = ZIPDIR_PATH_PREFIX;
-        while(startsWith(hostPath, zipDirPrefix)) {                             // if the host path starts with ZIP DIR path prefix, replace it with real path (in loop, at this might be nested ZIP DIR)
-            std::string zipDirPath = hostPath.substr(0, ZIPDIR_PATH_LENGTH);    // get just ZIP DIR path
-            std::string restOfPath = hostPath.substr(ZIPDIR_PATH_LENGTH);       // get the rest of the path after ZIP DIR
-            
-            int zipDirIndex = getZipDirByMountPoint(zipDirPath);                // find the zip dir path
-            
-            if(zipDirIndex != -1) {                                             // zip dir mount point found? replace it in host path with real path
-                Debug::out(LOG_DEBUG, "TranslatedDisk::createAtariPathFromHostPath -> will replace ZIP DIR prefix on this path: %s", (char *) hostPath.c_str());
-                hostPath = zipDirs[zipDirIndex]->realHostPath + restOfPath;
-                Debug::out(LOG_DEBUG, "TranslatedDisk::createAtariPathFromHostPath -> path after ZIP DIR prefix replacement   : %s", (char *) hostPath.c_str());
-            } else {
-                Debug::out(LOG_DEBUG, "TranslatedDisk::createAtariPathFromHostPath -> couldn't find realHostPath for this ZIP DIR prefixed path: %s", (char *) hostPath.c_str());
-                break;
-            }
-        }
-    
-    }
-    #endif
-    //-----------
-    // now try to convert full host path to atari path
-    if(hostPath.find(hostRoot) == 0) {                          // the full host path contains host root
-        atariPath = hostPath.substr(hostRoot.length());         // atari path = hostPath - hostRoot
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createAtariPathFromHostPath - hostPath: %s -> atariPath: %s", (char *) hostPath.c_str(), (char *) atariPath.c_str());
-    } else {                                                    // this shouldn't happen...
-        Debug::out(LOG_ERROR, "TranslatedDisk::createAtariPathFromHostPath - hostPath: %s, hostRoot: %s -- WTF, this shouldn't happen!", (char *) hostPath.c_str(), (char *) hostRoot.c_str());
-        atariPath = "";
-    }
 }
 
 int  TranslatedDisk::getZipDirByMountPoint(std::string &searchedMountPoint)

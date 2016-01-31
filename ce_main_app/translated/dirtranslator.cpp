@@ -86,12 +86,19 @@ void DirTranslator::shortToLongPath(std::string &rootPath, std::string &shortPat
             fs = it->second;
         } else {                                        // don't have the shortener yet
             fs = createShortener(pathPart);
+            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - translator for pathPart: %s not found, shortener created.", (char *) pathPart.c_str());
         }
 
+        if(strings[i].length() == 0) {                  // skip empty path part
+            continue;
+        }
+        
         res = fs->shortToLongFileName((char *) strings[i].c_str(), longName);   // try to convert the name
 
-        if(res) {                               // if there was a long version of the file name, replace the short one
+        if(res) {                                       // if there was a long version of the file name, replace the short one
             strings[i] = longName;
+        } else {
+            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s", (char *) strings[i].c_str());
         }
 
         Utils::mergeHostPaths(pathPart, strings[i]);   // build the path slowly

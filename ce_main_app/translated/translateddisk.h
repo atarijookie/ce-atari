@@ -119,8 +119,10 @@ public:
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
     bool hostPathExists(std::string hostPath);
-    bool createHostPath(std::string atariPath, std::string &hostPath, bool &waitingForMount);
     void pathSeparatorAtariToHost(std::string &path);
+    
+    bool createFullAtariPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex);
+    void createFullHostPath (std::string inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount);
 
     void replaceHostPathWithZipDirPath(std::string &hostPath, bool &waitingForMount);
 
@@ -161,8 +163,6 @@ private:
     bool isDriveIndexReadOnly(int driveIndex);
     void removeDoubleDots(std::string &path);
     void pathSeparatorHostToAtari(std::string &path);
-    void createAtariPathFromHostPath(std::string hostPath, std::string &atariPath);
-    bool newPathRequiresCurrentDriveChange(std::string atariPath, int &newDriveIndex);
     bool isLetter(char a);
     char toUpperCase(char a);
     bool isValidDriveLetter(char a);

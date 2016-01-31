@@ -87,11 +87,6 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
 {
     bool res;
 
-    // the path can be:
-    // with \\    as first char -- that means starting at root
-    // without \\ as first char -- relative to the current dir
-    // with ..                  -- means one dir up
-
     if(!conf[currentDriveIndex].enabled) {
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - current Drive Index - %d, not enabled, so not handled", currentDriveIndex);
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
@@ -111,11 +106,14 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
     convertAtariASCIItoPc((char *) dataBuffer);     // try to fix the path with only allowed chars
     newAtariPath =        (char *) dataBuffer;
 
-    bool waitingForMount;
-    res = createHostPath(newAtariPath, hostPath, waitingForMount);
-
+    bool        waitingForMount;
+    int         atariDriveIndex;
+    std::string fullAtariPath;
+    res = createFullAtariPath(newAtariPath, fullAtariPath, atariDriveIndex);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
+    
     if(!res) {                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, createHostPath failed!", (char *) newAtariPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, createFullAtariPath failed!", (char *) newAtariPath.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
@@ -137,20 +135,17 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s -> hostPath: %s", (char *) newAtariPath.c_str(), (char *) hostPath.c_str());
 
-    int newDriveIndex;
-    if(newPathRequiresCurrentDriveChange(newAtariPath, newDriveIndex)) {    // if we need to change the drive too
-        currentDriveIndex   = newDriveIndex;                                // update the current drive index
-        currentDriveLetter  = newDriveIndex + 'A';
+    if(currentDriveIndex != atariDriveIndex) {      // if we need to change the drive too
+        currentDriveIndex   = atariDriveIndex;      // update the current drive index
+        currentDriveLetter  = atariDriveIndex + 'A';
 
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - current drive changed to %c", currentDriveLetter);
     }
 
-    createAtariPathFromHostPath(hostPath, newAtariPath);    // remove the host root path
-
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, host path: %s - success", (char *) newAtariPath.c_str(), (char *) hostPath.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, host path: %s, fullAtariPath: %s - success", (char *) newAtariPath.c_str(), (char *) hostPath.c_str(), (char *) fullAtariPath.c_str());
 
     // if path exists, store it and return OK
-    conf[currentDriveIndex].currentAtariPath = newAtariPath;
+    conf[currentDriveIndex].currentAtariPath = fullAtariPath;
     dataTrans->setStatus(E_OK);
 }
 
@@ -219,7 +214,10 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     }
     
     bool waitingForMount;
-    res = createHostPath(atariSearchString, hostSearchString, waitingForMount);   // create the host path
+    int         atariDriveIndex;
+    std::string fullAtariPath;
+    res = createFullAtariPath(atariSearchString, fullAtariPath, atariDriveIndex);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostSearchString, waitingForMount);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s -- failed to create host path", (char *) atariSearchString.c_str());
@@ -451,11 +449,14 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     convertAtariASCIItoPc((char *) dataBuffer);     // try to fix the path with only allowed chars
     newAtariPath =        (char *) dataBuffer;
 
-    bool waitingForMount;
-    res = createHostPath(newAtariPath, hostPath, waitingForMount);   // create the host path
+    bool        waitingForMount;
+    int         atariDriveIndex;
+    std::string fullAtariPath;
+    res = createFullAtariPath(newAtariPath, fullAtariPath, atariDriveIndex);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
 
     if(!res) {                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- createHostPath failed", (char *) newAtariPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- createFullAtariPath failed", (char *) newAtariPath.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
@@ -535,11 +536,14 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
     convertAtariASCIItoPc((char *) dataBuffer);     // try to fix the path with only allowed chars
     newAtariPath =        (char *) dataBuffer;
 
-    bool waitingForMount;
-    res = createHostPath(newAtariPath, hostPath, waitingForMount);   // create the host path
+    bool        waitingForMount;
+    int         atariDriveIndex;
+    std::string fullAtariPath;
+    res = createFullAtariPath(newAtariPath, fullAtariPath, atariDriveIndex);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
 
     if(!res) {                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -- createHostPath failed, the path doesn't bellong to us", (char *) newAtariPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -- createFullAtariPath failed, the path doesn't bellong to us", (char *) newAtariPath.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
@@ -585,11 +589,12 @@ void TranslatedDisk::onFrename(BYTE *cmd)
     convertAtariASCIItoPc((char *) (dataBuffer + oldAtariName.length() + 1));   // try to fix the path with only allowed chars
     newAtariName =        (char *) (dataBuffer + oldAtariName.length() + 1);    // get new name
 
-    std::string oldHostName, newHostName;
-    bool wfm1, wfm2;
-    res     = createHostPath(oldAtariName, oldHostName, wfm1);          // create the host path
-    res2    = createHostPath(newAtariName, newHostName, wfm2);          // create the host path
-
+    int         atariDriveIndexOld, atariDriveIndexNew;
+    std::string fullAtariPathOld,   fullAtariPathNew;
+    bool        wfm1, wfm2;
+    res  = createFullAtariPath(oldAtariName, fullAtariPathOld, atariDriveIndexOld);
+    res2 = createFullAtariPath(newAtariName, fullAtariPathNew, atariDriveIndexNew);
+    
     if(wfm1) {                                                          // if the path will be available in a while, but we're waiting for mount to finish now
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename -- waiting for mount, call this function again to succeed later.");
     
@@ -598,11 +603,15 @@ void TranslatedDisk::onFrename(BYTE *cmd)
     }
     
     if(!res || !res2) {                                             // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - failed to createHostPath for %s or %s", (char *) oldAtariName.c_str(), (char *) newAtariName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - failed to createFullAtariPath for %s or %s", (char *) oldAtariName.c_str(), (char *) newAtariName.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
     }
+
+    std::string oldHostName, newHostName;
+    createFullHostPath (fullAtariPathOld, atariDriveIndexOld, oldHostName, wfm1);
+    createFullHostPath (fullAtariPathNew, atariDriveIndexNew, newHostName, wfm2);
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - rename %s to %s", (char *) oldHostName.c_str(), (char *) newHostName.c_str());
 
@@ -643,11 +652,14 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
     convertAtariASCIItoPc((char *) dataBuffer);     // try to fix the path with only allowed chars
     newAtariPath =        (char *) dataBuffer;
 
-    bool waitingForMount;
-    res = createHostPath(newAtariPath, hostPath, waitingForMount);   // create the host path
+    bool        waitingForMount;
+    int         atariDriveIndex;
+    std::string fullAtariPath;
+    res = createFullAtariPath(newAtariPath, fullAtariPath, atariDriveIndex);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
 
     if(!res) {                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - createHostPath failed", (char *) newAtariPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - createFullAtariPath failed", (char *) newAtariPath.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
@@ -742,8 +754,11 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     convertAtariASCIItoPc((char *) (dataBuffer + 2));   // try to fix the path with only allowed chars
     atariName =           (char *) (dataBuffer + 2);    // get file name
 
-    bool waitingForMount;
-    res = createHostPath(atariName, hostName, waitingForMount);     // create the host path
+    bool        waitingForMount;
+    int         atariDriveIndex;
+    std::string fullAtariPath;
+    res = createFullAtariPath(atariName, fullAtariPath, atariDriveIndex);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostName, waitingForMount);
 
     if(!res) {                                                      // the path doesn't bellong to us?
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
@@ -825,11 +840,14 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     convertAtariASCIItoPc((char *) (dataBuffer + 1));               // try to fix the path with only allowed chars
     atariName =           (char *) (dataBuffer + 1);                // get file name
 
-    bool waitingForMount;
-    res = createHostPath(atariName, hostName, waitingForMount);     // create the host path
+    bool        waitingForMount;
+    int         atariDriveIndex;
+    std::string fullAtariPath;
+    res = createFullAtariPath(atariName, fullAtariPath, atariDriveIndex);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostName, waitingForMount);
 
     if(!res) {                                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - createHostPath failed", (char *) atariName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - createFullAtariPath failed", (char *) atariName.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
@@ -923,11 +941,14 @@ void TranslatedDisk::onFopen(BYTE *cmd)
     convertAtariASCIItoPc((char *) (dataBuffer + 1));               // try to fix the path with only allowed chars
     atariName =           (char *) (dataBuffer + 1);                // get file name
 
-    bool waitingForMount;
-    res = createHostPath(atariName, hostName, waitingForMount);     // create the host path
+    bool        waitingForMount;
+    int         atariDriveIndex;
+    std::string fullAtariPath;
+    res = createFullAtariPath(atariName, fullAtariPath, atariDriveIndex);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostName, waitingForMount);
 
     if(!res) {                                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - createHostPath failed", (char *) atariName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - createFullAtariPath failed", (char *) atariName.c_str());
 
 		dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
