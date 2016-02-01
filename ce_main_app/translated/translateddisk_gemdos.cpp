@@ -107,10 +107,10 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
     newAtariPath =        (char *) dataBuffer;
 
     bool        waitingForMount;
-    int         atariDriveIndex;
+    int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
     res = createFullAtariPath(newAtariPath, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
     
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, createFullAtariPath failed!", (char *) newAtariPath.c_str());
@@ -214,10 +214,10 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     }
     
     bool waitingForMount;
-    int         atariDriveIndex;
+    int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
     res = createFullAtariPath(atariSearchString, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostSearchString, waitingForMount);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostSearchString, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s -- failed to create host path", (char *) atariSearchString.c_str());
@@ -242,10 +242,15 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     Utils::splitFilenameFromPath(hostSearchString, justPath, justSearchString); 
     
     bool rootDir = isRootDir(justPath);
+
+    bool useZipdirNotFileForThisSubDir = useZipdirNotFile;          // by default - use this useZipdirNotFile flag, if we're not nested in ZIP DIRs too deep
+    if(zipDirNestingLevel >= MAX_ZIPDIR_NESTING) {                  // but if we are nested too deep, don't show ZIP files as DIRs anymore for this nested dir
+        useZipdirNotFileForThisSubDir = false;
+    }    
     
 	//now use the dir translator to get the dir content
 	DirTranslator *dt = &conf[atariDriveIndex].dirTranslator;
-	res = dt->buildGemdosFindstorageData(&tempFindStorage, hostSearchString, findAttribs, rootDir);
+	res = dt->buildGemdosFindstorageData(&tempFindStorage, hostSearchString, findAttribs, rootDir, useZipdirNotFileForThisSubDir);
 
 	if(!res) {
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- failed to build gemdos find storage data", (char *) hostSearchString.c_str());
@@ -441,10 +446,10 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     newAtariPath =        (char *) dataBuffer;
 
     bool        waitingForMount;
-    int         atariDriveIndex;
+    int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
     res = createFullAtariPath(newAtariPath, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- createFullAtariPath failed", (char *) newAtariPath.c_str());
@@ -528,10 +533,10 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
     newAtariPath =        (char *) dataBuffer;
 
     bool        waitingForMount;
-    int         atariDriveIndex;
+    int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
     res = createFullAtariPath(newAtariPath, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -- createFullAtariPath failed, the path doesn't bellong to us", (char *) newAtariPath.c_str());
@@ -600,9 +605,10 @@ void TranslatedDisk::onFrename(BYTE *cmd)
         return;
     }
 
+    int zipDirNestingLevel;
     std::string oldHostName, newHostName;
-    createFullHostPath (fullAtariPathOld, atariDriveIndexOld, oldHostName, wfm1);
-    createFullHostPath (fullAtariPathNew, atariDriveIndexNew, newHostName, wfm2);
+    createFullHostPath (fullAtariPathOld, atariDriveIndexOld, oldHostName, wfm1, zipDirNestingLevel);
+    createFullHostPath (fullAtariPathNew, atariDriveIndexNew, newHostName, wfm2, zipDirNestingLevel);
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - rename %s to %s", (char *) oldHostName.c_str(), (char *) newHostName.c_str());
 
@@ -644,10 +650,10 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
     newAtariPath =        (char *) dataBuffer;
 
     bool        waitingForMount;
-    int         atariDriveIndex;
+    int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
     res = createFullAtariPath(newAtariPath, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - createFullAtariPath failed", (char *) newAtariPath.c_str());
@@ -746,10 +752,10 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     atariName =           (char *) (dataBuffer + 2);    // get file name
 
     bool        waitingForMount;
-    int         atariDriveIndex;
+    int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
     res = createFullAtariPath(atariName, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostName, waitingForMount);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                                      // the path doesn't bellong to us?
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
@@ -832,10 +838,10 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     atariName =           (char *) (dataBuffer + 1);                // get file name
 
     bool        waitingForMount;
-    int         atariDriveIndex;
+    int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
     res = createFullAtariPath(atariName, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostName, waitingForMount);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - createFullAtariPath failed", (char *) atariName.c_str());
@@ -933,10 +939,10 @@ void TranslatedDisk::onFopen(BYTE *cmd)
     atariName =           (char *) (dataBuffer + 1);                // get file name
 
     bool        waitingForMount;
-    int         atariDriveIndex;
+    int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
     res = createFullAtariPath(atariName, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostName, waitingForMount);
+          createFullHostPath (fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - createFullAtariPath failed", (char *) atariName.c_str());

@@ -122,9 +122,7 @@ public:
     void pathSeparatorAtariToHost(std::string &path);
     
     bool createFullAtariPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex);
-    void createFullHostPath (std::string inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount);
-
-    void replaceHostPathWithZipDirPath(std::string &hostPath, bool &waitingForMount);
+    void createFullHostPath (std::string inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
 
 private:
 	void mountAndAttachSharedDrive(void);
@@ -165,7 +163,6 @@ private:
     char toUpperCase(char a);
     bool isValidDriveLetter(char a);
     bool pathContainsWildCards(char *path);
-    int  deleteDirectoryRecursive(char *path);
     int  deleteDirectoryPlain(char *path);
 
     bool startsWith(std::string what, std::string subStr);
@@ -244,8 +241,6 @@ private:
     DWORD getByteCountToEOF(FILE *f);
     
     int  driveLetterToDriveIndex(char pathDriveLetter);
-    void createHostPath_finish(std::string &hostPath, int driveIndex, bool &waitingForMount);
-    int  getZipDirByMountPoint(std::string &searchedMountPoint);
     
     //-----------------------------------
     // ZIP DIR stuff
@@ -254,7 +249,14 @@ private:
     bool useZipdirNotFile;
     
     void getZipDirMountPoint(int index, std::string &mountPoint);
+    int  getZipDirByMountPoint(std::string &searchedMountPoint);
     bool zipDirAlreadyMounted(char *zipFile, int &zipDirIndex);
+    
+    bool isOkToMountThisAsZipDir(char *zipFilePath);
+    void doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath, int zipDirIndex, bool &waitingForMount);
+    
+    void replaceHostPathWithZipDirPath(std::string &hostPath, bool &waitingForMount, bool &containsZip, int &zipDirNestingLevel);
+    void replaceHostPathWithZipDirPath_internal(std::string &hostPath, bool &waitingForMount, bool &containsZip);
     //-----------------------------------
     // helpers for find storage
     void initFindStorages(void);

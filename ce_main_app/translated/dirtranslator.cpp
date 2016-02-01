@@ -172,7 +172,7 @@ FilenameShortener *DirTranslator::createShortener(std::string &path)
     return fs;
 }
 
-bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, BYTE findAttribs, bool isRootDir)
+bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, BYTE findAttribs, bool isRootDir, bool useZipdirNotFile)
 {
 	std::string hostPath, searchString;
 
@@ -221,21 +221,23 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
         #ifdef ZIPDIRS
         // if ZIP directories are supported
         
-        if(de->d_type == DT_REG) {                                          // if it's a file
-            int len = strlen(de->d_name);                                   // get filename length
-            
-            if(len > 4) {                                                   // if filename is at least 5 chars long
-                char *found = strcasestr(de->d_name + len - 4, (char *) ".ZIP");    // see if it ends with .ZIP
-
-                if(found != NULL) {                                         // if filename ends with .ZIP
-                    std::string fullZipPath = hostPath + "/" + longFname;   // create full path to that zip file
+        if(useZipdirNotFile) {                                                  // if ZIP DIRs are enabled
+            if(de->d_type == DT_REG) {                                          // if it's a file
+                int len = strlen(de->d_name);                                   // get filename length
                 
-                    struct stat attr;
-                    int res = stat((char *) fullZipPath.c_str(), &attr);    // get the status of the possible zip file
+                if(len > 4) {                                                   // if filename is at least 5 chars long
+                    char *found = strcasestr(de->d_name + len - 4, (char *) ".ZIP");    // see if it ends with .ZIP
 
-                    if(res == 0) {                                          // if stat() succeeded
-                        if(attr.st_size <= MAX_ZIPDIR_ZIPFILE_SIZE) {       // file not too big? change flags from file to dir
-                            de->d_type = DT_DIR;
+                    if(found != NULL) {                                         // if filename ends with .ZIP
+                        std::string fullZipPath = hostPath + "/" + longFname;   // create full path to that zip file
+                    
+                        struct stat attr;
+                        int res = stat((char *) fullZipPath.c_str(), &attr);    // get the status of the possible zip file
+
+                        if(res == 0) {                                          // if stat() succeeded
+                            if(attr.st_size <= MAX_ZIPDIR_ZIPFILE_SIZE) {       // file not too big? change flags from file to dir
+                                de->d_type = DT_DIR;
+                            }
                         }
                     }
                 }
