@@ -920,12 +920,17 @@ BYTE isOurDrive(WORD drive, BYTE withCurrentDrive)
 void showWaitSymbol(BYTE showNotHide)
 {
     static BYTE isShown = 0;
+    static char progChars[4] = {'|', '/', '-', '\\'};
+    static BYTE progress = 0;
 
     if(showNotHide) {   // show wait symbol
-        if(!isShown) {
-            isShown = 1;
-            (void) Cconws("\33Y  \33p*\33q");
-        }
+        isShown = 1;
+
+        (void) Cconws("\33Y  \33p");
+        Cconout(progChars[progress]);
+        (void) Cconws("\33q");
+        
+        progress = (progress + 1) & 0x03;
     } else {            // hide wait symbol
         if(isShown) {
             isShown = 0;
