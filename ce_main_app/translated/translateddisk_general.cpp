@@ -775,25 +775,8 @@ void TranslatedDisk::createFullHostPath(std::string inFullAtariPath, int inAtari
     
     #ifdef ZIPDIRS
     if(useZipdirNotFile) {                                          // if ZIP DIRs are enabled
-        bool containsZip;
-        replaceHostPathWithZipDirPath(outFullHostPath, waitingForMount, containsZip, zipDirNestingLevel);
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - replaceHostPathWithZipDirPath -- new outFullHostPath: %s , waitingForMount: %d, containsZip: %d, zipDirNestingLevel: %d", (char *) outFullHostPath.c_str(), (int) waitingForMount, (int) containsZip, zipDirNestingLevel);
-        
-        bool hasZipDirSubPath = (outFullHostPath.length() > 13);    // if it's not just path to ZIP DIR (e.g. not only '/tmp/zipdir3' ), but it has some sub path (e.g. '/tmp/zipdir3/LONGFI~1.TXT' )
-        
-        if(containsZip && hasZipDirSubPath) {                       // if the path contains at least one ZIP DIR, we need to do translation from short to long path again, as this is now a new path
-            // outFullHostPath is now something like /tmp/zipdir3/LONGFI~1.TXT , so we should break it into root ( '/tmp/zipdir3') and the rest
-            std::string zipDirRoot      = outFullHostPath.substr(0, 12);    // contains something like '/tmp/zipdir3'
-            std::string zipDirSubPath   = outFullHostPath.substr(13);       // contains the rest of the string, like 'LONGFI~1.TXT'
-            
-            std::string partialLongHostZipDirPath;
-            conf[inAtariDriveIndex].dirTranslator.shortToLongPath(zipDirRoot, zipDirSubPath, partialLongHostZipDirPath);    // now convert short to long path
-            
-            outFullHostPath = zipDirRoot;
-            Utils::mergeHostPaths(outFullHostPath, partialLongHostZipDirPath);  // merge and thus create /tmp/zipdir3/LongFileName.txt
-            
-            Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - after ZIP DIR translation: dirTranslator.shortToLongPath -- zipDirRoot: %s, zipDirSubPath: %s -> partialLongHostZipDirPath: %s", (char *) zipDirRoot.c_str(), (char *) zipDirSubPath.c_str(), (char *) partialLongHostZipDirPath.c_str());
-        }
+        replaceHostPathWithZipDirPath(inAtariDriveIndex, outFullHostPath, waitingForMount, zipDirNestingLevel);
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - replaceHostPathWithZipDirPath -- new outFullHostPath: %s , waitingForMount: %d, zipDirNestingLevel: %d", (char *) outFullHostPath.c_str(), (int) waitingForMount, zipDirNestingLevel);
     }
     #endif
 }
@@ -1322,26 +1305,42 @@ bool TranslatedDisk::zipDirAlreadyMounted(char *zipFile, int &zipDirIndex)
     return false;
 }
 
-void TranslatedDisk::replaceHostPathWithZipDirPath(std::string &hostPath, bool &waitingForMount, bool &containsZip, int &zipDirNestingLevel)
+void TranslatedDisk::replaceHostPathWithZipDirPath(int inAtariDriveIndex, std::string &hostPath, bool &waitingForMount, int &zipDirNestingLevel)
 {
     waitingForMount = false;
-    containsZip     = false;
 
     int i;
     
     for(i=0; i<MAX_ZIPDIR_NESTING; i++) {
-        bool containsZipInternal = false;               // we need extra flag for containsZip, because the path may contain more ZIP files, but we don't want the last cycle for non-existing ZIP in path break the whole flag
+        bool containsZip = false;                                   // flag marking if the path still contains a ZIP file and thus needs another iteration
     
-        replaceHostPathWithZipDirPath_internal(hostPath, waitingForMount, containsZipInternal);
+        replaceHostPathWithZipDirPath_internal(hostPath, waitingForMount, containsZip);
         
-        if(containsZipInternal) {                       // if the last call of replaceHostPathWithZipDirPath_internal() contained ZIP file, mark that the whole path contained at least one zip
-            containsZip = true;
-            zipDirNestingLevel++;                       // nesting level increased
+        if(containsZip) {                                           // if the last call of replaceHostPathWithZipDirPath_internal() contained ZIP file, mark that the whole path contained at least one zip
+            zipDirNestingLevel++;                                   // nesting level increased
         }
         
-        if(waitingForMount || !containsZipInternal) {   // if we're waiting for mount now, or it doesn't contain ZIP, quit
+        if(waitingForMount || !containsZip) {                       // if we're waiting for mount now, or it doesn't contain ZIP, quit
             return;
         }
+
+        //------------------
+        // if we got here, part of the path now has been replaced and the rest needs to be translated from short to long
+        bool hasZipDirSubPath = (hostPath.length() > 13);           // if it's not just path to ZIP DIR (e.g. not only '/tmp/zipdir3' ), but it has some sub path (e.g. '/tmp/zipdir3/LONGFI~1.TXT' )
+        
+        if(hasZipDirSubPath) {                                      // if the path contains at least one ZIP DIR, we need to do translation from short to long path again, as this is now a new path
+            // hostPath is now something like /tmp/zipdir3/LONGFI~1.TXT , so we should break it into root ( '/tmp/zipdir3') and the rest
+            std::string zipDirRoot      = hostPath.substr(0, 12);   // contains something like '/tmp/zipdir3'
+            std::string zipDirSubPath   = hostPath.substr(13);      // contains the rest of the string, like 'LONGFI~1.TXT'
+            
+            std::string partialLongHostZipDirPath;
+            conf[inAtariDriveIndex].dirTranslator.shortToLongPath(zipDirRoot, zipDirSubPath, partialLongHostZipDirPath);    // now convert short to long path
+            
+            hostPath = zipDirRoot;
+            Utils::mergeHostPaths(hostPath, partialLongHostZipDirPath);     // merge and thus create /tmp/zipdir3/LongFileName.txt
+            
+            Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath - after ZIP DIR translation: dirTranslator.shortToLongPath -- zipDirRoot: %s, zipDirSubPath: %s -> partialLongHostZipDirPath: %s", (char *) zipDirRoot.c_str(), (char *) zipDirSubPath.c_str(), (char *) partialLongHostZipDirPath.c_str());
+        }        
     }
 }
 

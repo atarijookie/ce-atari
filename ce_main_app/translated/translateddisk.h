@@ -255,7 +255,7 @@ private:
     bool isOkToMountThisAsZipDir(char *zipFilePath);
     void doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath, int zipDirIndex, bool &waitingForMount);
     
-    void replaceHostPathWithZipDirPath(std::string &hostPath, bool &waitingForMount, bool &containsZip, int &zipDirNestingLevel);
+    void replaceHostPathWithZipDirPath(int inAtariDriveIndex, std::string &hostPath, bool &waitingForMount, int &zipDirNestingLevel);
     void replaceHostPathWithZipDirPath_internal(std::string &hostPath, bool &waitingForMount, bool &containsZip);
     //-----------------------------------
     // helpers for find storage

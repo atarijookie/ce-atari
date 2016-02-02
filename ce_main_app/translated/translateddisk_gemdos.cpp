@@ -466,8 +466,8 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     }
     
     //---------------
-    // if it's read only, quit
-    if(isDriveIndexReadOnly(atariDriveIndex)) {
+    // if it's read only (or inside of ZIP DIR - that's also read only), quit
+    if(isDriveIndexReadOnly(atariDriveIndex) || zipDirNestingLevel > 0) {
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- path is read only", (char *) newAtariPath.c_str());
 
         dataTrans->setStatus(EACCDN);
@@ -552,7 +552,7 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
         return;
     }
 
-    if(isDriveIndexReadOnly(atariDriveIndex)) {     // if it's read only, quit
+    if(isDriveIndexReadOnly(atariDriveIndex) || zipDirNestingLevel > 0) {     // if it's read only (or inside of ZIP DIR - that's also read only), quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -> hostPath: %s -- path is read only", (char *) newAtariPath.c_str(), (char *) hostPath.c_str());
 
         dataTrans->setStatus(EACCDN);
@@ -612,7 +612,7 @@ void TranslatedDisk::onFrename(BYTE *cmd)
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - rename %s to %s", (char *) oldHostName.c_str(), (char *) newHostName.c_str());
 
-    if(isDriveIndexReadOnly(atariDriveIndexOld)) {                  // if it's read only, quit
+    if(isDriveIndexReadOnly(atariDriveIndexOld) || zipDirNestingLevel > 0) {                  // if it's read only (or inside of ZIP DIR - that's also read only), quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - it's read only");
 
         dataTrans->setStatus(EACCDN);
@@ -669,7 +669,7 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
         return;
     }
 
-    if(isDriveIndexReadOnly(atariDriveIndex)) {     // if it's read only, quit
+    if(isDriveIndexReadOnly(atariDriveIndex) || zipDirNestingLevel > 0) {     // if it's read only (or inside of ZIP DIR - that's also read only), quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - it's read only", (char *) newAtariPath.c_str());
 
         dataTrans->setStatus(EACCDN);
@@ -857,7 +857,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
         return;
     }
     
-    if(isDriveIndexReadOnly(atariDriveIndex)) {                     // if it's read only, quit
+    if(isDriveIndexReadOnly(atariDriveIndex) || zipDirNestingLevel > 0) {                     // if it's read only (or inside of ZIP DIR - that's also read only), quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - it's read only", (char *) atariName.c_str());
 
         dataTrans->setStatus(EACCDN);
@@ -958,7 +958,7 @@ void TranslatedDisk::onFopen(BYTE *cmd)
         return;
     }
     
-    if((mode & 0x07) != 0 && isDriveIndexReadOnly(atariDriveIndex)) {      // if it's WRITE and read only, quit
+    if((mode & 0x07) != 0 && (isDriveIndexReadOnly(atariDriveIndex) || zipDirNestingLevel > 0)) {      // if it's WRITE mode and read only (or inside of ZIP DIR - that's also read only), quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is write, but file is read only, fail! ", (char *) atariName.c_str());
 
         dataTrans->setStatus(EACCDN);
