@@ -83,10 +83,13 @@ void DirTranslator::shortToLongPath(std::string &rootPath, std::string &shortPat
 
         FilenameShortener *fs;
         if(it != mapPathToShortener.end()) {            // already got the shortener
+            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortener for pathPart: %s found", (char *) pathPart.c_str());
+        
             fs = it->second;
         } else {                                        // don't have the shortener yet
+            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortener for pathPart: %s NOT found, will create shortener", (char *) pathPart.c_str());
+
             fs = createShortener(pathPart);
-            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - translator for pathPart: %s not found, shortener created.", (char *) pathPart.c_str());
         }
 
         if(strings[i].length() == 0) {                  // skip empty path part
@@ -123,8 +126,12 @@ bool DirTranslator::longToShortFilename(std::string &longHostPath, std::string &
 
     FilenameShortener *fs;
     if(it != mapPathToShortener.end()) {            // already got the shortener
+        Debug::out(LOG_DEBUG, "DirTranslator::longToShortFilename - shortener for longHostPath: %s found", (char *) longHostPath.c_str());
+
         fs = it->second;
     } else {                                        // don't have the shortener yet
+        Debug::out(LOG_DEBUG, "DirTranslator::longToShortFilename - shortener for longHostPath: %s NOT found, will create shortener", (char *) longHostPath.c_str());
+
         fs = createShortener(longHostPath);
     }
 
