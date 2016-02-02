@@ -237,7 +237,12 @@ void deleteRecursive(char *subPath)
         return;
     }
     
-    Dsetpath(subPath);                          // go in that dir
+    int r;
+    r = Dsetpath(subPath);                      // go in that dir
+    
+    if(r != 0) {                                // Dsetpath() failed? Don't try to do anything else here.
+        return;
+    }
     
     char dta[44];
     memset(dta, 0, 44);
@@ -256,12 +261,9 @@ void deleteRecursive(char *subPath)
         res = Fsnext();                         // try to find next dir
     }
     
-    Dsetpath("..");                             // go out of that dir
+    r = Dsetpath("..");                         // go out of that dir
     
-    char curPath[128];
-    Dgetpath(curPath, 0);
-    
-    if(strcmp(curPath, "\\") == 0 || curPath[0] == 0) { // if we're in the root of drive, don't delete this
+    if(r != 0) {                                // Dsetpath() failed? Don't try to do anything else here.
         return;
     }
     

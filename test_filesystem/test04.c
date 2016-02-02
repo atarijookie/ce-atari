@@ -41,11 +41,9 @@ void test04(void)
     test044x();
     test045x();
     test046x();
-    
+
     deleteRecursive("\\TEST04");
-    Ddelete        ("\\TEST04");
     deleteRecursive("\\TESTDIR");
-    Ddelete        ("\\TESTDIR");
     
     out_s("");
 }
