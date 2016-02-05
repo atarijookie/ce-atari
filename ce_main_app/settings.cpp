@@ -57,7 +57,7 @@ void Settings::storeDefaultValues(void)
 
 bool Settings::getBool(char *key, bool defValue)
 {
-	FILE *file = open(key, true);
+	FILE *file = sOpen(key, true);
 	if(!file) {											// failed to open settings?
 //		Debug::out(LOG_DEBUG, "Settings::getBool -- returning default value for %s", key);
 		return defValue;
@@ -82,7 +82,7 @@ bool Settings::getBool(char *key, bool defValue)
 
 void Settings::setBool(char *key, bool value)
 {
-	FILE *file = open(key, false);
+	FILE *file = sOpen(key, false);
 	if(!file) {											// failed to open settings?
 		Debug::out(LOG_ERROR, "Settings::setBool -- could not write key %s", key);
 		return;
@@ -100,7 +100,7 @@ void Settings::setBool(char *key, bool value)
 //-------------------------	
 int Settings::getInt(char *key, int defValue)
 {
-	FILE *file = open(key, true);
+	FILE *file = sOpen(key, true);
 	if(!file) {											// failed to open settings?
 //		Debug::out(LOG_DEBUG, "Settings::getInt -- returning default value for %s", key);
 		return defValue;
@@ -120,7 +120,7 @@ int Settings::getInt(char *key, int defValue)
 
 void Settings::setInt(char *key, int value)
 {
-	FILE *file = open(key, false);
+	FILE *file = sOpen(key, false);
 	if(!file) {											// failed to open settings?
 		Debug::out(LOG_ERROR, "Settings::setInt -- could not write key %s", key);
 		return;
@@ -132,7 +132,7 @@ void Settings::setInt(char *key, int value)
 //-------------------------	
 float Settings::getFloat(char *key, float defValue)
 {
-	FILE *file = open(key, true);
+	FILE *file = sOpen(key, true);
 	if(!file) {											// failed to open settings?
 		return defValue;
 	}
@@ -151,7 +151,7 @@ float Settings::getFloat(char *key, float defValue)
 
 void Settings::setFloat(char *key, float value)
 {
-	FILE *file = open(key, false);
+	FILE *file = sOpen(key, false);
 	if(!file) {											// failed to open settings?
 		Debug::out(LOG_ERROR, "Settings::setFloat -- could not write key %s", key);
 		return;
@@ -166,7 +166,7 @@ char *Settings::getString(char *key, char *defValue)
 	static char buffer[256];
 	memset(buffer, 0, 256);
 
-	FILE *file = open(key, true);
+	FILE *file = sOpen(key, true);
 	if(!file) {											// failed to open settings?
 //		Debug::out(LOG_DEBUG, "Settings::getString -- returning default value for %s", key);
 		strcpy(buffer, defValue);
@@ -188,7 +188,7 @@ char *Settings::getString(char *key, char *defValue)
 
 void Settings::setString(char *key, char *value)
 {
-	FILE *file = open(key, false);
+	FILE *file = sOpen(key, false);
 	if(!file) {											// failed to open settings?
 		Debug::out(LOG_ERROR, "Settings::setString -- could not write key %s", key);
 		return;
@@ -200,7 +200,7 @@ void Settings::setString(char *key, char *value)
 //-------------------------
 char Settings::getChar(char *key, char defValue)
 {
-    FILE *file = open(key, true);
+    FILE *file = sOpen(key, true);
     if(!file) {											// failed to open settings?
 //        Debug::out(LOG_DEBUG, "Settings::getChar -- returning default value for %s", key);
         return defValue;
@@ -221,7 +221,7 @@ char Settings::getChar(char *key, char defValue)
 
 void Settings::setChar(char *key, char value)
 {
-    FILE *file = open(key, false);
+    FILE *file = sOpen(key, false);
     if(!file) {											// failed to open settings?
         Debug::out(LOG_ERROR, "Settings::setChar -- could not write key %s", key);
         return;
@@ -305,7 +305,7 @@ void Settings::saveFloppyConfig(FloppyConfig *fc)
     setBool((char *)    "FLOPPYCONF_WRITEPROTECTED",    fc->writeProtected);
 }
 //-------------------------
-FILE *Settings::open(char *key, bool readNotWrite)
+FILE *Settings::sOpen(char *key, bool readNotWrite)
 {
 	char path[1024];
 	

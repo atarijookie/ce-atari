@@ -173,7 +173,7 @@ public:
         
         suspicious      = false;
         
-        if(cycle.total > 1050 || loadPercents > 90) {
+        if(cycle.total > 1100 || loadPercents > 90) {
             suspicious  = true;
         }
     }

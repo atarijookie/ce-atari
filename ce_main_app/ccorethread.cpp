@@ -252,7 +252,10 @@ void CCoreThread::run(void)
             if(load.suspicious) {                                       // load is suspiciously high?
                 Debug::out(LOG_DEBUG, ">>> Suspicious core cycle load -- cycle time: %4d ms, load: %3d %%", load.cycle.total, load.loadPercents);
                 printf(">>> Suspicious core cycle load -- cycle time: %4d ms, load: %3d %%\n", load.cycle.total, load.loadPercents);
-            }
+
+                lastFwInfoTime.hansResetTime    = now;
+                lastFwInfoTime.franzResetTime   = now;
+                }
             //-------------
             
             float hansTime  = ((float)(now - lastFwInfoTime.hans))  / 1000.0f;
@@ -331,16 +334,16 @@ void CCoreThread::run(void)
 
 			switch(inBuff[3]) {
 			case ATN_FW_VERSION:
-                lastFwInfoTime.hans = Utils::getCurrentMs();
-    			handleFwVersion_hans();
+                    lastFwInfoTime.hans = Utils::getCurrentMs();
+                    handleFwVersion_hans();
 				break;
 
 			case ATN_ACSI_COMMAND:
-                dbgVars.isInHandleAcsiCommand = 1;
-				
-                handleAcsiCommand();
-                
-                dbgVars.isInHandleAcsiCommand = 0;
+                    dbgVars.isInHandleAcsiCommand = 1;
+                    
+                    handleAcsiCommand();
+                    
+                    dbgVars.isInHandleAcsiCommand = 0;
 				break;
 
 			default:
@@ -796,8 +799,9 @@ void CCoreThread::getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId)
 
 void CCoreThread::convertXilinxInfo(BYTE xilinxInfo)
 {
-    int prevHwHddIface = hwConfig.hddIface; 
-
+    THwConfig   hwConfigOld     = hwConfig;
+    int         prevHwHddIface  = hwConfig.hddIface; 
+    
     switch(xilinxInfo) {
         // GOOD
         case 0x21:  hwConfig.version        = 2;                        // v.2
@@ -838,7 +842,9 @@ void CCoreThread::convertXilinxInfo(BYTE xilinxInfo)
         setEnabledIDbits = true;
     }
     
-    saveHwConfig();
+    if(memcmp(&hwConfigOld, &hwConfig, sizeof(THwConfig)) != 0) {    // config changed? save it
+        saveHwConfig();
+    }
 }
 
 void CCoreThread::saveHwConfig(void)
