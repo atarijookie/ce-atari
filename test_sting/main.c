@@ -17,8 +17,9 @@ TPL       *tpl;
 
 BYTE find_STiNG(void);
 
-// 0xc0a87b9a -- 192.168.123.154, 0x2710 -- 10000
-#define SERVER_ADDR         0xc0a87b9a
+// 0xc0a87b9a -- 192.168.123.154
+// 0xc0a87b8e -- 192.168.123.142
+#define SERVER_ADDR         0xc0a87b8e
 #define SERVER_PORT_START   10000
 
 void doTest01(void);
@@ -36,6 +37,9 @@ int main(void)
     }
 
     doTest01();
+    
+    writeBufferToFile();
+    deinitBuffer();
     
     sleep(3);
 	return 0;
@@ -70,7 +74,7 @@ void doTest01(void)
     
     if(res != E_NORMAL) {
         out_tr_bw(0x0001, "TCP_wait_state() failed ", 0, res);
-        return;
+        goto test01close;
     }
     
     //----------
@@ -92,7 +96,7 @@ void doTest01(void)
     
     if(res != E_NORMAL) { 
         out_tr_bw(0x0001, "TCP_send() failed ", 0, res);
-        return;
+        goto test01close;
     }
     out_tr_bw(0x0001, "TCP_send() OK ", 1, res);
     
@@ -105,13 +109,13 @@ void doTest01(void)
             break;
         }
 
-        out_tr_bw(0x0001, "CNbyte_count() - another loop", 0, res);
+        out_sw("waiting for data, CNbyte_count() returned ", res);
         sleep(1);
     }
     
     if(res < 32) {                      // not enough data?
         out_tr_bw(0x0001, "CNbyte_count() - not enough data or error", 0, res);
-        return;
+        goto test01close;
     }
     
     //----------
@@ -121,9 +125,9 @@ void doTest01(void)
     
     res = CNget_block(handle, tmpIn, 32);
     
-    if(res != E_NORMAL) { 
+    if(res != 32) { 
         out_tr_bw(0x0001, "CNget_block() failed ", 0, res);
-        return;
+        goto test01close;
     }
     
     //----------
@@ -132,13 +136,16 @@ void doTest01(void)
     
     if(res != 0) {
         out_tr_bw(0x0001, "Received data mistmatch", 0, res);
-        return;
+        goto test01close;
     }
     
     out_tr_bw(0x0001, "Received data OK", 1, res);
+    
+test01close:
     res = TCP_close(handle, 0, 0);              // close
     
-    out_tr_bw(0x0001, "TCP_close returned", 0, res);
+    int ok = (res == E_NORMAL) ? 1 : 0;    
+    out_tr_bw(0x0001, "TCP_close", ok, res);
 }
 
 BYTE find_STiNG(void)

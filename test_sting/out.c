@@ -209,7 +209,7 @@ void writeBufferToFile(void)
 
     char path[32] = {"X:\\STNG_TST.txt"};       // filename string template
     
-    char fromDrive = 12;
+    char fromDrive = Dgetdrv();
     path[0] = 'A' + fromDrive;                  // place drive letter - of drive where the test was runned from 
     int f = Fcreate(path, 0);                   // create file
     
