@@ -9,6 +9,9 @@ void out_tr_b (WORD testNo, char *testName, BYTE result);
 void out_tr_bw(WORD testNo, char *testName, BYTE result, WORD errorCode);
 void out_tr_bd(WORD testNo, char *testName, BYTE result, DWORD errorCode);
 
+void out_tr_eb (WORD testNo, char *testName, char *errorString, BYTE result);
+void out_tr_ebw(WORD testNo, char *testName, char *errorString, BYTE result, WORD errorCode);
+
 void out_s   (char *str1);
 void out_ss  (char *str1, char *str2);
 void out_sc  (char *str1, char c);

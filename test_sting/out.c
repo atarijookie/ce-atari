@@ -82,6 +82,67 @@ void out_tr_bw(WORD testNo, char *testName, BYTE result, WORD errorCode)
     outString("]\n\r");
 }
 
+// output Test Result - test name, error string, bool result, word errorcode
+void out_tr_ebw(WORD testNo, char *testName, char *errorString, BYTE result, WORD errorCode)
+{
+    char testNoStr[16];
+    wordToHex(testNo, testNoStr);
+
+    //-----------
+    // create string, which will contain both test name and also error string
+    char testNameWithErrorString[256];
+    strcpy(testNameWithErrorString, testName);
+    strcat(testNameWithErrorString, " - ");
+    strcat(testNameWithErrorString, errorString);
+    //-----------
+    
+    char testNameFixed[41];
+    fixTestName(testNameWithErrorString, testNameFixed);
+    
+    char *resultString = resultToString(result);
+    
+    char errCodeStr[16];
+    wordToHex(errorCode, errCodeStr);
+    
+    outString("[");
+    outString(testNoStr);
+    outString("] [");
+    outString(testNameFixed);
+    outString("] ");
+    outString(resultString);
+    outString(" [");
+    outString(errCodeStr);
+    outString("]\n\r");
+}
+
+// output Test Result - test name, error string, bool result
+void out_tr_eb(WORD testNo, char *testName, char *errorString, BYTE result)
+{
+    char testNoStr[16];
+    wordToHex(testNo, testNoStr);
+
+    //-----------
+    // create string, which will contain both test name and also error string
+    char testNameWithErrorString[256];
+    strcpy(testNameWithErrorString, testName);
+    strcat(testNameWithErrorString, " - ");
+    strcat(testNameWithErrorString, errorString);
+    //-----------
+    
+    char testNameFixed[41];
+    fixTestName(testNameWithErrorString, testNameFixed);
+    
+    char *resultString = resultToString(result);
+    
+    outString("[");
+    outString(testNoStr);
+    outString("] [");
+    outString(testNameFixed);
+    outString("] ");
+    outString(resultString);
+    outString("\n\r");
+}
+
 // output Test Result - bool, dword
 void out_tr_bd(WORD testNo, char *testName, BYTE result, DWORD errorCode)
 {

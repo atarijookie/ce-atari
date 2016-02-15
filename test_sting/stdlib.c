@@ -56,6 +56,25 @@ int strlen ( const char * str )
 	return 0;
 }
 
+char *strcat(char *dest, const char *src) 
+{
+    int   endOfFirst    = strlen(dest);         // find end of first string
+    char *p             = &dest[endOfFirst];    // get pointer to that place
+    int   len2          = strlen(src);
+    strncpy(p, src, len2);                      // copy the 2nd string to end of first
+    p[len2]             = 0;                    // terminate string
+    
+    return dest;
+}
+
+char *strcpy(char *dest, const char *source)
+{
+    int len = strlen(source);
+    memcpy(dest, source, len + 1);
+    
+    return dest;
+}
+
 char *strncpy ( char * destination, const char * source, int num )
 {
 	int i;
