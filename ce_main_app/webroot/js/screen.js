@@ -1,5 +1,6 @@
 var CosmosEx = CosmosEx || {};
-CosmosEx.Screencast=function(){
+CosmosEx.Screencast=function(c){
+	var config = c || {reloadms:200};
 	// Locate "<div id="demo_placeholder" ...>" element in web page
 	var element = document.getElementById('demo_placeholder');
 	var iCurrentRes=-1;
@@ -29,11 +30,15 @@ CosmosEx.Screencast=function(){
 				}
 			}
 			dv=null;
-			setTimeout(loadScreen,200);
+			if( config.reloadms>0 ){
+				setTimeout(loadScreen,config.reloadms);
+			}
 		};
 	
 	var onError=function(e) {
-			setTimeout(loadScreen,200);
+			if( config.reloadms>0 ){
+				setTimeout(loadScreen,config.reloadms);
+			}
 		};
 	var loadScreen=function(){
 		var xhr = new XMLHttpRequest();
@@ -47,4 +52,7 @@ CosmosEx.Screencast=function(){
 	    xhr = null;
 	};
 	loadScreen();
-};  
+	return {
+		loadScreen:loadScreen
+	}
+};

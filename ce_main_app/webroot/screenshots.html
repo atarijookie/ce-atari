@@ -23,6 +23,8 @@
     </script>
     
     <script>
+    	var loadScreen;
+    	var dlcount=0;
         $(document).ready(function() {
             $.ajax({
                 type: 'GET',
@@ -46,7 +48,39 @@
                 }
             });
             
-            CosmosEx.Screencast();
+            var ignoreEvent=function(e){
+        		e.preventDefault();
+        		e.stopPropagation();
+				return false;	        		
+        	};
+	        var bindClickHelper=function(selector,funcEvent){
+	            var $element=$(selector);
+					    $element.bind('touchstart', funcEvent);
+					    $element.bind('touchend', ignoreEvent);
+		        	$element.mousedown(funcEvent);
+		        	$element.mouseup(ignoreEvent);
+		        	$element.click(ignoreEvent);
+	          }; 			 
+	        var closeAlert=function(e){
+	         		e.preventDefault();
+	         		e.stopPropagation();
+	            $(this).parent().hide();
+	          }; 
+            //close help
+            bindClickHelper(".alert.help a.close",closeAlert);
+			$('#download-screenshot').click(function() {
+				var canvas=document.getElementById("demo");
+				var file="screenshot-"+(1e15+dlcount+"").slice(-3)+".png";
+				if( canvas.msToBlob ){
+					var blob=canvas.msToBlob();
+					window.navigator.msSaveBlob(blob,file);
+				}else{
+				    this.href = document.getElementById("demo").toDataURL();
+				    this.download = file;
+				}
+			    dlcount++;
+			}); 
+            loadScreen=CosmosEx.Screencast({reloadms:0}).loadScreen;
         });
     
         function vblOn(onNotOff) {
@@ -70,7 +104,15 @@
                 type: 'POST',
                 url: '/app/screencast/do_screenshot',
                 data: JSON.stringify({ "action":"do_screenshot" }),
-                contentType: 'application/json'
+                contentType: 'application/json',
+				success: function(){
+					//screenshot can take up to 1 second tzo be generated, so delay here
+					setTimeout(loadScreen, 1500);
+				},
+				error: function(){
+					//screenshot can take up to 1 second tzo be generated, so delay here
+					setTimeout(loadScreen, 1500);
+				}
             });        
         }
         
@@ -116,7 +158,8 @@
 			        <label for="vbl_onoff">Screenshot VBL in CE_DD.PRG</label>
 			        <input type="radio" name="vbl_onoff" id="vbl_on"  value="on"  onclick="vblOn(1);">ON  
 			        <input type="radio" name="vbl_onoff" id="vbl_off" value="off" onclick="vblOn(0);">OFF
-		        <button id="screenshot" class="btn" onclick="doScreenShot();">Take screenshot</button>
+		        <button id="screenshot" class="btn btn-primary" onclick="doScreenShot();">Take screenshot</button>
+		        <a id="download-screenshot"><button class="btn">Download</button></a>
             </div>
 	        <div class="span2">
 	        </div>
@@ -134,12 +177,22 @@
         			<a class="close">×</a>
 			    	<p><strong>Note!</strong></p>
 			        <p>By default this functionality is disabled, so it won't interfere with disk transfers in most cases.</p>
-			        <p>For the screenshot functionality you have to have CE_DD driver loaded.</p>
+			        <p>For the screenshot functionality you have to have CE_DD driver loaded on your ST.</p>
 			        <p>If you enable or disable this feature, your ST needs a restart and/or the CE_DD has to be reloaded.</p>
+			        <p>A Screenshot takes about a second to display.</p>
 		        </div>
 	        </div>
         </div>
 		<canvas id="canvas">Please use a better browser! </canvas>
+        <div class="row">
+	        <div class="span3">
+	        </div>
+	        <div class="span3">
+	        <a href="">Download</a>
+	        </div>
+	        <div class="span3">
+	        </div>
+        </div>
         
     </div>
     

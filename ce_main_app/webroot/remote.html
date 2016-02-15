@@ -20,6 +20,13 @@
     <!-- scale hack to show whole keyboard even on small devices -->
     <script>if ($(window).width() < 768) { $('meta[name=viewport]').attr('content','initial-scale='+$(window).width()/768+', maximum-scale='+$(window).width()/768+', user-scalable=0'); }</script>
 		<!-- <script type="text/javascript" src="js/keylinux.js"></script> -->
+    <script>
+		$(document).ready(function () {
+		 	CosmosEx.Remote.init();
+		});
+    </script>
+
+
     </head>
     <body class="background">
     <noscript>

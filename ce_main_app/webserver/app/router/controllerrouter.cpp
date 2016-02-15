@@ -96,10 +96,7 @@ bool ControllerRouter::handleGet(CivetServer *server, struct mg_connection *conn
         sJson += "}"; 
 
         // send HTTP header
-        mg_printf(conn, "HTTP/1.1 200 OK\r\n");
-        mg_printf(conn, "Cache: no-cache\r\n");
-        mg_printf(conn, "Content-Type: application/json\r\n");
-        mg_printf(conn, "Content-Length: %d\r\n\r\n", sJson.length());  // Always set Content-Length
+        this->helperHttpHeader(conn,"200 OK",sJson.length());
         mg_write(conn, sJson.c_str(), sJson.length());                  // add the content
 
         return true;
@@ -108,18 +105,21 @@ bool ControllerRouter::handleGet(CivetServer *server, struct mg_connection *conn
     if( controllerAction=="screencast/screenshot_vbl_enable" ) {
         Debug::out(LOG_DEBUG, "ScreenCast - enabling screenshot VBL in CE_DD");
         events.screenShotVblEnabled = true;
+        this->helperHttpHeader(conn,"200 OK",0);
         return true;
     }
     
     if( controllerAction=="screencast/screenshot_vbl_disable" ) {
         Debug::out(LOG_DEBUG, "ScreenCast - disabling screenshot VBL in CE_DD");
         events.screenShotVblEnabled = false;
+        this->helperHttpHeader(conn,"200 OK",0);
         return true;
     }
 
     if( controllerAction=="screencast/do_screenshot" ) {
         Debug::out(LOG_DEBUG, "ScreenCast - request for screenshot");
         events.doScreenShot = true;
+        this->helperHttpHeader(conn,"200 OK",0);
         return true;
     }
     
@@ -154,4 +154,13 @@ bool ControllerRouter::handlePost(CivetServer *server, struct mg_connection *con
 {
     //the same for now
     return handleGet(server, conn);
+}
+
+void ControllerRouter::helperHttpHeader(struct mg_connection *conn, const char* pcStatus, int iLength)
+{
+        // send HTTP header
+        mg_printf(conn, "HTTP/1.1 %s\r\n",pcStatus);
+        mg_printf(conn, "Cache: no-cache\r\n");
+        mg_printf(conn, "Content-Type: application/json\r\n");
+        mg_printf(conn, "Content-Length: %d\r\n\r\n", iLength);  // Always set Content-Length
 }

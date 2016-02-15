@@ -35,10 +35,6 @@
 //    - mouse drag
 //    - better orientation support
 
-$(document).ready(function () {
- 	CosmosEx.Remote.init();
-});
-
 var CosmosEx = CosmosEx || {};
 CosmosEx.Remote=function(){
     	//Mouse position states
