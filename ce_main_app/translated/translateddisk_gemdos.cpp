@@ -109,8 +109,7 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
     bool        waitingForMount;
     int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
-    res = createFullAtariPath(newAtariPath, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
     
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, createFullAtariPath failed!", (char *) newAtariPath.c_str());
@@ -216,8 +215,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     bool waitingForMount;
     int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
-    res = createFullAtariPath(atariSearchString, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostSearchString, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(atariSearchString, fullAtariPath, atariDriveIndex, hostSearchString, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s -- failed to create host path", (char *) atariSearchString.c_str());
@@ -448,8 +446,7 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     bool        waitingForMount;
     int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
-    res = createFullAtariPath(newAtariPath, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- createFullAtariPath failed", (char *) newAtariPath.c_str());
@@ -535,8 +532,7 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
     bool        waitingForMount;
     int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
-    res = createFullAtariPath(newAtariPath, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -- createFullAtariPath failed, the path doesn't bellong to us", (char *) newAtariPath.c_str());
@@ -588,8 +584,10 @@ void TranslatedDisk::onFrename(BYTE *cmd)
     int         atariDriveIndexOld, atariDriveIndexNew;
     std::string fullAtariPathOld,   fullAtariPathNew;
     bool        wfm1, wfm2;
-    res  = createFullAtariPath(oldAtariName, fullAtariPathOld, atariDriveIndexOld);
-    res2 = createFullAtariPath(newAtariName, fullAtariPathNew, atariDriveIndexNew);
+    int zipDirNestingLevel;
+    std::string oldHostName, newHostName;
+    res  = createFullAtariPathAndFullHostPath(oldAtariName, fullAtariPathOld, atariDriveIndexOld, oldHostName, wfm1, zipDirNestingLevel);
+    res2 = createFullAtariPathAndFullHostPath(newAtariName, fullAtariPathNew, atariDriveIndexNew, newHostName, wfm2, zipDirNestingLevel);
     
     if(wfm1) {                                                          // if the path will be available in a while, but we're waiting for mount to finish now
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename -- waiting for mount, call this function again to succeed later.");
@@ -604,11 +602,6 @@ void TranslatedDisk::onFrename(BYTE *cmd)
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
     }
-
-    int zipDirNestingLevel;
-    std::string oldHostName, newHostName;
-    createFullHostPath (fullAtariPathOld, atariDriveIndexOld, oldHostName, wfm1, zipDirNestingLevel);
-    createFullHostPath (fullAtariPathNew, atariDriveIndexNew, newHostName, wfm2, zipDirNestingLevel);
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - rename %s to %s", (char *) oldHostName.c_str(), (char *) newHostName.c_str());
 
@@ -652,8 +645,7 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
     bool        waitingForMount;
     int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
-    res = createFullAtariPath(newAtariPath, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - createFullAtariPath failed", (char *) newAtariPath.c_str());
@@ -754,8 +746,7 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     bool        waitingForMount;
     int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
-    res = createFullAtariPath(atariName, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                                      // the path doesn't bellong to us?
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
@@ -840,8 +831,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     bool        waitingForMount;
     int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
-    res = createFullAtariPath(atariName, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - createFullAtariPath failed", (char *) atariName.c_str());
@@ -941,8 +931,7 @@ void TranslatedDisk::onFopen(BYTE *cmd)
     bool        waitingForMount;
     int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
-    res = createFullAtariPath(atariName, fullAtariPath, atariDriveIndex);
-          createFullHostPath (fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
+    res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - createFullAtariPath failed", (char *) atariName.c_str());

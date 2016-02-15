@@ -19,6 +19,7 @@
 
 #include <stdarg.h>
 
+#include "global.h"
 #include "debug.h"
 #include "gpio.h"
 #include "utils.h"
@@ -30,9 +31,14 @@ extern volatile sig_atomic_t sigintReceived;
 volatile bool do_loadIkbdConfig = false;
 
 //#define SPYIKBD
-//#define IKBDLOG
+extern TFlags flags;                                // global flags from command line
 
 void ikbdLog(const char *format, ...);
+
+#define logDebugAndIkbd(LOGLEVEL, FORMAT...)  {                                 \
+                                                Debug::out(LOGLEVEL, FORMAT);   \
+                                                ikbdLog(FORMAT);                \
+                                              }
 
 void *ikbdThreadCode(void *ptr)
 {
@@ -40,6 +46,9 @@ void *ikbdThreadCode(void *ptr)
     Ikbd ikbd;
     DWORD nextDevFindTime;
 
+    ikbdLog("----------------------------------------------------------");
+    ikbdLog("ikbdThreadCode will enter loop...");
+    
     bcm2835_gpio_write(PIN_TX_SEL1N2, HIGH);		// TX_SEL1N2, switch the RX line to receive from Franz, which does the 9600 to 7812 baud translation
 
     nextDevFindTime = Utils::getEndTime(3000);      // check the devices in 3 seconds
@@ -49,7 +58,7 @@ void *ikbdThreadCode(void *ptr)
 	// open and set up uart
 	int res = ikbd.serialSetup(&termiosStruct);
 	if(res == -1) {
-        Debug::out(LOG_ERROR, "ikbd.serialSetup failed, won't be able to send IKDB data");
+        logDebugAndIkbd(LOG_ERROR, "ikbd.serialSetup failed, won't be able to send IKDB data");
 	}
 
     while(sigintReceived == 0) {
@@ -126,6 +135,8 @@ void *ikbdThreadCode(void *ptr)
     }
     
     ikbd.closeDevs();
+    
+    ikbdLog("ikbdThreadCode has quit");
     return 0;
 }
 
@@ -909,7 +920,7 @@ void Ikbd::processKeyboard(input_event *ev)
     	int res = fdWrite(fdUart, &bfr, 1); 
 
     	if(res < 0) {
-	    	Debug::out(LOG_ERROR, "processKeyboard - sending to ST failed, errno: %d", errno);
+	    	logDebugAndIkbd(LOG_ERROR, "processKeyboard - sending to ST failed, errno: %d", errno);
 	    }
     }
 }
@@ -1005,7 +1016,7 @@ void Ikbd::sendBothJoyReport(void)
 	res = fdWrite(fdUart, bfr, 3); 
 
     if(res < 0) {
-        Debug::out(LOG_ERROR, "write to uart failed, errno: %d", errno);
+        logDebugAndIkbd(LOG_ERROR, "write to uart failed, errno: %d", errno);
     }
 }
 
@@ -1027,7 +1038,7 @@ void Ikbd::sendJoyState(int joyNumber, int dirTotal)
     res = fdWrite(fdUart, bfr, 2); 
 
     if(res < 0) {
-        Debug::out(LOG_ERROR, "write to uart (0) failed, errno: %d", errno);
+        logDebugAndIkbd(LOG_ERROR, "write to uart (0) failed, errno: %d", errno);
     }
 }
 
@@ -1050,7 +1061,7 @@ void Ikbd::sendJoy0State(void)
     int res = fdWrite(fdUart, bfr, 3); 
 
     if(res < 0) {
-        Debug::out(LOG_ERROR, "write to uart (1) failed, errno: %d", errno);
+        logDebugAndIkbd(LOG_ERROR, "write to uart (1) failed, errno: %d", errno);
     }
 }
 
@@ -1237,13 +1248,13 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
     int fd = open(fullPath, O_RDONLY | O_NONBLOCK);
 
     if(fd < 0) {
-        Debug::out(LOG_ERROR, "Failed to open input device (%s): %s", what, fullPath);
+        logDebugAndIkbd(LOG_ERROR, "Failed to open input device (%s): %s", what, fullPath);
         return;
     }
 
     in->fd = fd;
     strcpy(in->devPath, fullPath);
-    Debug::out(LOG_DEBUG, "Got device (%s): %s", what, fullPath);
+    logDebugAndIkbd(LOG_DEBUG, "Got device (%s): %s", what, fullPath);
 }
 
 int Ikbd::getFdByIndex(int index)
@@ -1467,7 +1478,7 @@ void Ikbd::fillKeyTranslationTable(void)
 void Ikbd::addToTable(int pcKey, int stKey)
 {
     if(pcKey >= KEY_TABLE_SIZE) {
-        Debug::out(LOG_ERROR, "addToTable -- Can't add pair %d - %d - out of range.", pcKey, stKey);
+        logDebugAndIkbd(LOG_ERROR, "addToTable -- Can't add pair %d - %d - out of range.", pcKey, stKey);
         return;
     }
 
@@ -1501,7 +1512,7 @@ void Ikbd::sendMousePosAbsolute(int fd, BYTE absButtons)
 	int res = fdWrite(fd, bfr, 6); 
 
 	if(res < 0) {
-		Debug::out(LOG_ERROR, "sendMousePosAbsolute failed, errno: %d", errno);
+		logDebugAndIkbd(LOG_ERROR, "sendMousePosAbsolute failed, errno: %d", errno);
 	}
 }
 
@@ -1534,7 +1545,7 @@ void Ikbd::sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
 	int res = fdWrite(fd, bfr, 3); 
 
 	if(res < 0) {
-		Debug::out(LOG_ERROR, "sendMousePosRelative failed, errno: %d", errno);
+		logDebugAndIkbd(LOG_ERROR, "sendMousePosRelative failed, errno: %d", errno);
 	}
 }
 
@@ -1546,9 +1557,10 @@ int Ikbd::serialSetup(termios *ts)
 
 	fd = open(UARTFILE, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK);
 	if(fd == -1) {
-        Debug::out(LOG_ERROR, "Failed to open %s", UARTFILE);
+        logDebugAndIkbd(LOG_ERROR, "Failed to open %s", UARTFILE);
         return -1;
 	}
+    
 	fcntl(fd, F_SETFL, 0);
 	tcgetattr(fd, ts);
 
@@ -1594,15 +1606,17 @@ int Ikbd::serialSetup(termios *ts)
 
 int Ikbd::fdWrite(int fd, BYTE *bfr, int cnt)
 {
-#if defined(IKBDLOG) && !defined(IKBDSPY)
-    std::string text = "sending to ST: ";
-    char tmp[16];
-    
-    for(int i=0; i<cnt; i++) {
-        sprintf(tmp, "%02x ", bfr[i]);
-        text += tmp;
-    }    
-    ikbdLog(text.c_str());
+#if !defined(IKBDSPY)
+    if(flags.ikbdLogs) {
+        std::string text = "sending to ST: ";
+        char tmp[16];
+        
+        for(int i=0; i<cnt; i++) {
+            sprintf(tmp, "%02x ", bfr[i]);
+            text += tmp;
+        }    
+        ikbdLog(text.c_str());
+    }
 #endif
 
     if(fd == -1) {                                  // no fd? quit
@@ -1659,12 +1673,12 @@ void Ikbd::markVirtualMouseEvenTime(void)
     lastVDevMouseEventTime = Utils::getCurrentMs();         
 }
 
-
 void ikbdLog(const char *format, ...)
 {
-#ifndef IKBDLOG
-    return;
-#endif    
+    if(!flags.ikbdLogs) {               // don't do IKBD logs? quit
+        return;
+    }
+    
     static DWORD prevLogOutIkbd = 0;
 
     va_list args;

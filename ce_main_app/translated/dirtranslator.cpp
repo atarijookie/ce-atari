@@ -225,9 +225,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
             }            
 		}	
 		
-        #ifdef ZIPDIRS
         // if ZIP directories are supported
-        
         if(useZipdirNotFile) {                                                  // if ZIP DIRs are enabled
             if(de->d_type == DT_REG) {                                          // if it's a file
                 int len = strlen(de->d_name);                                   // get filename length
@@ -250,7 +248,6 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
                 }
             }
         }
-        #endif
         
 		// finnaly append to the find storage
 		appendFoundToFindStorage(hostPath, (char *) searchString.c_str(), fs, de, findAttribs);

@@ -207,8 +207,7 @@ void FloppySetup::downloadOnDevice(void)
     bool        waitingForMount, res;
     int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
-    res = translated->createFullAtariPath(atariFilePath, fullAtariPath, atariDriveIndex);
-          translated->createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
+    res = translated->createFullAtariPathAndFullHostPath(atariFilePath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
     
     if(res) {                                               // good? file is on translated drive
         res = Utils::copyFile(currentDownload.fh, hostPath);
@@ -350,9 +349,7 @@ void FloppySetup::uploadStart(void)
     bool        waitingForMount, res;
     int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
-    res = translated->createFullAtariPath(atariFilePath, fullAtariPath, atariDriveIndex);
-          translated->createFullHostPath (fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
-
+    res = translated->createFullAtariPathAndFullHostPath(atariFilePath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
 
     if(res) {                                               // good? file is on translated drive
         if(translated->hostPathExists(hostPath)) {          // file exists? do on-device-copy of file

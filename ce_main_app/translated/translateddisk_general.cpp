@@ -705,6 +705,22 @@ bool TranslatedDisk::hostPathExists(std::string hostPath)
     return false;
 }
 
+bool TranslatedDisk::createFullAtariPathAndFullHostPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel)
+{
+    bool res;
+
+    // convert partial atari path to full atari path
+    res = createFullAtariPath(inPartialAtariPath, outFullAtariPath, outAtariDriveIndex);        
+    
+    if(!res) {                  // if createFullAtariPath() failed, don't do the rest
+        return false;
+    }
+    
+    // got full atari path, now try to create full host path
+    createFullHostPath(outFullAtariPath, outAtariDriveIndex, outFullHostPath, waitingForMount, zipDirNestingLevel);
+    return true;
+}
+
 bool TranslatedDisk::createFullAtariPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex)
 {
     outAtariDriveIndex = -1;
@@ -773,12 +789,10 @@ void TranslatedDisk::createFullHostPath(std::string inFullAtariPath, int inAtari
     outFullHostPath = root;
     Utils::mergeHostPaths(outFullHostPath, partialLongHostPath);    // merge 
     
-    #ifdef ZIPDIRS
     if(useZipdirNotFile) {                                          // if ZIP DIRs are enabled
         replaceHostPathWithZipDirPath(inAtariDriveIndex, outFullHostPath, waitingForMount, zipDirNestingLevel);
         Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - replaceHostPathWithZipDirPath -- new outFullHostPath: %s , waitingForMount: %d, zipDirNestingLevel: %d", (char *) outFullHostPath.c_str(), (int) waitingForMount, zipDirNestingLevel);
     }
-    #endif
 }
 
 int TranslatedDisk::driveLetterToDriveIndex(char pathDriveLetter)

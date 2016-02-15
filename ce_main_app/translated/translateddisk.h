@@ -121,8 +121,7 @@ public:
     bool hostPathExists(std::string hostPath);
     void pathSeparatorAtariToHost(std::string &path);
     
-    bool createFullAtariPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex);
-    void createFullHostPath (std::string inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
+    bool createFullAtariPathAndFullHostPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
 
 private:
 	void mountAndAttachSharedDrive(void);
@@ -242,6 +241,9 @@ private:
     
     int  driveLetterToDriveIndex(char pathDriveLetter);
     
+    bool createFullAtariPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex);
+    void createFullHostPath (std::string inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
+
     //-----------------------------------
     // ZIP DIR stuff
     ZipDirEntry *zipDirs[MAX_ZIP_DIRS];

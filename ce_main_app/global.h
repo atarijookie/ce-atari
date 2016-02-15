@@ -29,9 +29,9 @@
 #define MFM_8US     3
 
 
-#define VERSION_STRING          "CosmosEx v1.00 (by Jookie)"
-#define VERSION_STRING_SHORT    "1.00"
-#define DATE_STRING             "10/09/13"
+#define VERSION_STRING          "CosmosEx v2.10 (by Jookie)"
+#define VERSION_STRING_SHORT    "2.10"
+#define DATE_STRING             "02/15/16"
                                 // MM/DD/YY
 
 
@@ -136,6 +136,7 @@ typedef struct {
     bool actAsCeConf;           // if set to true, this app will behave as ce_conf app instead of CosmosEx app
     bool getHwInfo;             // if set to true, wait for HW info from Hans, and then quit and report it
     bool noFranz;               // if set to true, won't communicate with Franz
+    bool ikbdLogs;              // if set to true, will generate ikbd logs file
     
     bool gotHansFwVersion;
     bool gotFranzFwVersion;

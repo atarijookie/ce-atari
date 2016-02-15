@@ -316,6 +316,7 @@ void initializeFlags(void)
     flags.actAsCeConf  = false;         // if set to true, this app will behave as ce_conf app instead of CosmosEx app
     flags.getHwInfo    = false;         // if set to true, wait for HW info from Hans, and then quit and report it
     flags.noFranz      = false;         // if set to true, won't communicate with Franz
+    flags.ikbdLogs     = false;         // no ikbd logs by default
     
     flags.gotHansFwVersion  = false;
     flags.gotFranzFwVersion = false;
@@ -373,9 +374,12 @@ void parseCmdLineArguments(int argc, char *argv[])
         if(len < 1) {                                               // argument too short? skip it
             continue;
         }
-    
+
+        bool isKnownTag = false;
+        
         // it's a LOG LEVEL change command (ll)
         if(strncmp(argv[i], "ll", 2) == 0) {
+            isKnownTag = true;                                      // this is a known tag
             int ll;
 
             ll = (int) argv[i][2];
@@ -394,42 +398,59 @@ void parseCmdLineArguments(int argc, char *argv[])
         }
 
         if(strcmp(argv[i], "help") == 0 || strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "/?") == 0 || strcmp(argv[i], "?") == 0) {
-            flags.justShowHelp = true;
+            isKnownTag          = true;                             // this is a known tag
+            flags.justShowHelp  = true;
             continue;
         }
         
         // should we just reset Hans and Franz and quit? (used with STM32 ST-Link JTAG)
         if(strcmp(argv[i], "reset") == 0) {
-            flags.justDoReset = true;
+            isKnownTag          = true;                             // this is a known tag
+            flags.justDoReset   = true;
             continue;
         }
 
         // don't resetHans and Franz on start (used with STM32 ST-Link JTAG)
         if(strcmp(argv[i], "noreset") == 0) {
-            flags.noReset = true;
+            isKnownTag          = true;                             // this is a known tag
+            flags.noReset       = true;
             continue;
         }
 
         // for testing purposes: set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
         if(strcmp(argv[i], "test") == 0) {
             printf("Testing setup active!\n");
-            flags.test = true;
+            isKnownTag          = true;                             // this is a known tag
+            flags.test          = true;
             continue;
         }
         
         // for running this app as ce_conf terminal
         if(strcmp(argv[i], "ce_conf") == 0) {
-            flags.actAsCeConf = true;
+            isKnownTag          = true;                             // this is a known tag
+            flags.actAsCeConf   = true;
         }
 
         // get hardware version and HDD interface type
         if(strcmp(argv[i], "hwinfo") == 0) {
-            flags.getHwInfo = true;
+            isKnownTag          = true;                             // this is a known tag
+            flags.getHwInfo     = true;
         }
 
         // run the device without communicating with Franz
         if(strcmp(argv[i], "nofranz") == 0) {
-            flags.noFranz = true;
+            isKnownTag          = true;                             // this is a known tag
+            flags.noFranz       = true;
+        }
+        
+        // run the device without communicating with Franz
+        if(strcmp(argv[i], "ikbdlogs") == 0) {
+            isKnownTag          = true;                             // this is a known tag
+            flags.ikbdLogs      = true;
+        }
+        
+        if(!isKnownTag) {                                           // if tag unknown, show warning
+            printf(">>> UNKNOWN APP ARGUMENT: '%s' <<<\n", argv[i]);
         }
     }
 }
@@ -437,12 +458,13 @@ void parseCmdLineArguments(int argc, char *argv[])
 void printfPossibleCmdLineArgs(void)
 {
     printf("\nPossible command line args:\n");
-    printf("reset   - reset Hans and Franz, release lines, quit\n");
-    printf("noreset - when starting, don't reset Hans and Franz\n");
-    printf("llx     - set log level to x (default is 1, max is 3)\n");
-    printf("test    - some default config for device testing\n");
-    printf("ce_conf - use this app as ce_conf on RPi (the app must be running normally, too)\n");
-    printf("hwinfo  - get HW version and HDD interface type\n");
+    printf("reset    - reset Hans and Franz, release lines, quit\n");
+    printf("noreset  - when starting, don't reset Hans and Franz\n");
+    printf("llx      - set log level to x (default is 1, max is 3)\n");
+    printf("test     - some default config for device testing\n");
+    printf("ce_conf  - use this app as ce_conf on RPi (the app must be running normally, too)\n");
+    printf("hwinfo   - get HW version and HDD interface type\n");
+    printf("ikbdlogs - write IKBD logs to /var/log/ikbdlog.txt\n");
 }
 
 void handlePthreadCreate(int res, char *threadName, pthread_t *pThread)
