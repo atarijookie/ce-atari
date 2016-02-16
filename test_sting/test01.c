@@ -79,6 +79,7 @@ void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD
 {
     DWORD start = getTicks();
 
+    out_test_header(testNo, testName);          // show test header
     //----------
     // open socket
     int handle;
@@ -90,7 +91,7 @@ void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD
     }
     
     if(handle < 0) {
-        out_tr_eb(testNo, testName, "TCP/UDP open() failed", 0);
+        out_result_string(0, "TCP/UDP open() failed");
         return;
     }
 
@@ -109,13 +110,13 @@ void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD
 
             DWORD now = getTicks();
             if((now - start) > 5*200) {
-                out_tr_eb(testNo, testName, "TCP_wait_state() timeout", 0);
+                out_result_string(0, "TCP_wait_state() timeout");
                 goto test01close;
             }
         }
         
         if(res != E_NORMAL) {
-            out_tr_ebw(testNo, testName, "TCP_wait_state() failed", 0, res);
+            out_result_error_string(0, res, "TCP_wait_state() failed");
             goto test01close;
         }
     }
@@ -133,7 +134,7 @@ void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD
     
     //---------------------
     
-    out_tr_eb(testNo, testName, " ", 1);        // success!
+    out_result(1);                              // success!
     
 test01close:
     if(tcpNotUdp) {
@@ -143,7 +144,7 @@ test01close:
     }
     
     if(res != E_NORMAL) {
-        out_tr_ebw(testNo, testName, "TCP/UDP close() failed", 0, res);
+        out_result_error_string(0, res, "TCP/UDP close() failed");
     }
 }
 
@@ -169,13 +170,13 @@ int sendAndReceive(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD blockSize,
         
         now = getTicks();
         if((now - start) > (5 * 200)) {     // timeout? 
-            out_tr_eb(testNo, testName, "TCP / UDP send() timeout", 0);
+            out_result_string(0, "TCP / UDP send() timeout");
             return 0;
         }
     }
     
     if(res != E_NORMAL) { 
-        out_tr_ebw(testNo, testName, "TCP / UDP send() failed", 0, res);
+        out_result_error_string(0, res, "TCP / UDP send() failed");
         return 0;
     }
     
@@ -192,13 +193,13 @@ int sendAndReceive(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD blockSize,
 
         now = getTicks();
         if((now - start) > (5 * 200)) {     // timeout? 
-            out_tr_eb(testNo, testName, "CNbyte_count() timeout", 0);
+            out_result_string(0, "CNbyte_count() timeout");
             return 0;
         }
     }
     
     if(res < blockSize) {                   // not enough data?
-        out_tr_ebw(testNo, testName, "CNbyte_count() failed", 0, res);
+        out_result_error_string(0, res, "CNbyte_count() failed");
         return 0;
     }
     
@@ -209,7 +210,7 @@ int sendAndReceive(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD blockSize,
     res = CNget_block(handle, rBuf, blockSize);
     
     if(res != blockSize) { 
-        out_tr_ebw(testNo, testName, "CNget_block() failed", 0, res);
+        out_result_error_string(0, res, "CNget_block() failed");
         return 0;
     }
     
@@ -218,7 +219,7 @@ int sendAndReceive(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD blockSize,
     res = memcmp(rBuf, wBuf, blockSize);
     
     if(res != 0) {
-        out_tr_eb(testNo, testName, "Received data mismatch", 0);
+        out_result_string(0, "Received data mismatch");
         return 0;
     }
 

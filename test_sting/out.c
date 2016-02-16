@@ -37,6 +37,62 @@ char *resultToString(BYTE result)
     return resStr;
 }
 
+void out_test_header(WORD testNo, char *testName)
+{
+    char testNoStr[16];
+    wordToHex(testNo, testNoStr);
+
+    outString("[");
+    outString(testNoStr);
+    outString("] [");
+    outString(testName);
+    outString("]");
+}
+
+void out_result(BYTE result)
+{
+    char *resultString = resultToString(result);
+    outString(resultString);
+    outString("\n\r");
+}
+
+void out_result_error(BYTE result, WORD errorCode)
+{
+    char *resultString = resultToString(result);
+    outString(resultString);
+    
+    char errCodeStr[16];
+    wordToHex(errorCode, errCodeStr);
+    outString(" [");
+    outString(errCodeStr);
+    outString("]\n\r");
+}
+
+void out_result_error_string(BYTE result, WORD errorCode, char *errorStr)
+{
+    char *resultString = resultToString(result);
+    outString(resultString);
+    
+    char errCodeStr[16];
+    wordToHex(errorCode, errCodeStr);
+    outString(" [");
+    outString(errCodeStr);
+    outString("] err: ");
+    
+    outString(errorStr);
+    outString("\n\r");
+}
+
+void out_result_string(BYTE result, char *errorStr)
+{
+    char *resultString = resultToString(result);
+    outString(resultString);
+    
+    outString(" err: ");
+    outString(errorStr);
+    outString("\n\r");
+}
+
 // output Test Result - bool
 void out_tr_b(WORD testNo, char *testName, BYTE result)
 {
