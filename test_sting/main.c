@@ -17,6 +17,7 @@ TPL       *tpl;
 
 BYTE find_STiNG(void);
 
+void doTest00(void);
 void doTest01(void);
 
 BYTE readBuffer [130 * 1024];
@@ -39,6 +40,7 @@ int main(void)
         return 0;
     }
 
+    doTest00();
     doTest01();
     
     writeBufferToFile();
