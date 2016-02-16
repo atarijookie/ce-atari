@@ -156,11 +156,11 @@ static void sleepInSupervisor(void)
 	DWORD now, until;
 	DWORD tics = sleepSeconds * 200;
 
-	now = getTicks();						// get current ticks
+	now = getTicksInSupervisor();			// get current ticks
 	until = now + tics;   					// calc value timer must get to
 
 	while(1) {
-		now = getTicks();					// get current ticks
+		now = getTicksInSupervisor();		// get current ticks
 		
 		if(now >= until) {
 			break;
@@ -169,6 +169,11 @@ static void sleepInSupervisor(void)
 }
 
 DWORD getTicks(void)
+{
+    return Supexec(getTicksInSupervisor);
+}
+
+DWORD getTicksInSupervisor(void)
 {
 	DWORD now;
 	

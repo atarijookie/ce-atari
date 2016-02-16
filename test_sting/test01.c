@@ -9,7 +9,7 @@
 #include "out.h"
 
 //--------------------------------------------------
-extern TPL       *tpl;
+extern TPL *tpl;
 
 void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD blockSizesCount);
 void test01TcpNotUdp(int testNoOffset, int tcpNotUdp);
@@ -23,8 +23,8 @@ void doTest01(void)
 {
     generateWriteBuffer();
     
-    test01TcpNotUdp(0,  1);          // offset  0, TCP
-    test01TcpNotUdp(10, 0);          // offset 10, UDP
+    test01TcpNotUdp(0,    1);          // offset    0, TCP
+    test01TcpNotUdp(0x10, 0);          // offset 0x10, UDP
 }
 
 void generateWriteBuffer(void)
@@ -35,25 +35,44 @@ void generateWriteBuffer(void)
     }
 }
 
+void generateTestName(int tcpNotUdp, char *partialName, char *fullName)
+{
+    if(tcpNotUdp) {
+        strcpy(fullName, "TCP ");
+    } else {
+        strcpy(fullName, "UDP ");
+    }
+    
+    strcat(fullName, partialName);
+}
+
 void test01TcpNotUdp(int testNoOffset, int tcpNotUdp)
 {
+    char testName[64];
+
     DWORD blocks01[1] = {32};
-    test01(0x0101 + testNoOffset, "TCP echo     32 B", tcpNotUdp, &blocks01[0], 1);
+    generateTestName(tcpNotUdp, "echo     32 B", testName);
+    test01(0x0101 + testNoOffset, testName, tcpNotUdp, &blocks01[0], 1);
 
     DWORD blocks02[3] = {250, 250, 250};
-    test01(0x0102 + testNoOffset, "TCP echo    750 B", tcpNotUdp, &blocks02[0], 3);
+    generateTestName(tcpNotUdp, "echo    750 B", testName);
+    test01(0x0102 + testNoOffset, testName, tcpNotUdp, &blocks02[0], 3);
     
     DWORD blocks03[3] = {511, 512, 513};
-    test01(0x0103 + testNoOffset, "TCP echo   1536 B", tcpNotUdp, &blocks03[0], 3);
+    generateTestName(tcpNotUdp, "echo   1536 B", testName);
+    test01(0x0103 + testNoOffset, testName, tcpNotUdp, &blocks03[0], 3);
 
     DWORD blocks04[3] = {1000, 250, 1000};
-    test01(0x0104 + testNoOffset, "TCP echo   2250 B", tcpNotUdp, &blocks04[0], 3);
+    generateTestName(tcpNotUdp, "echo   2250 B", testName);
+    test01(0x0104 + testNoOffset, testName, tcpNotUdp, &blocks04[0], 3);
 
     DWORD blocks05[4] = {10, 5000, 10, 5000};
-    test01(0x0105 + testNoOffset, "TCP echo  10020 B", tcpNotUdp, &blocks05[0], 4);
+    generateTestName(tcpNotUdp, "echo  10020 B", testName);
+    test01(0x0105 + testNoOffset, testName, tcpNotUdp, &blocks05[0], 4);
 
     DWORD blocks06[3] = {32000, 64000, 127000};
-    test01(0x0106 + testNoOffset, "TCP echo 223000 B", tcpNotUdp, &blocks06[0], 3);
+    generateTestName(tcpNotUdp, "echo 223000 B", testName);
+    test01(0x0106 + testNoOffset, testName, tcpNotUdp, &blocks06[0], 3);
 }
 
 void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD blockSizesCount)

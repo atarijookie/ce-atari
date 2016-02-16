@@ -19,8 +19,8 @@ BYTE find_STiNG(void);
 
 void doTest01(void);
 
-BYTE readBuffer [256 * 1024];
-BYTE writeBuffer[256 * 1024];
+BYTE readBuffer [130 * 1024];
+BYTE writeBuffer[130 * 1024];
 
 BYTE *rBuf, *wBuf;
 
