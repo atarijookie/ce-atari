@@ -13,14 +13,17 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 
-int createListeningSocket(int port);
+int createListeningSocket(int port, int tcpNotUdp);
 int acceptConnection(int listenFd);
 
 #define LISTEN_PORT_START   10000
 
-#define MAX_FDS  4
+#define MAX_FDS  8
 int fdListen[MAX_FDS];
 int fdData  [MAX_FDS];
+
+#define IS_TCP_SOCK(INDEX)  (INDEX >= 0 && INDEX < 4)
+#define IS_UDP_SOCK(INDEX)  (INDEX >= 4 && INDEX < MAX_FDS)
 
 void clientMain(void);
 void serverMain(void);
@@ -33,16 +36,40 @@ void server_checkIfDataSocketsClosed(void);
 void server_readWriteData(void);
 
 //---------------------------------
-void handleSocket0(int readCount);
 
-void handleSocket1(int readCount);
-void sock1send (void);
-void sock1close(void);
+typedef struct {
+    int configReceived;
 
-void handleSocket2(int readCount);
+    int blockCount;
+    int blockLength;
+    int pauseBetweenBlocks;
 
-void handleSocket3(int readCount);
-void closeSock3(void);
+    int lastSendTime;
+} Tsock1conf;
+
+typedef struct {
+    int configReceived;
+    int closeAfterTime;
+    int closeTime;
+} Tsock3conf;
+
+Tsock1conf sock1conf, sock5conf;
+Tsock3conf sock3conf, sock7conf;
+
+//---------------------------------
+
+void handleSocket0(int *dataFd, int readCount, int tcpNotUdp);
+
+void handleSocket1(int *dataFd, Tsock1conf *sc, int readCount, int tcpNotUdp);
+void sock1send    (int *dataFd, Tsock1conf *sc);
+void sock1close   (int *dataFd, Tsock1conf *sc,                int tcpNotUdp);
+void handleSock1  (int *dataFd, Tsock1conf *sc,                int tcpNotUdp);
+
+void handleSocket2(int *dataFd, int readCount, int tcpNotUdp);
+
+void handleSocket3(int *dataFd, Tsock3conf *sc, int readCount, int tcpNotUdp);
+void closeSock3   (int *dataFd, Tsock3conf *sc,                int tcpNotUdp);
+void handleSock3  (int *dataFd, Tsock3conf *sc,                int tcpNotUdp);
 //---------------------------------
 
 /*
@@ -77,29 +104,17 @@ int main(int argc, char *argv[])
 
 //----------------------------------------
 
-struct {
-    int configReceived;
-
-    int blockCount;
-    int blockLength;
-    int pauseBetweenBlocks;
-
-    int lastSendTime;
-} sock1conf;
-
-struct {
-    int configReceived;
-    int closeAfterTime;
-    int closeTime;
-} sock3conf;
-
 void serverMain(void)
 {
     printf("Running as server...\n");
 
     int i;
     for(i=0; i<MAX_FDS; i++) {
-        fdListen[i] = createListeningSocket(LISTEN_PORT_START + i);
+        if(IS_TCP_SOCK(i)) {
+            fdListen[i] = createListeningSocket(LISTEN_PORT_START + i, 1);      // 0..3: TCP
+        } else {
+            fdData[i]   = createListeningSocket(LISTEN_PORT_START + i, 0);      // 4..7: UDP
+        }
     }
     
     int loops = 0;
@@ -124,35 +139,35 @@ void serverMain(void)
 //----------------------------------------
 
 // socket 0: echo socket
-void handleSocket0(int readCount)
+void handleSocket0(int *dataFd, int readCount, int tcpNotUdp)
 {
     int rcnt = (readCount < BFR_SIZE) ? readCount : BFR_SIZE;
 
-    int res  = read(fdData[0], gBfrIn, rcnt);               // read
+    int res  = read(*dataFd, gBfrIn, rcnt);                 // read
 
     if(res == 0) {                                          // closed?
         printf("Socket 0 closed by other side.\n");
 
-        close(fdData[0]);
-        fdData[0] = 0;
+        close(*dataFd);
+        *dataFd = 0;
     }
 
     if(res < 0) {                                           // fail?
         return;
     }
 
-    write(fdData[0], gBfrIn, res);                          // write back
+    write(*dataFd, gBfrIn, res);                          // write back
 }
 
-void handleSocket1(int readCount)
+void handleSocket1(int *dataFd, Tsock1conf *sc, int readCount, int tcpNotUdp)
 {
     int rcnt = (readCount < BFR_SIZE) ? readCount : BFR_SIZE;
 
-    int res  = read(fdData[1], gBfrIn, rcnt);               // read
+    int res  = read(*dataFd, gBfrIn, rcnt);               // read
 
     if(res == 0) {                                          // closed?
         printf("Socket 1 closed by other side.\n");
-        sock1close();
+        sock1close(dataFd, sc, tcpNotUdp);
         return;
     }
 
@@ -160,34 +175,34 @@ void handleSocket1(int readCount)
         return;
     }
 
-    if(!sock1conf.configReceived) {
-        sock1conf.blockCount            = (gBfrIn[0] <<  8) |  gBfrIn[1];
-        sock1conf.blockLength           = (gBfrIn[2] << 24) | (gBfrIn[3] << 16) | (gBfrIn[4] << 8) | gBfrIn[5];
-        sock1conf.pauseBetweenBlocks    = (gBfrIn[6] <<  8) |  gBfrIn[7];
+    if(!sc->configReceived) {
+        sc->blockCount            = (gBfrIn[0] <<  8) |  gBfrIn[1];
+        sc->blockLength           = (gBfrIn[2] << 24) | (gBfrIn[3] << 16) | (gBfrIn[4] << 8) | gBfrIn[5];
+        sc->pauseBetweenBlocks    = (gBfrIn[6] <<  8) |  gBfrIn[7];
 
-        sock1conf.configReceived    = 1;
-        sock1conf.lastSendTime      = 0;
+        sc->configReceived    = 1;
+        sc->lastSendTime      = 0;
     }
 }
 
-void sock1close(void)
+void sock1close(int *dataFd, Tsock1conf *sc, int tcpNotUdp)
 {
-    if(fdData[1] > 0) {
-        close(fdData[1]);
-        fdData[1] = 0;
+    if(*dataFd > 0 && tcpNotUdp) {
+        close(*dataFd);
+        *dataFd = 0;
     }
 
-    sock1conf.configReceived    = 0;
-    sock1conf.lastSendTime      = 0;
+    sc->configReceived    = 0;
+    sc->lastSendTime      = 0;
 }
 
-void sock1send(void)
+void sock1send(int *dataFd, Tsock1conf *sc)
 {
-    if(sock1conf.blockCount <= 0) {                 // nothing to send? quit
+    if(sc->blockCount <= 0) {                 // nothing to send? quit
         return;
     }
 
-    int bl = (sock1conf.blockLength < BFR_SIZE) ? sock1conf.blockLength : BFR_SIZE;
+    int bl = (sc->blockLength < BFR_SIZE) ? sc->blockLength : BFR_SIZE;
 
     int cntr = 0;
     int i;
@@ -198,17 +213,17 @@ void sock1send(void)
         cntr++;
     }
 
-    write(fdData[1], gBfrOut, bl);                  // send data
-    sock1conf.blockCount--;
+    write(*dataFd, gBfrOut, bl);                  // send data
+    sc->blockCount--;
 }
 
-void handleSocket2(int readCount)
+void handleSocket2(int *dataFd, int readCount, int tcpNotUdp)
 {
     if(readCount < 2) {
         return;
     }
 
-    int res = read(fdData[2], gBfrIn, 2);           // read
+    int res = read(*dataFd, gBfrIn, 2);             // read
 
     if(res <= 0) {                                  // closed or fail?
         goto closeSock2;
@@ -236,9 +251,9 @@ void handleSocket2(int readCount)
         int len = strlen(line);
         char tmp[32];
         sprintf(tmp, "%04d", len);
-        write(fdData[2], tmp,  4);              // send length
+        write(*dataFd, tmp,  4);              // send length
 
-        write(fdData[2], line, len);            // send data
+        write(*dataFd, line, len);            // send data
 
         lineIndex++;
         if(lineIndex > 9) {                     // move to next line
@@ -249,43 +264,43 @@ void handleSocket2(int readCount)
 
 // close the socket
 closeSock2:
-    close(fdData[2]);
-    fdData[2] = 0;
+    close(*dataFd);
+    *dataFd = 0;
     printf("Socket 2 closed\n");
 }
 
-void handleSocket3(int readCount)
+void handleSocket3(int *dataFd, Tsock3conf *sc, int readCount, int tcpNotUdp)
 {
     if(readCount < 2) {                 // not enough data?
         return;
     }
 
-    if(sock3conf.configReceived) {      // if config received, don't receive it again
+    if(sc->configReceived) {            // if config received, don't receive it again
         return;
     }
 
-    int res = read(fdData[3], gBfrIn, 2);   // read
+    int res = read(*dataFd, gBfrIn, 2); // read
 
     if(res <= 0) {                      // closed or fail?
-        closeSock3();
+        closeSock3(dataFd, sc, tcpNotUdp);
         return;
     }
 
-    sock3conf.closeAfterTime    = (gBfrIn[0] <<  8) |  gBfrIn[1];               // time - in ms, after which the socket should be closed
-    sock3conf.closeTime         = getCurrentMs() + sock3conf.closeAfterTime;    // local time, after which the sock should be closed
-    sock3conf.configReceived    = 1;
+    sc->closeAfterTime    = (gBfrIn[0] <<  8) |  gBfrIn[1];               // time - in ms, after which the socket should be closed
+    sc->closeTime         = getCurrentMs() + sock3conf.closeAfterTime;    // local time, after which the sock should be closed
+    sc->configReceived    = 1;
 }
 
-void closeSock3(void)
+void closeSock3(int *dataFd, Tsock3conf *sc, int tcpNotUdp)
 {
-    if(fdData[3] > 0) {
-        close(fdData[3]);
-        fdData[3] = 0;
+    if(*dataFd > 0) {
+        close(*dataFd);
+        *dataFd = 0;
     }
 
-    sock3conf.configReceived    = 0;
-    sock3conf.closeAfterTime    = 0;
-    sock3conf.closeTime         = 0;
+    sc->configReceived    = 0;
+    sc->closeAfterTime    = 0;
+    sc->closeTime         = 0;
 }
 
 void server_readWriteData(void)
@@ -296,40 +311,67 @@ void server_readWriteData(void)
             int count;
             int res = ioctl(fdData[i], FIONREAD, &count);
 
+            int tcpNotUdp = IS_TCP_SOCK(i);
+
             if(res == 0 && count > 0) {
                 switch(i) {
-                    case 0: handleSocket0(count); break;
-                    case 1: handleSocket1(count); break;
-                    case 2: handleSocket2(count); break;
-                    case 3: handleSocket3(count); break;
+                    case 4:
+                    case 0: handleSocket0(&fdData[i],             count, tcpNotUdp); break;
+
+                    case 1: handleSocket1(&fdData[i], &sock1conf, count, tcpNotUdp); break;
+                    case 5: handleSocket1(&fdData[i], &sock5conf, count, tcpNotUdp); break;
+
+                    case 6:
+                    case 2: handleSocket2(&fdData[i],             count, tcpNotUdp); break;
+
+                    case 3: handleSocket3(&fdData[i], &sock3conf, count, tcpNotUdp); break;
+                    case 7: handleSocket3(&fdData[i], &sock7conf, count, tcpNotUdp); break;
                 }
             }
         }
     }
 
     //-------------
-    if(fdData[1] != 0 && sock1conf.configReceived) {            // if got socket 1 and got also the config for it
-        int now             = getCurrentMs();
-        int nextSendTime    = sock1conf.lastSendTime + sock1conf.pauseBetweenBlocks;
-
-        if(now >= nextSendTime && sock1conf.blockCount > 0) {   // if it's time to send something, and we still should send a block
-            sock1conf.lastSendTime = now;
-
-            sock1send();
-        }
-
-        if(sock1conf.blockCount <= 0) {                         // nothing more to send? close socket
-            sock1close();
-        }
+    // if got socket 1 and got also the config for it
+    if(fdData[1] != 0 && sock1conf.configReceived) {            
+        handleSock1(&fdData[1], &sock1conf, IS_TCP_SOCK(1));
     }
 
+    if(fdData[5] != 0 && sock5conf.configReceived) {            
+        handleSock1(&fdData[5], &sock5conf, IS_TCP_SOCK(5));
+    }
     //-------------
     if(fdData[3] != 0 && sock3conf.configReceived) {            // if got socket 3 and got also the config for it
-        int now = getCurrentMs();
+        handleSock3(&fdData[3], &sock3conf, IS_TCP_SOCK(3));
+    }
 
-        if(now >= sock3conf.closeTime) {                        // if enough time passed, we can close this socket
-            closeSock3();
-        }
+    if(fdData[7] != 0 && sock7conf.configReceived) {            // if got socket 3 and got also the config for it
+        handleSock3(&fdData[7], &sock7conf, IS_TCP_SOCK(7));
+    }
+}
+
+void handleSock1(int *dataFd, Tsock1conf *sc, int tcpNotUdp)
+{
+    int now             = getCurrentMs();
+    int nextSendTime    = sc->lastSendTime + sc->pauseBetweenBlocks;
+
+    if(now >= nextSendTime && sc->blockCount > 0) {             // if it's time to send something, and we still should send a block
+        sc->lastSendTime = now;
+
+        sock1send(dataFd, sc);
+    }
+
+    if(sc->blockCount <= 0) {                                   // nothing more to send? close socket
+        sock1close(dataFd, sc, tcpNotUdp);
+    }
+}
+
+void handleSock3(int *dataFd, Tsock3conf *sc, int tcpNotUdp)
+{
+    int now = getCurrentMs();
+
+    if(now >= sc->closeTime) {                                  // if enough time passed, we can close this socket
+        closeSock3(dataFd, sc, tcpNotUdp);
     }
 }
 
@@ -338,7 +380,11 @@ void server_checkListeningSocketsAndAccept(void)
     int i;
 
     for(i=0; i<MAX_FDS; i++) {
-        if(fdData[i] < 1) {             // if connection is not accept()ed yet
+        if(IS_UDP_SOCK(i)) {                                    // skip UDP sockets
+            continue;
+        }
+
+        if(fdData[i] < 1 && fdListen[i] > 0) {                  // if TCP connection is not accept()ed yet
             int s = acceptConnection(fdListen[i]);
 
             if(s > 0) {
@@ -356,19 +402,31 @@ void server_checkIfDataSocketsClosed(void)
     ssize_t res;
 
     for(i=0; i<MAX_FDS; i++) {
+        if(IS_UDP_SOCK(i)) {            // skip UDP sockets
+            continue;
+        }
+
         if(fdData[i] > 0) {             // if socket opened
             res = recv(fdData[i], &c, 1, MSG_PEEK);
+
+            int tcpNotUdp = IS_TCP_SOCK(i);
 
             if(res == 0) {
                 printf("Socket %d closed by other side.\n", i);
 
-                if(i == 1) {            // socket 1? close in special way
-                    sock1close();
+                if       (i == 1) {     // socket 1? close in special way
+                    sock1close(&fdData[i], &sock1conf, tcpNotUdp);
+                } else if(i == 5) {
+                    sock1close(&fdData[i], &sock5conf, tcpNotUdp);
                 } else if(i == 3) {     // socket 3? close in special way
-                    closeSock3();
+                    closeSock3(&fdData[i], &sock3conf, tcpNotUdp);
+                } else if(i == 3) {     // socket 3? close in special way
+                    closeSock3(&fdData[i], &sock7conf, tcpNotUdp);
                 } else {                // other socket? close normally
-                    close(fdData[i]);
-                    fdData[i] = 0;
+                    if(tcpNotUdp) {
+                        close(fdData[i]);
+                        fdData[i] = 0;
+                    }
                 }
             }
 
@@ -401,9 +459,16 @@ int acceptConnection(int listenFd)
     return fd;
 }
 
-int createListeningSocket(int port)
+int createListeningSocket(int port, int tcpNotUdp)
 {
-    int fd = socket(AF_INET, SOCK_STREAM, 0);                       // create socket
+    int fd;
+
+    // create socket
+    if(tcpNotUdp) {     // for TCP
+        fd = socket(AF_INET, SOCK_STREAM, 0);
+    } else {            // for UDP
+        fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    }
     
     int allowReuse = 1;
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&allowReuse, sizeof(allowReuse));
@@ -417,7 +482,9 @@ int createListeningSocket(int port)
 
     bind(fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));      // bind socket
 
-    listen(fd, 1);                                                  // set length of listening queue (max waiting connections)
+    if(tcpNotUdp) {     // for TCP
+        listen(fd, 1);                                              // set length of listening queue (max waiting connections)
+    }
 
     int flags = fcntl(fd, F_GETFL, 0);                              // get flags
     int ires  = fcntl(fd, F_SETFL, flags | O_NONBLOCK);             // set it as non-blocking
