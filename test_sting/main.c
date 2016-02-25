@@ -19,6 +19,7 @@ BYTE find_STiNG(void);
 
 void doTest00(void);
 void doTest01(void);
+void doTest02(void);
 
 BYTE readBuffer [130 * 1024];
 BYTE writeBuffer[130 * 1024];
@@ -42,6 +43,7 @@ int main(void)
 
     doTest00();
     doTest01();
+    doTest02();
     
     writeBufferToFile();
     deinitBuffer();

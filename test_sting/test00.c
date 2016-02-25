@@ -120,6 +120,7 @@ void testMaxTcpBuffSize(void)
     
     if(handle < 0) {
         out_result_error_string(0, handle, "TCP_open failed");
+        return;
     }
     
     res = tryTcpSend(handle, 1000);         // send less than allowed
@@ -138,8 +139,8 @@ void testMaxTcpBuffSize(void)
     ok  = (res == E_OBUFFULL) ? 1 : 0;
     out_result_error(ok, res);
 
-    
-    
+    //------------
+
     TCP_close(handle, 0, 0);
 }
 
