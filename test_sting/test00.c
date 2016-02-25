@@ -10,13 +10,31 @@
 
 //--------------------------------------------------
 extern TPL *tpl;
+extern BYTE *rBuf, *wBuf;
+
+void testInvalidHandles(void);
+void testMaxTcpBuffSize(void);
+int  tryTcpSend(int handle, int size);
 
 void doTest00(void)
+{
+    //--------------------
+    // test invalid handles
+    testInvalidHandles();   
+
+    //--------------------
+    // test maximum TCP block size
+    testMaxTcpBuffSize();
+    
+    
+}
+
+void testInvalidHandles(void)
 {
     int res, ok;
     char bfr[4];
     memset(bfr, 0, 4);
-    
+
     #define INVALID_HANDLE_NO       10
 
     //--------------------------------------
@@ -93,3 +111,64 @@ void doTest00(void)
     */
 }
 
+void testMaxTcpBuffSize(void)
+{
+    int handle, res, ok;
+    
+    out_test_header(0x0030, "TCP open + send less than allowed");
+    handle = TCP_open(SERVER_ADDR, SERVER_PORT_START, 0, 2000);
+    
+    if(handle < 0) {
+        out_result_error_string(0, handle, "TCP_open failed");
+    }
+    
+    res = tryTcpSend(handle, 1000);         // send less than allowed
+    ok  = (res == E_NORMAL) ? 1 : 0;
+    out_result_error(ok, res);
+    
+    //------------
+    out_test_header(0x0031, "TCP open + send exactly as much as allowed");
+    res = tryTcpSend(handle, 2000);         // send exactly as much as allowed
+    ok  = (res == E_NORMAL) ? 1 : 0;
+    out_result_error(ok, res);
+
+    //------------
+    out_test_header(0x0032, "TCP open + send more than allowed");
+    res = tryTcpSend(handle, 2001);         // send more than allowed
+    ok  = (res == E_OBUFFULL) ? 1 : 0;
+    out_result_error(ok, res);
+
+    
+    
+    TCP_close(handle, 0, 0);
+}
+
+int tryTcpSend(int handle, int size)
+{
+    int res;
+    DWORD now, start;
+    
+    start = getTicks();
+    
+    while(1) {
+        res = TCP_send(handle, wBuf, size);
+    
+        now = getTicks();
+        
+        if((now - start) >= 200) {                  // if timeout, quit
+            return -64;                             // custom timeout error code
+        }
+
+        if(res == E_OBUFFULL) {                     // buffer full? wait more
+            continue;
+        }
+    
+        if(res == E_NORMAL) {                       // good? success!
+            return E_NORMAL;
+        }
+        
+        break;                                      // if came here, it's not success and not full buffer
+    }
+    
+    return res;                                     // fail
+}

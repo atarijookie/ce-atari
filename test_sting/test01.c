@@ -79,15 +79,27 @@ void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD
 {
     DWORD start = getTicks();
 
+    //----------
     out_test_header(testNo, testName);          // show test header
+    
+    //----------
+    // find out the largest block size
+    int i;
+    int maxBlockSize = 0;
+
+    for(i=0; i<blockSizesCount; i++) {
+        if(maxBlockSize < blockSizes[i]) {      // if current max block size is smaller than this block size, store it
+            maxBlockSize = blockSizes[i];
+        }
+    }
     //----------
     // open socket
     int handle;
     
     if(tcpNotUdp) {
-        handle = TCP_open(SERVER_ADDR, SERVER_PORT_START, 0, 1000);
+        handle = TCP_open(SERVER_ADDR, SERVER_PORT_START, 0, maxBlockSize);
     } else {
-        handle = UDP_open(SERVER_ADDR, SERVER_PORT_START);
+        handle = UDP_open(SERVER_ADDR, SERVER_PORT_START + 4);
     }
     
     if(handle < 0) {
@@ -122,7 +134,7 @@ void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD
     }
     
     //---------------------
-    int i, res;
+    int res;
     
     for(i=0; i<blockSizesCount; i++) {
         res = sendAndReceive(testNo, testName, tcpNotUdp, blockSizes[i], handle);
