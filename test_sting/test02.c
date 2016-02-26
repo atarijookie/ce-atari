@@ -13,10 +13,11 @@ extern TPL *tpl;
 extern BYTE *rBuf, *wBuf;
 
 void doTest0200(BYTE tcpNotUdp);
-void doTest0202(BYTE tcpNotUdp);
+void doTest0202(BYTE tcpNotUdp, BYTE test0202not0204);
 
 int trySend0202   (int handle, int tcpNotUdp, int size, int timeoutSecs);
 int tryReceive0202(int handle, int size, int timeoutSecs);
+int tryReceive0204(int handle, int size, int timeoutSecs);
 
 void doTest02(void)
 {
@@ -25,8 +26,14 @@ void doTest02(void)
     doTest0200(0);      // UDP
 
     // CNget_NDB
-    doTest0202(1);      // TCP
-    doTest0202(0);      // UDP
+    doTest0202(1, 1);   // TCP
+    doTest0202(0, 1);   // UDP
+    
+    // CNget_block
+    doTest0202(1, 0);   // TCP
+    doTest0202(0, 0);   // UDP
+    
+    
 }
 
 void doTest0200(BYTE tcpNotUdp)
@@ -113,16 +120,26 @@ test0200end:
     }
 }
 
-void doTest0202(BYTE tcpNotUdp)
+void doTest0202(BYTE tcpNotUdp, BYTE test0202not0204)
 {
     int handle, res;
     
     // open connection
     if(tcpNotUdp) {
-        out_test_header(0x0202, "TCP CNget_NDB");
+        if(test0202not0204) {
+            out_test_header(0x0202, "TCP CNget_NDB");
+        } else {
+            out_test_header(0x0204, "TCP CNget_block");
+        }
+        
         handle = TCP_open(SERVER_ADDR, SERVER_PORT_START, 0, 2000);
     } else {
-        out_test_header(0x0203, "UDP CNget_NDB");
+        if(test0202not0204) {
+            out_test_header(0x0203, "UDP CNget_NDB");
+        } else {
+            out_test_header(0x0205, "UDP CNget_block");
+        }
+        
         handle = UDP_open(SERVER_ADDR, SERVER_PORT_START + 4);
     }
     
@@ -142,9 +159,13 @@ void doTest0202(BYTE tcpNotUdp)
         }
     
         // get data
-        res = tryReceive0202(handle, 1000, 3);
-        
-        if(!res) {
+        if(test0202not0204) {
+            res = tryReceive0202(handle, 1000, 3);
+        } else {
+            res = tryReceive0204(handle, 1000, 3);
+        }
+
+        if(res) {       // if not 0 (not good)
             goto test0202end;
         }
     }
@@ -225,5 +246,40 @@ int tryReceive0202(int handle, int size, int timeoutSecs)
     KRfree (ndb);
 
     return res;                             // return error code
+}
+
+int tryReceive0204(int handle, int size, int timeoutSecs)
+{
+    int   timeoutTics = timeoutSecs * 200;
+    DWORD timeout     = getTicks() + timeoutTics;
+    
+    int res;
+    
+    while(1) {
+        res = CNget_block(handle, rBuf, size);
+    
+        if(getTicks() >= timeout) {         // if timeout, fail
+            out_result_error_string(0, 0, "timeout on CNget_block");
+            return -1;
+        }
+
+        if(res != E_NODATA) {
+            break;
+        }
+    }
+        
+    if(res != size) { 
+        out_result_error_string(0, res, "CNget_block failed");
+        return res;
+    }        
+
+    res = memcmp(wBuf, rBuf, size);
+    
+    if(res != 0) {
+        out_result_error_string(0, 0, "data mismatch");
+        return -2;
+    }
+    
+    return 0;           // good
 }
 
