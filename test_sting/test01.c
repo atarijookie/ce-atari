@@ -51,27 +51,27 @@ void test01TcpNotUdp(int testNoOffset, int tcpNotUdp)
     char testName[64];
 
     DWORD blocks01[1] = {32};
-    generateTestName(tcpNotUdp, "echo     32 B", testName);
+    generateTestName(tcpNotUdp, "echo    32 B", testName);
     test01(0x0101 + testNoOffset, testName, tcpNotUdp, &blocks01[0], 1);
 
     DWORD blocks02[3] = {250, 250, 250};
-    generateTestName(tcpNotUdp, "echo    750 B", testName);
+    generateTestName(tcpNotUdp, "echo   750 B", testName);
     test01(0x0102 + testNoOffset, testName, tcpNotUdp, &blocks02[0], 3);
     
     DWORD blocks03[3] = {511, 512, 513};
-    generateTestName(tcpNotUdp, "echo   1536 B", testName);
+    generateTestName(tcpNotUdp, "echo  1536 B", testName);
     test01(0x0103 + testNoOffset, testName, tcpNotUdp, &blocks03[0], 3);
 
     DWORD blocks04[3] = {1000, 250, 1000};
-    generateTestName(tcpNotUdp, "echo   2250 B", testName);
+    generateTestName(tcpNotUdp, "echo  2250 B", testName);
     test01(0x0104 + testNoOffset, testName, tcpNotUdp, &blocks04[0], 3);
 
-    DWORD blocks05[4] = {10, 5000, 10, 5000};
-    generateTestName(tcpNotUdp, "echo  10020 B", testName);
+    DWORD blocks05[4] = {500, 1000, 1500, 2000};
+    generateTestName(tcpNotUdp, "echo 15000 B", testName);
     test01(0x0105 + testNoOffset, testName, tcpNotUdp, &blocks05[0], 4);
 
-    DWORD blocks06[3] = {32000, 64000, 127000};
-    generateTestName(tcpNotUdp, "echo 223000 B", testName);
+    DWORD blocks06[3] = {5000, 10000, 16000};
+    generateTestName(tcpNotUdp, "echo 31000 B", testName);
     test01(0x0106 + testNoOffset, testName, tcpNotUdp, &blocks06[0], 3);
 }
 
@@ -165,9 +165,10 @@ int sendAndReceive(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD blockSize,
     //----------
     // send
     int res;
-    DWORD now, start;
+    DWORD now, endTime;
+    DWORD kbs = 1 + (blockSize / 1024);
     
-    start = getTicks();
+    endTime = getTicks() + (kbs * 200);         // for each kB of data give 1 second to transfer
     
     while(1) {              // try to send
         if(tcpNotUdp) {
@@ -181,8 +182,8 @@ int sendAndReceive(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD blockSize,
         }
         
         now = getTicks();
-        if((now - start) > (5 * 200)) {     // timeout? 
-            out_result_string(0, "TCP / UDP send() timeout");
+        if(now >= endTime) {        // timeout? 
+            out_result_error_string(0, blockSize, "TCP / UDP send() timeout");
             return 0;
         }
     }
@@ -194,36 +195,30 @@ int sendAndReceive(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD blockSize,
     
     //----------
     // wait
-    start = getTicks();
+    endTime = getTicks() + (kbs * 200);         // for each kB of data give 1 second to transfer
+    
+    memset(rBuf, 0, blockSize);
+    BYTE *pBuf  = rBuf;
+    DWORD toGet = blockSize;
     
     while(1) {
-        res = CNbyte_count(handle);
-        
-        if(res >= blockSize) {
+        if(toGet <= 0) {                        // nothing to get? quit
             break;
+        }
+    
+        res = CNbyte_count(handle);             // find out how many bytes are waiting
+
+        if(res > 0) {                           // something waiting? read it
+            res    = CNget_block(handle, pBuf, res);
+            pBuf  += res;
+            toGet -= res;
         }
 
         now = getTicks();
-        if((now - start) > (5 * 200)) {     // timeout? 
-            out_result_string(0, "CNbyte_count() timeout");
+        if(now >= endTime) {     // timeout? 
+            out_result_error_string(0, blockSize, "CNbyte_count() timeout");
             return 0;
         }
-    }
-    
-    if(res < blockSize) {                   // not enough data?
-        out_result_error_string(0, res, "CNbyte_count() failed");
-        return 0;
-    }
-    
-    //----------
-    // receive
-    memset(rBuf, 0, blockSize);
-    
-    res = CNget_block(handle, rBuf, blockSize);
-    
-    if(res != blockSize) { 
-        out_result_error_string(0, res, "CNget_block() failed");
-        return 0;
     }
     
     //----------

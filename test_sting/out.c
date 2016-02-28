@@ -37,6 +37,18 @@ char *resultToString(BYTE result)
     return resStr;
 }
 
+void out_string_lenght(char *str, int len)
+{
+    int strLen = strlen(str);
+    
+    char tmp[100];
+    memset(tmp, ' ', len);
+    tmp[len]    = 0;
+    
+    strncpy(tmp, str, (strLen < len) ? strLen : len);
+    outString(tmp);
+}
+
 void out_test_header(WORD testNo, char *testName)
 {
     char testNoStr[16];
@@ -45,7 +57,7 @@ void out_test_header(WORD testNo, char *testName)
     outString("[");
     outString(testNoStr);
     outString("] [");
-    outString(testName);
+    out_string_lenght(testName, 40);
     outString("]");
 }
 

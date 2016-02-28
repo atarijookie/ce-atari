@@ -44,7 +44,7 @@ int main(void)
     doTest00();
     doTest01();
     doTest02();
-    
+
     writeBufferToFile();
     deinitBuffer();
     
