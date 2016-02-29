@@ -103,12 +103,10 @@ void testInvalidHandles(void)
     out_test_header(0x0026, "CNgetinfo()      - on invalid handle");
     out_result_error(ok, res);
 
-    /*
     res = CNgets(INVALID_HANDLE_NO, bfr, 4, '\n');
     ok  = (res == E_BADHANDLE) ? 1 : 0;
-    out_test_header(0x0027, "CNgets()       - on invalid handle");
+    out_test_header(0x0027, "CNgets()         - on invalid handle");
     out_result_error(ok, res);
-    */
 }
 
 void testMaxTcpBuffSize(void)

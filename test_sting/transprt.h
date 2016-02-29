@@ -1235,7 +1235,7 @@ __extension__							\
 #define off_port(x)				STinG_vf_s(tpl->off_port, (x))
 #define setvstr(x,y)			STinG_wf_ss(tpl->setvstr, (x),(y))
 #define query_port(x)			STinG_wf_s(tpl->query_port, (x))
-#define CNgets(w,x,y,z)			STinG_wf_wswb(tpl->CNgets, (x))
+#define CNgets(w,x,y,z)			STinG_wf_wswb(tpl->CNgets, (w),(x),(y),(z))
 #define ICMP_send(v,w,x,y,z)	STinG_wf_LBBpW(tpl->ICMP_send, (v),(w),(x),(y),(z))
 #define ICMP_handler(x,y)		STinG_wf_xw(tpl->ICMP_handler, (x),(y))
 #define ICMP_discard(x)			STinG_vf_D(tpl->ICMP_discard, (x))
