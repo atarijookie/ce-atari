@@ -15,6 +15,7 @@ extern BYTE *rBuf, *wBuf;
 void testInvalidHandles(void);
 void testMaxTcpBuffSize(void);
 int  tryTcpSend(int handle, int size);
+void testResolve(void);
 
 void doTest00(void)
 {
@@ -26,7 +27,9 @@ void doTest00(void)
     // test maximum TCP block size
     testMaxTcpBuffSize();
     
-    
+    //--------------------
+    // test resolve
+    testResolve();
 }
 
 void testInvalidHandles(void)
@@ -163,3 +166,103 @@ int tryTcpSend(int handle, int size)
         }
     }
 }
+
+void testResolve(void)
+{
+    char *real = 0;
+    DWORD adds[16];
+    int res, ok;
+    
+    //-------------------------
+    // resolve address with 2 results
+    out_test_header(0x0050, "resolve sme.sk");
+    res = resolve("www.sme.sk", &real, adds, 16);
+    
+    // 104.20.95.81 & 104.20.94.81 -> 0x68145f51 & 0x68145e51
+    ok = 0;
+    if(res == 2) {
+        if( (adds[0] == 0x68145f51 && adds[1] == 0x68145e51) ||
+            (adds[1] == 0x68145f51 && adds[0] == 0x68145e51) ) {
+        
+            ok = 1;
+        }
+    }
+    
+    if(real != NULL) {             
+        out_result_error_string(ok, res, real);
+        KRfree(real);           // free real address
+    } else {
+        out_result_error(ok, res);
+    }
+    
+    //-------------------------
+    // resolve address with 1 result
+    out_test_header(0x0051, "resolve kie.sk");
+    res = resolve("kie.sk", &real, adds, 16);
+    
+    // 92.240.253.107 -> 0x5cf0fd6b
+    ok = 0;
+    if(res == 1 && adds[0] == 0x5cf0fd6b) {
+        ok = 1;
+    }
+    
+    if(real != NULL) {             
+        out_result_error_string(ok, res, real);
+        KRfree(real);           // free real address
+    } else {
+        out_result_error(ok, res);
+    }
+    
+    //-------------------------
+    // resolve invalid address
+    out_test_header(0x0052, "resolve invalid");
+    res = resolve("invalid", &real, adds, 16);
+    
+    ok = (res == E_CANTRESOLVE) ? 1 : 0;
+    if(real != NULL) {             
+        out_result_error_string(ok, res, real);
+        KRfree(real);           // free real address
+    } else {
+        out_result_error(ok, res);
+    }
+
+    //-------------------------
+    // resolve empty address
+    out_test_header(0x0053, "resolve empty string");
+    res = resolve(" ", &real, adds, 16);
+    
+    ok = (res == E_CANTRESOLVE) ? 1 : 0;
+    if(real != NULL) {             
+        out_result_error_string(ok, res, real);
+        KRfree(real);           // free real address
+    } else {
+        out_result_error(ok, res);
+    }
+
+    //-------------------------
+    // resolve empty address
+    out_test_header(0x0054, "resolve NULL");
+    res = resolve(0, &real, adds, 16);
+    
+    ok = (res == E_CANTRESOLVE) ? 1 : 0;
+    if(real != NULL) {             
+        out_result_error_string(ok, res, real);
+        KRfree(real);           // free real address
+    } else {
+        out_result_error(ok, res);
+    }
+    
+    //-------------------------
+    // resolve dotted IP address: 192.168.123.154 -> 0xc0a87b9a
+    out_test_header(0x0055, "resolve dotted IP");
+    res = resolve("192.168.123.154", &real, adds, 16);
+    
+    ok = (res == 1 && adds[0] == 0xc0a87b9a) ? 1 : 0;
+    if(real != NULL) {             
+        out_result_error_string(ok, res, real);
+        KRfree(real);           // free real address
+    } else {
+        out_result_error(ok, res);
+    }
+}
+
