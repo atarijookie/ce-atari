@@ -168,6 +168,18 @@ static void sleepInSupervisor(void)
 	}
 }
 
+void sleepMs(int ms)
+{
+    DWORD ticks = ms / 5;
+    DWORD until = getTicks() + ticks;
+    
+    while(1) {
+        if(getTicks() >= until) {
+            break;
+        }
+    }
+}
+
 DWORD getTicks(void)
 {
     return Supexec(getTicksInSupervisor);

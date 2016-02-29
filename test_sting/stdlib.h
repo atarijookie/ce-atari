@@ -13,6 +13,7 @@ char *  strcat              (char *dest, const char *src);
 char *  strcpy_switch_rn    (char * destination, const char * source);
 int		strncmp             (const char * str1, const char * str2, int num);
 void	sleep               (int seconds);
+void    sleepMs             (int ms);
 
 DWORD getTicks(void);
 DWORD getTicksInSupervisor(void);
