@@ -19,9 +19,8 @@
 
 #define HZ_200     ((volatile DWORD *) 0x04BA) /* 200 Hz system clock */ 
 
-// 0xc0a87b9a -- 192.168.123.154
-// 0xc0a87b8e -- 192.168.123.142
-#define SERVER_ADDR         0xc0a87b8e
+extern DWORD SERVER_ADDR;
+
 #define SERVER_PORT_START   10000
 
 #endif

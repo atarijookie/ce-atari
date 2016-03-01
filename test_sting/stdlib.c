@@ -56,6 +56,19 @@ int strlen ( const char * str )
 	return 0;
 }
 
+int strlen_ex(const char * str, char terminator)
+{
+	int i;
+
+	for(i=0; i<2048; i++) {				// find first terminator or zero and return it's position
+		if(str[i] == terminator || str[i] == 0) {
+			return i;
+		}
+	}
+	
+	return 0;
+}
+
 char *strcat(char *dest, const char *src) 
 {
     int   endOfFirst    = strlen(dest);         // find end of first string

@@ -7,6 +7,7 @@ void *	memcpy              (void * destination, const void * source, int num);
 void *	memset              (void * ptr, int value, int num);
 int     memcmp              (const void *a, const void *b, int num);
 int		strlen              (const char * str);
+int     strlen_ex           (const char * str, char terminator);
 char *	strncpy             (char * destination, const char * source, int num);
 char *  strcpy              (char *dest, const char *source);
 char *  strcat              (char *dest, const char *src);

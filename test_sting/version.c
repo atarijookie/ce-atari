@@ -94,7 +94,13 @@ void showInt(int value, int length)
     char tmp[10];
     memset(tmp, 0, 10);
 
-    //--------------------------------------
+    intToString(value, length, tmp);
+    
+    (void) Cconws(tmp);                     // write it out
+}
+
+void intToString(int value, int length, char *tmp)
+{
     // determine length?
     if(length == -1) {
         length = countIntDigits(value);
@@ -123,6 +129,6 @@ void showInt(int value, int length)
         value = val;
     }
 
-    (void) Cconws(tmp);                     // write it out
+    tmp[length] = 0;                        // terminate string
 }
 
