@@ -1,5 +1,5 @@
 /*--------------------------------------------------------------------------*/
-/*	File name:	TRANSPRT.H						Revision date:	2010.01.31	*/
+/*	File name:	TRANSPRT.H						Revision date:	2016.02.29	*/
 /*	Revised by:	Miro Kropacek					Revision start:	2010.01.31	*/
 /*	Revised by:	Ulf Ronald Andersson			Revision start:	1999.09.21	*/
 /*	Created by:	Peter Rottengatter				Creation date:	1996.xx.xx	*/
@@ -800,7 +800,7 @@ __extension__							\
 #define	STinG_wf_xw(func, arg1,arg2)	\
 __extension__							\
 ({	register int16 retv __asm__("d0");	\
-	int16 cdecl (*) (IP_DGRAM *) _arg1 = (int16 cdecl (*) (IP_DGRAM *))(arg1);		\
+	int16 cdecl (*_arg1) (IP_DGRAM *) = (int16 cdecl (*) (IP_DGRAM *))(arg1);		\
 	int16 _arg2 = (int16)(arg2);		\
 	__asm__ volatile					\
 	(									\

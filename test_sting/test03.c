@@ -29,7 +29,7 @@ void doTest03(void)
 void doTest0300(void)
 {
     int res, ok;
-/*
+
     //------------
     // test NULL as handler pointer
     out_test_header(0x0301, "ICMP_handler(NULL, HNDLR_SET)");
@@ -104,7 +104,6 @@ void doTest0300(void)
     res = ICMP_handler(0, HNDLR_QUERY);
     ok  = (res == FALSE) ? 1 : 0;
     out_result_error(ok, res);
-*/
 }
 
 int16 cdecl receive_echo(IP_DGRAM  *datagram)
