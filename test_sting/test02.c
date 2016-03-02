@@ -27,6 +27,9 @@ void doTest0208    (BYTE tcpNotUdp);
 void doTest0210    (WORD testNumber);
 int  sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle);
 
+void doTest0230    (void);
+void doTest0240    (void);
+
 void doTest02(void)
 {
     // CNbyte_count + CNget_char
@@ -54,6 +57,12 @@ void doTest02(void)
     for(i = 0x0210; i <= 0x0222; i++) {
         doTest0210(i);
     }
+    
+    // TCP waiting for listening socket to connect
+    doTest0230();
+    
+    // test canaries on CNget_block    
+    doTest0240();
 }
 
 void doTest0200(BYTE tcpNotUdp)
@@ -676,3 +685,19 @@ test0210end:
     }
 }
 
+void doTest0230(void)
+{
+    // open passive connection 
+    
+    // wait using TCP_wait_state
+    
+    // wait using CNbyte_count
+    
+    // wait by check out the info that is pointed to by the pointer returned by CNgetinfo
+    
+}
+
+void doTest0240(void)
+{
+    // test canaries on CNget_block
+}
