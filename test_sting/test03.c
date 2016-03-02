@@ -34,22 +34,22 @@ void doTest0300(void)
     // test NULL as handler pointer
     out_test_header(0x0301, "ICMP_handler(NULL, HNDLR_SET)");
     res = ICMP_handler(0, HNDLR_SET);
-    ok  = (res == FALSE) ? 1 : 0;
+    ok  = (res == TRUE) ? 1 : 0;        // it seems that you can set NULL as a handler
     out_result_error(ok, res);
     
     out_test_header(0x0302, "ICMP_handler(NULL, HNDLR_FORCE)");
     res = ICMP_handler(0, HNDLR_FORCE);
-    ok  = (res == FALSE) ? 1 : 0;
+    ok  = (res == FALSE) ? 1 : 0;       // this is the same as HNDLR_SET for ICMP, so it will fail, as the NULL handler already exists
     out_result_error(ok, res);
-    
-    out_test_header(0x0303, "ICMP_handler(NULL, HNDLR_REMOVE)");
-    res = ICMP_handler(0, HNDLR_REMOVE);
-    ok  = (res == FALSE) ? 1 : 0;
-    out_result_error(ok, res);
-    
-    out_test_header(0x0304, "ICMP_handler(NULL, HNDLR_QUERY)");
+
+    out_test_header(0x0303, "ICMP_handler(NULL, HNDLR_QUERY)");
     res = ICMP_handler(0, HNDLR_QUERY);
-    ok  = (res == FALSE) ? 1 : 0;
+    ok  = (res == TRUE) ? 1 : 0;        // query will succeed, NULL handler exists
+    out_result_error(ok, res);
+    
+    out_test_header(0x0304, "ICMP_handler(NULL, HNDLR_REMOVE)");
+    res = ICMP_handler(0, HNDLR_REMOVE);
+    ok  = (res == TRUE) ? 1 : 0;        // as NULL was set by ICMP_handler() call, this will succeed and remove it from list of handlers
     out_result_error(ok, res);
     
     //------------
@@ -62,7 +62,7 @@ void doTest0300(void)
     out_result_error(ok, res);
 
     out_test_header(0x0306, "ICMP_handler - HNDLR_QUERY not registered");
-    res = ICMP_handler(0, HNDLR_QUERY);
+    res = ICMP_handler(receive_echo, HNDLR_QUERY);
     ok  = (res == FALSE) ? 1 : 0;
     out_result_error(ok, res);
     
@@ -73,15 +73,20 @@ void doTest0300(void)
     ok  = (res == TRUE) ? 1 : 0;
     out_result_error(ok, res);
 
-    out_test_header(0x0308, "ICMP_handler - HNDLR_QUERY of real");
-    res = ICMP_handler(0, HNDLR_QUERY);
+    out_test_header(0x0308, "ICMP_handler - HNDLR_SET real, again");
+    res = ICMP_handler(receive_echo, HNDLR_SET);
+    ok  = (res == FALSE) ? 1 : 0;
+    out_result_error(ok, res);
+
+    out_test_header(0x0309, "ICMP_handler - HNDLR_QUERY of real");
+    res = ICMP_handler(receive_echo, HNDLR_QUERY);
     ok  = (res == TRUE) ? 1 : 0;
     out_result_error(ok, res);
     
     //------------
     // test the ping
     received = 0;
-    out_test_header(0x0309, "ICMP_send - 5 pings");
+    out_test_header(0x0310, "ICMP_send - 5 pings");
     
     int i;
     for(i=0; i<5; i++) {
@@ -93,17 +98,30 @@ void doTest0300(void)
     ok = (received == 5) ? 1 : 0;
     out_result_error(ok, received);
     
-    //------------    
+    //------------
     // now remove the handler and see if it is removed
-    out_test_header(0x0310, "ICMP_handler - HNDLR_REMOVE existing");
-    res = ICMP_handler (receive_echo, HNDLR_REMOVE);
+    out_test_header(0x0311, "ICMP_handler - HNDLR_REMOVE existing");
+    res = ICMP_handler(receive_echo, HNDLR_REMOVE);
     ok  = (res == TRUE) ? 1 : 0;
     out_result_error(ok, res);
 
-    out_test_header(0x0311, "ICMP_handler - HNDLR_QUERY after REMOVE");
-    res = ICMP_handler(0, HNDLR_QUERY);
+    out_test_header(0x0312, "ICMP_handler - HNDLR_QUERY after REMOVE");
+    res = ICMP_handler(receive_echo, HNDLR_QUERY);
     ok  = (res == FALSE) ? 1 : 0;
     out_result_error(ok, res);
+
+    //------------
+    out_test_header(0x0313, "ICMP_send - calling handler after REMOVE");
+    received = 0;
+
+    for(i=0; i<5; i++) {
+        send_echo();
+        sleepMs(200);
+    }
+    
+    sleep(1);
+    ok = (received == 0) ? 1 : 0;
+    out_result_error(ok, received);
 }
 
 int16 cdecl receive_echo(IP_DGRAM  *datagram)
