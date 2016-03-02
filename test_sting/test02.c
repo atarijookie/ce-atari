@@ -24,6 +24,9 @@ int  tryReceive0206(int handle);
 
 void doTest0208    (BYTE tcpNotUdp);
 
+void doTest0210    (WORD testNumber);
+int  sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle);
+
 void doTest02(void)
 {
     // CNbyte_count + CNget_char
@@ -45,6 +48,12 @@ void doTest02(void)
     // CNgetinfo
     doTest0208(1);      // TCP
     doTest0208(0);      // UDP
+    
+    // TCP_open() and UDP_open - addressing modes tests
+    int i;
+    for(i = 0x0210; i <= 0x0222; i++) {
+        doTest0210(i);
+    }
 }
 
 void doTest0200(BYTE tcpNotUdp)
@@ -87,7 +96,7 @@ void doTest0200(BYTE tcpNotUdp)
         if(toReceive <= 0) {
 
             if(!mismatch) {         // no mismatch?   good
-                out_result_error(1, 0);
+                out_result(1);
             } else {                // data mismatch? fail
                 out_result_string(0, "received enough data, but mismatch");
             }
@@ -181,7 +190,7 @@ void doTest0202(BYTE tcpNotUdp, BYTE test0202not0204)
         }
     }
     
-    out_result_error(1, 0);                 // everything OK
+    out_result(1);                 // everything OK
     
 test0202end:
     // close connection
@@ -247,7 +256,7 @@ int tryReceive0202(int handle, int size, int timeoutSecs)
         for(i=0; i<size; i++) {
             if(ndb->ndata[i] != wBuf[i]) {  // received data mismatch? fail
                 res = -3;
-                out_result_error_string(0, 0, "CNget_NDB data mismatch");
+                out_result_string(0, "CNget_NDB data mismatch");
                 break;
             }
         }
@@ -338,7 +347,7 @@ void doTest0206(BYTE tcpNotUdp)
         }
     }
     
-    out_result_error(1, 0);                 // everything OK
+    out_result(1);                      // everything OK
     
 test0206end:
     // close connection
@@ -463,26 +472,20 @@ void doTest0208(BYTE tcpNotUdp)
     
     //---------------------------
     // if it's TCP, wait for closing and check status
+    DWORD start = getTicks();
     if(tcpNotUdp) {
         // wait for connection to close
-        DWORD endTime = getTicks() + (CLOSING_TIME_MS / 5) + 600;
-
-        WORD statusPrev = 0;
+        res = TCP_wait_state(handle, TCLOSED, 3);
         
-        while(1) {
-            if(getTicks() >= endTime) {
-                out_result_error_string(0, res, "waiting for close failed");
-                goto test0208end;
-            }
-            
-            if(statusPrev != cib->status) {     // if CIB->status changed
-                out_result_error_string(0, cib->status, "cib->status");
-                statusPrev = cib->status;
-            }
+        if(res != E_NORMAL) {                       // if didn't get to TCLOSED state, fail
+            out_result_error_string(0, res, "waiting for close failed");
+            goto test0208end;
         }
     }
+    DWORD end   = getTicks();
+    DWORD ms    = (end - start) * 5;                // calculate how long it took to find out, that the socket has closed on the other side
     
-    out_result_error(1, 0);                 // everything OK
+    out_result_error(1, ms);                        // everything OK
     
 test0208end:
     // close connection
@@ -492,3 +495,184 @@ test0208end:
         UDP_close(handle);
     }    
 }
+
+void doTest0210(WORD testNumber)
+{
+    int handle, res, ok;
+    
+    CAB cab;
+    cab.lhost = 0;                      // local  host
+    cab.lport = 10000;                  // local  port
+    cab.rhost = SERVER_ADDR;            // remove host
+    cab.rport = SERVER_PORT_START;      // remove port
+    
+    int tcpNotUdp           = 1;        // by default - TCP
+    int activeNotPassive    = 1;        // by default - active connection
+    
+    switch(testNumber) {
+        /////////////////
+        // remote host is normal IP
+        case 0x0210:                // TCP, rem_host = IP addr, rem_port = port number (not TCP_ACTIVE, not TCP_PASSIVE) --> ACTIVE
+            out_test_header(testNumber, "TCP_open - IP specified, port specified");
+            handle = TCP_open(SERVER_ADDR, SERVER_PORT_START, 0, 2000);
+            break;
+            
+        case 0x0211:                // TCP, rem_host = 0,       rem_port = port number (not TCP_ACTIVE, not TCP_PASSIVE) --> PASSIVE, rem_port is local port number
+            activeNotPassive = 0;   // passive connection
+            out_test_header(testNumber, "TCP_open - IP specified, port 0");
+            handle = TCP_open(SERVER_ADDR, 0, 0, 2000);
+            break;
+
+        /////////////////
+        // remote host is CAB *, TCP_ACTIVE
+        case 0x0212:                // TCP, rem_host = CAB *,   rem_port = TCP_ACTIVE, rport & rhost specify remote address, cab->lport is local port, cab->lhost may be 0 (in that case it's filled with local ip)
+            out_test_header(testNumber, "TCP_open - TCP_ACTIVE, got remote & local");
+            handle = TCP_open(&cab,        TCP_ACTIVE, 0, 2000);
+            break;
+
+        case 0x0213:                // TCP, rem_host = CAB *,   rem_port = TCP_ACTIVE, rport & rhost specify remote address, cab->lport is 0, next free port will be used (use CNgetinfo() to find out used port #), cab->lhost may be 0 (in that case it's filled with local ip)
+            out_test_header(testNumber, "TCP_open - TCP_ACTIVE, got only remote");
+            cab.lport = 0;
+            handle = TCP_open(&cab,        TCP_ACTIVE, 0, 2000);
+            break;
+        
+        case 0x0214:                // TCP, rem_host = 0,       rem_port = TCP_ACTIVE --> either will crash, or returns E_PARAMETER
+            out_test_header(testNumber, "TCP_open - TCP_ACTIVE, rem_host is NULL");
+            handle = TCP_open(NULL,        TCP_ACTIVE, 0, 2000);
+            
+            ok = (handle == E_PARAMETER) ? 1 : 0;
+            out_result(ok);
+            return;
+            
+            break;
+
+        /////////////////
+        // remote host is CAB *, TCP_PASSIVE
+        case 0x0215:                // TCP, rem_host = CAB *,   rem_port = TCP_PASSIVE, cab->lport is local port
+            activeNotPassive = 0;   // passive connection
+            out_test_header(testNumber, "TCP_open - TCP_PASSIVE, got local port");
+            handle = TCP_open(&cab,        TCP_PASSIVE, 0, 2000);
+            break;
+
+        case 0x0216:                // TCP, rem_host = CAB *,   rem_port = TCP_PASSIVE, cab->lport is 0, next free port will be used (use CNgetinfo() to find out used port #)
+            activeNotPassive = 0;   // passive connection
+            out_test_header(testNumber, "TCP_open - TCP_PASSIVE, local port is 0");
+            cab.lport = 0;
+            handle = TCP_open(&cab,        TCP_PASSIVE, 0, 2000);
+            break;
+        
+        case 0x0217:                // TCP, rem_host = 0,       rem_port = TCP_PASSIVE --> either will crash, or will open PASSIVE connection on next free port
+            activeNotPassive = 0;   // passive connection
+            out_test_header(testNumber, "TCP_open - TCP_PASSIVE, rem_host is NULL");
+            handle = TCP_open(NULL,        TCP_PASSIVE, 0, 2000);
+            break;
+            
+        ////////////////////////////////////////////////////////
+        case 0x0220:                // UDP, rem_host is IP,    rem_port is port # (not 0 / UDP_EXTEND) -> remote is to IP:port, local port is next free port
+            tcpNotUdp = 0;          // it's UDP
+            out_test_header(testNumber, "UDP_open - IP specified, port specified");
+            handle = UDP_open(SERVER_ADDR, SERVER_PORT_START);
+            break;
+
+        case 0x0221:                // UDP, rem_host is CAB *, rem_port is 0 / UDP_EXTEND, cab->lport is port # (not 0) -> open UDP on this local port
+            tcpNotUdp = 0;          // it's UDP
+            out_test_header(testNumber, "UDP_open - UDP_EXTEND, got local port");
+            handle = UDP_open(&cab, UDP_EXTEND);
+            break;
+        
+        case 0x0222:                // UDP, rem_host is CAB *, rem_port is 0 / UDP_EXTEND, cab->lport is 0              -> open UDP on first free local port
+            tcpNotUdp = 0;          // it's UDP
+            out_test_header(testNumber, "UDP_open - UDP_EXTEND, local port is 0");
+            cab.lport = 0;
+            handle = UDP_open(&cab, UDP_EXTEND);
+            break;
+            
+        ////////////////////////////////////////////////////////
+        // bad test case number? quit
+        default:    return;
+    }
+    
+    if(handle < 0) {
+        out_result_error_string(0, handle, "open failed");
+        return;
+    }
+    
+    //---------------------
+    // for passive connection, send local port to server, wait for connection
+    if(!activeNotPassive) {
+        //---------
+        // find out local port
+        CIB *cib = CNgetinfo(handle);
+        
+        if(!cib) {
+            out_result_string(0, "CNgetinfo() failed");
+            goto test0210end;
+        }
+        
+        //---------
+        // send local port to server
+        BYTE tmp[6];
+        
+        tmp[0] = (cib->address.lhost >> 24) & 0xff;
+        tmp[1] = (cib->address.lhost >> 16) & 0xff;
+        tmp[2] = (cib->address.lhost >>  8) & 0xff;
+        tmp[3] = (cib->address.lhost      ) & 0xff;
+
+        tmp[4] = (cib->address.lport >>  8) & 0xff;
+        tmp[5] = (cib->address.lport      ) & 0xff;
+        
+        int handle2;
+        
+        handle2 = TCP_open(SERVER_ADDR, SERVER_PORT_START + 20, 0, 1000);
+        
+        if(handle2 < 0) {
+            out_result_error_string(0, handle2, "tell port TCP_open() failed");
+            goto test0210end;
+        }
+        
+        res = TCP_wait_state(handle2, TESTABLISH, 3);
+        
+        if(res != E_NORMAL) {
+            out_result_error_string(0, res, "tell port TCP_wait_state() failed");
+            goto test0210end;
+        }
+        
+        res = TCP_send(handle2, tmp, 6);
+        
+        if(res != E_NORMAL) {
+            out_result_error_string(0, res, "tell port TCP_send() failed");
+            goto test0210end;
+        }
+        
+        TCP_close(handle2, 0, 0);
+        
+        //---------
+        // wait until server connects back
+        res = TCP_wait_state(handle, TESTABLISH, 5);
+        
+        if(res != E_NORMAL) {
+            out_result_error_string(0, res, "server didn't connect back");
+            goto test0210end;
+        }
+    }
+    
+    //---------------------
+    // send & receive data
+    res = sendAndReceive(tcpNotUdp, 1000, handle);
+    
+    if(!res) {                              // if single block-send-and-receive operation failed, quit and close
+        goto test0210end;
+    }
+    
+    //---------------------
+    // success flows through here
+    out_result(1);                          // success!    
+    
+test0210end:
+    if(tcpNotUdp) {
+        TCP_close(handle, 0, 0);
+    } else {
+        UDP_close(handle);
+    }
+}
+

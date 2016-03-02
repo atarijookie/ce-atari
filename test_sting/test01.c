@@ -15,7 +15,7 @@ void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD
 void test01TcpNotUdp(int testNoOffset, int tcpNotUdp);
 
 extern BYTE *rBuf, *wBuf;
-int sendAndReceive(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD blockSize, int handle);
+int sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle);
 
 void generateWriteBuffer(void);
 
@@ -137,7 +137,7 @@ void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD
     int res;
     
     for(i=0; i<blockSizesCount; i++) {
-        res = sendAndReceive(testNo, testName, tcpNotUdp, blockSizes[i], handle);
+        res = sendAndReceive(tcpNotUdp, blockSizes[i], handle);
     
         if(!res) {                              // if single block-send-and-receive operation failed, quit and close
             goto test01close;
@@ -160,7 +160,7 @@ test01close:
     }
 }
 
-int sendAndReceive(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD blockSize, int handle)
+int sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle)
 {
     //----------
     // send
@@ -183,13 +183,13 @@ int sendAndReceive(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD blockSize,
         
         now = getTicks();
         if(now >= endTime) {        // timeout? 
-            out_result_error_string(0, blockSize, "TCP / UDP send() timeout");
+            out_result_error_string(0, blockSize, "send() timeout");
             return 0;
         }
     }
     
     if(res != E_NORMAL) { 
-        out_result_error_string(0, res, "TCP / UDP send() failed");
+        out_result_error_string(0, res, "send() failed");
         return 0;
     }
     
@@ -210,12 +210,18 @@ int sendAndReceive(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD blockSize,
 
         if(res > 0) {                           // something waiting? read it
             res    = CNget_block(handle, pBuf, res);
+            
+            if(res != E_NODATA && res < 0) {    // if it's some error, and that error is not E_NODATA, fail
+                out_result_error_string(0, blockSize, "CNget_block() failed");
+                return 0;
+            }
+            
             pBuf  += res;
             toGet -= res;
         }
 
         now = getTicks();
-        if(now >= endTime) {     // timeout? 
+        if(now >= endTime) {                    // timeout? 
             out_result_error_string(0, blockSize, "CNbyte_count() timeout");
             return 0;
         }
