@@ -22,6 +22,9 @@ int acceptConnection(int listenFd);
 int fdListen[MAX_FDS];
 int fdData  [MAX_FDS];
 
+int fdListen20;
+int fdData20;
+
 #define IS_TCP_SOCK(INDEX)  (INDEX >= 0 && INDEX < 4)
 #define IS_UDP_SOCK(INDEX)  (INDEX >= 4 && INDEX < MAX_FDS)
 
@@ -73,14 +76,25 @@ void handleSocket2(int *dataFd, int port, int readCount, int tcpNotUdp);
 void handleSocket3(int *dataFd, int port, Tsock3conf *sc, int readCount, int tcpNotUdp);
 void closeSock3   (int *dataFd, int port, Tsock3conf *sc,                int tcpNotUdp);
 void handleSock3  (int *dataFd, int port, Tsock3conf *sc,                int tcpNotUdp);
+
+void handleSocket20(void);
 //---------------------------------
 
 /*
-Server sockets:
+
+Server TCP sockets:
 +0 - echo - returns the same as you send there
 +1 - client sends block length, pause between blocks, block count
 +2 - client sends number of lines, server sends that count of lines of text (terminated with end-of-line)
 +3 - client sends time, close socket after that time seconds
+
++4 \
++5  \ Server UDP sockets, same functionality as TCP, but on higher port #
++6  /
++7 /
+
++20 - TCP socket, which waits for client IP and port, so it can then connect +0 to that
+
 */
 
 #define BFR_SIZE        (1024 * 1024)
@@ -119,6 +133,8 @@ void serverMain(void)
             fdData[i]   = createListeningSocket(LISTEN_PORT_START + i, 0);      // 4..7: UDP
         }
     }
+
+    fdListen20 = createListeningSocket(LISTEN_PORT_START + 20, 1);              // +20: TCP
     
     int loops = 0;
     while(1) {
@@ -364,11 +380,13 @@ void closeSock3(int *dataFd, int port, Tsock3conf *sc, int tcpNotUdp)
 
 void server_readWriteData(void)
 {
+    int count;
+    int res;
     int i;
+
     for(i=0; i<MAX_FDS; i++) {
         if(fdData[i] > 0) {             // if socket connected
-            int count;
-            int res = ioctl(fdData[i], FIONREAD, &count);
+            res = ioctl(fdData[i], FIONREAD, &count);
 
             int tcpNotUdp = IS_TCP_SOCK(i);
 
@@ -411,6 +429,16 @@ void server_readWriteData(void)
     if(fdData[7] != 0 && sock7conf.configReceived) {            // if got socket 3 and got also the config for it
         handleSock3(&fdData[7], LISTEN_PORT_START + 7, &sock7conf, IS_TCP_SOCK(7));
     }
+
+    //-----------------
+    // specialy for socket #20
+    res = ioctl(fdData20, FIONREAD, &count);
+
+    if(count >= 6) {
+        printf("server_readWriteData: got data for socket 20\n");
+        handleSocket20();
+    }
+
 }
 
 void handleSock1(int *dataFd, int port, Tsock1conf *sc, int tcpNotUdp)
@@ -456,6 +484,15 @@ void server_checkListeningSocketsAndAccept(void)
             }
         }
     }
+
+    if(fdListen20 > 0) {
+        int s = acceptConnection(fdListen20);
+        
+        if(s > 0) {
+            fdData20 = s;
+            printf("Socked 20 connected.\n");
+        }
+    }
 }
 
 void server_checkIfDataSocketsClosed(void)
@@ -499,6 +536,11 @@ void server_checkIfDataSocketsClosed(void)
                 }
             }
         }
+    }
+
+    if(recv(fdData20, &c, 1, MSG_PEEK) == 0) {
+        close(fdData20);
+        fdData20 = 0;
     }
 }
 
@@ -554,6 +596,46 @@ int createListeningSocket(int port, int tcpNotUdp)
 
     printf("Created %s socket on port %d (fd = %d)\n", tcpNotUdp ? "TCP" : "UDP", port, fd);
     return fd;
+}
+
+void handleSocket20(void)
+{
+    int res;
+    struct sockaddr_in si_other;
+    int                slen = sizeof(si_other);
+
+    res = read(fdData20, gBfrIn, 6);    // read
+
+    if(res <= 0) {                      // closed or fail?
+        goto closeSocket20;
+    }
+
+    int ip1,ip2,ip3,ip4, port;          // get IP and port, convert it to string
+    ip1 = gBfrIn[0];
+    ip2 = gBfrIn[1];
+    ip3 = gBfrIn[2];
+    ip4 = gBfrIn[3];
+
+    port = (((int) gBfrIn[4]) << 8) | ((int) gBfrIn[5]);
+
+    char host[32];
+    sprintf(host, "%d.%d.%d.%d", ip1, ip2, ip3, ip4);
+    
+    int s = connectToHost(host, port, 1);
+
+    if(s <= 0) {                        // if failed, quit
+        goto closeSocket20;
+    }
+
+    if(fdData[0]) {                     // if there was some socket +0 opened, close it
+        close(fdData[0]);
+    }
+
+    fdData[0] = s;                      // pretend, that this outgoing socket is incomming ECHO (+0) socket
+
+closeSocket20:
+    close(fdData20);                    // close socket #20, it's not needed anymore
+    fdData20 = 0;
 }
 
 /////////////////////////////////////////////////////////////////////
