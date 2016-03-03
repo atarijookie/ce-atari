@@ -183,8 +183,14 @@ void testResolve(void)
     if(res == 2) {
         if( (adds[0] == 0x68145f51 && adds[1] == 0x68145e51) ||
             (adds[1] == 0x68145f51 && adds[0] == 0x68145e51) ) {
-        
-            ok = 1;
+    
+            #define RESOLVE_REAL1   "www.sme.sk.cdn.cloudflare.net"
+    
+            if(real != 0) {
+                if(strncmp(real, RESOLVE_REAL1, strlen(RESOLVE_REAL1)) == 0) {
+                    ok = 1;
+                }
+            }
         }
     }
     
@@ -203,7 +209,15 @@ void testResolve(void)
     
     // 92.240.253.107 -> 0x5cf0fd6b
     ok = 0;
-    if(res == 1 && adds[0] == 0x5cf0fd6b) {
+    
+    #define RESOLVE_REAL2   "kie.sk"
+    int mismatch = 1;
+    
+    if(real != 0) {
+        mismatch = strncmp(real, RESOLVE_REAL2, strlen(RESOLVE_REAL2));
+    }       
+
+    if(res == 1 && adds[0] == 0x5cf0fd6b && !mismatch) {
         ok = 1;
     }
     

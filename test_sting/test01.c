@@ -15,7 +15,7 @@ void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD
 void test01TcpNotUdp(int testNoOffset, int tcpNotUdp);
 
 extern BYTE *rBuf, *wBuf;
-int sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle);
+int sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle, BYTE getBlockNotNdb);
 
 void generateWriteBuffer(void);
 
@@ -139,7 +139,7 @@ void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD
     int res;
     
     for(i=0; i<blockSizesCount; i++) {
-        res = sendAndReceive(tcpNotUdp, blockSizes[i], handle);
+        res = sendAndReceive(tcpNotUdp, blockSizes[i], handle, 1);
     
         if(!res) {                              // if single block-send-and-receive operation failed, quit and close
             goto test01close;
@@ -162,7 +162,7 @@ test01close:
     }
 }
 
-int sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle)
+int sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle, BYTE getBlockNotNdb)
 {
     //----------
     // send
@@ -204,18 +204,33 @@ int sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle)
     DWORD toGet = blockSize;
     
     while(1) {
-        if(toGet <= 0) {                        // nothing to get? quit
+        if(toGet <= 0) {                                // nothing to get? quit
             break;
         }
     
-        res = CNbyte_count(handle);             // find out how many bytes are waiting
+        res = CNbyte_count(handle);                     // find out how many bytes are waiting
 
-        if(res > 0) {                           // something waiting? read it
-            res    = CNget_block(handle, pBuf, res);
-            
-            if(res != E_NODATA && res < 0) {    // if it's some error, and that error is not E_NODATA, fail
-                out_result_error_string(0, blockSize, "CNget_block() failed");
-                return 0;
+        if(res > 0) {                                   // something waiting? read it
+            if(getBlockNotNdb) {                        // retrieve using CNget_block?
+                res = CNget_block(handle, pBuf, res);
+                
+                if(res != E_NODATA && res < 0) {        // if it's some error, and that error is not E_NODATA, fail
+                    out_result_error_string(0, blockSize, "CNget_block() failed");
+                    return 0;
+                }
+            } else {                                    // retrieve using CNget_NDB
+                NDB *ndb = CNget_NDB(handle);
+    
+                if(ndb) {                               // if something retrieved
+                    memcpy(pBuf, ndb->ndata, ndb->len); // copy in the data
+                    
+                    KRfree (ndb->ptr);                  // free the ram
+                    KRfree (ndb);
+                    
+                    res = ndb->len;                     // it was this many bytes
+                } else {                                // if nothing retrieved
+                    res = 0;
+                }
             }
             
             pBuf  += res;

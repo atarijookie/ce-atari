@@ -25,7 +25,7 @@ int  tryReceive0206(int handle, int line);
 void doTest0208    (BYTE tcpNotUdp);
 
 void doTest0210    (WORD testNumber);
-int  sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle);
+int  sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle, BYTE getBlockNotNdb);
 int  getCab        (int handle, CAB *cab);
 
 int verifyCab(  int handle, 
@@ -193,28 +193,17 @@ void doTest0202(BYTE tcpNotUdp, BYTE test0202not0204)
     }
     
     int j;
-    for(j=0; j<10; j++) {
-        // send data
-        res = trySend0202(handle, tcpNotUdp, 1000, 3);
-
-        if(!res) {
-            out_result_string(0, "timeout on send");
-            goto test0202end;
-        }
+    BYTE getBlockNotNdb = test0202not0204 ? 0 : 1;  // test 0202 goes through CNget_NDB, test 0204 uses CNget_block
     
-        // get data
-        if(test0202not0204) {
-            res = tryReceive0202(handle, 1000, 3);
-        } else {
-            res = tryReceive0204(handle, 1000, 3);
-        }
-
-        if(res) {       // if not 0 (not good)
+    for(j=0; j<10; j++) {
+        res = sendAndReceive(tcpNotUdp, 1000, handle,  getBlockNotNdb);
+        
+        if(!res) {                                  // if 0 (not good), fail
             goto test0202end;
         }
     }
     
-    out_result(1);                 // everything OK
+    out_result(1);                                  // everything OK
     
 test0202end:
     // close connection
@@ -223,108 +212,6 @@ test0202end:
     } else {
         UDP_close(handle);
     }
-}
-
-int trySend0202(int handle, int tcpNotUdp, int size, int timeoutSecs)
-{
-    int   res;
-    int   timeoutTics = timeoutSecs * 200;
-    DWORD timeout     = getTicks() + timeoutTics;
-    
-    while(1) {
-        if(tcpNotUdp) {
-            res = TCP_send(handle, wBuf, size);
-        } else {
-            res = UDP_send(handle, wBuf, size);
-        }
-
-        if(res == E_NORMAL) {                       // if good, success
-            return 1;
-        }
-        
-        if(getTicks() >= timeout) {                 // if timeout, fail
-            return 0;
-        }
-    }
-}
-
-int tryReceive0202(int handle, int size, int timeoutSecs)
-{
-    int   timeoutTics = timeoutSecs * 200;
-    DWORD timeout     = getTicks() + timeoutTics;
-    
-    NDB *ndb;
-    
-    while(1) {
-        ndb = CNget_NDB(handle);
-
-        if(getTicks() >= timeout) {         // if timeout, fail
-            out_result_string(0, "timeout on CNget_NDB");
-            return -1;
-        }
-        
-        if(ndb) {                           // some received? process it
-            break;
-        }
-    }
-        
-    int res = 0;                            // good (for now)
-   
-    if(ndb->len != size) {                  // block size mismatch, fail
-        res = -2;
-        out_result_string(0, "CNget_NDB size mismatch");
-    }
-    
-    if(res == 0) {                          // only if size OK
-        int i;
-        for(i=0; i<size; i++) {
-            if(ndb->ndata[i] != wBuf[i]) {  // received data mismatch? fail
-                res = -3;
-                out_result_string(0, "CNget_NDB data mismatch");
-                break;
-            }
-        }
-    }
-    
-    KRfree (ndb->ptr);                      // free the ram
-    KRfree (ndb);
-
-    return res;                             // return error code
-}
-
-int tryReceive0204(int handle, int size, int timeoutSecs)
-{
-    int   timeoutTics = timeoutSecs * 200;
-    DWORD timeout     = getTicks() + timeoutTics;
-    
-    int res;
-    
-    while(1) {
-        res = CNget_block(handle, rBuf, size);
-    
-        if(getTicks() >= timeout) {         // if timeout, fail
-            out_result_string(0, "timeout on CNget_block");
-            return -1;
-        }
-
-        if(res != E_NODATA) {
-            break;
-        }
-    }
-        
-    if(res != size) { 
-        out_result_error_string(0, res, "CNget_block failed");
-        return res;
-    }        
-
-    res = memcmp(wBuf, rBuf, size);
-    
-    if(res != 0) {
-        out_result_string(0, "data mismatch");
-        return -2;
-    }
-    
-    return 0;           // good
 }
 
 void doTest0206(BYTE tcpNotUdp)
@@ -408,7 +295,7 @@ int tryReceive0206(int handle, int line)
     
     if((lenFromString + 4) != lenFromStrlen) {
         out_result_error_string(0, line, "too short received string");
-        out_result_string_dw_w(0, rBuf, lenFromString, lenFromStrlen);
+        out_result_string_dw_w(0, (char *) rBuf, lenFromString, lenFromStrlen);
         return -2;
     }
     
@@ -760,7 +647,7 @@ void doTest0210(WORD testNumber)
     
     //---------------------
     // send & receive data
-    res = sendAndReceive(tcpNotUdp, 1000, handle);
+    res = sendAndReceive(tcpNotUdp, 1000, handle, 1);
     
     if(!res) {                              // if single block-send-and-receive operation failed, quit and close
         goto test0210end;
