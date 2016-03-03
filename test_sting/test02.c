@@ -293,7 +293,9 @@ int tryReceive0206(int handle, int line)
     int lenFromString = getIntFromStr((char *) rBuf, 4);
     int lenFromStrlen = strlen       ((char *) rBuf);
     
-    if((lenFromString + 4) != lenFromStrlen) {
+    // If the lenght from sting doesn't match the length from strlen(), fail
+    // Valid difference between those lengths is 3, because strlen() on server also count '\n', and strlen() on client also counts integer on start, but there's no '\n'.
+    if((lenFromString + 3) != lenFromStrlen) {      
         out_result_error_string(0, line, "too short received string");
         out_result_string_dw_w(0, (char *) rBuf, lenFromString, lenFromStrlen);
         return -2;
@@ -739,3 +741,4 @@ void doTest0240(void)
 {
     // test canaries on CNget_block
 }
+
