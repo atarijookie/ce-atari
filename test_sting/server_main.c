@@ -144,7 +144,7 @@ void serverMain(void)
         server_readWriteData();
 
         if(loops >= 10) {
-            printf(".\n");
+            //printf(".\n");
             loops = 0;
         }
         loops++;
@@ -269,6 +269,7 @@ void sock1send(int *dataFd, int port, Tsock1conf *sc, int tcpNotUdp)
 void handleSocket2(int *dataFd, int port, int readCount, int tcpNotUdp)
 {
     if(readCount < 2) {
+        printf("handleSocket2 - not enough data\n");
         return;
     }
 
@@ -284,11 +285,14 @@ void handleSocket2(int *dataFd, int port, int readCount, int tcpNotUdp)
     }
 
     if(res <= 0) {                                  // closed or fail?
+        printf("handleSocket2 - closed or fail\n");
         goto closeSock2;
     }
 
     int linesCount = (gBfrIn[0] <<  8) |  gBfrIn[1];
 
+    printf("handleSocket2 - will send linesCount: %d\n", linesCount);
+    
     char *lines[10] = {
                         "Bacon ipsum dolor amet strip steak turducken meatball short loin rump ham ribeye ham hock turkey.\n", 
                         "Fatback shank turducken, drumstick chuck turkey pork belly prosciutto.\n",
@@ -332,16 +336,18 @@ closeSock2:
         *dataFd = 0;
     }
 
-    printf("Socket 2 closed\n");
+    printf("Socket 2 closed\n\n");
 }
 
 void handleSocket3(int *dataFd, int port, Tsock3conf *sc, int readCount, int tcpNotUdp)
 {
     if(readCount < 2) {                 // not enough data?
+        printf("handleSocket3 - not enough data\n");
         return;
     }
 
     if(sc->configReceived) {            // if config received, don't receive it again
+        printf("handleSocket3 - config received, not processing\n");
         return;
     }
 
@@ -364,13 +370,18 @@ void handleSocket3(int *dataFd, int port, Tsock3conf *sc, int readCount, int tcp
     sc->closeAfterTime    = (gBfrIn[0] <<  8) |  gBfrIn[1];               // time - in ms, after which the socket should be closed
     sc->closeTime         = getCurrentMs() + sock3conf.closeAfterTime;    // local time, after which the sock should be closed
     sc->configReceived    = 1;
+    
+    printf("handleSocket3 - closeAfterTime: %d ms\n", sc->closeAfterTime);
 }
 
 void closeSock3(int *dataFd, int port, Tsock3conf *sc, int tcpNotUdp)
 {
     if(*dataFd > 0 && tcpNotUdp) {
+        printf("closeSock3 - closed socket %d\n", *dataFd);
         close(*dataFd);
         *dataFd = 0;
+    } else {
+        printf("closeSock3 - NOT closed socket %d\n", *dataFd);
     }
 
     sc->configReceived    = 0;
@@ -462,6 +473,7 @@ void handleSock3(int *dataFd, int port, Tsock3conf *sc, int tcpNotUdp)
     int now = getCurrentMs();
 
     if(now >= sc->closeTime) {                                  // if enough time passed, we can close this socket
+        printf("handleSock3 - closing socket 3, because %d >= %d\n", now, sc->closeTime);
         closeSock3(dataFd, port, sc, tcpNotUdp);
     }
 }
@@ -873,6 +885,8 @@ int connectToHost(char *host, int port, int tcpNotUdp)
 {
     struct sockaddr_in serv_addr; 
 
+    printf("connectToHost(%s, %d, %s)\n", host, port, (tcpNotUdp ? "TCP" : "UDP"));
+    
     int s;
     if(tcpNotUdp) {     // for TCP
         s = socket(AF_INET, SOCK_STREAM, 0);

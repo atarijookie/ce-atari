@@ -20,7 +20,7 @@ int tryReceive0202(int handle, int size, int timeoutSecs);
 int tryReceive0204(int handle, int size, int timeoutSecs);
 
 void doTest0206    (BYTE tcpNotUdp);
-int  tryReceive0206(int handle);
+int  tryReceive0206(int handle, int line);
 
 void doTest0208    (BYTE tcpNotUdp);
 
@@ -364,7 +364,7 @@ void doTest0206(BYTE tcpNotUdp)
     
     int j;
     for(j=0; j<GETS_LINES; j++) {
-        res = tryReceive0206(handle);
+        res = tryReceive0206(handle, j);
 
         if(res) {       // if not 0 (not good)
             goto test0206end;
@@ -382,7 +382,7 @@ test0206end:
     }
 }
 
-int tryReceive0206(int handle)
+int tryReceive0206(int handle, int line)
 {
     int   timeoutTics = 3 * 200;
     DWORD timeout     = getTicks() + timeoutTics;
@@ -393,12 +393,12 @@ int tryReceive0206(int handle)
     while(1) {
         res = CNgets(handle, rBuf, 200, '\n');
     
-        if(res == E_NORMAL) {               // if good, quit
+        if(res > 0) {                       // if good, quit
             break;
         }
 
         if(getTicks() >= timeout) {         // if timeout, fail
-            out_result_string(0, "timeout on CNgets");
+            out_result_error_string(0, line, "timeout on CNgets");
             return res;
         }
     }
@@ -407,7 +407,8 @@ int tryReceive0206(int handle)
     int lenFromStrlen = strlen       ((char *) rBuf);
     
     if((lenFromString + 4) != lenFromStrlen) {
-        out_result_string(0, "too short received string");
+        out_result_error_string(0, line, "too short received string");
+        out_result_string_dw_w(0, rBuf, lenFromString, lenFromStrlen);
         return -2;
     }
     
@@ -499,9 +500,9 @@ void doTest0208(BYTE tcpNotUdp)
     DWORD start = getTicks();
     if(tcpNotUdp) {
         // wait for connection to close
-        res = TCP_wait_state(handle, TCLOSED, 3);
+        res = TCP_wait_state(handle, TCLOSE_WAIT, 3);
         
-        if(res != E_NORMAL) {                       // if didn't get to TCLOSED state, fail
+        if(res != E_NORMAL) {                       // if didn't get to TCLOSE_WAIT state, fail
             out_result_error_string(0, res, "waiting for close failed");
             goto test0208end;
         }
