@@ -27,7 +27,7 @@ void doTest0208    (BYTE tcpNotUdp);
 void doTest0210    (WORD testNumber);
 int  sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle, BYTE getBlockNotNdb);
 int  getCab        (int handle, CAB *cab);
-int  tellServerToConnectToOutPassiveConnection(int handlePassive, WORD myPort);
+int  tellServerToConnectToOutPassiveConnection(int handlePassive);
 
 int verifyCab(  int handle, 
                 DWORD lhost, char op1, WORD lport, char op2, 
@@ -629,8 +629,7 @@ void doTest0210(WORD testNumber)
     //---------------------
     // for passive connection, send local port to server, wait for connection
     if(!activeNotPassive) {
-        //---------
-        res = tellServerToConnectToOutPassiveConnection(handle, LOCAL_PASSIVE_PORT);
+        res = tellServerToConnectToOutPassiveConnection(handle);
 
         if(!res) {              // failed to tell server? fail
             goto test0210end;
@@ -724,7 +723,7 @@ int verifyCab(  int handle,
     return 1;
 }
 
-int tellServerToConnectToOutPassiveConnection(int handlePassive, WORD myPort)
+int tellServerToConnectToOutPassiveConnection(int handlePassive)
 {
     int res;
 
@@ -769,8 +768,8 @@ int tellServerToConnectToOutPassiveConnection(int handlePassive, WORD myPort)
     tmp[2] = (myIp   >>  8) & 0xff;
     tmp[3] = (myIp        ) & 0xff;
 
-    tmp[4] = (myPort >>  8) & 0xff;
-    tmp[5] = (myPort      ) & 0xff;
+    tmp[4] = (cib->address.lport >> 8) & 0xff;
+    tmp[5] = (cib->address.lport     ) & 0xff;
     
     res = TCP_send(handle2, tmp, 6);
     
@@ -809,7 +808,7 @@ void doTest0230(void)
     // wait using TCP_wait_state
     out_test_header(0x0230, "PASSIVE waiting using TCP_wait_state");
     handle  = createPassiveConnection(LOCAL_PASSIVE_PORT);
-    res     = tellServerToConnectToOutPassiveConnection(handle, LOCAL_PASSIVE_PORT);
+    res     = tellServerToConnectToOutPassiveConnection(handle);
     if(res) {
         res = TCP_wait_state(handle, TESTABLISH, 3);    // wait 3 seconds for connection
         ok = (res == E_NORMAL) ? 1 : 0;
@@ -822,7 +821,7 @@ void doTest0230(void)
     // wait using CNbyte_count
     out_test_header(0x0231, "PASSIVE waiting using CNbyte_count");
     handle  = createPassiveConnection(LOCAL_PASSIVE_PORT);
-    res     = tellServerToConnectToOutPassiveConnection(handle, LOCAL_PASSIVE_PORT);
+    res     = tellServerToConnectToOutPassiveConnection(handle);
     if(res) {
         DWORD end = getTicks() + 600;           // wait 3 seconds for connection
 
@@ -848,7 +847,7 @@ void doTest0230(void)
     // wait by check out the info that is pointed to by the pointer returned by CNgetinfo
     out_test_header(0x0232, "PASSIVE waiting using CNgetinfo");
     handle  = createPassiveConnection(LOCAL_PASSIVE_PORT);
-    res     = tellServerToConnectToOutPassiveConnection(handle, LOCAL_PASSIVE_PORT);
+    res     = tellServerToConnectToOutPassiveConnection(handle);
     
     CIB *cib = CNgetinfo(handle);
     
@@ -879,10 +878,10 @@ void doTest0240(void)
     int handle;
 
     // open connection
-    out_test_header(0x0240, "CNget_block canaries");
     handle = TCP_open(SERVER_ADDR, SERVER_PORT_START, 0, 2000);
 
     if(handle < 0) {
+        out_test_header(0x0240, "CNget_block canaries");
         out_result_string(0, "TCP_open failed");
         return;
     }
