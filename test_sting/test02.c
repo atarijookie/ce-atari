@@ -27,6 +27,7 @@ void doTest0208    (BYTE tcpNotUdp);
 void doTest0210    (WORD testNumber);
 int  sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle, BYTE getBlockNotNdb);
 int  getCab        (int handle, CAB *cab);
+int  tellServerToConnectToOutPassiveConnection(int handlePassive, WORD myPort);
 
 int verifyCab(  int handle, 
                 DWORD lhost, char op1, WORD lport, char op2, 
@@ -34,6 +35,10 @@ int verifyCab(  int handle,
                 
 void doTest0230    (void);
 void doTest0240    (void);
+
+int testCanaries(int handle, int blockSize, int offset);
+
+#define LOCAL_PASSIVE_PORT 10000
 
 void doTest02(void)
 {
@@ -416,9 +421,9 @@ void doTest0210(WORD testNumber)
     
     CAB cab;
     cab.lhost = 0;                      // local  host
-    cab.lport = 10000;                  // local  port
-    cab.rhost = SERVER_ADDR;            // remove host
-    cab.rport = SERVER_PORT_START;      // remove port
+    cab.lport = LOCAL_PASSIVE_PORT;     // local  port
+    cab.rhost = SERVER_ADDR;            // remote host
+    cab.rport = SERVER_PORT_START;      // remote port
     
     int tcpNotUdp           = 1;        // by default - TCP
     int activeNotPassive    = 1;        // by default - active connection
@@ -592,50 +597,11 @@ void doTest0210(WORD testNumber)
     // for passive connection, send local port to server, wait for connection
     if(!activeNotPassive) {
         //---------
-        // find out local port
-        CIB *cib = CNgetinfo(handle);
-        
-        if(!cib) {
-            out_result_string(0, "CNgetinfo() failed");
-            goto test0210end;
-        }
-        
-        //---------
-        // send local port to server
-        BYTE tmp[6];
-        
-        tmp[0] = (myIp >> 24) & 0xff;
-        tmp[1] = (myIp >> 16) & 0xff;
-        tmp[2] = (myIp >>  8) & 0xff;
-        tmp[3] = (myIp      ) & 0xff;
+        res = tellServerToConnectToOutPassiveConnection(handle, LOCAL_PASSIVE_PORT);
 
-        tmp[4] = (cib->address.lport >>  8) & 0xff;
-        tmp[5] = (cib->address.lport      ) & 0xff;
-        
-        int handle2;
-        
-        handle2 = TCP_open(SERVER_ADDR, SERVER_PORT_START + 20, 0, 1000);
-        
-        if(handle2 < 0) {
-            out_result_error_string(0, handle2, "tell port TCP_open() failed");
+        if(!res) {              // failed to tell server? fail
             goto test0210end;
         }
-        
-        res = TCP_wait_state(handle2, TESTABLISH, 3);
-        
-        if(res != E_NORMAL) {
-            out_result_error_string(0, res, "tell port TCP_wait_state() failed");
-            goto test0210end;
-        }
-        
-        res = TCP_send(handle2, tmp, 6);
-        
-        if(res != E_NORMAL) {
-            out_result_error_string(0, res, "tell port TCP_send() failed");
-            goto test0210end;
-        }
-        
-        TCP_close(handle2, 0, 0);
         
         //---------
         // wait until server connects back
@@ -725,20 +691,296 @@ int verifyCab(  int handle,
     return 1;
 }
 
+int tellServerToConnectToOutPassiveConnection(int handlePassive, WORD myPort)
+{
+    int res;
+
+    //---------
+    // find out local port
+    CIB *cib = CNgetinfo(handlePassive);
+    
+    if(!cib) {
+        out_result_string(0, "CNgetinfo() failed");
+        return 0;
+    }
+    
+    //---------
+    // connect to server
+    int handle2;
+    
+    handle2 = TCP_open(SERVER_ADDR, SERVER_PORT_START + 20, 0, 1000);
+    
+    if(handle2 < 0) {
+        out_result_error_string(0, handle2, "tell port TCP_open() failed");
+        return 0;
+    }
+    
+    res = TCP_wait_state(handle2, TESTABLISH, 3);
+    
+    if(res != E_NORMAL) {
+        out_result_error_string(0, res, "tell port TCP_wait_state() failed");
+        TCP_close(handle2, 0, 0);
+        return 0;
+    }
+
+    //---------
+    // send local port to server
+    CAB         cab;
+    res         = getCab(handle2, &cab);
+    DWORD myIp  = cab.lhost;
+
+    BYTE tmp[6];
+    
+    tmp[0] = (myIp   >> 24) & 0xff;
+    tmp[1] = (myIp   >> 16) & 0xff;
+    tmp[2] = (myIp   >>  8) & 0xff;
+    tmp[3] = (myIp        ) & 0xff;
+
+    tmp[4] = (myPort >>  8) & 0xff;
+    tmp[5] = (myPort      ) & 0xff;
+    
+    res = TCP_send(handle2, tmp, 6);
+    
+    if(res != E_NORMAL) {
+        out_result_error_string(0, res, "tell port TCP_send() failed");
+        TCP_close(handle2, 0, 0);
+        return 0;
+    }
+    
+    TCP_close(handle2, 0, 0);
+    return 1;
+}
+
+int createPassiveConnection(int localPort)
+{
+    int handle;
+    
+    CAB cab;
+    cab.lhost = 0;                      // local  host
+    cab.lport = localPort;              // local  port
+    
+    // remote host and port must be 0, otherwise socket won't listen
+    cab.rhost = 0;                      // remote host
+    cab.rport = 0;                      // remote port
+    
+    handle = TCP_open(&cab, TCP_PASSIVE, 0, 2000);
+
+    return handle;
+}
+
 void doTest0230(void)
 {
-    // open passive connection 
-    
+    int handle, res, ok;
+
+    //--------------------------
     // wait using TCP_wait_state
+    out_test_header(0x0230, "PASSIVE waiting using TCP_wait_state");
+    handle  = createPassiveConnection(LOCAL_PASSIVE_PORT);
+    res     = tellServerToConnectToOutPassiveConnection(handle, LOCAL_PASSIVE_PORT);
+    if(res) {
+        res = TCP_wait_state(handle, TESTABLISH, 3);    // wait 3 seconds for connection
+        ok = (res == E_NORMAL) ? 1 : 0;
     
+        out_result_error(ok, res);
+    }
+    TCP_close(handle, 0, 0);
+    
+    //--------------------------    
     // wait using CNbyte_count
+    out_test_header(0x0231, "PASSIVE waiting using CNbyte_count");
+    handle  = createPassiveConnection(LOCAL_PASSIVE_PORT);
+    res     = tellServerToConnectToOutPassiveConnection(handle, LOCAL_PASSIVE_PORT);
+    if(res) {
+        DWORD end = getTicks() + 600;           // wait 3 seconds for connection
+
+        ok = 0;
+        while(1) {
+            if(getTicks() >= end) {             // if timeout, fail
+                ok = 0;
+                break;
+            }
+        
+            res = CNbyte_count(handle);         // try to get byte count, which will return E_LISTEN if still listening
+            
+            if(res >= 0 || res == E_NODATA) {   // can finally get amount waiting, or E_NODATA? it's better than E_LISTEN, good
+                ok = 1;
+                break;
+            }
+        }
+        out_result_error(ok, res);
+    }
+    TCP_close(handle, 0, 0);
     
+    //--------------------------    
     // wait by check out the info that is pointed to by the pointer returned by CNgetinfo
+    out_test_header(0x0232, "PASSIVE waiting using CNgetinfo");
+    handle  = createPassiveConnection(LOCAL_PASSIVE_PORT);
+    res     = tellServerToConnectToOutPassiveConnection(handle, LOCAL_PASSIVE_PORT);
     
+    CIB *cib = CNgetinfo(handle);
+    
+    if(cib != NULL) {
+        DWORD end = getTicks() + 600;           // wait 3 seconds for connection
+
+        ok = 0;
+        while(1) {
+            if(getTicks() >= end) {             // if timeout, fail
+                ok = 0;
+                break;
+            }
+
+            if(cib->address.rhost != 0) {       // did remote host change from 0 to something? We're connected, good
+                ok = 1;
+                break;
+            }
+        }
+        out_result_error(ok, res);
+    } else {
+        out_result_string(0, "CNgetinfo failed");
+    }
+    TCP_close(handle, 0, 0);
 }
 
 void doTest0240(void)
 {
+    int handle;
+
+    // open connection
+    out_test_header(0x0240, "CNget_block canaries");
+    handle = TCP_open(SERVER_ADDR, SERVER_PORT_START, 0, 2000);
+
+    if(handle < 0) {
+        out_result_string(0, "TCP_open failed");
+        return;
+    }
+        
     // test canaries on CNget_block
+    WORD testNo = 0x0240;
+    
+    out_test_header(testNo++, "CNget_block canaries  511 0");
+    testCanaries(handle, 511, 0);
+    
+    out_test_header(testNo++, "CNget_block canaries  511 1");
+    testCanaries(handle, 511, 1);
+    
+    out_test_header(testNo++, "CNget_block canaries  512 0");
+    testCanaries(handle, 512, 0);
+    
+    out_test_header(testNo++, "CNget_block canaries  512 1");
+    testCanaries(handle, 512, 1);
+
+    out_test_header(testNo++, "CNget_block canaries  513 0");
+    testCanaries(handle, 513, 0);
+    
+    out_test_header(testNo++, "CNget_block canaries  513 1");
+    testCanaries(handle, 513, 1);
+    
+    out_test_header(testNo++, "CNget_block canaries 1023 0");
+    testCanaries(handle, 1023, 0);
+    
+    out_test_header(testNo++, "CNget_block canaries 1023 1");
+    testCanaries(handle, 1023, 1);
+    
+    out_test_header(testNo++, "CNget_block canaries 1024 0");
+    testCanaries(handle, 1024, 0);
+    
+    out_test_header(testNo++, "CNget_block canaries 1024 1");
+    testCanaries(handle, 1024, 1);
+    
+    out_test_header(testNo++, "CNget_block canaries 1025 0");
+    testCanaries(handle, 1025, 0);
+    
+    out_test_header(testNo++, "CNget_block canaries 1025 1");
+    testCanaries(handle, 1025, 1);
+    
+    out_test_header(testNo++, "CNget_block canaries 1535 0");
+    testCanaries(handle, 1535, 0);
+    
+    out_test_header(testNo++, "CNget_block canaries 1535 1");
+    testCanaries(handle, 1535, 1);
+    
+    out_test_header(testNo++, "CNget_block canaries 1536 0");
+    testCanaries(handle, 1536, 0);
+    
+    out_test_header(testNo++, "CNget_block canaries 1536 1");
+    testCanaries(handle, 1536, 1);
+    
+    out_test_header(testNo++, "CNget_block canaries 1537 0");
+    testCanaries(handle, 1537, 0);
+    
+    out_test_header(testNo++, "CNget_block canaries 1537 1");
+    testCanaries(handle, 1537, 1);
+    
+    TCP_close(handle, 0, 0);
 }
 
+int testCanaries(int handle, int blockSize, int offset)
+{
+    int res;
+    
+    //------------
+    // send data
+    res = TCP_send(handle, wBuf, blockSize);
+    
+    if(res != E_NORMAL) {
+        out_result_error_string(0, res, "send failed");
+        return 0;
+    }
+    
+    //------------
+    // wait for enough data to arrive
+    DWORD end = getTicks() + 600;
+    while(1) {
+        if(getTicks() >= end) {                     // if timeout, fail
+            out_result_error_string(0, res, "waiting for data failed");
+            return 0;
+        }
+        
+        res = CNbyte_count(handle);
+        
+        if(res >= blockSize) {                      // if enough data arrived, stop waiting
+            break;
+        }
+    }
+    
+    //------------
+    // prepare read buffer and receive data
+    memcpy(rBuf                 + offset, "CANARIES", 8);    // put canaries before buffer
+    memset(rBuf + 8             + offset, 0, blockSize);     // clear buffer
+    memcpy(rBuf + 8 + blockSize + offset, "HMNGBRDS", 8);    // put canaries after buffer
+    
+    res = CNget_block(handle, rBuf + 8 + offset, blockSize); // read data
+
+    if(res < blockSize) {
+        out_result_error_string(0, res, "CNget_block not enough data");
+        return 0;
+    }
+    
+    // verify received data
+    int mismatch = memcmp(wBuf, rBuf + 8 + offset, blockSize);
+    
+    if(mismatch) {                                              // if mismatch
+        out_result_error_string(0, res, "received data mismatch");
+        return 0;
+    }
+    
+    // verify canaries before received buffer
+    mismatch = memcmp(rBuf + offset, "CANARIES", 8);
+    
+    if(mismatch) {                                              // if mismatch
+        out_result_error_string(0, res, "canaries before destroyed");
+        return 0;
+    }
+    
+    // verify canaries after received buffer
+    mismatch = memcmp(rBuf + 8 + blockSize + offset, "HMNGBRDS", 8);
+    
+    if(mismatch) {                                              // if mismatch
+        out_result_error_string(0, res, "canaries after destroyed");
+        return 0;
+    }
+    
+    // everything OK
+    out_result(1);
+    return 1;
+}
