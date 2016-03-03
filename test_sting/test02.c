@@ -236,6 +236,16 @@ void doTest0206(BYTE tcpNotUdp)
         out_result_error_string(0, handle, "open failed");
         return;
     }
+
+    //----------
+    // try when there is no data to get
+    res = CNgets(handle, rBuf, 9, '\n');        // try to receive to small buffer
+    
+    if(res != E_NODATA) {                       // if not this error, fail
+        out_result_error_string(0, res, "didn't get E_NODATA on empty socket");
+        goto test0206end;
+    }
+    //----------
     
     #define GETS_LINES  32
     
@@ -253,6 +263,29 @@ void doTest0206(BYTE tcpNotUdp)
         out_result_string(0, "timeout on send");
         goto test0206end;
     }
+
+    //-----------
+    // try too small buffer
+    DWORD end = getTicks() + 600;
+    while(1) {                                  // wait until there is some data
+        if(getTicks() >= end) {
+            out_result_string(0, "timeout on wait for data");
+            goto test0206end;
+        }
+        
+        res = CNbyte_count(handle);
+        if(res >= 10) {
+            break;
+        }
+    }
+    
+    res = CNgets(handle, rBuf, 9, '\n');        // try to receive to small buffer
+    
+    if(res != E_BIGBUF) {                       // if not this error, fail
+        out_result_error_string(0, res, "didn't get E_BIGBUF on small buffer");
+        goto test0206end;
+    }
+    //-----------
     
     int j;
     for(j=0; j<GETS_LINES; j++) {
