@@ -26,7 +26,12 @@ void doTest0208    (BYTE tcpNotUdp);
 
 void doTest0210    (WORD testNumber);
 int  sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle);
+int  getCab        (int handle, CAB *cab);
 
+int verifyCab(  int handle, 
+                DWORD lhost, char op1, WORD lport, char op2, 
+                DWORD rhost, char op3, WORD rport, char op4 );
+                
 void doTest0230    (void);
 void doTest0240    (void);
 
@@ -47,16 +52,26 @@ void doTest02(void)
     // CNgets
     doTest0206(1);      // TCP
     doTest0206(0);      // UDP
-    
+
     // CNgetinfo
     doTest0208(1);      // TCP
     doTest0208(0);      // UDP
     
+    //----------------------------
+    /*
+    TCP_ACTIVE : remote host and port must be specified.
+                 Local host is local IP.
+    
+    TCP_PASSIVE: remote host and port must be 0, otherwise socket won't listen.
+                 Local host is 0.
+    */
+
     // TCP_open() and UDP_open - addressing modes tests
     int i;
     for(i = 0x0210; i <= 0x0222; i++) {
         doTest0210(i);
     }
+    //----------------------------
     
     // TCP waiting for listening socket to connect
     doTest0230();
@@ -507,7 +522,7 @@ test0208end:
 
 void doTest0210(WORD testNumber)
 {
-    int handle, res, ok;
+    int handle, res;
     
     CAB cab;
     cab.lhost = 0;                      // local  host
@@ -518,87 +533,164 @@ void doTest0210(WORD testNumber)
     int tcpNotUdp           = 1;        // by default - TCP
     int activeNotPassive    = 1;        // by default - active connection
     
+    CAB cab2;
+    memset(&cab2, 0, sizeof(CAB));
+    
+    static uint32 myIp = 0;
+    
+    #define TCP_FIRST_PORT      1024
+    #define UDP_FIRST_PORT      1024
+    
     switch(testNumber) {
         /////////////////
         // remote host is normal IP
         case 0x0210:                // TCP, rem_host = IP addr, rem_port = port number (not TCP_ACTIVE, not TCP_PASSIVE) --> ACTIVE
             out_test_header(testNumber, "TCP_open - IP specified, port specified");
             handle = TCP_open(SERVER_ADDR, SERVER_PORT_START, 0, 2000);
+            
+            res = getCab(handle, &cab2);
+            myIp = cab2.lhost;
+            
+            if(!verifyCab(handle, myIp, '!', 0, ' ', SERVER_ADDR, '!', SERVER_PORT_START, '!')) {
+                goto test0210end;
+            }
+            
             break;
             
-        case 0x0211:                // TCP, rem_host = 0,       rem_port = port number (not TCP_ACTIVE, not TCP_PASSIVE) --> PASSIVE, rem_port is local port number
-            activeNotPassive = 0;   // passive connection
-            out_test_header(testNumber, "TCP_open - IP specified, port 0");
-            handle = TCP_open(SERVER_ADDR, 0, 0, 2000);
-            break;
-
         /////////////////
         // remote host is CAB *, TCP_ACTIVE
-        case 0x0212:                // TCP, rem_host = CAB *,   rem_port = TCP_ACTIVE, rport & rhost specify remote address, cab->lport is local port, cab->lhost may be 0 (in that case it's filled with local ip)
+        case 0x0211:                // TCP, rem_host = CAB *,   rem_port = TCP_ACTIVE, rport & rhost specify remote address, cab->lport is local port, cab->lhost may be 0 (in that case it's filled with local ip)
             out_test_header(testNumber, "TCP_open - TCP_ACTIVE, got remote & local");
-            handle = TCP_open(&cab,        TCP_ACTIVE, 0, 2000);
+            handle = TCP_open(&cab, TCP_ACTIVE, 0, 2000);
+
+            if(!verifyCab(handle, myIp, '!', cab.lport, '!', cab.rhost, '!', cab.rport, '!')) {
+                goto test0210end;
+            }
+            
             break;
 
-        case 0x0213:                // TCP, rem_host = CAB *,   rem_port = TCP_ACTIVE, rport & rhost specify remote address, cab->lport is 0, next free port will be used (use CNgetinfo() to find out used port #), cab->lhost may be 0 (in that case it's filled with local ip)
+        case 0x0212:                // TCP, rem_host = CAB *,   rem_port = TCP_ACTIVE, rport & rhost specify remote address, cab->lport is 0, next free port will be used (use CNgetinfo() to find out used port #), cab->lhost may be 0 (in that case it's filled with local ip)
             out_test_header(testNumber, "TCP_open - TCP_ACTIVE, got only remote");
+            cab.lhost = 0;
             cab.lport = 0;
-            handle = TCP_open(&cab,        TCP_ACTIVE, 0, 2000);
+            handle = TCP_open(&cab, TCP_ACTIVE, 0, 2000);
+
+            if(!verifyCab(handle, myIp, '!', TCP_FIRST_PORT, '<', cab.rhost, '!', cab.rport, '!')) {
+                goto test0210end;
+            }
+
             break;
         
-        case 0x0214:                // TCP, rem_host = 0,       rem_port = TCP_ACTIVE --> either will crash, or returns E_PARAMETER
+        case 0x0213:                // TCP, rem_host = 0,       rem_port = TCP_ACTIVE --> becomes PASSIVE connection, local port is next free port
             out_test_header(testNumber, "TCP_open - TCP_ACTIVE, rem_host is NULL");
             handle = TCP_open(NULL,        TCP_ACTIVE, 0, 2000);
             
-            ok = (handle == E_PARAMETER) ? 1 : 0;
-            out_result(ok);
-            return;
+            activeNotPassive = 0;   // passive connection, because nothing specified as rem_host
+            
+            // when listening, local host is 0
+            if(!verifyCab(handle, 0, '!', TCP_FIRST_PORT, '<', 0, '!', 0, '!')) {
+                goto test0210end;
+            }
             
             break;
 
         /////////////////
         // remote host is CAB *, TCP_PASSIVE
-        case 0x0215:                // TCP, rem_host = CAB *,   rem_port = TCP_PASSIVE, cab->lport is local port
+        case 0x0214:                // TCP, rem_host = CAB *,   rem_port = TCP_PASSIVE, cab->lport is local port
             activeNotPassive = 0;   // passive connection
             out_test_header(testNumber, "TCP_open - TCP_PASSIVE, got local port");
-            handle = TCP_open(&cab,        TCP_PASSIVE, 0, 2000);
+            
+            // remote host and port must be 0, otherwise socket won't listen
+            cab.rhost = 0;          
+            cab.rport = 0;
+            
+            handle = TCP_open(&cab, TCP_PASSIVE, 0, 2000);
+            
+            // when listening, local host is 0
+            if(!verifyCab(handle, 0, '!', cab.lport, '!', 0, ' ', 0, ' ')) {
+                goto test0210end;
+            }
+
             break;
 
-        case 0x0216:                // TCP, rem_host = CAB *,   rem_port = TCP_PASSIVE, cab->lport is 0, next free port will be used (use CNgetinfo() to find out used port #)
+        case 0x0215:                // TCP, rem_host = CAB *,   rem_port = TCP_PASSIVE, cab->lport is 0, next free port will be used (use CNgetinfo() to find out used port #)
             activeNotPassive = 0;   // passive connection
             out_test_header(testNumber, "TCP_open - TCP_PASSIVE, local port is 0");
+            
+            // remote host and port must be 0, otherwise socket won't listen
+            cab.rhost = 0;          
+            cab.rport = 0;
+
             cab.lport = 0;
-            handle = TCP_open(&cab,        TCP_PASSIVE, 0, 2000);
+            handle = TCP_open(&cab, TCP_PASSIVE, 0, 2000);
+            
+            // when listening, local host is 0
+            if(!verifyCab(handle, 0, '!', TCP_FIRST_PORT, '<', 0, ' ', 0, ' ')) {
+                goto test0210end;
+            }
+            
             break;
         
-        case 0x0217:                // TCP, rem_host = 0,       rem_port = TCP_PASSIVE --> either will crash, or will open PASSIVE connection on next free port
+        case 0x0216:                // TCP, rem_host = 0,       rem_port = TCP_PASSIVE --> either will crash, or will open PASSIVE connection on next free port
             activeNotPassive = 0;   // passive connection
             out_test_header(testNumber, "TCP_open - TCP_PASSIVE, rem_host is NULL");
-            handle = TCP_open(NULL,        TCP_PASSIVE, 0, 2000);
+            
+            // remote host and port must be 0, otherwise socket won't listen
+            cab.rhost = 0;          
+            cab.rport = 0;
+            
+            handle = TCP_open(NULL, TCP_PASSIVE, 0, 2000);
+            
+            // when listening, local host is 0
+            if(!verifyCab(handle, 0, '!', TCP_FIRST_PORT, '<', 0, ' ', 0, ' ')) {
+                goto test0210end;
+            }
+            
             break;
             
         ////////////////////////////////////////////////////////
         case 0x0220:                // UDP, rem_host is IP,    rem_port is port # (not 0 / UDP_EXTEND) -> remote is to IP:port, local port is next free port
             tcpNotUdp = 0;          // it's UDP
             out_test_header(testNumber, "UDP_open - IP specified, port specified");
-            handle = UDP_open(SERVER_ADDR, SERVER_PORT_START);
+            handle = UDP_open(SERVER_ADDR, SERVER_PORT_START + 4);
+
+            if(!verifyCab(handle, myIp, '!', UDP_FIRST_PORT, '<', SERVER_ADDR, '!', SERVER_PORT_START + 4, '!')) {
+                goto test0210end;
+            }
+            
             break;
 
         case 0x0221:                // UDP, rem_host is CAB *, rem_port is 0 / UDP_EXTEND, cab->lport is port # (not 0) -> open UDP on this local port
             tcpNotUdp = 0;          // it's UDP
             out_test_header(testNumber, "UDP_open - UDP_EXTEND, got local port");
+            
+            cab.rport += 4;
+            
             handle = UDP_open(&cab, UDP_EXTEND);
+            
+            if(!verifyCab(handle, myIp, '!', cab.lport, '!', cab.rhost, '!', cab.rport, '!')) {
+                goto test0210end;
+            }
+            
             break;
         
         case 0x0222:                // UDP, rem_host is CAB *, rem_port is 0 / UDP_EXTEND, cab->lport is 0              -> open UDP on first free local port
             tcpNotUdp = 0;          // it's UDP
             out_test_header(testNumber, "UDP_open - UDP_EXTEND, local port is 0");
-            cab.lport = 0;
+            cab.lport  = 0;
+            cab.rport += 4;
+
             handle = UDP_open(&cab, UDP_EXTEND);
+            
+            if(!verifyCab(handle, myIp, '!', UDP_FIRST_PORT, '<', cab.rhost, '!', cab.rport, '!')) {
+                goto test0210end;
+            }
+            
             break;
             
         ////////////////////////////////////////////////////////
         // bad test case number? quit
-        default:    return;
+        default:        return;
     }
     
     if(handle < 0) {
@@ -622,10 +714,10 @@ void doTest0210(WORD testNumber)
         // send local port to server
         BYTE tmp[6];
         
-        tmp[0] = (cib->address.lhost >> 24) & 0xff;
-        tmp[1] = (cib->address.lhost >> 16) & 0xff;
-        tmp[2] = (cib->address.lhost >>  8) & 0xff;
-        tmp[3] = (cib->address.lhost      ) & 0xff;
+        tmp[0] = (myIp >> 24) & 0xff;
+        tmp[1] = (myIp >> 16) & 0xff;
+        tmp[2] = (myIp >>  8) & 0xff;
+        tmp[3] = (myIp      ) & 0xff;
 
         tmp[4] = (cib->address.lport >>  8) & 0xff;
         tmp[5] = (cib->address.lport      ) & 0xff;
@@ -678,11 +770,69 @@ void doTest0210(WORD testNumber)
     out_result(1);                          // success!    
     
 test0210end:
+    if(handle <= 0) {                       // no handle? just quit
+        return;
+    }
+
     if(tcpNotUdp) {
         TCP_close(handle, 0, 0);
     } else {
         UDP_close(handle);
     }
+}
+
+int getCab(int handle, CAB *cab)
+{
+    if(handle < 0) {
+        return 0;
+    }
+    
+    CIB *cib = CNgetinfo(handle);
+    
+    if(cib == 0) {
+        out_result_string(0, "verify port - CNgetinfo() failed");
+        return 0;
+    }
+
+    *cab = cib->address;
+    return 1;
+}
+
+int compare(DWORD a, DWORD b, char op)
+{
+    switch(op) {
+        case '!':   return (a != b);
+        case '=':   return (a == b);
+        case '<':   return (a < b);
+        case '>':   return (a > b);
+        case ' ':   return 0;               // return false == ignore this comparing
+    }
+    
+    return 1;                               // unknown op? fail
+}
+
+int verifyCab(  int handle, 
+                DWORD lhost, char op1, WORD lport, char op2, 
+                DWORD rhost, char op3, WORD rport, char op4 )
+{
+    CAB cab2;
+    int res = getCab(handle, &cab2);
+    
+    if(res) {
+        if( compare(cab2.lhost, lhost, op1) || 
+            compare(cab2.lport, lport, op2) ) {
+            out_result_string_dw_w(0, "CNgetinfo() local info bad", cab2.lhost, cab2.lport);
+            return 0;
+        }
+
+        if( compare(cab2.rhost, rhost, op3) || 
+            compare(cab2.rport, rport, op4) ) {
+            out_result_string_dw_w(0, "CNgetinfo() remote info bad", cab2.rhost, cab2.rport);
+            return 0;
+        }
+    }
+
+    return 1;
 }
 
 void doTest0230(void)

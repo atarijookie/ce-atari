@@ -17,6 +17,7 @@ void out_result              (BYTE result);
 void out_result_error        (BYTE result, WORD errorCode);
 void out_result_error_string (BYTE result, WORD errorCode, char *errorStr);
 void out_result_string       (BYTE result, char *errorStr);
+void out_result_string_dw_w  (BYTE result, char *errorStr, DWORD dw, WORD w);
 
 void out_s   (char *str1);
 void out_ss  (char *str1, char *str2);

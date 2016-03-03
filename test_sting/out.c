@@ -105,6 +105,27 @@ void out_result_string(BYTE result, char *errorStr)
     outString("\n\r");
 }
 
+void out_result_string_dw_w(BYTE result, char *errorStr, DWORD dw, WORD w)
+{
+    char *resultString = resultToString(result);
+    outString(resultString);
+    
+    outString(" err: ");
+    outString(errorStr);
+
+    char tmp[16];
+    
+    outString (" ");
+    dwordToHex(dw, tmp);
+    outString (tmp);
+
+    outString (" ");
+    wordToHex(w, tmp);
+    outString (tmp);
+
+    outString("\n\r");
+}
+
 // output Test Result - bool
 void out_tr_b(WORD testNo, char *testName, BYTE result)
 {

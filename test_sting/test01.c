@@ -66,13 +66,15 @@ void test01TcpNotUdp(int testNoOffset, int tcpNotUdp)
     generateTestName(tcpNotUdp, "echo  2250 B", testName);
     test01(0x0104 + testNoOffset, testName, tcpNotUdp, &blocks04[0], 3);
 
-    DWORD blocks05[4] = {500, 1000, 1500, 2000};
-    generateTestName(tcpNotUdp, "echo 15000 B", testName);
-    test01(0x0105 + testNoOffset, testName, tcpNotUdp, &blocks05[0], 4);
+    if(tcpNotUdp) {
+        DWORD blocks05[4] = {500, 1000, 1500, 2000};
+        generateTestName(tcpNotUdp, "echo 15000 B", testName);
+        test01(0x0105 + testNoOffset, testName, tcpNotUdp, &blocks05[0], 4);
 
-    DWORD blocks06[3] = {5000, 10000, 16000};
-    generateTestName(tcpNotUdp, "echo 31000 B", testName);
-    test01(0x0106 + testNoOffset, testName, tcpNotUdp, &blocks06[0], 3);
+        DWORD blocks06[3] = {5000, 10000, 16000};
+        generateTestName(tcpNotUdp, "echo 31000 B", testName);
+        test01(0x0106 + testNoOffset, testName, tcpNotUdp, &blocks06[0], 3);
+    }
 }
 
 void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD blockSizesCount)
