@@ -41,6 +41,7 @@ uint16      icmp_id = 0;
 
 #define MAX_ICMP_HANDLERS   16
 DWORD icmpHandlers[MAX_ICMP_HANDLERS];
+BYTE  gotNullIcmpHandler;
 
 int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_length)
 {
@@ -89,9 +90,35 @@ int16 ICMP_handler (int16 (* handler) (IP_DGRAM *), int16 flag)
     int i;
     int existing = -1, empty = -1;
     
+    /*
+    // Don't avoid storing NULL to handlers - Sting allows that, so this is a compatibility thing, even if it seems wrong. 
     if(handler == NULL) {                                   // empty pointer? nothing to do
         return FALSE;
     }
+    */
+    
+    //----------------
+    // the following code is here just to pretend that having NULL handler is OK (Sting compatibility thing)
+    if(((DWORD) handler) == 0) {
+        if(flag == HNDLR_SET || flag == HNDLR_FORCE) {
+            BYTE didSetIt = gotNullIcmpHandler ? 0 : 1;
+            gotNullIcmpHandler = 1;
+            return didSetIt;
+        }
+        
+        if(flag == HNDLR_QUERY) {
+            return gotNullIcmpHandler;
+        }
+    
+        if(flag == HNDLR_REMOVE) {
+            BYTE didRemoveIt = gotNullIcmpHandler ? 1 : 0;
+            gotNullIcmpHandler = 0;
+            return didRemoveIt;
+        }
+        
+        return 0;
+    }
+    //----------------
     
     for(i=0; i<MAX_ICMP_HANDLERS; i++) {
         if(icmpHandlers[i] == (DWORD) handler) {            // if we got that handler, store it's index
