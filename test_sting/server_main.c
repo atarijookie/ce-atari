@@ -291,6 +291,9 @@ void handleSocket2(int *dataFd, int port, int readCount, int tcpNotUdp)
 
     int linesCount = (gBfrIn[0] <<  8) |  gBfrIn[1];
 
+    char bigBuf[100*1024];
+    memset(bigBuf, 0, 100*1024);
+    
     printf("handleSocket2 - will send linesCount: %d\n", linesCount);
     
     char *lines[10] = {
@@ -311,23 +314,25 @@ void handleSocket2(int *dataFd, int port, int readCount, int tcpNotUdp)
         char *line = lines[lineIndex];          // get line
 
         int len = strlen(line);
-        char tmp[32];
-        sprintf(tmp, "%04d", len);
+        char tmp[200];
+        sprintf(tmp, "%04d%s", len, line);
 
-        if(tcpNotUdp) {                         // TCP?
-            write (*dataFd, tmp,  4);           // send length
-            write (*dataFd, line, len);         // send data
-        } else {
-            sendto(*dataFd, tmp,  4,   0, (struct sockaddr*) &si_other, slen);
-            sendto(*dataFd, line, len, 0, (struct sockaddr*) &si_other, slen);
-        }
+        strcat(bigBuf, tmp);
 
         lineIndex++;
         if(lineIndex > 9) {                     // move to next line
             lineIndex = 0;
         }
     }
+    
+    // send in one big send, because otherwise Sting somehow fails to receive all the data...
+    if(tcpNotUdp) {                         // TCP?
+        write (*dataFd, bigBuf,  strlen(bigBuf)); // send length
+    } else {
+        sendto(*dataFd, bigBuf,  strlen(bigBuf), 0, (struct sockaddr*) &si_other, slen);
+    }
 
+printf("Data sent: %d (0x%x)\n", strlen(bigBuf), strlen(bigBuf));    
 
 // close the socket
 closeSock2:

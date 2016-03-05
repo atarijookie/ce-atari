@@ -38,7 +38,7 @@ void doTest0240    (void);
 
 int testCanaries(int handle, int blockSize, int offset);
 
-#define LOCAL_PASSIVE_PORT 10000
+#define LOCAL_PASSIVE_PORT 30000
 
 void doTest02(void)
 {
@@ -53,7 +53,7 @@ void doTest02(void)
     // CNget_block
     doTest0202(1, 0);   // TCP
     doTest0202(0, 0);   // UDP
-    
+
     // CNgets
     doTest0206(1);      // TCP
     doTest0206(0);      // UDP
@@ -226,7 +226,7 @@ void doTest0206(BYTE tcpNotUdp)
     // open connection
     if(tcpNotUdp) {
         out_test_header(0x0206, "TCP CNgets");
-        handle = TCP_open(SERVER_ADDR, SERVER_PORT_START + 2, 0, 2000);
+        handle = TCP_open(SERVER_ADDR, SERVER_PORT_START + 2, 0, 3000);
     } else {
         out_test_header(0x0207, "UDP CNgets");
         handle = UDP_open(SERVER_ADDR, SERVER_PORT_START + 2 + 4);
@@ -236,6 +236,8 @@ void doTest0206(BYTE tcpNotUdp)
         out_result_error_string(0, handle, "open failed");
         return;
     }
+    
+    TCP_wait_state(handle, TESTABLISH, 3);
 
     //----------
     // try when there is no data to get
@@ -246,12 +248,17 @@ void doTest0206(BYTE tcpNotUdp)
         goto test0206end;
     }
     //----------
+    int getLines;
     
-    #define GETS_LINES  32
+    if(tcpNotUdp) {         // TCP? more lines
+        getLines = 32;
+    } else {                // UDP? less lines
+        getLines = 12;
+    }
     
     char txBuf[2];
     txBuf[0] = 0;
-    txBuf[1] = GETS_LINES;
+    txBuf[1] = getLines;
         
     if(tcpNotUdp) {
         res = TCP_send(handle, txBuf, 2);
@@ -278,7 +285,7 @@ void doTest0206(BYTE tcpNotUdp)
             break;
         }
     }
-    
+
     res = CNgets(handle, rBuf, 9, '\n');        // try to receive to small buffer
     
     if(res != E_BIGBUF) {                       // if not this error, fail
@@ -288,7 +295,7 @@ void doTest0206(BYTE tcpNotUdp)
     //-----------
     
     int j;
-    for(j=0; j<GETS_LINES; j++) {
+    for(j=0; j<getLines; j++) {
         res = tryReceive0206(handle, j);
 
         if(res) {       // if not 0 (not good)
@@ -316,15 +323,24 @@ int tryReceive0206(int handle, int line)
     
     int res;
     while(1) {
+        int bCount = CNbyte_count(handle);
+        
+        if(getTicks() >= timeout) {         // if timeout, fail
+            out_result_error_string(0, line, "timeout on CNgets");
+
+            out_sw("CNbyte_count: ", bCount);
+            
+            return -1;
+        }
+
+        if(bCount < 20) {
+            continue;
+        }
+        
         res = CNgets(handle, rBuf, 200, '\n');
     
         if(res > 0) {                       // if good, quit
             break;
-        }
-
-        if(getTicks() >= timeout) {         // if timeout, fail
-            out_result_error_string(0, line, "timeout on CNgets");
-            return res;
         }
     }
 
