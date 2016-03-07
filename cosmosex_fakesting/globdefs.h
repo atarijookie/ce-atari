@@ -538,7 +538,8 @@ typedef struct {
     CIB     cib;                            // connection information block
     DWORD   bytesToRead;                    // how many bytes we can read from this connection
     BYTE    tcpConnectionState;             // TCP connection states -- TCLOSED, TLISTEN, ...
-        
+    DWORD   buff_size;                      // send buffer size, valid only for TCP
+    
     WORD rCount;					        // how much data is buffer (specifies where the next read data could come from)
     WORD rStart;					        // starting index of where we should start reading the buffer
     BYTE rBuf[READ_BUFFER_SIZE];

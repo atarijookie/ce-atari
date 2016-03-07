@@ -432,6 +432,8 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
         setCIB((BYTE *) &conInfo[stHandle].cib, proto, 0, rem_port, rem_host, localIP, status);
         update_con_info(TRUE);                      // let's FORCE update connection info - CIB should be updated with real local port after this (e.g. aFTP relies on the info when using active ftp connection)
         
+        conInfo[stHandle].buff_size = buff_size;    // store the maximu buffer size fot TCP
+        
         return stHandle;                            // return the new handle
     } 
 
@@ -476,6 +478,12 @@ int16 connection_send(int tcpNotUdp, int16 handle, void *buffer, int16 length)
 {
     if(!handle_valid(handle)) {                     // we don't have this handle? fail
         return E_BADHANDLE;
+    }
+    
+    if(tcpNotUdp) {                                 // if it's TCP connection...
+        if(length > conInfo[handle].buff_size) {    // ...and trying to send more than specified buffer size in TCP_open(), fail
+            return E_OBUFFULL;
+        }
     }
     
     // first store command code
@@ -551,6 +559,10 @@ int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
     commandShort[4] = NET_CMD_RESOLVE;
     commandShort[5] = 0;
     
+    if(domain == NULL) {                                                // if nothing to resolve, quit
+        return E_CANTRESOLVE;
+    }
+    
     strcpy((char *) pDmaBuffer, domain);                                // copy in the domain or dotted quad IP address
 
     // send it to host
@@ -578,11 +590,6 @@ int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
         
         break;                                                          // if came here, success and finished, quit this loop
     }
-
-    // possibly copy the real domain name
-    if(real_domain != NULL) {                                           // if got pointer to real domain
-        *real_domain = (char *) pDmaBuffer;                             // store the pointer to where the real domain should be
-    }
     
     // now copy the list of IPs to ip_list
     int ipListCount = (int) pDmaBuffer[256];                            // get how many IPs we got from host
@@ -592,6 +599,21 @@ int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
     uint32 *pIPs = (uint32 *) &pDmaBuffer[258];
     for(i=0; i<ipCount; i++) {                                          // copy all the IPs
         ip_list[i] = pIPs[i];
+    }
+    
+    if(ipCount == 0) {                                                  // no IPs? can't resolve
+        return E_CANTRESOLVE;
+    }
+
+    // possibly copy the real domain name
+    if(real_domain != NULL) {                                           // if got pointer to real domain
+        char *realName = KRmalloc_internal(512);
+        if(!realName) {                                                 // failed to allocate RAM?
+            return E_NOMEM;
+        }
+    
+        strcpy(realName, (char *) pDmaBuffer);                          // copy in the real name
+        *real_domain = realName;                                        // store the pointer to where the real domain should be
     }
     
     return ipCount;                                                     // Returns the number of dotted quad IP addresses filled in, or an error.
