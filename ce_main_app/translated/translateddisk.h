@@ -297,8 +297,14 @@ private:
 
     void onPexec_getBpb(BYTE *cmd);
     void onPexec_readSector(BYTE *cmd);
+    
+    bool pexecWholeFileWasRead(void);
 
+    WORD prgSectorStart;
+    WORD prgSectorEnd;
+    
     BYTE *pexecImage;
+    BYTE *pexecImageReadFlags;
     //-----------------------------------
     // other ACSI command helpers
     ConfigService*          configService;

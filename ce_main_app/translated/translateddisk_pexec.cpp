@@ -115,7 +115,11 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
 void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSize)
 {
     memset(pexecImage, 0, PEXEC_DRIVE_SIZE_BYTES);                  // clear the whole image
+    memset(pexecImageReadFlags, 0, PEXEC_DRIVE_SIZE_SECTORS);       // clear all the READ flags
 
+    prgSectorStart  = 0;
+    prgSectorEnd    = PEXEC_DRIVE_SIZE_SECTORS;
+    
     DWORD fat1startingSector = 4;
     DWORD fat2startingSector = fat1startingSector + PEXEC_FAT_SECTORS_NEEDED;
     DWORD dataStartingSector = fat2startingSector + PEXEC_FAT_SECTORS_NEEDED;
@@ -171,12 +175,15 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
     BYTE *pFileInImage = pexecImage + (curSector * 512);     // get pointer to file in image
     fread(pFileInImage, 1, fileSize, f);
     
+    int fileSectors = (fileSize / 512) + ((fileSize % 512) == 0) ? 0 : 1;   // calculate how many sector the file takes
+    
+    prgSectorStart  = curSector;                            // first sector - where the PRG starts
+    prgSectorEnd    = curSector + fileSectors - 1;          // last sector  - where the PRG ends
+    
     //-------------
     // now create the FAT table
     BYTE *pFat1 = pexecImage + (fat1startingSector * 512);  // get pointer to FAT1
     memset(pFat1 + 4, 0xff, 2 * (found - 1));               // all the DIR entries sectors will have 0xFF in FAT, because they take only single sector
-    
-    int fileSectors = (fileSize / 512) + ((fileSize % 512) == 0) ? 0 : 1;   // calculate how many sector the file takes
     
     int fileOffsetInFat = 4 + (found - 1) * 2;              // offset in bytes in the FAT to start of the file 
     int  sectorInFat    = 3 + (found - 1);
@@ -242,7 +249,26 @@ void TranslatedDisk::onPexec_readSector(BYTE *cmd)
     
     BYTE *pSector = pexecImage + (startingSector * 512);                // get pointer to start of the sector
     dataTrans->addDataBfr(pSector, byteCount, true);                    // add that data to dataTrans
+
+    for(int i=0; i<sectorCount; i++) {                                  // now mark those read sectors as already read
+        pexecImageReadFlags[startingSector + i] = 1; 
+    }
+    
     dataTrans->setStatus(E_OK);                                         // everything OK
+}
+
+bool TranslatedDisk::pexecWholeFileWasRead(void)
+{
+    int i;
+    
+    // go through all the sectors of the PRG and see if all were read
+    for(i = prgSectorStart; i <= prgSectorEnd; i++) {
+        if(pexecImageReadFlags[i] == 0) {       // this sector wasn't read? The whole wasn't read yet
+            return false;
+        }
+    }
+    
+    return true;                                // we didn't find a sector which wasn't read, so the whole file was read
 }
 
 void TranslatedDisk::storeIntelWord(BYTE *p, WORD a)

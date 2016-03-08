@@ -34,6 +34,12 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastS
     pexecImage  = new BYTE[PEXEC_DRIVE_SIZE_BYTES];
     memset(pexecImage, 0, PEXEC_DRIVE_SIZE_BYTES);
     
+    pexecImageReadFlags = new BYTE[PEXEC_DRIVE_SIZE_SECTORS];
+    memset(pexecImageReadFlags, 0, PEXEC_DRIVE_SIZE_SECTORS);
+
+    prgSectorStart  = 0;
+    prgSectorEnd    = PEXEC_DRIVE_SIZE_SECTORS;
+
     detachAll();
 
     for(int i=0; i<MAX_FILES; i++) {        // initialize host file structures
@@ -71,6 +77,7 @@ TranslatedDisk::~TranslatedDisk()
     delete []dataBuffer2;
 
     delete []pexecImage;
+    delete []pexecImageReadFlags;
     
     destroyFindStorages();
     
