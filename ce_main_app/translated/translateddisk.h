@@ -69,6 +69,22 @@ typedef struct {
 #define ZIPDIR_PATH_PREFIX              "/tmp/zipdir"
 #define ZIPDIR_PATH_LENGTH              12              // length of ZIP DIR path, including the number which is generated in getZipDirMountPoint()
 
+//---------------------------------------
+// Pexec() image stuff
+// whole image size
+#define PEXEC_DRIVE_SIZE_BYTES          (5 * 1024 * 1024)
+#define PEXEC_DRIVE_SIZE_SECTORS        (PEXEC_DRIVE_SIZE_BYTES / 512)
+
+// FAT size
+#define PEXEC_FAT_BYTES_NEEDED          (PEXEC_DRIVE_SIZE_SECTORS * 2)
+#define PEXEC_FAT_SECTORS_NEEDED        (PEXEC_FAT_BYTES_NEEDED / 512)
+
+// image size usable for data = whole image size - 2 * fat size
+#define PEXEC_DRIVE_USABLE_SIZE_SECTORS (PEXEC_DRIVE_SIZE_SECTORS - (2 * PEXEC_FAT_SECTORS_NEEDED) - 10)
+#define PEXEC_DRIVE_USABLE_SIZE_BYTES   (PEXEC_DRIVE_USABLE_SIZE_SECTORS * 512)
+
+//---------------------------------------
+
 class ZipDirEntry {
     public:
 
@@ -198,6 +214,9 @@ private:
     void onFread(BYTE *cmd);
     void onFwrite(BYTE *cmd);
     void onFseek(BYTE *cmd);
+    
+    // Pexec() handling
+    void onPexec(BYTE *cmd);
 
     // custom functions, which are not translated gemdos functions, but needed to do some other work
     void onInitialize(void);            // this method is called on the startup of CosmosEx translated disk driver
@@ -268,6 +287,18 @@ private:
     int  getEmptyFindStorageIndex(void);
     int  getFindStorageIndexByDta(DWORD dta);
 
+    //-----------------------------------
+    // helpers for Pexec()
+    void onPexec_createImage(BYTE *cmd);
+    void createImage(std::string &fullAtariPath, FILE *f, int fileSize);
+    void createDirEntry(bool isRoot, bool isDir, WORD date, WORD time, DWORD fileSize, char *dirEntryName, DWORD thisSectorNo);
+    void storeIntelWord (BYTE *p,  WORD a);
+    void storeIntelDword(BYTE *p, DWORD a);
+
+    void onPexec_getBpb(BYTE *cmd);
+    void onPexec_readSector(BYTE *cmd);
+
+    BYTE *pexecImage;
     //-----------------------------------
     // other ACSI command helpers
     ConfigService*          configService;

@@ -30,6 +30,9 @@
 #define GEMDOS_Fwrite       0x40
 #define GEMDOS_Fseek        0x42
 
+// Pexec() related stuff
+#define GEMDOS_Pexec        0x4B
+
 // date and time function
 #define GEMDOS_Tgetdate     0x2A
 #define GEMDOS_Tsetdate     0x2B
@@ -94,5 +97,12 @@ typedef struct
 #define GSH_MIDIIN  -4
 #define GSH_MIDIOUT -5
 
+//////////////////////////////////////
+
+#define PEXEC_CREATE_IMAGE      0
+#define PEXEC_GET_BPB           1
+#define PEXEC_READ_SECTOR       2
+
+//////////////////////////////////////
 
 #endif // GEMDOS_H

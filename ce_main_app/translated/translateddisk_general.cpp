@@ -31,6 +31,9 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastS
     dataBuffer  = new BYTE[ACSI_BUFFER_SIZE];
     dataBuffer2 = new BYTE[ACSI_BUFFER_SIZE];
 
+    pexecImage  = new BYTE[PEXEC_DRIVE_SIZE_BYTES];
+    memset(pexecImage, 0, PEXEC_DRIVE_SIZE_BYTES);
+    
     detachAll();
 
     for(int i=0; i<MAX_FILES; i++) {        // initialize host file structures
@@ -67,6 +70,8 @@ TranslatedDisk::~TranslatedDisk()
     delete []dataBuffer;
     delete []dataBuffer2;
 
+    delete []pexecImage;
+    
     destroyFindStorages();
     
     for(int i=0; i<MAX_ZIP_DIRS; i++) {                 // init the ZIP dirs
@@ -431,6 +436,9 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case GEMDOS_Fwrite:         onFwrite(cmd);      break;
         case GEMDOS_Fseek:          onFseek(cmd);       break;
 
+        // Pexec() related stuff
+        case GEMDOS_Pexec:          onPexec(cmd);       break;
+        
         // custom functions, which are not translated gemdos functions, but needed to do some other work
         case GD_CUSTOM_initialize:      onInitialize();                 break;
         case GD_CUSTOM_getConfig:       onGetConfig(cmd);               break;
