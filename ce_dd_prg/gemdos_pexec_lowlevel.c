@@ -60,6 +60,9 @@ extern WORD virtualDriveChanged;
 #define PEXEC_GET_BPB           1
 #define PEXEC_READ_SECTOR       2
 
+static BYTE readRwabsSectors(WORD startingSector, WORD sectorCount, BYTE *pBuffer);
+extern BYTE FastRAMBuffer[]; 
+
 // ------------------------------------------------------------------ 
 // LONG Pexec( mode, fname, cmdline, envstr )
 int32_t custom_pexec_lowlevel( void *sp )
@@ -138,43 +141,76 @@ DWORD myRwabs(BYTE *sp)
 {
 	BYTE *params = (BYTE *) sp;
     
-    WORD  mode   =          *(( WORD *) params);
+    WORD  mode              =          *(( WORD *) params);
 	params += 2;
-    BYTE *buf    = (BYTE *) *((DWORD *) params);
+    BYTE *pBuffer           = (BYTE *) *((DWORD *) params);
 	params += 4;
-    WORD  count  =          *(( WORD *) params);
+    WORD  sectorCount       =          *(( WORD *) params);
 	params += 2;
-    WORD  start  =          *(( WORD *) params);
+    WORD  startingSector    =          *(( WORD *) params);
 	params += 2;
-    WORD  device =          *(( WORD *) params);
+    WORD  device            =          *(( WORD *) params);
     
     if(!isOurDrive(device, 0)) {                    // not our drive? fail
         return -1;
 	}
     
-    if((start + count) > virtualBpbStruct.numcl) {  // out of range?
+    if((startingSector + sectorCount) > virtualBpbStruct.numcl) {  // out of range?
         return -1;
     }
     
     if(mode & 1) {                                  // write (from ST to drive)? Not supported.
         return -1;
-    } 
-
+    }
+    
+    BYTE  toFastRam     =  (((DWORD) pBuffer) >= 0x1000000) ? TRUE  : FALSE;        // flag: are we reading to FAST RAM?
+    BYTE  bufAddrIsOdd  = ((((DWORD) pBuffer) & 1) == 0)    ? FALSE : TRUE;         // flag: buffer pointer is on ODD address?
+    BYTE  useMidBuffer  = (toFastRam || bufAddrIsOdd);                              // flag: is load to fast ram or on odd address, use middle buffer
+    
+    DWORD maxSectorCount = useMidBuffer ? (FASTRAM_BUFFER_SIZE / 512) : MAXSECTORS; // how many sectors we can read at once - if going through middle buffer then middle buffer size, otherwise max sector coun
+    BYTE res;
+    
+    while(sectorCount > 0) {
+        DWORD thisSectorCount   = (sectorCount < maxSectorCount) ? sectorCount : maxSectorCount;    // will the needed read size be within the blockSize, or not?
+        DWORD thisByteCount     = thisSectorCount << 9;
+        
+        if(useMidBuffer) {          // through middle buffer?
+            res = readRwabsSectors(startingSector, thisSectorCount, FastRAMBuffer);
+            memcpy(pBuffer, FastRAMBuffer, thisByteCount);
+        } else {                    // directly to final buffer?
+            res = readRwabsSectors(startingSector, thisSectorCount, pBuffer);
+        }
+        
+        if(!res) {      // if failed, fail and quit
+            return -1;
+        }
+        
+        sectorCount     -= thisSectorCount;         // now we need to read less sectors
+        startingSector  += thisSectorCount;         // advance to next sectors
+        
+        pBuffer         += thisByteCount;           // advance in the buffer
+    }
+    
+    return 0;           // success
+}
+//--------------------------------------------------
+BYTE readRwabsSectors(WORD startingSector, WORD sectorCount, BYTE *pBuffer)
+{
     commandLong[ 5] = GEMDOS_pexec;                 // store GEMDOS function number 
 	commandLong[ 6] = PEXEC_READ_SECTOR;            // and sub function number
 	
-    commandLong[ 7] = (BYTE) (start >> 8);
-    commandLong[ 8] = (BYTE) (start     );
+    commandLong[ 7] = (BYTE) (startingSector >> 8);
+    commandLong[ 8] = (BYTE) (startingSector     );
     
-    commandLong[ 9] = (BYTE) (count >> 8);
-    commandLong[10] = (BYTE) (count     );
+    commandLong[ 9] = (BYTE) (sectorCount    >> 8);
+    commandLong[10] = (BYTE) (sectorCount        );
     
-	(*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, buf, count);   // send command to host over ACSI 
+	(*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, sectorCount); // send command to host over ACSI 
 
     if(!hdIf.success || hdIf.statusByte != E_OK) {	// not handled or error? 
-        return -1;
+        return 0;   // bad
 	}
-    
-    return 0;
+
+    return 1;       // good
 }
 //--------------------------------------------------
