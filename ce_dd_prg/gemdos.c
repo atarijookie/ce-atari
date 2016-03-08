@@ -69,6 +69,11 @@ void showWaitSymbol(BYTE showNotHide);
 void msleepInSuper(int ms);
 
 // ------------------------------------------------------------------ 
+// fot fake Pexec() and Pterm() handling
+void    installHddLowLevelDriver(void);
+int32_t custom_pexec_lowlevel(void *sp);
+
+// ------------------------------------------------------------------ 
 // the custom GEMDOS handlers now follow 
 
 int32_t custom_dgetdrv( void *sp )
@@ -973,10 +978,23 @@ void initFunctionTable(void)
 	gemdos_table[GEMDOS_Fseek]      = custom_fseek;
 
     // program execution functions
+    
+#define MANUAL_PEXEC
+    
+#ifdef MANUAL_PEXEC    
+    // manually handling Pexec() and Pterm*() functions
 	gemdos_table[GEMDOS_pexec]      = custom_pexec;
 	gemdos_table[GEMDOS_pterm]      = custom_pterm;
 	gemdos_table[GEMDOS_pterm0]     = custom_pterm0;
+#else
+    // letting TOS handle Pexec() and Pterm*() function by faking native drive
+	gemdos_table[GEMDOS_pexec]      = custom_pexec_lowlevel;
+	gemdos_table[GEMDOS_pterm]      = 0;
+	gemdos_table[GEMDOS_pterm0]     = 0;
 
+    Supexec(installHddLowLevelDriver);
+#endif
+    
     // BIOS functions we need to support
 	bios_table[0x0a] = custom_drvmap; 
 	bios_table[0x09] = custom_mediach;
