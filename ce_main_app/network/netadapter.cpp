@@ -26,6 +26,8 @@
 
 #define REQUIRED_NETADAPTER_VERSION     0x0100
 
+#define IS_VALID_IP_NUMBER(X)  (X >= 0 && X <= 255)
+
 //--------------------------------------------------------
 
 struct Tresolv {
@@ -1113,6 +1115,52 @@ void NetAdapter::resolveStart(void)
         return;
     }
 
+    //-------------------
+    // first handle weird names
+    int len = strlen((char *)dataBuffer);
+    int i;
+
+    if(len <= 0) {              // address too short? fail
+        Debug::out(LOG_DEBUG, "NetAdapter::resolveStart - host name too short");
+        dataTrans->setStatus(E_CANTRESOLVE);
+        return;
+    }
+    
+    bool foundNormalChar = false;
+    for(i=0; i<len; i++) {      // find any normal alpha numeric char
+        
+        if(isalnum((char) dataBuffer[i])) {
+            foundNormalChar = true;
+        }
+    }
+    
+    if(!foundNormalChar) {      // no normal char? fail
+        Debug::out(LOG_DEBUG, "NetAdapter::resolveStart - host name doesn't contain any normal character");
+        dataTrans->setStatus(E_CANTRESOLVE);
+        return;
+    }
+    
+    //-------------------
+    // check and possibly resolve dotted IP
+    int a,b,c,d;
+    int iRes = sscanf((char *) dataBuffer, "%d.%d.%d.%d", &a, &b, &c, &d);
+    
+    if(iRes == 4) {         // succeeded to get IP parts
+        if(IS_VALID_IP_NUMBER(a) && IS_VALID_IP_NUMBER(b) && IS_VALID_IP_NUMBER(c) && IS_VALID_IP_NUMBER(d)) {
+            resolv.h_name = (char *) dataBuffer;                        // store official name
+
+            DWORD *pIps     = (DWORD *) resolv.data;
+            pIps[0]         = (a << 24) | (b << 16) | (c << 8) | d;     // store that IP
+            resolv.count    = 1;                                        // store count
+            resolv.done     = true;                                     // resolve finished
+    
+            dataTrans->setStatus(E_NORMAL);
+            return;
+        }
+    }
+    
+    //-------------------
+    
     Debug::out(LOG_DEBUG, "NetAdapter::resolveStart - will resolve: %s", dataBuffer);
     
     // try to resolve the name asynchronously
