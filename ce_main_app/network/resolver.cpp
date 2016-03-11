@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <string>
 
+#include "../debug.h"
 #include "../utils.h"
 #include "resolver.h"
 
@@ -98,11 +99,11 @@ int ResolverRequest::addRequest(char *hostName)
     int ret = getaddrinfo_a(GAI_NOWAIT, &pReq, 1, NULL);
 
     if (ret) {
-        printf("addRequest() failed\n");
+        Debug::out(LOG_DEBUG, "addRequest() failed");
         return -1;
     }
 
-    printf("addRequest() - resolving %s under index %d\n", hostName, usedIndex);
+    Debug::out(LOG_DEBUG, "addRequest() - resolving %s under index %d", hostName, usedIndex);
     return usedIndex;           // return index under which this request runs
 }
 
@@ -214,35 +215,35 @@ bool ResolverRequest::processSlot(int index)                // process the reque
 void ResolverRequest::showSlot(int index)
 {
     if(!slotIndexValid(index)) {        // out of bounds? false
-        printf("resolveRequestShow - bad index\n");
+        Debug::out(LOG_DEBUG, "resolveRequestShow - bad index");
         return;
     }
 
     Tresolv *r = &requests[index];
 
     if(!r->getaddrinfoHasFinished) {    // if not done, or there is some error, fail
-        printf("resolveRequestShow - request not done yet\n");
+        Debug::out(LOG_DEBUG, "resolveRequestShow - request not done yet");
         return;
     }
 
     if(!r->processed) {                 // not processed?
-        printf("resolveRequestShow - not processed yet\n");
+        Debug::out(LOG_DEBUG, "resolveRequestShow - not processed yet");
         return;
     }
 
     if(r->count > 0) {
-        printf("[%d] host: %s (%s) resolved to %d IPs:\n", index, r->hostName, r->canonName, r->count);
+        Debug::out(LOG_DEBUG, "[%d] host: %s (%s) resolved to %d IPs:", index, r->hostName, r->canonName, r->count);
 
         DWORD *pip = (DWORD *) r->data;
         for(int i=0; i < r->count; i++) {
             BYTE *ipb = (BYTE *) &pip[i];
-            printf("IP %d: %d.%d.%d.%d\n", i, ipb[0], ipb[1], ipb[2], ipb[3]);
+            Debug::out(LOG_DEBUG, "IP %d: %d.%d.%d.%d", i, ipb[0], ipb[1], ipb[2], ipb[3]);
         }
     } else {
-        printf("[%d] host: %s not resolved, error is: %d (%s)\n", index, r->hostName, r->error, gai_strerror(r->error));
+        Debug::out(LOG_DEBUG, "[%d] host: %s not resolved, error is: %d (%s)", index, r->hostName, r->error, gai_strerror(r->error));
     }
 
-    printf("\n");
+    Debug::out(LOG_DEBUG, "\n");
 }
 
 bool ResolverRequest::checkAndhandleSlot(int index)
