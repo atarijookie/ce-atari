@@ -568,15 +568,28 @@ int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
     // send it to host
     hdIf.cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-	if(!hdIf.success || hdIf.statusByte != E_NORMAL) {
+	if(!hdIf.success) {
 		return E_CANTRESOLVE;
 	}
+    
+    if(hdIf.statusByte >= 10) {                                          // 0 .. 9 is handle, 10 and more means error
+        return E_CANTRESOLVE;
+    }
+    
+    BYTE resolverHandle = hdIf.statusByte;                              // this is the new handle for resolver
 
     // now receive the response
     memset(pDmaBuffer, 0, 512);
     commandShort[4] = NET_CMD_RESOLVE_GET_RESPONSE;
+    commandShort[5] = resolverHandle;
+    
+    DWORD end = getTicks() + 10 * 200;                                  // 10 second timeout
     
     while(1) {                                                          // repeat this command few times, as it might reply with 'I didn't finish yet'
+        if(getTicks() >= end) {                                         // if timeout
+            return E_CANTRESOLVE;
+        }
+    
         hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
         if(hdIf.statusByte == RES_DIDNT_FINISH_YET) {                   // if not finished, try again
@@ -587,8 +600,6 @@ int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
         if(hdIf.statusByte != OK) {                                     // if failed, return FALSE 
             return E_CANTRESOLVE;
         }
-        
-        break;                                                          // if came here, success and finished, quit this loop
     }
     
     // now copy the list of IPs to ip_list
