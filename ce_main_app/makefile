@@ -8,10 +8,10 @@ CC	    = g++
 CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
 
 ifeq ($(ONPC),yes)
-    LDFLAGS	= -Llib -Llib -lrt -lpthread -lcurl -lcivetweb -ldl -lutil
+    LDFLAGS	= -Llib -Llib -lrt -lanl -lpthread -lcurl -lcivetweb -ldl -lutil
     CFLAGS += -DONPC_NOTHING -I./
 else
-    LDFLAGS	= -Llib -lbcm2835 -lrt -lpthread -lcurl -lcivetweb -ldl -lutil
+    LDFLAGS	= -Llib -lbcm2835 -lrt -lanl -lpthread -lcurl -lcivetweb -ldl -lutil
     CFLAGS += -I./
 endif
 

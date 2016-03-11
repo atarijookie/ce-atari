@@ -19,6 +19,7 @@
 #include "../settings.h"
 #include "../datatypes.h"
 #include "../isettingsuser.h"
+#include "resolver.h"
 
 #include "sting.h"
 
@@ -237,6 +238,8 @@ public:
     TRawSocks       rawSockHeads;       // this holds the headers for RAW socket
 
     BYTE *rBfr;                         // pointer to 100 kB read buffer - used when conLocateDelim() is called
+
+    ResolverRequest resolver;           // DNS resolver
     
     void loadSettings(void);
 

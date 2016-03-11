@@ -26,17 +26,6 @@
 
 #define REQUIRED_NETADAPTER_VERSION     0x0100
 
-#define IS_VALID_IP_NUMBER(X)  (X >= 0 && X <= 255)
-
-//--------------------------------------------------------
-
-struct Tresolv {
-    volatile BYTE           done;
-             int            count;
-             BYTE           data[128];
-             std::string    h_name;
-} resolv;
-
 //--------------------------------------------------------
 
 pthread_mutex_t networkThreadMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -158,11 +147,6 @@ void *networkThreadCode(void *ptr)
 		netReqQueue.pop();								// and remove it form queue
 		pthread_mutex_unlock(&networkThreadMutex);		// unlock the mutex
 
-        // resolve host name to IP addresses
-        if(tnr.type == NETREQ_TYPE_RESOLVE) {
-            resolveNameToIp(tnr);
-            continue;
-        }
 
     }
 
@@ -172,46 +156,6 @@ void *networkThreadCode(void *ptr)
 	return 0;
 }
 
-//--------------------------------------------------------
-void resolveNameToIp(TNetReq &tnr)
-{
-    struct hostent *he;
-    he = gethostbyname((char *) tnr.strParam.c_str());      // try to resolve
-
-    if (he == NULL) {
-        Debug::out(LOG_DEBUG, "resolveNameToIp - gethostbyname() failed for %s", (char *) tnr.strParam.c_str());
-
-        resolv.count    = 0;
-        resolv.done     = true;
-        return;
-    }
-
-    resolv.h_name = (char *) he->h_name;                    // store official name
-
-    struct in_addr **addr_list;
-    addr_list = (struct in_addr **) he->h_addr_list;        // get pointer to IP addresses
-
-    int i, cnt = 0;     
-    DWORD *pIps = (DWORD *) resolv.data;
-
-    for(i=0; addr_list[i] != NULL; i++) {                   // now walk through the IP address list
-        in_addr ia = *addr_list[i];
-        pIps[cnt] = ia.s_addr;                              // store the current IP, network order is OK for ST
-
-        BYTE *ip = (BYTE *) &pIps[cnt];
-        Debug::out(LOG_DEBUG, "resolveNameToIp - gethostbyname() for %s returned IP %d.%d.%d.%d", (char *) tnr.strParam.c_str(), (int) ip[0], (int) ip[1], (int) ip[2], (int) ip[3]);
-
-        cnt++;
-        if(cnt >= (128 / 4)) {                              // if we have the maximum possible IPs we can store, quit
-            break;
-        }
-    }
-
-    Debug::out(LOG_DEBUG, "resolveNameToIp - gethostbyname() for %s was resolved to %d IPs", (char *) tnr.strParam.c_str(), cnt);
-
-    resolv.count    = cnt;                                  // store count and we're done
-    resolv.done     = true;
-}
 //--------------------------------------------------------
 bool tryIcmpRecv(BYTE *bfr)
 {
@@ -465,9 +409,6 @@ void NetAdapter::closeAndCleanAll(void)
     for(i=0; i<MAX_STING_DGRAMS; i++) {             // clear received icmp dgrams
         dgrams[i].clear();
     }
-    
-    resolv.count    = 0;                            // clear the resolver thing
-    resolv.done     = false;
     
 	pthread_mutex_unlock(&networkThreadMutex);      // unlock the mutex
 }
@@ -1141,61 +1082,48 @@ void NetAdapter::resolveStart(void)
     }
     
     //-------------------
-    // check and possibly resolve dotted IP
-    int a,b,c,d;
-    int iRes = sscanf((char *) dataBuffer, "%d.%d.%d.%d", &a, &b, &c, &d);
-    
-    if(iRes == 4) {         // succeeded to get IP parts
-        if(IS_VALID_IP_NUMBER(a) && IS_VALID_IP_NUMBER(b) && IS_VALID_IP_NUMBER(c) && IS_VALID_IP_NUMBER(d)) {
-            resolv.h_name = (char *) dataBuffer;                        // store official name
-
-            DWORD *pIps     = (DWORD *) resolv.data;
-            pIps[0]         = (a << 24) | (b << 16) | (c << 8) | d;     // store that IP
-            resolv.count    = 1;                                        // store count
-            resolv.done     = true;                                     // resolve finished
-    
-            dataTrans->setStatus(E_NORMAL);
-            return;
-        }
-    }
-    
-    //-------------------
     
     Debug::out(LOG_DEBUG, "NetAdapter::resolveStart - will resolve: %s", dataBuffer);
     
-    // try to resolve the name asynchronously
-    resolv.done     = false;                    // mark that this hasn't finished yet
-
-    TNetReq tnr;
-    tnr.type        = NETREQ_TYPE_RESOLVE;      // request type
-    tnr.strParam    = (char *) dataBuffer;      // this is the input string param (the name)
-    netReqAdd(tnr);
-
-    dataTrans->setStatus(E_NORMAL);
+    int resolverHandle = resolver.addRequest((char *) dataBuffer);      // this is the input string param (the name)
+    dataTrans->setStatus(resolverHandle);                               // return handle
 }
 //----------------------------------------------
 void NetAdapter::resolveGetResp(void)
 {
-    if(!resolv.done) {                                  // if the resolve command didn't finish yet
-        Debug::out(LOG_DEBUG, "NetAdapter::resolveGetResp -- the resolved didn't finish yet");
+    int index = cmd[5];
+
+    if(!resolver.slotIndexValid(index)) {                       // invalid index? E_PARAMETER
+        dataTrans->setStatus(E_PARAMETER);
+        return;
+    }
+    
+    bool resolveDone = resolver.checkAndhandleSlot(index);      // check if resolved finished
+    
+    if(!resolveDone) {                                  // if the resolve command didn't finish yet
+        Debug::out(LOG_DEBUG, "NetAdapter::resolveGetResp -- the resolved didn't finish yet for slot %d", index);
         dataTrans->setStatus(RES_DIDNT_FINISH_YET);     // return this special status
         return;
     }
 
+    Tresolv *r = &resolver.requests[index];
+    
     // if resolve did finish
     BYTE empty[256];
     memset(empty, 0, 256);
 
-    int domLen = resolv.h_name.length();                                    // length of real domain name
-    dataTrans->addDataBfr((BYTE *) resolv.h_name.c_str(), domLen, false);   // store real domain name
+    int domLen = strlen(r->canonName);                                      // length of real domain name
+    dataTrans->addDataBfr((BYTE *) r->canonName, domLen, false);            // store real domain name
     dataTrans->addDataBfr(empty, 256 - domLen, false);                      // add zeros to pad to 256 bytes
 
-    dataTrans->addDataByte(resolv.count);                                   // data[256] = count of IP addreses resolved
+    dataTrans->addDataByte(r->count);                                       // data[256] = count of IP addreses resolved
     dataTrans->addDataByte(0);                                              // data[257] = just a dummy byte
 
-    dataTrans->addDataBfr((BYTE *) resolv.data, 4 * resolv.count, true);    // now store all the resolved data, and pad to multiple of 16
+    dataTrans->addDataBfr((BYTE *) r->data, 4 * r->count, true);            // now store all the resolved data, and pad to multiple of 16
 
-    Debug::out(LOG_DEBUG, "NetAdapter::resolveGetResp -- returned %d IPs", resolv.count);
+    Debug::out(LOG_DEBUG, "NetAdapter::resolveGetResp -- returned %d IPs", r->count);
+    
+    resolver.clearSlot(index);                                              // clear the slot for next usage
     dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
