@@ -692,7 +692,7 @@ void NetAdapter::conSend(void)
     }
 
     Debug::out(LOG_DEBUG, "NetAdapter::conSend() -- sending %d bytes through connection %d (received %d from ST, isOdd: %d)", length, handle, lenRoundUp, isOdd);
-    Debug::outBfr(pData, length);
+//  Debug::outBfr(pData, length);
     
     int ires = write(cons[handle].fd, dataBuffer, length);  // try to send the data
 
@@ -826,16 +826,21 @@ void NetAdapter::conGetDataCount(void)
     int handle = cmd[5];                                    // get handle
 
     if(handle < 0 || handle >= MAX_HANDLE) {                // handle out of range? fail
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetDataCount - bad handle");
         dataTrans->setStatus(E_BADHANDLE);
         return;
     }
 
     if(cons[handle].isClosed()) {                           // connection not open? fail
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetDataCount - connection is closed");    
         dataTrans->setStatus(E_BADHANDLE);
         return;
     }
 
+    Debug::out(LOG_DEBUG, "NetAdapter::conGetDataCount - returning lastReadCount: %d", cons[handle].lastReadCount);
+    
     dataTrans->addDataDword(cons[handle].lastReadCount);    // store last read count
+    dataTrans->padDataToMul16();
     dataTrans->setStatus(E_NORMAL);
 }
 //----------------------------------------------
