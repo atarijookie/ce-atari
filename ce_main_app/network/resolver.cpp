@@ -78,9 +78,13 @@ int ResolverRequest::addRequest(char *hostName)
     if(iRes == 4) {         // succeeded to get IP parts
         if(IS_VALID_IP_NUMBER(a) && IS_VALID_IP_NUMBER(b) && IS_VALID_IP_NUMBER(c) && IS_VALID_IP_NUMBER(d)) {
 
-            DWORD *pIps     = (DWORD *) r->data;
-            pIps[0]         = (a << 24) | (b << 16) | (c << 8) | d;     // store that IP
-            r->count        = 1;                                        // store count
+            BYTE *pIps = (BYTE *) r->data;
+            pIps[0]     = a;    // store that IP
+            pIps[1]     = b;
+            pIps[2]     = c;
+            pIps[3]     = d;
+            
+            r->count    = 1;    // store count
             
             strcpy(r->canonName, r->hostName);                          // pretend that the string is canonical name
             
