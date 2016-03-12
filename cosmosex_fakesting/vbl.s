@@ -4,7 +4,8 @@
     .globl  _update_con_info
     .globl  _update_con_info_vbl
     .globl  _fromVbl
-
+    .globl  _vblEnabled
+    
 |-------------------------------------------------
 
     .text 
@@ -28,6 +29,10 @@ _update_con_info_vbl:
 
     movem.l D0-A6,-(SP)             | back up registers
 
+    move.w  _vblEnabled, d0         | read this enabled flag
+    tst.w   d0
+    beq     dontUpdateConInfo       | if vblEnabled is 0, then skip our vbl routine
+    
     lea     __vbl_counter, a0       | get address of conter variable
     move.w  (a0), d0                | get value
     add.w   #1, d0                  | increment it
@@ -66,3 +71,4 @@ dontUpdateConInfo:
 __vbl_counter:          .ds.w   1
 __oldVbl:               .ds.l   1
 _fromVbl:               .ds.w   1
+_vblEnabled:            .ds.w   1

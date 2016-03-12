@@ -586,19 +586,19 @@ int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
     DWORD end = getTicks() + 10 * 200;                                  // 10 second timeout
     
     while(1) {                                                          // repeat this command few times, as it might reply with 'I didn't finish yet'
+        sleepMs(250);                                               // wait 250 ms before trying again
         if(getTicks() >= end) {                                         // if timeout
             return E_CANTRESOLVE;
         }
     
         hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-        if(hdIf.statusByte == RES_DIDNT_FINISH_YET) {                   // if not finished, try again
-            sleepMs(250);                                               // wait 250 ms before trying again
-            continue;
+        if(hdIf.statusByte == E_NORMAL) {                               // if finished, continue after loop
+            break;
         }
-    
-        if(hdIf.statusByte != OK) {                                     // if failed, return FALSE 
-            return E_CANTRESOLVE;
+
+        if(hdIf.statusByte == RES_DIDNT_FINISH_YET) {                   // if not finished, try again
+            continue;
         }
     }
     

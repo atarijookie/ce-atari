@@ -27,6 +27,8 @@ void   clear_flag (int16 flag);
 
 DWORD jumptable[40];
 
+extern WORD vblEnabled;         // set to 0 to disable my VBL execution (other VBL routines will run)
+
 void initJumpTable(void)
 {
     int i;
@@ -179,8 +181,9 @@ int16 TCP_open_mid(BYTE *sp)
     logStr(", res: ");
     #endif
 
+    vblEnabled = 0;
     int16 res = connection_open(1, rem_host, rem_port, tos, buff_size);
-//    int16 res = 0;
+    vblEnabled = 1;
     
     #ifdef DEBUG_STRING
     showHexWord((WORD) res);
@@ -201,7 +204,9 @@ int16 TCP_close_mid(BYTE *sp)
     logStr(", res: ");
     #endif
 
+    vblEnabled = 0;
     int16 res = connection_close(1, handle, timeout);
+    vblEnabled = 1;
 
     #ifdef DEBUG_STRING
     showHexWord((WORD) res);
@@ -227,7 +232,10 @@ int16 TCP_send_mid(BYTE *sp)
     logStr("\n");
     #endif
     
+    vblEnabled = 0;
     int16 res = TCP_send(handle, buffer, length);
+    vblEnabled = 1;
+
     return res;
 }
     
@@ -245,7 +253,10 @@ int16 TCP_wait_state_mid(BYTE *sp)
     logStr("\n");
     #endif
     
+    vblEnabled = 0;
     int16 res = TCP_wait_state(handle, wantedState, timeout);
+    vblEnabled = 1;
+
     return res;
 }
     
@@ -258,7 +269,9 @@ int16 TCP_ack_wait_mid(BYTE *sp)
     logStr("TCP_ack_wait\n");
     #endif
 
+    vblEnabled = 0;
     int16 res = TCP_ack_wait(handle, timeout);
+    vblEnabled = 1;
 
     return res;
 }
@@ -272,7 +285,9 @@ int16 TCP_info_mid(BYTE *sp)
     logStr("TCP_info\n");
     #endif
     
+    vblEnabled = 0;
     int16 res = TCP_info(handle, tcp_info);
+    vblEnabled = 1;
 
     return res;
 }    
@@ -286,7 +301,9 @@ int16 UDP_open_mid (BYTE *sp)
     logStr("UDP_open\n");
     #endif
 
+    vblEnabled = 0;
     int16 res = connection_open(0, rem_host, rem_port, 0, 0);
+    vblEnabled = 1;
     
     return res;
 }
@@ -299,7 +316,9 @@ int16 UDP_close_mid(BYTE *sp)
     logStr("UDP_close\n");
     #endif
     
+    vblEnabled = 0;
     int16 res = connection_close(0, handle, 0);
+    vblEnabled = 1;
     
     return res;
 }
@@ -314,7 +333,9 @@ int16 UDP_send_mid(BYTE *sp)
     logStr("UDP_send\n");
     #endif
     
+    vblEnabled = 0;
     int16 res = connection_send(0, handle, buffer, length);
+    vblEnabled = 1;
     
     return res;
 }
@@ -327,7 +348,9 @@ int16 CNkick_mid(BYTE *sp)
     logStr("CNkick\n");
     #endif
     
+    vblEnabled = 0;
     int16 res = CNkick(handle);
+    vblEnabled = 1;
 
     return res;
 }
@@ -342,7 +365,9 @@ int16 CNbyte_count_mid(BYTE *sp)
     logStr(", res: ");
     #endif
 
+    vblEnabled = 0;
     int16 res = CNbyte_count(handle);
+    vblEnabled = 1;
 
     #ifdef DEBUG_STRING
     showHexWord((DWORD) res);
@@ -360,7 +385,9 @@ int16 CNget_char_mid(BYTE *sp)
     logStr("CNget_char: ");
     #endif
 
+    vblEnabled = 0;
     int16 res = CNget_char(handle);
+    vblEnabled = 1;
 
     #ifdef DEBUG_STRING
     showHexWord((DWORD) res);
@@ -389,7 +416,9 @@ NDB *CNget_NDB_mid(BYTE *sp)
     logStr("CNget_NDB\n");
     #endif
     
+    vblEnabled = 0;
     NDB *res = CNget_NDB (handle);
+    vblEnabled = 1;
 
     return res;
 }    
@@ -410,7 +439,9 @@ int16 CNget_block_mid(BYTE *sp)
     logStr(", res: ");
     #endif
 
+    vblEnabled = 0;
     int16 res = CNget_block(handle, buffer, length);
+    vblEnabled = 1;
 
     #ifdef DEBUG_STRING
     showHexWord(res);
@@ -446,7 +477,10 @@ int16 resolve_mid(BYTE *sp)
     logStr("resolve\n");
     #endif
     
+    vblEnabled = 0;
     int16 res = resolve(domain, real_domain, ip_list, ip_num);
+    vblEnabled = 1;
+    
     return res;
 }
     
@@ -484,7 +518,9 @@ CIB *CNgetinfo_mid(BYTE *sp)
     logStr(", res: ");
     #endif
 
+    vblEnabled = 0;
     CIB *res = CNgetinfo(handle);
+    vblEnabled = 1;
 
     #ifdef DEBUG_STRING
     showHexDword((DWORD) res);
@@ -494,6 +530,86 @@ CIB *CNgetinfo_mid(BYTE *sp)
     return res;
 }
     
+int16 setvstr_mid(BYTE *sp)
+{
+    char *name    = getVoidPFromSP();
+    char *value   = getVoidPFromSP();
+
+    #ifdef DEBUG_STRING
+    logStr("setvstr\n");
+    #endif
+    
+    int16 res = setvstr(name, value);
+
+    return res;
+}
+
+int16 CNgets_mid(BYTE *sp)
+{
+    int16  handle      = getWordFromSP();
+    char * buffer      = getVoidPFromSP();
+    int16  length      = getWordFromSP();
+    char   delimiter   = getByteFromSP();
+
+    #ifdef DEBUG_STRING
+    logStr("CNgets\n");
+    #endif
+
+    vblEnabled = 0;
+    int16 res = CNgets(handle, buffer, length, delimiter);
+    vblEnabled = 1;
+
+    return res;
+}
+
+int16 ICMP_send_mid(BYTE *sp)
+{
+    uint32  dest        = getDwordFromSP();
+    uint8   type        = getByteFromSP();
+    uint8   code        = getByteFromSP();
+    void   *data        = getVoidPFromSP();
+    uint16  dat_length  = getWordFromSP();
+
+    #ifdef DEBUG_STRING
+    logStr("ICMP_send\n");
+    #endif
+    
+    vblEnabled = 0;
+    int16 res = ICMP_send(dest, type, code, data, dat_length);
+    vblEnabled = 1;
+
+    return res;
+}
+
+int16 ICMP_handler_mid(BYTE *sp)
+{
+    int16 (*handler)(IP_DGRAM *)    = getVoidPFromSP();
+    int16 flag                      = getWordFromSP();
+
+    #ifdef DEBUG_STRING
+    logStr("ICMP_handler\n");
+    #endif
+    
+    vblEnabled = 0;
+    int16 res = ICMP_handler (handler, flag);
+    vblEnabled = 1;
+
+    return res;
+}
+
+void ICMP_discard_mid(BYTE *sp)
+{
+    IP_DGRAM *dgram = getVoidPFromSP();
+
+    #ifdef DEBUG_STRING
+    logStr("ICMP_discard\n");
+    #endif
+
+    vblEnabled = 0;
+    ICMP_discard(dgram);
+    vblEnabled = 1;
+}
+
 int16 on_port_mid(BYTE *sp)
 {
     char *port_name = getVoidPFromSP();
@@ -517,20 +633,6 @@ void off_port_mid(BYTE *sp)
 
     off_port(port_name);
 }
- 
-int16 setvstr_mid(BYTE *sp)
-{
-    char *name    = getVoidPFromSP();
-    char *value   = getVoidPFromSP();
-
-    #ifdef DEBUG_STRING
-    logStr("setvstr\n");
-    #endif
-    
-    int16 res = setvstr(name, value);
-
-    return res;
-}
 
 int16 query_port_mid(BYTE *sp)
 {
@@ -543,64 +645,6 @@ int16 query_port_mid(BYTE *sp)
     int16 res = query_port(port_name);
 
     return res;
-}
-
-int16 CNgets_mid(BYTE *sp)
-{
-    int16  handle      = getWordFromSP();
-    char * buffer      = getVoidPFromSP();
-    int16  length      = getWordFromSP();
-    char   delimiter   = getByteFromSP();
-
-    #ifdef DEBUG_STRING
-    logStr("CNgets\n");
-    #endif
-
-    int16 res = CNgets(handle, buffer, length, delimiter);
-
-    return res;
-}
-
-int16 ICMP_send_mid(BYTE *sp)
-{
-    uint32  dest        = getDwordFromSP();
-    uint8   type        = getByteFromSP();
-    uint8   code        = getByteFromSP();
-    void   *data        = getVoidPFromSP();
-    uint16  dat_length  = getWordFromSP();
-
-    #ifdef DEBUG_STRING
-    logStr("ICMP_send\n");
-    #endif
-    
-    int16 res = ICMP_send(dest, type, code, data, dat_length);
-
-    return res;
-}
-
-int16 ICMP_handler_mid(BYTE *sp)
-{
-    int16 (*handler)(IP_DGRAM *)    = getVoidPFromSP();
-    int16 flag                      = getWordFromSP();
-
-    #ifdef DEBUG_STRING
-    logStr("ICMP_handler\n");
-    #endif
-    
-    int16 res = ICMP_handler (handler, flag);
-
-    return res;
-}
-
-void ICMP_discard_mid(BYTE *sp)
-{
-    IP_DGRAM *dgram = getVoidPFromSP();
-
-    #ifdef DEBUG_STRING
-    logStr("ICMP_discard\n");
-    #endif
-
-    ICMP_discard(dgram);
 }
 
 int16 cntrl_port_mid(BYTE *sp)

@@ -61,6 +61,8 @@ BYTE *pDmaBuffer;
 DWORD localIP;
 WORD  requiredVersion;
 
+extern WORD vblEnabled;         // set to 0 to disable my VBL execution (other VBL routines will run)
+
 void initJumpTable(void);
 
 //---------------------------------------
@@ -125,6 +127,7 @@ int main(void)
 
     install();
     Supexec(install_vbl);
+    vblEnabled = 1;
     
     (void) Cconws("Driver was installed...");
 
