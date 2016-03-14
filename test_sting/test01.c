@@ -19,12 +19,16 @@ int sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle, BYTE getBlockNot
 
 void generateWriteBuffer(void);
 
+void test0130(void);
+
 void doTest01(void)
 {
     generateWriteBuffer();
     
-    test01TcpNotUdp(0,    1);          // offset    0, TCP
-    test01TcpNotUdp(0x10, 0);          // offset 0x10, UDP
+    test01TcpNotUdp(0,    1);           // offset    0, TCP
+    test01TcpNotUdp(0x10, 0);           // offset 0x10, UDP
+    
+    test0130();                         // test UDP cutting of received data to separate datagrams
 }
 
 void generateWriteBuffer(void)
@@ -257,3 +261,188 @@ int sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle, BYTE getBlockNot
     // if came here, everything is OK
     return 1;
 }
+
+void test0130(void)
+{
+    int handle, res, ok;
+    int a,b,c;
+    
+    out_test_header(0x0130, "UDP - CNbyte_count() on 3 datagrams");
+    handle = UDP_open(SERVER_ADDR, SERVER_PORT_START + 4);
+    if(handle >= 0) {
+        // send 3 x 100 bytes
+        (void) UDP_send(handle, wBuf, 100);
+        (void) UDP_send(handle, wBuf, 100);
+        (void) UDP_send(handle, wBuf, 100);
+        
+        sleep(1);
+        
+        res = CNbyte_count(handle);         // see how many bytes we got for reading on this socket
+        ok = (res == 300) ? 1 : 0;      
+        
+        out_result_error(ok, res);
+        //-----------------------------------
+        out_test_header(0x0131, "UDP - CNget_block() on 3 datagrams");
+        
+                                            // receive it using 3x CNget_block()
+        a = CNget_block (handle, rBuf, 100);
+        b = CNget_block (handle, rBuf, 100);
+        c = CNget_block (handle, rBuf, 100);
+        
+        ok = (a == 100 && b == 100 && c == 100) ? 1 : 0;
+        //-----------------------------------
+        
+        UDP_close(handle);
+    } else {
+        out_result_string(0, "UDP_open failed");
+    }
+    
+    //////////////////////////////////////////////////////////////////////////////
+    
+    out_test_header(0x0132, "UDP - CNbyte_count() after partial read");
+    handle = UDP_open(SERVER_ADDR, SERVER_PORT_START + 4);
+    if(handle >= 0) {
+        // send 300 bytes
+        (void) UDP_send(handle, wBuf, 300);
+        
+        sleep(1);
+        
+        res = CNbyte_count(handle);         // see how many bytes we got for reading on this socket
+        ok = (res == 300) ? 1 : 0;      
+
+        if(!ok) {                           // if not enough data, fail
+            out_result_error_string(ok, res, "not enough data");
+        } else {
+            a = CNget_block (handle, rBuf, 100);
+            b = CNbyte_count(handle);
+            
+            ok = (a == 100 && b == 200) ? 1 : 0;
+            out_result_error(ok, b);
+         }
+        
+        UDP_close(handle);
+    } else {
+        out_result_string(0, "UDP_open failed");
+    }    
+    
+    //////////////////////////////////////////////////////////////////////////////
+    
+    out_test_header(0x0133, "UDP - get 3 DGRAMs with 1 CNget_block");
+    handle = UDP_open(SERVER_ADDR, SERVER_PORT_START + 4);
+    if(handle >= 0) {
+        // send 300 bytes
+        (void) UDP_send(handle, wBuf, 100);
+        (void) UDP_send(handle, wBuf, 100);
+        (void) UDP_send(handle, wBuf, 100);
+        
+        sleep(1);
+        
+        res = CNbyte_count(handle);         // see how many bytes we got for reading on this socket
+        ok = (res == 300) ? 1 : 0;      
+
+        if(!ok) {                           // if not enough data, fail
+            out_result_error_string(ok, res, "not enough data");
+        } else {
+            a = CNget_block (handle, rBuf, 300);
+            b = CNbyte_count(handle);
+            
+            ok = (a == 300 && b == 0) ? 1 : 0;
+            out_result_error(ok, b);
+         }
+        
+        UDP_close(handle);
+    } else {
+        out_result_string(0, "UDP_open failed");
+    }        
+    
+    //////////////////////////////////////////////////////////////////////////////
+    
+    out_test_header(0x0134, "UDP - get 3 DGRAMs with 3x CNget_NDB");
+    handle = UDP_open(SERVER_ADDR, SERVER_PORT_START + 4);
+    if(handle >= 0) {
+        // send 300 bytes
+        (void) UDP_send(handle, wBuf, 100);
+        (void) UDP_send(handle, wBuf, 100);
+        (void) UDP_send(handle, wBuf, 100);
+        
+        sleep(1);
+        
+        res = CNbyte_count(handle);         // see how many bytes we got for reading on this socket
+        ok = (res == 300) ? 1 : 0;      
+
+        if(!ok) {                           // if not enough data, fail
+            out_result_error_string(ok, res, "not enough data");
+        } else {
+            NDB *m,*n,*o;
+            
+            m = CNget_NDB(handle);
+            n = CNget_NDB(handle);
+            o = CNget_NDB(handle);
+            
+            ok = (m != NULL && n != NULL && o != NULL) ? 1 : 0;
+            
+            if(!ok) {
+                out_result_string(ok, "some CNget_NDB failed");
+            } else {
+                ok = (m->len == 100 && n->len == 100 && o->len == 100) ? 1 : 0;
+                
+                if(!ok) {
+                    out_result_string(ok, "length of NDB block wrong");
+                } else {
+                    out_result(1);
+                }
+            }
+         }
+        
+        UDP_close(handle);
+    } else {
+        out_result_string(0, "UDP_open failed");
+    }        
+
+    //////////////////////////////////////////////////////////////////////////////
+    
+    out_test_header(0x0135, "UDP - get 3 DGRAMs with CNget_char");
+    handle = UDP_open(SERVER_ADDR, SERVER_PORT_START + 4);
+    if(handle >= 0) {
+        // send 300 bytes
+        (void) UDP_send(handle, wBuf, 100);
+        (void) UDP_send(handle, wBuf, 100);
+        (void) UDP_send(handle, wBuf, 100);
+        
+        sleep(1);
+        
+        res = CNbyte_count(handle);         // see how many bytes we got for reading on this socket
+        ok = (res == 300) ? 1 : 0;      
+
+        b = 1;                              // good for now
+        if(!ok) {                           // if not enough data, fail
+            out_result_error_string(ok, res, "not enough data");
+        } else {
+            int i;
+            for(i=0; i<300; i++) {
+                a = CNget_char(handle);
+                
+                if(a >= 0) {
+                    rBuf[i] = a;
+                } else {
+                    out_result_error_string(0, a, "error on CNget_char");
+                    b = 0;                  // failed
+                    break;
+                }
+            }
+        
+            if(b) {                         // if good, check data
+                c = memcmp(rBuf, wBuf, 300);
+                
+                ok = (c == 0) ? 1 : 0;
+                out_result(ok);
+            }
+         }
+        
+        UDP_close(handle);
+    } else {
+        out_result_string(0, "UDP_open failed");
+    }
+}
+
+

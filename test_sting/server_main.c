@@ -869,6 +869,72 @@ void testSock3(int portOffset, int tcpNotUdp)
     printf("testSock%d: socket should have closed after %d ms, did close after %d ms\n", portOffset, SOCK3_CLOSETIME, diff);
 }
 
+void testUdpReceiving(void)
+{
+    int s = connectToHost("127.0.0.1", LISTEN_PORT_START + 4, 0);
+
+    if(s <= 0) {
+        return;
+    }
+
+    printf("testUdpReceiving -- sending 3 x 100 bytes (3 datagrams)\n");
+
+    int i, cntr = 0;
+    for(i=0; i<100;) {              // fill output buffer
+        gBfrOut[i++] = (unsigned char) (cntr >> 8);
+        gBfrOut[i++] = (unsigned char) (cntr     );
+        cntr++;
+    }
+
+    for(i=0; i<3; i++) {
+        write(s, gBfrOut, 100);     // send output buffer
+    }
+
+    sleep(1);                       // wait a second, just to be sure
+
+    struct sockaddr_in si_other;
+    int                slen = sizeof(si_other);
+    int                count, res;
+
+    for(i=0; i<3; i++) {
+        res = ioctl(s, FIONREAD, &count);
+
+        if(res < 0) {
+            printf("testUdpReceiving -- ioctl() failed\n");
+            continue;
+        }
+
+        printf("testUdpReceiving -- data available: %d\n", count);
+        
+        if(count > 0) {
+            res = recvfrom(s, gBfrIn, count, 0, (struct sockaddr *) &si_other, &slen);
+
+            if(res < 0) {
+                printf("testUdpReceiving -- recvfrom() failed\n");
+                continue;
+            }
+
+            res = memcmp(gBfrIn, gBfrOut, 100);
+            if(res != 0) {
+                printf("testUdpReceiving -- received data mismatch\n");
+            }
+        }
+    }
+
+    //------------------------
+    int c1, c2;
+
+    write(s, gBfrOut, 100);     // send output buffer
+    sleep(1);
+    ioctl(s, FIONREAD, &c1);
+    recvfrom(s, gBfrIn, 50, 0, (struct sockaddr *) &si_other, &slen);
+    ioctl(s, FIONREAD, &c2);
+    
+    printf("Send 100, wating %d, read 50, waiting %d.\n", c1, c2);
+
+    close(s);
+}
+
 void clientMain(void)
 {
     printf("Running as client...\n");
@@ -882,6 +948,8 @@ void clientMain(void)
     testSock1(5, 0);
     testSock2(6, 0);
 //  testSock3(7, 0);        // don't run test on 7 on UDP - UDP can't be closed, it's useless test
+
+    testUdpReceiving();
 
     printf("Client has terminated.\n");
 }
