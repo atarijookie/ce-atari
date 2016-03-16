@@ -290,6 +290,7 @@ void test0130(void)
         c = CNget_block (handle, rBuf, 100);
         
         ok = (a == 100 && b == 100 && c == 100) ? 1 : 0;
+        out_result_error(ok, res);
         //-----------------------------------
         
         UDP_close(handle);
@@ -432,9 +433,11 @@ void test0130(void)
             }
         
             if(b) {                         // if good, check data
-                c = memcmp(rBuf, wBuf, 300);
+                a = memcmp(rBuf,       wBuf, 100);
+                b = memcmp(rBuf + 100, wBuf, 100);
+                c = memcmp(rBuf + 200, wBuf, 100);
                 
-                ok = (c == 0) ? 1 : 0;
+                ok = (a == 0 && b == 0 && c == 0) ? 1 : 0;
                 out_result(ok);
             }
          }
