@@ -540,9 +540,9 @@ typedef struct {
     BYTE    tcpConnectionState;             // TCP connection states -- TCLOSED, TLISTEN, ...
     DWORD   buff_size;                      // send buffer size, valid only for TCP
     
-    WORD rCount;					        // how much data is buffer (specifies where the next read data could come from)
-    WORD rStart;					        // starting index of where we should start reading the buffer
-    BYTE rBuf[READ_BUFFER_SIZE];
+    BYTE charsUsed;                         // how many chars from this buffer was used by CNget_char()
+    BYTE charsGot;                          // how many chars we have
+    BYTE chars[READ_BUFFER_SIZE];
 } TConInfo;
 
 /*--------------------------------------------------------------------------*/

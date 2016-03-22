@@ -58,27 +58,25 @@ CIB *CNgetinfo(int16 handle)
 {
     // Note: do return valid CIB* even for closed handles, the client app might expect this to be not NULL even if the connection is opening / closing / whatever
 
-    if(handle < 0 || handle >= MAX_HANDLE) {    // handle out of range? fail
+    if(handle < 0 || handle >= MAX_HANDLE) {        // handle out of range? fail
         return (CIB *) NULL;
     }
 
-    update_con_info(FALSE);                     // update connections info structs (max once per 100 ms)
+    update_con_info(FALSE);                         // update connections info structs (max once per 100 ms)
 
-	return &conInfo[handle].cib;        // return pointer to correct CIB
+	return &conInfo[handle].cib;                    // return pointer to correct CIB
 }
 
 int16 CNbyte_count (int16 handle)
 {
-    if(!handle_valid(handle)) {                 // we don't have this handle? fail
+    if(!handle_valid(handle)) {                     // we don't have this handle? fail
         return E_BADHANDLE;
     }
-
-    update_con_info(FALSE);                                         // update connections info structs (max once per 100 ms)
-    TConInfo    *ci             = &conInfo[handle];                 // we're working with this connection
-    DWORD       dataLeftLocal   = ci->rCount - ci->rStart;          // calculate how much data we have in local buffer
-    DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;  // total data left = local data count + host data count
     
-    if(dataLeftTotal == 0 && ci->tcpConnectionState == TCLOSED) {   // no data to read, and connection closed? return E_EOF
+    update_con_info(FALSE);                         // update connections info structs (max once per 100 ms)
+    TConInfo *ci = &conInfo[handle];                // we're working with this connection
+    
+    if(ci->bytesToRead == 0 && ci->tcpConnectionState == TCLOSED) { // no data to read, and connection closed? return E_EOF
         return E_EOF;
     }
     
@@ -86,16 +84,16 @@ int16 CNbyte_count (int16 handle)
         return E_LISTEN;
     }
     
-    if(dataLeftTotal == 0) {                                        // no data in host and in local buffer?
+    if(ci->bytesToRead == 0) {                                      // no data in host and in local buffer?
         return 0;
     }
 
-    if(dataLeftTotal > 0x7FFF) {                                    // if we can now receive more than 0x7FFF bytes, return just 0x7FFF, because otherwise it would look like negative error
+    if(ci->bytesToRead > 0x7FFF) {                                  // if we can now receive more than 0x7FFF bytes, return just 0x7FFF, because otherwise it would look like negative error
         return 0x7FFF;
     } 
     
     // if have less than 0x7FFF, just return the value             
-    return dataLeftTotal;
+    return ci->bytesToRead;
 }
 
 //-------------------------------------
@@ -106,60 +104,85 @@ int16 CNget_char(int16 handle)
         return E_BADHANDLE;
     }
 
-    update_con_info(FALSE);                                         // update connections info structs (max once per 100 ms)
-    TConInfo    *ci             = &conInfo[handle];                 // we're working with this connection
-    DWORD       dataLeftLocal   = ci->rCount - ci->rStart;          // calculate how much data we have in local buffer
-    DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;  // total data left = local data count + host data count
+    update_con_info(FALSE);                     // update connections info structs (max once per 100 ms)
+    TConInfo *ci = &conInfo[handle];            // we're working with this connection
     
-    if(dataLeftTotal == 0 && ci->tcpConnectionState == TCLOSED) {   // no data to read, and connection closed? return E_EOF
-        return E_EOF;
-    }
-    
-    if(dataLeftTotal == 0) {                                        // no data in host and in local buffer?
+    if(ci->bytesToRead == 0) {                  // no data in host and in local buffer?
         return E_NODATA;
     }
-    
-    // if there is data...    
-    if(dataLeftLocal == 0) {                                        // ...but we don't have data in local read buffer? read it
-        fillReadBuffer(handle);
 
-        dataLeftLocal = ci->rCount - ci->rStart;
-        if(dataLeftLocal == 0) {                                    // this shouldn't happen - no data after read
+    if(ci->tcpConnectionState == TCLOSED) {     // connection closed? return E_EOF
+        return E_EOF;
+    }
+
+    // if no data buffered, read the data
+    if(ci->charsGot == 0 || ci->charsUsed == ci->charsGot) {
+        commandLong[ 5] = NET_CMD_CNGET_CHAR;   // store function number 
+        commandLong[ 6] = handle;				// store file handle 
+        commandLong[10] = ci->charsUsed;        // how many chars were used
+
+        // no more used chars and got chars
+        ci->charsUsed   = 0;                    
+        ci->charsGot    = 0;
+
+        hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);
+
+        if(hdIf.success && hdIf.statusByte == E_NORMAL) {       // success?
+            ci->charsGot = pDmaBuffer[0];                       // store the new count of chars we got
+            memcpy(ci->chars, pDmaBuffer + 1, ci->charsGot);    // copy those bytes
+        } else {                                                // fail?
             return E_NODATA;
         }
     }
     
-    // get the byte and return it
-    int16 value = ci->rBuf[ci->rStart];         
-    ci->rStart++;
+    if(ci->charsUsed >= ci->charsGot) {         // still no data? fail
+        return E_NODATA;
+    }
     
-    return value;
+    int value = ci->chars[ci->charsUsed];       // get the char
+    ci->charsUsed++;                            // update used count
+    return value;                               // return that char
 }
 
-NDB *CNget_NDB (int16 handle)
+NDB *CNget_NDB(int16 handle)
 {
-    if(!handle_valid(handle)) {                                             // we don't have this handle? fail
+    if(!handle_valid(handle)) {             // we don't have this handle? fail
         return (NDB *) NULL;
     }
 
-    update_con_info(FALSE);                                                 // update connections info structs (max once per 100 ms)
-    TConInfo    *ci             = &conInfo[handle];                         // we're working with this connection
-    DWORD       dataLeftLocal   = ci->rCount - ci->rStart;                  // calculate how much data we have in local buffer
-    DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;          // total data left = local data count + host data count
+    update_con_info(FALSE);                 // update connections info structs (max once per 100 ms)
+    TConInfo *ci = &conInfo[handle];        // we're working with this connection
     
-    if(dataLeftTotal == 0 && ci->tcpConnectionState == TCLOSED) {   // no data to read, and connection closed? return E_EOF
-        return (NDB *) E_EOF;
+    if(ci->tcpConnectionState == TCLOSED || ci->bytesToRead == 0) { // closed or nothing to read?
+        return (NDB *) NULL;
     }
 
-    if(dataLeftTotal == 0) {                                                // no data in host and in local buffer?
-        return (NDB *) E_NODATA;
-    }
+    //-----------------
+    // first find out how big is the next NDB
+  	commandLong[ 5] = NET_CMD_CNGET_NDB;    // store function number 
+	commandLong[ 6] = handle;				// store file handle 
+	commandLong[ 7] = 0;                    // get next NDB size
+	commandLong[10] = ci->charsUsed;        // how many chars were used
 
-    // if we got here, then there's some data to retrieve...
+    // no more used chars and got chars
+    ci->charsUsed   = 0;                    
+    ci->charsGot    = 0;
+
+    hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);
+
+    if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // failed? quit
+        return NULL;
+    }
+    
+    // get size of NDB
+    int  nexdNdbSizeBytes   = getDword(pDmaBuffer);     
+    BYTE nextNdbSizeSectors = pDmaBuffer[4];
+    
+    //-----------------
+    // then try to allocate the RAM for NDB
     DWORD readCount, freeSize;
-    freeSize    = KRgetfree_internal(TRUE);                                 // get size of largest free block
-    readCount   = (dataLeftTotal    <= 0xffff)   ? dataLeftTotal : 0xffff;  // Do we have less than 64kB of data? Retrieve all, otherwise retrieve just 64kB.
-    readCount   = (readCount        <= freeSize) ? readCount : freeSize;    // Do we have less data to read, then what we can KRmalloc()? If yes, read all, otherwise read just what we can KRmalloc()
+    freeSize    = KRgetfree_internal(TRUE);                                     // get size of largest free block
+    readCount   = (nexdNdbSizeBytes < freeSize) ? nexdNdbSizeBytes : freeSize;  // Do we have less data to read, then what we can KRmalloc()? If yes, read all, otherwise read just what we can KRmalloc()
     
     // allocate buffer for structure and the data
     BYTE *bfr = KRmalloc_internal(readCount);                               // try to malloc() RAM for data
@@ -175,129 +198,142 @@ NDB *CNget_NDB (int16 handle)
         return (NDB *) NULL;
     }
 
+    //-----------------
     // setup the NDB structure - but using direct access, as calling code uses different packing than gcc
     storeDword(((BYTE *)pNdb) +  0, (DWORD) pNdb);          // pointer block start - for free()
     storeDword(((BYTE *)pNdb) +  4, (DWORD) bfr);           // pointer to data
     storeWord (((BYTE *)pNdb) +  8, (WORD)  readCount);     // length of data in buffer
     storeDword(((BYTE *)pNdb) + 10, (DWORD) 0);             // pointer to next NDB
-    
-    // now do the actual transfer
-    DWORD res = 0;
-    if(readCount <= (2*READ_BUFFER_SIZE)) {                                 // less than 2 local buffers? 
-        res = read_small(handle, readCount, (BYTE *) bfr);                  // do small read
-    } else {
-        res = read_big(handle, readCount, (BYTE *) bfr);                    // do big read
-    }
 
-    if(res == 0) {                                                          // if failed, fail
+    //-----------------
+    // get the NDB data from host
+   	commandLong[ 5] = NET_CMD_CNGET_NDB;    // store function number 
+	commandLong[ 6] = handle;				// store file handle 
+	commandLong[ 7] = 1;                    // get next NDB data
+	commandLong[10] = 0;                    // how many chars were used
+
+    hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, bfr, nextNdbSizeSectors);
+
+    if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // failed? quit
         KRfree_internal(bfr);
         KRfree_internal(pNdb);
         return (NDB *) NULL;
     }
     
-    storeWord (((BYTE *)pNdb) +  8, (WORD) res);            // store how many bytes we actually did read
     return pNdb;                                                            // return the pointer to NDB structure
 }
 
 int16 CNget_block(int16 handle, void *buffer, int16 length)
 {
-    if(!handle_valid(handle)) {                 // we don't have this handle? fail
+    if(!handle_valid(handle)) {             // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
-    update_con_info(FALSE);                                         // update connections info structs (max once per 100 ms)
-    TConInfo    *ci             = &conInfo[handle];                 // we're working with this connection
-    DWORD       dataLeftLocal   = ci->rCount - ci->rStart;          // calculate how much data we have in local buffer
-    DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;  // total data left = local data count + host data count
+    update_con_info(FALSE);                 // update connections info structs (max once per 100 ms)
+    TConInfo *ci = &conInfo[handle];        // we're working with this connection
     
-    if(dataLeftTotal == 0 && ci->tcpConnectionState == TCLOSED) {   // no data to read, and connection closed? return E_EOF
+    if(ci->tcpConnectionState == TCLOSED) { // no data to read, and connection closed? return E_EOF
         return E_EOF;
     }
     
-    if(dataLeftTotal == 0) {                                        // no data in host and in local buffer?
+    if(ci->bytesToRead < length) {          // not enough data to read the whole block? fail
         return E_NODATA;
     }
 
-    if(dataLeftTotal < length) {                                    // not enough data to read the whole block? fail
+    //----------------------------------------
+    // no more used chars and got chars
+    int charsUsed   = ci->charsUsed;
+    ci->charsUsed   = 0;                    
+    ci->charsGot    = 0;
+
+    //----------------------------------------
+    // how many sectors and bytes we need for long transfer
+    int lenLongSectors  = length         >> 9;
+    int lenLongBytes    = lenLongSectors << 9;
+    
+    // how many bytes we need for short transfer
+    int lenShortBytes   = length      & 0x1ff;
+    
+    //----------------------------------------
+    // first do the long transfer
+  	commandLong[ 5] = NET_CMD_CNGET_BLOCK;  // store function number 
+	commandLong[ 6] = handle;				// store file handle 
+	commandLong[ 7] = (BYTE) (lenLongBytes >> 8);
+	commandLong[ 8] = (BYTE) (lenLongBytes     );
+	commandLong[10] = charsUsed;            // how many chars were used
+
+    hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, buffer, lenLongSectors);
+
+    if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // failed? quit
+        return E_NODATA;
+    }    
+    //----------------------------------------
+    // then do the short transfer
+  	commandLong[ 5] = NET_CMD_CNGET_BLOCK;  // store function number 
+	commandLong[ 6] = handle;				// store file handle 
+	commandLong[ 7] = (BYTE) (lenShortBytes >> 8);
+	commandLong[ 8] = (BYTE) (lenShortBytes     );
+	commandLong[10] = 0;                    // no chars were used
+
+    hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);
+
+    if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // failed? quit
         return E_NODATA;
     }
     
-    int16 res = 0;
-    if(length <= (2*READ_BUFFER_SIZE)) {                            // less than 2 local buffers? 
-        res = read_small(handle, length, (BYTE *) buffer);          // do small read
-    } else {
-        res = read_big(handle, length, (BYTE *) buffer);            // do big read
-    }
+    memcpy(buffer + lenLongBytes, pDmaBuffer, lenShortBytes);   // copy it from intermediate buffer to final buffer
+    //----------------------------------------
     
-    return res;
+    return length;
 }
 
 int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
 {
-    if(!handle_valid(handle)) {                                     // we don't have this handle? fail
+    if(!handle_valid(handle)) {             // we don't have this handle? fail
         return E_BADHANDLE;
     }
 
-    update_con_info(FALSE);                                         // update connections info structs (max once per 100 ms)
-    TConInfo    *ci             = &conInfo[handle];                 // we're working with this connection
-    DWORD       dataLeftLocal   = ci->rCount - ci->rStart;          // calculate how much data we have in local buffer
-    DWORD       dataLeftTotal   = dataLeftLocal + ci->bytesToRead;  // total data left = local data count + host data count
+    update_con_info(FALSE);                 // update connections info structs (max once per 100 ms)
+    TConInfo *ci = &conInfo[handle];        // we're working with this connection
     
-    if(dataLeftTotal == 0 && ci->tcpConnectionState == TCLOSED) {   // no data to read, and connection closed? return E_EOF
+    if(ci->tcpConnectionState == TCLOSED) { // no data to read, and connection closed? return E_EOF
         return E_EOF;
     }
     
-    if(dataLeftTotal == 0) {                                        // no data in host and in local buffer?
+    if(ci->bytesToRead <= 2) {              // not enough data to read? fail
         return E_NODATA;
     }
 
     //-----------------------
-    // before we do anything, we should check if the string could fit in the provided buffer
-    int32 i, realLen = -1;
-    
-    for(i=ci->rStart; i<ci->rCount; i++) {                          // check if the local buffer has this delimiter
-        if(ci->rBuf[i] == delimiter) {                              // delimiter found, quit the search
-            realLen = i - ci->rStart;
-            break;
-        }
-    }
-
-    if(realLen == -1) {                                                                     // we didn't find the delimiter, try to search for it in host
-    	commandLong[5] = NET_CMD_CN_LOCATE_DELIMITER;
-		commandLong[6] = handle;
-        commandLong[7] = delimiter;
-    
-		hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);      // send command to host over ACSI
-
-		if(!hdIf.success || hdIf.statusByte != E_NORMAL) {                                  // failed? say that no data was transfered
-			return E_NODATA;
-		}
-        
-        DWORD lenOnHost = getDword(pDmaBuffer);                                             // read the position on host
-        
-        if(lenOnHost == DELIMITER_NOT_FOUND) {                                              // not found? fail
-            return E_NODATA;                                                                // not enough data in the input buffer to find the delimiter
-        }
-        
-        realLen = dataLeftLocal + lenOnHost;                                                // found on host, so real length is local length + length on host
-    }
-    
-    // now verify if the provided buffer is long enough
-    if(length < realLen) {
-        return E_BIGBUF;                                                                    // return: the buffer is not large enough to hold the whole block of data
-    }
-    
+    // limit the length
+    length              = (length < DMA_BUFFER_SIZE) ? length : DMA_BUFFER_SIZE;
+    int sectorLength    = length >> 9;
     //-----------------------
-    // if we got here, we know that we do have that delimiter and the buffer is large enough to get it, 
-    // so get it using small buffers
-    DWORD cnt = read_small(handle, realLen, (BYTE *) buffer);
+    // issue the command
+  	commandLong[ 5] = NET_CMD_CNGETS;       // store function number 
+	commandLong[ 6] = handle;				// store file handle 
+	commandLong[ 7] = (BYTE) (length >> 8); // store max length
+	commandLong[ 8] = (BYTE) (length     );
+    commandLong[ 9] = delimiter;            // store delimiter
+	commandLong[10] = ci->charsUsed;        // how many chars were used
+
+    // no chars used and got no chars
+    ci->charsUsed   = 0;                    
+    ci->charsGot    = 0;
     
-    if(cnt != realLen) {                // if failed to read all required data (shouldn't happen), fail
+    hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, sectorLength);
+
+    if(!hdIf.success) {                     // communication failed? quit
         return E_NODATA;
     }
     
-    buffer[realLen - 1] = 0;            // terminate the string by removing the delimiter
-	return (realLen - 1);               // returns the number of bytes read until the delimiter was found, i.e. the length of the buffer contents without the final '\0' byte
+    if(hdIf.statusByte == E_NORMAL) {       // got the string? good
+        memcpy(buffer, pDmaBuffer, length); // copy it to buffer
+        return E_NORMAL;
+    }
+
+    // in other cases - just return the status byte
+    return hdIf.statusByte;
 }
 
 //--------------------------------------
@@ -637,12 +673,14 @@ static void initConInfoStruct(int i)
         return;
     }
 
-    conInfo[i].bytesToRead          = 0;
-    conInfo[i].tcpConnectionState   = TCLOSED;
-    conInfo[i].rCount               = 0;
-    conInfo[i].rStart               = 0;
-    setCIB((BYTE *) &conInfo[i].cib, 0, 0, 0, 0, 0, 0);     // clear the CIB structure
-    memset(conInfo[i].rBuf, 0, READ_BUFFER_SIZE);
+    TConInfo *ci = &conInfo[i];
+    
+    ci->bytesToRead          = 0;
+    ci->tcpConnectionState   = TCLOSED;
+    ci->charsUsed            = 0;
+    ci->charsGot             = 0;
+    setCIB((BYTE *) &ci->cib, 0, 0, 0, 0, 0, 0);    // clear the CIB structure
+    memset(ci->chars, 0, READ_BUFFER_SIZE);
 }
 //-------------------------------------------------------------------------------
 void init_con_info(void)
@@ -652,221 +690,6 @@ void init_con_info(void)
     for(i=0; i<MAX_HANDLE; i++) {
         initConInfoStruct(i);
     }
-}
-//-------------------------------------------------------------------------------
-BYTE fillReadBuffer(int16 handle)
-{
-	DWORD res;
-
-	if(handle >= MAX_HANDLE) {                                        // would be out of index? quit - with error 
-		return FALSE;
-	}
-
-    TConInfo *ci = &conInfo[handle];
-	ci->rCount = 0;
-	ci->rStart = 0;
-	
-	res = readData(handle, ci->rBuf, 512, 0);                       // try to read 512 bytes
-
-	ci->rCount = res;                                               // store how much data we've read
-    
-    if(res <= ci->bytesToRead) {                                    // update how many bytes there are on host to read, if the result is >= 0
-        ci->bytesToRead -= res;
-    } else {                                                        // update how many bytes there are on host - the result is 0
-        ci->bytesToRead = 0;
-    }
-    
-	return TRUE;
-}
-//-------------------------------------------------------------------------------
-// BEWARE! BYTE *bfr must point to ST RAM, because DMA chip can't transfer data to FAST RAM!
-DWORD readData(int16 handle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
-{
-	commandLong[5] = NET_CMD_CN_READ_DATA;      // store function number 
-	commandLong[6] = handle;					// store file handle 
-	
-	commandLong[10] = seekOffset;				// seek offset before read
-	
-	WORD sectorCount = cnt / 512;				// calculate how many sectors should we transfer 
-	DWORD count=0;
-
-	if((cnt % 512) != 0) {                      // and if we have more than full sector(s) in buffer, send one more! 
-		sectorCount++;
-	}
-
-    commandLong[7] = cnt >> 16;                                                         // store byte count 
-    commandLong[8] = cnt >>  8;
-    commandLong[9] = cnt  & 0xff;
-
-    hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);     // Normal read to ST RAM - send command to host over ACSI 
-
-    if(!hdIf.success) {
-        return 0;
-    }
-
-    // if all data transfered, return count of all data
-    if(hdIf.statusByte == RW_ALL_TRANSFERED) {
-        return cnt;
-    }
-
-    // if the result is also not partial transfer, then some other error happened, return that no data was transfered
-    if(hdIf.statusByte != RW_PARTIAL_TRANSFER ) {
-        return 0;	
-    }
-
-    // if we got here, then partial transfer happened, see how much data we got
-    commandShort[4] = NET_CMD_CN_GET_DATA_COUNT;
-    commandShort[5] = handle;										
-
-    hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);         // send command to host over ACSI
-
-    if(!hdIf.success || hdIf.statusByte != E_NORMAL) {                          // failed? say that no data was transfered
-        return 0;
-    }
-
-    count = getDword(pDmaBuffer);                                               // read how much data was read
-	return count;
-}
-
-//-------------------------------------------------------------------------------
-
-// for small reads get the data through the local buffers
-DWORD read_small(int16 handle, DWORD countNeeded, BYTE *buffer)
-{
-    DWORD countDone = 0;
-    WORD dataLeft, copyCount;
-    
-	TConInfo *ci    = &conInfo[handle];								// to shorten the following operations use this pointer 
-    dataLeft        = ci->rCount - ci->rStart;	                        // see how many data we have buffered									
-    
-    while(countNeeded > 0) {
-
-        if(dataLeft == 0) {                                             // no data buffered?
-            fillReadBuffer(handle);									    // fill the read buffer with new data
-            dataLeft = ci->rCount - ci->rStart;	                        // see how many data we have buffered
-            
-            if(dataLeft == 0) {                                         // if nothing left, quit and return how many we got
-                break;
-            }
-        }
-        
-        copyCount = (dataLeft > countNeeded) ? countNeeded : dataLeft;  // do we have more data than we need? Just use only what we need, otherwise use all data left
-		memcpy(buffer, &ci->rBuf[ ci->rStart], copyCount);
-
-        buffer      += copyCount;                                       // update pointer to where next data should be stored
-        countDone   += copyCount;                                       // add to count of bytes read
-        countNeeded -= copyCount;                                       // subtract from count of bytes needed to be read
-
-        ci->rStart  += copyCount;                                       // update pointer to first unused data
-        dataLeft    = ci->rCount - ci->rStart;	                        // see how many data we have buffered									
-    }
-
-    return countDone;
-}
-
-// for big reads use buffered data, then do big data transfer (multiple sectors at once), then finish with buffered data
-DWORD read_big(int16 handle, DWORD countNeeded, BYTE *buffer)
-{
-	TConInfo *ci	    = &conInfo[handle];					        // to shorten the following operations use this pointer 
-	WORD dataLeft	    = ci->rCount - ci->rStart;										
-    
-    DWORD countDone     = 0;
-    DWORD dwBuffer      = (DWORD) buffer;
-    BYTE bufferIsOdd	= dwBuffer	& 1;
-	BYTE dataLeftIsOdd;
-    char seekOffset     = 0;	
-
-    // First phase of BIG fread:
-    // Use all the possible buffered data, and also make the buffer pointer EVEN, as the ACSI transfer works only on EVEN addresses.
-    // This means that if the buffer pointer is EVEN, don't use too much data and don't make it ODD this way;
-    // and if the buffer pointer is ODD, then make it EVEN - either use already available buffered data, or read data to buffer.
-    
-    if(bufferIsOdd) {                                                   // if buffer address is ODD, we need to make it EVEN before the big ACSI transfer starts
-        if(dataLeft == 0) {                                             // no data buffered?
-            fillReadBuffer(handle);									// fill the read buffer with new data
-            dataLeft = ci->rCount - ci->rStart;	                        // see how many data we have buffered
-            
-            if(dataLeft == 0) {                                         // no data in the file? fail
-                return 0;
-            }
-        }
-    
-        // ok, so we got some data buffered, now use only ODD number of data, so the buffer pointer after this would be EVEN
-        dataLeftIsOdd = dataLeft & 1;
-
-        if(!dataLeftIsOdd) {                                            // remaining buffered data count is EVEN? Use only ODD part
-            dataLeft    -= 1;
-            seekOffset  = -1;
-        }
-    } else {                                                            // if buffer address is EVEN, we don't need to fix the buffer to be on EVEN address
-        if(dataLeft != 0) {                                             // so use buffered data if there are some (otherwise skip this step)
-            dataLeftIsOdd = dataLeft & 1;
-
-            if(dataLeftIsOdd) {                                         // if the data left is ODD, use one byte less - to keep the buffer pointer EVEN
-                dataLeft--;
-                seekOffset = -1;
-            }
-        }    
-    }
-
-    if(dataLeft != 0) {                                                 // if should copy some remaining buffered data, do it
-  		memcpy(buffer, &ci->rBuf[ ci->rStart], dataLeft);               // copy the data
-            
-        buffer      += dataLeft;                                        // update pointer to where next data should be stored
-        countDone   += dataLeft;                                        // add to count of bytes read
-        countNeeded -= dataLeft;                                        // subtract from count of bytes needed to be read
-    }
-    
-	ci->rStart = 0;													    // mark that the buffer doesn't contain any data anymore (although it might contain 1 byte)
-    ci->rCount = 0;
-    //---------------
-    if(ci->bytesToRead < countNeeded) {                                 // if we have less data in the file than what the caller requested, update the countNeeded
-        countNeeded = ci->bytesToRead;
-    }
-    
-    ci->bytesToRead -= countNeeded;                                     // subtract the amount we will use from host buffer / socket
-    
-    // Second phase of BIG fread: transfer data by blocks of size 512 bytes, buffer must be EVEN
-    BYTE  toFastRam = (((int)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
-    DWORD blockSize = toFastRam ? FASTRAM_BUFFER_SIZE : (MAXSECTORS * 512); // size of block, which we will read
-    DWORD res;
-    
-	while(countNeeded >= 512) {											// while we're not at the ending sector
-        // To avoid corruption of data beyond the border of buffer, read LESS than what's needed - rounded to nearest lower sector count
-        DWORD countNeededRoundedDown = countNeeded & 0xfffffe00;        // round to multiple of 512 (sector size)
-    
-        // If the needed count is bigger that what we can fit in maximum transfer size, limit it to that maximum; otherwise just use it.
-        DWORD thisReadSizeBytes = (countNeededRoundedDown < blockSize) ? countNeededRoundedDown : blockSize;    
-			
-        if(toFastRam) {     // if reading to FAST RAM, first read to fastRamBuffer, and then copy to the correct buffer
-            res = readData(handle, FastRAMBuffer, thisReadSizeBytes, seekOffset);
-            memcpy(buffer, FastRAMBuffer, thisReadSizeBytes);
-        } else {            // if reading to ST RAM, just read directly there
-            res = readData(handle, buffer, thisReadSizeBytes, seekOffset);
-        }
-			
-		countDone	    += res;											// update the bytes read variable
-		buffer		    += res;											// update the buffer pointer
-		countNeeded     -= res;											// update the count that we still should read
-			
-		if(res != thisReadSizeBytes) {                                  // if failed to read all the requested data?
-			return countDone;										    // return with the count of read data 
-		}
-	}
-    //--------------
-        
-    // Third phase of BIG fread: if the rest after reading big blocks is not 0, we need to finish it with one last buffered read    
-	if(countNeeded != 0) {												
-		fillReadBuffer(handle);
-			
-		DWORD rest = (countNeeded <= ci->rCount) ? countNeeded : ci->rCount;    // see if we have enough data to read the rest, and use which is lower - either what we want to read, or what we can read
-			
-		memcpy(buffer, &ci->rBuf[ ci->rStart ], rest);				    // copy the data that we have
-		ci->rStart	+= rest;										    // and move the pointer further in buffer
-		countDone	+= rest;										    // also mark that we've read this rest
-	}
-
-    return countDone;                                                   // return how much bytes we've read together
 }
 //-------------------------------------------------------------------------------
 void setCIB(BYTE *cib, WORD protocol, WORD lPort, WORD rPort, DWORD rHost, DWORD lHost, WORD status)
