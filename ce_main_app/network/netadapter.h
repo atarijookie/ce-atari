@@ -20,6 +20,8 @@
 #include "../datatypes.h"
 #include "../isettingsuser.h"
 #include "resolver.h"
+#include "readwrapper.h"
+#include "icmpwrapper.h"
 
 #include "sting.h"
 
@@ -44,112 +46,6 @@ extern "C" {
 	void *networkThreadCode(void *ptr);
 }
 
-//-------------------------------------
-#define STING_DGRAM_MAXSIZE     512
-
-class TStingDgram {
-public:
-    TStingDgram() {
-        data = new BYTE[STING_DGRAM_MAXSIZE];
-        clear();
-    }
-
-    ~TStingDgram() {
-        delete []data;
-    }
-
-    void clear(void) {
-        memset(data, 0, STING_DGRAM_MAXSIZE);
-        count   = 0;
-        time    = 0;
-    }
-
-    bool isEmpty(void) {
-        return (count == 0);
-    }
-
-    BYTE  *data;
-    WORD  count;
-    DWORD time;
-};
-
-//-------------------------------------
-
-class TRawSocks{
-public:
-    TRawSocks() {
-        packet      = (char*) new BYTE[ sizeof(struct iphdr) + sizeof(struct icmphdr) + CON_BFR_SIZE];
-
-        ip          = (struct iphdr*)    packet;                                                    // pointer to IP   header (start of packet)
-        icmp        = (struct icmphdr*) (packet + sizeof(struct iphdr));                            // pointer to ICMP header (that is just beyond IP header)
-        data        = (BYTE *)          (packet + sizeof(struct iphdr) + sizeof(struct icmphdr));   // pointer to ICMP data   (located beyond ICMP header)
-    }
-
-    ~TRawSocks() {
-        delete []packet;
-    }
-
-    void setIpHeader(DWORD src_addr, DWORD dst_addr, WORD dataLength) {
-        ip->ihl         = 5;
-        ip->version     = 4;        // IPv4
-        ip->tos         = 0;
-        ip->tot_len     = sizeof(struct iphdr) + sizeof(struct icmphdr) + dataLength;
-        ip->id          = htons(random());
-        ip->ttl         = 255;
-        ip->protocol    = IPPROTO_ICMP;
-        ip->saddr       = htonl(src_addr);
-        ip->daddr       = htonl(dst_addr);
-
-        ip->check       = 0;                                                // first set checksum to zero
-        ip->check       = checksum((WORD *) ip, sizeof(struct iphdr));      // then calculate real checksum and store it
-    }
-
-    void setIcmpHeader(int type, int code, int id, int sequence) {
-        icmp->type              = type;
-        icmp->code              = code;
-        icmp->un.echo.id        = htons(id);
-        icmp->un.echo.sequence  = htons(sequence);
-
-        icmp->checksum = 0;                                                 // first set checksum to zero
-        icmp->checksum = checksum((WORD *) icmp, sizeof(struct icmphdr));   // then calculate real checksum and store it
-        
-        echoId = id;
-    }
-
-    static WORD checksum(WORD *addr, int len) {
-        int sum         = 0;
-        WORD answer  = 0;
-        WORD *w      = addr;
-        int nleft       = len;
-
-        while (nleft > 1) {     // sum WORDs in a loop
-            sum += *w++;
-            nleft -= 2;
-        }
-
-        /* mop up an odd byte, if necessary */
-        if (nleft == 1) {
-            *(u_char *) (&answer) = *(u_char *) w;
-            sum += answer;
-        }
-
-        /* add back carry outs from top 16 bits to low 16 bits */
-        sum = (sum >> 16) + (sum & 0xffff); // add hi 16 to low 16
-        sum += (sum >> 16);                 // add carry
-        answer = ~sum;                      // truncate to 16 bits
-        return (answer);
-    }
-
-    char*           packet;
-    struct iphdr*   ip;
-    struct icmphdr* icmp;
-    BYTE*           data;
-    
-    WORD            echoId;
-};
-
-//-------------------------------------
-
 class TNetConnection
 {
 public:
@@ -159,6 +55,7 @@ public:
 
     ~TNetConnection() {                 // destructor to possibly close connection
         closeIt();
+        readWrapper.clearAll();
     }
 
     void closeIt(void) {                // close the data socket
@@ -188,7 +85,6 @@ public:
 
         gotPrevLastByte     = false;
         prevLastByte        = 0;
-        
     }
 
     bool isClosed(void) {                       // check if it's closed
@@ -205,6 +101,9 @@ public:
     struct  sockaddr_in remote_adr; // remote address
     struct  sockaddr_in local_adr;  // local  address
     int     type;                   // TCP / UDP / ICMP
+    int     buff_size;              // for TCP - TX buffer size = maximu packet size that should be sent
+
+    ReadWrapper readWrapper;
 
     int bytesInSocket;          // how many bytes are waiting to be read from socket
     int status;                 // status of connection - open, closed, ...
@@ -234,8 +133,6 @@ public:
     BYTE            *dataBuffer;
 
     TNetConnection  cons[MAX_HANDLE];   // this holds the info about connections
-    TNetConnection  rawSock;            // this is info about RAW socket - used for ICMP
-    TRawSocks       rawSockHeads;       // this holds the headers for RAW socket
 
     BYTE *rBfr;                         // pointer to 100 kB read buffer - used when conLocateDelim() is called
 
@@ -252,6 +149,11 @@ public:
     void conReadData(void);             // receive data
     void conGetDataCount(void);         // get how many data there is
     void conLocateDelim(void);          // find string delimiter in received data
+
+    void conGetCharBuffer(void);
+    void conGetNdb(void);
+    void conGetBlock(void);
+    void conGetString(void);
 
     void icmpSend(void);                // send ICMP packet
     void icmpGetDgrams(void);           // receive ICMP packets
@@ -270,9 +172,8 @@ public:
     // helper functions
     int  findEmptyConnectionSlot(void); // get index of empty connection slot, or -1 if nothing is available
     void updateCons(void);
-    int  howManyWeCanReadFromFd(int fd);
 
-    int  readFromSocket(TNetConnection *nc, int cnt);
+    int  readFromSocket(TNetConnection *nc, int wantCount);
     void finishDataRead(TNetConnection *nc, int totalCnt, BYTE status);
     
     void logFunctionName(BYTE cmd);

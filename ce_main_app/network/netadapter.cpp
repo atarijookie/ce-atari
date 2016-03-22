@@ -32,82 +32,8 @@ pthread_mutex_t networkThreadMutex = PTHREAD_MUTEX_INITIALIZER;
 std::queue<TNetReq> netReqQueue;
 
 DWORD localIp;
-int   rawSockFd = -1;
-bool  tryIcmpRecv(BYTE *bfr);
 
-void resolveNameToIp(TNetReq &tnr);
-
-#define RECV_BFR_SIZE   (64 * 1024)
-
-#define MAX_STING_DGRAMS    32
-TStingDgram dgrams[MAX_STING_DGRAMS];
-volatile DWORD icmpDataCount;
-
-void dgram_clearOld(void) 
-{
-    DWORD now = Utils::getCurrentMs();
-    
-    for(int i=0; i<MAX_STING_DGRAMS; i++) {     // find non-empty slot, and if it's old, clear it
-        if(dgrams[i].isEmpty()) {               // found empty? skip it
-            continue;
-        }
-        
-        DWORD diff = now - dgrams[i].time;      // calculate how old is this dgram
-        if(diff < 10000) {                      // dgram is younger than 10 seconds? skip it
-            continue;
-        }
-
-        dgrams[i].clear();                      // it's too old, clear it
-        Debug::out(LOG_DEBUG, "dgram_clearOld() - dgram #%d was too old and it was cleared", i);
-    }
-}
-
-int dgram_getEmpty(void) {
-    int i; 
-    DWORD oldestTime    = 0xffffffff;
-    int   oldestIndex   = 0;
-    
-    for(i=0; i<MAX_STING_DGRAMS; i++) {     // try to find empty slot
-        if(dgrams[i].time < oldestTime) {   // found older item than we had found before? store index
-            oldestTime  = dgrams[i].time;
-            oldestIndex = i;
-        }
-    
-        if(dgrams[i].isEmpty()) {           // found empty? return it
-            return i;
-        }
-    }
-
-    // no empty slot found, clear and return the oldest - to avoid filling up the dgrams array (at the cost of loosing oldest items)
-    Debug::out(LOG_DEBUG, "dgram_getEmpty() - no empty slot, returning oldest slot - #%d", oldestIndex);
-    
-    dgrams[oldestIndex].clear();
-    return oldestIndex;
-}
-
-int dgram_getNonEmpty(void) {
-    int i; 
-    for(i=0; i<MAX_STING_DGRAMS; i++) {
-        if(!dgrams[i].isEmpty()) {
-            return i;
-        }
-    }
-
-    return -1;
-}
-
-int dgram_calcIcmpDataCount(void) {
-    DWORD sum = 0;
-    int i; 
-
-    for(i=0; i<MAX_STING_DGRAMS; i++) {     // go through received DGRAMs
-        if(!dgrams[i].isEmpty()) {          // not empty?
-            sum += dgrams[i].count;         // add size of this DGRAM
-        }
-    }
-
-    return sum;
-}
+IcmpWrapper icmpWrapper;
 
 void netReqAdd(TNetReq &tnr)
 {
@@ -119,22 +45,25 @@ void netReqAdd(TNetReq &tnr)
 void *networkThreadCode(void *ptr)
 {
 	Debug::out(LOG_DEBUG, "Network thread starting...");
-    BYTE *recvBfr = new BYTE[RECV_BFR_SIZE];                // 64 kB receive buffer    
 
     // The following line is needed to allow root to create raw sockets for ICMP echo... 
     // The problem with this is it allows only ICMP echo to be done.
     system("sysctl -w net.ipv4.ping_group_range=\"0 0\" > /dev/null");  
 
 	while(sigintReceived == 0) {
-        dgram_clearOld();                               // clear old dgrams that are probably stuck in the queue 
+        pthread_mutex_lock(&networkThreadMutex);
+        icmpWrapper.clearOld();                         // clear old dgrams that are probably stuck in the queue 
     
         while(1) {                                      // receive all available ICMP data 
-            bool r = tryIcmpRecv(recvBfr);              // this will cause 100 ms delay when no data is there
+            bool r = icmpWrapper.receive();             // this will cause 100 ms delay when no data is there
             if(!r) {                                    // if receiving failed, quit; otherwise do another receiving!
                 break;
             }
         }                           
+        pthread_mutex_unlock(&networkThreadMutex);
+        Utils::sleepMs(100); 						    // wait 100 ms and try again
 
+/*
 		pthread_mutex_lock(&networkThreadMutex);		// lock the mutex
 
 		if(netReqQueue.size() == 0) {					// nothing to do?
@@ -146,105 +75,11 @@ void *networkThreadCode(void *ptr)
 		TNetReq tnr = netReqQueue.front();		        // get the 'oldest' element from queue
 		netReqQueue.pop();								// and remove it form queue
 		pthread_mutex_unlock(&networkThreadMutex);		// unlock the mutex
-
-
+*/
     }
 
-    delete []recvBfr;
-	
 	Debug::out(LOG_DEBUG, "Network thread terminated.");
 	return 0;
-}
-
-//--------------------------------------------------------
-bool tryIcmpRecv(BYTE *bfr)
-{
-    if(rawSockFd == -1) {                                   // ICMP socket closed? quit, no data
-        return false;
-    }
-
-    //-----------------------
-    // wait for data for 100 ms, and quit if there is no data
-    struct timeval  timeout = {0, 100000};                  // receive timeout - 100 ms
-    fd_set          read_set;
-
-    memset(&read_set, 0, sizeof(read_set));
-    FD_SET(rawSockFd, &read_set);
-
-    int res = select(rawSockFd + 1, &read_set, NULL, NULL, &timeout);     //wait for a reply with a timeout
-
-    if(res == 0) {                  // no fd? timeout, quit
-        return false;
-    }
-    
-    if(res < 0) {                   // select failed
-        return false;
-    }
-
-    //-----------------------
-    // receive the data
-    // recvfrom will receive only one ICMP packet, even if there are more than 1 packets waiting in socket
-    struct sockaddr src_addr;
-    int addrlen = sizeof(struct sockaddr);
-
-    res = recvfrom(rawSockFd, bfr, RECV_BFR_SIZE, 0, (struct sockaddr *) &src_addr, (socklen_t *) &addrlen);
-
-    if(res == -1) {                 // if recvfrom failed, no data
-        Debug::out(LOG_DEBUG, "tryIcmpRecv - recvfrom() failed");
-        return false;
-    }
-
-    // res now contains length of ICMP packet (header + data)
-
-    //-----------------------
-    // parse response to the right structs
-    pthread_mutex_lock(&networkThreadMutex);
-
-    int i = dgram_getEmpty();       // now find space for the datagram
-    if(i == -1) {                   // no space? fail, but return that we were able to receive data
-        pthread_mutex_unlock(&networkThreadMutex);
-        
-        Debug::out(LOG_DEBUG, "tryIcmpRecv - dgram_getEmpty() returned -1");
-        return true;
-    }
-
-    TStingDgram *d = &dgrams[i];
-    d->clear();
-    d->time = Utils::getCurrentMs();
-    
-    //-------------
-    // fill IP header
-    d->data[0] = 0x45;                          // IP ver, IHL
-    Utils::storeWord(d->data + 2, 20 + res);    // data[2 .. 3] = TOTAL LENGTH = IP header lenght (20) + ICMP header & data length (res)
-    d->data[8] = 128;                           // TTL
-    d->data[9] = ICMP;                          // protocol
-
-    struct sockaddr_in *sa_in = (struct sockaddr_in *) &src_addr;       // cast sockaddr to sockaddr_in
-    Utils::storeDword(d->data + 12, ntohl(sa_in->sin_addr.s_addr));     // data[12 .. 15] - source IP
-    Utils::storeDword(d->data + 16, localIp);                           // data[16 .. 19] - destination IP 
-
-    WORD checksum = TRawSocks::checksum((WORD *) d->data, 20);
-    Utils::storeWord(d->data + 10, checksum);                           // calculate chekcsum, store to data[10 .. 11]
-    //-------------
-    // fill IP_DGRAM header
-    Utils::storeWord(d->data + 30, res);                                // data[30 .. 31] - pkt_length - length of IP packet data block (res)
-    Utils::storeDword(d->data + 32, 128);                               // data[32 .. 35] - timeout - timeout of packet life
-
-    //-------------
-    // now append ICMP packet
-
-    int rest = MIN(STING_DGRAM_MAXSIZE - 48 - 2, res);                  // we can store only (STING_DGRAM_MAXSIZE - 48 - 2) = 462 bytes of ICMP packets to fit 512 B
-    memcpy(d->data + 48, bfr, rest);                                    // copy whole ICMP packet beyond the IP_DGRAM structure
-
-    //--------------
-    // epilogue - update stuff, unlock mutex, success!
-    d->count = 48 + rest;                                               // update how many bytes this gram contains all together
-
-    icmpDataCount = dgram_calcIcmpDataCount();                          // update icmpDataCount
-
-    Debug::out(LOG_DEBUG, "tryIcmpRecv - icmpDataCount is now %d bytes", icmpDataCount);
-    pthread_mutex_unlock(&networkThreadMutex);
-    return true;
 }
 
 //--------------------------------------------------------
@@ -254,7 +89,6 @@ NetAdapter::NetAdapter(void)
     dataTrans       = 0;
     dataBuffer      = new BYTE[NET_BUFFER_SIZE];
     localIp         = 0;
-    icmpDataCount   = 0;
 
     rBfr = new BYTE[CON_BFR_SIZE];
     memset(rBfr, 0, CON_BFR_SIZE);
@@ -335,16 +169,15 @@ void NetAdapter::processCommand(BYTE *command)
 
         // CONNECTION MANAGER
         case NET_CMD_CNKICK:                break;                      // currently not used on host
+
+        case NET_CMD_CNGET_CHAR:            conGetCharBuffer(); break;
+        case NET_CMD_CNGET_NDB:             conGetNdb();        break;
+        case NET_CMD_CNGET_BLOCK:           conGetBlock();      break;
+        case NET_CMD_CNGETS:                conGetString();     break;
+
         case NET_CMD_CNBYTE_COUNT:          break;                      // currently not used on host
-        case NET_CMD_CNGET_CHAR:            break;                      // currently not used on host
-        case NET_CMD_CNGET_NDB:             break;                      // currently not used on host
-        case NET_CMD_CNGET_BLOCK:           break;                      // currently not used on host
         case NET_CMD_CNGETINFO:             break;                      // currently not used on host
-        case NET_CMD_CNGETS:                break;                      // currently not used on host
         case NET_CMD_CN_UPDATE_INFO:        conUpdateInfo();    break;
-        case NET_CMD_CN_READ_DATA:          conReadData();      break;
-        case NET_CMD_CN_GET_DATA_COUNT:     conGetDataCount();  break;
-        case NET_CMD_CN_LOCATE_DELIMITER:   conLocateDelim();   break;
 
         // MISC
         case NET_CMD_RESOLVE:               resolveStart();     break;
@@ -403,12 +236,8 @@ void NetAdapter::closeAndCleanAll(void)
     for(i=0; i<MAX_HANDLE; i++) {                   // close normal sockets
         cons[i].closeIt();
     }
-    
-    rawSock.closeIt();                              // close raw / icmp socket
-    
-    for(i=0; i<MAX_STING_DGRAMS; i++) {             // clear received icmp dgrams
-        dgrams[i].clear();
-    }
+
+    icmpWrapper.closeAndClean();    
     
 	pthread_mutex_unlock(&networkThreadMutex);      // unlock the mutex
 }
@@ -527,16 +356,18 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, WORD t
     }
     
     listen(fd, 1);                                                  // mark this socket as listening, with queue length of 1
-    
-    cons[slot].initVars();                                          // init vars
+
+    TNetConnection *nc = &cons[slot];
+    nc->initVars();                                                 // init vars
 
     // store the info
-    cons[slot].activeNotPassive = false;                            // it's passive (listening) socket
-    cons[slot].listenFd         = fd;
-    cons[slot].local_adr        = local_addr;
-    cons[slot].type             = tcpNotUdp ? TCP : UDP;
-    cons[slot].bytesInSocket    = 0;
-    cons[slot].status           = TLISTEN;
+    nc->activeNotPassive = false;                                   // it's passive (listening) socket
+    nc->listenFd         = fd;
+    nc->local_adr        = local_addr;
+    nc->type             = tcpNotUdp ? TCP : UDP;
+    nc->bytesInSocket    = 0;
+    nc->status           = TLISTEN;
+    nc->buff_size        = buff_size;
 
     // return the handle
     dataTrans->setStatus(handleAtariToCE(slot));
@@ -592,15 +423,19 @@ void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, DWORD remoteHost, WOR
         Debug::out(LOG_DEBUG, "NetAdapter::conOpen_connect() - non-blocking TCP is connecting, going to TSYN_SENT status");
     }
     
-    cons[slot].initVars();                      // init vars
+    TNetConnection *nc = &cons[slot];
+    nc->initVars();                             // init vars
 
     // store the info
-    cons[slot].activeNotPassive = true;         // it's active (outgoing) socket
-    cons[slot].fd               = fd;
-    cons[slot].remote_adr       = serv_addr;
-    cons[slot].type             = tcpNotUdp ? TCP : UDP;
-    cons[slot].bytesInSocket    = 0;
-    cons[slot].status           = conStatus;
+    nc->activeNotPassive = true;                // it's active (outgoing) socket
+    nc->fd               = fd;
+    nc->remote_adr       = serv_addr;
+    nc->type             = tcpNotUdp ? TCP : UDP;
+    nc->bytesInSocket    = 0;
+    nc->status           = conStatus;
+    nc->buff_size         = buff_size;
+
+    nc->readWrapper.init(fd, nc->type, buff_size);
 
     // return the handle
     dataTrans->setStatus(handleAtariToCE(slot));
@@ -741,168 +576,14 @@ void NetAdapter::conUpdateInfo(void)
     }
 
     pthread_mutex_lock(&networkThreadMutex);
-    dataTrans->addDataDword(icmpDataCount);                 // fill the data to be read from ICMP sock
+    DWORD imcpCnt = icmpWrapper.calcDataByteCountTotal();
+    dataTrans->addDataDword(imcpCnt);                       // fill the data to be read from ICMP sock
     pthread_mutex_unlock(&networkThreadMutex);
 
-    Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo - icmpDataCount: %d", icmpDataCount);
+    Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo - imcpCnt: %d", imcpCnt);
 
     dataTrans->padDataToMul16();
     dataTrans->setStatus(E_NORMAL);
-}
-//----------------------------------------------
-void NetAdapter::conReadData(void)
-{
-    int   handle                = cmd[5];                       // get handle
-    DWORD byteCountStRequested  = Utils::get24bits(cmd + 6);    // get how many bytes we want to read
-    int   seekOffset            = (signed char) cmd[9];         // get seek offset (can be 0 or -1)
-
-    if(handle < 0 || handle >= MAX_HANDLE) {                    // handle out of range? fail
-        Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- bad handle: %d", handle);
-        dataTrans->setStatus(E_BADHANDLE);
-        return;
-    }
-
-    TNetConnection *nc = &cons[handle];                         // will use this nc instead of longer cons[handle] in the next lines
-
-    if(nc->isClosed()) {                                        // connection not open? fail
-        Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- connection %d is closed", handle);
-        dataTrans->setStatus(E_BADHANDLE);
-        return;
-    }
-
-    Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- handle: %d, byteCountStRequested: %d, seekOffset: %d", handle, byteCountStRequested, seekOffset);
-    
-    int totalCnt    = 0;
-    int toRead      = byteCountStRequested;
-
-    //--------------
-    // first handle negative seek offset
-    if(seekOffset == -1 && nc->gotPrevLastByte) {               // if we want to seek one byte back, and we do have that byte, do seek
-        dataTrans->addDataByte(nc->prevLastByte);               // add this byte as first
-        nc->gotPrevLastByte = false;
-
-        totalCnt++;
-        toRead--;
-
-        if(toRead == 0) {                                       // if this is what ST wanted to read, quit
-            Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- finished with SINGLE byte returned, totalCnt: %d bytes", totalCnt);
-            
-            finishDataRead(nc, totalCnt, RW_ALL_TRANSFERED);    // update variables, set status
-            return;
-        }
-    }
-
-    //--------------
-    // now find out if we can read anything
-    nc->bytesInSocket = howManyWeCanReadFromFd(nc->fd);                     // update how many bytes we have waiting in socket
-
-    if(nc->bytesInSocket == 0) {                                            // nothing to read? return that we don't have enough data
-        Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- not enough data, RW_PARTIAL_TRANSFER, totalCnt: %d bytes", totalCnt);
-
-        finishDataRead(nc, totalCnt, RW_PARTIAL_TRANSFER);                  // update variables, set status
-        return;
-    }
-
-    //-----------------
-    // try to read the data from socket
-    int cntSck = readFromSocket(nc, toRead);
-
-    toRead      -= cntSck;
-    totalCnt    += cntSck;
-
-    if(toRead == 0) {                                               // we don't need to read more? quit with success
-        Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- finishing after readFromSocked() with RW_ALL_TRANSFERED, totalCnt: %d bytes", totalCnt);
-        
-        finishDataRead(nc, totalCnt, RW_ALL_TRANSFERED);            // transfered all that was wanted
-    } else {
-        Debug::out(LOG_DEBUG, "NetAdapter::conReadData -- finishing after readFromSocked() with RW_PARTIAL_TRANSFER, totalCnt: %d bytes", totalCnt);
-
-        finishDataRead(nc, totalCnt, RW_PARTIAL_TRANSFER);          // transfer was just partial
-    }
-}
-//----------------------------------------------
-void NetAdapter::conGetDataCount(void)
-{
-    int handle = cmd[5];                                    // get handle
-
-    if(handle < 0 || handle >= MAX_HANDLE) {                // handle out of range? fail
-        Debug::out(LOG_DEBUG, "NetAdapter::conGetDataCount - bad handle");
-        dataTrans->setStatus(E_BADHANDLE);
-        return;
-    }
-
-    if(cons[handle].isClosed()) {                           // connection not open? fail
-        Debug::out(LOG_DEBUG, "NetAdapter::conGetDataCount - connection is closed");    
-        dataTrans->setStatus(E_BADHANDLE);
-        return;
-    }
-
-    Debug::out(LOG_DEBUG, "NetAdapter::conGetDataCount - returning lastReadCount: %d", cons[handle].lastReadCount);
-    
-    dataTrans->addDataDword(cons[handle].lastReadCount);    // store last read count
-    dataTrans->padDataToMul16();
-    dataTrans->setStatus(E_NORMAL);
-}
-//----------------------------------------------
-void NetAdapter::conLocateDelim(void)
-{
-    int  handle = cmd[5];                               // get connection handle
-    BYTE delim  = cmd[6];                               // get string delimiter
-    
-    if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
-        Debug::out(LOG_DEBUG, "NetAdapter::conLocateDelim -- bad handle: %d", handle);
-        dataTrans->setStatus(E_BADHANDLE);
-        return;
-    }
-
-    TNetConnection *nc = &cons[handle];
-
-    if(nc->isClosed()) {                                        // connection not open? fail
-        Debug::out(LOG_DEBUG, "NetAdapter::conLocateDelim -- connection %d closed", handle);
-        dataTrans->setStatus(E_BADHANDLE);
-        return;
-    }
-
-    //-----------------
-    // if there's some data we can read, PEEK data (leave it in socket for next real read)
-    int canRead     = howManyWeCanReadFromFd(nc->fd);                   // find out how many bytes we can read
-    
-    if(canRead <= 0) {
-        Debug::out(LOG_DEBUG, "NetAdapter::conLocateDelim -- delimiter NOT found, because no data to recv");
-        dataTrans->addDataDword(DELIMITER_NOT_FOUND);
-        return;
-    }
-    
-    int readCount   = MIN(canRead, CON_BFR_SIZE);                       // get the smaller number out of these two
-
-    int res = recv(nc->fd, rBfr, readCount, MSG_DONTWAIT | MSG_PEEK);   // PEEK read the data
-
-    if(res <= 0) {                                                      // read failed? quit
-        Debug::out(LOG_DEBUG, "NetAdapter::conLocateDelim -- delimiter NOT found, because recv failed");
-        dataTrans->addDataDword(DELIMITER_NOT_FOUND);
-        return;
-    }
-    //-----------------
-    // now try to find the delimiter
-    int i;
-    bool found = false;
-    for(i=0; i<res; i++) {                              // go through the buffer and find delimiter
-        if(rBfr[i] == delim) {                          // delimiter found?
-            found = true;
-            break;
-        }
-    }
-
-    if(found) {                                         // if found, store position
-        Debug::out(LOG_DEBUG, "NetAdapter::conLocateDelim -- delimiter found at position %d", i);
-        dataTrans->addDataDword(i);
-    } else {                                            // not found? return DELIMITER_NOT_FOUND
-        Debug::out(LOG_DEBUG, "NetAdapter::conLocateDelim -- delimiter NOT found");
-        dataTrans->addDataDword(DELIMITER_NOT_FOUND);
-    }
-    dataTrans->padDataToMul16();                        // make sure the data size is multiple of 16
-
-    dataTrans->setStatus(E_NORMAL);                     // this operation was OK
 }
 //----------------------------------------------
 void NetAdapter::icmpSend(void)
@@ -932,69 +613,23 @@ void NetAdapter::icmpSend(void)
         return;
     }
 
-    if(rawSock.isClosed()) {                                        // we don't have RAW socket yet? create it
-        int rawFd = socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP);
-        
-        if(rawFd == -1) {                                           // failed to create RAW socket? 
-            Debug::out(LOG_DEBUG, "NetAdapter::icmpSend - failed to create RAW socket");
-            dataTrans->setStatus(E_FNAVAIL);
-            return;
-        } else {
-            Debug::out(LOG_DEBUG, "NetAdapter::icmpSend - RAW socket created");
-        }
-
-/*
-        // IP_HDRINCL must be set on the socket so that the kernel does not attempt to automatically add a default ip header to the packet
-        int optval = 0;
-        setsockopt(rawFd, IPPROTO_IP, IP_HDRINCL, &optval, sizeof(int));
-*/
-
-        rawSock.fd  = rawFd;                                        // RAW socket created
-        rawSockFd   = rawFd;
-    }
-
     BYTE *pData = dataBuffer;                                       // pointer to where data starts
     if(!evenNotOdd) {                                               // if data is odd, it starts one byte further
         pData++;
     }
 
-    WORD id         = Utils::getWord(pData);                        // get ID 
-    WORD sequence   = Utils::getWord(pData + 2);                    // get sequence
-
-    length = (length >= 4) ? (length - 4) : 0;                      // as 4 bytes have been already used, subtract 4 if possible, otherwise set to 0
-
-    BYTE a,b,c,d;
-    a = destinIP >> 24;
-    b = destinIP >> 16;
-    c = destinIP >>  8;
-    d = destinIP      ;
-    Debug::out(LOG_DEBUG, "NetAdapter::icmpSend -- will send ICMP data to %d.%d.%d.%d, ICMP type: %d, ICMP code: %d, ICMP id: %d, ICMP sequence: %d, data length: %d", a, b, c, d, icmpType, icmpCode, id, sequence, length);
-
-    rawSockHeads.setIpHeader(localIp, destinIP, length);            // source IP, destination IP, data length
-    rawSockHeads.setIcmpHeader(icmpType, icmpCode, id, sequence);   // ICMP ToS, ICMP code, ID, sequence
-    
-    rawSock.remote_adr.sin_family       = AF_INET;
-    rawSock.remote_adr.sin_addr.s_addr  = htonl(destinIP);
-
-    if(length > 0) {
-        memcpy(rawSockHeads.data, pData + 4, length);               // copy the rest of data from received buffer to raw packet data
-    }
-
-    int ires = sendto(rawSock.fd, rawSockHeads.icmp, sizeof(struct icmphdr) + length, 0, (struct sockaddr *) &rawSock.remote_adr, sizeof(struct sockaddr));
-
-    if(ires == -1) {                                                // on failure
-        Debug::out(LOG_DEBUG, "NetAdapter::icmpSend -- sendto() failed, errno: %d", errno);
-        dataTrans->setStatus(E_BADDNAME);
-    } else {                                                        // on success
-        dataTrans->setStatus(E_NORMAL);
-    }
+    BYTE result;
+    result = icmpWrapper.send(destinIP, icmpType, icmpCode, length, pData);
+    dataTrans->setStatus(result);
 }
 //----------------------------------------------
 void NetAdapter::icmpGetDgrams(void)
 {
     pthread_mutex_lock(&networkThreadMutex);
-    
-    if(icmpDataCount <= 0) {                                // nothing to read? fail, no data
+
+    DWORD icmpByteCount = icmpWrapper.calcDataByteCountTotal();    
+
+    if(icmpByteCount <= 0) {                                        // nothing to read? quit, no data
         pthread_mutex_unlock(&networkThreadMutex);
 
         Debug::out(LOG_DEBUG, "NetAdapter::icmpGetDgrams -- no data, quit");
@@ -1004,51 +639,36 @@ void NetAdapter::icmpGetDgrams(void)
 
     //--------------
     // find out how many dgrams we can fit into this transfer
-    int sectorCount = cmd[5];                               // get sector count and byte count
-    int byteCount   = sectorCount * 512;
+    int bufferSizeSectors   = cmd[5];                               // get sector count and byte count
+    int bufferSizeBytes     = bufferSizeSectors * 512;
 
-    int gotCount    = 0;
-    int gotBytes    = 2;
+    int howManyDgramsWillFit = icmpWrapper.calcHowManyDatagramsFitIntoBuffer(bufferSizeBytes);
 
-    int i; 
-    for(i=0; i<MAX_STING_DGRAMS; i++) {                         // now count how many dgrams we can send before we run out of sectors
-        if(!dgrams[i].isEmpty()) {
-            if((gotBytes + dgrams[i].count + 2) > byteCount) {  // if adding this dgram would cause buffer overflow, quit
-                break;
-            }
+    Debug::out(LOG_DEBUG, "NetAdapter::icmpGetDgrams -- I can fit %d datagrams into the buffer of %d bytes", howManyDgramsWillFit, bufferSizeBytes);
 
-            gotCount++;                                         // will fit into requested sectors, add it
-            gotBytes += 2 + dgrams[i].count;                    // size of a datagram + WORD for its size
-        }
-    }
-
-    Debug::out(LOG_DEBUG, "NetAdapter::icmpGetDgrams -- found %d ICMP Dgrams, they take %d bytes", gotCount, gotBytes);
     //------------
-    // now will the data transporter with dgrams
-    for(i=0; i<gotCount; i++) {
-        int index = dgram_getNonEmpty();
-        if(index == -1) {                               // no more dgrams? quit
+    // now fill the data transporter with dgrams
+    for(int i=0; i<howManyDgramsWillFit; i++) {
+        int index = icmpWrapper.getNonEmptyIndex();
+        if(index == -1) {                                           // no more dgrams? quit
             break;
         }
 
-        Utils::storeWord(dgrams[index].data + 52, rawSockHeads.echoId);                     // fake this ECHO ID, because linux replaced the ECHO ID when sending ECHO packet
+        TStingDgram *d = &icmpWrapper.dgrams[index];
+
+        dataTrans->addDataWord(d->count);                           // add size of this dgram
+        dataTrans->addDataBfr((BYTE *) d->data, d->count, false);   // add the dgram
         
-        dataTrans->addDataWord(dgrams[index].count);                                        // add size of this dgram
-        dataTrans->addDataBfr((BYTE *) dgrams[index].data, dgrams[index].count, false);     // add the dgram
+        Debug::out(LOG_DEBUG, "NetAdapter::icmpGetDgrams -- stored Dgram of length %d", d->count);
         
-        Debug::out(LOG_DEBUG, "NetAdapter::icmpGetDgrams -- stored Dgram of length %d", dgrams[index].count);
-        
-        dgrams[index].clear();                                                              // empty it
+        d->clear();                                                 // empty it
     }   
 
-    dataTrans->addDataWord(0);                          // terminate with a zero, that means no other DGRAM
-    dataTrans->padDataToMul16();                        // pad to multiple of 16
-
-    icmpDataCount = dgram_calcIcmpDataCount();
-    Debug::out(LOG_DEBUG, "NetAdapter::icmpGetDgrams -- updated icmpDataCount to %d bytes", icmpDataCount);
-    
-    pthread_mutex_unlock(&networkThreadMutex);
+    dataTrans->addDataWord(0);                                      // terminate with a zero, that means no other DGRAM
+    dataTrans->padDataToMul16();                                    // pad to multiple of 16
     dataTrans->setStatus(E_NORMAL);
+
+    pthread_mutex_unlock(&networkThreadMutex);
 }
 //----------------------------------------------
 void NetAdapter::resolveStart(void)
@@ -1170,13 +790,15 @@ void NetAdapter::updateCons_passive(int i)
         return;
     }
 
-    if(cons[i].fd == -1 && cons[i].listenFd != -1) {                        // got listening socket, but not normal socket? 
+    TNetConnection *nc = &cons[i];
+
+    if(nc->fd == -1 && nc->listenFd != -1) {                                // got listening socket, but not normal socket? 
         struct sockaddr_storage remoteAddress;                              // this struct will receive the remote address if accept() succeeds
         socklen_t               addrSize;
         addrSize = sizeof(sockaddr);
         memset(&remoteAddress, 0, addrSize);
         
-        int fd = accept(cons[i].listenFd, (struct sockaddr*) &remoteAddress, &addrSize);    // try to accept
+        int fd = accept(nc->listenFd, (struct sockaddr*) &remoteAddress, &addrSize);    // try to accept
         
         if(fd == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {         // failed, because nothing waiting? quit
             return;
@@ -1185,15 +807,17 @@ void NetAdapter::updateCons_passive(int i)
         Debug::out(LOG_DEBUG, "NetAdapter::updateCons_passive() -- connection %d - accept() succeeded, client connected", i);
         
         // ok, got the connection, store file descriptor and new state
-        cons[i].fd      = fd;
-        cons[i].status  = TESTABLISH;
+        nc->fd      = fd;
+        nc->status  = TESTABLISH;
         
+        nc->readWrapper.init(fd, nc->type, nc->buff_size);
+
         // also store the remote address that just connected to us
         if (remoteAddress.ss_family == AF_INET) {               // if it's IPv4
             struct sockaddr_in *s = (struct sockaddr_in *) &remoteAddress;
         
-            cons[i].remote_adr.sin_addr.s_addr  = s->sin_addr.s_addr;
-            cons[i].remote_adr.sin_port         = s->sin_port;
+            nc->remote_adr.sin_addr.s_addr  = s->sin_addr.s_addr;
+            nc->remote_adr.sin_port         = s->sin_port;
 
             Debug::out(LOG_DEBUG, "NetAdapter::updateCons_passive() -- connection %d - got IP & port of remote host", i);
         }
@@ -1205,8 +829,8 @@ void NetAdapter::updateCons_passive(int i)
     if(didSocketHangUp(i)) {
         Debug::out(LOG_DEBUG, "NetAdapter::updateCons_passive() -- connection %d - poll returned POLLRDHUP, so closing", i);
     
-        cons[i].status = TCLOSED;   // mark the state as TCLOSED
-        cons[i].closeIt();
+        nc->status = TCLOSED;       // mark the state as TCLOSED
+        nc->closeIt();
     }
 }
 //----------------------------------------------
@@ -1214,41 +838,43 @@ void NetAdapter::updateCons_active(int i)
 {
     int res;
 
+    TNetConnection *nc = &cons[i];
+
     //---------
     // update how many bytes we can read from this sock
-    cons[i].bytesInSocket = howManyWeCanReadFromFd(cons[i].fd);       // try to get how many bytes can be read
-    Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- cons[%d].bytesInSocket: %d, status: cons[%d].status: %d", i, cons[i].bytesInSocket, i, cons[i].status);
+    nc->bytesInSocket = nc->readWrapper.getCount();         // try to get how many bytes can be read
+    Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- cons[%d].bytesInSocket: %d, status: cons[%d].status: %d", i, nc->bytesInSocket, i, nc->status);
     
     //---------
     // if it's not TCP connection, just pretend the state is 'connected' - it's only used for TCP connections, so it doesn't matter
-    if(cons[i].type != TCP) {    
+    if(nc->type != TCP) {    
         Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- non-TCP connection %d -- now TESTABLISH", i);
-        cons[i].status = TESTABLISH;
+        nc->status = TESTABLISH;
         return;
     }
 
     //---------
     // update connection status of TCP socket
     
-    if(cons[i].status == TSYN_SENT) {               // if this is TCP connection and it's in the 'connecting' state
-        res = connect(cons[i].fd, (struct sockaddr *) &cons[i].remote_adr, sizeof(cons[i].remote_adr));   // try to connect again
+    if(nc->status == TSYN_SENT) {               // if this is TCP connection and it's in the 'connecting' state
+        res = connect(nc->fd, (struct sockaddr *) &nc->remote_adr, sizeof(nc->remote_adr));   // try to connect again
 
         if(res < 0) {                           // error occured on connect, check what it was
             switch(errno) {
                 case EISCONN:
-                case EALREADY:      cons[i].status = TESTABLISH;    
+                case EALREADY:      nc->status = TESTABLISH;    
                                     Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d is now TESTABLISH", i);
                                     break;  // ok, we're connected!
                                     
-                case EINPROGRESS:   cons[i].status = TSYN_SENT;     
+                case EINPROGRESS:   nc->status = TSYN_SENT;     
                                     Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d is now TSYN_SENT", i);
                                     break;  // still trying to connect
 
                  // on failures
                 case ETIMEDOUT:
                 case ENETUNREACH:
-                case ECONNREFUSED:  cons[i].status = TCLOSED;       
-                                    cons[i].closeIt();
+                case ECONNREFUSED:  nc->status = TCLOSED;       
+                                    nc->closeIt();
                                     Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d is now TCLOSED", i);
                                     break;
                                     
@@ -1257,15 +883,15 @@ void NetAdapter::updateCons_active(int i)
                                     break;
             }
         } else if(res == 0) {                   // no error occured? 
-            cons[i].status = TESTABLISH;
+            nc->status = TESTABLISH;
             Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d is now TESTABLISH - because no error", i);
         }
     } else {                                            // not connecting state? try to find out the state
         if(didSocketHangUp(i)) {
             Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d - poll returned POLLRDHUP, so closing", i);
     
-            cons[i].status = TCLOSED;   // mark the state as TCLOSED
-            cons[i].closeIt();
+            nc->status = TCLOSED;   // mark the state as TCLOSED
+            nc->closeIt();
         }
     }
 }
@@ -1293,42 +919,195 @@ bool NetAdapter::didSocketHangUp(int i)
 
     return false;
 }
+
 //----------------------------------------------
-
-int NetAdapter::howManyWeCanReadFromFd(int fd)
+void NetAdapter::conGetCharBuffer(void)
 {
-    int res, value;
+    // long command
+    // cmd[5] = NET_CMD_CNGET_CHAR
+    int handle = cmd[6];                                // get handle
 
-    res = ioctl(fd, FIONREAD, &value);          // try to get how many bytes can be read
-        
-    if(res == -1) {                             // ioctl failed? 
-        value = 0;
+    if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() -- bad handle: %d", handle);
+        dataTrans->setStatus(E_PARAMETER);
+        return;
     }
 
-    return value;
+    TNetConnection *nc = &cons[handle];
+
+    int charsUsed = cmd[10];                            // cmd[10] - how many chars were used by calling CNget_char() - we need to remove them first
+    if(charsUsed > 0) {                                 // some chars were used, remove them
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() -- CNget_char() used %d bytes, removing them from socket", charsUsed);
+        nc->readWrapper.removeBlock(charsUsed);
+    }
+
+    int gotBytes = nc->readWrapper.peekBlock(dataBuffer, 250);  // peek data from socket - less than 255, because 'charsUsed' is sent as byte (for removing the last used chars from deque)
+    dataTrans->addDataByte(gotBytes);                   // first store how many bytes we will return (this will be 250 bytes or less)
+
+    Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() -- will return buffer of %d bytes", gotBytes);
+
+    dataTrans->addDataBfr(dataBuffer, gotBytes, true);  // add that char buffer to data buffer, pad to mul 16
+    dataTrans->setStatus(E_NORMAL);
 }
-//----------------------------------------------
-int NetAdapter::readFromSocket(TNetConnection *nc, int cnt)
+
+void NetAdapter::conGetNdb(void)
 {
-    int countFromSocket = MIN(cnt, nc->bytesInSocket);      // how much can we read from socket?
+    // long command
+    // cmd[5]           = NET_CMD_CNGET_NDB
+    int handle          = cmd[6];                       // get handle
+    int getNdbNotSize   = cmd[7];                       // If zero, returns just size. If non-zero, return data.
 
-    int res = recv(nc->fd, dataBuffer, countFromSocket, MSG_DONTWAIT);      // read the data
-
-    Debug::out(LOG_DEBUG, "NetAdapter::readFromSocket -- cnt: %d, res: %d", cnt, res);
-    
-    if(res == -1) {                                         // failed to read? 
-    
-        return 0;
+    if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetNdb() -- bad handle: %d", handle);
+        dataTrans->setStatus(E_PARAMETER);
+        return;
     }
 
-    if(res > 0) {                                           // if some bytes have been read
-        nc->prevLastByte    = dataBuffer[res - 1];          // store the last byte of buffer
+    TNetConnection *nc = &cons[handle];
+
+    int charsUsed = cmd[10];                            // cmd[10] - how many chars were used by calling CNget_char() - we need to remove them first
+    if(charsUsed > 0) {                                 // some chars were used, remove them
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetNdb() -- CNget_char() used %d bytes, removing them from socket", charsUsed);
+        nc->readWrapper.removeBlock(charsUsed);
+    }
+
+    if(getNdbNotSize) {
+        int ndbSize = nc->readWrapper.getNdb(dataBuffer);   // read data from socket (wrapper)
+
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetNdb() -- returning NDB data, size %d bytes", ndbSize);
+
+        dataTrans->addDataBfr(dataBuffer, ndbSize, true);   // add data buffer, pad to mul 16
+        dataTrans->setStatus(E_NORMAL);
+    } else {
+        int nextSizeBytes   = nc->readWrapper.getNextNdbSize();
+        int nextSizeSectors = (nextSizeBytes / 512) + ((nextSizeBytes % 512) == 0 ? 0 : 1);
+
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetNextNdbSize() -- returning NDB size, nextSizeBytes: %d, nextSizeSectors: %d", nextSizeBytes, nextSizeSectors);
+
+        dataTrans->addDataDword(nextSizeBytes);             // send byte count
+        dataTrans->addDataByte(nextSizeSectors);            // send sector count
+
+        dataTrans->padDataToMul16();                        // pad to multiple of 16
+        dataTrans->setStatus(E_NORMAL);
+    }
+}
+
+//----------------------------------------------
+
+void NetAdapter::conGetBlock(void)
+{
+    // Long command
+    // cmd[5] = NET_CMD_CNGET_BLOCK
+
+    int handle          = cmd[6];                       // cmd[6]      - handle
+    int wantedLength    = Utils::getDword(cmd + 7);     // cmd[7 .. 8] - block length
+
+    if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetBlock() -- bad handle: %d", handle);
+        dataTrans->setStatus(E_PARAMETER);
+        return;
+    }
+
+    TNetConnection *nc  = &cons[handle];
+
+    int charsUsed = cmd[10];                            // cmd[10]     - how many chars were used by calling CNget_char() - we need to remove them first
+    if(charsUsed > 0) {                                 // some chars were used, remove them
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetBlock() -- CNget_char() used %d bytes, removing them from socket", charsUsed);
+        nc->readWrapper.removeBlock(charsUsed);
+    }
+
+    int gotBytes = nc->readWrapper.getCount();          // find out how many bytes we got for reading
+
+    if(gotBytes < wantedLength) {                       // not enough data? fail
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetBlock() -- not enough data - wanted %d, got only %d", wantedLength, gotBytes);
+        dataTrans->setStatus(E_NODATA);
+        return;
+    }
+
+    Debug::out(LOG_DEBUG, "NetAdapter::conGetBlock() -- OK", wantedLength, gotBytes);
+
+    nc->readWrapper.peekBlock(dataBuffer, wantedLength);    // peek   data from socket
+    nc->readWrapper.removeBlock(wantedLength);              // remove data from socket
+
+    dataTrans->addDataBfr(dataBuffer, wantedLength, true);  // add data buffer, pad to mul 16
+    dataTrans->setStatus(E_NORMAL);    
+}
+
+void NetAdapter::conGetString(void)
+{
+    // Long command
+    // cmd[5] = NET_CMD_CNGETS
+
+    int handle      = cmd[6];                       // cmd[6]      - handle    
+    int maxLength   = Utils::getDword(cmd + 7);     // cmd[7 .. 8] - max length
+    BYTE delim      = cmd[9];                       // cmd[9]      - string delimiter / terminator
+
+    if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetString() -- bad handle: %d", handle);
+        dataTrans->setStatus(E_PARAMETER);
+        return;
+    }
+
+    TNetConnection *nc  = &cons[handle];
+
+    int charsUsed = cmd[10];                        // cmd[10]     - how many chars were used by calling CNget_char() - we need to remove them first
+    if(charsUsed > 0) {                             // some chars were used, remove them
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetString() -- CNget_char() used %d bytes, removing them from socket", charsUsed);
+        nc->readWrapper.removeBlock(charsUsed);
+    }
+
+    int streamLength    = nc->readWrapper.getCount();       // find out how many bytes we have
+
+    nc->readWrapper.peekBlock(dataBuffer, streamLength);    // peek the whole stream
+    
+    int i, foundIndex = -1;
+    for(i=0; i<streamLength; i++) {                         // now search the whole stream for the delimiter
+        if(dataBuffer[i] == delim) {
+            foundIndex = i;
+            break;
+        }
+    }
+
+    if(foundIndex == -1) {                          // if delimiter not found, E_NODATA
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetString() -- delimiter not found");
+        dataTrans->setStatus(E_NODATA);
+        return;
+    }
+
+    if(foundIndex >= maxLength) {                   // if input buffer is not big enough to get the stream, E_BIGBUF
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetString() -- delimiter found, but input buffer too small");
+        dataTrans->setStatus(E_BIGBUF);
+        return;
+    }
+
+    Debug::out(LOG_DEBUG, "NetAdapter::conGetString() -- delimiter found, returning string");
+    
+    dataBuffer[foundIndex] = 0;                             // remove the delimiter
+    dataTrans->addDataBfr(dataBuffer, foundIndex, true);    // add data buffer, pad to mul 16
+
+    nc->readWrapper.removeBlock(foundIndex + 1);            // remove the string from stream (and remove the delimiter)
+    dataTrans->setStatus(E_NORMAL);    
+}
+
+//----------------------------------------------
+
+int NetAdapter::readFromSocket(TNetConnection *nc, int wantCount)
+{
+    int countFromSocket = MIN(wantCount, nc->readWrapper.getCount());               // how much can we read from socket?
+    int gotCount        = nc->readWrapper.peekBlock(dataBuffer, countFromSocket);   // read it from socket
+
+    Debug::out(LOG_DEBUG, "NetAdapter::readFromSocket -- wanted count: %d, got count: %d", wantCount, gotCount);
+    
+    if(gotCount > 0) {                                      // if some bytes have been read
+        nc->readWrapper.removeBlock(gotCount);              // remove this block from deque
+
+        nc->prevLastByte    = dataBuffer[gotCount - 1];     // store the last byte of buffer
         nc->gotPrevLastByte = true;
 
-        dataTrans->addDataBfr(dataBuffer, res, false);      // put the data in data transporter
+        dataTrans->addDataBfr(dataBuffer, gotCount, false); // put the data in data transporter
     }
 
-    return res;                                             // return count
+    return gotCount;                                        // return count
 }
 //----------------------------------------------
 void NetAdapter::finishDataRead(TNetConnection *nc, int totalCnt, BYTE status)
@@ -1373,9 +1152,6 @@ void NetAdapter::logFunctionName(BYTE cmd)
         case NET_CMD_CNGETINFO:             Debug::out(LOG_DEBUG, "NET_CMD_CNGETINFO");             break;
         case NET_CMD_CNGETS:                Debug::out(LOG_DEBUG, "NET_CMD_CNGETS");                break;
         case NET_CMD_CN_UPDATE_INFO:        Debug::out(LOG_DEBUG, "NET_CMD_CN_UPDATE_INFO");        break;
-        case NET_CMD_CN_READ_DATA:          Debug::out(LOG_DEBUG, "NET_CMD_CN_READ_DATA");          break;
-        case NET_CMD_CN_GET_DATA_COUNT:     Debug::out(LOG_DEBUG, "NET_CMD_CN_GET_DATA_COUNT");     break;
-        case NET_CMD_CN_LOCATE_DELIMITER:   Debug::out(LOG_DEBUG, "NET_CMD_CN_LOCATE_DELIMITER");   break;
 
         // MISC
         case NET_CMD_RESOLVE:               Debug::out(LOG_DEBUG, "NET_CMD_RESOLVE");               break;

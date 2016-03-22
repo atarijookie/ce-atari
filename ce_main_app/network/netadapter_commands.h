@@ -34,9 +34,7 @@
 
 #define NET_CMD_CN_UPDATE_INFO          0x47
 
-#define NET_CMD_CN_READ_DATA            0x4A
-#define NET_CMD_CN_GET_DATA_COUNT       0x4B
-#define NET_CMD_CN_LOCATE_DELIMITER     0x4C
+#define NET_CMD_GET_NEXT_NDB_SIZE       0x4E
 
 // MISC
 #define NET_CMD_RESOLVE                 0x50
