@@ -81,7 +81,7 @@ public:
         lastReadCount       = 0;
         
         memset(&remote_adr, 0, sizeof(remote_adr)); 
-        memset(&local_adr,  0, sizeof(local_adr)); 
+        localPort           = 0;
 
         gotPrevLastByte     = false;
         prevLastByte        = 0;
@@ -99,7 +99,7 @@ public:
     int     fd;                     // file descriptor of socket
     int     listenFd;               // fd of listening socket
     struct  sockaddr_in remote_adr; // remote address
-    struct  sockaddr_in local_adr;  // local  address
+    WORD    localPort;              // local port
     int     type;                   // TCP / UDP / ICMP
     int     buff_size;              // for TCP - TX buffer size = maximu packet size that should be sent
 
@@ -161,12 +161,12 @@ public:
     void resolveStart(void);            // resolve name to ip
     void resolveGetResp(void);          // retrieve the results of resolve
 
-    void conOpen_connect(int slot, bool tcpNotUdp, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size);
-    void conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, WORD tos, WORD buff_size);
+    void conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size);
+    void conOpen_listen (int slot, bool tcpNotUdp, WORD localPort, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size);
 
-    void updateCons_active(int i);
+    void updateCons_active (int i);
     void updateCons_passive(int i);
-    bool didSocketHangUp(int i);
+    bool didSocketHangUp   (int i);
     
     //--------------
     // helper functions

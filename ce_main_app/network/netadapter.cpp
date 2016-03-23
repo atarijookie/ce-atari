@@ -279,18 +279,21 @@ void NetAdapter::conOpen(void)
         
     Debug::out(LOG_DEBUG, "NetAdapter::conOpen() -- remoteHost: %d.%d.%d.%d, remotePort: %d -- will %s", (BYTE) (remoteHost >> 24), (BYTE) (remoteHost >> 16), (BYTE) (remoteHost >> 8), (BYTE) (remoteHost), remotePort, (connectNotListen ? "connect to host" : "listen for connection"));
     
-    // following 2 params can be received, but are not used for now
+    // type of service (tos) is not used for now, buff_size is used for faking packet size in CNget_NDB()
     WORD  tos           = Utils::getWord (dataBuffer + 6);
     WORD  buff_size     = Utils::getWord (dataBuffer + 8);
-    
+
+    // local port, useful mainly for pasive (listening) connections
+    WORD  localPort     = Utils::getWord (dataBuffer + 14);
+
     if(remoteHost != 0) {       // remote host specified? Open by connecting to remote host
-        conOpen_connect(slot, tcpNotUdp, remoteHost, remotePort, tos, buff_size);
+        conOpen_connect(slot, tcpNotUdp, localPort, remoteHost, remotePort, tos, buff_size);
     } else {                    // remote host not specified? Open by listening for connection
-        conOpen_listen(slot, tcpNotUdp, remotePort, tos, buff_size);
+        conOpen_listen (slot, tcpNotUdp, localPort, remoteHost, remotePort, tos, buff_size);
     }
 }
 
-void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, WORD tos, WORD buff_size)
+void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size)
 {
     int ires;
     int fd;
@@ -321,9 +324,9 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, WORD t
     memset(&local_addr, '0', sizeof(local_addr)); 
     local_addr.sin_family        = AF_INET;
     local_addr.sin_addr.s_addr   = htonl(INADDR_ANY);
-    local_addr.sin_port          = htons(localPort); 
+    local_addr.sin_port          = htons(localPort);                    // if localPort is 0, it will bind to random free port
     
-    ires = bind(fd, (struct sockaddr*) &local_addr, sizeof(local_addr));  // bind IP & port to this socket
+    ires = bind(fd, (struct sockaddr*) &local_addr, sizeof(local_addr));    // bind IP & port to this socket
     
     if(ires == -1) {                                                    // if bind failed, quit
         close(fd);
@@ -333,6 +336,8 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, WORD t
         return;
     }
     
+    listen(fd, 1);                                                      // mark this socket as listening, with queue length of 1
+
     if(localPort == 0) {                                                // should listen on 1st free port?
         struct sockaddr_in real_addr;
         memset(&real_addr, '0', sizeof(local_addr)); 
@@ -348,22 +353,20 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, WORD t
             return;
         }
         
-        local_addr.sin_port = real_addr.sin_port;                   // store port
-        WORD port = ntohs(local_addr.sin_port);
-        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - now listening on first free port %d (hex: 0x%04x, dec: %d, %d)", port, port, port >> 8, port & 0xff);
+        localPort = ntohs(real_addr.sin_port);                          // get the real local port
+
+        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - now listening on first free port %d (hex: 0x%04x, dec: %d, %d)", localPort, localPort, localPort >> 8, localPort & 0xff);
     } else {
-        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - now listening on specified port %d (hex: 0x%04x, dec: %d, %d)", localPort, localPort, localPort >> 8, localPort & 0xff);
+        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - now listening on specified port %d (hex: 0x%04x, dec: %d, %d)",  localPort, localPort, localPort >> 8, localPort & 0xff);
     }
-    
-    listen(fd, 1);                                                  // mark this socket as listening, with queue length of 1
 
     TNetConnection *nc = &cons[slot];
-    nc->initVars();                                                 // init vars
+    nc->initVars();                                 // init vars
 
     // store the info
-    nc->activeNotPassive = false;                                   // it's passive (listening) socket
+    nc->activeNotPassive = false;                   // it's passive (listening) socket
     nc->listenFd         = fd;
-    nc->local_adr        = local_addr;
+    nc->localPort        = localPort;               // store local port - either the specified one, or the first free which was assigned
     nc->type             = tcpNotUdp ? TCP : UDP;
     nc->bytesInSocket    = 0;
     nc->status           = TLISTEN;
@@ -373,7 +376,7 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, WORD t
     dataTrans->setStatus(handleAtariToCE(slot));
 }
 
-void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size)
+void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size)
 {
     int ires;
     int fd;
@@ -564,7 +567,7 @@ void NetAdapter::conUpdateInfo(void)
     }
 
     for(i=0; i<MAX_HANDLE; i++) {                           // store local ports (LPort)
-        dataTrans->addDataWord(ntohs(cons[i].local_adr.sin_port));
+        dataTrans->addDataWord(cons[i].localPort);
     }
 
     for(i=0; i<MAX_HANDLE; i++) {                           // store remote addresses (RHost)
