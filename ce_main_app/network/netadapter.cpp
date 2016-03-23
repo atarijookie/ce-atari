@@ -90,16 +90,12 @@ NetAdapter::NetAdapter(void)
     dataBuffer      = new BYTE[NET_BUFFER_SIZE];
     localIp         = 0;
 
-    rBfr = new BYTE[CON_BFR_SIZE];
-    memset(rBfr, 0, CON_BFR_SIZE);
-    
     loadSettings();
 }
 
 NetAdapter::~NetAdapter()
 {
     delete []dataBuffer;
-    delete []rBfr;
 }
 
 void NetAdapter::setAcsiDataTrans(AcsiDataTrans *dt)
@@ -235,6 +231,7 @@ void NetAdapter::closeAndCleanAll(void)
     int i;
     for(i=0; i<MAX_HANDLE; i++) {                   // close normal sockets
         cons[i].closeIt();
+        cons[i].cleanIt();
     }
 
     icmpWrapper.closeAndClean();    
@@ -1092,34 +1089,6 @@ void NetAdapter::conGetString(void)
     dataTrans->setStatus(E_NORMAL);    
 }
 
-//----------------------------------------------
-
-int NetAdapter::readFromSocket(TNetConnection *nc, int wantCount)
-{
-    int countFromSocket = MIN(wantCount, nc->readWrapper.getCount());               // how much can we read from socket?
-    int gotCount        = nc->readWrapper.peekBlock(dataBuffer, countFromSocket);   // read it from socket
-
-    Debug::out(LOG_DEBUG, "NetAdapter::readFromSocket -- wanted count: %d, got count: %d", wantCount, gotCount);
-    
-    if(gotCount > 0) {                                      // if some bytes have been read
-        nc->readWrapper.removeBlock(gotCount);              // remove this block from deque
-
-        nc->prevLastByte    = dataBuffer[gotCount - 1];     // store the last byte of buffer
-        nc->gotPrevLastByte = true;
-
-        dataTrans->addDataBfr(dataBuffer, gotCount, false); // put the data in data transporter
-    }
-
-    return gotCount;                                        // return count
-}
-//----------------------------------------------
-void NetAdapter::finishDataRead(TNetConnection *nc, int totalCnt, BYTE status)
-{
-    nc->lastReadCount = totalCnt;                               // store how many we have read
-
-    dataTrans->padDataToMul16();                                // pad to multiple of 16
-    dataTrans->setStatus(status);
-}
 //----------------------------------------------
 void NetAdapter::logFunctionName(BYTE cmd) 
 {

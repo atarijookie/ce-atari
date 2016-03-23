@@ -65,7 +65,7 @@ void IcmpWrapper::clearOld(void)
         }
 
         dgrams[i].clear();                      // it's too old, clear it
-        Debug::out(LOG_DEBUG, "dgram_clearOld() - dgram #%d was too old and it was cleared", i);
+        Debug::out(LOG_DEBUG, "IcmpWrapper::clearOld() - dgram #%d was too old and it was cleared", i);
     }
 }
 
@@ -86,7 +86,7 @@ int IcmpWrapper::getEmptyIndex(void) {
     }
 
     // no empty slot found, clear and return the oldest - to avoid filling up the dgrams array (at the cost of loosing oldest items)
-    Debug::out(LOG_DEBUG, "dgram_getEmpty() - no empty slot, returning oldest slot - #%d", oldestIndex);
+    Debug::out(LOG_DEBUG, "IcmpWrapper::getEmptyIndex() - no empty slot, returning oldest slot - #%d", oldestIndex);
     
     dgrams[oldestIndex].clear();
     return oldestIndex;
@@ -134,7 +134,7 @@ int IcmpWrapper::calcHowManyDatagramsFitIntoBuffer(int bufferSizeBytes)
         }
     }
 
-    Debug::out(LOG_DEBUG, "IcmpWrapper::calcHowManyDatagramsFitIntoBuffer -- found %d ICMP Dgrams, they take %d bytes", gotCount, gotBytes);
+    Debug::out(LOG_DEBUG, "IcmpWrapper::calcHowManyDatagramsFitIntoBuffer() -- found %d ICMP Dgrams, they take %d bytes", gotCount, gotBytes);
     return gotCount;
 }
 
@@ -171,7 +171,7 @@ bool IcmpWrapper::receive(void)
     res = recvfrom(rawSockFd, recvBfr, RECV_BFR_SIZE, 0, (struct sockaddr *) &src_addr, (socklen_t *) &addrlen);
 
     if(res == -1) {                 // if recvfrom failed, no data
-        Debug::out(LOG_DEBUG, "tryIcmpRecv - recvfrom() failed");
+        Debug::out(LOG_DEBUG, "IcmpWrapper::receive() - recvfrom() failed");
         return false;
     }
 
@@ -181,7 +181,7 @@ bool IcmpWrapper::receive(void)
     // parse response to the right structs
     int i = getEmptyIndex();        // now find space for the datagram
     if(i == -1) {                   // no space? fail, but return that we were able to receive data
-        Debug::out(LOG_DEBUG, "tryIcmpRecv - dgram_getEmpty() returned -1");
+        Debug::out(LOG_DEBUG, "IcmpWrapper::receive() - dgram_getEmpty() returned -1");
         return true;
     }
 
@@ -220,7 +220,7 @@ bool IcmpWrapper::receive(void)
 
     icmpDataCount = calcDataByteCountTotal();                           // update icmpDataCount
 
-    Debug::out(LOG_DEBUG, "tryIcmpRecv - icmpDataCount is now %d bytes", icmpDataCount);
+    Debug::out(LOG_DEBUG, "IcmpWrapper::receive() - icmpDataCount is now %d bytes", icmpDataCount);
     return true;
 }
 
@@ -230,10 +230,10 @@ BYTE IcmpWrapper::send(DWORD destinIP, int icmpType, int icmpCode, WORD length, 
         int rawFd = socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP);
         
         if(rawFd == -1) {                                           // failed to create RAW socket? 
-            Debug::out(LOG_DEBUG, "NetAdapter::icmpSend - failed to create RAW socket");
+            Debug::out(LOG_DEBUG, "IcmpWrapper::send() - failed to create RAW socket");
             return E_FNAVAIL;
         } else {
-            Debug::out(LOG_DEBUG, "NetAdapter::icmpSend - RAW socket created");
+            Debug::out(LOG_DEBUG, "IcmpWrapper::send() - RAW socket created");
         }
 
 /*
@@ -256,7 +256,7 @@ BYTE IcmpWrapper::send(DWORD destinIP, int icmpType, int icmpCode, WORD length, 
     b = destinIP >> 16;
     c = destinIP >>  8;
     d = destinIP      ;
-    Debug::out(LOG_DEBUG, "NetAdapter::icmpSend -- will send ICMP data to %d.%d.%d.%d, ICMP type: %d, ICMP code: %d, ICMP id: %d, ICMP sequence: %d, data length: %d", a, b, c, d, icmpType, icmpCode, id, sequence, length);
+    Debug::out(LOG_DEBUG, "IcmpWrapper::send() -- will send ICMP data to %d.%d.%d.%d, ICMP type: %d, ICMP code: %d, ICMP id: %d, ICMP sequence: %d, data length: %d", a, b, c, d, icmpType, icmpCode, id, sequence, length);
 
     rawSockHeads.setIpHeader(localIp, destinIP, length);            // source IP, destination IP, data length
     rawSockHeads.setIcmpHeader(icmpType, icmpCode, id, sequence);   // ICMP ToS, ICMP code, ID, sequence
@@ -271,7 +271,7 @@ BYTE IcmpWrapper::send(DWORD destinIP, int icmpType, int icmpCode, WORD length, 
     int ires = sendto(rawSock->fd, rawSockHeads.icmp, sizeof(struct icmphdr) + length, 0, (struct sockaddr *) &rawSock->remote_adr, sizeof(struct sockaddr));
 
     if(ires == -1) {                                                // on failure
-        Debug::out(LOG_DEBUG, "NetAdapter::icmpSend -- sendto() failed, errno: %d", errno);
+        Debug::out(LOG_DEBUG, "IcmpWrapper::send() -- sendto() failed, errno: %d", errno);
         return E_BADDNAME;
     } 
 

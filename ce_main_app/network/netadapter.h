@@ -70,6 +70,10 @@ public:
         initVars();
     }
 
+    void cleanIt(void) {
+        readWrapper.clearAll();
+    }
+
     void initVars(void) {               // initialize the variables
         activeNotPassive    = true;
         fd                  = -1;
@@ -126,37 +130,29 @@ public:
 
     void processCommand(BYTE *command);
 	
-//private:
-    AcsiDataTrans   *dataTrans;
+private:
     BYTE            *cmd;
-
+    AcsiDataTrans   *dataTrans;
     BYTE            *dataBuffer;
 
-    TNetConnection  cons[MAX_HANDLE];   // this holds the info about connections
-
-    BYTE *rBfr;                         // pointer to 100 kB read buffer - used when conLocateDelim() is called
-
-    ResolverRequest resolver;           // DNS resolver
+    TNetConnection  cons[MAX_HANDLE];   // for handling of TCP and UDP connections
+    ResolverRequest resolver;           // for handling DNS resolve requests
     
     void loadSettings(void);
-
     void identify(void);
 
-    void conOpen(void);                 // open connection
-    void conClose(void);                // close connection            
-    void conSend(void);                 // send data
-    void conUpdateInfo(void);           // send connection info to ST
-    void conReadData(void);             // receive data
-    void conGetDataCount(void);         // get how many data there is
-    void conLocateDelim(void);          // find string delimiter in received data
+    void conOpen(void);                 // TCP_open()  and UDP_open()     handling
+    void conClose(void);                // TCP_close() and UDP_close()    handling
+    void conSend(void);                 // TCP_send()  and UDP_send()     handling
 
-    void conGetCharBuffer(void);
-    void conGetNdb(void);
-    void conGetBlock(void);
-    void conGetString(void);
+    void conGetCharBuffer(void);        // CNget_char()  handling 
+    void conGetNdb(void);               // CNget_NDB()   handling
+    void conGetBlock(void);             // CNget_block() handling
+    void conGetString(void);            // CNgets()      handling
+    void conUpdateInfo(void);           // CNgetinfo() and CNbyte_count() handling
 
-    void icmpSend(void);                // send ICMP packet
-    void icmpGetDgrams(void);           // receive ICMP packets
+    void icmpSend(void);                // ICMP_send()   handling
+    void icmpGetDgrams(void);           // ICMP datagram retrieving 
 
     void resolveStart(void);            // resolve name to ip
     void resolveGetResp(void);          // retrieve the results of resolve
@@ -173,9 +169,6 @@ public:
     int  findEmptyConnectionSlot(void); // get index of empty connection slot, or -1 if nothing is available
     void updateCons(void);
 
-    int  readFromSocket(TNetConnection *nc, int wantCount);
-    void finishDataRead(TNetConnection *nc, int totalCnt, BYTE status);
-    
     void logFunctionName(BYTE cmd);
     void closeAndCleanAll(void);
 };
