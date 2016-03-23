@@ -116,7 +116,7 @@ int16 CNget_char(int16 handle)
     }
 
     // if no data buffered, read the data
-    if(ci->charsGot == 0 || ci->charsUsed == ci->charsGot) {
+    if(ci->charsGot == 0 || ci->charsUsed >= ci->charsGot) {
         commandLong[ 5] = NET_CMD_CNGET_CHAR;   // store function number 
         commandLong[ 6] = handle;				// store file handle 
         commandLong[10] = ci->charsUsed;        // how many chars were used
@@ -239,6 +239,10 @@ int16 CNget_block(int16 handle, void *buffer, int16 length)
     if(ci->bytesToRead < length) {          // not enough data to read the whole block? fail
         return E_NODATA;
     }
+    
+    if(length < 1) {                        // nothing to do? good
+        return 0;
+    }
 
     //----------------------------------------
     // no more used chars and got chars
@@ -256,32 +260,36 @@ int16 CNget_block(int16 handle, void *buffer, int16 length)
     
     //----------------------------------------
     // first do the long transfer
-  	commandLong[ 5] = NET_CMD_CNGET_BLOCK;  // store function number 
-	commandLong[ 6] = handle;				// store file handle 
-	commandLong[ 7] = (BYTE) (lenLongBytes >> 8);
-	commandLong[ 8] = (BYTE) (lenLongBytes     );
-	commandLong[10] = charsUsed;            // how many chars were used
+    if(lenLongSectors > 0) {                    // if we should do the long transfer (something to transfer?)
+        commandLong[ 5] = NET_CMD_CNGET_BLOCK;  // store function number 
+        commandLong[ 6] = handle;				// store file handle 
+        commandLong[ 7] = (BYTE) (lenLongBytes >> 8);
+        commandLong[ 8] = (BYTE) (lenLongBytes     );
+        commandLong[10] = charsUsed;            // how many chars were used
 
-    hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, buffer, lenLongSectors);
+        hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, buffer, lenLongSectors);
 
-    if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // failed? quit
-        return E_NODATA;
-    }    
+        if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // failed? quit
+            return E_NODATA;
+        }
+    }
     //----------------------------------------
     // then do the short transfer
-  	commandLong[ 5] = NET_CMD_CNGET_BLOCK;  // store function number 
-	commandLong[ 6] = handle;				// store file handle 
-	commandLong[ 7] = (BYTE) (lenShortBytes >> 8);
-	commandLong[ 8] = (BYTE) (lenShortBytes     );
-	commandLong[10] = 0;                    // no chars were used
+    if(lenShortBytes > 0) {                     // if we should do the short transfer (something to transfer?)
+        commandLong[ 5] = NET_CMD_CNGET_BLOCK;  // store function number 
+        commandLong[ 6] = handle;				// store file handle 
+        commandLong[ 7] = (BYTE) (lenShortBytes >> 8);
+        commandLong[ 8] = (BYTE) (lenShortBytes     );
+        commandLong[10] = 0;                    // no chars were used
 
-    hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);
+        hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);
 
-    if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // failed? quit
-        return E_NODATA;
+        if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // failed? quit
+            return E_NODATA;
+        }
+        
+        memcpy(buffer + lenLongBytes, pDmaBuffer, lenShortBytes);   // copy it from intermediate buffer to final buffer
     }
-    
-    memcpy(buffer + lenLongBytes, pDmaBuffer, lenShortBytes);   // copy it from intermediate buffer to final buffer
     //----------------------------------------
     
     return length;
@@ -303,6 +311,10 @@ int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
     if(ci->bytesToRead <= 2) {              // not enough data to read? fail
         return E_NODATA;
     }
+
+    if(length < 1) {                        // nothing to do? good
+        return E_BIGBUF;
+    }    
 
     //-----------------------
     // limit the length
