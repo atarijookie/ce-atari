@@ -412,7 +412,7 @@ void update_con_info(BYTE forceUpdate)
         // CIB update through helper functions because of Pure C vs gcc packing of structs
         // Update      : local port, remote port, remote host, status
         // Don't update: protocol, local host
-        setCIB((BYTE *) &ci->cib, NO_CHANGE_W, lPort, rPort, rHost, NO_CHANGE_DW, pConnStatus[i]);
+        setCIB((BYTE *) &ci->cib, NO_CHANGE_W, lPort, rPort, rHost, NO_CHANGE_DW, /* pConnStatus[i] */ 0);
     }
     
     DWORD bytesToReadIcmp = (DWORD) *pBytesToReadIcmp;                          // get how many bytes we can read from ICMP socket(s)
