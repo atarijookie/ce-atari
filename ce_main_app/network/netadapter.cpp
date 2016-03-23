@@ -33,8 +33,6 @@ std::queue<TNetReq> netReqQueue;
 
 DWORD localIp;
 
-IcmpWrapper icmpWrapper;
-
 void netReqAdd(TNetReq &tnr)
 {
 	pthread_mutex_lock(&networkThreadMutex);            // try to lock the mutex
@@ -50,20 +48,13 @@ void *networkThreadCode(void *ptr)
     // The problem with this is it allows only ICMP echo to be done.
     system("sysctl -w net.ipv4.ping_group_range=\"0 0\" > /dev/null");  
 
+/*
 	while(sigintReceived == 0) {
         pthread_mutex_lock(&networkThreadMutex);
-        icmpWrapper.clearOld();                         // clear old dgrams that are probably stuck in the queue 
-    
-        while(1) {                                      // receive all available ICMP data 
-            bool r = icmpWrapper.receive();             // this will cause 100 ms delay when no data is there
-            if(!r) {                                    // if receiving failed, quit; otherwise do another receiving!
-                break;
-            }
-        }                           
+
         pthread_mutex_unlock(&networkThreadMutex);
         Utils::sleepMs(100); 						    // wait 100 ms and try again
 
-/*
 		pthread_mutex_lock(&networkThreadMutex);		// lock the mutex
 
 		if(netReqQueue.size() == 0) {					// nothing to do?
@@ -75,8 +66,8 @@ void *networkThreadCode(void *ptr)
 		TNetReq tnr = netReqQueue.front();		        // get the 'oldest' element from queue
 		netReqQueue.pop();								// and remove it form queue
 		pthread_mutex_unlock(&networkThreadMutex);		// unlock the mutex
-*/
     }
+*/
 
 	Debug::out(LOG_DEBUG, "Network thread terminated.");
 	return 0;
@@ -575,10 +566,9 @@ void NetAdapter::conUpdateInfo(void)
         dataTrans->addDataWord(ntohs(cons[i].remote_adr.sin_port));
     }
 
-    pthread_mutex_lock(&networkThreadMutex);
+    icmpWrapper.receiveAll();
     DWORD imcpCnt = icmpWrapper.calcDataByteCountTotal();
     dataTrans->addDataDword(imcpCnt);                       // fill the data to be read from ICMP sock
-    pthread_mutex_unlock(&networkThreadMutex);
 
     Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo - imcpCnt: %d", imcpCnt);
 
@@ -627,6 +617,7 @@ void NetAdapter::icmpGetDgrams(void)
 {
     pthread_mutex_lock(&networkThreadMutex);
 
+    icmpWrapper.receiveAll();
     DWORD icmpByteCount = icmpWrapper.calcDataByteCountTotal();    
 
     if(icmpByteCount <= 0) {                                        // nothing to read? quit, no data

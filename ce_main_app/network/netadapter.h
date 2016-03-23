@@ -136,6 +136,7 @@ private:
     BYTE            *dataBuffer;
 
     TNetConnection  cons[MAX_HANDLE];   // for handling of TCP and UDP connections
+    IcmpWrapper     icmpWrapper;        // for handling ICMP sending and receiving
     ResolverRequest resolver;           // for handling DNS resolve requests
     
     void loadSettings(void);

@@ -138,27 +138,21 @@ int IcmpWrapper::calcHowManyDatagramsFitIntoBuffer(int bufferSizeBytes)
     return gotCount;
 }
 
+void IcmpWrapper::receiveAll(void)
+{
+    clearOld();                 // clear old dgrams that are probably stuck in the queue 
+
+    while(1) {                  // receive all available ICMP data 
+        bool r = receive();     // this will fail if no data available
+        if(!r) {                // if receiving failed, quit; otherwise do another receiving!
+            break;
+        }
+    }
+}
+
 bool IcmpWrapper::receive(void)
 {
     if(rawSockFd == -1) {                                   // ICMP socket closed? quit, no data
-        return false;
-    }
-
-    //-----------------------
-    // wait for data for 100 ms, and quit if there is no data
-    struct timeval  timeout = {0, 100000};                  // receive timeout - 100 ms
-    fd_set          read_set;
-
-    memset(&read_set, 0, sizeof(read_set));
-    FD_SET(rawSockFd, &read_set);
-
-    int res = select(rawSockFd + 1, &read_set, NULL, NULL, &timeout);     //wait for a reply with a timeout
-
-    if(res == 0) {                  // no fd? timeout, quit
-        return false;
-    }
-    
-    if(res < 0) {                   // select failed
         return false;
     }
 
@@ -168,10 +162,13 @@ bool IcmpWrapper::receive(void)
     struct sockaddr src_addr;
     int addrlen = sizeof(struct sockaddr);
 
-    res = recvfrom(rawSockFd, recvBfr, RECV_BFR_SIZE, 0, (struct sockaddr *) &src_addr, (socklen_t *) &addrlen);
+    int res = recvfrom(rawSockFd, recvBfr, RECV_BFR_SIZE, MSG_DONTWAIT, (struct sockaddr *) &src_addr, (socklen_t *) &addrlen);
 
     if(res == -1) {                 // if recvfrom failed, no data
-        Debug::out(LOG_DEBUG, "IcmpWrapper::receive() - recvfrom() failed");
+        if(errno != EAGAIN && errno != EWOULDBLOCK) {
+            Debug::out(LOG_DEBUG, "IcmpWrapper::receive() - recvfrom() failed, errno: %d", errno);
+        } 
+
         return false;
     }
 

@@ -123,27 +123,28 @@ public:
      IcmpWrapper (void);
     ~IcmpWrapper (void);
 
-    bool  receive      (void);
+    void  receiveAll   (void);
     BYTE  send         (DWORD destinIP, int icmpType, int icmpCode, WORD length, BYTE *data);
-    void  clearOld     (void);
 
     void  closeAndClean(void);
 
     DWORD calcDataByteCountTotal(void);
     int   calcHowManyDatagramsFitIntoBuffer(int bufferSizeBytes);
 
-    int   getEmptyIndex   (void);
     int   getNonEmptyIndex(void);
-
     TStingDgram      dgrams[MAX_STING_DGRAMS];
 
 private:
-    int             rawSockFd;
-    BYTE           *recvBfr;
-    DWORD           icmpDataCount;
+    int              rawSockFd;
+    BYTE            *recvBfr;
+    DWORD            icmpDataCount;
 
     TRawSocks        rawSockHeads;      // this holds the headers for RAW socket
     TNetConnection  *rawSock;           // this is info about RAW socket - used for ICMP
+
+    bool  receive       (void);
+    void  clearOld      (void);
+    int   getEmptyIndex (void);
 };
 
 #endif
