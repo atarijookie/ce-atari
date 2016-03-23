@@ -388,8 +388,10 @@ void update_con_info(BYTE forceUpdate)
     
     for(i=0; i<MAX_HANDLE; i++) {                                               // retrieve all the data and fill the variables
         // retrieve and update internal vars
-        conInfo[i].bytesToRead          = (DWORD)   pBytesToRead[i];
-        conInfo[i].tcpConnectionState   = (BYTE)    pConnStatus[i];
+        TConInfo *ci = &conInfo[i];
+        
+        ci->bytesToRead         = (DWORD)   pBytesToRead[i];
+        ci->tcpConnectionState  = (BYTE)    pConnStatus[i];
         
         WORD  lPort = (WORD )   pLPort[i];
         DWORD rHost = (DWORD)   pRHost[i];
@@ -398,7 +400,7 @@ void update_con_info(BYTE forceUpdate)
         // CIB update through helper functions because of Pure C vs gcc packing of structs
         // Update      : local port, remote port, remote host, status
         // Don't update: protocol, local host
-        setCIB((BYTE *) &conInfo[i].cib, NO_CHANGE_W, lPort, rPort, rHost, NO_CHANGE_DW, pConnStatus[i]);
+        setCIB((BYTE *) &ci->cib, NO_CHANGE_W, lPort, rPort, rHost, NO_CHANGE_DW, pConnStatus[i]);
     }
     
     DWORD bytesToReadIcmp = (DWORD) *pBytesToReadIcmp;                          // get how many bytes we can read from ICMP socket(s)
@@ -424,31 +426,44 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
     WORD  lPort = 0;
     DWORD lHost = 0;
     
+    //--------------------------
+    // find out if it's active or passive connection
+    BYTE activeNotPassive = TRUE;       // active by default
+    
+    if(tcpNotUdp) {                     // for TCP
+        if(rem_host == 0 || rem_port == TCP_PASSIVE) {      // if no remote host specified, or specified TCP_PASSIVE, it's passive connection
+            activeNotPassive = FALSE;
+        }
+    }
+    //--------------------------
+    
     if(rem_port == TCP_ACTIVE || rem_port == TCP_PASSIVE) {     // if the remote port is special flag (passive or active), then remote host contains pointer to CAB structure
         if(rem_host != 0) {                                     // it's not a NULL pointer
             BYTE *pCAB = (BYTE *) rem_host;                     // convert int to pointer and retrieve struct values
             
-            lPort       = *((WORD  *) (pCAB + 0));
-            rem_port    = *((WORD  *) (pCAB + 2));
-            rem_host    = *((DWORD *) (pCAB + 4));
-            lHost       = *((DWORD *) (pCAB + 8));
+            lPort       = getWord (pCAB + 0);
+            rem_port    = getWord (pCAB + 2);
+            rem_host    = getDword(pCAB + 4);
+            lHost       = getDword(pCAB + 8);
         }
     }
     
     // then store the params in buffer
     BYTE *pBfr = pDmaBuffer;
-    pBfr = storeDword   (pBfr, rem_host);
-    pBfr = storeWord    (pBfr, rem_port);
-    pBfr = storeWord    (pBfr, tos);
-    pBfr = storeWord    (pBfr, buff_size);
-    pBfr = storeDword   (pBfr, lHost);
-    pBfr = storeWord    (pBfr, lPort);
+    pBfr = storeDword   (pBfr, rem_host);       //  0 ..  3
+    pBfr = storeWord    (pBfr, rem_port);       //  4 ..  5
+    pBfr = storeWord    (pBfr, tos);            //  6 ..  7
+    pBfr = storeWord    (pBfr, buff_size);      //  8 ..  9
+    pBfr = storeDword   (pBfr, lHost);          // 10 .. 13
+    pBfr = storeWord    (pBfr, lPort);          // 14 .. 15
 
     // send it to host
     hdIf.cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
     if(handleIsFromCE(hdIf.statusByte)) {                   // if it's CE handle
         int stHandle = handleCEtoAtari(hdIf.statusByte);    // convert it to ST handle
+        TConInfo *ci = &conInfo[stHandle];
+        
         int proto, status;
         
         // store info to CIB and CAB structures
@@ -458,17 +473,21 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
             proto = UDP;
         }
         
-        if(rem_host == 0) {                         // if no remote host specified, it's a passive (listening) socket - listening for connection
-            status = TLISTEN;
-        } else {                                    // if remote host was specified, it's an active (outgoing) socket - trying to connect
-            status = TSYN_SENT;
+        DWORD local_host;
+        if(activeNotPassive) {      // active connection - trying to connect now, local host is local IP
+            status      = TSYN_SENT;
+            local_host  = localIP;
+        } else {                    // passive connection - listening, local host is 0
+            status      = TLISTEN;
+            local_host  = 0;
         }
 
         // local port to 0 - we currently don't know that (yet)
-        setCIB((BYTE *) &conInfo[stHandle].cib, proto, 0, rem_port, rem_host, localIP, status);
+        setCIB((BYTE *) &ci->cib, proto, lPort, rem_port, rem_host, local_host, status);
         update_con_info(TRUE);                      // let's FORCE update connection info - CIB should be updated with real local port after this (e.g. aFTP relies on the info when using active ftp connection)
         
-        conInfo[stHandle].buff_size = buff_size;    // store the maximu buffer size fot TCP
+        ci->buff_size           = buff_size;        // store the maximu buffer size fot TCP
+        ci->activeNotPassive    = activeNotPassive; // store active/passive flag
         
         return stHandle;                            // return the new handle
     } 

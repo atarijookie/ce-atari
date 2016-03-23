@@ -539,6 +539,7 @@ typedef struct {
     DWORD   bytesToRead;                    // how many bytes we can read from this connection
     BYTE    tcpConnectionState;             // TCP connection states -- TCLOSED, TLISTEN, ...
     DWORD   buff_size;                      // send buffer size, valid only for TCP
+    BYTE    activeNotPassive;               // zero for passive (incomming) connection, non-zero for active (outgoing) connection
     
     BYTE charsUsed;                         // how many chars from this buffer was used by CNget_char()
     BYTE charsGot;                          // how many chars we have
