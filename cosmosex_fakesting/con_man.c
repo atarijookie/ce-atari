@@ -19,6 +19,12 @@
 #include "stdlib.h"
 
 //--------------------------------------
+// The following variable should be used to force update_con_info() when there was some reading / writing to socket.
+// Functions used for determining connection state / byte count should use it to force update_con_info() when possibly needed.
+// Functions used for sending / receiving stuff should SET it to true to force update before next socket info retrieval.
+BYTE forceNextUpdateConInfo;
+
+//--------------------------------------
 
 extern  uint32  localIP;
 extern  BYTE    FastRAMBuffer[]; 
@@ -62,8 +68,9 @@ CIB *CNgetinfo(int16 handle)
         return (CIB *) NULL;
     }
 
-    update_con_info(FALSE);                         // update connections info structs (max once per 100 ms)
-
+    update_con_info(forceNextUpdateConInfo);        // update connections info structs (max once per 100 ms)
+    forceNextUpdateConInfo = FALSE;
+    
 	return &conInfo[handle].cib;                    // return pointer to correct CIB
 }
 
@@ -73,7 +80,9 @@ int16 CNbyte_count (int16 handle)
         return E_BADHANDLE;
     }
     
-    update_con_info(FALSE);                         // update connections info structs (max once per 100 ms)
+    update_con_info(forceNextUpdateConInfo);        // update connections info structs (max once per 100 ms)
+    forceNextUpdateConInfo = FALSE;
+    
     TConInfo *ci = &conInfo[handle];                // we're working with this connection
     
     if(ci->bytesToRead == 0 && ci->tcpConnectionState == TCLOSED) { // no data to read, and connection closed? return E_EOF
@@ -107,10 +116,6 @@ int16 CNget_char(int16 handle)
     update_con_info(FALSE);                     // update connections info structs (max once per 100 ms)
     TConInfo *ci = &conInfo[handle];            // we're working with this connection
     
-    if(ci->bytesToRead == 0) {                  // no data in host and in local buffer?
-        return E_NODATA;
-    }
-
     if(ci->tcpConnectionState == TCLOSED) {     // connection closed? return E_EOF
         return E_EOF;
     }
@@ -139,6 +144,8 @@ int16 CNget_char(int16 handle)
         return E_NODATA;
     }
     
+    forceNextUpdateConInfo = TRUE;              // force update_con_info() if asked to do it next time.
+    
     int value = ci->chars[ci->charsUsed];       // get the char
     ci->charsUsed++;                            // update used count
     return value;                               // return that char
@@ -146,14 +153,14 @@ int16 CNget_char(int16 handle)
 
 NDB *CNget_NDB(int16 handle)
 {
-    if(!handle_valid(handle)) {             // we don't have this handle? fail
+    if(!handle_valid(handle)) {                 // we don't have this handle? fail
         return (NDB *) NULL;
     }
 
-    update_con_info(FALSE);                 // update connections info structs (max once per 100 ms)
-    TConInfo *ci = &conInfo[handle];        // we're working with this connection
+    update_con_info(FALSE);                     // update connections info structs (max once per 100 ms)
+    TConInfo *ci = &conInfo[handle];            // we're working with this connection
     
-    if(ci->tcpConnectionState == TCLOSED || ci->bytesToRead == 0) { // closed or nothing to read?
+    if(ci->tcpConnectionState == TCLOSED) {     // closed?
         return (NDB *) NULL;
     }
 
@@ -220,7 +227,8 @@ NDB *CNget_NDB(int16 handle)
         return (NDB *) NULL;
     }
     
-    return pNdb;                                                            // return the pointer to NDB structure
+    forceNextUpdateConInfo = TRUE;          // force update_con_info() if asked to do it next time.
+    return pNdb;                            // return the pointer to NDB structure
 }
 
 int16 CNget_block(int16 handle, void *buffer, int16 length)
@@ -234,10 +242,6 @@ int16 CNget_block(int16 handle, void *buffer, int16 length)
     
     if(ci->tcpConnectionState == TCLOSED) { // no data to read, and connection closed? return E_EOF
         return E_EOF;
-    }
-    
-    if(ci->bytesToRead < length) {          // not enough data to read the whole block? fail
-        return E_NODATA;
     }
     
     if(length < 1) {                        // nothing to do? good
@@ -292,6 +296,7 @@ int16 CNget_block(int16 handle, void *buffer, int16 length)
     }
     //----------------------------------------
     
+    forceNextUpdateConInfo = TRUE;              // force update_con_info() if asked to do it next time.
     return length;
 }
 
@@ -308,10 +313,6 @@ int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
         return E_EOF;
     }
     
-    if(ci->bytesToRead <= 2) {              // not enough data to read? fail
-        return E_NODATA;
-    }
-
     if(length < 1) {                        // nothing to do? good
         return E_BIGBUF;
     }    
@@ -341,6 +342,7 @@ int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
     
     if(hdIf.statusByte == E_NORMAL) {       // got the string? good
         memcpy(buffer, pDmaBuffer, length); // copy it to buffer
+        forceNextUpdateConInfo = TRUE;      // force update_con_info() if asked to do it next time.
         return E_NORMAL;
     }
 
