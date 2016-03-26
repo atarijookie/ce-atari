@@ -915,8 +915,8 @@ bool NetAdapter::didSocketHangUp(int i)
 void NetAdapter::conGetCharBuffer(void)
 {
     // long command
-    // cmd[5] = NET_CMD_CNGET_CHAR
-    int handle = cmd[6];                                // get handle
+    // cmd[4] = NET_CMD_CNGET_CHAR
+    int handle = cmd[5];                                // get handle
 
     if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() -- bad handle: %d", handle);
@@ -926,7 +926,7 @@ void NetAdapter::conGetCharBuffer(void)
 
     TNetConnection *nc = &cons[handle];
 
-    int charsUsed = cmd[10];                            // cmd[10] - how many chars were used by calling CNget_char() - we need to remove them first
+    int charsUsed = cmd[9];                             // cmd[10] - how many chars were used by calling CNget_char() - we need to remove them first
     if(charsUsed > 0) {                                 // some chars were used, remove them
         Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() -- CNget_char() used %d bytes, removing them from socket", charsUsed);
         nc->readWrapper.removeBlock(charsUsed);
@@ -944,9 +944,9 @@ void NetAdapter::conGetCharBuffer(void)
 void NetAdapter::conGetNdb(void)
 {
     // long command
-    // cmd[5]           = NET_CMD_CNGET_NDB
-    int handle          = cmd[6];                       // get handle
-    int getNdbNotSize   = cmd[7];                       // If zero, returns just size. If non-zero, return data.
+    // cmd[4]           = NET_CMD_CNGET_NDB
+    int handle          = cmd[5];                       // get handle
+    int getNdbNotSize   = cmd[6];                       // If zero, returns just size. If non-zero, return data.
 
     if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conGetNdb() -- bad handle: %d", handle);
@@ -956,7 +956,7 @@ void NetAdapter::conGetNdb(void)
 
     TNetConnection *nc = &cons[handle];
 
-    int charsUsed = cmd[10];                            // cmd[10] - how many chars were used by calling CNget_char() - we need to remove them first
+    int charsUsed = cmd[9];                             // cmd[10] - how many chars were used by calling CNget_char() - we need to remove them first
     if(charsUsed > 0) {                                 // some chars were used, remove them
         Debug::out(LOG_DEBUG, "NetAdapter::conGetNdb() -- CNget_char() used %d bytes, removing them from socket", charsUsed);
         nc->readWrapper.removeBlock(charsUsed);
@@ -988,10 +988,10 @@ void NetAdapter::conGetNdb(void)
 void NetAdapter::conGetBlock(void)
 {
     // Long command
-    // cmd[5] = NET_CMD_CNGET_BLOCK
+    // cmd[4] = NET_CMD_CNGET_BLOCK
 
-    int handle          = cmd[6];                       // cmd[6]      - handle
-    int wantedLength    = Utils::getDword(cmd + 7);     // cmd[7 .. 8] - block length
+    int handle          = cmd[5];                       // cmd[6]      - handle
+    int wantedLength    = Utils::getWord(cmd + 6);      // cmd[7 .. 8] - block length
 
     if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conGetBlock() -- bad handle: %d", handle);
@@ -1001,7 +1001,7 @@ void NetAdapter::conGetBlock(void)
 
     TNetConnection *nc  = &cons[handle];
 
-    int charsUsed = cmd[10];                            // cmd[10]     - how many chars were used by calling CNget_char() - we need to remove them first
+    int charsUsed = cmd[9];                             // cmd[10]     - how many chars were used by calling CNget_char() - we need to remove them first
     if(charsUsed > 0) {                                 // some chars were used, remove them
         Debug::out(LOG_DEBUG, "NetAdapter::conGetBlock() -- CNget_char() used %d bytes, removing them from socket", charsUsed);
         nc->readWrapper.removeBlock(charsUsed);
@@ -1027,11 +1027,11 @@ void NetAdapter::conGetBlock(void)
 void NetAdapter::conGetString(void)
 {
     // Long command
-    // cmd[5] = NET_CMD_CNGETS
+    // cmd[4] = NET_CMD_CNGETS
 
-    int handle      = cmd[6];                       // cmd[6]      - handle    
-    int maxLength   = Utils::getDword(cmd + 7);     // cmd[7 .. 8] - max length
-    BYTE delim      = cmd[9];                       // cmd[9]      - string delimiter / terminator
+    int handle      = cmd[5];                       // cmd[6]      - handle    
+    int maxLength   = Utils::getWord(cmd + 6);      // cmd[7 .. 8] - max length
+    BYTE delim      = cmd[8];                       // cmd[9]      - string delimiter / terminator
 
     if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conGetString() -- bad handle: %d", handle);
@@ -1041,7 +1041,7 @@ void NetAdapter::conGetString(void)
 
     TNetConnection *nc  = &cons[handle];
 
-    int charsUsed = cmd[10];                        // cmd[10]     - how many chars were used by calling CNget_char() - we need to remove them first
+    int charsUsed = cmd[9];                         // cmd[10]     - how many chars were used by calling CNget_char() - we need to remove them first
     if(charsUsed > 0) {                             // some chars were used, remove them
         Debug::out(LOG_DEBUG, "NetAdapter::conGetString() -- CNget_char() used %d bytes, removing them from socket", charsUsed);
         nc->readWrapper.removeBlock(charsUsed);
