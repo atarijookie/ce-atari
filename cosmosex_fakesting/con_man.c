@@ -47,6 +47,13 @@ void setCIB(BYTE *cib, WORD protocol, WORD lPort, WORD rPort, DWORD rHost, DWORD
 
 DWORD getCIBitem(BYTE *cib, BYTE item);
 //--------------------------------------
+static void initConInfoStruct(int i);
+
+int tcpUdpGotSomeConnection(void);      // return TRUE if there is a valid connection (in or out), return FALSE otherwise
+int icmpGotSomeHandler     (void);      // return TRUE if there is a valid ICMP handler, return FALSE otherwise
+
+extern WORD fromVbl;                    // if non-zero, then update_con_info() was called from VBL
+//--------------------------------------
 // connection info function
 
 int16 CNkick(int16 handle)
@@ -320,7 +327,11 @@ int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
     //-----------------------
     // limit the length
     length              = (length < DMA_BUFFER_SIZE) ? length : DMA_BUFFER_SIZE;
-    int sectorLength    = length >> 9;
+    int sectorLength    = (length >> 9);
+    
+    if((length & 0x1ff) != 0) {
+        sectorLength++;
+    }
     //-----------------------
     // issue the command
   	commandLong[ 5] = NET_CMD_CNGETS;       // store function number 
@@ -343,11 +354,13 @@ int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
     if(hdIf.statusByte == E_NORMAL) {       // got the string? good
         memcpy(buffer, pDmaBuffer, length); // copy it to buffer
         forceNextUpdateConInfo = TRUE;      // force update_con_info() if asked to do it next time.
-        return E_NORMAL;
+
+        int len = strlen(buffer);           // get string length and return it
+        return len;
     }
 
     // in other cases - just return the status byte
-    return hdIf.statusByte;
+    return extendByteToWord(hdIf.statusByte);
 }
 
 //--------------------------------------
@@ -380,7 +393,18 @@ void update_con_info(BYTE forceUpdate)
     }
 	
 	lastUpdate = now;											            // mark that we've just updated the ceDrives 
-	
+    
+	//---------------
+    if(fromVbl) {
+        int gotConnection   = tcpUdpGotSomeConnection();                    // return TRUE if there is a valid connection (in or out), return FALSE otherwise
+        int gotIcmpHandler  = icmpGotSomeHandler();                         // return TRUE if there is a valid ICMP handler, return FALSE otherwise
+
+        if(!gotConnection && !gotIcmpHandler) {                             // no connection, no ICMP handler? Don't update info.
+            return;
+        }
+    }
+	//---------------
+    
 	// now do the real update 
 	commandShort[4] = NET_CMD_CN_UPDATE_INFO;								// store function number 
 	commandShort[5] = 0;										
@@ -477,6 +501,8 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
     if(handleIsFromCE(hdIf.statusByte)) {                   // if it's CE handle
         int stHandle = handleCEtoAtari(hdIf.statusByte);    // convert it to ST handle
         TConInfo *ci = &conInfo[stHandle];
+        
+        initConInfoStruct(stHandle);                        // init struct
         
         int proto, status;
         
@@ -611,9 +637,9 @@ void connection_send_block(BYTE netCmd, BYTE handle, WORD length, BYTE *buffer)
     }    
     
     // calculate sector count
-    WORD sectorCount = length / 512;                // get number of sectors we need to send
+    WORD sectorCount = length >> 9;                 // get number of sectors we need to send
     
-    if((length % 512) != 0) {                       // if the number of bytes is not multiple of 512, then we need to send one sector more
+    if((length & 0x1ff) != 0) {                     // if the number of bytes is not multiple of 512, then we need to send one sector more
         sectorCount++;
     }
     

@@ -27,6 +27,8 @@
 
 extern TConInfo conInfo[MAX_HANDLE];                   // this holds info about each connection
 
+int tcpUdpGotSomeConnection(void);                      // return TRUE if there is a valid connection (in or out), return FALSE otherwise
+
 //---------------------
 int16 TCP_send(int16 handle, void *buffer, int16 length)
 {
@@ -108,3 +110,14 @@ int16 TCP_info(int16 handle, TCPIB *tcp_info)
     return E_NORMAL;
 }
 
+int tcpUdpGotSomeConnection(void)                // return TRUE if there is a valid connection (in or out), return FALSE otherwise
+{
+    int i;
+    for(i=0; i<MAX_HANDLE; i++) {
+        if(conInfo[i].tcpConnectionState != TCLOSED) {  // if found a connection, which is not closed, return TRUE
+            return TRUE;
+        }
+    }
+    
+    return FALSE;                               // no open connection was found
+}

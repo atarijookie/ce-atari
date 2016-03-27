@@ -24,6 +24,8 @@ int16 ICMP_send     (uint32 dest, uint8 type, uint8 code, void *data, uint16 len
 int16 ICMP_handler  (int16  handler (IP_DGRAM *), int16 flag);
 void  ICMP_discard  (IP_DGRAM *dgram);
 
+int icmpGotSomeHandler(void);               // return TRUE if there is a valid ICMP handler, return FALSE otherwise
+
 extern PORT    my_port;
 extern CONFIG  conf;
 extern uint32  sting_clock;
@@ -228,3 +230,16 @@ void passDatagramToAllHandlers(IP_DGRAM *dgram)
         }
     }
 }
+
+int icmpGotSomeHandler(void)                // return TRUE if there is a valid ICMP handler, return FALSE otherwise
+{
+    int i;
+    for(i=0; i<MAX_ICMP_HANDLERS; i++) {            
+        if(icmpHandlers[i]) {               // this is a valid handler? return TRUE
+            return TRUE;
+        }
+    }
+    
+    return FALSE;
+}
+
