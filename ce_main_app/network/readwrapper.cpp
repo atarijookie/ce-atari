@@ -271,7 +271,7 @@ void ReadWrapper::removeBlock(int size)                 // remove from queue
 
         int howManyWeWillRemove = MIN(totalCount, size);    // how many we will remove?
 
-        while(1) {                                          // remove data in a loop, remove by the size of TMP BUFFER
+        while(howManyWeWillRemove > 0) {                    // remove data in a loop, remove by the size of TMP BUFFER
             int removeCountSingle = (howManyWeWillRemove < TMP_BFR_SIZE) ? howManyWeWillRemove : TMP_BFR_SIZE;
 
             res = recv(fd, tmpBfr, removeCountSingle, MSG_DONTWAIT);    // get the data (remove it)

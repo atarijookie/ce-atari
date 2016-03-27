@@ -993,6 +993,8 @@ void NetAdapter::conGetBlock(void)
     int handle          = cmd[5];                       // cmd[6]      - handle
     int wantedLength    = Utils::getWord(cmd + 6);      // cmd[7 .. 8] - block length
 
+    Debug::out(LOG_DEBUG, "NetAdapter::conGetBlock() -- from handle %d get %d bytes", handle, wantedLength);
+    
     if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conGetBlock() -- bad handle: %d", handle);
         dataTrans->setStatus(E_PARAMETER);
@@ -1071,10 +1073,10 @@ void NetAdapter::conGetString(void)
         return;
     }
 
-    Debug::out(LOG_DEBUG, "NetAdapter::conGetString() -- delimiter found, returning string");
-    
-    dataBuffer[foundIndex] = 0;                             // remove the delimiter
-    dataTrans->addDataBfr(dataBuffer, foundIndex, true);    // add data buffer, pad to mul 16
+    dataBuffer[foundIndex] = 0;                                 // remove the delimiter
+    dataTrans->addDataBfr(dataBuffer, foundIndex + 1, true);    // add data buffer (including terminating zero), pad to mul 16
+
+    Debug::out(LOG_DEBUG, "NetAdapter::conGetString() -- delimiter found at index %d, returning string '%s'", foundIndex, dataBuffer);
 
     nc->readWrapper.removeBlock(foundIndex + 1);            // remove the string from stream (and remove the delimiter)
     dataTrans->setStatus(E_NORMAL);    
