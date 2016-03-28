@@ -265,8 +265,6 @@ void NetAdapter::conOpen(void)
     WORD  remotePort        = Utils::getWord (dataBuffer + 4);
     bool  connectNotListen  = (remoteHost != 0);
         
-    Debug::out(LOG_DEBUG, "NetAdapter::conOpen() -- remoteHost: %d.%d.%d.%d, remotePort: %d -- will %s", (BYTE) (remoteHost >> 24), (BYTE) (remoteHost >> 16), (BYTE) (remoteHost >> 8), (BYTE) (remoteHost), remotePort, (connectNotListen ? "connect to host" : "listen for connection"));
-    
     // type of service (tos) is not used for now, buff_size is used for faking packet size in CNget_NDB()
     WORD  tos           = Utils::getWord (dataBuffer + 6);
     WORD  buff_size     = Utils::getWord (dataBuffer + 8);
@@ -274,9 +272,12 @@ void NetAdapter::conOpen(void)
     // local port, useful mainly for pasive (listening) connections
     WORD  localPort     = Utils::getWord (dataBuffer + 14);
 
-    if(remoteHost != 0) {       // remote host specified? Open by connecting to remote host
+    Debug::out(LOG_DEBUG, "NetAdapter::conOpen() -- remoteHost: %d.%d.%d.%d, remotePort: %d, buff_size: %d, localPort: %d", (BYTE) (remoteHost >> 24), (BYTE) (remoteHost >> 16), (BYTE) (remoteHost >> 8), (BYTE) (remoteHost), remotePort, buff_size, localPort);
+    Debug::out(LOG_DEBUG, "NetAdapter::conOpen() -- will %s", (connectNotListen ? "connect to host" : "listen for connection"));
+
+    if(connectNotListen) {      // connect to remote host (active connection)
         conOpen_connect(slot, tcpNotUdp, localPort, remoteHost, remotePort, tos, buff_size);
-    } else {                    // remote host not specified? Open by listening for connection
+    } else {                    // listen for connection  (passive connection)
         conOpen_listen (slot, tcpNotUdp, localPort, remoteHost, remotePort, tos, buff_size);
     }
 }
@@ -421,6 +422,7 @@ void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD
     nc->activeNotPassive = true;                // it's active (outgoing) socket
     nc->fd               = fd;
     nc->remote_adr       = serv_addr;
+    nc->localPort        = localPort;               // store local port - either the specified one, or the first free which was assigned
     nc->type             = tcpNotUdp ? TCP : UDP;
     nc->bytesInSocket    = 0;
     nc->status           = conStatus;
@@ -541,12 +543,16 @@ void NetAdapter::conUpdateInfo(void)
     
     // fill the buffer
     for(i=0; i<MAX_HANDLE; i++) {                           // store how many bytes we can read from connections
-        DWORD bytesToBeRead = cons[i].bytesInSocket;
-        dataTrans->addDataDword(bytesToBeRead);
+        TNetConnection *ci = &cons[i];
+        dataTrans->addDataDword(ci->bytesInSocket);
         
-        if(bytesToBeRead > 0) {
-            Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo - connection %d has %d bytes waiting to be read", i, bytesToBeRead);
+        if(ci->bytesInSocket > 0) {                         // something to read?
+            Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo - connection %d has %d bytes waiting to be read", i, ci->bytesInSocket);
             found++;
+        }
+        
+        if(ci->status != TCLOSED) {                         // not closed?
+            Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo [%d] - status: %d, localPort: %d, remoteHost: %08x, remotePort: %02x, bytesInSocket: %d", i, ci->status, ci->localPort, ntohl(ci->remote_adr.sin_addr.s_addr), ntohs(ci->remote_adr.sin_port), ci->bytesInSocket);
         }
     }
 
