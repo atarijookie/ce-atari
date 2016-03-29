@@ -518,9 +518,14 @@ Error return values:
 // if sign bit is set, extend the sign to whole WORD
 #define extendByteToWord(X)    ( ((X & 0x80)==0) ? X : (0xff00 | X) )
 
-#define handleIsFromCE(X)		(X >= 0x50 && X <= 0x6f)
-#define handleAtariToCE(X)		(X  + 0x50)
-#define handleCEtoAtari(X)		(X  - 0x50)
+#define NET_HANDLES_COUNT       32
+#define NET_STARTING_HANDLE     0x50
+
+#define network_handleIsValid(X)    ((X >= NET_STARTING_HANDLE) && (X < (NET_STARTING_HANDLE + NET_HANDLES_COUNT)))
+#define network_slotIsValid(X)      ((X >= 0) && (X < (NET_STARTING_HANDLE + NET_HANDLES_COUNT)))
+
+#define network_slotToHandle(X)     (X + NET_STARTING_HANDLE)
+#define network_handleToSlot(X)	    (X - NET_STARTING_HANDLE)
 
 /*--------------------------------------------------------------------------*/
 

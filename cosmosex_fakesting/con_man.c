@@ -29,7 +29,7 @@ BYTE forceNextUpdateConInfo;
 extern  uint32  localIP;
 extern  BYTE    FastRAMBuffer[]; 
 
-TConInfo conInfo[MAX_HANDLE];                                                // this holds info about each connection
+TConInfo conInfo[NET_HANDLES_COUNT];        // this holds info about each connection
 
 static void connection_send_block(BYTE netCmd, BYTE handle, WORD length, BYTE *buffer);
 //--------------------------------------
@@ -71,14 +71,15 @@ CIB *CNgetinfo(int16 handle)
 {
     // Note: do return valid CIB* even for closed handles, the client app might expect this to be not NULL even if the connection is opening / closing / whatever
 
-    if(handle < 0 || handle >= MAX_HANDLE) {        // handle out of range? fail
+    if(!network_handleIsValid(handle)) {            // handle out of range? fail
         return (CIB *) NULL;
     }
+    int slot = network_handleToSlot(handle);
 
     update_con_info(forceNextUpdateConInfo);        // update connections info structs (max once per 100 ms)
     forceNextUpdateConInfo = FALSE;
     
-	return &conInfo[handle].cib;                    // return pointer to correct CIB
+	return &conInfo[slot].cib;                      // return pointer to correct CIB
 }
 
 int16 CNbyte_count (int16 handle)
@@ -86,11 +87,12 @@ int16 CNbyte_count (int16 handle)
     if(!handle_valid(handle)) {                     // we don't have this handle? fail
         return E_BADHANDLE;
     }
+    int slot = network_handleToSlot(handle);
     
     update_con_info(forceNextUpdateConInfo);        // update connections info structs (max once per 100 ms)
     forceNextUpdateConInfo = FALSE;
     
-    TConInfo *ci = &conInfo[handle];                // we're working with this connection
+    TConInfo *ci = &conInfo[slot];                  // we're working with this connection
     
     if(ci->bytesToRead == 0 && ci->tcpConnectionState == TCLOSED) { // no data to read, and connection closed? return E_EOF
         return E_EOF;
@@ -119,9 +121,10 @@ int16 CNget_char(int16 handle)
     if(!handle_valid(handle)) {                 // we don't have this handle? fail
         return E_BADHANDLE;
     }
+    int slot = network_handleToSlot(handle);
 
     update_con_info(FALSE);                     // update connections info structs (max once per 100 ms)
-    TConInfo *ci = &conInfo[handle];            // we're working with this connection
+    TConInfo *ci = &conInfo[slot];              // we're working with this connection
     
     if(ci->tcpConnectionState == TCLOSED) {     // connection closed? return E_EOF
         return E_EOF;
@@ -163,9 +166,10 @@ NDB *CNget_NDB(int16 handle)
     if(!handle_valid(handle)) {                 // we don't have this handle? fail
         return (NDB *) NULL;
     }
+    int slot = network_handleToSlot(handle);
 
     update_con_info(FALSE);                     // update connections info structs (max once per 100 ms)
-    TConInfo *ci = &conInfo[handle];            // we're working with this connection
+    TConInfo *ci = &conInfo[slot];              // we're working with this connection
     
     if(ci->tcpConnectionState == TCLOSED) {     // closed?
         return (NDB *) NULL;
@@ -243,9 +247,10 @@ int16 CNget_block(int16 handle, void *buffer, int16 length)
     if(!handle_valid(handle)) {             // we don't have this handle? fail
         return E_BADHANDLE;
     }
-
+    int slot = network_handleToSlot(handle);
+    
     update_con_info(FALSE);                 // update connections info structs (max once per 100 ms)
-    TConInfo *ci = &conInfo[handle];        // we're working with this connection
+    TConInfo *ci = &conInfo[slot];          // we're working with this connection
     
     if(ci->tcpConnectionState == TCLOSED) { // no data to read, and connection closed? return E_EOF
         return E_EOF;
@@ -312,9 +317,10 @@ int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
     if(!handle_valid(handle)) {             // we don't have this handle? fail
         return E_BADHANDLE;
     }
+    int slot = network_handleToSlot(handle);
 
     update_con_info(FALSE);                 // update connections info structs (max once per 100 ms)
-    TConInfo *ci = &conInfo[handle];        // we're working with this connection
+    TConInfo *ci = &conInfo[slot];          // we're working with this connection
     
     if(ci->tcpConnectionState == TCLOSED) { // no data to read, and connection closed? return E_EOF
         return E_EOF;
@@ -366,13 +372,14 @@ int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
 //--------------------------------------
 // helper functions
 
-int handle_valid(int16 h)
+int handle_valid(int16 handle)
 {
-    if(h < 0 && h >= MAX_HANDLE) {                                          // handle out of range?
+    if(!network_handleIsValid(handle)) {        // handle out of range?
         return FALSE;
     }
     
-    WORD proto = getCIBitem((BYTE *) &conInfo[h].cib, CIB_PROTO);
+    int slot    = network_handleToSlot(handle);
+    WORD proto  = getCIBitem((BYTE *) &conInfo[slot].cib, CIB_PROTO);
     
     if(proto == 0) {                // if connection not used
         return FALSE;
@@ -498,11 +505,12 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
     // send it to host
     hdIf.cmd(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-    if(handleIsFromCE(hdIf.statusByte)) {                   // if it's CE handle
-        int stHandle = handleCEtoAtari(hdIf.statusByte);    // convert it to ST handle
-        TConInfo *ci = &conInfo[stHandle];
+    if(network_handleIsValid(hdIf.statusByte)) {            // if it's CE handle
+        int netHandle   = hdIf.statusByte;
+        int slot        = network_handleToSlot(netHandle);
+        TConInfo *ci = &conInfo[slot];
         
-        initConInfoStruct(stHandle);                        // init struct
+        initConInfoStruct(slot);                            // init struct
         
         int proto, status;
         
@@ -529,7 +537,7 @@ int16 connection_open(int tcpNotUdp, uint32 rem_host, uint16 rem_port, uint16 to
         ci->buff_size           = buff_size;        // store the maximu buffer size fot TCP
         ci->activeNotPassive    = activeNotPassive; // store active/passive flag
         
-        return stHandle;                            // return the new handle
+        return netHandle;                           // return the new handle
     } 
 
     // it's not a CE handle
@@ -543,6 +551,7 @@ int16 connection_close(int tcpNotUdp, int16 handle, int16 timeout)
     if(!handle_valid(handle)) {                     // we don't have this handle? fail
         return E_BADHANDLE;
     }
+    int slot = network_handleToSlot(handle);
     
     // first store command code
     if(tcpNotUdp) {                         // close TCP
@@ -563,7 +572,7 @@ int16 connection_close(int tcpNotUdp, int16 handle, int16 timeout)
 
     // don't handle failures, just pretend it's always closed just fine
 
-    setCIB((BYTE *) &conInfo[handle].cib, 0, 0, 0, 0, 0, 0);     // clear the CIB structure
+    setCIB((BYTE *) &conInfo[slot].cib, 0, 0, 0, 0, 0, 0);     // clear the CIB structure
     return E_NORMAL;
 }
 
@@ -574,9 +583,10 @@ int16 connection_send(int tcpNotUdp, int16 handle, void *buffer, int16 length)
     if(!handle_valid(handle)) {                     // we don't have this handle? fail
         return E_BADHANDLE;
     }
+    int slot = network_handleToSlot(handle);
     
     if(tcpNotUdp) {                                 // if it's TCP connection...
-        if(length > conInfo[handle].buff_size) {    // ...and trying to send more than specified buffer size in TCP_open(), fail
+        if(length > conInfo[slot].buff_size) {      // ...and trying to send more than specified buffer size in TCP_open(), fail
             return E_OBUFFULL;
         }
     }
