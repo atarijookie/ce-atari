@@ -25,9 +25,18 @@
 
 #include "sting.h"
 
-#define MAX_HANDLE          32
-#define NET_BUFFER_SIZE     (1024 * 1024)
+#define NET_HANDLES_COUNT       32
+#define NET_STARTING_HANDLE     0x50
 
+#define network_handleIsValid(X)    ((X >= NET_STARTING_HANDLE) && (X < (NET_STARTING_HANDLE + NET_HANDLES_COUNT)))
+#define network_slotIsValid(X)      ((X >= 0) && (X < (NET_STARTING_HANDLE + NET_HANDLES_COUNT)))
+
+#define network_slotToHandle(X)     (X + NET_STARTING_HANDLE)
+#define network_handleToSlot(X)	    (X - NET_STARTING_HANDLE)
+
+//--------------------------------------------------------------------------
+
+#define NET_BUFFER_SIZE     (1024 * 1024)
 #define CON_BFR_SIZE        (100 * 1024)
 
 //-------------------------------------
@@ -135,9 +144,9 @@ private:
     AcsiDataTrans   *dataTrans;
     BYTE            *dataBuffer;
 
-    TNetConnection  cons[MAX_HANDLE];   // for handling of TCP and UDP connections
-    IcmpWrapper     icmpWrapper;        // for handling ICMP sending and receiving
-    ResolverRequest resolver;           // for handling DNS resolve requests
+    TNetConnection  cons[NET_HANDLES_COUNT];    // for handling of TCP and UDP connections
+    IcmpWrapper     icmpWrapper;                // for handling ICMP sending and receiving
+    ResolverRequest resolver;                   // for handling DNS resolve requests
     
     void loadSettings(void);
     void identify(void);

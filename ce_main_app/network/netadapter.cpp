@@ -220,7 +220,7 @@ void NetAdapter::closeAndCleanAll(void)
     pthread_mutex_lock(&networkThreadMutex);        // try to lock the mutex
 
     int i;
-    for(i=0; i<MAX_HANDLE; i++) {                   // close normal sockets
+    for(i=0; i<NET_HANDLES_COUNT; i++) {            // close normal sockets
         cons[i].closeIt();
         cons[i].cleanIt();
     }
@@ -362,7 +362,9 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, DWORD 
     nc->buff_size        = buff_size;
 
     // return the handle
-    dataTrans->setStatus(handleAtariToCE(slot));
+    BYTE connectionHandle = network_slotToHandle(slot);
+    Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen() - returning %d as handle for slot %d", (int) connectionHandle, slot);
+    dataTrans->setStatus(connectionHandle);
 }
 
 void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size)
@@ -431,7 +433,9 @@ void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD
     nc->readWrapper.init(fd, nc->type, buff_size);
 
     // return the handle
-    dataTrans->setStatus(handleAtariToCE(slot));
+    BYTE connectionHandle = network_slotToHandle(slot);
+    Debug::out(LOG_DEBUG, "NetAdapter::conOpen_connect() - returning %d as handle for slot %d", (int) connectionHandle, slot);
+    dataTrans->setStatus(connectionHandle);
 }
 //----------------------------------------------
 void NetAdapter::conClose(void)
@@ -444,22 +448,23 @@ void NetAdapter::conClose(void)
         return;
     }
 
-    int handle = Utils::getWord(dataBuffer);            // retrieve handle
+    int handle  = Utils::getWord(dataBuffer);           // retrieve handle
 
-    if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
+    if(!network_handleIsValid(handle)) {                // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conClose() -- bad handle: %d", handle);
         dataTrans->setStatus(E_PARAMETER);
         return;
     }
+    int slot = network_handleToSlot(handle);
 
-    if(cons[handle].isClosed()) {                       // handle already closed? fail
-        Debug::out(LOG_DEBUG, "NetAdapter::conClose() -- handle %d is already closed, pretending that it was closed :)", handle);
+    if(cons[slot].isClosed()) {                         // handle already closed? fail
+        Debug::out(LOG_DEBUG, "NetAdapter::conClose() -- slot %d is already closed, pretending that it was closed :)", slot);
         dataTrans->setStatus(E_NORMAL);
         return;
     }
 
-    Debug::out(LOG_DEBUG, "NetAdapter::conClose() -- closing connection %d", handle);
-    cons[handle].closeIt();                             // handle good, close it
+    Debug::out(LOG_DEBUG, "NetAdapter::conClose() -- closing connection with handle %d on slot %d", handle, slot);
+    cons[slot].closeIt();                             // handle good, close it
 
     dataTrans->setStatus(E_NORMAL);
 }
@@ -472,21 +477,22 @@ void NetAdapter::conSend(void)
     bool isOdd      = cmd[8];                           // if the data was send from odd address, this will be non-zero...
     BYTE oddByte    = cmd[9];                           // ...and this will contain the 0th byte
 
-    if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
+    if(!network_handleIsValid(handle)) {                // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conSend() -- bad handle: %d", handle);
-        dataTrans->setStatus(E_BADHANDLE);
+        dataTrans->setStatus(E_PARAMETER);
         return;
     }
+    int slot = network_handleToSlot(handle);
 
-    if(cons[handle].isClosed()) {                       // connection not open? fail
-        Debug::out(LOG_DEBUG, "NetAdapter::conSend() -- connection %d is closed", handle);
+    if(cons[slot].isClosed()) {                         // connection not open? fail
+        Debug::out(LOG_DEBUG, "NetAdapter::conSend() -- connection %d is closed", slot);
         dataTrans->setStatus(E_BADHANDLE);
         return;
     }
 
     bool good = false;                                  // check if trying to do right type of send over right type of connection (TCP over TCP, UDP over UDP)
-    if( (cmdType == NET_CMD_TCP_SEND && cons[handle].type == TCP) || 
-        (cmdType == NET_CMD_UDP_SEND && cons[handle].type == UDP)) {
+    if( (cmdType == NET_CMD_TCP_SEND && cons[slot].type == TCP) || 
+        (cmdType == NET_CMD_UDP_SEND && cons[slot].type == UDP)) {
         good = true;
     }
 
@@ -519,10 +525,10 @@ void NetAdapter::conSend(void)
         return;
     }
 
-    Debug::out(LOG_DEBUG, "NetAdapter::conSend() -- sending %d bytes through connection %d (received %d from ST, isOdd: %d)", length, handle, lenRoundUp, isOdd);
+    Debug::out(LOG_DEBUG, "NetAdapter::conSend() -- sending %d bytes through connection %d (received %d from ST, isOdd: %d)", length, slot, lenRoundUp, isOdd);
 //  Debug::outBfr(pData, length);
     
-    int ires = write(cons[handle].fd, dataBuffer, length);  // try to send the data
+    int ires = write(cons[slot].fd, dataBuffer, length);  // try to send the data
 
     if(ires < length) {                                 // if written less than should, fail
         Debug::out(LOG_DEBUG, "NetAdapter::conSend - failed to write() all data");
@@ -542,7 +548,7 @@ void NetAdapter::conUpdateInfo(void)
     int found = 0;
     
     // fill the buffer
-    for(i=0; i<MAX_HANDLE; i++) {                           // store how many bytes we can read from connections
+    for(i=0; i<NET_HANDLES_COUNT; i++) {                    // store how many bytes we can read from connections
         TNetConnection *ci = &cons[i];
         dataTrans->addDataDword(ci->bytesInSocket);
         
@@ -556,19 +562,19 @@ void NetAdapter::conUpdateInfo(void)
         }
     }
 
-    for(i=0; i<MAX_HANDLE; i++) {                           // store connection statuses
+    for(i=0; i<NET_HANDLES_COUNT; i++) {                    // store connection statuses
         dataTrans->addDataByte(cons[i].status);
     }
 
-    for(i=0; i<MAX_HANDLE; i++) {                           // store local ports (LPort)
+    for(i=0; i<NET_HANDLES_COUNT; i++) {                    // store local ports (LPort)
         dataTrans->addDataWord(cons[i].localPort);
     }
 
-    for(i=0; i<MAX_HANDLE; i++) {                           // store remote addresses (RHost)
+    for(i=0; i<NET_HANDLES_COUNT; i++) {                    // store remote addresses (RHost)
         dataTrans->addDataDword(ntohl(cons[i].remote_adr.sin_addr.s_addr));
     }
 
-    for(i=0; i<MAX_HANDLE; i++) {                           // store remote ports (RPort)
+    for(i=0; i<NET_HANDLES_COUNT; i++) {                    // store remote ports (RPort)
         dataTrans->addDataWord(ntohs(cons[i].remote_adr.sin_port));
     }
 
@@ -753,7 +759,7 @@ int NetAdapter::findEmptyConnectionSlot(void)
 {
     int i;
 
-    for(i=0; i<MAX_HANDLE; i++) {                   // try to find closed (empty) slot
+    for(i=0; i<NET_HANDLES_COUNT; i++) {            // try to find closed (empty) slot
         if(cons[i].isClosed()) {
             return i;
         }
@@ -767,7 +773,7 @@ void NetAdapter::updateCons(void)
 {
     int i;
 
-    for(i=0; i<MAX_HANDLE; i++) {                   // update connection info                
+    for(i=0; i<NET_HANDLES_COUNT; i++) {            // update connection info                
         if(cons[i].isClosed()) {                    // if connection closed, skip it
             continue;
         }
@@ -924,13 +930,14 @@ void NetAdapter::conGetCharBuffer(void)
     // cmd[4] = NET_CMD_CNGET_CHAR
     int handle = cmd[5];                                // get handle
 
-    if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
+    if(!network_handleIsValid(handle)) {                // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() -- bad handle: %d", handle);
         dataTrans->setStatus(E_PARAMETER);
         return;
     }
+    int slot = network_handleToSlot(handle);
 
-    TNetConnection *nc = &cons[handle];
+    TNetConnection *nc = &cons[slot];
 
     int charsUsed = cmd[9];                             // cmd[10] - how many chars were used by calling CNget_char() - we need to remove them first
     if(charsUsed > 0) {                                 // some chars were used, remove them
@@ -954,13 +961,14 @@ void NetAdapter::conGetNdb(void)
     int handle          = cmd[5];                       // get handle
     int getNdbNotSize   = cmd[6];                       // If zero, returns just size. If non-zero, return data.
 
-    if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
+    if(!network_handleIsValid(handle)) {                // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conGetNdb() -- bad handle: %d", handle);
         dataTrans->setStatus(E_PARAMETER);
         return;
     }
+    int slot = network_handleToSlot(handle);
 
-    TNetConnection *nc = &cons[handle];
+    TNetConnection *nc = &cons[slot];
 
     int charsUsed = cmd[9];                             // cmd[10] - how many chars were used by calling CNget_char() - we need to remove them first
     if(charsUsed > 0) {                                 // some chars were used, remove them
@@ -1000,14 +1008,15 @@ void NetAdapter::conGetBlock(void)
     int wantedLength    = Utils::getWord(cmd + 6);      // cmd[7 .. 8] - block length
 
     Debug::out(LOG_DEBUG, "NetAdapter::conGetBlock() -- from handle %d get %d bytes", handle, wantedLength);
-    
-    if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
+
+    if(!network_handleIsValid(handle)) {                // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conGetBlock() -- bad handle: %d", handle);
         dataTrans->setStatus(E_PARAMETER);
         return;
     }
+    int slot = network_handleToSlot(handle);
 
-    TNetConnection *nc  = &cons[handle];
+    TNetConnection *nc  = &cons[slot];
 
     int charsUsed = cmd[9];                             // cmd[10]     - how many chars were used by calling CNget_char() - we need to remove them first
     if(charsUsed > 0) {                                 // some chars were used, remove them
@@ -1041,13 +1050,14 @@ void NetAdapter::conGetString(void)
     int maxLength   = Utils::getWord(cmd + 6);      // cmd[7 .. 8] - max length
     BYTE delim      = cmd[8];                       // cmd[9]      - string delimiter / terminator
 
-    if(handle < 0 || handle >= MAX_HANDLE) {            // handle out of range? fail
+    if(!network_handleIsValid(handle)) {                // handle out of range? fail
         Debug::out(LOG_DEBUG, "NetAdapter::conGetString() -- bad handle: %d", handle);
         dataTrans->setStatus(E_PARAMETER);
         return;
     }
+    int slot = network_handleToSlot(handle);
 
-    TNetConnection *nc  = &cons[handle];
+    TNetConnection *nc  = &cons[slot];
 
     int charsUsed = cmd[9];                         // cmd[10]     - how many chars were used by calling CNget_char() - we need to remove them first
     if(charsUsed > 0) {                             // some chars were used, remove them
