@@ -41,6 +41,7 @@ int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
     if(!handle_valid(handle)) {                         // we don't have this handle? fail
         return E_BADHANDLE;
     }
+    int slot = network_handleToSlot(handle);
 
     DWORD timeStart = getTicks();
     DWORD timeout2 = timeout * 200;    
@@ -53,7 +54,7 @@ int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
             nextConUpdate = getTicks() + 100;
         }
         
-        WORD currentState = conInfo[handle].tcpConnectionState;     // get the current state
+        WORD currentState = conInfo[slot].tcpConnectionState;       // get the current state
     
         // if the wanted state is CLOSED or CLOSING, and the current state is similar - success
         if(wantedState == TCLOSED || wantedState == TFIN_WAIT1 ||  wantedState == TFIN_WAIT2 ||  wantedState == TCLOSE_WAIT ||  wantedState == TCLOSING ||  wantedState == TLAST_ACK ||  wantedState == TTIME_WAIT) {
@@ -99,6 +100,7 @@ int16 TCP_info(int16 handle, TCPIB *tcp_info)
     if(!handle_valid(handle)) {                                 // we don't have this handle? fail
         return E_BADHANDLE;
     }
+    int slot = network_handleToSlot(handle);
     
     update_con_info(FALSE);                                     // update the info 
 
@@ -106,7 +108,7 @@ int16 TCP_info(int16 handle, TCPIB *tcp_info)
         return E_BADHANDLE;
     }
     
-    storeWord((BYTE *) tcp_info, conInfo[handle].tcpConnectionState);       // return the connection state
+    storeWord((BYTE *) tcp_info, conInfo[slot].tcpConnectionState); // return the connection state
     return E_NORMAL;
 }
 
