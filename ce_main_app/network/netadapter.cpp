@@ -328,22 +328,7 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, DWORD 
     listen(fd, 1);                                                      // mark this socket as listening, with queue length of 1
 
     if(localPort == 0) {                                                // should listen on 1st free port?
-        struct sockaddr_in real_addr;
-        memset(&real_addr, '0', sizeof(local_addr)); 
-
-        socklen_t len = (socklen_t) sizeof(real_addr);
-        ires = getsockname(fd, (struct sockaddr*) &real_addr, &len);    // try to find out real local port number that was open / used
-        
-        if(ires == -1) {
-            close(fd);
-
-            Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - getsockname() failed with error: %d", errno);
-            dataTrans->setStatus(E_CONNECTFAIL);
-            return;
-        }
-        
-        localPort = ntohs(real_addr.sin_port);                          // get the real local port
-
+        localPort = getLocalPort(fd);   
         Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - now listening on first free port %d (hex: 0x%04x, dec: %d, %d)", localPort, localPort, localPort >> 8, localPort & 0xff);
     } else {
         Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - now listening on specified port %d (hex: 0x%04x, dec: %d, %d)",  localPort, localPort, localPort >> 8, localPort & 0xff);
@@ -365,6 +350,27 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, DWORD 
     BYTE connectionHandle = network_slotToHandle(slot);
     Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen() - returning %d as handle for slot %d", (int) connectionHandle, slot);
     dataTrans->setStatus(connectionHandle);
+}
+
+WORD NetAdapter::getLocalPort(int sockFd)
+{
+    WORD localPort = 0;
+
+    struct sockaddr_in real_addr;
+    memset(&real_addr, '0', sizeof(sockaddr_in)); 
+
+    socklen_t len = (socklen_t) sizeof(real_addr);
+    int ires = getsockname(sockFd, (struct sockaddr*) &real_addr, &len);    // try to find out real local port number that was open / used
+    
+    if(ires == -1) {
+        Debug::out(LOG_DEBUG, "NetAdapter::getLocalPort - getsockname() failed with error: %d", errno);
+        return 0;
+    }
+    
+    localPort = ntohs(real_addr.sin_port);                          // get the real local port
+
+    Debug::out(LOG_DEBUG, "NetAdapter::getLocalPort - getsockname() returned local port: %d", localPort);
+    return localPort;
 }
 
 void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size)
@@ -415,6 +421,10 @@ void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD
     if(ires < 0 && errno == EINPROGRESS) {      // if it's a O_NONBLOCK socket connecting, the state is connecting
         conStatus = TSYN_SENT;                  // for non-blocking TCP, this is 'we're trying to connect'
         Debug::out(LOG_DEBUG, "NetAdapter::conOpen_connect() - non-blocking TCP is connecting, going to TSYN_SENT status");
+    }
+    
+    if(localPort == 0) {                        // if local port not specified, find out current local port
+        localPort = getLocalPort(fd);
     }
     
     TNetConnection *nc = &cons[slot];
@@ -558,7 +568,7 @@ void NetAdapter::conUpdateInfo(void)
         }
         
         if(ci->status != TCLOSED) {                         // not closed?
-            Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo [%d] - status: %d, localPort: %d, remoteHost: %08x, remotePort: %02x, bytesInSocket: %d", i, ci->status, ci->localPort, ntohl(ci->remote_adr.sin_addr.s_addr), ntohs(ci->remote_adr.sin_port), ci->bytesInSocket);
+            Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo [%d] - status: %d, localPort: %d, remoteHost: %08x, remotePort: %d, bytesInSocket: %d", i, ci->status, ci->localPort, ntohl(ci->remote_adr.sin_addr.s_addr), ntohs(ci->remote_adr.sin_port), ci->bytesInSocket);
         }
     }
 
@@ -828,6 +838,11 @@ void NetAdapter::updateCons_passive(int i)
         return;
     }
     
+    if(nc->fd != -1) {
+        nc->bytesInSocket = nc->readWrapper.getCount();         // try to get how many bytes can be read
+        Debug::out(LOG_DEBUG, "NetAdapter::updateCons_passive(%d) -- bytesInSocket: %d, status: %d", i, nc->bytesInSocket, nc->status);
+    }
+    
     // ok, so we have both sockets? did the data socket HUP?
     if(didSocketHangUp(i)) {
         Debug::out(LOG_DEBUG, "NetAdapter::updateCons_passive() -- connection %d - poll returned POLLRDHUP, so closing", i);
@@ -846,7 +861,7 @@ void NetAdapter::updateCons_active(int i)
     //---------
     // update how many bytes we can read from this sock
     nc->bytesInSocket = nc->readWrapper.getCount();         // try to get how many bytes can be read
-    Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- cons[%d].bytesInSocket: %d, status: cons[%d].status: %d", i, nc->bytesInSocket, i, nc->status);
+    Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active(%d) -- bytesInSocket: %d, status: %d", i, nc->bytesInSocket, nc->status);
     
     //---------
     // if it's not TCP connection, just pretend the state is 'connected' - it's only used for TCP connections, so it doesn't matter
