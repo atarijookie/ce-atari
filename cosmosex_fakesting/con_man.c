@@ -242,6 +242,66 @@ NDB *CNget_NDB(int16 handle)
     return pNdb;                            // return the pointer to NDB structure
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static BYTE getBlockSingle(TConInfo *ci, BYTE handle, BYTE *buffer, WORD byteCount, WORD sectorCount)
+{
+    // no more used chars and got chars
+    int charsUsed   = ci->charsUsed;
+    ci->charsUsed   = 0;                    
+    ci->charsGot    = 0;
+
+    //----------------------------------------
+    commandLong[ 5] = NET_CMD_CNGET_BLOCK;  // store function number 
+    commandLong[ 6] = handle;				// store file handle 
+    commandLong[ 7] = (BYTE) (byteCount >> 8);
+    commandLong[ 8] = (BYTE) (byteCount     );
+    commandLong[10] = charsUsed;            // how many chars were used
+
+    hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, buffer, sectorCount);
+
+    if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // failed? quit
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static BYTE getBlockLong(TConInfo *ci, BYTE handle, BYTE *buffer, WORD byteCount, WORD sectorCount)
+{
+    BYTE res;
+    BYTE toFastRam = (((int)buffer) >= 0x1000000) ? TRUE : FALSE;       // flag: are we reading to FAST RAM?
+    
+    if((((DWORD) buffer) & 1) != 0) {                                   // buffer address is odd? act like if reading to FAST RAM
+        toFastRam = TRUE;
+    }
+    
+    if(toFastRam == FALSE) {                                            // not to FAST RAM? Do a single transfer and quit
+        res = getBlockSingle(ci, handle, buffer, byteCount, sectorCount);
+        return res;
+    }
+    
+    // it's to FAST RAM (or odd address), let's go through middle buffer
+
+	while(byteCount > 0) {
+        // If the needed count is bigger that what we can fit in maximum transfer size, limit it to that maximum; otherwise just use it.
+        WORD thisGetSizeBytes   = (byteCount < FASTRAM_BUFFER_SIZE) ? byteCount : FASTRAM_BUFFER_SIZE;    
+		WORD thisGetSizeSectors = (thisGetSizeBytes >> 9) + (((thisGetSizeBytes & 0x1ff) == 0) ? 0 : 1);
+        
+        res = getBlockSingle(ci, handle, FastRAMBuffer, thisGetSizeBytes, thisGetSizeSectors);  // make transfer to middle buffer
+        memcpy(buffer, FastRAMBuffer, thisGetSizeBytes);                                    // copy to the final buffer
+
+        if(res == FALSE) {
+            return FALSE;
+        }
+        
+		buffer		    += thisGetSizeBytes;        // update the buffer pointer
+		byteCount       -= thisGetSizeBytes;        // update the count that we still should read
+	}
+    
+    return TRUE;
+}
+
 int16 CNget_block(int16 handle, void *buffer, int16 length)
 {
     if(!handle_valid(handle)) {             // we don't have this handle? fail
@@ -261,12 +321,6 @@ int16 CNget_block(int16 handle, void *buffer, int16 length)
     }
 
     //----------------------------------------
-    // no more used chars and got chars
-    int charsUsed   = ci->charsUsed;
-    ci->charsUsed   = 0;                    
-    ci->charsGot    = 0;
-
-    //----------------------------------------
     // how many sectors and bytes we need for long transfer
     int lenLongSectors  = length         >> 9;
     int lenLongBytes    = lenLongSectors << 9;
@@ -276,31 +330,21 @@ int16 CNget_block(int16 handle, void *buffer, int16 length)
     
     //----------------------------------------
     // first do the long transfer
+    BYTE res;
+    
     if(lenLongSectors > 0) {                    // if we should do the long transfer (something to transfer?)
-        commandLong[ 5] = NET_CMD_CNGET_BLOCK;  // store function number 
-        commandLong[ 6] = handle;				// store file handle 
-        commandLong[ 7] = (BYTE) (lenLongBytes >> 8);
-        commandLong[ 8] = (BYTE) (lenLongBytes     );
-        commandLong[10] = charsUsed;            // how many chars were used
+        res = getBlockLong(ci, handle, buffer, lenLongBytes, lenLongSectors);
 
-        hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, buffer, lenLongSectors);
-
-        if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // failed? quit
+        if(res == FALSE) {                      // if failed, quit
             return E_NODATA;
         }
     }
     //----------------------------------------
     // then do the short transfer
     if(lenShortBytes > 0) {                     // if we should do the short transfer (something to transfer?)
-        commandLong[ 5] = NET_CMD_CNGET_BLOCK;  // store function number 
-        commandLong[ 6] = handle;				// store file handle 
-        commandLong[ 7] = (BYTE) (lenShortBytes >> 8);
-        commandLong[ 8] = (BYTE) (lenShortBytes     );
-        commandLong[10] = 0;                    // no chars were used
+        res = getBlockSingle(ci, handle, pDmaBuffer, lenShortBytes, 1);
 
-        hdIf.cmd(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);
-
-        if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // failed? quit
+        if(res == FALSE) {                      // if failed, quit
             return E_NODATA;
         }
         
@@ -311,6 +355,8 @@ int16 CNget_block(int16 handle, void *buffer, int16 length)
     forceNextUpdateConInfo = TRUE;              // force update_con_info() if asked to do it next time.
     return length;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int16 CNgets(int16 handle, char *buffer, int16 length, char delimiter)
 {
