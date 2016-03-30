@@ -837,25 +837,32 @@ void doTest0230(void)
     // wait using CNbyte_count
     out_test_header(0x0231, "PASSIVE waiting using CNbyte_count");
     handle  = createPassiveConnection(LOCAL_PASSIVE_PORT);
-    res     = tellServerToConnectToOutPassiveConnection(handle);
-    if(res) {
-        DWORD end = getTicks() + 600;           // wait 3 seconds for connection
+    
+    res = CNbyte_count(handle);
+    
+    if(res != E_LISTEN) {
+        out_result_error_string(0, res, "CNbyte_count() didn't return E_LISTEN");
+    } else {
+        res     = tellServerToConnectToOutPassiveConnection(handle);
+        if(res) {
+            DWORD end = getTicks() + 600;           // wait 3 seconds for connection
 
-        ok = 0;
-        while(1) {
-            if(getTicks() >= end) {             // if timeout, fail
-                ok = 0;
-                break;
-            }
-        
-            res = CNbyte_count(handle);         // try to get byte count, which will return E_LISTEN if still listening
+            ok = 0;
+            while(1) {
+                if(getTicks() >= end) {             // if timeout, fail
+                    ok = 0;
+                    break;
+                }
             
-            if(res >= 0 || res == E_NODATA) {   // can finally get amount waiting, or E_NODATA? it's better than E_LISTEN, good
-                ok = 1;
-                break;
+                res = CNbyte_count(handle);         // try to get byte count, which will return E_LISTEN if still listening
+                
+                if(res >= 0 || res == E_NODATA) {   // can finally get amount waiting, or E_NODATA? it's better than E_LISTEN, good
+                    ok = 1;
+                    break;
+                }
             }
+            out_result_error(ok, res);
         }
-        out_result_error(ok, res);
     }
     TCP_close(handle, 0, 0);
     
