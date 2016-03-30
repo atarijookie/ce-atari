@@ -426,6 +426,10 @@ void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD
         return;
     }
 
+    if(tcpNotUdp) {
+        setKeepAliveOptions(fd);                // configure keep alive on TCP socket
+    }
+
     int conStatus = TESTABLISH;                 // for UDP and blocking TCP, this is 'we have connection'
     if(ires < 0 && errno == EINPROGRESS) {      // if it's a O_NONBLOCK socket connecting, the state is connecting
         conStatus = TSYN_SENT;                  // for non-blocking TCP, this is 'we're trying to connect'
@@ -827,7 +831,10 @@ void NetAdapter::updateCons_passive(int i)
         }
 
         Debug::out(LOG_DEBUG, "NetAdapter::updateCons_passive() -- connection %d - accept() succeeded, client connected", i);
-        
+
+        //----------     
+        setKeepAliveOptions(fd);                                // configure keep alive
+
         // ok, got the connection, store file descriptor and new state
         nc->fd      = fd;
         nc->status  = TESTABLISH;
@@ -921,6 +928,22 @@ void NetAdapter::updateCons_active(int i)
             nc->closeIt();
         }
     }
+}
+
+void NetAdapter::setKeepAliveOptions(int fd)
+{
+    // turning on keep alive on TCP socket
+    int keepAliveEnabled = 1;
+    setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &keepAliveEnabled, sizeof(int));
+
+    // seting params of keepalive
+    int keepcnt     = 5;    // The maximum number of keepalive probes TCP should send before dropping the connection. 
+    int keepidle    = 30;   // The time (in seconds) the connection needs to remain idle before TCP starts sending keepalive probes
+    int keepintvl   = 60;   // The time (in seconds) between individual keepalive probes.
+
+    setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT,    &keepcnt,   sizeof(int));
+    setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE,   &keepidle,  sizeof(int));
+    setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL,  &keepintvl, sizeof(int));
 }
 
 //----------------------------------------------

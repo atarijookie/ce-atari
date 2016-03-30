@@ -170,7 +170,8 @@ private:
     void conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size);
     void conOpen_listen (int slot, bool tcpNotUdp, WORD localPort, DWORD remoteHost, WORD remotePort, WORD tos, WORD buff_size);
     WORD getLocalPort(int sockFd);
-    
+    void setKeepAliveOptions(int fd);
+
     void updateCons_active (int i);
     void updateCons_passive(int i);
     bool didSocketHangUp   (int i);
