@@ -95,10 +95,10 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
     }
     
     fseek(f, 0, SEEK_END);                                          // move to the end of file
-    int fileSize = ftell(f);                                        // store the position of the end of file
+    int fileSizeBytes = ftell(f);                                   // store the position of the end of file
     fseek(f, 0, SEEK_SET);                                          // set to start of file again
 
-    if(fileSize > PEXEC_DRIVE_USABLE_SIZE_BYTES) {
+    if(fileSizeBytes > PEXEC_DRIVE_USABLE_SIZE_BYTES) {
         fclose(f);
         Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - the file is too big to fit in our image!");
 
@@ -106,13 +106,13 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
         return;
     }
     
-    createImage(fullAtariPath, f, fileSize);                        // now create the image    
+    createImage(fullAtariPath, f, fileSizeBytes);                   // now create the image    
     
     fclose(f);                                                      // close the file
     dataTrans->setStatus(E_OK);                                     // ok!
 }
 
-void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSize)
+void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSizeBytes)
 {
     memset(pexecImage, 0, PEXEC_DRIVE_SIZE_BYTES);                  // clear the whole image
     memset(pexecImageReadFlags, 0, PEXEC_DRIVE_SIZE_SECTORS);       // clear all the READ flags
@@ -122,7 +122,9 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
     
     DWORD fat1startingSector = 4;
     DWORD fat2startingSector = fat1startingSector + PEXEC_FAT_SECTORS_NEEDED;
-    DWORD dataStartingSector = fat2startingSector + PEXEC_FAT_SECTORS_NEEDED;
+    
+    DWORD dataSectorAbsolute = fat2startingSector + PEXEC_FAT_SECTORS_NEEDED;   // absolute sector - from the start of the image (something like sector #84)
+    DWORD dataSectorRelative = 2;                                               // relative sector - relative sector numbering from the start of data area (probably #2)
     
     //--------------
     // split path to dirs
@@ -158,55 +160,61 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
     
     //--------------
     // first add dirs to image as dir entries
-    int curSector = dataStartingSector;             // start at root dir
+    BYTE *pFat1 = pexecImage + (fat1startingSector * 512);  // pointer to FAT1
+    BYTE *pFat2 = pexecImage + (fat2startingSector * 512);  // pointer to FAT2
+
+    int curSectorAbs = dataSectorAbsolute;                  // start at root dir
+    int curSectorRel = dataSectorRelative;                  
     
     WORD date = 0, time = 0;
     
     for(i=0; i<(found-1); i++) {
-        createDirEntry(i == 0, true, date, time, 0, (char *) strings[i].c_str(), curSector);
-        curSector++;   
+        createDirEntry(i == 0, true, date, time, 0,             (char *) strings[i].c_str(),            curSectorAbs, curSectorRel);   // store DIR entry 
+        storeFatChain (pFat1, curSectorRel, curSectorRel);  // mark that DIR entry in FAT chain
+        curSectorAbs++;
+        curSectorRel++;   
     }
     
     // then add the file to image as dir entry
-    createDirEntry(found < 2, false, date, time, fileSize, (char *) strings[found - 1].c_str(), curSector);
-    curSector++;
+    createDirEntry(found < 2, false, date, time, fileSizeBytes, (char *) strings[found - 1].c_str(),    curSectorAbs, curSectorRel);
+    storeFatChain (pFat1, curSectorRel, curSectorRel);      // mark that DIR entry in FAT chain
+    curSectorAbs++;
+    curSectorRel++;   
     
     // now add the file content to the image
-    BYTE *pFileInImage = pexecImage + (curSector * 512);     // get pointer to file in image
-    fread(pFileInImage, 1, fileSize, f);
+    BYTE *pFileInImage = pexecImage + (curSectorAbs * 512); // get pointer to file in image
+    fread(pFileInImage, 1, fileSizeBytes, f);
     
-    int fileSectors = (fileSize / 512) + ((fileSize % 512) == 0) ? 0 : 1;   // calculate how many sector the file takes
+    int fileSizeSectors = (fileSizeBytes / 512) + ((fileSizeBytes % 512) == 0) ? 0 : 1; // calculate how many sector the file takes
     
-    prgSectorStart  = curSector;                            // first sector - where the PRG starts
-    prgSectorEnd    = curSector + fileSectors - 1;          // last sector  - where the PRG ends
+    prgSectorStart  = curSectorRel;                         // first sector - where the PRG starts
+    prgSectorEnd    = curSectorRel + fileSizeSectors - 1;   // last sector  - where the PRG ends
     
-    //-------------
-    // now create the FAT table
-    BYTE *pFat1 = pexecImage + (fat1startingSector * 512);  // get pointer to FAT1
-    memset(pFat1 + 4, 0xff, 2 * (found - 1));               // all the DIR entries sectors will have 0xFF in FAT, because they take only single sector
-    
-    int fileOffsetInFat = 4 + (found - 1) * 2;              // offset in bytes in the FAT to start of the file 
-    int  sectorInFat    = 3 + (found - 1);
-    BYTE *pFileInFat    = pFat1 + fileOffsetInFat;
-    
-    for(i=0; i<(fileSectors - 1); i++) {
-        storeIntelWord(pFileInFat, sectorInFat);
-        
-        pFileInFat += 2;                                    // move 2 bytes forward in FAT
-        sectorInFat++;                                      // increment next sector #
-    }
-    storeIntelWord(pFileInFat, 0xffff);                     // last item is 0xffff - EOF (no next sector)
-    
+    storeFatChain (pFat1, prgSectorStart, prgSectorEnd);    // mark PRG location in FAT chain
+
     //-------------
     //and now make copy of FAT1 to FAT2
-    BYTE *pFat2 = pexecImage + (fat2startingSector * 512);
     memcpy(pFat2, pFat1, PEXEC_FAT_BYTES_NEEDED);  
 }
 
-void TranslatedDisk::createDirEntry(bool isRoot, bool isDir, WORD date, WORD time, DWORD fileSize, char *dirEntryName, DWORD thisSectorNo)
+void TranslatedDisk::storeFatChain(BYTE *pbFat, WORD sectorStart, WORD sectorEnd)
 {
-    BYTE  *pSector     = pexecImage + (thisSectorNo * 512);          // get pointer to this sector
-    DWORD nextSectorNo = thisSectorNo + 1;
+    WORD *pwFat = (WORD *) pbFat;
+
+    sectorStart = (sectorStart  < PEXEC_DRIVE_SIZE_SECTORS) ? sectorStart   : (PEXEC_DRIVE_SIZE_SECTORS - 1);
+    sectorEnd   = (sectorEnd    < PEXEC_DRIVE_SIZE_SECTORS) ? sectorEnd     : (PEXEC_DRIVE_SIZE_SECTORS - 1);
+
+    for(int i=sectorStart; i<sectorEnd; i++) {  // go through all the sectors
+        pwFat[i] = i+1;                         // current sector points to next sector
+    }
+
+    pwFat[sectorEnd] = 0xffff;                  // ending sector = last sector in chain marker
+}
+
+void TranslatedDisk::createDirEntry(bool isRoot, bool isDir, WORD date, WORD time, DWORD fileSize, char *dirEntryName, int sectorNoAbs, int sectorNoRel)
+{
+    BYTE  *pSector     = pexecImage + (sectorNoAbs * 512);  // get pointer to this sector
+    DWORD nextSectorNo = sectorNoRel + 1;
     
     memcpy(pSector + 0, dirEntryName, 11);          // filename
     pSector[11] = isDir ? 0x10 : 0x00;              // DIR / File flag

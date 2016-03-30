@@ -290,8 +290,9 @@ private:
     //-----------------------------------
     // helpers for Pexec()
     void onPexec_createImage(BYTE *cmd);
-    void createImage(std::string &fullAtariPath, FILE *f, int fileSize);
-    void createDirEntry(bool isRoot, bool isDir, WORD date, WORD time, DWORD fileSize, char *dirEntryName, DWORD thisSectorNo);
+    void createImage(std::string &fullAtariPath, FILE *f, int fileSizeBytes);
+    void createDirEntry(bool isRoot, bool isDir, WORD date, WORD time, DWORD fileSize, char *dirEntryName, int sectorNoAbs, int sectorNoRel);
+    void storeFatChain(BYTE *pbFat, WORD sectorStart, WORD sectorEnd);
     void storeIntelWord (BYTE *p,  WORD a);
     void storeIntelDword(BYTE *p, DWORD a);
 
