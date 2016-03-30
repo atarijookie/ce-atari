@@ -307,7 +307,16 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, DWORD 
             Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - setting O_NONBLOCK failed, but continuing");
         }
     }
-
+    
+    //------------------
+    int optval = 1;
+    ires = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(int));
+    
+    if(ires == -1) {
+        Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - setsockopt(SO_REUSEADDR) failed with errno: %d", errno);
+    }
+    //------------------
+    
     // fill the local address info
     struct sockaddr_in local_addr;
     memset(&local_addr, '0', sizeof(local_addr)); 
