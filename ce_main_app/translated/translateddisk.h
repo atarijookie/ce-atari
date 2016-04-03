@@ -304,6 +304,7 @@ private:
 
     WORD prgSectorStart;
     WORD prgSectorEnd;
+    int  pexecDriveIndex;
     
     BYTE *pexecImage;
     BYTE *pexecImageReadFlags;

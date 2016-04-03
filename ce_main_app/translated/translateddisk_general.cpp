@@ -39,7 +39,8 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastS
 
     prgSectorStart  = 0;
     prgSectorEnd    = PEXEC_DRIVE_SIZE_SECTORS;
-
+    pexecDriveIndex = -1;
+    
     detachAll();
 
     for(int i=0; i<MAX_FILES; i++) {        // initialize host file structures
@@ -445,7 +446,7 @@ void TranslatedDisk::processCommand(BYTE *cmd)
 
         // Pexec() related stuff
         case GEMDOS_Pexec:          onPexec(cmd);       break;
-        
+
         // custom functions, which are not translated gemdos functions, but needed to do some other work
         case GD_CUSTOM_initialize:      onInitialize();                 break;
         case GD_CUSTOM_getConfig:       onGetConfig(cmd);               break;
@@ -1145,6 +1146,9 @@ char *TranslatedDisk::functionCodeToName(int code)
         case GEMDOS_Tsetdate:           return (char *)"GEMDOS_Tsetdate";
         case GEMDOS_Tgettime:           return (char *)"GEMDOS_Tgettime";
         case GEMDOS_Tsettime:           return (char *)"GEMDOS_Tsettime";
+        
+        case GEMDOS_Pexec:              return (char *)"GEMDOS_Pexec & sub commands";
+        
         case GD_CUSTOM_initialize:      return (char *)"GD_CUSTOM_initialize";
         case GD_CUSTOM_getConfig:       return (char *)"GD_CUSTOM_getConfig";
         case GD_CUSTOM_ftell:           return (char *)"GD_CUSTOM_ftell";

@@ -1401,6 +1401,14 @@ void TranslatedDisk::onGetbpb(BYTE *cmd)
         return;
     }
 
+    if(drive == pexecDriveIndex) {              // if it's Pexec() faked drive, return special Pexec() drvie BPB
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onGetbpb() - it's a Pexec() RAW drive, will return Pexec() RAW drive BPB");
+        onPexec_getBpb(cmd);
+        return;
+    } else {
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onGetbpb() - will return fake translated drive BPB, which is probably wrong (but that shouldn't matter)");
+    }
+    
     // if we got here, we should return the BPB data for this drive
     dataTrans->addDataWord(512);                // bytes per sector
     dataTrans->addDataWord(4);                  // sectors per cluster - just a guess :)

@@ -63,6 +63,9 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
     std::string fullAtariPath;
     res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
 
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - will fake raw drive %c:", 'A' + atariDriveIndex);
+    pexecDriveIndex = atariDriveIndex;                              // we will fake this drive index as RAW drive for Pexec() usage
+    
     if(!res) {                                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - %s - createFullAtariPath failed", (char *) atariName.c_str());
 
@@ -99,9 +102,9 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
     struct stat attr;
     tm *timestr;
 
-	int res = stat(hostName.c_str(), &attr);					    // get the file status
+	int ires = stat(hostName.c_str(), &attr);					    // get the file status
 	
-	if(res != 0) {
+	if(ires != 0) {
 		Debug::out(LOG_ERROR, "TranslatedDisk::onPexec_createImage -- stat() failed, errno %d", errno);
 	}
 
@@ -165,7 +168,13 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
         }
 
         strings[found] = fullAtariPath.substr(start, (pos - start));
-        found++;
+        
+        if(strings[found].length() > 0) {           // valid string?
+            Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - valid string: %s", (char *) strings[found].c_str());
+            found++;
+        } else {
+            Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - invalid string skipped");
+        }
 
         start = pos + 1;
 
@@ -291,19 +300,23 @@ void TranslatedDisk::storeDirEntry(BYTE *pEntry, char *dirEntryName, bool isDir,
 
 void TranslatedDisk::onPexec_getBpb(BYTE *cmd)
 {
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_getBpb() - PEXEC_FAT_SECTORS_NEEDED: %d, PEXEC_DRIVE_SIZE_SECTORS: %d", PEXEC_FAT_SECTORS_NEEDED, PEXEC_DRIVE_SIZE_SECTORS);
+
     #define ROOTDIR_SIZE            1
     #define FAT1_STARTING_SECTOR    4
     
-    dataTrans->addDataWord(512);                        // bytes per sector
-    dataTrans->addDataWord(1);                          // sectors per cluster
-    dataTrans->addDataWord(512);                        // bytes per cluster
-    dataTrans->addDataWord(ROOTDIR_SIZE);               // sector length of root directory
-    dataTrans->addDataWord(PEXEC_FAT_SECTORS_NEEDED);   // sectors per FAT
-    dataTrans->addDataWord(FAT1_STARTING_SECTOR + PEXEC_FAT_SECTORS_NEEDED);                        // starting sector of second FAT
-    dataTrans->addDataWord(FAT1_STARTING_SECTOR + (2 * PEXEC_FAT_SECTORS_NEEDED) + ROOTDIR_SIZE);   // starting sector of data
-    dataTrans->addDataWord(PEXEC_DRIVE_SIZE_SECTORS);   // clusters per disk
-    dataTrans->addDataWord(1);                          // bit 0=1 - 16 bit FAT, else 12 bit
+    dataTrans->addDataWord(512);                                                                    //  0- 1: bytes per sector
+    dataTrans->addDataWord(1);                                                                      //  2- 3: sectors per cluster
+    dataTrans->addDataWord(512);                                                                    //  4- 5: bytes per cluster
+    dataTrans->addDataWord(ROOTDIR_SIZE);                                                           //  6- 7: sector length of root directory
+    dataTrans->addDataWord(PEXEC_FAT_SECTORS_NEEDED);                                               //  8- 9: sectors per FAT
+    dataTrans->addDataWord(FAT1_STARTING_SECTOR + PEXEC_FAT_SECTORS_NEEDED);                        // 10-11: starting sector of second FAT
+    dataTrans->addDataWord(FAT1_STARTING_SECTOR + (2 * PEXEC_FAT_SECTORS_NEEDED) + ROOTDIR_SIZE);   // 12-13: starting sector of data
+    dataTrans->addDataWord(PEXEC_DRIVE_SIZE_SECTORS);                                               // 14-15: clusters per disk
+    dataTrans->addDataWord(1);                                                                      // 16-17: bit 0=1 - 16 bit FAT, else 12 bit
 
+    dataTrans->addDataByte(pexecDriveIndex);                                                        // 18   : index of drive, which will now be RAW Pexec() drive
+    
     dataTrans->padDataToMul16();
     dataTrans->setStatus(E_OK);
 }
@@ -314,7 +327,11 @@ void TranslatedDisk::onPexec_readSector(BYTE *cmd)
     WORD  sectorCount       = Utils::getWord(cmd + 8);
     DWORD byteCount         = sectorCount * 512;
 
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_readSector() - startingSector: %d, sectorCount: %d", startingSector, sectorCount);
+
     if(startingSector + sectorCount > PEXEC_DRIVE_SIZE_SECTORS) {       // would be out of boundary? fail
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_readSector() - out of range!");
+
         dataTrans->setStatus(EINTRN);
         return;
     }
