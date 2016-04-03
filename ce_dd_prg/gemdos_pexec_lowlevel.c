@@ -127,9 +127,14 @@ int32_t custom_pexec_lowlevel( void *sp )
     //----------
     // set the variables
     virtualBpbPointer   = (DWORD) &virtualBpbStruct;        // store pointer to virtual drive BPB
-    virtualDriveIndex   = drive;                            // store number of drive we should emulate
+    virtualDriveIndex   = pDmaBuffer[18];                   // store number of drive we should emulate (should be same as 'drive' variable)
     virtualHddEnabled   = 1;                                // now enable our custom hard drive
     virtualDriveChanged = 2;                                // mark that the virtual drive has changed (2 = MED_CHANGED)
+    
+    #define DRVBITS     ((DWORD *) 0x4c2)
+    DWORD drvBits    = *DRVBITS;                            // read DRVBITS
+    drvBits         |= (1 << virtualDriveIndex);            // add our Pexec() RAW drive
+    *DRVBITS         = drvBits;                             // put it back updated
     
     pexec_callOrig      = 1;                                // now let the original Pexec() do the real work
 	return 0;                       
