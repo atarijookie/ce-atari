@@ -156,7 +156,7 @@ DWORD myRwabs(BYTE *sp)
 	params += 2;
     WORD  device            =          *(( WORD *) params);
     
-    if(!isOurDrive(device, 0)) {                    // not our drive? fail
+    if(!virtualHddEnabled || virtualDriveIndex != device) {         // not our drive? fail
         return -1;
 	}
     

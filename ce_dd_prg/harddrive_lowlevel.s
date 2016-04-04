@@ -11,8 +11,6 @@
 | ------------------------------------------------------	
 
 _installHddLowLevelDriver:
-	movem.l d1/d2, saveregs	    | save registers
-    
     move.l  0x472,      oldGetBpb
     move.l  0x47e,      oldMediach
     move.l  0x476,      oldRwabs    
@@ -20,17 +18,6 @@ _installHddLowLevelDriver:
     move.l  #myGetBpb,  0x472
     move.l  #myMediach, 0x47e
     move.l  #myRwabs,   0x476
-
-    move.w  _virtualDriveIndex, d1  | get our drive index
-    move.l  #1,d2
-    rol.l   d1,d2               | D2 is now bitmask representing our drive
-    
-    move.l  0x4c2, d0           | read DRVBITS
-    or.w    d2, d0              | add drive 'D'
-    move.l  d0, 0x4c2           | put it back
-
-	movem.l saveregs, d1/d2     | restore registers
-    
     rts
     
 | ------------------------------------------------------
@@ -78,7 +65,7 @@ myRwabs:
     move.w  _virtualDriveIndex, d0
     cmp.w   14(sp), d0
     bne     callOldRwabs        | if requested drive is not ours, jump to old
-    
+
     lea     4(sp), a0           | get pointer to first param
     move.l  a0, -(sp)           | store it on stack - it will be the 1st param of the next C _function
     

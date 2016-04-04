@@ -109,39 +109,19 @@ int32_t custom_dgetdrv( void *sp )
 
 int32_t custom_dsetdrv( void *sp )
 {
-	DWORD res;
-
 	// get the drive # from stack 
 	WORD drive = (WORD) *((WORD *) sp);
-	currentDrive = drive;												        // store the drive - GEMDOS seems to let you set even invalid drive 
+	currentDrive = drive;												    // store the drive - GEMDOS seems to let you set even invalid drive 
 	
-	if(!isOurDrive(drive, 0)) {											        // if the drive is not our drive 
-        // note: even though we now know that this drive is not ours, we will let the host know that we've changed the drive
-        commandShort[4] = GEMDOS_Dsetdrv;										// store GEMDOS function number 
-        commandShort[5] = (BYTE) drive;											// store drive number 
-        (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// send command to host over ACSI 
+    useOldGDHandler = 1;
+    Dsetdrv(drive);                                                         // let TOS know the current drive
 
-        CALL_OLD_GD_NORET(Dsetdrv, drive);
-	
-		res = res | ceDrives;											    // mounted drives = original drives + ceDrives 	
-		return res;
-	}
-
-    // in this case the drive is ours, now we even care for the result
     commandShort[4] = GEMDOS_Dsetdrv;										// store GEMDOS function number 
     commandShort[5] = (BYTE) drive;											// store drive number 
-    (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);  // send command to host over ACSI 
+    (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// send command to host over ACSI 
 
-    if(!hdIf.success || hdIf.statusByte == E_NOTHANDLED) {				// not handled or error? 
-		CALL_OLD_GD_NORET(Dsetdrv, drive);
-
-		res = res | ceDrives;											// mounted drives = original drives + ceDrives 	
-		return res;														// return the value returned from old handler 
-	}
-	
-	WORD drivesMap = Drvmap();											// BIOS call - get drives bitmap - this will also communicate with CE 
-	
-	return drivesMap;													// result = original + my drives bitmap 
+	DWORD res = Drvmap();											        // BIOS call - get drives bitmap - this will also communicate with CE 
+    return res;
 }
 
 int32_t custom_dfree( void *sp )
@@ -258,6 +238,10 @@ int32_t custom_dsetpath( void *sp )
 	if(!isOurDrive(drive, 0)) {											    // not our drive? 
 		CALL_OLD_GD( Dsetpath, pPath);
 	}
+    
+    if(virtualHddEnabled && drive == virtualDriveIndex) {                   // if it's on Pexec RAW fake drive, let TOS handle it, too
+        CALL_OLD_GD_VOIDRET(Dsetpath, pPath);
+    }
 	
 	commandShort[4] = GEMDOS_Dsetpath;										// store GEMDOS function number 
 	commandShort[5] = 0;									
