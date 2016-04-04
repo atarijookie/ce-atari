@@ -1367,13 +1367,19 @@ void TranslatedDisk::onDrvMap(BYTE *cmd)
 void TranslatedDisk::onMediach(BYTE *cmd)
 {
     WORD mediach = 0;
-
+    int chgCount = 0;
+    
     for(int i=2; i<MAX_DRIVES; i++) {       // create media changed bits
-        if(conf[i].mediaChanged) {
+        if(conf[i].enabled && conf[i].mediaChanged) {
             mediach |= (1 << i);            // set the bit
+
+            Debug::out(LOG_DEBUG, "TranslatedDisk::onMediach() - drive %c: changed", 'A' + i);
+            chgCount++;
         }
     }
 
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onMediach() - drives changed count: %d", chgCount);
+    
     dataTrans->addDataWord(mediach);
     dataTrans->padDataToMul16();            // pad to multiple of 16
 
@@ -1390,16 +1396,6 @@ void TranslatedDisk::onGetbpb(BYTE *cmd)
     }
 
     conf[drive].mediaChanged = false;               // mark as media not changed
-
-    if(!conf[drive].enabled) {                      // if drive not enabled
-        for(int i=0; i<9; i++) {                    // add empty data - just in case
-            dataTrans->addDataWord(0);
-        }
-        dataTrans->padDataToMul16();
-
-        dataTrans->setStatus(E_NOTHANDLED);
-        return;
-    }
 
     if(drive == pexecDriveIndex) {              // if it's Pexec() faked drive, return special Pexec() drvie BPB
         Debug::out(LOG_DEBUG, "TranslatedDisk::onGetbpb() - it's a Pexec() RAW drive, will return Pexec() RAW drive BPB");
@@ -1421,7 +1417,12 @@ void TranslatedDisk::onGetbpb(BYTE *cmd)
     dataTrans->addDataWord(1);                  // bit 0=1 - 16 bit FAT, else 12 bit
 
     dataTrans->padDataToMul16();
-    dataTrans->setStatus(E_OK);
+    
+    if(!conf[drive].enabled) {                  // if drive not enabled, not handled
+        dataTrans->setStatus(E_NOTHANDLED);
+    } else {                                    // drive enabled, all OK
+        dataTrans->setStatus(E_OK);
+    }
 }
 
 void TranslatedDisk::atariFindAttribsToString(BYTE attr, std::string &out)

@@ -66,6 +66,12 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
     Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - will fake raw drive %c:", 'A' + atariDriveIndex);
     pexecDriveIndex = atariDriveIndex;                              // we will fake this drive index as RAW drive for Pexec() usage
     
+    if(pexecDriveIndex >= 0 && pexecDriveIndex < MAX_DRIVES) {      // if index valid, drive changed
+        conf[pexecDriveIndex].mediaChanged = true;
+    } else {
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - drive %c: seems to be invalid!", 'A' + pexecDriveIndex);
+    }
+    
     if(!res) {                                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - %s - createFullAtariPath failed", (char *) atariName.c_str());
 
