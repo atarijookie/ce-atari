@@ -725,6 +725,13 @@ bool TranslatedDisk::createFullAtariPathAndFullHostPath(std::string inPartialAta
 {
     bool res;
 
+    // initialize variables - in case that anything following fails
+    outFullAtariPath    = "";
+    outAtariDriveIndex  = -1;
+    outFullHostPath     = "";
+    waitingForMount     = false;
+    zipDirNestingLevel  = 0;
+
     // convert partial atari path to full atari path
     res = createFullAtariPath(inPartialAtariPath, outFullAtariPath, outAtariDriveIndex);        
     
@@ -793,7 +800,8 @@ createFullAtariPath_finish:
 
 void TranslatedDisk::createFullHostPath(std::string inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel)
 {
-    zipDirNestingLevel = 0;                                         // no ZIP DIR nesting atm
+    waitingForMount     = false;
+    zipDirNestingLevel  = 0;                                        // no ZIP DIR nesting atm
 
     std::string root = conf[inAtariDriveIndex].hostRootPath;        // get root path
     

@@ -212,7 +212,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
         Debug::out(LOG_DEBUG, "find attribs: 0x%02x -> %s", findAttribs, (char *) atts.c_str());
     }
     
-    bool waitingForMount;
+    bool        waitingForMount;
     int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
     res = createFullAtariPathAndFullHostPath(atariSearchString, fullAtariPath, atariDriveIndex, hostSearchString, waitingForMount, zipDirNestingLevel);
