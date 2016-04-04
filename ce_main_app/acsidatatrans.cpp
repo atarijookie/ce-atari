@@ -378,4 +378,8 @@ void AcsiDataTrans::sendStatusAfterWrite(void)
 #endif
 }
 
+DWORD AcsiDataTrans::getCount(void)
+{
+    return count;
+}
 

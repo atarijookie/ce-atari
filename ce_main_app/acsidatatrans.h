@@ -65,6 +65,8 @@ public:
     
 	void dumpDataOnce(void);
 
+    DWORD getCount(void);
+    
 private:
     BYTE    *buffer;
     DWORD   count;

@@ -134,6 +134,22 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
     
     createImage(fullAtariPath, f, fileSizeBytes, atariTime, atariDate); // now create the image    
     
+    //------------
+    // get path to PRG and store it
+    Utils::splitFilenameFromPath(fullAtariPath, pexecPrgPath, pexecPrgFilename);
+    
+    if(pexecPrgPath.length() > 1) {
+        int  lastCharIndex  = pexecPrgPath.length() - 1;
+        
+        if(pexecPrgPath[lastCharIndex] == HOSTPATH_SEPAR_CHAR) {    // if the string terminated with path separator, remove it
+            pexecPrgPath.erase(lastCharIndex);
+        }
+    }
+    pathSeparatorHostToAtari(pexecPrgPath);                         // change '/' to '\'
+    
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - pexecPrgPath: %s", (char *) pexecPrgPath.c_str());
+    //------------
+    
     fclose(f);                                                      // close the file
     dataTrans->setStatus(E_OK);                                     // ok!
 }
@@ -322,6 +338,23 @@ void TranslatedDisk::onPexec_getBpb(BYTE *cmd)
     dataTrans->addDataWord(1);                                                                      // 16-17: bit 0=1 - 16 bit FAT, else 12 bit
 
     dataTrans->addDataByte(pexecDriveIndex);                                                        // 18   : index of drive, which will now be RAW Pexec() drive
+    
+    int i;
+    DWORD gotCnt;
+    gotCnt = dataTrans->getCount();
+    for(i=gotCnt; i<32; i++) {                                                                      // ??-31: zeros
+        dataTrans->addDataByte(0);
+    }
+    
+    dataTrans->addDataBfr((BYTE *) pexecPrgPath.c_str(), pexecPrgPath.length() + 1, false);         // 32 .. ??: path to PRG file
+    
+    gotCnt = dataTrans->getCount();
+    for(i=gotCnt; i<256; i++) {                                                                     // ??-255: zeros
+        dataTrans->addDataByte(0);
+    }
+
+    dataTrans->addDataBfr((BYTE *) pexecPrgFilename.c_str(), pexecPrgFilename.length() + 1, false); // 256 .. ??: path to PRG file
+    dataTrans->dumpDataOnce();
     
     dataTrans->padDataToMul16();
     dataTrans->setStatus(E_OK);

@@ -306,6 +306,9 @@ private:
     WORD prgSectorEnd;
     int  pexecDriveIndex;
     
+    std::string pexecPrgPath;
+    std::string pexecPrgFilename;
+    
     BYTE *pexecImage;
     BYTE *pexecImageReadFlags;
     //-----------------------------------
