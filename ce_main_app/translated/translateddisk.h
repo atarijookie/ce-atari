@@ -139,6 +139,10 @@ public:
     
     bool createFullAtariPathAndFullHostPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
 
+    // for status report
+    bool driveIsEnabled(int driveIndex);
+    void driveGetReport(int driveIndex, std::string &reportString);
+
 private:
 	void mountAndAttachSharedDrive(void);
 	void attachConfigDrive(void);

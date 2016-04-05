@@ -45,6 +45,9 @@ extern SharedObjects shared;
 
 bool inetIfaceReady(const char* ifrname);
 
+bool state_eth0     = false;
+bool state_wlan0    = false;
+
 void handleConfigStreams(ConfigStream *cs, int fd1, int fd2);
 void updateUpdateState(void);
 void checkInetIfEnabled(void);
@@ -144,9 +147,6 @@ void *periodicThreadCode(void *ptr)
 void checkInetIfEnabled(void)
 {
 	//up/running state of inet interfaces
-	static bool  state_eth0     = false;
-	static bool  state_wlan0    = false;
-
     bool state_temp 		= 	inetIfaceReady("eth0"); 
     bool change_to_enabled	= 	(state_eth0!=state_temp)&&!state_eth0; 	    //was this iface disabled and current state changed to enabled?
     state_eth0 				= 	state_temp; 

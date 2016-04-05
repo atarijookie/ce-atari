@@ -1510,3 +1510,38 @@ void TranslatedDisk::doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath
         // if mounted, it continues here
     }
 }
+
+bool TranslatedDisk::driveIsEnabled(int driveIndex)
+{
+    if(driveIndex < 0 || driveIndex >= MAX_DRIVES) {        // out of bounds? fail
+        return false;
+    }
+
+    return conf[driveIndex].enabled;
+}
+
+void TranslatedDisk::driveGetReport(int driveIndex, std::string &reportString)
+{
+    reportString = "";
+
+    if(driveIndex < 0 || driveIndex >= MAX_DRIVES) {        // out of bounds? fail
+        return;
+    }
+
+    if(!conf[driveIndex].enabled) {                         // not enabled? fail
+        return;
+    }
+
+	char *trTypeStr[4] = {(char *) "", (char *) "USB drive", (char *) "shared drive", (char *) "config drive"};
+	
+  	int  typeIndex  = conf[driveIndex].translatedType + 1;
+	char *typeStr   = trTypeStr[typeIndex];
+
+	char tmp[256];
+    sprintf(tmp, "%s, mount point: %s", typeStr, (char *) conf[driveIndex].hostRootPath.c_str());
+    reportString = tmp;
+}
+
+
+
+

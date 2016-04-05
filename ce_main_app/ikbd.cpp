@@ -26,6 +26,7 @@
 #include "ikbd.h"
 #include "settings.h"
 #include "datatypes.h"
+#include "statusreport.h"
 
 extern volatile sig_atomic_t sigintReceived;
 volatile bool do_loadIkbdConfig = false;
@@ -277,6 +278,9 @@ void Ikbd::processStCommands(void)
     if(cbStCommands.count <= 0) {                               // no data? quit
         return;
     }
+
+    statuses.ikbdSt.aliveTime = Utils::getCurrentMs();
+    statuses.ikbdSt.aliveSign = ALIVE_IKBD_CMD;
 
     while(cbStCommands.count > 0) {                             // while there are some data, process
         BYTE cmd = peekCyclicBuffer(&cbStCommands);             // get the data, but don't move the get pointer, because we might fail later
@@ -805,6 +809,9 @@ void Ikbd::processMouse(input_event *ev)
     if(ev->type == EV_KEY) {		// on button press
 	    int btnNew = mouseBtnNow;
 		
+        statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
+        statuses.ikbdUsb.aliveSign = ALIVE_MOUSEBTN;
+
 		BYTE absButtons = 0;
 		
 	    switch(ev->code) {
@@ -866,6 +873,9 @@ void Ikbd::processMouse(input_event *ev)
 	}
 		
 	if(ev->type == EV_REL) {
+        statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
+        statuses.ikbdUsb.aliveSign = ALIVE_MOUSEMOVE;
+
 		if(ev->code == REL_X) {
             // update absolute position
             absMouse.x += ev->value;
@@ -893,6 +903,9 @@ void Ikbd::processKeyboard(input_event *ev)
 //    ikbdLog("processKeyboard");
     
     if (ev->type == EV_KEY) {
+        statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
+        statuses.ikbdUsb.aliveSign = ALIVE_KEYDOWN;
+
         if(ev->code >= KEY_TABLE_SIZE) {        // key out of index? quit
             return;
         }
@@ -936,12 +949,18 @@ void Ikbd::processJoystick(js_event *jse, int joyNumber)
     }
 
     if(jse->type == JS_EVENT_AXIS) {
+        statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
+        statuses.ikbdUsb.aliveSign = ALIVE_JOYMOVE;
+
         if(jse->number >= JOYAXIS) {                // if the index of axis would be out of index, quit
             return;
         } 
 
 	    js->axis[ jse->number ] = jse->value;       // store new axis value
     } else if(jse->type == JS_EVENT_BUTTON) {
+        statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
+        statuses.ikbdUsb.aliveSign = ALIVE_JOYBTN;
+
         if(jse->number >= JOYBUTTONS) {             // if the index of button would be out of index, quit
             return;
         } 

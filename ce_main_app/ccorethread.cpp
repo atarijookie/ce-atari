@@ -17,6 +17,7 @@
 #include "update.h"
 #include "config/netsettings.h"
 #include "ce_conf_on_rpi.h" 
+#include "statusreport.h"
 
 #include "periodicthread.h"
 
@@ -332,6 +333,9 @@ void CCoreThread::run(void)
 		if(res) {									    // HANS is signaling attention?
 			gotAtn = true;							    // we've some ATN
 
+            statuses.hans.aliveTime = now;
+            statuses.hans.aliveSign = ALIVE_CMD;
+
 			switch(inBuff[3]) {
 			case ATN_FW_VERSION:
                     lastFwInfoTime.hans = Utils::getCurrentMs();
@@ -341,6 +345,9 @@ void CCoreThread::run(void)
 			case ATN_ACSI_COMMAND:
                     dbgVars.isInHandleAcsiCommand = 1;
                     
+                    statuses.hdd.aliveTime = now;
+                    statuses.hdd.aliveSign = ALIVE_RW;
+
                     handleAcsiCommand();
                     
                     dbgVars.isInHandleAcsiCommand = 0;
@@ -377,6 +384,9 @@ void CCoreThread::run(void)
 		if(res) {									// FRANZ is signaling attention?
 			gotAtn = true;							// we've some ATN
 
+            statuses.franz.aliveTime = now;
+            statuses.franz.aliveSign = ALIVE_CMD;
+
 			switch(inBuff[3]) {
 			case ATN_FW_VERSION:                    // device has sent FW version
                 lastFwInfoTime.franz = Utils::getCurrentMs();
@@ -384,10 +394,16 @@ void CCoreThread::run(void)
 				break;
 
             case ATN_SECTOR_WRITTEN:                // device has sent written sector data
+                statuses.fdd.aliveTime = now;
+                statuses.fdd.aliveSign = ALIVE_WRITE;
+
                 handleSectorWritten();
                 break;
 
 			case ATN_SEND_TRACK:                    // device requests data of a whole track
+                statuses.fdd.aliveTime = now;
+                statuses.fdd.aliveSign = ALIVE_READ;
+
 				handleSendTrack();
 				break;
 
