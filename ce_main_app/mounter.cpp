@@ -185,12 +185,10 @@ bool Mounter::mountDevice(char *devicePath, char *mountDir)
 	}
 
     // was: sudo
-	snprintf(cmd, MAX_STR_SIZE, "mount -v %s %s >> %s 2>> %s", devicePath, mountDir, LOGFILE1, LOGFILE2);
-
-	int len = strnlen(cmd, MAX_STR_SIZE);	// get the length
+	int len = snprintf(cmd, MAX_STR_SIZE, "mount -v %s %s >> %s 2>> %s", devicePath, mountDir, LOGFILE1, LOGFILE2);
 
 	// if the final command string did not fit in the buffer
-	if(len == MAX_STR_SIZE) {
+	if(len >= MAX_STR_SIZE) {
 		Debug::out(LOG_ERROR, "Mounter::mountDevice - cmd string not large enough for mount!\n");
 		return false;
 	}
@@ -215,9 +213,9 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
         }
     } else {                                // got user name?
         if(strlen(password) == 0) {         // don't have password?
-            snprintf(auth, MAX_STR_SIZE, ",username=%s", username);
+            snprintf(auth, MAX_STR_SIZE, ",username='%s'", username);
         } else {                            // and got password?
-            snprintf(auth, MAX_STR_SIZE, ",username=%s,password=%s", username, password);
+            snprintf(auth, MAX_STR_SIZE, ",username='%s',password='%s'", username, password);
         }
     }
 	
@@ -231,7 +229,7 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 		
 	if(nfsNotSamba) {		// for NFS
         // was: sudo
-		snprintf(cmd, MAX_STR_SIZE, "mount -v -t nfs -o nolock%s %s %s >> %s 2>> %s", auth, source, mountDir, LOGFILE1, LOGFILE2);
+		len = snprintf(cmd, MAX_STR_SIZE, "mount -v -t nfs -o nolock%s %s %s >> %s 2>> %s", auth, source, mountDir, LOGFILE1, LOGFILE2);
 	} else {				// for Samba
 		passwd *psw = getpwnam("pi");
 		
@@ -241,13 +239,11 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 		}
         
         // was: sudo
-		snprintf(cmd, MAX_STR_SIZE, "mount -v -t cifs -o gid=%d,uid=%d%s %s %s >> %s 2>> %s", psw->pw_gid, psw->pw_uid, auth, source, mountDir, LOGFILE1, LOGFILE2);
+		len = snprintf(cmd, MAX_STR_SIZE, "mount -v -t cifs -o gid=%d,uid=%d%s \"%s\" \"%s\" >> %s 2>> %s", psw->pw_gid, psw->pw_uid, auth, source, mountDir, LOGFILE1, LOGFILE2);
 	}
 
-	len = strnlen(cmd, MAX_STR_SIZE);	// get the length
-
 	// if the final command string did not fit in the buffer
-	if(len == MAX_STR_SIZE) {
+	if(len >= MAX_STR_SIZE) {
 		Debug::out(LOG_ERROR, "Mounter::mountShared - cmd string not large enough for mount!\n");
 		return false;
 	}
