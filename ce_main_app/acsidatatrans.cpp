@@ -383,3 +383,9 @@ DWORD AcsiDataTrans::getCount(void)
     return count;
 }
 
+void AcsiDataTrans::addZerosUntilSize(DWORD finalBufferCnt)
+{
+    while(count < finalBufferCnt) {         // add zeros until we don't have enough
+        addDataByte(0);
+    }
+}

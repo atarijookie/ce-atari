@@ -54,6 +54,8 @@ public:
     void addDataByte(BYTE val);
     void addDataWord(WORD val);
     void addDataDword(DWORD val);
+    
+    void addZerosUntilSize(DWORD finalBufferCnt);
 
     void addDataBfr(BYTE *data, DWORD cnt, bool padToMul16);
 	

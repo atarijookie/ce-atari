@@ -313,6 +313,7 @@ private:
     
     std::string pexecPrgPath;
     std::string pexecPrgFilename;
+    std::string pexecFakeRootPath;
     
     BYTE *pexecImage;
     BYTE *pexecImageReadFlags;

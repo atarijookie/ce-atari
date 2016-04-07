@@ -21,10 +21,14 @@
 extern THwConfig hwConfig;
 extern InterProcessEvents events;
 
+// if PEXEC_FULL_PATH, then RAW IMAGE will contain full path -> \FULL\PATH\TO\MY.PRG will be created
+//#define PEXEC_FULL_PATH    
+    
 /* Pexec() related sub commands:
-    - create image for Pexec() - WRITE
-    - GetBpb()                 - READ
-    - read sector              - READ (WORD sectorStart, WORD sectorCount)
+    - create image for Pexec()          - WRITE
+    - GetBpb()                          - READ
+    - read sector                       - READ  (WORD sectorStart, WORD sectorCount)
+    - write sector (for debugging only) - WRITE (WORD sectorStart, WORD sectorCount)
 */
 
 void TranslatedDisk::onPexec(BYTE *cmd)
@@ -94,6 +98,26 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
         return;
     }
 	
+    //------------
+    // get path to PRG and store it
+    Utils::splitFilenameFromPath(fullAtariPath, pexecPrgPath, pexecPrgFilename);
+    
+    if(pexecPrgPath.length() > 1) {
+        int  lastCharIndex  = pexecPrgPath.length() - 1;
+        
+        if(pexecPrgPath[lastCharIndex] == HOSTPATH_SEPAR_CHAR) {    // if the string terminated with path separator, remove it
+            pexecPrgPath.erase(lastCharIndex);
+        }
+    }
+    pathSeparatorHostToAtari(pexecPrgPath);                         // change '/' to '\'
+    
+    pexecFakeRootPath    = "X:\\";                                  // create fake short path as if the PRG was always in the root of the drive
+    pexecFakeRootPath   += pexecPrgFilename;
+    pexecFakeRootPath[0] = 'A' + pexecDriveIndex;
+    
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - pexecPrgPath: %s, pexecFakeRootPath: %s", (char *) pexecPrgPath.c_str(), (char *) pexecFakeRootPath.c_str());
+
+    //------------
     // create file and close it
     FILE *f = fopen(hostName.c_str(), "rb");                        // open according to required mode
 
@@ -135,22 +159,6 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
     
     createImage(fullAtariPath, f, fileSizeBytes, atariTime, atariDate); // now create the image    
     
-    //------------
-    // get path to PRG and store it
-    Utils::splitFilenameFromPath(fullAtariPath, pexecPrgPath, pexecPrgFilename);
-    
-    if(pexecPrgPath.length() > 1) {
-        int  lastCharIndex  = pexecPrgPath.length() - 1;
-        
-        if(pexecPrgPath[lastCharIndex] == HOSTPATH_SEPAR_CHAR) {    // if the string terminated with path separator, remove it
-            pexecPrgPath.erase(lastCharIndex);
-        }
-    }
-    pathSeparatorHostToAtari(pexecPrgPath);                         // change '/' to '\'
-    
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - pexecPrgPath: %s", (char *) pexecPrgPath.c_str());
-    //------------
-    
     fclose(f);                                                      // close the file
     dataTrans->setStatus(E_OK);                                     // ok!
 }
@@ -174,11 +182,22 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
     DWORD dataSectorRelative = 1;                                               // relative sector - relative sector numbering from the start of data area (probably #2)
     
     //--------------
-    // split path to dirs
+    BYTE *pFat1 = pexecImage + (fat1startingSector * 512);  // pointer to FAT1
+    BYTE *pFat2 = pexecImage + (fat2startingSector * 512);  // pointer to FAT2
+
+    int curSectorAbs = dataSectorAbsolute;                  // start at root dir
+    int curSectorRel = dataSectorRelative;                  
+    
+    bool isRootDir = true;    
+    //--------------
     #define MAX_DIR_NESTING     64
     std::string strings[MAX_DIR_NESTING];
+    int found = 0;
+    
+#ifdef PEXEC_FULL_PATH    
+    // split path to dirs
     int start = 0, pos;
-    int i, found = 0;
+    int i;
 
     // first split the string by separator
     while(1) {
@@ -216,14 +235,6 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
     
     //--------------
     // first add dirs to image as dir entries
-    BYTE *pFat1 = pexecImage + (fat1startingSector * 512);  // pointer to FAT1
-    BYTE *pFat2 = pexecImage + (fat2startingSector * 512);  // pointer to FAT2
-
-    int curSectorAbs = dataSectorAbsolute;                  // start at root dir
-    int curSectorRel = dataSectorRelative;                  
-    
-    bool isRootDir = true;    
-    
     for(i=0; i<(found-1); i++) {
         Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - LOOP storing DIR ENTRY: %s on curSectorAbs: %d, curSectorRel: %d", (char *) strings[i].c_str(), curSectorAbs, curSectorRel);
 
@@ -238,10 +249,17 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
         curSectorAbs++;
         curSectorRel++;   
     }
-    
+#endif
     //------------
     // then add the file to image as dir entry
+#ifdef PEXEC_FULL_PATH
     Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - LAST storing DIR ENTRY: %s on curSectorAbs: %d, curSectorRel: %d", (char *) strings[found - 1].c_str(), curSectorAbs, curSectorRel);
+#else
+    found = 1;
+    strings[0] = pexecPrgFilename;
+    
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - storing PRG as DIR ENTRY to root: %s on curSectorAbs: %d, curSectorRel: %d", (char *) strings[0].c_str(), curSectorAbs, curSectorRel);
+#endif
 
     createDirEntry(isRootDir, false, atariDate, atariTime, fileSizeBytes, (char *) strings[found - 1].c_str(), curSectorAbs, curSectorRel);
 
@@ -339,22 +357,25 @@ void TranslatedDisk::onPexec_getBpb(BYTE *cmd)
     dataTrans->addDataWord(1);                                                                      // 16-17: bit 0=1 - 16 bit FAT, else 12 bit
 
     dataTrans->addDataByte(pexecDriveIndex);                                                        // 18   : index of drive, which will now be RAW Pexec() drive
+    dataTrans->addZerosUntilSize(32);                                                               // 19-31: zeros
     
-    int i;
-    DWORD gotCnt;
-    gotCnt = dataTrans->getCount();
-    for(i=gotCnt; i<32; i++) {                                                                      // ??-31: zeros
-        dataTrans->addDataByte(0);
-    }
+    BYTE *pPrgPath;
+    int    prgPathLength;
     
-    dataTrans->addDataBfr((BYTE *) pexecPrgPath.c_str(), pexecPrgPath.length() + 1, false);         // 32 .. ??: path to PRG file
+#ifdef PEXEC_FULL_PATH
+    // if full path, store full path to PRG
+    pPrgPath        = (BYTE *) pexecPrgPath.c_str();
+    prgPathLength   = pexecPrgPath.length();
+#else
+    // if not full path, then store just path to root
+    pPrgPath        = (BYTE *) "\"";
+    prgPathLength   = 1;
+#endif
     
-    gotCnt = dataTrans->getCount();
-    for(i=gotCnt; i<256; i++) {                                                                     // ??-255: zeros
-        dataTrans->addDataByte(0);
-    }
+    dataTrans->addDataBfr(pPrgPath, prgPathLength + 1, false);                                      // 32 .. ??: path to PRG file
 
-    dataTrans->addDataBfr((BYTE *) pexecPrgFilename.c_str(), pexecPrgFilename.length() + 1, false); // 256 .. ??: path to PRG file
+    dataTrans->addZerosUntilSize(256);                                                              // ??-255: zeros
+    dataTrans->addDataBfr((BYTE *) pexecPrgFilename.c_str(), pexecPrgFilename.length() + 1, false); // 256 .. ??: just the PRG filename (without path)
     dataTrans->dumpDataOnce();
     
     dataTrans->padDataToMul16();

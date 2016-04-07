@@ -1390,39 +1390,13 @@ void TranslatedDisk::onGetbpb(BYTE *cmd)
 {
     WORD drive = cmd[5];
 
-    if(drive >= MAX_DRIVES) {                       // index would be out of range?
+    if(drive >= MAX_DRIVES || !conf[drive].enabled) {   // index would be out of range, or drive not enabled?
         dataTrans->setStatus(E_NOTHANDLED);
         return;
     }
 
-    conf[drive].mediaChanged = false;               // mark as media not changed
-
-    if(drive == pexecDriveIndex) {              // if it's Pexec() faked drive, return special Pexec() drvie BPB
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onGetbpb() - it's a Pexec() RAW drive, will return Pexec() RAW drive BPB");
-        onPexec_getBpb(cmd);
-        return;
-    } else {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onGetbpb() - will return fake translated drive BPB, which is probably wrong (but that shouldn't matter)");
-    }
-    
-    // if we got here, we should return the BPB data for this drive
-    dataTrans->addDataWord(512);                // bytes per sector
-    dataTrans->addDataWord(4);                  // sectors per cluster - just a guess :)
-    dataTrans->addDataWord(4 * 512);            // bytes per cluster
-    dataTrans->addDataWord(32);                 // sector length of root directory - this would be 512 entries in root directory
-    dataTrans->addDataWord(8192);               // sectors per FAT - this would be just enough for 1 GB
-    dataTrans->addDataWord(1000 + 8192);        // starting sector of second FAT
-    dataTrans->addDataWord(1000 + 2*8192);      // starting sector of data
-    dataTrans->addDataWord(32000);             	// clusters per disk
-    dataTrans->addDataWord(1);                  // bit 0=1 - 16 bit FAT, else 12 bit
-
-    dataTrans->padDataToMul16();
-    
-    if(!conf[drive].enabled) {                  // if drive not enabled, not handled
-        dataTrans->setStatus(E_NOTHANDLED);
-    } else {                                    // drive enabled, all OK
-        dataTrans->setStatus(E_OK);
-    }
+    conf[drive].mediaChanged = false;                   // mark as media not changed
+    onPexec_getBpb(cmd);                                // let just always use Pexec() RAW drive BPB
 }
 
 void TranslatedDisk::atariFindAttribsToString(BYTE attr, std::string &out)
