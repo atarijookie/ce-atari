@@ -31,12 +31,13 @@ int32_t custom_mediach( void *sp )
     WORD drive = (WORD) *((WORD *) sp);
 
     updateCeDrives();                                                   // update the drives - once per 3 seconds 
-    updateCeMediach();                                                  // update the mediach status - once per 3 seconds 
     
     if(!isOurDrive(drive, 0)) {                                         // if the drive is not our drive 
         CALL_OLD_BIOS(Mediach, drive);                                  // call the original function 
         return res;
     }
+    
+    updateCeMediach();                                                  // update the mediach status - once per 3 seconds 
     
     if((ceMediach & (1 << drive)) != 0) {                               // if bit is set, media changed 
         return 2;
@@ -69,6 +70,9 @@ int32_t custom_getbpb( void *sp )
         CALL_OLD_BIOS(Getbpb, drive);                                   // call the original function 
         return res;
     }
+
+    WORD driveMaskInv = ~(1 << drive);
+    ceMediach = ceMediach & driveMaskInv;                               // this drive is no longer in MEDIA CHANGED state
 
     // create pointer to even address 
     DWORD dwBpb = (DWORD) &bpb[1];

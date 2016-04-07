@@ -72,7 +72,7 @@ BYTE dtaBuffer[DTA_BUFFER_SIZE + 2];
 BYTE *pDtaBuffer;
 BYTE fsnextIsForUs;
 
-WORD ceDrives;
+extern WORD ceDrives;
 WORD ceMediach;
 BYTE currentDrive;
 WORD driveMap;

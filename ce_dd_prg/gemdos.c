@@ -68,10 +68,6 @@ void fseek_hdif_command(int32_t offset, BYTE ceHandle, BYTE seekMode);
 void showWaitSymbol(BYTE showNotHide);
 void msleepInSuper(int ms);
 
-extern WORD virtualDriveIndex;
-extern WORD virtualHddEnabled;
-extern WORD virtualDriveChanged;
-
 // ------------------------------------------------------------------ 
 // fot fake Pexec() and Pterm() handling
 void    installHddLowLevelDriver(void);
@@ -239,10 +235,6 @@ int32_t custom_dsetpath( void *sp )
 		CALL_OLD_GD( Dsetpath, pPath);
 	}
     
-    if(virtualHddEnabled && drive == virtualDriveIndex) {                   // if it's on Pexec RAW fake drive, let TOS handle it, too
-        CALL_OLD_GD_VOIDRET(Dsetpath, pPath);
-    }
-	
 	commandShort[4] = GEMDOS_Dsetpath;										// store GEMDOS function number 
 	commandShort[5] = 0;									
 	
@@ -981,8 +973,6 @@ void initFunctionTable(void)
 	gemdos_table[GEMDOS_pterm0]     = 0;
 
     virtualDriveIndex               = 0xffff;   // for now - nothing (no drive)
-    virtualHddEnabled               = 0;
-    virtualDriveChanged             = 0;
     
     Supexec(installHddLowLevelDriver);
 #endif

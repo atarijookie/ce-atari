@@ -39,6 +39,8 @@ extern BYTE commandShort[CMD_LENGTH_SHORT];
 extern BYTE commandLong[CMD_LENGTH_LONG];
 
 extern WORD ceDrives;
+extern WORD ceMediach;
+
 extern BYTE currentDrive;
 
 #define PE_LOADGO		0
@@ -49,12 +51,7 @@ extern BYTE currentDrive;
 
 extern WORD pexec_callOrig;
 
-       _BPB  virtualBpbStruct;
-extern DWORD virtualBpbPointer;
-       
 extern WORD virtualDriveIndex;
-extern WORD virtualHddEnabled;
-extern WORD virtualDriveChanged;
 
 #define PEXEC_CREATE_IMAGE      0
 #define PEXEC_GET_BPB           1
@@ -62,6 +59,8 @@ extern WORD virtualDriveChanged;
 
 static BYTE readRwabsSectors(WORD startingSector, WORD sectorCount, BYTE *pBuffer);
 extern BYTE FastRAMBuffer[]; 
+
+char fakePrgPath[256];
 
 // ------------------------------------------------------------------ 
 // LONG Pexec( mode, fname, cmdline, envstr )
@@ -77,8 +76,6 @@ int32_t custom_pexec_lowlevel( void *sp )
 	params += 2;
     fname	= (char *)	*((DWORD *) params);
 
-    virtualHddEnabled = 0;                                  // disable our custom hard drive
-    
 	// for any other than these modes don't do anything special, just call the original
 	if(mode != PE_LOADGO && mode != PE_LOAD) {              // not one of 2 supported modes? Call original Pexec()
         pexec_callOrig = 1;                                 // will call the original Pexec() handler from asm when this finishes
@@ -122,27 +119,42 @@ int32_t custom_pexec_lowlevel( void *sp )
         return 0;
 	}
     
-    memcpy(&virtualBpbStruct, pDmaBuffer, sizeof(_BPB));    // copy in the BPB
-    
     //----------
     // set the variables
-    virtualBpbPointer   = (DWORD) &virtualBpbStruct;        // store pointer to virtual drive BPB
     virtualDriveIndex   = pDmaBuffer[18];                   // store number of drive we should emulate (should be same as 'drive' variable)
-    virtualHddEnabled   = 1;                                // now enable our custom hard drive
-    virtualDriveChanged = 2;                                // mark that the virtual drive has changed (2 = MED_CHANGED)
+
+    updateCeMediach();                                      // update the mediach status - once per 3 seconds 
+    ceMediach       |= (1 << virtualDriveIndex);            // this drive has in MEDIA CHANGE
+
+    //----------
+#define PEXEC_FAKE_ROOT_PATH
     
+#ifdef PEXEC_FAKE_ROOT_PATH
+    // if should fake root path location of PRG, then copy the new fake path to original path
+    char *pFakePath = (char *) pDmaBuffer + 384;
+    int   fakeLen   = strlen(pFakePath);
+    
+    memcpy(fakePrgPath, pFakePath, fakeLen + 1);            // copy it to temporary buffer
+    
+    DWORD *pSpFakePath  = (DWORD *) (((BYTE *) sp) + 2);    // pointer to stack, where the pointer to filename is
+    *pSpFakePath        = (DWORD) fakePrgPath;              // now update the value under the pointer, so the filename on stack will now point to fakePrgPath instead of original pointer
+#endif
+
+    //----------
+    // set DRVBITS variable
     #define DRVBITS     ((DWORD *) 0x4c2)
     DWORD drvBits    = *DRVBITS;                            // read DRVBITS
     drvBits         |= (1 << virtualDriveIndex);            // add our Pexec() RAW drive
     *DRVBITS         = drvBits;                             // put it back updated
     
+    //----------
     pexec_callOrig      = 1;                                // now let the original Pexec() do the real work
 	return 0;                       
 }
 
 //--------------------------------------------------
 
-DWORD myRwabs(BYTE *sp)
+DWORD myCRwabs(BYTE *sp)
 {
 	BYTE *params = (BYTE *) sp;
     
@@ -156,15 +168,11 @@ DWORD myRwabs(BYTE *sp)
 	params += 2;
     WORD  device            =          *(( WORD *) params);
     
-    if(!virtualHddEnabled || virtualDriveIndex != device) {         // not our drive? fail
+    if(virtualDriveIndex != device) {       // not our drive? fail
         return -1;
 	}
     
-    if((startingSector + sectorCount) > virtualBpbStruct.numcl) {  // out of range?
-        return -1;
-    }
-    
-    if(mode & 1) {                                  // write (from ST to drive)? Not supported.
+    if(mode & 1) {                          // write (from ST to drive)? Not supported.
         return -1;
     }
     

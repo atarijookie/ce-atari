@@ -1,13 +1,11 @@
 
     .globl  _installHddLowLevelDriver
     .globl  _virtualDriveIndex
-    .globl  _virtualGetBpb
-    .globl  _virtualRwabs
 
-    .globl  _virtualHddEnabled
-    .globl  _virtualDriveChanged
-    .globl  _virtualBpbPointer
-    
+    .globl  _ceDrives
+    .globl  _custom_getbpb
+    .globl  _custom_mediach
+    .globl  _myCRwabs
 | ------------------------------------------------------	
 
 _installHddLowLevelDriver:
@@ -15,22 +13,33 @@ _installHddLowLevelDriver:
     move.l  0x47e,      oldMediach
     move.l  0x476,      oldRwabs    
     
-    move.l  #myGetBpb,  0x472
-    move.l  #myMediach, 0x47e
-    move.l  #myRwabs,   0x476
+    move.l  #myAsmGetBpb,  0x472
+    move.l  #myAsmMediach, 0x47e
+    move.l  #myAsmRwabs,   0x476
     rts
     
 | ------------------------------------------------------
-myGetBpb:
-    move.w  _virtualHddEnabled, d0
-    tst.w   d0
-    beq     callOldGetBpb               | if virtual hdd not enabled, jump to old
+myAsmGetBpb:
+    movem.l d1,saveregs
 
-    move.w  _virtualDriveIndex, d0
-    cmp.w   4(sp), d0
-    bne     callOldGetBpb               | if requested drive is not ours, jump to old
+    move.w  4(sp), d0           | d0 is drive number
+    move.w  #1, d1
+    lsl.w   d0, d1              | d1 = (1 << drive number) -- drive mask
     
-    move.l  _virtualBpbPointer, d0      | read the pointer to D0 and quit
+    move.w  _ceDrives, d0       | get drives to d0
+    and.w   d1, d0              | get only relevant drive bit
+    
+    movem.l saveregs, d1
+    
+    tst.w   d0                  | is the drive bit is 0 after applying drive mask? 
+    beq     callOldGetBpb       | if this drive is not CE drive, use old GetBbp()
+
+    lea     4(sp), a0           | get pointer to first param
+    move.l  a0, -(sp)           | store it on stack - it will be the 1st param of the next C _function
+    
+    jsr     _custom_getbpb
+
+    add.l   #4, sp              | restore stack addr
     rts
 
 callOldGetBpb:
@@ -38,18 +47,27 @@ callOldGetBpb:
     jmp     (a0)
     
 | ------------------------------------------------------
-myMediach:
-    move.w  _virtualHddEnabled, d0
-    tst.w   d0
-    beq     callOldGetBpb               | if virtual hdd not enabled, jump to old
+myAsmMediach:
+    movem.l d1,saveregs
 
-    move.w  _virtualDriveIndex, d0
-    cmp.w   4(sp), d0
-    bne     callOldMediach              | if requested drive is not ours, jump to old
+    move.w  4(sp), d0           | d0 is drive number
+    move.w  #1, d1
+    lsl.w   d0, d1              | d1 = (1 << drive number) -- drive mask
     
-    clr.l   d0
-    move.w  _virtualDriveChanged, d0    | return the current status of drive changed
-    move.w  #0,_virtualDriveChanged     | not changed in the next call
+    move.w  _ceDrives, d0       | get drives to d0
+    and.w   d1, d0              | get only relevant drive bit
+    
+    movem.l saveregs, d1
+    
+    tst.w   d0                  | is the drive bit is 0 after applying drive mask? 
+    beq     callOldMediach      | if this drive is not CE drive, use old Mediach()
+
+    lea     4(sp), a0           | get pointer to first param
+    move.l  a0, -(sp)           | store it on stack - it will be the 1st param of the next C _function
+    
+    jsr     _custom_mediach
+
+    add.l   #4, sp              | restore stack addr
     rts
 
 callOldMediach:
@@ -57,19 +75,25 @@ callOldMediach:
     jmp     (a0)
 
 | ------------------------------------------------------
-myRwabs:
-    move.w  _virtualHddEnabled, d0
-    tst.w   d0
-    beq     callOldGetBpb       | if virtual hdd not enabled, jump to old
+myAsmRwabs:
+    movem.l d1,saveregs
 
-    move.w  _virtualDriveIndex, d0
-    cmp.w   14(sp), d0
-    bne     callOldRwabs        | if requested drive is not ours, jump to old
+    move.w  14(sp), d0          | d0 is drive number
+    move.w  #1, d1
+    lsl.w   d0, d1              | d1 = (1 << drive number) -- drive mask
+    
+    move.w  _ceDrives, d0       | get drives to d0
+    and.w   d1, d0              | get only relevant drive bit
+    
+    movem.l saveregs, d1
+    
+    tst.w   d0                  | is the drive bit is 0 after applying drive mask? 
+    beq     callOldRwabs        | if this drive is not CE drive, use old Mediach()
 
     lea     4(sp), a0           | get pointer to first param
     move.l  a0, -(sp)           | store it on stack - it will be the 1st param of the next C _function
     
-    jsr     _myRwabs            | it's our drive, call our Rwabs()
+    jsr     _myCRwabs
 
     add.l   #4, sp              | restore stack addr
     rts
@@ -85,10 +109,9 @@ oldGetBpb:              .ds.l   1
 oldMediach:             .ds.l   1
 oldRwabs:               .ds.l   1
 
-_virtualHddEnabled:     .ds.w   1
+_ceDrives:              .ds.w   1
 _virtualDriveIndex:     .ds.w   1
-_virtualDriveChanged:   .ds.w   1
-_virtualBpbPointer:     .ds.l   1
+
 saveregs:               .ds.l   16    
 
 | ------------------------------------------------------	
