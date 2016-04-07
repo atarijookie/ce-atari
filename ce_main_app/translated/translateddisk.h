@@ -303,6 +303,7 @@ private:
 
     void onPexec_getBpb(BYTE *cmd);
     void onPexec_readSector(BYTE *cmd);
+    void onPexec_writeSector(BYTE *cmd);
     
     bool pexecWholeFileWasRead(void);
 

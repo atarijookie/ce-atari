@@ -102,6 +102,7 @@ typedef struct
 #define PEXEC_CREATE_IMAGE      0
 #define PEXEC_GET_BPB           1
 #define PEXEC_READ_SECTOR       2
+#define PEXEC_WRITE_SECTOR      3
 
 //////////////////////////////////////
 

@@ -33,6 +33,7 @@ void TranslatedDisk::onPexec(BYTE *cmd)
         case PEXEC_CREATE_IMAGE:    onPexec_createImage(cmd);   return;
         case PEXEC_GET_BPB:         onPexec_getBpb(cmd);        return;
         case PEXEC_READ_SECTOR:     onPexec_readSector(cmd);    return;
+        case PEXEC_WRITE_SECTOR:    onPexec_writeSector(cmd);   return;
     }
     
     // if came here, bad sub command
@@ -381,6 +382,35 @@ void TranslatedDisk::onPexec_readSector(BYTE *cmd)
     for(int i=0; i<sectorCount; i++) {                                  // now mark those read sectors as already read
         pexecImageReadFlags[startingSector + i] = 1; 
     }
+    
+    dataTrans->setStatus(E_OK);                                         // everything OK
+}
+
+void TranslatedDisk::onPexec_writeSector(BYTE *cmd)
+{
+    WORD  startingSector    = Utils::getWord(cmd + 6);
+    WORD  sectorCount       = Utils::getWord(cmd + 8);
+    DWORD byteCount         = sectorCount * 512;
+
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_writeSector() - startingSector: %d, sectorCount: %d", startingSector, sectorCount);
+
+    if(startingSector + sectorCount > PEXEC_DRIVE_SIZE_SECTORS) {       // would be out of boundary? fail
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_writeSector() - out of range!");
+
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+    
+    bool res = dataTrans->recvData(dataBuffer, byteCount);              // get data from Hans
+
+    if(!res) {
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_writeSector() - failed to receive data...");
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+    
+    BYTE *pSector = pexecImage + (startingSector * 512);                // get pointer to start of the sector
+    memcpy(pSector, dataBuffer, byteCount);
     
     dataTrans->setStatus(E_OK);                                         // everything OK
 }
