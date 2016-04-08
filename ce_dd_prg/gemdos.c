@@ -972,8 +972,6 @@ void initFunctionTable(void)
 	gemdos_table[GEMDOS_pterm]      = 0;
 	gemdos_table[GEMDOS_pterm0]     = 0;
 
-    virtualDriveIndex               = 0xffff;   // for now - nothing (no drive)
-    
     Supexec(installHddLowLevelDriver);
 #endif
     

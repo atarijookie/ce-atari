@@ -1,6 +1,5 @@
 
     .globl  _installHddLowLevelDriver
-    .globl  _virtualDriveIndex
 
     .globl  _ceDrives
     .globl  _custom_getbpb
@@ -20,9 +19,13 @@ _installHddLowLevelDriver:
     
 | ------------------------------------------------------
 myAsmGetBpb:
+    move.w  4(sp), d0           | d0 is drive number
+    
+    cmp.w   #2,d0               | if drive number is less than 2, it's a floppy, call original
+    blo     callOldGetBpb
+    
     movem.l d1,saveregs
 
-    move.w  4(sp), d0           | d0 is drive number
     move.w  #1, d1
     lsl.w   d0, d1              | d1 = (1 << drive number) -- drive mask
     
@@ -43,14 +46,23 @@ myAsmGetBpb:
     rts
 
 callOldGetBpb:
-    move.l  oldGetBpb, a0
-    jmp     (a0)
+    move.l  oldGetBpb, a0       | get old handler to A0
+    
+    move.l  a0,d0
+    tst.l   d0                  | if the old handler is NULL, jump to noOldHandler (do nothing)
+    beq     noOldHandler
+    
+    jmp     (a0)                | jump to old handler
     
 | ------------------------------------------------------
 myAsmMediach:
-    movem.l d1,saveregs
-
     move.w  4(sp), d0           | d0 is drive number
+    
+    cmp.w   #2,d0               | if drive number is less than 2, it's a floppy, call original
+    blo     callOldMediach
+
+    movem.l d1,saveregs
+    
     move.w  #1, d1
     lsl.w   d0, d1              | d1 = (1 << drive number) -- drive mask
     
@@ -71,14 +83,23 @@ myAsmMediach:
     rts
 
 callOldMediach:
-    move.l  oldMediach, a0
-    jmp     (a0)
+    move.l  oldMediach, a0      | get old handler to A0
+    
+    move.l  a0,d0
+    tst.l   d0                  | if the old handler is NULL, jump to noOldHandler (do nothing)
+    beq     noOldHandler
+    
+    jmp     (a0)                | jump to old handler
 
 | ------------------------------------------------------
 myAsmRwabs:
+    move.w  14(sp), d0          | d0 is drive number
+    
+    cmp.w   #2,d0               | if drive number is less than 2, it's a floppy, call original
+    blo     callOldRwabs
+    
     movem.l d1,saveregs
 
-    move.w  14(sp), d0          | d0 is drive number
     move.w  #1, d1
     lsl.w   d0, d1              | d1 = (1 << drive number) -- drive mask
     
@@ -99,9 +120,17 @@ myAsmRwabs:
     rts
 
 callOldRwabs:
-    move.l  oldRwabs, a0
-    jmp     (a0)
+    move.l  oldRwabs, a0        | get old handler to a0
+    
+    move.l  a0,d0
+    tst.l   d0                  | if the old handler is NULL, jump to noOldHandler (do nothing)
+    beq     noOldHandler
+    
+    jmp     (a0)                | jump to old handler
 
+noOldHandler:
+    rts
+    
 | ------------------------------------------------------	
 	.bss
 
@@ -110,7 +139,6 @@ oldMediach:             .ds.l   1
 oldRwabs:               .ds.l   1
 
 _ceDrives:              .ds.w   1
-_virtualDriveIndex:     .ds.w   1
 
 saveregs:               .ds.l   16    
 

@@ -51,8 +51,6 @@ extern BYTE currentDrive;
 
 extern WORD pexec_callOrig;
 
-extern WORD virtualDriveIndex;
-
 #define PEXEC_CREATE_IMAGE      0
 #define PEXEC_GET_BPB           1
 #define PEXEC_READ_SECTOR       2
@@ -121,7 +119,7 @@ int32_t custom_pexec_lowlevel( void *sp )
     
     //----------
     // set the variables
-    virtualDriveIndex   = pDmaBuffer[18];                   // store number of drive we should emulate (should be same as 'drive' variable)
+    int virtualDriveIndex = pDmaBuffer[18];                 // store number of drive we should emulate (should be same as 'drive' variable)
 
     updateCeMediach();                                      // update the mediach status - once per 3 seconds 
     ceMediach       |= (1 << virtualDriveIndex);            // this drive has in MEDIA CHANGE
@@ -168,12 +166,16 @@ DWORD myCRwabs(BYTE *sp)
 	params += 2;
     WORD  device            =          *(( WORD *) params);
     
-    if(virtualDriveIndex != device) {       // not our drive? fail
-        return -1;
+    if((ceDrives & (1 << device)) == 0) {   // not our drive? fail
+        return -5;                          // Bad request
+	}
+    
+    if(ceMediach & (1 << device)) {         // this drive has changed? 
+        return -14;                         // Media change detected
 	}
     
     if(mode & 1) {                          // write (from ST to drive)? Not supported.
-        return -1;
+        return -12;                         // Device is write protected
     }
     
     BYTE  toFastRam     =  (((DWORD) pBuffer) >= 0x1000000) ? TRUE  : FALSE;        // flag: are we reading to FAST RAM?
@@ -195,7 +197,7 @@ DWORD myCRwabs(BYTE *sp)
         }
         
         if(!res) {      // if failed, fail and quit
-            return -1;
+            return -11; // Read fault
         }
         
         sectorCount     -= thisSectorCount;         // now we need to read less sectors

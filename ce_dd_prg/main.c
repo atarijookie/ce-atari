@@ -17,7 +17,7 @@
 #include "main.h"
 
 /* 
- * CosmosEx GEMDOS driver by Jookie, 2013-2015
+ * CosmosEx GEMDOS driver by Jookie, 2013-2016
  * GEMDOS hooks part (assembler and C) by MiKRO (Miro Kropacek), 2013
  */
  
@@ -99,7 +99,7 @@ int main( int argc, char* argv[] )
 
 	// write some header out 
 	Clear_home();
-	(void) Cconws("\33p[ CosmosEx disk driver  ]\r\n[ by Jookie 2013 - 2015 ]\r\n[        ver ");
+	(void) Cconws("\33p[ CosmosEx disk driver  ]\r\n[ by Jookie 2013 - 2016 ]\r\n[        ver ");
     showAppVersion();
     (void) Cconws(" ]\33q\r\n\r\n");
 
