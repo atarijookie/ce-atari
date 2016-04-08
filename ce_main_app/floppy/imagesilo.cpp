@@ -19,6 +19,9 @@
 pthread_mutex_t floppyEncodeThreadMutex = PTHREAD_MUTEX_INITIALIZER;
 std::queue<EncodeRequest> encodeQueue;
 
+SiloSlotSimple  floppyImages[3];
+int             floppyImageSelected = EMPTY_IMAGE_SLOT;  
+
 extern TFlags flags;
 
 volatile bool floppyEncodingRunning;
@@ -121,6 +124,7 @@ ImageSilo::ImageSilo()
 	currentSlot = EMPTY_IMAGE_SLOT;
     reloadProxy = NULL;
 
+    floppyImageSelected = -1;
     //-----------
     // create empty image and encode it (will be used when no slot is selected)
     bool res = FloppySetup::createNewImage(EMPTY_IMAGE_PATH);                   // create empty image in /tmp/ directory
@@ -239,6 +243,8 @@ void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostD
     slots[positionIndex].atariSrcPath   = atariSrcPath;     // from where the file was uploaded:   C:\gamez\bla.st
     slots[positionIndex].hostSrcPath    = hostSrcPath;      // for translated disk, host path:     /mnt/sda/gamez/bla.st
 	
+    floppyImages[positionIndex].imageFile = filename;
+
 	// create and add floppy encode request
 	EncodeRequest er;
 	
@@ -285,6 +291,10 @@ void ImageSilo::swap(int index)
 	a->atariSrcPath.swap(b->atariSrcPath);
 	a->hostSrcPath.swap(b->hostSrcPath);
 
+    for(int i=0; i<3; i++) {
+        floppyImages[i].imageFile = slots[i].imageFile;
+    }
+
     // save it to settings
     saveSettings();
 }
@@ -294,6 +304,8 @@ void ImageSilo::remove(int index)                   // remove image at specified
     if(index < 0 || index > 2) {
         return;
     }
+
+    floppyImages[index].imageFile = "";
 
 	if(slots[index].imageFile.empty()) {			// no image in this slot? skip the rest
 		return;
@@ -323,6 +335,10 @@ void ImageSilo::clearSlot(int index)
 	slots[index].hostDestPath.clear();
 	slots[index].atariSrcPath.clear();
 	slots[index].hostSrcPath.clear();
+
+    if(index >= 0 && index < 3) {
+        floppyImages[index].imageFile.clear();
+    }
 }
 
 BYTE ImageSilo::getSlotBitmap(void)
@@ -341,9 +357,11 @@ BYTE ImageSilo::getSlotBitmap(void)
 void ImageSilo::setCurrentSlot(int index)
 {
     if(index >= 0 && index <= 2) {                      // index good? use it
-    	currentSlot = index;
+    	currentSlot         = index;
+        floppyImageSelected = index;
     } else {                                            // index bad? use slot with empty image
-        currentSlot = EMPTY_IMAGE_SLOT;
+        currentSlot         = EMPTY_IMAGE_SLOT;
+        floppyImageSelected = -1;
     }
     
     slots[currentSlot].encImage.newContent = false;     // current slot content not changed

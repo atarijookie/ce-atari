@@ -166,6 +166,8 @@ typedef struct {
 
 void *ikbdThreadCode(void *ptr);
 
+extern TInputDevice ikbdDevs[INTYPE_MAX+1];
+
 class Ikbd
 {
 public:
@@ -191,7 +193,6 @@ public:
 private:
 	int				ceIkbdMode;
 
-    TInputDevice    inDevs[INTYPE_MAX+1];
     int             tableKeysPcToSt[KEY_TABLE_SIZE];
     int             fdUart;
 

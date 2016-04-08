@@ -131,6 +131,7 @@ void TranslatedDisk::reloadSettings(int type)
         tmpConf[i].enabled          = conf[i].enabled;
         tmpConf[i].hostRootPath     = conf[i].hostRootPath;
         tmpConf[i].translatedType   = conf[i].translatedType;
+        tmpConf[i].devicePath       = conf[i].devicePath;
     }
 
     detachAll();                                // then deinit the conf structures
@@ -143,7 +144,7 @@ void TranslatedDisk::reloadSettings(int type)
             continue;
         }
 
-        res = attachToHostPath(tmpConf[i].hostRootPath, tmpConf[i].translatedType);   // now attach back
+        res = attachToHostPath(tmpConf[i].hostRootPath, tmpConf[i].translatedType, tmpConf[i].devicePath);   // now attach back
 
         if(res) {
             good++;
@@ -200,7 +201,8 @@ void TranslatedDisk::mountAndAttachSharedDrive(void)
 	tmr.mountDir			= mountPath;
 	mountAdd(tmr);
 
-	bool res = attachToHostPath(mountPath, TRANSLATEDTYPE_SHAREDDRIVE);	// try to attach
+    std::string devicePath = std::string(nfsNotSamba ? "NFS: " : "samba: ") + addr + std::string(" + ") + path;
+	bool res = attachToHostPath(mountPath, TRANSLATEDTYPE_SHAREDDRIVE, devicePath);	// try to attach
 
 	if(!res) {																// if didn't attach, skip the rest
 		Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: failed to attach shared drive %s", (char *) mountPath.c_str());
@@ -210,14 +212,14 @@ void TranslatedDisk::mountAndAttachSharedDrive(void)
 void TranslatedDisk::attachConfigDrive(void)
 {
     std::string configDrivePath = CONFIG_DRIVE_PATH;
-	bool res = attachToHostPath(configDrivePath, TRANSLATEDTYPE_CONFIGDRIVE);   // try to attach
+	bool res = attachToHostPath(configDrivePath, TRANSLATEDTYPE_CONFIGDRIVE, configDrivePath);   // try to attach
 
 	if(!res) {																                // if didn't attach, skip the rest
 		Debug::out(LOG_ERROR, "attachConfigDrive: failed to attach config drive %s", (char *) configDrivePath.c_str());
 	}
 }
 
-bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedType)
+bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedType, std::string devicePath)
 {
     int index = -1;
 
@@ -229,7 +231,7 @@ bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedTy
     // are we attaching shared drive?
     if(translatedType == TRANSLATEDTYPE_SHAREDDRIVE) {
         if(driveLetters.shared > 0) {                       // we have shared drive letter defined
-            attachToHostPathByIndex(driveLetters.shared, hostRootPath, translatedType);
+            attachToHostPathByIndex(driveLetters.shared, hostRootPath, translatedType, devicePath);
 
             return true;
         } else {
@@ -240,7 +242,7 @@ bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedTy
     // are we attaching config drive?
     if(translatedType == TRANSLATEDTYPE_CONFIGDRIVE) {
         if(driveLetters.confDrive > 0) {              // we have config drive letter defined
-            attachToHostPathByIndex(driveLetters.confDrive, hostRootPath, translatedType);
+            attachToHostPathByIndex(driveLetters.confDrive, hostRootPath, translatedType, devicePath);
 
             return true;
         } else {
@@ -276,11 +278,11 @@ bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedTy
         return false;
     }
 
-    attachToHostPathByIndex(index, hostRootPath, translatedType);
+    attachToHostPathByIndex(index, hostRootPath, translatedType, devicePath);
     return true;
 }
 
-void TranslatedDisk::attachToHostPathByIndex(int index, std::string hostRootPath, int translatedType)
+void TranslatedDisk::attachToHostPathByIndex(int index, std::string hostRootPath, int translatedType, std::string devicePath)
 {
     if(index < 0 || index > MAX_DRIVES) {
         return;
@@ -288,6 +290,7 @@ void TranslatedDisk::attachToHostPathByIndex(int index, std::string hostRootPath
 
 	conf[index].dirTranslator.clear();
     conf[index].enabled             = true;
+    conf[index].devicePath          = devicePath;
     conf[index].hostRootPath        = hostRootPath;
     conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
     conf[index].translatedType      = translatedType;
@@ -1538,7 +1541,7 @@ void TranslatedDisk::driveGetReport(int driveIndex, std::string &reportString)
 	char *typeStr   = trTypeStr[typeIndex];
 
 	char tmp[256];
-    sprintf(tmp, "%s, mount point: %s", typeStr, (char *) conf[driveIndex].hostRootPath.c_str());
+    sprintf(tmp, "%s, device: %s", typeStr, (char *) conf[driveIndex].devicePath.c_str());
     reportString = tmp;
 }
 

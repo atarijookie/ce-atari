@@ -55,21 +55,30 @@ extern volatile TStatuses statuses;
 #define REPORTFORMAT_HTML       1
 #define REPORTFORMAT_JSON       2
 
+#define TEXT_COL1_WIDTH     40
+#define TEXT_COL2_WIDTH     20
+#define TEXT_COL3_WIDTH     20
+
 class StatusReport {
 public:
     void createReport(std::string &report, int reportFormat);
 
 private:
+    int  noOfElements;
+    int  noOfSections;
+
     void startReport    (std::string &report, int reportFormat);
     void endReport      (std::string &report, int reportFormat);
     
     void startSection   (std::string &report, const char *sectionName,  int reportFormat);
     void endSection     (std::string &report,                           int reportFormat);
 
+    void putStatusHeader(std::string &report, int reportFormat);
     void dumpStatus     (std::string &report, const char *desciprion, volatile TStatus &status, int reportFormat);
-    void dumpPair       (std::string &report, const char *key,               const char *value, int reportFormat);
+    void dumpPair       (std::string &report, const char *key,               const char *value, int reportFormat, int len1=TEXT_COL1_WIDTH, int len2=TEXT_COL2_WIDTH);
 
     const char *aliveSignIntToString(int aliveSign);
+          char *fixStringToLength(const char *inStr, int len);
 };
 
 #endif

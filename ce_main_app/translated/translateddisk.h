@@ -31,6 +31,7 @@ typedef struct {
     bool        enabled;
     bool        mediaChanged;
 
+    std::string devicePath;                 // where the device is
     std::string hostRootPath;               // where is the root on host file system
     char        stDriveLetter;              // what letter will be used on ST
     std::string currentAtariPath;           // what is the current path on this drive
@@ -42,6 +43,7 @@ typedef struct {
 
 typedef struct {
     bool        enabled;
+    std::string devicePath;                 // where the device is
     std::string hostRootPath;               // where is the root on host file system
     int         translatedType;             // normal / shared / config
 } TranslatedConfTemp;
@@ -125,7 +127,7 @@ public:
 
     void processCommand(BYTE *cmd);
 
-    bool attachToHostPath(std::string hostRootPath, int translatedType);
+    bool attachToHostPath(std::string hostRootPath, int translatedType, std::string devicePath);
     void detachFromHostPath(std::string hostRootPath);
     void detachAll(void);
     void detachAllUsbMedia(void);
@@ -249,7 +251,7 @@ private:
     void closeFileByIndex(int index);
     void closeAllFiles(void);
 
-    void attachToHostPathByIndex(int index, std::string hostRootPath, int translatedType);
+    void attachToHostPathByIndex(int index, std::string hostRootPath, int translatedType, std::string devicePath);
     void detachByIndex(int index);
     bool isAlreadyAttached(std::string hostRootPath);
 

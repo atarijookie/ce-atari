@@ -28,6 +28,8 @@
 #include "datatypes.h"
 #include "statusreport.h"
 
+TInputDevice ikbdDevs[INTYPE_MAX+1];
+
 extern volatile sig_atomic_t sigintReceived;
 volatile bool do_loadIkbdConfig = false;
 
@@ -1205,8 +1207,8 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
     char *what;
 
     if(strstr(linkName, "/tmp/vdev/mouse") != NULL && in==NULL) {             // it's a mouse
-        if(inDevs[INTYPE_VDEVMOUSE].fd == -1) {             // don't have mouse?
-            in = &inDevs[INTYPE_VDEVMOUSE];
+        if(ikbdDevs[INTYPE_VDEVMOUSE].fd == -1) {             // don't have mouse?
+            in = &ikbdDevs[INTYPE_VDEVMOUSE];
             what = (char *) "/tmp/vdev/mouse";
         } else {                                        // already have a mouse?
             return;
@@ -1214,8 +1216,8 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
     }
 
     if(strstr(linkName, "/tmp/vdev/kbd") != NULL && in==NULL) {               // it's a keyboard?
-        if(inDevs[INTYPE_VDEVKEYBOARD].fd == -1) {          // don't have keyboard?
-            in = &inDevs[INTYPE_VDEVKEYBOARD];
+        if(ikbdDevs[INTYPE_VDEVKEYBOARD].fd == -1) {          // don't have keyboard?
+            in = &ikbdDevs[INTYPE_VDEVKEYBOARD];
             what = (char *) "/tmp/vdev/keyboard";         
         } else {                                        // already have a keyboard?
             return;
@@ -1223,8 +1225,8 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
     }
 
     if(strstr(linkName, "mouse") != NULL && in==NULL) {             // it's a mouse
-        if(inDevs[INTYPE_MOUSE].fd == -1) {             // don't have mouse?
-            in = &inDevs[INTYPE_MOUSE];         
+        if(ikbdDevs[INTYPE_MOUSE].fd == -1) {             // don't have mouse?
+            in = &ikbdDevs[INTYPE_MOUSE];         
             what = (char *) "mouse";
         } else {                                        // already have a mouse?
             return;
@@ -1232,8 +1234,8 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
     }
 
     if(strstr(linkName, "kbd") != NULL && in==NULL) {               // it's a keyboard?
-        if(inDevs[INTYPE_KEYBOARD].fd == -1) {          // don't have keyboard?
-            in = &inDevs[INTYPE_KEYBOARD];
+        if(ikbdDevs[INTYPE_KEYBOARD].fd == -1) {          // don't have keyboard?
+            in = &ikbdDevs[INTYPE_KEYBOARD];
             what = (char *) "keyboard";         
         } else {                                        // already have a keyboard?
             return;
@@ -1241,19 +1243,19 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
     }
 
     if(strstr(linkName, "joystick") != NULL && in==NULL) {                  // it's a joystick?
-        if(inDevs[joy1st].fd == -1) {                                       // don't have joystick 1?
-            if(strcmp(fullPath, inDevs[joy2nd].devPath) == 0) {             // if this device is already connected as joystick 2, skip it
+        if(ikbdDevs[joy1st].fd == -1) {                                       // don't have joystick 1?
+            if(strcmp(fullPath, ikbdDevs[joy2nd].devPath) == 0) {             // if this device is already connected as joystick 2, skip it
                 return;
             }
 
-            in = &inDevs[joy1st];         
+            in = &ikbdDevs[joy1st];         
             what = (char *) "joystick1";
-        } else if(inDevs[joy2nd].fd == -1) {                                // don't have joystick 2?
-            if(strcmp(fullPath, inDevs[joy1st].devPath) == 0) {             // if this device is already connected as joystick 1, skip it
+        } else if(ikbdDevs[joy2nd].fd == -1) {                                // don't have joystick 2?
+            if(strcmp(fullPath, ikbdDevs[joy1st].devPath) == 0) {             // if this device is already connected as joystick 1, skip it
                 return;
             }
 
-            in = &inDevs[joy2nd];         
+            in = &ikbdDevs[joy2nd];         
             what = (char *) "joystick2";
         } else {                                                            // already have a joystick?
             return;
@@ -1282,7 +1284,7 @@ int Ikbd::getFdByIndex(int index)
         return -1;
     }
 
-    return inDevs[index].fd;
+    return ikbdDevs[index].fd;
 }
 
 void Ikbd::initDevs(void)
@@ -1292,7 +1294,7 @@ void Ikbd::initDevs(void)
     lastVDevMouseEventTime = 0;
     
     for(i=0; i<6; i++) {
-        inDevs[i].fd = -1;
+        ikbdDevs[i].fd = -1;
 
         deinitDev(i);
     }
@@ -1304,12 +1306,12 @@ void Ikbd::deinitDev(int index)
         return;
     }
 
-    if(inDevs[index].fd != -1) {            // device was open? close it
-        close(inDevs[index].fd);
+    if(ikbdDevs[index].fd != -1) {            // device was open? close it
+        close(ikbdDevs[index].fd);
     }
 
-    inDevs[index].fd            = -1;       // set vars to default init values
-    inDevs[index].devPath[0]    = 0;
+    ikbdDevs[index].fd            = -1;       // set vars to default init values
+    ikbdDevs[index].devPath[0]    = 0;
     
     if(index == INTYPE_JOYSTICK1) {         // for joy1 - init it
         initJoystickState(&joystick[0]);
@@ -1339,9 +1341,9 @@ void Ikbd::closeDevs(void)
     int i;
 
     for(i=0; i<6; i++) {
-        if(inDevs[i].fd != -1) {        // if device is open
-            close(inDevs[i].fd);        // close it
-            inDevs[i].fd = -1;          // mark it as closed
+        if(ikbdDevs[i].fd != -1) {        // if device is open
+            close(ikbdDevs[i].fd);        // close it
+            ikbdDevs[i].fd = -1;          // mark it as closed
         }
     }
 }
@@ -1652,11 +1654,11 @@ int Ikbd::fdWrite(int fd, BYTE *bfr, int cnt)
 
 bool Ikbd::gotUsbMouse(void)
 {
-	if(inDevs[INTYPE_MOUSE].fd != -1 ) {            // got real USB mouse? return true
+	if(ikbdDevs[INTYPE_MOUSE].fd != -1 ) {            // got real USB mouse? return true
 		return true;
 	}
 	
-    if(inDevs[INTYPE_VDEVMOUSE].fd != -1) {                             // got virtual mouse? 
+    if(ikbdDevs[INTYPE_VDEVMOUSE].fd != -1) {                             // got virtual mouse? 
         DWORD diff = Utils::getCurrentMs() - lastVDevMouseEventTime;    // calculate how much time has passed since last VDevMouse event
         
         if(diff < 10000) {                                              // if virtual mouse moved in the last 10 seconds, we got it (otherwise we don't have it)
@@ -1669,7 +1671,7 @@ bool Ikbd::gotUsbMouse(void)
 
 bool Ikbd::gotUsbJoy1(void)
 {
-	if(inDevs[INTYPE_JOYSTICK1].fd != -1) {
+	if(ikbdDevs[INTYPE_JOYSTICK1].fd != -1) {
 		return true;
 	}
 	
@@ -1678,7 +1680,7 @@ bool Ikbd::gotUsbJoy1(void)
 
 bool Ikbd::gotUsbJoy2(void)
 {
-	if(inDevs[INTYPE_JOYSTICK2].fd != -1) {
+	if(ikbdDevs[INTYPE_JOYSTICK2].fd != -1) {
 		return true;
 	}
 	

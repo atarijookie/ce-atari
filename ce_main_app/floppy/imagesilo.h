@@ -12,6 +12,17 @@
 #define EMPTY_IMAGE_SLOT        3
 #define EMPTY_IMAGE_PATH        "/tmp/emptyimage.st"
 
+//-------------------------------------------
+// these globals here are just for status report
+typedef struct 
+{
+    std::string imageFile;
+} SiloSlotSimple;
+
+extern SiloSlotSimple  floppyImages[3];
+extern int             floppyImageSelected;
+//-------------------------------------------
+
 typedef struct 
 {
     std::string		imageFile;      // just file name:                     bla.st

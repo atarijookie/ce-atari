@@ -363,7 +363,7 @@ void DevFinder::attachDevAsTranslated(std::string devName)
 		tmr.mountDir		= mountPath;										// e.g. /mnt/sda2
 		mountAdd(tmr);
 
-		res = shared.translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL);	// try to attach
+		res = shared.translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL, partitionDevice);   // try to attach
 
 		if(!res) {																// if didn't attach, skip the rest
 			Debug::out(LOG_ERROR, "attachDevAsTranslated: failed to attach %s", (char *) mountPath.c_str());
