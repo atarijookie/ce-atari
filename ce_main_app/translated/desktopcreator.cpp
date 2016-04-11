@@ -71,9 +71,11 @@ char *DesktopCreator::storeHeader(char *bfr, DesktopConfig *dc)
     bfr += strlen(bfr);
 
     // then some config with dc->settingsResolution settings
-    sprintf(tmp, "#E 98 %02X\r\n", dc->settingsResolution);
-    strcpy(bfr, tmp);
-    bfr += strlen(bfr);
+    // fix the "med res" 1.06 TOS bug by outputing 3 (high res) instead of 2 (med res)
+    int len = snprintf(tmp, sizeof(tmp), "#E 98 %02X\r\n",
+                       (dc->tosVersion == TOSVER106 && dc->settingsResolution == 2) ? 3 : dc->settingsResolution);
+    memcpy(bfr, tmp, len + 1);
+    bfr += len;
     
     return bfr;
 }
