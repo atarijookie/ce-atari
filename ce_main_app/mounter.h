@@ -49,26 +49,26 @@ extern "C" {
 class Mounter 
 {
 public:
-	bool mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mountDir, char *username, char *password);
-	bool mountDevice(char *devicePath, char *mountDir);
-    void mountZipFile(char *zipFilePath, char *mountDir);
-	void umountIfMounted(char *mountDir);
+	bool mountShared(const char *host, const char *hostDir, bool nfsNotSamba, const char *mountDir, const char *username, const char *password);
+	bool mountDevice(const char *devicePath, const char *mountDir);
+    void mountZipFile(const char *zipFilePath, const char *mountDir);
+	void umountIfMounted(const char *mountDir);
 	void restartNetwork(void);
 	void sync(void);
 
 private:
-	bool mount(char *mountCmd, char *mountDir);
+	bool mount(const char *mountCmd, const char *mountDir);
 
-	bool isAlreadyMounted(char *source);
-	bool isMountdirUsed(char *mountDir);
-	bool tryUnmount(char *mountDir);
+	bool isAlreadyMounted(const char *source);
+	bool isMountdirUsed(const char *mountDir);
+	bool tryUnmount(const char *mountDir);
 	
-	void createSource(char *host, char *hostDir, bool nfsNotSamba, char *source);
+	void createSource(const char *host, const char *hostDir, bool nfsNotSamba, char *source);
 	
-	bool mountDumpContains(char *searchedString);
+	bool mountDumpContains(const char *searchedString);
     bool wlan0IsPresent(void);
 
-    void copyTextFileToLog(char *path);
+    void copyTextFileToLog(const char *path);
 };
 
 #endif

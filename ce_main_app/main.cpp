@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
                 dup2(linuxConsole_fdSlave, 1);        
                 dup2(linuxConsole_fdSlave, 2);
 
-                char *shell = (char *) "/bin/sh";
+                const char *shell = "/bin/sh";
                 execlp(shell, shell, (char *) NULL);
     
                 return 0;

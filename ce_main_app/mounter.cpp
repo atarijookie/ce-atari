@@ -129,14 +129,14 @@ void *mountThreadCode(void *ptr)
         
 		if(tmr.action == MOUNTER_ACTION_MOUNT) {		// should we mount this?
 			if(tmr.deviceNotShared) {					// mount device?
-				mounter.mountDevice((char *) tmr.devicePath.c_str(), (char *) tmr.mountDir.c_str());	
+				mounter.mountDevice(tmr.devicePath.c_str(), tmr.mountDir.c_str());	
 			} else {									// mount shared?
-				mounter.mountShared((char *) tmr.shared.host.c_str(), (char *) tmr.shared.hostDir.c_str(), tmr.shared.nfsNotSamba, (char *) tmr.mountDir.c_str(), (char *) tmr.shared.username.c_str(), (char *) tmr.shared.password.c_str());
+				mounter.mountShared(tmr.shared.host.c_str(), tmr.shared.hostDir.c_str(), tmr.shared.nfsNotSamba, tmr.mountDir.c_str(), tmr.shared.username.c_str(), tmr.shared.password.c_str());
 			}
 		} 
 		
 		if(tmr.action == MOUNTER_ACTION_UMOUNT) {		// should umount?
-			mounter.umountIfMounted((char *) tmr.mountDir.c_str());
+			mounter.umountIfMounted(tmr.mountDir.c_str());
 		}
 		
 		if(tmr.action == MOUNTER_ACTION_RESTARTNETWORK) {   // restart network?
@@ -148,7 +148,7 @@ void *mountThreadCode(void *ptr)
         }
         
         if(tmr.action == MOUNTER_ACTION_MOUNT_ZIP) {        // mount ZIP file?
-            mounter.mountZipFile((char *) tmr.devicePath.c_str(), (char *) tmr.mountDir.c_str());	
+            mounter.mountZipFile(tmr.devicePath.c_str(), tmr.mountDir.c_str());
         }
         
         // mark the mount action state as DONE
@@ -159,7 +159,7 @@ void *mountThreadCode(void *ptr)
 	return 0;
 }
 
-void Mounter::mountZipFile(char *zipFilePath, char *mountDir)
+void Mounter::mountZipFile(const char *zipFilePath, const char *mountDir)
 {
     char cmd[512];
     
@@ -175,7 +175,7 @@ void Mounter::mountZipFile(char *zipFilePath, char *mountDir)
     system(cmd);                                    // unzip it to dir
 }
 
-bool Mounter::mountDevice(char *devicePath, char *mountDir)
+bool Mounter::mountDevice(const char *devicePath, const char *mountDir)
 {
 	char cmd[MAX_STR_SIZE];
 
@@ -197,7 +197,7 @@ bool Mounter::mountDevice(char *devicePath, char *mountDir)
 	return mount(cmd, mountDir);
 }
 
-bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mountDir, char *username, char *password)
+bool Mounter::mountShared(const char *host, const char *hostDir, bool nfsNotSamba, const char *mountDir, const char *username, const char *password)
 {
 	// build and run the command
 	char cmd[MAX_STR_SIZE];
@@ -252,7 +252,7 @@ bool Mounter::mountShared(char *host, char *hostDir, bool nfsNotSamba, char *mou
 	return mount(cmd, mountDir);
 }
 
-bool Mounter::mount(char *mountCmd, char *mountDir)
+bool Mounter::mount(const char *mountCmd, const char *mountDir)
 {
 	// create mount dir if possible
 	int ires = mkdir(mountDir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// try to create the mount dir, mod: 0x775
@@ -297,8 +297,8 @@ bool Mounter::mount(char *mountCmd, char *mountDir)
 	Debug::out(LOG_ERROR, "Mounter::mount - mount failed. (mount dir: %s)\n", mountDir);
 		
     // copy the content of mount output to log file so we can examine it later...
-    copyTextFileToLog((char *) LOGFILE1);
-    copyTextFileToLog((char *) LOGFILE2);
+    copyTextFileToLog(LOGFILE1);
+    copyTextFileToLog(LOGFILE2);
 
 	// move the logs to mount dir
 	char cmd[MAX_STR_SIZE];
@@ -314,17 +314,17 @@ bool Mounter::mount(char *mountCmd, char *mountDir)
 	return false;
 }
 
-bool Mounter::isAlreadyMounted(char *source)
+bool Mounter::isAlreadyMounted(const char *source)
 {
 	return mountDumpContains(source);
 }
 
-bool Mounter::isMountdirUsed(char *mountDir)
+bool Mounter::isMountdirUsed(const char *mountDir)
 {
 	return mountDumpContains(mountDir);
 }
 
-bool Mounter::mountDumpContains(char *searchedString)
+bool Mounter::mountDumpContains(const char *searchedString)
 {
 	char line[MAX_STR_SIZE];
 
@@ -357,7 +357,7 @@ bool Mounter::mountDumpContains(char *searchedString)
 	return false;								// if we got here, then we didn't find the mount
 }
 
-bool Mounter::tryUnmount(char *mountDir)
+bool Mounter::tryUnmount(const char *mountDir)
 {
 	char line[MAX_STR_SIZE];
 	
@@ -378,7 +378,7 @@ bool Mounter::tryUnmount(char *mountDir)
 	return false;
 }
 
-void Mounter::createSource(char *host, char *hostDir, bool nfsNotSamba, char *source)
+void Mounter::createSource(const char *host, const char *hostDir, bool nfsNotSamba, char *source)
 {
 	if(strlen(host) < 1 || strlen(hostDir) < 1) {		// input string(s) too short? fail
 		source[0] = 0;
@@ -415,7 +415,7 @@ void Mounter::createSource(char *host, char *hostDir, bool nfsNotSamba, char *so
 	}
 }
 
-void Mounter::umountIfMounted(char *mountDir)
+void Mounter::umountIfMounted(const char *mountDir)
 {
 	if(isMountdirUsed(mountDir)) {				// if mountDir is used, umount
 		tryUnmount(mountDir);
@@ -473,7 +473,7 @@ void Mounter::sync(void)                        // just do sync on filesystem
 	Debug::out(LOG_DEBUG, "Mounter::sync - filesystem sync done\n");
 }
 
-void Mounter::copyTextFileToLog(char *path)
+void Mounter::copyTextFileToLog(const char *path)
 {
     FILE *f = fopen(path, "rt");
 
