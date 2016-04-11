@@ -169,9 +169,6 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - fullAtariPath: %s, fileSizeBytes: %d, fileSizeSectors: %d", (char *) fullAtariPath.c_str(), fileSizeBytes, fileSizeSectors);
 
-    memset(pexecImage, 0, PEXEC_DRIVE_SIZE_BYTES);                  // clear the whole image
-    memset(pexecImageReadFlags, 0, PEXEC_DRIVE_SIZE_SECTORS);       // clear all the READ flags
-
     prgSectorStart  = 0;
     prgSectorEnd    = PEXEC_DRIVE_SIZE_SECTORS;
     
@@ -180,6 +177,11 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
     
     DWORD dataSectorAbsolute = fat2startingSector + PEXEC_FAT_SECTORS_NEEDED;   // absolute sector - from the start of the image (something like sector #84)
     DWORD dataSectorRelative = 1;                                               // relative sector - relative sector numbering from the start of data area (probably #2)
+
+    //memset(pexecImage,        0, PEXEC_DRIVE_SIZE_BYTES);                                     // clear the whole image
+    memset(pexecImage,          0, (fat1startingSector + 2*PEXEC_FAT_SECTORS_NEEDED) * 512);    // clear just the FAT section of image (to speed this up)
+    
+    memset(pexecImageReadFlags, 0, PEXEC_DRIVE_SIZE_SECTORS);                   // clear all the READ flags
     
     //--------------
     BYTE *pFat1 = pexecImage + (fat1startingSector * 512);  // pointer to FAT1

@@ -93,7 +93,7 @@ void StatusReport::createReport(std::string &report, int reportFormat)
 
     char tmp[32];
     if(floppyImageSelected >= 0) {
-        sprintf(tmp, "%d", floppyImageSelected);
+        sprintf(tmp, "%d", floppyImageSelected + 1);
     } else {
         strcpy(tmp, "none");
     }

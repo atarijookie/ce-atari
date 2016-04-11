@@ -201,7 +201,13 @@ void TranslatedDisk::mountAndAttachSharedDrive(void)
 	tmr.mountDir			= mountPath;
 	mountAdd(tmr);
 
-    std::string devicePath = std::string(nfsNotSamba ? "NFS: " : "samba: ") + addr + std::string(" + ") + path;
+    std::string devicePath;
+    if(nfsNotSamba) {
+        devicePath = std::string("NFS: ") + addr + std::string(":/") + path;
+    } else {
+        devicePath = std::string("samba: \\\\") + addr + std::string("\\") + path;
+    }
+    
 	bool res = attachToHostPath(mountPath, TRANSLATEDTYPE_SHAREDDRIVE, devicePath);	// try to attach
 
 	if(!res) {																// if didn't attach, skip the rest
