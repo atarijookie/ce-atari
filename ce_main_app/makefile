@@ -3,9 +3,11 @@ TARGET	= cosmosex
 #ONPC    = yes
 # in the CFLAGS use ONPC_GPIO or ONPC_HIGHLEVEL or ONPC_NOTHING
 
-CC	    = g++
+CXX	    = g++
+CC	    = gcc
 #STRIP	= strip
 CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
+CXXFLAGS = $(CFLAGS)
 
 ifeq ($(ONPC),yes)
     LDFLAGS	= -Llib -Llib -lrt -lanl -lpthread -lcurl -lcivetweb -ldl -lutil
@@ -57,7 +59,7 @@ HDRS += $(wildcard $(SUBDIR8)/*.h)
 HDRS += $(wildcard $(SUBDIR9)/*.h)
 HDRS += $(wildcard $(SUBDIR10)/*.h)
 
-OBJS = $(patsubst %.cpp,%.o,$(SRCS))
+OBJS = $(patsubst %.cpp,%.o,$(SRCS:.c=.o))
 
 #combine web scripts
 WEB_CSS_PATH=webroot/css
@@ -77,30 +79,21 @@ WEBCOMPONENTS = $(WEB_CSS_PATH)/combined.css.gz $(WEB_JS_PATH)/jquery-combined.j
 all:	$(TARGET)
 
 $(TARGET): $(OBJS) $(HDRS) $(WEBCOMPONENTS)
-	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@
+	$(CXX) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@
 #	$(STRIP) -s $@ 
 
-%.o: %.cpp 
-	$(CC) $(CFLAGS) -c $< -o $@
-
 $(WEB_CSS_PATH)/combined.css.gz: ${WEB_CSS_MODULES}
-	cat > $@ $^
-	gzip -f $@
-	mv $@.gz $@
+	cat $^ | gzip -f > $@
     
 $(WEB_JS_PATH)/zepto-combined.js.gz: $(WEB_JS_PATH)/zepto.js $(WEB_JS_PATH)/zepto.hack.js ${WEB_JS_MODULES}
-	cat > $@ $^
-	gzip -f $@
-	mv $@.gz $@
+	cat $^ | gzip -f > $@
 
 $(WEB_JS_PATH)/jquery-combined.js.gz: $(WEB_JS_PATH)/jquery.js ${WEB_JS_MODULES}
-	cat > $@ $^
-	gzip -f $@
-	mv $@.gz $@
+	cat $^ | gzip -f > $@
 
 clean:
-	rm -f $(WEB_JS_PATH)/*.gz
-	rm -f $(WEB_CSS_PATH)/*.gz
-	find . -name "*.o" -print0| xargs -0 rm -rf
-	rm -f *.o *~ cosmosex
+	$(RM) $(WEB_JS_PATH)/*.gz
+	$(RM) $(WEB_CSS_PATH)/*.gz
+	find . -name "*.o" -exec $(RM) {} \;
+	$(RM) *.o *~ $(TARGET)
 
