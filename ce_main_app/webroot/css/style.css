@@ -156,6 +156,10 @@ form#frmInsertConfig {
 form.form-floppy-upload {
     margin-bottom: 10px;
 }
-#optionsCheckbox0 {
+#optionsCheckbox0 {          
     margin-top: 10px;
+}
+.statusreport table tr td{
+	border: black 2px double;
+	padding: 2px;	
 }

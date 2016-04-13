@@ -1,7 +1,6 @@
 <b>CosmosEx App version: </b>{{version_app}}<br />
-<b>HTTP Headers:</b>{{browser_headers}}
 <b>CosmosEx date (DD.MM.YYYY): </b>{{date}}<br />
-<br /><br />
+<br />
 Download <a href="/app/debug/getconfig">config of your CosmosEx</a> device as text file.
 <br /><br />
 Download <a href="/app/debug/getlog">app log</a>.
@@ -14,6 +13,7 @@ Download <a href="/app/debug/getlog">app log</a>.
 <option value="ll3">ll3</option>
 </select>
 <br /><br />
+<b>HTTP Headers:</b>{{browser_headers}}
 <script language="JavaScript">
 $(document).ready(function(){
   $('#setloglevel').on('change', function() {

@@ -20,6 +20,7 @@
 #include "../../../utils.h"
 #include "../../../config/configstream.h"
 #include "../../../ce_conf_on_rpi.h"
+#include "../../../statusreport.h"
 
 extern int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt);
 extern bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BYTE *tempBuffer, int &vt100byteCount);
@@ -105,6 +106,7 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         mg_printf(conn, "HTTP/1.1 200 OK\r\n\r\n");
         return true;    
     }
+
     //get configterminal screen
     if( strstr(req_info->request_method,"GET")>0 && sResourceInfo=="terminal" ){
         Debug::out(LOG_DEBUG, "/config/terminal GET");
@@ -129,7 +131,7 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         }                
     }
 
-    //return config info
+    //return config info @TODO
     if( strstr(req_info->request_method,"GET")>0 && sResourceInfo=="" ){
         Debug::out(LOG_DEBUG, "/config GET");
         //const char *qs = req_info->query_string;
@@ -139,6 +141,21 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         stringStream << "{\"config\":[";
         stringStream << "]}"; 
         std::string sJson=stringStream.str();
+        mg_printf(conn, "Content-Length: %d\r\n\r\n",sJson.length());   // Always set Content-Length
+        mg_write(conn, sJson.c_str(), sJson.length());                  // now send content
+        return true;
+    }
+
+    //return status info
+    if( strstr(req_info->request_method,"GET")>0 && sResourceInfo=="status" ){
+        Debug::out(LOG_DEBUG, "/config/status GET");
+        //const char *qs = req_info->query_string;
+        mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n");
+        mg_printf(conn, "Cache: no-cache\r\n");
+		//get status report
+		std::string sJson;
+		StatusReport xStatusReport;
+		xStatusReport.createReport(sJson,REPORTFORMAT_JSON);  
         mg_printf(conn, "Content-Length: %d\r\n\r\n",sJson.length());   // Always set Content-Length
         mg_write(conn, sJson.c_str(), sJson.length());                  // now send content
         return true;

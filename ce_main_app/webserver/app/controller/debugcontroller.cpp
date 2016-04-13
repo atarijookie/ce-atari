@@ -4,6 +4,7 @@
 #include <fstream>
 #include <streambuf>
 #include "version.h"
+#include "statusreport.h"
 #include "../../../config/configstream.h"
 
 DebugController::DebugController(ConfigService* pxDateService, FloppyService* pxFloppyService):pxDateService(pxDateService),pxFloppyService(pxFloppyService)
@@ -37,9 +38,16 @@ bool DebugController::indexAction(mg_connection *conn, mg_request_info *req_info
 	mapVariables["browser_headers"]=stringStream.str();
 	mapVariables["version_app"]=std::string(appVersion);
 	mapVariables["date"]=pxDateService->getTimeString();
+	//get status report
+	std::string sStatusReport;
+	StatusReport xStatusReport;
+	xStatusReport.createReport(sStatusReport,REPORTFORMAT_HTML);  
+	mapVariables["statusreport"]=sStatusReport;
 
     std::string sOutput=replaceAll(sTemplateLayout,std::string("{{title}}"),std::string("CosmosEx debug information"));
 	sOutput=replaceAll(sOutput,std::string("{{content}}"),sTemplateDebug);
+	sOutput=replaceAll(sOutput,std::string("{{activeHome}}"),"active");
+	sOutput=replaceAll(sOutput,std::string("{{info}}"),"Some internal information. Just in case.");
 
 	std::map<std::string, std::string>::iterator pxVarIter;
     for (pxVarIter = mapVariables.begin(); pxVarIter != mapVariables.end(); ++pxVarIter) {
@@ -51,13 +59,6 @@ bool DebugController::indexAction(mg_connection *conn, mg_request_info *req_info
     mg_printf(conn, "Cache: no-cache\r\n");
     mg_printf(conn, "Content-Length: %d\r\n\r\n",sOutput.length());        // Always set Content-Length
     mg_write(conn, sOutput.c_str(), sOutput.length());
-    return true;
-
-    mg_printf(conn, "<html><body>");
-    mg_printf(conn, "<h2>This is the debug/index action</h2>");
-    mg_printf(conn, "<p>The request was:<br><pre>%s %s HTTP/%s</pre></p>",
-              req_info->request_method, req_info->uri, req_info->http_version);
-    mg_printf(conn, "</body></html>\n");
     return true;
 }
 

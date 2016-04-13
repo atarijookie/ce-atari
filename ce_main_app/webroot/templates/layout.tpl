@@ -24,16 +24,19 @@
         <div class="row">
             <div class="span10">
                 <ul class="nav nav-pills">
-                    <li class="active"><a href="/">Home</a></li>
+                    <li class="{{activeHome}}"><a href="/?v=5">Home</a></li>
                     <li><a href="http://joo.kie.sk/?page_id=415">Manual</a></li>
-                    <li><a href="/floppy.html">Floppy</a></li>
-                    <li><a href="/remote.html">Remote</a></li>
-                    <li><a href="/screenshots.html">Screenshots</a></li>
-                    <li><a href="/config.html">Config</a></li>
+                    <li><a href="/floppy.html?v=5">Floppy</a></li>
+                    <li><a href="/remote.html?v=5">Remote</a></li>
+                    <li><a href="/screenshots.html?v=5">Screenshots</a></li>
+                    <li><a href="/config.html?v=5">Config</a></li>
+                    <li class="{{activeStatus}}"><a href="/app/status/?v=5">Status</a></li>
                 </ul>
+        <h3>{{title}}</h3>
+        <p>{{info}}</p>
             </div>
             <div class="span2">
-                <!-- <img class="logo" src="/img/ce_logo.png"> -->
+                <img class="logo" src="/img/ce_logo.png">
             </div>
         </div>     
     {{content}}

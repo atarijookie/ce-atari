@@ -4,6 +4,7 @@
 //#include <regex>
 
 #include "../controller/configcontroller.h"
+#include "../controller/statuscontroller.h"
 #include "../controller/debugcontroller.h"
 #include "../controller/screencastcontroller.h"
 #include "../../../config/configstream.h"
@@ -28,6 +29,13 @@ bool ControllerRouter::handleGet(CivetServer *server, struct mg_connection *conn
     {
         ConfigController *pxController=new ConfigController(pxDateService,pxFloppyService);
         bool processed=pxController->showAction(conn,req_info);
+        delete pxController;
+        return processed;
+    }
+    if( controllerAction=="status/" )
+    {
+        StatusController *pxController=new StatusController(pxDateService,pxFloppyService);
+        bool processed=pxController->indexAction(conn,req_info);
         delete pxController;
         return processed;
     }
