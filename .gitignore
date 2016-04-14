@@ -1,3 +1,5 @@
 *.o
 *.prg
+*.bs
+ce_dd_bootsectors/convertor
 

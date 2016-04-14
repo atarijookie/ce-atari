@@ -2,35 +2,40 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define CE_DD_PRG_PATH "../ce_dd_prg/"
+
 #define BYTE    unsigned char
 #define WORD    unsigned short
 #define DWORD   unsigned int
 
 WORD swapNibbles(WORD val);
 
-bool createBootsectorFromPrg(char *path, char *inFile, char *outFile, bool bootsectorNotRaw);
+bool createBootsectorFromPrg(const char *path, const char *inFile, const char *outFile, bool bootsectorNotRaw);
 void checkCeddSize(void);
 DWORD getValue(BYTE *p);
 void createImage(void);
 
 int main(int argc, char *argv[])
 {
-    char *path = "c:\\!nohaj\\tmp\\assembla_atarijookie\\trunk\\ce_dd_bootsectors";
-    createBootsectorFromPrg(path, (char *) "bs_st.prg", (char *) "ce_dd_st.bs", true);
-    createBootsectorFromPrg(path, (char *) "bs_tt.prg", (char *) "ce_dd_tt.bs", true);
-    createBootsectorFromPrg(path, (char *) "bs_fn.prg", (char *) "ce_dd_fn.bs", true);
-    createBootsectorFromPrg(path, (char *) "bs_l2.prg", (char *) "ce_dd_l2.bs", false);
+	const char * path = "./";
+    /*const char *path = "c:\\!nohaj\\tmp\\assembla_atarijookie\\trunk\\ce_dd_bootsectors";*/
+	if(argc > 1) path = argv[1];
 
-/*
+    createBootsectorFromPrg(path, "bs_st.prg", "ce_dd_st.bs", true);
+    createBootsectorFromPrg(path, "bs_tt.prg", "ce_dd_tt.bs", true);
+    createBootsectorFromPrg(path, "bs_fn.prg", "ce_dd_fn.bs", true);
+    createBootsectorFromPrg(path, "bs_l2.prg", "ce_dd_l2.bs", false);
+
+#if 0
     checkCeddSize();
     createImage();
-*/
+#endif
 
-    getchar();
+    /*getchar();*/
     return 0;
 }
 
-bool createBootsectorFromPrg(char *path, char *inFile, char *outFile, bool bootsectorNotRaw)
+bool createBootsectorFromPrg(const char *path, const char *inFile, const char *outFile, bool bootsectorNotRaw)
 {
     printf("\nConvert: %s -> %s\n", inFile, outFile);
 
@@ -42,16 +47,9 @@ bool createBootsectorFromPrg(char *path, char *inFile, char *outFile, bool boots
 
     char fullInFile [256];
     char fullOutFile[256];
-    memset(fullInFile, 0, 256);
-    memset(fullOutFile, 0, 256);
 
-    strcpy(fullInFile, path);
-    strcat(fullInFile, "\\");
-    strcat(fullInFile, inFile);
-
-    strcpy(fullOutFile, path);
-    strcat(fullOutFile, "\\");
-    strcat(fullOutFile, outFile);
+	snprintf(fullInFile, sizeof(fullInFile), "%s%s", path, inFile);
+	snprintf(fullOutFile, sizeof(fullOutFile), "%s%s", path, outFile);
 
     //---------------------------------------
     // read the boot code to buffer
@@ -135,7 +133,7 @@ void createImage(void)
 
     //--------------------------
     // read and write bootsector
-    FILE *in = fopen("bootsect.bin", "rb");
+ 	FILE *in = fopen("bootsect.bin", "rb");
     if(!in) {
         fclose(out);
         printf("\ncreateImage - could not open bootsector file (001)!\n");
@@ -154,7 +152,7 @@ void createImage(void)
 
     //--------------------------
     // read and write the driver
-    in = fopen("ce_dd.prg", "rb");
+    in = fopen(CE_DD_PRG_PATH "ce_dd.prg", "rb");
     if(!in) {
         fclose(out);
         printf("\ncreateImage - could not open driver file (002)!\n");
@@ -193,7 +191,7 @@ void createImage(void)
 
 void checkCeddSize(void)
 {
-    FILE *f = fopen("ce_dd.prg", "rb");
+    FILE *f = fopen(CE_DD_PRG_PATH "ce_dd.prg", "rb");
 
     if(!f) {
         printf("\nCould not open ce_dd.prg file!\n");
