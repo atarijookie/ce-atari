@@ -72,7 +72,8 @@ char *DesktopCreator::storeHeader(char *bfr, DesktopConfig *dc)
 
     // then some config with dc->settingsResolution settings
     // fix the "med res" 1.06 TOS bug by outputing 3 (high res) instead of 2 (med res)
-    int len = snprintf(tmp, sizeof(tmp), "#E 98 %02X\r\n",
+    int len = snprintf(tmp, sizeof(tmp), "#E 98 %1X%1X\r\n",
+                       (dc->tosVersion >= TOSVER102) ? 1 : 0, // Enable Blitter
                        (dc->tosVersion == TOSVER106 && dc->settingsResolution == 2) ? 3 : dc->settingsResolution);
     memcpy(bfr, tmp, len + 1);
     bfr += len;
@@ -85,7 +86,7 @@ char *DesktopCreator::storeWindowPositions(char *bfr, DesktopConfig *dc)
     char tmp[128];
     int n;
     
-    if(dc->tosVersion < TOSVER205) {        // store 4 windows in older TOS 
+    if(dc->tosVersion < TOSVER205) {        // store 4 windows in older TOS
         n = 4;
     } else {                            // store 8 windows in newer TOS
         n = 8;
