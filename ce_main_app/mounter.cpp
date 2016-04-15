@@ -5,6 +5,7 @@
 #include <pwd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mount.h>
 #include <errno.h>
 
 #include <signal.h>
@@ -359,23 +360,16 @@ bool Mounter::mountDumpContains(const char *searchedString)
 
 bool Mounter::tryUnmount(const char *mountDir)
 {
-	char line[MAX_STR_SIZE];
-	
-    system("sync");                             // sync the caches
+    sync();                             // sync the caches
     
-	// build and execute the command - was: sudo
-	snprintf(line, MAX_STR_SIZE, "umount %s", mountDir);
-	Debug::out(LOG_DEBUG, "Mounter::tryUnmount - umount command: %s", line);
-    
-    int ret = system(line);
-	
-	// handle the result
-	if(WIFEXITED(ret) && WEXITSTATUS(ret) == 0) {
-		Debug::out(LOG_DEBUG, "Mounter::tryUnmount - umount succeeded\n");
-		return true;
-	} 
-	
-	return false;
+    Debug::out(LOG_DEBUG, "Mounter::tryUnmount - umount(\"%s\")", mountDir);
+    if(umount(mountDir) < 0) {
+        Debug::out(LOG_ERROR, "Mounter::tryUnmount - umount failed : %s", strerror(errno));
+        return false;
+    } else {
+        Debug::out(LOG_DEBUG, "Mounter::tryUnmount - umount succeeded\n");
+        return true;
+    }
 }
 
 void Mounter::createSource(const char *host, const char *hostDir, bool nfsNotSamba, char *source)
@@ -426,7 +420,7 @@ void Mounter::restartNetwork(void)
 {
 	Debug::out(LOG_DEBUG, "Mounter::restartNetwork - starting to restart the network\n");
 
-    system("sync");                                                 // first sync the filesystem caches...
+    ::sync();                                                 // first sync the filesystem caches...
 
     bool gotWlan0 = wlan0IsPresent();                               // first find out if we got wlan0 or not
 
@@ -469,7 +463,7 @@ bool Mounter::wlan0IsPresent(void)
 
 void Mounter::sync(void)                        // just do sync on filesystem
 {
-    system("sync");
+    ::sync();
 	Debug::out(LOG_DEBUG, "Mounter::sync - filesystem sync done\n");
 }
 
