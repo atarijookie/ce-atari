@@ -165,13 +165,13 @@ void Mounter::mountZipFile(const char *zipFilePath, const char *mountDir)
     
     Debug::out(LOG_DEBUG, "Mounter::mountZipFile -- will mount %s file to %s directory", zipFilePath, mountDir);
 
-    sprintf(cmd, "rm -rf %s", mountDir);
+    sprintf(cmd, "rm -rf '%s'", mountDir);
     system(cmd);                                    // delete dir if it exists (e.g. contains previous zip file content)
 
-    sprintf(cmd, "mkdir -p %s", mountDir);
+    sprintf(cmd, "mkdir -p '%s'", mountDir);
     system(cmd);                                    // create mount dir 
 
-    sprintf(cmd, "unzip -o %s -d %s > /dev/null 2> /dev/null", zipFilePath, mountDir);
+    sprintf(cmd, "unzip -o '%s' -d '%s' > /dev/null 2> /dev/null", zipFilePath, mountDir);
     system(cmd);                                    // unzip it to dir
 }
 
