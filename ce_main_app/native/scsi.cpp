@@ -649,6 +649,7 @@ void Scsi::SCSI_Inquiry(void)
     BYTE val;
 
     BYTE *vendor = (BYTE *) "JOOKIE  ";
+    char type_str[5] = {' ', ' ', ' ', ' ', '\0'};
 
     if(dataMedia->mediaChanged())                                   // this command clears the unit attention state
         ClearTheUnitAttention();
@@ -665,6 +666,25 @@ void Scsi::SCSI_Inquiry(void)
         return;
     }
 
+    if(devInfo[acsiId].attachedMediaIndex != -1) {
+        int type = attachedMedia[devInfo[acsiId].attachedMediaIndex].hostSourceType;
+        switch(type) {
+        case SOURCETYPE_IMAGE:
+          memcpy(type_str, " IMG", 4);
+          break;
+        case SOURCETYPE_IMAGE_TRANSLATEDBOOT:
+          memcpy(type_str, "BOOT", 4);
+          break;
+        case SOURCETYPE_DEVICE:
+          memcpy(type_str, " RAW", 4);
+          break;
+        case SOURCETYPE_SD_CARD:
+          memcpy(type_str, "  SD", 4);
+          break;
+        default:
+          snprintf(type_str, sizeof(type_str), "%4d", type);
+        }
+    }
     //-----------
     xx = cmd[4];		  									// how many bytes should be sent
 
@@ -699,6 +719,10 @@ void Scsi::SCSI_Inquiry(void)
 
         if(i == 27) {                   // send ACSI ID # (0 .. 7)
             val = '0' + acsiId;
+        }
+
+        if(i>=28 && i<32) {             // send type
+            val = type_str[i-28];
         }
 
         if(i>=32 && i<=35) {            // version string
