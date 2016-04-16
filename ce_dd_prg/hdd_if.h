@@ -29,7 +29,8 @@ BYTE dmaDataTx_prepare_Falcon   (BYTE readNotWrite, BYTE *buffer, DWORD dataByte
 BYTE dmaDataTx_do_Falcon        (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
 
 typedef struct {
-    THddIfCmd           cmd;
+    THddIfCmd		    cmd;
+    THddIfCmd		    cmd_nolock;
     THddIfCmd           cmd_intern;
 
     BYTE                success;

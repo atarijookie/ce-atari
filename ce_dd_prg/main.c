@@ -15,6 +15,7 @@
 #include "translated.h"
 #include "gemdos.h"
 #include "main.h"
+#include "mutex.h"
 
 /* 
  * CosmosEx GEMDOS driver by Jookie, 2013-2016
@@ -91,11 +92,17 @@ WORD transDiskProtocolVersion;              // this will hold the protocol versi
 
 volatile ScreenShots screenShots;           // screenshots config
 void init_screencapture(void);
+
+volatile mutex mtx;  
+
 // ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
 {
 	BYTE found;
 	int i;
+
+	//initialize lock
+	mutex_unlock(&mtx);
 
 	// write some header out 
 	Clear_home();
@@ -142,7 +149,6 @@ int main( int argc, char* argv[] )
 
 	// search for CosmosEx on ACSI bus
 	found = Supexec(findDevice);
-
 	if(!found) {								            // not found? quit
 		sleep(3);
 		return 0;
@@ -229,7 +235,7 @@ int main( int argc, char* argv[] )
     // if screenshots functionality was enabled
     if(screenShots.enabled) {
         (void) Cconws(">>> ScreenShots VBL installed. <<<\r\n" );
-        init_screencapture();
+        Supexec(init_screencapture);
     }
     
     

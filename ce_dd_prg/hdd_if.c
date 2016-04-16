@@ -11,11 +11,28 @@
 #include "hdd_if.h"
 #include "translated.h"
 #include "stdlib.h"
+#include "mutex.h"
 
 THDif hdIf;
+extern volatile mutex mtx;  
 
-void hddIfCmd_withRetries(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+void hddIfCmd_withRetries_lock(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {
+	hddIfCmd_withRetries_worker(readNotWrite, cmd, cmdLength, buffer, sectorCount, 1);
+}
+
+void hddIfCmd_withRetries_nolock(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+{
+	hddIfCmd_withRetries_worker(readNotWrite, cmd, cmdLength, buffer, sectorCount, 0);
+}
+
+void hddIfCmd_withRetries_worker(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount, BYTE lock)
+{
+	if( lock ){
+		while( mtx!=0 ){}
+		mutex_trylock( &mtx );
+	}
+	
     hdIf.retriesDoneCount = 0;              // set retries count to zero
  
     //--------------
@@ -24,6 +41,9 @@ void hddIfCmd_withRetries(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *bu
 
     if(scsiId == hdIf.scsiHostId) {         // Trying to access reserved SCSI ID? Fail... (skip)
         hdIf.success = FALSE;
+		if( lock ){
+			mutex_unlock(&mtx);
+		}
         return;
     }
     
@@ -32,10 +52,16 @@ void hddIfCmd_withRetries(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *bu
     (*hdIf.cmd_intern)(readNotWrite, cmd, cmdLength, buffer, sectorCount);      // try the correct command for the first time
     
     if(hdIf.success) {                      // if succeeded on the 1st time, quit
+		if( lock ){
+			mutex_unlock(&mtx);
+		}
         return;
     }
     
     if(hdIf.maxRetriesCount < 1) {          // retries are disabled? quit
+		if( lock ){
+			mutex_unlock(&mtx);
+		}
         return;
     }
     
@@ -52,6 +78,9 @@ void hddIfCmd_withRetries(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *bu
     
     while(1) {
         if(hdIf.retriesDoneCount >= hdIf.maxRetriesCount) {     // did we reach the maximum number of retries? quit
+			if( lock ){
+				mutex_unlock(&mtx);
+			}
             return;
         }
     
@@ -60,6 +89,9 @@ void hddIfCmd_withRetries(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *bu
         (*hdIf.cmd_intern)(readNotWrite, retryCmd, cmdLength, buffer, sectorCount);      // try the retry command until we succeed
         
         if(hdIf.success) {                  // if succeeded, quit
+			if( lock ){
+				mutex_unlock(&mtx);
+			}
             return;
         }
     }
@@ -67,7 +99,8 @@ void hddIfCmd_withRetries(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *bu
 
 void hdd_if_select(int ifType)
 {
-    hdIf.cmd = (THddIfCmd) hddIfCmd_withRetries;
+    hdIf.cmd = (THddIfCmd) hddIfCmd_withRetries_lock;
+    hdIf.cmd_nolock = (THddIfCmd) hddIfCmd_withRetries_nolock;
 
     switch(ifType) {
         case IF_ACSI:           // for ACSI
