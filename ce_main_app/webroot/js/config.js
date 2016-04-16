@@ -18,14 +18,19 @@ var CosmosEx = CosmosEx || {};
 CosmosEx.ConfigTerminal=function(){
   return {
     init:function(){
-    var term = new Terminal({
+	  var term = new Terminal({
         cols: 80,
         rows: 24,
         useStyle: true,
         screenKeys: true,
         cursorBlink: false
       });
+      var lock=false;
       term.on('data', function(data) {
+      	//naive lock; CE might take a while to digest the last command, so don't flood it
+      	if( lock ){
+      	  return false;
+		}
         var stkeycode=0;
         console.log(data.charCodeAt(0));
         if(data.charCodeAt(0)==27 && data.length==1 ){
@@ -104,12 +109,17 @@ CosmosEx.ConfigTerminal=function(){
               stkeycode=data.charCodeAt(0);
         }
         if( stkeycode!=0 ){
+          lock=true;
           $.ajax({
             type: "POST",
             url: "/api/v1/config/terminal",
             data: JSON.stringify({key:stkeycode}),
             success: function(data){
               term.write(data);        
+	          lock=false;
+            },
+            error: function(data){
+	          lock=false;
             }
           });
         }
