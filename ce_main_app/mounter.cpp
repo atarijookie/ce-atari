@@ -231,7 +231,7 @@ bool Mounter::mountShared(const char *host, const char *hostDir, bool nfsNotSamb
 	}
 		
 	if(nfsNotSamba) {		// for NFS
-		len = snprintf(options, MAX_STR_SIZE, "nolock%s", auth);
+		len = snprintf(options, MAX_STR_SIZE, "nolock,addr=%s%s", host, auth);
 	} else {				// for Samba
 		passwd *psw = getpwnam("pi");
 		
