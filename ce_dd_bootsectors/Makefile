@@ -12,12 +12,12 @@ $(TARGET): $(STARTUP) $(SSRC)
 	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(CSRC) $(SSRC) $(LDFLAGS)
 	$(STRIP) -s $@
 
-all: ce_dd_st.bs ce_dd_tt.bs ce_dd_fn.bs ce_dd_l2.bs
+all:	ce_dd_al.bs ce_dd_st.bs ce_dd_tt.bs ce_dd_fn.bs ce_dd_l2.bs
 
 convertor:	convertor.cpp
 	$(HOSTCXX) $(CXXFLAGS) -o $@ $<
 
-convertor:	bs_st.prg bs_tt.prg bs_fn.prg bs_l2.prg ../ce_dd_prg/ce_dd.prg
+convertor:	bs_al.prg bs_st.prg bs_tt.prg bs_fn.prg bs_l2.prg ../ce_dd_prg/ce_dd.prg
 
 ../ce_dd_prg/ce_dd.prg:	../ce_dd_prg/main.c
 	$(MAKE) -C ../ce_dd_prg
@@ -25,6 +25,10 @@ convertor:	bs_st.prg bs_tt.prg bs_fn.prg bs_l2.prg ../ce_dd_prg/ce_dd.prg
 ce_dd_%.bs:	bs_%.prg
 	$(MAKE) convertor
 	./convertor
+
+bs_al.prg: bootsector_all.s
+	$(CC) $(CFLAGS) -o $@ bootsector_all.s $(LDFLAGS)
+	$(STRIP) -s $@
 
 bs_st.prg: bootsector_acsi_st.s
 	$(CC) $(CFLAGS) -o $@ bootsector_acsi_st.s $(LDFLAGS)
