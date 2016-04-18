@@ -14,6 +14,10 @@
 #include "dirtranslator.h"
 #include "gemdos.h"
 
+#define GEMDOS_FILE_MAXSIZE	(2147483647)
+// TOS 1.x cannot display size with more than 8 digits
+//#define GEMDOS_FILE_MAXSIZE (100*1000*1000-1)
+
 DirTranslator::DirTranslator()
 {
     fsDirs.count    = 0;
@@ -357,10 +361,16 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
     buf[4] = atariDate &  0xff;
 
     // File Length
-    buf[5] = attr.st_size >>  24;
-    buf[6] = attr.st_size >>  16;
-    buf[7] = attr.st_size >>   8;
-    buf[8] = attr.st_size & 0xff;
+	DWORD size;
+	if(attr.st_size > GEMDOS_FILE_MAXSIZE) {
+		size = GEMDOS_FILE_MAXSIZE;
+	} else {
+		size = (DWORD)attr.st_size;
+	}
+    buf[5] = (size >>  24) & 0xff;
+    buf[6] = (size >>  16) & 0xff;
+    buf[7] = (size >>   8) & 0xff;
+    buf[8] = size & 0xff;
 
     // Filename -- d_fname[14]
     memset(&buf[9], 0, 14);                                // first clear the mem
