@@ -24,14 +24,14 @@ public:
 
     void clear(void);                                                       // clear maps - e.g. on ST restart
 
-    bool longToShortFileName(char *longFileName, char *shortFileName);      // translates 'long file name' to 'long_f~1'
-    bool shortToLongFileName(char *shortFileName, char *longFileName);      // translates 'long_f~1' to 'long file name'
+    bool longToShortFileName(const char *longFileName, char *shortFileName);      // translates 'long file name' to 'long_f~1'
+    bool shortToLongFileName(const char *shortFileName, char *longFileName);      // translates 'long_f~1' to 'long file name'
 
-    static void mergeFilenameAndExtension(char *shortFn, char *shortExt, bool extendWithSpaces, char *merged);
+    static void mergeFilenameAndExtension(const char *shortFn, const char *shortExt, bool extendWithSpaces, char *merged);
 
-    static void removeSpaceExtension(char *extendedFn, char *extRemovedFn); // 'FILE    .C  ' -> 'FILE.C'
-    static void extendWithSpaces(char *normalFname, char *extendedFn);      // 'FILE.C'       -> 'FILE    .C  '
-    static void splitFilenameFromExtension(char *filenameWithExt, char *fileName, char *ext);
+    static void removeSpaceExtension(const char *extendedFn, char *extRemovedFn); // 'FILE    .C  ' -> 'FILE.C'
+    static void extendWithSpaces(const char *normalFname, char *extendedFn);      // 'FILE.C'       -> 'FILE    .C  '
+    static void splitFilenameFromExtension(const char *filenameWithExt, char *fileName, char *ext);
 
 private:
     std::map<std::string, std::string>  mapFilenameWithExt;                 // for file name conversion from long to short
@@ -42,7 +42,7 @@ private:
     bool shortenName(char *nLong, char *nShort);
     bool shortenExtension(char *shortFileName, char *nLongExt, char *nShortExt);
 
-    static int  strCharPos(char *str, int maxLen, char ch);
+    static int  strCharPos(const char *str, int maxLen, char ch);
     static void replaceNonLetters(char *str);
     static void extendToLenghtWithSpaces(char *str, int len);
     static void removeTrailingSpaces(char *str);

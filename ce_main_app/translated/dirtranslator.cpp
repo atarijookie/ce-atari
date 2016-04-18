@@ -83,11 +83,11 @@ void DirTranslator::shortToLongPath(std::string &rootPath, std::string &shortPat
 
         FilenameShortener *fs;
         if(it != mapPathToShortener.end()) {            // already got the shortener
-            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortener for pathPart: %s found", (char *) pathPart.c_str());
+            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortener for pathPart: %s found", pathPart.c_str());
         
             fs = it->second;
         } else {                                        // don't have the shortener yet
-            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortener for pathPart: %s NOT found, will create shortener", (char *) pathPart.c_str());
+            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortener for pathPart: %s NOT found, will create shortener", pathPart.c_str());
 
             fs = createShortener(pathPart);
         }
@@ -96,12 +96,12 @@ void DirTranslator::shortToLongPath(std::string &rootPath, std::string &shortPat
             continue;
         }
         
-        res = fs->shortToLongFileName((char *) strings[i].c_str(), longName);   // try to convert the name
+        res = fs->shortToLongFileName(strings[i].c_str(), longName);   // try to convert the name
 
         if(res) {                                       // if there was a long version of the file name, replace the short one
             strings[i] = longName;
         } else {
-            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s", (char *) strings[i].c_str());
+            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s", strings[i].c_str());
         }
 
         Utils::mergeHostPaths(pathPart, strings[i]);   // build the path slowly
@@ -126,17 +126,17 @@ bool DirTranslator::longToShortFilename(std::string &longHostPath, std::string &
 
     FilenameShortener *fs;
     if(it != mapPathToShortener.end()) {            // already got the shortener
-        Debug::out(LOG_DEBUG, "DirTranslator::longToShortFilename - shortener for longHostPath: %s found", (char *) longHostPath.c_str());
+        Debug::out(LOG_DEBUG, "DirTranslator::longToShortFilename - shortener for longHostPath: %s found", longHostPath.c_str());
 
         fs = it->second;
     } else {                                        // don't have the shortener yet
-        Debug::out(LOG_DEBUG, "DirTranslator::longToShortFilename - shortener for longHostPath: %s NOT found, will create shortener", (char *) longHostPath.c_str());
+        Debug::out(LOG_DEBUG, "DirTranslator::longToShortFilename - shortener for longHostPath: %s NOT found, will create shortener", longHostPath.c_str());
 
         fs = createShortener(longHostPath);
     }
 
     char shortName[32];                             // try to shorten the name
-    bool res = fs->longToShortFileName((char *) longFname.c_str(), shortName);   // try to convert the name from long to short
+    bool res = fs->longToShortFileName(longFname.c_str(), shortName);   // try to convert the name from long to short
 
     if(res) {                                       // name shortened - store it
         shortFname = shortName;
@@ -152,7 +152,7 @@ FilenameShortener *DirTranslator::createShortener(std::string &path)
     FilenameShortener *fs = new FilenameShortener();
     mapPathToShortener.insert( std::pair<std::string, FilenameShortener *>(path, fs) );
 
-	DIR *dir = opendir((char *) path.c_str());						// try to open the dir
+	DIR *dir = opendir(path.c_str());						// try to open the dir
 	
     if(dir == NULL) {                                 				// not found?
         return fs;
@@ -220,7 +220,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 			if((isRootDir)||((findAttribs&FA_DIR)==0)) {    // for root dir or when no subdirs are requested (FA_DIR) - don't add '.' or '..'
                 continue;
             } else {                                        // for non-root dir                                       - must add '.' or '..' (TOS does this, and it makes the TOS dir copying work)
-                appendFoundToFindStorage_dirUpDirCurr(hostPath, (char *) searchString.c_str(), fs, de, findAttribs);
+                appendFoundToFindStorage_dirUpDirCurr(hostPath, searchString.c_str(), fs, de, findAttribs);
                 continue;
             }            
 		}	
@@ -231,13 +231,13 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
                 int len = strlen(de->d_name);                                   // get filename length
                 
                 if(len > 4) {                                                   // if filename is at least 5 chars long
-                    char *found = strcasestr(de->d_name + len - 4, (char *) ".ZIP");    // see if it ends with .ZIP
+                    char *found = strcasestr(de->d_name + len - 4, ".ZIP");    // see if it ends with .ZIP
 
                     if(found != NULL) {                                         // if filename ends with .ZIP
                         std::string fullZipPath = hostPath + "/" + longFname;   // create full path to that zip file
                     
                         struct stat attr;
-                        int res = stat((char *) fullZipPath.c_str(), &attr);    // get the status of the possible zip file
+                        int res = stat(fullZipPath.c_str(), &attr);    // get the status of the possible zip file
 
                         if(res == 0) {                                          // if stat() succeeded
                             if(attr.st_size <= MAX_ZIPDIR_ZIPFILE_SIZE) {       // file not too big? change flags from file to dir
@@ -250,7 +250,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
         }
         
 		// finnaly append to the find storage
-		appendFoundToFindStorage(hostPath, (char *) searchString.c_str(), fs, de, findAttribs);
+		appendFoundToFindStorage(hostPath, searchString.c_str(), fs, de, findAttribs);
 
         if(fs->count >= fs->maxCount) {         					// avoid buffer overflow
             break;
@@ -269,7 +269,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 	return true;
 }
 
-void DirTranslator::appendFoundToFindStorage(std::string &hostPath, char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs)
+void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs)
 {
     // TODO: verify on ST that the find attributes work like this
 
@@ -336,10 +336,10 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, char *search
 
     // now convert the short 'FILE.C' to 'FILE    .C  '
     char shortFnameExtended[14];
-    FilenameShortener::extendWithSpaces((char *) shortFname.c_str(), shortFnameExtended);
+    FilenameShortener::extendWithSpaces(shortFname.c_str(), shortFnameExtended);
 
     // check the current name against searchString using fnmatch
-	int ires = compareSearchStringAndFilename(searchString, (char *) shortFname.c_str());
+	int ires = compareSearchStringAndFilename(searchString, shortFname.c_str());
 		
 	if(ires != 0) {     // not matching? quit
 		return;
@@ -363,15 +363,15 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, char *search
     buf[8] = attr.st_size & 0xff;
 
     // Filename -- d_fname[14]
-    memset(&buf[9], 0, 14);                                         // first clear the mem
-//  strncpy((char *) &buf[9], (char *) shortFnameExtended, 14);     // copy the filename - 'FILE    .C  '
-    strncpy((char *) &buf[9], (char *) shortFname.c_str(), 14);     // copy the filename - 'FILE.C'
+    memset(&buf[9], 0, 14);                                // first clear the mem
+//  strncpy((char *) &buf[9], shortFnameExtended, 14);     // copy the filename - 'FILE    .C  '
+    strncpy((char *) &buf[9], shortFname.c_str(), 14);     // copy the filename - 'FILE.C'
 
     fsPart->count++;                                                // increase partial count
     fs->count++;                                                    // increase total count
 }
 
-void DirTranslator::appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath, char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs)
+void DirTranslator::appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs)
 {
     TFindStorage *fsPart = &fsDirs;                     // get the pointer to partial find storage to separate dirs from files when searching
 
@@ -404,7 +404,7 @@ void DirTranslator::appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath,
     WORD atariDate = Utils::fileTimeToAtariDate(timestr);
 
     // check the current name against searchString using fnmatch
-	int ires = compareSearchStringAndFilename(searchString, (char *) shortFname.c_str());
+	int ires = compareSearchStringAndFilename(searchString, shortFname.c_str());
 		
 	if(ires != 0) {     // not matching? quit
 		return;
@@ -445,7 +445,7 @@ void DirTranslator::toUpperCaseString(std::string &st)
 	}
 }
 
-int DirTranslator::compareSearchStringAndFilename(char *searchString, char *filename)
+int DirTranslator::compareSearchStringAndFilename(const char *searchString, const char *filename)
 {
 	char ss1[16], ss2[16];
 	char fn1[16], fn2[16];

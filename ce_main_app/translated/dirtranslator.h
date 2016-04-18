@@ -51,10 +51,10 @@ private:
     FilenameShortener *createShortener(std::string &path);
     void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
 
-    void appendFoundToFindStorage(std::string &hostPath, char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
-	void appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath, char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
+    void appendFoundToFindStorage(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
+	void appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
 
-	int compareSearchStringAndFilename(char *searchString, char *filename);
+	int compareSearchStringAndFilename(const char *searchString, const char *filename);
 	void toUpperCaseString(std::string &st);
 };
 
