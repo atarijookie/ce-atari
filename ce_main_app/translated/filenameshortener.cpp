@@ -126,7 +126,7 @@ void FilenameShortener::removeSpaceExtension(const char *extendedFn, char *extRe
     removeTrailingSpaces(fname);                            // convert 'FILE    ' to 'FILE'
     removeTrailingSpaces(ext);                              // convert 'C  ' to 'C'
 
-    mergeFilenameAndExtension(fname, ext, false, extendedFn);
+    mergeFilenameAndExtension(fname, ext, false, extRemovedFn);
 }
 
 void FilenameShortener::extendWithSpaces(const char *normalFname, char *extendedFn)
