@@ -58,6 +58,7 @@ public:
 
 private:
 	bool mount(const char *mountCmd, const char *mountDir);
+	bool mount(const char*, const char*, const char*, const char*);
 
 	bool isAlreadyMounted(const char *source);
 	bool isMountdirUsed(const char *mountDir);

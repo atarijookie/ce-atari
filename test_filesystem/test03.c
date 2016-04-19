@@ -52,7 +52,8 @@ void test0310(void)
     while(1) {
         //-------------------
         // protection against endless loop in case of failing test
-        if((getTicks() - start) > 1000) {       // more than 5 seconds of run? quit, fail
+        if((getTicks() - start) > 15*200) {  // more than 15 seconds of run?
+            out_s("test timeout");           // fail and quit
             break;
         }
         //-------------------

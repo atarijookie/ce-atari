@@ -5,6 +5,7 @@
 #include <pwd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mount.h>
 #include <errno.h>
 
 #include <signal.h>
@@ -165,13 +166,13 @@ void Mounter::mountZipFile(const char *zipFilePath, const char *mountDir)
     
     Debug::out(LOG_DEBUG, "Mounter::mountZipFile -- will mount %s file to %s directory", zipFilePath, mountDir);
 
-    sprintf(cmd, "rm -rf %s", mountDir);
+    sprintf(cmd, "rm -rf '%s'", mountDir);
     system(cmd);                                    // delete dir if it exists (e.g. contains previous zip file content)
 
-    sprintf(cmd, "mkdir -p %s", mountDir);
+    sprintf(cmd, "mkdir -p '%s'", mountDir);
     system(cmd);                                    // create mount dir 
 
-    sprintf(cmd, "unzip -o %s -d %s > /dev/null 2> /dev/null", zipFilePath, mountDir);
+    sprintf(cmd, "unzip -o '%s' -d '%s' > /dev/null 2> /dev/null", zipFilePath, mountDir);
     system(cmd);                                    // unzip it to dir
 }
 
@@ -200,7 +201,7 @@ bool Mounter::mountDevice(const char *devicePath, const char *mountDir)
 bool Mounter::mountShared(const char *host, const char *hostDir, bool nfsNotSamba, const char *mountDir, const char *username, const char *password)
 {
 	// build and run the command
-	char cmd[MAX_STR_SIZE];
+	char options[MAX_STR_SIZE];
     char auth[MAX_STR_SIZE];
 	char source[MAX_STR_SIZE];
 	int len;
@@ -213,9 +214,11 @@ bool Mounter::mountShared(const char *host, const char *hostDir, bool nfsNotSamb
         }
     } else {                                // got user name?
         if(strlen(password) == 0) {         // don't have password?
-            snprintf(auth, MAX_STR_SIZE, ",username='%s'", username);
+            snprintf(auth, MAX_STR_SIZE, ",username=%s", username);
         } else {                            // and got password?
-            snprintf(auth, MAX_STR_SIZE, ",username='%s',password='%s'", username, password);
+			/* if password contain character ',' we should use
+			 * PASSWD environment variable or credentials file (see man 8 mount.cifs) */
+            snprintf(auth, MAX_STR_SIZE, ",username=%s,password=%s", username, password);
         }
     }
 	
@@ -223,33 +226,78 @@ bool Mounter::mountShared(const char *host, const char *hostDir, bool nfsNotSamb
 	
 	// check if we're not trying to mount something we already have mounted
 	if(isAlreadyMounted(source)) {
-		Debug::out(LOG_DEBUG, "Mounter::mountShared -- The source %s is already mounted, not doing anything.\n", source);
+		Debug::out(LOG_DEBUG, "Mounter::mountShared -- The source %s is already mounted, not doing anything.", source);
 		return true;
 	}
 		
 	if(nfsNotSamba) {		// for NFS
-        // was: sudo
-		len = snprintf(cmd, MAX_STR_SIZE, "mount -v -t nfs -o nolock%s %s %s >> %s 2>> %s", auth, source, mountDir, LOGFILE1, LOGFILE2);
+		len = snprintf(options, MAX_STR_SIZE, "nolock,addr=%s%s", host, auth);
 	} else {				// for Samba
 		passwd *psw = getpwnam("pi");
 		
 		if(psw == NULL) {
-			Debug::out(LOG_ERROR, "Mounter::mountShared - failed, because couldn't get uid and gid for user 'pi'\n");
+			Debug::out(LOG_ERROR, "Mounter::mountShared - failed, because couldn't get uid and gid for user 'pi'");
 			return false;
 		}
         
-        // was: sudo
-		len = snprintf(cmd, MAX_STR_SIZE, "mount -v -t cifs -o gid=%d,uid=%d%s \"%s\" \"%s\" >> %s 2>> %s", psw->pw_gid, psw->pw_uid, auth, source, mountDir, LOGFILE1, LOGFILE2);
+		len = snprintf(options, MAX_STR_SIZE, "gid=%d,forcegid,uid=%d,forceuid%s",
+		               psw->pw_gid, psw->pw_uid, auth);
 	}
 
 	// if the final command string did not fit in the buffer
 	if(len >= MAX_STR_SIZE) {
-		Debug::out(LOG_ERROR, "Mounter::mountShared - cmd string not large enough for mount!\n");
+		Debug::out(LOG_ERROR, "Mounter::mountShared - options string not large enough for mount!");
 		return false;
 	}
 	
 	// now do the mount stuff
-	return mount(cmd, mountDir);
+	return mount(source, mountDir, nfsNotSamba ? "nfs" : "cifs", options);
+}
+
+bool Mounter::mount(const char *source, const char *target,
+                    const char *type, const char * options)
+{
+	int r;
+	const char * err;
+	// create mount dir if possible : mod : 0775
+	r = mkdir(target, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+	
+	if(r != 0 && errno != EEXIST) {	// if failed to create dir, and it's not because it already exists...
+		err = strerror(errno);
+		Debug::out(LOG_ERROR, "Mounter::mount - failed to create directory %s : %s", target, err);
+		return false;
+	}
+
+	// check if we should do unmount first
+	if(isMountdirUsed(target)) {
+		if(!tryUnmount(target)) {
+			Debug::out(LOG_ERROR, "Mounter::mount - Mount dir %s is busy, and unmount failed, not doing mount!", target);
+			return false;
+		}
+		Debug::out(LOG_DEBUG, "Mounter::mount - Mount dir %s was used and was unmounted.", target);
+	}
+
+	r = ::mount(source, target, type, MS_MGC_VAL | MS_NOEXEC | MS_NOATIME, options);
+	if(r == 0) {
+		Debug::out(LOG_DEBUG, "Mounter::mount - mount succeeded! (mount dir: %s)", target);
+		return true;
+	}
+	err = strerror(errno);
+	Debug::out(LOG_ERROR, "Mounter::mount - mount failed. (mount dir: %s)", target);
+	Debug::out(LOG_ERROR, "Mounter::mount - mount error : %s", err);
+	Debug::out(LOG_ERROR, "Mounter::mount - type=%s source='%s' options='%s'", type, source, options);
+	char logpath[128];
+	snprintf(logpath, sizeof(logpath), "%s/mount.err", target);
+	FILE * flog = fopen(logpath, "wb");
+	if(flog) {
+		fprintf(flog, "mount() failed : %s\r\n\r\n", err);
+		fprintf(flog, "source : '%s'\r\n", source);
+		fprintf(flog, "type   : '%s'\r\n", type);
+		fprintf(flog, "target : '%s'\r\n", target);
+		fprintf(flog, "options: '%s'\r\n", options);
+		fclose(flog);
+	}
+	return false;
 }
 
 bool Mounter::mount(const char *mountCmd, const char *mountDir)
@@ -359,23 +407,16 @@ bool Mounter::mountDumpContains(const char *searchedString)
 
 bool Mounter::tryUnmount(const char *mountDir)
 {
-	char line[MAX_STR_SIZE];
-	
-    system("sync");                             // sync the caches
+    sync();                             // sync the caches
     
-	// build and execute the command - was: sudo
-	snprintf(line, MAX_STR_SIZE, "umount %s", mountDir);
-	Debug::out(LOG_DEBUG, "Mounter::tryUnmount - umount command: %s", line);
-    
-    int ret = system(line);
-	
-	// handle the result
-	if(WIFEXITED(ret) && WEXITSTATUS(ret) == 0) {
-		Debug::out(LOG_DEBUG, "Mounter::tryUnmount - umount succeeded\n");
-		return true;
-	} 
-	
-	return false;
+    Debug::out(LOG_DEBUG, "Mounter::tryUnmount - umount(\"%s\")", mountDir);
+    if(umount(mountDir) < 0) {
+        Debug::out(LOG_ERROR, "Mounter::tryUnmount - umount failed : %s", strerror(errno));
+        return false;
+    } else {
+        Debug::out(LOG_DEBUG, "Mounter::tryUnmount - umount succeeded\n");
+        return true;
+    }
 }
 
 void Mounter::createSource(const char *host, const char *hostDir, bool nfsNotSamba, char *source)
@@ -426,7 +467,7 @@ void Mounter::restartNetwork(void)
 {
 	Debug::out(LOG_DEBUG, "Mounter::restartNetwork - starting to restart the network\n");
 
-    system("sync");                                                 // first sync the filesystem caches...
+    ::sync();                                                 // first sync the filesystem caches...
 
     bool gotWlan0 = wlan0IsPresent();                               // first find out if we got wlan0 or not
 
@@ -469,7 +510,7 @@ bool Mounter::wlan0IsPresent(void)
 
 void Mounter::sync(void)                        // just do sync on filesystem
 {
-    system("sync");
+    ::sync();
 	Debug::out(LOG_DEBUG, "Mounter::sync - filesystem sync done\n");
 }
 
