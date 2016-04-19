@@ -15,7 +15,7 @@ void FilenameShortener::clear(void)
     mapFilenameNoExt.clear();
 }
 
-bool FilenameShortener::longToShortFileName(char *longFileName, char *shortFileName)
+bool FilenameShortener::longToShortFileName(const char *longFileName, char *shortFileName)
  {
      // QStringList &fileNames, QStringList &fullNames
     static char fileName[MAX_FILENAME_LEN];
@@ -29,7 +29,7 @@ bool FilenameShortener::longToShortFileName(char *longFileName, char *shortFileN
     it = mapFilenameWithExt.find(longFileName);                  // try to find the string in the map
 
     if(it != mapFilenameWithExt.end()) {                        // if we have this fileName already, use it!
-        char *shortFileNameFromMap = (char *) it->second.c_str();
+        const char *shortFileNameFromMap = it->second.c_str();
         strcpy(shortFileName, shortFileNameFromMap);
         return true;
     }
@@ -90,7 +90,7 @@ bool FilenameShortener::longToShortFileName(char *longFileName, char *shortFileN
     return true;
 }
 
-void FilenameShortener::mergeFilenameAndExtension(char *shortFn, char *shortExt, bool extendWithSpaces, char *merged)
+void FilenameShortener::mergeFilenameAndExtension(const char *shortFn, const char *shortExt, bool extendWithSpaces, char *merged)
 {
     if(extendWithSpaces) {                                      // space extended - 'FILE    .C  '
         memset(merged, ' ', 12);                                // clear the
@@ -103,8 +103,8 @@ void FilenameShortener::mergeFilenameAndExtension(char *shortFn, char *shortExt,
         lenFn = MIN(lenFn, 8);
         lenEx = MIN(lenEx, 3);
 
-        strncpy(merged,     shortFn,    lenFn);                 // copy in the filename
-        strncpy(merged + 9, shortExt,   lenEx);                 // copy in the file extension
+        memcpy(merged,     shortFn,    lenFn);                 // copy in the filename
+        memcpy(merged + 9, shortExt,   lenEx);                 // copy in the file extension
     } else {                                                    // not extended - 'FILE.C'
         memset(merged, 0, 13);                                  // clear the final string first
 
@@ -117,7 +117,7 @@ void FilenameShortener::mergeFilenameAndExtension(char *shortFn, char *shortExt,
     }
 }
 
-void FilenameShortener::removeSpaceExtension(char *extendedFn, char *extRemovedFn)
+void FilenameShortener::removeSpaceExtension(const char *extendedFn, char *extRemovedFn)
 {
     char fname[12];
     char ext[4];
@@ -126,10 +126,10 @@ void FilenameShortener::removeSpaceExtension(char *extendedFn, char *extRemovedF
     removeTrailingSpaces(fname);                            // convert 'FILE    ' to 'FILE'
     removeTrailingSpaces(ext);                              // convert 'C  ' to 'C'
 
-    mergeFilenameAndExtension(fname, ext, false, extendedFn);
+    mergeFilenameAndExtension(fname, ext, false, extRemovedFn);
 }
 
-void FilenameShortener::extendWithSpaces(char *normalFname, char *extendedFn)
+void FilenameShortener::extendWithSpaces(const char *normalFname, char *extendedFn)
 {
     char fname[12];
     char ext[4];
@@ -152,7 +152,7 @@ void FilenameShortener::removeTrailingSpaces(char *str)
     }
 }
 
-bool FilenameShortener::shortToLongFileName(char *shortFileName, char *longFileName)
+bool FilenameShortener::shortToLongFileName(const char *shortFileName, char *longFileName)
 {
     if(strlen(shortFileName) == 0) {                            // empty short path? fail
         return false;
@@ -170,7 +170,7 @@ bool FilenameShortener::shortToLongFileName(char *shortFileName, char *longFileN
     return false;
 }
 
-int FilenameShortener::strCharPos(char *str, int maxLen, char ch)
+int FilenameShortener::strCharPos(const char *str, int maxLen, char ch)
 {
     int i;
 
@@ -187,7 +187,7 @@ int FilenameShortener::strCharPos(char *str, int maxLen, char ch)
     return -1;                      // not found
 }
 
-void FilenameShortener::splitFilenameFromExtension(char *filenameWithExt, char *fileName, char *ext)
+void FilenameShortener::splitFilenameFromExtension(const char *filenameWithExt, char *fileName, char *ext)
 {
     int filenameLength = strlen(filenameWithExt);
 
@@ -306,8 +306,7 @@ void FilenameShortener::replaceNonLetters(char *str)
     int i, len, j;
     len = strlen(str);
 
-    char *allowed = (char *) "!#$%&'()~^@-_{}";
-    #define ALLOWED_COUNT   15
+    const char *allowed = "!#$%&'()~^@-_{}";
 
     for(i=0; i<len; i++) {
         if(str[i] >= '0' && str[i] <= '9') {    // numbers are OK
@@ -324,7 +323,7 @@ void FilenameShortener::replaceNonLetters(char *str)
         }
 
         bool isAllowed = false;
-        for(j=0; j<ALLOWED_COUNT; j++) {        // try to find this char in allowed characters array
+        for(j=0; allowed[j] != '\0'; j++) {        // try to find this char in allowed characters array
             if(str[i] == allowed[j]) {
                 isAllowed = true;
                 break;
