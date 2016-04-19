@@ -34,7 +34,7 @@
 	pea     (A1)       	| buffer 	Offset  8
     move.b  1(a2),D0    | d0 holds sector count we should transfer
 	move.w  D0,-(sp)  	| count 	Offset  6
-	move.l  #0,-(sp) 	| Offset  2
+	move.l  #1,-(sp) 	| secno Offset  2
 	move.w  #42,-(sp)   | Offset  0
 	trap    #14         | Call XBIOS
 	lea     14(sp),sp   | Correct stack
