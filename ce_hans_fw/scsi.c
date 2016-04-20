@@ -413,6 +413,12 @@ void SCSI_Inquiry(BYTE lun)
 		if(i == 27) {                   // send ACSI id
 			val = '0' + sdCardID;
 		}
+		if(i == 30) {
+			val = 'S';
+		}
+		if(i == 31) {
+			val = 'D';
+		}
 
 		if(i>=32 && i<=35) {            // version string
 		    val = VERSION_STRING_SHORT[i-32];
