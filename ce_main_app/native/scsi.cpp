@@ -16,7 +16,7 @@ Scsi::Scsi(void)
 	int i;
 	
     dataTrans = 0;
-    strncpy((char *) inquiryName, "CosmosEx  ", 10);
+    strcpy((char *) inquiryName, "CosmosEx");
 
     dataBuffer  = new BYTE[SCSI_BUFFER_SIZE];
     dataBuffer2 = new BYTE[SCSI_BUFFER_SIZE];
@@ -670,16 +670,16 @@ void Scsi::SCSI_Inquiry(void)
         int type = attachedMedia[devInfo[acsiId].attachedMediaIndex].hostSourceType;
         switch(type) {
         case SOURCETYPE_IMAGE:
-          memcpy(type_str, " IMG", 4);
+          memcpy(type_str, "IMG ", 4);
           break;
         case SOURCETYPE_IMAGE_TRANSLATEDBOOT:
-          memcpy(type_str, "BOOT", 4);
+          memcpy(type_str, "CEDD", 4);
           break;
         case SOURCETYPE_DEVICE:
-          memcpy(type_str, " RAW", 4);
+          memcpy(type_str, "RAW ", 4);
           break;
         case SOURCETYPE_SD_CARD:
-          memcpy(type_str, "  SD", 4);
+          memcpy(type_str, "SD  ", 4);
           break;
         default:
           snprintf(type_str, sizeof(type_str), "%4d", type);
@@ -690,7 +690,6 @@ void Scsi::SCSI_Inquiry(void)
 
     for(i=0; i<xx; i++)
     {
-
         if(i >= 8 && i<=43) {           // if the returned byte is somewhere from ASCII part of data, init on 'space' character
             val = ' ';
         } else {                        // for other locations init on ZERO
@@ -713,16 +712,16 @@ void Scsi::SCSI_Inquiry(void)
             val = vendor[i-8];
         }
 
-        if(i>=16 && i<=25) {            // send device name (CosmosEx)
+        if(i>=16 && i<=23) {            // send device name (CosmosEx)
             val = inquiryName[i-16];
         }
 
-        if(i == 27) {                   // send ACSI ID # (0 .. 7)
+        if(i == 25) {                   // send ACSI ID # (0 .. 7)
             val = '0' + acsiId;
         }
 
-        if(i>=28 && i<32) {             // send type
-            val = type_str[i-28];
+        if(i>=27 && i<31) {             // send type
+            val = type_str[i-27];
         }
 
         if(i>=32 && i<=35) {            // version string

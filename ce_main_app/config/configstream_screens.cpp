@@ -76,7 +76,8 @@ void ConfigStream::createScreen_acsiConfig(void)
     screenChanged		= true;			// mark that the screen has changed
     showingHomeScreen	= false;		// mark that we're NOT showing the home screen
 
-    screen_addHeaderAndFooter(screen, (char *) "ACSI config");
+    const char *idHeaderLabel = (hwConfig.hddIface == HDD_IF_SCSI) ? " SCSI IDs config " : " ACSI IDs config ";
+    screen_addHeaderAndFooter(screen, (char *) idHeaderLabel);
 
     ConfigComponent *comp;
 
@@ -489,12 +490,12 @@ void ConfigStream::onAcsiConfig_save(void)
     }
 
     if(somethingInvalid) {									// if everything is set to OFF
-        showMessageScreen((char *) "Warning", (char *) "Some ACSI ID has no selected type.\n\rGo and select something!");
+        showMessageScreen((char *) "Warning", (char *) "Some ACSI/SCSI ID has no selected type.\n\rGo and select something!");
         return;
     }
 
     if(!somethingActive) {									// if everything is set to OFF
-        showMessageScreen((char *) "Warning", (char *) "All ACSI IDs are set to 'OFF',\n\rthis is invalid and would brick the device.\n\rSelect at least one active ACSI ID.");
+        showMessageScreen((char *) "Warning", (char *) "All ACSI/SCSI IDs are set to 'OFF',\n\rit is invalid and would brick the device.\n\rSelect at least one active ACSI/SCSI ID.");
         return;
     }
 
