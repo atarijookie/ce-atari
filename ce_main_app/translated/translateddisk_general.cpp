@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <string>
 #include <string.h>
 #include <stdio.h>
@@ -203,9 +204,23 @@ void TranslatedDisk::mountAndAttachSharedDrive(void)
 
     std::string devicePath;
     if(nfsNotSamba) {
-        devicePath = std::string("NFS: ") + addr + std::string(":/") + path;
+        devicePath = std::string("NFS: ") + addr + std::string(":");
+
+        if(path.length() > 0 && (path[0] != '/' && path[0] != '\\')) {      // if the path doesn't end with slash, add it
+            devicePath += "/";
+        }
+        
+        devicePath += path;                                                 // now add the path
+        std::replace( devicePath.begin(), devicePath.end(), '\\', '/');
     } else {
-        devicePath = std::string("samba: \\\\") + addr + std::string("\\") + path;
+        devicePath = std::string("samba: \\\\") + addr;
+
+        if(path.length() > 0 && (path[0] != '/' && path[0] != '\\')) {      // if the path doesn't end with slash, add it
+            devicePath += "\\";
+        }
+
+        devicePath += path;
+        std::replace(devicePath.begin(), devicePath.end(), '/', '\\');
     }
     
 	bool res = attachToHostPath(mountPath, TRANSLATEDTYPE_SHAREDDRIVE, devicePath);	// try to attach
@@ -1541,16 +1556,16 @@ void TranslatedDisk::driveGetReport(int driveIndex, std::string &reportString)
         return;
     }
 
-	char *trTypeStr[4] = {(char *) "", (char *) "USB drive", (char *) "shared drive", (char *) "config drive"};
-	
-  	int  typeIndex  = conf[driveIndex].translatedType + 1;
-	char *typeStr   = trTypeStr[typeIndex];
+  	int typeIndex  = conf[driveIndex].translatedType;
 
 	char tmp[256];
-    sprintf(tmp, "%s, device: %s", typeStr, (char *) conf[driveIndex].devicePath.c_str());
+    
+    switch(typeIndex) {
+        case TRANSLATEDTYPE_NORMAL:         sprintf(tmp, "USB drive - device: %s",         conf[driveIndex].devicePath.c_str());    break;
+        case TRANSLATEDTYPE_SHAREDDRIVE:    sprintf(tmp, "shared drive, %s",               conf[driveIndex].devicePath.c_str());    break;
+        case TRANSLATEDTYPE_CONFIGDRIVE:    sprintf(tmp, "config drive (located at %s)",   conf[driveIndex].devicePath.c_str());    break;
+        default: sprintf(tmp, "unknown"); break;
+    }
+        
     reportString = tmp;
 }
-
-
-
-

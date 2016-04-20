@@ -1,4 +1,4 @@
-#include "debugcontroller.h"
+    #include "debugcontroller.h"
 #include <string>
 #include <sstream>
 #include <fstream>
@@ -41,7 +41,7 @@ bool DebugController::indexAction(mg_connection *conn, mg_request_info *req_info
 	//get status report
 	std::string sStatusReport;
 	StatusReport xStatusReport;
-	xStatusReport.createReport(sStatusReport,REPORTFORMAT_HTML);  
+	xStatusReport.createReport(sStatusReport,REPORTFORMAT_HTML_ONLYBODY);  
 	mapVariables["statusreport"]=sStatusReport;
 
     std::string sOutput=replaceAll(sTemplateLayout,std::string("{{title}}"),std::string("CosmosEx debug information"));

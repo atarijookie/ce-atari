@@ -52,12 +52,12 @@ void StatusReport::createReport(std::string &report, int reportFormat)
     // ikdb emulation
     startSection(report, "IKBD emulation", reportFormat);
 
-    if(ikbdDevs[INTYPE_MOUSE].fd        > 0) dumpPair(report, "USB mouse",          ikbdDevs[INTYPE_MOUSE].devPath,         reportFormat);
-    if(ikbdDevs[INTYPE_KEYBOARD].fd     > 0) dumpPair(report, "USB keyboard",       ikbdDevs[INTYPE_KEYBOARD].devPath,      reportFormat);
-    if(ikbdDevs[INTYPE_JOYSTICK1].fd    > 0) dumpPair(report, "USB joystick 1",     ikbdDevs[INTYPE_JOYSTICK1].devPath,     reportFormat);
-    if(ikbdDevs[INTYPE_JOYSTICK2].fd    > 0) dumpPair(report, "USB joystick 2",     ikbdDevs[INTYPE_JOYSTICK2].devPath,     reportFormat);
-    if(ikbdDevs[INTYPE_VDEVMOUSE].fd    > 0) dumpPair(report, "virtual mouse",      ikbdDevs[INTYPE_VDEVMOUSE].devPath,     reportFormat);
-    if(ikbdDevs[INTYPE_VDEVKEYBOARD].fd > 0) dumpPair(report, "virtual keyboard",   ikbdDevs[INTYPE_VDEVKEYBOARD].devPath,  reportFormat);
+    if(ikbdDevs[INTYPE_MOUSE].fd        > 0) dumpPair(report, "USB mouse",          ikbdDevs[INTYPE_MOUSE].devPath,         reportFormat, false);
+    if(ikbdDevs[INTYPE_KEYBOARD].fd     > 0) dumpPair(report, "USB keyboard",       ikbdDevs[INTYPE_KEYBOARD].devPath,      reportFormat, false);
+    if(ikbdDevs[INTYPE_JOYSTICK1].fd    > 0) dumpPair(report, "USB joystick 1",     ikbdDevs[INTYPE_JOYSTICK1].devPath,     reportFormat, false);
+    if(ikbdDevs[INTYPE_JOYSTICK2].fd    > 0) dumpPair(report, "USB joystick 2",     ikbdDevs[INTYPE_JOYSTICK2].devPath,     reportFormat, false);
+    if(ikbdDevs[INTYPE_VDEVMOUSE].fd    > 0) dumpPair(report, "virtual mouse",      ikbdDevs[INTYPE_VDEVMOUSE].devPath,     reportFormat, false);
+    if(ikbdDevs[INTYPE_VDEVKEYBOARD].fd > 0) dumpPair(report, "virtual keyboard",   ikbdDevs[INTYPE_VDEVKEYBOARD].devPath,  reportFormat, false);
 
     if(noOfElements < 1) dumpPair(report, "no input devices", "0", reportFormat);
 
@@ -79,7 +79,7 @@ void StatusReport::createReport(std::string &report, int reportFormat)
             std::string reportString;
             shared.translated->driveGetReport(i, reportString);
 
-            dumpPair(report, driveName.c_str(), reportString.c_str(), reportFormat, TEXT_COL1_WIDTH, 60);
+            dumpPair(report, driveName.c_str(), reportString.c_str(), reportFormat, false, TEXT_COL1_WIDTH, 60);
         }
     }
     
@@ -137,12 +137,13 @@ void StatusReport::putStatusHeader(std::string &report, int reportFormat)
         report += std::string( fixStringToLength("What alive sign",         TEXT_COL3_WIDTH)) + std::string("\n");
         break;
 
-        case REPORTFORMAT_HTML:
-        report += "<tr bgcolor='#cccccc'>";
-        report += "    <td>What chip or interface </td>";
-        report += "    <td>When was alive sign    </td>";
-        report += "    <td>Is that good or bad?   </td>";
-        report += "    <td>What was the alive sign</td> </tr>\n";
+        case REPORTFORMAT_HTML_FULL:
+        case REPORTFORMAT_HTML_ONLYBODY:
+        report += "<tr>";
+        report += "    <th class='thStatus'>What chip or interface </th>";
+        report += "    <th class='thStatus'>When was alive sign    </th>";
+        report += "    <th class='thStatus'>Is that good or bad?   </th>";
+        report += "    <th class='thStatus'>What was the alive sign</th> </tr>\n";
         break;
     }
 }
@@ -186,14 +187,17 @@ void StatusReport::dumpStatus(std::string &report, const char *desciprion, volat
         report += fixStringToLength(aliveSignString,    TEXT_COL3_WIDTH) + std::string("\n");
         break;
 
-        case REPORTFORMAT_HTML:
-        report += "<tr><td bgcolor='#cccccc'>";
+        case REPORTFORMAT_HTML_FULL:
+        case REPORTFORMAT_HTML_ONLYBODY:
+        report += "<tr><th class='thStatus'>";
         report += desciprion;
-        report += "</td><td><center>";
+        report += "</th><td><center>";
         report += aliveAgoString;
+        report += "</center></td><td ";
+        report += good ? "class='aliveGood'" : "class='aliveBad'";
+        report += "><center>";
+        report += good ? "good" : "bad";
         report += "</center></td><td><center>";
-        report += good ? "<font color='#00aa00'>good" : "<font color='#cc0000'>bad";
-        report += "</font></center></td><td><center>";
         report += aliveSignString;
         report += "</center></td></tr>";
         break;
@@ -218,7 +222,7 @@ void StatusReport::dumpStatus(std::string &report, const char *desciprion, volat
     noOfElements++;
 }
 
-void StatusReport::dumpPair(std::string &report, const char *key, const char *value, int reportFormat, int len1, int len2)
+void StatusReport::dumpPair(std::string &report, const char *key, const char *value, int reportFormat, bool centerValue, int len1, int len2)
 {
     switch(reportFormat) {
     case REPORTFORMAT_RAW_TEXT: 
@@ -228,12 +232,15 @@ void StatusReport::dumpPair(std::string &report, const char *key, const char *va
         report += "\n";
         break;
 
-        case REPORTFORMAT_HTML:
-        report += "<tr><td bgcolor='#cccccc'>";
+        case REPORTFORMAT_HTML_FULL:
+        case REPORTFORMAT_HTML_ONLYBODY:
+        report += "<tr><th class='thStatus'>";
         report += key;
-        report += "</td><td><center>";
+        report += "</th><td ";
+        report += centerValue ? "class='valueCenter'" : "class='valueLeft'";
+        report += ">";
         report += value;
-        report += "</center></td></tr>";
+        report += "</td></tr>";
         break;
 
         case REPORTFORMAT_JSON:
@@ -262,10 +269,11 @@ void StatusReport::startSection(std::string &report, const char *sectionName, in
         report += "\n----------------------------------------\n";
         break;
 
-        case REPORTFORMAT_HTML:
+        case REPORTFORMAT_HTML_FULL:
+        case REPORTFORMAT_HTML_ONLYBODY:
         report += "<b>";
         report += sectionName;
-        report += "</b><br> <table border=1 cellspacing=0 cellpadding=5>";
+        report += "</b><br> <table>";
         break;
 
         case REPORTFORMAT_JSON:
@@ -289,7 +297,8 @@ void StatusReport::endSection(std::string &report, int reportFormat)
         report += "\n\n";
         break;
 
-        case REPORTFORMAT_HTML:
+        case REPORTFORMAT_HTML_FULL:
+        case REPORTFORMAT_HTML_ONLYBODY:
         report += "</table><br><br>\n";
         break;
 
@@ -310,9 +319,12 @@ void StatusReport::startReport(std::string &report, int reportFormat)
         report += "----------------------\n\n";
         break;
 
-        case REPORTFORMAT_HTML:
+        case REPORTFORMAT_HTML_FULL:        // output html, head and body for full
         report += "<html><head><title>CosmosEx device report</title></head>";
         report += "<body><b>CosmosEx device report</b><br><br>";
+        break;
+
+        case REPORTFORMAT_HTML_ONLYBODY:    // don't output anything special for body only
         break;
 
         case REPORTFORMAT_JSON:
@@ -328,8 +340,11 @@ void StatusReport::endReport(std::string &report, int reportFormat)
         report += "\n";
         break;
 
-        case REPORTFORMAT_HTML:
+        case REPORTFORMAT_HTML_FULL:
         report += "\n</body></html>";
+        break;
+
+        case REPORTFORMAT_HTML_ONLYBODY:
         break;
 
         case REPORTFORMAT_JSON:

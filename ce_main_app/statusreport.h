@@ -51,9 +51,10 @@ typedef struct {
 
 extern volatile TStatuses statuses;
 
-#define REPORTFORMAT_RAW_TEXT   0
-#define REPORTFORMAT_HTML       1
-#define REPORTFORMAT_JSON       2
+#define REPORTFORMAT_RAW_TEXT       0
+#define REPORTFORMAT_HTML_FULL      1
+#define REPORTFORMAT_HTML_ONLYBODY  2
+#define REPORTFORMAT_JSON           3
 
 #define TEXT_COL1_WIDTH     40
 #define TEXT_COL2_WIDTH     20
@@ -75,7 +76,7 @@ private:
 
     void putStatusHeader(std::string &report, int reportFormat);
     void dumpStatus     (std::string &report, const char *desciprion, volatile TStatus &status, int reportFormat);
-    void dumpPair       (std::string &report, const char *key,               const char *value, int reportFormat, int len1=TEXT_COL1_WIDTH, int len2=TEXT_COL2_WIDTH);
+    void dumpPair       (std::string &report, const char *key,               const char *value, int reportFormat, bool centerValue=true, int len1=TEXT_COL1_WIDTH, int len2=TEXT_COL2_WIDTH);
 
     const char *aliveSignIntToString(int aliveSign);
           char *fixStringToLength(const char *inStr, int len);

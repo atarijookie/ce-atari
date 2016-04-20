@@ -25,10 +25,10 @@ bool StatusController::indexAction(mg_connection *conn, mg_request_info *req_inf
 	//get status report
 	std::string sStatusReport;
 	StatusReport xStatusReport;
-	xStatusReport.createReport(sStatusReport,REPORTFORMAT_HTML);  
+	xStatusReport.createReport(sStatusReport,REPORTFORMAT_HTML_ONLYBODY);  
 	mapVariables["statusreport"]=sStatusReport;
 
-        std::string sOutput=replaceAll(sTemplateLayout,std::string("{{title}}"),std::string("CosmosEx status"));
+    std::string sOutput=replaceAll(sTemplateLayout,std::string("{{title}}"),std::string("CosmosEx status"));
 	sOutput=replaceAll(sOutput,std::string("{{content}}"),sTemplateDebug);
 	sOutput=replaceAll(sOutput,std::string("{{activeStatus}}"),"active");
 	sOutput=replaceAll(sOutput,std::string("{{info}}"),"This is your CosmosEx current status.");
