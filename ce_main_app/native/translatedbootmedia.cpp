@@ -41,11 +41,7 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
     // load Level 1 bootsector
     const char *bootsectorPath = NULL;
     
-    if(hwConfig.hddIface == HDD_IF_ACSI) {     // for ACSI IF
-        bootsectorPath = "/tmp/configdrive/ce_dd_st.bs";
-    } else {                            // for SCSI IF
-        bootsectorPath = "/tmp/configdrive/ce_dd_fn.bs";
-    }
+    bootsectorPath = "/tmp/configdrive/ce_dd.bs";
     f = fopen(bootsectorPath, "rb");
 
 	if(!f) {

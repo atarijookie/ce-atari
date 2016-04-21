@@ -30,7 +30,7 @@
 	|int16_t DMAread( int32_t sector, int16_t count, void *buffer, int16_t devno );
 	moveq 	#0,D0
 	move.b  (A2),D0
-	move.w 	D0,-(sp)  	| devno 	Offset 12
+	move.w 	D0,-(sp)  	| devno (ACSI:0-7 SCSI:8-15)	Offset 12
 	pea     (A1)       	| buffer 	Offset  8
     move.b  1(a2),D0    | d0 holds sector count we should transfer
 	move.w  D0,-(sp)  	| count 	Offset  6
