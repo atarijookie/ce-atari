@@ -1,0 +1,4 @@
+#ifndef MEDIASTREAMING_H
+#define MEDIASTREAMING_H
+
+#endif // MEDIASTREAMING_H

@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
@@ -536,10 +537,17 @@ void CCoreThread::handleAcsiCommand(void)
             wasHandled = true;
             netAdapter.processCommand(pCmd);
             break;
+
+/*
+        case HOSTMOD_MEDIA_STREAMING:
+            wasHandled = true;
+            mediaStreaming.processCommand(pCmd);
+            break;
+*/
         }
     }
 
-    if(wasHandled != true) {                            // if the command was not previously handled, it's probably just some SCSI command
+    if(!wasHandled) {           // if the command was not previously handled, it's probably just some SCSI command
         pthread_mutex_lock(&shared.mtxScsi);
         shared.scsi->processCommand(bufIn);                    // process the command
         pthread_mutex_unlock(&shared.mtxScsi);
