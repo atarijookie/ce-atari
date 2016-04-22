@@ -6,6 +6,7 @@
 #include <linux/input.h>
 #include <linux/joystick.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include "global.h"
 #include "debug.h"
