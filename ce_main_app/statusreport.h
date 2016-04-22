@@ -16,10 +16,8 @@
 // IKBD interface
 #define ALIVE_IKBD_CMD  0x30
 #define ALIVE_KEYDOWN   0x31
-#define ALIVE_MOUSEMOVE 0x32
-#define ALIVE_MOUSEBTN  0x33
-#define ALIVE_JOYMOVE   0x34
-#define ALIVE_JOYBTN    0x35
+#define ALIVE_MOUSEVENT 0x32
+#define ALIVE_JOYEVENT  0x33
 
 /* 
 Should also report:
