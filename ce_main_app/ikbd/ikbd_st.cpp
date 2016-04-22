@@ -1,190 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <string>
-
-#include <signal.h>
-#include <termios.h> 
-#include <linux/input.h>
-#include <linux/joystick.h>
 #include <errno.h>
-
-#include <stdarg.h>
 
 #include "global.h"
 #include "debug.h"
-#include "gpio.h"
 #include "utils.h"
-#include "ikbd.h"
-#include "settings.h"
-#include "datatypes.h"
 #include "statusreport.h"
 
-TInputDevice ikbdDevs[INTYPE_MAX+1];
-
-extern volatile sig_atomic_t sigintReceived;
-volatile bool do_loadIkbdConfig = false;
-
-//#define SPYIKBD
-extern TFlags flags;                                // global flags from command line
-
-void ikbdLog(const char *format, ...);
-
-#define logDebugAndIkbd(LOGLEVEL, FORMAT...)  {                                 \
-                                                Debug::out(LOGLEVEL, FORMAT);   \
-                                                ikbdLog(FORMAT);                \
-                                              }
-
-void *ikbdThreadCode(void *ptr)
-{
-    struct termios	termiosStruct;
-    Ikbd ikbd;
-    DWORD nextDevFindTime;
-
-    ikbdLog("----------------------------------------------------------");
-    ikbdLog("ikbdThreadCode will enter loop...");
-    
-    bcm2835_gpio_write(PIN_TX_SEL1N2, HIGH);		// TX_SEL1N2, switch the RX line to receive from Franz, which does the 9600 to 7812 baud translation
-
-    nextDevFindTime = Utils::getEndTime(3000);      // check the devices in 3 seconds
-    ikbd.findDevices();
-    ikbd.findVirtualDevices();
-    
-	// open and set up uart
-	int res = ikbd.serialSetup(&termiosStruct);
-	if(res == -1) {
-        logDebugAndIkbd(LOG_ERROR, "ikbd.serialSetup failed, won't be able to send IKDB data");
-	}
-
-    while(sigintReceived == 0) {
-        // reload config if needed
-        if(do_loadIkbdConfig) {
-            do_loadIkbdConfig = false;
-            ikbd.loadSettings();
-        }
-
-        // look for new input devices
-        if(Utils::getCurrentMs() >= nextDevFindTime) {      // should we check for new devices?
-            nextDevFindTime = Utils::getEndTime(3000);      // check the devices in 3 seconds
-
-            ikbd.findDevices();
-            ikbd.findVirtualDevices();
-        }
-
-        // process the incomming data from original keyboard and from ST
-        ikbd.processReceivedCommands();
-
-        // process events from attached input devices
-        struct input_event  ev;
-        struct js_event     js;
-
-        ssize_t res;
-        int i;
-        bool gotSomething = false;
-
-        for(i=0; i<6; i++) {                                        // go through the input devices
-            if(ikbd.getFdByIndex(i) == -1) {                        // device not attached? skip the rest
-                continue;
-            }
-
-            if(i < 2) {     // for keyboard and mouse
-                res = read(ikbd.getFdByIndex(i), &ev, sizeof(input_event)); 
-            } else if (i<4) {        // for joysticks
-                res = read(ikbd.getFdByIndex(i), &js, sizeof(js_event)); 
-            }
-            if( i==4 || i==5) {     // for virtual mouse and keyboard
-                res = read(ikbd.getFdByIndex(i), &ev, sizeof(input_event)); 
-            }
-            if(res < 0) {                                           // on error, skip the rest
-                if(errno == ENODEV) {                               // if device was removed, deinit it
-                    ikbd.deinitDev(i);
-                }
-
-                continue;
-            }
-            if( res==0 ) {                                           // on error, skip the rest
-                continue;
-            }
-
-            gotSomething = true;                                    // mark that reading of at least one device succeeded
-
-            switch(i) {
-                case INTYPE_MOUSE:          ikbd.processMouse(&ev);          break;
-
-                case INTYPE_VDEVMOUSE:
-                    ikbd.markVirtualMouseEvenTime();                // first mark the event time
-                    ikbd.processMouse(&ev);                         // then process the event
-                    break;
-
-                case INTYPE_KEYBOARD:       ikbd.processKeyboard(&ev);       break;
-                case INTYPE_VDEVKEYBOARD:   ikbd.processKeyboard(&ev);       break;
-                case INTYPE_JOYSTICK1:      ikbd.processJoystick(&js, 0);    break;
-                case INTYPE_JOYSTICK2:      ikbd.processJoystick(&js, 1);    break;
-            }
-        }
-
-        if(!gotSomething) {                                         // didn't succeed with reading of any device? 
-            usleep(10000);                                          // sleep for 10 ms
-            continue;
-        }
-    }
-    
-    ikbd.closeDevs();
-    
-    ikbdLog("ikbdThreadCode has quit");
-    return 0;
-}
-
-Ikbd::Ikbd()
-{
-    loadSettings();
-
-    initDevs();
-    fillKeyTranslationTable();
-
-    ceIkbdMode = CE_IKBDMODE_SOLO;
-	
-    fdUart      = -1;
-    mouseBtnNow = 0;
-
-    // init uart RX cyclic buffers
-    initCyclicBuffer(&cbStCommands);
-    initCyclicBuffer(&cbKeyboardData);
-
-    gotHalfPair     = false;
-    halfPairData    = 0;
-
-    fillSpecialCodeLengthTable();
-    fillStCommandsLengthTable();
-
-    resetInternalIkbdVars();
-}
-
-void Ikbd::loadSettings(void)
-{
-    Settings s;
-    bool firstJoyIs0 = s.getBool((char *) "JOY_FIRST_IS_0", false);
-
-    if(firstJoyIs0) {
-        joy1st = INTYPE_JOYSTICK1;
-        joy2nd = INTYPE_JOYSTICK2;
-    } else {
-        joy1st = INTYPE_JOYSTICK2;
-        joy2nd = INTYPE_JOYSTICK1;
-    }
-}
+#include "ikbd.h"
 
 void Ikbd::processReceivedCommands(void)
 {
-    if(fdUart == -1) {                          // uart not open? quit
+    if(fdUart == -1) {                                          // uart not open? quit
         return;
     }
 
@@ -206,9 +34,9 @@ void Ikbd::processReceivedCommands(void)
         for(int i=0; i<res; i += 2) {
             if((i+1) < res) {                                   // there's at least this pair in buffer
                 if(bfr[i] == UARTMARK_STCMD) {                  // this is ST command byte, add it to ST command buffer
-                    addToCyclicBuffer(&cbStCommands, bfr[i + 1]);
+                    cbStCommands.add(bfr[i + 1]);
                 } else if(bfr[i] == UARTMARK_KEYBDATA) {        // this is original keyboard data, add it to keyboard data buffer
-                    addToCyclicBuffer(&cbKeyboardData, bfr[i + 1]);
+                    cbKeyboardData.add(bfr[i + 1]);
                 } else {                                        // this is not command MARK and not keyboard MARK, move half pair back (we're not in sync with pairs somehow)
                     i--;
                 }
@@ -247,7 +75,7 @@ void Ikbd::processReceivedCommands(void)
 void Ikbd::dumpBuffer(bool fromStNotKeyboard)
 {
     std::string text;
-    TCyclicBuff *cb;
+    CyclicBuff *cb;
     
     if(fromStNotKeyboard) {
         text = "ST says      : ";
@@ -260,7 +88,7 @@ void Ikbd::dumpBuffer(bool fromStNotKeyboard)
     char bfr[16];
 
     while(cb->count > 0) {                      // if there's some data
-        BYTE val = getFromCyclicBuffer(cb);     // get data
+        BYTE val = cb->get();                   // get data
         
         sprintf(bfr, "%02x ", val);             // add hex dump of this data
         text += bfr;
@@ -285,7 +113,7 @@ void Ikbd::processStCommands(void)
     statuses.ikbdSt.aliveSign = ALIVE_IKBD_CMD;
 
     while(cbStCommands.count > 0) {                             // while there are some data, process
-        BYTE cmd = peekCyclicBuffer(&cbStCommands);             // get the data, but don't move the get pointer, because we might fail later
+        BYTE cmd = cbStCommands.peek();                         // get the data, but don't move the get pointer, because we might fail later
         int len = 0;
 
         if((cmd & 0x80) == 0) {                                 // highest bit is 0? SET command
@@ -303,7 +131,7 @@ void Ikbd::processStCommands(void)
         
         if(len == 0) {                                          // it's not GET command and we don't have this SET command defined?
             ikbdLog( "Ikbd::processStCommands -- not GET cmd, and we don't know what to do");
-            getFromCyclicBuffer(&cbStCommands);                 // just remove this byte and try the next byte
+            cbStCommands.get();                                 // just remove this byte and try the next byte
             continue;
         }
 
@@ -314,7 +142,7 @@ void Ikbd::processStCommands(void)
                 return;
             }
 
-            len = peekCyclicBufferWithOffset(&cbStCommands, 3); // get the data at offset [3] but don't really move
+            len = cbStCommands.peekWithOffset(3);               // get the data at offset [3] but don't really move
         }
 
         if(len > cbStCommands.count) {                          // if we don't have enough data in the buffer, quit
@@ -325,7 +153,7 @@ void Ikbd::processStCommands(void)
         // if we got here, it's either GET or SET command that we support
 
         for(int i=0; i<len; i++) {                              // get the whole sequence
-            bfr[i] = getFromCyclicBuffer(&cbStCommands);
+            bfr[i] = cbStCommands.get();
         }
 
         if(bfr[0] != STCMD_PAUSE_OUTPUT) {              		// if this command is not PAUSE OUTPUT command, then enable output
@@ -649,33 +477,6 @@ void Ikbd::fixAbsMousePos(void)
     }
 }
 
-void Ikbd::resetInternalIkbdVars(void)
-{
-    outputEnabled   = true;
-
-    mouseMode       = MOUSEMODE_REL;
-    mouseEnabled    = true;
-    mouseY0atTop    = true;
-    mouseAbsBtnAct  = MOUSEBTN_REPORT_NOTHING;
-
-    absMouse.maxX   	= 640;
-    absMouse.maxY   	= 400;
-    absMouse.x      	= 0;
-    absMouse.y      	= 0;
-	absMouse.buttons	= 0;
-	absMouse.scaleX		= 1;
-	absMouse.scaleY		= 1;
-
-	relMouse.threshX	= 1;
-	relMouse.threshY	= 1;
-	
-	keycodeMouse.deltaX	= 0;
-	keycodeMouse.deltaY	= 0;
-	
-    joystickMode    = JOYMODE_EVENT;
-    joystickEnabled = true;
-}
-
 void Ikbd::processKeyboardData(void)
 {
     BYTE bfr[128];
@@ -685,7 +486,7 @@ void Ikbd::processKeyboardData(void)
     }
 
     while(cbKeyboardData.count > 0) {                           // while there are some data, process
-        BYTE val = peekCyclicBuffer(&cbKeyboardData);           // get the data, but don't move the get pointer, because we might fail later
+        BYTE val = cbKeyboardData.peek();                       // get the data, but don't move the get pointer, because we might fail later
 
         if(val >= KEYBDATA_SPECIAL_LOWEST && val <= 0xff) {     // if this a special code?
             BYTE index = val - KEYBDATA_SPECIAL_LOWEST;         // convert it to table index
@@ -697,7 +498,7 @@ void Ikbd::processKeyboardData(void)
             }
 
             for(int i=0; i<len; i++) {                          // get the whole sequence
-                bfr[i] = getFromCyclicBuffer(&cbKeyboardData);
+                bfr[i] = cbKeyboardData.get();
             }
 			
 			ceIkbdMode = CE_IKBDMODE_INJECT;					// if we got at least one data sequence from original keyboard, switch to INJECT mode
@@ -744,280 +545,8 @@ void Ikbd::processKeyboardData(void)
         }
 
         // if we got here, it's not a special code, just make / break keyboard code
-        val = getFromCyclicBuffer(&cbKeyboardData);             // get data from buffer
+        val = cbKeyboardData.get();                             // get data from buffer
         fdWrite(fdUart, &val, 1);                               // send byte to ST
-    }
-}
-
-void Ikbd::initCyclicBuffer(TCyclicBuff *cb)
-{
-    cb->count    = 0;
-    cb->addPos   = 0;
-    cb->getPos   = 0;
-}
-
-void Ikbd::addToCyclicBuffer(TCyclicBuff *cb, BYTE val)
-{
-    if(cb->count >= CYCLIC_BUF_SIZE) {  // buffer full? quit
-        return;
-    }
-    cb->count++;                        // update count
-
-    cb->buf[cb->addPos] = val;          // store data
-
-    cb->addPos++;                       // update 'add' position
-    cb->addPos = cb->addPos & CYCLIC_BUF_MASK;
-}
-
-BYTE Ikbd::getFromCyclicBuffer(TCyclicBuff *cb)
-{
-    if(cb->count == 0) {                // buffer empty? quit
-        return 0;
-    }
-    cb->count--;                        // update count
-
-    BYTE val = cb->buf[cb->getPos];     // get data
-
-    cb->getPos++;                       // update 'get' position
-    cb->getPos = cb->getPos & CYCLIC_BUF_MASK;
-
-    return val;
-}
-
-BYTE Ikbd::peekCyclicBuffer(TCyclicBuff *cb)
-{
-    if(cb->count == 0) {                // buffer empty? 
-        return 0;
-    }
-
-    BYTE val = cb->buf[cb->getPos];     // just get the data
-    return val;
-}
-
-BYTE Ikbd::peekCyclicBufferWithOffset(TCyclicBuff *cb, int offset)
-{
-    if(offset >= cb->count) {                                           // not enough data in buffer? quit
-        return 0;
-    }
-
-    int getPosWithOffet = (cb->getPos + offset) & CYCLIC_BUF_MASK;      // calculate get position
-
-    BYTE val = cb->buf[getPosWithOffet];                                // get data
-    return val;
-}
-
-void Ikbd::processMouse(input_event *ev)
-{
-    if(ev->type == EV_KEY) {		// on button press
-	    int btnNew = mouseBtnNow;
-		
-        statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
-        statuses.ikbdUsb.aliveSign = ALIVE_MOUSEBTN;
-
-		BYTE absButtons = 0;
-		
-	    switch(ev->code) {
-		    case BTN_LEFT:		
-			if(ev->value == 1) {				// on DOWN - add bit
-			    btnNew |= 2;
-				absButtons			|= MOUSEABS_BTN_LEFT_DOWN;
-				absMouse.buttons	|= MOUSEABS_BTN_LEFT_DOWN;
-		    } else {						    // on UP - remove bit
-		    	btnNew &= ~2; 
-				absButtons			|= MOUSEABS_BTN_LEFT_UP;
-				absMouse.buttons	|= MOUSEABS_BTN_LEFT_UP;
-			}
-			break;
-		
-    		case BTN_RIGHT:		
-			if(ev->value == 1) {				// on DOWN - add bit
-				btnNew |= 1; 
-				absButtons			|= MOUSEABS_BTN_RIGHT_DOWN;
-				absMouse.buttons	|= MOUSEABS_BTN_RIGHT_DOWN;
-			} else {						    // on UP - remove bit
-				btnNew &= ~1; 
-				absButtons			|= MOUSEABS_BTN_RIGHT_UP;
-				absMouse.buttons	|= MOUSEABS_BTN_RIGHT_UP;
-			}
-			break;
-		}
-			
-		if(btnNew == mouseBtnNow) {							    // mouse buttons didn't change? 
-			return;
-		}
-
-		mouseBtnNow = btnNew;								    // store new button states
-
-        if(mouseAbsBtnAct & MOUSEBTN_REPORT_ACTLIKEKEYS) {      // if should report mouse clicks as keys
-            BYTE bfr;
-            
-            switch(absButtons) {
-                case MOUSEABS_BTN_LEFT_DOWN:    bfr = 0x74; fdWrite(fdUart, &bfr, 1); break;
-                case MOUSEABS_BTN_LEFT_UP:      bfr = 0xf4; fdWrite(fdUart, &bfr, 1); break;
-                case MOUSEABS_BTN_RIGHT_DOWN:   bfr = 0x75; fdWrite(fdUart, &bfr, 1); break;
-                case MOUSEABS_BTN_RIGHT_UP:     bfr = 0xf5; fdWrite(fdUart, &bfr, 1); break;
-            }
-        }
-        
-        if(mouseMode == MOUSEMODE_ABS) {                        // for absolute mouse mode
-			bool wasUp		= (absButtons		& MOUSEABS_BTN_UP)			!= 0;
-			bool reportUp	= (mouseAbsBtnAct	& MOUSEBTN_REPORT_RELEASE)  != 0;
-			bool wasDown	= (absButtons		& MOUSEABS_BTN_DOWN)		!= 0;
-			bool reportDown	= (mouseAbsBtnAct	& MOUSEBTN_REPORT_PRESS)	!= 0;
-		
-            if(	(wasUp && reportUp) || (wasDown && reportDown) ) {	// if button pressed / released and we should report that
-                sendMousePosAbsolute(fdUart, absButtons);
-            }            
-        } else {                                                // for relative mouse mode
-            sendMousePosRelative(fdUart, mouseBtnNow, 0, 0);    // send them to ST
-        }
-		return;
-	}
-		
-	if(ev->type == EV_REL) {
-        statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
-        statuses.ikbdUsb.aliveSign = ALIVE_MOUSEMOVE;
-
-		if(ev->code == REL_X) {
-            // update absolute position
-            absMouse.x += ev->value;
-            fixAbsMousePos();
-
-			sendMousePosRelative(fdUart, mouseBtnNow, ev->value, 0);	// send movement to ST
-		}
-
-		if(ev->code == REL_Y) {
-            // update absolute position
-            if(mouseY0atTop) {              // Y=0 at top - add value
-                absMouse.y += ev->value;
-            } else {                        // Y=0 at bottom - subtract value
-                absMouse.y -= ev->value;
-            }
-            fixAbsMousePos();
-                                 
-			sendMousePosRelative(fdUart, mouseBtnNow, 0, ev->value);	// send movement to ST
-		}
-	}
-}
-
-void Ikbd::processKeyboard(input_event *ev)
-{
-//    ikbdLog("processKeyboard");
-    
-    if (ev->type == EV_KEY) {
-        statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
-        statuses.ikbdUsb.aliveSign = ALIVE_KEYDOWN;
-
-        if(ev->code >= KEY_TABLE_SIZE) {        // key out of index? quit
-            return;
-        }
-
-        int stKey = tableKeysPcToSt[ev->code];  // translate PC key to ST key
-
-        if(stKey == 0) {                        // key not found? quit
-            return;
-        }
-
-        // ev->value -- 1: down, 2: auto repeat, 0: up
-        if(ev->value == 0) {        // when key is released, ST scan code has the highest bit set
-            stKey = stKey | 0x80;
-        }
-
-        ikbdLog("\nEV_KEY: code %d, value %d, stKey: %02x", ev->code, ev->value, stKey);
-
-        if(fdUart == -1) {                          // no UART open? quit
-            return;
-        }
-
-        BYTE bfr;
-        bfr = stKey;
-    
-    	int res = fdWrite(fdUart, &bfr, 1); 
-
-    	if(res < 0) {
-	    	logDebugAndIkbd(LOG_ERROR, "processKeyboard - sending to ST failed, errno: %d", errno);
-	    }
-    }
-}
-
-void Ikbd::processJoystick(js_event *jse, int joyNumber)
-{
-    TJoystickState *js;
-
-    if(joyNumber == 0 || joyNumber == 1) {          // if the index is OK, use it
-        js = &joystick[joyNumber];
-    } else {                                        // index is not OK, quit
-        return;
-    }
-
-    if(jse->type == JS_EVENT_AXIS) {
-        statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
-        statuses.ikbdUsb.aliveSign = ALIVE_JOYMOVE;
-
-        if(jse->number >= JOYAXIS) {                // if the index of axis would be out of index, quit
-            return;
-        } 
-
-	    js->axis[ jse->number ] = jse->value;       // store new axis value
-    } else if(jse->type == JS_EVENT_BUTTON) {
-        statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
-        statuses.ikbdUsb.aliveSign = ALIVE_JOYBTN;
-
-        if(jse->number >= JOYBUTTONS) {             // if the index of button would be out of index, quit
-            return;
-        } 
-
-	    js->button[ jse->number ] = jse->value;     // 1 means down, 0 means up
-    } else {
-	    return;
-    }
-
-    int dirTotal, dirX, dirY;
-
-    if(js->axis[0] < -16000) {          // joy left?
-        dirX    = JOYDIR_LEFT;
-    } else if(js->axis[0] > 16000) {    // joy right?
-        dirX    = JOYDIR_RIGHT;
-    } else {                            // joy in center
-        dirX    = 0;
-    }
-
-    if(js->axis[1] < -16000) {          // joy up?
-        dirY    = JOYDIR_UP;
-    } else if(js->axis[1] > 16000) {    // joy down?
-        dirY    = JOYDIR_DOWN;
-    } else {                            // joy in center
-        dirY    = 0;
-    }
-
-    dirTotal = dirX | dirY;             // merge left-right with up-down
-
-    int button = 0;
-    for(int i=0; i<JOYBUTTONS; i++) {   // check if any button is pressed
-        if(js->button[i] != 0) {        // this button pressed? mark that something is pressed
-            button = JOYDIR_BUTTON;
-        }
-    }
-
-    if(fdUart == -1) {                  // nowhere to send data? quit
-        return;
-    }
-
-    // port 0: mouse + joystick
-    // port 1: joystick
-
-    bool dirChanged = (dirTotal != js->lastDir);            // dir changed flag
-    bool btnChanged = (button != js->lastBtn);              // btn changed flag
-    
-    if(dirChanged || btnChanged) {                          // direction or button changed?
-        js->lastDir = dirTotal;
-        js->lastBtn = button;
-
-        if(joyNumber == 1 && (mouseMode == MOUSEMODE_REL) && btnChanged) {  // if button state changed, send it as mouse packet
-            sendJoy0State();
-        } else {
-            sendJoyState(joyNumber, button | dirTotal);			            // report current direction and buttons
-        }
     }
 }
 
@@ -1083,268 +612,6 @@ void Ikbd::sendJoy0State(void)
 
     if(res < 0) {
         logDebugAndIkbd(LOG_ERROR, "write to uart (1) failed, errno: %d", errno);
-    }
-}
-
-void Ikbd::findVirtualDevices(void)
-{
-    char linkBuf[PATH_BUFF_SIZE];
-    char devBuf[PATH_BUFF_SIZE];
-
-    DIR *dir = opendir("/tmp/vdev/");							// try to open the dir
-	
-    if(dir == NULL) {                                 				// not found?
-        return;
-    }
-
-	while(1) {                                                  	// while there are more files, store them
-		struct dirent *de = readdir(dir);							// read the next directory entry
-	
-		if(de == NULL) {											// no more entries?
-			break;
-		}
-
-    if(de->d_type != DT_FIFO) {									// if it's not a fifo, skip it
-			continue;
-		}
-
-        char *pMouse  = strstr(de->d_name, "mouse");            // does the name contain 'mouse'?
-        char *pKbd    = strstr(de->d_name, "kbd");              // does the name contain 'kbd'?
-
-        if(pMouse == NULL && pKbd == NULL) {
-            continue;
-        }
-
-        memset(linkBuf,	0, PATH_BUFF_SIZE);
-        memset(devBuf,	0, PATH_BUFF_SIZE);
-
-        strcpy(linkBuf, "/tmp/vdev");                          // create path to link files, e.g. /dev/input/by-path/usb-kbd-event
-        strcat(linkBuf, HOSTPATH_SEPAR_STRING);
-        strcat(linkBuf, de->d_name);
-
-        /*
-        int ires = readlink(linkBuf, devBuf, PATH_BUFF_SIZE);		// try to resolve the filename from the link
-        if(ires == -1) {
-                continue;
-        }
-
-        std::string pathAndFile = devBuf;
-        std::string path, file;
-        */
-
-        std::string pathAndFile = linkBuf;
-        std::string path, file;
-        Utils::splitFilenameFromPath(pathAndFile, path, file);		// get only file name, skip the path (which now is something like '../../')
-        //file = "/dev/input/" + file;    							// create full path - /dev/input/event0
-        file = "/tmp/vdev/"+file;    							// create full path - /dev/input/event0
-
-        processFoundDev((char *) file.c_str(), (char *) file.c_str());    // and do something with that file
-    }
-
-    closedir(dir);	
-}
-
-void Ikbd::findDevices(void)
-{
-	char linkBuf[PATH_BUFF_SIZE];
-	char devBuf[PATH_BUFF_SIZE];
-	
-	DIR *dir = opendir(INPUT_LINKS_PATH);							// try to open the dir
-	
-    if(dir == NULL) {                                 				// not found?
-        return;
-    }
-
-	while(1) {                                                  	// while there are more files, store them
-		struct dirent *de = readdir(dir);							// read the next directory entry
-	
-		if(de == NULL) {											// no more entries?
-			break;
-		}
-
-		if(de->d_type != DT_LNK) {									// if it's not a link, skip it
-			continue;
-		}
-
-        char *pJoystick = strstr(de->d_name, "joystick");           // does the name contain 'joystick'?
-        char *pEvent    = strstr(de->d_name, "event");              // does the name contain 'event'?
-
-        if(pJoystick == NULL && pEvent == NULL) {                   // if it's not joystick and doesn't contain 'event', skip it (non-joystick must have event)
-            continue;
-        }
-
-        if(pJoystick != NULL && pEvent != NULL) {                   // if it's joystick and contains 'event', skip it (joystick must NOT have event)
-            continue;
-        }
-
-		memset(linkBuf,	0, PATH_BUFF_SIZE);
-		memset(devBuf,	0, PATH_BUFF_SIZE);
-		
-		strcpy(linkBuf, INPUT_LINKS_PATH);                          // create path to link files, e.g. /dev/input/by-path/usb-kbd-event
-		strcat(linkBuf, HOSTPATH_SEPAR_STRING);
-		strcat(linkBuf, de->d_name);
-
-		int ires = readlink(linkBuf, devBuf, PATH_BUFF_SIZE);		// try to resolve the filename from the link
-		if(ires == -1) {
-			continue;
-		}
-		
-		std::string pathAndFile = devBuf;
-		std::string path, file;
-		
-		Utils::splitFilenameFromPath(pathAndFile, path, file);		// get only file name, skip the path (which now is something like '../../')
-		file = "/dev/input/" + file;    							// create full path - /dev/input/event0
-		
-		processFoundDev((char *) de->d_name, (char *) file.c_str());    // and do something with that file
-    }
-
-	closedir(dir);	
-}
-
-void Ikbd::processFoundDev(char *linkName, char *fullPath)
-{
-    TInputDevice *in = NULL;
-    char *what;
-
-    if(strstr(linkName, "/tmp/vdev/mouse") != NULL && in==NULL) {             // it's a mouse
-        if(ikbdDevs[INTYPE_VDEVMOUSE].fd == -1) {             // don't have mouse?
-            in = &ikbdDevs[INTYPE_VDEVMOUSE];
-            what = (char *) "/tmp/vdev/mouse";
-        } else {                                        // already have a mouse?
-            return;
-        }
-    }
-
-    if(strstr(linkName, "/tmp/vdev/kbd") != NULL && in==NULL) {               // it's a keyboard?
-        if(ikbdDevs[INTYPE_VDEVKEYBOARD].fd == -1) {          // don't have keyboard?
-            in = &ikbdDevs[INTYPE_VDEVKEYBOARD];
-            what = (char *) "/tmp/vdev/keyboard";         
-        } else {                                        // already have a keyboard?
-            return;
-        }
-    }
-
-    if(strstr(linkName, "mouse") != NULL && in==NULL) {             // it's a mouse
-        if(ikbdDevs[INTYPE_MOUSE].fd == -1) {             // don't have mouse?
-            in = &ikbdDevs[INTYPE_MOUSE];         
-            what = (char *) "mouse";
-        } else {                                        // already have a mouse?
-            return;
-        }
-    }
-
-    if(strstr(linkName, "kbd") != NULL && in==NULL) {               // it's a keyboard?
-        if(ikbdDevs[INTYPE_KEYBOARD].fd == -1) {          // don't have keyboard?
-            in = &ikbdDevs[INTYPE_KEYBOARD];
-            what = (char *) "keyboard";         
-        } else {                                        // already have a keyboard?
-            return;
-        }
-    }
-
-    if(strstr(linkName, "joystick") != NULL && in==NULL) {                  // it's a joystick?
-        if(ikbdDevs[joy1st].fd == -1) {                                       // don't have joystick 1?
-            if(strcmp(fullPath, ikbdDevs[joy2nd].devPath) == 0) {             // if this device is already connected as joystick 2, skip it
-                return;
-            }
-
-            in = &ikbdDevs[joy1st];         
-            what = (char *) "joystick1";
-        } else if(ikbdDevs[joy2nd].fd == -1) {                                // don't have joystick 2?
-            if(strcmp(fullPath, ikbdDevs[joy1st].devPath) == 0) {             // if this device is already connected as joystick 1, skip it
-                return;
-            }
-
-            in = &ikbdDevs[joy2nd];         
-            what = (char *) "joystick2";
-        } else {                                                            // already have a joystick?
-            return;
-        }
-    }
-
-    if(in == NULL) {                                                        // this isn't mouse, keyboard of joystick, quit!
-        return;
-    }
-
-    int fd = open(fullPath, O_RDONLY | O_NONBLOCK);
-
-    if(fd < 0) {
-        logDebugAndIkbd(LOG_ERROR, "Failed to open input device (%s): %s", what, fullPath);
-        return;
-    }
-
-    in->fd = fd;
-    strcpy(in->devPath, fullPath);
-    logDebugAndIkbd(LOG_DEBUG, "Got device (%s): %s", what, fullPath);
-}
-
-int Ikbd::getFdByIndex(int index)
-{
-    if(index < 0 || index > 5) {
-        return -1;
-    }
-
-    return ikbdDevs[index].fd;
-}
-
-void Ikbd::initDevs(void)
-{
-    int i;
-
-    lastVDevMouseEventTime = 0;
-    
-    for(i=0; i<6; i++) {
-        ikbdDevs[i].fd = -1;
-
-        deinitDev(i);
-    }
-}
-
-void Ikbd::deinitDev(int index)
-{
-    if(index < 0 || index > 5) {            // out of index?
-        return;
-    }
-
-    if(ikbdDevs[index].fd != -1) {            // device was open? close it
-        close(ikbdDevs[index].fd);
-    }
-
-    ikbdDevs[index].fd            = -1;       // set vars to default init values
-    ikbdDevs[index].devPath[0]    = 0;
-    
-    if(index == INTYPE_JOYSTICK1) {         // for joy1 - init it
-        initJoystickState(&joystick[0]);
-    }
-
-    if(index == INTYPE_JOYSTICK2) {         // for joy2 - init it
-        initJoystickState(&joystick[1]);
-    }
-}
-
-void Ikbd::initJoystickState(TJoystickState *joy)
-{
-    for(int i=0; i<JOYAXIS; i++) {
-        joy->axis[i] = 0;
-    }
-
-    for(int i=0; i<JOYBUTTONS; i++) {
-        joy->button[i] = 0;
-    }
-
-    joy->lastDir = 0;
-    joy->lastBtn = 0;
-}
-
-void Ikbd::closeDevs(void)
-{
-    int i;
-
-    for(i=0; i<6; i++) {
-        if(ikbdDevs[i].fd != -1) {        // if device is open
-            close(ikbdDevs[i].fd);        // close it
-            ikbdDevs[i].fd = -1;          // mark it as closed
-        }
     }
 }
 
@@ -1570,162 +837,3 @@ void Ikbd::sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
 	}
 }
 
-int Ikbd::serialSetup(termios *ts) 
-{
-	int fd;
-	
-    fdUart = -1;
-
-	fd = open(UARTFILE, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK);
-	if(fd == -1) {
-        logDebugAndIkbd(LOG_ERROR, "Failed to open %s", UARTFILE);
-        return -1;
-	}
-    
-	fcntl(fd, F_SETFL, 0);
-	tcgetattr(fd, ts);
-
-	/* reset the settings */
-	cfmakeraw(ts);
-	ts->c_cflag &= ~(CSIZE | CRTSCTS);
-	ts->c_iflag &= ~(IXON | IXOFF | IXANY | IGNPAR);
-	ts->c_lflag &= ~(ECHOK | ECHOCTL | ECHOKE);
-	ts->c_oflag &= ~(OPOST | ONLCR);
-
-	/* setup the new settings */
-	cfsetispeed(ts, B19200);
-	cfsetospeed(ts, B19200);
-	ts->c_cflag |=  CS8 | CLOCAL | CREAD;			// uart: 8N1
-
-	ts->c_cc[VMIN ] = 0;
-	ts->c_cc[VTIME] = 0;
-
-	/* set the settings */
-	tcflush(fd, TCIFLUSH); 
-	
-	if (tcsetattr(fd, TCSANOW, ts) != 0) {
-		close(fd);
-		return -1;
-	}
-
-	/* confirm they were set */
-	struct termios settings;
-	tcgetattr(fd, &settings);
-	if (settings.c_iflag != ts->c_iflag ||
-		settings.c_oflag != ts->c_oflag ||
-		settings.c_cflag != ts->c_cflag ||
-		settings.c_lflag != ts->c_lflag) {
-		close(fd);
-		return -1;
-	}
-
-    fcntl(fd, F_SETFL, FNDELAY);                    // make reading non-blocking
-
-    fdUart = fd;
-	return fd;
-}
-
-int Ikbd::fdWrite(int fd, BYTE *bfr, int cnt)
-{
-#if !defined(IKBDSPY)
-    if(flags.ikbdLogs) {
-        std::string text = "sending to ST: ";
-        char tmp[16];
-        
-        for(int i=0; i<cnt; i++) {
-            sprintf(tmp, "%02x ", bfr[i]);
-            text += tmp;
-        }    
-        ikbdLog(text.c_str());
-    }
-#endif
-
-    if(fd == -1) {                                  // no fd? quit
-        return 0;
-    }
-
-    if(!outputEnabled) {                            // output not enabled? Pretend that it was sent...
-        return cnt;
-    }
-
-    int res = write(fd, bfr, cnt);                  // send content
-    return res;
-}
-
-bool Ikbd::gotUsbMouse(void)
-{
-	if(ikbdDevs[INTYPE_MOUSE].fd != -1 ) {            // got real USB mouse? return true
-		return true;
-	}
-	
-    if(ikbdDevs[INTYPE_VDEVMOUSE].fd != -1) {                             // got virtual mouse? 
-        DWORD diff = Utils::getCurrentMs() - lastVDevMouseEventTime;    // calculate how much time has passed since last VDevMouse event
-        
-        if(diff < 10000) {                                              // if virtual mouse moved in the last 10 seconds, we got it (otherwise we don't have it)
-            return true;
-        }
-    }
-    
-	return false;                                   // no mouse present
-}
-
-bool Ikbd::gotUsbJoy1(void)
-{
-	if(ikbdDevs[INTYPE_JOYSTICK1].fd != -1) {
-		return true;
-	}
-	
-	return false;
-}
-
-bool Ikbd::gotUsbJoy2(void)
-{
-	if(ikbdDevs[INTYPE_JOYSTICK2].fd != -1) {
-		return true;
-	}
-	
-	return false;
-}
-
-void Ikbd::markVirtualMouseEvenTime(void)
-{
-    // store time when we received VDevMouse event -- for telling that 
-    // the virtual mouse is not here when it doesn't move for a longer time
-    lastVDevMouseEventTime = Utils::getCurrentMs();         
-}
-
-void ikbdLog(const char *format, ...)
-{
-    if(!flags.ikbdLogs) {               // don't do IKBD logs? quit
-        return;
-    }
-    
-    static DWORD prevLogOutIkbd = 0;
-
-    va_list args;
-    va_start(args, format);
-
-	FILE *f;
-
-    f = fopen("/var/log/ikbdlog.txt", "a+t");
-	
-	if(!f) {
-		printf("%08d: ", Utils::getCurrentMs());
-		vprintf(format, args);
-		printf("\n");
-
-        va_end(args);
-        return;
-	}
-
-	DWORD now = Utils::getCurrentMs();
-	DWORD diff = now - prevLogOutIkbd;
-	prevLogOutIkbd = now;
-	
-	fprintf(f, "%08d\t%08d\t ", now, diff);
-    vfprintf(f, format, args);
-	fprintf(f, "\n");
-	fclose(f);
-
-    va_end(args);
-}

@@ -15,7 +15,7 @@
 #include "debug.h"
 #include "mounter.h"
 #include "downloader.h"
-#include "ikbd.h"
+#include "ikbd/ikbd.h"
 #include "timesync.h"
 #include "update.h"
 #include "version.h"
