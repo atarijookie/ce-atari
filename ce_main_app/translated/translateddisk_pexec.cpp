@@ -377,10 +377,10 @@ void TranslatedDisk::onPexec_getBpb(BYTE *cmd)
     dataTrans->addDataBfr(pPrgPath, prgPathLength + 1, false);                                      // 32 .. ??: path to PRG file
 
     dataTrans->addZerosUntilSize(256);                                                              // ??-255: zeros
-    dataTrans->addDataBfr((BYTE *) pexecPrgFilename.c_str(), pexecPrgFilename.length() + 1, false); // 256 .. ??: just the PRG filename (without path)
+    dataTrans->addDataBfr(pexecPrgFilename.c_str(), pexecPrgFilename.length() + 1, false); // 256 .. ??: just the PRG filename (without path)
     
     dataTrans->addZerosUntilSize(384);                                                              // ??-383: zeros
-    dataTrans->addDataBfr((BYTE *) pexecFakeRootPath.c_str(), pexecFakeRootPath.length() + 1, false); // 384 .. ??: just the PRG filename (without path)
+    dataTrans->addDataBfr(pexecFakeRootPath.c_str(), pexecFakeRootPath.length() + 1, false); // 384 .. ??: just the PRG filename (without path)
     
     dataTrans->padDataToMul16();
     dataTrans->setStatus(E_OK);

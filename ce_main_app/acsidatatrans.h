@@ -57,7 +57,7 @@ public:
     
     void addZerosUntilSize(DWORD finalBufferCnt);
 
-    void addDataBfr(BYTE *data, DWORD cnt, bool padToMul16);
+    void addDataBfr(const void *data, DWORD cnt, bool padToMul16);
 	
     void padDataToMul16(void);
 
