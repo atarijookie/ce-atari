@@ -538,12 +538,10 @@ void CCoreThread::handleAcsiCommand(void)
             netAdapter.processCommand(pCmd);
             break;
 
-/*
         case HOSTMOD_MEDIA_STREAMING:
             wasHandled = true;
-            mediaStreaming.processCommand(pCmd);
+            mediaStreaming.processCommand(pCmd, dataTrans);
             break;
-*/
         }
     }
 
