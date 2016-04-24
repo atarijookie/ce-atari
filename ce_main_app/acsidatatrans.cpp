@@ -99,7 +99,7 @@ void AcsiDataTrans::addDataWord(WORD val)
     count += 2;
 }
 
-void AcsiDataTrans::addDataBfr(BYTE *data, DWORD cnt, bool padToMul16)
+void AcsiDataTrans::addDataBfr(const void *data, DWORD cnt, bool padToMul16)
 {
     memcpy(&buffer[count], data, cnt);
     count += cnt;

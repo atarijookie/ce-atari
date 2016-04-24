@@ -57,7 +57,7 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
 
     switch(cmd[4]) {
     case CFG_CMD_IDENTIFY:          // identify?
-        dataTrans->addDataBfr((BYTE *) "CosmosEx config console", 23, true);       // add identity string with padding
+        dataTrans->addDataBfr("CosmosEx config console", 23, true);       // add identity string with padding
         dataTrans->setStatus(SCSI_ST_OK);
         break;
 
