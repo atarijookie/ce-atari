@@ -98,6 +98,9 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
 
     // set up network adapter stuff
     netAdapter.setAcsiDataTrans(dataTrans);
+
+	// set up mediastreaming service
+	mediaStreaming.setTranslatedDisk(shared.translated);
 }
 
 CCoreThread::~CCoreThread()
