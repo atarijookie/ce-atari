@@ -49,13 +49,13 @@ private:
     TFindStorage    fsFiles;
     
     FilenameShortener *createShortener(std::string &path);
-    void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
+    static void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
 
     void appendFoundToFindStorage(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
 	void appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
 
-	int compareSearchStringAndFilename(const char *searchString, const char *filename);
-	void toUpperCaseString(std::string &st);
+	static int compareSearchStringAndFilename(const char *searchString, const char *filename);
+	static void toUpperCaseString(std::string &st);
 };
 
 #endif // DIRTRANSLATOR_H

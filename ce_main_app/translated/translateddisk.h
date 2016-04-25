@@ -136,10 +136,11 @@ public:
     
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
-    bool hostPathExists(std::string hostPath);
-    void pathSeparatorAtariToHost(std::string &path);
+    static bool hostPathExists(std::string hostPath);
+    static void pathSeparatorAtariToHost(std::string &path);
     
     bool createFullAtariPathAndFullHostPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
+    void createFullHostPath (std::string inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
 
     // for status report
     bool driveIsEnabled(int driveIndex);
@@ -178,16 +179,16 @@ private:
 
     WORD getDrivesBitmap(void);
     bool isDriveIndexReadOnly(int driveIndex);
-    void removeDoubleDots(std::string &path);
-    void pathSeparatorHostToAtari(std::string &path);
-    bool isLetter(char a);
-    char toUpperCase(char a);
-    bool isValidDriveLetter(char a);
-    bool pathContainsWildCards(char *path);
-    int  deleteDirectoryPlain(char *path);
+    static void removeDoubleDots(std::string &path);
+    static void pathSeparatorHostToAtari(std::string &path);
+    static bool isLetter(char a);
+    static char toUpperCase(char a);
+    static bool isValidDriveLetter(char a);
+    static bool pathContainsWildCards(char *path);
+    static int  deleteDirectoryPlain(char *path);
 
-    bool startsWith(std::string what, std::string subStr);
-    bool endsWith(std::string what, std::string subStr);
+    static bool startsWith(std::string what, std::string subStr);
+    static bool endsWith(std::string what, std::string subStr);
 
     void onGetConfig(BYTE *cmd);
     void getIpAdds(BYTE *bfr);
@@ -267,7 +268,6 @@ private:
     int  driveLetterToDriveIndex(char pathDriveLetter);
     
     bool createFullAtariPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex);
-    void createFullHostPath (std::string inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
 
     //-----------------------------------
     // ZIP DIR stuff
@@ -277,9 +277,9 @@ private:
     
     void getZipDirMountPoint(int index, std::string &mountPoint);
     int  getZipDirByMountPoint(std::string &searchedMountPoint);
-    bool zipDirAlreadyMounted(char *zipFile, int &zipDirIndex);
+    bool zipDirAlreadyMounted(const char *zipFile, int &zipDirIndex);
     
-    bool isOkToMountThisAsZipDir(char *zipFilePath);
+    static bool isOkToMountThisAsZipDir(const char *zipFilePath);
     void doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath, int zipDirIndex, bool &waitingForMount);
     
     void replaceHostPathWithZipDirPath(int inAtariDriveIndex, std::string &hostPath, bool &waitingForMount, int &zipDirNestingLevel);
