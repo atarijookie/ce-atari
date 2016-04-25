@@ -38,10 +38,15 @@ extern DebugVars    dbgVars;
 
 extern SharedObjects shared;
 
+extern volatile BYTE updateListDownloadStatus;
+
 #define DEV_CHECK_TIME_MS	        3000
 #define UPDATE_CHECK_TIME           1000
 #define INET_IFACE_CHECK_TIME       1000
 #define UPDATE_SCRIPTS_TIME         10000
+
+#define UPDATELIST_DOWNLOAD_TIME_ONFAIL     ( 1 * 60 * 1000)
+#define UPDATELIST_DOWNLOAD_TIME_ONSUCCESS  (30 * 60 * 1000)
 
 bool inetIfaceReady(const char* ifrname);
 
@@ -50,17 +55,17 @@ bool state_wlan0    = false;
 
 void handleConfigStreams(ConfigStream *cs, int fd1, int fd2);
 void updateUpdateState(void);
-void checkInetIfEnabled(void);
+bool checkInetIfEnabled(void);
 
 void *periodicThreadCode(void *ptr)
 {
 	Debug::out(LOG_DEBUG, "Periodic thread starting...");
 
-	DWORD nextDevFindTime       = Utils::getCurrentMs();                    // create a time when the devices should be checked - and that time is now
-    DWORD nextUpdateCheckTime   = Utils::getEndTime(5000);                  // create a time when update download status should be checked
-    DWORD nextInetIfaceCheckTime= Utils::getEndTime(1000);  			    // create a time when we should check for inet interfaces that got ready
+	DWORD nextDevFindTime               = Utils::getCurrentMs();            // create a time when the devices should be checked - and that time is now
+    DWORD nextUpdateCheckTime           = Utils::getEndTime(5000);          // create a time when update download status should be checked
+    DWORD nextInetIfaceCheckTime        = Utils::getEndTime(1000);          // create a time when we should check for inet interfaces that got ready
     
-    Update::downloadUpdateList(NULL);                                       // download the list of components with the newest available versions
+    DWORD nextUpdateListDownloadTime    = Utils::getEndTime(3000);          // try to download update list at this time
     
     ce_conf_createFifos();                                                  // if should run normally, create the ce_conf FIFOs
     
@@ -70,8 +75,13 @@ void *periodicThreadCode(void *ptr)
         //------------------------------------
         // should we check for inet interfaces that might came up?
         if(Utils::getCurrentMs() >= nextInetIfaceCheckTime) {
-            checkInetIfEnabled();
+            bool someIfChangedToEnabled = checkInetIfEnabled();
             nextInetIfaceCheckTime  = Utils::getEndTime(INET_IFACE_CHECK_TIME);     // update the time when we should interfaces again
+            
+            if(someIfChangedToEnabled) {                                            // if some IF has changed to enabled, try to download the update list again
+                Debug::out(LOG_DEBUG, "periodicThreadCode -- eth0 or wlan0 changed to up, will now download update list");
+                nextUpdateListDownloadTime = Utils::getEndTime(1000);
+            }
 		}
 
         //------------------------------------
@@ -106,16 +116,34 @@ void *periodicThreadCode(void *ptr)
 			nextDevFindTime = Utils::getEndTime(DEV_CHECK_TIME_MS); // update the time when devices should be checked
 		}
 
+        if(Utils::getCurrentMs() >= nextUpdateListDownloadTime) {
+            Debug::out(LOG_DEBUG, "periodicThreadCode -- will download update list now");
+            Update::downloadUpdateList(NULL);                                                           // download the list of components with the newest available versions
+            
+            nextUpdateListDownloadTime = Utils::getEndTime(UPDATELIST_DOWNLOAD_TIME_ONSUCCESS);         // set the next download time in the future, so we won't do this immediately again
+        }
+        
         //------------------------------------
         // should check the update status?
         if(Utils::getCurrentMs() >= nextUpdateCheckTime) {
-            nextUpdateCheckTime   = Utils::getEndTime(UPDATE_CHECK_TIME);   // update the time when we should check update status again
+            nextUpdateCheckTime   = Utils::getEndTime(UPDATE_CHECK_TIME);                               // update the time when we should check update status again
 
-            // should we process update list?
-            if(!Update::versions.updateListWasProcessed) {              // if didn't process update list yet
-                Update::processUpdateList();
+            if(updateListDownloadStatus == DWNSTATUS_DOWNLOAD_FAIL) {                                   // download of update list fail?
+                updateListDownloadStatus    = DWNSTATUS_WAITING;
+                nextUpdateListDownloadTime  = Utils::getEndTime(UPDATELIST_DOWNLOAD_TIME_ONFAIL);       // set the next download time in the future, so we won't do this immediately again
+                Debug::out(LOG_DEBUG, "periodicThreadCode -- update list download failed, will retry in %d seconds", UPDATELIST_DOWNLOAD_TIME_ONFAIL / 1000);
+            }
+            
+            if(updateListDownloadStatus == DWNSTATUS_DOWNLOAD_OK) {                                     // download of update list good?
+                updateListDownloadStatus    = DWNSTATUS_WAITING;
+                nextUpdateListDownloadTime  = Utils::getEndTime(UPDATELIST_DOWNLOAD_TIME_ONSUCCESS);    // try to download the update list in longer time again
+                Debug::out(LOG_DEBUG, "periodicThreadCode -- update list download good, will retry in %d minutes", UPDATELIST_DOWNLOAD_TIME_ONSUCCESS / (60 * 1000));
+            
+                if(!Update::versions.updateListWasProcessed) {                                          // Didn't process update list yet? process it
+                    Update::processUpdateList();
+                }
 
-                if(Update::versions.updateListWasProcessed) {           // if we processed the list, update config stream
+                if(Update::versions.updateListWasProcessed) {                                           // if we processed the list, update config stream
                     // if the config screen is shown, then update info on it
                     pthread_mutex_lock(&shared.mtxConfigStreams);
 
@@ -144,7 +172,7 @@ void *periodicThreadCode(void *ptr)
 	return 0;
 }
 
-void checkInetIfEnabled(void)
+bool checkInetIfEnabled(void)
 {
 	//up/running state of inet interfaces
     bool state_temp 		= 	inetIfaceReady("eth0"); 
@@ -161,7 +189,11 @@ void checkInetIfEnabled(void)
         pthread_mutex_lock(&shared.mtxTranslated);
         shared.translated->reloadSettings(SETTINGSUSER_TRANSLATED);
         pthread_mutex_unlock(&shared.mtxTranslated);
+        
+        return true;            // some IF changed to enabled
     }
+    
+    return false;               // no IF changed to enabled
 }
 
 void updateUpdateState(void)

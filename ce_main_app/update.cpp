@@ -21,7 +21,8 @@ int Update::currentState = UPDATE_STATE_IDLE;
 
 extern THwConfig hwConfig;
 
-volatile BYTE packageDownloadStatus = DWNSTATUS_WAITING;
+volatile BYTE packageDownloadStatus     = DWNSTATUS_WAITING;
+volatile BYTE updateListDownloadStatus  = DWNSTATUS_WAITING;
 
 void Update::initialize(void)
 {
@@ -39,7 +40,7 @@ void Update::initialize(void)
 void Update::processUpdateList(void)
 {
     Update::versions.gotUpdate              = false;
-
+   
     // check if the local update list exists
     int res = access(UPDATE_LOCALLIST, F_OK);
 
@@ -176,10 +177,12 @@ void Update::downloadUpdateList(char *remoteUrl)
         tdr.srcUrl = remoteUrl;
     }
         
+    Debug::out(LOG_DEBUG, "Update::downloadUpdateList() -- will download UPDATE_LIST: %s", tdr.srcUrl.c_str());
+        
     tdr.dstDir          = UPDATE_LOCALPATH;
     tdr.downloadType    = DWNTYPE_UPDATE_LIST;
-    tdr.checksum        = 0;                        // special case - don't check checsum
-    tdr.pStatusByte     = NULL;                     // don't update this status byte
+    tdr.checksum        = 0;                            // special case - don't check checsum
+    tdr.pStatusByte     = &updateListDownloadStatus;
     Downloader::add(tdr);
 }
 
