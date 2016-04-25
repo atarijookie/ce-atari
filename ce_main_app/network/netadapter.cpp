@@ -185,7 +185,7 @@ void NetAdapter::identify(void)
     
     closeAndCleanAll();
     //--------
-    dataTrans->addDataBfr((BYTE *) "CosmosEx network module", 24, false);   // add 24 bytes which are the identification string
+    dataTrans->addDataBfr("CosmosEx network module", 24, false);   // add 24 bytes which are the identification string
     
     BYTE bfr[10];
     memset(bfr, 0, 8);
@@ -683,7 +683,7 @@ void NetAdapter::icmpGetDgrams(void)
         TStingDgram *d = &icmpWrapper.dgrams[index];
 
         dataTrans->addDataWord(d->count);                           // add size of this dgram
-        dataTrans->addDataBfr((BYTE *) d->data, d->count, false);   // add the dgram
+        dataTrans->addDataBfr(d->data, d->count, false);   // add the dgram
         
         Debug::out(LOG_DEBUG, "NetAdapter::icmpGetDgrams -- stored Dgram of length %d", d->count);
         
@@ -764,13 +764,13 @@ void NetAdapter::resolveGetResp(void)
     memset(empty, 0, 256);
 
     int domLen = strlen(r->canonName);                                      // length of real domain name
-    dataTrans->addDataBfr((BYTE *) r->canonName, domLen, false);            // store real domain name
+    dataTrans->addDataBfr(r->canonName, domLen, false);            // store real domain name
     dataTrans->addDataBfr(empty, 256 - domLen, false);                      // add zeros to pad to 256 bytes
 
     dataTrans->addDataByte(r->count);                                       // data[256] = count of IP addreses resolved
     dataTrans->addDataByte(0);                                              // data[257] = just a dummy byte
 
-    dataTrans->addDataBfr((BYTE *) r->data, 4 * r->count, true);            // now store all the resolved data, and pad to multiple of 16
+    dataTrans->addDataBfr(r->data, 4 * r->count, true);            // now store all the resolved data, and pad to multiple of 16
 
     Debug::out(LOG_DEBUG, "NetAdapter::resolveGetResp -- returned %d IPs", r->count);
     

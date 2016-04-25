@@ -79,7 +79,7 @@ void FloppySetup::processCommand(BYTE *command)
 
     switch(cmd[4]) {
         case FDD_CMD_IDENTIFY:                          // return identification string
-            dataTrans->addDataBfr((unsigned char *)"CosmosEx floppy setup", 21, true);       // add identity string with padding
+            dataTrans->addDataBfr("CosmosEx floppy setup", 21, true);       // add identity string with padding
             dataTrans->setStatus(FDD_OK);
             break;
 
@@ -282,7 +282,7 @@ void FloppySetup::searchDownload(void)
         }
         
         if(imgDnStatus != IMG_DN_STATUS_IDLE) {             // if it's not the case of failed download
-            dataTrans->addDataBfr((BYTE *) statusStr.c_str(), statusStr.length(), true);
+            dataTrans->addDataBfr(statusStr.c_str(), statusStr.length(), true);
             dataTrans->setStatus(statusVal);
             return;
         }
@@ -310,7 +310,7 @@ void FloppySetup::searchDownload(void)
             Downloader::add(tdr);
             
             statusStr += "Downloading: " + url;
-            dataTrans->addDataBfr((BYTE *) statusStr.c_str(), statusStr.length(), true);
+            dataTrans->addDataBfr(statusStr.c_str(), statusStr.length(), true);
 
             dataTrans->setStatus(FDD_DN_WORKING);           // tell ST we're downloading
         } else {                                            // nothing to download? say that to ST
@@ -598,7 +598,7 @@ void FloppySetup::downloadStart(void)
     currentDownload.fh          = fh;
     currentDownload.imageFile   = justFileName;
 
-    dataTrans->addDataBfr((BYTE *) justFileName.c_str(), justFileName.length() + 1, true);     // send filename to ST
+    dataTrans->addDataBfr(justFileName.c_str(), justFileName.length() + 1, true);     // send filename to ST
     dataTrans->setStatus(FDD_OK);
 }
 
