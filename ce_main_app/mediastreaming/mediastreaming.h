@@ -19,6 +19,7 @@ public:
 	void close(void);
 private:
 	FILE * f;
+	bool isPipe;
 };
 
 class MediaStreaming

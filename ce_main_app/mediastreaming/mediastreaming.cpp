@@ -1,4 +1,6 @@
 // vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
+#include <errno.h>
+#include <string.h>
 #include "global.h"
 #include "debug.h"
 #include "mediastreaming.h"
@@ -15,7 +17,10 @@ MediaStream::MediaStream(void)
 MediaStream::~MediaStream()
 {
 	if(f != NULL) {
-		fclose(f);
+		if(isPipe)
+			pclose(f);
+		else
+			fclose(f);
 	}
 }
 
@@ -26,9 +31,17 @@ bool MediaStream::isFree(void)
 
 bool MediaStream::open(const char * filename)
 {
-	f = fopen(filename, "rb");
+	char command[256];
+	snprintf(command, sizeof(command),
+	         //"/usr/local/bin/sox '%s' -r 50066 -b 8 -e signed-integer -c 1 -t au -",
+	         "ffmpeg -v 0 -i '%s' -ar 50066 -f au -c pcm_s8 -", // -ac 1 => mono
+	         filename);
+	Debug::out(LOG_DEBUG, "MediaStream::open \"%s\"", command);
+	f = popen(command, "r");
+	isPipe = true;
+	//f = fopen(filename, "rb");
 	if(f == NULL) {
-		Debug::out(LOG_ERROR, "MediaStream::open error opening %s", filename);
+		Debug::out(LOG_ERROR, "MediaStream::open error opening %s : %s", filename, strerror(errno));
 	}
 	return (f != NULL);
 }
@@ -36,7 +49,10 @@ bool MediaStream::open(const char * filename)
 void MediaStream::close(void)
 {
 	if(f != NULL) {
-		fclose(f);
+		if(isPipe)
+			pclose(f);
+		else
+			fclose(f);
 		f = NULL;
 	}
 }
@@ -120,7 +136,7 @@ void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 	}
 	if(i >= MEDIASTREAMING_MAXSTREAMS) {
 		Debug::out(LOG_ERROR, "MediaStreaming::openStream no more free streams");
-		dataTrans->setStatus(0xfd);
+		dataTrans->setStatus(MEDIASTREAMING_ERR_INTERNAL);
 		return;
 	}
 	char * path;
@@ -131,11 +147,17 @@ void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 	std::string hostPath;
 	bool waitingForMount;
 	int zipDirNestingLevel;
+	if(!translated) {
+		Debug::out(LOG_ERROR, "MediaStreaming::openStream translated=%p cannot convert %s", translated, (char *)buffer);
+		dataTrans->setStatus(MEDIASTREAMING_ERR_INTERNAL);
+		return;
+	}
 	translated->createFullHostPath(atariPath, driveIndex, hostPath, waitingForMount, zipDirNestingLevel);
 	Debug::out(LOG_DEBUG, "MediaStreaming::openStream %s => %s", buffer, hostPath.c_str());
 	//if(!streams[i].open("/mnt/sda/ATARI/STEAUPLY/BILLJE12.au")) {
-	if(!streams[i].open("/home/root/nnd/THRILLER.au")) {
-		dataTrans->setStatus(0xfc);
+	//if(!streams[i].open("/home/root/nnd/THRILLER.au")) {
+	if(!streams[i].open(hostPath.c_str())) {
+		dataTrans->setStatus(MEDIASTREAMING_ERR_INTERNAL);
 		return;
 	} 
 	dataTrans->setStatus(i + 1);
