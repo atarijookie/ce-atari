@@ -153,6 +153,14 @@ char *DesktopCreator::storeMediaPlayers(char *bfr, DesktopConfig *dc)
 	               "#P 03 04   %c:\\CEMEDIAP.TTP@ *.MP3@ \r\n", 'A' + dc->configDrive);
 	memcpy(bfr, tmp, len+1);
 	bfr += len;
+	len = snprintf(tmp, sizeof(tmp),
+	               "#P 03 04   %c:\\CEMEDIAP.TTP@ *.WMA@ \r\n", 'A' + dc->configDrive);
+	memcpy(bfr, tmp, len+1);
+	bfr += len;
+	len = snprintf(tmp, sizeof(tmp),
+	               "#P 03 04   %c:\\CEMEDIAP.TTP@ *.OGG@ \r\n", 'A' + dc->configDrive);
+	memcpy(bfr, tmp, len+1);
+	bfr += len;
 	return bfr;
 }
 
