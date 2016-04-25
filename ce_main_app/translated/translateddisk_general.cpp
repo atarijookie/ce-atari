@@ -226,7 +226,7 @@ void TranslatedDisk::mountAndAttachSharedDrive(void)
 	bool res = attachToHostPath(mountPath, TRANSLATEDTYPE_SHAREDDRIVE, devicePath);	// try to attach
 
 	if(!res) {																// if didn't attach, skip the rest
-		Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: failed to attach shared drive %s", (char *) mountPath.c_str());
+		Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: failed to attach shared drive %s", mountPath.c_str());
 	}
 }
 
@@ -236,7 +236,7 @@ void TranslatedDisk::attachConfigDrive(void)
 	bool res = attachToHostPath(configDrivePath, TRANSLATEDTYPE_CONFIGDRIVE, configDrivePath);   // try to attach
 
 	if(!res) {																                // if didn't attach, skip the rest
-		Debug::out(LOG_ERROR, "attachConfigDrive: failed to attach config drive %s", (char *) configDrivePath.c_str());
+		Debug::out(LOG_ERROR, "attachConfigDrive: failed to attach config drive %s", configDrivePath.c_str());
 	}
 }
 
@@ -737,11 +737,11 @@ bool TranslatedDisk::hostPathExists(std::string hostPath)
     int res = access(hostPath.c_str(), F_OK);
 
     if(res != -1) {             // if it's not this error, then the file exists
-        Debug::out(LOG_DEBUG, "TranslatedDisk::hostPathExists( %s ) == TRUE (file / dir exists)", (char *) hostPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::hostPathExists( %s ) == TRUE (file / dir exists)", hostPath.c_str());
         return true;
     }
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::hostPathExists( %s ) == FALSE (file / dir does not exist)", (char *) hostPath.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::hostPathExists( %s ) == FALSE (file / dir does not exist)", hostPath.c_str());
     return false;
 }
 
@@ -772,7 +772,7 @@ bool TranslatedDisk::createFullAtariPath(std::string inPartialAtariPath, std::st
 {
     outAtariDriveIndex = -1;
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - inPartialAtariPath: %s", (char *) inPartialAtariPath.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - inPartialAtariPath: %s", inPartialAtariPath.c_str());
 
     pathSeparatorAtariToHost(inPartialAtariPath);
     
@@ -818,7 +818,7 @@ bool TranslatedDisk::createFullAtariPath(std::string inPartialAtariPath, std::st
 createFullAtariPath_finish:
 
     removeDoubleDots(outFullAtariPath);                             // search for '..' and simplify the path
-    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - outFullAtariPath is: %s", (char *) outFullAtariPath.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - outFullAtariPath is: %s", outFullAtariPath.c_str());
     return true;
 }
 
@@ -832,14 +832,14 @@ void TranslatedDisk::createFullHostPath(std::string inFullAtariPath, int inAtari
     std::string partialLongHostPath;
     conf[inAtariDriveIndex].dirTranslator.shortToLongPath(root, inFullAtariPath, partialLongHostPath);	// now convert short to long path
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - dirTranslator.shortToLongPath -- root: %s, inFullAtariPath: %s -> partialLongHostPath: %s", (char *) root.c_str(), (char *) inFullAtariPath.c_str(), (char *) partialLongHostPath.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - dirTranslator.shortToLongPath -- root: %s, inFullAtariPath: %s -> partialLongHostPath: %s", root.c_str(), inFullAtariPath.c_str(), partialLongHostPath.c_str());
     
     outFullHostPath = root;
     Utils::mergeHostPaths(outFullHostPath, partialLongHostPath);    // merge 
     
     if(useZipdirNotFile) {                                          // if ZIP DIRs are enabled
         replaceHostPathWithZipDirPath(inAtariDriveIndex, outFullHostPath, waitingForMount, zipDirNestingLevel);
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - replaceHostPathWithZipDirPath -- new outFullHostPath: %s , waitingForMount: %d, zipDirNestingLevel: %d", (char *) outFullHostPath.c_str(), (int) waitingForMount, zipDirNestingLevel);
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - replaceHostPathWithZipDirPath -- new outFullHostPath: %s , waitingForMount: %d, zipDirNestingLevel: %d", outFullHostPath.c_str(), (int) waitingForMount, zipDirNestingLevel);
     }
 }
 
@@ -890,7 +890,7 @@ void TranslatedDisk::removeDoubleDots(std::string &path)
 {
     #define MAX_DIR_NESTING     64
 
-//    Debug::out(LOG_DEBUG, "removeDoubleDots before: %s", (char *) path.c_str());
+//    Debug::out(LOG_DEBUG, "removeDoubleDots before: %s", path.c_str());
 
     std::string strings[MAX_DIR_NESTING];
     int found = 0, start = 0, pos;
@@ -944,7 +944,7 @@ void TranslatedDisk::removeDoubleDots(std::string &path)
         }
     }
 
-//    Debug::out(LOG_DEBUG, "removeDoubleDots after: %s", (char *) final.c_str());
+//    Debug::out(LOG_DEBUG, "removeDoubleDots after: %s", final.c_str());
     path = final;
 }
 
@@ -1052,12 +1052,12 @@ bool TranslatedDisk::isRootDir(std::string hostPath)
         }
         
         if(conf[i].hostRootPath == hostPath) {          // ok, this is root dir!
-            Debug::out(LOG_DEBUG, "TranslatedDisk::isRootDir - hostPath: %s -- yes, it's a root dir", (char *) hostPath.c_str());
+            Debug::out(LOG_DEBUG, "TranslatedDisk::isRootDir - hostPath: %s -- yes, it's a root dir", hostPath.c_str());
             return true;
         }
     }
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::isRootDir - hostPath: %s -- no, it's NOT a root dir", (char *) hostPath.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::isRootDir - hostPath: %s -- no, it's NOT a root dir", hostPath.c_str());
     return false;                                       // this wasn't found as root dir
 }
 
@@ -1348,7 +1348,7 @@ void TranslatedDisk::getScreenShotConfig(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-bool TranslatedDisk::zipDirAlreadyMounted(char *zipFile, int &zipDirIndex)
+bool TranslatedDisk::zipDirAlreadyMounted(const char *zipFile, int &zipDirIndex)
 {
     DWORD minAccessTime     = 0xffffffff;
     int   minAccessIndex    = 0;
@@ -1404,20 +1404,20 @@ void TranslatedDisk::replaceHostPathWithZipDirPath(int inAtariDriveIndex, std::s
             hostPath = zipDirRoot;
             Utils::mergeHostPaths(hostPath, partialLongHostZipDirPath);     // merge and thus create /tmp/zipdir3/LongFileName.txt
             
-            Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath - after ZIP DIR translation: dirTranslator.shortToLongPath -- zipDirRoot: %s, zipDirSubPath: %s -> partialLongHostZipDirPath: %s", (char *) zipDirRoot.c_str(), (char *) zipDirSubPath.c_str(), (char *) partialLongHostZipDirPath.c_str());
+            Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath - after ZIP DIR translation: dirTranslator.shortToLongPath -- zipDirRoot: %s, zipDirSubPath: %s -> partialLongHostZipDirPath: %s", zipDirRoot.c_str(), zipDirSubPath.c_str(), partialLongHostZipDirPath.c_str());
         }        
     }
 }
 
 void TranslatedDisk::replaceHostPathWithZipDirPath_internal(std::string &hostPath, bool &waitingForMount, bool &containsZip)
 {
-    char *pHostPath = (char *) hostPath.c_str();
+    const char *pHostPath = hostPath.c_str();
     waitingForMount = false;
     containsZip     = false;
  
     //----------
     // first check if the host path contains '*.ZIP' part
-    char *pZip = strcasestr(pHostPath, (char *) ".ZIP");
+    const char *pZip = strcasestr(pHostPath, ".ZIP");
     
     if(pZip == NULL) {                                  // didn't find .ZIP string? just a normal path
         Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath_internal -- no ZIP file in hostPath: %s", pHostPath);
@@ -1461,11 +1461,11 @@ void TranslatedDisk::replaceHostPathWithZipDirPath_internal(std::string &hostPat
 
     zipDirs[zipDirIndex]->lastAccessTime = Utils::getCurrentMs();                   // mark the current time as the time of last access
     
-    Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath_internal -- new path now is %s", (char *) hostPath.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath_internal -- new path now is %s", hostPath.c_str());
     containsZip = true;
 }
 
-bool TranslatedDisk::isOkToMountThisAsZipDir(char *zipFilePath)
+bool TranslatedDisk::isOkToMountThisAsZipDir(const char *zipFilePath)
 {
     struct stat attr;
     int res = stat(zipFilePath, &attr);                 // get the status of the possible zip file
@@ -1499,7 +1499,7 @@ bool TranslatedDisk::isOkToMountThisAsZipDir(char *zipFilePath)
 void TranslatedDisk::doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath, int zipDirIndex, bool &waitingForMount)
 {
     if(!isMounted) {                                    // if ZIP file not mounted yet, mount it
-        Debug::out(LOG_DEBUG, "TranslatedDisk::doZipDirMountOrStateCheck -- mounting file %s to dir %s", zipFilePath, (char *) zipDirs[zipDirIndex]->mountPoint.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::doZipDirMountOrStateCheck -- mounting file %s to dir %s", zipFilePath, zipDirs[zipDirIndex]->mountPoint.c_str());
         
         //----------
         // issue mount request
@@ -1518,7 +1518,7 @@ void TranslatedDisk::doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath
         waitingForMount = true;                             // return that we're waiting for mount to finish
         return;
     } else {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::doZipDirMountOrStateCheck -- file %s already mounted to %s, reusing and not mounting", zipFilePath, (char *) zipDirs[zipDirIndex]->mountPoint.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::doZipDirMountOrStateCheck -- file %s already mounted to %s, reusing and not mounting", zipFilePath, zipDirs[zipDirIndex]->mountPoint.c_str());
         
         if(!zipDirs[zipDirIndex]->isMounted) {                                      // if not mounted yet
             int state = mas_getState(zipDirs[zipDirIndex]->mountActionStateId);     // get state of this mount action

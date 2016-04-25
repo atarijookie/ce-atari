@@ -54,7 +54,7 @@ bool FilenameShortener::longToShortFileName(const char *longFileName, char *shor
         res = shortenName(fileName, shortName);
 
         if(!res) {
-            printf("FilenameShortener::longToShortFileName failed to shortenName!\n");
+            printf("FilenameShortener::longToShortFileName failed to shortenName %s", fileName);
             return false;
         }
     } else {                                                    // filename not long? ok...
@@ -69,7 +69,7 @@ bool FilenameShortener::longToShortFileName(const char *longFileName, char *shor
         res = shortenExtension(shortName, fileExt, shortExt);
 
         if(!res) {
-            printf("FilenameShortener::longToShortFileName failed to shortenExtension!\n");
+            printf("FilenameShortener::longToShortFileName failed to shortenExtension %s.%s", shortName, fileExt);
             return false;
         }
     } else {                                                    // file extension not long? ok...
