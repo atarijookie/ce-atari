@@ -36,6 +36,7 @@ private:
     static char *storeExistingDrives (char *bfr, DesktopConfig *dc);
     
     static char *storeFloppyImageLauncher(char *bfr, DesktopConfig *dc);
+    static char *storeMediaPlayers(char *bfr, DesktopConfig *dc);
 };
 
 #endif

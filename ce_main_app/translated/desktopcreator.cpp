@@ -108,6 +108,8 @@ char *DesktopCreator::storeExecutables(char *bfr, DesktopConfig *dc)
         bfr += strlen(bfr);
         
         bfr = storeFloppyImageLauncher(bfr, dc);
+
+	bfr = storeMediaPlayers(bfr, dc);
         
         *bfr = 0x1a;
         bfr++;
@@ -116,6 +118,8 @@ char *DesktopCreator::storeExecutables(char *bfr, DesktopConfig *dc)
         bfr += strlen(bfr);
 
         bfr = storeFloppyImageLauncher(bfr, dc);
+        
+	bfr = storeMediaPlayers(bfr, dc);
     }   
     
     return bfr;
@@ -135,6 +139,21 @@ char *DesktopCreator::storeFloppyImageLauncher(char *bfr, DesktopConfig *dc)
     bfr += strlen(bfr);
 
     return bfr;
+}
+
+char *DesktopCreator::storeMediaPlayers(char *bfr, DesktopConfig *dc)
+{
+	char tmp[128];
+	int len;
+	len = snprintf(tmp, sizeof(tmp),
+	               "#P 03 04   %c:\\STEAUPLY.TTP@ *.AU@ \r\n", 'A' + dc->configDrive);
+	memcpy(bfr, tmp, len+1);
+	bfr += len;
+	len = snprintf(tmp, sizeof(tmp),
+	               "#P 03 04   %c:\\CEMEDIAP.TTP@ *.MP3@ \r\n", 'A' + dc->configDrive);
+	memcpy(bfr, tmp, len+1);
+	bfr += len;
+	return bfr;
 }
 
 char *DesktopCreator::storeExistingDrives(char *bfr, DesktopConfig *dc)
