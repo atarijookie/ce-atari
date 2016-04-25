@@ -21,9 +21,7 @@ int main(int argc, char *argv[])
     /*const char *path = "c:\\!nohaj\\tmp\\assembla_atarijookie\\trunk\\ce_dd_bootsectors";*/
 	if(argc > 1) path = argv[1];
 
-    createBootsectorFromPrg(path, "bs_st.prg", "ce_dd_st.bs", true);
-    createBootsectorFromPrg(path, "bs_tt.prg", "ce_dd_tt.bs", true);
-    createBootsectorFromPrg(path, "bs_fn.prg", "ce_dd_fn.bs", true);
+    createBootsectorFromPrg(path, "bs.prg", "ce_dd.bs", true);
     createBootsectorFromPrg(path, "bs_l2.prg", "ce_dd_l2.bs", false);
 
 #if 0
