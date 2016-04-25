@@ -278,7 +278,7 @@ void Ikbd::processMouse(input_event *ev)
 	    int btnNew = mouseBtnNow;
 		
         statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
-        statuses.ikbdUsb.aliveSign = ALIVE_MOUSEBTN;
+        statuses.ikbdUsb.aliveSign = ALIVE_MOUSEVENT;
 
 		BYTE absButtons = 0;
 		
@@ -342,7 +342,7 @@ void Ikbd::processMouse(input_event *ev)
 		
 	if(ev->type == EV_REL) {
         statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
-        statuses.ikbdUsb.aliveSign = ALIVE_MOUSEMOVE;
+        statuses.ikbdUsb.aliveSign = ALIVE_MOUSEVENT;
 
 		if(ev->code == REL_X) {
             // update absolute position
@@ -418,7 +418,7 @@ void Ikbd::processJoystick(js_event *jse, int joyNumber)
 
     if(jse->type == JS_EVENT_AXIS) {
         statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
-        statuses.ikbdUsb.aliveSign = ALIVE_JOYMOVE;
+        statuses.ikbdUsb.aliveSign = ALIVE_JOYEVENT;
 
         if(jse->number >= JOYAXIS) {                // if the index of axis would be out of index, quit
             return;
@@ -427,7 +427,7 @@ void Ikbd::processJoystick(js_event *jse, int joyNumber)
 	    js->axis[ jse->number ] = jse->value;       // store new axis value
     } else if(jse->type == JS_EVENT_BUTTON) {
         statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
-        statuses.ikbdUsb.aliveSign = ALIVE_JOYBTN;
+        statuses.ikbdUsb.aliveSign = ALIVE_JOYEVENT;
 
         if(jse->number >= JOYBUTTONS) {             // if the index of button would be out of index, quit
             return;

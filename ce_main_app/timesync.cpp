@@ -5,6 +5,7 @@
 #include <pwd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <errno.h>
 
 #include <errno.h>  
@@ -31,14 +32,28 @@ void *timesyncThreadCode(void *ptr)
 	Debug::out(LOG_DEBUG, "Timesync thread starting...");
 
     TimeSync timeSync;
-    timeSync.sync();
 
+    DWORD nextTimeSync = Utils::getCurrentMs();             // should do one time sync now....
+    bool res;
+    
     while(sigintReceived == 0) {                            // this thread does time sync when requested
         sleep(1);
 
+        if(Utils::getCurrentMs() >= nextTimeSync) {         // if it's time to do one time sync, do it now
+            do_timeSync = true;
+        }
+        
         if(do_timeSync) {                                   // should do time sync? do it
             do_timeSync = false;
-            timeSync.sync();
+            res = timeSync.sync();
+            
+            if(!res) {                                      // if time sync failed, try in one minute
+                nextTimeSync = Utils::getEndTime( 1 * 60 * 1000);
+                Debug::out(LOG_DEBUG, "Timesync fail, retry in one minute.");
+            } else {                                        // success? Do it again in 30 minutes
+                nextTimeSync = Utils::getEndTime(30 * 60 * 1000);
+                Debug::out(LOG_DEBUG, "Timesync good, next sync in 30 minutes.");
+            }
         }
     }
 
@@ -130,9 +145,11 @@ void TimeSync::refreshNetworkDateNtp(void)
   char hostname[64];
   strcpy(hostname, (char *) ntpServer.c_str());
 
-  int portno=123;     //NTP is port 123
-  int maxlen=1024;        //check our buffers
-  int i;          // misc var i
+  iInitState = INIT_NTP_FAILED;
+  
+  int portno=123;       //NTP is port 123
+  int maxlen=1024;      //check our buffers
+  int i;                // misc var i
   unsigned char msg[48]={010,0,0,0,0,0,0,0,0};    // the packet we send
   unsigned long  buf[maxlen]; // the buffer we get back
   //struct in_addr ipaddr;        //  
@@ -171,25 +188,55 @@ void TimeSync::refreshNetworkDateNtp(void)
   struct timeval tv;
   tv.tv_sec     = 5;        // 5 second timeout
   tv.tv_usec    = 0;
-  i=setsockopt(s, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv));
-  if( i<0 ) {
+  i = setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+  if(i < 0) {
     iInitState=INIT_NTP_FAILED;
     Debug::out(LOG_DEBUG, "TimeSync: could not set options on UDP socket: %s",strerror(errno));
     return;
   }
-  i=sendto(s,msg,sizeof(msg),0,(struct sockaddr *)&server_addr,sizeof(server_addr));
-  if( i<0 ){
+  
+  i = sendto(s,msg,sizeof(msg),0,(struct sockaddr *)&server_addr,sizeof(server_addr));
+  if(i < 0){
     iInitState=INIT_NTP_FAILED;
     Debug::out(LOG_DEBUG, "TimeSync: could not set UDP packet: %s",strerror(errno));
     return;
   }
+
+  //------------------
   // get the data back
-  struct sockaddr saddr;
-  socklen_t saddr_l = sizeof (saddr);
-  i=recvfrom(s,buf,48,0,&saddr,&saddr_l);
-  if( i<0 ){
-    iInitState=INIT_NTP_FAILED;
-    Debug::out(LOG_DEBUG, "TimeSync: could not recieve packet: %s",strerror(errno));
+  DWORD recvTimeoutTime = Utils::getEndTime(5000);
+    
+  while(sigintReceived == 0) {
+    if(Utils::getCurrentMs() >= recvTimeoutTime) {          // if timeout, quit loop
+        i       = -1;
+        errno   = ETIMEDOUT;
+        break;
+    }
+
+    int res, readCount;
+    res = ioctl(s, FIONREAD, &readCount);                   // try to get how many bytes can be read
+    if(res < 0) {                                           // ioctl failed? nothing to receive
+        Utils::sleepMs(330);                                // wait 1/3 of second and then check again
+        continue;
+    }
+
+    #define RECV_SIZE   48
+    
+    if(readCount < RECV_SIZE)  {                            // not enough data waiting?
+        Utils::sleepMs(330);                                // wait 1/3 of second and then check again
+        continue;
+    }
+
+    // if it came here, we got enough data to recvfrom() without waiting
+    struct sockaddr saddr;
+    socklen_t saddr_l = sizeof (saddr);
+    i = recvfrom(s, buf, RECV_SIZE, 0, &saddr, &saddr_l);   // try to read data (should succeed)
+    break;
+  }
+  
+  if(i < 0) {                                               // failed? quit
+    iInitState = INIT_NTP_FAILED;
+    Debug::out(LOG_DEBUG, "TimeSync: could not recieve packet: %s", strerror(errno));
     return;
   }
   

@@ -337,11 +337,11 @@ void CCoreThread::run(void)
 		if(res) {									    // HANS is signaling attention?
 			gotAtn = true;							    // we've some ATN
 
-            statuses.hans.aliveTime = now;
-            statuses.hans.aliveSign = ALIVE_CMD;
-
 			switch(inBuff[3]) {
 			case ATN_FW_VERSION:
+                    statuses.hans.aliveTime = now;
+                    statuses.hans.aliveSign = ALIVE_FWINFO;
+
                     lastFwInfoTime.hans = Utils::getCurrentMs();
                     handleFwVersion_hans();
 				break;
@@ -349,8 +349,11 @@ void CCoreThread::run(void)
 			case ATN_ACSI_COMMAND:
                     dbgVars.isInHandleAcsiCommand = 1;
                     
-                    statuses.hdd.aliveTime = now;
-                    statuses.hdd.aliveSign = ALIVE_RW;
+                    statuses.hdd.aliveTime  = now;
+                    statuses.hdd.aliveSign  = ALIVE_RW;
+
+                    statuses.hans.aliveTime = now;
+                    statuses.hans.aliveSign = ALIVE_CMD;
 
                     handleAcsiCommand();
                     
@@ -388,25 +391,31 @@ void CCoreThread::run(void)
 		if(res) {									// FRANZ is signaling attention?
 			gotAtn = true;							// we've some ATN
 
-            statuses.franz.aliveTime = now;
-            statuses.franz.aliveSign = ALIVE_CMD;
-
 			switch(inBuff[3]) {
 			case ATN_FW_VERSION:                    // device has sent FW version
+                statuses.franz.aliveTime = now;
+                statuses.franz.aliveSign = ALIVE_FWINFO;
+
                 lastFwInfoTime.franz = Utils::getCurrentMs();
 				handleFwVersion_franz();
 				break;
 
             case ATN_SECTOR_WRITTEN:                // device has sent written sector data
-                statuses.fdd.aliveTime = now;
-                statuses.fdd.aliveSign = ALIVE_WRITE;
+                statuses.fdd.aliveTime   = now;
+                statuses.fdd.aliveSign   = ALIVE_WRITE;
+
+                statuses.franz.aliveTime = now;
+                statuses.franz.aliveSign = ALIVE_WRITE;
 
                 handleSectorWritten();
                 break;
 
 			case ATN_SEND_TRACK:                    // device requests data of a whole track
-                statuses.fdd.aliveTime = now;
-                statuses.fdd.aliveSign = ALIVE_READ;
+                statuses.franz.aliveTime = now;
+                statuses.franz.aliveSign = ALIVE_READ;
+            
+                statuses.fdd.aliveTime   = now;
+                statuses.fdd.aliveSign   = ALIVE_READ;
 
 				handleSendTrack();
 				break;

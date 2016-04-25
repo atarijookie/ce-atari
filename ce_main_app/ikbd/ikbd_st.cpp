@@ -486,6 +486,9 @@ void Ikbd::processKeyboardData(void)
         return;
     }
 
+    statuses.ikbdSt.aliveTime = Utils::getCurrentMs();          // store current time, so we won't have to call this many times in the loop
+    statuses.ikbdSt.aliveSign = ALIVE_KEYDOWN;                  // we don't know at this moment if it's a key down event, but store it just to make sure that user will not see it's a ST IKBD command from ST, but something from original keyboard
+
     while(cbKeyboardData.count > 0) {                           // while there are some data, process
         BYTE val = cbKeyboardData.peek();                       // get the data, but don't move the get pointer, because we might fail later
 
@@ -506,7 +509,19 @@ void Ikbd::processKeyboardData(void)
 			
 			bool resendTheseData = true;						// reset this flag to not resend these data
 			
-			switch(bfr[0]) {									// handle data sent from original keyboard
+            BYTE stKeyboadCmd = bfr[0];                         // 0th byte is the original ST keyboard command code
+            //---------------
+            // just for the cause of status alive reporting
+            if(stKeyboadCmd < KEYBDATA_SPECIAL_LOWEST) {                                            // lower than special command? it's key up / down event
+                statuses.ikbdSt.aliveSign = ALIVE_KEYDOWN;
+            } else if(stKeyboadCmd >= KEYBDATA_MOUSE_ABS && stKeyboadCmd <= KEYBDATA_MOUSE_RELB) {  // it's in the mouse command range? it's a mouse event
+                statuses.ikbdSt.aliveSign = ALIVE_MOUSEVENT;
+            } else if(stKeyboadCmd >= KEYBDATA_JOY_BOTH  && stKeyboadCmd <= KEYBDATA_JOY1) {        // it's in the joy command range? it's a joy event
+                statuses.ikbdSt.aliveSign = ALIVE_JOYEVENT;
+            }
+            //---------------
+            
+			switch(stKeyboadCmd) {                              // handle data sent from original keyboard
 				case KEYBDATA_MOUSE_ABS:						// report of absolute mouse position?
                 ikbdLog( "Ikbd::processKeyboardData - keyboard says: KEYBDATA_MOUSE_ABS");
 
@@ -541,7 +556,7 @@ void Ikbd::processKeyboardData(void)
 			if(resendTheseData) {								// if we should resend this data
 				fdWrite(fdUart, bfr, len);                      // send the whole sequence to ST
             }
-			
+            
 			continue;
         }
 

@@ -363,10 +363,8 @@ const char *StatusReport::aliveSignIntToString(int aliveSign)
         case ALIVE_WRITE:       return "write command";
         case ALIVE_IKBD_CMD:    return "IKBC command";
         case ALIVE_KEYDOWN:     return "key pressed";
-        case ALIVE_MOUSEMOVE:   return "mouse moved";
-        case ALIVE_MOUSEBTN:    return "mouse button pressed";
-        case ALIVE_JOYMOVE:     return "joy moved";
-        case ALIVE_JOYBTN:      return "joy button pressed";
+        case ALIVE_MOUSEVENT:   return "mouse moved / clicked";
+        case ALIVE_JOYEVENT:    return "joy moved / pressed";
 
         case ALIVE_DEAD:    
         default:    

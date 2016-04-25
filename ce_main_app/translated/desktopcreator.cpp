@@ -109,7 +109,7 @@ char *DesktopCreator::storeExecutables(char *bfr, DesktopConfig *dc)
         
         bfr = storeFloppyImageLauncher(bfr, dc);
 
-	bfr = storeMediaPlayers(bfr, dc);
+        bfr = storeMediaPlayers(bfr, dc);
         
         *bfr = 0x1a;
         bfr++;
@@ -119,7 +119,7 @@ char *DesktopCreator::storeExecutables(char *bfr, DesktopConfig *dc)
 
         bfr = storeFloppyImageLauncher(bfr, dc);
         
-	bfr = storeMediaPlayers(bfr, dc);
+        bfr = storeMediaPlayers(bfr, dc);
     }   
     
     return bfr;

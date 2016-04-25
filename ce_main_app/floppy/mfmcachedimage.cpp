@@ -68,9 +68,8 @@ void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img, bool bufferOfBytes)
 	
 	DWORD after50ms = Utils::getEndTime(50);								// this will help to add pauses at least every 50 ms to allow other threads to do stuff
 
-    for(int t=0; t<tracksNo; t++) {       // go through the whole image and encode it
+    for(int t=0; t<tracksNo; t++) {                                         // go through the whole image and encode it
         for(int s=0; s<sides; s++) {
-			
 			if(Utils::getCurrentMs() > after50ms) {							// if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
 				Utils::sleepMs(5);
 				after50ms = Utils::getEndTime(50);
@@ -83,6 +82,10 @@ void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img, bool bufferOfBytes)
             #endif
 
             encodeSingleTrack(img, s, t, spt, buffer, bytesStored, bufferOfBytes);
+
+   			if(sigintReceived) {                                            // app terminated? quit
+                return;
+            }
 
             int index = t * 2 + s;
             if(index >= MAX_TRACKS) {                                       // index out of bounds?
@@ -131,6 +134,10 @@ void MfmCachedImage::encodeSingleTrack(IFloppyImage *img, int side, int track, i
 
         createMfmStream(img, side, track, sect, buffer + countInTrack, countInSect);	// then create the right MFM stream
         countInTrack += countInSect;
+
+        if(sigintReceived) {                                            // app terminated? quit
+            return;
+        }
     }
 
     if(!bufferOfBytes) {                                                            // buffer of WORDs? append to WORD
@@ -200,12 +207,15 @@ void MfmCachedImage::copyFromOther(MfmCachedImage &other)
 	
     for(int side=0; side<2; side++) {									// copy both sides
 		for(int track=0; track<params.tracks; track++) {				// copy all the tracks
-		
 			if(Utils::getCurrentMs() > after50ms) {						// if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
 				Utils::sleepMs(5);
 				after50ms = Utils::getEndTime(50);
 			}
-		
+
+   			if(sigintReceived) {                                        // app terminated? quit
+                return;
+            }
+            
 			int bytesInBuffer;
 			BYTE *src = other.getEncodedTrack(track, side, bytesInBuffer);	// get pointer to source track
 	
