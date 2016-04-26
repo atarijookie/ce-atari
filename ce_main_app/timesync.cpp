@@ -272,7 +272,8 @@ void TimeSync::refreshNetworkDateNtp(void)
   //>std::cout << "System time is " << (i-tmit) << " seconds off" << std::endl;
   Debug::out(LOG_DEBUG, "TimeSync: System time is %d seconds off",(i-tmit));
 
-  lTime=tmit;
+  lTime         = tmit;
+  iInitState    = INIT_OK;
 }
 
 bool TimeSync::syncByWeb(void)

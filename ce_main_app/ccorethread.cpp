@@ -865,6 +865,10 @@ void CCoreThread::convertXilinxInfo(BYTE xilinxInfo)
     if((prevHwHddIface != hwConfig.hddIface) && hwConfig.hddIface == HDD_IF_SCSI) {
         Debug::out(LOG_DEBUG, "Found out that we're running on SCSI bus - will resend the ID bits configuration to Hans");
         setEnabledIDbits = true;
+        
+        pthread_mutex_lock(&shared.mtxScsi);
+        shared.scsi->updateTranslatedBootMedia();                   // also update CE_DD bootsector with proper SCSI ID
+        pthread_mutex_unlock(&shared.mtxScsi);
     }
     
     if(memcmp(&hwConfigOld, &hwConfig, sizeof(THwConfig)) != 0) {    // config changed? save it

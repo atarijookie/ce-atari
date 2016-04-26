@@ -35,6 +35,8 @@ private:
 	bool	gotImage;
     BYTE	*imageBuffer;
 	
+    BYTE    lastUsedAcsiId;
+    
 	bool	loadDataIntoBuffer(void);
 	void 	updateBootsectorConfig(void);
 	int		getConfigPosition(void);
