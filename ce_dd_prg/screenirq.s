@@ -14,7 +14,8 @@ _init_screencapture:
     movem.l D0-A6,-(SP)
     
     move.l  0x70,__savevbl
-    move.l  #screenirq,0x70                     | install VBL   
+    move.l  #screenirq,0x70                     | install VBL
+	clr.w 	__vblcntscreen   
 
     movem.l (SP)+,D0-A6
     rts
@@ -22,7 +23,6 @@ _init_screencapture:
 | -------------------------------------------------    
 screenirq:
     movem.l D0-A6,-(SP)
-    
     | --------------------
     | this limits the screen shot to once per second
     lea     __vblcntscreen,A1
