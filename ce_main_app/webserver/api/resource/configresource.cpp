@@ -85,7 +85,7 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         // Parse form data. input1 and input2 are guaranteed to be NUL-terminated
         mg_get_var(post_data, post_data_len, "loglevel", loglevel, sizeof(loglevel));
         std::string sLogLevel=std::string(loglevel);
-        if( sLogLevel!="ll1" && sLogLevel!="ll2" && sLogLevel!="ll3" && sLogLevel!="" )
+        if( sLogLevel!="ll1" && sLogLevel!="ll2" && sLogLevel!="ll3" && sLogLevel!="ikbdlogs" && sLogLevel!="" )
         {
             mg_printf(conn, "HTTP/1.1 400 unknown loglevel\r\n");
             return true;
@@ -93,12 +93,19 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
 
         if(sLogLevel == "ll1" || sLogLevel == "") {     // LOG_INFO
             flags.logLevel = 1;
+            flags.ikbdLogs = false;
         } else if(sLogLevel == "ll2") {                 // LOG_ERROR
             flags.logLevel = 2;
+            flags.ikbdLogs = false;
         } else if(sLogLevel == "ll3") {                 // LOG_DEBUG
             flags.logLevel = 3;
+            flags.ikbdLogs = false;
+        } else if(sLogLevel == "ikbdlogs") { 			// LOG_DEBUG + ikbdlogs            
+            flags.logLevel = 3;
+            flags.ikbdLogs = true;
         } else {
             flags.logLevel = 1;
+            flags.ikbdLogs = false;
         }        
      
         Debug::out(LOG_INFO, "Log level changed from web to level %d", flags.logLevel);

@@ -128,7 +128,7 @@ void Ikbd::processStCommands(void)
             }
         }
 
-        //ikbdLog( "Ikbd::processStCommands -- got command %02x, len: %d, cb contains %d bytes", cmd, len, cbStCommands.count);
+        ikbdLog( "Ikbd::processStCommands -- got command %02x, len: %d, cb contains %d bytes", cmd, len, cbStCommands.count);
         
         if(len == 0) {                                          // it's not GET command and we don't have this SET command defined?
             ikbdLog( "Ikbd::processStCommands -- not GET cmd, and we don't know what to do");
@@ -147,7 +147,7 @@ void Ikbd::processStCommands(void)
         }
 
         if(len > cbStCommands.count) {                          // if we don't have enough data in the buffer, quit
-            //ikbdLog( "Ikbd::processStCommands -- not enough data in buffer, quitting (%d > %d)", len, cbStCommands.count);
+            ikbdLog( "Ikbd::processStCommands -- not enough data in buffer, quitting (%d > %d)", len, cbStCommands.count);
             return;
         }
 
