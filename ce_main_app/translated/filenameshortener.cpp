@@ -177,15 +177,11 @@ bool FilenameShortener::shortToLongFileName(const char *shortFileName, char *lon
     return false;
 }
 
-int FilenameShortener::strCharPos(const char *str, int maxLen, char ch)
+int FilenameShortener::strrCharPos(const char *str, int maxLen, char ch)
 {
     int i;
 
-    for(i=0; i<maxLen; i++) {       // find that char!
-        if(str[i] == 0) {           // end of string?
-            break;
-        }
-
+    for(i = MIN((int)strlen(str), maxLen) - 1; i >= 0; i--) {       // find that char!
         if(str[i] == ch) {          // that character found?
             return i;
         }
@@ -207,7 +203,7 @@ void FilenameShortener::splitFilenameFromExtension(const char *filenameWithExt, 
     memset(ext, 0, 4);
 
     // divide longFileName to filename and extension
-    int dotPos = strCharPos(filenameWithExt, filenameLength, '.'); // find name and extension separator
+    int dotPos = strrCharPos(filenameWithExt, filenameLength, '.'); // find name and extension separator
 
     if(dotPos == -1) {                                          // not found?
         strncpy(fileName, filenameWithExt, filenameLength + 1); // copy whole name to filename
