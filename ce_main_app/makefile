@@ -1,5 +1,8 @@
 TARGET	= cosmosex
 
+# control verbosity. use make V=1
+V = 0
+
 #ONPC    = yes
 # in the CFLAGS use ONPC_GPIO or ONPC_HIGHLEVEL or ONPC_NOTHING
 
@@ -21,6 +24,22 @@ endif
 
 # uncomment following line to get map file (ce.map)
 #LDFLAGS += -Wl,-Map,ce.map
+
+ACTUAL_CC := $(CC)
+CC_0 = @echo "$(if $(findstring .d,$@),Building dependencies for,Compiling) $<"; $(ACTUAL_CC)
+CC_1 = $(ACTUAL_CC)
+CC = $(CC_$(V))
+ACTUAL_CXX := $(CXX)
+CXX_0 = @echo "$(if $(findstring .d,$@),Building dependencies for,Compiling) $<"; $(ACTUAL_CXX)
+CXX_1 = $(ACTUAL_CXX)
+CXX = $(CXX_$(V))
+CXXL_0 = @echo "Linking $@"; $(ACTUAL_CXX)
+CXXL_1 = $(ACTUAL_CXX)
+CXX_LINK = $(CXXL_$(V))
+
+AT_0 := @
+AT_1 :=
+AT = $(AT_$(V))
 
 SUBDIR1	= config
 SUBDIR2	= native
@@ -85,28 +104,28 @@ WEBCOMPONENTS = $(WEB_CSS_PATH)/combined.css.gz $(WEB_JS_PATH)/jquery-combined.j
 all:	$(TARGET)
 
 $(TARGET): $(OBJS) $(HDRS) $(WEBCOMPONENTS)
-	$(CXX) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@
+	$(CXX_LINK) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@
 #	$(STRIP) -s $@
 
 $(WEB_CSS_PATH)/combined.css.gz: ${WEB_CSS_MODULES}
-	cat $^ | gzip -f > $@
+	$(AT)cat $^ | gzip -f > $@
 
 $(WEB_JS_PATH)/zepto-combined.js.gz: $(WEB_JS_PATH)/zepto.js $(WEB_JS_PATH)/zepto.hack.js ${WEB_JS_MODULES}
-	cat $^ | gzip -f > $@
+	$(AT)cat $^ | gzip -f > $@
 
 $(WEB_JS_PATH)/jquery-combined.js.gz: $(WEB_JS_PATH)/jquery.js ${WEB_JS_MODULES}
-	cat $^ | gzip -f > $@
+	$(AT)cat $^ | gzip -f > $@
 
 .PHONY:	clean depclean
 
 clean:	depclean
-	$(RM) $(WEB_JS_PATH)/*.gz
-	$(RM) $(WEB_CSS_PATH)/*.gz
-	@$(RM) $(OBJS)
-	$(RM) *.o *~ $(TARGET)
+	$(AT)$(RM) $(WEB_JS_PATH)/*.gz
+	$(AT)$(RM) $(WEB_CSS_PATH)/*.gz
+	$(AT)$(RM) $(OBJS)
+	$(AT)$(RM) *.o *~ $(TARGET)
 
 depclean:
-	@$(RM) $(DEPS)
+	$(AT)$(RM) $(DEPS)
 
 depend:	$(DEPS)
 
