@@ -6,6 +6,7 @@
 #include "../utils.h"
 
 FilenameShortener::FilenameShortener()
+: allowExtUse(true)
 {
 }
 
@@ -45,36 +46,41 @@ bool FilenameShortener::longToShortFileName(const char *longFileName, char *shor
         strcpy(fileName, "________");
     }
 
-    // shorten filename if needed
+    // shorten filename and extension if needed
     char shortName[9];
     memset(shortName, 0, 9);
-
-    bool res;
-
-    if(strlen(fileName) > 8) {                                  // filename too long? Shorten it.
-        res = shortenName(fileName, shortName);
-
-        if(!res) {
-            printf("FilenameShortener::longToShortFileName failed to shortenName %s", fileName);
-            return false;
-        }
-    } else {                                                    // filename not long? ok...
-        strcpy(shortName, fileName);
-    }
-
-    // shorten file extension if needed
     char shortExt[4];
     memset(shortExt, 0, 4);
 
-    if(strlen(fileExt) > 3) {                                  // file extension too long? Shorten it.
-        res = shortenExtension(shortName, fileExt, shortExt);
-
-        if(!res) {
-            printf("FilenameShortener::longToShortFileName failed to shortenExtension %s.%s", shortName, fileExt);
-            return false;
+    if((strlen(fileExt) == 0) && allowExtUse) {
+        // no extension
+        if(strlen(fileName) <= 8) {
+            strcpy(shortName, fileName);
+        } else {
+            if(!shortenNameUsingExt(fileName, shortName, shortExt)) {
+                printf("FilenameShortener::longToShortFileName failed to shortenName %s", fileName);
+                return false;
+            }
         }
-    } else {                                                    // file extension not long? ok...
-        strcpy(shortExt, fileExt);
+    } else {
+        // there is an extension
+        if(strlen(fileName) > 8) {                                  // filename too long? Shorten it.
+            if(!shortenName(fileName, shortName)) {
+                printf("FilenameShortener::longToShortFileName failed to shortenName %s", fileName);
+                return false;
+            }
+        } else {                                                    // filename not long? ok...
+            strcpy(shortName, fileName);
+        }
+
+        if(strlen(fileExt) > 3) {                                  // file extension too long? Shorten it.
+            if(!shortenExtension(shortName, fileExt, shortExt)) {
+                printf("FilenameShortener::longToShortFileName failed to shortenExtension %s.%s", shortName, fileExt);
+                return false;
+            }
+        } else {                                                    // file extension not long? ok...
+            strcpy(shortExt, fileExt);
+        }
     }
 
     // create final short name
@@ -300,6 +306,18 @@ bool FilenameShortener::shortenExtension(const char *shortFileName, const char *
     }
 
     return false;                                           // this should never happen
+}
+
+bool FilenameShortener::shortenNameUsingExt(const char *fileName, char *shortName, char *shortExt)
+{
+    // use 8 first characters as filename
+    memcpy(shortName, fileName, 8);
+	shortName[8] = '\0';
+    // and following characters as extension !
+	const char *longExt = fileName + 8;
+	// skip spaces
+	while(longExt[0] == '_' && longExt[1] != '\0') longExt++;
+    return shortenExtension(shortName, longExt, shortExt);
 }
 
 void FilenameShortener::replaceNonLetters(char *str)
