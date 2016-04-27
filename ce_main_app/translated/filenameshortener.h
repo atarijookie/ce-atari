@@ -39,8 +39,8 @@ private:
 
     std::map<std::string, std::string> mapFilenameNoExt;                    // used by shortenName() to create unique file name with ~
 
-    bool shortenName(char *nLong, char *nShort);
-    bool shortenExtension(char *shortFileName, char *nLongExt, char *nShortExt);
+    bool shortenName(const char *nLong, char *nShort);
+    bool shortenExtension(const char *shortFileName, const char *nLongExt, char *nShortExt);
 
     static int  strCharPos(const char *str, int maxLen, char ch);
     static void replaceNonLetters(char *str);
