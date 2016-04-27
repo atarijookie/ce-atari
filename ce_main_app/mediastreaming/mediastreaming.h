@@ -7,13 +7,18 @@
 
 #define MEDIASTREAMING_MAXSTREAMS	4
 
+typedef struct {
+	unsigned short audioRate;
+	bool forceMono;
+} MediaParams;
+
 class MediaStream
 {
 public:
 	MediaStream(void);
 	~MediaStream();
 	bool isFree(void);
-	bool open(const char * filename);
+	bool open(const char * filename, const MediaParams * params);
 	int getInfos(BYTE * buffer, int bufferlen);
 	int read(BYTE * buffer, int bufferlen);
 	void close(void);

@@ -10,6 +10,9 @@
  * 05 argument
  *
  * MEDIASTREAMING_CMD_OPENSTREAM : 512 byte data
+ * 4 first bytes : 'CEMP'
+ * followed by a parameter list (see ids below)
+ * MEDIAPARAM_PATH should be the last in the list
  *
  * MEDIASTREAMING_CMD_GETSTREAMINFOS : arg = stream_id
  *
@@ -24,6 +27,12 @@
 #define MEDIASTREAMING_CMD_READSTREAM	3
 #define MEDIASTREAMING_CMD_CLOSESTREAM	4
 
+/* parameters for MEDIASTREAMING_CMD_OPENSTREAM */
+#define MEDIAPARAM_AUDIORATE	0x0001		// WORD value : 50066, 25033, etc.
+#define MEDIAPARAM_FORCEMONO	0x0002		// WORD value : 1 for true / 0 false
+
+#define MEDIAPARAM_PATH			0x00ff		// null terminated ascii string
+
 /* error codes */
 #define MEDIASTREAMING_OK					0
 #define MEDIASTREAMING_ERR_INVALIDCOMMAND	0xff
@@ -31,6 +40,7 @@
 #define MEDIASTREAMING_ERR_STREAMERROR		0xfd
 #define MEDIASTREAMING_ERR_RX				0xfc
 #define MEDIASTREAMING_ERR_INTERNAL			0xfb
+#define MEDIASTREAMING_ERR_BADPARAM			0xfa
 #define MEDIASTREAMING_EOF					0xf0
 
 #endif // MEDIASTREAMING_COMMANDS_H

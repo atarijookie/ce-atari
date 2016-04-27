@@ -29,13 +29,33 @@ bool MediaStream::isFree(void)
 	return (f == NULL);
 }
 
-bool MediaStream::open(const char * filename)
+/* filename of url */
+bool MediaStream::open(const char * filename, const MediaParams * params)
 {
 	char command[256];
+	char escfilename[256];
+	{
+		// replace ' by '\''
+		const char * p = filename;
+		char * q = escfilename;
+		/* remove file:/// */
+		if(memcmp(p, "file://", 7) == 0) p += 7;
+		while(*p && (q < escfilename + 255)) {
+			if(*p == '\'') {
+				*q++ = '\'';
+				*q++ = '\\';
+				*q++ = '\'';
+				*q++ = '\'';
+			} else {
+				*q++ = *p;
+			}
+			p++;
+		}
+		*q = '\0';
+	}
 	snprintf(command, sizeof(command),
-	         //"/usr/local/bin/sox '%s' -r 50066 -b 8 -e signed-integer -c 1 -t au -",
-	         "ffmpeg -v 0 -i '%s' -ar 50066 -f au -c pcm_s8 -", // -ac 1 => mono
-	         filename);
+	         "/usr/local/bin/ffmpeg -v 0 -i '%s' -ar %u %s-f au -c pcm_s8 -", // -ac 1 => mono
+	         escfilename, params->audioRate, params->forceMono ? "-ac 1 " : "");
 	Debug::out(LOG_DEBUG, "MediaStream::open \"%s\"", command);
 	f = popen(command, "r");
 	isPipe = true;
@@ -66,7 +86,11 @@ int MediaStream::getInfos(BYTE * buffer, int bufferlen)
 	if(bufferlen < 24) return -1;
 	rewind(f);
 	n = fread(buffer, 1, 24, f);
-	if(n != 24) return -1;
+	if(n != 24) {
+		Debug::out(LOG_ERROR, "MediaStream::getInfos failed to read 24 bytes : %s",
+		           feof(f) ? "EOF" : "ERROR");
+		return -1;
+	}
 	header_len = (buffer[4] << 24) | (buffer[5] << 16) | (buffer[6] << 8) | (buffer[7]);
 	if(header_len < 24) return 24;
 	n = header_len;
@@ -122,6 +146,11 @@ void MediaStreaming::processCommand(BYTE *command, AcsiDataTrans *dataTrans)
 void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 {
 	BYTE buffer[512];
+	MediaParams params;
+	const char * path_or_url;
+	std::string hostPath;
+	const char * path;
+
 	// first, get data from Hans
 	if(!dataTrans->recvData(buffer, 512)) {
 		Debug::out(LOG_ERROR, "MediaStreaming::openStream failed to receive data");
@@ -139,24 +168,82 @@ void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 		dataTrans->setStatus(MEDIASTREAMING_ERR_INTERNAL);
 		return;
 	}
-	char * path;
-	int driveIndex;
-	path = (char *)buffer + 2;	// XXX
-	driveIndex = buffer[0] - 'A';
-	std::string atariPath(path);
-	std::string hostPath;
-	bool waitingForMount;
-	int zipDirNestingLevel;
-	if(!translated) {
-		Debug::out(LOG_ERROR, "MediaStreaming::openStream translated=%p cannot convert %s", translated, (char *)buffer);
-		dataTrans->setStatus(MEDIASTREAMING_ERR_INTERNAL);
-		return;
+
+	// default params
+	params.audioRate = 50066;	// STE higher sample rate
+	params.forceMono = false;	// STE can do stereo !
+
+	// parse open infos
+	if(memcmp(buffer, "CEMP", 5) == 0) {
+		path = NULL;
+		unsigned int i = 4;
+		// path is always the last param
+		while((i < sizeof(buffer)) && (path == NULL)) {
+			WORD id = buffer[i] << 8 | buffer[i+1];
+			i += 2;
+			switch(id) {
+			case MEDIAPARAM_AUDIORATE:
+				params.audioRate = buffer[i] << 8 | buffer[i+1];
+				i += 2;
+				break;
+			case MEDIAPARAM_FORCEMONO:
+				params.forceMono = (buffer[i] << 8 | buffer[i+1]) != 0;
+				i += 2;
+				break;
+			case MEDIAPARAM_PATH:
+				path = (char *)(buffer + i);
+				break;
+			default:
+				Debug::out(LOG_ERROR, "MediaStreaming::openStream unknown parameter id %04X at offset %d", id, i);
+				path = (char *)(buffer + i);
+			}
+		}
+		if(path == NULL) {
+			Debug::out(LOG_ERROR, "MediaStreaming::openStream mandatory parameter path not found");
+			dataTrans->setStatus(MEDIASTREAMING_ERR_BADPARAM);
+			return;
+		}
+	} else {
+		// only plain path/url
+		path = (char *)buffer;
 	}
-	translated->createFullHostPath(atariPath, driveIndex, hostPath, waitingForMount, zipDirNestingLevel);
-	Debug::out(LOG_DEBUG, "MediaStreaming::openStream %s => %s", buffer, hostPath.c_str());
-	//if(!streams[i].open("/mnt/sda/ATARI/STEAUPLY/BILLJE12.au")) {
-	//if(!streams[i].open("/home/root/nnd/THRILLER.au")) {
-	if(!streams[i].open(hostPath.c_str())) {
+
+	// parse file path / url
+	if(memcmp(path, "http", 4) == 0) {
+		// url
+		path_or_url = path;
+	} else if(path[1] == ':') {
+		// Full ATARI Path name
+		int driveIndex;
+		driveIndex = path[0] - 'A';
+		std::string atariPath(path + 2); // skip drive letter and :
+		bool waitingForMount;
+		int zipDirNestingLevel;
+		if(!translated) {
+			Debug::out(LOG_ERROR, "MediaStreaming::openStream translated=%p cannot convert %s", translated, path);
+			dataTrans->setStatus(MEDIASTREAMING_ERR_INTERNAL);
+			return;
+		}
+		translated->createFullHostPath(atariPath, driveIndex, hostPath, waitingForMount, zipDirNestingLevel);
+		Debug::out(LOG_DEBUG, "MediaStreaming::openStream %s => %s", path, hostPath.c_str());
+		path_or_url = hostPath.c_str();
+	} else {
+		// relative file name
+		std::string partialAtariPath(path);
+		std::string fullAtariPath;
+		int driveIndex = 0;
+		bool waitingForMount;
+		int zipDirNestingLevel;
+		if(!translated->createFullAtariPathAndFullHostPath(partialAtariPath, fullAtariPath, driveIndex, hostPath, waitingForMount, zipDirNestingLevel)) {
+			Debug::out(LOG_ERROR, "MediaStreaming::openStream failed to convert atariPath '%s'", partialAtariPath.c_str());
+			dataTrans->setStatus(MEDIASTREAMING_ERR_INTERNAL);
+			return;
+		}
+		Debug::out(LOG_DEBUG, "MediaStreaming::openStream %s => %s", path, hostPath.c_str());
+		path_or_url = hostPath.c_str();
+	}
+	// now we have the path or url, open the stream :
+	if(!streams[i].open(path_or_url, &params)) {
 		dataTrans->setStatus(MEDIASTREAMING_ERR_INTERNAL);
 		return;
 	} 
