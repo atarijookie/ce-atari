@@ -9,6 +9,7 @@
 #include "debug.h"
 #include "update.h"
 #include "periodicthread.h"
+#include "translated/translateddisk.h"
 #include "ikbd/ikbd.h"
 #include "floppy/imagesilo.h"
 

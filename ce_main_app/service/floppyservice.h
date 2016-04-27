@@ -2,9 +2,9 @@
 #define _FLOPPYSERVICE_H_
 
 #include <string>
-#include "floppy/imagesilo.h"
 
 class CCoreThread;
+class ImageSilo;
 
 class FloppyService
 {

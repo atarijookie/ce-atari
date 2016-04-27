@@ -3,32 +3,23 @@
 
 #include "utils.h"
 #include "global.h"
-#include "conspi.h"
-#include "acsidatatrans.h"
 #include "settings.h"
-#include "retrymodule.h"
-
-#include "native/translatedbootmedia.h"
-#include "native/scsi.h"
-#include "translated/translateddisk.h"
 
 #include "settingsreloadproxy.h"
 #include "isettingsuser.h"
 
 #include "config/configstream.h"
-
-#include "floppy/floppyimagefactory.h"
-#include "floppy/mfmdecoder.h"
-#include "floppy/mfmcachedimage.h"
 #include "floppy/floppysetup.h"
-
-#include "service/configservice.h"
-#include "service/floppyservice.h"
-#include "service/screencastservice.h"
-
 #include "network/netadapter.h"
 
 #include "version.h"
+
+class ConfigService;
+class FloppyService;
+class ScreencastService;
+class AcsiDataTrans;
+class CConSpi;
+class RetryModule;
 
 class CCoreThread: public ISettingsUser
 {

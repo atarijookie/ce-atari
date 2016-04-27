@@ -12,6 +12,8 @@
 #include "../utils.h"
 #include "../debug.h"
 #include "dirtranslator.h"
+#include "translatedhelper.h"
+#include "filenameshortener.h"
 #include "gemdos.h"
 
 #define GEMDOS_FILE_MAXSIZE	(2147483647)

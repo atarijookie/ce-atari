@@ -20,6 +20,7 @@
 
 #include "global.h"
 #include "ccorethread.h"
+#include "native/scsi.h"
 #include "native/scsi_defs.h"
 #include "gpio.h"
 #include "mounter.h"

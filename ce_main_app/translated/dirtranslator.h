@@ -5,7 +5,8 @@
 #include <map>
 
 #include "../datatypes.h"
-#include "filenameshortener.h"
+
+class FilenameShortener;
 
 class TFindStorage {
 public:

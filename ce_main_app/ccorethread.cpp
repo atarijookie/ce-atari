@@ -10,6 +10,7 @@
 #include "global.h"
 #include "debug.h"
 #include "ccorethread.h"
+#include "native/scsi.h"
 #include "native/scsi_defs.h"
 #include "gpio.h"
 #include "mounter.h"
@@ -18,6 +19,10 @@
 #include "config/netsettings.h"
 #include "ce_conf_on_rpi.h" 
 #include "statusreport.h"
+
+#include "service/configservice.h"
+#include "service/floppyservice.h"
+#include "service/screencastservice.h"
 
 #include "periodicthread.h"
 

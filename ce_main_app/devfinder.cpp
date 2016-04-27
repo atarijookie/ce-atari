@@ -11,10 +11,12 @@
 #define PATH_BUFF_SIZE		1024
 
 #include "translated/translatedhelper.h"
+#include "translated/translateddisk.h"
 #include "devfinder.h"
 #include "utils.h"
 #include "debug.h"
 #include "mounter.h"
+#include "native/scsi.h"
 
 #include "periodicthread.h"
 

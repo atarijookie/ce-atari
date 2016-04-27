@@ -63,7 +63,7 @@ void *timesyncThreadCode(void *ptr)
 
 TimeSync::TimeSync()
 {
-    iInitState = INIT_NONE;
+    eInitState = INIT_NONE;
 }
 
 bool TimeSync::sync(void)
@@ -112,7 +112,7 @@ bool TimeSync::syncByNtp(void)
 {
     refreshNetworkDateNtp();
 
-    if(iInitState == INIT_NTP_FAILED) {       // if failed, then failed ;)
+    if(eInitState == INIT_NTP_FAILED) {       // if failed, then failed ;)
         return false;
     }
   
@@ -124,14 +124,14 @@ bool TimeSync::syncByNtp(void)
     int ret=settimeofday(&tv,NULL);
 
     if( ret<0 ){
-        iInitState=INIT_DATE_NOT_SET;
+        eInitState=INIT_DATE_NOT_SET;
         Debug::out(LOG_DEBUG, "TimeSync: could not set date: %d", errno);
         return false;
     }
     
     Debug::out(LOG_DEBUG, "TimeSync: date set to %d",lTime);
 
-    iInitState=INIT_OK;
+    eInitState=INIT_OK;
     Debug::out(LOG_DEBUG, "TimeSync: init done.");
     return true;
 }
@@ -145,7 +145,7 @@ void TimeSync::refreshNetworkDateNtp(void)
   char hostname[64];
   strcpy(hostname, (char *) ntpServer.c_str());
 
-  iInitState = INIT_NTP_FAILED;
+  eInitState = INIT_NTP_FAILED;
   
   int portno=123;       //NTP is port 123
   int maxlen=1024;      //check our buffers
@@ -164,7 +164,7 @@ void TimeSync::refreshNetworkDateNtp(void)
   proto=getprotobyname("udp");
   s=socket(PF_INET, SOCK_DGRAM, proto->p_proto);
   if( s<0 ){
-    iInitState=INIT_NTP_FAILED;
+    eInitState=INIT_NTP_FAILED;
     Debug::out(LOG_DEBUG, "TimeSync: could not open NTP UDP socket: ",strerror(errno));
     return;
   }
@@ -190,14 +190,14 @@ void TimeSync::refreshNetworkDateNtp(void)
   tv.tv_usec    = 0;
   i = setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
   if(i < 0) {
-    iInitState=INIT_NTP_FAILED;
+    eInitState=INIT_NTP_FAILED;
     Debug::out(LOG_DEBUG, "TimeSync: could not set options on UDP socket: %s",strerror(errno));
     return;
   }
   
   i = sendto(s,msg,sizeof(msg),0,(struct sockaddr *)&server_addr,sizeof(server_addr));
   if(i < 0){
-    iInitState=INIT_NTP_FAILED;
+    eInitState=INIT_NTP_FAILED;
     Debug::out(LOG_DEBUG, "TimeSync: could not set UDP packet: %s",strerror(errno));
     return;
   }
@@ -235,7 +235,7 @@ void TimeSync::refreshNetworkDateNtp(void)
   }
   
   if(i < 0) {                                               // failed? quit
-    iInitState = INIT_NTP_FAILED;
+    eInitState = INIT_NTP_FAILED;
     Debug::out(LOG_DEBUG, "TimeSync: could not recieve packet: %s", strerror(errno));
     return;
   }
@@ -273,7 +273,7 @@ void TimeSync::refreshNetworkDateNtp(void)
   Debug::out(LOG_DEBUG, "TimeSync: System time is %d seconds off",(i-tmit));
 
   lTime         = tmit;
-  iInitState    = INIT_OK;
+  eInitState    = INIT_OK;
 }
 
 bool TimeSync::syncByWeb(void)

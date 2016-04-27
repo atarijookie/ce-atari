@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <stdio.h>
 #include <string.h>
 
@@ -218,8 +219,8 @@ void FilenameShortener::splitFilenameFromExtension(const char *filenameWithExt, 
     }
 }
 
- bool FilenameShortener::shortenName(char *nLong, char *nShort)
- {
+bool FilenameShortener::shortenName(const char *nLong, char *nShort)
+{
     int ind = 1;
     char num[12], newName[12];
     std::map<std::string, std::string>::iterator it;
@@ -250,7 +251,7 @@ void FilenameShortener::splitFilenameFromExtension(const char *filenameWithExt, 
     return false;                                          // failed
 }
 
-bool FilenameShortener::shortenExtension(char *shortFileName, char *nLongExt, char *nShortExt)
+bool FilenameShortener::shortenExtension(const char *shortFileName, const char *nLongExt, char *nShortExt)
 {
      int ind = 1;
 
@@ -350,5 +351,3 @@ void FilenameShortener::extendToLenghtWithSpaces(char *str, int len)
 
     str[len] = 0;                   // terminate with zero
 }
-
-
