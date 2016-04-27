@@ -1,9 +1,10 @@
 #ifndef MEDIASTREAMING_H
 #define MEDIASTREAMING_H
 
-#include <stdio.h>
-#include "acsidatatrans.h"
-#include "translated/translateddisk.h"
+#include "datatypes.h"
+
+class TranslatedDisk;
+class AcsiDataTrans;
 
 #define MEDIASTREAMING_MAXSTREAMS	4
 

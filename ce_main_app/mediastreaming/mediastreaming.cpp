@@ -1,10 +1,13 @@
 // vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <errno.h>
 #include <string.h>
+#include <stdio.h>
 #include "global.h"
 #include "debug.h"
 #include "mediastreaming.h"
 #include "mediastreaming_commands.h"
+#include "acsidatatrans.h"
+#include "translated/translateddisk.h"
 #include <string>
 
 // MediaStream implementation
