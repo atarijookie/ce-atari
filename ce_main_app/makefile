@@ -102,11 +102,11 @@ $(WEB_JS_PATH)/jquery-combined.js.gz: $(WEB_JS_PATH)/jquery.js ${WEB_JS_MODULES}
 clean:	depclean
 	$(RM) $(WEB_JS_PATH)/*.gz
 	$(RM) $(WEB_CSS_PATH)/*.gz
-	find . -name "*.o" -exec $(RM) {} \;
+	@$(RM) $(OBJS)
 	$(RM) *.o *~ $(TARGET)
 
 depclean:
-	$(RM) $(DEPS)
+	@$(RM) $(DEPS)
 
 depend:	$(DEPS)
 
