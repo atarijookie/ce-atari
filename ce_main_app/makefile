@@ -86,11 +86,11 @@ all:	$(TARGET)
 
 $(TARGET): $(OBJS) $(HDRS) $(WEBCOMPONENTS)
 	$(CXX) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@
-#	$(STRIP) -s $@ 
+#	$(STRIP) -s $@
 
 $(WEB_CSS_PATH)/combined.css.gz: ${WEB_CSS_MODULES}
 	cat $^ | gzip -f > $@
-    
+
 $(WEB_JS_PATH)/zepto-combined.js.gz: $(WEB_JS_PATH)/zepto.js $(WEB_JS_PATH)/zepto.hack.js ${WEB_JS_MODULES}
 	cat $^ | gzip -f > $@
 
