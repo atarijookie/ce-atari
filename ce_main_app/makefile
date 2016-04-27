@@ -120,4 +120,8 @@ depend:	$(DEPS)
 %.d:	%.c
 	$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $^
 
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(MAKECMDGOALS),depclean)
 -include $(DEPS)
+endif
+endif
