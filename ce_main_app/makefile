@@ -8,6 +8,8 @@ CC	    = gcc
 #STRIP	= strip
 CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
 CXXFLAGS = $(CFLAGS)
+DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@)
+# -M : with system headers, -MM : without
 
 ifeq ($(ONPC),yes)
     LDFLAGS	= -Llib -Llib -lrt -lanl -lpthread -lcurl -lcivetweb -ldl -lutil
@@ -63,6 +65,7 @@ HDRS += $(wildcard $(SUBDIR10)/*.h)
 HDRS += $(wildcard $(SUBDIR11)/*.h)
 
 OBJS = $(patsubst %.cpp,%.o,$(SRCS:.c=.o))
+DEPS = $(patsubst %.o,%.d,$(OBJS))
 
 #combine web scripts
 WEB_CSS_PATH=webroot/css
@@ -94,9 +97,25 @@ $(WEB_JS_PATH)/zepto-combined.js.gz: $(WEB_JS_PATH)/zepto.js $(WEB_JS_PATH)/zept
 $(WEB_JS_PATH)/jquery-combined.js.gz: $(WEB_JS_PATH)/jquery.js ${WEB_JS_MODULES}
 	cat $^ | gzip -f > $@
 
-clean:
+.PHONY:	clean depclean
+
+clean:	depclean
 	$(RM) $(WEB_JS_PATH)/*.gz
 	$(RM) $(WEB_CSS_PATH)/*.gz
 	find . -name "*.o" -exec $(RM) {} \;
 	$(RM) *.o *~ $(TARGET)
 
+depclean:
+	$(RM) $(DEPS)
+
+%.o:	%.cpp %.d
+
+%.d:	%.cpp
+	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -o $@ $^
+
+%.o:	%.c %.d
+
+%.d:	%.c
+	$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $^
+
+-include $(DEPS)
