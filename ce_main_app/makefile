@@ -108,6 +108,8 @@ clean:	depclean
 depclean:
 	$(RM) $(DEPS)
 
+depend:	$(DEPS)
+
 %.o:	%.cpp %.d
 
 %.d:	%.cpp
