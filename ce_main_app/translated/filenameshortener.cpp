@@ -291,9 +291,9 @@ const bool FilenameShortener::shortenExtension(const char *shortFileName, const 
 
         mergeFilenameAndExtension(shortFileName, newExt, false, newName1);
 
-        it = mapFilenameWithExt.find(newName1);             // try to find the string in the map
+        it = mapReverseFilename.find(newName1);             // try to find the string in the map
 
-        if(it == mapFilenameWithExt.end()) {                // if we don't have this fileName already, use it!
+        if(it == mapReverseFilename.end()) {                // if we don't have this fileName already, use it!
             strncpy(nShortExt, newExt, 3);                  // store the extension string
             nShortExt[3] = 0;
 
