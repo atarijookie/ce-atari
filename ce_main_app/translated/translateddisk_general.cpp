@@ -1040,7 +1040,7 @@ int TranslatedDisk::deleteDirectoryPlain(const char *path)
     if(res == 0) {              // on success return success
         return E_OK;
     }
-    
+    Debug::out(LOG_ERROR, "TranslatedDisk::deleteDirectoryPlain rmdir(%s) : %s", path, strerror(errno));
     return EACCDN;
 }
 
