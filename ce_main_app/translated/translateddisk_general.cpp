@@ -1032,7 +1032,7 @@ void TranslatedDisk::pathSeparatorHostToAtari(std::string &path)
     }
 }
 
-int TranslatedDisk::deleteDirectoryPlain(char *path)
+int TranslatedDisk::deleteDirectoryPlain(const char *path)
 {
     // if the dir is empty, it will delete it, otherwise it will fail
     int res = rmdir(path);
@@ -1253,16 +1253,9 @@ void TranslatedDisk::initAsciiTranslationTable(void)
     asciiAtariToPc[184] = 'O';
 }
 
-bool TranslatedDisk::pathContainsWildCards(char *path)
+bool TranslatedDisk::pathContainsWildCards(const char *path)
 {
-    int i, len;
-    len = strlen(path);
-
-    if(len >= 2048) {                   // probably no terminating char? go only this far
-        len = 2048;
-    }
-
-    for(i=0; i<len; i++) {              // go through the string
+    for(int i=0; i<2048; i++) {         // go through the string. Limit length to 2048
         char in = path[i];
 
         if(in == 0) {                   // if it's string terminator, quit

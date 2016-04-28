@@ -184,8 +184,8 @@ private:
     static bool isLetter(char a);
     static char toUpperCase(char a);
     static bool isValidDriveLetter(char a);
-    static bool pathContainsWildCards(char *path);
-    static int  deleteDirectoryPlain(char *path);
+    static bool pathContainsWildCards(const char *path);
+    static int  deleteDirectoryPlain(const char *path);
 
     static bool startsWith(std::string what, std::string subStr);
     static bool endsWith(std::string what, std::string subStr);
