@@ -11,7 +11,7 @@ CC	    = gcc
 #STRIP	= strip
 CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
 CXXFLAGS = $(CFLAGS)
-DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@)
+DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 # -M : with system headers, -MM : without
 
 ifeq ($(ONPC),yes)
