@@ -1046,11 +1046,17 @@ int TranslatedDisk::deleteDirectoryPlain(const char *path)
 
 bool TranslatedDisk::isRootDir(std::string hostPath)
 {
+	// remove trailing '/' if needed
+	if(hostPath.size() > 0 && hostPath[hostPath.size() - 1] == HOSTPATH_SEPAR_CHAR) {
+		hostPath.erase(hostPath.size() - 1, 1);
+	}
+
     for(int i=2; i<MAX_DRIVES; i++) {                   // go through all translated drives
         if(!conf[i].enabled) {                          // skip disabled drives
             continue;
         }
         
+        //Debug::out(LOG_DEBUG, "TranslatedDisk::isRootDir - %s == %s ?", conf[i].hostRootPath.c_str(), hostPath.c_str());
         if(conf[i].hostRootPath == hostPath) {          // ok, this is root dir!
             Debug::out(LOG_DEBUG, "TranslatedDisk::isRootDir - hostPath: %s -- yes, it's a root dir", hostPath.c_str());
             return true;
