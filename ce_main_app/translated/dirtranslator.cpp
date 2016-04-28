@@ -41,41 +41,31 @@ void DirTranslator::clear(void)
     mapPathToShortener.clear();
 }
 
-void DirTranslator::shortToLongPath(std::string &rootPath, std::string &shortPath, std::string &longPath)
+void DirTranslator::shortToLongPath(const std::string &rootPath, const std::string &shortPath, std::string &longPath)
 {
     #define MAX_DIR_NESTING     64
     static char longName[MAX_FILENAME_LEN];
 
     std::string strings[MAX_DIR_NESTING];
-    int start = 0, pos;
+    unsigned int start = 0;
     unsigned int i, found = 0;
 
     // replace all possible atari path separators to host path separators
-    for(i=0; i<shortPath.length(); i++) {
-        if(shortPath[i] == ATARIPATH_SEPAR_CHAR) {
-            shortPath[i] = HOSTPATH_SEPAR_CHAR;
-        }
-    }
 
     // first split the string by separator
-    while(1) {
-        pos = shortPath.find(HOSTPATH_SEPAR_CHAR, start);
+    for(i = 0; i < shortPath.length(); i++) {
+		if(shortPath[i] != ATARIPATH_SEPAR_CHAR && shortPath[i] != HOSTPATH_SEPAR_CHAR)
+			continue;
 
-        if(pos == -1) {                             // not found?
-            strings[found] = shortPath.substr(start);    // copy in the rest
-            found++;
-            break;
-        }
-
-        strings[found] = shortPath.substr(start, (pos - start));
+        strings[found] = shortPath.substr(start, (i - start));
         found++;
-
-        start = pos + 1;
-
+        start = i + 1;
         if(found >= MAX_DIR_NESTING) {              // sanitize possible overflow
             break;
         }
     }
+    strings[found] = shortPath.substr(start);    // copy in the rest
+    found++;
 
     // now convert all the short names to long names
     bool res;
