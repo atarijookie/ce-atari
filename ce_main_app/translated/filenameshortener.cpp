@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <stdio.h>
 #include <string.h>
 
@@ -5,6 +6,7 @@
 #include "../utils.h"
 
 FilenameShortener::FilenameShortener()
+: allowExtUse(true)
 {
 }
 
@@ -44,36 +46,41 @@ bool FilenameShortener::longToShortFileName(const char *longFileName, char *shor
         strcpy(fileName, "________");
     }
 
-    // shorten filename if needed
+    // shorten filename and extension if needed
     char shortName[9];
     memset(shortName, 0, 9);
-
-    bool res;
-
-    if(strlen(fileName) > 8) {                                  // filename too long? Shorten it.
-        res = shortenName(fileName, shortName);
-
-        if(!res) {
-            printf("FilenameShortener::longToShortFileName failed to shortenName %s", fileName);
-            return false;
-        }
-    } else {                                                    // filename not long? ok...
-        strcpy(shortName, fileName);
-    }
-
-    // shorten file extension if needed
     char shortExt[4];
     memset(shortExt, 0, 4);
 
-    if(strlen(fileExt) > 3) {                                  // file extension too long? Shorten it.
-        res = shortenExtension(shortName, fileExt, shortExt);
-
-        if(!res) {
-            printf("FilenameShortener::longToShortFileName failed to shortenExtension %s.%s", shortName, fileExt);
-            return false;
+    if((strlen(fileExt) == 0) && allowExtUse) {
+        // no extension
+        if(strlen(fileName) <= 8) {
+            strcpy(shortName, fileName);
+        } else {
+            if(!shortenNameUsingExt(fileName, shortName, shortExt)) {
+                printf("FilenameShortener::longToShortFileName failed to shortenName %s", fileName);
+                return false;
+            }
         }
-    } else {                                                    // file extension not long? ok...
-        strcpy(shortExt, fileExt);
+    } else {
+        // there is an extension
+        if(strlen(fileName) > 8) {                                  // filename too long? Shorten it.
+            if(!shortenName(fileName, shortName)) {
+                printf("FilenameShortener::longToShortFileName failed to shortenName %s", fileName);
+                return false;
+            }
+        } else {                                                    // filename not long? ok...
+            strcpy(shortName, fileName);
+        }
+
+        if(strlen(fileExt) > 3) {                                  // file extension too long? Shorten it.
+            if(!shortenExtension(shortName, fileExt, shortExt)) {
+                printf("FilenameShortener::longToShortFileName failed to shortenExtension %s.%s", shortName, fileExt);
+                return false;
+            }
+        } else {                                                    // file extension not long? ok...
+            strcpy(shortExt, fileExt);
+        }
     }
 
     // create final short name
@@ -170,15 +177,11 @@ bool FilenameShortener::shortToLongFileName(const char *shortFileName, char *lon
     return false;
 }
 
-int FilenameShortener::strCharPos(const char *str, int maxLen, char ch)
+int FilenameShortener::strrCharPos(const char *str, int maxLen, char ch)
 {
     int i;
 
-    for(i=0; i<maxLen; i++) {       // find that char!
-        if(str[i] == 0) {           // end of string?
-            break;
-        }
-
+    for(i = MIN((int)strlen(str), maxLen) - 1; i >= 0; i--) {       // find that char!
         if(str[i] == ch) {          // that character found?
             return i;
         }
@@ -200,7 +203,7 @@ void FilenameShortener::splitFilenameFromExtension(const char *filenameWithExt, 
     memset(ext, 0, 4);
 
     // divide longFileName to filename and extension
-    int dotPos = strCharPos(filenameWithExt, filenameLength, '.'); // find name and extension separator
+    int dotPos = strrCharPos(filenameWithExt, filenameLength, '.'); // find name and extension separator
 
     if(dotPos == -1) {                                          // not found?
         strncpy(fileName, filenameWithExt, filenameLength + 1); // copy whole name to filename
@@ -218,8 +221,8 @@ void FilenameShortener::splitFilenameFromExtension(const char *filenameWithExt, 
     }
 }
 
- bool FilenameShortener::shortenName(char *nLong, char *nShort)
- {
+bool FilenameShortener::shortenName(const char *nLong, char *nShort)
+{
     int ind = 1;
     char num[12], newName[12];
     std::map<std::string, std::string>::iterator it;
@@ -250,7 +253,7 @@ void FilenameShortener::splitFilenameFromExtension(const char *filenameWithExt, 
     return false;                                          // failed
 }
 
-bool FilenameShortener::shortenExtension(char *shortFileName, char *nLongExt, char *nShortExt)
+bool FilenameShortener::shortenExtension(const char *shortFileName, const char *nLongExt, char *nShortExt)
 {
      int ind = 1;
 
@@ -299,6 +302,18 @@ bool FilenameShortener::shortenExtension(char *shortFileName, char *nLongExt, ch
     }
 
     return false;                                           // this should never happen
+}
+
+bool FilenameShortener::shortenNameUsingExt(const char *fileName, char *shortName, char *shortExt)
+{
+    // use 8 first characters as filename
+    memcpy(shortName, fileName, 8);
+	shortName[8] = '\0';
+    // and following characters as extension !
+	const char *longExt = fileName + 8;
+	// skip spaces
+	while(longExt[0] == '_' && longExt[1] != '\0') longExt++;
+    return shortenExtension(shortName, longExt, shortExt);
 }
 
 void FilenameShortener::replaceNonLetters(char *str)
@@ -350,5 +365,3 @@ void FilenameShortener::extendToLenghtWithSpaces(char *str, int len)
 
     str[len] = 0;                   // terminate with zero
 }
-
-

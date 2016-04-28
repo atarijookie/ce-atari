@@ -38,11 +38,13 @@ private:
     std::map<std::string, std::string>  mapReverseFilename;                 // for file name conversion from short to long
 
     std::map<std::string, std::string> mapFilenameNoExt;                    // used by shortenName() to create unique file name with ~
+    bool allowExtUse;          // Allow use of Extension for shortening (if file without extension)
 
-    bool shortenName(char *nLong, char *nShort);
-    bool shortenExtension(char *shortFileName, char *nLongExt, char *nShortExt);
+    bool shortenName(const char *nLong, char *nShort);
+    bool shortenExtension(const char *shortFileName, const char *nLongExt, char *nShortExt);
+    bool shortenNameUsingExt(const char *fileName, char *shortName, char *shortExt);
 
-    static int  strCharPos(const char *str, int maxLen, char ch);
+    static int  strrCharPos(const char *str, int maxLen, char ch);
     static void replaceNonLetters(char *str);
     static void extendToLenghtWithSpaces(char *str, int len);
     static void removeTrailingSpaces(char *str);
