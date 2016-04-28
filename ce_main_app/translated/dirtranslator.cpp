@@ -158,6 +158,8 @@ FilenameShortener *DirTranslator::createShortener(const std::string &path)
 			Debug::out(LOG_DEBUG, "TranslatedDisk::createShortener -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
 			continue;
 		}
+		if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
+			continue;
 
 		fs->longToShortFileName(de->d_name, shortName);
     }
