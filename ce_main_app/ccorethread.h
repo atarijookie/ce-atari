@@ -1,7 +1,6 @@
 #ifndef CCORETHREAD_H
 #define CCORETHREAD_H
 
-#include "utils.h"
 #include "global.h"
 #include "settings.h"
 

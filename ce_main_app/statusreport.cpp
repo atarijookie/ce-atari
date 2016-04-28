@@ -5,6 +5,7 @@
 #include <sys/ioctl.h>
 #include <errno.h>
 
+#include "utils.h"
 #include "global.h"
 #include "debug.h"
 #include "update.h"
