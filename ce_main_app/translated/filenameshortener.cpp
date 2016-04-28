@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "debug.h"
 #include "filenameshortener.h"
 #include "../utils.h"
 
@@ -58,7 +59,7 @@ bool FilenameShortener::longToShortFileName(const char *longFileName, char *shor
             strcpy(shortName, fileName);
         } else {
             if(!shortenNameUsingExt(fileName, shortName, shortExt)) {
-                printf("FilenameShortener::longToShortFileName failed to shortenName %s", fileName);
+                Debug::out(LOG_ERROR, "FilenameShortener::longToShortFileName failed to shortenName %s", fileName);
                 return false;
             }
         }
@@ -66,7 +67,7 @@ bool FilenameShortener::longToShortFileName(const char *longFileName, char *shor
         // there is an extension
         if(strlen(fileName) > 8) {                                  // filename too long? Shorten it.
             if(!shortenName(fileName, shortName)) {
-                printf("FilenameShortener::longToShortFileName failed to shortenName %s", fileName);
+                Debug::out(LOG_ERROR, "FilenameShortener::longToShortFileName failed to shortenName %s", fileName);
                 return false;
             }
         } else {                                                    // filename not long? ok...
@@ -75,7 +76,7 @@ bool FilenameShortener::longToShortFileName(const char *longFileName, char *shor
 
         if(strlen(fileExt) > 3) {                                  // file extension too long? Shorten it.
             if(!shortenExtension(shortName, fileExt, shortExt)) {
-                printf("FilenameShortener::longToShortFileName failed to shortenExtension %s.%s", shortName, fileExt);
+                Debug::out(LOG_ERROR, "FilenameShortener::longToShortFileName failed to shortenExtension %s.%s", shortName, fileExt);
                 return false;
             }
         } else {                                                    // file extension not long? ok...
@@ -94,6 +95,7 @@ bool FilenameShortener::longToShortFileName(const char *longFileName, char *shor
     mapFilenameWithExt.insert( std::pair<std::string, std::string>(longFn, shortFn) );  // store this key-value pair
     mapReverseFilename.insert( std::pair<std::string, std::string>(shortFn, longFn) );  // for reverse transformation
 
+	Debug::out(LOG_DEBUG, "FilenameShortener mapped %s <=> %s", shortFileName, longFileName);
     return true;
 }
 
@@ -159,7 +161,7 @@ void FilenameShortener::removeTrailingSpaces(char *str)
     }
 }
 
-bool FilenameShortener::shortToLongFileName(const char *shortFileName, char *longFileName)
+const bool FilenameShortener::shortToLongFileName(const char *shortFileName, char *longFileName)
 {
     if(strlen(shortFileName) == 0) {                            // empty short path? fail
         return false;
@@ -221,7 +223,7 @@ void FilenameShortener::splitFilenameFromExtension(const char *filenameWithExt, 
     }
 }
 
-bool FilenameShortener::shortenName(const char *nLong, char *nShort)
+const bool FilenameShortener::shortenName(const char *nLong, char *nShort)
 {
     int ind = 1;
     char num[12], newName[12];
@@ -253,7 +255,7 @@ bool FilenameShortener::shortenName(const char *nLong, char *nShort)
     return false;                                          // failed
 }
 
-bool FilenameShortener::shortenExtension(const char *shortFileName, const char *nLongExt, char *nShortExt)
+const bool FilenameShortener::shortenExtension(const char *shortFileName, const char *nLongExt, char *nShortExt)
 {
      int ind = 1;
 
@@ -278,9 +280,9 @@ bool FilenameShortener::shortenExtension(const char *shortFileName, const char *
 
     while(ind < 1000) {
         if(ind < 100) {                                     // according to the size of the number
-            sprintf(num, "~%d", ind);                       // numbers 1 .. 99 -> ~1 ~99
+            snprintf(num, sizeof(num), "~%d", ind);         // numbers 1 .. 99 -> ~1 ~99
         } else {
-            sprintf(num, "%d", ind);                        // numbers >= 100  -> 100 101 ...
+            snprintf(num, sizeof(num), "%d", ind);          // numbers >= 100  -> 100 101 ...
         }
 
         strncpy(newExt, nLongExt, 3);                       // get fist half, e.g. 'JPE'
@@ -304,7 +306,7 @@ bool FilenameShortener::shortenExtension(const char *shortFileName, const char *
     return false;                                           // this should never happen
 }
 
-bool FilenameShortener::shortenNameUsingExt(const char *fileName, char *shortName, char *shortExt)
+const bool FilenameShortener::shortenNameUsingExt(const char *fileName, char *shortName, char *shortExt)
 {
     // use 8 first characters as filename
     memcpy(shortName, fileName, 8);

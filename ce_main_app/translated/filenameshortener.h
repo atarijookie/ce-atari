@@ -25,7 +25,7 @@ public:
     void clear(void);                                                       // clear maps - e.g. on ST restart
 
     bool longToShortFileName(const char *longFileName, char *shortFileName);      // translates 'long file name' to 'long_f~1'
-    bool shortToLongFileName(const char *shortFileName, char *longFileName);      // translates 'long_f~1' to 'long file name'
+    const bool shortToLongFileName(const char *shortFileName, char *longFileName);      // translates 'long_f~1' to 'long file name'
 
     static void mergeFilenameAndExtension(const char *shortFn, const char *shortExt, bool extendWithSpaces, char *merged);
 
@@ -40,9 +40,9 @@ private:
     std::map<std::string, std::string> mapFilenameNoExt;                    // used by shortenName() to create unique file name with ~
     bool allowExtUse;          // Allow use of Extension for shortening (if file without extension)
 
-    bool shortenName(const char *nLong, char *nShort);
-    bool shortenExtension(const char *shortFileName, const char *nLongExt, char *nShortExt);
-    bool shortenNameUsingExt(const char *fileName, char *shortName, char *shortExt);
+    const bool shortenName(const char *nLong, char *nShort);
+    const bool shortenExtension(const char *shortFileName, const char *nLongExt, char *nShortExt);
+    const bool shortenNameUsingExt(const char *fileName, char *shortName, char *shortExt);
 
     static int  strrCharPos(const char *str, int maxLen, char ch);
     static void replaceNonLetters(char *str);
