@@ -72,22 +72,26 @@ public:
     void processReceivedCommands(void);
 
 private:
-	int				ceIkbdMode;
+	int		ceIkbdMode;
 
-    int             tableKeysPcToSt[KEY_TABLE_SIZE];
-    int             fdUart;
+    int     tableKeysPcToSt[KEY_TABLE_SIZE];
+    int     fdUart;
 
-    bool            outputEnabled;
+    bool    outputEnabled;
 
-    int             mouseBtnNow;
-    int             mouseMode;
-    bool            mouseEnabled;
-    bool            mouseY0atTop;
-    int             mouseAbsBtnAct;
+    int     mouseBtnNow;
+    int     mouseMode;
+    bool    mouseEnabled;
+    bool    mouseY0atTop;
+    int     mouseAbsBtnAct;
 
-    int             joy1st;
-    int             joy2nd;
+    int     joy1st;
+    int     joy2nd;
 
+    bool    mouseWheelAsArrowsUpDown;       // if true, mouse wheel up / down will be translated to arrow up / down
+    bool    keybJoy0;                       // if true, specific keys will act as joy 0
+    bool    keybJoy1;                       // if true, specific keys will act as joy 1
+    
 	struct {
 		int		threshX, threshY;
 	} relMouse;
@@ -144,6 +148,9 @@ private:
 	bool gotUsbMouse(void);
 	bool gotUsbJoy1(void);
 	bool gotUsbJoy2(void);
+    
+    bool isKeybJoyKey (int joyNumber, int pcKey);
+    void handleKeybJoy(int joyNumber, int pcKey, int eventValue);
     
     int fdWrite(int fd, BYTE *bfr, int cnt);
     

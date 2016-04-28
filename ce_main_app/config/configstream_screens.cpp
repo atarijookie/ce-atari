@@ -32,39 +32,52 @@ void ConfigStream::createScreen_homeScreen(void)
     screenChanged		= true;			// mark that the screen has changed
     showingHomeScreen	= true;			// mark that we're showing the home screen
 
-    screen_addHeaderAndFooter(screen, (char *) "Main menu");
+    screen_addHeaderAndFooter(screen, "Main menu");
 
     ConfigComponent *comp;
 
-    const char *idConfigLabel = (hwConfig.hddIface == HDD_IF_SCSI) ? " SCSI IDs config " : " ACSI IDs config ";
+    int line = 5;
     
-    comp = new ConfigComponent(this, ConfigComponent::button, idConfigLabel,	    18, 10,  6, gotoOffset);
+    const char *idConfigLabel = (hwConfig.hddIface == HDD_IF_SCSI) ? " SCSI IDs config " : " ACSI IDs config ";
+    comp = new ConfigComponent(this, ConfigComponent::button, idConfigLabel,	    18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_ACSI);
     screen.push_back(comp);
+    line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Translated disks ",	18, 10,  8, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Translated disks ",	18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_TRANSLATED);
     screen.push_back(comp);
+    line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Shared drive ",		18, 10, 10, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Shared drive ",		18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_SHARED);
     screen.push_back(comp);
+    line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Floppy config ",	18, 10, 12, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Floppy config ",	18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_FLOPPY_CONF);
     screen.push_back(comp);
+    line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Network settings ",	18, 10, 14, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Network settings ",	18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_NETWORK);
     screen.push_back(comp);
+    line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Other ",	        18, 10, 16, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " IKBD ",	            18, 10, line, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_CREATE_IKBD);
+    screen.push_back(comp);
+    line += 2;
+
+    comp = new ConfigComponent(this, ConfigComponent::button, " Other ",	        18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_OTHER);
     screen.push_back(comp);
+    line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Update software ",	18, 10, 18, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Update software ",	18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_UPDATE);
     screen.push_back(comp);
+    line += 2;
 
     setFocusToFirstFocusable();
 }
@@ -77,7 +90,7 @@ void ConfigStream::createScreen_acsiConfig(void)
     showingHomeScreen	= false;		// mark that we're NOT showing the home screen
 
     const char *idHeaderLabel = (hwConfig.hddIface == HDD_IF_SCSI) ? " SCSI IDs config " : " ACSI IDs config ";
-    screen_addHeaderAndFooter(screen, (char *) idHeaderLabel);
+    screen_addHeaderAndFooter(screen, idHeaderLabel);
 
     ConfigComponent *comp;
 
@@ -149,7 +162,7 @@ void ConfigStream::createScreen_network(void)
     screenChanged	= true;			// mark that the screen has changed
     showingHomeScreen	= false;		// mark that we're NOT showing the home screen
 
-    screen_addHeaderAndFooter(screen, (char *) "Network settings");
+    screen_addHeaderAndFooter(screen, "Network settings");
 
     ConfigComponent *comp;
 
@@ -312,7 +325,7 @@ void ConfigStream::createScreen_translated(void)
     screenChanged		= true;			// mark that the screen has changed
     showingHomeScreen	= false;		// mark that we're NOT showing the home screen
 
-    screen_addHeaderAndFooter(screen, (char *) "Translated disk");
+    screen_addHeaderAndFooter(screen, "Translated disk");
 
     int col1x = 4, col2x = 24, col3x = 30;
     ConfigComponent *comp;
@@ -426,9 +439,9 @@ void ConfigStream::createScreen_translated(void)
     char drive1, drive2, drive3;
     bool mountRawNotTrans;
 
-    drive1 = s.getChar((char *) "DRIVELETTER_FIRST",      0);
-    drive2 = s.getChar((char *) "DRIVELETTER_SHARED",     0);
-    drive3 = s.getChar((char *) "DRIVELETTER_CONFDRIVE",  0);
+    drive1 = s.getChar("DRIVELETTER_FIRST",      0);
+    drive2 = s.getChar("DRIVELETTER_SHARED",     0);
+    drive3 = s.getChar("DRIVELETTER_CONFDRIVE",  0);
     
     char driveStr[2] = {0, 0};
     std::string driveString;
@@ -446,7 +459,7 @@ void ConfigStream::createScreen_translated(void)
     setTextByComponentId(COMPID_TRAN_CONFDRIVE, driveString);
 
     //---------
-    mountRawNotTrans = s.getBool((char *) "MOUNT_RAW_NOT_TRANS", 0);
+    mountRawNotTrans = s.getBool("MOUNT_RAW_NOT_TRANS", 0);
 
  	if(mountRawNotTrans) {
 		checkboxGroup_setCheckedId(COMPID_MOUNT_RAW_NOT_TRANS, 1);			// select RAW
@@ -455,7 +468,7 @@ void ConfigStream::createScreen_translated(void)
 	}
     
     //---------
-    bool useZipdirNotFile = s.getBool((char *) "USE_ZIP_DIR", 1);           // use ZIP DIRs, enabled by default
+    bool useZipdirNotFile = s.getBool("USE_ZIP_DIR", 1);           // use ZIP DIRs, enabled by default
 
  	if(useZipdirNotFile) {
 		checkboxGroup_setCheckedId(COMPID_USE_ZIP_DIR_NOT_FILE, 1);			// ZIP DIRs enabled
@@ -490,28 +503,28 @@ void ConfigStream::onAcsiConfig_save(void)
     }
 
     if(somethingInvalid) {									// if everything is set to OFF
-        showMessageScreen((char *) "Warning", (char *) "Some ACSI/SCSI ID has no selected type.\n\rGo and select something!");
+        showMessageScreen("Warning", "Some ACSI/SCSI ID has no selected type.\n\rGo and select something!");
         return;
     }
 
     if(!somethingActive) {									// if everything is set to OFF
-        showMessageScreen((char *) "Warning", (char *) "All ACSI/SCSI IDs are set to 'OFF',\n\rit is invalid and would brick the device.\n\rSelect at least one active ACSI/SCSI ID.");
+        showMessageScreen("Warning", "All ACSI/SCSI IDs are set to 'OFF',\n\rit is invalid and would brick the device.\n\rSelect at least one active ACSI/SCSI ID.");
         return;
     }
 
     if(tranCnt > 1) {										// more than 1 of this type?
-        showMessageScreen((char *) "Warning", (char *) "You have more than 1 CE_DD selected.\n\rUnselect some to leave only\n\r1 active.");
+        showMessageScreen("Warning", "You have more than 1 CE_DD selected.\n\rUnselect some to leave only\n\r1 active.");
         return;
     }
 
     if(sdCnt > 1) {										    // more than 1 of this type?
-        showMessageScreen((char *) "Warning", (char *) "You have more than 1 SD cards\n\rselected. Unselect some to leave only\n\r1 active.");
+        showMessageScreen("Warning", "You have more than 1 SD cards\n\rselected. Unselect some to leave only\n\r1 active.");
         return;
     }
 
     if(hwConfig.hddIface == HDD_IF_SCSI) {                         // running on SCSI? Show warning if ID 0 or 7 is used
         if(devTypes[0] != DEVTYPE_OFF || devTypes[7] != DEVTYPE_OFF) {
-            showMessageScreen((char *) "Warning", (char *) "You assigned something to ID 0 or ID 7.\n\rThey might not work as they might be\n\rused by SCSI controller.\n\r");
+            showMessageScreen("Warning", "You assigned something to ID 0 or ID 7.\n\rThey might not work as they might be\n\rused by SCSI controller.\n\r");
         }
     }
     
@@ -563,21 +576,21 @@ void ConfigStream::onTranslated_save(void)
     }
 
     if(letter1 == -1 && letter2 == -1 && letter3 == -1) {
-        showMessageScreen((char *) "Info", (char *) "No drive letter assigned, this is OK,\n\rbut the translated disk will be\n\runaccessible.");
+        showMessageScreen("Info", "No drive letter assigned, this is OK,\n\rbut the translated disk will be\n\runaccessible.");
     }
 
     if(letter1 == letter2 || letter1 == letter3 || letter2 == letter3) {
-        showMessageScreen((char *) "Warning", (char *) "Drive letters must be different!\n\rPlease fix this and try again.");
+        showMessageScreen("Warning", "Drive letters must be different!\n\rPlease fix this and try again.");
         return;
     }
 
     if((letter1 != -1 && letter1 < 'C') || (letter2 != -1 && letter2 < 'C') || (letter3 != -1 && letter3 < 'C')) {
-        showMessageScreen((char *) "Warning", (char *) "Drive letters A and B are for floppies.\n\rPlease fix this and try again.");
+        showMessageScreen("Warning", "Drive letters A and B are for floppies.\n\rPlease fix this and try again.");
         return;
     }
 
     if(letter1 > 'P' || letter2 > 'P' || letter3 > 'P') {
-        showMessageScreen((char *) "Warning", (char *) "Last allowed drive letter is 'P'.\n\rPlease fix this and try again.");
+        showMessageScreen("Warning", "Last allowed drive letter is 'P'.\n\rPlease fix this and try again.");
         return;
     }
 
@@ -587,11 +600,11 @@ void ConfigStream::onTranslated_save(void)
     //---------
     // now save the settings
     Settings s;
-    s.setChar((char *) "DRIVELETTER_FIRST",      letter1);
-    s.setChar((char *) "DRIVELETTER_SHARED",     letter2);
-    s.setChar((char *) "DRIVELETTER_CONFDRIVE",  letter3);
-    s.setBool((char *) "MOUNT_RAW_NOT_TRANS",    mountRawNotTrans);
-    s.setBool((char *) "USE_ZIP_DIR",            useZipdirNotFile); // use ZIP DIRs, enabled by default
+    s.setChar("DRIVELETTER_FIRST",      letter1);
+    s.setChar("DRIVELETTER_SHARED",     letter2);
+    s.setChar("DRIVELETTER_CONFDRIVE",  letter3);
+    s.setBool("MOUNT_RAW_NOT_TRANS",    mountRawNotTrans);
+    s.setBool("USE_ZIP_DIR",            useZipdirNotFile); // use ZIP DIRs, enabled by default
 
     if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
         reloadProxy->reloadSettings(SETTINGSUSER_TRANSLATED);
@@ -642,7 +655,7 @@ void ConfigStream::onNetwork_save(void)
         d = verifyAndFixIPaddress(gateway,  gateway,    true);
 
         if(!a || !b || !c || !d) {
-            showMessageScreen((char *) "Warning", (char *) "Some ethernet network address has invalid format.\n\rPlease fix this and try again.");
+            showMessageScreen("Warning", "Some ethernet network address has invalid format.\n\rPlease fix this and try again.");
             return;
         }
     }
@@ -655,7 +668,7 @@ void ConfigStream::onNetwork_save(void)
         c = verifyAndFixIPaddress(gateway2,  gateway2,    true);
 
         if(!a || !b || !c) {
-            showMessageScreen((char *) "Warning", (char *) "Some wifi network address has invalid format.\n\rPlease fix this and try again.");
+            showMessageScreen("Warning", "Some wifi network address has invalid format.\n\rPlease fix this and try again.");
             return;
         }
     }
@@ -708,7 +721,7 @@ void ConfigStream::createScreen_update(void)
     screenChanged	= true;			// mark that the screen has changed
     showingHomeScreen	= false;		// mark that we're NOT showing the home screen
 
-    screen_addHeaderAndFooter(screen, (char *) "Software & Firmware updates");
+    screen_addHeaderAndFooter(screen, "Software & Firmware updates");
 
     updateFromWebNotUsb = true;         // do update from web
     
@@ -866,12 +879,12 @@ void ConfigStream::onUpdateCheckUsb(void)
     bool found = Update::checkForUpdateListOnUsb(pathToUpdateFile);
 
     if(!found) {
-        showMessageScreen((char *) "Update from USB", (char *) "File ce_update.zip not found.\n\rCan't update from USB.\n\r");
+        showMessageScreen("Update from USB", "File ce_update.zip not found.\n\rCan't update from USB.\n\r");
         return;
     }
     
     // copy and unzip the update
-    Update::downloadUpdateList((char *) pathToUpdateFile.c_str());
+    Update::downloadUpdateList(pathToUpdateFile.c_str());
     
     Update::versions.updateListWasProcessed = false;            // mark that the new update list wasn't updated
 }
@@ -879,12 +892,12 @@ void ConfigStream::onUpdateCheckUsb(void)
 void ConfigStream::onUpdateUpdate(void)
 {
     if(!Update::versions.updateListWasProcessed) {     // didn't process the update list yet? show message
-        showMessageScreen((char *) "No updates info", (char *) "No update info was downloaded,\n\rplease press web / usb button and wait.");
+        showMessageScreen("No updates info", "No update info was downloaded,\n\rplease press web / usb button and wait.");
         return;
     }
 
     if(!Update::versions.gotUpdate) {
-        showMessageScreen((char *) "No update needed", (char *) "All your components are up to date.");
+        showMessageScreen("No update needed", "All your components are up to date.");
         return;
     }
 
@@ -902,7 +915,7 @@ void ConfigStream::createScreen_update_download(void)
     screenChanged	    = true;			// mark that the screen has changed
     showingHomeScreen	= false;		// mark that we're NOT showing the home screen
 
-    screen_addHeaderAndFooter(screen, (char *) "Updates download");
+    screen_addHeaderAndFooter(screen, "Updates download");
 
     ConfigComponent *comp;
 
@@ -949,11 +962,11 @@ void ConfigStream::createScreen_other(void)
     screenChanged	    = true;			// mark that the screen has changed
     showingHomeScreen	= false;		// mark that we're NOT showing the home screen
 
-    screen_addHeaderAndFooter(screen, (char *) "Other settings");
+    screen_addHeaderAndFooter(screen, "Other settings");
 
     ConfigComponent *comp;
 
-    int row     = 3;
+    int row     = 5;
     int col     = 7;
     int col2    = 20;
     
@@ -992,15 +1005,6 @@ void ConfigStream::createScreen_other(void)
     screen.push_back(comp);
 
     //-----------
-    row++;
-    comp = new ConfigComponent(this, ConfigComponent::label, "Attach 1st joy as JOY 0",     40, col, row, gotoOffset);
-    screen.push_back(comp);
-    
-    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                      3,  32, row++, gotoOffset);
-    comp->setComponentId(COMPID_JOY0_FIRST);
-    screen.push_back(comp);
-
-    //----------------------
     row++;
     comp = new ConfigComponent(this, ConfigComponent::label, "Screen res in DESKTOP.INF",  40, col, row++, gotoOffset);
     screen.push_back(comp);
@@ -1046,18 +1050,16 @@ void ConfigStream::createScreen_other(void)
     Settings s;
     
     bool        setDateTime;
-    bool        joy0First;
     float       utcOffset;
     std::string ntpServer;
     int			frameSkip;
     int         screenRes;
     
-    setDateTime = s.getBool     ((char *) "TIME_SET",             true);
-    utcOffset   = s.getFloat    ((char *) "TIME_UTC_OFFSET",      0);
-    ntpServer   = s.getString   ((char *) "TIME_NTP_SERVER",      (char *) "200.20.186.76");
-    frameSkip   = s.getInt      ((char *) "SCREENCAST_FRAMESKIP", 20);
-    joy0First   = s.getBool     ((char *) "JOY_FIRST_IS_0",       false);
-    screenRes   = s.getInt      ((char *) "SCREEN_RESOLUTION",    1);
+    setDateTime = s.getBool     ("TIME_SET",             true);
+    utcOffset   = s.getFloat    ("TIME_UTC_OFFSET",      0);
+    ntpServer   = s.getString   ("TIME_NTP_SERVER",      "200.20.186.76");
+    frameSkip   = s.getInt      ("SCREENCAST_FRAMESKIP", 20);
+    screenRes   = s.getInt      ("SCREEN_RESOLUTION",    1);
     
     if( frameSkip<10 )
     {
@@ -1072,7 +1074,6 @@ void ConfigStream::createScreen_other(void)
     setFloatByComponentId(COMPID_TIMESYNC_UTC_OFFSET,   utcOffset);
     setTextByComponentId(COMPID_TIMESYNC_NTP_SERVER,    ntpServer);
     setIntByComponentId(COMPID_SCREENCAST_FRAMESKIP,    frameSkip);
-    setBoolByComponentId(COMPID_JOY0_FIRST,             joy0First);
     checkboxGroup_setCheckedId(COMPID_SCREEN_RESOLUTION, screenRes);
     //------------------------
     
@@ -1084,7 +1085,6 @@ void ConfigStream::onOtherSave(void)
     Settings s;
 
     bool        setDateTime = false;
-    bool        joy0First   = false;
     float       utcOffset   = 0;
     std::string ntpServer;
     int			frameSkip;
@@ -1094,7 +1094,6 @@ void ConfigStream::onOtherSave(void)
     getFloatByComponentId(COMPID_TIMESYNC_UTC_OFFSET,   utcOffset);
     getTextByComponentId(COMPID_TIMESYNC_NTP_SERVER,    ntpServer);
     getIntByComponentId(COMPID_SCREENCAST_FRAMESKIP,    frameSkip);
-    getBoolByComponentId(COMPID_JOY0_FIRST,             joy0First);
     screenRes = checkboxGroup_getCheckedId(COMPID_SCREEN_RESOLUTION);
     
     if( frameSkip<10 )
@@ -1106,20 +1105,130 @@ void ConfigStream::onOtherSave(void)
         frameSkip=255;
     }
     
-    s.setBool     ((char *) "TIME_SET",             setDateTime);
-    s.setFloat    ((char *) "TIME_UTC_OFFSET",      utcOffset);
-    s.setString   ((char *) "TIME_NTP_SERVER",      (char *) ntpServer.c_str());
-    s.setInt      ((char *) "SCREENCAST_FRAMESKIP", frameSkip);
-    s.setBool     ((char *) "JOY_FIRST_IS_0",       joy0First);
-    s.setInt      ((char *) "SCREEN_RESOLUTION",    screenRes);
+    s.setBool     ("TIME_SET",             setDateTime);
+    s.setFloat    ("TIME_UTC_OFFSET",      utcOffset);
+    s.setString   ("TIME_NTP_SERVER",      ntpServer.c_str());
+    s.setInt      ("SCREENCAST_FRAMESKIP", frameSkip);
+    s.setInt      ("SCREEN_RESOLUTION",    screenRes);
 
     do_timeSync         = true;     // do time sync again
-    do_loadIkbdConfig   = true;     // reload ikbd config
 
     Utils::forceSync();             // tell system to flush the filesystem caches
     Utils::setTimezoneVariable_inProfileScript();   // create the timezone setting script, because TIME_UTC_OFFSET could possibly change
     Utils::setTimezoneVariable_inThisContext();     // and also set the TZ variable for this context, so the change for this app would be immediate
     
+    createScreen_homeScreen();		// now back to the home screen
+}
+
+void ConfigStream::createScreen_ikbd(void)
+{
+    // the following 3 lines should be at start of each createScreen_ method
+    destroyCurrentScreen();			    // destroy current components
+    screenChanged	    = true;			// mark that the screen has changed
+    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+
+    screen_addHeaderAndFooter(screen, "IKBD settings");
+
+    ConfigComponent *comp;
+
+    int row     = 6;
+    int col     = 2;
+    int col2    = 33;
+    
+    //-----------
+    row++;
+    comp = new ConfigComponent(this, ConfigComponent::label, "Attach 1st joy as JOY 0",     40, col, row, gotoOffset);
+    screen.push_back(comp);
+    
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                      3, col2, row++, gotoOffset);
+    comp->setComponentId(COMPID_JOY0_FIRST);
+    screen.push_back(comp);
+
+    //----------------------
+
+    row++;
+    comp = new ConfigComponent(this, ConfigComponent::label, "Mouse wheel as arrow UP / DOWN", 40, col, row, gotoOffset);
+    screen.push_back(comp);
+    
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                          3, col2, row++, gotoOffset);
+    comp->setComponentId(COMPID_MOUSEWHEEL_ENABLED);
+    screen.push_back(comp);
+
+    //----------------------
+
+    row++;
+    comp = new ConfigComponent(this, ConfigComponent::label, "ASDW-Q as JOY 0",                 40, col, row, gotoOffset);
+    screen.push_back(comp);
+    
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                          3, col2, row++, gotoOffset);
+    comp->setComponentId(COMPID_KEYB_JOY0);
+    screen.push_back(comp);
+
+    //----------------------
+
+    row++;
+    comp = new ConfigComponent(this, ConfigComponent::label, "JKLI-B as JOY 1",                 40, col, row, gotoOffset);
+    screen.push_back(comp);
+    
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                          3, col2, row++, gotoOffset);
+    comp->setComponentId(COMPID_KEYB_JOY1);
+    screen.push_back(comp);
+
+    //----------------------
+    
+    row += 2;
+    comp = new ConfigComponent(this, ConfigComponent::button, "   Save   ",                 10,  6, row, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_IKBD_SAVE);
+    comp->setComponentId(COMPID_BTN_SAVE);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Cancel  ",                 10,  22, row, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_GO_HOME);
+    comp->setComponentId(COMPID_BTN_CANCEL);
+    screen.push_back(comp);
+
+    //------------------------
+    Settings s;
+    
+    bool joy0First;
+    bool mouseWheelEnabled;
+    bool keybJoy0, keybJoy1;
+    
+    joy0First           = s.getBool("JOY_FIRST_IS_0",       false);
+    mouseWheelEnabled   = s.getBool("MOUSE_WHEEL_AS_KEYS",  true);
+    keybJoy0            = s.getBool("KEYBORD_JOY0",         false);
+    keybJoy1            = s.getBool("KEYBORD_JOY1",         false);
+    
+    setBoolByComponentId(COMPID_JOY0_FIRST,         joy0First);
+    setBoolByComponentId(COMPID_MOUSEWHEEL_ENABLED, mouseWheelEnabled);
+    setBoolByComponentId(COMPID_KEYB_JOY0,          keybJoy0);
+    setBoolByComponentId(COMPID_KEYB_JOY1,          keybJoy1);
+    //------------------------
+    
+    setFocusToFirstFocusable();
+}
+
+void ConfigStream::onIkbdSave(void)
+{
+    Settings s;
+
+    bool joy0First          = false;
+    bool mouseWheelEnabled  = true;
+    bool keybJoy0           = false;
+    bool keybJoy1           = false;
+    
+    getBoolByComponentId(COMPID_JOY0_FIRST,         joy0First);
+    getBoolByComponentId(COMPID_MOUSEWHEEL_ENABLED, mouseWheelEnabled);
+    getBoolByComponentId(COMPID_KEYB_JOY0,          keybJoy0);
+    getBoolByComponentId(COMPID_KEYB_JOY1,          keybJoy1);
+
+    s.setBool("JOY_FIRST_IS_0",        joy0First);
+    s.setBool("MOUSE_WHEEL_AS_KEYS",   mouseWheelEnabled);
+    s.setBool("KEYBORD_JOY0",          keybJoy0);
+    s.setBool("KEYBORD_JOY1",          keybJoy1);
+    
+    do_loadIkbdConfig   = true;     // reload ikbd config
+
     createScreen_homeScreen();		// now back to the home screen
 }
 
@@ -1186,7 +1295,7 @@ void ConfigStream::showUpdateDownloadFail(void)
 
     // ok, so we're on update donload page... go back to update page and show error
     createScreen_update();
-    showMessageScreen((char *) "Update download fail", (char *) "Failed to download the update,\nplease try again later.");
+    showMessageScreen("Update download fail", "Failed to download the update,\nplease try again later.");
 }
 
 void ConfigStream::showUpdateError(void)
@@ -1198,7 +1307,7 @@ void ConfigStream::showUpdateError(void)
 
     // ok, so we're on update donload page... go back to update page and show error
     createScreen_update();
-    showMessageScreen((char *) "Update fail", (char *) "Failed to do the update.\n");
+    showMessageScreen("Update fail", "Failed to do the update.\n");
 }
 
 bool ConfigStream::isUpdateDownloadPageShown(void)
@@ -1224,7 +1333,7 @@ void ConfigStream::createScreen_shared(void)
     screenChanged	= true;			// mark that the screen has changed
     showingHomeScreen	= false;		// mark that we're NOT showing the home screen
 
-    screen_addHeaderAndFooter(screen, (char *) "Shared drive settings");
+    screen_addHeaderAndFooter(screen, "Shared drive settings");
 
     ConfigComponent *comp;
 
@@ -1338,14 +1447,14 @@ void ConfigStream::createScreen_shared(void)
     std::string addr, path, username, password;
 	bool enabled, nfsNotSamba;
 
-    addr = s.getString((char *) "SHARED_ADDRESS",  (char *) "");
-    path = s.getString((char *) "SHARED_PATH",     (char *) "");
+    addr = s.getString("SHARED_ADDRESS",  "");
+    path = s.getString("SHARED_PATH",     "");
 
-    username = s.getString((char *) "SHARED_USERNAME",  (char *) "");
-    password = s.getString((char *) "SHARED_PASSWORD",     (char *) "");
+    username = s.getString("SHARED_USERNAME",  "");
+    password = s.getString("SHARED_PASSWORD",  "");
 
-	enabled		= s.getBool((char *) "SHARED_ENABLED",			false);
-	nfsNotSamba	= s.getBool((char *) "SHARED_NFS_NOT_SAMBA",	true);
+	enabled		= s.getBool("SHARED_ENABLED",			false);
+	nfsNotSamba	= s.getBool("SHARED_NFS_NOT_SAMBA",	true);
 
     setTextByComponentId(COMPID_SHARED_IP,      addr);
     setTextByComponentId(COMPID_SHARED_PATH,    path);
@@ -1383,12 +1492,12 @@ void ConfigStream::onSharedSave(void)
 
 	if(enabled) {										// if enabled, do validity checks, othewise let it just pass
 		if(!verifyAndFixIPaddress(ip, ip, false)) {
-			showMessageScreen((char *) "Warning", (char *) "Server address seems to be invalid.\n\rPlease fix this and try again.");
+			showMessageScreen("Warning", "Server address seems to be invalid.\n\rPlease fix this and try again.");
 			return;
 		}
 
 		if(path.length() < 1) {
-			showMessageScreen((char *) "Warning", (char *) "Path for server is empty.\n\rPlease fix this and try again.");
+			showMessageScreen("Warning", "Path for server is empty.\n\rPlease fix this and try again.");
 			return;
 		}
 	}
@@ -1397,13 +1506,13 @@ void ConfigStream::onSharedSave(void)
 
     Settings s;
 
-	s.setBool	((char *) "SHARED_ENABLED",			enabled);
-	s.setBool	((char *) "SHARED_NFS_NOT_SAMBA",	nfsNotSamba);
-    s.setString	((char *) "SHARED_ADDRESS",  		(char *) ip.c_str());
-    s.setString	((char *) "SHARED_PATH",     		(char *) path.c_str());
+	s.setBool	("SHARED_ENABLED",			enabled);
+	s.setBool	("SHARED_NFS_NOT_SAMBA",	nfsNotSamba);
+    s.setString	("SHARED_ADDRESS",  		ip.c_str());
+    s.setString	("SHARED_PATH",     		path.c_str());
 
-    s.setString	((char *) "SHARED_USERNAME",  		(char *) username.c_str());
-    s.setString	((char *) "SHARED_PASSWORD",     	(char *) password.c_str());
+    s.setString	("SHARED_USERNAME",  		username.c_str());
+    s.setString	("SHARED_PASSWORD",     	password.c_str());
 
     if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
         reloadProxy->reloadSettings(SETTINGSUSER_SHARED);
@@ -1418,7 +1527,7 @@ void ConfigStream::onResetSettings(void)
 {
     createScreen_homeScreen();		// now back to the home screen
 
-    showMessageScreen((char *) "Reset all settings", (char *) "All settings have been reset to default.\n\rReseting your ST might be a good idea...");
+    showMessageScreen("Reset all settings", "All settings have been reset to default.\n\rReseting your ST might be a good idea...");
 
     system("rm -f /ce/settings/*");
     Utils::forceSync();                                     // tell system to flush the filesystem caches
@@ -1439,7 +1548,7 @@ void ConfigStream::onSendSettings(void)
     tdr.pStatusByte     = NULL;                     // don't update this status byte
     Downloader::add(tdr);
     
-    showMessageScreen((char *) "Send config", (char *) "Sending your configuration to Jookie.\n\rThis will take a while.\n\rInternet connection needed.");    
+    showMessageScreen("Send config", "Sending your configuration to Jookie.\n\rThis will take a while.\n\rInternet connection needed.");    
 }
 
 

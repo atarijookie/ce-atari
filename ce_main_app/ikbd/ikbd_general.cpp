@@ -164,6 +164,11 @@ void Ikbd::loadSettings(void)
         joy1st = INTYPE_JOYSTICK2;
         joy2nd = INTYPE_JOYSTICK1;
     }
+    
+    mouseWheelAsArrowsUpDown = s.getBool((char *) "MOUSE_WHEEL_AS_KEYS", true);
+    
+    keybJoy0 = s.getBool("KEYBORD_JOY0", false);
+    keybJoy1 = s.getBool("KEYBORD_JOY1", false);
 }
 
 void Ikbd::resetInternalIkbdVars(void)

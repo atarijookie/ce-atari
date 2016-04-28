@@ -13,14 +13,15 @@
 class AcsiDataTrans;
 
 enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED,
-                 CS_CREATE_FLOPPY_CONF, 
+                 CS_CREATE_FLOPPY_CONF, CS_CREATE_IKBD,
                  CS_CREATE_NETWORK,     CS_CREATE_UPDATE,       CS_CREATE_OTHER,
                  CS_SAVE_ACSI,          CS_SAVE_TRANSLATED,     CS_SAVE_NETWORK,
                  CS_HIDE_MSG_SCREEN,    CS_GO_HOME,
                  CS_UPDATE_CHECK,       CS_UPDATE_CHECK_USB,    CS_UPDATE_UPDATE,       
                  CS_SHARED_TEST,        CS_SHARED_SAVE,
                  CS_FLOPPY_IMAGE_SAVE,  CS_FLOPPY_CONFIG_SAVE,
-                 CS_OTHER_SAVE,         CS_RESET_SETTINGS,      CS_SEND_SETTINGS
+                 CS_OTHER_SAVE,         CS_RESET_SETTINGS,      CS_SEND_SETTINGS,
+                 CS_IKBD_SAVE
                 };
 
 
@@ -47,8 +48,8 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
 
                 COMPID_DL1,                 COMPID_DL2,                 COMPID_DL3,                 COMPID_DL4,
                 COMPID_TIMESYNC_ENABLE,     COMPID_TIMESYNC_NTP_SERVER, COMPID_TIMESYNC_UTC_OFFSET,
-                COMPID_SCREENCAST_FRAMESKIP,    
-                COMPID_JOY0_FIRST,          COMPID_SCREEN_RESOLUTION
+                COMPID_SCREENCAST_FRAMESKIP,    COMPID_SCREEN_RESOLUTION,
+                COMPID_JOY0_FIRST,          COMPID_MOUSEWHEEL_ENABLED,  COMPID_KEYB_JOY0, COMPID_KEYB_JOY1                
             };
 
 #define ST_RESOLUTION_LOW       0
@@ -78,7 +79,7 @@ public:
     int  checkboxGroup_getCheckedId(int groupId);
     void checkboxGroup_setCheckedId(int groupId, int checkedId);
 
-    void showMessageScreen(char *msgTitle, char *msgTxt);
+    void showMessageScreen(const char *msgTitle, const char *msgTxt);
     void hideMessageScreen(void);
 
     void createConfigDump(void);
@@ -91,6 +92,7 @@ public:
     void createScreen_shared(void);
     void createScreen_floppy_config(void);
     void createScreen_other(void);
+    void createScreen_ikbd(void);
 
     ConfigComponent *findComponentById(int compId);
     bool getTextByComponentId(int componentId, std::string &text);
@@ -135,7 +137,7 @@ private:
     void destroyCurrentScreen(void);
     void setFocusToFirstFocusable(void);
 
-    void screen_addHeaderAndFooter(StupidVector &scr, char *screenName);
+    void screen_addHeaderAndFooter(StupidVector &scr, const char *screenName);
     void destroyScreen(StupidVector &scr);
 
     void onAcsiConfig_save(void);
@@ -156,6 +158,7 @@ private:
     void onFloppyConfigSave(void);
 
     void onOtherSave(void);
+    void onIkbdSave(void);
     void onResetSettings(void);
     void onSendSettings(void);
     
@@ -163,7 +166,7 @@ private:
 
     void replaceNewLineWithGoto(std::string &line, int startX, int startY);
     
-    void translateVT52rawConsole(BYTE *vt52stream, int vt52cnt, char *rawConsole, int rawConsoleSize);
+    void translateVT52rawConsole(const BYTE *vt52stream, int vt52cnt, char *rawConsole, int rawConsoleSize);
     void dumpScreenToFile(FILE *f);
     //-------------
     // remote console stuff
