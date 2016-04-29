@@ -323,7 +323,7 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
     return totalCnt;                                    // return the count of bytes used
 }
 
-void ConfigStream::showMessageScreen(char *msgTitle, char *msgTxt)
+void ConfigStream::showMessageScreen(const char *msgTitle, const char *msgTxt)
 {
     screenChanged = true;
 
@@ -445,7 +445,7 @@ bool ConfigStream::getIntByComponentId(int componentId, int &value)
     std::string text;
     c->getText(text);
     
-    int ires = sscanf((char *) text.c_str(), "%d", &value);
+    int ires = sscanf(text.c_str(), "%d", &value);
     
     if(ires != 1) {
         return false;
@@ -480,7 +480,7 @@ bool ConfigStream::getFloatByComponentId(int componentId, float &value)
     std::string text;
     c->getText(text);
     
-    int ires = sscanf((char *) text.c_str(), "%f", &value);
+    int ires = sscanf(text.c_str(), "%f", &value);
     
     if(ires != 1) {
         return false;
@@ -608,7 +608,7 @@ void ConfigStream::onCheckboxGroupEnter(int groupId, int checkboxId)
     checkboxGroup_setCheckedId(groupId, checkboxId);
 }
 
-void ConfigStream::screen_addHeaderAndFooter(StupidVector &scr, char *screenName)
+void ConfigStream::screen_addHeaderAndFooter(StupidVector &scr, const char *screenName)
 {
     ConfigComponent *comp;
 
@@ -651,6 +651,7 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_CREATE_SHARED:      createScreen_shared();          break;
     case CS_CREATE_FLOPPY_CONF: createScreen_floppy_config();   break;
     case CS_CREATE_NETWORK:     createScreen_network();         break;
+    case CS_CREATE_IKBD:        createScreen_ikbd();            break;
     case CS_CREATE_OTHER:       createScreen_other();           break;
     case CS_CREATE_UPDATE:      createScreen_update();          break;
 
@@ -665,11 +666,12 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_UPDATE_UPDATE:      onUpdateUpdate();           break;
 
     case CS_OTHER_SAVE:         onOtherSave();              break;
+    case CS_IKBD_SAVE:          onIkbdSave();               break;
     case CS_RESET_SETTINGS:     onResetSettings();          break;
     
     case CS_SEND_SETTINGS:      onSendSettings();           break;
 
-//    case CS_SHARED_TEST:        onSharedTest();             break;
+//  case CS_SHARED_TEST:        onSharedTest();             break;
     case CS_SHARED_SAVE:        onSharedSave();             break;
 
     case CS_FLOPPY_CONFIG_SAVE: onFloppyConfigSave();       break;
@@ -789,6 +791,9 @@ void ConfigStream::createConfigDump(void)
     createScreen_floppy_config();
     dumpScreenToFile(f);
 
+    createScreen_ikbd();
+    dumpScreenToFile(f);
+
     createScreen_other();
     dumpScreenToFile(f);
 
@@ -811,7 +816,7 @@ void ConfigStream::dumpScreenToFile(FILE *f)
     fputs("\n--------------------------------------------------------------------------------\n", f);
 }
 
-void ConfigStream::translateVT52rawConsole(BYTE *vt52stream, int vt52cnt, char *rawConsole, int rawConsoleSize)
+void ConfigStream::translateVT52rawConsole(const BYTE *vt52stream, int vt52cnt, char *rawConsole, int rawConsoleSize)
 {
     int i;
 

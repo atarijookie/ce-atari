@@ -26,7 +26,7 @@ public:
 	
     static void initialize(void);
     static void deleteLocalUpdateComponents(void);
-    static void downloadUpdateList(char *remoteUrl);
+    static void downloadUpdateList(const char *remoteUrl);
     static void processUpdateList(void);
 
     static void downloadNewComponents(void);

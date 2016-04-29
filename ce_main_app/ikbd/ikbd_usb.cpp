@@ -363,6 +363,34 @@ void Ikbd::processMouse(input_event *ev)
                                  
 			sendMousePosRelative(fdUart, mouseBtnNow, 0, ev->value);	// send movement to ST
 		}
+        
+        //--------------------------
+        // mouse wheel moved and mouse wheel should act as UP / DOWN keys?
+        if(ev->code == REL_WHEEL && mouseWheelAsArrowsUpDown) {
+            int stKey;
+            
+            if(ev->value > 0) {
+                stKey = keyTranslator.pcKeyToSt(KEY_UP);
+            } else {
+                stKey = keyTranslator.pcKeyToSt(KEY_DOWN);
+            }
+
+            if(stKey == 0 || fdUart == -1) {    // key not found, or UART not open? quit
+                return;
+            }
+
+            ikbdLog("\nEV_REL -> REL_WHEEL: ev->value: %d, stKey: %d", ev->value, stKey);
+
+            BYTE bfr[2];
+            bfr[0] = stKey;                     // key down
+            bfr[1] = stKey | 0x80;              // key up
+    
+            int res = fdWrite(fdUart, bfr, 2); 
+
+            if(res < 0) {
+                logDebugAndIkbd(LOG_ERROR, "processMouse - sending to ST failed, errno: %d", errno);
+            }
+        }        
 	}
 }
 
@@ -374,13 +402,19 @@ void Ikbd::processKeyboard(input_event *ev)
         statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
         statuses.ikbdUsb.aliveSign = ALIVE_KEYDOWN;
 
-        if(ev->code >= KEY_TABLE_SIZE) {        // key out of index? quit
+        int stKey = keyTranslator.pcKeyToSt(ev->code);          // translate PC key to ST key
+
+        if(stKey == 0 || fdUart == -1) {                        // key not found, no UART open? quit
+            return;
+        }
+        
+        if(keybJoy0 && keyJoyKeys.isKeybJoyKeyPc(0, ev->code)) {    // Keyb joy 0 is enabled, and it's a keyb joy 0 key? Handle it specially. 
+            handlePcKeyAsKeybJoy(0, ev->code, ev->value);
             return;
         }
 
-        int stKey = tableKeysPcToSt[ev->code];  // translate PC key to ST key
-
-        if(stKey == 0) {                        // key not found? quit
+        if(keybJoy1 && keyJoyKeys.isKeybJoyKeyPc(1, ev->code)) {    // Keyb joy 1 is enabled, and it's a keyb joy 1 key? Handle it specially. 
+            handlePcKeyAsKeybJoy(1, ev->code, ev->value);
             return;
         }
 
@@ -390,10 +424,6 @@ void Ikbd::processKeyboard(input_event *ev)
         }
 
         ikbdLog("\nEV_KEY: code %d, value %d, stKey: %02x", ev->code, ev->value, stKey);
-
-        if(fdUart == -1) {                          // no UART open? quit
-            return;
-        }
 
         BYTE bfr;
         bfr = stKey;
@@ -538,4 +568,37 @@ void Ikbd::markVirtualMouseEvenTime(void)
     lastVDevMouseEventTime = Utils::getCurrentMs();         
 }
 
+void Ikbd::handlePcKeyAsKeybJoy(int joyNumber, int pcKey, int eventValue)
+{
+    bool keyDown = (eventValue != 0);   // if eventValue is 0, then it's up; otherwise down
+    handleKeyAsKeybJoy(true, joyNumber, pcKey, keyDown);  // handle this key press, and it comes from PC keys (therefore first param: true)
+}
+    
+void Ikbd::handleKeyAsKeybJoy(bool pcNotSt, int joyNumber, int pcKey, bool keyDown)
+{
+    js_event jse;
 
+    if(keyJoyKeys.isKeyUp(pcNotSt, joyNumber, pcKey)) {
+        jse.type    = JS_EVENT_AXIS;        // axis movement
+        jse.number  = 1;                    // it's Y axis
+        jse.value   = keyDown ? -20000 : 0; // keyboard key down? Joy to direction, otherwise to center (on up)
+    } else if(keyJoyKeys.isKeyDown(pcNotSt, joyNumber, pcKey)) {
+        jse.type    = JS_EVENT_AXIS;        // axis movement
+        jse.number  = 1;                    // it's Y axis
+        jse.value   = keyDown ? 20000 : 0;  // keyboard key down? Joy to direction, otherwise to center (on up)
+    } else if(keyJoyKeys.isKeyLeft(pcNotSt, joyNumber, pcKey)) {
+        jse.type    = JS_EVENT_AXIS;        // axis movement
+        jse.number  = 0;                    // it's X axis
+        jse.value   = keyDown ? -20000 : 0; // keyboard key down? Joy to direction, otherwise to center (on up)
+    } else if(keyJoyKeys.isKeyRight(pcNotSt, joyNumber, pcKey)) {
+        jse.type    = JS_EVENT_AXIS;        // axis movement
+        jse.number  = 0;                    // it's X axis
+        jse.value   = keyDown ? 20000 : 0;  // keyboard key down? Joy to direction, otherwise to center (on up)
+    } else if(keyJoyKeys.isKeyButton(pcNotSt, joyNumber, pcKey)) {
+        jse.type    = JS_EVENT_BUTTON;      // button press
+        jse.number  = 0;                    // it's Y axis
+        jse.value   = keyDown ? 1 : 0;      // keyboard key down? 1 means down, 0 means up
+    }
+    
+    processJoystick(&jse, joyNumber);
+}

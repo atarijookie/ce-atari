@@ -45,17 +45,17 @@ void Settings::storeDefaultValues(void)
 		}
 	}
 	
-	setChar((char *) "DRIVELETTER_FIRST",      'C');
-    setChar((char *) "DRIVELETTER_SHARED",     'P');
-    setChar((char *) "DRIVELETTER_CONFDRIVE",  'O');
+	setChar("DRIVELETTER_FIRST",      'C');
+    setChar("DRIVELETTER_SHARED",     'P');
+    setChar("DRIVELETTER_CONFDRIVE",  'O');
 
-	setBool((char *) "MOUNT_RAW_NOT_TRANS",     false);
+	setBool("MOUNT_RAW_NOT_TRANS",     false);
 	
-	setBool((char *) "SHARED_ENABLED",			false);
-	setBool((char *) "SHARED_NFS_NOT_SAMBA",	false);
+	setBool("SHARED_ENABLED",			false);
+	setBool("SHARED_NFS_NOT_SAMBA",	false);
 }
 
-bool Settings::getBool(char *key, bool defValue)
+bool Settings::getBool(const char *key, bool defValue)
 {
 	FILE *file = sOpen(key, true);
 	if(!file) {											// failed to open settings?
@@ -80,7 +80,7 @@ bool Settings::getBool(char *key, bool defValue)
 	return ret;											// return
 }
 
-void Settings::setBool(char *key, bool value)
+void Settings::setBool(const char *key, bool value)
 {
 	FILE *file = sOpen(key, false);
 	if(!file) {											// failed to open settings?
@@ -98,7 +98,7 @@ void Settings::setBool(char *key, bool value)
 }
 	
 //-------------------------	
-int Settings::getInt(char *key, int defValue)
+int Settings::getInt(const char *key, int defValue)
 {
 	FILE *file = sOpen(key, true);
 	if(!file) {											// failed to open settings?
@@ -118,7 +118,7 @@ int Settings::getInt(char *key, int defValue)
 	return val;											// return
 }
 
-void Settings::setInt(char *key, int value)
+void Settings::setInt(const char *key, int value)
 {
 	FILE *file = sOpen(key, false);
 	if(!file) {											// failed to open settings?
@@ -130,7 +130,7 @@ void Settings::setInt(char *key, int value)
 	fclose(file);
 }
 //-------------------------	
-float Settings::getFloat(char *key, float defValue)
+float Settings::getFloat(const char *key, float defValue)
 {
 	FILE *file = sOpen(key, true);
 	if(!file) {											// failed to open settings?
@@ -149,7 +149,7 @@ float Settings::getFloat(char *key, float defValue)
 	return val;											// return
 }
 
-void Settings::setFloat(char *key, float value)
+void Settings::setFloat(const char *key, float value)
 {
 	FILE *file = sOpen(key, false);
 	if(!file) {											// failed to open settings?
@@ -161,7 +161,7 @@ void Settings::setFloat(char *key, float value)
 	fclose(file);
 }
 //-------------------------	
-char *Settings::getString(char *key, char *defValue)
+char *Settings::getString(const char *key, const char *defValue)
 {
 	static char buffer[256];
 	memset(buffer, 0, 256);
@@ -186,7 +186,7 @@ char *Settings::getString(char *key, char *defValue)
 	return buffer;											// return
 }
 
-void Settings::setString(char *key, char *value)
+void Settings::setString(const char *key, const char *value)
 {
 	FILE *file = sOpen(key, false);
 	if(!file) {											// failed to open settings?
@@ -198,7 +198,7 @@ void Settings::setString(char *key, char *value)
 	fclose(file);
 }	
 //-------------------------
-char Settings::getChar(char *key, char defValue)
+char Settings::getChar(const char *key, char defValue)
 {
     FILE *file = sOpen(key, true);
     if(!file) {											// failed to open settings?
@@ -219,7 +219,7 @@ char Settings::getChar(char *key, char defValue)
     return val;											// return
 }
 
-void Settings::setChar(char *key, char value)
+void Settings::setChar(const char *key, char value)
 {
     FILE *file = sOpen(key, false);
     if(!file) {											// failed to open settings?
@@ -293,19 +293,19 @@ void Settings::loadAcsiIDs(AcsiIDinfo *aii, bool useDefaultsIfNoSettings)
 //-------------------------
 void Settings::loadFloppyConfig(FloppyConfig *fc)
 {
-    fc->enabled         = getBool((char *)    "FLOPPYCONF_ENABLED",           true);
-    fc->id              = getInt((char *)     "FLOPPYCONF_DRIVEID",           0);
-    fc->writeProtected  = getBool((char *)    "FLOPPYCONF_WRITEPROTECTED",    false);
+    fc->enabled         = getBool("FLOPPYCONF_ENABLED",           true);
+    fc->id              = getInt ("FLOPPYCONF_DRIVEID",           0);
+    fc->writeProtected  = getBool("FLOPPYCONF_WRITEPROTECTED",    false);
 }
 
 void Settings::saveFloppyConfig(FloppyConfig *fc)
 {
-    setBool((char *)    "FLOPPYCONF_ENABLED",           fc->enabled);
-    setInt((char *)     "FLOPPYCONF_DRIVEID",           fc->id);
-    setBool((char *)    "FLOPPYCONF_WRITEPROTECTED",    fc->writeProtected);
+    setBool("FLOPPYCONF_ENABLED",           fc->enabled);
+    setInt ("FLOPPYCONF_DRIVEID",           fc->id);
+    setBool("FLOPPYCONF_WRITEPROTECTED",    fc->writeProtected);
 }
 //-------------------------
-FILE *Settings::sOpen(char *key, bool readNotWrite)
+FILE *Settings::sOpen(const char *key, bool readNotWrite)
 {
 	char path[1024];
 	
