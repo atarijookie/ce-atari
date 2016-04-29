@@ -553,16 +553,23 @@ void Ikbd::processKeyboardData(void)
 				
 			}
 
-			if(resendTheseData) {								// if we should resend this data
-				fdWrite(fdUart, bfr, len);                      // send the whole sequence to ST
+			if(resendTheseData) {								    // if we should resend this data
+				fdWrite(fdUart, bfr, len);                          // send the whole sequence to ST
             }
             
 			continue;
+        } else {                                                    // if it's not special IKBD code, then it's just a key press
+            val = cbKeyboardData.get();                             // get data from buffer
+            bool wasHandledAsKeybJoy = false;                       // it wasn't handled as keyb joy (yet)
+            
+            if(keybJoy0 || keybJoy1) {                              // if at least one keyboard joy is enabled
+                wasHandledAsKeybJoy = handleStKeyAsKeybJoy(val);    // get if it was handled as keyb joy
+            }
+            
+            if(!wasHandledAsKeybJoy) {                              // if not handled as keyb joy, send it to ST
+                fdWrite(fdUart, &val, 1);                           // send byte to ST
+            }
         }
-
-        // if we got here, it's not a special code, just make / break keyboard code
-        val = cbKeyboardData.get();                             // get data from buffer
-        fdWrite(fdUart, &val, 1);                               // send byte to ST
     }
 }
 
@@ -741,3 +748,35 @@ void Ikbd::sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
 	}
 }
 
+bool Ikbd::handleStKeyAsKeybJoy(BYTE val)
+{
+    bool keyDown    = ((val & 0x80) == 0);      // if highest bit is zero, it's key down event
+    BYTE stKey      =   val & 0x7f;             // get just the key, without highest bit
+    
+    bool isKeybJoy0 = keyJoyKeys.isKeybJoyKeyAtari(0, stKey);       // find out if it bellongs to joy0
+    bool isKeybJoy1 = keyJoyKeys.isKeybJoyKeyAtari(1, stKey);       // find out if it bellongs to joy1
+    
+    if(isKeybJoy0 && !keybJoy0) {               // it's keyb joy 0, but keyb joy 0 is not enabled, fail
+        return false;
+    }
+
+    if(isKeybJoy1 && !keybJoy1) {               // it's keyb joy 1, but keyb joy 1 is not enabled, fail
+        return false;
+    }
+    
+    if(!isKeybJoy0 && !isKeybJoy1) {            // it's not from any keyb joy, quit
+        return false;
+    }
+
+    int joyNumber = isKeybJoy0 ? 0 : 1;         // if it's from joy 0, then joy # is 0, otherwise 1
+    int pcKey = keyTranslator.stKeyToPc(stKey); // translate ST key to PC key
+
+    if(pcKey == 0) {                            // failed to translate ST key to PC key? fail
+        return false;
+    }
+
+    handleKeyAsKeybJoy(false, joyNumber, pcKey, keyDown);   // handle this key press, and it comes from ST keys (therefore first param: false)
+    return true;
+}
+
+    

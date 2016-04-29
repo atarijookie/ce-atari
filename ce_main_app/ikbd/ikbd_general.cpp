@@ -132,8 +132,10 @@ Ikbd::Ikbd()
     loadSettings();
 
     initDevs();
-    fillKeyTranslationTable();
-
+    
+    keyJoyKeys.setKeyTranslator(&keyTranslator);        // first set the translator
+    keyJoyKeys.loadKeys();                              // then load the keys
+    
     ceIkbdMode = CE_IKBDMODE_SOLO;
 	
     fdUart      = -1;

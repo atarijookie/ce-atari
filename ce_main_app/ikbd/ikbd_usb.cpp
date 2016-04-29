@@ -370,9 +370,9 @@ void Ikbd::processMouse(input_event *ev)
             int stKey;
             
             if(ev->value > 0) {
-                stKey = tableKeysPcToSt[KEY_UP];
+                stKey = keyTranslator.pcKeyToSt(KEY_UP);
             } else {
-                stKey = tableKeysPcToSt[KEY_DOWN];
+                stKey = keyTranslator.pcKeyToSt(KEY_DOWN);
             }
 
             if(stKey == 0 || fdUart == -1) {    // key not found, or UART not open? quit
@@ -402,23 +402,19 @@ void Ikbd::processKeyboard(input_event *ev)
         statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
         statuses.ikbdUsb.aliveSign = ALIVE_KEYDOWN;
 
-        if(ev->code >= KEY_TABLE_SIZE) {        // key out of index? quit
-            return;
-        }
+        int stKey = keyTranslator.pcKeyToSt(ev->code);          // translate PC key to ST key
 
-        int stKey = tableKeysPcToSt[ev->code];  // translate PC key to ST key
-
-        if(stKey == 0 || fdUart == -1) {        // key not found, no UART open? quit
+        if(stKey == 0 || fdUart == -1) {                        // key not found, no UART open? quit
             return;
         }
         
-        if(keybJoy0 && isKeybJoyKey(0, ev->code)) {   // Keyb joy 0 is enabled, and it's a keyb joy 0 key? Handle it specially. 
-            handleKeybJoy(0, ev->code, ev->value);
+        if(keybJoy0 && keyJoyKeys.isKeybJoyKeyPc(0, ev->code)) {    // Keyb joy 0 is enabled, and it's a keyb joy 0 key? Handle it specially. 
+            handlePcKeyAsKeybJoy(0, ev->code, ev->value);
             return;
         }
 
-        if(keybJoy1 && isKeybJoyKey(1, ev->code)) {   // Keyb joy 1 is enabled, and it's a keyb joy 1 key? Handle it specially. 
-            handleKeybJoy(1, ev->code, ev->value);
+        if(keybJoy1 && keyJoyKeys.isKeybJoyKeyPc(1, ev->code)) {    // Keyb joy 1 is enabled, and it's a keyb joy 1 key? Handle it specially. 
+            handlePcKeyAsKeybJoy(1, ev->code, ev->value);
             return;
         }
 
@@ -572,135 +568,37 @@ void Ikbd::markVirtualMouseEvenTime(void)
     lastVDevMouseEventTime = Utils::getCurrentMs();         
 }
 
-void Ikbd::fillKeyTranslationTable(void)
+void Ikbd::handlePcKeyAsKeybJoy(int joyNumber, int pcKey, int eventValue)
 {
-    for(int i=0; i<KEY_TABLE_SIZE; i++) {
-        tableKeysPcToSt[i] = 0;
-    }
-
-    addToTable(KEY_ESC,         0x01);
-    addToTable(KEY_1,           0x02);
-    addToTable(KEY_2,           0x03);
-    addToTable(KEY_3,           0x04);
-    addToTable(KEY_4,           0x05);
-    addToTable(KEY_5,           0x06);
-    addToTable(KEY_6,           0x07);
-    addToTable(KEY_7,           0x08);
-    addToTable(KEY_8,           0x09);
-    addToTable(KEY_9,           0x0a);
-    addToTable(KEY_0,           0x0b);
-    addToTable(KEY_MINUS,       0x0c);
-    addToTable(KEY_EQUAL,       0x0d);
-    addToTable(KEY_BACKSPACE,   0x0e);
-    addToTable(KEY_TAB,         0x0f);
-    addToTable(KEY_Q,           0x10);
-    addToTable(KEY_W,           0x11);
-    addToTable(KEY_E,           0x12);
-    addToTable(KEY_R,           0x13);
-    addToTable(KEY_T,           0x14);
-    addToTable(KEY_Y,           0x15);
-    addToTable(KEY_U,           0x16);
-    addToTable(KEY_I,           0x17);
-    addToTable(KEY_O,           0x18);
-    addToTable(KEY_P,           0x19);
-    addToTable(KEY_LEFTBRACE,   0x1a);
-    addToTable(KEY_RIGHTBRACE,  0x1b);
-    addToTable(KEY_ENTER,       0x1c);
-    addToTable(KEY_LEFTCTRL,    0x1d);
-    addToTable(KEY_A,           0x1e);
-    addToTable(KEY_S,           0x1f);
-    addToTable(KEY_D,           0x20);
-    addToTable(KEY_F,           0x21);
-    addToTable(KEY_G,           0x22);
-    addToTable(KEY_H,           0x23);
-    addToTable(KEY_J,           0x24);
-    addToTable(KEY_K,           0x25);
-    addToTable(KEY_L,           0x26);
-    addToTable(KEY_SEMICOLON,   0x27);
-    addToTable(KEY_APOSTROPHE,  0x28);
-    addToTable(KEY_GRAVE,       0x2b);
-    addToTable(KEY_LEFTSHIFT,   0x2a);
-    addToTable(KEY_BACKSLASH,   0x60);
-    addToTable(KEY_Z,           0x2c);
-    addToTable(KEY_X,           0x2d);
-    addToTable(KEY_C,           0x2e);
-    addToTable(KEY_V,           0x2f);
-    addToTable(KEY_B,           0x30);
-    addToTable(KEY_N,           0x31);
-    addToTable(KEY_M,           0x32);
-    addToTable(KEY_COMMA,       0x33);
-    addToTable(KEY_DOT,         0x34);
-    addToTable(KEY_SLASH,       0x35);
-    addToTable(KEY_RIGHTSHIFT,  0x36);
-    addToTable(KEY_KPASTERISK,  0x66);
-    addToTable(KEY_LEFTALT,     0x38);
-    addToTable(KEY_SPACE,       0x39);
-    addToTable(KEY_CAPSLOCK,    0x3a);
-    addToTable(KEY_F1,          0x3b);
-    addToTable(KEY_F2,          0x3c);
-    addToTable(KEY_F3,          0x3d);
-    addToTable(KEY_F4,          0x3e);
-    addToTable(KEY_F5,          0x3f);
-    addToTable(KEY_F6,          0x40);
-    addToTable(KEY_F7,          0x41);
-    addToTable(KEY_F8,          0x42);
-    addToTable(KEY_F9,          0x43);
-    addToTable(KEY_F10,         0x44);
-    addToTable(KEY_KP7,         0x67);
-    addToTable(KEY_KP8,         0x68);
-    addToTable(KEY_KP9,         0x69);
-    addToTable(KEY_KPMINUS,     0x4a);
-    addToTable(KEY_KP4,         0x6a);
-    addToTable(KEY_KP5,         0x6b);
-    addToTable(KEY_KP6,         0x6c);
-    addToTable(KEY_KPPLUS,      0x4e);
-    addToTable(KEY_KP1,         0x6d);
-    addToTable(KEY_KP2,         0x6e);
-    addToTable(KEY_KP3,         0x6f);
-    addToTable(KEY_KP0,         0x70);
-    addToTable(KEY_KPDOT,       0x71);
-    addToTable(KEY_KPENTER,     0x72);
-    addToTable(KEY_RIGHTCTRL,   0x1d);
-    addToTable(KEY_KPSLASH,     0x65);
-    addToTable(KEY_RIGHTALT,    0x38);
-    addToTable(KEY_UP,          0x48);
-    addToTable(KEY_LEFT,        0x4b);
-    addToTable(KEY_RIGHT,       0x4d);
-    addToTable(KEY_DOWN,        0x50);
-    addToTable(KEY_HOME,        0x62);
-    addToTable(KEY_PAGEUP,      0x61);
-    addToTable(KEY_PAGEDOWN,    0x47);
-    addToTable(KEY_INSERT,      0x52);
-    addToTable(KEY_DELETE,      0x53);
+    bool keyDown = (eventValue != 0);   // if eventValue is 0, then it's up; otherwise down
+    handleKeyAsKeybJoy(true, joyNumber, pcKey, keyDown);  // handle this key press, and it comes from PC keys (therefore first param: true)
 }
-
-void Ikbd::addToTable(int pcKey, int stKey)
-{
-    if(pcKey >= KEY_TABLE_SIZE) {
-        logDebugAndIkbd(LOG_ERROR, "addToTable -- Can't add pair %d - %d - out of range.", pcKey, stKey);
-        return;
-    }
-
-    tableKeysPcToSt[pcKey] = stKey;
-}
-
-bool Ikbd::isKeybJoyKey(int joyNumber, int pcKey)
-{
-    int keybJoy0pcKeys[5] = {KEY_A, KEY_S, KEY_D, KEY_W, KEY_Q};
-    int keybJoy1pcKeys[5] = {KEY_J, KEY_K, KEY_L, KEY_I, KEY_B};
     
-    int *keybJoyKeys = (joyNumber == 0) ? keybJoy0pcKeys : keybJoy1pcKeys;
-    
-    for(int i=0; i<5; i++) {
-        if(pcKey == keybJoyKeys[i]) {
-            return true;
-        }
+void Ikbd::handleKeyAsKeybJoy(bool pcNotSt, int joyNumber, int pcKey, bool keyDown)
+{
+    js_event jse;
+
+    if(keyJoyKeys.isKeyUp(pcNotSt, joyNumber, pcKey)) {
+        jse.type    = JS_EVENT_AXIS;        // axis movement
+        jse.number  = 1;                    // it's Y axis
+        jse.value   = keyDown ? -20000 : 0; // keyboard key down? Joy to direction, otherwise to center (on up)
+    } else if(keyJoyKeys.isKeyDown(pcNotSt, joyNumber, pcKey)) {
+        jse.type    = JS_EVENT_AXIS;        // axis movement
+        jse.number  = 1;                    // it's Y axis
+        jse.value   = keyDown ? 20000 : 0;  // keyboard key down? Joy to direction, otherwise to center (on up)
+    } else if(keyJoyKeys.isKeyLeft(pcNotSt, joyNumber, pcKey)) {
+        jse.type    = JS_EVENT_AXIS;        // axis movement
+        jse.number  = 0;                    // it's X axis
+        jse.value   = keyDown ? -20000 : 0; // keyboard key down? Joy to direction, otherwise to center (on up)
+    } else if(keyJoyKeys.isKeyRight(pcNotSt, joyNumber, pcKey)) {
+        jse.type    = JS_EVENT_AXIS;        // axis movement
+        jse.number  = 0;                    // it's X axis
+        jse.value   = keyDown ? 20000 : 0;  // keyboard key down? Joy to direction, otherwise to center (on up)
+    } else if(keyJoyKeys.isKeyButton(pcNotSt, joyNumber, pcKey)) {
+        jse.type    = JS_EVENT_BUTTON;      // button press
+        jse.number  = 0;                    // it's Y axis
+        jse.value   = keyDown ? 1 : 0;      // keyboard key down? 1 means down, 0 means up
     }
     
-    return false;
-}
-
-void Ikbd::handleKeybJoy(int joyNumber, int pcKey, int eventValue)
-{
-
+    processJoystick(&jse, joyNumber);
 }

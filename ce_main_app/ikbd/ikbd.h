@@ -6,6 +6,8 @@
 
 #include "ikbd_defs.h"
 #include "cyclicbuff.h"
+#include "keybjoys.h"
+#include "keytranslator.h"
 
 //#define SPYIKBD
 
@@ -20,8 +22,6 @@ typedef struct {
 
 #define JOYAXIS             8
 #define JOYBUTTONS          12
-
-#define KEY_TABLE_SIZE      256
 
 #define UARTFILE	        "/dev/ttyAMA0"
 
@@ -74,7 +74,6 @@ public:
 private:
 	int		ceIkbdMode;
 
-    int     tableKeysPcToSt[KEY_TABLE_SIZE];
     int     fdUart;
 
     bool    outputEnabled;
@@ -91,6 +90,9 @@ private:
     bool    mouseWheelAsArrowsUpDown;       // if true, mouse wheel up / down will be translated to arrow up / down
     bool    keybJoy0;                       // if true, specific keys will act as joy 0
     bool    keybJoy1;                       // if true, specific keys will act as joy 1
+    
+    TKeybJoyKeys    keyJoyKeys;
+    KeyTranslator   keyTranslator;
     
 	struct {
 		int		threshX, threshY;
@@ -127,7 +129,7 @@ private:
     void initDevs(void);
     void initJoystickState(TJoystickState *joy);
     void fillKeyTranslationTable(void);
-    void addToTable(int pcKey, int stKey);
+    void addToTable(int pcKey, int stKey, int humanKey=0);
     void fillSpecialCodeLengthTable(void);
     void fillStCommandsLengthTable(void);
 
@@ -149,8 +151,9 @@ private:
 	bool gotUsbJoy1(void);
 	bool gotUsbJoy2(void);
     
-    bool isKeybJoyKey (int joyNumber, int pcKey);
-    void handleKeybJoy(int joyNumber, int pcKey, int eventValue);
+    void handlePcKeyAsKeybJoy(int joyNumber, int pcKey, int eventValue);
+    bool handleStKeyAsKeybJoy(BYTE val);
+    void handleKeyAsKeybJoy  (bool pcNotSt, int joyNumber, int pcKey, bool keyDown);
     
     int fdWrite(int fd, BYTE *bfr, int cnt);
     
