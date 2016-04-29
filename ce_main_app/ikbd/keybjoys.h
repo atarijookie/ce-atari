@@ -9,17 +9,17 @@ typedef struct {
     int left;
     int right;
     int button;
-} TJoyKeys;
+} JoyKeys;
 
 typedef struct {
-    TJoyKeys human;             // human readable keys, e.g. 'A' 
-    TJoyKeys linuxx;            // linux key event codes, like KEY_A
-    TJoyKeys atari;             // atari key codes, like 0x1e
-} TJoyKeysPcSt;
+    JoyKeys human;             // human readable keys, e.g. 'A' 
+    JoyKeys linuxx;            // linux key event codes, like KEY_A
+    JoyKeys atari;             // atari key codes, like 0x1e
+} JoyKeysPcSt;
 
-class TKeybJoyKeys {
+class KeybJoyKeys {
 public:
-    TKeybJoyKeys(void);
+    KeybJoyKeys(void);
     void setKeyTranslator(KeyTranslator *keyTrans);
     
     bool isKeybJoyKey       (bool pcNotSt, int joyNumber, int key);
@@ -35,14 +35,17 @@ public:
     void loadKeys(void);
     void saveKeys(void);
     
+    bool keybJoyHumanSettingsValidForSingleJoy(int joyNumber);
+    bool keybJoyHumanSettingsValidBetweenJoys(void);
+    
+    JoyKeysPcSt   joyKeys[2];
 private:    
-    TJoyKeysPcSt   joyKeys[2];
     KeyTranslator *keyTranslator;
 
     void loadKeys(int joyNumber);
     void saveKeys(int joyNumber);
     
-    TJoyKeys *getkeybJoysStruct(bool pcNotSt, int joyNumber);
+    JoyKeys *getkeybJoysStruct(bool pcNotSt, int joyNumber);
 };
 
 #endif

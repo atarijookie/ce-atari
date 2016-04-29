@@ -134,7 +134,7 @@ Ikbd::Ikbd()
     initDevs();
     
     keyJoyKeys.setKeyTranslator(&keyTranslator);        // first set the translator
-    keyJoyKeys.loadKeys();                              // then load the keys
+    keyJoyKeys.loadKeys();                              // load the keys used for keyb joys
     
     ceIkbdMode = CE_IKBDMODE_SOLO;
 	
@@ -167,10 +167,14 @@ void Ikbd::loadSettings(void)
         joy2nd = INTYPE_JOYSTICK1;
     }
     
+    // get enabled flags for mouse wheel as keys
     mouseWheelAsArrowsUpDown = s.getBool((char *) "MOUSE_WHEEL_AS_KEYS", true);
     
+    // get enabled flags for keyb joys
     keybJoy0 = s.getBool("KEYBORD_JOY0", false);
     keybJoy1 = s.getBool("KEYBORD_JOY1", false);
+    
+    keyJoyKeys.loadKeys();                              // load the keys used for keyb joys
 }
 
 void Ikbd::resetInternalIkbdVars(void)

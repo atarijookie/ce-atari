@@ -14,6 +14,8 @@
 #include "../utils.h"
 #include "../update.h"
 #include "../downloader.h"
+#include "../ikbd/keybjoys.h"
+
 #include "keys.h"
 #include "configstream.h"
 #include "netsettings.h"
@@ -1131,7 +1133,7 @@ void ConfigStream::createScreen_ikbd(void)
 
     ConfigComponent *comp;
 
-    int row     = 6;
+    int row     = 3;
     int col     = 2;
     int col2    = 33;
     
@@ -1156,24 +1158,99 @@ void ConfigStream::createScreen_ikbd(void)
 
     //----------------------
 
-    row++;
-    comp = new ConfigComponent(this, ConfigComponent::label, "ASDW-Q as JOY 0",                 40, col, row, gotoOffset);
+    int colButton   = col + 19;
+    int colLeft     = col + 25;
+    int colUpDown   = col + 29;
+    int colRight    = col + 33;
+    
+    row += 2;
+    comp = new ConfigComponent(this, ConfigComponent::label, "Keyboard Joy 0 enabled",         40, col, row, gotoOffset);
     screen.push_back(comp);
     
     comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                          3, col2, row++, gotoOffset);
     comp->setComponentId(COMPID_KEYB_JOY0);
     screen.push_back(comp);
 
-    //----------------------
+    row++;
+    comp = new ConfigComponent(this, ConfigComponent::label, "Keys",                          40, col, row, gotoOffset);
+    screen.push_back(comp);
+
+    // button
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                       1, colButton, row, gotoOffset);
+    comp->setComponentId(COMPID_KEYBJOY0_BUTTON);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
+    screen.push_back(comp);
+    
+    // up
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                       1, colUpDown, row, gotoOffset);
+    comp->setComponentId(COMPID_KEYBJOY0_UP);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
+    screen.push_back(comp);
 
     row++;
-    comp = new ConfigComponent(this, ConfigComponent::label, "JKLI-B as JOY 1",                 40, col, row, gotoOffset);
+    // left
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                       1, colLeft, row, gotoOffset);
+    comp->setComponentId(COMPID_KEYBJOY0_LEFT);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
+    screen.push_back(comp);
+
+    // down
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                       1, colUpDown, row, gotoOffset);
+    comp->setComponentId(COMPID_KEYBJOY0_DOWN);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
+    screen.push_back(comp);
+
+    // right
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                       1, colRight, row, gotoOffset);
+    comp->setComponentId(COMPID_KEYBJOY0_RIGHT);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
+    screen.push_back(comp);
+
+    //----------------------
+
+    row += 3;
+    comp = new ConfigComponent(this, ConfigComponent::label, "Keyboard as Joy 1 enabled",      40, col, row, gotoOffset);
     screen.push_back(comp);
     
     comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                          3, col2, row++, gotoOffset);
     comp->setComponentId(COMPID_KEYB_JOY1);
     screen.push_back(comp);
 
+    row++;
+    comp = new ConfigComponent(this, ConfigComponent::label, "Keys",                          40, col, row, gotoOffset);
+    screen.push_back(comp);
+
+    // button
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                       1, colButton, row, gotoOffset);
+    comp->setComponentId(COMPID_KEYBJOY1_BUTTON);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
+    screen.push_back(comp);
+    
+    // up
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                       1, colUpDown, row, gotoOffset);
+    comp->setComponentId(COMPID_KEYBJOY1_UP);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
+    screen.push_back(comp);
+
+    row++;
+    // left
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                       1, colLeft, row, gotoOffset);
+    comp->setComponentId(COMPID_KEYBJOY1_LEFT);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
+    screen.push_back(comp);
+
+    // down
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                       1, colUpDown, row, gotoOffset);
+    comp->setComponentId(COMPID_KEYBJOY1_DOWN);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
+    screen.push_back(comp);
+
+    // right
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                       1, colRight, row, gotoOffset);
+    comp->setComponentId(COMPID_KEYBJOY1_RIGHT);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
+    screen.push_back(comp);
+    
     //----------------------
     
     row += 2;
@@ -1203,6 +1280,47 @@ void ConfigStream::createScreen_ikbd(void)
     setBoolByComponentId(COMPID_MOUSEWHEEL_ENABLED, mouseWheelEnabled);
     setBoolByComponentId(COMPID_KEYB_JOY0,          keybJoy0);
     setBoolByComponentId(COMPID_KEYB_JOY1,          keybJoy1);
+    
+    //------------------------
+    // now fill the keyb joys config
+    KeybJoyKeys     keyJoyKeys;
+    KeyTranslator   keyTranslator;
+    
+    keyJoyKeys.setKeyTranslator(&keyTranslator);        // first set the translator
+    keyJoyKeys.loadKeys();                              // then load the keys
+
+    std::string joyString = "?";
+
+    joyString[0] = keyJoyKeys.joyKeys[0].human.button;
+    setTextByComponentId(COMPID_KEYBJOY0_BUTTON, joyString);
+    
+    joyString[0] = keyJoyKeys.joyKeys[0].human.left;
+    setTextByComponentId(COMPID_KEYBJOY0_LEFT, joyString);
+
+    joyString[0] = keyJoyKeys.joyKeys[0].human.right;
+    setTextByComponentId(COMPID_KEYBJOY0_RIGHT, joyString);
+
+    joyString[0] = keyJoyKeys.joyKeys[0].human.up;
+    setTextByComponentId(COMPID_KEYBJOY0_UP, joyString);
+
+    joyString[0] = keyJoyKeys.joyKeys[0].human.down;
+    setTextByComponentId(COMPID_KEYBJOY0_DOWN, joyString);
+
+    //----------
+    joyString[0] = keyJoyKeys.joyKeys[1].human.button;
+    setTextByComponentId(COMPID_KEYBJOY1_BUTTON, joyString);
+    
+    joyString[0] = keyJoyKeys.joyKeys[1].human.left;
+    setTextByComponentId(COMPID_KEYBJOY1_LEFT, joyString);
+
+    joyString[0] = keyJoyKeys.joyKeys[1].human.right;
+    setTextByComponentId(COMPID_KEYBJOY1_RIGHT, joyString);
+
+    joyString[0] = keyJoyKeys.joyKeys[1].human.up;
+    setTextByComponentId(COMPID_KEYBJOY1_UP, joyString);
+
+    joyString[0] = keyJoyKeys.joyKeys[1].human.down;
+    setTextByComponentId(COMPID_KEYBJOY1_DOWN, joyString);
     //------------------------
     
     setFocusToFirstFocusable();
@@ -1216,6 +1334,70 @@ void ConfigStream::onIkbdSave(void)
     bool mouseWheelEnabled  = true;
     bool keybJoy0           = false;
     bool keybJoy1           = false;
+    
+    //------------------------
+    // now get the keyb joys config
+    KeybJoyKeys     keyJoyKeys;
+    KeyTranslator   keyTranslator;
+    
+    keyJoyKeys.setKeyTranslator(&keyTranslator);        // first set the translator
+    keyJoyKeys.loadKeys();                              // then load the keys
+
+    std::string joyString = "?";
+
+    //----------
+    // get settings for joy 0 
+    getTextByComponentId(COMPID_KEYBJOY0_BUTTON, joyString);
+    keyJoyKeys.joyKeys[0].human.button = joyString[0];
+    
+    getTextByComponentId(COMPID_KEYBJOY0_LEFT, joyString);
+    keyJoyKeys.joyKeys[0].human.left = joyString[0];
+
+    getTextByComponentId(COMPID_KEYBJOY0_RIGHT, joyString);
+    keyJoyKeys.joyKeys[0].human.right = joyString[0];
+
+    getTextByComponentId(COMPID_KEYBJOY0_UP, joyString);
+    keyJoyKeys.joyKeys[0].human.up = joyString[0];
+
+    getTextByComponentId(COMPID_KEYBJOY0_DOWN, joyString);
+    keyJoyKeys.joyKeys[0].human.down = joyString[0];
+
+    //----------
+    // get settings for joy 1
+    getTextByComponentId(COMPID_KEYBJOY1_BUTTON, joyString);
+    keyJoyKeys.joyKeys[1].human.button = joyString[0];
+    
+    getTextByComponentId(COMPID_KEYBJOY1_LEFT, joyString);
+    keyJoyKeys.joyKeys[1].human.left = joyString[0];
+
+    getTextByComponentId(COMPID_KEYBJOY1_RIGHT, joyString);
+    keyJoyKeys.joyKeys[1].human.right = joyString[0];
+
+    getTextByComponentId(COMPID_KEYBJOY1_UP, joyString);
+    keyJoyKeys.joyKeys[1].human.up = joyString[0];
+
+    getTextByComponentId(COMPID_KEYBJOY1_DOWN, joyString);
+    keyJoyKeys.joyKeys[1].human.down = joyString[0];
+    
+    //----------
+    // validate new settings
+    if(!keyJoyKeys.keybJoyHumanSettingsValidForSingleJoy(0)) {  // keyb joy 0 invalid?
+        showMessageScreen("Warning", "Keyboard Joy 0 settins invalid!'.\n\rPlease fix this and try again.");
+        return;
+    }
+    
+    if(!keyJoyKeys.keybJoyHumanSettingsValidForSingleJoy(1)) {  // keyb joy 1 invalid?
+        showMessageScreen("Warning", "Keyboard Joy 1 settins invalid!'.\n\rPlease fix this and try again.");
+        return;
+    }
+    
+    if(!keyJoyKeys.keybJoyHumanSettingsValidBetweenJoys()) {    // keyb joy 0 + joy 1 invalid when used together?
+        showMessageScreen("Warning", "Keyboard Joy 0 and Joy 1 settins invalid!'.\n\rPlease fix this and try again.");
+        return;
+    }
+    
+    keyJoyKeys.saveKeys();              // save settings
+    //------------------------
     
     getBoolByComponentId(COMPID_JOY0_FIRST,         joy0First);
     getBoolByComponentId(COMPID_MOUSEWHEEL_ENABLED, mouseWheelEnabled);

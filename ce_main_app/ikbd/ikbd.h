@@ -91,7 +91,7 @@ private:
     bool    keybJoy0;                       // if true, specific keys will act as joy 0
     bool    keybJoy1;                       // if true, specific keys will act as joy 1
     
-    TKeybJoyKeys    keyJoyKeys;
+    KeybJoyKeys     keyJoyKeys;
     KeyTranslator   keyTranslator;
     
 	struct {
