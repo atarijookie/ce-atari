@@ -1209,7 +1209,7 @@ void ConfigStream::createScreen_ikbd(void)
     //----------------------
 
     row += 3;
-    comp = new ConfigComponent(this, ConfigComponent::label, "Keyboard as Joy 1 enabled",      40, col, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Keyboard Joy 1 enabled",         40, col, row, gotoOffset);
     screen.push_back(comp);
     
     comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                          3, col2, row++, gotoOffset);
