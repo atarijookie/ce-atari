@@ -20,8 +20,8 @@ public:
 	static WORD fileTimeToAtariTime(struct tm *ptm);
 	static WORD fileTimeToAtariDate(struct tm *ptm);
 	
-	static void mergeHostPaths(std::string &dest, std::string &tail);
-	static void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
+	static void mergeHostPaths(std::string &dest, const std::string &tail);
+	static void splitFilenameFromPath(const std::string &pathAndFile, std::string &path, std::string &file);
 
 	static void resetHansAndFranz(void);
     static void resetHans(void);
