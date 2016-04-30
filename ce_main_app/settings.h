@@ -27,20 +27,20 @@ public:
 	Settings(void);
 	virtual ~Settings(void) { };
 
-	bool getBool(char *key, bool defValue);
-	void setBool(char *key, bool value);
+	bool getBool(const char *key, bool defValue);
+	void setBool(const char *key, bool value);
 
-	int  getInt(char *key, int defValue);
-	void setInt(char *key, int value);
+	int  getInt(const char *key, int defValue);
+	void setInt(const char *key, int value);
 
-	float getFloat(char *key, float defValue);
-	void  setFloat(char *key, float value);
+	float getFloat(const char *key, float defValue);
+	void  setFloat(const char *key, float value);
 	
-	char *getString(char *key, char *defValue);
-	void  setString(char *key, char *value);
+	char *getString(const char *key, const char *defValue);
+	void  setString(const char *key, const char *value);
 
-    char getChar(char *key, char defValue);
-    void setChar(char *key, char value);
+    char getChar(const char *key, char defValue);
+    void setChar(const char *key, char value);
 
 	void loadAcsiIDs(AcsiIDinfo *aii, bool useDefaultsIfNoSettings=true);
 
@@ -49,7 +49,7 @@ public:
 	
 private:
 
-	FILE *sOpen(char *key, bool readNotWrite);
+	FILE *sOpen(const char *key, bool readNotWrite);
 	
 	void storeDefaultValues(void);
 };

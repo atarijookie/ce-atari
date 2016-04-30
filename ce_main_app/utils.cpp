@@ -130,7 +130,7 @@ void Utils::fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *pt
 	ptm->tm_sec		= seconds;
 }
 
-void Utils::mergeHostPaths(std::string &dest, std::string &tail)
+void Utils::mergeHostPaths(std::string &dest, const std::string &tail)
 {
     if(dest.empty()) {      // if the 1st part is empty, then result is just the 2nd part
         dest = tail;
@@ -159,11 +159,11 @@ void Utils::mergeHostPaths(std::string &dest, std::string &tail)
     dest = dest + tail;
 }
 
-void Utils::splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file)
+void Utils::splitFilenameFromPath(const std::string &pathAndFile, std::string &path, std::string &file)
 {
-    int sepPos = pathAndFile.rfind(HOSTPATH_SEPAR_STRING);
+    size_t sepPos = pathAndFile.rfind(HOSTPATH_SEPAR_STRING);
 
-    if(sepPos == ((int) std::string::npos)) {                   // not found?
+    if(sepPos == std::string::npos) {                   // not found?
         path.clear();
         file = pathAndFile;                                     // pretend we don't have path, just filename
     } else {                                                    // separator found?
