@@ -1382,17 +1382,17 @@ void ConfigStream::onIkbdSave(void)
     //----------
     // validate new settings
     if(!keyJoyKeys.keybJoyHumanSettingsValidForSingleJoy(0)) {  // keyb joy 0 invalid?
-        showMessageScreen("Warning", "Keyboard Joy 0 settins invalid!'.\n\rPlease fix this and try again.");
+        showMessageScreen("Warning", "Keyboard Joy 0 settings are invalid!\n\rPlease fix this and try again.");
         return;
     }
     
     if(!keyJoyKeys.keybJoyHumanSettingsValidForSingleJoy(1)) {  // keyb joy 1 invalid?
-        showMessageScreen("Warning", "Keyboard Joy 1 settins invalid!'.\n\rPlease fix this and try again.");
+        showMessageScreen("Warning", "Keyboard Joy 1 settings are invalid!\n\rPlease fix this and try again.");
         return;
     }
     
     if(!keyJoyKeys.keybJoyHumanSettingsValidBetweenJoys()) {    // keyb joy 0 + joy 1 invalid when used together?
-        showMessageScreen("Warning", "Keyboard Joy 0 and Joy 1 settins invalid!'.\n\rPlease fix this and try again.");
+        showMessageScreen("Warning", "Keyboard Joy 0 and Joy 1 settings invalid!\n\rPlease fix this and try again.");
         return;
     }
     
