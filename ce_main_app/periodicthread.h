@@ -1,13 +1,10 @@
 #ifndef _PERIODICTHREAD_H_
 #define _PERIODICTHREAD_H_
 
-#include "native/translatedbootmedia.h"
-#include "native/scsi.h"
-#include "translated/translateddisk.h"
-#include "acsidatatrans.h"
-
-#include "config/configstream.h"
-#include "acsidatatrans.h"
+class TranslatedDisk;
+class AcsiDataTrans;
+class Scsi;
+class ConfigStream;
 
 typedef struct {
     int fd1;

@@ -5,20 +5,15 @@
 #include <string>
 #include <time.h>
 
-#include "translatedhelper.h"
 #include "dirtranslator.h"
-
-#include "../acsidatatrans.h"
-#include "../datatypes.h"
-
 #include "../isettingsuser.h"
 
-#include "service/configservice.h"
-#include "service/screencastservice.h"
-#include "acsicommand/dateacsicommand.h"
-#include "acsicommand/screencastacsicommand.h"
-
-#include "../settingsreloadproxy.h"
+class ConfigService;
+class ScreencastService;
+class DateAcsiCommand;
+class ScreencastAcsiCommand;
+class AcsiDataTrans;
+class SettingsReloadProxy;
 
 #define CONFIG_DRIVE_PATH       "/tmp/configdrive"
 #define SHARED_DRIVE_PATH       "/mnt/shared"

@@ -3,7 +3,6 @@
 
 #include <map>
 
-#include "utils.h"
 #include "global.h"
 #include "version.h"
 

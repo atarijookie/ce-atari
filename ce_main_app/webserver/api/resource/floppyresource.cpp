@@ -13,11 +13,12 @@
 #include <linux/input.h>
 #include <unistd.h>
 
-#include "../../../lib/cjson-code-58/cJSON.h"
-#include "../../../debug.h"
-#include "../../../global.h"
+#include "lib/cjson-code-58/cJSON.h"
+#include "debug.h"
+#include "global.h"
 
 #include "service/floppyservice.h"
+#include "floppy/imagesilo.h"
 
 FloppyResource::FloppyResource(FloppyService *pxFloppyService) : pxFloppyService(pxFloppyService)  
 {

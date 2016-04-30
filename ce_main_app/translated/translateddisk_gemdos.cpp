@@ -14,7 +14,9 @@
 #include "../global.h"
 #include "../debug.h"
 #include "../utils.h"
+#include "acsidatatrans.h"
 #include "translateddisk.h"
+#include "translatedhelper.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
 

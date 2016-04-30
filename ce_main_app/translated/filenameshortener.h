@@ -6,8 +6,6 @@
 
 // Average size for one record seems to be around 130 bytes.
 
-#include "translatedhelper.h"
-
 #define MAX_FILENAME_LEN    1024
 #define MAX_FILEEXT_LEN     256
 

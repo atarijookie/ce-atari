@@ -1,6 +1,8 @@
 #ifndef _STATUSREPORT_H_
 #define _STATUSREPORT_H_
 
+#include "datatypes.h"
+
 // when not received anything
 #define ALIVE_DEAD      0
 

@@ -13,6 +13,7 @@
 #include "../utils.h"
 #include "../debug.h"
 #include "../settings.h"
+#include "acsidatatrans.h"
 #include "imagesilo.h"
 #include "floppysetup.h"
 
