@@ -1170,3 +1170,24 @@ bool Scsi::eraseMedia(void)
     return true;                                                // all good
 }
 //----------------------------------------------
+
+void Scsi::updateTranslatedBootMedia(void)
+{
+    int i, idOnBus = -1;
+    
+    for(i=0; i<8; i++) {        // find where the CE_DD is on ACSI / SCSI bus
+        if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_TRANSLATED) {
+            idOnBus = i;
+            break;
+        }
+    }
+    
+    if(idOnBus == -1) {         // don't have this media?
+        Debug::out(LOG_DEBUG, "Scsi::updateTranslatedBootMedia() - could not find CE_DD bus ID, fail");
+        return;
+    } else {
+        Debug::out(LOG_DEBUG, "Scsi::updateTranslatedBootMedia() - the bus ID of CE_DD is: %d", idOnBus);
+    }
+
+    tranBootMedia.updateBootsectorConfigWithACSIid(idOnBus);
+}

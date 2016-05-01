@@ -11,6 +11,7 @@ Download <a href="/app/debug/getlog">app log</a>.
 <option value="ll1">ll1</option>
 <option value="ll2">ll2</option>
 <option value="ll3">ll3</option>
+<option value="ikbdlogs">ll3 and ikbdlogs</option>
 </select>
 <br /><br />
 <b>HTTP Headers:</b>{{browser_headers}}

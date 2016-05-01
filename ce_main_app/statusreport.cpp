@@ -5,10 +5,12 @@
 #include <sys/ioctl.h>
 #include <errno.h>
 
+#include "utils.h"
 #include "global.h"
 #include "debug.h"
 #include "update.h"
 #include "periodicthread.h"
+#include "translated/translateddisk.h"
 #include "ikbd/ikbd.h"
 #include "floppy/imagesilo.h"
 

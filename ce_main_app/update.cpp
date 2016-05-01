@@ -152,7 +152,7 @@ void Update::deleteLocalUpdateComponents(void)
     system("rm -f /tmp/*.hex /tmp/*.zip /tmp/*.xsvf");
 }
 
-void Update::downloadUpdateList(char *remoteUrl)
+void Update::downloadUpdateList(const char *remoteUrl)
 {
     // check for existence and possibly create update dir
   	int res = mkdir(UPDATE_LOCALPATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
@@ -451,7 +451,7 @@ void Update::createNewScripts(void)
     
     //------------
     // last step: mark the version of the scripts we now have
-    s.setString((char *) "SCRIPTS_VER", appVerThis);                                 // store version of scripts we now have on disk
+    s.setString("SCRIPTS_VER", appVerThis);                                 // store version of scripts we now have on disk
     Debug::out(LOG_DEBUG, "Update::createNewScripts() - scripts updated to version %s", appVerThis);
 }
 

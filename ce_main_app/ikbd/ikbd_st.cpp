@@ -128,7 +128,7 @@ void Ikbd::processStCommands(void)
             }
         }
 
-        //ikbdLog( "Ikbd::processStCommands -- got command %02x, len: %d, cb contains %d bytes", cmd, len, cbStCommands.count);
+        ikbdLog( "Ikbd::processStCommands -- got command %02x, len: %d, cb contains %d bytes", cmd, len, cbStCommands.count);
         
         if(len == 0) {                                          // it's not GET command and we don't have this SET command defined?
             ikbdLog( "Ikbd::processStCommands -- not GET cmd, and we don't know what to do");
@@ -147,7 +147,7 @@ void Ikbd::processStCommands(void)
         }
 
         if(len > cbStCommands.count) {                          // if we don't have enough data in the buffer, quit
-            //ikbdLog( "Ikbd::processStCommands -- not enough data in buffer, quitting (%d > %d)", len, cbStCommands.count);
+            ikbdLog( "Ikbd::processStCommands -- not enough data in buffer, quitting (%d > %d)", len, cbStCommands.count);
             return;
         }
 
@@ -553,16 +553,23 @@ void Ikbd::processKeyboardData(void)
 				
 			}
 
-			if(resendTheseData) {								// if we should resend this data
-				fdWrite(fdUart, bfr, len);                      // send the whole sequence to ST
+			if(resendTheseData) {								    // if we should resend this data
+				fdWrite(fdUart, bfr, len);                          // send the whole sequence to ST
             }
             
 			continue;
+        } else {                                                    // if it's not special IKBD code, then it's just a key press
+            val = cbKeyboardData.get();                             // get data from buffer
+            bool wasHandledAsKeybJoy = false;                       // it wasn't handled as keyb joy (yet)
+            
+            if(keybJoy0 || keybJoy1) {                              // if at least one keyboard joy is enabled
+                wasHandledAsKeybJoy = handleStKeyAsKeybJoy(val);    // get if it was handled as keyb joy
+            }
+            
+            if(!wasHandledAsKeybJoy) {                              // if not handled as keyb joy, send it to ST
+                fdWrite(fdUart, &val, 1);                           // send byte to ST
+            }
         }
-
-        // if we got here, it's not a special code, just make / break keyboard code
-        val = cbKeyboardData.get();                             // get data from buffer
-        fdWrite(fdUart, &val, 1);                               // send byte to ST
     }
 }
 
@@ -677,118 +684,6 @@ void Ikbd::fillSpecialCodeLengthTable(void)
     specialCodeLen[KEYBDATA_JOY1		- KEYBDATA_SPECIAL_LOWEST] = KEYBDATA_JOY1_LEN;
 }
 
-void Ikbd::fillKeyTranslationTable(void)
-{
-    for(int i=0; i<KEY_TABLE_SIZE; i++) {
-        tableKeysPcToSt[i] = 0;
-    }
-
-    addToTable(KEY_ESC,         0x01);
-    addToTable(KEY_1,           0x02);
-    addToTable(KEY_2,           0x03);
-    addToTable(KEY_3,           0x04);
-    addToTable(KEY_4,           0x05);
-    addToTable(KEY_5,           0x06);
-    addToTable(KEY_6,           0x07);
-    addToTable(KEY_7,           0x08);
-    addToTable(KEY_8,           0x09);
-    addToTable(KEY_9,           0x0a);
-    addToTable(KEY_0,           0x0b);
-    addToTable(KEY_MINUS,       0x0c);
-    addToTable(KEY_EQUAL,       0x0d);
-    addToTable(KEY_BACKSPACE,   0x0e);
-    addToTable(KEY_TAB,         0x0f);
-    addToTable(KEY_Q,           0x10);
-    addToTable(KEY_W,           0x11);
-    addToTable(KEY_E,           0x12);
-    addToTable(KEY_R,           0x13);
-    addToTable(KEY_T,           0x14);
-    addToTable(KEY_Y,           0x15);
-    addToTable(KEY_U,           0x16);
-    addToTable(KEY_I,           0x17);
-    addToTable(KEY_O,           0x18);
-    addToTable(KEY_P,           0x19);
-    addToTable(KEY_LEFTBRACE,   0x1a);
-    addToTable(KEY_RIGHTBRACE,  0x1b);
-    addToTable(KEY_ENTER,       0x1c);
-    addToTable(KEY_LEFTCTRL,    0x1d);
-    addToTable(KEY_A,           0x1e);
-    addToTable(KEY_S,           0x1f);
-    addToTable(KEY_D,           0x20);
-    addToTable(KEY_F,           0x21);
-    addToTable(KEY_G,           0x22);
-    addToTable(KEY_H,           0x23);
-    addToTable(KEY_J,           0x24);
-    addToTable(KEY_K,           0x25);
-    addToTable(KEY_L,           0x26);
-    addToTable(KEY_SEMICOLON,   0x27);
-    addToTable(KEY_APOSTROPHE,  0x28);
-    addToTable(KEY_GRAVE,       0x2b);
-    addToTable(KEY_LEFTSHIFT,   0x2a);
-    addToTable(KEY_BACKSLASH,   0x60);
-    addToTable(KEY_Z,           0x2c);
-    addToTable(KEY_X,           0x2d);
-    addToTable(KEY_C,           0x2e);
-    addToTable(KEY_V,           0x2f);
-    addToTable(KEY_B,           0x30);
-    addToTable(KEY_N,           0x31);
-    addToTable(KEY_M,           0x32);
-    addToTable(KEY_COMMA,       0x33);
-    addToTable(KEY_DOT,         0x34);
-    addToTable(KEY_SLASH,       0x35);
-    addToTable(KEY_RIGHTSHIFT,  0x36);
-    addToTable(KEY_KPASTERISK,  0x66);
-    addToTable(KEY_LEFTALT,     0x38);
-    addToTable(KEY_SPACE,       0x39);
-    addToTable(KEY_CAPSLOCK,    0x3a);
-    addToTable(KEY_F1,          0x3b);
-    addToTable(KEY_F2,          0x3c);
-    addToTable(KEY_F3,          0x3d);
-    addToTable(KEY_F4,          0x3e);
-    addToTable(KEY_F5,          0x3f);
-    addToTable(KEY_F6,          0x40);
-    addToTable(KEY_F7,          0x41);
-    addToTable(KEY_F8,          0x42);
-    addToTable(KEY_F9,          0x43);
-    addToTable(KEY_F10,         0x44);
-    addToTable(KEY_KP7,         0x67);
-    addToTable(KEY_KP8,         0x68);
-    addToTable(KEY_KP9,         0x69);
-    addToTable(KEY_KPMINUS,     0x4a);
-    addToTable(KEY_KP4,         0x6a);
-    addToTable(KEY_KP5,         0x6b);
-    addToTable(KEY_KP6,         0x6c);
-    addToTable(KEY_KPPLUS,      0x4e);
-    addToTable(KEY_KP1,         0x6d);
-    addToTable(KEY_KP2,         0x6e);
-    addToTable(KEY_KP3,         0x6f);
-    addToTable(KEY_KP0,         0x70);
-    addToTable(KEY_KPDOT,       0x71);
-    addToTable(KEY_KPENTER,     0x72);
-    addToTable(KEY_RIGHTCTRL,   0x1d);
-    addToTable(KEY_KPSLASH,     0x65);
-    addToTable(KEY_RIGHTALT,    0x38);
-    addToTable(KEY_UP,          0x48);
-    addToTable(KEY_LEFT,        0x4b);
-    addToTable(KEY_RIGHT,       0x4d);
-    addToTable(KEY_DOWN,        0x50);
-    addToTable(KEY_HOME,        0x62);
-    addToTable(KEY_PAGEUP,      0x61);
-    addToTable(KEY_PAGEDOWN,    0x47);
-    addToTable(KEY_INSERT,      0x52);
-    addToTable(KEY_DELETE,      0x53);
-}
-
-void Ikbd::addToTable(int pcKey, int stKey)
-{
-    if(pcKey >= KEY_TABLE_SIZE) {
-        logDebugAndIkbd(LOG_ERROR, "addToTable -- Can't add pair %d - %d - out of range.", pcKey, stKey);
-        return;
-    }
-
-    tableKeysPcToSt[pcKey] = stKey;
-}
-
 void Ikbd::sendMousePosAbsolute(int fd, BYTE absButtons)
 {
     if(fd == -1) {                      // no UART open?
@@ -853,3 +748,35 @@ void Ikbd::sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
 	}
 }
 
+bool Ikbd::handleStKeyAsKeybJoy(BYTE val)
+{
+    bool keyDown    = ((val & 0x80) == 0);      // if highest bit is zero, it's key down event
+    BYTE stKey      =   val & 0x7f;             // get just the key, without highest bit
+    
+    bool isKeybJoy0 = keyJoyKeys.isKeybJoyKeyAtari(0, stKey);       // find out if it bellongs to joy0
+    bool isKeybJoy1 = keyJoyKeys.isKeybJoyKeyAtari(1, stKey);       // find out if it bellongs to joy1
+    
+    if(isKeybJoy0 && !keybJoy0) {               // it's keyb joy 0, but keyb joy 0 is not enabled, fail
+        return false;
+    }
+
+    if(isKeybJoy1 && !keybJoy1) {               // it's keyb joy 1, but keyb joy 1 is not enabled, fail
+        return false;
+    }
+    
+    if(!isKeybJoy0 && !isKeybJoy1) {            // it's not from any keyb joy, quit
+        return false;
+    }
+
+    int joyNumber = isKeybJoy0 ? 0 : 1;         // if it's from joy 0, then joy # is 0, otherwise 1
+    int pcKey = keyTranslator.stKeyToPc(stKey); // translate ST key to PC key
+
+    if(pcKey == 0) {                            // failed to translate ST key to PC key? fail
+        return false;
+    }
+
+    handleKeyAsKeybJoy(false, joyNumber, pcKey, keyDown);   // handle this key press, and it comes from ST keys (therefore first param: false)
+    return true;
+}
+
+    

@@ -14,7 +14,12 @@
 #include "../settings.h"
 #include "../utils.h"
 #include "../mounter.h"
+#include "acsidatatrans.h"
+#include "acsicommand/screencastacsicommand.h"
+#include "acsicommand/dateacsicommand.h"
+#include "settingsreloadproxy.h"
 #include "translateddisk.h"
+#include "translatedhelper.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "desktopcreator.h"
@@ -1032,7 +1037,7 @@ void TranslatedDisk::pathSeparatorHostToAtari(std::string &path)
     }
 }
 
-int TranslatedDisk::deleteDirectoryPlain(char *path)
+int TranslatedDisk::deleteDirectoryPlain(const char *path)
 {
     // if the dir is empty, it will delete it, otherwise it will fail
     int res = rmdir(path);
@@ -1040,17 +1045,23 @@ int TranslatedDisk::deleteDirectoryPlain(char *path)
     if(res == 0) {              // on success return success
         return E_OK;
     }
-    
+    Debug::out(LOG_ERROR, "TranslatedDisk::deleteDirectoryPlain rmdir(%s) : %s", path, strerror(errno));
     return EACCDN;
 }
 
 bool TranslatedDisk::isRootDir(std::string hostPath)
 {
+	// remove trailing '/' if needed
+	if(hostPath.size() > 0 && hostPath[hostPath.size() - 1] == HOSTPATH_SEPAR_CHAR) {
+		hostPath.erase(hostPath.size() - 1, 1);
+	}
+
     for(int i=2; i<MAX_DRIVES; i++) {                   // go through all translated drives
         if(!conf[i].enabled) {                          // skip disabled drives
             continue;
         }
         
+        //Debug::out(LOG_DEBUG, "TranslatedDisk::isRootDir - %s == %s ?", conf[i].hostRootPath.c_str(), hostPath.c_str());
         if(conf[i].hostRootPath == hostPath) {          // ok, this is root dir!
             Debug::out(LOG_DEBUG, "TranslatedDisk::isRootDir - hostPath: %s -- yes, it's a root dir", hostPath.c_str());
             return true;
@@ -1253,16 +1264,9 @@ void TranslatedDisk::initAsciiTranslationTable(void)
     asciiAtariToPc[184] = 'O';
 }
 
-bool TranslatedDisk::pathContainsWildCards(char *path)
+bool TranslatedDisk::pathContainsWildCards(const char *path)
 {
-    int i, len;
-    len = strlen(path);
-
-    if(len >= 2048) {                   // probably no terminating char? go only this far
-        len = 2048;
-    }
-
-    for(i=0; i<len; i++) {              // go through the string
+    for(int i=0; i<2048; i++) {         // go through the string. Limit length to 2048
         char in = path[i];
 
         if(in == 0) {                   // if it's string terminator, quit

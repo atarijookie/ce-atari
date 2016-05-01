@@ -71,6 +71,8 @@ public:
 
 	void setSdCardCapacity(DWORD capInSectors);
 	
+    void updateTranslatedBootMedia(void);
+    
 private:
     AcsiDataTrans   *dataTrans;
 

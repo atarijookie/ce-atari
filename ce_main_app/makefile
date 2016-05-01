@@ -1,5 +1,8 @@
 TARGET	= cosmosex
 
+# control verbosity. use make V=1
+V = 0
+
 #ONPC    = yes
 # in the CFLAGS use ONPC_GPIO or ONPC_HIGHLEVEL or ONPC_NOTHING
 
@@ -8,6 +11,8 @@ CC	    = gcc
 #STRIP	= strip
 CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
 CXXFLAGS = $(CFLAGS)
+DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
+# -M : with system headers, -MM : without
 
 ifeq ($(ONPC),yes)
     LDFLAGS	= -Llib -Llib -lrt -lanl -lpthread -lcurl -lcivetweb -ldl -lutil
@@ -19,6 +24,22 @@ endif
 
 # uncomment following line to get map file (ce.map)
 #LDFLAGS += -Wl,-Map,ce.map
+
+ACTUAL_CC := $(CC)
+CC_0 = @echo "$(if $(findstring .d,$@),Building dependencies for,Compiling) $<"; $(ACTUAL_CC)
+CC_1 = $(ACTUAL_CC)
+CC = $(CC_$(V))
+ACTUAL_CXX := $(CXX)
+CXX_0 = @echo "$(if $(findstring .d,$@),Building dependencies for,Compiling) $<"; $(ACTUAL_CXX)
+CXX_1 = $(ACTUAL_CXX)
+CXX = $(CXX_$(V))
+CXXL_0 = @echo "Linking $@"; $(ACTUAL_CXX)
+CXXL_1 = $(ACTUAL_CXX)
+CXX_LINK = $(CXXL_$(V))
+
+AT_0 := @
+AT_1 :=
+AT = $(AT_$(V))
 
 SUBDIR1	= config
 SUBDIR2	= native
@@ -66,6 +87,7 @@ HDRS += $(wildcard $(SUBDIR11)/*.h)
 HDRS += $(wildcard $(SUBDIR12)/*.h)
 
 OBJS = $(patsubst %.cpp,%.o,$(SRCS:.c=.o))
+DEPS = $(patsubst %.o,%.d,$(OBJS))
 
 #combine web scripts
 WEB_CSS_PATH=webroot/css
@@ -85,20 +107,43 @@ WEBCOMPONENTS = $(WEB_CSS_PATH)/combined.css.gz $(WEB_JS_PATH)/jquery-combined.j
 all:	$(TARGET)
 
 $(TARGET): $(OBJS) $(HDRS) $(WEBCOMPONENTS)
-	$(CXX) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@
+	$(CXX_LINK) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@
 #	$(STRIP) -s $@
 
 $(WEB_CSS_PATH)/combined.css.gz: ${WEB_CSS_MODULES}
-	cat $^ | gzip -f > $@
+	$(AT)cat $^ | gzip -f > $@
 
 $(WEB_JS_PATH)/zepto-combined.js.gz: $(WEB_JS_PATH)/zepto.js $(WEB_JS_PATH)/zepto.hack.js ${WEB_JS_MODULES}
-	cat $^ | gzip -f > $@
+	$(AT)cat $^ | gzip -f > $@
 
 $(WEB_JS_PATH)/jquery-combined.js.gz: $(WEB_JS_PATH)/jquery.js ${WEB_JS_MODULES}
-	cat $^ | gzip -f > $@
+	$(AT)cat $^ | gzip -f > $@
 
-clean:
-	$(RM) $(WEB_JS_PATH)/*.gz
-	$(RM) $(WEB_CSS_PATH)/*.gz
-	find . -name "*.o" -exec $(RM) {} \;
-	$(RM) *.o *~ $(TARGET)
+.PHONY:	clean depclean
+
+clean:	depclean
+	$(AT)$(RM) $(WEB_JS_PATH)/*.gz
+	$(AT)$(RM) $(WEB_CSS_PATH)/*.gz
+	$(AT)$(RM) $(OBJS)
+	$(AT)$(RM) *.o *~ $(TARGET)
+
+depclean:
+	$(AT)$(RM) $(DEPS)
+
+depend:	$(DEPS)
+
+%.o:	%.cpp %.d
+
+%.d:	%.cpp
+	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -o $@ $^
+
+%.o:	%.c %.d
+
+%.d:	%.c
+	$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $^
+
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(MAKECMDGOALS),depclean)
+-include $(DEPS)
+endif
+endif

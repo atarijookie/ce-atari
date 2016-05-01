@@ -1,4 +1,5 @@
 #include "floppyservice.h"
+#include "floppy/imagesilo.h"
 #include "debug.h"
 #include "utils.h"
 #include "ccorethread.h" 

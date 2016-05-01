@@ -10,8 +10,8 @@ CFLAGS      = -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 CFLAGS030   = -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS  = -Wl,--traditional-format -lgcc
 
-HDR      = xbra.h acsi.h scsi.h                  gemdos.h gemdos_errno.h translated.h bios.h main.h find_ce.h hdd_if.h global.h screen.h
-CSRC     = xbra.c acsi.c scsi_falcon.c scsi_tt.c gemdos.c gemdos_rw.c bios.c main.c find_ce.c hdd_if.c screen.c gemdos_pexec_lowlevel.c # gemdos_pexec.c
+HDR      = mutex.h xbra.h acsi.h scsi.h                  gemdos.h gemdos_errno.h translated.h bios.h main.h find_ce.h hdd_if.h global.h screen.h
+CSRC     = mutex.c xbra.c acsi.c scsi_falcon.c scsi_tt.c gemdos.c gemdos_rw.c bios.c main.c find_ce.c hdd_if.c screen.c gemdos_pexec_lowlevel.c # gemdos_pexec.c
 SSRC     = gemdos_asm.s bios_asm.s screenirq.s   harddrive_lowlevel.s
 
 ifeq ($(SLIM),yes)
@@ -31,7 +31,7 @@ OBJS030 = cache030.o
 $(TARGET): $(STARTUP) $(OBJS) $(OBJS030) $(SSRC) $(HDR)
 	@echo [Compiling final app] $(@:.o=.c)
 	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(OBJS) $(OBJS030) $(SSRC) $(LDFLAGS)
-	$(STRIP) -s $@
+#	$(STRIP) -s $@
 	$(PRGFLAGS) $@ --mno-fastram --mno-fastalloc --mno-fastload
 	
 cache030.o: cache030.s

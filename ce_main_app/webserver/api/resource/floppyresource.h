@@ -7,7 +7,8 @@
 #include "../../CivetServer.h"
 
 #include "iapiresource.h"
-#include "service/floppyservice.h"
+
+class FloppyService;
 
 class FloppyResource : public IApiResource {
 public:
@@ -19,4 +20,3 @@ private:
 };
 
 #endif
-

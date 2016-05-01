@@ -1,11 +1,6 @@
 #ifndef _TIMESYNC_H_
 #define _TIMESYNC_H_
 
-#define INIT_NONE           0
-#define INIT_NTP_FAILED     1
-#define INIT_DATE_NOT_SET   2
-#define INIT_OK             3
-
 void *timesyncThreadCode(void *ptr);
 
 class TimeSync 
@@ -16,7 +11,7 @@ public:
     bool sync(void);
 
 private:
-    int         iInitState;
+    enum {INIT_NONE=0, INIT_NTP_FAILED=1, INIT_DATE_NOT_SET=2, INIT_OK=3} eInitState;
     long int    lTime;
 
     bool syncByNtp(void);

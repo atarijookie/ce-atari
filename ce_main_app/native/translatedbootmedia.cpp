@@ -17,7 +17,8 @@ TranslatedBootMedia::TranslatedBootMedia()
 	memset(imageBuffer, 0, TRANSLATEDBOOTMEDIA_SIZE);	
 	
 	gotImage		= false;									// mark that we don't have the image yet
-	
+	lastUsedAcsiId  = 0xff;
+    
 	bool res = loadDataIntoBuffer();							// try to load the data from disk to buffer
 	
 	if(res) {													// if succeeded, mark that we got the image now
@@ -41,18 +42,14 @@ bool TranslatedBootMedia::loadDataIntoBuffer(void)
     // load Level 1 bootsector
     const char *bootsectorPath = NULL;
     
-    if(hwConfig.hddIface == HDD_IF_ACSI) {     // for ACSI IF
-        bootsectorPath = "/tmp/configdrive/ce_dd_st.bs";
-    } else {                            // for SCSI IF
-        bootsectorPath = "/tmp/configdrive/ce_dd_fn.bs";
-    }
+    bootsectorPath = "/tmp/configdrive/ce_dd.bs";
     f = fopen(bootsectorPath, "rb");
 
 	if(!f) {
         Debug::out(LOG_ERROR, "TranslatedBootMedia - failed to open Level 1 bootsector file: %s", bootsectorPath);
 		return false;
 	}
-    Debug::out(LOG_ERROR, "TranslatedBootMedia - loaded Level 1 bootsector file: %s", bootsectorPath);
+    Debug::out(LOG_DEBUG, "TranslatedBootMedia - loaded Level 1 bootsector file: %s", bootsectorPath);
 	
 	bytesRead = fread(&imageBuffer[0], 1, 512, f);
 	
@@ -147,6 +144,8 @@ void TranslatedBootMedia::updateBootsectorConfig(void)
 	updateBootsectorChecksum();							// update the checksum at the end
 	
     Debug::out(LOG_DEBUG, "TranslatedBootMedia - bootsector will read %d sectors, the driver will take %d kB of RAM.", (int) imageBuffer[pos + 7], (int) (totalSize / 1024));
+    
+    updateBootsectorConfigWithACSIid(lastUsedAcsiId);
 }
 
 void TranslatedBootMedia::updateBootsectorChecksum(void)
@@ -185,6 +184,8 @@ WORD TranslatedBootMedia::swapNibbles(WORD val)
 	
 void TranslatedBootMedia::updateBootsectorConfigWithACSIid(BYTE acsiId)
 {
+    lastUsedAcsiId = acsiId;            // store this ACSI ID for future usage
+
 	int pos = getConfigPosition();
 	
 	if(pos == -1) {
@@ -195,15 +196,17 @@ void TranslatedBootMedia::updateBootsectorConfigWithACSIid(BYTE acsiId)
     BYTE id;
     if(hwConfig.hddIface == HDD_IF_ACSI) {     // for ACSI - it's the ID (0 .. 7)
         id = acsiId;
-    } else {                            // for SCSI - it's the ID bit (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80)
-        id = (1 << acsiId);
+
+    	Debug::out(LOG_DEBUG, "TranslatedBootMedia::updateBootsectorConfigWithACSIid() - hddIface is ACSI, bootsector ID set to: %d", (int) id);
+    } else {                            // for SCSI - it's 8 ... 15 (XBIOS 42 DMAread, see http://toshyp.atari.org/en/00400d.html#DMAread)
+        id = (acsiId+8);
+
+    	Debug::out(LOG_DEBUG, "TranslatedBootMedia::updateBootsectorConfigWithACSIid() - hddIface is SCSI, bootsector ID set to: %d", (int) id);
     }
     
 	imageBuffer[pos + 6] = id;          // store from which ID we should read the driver sectors
 	
 	updateBootsectorChecksum();         // update the checksum at the end
-	
-	Debug::out(LOG_DEBUG, "TranslatedBootMedia - bootsector config updated with new ACSI ID set to %d", (int) acsiId);
 }
 
 int TranslatedBootMedia::getConfigPosition(void)
@@ -291,3 +294,4 @@ bool TranslatedBootMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
 	return false;								// write not supported
 }
+

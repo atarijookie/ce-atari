@@ -21,6 +21,8 @@ BYTE scsiLogNow;
 void processCosmoSoloCommands(void);
 void updateEnabledIDsInSoloMode(void);
 
+void memcpy(char *dest, char *src, int cnt);
+
 void processScsiLocaly(BYTE justCmd, BYTE isIcd)
 {
     BYTE lun;
@@ -337,13 +339,15 @@ void SCSI_Inquiry(BYTE lun)
 {
 	WORD i,xx;
 	BYTE val, firstByte;
-	
-	BYTE vendor[8]          = {"JOOKIE  "};
 
-    BYTE *inquiryName;
-    BYTE inquiryNameWithRpi[10] = {"CosmosEx  "};
-    BYTE inquiryNameSolo[10]    = {"CosmoSolo "};
-        
+    //                      0   0   0   0   0   0   0   0   001111111111222222222233333333334444 
+    //                      0   1   2   3   4   5   6   7   890123456789012345678901234567890123 
+    char inquiryData[44] = "\x00\x80\x02\x02\x27\x00\x00\x00JOOKIE  CosmosEx 0 SD   2.0001/08/16";
+	
+    char *inquiryName;
+    char inquiryNameWithRpi[10] = {"CosmosEx  "};
+    char inquiryNameSolo[10]    = {"CosmoSolo "};
+
     if(firstConfigReceived) {
         inquiryName = inquiryNameWithRpi;
     } else {
@@ -373,55 +377,25 @@ void SCSI_Inquiry(BYTE lun)
 	}
 
 	//-----------	
-	xx = cmd[4];		  									// how many bytes should be sent
+    // prepare the inquiry data
+    inquiryData[ 0] = firstByte;                            // first byte depends on LUN #
+    inquiryData[25] = '0' + sdCardID;                       // sd card id 
+    memcpy(inquiryData + 16, inquiryName,           9);     // inquiry name depends on solo or normal mode
+    memcpy(inquiryData + 32, VERSION_STRING_SHORT,  4);     // version string is fixed (compiled) in FW
+    memcpy(inquiryData + 36, DATE_STRING,           8);     // date    string is fixed (compiled) in FW
 
+	//-----------	
+	xx = cmd[4];		  									// how many bytes should be sent
+    
 	ACSI_DATADIR_READ();
 
-	for(i=0; i<xx; i++)	{		  
-		// first init the val to zero or space
-		if(i >= 8 && i<=43) {           // if the returned byte is somewhere from ASCII part of data, init on 'space' character
-		    val = ' ';
+	for(i=0; i<xx; i++)	{
+        if(i<=43) {                     // first 44 bytes come from the inquiry data array
+            val = inquiryData[i];
 		} else {                        // for other locations init on ZERO
     		val = 0;
 		}
 
-		// then for the appropriate position return the right value
-		if(i == 0) {					// PERIPHERAL QUALIFIER + PERIPHERAL DEVICE TYPE
-			val = firstByte;			// depending on LUN number
-		}
-		
-		if(i==1) {                      // 1st byte
-			val = 0x80;                 // removable (RMB) bit set
-		}
-			
-		if(i==2 || i==3) {              // 2nd || 3rd byte
-			val = 0x02;                 // SCSI level || response data format
-		}			
-				
-		if(i==4) {
-			val = 0x27;                 // 4th byte = Additional length
-		}
-				
-		if(i>=8 && i<=15) {             // send vendor (JOOKIE)
-		    val = vendor[i-8];
-		}
-			
-		if(i>=16 && i<=25) {            // send device name (CosmosEx)
-		    val = inquiryName[i-16];
-		}
-		
-		if(i == 27) {                   // send ACSI id
-			val = '0' + sdCardID;
-		}
-
-		if(i>=32 && i<=35) {            // version string
-		    val = VERSION_STRING_SHORT[i-32];
-		}
-
-		if(i>=36 && i<=43) {            // date string
-		    val = DATE_STRING[i-36];
-		}
-		
 		DMA_read(val);	
 	
 		if(brStat != E_OK) {            // if something isn't OK
@@ -501,4 +475,13 @@ void processCosmoSoloCommands(void)
     } else {                    // bad?
         PIO_read(SCSI_ST_CHECK_CONDITION);
     }    
+}
+
+void memcpy(char *dest, char *src, int cnt)
+{
+    int i;
+    
+    for(i=0; i<cnt; i++) {
+        dest[i] = src[i];
+    }
 }

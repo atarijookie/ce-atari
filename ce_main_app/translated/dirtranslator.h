@@ -5,7 +5,8 @@
 #include <map>
 
 #include "../datatypes.h"
-#include "filenameshortener.h"
+
+class FilenameShortener;
 
 class TFindStorage {
 public:
@@ -34,10 +35,10 @@ public:
     void clear(void);
 
     // convert single filename from long to short
-    bool longToShortFilename(std::string &longHostPath, std::string &longFname, std::string &shortFname);
+    bool longToShortFilename(const std::string &longHostPath, const std::string &longFname, std::string &shortFname);
 
     // convert whole path from short to long
-    void shortToLongPath(std::string &rootPath, std::string &shortPath, std::string &longPath);    // convert 'long_p~1\\sub_fo~1\\anothe~1' to 'long path/sub folder/another one'
+    void shortToLongPath(const std::string &rootPath, const std::string &shortPath, std::string &longPath);    // convert 'long_p~1\\sub_fo~1\\anothe~1' to 'long path/sub folder/another one'
 
     // call this for find first / find next for Gemdos
     bool buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, BYTE findAttribs, bool isRootDir, bool useZipdirNotFile);
@@ -48,7 +49,8 @@ private:
     TFindStorage    fsDirs;
     TFindStorage    fsFiles;
     
-    FilenameShortener *createShortener(std::string &path);
+	FilenameShortener *getShortenerForPath(std::string path);
+    FilenameShortener *createShortener(const std::string &path);
     static void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
 
     void appendFoundToFindStorage(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
