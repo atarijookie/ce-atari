@@ -1,3 +1,6 @@
+#ifndef _TRANSLATED_H_
+#define _TRANSLATED_H_
+
 // typed of devices / modules we support
 #define HOSTMOD_CONFIG				1
 #define HOSTMOD_LINUX_TERMINAL		2
@@ -11,3 +14,4 @@
 #define TRAN_CMD_SCREENCASTPALETTE  3
 // ...other commands are just function codes from gemdos.h
 
+#endif

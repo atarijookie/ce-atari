@@ -45,7 +45,7 @@ BYTE ikbd_get(BYTE* retval){
 	return TRUE;
 }
 
-BYTE ikbd_txready(){
+BYTE ikbd_txready(void){
 	ikbdtxready();
 	if((BYTE)ikbdtimeoutflag==(BYTE)0 ){
 		return TRUE;
@@ -53,10 +53,11 @@ BYTE ikbd_txready(){
 	return FALSE;
 }
 
-BYTE ikbd_disable_irq(){
+void ikbd_disable_irq(){
 	*((volatile BYTE*)0xFFFFFA15)&=0xBF;
+    
 }
 
-BYTE ikbd_enable_irq(){
+void ikbd_enable_irq(){
 	*((BYTE*)0xFFFFFA15)|=(6<<1);
 }
