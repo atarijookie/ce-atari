@@ -18,9 +18,9 @@ BYTE test_ikbd_reset_run()
 {
 	BYTE retcode=0;
 	//write reset code
-	ASSERT_SUCCESS( ikbd_ws(test_ikbd_reset_data,2), "Could not send reset command to IKBD" )
+	ASSERT_SUCCESS( ikbd_puts(test_ikbd_reset_data,2), "Could not send reset command to IKBD" )
 /*	
-	if( ikbd_ws(test_ikbd_reset_data,2)==FALSE ){
+	if( ikbd_puts(test_ikbd_reset_data,2)==FALSE ){
 		return FALSE;
 	}
 */

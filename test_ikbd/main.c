@@ -18,6 +18,7 @@
 #include "tests/ikbd_send.h"
 #include "tests/ikbd_reset.h"
 #include "tests/mouse_absolute_zero.h"
+#include "helper/ikbd.h"
 
 //--------------------------------------------------
 
@@ -97,12 +98,17 @@ void printOpResult(int res);
 //============================================================================
 //test queue
 //----------------------------------------------------------------------------
+extern TTestIf test_mouse_loadpos;
+
 TTestIf* tests[]=
 {
+/*
     &test_ikbd_txready,
     &test_ikbd_send,
     &test_ikbd_reset,
     &test_mouse_absolute_zero,
+*/    
+    &test_mouse_loadpos,
     NULL
 };
 //============================================================================
@@ -111,13 +117,24 @@ void runTests(void)
 {
     int testid=0;
     BYTE success=FALSE;
+    
+    ikbd_disable_irq();                     // disable ikbd irqs, because we're reading the data through polling
+    
     while( tests[testid]!=NULL )
     {
         success=FALSE;
         VT52_Save_pos();
-        (tests[testid]->init)();
+        
+        if(tests[testid]->init) {           // if there is an init function, call it
+            (tests[testid]->init)();
+        }
+        
         success=(tests[testid]->run)();
-        (tests[testid]->tearDown)();
+        
+        if(tests[testid]->tearDown) {       // if there is the teardown function, call it
+            (tests[testid]->tearDown)();
+        }
+        
         VT52_Load_pos();
         if( success==FALSE )
         {
@@ -130,6 +147,9 @@ void runTests(void)
         (void) Cconws("\r\n");
         testid++;
     }
+    
+    ikbd_enable_irq();                      // enable ikbd irqs again
+    ikbd_puts((const BYTE []) {0x08}, 1);   // set relative mouse reporting
 }
 
 //--------------------------------------------------
@@ -658,6 +678,14 @@ void showHexDword(DWORD val)
     showHexByte((BYTE) (val >> 16));
     showHexByte((BYTE) (val >>  8));
     showHexByte((BYTE)  val);
+}
+
+void showHexBytes(BYTE *bfr, int cnt)
+{
+    int i;
+    for(i=0; i<cnt; i++) {
+        showHexByte(bfr[i]);
+    }
 }
 
 void speedTest(void)

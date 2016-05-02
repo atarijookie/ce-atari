@@ -4,8 +4,6 @@
 #include "../helper/ikbd.h"
 #include "ikbd_txready.h"
 
-TTestIf test_ikbd_txready={&test_ikbd_txready_init,&test_ikbd_txready_run,&test_ikbd_txready_teardown};
-
 void test_ikbd_txready_init()
 {
 	(void) Cconws("     test_ikbd_txready ");
@@ -18,6 +16,4 @@ BYTE test_ikbd_txready_run()
 	return TRUE;
 }
 
-void test_ikbd_txready_teardown()
-{
-}
+TTestIf test_ikbd_txready={&test_ikbd_txready_init, &test_ikbd_txready_run, 0};
