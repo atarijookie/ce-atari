@@ -99,24 +99,6 @@ int main(void)
 	commandLong[0] = (deviceID << 5) | 0x1f;			/* cmd[0] = ACSI_id + ICD command marker (0x1f)	*/
 	commandLong[1] = 0xA0;								/* cmd[1] = command length group (5 << 5) + TEST UNIT READY (0) */ 	
 
-    WORD currentDrive		= Dgetdrv();						/* get the current drive from system */ 
-    getDriveConfig();                                     /* get translated disk configuration */ 
-   
-    
-    if(ceTranslatedDriveMap & (1 << currentDrive))      /* did we start from translated drive? */ 
-    {
-        /* abort, ptermres isn't working from translated drives */				
-        Cconws("Could not start driver from translated\r\n"); 
-        Cconws("drive.\r\n");
-        Cconws("Please copy this driver to e.g. drive C:\r\n");
-        Cconws("and start it from there.\r\n");
-        Cconws("TSRs can only be reliably loaded from\r\n");
-        Cconws("SD card or raw drives.\r\n");
-        Cconws("\33pAborted.\33q\r\n");
-        Cconin();
-    	return 0;
-	}
-        
 	//only transfer screen every 10th VBL
 	_vblskipscreen=10;
 	//transfer config every 50th frame	
