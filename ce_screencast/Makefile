@@ -9,14 +9,14 @@ LDFLAGS	= -Wl,--traditional-format -lgcc
 
 HDR	= $(wildcard *.h)
 CSRC	= $(wildcard *.c) 
-SSRC	= screenirq.s 
+SSRC	= screenirq.s cache030.s
 STARTUP	= startup.s
 
 OBJS    = $(patsubst %.c,%.o,$(CRCS))
 
 CFLAGS	+= -nostdlib -DSLIM 
 
-OBJS	 = $(patsubst %.c,%.o,$(CSRC)) screenirq.o
+OBJS	 = $(patsubst %.c,%.o,$(CSRC)) screenirq.o cache030.o
 
 $(TARGET): $(STARTUP) $(OBJS) $(HDR)
 	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(OBJS) $(LDFLAGS)

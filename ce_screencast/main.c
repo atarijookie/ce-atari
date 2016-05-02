@@ -9,6 +9,7 @@
 #include "acsi.h"
 #include "translated.h"
 #include "gemdos.h"
+#include "mutex.h"
 /*--------------------------------------------------*/
 
 void showHomeScreen(void);
@@ -28,8 +29,10 @@ BYTE      deviceID;
 BYTE commandShort[CMD_LENGTH_SHORT]	= {			0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
 BYTE commandLong[CMD_LENGTH_LONG]	= {0x1f,	0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
 
-BYTE myBuffer[4*512];
-BYTE *pBuffer;
+#define DMA_BUFFER_SIZE		512
+
+BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
+BYTE *pDmaBuffer; 
 
 BYTE prevCommandFailed;
 
@@ -54,8 +57,9 @@ extern WORD _installed;
 extern WORD _vblskipscreen;
 extern WORD _vblskipconfig;
 
-char *version = "2014-08-17"; 
+char *version = "2016-05-02"; 
 
+volatile mutex mtx;   
 /*--------------------------------------------------*/
 int main(void)
 {
@@ -71,12 +75,12 @@ int main(void)
 	
 	/* ---------------------- */
 	/* create buffer pointer to even address */
-	toEven = (DWORD) &myBuffer[0];
+	toEven = (DWORD) &dmaBuffer[0];
   
 	if(toEven & 0x0001)       /* not even number? */
 		toEven++;
   
-	pBuffer = (BYTE *) toEven; 
+	pDmaBuffer = (BYTE *) toEven; 
 
 	Clear_home();
 
@@ -115,81 +119,30 @@ int main(void)
 
 	return 0;
 }
-/*--------------------------------------------------*/
-BYTE ce_identify(BYTE ACSI_id)
-{
-  WORD res;
-  BYTE cmd[] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TRAN_CMD_IDENTIFY, 0};
-  
-  cmd[0] = (ACSI_id << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
-  memset(pBuffer, 0, 512);              	/* clear the buffer */
-
-  res = acsi_cmd(1, cmd, 6, pBuffer, 1);	/* issue the identify command and check the result */
-    
-  if(res != OK)                         	/* if failed, return FALSE */
-    return 0;
-    
-  if(strncmp((char *) pBuffer, "CosmosEx translated disk", 24) != 0) {		/* the identity string doesn't match? */
-	 return 0;
-  }
-	
-  return 1;                             /* success */
-}
-/*--------------------------------------------------*/
-void showConnectionErrorMessage(void)
-{
-//	Clear_home();
-	Cconws("Communication with CosmosEx failed.\nWill try to reconnect in a while.\n\nTo quit to desktop, press F10\n");
-	
-	prevCommandFailed = 1;
-}
-/*--------------------------------------------------*/
-BYTE findDevice()
-{
-	BYTE i;
-	BYTE key, vkey, res;
-	BYTE deviceID = 0;
-	char bfr[2];
-
-	bfr[1] = 0; 
-	Cconws("Looking for CosmosEx: ");
-
-	while(1) {
-		for(i=0; i<8; i++) {
-			bfr[0] = i + '0';
-			(void) Cconws(bfr); 
-		      
-			res = ce_identify(i);      					/* try to read the IDENTITY string */
-      
-			if(res == 1) {                           	/* if found the CosmosEx */
-				deviceID = i;                     		/* store the ACSI ID of device */
-				break;
-			}
-		}
-  
-		if(res == 1) {                             		/* if found, break */
-			break;
-		}
-      
-		Cconws(" - not found.\r\nPress any key to retry or 'Q' to quit.\r\n");
-		key = Cnecin();
-    
-		if(key == 'Q' || key=='q') {
-			return -1;
-		}
-	}
-  
-	bfr[0] = deviceID + '0';
-	Cconws("\r\nCosmosEx ACSI ID: ");
-	Cconws(bfr);
-	Cconws("\r\n\r\n");
-	return deviceID;
-}
 
 void getDriveConfig(void)
 {
     getConfig();
  
-    ceTranslatedDriveMap = pBuffer[0]<<8|pBuffer[1];
+    ceTranslatedDriveMap = pDmaBuffer[0]<<8|pDmaBuffer[1];
 
 }
+
+void logMsg(char *logMsg)
+{
+//    if(showLogs) {
+//        (void) Cconws(logMsg);
+//    }
+}
+void logMsgProgress(DWORD current, DWORD total)
+{
+//    if(!showLogs) {
+//        return;
+//    }
+
+//    (void) Cconws("Progress: ");
+//    showHexDword(current);
+//    (void) Cconws(" out of ");
+//    showHexDword(total);
+//    (void) Cconws("\n\r");
+}  

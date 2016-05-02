@@ -1,4 +1,5 @@
 #include <mint/osbind.h> 
+#include "hdd_if.h"
 #include "acsi.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
@@ -11,7 +12,7 @@ extern BYTE commandLong[CMD_LENGTH_LONG];
 
 extern WORD _vblskipscreen;
 extern WORD _vblskipconfig;
-extern BYTE *pBuffer;
+extern BYTE *pDmaBuffer;
 extern BYTE deviceID;
 
 DWORD writeScreen(BYTE command, BYTE screenmode, BYTE *bfr, DWORD cnt);
@@ -20,25 +21,25 @@ int getConfig(void);
 void screenworker()
 {
 	/* save DMA address - in case some DMA using programm is resuing its set DMA address */
-	DWORD dmaadr=getdma();
+//>	DWORD dmaadr=getdma();
 	WORD* pxPal=(WORD*)0xffff8240;
 	DWORD* pxScreen=*((DWORD*)0x44e);
 	/* send screen memory */
 	writeScreen(TRAN_CMD_SENDSCREENCAST,(*((BYTE*)0xffff8260))&3,pxScreen,32000);
 	/* send 16 ST palette entries */
-	memcpy(pBuffer,pxPal,16*2);
-	writeScreen(TRAN_CMD_SCREENCASTPALETTE,(*((BYTE*)0xffff8260))&3,pBuffer,16*2);
+	memcpy(pDmaBuffer,pxPal,16*2);
+	writeScreen(TRAN_CMD_SCREENCASTPALETTE,(*((BYTE*)0xffff8260))&3,pDmaBuffer,16*2);
 	/* set old DMA address */
-	setdma(dmaadr);
+//>	setdma(dmaadr);
 }  
    
 void configworker()
 {
 	/* save DMA address - in case some DMA using programm is resuing its set DMA address */
-	DWORD dmaadr=getdma();
+//>	DWORD dmaadr=getdma();
 	if( getConfig()>=0 )
 	{
-		_vblskipscreen=(unsigned int)pBuffer[24];
+		_vblskipscreen=(unsigned int)pDmaBuffer[24];
 		/* ensure safe values */
 		if( _vblskipscreen<2 ){
 			_vblskipscreen=2;
@@ -48,7 +49,7 @@ void configworker()
 		}    
 	}
 	/* set old DMA address */
-	setdma(dmaadr);
+//>	setdma(dmaadr);
 }  
 
 DWORD writeScreen(BYTE command, BYTE screenmode, BYTE *bfr, DWORD cnt)
@@ -66,31 +67,23 @@ DWORD writeScreen(BYTE command, BYTE screenmode, BYTE *bfr, DWORD cnt)
 		sectorCount++;
 	}
 	
-	BYTE res = acsi_cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);	// send command to host over ACSI 
-	
+	(*hdIf.cmd)(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount); 
 	/* if all data transfered, return count of all data */
-	if(res == RW_ALL_TRANSFERED) {
+	if(hdIf.success) {
 		return cnt;
 	}
 
-	/* if the result is also not partial transfer, then some other error happened, return that no data was transfered */
-	if(res != E_OK ) {
-		return 0;	
-	}
-	
 	return 0;
 } 
 
 int getConfig(void)
 {
-    WORD res;
-    
 	commandShort[0] = (deviceID << 5); 					                        // cmd[0] = ACSI_id + TEST UNIT READY (0)
 	commandShort[4] = GD_CUSTOM_getConfig;
   
-	res = acsi_cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBuffer, 1);		// issue the command and check the result
+	(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);		// issue the command and check the result
     
-    if(res != OK) {                                                             // failed to get config?
+	if(hdIf.success) {                                                             // failed to get config?
         return -1;
     }
 	return 0;
