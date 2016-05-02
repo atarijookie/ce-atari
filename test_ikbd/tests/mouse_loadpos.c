@@ -1,6 +1,7 @@
 #include <mint/osbind.h> 
 #include "../global.h"
 #include "../helper/ikbd.h"
+#include "../helper/commands.h"
 #include "../stdlib.h"
 #include "test.h"
 
@@ -9,6 +10,8 @@ void showHexBytes(BYTE *bfr, int cnt);
 void test_mouse_loadpos_init()
 {
 	(void) Cconws("     test_mouse_loadpos");
+	ikbd_disable_irq(); 	//disable KBD IRQ so TOS doesn't recieve IKBD return values
+	ikbd_reset();
 }
 
 BYTE test_mouse_loadpos_run()
@@ -47,5 +50,10 @@ BYTE test_mouse_loadpos_run()
     return TRUE;
 }
 
-TTestIf test_mouse_loadpos = {&test_mouse_loadpos_init, &test_mouse_loadpos_run, 0};
+void test_mouse_loadpos_teardown()
+{
+	ikbd_enable_irq(); 	//disable KBD IRQ so TOS doesn't recieve IKBD return values
+}
+
+TTestIf test_mouse_loadpos = {&test_mouse_loadpos_init, &test_mouse_loadpos_run, &test_mouse_loadpos_teardown};
 

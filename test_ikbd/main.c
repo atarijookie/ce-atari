@@ -102,12 +102,10 @@ extern TTestIf test_mouse_loadpos;
 
 TTestIf* tests[]=
 {
-/*
     &test_ikbd_txready,
     &test_ikbd_send,
     &test_ikbd_reset,
     &test_mouse_absolute_zero,
-*/    
     &test_mouse_loadpos,
     NULL
 };
