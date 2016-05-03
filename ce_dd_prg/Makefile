@@ -31,7 +31,7 @@ OBJS030 = cache030.o
 $(TARGET): $(STARTUP) $(OBJS) $(OBJS030) $(SSRC) $(HDR)
 	@echo [Compiling final app] $(@:.o=.c)
 	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(OBJS) $(OBJS030) $(SSRC) $(LDFLAGS)
-#	$(STRIP) -s $@
+	$(STRIP) -s $@
 	$(PRGFLAGS) $@ --mno-fastram --mno-fastalloc --mno-fastload
 	
 cache030.o: cache030.s
