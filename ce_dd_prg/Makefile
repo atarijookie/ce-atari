@@ -1,6 +1,6 @@
 TARGET  = ce_dd.prg
 SLIM    = yes
-USE_LOWELEVEL_PEXEC = yes
+USE_LOWLEVEL_PEXEC = yes
 
 # control verbosity. use make V=1 to show commands
 V = 0
@@ -45,7 +45,7 @@ CSRC     = mutex.c xbra.c acsi.c scsi_falcon.c scsi_tt.c \
            hdd_if.c screen.c
 SSRC     = gemdos_asm.s bios_asm.s screenirq.s
 
-ifeq ($(USE_LOWELEVEL_PEXEC),yes)
+ifeq ($(USE_LOWLEVEL_PEXEC),yes)
     CSRC += gemdos_pexec_lowlevel.c
     SSRC += harddrive_lowlevel.s
 else
