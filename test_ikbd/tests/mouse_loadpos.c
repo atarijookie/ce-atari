@@ -7,6 +7,28 @@
 
 void showHexBytes(BYTE *bfr, int cnt);
 
+int setAndQuery(const char *subTestName, const BYTE *setCmd, int setCmdLen, const BYTE *queryCmd, int queryCmdLen, const BYTE *expectedResponse, int expectedResponseLength)
+{
+    BYTE response[8];
+    
+    ASSERT_SUCCESS( ikbd_puts(setCmd, setCmdLen),                   subTestName )   // send SET cmd
+
+    ASSERT_SUCCESS( ikbd_puts(queryCmd, queryCmdLen),               subTestName )   // send QUERY cmd
+    ASSERT_SUCCESS( ikbd_gets(response, expectedResponseLength),    subTestName )   // get  QUERY response
+    
+    int res = memcmp(response, expectedResponse, expectedResponseLength);           // compare with expected result
+    
+    if(res != 0) {
+        (void) Cconws(" - ");
+        TEST_FAIL_REASON( subTestName );
+        (void) Cconws(": ");
+        showHexBytes(response, expectedResponseLength);
+        return FALSE;
+    }
+    
+    return TRUE;
+}
+
 void test_mouse_loadpos_init()
 {
 	(void) Cconws("     test_mouse_loadpos");
@@ -16,36 +38,27 @@ void test_mouse_loadpos_init()
 
 BYTE test_mouse_loadpos_run()
 {
+    int res;
+    //------------------
+    // set mouse to ABS mode
+    res = setAndQuery("E1", (const BYTE []) {0x09,3,0,3,0}, 5,              // set ABS mouse with max [0x300, 0x300]
+                            (const BYTE []) {0x89},         1,              // inquiry mode
+                            (const BYTE []) {0xf6, 9, 3,0, 3,0, 0,0}, 8);   // should report ABS, with max [0x300, 0x300]
+    if(!res) return FALSE;
+
     //------------------
     // set mouse to [0,0], read back
-    ASSERT_SUCCESS( ikbd_puts((const BYTE []) {0x09,0,0,0,0}, 5), "puts 1 failed" )     // set mouse pos
-    ASSERT_SUCCESS( ikbd_puts((const BYTE []) {0x89,0,0,0,0}, 5), "puts 2 failed" )     // status inquiry
-    
-    BYTE resp[8];
-    ASSERT_SUCCESS( ikbd_gets(resp, 8), "gets 1 failed" )
-    
-    BYTE res = memcmp(resp, (const BYTE []) {0xf6, 9, 0, 0, 0, 0, 0, 0}, 8);            // compare with expected result
-
-    if(res != 0) {
-        TEST_FAIL_REASON( "Wrong received data 1.\r\nData: " );
-        showHexBytes(resp, 8);
-        return FALSE;
-    }
+    res = setAndQuery("E2", (const BYTE []) {0x0e,0,0,0,0,0},    6,         // load mouse pos [0,0]
+                            (const BYTE []) {0x0d},              1,         // interrogate mouse
+                            (const BYTE []) {0xf7, 0, 0,0, 0,0}, 6);        // test the mouse pos [0,0]
+    if(!res) return FALSE;
 
     //------------------
-    // set mouse to [111,222], read back
-    ASSERT_SUCCESS( ikbd_puts((const BYTE []) {0x09,0,111,0,222}, 5),   "puts 3 failed" )   // set mouse pos
-    ASSERT_SUCCESS( ikbd_puts((const BYTE []) {0x89,0,0,0,0}, 5),       "puts 4 failed" )   // status inquiry
-
-    ASSERT_SUCCESS( ikbd_gets(resp, 8), "gets 2 failed" )
-    
-    res = memcmp(resp, (const BYTE []) {0xf6, 9, 0, 111, 0, 222, 0, 0}, 8);            // compare with expected result
-
-    if(res != 0) {
-        TEST_FAIL_REASON( "Wrong received data 2.\r\nData: " );
-        showHexBytes(resp, 8);
-        return FALSE;
-    }
+    // set mouse to [0x300,0x300], read back
+    res = setAndQuery("E3", (const BYTE []) {0x0e,0, 3,0, 3,0},  6,         // load mouse pos [0x300,0x300]
+                            (const BYTE []) {0x0d},              1,         // interrogate mouse
+                            (const BYTE []) {0xf7, 0, 3,0, 3,0}, 6);        // test the mouse pos [0x300,0x300]
+    if(!res) return FALSE;
     
     return TRUE;
 }
