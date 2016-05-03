@@ -10,12 +10,14 @@ ASFLAGS   = -m68000
 ASFLAGS030= -m68030
 LDFLAGS   = -Wl,--traditional-format
 LDLIBS    = -lgcc
+DEPFLAGS  = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 HDR     = $(wildcard *.h)
 CSRC    = $(wildcard *.c)
 SSRC    = tpl_middle_jump.s vbl.s
 STARTUP = startup.s
 
+DEPS = $(CSRC:.c=.d)
 OBJS = $(CSRC:.c=.o) $(SSRC:.s=.o)
 OBJS030 = cache030.o
 
@@ -28,8 +30,21 @@ $(TARGET): $(STARTUP) $(OBJS) $(OBJS030)
 %030.o: %030.s
 	$(AS) $(ASFLAGS030) -c -o $@ $<
 
+depend:	$(DEPS)
 
-clean:
-	rm -f $(TARGET) *~ *.o
+%.o: %.c %.d
 
-	
+%.d:	%.c
+	$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $^
+
+clean:	depclean
+	$(RM) $(TARGET) *~ *.o
+
+depclean:
+	$(RM) $(DEPS)
+
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(MAKECMDGOALS),depclean)
+-include $(DEPS)
+endif
+endif
