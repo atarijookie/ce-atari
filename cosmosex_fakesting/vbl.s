@@ -24,8 +24,8 @@ _install_vbl:
 |-------------------------------------------------    
     
 _update_con_info_vbl:
-    move.w  sr,-(SP)                | save Status Register
-    move    #0x2700,sr              | protect this from interrupts, making it almost atomic  
+    #move.w  sr,-(SP)                | save Status Register
+    #move    #0x2700,sr              | protect this from interrupts, making it almost atomic
 
     movem.l D0-A6,-(SP)             | back up registers
 
@@ -60,7 +60,7 @@ _update_con_info_vbl:
 dontUpdateConInfo:
     
     movem.l (SP)+,D0-A6             | restore registers
-    move.w  (SP)+,sr                | restore Status Register
+    #move.w  (SP)+,sr                | restore Status Register
     
     move.l  __oldVbl,-(SP)          | call original VBL routine   
     rts
