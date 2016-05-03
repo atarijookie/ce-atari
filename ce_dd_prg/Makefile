@@ -1,5 +1,6 @@
 TARGET  = ce_dd.prg
 SLIM    = yes
+USE_LOWELEVEL_PEXEC = yes
 
 #ONPC    = yes
 
@@ -10,9 +11,22 @@ CFLAGS      = -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 CFLAGS030   = -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS  = -Wl,--traditional-format -lgcc
 
-HDR      = mutex.h xbra.h acsi.h scsi.h                  gemdos.h gemdos_errno.h translated.h bios.h main.h find_ce.h hdd_if.h global.h screen.h
-CSRC     = mutex.c xbra.c acsi.c scsi_falcon.c scsi_tt.c gemdos.c gemdos_rw.c bios.c main.c find_ce.c hdd_if.c screen.c gemdos_pexec_lowlevel.c # gemdos_pexec.c
-SSRC     = gemdos_asm.s bios_asm.s screenirq.s   harddrive_lowlevel.s
+HDR      = mutex.h xbra.h acsi.h scsi.h \
+           gemdos.h gemdos_errno.h translated.h \
+           bios.h main.h find_ce.h \
+           hdd_if.h global.h screen.h
+CSRC     = mutex.c xbra.c acsi.c scsi_falcon.c scsi_tt.c \
+           gemdos.c gemdos_rw.c \
+           bios.c main.c find_ce.c \
+           hdd_if.c screen.c
+SSRC     = gemdos_asm.s bios_asm.s screenirq.s \
+           harddrive_lowlevel.s
+
+ifeq ($(USE_LOWELEVEL_PEXEC),yes)
+    CSRC += gemdos_pexec_lowlevel.c
+else
+    CSRC += gemdos_pexec.c
+endif
 
 ifeq ($(SLIM),yes)
     CFLAGS    += -nostdlib -DSLIM
