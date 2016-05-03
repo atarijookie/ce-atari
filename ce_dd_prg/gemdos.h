@@ -113,7 +113,6 @@ void initFunctionTable(void);
 
 WORD getDriveFromPath(char *path);
 BYTE isOurDrive(WORD drive, BYTE withCurrentDrive);
-void updateCeDrives(void);
 
 int32_t custom_fread ( void *sp );
 int32_t custom_fwrite( void *sp );

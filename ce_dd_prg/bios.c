@@ -17,7 +17,11 @@
 #include "main.h"
 
 extern int16_t useOldBiosHandler;
-extern WORD ceDrives;
+#ifdef MANUAL_PEXEC
+WORD ceDrives;
+#else
+extern WORD ceDrives;	/* defined in harddrive_lowlevel.s */
+#endif
 extern WORD ceMediach;
 
 extern BYTE commandShort[CMD_LENGTH_SHORT];

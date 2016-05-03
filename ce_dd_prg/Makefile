@@ -43,13 +43,14 @@ CSRC     = mutex.c xbra.c acsi.c scsi_falcon.c scsi_tt.c \
            gemdos.c gemdos_rw.c \
            bios.c main.c find_ce.c \
            hdd_if.c screen.c
-SSRC     = gemdos_asm.s bios_asm.s screenirq.s \
-           harddrive_lowlevel.s
+SSRC     = gemdos_asm.s bios_asm.s screenirq.s
 
 ifeq ($(USE_LOWELEVEL_PEXEC),yes)
     CSRC += gemdos_pexec_lowlevel.c
+    SSRC += harddrive_lowlevel.s
 else
     CSRC += gemdos_pexec.c
+    CFLAGS += -DMANUAL_PEXEC
 endif
 
 ifeq ($(SLIM),yes)
