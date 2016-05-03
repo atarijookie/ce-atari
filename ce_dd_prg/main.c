@@ -60,7 +60,7 @@ void msleep(int ms);
 
 void possiblyFixCurrentDrive(void);
 
-WORD dmaBuffer[DMA_BUFFER_SIZE/2];
+WORD dmaBuffer[DMA_BUFFER_SIZE/2];	/* declare as WORD buffer to force WORD alignment */
 
 BYTE *pDmaBuffer;
 
@@ -444,7 +444,7 @@ void showIpAddress(BYTE *bfr)
 
 void showAppVersion(void)
 {
-    static char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    static const char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     char const *buildDate = __DATE__;
     
     int year = 0, month = 0, day = 0;
