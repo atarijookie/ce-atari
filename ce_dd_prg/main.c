@@ -14,6 +14,7 @@
 #include "hdd_if.h"
 #include "translated.h"
 #include "gemdos.h"
+#include "bios.h"
 #include "main.h"
 #include "mutex.h"
 

@@ -47,7 +47,6 @@ extern BYTE fsnextIsForUs;
 BYTE getNextDTAsFromHost(void);
 DWORD copyNextDtaToAtari(void);
 
-extern WORD ceDrives;
 extern BYTE currentDrive;
 
 #define PE_LOADGO		0
