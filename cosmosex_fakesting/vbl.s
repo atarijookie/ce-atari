@@ -29,8 +29,7 @@ _update_con_info_vbl:
 
     movem.l D0-A6,-(SP)             | back up registers
 
-    move.w  _vblEnabled, d0         | read this enabled flag
-    tst.w   d0
+    tst.w   _vblEnabled             | read this enabled flag
     beq     dontUpdateConInfo       | if vblEnabled is 0, then skip our vbl routine
     
     lea     __vbl_counter, a0       | get address of conter variable
