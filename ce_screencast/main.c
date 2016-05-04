@@ -1,6 +1,8 @@
 /*--------------------------------------------------*/
 //#include <tos.h>
 #include <mint/osbind.h> 
+#include <mint/falcon.h> 
+#include <mt_gem.h>
 #include <stdio.h>
 //>#include <screen.h>
 #include <string.h>
@@ -10,6 +12,7 @@
 #include "translated.h"
 #include "gemdos.h"
 #include "mutex.h"
+#include "find_ce.h"
 /*--------------------------------------------------*/
 
 void showHomeScreen(void);
@@ -20,6 +23,7 @@ void showConnectionErrorMessage(void);
 BYTE findDevice(void);
 void getDriveConfig(void);
 extern void getConfig(void); 
+BYTE checkrez(void);
 
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
 BYTE ce_identify(BYTE ACSI_id);
@@ -57,6 +61,8 @@ extern WORD _installed;
 extern WORD _vblskipscreen;
 extern WORD _vblskipconfig;
 
+extern BYTE machine;
+
 char *version = "2016-05-02"; 
 
 volatile mutex mtx;   
@@ -90,12 +96,33 @@ int main(void)
 	/* ---------------------- */
 	/* search for device on the ACSI bus */
 	deviceID=findDevice();
-	if( deviceID == (BYTE)-1 ){
+	if( deviceID == FALSE && 0==1 ){
     	(void) Cconws("Quit."); 		
 	    Super((void *)OldSP);  			      /* user mode */
 		return 0;
 	}
 	/* ----------------- */
+
+	if( !checkrez() )
+	{
+		(void) Cconws("\r\n");
+		(void) Cconws("Wrong resolution!\r\n");
+		(void) Cconws("Only the following resolutions\r\n");
+		(void) Cconws("are supported:\r\n");
+		(void) Cconws("\r\n");
+		(void) Cconws("320*200*16\r\n");
+		(void) Cconws("640*200*4\r\n");
+		(void) Cconws("640*200*2\r\n");
+		(void) Cconws("\r\n");
+		(void) Cconws("Screencast not installed.\r\n");
+    	(void) Cconws("Press any key to quit, T to try anyway.\r\n"); 		
+		key=Cnecin();
+		if( key!='t' ) 
+		{
+	    	Super((void *)OldSP);  			      /* user mode */
+			return 0;
+		}
+	}
 
 	/* now set up the acsi command bytes so we don't have to deal with this one anymore */
 	commandShort[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
@@ -146,3 +173,48 @@ void logMsgProgress(DWORD current, DWORD total)
 //    showHexDword(total);
 //    (void) Cconws("\n\r");
 }  
+
+BYTE checkrez(void)
+{
+ 	short vdi_work_in[11] = {1,1,1,1,1,1,1,1,1,1,2};
+	short vdi_work_out[57];
+	VdiHdl vdi_handle;
+	int scr_x, scr_y, colors;
+	BYTE result=FALSE;
+
+   	v_opnvwk(vdi_work_in, &vdi_handle, vdi_work_out);
+	v_clsvwk(vdi_handle);
+
+    scr_x=vdi_work_out[0]+12;
+	scr_y=vdi_work_out[1]+1;
+	colors=vdi_work_out[13];
+//	colorsall=vdi_work_out[39];
+
+//>	printf("detected %d*%d*%d\r\n",scr_x,scr_y,colors);
+
+	switch(machine)
+	{
+		case MACHINE_FALCON:
+			//check screen buffer size
+			if( VgetSize( VsetMode(-1) )!=32000 )
+			{
+				return FALSE;
+			}
+		case MACHINE_ST:
+		case MACHINE_TT:
+			if( scr_x==320 && scr_y==200 && colors==16 )
+			{
+				return TRUE;				
+			}   			
+			if( scr_x==640 && scr_y==200 && colors==4 )
+			{
+				return TRUE;				
+			}   			
+			if( scr_x==640 && scr_y==400 && colors==2 )
+			{
+				return TRUE;				
+			}   			
+			break;
+	}
+	return FALSE;				
+}
