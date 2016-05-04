@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 expandtab
 //--------------------------------------------------
 #include <mint/osbind.h> 
 #include <stdio.h>
@@ -24,6 +25,8 @@ int  tryReceive0206(int handle, int line);
 
 void doTest0208    (BYTE tcpNotUdp);
 
+void doTest020a(void);
+
 void doTest0210    (WORD testNumber);
 int  sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle, BYTE getBlockNotNdb);
 int  getCab        (int handle, CAB *cab);
@@ -49,7 +52,7 @@ void doTest02(void)
     // CNget_NDB
     doTest0202(1, 1);   // TCP
     doTest0202(0, 1);   // UDP
-    
+
     // CNget_block
     doTest0202(1, 0);   // TCP
     doTest0202(0, 0);   // UDP
@@ -61,7 +64,9 @@ void doTest02(void)
     // CNgetinfo
     doTest0208(1);      // TCP
     doTest0208(0);      // UDP
-    
+
+    // CNget_char
+    doTest020a();
     //----------------------------
     /*
     TCP_ACTIVE : remote host and port must be specified.
@@ -462,6 +467,58 @@ test0208end:
     } else {
         UDP_close(handle);
     }    
+}
+
+/* Test020A : only CNget_char() */
+void doTest020a()
+{
+    static const int byteCount = 5000;
+    int handle, res;
+    int i;
+
+    out_test_header(0x020a, "TCP CNget_char");
+    handle = TCP_open(SERVER_ADDR, SERVER_PORT_START, 0, byteCount/2);
+
+    if(handle < 0) {
+        out_result_error_string(0, handle, "open failed");
+        return;
+    }
+
+    res = TCP_send(handle, wBuf, byteCount/2);
+    if(res != E_NORMAL) {
+        out_result_error_string(0, res, "send failed");
+        TCP_close(handle, 0, 0);
+        return;
+    }
+
+    for(i = 0; i < byteCount;) {
+        int16 c = CNget_char(handle);
+        if(c >= 0) {
+            if(c != wBuf[i]) {  // DATA mismatch !
+                out_result_error_string(0, i, "CNget_char() data mismatch");
+                break;
+            }
+            i++;
+        } else if(c == E_NODATA) {
+            // wait for more
+            DWORD ts = getTicks();
+            while(getTicks() < ts + 10);
+        } else {
+            out_result_error_string(0, c, "CNget_char()");
+            break;
+        }
+        if(i == byteCount/2 - 50) {
+            res = TCP_send(handle, wBuf+byteCount/2, byteCount/2);
+            if(res != E_NORMAL) {
+                out_result_error_string(0, res, "2nd send failed");
+                break;
+            }
+        }
+    }
+    if(i == byteCount) {
+        out_result(1);
+    }
+    TCP_close(handle, 0, 0);
 }
 
 void doTest0210(WORD testNumber)
