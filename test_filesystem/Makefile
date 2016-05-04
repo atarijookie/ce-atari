@@ -5,24 +5,20 @@ CC		= m68k-atari-mint-gcc
 STRIP	= m68k-atari-mint-strip
 PRGFLAGS= m68k-atari-mint-flags
 CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar -nostdlib 
-LDFLAGS	= -Wl,--traditional-format -lgcc
+LDFLAGS	= -Wl,--traditional-format
+LDLIBS	= -lgcc
 
 HDR		= stdlib.h out.h
 CSRC	= stdlib.c out.c main.c test01.c test02.c test03.c test04.c test05.c
 SSRC	= 
 STARTUP	= startup.s
 
-OBJS = $(patsubst %.c,%.o,$(CSRC))
+OBJS = $(CSRC:.c=.o) $(SSRC:.s=.o)
 
-$(TARGET): $(STARTUP) $(OBJS) $(SSRC) $(HDR)
-	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(OBJS) $(SSRC) $(LDFLAGS)
+$(TARGET): $(STARTUP) $(OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 	$(STRIP) -s $@
 	$(PRGFLAGS) $@ --mno-fastram --mno-fastalloc --mno-fastload
-	
-%.o: %.c 
-	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(TARGET) *~ *.o
-
-	
+	$(RM) $(TARGET) *~ *.o
