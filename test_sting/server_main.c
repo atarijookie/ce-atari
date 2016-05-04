@@ -15,6 +15,7 @@
 
 int createListeningSocket(int port, int tcpNotUdp);
 int acceptConnection(int listenFd);
+int connectToHost(char *host, int port, int tcpNotUdp);
 
 #define LISTEN_PORT_START   10000
 
@@ -50,7 +51,7 @@ typedef struct {
     int lastSendTime;
 
     struct sockaddr_in si_other;
-    int                slen;
+    socklen_t          slen;
 } Tsock1conf;
 
 typedef struct {
@@ -103,7 +104,7 @@ unsigned char gBfrIn[BFR_SIZE];
 
 int main(int argc, char *argv[])
 {
-    printf("\n\n");
+	printf("usage: %s [server]\ndefault is client mode\n\n", argv[0]);
 
     int asClient = 1;
     if(argc > 1) {
@@ -117,6 +118,7 @@ int main(int argc, char *argv[])
     } else {
         serverMain();
     }
+	return 0;
 }
 
 //----------------------------------------
@@ -160,12 +162,13 @@ void serverMain(void)
 // socket 0: echo socket
 void handleSocket0(int *dataFd, int port, int readCount, int tcpNotUdp)
 {
+	(void)port;
     int rcnt = (readCount < BFR_SIZE) ? readCount : BFR_SIZE;
 
     int res;
     
     struct sockaddr_in si_other;
-    int                slen = sizeof(si_other);
+    socklen_t          slen = sizeof(si_other);
 
     // read
     if(tcpNotUdp) {     // TCP?
@@ -231,6 +234,8 @@ void handleSocket1(int *dataFd, int port, Tsock1conf *sc, int readCount, int tcp
 
 void sock1close(int *dataFd, int port, Tsock1conf *sc, int tcpNotUdp)
 {
+	(void)port;
+
     if(*dataFd > 0 && tcpNotUdp) {
         close(*dataFd);
         *dataFd = 0;
@@ -242,6 +247,8 @@ void sock1close(int *dataFd, int port, Tsock1conf *sc, int tcpNotUdp)
 
 void sock1send(int *dataFd, int port, Tsock1conf *sc, int tcpNotUdp)
 {
+	(void)port;
+
     if(sc->blockCount <= 0) {                 // nothing to send? quit
         return;
     }
@@ -268,6 +275,8 @@ void sock1send(int *dataFd, int port, Tsock1conf *sc, int tcpNotUdp)
 
 void handleSocket2(int *dataFd, int port, int readCount, int tcpNotUdp)
 {
+	(void)port;
+
     if(readCount < 2) {
         printf("handleSocket2 - not enough data\n");
         return;
@@ -275,7 +284,7 @@ void handleSocket2(int *dataFd, int port, int readCount, int tcpNotUdp)
 
     int res;
     struct sockaddr_in si_other;
-    int                slen = sizeof(si_other);
+    socklen_t          slen = sizeof(si_other);
 
     // read
     if(tcpNotUdp) {     // TCP?
@@ -332,7 +341,7 @@ void handleSocket2(int *dataFd, int port, int readCount, int tcpNotUdp)
         sendto(*dataFd, bigBuf,  strlen(bigBuf), 0, (struct sockaddr*) &si_other, slen);
     }
 
-printf("Data sent: %d (0x%x)\n", strlen(bigBuf), strlen(bigBuf));    
+printf("Data sent: %lu (0x%lx)\n", strlen(bigBuf), strlen(bigBuf));
 
 // close the socket
 closeSock2:
@@ -358,7 +367,7 @@ void handleSocket3(int *dataFd, int port, Tsock3conf *sc, int readCount, int tcp
 
     int res;
     struct sockaddr_in si_other;
-    int                slen = sizeof(si_other);
+    socklen_t          slen = sizeof(si_other);
 
     // read
     if(tcpNotUdp) {     // TCP?
@@ -381,6 +390,8 @@ void handleSocket3(int *dataFd, int port, Tsock3conf *sc, int readCount, int tcp
 
 void closeSock3(int *dataFd, int port, Tsock3conf *sc, int tcpNotUdp)
 {
+	(void)port;
+
     if(*dataFd > 0 && tcpNotUdp) {
         printf("closeSock3 - closed socket %d\n", *dataFd);
         close(*dataFd);
@@ -576,7 +587,7 @@ int acceptConnection(int listenFd)
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(struct timeval));
 
     int flags = fcntl(fd, F_GETFL, 0);                              // get flags
-    int ires  = fcntl(fd, F_SETFL, flags | O_NONBLOCK);             // set it as non-blocking
+    (void)fcntl(fd, F_SETFL, flags | O_NONBLOCK);             // set it as non-blocking
 
     return fd;
 }
@@ -609,7 +620,7 @@ int createListeningSocket(int port, int tcpNotUdp)
     }
 
     int flags = fcntl(fd, F_GETFL, 0);                              // get flags
-    int ires  = fcntl(fd, F_SETFL, flags | O_NONBLOCK);             // set it as non-blocking
+    (void)fcntl(fd, F_SETFL, flags | O_NONBLOCK);             // set it as non-blocking
 
     printf("Created %s socket on port %d (fd = %d)\n", tcpNotUdp ? "TCP" : "UDP", port, fd);
     return fd;
@@ -618,8 +629,6 @@ int createListeningSocket(int port, int tcpNotUdp)
 void handleSocket20(void)
 {
     int res;
-    struct sockaddr_in si_other;
-    int                slen = sizeof(si_other);
 
     res = read(fdData20, gBfrIn, 6);    // read
 
@@ -705,7 +714,7 @@ void testSock0(int portOffset, int tcpNotUdp)
 
     int gotBytes;
     memset(gBfrIn, 0, ECHO_SIZE);
-    gotBytes = readLoop(s, gBfrIn, ECHO_SIZE, 5000);            // receive input buffer
+    gotBytes = readLoop(s, (char *)gBfrIn, ECHO_SIZE, 5000);            // receive input buffer
     close(s);
 
     int match = memcmp(gBfrIn, gBfrOut, ECHO_SIZE);
@@ -741,7 +750,7 @@ void testSock1(int portOffset, int tcpNotUdp)
 
     int gotBytes;
     memset(gBfrIn, 0, ECHO_SIZE);
-    gotBytes = readLoop(s, gBfrIn, SOCK1_BLOCKCOUNT * SOCK1_BLOCKLENGTH, (SOCK1_BLOCKCOUNT + 1) * SOCK1_BLOCKPAUSE);    // receive input buffer
+    gotBytes = readLoop(s, (char *)gBfrIn, SOCK1_BLOCKCOUNT * SOCK1_BLOCKLENGTH, (SOCK1_BLOCKCOUNT + 1) * SOCK1_BLOCKPAUSE);    // receive input buffer
     close(s);
 
     printf("testSock%d: received %d bytes, wanted %d bytes\n", portOffset, gotBytes, SOCK1_BLOCKCOUNT * SOCK1_BLOCKLENGTH);
@@ -793,13 +802,14 @@ void testSock2(int portOffset, int tcpNotUdp)
 
     int gotBytes;
     memset(gBfrIn, 0, BFR_SIZE);
-    gotBytes = readLoop(s, gBfrIn, BFR_SIZE, 3000);         // receive input buffer
+    gotBytes = readLoop(s, (char *)gBfrIn, BFR_SIZE, 3000);         // receive input buffer
     close(s);
+	(void)gotBytes;
 
     int gotLines = 0;
     int linesGood = 0, linesBad = 0;
 
-    char *pBfr = gBfrIn;
+    char *pBfr = (char *)gBfrIn;
     while(1) {
         int lineLen = 0;
         char *eol   = strchr(pBfr, '\n');
@@ -893,7 +903,7 @@ void testUdpReceiving(void)
     sleep(1);                       // wait a second, just to be sure
 
     struct sockaddr_in si_other;
-    int                slen = sizeof(si_other);
+    socklen_t          slen = sizeof(si_other);
     int                count, res;
 
     for(i=0; i<3; i++) {
