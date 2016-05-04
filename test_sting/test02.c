@@ -123,37 +123,29 @@ void doTest0200(BYTE tcpNotUdp)
     
     int toReceive = 1000;
     int idx = 0;
-    int mismatch = 0;
+    WORD mismatch = 0;
     
-    while(1) {
-        // nothing more to receive? quit
-        if(toReceive <= 0) {
-
-            if(!mismatch) {         // no mismatch?   good
-                out_result(1);
-            } else {                // data mismatch? fail
-                out_result_string(0, "received enough data, but mismatch");
-            }
-             
-            goto test0200end;
-        }
-    
-        //----------
+    while(toReceive > 0) { // nothing more to receive? quit
         // something to receive?
-        int gotBytes = CNbyte_count(handle);    // how much data we have?
-        if(gotBytes > 0) {
+        int availBytes = CNbyte_count(handle);    // how much data we have?
+        if(availBytes > 0) {
             int i, a;
             
-            for(i=0; i<gotBytes; i++) {         // try to receive it all
+            for(i=0; i<availBytes; i++) {         // try to receive it all
                 a = CNget_char(handle);
                 
                 if(a != wBuf[idx]) {            // check if the data is matching the sent data
-                    mismatch = 1;
+                    mismatch++;
                 }
                 idx++;
+                toReceive--;
+                // check that bytes not consumed are still available !
+                int newAvailBytes = CNbyte_count(handle);
+                if(newAvailBytes < availBytes - i) {
+                    out_result_error_string(0, availBytes - i - newAvailBytes, "CNbyte_count() mismatch");
+                    goto test0200end;
+                }
             }
-            
-            toReceive -= gotBytes;              // now we need to receive less
         }    
         
         //----------
@@ -165,7 +157,12 @@ void doTest0200(BYTE tcpNotUdp)
             goto test0200end;
         }
     }
-    
+
+    if(mismatch == 0) {         // no mismatch?   good
+        out_result(1);
+    } else {                // data mismatch? fail
+        out_result_error_string(0, mismatch, "received enough data, but mismatch");
+    }
 test0200end:
     if(tcpNotUdp) {
         TCP_close(handle, 0, 0);
