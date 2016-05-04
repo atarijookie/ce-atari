@@ -83,7 +83,7 @@ int getConfig(void)
   
 	(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);		// issue the command and check the result
     
-	if(hdIf.success) {                                                             // failed to get config?
+	if(!hdIf.success) {                                                   // failed to get config?
         return -1;
     }
 	return 0;
