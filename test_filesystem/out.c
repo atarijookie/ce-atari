@@ -255,7 +255,7 @@ void deinitBuffer(void)
 void byteToHex( BYTE val, char *bfr)
 {
     int hi, lo;
-    char table[16] = {"0123456789ABCDEF"};
+    static const char table[16] = {"0123456789ABCDEF"};
     
     hi = (val >> 4) & 0x0f;;
     lo = (val     ) & 0x0f;
