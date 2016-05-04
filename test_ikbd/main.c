@@ -98,6 +98,7 @@ void printOpResult(int res);
 //============================================================================
 //test queue
 //----------------------------------------------------------------------------
+extern TTestIf test_mouse_absolute_zero;
 extern TTestIf test_mouse_loadpos;
 
 TTestIf* tests[]=
@@ -111,12 +112,16 @@ TTestIf* tests[]=
 };
 //============================================================================
 
+int testLine;
+
 void runTests(void)
 {
     int testid=0;
     BYTE success=FALSE;
     
     ikbd_disable_irq();                     // disable ikbd irqs, because we're reading the data through polling
+    
+    testLine = 5;
     
     while( tests[testid]!=NULL )
     {
@@ -144,6 +149,8 @@ void runTests(void)
         }
         (void) Cconws("\r\n");
         testid++;
+        
+        testLine++;
     }
     
     ikbd_enable_irq();                      // enable ikbd irqs again
@@ -261,7 +268,8 @@ int main(void)
     // ---------------------- 
     runTests();
 
-    key = Cnecin();
+    (void) Cconws("Done. Press any key to terminate.\r\n");
+    Cnecin();
 
     Super((void *)OldSP);  			      			// user mode 
 
@@ -668,6 +676,12 @@ void showHexByte(BYTE val)
     tmp[2] = 0;
     
     (void) Cconws(tmp);
+}
+
+void showHexWord(WORD val)
+{
+    showHexByte((BYTE) (val >>  8));
+    showHexByte((BYTE)  val);
 }
 
 void showHexDword(DWORD val)
