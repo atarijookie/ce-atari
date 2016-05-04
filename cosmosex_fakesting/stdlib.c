@@ -1,10 +1,10 @@
 #include <mint/sysbind.h>
 #include <mint/osbind.h>
 
+#include "vbl.h"
 #include "stdlib.h"
 
 BYTE showHex_toLogNotScreen;
-extern WORD fromVbl;                    // this is non-zero when acsi_cmd is called from VBL (no need for Supexec() then)
 
 void *memcpy ( void * destination, const void * source, int num )
 {

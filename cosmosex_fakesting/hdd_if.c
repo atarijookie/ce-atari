@@ -10,6 +10,7 @@
 #include "acsi.h"
 #include "hdd_if.h"
 #include "stdlib.h"
+#include "vbl.h"
 
 THDif hdIf;
 
@@ -21,7 +22,6 @@ BYTE  gl_cmdLength;
 BYTE *gl_buffer;
 WORD  gl_sectorCount;
 
-extern WORD fromVbl;                    // this is non-zero when acsi_cmd is called from VBL (no need for Supexec() then)
 static void hddIfCmd_as_super(void);
 // -------------------------------------- 
 // call this from user mode
