@@ -159,10 +159,10 @@ bool IcmpWrapper::receive(void)
     //-----------------------
     // receive the data
     // recvfrom will receive only one ICMP packet, even if there are more than 1 packets waiting in socket
-    struct sockaddr src_addr;
-    int addrlen = sizeof(struct sockaddr);
+    struct sockaddr_in src_addr;
+    socklen_t addrlen = sizeof(struct sockaddr);
 
-    int res = recvfrom(rawSockFd, recvBfr, RECV_BFR_SIZE, MSG_DONTWAIT, (struct sockaddr *) &src_addr, (socklen_t *) &addrlen);
+    ssize_t res = recvfrom(rawSockFd, recvBfr, RECV_BFR_SIZE, MSG_DONTWAIT, (struct sockaddr *) &src_addr, &addrlen);
 
     if(res == -1) {                 // if recvfrom failed, no data
         if(errno != EAGAIN && errno != EWOULDBLOCK) {
@@ -193,8 +193,7 @@ bool IcmpWrapper::receive(void)
     d->data[8] = 128;                           // TTL
     d->data[9] = ICMP;                          // protocol
 
-    struct sockaddr_in *sa_in = (struct sockaddr_in *) &src_addr;       // cast sockaddr to sockaddr_in
-    Utils::storeDword(d->data + 12, ntohl(sa_in->sin_addr.s_addr));     // data[12 .. 15] - source IP
+    Utils::storeDword(d->data + 12, ntohl(src_addr.sin_addr.s_addr));     // data[12 .. 15] - source IP
     Utils::storeDword(d->data + 16, localIp);                           // data[16 .. 19] - destination IP 
 
     WORD checksum = TRawSocks::checksum((WORD *) d->data, 20);
