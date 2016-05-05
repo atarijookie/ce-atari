@@ -471,20 +471,14 @@ void doTest020a()
 {
     static const int byteCount = 5000;
     int handle, res;
-    int i;
+    int i;      // received bytes
+    int sentBytes = 0;
 
     out_test_header(0x020a, "TCP CNget_char");
-    handle = TCP_open(SERVER_ADDR, SERVER_PORT_START, 0, byteCount/2);
+    handle = TCP_open(SERVER_ADDR, SERVER_PORT_START, 0, 1024);
 
     if(handle < 0) {
         out_result_error_string(0, handle, "open failed");
-        return;
-    }
-
-    res = TCP_send(handle, wBuf, byteCount/2);
-    if(res != E_NORMAL) {
-        out_result_error_string(0, res, "send failed");
-        TCP_close(handle, 0, 0);
         return;
     }
 
@@ -497,19 +491,26 @@ void doTest020a()
             }
             i++;
         } else if(c == E_NODATA) {
-            // wait for more
-            DWORD ts = getTicks();
-            while(getTicks() < ts + 10);
-        } else {
-            out_result_error_string(0, c, "CNget_char()");
-            break;
-        }
-        if(i == byteCount/2 - 50) {
-            res = TCP_send(handle, wBuf+byteCount/2, byteCount/2);
-            if(res != E_NORMAL) {
-                out_result_error_string(0, res, "2nd send failed");
-                break;
+            if(sentBytes <= i) {
+                // need to send bytes before receiving them !
+                // generate pseudo random number between 1 and 1009
+                int random = 1 + (int)(getTicks() & 63) * 16;
+                if(sentBytes + random > byteCount)
+                    random = byteCount - sentBytes;
+                res = TCP_send(handle, wBuf+sentBytes, random);
+                if(res != E_NORMAL) {
+                    out_result_error_string(0, res, "send failed");
+                    break;
+                }
+                sentBytes += random;
+            } else {
+                // wait for more
+                DWORD ts = getTicks();
+                while(getTicks() < ts + 10);
             }
+        } else {
+            out_result_error_string(0, c, "CNget_char() ERR");
+            break;
         }
     }
     if(i == byteCount) {
