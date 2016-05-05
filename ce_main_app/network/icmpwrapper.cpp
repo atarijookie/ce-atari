@@ -166,13 +166,17 @@ bool IcmpWrapper::receive(void)
 
     if(res == -1) {                 // if recvfrom failed, no data
         if(errno != EAGAIN && errno != EWOULDBLOCK) {
-            Debug::out(LOG_DEBUG, "IcmpWrapper::receive() - recvfrom() failed, errno: %d", errno);
+            Debug::out(LOG_ERROR, "IcmpWrapper::receive() - recvfrom() failed, errno: %d", errno);
         } 
 
+        return false;
+    } else if (res == 0) {
+        Debug::out(LOG_ERROR, "IcmpWrapper::receive() - recvfrom() returned 0");
         return false;
     }
 
     // res now contains length of ICMP packet (header + data)
+    Debug::out(LOG_DEBUG, "IcmpWrapper::receive() %d bytes from %s", res, inet_ntoa(src_addr.sin_addr));
 
     //-----------------------
     // parse response to the right structs
