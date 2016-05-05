@@ -277,6 +277,7 @@ int32_t custom_fwrite( void *sp )
 		if(count <= spaceLeft) {										// the whole new data would fit in our buffer 
 			memcpy(&fb->wBuf[ fb->wCount ], buffer, count);				// copy in the data, update the data counter, and return the written count 
 			fb->wCount += count;
+			fb->currentPos += count;
 			return count;
 		} else {														// the new data won't fit in the current (not empty) buffer 
 			WORD firstPart	= spaceLeft;								// store to buffer what we could store to make it full 
@@ -290,6 +291,7 @@ int32_t custom_fwrite( void *sp )
 			memcpy(&fb->wBuf[0], buffer + firstPart, rest);				// copy the rest to buffer, update data counter 
 			fb->wCount = rest;
 			
+			fb->currentPos += count;
 			return count;
 		}		
 	} else {															// if writing more than size of our buffer 
@@ -345,6 +347,7 @@ int32_t custom_fwrite( void *sp )
 			memcpy(&fb->wBuf[ 0 ], buffer, remCount);					// copy data to current buffer 
 			fb->wCount += remCount;										// calculate the new data count 
 
+			fb->currentPos += count;
 			return count;												
 		} else {														// if the remaining data count is more that we can buffer 
 			// transfer the remaining data in a loop 
@@ -367,10 +370,12 @@ int32_t custom_fwrite( void *sp )
 				remCount		-= res;									// decrease the count that is remaining 
 
 				if(res != thisWriteSizeBytes) {                         // failed to write more data? return the count of data written 
+					fb->currentPos += bytesWritten;
 					return bytesWritten;
 				}
 			}		
 			
+			fb->currentPos += bytesWritten;
 			return bytesWritten;										// return how much we've written total 
 		}
 	}
