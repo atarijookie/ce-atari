@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 tabstop=4 softtabstop=4 expandtab
 #include <string.h>
 #include <stdio.h>
 
@@ -75,13 +76,13 @@ int IcmpWrapper::getEmptyIndex(void) {
     int   oldestIndex   = 0;
     
     for(i=0; i<MAX_STING_DGRAMS; i++) {     // try to find empty slot
+        if(dgrams[i].isEmpty()) {           // found empty? return it
+            return i;
+        }
+
         if(dgrams[i].time < oldestTime) {   // found older item than we had found before? store index
             oldestTime  = dgrams[i].time;
             oldestIndex = i;
-        }
-    
-        if(dgrams[i].isEmpty()) {           // found empty? return it
-            return i;
         }
     }
 
