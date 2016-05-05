@@ -131,7 +131,7 @@ void showMenu(void)
 
 void getServerIp(void)
 {
-    (void) Cconws("Enter server IP: ");
+    (void) Cconws("Enter server IP (default " SERVER_ADDR_DEFAULT_STRING ") : ");
 
     char inIp[20];
     memset(inIp, 0, 20);
