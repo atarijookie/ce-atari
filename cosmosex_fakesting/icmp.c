@@ -15,6 +15,7 @@
 #include "icmp.h"
 #include "con_man.h"
 #include "hdd_if.h"
+#include "vbl.h"
 
 #define  M_YEAR    16
 #define  M_MONTH   11
@@ -138,8 +139,13 @@ int16 ICMP_handler (int16 (* handler) (IP_DGRAM *), int16 flag)
             if(existing != -1) {                    // handler already exists? fail
                 return FALSE;
             }
-      
+
             icmpHandlers[empty] = (DWORD) handler;  // store handler
+            // now that a ICMP handler is installed, we need to make sure VBL
+            // is installed
+            if(!vblInstalled) {
+                 Supexec(install_vbl);
+            }
             return TRUE;
         //--------------------------------
         

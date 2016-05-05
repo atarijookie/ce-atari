@@ -11,6 +11,7 @@
 #include "con_man.h"
 #include "icmp.h"
 #include "setup.h"
+#include "vbl.h"
 
 //---------------------
 // ACSI / CosmosEx stuff
@@ -52,7 +53,6 @@ static void initConInfoStruct(int i);
 int tcpUdpGotSomeConnection(void);      // return TRUE if there is a valid connection (in or out), return FALSE otherwise
 int icmpGotSomeHandler     (void);      // return TRUE if there is a valid ICMP handler, return FALSE otherwise
 
-extern WORD fromVbl;                    // if non-zero, then update_con_info() was called from VBL
 //--------------------------------------
 // connection info function
 

@@ -22,8 +22,7 @@
 #include "stdlib.h"
 #include "setup.h"
 #include "find_ce.h"
-
-void install_vbl(void);
+#include "vbl.h"
 
 void showAppVersion(void);
 int  getIntFromStr(const char *str, int len);
@@ -60,8 +59,6 @@ BYTE *pDmaBuffer;
 
 DWORD localIP;
 WORD  requiredVersion;
-
-extern WORD vblEnabled;         // set to 0 to disable my VBL execution (other VBL routines will run)
 
 void initJumpTable(void);
 
@@ -126,8 +123,13 @@ int main(void)
 	}
 
     install();
+
+    /* do not install vbl handler now, wait until we need it :
+       when an ICMP handler is installed. All other STing functions
+       are based on polling
     Supexec(install_vbl);
     vblEnabled = 1;
+    */
     
     (void) Cconws("Driver was installed...");
 

@@ -2,9 +2,9 @@
 
     .globl  _install_vbl
     .globl  _update_con_info
-    .globl  _update_con_info_vbl
     .globl  _fromVbl
     .globl  _vblEnabled
+    .globl  _vblInstalled
     
 |-------------------------------------------------
 
@@ -13,24 +13,24 @@
 _flock      = 0x43e
 
 _install_vbl:
-    movem.l D0-A6,-(SP)
+    ;movem.l D0-A6,-(SP)
 
     move.l  0x70, __oldVbl
     move.l  #_update_con_info_vbl,0x70      | install VBL   
+	move.w	#1,_vblInstalled
 
-    movem.l (SP)+,D0-A6
+    ;movem.l (SP)+,D0-A6
     rts
 
 |-------------------------------------------------    
     
 _update_con_info_vbl:
-    move.w  sr,-(SP)                | save Status Register
-    move    #0x2700,sr              | protect this from interrupts, making it almost atomic  
+    #move.w  sr,-(SP)                | save Status Register
+    #move    #0x2700,sr              | protect this from interrupts, making it almost atomic
 
     movem.l D0-A6,-(SP)             | back up registers
 
-    move.w  _vblEnabled, d0         | read this enabled flag
-    tst.w   d0
+    tst.w   _vblEnabled             | read this enabled flag
     beq     dontUpdateConInfo       | if vblEnabled is 0, then skip our vbl routine
     
     lea     __vbl_counter, a0       | get address of conter variable
@@ -60,7 +60,7 @@ _update_con_info_vbl:
 dontUpdateConInfo:
     
     movem.l (SP)+,D0-A6             | restore registers
-    move.w  (SP)+,sr                | restore Status Register
+    #move.w  (SP)+,sr                | restore Status Register
     
     move.l  __oldVbl,-(SP)          | call original VBL routine   
     rts
@@ -72,3 +72,4 @@ __vbl_counter:          .ds.w   1
 __oldVbl:               .ds.l   1
 _fromVbl:               .ds.w   1
 _vblEnabled:            .ds.w   1
+_vblInstalled:			.ds.w	1

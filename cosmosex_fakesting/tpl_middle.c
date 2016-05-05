@@ -13,6 +13,7 @@
 #include "icmp.h"
 #include "con_man.h"
 #include "port.h"
+#include "vbl.h"
 
 
 // This file serves as middle layer between the client and client, as clients were compiled with Pure C cdecl calling convention,
@@ -26,8 +27,6 @@ int16  set_flag (int16 flag);
 void   clear_flag (int16 flag);
 
 DWORD jumptable[40];
-
-extern WORD vblEnabled;         // set to 0 to disable my VBL execution (other VBL routines will run)
 
 void initJumpTable(void)
 {
