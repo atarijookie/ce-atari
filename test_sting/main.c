@@ -77,7 +77,7 @@ int main(void)
     if(whichTests & 4) doTest02();
     if(whichTests & 8) doTest03();
 
-    writeBufferToFile();
+    if(whichTests != 0) writeBufferToFile();
     deinitBuffer();
     
     sleep(3);
