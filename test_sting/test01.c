@@ -94,7 +94,7 @@ void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD
     int maxBlockSize = 0;
 
     for(i=0; i<blockSizesCount; i++) {
-        if(maxBlockSize < blockSizes[i]) {      // if current max block size is smaller than this block size, store it
+        if(maxBlockSize < (int)blockSizes[i]) {      // if current max block size is smaller than this block size, store it
             maxBlockSize = blockSizes[i];
         }
     }
