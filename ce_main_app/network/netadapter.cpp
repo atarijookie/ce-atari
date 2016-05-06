@@ -994,11 +994,17 @@ void NetAdapter::conGetCharBuffer(void)
     }
 
     int gotBytes = nc->readWrapper.peekBlock(dataBuffer, 250);  // peek data from socket - less than 255, because 'charsUsed' is sent as byte (for removing the last used chars from deque)
+    if(gotBytes < 0) gotBytes = 0;
     dataTrans->addDataByte(gotBytes);                   // first store how many bytes we will return (this will be 250 bytes or less)
 
-    Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() -- will return buffer of %d bytes", gotBytes);
-
-    dataTrans->addDataBfr(dataBuffer, gotBytes, true);  // add that char buffer to data buffer, pad to mul 16
+    Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() [%d] will return buffer of %d bytes", slot, gotBytes);
+    if(gotBytes > 0) {
+        dataTrans->addDataBfr(dataBuffer, gotBytes, true);  // add that char buffer to data buffer, pad to mul 16
+    }  else {
+        // return a few 0's to pad transmission
+        memset(dataBuffer, 0, 32);
+        dataTrans->addDataBfr(dataBuffer, 32, true);
+    }
     dataTrans->setStatus(E_NORMAL);
 }
 
