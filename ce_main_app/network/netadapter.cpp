@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <string.h>
 #include <stdio.h>
 
@@ -1079,7 +1080,7 @@ void NetAdapter::conGetBlock(void)
         return;
     }
 
-    Debug::out(LOG_DEBUG, "NetAdapter::conGetBlock() -- OK", wantedLength, gotBytes);
+    Debug::out(LOG_DEBUG, "NetAdapter::conGetBlock() -- OK wanted %d, got %d", wantedLength, gotBytes);
 
     nc->readWrapper.peekBlock(dataBuffer, wantedLength);    // peek   data from socket
     nc->readWrapper.removeBlock(wantedLength);              // remove data from socket

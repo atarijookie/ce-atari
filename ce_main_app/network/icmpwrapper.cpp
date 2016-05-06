@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 tabstop=4 softtabstop=4 expandtab
 #include <string.h>
 #include <stdio.h>
 
@@ -29,8 +30,6 @@ extern   DWORD localIp;
 
 IcmpWrapper::IcmpWrapper(void)
 {
-    rawSockFd = -1;
-
     recvBfr = new BYTE[RECV_BFR_SIZE];
     rawSock = new TNetConnection();
 }
@@ -75,13 +74,13 @@ int IcmpWrapper::getEmptyIndex(void) {
     int   oldestIndex   = 0;
     
     for(i=0; i<MAX_STING_DGRAMS; i++) {     // try to find empty slot
+        if(dgrams[i].isEmpty()) {           // found empty? return it
+            return i;
+        }
+
         if(dgrams[i].time < oldestTime) {   // found older item than we had found before? store index
             oldestTime  = dgrams[i].time;
             oldestIndex = i;
-        }
-    
-        if(dgrams[i].isEmpty()) {           // found empty? return it
-            return i;
         }
     }
 
@@ -152,27 +151,31 @@ void IcmpWrapper::receiveAll(void)
 
 bool IcmpWrapper::receive(void)
 {
-    if(rawSockFd == -1) {                                   // ICMP socket closed? quit, no data
+    if(rawSock->fd == -1) {                                   // ICMP socket closed? quit, no data
         return false;
     }
 
     //-----------------------
     // receive the data
     // recvfrom will receive only one ICMP packet, even if there are more than 1 packets waiting in socket
-    struct sockaddr src_addr;
-    int addrlen = sizeof(struct sockaddr);
+    struct sockaddr_in src_addr;
+    socklen_t addrlen = sizeof(struct sockaddr);
 
-    int res = recvfrom(rawSockFd, recvBfr, RECV_BFR_SIZE, MSG_DONTWAIT, (struct sockaddr *) &src_addr, (socklen_t *) &addrlen);
+    ssize_t res = recvfrom(rawSock->fd, recvBfr, RECV_BFR_SIZE, MSG_DONTWAIT, (struct sockaddr *) &src_addr, &addrlen);
 
     if(res == -1) {                 // if recvfrom failed, no data
         if(errno != EAGAIN && errno != EWOULDBLOCK) {
-            Debug::out(LOG_DEBUG, "IcmpWrapper::receive() - recvfrom() failed, errno: %d", errno);
+            Debug::out(LOG_ERROR, "IcmpWrapper::receive() - recvfrom() failed, errno: %d", errno);
         } 
 
+        return false;
+    } else if (res == 0) {
+        Debug::out(LOG_ERROR, "IcmpWrapper::receive() - recvfrom() returned 0");
         return false;
     }
 
     // res now contains length of ICMP packet (header + data)
+    Debug::out(LOG_DEBUG, "IcmpWrapper::receive() %d bytes from %s", res, inet_ntoa(src_addr.sin_addr));
 
     //-----------------------
     // parse response to the right structs
@@ -193,8 +196,7 @@ bool IcmpWrapper::receive(void)
     d->data[8] = 128;                           // TTL
     d->data[9] = ICMP;                          // protocol
 
-    struct sockaddr_in *sa_in = (struct sockaddr_in *) &src_addr;       // cast sockaddr to sockaddr_in
-    Utils::storeDword(d->data + 12, ntohl(sa_in->sin_addr.s_addr));     // data[12 .. 15] - source IP
+    Utils::storeDword(d->data + 12, ntohl(src_addr.sin_addr.s_addr));     // data[12 .. 15] - source IP
     Utils::storeDword(d->data + 16, localIp);                           // data[16 .. 19] - destination IP 
 
     WORD checksum = TRawSocks::checksum((WORD *) d->data, 20);
@@ -227,11 +229,10 @@ BYTE IcmpWrapper::send(DWORD destinIP, int icmpType, int icmpCode, WORD length, 
         int rawFd = socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP);
         
         if(rawFd == -1) {                                           // failed to create RAW socket? 
-            Debug::out(LOG_DEBUG, "IcmpWrapper::send() - failed to create RAW socket");
+            Debug::out(LOG_DEBUG, "IcmpWrapper::send() - failed to create RAW socket : %s", strerror(errno));
             return E_FNAVAIL;
-        } else {
-            Debug::out(LOG_DEBUG, "IcmpWrapper::send() - RAW socket created");
         }
+        Debug::out(LOG_DEBUG, "IcmpWrapper::send() - RAW socket created fd #%d", rawFd);
 
 /*
         // IP_HDRINCL must be set on the socket so that the kernel does not attempt to automatically add a default ip header to the packet
@@ -240,7 +241,6 @@ BYTE IcmpWrapper::send(DWORD destinIP, int icmpType, int icmpCode, WORD length, 
 */
 
         rawSock->fd = rawFd;                                        // RAW socket created
-        rawSockFd   = rawFd;
     }
 
     WORD id         = Utils::getWord(data);                         // get ID 
