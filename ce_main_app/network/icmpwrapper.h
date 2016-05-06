@@ -135,7 +135,6 @@ public:
     TStingDgram      dgrams[MAX_STING_DGRAMS];
 
 private:
-    int              rawSockFd;
     BYTE            *recvBfr;
     DWORD            icmpDataCount;
 

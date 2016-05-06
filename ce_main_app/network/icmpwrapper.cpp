@@ -30,8 +30,6 @@ extern   DWORD localIp;
 
 IcmpWrapper::IcmpWrapper(void)
 {
-    rawSockFd = -1;
-
     recvBfr = new BYTE[RECV_BFR_SIZE];
     rawSock = new TNetConnection();
 }
@@ -153,7 +151,7 @@ void IcmpWrapper::receiveAll(void)
 
 bool IcmpWrapper::receive(void)
 {
-    if(rawSockFd == -1) {                                   // ICMP socket closed? quit, no data
+    if(rawSock->fd == -1) {                                   // ICMP socket closed? quit, no data
         return false;
     }
 
@@ -163,7 +161,7 @@ bool IcmpWrapper::receive(void)
     struct sockaddr_in src_addr;
     socklen_t addrlen = sizeof(struct sockaddr);
 
-    ssize_t res = recvfrom(rawSockFd, recvBfr, RECV_BFR_SIZE, MSG_DONTWAIT, (struct sockaddr *) &src_addr, &addrlen);
+    ssize_t res = recvfrom(rawSock->fd, recvBfr, RECV_BFR_SIZE, MSG_DONTWAIT, (struct sockaddr *) &src_addr, &addrlen);
 
     if(res == -1) {                 // if recvfrom failed, no data
         if(errno != EAGAIN && errno != EWOULDBLOCK) {
@@ -231,11 +229,10 @@ BYTE IcmpWrapper::send(DWORD destinIP, int icmpType, int icmpCode, WORD length, 
         int rawFd = socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP);
         
         if(rawFd == -1) {                                           // failed to create RAW socket? 
-            Debug::out(LOG_DEBUG, "IcmpWrapper::send() - failed to create RAW socket");
+            Debug::out(LOG_DEBUG, "IcmpWrapper::send() - failed to create RAW socket : %s", strerror(errno));
             return E_FNAVAIL;
-        } else {
-            Debug::out(LOG_DEBUG, "IcmpWrapper::send() - RAW socket created");
         }
+        Debug::out(LOG_DEBUG, "IcmpWrapper::send() - RAW socket created fd #%d", rawFd);
 
 /*
         // IP_HDRINCL must be set on the socket so that the kernel does not attempt to automatically add a default ip header to the packet
@@ -244,7 +241,6 @@ BYTE IcmpWrapper::send(DWORD destinIP, int icmpType, int icmpCode, WORD length, 
 */
 
         rawSock->fd = rawFd;                                        // RAW socket created
-        rawSockFd   = rawFd;
     }
 
     WORD id         = Utils::getWord(data);                         // get ID 
