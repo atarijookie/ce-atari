@@ -202,21 +202,26 @@ int ReadWrapper::peekBlock(BYTE *tmpBuffer, int size)   // for UDP merge buffers
 {
     int totalCount, res;
 
-    //--------------
-    // for TCP
-    if(type == TCP) {
+	if(size <= 0) {
+		return 0;	//nothing to do
+	}
+
+    if(type == TCP) {        //-------------- for TCP
         totalCount = tcpBytesWaiting();                            // how many bytes are waiting?
 
         size = MIN(totalCount, size);
         res  = recv(fd, tmpBuffer, size, MSG_DONTWAIT | MSG_PEEK); // peek the data (leave it in deque)
 
-        Debug::out(LOG_DEBUG, "ReadWrapper::peekBlock() - TCP peek %d bytes, res: %d", size, res);
+		if(res < 0) {
+			if(errno == EAGAIN || errno == EWOULDBLOCK) {
+				return 0;	// nothing available yet
+			}
+			Debug::out(LOG_ERROR, "ReadWrapper::peekBlock() - TCP recv() %d bytes error : %s", size, strerror(errno));
+		} else {
+	        Debug::out(LOG_DEBUG, "ReadWrapper::peekBlock() - TCP peek %d bytes, res: %d", size, res);
+		}
         return res;
-    }
-
-    //--------------
-    // for UDP
-    if(type == UDP) {
+    } else if(type == UDP) { //-------------- for UDP
         udpTryReceive();                                // try to receive if something is waiting
 
         if(items.empty()) {                             // nothing in deque? quit
@@ -272,15 +277,15 @@ void ReadWrapper::removeBlock(int size)                 // remove from queue
         int howManyWeWillRemove = MIN(totalCount, size);    // how many we will remove?
 
         while(howManyWeWillRemove > 0) {                    // remove data in a loop, remove by the size of TMP BUFFER
-            int removeCountSingle = (howManyWeWillRemove < TMP_BFR_SIZE) ? howManyWeWillRemove : TMP_BFR_SIZE;
+            int removeCountSingle = MIN(howManyWeWillRemove, TMP_BFR_SIZE);
 
             res = recv(fd, tmpBfr, removeCountSingle, MSG_DONTWAIT);    // get the data (remove it)
-
             if(res < 0) {
+				Debug::out(LOG_ERROR, "ReadWrapper::removeBlock() TCP recv error : %s", strerror(errno));
                 break;
             }
-
-            howManyWeWillRemove -= removeCountSingle;       // update count how many we still need to remove
+			Debug::out(LOG_DEBUG, "ReadWrapper::removeBlock() TCP removed %d bytes", res);
+            howManyWeWillRemove -= res;       // update count how many we still need to remove
         }
 
         return;
@@ -382,7 +387,7 @@ void ReadWrapper::udpTryReceive(void)
             if(errno == EAGAIN || errno == EWOULDBLOCK) {   // no data? quit loop
                 break;
             }
-        
+        	Debug::out(LOG_ERROR, "ReadWrapper::udpTryReceive() recvfrom() %d bytes error : %s", readCount, strerror(errno));
             continue;                                       // other error? try again
         }
 

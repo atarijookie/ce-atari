@@ -577,12 +577,12 @@ void NetAdapter::conUpdateInfo(void)
         dataTrans->addDataDword(ci->bytesInSocket);
         
         if(ci->bytesInSocket > 0) {                         // something to read?
-            Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo - connection %d has %d bytes waiting to be read", i, ci->bytesInSocket);
+            Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo [%d] connection has %d bytes waiting to be read", i, ci->bytesInSocket);
             found++;
         }
         
         if(ci->status != TCLOSED) {                         // not closed?
-            Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo [%d] - status: %d, localPort: %d, remoteHost: %08x, remotePort: %d, bytesInSocket: %d", i, ci->status, ci->localPort, ntohl(ci->remote_adr.sin_addr.s_addr), ntohs(ci->remote_adr.sin_port), ci->bytesInSocket);
+            Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo [%d] - status: %d, localPort: %d, remote: %08x:%d, bytesInSocket: %d", i, ci->status, ci->localPort, ntohl(ci->remote_adr.sin_addr.s_addr), ntohs(ci->remote_adr.sin_port), ci->bytesInSocket);
         }
     }
 
@@ -989,7 +989,7 @@ void NetAdapter::conGetCharBuffer(void)
 
     int charsUsed = cmd[9];                             // cmd[10] - how many chars were used by calling CNget_char() - we need to remove them first
     if(charsUsed > 0) {                                 // some chars were used, remove them
-        Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() -- CNget_char() used %d bytes, removing them from socket", charsUsed);
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() [%d] CNget_char() used %d bytes, removing them from socket", slot, charsUsed);
         nc->readWrapper.removeBlock(charsUsed);
     }
 
