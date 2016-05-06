@@ -473,6 +473,7 @@ void doTest020a()
     int handle, res;
     int i;      // received bytes
     int sentBytes = 0;
+    DWORD timeout;
 
     out_test_header(0x020a, "TCP CNget_char");
     handle = TCP_open(SERVER_ADDR, SERVER_PORT_START, 0, 1024);
@@ -482,6 +483,7 @@ void doTest020a()
         return;
     }
 
+    timeout = getTicks() + 200*15;  /* 15 sec timeout to complete the test */
     for(i = 0; i < byteCount;) {
         int16 c = CNget_char(handle);
         if(c >= 0) {
@@ -506,6 +508,10 @@ void doTest020a()
             } else {
                 // wait for more
                 DWORD ts = getTicks();
+                if(ts >= timeout) {
+                    out_result_error_string(0, i, "test timeout");
+                    break;
+                }
                 while(getTicks() < ts + 10);
             }
         } else {
