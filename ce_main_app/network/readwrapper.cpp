@@ -208,6 +208,10 @@ int ReadWrapper::peekBlock(BYTE *tmpBuffer, int size)   // for UDP merge buffers
 
     if(type == TCP) {        //-------------- for TCP
         totalCount = tcpBytesWaiting();                            // how many bytes are waiting?
+		if(totalCount <= 0) {
+	        Debug::out(LOG_DEBUG, "ReadWrapper::peekBlock() - TCP No available byte. asked %d", size);
+			return 0;
+		}
 
         size = MIN(totalCount, size);
         res  = recv(fd, tmpBuffer, size, MSG_DONTWAIT | MSG_PEEK); // peek the data (leave it in deque)
