@@ -20,23 +20,17 @@ int getConfig(void);
   
 void screenworker()
 {
-	/* save DMA address - in case some DMA using programm is resuing its set DMA address */
-//>	DWORD dmaadr=getdma();
 	WORD* pxPal=(WORD*)0xffff8240;
 	DWORD* pxScreen=*((DWORD*)0x44e);
-	/* send screen memory */
+	/* send screen resolution and screen memory */
 	writeScreen(TRAN_CMD_SENDSCREENCAST,(*((BYTE*)0xffff8260))&3,pxScreen,32000);
 	/* send 16 ST palette entries */
 	memcpy(pDmaBuffer,pxPal,16*2);
 	writeScreen(TRAN_CMD_SCREENCASTPALETTE,(*((BYTE*)0xffff8260))&3,pDmaBuffer,16*2);
-	/* set old DMA address */
-//>	setdma(dmaadr);
 }  
    
 void configworker()
 {
-	/* save DMA address - in case some DMA using programm is resuing its set DMA address */
-//>	DWORD dmaadr=getdma();
 	if( getConfig()>=0 )
 	{
 		_vblskipscreen=(unsigned int)pDmaBuffer[24];
@@ -48,9 +42,9 @@ void configworker()
 			_vblskipscreen=255;
 		}    
 	}
-	/* set old DMA address */
-//>	setdma(dmaadr);
 }  
+
+BYTE acsi_cmd2(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 
 DWORD writeScreen(BYTE command, BYTE screenmode, BYTE *bfr, DWORD cnt)
 {
@@ -66,8 +60,11 @@ DWORD writeScreen(BYTE command, BYTE screenmode, BYTE *bfr, DWORD cnt)
 	if((cnt % 512) != 0) {												// and if we have more than full sector(s) in buffer, send one more! 
 		sectorCount++;
 	}
-	
+
+    hdIf.forceFlock = 1;                    // let HD IF force FLOCK, as this FLOCK has been acquired in the asm code before this function 	hdIf.forceFlock=TRUE;
 	(*hdIf.cmd)(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount); 
+    hdIf.forceFlock = 0;
+	//acsi_cmd2(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount); 
 	/* if all data transfered, return count of all data */
 	if(hdIf.success) {
 		return cnt;
@@ -81,7 +78,10 @@ int getConfig(void)
 	commandShort[0] = (deviceID << 5); 					                        // cmd[0] = ACSI_id + TEST UNIT READY (0)
 	commandShort[4] = GD_CUSTOM_getConfig;
   
+    hdIf.forceFlock = 1;                    // let HD IF force FLOCK, as this FLOCK has been acquired in the asm code before this function 	hdIf.forceFlock=TRUE;
 	(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);		// issue the command and check the result
+    hdIf.forceFlock = 0;
+	//acsi_cmd2(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);		// issue the command and check the result
     
 	if(!hdIf.success) {                                                   // failed to get config?
         return -1;
