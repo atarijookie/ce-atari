@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <sys/time.h>
 
 #include "global.h"
 #include "debug.h"
@@ -75,9 +76,13 @@ void Debug::out(int logLevel, const char *format, ...)
 	prevLogOut = now;
 
     char humanTime[128];
-    time_t t = time(NULL);
-    struct tm tm = *localtime(&t);
-    sprintf(humanTime, "%04d-%02d-%02d %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    struct timeval tv;
+    if(gettimeofday(&tv, NULL) < 0) {
+        memset(&tv, 0, sizeof(tv)); // failure
+    }
+    struct tm tm = *localtime(&tv.tv_sec);
+    sprintf(humanTime, "%04d-%02d-%02d %02d:%02d:%02d.%06ld",
+            tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, tv.tv_usec);
 
     if(logLevel == LOG_ERROR && dbgVars.isInHandleAcsiCommand) {    // it's an error, and we're debugging ACSI stuff
         fprintf(f, "%08d\t%08d\t(%s)\n", now, diff, humanTime); // CLOCK in ms, diff in ms, date/time in human readable format
