@@ -121,7 +121,8 @@ void Debug::outBfr(BYTE *bfr, int count)
 
     for(i=0; i<rows; i++) {
         int ofs = i * 16;
-        
+        fprintf(f, "        ");//some indentation
+
         for(j=0; j<16; j++) {
             if((ofs + j) < count) {
                 fprintf(f, "%02x ", bfr[ofs + j]);
