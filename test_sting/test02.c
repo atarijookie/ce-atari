@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 expandtab
 //--------------------------------------------------
 #include <mint/osbind.h> 
 #include <stdio.h>
@@ -24,6 +25,8 @@ int  tryReceive0206(int handle, int line);
 
 void doTest0208    (BYTE tcpNotUdp);
 
+void doTest020a(void);
+
 void doTest0210    (WORD testNumber);
 int  sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle, BYTE getBlockNotNdb);
 int  getCab        (int handle, CAB *cab);
@@ -49,7 +52,7 @@ void doTest02(void)
     // CNget_NDB
     doTest0202(1, 1);   // TCP
     doTest0202(0, 1);   // UDP
-    
+
     // CNget_block
     doTest0202(1, 0);   // TCP
     doTest0202(0, 0);   // UDP
@@ -61,7 +64,9 @@ void doTest02(void)
     // CNgetinfo
     doTest0208(1);      // TCP
     doTest0208(0);      // UDP
-    
+
+    // CNget_char
+    doTest020a();
     //----------------------------
     /*
     TCP_ACTIVE : remote host and port must be specified.
@@ -118,37 +123,29 @@ void doTest0200(BYTE tcpNotUdp)
     
     int toReceive = 1000;
     int idx = 0;
-    int mismatch = 0;
+    WORD mismatch = 0;
     
-    while(1) {
-        // nothing more to receive? quit
-        if(toReceive <= 0) {
-
-            if(!mismatch) {         // no mismatch?   good
-                out_result(1);
-            } else {                // data mismatch? fail
-                out_result_string(0, "received enough data, but mismatch");
-            }
-             
-            goto test0200end;
-        }
-    
-        //----------
+    while(toReceive > 0) { // nothing more to receive? quit
         // something to receive?
-        int gotBytes = CNbyte_count(handle);    // how much data we have?
-        if(gotBytes > 0) {
+        int availBytes = CNbyte_count(handle);    // how much data we have?
+        if(availBytes > 0) {
             int i, a;
             
-            for(i=0; i<gotBytes; i++) {         // try to receive it all
+            for(i=0; i<availBytes; i++) {         // try to receive it all
                 a = CNget_char(handle);
                 
                 if(a != wBuf[idx]) {            // check if the data is matching the sent data
-                    mismatch = 1;
+                    mismatch++;
                 }
                 idx++;
+                toReceive--;
+                // check that bytes not consumed are still available !
+                int newAvailBytes = CNbyte_count(handle);
+                if(newAvailBytes < availBytes - i) {
+                    out_result_error_string(0, availBytes - i - newAvailBytes, "CNbyte_count() mismatch");
+                    goto test0200end;
+                }
             }
-            
-            toReceive -= gotBytes;              // now we need to receive less
         }    
         
         //----------
@@ -160,7 +157,12 @@ void doTest0200(BYTE tcpNotUdp)
             goto test0200end;
         }
     }
-    
+
+    if(mismatch == 0) {         // no mismatch?   good
+        out_result(1);
+    } else {                // data mismatch? fail
+        out_result_error_string(0, mismatch, "received enough data, but mismatch");
+    }
 test0200end:
     if(tcpNotUdp) {
         TCP_close(handle, 0, 0);
@@ -462,6 +464,65 @@ test0208end:
     } else {
         UDP_close(handle);
     }    
+}
+
+/* Test020A : only CNget_char() */
+void doTest020a()
+{
+    static const int byteCount = 5000;
+    int handle, res;
+    int i;      // received bytes
+    int sentBytes = 0;
+    DWORD timeout;
+
+    out_test_header(0x020a, "TCP CNget_char");
+    handle = TCP_open(SERVER_ADDR, SERVER_PORT_START, 0, 1024);
+
+    if(handle < 0) {
+        out_result_error_string(0, handle, "open failed");
+        return;
+    }
+
+    timeout = getTicks() + 200*15;  /* 15 sec timeout to complete the test */
+    for(i = 0; i < byteCount;) {
+        int16 c = CNget_char(handle);
+        if(c >= 0) {
+            if(c != wBuf[i]) {  // DATA mismatch !
+                out_result_error_string(0, i, "CNget_char() data mismatch");
+                break;
+            }
+            i++;
+        } else if(c == E_NODATA) {
+            if(sentBytes <= i) {
+                // need to send bytes before receiving them !
+                // generate pseudo random number between 1 and 1009
+                int random = 1 + (int)(getTicks() & 63) * 16;
+                if(sentBytes + random > byteCount)
+                    random = byteCount - sentBytes;
+                res = TCP_send(handle, wBuf+sentBytes, random);
+                if(res != E_NORMAL) {
+                    out_result_error_string(0, res, "send failed");
+                    break;
+                }
+                sentBytes += random;
+            } else {
+                // wait for more
+                DWORD ts = getTicks();
+                if(ts >= timeout) {
+                    out_result_error_string(0, i, "test timeout");
+                    break;
+                }
+                while(getTicks() < ts + 10);
+            }
+        } else {
+            out_result_error_string(0, c, "CNget_char() ERR");
+            break;
+        }
+    }
+    if(i == byteCount) {
+        out_result(1);
+    }
+    TCP_close(handle, 0, 0);
 }
 
 void doTest0210(WORD testNumber)

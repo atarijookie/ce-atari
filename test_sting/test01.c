@@ -94,7 +94,7 @@ void test01(WORD testNo, char *testName, BYTE tcpNotUdp, DWORD *blockSizes, WORD
     int maxBlockSize = 0;
 
     for(i=0; i<blockSizesCount; i++) {
-        if(maxBlockSize < blockSizes[i]) {      // if current max block size is smaller than this block size, store it
+        if(maxBlockSize < (int)blockSizes[i]) {      // if current max block size is smaller than this block size, store it
             maxBlockSize = blockSizes[i];
         }
     }
@@ -207,44 +207,39 @@ int sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle, BYTE getBlockNot
     BYTE *pBuf  = rBuf;
     DWORD toGet = blockSize;
     
-    while(1) {
-        if(toGet <= 0) {                                // nothing to get? quit
-            break;
+    while(toGet > 0) {
+        now = getTicks();
+        if(now >= endTime) {                    // timeout?
+            out_result_error_string(0, blockSize, "CNbyte_count() timeout");
+            return 0;
         }
-    
+
         res = CNbyte_count(handle);                     // find out how many bytes are waiting
 
         if(res > 0) {                                   // something waiting? read it
             if(getBlockNotNdb) {                        // retrieve using CNget_block?
                 res = CNget_block(handle, pBuf, res);
                 
-                if(res != E_NODATA && res < 0) {        // if it's some error, and that error is not E_NODATA, fail
+                if(res > 0) {
+                    pBuf  += res;
+                    toGet -= res;
+                } else if(res != E_NODATA && res < 0) {        // if it's some error, and that error is not E_NODATA, fail
                     out_result_error_string(0, blockSize, "CNget_block() failed");
                     return 0;
                 }
             } else {                                    // retrieve using CNget_NDB
                 NDB *ndb = CNget_NDB(handle);
-    
+
                 if(ndb) {                               // if something retrieved
                     memcpy(pBuf, ndb->ndata, ndb->len); // copy in the data
                     
                     KRfree (ndb->ptr);                  // free the ram
                     KRfree (ndb);
                     
-                    res = ndb->len;                     // it was this many bytes
-                } else {                                // if nothing retrieved
-                    res = 0;
+                    pBuf += ndb->len;                     // it was this many bytes
+                    toGet -= ndb->len;
                 }
             }
-            
-            pBuf  += res;
-            toGet -= res;
-        }
-
-        now = getTicks();
-        if(now >= endTime) {                    // timeout? 
-            out_result_error_string(0, blockSize, "CNbyte_count() timeout");
-            return 0;
         }
     }
     
