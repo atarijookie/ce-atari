@@ -1,20 +1,66 @@
 #ifndef _NETADAPTER_COMMANDS_H_
 #define _NETADAPTER_COMMANDS_H_
 
+/* command format :
+ * short : ID 'C' 'E' CMD arg1 arg2
+ * long :  ID|1f 00 'C' 'E' CMD arg1 arg2 arg3 arg4 ...
+ */
+
 #define NET_CMD_IDENTIFY                0x00
+/* no argument
+ * return a buffer with :
+ * 32 bytes = identification string + padding
+ * 4 bytes = local IP address */
 
 // TCP functions
 #define NET_CMD_TCP_OPEN                0x10
+/* data buffer argument :
+ * 4 bytes : remote host (0 for listen)
+ * 2 bytes : remote port
+ * 2 bytes : type of service (not used)
+ * 2 bytes : buffer size (CNget_NDB() packet size)
+ * 2 bytes : local port (useful for listening sockets
+ * returns a connection handle
+ */
 #define NET_CMD_TCP_CLOSE               0x11
+/* data buffer argument :
+ * 2 bytes : connection handle
+ * returns E_PARAMETER / E_NORMAL */
 #define NET_CMD_TCP_SEND                0x12
+/* arg1 = connection handle
+ * arg2/arg3 = data length (word)
+ * arg4 = isOdd
+ * arg5 = oddByte
+ * + data buffer
+ * returns E_PARAMETER / E_OBUFFULL / E_NORMAL */
 #define NET_CMD_TCP_WAIT_STATE          0x13
+/* not used */
 #define NET_CMD_TCP_ACK_WAIT            0x14
+/* not used */
 #define NET_CMD_TCP_INFO                0x15
+/* not used */
 
-// UDP FUNCTION
+// UDP FUNCTIONS
 #define NET_CMD_UDP_OPEN                0x20
+/* data buffer argument :
+ * 4 bytes : remote host (0 for listen)
+ * 2 bytes : remote port
+ * 2 bytes : type of service (not used)
+ * 2 bytes : buffer size (CNget_NDB() packet size)
+ * 2 bytes : local port (useful for listening sockets
+ * returns a connection handle
+ */
 #define NET_CMD_UDP_CLOSE               0x21
+/* data buffer argument :
+ * 2 bytes : connection handle
+ * returns E_PARAMETER / E_NORMAL */
 #define NET_CMD_UDP_SEND                0x22
+/* arg1 = connection handle
+ * arg2/arg3 = data length (word)
+ * arg4 = isOdd
+ * arg5 = oddByte
+ * + data buffer
+ * returns E_PARAMETER / E_OBUFFULL / E_NORMAL */
 
 // ICMP FUNCTIONS
 #define NET_CMD_ICMP_SEND_EVEN          0x30
@@ -33,7 +79,15 @@
 #define NET_CMD_CNGETS                  0x46
 
 #define NET_CMD_CN_UPDATE_INFO          0x47
-
+/* no arguments
+ * return a buffer of data
+ * NET_HANDLES_COUNT x 4 = bytes waiting to be read in socket
+ * NET_HANDLES_COUNT x 1 = connection status
+ * NET_HANDLES_COUNT x 2 = local port
+ * NET_HANDLES_COUNT x 4 = remote host
+ * NET_HANDLES_COUNT x 2 = remote port
+ * 4 = bytes waiting to be read on ICMP socket
+ */
 #define NET_CMD_GET_NEXT_NDB_SIZE       0x4E
 
 // MISC
