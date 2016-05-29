@@ -71,12 +71,43 @@
 
 // CONNECTION MANAGER
 #define NET_CMD_CNKICK                  0x40
+/* not used */
 #define NET_CMD_CNBYTE_COUNT            0x41
+/* not used */
 #define NET_CMD_CNGET_CHAR              0x42
+/* arg1 = connection handle
+ * arg5 = "charsUsed"
+ * return a data buffer :
+ * 1 byte : data byte count
+ * n bytes : data bytes
+ * returns E_PARAMETER / E_NORMAL */
 #define NET_CMD_CNGET_NDB               0x43
+/* arg1 = connection handle
+ * arg2 = data flag. If zero, returns just size. If non-zero, return data.
+ * arg5 = "charsUsed"
+ * return a data buffer, either :
+ *   n bytes : data bytes (predefined ndbSize)
+ * or :
+ *   4 bytes : "nextNdbSize"
+ *   1 byte : sector count
+ * returns E_PARAMETER / E_NORMAL */
 #define NET_CMD_CNGET_BLOCK             0x44
+/* arg1 = connection handle
+ * arg2,arg3 (Word) = block length
+ * arg5 = "charsUsed"
+ * return a data buffer :
+ * block length bytes = data
+ * returns E_PARAMETER / E_NODATA / E_NORMAL */
 #define NET_CMD_CNGETINFO               0x45
+/* not used */
 #define NET_CMD_CNGETS                  0x46
+/* arg1 = connection handle
+ * arg2,arg3 (Word) = max length
+ * arg4 = delimiter character
+ * arg5 = "charsUsed"
+ * return a data buffer :
+ * n bytes (null terminated string, excluding delimiter)
+ * returns E_PARAMETER / E_NODATA / E_BIGBUF / E_NORMAL */
 
 #define NET_CMD_CN_UPDATE_INFO          0x47
 /* no arguments
@@ -93,9 +124,13 @@
 // MISC
 #define NET_CMD_RESOLVE                 0x50
 #define NET_CMD_ON_PORT                 0x51
+/* not used */
 #define NET_CMD_OFF_PORT                0x52
+/* not used */
 #define NET_CMD_QUERY_PORT              0x53
+/* not used */
 #define NET_CMD_CNTRL_PORT              0x54
+/* not used */
 
 #define NET_CMD_RESOLVE_GET_RESPONSE    0x55
 
