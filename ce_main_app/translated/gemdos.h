@@ -24,11 +24,43 @@
 
 // file content functions
 #define GEMDOS_Fcreate      0x3c
+/* ACSI/SCSI command arguments :
+ * 512 byte data buffer :
+ * offset 0 : 1 byte = attributes
+ * offset 1 : n bytes = file name
+ * returns EINTRN / EACCDN / E_NOTHANDLED / ENHNDL / E_WAITING_FOR_MOUNT or handle */
 #define GEMDOS_Fopen        0x3d
+/* ACSI/SCSI command arguments :
+ * 512 byte data buffer :
+ * offset 0 : 1 byte = mode (0 = read / 1 = write / 2 = read write)
+ * offset 1 : n bytes = file name
+ * returns EINTRN / EACCDN / E_NOTHANDLED / ENHNDL / E_WAITING_FOR_MOUNT or handle */
 #define GEMDOS_Fclose       0x3e
+/* ACSI/SCSI command arguments :
+ * arg1 = file handle
+ * returns E_NOTHANDLED / EINTRN / E_OK */
 #define GEMDOS_Fread        0x3f
+/* ACSI/SCSI command arguments :
+ * arg1 = file handle
+ * arg2,arg3,arg4 = byte count
+ * arg5 = seek offset
+ * return a data buffer
+ * returns E_NOTHANDLED / EINTRN / RW_ALL_TRANSFERED / RW_PARTIAL_TRANSFER */
 #define GEMDOS_Fwrite       0x40
+/* ACSI/SCSI command arguments :
+ * arg1 = file handle
+ * arg2,arg3,arg4 = byte count
+ * + a data buffer
+ * returns E_NOTHANDLED / EINTRN / RW_ALL_TRANSFERED / RW_PARTIAL_TRANSFER */
 #define GEMDOS_Fseek        0x42
+/* ACSI/SCSI command arguments :
+ * arg1,arg2,arg3,arg4 = offset
+ * arg5 = handle
+ * arg6 = seek mode (0=SEEK_SET/1=SEEK_CUR/2=SEEK_END)
+ * returns a data buffer :
+ * 4 bytes : current position
+ * 4 bytes : bytes count to end of file
+ * returns E_NOTHANDLED / EINTRN / E_OK */
 
 // Pexec() related stuff
 #define GEMDOS_Pexec        0x4B
