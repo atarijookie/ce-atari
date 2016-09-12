@@ -137,12 +137,6 @@ depclean:
 
 depend:	$(DEPS)
 
-testdistro:
-	@echo "This is a distro test"
-	@echo $(DISTRO)
-
-#	echo ${distro}
-
 %.o:	%.cpp %.d
 
 %.d:	%.cpp
