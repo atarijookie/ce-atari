@@ -14,12 +14,20 @@ CXXFLAGS = $(CFLAGS)
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 # -M : with system headers, -MM : without
 
+LDFLAGS	= -Llib -lrt -lanl -lpthread -lcurl -ldl -lutil
+
 ifeq ($(ONPC),yes)
-    LDFLAGS	= -Llib -Llib -lrt -lanl -lpthread -lcurl -lcivetweb -ldl -lutil
     CFLAGS += -DONPC_NOTHING -I./
 else
-    LDFLAGS	= -Llib -lbcm2835 -lrt -lanl -lpthread -lcurl -lcivetweb -ldl -lutil
+    LDFLAGS	+= -lbcm2835
     CFLAGS += -I./
+endif
+
+DISTRO := $(shell ./whichdistro.sh)
+ifeq ($(DISTRO),yocto)
+	LDFLAGS += -lcivetweb_yocto
+else
+	LDFLAGS += -lcivetweb_raspbian
 endif
 
 # uncomment following line to get map file (ce.map)
@@ -128,6 +136,12 @@ depclean:
 	$(AT)$(RM) $(DEPS)
 
 depend:	$(DEPS)
+
+testdistro:
+	@echo "This is a distro test"
+	@echo $(DISTRO)
+
+#	echo ${distro}
 
 %.o:	%.cpp %.d
 
