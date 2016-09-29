@@ -40,7 +40,7 @@ void Update::initialize(void)
 void Update::processUpdateList(void)
 {
     Update::versions.gotUpdate              = false;
-   
+
     // check if the local update list exists
     int res = access(UPDATE_LOCALLIST, F_OK);
 
