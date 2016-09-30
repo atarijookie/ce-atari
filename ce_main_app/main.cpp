@@ -83,7 +83,14 @@ int main(int argc, char *argv[])
     
     loadLastHwConfig();                                         // load last found HW IF, HW version, SCSI machine
     
-    printf("CosmosEx main app starting...\n");
+    const char *distro;
+#ifdef DISTRO_YOCTO
+    distro = "Yocto";
+#else
+    distro = "Raspbian";
+#endif
+
+    printf("CosmosEx main app starting on %s...\n", distro);
     //------------------------------------
     // if not running as ce_conf, register signal handlers
     if(!flags.actAsCeConf) {                                        

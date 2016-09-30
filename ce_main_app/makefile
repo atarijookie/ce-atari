@@ -26,8 +26,10 @@ endif
 DISTRO := $(shell ./whichdistro.sh)
 ifeq ($(DISTRO),yocto)
 	LDFLAGS += -lcivetweb_yocto
+	CFLAGS += -DDISTRO_YOCTO
 else
 	LDFLAGS += -lcivetweb_raspbian
+	CFLAGS += -DDISTRO_RASPBIAN
 endif
 
 # uncomment following line to get map file (ce.map)
