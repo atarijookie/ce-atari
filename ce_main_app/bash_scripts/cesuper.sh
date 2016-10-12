@@ -1,6 +1,6 @@
 #!/bin/sh
 while :
-do
+do 
 
     #try to get pid of process
     pid=$(pidof cosmosex)
@@ -10,7 +10,7 @@ do
 
         # app is not running - either we want to do update, or it crashed
 
-        if [ -e /ce/update/doupdate.sh ]        # if update file exists, we do the update
+        if [ -f /ce/update/doupdate.sh ]        # if update file exists, we do the update
         then
             echo "doing update"
 

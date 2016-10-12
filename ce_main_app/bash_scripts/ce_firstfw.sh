@@ -6,7 +6,10 @@ if [ "$1" != "nokill" ]; then
     /ce/ce_stop.sh
 fi
 
-echo -e "\nReverting to first firmware, this will take a while.\nDO NOT POWER OFF THE DEVICE!!!\n\n"
+echo ""
+echo "Reverting to first firmware, this will take a while."
+echo "DO NOT POWER OFF THE DEVICE!!!"
+echo ""
 
 # remove all the settings - if they would be cause of some issue, this could help
 rm -f /ce/settings/*
@@ -36,6 +39,9 @@ fi
 /ce/update/update_franz.sh
 
 sync
-echo -e "\n\nRevert to first firmware done, you may start the /ce/ce_start.sh now!";
+echo ""
+echo "Revert to first firmware done, you may start the /ce/ce_start.sh now!"
+echo ""
+
 
 

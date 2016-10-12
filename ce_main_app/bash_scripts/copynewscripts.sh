@@ -1,21 +1,30 @@
-function compareAndCopy 
+#!/bin/sh
+
+compareAndCopy()
 {
-    # create md5 checksums
-    sum_loc=($( cat $1 2> /dev/null | md5sum ))
-    sum_new=($( cat $2 2> /dev/null | md5sum ))
-    
-    # if checksums don't match, copy the new file
-    if [ $sum_loc != $sum_new ]; then
-        echo "Copying new file to $1"
-        rm -f $1        # delete local file
-        cp $2 $1        # copy new file to local file
-        chmod 755 $1    # make new local file executable
-    else 
-        echo "Skipping file $1"
+    if [ ! -f "$2" ]; then      # new file doesn't exist? quit
+        echo "Skipping file $1 - new file doesn't exist!"
+        return
     fi
-}  
+
+    if [ -f "$1" ]; then        # if got the old file, compare
+        cmp -s $1 $2
+
+        if [ $? -eq "0" ]; then
+            echo "Skipping file $1 - files are the same"
+            return
+        fi
+    fi
+
+    # copy the new file
+    echo "Copying file $1"
+    rm -f $1        # delete local file
+    cp $2 $1        # copy new file to local file
+    chmod 755 $1    # make new local file executable
+}
 
 echo "Will compare with old and copy new files..."
+mkdir -p /ce/update
 
 #compareAndCopy  local file                      new file
 compareAndCopy   "/ce/cesuper.sh"                "/tmp/newscripts/cesuper.sh"
