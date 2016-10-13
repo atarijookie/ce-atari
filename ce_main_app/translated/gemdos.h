@@ -15,12 +15,50 @@
 
 // file and directory manipulation
 #define GEMDOS_Dfree        0x36
+/* ACSI/SCSI command arguments :
+ * arg1 = drive index
+ * returns a buffer with :
+ * offset 0   DWORD free cluster count
+ * offset 4   DWORD total cluster count
+ * offset 8   DWORD sector size (512)
+ * offset 12  DWORD sector count per cluster
+ * returns E_OK or E_NOTHANDLED */
 #define GEMDOS_Dcreate      0x39
+/* ACSI/SCSI command arguments :
+ * 512 byte data buffer :
+ *   null terminated ASCII string
+ * returns E_OK or E_NOTHANDLED / EACCDN / EINTRN / EPTHNF / E_WAITING_FOR_MOUNT */
 #define GEMDOS_Ddelete      0x3a
+/* ACSI/SCSI command arguments :
+ * 512 byte data buffer :
+ *   null terminated ASCII string
+ * returns E_OK or E_NOTHANDLED / EACCDN / EINTRN / EPTHNF / E_WAITING_FOR_MOUNT */
 #define GEMDOS_Frename      0x56
+/* ACSI/SCSI command arguments :
+ * 512 byte data buffer :
+ *   2 null terminated ASCII string : old name then new name
+ * returns E_OK or E_NOTHANDLED / EACCDN / EFILNF / E_WAITING_FOR_MOUNT */
 #define GEMDOS_Fdatime      0x57
+/* ACSI/SCSI command arguments :
+ * arg1 = file handle (7 lower bits) + "set" bit (0 is get, 1 is set)
+ * arg2,arg3 = time
+ * arg4,arg5 = date
+ * return a data buffer
+ *  offset 0 : WORD time
+ *  offset 2 : DORD date
+ * returns E_OK or E_NOTHANDLED / EINTRN */
 #define GEMDOS_Fdelete      0x41
+/* ACSI/SCSI command arguments :
+ * 512 byte data buffer :
+ *   null terminated ASCII string
+ * returns E_OK or E_NOTHANDLED / EACCDN / EINTRN / EFILNF / E_WAITING_FOR_MOUNT */
 #define GEMDOS_Fattrib      0x43
+/* ACSI/SCSI command arguments :
+ * 512 byte data buffer :
+ *  offset 0 : 0 to inquire, non zero to set
+ *  offset 1 : new attribute byte
+ *  offset 2 :  null terminated ASCII string
+ * returns E_OK or E_NOTHANDLED / EACCDN / EINTRN / EFILNF / E_WAITING_FOR_MOUNT */
 
 // file content functions
 #define GEMDOS_Fcreate      0x3c
