@@ -1070,6 +1070,9 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
 		Utils::fileDateTimeToHostTime(atariDate, atariTime, &timeStruct);	// convert atari date and time to struct tm
 		//timeT = timelocal(&timeStruct);								// convert tm to time_t
 		timeT = mktime(&timeStruct);								// convert tm to time_t
+		Debug::out(LOG_DEBUG, "TranslatedDisk::onFdatime %hu %hu => %d (%04d-%02d-%02d %02d:%02d:%02d)",
+		           atariTime, atariDate, timeT, timeStruct.tm_year+1900, timeStruct.tm_mon+1, timeStruct.tm_mday,
+		           timeStruct.tm_hour, timeStruct.tm_min, timeStruct.tm_sec);
 
 		uTimBuf.actime	= timeT;									// store access time
 		uTimBuf.modtime	= timeT;									// store modification time
