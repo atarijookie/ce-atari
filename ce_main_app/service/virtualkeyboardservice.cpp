@@ -35,20 +35,23 @@ void VirtualKeyboardService::stop()
 
 void VirtualKeyboardService::openFifo() 
 {
-    if (mkdir("/tmp/vdev/",0666) == -1) {
-        Debug::out(LOG_ERROR, "Virtual keyboard could not create /tmp/vdev/.");
+    int res;
+
+    res = mkdir("/tmp/vdev/",0666);
+    if (res == -1 && errno != EEXIST) {     // if failed to create dir, and it's not because it already exists
+        Debug::out(LOG_ERROR, "Virtual keyboard could not create /tmp/vdev/ - errno: %d", errno);
     }
+    
     Debug::out(LOG_DEBUG, "Virtual keyboard creating /tmp/vdev/kbd.");
+    
     //try to remove if it's a file
     unlink("/tmp/vdev/kbd");
-    int err=mkfifo("/tmp/vdev/kbd",0666);
-    if(err < 0) 
-    {
-        Debug::out(LOG_ERROR, "Virtual keyboard could not create /tmp/vdev/kbd.");
+    int err = mkfifo("/tmp/vdev/kbd",0666);
+    if(err < 0) {
+        Debug::out(LOG_ERROR, "Virtual keyboard could not create /tmp/vdev/kbd - errno: %d", errno);
 		if(errno == EEXIST) {
             Debug::out(LOG_ERROR, "    /tmp/vdev/kbd already exists.");
 		}
-		    //printf("errno is set as %d\n", errno);
 	}    
 }
 
