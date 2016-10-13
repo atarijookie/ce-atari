@@ -113,21 +113,23 @@ void Utils::fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *pt
     WORD year, month, day;
     WORD hours, minutes, seconds;
 
-    year    = (atariDate >> 9)   + 1980;
-    month   = (atariDate >> 5)   & 0x0f;
-    day     =  atariDate         & 0x1f;
+    year    = (atariDate >> 9)   + 1980; // 0-119 with 0=1980
+    month   = (atariDate >> 5)   & 0x0f; // 1-12
+    day     =  atariDate         & 0x1f; // 1-31
 
-    hours   =  (atariTime >> 11) & 0x1f;
-    minutes =  (atariTime >>  5) & 0x3f;
-    seconds = ((atariTime >>  5) & 0x1f) * 2;
+    hours   =  (atariTime >> 11) & 0x1f;	// 0-23
+    minutes =  (atariTime >>  5) & 0x3f;	// 0-59
+    seconds = ( atariTime        & 0x1f) * 2;	// in unit of two
 	
-	ptm->tm_year	= year;
-	ptm->tm_mon		= month;
-	ptm->tm_mday	= day;
+	memset(ptm, 0, sizeof(struct tm));
+	ptm->tm_year	= year - 1900;		// number of years since 1900.
+	ptm->tm_mon		= month - 1;	// The number of months since January, in the range 0 to 11
+	ptm->tm_mday	= day;		// The day of the month, in the range 1 to 31.
 	
-	ptm->tm_hour	= hours;
-	ptm->tm_min		= minutes;
-	ptm->tm_sec		= seconds;
+	ptm->tm_hour	= hours;	// The number of hours past midnight, in the range 0 to 23
+	ptm->tm_min		= minutes;	// The number of minutes after the hour, in the range 0 to 59
+	ptm->tm_sec		= seconds;	// The number of seconds after the minute, normally in the range 0 to 59,
+								//  but can be up to 60 to allow for leap seconds.
 }
 
 void Utils::mergeHostPaths(std::string &dest, const std::string &tail)
