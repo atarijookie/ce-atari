@@ -138,6 +138,7 @@ typedef struct {
     bool getHwInfo;             // if set to true, wait for HW info from Hans, and then quit and report it
     bool noFranz;               // if set to true, won't communicate with Franz
     bool ikbdLogs;              // if set to true, will generate ikbd logs file
+    bool fakeOldApp;            // if set to true, will always return old app version, so you can test app installation over and over
     
     bool gotHansFwVersion;
     bool gotFranzFwVersion;

@@ -323,6 +323,7 @@ void initializeFlags(void)
     flags.getHwInfo    = false;         // if set to true, wait for HW info from Hans, and then quit and report it
     flags.noFranz      = false;         // if set to true, won't communicate with Franz
     flags.ikbdLogs     = false;         // no ikbd logs by default
+    flags.fakeOldApp   = false;         // don't fake old app by default
     
     flags.gotHansFwVersion  = false;
     flags.gotFranzFwVersion = false;
@@ -449,12 +450,18 @@ void parseCmdLineArguments(int argc, char *argv[])
             flags.noFranz       = true;
         }
         
-        // run the device without communicating with Franz
+        // produce ikbd logs
         if(strcmp(argv[i], "ikbdlogs") == 0) {
             isKnownTag          = true;                             // this is a known tag
             flags.ikbdLogs      = true;
         }
-        
+
+        // should fake old app version? (for reinstall tests)
+        if(strcmp(argv[i], "fakeold") == 0) {
+            isKnownTag          = true;                             // this is a known tag
+            flags.fakeOldApp    = true;
+        }
+
         if(!isKnownTag) {                                           // if tag unknown, show warning
             printf(">>> UNKNOWN APP ARGUMENT: '%s' <<<\n", argv[i]);
         }
@@ -471,6 +478,7 @@ void printfPossibleCmdLineArgs(void)
     printf("ce_conf  - use this app as ce_conf on RPi (the app must be running normally, too)\n");
     printf("hwinfo   - get HW version and HDD interface type\n");
     printf("ikbdlogs - write IKBD logs to /var/log/ikbdlog.txt\n");
+    printf("fakeold  - fake old app version for reinstall tests\n");
 }
 
 void handlePthreadCreate(int res, char *threadName, pthread_t *pThread)

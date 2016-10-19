@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "global.h"
 #include "version.h"
+
+extern TFlags flags;			// global flags from command line
 
 Version::Version()
 {
@@ -165,6 +168,10 @@ void Version::getAppVersion(char *bfr)
     
     i = sscanf(buildDate + 4, "%d %d", &day, &year);
     
+    if(flags.fakeOldApp) {		// if should fake that the app is old, subtract 2 years from app year
+        year -= 2;
+    }
+
     if(i == 2 && month > 0) {
         sprintf(bfr, "%04d-%02d-%02d", year, month, day);
     } else {
