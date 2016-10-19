@@ -52,6 +52,12 @@ extern SharedObjects shared;
 
 InterProcessEvents events;
 
+#ifdef DISTRO_YOCTO
+const char *distroString = "Yocto";
+#else
+const char *distroString = "Raspbian";
+#endif
+
 int main(int argc, char *argv[])
 {
     CCoreThread *core;
@@ -82,15 +88,8 @@ int main(int argc, char *argv[])
     }
     
     loadLastHwConfig();                                         // load last found HW IF, HW version, SCSI machine
-    
-    const char *distro;
-#ifdef DISTRO_YOCTO
-    distro = "Yocto";
-#else
-    distro = "Raspbian";
-#endif
 
-    printf("CosmosEx main app starting on %s...\n", distro);
+    printf("CosmosEx main app starting on %s...\n", distroString);
     //------------------------------------
     // if not running as ce_conf, register signal handlers
     if(!flags.actAsCeConf) {                                        

@@ -10,6 +10,10 @@
 
 #define CONFIG_TEXT_FILE        "/tmp/ce_config.txt"
 
+#define CONFIGSTREAM_ON_ATARI           0
+#define CONFIGSTREAM_IN_LINUX_CONSOLE   1
+#define CONFIGSTREAM_THROUGH_WEB        2
+
 class AcsiDataTrans;
 
 enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED,
@@ -64,7 +68,7 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
 class ConfigStream
 {
 public:
-    ConfigStream();
+    ConfigStream(int whereItWillBeShown);
     ~ConfigStream();
 
     // functions which are called from the main loop
@@ -115,6 +119,8 @@ public:
     void enterKeyHandlerLater(int event);
     
 private:
+    int shownOn;
+
     StupidVector screen;
     StupidVector message;
 

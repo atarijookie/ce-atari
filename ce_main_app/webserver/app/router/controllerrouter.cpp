@@ -55,7 +55,7 @@ bool ControllerRouter::handleGet(CivetServer *server, struct mg_connection *conn
     }
     if( controllerAction=="debug/getconfig" )
     {
-        ConfigStream cs;
+        ConfigStream cs(CONFIGSTREAM_THROUGH_WEB);
         cs.createConfigDump();
 
         DebugController *pxController=new DebugController(pxDateService,pxFloppyService);

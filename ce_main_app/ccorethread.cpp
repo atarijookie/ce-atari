@@ -131,19 +131,19 @@ void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyServi
 
     //-----------
     // create config stream for ACSI interface
-    shared.configStream.acsi = new ConfigStream();
+    shared.configStream.acsi = new ConfigStream(CONFIGSTREAM_ON_ATARI);
     shared.configStream.acsi->setAcsiDataTrans(dataTrans);
     shared.configStream.acsi->setSettingsReloadProxy(&settingsReloadProxy);
     
     // create config stream for web interface
     shared.configStream.dataTransWeb    = new AcsiDataTrans();
-    shared.configStream.web             = new ConfigStream();
+    shared.configStream.web             = new ConfigStream(CONFIGSTREAM_THROUGH_WEB);
     shared.configStream.web->setAcsiDataTrans(shared.configStream.dataTransWeb);
     shared.configStream.web->setSettingsReloadProxy(&settingsReloadProxy);
 
     // create config stream for linux terminal
     shared.configStream.dataTransTerm   = new AcsiDataTrans();
-    shared.configStream.term            = new ConfigStream();
+    shared.configStream.term            = new ConfigStream(CONFIGSTREAM_IN_LINUX_CONSOLE);
     shared.configStream.term->setAcsiDataTrans(shared.configStream.dataTransTerm);
     shared.configStream.term->setSettingsReloadProxy(&settingsReloadProxy);
 }

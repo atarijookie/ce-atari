@@ -10,8 +10,10 @@
 #include "configstream.h"
 #include "../debug.h"
 
-ConfigStream::ConfigStream()
+ConfigStream::ConfigStream(int whereItWillBeShown)
 {
+    shownOn = whereItWillBeShown;
+
     stScreenWidth   = 40;
     gotoOffset      = 0;
 
@@ -618,7 +620,16 @@ void ConfigStream::screen_addHeaderAndFooter(StupidVector &scr, const char *scre
     scr.push_back(comp);
 
     // insert footer
-    comp = new ConfigComponent(this, ConfigComponent::label, " F5 - refresh, F8 - console, F10 - quit ", 40, 0, 24, gotoOffset);
+    const char *footerText;
+    if(shownOn == CONFIGSTREAM_ON_ATARI) {                  // show valid keys for Atari
+        footerText = " F5 - refresh, F8 - console, F10 - quit ";
+    } else if(shownOn == CONFIGSTREAM_IN_LINUX_CONSOLE) {   // show valid keys for config through linux console 
+        footerText = "       F5 - refresh, Ctrl+C - quit      ";
+    } else {                                                // show valid keys for browser and other cases
+        footerText = "              F5 - refresh              ";
+    }
+    
+    comp = new ConfigComponent(this, ConfigComponent::label, footerText, 40, 0, 24, gotoOffset);
     comp->setReverse(true);
     scr.push_back(comp);
 

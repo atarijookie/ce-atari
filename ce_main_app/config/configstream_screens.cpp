@@ -24,6 +24,7 @@ extern volatile bool do_timeSync;
 extern volatile bool do_loadIkbdConfig;
 
 extern THwConfig hwConfig;
+extern const char *distroString;
 
 //--------------------------
 // screen creation methods
@@ -729,77 +730,101 @@ void ConfigStream::createScreen_update(void)
     
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Hardware version  : ", 22, 7, 4, gotoOffset);
+    int cl1 = 5;
+    int cl2 = 27;
+    
+    int line = 4;
+    comp = new ConfigComponent(this, ConfigComponent::label, "Hardware version  : ", 22, cl1, line, gotoOffset);
     screen.push_back(comp);
 
     const char *hwVer = (hwConfig.version == 2) ? "v. 2" : "v. 1";
 
-    comp = new ConfigComponent(this, ConfigComponent::label, hwVer, 10, 29, 4, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, hwVer, 10, cl2, line, gotoOffset);
     screen.push_back(comp);
+    line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "HDD interface type: ", 22, 7, 5, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "HDD interface type: ", 22, cl1, line, gotoOffset);
     screen.push_back(comp);
 
     const char *hddIf = (hwConfig.hddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI";
 
-    comp = new ConfigComponent(this, ConfigComponent::label, hddIf, 10, 29, 5, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, hddIf, 10, cl2, line, gotoOffset);
+    screen.push_back(comp);
+    line++;
+    
+    //-------
+    comp = new ConfigComponent(this, ConfigComponent::label, "Linux distribution: ", 22, cl1, line, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, distroString, 10, cl2, line, gotoOffset);
     screen.push_back(comp);
     
-    comp = new ConfigComponent(this, ConfigComponent::label, " part       your version   ", 27, 0, 8, gotoOffset);
+    line += 2;
+    //-------
+    
+    comp = new ConfigComponent(this, ConfigComponent::label, " part       your version   ", 27, 0, line, gotoOffset);
     comp->setReverse(true);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "on web", 13, 27, 8, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "on web", 13, 27, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_LOCATION);
     comp->setReverse(true);
     screen.push_back(comp);
+    
+    line += 2;
 
 	int col1 = 1, col2 = 13;
 		
-    comp = new ConfigComponent(this, ConfigComponent::label, "Main App", 12,	col1, 10, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Main App", 12,	col1, line, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, 10, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_COSMOSEX);
     screen.push_back(comp);
+    line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Franz", 12, 		col1, 11, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Franz", 12, 		col1, line, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 			col2, 11, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 			col2, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_FRANZ);
     screen.push_back(comp);
+    line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Hans", 12,		col1, 12, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Hans", 12,		col1, line, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, 12, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_HANZ);
     screen.push_back(comp);
+    line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Xilinx", 12,		col1, 13, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Xilinx", 12,		col1, line, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, 13, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_XILINX);
     screen.push_back(comp);
+    
+    line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " From web ", 10,  6, 15, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " From web ", 10,  6, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_CHECK);
     comp->setComponentId(COMPID_UPDATE_BTN_CHECK);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " From USB ", 10,  22, 15, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " From USB ", 10,  22, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_CHECK_USB);
     comp->setComponentId(COMPID_UPDATE_BTN_CHECK_USB);
     screen.push_back(comp);
+    line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Update  ", 10,  6, 16, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Update  ", 10,  6, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_UPDATE);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Cancel  ", 10,  22, 16, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Cancel  ", 10,  22, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
@@ -1717,7 +1742,7 @@ void ConfigStream::onResetSettings(void)
 
 void ConfigStream::onSendSettings(void)
 {
-    ConfigStream cs;
+    ConfigStream cs(CONFIGSTREAM_THROUGH_WEB);
     cs.createConfigDump();
     
     // add request for download of the update list
