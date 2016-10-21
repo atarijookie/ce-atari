@@ -118,7 +118,7 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
     res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
     
     if(!res) {                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, createFullAtariPath failed!", (char *) newAtariPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, createFullAtariPath failed!", newAtariPath.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
@@ -132,13 +132,13 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
     }
     
     if(!hostPathExists(hostPath)) {                 // path doesn't exists?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, hostPathExist failed for %s", (char *) newAtariPath.c_str(), (char *) hostPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, hostPathExist failed for %s", newAtariPath.c_str(), hostPath.c_str());
 
         dataTrans->setStatus(EPTHNF);               // path not found
         return;
     }
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s -> hostPath: %s", (char *) newAtariPath.c_str(), (char *) hostPath.c_str());
+    //Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s -> hostPath: %s", newAtariPath.c_str(), hostPath.c_str());
 
     if(currentDriveIndex != atariDriveIndex) {      // if we need to change the drive too
         currentDriveIndex   = atariDriveIndex;      // update the current drive index
@@ -147,7 +147,7 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - current drive changed to %c", currentDriveLetter);
     }
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, host path: %s, fullAtariPath: %s - success", (char *) newAtariPath.c_str(), (char *) hostPath.c_str(), (char *) fullAtariPath.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, host path: %s, fullAtariPath: %s - success", newAtariPath.c_str(), hostPath.c_str(), fullAtariPath.c_str());
 
     // if path exists, store it and return OK
     conf[currentDriveIndex].currentAtariPath = fullAtariPath;
@@ -175,7 +175,7 @@ void TranslatedDisk::onDgetpath(BYTE *cmd)
     std::string aPath = conf[whichDrive].currentAtariPath;
     pathSeparatorHostToAtari(aPath);
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onDgetpath - which drive: %d, atari path: %s", whichDrive, (char *) aPath.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onDgetpath - which drive: %d, atari path: %s", whichDrive, aPath.c_str());
 
     // return the current path for current drive
     dataTrans->addDataBfr(aPath.c_str(), aPath.length(), true);
@@ -210,7 +210,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     convertAtariASCIItoPc((char *) (dataBuffer + 5));   // try to fix the path with only allowed chars
     atariSearchString   = (char *) (dataBuffer + 5);    // get search string, e.g.: C:\\*.*
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst(%08x) - atari search string: %s, find attribs: 0x%02x", dta, (char *) atariSearchString.c_str(), findAttribs);
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst(%08x) - atari search string: %s, find attribs: 0x%02x", dta, atariSearchString.c_str(), findAttribs);
     
     if(LOG_DEBUG <= flags.logLevel) {                   // only when debug is enabled
         std::string atts;
@@ -944,13 +944,13 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     f = fopen(hostName.c_str(), "rb+");                             // read/update - file must exist
 
     if(!f) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - fopen failed for reopening", (char *) hostName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - fopen failed for reopening", hostName.c_str());
 
         dataTrans->setStatus(EACCDN);                               // if failed to create, access error
         return;
     }
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - success, index is: %d", (char *) hostName.c_str(), index);
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - success, index is: %d", hostName.c_str(), index);
 
     // store the params
     files[index].hostHandle     = f;
