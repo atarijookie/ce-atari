@@ -659,7 +659,7 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     dc.sharedDrive       = driveLetters.shared;          // index of shared drive
     
     Settings s;
-    dc.settingsResolution   = s.getInt((char *) "SCREEN_RESOLUTION", 1);
+    dc.settingsResolution   = s.getInt("SCREEN_RESOLUTION", 1);
     
     system("rm -f /tmp/configdrive/*.inf");             // remove any *.inf file
     system("rm -f /tmp/configdrive/*.INF");             // remove any *.INF file, too
@@ -685,8 +685,8 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     Settings s;
     bool    setDateTime;
     float   utcOffset;
-    setDateTime = s.getBool ((char *) "TIME_SET",        true);
-    utcOffset   = s.getFloat((char *) "TIME_UTC_OFFSET", 0);
+    setDateTime = s.getBool ("TIME_SET",        true);
+    utcOffset   = s.getFloat("TIME_UTC_OFFSET", 0);
 
     int iUtcOffset = (int) (utcOffset * 10.0);
 
@@ -719,7 +719,7 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     //------------------
 
 	//after sending screencast skip frameSkip frames
-    int frameSkip = s.getInt ((char *) "SCREENCAST_FRAMESKIP",        20);
+    int frameSkip = s.getInt ("SCREENCAST_FRAMESKIP",        20);
     dataTrans->addDataByte(frameSkip);                     		// byte 24 - frame skip for screencast
 
     //-----------------
