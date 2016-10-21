@@ -160,16 +160,69 @@
 
 // date and time function
 #define GEMDOS_Tgetdate     0x2A
+/* Tgetdate is handled on ST only */
 #define GEMDOS_Tsetdate     0x2B
+/* Tsetdate is handled on ST only */
 #define GEMDOS_Tgettime     0x2C
+/* Tgettime is handled on ST only */
 #define GEMDOS_Tsettime     0x2D
+/* Tsettime is handled on ST only */
 
 #define GD_CUSTOM_initialize    0x60
+/* called on the startup of CosmosEx translated disk driver
+ * ACSI/SCSI command arguments :
+ * 512 byte data buffer :
+ * offset 0  WORD TOS Version
+ * offset 2  WORD current resolution
+ * offset 4  drives bitmap
+ * returns E_OK or EINTRN */
 #define GD_CUSTOM_getConfig     0x61
+/* no argument
+ * returns a buffer :
+ * offset 0  WORD drive bitmap
+ * offset 2  BYTE first translated drive
+ * offset 3  BYTE shared drive
+ * offset 4  BYTE config drive
+ * offset 5  BYTE set date time flag
+ * offset 6  BYTE UTC offset (in hours * 10)
+ * offset 7  WORD (unaligned !) year
+ * offset 9  BYTE month
+ * offset 10 BYTE day
+ * offset 11 BYTE hours
+ * offset 12 BYTE minutes
+ * offset 13 BYTE seconds
+ * offset 14 BYTE eth0 enabled flag
+ * offset 15 DWORD (unaligned) eth0 IP address
+ * offset 19 BYTE wlan0 enabled flag
+ * offset 20 DWORD wlan0 IP address
+ * offset 24 BYTE frame skip for screencast
+ * offset 25 WORD (unaligned) TRANSLATEDDISK_VERSION
+ * offset 27 BYTE screen shot vbl enabled
+ * offset 28 BYTE take screenshot ?
+ * returns E_OK */
 #define GD_CUSTOM_ftell         0x62
+/* ACSI/SCSI command arguments :
+ * arg1 = file handle
+ * returns a data buffer :
+ * offset 0 DWORD position
+ * returns E_NOTHANDLED / EINTRN / E_OK */
 #define GD_CUSTOM_getRWdataCnt  0x63
+/* ACSI/SCSI command arguments :
+ * arg1 = file handle
+ * returns a data buffer :
+ * offset 0 DWORD last data count
+ * returns E_NOTHANDLED / EINTRN / E_OK */
 #define GD_CUSTOM_Fsnext_last   0x64
+/* ACSI/SCSI command arguments :
+ * arg1,arg2,arg3,arg4 = DWORD dta address on ST used as identifier
+ * clear the structures used by Fsfirst/Fsnext
+ * returns E_OK or EIHNDL */
 #define GD_CUSTOM_getBytesToEOF 0x65
+/* ACSI/SCSI command arguments :
+ * arg1 = file handle
+ * returns a data buffer :
+ * offset 0 DWORD byte count to end of file
+ * returns E_NOTHANDLED / EINTRN / E_OK */
 
 // BIOS functions we need to support
 #define BIOS_Drvmap				0x70
