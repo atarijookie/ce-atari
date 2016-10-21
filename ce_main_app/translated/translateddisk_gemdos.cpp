@@ -683,7 +683,7 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
     res = stat(hostPath.c_str(), &attr);							// get the file status
 	
 	if(res != 0) {
-		Debug::out(LOG_ERROR, "TranslatedDisk::onFdelete() -- stat() failed");
+		Debug::out(LOG_ERROR, "TranslatedDisk::onFdelete() -- stat(%s) failed", hostPath.c_str());
 		dataTrans->setStatus(EINTRN);
 		return;		
 	}
@@ -769,7 +769,7 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     res = stat(hostName.c_str(), &attr);							// get the file status
 	
 	if(res != 0) {
-		Debug::out(LOG_ERROR, "TranslatedDisk::onFattrib() -- stat() failed");
+		Debug::out(LOG_ERROR, "TranslatedDisk::onFattrib() -- stat(%s) failed", hostName.c_str());
 		dataTrans->setStatus(EINTRN);
 		return;		
 	}
@@ -1089,7 +1089,7 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
 		res = stat(files[index].hostPath.c_str(), &attr);			// get the file status
 	
 		if(res != 0) {
-			Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- stat() failed");
+			Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- stat(%s) failed", files[index].hostPath.c_str());
 			dataTrans->setStatus(EINTRN);
 			return;		
 		}
