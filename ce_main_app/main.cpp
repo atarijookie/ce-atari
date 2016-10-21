@@ -39,7 +39,7 @@ void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
 void loadDefaultArgumentsFromFile(void);
 
-int     linuxConsole_fdMaster, linuxConsole_fdSlave;            // file descriptors for pty pair
+int     linuxConsole_fdMaster;                                  // file descriptors for linux console
 pid_t   childPid;                                               // pid of forked child
 
 void loadLastHwConfig(void);
@@ -104,23 +104,17 @@ int main(int argc, char *argv[])
 
     //------------------------------------
     // if this is not just a reset command AND not a get HW info command
-    if(!flags.justDoReset && !flags.getHwInfo) {                                
-        int ires = openpty(&linuxConsole_fdMaster, &linuxConsole_fdSlave, NULL, NULL, NULL);    // open PTY pair
+    if(!flags.justDoReset && !flags.getHwInfo) {
+        childPid = forkpty(&linuxConsole_fdMaster, NULL, NULL, NULL);
 
-        if(ires != -1) {                                                // if openpty() was OK  
-            childPid = fork();
+        if(childPid == 0) {                                         // code executed only by child
+            const char *shell = "/bin/sh";
+            execlp(shell, shell, (char *) NULL);
 
-            if(childPid == 0) {                                         // code executed only by child
-                dup2(linuxConsole_fdSlave, 0);
-                dup2(linuxConsole_fdSlave, 1);        
-                dup2(linuxConsole_fdSlave, 2);
-
-                const char *shell = "/bin/sh";
-                execlp(shell, shell, (char *) NULL);
-    
-                return 0;
-            }
-        }
+            return 0;
+        } 
+        
+        // parent (full app) continues here
     }
     
     //------------------------------------

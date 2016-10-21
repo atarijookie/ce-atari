@@ -17,7 +17,7 @@
 #include "configstream.h"
 #include "../debug.h"
 
-extern int linuxConsole_fdMaster, linuxConsole_fdSlave;                 // file descriptors for pty pair
+extern int linuxConsole_fdMaster;                                       // file descriptor for linux console master
 
 void ConfigStream::linuxConsole_KeyDown(BYTE atariKey)
 {

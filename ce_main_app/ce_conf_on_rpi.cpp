@@ -305,6 +305,8 @@ static BYTE getKey(int count)
 
 void ce_conf_mainLoop(void)
 {
+    bool configNotLinuxConsole = true;
+
     inBfr   = new BYTE[INBFR_SIZE];
     tmpBfr  = new BYTE[INBFR_SIZE];
     
@@ -355,8 +357,18 @@ void ce_conf_mainLoop(void)
                 break;
             }
             
+            if(key == KEY_F8) {                                     // if should switch between config view and linux console view
+                write(STDOUT_FILENO, "\033[37m", 5);                // foreground white
+                write(STDOUT_FILENO, "\033[40m", 5);                // background black
+                write(STDOUT_FILENO, "\033[2J" , 4);                // clear whole screen
+                write(STDOUT_FILENO, "\033[H"  , 3);                // position cursor to 0,0
+
+                configNotLinuxConsole = !configNotLinuxConsole;
+                key = 0;
+            }
+            
             if(key != 0) {                                          // if got the key, send key down event
-                res = sendCmd(CFG_CMD_KEYDOWN, key, termFd1, termFd2, inBfr, tmpBfr, vt100count);
+                res = sendCmd(configNotLinuxConsole ? CFG_CMD_KEYDOWN : CFG_CMD_LINUXCONSOLE_GETSTREAM, key, termFd1, termFd2, inBfr, tmpBfr, vt100count);
                 
                 if(res) {
                     write(STDOUT_FILENO, (char *) inBfr, vt100count);
@@ -371,7 +383,7 @@ void ce_conf_mainLoop(void)
         if(Utils::getCurrentMs() - lastUpdate >= 1000) {            // last update more than 1 second ago? refresh
             didSomething = true;
         
-            res = sendCmd(CFG_CMD_REFRESH, 0, termFd1, termFd2, inBfr, tmpBfr, vt100count);
+            res = sendCmd(configNotLinuxConsole ? CFG_CMD_REFRESH : CFG_CMD_LINUXCONSOLE_GETSTREAM, 0, termFd1, termFd2, inBfr, tmpBfr, vt100count);
         
             if(res) {
                 write(STDOUT_FILENO, (char *) inBfr, vt100count);
