@@ -6,7 +6,11 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <errno.h>
+
+#include <sys/ioctl.h>
+#include <linux/msdos_fs.h>
 
 #include "global.h"
 #include "../utils.h"
@@ -334,6 +338,26 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
 		
 	if(ires != 0) {     // not matching? quit
 		return;
+	}
+
+	// get MS-DOS VFAT attributes
+	{
+		int fd = open(fullEntryPath.c_str(), O_RDONLY);
+		if(fd >= 0) {
+			__u32 dosattrs = 0;
+			if (ioctl(fd, FAT_IOCTL_GET_ATTRIBUTES, &dosattrs) >= 0) {
+				if(dosattrs & ATTR_RO) atariAttribs |= FA_READONLY;
+				if(dosattrs & ATTR_HIDDEN) atariAttribs |= FA_HIDDEN;
+				if(dosattrs & ATTR_SYS) atariAttribs |= FA_SYSTEM;
+				//if(dosattrs & ATTR_ARCH) atariAttribs |= FA_ARCHIVE;
+			} else {
+				// it will fail if the underlying FileSystem is not FAT
+				//Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- ioctl(%s, FAT_IOCTL_GET_ATTRIBUTES) failed errno %d", fullEntryPath.c_str(), errno);
+			}
+			close(fd);
+		} else {
+			Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- open(%s) failed, errno %d", fullEntryPath.c_str(), errno);
+		}
 	}
 
     // GEMDOS File Attributes
