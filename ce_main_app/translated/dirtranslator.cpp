@@ -196,7 +196,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
     // initialize find storage in case anything goes bad
     fs->clear();
 
-	while(1) {                                                  	// while there are more files, store them
+    while(fs->count < fs->maxCount) {	        					// avoid buffer overflow
 		struct dirent *de = readdir(dir);							// read the next directory entry
 	
 		if(de == NULL) {											// no more entries?
@@ -246,10 +246,6 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
         
 		// finnaly append to the find storage
 		appendFoundToFindStorage(hostPath, searchString.c_str(), fs, de, findAttribs);
-
-        if(fs->count >= fs->maxCount) {         					// avoid buffer overflow
-            break;
-        }
     }
 
 	closedir(dir);
