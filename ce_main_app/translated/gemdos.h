@@ -3,15 +3,45 @@
 
 // path functions
 #define GEMDOS_Dsetdrv      0x0e
+/* ACSI/SCSI command arguments :
+ * arg1 = drive index
+ * returns a buffer with :
+ * offset 0  WORD drive bitmap (bitmap of enabled drives from A to P)
+ * returns E_OK or E_NOTHANDLED */
 #define GEMDOS_Dgetdrv      0x19
+/* No argument
+ * return index of current drive (0 to 15) */
 #define GEMDOS_Dsetpath     0x3b
+/* ACSI/SCSI command arguments :
+ * data buffer containing the path
+ * returns E_OK or E_NOTHANDLED / EINTRN / E_WAITING_FOR_MOUNT / EPTHNF */
 #define GEMDOS_Dgetpath     0x47
+/* ACSI/SCSI command arguments :
+ * arg1 = drive index + 1 (0 is for current drive)
+ * returns a buffer with :
+ * offset 0  current path for drive
+ * returns E_OK or E_NOTHANDLED */
 
 // directory & file search
 #define GEMDOS_Fsetdta      0x1a
+/* Fsetdta is handled on ST only */
 #define GEMDOS_Fgetdta      0x2f
+/* Fgetdta is handled on ST only */
 #define GEMDOS_Fsfirst      0x4e
+/* ACSI/SCSI command arguments :
+ * data buffer containing :
+ * offset 0  DWORD dta address on ST used as identifier
+ * offset 4  BYTE find attributes FA_READONLY, FA_HIDDEN, FA_SYSTEM, FA_DIR, FA_ARCHIVE
+ * offset 5  character string of the search string (C:\PATH\*.*)
+ * returns E_OK or E_NOTHANDLED / EINTRN / E_WAITING_FOR_MOUNT / EFILNF */
 #define GEMDOS_Fsnext       0x4f
+/* ACSI/SCSI command arguments :
+ * arg1,arg2,arg3,arg4 = DWORD dta address on ST used as identifier
+ * arg5,arg6 = WORD index of first item to send to ST
+ * returns a buffer with :
+ * offset 0   WORD count of DTA transfered
+ * offset 2   n * DTA structures, 23bytes each (see DTAshort below)
+ * returns E_OK or EINTRN / EIHNDL / ENMFIL */
 
 // file and directory manipulation
 #define GEMDOS_Dfree        0x36
@@ -102,6 +132,31 @@
 
 // Pexec() related stuff
 #define GEMDOS_Pexec        0x4B
+/* ACSI/SCSI command arguments :
+ * arg1 = subcommand : PEXEC_CREATE_IMAGE / PEXEC_GET_BPB / PEXEC_READ_SECTOR / PEXEC_WRITE_SECTOR
+ * - PEXEC_CREATE_IMAGE :
+ *   512 byte data buffer :
+ *   offset 0  WORD mode (ignored ?)
+ *   offset 2  char string of program path
+ *   returns E_NOTHANDLED / E_WAITING_FOR_MOUNT / EFILNF / EACCDN / EINTRN / E_OK
+ * - PEXEC_GET_BPB :
+ *   returns a data buffer :
+ *   offset 0   BPB (20 bytes)
+ *   offset 32  path to PRG file
+ *   offset 256 PRG name without path
+ *   offset 384 PRG path
+ *   returns E_OK
+ * - PEXEC_READ_SECTOR :
+ *   arg2,arg3 : WORD starting sector
+ *   arg4,arg5 : WORD sector count
+ *   returns a byte buffer with the requested sector data
+ *   returns E_OK or EINTRN
+ * - PEXEC_WRITE_SECTOR :
+ *   arg2,arg3 : WORD starting sector
+ *   arg4,arg5 : WORD sector count
+ *   + a data buffer for sector data
+ *   returns E_OK or EINTRN
+ */
 
 // date and time function
 #define GEMDOS_Tgetdate     0x2A
