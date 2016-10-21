@@ -138,6 +138,7 @@ void TranslatedDisk::reloadSettings(int type)
         tmpConf[i].hostRootPath     = conf[i].hostRootPath;
         tmpConf[i].translatedType   = conf[i].translatedType;
         tmpConf[i].devicePath       = conf[i].devicePath;
+        tmpConf[i].label            = conf[i].label;
     }
 
     detachAll();                                // then deinit the conf structures
@@ -321,6 +322,7 @@ void TranslatedDisk::attachToHostPathByIndex(int index, std::string hostRootPath
     conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
     conf[index].translatedType      = translatedType;
     conf[index].mediaChanged        = true;
+    conf[index].label = Utils::getDeviceLabel(devicePath);
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::attachToHostPath - path %s attached to index %d (letter %c)", hostRootPath.c_str(), index, 'A' + index);
 }
@@ -660,10 +662,13 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     
     Settings s;
     dc.settingsResolution   = s.getInt("SCREEN_RESOLUTION", 1);
-    
-    system("rm -f /tmp/configdrive/*.inf");             // remove any *.inf file
-    system("rm -f /tmp/configdrive/*.INF");             // remove any *.INF file, too
-    
+    for(int i = 2; i < MAX_DRIVES; i++) {
+        dc.label[i] = conf[i].label;
+    }
+
+    //system("rm -f /tmp/configdrive/*.inf");             // remove any *.inf file
+    //system("rm -f /tmp/configdrive/*.INF");             // remove any *.INF file, too
+
     DesktopCreator::createToFile(&dc);                  // create the DESKTOP.INF / NEWDESK.INF file
 
     dataTrans->setStatus(E_OK);

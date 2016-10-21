@@ -1,7 +1,10 @@
 #ifndef _DESKTOPCREATOR_H_
 #define _DESKTOPCREATOR_H_
 
+#include <string>
+
 #include "../datatypes.h"
+#include "translateddisk.h"
 
 #define TOSVER100   0x0100
 #define TOSVER102   0x0102
@@ -22,6 +25,7 @@ typedef struct {
     DWORD translatedDrives;     // bitmap of drives which are translated
     BYTE  configDrive;          // index of config drive
     BYTE  sharedDrive;          // index of shared drive
+    std::string label[MAX_DRIVES];
 } DesktopConfig;
 
 class DesktopCreator {
