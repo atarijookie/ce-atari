@@ -105,9 +105,9 @@ void TranslatedDisk::loadSettings(void)
     Settings s;
     char drive1, drive2, drive3;
 
-    drive1 = s.getChar((char *) "DRIVELETTER_FIRST",      -1);
-    drive2 = s.getChar((char *) "DRIVELETTER_SHARED",     -1);
-    drive3 = s.getChar((char *) "DRIVELETTER_CONFDRIVE",  'O');
+    drive1 = s.getChar("DRIVELETTER_FIRST",      -1);
+    drive2 = s.getChar("DRIVELETTER_SHARED",     -1);
+    drive3 = s.getChar("DRIVELETTER_CONFDRIVE",  'O');
 
     driveLetters.firstTranslated    = drive1 - 'A';
     driveLetters.shared             = drive2 - 'A';
@@ -120,7 +120,7 @@ void TranslatedDisk::loadSettings(void)
         driveLetters.readOnly = (1 << driveLetters.confDrive);              // make config drive read only
     }
     
-    useZipdirNotFile = s.getBool((char *) "USE_ZIP_DIR", 1);
+    useZipdirNotFile = s.getBool("USE_ZIP_DIR", 1);
 }
 
 void TranslatedDisk::reloadSettings(int type)
