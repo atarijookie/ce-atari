@@ -303,6 +303,8 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
     BYTE atariAttribs;								            // convert host to atari attribs
     Utils::attributesHostToAtari(isReadOnly, isDir, atariAttribs);
 
+	if(de->d_name[0] == '.') atariAttribs |= FA_HIDDEN;		// enforce Mac/Unix convention of hidding files startings with '.'
+
 	std::string fullEntryPath 	= hostPath;
 	std::string longFname		= de->d_name;
 	Utils::mergeHostPaths(fullEntryPath, longFname);
