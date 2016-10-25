@@ -783,10 +783,7 @@ void ConfigStream::createScreen_update(void)
     line++;
     //-------
     #ifndef DISTRO_YOCTO
-    comp = new ConfigComponent(this, ConfigComponent::label, "RPi model   : ", 22, cl1, line, gotoOffset);
-    screen.push_back(comp);
-
-    comp = new ConfigComponent(this, ConfigComponent::label, rpiConfig.model, 20, cl2, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, rpiConfig.model, 40, cl1, line, gotoOffset);
     screen.push_back(comp);
     #endif
 

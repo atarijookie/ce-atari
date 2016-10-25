@@ -339,7 +339,7 @@ void ce_conf_mainLoop(void)
 	new_tio_out.c_lflag &= (~ICANON);               // disable canonical mode (buffered i/o)
 	tcsetattr(STDOUT_FILENO,TCSANOW, &new_tio_out); // set the new settings immediately
     
-    DWORD lastUpdate = Utils::getCurrentMs();
+    DWORD lastUpdate = 0;
     
     while(sigintReceived == 0) {
         bool didSomething = false;

@@ -335,12 +335,12 @@ void getRaspberryPiInfo(void)
     // first parse the files, so we won't have to do this in C 
     system("cat /proc/cpuinfo | grep 'Serial' | tr -d ' ' | awk -F ':' '{print $2}' > /tmp/rpiserial.txt");
     system("cat /proc/cpuinfo | grep 'Revision' | tr -d ' ' | awk -F ':' '{print $2}' > /tmp/rpirevision.txt");
-    system("dmesg | grep 'Machine model' > /tmp/rpimodel.txt");
+    system("dmesg | grep 'Machine model' | awk -F ': ' '{print $2}' > /tmp/rpimodel.txt");
     
     // read in the data
     readLineFromFile("/tmp/rpiserial.txt",      rpiConfig.serial,   20, "unknown");
     readLineFromFile("/tmp/rpirevision.txt",    rpiConfig.revision,  8, "unknown");
-    readLineFromFile("/tmp/rpimodel.txt",       rpiConfig.model,    20, "unknown");
+    readLineFromFile("/tmp/rpimodel.txt",       rpiConfig.model,    40, "Raspberry Pi unknown model");
     
     // print to log file in debug mode
     Debug::out(LOG_DEBUG, "RPi serial  : %s", rpiConfig.serial);

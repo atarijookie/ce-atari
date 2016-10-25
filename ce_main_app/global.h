@@ -124,7 +124,7 @@
 typedef struct {
     char serial  [20];
     char revision[8];
-    char model   [20];
+    char model   [40];
 } RPiConfig;
 
 typedef struct {
