@@ -122,6 +122,12 @@
 //////////////////////////////////////////////////////
 
 typedef struct {
+    char serial  [20];
+    char revision[8];
+    char model   [20];
+} RPiConfig;
+
+typedef struct {
     int  version;               // returned from Hans: HW version (1 for HW from 2014, 2 for new HW from 2015)
     int  hddIface;              // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
     int  scsiMachine;           // when HwHddIface is HDD_IF_SCSI, this specifies what machine (TT or Falcon) is using this device

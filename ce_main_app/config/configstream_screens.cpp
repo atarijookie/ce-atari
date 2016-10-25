@@ -26,6 +26,8 @@ extern volatile bool do_loadIkbdConfig;
 extern THwConfig hwConfig;
 extern const char *distroString;
 
+extern RPiConfig rpiConfig;             // RPi info structure
+
 //--------------------------
 // screen creation methods
 void ConfigStream::createScreen_homeScreen(void)
@@ -759,6 +761,35 @@ void ConfigStream::createScreen_update(void)
     comp = new ConfigComponent(this, ConfigComponent::label, distroString, 10, cl2, line, gotoOffset);
     screen.push_back(comp);
     
+    line++;
+    //-------
+    #ifndef DISTRO_YOCTO
+    line++;
+    cl1 = 2;
+    cl2 = 17;
+    #endif
+
+    #ifdef DISTRO_YOCTO
+    comp = new ConfigComponent(this, ConfigComponent::label, "RPi revision      : ", 22, cl1, line, gotoOffset);
+    #else
+    comp = new ConfigComponent(this, ConfigComponent::label, "RPi revision: ", 22, cl1, line, gotoOffset);
+    #endif
+    
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, rpiConfig.revision, 20, cl2, line, gotoOffset);
+    screen.push_back(comp);
+    
+    line++;
+    //-------
+    #ifndef DISTRO_YOCTO
+    comp = new ConfigComponent(this, ConfigComponent::label, "RPi model   : ", 22, cl1, line, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, rpiConfig.model, 20, cl2, line, gotoOffset);
+    screen.push_back(comp);
+    #endif
+
     line += 2;
     //-------
     
