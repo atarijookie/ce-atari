@@ -551,15 +551,15 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
     }
 
     if(isDriveIndexReadOnly(atariDriveIndex) || zipDirNestingLevel > 0) {     // if it's read only (or inside of ZIP DIR - that's also read only), quit
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -> hostPath: %s -- path is read only", (char *) newAtariPath.c_str(), (char *) hostPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -> hostPath: %s -- path is read only", newAtariPath.c_str(), hostPath.c_str());
 
         dataTrans->setStatus(EACCDN);
         return;
     }
 
-	int ires = deleteDirectoryPlain((char *) hostPath.c_str());
+	int ires = deleteDirectoryPlain(hostPath.c_str());
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - deleting directory hostPath: %s, result is %d", (char *) hostPath.c_str(), ires);
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - deleting directory hostPath: %s, result is %d", hostPath.c_str(), ires);
 
     dataTrans->setStatus(ires);
 }

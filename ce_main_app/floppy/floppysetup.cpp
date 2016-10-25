@@ -12,6 +12,7 @@
 #include "../translated/gemdos_errno.h"
 #include "../downloader.h"
 #include "floppysetup.h"
+#include "floppysetup_commands.h"
 
 #define UPLOAD_PATH "/tmp/"
 
