@@ -19,6 +19,7 @@
 #include "../../../debug.h"
 #include "../../../utils.h"
 #include "../../../config/configstream.h"
+#include "../../../config/config_commands.h"
 #include "../../../ce_conf_on_rpi.h"
 #include "../../../statusreport.h"
 

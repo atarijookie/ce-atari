@@ -15,6 +15,7 @@
 #include "global.h"
 #include "debug.h"
 #include "utils.h"
+#include "config/config_commands.h"
 #include "config/configstream.h"
 #include "config/keys.h"
 
