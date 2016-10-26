@@ -14,14 +14,19 @@
 #include <vector>    
 
 #include <curl/curl.h>
+#include "global.h"
 #include "debug.h"
 #include "downloader.h"
 #include "utils.h"
+#include "version.h"
 
 // sudo apt-get install libcurl4-gnutls-dev
 // gcc main.c -lcurl
 
 extern volatile sig_atomic_t sigintReceived;
+
+extern const char *distroString;        // linux distro string
+extern RPiConfig rpiConfig;             // RPi info structure 
 
 void updateStatusByte(TDownloadRequest &tdr, BYTE newStatus);
 
@@ -169,6 +174,12 @@ bool Downloader::verifyChecksum(char *filename, WORD checksum)
     return checksumIsGood;                // return if the calculated cs is equal to the provided cs
 }
 
+static size_t my_write_func_reportVersions(void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+    // for now just return fake written size
+    return (size * nmemb);
+}
+
 static size_t my_write_func(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
   return fwrite(ptr, size, nmemb, stream);
@@ -295,6 +306,35 @@ void handleSendConfig(char *localConfigFile, char *remoteUrl)
     curl_easy_cleanup(curl);              
 }
 
+void handleReportVersions(CURL *curl, const char *reportUrl)
+{
+    // specify url
+    curl_easy_setopt(curl, CURLOPT_URL, reportUrl);
+    
+    // specify where the retrieved data should go 
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, my_write_func_reportVersions);
+    
+    // specify the POST data
+    char postFields[256];
+    
+    char appVersion[16]; 
+    Version::getAppVersion(appVersion);
+    
+    sprintf(postFields, "mainapp=%s&distro=%s&rpirevision=%s&rpiserial=%s", appVersion, distroString, rpiConfig.revision, rpiConfig.serial);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
+ 
+    // Perform the request, res will get the return code
+    CURLcode res = curl_easy_perform(curl);
+    
+    // Check for errors
+    if(res != CURLE_OK) {
+        Debug::out(LOG_ERROR, "CURL curl_easy_perform() failed: %s", curl_easy_strerror(res));
+    }
+ 
+    // always cleanup
+    curl_easy_cleanup(curl);
+}
+
 void *downloadThreadCode(void *ptr)
 {
     CURLcode cres;
@@ -337,6 +377,14 @@ void *downloadThreadCode(void *ptr)
         
         if(!curl) {
             Debug::out(LOG_ERROR, "CURL init failed, the file %s was not downloaded...", (char *) downloadCurrent.srcUrl.c_str());
+            continue;
+        }
+
+        //-------------------
+        // if this is a request to report versions, do it in a separate function
+        if(downloadCurrent.downloadType == DWNTYPE_REPORT_VERSIONS) {
+            handleReportVersions(curl, downloadCurrent.srcUrl.c_str());
+            curl = NULL;
             continue;
         }
         //-------------------

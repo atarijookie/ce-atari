@@ -168,6 +168,16 @@ void Update::downloadUpdateList(const char *remoteUrl)
     // remove old update list
     remove(UPDATE_LOCALLIST);
 
+    //------------
+    // report versions, possibly get correct download URL
+    TDownloadRequest tdrReport;
+    tdrReport.srcUrl        = REPORT_URL;
+    tdrReport.downloadType  = DWNTYPE_REPORT_VERSIONS;
+    tdrReport.checksum      = 0;// special case - don't check checsum
+    tdrReport.pStatusByte   = NULL;
+    Downloader::add(tdrReport);
+    //------------
+    
     // add request for download of the update list
     TDownloadRequest tdr;
     

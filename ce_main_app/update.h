@@ -19,6 +19,8 @@
 #define UPDATE_STATE_DOWNLOAD_OK    2
 #define UPDATE_STATE_DOWNLOAD_FAIL  3
 
+#define REPORT_URL          "http://joo.kie.sk/cosmosex/update/report.php"
+
 class Update
 {
 public:

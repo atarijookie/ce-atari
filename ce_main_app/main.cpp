@@ -43,14 +43,13 @@ int     linuxConsole_fdMaster;                                  // file descript
 pid_t   childPid;                                               // pid of forked child
 
 void loadLastHwConfig(void);
-THwConfig hwConfig;                                             // info about the current HW setup
-
-TFlags flags;                                                   // global flags from command line
 void initializeFlags(void);
 
-extern SharedObjects shared;
-
-InterProcessEvents events;
+THwConfig           hwConfig;                           // info about the current HW setup
+TFlags              flags;                              // global flags from command line
+RPiConfig           rpiConfig;                          // RPi model, revision, serial
+InterProcessEvents  events;
+SharedObjects       shared;
 
 #ifdef DISTRO_YOCTO
 const char *distroString = "Yocto";
@@ -90,6 +89,8 @@ int main(int argc, char *argv[])
     loadLastHwConfig();                                         // load last found HW IF, HW version, SCSI machine
 
     printf("CosmosEx main app starting on %s...\n", distroString);
+    
+    Version::getRaspberryPiInfo();                              // fetch model, revision, serial of RPi
     //------------------------------------
     // if not running as ce_conf, register signal handlers
     if(!flags.actAsCeConf) {                                        

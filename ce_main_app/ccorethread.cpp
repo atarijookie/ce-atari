@@ -41,7 +41,7 @@ extern TFlags       flags;
 
 extern DebugVars    dbgVars;
 
-SharedObjects shared;
+extern SharedObjects shared;
 extern volatile bool floppyEncodingRunning;
 
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)

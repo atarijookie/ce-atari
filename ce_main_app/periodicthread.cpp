@@ -58,10 +58,6 @@ void handleConfigStreams(ConfigStream *cs, int fd1, int fd2);
 void updateUpdateState(void);
 bool checkInetIfEnabled(void);
 
-RPiConfig rpiConfig;
-void getRaspberryPiInfo(void);
-void readLineFromFile(const char *filename, char *buffer, int maxLen, const char *defValue);
-
 void *periodicThreadCode(void *ptr)
 {
 	Debug::out(LOG_DEBUG, "Periodic thread starting...");
@@ -73,7 +69,6 @@ void *periodicThreadCode(void *ptr)
     DWORD nextUpdateListDownloadTime    = Utils::getEndTime(3000);          // try to download update list at this time
     
     ce_conf_createFifos();                                                  // if should run normally, create the ce_conf FIFOs
-    getRaspberryPiInfo();
     
     DevFinder devFinder;
 
@@ -328,43 +323,4 @@ bool inetIfaceReady(const char* ifrname)
     } while (result == -1 && errno == EINTR);	
 
 	return up_and_running; 
-}
-
-void getRaspberryPiInfo(void)
-{
-    // first parse the files, so we won't have to do this in C 
-    system("cat /proc/cpuinfo | grep 'Serial' | tr -d ' ' | awk -F ':' '{print $2}' > /tmp/rpiserial.txt");
-    system("cat /proc/cpuinfo | grep 'Revision' | tr -d ' ' | awk -F ':' '{print $2}' > /tmp/rpirevision.txt");
-    system("dmesg | grep 'Machine model' | awk -F ': ' '{print $2}' > /tmp/rpimodel.txt");
-    
-    // read in the data
-    readLineFromFile("/tmp/rpiserial.txt",      rpiConfig.serial,   20, "unknown");
-    readLineFromFile("/tmp/rpirevision.txt",    rpiConfig.revision,  8, "unknown");
-    readLineFromFile("/tmp/rpimodel.txt",       rpiConfig.model,    40, "Raspberry Pi unknown model");
-    
-    // print to log file in debug mode
-    Debug::out(LOG_DEBUG, "RPi serial  : %s", rpiConfig.serial);
-    Debug::out(LOG_DEBUG, "RPi revision: %s", rpiConfig.revision);
-    Debug::out(LOG_DEBUG, "RPi model   : %s", rpiConfig.model);
-}
-
-void readLineFromFile(const char *filename, char *buffer, int maxLen, const char *defValue)
-{
-    memset(buffer, 0, maxLen);                  // clear the buffer where the value should be stored
-    
-    FILE *f = fopen(filename, "rt");            // open the file
-    
-    if(!f) {                                    // if failed to open, copy in the default value
-        strncpy(buffer, defValue, maxLen - 1);
-        return;
-    }
-
-    char *res = fgets(buffer, maxLen - 1, f);   // try to read the line
-    
-    if(res == NULL) {
-        strncpy(buffer, defValue, maxLen - 1);  // failed to read the line? use default value
-        return;
-    }
-
-    fclose(f);                                  // close the file
 }
