@@ -134,8 +134,8 @@ public:
     static bool hostPathExists(std::string hostPath);
     static void pathSeparatorAtariToHost(std::string &path);
     
-    bool createFullAtariPathAndFullHostPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
-    void createFullHostPath (std::string inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
+    bool createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
+    void createFullHostPath (const std::string &inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
 
     // for status report
     bool driveIsEnabled(int driveIndex);

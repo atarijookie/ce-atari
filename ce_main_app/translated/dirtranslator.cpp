@@ -85,7 +85,7 @@ void DirTranslator::shortToLongPath(const std::string &rootPath, const std::stri
         if(fs->shortToLongFileName(strings[i].c_str(), longName)) {   // try to convert the name
             strings[i] = longName; // if there was a long version of the file name, replace the short one
         } else {
-            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s", strings[i].c_str());
+            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s path=%s", strings[i].c_str(), pathPart.c_str());
         }
 
         Utils::mergeHostPaths(pathPart, strings[i]);   // build the path slowly
@@ -131,7 +131,7 @@ FilenameShortener *DirTranslator::getShortenerForPath(std::string path)
     FilenameShortener *fs;
 
     if(it != mapPathToShortener.end()) {            // already got the shortener
-        Debug::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s found", path.c_str());
+        //Debug::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s found", path.c_str());
         fs = it->second;
     } else {                                        // don't have the shortener yet
         Debug::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, creating", path.c_str());
@@ -196,7 +196,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
     // initialize find storage in case anything goes bad
     fs->clear();
 
-	while(1) {                                                  	// while there are more files, store them
+    while(fs->count < fs->maxCount) {	        					// avoid buffer overflow
 		struct dirent *de = readdir(dir);							// read the next directory entry
 	
 		if(de == NULL) {											// no more entries?
@@ -246,10 +246,6 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
         
 		// finnaly append to the find storage
 		appendFoundToFindStorage(hostPath, searchString.c_str(), fs, de, findAttribs);
-
-        if(fs->count >= fs->maxCount) {         					// avoid buffer overflow
-            break;
-        }
     }
 
 	closedir(dir);
