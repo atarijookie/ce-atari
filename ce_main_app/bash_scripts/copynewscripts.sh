@@ -27,6 +27,7 @@ echo "Will compare with old and copy new files..."
 mkdir -p /ce/update
 
 #compareAndCopy  local file                      new file
+compareAndCopy   "/ce/ceboot.sh"                 "/tmp/newscripts/ceboot.sh"
 compareAndCopy   "/ce/cesuper.sh"                "/tmp/newscripts/cesuper.sh"
 compareAndCopy   "/ce/wifisuper.sh"              "/tmp/newscripts/wifisuper.sh"
 compareAndCopy   "/ce/ce_conf.sh"                "/tmp/newscripts/ce_conf.sh"
@@ -40,7 +41,8 @@ compareAndCopy   "/ce/update/update_app.sh"      "/tmp/newscripts/update_app.sh"
 compareAndCopy   "/ce/update/update_franz.sh"    "/tmp/newscripts/update_franz.sh"
 compareAndCopy   "/ce/update/update_hans.sh"     "/tmp/newscripts/update_hans.sh"
 compareAndCopy   "/ce/update/update_xilinx.sh"   "/tmp/newscripts/update_xilinx.sh"
-                
+compareAndCopy   "/etc/init.d/cosmosex"          "/tmp/newscripts/initd_cosmosex"
+
 echo "Doing sync..."
 sync
 echo "All files should be up to date now."
