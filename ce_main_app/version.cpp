@@ -217,6 +217,20 @@ void Version::readLineFromFile(const char *filename, char *buffer, int maxLen, c
         strncpy(buffer, defValue, maxLen - 1);  // failed to read the line? use default value
         return;
     }
+    
+    int len = strlen(buffer);
+    
+    if(len > 0) {                                                   // got at least 1 character?
+        if(buffer[len - 1] == '\n' || buffer[len - 1] == '\r') {    // if it's new line, remove it
+            buffer[len - 1] = 0;
+        }
+    }
+
+    if(len > 1) {                                                   // got at least 2 characters?
+        if(buffer[len - 2] == '\n' || buffer[len - 2] == '\r') {    // if it's new line, remove it
+            buffer[len - 2] = 0;
+        }
+    }
 
     fclose(f);                                  // close the file
 }

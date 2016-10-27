@@ -90,7 +90,6 @@ int main(int argc, char *argv[])
 
     printf("CosmosEx main app starting on %s...\n", distroString);
     
-    Version::getRaspberryPiInfo();                              // fetch model, revision, serial of RPi
     //------------------------------------
     // if not running as ce_conf, register signal handlers
     if(!flags.actAsCeConf) {                                        
@@ -156,6 +155,7 @@ int main(int argc, char *argv[])
     Debug::out(LOG_INFO, "\n\n---------------------------------------------------");
     Debug::out(LOG_INFO, "CosmosEx starting, version: %s", appVersion);
 
+    Version::getRaspberryPiInfo();                                  // fetch model, revision, serial of RPi
     Update::createNewScripts();                                     // update the scripts if needed
     
 //	system("sudo echo none > /sys/class/leds/led0/trigger");	    // disable usage of GPIO 23 (pin 16) by LED
