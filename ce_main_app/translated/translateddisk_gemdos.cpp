@@ -10,6 +10,10 @@
 #include <utime.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <fcntl.h>
+
+#include <sys/ioctl.h>
+#include <linux/msdos_fs.h>
 
 #include "../global.h"
 #include "../debug.h"
@@ -683,7 +687,7 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
     res = stat(hostPath.c_str(), &attr);							// get the file status
 	
 	if(res != 0) {
-		Debug::out(LOG_ERROR, "TranslatedDisk::onFdelete() -- stat() failed");
+		Debug::out(LOG_ERROR, "TranslatedDisk::onFdelete() -- stat(%s) failed", hostPath.c_str());
 		dataTrans->setStatus(EINTRN);
 		return;		
 	}
@@ -739,9 +743,6 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     bool setNotInquire  = dataBuffer[0];
     BYTE attrAtariNew   = dataBuffer[1];
 
-    (void) attrAtariNew;
-    #warning TranslatedDisk::onFattrib -- setting new file attribute not implemented!
-
     convertAtariASCIItoPc((char *) (dataBuffer + 2));   // try to fix the path with only allowed chars
     atariName =           (char *) (dataBuffer + 2);    // get file name
 
@@ -769,20 +770,54 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     res = stat(hostName.c_str(), &attr);							// get the file status
 	
 	if(res != 0) {
-		Debug::out(LOG_ERROR, "TranslatedDisk::onFattrib() -- stat() failed");
+		Debug::out(LOG_ERROR, "TranslatedDisk::onFattrib() -- stat(%s) failed", hostName.c_str());
 		dataTrans->setStatus(EINTRN);
 		return;		
 	}
 	
 	bool isDir = (S_ISDIR(attr.st_mode) != 0);						// check if it's a directory
 
+	bool hostIsFAT = false;
 	bool isReadOnly = false;
 	// TODO: checking of read only for file
 	
     Utils::attributesHostToAtari(isReadOnly, isDir, oldAttrAtari);
+	{
+		int fd = open(hostName.c_str(), O_RDONLY);
+		if(fd >= 0) {
+			__u32 dosattrs = 0;
+			if(ioctl(fd, FAT_IOCTL_GET_ATTRIBUTES, &dosattrs) >= 0) {
+				hostIsFAT = true;	// success, that means the underlying FS is FAT
+				if(dosattrs & ATTR_RO) oldAttrAtari |= FA_READONLY;
+				if(dosattrs & ATTR_HIDDEN) oldAttrAtari |= FA_HIDDEN;
+				if(dosattrs & ATTR_SYS) oldAttrAtari |= FA_SYSTEM;
+				//if(dosattrs & ATTR_ARCH) oldAttrAtari |= FA_ARCHIVE;
+			}
+		}
+	}
 	
-    if(setNotInquire) {     // SET attribs?
-		Debug::out(LOG_DEBUG, "TranslatedDisk::onFattrib() -- TODO: setting attributes needs to be implemented!");
+    if(setNotInquire) {     // SET attribs? - SET FAT Attributes!
+		if(hostIsFAT) {
+			int fd = open(hostName.c_str(), O_RDWR);
+			if(fd < 0) {
+				Debug::out(LOG_ERROR, "TranslatedDisk::onFattrib() -- setting attributes open(%s) failed", hostName.c_str());
+	            dataTrans->setStatus(EACCDN);
+	            return;
+			}
+			__u32 dosattrs = ATTR_NONE;
+			if(attrAtariNew & FA_READONLY) dosattrs |= ATTR_RO;
+			if(attrAtariNew & FA_HIDDEN) dosattrs |= ATTR_HIDDEN;
+			if(attrAtariNew & FA_SYSTEM) dosattrs |= ATTR_SYS;
+			if(attrAtariNew & FA_VOLUME) dosattrs |= ATTR_VOLUME;
+			if(attrAtariNew & FA_DIR) dosattrs |= ATTR_DIR;
+			if(attrAtariNew & FA_ARCHIVE) dosattrs |= ATTR_ARCH;
+			if(ioctl(fd, FAT_IOCTL_SET_ATTRIBUTES, &dosattrs) < 0) {
+				Debug::out(LOG_ERROR, "TranslatedDisk::onFattrib() -- ioctl(%s, FAT_IOCTL_SET_ATTRIBUTES, %x) failed errno %d", hostName.c_str(), (int)dosattrs, errno);
+			} else {
+				Debug::out(LOG_DEBUG, "TranslatedDisk::onFattrib() -- FAT attributes %x set %s", (int)dosattrs, hostName.c_str());
+			}
+			close(fd);
+		}
 	/*
         attributesAtariToHost(attrAtariNew, attrHost);
 
@@ -822,8 +857,6 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     }
     
     BYTE attribs = dataBuffer[0];
-    (void) attribs;
-    #warning TranslatedDisk::onFcreate -- setting file attribute not implemented!
 
     std::string atariName, hostName;
 
@@ -875,10 +908,25 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
         return;
     }
 
+    // now set it's attributes
+	int fd = fileno(f);
+	if(fd >= 0) {
+		__u32 dosattrs = ATTR_NONE;
+		if(attribs & FA_READONLY) dosattrs |= ATTR_RO;
+		if(attribs & FA_HIDDEN) dosattrs |= ATTR_HIDDEN;
+		if(attribs & FA_SYSTEM) dosattrs |= ATTR_SYS;
+		if(attribs & FA_VOLUME) dosattrs |= ATTR_VOLUME;
+		if(attribs & FA_DIR) dosattrs |= ATTR_DIR;
+		if(attribs & FA_ARCHIVE) dosattrs |= ATTR_ARCH;
+		if(ioctl(fd, FAT_IOCTL_SET_ATTRIBUTES, &dosattrs) < 0) {
+			Debug::out(LOG_ERROR, "TranslatedDisk::onFcreate -- failed to set (FAT) files attributes on %s", hostName.c_str());
+		} else {
+			Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate -- attributes %x set on %s", (int)dosattrs, hostName.c_str());
+		}
+	}
+
     fclose(f);
 
-    // now set it's attributes
-	Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate -- TODO: setting attributes needs to be implemented!");
 
 /*	
     DWORD attrHost;
@@ -1089,7 +1137,7 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
 		res = stat(files[index].hostPath.c_str(), &attr);			// get the file status
 	
 		if(res != 0) {
-			Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- stat() failed");
+			Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- stat(%s) failed", files[index].hostPath.c_str());
 			dataTrans->setStatus(EINTRN);
 			return;		
 		}
