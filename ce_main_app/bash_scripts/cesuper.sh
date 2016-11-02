@@ -10,11 +10,11 @@ do
 
         # app is not running - either we want to do update, or it crashed
 
-        if [ -f /ce/update/doupdate.sh ]        # if update file exists, we do the update
+        if [ -e /ce/update/doupdate.sh ]        # if update file exists, we do the update
         then
             echo "doing update"
 
-            chmod 777 /ce/update/doupdate.sh    # make the script executable
+            chmod +x /ce/update/doupdate.sh     # make the script executable
             /ce/update/doupdate.sh              # execute the update script, wait for finish
             rm -f /ce/update/doupdate.sh        # delete the update script
         fi

@@ -20,7 +20,7 @@ compareAndCopy()
     echo "Copying file $1"
     rm -f $1        # delete local file
     cp $2 $1        # copy new file to local file
-    chmod 755 $1    # make new local file executable
+    chmod +x $1     # make new local file executable
 }
 
 echo "Will compare with old and copy new files..."
@@ -42,6 +42,16 @@ compareAndCopy   "/ce/update/update_franz.sh"    "/tmp/newscripts/update_franz.s
 compareAndCopy   "/ce/update/update_hans.sh"     "/tmp/newscripts/update_hans.sh"
 compareAndCopy   "/ce/update/update_xilinx.sh"   "/tmp/newscripts/update_xilinx.sh"
 compareAndCopy   "/etc/init.d/cosmosex"          "/tmp/newscripts/initd_cosmosex"
+
+# todo
+# check distro, if raspbian
+# check if link exists:
+# link doesn't exist - create it
+# link does exist - check where it goes, and and replace it if needed
+
+#readlink -f /etc/rc6.d/K01cosmosex
+#ln -s /etc/init.d/cosmosex /etc/rcS.d/S09cosmosex
+#ln -s /etc/init.d/cosmosex /etc/rc6.d/K01cosmosex
 
 echo "Doing sync..."
 sync

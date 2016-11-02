@@ -16,7 +16,31 @@ fi
 rm -rf /ce/app
 mkdir /ce/app
 unzip -o /tmp/app.zip -d /ce/app
-chmod 755 /ce/app/cosmosex
+
+#----------------------
+# The following section should rename the right cosmosex app (for the right linux distro) to be used
+
+# count the lines of /etc/issue which contain word Yocto in it.
+issue=$( cat /etc/issue | grep -o "Yocto" | wc -l )
+
+# If at least once the Yocto was found, it's Yocto
+if [ "$issue" -gt "0" ]; then   # on Yocto - use yocto, remove raspbian
+    echo "Linux distro: Yocto"
+    echo "Using binary: cosmosex_yocto"
+
+    mv -f /ce/app/cosmosex_yocto /ce/app/cosmosex
+    rm -f /ce/app/cosmosex_raspbian
+else                            # on Raspbian - use raspbian, remove yocto
+    echo "Linux distro: Raspbian"
+    echo "Using binary: cosmosex_raspbian"
+
+    mv -f /ce/app/cosmosex_raspbian /ce/app/cosmosex
+    rm -f /ce/app/cosmosex_yocto
+fi
+ 
+#----------------------
+
+chmod +x /ce/app/cosmosex
 rm -f /tmp/app.zip
 sync
 echo ">>> Updating Main App - END"
