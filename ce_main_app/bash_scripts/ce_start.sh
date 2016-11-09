@@ -9,5 +9,5 @@ rm -f /ce/update/doupdate.sh
 
 # run the cesuper script on background
 echo "Starting CosmosEx supervisor script and CosmosEx app"
-/ce/cesuper.sh &
+/ce/cesuper.sh > /dev/null 2> /dev/null &
 

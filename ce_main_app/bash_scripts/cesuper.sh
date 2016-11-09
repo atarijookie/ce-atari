@@ -21,7 +21,7 @@ do
 
         # if we got here, there was an update or crash, so run the app!
         echo "restarting app"
-        /ce/app/cosmosex &                      # run the application on the background
+        /ce/app/cosmosex > /dev/null 2> /dev/null &     # run the application on the background
 
     else                        # if pid of process is not empty, process is running
 

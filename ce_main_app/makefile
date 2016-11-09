@@ -1,5 +1,3 @@
-TARGET	= cosmosex
-
 # control verbosity. use make V=1
 V = 0
 
@@ -25,9 +23,11 @@ endif
 
 DISTRO := $(shell ./whichdistro.sh)
 ifeq ($(DISTRO),yocto)
+	TARGET   =  cosmosex_yocto
 	LDFLAGS += -lcivetweb_yocto
-	CFLAGS += -DDISTRO_YOCTO
+	CFLAGS  += -DDISTRO_YOCTO
 else
+	TARGET   =  cosmosex_raspbian
 	LDFLAGS += -lcivetweb_raspbian
 	CFLAGS += -DDISTRO_RASPBIAN
 endif

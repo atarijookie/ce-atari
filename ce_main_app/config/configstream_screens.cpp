@@ -1080,10 +1080,12 @@ void ConfigStream::createScreen_other(void)
 
     //----------------------
     row++;
-    
+
+/*
     comp = new ConfigComponent(this, ConfigComponent::button, " Send your settings to Jookie ", 30, 5, row++, gotoOffset);
     comp->setOnEnterFunctionCode(CS_SEND_SETTINGS);
     screen.push_back(comp);
+*/
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Reset all settings ",       19, 10, row++, gotoOffset);
     comp->setOnEnterFunctionCode(CS_RESET_SETTINGS);

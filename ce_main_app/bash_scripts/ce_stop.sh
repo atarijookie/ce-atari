@@ -6,5 +6,7 @@ killall -9 cesuper.sh > /dev/null 2> /dev/null
 
 # then kill the cosmosex app
 echo "Terminating cosmosex"
-killall -9 cosmosex > /dev/null 2> /dev/null
+killall -9 cosmosex          > /dev/null 2> /dev/null
+killall -9 cosmosex_raspbian > /dev/null 2> /dev/null
+killall -9 cosmosex_yocto    > /dev/null 2> /dev/null
 
