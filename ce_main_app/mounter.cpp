@@ -474,14 +474,26 @@ void Mounter::restartNetwork(void)
 	system("ifconfig eth0 down");                                   // shut down ethernet
 
     if(gotWlan0) {                                                  // if got wlan, shut it down
-    	system("ifconfig wlan0 down");
-    	system("wpa_cli reconfigure");                              // also try to reconnect to wifi AP (wifi settings might have changed)
+#ifdef DISTRO_YOCTO
+        // do this for yocto
+        system("ifconfig wlan0 down");
+        system("wpa_cli reconfigure");                              // also try to reconnect to wifi AP (wifi settings might have changed)
+#else
+        // do this for raspbian
+        system("ifdown wlan0");
+#endif
     }
 
 	system("ifconfig eth0 up");                                     // bring up ethernet
 
     if(gotWlan0) {                                                  // if got wlan, bring it up
-    	system("ifconfig wlan0 up");
+#ifdef DISTRO_YOCTO
+        // for yocto
+        system("ifconfig wlan0 up");
+#else
+        // for raspbian
+        system("ifup wlan0");
+#endif
     }
 	
 	Debug::out(LOG_DEBUG, "Mounter::restartNetwork - done\n");

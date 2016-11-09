@@ -10,7 +10,14 @@
 
 #define NETWORK_CONFIG_FILE		"/etc/network/interfaces"
 #define NAMESERVER_FILE			"/etc/resolv.conf"
-#define WPA_SUPPLICANT_FILE     "/etc/wpa_supplicant.conf"
+
+#ifdef DISTRO_YOCTO
+    // for yocto
+    #define WPA_SUPPLICANT_FILE     "/etc/wpa_supplicant.conf"
+#else
+    // for raspbian
+    #define WPA_SUPPLICANT_FILE     "/etc/wpa_supplicant/wpa_supplicant.conf"
+#endif
 
 NetworkSettings::NetworkSettings(void)
 {
@@ -253,7 +260,16 @@ void NetworkSettings::saveWpaSupplicant(void)
 		return;
 	}
     
+#ifdef DISTRO_YOCTO
+    // do this for yocto
     fprintf(f, "ctrl_interface=/var/run/wpa_supplicant\n");               // this is needed for wpa_cli to work
+#else
+    // do this for raspbian
+    fprintf(f, "country=GB\n");
+    fprintf(f, "ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\n");
+    fprintf(f, "update_config=1\n");
+#endif
+
     fprintf(f, "network={\n");
 	fprintf(f, "    ssid=\"%s\"\n",	(char *) wlan0.wpaSsid.c_str()); 
 	fprintf(f, "    psk=\"%s\"\n",	(char *) wlan0.wpaPsk.c_str());
