@@ -1,8 +1,7 @@
 #!/bin/sh
 
 # kill previously running script and app
-killall -9 cesuper.sh > /dev/null 2> /dev/null
-killall -9 cosmosex > /dev/null 2> /dev/null
+/ce/ce_stop.sh
 
 # remove doupdate script
 rm -f /ce/update/doupdate.sh

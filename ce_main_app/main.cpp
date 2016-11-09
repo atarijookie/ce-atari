@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <queue>
 #include <pty.h>
+#include <sys/file.h>
  
 #include "config/configstream.h"
 #include "settings.h"
@@ -56,6 +57,9 @@ const char *distroString = "Yocto";
 #else
 const char *distroString = "Raspbian";
 #endif
+
+bool otherInstanceIsRunning(void);
+int pidFileFd;
 
 int main(int argc, char *argv[])
 {
@@ -159,6 +163,12 @@ int main(int argc, char *argv[])
     Update::createNewScripts();                                     // update the scripts if needed
     
 //	system("sudo echo none > /sys/class/leds/led0/trigger");	    // disable usage of GPIO 23 (pin 16) by LED
+
+    if(otherInstanceIsRunning()) {
+        Debug::out(LOG_ERROR, "Other instance of CosmosEx is running, terminate it before starting a new one!");
+        printf("\nOther instance of CosmosEx is running, terminate it before starting a new one!\n\n\n");
+        return 0;
+    }
 
 	if(!gpio_open()) {									            // try to open GPIO and SPI on RPi
 		return 0;
@@ -292,6 +302,10 @@ int main(int argc, char *argv[])
     printf("Downloader clean up before quit\n");
     Downloader::cleanupBeforeQuit();
 
+    if(pidFileFd > 0) {                                 // if we got the PID file, close it
+        close(pidFileFd);
+    }
+    
     Debug::out(LOG_INFO, "CosmosEx terminated.");
     printf("Terminated\n");
     return 0;
@@ -495,5 +509,25 @@ void sigint_handler(int sig)
         Debug::out(LOG_DEBUG, "Killing child with pid %d\n", childPid);
         kill(childPid, SIGKILL);
     }
+}
+
+bool otherInstanceIsRunning(void)
+{
+    // create pid file
+    pidFileFd = open("/var/run/cosmosex.pid", O_CREAT | O_RDWR, 0666);
+    
+    if(pidFileFd == -1) {   // failed to create pid file? other instance might be running
+        return true;
+    }
+    
+    // lock pid file - exclusive, non blocking
+    int res = flock(pidFileFd, LOCK_EX | LOCK_NB);
+    
+    if(res == -1) {     // failed to lock the file? other instance might be running
+        return true;
+    }
+    
+    // if came here, open and lock succeeded, no other instance is running
+    return false;
 }
 
