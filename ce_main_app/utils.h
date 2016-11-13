@@ -3,6 +3,7 @@
 
 #include <signal.h>
 #include <string>
+#include <vector>
 
 #include "datatypes.h"
 
@@ -49,6 +50,9 @@ public:
     static void setTimezoneVariable_inThisContext(void);
 
     static std::string getDeviceLabel(const std::string & devicePath);
+
+    static void splitString(const std::string &s, char delim, std::vector<std::string> &elems);
+
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
 

@@ -1,9 +1,11 @@
 #include <algorithm>
 #include <string>
+#include <vector>
 
 #include "keybjoys.h"
 #include "../settings.h"
 #include "../debug.h"
+#include "../utils.h"
 
 #define KEYBOARD_KEYS_SETTINGS0 "KEYBOARD_KEYS_JOY0"
 #define KEYBOARD_KEYS_SETTINGS1 "KEYBOARD_KEYS_JOY1"
@@ -92,20 +94,31 @@ bool KeybJoyKeys::isKeyButton(bool pcNotSt, int joyNumber, int pcKey)
 void KeybJoyKeys::loadKeys(int joyNumber)
 {
     // prepare pointers to right things for the joyNumber
-    const char      *settingsName   = (joyNumber == 0) ? KEYBOARD_KEYS_SETTINGS0    : KEYBOARD_KEYS_SETTINGS1;  // what settings name we should use?
-    const char      *defaultKeys    = (joyNumber == 0) ? "ASDWQ"                    : "JKLIB";                  // what are the default settings, if we don't have anything stored?
-    JoyKeysPcSt     *keysStruct     = (joyNumber == 0) ? &joyKeys[0]                : &joyKeys[1];              // to which structure we should store it?
+    const char      *settingsName   = (joyNumber == 0) ? KEYBOARD_KEYS_SETTINGS0    : KEYBOARD_KEYS_SETTINGS1;      // what settings name we should use?
+    const char      *defaultKeys    = (joyNumber == 0) ? "A%S%D%W%LSHIFT"           : "LEFT%DOWN%RIGHT%UP%RSHIFT";  // what are the default settings, if we don't have anything stored?
+    JoyKeysPcSt     *keysStruct     = (joyNumber == 0) ? &joyKeys[0]                : &joyKeys[1];                  // to which structure we should store it?
     
     // get the settings
     Settings s;
     char *keys = s.getString(settingsName, defaultKeys);
-    
+
     // store the human readable keys directly to struct
-    keysStruct->human.left   = keys[0];
-    keysStruct->human.down   = keys[1];
-    keysStruct->human.right  = keys[2];
-    keysStruct->human.up     = keys[3];
-    keysStruct->human.button = keys[4];
+    std::vector<std::string> keyElems;
+    Utils::splitString(keys, '%', keyElems);
+    if (keyElems.size() != 5) {
+        // old format
+        keysStruct->human.left   = keys[0];
+        keysStruct->human.down   = keys[1];
+        keysStruct->human.right  = keys[2];
+        keysStruct->human.up     = keys[3];
+        keysStruct->human.button = keys[4];
+    } else {
+        keysStruct->human.left   = keyElems[0];
+        keysStruct->human.down   = keyElems[1];
+        keysStruct->human.right  = keyElems[2];
+        keysStruct->human.up     = keyElems[3];
+        keysStruct->human.button = keyElems[4];
+    }
     
     // no key translator? fail
     if(!keyTranslator) {
@@ -132,19 +145,22 @@ void KeybJoyKeys::saveKeys(int joyNumber)
 {
     Settings s;
 
-    const char  *settingsName   = (joyNumber == 0) ? KEYBOARD_KEYS_SETTINGS0    : KEYBOARD_KEYS_SETTINGS1;  // what settings name we should use?
-    JoyKeys     *keysStruct     = (joyNumber == 0) ? &joyKeys[0].human          : &joyKeys[1].human;        // from which structure we should save it?
+    const char   *settingsName   = (joyNumber == 0) ? KEYBOARD_KEYS_SETTINGS0    : KEYBOARD_KEYS_SETTINGS1;  // what settings name we should use?
+    JoyKeysHuman *keysStruct     = (joyNumber == 0) ? &joyKeys[0].human          : &joyKeys[1].human;        // from which structure we should save it?
+
+    // using '%' as a separator should be safe as we don't really support SHIFT + KEY mapping...
+    std::string keysString;
+    keysString += keysStruct->left;
+    keysString += "%";
+    keysString += keysStruct->down;
+    keysString += "%";
+    keysString += keysStruct->right;
+    keysString += "%";
+    keysString += keysStruct->up;
+    keysString += "%";
+    keysString += keysStruct->button;
     
-    char keysString[6];
-    
-    keysString[0] = keysStruct->left;
-    keysString[1] = keysStruct->down;
-    keysString[2] = keysStruct->right;
-    keysString[3] = keysStruct->up;
-    keysString[4] = keysStruct->button;
-    keysString[5] = 0;
-    
-    s.setString(settingsName, keysString);    
+    s.setString(settingsName, keysString.c_str());
 }
 
 void KeybJoyKeys::loadKeys(void)
@@ -161,15 +177,15 @@ void KeybJoyKeys::saveKeys(void)
 
 bool KeybJoyKeys::keybJoyHumanSettingsValidForSingleJoy(int joyNumber)
 {
-    JoyKeys *keysStruct = (joyNumber == 0) ? &joyKeys[0].human : &joyKeys[1].human;     // which structure we should check?
+    JoyKeysHuman *keysStruct = (joyNumber == 0) ? &joyKeys[0].human : &joyKeys[1].human;     // which structure we should check?
     
-    // first construct a string out of individual keys
-    std::string allKeys = "     ";
-    allKeys[0] = keysStruct->up;
-    allKeys[1] = keysStruct->down;
-    allKeys[2] = keysStruct->left;
-    allKeys[3] = keysStruct->right;
-    allKeys[4] = keysStruct->button;
+    // first construct a vector out of individual keys
+    std::vector<std::string> allKeys;
+    allKeys.push_back(keysStruct->up);
+    allKeys.push_back(keysStruct->down);
+    allKeys.push_back(keysStruct->left);
+    allKeys.push_back(keysStruct->right);
+    allKeys.push_back(keysStruct->button);
     
     // see if that key isn't used mode than once
     int c0 = std::count(allKeys.begin(), allKeys.end(), allKeys[0]);
@@ -184,7 +200,7 @@ bool KeybJoyKeys::keybJoyHumanSettingsValidForSingleJoy(int joyNumber)
     }
     
     // if some key is unspecified, fail
-    if(keysStruct->up == 0 || keysStruct->down == 0 || keysStruct->left == 0 || keysStruct->right == 0 || keysStruct->button == 0) {
+    if(keysStruct->up.empty() || keysStruct->down.empty() || keysStruct->left.empty() || keysStruct->right.empty() || keysStruct->button.empty()) {
         return false;
     }
     
@@ -194,22 +210,22 @@ bool KeybJoyKeys::keybJoyHumanSettingsValidForSingleJoy(int joyNumber)
 
 bool KeybJoyKeys::keybJoyHumanSettingsValidBetweenJoys(void)
 {
-    JoyKeys *k0 = &joyKeys[0].human;
-    JoyKeys *k1 = &joyKeys[1].human;
+    JoyKeysHuman *k0 = &joyKeys[0].human;
+    JoyKeysHuman *k1 = &joyKeys[1].human;
     
-    // put all chars into one string
-    std::string allKeys = "          ";
-    allKeys[0] = k0->up;
-    allKeys[1] = k0->down;
-    allKeys[2] = k0->left;
-    allKeys[3] = k0->right;
-    allKeys[4] = k0->button;
+    // put all chars into one vector
+    std::vector<std::string> allKeys;
+    allKeys.push_back(k0->up);
+    allKeys.push_back(k0->down);
+    allKeys.push_back(k0->left);
+    allKeys.push_back(k0->right);
+    allKeys.push_back(k0->button);
 
-    allKeys[5] = k1->up;
-    allKeys[6] = k1->down;
-    allKeys[7] = k1->left;
-    allKeys[8] = k1->right;
-    allKeys[9] = k1->button;
+    allKeys.push_back(k1->up);
+    allKeys.push_back(k1->down);
+    allKeys.push_back(k1->left);
+    allKeys.push_back(k1->right);
+    allKeys.push_back(k1->button);
     
     // see if that key isn't used mode than once
     int c0 = std::count(allKeys.begin(), allKeys.end(), allKeys[0]);

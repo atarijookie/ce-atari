@@ -769,13 +769,8 @@ bool Ikbd::handleStKeyAsKeybJoy(BYTE val)
     }
 
     int joyNumber = isKeybJoy0 ? 0 : 1;         // if it's from joy 0, then joy # is 0, otherwise 1
-    int pcKey = keyTranslator.stKeyToPc(stKey); // translate ST key to PC key
 
-    if(pcKey == 0) {                            // failed to translate ST key to PC key? fail
-        return false;
-    }
-
-    handleKeyAsKeybJoy(false, joyNumber, pcKey, keyDown);   // handle this key press, and it comes from ST keys (therefore first param: false)
+    handleKeyAsKeybJoy(false, joyNumber, stKey, keyDown);   // handle this key press, and it comes from ST keys (therefore first param: false)
     return true;
 }
 
