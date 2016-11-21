@@ -86,15 +86,15 @@ struct {
 
 void updateCounts(BYTE doingWriteNotRead, int res);
 void printOpResult(int res);
+
+void testDataReliability(void);
+void testContinousRead  (void);
 //--------------------------------------------------
 int main(void)
 {
     BYTE key;
 	DWORD toEven;
 	void *OldSP;
-	WORD xorVal=0xC0DE;
-	int charcnt=0;
-	int linecnt=0;
 
     //----------------------
     // read all the keys which are waiting, so we can ignore them
@@ -226,6 +226,96 @@ int main(void)
 
 	// ----------------- 
 	VT52_Clear_home();
+    
+    (void) Cconws("Choose test type:\r\n");
+    (void) Cconws("[D] - data check\r\n");
+    (void) Cconws("[S] - stress - continous read\r\n");
+    (void) Cconws("[Q] - quit\r\n");
+
+    while(1) {
+        key = Cnecin();
+            
+        if(key == 'q' || key == 'Q') {
+            break;
+        }
+        
+        if(key == 'd' || key == 'D') {          // data check test?
+            testDataReliability();
+            break;
+        }
+
+        if(key == 's' || key == 'S') {          // stress test - continous read?
+            testContinousRead();
+            break;
+        }
+    }
+    
+  	// ----------------- 
+
+	
+    linea9();										// show mouse    
+    Super((void *)OldSP);  			      			// user mode 
+
+	return 0;
+}
+
+void scsi_reset(void);
+
+void testContinousRead(void)
+{
+    hdIf.maxRetriesCount = 0;        
+    DWORD byteCount = ((DWORD) MAXSECTORS) << 9;     // convert sector count to byte count ( sc * 512 )
+
+	commandLong[4+1] = TEST_READ;
+
+    // size to read
+	commandLong[5+1] = (byteCount >> 16) & 0xFF;
+	commandLong[6+1] = (byteCount >>  8) & 0xFF;
+	commandLong[7+1] = (byteCount      ) & 0xFF;
+
+    // Word to XOR with data on CE side
+	commandLong[8+1] = 0;
+	commandLong[9+1] = 0;
+
+  	VT52_Clear_home();
+    VT52_Wrap_on();
+    (void) Cconws("Continous read without data checking\r\n");
+    (void) Cconws("Press 'R' for SCSI bus RESET.\r\n");
+    (void) Cconws("Press 'Q' to quit.\r\n");
+    
+    while(1) {
+        (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, MAXSECTORS );  // issue the command and check the result
+
+        if(!hdIf.success) {                     // ACSI ERROR?
+            (void) Cconws("_");
+            continue;
+        } else {
+            (void) Cconws("*");
+        }
+        
+        if(Cconis() != 0) {                     // if some key is waiting
+            BYTE key = Cnecin();
+            
+            if(key == 'q' || key == 'Q') {
+                break;
+            }
+            
+            if(key == 'r' || key == 'R') {
+                scsi_reset();
+                continue;                
+            }
+        }
+    }
+}
+
+void testDataReliability(void)
+{
+    BYTE key;
+  	WORD xorVal=0xC0DE;
+	int charcnt=0;
+	int linecnt=0;
+
+	VT52_Clear_home();
 
     print_head();
     print_status();
@@ -328,12 +418,7 @@ int main(void)
  			}
             x += 2;
 		}
-	}
-	
-    linea9();										// show mouse    
-    Super((void *)OldSP);  			      			// user mode 
-
-	return 0;
+	}    
 }
 
 void updateCounts(BYTE doingWriteNotRead, int res)
