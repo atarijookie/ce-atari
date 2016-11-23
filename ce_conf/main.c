@@ -14,12 +14,14 @@
 #include "keys.h"
 #include "global.h"
 #include "find_ce.h"
+#include "vt52.h"
+
 //--------------------------------------------------
 
 void showHomeScreen(void);
 void sendKeyDown(BYTE key, BYTE keyDownCommand);
 void refreshScreen(void);							
-void setResolution(void);
+BYTE setResolution(void);
 void showConnectionErrorMessage(void);
 void showMoreStreamIfNeeded(void);
 
@@ -28,6 +30,16 @@ BYTE ce_identify(BYTE ACSI_id);
 
 void retrieveIsUpdateScreen(char *stream);
 BYTE isUpdateScreen;
+
+#define UPDATECOMPONENT_APP     0x01
+#define UPDATECOMPONENT_XILINX  0x02
+#define UPDATECOMPONENT_HANS    0x04
+#define UPDATECOMPONENT_FRANZ   0x08
+
+BYTE updateComponents;
+
+BYTE getKeyIfPossible(void);
+void showFakeProgress(void);
 
 void cosmoSoloConfig(void);
 //--------------------------------------------------
@@ -44,14 +56,14 @@ BYTE prevCommandFailed;
 //--------------------------------------------------
 int main(void)
 {
-	DWORD scancode;
-	BYTE key, vkey, res;
+	BYTE key, res;
 	WORD timeNow, timePrev;
 	DWORD toEven;
 	void *OldSP;
     BYTE keyDownCommand = CFG_CMD_KEYDOWN;
 
-    isUpdateScreen = FALSE;
+    isUpdateScreen      = FALSE;
+    updateComponents    = 0;
     
 	OldSP = (void *) Super((void *)0);  			                // supervisor mode  
 	
@@ -96,9 +108,14 @@ int main(void)
 	timePrev = Tgettime();
 	
 	while(1) {
-		res = Cconis();						                        // see if there's something waiting from keyboard 
+        if(isUpdateScreen) {                                        // if we're on a update screen, show fake update progress
+            showFakeProgress();
+            isUpdateScreen = FALSE;                                 // we're (probably) not updating anymore
+        }
+    
+		key = getKeyIfPossible();                                   // see if there's something waiting from keyboard 
 		
-		if(res == 0) {							                    // nothing waiting from keyboard? 
+		if(key == 0) {							                    // nothing waiting from keyboard? 
 			timeNow = Tgettime();
 			
 			if((timeNow - timePrev) > 0) {		                    // check if time changed (2 seconds passed) 
@@ -109,13 +126,6 @@ int main(void)
 			
 			continue;							                    // try again 
 		}
-
-		scancode = Bconin(DEV_CONSOLE); 		                    // get char form keyboard, no echo on screen 
-
-		vkey	= (scancode>>16)	& 0xff;
-		key		=  scancode			& 0xff;
-
-		key		= atariKeysToSingleByte(vkey, key);	                // transform BYTE pair into single BYTE
 
         if(key == KEY_F8) {                                         // should switch between config and linux console?
             Clear_home();                                           // clear the screen
@@ -227,6 +237,32 @@ void showHomeScreen(void)
     retrieveIsUpdateScreen((char *) pBuffer);       // get the flag isUpdateScreen from the end of the stream
 	(void) Cconws((char *) pBuffer);				// now display the buffer
 }
+
+BYTE showHomeScreenSimple(void)
+{
+    BYTE res = setResolution();                     // first try to set the new resolution
+    
+    if(res == FALSE) {                              // failed to set resolution? fail
+        return FALSE;
+    }
+
+    // if we got here, the previous command passed and this should work also
+    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_GO_HOME, 0};
+    
+    cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)	
+    memset(pBuffer, 0, 512);                        // clear the buffer 
+  
+    (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the GO_HOME command and show the screen stream 
+    
+    if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
+        return FALSE;
+    }
+    
+    retrieveIsUpdateScreen((char *) pBuffer);       // get the flag isUpdateScreen from the end of the stream
+    (void) Cconws((char *) pBuffer);                // now display the buffer
+    
+    return TRUE;                                    // return success
+}
 //--------------------------------------------------
 void refreshScreen(void)							
 {
@@ -246,7 +282,7 @@ void refreshScreen(void)
 	(void) Cconws((char *) pBuffer);				// now display the buffer
 }
 //--------------------------------------------------
-void setResolution(void)							
+BYTE setResolution(void)							
 {
 	BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_SET_RESOLUTION, 0};
 	
@@ -255,6 +291,12 @@ void setResolution(void)
 	memset(pBuffer, 0, 512);               			// clear the buffer 
   
 	(*hdIf.cmd)(1, cmd, 6, pBuffer, 1);              // issue the SET RESOLUTION command 
+    
+    if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
+        return FALSE;
+    }
+
+    return TRUE;                                    // if success, return TRUE
 }
 //--------------------------------------------------
 void showConnectionErrorMessage(void)
@@ -335,10 +377,19 @@ void retrieveIsUpdateScreen(char *stream)
         return;
     }
     
-    if(stream[i + 1] == 1) {            // if the flag after the stream is equal to 1, then it's update screen
+    if(stream[i + 1] == 1) {                        // if the flag after the stream is equal to 1, then it's update screen
         isUpdateScreen = TRUE;
+        
+        BYTE components     =  stream[i + 2];       // get where the update components should be stored
+        BYTE validitySign   = (components & 0xf0);  // get upper nibble
+        if(validitySign == 0xc0) {                  // if upper nible is 'C', then this valid update components thing
+            updateComponents = components & 0x0f;   // get only the bottom part of components byte
+        } else {                                    // if update components is possibly invalid, pretend that we're updating everything to wait long enough
+            updateComponents = 0x0f;                
+        }
     } else {                            // it's not update screen
-        isUpdateScreen = FALSE;
+        isUpdateScreen      = FALSE;
+        updateComponents    = 0;        // no components will be updated
     }
 }
 //--------------------------------------------------
@@ -387,5 +438,92 @@ void logMsgProgress(DWORD current, DWORD total)
 //    (void) Cconws("\n\r");
 }
 //--------------------------------------------------
+void showFakeProgressOfItem(const char *title, int timeout)
+{
+    (void) Cconws(title);           // show what we are updating
+    
+    int i;
+    for(i=0; i<=timeout; i++) {     // wait the whole timeout
+        showInt(i, 2);              // show current time (progress)
+        (void) Cconws(" s");        // show time unit
+        sleep(1);                   // wait 1 second
+        (void) Cconws("\33D\33D\33D\33D");
+    }
 
+    (void) Cconws("\r\n");          // move to next line
+}
 
+void showFakeProgress(void)
+{
+    // retrieve individual update components flags
+    BYTE updatingApp    = updateComponents & UPDATECOMPONENT_APP;
+    BYTE updatingXilinx = updateComponents & UPDATECOMPONENT_XILINX;
+    BYTE updatingHans   = updateComponents & UPDATECOMPONENT_HANS;
+    BYTE updatingFranz  = updateComponents & UPDATECOMPONENT_FRANZ;
+
+    // show title saying we're updating
+    Clear_home();
+    VT52_Rev_on();
+    (void) Cconws(">>>   Your device is updating.  <<<\n\r");
+    (void) Cconws(">>> Do NOT turn the device off! <<<\n\r\n\r");
+    VT52_Rev_off();
+    
+    // now possibly wait for each component to be done
+    if(updatingApp) {
+        showFakeProgressOfItem("Updating app    ( 5 s): ", 5);
+    }
+
+    if(updatingXilinx) {
+        showFakeProgressOfItem("Updating Xilinx (50 s): ", 50);
+    }
+
+    if(updatingHans) {
+        showFakeProgressOfItem("Updating Hans   (10 s): ", 10);
+    }
+
+    if(updatingFranz) {
+        showFakeProgressOfItem("Updating Franz  (10 s): ", 10);
+    }
+    
+    // we're done, try to reconnect.
+    (void) Cconws("\r\nIf everything went well,\r\nwill connect back soon.\r\n");
+    
+    int i;
+    for(i=0; i<15; i++) {
+        BYTE res = showHomeScreenSimple();                  // try to reconnect and show home screen
+        
+        if(res == TRUE) {                                   // if reconnect succeeded, quit
+            break;
+        }
+        
+        BYTE key = getKeyIfPossible();
+        
+        if(key == KEY_F10 || key == 'q' || key == 'Q') {    // user requested quit by key press? quit
+            break;
+        }
+        
+        (void) Cconws(".");                                 // if reconnect failed, show dot and wait again
+        sleep(1);
+    }
+}
+
+BYTE getKeyIfPossible(void)
+{
+    DWORD scancode;
+    BYTE key, vkey, res;
+
+    res = Cconis();                             // see if there's something waiting from keyboard 
+
+    if(res == 0) {                              // nothing waiting from keyboard?
+        return 0;
+    }
+
+    scancode = Bconin(DEV_CONSOLE);             // get char form keyboard, no echo on screen 
+
+    vkey    = (scancode>>16)    & 0xff;
+    key     =  scancode         & 0xff;
+
+    key     = atariKeysToSingleByte(vkey, key); // transform BYTE pair into single BYTE
+    return key;
+}
+//--------------------------------------------------
