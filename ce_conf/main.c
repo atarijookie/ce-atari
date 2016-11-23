@@ -35,6 +35,7 @@ BYTE isUpdateScreen;
 #define UPDATECOMPONENT_XILINX  0x02
 #define UPDATECOMPONENT_HANS    0x04
 #define UPDATECOMPONENT_FRANZ   0x08
+#define UPDATECOMPONENT_ALL     0x0f
 
 BYTE updateComponents;
 
@@ -384,8 +385,12 @@ void retrieveIsUpdateScreen(char *stream)
         BYTE validitySign   = (components & 0xf0);  // get upper nibble
         if(validitySign == 0xc0) {                  // if upper nible is 'C', then this valid update components thing
             updateComponents = components & 0x0f;   // get only the bottom part of components byte
+            
+            if(updateComponents == 0) {             // no update components? pretend that we're updating everything to wait long enough
+                updateComponents = UPDATECOMPONENT_ALL;
+            }
         } else {                                    // if update components is possibly invalid, pretend that we're updating everything to wait long enough
-            updateComponents = 0x0f;                
+            updateComponents = UPDATECOMPONENT_ALL;
         }
     } else {                            // it's not update screen
         isUpdateScreen      = FALSE;

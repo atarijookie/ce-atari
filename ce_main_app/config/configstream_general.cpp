@@ -4,6 +4,7 @@
 #include "../global.h"
 #include "../native/scsi_defs.h"
 #include "../acsidatatrans.h"
+#include "../update.h"
 
 #include "../settings.h"
 #include "keys.h"
@@ -316,12 +317,26 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
     }
 
     screenChanged = false;
-	
-	*bfr++ = 0;									        // add string terminator
-	totalCnt++;
+    
+    *bfr++ = 0;									        // add string terminator
+    totalCnt++;
 
-    *bfr++ = isUpdateScreen();                   // after the string store a flag if this screen is update screen, so the ST client could show good message on update
-	totalCnt++;
+    //-------
+    // after the string store a flag if this screen is update screen, so the ST client could show good message on update
+    BYTE isUpdScreen = isUpdateScreen();
+    *bfr++ = isUpdScreen;
+    totalCnt++;
+
+    //-------
+    // get update components, if on update screen
+    if(isUpdScreen) {
+        BYTE updateComponents = Update::getUpdateComponents();  // get which components are newer
+        *bfr++ = 0xC0 | updateComponents;                       // store update components and the validity nibble
+    } else {
+        *bfr++ = 0;     // store update components - not updating anything
+    }
+    totalCnt++;
+    //-------
     
     return totalCnt;                                    // return the count of bytes used
 }

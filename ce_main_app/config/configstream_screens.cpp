@@ -978,6 +978,7 @@ void ConfigStream::createScreen_update_download(void)
     int row = 9;
 
     comp = new ConfigComponent(this, ConfigComponent::label, "Downloading", 40, col + 2, row, gotoOffset);
+    comp->setComponentId(COMPID_DL_TITLE);
     screen.push_back(comp);
 
     row += 2;
@@ -1487,6 +1488,19 @@ void ConfigStream::fillUpdateDownloadWithProgress(void)
     setTextByComponentId(COMPID_DL2, l2);
     setTextByComponentId(COMPID_DL3, l3);
     setTextByComponentId(COMPID_DL4, l4);
+}
+
+void ConfigStream::fillUpdateDownloadWithFinish(void)
+{
+    std::string s1 = "Update downloaded.";
+    std::string s2 = "Starting install...";
+    std::string s3 = "";
+
+    setTextByComponentId(COMPID_DL_TITLE, s1);
+    setTextByComponentId(COMPID_DL1, s2);
+    setTextByComponentId(COMPID_DL2, s3);
+    setTextByComponentId(COMPID_DL3, s3);
+    setTextByComponentId(COMPID_DL4, s3);
 }
 
 void ConfigStream::getProgressLine(int index, std::string &lines, std::string &line)

@@ -50,6 +50,7 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
 
                 COMPID_FLOPCONF_ENABLED,    COMPID_FLOPCONF_ID,         COMPID_FLOPCONF_WRPROT,
 
+                COMPID_DL_TITLE,
                 COMPID_DL1,                 COMPID_DL2,                 COMPID_DL3,                 COMPID_DL4,
                 COMPID_TIMESYNC_ENABLE,     COMPID_TIMESYNC_NTP_SERVER, COMPID_TIMESYNC_UTC_OFFSET,
                 COMPID_SCREENCAST_FRAMESKIP,    COMPID_SCREEN_RESOLUTION,
@@ -78,6 +79,7 @@ public:
 
     void fillUpdateWithCurrentVersions(void);
     void fillUpdateDownloadWithProgress(void);
+    void fillUpdateDownloadWithFinish(void);
     void showUpdateDownloadFail(void);
     bool isUpdateDownloadPageShown(void);
     void showUpdateError(void);

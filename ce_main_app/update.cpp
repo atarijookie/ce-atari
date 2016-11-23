@@ -11,13 +11,15 @@
 #include "settings.h"
 #include "downloader.h"
 #include "update.h"
+#include "utils.h"
 #include "mounter.h"
 #include "dir2fdd/cdirectory.h"
 
 #include "newscripts_zip.h"
 
 Versions Update::versions;
-int Update::currentState = UPDATE_STATE_IDLE;
+int   Update::currentState          = UPDATE_STATE_IDLE;
+DWORD Update::whenCanStartInstall   = 0xffffffff;
 
 extern THwConfig hwConfig;
 
@@ -34,7 +36,8 @@ void Update::initialize(void)
     Update::versions.updateListWasProcessed = false;
     Update::versions.gotUpdate              = false;
 
-    Update::currentState = UPDATE_STATE_IDLE;
+    Update::currentState        = UPDATE_STATE_IDLE;
+    Update::whenCanStartInstall = 0xffffffff;
 }
 
 void Update::processUpdateList(void)
@@ -210,6 +213,47 @@ void Update::downloadNewComponents(void)
     Update::currentState = UPDATE_STATE_DOWNLOADING;
 }
 
+BYTE Update::getUpdateComponents(void)
+{
+    // if the list wasn't processed, nothing to update
+    if(!Update::versions.updateListWasProcessed) {              
+        return 0;
+    }
+
+    // check what is newer in the update
+    bool app, hans, xilinx, franz;
+    app     = Update::versions.current.app.isOlderThan   (Update::versions.onServer.app);
+    xilinx  = Update::versions.current.xilinx.isOlderThan(Update::versions.onServer.xilinx);
+    hans    = Update::versions.current.hans.isOlderThan  (Update::versions.onServer.hans);
+    franz   = Update::versions.current.franz.isOlderThan (Update::versions.onServer.franz);
+
+    // now construct the update components byte
+    BYTE updateComponents = 0;
+    
+    if(app) {
+        updateComponents |= UPDATECOMPONENT_APP;
+    }
+    
+    if(hans) {
+        updateComponents |= UPDATECOMPONENT_HANS;
+    }
+
+    if(franz) {
+        updateComponents |= UPDATECOMPONENT_FRANZ;
+    }
+
+    if(xilinx) {
+        updateComponents |= UPDATECOMPONENT_XILINX;
+    }
+    
+    // nothing to update? possibly update everything
+    if(updateComponents == 0) {
+        updateComponents = UPDATECOMPONENT_ALL;
+    }
+    
+    return updateComponents;
+}
+
 int Update::state(void)
 {
     if(currentState == UPDATE_STATE_IDLE) {                 // when idle, just return idle
@@ -239,6 +283,22 @@ int Update::state(void)
 void Update::stateGoIdle(void)
 {
     currentState = UPDATE_STATE_IDLE;
+}
+
+void Update::stateGoWaitBeforeInstall(void)
+{
+    currentState        = UPDATE_STATE_WAITBEFOREINSTALL;
+    whenCanStartInstall = Utils::getEndTime(3000);          // we can start install after 3 seconds from now on
+}
+
+bool Update::canStartInstall(void)
+{
+    if(currentState != UPDATE_STATE_WAITBEFOREINSTALL) {    // if we're not waiting before install, we can't start the install
+        return false;
+    }
+    
+    DWORD now = Utils::getCurrentMs();                      // get current time
+    return (now >= whenCanStartInstall);                    // if current time is greater than when we can start install, we can start install
 }
 
 void Update::stateGoDownloadOK(void)

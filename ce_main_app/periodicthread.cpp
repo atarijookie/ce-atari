@@ -200,6 +200,7 @@ bool checkInetIfEnabled(void)
 void updateUpdateState(void)
 {
     int updateState = Update::state();                              // get the update state
+    
     switch(updateState) {
         case UPDATE_STATE_DOWNLOADING:
         pthread_mutex_lock(&shared.mtxConfigStreams);
@@ -229,41 +230,57 @@ void updateUpdateState(void)
 
         //-----------
         case UPDATE_STATE_DOWNLOAD_OK:
+        {
+            pthread_mutex_lock(&shared.mtxConfigStreams);
 
-        pthread_mutex_lock(&shared.mtxConfigStreams);
+            // check if any of the config streams shows download page
+            bool shownA = shared.configStream.acsi->isUpdateDownloadPageShown();
+            bool shownW = shared.configStream.web->isUpdateDownloadPageShown();
+            bool shownT = shared.configStream.term->isUpdateDownloadPageShown();
+            
+            pthread_mutex_unlock(&shared.mtxConfigStreams);
+            
+            if(!shownA && !shownW && !shownT) {         // if user is NOT waiting on download page (cancel pressed), don't update
+                Update::stateGoIdle();
+                Debug::out(LOG_DEBUG, "Update state - download OK, but user is not on download page - NOT doing update");
+            } else {                                    // if user is waiting on download page, apply update
+                bool res = Update::createUpdateScript();
 
-        // check if any of the config streams shows download page
-        bool shownA = shared.configStream.acsi->isUpdateDownloadPageShown();
-        bool shownW = shared.configStream.web->isUpdateDownloadPageShown();
-        bool shownT = shared.configStream.term->isUpdateDownloadPageShown();
-        
-        pthread_mutex_unlock(&shared.mtxConfigStreams);
-        
-        if(!shownA && !shownW && !shownT) {         // if user is NOT waiting on download page (cancel pressed), don't update
-            Update::stateGoIdle();
-            Debug::out(LOG_DEBUG, "Update state - download OK, but user is not on download page - NOT doing update");
-        } else {                                    // if user is waiting on download page, aplly update
-            bool res = Update::createUpdateScript();
+                if(!res) {                              // if failed to create update script, fail and go to update idle state
+                    pthread_mutex_lock(&shared.mtxConfigStreams);
 
-            if(!res) {
-                pthread_mutex_lock(&shared.mtxConfigStreams);
+                    shared.configStream.acsi->showUpdateError();
+                    shared.configStream.web->showUpdateError();
+                    shared.configStream.term->showUpdateError();
+                    
+                    pthread_mutex_unlock(&shared.mtxConfigStreams);
 
-                shared.configStream.acsi->showUpdateError();
-                shared.configStream.web->showUpdateError();
-                shared.configStream.term->showUpdateError();
-                
-                pthread_mutex_unlock(&shared.mtxConfigStreams);
-
-                Debug::out(LOG_ERROR, "Update state - download OK, failed to create update script - NOT doing update");
-            } else {
-                Debug::out(LOG_INFO, "Update state - download OK, update script created, will do update.");
-                sigintReceived = 1;
+                    Debug::out(LOG_ERROR, "Update state - download OK, failed to create update script - NOT doing update");
+                    Update::stateGoIdle();
+                } else {                                // update downloaded, user is on download page, update script created - now wait a while before doing the install
+                    Debug::out(LOG_INFO, "Update state - download OK, update script created, will wait before install");
+                    Update::stateGoWaitBeforeInstall();
+                }
             }
+        break;
         }
+        
+        //---------
+        // are we waiting a while before the install?
+        case UPDATE_STATE_WAITBEFOREINSTALL:
+            shared.configStream.acsi->fillUpdateDownloadWithFinish();
+            shared.configStream.web->fillUpdateDownloadWithFinish();
+            shared.configStream.term->fillUpdateDownloadWithFinish();
 
+            if(Update::canStartInstall()) {
+                Debug::out(LOG_INFO, "Update state - waiting before install - can start install, will quit and install!");
+                sigintReceived = 1;
+            } else {
+                Debug::out(LOG_INFO, "Update state - waiting before install, not starting install yet");
+            }
         break;
     }
-}            
+}
 
 void handleConfigStreams(ConfigStream *cs, int fd1, int fd2)
 {
