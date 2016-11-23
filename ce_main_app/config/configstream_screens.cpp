@@ -970,38 +970,26 @@ void ConfigStream::createScreen_update_download(void)
     screenChanged	    = true;			// mark that the screen has changed
     showingHomeScreen	= false;		// mark that we're NOT showing the home screen
 
-    screen_addHeaderAndFooter(screen, "Updates download");
+    screen_addHeaderAndFooter(screen, "Download of update");
 
     ConfigComponent *comp;
 
     int col = 7;
     int row = 9;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Downloading", 40, col + 2, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Downloading",                 40, col, row, gotoOffset);
     comp->setComponentId(COMPID_DL_TITLE);
     screen.push_back(comp);
 
     row += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 30, col, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "ce_update.zip          0 %",  30, col, row, gotoOffset);
     comp->setComponentId(COMPID_DL1);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 30, col, row++, gotoOffset);
-    comp->setComponentId(COMPID_DL2);
-    screen.push_back(comp);
+    row += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 30, col, row++, gotoOffset);
-    comp->setComponentId(COMPID_DL3);
-    screen.push_back(comp);
-
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 30, col, row++, gotoOffset);
-    comp->setComponentId(COMPID_DL4);
-    screen.push_back(comp);
-
-    row++;
-
-    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, col + 3, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ",                    8, col, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
@@ -1479,28 +1467,18 @@ void ConfigStream::fillUpdateDownloadWithProgress(void)
 
     // split it to lines
     getProgressLine(0, status, l1);
-    getProgressLine(1, status, l2);
-    getProgressLine(2, status, l3);
-    getProgressLine(3, status, l4);
 
     // set it to components
     setTextByComponentId(COMPID_DL1, l1);
-    setTextByComponentId(COMPID_DL2, l2);
-    setTextByComponentId(COMPID_DL3, l3);
-    setTextByComponentId(COMPID_DL4, l4);
 }
 
 void ConfigStream::fillUpdateDownloadWithFinish(void)
 {
     std::string s1 = "Update downloaded.";
     std::string s2 = "Starting install...";
-    std::string s3 = "";
 
     setTextByComponentId(COMPID_DL_TITLE, s1);
     setTextByComponentId(COMPID_DL1, s2);
-    setTextByComponentId(COMPID_DL2, s3);
-    setTextByComponentId(COMPID_DL3, s3);
-    setTextByComponentId(COMPID_DL4, s3);
 }
 
 void ConfigStream::getProgressLine(int index, std::string &lines, std::string &line)

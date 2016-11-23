@@ -28,6 +28,8 @@ extern SharedObjects shared;
 BYTE *inBfr;
 BYTE *tmpBfr;
 
+extern bool otherInstanceIsRunning(void);
+
 int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt)
 {
     int i, t = 0;
@@ -135,7 +137,18 @@ bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BYTE *tem
     
     bool bRes = receiveStream(2, (BYTE *) &howManyBytes, fd2);  // first receive byte count that we should read
 
-    if(!bRes) {
+    if(!bRes) {                                                 // didn't receive available byte count?
+        bRes = otherInstanceIsRunning();                        // is the main app running?
+
+        if(!bRes) {                                             // the main app is not running? should quit now!
+            write(STDOUT_FILENO, "\033[2J\033[H" , 7);          // clear whole screen, cursor up
+
+            printf("The CosmosEx main app not running, terminating config tool!\n");
+            sleep(3);
+            sigintReceived = 1;
+            return false;
+        }
+
         printf("sendCmd -- failed to receive byte count\n");
         
         Debug::out(LOG_DEBUG, "sendCmd fail on receiving howManyBytes");
@@ -146,7 +159,7 @@ bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BYTE *tem
         Debug::out(LOG_DEBUG, "sendCmd success because didn't need any other data");
         return true;
     }
-    
+
     bRes = receiveStream(howManyBytes, dataBuffer, fd2);        // then receive the stream
 
     if(bRes) {
@@ -204,7 +217,7 @@ static bool receiveStream(int byteCount, BYTE *data, int fd)
             
             Debug::out(LOG_DEBUG, "receiveStream - readCount: %d", readCount);
         }
-        
+
         Utils::sleepMs(10);     // sleep a little
     }
     
