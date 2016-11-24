@@ -555,7 +555,7 @@ void TranslatedDisk::onGetMounts(BYTE *cmd)
 		mounts += tmp;
     }
 
-	dataTrans->addDataBfr(mounts.c_str(), mounts.length(), true);
+	dataTrans->addDataCString(mounts.c_str(), true);
 	dataTrans->setStatus(E_OK);
 }
 
