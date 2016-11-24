@@ -43,6 +43,7 @@ public:
     static void status(std::string &status, int downloadTypeMask);      // create status report string of pending and running downloads according to mask
 
     static bool verifyChecksum(char *filename, WORD checksum);
+    static bool handleZIPedImage(const char *destDirectory, const char *zipFilePath);
 
 private:
     static void formatStatus(TDownloadRequest &tdr, std::string &line);
