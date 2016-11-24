@@ -539,8 +539,8 @@ void TranslatedDisk::onGetMounts(BYTE *cmd)
 	std::string mounts;
 	int index;
 
-	char *trTypeStr[4] = {(char *) "", (char *) "USB drive", (char *) "shared drive", (char *) "config drive"};
-	char *mountStr;
+	const char *trTypeStr[4] = {"", "USB drive", "shared drive", "config drive"};
+	const char *mountStr;
 
     for(int i=2; i<MAX_DRIVES; i++) {       // create enabled drive bits
         if(conf[i].enabled) {
