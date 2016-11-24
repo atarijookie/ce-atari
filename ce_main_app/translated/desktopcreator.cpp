@@ -196,7 +196,10 @@ char *DesktopCreator::storeExistingDrives(char *bfr, DesktopConfig *dc)
                     driveName = "SHARED DRIVE";
                     driveIcon = 0x06;
                 } else {                                    // it's a usb drive
-                    driveName = "USB DRIVE";
+                    if(!dc->label[i].empty())
+                        driveName = dc->label[i].c_str();
+                    else
+                        driveName = "USB DRIVE";
                     driveIcon = 0x08;
                 }
             }

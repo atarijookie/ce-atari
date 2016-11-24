@@ -468,3 +468,40 @@ void Utils::setTimezoneVariable_inThisContext(void)
     
     setenv("TZ", utcOfsset, 1);
 }
+
+std::string Utils::getDeviceLabel(const std::string & devicePath)
+{
+#define DEV_BY_LABEL_PATH "/dev/disk/by-label/"
+	std::string label("");
+
+	if(devicePath.substr(0,5) != "/dev/") return label;
+	std::string devShort = devicePath.substr(5);
+
+	DIR *d = opendir(DEV_BY_LABEL_PATH);
+	if(d != NULL) {
+		//FILE *f = fopen("/tmp/labels.txt", "w");
+		//fprintf(f, "%s\n", devShort.c_str());
+		struct dirent * de;
+		char link_path[256];
+		char link_target[256];
+		while((de = readdir(d)) != NULL) {
+			if(de->d_type == DT_LNK) {	// symbolic link
+				snprintf(link_path, sizeof(link_path), "%s%s", DEV_BY_LABEL_PATH, de->d_name);
+				ssize_t n = readlink(link_path, link_target, sizeof(link_target) - 1);
+				//fprintf(f, "%s %d\n", link_path, (int)n);
+				if(n >= 0) {
+					link_target[n] = '\0';
+					char * target_short = strrchr(link_target, '/');
+					if(target_short != NULL) {
+						target_short++;
+						if(devShort == target_short) label = de->d_name;
+						//fprintf(f, "%x %s %s\n", de->d_type, de->d_name, target_short);
+					}
+				}
+			}
+		}
+		//fclose(f);
+		closedir(d);
+	}
+	return label;
+}

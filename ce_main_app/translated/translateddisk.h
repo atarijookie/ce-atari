@@ -28,6 +28,7 @@ typedef struct {
 
     std::string devicePath;                 // where the device is
     std::string hostRootPath;               // where is the root on host file system
+    std::string label;						// "DOS" label
     char        stDriveLetter;              // what letter will be used on ST
     std::string currentAtariPath;           // what is the current path on this drive
 
@@ -40,6 +41,7 @@ typedef struct {
     bool        enabled;
     std::string devicePath;                 // where the device is
     std::string hostRootPath;               // where is the root on host file system
+    std::string label;						// "DOS" label
     int         translatedType;             // normal / shared / config
 } TranslatedConfTemp;
 
