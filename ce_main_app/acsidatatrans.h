@@ -58,6 +58,8 @@ public:
     void addZerosUntilSize(DWORD finalBufferCnt);
 
     void addDataBfr(const void *data, DWORD cnt, bool padToMul16);
+
+    void addDataCString(const char *data, bool padToMul16);	// including null terminator
 	
     void padDataToMul16(void);
 
