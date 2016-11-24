@@ -353,6 +353,7 @@ void TranslatedDisk::detachByIndex(int index)
     conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
     conf[index].translatedType      = TRANSLATEDTYPE_NORMAL;
     conf[index].mediaChanged        = true;
+	conf[index].label.clear();
 	conf[index].dirTranslator.clear();
 }
 
