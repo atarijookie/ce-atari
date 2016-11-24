@@ -385,7 +385,7 @@ void ce_conf_mainLoop(void)
                 res = sendCmd(configNotLinuxConsole ? CFG_CMD_KEYDOWN : CFG_CMD_LINUXCONSOLE_GETSTREAM, key, termFd1, termFd2, inBfr, tmpBfr, vt100count);
                 
                 if(res) {
-                    int len = strnlen((const char *) inBfr, vt100count);
+                    int len = strnlen((const char *) inBfr, vt100count);    // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator  
                     write(STDOUT_FILENO, (char *) inBfr, len);
                 }
                 
@@ -401,7 +401,7 @@ void ce_conf_mainLoop(void)
             res = sendCmd(configNotLinuxConsole ? CFG_CMD_REFRESH : CFG_CMD_LINUXCONSOLE_GETSTREAM, 0, termFd1, termFd2, inBfr, tmpBfr, vt100count);
         
             if(res) {
-                int len = strnlen((const char *) inBfr, vt100count);
+                int len = strnlen((const char *) inBfr, vt100count);    // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator
                 write(STDOUT_FILENO, (char *) inBfr, len);
             }
 

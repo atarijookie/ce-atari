@@ -127,10 +127,12 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         bool res = sendCmd(CFG_CMD_REFRESH, 0, webFd1, webFd2, in_bfr, tmp_bfr, iReadLen);
         
         if( res ){
+            int realLen = strnlen((const char *) in_bfr, iReadLen);         // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator
+        
             mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n");
             mg_printf(conn, "Cache: no-cache\r\n");
-            mg_printf(conn, "Content-Length: %d\r\n\r\n",iReadLen);        // Always set Content-Length
-            mg_write(conn, in_bfr,iReadLen );
+            mg_printf(conn, "Content-Length: %d\r\n\r\n", realLen);         // Always set Content-Length
+            mg_write(conn, in_bfr, realLen);
             return true;
         } else{
             Debug::out(LOG_ERROR, "could not send config command");
@@ -202,10 +204,12 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
                 int iReadLen;
                 bool res = sendCmd(CFG_CMD_KEYDOWN, iCode, webFd1, webFd2, in_bfr, tmp_bfr, iReadLen);
                 if( res ){
+                    int realLen = strnlen((const char *) in_bfr, iReadLen);         // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator
+
                     mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n");
                     mg_printf(conn, "Cache: no-cache\r\n");
-                    mg_printf(conn, "Content-Length: %d\r\n\r\n",iReadLen);        // Always set Content-Length
-                    mg_write(conn, in_bfr,iReadLen );
+                    mg_printf(conn, "Content-Length: %d\r\n\r\n", realLen);         // Always set Content-Length
+                    mg_write(conn, in_bfr, realLen);
                     return true;
                 } else{
                     Debug::out(LOG_ERROR, "could not send config command");
