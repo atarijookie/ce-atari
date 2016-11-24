@@ -245,6 +245,11 @@ void ConfigComponent::handleEditLineKeyPress(BYTE key)
 		return;
     }
 
+    if(key == KEY_END) {            // END pressed? (not present on Atari keyboard)
+        cursorPos = text.length();
+        return;
+    }
+
     //-----
     // now for the other keys
     if(key == KEY_BACKSP) {									// backspace?

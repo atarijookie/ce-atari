@@ -216,6 +216,11 @@ void ConfigStream::onKeyDown(BYTE key)
         }
     }
     
+    // if you press ENTER key on a editline, it's like you pressed arrow down
+    if(key == KEY_ENTER && (curr->getComponentType() == ConfigComponent::editline || curr->getComponentType() == ConfigComponent::editline_pass)) {
+        key = KEY_DOWN;
+    }
+
     if(key == KEY_UP) {							// arrow up
         curr->setFocus(false);					// unfocus this component
 

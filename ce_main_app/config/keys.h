@@ -14,6 +14,7 @@
 #define		KEY_HOME	146
 #define		KEY_HELP	147
 #define		KEY_UNDO	148
+#define		KEY_END     149         // not present on Atari keyboard, but present on PC keyboard (e.g. when running CE_CONF in linux console)
 
 #define		KEY_F1		150
 #define		KEY_F2		151

@@ -228,7 +228,7 @@ static bool receiveStream(int byteCount, BYTE *data, int fd)
 static BYTE getKey(int count)
 {
     int c = getchar();
-    
+
     if(c != 27) {           // not ESC sequence? just return value
         switch(c) {
             case 0x0a:  return KEY_ENTER;
@@ -301,6 +301,13 @@ static BYTE getKey(int count)
                 }
                 break;
                 
+            case 0x34:
+                c = getchar();
+                if(c == 0x7e) {
+                    return KEY_END;
+                }
+                break;
+
             case 0x5b:
                 c = getchar();
                 switch(c) {
