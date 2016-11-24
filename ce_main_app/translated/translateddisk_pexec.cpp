@@ -364,26 +364,23 @@ void TranslatedDisk::onPexec_getBpb(BYTE *cmd)
     dataTrans->addDataByte(pexecDriveIndex);                                                        // 18   : index of drive, which will now be RAW Pexec() drive
     dataTrans->addZerosUntilSize(32);                                                               // 19-31: zeros
     
-    BYTE *pPrgPath;
-    int    prgPathLength;
+    const char *pPrgPath;
     
 #ifdef PEXEC_FULL_PATH
     // if full path, store full path to PRG
-    pPrgPath        = (BYTE *) pexecPrgPath.c_str();
-    prgPathLength   = pexecPrgPath.length();
+    pPrgPath        = pexecPrgPath.c_str();
 #else
     // if not full path, then store just path to root
-    pPrgPath        = (BYTE *) "\"";
-    prgPathLength   = 1;
+    pPrgPath        = "\"";
 #endif
     
-    dataTrans->addDataBfr(pPrgPath, prgPathLength + 1, false);                                      // 32 .. ??: path to PRG file
+    dataTrans->addDataCString(pPrgPath, false);                                      // 32 .. ??: path to PRG file
 
     dataTrans->addZerosUntilSize(256);                                                              // ??-255: zeros
-    dataTrans->addDataBfr(pexecPrgFilename.c_str(), pexecPrgFilename.length() + 1, false); // 256 .. ??: just the PRG filename (without path)
+    dataTrans->addDataCString(pexecPrgFilename.c_str(), false); // 256 .. ??: just the PRG filename (without path)
     
     dataTrans->addZerosUntilSize(384);                                                              // ??-383: zeros
-    dataTrans->addDataBfr(pexecFakeRootPath.c_str(), pexecFakeRootPath.length() + 1, false); // 384 .. ??: just the PRG filename (without path)
+    dataTrans->addDataCString(pexecFakeRootPath.c_str(), false); // 384 .. ??: just the PRG filename (without path)
     
     dataTrans->padDataToMul16();
     dataTrans->setStatus(E_OK);
