@@ -109,6 +109,12 @@ void AcsiDataTrans::addDataBfr(const void *data, DWORD cnt, bool padToMul16)
     }
 }
 
+void AcsiDataTrans::addDataCString(const char *data, bool padToMul16)
+{
+	// include null terminator in byte count
+	addDataBfr(data, strlen(data) + 1, padToMul16);
+}
+
 void AcsiDataTrans::padDataToMul16(void)
 {
     int mod = count % 16;           // how many we got in the last 1/16th part?

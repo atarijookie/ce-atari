@@ -178,10 +178,7 @@ void TranslatedDisk::onDgetpath(BYTE *cmd)
     Debug::out(LOG_DEBUG, "TranslatedDisk::onDgetpath - which drive: %d, atari path: %s", whichDrive, aPath.c_str());
 
     // return the current path for current drive
-    dataTrans->addDataBfr(aPath.c_str(), aPath.length(), true);
-    
-    dataTrans->addDataByte(0);                      // add terminating zero, just in case
-    dataTrans->padDataToMul16();                    // and pad to 16 bytes for DMA chip
+    dataTrans->addDataCString(aPath.c_str(), true); // add terminating zero, just in case
     dataTrans->setStatus(E_OK);
 }
 
