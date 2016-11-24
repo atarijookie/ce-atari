@@ -304,6 +304,13 @@ void ConfigComponent::setTextOptions(int newOpts)
 
 BYTE ConfigComponent::filterTextKey(BYTE key)
 {
+    // if any of these controll keys were pressed, filter them out - they are not a valid TEXT keys
+    if( (key >= KEY_UP      && key <= KEY_RIGHT)    ||
+        (key >= KEY_ENTER   && key <= KEY_UNDO)     ||
+        (key >= KEY_F1      && key <= KEY_F10) ) {
+        return 0;
+    }
+
     // if the dot is allowed (for IP addresses)
     if(key == '.' && textOptionSet(TEXT_OPTION_ALLOW_DOT)) {
         return key;
