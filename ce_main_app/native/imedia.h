@@ -9,7 +9,7 @@ class IMedia
 public:
 	virtual ~IMedia()	{ };
 
-    virtual bool iopen(char *path, bool createIfNotExists) = 0;
+    virtual bool iopen(const char *path, bool createIfNotExists) = 0;
     virtual void iclose(void) = 0;
 
     virtual bool isInit(void) = 0;

@@ -26,7 +26,7 @@ DeviceMedia::~DeviceMedia()
     iclose();
 }
 
-bool DeviceMedia::iopen(char *path, bool createIfNotExists)
+bool DeviceMedia::iopen(const char *path, bool createIfNotExists)
 {
     mediaHasChanged = false;
 

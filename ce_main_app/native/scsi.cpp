@@ -108,7 +108,7 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
 
     case SOURCETYPE_IMAGE:
         dm  = new ImageFileMedia();
-        res = dm->iopen((char *) hostPath.c_str(), false);                  // try to open the image
+        res = dm->iopen(hostPath.c_str(), false);                  // try to open the image
 
         if(res) {                                                           // image opened?
             attachedMedia[index].hostPath       = hostPath;
@@ -140,7 +140,7 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
 
     case SOURCETYPE_DEVICE:
         dm  = new DeviceMedia();
-        res = dm->iopen((char *) hostPath.c_str(), false);                   // try to open the device
+        res = dm->iopen(hostPath.c_str(), false);                   // try to open the device
 
 		if(res) {
 			attachedMedia[index].hostPath       = hostPath;

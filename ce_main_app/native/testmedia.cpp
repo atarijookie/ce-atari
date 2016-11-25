@@ -14,7 +14,7 @@ TestMedia::~TestMedia()
     iclose();
 }
 
-bool TestMedia::iopen(char *path, bool createIfNotExists)
+bool TestMedia::iopen(const char *path, bool createIfNotExists)
 {
     return true;
 }

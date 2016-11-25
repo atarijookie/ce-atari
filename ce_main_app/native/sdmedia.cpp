@@ -24,7 +24,7 @@ void SdMedia::setCurrentCapacity(DWORD sectors)
 	}
 }
 
-bool SdMedia::iopen(char *path, bool createIfNotExists)
+bool SdMedia::iopen(const char *path, bool createIfNotExists)
 {
     return true;
 }

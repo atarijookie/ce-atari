@@ -17,7 +17,7 @@ ImageFileMedia::~ImageFileMedia()
     iclose();
 }
 
-bool ImageFileMedia::iopen(char *path, bool createIfNotExists)
+bool ImageFileMedia::iopen(const char *path, bool createIfNotExists)
 {
     bool imageWasCreated = false;
     mediaHasChanged = false;
