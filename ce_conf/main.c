@@ -60,7 +60,6 @@ BYTE prevCommandFailed;
 int main(void)
 {
     BYTE key, res;
-    WORD timeNow, timePrev;
     DWORD toEven;
     void *OldSP;
     BYTE keyDownCommand = CFG_CMD_KEYDOWN;
@@ -110,8 +109,7 @@ int main(void)
     setResolution();                                                // send the current ST resolution for screen centering 
     showHomeScreen();                                               // get the home screen 
     
-    // use Ctrl + C to quit 
-    timePrev = Tgettime();
+    DWORD lastShowStreamTime = getTicks();                          // when was the last time when we got some config stream?
     
     while(1) {
         if(isUpdateScreen) {
@@ -131,14 +129,14 @@ int main(void)
         key = getKeyIfPossible();                                   // see if there's something waiting from keyboard 
         
         if(key == 0) {                                              // nothing waiting from keyboard? 
-            timeNow = Tgettime();
+            DWORD now = getTicks();
             
-            if((timeNow - timePrev) > 0) {                          // check if time changed (2 seconds passed) 
-                timePrev = timeNow;
-                
+            if((now - lastShowStreamTime) > 200) {                  // last time the stream was shown was (at least) one second ago? do refresh...
                 sendKeyDown(0, keyDownCommand);                     // display a new stream (if something changed) 
+
+                lastShowStreamTime = now;                           // we just shown the stream, no need for refresh
             }
-            
+
             continue;                                               // try again 
         }
 
@@ -154,6 +152,7 @@ int main(void)
                 refreshScreen();                                    // refresh the screen
             }
             
+            lastShowStreamTime = getTicks();                        // we just shown the stream, no need for refresh
             continue;
         }
         
@@ -163,10 +162,12 @@ int main(void)
         
         if(key == KEY_F5 && keyDownCommand == CFG_CMD_KEYDOWN) {    // should refresh? and are we on the config part, not the linux console part? 
             refreshScreen();
+            lastShowStreamTime = getTicks();                        // we just shown the stream, no need for refresh
             continue;
         }
         
-        sendKeyDown(key, keyDownCommand);                           // send this key to device 
+        sendKeyDown(key, keyDownCommand);                           // send this key to device
+        lastShowStreamTime = getTicks();                            // we just shown the stream, no need for refresh
     }
     
     Super((void *)OldSP);                                           // user mode 
