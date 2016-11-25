@@ -97,6 +97,21 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
         Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_SET_RESOLUTION -- %d", cmd[5]);
         break;
 
+    case CFG_CMD_UPDATING_QUERY:
+    {
+        BYTE isUpdateStartingFlag               = (Update::state() == UPDATE_STATE_WAITBEFOREINSTALL) ? 1 : 0;
+        BYTE updateComponentsWithValidityNibble = 0xC0 | Update::getUpdateComponents();
+        
+        dataTrans->addDataByte(isUpdateStartingFlag);
+        dataTrans->addDataByte(updateComponentsWithValidityNibble);
+        dataTrans->padDataToMul16();
+        
+        dataTrans->setStatus(SCSI_ST_OK);
+        
+        Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_UPDATING_QUERY -- isUpdateStartingFlag: %d, updateComponentsWithValidityNibble: %x", isUpdateStartingFlag, updateComponentsWithValidityNibble);
+        break;
+    }
+        
     case CFG_CMD_REFRESH:
         screenChanged = true;                                           // get full stream, not only differences
         streamCount = getStream(false, readBuffer, READ_BUFFER_SIZE);   // then get current screen stream

@@ -28,8 +28,10 @@ void showMoreStreamIfNeeded(void);
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
 BYTE ce_identify(BYTE ACSI_id);
 
+BYTE retrieveIsUpdating    (void);
 void retrieveIsUpdateScreen(char *stream);
 BYTE isUpdateScreen;
+BYTE ceIsUpdating;
 
 #define UPDATECOMPONENT_APP     0x01
 #define UPDATECOMPONENT_XILINX  0x02
@@ -62,7 +64,9 @@ int main(void)
 	DWORD toEven;
 	void *OldSP;
     BYTE keyDownCommand = CFG_CMD_KEYDOWN;
+    DWORD lastUpdateCheckTime = 0;
 
+    ceIsUpdating        = FALSE;
     isUpdateScreen      = FALSE;
     updateComponents    = 0;
     
@@ -101,17 +105,27 @@ int main(void)
 	
     // ----------------- 
     // if the device is CosmosEx, do the remote console config
+    hdIf.maxRetriesCount = 1;                                       // retry only once
+    
 	setResolution();							                    // send the current ST resolution for screen centering 
-	
 	showHomeScreen();							                    // get the home screen 
 	
 	// use Ctrl + C to quit 
 	timePrev = Tgettime();
 	
 	while(1) {
-        if(isUpdateScreen) {                                        // if we're on a update screen, show fake update progress
+        if(isUpdateScreen) {
+            DWORD now = getTicks();
+            
+            if(now >= (lastUpdateCheckTime + 200)) {                // if last check was at least a second ago, do new check
+                lastUpdateCheckTime = now;
+                retrieveIsUpdating();                               // talk to CE to see if the update started
+            }
+        }
+        
+        if(ceIsUpdating) {                                          // if we're updating, show fake update progress
             showFakeProgress();
-            isUpdateScreen = FALSE;                                 // we're (probably) not updating anymore
+            ceIsUpdating = FALSE;                                   // we're (probably) not updating anymore
         }
     
 		key = getKeyIfPossible();                                   // see if there's something waiting from keyboard 
@@ -303,13 +317,7 @@ BYTE setResolution(void)
 void showConnectionErrorMessage(void)
 {
 	Clear_home();
-    
-    if(isUpdateScreen == FALSE) {
-        (void) Cconws("Communication with CosmosEx failed.\n\rWill try to reconnect in a while.\n\r\n\rTo quit to desktop, press F10\n\r");
-    } else {
-        (void) Cconws("\33pCosmosEx device is updating...\n\rPlease wait and do not turn off!\33q\n\r");
-    }
-	
+    (void) Cconws("Link to device is down - updating?\n\rTrying to reconnect.\n\r\n\rTo quit to desktop, press F10\n\r");
 	prevCommandFailed = 1;
 }
 //--------------------------------------------------
@@ -363,6 +371,47 @@ BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
 	return 0;							// unknown key 
 }
 //--------------------------------------------------
+BYTE processUpdateComponentsFlags(BYTE inByteWithFlags)
+{
+    BYTE components     =  inByteWithFlags;     // get where the update components should be stored
+    BYTE validitySign   = (components & 0xf0);  // get upper nibble
+    
+    BYTE upComponents   = 0;
+    
+    if(validitySign == 0xc0) {                  // if upper nible is 'C', then this valid update components thing
+        upComponents = components & 0x0f;       // get only the bottom part of components byte
+        
+        if(upComponents == 0) {                 // no update components? pretend that we're updating everything to wait long enough
+            upComponents = UPDATECOMPONENT_ALL;
+        }
+    } else {                                    // if update components is possibly invalid, pretend that we're updating everything to wait long enough
+        upComponents = UPDATECOMPONENT_ALL;
+    }
+    
+    return upComponents;
+}
+//--------------------------------------------------
+BYTE retrieveIsUpdating(void)
+{
+    ceIsUpdating = FALSE;                           // not updating yet
+    
+    // if we got here, the previous command passed and this should work also
+    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_UPDATING_QUERY, 0};
+    
+    cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)	
+    memset(pBuffer, 0, 512);                        // clear the buffer 
+  
+    (*hdIf.cmd)(1, cmd, 6, pBuffer, 1);             // issue UPDATING QUERY command
+    
+    if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
+        return FALSE;
+    }
+    
+    ceIsUpdating        = pBuffer[0];               // get the IS UPDATING flag
+    updateComponents    = processUpdateComponentsFlags(pBuffer[1]);
+    return TRUE;                                    // return success
+}
+//--------------------------------------------------
 void retrieveIsUpdateScreen(char *stream)
 {
     WORD i;
@@ -378,20 +427,9 @@ void retrieveIsUpdateScreen(char *stream)
         return;
     }
     
-    if(stream[i + 1] == 1) {                        // if the flag after the stream is equal to 1, then it's update screen
-        isUpdateScreen = TRUE;
-        
-        BYTE components     =  stream[i + 2];       // get where the update components should be stored
-        BYTE validitySign   = (components & 0xf0);  // get upper nibble
-        if(validitySign == 0xc0) {                  // if upper nible is 'C', then this valid update components thing
-            updateComponents = components & 0x0f;   // get only the bottom part of components byte
-            
-            if(updateComponents == 0) {             // no update components? pretend that we're updating everything to wait long enough
-                updateComponents = UPDATECOMPONENT_ALL;
-            }
-        } else {                                    // if update components is possibly invalid, pretend that we're updating everything to wait long enough
-            updateComponents = UPDATECOMPONENT_ALL;
-        }
+    if(stream[i + 1] == 1) {            // if the flag after the stream is equal to 1, then it's update screen
+        isUpdateScreen      = TRUE;
+        updateComponents    = processUpdateComponentsFlags(stream[i + 2]);
     } else {                            // it's not update screen
         isUpdateScreen      = FALSE;
         updateComponents    = 0;        // no components will be updated
@@ -493,6 +531,8 @@ void showFakeProgress(void)
     // we're done, try to reconnect.
     (void) Cconws("\r\nIf everything went well,\r\nwill connect back soon.\r\n");
     
+    hdIf.maxRetriesCount = 0;                               // don't retry - we're still might be updating
+    
     int i;
     for(i=0; i<15; i++) {
         BYTE res = showHomeScreenSimple();                  // try to reconnect and show home screen
@@ -510,6 +550,8 @@ void showFakeProgress(void)
         (void) Cconws(".");                                 // if reconnect failed, show dot and wait again
         sleep(1);
     }
+    
+    hdIf.maxRetriesCount = 1;                               // enable retry, but just once
 }
 
 BYTE getKeyIfPossible(void)

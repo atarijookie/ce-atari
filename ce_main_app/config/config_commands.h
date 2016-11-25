@@ -5,6 +5,7 @@
 #define CFG_CMD_IDENTIFY            0
 #define CFG_CMD_KEYDOWN             1
 #define CFG_CMD_SET_RESOLUTION      2
+#define CFG_CMD_UPDATING_QUERY      3
 #define CFG_CMD_REFRESH             0xfe
 #define CFG_CMD_GO_HOME             0xff
 
