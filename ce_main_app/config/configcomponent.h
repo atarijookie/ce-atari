@@ -49,7 +49,7 @@ public:
     
     int getComponentType(void);
 
-    void terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt);    // then add +cnt to bfr (might be 0 or 4)
+    BYTE *terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt);    // then add +cnt to bfr (might be 0 or 4)
 
 private:
     ConfigStream    *confStream;
@@ -82,9 +82,9 @@ private:
     int onEnter;
     int onChBEnter;
 
-    void terminal_addGoto(BYTE *bfr, int x, int y);                     // then add +4 to bfr
-    void terminal_addReverse(BYTE *bfr, bool onNotOff);         // then add +2 to bfr
-    void terminal_addCursorOn(BYTE *bfr, bool on);                      // then add +2 to bfr
+    BYTE *terminal_addGoto(BYTE *bfr, int x, int y);
+    BYTE *terminal_addReverse(BYTE *bfr, bool onNotOff);
+    BYTE *terminal_addCursorOn(BYTE *bfr, bool on);
 
     void handleEditLineKeyPress(BYTE key);
 

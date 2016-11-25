@@ -58,12 +58,10 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
     changed = false;                                // mark that we've displayed current state and that nothing changed, until it changes ;)
 
     if(type == label) {
-        terminal_addGoto(bfr, posX, posY);          // goto(x,y)
-        bfr += 4;
+        bfr = terminal_addGoto(bfr, posX, posY);    // goto(x,y)
 
         if(isReverse) {                             // if reversed, start reverse
-            terminal_addReverse(bfr, true);
-            bfr += 2;
+            bfr = terminal_addReverse(bfr, true);
         }
 
         for(int i=0; i<maxLen; i++) {               // fill with spaces
@@ -74,8 +72,7 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
         bfr += maxLen;
 
         if(isReverse) {                             // if reversed, stop reverse
-            terminal_addReverse(bfr, false);
-            bfr += 2;
+            bfr = terminal_addReverse(bfr, false);
         }
 
         len = bfr - bfrStart;                       // we printed this much
@@ -84,12 +81,10 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
 
     //------
     if(type == button || type == editline || type == editline_pass || type == checkbox) {
-        terminal_addGoto(bfr, posX, posY);              // goto(x,y)
-        bfr += 4;
+        bfr = terminal_addGoto(bfr, posX, posY);        // goto(x,y)
 
         if(hasFocus) {                                  // if has focus, start reverse
-            terminal_addReverse(bfr, true);
-            bfr += 2;
+            bfr = terminal_addReverse(bfr, true);
         }
 
         bfr[         0] = '[';
@@ -109,8 +104,7 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
         bfr += maxLen + 2;                                                  // +2 because of [ and ]
 
         if(hasFocus) {                                  // if has focus, stop reverse
-            terminal_addReverse(bfr, false);
-            bfr += 2;
+            bfr = terminal_addReverse(bfr, false);
         }
 
         len = bfr - bfrStart;                           // we printed this much
@@ -122,12 +116,10 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
     if(type == heartBeat) {
         changed = true;                                 // this heartbeat always changes
 
-        terminal_addGoto(bfr, posX, posY);              // goto(x,y)
-        bfr += 4;
+        bfr = terminal_addGoto(bfr, posX, posY);        // goto(x,y)
         
         if(isReverse) {                                 // if reversed, start reverse
-            terminal_addReverse(bfr, true);
-            bfr += 2;
+            bfr = terminal_addReverse(bfr, true);
         }
 
         bfr[0] = heartBeatStateChar[heartBeatState];    // store heartbeat char
@@ -139,8 +131,7 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
         }
         
         if(isReverse) {                                 // if reversed, stop reverse
-            terminal_addReverse(bfr, false);
-            bfr += 2;
+            bfr = terminal_addReverse(bfr, false);
         }
         
         len = bfr - bfrStart;                           // we printed this much
@@ -459,15 +450,17 @@ bool ConfigComponent::canFocus(void)
     return (type != label && type != heartBeat);        // can focus if not label and not hearBeat
 }
 
-void ConfigComponent::terminal_addGoto(BYTE *bfr, int x, int y)
+BYTE *ConfigComponent::terminal_addGoto(BYTE *bfr, int x, int y)
 {
     bfr[0] = 27;
     bfr[1] = 'Y';
     bfr[2] = ' ' + y;
     bfr[3] = ' ' + x + gotoOffset;
+    
+    return (bfr + 4);
 }
 
-void ConfigComponent::terminal_addReverse(BYTE *bfr, bool onNotOff)
+BYTE *ConfigComponent::terminal_addReverse(BYTE *bfr, bool onNotOff)
 {
     bfr[0] = 27;
 
@@ -476,9 +469,11 @@ void ConfigComponent::terminal_addReverse(BYTE *bfr, bool onNotOff)
     } else {
         bfr[1] = 'q';
     }
+    
+    return (bfr + 2);
 }
 
-void ConfigComponent::terminal_addCursorOn(BYTE *bfr, bool on)
+BYTE *ConfigComponent::terminal_addCursorOn(BYTE *bfr, bool on)
 {
     bfr[0] = 27;
 
@@ -487,30 +482,33 @@ void ConfigComponent::terminal_addCursorOn(BYTE *bfr, bool on)
     } else {
         bfr[1] = 'f';       // CUR_OFF
     }
+    
+    return (bfr + 2);
 }
 
-void ConfigComponent::terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt)
+BYTE *ConfigComponent::terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt)
 {
     cnt = 0;
 
     if(type != editline && type != editline_pass) { // if it's not editline, skip adding current cursor
-        terminal_addCursorOn(bfr, false);
-        cnt = 2;
-        return;
+        bfr = terminal_addCursorOn(bfr, false);
+        cnt += 2;
+        return bfr;
     }
 
     if(!hasFocus) {                                 // if this editline doesn't have focus, skip adding current cursor
-        terminal_addCursorOn(bfr, false);
-        cnt = 2;
-        return;
+        bfr = terminal_addCursorOn(bfr, false);
+        cnt += 2;
+        return bfr;
     }
 
-    terminal_addCursorOn(bfr, true);
+    bfr = terminal_addCursorOn(bfr, true);
     cnt += 2;
-    bfr += 2;
 
-    terminal_addGoto(bfr, posX + 1 + cursorPos, posY);      // add goto(x,y) at cursor position
+    bfr = terminal_addGoto(bfr, posX + 1 + cursorPos, posY);      // add goto(x,y) at cursor position
     cnt += 4;
+    
+    return bfr;
 }
 
 bool ConfigComponent::isGroupCheckBox(void)

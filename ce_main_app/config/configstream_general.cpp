@@ -330,9 +330,8 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
     if(focused != -1) {									// if got some component with focus
         int gotLen;
         ConfigComponent *c = (ConfigComponent *) scr[focused];
-        c->terminal_addGotoCurrentCursor(bfr, gotLen);	// position the cursor at the right place
+        bfr = c->terminal_addGotoCurrentCursor(bfr, gotLen);	// position the cursor at the right place
 
-        bfr         += gotLen;
         totalCnt    += gotLen;
     }
 
