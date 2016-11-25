@@ -2,8 +2,6 @@
 #include <mint/osbind.h> 
 #include <mint/linea.h> 
 #include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 
 #include "acsi.h"
 #include "translated.h"
@@ -13,6 +11,7 @@
 #include "Cookiejar.h"
 #include "version.h"
 #include "hdd_if.h"
+#include "stdlib.h"
 
 //--------------------------------------------------
 
@@ -44,18 +43,23 @@ BYTE *rBuffer, *wBuffer;
 
 BYTE prevCommandFailed;
 
-#define HOSTMOD_CONFIG				1
-#define HOSTMOD_LINUX_TERMINAL		2
-#define HOSTMOD_TRANSLATED_DISK		3
-#define HOSTMOD_NETWORK_ADAPTER		4
+#define HOSTMOD_CONFIG              1
+#define HOSTMOD_LINUX_TERMINAL      2
+#define HOSTMOD_TRANSLATED_DISK     3
+#define HOSTMOD_NETWORK_ADAPTER     4
 #define HOSTMOD_FDD_SETUP           5
 
 #define TRAN_CMD_IDENTIFY           0
 #define TRAN_CMD_GETDATETIME        1
 
-#define DATE_OK                              0
-#define DATE_ERROR                           2
-#define DATE_DATETIME_UNKNOWN                4
+#define DATE_OK                     0
+#define DATE_ERROR                  2
+#define DATE_DATETIME_UNKNOWN       4
+
+#define DEVTYPE_OFF                 0
+#define DEVTYPE_SD                  1
+#define DEVTYPE_RAW                 2
+#define DEVTYPE_TRANSLATED          3
 
 #define Clear_home()    (void) Cconws("\33E")
 
@@ -88,13 +92,13 @@ void updateCounts(BYTE doingWriteNotRead, int res);
 void printOpResult(int res);
 
 void testDataReliability(void);
-void testContinousRead  (void);
+void testContinousRead  (BYTE testReadNotSDcard);
 //--------------------------------------------------
 int main(void)
 {
     BYTE key;
-	DWORD toEven;
-	void *OldSP;
+    DWORD toEven;
+    void *OldSP;
 
     //----------------------
     // read all the keys which are waiting, so we can ignore them
@@ -107,52 +111,52 @@ int main(void)
     }
     //----------------------
     
-	OldSP = (void *) Super((void *)0);  			// supervisor mode 
-	lineaa();	// hide mouse    
-	
-	prevCommandFailed = 0;
-	
-	// ---------------------- 
-	// create buffer pointer to even address 
-	toEven = (DWORD) &readBuffer[0];
+    OldSP = (void *) Super((void *)0);              // supervisor mode 
+    lineaa();   // hide mouse    
+    
+    prevCommandFailed = 0;
+    
+    // ---------------------- 
+    // create buffer pointer to even address 
+    toEven = (DWORD) &readBuffer[0];
   
-	if(toEven & 0x0001)       // not even number? 
-		toEven++;
+    if(toEven & 0x0001)       // not even number? 
+        toEven++;
   
-	rBuffer = (BYTE *) toEven; 
+    rBuffer = (BYTE *) toEven; 
 
     //----------
-  	toEven = (DWORD) &writeBuffer[0];
+    toEven = (DWORD) &writeBuffer[0];
   
-	if(toEven & 0x0001)       // not even number? 
-		toEven++;
+    if(toEven & 0x0001)       // not even number? 
+        toEven++;
   
-	wBuffer = (BYTE *) toEven; 
+    wBuffer = (BYTE *) toEven; 
 
-	Clear_home();
+    Clear_home();
 
-	// ---------------------- 
-	print_head();
-	(void) Cconws("\r\n");
-	(void) Cconws(" Non-destructive ACSI read/write test.\r\n");
-	(void) Cconws(" Helpful to detect possible DMA problems\r\n"); 		
-	(void) Cconws(" your ST hardware might have. See:\r\n"); 		
-	(void) Cconws(" http://joo.kie.sk/?page_id=250 and \r\n");
-	(void) Cconws(" http://goo.gl/23AqXk for infos+fixes.\r\n\r\n"); 		
-	
-	unsigned long *cescreencast_cookie=0;
-	if( CookieJarRead(0x43455343,(unsigned long *) &cescreencast_cookie)!=0 ) // Cookie "CESC" 
-	{ 
-		(void) Cconws("\r\n");
-		(void) Cconws(" CosmosEx Screencast is active. Please\r\n");
-		(void) Cconws(" deactivate. \r\n\r\n Press any key to quit.\r\n");
-		Cnecin();
-		(void) Cconws("Quit."); 		
-		
-		linea9();   
-		Super((void *)OldSP);  			      // user mode 
-		return 0;
-	}
+    // ---------------------- 
+    print_head();
+    (void) Cconws("\r\n");
+    (void) Cconws(" Non-destructive ACSI read/write test.\r\n");
+    (void) Cconws(" Helpful to detect possible DMA problems\r\n");      
+    (void) Cconws(" your ST hardware might have. See:\r\n");        
+    (void) Cconws(" http://joo.kie.sk/?page_id=250 and \r\n");
+    (void) Cconws(" http://goo.gl/23AqXk for infos+fixes.\r\n\r\n");        
+    
+    unsigned long *cescreencast_cookie=0;
+    if( CookieJarRead(0x43455343,(unsigned long *) &cescreencast_cookie)!=0 ) // Cookie "CESC" 
+    { 
+        (void) Cconws("\r\n");
+        (void) Cconws(" CosmosEx Screencast is active. Please\r\n");
+        (void) Cconws(" deactivate. \r\n\r\n Press any key to quit.\r\n");
+        Cnecin();
+        (void) Cconws("Quit.");         
+        
+        linea9();   
+        Super((void *)OldSP);                 // user mode 
+        return 0;
+    }
     
     //----------------------
     // detect TOS version and try to automatically choose the interface
@@ -193,8 +197,8 @@ int main(void)
         }
     }
 
-	// ---------------------- 
-	(void) Cconws("\r\n\r\n[S]imple or [D]etailed error report?\r\n");
+    // ---------------------- 
+    (void) Cconws("\r\n\r\n[S]imple or [D]etailed error report?\r\n");
     
     key = Cnecin();
     if(key == 'D' || key == 'd') {      // detailed?
@@ -203,33 +207,34 @@ int main(void)
         simpleNotDetailedErrReport = 1;
     }
     
-	// ---------------------- 
-	// search for device on the ACSI bus 
-	deviceID = findDevice();
+    // ---------------------- 
+    // search for device on the ACSI bus 
+    deviceID = findDevice();
 
-	if( deviceID == 0xff )
-	{
-    	(void) Cconws("Quit."); 		
+    if( deviceID == 0xff )
+    {
+        (void) Cconws("Quit.");         
 
-      	linea9();   
-	    Super((void *)OldSP);  			      // user mode 
-		return 0;
-	}
+        linea9();   
+        Super((void *)OldSP);                 // user mode 
+        return 0;
+    }
   
-	// ----------------- 
+    // ----------------- 
     // now set up the acsi command bytes so we don't have to deal with this one anymore 
-	commandLong [0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
+    commandLong [0] = (deviceID << 5) | 0x1f;           // cmd[0] = ACSI_id + ICD command marker (0x1f) 
 
-	// ----------------- 
+    // ----------------- 
     // do a simple speed test
     speedTest();
 
-	// ----------------- 
-	VT52_Clear_home();
+    // ----------------- 
+    VT52_Clear_home();
     
     (void) Cconws("Choose test type:\r\n");
-    (void) Cconws("[D] - data check\r\n");
-    (void) Cconws("[S] - stress - continous read\r\n");
+    (void) Cconws("[D] - data from RPi     validity check\r\n");
+    (void) Cconws("[C] - data from RPI     continous read\r\n");
+    (void) Cconws("[S] - data from SD card continous read\r\n");
     (void) Cconws("[Q] - quit\r\n");
 
     while(1) {
@@ -244,56 +249,119 @@ int main(void)
             break;
         }
 
-        if(key == 's' || key == 'S') {          // stress test - continous read?
-            testContinousRead();
+        if(key == 'c' || key == 'C') {          // stress test - continous read?
+            testContinousRead(1);
+            break;
+        }
+
+        if(key == 's' || key == 'S') {          // SD card continous read?
+            testContinousRead(0);
             break;
         }
     }
     
-  	// ----------------- 
+    // ----------------- 
 
-	
-    linea9();										// show mouse    
-    Super((void *)OldSP);  			      			// user mode 
+    
+    linea9();                                       // show mouse    
+    Super((void *)OldSP);                           // user mode 
 
-	return 0;
+    return 0;
 }
 
 void scsi_reset(void);
 
-void testContinousRead(void)
+BYTE getSDcardId(void)
 {
-    hdIf.maxRetriesCount = 0;        
-    DWORD byteCount = ((DWORD) MAXSECTORS) << 9;     // convert sector count to byte count ( sc * 512 )
+    BYTE cmd[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TEST_GET_ACSI_IDS, 0};
 
-	commandLong[4+1] = TEST_READ;
+    cmd[0] = (deviceID << 5);                                       // cmd[0] = deviceID + TEST UNIT READY (0)   
+    memset(rBuffer, 0, 512);                                        // clear the buffer 
 
-    // size to read
-	commandLong[5+1] = (byteCount >> 16) & 0xFF;
-	commandLong[6+1] = (byteCount >>  8) & 0xFF;
-	commandLong[7+1] = (byteCount      ) & 0xFF;
+    (*hdIf.cmd) (ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);
+    if(!hdIf.success || hdIf.statusByte != 0) {                     // if command failed, return -1 (0xff)
+        return 0xff;
+    }
+    
+    int i;
+    for(i=0; i<8; i++) {                                            // go through ACSI IDs
+        if(rBuffer[i] == DEVTYPE_SD) {                              // if found SD card, good!
+            return i;
+        }
+    }
+    
+    return 0xff;                                                    // SD card ACSI ID not found
+}
 
-    // Word to XOR with data on CE side
-	commandLong[8+1] = 0;
-	commandLong[9+1] = 0;
-
-  	VT52_Clear_home();
+void testContinousRead(BYTE testReadNotSDcard)
+{
+    VT52_Clear_home();
     VT52_Wrap_on();
     (void) Cconws("Continous read without data checking\r\n");
+
+    hdIf.maxRetriesCount = 0;                           // disable retries
+
+    BYTE sdReadCmd[CMD_LENGTH_SHORT] = {0, 0, 0, 0, 0, 0};
+    
+    if(testReadNotSDcard) {                             // should do test on CE generated data?
+        (void) Cconws("Data source: Raspberry Pi\r\n");
+        
+        DWORD byteCount = ((DWORD) MAXSECTORS) << 9;    // convert sector count to byte count ( sc * 512 )
+
+        commandLong[4+1] = TEST_READ;
+
+        // size to read
+        commandLong[5+1] = (byteCount >> 16) & 0xFF;
+        commandLong[6+1] = (byteCount >>  8) & 0xFF;
+        commandLong[7+1] = (byteCount      ) & 0xFF;
+
+        // Word to XOR with data on CE side
+        commandLong[8+1] = 0;
+        commandLong[9+1] = 0;
+    } else {                                            // should do test on SD card?
+        (void) Cconws("Data source: SD card\r\n");
+        
+        BYTE sdCardId = getSDcardId();
+        
+        if(sdCardId == 0xff) {                          // SD card not configured on ACSI bus?
+            (void) Cconws("No ACSI/SCSI ID configured for SD card!\r\n");
+            (void) Cconws("Set it and try again.\r\n");
+            Cnecin();
+            return;                                     // fail and quit
+        }
+
+        // generate READ(6) command
+        sdReadCmd[0] = (sdCardId << 5) | 0x08;          // cmd[0] = ACSI id of SD card + SCSI READ(6)
+        // sdReadCmd[1] - leave 0
+        // sdReadCmd[2] - sector # msb
+        // sdReadCmd[3] - sector # lsb
+        sdReadCmd[4] = MAXSECTORS;
+        // v[5] - leave 0
+    }
+
     (void) Cconws("Press 'R' for SCSI bus RESET.\r\n");
     (void) Cconws("Press 'Q' to quit.\r\n");
     
     while(1) {
-        (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, MAXSECTORS );  // issue the command and check the result
+        if(testReadNotSDcard) {     // should do test on CE generated data?
+            (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, MAXSECTORS);    // issue the command and check the result
+        } else {                    // should do test on SD card?
+            DWORD randomSectorNo = getTicks();
+        
+            sdReadCmd[2] = (BYTE) (randomSectorNo >> 8);    // sector # high
+            sdReadCmd[3] = (BYTE) (randomSectorNo     );    // sector # low
+        
+            (*hdIf.cmd) (ACSI_READ, sdReadCmd, CMD_LENGTH_SHORT, rBuffer, MAXSECTORS);      // issue the command and check the result
+        }
 
-        if(!hdIf.success) {                     // ACSI ERROR?
+        if(!hdIf.success || hdIf.statusByte != 0) { // failed?
             (void) Cconws("_");
             continue;
-        } else {
+        } else {                                    // everything OK
             (void) Cconws("*");
         }
         
-        if(Cconis() != 0) {                     // if some key is waiting
+        if(Cconis() != 0) {                         // if some key is waiting
             BYTE key = Cnecin();
             
             if(key == 'q' || key == 'Q') {
@@ -311,29 +379,29 @@ void testContinousRead(void)
 void testDataReliability(void)
 {
     BYTE key;
-  	WORD xorVal=0xC0DE;
-	int charcnt=0;
-	int linecnt=0;
+    WORD xorVal=0xC0DE;
+    int charcnt=0;
+    int linecnt=0;
 
-	VT52_Clear_home();
+    VT52_Clear_home();
 
     print_head();
     print_status();
    
-  	VT52_Goto_pos(0, 22);
-    (void) Cconws("Press 'Q' to quit the test...\r\n"); 		
-    (void) Cconws("Testing (*=OK,C=Crc,_=Timeout):\r\n"); 		
+    VT52_Goto_pos(0, 22);
+    (void) Cconws("Press 'Q' to quit the test...\r\n");         
+    (void) Cconws("Testing (*=OK,C=Crc,_=Timeout):\r\n");       
 
     int x = 0;                          // this variable will store current X position of carret, so we can return to the right position after some VT52_Goto_pos()
-  	VT52_Goto_pos(0, 24);
+    VT52_Goto_pos(0, 24);
 
     (void) Cconws("R:");
     x += 2;
     
     BYTE doingWriteNotRead;
     
-  	while(1)
-  	{
+    while(1)
+    {
         if(Cconis() != 0) {             // if some key is waiting
             key = Cnecin();
             
@@ -348,11 +416,11 @@ void testDataReliability(void)
   
         doingWriteNotRead = linecnt & 1;
   
-      	if( doingWriteNotRead ){
-    		res = writeHansTest(MAXSECTORS * 512, xorVal);
-      	}else{
-    		res = readHansTest (MAXSECTORS * 512, xorVal);
-      	}
+        if( doingWriteNotRead ){
+            res = writeHansTest(MAXSECTORS * 512, xorVal);
+        }else{
+            res = readHansTest (MAXSECTORS * 512, xorVal);
+        }
         
         xorVal++;  // change XOR value every time, so the data will be different every time (better for detecting errors)
         
@@ -362,10 +430,10 @@ void testDataReliability(void)
         printOpResult(res);                             // show the result as a single characted ( * _ c ? )
         
         x++;
-		charcnt++;
+        charcnt++;
         
-		print_status();
-		print_head();
+        print_status();
+        print_head();
 
         //--------------
         if(!simpleNotDetailedErrReport) {                           // if detailed error report with wait
@@ -397,28 +465,28 @@ void testDataReliability(void)
         //--------------
 
         VT52_Goto_pos(x, 24);
-		
-		if( charcnt>=40-2 ){
-			VT52_Goto_pos(0,4);
-			VT52_Del_line();
+        
+        if( charcnt>=40-2 ){
+            VT52_Goto_pos(0,4);
+            VT52_Del_line();
             
-			VT52_Goto_pos(0, 24);
+            VT52_Goto_pos(0, 24);
             x = 0;
             
-			charcnt=0;
-			linecnt++;
+            charcnt=0;
+            linecnt++;
             
             doingWriteNotRead = linecnt & 1;
             
-			if( doingWriteNotRead ){
-			    (void) Cconws("W:");
-			}else{
-				(void) Cconws("R:");
+            if( doingWriteNotRead ){
+                (void) Cconws("W:");
+            }else{
+                (void) Cconws("R:");
                 counts.run++;
- 			}
+            }
             x += 2;
-		}
-	}    
+        }
+    }    
 }
 
 void updateCounts(BYTE doingWriteNotRead, int res)
@@ -428,9 +496,9 @@ void updateCounts(BYTE doingWriteNotRead, int res)
     // get the pointer to the right structure
     Tresults *pResults = doingWriteNotRead ? &counts.write : &counts.read;
     
-  	switch( res )
-	{
-		case 0:                                 // test succeeded
+    switch( res )
+    {
+        case 0:                                 // test succeeded
             if(hdIf.retriesDoneCount == 0) {    // success without retries
                 pResults->goodPlain++;
             } else {                            // success with some retries
@@ -454,9 +522,9 @@ void updateCounts(BYTE doingWriteNotRead, int res)
 
 void printOpResult(int res) 
 {
-  	switch( res )
-	{
-		case 0:                                 // test succeeded
+    switch( res )
+    {
+        case 0:                                 // test succeeded
             if(hdIf.retriesDoneCount == 0) {    // success without retries
                 Cconout('*');
             } else {                            // success with some retries
@@ -481,11 +549,11 @@ void printOpResult(int res)
 
 void print_head()
 {
-  	VT52_Goto_pos(0,0);
+    VT52_Goto_pos(0,0);
 
-	(void) Cconws("\33p[ CosmosEx HDD IF test  ver "); 
+    (void) Cconws("\33p[ CosmosEx HDD IF test  ver "); 
     showAppVersion();
-    (void) Cconws(" ]\33q\r\n"); 		
+    (void) Cconws(" ]\33q\r\n");        
 }
 
 void print_status(void)
@@ -494,12 +562,12 @@ void print_status(void)
 
     //-------------
     // 2nd row - general info
-	VT52_Goto_pos(0,1);
-	(void) Cconws("\33p[ Run:");
-	showInt(counts.run, 3);
-	
+    VT52_Goto_pos(0,1);
+    (void) Cconws("\33p[ Run:");
+    showInt(counts.run, 3);
+    
     (void) Cconws("  Ops: ");
-	showInt(counts.singleOps, 5);
+    showInt(counts.singleOps, 5);
     
     (void) Cconws("  Data: ");
 
@@ -511,7 +579,7 @@ void print_status(void)
     showIntWithPrepadding(megsInteger, 4, ' ');
     Cconout('.');
     showInt(megsFraction, 1);
-	(void) Cconws(" MB ]\33q\r\n");
+    (void) Cconws(" MB ]\33q\r\n");
 
     //-------------
     // 3rd row - read statistics
@@ -521,10 +589,10 @@ void print_status(void)
         (void) Cconws("\33p[ R Gp:");
     }
         
-	showInt(counts.read.goodPlain,      4);
+    showInt(counts.read.goodPlain,      4);
     
-	(void) Cconws(" Gr:");
-	showInt(counts.read.goodWithRetry,  3);
+    (void) Cconws(" Gr:");
+    showInt(counts.read.goodWithRetry,  3);
     
     if(colorOrBw) {
         (void) Cconws(" \33c1T/O:");
@@ -532,13 +600,13 @@ void print_status(void)
         (void) Cconws(" T/O:");
     }
     
-	showInt(counts.read.errorTimeout,   2);
+    showInt(counts.read.errorTimeout,   2);
 
-	(void) Cconws(" CRC:");
-	showInt(counts.read.errorCrc,       2);
+    (void) Cconws(" CRC:");
+    showInt(counts.read.errorCrc,       2);
 
-	(void) Cconws(" Oth:");
-	showInt(counts.read.errorOther,     2);
+    (void) Cconws(" Oth:");
+    showInt(counts.read.errorOther,     2);
 
     if(colorOrBw) {
         (void) Cconws("\33c0]\33q\r\n");
@@ -554,23 +622,23 @@ void print_status(void)
         (void) Cconws("\33p[ W Gp:");
     }
     
-	showInt(counts.write.goodPlain,     4);
+    showInt(counts.write.goodPlain,     4);
     
-	(void) Cconws(" Gr:");
-	showInt(counts.write.goodWithRetry, 3);
+    (void) Cconws(" Gr:");
+    showInt(counts.write.goodWithRetry, 3);
     
     if(colorOrBw) {
         (void) Cconws(" \33c1T/O:");
     } else {
         (void) Cconws(" T/O:");
     }
-	showInt(counts.write.errorTimeout,  2);
+    showInt(counts.write.errorTimeout,  2);
 
-	(void) Cconws(" CRC:");
-	showInt(counts.write.errorCrc,      2);
+    (void) Cconws(" CRC:");
+    showInt(counts.write.errorCrc,      2);
 
-	(void) Cconws(" Oth:");
-	showInt(counts.write.errorOther,    2);
+    (void) Cconws(" Oth:");
+    showInt(counts.write.errorOther,    2);
 
     if(colorOrBw) {
         (void) Cconws("\33c0]\33q\r\n");
@@ -584,8 +652,8 @@ BYTE ce_identify(BYTE ACSI_id)
 {
   BYTE cmd[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TRAN_CMD_IDENTIFY, 0};
   
-  cmd[0] = (ACSI_id << 5); 					// cmd[0] = ACSI_id + TEST UNIT READY (0)	
-  memset(rBuffer, 0, 512);              	// clear the buffer 
+  cmd[0] = (ACSI_id << 5);                  // cmd[0] = ACSI_id + TEST UNIT READY (0)   
+  memset(rBuffer, 0, 512);                  // clear the buffer 
 
   (*hdIf.cmd) (ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);   // issue the identify command and check the result 
     
@@ -593,32 +661,32 @@ BYTE ce_identify(BYTE ACSI_id)
     return 0;
   }
     
-  if(strncmp((char *) rBuffer, "CosmosEx translated disk", 24) != 0) {		// the identity string doesn't match? 
-	 return 0;
+  if(strncmp((char *) rBuffer, "CosmosEx translated disk", 24) != 0) {      // the identity string doesn't match? 
+    return 0;
   }
-	
+    
   return 1;                             // success 
 }
 //--------------------------------------------------
 void showConnectionErrorMessage(void)
 {
-//	Clear_home();
-	(void) Cconws("Communication with CosmosEx failed.\nWill try to reconnect in a while.\n\nTo quit to desktop, press F10\n");
-	
-	prevCommandFailed = 1;
+//  Clear_home();
+    (void) Cconws("Communication with CosmosEx failed.\nWill try to reconnect in a while.\n\nTo quit to desktop, press F10\n");
+    
+    prevCommandFailed = 1;
 }
 //--------------------------------------------------
 BYTE findDevice(void)
 {
-	BYTE i;
-	BYTE key, res;
-	BYTE id = 0xff;
-	char bfr[2];
+    BYTE i;
+    BYTE key, res;
+    BYTE id = 0xff;
+    char bfr[2];
 
     hdIf.maxRetriesCount = 0;           // disable retries - we are expecting that the devices won't answer on every ID
     
-	bfr[1] = 0; 
-	(void) Cconws("Looking for CosmosEx on ");
+    bfr[1] = 0; 
+    (void) Cconws("Looking for CosmosEx on ");
     
     switch(ifUsed) {
         case IF_ACSI:           (void) Cconws("ACSI: ");        break;
@@ -626,60 +694,60 @@ BYTE findDevice(void)
         case IF_SCSI_FALCON:    (void) Cconws("Falcon SCSI: "); break;
     }
 
-	while(1) {
-		for(i=0; i<8; i++) {
-			bfr[0] = i + '0';
-			(void) Cconws(bfr); 
-		      
-			res = ce_identify(i);      					// try to read the IDENTITY string 
+    while(1) {
+        for(i=0; i<8; i++) {
+            bfr[0] = i + '0';
+            (void) Cconws(bfr); 
+              
+            res = ce_identify(i);                       // try to read the IDENTITY string 
       
-			if(res == 1) {                           	// if found the CosmosEx 
-				id = i;                     		    // store the ACSI ID of device 
-				break;
-			}
-		}
+            if(res == 1) {                              // if found the CosmosEx 
+                id = i;                                 // store the ACSI ID of device 
+                break;
+            }
+        }
   
-		if(res == 1) {                             		// if found, break 
-			break;
-		}
+        if(res == 1) {                                  // if found, break 
+            break;
+        }
       
-		(void) Cconws(" - not found.\r\nPress any key to retry or 'Q' to quit.\r\n");
-		key = Cnecin();        
+        (void) Cconws(" - not found.\r\nPress any key to retry or 'Q' to quit.\r\n");
+        key = Cnecin();        
     
-		if(key == 'Q' || key=='q') {
+        if(key == 'Q' || key=='q') {
             hdIf.maxRetriesCount = 16;                  // enable retries
-			return 0xff;
-		}
-	}
+            return 0xff;
+        }
+    }
   
     hdIf.maxRetriesCount = 16;                          // enable retries
     
-	bfr[0] = id + '0';
-	(void) Cconws("\r\nCosmosEx ID: ");
-	(void) Cconws(bfr);
-	(void) Cconws("\r\n\r\n");
+    bfr[0] = id + '0';
+    (void) Cconws("\r\nCosmosEx ID: ");
+    (void) Cconws(bfr);
+    (void) Cconws("\r\n\r\n");
     
-	return id;
+    return id;
 }
 
 //--------------------------------------------------
 
 int readHansTest(DWORD byteCount, WORD xorVal )
 {
-	commandLong[4+1] = TEST_READ;
+    commandLong[4+1] = TEST_READ;
 
     // size to read
-	commandLong[5+1] = (byteCount >> 16) & 0xFF;
-	commandLong[6+1] = (byteCount >>  8) & 0xFF;
-	commandLong[7+1] = (byteCount      ) & 0xFF;
+    commandLong[5+1] = (byteCount >> 16) & 0xFF;
+    commandLong[6+1] = (byteCount >>  8) & 0xFF;
+    commandLong[7+1] = (byteCount      ) & 0xFF;
 
     // Word to XOR with data on CE side
-	commandLong[8+1] = (xorVal >> 8) & 0xFF;
-	commandLong[9+1] = (xorVal     ) & 0xFF;
+    commandLong[8+1] = (xorVal >> 8) & 0xFF;
+    commandLong[9+1] = (xorVal     ) & 0xFF;
 
     memset(rBuffer, 0, 8);                  // clear first few bytes so we can detect if the data was really read, or it was only retained from last write in the buffer    
         
-	(*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, (byteCount+511)>>9 );		// issue the command and check the result
+    (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, (byteCount+511)>>9 );        // issue the command and check the result
     
     if(!hdIf.success) {                     // FAIL? quit...
         return -1;
@@ -715,7 +783,7 @@ int readHansTest(DWORD byteCount, WORD xorVal )
         logMsg("xCSI cmd failed, but the READ buffer seems to be OK, wtf?!");
     }
     
-	return retVal;
+    return retVal;
 }
 
 //--------------------------------------------------
@@ -724,16 +792,16 @@ int writeHansTest(DWORD byteCount, WORD xorVal)
 {
     static WORD prevXorVal = 0xffff;
     
-	commandLong[4+1] = TEST_WRITE;
+    commandLong[4+1] = TEST_WRITE;
 
   //size to read
-	commandLong[5+1] = (byteCount >> 16) & 0xFF;
-	commandLong[6+1] = (byteCount >> 8 ) & 0xFF;
-	commandLong[7+1] = (byteCount      ) & 0xFF;
+    commandLong[5+1] = (byteCount >> 16) & 0xFF;
+    commandLong[6+1] = (byteCount >> 8 ) & 0xFF;
+    commandLong[7+1] = (byteCount      ) & 0xFF;
 
   //Word to XOR with data on CE side
-	commandLong[8+1] = (xorVal >> 8) & 0xFF;
-	commandLong[9+1] = (xorVal     ) & 0xFF;
+    commandLong[8+1] = (xorVal >> 8) & 0xFF;
+    commandLong[9+1] = (xorVal     ) & 0xFF;
 
     if(prevXorVal != xorVal) {              // if xorVal changed since last call, generate buffer (otherwise skip that)
         prevXorVal = xorVal;
@@ -754,7 +822,7 @@ int writeHansTest(DWORD byteCount, WORD xorVal)
         }
     }
 
-	(*hdIf.cmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, wBuffer, (byteCount+511)>>9 );		// issue the command and check the result
+    (*hdIf.cmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, wBuffer, (byteCount+511)>>9 );       // issue the command and check the result
     
     if(!hdIf.success) {                 // fail?
 logMsg("writeHansTest: not success");
@@ -772,7 +840,7 @@ showHexByte(hdIf.statusByte);
         return -3;
     }
     
-	return 0;
+    return 0;
 }
 
 void logMsg(char *logMsg)
@@ -835,22 +903,22 @@ void speedTest(void)
 {
     DWORD byteCount = ((DWORD) MAXSECTORS) << 9;     // convert sector count to byte count ( sc * 512 )
 
-	commandLong[4+1] = TEST_READ;
+    commandLong[4+1] = TEST_READ;
 
     // size to read
-	commandLong[5+1] = (byteCount >> 16) & 0xFF;
-	commandLong[6+1] = (byteCount >>  8) & 0xFF;
-	commandLong[7+1] = (byteCount      ) & 0xFF;
+    commandLong[5+1] = (byteCount >> 16) & 0xFF;
+    commandLong[6+1] = (byteCount >>  8) & 0xFF;
+    commandLong[7+1] = (byteCount      ) & 0xFF;
 
     // Word to XOR with data on CE side
-	commandLong[8+1] = 0;
-	commandLong[9+1] = 0;
+    commandLong[8+1] = 0;
+    commandLong[9+1] = 0;
 
-  	VT52_Goto_pos(0, 23);
+    VT52_Goto_pos(0, 23);
     (void) Cconws("Read speed: ");
     
-  	DWORD now, until, diff;
-	now = *HZ_200;
+    DWORD now, until, diff;
+    now = *HZ_200;
     
     int i;
     
@@ -869,7 +937,7 @@ void speedTest(void)
         }
     }
     
-  	until   = *HZ_200;
+    until   = *HZ_200;
     diff    = until - now;
 
     int timeMs  = (diff * 1000) / 200;

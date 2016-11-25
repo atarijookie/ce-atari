@@ -18,6 +18,7 @@
 #include "../global.h"
 #include "../debug.h"
 #include "../utils.h"
+#include "../settings.h"
 #include "acsidatatrans.h"
 #include "translateddisk.h"
 #include "translatedhelper.h"
@@ -1577,4 +1578,18 @@ void TranslatedDisk::onTestWrite(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
+void TranslatedDisk::onTestGetACSIids(BYTE *cmd)
+{
+    AcsiIDinfo  acsiIdInfo;
+    Settings    s;
+    s.loadAcsiIDs(&acsiIdInfo);                                 // read the list of device types from settings
+    
+    for(int id=0; id<8; id++) {                                 // now store it one after another to buffer
+        dataTrans->addDataByte(acsiIdInfo.acsiIDdevType[id]);
+    }
 
+    dataTrans->addDataByte(acsiIdInfo.enabledIDbits);           // store the enabled ACSI IDs 
+    
+    dataTrans->padDataToMul16();                                // pad to multiple of 16
+    dataTrans->setStatus(E_OK);
+}

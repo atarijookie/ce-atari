@@ -240,6 +240,7 @@ private:
     void onStLog(BYTE *cmd);
     void onTestRead(BYTE *cmd);
     void onTestWrite(BYTE *cmd);
+    void onTestGetACSIids(BYTE *cmd);
     void getScreenShotConfig(BYTE *cmd);
     
     // helper functions

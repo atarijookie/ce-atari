@@ -237,6 +237,7 @@
 
 #define TEST_READ               0x90
 #define TEST_WRITE              0x91
+#define TEST_GET_ACSI_IDS       0x92
 
 //////////////////////////////////////
 

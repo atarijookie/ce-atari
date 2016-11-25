@@ -498,6 +498,7 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case ST_LOG_TEXT:               onStLog(cmd);                   break;
         case TEST_READ:                 onTestRead(cmd);                break;
         case TEST_WRITE:                onTestWrite(cmd);               break;
+        case TEST_GET_ACSI_IDS:         onTestGetACSIids(cmd);          break;
 
         // in other cases
         default:                                // in other cases
