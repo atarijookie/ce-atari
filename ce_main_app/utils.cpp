@@ -17,6 +17,9 @@
 #include <linux/if_link.h>
 //--------
 
+#include <sstream>
+#include <iostream>
+
 #include "utils.h"
 #include "translated/translatedhelper.h"
 #include "translated/gemdos.h"
@@ -502,6 +505,14 @@ std::string Utils::getDeviceLabel(const std::string & devicePath)
 		}
 		//fclose(f);
 		closedir(d);
+	}
+	size_t pos;
+	while((pos = label.find("\\x")) != std::string::npos) {
+		int c;
+		std::stringstream ss;
+		ss << std::hex << label.substr(pos + 2, 2);
+		ss >> c;
+		label.replace(pos, 4, 1, (char)c);
 	}
 	return label;
 }
