@@ -530,7 +530,7 @@ void showFakeProgress(void)
     }
 
     // everything installed, but main app needs to start and possibly update script
-    showFakeProgressOfItem("Restarting app  (10 s): ", 10);
+    showFakeProgressOfItem("Restarting app  (15 s): ", 15);
     
     // we're done, try to reconnect.
     (void) Cconws("\r\nIf everything went well,\r\nwill connect back soon.\r\n");
