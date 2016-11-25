@@ -6,37 +6,40 @@
 #include "configstream.h"
 #include "keys.h"
 
+#define HEARTBEATSTATECHAR_COUNT    4
+char heartBeatStateChar[HEARTBEATSTATECHAR_COUNT] = {'|', '/', '-', '\\'}; 
+
 ConfigComponent::ConfigComponent(ConfigStream *parent, ComponentType type, std::string text, WORD maxLen, int x, int y, int gotoOffset)
 {
     confStream = parent;
 
-    onEnter		= 0;
-    onChBEnter	= 0;
+    onEnter     = 0;
+    onChBEnter  = 0;
 
     cursorPos = 0;
 
+    heartBeatState  = 0;
+    
     checkBoxGroup   = -1;
     checkBoxId      = -1;
 
-    this->type	= type;
+    this->type  = type;
 
-    hasFocus	= false;
-    isReverse	= false;
-    checked	= false;
+    hasFocus    = false;
+    isReverse   = false;
+    checked     = false;
 
-    posX	= x;
-    posY	= y;
-    this->gotoOffset = gotoOffset;
-
-    this->maxLen = maxLen;
-
-    this->text = text;
+    posX    = x;
+    posY    = y;
+    this->gotoOffset    = gotoOffset;
+    this->maxLen        = maxLen;
+    this->text          = text;
 
     if(text.length() > maxLen) {
         this->text.resize(maxLen);
     }
 
-    changed = true;							// mark that we got new data and we should display them
+    changed = true;                         // mark that we got new data and we should display them
 
     componentId = -1;                       // no component id yet defined
     textOptions = TEXT_OPTION_ALLOW_ALL;    // no restrictions on chars
@@ -47,44 +50,44 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
     len = 0;
     BYTE *bfrStart = bfr;
 
-    if(!fullNotChange && !changed) {					// if we're displaying only a change and change didn't occur, quit
+    if(!fullNotChange && !changed) {                // if we're displaying only a change and change didn't occur, quit
         return;
     }
 
     // now we're either displaying full component, or change occured
-    changed = false;									// mark that we've displayed current state and that nothing changed, until it changes ;)
+    changed = false;                                // mark that we've displayed current state and that nothing changed, until it changes ;)
 
     if(type == label) {
-        terminal_addGoto(bfr, posX, posY);			// goto(x,y)
+        terminal_addGoto(bfr, posX, posY);          // goto(x,y)
         bfr += 4;
 
-        if(isReverse) {								// if reversed, start reverse
+        if(isReverse) {                             // if reversed, start reverse
             terminal_addReverse(bfr, true);
             bfr += 2;
         }
 
-        for(int i=0; i<maxLen; i++) {				// fill with spaces
+        for(int i=0; i<maxLen; i++) {               // fill with spaces
             bfr[i] = ' ';
         }
 
-        strncpy((char *) bfr, text.c_str(), text.length());	// copy the text
+        strncpy((char *) bfr, text.c_str(), text.length()); // copy the text
         bfr += maxLen;
 
-        if(isReverse) {								// if reversed, stop reverse
+        if(isReverse) {                             // if reversed, stop reverse
             terminal_addReverse(bfr, false);
             bfr += 2;
         }
 
-        len = bfr - bfrStart;						// we printed this much
+        len = bfr - bfrStart;                       // we printed this much
         return;
     }
 
     //------
     if(type == button || type == editline || type == editline_pass || type == checkbox) {
-        terminal_addGoto(bfr, posX, posY);				// goto(x,y)
+        terminal_addGoto(bfr, posX, posY);              // goto(x,y)
         bfr += 4;
 
-        if(hasFocus) {									// if has focus, start reverse
+        if(hasFocus) {                                  // if has focus, start reverse
             terminal_addReverse(bfr, true);
             bfr += 2;
         }
@@ -92,7 +95,7 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
         bfr[         0] = '[';
         bfr[maxLen + 1] = ']';
 
-        for(int i=0; i<maxLen; i++) {					// fill with spaces
+        for(int i=0; i<maxLen; i++) {                   // fill with spaces
             bfr[i+1] = ' ';
         }
 
@@ -103,14 +106,44 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
         }
 
         strncpy((char *) bfr+1, displayText.c_str(), displayText.length()); // copy the text
-        bfr += maxLen + 2;								                    // +2 because of [ and ]
+        bfr += maxLen + 2;                                                  // +2 because of [ and ]
 
-        if(hasFocus) {									// if has focus, stop reverse
+        if(hasFocus) {                                  // if has focus, stop reverse
             terminal_addReverse(bfr, false);
             bfr += 2;
         }
 
-        len = bfr - bfrStart;							// we printed this much
+        len = bfr - bfrStart;                           // we printed this much
+        return;
+    }
+    
+    //-----
+    // for heartbeat
+    if(type == heartBeat) {
+        changed = true;                                 // this heartbeat always changes
+
+        terminal_addGoto(bfr, posX, posY);              // goto(x,y)
+        bfr += 4;
+        
+        if(isReverse) {                                 // if reversed, start reverse
+            terminal_addReverse(bfr, true);
+            bfr += 2;
+        }
+
+        bfr[0] = heartBeatStateChar[heartBeatState];    // store heartbeat char
+        bfr++;
+        
+        heartBeatState++;                               // move to next heartbeat state
+        if(heartBeatState >= HEARTBEATSTATECHAR_COUNT) {
+            heartBeatState = 0;
+        }
+        
+        if(isReverse) {                                 // if reversed, stop reverse
+            terminal_addReverse(bfr, false);
+            bfr += 2;
+        }
+        
+        len = bfr - bfrStart;                           // we printed this much
         return;
     }
 }
@@ -127,24 +160,24 @@ void ConfigComponent::setOnChBEnterFunctionCode(int onChBEnter)
 
 void ConfigComponent::setCheckboxGroupIds(int groupId, int checkboxId)
 {
-    checkBoxGroup	= groupId;
-    checkBoxId		= checkboxId;
+    checkBoxGroup   = groupId;
+    checkBoxId      = checkboxId;
 }
 
 void ConfigComponent::getCheckboxGroupIds(int& groupId, int& checkboxId)
 {
-    groupId		= checkBoxGroup;
-    checkboxId	= checkBoxId;
+    groupId     = checkBoxGroup;
+    checkboxId  = checkBoxId;
 }
 
 void ConfigComponent::setFocus(bool hasFocus)
 {
-    if(type == label) {							// limimt hasFocus to anything but label
+    if(type == label || type == heartBeat) {    // can't focus on label and heartBeat
         return;
     }
 
-    if(this->hasFocus != hasFocus) {			// if data changed
-        changed = true;							// mark that we got new data and we should display them
+    if(this->hasFocus != hasFocus) {            // if data changed
+        changed = true;                         // mark that we got new data and we should display them
     }
 
     this->hasFocus = hasFocus;
@@ -152,12 +185,12 @@ void ConfigComponent::setFocus(bool hasFocus)
 
 void ConfigComponent::setReverse(bool isReverse)
 {
-    if(type != label) {							// limimt isReverse only to label
+    if(type != label && type != heartBeat) {    // reverse works only on label and heartBeat
         return;
     }
 
-    if(this->isReverse != isReverse) {			// if data changed
-        changed = true;							// mark that we got new data and we should display them
+    if(this->isReverse != isReverse) {          // if data changed
+        changed = true;                         // mark that we got new data and we should display them
     }
 
     this->isReverse = isReverse;
@@ -165,30 +198,30 @@ void ConfigComponent::setReverse(bool isReverse)
 
 void ConfigComponent::setIsChecked(bool isChecked)
 {
-    if(type != checkbox) {						// limimt isChecked only to checkbox
+    if(type != checkbox) {                      // limimt isChecked only to checkbox
         return;
     }
 
-    if(checked != isChecked) {					// if data changed
-        changed = true;							// mark that we got new data and we should display them
+    if(checked != isChecked) {                  // if data changed
+        changed = true;                         // mark that we got new data and we should display them
     }
 
     checked = isChecked;
 
     text.resize(maxLen);
-    for(int i=0; i<maxLen; i++) {				// fill with spaces
+    for(int i=0; i<maxLen; i++) {               // fill with spaces
         text[i] = ' ';
     }
 
-    if(checked) {								// if is checked, put a star in the middle
-        int pos = (maxLen / 2);					// calculate the position of '*' in string
+    if(checked) {                               // if is checked, put a star in the middle
+        int pos = (maxLen / 2);                 // calculate the position of '*' in string
         text[pos] = '*';
     }
 }
 
 bool ConfigComponent::isChecked(void)
 {
-    if(type != checkbox) {						// for other types - not checked
+    if(type != checkbox) {                      // for other types - not checked
         return false;
     }
 
@@ -197,52 +230,52 @@ bool ConfigComponent::isChecked(void)
 
 void ConfigComponent::onKeyPressed(BYTE key)
 {
-    if(type == label) {							// do nothing on key pressed for label
+    if(type == label || type == heartBeat) {    // do nothing on key pressed for label and heartBeat
         return;
     }
 
-    if(type == checkbox || type == button) {	// for checkbox and button
-        if(key == KEY_ENTER || key == 32) {			// when ENTER or SPACE pressed on checkbox
+    if(type == checkbox || type == button) {    // for checkbox and button
+        if(key == KEY_ENTER || key == 32) {         // when ENTER or SPACE pressed on checkbox
 
-            if(!isGroupCheckBox()) {			// for non group checkbox - just invert
-                setIsChecked(!checked);			// invert isChecked
-            } else {							// for group checkbox - special handling
+            if(!isGroupCheckBox()) {            // for non group checkbox - just invert
+                setIsChecked(!checked);         // invert isChecked
+            } else {                            // for group checkbox - special handling
                 confStream->onCheckboxGroupEnter(checkBoxGroup, checkBoxId);
             }
 
-            if(onEnter != 0) {          			// if we got onEnter function, call it
+            if(onEnter != 0) {                      // if we got onEnter function, call it
                 confStream->enterKeyHandlerLater(onEnter);
             }
 
-            changed = true;						    // mark that we got new data and we should display them
+            changed = true;                         // mark that we got new data and we should display them
         }
     }
 
     if(type == editline || type == editline_pass) { // for editLine better use separate function
-        changed = true;							    // mark that we got new data and we should display them
+        changed = true;                             // mark that we got new data and we should display them
         handleEditLineKeyPress(key);
     }
 }
 
 void ConfigComponent::handleEditLineKeyPress(BYTE key)
 {
-    if(key == KEY_LEFT) {			// arrow left?
+    if(key == KEY_LEFT) {           // arrow left?
         if(cursorPos > 0) {
             cursorPos--;
         }
-		return;
+        return;
     }
 
-    if(key == KEY_RIGHT) {			// arrow right?
+    if(key == KEY_RIGHT) {          // arrow right?
         if(cursorPos < text.length()) {
             cursorPos++;
         }
-		return;
+        return;
     }
 
-    if(key == KEY_HOME) {			// home?
+    if(key == KEY_HOME) {           // home?
         cursorPos = 0;
-		return;
+        return;
     }
 
     if(key == KEY_END) {            // END pressed? (not present on Atari keyboard)
@@ -252,16 +285,16 @@ void ConfigComponent::handleEditLineKeyPress(BYTE key)
 
     //-----
     // now for the other keys
-    if(key == KEY_BACKSP) {									// backspace?
+    if(key == KEY_BACKSP) {                                 // backspace?
         if(text.length() > 0) {
 
-            if(cursorPos < text.length()) {					// cursor IN text
-                if(cursorPos > 0) {							// and we're not at the start of the line
+            if(cursorPos < text.length()) {                 // cursor IN text
+                if(cursorPos > 0) {                         // and we're not at the start of the line
                     text.erase(cursorPos - 1, 1);
                     cursorPos--;
                 }
-            } else {										// cursor BEHIND text
-                text.resize(text.length() - 1);				// just remove the last char
+            } else {                                        // cursor BEHIND text
+                text.resize(text.length() - 1);             // just remove the last char
                 cursorPos--;
             }
         }
@@ -269,9 +302,9 @@ void ConfigComponent::handleEditLineKeyPress(BYTE key)
         return;
     }
 
-    if(key == KEY_DELETE) {										// delete?
-        if(text.length() > 0 && cursorPos < text.length()) {	// we got some text and we're not at the end of the line?
-            text.erase(cursorPos, 1);							// delete char at cursor
+    if(key == KEY_DELETE) {                                     // delete?
+        if(text.length() > 0 && cursorPos < text.length()) {    // we got some text and we're not at the end of the line?
+            text.erase(cursorPos, 1);                           // delete char at cursor
         }
 
         return;
@@ -293,11 +326,11 @@ void ConfigComponent::handleEditLineKeyPress(BYTE key)
 
     cursorPos++;
 
-    if(text.length() > maxLen) {                			// if too long
-        text.resize(maxLen);								// cut string to maxLen
+    if(text.length() > maxLen) {                            // if too long
+        text.resize(maxLen);                                // cut string to maxLen
     }
 
-    if(cursorPos >= maxLen) {								// if cursor too far
+    if(cursorPos >= maxLen) {                               // if cursor too far
         cursorPos = maxLen -1;
     }
 }
@@ -400,8 +433,8 @@ bool ConfigComponent::isNumber(BYTE key)
 
 void ConfigComponent::setText(std::string text)
 {
-    if(this->text != text) {					// if data changed
-        changed = true;							// mark that we got new data and we should display them
+    if(this->text != text) {                    // if data changed
+        changed = true;                         // mark that we got new data and we should display them
     }
 
     this->text = text;
@@ -423,7 +456,7 @@ bool ConfigComponent::isFocused(void)
 
 bool ConfigComponent::canFocus(void)
 {
-    return (type != label);						// if not label, then can focus
+    return (type != label && type != heartBeat);        // can focus if not label and not hearBeat
 }
 
 void ConfigComponent::terminal_addGoto(BYTE *bfr, int x, int y)
@@ -466,7 +499,7 @@ void ConfigComponent::terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt)
         return;
     }
 
-    if(!hasFocus) {					                // if this editline doesn't have focus, skip adding current cursor
+    if(!hasFocus) {                                 // if this editline doesn't have focus, skip adding current cursor
         terminal_addCursorOn(bfr, false);
         cnt = 2;
         return;
@@ -476,13 +509,13 @@ void ConfigComponent::terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt)
     cnt += 2;
     bfr += 2;
 
-    terminal_addGoto(bfr, posX + 1 + cursorPos, posY);		// add goto(x,y) at cursor position
+    terminal_addGoto(bfr, posX + 1 + cursorPos, posY);      // add goto(x,y) at cursor position
     cnt += 4;
 }
 
 bool ConfigComponent::isGroupCheckBox(void)
 {
-    return (checkBoxGroup != -1);		// if the group ID is not -1, then it's a group checkbox
+    return (checkBoxGroup != -1);       // if the group ID is not -1, then it's a group checkbox
 }
 
 void ConfigComponent::setComponentId(int newId)

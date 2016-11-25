@@ -20,7 +20,7 @@
 
 void showHomeScreen(void);
 void sendKeyDown(BYTE key, BYTE keyDownCommand);
-void refreshScreen(void);							
+void refreshScreen(void);
 BYTE setResolution(void);
 void showConnectionErrorMessage(void);
 void showMoreStreamIfNeeded(void);
@@ -59,10 +59,10 @@ BYTE prevCommandFailed;
 //--------------------------------------------------
 int main(void)
 {
-	BYTE key, res;
-	WORD timeNow, timePrev;
-	DWORD toEven;
-	void *OldSP;
+    BYTE key, res;
+    WORD timeNow, timePrev;
+    DWORD toEven;
+    void *OldSP;
     BYTE keyDownCommand = CFG_CMD_KEYDOWN;
     DWORD lastUpdateCheckTime = 0;
 
@@ -70,28 +70,28 @@ int main(void)
     isUpdateScreen      = FALSE;
     updateComponents    = 0;
     
-	OldSP = (void *) Super((void *)0);  			                // supervisor mode  
-	
-	prevCommandFailed = 0;
-	
-	// ---------------------- 
-	// create buffer pointer to even address 
-	toEven = (DWORD) &myBuffer[0];
+    OldSP = (void *) Super((void *)0);                              // supervisor mode  
+    
+    prevCommandFailed = 0;
+    
+    // ---------------------- 
+    // create buffer pointer to even address 
+    toEven = (DWORD) &myBuffer[0];
   
-	if(toEven & 0x0001)       // not even number? 
-		toEven++;
+    if(toEven & 0x0001)       // not even number? 
+        toEven++;
   
-	pBuffer = (BYTE *) toEven; 
-	
-	// ---------------------- 
-	// search for device on the ACSI / SCSI bus 
-	deviceID = 0;
+    pBuffer = (BYTE *) toEven; 
+    
+    // ---------------------- 
+    // search for device on the ACSI / SCSI bus 
+    deviceID = 0;
 
-	Clear_home();
+    Clear_home();
     res = Supexec(findDevice);
 
     if(res != TRUE) {
-        Super((void *)OldSP);  			      			            // user mode 
+        Super((void *)OldSP);                                       // user mode 
         return 0;
     }
     
@@ -99,21 +99,21 @@ int main(void)
     // if the device is CosmoSolo, go this way
     if(cosmosExNotCosmoSolo == FALSE) {
         cosmoSoloConfig();
-        Super((void *)OldSP);  			      			            // user mode 
+        Super((void *)OldSP);                                       // user mode 
         return 0;
     }
-	
+    
     // ----------------- 
     // if the device is CosmosEx, do the remote console config
     hdIf.maxRetriesCount = 1;                                       // retry only once
     
-	setResolution();							                    // send the current ST resolution for screen centering 
-	showHomeScreen();							                    // get the home screen 
-	
-	// use Ctrl + C to quit 
-	timePrev = Tgettime();
-	
-	while(1) {
+    setResolution();                                                // send the current ST resolution for screen centering 
+    showHomeScreen();                                               // get the home screen 
+    
+    // use Ctrl + C to quit 
+    timePrev = Tgettime();
+    
+    while(1) {
         if(isUpdateScreen) {
             DWORD now = getTicks();
             
@@ -128,19 +128,19 @@ int main(void)
             ceIsUpdating = FALSE;                                   // we're (probably) not updating anymore
         }
     
-		key = getKeyIfPossible();                                   // see if there's something waiting from keyboard 
-		
-		if(key == 0) {							                    // nothing waiting from keyboard? 
-			timeNow = Tgettime();
-			
-			if((timeNow - timePrev) > 0) {		                    // check if time changed (2 seconds passed) 
-				timePrev = timeNow;
-				
-				sendKeyDown(0, keyDownCommand);                     // display a new stream (if something changed) 
-			}
-			
-			continue;							                    // try again 
-		}
+        key = getKeyIfPossible();                                   // see if there's something waiting from keyboard 
+        
+        if(key == 0) {                                              // nothing waiting from keyboard? 
+            timeNow = Tgettime();
+            
+            if((timeNow - timePrev) > 0) {                          // check if time changed (2 seconds passed) 
+                timePrev = timeNow;
+                
+                sendKeyDown(0, keyDownCommand);                     // display a new stream (if something changed) 
+            }
+            
+            continue;                                               // try again 
+        }
 
         if(key == KEY_F8) {                                         // should switch between config and linux console?
             Clear_home();                                           // clear the screen
@@ -156,48 +156,48 @@ int main(void)
             
             continue;
         }
-		
-		if(key == KEY_F10) {						                // should quit? 
-			break;
-		}
-		
-		if(key == KEY_F5 && keyDownCommand == CFG_CMD_KEYDOWN) {    // should refresh? and are we on the config part, not the linux console part? 
-			refreshScreen();
-			continue;
-		}
-		
-		sendKeyDown(key, keyDownCommand);			                // send this key to device 
-	}
-	
-    Super((void *)OldSP);  			      			                // user mode 
-	return 0;
+        
+        if(key == KEY_F10) {                                        // should quit? 
+            break;
+        }
+        
+        if(key == KEY_F5 && keyDownCommand == CFG_CMD_KEYDOWN) {    // should refresh? and are we on the config part, not the linux console part? 
+            refreshScreen();
+            continue;
+        }
+        
+        sendKeyDown(key, keyDownCommand);                           // send this key to device 
+    }
+    
+    Super((void *)OldSP);                                           // user mode 
+    return 0;
 }
 //--------------------------------------------------
 void sendKeyDown(BYTE key, BYTE keyDownCommand)
 {
-	BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, keyDownCommand, 0};
-	
-	cmd[0] = (deviceID << 5); 						// cmd[0] = ACSI_id + TEST UNIT READY (0)	
-	cmd[5] = key;									// store the pressed key to cmd[5] 
-  
-	memset(pBuffer, 0, 512);               			// clear the buffer 
-  
-	(*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the KEYDOWN command and show the screen stream 
+    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, keyDownCommand, 0};
     
-	if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
-		showConnectionErrorMessage();
-		return;
-	}
-	
-	if(prevCommandFailed != 0) {					// if previous ACSI command failed, do some recovery 
-		prevCommandFailed = 0;
-		
-		setResolution();
-		showHomeScreen();
-	}
-	
+    cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
+    cmd[5] = key;                                   // store the pressed key to cmd[5] 
+  
+    memset(pBuffer, 0, 512);                        // clear the buffer 
+  
+    (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the KEYDOWN command and show the screen stream 
+    
+    if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
+        showConnectionErrorMessage();
+        return;
+    }
+    
+    if(prevCommandFailed != 0) {                    // if previous ACSI command failed, do some recovery 
+        prevCommandFailed = 0;
+        
+        setResolution();
+        showHomeScreen();
+    }
+    
     retrieveIsUpdateScreen((char *) pBuffer);       // get the flag isUpdateScreen from the end of the stream
-	(void) Cconws((char *) pBuffer);				// now display the buffer
+    (void) Cconws((char *) pBuffer);                // now display the buffer
     
     if(keyDownCommand == CFG_CMD_LINUXCONSOLE_GETSTREAM) {  // if we're on the linux console stream, possibly show more data
         showMoreStreamIfNeeded();                           // if there's a marker about more data, fetch it
@@ -206,17 +206,17 @@ void sendKeyDown(BYTE key, BYTE keyDownCommand)
 //--------------------------------------------------
 void showMoreStreamIfNeeded(void)
 {
-	BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_LINUXCONSOLE_GETSTREAM, 0};
-	
-	cmd[0] = (deviceID << 5); 						    // cmd[0] = ACSI_id + TEST UNIT READY (0)	
-	cmd[5] = 0;									        // no key pressed 
+    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_LINUXCONSOLE_GETSTREAM, 0};
+    
+    cmd[0] = (deviceID << 5);                           // cmd[0] = ACSI_id + TEST UNIT READY (0)   
+    cmd[5] = 0;                                         // no key pressed 
   
     while(1) {
         if(pBuffer[ (3 * 512) - 1 ] == LINUXCONSOLE_NO_MORE_DATA) {     // no more data? quit
             break;
         }
     
-        memset(pBuffer, 0, 3 * 512);               	    // clear the buffer 
+        memset(pBuffer, 0, 3 * 512);                    // clear the buffer 
   
         (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the KEYDOWN command and show the screen stream 
     
@@ -224,33 +224,33 @@ void showMoreStreamIfNeeded(void)
             return;
         }
 
-        (void) Cconws((char *) pBuffer);				// now display the buffer
+        (void) Cconws((char *) pBuffer);                // now display the buffer
     }
 } 
 
-void showHomeScreen(void)							
+void showHomeScreen(void)                           
 {
-	BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_GO_HOME, 0};
-	
-	cmd[0] = (deviceID << 5); 						// cmd[0] = ACSI_id + TEST UNIT READY (0)	
-	memset(pBuffer, 0, 512);               			// clear the buffer 
-  
-	(*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the GO_HOME command and show the screen stream 
+    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_GO_HOME, 0};
     
-	if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
-		showConnectionErrorMessage();
-		return;
-	}
-	
-	if(prevCommandFailed != 0) {					// if previous ACSI command failed, do some recovery 
-		prevCommandFailed = 0;
-		
-		setResolution();
-		showHomeScreen();
-	}
-	
+    cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
+    memset(pBuffer, 0, 512);                        // clear the buffer 
+  
+    (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the GO_HOME command and show the screen stream 
+    
+    if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
+        showConnectionErrorMessage();
+        return;
+    }
+    
+    if(prevCommandFailed != 0) {                    // if previous ACSI command failed, do some recovery 
+        prevCommandFailed = 0;
+        
+        setResolution();
+        showHomeScreen();
+    }
+    
     retrieveIsUpdateScreen((char *) pBuffer);       // get the flag isUpdateScreen from the end of the stream
-	(void) Cconws((char *) pBuffer);				// now display the buffer
+    (void) Cconws((char *) pBuffer);                // now display the buffer
 }
 
 BYTE showHomeScreenSimple(void)
@@ -264,7 +264,7 @@ BYTE showHomeScreenSimple(void)
     // if we got here, the previous command passed and this should work also
     BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_GO_HOME, 0};
     
-    cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)	
+    cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     memset(pBuffer, 0, 512);                        // clear the buffer 
   
     (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the GO_HOME command and show the screen stream 
@@ -279,33 +279,33 @@ BYTE showHomeScreenSimple(void)
     return TRUE;                                    // return success
 }
 //--------------------------------------------------
-void refreshScreen(void)							
+void refreshScreen(void)                            
 {
-	BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_REFRESH, 0};
-	
-	cmd[0] = (deviceID << 5); 						// cmd[0] = ACSI_id + TEST UNIT READY (0)	
-	memset(pBuffer, 0, 512);               			// clear the buffer 
-  
-	(*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the REFRESH command and show the screen stream 
+    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_REFRESH, 0};
     
-	if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
-		showConnectionErrorMessage();
-		return;
-	}
-	
+    cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
+    memset(pBuffer, 0, 512);                        // clear the buffer 
+  
+    (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the REFRESH command and show the screen stream 
+    
+    if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
+        showConnectionErrorMessage();
+        return;
+    }
+    
     retrieveIsUpdateScreen((char *) pBuffer);       // get the flag isUpdateScreen from the end of the stream
-	(void) Cconws((char *) pBuffer);				// now display the buffer
+    (void) Cconws((char *) pBuffer);                // now display the buffer
 }
 //--------------------------------------------------
-BYTE setResolution(void)							
+BYTE setResolution(void)                            
 {
-	BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_SET_RESOLUTION, 0};
-	
-	cmd[0] = (deviceID << 5); 						// cmd[0] = ACSI_id + TEST UNIT READY (0)	
-	cmd[5] = Getrez();
-	memset(pBuffer, 0, 512);               			// clear the buffer 
+    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_SET_RESOLUTION, 0};
+    
+    cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
+    cmd[5] = Getrez();
+    memset(pBuffer, 0, 512);                        // clear the buffer 
   
-	(*hdIf.cmd)(1, cmd, 6, pBuffer, 1);              // issue the SET RESOLUTION command 
+    (*hdIf.cmd)(1, cmd, 6, pBuffer, 1);              // issue the SET RESOLUTION command 
     
     if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
         return FALSE;
@@ -316,59 +316,59 @@ BYTE setResolution(void)
 //--------------------------------------------------
 void showConnectionErrorMessage(void)
 {
-	Clear_home();
+    Clear_home();
     (void) Cconws("Link to device is down - updating?\n\rTrying to reconnect.\n\r\n\rTo quit to desktop, press F10\n\r");
-	prevCommandFailed = 1;
+    prevCommandFailed = 1;
 }
 //--------------------------------------------------
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
 {
-	WORD vkeyKey;
+    WORD vkeyKey;
 
-	if(key >= 32 && key < 127) {		// printable ASCII key? just return it 
-		return key;
-	}
-	
-	if(key == 0) {						// will this be some non-ASCII key? convert it 
-		switch(vkey) {
-			case 0x48: return KEY_UP;
-			case 0x50: return KEY_DOWN;
-			case 0x4b: return KEY_LEFT;
-			case 0x4d: return KEY_RIGHT;
-			case 0x52: return KEY_INSERT;
-			case 0x47: return KEY_HOME;
-			case 0x62: return KEY_HELP;
-			case 0x61: return KEY_UNDO;
-			case 0x3b: return KEY_F1;
-			case 0x3c: return KEY_F2;
-			case 0x3d: return KEY_F3;
-			case 0x3e: return KEY_F4;
-			case 0x3f: return KEY_F5;
-			case 0x40: return KEY_F6;
-			case 0x41: return KEY_F7;
-			case 0x42: return KEY_F8;
-			case 0x43: return KEY_F9;
-			case 0x44: return KEY_F10;
-			default: return 0;			// unknown key 
-		}
-	}
-	
-	vkeyKey = (((WORD) vkey) << 8) | ((WORD) key);		// create a WORD with vkey and key together 
-	
-	switch(vkeyKey) {					// some other no-ASCII key, but check with vkey too 
-		case 0x011b: return KEY_ESC;
-		case 0x537f: return KEY_DELETE;
-		case 0x0e08: return KEY_BACKSP;
-		case 0x0f09: return KEY_TAB;
-		case 0x1c0d: return KEY_ENTER;
-		case 0x720d: return KEY_ENTER;
+    if(key >= 32 && key < 127) {        // printable ASCII key? just return it 
+        return key;
+    }
+    
+    if(key == 0) {                      // will this be some non-ASCII key? convert it 
+        switch(vkey) {
+            case 0x48: return KEY_UP;
+            case 0x50: return KEY_DOWN;
+            case 0x4b: return KEY_LEFT;
+            case 0x4d: return KEY_RIGHT;
+            case 0x52: return KEY_INSERT;
+            case 0x47: return KEY_HOME;
+            case 0x62: return KEY_HELP;
+            case 0x61: return KEY_UNDO;
+            case 0x3b: return KEY_F1;
+            case 0x3c: return KEY_F2;
+            case 0x3d: return KEY_F3;
+            case 0x3e: return KEY_F4;
+            case 0x3f: return KEY_F5;
+            case 0x40: return KEY_F6;
+            case 0x41: return KEY_F7;
+            case 0x42: return KEY_F8;
+            case 0x43: return KEY_F9;
+            case 0x44: return KEY_F10;
+            default: return 0;          // unknown key 
+        }
+    }
+    
+    vkeyKey = (((WORD) vkey) << 8) | ((WORD) key);      // create a WORD with vkey and key together 
+    
+    switch(vkeyKey) {                   // some other no-ASCII key, but check with vkey too 
+        case 0x011b: return KEY_ESC;
+        case 0x537f: return KEY_DELETE;
+        case 0x0e08: return KEY_BACKSP;
+        case 0x0f09: return KEY_TAB;
+        case 0x1c0d: return KEY_ENTER;
+        case 0x720d: return KEY_ENTER;
         case 0x2e03: return KEY_CTRL_C;
         case 0x250b: return KEY_CTRL_K;
         case 0x260c: return KEY_CTRL_L;
         case 0x1615: return KEY_CTRL_U;
-	}
+    }
 
-	return 0;							// unknown key 
+    return 0;                           // unknown key 
 }
 //--------------------------------------------------
 BYTE processUpdateComponentsFlags(BYTE inByteWithFlags)
@@ -398,7 +398,7 @@ BYTE retrieveIsUpdating(void)
     // if we got here, the previous command passed and this should work also
     BYTE cmd[] = {0, 'C', 'E', HOSTMOD_CONFIG, CFG_CMD_UPDATING_QUERY, 0};
     
-    cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)	
+    cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     memset(pBuffer, 0, 512);                        // clear the buffer 
   
     (*hdIf.cmd)(1, cmd, 6, pBuffer, 1);             // issue UPDATING QUERY command
@@ -449,7 +449,7 @@ void cosmoSoloConfig(void)
         BYTE newId = key - '0';
         BYTE cmd[] = {0, 'C', 'S', deviceID, newId, 0};
         
-        cmd[0] = (deviceID << 5); 						    // cmd[0] = ACSI_id + TEST UNIT READY (0)	
+        cmd[0] = (deviceID << 5);                           // cmd[0] = ACSI_id + TEST UNIT READY (0)   
   
         (*hdIf.cmd)(ACSI_READ, cmd, 6, pBuffer, 1);
         
@@ -527,6 +527,9 @@ void showFakeProgress(void)
     if(updatingFranz) {
         showFakeProgressOfItem("Updating Franz  (10 s): ", 10);
     }
+
+    // everything installed, but main app needs to start and possibly update script
+    showFakeProgressOfItem("Restarting app  (10 s): ", 10);
     
     // we're done, try to reconnect.
     (void) Cconws("\r\nIf everything went well,\r\nwill connect back soon.\r\n");

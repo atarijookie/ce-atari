@@ -678,7 +678,11 @@ void ConfigStream::screen_addHeaderAndFooter(StupidVector &scr, const char *scre
     int pos = (40 / 2) - (len / 2);			// calculate the position in the middle of screen
     strncpy(bfr + pos, screenName, len);	// copy the string in the middle, withouth the terminating zero
 
-    comp = new ConfigComponent(this, ConfigComponent::label, bfr, 40, 0, 1, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, bfr, 39, 0, 1, gotoOffset);
+    comp->setReverse(true);
+    scr.push_back(comp);
+    
+    comp = new ConfigComponent(this, ConfigComponent::heartBeat, bfr, 1, 39, 1, gotoOffset);
     comp->setReverse(true);
     scr.push_back(comp);
 }
