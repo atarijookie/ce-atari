@@ -353,6 +353,7 @@ void TranslatedDisk::detachByIndex(int index)
     conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
     conf[index].translatedType      = TRANSLATEDTYPE_NORMAL;
     conf[index].mediaChanged        = true;
+	conf[index].label.clear();
 	conf[index].dirTranslator.clear();
 }
 
@@ -552,7 +553,11 @@ void TranslatedDisk::onGetMounts(BYTE *cmd)
 		}
 
 		mountStr = trTypeStr[index];
-		sprintf(tmp, "%c: %s\n", ('A' + i), mountStr);
+		if(conf[i].label.empty()) {
+			sprintf(tmp, "%c: %s\n", ('A' + i), mountStr);
+		} else {
+			sprintf(tmp, "%c: %s (%s)\n", ('A' + i), conf[i].label.c_str(), mountStr);
+		}
 
 		mounts += tmp;
     }
