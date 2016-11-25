@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
     if(flags.actAsCeConf) {                                         
         printf("CE_CONF tool - Raspberry Pi version.\nPress Ctrl+C to quit.\n");
         
-        Debug::setLogFile((char *) "/var/log/ce_conf.log");
+        Debug::setLogFile("/var/log/ce_conf.log");
         ce_conf_mainLoop();
         return 0;
     }
@@ -315,9 +315,9 @@ void loadLastHwConfig(void)
 {
     Settings s;
     
-    hwConfig.version        = s.getInt((char *) "HW_VERSION",       1);
-    hwConfig.hddIface       = s.getInt((char *) "HW_HDD_IFACE",     HDD_IF_ACSI);
-    hwConfig.scsiMachine    = s.getInt((char *) "HW_SCSI_MACHINE",  SCSI_MACHINE_UNKNOWN);
+    hwConfig.version        = s.getInt("HW_VERSION",       1);
+    hwConfig.hddIface       = s.getInt("HW_HDD_IFACE",     HDD_IF_ACSI);
+    hwConfig.scsiMachine    = s.getInt("HW_SCSI_MACHINE",  SCSI_MACHINE_UNKNOWN);
     hwConfig.fwMismatch     = false;
 }
 
