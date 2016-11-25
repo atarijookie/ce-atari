@@ -17,6 +17,7 @@ TPL       *tpl;
 
 void  getServerIp (void);
 DWORD tryToParseIp(char *ipString);
+void showMenu(void);
 
 BYTE find_STiNG(void);
 
@@ -53,13 +54,30 @@ int main(void)
     }
 
     getServerIp();
+	WORD whichTests = 0;
+	while(whichTests == 0) {
+		showMenu();
+		char req = Cnecin();
+		if(req >= 'A' && req <= 'Z') req += 32;	// to upper case
+		if(req == 'q') break;	// quit
+		switch(req) {
+		case 'a':	// all tests
+			whichTests = 0xffff;
+			break;
+		case '0':
+		case '1':
+		case '2':
+		case '3':
+			whichTests = 1 << (req - '0');
+		}
+	}
 
-    doTest00();
-    doTest01();
-    doTest02();
-    doTest03();
+    if(whichTests & 1) doTest00();
+    if(whichTests & 2) doTest01();
+    if(whichTests & 4) doTest02();
+    if(whichTests & 8) doTest03();
 
-    writeBufferToFile();
+    if(whichTests != 0) writeBufferToFile();
     deinitBuffer();
     
     sleep(3);
@@ -99,9 +117,21 @@ BYTE find_STiNG(void)
     return 1;
 }
 
+void showMenu(void)
+{
+    //(void) Cconws("\33E");
+    (void) Cconws("Select which tests to run:\r\n");
+    (void) Cconws(" \33p[ 0 ]\33q Basic API tests + resolve\r\n");
+    (void) Cconws(" \33p[ 1 ]\33q TCP/UDP echo + UDP datagrams\r\n");
+    (void) Cconws(" \33p[ 2 ]\33q CNbyte_count / CNget_char / CNget_block / etc.\r\n");
+    (void) Cconws(" \33p[ 3 ]\33q ICMP\r\n");
+    (void) Cconws(" \33p[ A ]\33q ALL TESTS\r\n");
+    (void) Cconws(" \33p[ Q ]\33q QUIT\r\n");
+}
+
 void getServerIp(void)
 {
-    (void) Cconws("Enter server IP: ");
+    (void) Cconws("Enter server IP (default " SERVER_ADDR_DEFAULT_STRING ") : ");
 
     char inIp[20];
     memset(inIp, 0, 20);

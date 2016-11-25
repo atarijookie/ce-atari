@@ -8,20 +8,26 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <dirent.h>
 
 #include <signal.h>
 #include <pthread.h>
 #include <vector>    
 
 #include <curl/curl.h>
+#include "global.h"
 #include "debug.h"
 #include "downloader.h"
 #include "utils.h"
+#include "version.h"
 
 // sudo apt-get install libcurl4-gnutls-dev
 // gcc main.c -lcurl
 
 extern volatile sig_atomic_t sigintReceived;
+
+extern const char *distroString;        // linux distro string
+extern RPiConfig rpiConfig;             // RPi info structure 
 
 void updateStatusByte(TDownloadRequest &tdr, BYTE newStatus);
 
@@ -42,11 +48,11 @@ void Downloader::cleanupBeforeQuit(void)
 
 void Downloader::add(TDownloadRequest &tdr)
 {
-	pthread_mutex_lock(&downloadThreadMutex);				// try to lock the mutex
+    pthread_mutex_lock(&downloadThreadMutex);               // try to lock the mutex
     tdr.downPercent = 0;                                    // mark that the download didn't start
     updateStatusByte(tdr, DWNSTATUS_WAITING);               // mark that the download didn't start
-	downloadQueue.push_back(tdr);   						// add this to queue
-	pthread_mutex_unlock(&downloadThreadMutex);			    // unlock the mutex
+    downloadQueue.push_back(tdr);                           // add this to queue
+    pthread_mutex_unlock(&downloadThreadMutex);             // unlock the mutex
 }
 
 void Downloader::formatStatus(TDownloadRequest &tdr, std::string &line)
@@ -70,7 +76,7 @@ void Downloader::formatStatus(TDownloadRequest &tdr, std::string &line)
 
 void Downloader::status(std::string &status, int downloadTypeMask)
 {
-	pthread_mutex_lock(&downloadThreadMutex);				// try to lock the mutex
+    pthread_mutex_lock(&downloadThreadMutex);               // try to lock the mutex
 
     std::string line;
     status.clear();
@@ -96,12 +102,12 @@ void Downloader::status(std::string &status, int downloadTypeMask)
         }
     }
 
-	pthread_mutex_unlock(&downloadThreadMutex);			    // unlock the mutex
+    pthread_mutex_unlock(&downloadThreadMutex);             // unlock the mutex
 }
 
 int Downloader::count(int downloadTypeMask)
 {
-	pthread_mutex_lock(&downloadThreadMutex);				// try to lock the mutex
+    pthread_mutex_lock(&downloadThreadMutex);               // try to lock the mutex
 
     int typeCnt = 0;
 
@@ -124,7 +130,7 @@ int Downloader::count(int downloadTypeMask)
         }
     }
 
-	pthread_mutex_unlock(&downloadThreadMutex);			    // unlock the mutex
+    pthread_mutex_unlock(&downloadThreadMutex);             // unlock the mutex
 
     return typeCnt;
 }
@@ -169,6 +175,69 @@ bool Downloader::verifyChecksum(char *filename, WORD checksum)
     return checksumIsGood;                // return if the calculated cs is equal to the provided cs
 }
 
+bool Downloader::handleZIPedImage(const char *destDirectory, const char *zipFilePath)
+{
+    system("rm    -rf /tmp/zipedfloppy");           // delete this dir, if it exists
+    system("mkdir -p  /tmp/zipedfloppy");           // create that dir
+    
+    char unzipCommand[512];
+    sprintf(unzipCommand, "unzip -o %s -d /tmp/zipedfloppy", zipFilePath);
+    system(unzipCommand);                           // unzip the downloaded ZIP file into that tmp directory
+    
+    // find the first usable floppy image
+    DIR *dir = opendir("/tmp/zipedfloppy");         // try to open the dir
+    
+    if(dir == NULL) {                               // not found?
+        return false;
+    }
+
+    bool found          = false;
+    struct dirent *de   = NULL;
+    
+    while(1) {                                      // avoid buffer overflow
+        de = readdir(dir);                          // read the next directory entry
+    
+        if(de == NULL) {                            // no more entries?
+            break;
+        }
+
+        if(de->d_type != DT_REG) {                  // not a file? skip it
+            continue;
+        }
+
+        int fileNameLen = strlen(de->d_name);       // get length of filename
+
+        if(fileNameLen < 3) {                       // if it's too short, skip it
+            continue;
+        }
+
+        char *pExt = de->d_name + fileNameLen - 3;  // get pointer to extension 
+
+        if(strcasecmp(pExt, ".st") == 0 || strcasecmp(pExt, "msa") == 0) {  // the extension of the file is valid for a floppy image? 
+            found = true;
+            break;
+        }
+    }
+
+    closedir(dir);                                  // close the dir
+    
+    if(found) {                                     // if we got some valid floppy image
+        unlink(zipFilePath);                        // delete the downloaded ZIP file
+        
+        char moveCommand[512];
+        sprintf(moveCommand, "mv -f /tmp/zipedfloppy/%s %s", de->d_name, destDirectory);
+        system(moveCommand);                        // move the file to destination directory
+    }
+    
+    return found;
+}
+
+static size_t my_write_func_reportVersions(void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+    // for now just return fake written size
+    return (size * nmemb);
+}
+
 static size_t my_write_func(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
   return fwrite(ptr, size, nmemb, stream);
@@ -204,10 +273,10 @@ static int my_progress_func(void *clientp, double downTotal, double downNow, dou
     percIprev = percI;
 
     if(clientp != NULL) {                                       // if got pointer to currently downloading request
-    	pthread_mutex_lock(&downloadThreadMutex);				// try to lock the mutex
+        pthread_mutex_lock(&downloadThreadMutex);               // try to lock the mutex
         TDownloadRequest *tdr = (TDownloadRequest *) clientp;   // convert pointer type
         tdr->downPercent = percI;                               // mark that the download didn't start
-    	pthread_mutex_unlock(&downloadThreadMutex);			    // unlock the mutex
+        pthread_mutex_unlock(&downloadThreadMutex);             // unlock the mutex
     }
     
     return abortTransfer;                                       // return 0 to continue transfer, or non-0 to abort transfer
@@ -295,26 +364,55 @@ void handleSendConfig(char *localConfigFile, char *remoteUrl)
     curl_easy_cleanup(curl);              
 }
 
+void handleReportVersions(CURL *curl, const char *reportUrl)
+{
+    // specify url
+    curl_easy_setopt(curl, CURLOPT_URL, reportUrl);
+    
+    // specify where the retrieved data should go 
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, my_write_func_reportVersions);
+    
+    // specify the POST data
+    char postFields[256];
+    
+    char appVersion[16]; 
+    Version::getAppVersion(appVersion);
+    
+    sprintf(postFields, "mainapp=%s&distro=%s&rpirevision=%s&rpiserial=%s", appVersion, distroString, rpiConfig.revision, rpiConfig.serial);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
+ 
+    // Perform the request, res will get the return code
+    CURLcode res = curl_easy_perform(curl);
+    
+    // Check for errors
+    if(res != CURLE_OK) {
+        Debug::out(LOG_ERROR, "CURL curl_easy_perform() failed: %s", curl_easy_strerror(res));
+    }
+ 
+    // always cleanup
+    curl_easy_cleanup(curl);
+}
+
 void *downloadThreadCode(void *ptr)
 {
     CURLcode cres;
     int res;
     FILE *outfile;
 
-	Debug::out(LOG_DEBUG, "Download thread starting...");
+    Debug::out(LOG_DEBUG, "Download thread starting...");
 
-	while(sigintReceived == 0) {
-		pthread_mutex_lock(&downloadThreadMutex);		// lock the mutex
+    while(sigintReceived == 0) {
+        pthread_mutex_lock(&downloadThreadMutex);       // lock the mutex
 
-		if(downloadQueue.size() == 0) {					// nothing to do?
-			pthread_mutex_unlock(&downloadThreadMutex);	// unlock the mutex
-			sleep(1);									// wait 1 second and try again
-			continue;
-		}
-		
-		downloadCurrent = downloadQueue.front();	    // get the 'oldest' element from queue
-		downloadQueue.erase(downloadQueue.begin());		// and remove it from queue
-		pthread_mutex_unlock(&downloadThreadMutex);		// unlock the mutex
+        if(downloadQueue.size() == 0) {                 // nothing to do?
+            pthread_mutex_unlock(&downloadThreadMutex); // unlock the mutex
+            sleep(1);                                   // wait 1 second and try again
+            continue;
+        }
+        
+        downloadCurrent = downloadQueue.front();        // get the 'oldest' element from queue
+        downloadQueue.erase(downloadQueue.begin());     // and remove it from queue
+        pthread_mutex_unlock(&downloadThreadMutex);     // unlock the mutex
     
         //-------------------
         // check if this isn't local file, and if it is, do the rest localy
@@ -337,6 +435,14 @@ void *downloadThreadCode(void *ptr)
         
         if(!curl) {
             Debug::out(LOG_ERROR, "CURL init failed, the file %s was not downloaded...", (char *) downloadCurrent.srcUrl.c_str());
+            continue;
+        }
+
+        //-------------------
+        // if this is a request to report versions, do it in a separate function
+        if(downloadCurrent.downloadType == DWNTYPE_REPORT_VERSIONS) {
+            handleReportVersions(curl, downloadCurrent.srcUrl.c_str());
+            curl = NULL;
             continue;
         }
         //-------------------
@@ -376,12 +482,33 @@ void *downloadThreadCode(void *ptr)
         fclose(outfile);
 
         if(cres == CURLE_OK) {                               // if download went OK
-            updateStatusByte(downloadCurrent, DWNSTATUS_VERIFYING);       // mark that we're verifying checksum
-        
+            updateStatusByte(downloadCurrent, DWNSTATUS_VERIFYING);     // mark that we're verifying checksum
+            
+            //-----------
+            // support for testing and automatic depacking of floppy images
+            bool isZIPedFloppyImage = false;
+            
+            if(downloadCurrent.downloadType == DWNTYPE_FLOPPYIMG) {                     // it's a floppy image download?
+                if(finalFile.length() >= 4) {                                           // if the length is long enough to contain '.zip' 
+                    std::string extension = finalFile.substr(finalFile.length() - 4);   // get last 4 characters
+                    int iRes = strcasecmp(extension.c_str(), ".zip");                   // compare the extension to .ZIP
+                    
+                    if(iRes == 0) {                                                     // if the extension is .ZIP, then it's a ZIPed floppy image
+                        isZIPedFloppyImage = true;
+                    }
+                }
+            }
+
+            //-----------
+            
             bool b = Downloader::verifyChecksum((char *) tmpFile.c_str(), downloadCurrent.checksum);
 
-            if(b) {             // checksum is OK? 
-                res = rename(tmpFile.c_str(), finalFile.c_str());
+            if(b) {             // checksum is OK?
+                if(isZIPedFloppyImage) {    // it's a ZIPed floppy?
+                    res = Downloader::handleZIPedImage(downloadCurrent.dstDir.c_str(), tmpFile.c_str());
+                } else {                    // not ZIPed floppy, just rename it
+                    res = rename(tmpFile.c_str(), finalFile.c_str());
+                }
 
                 if(res != 0) {  // download OK, checksum OK, rename BAD?
                     updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_FAIL);
@@ -419,7 +546,7 @@ void *downloadThreadCode(void *ptr)
         curl = NULL;
     }
 
-	Debug::out(LOG_DEBUG, "Download thread finished.");
+    Debug::out(LOG_DEBUG, "Download thread finished.");
     return 0;
 }
 

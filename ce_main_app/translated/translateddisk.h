@@ -28,6 +28,7 @@ typedef struct {
 
     std::string devicePath;                 // where the device is
     std::string hostRootPath;               // where is the root on host file system
+    std::string label;						// "DOS" label
     char        stDriveLetter;              // what letter will be used on ST
     std::string currentAtariPath;           // what is the current path on this drive
 
@@ -40,6 +41,7 @@ typedef struct {
     bool        enabled;
     std::string devicePath;                 // where the device is
     std::string hostRootPath;               // where is the root on host file system
+    std::string label;						// "DOS" label
     int         translatedType;             // normal / shared / config
 } TranslatedConfTemp;
 
@@ -134,8 +136,8 @@ public:
     static bool hostPathExists(std::string hostPath);
     static void pathSeparatorAtariToHost(std::string &path);
     
-    bool createFullAtariPathAndFullHostPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
-    void createFullHostPath (std::string inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
+    bool createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
+    void createFullHostPath (const std::string &inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
 
     // for status report
     bool driveIsEnabled(int driveIndex);
@@ -238,6 +240,7 @@ private:
     void onStLog(BYTE *cmd);
     void onTestRead(BYTE *cmd);
     void onTestWrite(BYTE *cmd);
+    void onTestGetACSIids(BYTE *cmd);
     void getScreenShotConfig(BYTE *cmd);
     
     // helper functions

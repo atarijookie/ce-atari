@@ -48,6 +48,7 @@ public:
     static void setTimezoneVariable_inProfileScript(void);
     static void setTimezoneVariable_inThisContext(void);
 
+    static std::string getDeviceLabel(const std::string & devicePath);
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
 

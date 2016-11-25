@@ -15,6 +15,7 @@
 #include "global.h"
 #include "debug.h"
 #include "utils.h"
+#include "config/config_commands.h"
 #include "config/configstream.h"
 #include "config/keys.h"
 
@@ -26,6 +27,8 @@ extern SharedObjects shared;
 #define INBFR_SIZE  (10 * 1024)
 BYTE *inBfr;
 BYTE *tmpBfr;
+
+extern bool otherInstanceIsRunning(void);
 
 int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt)
 {
@@ -134,7 +137,18 @@ bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BYTE *tem
     
     bool bRes = receiveStream(2, (BYTE *) &howManyBytes, fd2);  // first receive byte count that we should read
 
-    if(!bRes) {
+    if(!bRes) {                                                 // didn't receive available byte count?
+        bRes = otherInstanceIsRunning();                        // is the main app running?
+
+        if(!bRes) {                                             // the main app is not running? should quit now!
+            write(STDOUT_FILENO, "\033[2J\033[H" , 7);          // clear whole screen, cursor up
+
+            printf("The CosmosEx main app not running, terminating config tool!\n");
+            sleep(3);
+            sigintReceived = 1;
+            return false;
+        }
+
         printf("sendCmd -- failed to receive byte count\n");
         
         Debug::out(LOG_DEBUG, "sendCmd fail on receiving howManyBytes");
@@ -145,7 +159,7 @@ bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BYTE *tem
         Debug::out(LOG_DEBUG, "sendCmd success because didn't need any other data");
         return true;
     }
-    
+
     bRes = receiveStream(howManyBytes, dataBuffer, fd2);        // then receive the stream
 
     if(bRes) {
@@ -203,7 +217,7 @@ static bool receiveStream(int byteCount, BYTE *data, int fd)
             
             Debug::out(LOG_DEBUG, "receiveStream - readCount: %d", readCount);
         }
-        
+
         Utils::sleepMs(10);     // sleep a little
     }
     
@@ -214,7 +228,7 @@ static bool receiveStream(int byteCount, BYTE *data, int fd)
 static BYTE getKey(int count)
 {
     int c = getchar();
-    
+
     if(c != 27) {           // not ESC sequence? just return value
         switch(c) {
             case 0x0a:  return KEY_ENTER;
@@ -287,6 +301,13 @@ static BYTE getKey(int count)
                 }
                 break;
                 
+            case 0x34:
+                c = getchar();
+                if(c == 0x7e) {
+                    return KEY_END;
+                }
+                break;
+
             case 0x5b:
                 c = getchar();
                 switch(c) {
@@ -305,6 +326,8 @@ static BYTE getKey(int count)
 
 void ce_conf_mainLoop(void)
 {
+    bool configNotLinuxConsole = true;
+
     inBfr   = new BYTE[INBFR_SIZE];
     tmpBfr  = new BYTE[INBFR_SIZE];
     
@@ -337,7 +360,7 @@ void ce_conf_mainLoop(void)
 	new_tio_out.c_lflag &= (~ICANON);               // disable canonical mode (buffered i/o)
 	tcsetattr(STDOUT_FILENO,TCSANOW, &new_tio_out); // set the new settings immediately
     
-    DWORD lastUpdate = Utils::getCurrentMs();
+    DWORD lastUpdate = 0;
     
     while(sigintReceived == 0) {
         bool didSomething = false;
@@ -355,11 +378,22 @@ void ce_conf_mainLoop(void)
                 break;
             }
             
+            if(key == KEY_F8) {                                     // if should switch between config view and linux console view
+                write(STDOUT_FILENO, "\033[37m", 5);                // foreground white
+                write(STDOUT_FILENO, "\033[40m", 5);                // background black
+                write(STDOUT_FILENO, "\033[2J" , 4);                // clear whole screen
+                write(STDOUT_FILENO, "\033[H"  , 3);                // position cursor to 0,0
+
+                configNotLinuxConsole = !configNotLinuxConsole;
+                key = 0;
+            }
+            
             if(key != 0) {                                          // if got the key, send key down event
-                res = sendCmd(CFG_CMD_KEYDOWN, key, termFd1, termFd2, inBfr, tmpBfr, vt100count);
+                res = sendCmd(configNotLinuxConsole ? CFG_CMD_KEYDOWN : CFG_CMD_LINUXCONSOLE_GETSTREAM, key, termFd1, termFd2, inBfr, tmpBfr, vt100count);
                 
                 if(res) {
-                    write(STDOUT_FILENO, (char *) inBfr, vt100count);
+                    int len = strnlen((const char *) inBfr, vt100count);    // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator  
+                    write(STDOUT_FILENO, (char *) inBfr, len);
                 }
                 
                 lastUpdate = Utils::getCurrentMs();                 // store current time as we just updated
@@ -371,10 +405,11 @@ void ce_conf_mainLoop(void)
         if(Utils::getCurrentMs() - lastUpdate >= 1000) {            // last update more than 1 second ago? refresh
             didSomething = true;
         
-            res = sendCmd(CFG_CMD_REFRESH, 0, termFd1, termFd2, inBfr, tmpBfr, vt100count);
+            res = sendCmd(configNotLinuxConsole ? CFG_CMD_REFRESH : CFG_CMD_LINUXCONSOLE_GETSTREAM, 0, termFd1, termFd2, inBfr, tmpBfr, vt100count);
         
             if(res) {
-                write(STDOUT_FILENO, (char *) inBfr, vt100count);
+                int len = strnlen((const char *) inBfr, vt100count);    // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator
+                write(STDOUT_FILENO, (char *) inBfr, len);
             }
 
             lastUpdate = Utils::getCurrentMs();                     // store current time as we just updated

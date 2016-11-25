@@ -19,8 +19,7 @@ void FilenameShortener::clear(void)
 }
 
 bool FilenameShortener::longToShortFileName(const char *longFileName, char *shortFileName)
- {
-     // QStringList &fileNames, QStringList &fullNames
+{
     static char fileName[MAX_FILENAME_LEN];
     static char fileExt[MAX_FILEEXT_LEN];
 
@@ -34,6 +33,7 @@ bool FilenameShortener::longToShortFileName(const char *longFileName, char *shor
     if(it != mapFilenameWithExt.end()) {                        // if we have this fileName already, use it!
         const char *shortFileNameFromMap = it->second.c_str();
         strcpy(shortFileName, shortFileNameFromMap);
+        Debug::out(LOG_DEBUG, "FilenameShortener found mapping %s <=> %s", shortFileName, longFileName);
         return true;
     }
 
@@ -95,7 +95,7 @@ bool FilenameShortener::longToShortFileName(const char *longFileName, char *shor
     mapFilenameWithExt.insert( std::pair<std::string, std::string>(longFn, shortFn) );  // store this key-value pair
     mapReverseFilename.insert( std::pair<std::string, std::string>(shortFn, longFn) );  // for reverse transformation
 
-	Debug::out(LOG_DEBUG, "FilenameShortener mapped %s <=> %s", shortFileName, longFileName);
+    Debug::out(LOG_DEBUG, "FilenameShortener mapped %s <=> %s", shortFileName, longFileName);
     return true;
 }
 

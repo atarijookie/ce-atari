@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <string.h>
 #include <stdio.h>
 
@@ -576,12 +577,12 @@ void NetAdapter::conUpdateInfo(void)
         dataTrans->addDataDword(ci->bytesInSocket);
         
         if(ci->bytesInSocket > 0) {                         // something to read?
-            Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo - connection %d has %d bytes waiting to be read", i, ci->bytesInSocket);
+            Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo [%d] connection has %d bytes waiting to be read", i, ci->bytesInSocket);
             found++;
         }
         
         if(ci->status != TCLOSED) {                         // not closed?
-            Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo [%d] - status: %d, localPort: %d, remoteHost: %08x, remotePort: %d, bytesInSocket: %d", i, ci->status, ci->localPort, ntohl(ci->remote_adr.sin_addr.s_addr), ntohs(ci->remote_adr.sin_port), ci->bytesInSocket);
+            Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo [%d] - status: %d, localPort: %d, remote: %08x:%d, bytesInSocket: %d", i, ci->status, ci->localPort, ntohl(ci->remote_adr.sin_addr.s_addr), ntohs(ci->remote_adr.sin_port), ci->bytesInSocket);
         }
     }
 
@@ -988,16 +989,22 @@ void NetAdapter::conGetCharBuffer(void)
 
     int charsUsed = cmd[9];                             // cmd[10] - how many chars were used by calling CNget_char() - we need to remove them first
     if(charsUsed > 0) {                                 // some chars were used, remove them
-        Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() -- CNget_char() used %d bytes, removing them from socket", charsUsed);
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() [%d] CNget_char() used %d bytes, removing them from socket", slot, charsUsed);
         nc->readWrapper.removeBlock(charsUsed);
     }
 
     int gotBytes = nc->readWrapper.peekBlock(dataBuffer, 250);  // peek data from socket - less than 255, because 'charsUsed' is sent as byte (for removing the last used chars from deque)
+    if(gotBytes < 0) gotBytes = 0;
     dataTrans->addDataByte(gotBytes);                   // first store how many bytes we will return (this will be 250 bytes or less)
 
-    Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() -- will return buffer of %d bytes", gotBytes);
-
-    dataTrans->addDataBfr(dataBuffer, gotBytes, true);  // add that char buffer to data buffer, pad to mul 16
+    Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() [%d] will return buffer of %d bytes", slot, gotBytes);
+    if(gotBytes > 0) {
+        dataTrans->addDataBfr(dataBuffer, gotBytes, true);  // add that char buffer to data buffer, pad to mul 16
+    }  else {
+        // return a few 0's to pad transmission
+        memset(dataBuffer, 0, 32);
+        dataTrans->addDataBfr(dataBuffer, 32, true);
+    }
     dataTrans->setStatus(E_NORMAL);
 }
 
@@ -1079,7 +1086,7 @@ void NetAdapter::conGetBlock(void)
         return;
     }
 
-    Debug::out(LOG_DEBUG, "NetAdapter::conGetBlock() -- OK", wantedLength, gotBytes);
+    Debug::out(LOG_DEBUG, "NetAdapter::conGetBlock() -- OK wanted %d, got %d", wantedLength, gotBytes);
 
     nc->readWrapper.peekBlock(dataBuffer, wantedLength);    // peek   data from socket
     nc->readWrapper.removeBlock(wantedLength);              // remove data from socket

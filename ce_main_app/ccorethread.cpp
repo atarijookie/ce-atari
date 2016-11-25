@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
@@ -40,7 +41,7 @@ extern TFlags       flags;
 
 extern DebugVars    dbgVars;
 
-SharedObjects shared;
+extern SharedObjects shared;
 extern volatile bool floppyEncodingRunning;
 
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
@@ -102,6 +103,9 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
 
     // set up network adapter stuff
     netAdapter.setAcsiDataTrans(dataTrans);
+
+	// set up mediastreaming service
+	mediaStreaming.setTranslatedDisk(shared.translated);
 }
 
 CCoreThread::~CCoreThread()
@@ -127,19 +131,19 @@ void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyServi
 
     //-----------
     // create config stream for ACSI interface
-    shared.configStream.acsi = new ConfigStream();
+    shared.configStream.acsi = new ConfigStream(CONFIGSTREAM_ON_ATARI);
     shared.configStream.acsi->setAcsiDataTrans(dataTrans);
     shared.configStream.acsi->setSettingsReloadProxy(&settingsReloadProxy);
     
     // create config stream for web interface
     shared.configStream.dataTransWeb    = new AcsiDataTrans();
-    shared.configStream.web             = new ConfigStream();
+    shared.configStream.web             = new ConfigStream(CONFIGSTREAM_THROUGH_WEB);
     shared.configStream.web->setAcsiDataTrans(shared.configStream.dataTransWeb);
     shared.configStream.web->setSettingsReloadProxy(&settingsReloadProxy);
 
     // create config stream for linux terminal
     shared.configStream.dataTransTerm   = new AcsiDataTrans();
-    shared.configStream.term            = new ConfigStream();
+    shared.configStream.term            = new ConfigStream(CONFIGSTREAM_IN_LINUX_CONSOLE);
     shared.configStream.term->setAcsiDataTrans(shared.configStream.dataTransTerm);
     shared.configStream.term->setSettingsReloadProxy(&settingsReloadProxy);
 }
@@ -550,10 +554,15 @@ void CCoreThread::handleAcsiCommand(void)
             wasHandled = true;
             netAdapter.processCommand(pCmd);
             break;
+
+        case HOSTMOD_MEDIA_STREAMING:
+            wasHandled = true;
+            mediaStreaming.processCommand(pCmd, dataTrans);
+            break;
         }
     }
 
-    if(wasHandled != true) {                            // if the command was not previously handled, it's probably just some SCSI command
+    if(!wasHandled) {           // if the command was not previously handled, it's probably just some SCSI command
         pthread_mutex_lock(&shared.mtxScsi);
         shared.scsi->processCommand(bufIn);                    // process the command
         pthread_mutex_unlock(&shared.mtxScsi);

@@ -17,7 +17,11 @@
 #include "main.h"
 
 extern int16_t useOldBiosHandler;
-extern WORD ceDrives;
+#ifdef MANUAL_PEXEC
+WORD ceDrives;
+#else
+extern WORD ceDrives;	/* defined in harddrive_lowlevel.s */
+#endif
 extern WORD ceMediach;
 
 extern BYTE commandShort[CMD_LENGTH_SHORT];
@@ -62,7 +66,7 @@ int32_t custom_getbpb( void *sp )
 {
     DWORD res;
     WORD drive = (WORD) *((WORD *) sp);
-    static BYTE bpb[20];    
+    static WORD bpb[20/2];    // declare as WORD to have it aligned to even address
 
     updateCeDrives();                                                   // update the drives - once per 3 seconds 
 
@@ -74,10 +78,6 @@ int32_t custom_getbpb( void *sp )
     WORD driveMaskInv = ~(1 << drive);
     ceMediach = ceMediach & driveMaskInv;                               // this drive is no longer in MEDIA CHANGED state
 
-    // create pointer to even address 
-    DWORD dwBpb = (DWORD) &bpb[1];
-    BYTE *pBpb = (BYTE *) (dwBpb & 0xfffffffe);
-    
     commandShort[4] = BIOS_Getbpb;                                      // store BIOS function number 
     commandShort[5] = (BYTE) drive;                                     
     
@@ -90,8 +90,8 @@ int32_t custom_getbpb( void *sp )
     
     ceMediach = ceMediach & (~(1 << drive));                            // remove this bit media changes 
     
-    memcpy(pBpb, pDmaBuffer, 18);                                       // copy in the results 
-    return (DWORD) pBpb;
+    memcpy(bpb, pDmaBuffer, 18);                                       // copy in the results 
+    return (DWORD) bpb;
 }
 
 /* 

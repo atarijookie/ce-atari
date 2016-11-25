@@ -19,7 +19,7 @@ class ConfigStream;
 class ConfigComponent
 {
 public:
-    enum ComponentType{ label, button, checkbox, editline, editline_pass };
+    enum ComponentType{ label, button, checkbox, editline, editline_pass, heartBeat };
 
     // maxLen is maximum length of text, that means that on screen it might have 2 more ('[' and ']')
     ConfigComponent(ConfigStream *parent, ComponentType type, std::string text, WORD maxLen, int x, int y, int gotoOffset);
@@ -49,39 +49,42 @@ public:
     
     int getComponentType(void);
 
-    void terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt);	// then add +cnt to bfr (might be 0 or 4)
+    BYTE *terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt);    // then add +cnt to bfr (might be 0 or 4)
 
 private:
-    ConfigStream                *confStream;
+    ConfigStream    *confStream;
 
-    bool			changed;
+    bool            changed;
 
-    bool			hasFocus;
-    bool			isReverse;
-    bool			checked;
+    bool            hasFocus;
+    bool            isReverse;
+    bool            checked;
 
-    ComponentType               type;
-    int				posX, posY;
-    int                         gotoOffset;
-    WORD			maxLen;
-    std::string                 text;
+    ComponentType   type;
+    int             posX, posY;
+    int             gotoOffset;
+    WORD            maxLen;
+    std::string     text;
 
     int             componentId;
 
     // for editline
-    WORD			cursorPos;
+    WORD            cursorPos;
     int             textOptions;
 
     // for checkbox
-    int				checkBoxGroup;
-    int				checkBoxId;
+    int             checkBoxGroup;
+    int             checkBoxId;
 
-    int	onEnter;
+    // for heartbeat
+    int             heartBeatState;
+    
+    int onEnter;
     int onChBEnter;
 
-    void terminal_addGoto(BYTE *bfr, int x, int y);                     // then add +4 to bfr
-    void terminal_addReverse(BYTE *bfr, bool onNotOff);			// then add +2 to bfr
-    void terminal_addCursorOn(BYTE *bfr, bool on);                      // then add +2 to bfr
+    BYTE *terminal_addGoto(BYTE *bfr, int x, int y);
+    BYTE *terminal_addReverse(BYTE *bfr, bool onNotOff);
+    BYTE *terminal_addCursorOn(BYTE *bfr, bool on);
 
     void handleEditLineKeyPress(BYTE key);
 

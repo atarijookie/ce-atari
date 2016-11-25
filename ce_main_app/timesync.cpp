@@ -90,13 +90,12 @@ bool TimeSync::sync(void)
         return true;
     }
 
-   	Debug::out(LOG_DEBUG, "TimeSync::sync -- NTP failed, will try web...");
-
     if(sigintReceived) {
         Debug::out(LOG_DEBUG, "TimeSync::sync -- SIGINT received at line %d, exiting", __LINE__);
         return false;
     }
 
+   	Debug::out(LOG_DEBUG, "TimeSync::sync -- NTP failed, will try web...");
     res = syncByWeb();                      // NTP failed, try sync from web
     
     if(res) {
@@ -115,17 +114,32 @@ bool TimeSync::syncByNtp(void)
     if(eInitState == INIT_NTP_FAILED) {       // if failed, then failed ;)
         return false;
     }
-  
-    timeval tv;
-    tv.tv_sec=lTime;
-    tv.tv_usec=0;
 
+    //------------
+    // check date validity, reject if it seems bad
+    struct tm gmTime;
+    memset(&gmTime, 0, sizeof(gmTime));         // clear struct
+    gmtime_r(&lTime, &gmTime);                  // convert int time to struct time
+    
+    int year = gmTime.tm_year + 1900;
+    Debug::out(LOG_DEBUG, "TimeSync: date from NTP is: %04d-%02d-%02d", year, gmTime.tm_mon + 1, gmTime.tm_mday);
+     
+    if(year < 2016 || year > 2020) {
+        Debug::out(LOG_ERROR, "TimeSync: NTP year %04d seems to be invalid (it's not between 2016 and 2020), syncByNtp fail", year);
+        return false;
+    }
+    //------------
+    
+    timeval tv;
+    tv.tv_sec   = lTime;
+    tv.tv_usec  = 0;
+    
     Debug::out(LOG_DEBUG, "TimeSync: trying to set date to %d", lTime);
     int ret=settimeofday(&tv,NULL);
 
     if( ret<0 ){
         eInitState=INIT_DATE_NOT_SET;
-        Debug::out(LOG_DEBUG, "TimeSync: could not set date: %d", errno);
+        Debug::out(LOG_ERROR, "TimeSync: could not set date: %d", errno);
         return false;
     }
     
@@ -236,7 +250,13 @@ void TimeSync::refreshNetworkDateNtp(void)
   
   if(i < 0) {                                               // failed? quit
     eInitState = INIT_NTP_FAILED;
-    Debug::out(LOG_DEBUG, "TimeSync: could not recieve packet: %s", strerror(errno));
+    Debug::out(LOG_ERROR, "TimeSync: could not recieve packet: %s", strerror(errno));
+    return;
+  }
+  
+  if(sigintReceived) {
+    eInitState = INIT_NTP_FAILED;
+    Debug::out(LOG_ERROR, "TimeSync: SIGINT received, quitting");
     return;
   }
   

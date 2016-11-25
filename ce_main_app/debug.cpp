@@ -1,19 +1,21 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <sys/time.h>
 
 #include "global.h"
 #include "debug.h"
 #include "utils.h"
 
-#define LOG_FILE		"/var/log/ce.log"
+#define LOG_FILE        "/var/log/ce.log"
 DWORD prevLogOut;
 
 extern TFlags   flags;
        BYTE     g_outToConsole;
 
 DebugVars dbgVars;
-       
+
 char Debug::logFilePath[128];
 
 void Debug::setOutputToConsole(void)
@@ -30,7 +32,7 @@ void Debug::setLogFile(char *path)
 {
     strcpy(Debug::logFilePath, path);
 }
-    
+
 void Debug::printfLogLevelString(void)
 {
     printf("\nLog level: ");
@@ -55,42 +57,46 @@ void Debug::out(int logLevel, const char *format, ...)
     va_list args;
     va_start(args, format);
 
-	FILE *f;
+    FILE *f;
 
     if(g_outToConsole) {                    // should log to console? f is null
         f = NULL;
     } else {                                // log to file? open the file
         f = fopen(logFilePath, "a+t");
     }
-	
-	if(!f) {
-		printf("%08d: ", Utils::getCurrentMs());
-		vprintf(format, args);
-		printf("\n");
-		return;
-	}
 
-  	DWORD now = Utils::getCurrentMs();
-	DWORD diff = now - prevLogOut;
-	prevLogOut = now;
+    if(!f) {
+        printf("%08d: ", Utils::getCurrentMs());
+        vprintf(format, args);
+        printf("\n");
+        return;
+    }
+
+    DWORD now = Utils::getCurrentMs();
+    DWORD diff = now - prevLogOut;
+    prevLogOut = now;
 
     char humanTime[128];
-    time_t t = time(NULL);
-    struct tm tm = *localtime(&t);
-    sprintf(humanTime, "%04d-%02d-%02d %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    struct timeval tv;
+    if(gettimeofday(&tv, NULL) < 0) {
+        memset(&tv, 0, sizeof(tv)); // failure
+    }
+    struct tm tm = *localtime(&tv.tv_sec);
+    sprintf(humanTime, "%04d-%02d-%02d %02d:%02d:%02d.%06ld",
+            tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, tv.tv_usec);
 
     if(logLevel == LOG_ERROR && dbgVars.isInHandleAcsiCommand) {    // it's an error, and we're debugging ACSI stuff
-        fprintf(f, "%08d\t%08d\t(%s)\n", now, diff, humanTime); // CLOCK in ms, diff in ms, date/time in human readable format
+        fprintf(f, "%08d %08d (%s)\n", now, diff, humanTime); // CLOCK in ms, diff in ms, date/time in human readable format
         fprintf(f, "     LOG_ERROR occurred\n");
         fprintf(f, "     Time since beginning of ACSI command handling: %d\n", now - dbgVars.thisAcsiCmdTime);
         fprintf(f, "     Time between this and previous ACSI command  : %d\n", dbgVars.thisAcsiCmdTime - dbgVars.prevAcsiCmdTime);
     }
-    
-    fprintf(f, "%08d\t%08d\t(%s)\t", now, diff, humanTime); // CLOCK in ms, diff in ms, date/time in human readable format
-    
+
+    fprintf(f, "%08d %08d (%s)\t", now, diff, humanTime); // CLOCK in ms, diff in ms, date/time in human readable format
+
     vfprintf(f, format, args);
-	fprintf(f, "\n");
-	fclose(f);
+    fprintf(f, "\n");
+    fclose(f);
 
     va_end(args);
 }
@@ -101,21 +107,22 @@ void Debug::outBfr(BYTE *bfr, int count)
         return;
     }
 
-	FILE *f = fopen(logFilePath, "a+t");
-	
-	if(!f) {
-		return;
-	}
+    FILE *f = fopen(logFilePath, "a+t");
 
-	fprintf(f, "%08d: outBfr - %d bytes\n", Utils::getCurrentMs(), count);
+    if(!f) {
+        return;
+    }
+
+    fprintf(f, "%08d: outBfr - %d bytes\n", Utils::getCurrentMs(), count);
 
     int i, j;
-    
+
     int rows = (count / 16) + (((count % 16) == 0) ? 0 : 1);
-     
-	for(i=0; i<rows; i++) {
+
+    for(i=0; i<rows; i++) {
         int ofs = i * 16;
-        
+        fprintf(f, "        ");//some indentation
+
         for(j=0; j<16; j++) {
             if((ofs + j) < count) {
                 fprintf(f, "%02x ", bfr[ofs + j]);
@@ -129,18 +136,18 @@ void Debug::outBfr(BYTE *bfr, int count)
         for(j=0; j<16; j++) {
             char v = bfr[ofs + j];
             v = (v >= 32 && v <= 126) ? v : '.';
-            
+
             if((ofs + j) < count) {
                 fprintf(f, "%c", v);
             } else {
                 fprintf(f, " ");
             }
         }
-        
+
         fprintf(f, "\n");
     }
 
-	fprintf(f, "\n");
-	fclose(f);
+    //fprintf(f, "\n");
+    fclose(f);
 }
 

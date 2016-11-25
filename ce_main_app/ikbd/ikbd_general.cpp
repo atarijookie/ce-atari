@@ -174,6 +174,7 @@ void Ikbd::loadSettings(void)
     keybJoy0 = s.getBool("KEYBORD_JOY0", false);
     keybJoy1 = s.getBool("KEYBORD_JOY1", false);
     
+    keyJoyKeys.setKeyTranslator(&keyTranslator);        // first set the translator
     keyJoyKeys.loadKeys();                              // load the keys used for keyb joys
 }
 

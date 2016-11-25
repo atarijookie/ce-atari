@@ -24,6 +24,9 @@ extern volatile bool do_timeSync;
 extern volatile bool do_loadIkbdConfig;
 
 extern THwConfig hwConfig;
+extern const char *distroString;
+
+extern RPiConfig rpiConfig;             // RPi info structure
 
 //--------------------------
 // screen creation methods
@@ -226,10 +229,10 @@ void ConfigStream::createScreen_network(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "Wifi",		10,	col0x, row++, gotoOffset);
     screen.push_back(comp);
 
-	comp = new ConfigComponent(this, ConfigComponent::label, "WPA SSID",	20,	col1x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "WPA SSID",	20,	col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	20, col2x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "     ",	31, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_WIFI_SSID);
     comp->setTextOptions(TEXT_OPTION_ALLOW_ALL);
     screen.push_back(comp);
@@ -237,7 +240,7 @@ void ConfigStream::createScreen_network(void)
 	comp = new ConfigComponent(this, ConfigComponent::label, "WPA PSK",		20,	col1x, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline_pass, "      ",	40, col1x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline_pass, "      ",	63, col1x, row++, gotoOffset);
     comp->setComponentId(COMPID_WIFI_PSK);
     comp->setTextOptions(TEXT_OPTION_ALLOW_ALL);
     screen.push_back(comp);
@@ -729,77 +732,127 @@ void ConfigStream::createScreen_update(void)
     
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Hardware version  : ", 22, 7, 4, gotoOffset);
+    int cl1 = 5;
+    int cl2 = 27;
+    
+    int line = 4;
+    comp = new ConfigComponent(this, ConfigComponent::label, "Hardware version  : ", 22, cl1, line, gotoOffset);
     screen.push_back(comp);
 
     const char *hwVer = (hwConfig.version == 2) ? "v. 2" : "v. 1";
 
-    comp = new ConfigComponent(this, ConfigComponent::label, hwVer, 10, 29, 4, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, hwVer, 10, cl2, line, gotoOffset);
     screen.push_back(comp);
+    line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "HDD interface type: ", 22, 7, 5, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "HDD interface type: ", 22, cl1, line, gotoOffset);
     screen.push_back(comp);
 
     const char *hddIf = (hwConfig.hddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI";
 
-    comp = new ConfigComponent(this, ConfigComponent::label, hddIf, 10, 29, 5, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, hddIf, 10, cl2, line, gotoOffset);
+    screen.push_back(comp);
+    line++;
+    
+    //-------
+    comp = new ConfigComponent(this, ConfigComponent::label, "Linux distribution: ", 22, cl1, line, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, distroString, 10, cl2, line, gotoOffset);
     screen.push_back(comp);
     
-    comp = new ConfigComponent(this, ConfigComponent::label, " part       your version   ", 27, 0, 8, gotoOffset);
+    line++;
+    //-------
+    #ifndef DISTRO_YOCTO
+    line++;
+    cl1 = 2;
+    cl2 = 17;
+    #endif
+
+    #ifdef DISTRO_YOCTO
+    comp = new ConfigComponent(this, ConfigComponent::label, "RPi revision      : ", 22, cl1, line, gotoOffset);
+    #else
+    comp = new ConfigComponent(this, ConfigComponent::label, "RPi revision: ", 22, cl1, line, gotoOffset);
+    #endif
+    
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, rpiConfig.revision, 20, cl2, line, gotoOffset);
+    screen.push_back(comp);
+    
+    line++;
+    //-------
+    #ifndef DISTRO_YOCTO
+    comp = new ConfigComponent(this, ConfigComponent::label, rpiConfig.model, 40, cl1, line, gotoOffset);
+    screen.push_back(comp);
+    #endif
+
+    line += 2;
+    //-------
+    
+    comp = new ConfigComponent(this, ConfigComponent::label, " part       your version   ", 27, 0, line, gotoOffset);
     comp->setReverse(true);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "on web", 13, 27, 8, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "on web", 13, 27, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_LOCATION);
     comp->setReverse(true);
     screen.push_back(comp);
+    
+    line += 2;
 
 	int col1 = 1, col2 = 13;
 		
-    comp = new ConfigComponent(this, ConfigComponent::label, "Main App", 12,	col1, 10, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Main App", 12,	col1, line, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, 10, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_COSMOSEX);
     screen.push_back(comp);
+    line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Franz", 12, 		col1, 11, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Franz", 12, 		col1, line, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 			col2, 11, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 			col2, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_FRANZ);
     screen.push_back(comp);
+    line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Hans", 12,		col1, 12, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Hans", 12,		col1, line, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, 12, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_HANZ);
     screen.push_back(comp);
+    line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Xilinx", 12,		col1, 13, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Xilinx", 12,		col1, line, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, 13, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_XILINX);
     screen.push_back(comp);
+    
+    line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " From web ", 10,  6, 15, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " From web ", 10,  6, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_CHECK);
     comp->setComponentId(COMPID_UPDATE_BTN_CHECK);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " From USB ", 10,  22, 15, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " From USB ", 10,  22, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_CHECK_USB);
     comp->setComponentId(COMPID_UPDATE_BTN_CHECK_USB);
     screen.push_back(comp);
+    line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Update  ", 10,  6, 16, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Update  ", 10,  6, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_UPDATE);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Cancel  ", 10,  22, 16, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Cancel  ", 10,  22, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
@@ -917,37 +970,26 @@ void ConfigStream::createScreen_update_download(void)
     screenChanged	    = true;			// mark that the screen has changed
     showingHomeScreen	= false;		// mark that we're NOT showing the home screen
 
-    screen_addHeaderAndFooter(screen, "Updates download");
+    screen_addHeaderAndFooter(screen, "Download of update");
 
     ConfigComponent *comp;
 
     int col = 7;
     int row = 9;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Downloading", 40, col + 2, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Downloading",                 40, col, row, gotoOffset);
+    comp->setComponentId(COMPID_DL_TITLE);
     screen.push_back(comp);
 
     row += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 30, col, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "ce_update.zip          0 %",  30, col, row, gotoOffset);
     comp->setComponentId(COMPID_DL1);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 30, col, row++, gotoOffset);
-    comp->setComponentId(COMPID_DL2);
-    screen.push_back(comp);
+    row += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 30, col, row++, gotoOffset);
-    comp->setComponentId(COMPID_DL3);
-    screen.push_back(comp);
-
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 30, col, row++, gotoOffset);
-    comp->setComponentId(COMPID_DL4);
-    screen.push_back(comp);
-
-    row++;
-
-    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, col + 3, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ",                    8, col, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
@@ -1027,10 +1069,12 @@ void ConfigStream::createScreen_other(void)
 
     //----------------------
     row++;
-    
+
+/*
     comp = new ConfigComponent(this, ConfigComponent::button, " Send your settings to Jookie ", 30, 5, row++, gotoOffset);
     comp->setOnEnterFunctionCode(CS_SEND_SETTINGS);
     screen.push_back(comp);
+*/
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Reset all settings ",       19, 10, row++, gotoOffset);
     comp->setOnEnterFunctionCode(CS_RESET_SETTINGS);
@@ -1423,15 +1467,18 @@ void ConfigStream::fillUpdateDownloadWithProgress(void)
 
     // split it to lines
     getProgressLine(0, status, l1);
-    getProgressLine(1, status, l2);
-    getProgressLine(2, status, l3);
-    getProgressLine(3, status, l4);
 
     // set it to components
     setTextByComponentId(COMPID_DL1, l1);
-    setTextByComponentId(COMPID_DL2, l2);
-    setTextByComponentId(COMPID_DL3, l3);
-    setTextByComponentId(COMPID_DL4, l4);
+}
+
+void ConfigStream::fillUpdateDownloadWithFinish(void)
+{
+    std::string s1 = "Update downloaded.";
+    std::string s2 = "Starting install...";
+
+    setTextByComponentId(COMPID_DL_TITLE, s1);
+    setTextByComponentId(COMPID_DL1, s2);
 }
 
 void ConfigStream::getProgressLine(int index, std::string &lines, std::string &line)
@@ -1717,7 +1764,7 @@ void ConfigStream::onResetSettings(void)
 
 void ConfigStream::onSendSettings(void)
 {
-    ConfigStream cs;
+    ConfigStream cs(CONFIGSTREAM_THROUGH_WEB);
     cs.createConfigDump();
     
     // add request for download of the update list

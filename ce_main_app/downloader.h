@@ -11,6 +11,7 @@
 #define DWNTYPE_FLOPPYIMG       0x08
 #define DWNTYPE_TIMESYNC        0x10
 #define DWNTYPE_SEND_CONFIG     0x20
+#define DWNTYPE_REPORT_VERSIONS 0x40
 
 #define DWNSTATUS_WAITING       0              
 #define DWNSTATUS_DOWNLOADING   1 
@@ -42,6 +43,7 @@ public:
     static void status(std::string &status, int downloadTypeMask);      // create status report string of pending and running downloads according to mask
 
     static bool verifyChecksum(char *filename, WORD checksum);
+    static bool handleZIPedImage(const char *destDirectory, const char *zipFilePath);
 
 private:
     static void formatStatus(TDownloadRequest &tdr, std::string &line);

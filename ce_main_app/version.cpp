@@ -1,7 +1,13 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
+#include "global.h"
 #include "version.h"
+#include "debug.h"
+
+extern TFlags flags;			// global flags from command line
+extern RPiConfig rpiConfig;
 
 Version::Version()
 {
@@ -165,11 +171,68 @@ void Version::getAppVersion(char *bfr)
     
     i = sscanf(buildDate + 4, "%d %d", &day, &year);
     
+    if(flags.fakeOldApp) {		// if should fake that the app is old, subtract 2 years from app year
+        year -= 2;
+    }
+
     if(i == 2 && month > 0) {
         sprintf(bfr, "%04d-%02d-%02d", year, month, day);
     } else {
         strcpy(bfr, "YYYY-MM-DD");
     }
+}
+
+void Version::getRaspberryPiInfo(void)
+{
+    // first parse the files, so we won't have to do this in C 
+    system("cat /proc/cpuinfo | grep 'Serial' | tr -d ' ' | awk -F ':' '{print $2}' > /tmp/rpiserial.txt");
+    system("cat /proc/cpuinfo | grep 'Revision' | tr -d ' ' | awk -F ':' '{print $2}' > /tmp/rpirevision.txt");
+    system("dmesg | grep 'Machine model' | awk -F ': ' '{print $2}' > /tmp/rpimodel.txt");
+    
+    // read in the data
+    readLineFromFile("/tmp/rpiserial.txt",      rpiConfig.serial,   20, "unknown");
+    readLineFromFile("/tmp/rpirevision.txt",    rpiConfig.revision,  8, "unknown");
+    readLineFromFile("/tmp/rpimodel.txt",       rpiConfig.model,    40, "Raspberry Pi unknown model");
+    
+    // print to log file in debug mode
+    Debug::out(LOG_DEBUG, "RPi serial  : %s", rpiConfig.serial);
+    Debug::out(LOG_DEBUG, "RPi revision: %s", rpiConfig.revision);
+    Debug::out(LOG_DEBUG, "RPi model   : %s", rpiConfig.model);
+}
+
+void Version::readLineFromFile(const char *filename, char *buffer, int maxLen, const char *defValue)
+{
+    memset(buffer, 0, maxLen);                  // clear the buffer where the value should be stored
+    
+    FILE *f = fopen(filename, "rt");            // open the file
+    
+    if(!f) {                                    // if failed to open, copy in the default value
+        strncpy(buffer, defValue, maxLen - 1);
+        return;
+    }
+
+    char *res = fgets(buffer, maxLen - 1, f);   // try to read the line
+    
+    if(res == NULL) {
+        strncpy(buffer, defValue, maxLen - 1);  // failed to read the line? use default value
+        return;
+    }
+    
+    int len = strlen(buffer);
+    
+    if(len > 0) {                                                   // got at least 1 character?
+        if(buffer[len - 1] == '\n' || buffer[len - 1] == '\r') {    // if it's new line, remove it
+            buffer[len - 1] = 0;
+        }
+    }
+
+    if(len > 1) {                                                   // got at least 2 characters?
+        if(buffer[len - 2] == '\n' || buffer[len - 2] == '\r') {    // if it's new line, remove it
+            buffer[len - 2] = 0;
+        }
+    }
+
+    fclose(f);                                  // close the file
 }
 
 

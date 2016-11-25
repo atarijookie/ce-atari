@@ -15,6 +15,7 @@
 
 THDif hdIf;
 extern volatile mutex mtx;  
+void hddIfCmd_withRetries_worker(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount, BYTE lock);
 
 void hddIfCmd_withRetries_lock(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
 {

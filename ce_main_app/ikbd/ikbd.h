@@ -23,7 +23,13 @@ typedef struct {
 #define JOYAXIS             8
 #define JOYBUTTONS          12
 
-#define UARTFILE	        "/dev/ttyAMA0"
+#ifdef DISTRO_YOCTO
+    // use this serial port on yocto
+    #define UARTFILE	        "/dev/ttyAMA0"
+#else
+    // use this serial port on Raspbian
+    #define UARTFILE	        "/dev/serial0" 
+#endif
 
 #define UARTMARK_STCMD      0xAA
 #define UARTMARK_KEYBDATA   0xBB

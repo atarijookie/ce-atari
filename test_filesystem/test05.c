@@ -10,14 +10,15 @@
 extern int  drive;
 extern WORD tosVersion;
 
-void test050x(void);
-void test051x(WORD testCaseOffset, BYTE *rdBfr);    // tests 051x, 052x, 053x
-void test054x(void);                                // tests 054x, 055x, 056x 
-void test057x(void);
-void test058x(void);
-void test05ax(void);
-void test05bx(void);
-void test05dx(void);
+static void test050x(void);
+static void test051x(WORD testCaseOffset, BYTE *rdBfr);    // tests 051x, 052x, 053x
+static void test054x(void);                                // tests 054x, 055x, 056x
+static void test057x(void);
+static void test058x(void);
+static void test05ax(void);
+static void test05bx(void);
+static void test05dx(void);
+static void test05ex(void);
 
 BYTE filenameExists(char *filename);
 void deleteIfExists(char *fname);
@@ -79,7 +80,7 @@ void test05(WORD whichTests)
     }
      
     if(whichTests & 0x04) {         // S
-        test058x();                 // Fseek
+        test058x();                 // Fseek + read
     }
     
     if(whichTests & 0x08) {         // X
@@ -92,6 +93,10 @@ void test05(WORD whichTests)
     
     if(whichTests & 0x20) {         // V
         test05dx();                 // Fwrite - various cases
+    }
+
+    if(whichTests & 0x40) {         // T
+        test05ex();                 // Fseek + write
     }
     
     deleteFile(0xABCD);
@@ -429,6 +434,142 @@ void test058x(void)
     out_tr_bd(0x0591, "Fseek - SEEK_END to end", ok, res1);
     
     Fclose(f);    
+}
+
+void test05ex(void)
+{
+	//   32 byte line           01234567890123456789012345678901
+	static const char line[] = "This is a Line of the file !!!\r\n";
+	char buffer[32];
+	char bufferhex[16];
+	int i;
+	BYTE ok;
+	WORD f = 0;
+	DWORD written;
+	DWORD offset = 0;		// theorical offset in file
+	DWORD realoffset = 0;	// offset as returned by Fseek
+
+	Fdelete("TESTB00F");
+
+	f = Fcreate("TESTB00F", 0);
+	ok = (f > 0) ? 1 : 0;
+    out_tr_bw(0x05e1, "Fcreate - non-existing file", ok, f);
+	for(i = 0; i < 1024; i++) {
+		written = Fwrite(f, 32, line);
+		if(written != 32) {
+    		out_tr_bd(0x05e1, "Fwrite - line ", 0, written);
+			goto endtest;
+		}
+		offset += written;
+		realoffset = Fseek(0, f, SEEK_CUR);
+		if(offset != realoffset) {
+			out_tr_bd(0x05e2, "Fseek wrong offset", 0, realoffset);
+			goto endtest;
+		}
+	}
+
+	// seek to middle of the file
+	realoffset = Fseek(-32*512, f, SEEK_CUR);
+	offset += -32*512;
+	ok = (realoffset == offset) ? 1 : 0;
+	out_tr_bd(0x05e3, "Fseek to middle of the file ", ok, realoffset);
+    dwordToHex(offset, buffer);
+	written = Fwrite(f, 8, buffer);
+	ok = (written == 8) ? 1 : 0;
+	out_tr_bd(0x05e4, "Fwrite in middle of the file ", ok, written);
+	offset += written;
+	realoffset = Fseek(0, f, SEEK_CUR);
+	if(offset != realoffset) {
+		out_tr_bd(0x05e5, "Fseek wrong offset", 0, realoffset);
+	}
+	// seek forward
+	realoffset = Fseek(32*3-8, f, SEEK_CUR);
+	offset += 32*3-8;
+	ok = (realoffset == offset) ? 1 : 0;
+	out_tr_bd(0x05e6, "Fseek forward ", ok, realoffset);
+    dwordToHex(offset, buffer);
+	written = Fwrite(f, 8, buffer);
+	ok = (written == 8) ? 1 : 0;
+	out_tr_bd(0x05e7, "Fwrite after seek forward ", ok, written);
+	offset += written;
+	realoffset = Fseek(0, f, SEEK_CUR);
+	if(offset != realoffset) {
+		out_tr_bd(0x05e8, "Fseek wrong offset", 0, realoffset);
+	}
+	// seek to end of file
+	realoffset = Fseek(-4, f, SEEK_END);
+	offset = 32*1024-4;
+	ok = (realoffset == offset) ? 1 : 0;
+	out_tr_bd(0x05e9, "Fseek to the end of file ", ok, realoffset);
+    dwordToHex(offset, buffer);
+	written = Fwrite(f, 8, buffer);
+	ok = (written == 8) ? 1 : 0;
+	out_tr_bd(0x05ea, "Fwrite after seek to end ", ok, written);
+	offset += written;
+	realoffset = Fseek(0, f, SEEK_CUR);
+	if(offset != realoffset) {
+		out_tr_bd(0x05eb, "Fseek wrong offset", 0, realoffset);
+	}
+	// add a partial line
+	written = Fwrite(f, 32-4, line+4);
+	ok = (written == 32-4) ? 1 : 0;
+	out_tr_bd(0x05ec, "Fwrite after end of file ", ok, written);
+	offset += written;
+	realoffset = Fseek(0, f, SEEK_CUR);
+	if(offset != realoffset) {
+		out_tr_bd(0x05ed, "Fseek wrong offset", 0, realoffset);
+	}
+	// SEEK SET
+	offset = 32*4;
+	realoffset = Fseek(offset, f, SEEK_SET);
+	ok = (realoffset == offset) ? 1 : 0;
+	out_tr_bd(0x05ee, "Fseek to the start of file ", ok, realoffset);
+    dwordToHex(offset, buffer);
+	written = Fwrite(f, 8, buffer);
+	ok = (written == 8) ? 1 : 0;
+	out_tr_bw(0x05ef, "Fwrite ", ok, written);
+	offset += written;
+	realoffset = Fseek(0, f, SEEK_CUR);
+	if(offset != realoffset) {
+		out_tr_bd(0x05ef, "Fseek wrong offset", 0, realoffset);
+	}
+	Fclose(f);
+	f = 0;
+
+	f = Fopen("TESTB00F", 0);	//READ ONLY
+	offset = 0;
+	for(i = 0; i < 1024+1; i++) {
+		DWORD read = Fread(f, 32, buffer);
+		if(read != 32) {
+			out_tr_bd(0x05ef, "file verification : Fread failed", 0, read);
+			break;
+		}
+		switch(offset) {
+		case 32*4:
+		case 32*512:
+		case 32*(512+3):
+			dwordToHex(offset, bufferhex);
+			ok = (memcmp(buffer, bufferhex, 8) == 0 && memcmp(buffer+8, line+8, 32-8) == 0) ? 1 : 0;
+			break;
+		case 32*1023:
+			ok = (memcmp(buffer, line, 32-4) == 0 && memcmp(buffer+28, "0000", 4) == 0) ? 1 : 0;
+			break;
+		case 32*1024:
+			dwordToHex(offset-4, bufferhex);
+			ok = (memcmp(buffer, bufferhex+4, 4) == 0 && memcmp(buffer+4, line+4, 32-4) == 0) ? 1 : 0;
+			break;
+		default:
+			ok = memcmp(buffer, line, 32) == 0 ? 1 : 0;
+		}
+		if(!ok) {
+			out_tr_bd(0x05ef, "file verification : bad content", ok, offset);
+		}
+		offset += read;
+	}
+
+endtest:
+	if(f != 0) Fclose(f);
+	Fdelete("TESTB00F");
 }
 
 void test057x(void)

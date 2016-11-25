@@ -1,7 +1,15 @@
 #!/bin/sh
 
-# This is an endless script which checks for wifi dongle, then tries to connect to AP
+# count how many times is 'Yocto' is mentioned, if at least once, we're running on Yocto
+issue=$( cat /etc/issue | grep -o "Yocto" | wc -l )
 
+# If $issue is 0, we're running on Raspbian - we should probably quit
+if [ "$issue" -eq "0" ]; then
+	echo "You are running on Raspbian, this script was intended for Yocto, terminating."
+    exit
+fi
+
+# This is an endless script which checks for wifi dongle, then tries to connect to AP
 while :
 do
 	sleep 5
@@ -47,3 +55,4 @@ do
 	fi
 
 done
+

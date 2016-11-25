@@ -959,8 +959,6 @@ void initFunctionTable(void)
 
     // program execution functions
     
-//#define MANUAL_PEXEC
-    
 #ifdef MANUAL_PEXEC
     // manually handling Pexec() and Pterm*() functions
 	gemdos_table[GEMDOS_pexec]      = custom_pexec;

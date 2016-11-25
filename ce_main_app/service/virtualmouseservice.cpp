@@ -37,20 +37,21 @@ void VirtualMouseService::stop()
 
 void VirtualMouseService::openFifo() 
 {
-    if (mkdir("/tmp/vdev/",0666) == -1) {
-        Debug::out(LOG_ERROR, "Virtual mouse could not create /tmp/vdev/.");
+    int res;
+
+    res = mkdir("/tmp/vdev/",0666);
+    if (res == -1 && errno != EEXIST) {     // if failed to create dir, and it's not because it already exists
+        Debug::out(LOG_ERROR, "Virtual mouse could not create /tmp/vdev/ - errno: %d", errno);
     }
     Debug::out(LOG_DEBUG, "Virtual mouse creating /tmp/vdev/mouse.");
     //try to remove if it's a file
     unlink("/tmp/vdev/mouse");
-    int err=mkfifo("/tmp/vdev/mouse",0666);
-    if(err < 0) 
-    {
-        Debug::out(LOG_ERROR, "Virtual mouse could not create /tmp/vdev/mouse.");
-    		if(errno == EEXIST) {
+    int err = mkfifo("/tmp/vdev/mouse",0666);
+    if(err < 0) {
+        Debug::out(LOG_ERROR, "Virtual mouse could not create /tmp/vdev/mouse - errno: %d", errno);
+        if(errno == EEXIST) {
             Debug::out(LOG_ERROR, "    /tmp/vdev/mouse already exists.");
-    		}
-		    //printf("errno is set as %d\n", errno);
+        }
 	}    
     initialized=true;
 }

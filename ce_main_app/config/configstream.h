@@ -10,6 +10,10 @@
 
 #define CONFIG_TEXT_FILE        "/tmp/ce_config.txt"
 
+#define CONFIGSTREAM_ON_ATARI           0
+#define CONFIGSTREAM_IN_LINUX_CONSOLE   1
+#define CONFIGSTREAM_THROUGH_WEB        2
+
 class AcsiDataTrans;
 
 enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED,
@@ -46,7 +50,7 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
 
                 COMPID_FLOPCONF_ENABLED,    COMPID_FLOPCONF_ID,         COMPID_FLOPCONF_WRPROT,
 
-                COMPID_DL1,                 COMPID_DL2,                 COMPID_DL3,                 COMPID_DL4,
+                COMPID_DL_TITLE,            COMPID_DL1,
                 COMPID_TIMESYNC_ENABLE,     COMPID_TIMESYNC_NTP_SERVER, COMPID_TIMESYNC_UTC_OFFSET,
                 COMPID_SCREENCAST_FRAMESKIP,    COMPID_SCREEN_RESOLUTION,
                 COMPID_JOY0_FIRST,          COMPID_MOUSEWHEEL_ENABLED,  COMPID_KEYB_JOY0, COMPID_KEYB_JOY1,
@@ -64,7 +68,7 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
 class ConfigStream
 {
 public:
-    ConfigStream();
+    ConfigStream(int whereItWillBeShown);
     ~ConfigStream();
 
     // functions which are called from the main loop
@@ -74,6 +78,7 @@ public:
 
     void fillUpdateWithCurrentVersions(void);
     void fillUpdateDownloadWithProgress(void);
+    void fillUpdateDownloadWithFinish(void);
     void showUpdateDownloadFail(void);
     bool isUpdateDownloadPageShown(void);
     void showUpdateError(void);
@@ -115,6 +120,8 @@ public:
     void enterKeyHandlerLater(int event);
     
 private:
+    int shownOn;
+
     StupidVector screen;
     StupidVector message;
 

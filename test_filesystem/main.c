@@ -68,15 +68,16 @@ int main(void)
             break;
         }
         
-        if(req == 'o' || req == 'r' || req == 's' || req == 'x' || req == 'w' || req == 'v') {
+        if(req == 'o' || req == 'r' || req == 's' || req == 'x' || req == 'w' || req == 'v' || req == 't') {
             whichTests = 0x10;                  // test05
             switch(req) {
                 case 'o': which05Tests = 0x01; break;   // Fopen, Fcreate, Fclose
                 case 'r': which05Tests = 0x02; break;   // Fread
-                case 's': which05Tests = 0x04; break;   // Fseek
+                case 's': which05Tests = 0x04; break;   // Fseek + READ
                 case 'x': which05Tests = 0x08; break;   // Fread 10
                 case 'w': which05Tests = 0x10; break;   // Fwrite
                 case 'v': which05Tests = 0x20; break;   // Fwrite various
+                case 't': which05Tests = 0x40; break;   // Fseek + WRITE
                 default:  which05Tests = 0x00; break;   // nothing
             }
             break;
@@ -110,10 +111,11 @@ void showMenu(void)
     (void) Cconws(" \33p[ 5 ]\33q Fcreate, Fopen, Fclose, Fread, Fseek, Fwrite\r\n");
     (void) Cconws("       \33p[ O ]\33q Fopen, Fcreate, Fclose\r\n");
     (void) Cconws("       \33p[ R ]\33q Fread\r\n");
-    (void) Cconws("       \33p[ S ]\33q Fseek\r\n");
+    (void) Cconws("       \33p[ S ]\33q Fseek + READ\r\n");
     (void) Cconws("       \33p[ X ]\33q Fread - 10 files open and read\r\n");
     (void) Cconws("       \33p[ W ]\33q Fwrite\r\n");
     (void) Cconws("       \33p[ V ]\33q Fwrite - various cases\r\n");
+    (void) Cconws("       \33p[ T ]\33q Fseek + WRITE\r\n");
     (void) Cconws(" \33p[ A ]\33q ALL TESTS\r\n");
     (void) Cconws(" \33p[ Q ]\33q QUIT\r\n");
 }

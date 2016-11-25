@@ -1,5 +1,3 @@
-TARGET	= cosmosex
-
 # control verbosity. use make V=1
 V = 0
 
@@ -14,12 +12,24 @@ CXXFLAGS = $(CFLAGS)
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 # -M : with system headers, -MM : without
 
+LDFLAGS	= -Llib -lrt -lanl -lpthread -lcurl -ldl -lutil
+
 ifeq ($(ONPC),yes)
-    LDFLAGS	= -Llib -Llib -lrt -lanl -lpthread -lcurl -lcivetweb -ldl -lutil
     CFLAGS += -DONPC_NOTHING -I./
 else
-    LDFLAGS	= -Llib -lbcm2835 -lrt -lanl -lpthread -lcurl -lcivetweb -ldl -lutil
+    LDFLAGS	+= -lbcm2835
     CFLAGS += -I./
+endif
+
+DISTRO := $(shell ./whichdistro.sh)
+ifeq ($(DISTRO),yocto)
+	TARGET   =  cosmosex_yocto
+	LDFLAGS += -lcivetweb_yocto
+	CFLAGS  += -DDISTRO_YOCTO
+else
+	TARGET   =  cosmosex_raspbian
+	LDFLAGS += -lcivetweb_raspbian
+	CFLAGS += -DDISTRO_RASPBIAN
 endif
 
 # uncomment following line to get map file (ce.map)
@@ -52,6 +62,7 @@ SUBDIR8	= acsicommand
 SUBDIR9	= network
 SUBDIR10 = dir2fdd
 SUBDIR11 = ikbd
+SUBDIR12 = mediastreaming
 
 SRCS  = $(wildcard *.cpp) 
 SRCS += $(wildcard $(SUBDIR1)/*.cpp) 
@@ -67,6 +78,7 @@ SRCS += $(wildcard $(SUBDIR8)/*.cpp)
 SRCS += $(wildcard $(SUBDIR9)/*.cpp)
 SRCS += $(wildcard $(SUBDIR10)/*.cpp)
 SRCS += $(wildcard $(SUBDIR11)/*.cpp)
+SRCS += $(wildcard $(SUBDIR12)/*.cpp)
 
 HDRS  = $(wildcard *.h)
 HDRS += $(wildcard $(SUBDIR1)/*.h)
@@ -82,6 +94,7 @@ HDRS += $(wildcard $(SUBDIR8)/*.h)
 HDRS += $(wildcard $(SUBDIR9)/*.h)
 HDRS += $(wildcard $(SUBDIR10)/*.h)
 HDRS += $(wildcard $(SUBDIR11)/*.h)
+HDRS += $(wildcard $(SUBDIR12)/*.h)
 
 OBJS = $(patsubst %.cpp,%.o,$(SRCS:.c=.o))
 DEPS = $(patsubst %.o,%.d,$(OBJS))

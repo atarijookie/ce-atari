@@ -4,14 +4,18 @@
 #include "../global.h"
 #include "../native/scsi_defs.h"
 #include "../acsidatatrans.h"
+#include "../update.h"
 
 #include "../settings.h"
 #include "keys.h"
 #include "configstream.h"
+#include "config_commands.h"
 #include "../debug.h"
 
-ConfigStream::ConfigStream()
+ConfigStream::ConfigStream(int whereItWillBeShown)
 {
+    shownOn = whereItWillBeShown;
+
     stScreenWidth   = 40;
     gotoOffset      = 0;
 
@@ -93,6 +97,21 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
         Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_SET_RESOLUTION -- %d", cmd[5]);
         break;
 
+    case CFG_CMD_UPDATING_QUERY:
+    {
+        BYTE isUpdateStartingFlag               = (Update::state() == UPDATE_STATE_WAITBEFOREINSTALL) ? 1 : 0;
+        BYTE updateComponentsWithValidityNibble = 0xC0 | Update::getUpdateComponents();
+        
+        dataTrans->addDataByte(isUpdateStartingFlag);
+        dataTrans->addDataByte(updateComponentsWithValidityNibble);
+        dataTrans->padDataToMul16();
+        
+        dataTrans->setStatus(SCSI_ST_OK);
+        
+        Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_UPDATING_QUERY -- isUpdateStartingFlag: %d, updateComponentsWithValidityNibble: %x", isUpdateStartingFlag, updateComponentsWithValidityNibble);
+        break;
+    }
+        
     case CFG_CMD_REFRESH:
         screenChanged = true;                                           // get full stream, not only differences
         streamCount = getStream(false, readBuffer, READ_BUFFER_SIZE);   // then get current screen stream
@@ -212,6 +231,11 @@ void ConfigStream::onKeyDown(BYTE key)
         }
     }
     
+    // if you press ENTER key on a editline, it's like you pressed arrow down
+    if(key == KEY_ENTER && (curr->getComponentType() == ConfigComponent::editline || curr->getComponentType() == ConfigComponent::editline_pass)) {
+        key = KEY_DOWN;
+    }
+
     if(key == KEY_UP) {							// arrow up
         curr->setFocus(false);					// unfocus this component
 
@@ -306,19 +330,32 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
     if(focused != -1) {									// if got some component with focus
         int gotLen;
         ConfigComponent *c = (ConfigComponent *) scr[focused];
-        c->terminal_addGotoCurrentCursor(bfr, gotLen);	// position the cursor at the right place
+        bfr = c->terminal_addGotoCurrentCursor(bfr, gotLen);	// position the cursor at the right place
 
-        bfr         += gotLen;
         totalCnt    += gotLen;
     }
 
     screenChanged = false;
-	
-	*bfr++ = 0;									        // add string terminator
-	totalCnt++;
+    
+    *bfr++ = 0;									        // add string terminator
+    totalCnt++;
 
-    *bfr++ = isUpdateScreen();                   // after the string store a flag if this screen is update screen, so the ST client could show good message on update
-	totalCnt++;
+    //-------
+    // after the string store a flag if this screen is update screen, so the ST client could show good message on update
+    BYTE isUpdScreen = isUpdateScreen();
+    *bfr++ = isUpdScreen;
+    totalCnt++;
+
+    //-------
+    // get update components, if on update screen
+    if(isUpdScreen) {
+        BYTE updateComponents = Update::getUpdateComponents();  // get which components are newer
+        *bfr++ = 0xC0 | updateComponents;                       // store update components and the validity nibble
+    } else {
+        *bfr++ = 0;     // store update components - not updating anything
+    }
+    totalCnt++;
+    //-------
     
     return totalCnt;                                    // return the count of bytes used
 }
@@ -618,7 +655,16 @@ void ConfigStream::screen_addHeaderAndFooter(StupidVector &scr, const char *scre
     scr.push_back(comp);
 
     // insert footer
-    comp = new ConfigComponent(this, ConfigComponent::label, " F5 - refresh, F8 - console, F10 - quit ", 40, 0, 24, gotoOffset);
+    const char *footerText;
+    if(shownOn == CONFIGSTREAM_ON_ATARI) {                  // show valid keys for Atari
+        footerText = " F5 - refresh, F8 - console, F10 - quit ";
+    } else if(shownOn == CONFIGSTREAM_IN_LINUX_CONSOLE) {   // show valid keys for config through linux console 
+        footerText = "   F5 - refresh, Ctrl+C or F10 - quit   ";
+    } else {                                                // show valid keys for browser and other cases
+        footerText = "              F5 - refresh              ";
+    }
+    
+    comp = new ConfigComponent(this, ConfigComponent::label, footerText, 40, 0, 24, gotoOffset);
     comp->setReverse(true);
     scr.push_back(comp);
 
@@ -631,7 +677,11 @@ void ConfigStream::screen_addHeaderAndFooter(StupidVector &scr, const char *scre
     int pos = (40 / 2) - (len / 2);			// calculate the position in the middle of screen
     strncpy(bfr + pos, screenName, len);	// copy the string in the middle, withouth the terminating zero
 
-    comp = new ConfigComponent(this, ConfigComponent::label, bfr, 40, 0, 1, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, bfr, 39, 0, 1, gotoOffset);
+    comp->setReverse(true);
+    scr.push_back(comp);
+    
+    comp = new ConfigComponent(this, ConfigComponent::heartBeat, bfr, 1, 39, 1, gotoOffset);
     comp->setReverse(true);
     scr.push_back(comp);
 }

@@ -6,7 +6,11 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <errno.h>
+
+#include <sys/ioctl.h>
+#include <linux/msdos_fs.h>
 
 #include "global.h"
 #include "../utils.h"
@@ -81,7 +85,7 @@ void DirTranslator::shortToLongPath(const std::string &rootPath, const std::stri
         if(fs->shortToLongFileName(strings[i].c_str(), longName)) {   // try to convert the name
             strings[i] = longName; // if there was a long version of the file name, replace the short one
         } else {
-            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s", strings[i].c_str());
+            Debug::out(LOG_DEBUG, "DirTranslator::shortToLongPath - shortToLongFileName() failed for short name: %s path=%s", strings[i].c_str(), pathPart.c_str());
         }
 
         Utils::mergeHostPaths(pathPart, strings[i]);   // build the path slowly
@@ -127,7 +131,7 @@ FilenameShortener *DirTranslator::getShortenerForPath(std::string path)
     FilenameShortener *fs;
 
     if(it != mapPathToShortener.end()) {            // already got the shortener
-        Debug::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s found", path.c_str());
+        //Debug::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s found", path.c_str());
         fs = it->second;
     } else {                                        // don't have the shortener yet
         Debug::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, creating", path.c_str());
@@ -192,7 +196,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
     // initialize find storage in case anything goes bad
     fs->clear();
 
-	while(1) {                                                  	// while there are more files, store them
+    while(fs->count < fs->maxCount) {	        					// avoid buffer overflow
 		struct dirent *de = readdir(dir);							// read the next directory entry
 	
 		if(de == NULL) {											// no more entries?
@@ -242,10 +246,6 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
         
 		// finnaly append to the find storage
 		appendFoundToFindStorage(hostPath, searchString.c_str(), fs, de, findAttribs);
-
-        if(fs->count >= fs->maxCount) {         					// avoid buffer overflow
-            break;
-        }
     }
 
 	closedir(dir);
@@ -299,6 +299,8 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
     BYTE atariAttribs;								            // convert host to atari attribs
     Utils::attributesHostToAtari(isReadOnly, isDir, atariAttribs);
 
+	if(de->d_name[0] == '.') atariAttribs |= FA_HIDDEN;		// enforce Mac/Unix convention of hidding files startings with '.'
+
 	std::string fullEntryPath 	= hostPath;
 	std::string longFname		= de->d_name;
 	Utils::mergeHostPaths(fullEntryPath, longFname);
@@ -334,6 +336,26 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
 		
 	if(ires != 0) {     // not matching? quit
 		return;
+	}
+
+	// get MS-DOS VFAT attributes
+	{
+		int fd = open(fullEntryPath.c_str(), O_RDONLY);
+		if(fd >= 0) {
+			__u32 dosattrs = 0;
+			if (ioctl(fd, FAT_IOCTL_GET_ATTRIBUTES, &dosattrs) >= 0) {
+				if(dosattrs & ATTR_RO) atariAttribs |= FA_READONLY;
+				if(dosattrs & ATTR_HIDDEN) atariAttribs |= FA_HIDDEN;
+				if(dosattrs & ATTR_SYS) atariAttribs |= FA_SYSTEM;
+				//if(dosattrs & ATTR_ARCH) atariAttribs |= FA_ARCHIVE;
+			} else {
+				// it will fail if the underlying FileSystem is not FAT
+				//Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- ioctl(%s, FAT_IOCTL_GET_ATTRIBUTES) failed errno %d", fullEntryPath.c_str(), errno);
+			}
+			close(fd);
+		} else {
+			Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- open(%s) failed, errno %d", fullEntryPath.c_str(), errno);
+		}
 	}
 
     // GEMDOS File Attributes

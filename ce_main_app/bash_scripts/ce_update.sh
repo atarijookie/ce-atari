@@ -3,13 +3,17 @@
 # first stop any cosmosex process (script or app)
 /ce/ce_stop.sh
 
-echo -e "\nUpdating CosmosEx from internet, this will take a while\nDO NOT POWER OFF THE DEVICE!!!\n"
+echo " "
+echo "Updating CosmosEx from internet, this will take a while."
+echo "DO NOT POWER OFF THE DEVICE!!!"
+echo " "
 
 # download the update package
 cd /tmp/
 rm -f /tmp/*.zip /tmp/*.hex /tmp/*.csv /tmp/*.xsvf
 
-echo "\n>>> Downloading the update from web..."
+echo " "
+echo ">>> Downloading the update from web..."
 wget http://joo.kie.sk/cosmosex/update/ce_update.zip
 
 if [ ! -f "/tmp/ce_update.zip" ]
@@ -46,6 +50,8 @@ fi
 rm -f /tmp/*.zip /tmp/*.hex /tmp/*.csv /tmp/*.xsvf
 sync
 
-echo -e "\nUpdate done, you may start the /ce/ce_start.sh now!\n";
+echo " "
+echo "Update done, you may start the /ce/ce_start.sh now!";
+echo " "
 
 

@@ -1,6 +1,6 @@
 #!/bin/sh
 while :
-do
+do 
 
     #try to get pid of process
     pid=$(pidof cosmosex)
@@ -14,14 +14,14 @@ do
         then
             echo "doing update"
 
-            chmod 777 /ce/update/doupdate.sh    # make the script executable
+            chmod +x /ce/update/doupdate.sh     # make the script executable
             /ce/update/doupdate.sh              # execute the update script, wait for finish
             rm -f /ce/update/doupdate.sh        # delete the update script
         fi
 
         # if we got here, there was an update or crash, so run the app!
         echo "restarting app"
-        /ce/app/cosmosex &                      # run the application on the background
+        /ce/app/cosmosex > /dev/null 2> /dev/null &     # run the application on the background
 
     else                        # if pid of process is not empty, process is running
 

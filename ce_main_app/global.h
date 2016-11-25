@@ -46,20 +46,7 @@
 #define HOSTMOD_TRANSLATED_DISK		3
 #define HOSTMOD_NETWORK_ADAPTER		4
 #define HOSTMOD_FDD_SETUP           5
-
-//////////////////////////////////////////////////////
-// commands for HOSTMOD_CONFIG
-#define CFG_CMD_IDENTIFY            0
-#define CFG_CMD_KEYDOWN             1
-#define CFG_CMD_SET_RESOLUTION      2
-#define CFG_CMD_REFRESH             0xfe
-#define CFG_CMD_GO_HOME             0xff
-
-#define CFG_CMD_LINUXCONSOLE_GETSTREAM  10
-
-// two values of a last byte of LINUXCONSOLE stream - more data, or no more data
-#define LINUXCONSOLE_NO_MORE_DATA   0x00
-#define LINUXCONSOLE_GET_MORE_DATA  0xda
+#define HOSTMOD_MEDIA_STREAMING		6
 
 //////////////////////////////////////////////////////
 // commands for HOSTMOD_TRANSLATED_DISK
@@ -72,44 +59,6 @@
 
 
 //////////////////////////////////////////////////////
-// commands for HOSTMOD_FDD_SETUP
-#define FDD_CMD_IDENTIFY                    0
-#define FDD_CMD_GETSILOCONTENT              1
-
-#define FDD_CMD_UPLOADIMGBLOCK_START        10
-#define FDD_CMD_UPLOADIMGBLOCK_FULL         11
-#define FDD_CMD_UPLOADIMGBLOCK_PART         12
-#define FDD_CMD_UPLOADIMGBLOCK_DONE_OK      13
-#define FDD_CMD_UPLOADIMGBLOCK_DONE_FAIL    14
-
-#define FDD_CMD_SWAPSLOTS                   20
-#define FDD_CMD_REMOVESLOT                  21
-#define FDD_CMD_NEW_EMPTYIMAGE              22
-#define FDD_CMD_GET_CURRENT_SLOT            25
-#define FDD_CMD_SET_CURRENT_SLOT            26
-#define FDD_CMD_GET_IMAGE_ENCODING_RUNNING  28
-
-#define FDD_CMD_DOWNLOADIMG_START           30
-#define FDD_CMD_DOWNLOADIMG_GETBLOCK        31
-#define FDD_CMD_DOWNLOADIMG_DONE            32
-#define FDD_CMD_DOWNLOADIMG_ONDEVICE        35
-
-#define FDD_CMD_SEARCH_INIT                 40      // call this to init the image search
-#define FDD_CMD_SEARCH_STRING               41      // search for a string, create vector of results
-#define FDD_CMD_SEARCH_RESULTS              42      // retrieve one page of results
-#define FDD_CMD_SEARCH_MARK                 43      // mark one image for download
-#define FDD_CMD_SEARCH_DOWNLOAD             45      // start / check the download process
-#define FDD_CMD_SEARCH_REFRESHLIST          48      // delete old image list, download a new one
-
-#define FDD_OK                              0
-#define FDD_ERROR                           2
-#define FDD_DN_LIST                         4
-#define FDD_DN_WORKING                      5
-#define FDD_DN_DONE                         6
-#define FDD_DN_NOTHING_MORE                 7
-#define FDD_RES_ONDEVICECOPY                0xDC
-
-//////////////////////////////////////////////////////
 // HDD interface types
 #define HDD_IF_ACSI     1
 #define HDD_IF_SCSI     2
@@ -119,6 +68,12 @@
 #define SCSI_MACHINE_FALCON     2
 
 //////////////////////////////////////////////////////
+
+typedef struct {
+    char serial  [20];
+    char revision[8];
+    char model   [40];
+} RPiConfig;
 
 typedef struct {
     int  version;               // returned from Hans: HW version (1 for HW from 2014, 2 for new HW from 2015)
@@ -137,6 +92,7 @@ typedef struct {
     bool getHwInfo;             // if set to true, wait for HW info from Hans, and then quit and report it
     bool noFranz;               // if set to true, won't communicate with Franz
     bool ikbdLogs;              // if set to true, will generate ikbd logs file
+    bool fakeOldApp;            // if set to true, will always return old app version, so you can test app installation over and over
     
     bool gotHansFwVersion;
     bool gotFranzFwVersion;

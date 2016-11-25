@@ -105,9 +105,9 @@ void TranslatedDisk::loadSettings(void)
     Settings s;
     char drive1, drive2, drive3;
 
-    drive1 = s.getChar((char *) "DRIVELETTER_FIRST",      -1);
-    drive2 = s.getChar((char *) "DRIVELETTER_SHARED",     -1);
-    drive3 = s.getChar((char *) "DRIVELETTER_CONFDRIVE",  'O');
+    drive1 = s.getChar("DRIVELETTER_FIRST",      -1);
+    drive2 = s.getChar("DRIVELETTER_SHARED",     -1);
+    drive3 = s.getChar("DRIVELETTER_CONFDRIVE",  'O');
 
     driveLetters.firstTranslated    = drive1 - 'A';
     driveLetters.shared             = drive2 - 'A';
@@ -120,7 +120,7 @@ void TranslatedDisk::loadSettings(void)
         driveLetters.readOnly = (1 << driveLetters.confDrive);              // make config drive read only
     }
     
-    useZipdirNotFile = s.getBool((char *) "USE_ZIP_DIR", 1);
+    useZipdirNotFile = s.getBool("USE_ZIP_DIR", 1);
 }
 
 void TranslatedDisk::reloadSettings(int type)
@@ -138,6 +138,7 @@ void TranslatedDisk::reloadSettings(int type)
         tmpConf[i].hostRootPath     = conf[i].hostRootPath;
         tmpConf[i].translatedType   = conf[i].translatedType;
         tmpConf[i].devicePath       = conf[i].devicePath;
+        tmpConf[i].label            = conf[i].label;
     }
 
     detachAll();                                // then deinit the conf structures
@@ -321,6 +322,7 @@ void TranslatedDisk::attachToHostPathByIndex(int index, std::string hostRootPath
     conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
     conf[index].translatedType      = translatedType;
     conf[index].mediaChanged        = true;
+    conf[index].label = Utils::getDeviceLabel(devicePath);
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::attachToHostPath - path %s attached to index %d (letter %c)", hostRootPath.c_str(), index, 'A' + index);
 }
@@ -351,6 +353,7 @@ void TranslatedDisk::detachByIndex(int index)
     conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
     conf[index].translatedType      = TRANSLATEDTYPE_NORMAL;
     conf[index].mediaChanged        = true;
+	conf[index].label.clear();
 	conf[index].dirTranslator.clear();
 }
 
@@ -495,6 +498,7 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case ST_LOG_TEXT:               onStLog(cmd);                   break;
         case TEST_READ:                 onTestRead(cmd);                break;
         case TEST_WRITE:                onTestWrite(cmd);               break;
+        case TEST_GET_ACSI_IDS:         onTestGetACSIids(cmd);          break;
 
         // in other cases
         default:                                // in other cases
@@ -539,8 +543,8 @@ void TranslatedDisk::onGetMounts(BYTE *cmd)
 	std::string mounts;
 	int index;
 
-	char *trTypeStr[4] = {(char *) "", (char *) "USB drive", (char *) "shared drive", (char *) "config drive"};
-	char *mountStr;
+	const char *trTypeStr[4] = {"", "USB drive", "shared drive", "config drive"};
+	const char *mountStr;
 
     for(int i=2; i<MAX_DRIVES; i++) {       // create enabled drive bits
         if(conf[i].enabled) {
@@ -550,12 +554,16 @@ void TranslatedDisk::onGetMounts(BYTE *cmd)
 		}
 
 		mountStr = trTypeStr[index];
-		sprintf(tmp, "%c: %s\n", ('A' + i), mountStr);
+		if(conf[i].label.empty()) {
+			sprintf(tmp, "%c: %s\n", ('A' + i), mountStr);
+		} else {
+			sprintf(tmp, "%c: %s (%s)\n", ('A' + i), conf[i].label.c_str(), mountStr);
+		}
 
 		mounts += tmp;
     }
 
-	dataTrans->addDataBfr(mounts.c_str(), mounts.length(), true);
+	dataTrans->addDataCString(mounts.c_str(), true);
 	dataTrans->setStatus(E_OK);
 }
 
@@ -659,11 +667,14 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     dc.sharedDrive       = driveLetters.shared;          // index of shared drive
     
     Settings s;
-    dc.settingsResolution   = s.getInt((char *) "SCREEN_RESOLUTION", 1);
-    
-    system("rm -f /tmp/configdrive/*.inf");             // remove any *.inf file
-    system("rm -f /tmp/configdrive/*.INF");             // remove any *.INF file, too
-    
+    dc.settingsResolution   = s.getInt("SCREEN_RESOLUTION", 1);
+    for(int i = 2; i < MAX_DRIVES; i++) {
+        dc.label[i] = conf[i].label;
+    }
+
+    //system("rm -f /tmp/configdrive/*.inf");             // remove any *.inf file
+    //system("rm -f /tmp/configdrive/*.INF");             // remove any *.INF file, too
+
     DesktopCreator::createToFile(&dc);                  // create the DESKTOP.INF / NEWDESK.INF file
 
     dataTrans->setStatus(E_OK);
@@ -685,8 +696,8 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     Settings s;
     bool    setDateTime;
     float   utcOffset;
-    setDateTime = s.getBool ((char *) "TIME_SET",        true);
-    utcOffset   = s.getFloat((char *) "TIME_UTC_OFFSET", 0);
+    setDateTime = s.getBool ("TIME_SET",        true);
+    utcOffset   = s.getFloat("TIME_UTC_OFFSET", 0);
 
     int iUtcOffset = (int) (utcOffset * 10.0);
 
@@ -719,7 +730,7 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     //------------------
 
 	//after sending screencast skip frameSkip frames
-    int frameSkip = s.getInt ((char *) "SCREENCAST_FRAMESKIP",        20);
+    int frameSkip = s.getInt ("SCREENCAST_FRAMESKIP",        20);
     dataTrans->addDataByte(frameSkip);                     		// byte 24 - frame skip for screencast
 
     //-----------------
@@ -750,7 +761,7 @@ bool TranslatedDisk::hostPathExists(std::string hostPath)
     return false;
 }
 
-bool TranslatedDisk::createFullAtariPathAndFullHostPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel)
+bool TranslatedDisk::createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel)
 {
     bool res;
 
@@ -777,24 +788,25 @@ bool TranslatedDisk::createFullAtariPath(std::string inPartialAtariPath, std::st
 {
     outAtariDriveIndex = -1;
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - inPartialAtariPath: %s", inPartialAtariPath.c_str());
+    //Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - inPartialAtariPath: %s", inPartialAtariPath.c_str());
 
     pathSeparatorAtariToHost(inPartialAtariPath);
     
     //---------------------
     // if it's full path including drive letter, outAtariDriveIndex is in the path
-    if(inPartialAtariPath[1] == ':') {                                       
+    if(inPartialAtariPath[1] == ':') {
         outAtariDriveIndex = driveLetterToDriveIndex(inPartialAtariPath[0]);   // check if we have this drive or not
 
         if(outAtariDriveIndex == -1) {
-            Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - invalid drive letter");
+            Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - invalid drive letter '%c' -- %s", inPartialAtariPath[0], inPartialAtariPath.c_str());
             return false;
         }
 
-        outFullAtariPath = inPartialAtariPath.substr(2);                             // required atari path is absolute path, without drive letter and ':' 
+        outFullAtariPath = inPartialAtariPath.substr(2);               // required atari path is absolute path, without drive letter and ':'
         
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - with    drive letter, absolute path -- %s, drive index: %d", outFullAtariPath.c_str(), outAtariDriveIndex);
-        goto createFullAtariPath_finish;
+        removeDoubleDots(outFullAtariPath);                            // search for '..' and simplify the path
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - with    drive letter, absolute path : %s, drive index: %d => %s", inPartialAtariPath.c_str(), outAtariDriveIndex, outFullAtariPath.c_str());
+        return true;
     }
 
     //---------------------
@@ -802,32 +814,27 @@ bool TranslatedDisk::createFullAtariPath(std::string inPartialAtariPath, std::st
     outAtariDriveIndex = currentDriveIndex;
 
     if(!conf[currentDriveIndex].enabled) {                          // we're trying this on disabled drive?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - the current drive is not enabled (not translated drive)");
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - the current drive %d is not enabled (not translated drive)", currentDriveIndex);
         return false;
     }
     
-    if(startsWith(inPartialAtariPath, HOSTPATH_SEPAR_STRING)) {              // starts with    backslash? absolute path on current drive
+    if(startsWith(inPartialAtariPath, HOSTPATH_SEPAR_STRING)) {         // starts with backslash? absolute path on current drive
         outFullAtariPath = inPartialAtariPath.substr(1);
+        removeDoubleDots(outFullAtariPath);                             // search for '..' and simplify the path
         
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - without drive letter, absolute path -- %s", inPartialAtariPath.c_str());
-        goto createFullAtariPath_finish;
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - without drive letter, absolute path : %s => %s ", inPartialAtariPath.c_str(), outFullAtariPath.c_str());
+        return true;
     } else {                                                        // starts without backslash? relative path on current drive
         outFullAtariPath = conf[currentDriveIndex].currentAtariPath;
         Utils::mergeHostPaths(outFullAtariPath, inPartialAtariPath);
+        removeDoubleDots(outFullAtariPath);                             // search for '..' and simplify the path
         
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - without drive letter, relative path -- %s", inPartialAtariPath.c_str());
-        goto createFullAtariPath_finish;
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - without drive letter, relative path : %s => %s", inPartialAtariPath.c_str(), outFullAtariPath.c_str());
+        return true;
     }
-    
-    //------------
-createFullAtariPath_finish:
-
-    removeDoubleDots(outFullAtariPath);                             // search for '..' and simplify the path
-    Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - outFullAtariPath is: %s", outFullAtariPath.c_str());
-    return true;
 }
 
-void TranslatedDisk::createFullHostPath(std::string inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel)
+void TranslatedDisk::createFullHostPath(const std::string &inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel)
 {
     waitingForMount     = false;
     zipDirNestingLevel  = 0;                                        // no ZIP DIR nesting atm

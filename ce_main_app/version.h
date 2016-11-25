@@ -10,6 +10,9 @@ class Version
 {
 public:
     static void getAppVersion(char *bfr);
+    
+    static void getRaspberryPiInfo(void);
+    static void readLineFromFile  (const char *filename, char *buffer, int maxLen, const char *defValue);
 
     Version();
     void fromString(char *str);

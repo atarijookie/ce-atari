@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <queue>
 #include <pty.h>
+#include <sys/file.h>
  
 #include "config/configstream.h"
 #include "settings.h"
@@ -39,18 +40,26 @@ void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
 void loadDefaultArgumentsFromFile(void);
 
-int     linuxConsole_fdMaster, linuxConsole_fdSlave;            // file descriptors for pty pair
+int     linuxConsole_fdMaster;                                  // file descriptors for linux console
 pid_t   childPid;                                               // pid of forked child
 
 void loadLastHwConfig(void);
-THwConfig hwConfig;                                             // info about the current HW setup
-
-TFlags flags;                                                   // global flags from command line
 void initializeFlags(void);
 
-extern SharedObjects shared;
+THwConfig           hwConfig;                           // info about the current HW setup
+TFlags              flags;                              // global flags from command line
+RPiConfig           rpiConfig;                          // RPi model, revision, serial
+InterProcessEvents  events;
+SharedObjects       shared;
 
-InterProcessEvents events;
+#ifdef DISTRO_YOCTO
+const char *distroString = "Yocto";
+#else
+const char *distroString = "Raspbian";
+#endif
+
+bool otherInstanceIsRunning(void);
+int pidFileFd;
 
 int main(int argc, char *argv[])
 {
@@ -82,8 +91,9 @@ int main(int argc, char *argv[])
     }
     
     loadLastHwConfig();                                         // load last found HW IF, HW version, SCSI machine
+
+    printf("CosmosEx main app starting on %s...\n", distroString);
     
-    printf("CosmosEx main app starting...\n");
     //------------------------------------
     // if not running as ce_conf, register signal handlers
     if(!flags.actAsCeConf) {                                        
@@ -98,23 +108,17 @@ int main(int argc, char *argv[])
 
     //------------------------------------
     // if this is not just a reset command AND not a get HW info command
-    if(!flags.justDoReset && !flags.getHwInfo) {                                
-        int ires = openpty(&linuxConsole_fdMaster, &linuxConsole_fdSlave, NULL, NULL, NULL);    // open PTY pair
+    if(!flags.justDoReset && !flags.getHwInfo) {
+        childPid = forkpty(&linuxConsole_fdMaster, NULL, NULL, NULL);
 
-        if(ires != -1) {                                                // if openpty() was OK  
-            childPid = fork();
+        if(childPid == 0) {                                         // code executed only by child
+            const char *shell = "/bin/sh";
+            execlp(shell, shell, (char *) NULL);
 
-            if(childPid == 0) {                                         // code executed only by child
-                dup2(linuxConsole_fdSlave, 0);
-                dup2(linuxConsole_fdSlave, 1);        
-                dup2(linuxConsole_fdSlave, 2);
-
-                const char *shell = "/bin/sh";
-                execlp(shell, shell, (char *) NULL);
-    
-                return 0;
-            }
-        }
+            return 0;
+        } 
+        
+        // parent (full app) continues here
     }
     
     //------------------------------------
@@ -155,9 +159,16 @@ int main(int argc, char *argv[])
     Debug::out(LOG_INFO, "\n\n---------------------------------------------------");
     Debug::out(LOG_INFO, "CosmosEx starting, version: %s", appVersion);
 
+    Version::getRaspberryPiInfo();                                  // fetch model, revision, serial of RPi
     Update::createNewScripts();                                     // update the scripts if needed
     
 //	system("sudo echo none > /sys/class/leds/led0/trigger");	    // disable usage of GPIO 23 (pin 16) by LED
+
+    if(otherInstanceIsRunning()) {
+        Debug::out(LOG_ERROR, "Other instance of CosmosEx is running, terminate it before starting a new one!");
+        printf("\nOther instance of CosmosEx is running, terminate it before starting a new one!\n\n\n");
+        return 0;
+    }
 
 	if(!gpio_open()) {									            // try to open GPIO and SPI on RPi
 		return 0;
@@ -291,6 +302,10 @@ int main(int argc, char *argv[])
     printf("Downloader clean up before quit\n");
     Downloader::cleanupBeforeQuit();
 
+    if(pidFileFd > 0) {                                 // if we got the PID file, close it
+        close(pidFileFd);
+    }
+    
     Debug::out(LOG_INFO, "CosmosEx terminated.");
     printf("Terminated\n");
     return 0;
@@ -317,6 +332,7 @@ void initializeFlags(void)
     flags.getHwInfo    = false;         // if set to true, wait for HW info from Hans, and then quit and report it
     flags.noFranz      = false;         // if set to true, won't communicate with Franz
     flags.ikbdLogs     = false;         // no ikbd logs by default
+    flags.fakeOldApp   = false;         // don't fake old app by default
     
     flags.gotHansFwVersion  = false;
     flags.gotFranzFwVersion = false;
@@ -443,12 +459,18 @@ void parseCmdLineArguments(int argc, char *argv[])
             flags.noFranz       = true;
         }
         
-        // run the device without communicating with Franz
+        // produce ikbd logs
         if(strcmp(argv[i], "ikbdlogs") == 0) {
             isKnownTag          = true;                             // this is a known tag
             flags.ikbdLogs      = true;
         }
-        
+
+        // should fake old app version? (for reinstall tests)
+        if(strcmp(argv[i], "fakeold") == 0) {
+            isKnownTag          = true;                             // this is a known tag
+            flags.fakeOldApp    = true;
+        }
+
         if(!isKnownTag) {                                           // if tag unknown, show warning
             printf(">>> UNKNOWN APP ARGUMENT: '%s' <<<\n", argv[i]);
         }
@@ -465,6 +487,7 @@ void printfPossibleCmdLineArgs(void)
     printf("ce_conf  - use this app as ce_conf on RPi (the app must be running normally, too)\n");
     printf("hwinfo   - get HW version and HDD interface type\n");
     printf("ikbdlogs - write IKBD logs to /var/log/ikbdlog.txt\n");
+    printf("fakeold  - fake old app version for reinstall tests\n");
 }
 
 void handlePthreadCreate(int res, char *threadName, pthread_t *pThread)
@@ -486,5 +509,25 @@ void sigint_handler(int sig)
         Debug::out(LOG_DEBUG, "Killing child with pid %d\n", childPid);
         kill(childPid, SIGKILL);
     }
+}
+
+bool otherInstanceIsRunning(void)
+{
+    // create pid file
+    pidFileFd = open("/var/run/cosmosex.pid", O_CREAT | O_RDWR, 0666);
+    
+    if(pidFileFd == -1) {   // failed to create pid file? other instance might be running
+        return true;
+    }
+    
+    // lock pid file - exclusive, non blocking
+    int res = flock(pidFileFd, LOCK_EX | LOCK_NB);
+    
+    if(res == -1) {     // failed to lock the file? other instance might be running
+        return true;
+    }
+    
+    // if came here, open and lock succeeded, no other instance is running
+    return false;
 }
 
