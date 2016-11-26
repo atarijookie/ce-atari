@@ -115,12 +115,12 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
             attachedMedia[index].hostPath       = hostPath;
             attachedMedia[index].hostSourceType = hostSourceType;
             attachedMedia[index].dataMedia      = dm;
-			
-			if(hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT) {				// for normal images - full access
-				attachedMedia[index].accessType	= SCSI_ACCESSTYPE_FULL;
-			} else {															// for translated boot image - read only
-				attachedMedia[index].accessType	= SCSI_ACCESSTYPE_READ_ONLY;
-			}
+
+            if(hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT) {                // for normal images - full access is allowed
+                attachedMedia[index].accessType    = accessType;
+            } else {                                                            // for translated boot image - read only
+                attachedMedia[index].accessType    = SCSI_ACCESSTYPE_READ_ONLY;
+            }
 
             attachedMedia[index].dataMediaDynamicallyAllocated = true;      // did use new on .dataMedia
         } else {                                                            // failed to open image?
