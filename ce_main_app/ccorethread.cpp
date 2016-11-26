@@ -482,16 +482,16 @@ void CCoreThread::handleAcsiCommand(void)
 
     module  = pCmd[3];                                  // get the host module ID
 
-	if(isIcd){
-        Debug::out(LOG_DEBUG, "handleAcsiCommand: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5], bufIn[6], bufIn[7], bufIn[8], bufIn[9], bufIn[10], bufIn[11], bufIn[12], bufIn[13]);
-	    Debug::out(LOG_DEBUG, "handleAcsiCommand isIcd");
-	} else {
+    if(isIcd){
+        Debug::out(LOG_DEBUG, "handleAcsiCommand: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x isIcd",
+                   bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5], bufIn[6], bufIn[7], bufIn[8], bufIn[9], bufIn[10], bufIn[11], bufIn[12], bufIn[13]);
+    } else {
         Debug::out(LOG_DEBUG, "handleAcsiCommand: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
     }
 
     // if it's the retry module (highest bit in HOSTMOD is set), let it go before the big switch for modules, 
     // because it will change the command and let it possibly run trough the correct module
-    if(module & 0x80) {                         // if it's a RETRY attempt...
+    if(justCmd == 0 && tag1 == 'C' && tag2 == 'E' && (module & 0x80) != 0) {                         // if it's a RETRY attempt...
         module = module & 0x7f;                 // remove RETRY bit from module
         
         if(!isIcd) {                            // short command?
