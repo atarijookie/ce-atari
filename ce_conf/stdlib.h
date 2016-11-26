@@ -12,5 +12,6 @@ void	sleep  (int seconds);
 void    showInt(int value, int length);
 
 DWORD getTicks(void);
+DWORD getTicksAsUser(void);
 
 #endif
