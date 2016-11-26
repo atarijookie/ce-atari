@@ -394,6 +394,25 @@ void Scsi::loadSettings(void)
             attachMediaToACSIid(i, attachedMedia[i].hostSourceType, attachedMedia[i].accessType);
         }
     }
+
+    std::string img;
+    img = s.getString("HDDIMAGE", "");
+    if(!img.empty()) {
+        int accessType = SCSI_ACCESSTYPE_FULL;
+        while(img[img.length()-1] == '\n' || img[img.length()-1] == ' ')
+            img.erase(img.length()-1);
+        size_t pos = img.find_last_of(' ');
+        if(pos != std::string::npos) {
+            std::string end = img.substr(pos+1);
+            if(end.compare("READ_ONLY") == 0 || end.compare("READONLY") == 0) {
+                accessType = SCSI_ACCESSTYPE_READ_ONLY;
+                img = img.substr(0, pos);
+            }
+        }
+        if(!attachToHostPath(img, SOURCETYPE_IMAGE, accessType)) {
+            Debug::out(LOG_ERROR, "Scsi::loadSettings fail to attach HDDIMAGE %s", img.c_str());
+        }
+    }
 }
 
 void Scsi::processCommand(BYTE *command)
