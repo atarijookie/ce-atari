@@ -1,15 +1,18 @@
-#include <stdio.h>
+// vim: tabstop=4 shiftwidth=4 expandtab
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+//#include <stdio.h>
 #include <string.h>
 
 #include "imagefilemedia.h"
 #include "../debug.h"
 
 ImageFileMedia::ImageFileMedia()
+: BCapacity(0), SCapacity(0), mediaHasChanged(0), fd(-1)
 {
-    BCapacity       = 0;
-    SCapacity       = 0;
-    mediaHasChanged = 0;
-    image           = NULL;
 }
 
 ImageFileMedia::~ImageFileMedia()
@@ -22,15 +25,16 @@ bool ImageFileMedia::iopen(const char *path, bool createIfNotExists)
     bool imageWasCreated = false;
     mediaHasChanged = false;
 
-    image = fopen(path, "rb+");                  // try to open existing file
+    // try to open existing file
+    fd = open(path, O_RDWR);	// O_RDWR / O_RDONLY ?  O_LARGEFILE
 
-    if(image == NULL && createIfNotExists) {     // failed to open existing file and should create one?
-        image = fopen(path, "wb+");
+    if(fd == -1 && createIfNotExists) {     // failed to open existing file and should create one?
+        fd = open(path, O_RDWR|O_CREAT, 0666);
         imageWasCreated = true;
     }
 
-    if(image == NULL) {
-        Debug::out(LOG_ERROR, "ImageFileMedia - failed to open %s", path);
+    if(fd == -1) {
+        Debug::out(LOG_ERROR, "ImageFileMedia - failed to open %s : %s", path, strerror(errno));
         return false;
     }
 
@@ -38,45 +42,45 @@ bool ImageFileMedia::iopen(const char *path, bool createIfNotExists)
         BYTE bfr[512];
         memset(bfr, 0, 512);
 
+        Debug::out(LOG_DEBUG, "ImageFileMedia - creating %s, filling with 1MB of 0",path);
         for(int i=0; i<2048; i++) {     // create 1 MB image
-            fwrite(bfr, 1, 512, image);
+            write(fd, bfr, 512);
         }
 
-        fflush(image);
+        fsync(fd);
     }
 
-    fseek(image, 0, SEEK_END);          // move to the end of file
-    DWORD cap = ftell(image);           // get the position in file (offset from start)
-
-    BCapacity = cap;                    // capacity in bytes
-    SCapacity = cap / 512;              // capacity in sectors
+    struct stat st;
+    if(fstat(fd, &st) < 0) {
+        Debug::out(LOG_ERROR, "fstat(%d) %s FAILED : %s", fd, path, strerror(errno));
+    } else {
+        BCapacity = st.st_size;                    // capacity in bytes
+        SCapacity = st.st_size / 512;              // capacity in sectors
+    }
 
     mediaHasChanged = false;
 
-    Debug::out(LOG_DEBUG, "ImageFileMedia - open succeeded, capacity: %d, was created: %d", BCapacity, (int) imageWasCreated);
+    Debug::out(LOG_DEBUG, "ImageFileMedia - open succeeded, capacity: %lld sectors / %lld bytes, was created: %d",
+               (long long)SCapacity, (long long)BCapacity, (int)imageWasCreated);
 
     return true;
 }
 
 void ImageFileMedia::iclose(void)
 {
-    if(image) {
-        fclose(image);
+    if(fd >= 0) {
+        close(fd);
     }
 
     BCapacity       = 0;
     SCapacity       = 0;
     mediaHasChanged = 0;
-    image           = NULL;
+    fd              = -1;
 }
 
 bool ImageFileMedia::isInit(void)
 {
-    if(image) {
-        return true;
-    }
-
-    return false;
+    return (fd >= 0);
 }
 
 bool ImageFileMedia::mediaChanged(void)
@@ -101,18 +105,26 @@ bool ImageFileMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
         return false;
     }
 
-    DWORD pos = sectorNo * 512;                 // convert sector # to offset in image file
-    DWORD res = fseek(image, pos, SEEK_SET);      // move to the end of file
+    off_t pos = sectorNo * 512;                 // convert sector # to offset in image file
+    off_t ofs = lseek(fd, pos, SEEK_SET);       // move to the end of file
 
-    if(res != 0) {                              // failed to fseek?
+    if(ofs != pos) {                              // failed to seek?
+        Debug::out(LOG_ERROR, "ImageFileMedia - lseek failed %lld %s", (long long)ofs, strerror(errno));
         return false;
     }
 
-    DWORD byteCount = count * 512;
-    res = fread(bfr, 1, byteCount, image);      // read
-
-    if(res != byteCount) {                      // not all data was read? fail
-        return false;
+    size_t byteCount = count * 512;
+    while(byteCount > 0) {
+        ssize_t res = read(fd, bfr, byteCount);
+        if(res < 0) {
+            Debug::out(LOG_ERROR, "ImageFileMedia - read error : %s", strerror(errno));
+            return false;
+        } else if(res == 0) {
+            Debug::out(LOG_ERROR, "ImageFileMedia - read returned 0 (byteCount=%llu)", (long long unsigned)byteCount);
+            return false;
+        }
+        byteCount -= res;
+        bfr += res;
     }
 
     return true;
@@ -124,18 +136,26 @@ bool ImageFileMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
         return false;
     }
 
-    DWORD pos = sectorNo * 512;                 // convert sector # to offset in image file
-    DWORD res = fseek(image, pos, SEEK_SET);    // move to the end of file
+    off_t pos = sectorNo * 512;                 // convert sector # to offset in image file
+    off_t ofs = lseek(fd, pos, SEEK_SET);       // move to the end of file
 
-    if(res != 0) {                              // failed to fseek?
+    if(ofs != pos) {                              // failed to seek?
+        Debug::out(LOG_ERROR, "ImageFileMedia - lseek failed %lld %s", ofs, strerror(errno));
         return false;
     }
 
-    DWORD byteCount = count * 512;
-    res = fwrite(bfr, 1, byteCount, image);     // write
-
-    if(res != byteCount) {                      // not all data was written? fail
-        return false;
+    size_t byteCount = count * 512;
+    while(byteCount > 0) {
+        ssize_t res = write(fd, bfr, byteCount);
+        if(res < 0) {
+            Debug::out(LOG_ERROR, "ImageFileMedia - write error : %s", strerror(errno));
+            return false;
+        } else if(res == 0) {
+            Debug::out(LOG_ERROR, "ImageFileMedia - write returned 0");
+            return false;
+        }
+        byteCount -= res;
+        bfr += res;
     }
 
     return true;

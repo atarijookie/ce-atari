@@ -24,12 +24,12 @@ public:
 
 private:
 
-    int64_t	BCapacity;			// device capacity in bytes
-    int64_t	SCapacity;			// device capacity in sectors
+    off_t	BCapacity;			// device capacity in bytes
+    off_t	SCapacity;			// device capacity in sectors
 
     bool    mediaHasChanged;
 
-    FILE *image;
+    int     fd;
 };
 
 #endif // _IMAGEFILEMEDIA_H_
