@@ -543,7 +543,7 @@ void TranslatedDisk::onGetMounts(BYTE *cmd)
 	std::string mounts;
 	int index;
 
-	const char *trTypeStr[4] = {"", "USB drive", "shared drive", "config drive"};
+	static const char *trTypeStr[4] = {"", "USB drive", "shared drive", "config drive"};
 	const char *mountStr;
 
     for(int i=2; i<MAX_DRIVES; i++) {       // create enabled drive bits
@@ -1569,14 +1569,27 @@ void TranslatedDisk::driveGetReport(int driveIndex, std::string &reportString)
 
   	int typeIndex  = conf[driveIndex].translatedType;
 
-	char tmp[256];
-    
     switch(typeIndex) {
-        case TRANSLATEDTYPE_NORMAL:         sprintf(tmp, "USB drive - device: %s",         conf[driveIndex].devicePath.c_str());    break;
-        case TRANSLATEDTYPE_SHAREDDRIVE:    sprintf(tmp, "shared drive, %s",               conf[driveIndex].devicePath.c_str());    break;
-        case TRANSLATEDTYPE_CONFIGDRIVE:    sprintf(tmp, "config drive (located at %s)",   conf[driveIndex].devicePath.c_str());    break;
-        default: sprintf(tmp, "unknown"); break;
+        case TRANSLATEDTYPE_NORMAL:
+            if(conf[driveIndex].label.empty())
+                reportString = "USB drive";
+            else {
+                reportString = conf[driveIndex].label;
+                reportString += " (USB drive)";
+            }
+            reportString += " - device: ";
+            reportString += conf[driveIndex].devicePath;
+            break;
+        case TRANSLATEDTYPE_SHAREDDRIVE:
+            reportString = "shared drive, ";
+            reportString += conf[driveIndex].devicePath;
+            break;
+        case TRANSLATEDTYPE_CONFIGDRIVE:
+            reportString = "config drive (located at ";
+            reportString += conf[driveIndex].devicePath;
+            reportString += ")";
+            break;
+        default:
+            reportString = "unknown";
     }
-        
-    reportString = tmp;
 }
