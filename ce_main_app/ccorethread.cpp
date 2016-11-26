@@ -31,7 +31,7 @@
     #include "socks.h"
 #endif
 
-#define DEV_CHECK_TIME_MS	    3000
+#define DEV_CHECK_TIME_MS       3000
 #define UPDATE_CHECK_TIME       1000
 #define INET_IFACE_CHECK_TIME   1000
 #define UPDATE_SCRIPTS_TIME     10000
@@ -63,7 +63,7 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     lastFloppyImageLed      = -1;
     newFloppyImageLedAfterEncode = -2;
     
-	conSpi		= new CConSpi();
+    conSpi        = new CConSpi();
     retryMod    = new RetryModule();
 
     dataTrans   = new AcsiDataTrans();
@@ -77,12 +77,12 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPYIMGS);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPYCONF);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPY_SLOT);
-	settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_TRANSLATED);
-	settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_SCSI_IDS);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_TRANSLATED);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_SCSI_IDS);
     
     settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.scsi,          SETTINGSUSER_ACSI);
 
-	settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.translated,    SETTINGSUSER_TRANSLATED);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.translated,    SETTINGSUSER_TRANSLATED);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.translated,    SETTINGSUSER_SHARED);
 
     // give floppy setup everything it needs
@@ -104,8 +104,8 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     // set up network adapter stuff
     netAdapter.setAcsiDataTrans(dataTrans);
 
-	// set up mediastreaming service
-	mediaStreaming.setTranslatedDisk(shared.translated);
+    // set up mediastreaming service
+    mediaStreaming.setTranslatedDisk(shared.translated);
 }
 
 CCoreThread::~CCoreThread()
@@ -127,7 +127,7 @@ void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyServi
     shared.scsi->attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
 
     shared.translated = new TranslatedDisk(dataTrans, configService, screencastService);
-	shared.translated->setSettingsReloadProxy(&settingsReloadProxy);
+    shared.translated->setSettingsReloadProxy(&settingsReloadProxy);
 
     //-----------
     // create config stream for ACSI interface
@@ -176,7 +176,7 @@ void CCoreThread::run(void)
 {
     BYTE inBuff[8], outBuf[8];
 
-	memset(outBuf, 0, 8);
+    memset(outBuf, 0, 8);
     memset(inBuff, 0, 8);
 
     loadSettings();
@@ -235,7 +235,7 @@ void CCoreThread::run(void)
     lastFwInfoTime.hansResetTime    = Utils::getCurrentMs();
     lastFwInfoTime.franzResetTime   = Utils::getCurrentMs();
 
-	bool res;
+    bool res;
     
     DWORD nextFloppyEncodingCheck   = Utils::getEndTime(1000);
     bool prevFloppyEncodingRunning  = false;
@@ -243,7 +243,7 @@ void CCoreThread::run(void)
     LoadTracker load;
 
     while(sigintReceived == 0) {
-		bool gotAtn = false;						                    // no ATN received yet?
+        bool gotAtn = false;                                            // no ATN received yet?
         
         // if should just get the HW version and HDD interface, but timeout passed, quit
         if(flags.getHwInfo && Utils::getCurrentMs() >= getHwInfoTimeout) {
@@ -308,7 +308,7 @@ void CCoreThread::run(void)
                 
                     Debug::out(LOG_INFO, "No answer from Hans or Franz, will quit app, hopefully app restart will solve this.");
                     Debug::out(LOG_INFO, "If not, and this will happen in a loop, consider writing chips firmware again.");
-					sigintReceived = 1;
+                    sigintReceived = 1;
                 } else {
                     Debug::out(LOG_DEBUG, "Got answers from both Hans and Franz :)");
                 }
@@ -337,21 +337,21 @@ void CCoreThread::run(void)
         
 #if !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
         // check for any ATN code waiting from Hans
-		res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);
+        res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);
 
-		if(res) {									    // HANS is signaling attention?
-			gotAtn = true;							    // we've some ATN
+        if(res) {    // HANS is signaling attention?
+            gotAtn = true;  // we've some ATN
 
-			switch(inBuff[3]) {
-			case ATN_FW_VERSION:
+            switch(inBuff[3]) {
+                case ATN_FW_VERSION:
                     statuses.hans.aliveTime = now;
                     statuses.hans.aliveSign = ALIVE_FWINFO;
 
                     lastFwInfoTime.hans = Utils::getCurrentMs();
                     handleFwVersion_hans();
-				break;
+                    break;
 
-			case ATN_ACSI_COMMAND:
+                case ATN_ACSI_COMMAND:
                     dbgVars.isInHandleAcsiCommand = 1;
                     
                     statuses.hdd.aliveTime  = now;
@@ -363,13 +363,13 @@ void CCoreThread::run(void)
                     handleAcsiCommand();
                     
                     dbgVars.isInHandleAcsiCommand = 0;
-				break;
+                break;
 
-			default:
-				Debug::out(LOG_ERROR, (char *) "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
-				break;
-			}
-		}
+            default:
+                Debug::out(LOG_ERROR, "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
+                break;
+            }
+        }
 #endif
 
         if(events.insertSpecialFloppyImageId != 0) {                       // very stupid way of letting web IF to insert special image
@@ -393,17 +393,17 @@ void CCoreThread::run(void)
             res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuff);
         }
         
-		if(res) {									// FRANZ is signaling attention?
-			gotAtn = true;							// we've some ATN
+        if(res) {                                    // FRANZ is signaling attention?
+            gotAtn = true;                            // we've some ATN
 
-			switch(inBuff[3]) {
-			case ATN_FW_VERSION:                    // device has sent FW version
+            switch(inBuff[3]) {
+            case ATN_FW_VERSION:                    // device has sent FW version
                 statuses.franz.aliveTime = now;
                 statuses.franz.aliveSign = ALIVE_FWINFO;
 
                 lastFwInfoTime.franz = Utils::getCurrentMs();
-				handleFwVersion_franz();
-				break;
+                handleFwVersion_franz();
+                break;
 
             case ATN_SECTOR_WRITTEN:                // device has sent written sector data
                 statuses.fdd.aliveTime   = now;
@@ -415,29 +415,29 @@ void CCoreThread::run(void)
                 handleSectorWritten();
                 break;
 
-			case ATN_SEND_TRACK:                    // device requests data of a whole track
+            case ATN_SEND_TRACK:                    // device requests data of a whole track
                 statuses.franz.aliveTime = now;
                 statuses.franz.aliveSign = ALIVE_READ;
             
                 statuses.fdd.aliveTime   = now;
                 statuses.fdd.aliveSign   = ALIVE_READ;
 
-				handleSendTrack();
-				break;
+                handleSendTrack();
+                break;
 
-			default:
-				Debug::out(LOG_ERROR, (char *) "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
-				break;
-			}
-		}
+            default:
+                Debug::out(LOG_ERROR, (char *) "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
+                break;
+            }
+        }
 #else
     flags.gotFranzFwVersion = true;
 #endif
         load.busy.markEnd();                        // mark the end of the busy part of the code
 
-		if(!gotAtn) {								// no ATN was processed?
-			Utils::sleepMs(1);						// wait 1 ms...
-		}
+        if(!gotAtn) {                                // no ATN was processed?
+            Utils::sleepMs(1);                        // wait 1 ms...
+        }
     }
 }
 
@@ -465,8 +465,8 @@ void CCoreThread::handleAcsiCommand(void)
     BYTE isIcd = false;
     BYTE wasHandled = false;
 
-    BYTE acsiId = bufIn[0] >> 5;                        	// get just ACSI ID
-    if(acsiIdInfo.acsiIDdevType[acsiId] == DEVTYPE_OFF) {	// if this ACSI ID is off, reply with error and quit
+    BYTE acsiId = bufIn[0] >> 5;                            // get just ACSI ID
+    if(acsiIdInfo.acsiIDdevType[acsiId] == DEVTYPE_OFF) {    // if this ACSI ID is off, reply with error and quit
         dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
         dataTrans->sendDataAndStatus();
         return;
@@ -613,15 +613,15 @@ void CCoreThread::reloadSettings(int type)
         return;
     }
     
-	// first dettach all the devices
+    // first dettach all the devices
     pthread_mutex_lock(&shared.mtxScsi);
-	shared.scsi->detachAll();
+    shared.scsi->detachAll();
     pthread_mutex_unlock(&shared.mtxScsi);
     
-	// then load the new settings
+    // then load the new settings
     loadSettings();
 
-	// and now try to attach everything back
+    // and now try to attach everything back
     shared.devFinder_look = true;
 }
 
@@ -630,7 +630,7 @@ void CCoreThread::loadSettings(void)
     Debug::out(LOG_DEBUG, "CCoreThread::loadSettings");
 
     Settings s;
-	s.loadAcsiIDs(&acsiIdInfo);
+    s.loadAcsiIDs(&acsiIdInfo);
     s.loadFloppyConfig(&floppyConfig);
 
     shared.mountRawNotTrans = s.getBool((char *) "MOUNT_RAW_NOT_TRANS", 0);
@@ -644,7 +644,7 @@ void CCoreThread::loadSettings(void)
 void CCoreThread::handleFwVersion_hans(void)
 {
     BYTE fwVer[14], oBuf[14];
-	int cmdLength;
+    int cmdLength;
 
     memset(oBuf,    0, 14);                                         // first clear the output buffer
     memset(fwVer,   0, 14);
@@ -749,7 +749,7 @@ void CCoreThread::handleFwVersion_hans(void)
 void CCoreThread::handleFwVersion_franz(void)
 {
     BYTE fwVer[14], oBuf[14];
-	int cmdLength;
+    int cmdLength;
 
     memset(oBuf,    0, 14);                                         // first clear the output buffer
     memset(fwVer,   0, 14);
@@ -1002,7 +1002,7 @@ void CCoreThread::handleSendTrack(void)
     int side    = iBuf[0];                      // now read the current floppy position
     int track   = iBuf[1];
 
-    int remaining   = 15000 - (4*2) - 2;		// this much bytes remain to send after the received ATN
+    int remaining   = 15000 - (4*2) - 2;        // this much bytes remain to send after the received ATN
 
     int tr, si, spt;
     floppyImageSilo.getParams(tr, si, spt);      // read the floppy image params
@@ -1116,8 +1116,8 @@ void CCoreThread::deleteSettingAndSetNetworkToDhcp(void)
     system("rm -f /ce/settings/*");
     
     // get the network settings
-	NetworkSettings ns;
-	ns.load();						// load the current values     
+    NetworkSettings ns;
+    ns.load();                      // load the current values
     ns.eth0.dhcpNotStatic   = true; // force DHCP on eth0
     ns.wlan0.dhcpNotStatic  = true; // force DHCP on wlan0
     ns.save();                      // save those settings
