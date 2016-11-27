@@ -105,6 +105,11 @@ bool ImageFileMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
         return false;
     }
 
+    if(sectorNo >= SCapacity) {
+        Debug::out(LOG_ERROR, "ImageFileMedia::readSectors(%lld) after end of disk : total # of sectors = %lld",
+                   (long long)sectorNo, (long long)SCapacity);
+        return false;
+    }
     off_t pos = sectorNo * 512;                 // convert sector # to offset in image file
     off_t ofs = lseek(fd, pos, SEEK_SET);       // move to the end of file
 
@@ -133,6 +138,11 @@ bool ImageFileMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 bool ImageFileMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
     if(!isInit()) {                             // if not initialized, failed
+        return false;
+    }
+    if(sectorNo >= SCapacity) {
+        Debug::out(LOG_ERROR, "ImageFileMedia::writeSectors(%lld) after end of disk : total # of sectors = %lld",
+                   (long long)sectorNo, (long long)SCapacity);
         return false;
     }
 
