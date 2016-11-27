@@ -1,3 +1,4 @@
+// vim: expandtab shiftwidth=4 tabstop=4
 #ifndef _CONFIGSTREAM_H_
 #define _CONFIGSTREAM_H_
 
@@ -17,11 +18,12 @@
 class AcsiDataTrans;
 
 enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED,
-                 CS_CREATE_FLOPPY_CONF, CS_CREATE_IKBD,
+                 CS_CREATE_FLOPPY_CONF, CS_CREATE_IKBD,         CS_CREATE_HDDIMAGE,
                  CS_CREATE_NETWORK,     CS_CREATE_UPDATE,       CS_CREATE_OTHER,
                  CS_SAVE_ACSI,          CS_SAVE_TRANSLATED,     CS_SAVE_NETWORK,
+                 CS_HDDIMAGE_SAVE,
                  CS_HIDE_MSG_SCREEN,    CS_GO_HOME,
-                 CS_UPDATE_CHECK,       CS_UPDATE_CHECK_USB,    CS_UPDATE_UPDATE,       
+                 CS_UPDATE_CHECK,       CS_UPDATE_CHECK_USB,    CS_UPDATE_UPDATE,
                  CS_SHARED_TEST,        CS_SHARED_SAVE,
                  CS_FLOPPY_IMAGE_SAVE,  CS_FLOPPY_CONFIG_SAVE,
                  CS_OTHER_SAVE,         CS_RESET_SETTINGS,      CS_SEND_SETTINGS,
@@ -45,6 +47,7 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
                 COMPID_UPDATE_FRANZ,        COMPID_UPDATE_HANZ,             COMPID_UPDATE_XILINX,
                 COMPID_UPDATE_BTN_CHECK,    COMPID_UPDATE_BTN_CHECK_USB,    COMPID_SHARED_BTN_TEST,     
 				
+                COMPID_HDDIMAGE_PATH,
 				COMPID_SHARED_IP,           COMPID_SHARED_PATH, 		COMPID_SHARED_ENABLED, 
 				COMPID_SHARED_NFS_NOT_SAMBA,    COMPID_USERNAME,        COMPID_PASSWORD,
 
@@ -97,6 +100,7 @@ public:
     void createScreen_translated(void);
     void createScreen_network(void);
     void createScreen_update(void);
+    void createScreen_hddimage(void);
     void createScreen_shared(void);
     void createScreen_floppy_config(void);
     void createScreen_other(void);
@@ -161,6 +165,8 @@ private:
     void datesToStrings(Version &v1, Version &v2, std::string &str);
     void createScreen_update_download(void);
     void getProgressLine(int index, std::string &lines, std::string &line);
+
+    void onHddImageSave(void);
 
     void onSharedTest(void);
     void onSharedSave(void);

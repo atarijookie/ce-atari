@@ -1,3 +1,4 @@
+// vim: expandtab shiftwidth=4 tabstop=4
 #include <stdio.h>
 #include <string.h>
 
@@ -698,6 +699,7 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_GO_HOME:            createScreen_homeScreen();      break;
     case CS_CREATE_ACSI:        createScreen_acsiConfig();      break;
     case CS_CREATE_TRANSLATED:  createScreen_translated();      break;
+    case CS_CREATE_HDDIMAGE:    createScreen_hddimage();        break;
     case CS_CREATE_SHARED:      createScreen_shared();          break;
     case CS_CREATE_FLOPPY_CONF: createScreen_floppy_config();   break;
     case CS_CREATE_NETWORK:     createScreen_network();         break;
@@ -721,6 +723,7 @@ void ConfigStream::enterKeyHandler(int event)
     
     case CS_SEND_SETTINGS:      onSendSettings();           break;
 
+    case CS_HDDIMAGE_SAVE:      onHddImageSave();           break;
 //  case CS_SHARED_TEST:        onSharedTest();             break;
     case CS_SHARED_SAVE:        onSharedSave();             break;
 
