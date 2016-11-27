@@ -397,14 +397,14 @@ void Scsi::loadSettings(void)
 
     std::string img;
     img = s.getString("HDDIMAGE", "");
+    while(!img.empty() && (img[img.length()-1] == '\n' || img[img.length()-1] == ' '))
+        img.erase(img.length()-1);
     if(!img.empty()) {
         int accessType = SCSI_ACCESSTYPE_FULL;
-        while(img[img.length()-1] == '\n' || img[img.length()-1] == ' ')
-            img.erase(img.length()-1);
         size_t pos = img.find_last_of(' ');
         if(pos != std::string::npos) {
             std::string end = img.substr(pos+1);
-            if(end.compare("READ_ONLY") == 0 || end.compare("READONLY") == 0) {
+            if(end.compare("READ_ONLY") == 0 || end.compare("READONLY") == 0 || end.compare("RO") == 0) {
                 accessType = SCSI_ACCESSTYPE_READ_ONLY;
                 img = img.substr(0, pos);
             }
