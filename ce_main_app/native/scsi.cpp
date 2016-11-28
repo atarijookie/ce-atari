@@ -436,7 +436,7 @@ void Scsi::processCommand(BYTE *command)
     dataTrans->clear();                 // clean data transporter before handling
 
     if(dataMedia == 0) {
-        Debug::out(LOG_ERROR, "Scsi::processCommand was called without valid dataMedia, will return error CHECK CONDITION");
+        Debug::out(LOG_ERROR, "Scsi::processCommand was called without valid dataMedia, will return error CHECK CONDITION acsiId=%d attachedMediaIndex=%d", acsiId, attachedMediaIndex);
         dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
         dataTrans->sendDataAndStatus();
         return;
