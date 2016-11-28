@@ -6,6 +6,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
 #include <errno.h>
 
 #include <signal.h>
@@ -206,6 +209,21 @@ bool Mounter::mountShared(const char *host, const char *hostDir, bool nfsNotSamb
 	char source[MAX_STR_SIZE];
 	int len;
         
+    //Workaround: do not mount NFS if no network interface is up - NFS tends to hog the CPU almost completely until an interface is present 
+    //see: https://github.com/atarijookie/ce-atari/issues/87
+    if( nfsNotSamba && !checkIfUp( "eth0" ) && !checkIfUp( "wlan0" ) )	{
+		char logpath[128];
+		Debug::out(LOG_DEBUG, "Mounter::mountShared -- No network, not doing anything.", source);
+		snprintf(logpath, sizeof(logpath), "%s/mount.err", mountDir);
+		FILE * flog = fopen(logpath, "wb");
+		if(flog) {
+			fprintf(flog, "mount() not done - awaiting network.\r\n");
+			fclose(flog);
+		}
+
+		return false;
+	}    
+        
     if(strlen(username) == 0) {             // no user name? 
         if(nfsNotSamba) {                   // for NFS - don't specify auth
             memset(auth, 0, MAX_STR_SIZE);
@@ -240,7 +258,7 @@ bool Mounter::mountShared(const char *host, const char *hostDir, bool nfsNotSamb
 			return false;
 		}
         
-		len = snprintf(options, MAX_STR_SIZE, "gid=%d,forcegid,uid=%d,forceuid%s",
+		len = snprintf(options, MAX_STR_SIZE, "gid=%d,forcegid,uid=%d,forceuid%s,_netdev",
 		               psw->pw_gid, psw->pw_uid, auth);
 	}
 
@@ -518,6 +536,37 @@ bool Mounter::wlan0IsPresent(void)
 
   	Debug::out(LOG_DEBUG, "Mounter::wlan0IsPresent() -- wlan0 is present\n");
     return true;                                                                // ifconfig contains wlan0, so we got wlan0
+}
+
+/*
+Check if interface with given name is up & running
+*/
+bool Mounter::checkIfUp( const char* ifname )
+{
+	struct ifreq ifr;
+	
+	int dummy_fd = socket( AF_INET, SOCK_DGRAM, 0 );
+	if( dummy_fd<0 )
+	{
+    	Debug::out(LOG_DEBUG, "Mounter::checkIfUp() -- no dummy socket\n");
+		return false;
+	}
+	memset( &ifr, 0, sizeof(ifr) );
+	strcpy( ifr.ifr_name, ifname );
+	
+	if( ioctl( dummy_fd, SIOCGIFFLAGS, &ifr ) != -1 )
+	{
+	    close(dummy_fd);
+	    bool up_and_running = (ifr.ifr_flags & ( IFF_UP | IFF_RUNNING )) == ( IFF_UP | IFF_RUNNING );
+	    return up_and_running; 
+	}
+	else
+	{
+	    close(dummy_fd);
+    	Debug::out(LOG_DEBUG, "Mounter::checkIfUp() -- error\n");
+	    // error
+	    return false;
+	}
 }
 
 void Mounter::sync(void)                        // just do sync on filesystem
