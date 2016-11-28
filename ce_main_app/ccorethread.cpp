@@ -134,6 +134,7 @@ void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyServi
     shared.configStream.acsi = new ConfigStream(CONFIGSTREAM_ON_ATARI);
     shared.configStream.acsi->setAcsiDataTrans(dataTrans);
     shared.configStream.acsi->setSettingsReloadProxy(&settingsReloadProxy);
+    shared.configStream.acsi->setTranslatedDisk(shared.translated);
     
     // create config stream for web interface
     shared.configStream.dataTransWeb    = new AcsiDataTrans();

@@ -15,6 +15,7 @@
 #define CONFIGSTREAM_IN_LINUX_CONSOLE   1
 #define CONFIGSTREAM_THROUGH_WEB        2
 
+class TranslatedDisk;
 class AcsiDataTrans;
 
 enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED,
@@ -122,8 +123,10 @@ public:
     void onCheckboxGroupEnter(int groupId, int checkboxId);
 
     void enterKeyHandlerLater(int event);
-    
+
+    void setTranslatedDisk(TranslatedDisk *td) { this->translated = td; };
 private:
+    // properties
     int shownOn;
 
     StupidVector screen;
@@ -138,7 +141,9 @@ private:
     
     AcsiDataTrans       *dataTrans;
     SettingsReloadProxy *reloadProxy;
+    TranslatedDisk      *translated;
 
+    // private methods
     void onKeyDown(BYTE key);
     int  getStream(bool homeScreen, BYTE *bfr, int maxLen);
 
@@ -191,6 +196,8 @@ private:
     
     int  filterVT100(char *bfr, int cnt);
     void atariKeyToConsoleKey(BYTE atariKey, char *bfr, int &cnt);
+    // Set values
+    void onSetCfgValue(void);
 };
 
 #endif
