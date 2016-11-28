@@ -68,6 +68,7 @@ private:
 	
 	bool mountDumpContains(const char *searchedString);
     bool wlan0IsPresent(void);
+	bool checkIfUp( const char* ifname );
 
     void copyTextFileToLog(const char *path);
 };
