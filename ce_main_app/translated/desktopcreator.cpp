@@ -110,7 +110,7 @@ char *DesktopCreator::storeExecutables(char *bfr, DesktopConfig *dc)
         bfr = storeFloppyImageLauncher(bfr, dc);
 
         bfr = storeMediaPlayers(bfr, dc);
-        
+
         *bfr = 0x1a;
         bfr++;
     } else {
@@ -137,6 +137,9 @@ char *DesktopCreator::storeFloppyImageLauncher(char *bfr, DesktopConfig *dc)
     sprintf(tmp, "#G 03 04   %c:\\CE_FDD.TTP@ *.MSA@ \r\n", 'A' + dc->configDrive);
     strcpy(bfr, tmp);
     bfr += strlen(bfr);
+
+	// add app for mounting .IMG hard disk images
+	bfr += sprintf(bfr, "#G 03 04   %c:\\CE_HDIMG.TTP@ *.IMG@ \r\n", 'A' + dc->configDrive);
 
     return bfr;
 }
