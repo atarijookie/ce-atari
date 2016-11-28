@@ -249,14 +249,13 @@ void Scsi::detachMediaFromACSIidByIndex(int index)
     }
 
     int attMediaInd = devInfo[index].attachedMediaIndex;
-    attachedMedia[ attMediaInd ].devInfoIndex = -1;                   // set not attached in attached media
-
     if(    attachedMedia[attMediaInd].dataMediaDynamicallyAllocated) { // if dataMedia was creates using new, use delete
         if(attachedMedia[ attMediaInd ].dataMedia != NULL) {
             delete attachedMedia[ attMediaInd ].dataMedia;            // delete the data source access object
             attachedMedia[ attMediaInd ].dataMedia = NULL;
         }
     }
+    initializeAttachedMediaVars(attMediaInd);
 
     devInfo[index].attachedMediaIndex   = -1;                       // set not attached in dev info
     devInfo[index].accessType           = SCSI_ACCESSTYPE_NO_DATA;
