@@ -17,6 +17,7 @@
 #include "vt52.h"
 
 //--------------------------------------------------
+void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 
 void showHomeScreen(void);
 void sendKeyDown(BYTE key, BYTE keyDownCommand);
@@ -61,15 +62,12 @@ int main(void)
 {
     BYTE key, res;
     DWORD toEven;
-    void *OldSP;
     BYTE keyDownCommand = CFG_CMD_KEYDOWN;
     DWORD lastUpdateCheckTime = 0;
 
     ceIsUpdating        = FALSE;
     isUpdateScreen      = FALSE;
     updateComponents    = 0;
-    
-    OldSP = (void *) Super((void *)0);                              // supervisor mode  
     
     prevCommandFailed = 0;
     
@@ -90,7 +88,6 @@ int main(void)
     res = Supexec(findDevice);
 
     if(res != TRUE) {
-        Super((void *)OldSP);                                       // user mode 
         return 0;
     }
     
@@ -98,7 +95,6 @@ int main(void)
     // if the device is CosmoSolo, go this way
     if(cosmosExNotCosmoSolo == FALSE) {
         cosmoSoloConfig();
-        Super((void *)OldSP);                                       // user mode 
         return 0;
     }
     
@@ -109,11 +105,11 @@ int main(void)
     setResolution();                                                // send the current ST resolution for screen centering 
     showHomeScreen();                                               // get the home screen 
     
-    DWORD lastShowStreamTime = getTicks();                          // when was the last time when we got some config stream?
+    DWORD lastShowStreamTime = getTicksAsUser();                    // when was the last time when we got some config stream?
     
     while(1) {
         if(isUpdateScreen) {
-            DWORD now = getTicks();
+            DWORD now = getTicksAsUser();
             
             if(now >= (lastUpdateCheckTime + 200)) {                // if last check was at least a second ago, do new check
                 lastUpdateCheckTime = now;
@@ -129,9 +125,10 @@ int main(void)
         key = getKeyIfPossible();                                   // see if there's something waiting from keyboard 
         
         if(key == 0) {                                              // nothing waiting from keyboard? 
-            DWORD now = getTicks();
+            DWORD now   = getTicksAsUser();
+            DWORD diff  = now - lastShowStreamTime;
             
-            if((now - lastShowStreamTime) > 200) {                  // last time the stream was shown was (at least) one second ago? do refresh...
+            if(diff > 200) {                  // last time the stream was shown was (at least) one second ago? do refresh...
                 sendKeyDown(0, keyDownCommand);                     // display a new stream (if something changed) 
 
                 lastShowStreamTime = now;                           // we just shown the stream, no need for refresh
@@ -152,7 +149,7 @@ int main(void)
                 refreshScreen();                                    // refresh the screen
             }
             
-            lastShowStreamTime = getTicks();                        // we just shown the stream, no need for refresh
+            lastShowStreamTime = getTicksAsUser();                  // we just shown the stream, no need for refresh
             continue;
         }
         
@@ -162,15 +159,14 @@ int main(void)
         
         if(key == KEY_F5 && keyDownCommand == CFG_CMD_KEYDOWN) {    // should refresh? and are we on the config part, not the linux console part? 
             refreshScreen();
-            lastShowStreamTime = getTicks();                        // we just shown the stream, no need for refresh
+            lastShowStreamTime = getTicksAsUser();                  // we just shown the stream, no need for refresh
             continue;
         }
         
         sendKeyDown(key, keyDownCommand);                           // send this key to device
-        lastShowStreamTime = getTicks();                            // we just shown the stream, no need for refresh
+        lastShowStreamTime = getTicksAsUser();                      // we just shown the stream, no need for refresh
     }
     
-    Super((void *)OldSP);                                           // user mode 
     return 0;
 }
 //--------------------------------------------------
@@ -183,7 +179,7 @@ void sendKeyDown(BYTE key, BYTE keyDownCommand)
   
     memset(pBuffer, 0, 512);                        // clear the buffer 
   
-    (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the KEYDOWN command and show the screen stream 
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, 3);           // issue the KEYDOWN command and show the screen stream 
     
     if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
         showConnectionErrorMessage();
@@ -219,7 +215,7 @@ void showMoreStreamIfNeeded(void)
     
         memset(pBuffer, 0, 3 * 512);                    // clear the buffer 
   
-        (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the KEYDOWN command and show the screen stream 
+        hdIfCmdAsUser(1, cmd, 6, pBuffer, 3);           // issue the KEYDOWN command and show the screen stream 
     
         if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
             return;
@@ -236,7 +232,7 @@ void showHomeScreen(void)
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     memset(pBuffer, 0, 512);                        // clear the buffer 
   
-    (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the GO_HOME command and show the screen stream 
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, 3);             // issue the GO_HOME command and show the screen stream 
     
     if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
         showConnectionErrorMessage();
@@ -268,7 +264,7 @@ BYTE showHomeScreenSimple(void)
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     memset(pBuffer, 0, 512);                        // clear the buffer 
   
-    (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the GO_HOME command and show the screen stream 
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, 3);           // issue the GO_HOME command and show the screen stream 
     
     if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
         return FALSE;
@@ -287,7 +283,7 @@ void refreshScreen(void)
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     memset(pBuffer, 0, 512);                        // clear the buffer 
   
-    (*hdIf.cmd)(1, cmd, 6, pBuffer, 3);             // issue the REFRESH command and show the screen stream 
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, 3);           // issue the REFRESH command and show the screen stream 
     
     if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
         showConnectionErrorMessage();
@@ -306,7 +302,7 @@ BYTE setResolution(void)
     cmd[5] = Getrez();
     memset(pBuffer, 0, 512);                        // clear the buffer 
   
-    (*hdIf.cmd)(1, cmd, 6, pBuffer, 1);              // issue the SET RESOLUTION command 
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);           // issue the SET RESOLUTION command 
     
     if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
         return FALSE;
@@ -402,7 +398,7 @@ BYTE retrieveIsUpdating(void)
     cmd[0] = (deviceID << 5);                       // cmd[0] = ACSI_id + TEST UNIT READY (0)   
     memset(pBuffer, 0, 512);                        // clear the buffer 
   
-    (*hdIf.cmd)(1, cmd, 6, pBuffer, 1);             // issue UPDATING QUERY command
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);           // issue UPDATING QUERY command
     
     if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
         return FALSE;
@@ -452,7 +448,7 @@ void cosmoSoloConfig(void)
         
         cmd[0] = (deviceID << 5);                           // cmd[0] = ACSI_id + TEST UNIT READY (0)   
   
-        (*hdIf.cmd)(ACSI_READ, cmd, 6, pBuffer, 1);
+        hdIfCmdAsUser(ACSI_READ, cmd, 6, pBuffer, 1);
         
         if(!hdIf.success || hdIf.statusByte == OK) {
             (void) Cconws("\n\rNew ID was successfully set.\n\r");
@@ -512,25 +508,39 @@ void showFakeProgress(void)
     (void) Cconws(">>> Do NOT turn the device off! <<<\n\r\n\r");
     VT52_Rev_off();
     
+    const char *titleUpdateApp      = "Updating app    ( 5 s): ";
+    const char *titleUpdateXilinx   = "Updating Xilinx (50 s): ";
+    const char *titleUpdateHans     = "Updating Hans   (10 s): ";
+    const char *titleUpdateFranz    = "Updating Franz  (10 s): ";
+    const char *titleRestartingApp  = "Restarting app  (15 s): ";
+
+    // first show titles, so user will know how long it will all take and what will be updated
+    if(updatingApp)     { (void) Cconws(titleUpdateApp);        (void) Cconws("\r\n"); }
+    if(updatingXilinx)  { (void) Cconws(titleUpdateXilinx);     (void) Cconws("\r\n"); }
+    if(updatingHans)    { (void) Cconws(titleUpdateHans);       (void) Cconws("\r\n"); }
+    if(updatingFranz)   { (void) Cconws(titleUpdateFranz);      (void) Cconws("\r\n"); }
+                          (void) Cconws(titleRestartingApp);    
+    VT52_Goto_pos(0, 3);
+    
     // now possibly wait for each component to be done
     if(updatingApp) {
-        showFakeProgressOfItem("Updating app    ( 5 s): ", 5);
+        showFakeProgressOfItem(titleUpdateApp, 5);
     }
 
     if(updatingXilinx) {
-        showFakeProgressOfItem("Updating Xilinx (50 s): ", 50);
+        showFakeProgressOfItem(titleUpdateXilinx, 50);
     }
 
     if(updatingHans) {
-        showFakeProgressOfItem("Updating Hans   (10 s): ", 10);
+        showFakeProgressOfItem(titleUpdateHans, 10);
     }
 
     if(updatingFranz) {
-        showFakeProgressOfItem("Updating Franz  (10 s): ", 10);
+        showFakeProgressOfItem(titleUpdateFranz, 10);
     }
 
     // everything installed, but main app needs to start and possibly update script
-    showFakeProgressOfItem("Restarting app  (15 s): ", 15);
+    showFakeProgressOfItem(titleRestartingApp, 15);
     
     // we're done, try to reconnect.
     (void) Cconws("\r\nIf everything went well,\r\nwill connect back soon.\r\n");
@@ -568,8 +578,8 @@ BYTE getKeyIfPossible(void)
     if(res == 0) {                              // nothing waiting from keyboard?
         return 0;
     }
-
-    scancode = Bconin(DEV_CONSOLE);             // get char form keyboard, no echo on screen 
+    
+    scancode = Cnecin();                        // get char form keyboard, no echo on screen 
 
     vkey    = (scancode>>16)    & 0xff;
     key     =  scancode         & 0xff;
@@ -578,3 +588,27 @@ BYTE getKeyIfPossible(void)
     return key;
 }
 //--------------------------------------------------
+// global variables, later used for calling hdIfCmdAsSuper
+BYTE __readNotWrite, __cmdLength;
+WORD __sectorCount;
+BYTE *__cmd, *__buffer;
+
+void hdIfCmdAsSuper(void)
+{
+    // this should be called through Supexec()
+    (*hdIf.cmd)(__readNotWrite, __cmd, __cmdLength, __buffer, __sectorCount);
+}
+
+void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+{
+    // store params to global vars
+    __readNotWrite  = readNotWrite;
+    __cmd           = cmd;
+    __cmdLength     = cmdLength;
+    __buffer        = buffer;
+    __sectorCount   = sectorCount;    
+    
+    // call the function which does the real work, and uses those global vars
+    Supexec(hdIfCmdAsSuper);
+}
+

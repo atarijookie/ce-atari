@@ -117,6 +117,12 @@ DWORD getTicks(void)
 	return now;
 }
 
+DWORD getTicksAsUser(void)
+{
+    DWORD res = Supexec(getTicks);
+    return res;
+}
+
 int countIntDigits(int value)
 {
     int i, div = 10;
