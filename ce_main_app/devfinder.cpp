@@ -156,7 +156,7 @@ void DevFinder::getDevPartitions(std::string devName, std::list<std::string> &pa
 	partitions.sort();												// sort them alphabetically
     
     if(partitions.size() == 0) {                                    // if we didn't find partitions on that device (e.g. sda1, sda2), then add the whole disk (sda) - it might be without partitions, just one partition
-        Debug::out(LOG_DEBUG, "DevFinder::getDevPartitions -- no partitions found on the device %s, using whole device...", (char *) devName.c_str()); 
+        Debug::out(LOG_DEBUG, "DevFinder::getDevPartitions -- no partitions found on the device %s, using whole device...", devName.c_str());
         partitions.push_back(devName);
     }
 }
@@ -172,7 +172,7 @@ void DevFinder::processFoundDev(std::string file)
 		
 		bool atariDrive = isAtariDrive(file);
 		
-		Debug::out(LOG_DEBUG, "device attached: %s, is atari drive: %d", (char *) file.c_str(), atariDrive);		// write out
+		Debug::out(LOG_DEBUG, "device attached: %s, is atari drive: %d", file.c_str(), atariDrive);		// write out
 
 		onDevAttached(file, atariDrive);
 	} else {														// have this device? just mark it as found again
@@ -222,7 +222,7 @@ void DevFinder::findAndSignalDettached(void)
 			del = it;														// delete dev in next step
 			someDevChanged = true;
 			
-			Debug::out(LOG_DEBUG, "device detached: %s", (char *) it->first.c_str());
+			Debug::out(LOG_DEBUG, "device detached: %s", it->first.c_str());
 
 			onDevDetached(it->first);
 		}
@@ -242,7 +242,7 @@ bool DevFinder::isAtariDrive(std::string file)
 	std::string fullPath = "/dev/" + file;
 	char bfr[512];
 	
-	int fdes = open((char *) fullPath.c_str(), O_RDONLY);					// try to open the device
+	int fdes = open(fullPath.c_str(), O_RDONLY);					// try to open the device
 
 	if (fdes < 0) {															// failed to open?
 		return false;
@@ -297,7 +297,7 @@ bool DevFinder::isAtariPartitionType(char *bfr)
 
 void DevFinder::onDevAttached(std::string devName, bool isAtariDrive)
 {
-	Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached: devName %s", (char *) devName.c_str());
+	Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached: devName %s", devName.c_str());
 
     pthread_mutex_lock(&shared.mtxScsi);
     pthread_mutex_lock(&shared.mtxTranslated);
@@ -368,7 +368,7 @@ void DevFinder::attachDevAsTranslated(std::string devName)
 		res = shared.translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL, partitionDevice);   // try to attach
 
 		if(!res) {																// if didn't attach, skip the rest
-			Debug::out(LOG_ERROR, "attachDevAsTranslated: failed to attach %s", (char *) mountPath.c_str());
+			Debug::out(LOG_ERROR, "attachDevAsTranslated: failed to attach %s", mountPath.c_str());
 			continue;
 		}
 

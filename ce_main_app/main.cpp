@@ -35,7 +35,7 @@
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
 
-void handlePthreadCreate(int res, char *threadName, pthread_t *pThread);
+void handlePthreadCreate(int res, const char *threadName, pthread_t *pThread);
 void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
 void loadDefaultArgumentsFromFile(void);
@@ -223,27 +223,27 @@ int main(int argc, char *argv[])
     core = new CCoreThread(pxDateService,pxFloppyService,pxScreencastService);
 
 	int res = pthread_create(&mountThreadInfo, NULL, mountThreadCode, NULL);	// create mount thread and run it
-	handlePthreadCreate(res, (char *) "ce mount", &mountThreadInfo);
+	handlePthreadCreate(res, "ce mount", &mountThreadInfo);
 
     res = pthread_create(&downloadThreadInfo, NULL, downloadThreadCode, NULL);  // create download thread and run it
-	handlePthreadCreate(res, (char *) "ce download", &downloadThreadInfo);
+	handlePthreadCreate(res, "ce download", &downloadThreadInfo);
 
 #ifndef ONPC_NOTHING
     res = pthread_create(&ikbdThreadInfo, NULL, ikbdThreadCode, NULL);			// create the keyboard emulation thread and run it
-	handlePthreadCreate(res, (char *) "ce ikbd", &ikbdThreadInfo);
+	handlePthreadCreate(res, "ce ikbd", &ikbdThreadInfo);
 #endif
 
     res = pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL);	// create the floppy encoding thread and run it
-	handlePthreadCreate(res, (char *) "ce floppy encode", &floppyEncThreadInfo);
+	handlePthreadCreate(res, "ce floppy encode", &floppyEncThreadInfo);
 
     res = pthread_create(&timesyncThreadInfo, NULL, timesyncThreadCode, NULL);  // create the timesync thread and run it
-	handlePthreadCreate(res, (char *) "ce time sync", &timesyncThreadInfo);
+	handlePthreadCreate(res, "ce time sync", &timesyncThreadInfo);
 
     res = pthread_create(&networkThreadInfo, NULL, networkThreadCode, NULL);    // create the network thread and run it
-	handlePthreadCreate(res, (char *) "ce network", &networkThreadInfo);
+	handlePthreadCreate(res, "ce network", &networkThreadInfo);
 
     res = pthread_create(&periodicThreadInfo, NULL, periodicThreadCode, NULL);  // create the periodic thread and run it
-	handlePthreadCreate(res, (char *) "periodic", &periodicThreadInfo);
+	handlePthreadCreate(res, "periodic", &periodicThreadInfo);
     
     printf("Entering main loop...\n");
     
@@ -490,7 +490,7 @@ void printfPossibleCmdLineArgs(void)
     printf("fakeold  - fake old app version for reinstall tests\n");
 }
 
-void handlePthreadCreate(int res, char *threadName, pthread_t *pThread)
+void handlePthreadCreate(int res, const char *threadName, pthread_t *pThread)
 {
     if(res != 0) {
         Debug::out(LOG_ERROR, "Failed to create %s thread, %s won't work...", threadName, threadName);

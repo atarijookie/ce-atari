@@ -154,10 +154,10 @@ bool TimeSync::syncByNtp(void)
 void TimeSync::refreshNetworkDateNtp(void) 
 {
   Settings settings;
-  std::string ntpServer = settings.getString((char *) "TIME_NTP_SERVER", (char *) "200.20.186.76");
+  std::string ntpServer = settings.getString("TIME_NTP_SERVER", "200.20.186.76");
 
   char hostname[64];
-  strcpy(hostname, (char *) ntpServer.c_str());
+  strcpy(hostname, ntpServer.c_str());
 
   eInitState = INIT_NTP_FAILED;
   

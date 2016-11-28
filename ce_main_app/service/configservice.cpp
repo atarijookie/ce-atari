@@ -35,7 +35,7 @@ long ConfigService::getTime()
 {
     Settings s;
     float   utcOffset;
-    utcOffset   = s.getFloat((char *) "TIME_UTC_OFFSET", 0);
+    utcOffset   = s.getFloat("TIME_UTC_OFFSET", 0);
 
     int iSecondsOffset = (int) (utcOffset * 10.0 ) * 60*60;
 
