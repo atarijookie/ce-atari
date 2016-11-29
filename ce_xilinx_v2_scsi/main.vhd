@@ -3,20 +3,19 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
-
 -- commands which trigger REQ
 -- XPIO XMSG XRnW XDMA
---    0    0    0    ^    - PIO transfer - CMD          "000"
---    0    0    1    ^    - PIO transfer - STATUS       "001"
---    1    0    0    ^    - DMA transfer - DMA OUT      "100"
---    1    0    1    ^    - DMA transfer - DMA IN       "101"
---    0    1    0    ^    - MSG transfer - MSG OUT      "010"
---    0    1    1    ^    - MSG transfer - MSG IN       "011"
+--    0    0    0    ^    - PIO transfer - CMD          "000^"
+--    0    0    1    ^    - PIO transfer - STATUS       "001^"
+--    1    0    0    ^    - DMA transfer - DMA OUT      "100^"
+--    1    0    1    ^    - DMA transfer - DMA IN       "101^"
+--    0    1    0    ^    - MSG transfer - MSG OUT      "010^"
+--    0    1    1    ^    - MSG transfer - MSG IN       "011^"
 
 -- commands which DON'T trigger REQ
 -- XPIO XMSG XRnW XDMA
---    1    1    0    1    - RESET    (write)            "110"
---    1    1    1    1    - Identify (read)             "111"
+--    1    1    0    1    - Identify (write)            "1101"
+--    1    1    1    1    - RESET    (read)             "1111"
 
 entity main is
     Port ( 
@@ -103,8 +102,8 @@ architecture Behavioral of main is
     signal softReset     : std_logic;
 begin
 
-    identify   <= XPIO and XMSG and      XRnW  and XDMA and TXSEL1n2;  -- when TXSEL1n2 selects Franz (='1') and internalCmd is set to Identify and XMDA is high, then you can read the identification byte from DATA2
-    softReset  <= XPIO and XMSG and (not XRnW) and XDMA;               -- soft reset
+    identify   <= XPIO and XMSG and (not XRnW) and XDMA and TXSEL1n2;  -- when TXSEL1n2 selects Franz (='1') and internalCmd is set to Identify and XMDA is high, then you can read the identification byte from DATA2
+    softReset  <= XPIO and XMSG and (    XRnW) and XDMA;               -- soft reset
     resetCombo <= SRST and reset_hans and (not softReset);             -- when one of these reset signals is low, the result is low
 
     nSelection <= not ((not SEL) and BSYa);     -- selection is when SEL is 0 and BSY is 1. nSelection is inverted selection, because DATA1latch is captured on falling edge

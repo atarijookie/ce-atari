@@ -3,6 +3,33 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
+-- commands which trigger REQ
+-- XPIO XRnW XDMA
+--    0    0    ^    - PIO transfer - CMD          "00^"
+--    0    1    ^    - PIO transfer - STATUS       "01^"
+--    1    0    ^    - DMA transfer - DMA OUT      "10^"
+--    1    1    ^    - DMA transfer - DMA IN       "11^"
+
+-- commands which DON'T trigger REQ
+-- XPIO  XRnW XDMA
+--    1    0    1    - Identify (write)             "101"
+--    1    1    1    - RESET    (read)              "111"
+
+
+-- DMA OUT vs Identify:
+-- set XPIO to 1
+-- set XRnW to 0
+-- set XDMA to 1, this rising_edge(XDMA) will cause to start the DRQ + ACK DMA sequence - this is start of DMA 
+-- while XPIO and XDMA is 1, you can read status byte - this is Identify
+-- set XDMA to 0, you can read the DATA1latch if XRnW = 0
+-- thus reading status byte will always result in one DMA phase, but can be reset 
+
+-- DMA IN vs Reset:
+-- set XPIO to 1 
+-- set XRnW to 1
+-- set XDMA to 1, this rising_edge(XDMA) will cause to start the DRQ + ACK DMA sequence - this is start of DMA
+-- while XPIO, XDMA and XRnW is 1, the softReset is 1, and thus will terminate the above DRQ + ACK sequence - should softReset be removed from ACSI? 
+
 entity main is
     Port ( 
         -- signals connected to MCU
@@ -63,7 +90,6 @@ architecture Behavioral of main is
     signal latchClock: std_logic;
     signal resetCombo: std_logic;
     signal identify  : std_logic;
-    signal identifyS : std_logic;
     
     signal ACS       : std_logic;
     signal AA1       : std_logic;
@@ -77,14 +103,11 @@ architecture Behavioral of main is
     signal softReset : std_logic;
     
 begin
-    identify   <= XPIO and XDMA and TXSEL1n2;           -- when TXSEL1n2 selects Franz (='1') and you have PIO and DMA pins high, then you can read the identification byte from DATA2
-    identifyS  <= identify and HDD_IF;                  -- active when IDENTIFY and it's SCSI hardware
-    softReset  <= identify and XRnW;                    -- soft reset is done when it's IDENTIFY, but in READ direction (normally should be in WRITE direction)
-      
-
-    XCMD <= ACS or AA1 or (not ARESET);                 -- CMD - falling edge here will tell that CS with A1 low has been found (and ACSI RESET has to be high at that time)
-      
+    identify   <= XPIO and XDMA and (not XRnW) and TXSEL1n2;    -- when TXSEL1n2 selects Franz (='1') and you have PIO and DMA pins high, then you can read the identification byte from DATA2
+    softReset  <= XPIO and XDMA and (    XRnW);                 -- soft reset is done when it's IDENTIFY, but in READ direction (normally should be in WRITE direction)
     resetCombo <= ARESET and reset_hans and (not softReset);    -- when one of these reset signals is low, the result is low
+      
+    XCMD <= ACS or AA1 or (not ARESET);                         -- CMD - falling edge here will tell that CS with A1 low has been found (and ACSI RESET has to be high at that time)
            
     -- these are here to create single signal from double input pins, which should have the same value
     ACS     <= ACSa    and ACSb;
@@ -92,28 +115,23 @@ begin
     AACK    <= AACKa   and AACKb;
     ARESET  <= ARESETa and ARESETb; 
     ARNW    <= ARNWa   and ARNWb;
+
+    latchClock <= ACS and AACK;                         -- need this only to be able to react on falling edge of both CS and ACK
            
     -- D flip-flop with asynchronous reset 
     -- pull INT low after rising edge of PIO, let it in hi-Z after reset or low on CS
     -- DMA pin has to be low when toggling PIO hi and low
     PIOrequest: process(XPIO, XDMA, latchClock, resetCombo) is
     begin
-        if (latchClock = '0' or resetCombo = '0') then
+        if (latchClock = '0' or resetCombo = '0') then  -- if reset condition, reset these signals
             INTstate <= '1';
-        elsif (rising_edge(XPIO) and (XDMA = '0')) then
-            INTstate <= '0';
-        end if;
-    end process;
-
-    -- D flip-flop with asynchronous reset 
-    -- pull DRQ low after rising edge of DMA, let it in hi-Z after reset or low on ACK
-    -- PIO pin has to be low when toggling DMA hi and low
-    DMArequest: process(XDMA, XPIO, latchClock, resetCombo) is
-    begin
-        if (latchClock = '0' or resetCombo = '0') then
             DRQstate <= '1';
-        elsif (rising_edge(XDMA) and (XPIO = '0')) then
-            DRQstate <= '0';
+        elsif (rising_edge(XDMA)) then                  -- rising edge of XDMA
+            if (XPIO = '0') then                        -- when XPIO is L, it's PIO transfer
+                INTstate <= '0';
+            else                                        -- when XPIO is H, it's DMA transfer
+                DRQstate <= '0';
+            end if;
         end if;
     end process;
 
@@ -125,8 +143,6 @@ begin
             DATA1latch <= DATA1a;
         end if;
     end process;
-
-    latchClock <= ACS and AACK;                         -- need this only to be able to react on falling edge of both CS and ACK
 
     AINTa <= '0' when INTstate='0' else 'Z';            -- INT - pull to L, otherwise hi-Z
     AINTb <= '0' when INTstate='0' else 'Z';            -- INT - pull to L, otherwise hi-Z
@@ -141,7 +157,7 @@ begin
     statusReg(6) <= '0';
     statusReg(5) <= '1';            -- - 10 means HW v.2
     statusReg(4) <= '0';            -- / 
-    statusReg(3) <= identifyS;      -- when this is '1' -- BAD : when identify condition met, this identifies the XILINX and HW revision (0010 - HW rev 2, 1 - it's ACSI HW, 001 - ACSI Xilinx FW)
+    statusReg(3) <= HDD_IF;         -- when this is '1' -- BAD : when identify condition met, this identifies the XILINX and HW revision (0010 - HW rev 2, 1 - it's ACSI HW, 001 - ACSI Xilinx FW)
     statusReg(2) <= '0';            -- \
     statusReg(1) <= '0';            -- --- 001 = ACSI Xilinx FW
     statusReg(0) <= '1';            -- / 
