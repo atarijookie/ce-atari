@@ -269,6 +269,26 @@ int main(void)
     return 0;
 }
 
+BYTE showQuestionGetBool(const char *question)
+{
+    // show question
+    (void) Cconws(question);
+
+    while(1) {
+        BYTE key = Cnecin();
+
+        if(key == 'y' || key == 'Y') {          // yes
+            (void) Cconws(" YES\r\n");
+            return 1;
+        }
+
+        if(key == 'n' || key == 'N') {          // no
+            (void) Cconws(" NO\r\n");
+            return 0;
+        }
+    }
+}
+
 void scsi_reset(void);
 
 BYTE getSDcardId(void)
@@ -299,13 +319,17 @@ void testContinousRead(BYTE testReadNotSDcard)
     VT52_Wrap_on();
     (void) Cconws("Continous read without data checking\r\n");
 
+    BYTE pauseUntilKeypressAfterFail    = showQuestionGetBool("On fail - pause until key pressed? Y/N");
+    BYTE doScsiResetAfterFail           = showQuestionGetBool("On fail - do SCSI reset?           Y/N");
+    BYTE showGoodResultAsterisk         = showQuestionGetBool("Show asterisk after good result?   Y/N");
+
     hdIf.maxRetriesCount = 0;                           // disable retries
 
     BYTE sdReadCmd[CMD_LENGTH_SHORT] = {0, 0, 0, 0, 0, 0};
-    
+
     if(testReadNotSDcard) {                             // should do test on CE generated data?
         (void) Cconws("Data source: Raspberry Pi\r\n");
-        
+
         DWORD byteCount = ((DWORD) MAXSECTORS) << 9;    // convert sector count to byte count ( sc * 512 )
 
         commandLong[4+1] = TEST_READ;
@@ -343,34 +367,46 @@ void testContinousRead(BYTE testReadNotSDcard)
     (void) Cconws("Press 'Q' to quit.\r\n");
     
     while(1) {
+        if(Cconis() != 0) {                         // if some key is waiting
+            BYTE key = Cnecin();
+
+            if(key == 'q' || key == 'Q') {
+                break;
+            }
+
+            if(key == 'r' || key == 'R') {
+                scsi_reset();
+                continue;
+            }
+        }
+
         if(testReadNotSDcard) {     // should do test on CE generated data?
             (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, MAXSECTORS);    // issue the command and check the result
         } else {                    // should do test on SD card?
             DWORD randomSectorNo = getTicks();
-        
+
             sdReadCmd[2] = (BYTE) (randomSectorNo >> 8);    // sector # high
             sdReadCmd[3] = (BYTE) (randomSectorNo     );    // sector # low
-        
+
             (*hdIf.cmd) (ACSI_READ, sdReadCmd, CMD_LENGTH_SHORT, rBuffer, MAXSECTORS);      // issue the command and check the result
         }
 
         if(!hdIf.success || hdIf.statusByte != 0) { // failed?
+            if(doScsiResetAfterFail) {
+                scsi_reset();
+            }
+
             (void) Cconws("_");
+
+            if(pauseUntilKeypressAfterFail) {
+                (void) Cconws("\r\nCMD failed, press any key to continue.\r\n");
+                Cnecin();
+            }
+
             continue;
         } else {                                    // everything OK
-            (void) Cconws("*");
-        }
-        
-        if(Cconis() != 0) {                         // if some key is waiting
-            BYTE key = Cnecin();
-            
-            if(key == 'q' || key == 'Q') {
-                break;
-            }
-            
-            if(key == 'r' || key == 'R') {
-                scsi_reset();
-                continue;                
+            if(showGoodResultAsterisk) {
+                (void) Cconws("*");
             }
         }
     }
