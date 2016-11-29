@@ -8,10 +8,10 @@ use IEEE.STD_LOGIC_UNSIGNED.ALL;
 -- XPIO XMSG XRnW XDMA
 --    0    0    0    ^    - PIO transfer - CMD          "000"
 --    0    0    1    ^    - PIO transfer - STATUS       "001"
---    0    1    0    ^    - DMA transfer - DMA OUT      "010"
---    0    1    1    ^    - DMA transfer - DMA IN       "011"
---    1    0    0    ^    - MSG transfer - MSG OUT      "100"
---    1    0    1    ^    - MSG transfer - MSG IN       "101"
+--    1    0    0    ^    - DMA transfer - DMA OUT      "100"
+--    1    0    1    ^    - DMA transfer - DMA IN       "101"
+--    0    1    0    ^    - MSG transfer - MSG OUT      "010"
+--    0    1    1    ^    - MSG transfer - MSG IN       "011"
 
 -- commands which DON'T trigger REQ
 -- XPIO XMSG XRnW XDMA
@@ -145,8 +145,8 @@ begin
         elsif (rising_edge(REQtrig)) then               -- if REQ trig goes hi
             BSYsignal   <= '0';                         -- we're BSY
             IOsignal    <= not XRnW;                    -- set I/O - low on IN, hi on OUT
-            CDsignal    <=     ((not XPIO) and (    XMSG));   -- set C/D - low on CMD and MSG, hi on DATA ("01x")
-            MSGsignal   <= not ((    XPIO) and (not XMSG));   -- set MSG - low on MSG IN/OUT ("10x"), otherwise hi
+            CDsignal    <=     ((    XPIO) and (not XMSG));   -- set C/D - low on CMD and MSG, hi on DATA ("10x")
+            MSGsignal   <= not ((not XPIO) and (    XMSG));   -- set MSG - low on MSG IN/OUT ("01x"), otherwise hi
         end if;
     end process;
 
