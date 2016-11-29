@@ -3,6 +3,21 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
+
+-- commands which trigger REQ
+-- XPIO XMSG XRnW XDMA
+--    0    0    0    ^    - PIO transfer - CMD          "000"
+--    0    0    1    ^    - PIO transfer - STATUS       "001"
+--    0    1    0    ^    - DMA transfer - DMA OUT      "010"
+--    0    1    1    ^    - DMA transfer - DMA IN       "011"
+--    1    0    0    ^    - MSG transfer - MSG OUT      "100"
+--    1    0    1    ^    - MSG transfer - MSG IN       "101"
+
+-- commands which DON'T trigger REQ
+-- XPIO XMSG XRnW XDMA
+--    1    1    0    1    - RESET    (write)            "110"
+--    1    1    1    1    - Identify (read)             "111"
+
 entity main is
     Port ( 
         -- signals connected to MCU
@@ -73,8 +88,6 @@ architecture Behavioral of main is
 
     signal d1out         : std_logic;
     
-    signal identifyA     : std_logic;
-
     signal nSelection    : std_logic;
     signal lathClock     : std_logic;
 
@@ -88,19 +101,16 @@ architecture Behavioral of main is
 
     signal statusReg     : std_logic_vector(7 downto 0);
     signal softReset     : std_logic;
-
 begin
 
-    identify   <= XPIO and XDMA and TXSEL1n2;   -- when TXSEL1n2 selects Franz (='1') and you have PIO and DMA pins high, then you can read the identification byte from DATA2
-    identifyA  <= identify and (not HDD_IF);    -- active when IDENTIFY and it's ACSI hardware
-    softReset  <= identify and XRnW;            -- soft reset is done when it's IDENTIFY, but in READ direction (normally should be in WRITE direction)
+    identify   <= XPIO and XMSG and      XRnW  and XDMA and TXSEL1n2;  -- when TXSEL1n2 selects Franz (='1') and internalCmd is set to Identify and XMDA is high, then you can read the identification byte from DATA2
+    softReset  <= XPIO and XMSG and (not XRnW) and XDMA;               -- soft reset
+    resetCombo <= SRST and reset_hans and (not softReset);             -- when one of these reset signals is low, the result is low
 
     nSelection <= not ((not SEL) and BSYa);     -- selection is when SEL is 0 and BSY is 1. nSelection is inverted selection, because DATA1latch is captured on falling edge
     XCMD       <= nSelection or (not SRST);     -- falling edge means target selection (SRST must be 1, otherwise ignored)
 
-    resetCombo <= SRST and reset_hans and (not softReset);   -- when one of these reset signals is low, the result is low
-
-    REQtrig    <= XPIO xor XDMA xor XMSG;       -- REQ trig should go hi only when one of these (not 2, not 3) go hi
+    REQtrig    <= XDMA and (XPIO nand XMSG);    -- REQ trig should go hi only when XDMA is 1, and XPIO and XMSG are not both 1 (nand) (they might be 00, 01, 10, but not 11)
 
     captureAndDelay: process(clk, REQtrig, SACK) is  -- delaying process
     begin
@@ -135,8 +145,8 @@ begin
         elsif (rising_edge(REQtrig)) then               -- if REQ trig goes hi
             BSYsignal   <= '0';                         -- we're BSY
             IOsignal    <= not XRnW;                    -- set I/O - low on IN, hi on OUT
-            CDsignal    <= XDMA;                        -- set C/D - low on CMD and MSG, hi on DATA
-            MSGsignal   <= not XMSG;                    -- set MSG - low on MSG IN/OUT, otherwise hi
+            CDsignal    <=     ((not XPIO) and (    XMSG));   -- set C/D - low on CMD and MSG, hi on DATA ("01x")
+            MSGsignal   <= not ((    XPIO) and (not XMSG));   -- set MSG - low on MSG IN/OUT ("10x"), otherwise hi
         end if;
     end process;
 
@@ -177,11 +187,11 @@ begin
     DATA1b(0) <= '0' when ((d1out='1') and (DATA2(0)='1')) else 'Z';
 
     -- create status register, which consists of fixed values (HW ver 2, SCSI Xilinx FW), and current values - HW/FW mismatch, BSY low or high
-    statusReg(7) <= BSYsignal;      -- BSY signal - 0 means we're still busy!
+    statusReg(7) <= BSYsignal and IOsignal and CDsignal and MSGsignal;  -- if all these are 1, we're idle; otherwise we're still busy
     statusReg(6) <= '0';
     statusReg(5) <= '1';            -- - 10 means HW v.2
     statusReg(4) <= '0';            -- / 
-    statusReg(3) <= identifyA;      -- when this is '1' -- BAD : when identify condition met, this identifies the XILINX and HW revision (0010 - HW rev 2, 1 - it's ACSI HW, 010 - SCSI Xilinx FW)
+    statusReg(3) <= (not HDD_IF);   -- when this is '1' -- BAD : when identify condition met, this identifies the XILINX and HW revision (0010 - HW rev 2, 1 - it's ACSI HW, 010 - SCSI Xilinx FW)
     statusReg(2) <= '0';            -- \
     statusReg(1) <= '1';            -- --- 010 = SCSI Xilinx FW
     statusReg(0) <= '0';            -- / 
