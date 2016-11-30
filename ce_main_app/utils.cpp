@@ -217,19 +217,19 @@ bool Utils::copyFile(std::string &src, std::string &dst)
 {
     FILE *from, *to;
 
-    from = fopen((char *) src.c_str(), "rb");               // open source file
+    from = fopen(src.c_str(), "rb");               // open source file
 
     if(!from) {
-        Debug::out(LOG_ERROR, "Utils::copyFile - failed to open source file %s", (char *) src.c_str());
+        Debug::out(LOG_ERROR, "Utils::copyFile - failed to open source file %s", src.c_str());
         return false;
     }
 
-    to = fopen((char *) dst.c_str(), "wb");                 // open destrination file
+    to = fopen(dst.c_str(), "wb");                 // open destrination file
 
     if(!to) {
         fclose(from);
 
-        Debug::out(LOG_ERROR, "Utils::copyFile - failed to open destination file %s", (char *) dst.c_str());
+        Debug::out(LOG_ERROR, "Utils::copyFile - failed to open destination file %s", dst.c_str());
         return false;
     }
 
@@ -245,10 +245,10 @@ bool Utils::copyFile(FILE *from, std::string &dst)
 {
     FILE *to;
 
-    to = fopen((char *) dst.c_str(), "wb");                 // open destrination file
+    to = fopen(dst.c_str(), "wb");                 // open destrination file
 
     if(!to) {
-        Debug::out(LOG_ERROR, "Utils::copyFile - failed to open destination file %s", (char *) dst.c_str());
+        Debug::out(LOG_ERROR, "Utils::copyFile - failed to open destination file %s", dst.c_str());
         return false;
     }
 
@@ -419,7 +419,7 @@ void Utils::createTimezoneString(char *str)
 {
     Settings  s;
     float     utcOffset;
-    utcOffset = s.getFloat((char *) "TIME_UTC_OFFSET", 0);          // read UTC offset from settings
+    utcOffset = s.getFloat("TIME_UTC_OFFSET", 0);          // read UTC offset from settings
 
     char  signChar;
     int   ofsHours, ofsMinutes;

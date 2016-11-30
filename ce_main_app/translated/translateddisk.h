@@ -254,7 +254,7 @@ private:
     void detachByIndex(int index);
     bool isAlreadyAttached(std::string hostRootPath);
 
-    char *functionCodeToName(int code);
+    const char *functionCodeToName(int code);
     void atariFindAttribsToString(BYTE attr, std::string &out);
     bool isRootDir(std::string hostPath);
 
@@ -295,8 +295,8 @@ private:
     // helpers for Pexec()
     void onPexec_createImage(BYTE *cmd);
     void createImage(std::string &fullAtariPath, FILE *f, int fileSizeBytes, WORD atariTime, WORD atariDate);
-    void createDirEntry(bool isRoot, bool isDir, WORD date, WORD time, DWORD fileSize, char *dirEntryName, int sectorNoAbs, int sectorNoRel);
-    void storeDirEntry(BYTE *pEntry, char *dirEntryName, bool isDir, WORD time, WORD date, WORD startingSector, DWORD entrySizeBytes);
+    void createDirEntry(bool isRoot, bool isDir, WORD date, WORD time, DWORD fileSize, const char *dirEntryName, int sectorNoAbs, int sectorNoRel);
+    void storeDirEntry(BYTE *pEntry, const char *dirEntryName, bool isDir, WORD time, WORD date, WORD startingSector, DWORD entrySizeBytes);
     void storeFatChain(BYTE *pbFat, WORD sectorStart, WORD sectorEnd);
     void storeIntelWord (BYTE *p,  WORD a);
     void storeIntelDword(BYTE *p, DWORD a);

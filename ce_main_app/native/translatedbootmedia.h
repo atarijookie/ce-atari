@@ -13,7 +13,7 @@ public:
     TranslatedBootMedia();
     virtual ~TranslatedBootMedia();
 
-    virtual bool iopen(char *path, bool createIfNotExists);
+    virtual bool iopen(const char *path, bool createIfNotExists);
     virtual void iclose(void);
 
     virtual bool isInit(void);

@@ -178,14 +178,14 @@ void TranslatedDisk::mountAndAttachSharedDrive(void)
 	bool sharedEnabled;
 	bool nfsNotSamba;
 
-    addr			= s.getString((char *) "SHARED_ADDRESS",  (char *) "");
-    path			= s.getString((char *) "SHARED_PATH",     (char *) "");
+    addr			= s.getString("SHARED_ADDRESS",  "");
+    path			= s.getString("SHARED_PATH",     "");
 
-    username		= s.getString((char *) "SHARED_USERNAME",  (char *) "");
-    password		= s.getString((char *) "SHARED_PASSWORD",  (char *) "");
+    username		= s.getString("SHARED_USERNAME", "");
+    password		= s.getString("SHARED_PASSWORD", "");
 
-	sharedEnabled	= s.getBool((char *) "SHARED_ENABLED", false);
-	nfsNotSamba		= s.getBool((char *) "SHARED_NFS_NOT_SAMBA", false);
+	sharedEnabled	= s.getBool("SHARED_ENABLED", false);
+	nfsNotSamba		= s.getBool("SHARED_NFS_NOT_SAMBA", false);
 
 	if(!sharedEnabled) {
 		Debug::out(LOG_DEBUG, "mountAndAttachSharedDrive: shared drive not enabled, not mounting and not attaching...");
@@ -424,7 +424,7 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         return;
     }
 
-    char *functionName = functionCodeToName(cmd[4]);
+    const char *functionName = functionCodeToName(cmd[4]);
     Debug::out(LOG_DEBUG, "TranslatedDisk function - %s (%02x)", functionName, cmd[4]);
 	//>dataTrans->dumpDataOnce();
 
@@ -543,7 +543,7 @@ void TranslatedDisk::onGetMounts(BYTE *cmd)
 	std::string mounts;
 	int index;
 
-	const char *trTypeStr[4] = {"", "USB drive", "shared drive", "config drive"};
+	static const char *trTypeStr[4] = {"", "USB drive", "shared drive", "config drive"};
 	const char *mountStr;
 
     for(int i=2; i<MAX_DRIVES; i++) {       // create enabled drive bits
@@ -1161,57 +1161,57 @@ void TranslatedDisk::onStLog(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-char *TranslatedDisk::functionCodeToName(int code)
+const char *TranslatedDisk::functionCodeToName(int code)
 {
     switch(code) {
-        case TRAN_CMD_IDENTIFY:      	    return (char *)"TRAN_CMD_IDENTIFY";
-        case TRAN_CMD_GETDATETIME:          return (char *)"TRAN_CMD_GETDATETIME";
-        case TRAN_CMD_SENDSCREENCAST:       return (char *)"TRAN_CMD_SENDSCREENCAST";
-        case TRAN_CMD_SCREENCASTPALETTE:    return (char *)"TRAN_CMD_SCREENCASTPALETTE";
-        case TRAN_CMD_SCREENSHOT_CONFIG:    return (char *)"TRAN_CMD_SCREENSHOT_CONFIG";
-        case ST_LOG_TEXT:                   return (char *)"ST_LOG_TEXT";
+        case TRAN_CMD_IDENTIFY:      	    return "TRAN_CMD_IDENTIFY";
+        case TRAN_CMD_GETDATETIME:          return "TRAN_CMD_GETDATETIME";
+        case TRAN_CMD_SENDSCREENCAST:       return "TRAN_CMD_SENDSCREENCAST";
+        case TRAN_CMD_SCREENCASTPALETTE:    return "TRAN_CMD_SCREENCASTPALETTE";
+        case TRAN_CMD_SCREENSHOT_CONFIG:    return "TRAN_CMD_SCREENSHOT_CONFIG";
+        case ST_LOG_TEXT:                   return "ST_LOG_TEXT";
         
-        case GEMDOS_Dsetdrv:            return (char *)"GEMDOS_Dsetdrv";
-        case GEMDOS_Dgetdrv:            return (char *)"GEMDOS_Dgetdrv";
-        case GEMDOS_Dsetpath:           return (char *)"GEMDOS_Dsetpath";
-        case GEMDOS_Dgetpath:           return (char *)"GEMDOS_Dgetpath";
-        case GEMDOS_Fsetdta:            return (char *)"GEMDOS_Fsetdta";
-        case GEMDOS_Fgetdta:            return (char *)"GEMDOS_Fgetdta";
-        case GEMDOS_Fsfirst:            return (char *)"GEMDOS_Fsfirst";
-        case GEMDOS_Fsnext:             return (char *)"GEMDOS_Fsnext";
-        case GEMDOS_Dfree:              return (char *)"GEMDOS_Dfree";
-        case GEMDOS_Dcreate:            return (char *)"GEMDOS_Dcreate";
-        case GEMDOS_Ddelete:            return (char *)"GEMDOS_Ddelete";
-        case GEMDOS_Frename:            return (char *)"GEMDOS_Frename";
-        case GEMDOS_Fdatime:            return (char *)"GEMDOS_Fdatime";
-        case GEMDOS_Fdelete:            return (char *)"GEMDOS_Fdelete";
-        case GEMDOS_Fattrib:            return (char *)"GEMDOS_Fattrib";
-        case GEMDOS_Fcreate:            return (char *)"GEMDOS_Fcreate";
-        case GEMDOS_Fopen:              return (char *)"GEMDOS_Fopen";
-        case GEMDOS_Fclose:             return (char *)"GEMDOS_Fclose";
-        case GEMDOS_Fread:              return (char *)"GEMDOS_Fread";
-        case GEMDOS_Fwrite:             return (char *)"GEMDOS_Fwrite";
-        case GEMDOS_Fseek:              return (char *)"GEMDOS_Fseek";
-        case GEMDOS_Tgetdate:           return (char *)"GEMDOS_Tgetdate";
-        case GEMDOS_Tsetdate:           return (char *)"GEMDOS_Tsetdate";
-        case GEMDOS_Tgettime:           return (char *)"GEMDOS_Tgettime";
-        case GEMDOS_Tsettime:           return (char *)"GEMDOS_Tsettime";
+        case GEMDOS_Dsetdrv:            return "GEMDOS_Dsetdrv";
+        case GEMDOS_Dgetdrv:            return "GEMDOS_Dgetdrv";
+        case GEMDOS_Dsetpath:           return "GEMDOS_Dsetpath";
+        case GEMDOS_Dgetpath:           return "GEMDOS_Dgetpath";
+        case GEMDOS_Fsetdta:            return "GEMDOS_Fsetdta";
+        case GEMDOS_Fgetdta:            return "GEMDOS_Fgetdta";
+        case GEMDOS_Fsfirst:            return "GEMDOS_Fsfirst";
+        case GEMDOS_Fsnext:             return "GEMDOS_Fsnext";
+        case GEMDOS_Dfree:              return "GEMDOS_Dfree";
+        case GEMDOS_Dcreate:            return "GEMDOS_Dcreate";
+        case GEMDOS_Ddelete:            return "GEMDOS_Ddelete";
+        case GEMDOS_Frename:            return "GEMDOS_Frename";
+        case GEMDOS_Fdatime:            return "GEMDOS_Fdatime";
+        case GEMDOS_Fdelete:            return "GEMDOS_Fdelete";
+        case GEMDOS_Fattrib:            return "GEMDOS_Fattrib";
+        case GEMDOS_Fcreate:            return "GEMDOS_Fcreate";
+        case GEMDOS_Fopen:              return "GEMDOS_Fopen";
+        case GEMDOS_Fclose:             return "GEMDOS_Fclose";
+        case GEMDOS_Fread:              return "GEMDOS_Fread";
+        case GEMDOS_Fwrite:             return "GEMDOS_Fwrite";
+        case GEMDOS_Fseek:              return "GEMDOS_Fseek";
+        case GEMDOS_Tgetdate:           return "GEMDOS_Tgetdate";
+        case GEMDOS_Tsetdate:           return "GEMDOS_Tsetdate";
+        case GEMDOS_Tgettime:           return "GEMDOS_Tgettime";
+        case GEMDOS_Tsettime:           return "GEMDOS_Tsettime";
         
-        case GEMDOS_Pexec:              return (char *)"GEMDOS_Pexec & sub commands";
+        case GEMDOS_Pexec:              return "GEMDOS_Pexec & sub commands";
         
-        case GD_CUSTOM_initialize:      return (char *)"GD_CUSTOM_initialize";
-        case GD_CUSTOM_getConfig:       return (char *)"GD_CUSTOM_getConfig";
-        case GD_CUSTOM_ftell:           return (char *)"GD_CUSTOM_ftell";
-        case GD_CUSTOM_getRWdataCnt:    return (char *)"GD_CUSTOM_getRWdataCnt";
-        case GD_CUSTOM_Fsnext_last:     return (char *)"GD_CUSTOM_Fsnext_last";
-        case GD_CUSTOM_getBytesToEOF:   return (char *)"GD_CUSTOM_getBytesToEOF";
-        case BIOS_Drvmap:               return (char *)"BIOS_Drvmap";
-        case BIOS_Mediach:              return (char *)"BIOS_Mediach";
-        case BIOS_Getbpb:               return (char *)"BIOS_Getbpb";
+        case GD_CUSTOM_initialize:      return "GD_CUSTOM_initialize";
+        case GD_CUSTOM_getConfig:       return "GD_CUSTOM_getConfig";
+        case GD_CUSTOM_ftell:           return "GD_CUSTOM_ftell";
+        case GD_CUSTOM_getRWdataCnt:    return "GD_CUSTOM_getRWdataCnt";
+        case GD_CUSTOM_Fsnext_last:     return "GD_CUSTOM_Fsnext_last";
+        case GD_CUSTOM_getBytesToEOF:   return "GD_CUSTOM_getBytesToEOF";
+        case BIOS_Drvmap:               return "BIOS_Drvmap";
+        case BIOS_Mediach:              return "BIOS_Mediach";
+        case BIOS_Getbpb:               return "BIOS_Getbpb";
         
-        case TEST_READ:                 return (char *)"TEST_READ";
-        case TEST_WRITE:                return (char *)"TEST_WRITE";
-        default:                        return (char *)"unknown";
+        case TEST_READ:                 return "TEST_READ";
+        case TEST_WRITE:                return "TEST_WRITE";
+        default:                        return "unknown";
     }
 }
 
@@ -1292,7 +1292,7 @@ void TranslatedDisk::convertAtariASCIItoPc(char *path)
 {
     int i, len;
 
-    char *allowed = (char *) "!#$%&'()~^@-_{}";
+    const char *allowed = "!#$%&'()~^@-_{}";
     #define ALLOWED_COUNT   15
     
     len = strlen(path);
@@ -1569,14 +1569,27 @@ void TranslatedDisk::driveGetReport(int driveIndex, std::string &reportString)
 
   	int typeIndex  = conf[driveIndex].translatedType;
 
-	char tmp[256];
-    
     switch(typeIndex) {
-        case TRANSLATEDTYPE_NORMAL:         sprintf(tmp, "USB drive - device: %s",         conf[driveIndex].devicePath.c_str());    break;
-        case TRANSLATEDTYPE_SHAREDDRIVE:    sprintf(tmp, "shared drive, %s",               conf[driveIndex].devicePath.c_str());    break;
-        case TRANSLATEDTYPE_CONFIGDRIVE:    sprintf(tmp, "config drive (located at %s)",   conf[driveIndex].devicePath.c_str());    break;
-        default: sprintf(tmp, "unknown"); break;
+        case TRANSLATEDTYPE_NORMAL:
+            if(conf[driveIndex].label.empty())
+                reportString = "USB drive";
+            else {
+                reportString = conf[driveIndex].label;
+                reportString += " (USB drive)";
+            }
+            reportString += " - device: ";
+            reportString += conf[driveIndex].devicePath;
+            break;
+        case TRANSLATEDTYPE_SHAREDDRIVE:
+            reportString = "shared drive, ";
+            reportString += conf[driveIndex].devicePath;
+            break;
+        case TRANSLATEDTYPE_CONFIGDRIVE:
+            reportString = "config drive (located at ";
+            reportString += conf[driveIndex].devicePath;
+            reportString += ")";
+            break;
+        default:
+            reportString = "unknown";
     }
-        
-    reportString = tmp;
 }

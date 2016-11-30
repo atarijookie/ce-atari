@@ -72,6 +72,12 @@ public:
 	void setSdCardCapacity(DWORD capInSectors);
 	
     void updateTranslatedBootMedia(void);
+
+	TScsiConf * getDevAttachedMedia(int id) {
+		if(id < 0 || id >= 8) return NULL;
+		if(devInfo[id].attachedMediaIndex < 0) return NULL;
+		return &attachedMedia[devInfo[id].attachedMediaIndex];
+	}
     
 private:
     AcsiDataTrans   *dataTrans;

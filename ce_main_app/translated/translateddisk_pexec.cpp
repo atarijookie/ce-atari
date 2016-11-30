@@ -81,7 +81,7 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
     }
     
     if(!res) {                                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - %s - createFullAtariPath failed", (char *) atariName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - %s - createFullAtariPath failed", atariName.c_str());
 
 		dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
@@ -95,7 +95,7 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
     }
     
     if(!hostPathExists(hostName)) {			                        // and the file does not exist, quit with FILE NOT FOUND
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - %s - fopen mode is just read, but the file does not exist, failed!", (char *) hostName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - %s - fopen mode is just read, but the file does not exist, failed!", hostName.c_str());
 
         dataTrans->setStatus(EFILNF);
         return;
@@ -118,14 +118,14 @@ void TranslatedDisk::onPexec_createImage(BYTE *cmd)
     pexecFakeRootPath   += pexecPrgFilename;
     pexecFakeRootPath[0] = 'A' + pexecDriveIndex;
     
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - pexecPrgPath: %s, pexecFakeRootPath: %s", (char *) pexecPrgPath.c_str(), (char *) pexecFakeRootPath.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - pexecPrgPath: %s, pexecFakeRootPath: %s", pexecPrgPath.c_str(), pexecFakeRootPath.c_str());
 
     //------------
     // create file and close it
     FILE *f = fopen(hostName.c_str(), "rb");                        // open according to required mode
 
     if(!f) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - %s - fopen failed!", (char *) hostName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onPexec_createImage() - %s - fopen failed!", hostName.c_str());
 
         dataTrans->setStatus(EACCDN);                               // if failed to create, access error
         return;
@@ -170,7 +170,7 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
 {
     int fileSizeSectors = (fileSizeBytes / 512) + (((fileSizeBytes % 512) == 0) ? 0 : 1); // calculate how many sector the file takes
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - fullAtariPath: %s, fileSizeBytes: %d, fileSizeSectors: %d", (char *) fullAtariPath.c_str(), fileSizeBytes, fileSizeSectors);
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - fullAtariPath: %s, fileSizeBytes: %d, fileSizeSectors: %d", fullAtariPath.c_str(), fileSizeBytes, fileSizeSectors);
 
     prgSectorStart  = 0;
     prgSectorEnd    = PEXEC_DRIVE_SIZE_SECTORS;
@@ -217,7 +217,7 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
         strings[found] = fullAtariPath.substr(start, (pos - start));
         
         if(strings[found].length() > 0) {           // valid string?
-            Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - valid string: %s", (char *) strings[found].c_str());
+            Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - valid string: %s", strings[found].c_str());
             found++;
         } else {
             Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - invalid string skipped");
@@ -231,19 +231,19 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
     }    
     
     if(found < 1) {                                 // couldn't break it to string? fail
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - could not explode fullAtariPath: %s", (char *) fullAtariPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - could not explode fullAtariPath: %s", fullAtariPath.c_str());
         dataTrans->setStatus(EINTRN);
         return;    
     }
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - fullAtariPath: %s exploded into %d pieces", (char *) fullAtariPath.c_str(), found);
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - fullAtariPath: %s exploded into %d pieces", fullAtariPath.c_str(), found);
     
     //--------------
     // first add dirs to image as dir entries
     for(i=0; i<(found-1); i++) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - LOOP storing DIR ENTRY: %s on curSectorAbs: %d, curSectorRel: %d", (char *) strings[i].c_str(), curSectorAbs, curSectorRel);
+        Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - LOOP storing DIR ENTRY: %s on curSectorAbs: %d, curSectorRel: %d", strings[i].c_str(), curSectorAbs, curSectorRel);
 
-        createDirEntry(isRootDir, true, atariDate, atariTime, 0, (char *) strings[i].c_str(), curSectorAbs, curSectorRel);   // store DIR entry 
+        createDirEntry(isRootDir, true, atariDate, atariTime, 0, strings[i].c_str(), curSectorAbs, curSectorRel);   // store DIR entry
 
         if(!isRootDir) {    // not adding to root dir? mark FAT chain
             storeFatChain (pFat1, curSectorRel, curSectorRel);  // mark that DIR entry in FAT chain
@@ -258,15 +258,15 @@ void TranslatedDisk::createImage(std::string &fullAtariPath, FILE *f, int fileSi
     //------------
     // then add the file to image as dir entry
 #ifdef PEXEC_FULL_PATH
-    Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - LAST storing DIR ENTRY: %s on curSectorAbs: %d, curSectorRel: %d", (char *) strings[found - 1].c_str(), curSectorAbs, curSectorRel);
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - LAST storing DIR ENTRY: %s on curSectorAbs: %d, curSectorRel: %d", strings[found - 1].c_str(), curSectorAbs, curSectorRel);
 #else
     found = 1;
     strings[0] = pexecPrgFilename;
     
-    Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - storing PRG as DIR ENTRY to root: %s on curSectorAbs: %d, curSectorRel: %d", (char *) strings[0].c_str(), curSectorAbs, curSectorRel);
+    Debug::out(LOG_DEBUG, "TranslatedDisk::createImage() - storing PRG as DIR ENTRY to root: %s on curSectorAbs: %d, curSectorRel: %d", strings[0].c_str(), curSectorAbs, curSectorRel);
 #endif
 
-    createDirEntry(isRootDir, false, atariDate, atariTime, fileSizeBytes, (char *) strings[found - 1].c_str(), curSectorAbs, curSectorRel);
+    createDirEntry(isRootDir, false, atariDate, atariTime, fileSizeBytes, strings[found - 1].c_str(), curSectorAbs, curSectorRel);
 
     if(!isRootDir) {    // not adding to root dir? mark FAT chain
         storeFatChain (pFat1, curSectorRel, curSectorRel);      // mark that DIR entry in FAT chain
@@ -308,16 +308,16 @@ void TranslatedDisk::storeFatChain(BYTE *pbFat, WORD sectorStart, WORD sectorEnd
     pwFat[sectorEnd] = 0xffff;                  // ending sector = last sector in chain marker
 }
 
-void TranslatedDisk::createDirEntry(bool isRoot, bool isDir, WORD date, WORD time, DWORD fileSize, char *dirEntryName, int sectorNoAbs, int sectorNoRel)
+void TranslatedDisk::createDirEntry(bool isRoot, bool isDir, WORD date, WORD time, DWORD fileSize, const char *dirEntryName, int sectorNoAbs, int sectorNoRel)
 {
     BYTE *pSector = pexecImage + (sectorNoAbs * 512);   // get pointer to this sector
     
     if(!isRoot) {
-        storeDirEntry(pSector +  0, (char *) ".          ", true, time, date, sectorNoRel,  0); // pointer to this dir
+        storeDirEntry(pSector +  0, ".          ", true, time, date, sectorNoRel,  0); // pointer to this dir
 
         int prevDirSector   = sectorNoRel - 1; 
         int upDirSector     = prevDirSector > 1 ? prevDirSector : 0;                            // If updir is not root dir, use that number; otherwise store 0 for root dir sector.
-        storeDirEntry(pSector + 32, (char *) "..         ", true, time, date, upDirSector,  0); // pointer to up   dir
+        storeDirEntry(pSector + 32, "..         ", true, time, date, upDirSector,  0); // pointer to up   dir
     }
 
     // now convert the short 'FILE.C' to 'FILE    .C  '
@@ -333,7 +333,7 @@ void TranslatedDisk::createDirEntry(bool isRoot, bool isDir, WORD date, WORD tim
     storeDirEntry(pSector + offset, deNameExtended, isDir, time, date, sectorNoRel + 1, fileSize);  // pointer to next dir entries or this file content
 }
 
-void TranslatedDisk::storeDirEntry(BYTE *pEntry, char *dirEntryName, bool isDir, WORD time, WORD date, WORD startingSector, DWORD entrySizeBytes)
+void TranslatedDisk::storeDirEntry(BYTE *pEntry, const char *dirEntryName, bool isDir, WORD time, WORD date, WORD startingSector, DWORD entrySizeBytes)
 {
     memcpy(pEntry + 0, dirEntryName, 11);          // filename
     pEntry[11] = isDir ? 0x10 : 0x00;              // DIR / File flag

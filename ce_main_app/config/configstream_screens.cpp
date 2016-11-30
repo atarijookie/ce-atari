@@ -1,3 +1,4 @@
+// vim: expandtab shiftwidth=4 tabstop=4
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -51,6 +52,11 @@ void ConfigStream::createScreen_homeScreen(void)
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Translated disks ",	18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_TRANSLATED);
+    screen.push_back(comp);
+    line += 2;
+
+    comp = new ConfigComponent(this, ConfigComponent::button, " Disk Image ",	18, 10, line, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_CREATE_HDDIMAGE);
     screen.push_back(comp);
     line += 2;
 
@@ -1555,6 +1561,63 @@ bool ConfigStream::isUpdateDownloadPageShown(void)
     return true;
 }
 
+void ConfigStream::createScreen_hddimage(void)
+{
+    // the following 3 lines should be at start of each createScreen_ method
+    destroyCurrentScreen();			// destroy current components
+    screenChanged	= true;			// mark that the screen has changed
+    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+
+    screen_addHeaderAndFooter(screen, "Disk Image settings");
+
+    ConfigComponent *comp;
+
+    int row = 3;
+
+    // HDD Image path
+    comp = new ConfigComponent(this, ConfigComponent::label, "HDD Image path on RPi",
+                               40, 0, row++, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",
+                               38, 0, row++, gotoOffset);
+    comp->setComponentId(COMPID_HDDIMAGE_PATH);
+    screen.push_back(comp);
+
+    row++;
+
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ",
+                               8, /*15*/ 9, row, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_HDDIMAGE_SAVE);
+    comp->setComponentId(COMPID_BTN_SAVE);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ",
+                               8, /*27*/ 21, row, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_GO_HOME);
+    comp->setComponentId(COMPID_BTN_CANCEL);
+    screen.push_back(comp);
+    row += 2;
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "HDD Image will be mounted as RAW disk.  ",
+                               40, 0, row++, gotoOffset);
+    screen.push_back(comp);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Ensure you have at least one ACSI ID",
+                               40, 0, row++, gotoOffset);
+    screen.push_back(comp);
+    comp = new ConfigComponent(this, ConfigComponent::label, "configured as raw.",
+                               40, 0, row++, gotoOffset);
+    screen.push_back(comp);
+
+    Settings s;
+    std::string path;
+
+    path = s.getString("HDDIMAGE", "");
+    setTextByComponentId(COMPID_HDDIMAGE_PATH, path);
+
+    setFocusToFirstFocusable();
+}
+
 void ConfigStream::createScreen_shared(void)
 {
     // the following 3 lines should be at start of each createScreen_ method
@@ -1699,6 +1762,24 @@ void ConfigStream::createScreen_shared(void)
 	}
 
     setFocusToFirstFocusable();
+}
+
+void ConfigStream::onHddImageSave(void)
+{
+    std::string path;
+
+    getTextByComponentId(COMPID_HDDIMAGE_PATH, path);
+
+    Settings s;
+    s.setString("HDDIMAGE", path.c_str());
+
+    if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
+        reloadProxy->reloadSettings(SETTINGSUSER_ACSI);     // reload SCSI / ACSI settings
+    }
+
+    Utils::forceSync();                                     // tell system to flush the filesystem caches
+
+    createScreen_homeScreen();      // now back to the home screen
 }
 
 void ConfigStream::onSharedTest(void)

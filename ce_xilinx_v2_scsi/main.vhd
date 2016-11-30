@@ -76,6 +76,10 @@ architecture Behavioral of main is
     signal identifyA     : std_logic;
 
     signal nSelection    : std_logic;
+    signal nSelectD1     : std_logic;
+    signal nSelectD2     : std_logic;
+    signal nSelectD3     : std_logic;
+
     signal lathClock     : std_logic;
 
     signal REQtrigD1     : std_logic;
@@ -96,25 +100,34 @@ begin
     softReset  <= identify and XRnW;            -- soft reset is done when it's IDENTIFY, but in READ direction (normally should be in WRITE direction)
 
     nSelection <= not ((not SEL) and BSYa);     -- selection is when SEL is 0 and BSY is 1. nSelection is inverted selection, because DATA1latch is captured on falling edge
-    XCMD       <= nSelection or (not SRST);     -- falling edge means target selection (SRST must be 1, otherwise ignored)
+    XCMD       <= nSelectD3  or (not SRST);     -- falling edge means target selection (SRST must be 1, otherwise ignored)
 
-    resetCombo <= SRST and reset_hans and (not softReset);   -- when one of these reset signals is low, the result is low
+    resetCombo <= SRST and reset_hans and (not softReset) and (not (nSelectD2 and (not nSelectD1)));   -- when one of these reset signals is low, the result is low
 
     REQtrig    <= XPIO xor XDMA xor XMSG;       -- REQ trig should go hi only when one of these (not 2, not 3) go hi
 
     captureAndDelay: process(clk, REQtrig, SACK) is  -- delaying process
     begin
         if(rising_edge(clk)) then
-            REQtrigD2 <= REQtrigD1;             -- previous state of REQtrig
-            REQtrigD1 <= REQtrig;               -- current  state in REQtrig
+          if(resetCombo = '0') then
+            REQtrigD2 <= '0';
+            REQtrigD1 <= '0';
+          else
+            REQtrigD2 <= REQtrigD1;              -- previous state of REQtrig
+            REQtrigD1 <= REQtrig;                -- current  state in REQtrig
+          end if;
 
-            SACKD3    <= SACKD2;                -- previous previous state of SACK
-            SACKD2    <= SACKD1;                -- previous state of SACK
-            SACKD1    <= SACK;                  -- current  state of SACK
+          nSelectD3 <= nSelectD2;
+          nSelectD2 <= nSelectD1;
+          nSelectD1 <= nSelection;
+
+          SACKD3    <= SACKD2;                -- previous previous state of SACK
+          SACKD2    <= SACKD1;                -- previous state of SACK
+          SACKD1    <= SACK;                  -- current  state of SACK
         end if;
     end process;
 
-	SACKshort    <= '0' when (SACKD3    = '1' and SACKD2    = '0') else '1';
+    SACKshort    <= '0' when (SACKD3    = '1' and SACKD2    = '0') else '1';
 
     REQstateDflipflop: process(resetCombo, SACKshort, REQtrigD2) is
     begin
@@ -145,7 +158,7 @@ begin
 
     -- 8-bit latch register
     -- latch data from ST on falling edge of lathClock (that means either on falling nSelection, or falling SACK)
-    lathClock <= SACK and nSelection;
+    lathClock <= SACK and nSelectD3;
 
     dataLatch: process(lathClock) is
     begin 

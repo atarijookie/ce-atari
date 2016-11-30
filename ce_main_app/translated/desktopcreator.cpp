@@ -110,7 +110,7 @@ char *DesktopCreator::storeExecutables(char *bfr, DesktopConfig *dc)
         bfr = storeFloppyImageLauncher(bfr, dc);
 
         bfr = storeMediaPlayers(bfr, dc);
-        
+
         *bfr = 0x1a;
         bfr++;
     } else {
@@ -127,40 +127,31 @@ char *DesktopCreator::storeExecutables(char *bfr, DesktopConfig *dc)
 
 char *DesktopCreator::storeFloppyImageLauncher(char *bfr, DesktopConfig *dc)
 {
-    char tmp[64];
     // add app for opening .ST images
-    sprintf(tmp, "#G 03 04   %c:\\CE_FDD.TTP@ *.ST@ \r\n", 'A' + dc->configDrive);
-    strcpy(bfr, tmp);
-    bfr += strlen(bfr);
+    bfr += sprintf(bfr, "#G 03 04   %c:\\CE_FDD.TTP@ *.ST@ \r\n", 'A' + dc->configDrive);
 
     // add app for opening .MSA images
-    sprintf(tmp, "#G 03 04   %c:\\CE_FDD.TTP@ *.MSA@ \r\n", 'A' + dc->configDrive);
-    strcpy(bfr, tmp);
-    bfr += strlen(bfr);
+    bfr += sprintf(bfr, "#G 03 04   %c:\\CE_FDD.TTP@ *.MSA@ \r\n", 'A' + dc->configDrive);
+
+	// add app for mounting .IMG hard disk images
+	bfr += sprintf(bfr, "#G 03 04   %c:\\CE_HDIMG.TTP@ *.IMG@ \r\n", 'A' + dc->configDrive);
 
     return bfr;
 }
 
 char *DesktopCreator::storeMediaPlayers(char *bfr, DesktopConfig *dc)
 {
-	char tmp[128];
-	int len;
-	len = snprintf(tmp, sizeof(tmp),
+	bfr += sprintf(bfr,
 	               "#P 03 04   %c:\\STEAUPLY.TTP@ *.AU@ \r\n", 'A' + dc->configDrive);
-	memcpy(bfr, tmp, len+1);
-	bfr += len;
-	len = snprintf(tmp, sizeof(tmp),
+
+	bfr += sprintf(bfr,
 	               "#P 03 04   %c:\\CEMEDIAP.TTP@ *.MP3@ \r\n", 'A' + dc->configDrive);
-	memcpy(bfr, tmp, len+1);
-	bfr += len;
-	len = snprintf(tmp, sizeof(tmp),
+
+	bfr += sprintf(bfr,
 	               "#P 03 04   %c:\\CEMEDIAP.TTP@ *.WMA@ \r\n", 'A' + dc->configDrive);
-	memcpy(bfr, tmp, len+1);
-	bfr += len;
-	len = snprintf(tmp, sizeof(tmp),
+
+	bfr += sprintf(bfr,
 	               "#P 03 04   %c:\\CEMEDIAP.TTP@ *.OGG@ \r\n", 'A' + dc->configDrive);
-	memcpy(bfr, tmp, len+1);
-	bfr += len;
 	return bfr;
 }
 

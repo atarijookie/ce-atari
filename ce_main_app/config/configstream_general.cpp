@@ -1,3 +1,4 @@
+// vim: expandtab shiftwidth=4 tabstop=4
 #include <stdio.h>
 #include <string.h>
 
@@ -5,6 +6,7 @@
 #include "../native/scsi_defs.h"
 #include "../acsidatatrans.h"
 #include "../update.h"
+#include "../translated/translateddisk.h"
 
 #include "../settings.h"
 #include "keys.h"
@@ -95,6 +97,10 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
 
         dataTrans->setStatus(SCSI_ST_OK);
         Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_SET_RESOLUTION -- %d", cmd[5]);
+        break;
+
+    case CFG_CMD_SET_CFGVALUE:
+        onSetCfgValue();
         break;
 
     case CFG_CMD_UPDATING_QUERY:
@@ -698,6 +704,7 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_GO_HOME:            createScreen_homeScreen();      break;
     case CS_CREATE_ACSI:        createScreen_acsiConfig();      break;
     case CS_CREATE_TRANSLATED:  createScreen_translated();      break;
+    case CS_CREATE_HDDIMAGE:    createScreen_hddimage();        break;
     case CS_CREATE_SHARED:      createScreen_shared();          break;
     case CS_CREATE_FLOPPY_CONF: createScreen_floppy_config();   break;
     case CS_CREATE_NETWORK:     createScreen_network();         break;
@@ -721,6 +728,7 @@ void ConfigStream::enterKeyHandler(int event)
     
     case CS_SEND_SETTINGS:      onSendSettings();           break;
 
+    case CS_HDDIMAGE_SAVE:      onHddImageSave();           break;
 //  case CS_SHARED_TEST:        onSharedTest();             break;
     case CS_SHARED_SAVE:        onSharedSave();             break;
 
@@ -954,4 +962,67 @@ void ConfigStream::translateVT52rawConsole(const BYTE *vt52stream, int vt52cnt, 
         rawConsole[offset] = '\n';
     }
     rawConsole[rawConsoleSize - 1] = 0;     // terminate stream with zero
+}
+
+void ConfigStream::onSetCfgValue(void)
+{
+    BYTE buffer[512];
+    BYTE status = SCSI_ST_OK;
+
+    memset(buffer, 0, sizeof(buffer));
+    if(!dataTrans->recvData(buffer, sizeof(buffer))) {
+        Debug::out(LOG_ERROR, "ConfigStream::onSetCfgValue failed to receive data");
+        dataTrans->setStatus(SCSI_ST_CHECK_CONDITION); // ? check code
+        return;
+    }
+
+    // DATA :
+    // 6 bytes "CECFG1" (1 is for version 1)
+    // n records :
+    //     1 BYTE : value type
+    //     n BYTES (null terminated string) : key
+    //     1 BYTE value length
+    //     n BYTES value (null terminated if it is a string
+    if(memcmp(buffer, "CECFG1", 6) == 0) {
+        Settings s;
+        unsigned int i = 6;
+        BYTE type;
+        while((type = buffer[i++]) != 0 && i < sizeof(buffer)) {
+            const char * key = (const char *)buffer + i;
+            i += strlen(key) + 1;
+            BYTE val_len = buffer[i++];
+            switch(type) {
+            case CFGVALUE_TYPE_ST_PATH:
+                if(translated) {
+                    const char * path = (const char *)(buffer + i);
+                    std::string hostPath;
+                    if(path[1] == ':') {
+                        // Full ATARI Path
+                        int driveIndex = path[0] - 'A';
+                        std::string atariPath(path + 2);
+                        bool waitingForMount;
+                        int zipDirNestingLevel;
+                        translated->createFullHostPath(atariPath, driveIndex, hostPath, waitingForMount, zipDirNestingLevel);
+                    }  else {
+                        // relative path
+                        std::string partialAtariPath(path);
+                        std::string fullAtariPath;
+                        int driveIndex = 0;
+                        bool waitingForMount;
+                        int zipDirNestingLevel;
+                        translated->createFullAtariPathAndFullHostPath(partialAtariPath, fullAtariPath, driveIndex, hostPath, waitingForMount, zipDirNestingLevel);
+                    }
+                    s.setString(key, hostPath.c_str());
+                    reloadProxy->reloadSettings(SETTINGSUSER_ACSI);
+                } else {
+                    Debug::out(LOG_ERROR, "ConfigStream::onSetCfgValue() no translator available");
+                }
+                break;
+            default:
+                Debug::out(LOG_ERROR, "ConfigStream::onSetCfgValue() unknown type %d", (int)type);
+            }
+            i += val_len;
+        }
+    }
+    dataTrans->setStatus(status);
 }

@@ -213,7 +213,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     if(LOG_DEBUG <= flags.logLevel) {                   // only when debug is enabled
         std::string atts;
         atariFindAttribsToString(findAttribs, atts);
-        Debug::out(LOG_DEBUG, "find attribs: 0x%02x -> %s", findAttribs, (char *) atts.c_str());
+        Debug::out(LOG_DEBUG, "find attribs: 0x%02x -> %s", findAttribs, atts.c_str());
     }
     
     bool        waitingForMount;
@@ -222,7 +222,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     res = createFullAtariPathAndFullHostPath(atariSearchString, fullAtariPath, atariDriveIndex, hostSearchString, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s -- failed to create host path", (char *) atariSearchString.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s -- failed to create host path", atariSearchString.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
@@ -235,7 +235,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
         return;
     }
     
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s, host search string: %s", (char *) atariSearchString.c_str(), (char *) hostSearchString.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s, host search string: %s", atariSearchString.c_str(), hostSearchString.c_str());
 
     //----------
 	// now get the dir translator for the right drive
@@ -255,7 +255,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
 	res = dt->buildGemdosFindstorageData(&tempFindStorage, hostSearchString, findAttribs, rootDir, useZipdirNotFileForThisSubDir);
 
 	if(!res) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- failed to build gemdos find storage data", (char *) hostSearchString.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- failed to build gemdos find storage data", hostSearchString.c_str());
 
 		dataTrans->setStatus(EFILNF);                               // file not found
 		return;
@@ -263,13 +263,13 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
 
 	if (tempFindStorage.count==0)
 	{
-		Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s 0 entries found", (char *) hostSearchString.c_str());
+		Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s 0 entries found", hostSearchString.c_str());
 
 		dataTrans->setStatus(EFILNF);                               // file not found
 		return;
 	}
 	
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- found %d dir entries", (char *) hostSearchString.c_str(), tempFindStorage.count);
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- found %d dir entries", hostSearchString.c_str(), tempFindStorage.count);
 
     //----------	
     // now copy from temp findStorage to the some findStorages arrays
@@ -453,7 +453,7 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- createFullAtariPath failed", (char *) newAtariPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- createFullAtariPath failed", newAtariPath.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
@@ -469,7 +469,7 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     //---------------
     // if it's read only (or inside of ZIP DIR - that's also read only), quit
     if(isDriveIndexReadOnly(atariDriveIndex) || zipDirNestingLevel > 0) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- path is read only", (char *) newAtariPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -- path is read only", newAtariPath.c_str());
 
         dataTrans->setStatus(EACCDN);
         return;
@@ -499,7 +499,7 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
 	int status = mkdir(hostPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
 
     if(status == 0) {                               // directory created?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -> hostPath: %s -- dir created", (char *) newAtariPath.c_str(), (char *) hostPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -> hostPath: %s -- dir created", newAtariPath.c_str(), hostPath.c_str());
 
         dataTrans->setStatus(E_OK);
         return;
@@ -508,7 +508,7 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
 	status = errno;
 
     if(status == EEXIST || status == EACCES) {		// path already exists or other access problem?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -> hostPath: %s -- failed to create dir", (char *) newAtariPath.c_str(), (char *) hostPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -> hostPath: %s -- failed to create dir", newAtariPath.c_str(), hostPath.c_str());
 
         dataTrans->setStatus(EACCDN);
         return;
@@ -539,7 +539,7 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
     res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -- createFullAtariPath failed, the path doesn't bellong to us", (char *) newAtariPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - newAtariPath: %s -- createFullAtariPath failed, the path doesn't bellong to us", newAtariPath.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
@@ -601,13 +601,13 @@ void TranslatedDisk::onFrename(BYTE *cmd)
     }
     
     if(!res || !res2) {                                             // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - failed to createFullAtariPath for %s or %s", (char *) oldAtariName.c_str(), (char *) newAtariName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - failed to createFullAtariPath for %s or %s", oldAtariName.c_str(), newAtariName.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
     }
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - rename %s to %s", (char *) oldHostName.c_str(), (char *) newHostName.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - rename %s to %s", oldHostName.c_str(), newHostName.c_str());
 
     if(isDriveIndexReadOnly(atariDriveIndexOld) || zipDirNestingLevel > 0) {                  // if it's read only (or inside of ZIP DIR - that's also read only), quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - it's read only");
@@ -652,7 +652,7 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
     res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - createFullAtariPath failed", (char *) newAtariPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - createFullAtariPath failed", newAtariPath.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
@@ -666,7 +666,7 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
     }
 
     if(isDriveIndexReadOnly(atariDriveIndex) || zipDirNestingLevel > 0) {     // if it's read only (or inside of ZIP DIR - that's also read only), quit
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - it's read only", (char *) newAtariPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - it's read only", newAtariPath.c_str());
 
         dataTrans->setStatus(EACCDN);
         return;
@@ -702,13 +702,13 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
     res = unlink(hostPath.c_str());
 
     if(res == 0) {                                  // file deleted?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - deleted, success", (char *) hostPath.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - deleted, success", hostPath.c_str());
 
         dataTrans->setStatus(E_OK);
         return;
     }
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - unlink failed", (char *) hostPath.c_str());
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete - %s - unlink failed", hostPath.c_str());
 
     int err = errno;
 
@@ -867,7 +867,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - createFullAtariPath failed", (char *) atariName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - createFullAtariPath failed", atariName.c_str());
 
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
@@ -881,7 +881,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     }
     
     if(isDriveIndexReadOnly(atariDriveIndex) || zipDirNestingLevel > 0) {                     // if it's read only (or inside of ZIP DIR - that's also read only), quit
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - it's read only", (char *) atariName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - it's read only", atariName.c_str());
 
         dataTrans->setStatus(EACCDN);
         return;
@@ -890,7 +890,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     int index = findEmptyFileSlot();
 
     if(index == -1) {                                               // no place for new file? No more handles.
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - no empty slot", (char *) atariName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - no empty slot", atariName.c_str());
 
         dataTrans->setStatus(ENHNDL);
         return;
@@ -900,7 +900,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     FILE *f = fopen(hostName.c_str(), "wb+");                       // write/update - create empty / truncate existing
 
     if(!f) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - fopen failed", (char *) hostName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - fopen failed", hostName.c_str());
 
         dataTrans->setStatus(EACCDN);                               // if failed to create, access error
         return;
@@ -982,7 +982,7 @@ void TranslatedDisk::onFopen(BYTE *cmd)
     res = createFullAtariPathAndFullHostPath(atariName, fullAtariPath, atariDriveIndex, hostName, waitingForMount, zipDirNestingLevel);
 
     if(!res) {                                                      // the path doesn't bellong to us?
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - createFullAtariPath failed", (char *) atariName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - createFullAtariPath failed", atariName.c_str());
 
 		dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
@@ -996,7 +996,7 @@ void TranslatedDisk::onFopen(BYTE *cmd)
     }
     
     if((mode & 0x07) != 0 && (isDriveIndexReadOnly(atariDriveIndex) || zipDirNestingLevel > 0)) {      // if it's WRITE mode and read only (or inside of ZIP DIR - that's also read only), quit
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is write, but file is read only, fail! ", (char *) atariName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is write, but file is read only, fail! ", atariName.c_str());
 
         dataTrans->setStatus(EACCDN);
         return;
@@ -1005,18 +1005,18 @@ void TranslatedDisk::onFopen(BYTE *cmd)
     int index = findEmptyFileSlot();
 
     if(index == -1) {                                               // no place for new file? No more handles.
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - no empty slot, failed", (char *) atariName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - no empty slot, failed", atariName.c_str());
 
         dataTrans->setStatus(ENHNDL);
         return;
     }
 
     // opening for S_WRITE doesn't truncate file, but allows changing content (tested with PRGFLAGS.PRG)
-    char *fopenMode;
+    const char *fopenMode;
 
-    char *mode_S_READ       = (char *) "rb";
-    char *mode_S_WRITE      = (char *) "rb+";
-    char *mode_S_READWRITE  = (char *) "rb+";
+    const char *mode_S_READ       = "rb";
+    const char *mode_S_WRITE      = "rb+";
+    const char *mode_S_READWRITE  = "rb+";
 
     mode = mode & 0x07;         // leave only lowest 3 bits
 
@@ -1031,7 +1031,7 @@ void TranslatedDisk::onFopen(BYTE *cmd)
 
 	if(justRead) {								// if we should just read from the file (not write and thus create if does not exist)
 		if(!hostPathExists(hostName)) {			// and the file does not exist, quit with FILE NOT FOUND
-            Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is just read, but the file does not exist, failed!", (char *) hostName.c_str());
+            Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is just read, but the file does not exist, failed!", hostName.c_str());
 
 			dataTrans->setStatus(EFILNF);
 			return;
@@ -1042,13 +1042,13 @@ void TranslatedDisk::onFopen(BYTE *cmd)
     FILE *f = fopen(hostName.c_str(), fopenMode);                   // open according to required mode
 
     if(!f) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen failed!", (char *) hostName.c_str());
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen failed!", hostName.c_str());
 
         dataTrans->setStatus(EACCDN);                               // if failed to create, access error
         return;
     }
 
-    Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - success, index is %d", (char *) hostName.c_str(), index);
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - success, index is %d", hostName.c_str(), index);
 
     // store the params
     files[index].hostHandle     = f;
@@ -1397,7 +1397,7 @@ void TranslatedDisk::onDrvMap(BYTE *cmd)
         memset(tmp2, 0, 3);
 
         char tmp[128];
-        strcpy(tmp, (char *) "TranslatedDisk::onDrvMap -- translated drives: ");
+        strcpy(tmp, "TranslatedDisk::onDrvMap -- translated drives: ");
         for(int i=2; i<16; i++) {
             if(drives & (1 << i)) {
                 tmp2[0] = 'A' + i;
