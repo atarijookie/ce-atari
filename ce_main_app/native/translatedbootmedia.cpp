@@ -228,7 +228,7 @@ void TranslatedBootMedia::setDword(BYTE *bfr, DWORD val)
     bfr[3] = (BYTE) (val      );       // get lo
 }
 
-bool TranslatedBootMedia::iopen(char *path, bool createIfNotExists)
+bool TranslatedBootMedia::iopen(const char *path, bool createIfNotExists)
 {
     return gotImage;						// don't do anything, all the things have been probably done already
 }

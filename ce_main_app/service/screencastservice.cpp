@@ -46,7 +46,7 @@ void ScreencastService::stop()
 int ScreencastService::getFrameSkip()
 {
     Settings s;
-    int iFrameSkip = s.getInt ((char *) "SCREENCAST_FRAMESKIP",        20);
+    int iFrameSkip = s.getInt ("SCREENCAST_FRAMESKIP",        20);
 
     return iFrameSkip;
 }

@@ -25,10 +25,10 @@ void Debug::setOutputToConsole(void)
 
 void Debug::setDefaultLogFile(void)
 {
-    setLogFile((char *) LOG_FILE);
+    setLogFile(LOG_FILE);
 }
 
-void Debug::setLogFile(char *path)
+void Debug::setLogFile(const char *path)
 {
     strcpy(Debug::logFilePath, path);
 }

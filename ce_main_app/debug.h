@@ -24,7 +24,7 @@ public:
     
     static void setOutputToConsole(void);
     static void setDefaultLogFile(void);
-    static void setLogFile(char *path);
+    static void setLogFile(const char *path);
     
 private:    
     static char logFilePath[128];

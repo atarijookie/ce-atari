@@ -13,6 +13,7 @@
 #include "translated/translateddisk.h"
 #include "ikbd/ikbd.h"
 #include "floppy/imagesilo.h"
+#include "native/scsi.h"
 
 #include "statusreport.h"
 
@@ -88,7 +89,57 @@ void StatusReport::createReport(std::string &report, int reportFormat)
     pthread_mutex_unlock(&shared.mtxTranslated);
 
     endSection  (report, reportFormat);
-    
+
+    //------------------
+	// ACSI SCSI ID status / media
+	startSection(report, "ACSI/SCSI ID status / media", reportFormat);
+	for(int i=0; i < 8; i++) {
+		char tmp[10];
+		std::string desc;
+		snprintf(tmp, sizeof(tmp), "ID %d", i);
+		TScsiConf * media = shared.scsi->getDevAttachedMedia(i);
+		if(media) {
+			switch(media->hostSourceType) {
+			case SOURCETYPE_NONE:
+				desc = "none";
+				break;
+			case SOURCETYPE_IMAGE:
+				desc = "HDD Image";
+				break;
+			case SOURCETYPE_IMAGE_TRANSLATEDBOOT:
+				desc = "Translated boot Image";
+				break;
+			case SOURCETYPE_DEVICE:
+				desc = "Device";
+				break;
+			case SOURCETYPE_SD_CARD:
+				desc = "SD Card";
+				break;
+			default:
+				desc = "unknown";
+			}
+			desc += " : ";
+			desc += media->hostPath;
+			switch(media->accessType) {
+			case SCSI_ACCESSTYPE_FULL:
+				desc += " (RW)";
+				break;
+			case SCSI_ACCESSTYPE_READ_ONLY:
+				desc += " (READ-ONLY)";
+				break;
+			case SCSI_ACCESSTYPE_NO_DATA:
+				desc += " (NO DATA)";
+				break;
+			default:
+				desc += " (unknown)";
+			}
+		} else {
+			desc = "no media attached";
+		}
+		dumpPair(report, tmp, desc.c_str(), reportFormat);
+	}
+    endSection  (report, reportFormat);
+
     //------------------
     // floppy images
     startSection(report, "Floppy image slots", reportFormat);

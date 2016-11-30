@@ -134,6 +134,7 @@ void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyServi
     shared.configStream.acsi = new ConfigStream(CONFIGSTREAM_ON_ATARI);
     shared.configStream.acsi->setAcsiDataTrans(dataTrans);
     shared.configStream.acsi->setSettingsReloadProxy(&settingsReloadProxy);
+    shared.configStream.acsi->setTranslatedDisk(shared.translated);
     
     // create config stream for web interface
     shared.configStream.dataTransWeb    = new AcsiDataTrans();
@@ -426,7 +427,7 @@ void CCoreThread::run(void)
                 break;
 
             default:
-                Debug::out(LOG_ERROR, (char *) "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
+                Debug::out(LOG_ERROR, "CCoreThread received weird ATN code %02x waitForATN()", inBuff[3]);
                 break;
             }
         }
@@ -587,7 +588,7 @@ void CCoreThread::reloadSettings(int type)
     
     if(type == SETTINGSUSER_TRANSLATED) {
         Settings s;
-        bool newMountRawNotTrans = s.getBool((char *) "MOUNT_RAW_NOT_TRANS", 0);
+        bool newMountRawNotTrans = s.getBool("MOUNT_RAW_NOT_TRANS", 0);
         
         if(shared.mountRawNotTrans != newMountRawNotTrans) {       // mount strategy changed?
             shared.mountRawNotTrans = newMountRawNotTrans;
@@ -633,7 +634,7 @@ void CCoreThread::loadSettings(void)
     s.loadAcsiIDs(&acsiIdInfo);
     s.loadFloppyConfig(&floppyConfig);
 
-    shared.mountRawNotTrans = s.getBool((char *) "MOUNT_RAW_NOT_TRANS", 0);
+    shared.mountRawNotTrans = s.getBool("MOUNT_RAW_NOT_TRANS", 0);
     
     setEnabledIDbits    = true;
     setFloppyConfig     = true;
@@ -897,21 +898,21 @@ void CCoreThread::saveHwConfig(void)
     int ver, hddIf, scsiMch;
     
     // get current values for these configs
-    ver     = s.getInt((char *) "HW_VERSION",       1);
-    hddIf   = s.getInt((char *) "HW_HDD_IFACE",     HDD_IF_ACSI);
-    scsiMch = s.getInt((char *) "HW_SCSI_MACHINE",  SCSI_MACHINE_UNKNOWN);
+    ver     = s.getInt("HW_VERSION",       1);
+    hddIf   = s.getInt("HW_HDD_IFACE",     HDD_IF_ACSI);
+    scsiMch = s.getInt("HW_SCSI_MACHINE",  SCSI_MACHINE_UNKNOWN);
 
     // store value only if it has changed
     if(ver != hwConfig.version) {
-        s.setInt((char *) "HW_VERSION", ver);
+        s.setInt("HW_VERSION", ver);
     }
     
     if(hddIf != hwConfig.hddIface) {
-        s.setInt((char *) "HW_HDD_IFACE", hddIf);
+        s.setInt("HW_HDD_IFACE", hddIf);
     }
     
     if(scsiMch != hwConfig.scsiMachine) {
-        s.setInt((char *) "HW_SCSI_MACHINE", scsiMch);
+        s.setInt("HW_SCSI_MACHINE", scsiMch);
     }
 }
 

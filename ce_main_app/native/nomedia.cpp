@@ -12,7 +12,7 @@ NoMedia::~NoMedia()
 {
 }
 
-bool NoMedia::iopen(char *path, bool createIfNotExists)
+bool NoMedia::iopen(const char *path, bool createIfNotExists)
 {
     return true;
 }
