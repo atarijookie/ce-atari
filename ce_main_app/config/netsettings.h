@@ -29,20 +29,31 @@ public:
     std::string     hostname;
 
 private:
+	void loadOnYocto(void);
+	void saveOnYocto(void);
+
+  	void loadOnRaspbian(void);
+	void saveOnRaspbian(void);
 
 	void initNetSettings(TNetInterface *neti);
-	void readString(char *line, char *tag, std::string &val, bool singleWordLine);
+	void readString(const char *line, const char *tag, std::string &val, bool singleWordLine);
 	void dumpSettings(void);
 	
 	void loadNameserver(void);
 	void saveNameserver(void);
     
+    void saveDhcpcdRaspbian(void);
+    void writeDhcpcdSettingsRaspbian(FILE *f, TNetInterface *iface, const char *ifaceName);
+    
     void loadWpaSupplicant(void);
     void saveWpaSupplicant(void);
     
-    void writeNetInterfaceSettings(FILE *f, TNetInterface &iface, char *ifaceName);
+    void writeNetInterfaceSettingsYocto   (FILE *f, TNetInterface *iface, const char *ifaceName);
+    void writeNetInterfaceSettingsRaspbian(FILE *f, TNetInterface *iface, const char *ifaceName);
     
     void replaceIPonDhcpIface(void);
+    
+    int  ipNetmaskToCIDRnetmask(const char *ipNetmask);
 };
 
 #endif
