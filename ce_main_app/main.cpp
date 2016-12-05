@@ -59,7 +59,7 @@ const char *distroString = "Raspbian";
 #endif
 
 bool otherInstanceIsRunning(void);
-int pidFileFd;
+int  singleInstanceSocketFd;
 
 int main(int argc, char *argv[])
 {
@@ -302,8 +302,8 @@ int main(int argc, char *argv[])
     printf("Downloader clean up before quit\n");
     Downloader::cleanupBeforeQuit();
 
-    if(pidFileFd > 0) {                                 // if we got the PID file, close it
-        close(pidFileFd);
+    if(singleInstanceSocketFd > 0) {                    // if we got the single instance socket, close it
+        close(singleInstanceSocketFd);
     }
     
     Debug::out(LOG_INFO, "CosmosEx terminated.");
@@ -513,21 +513,26 @@ void sigint_handler(int sig)
 
 bool otherInstanceIsRunning(void)
 {
-    // create pid file
-    pidFileFd = open("/var/run/cosmosex.pid", O_CREAT | O_RDWR, 0666);
-    
-    if(pidFileFd == -1) {   // failed to create pid file? other instance might be running
+    singleInstanceSocketFd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if(singleInstanceSocketFd == -1) {
+        Debug::out(LOG_ERROR, "otherInstanceIsRunning - failed to create socket");
         return true;
     }
     
-    // lock pid file - exclusive, non blocking
-    int res = flock(pidFileFd, LOCK_EX | LOCK_NB);
+    struct sockaddr_in netAddrForBind;
+    netAddrForBind.sin_family       = AF_INET;
+    netAddrForBind.sin_port         = htons (32100);
+    netAddrForBind.sin_addr.s_addr  = htonl (INADDR_ANY);
+    int rc = bind(singleInstanceSocketFd, (struct sockaddr *) &netAddrForBind, sizeof (netAddrForBind));    
     
-    if(res == -1) {     // failed to lock the file? other instance might be running
+    if(rc == -1) {      // failed bind? other instance is running and using that port
+        Debug::out(LOG_ERROR, "otherInstanceIsRunning - bind() failed, so other instance is running");
         return true;
     }
     
-    // if came here, open and lock succeeded, no other instance is running
+    // if came here, no other instance is running
+    Debug::out(LOG_ERROR, "otherInstanceIsRunning - bind() succeeded, so other instance is not running");
     return false;
 }
 
