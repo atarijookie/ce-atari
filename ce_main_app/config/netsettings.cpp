@@ -30,6 +30,8 @@ void NetworkSettings::initNetSettings(TNetInterface *neti)
 
 void NetworkSettings::load(void)
 {
+    Debug::out(LOG_INFO, "NetworkSettings::load() - starting to load settings");
+
     #ifdef DISTRO_YOCTO
     loadOnYocto();
     #else
@@ -39,6 +41,8 @@ void NetworkSettings::load(void)
 
 void NetworkSettings::save(void)
 {
+    Debug::out(LOG_INFO, "NetworkSettings::save() - starting to save settings");
+
     #ifdef DISTRO_YOCTO
     saveOnYocto();
     #else
@@ -239,12 +243,14 @@ void NetworkSettings::saveNameserver(void)
     Settings s;
     s.setString("NAMESERVER", nameserver.c_str());
 
-    updateResolvConf();                                 // update resolv.conf
+    updateResolvConf(false);                            // update resolv.conf, no auto load
 }
 
-void NetworkSettings::updateResolvConf(void)
+void NetworkSettings::updateResolvConf(bool autoLoadBeforeSave)
 {
-    load();                                             // first load the settings
+    if(autoLoadBeforeSave) {
+        load();                                         // first load the settings
+    }
 
     if(eth0.dhcpNotStatic && wlan0.dhcpNotStatic) {     // if eth0 and wlan0 are DCHP, don't do anything
         Debug::out(LOG_ERROR, "NetworkSettings::updateResolvConf -- didn't update resolv.conf - network settings are DHCP");

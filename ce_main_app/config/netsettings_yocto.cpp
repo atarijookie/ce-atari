@@ -13,6 +13,7 @@ void NetworkSettings::loadOnYocto(void)
     initNetSettings(&eth0);
     initNetSettings(&wlan0);
     
+    Debug::out(LOG_DEBUG, "NetworkSettings::loadOnYocto() - reading from file %s", NETWORK_CONFIG_FILE);
     FILE *f = fopen(NETWORK_CONFIG_FILE, "rt");
     
     if(!f) {
@@ -34,6 +35,10 @@ void NetworkSettings::loadOnYocto(void)
         }
         
         if(line[0] == '#') {                                    // if it's a line with a comment, skip it
+            continue;
+        }
+        
+        if(strlen(line) < 2) {                                  // skip empty line
             continue;
         }
         
@@ -87,6 +92,7 @@ void NetworkSettings::loadOnYocto(void)
 
 void NetworkSettings::saveOnYocto(void)
 {
+    Debug::out(LOG_DEBUG, "NetworkSettings::saveOnYocto() - writing file %s", NETWORK_CONFIG_FILE);
     FILE *f = fopen(NETWORK_CONFIG_FILE, "wt");
     
     if(!f) {

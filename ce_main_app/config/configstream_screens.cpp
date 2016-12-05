@@ -42,7 +42,7 @@ void ConfigStream::createScreen_homeScreen(void)
 
     ConfigComponent *comp;
 
-    int line = 5;
+    int line = 4;
     
     const char *idConfigLabel = (hwConfig.hddIface == HDD_IF_SCSI) ? " SCSI IDs config " : " ACSI IDs config ";
     comp = new ConfigComponent(this, ConfigComponent::button, idConfigLabel,	    18, 10, line, gotoOffset);
@@ -55,7 +55,7 @@ void ConfigStream::createScreen_homeScreen(void)
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Disk Image ",	18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Hard Disk Image ", 18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_HDDIMAGE);
     screen.push_back(comp);
     line += 2;

@@ -14,6 +14,7 @@ void NetworkSettings::loadOnRaspbian(void)
     initNetSettings(&eth0);
     initNetSettings(&wlan0);
     
+    Debug::out(LOG_DEBUG, "NetworkSettings::loadOnRaspbian() - reading from file %s", NETWORK_DHCPCD_FILE);
     FILE *f = fopen(NETWORK_DHCPCD_FILE, "rt");                 // read static IP config from DHCPCD file
     
     if(!f) {
@@ -40,6 +41,10 @@ void NetworkSettings::loadOnRaspbian(void)
             continue;
         }
         
+        if(strlen(line) < 2) {                                  // skip empty line
+            continue;
+        }
+        
         // found start of interface section?
         if(strstr(line, "interface ") != NULL) {
             if(strstr(line, "eth0") != NULL) {                  // found eth0 section?
@@ -52,9 +57,7 @@ void NetworkSettings::loadOnRaspbian(void)
                 initNetSettings(currentIface);                  // clear the struct
             }
 
-            if(!currentIface) {                                 // it wasn't eth0 and it wasn't wlan0?
-                continue;
-            }
+            continue;                                           // nothing usefull in this line
         }
 
         if(!currentIface) {                                     // current interface not (yet) set? skip the rest
@@ -64,8 +67,8 @@ void NetworkSettings::loadOnRaspbian(void)
         if(strstr(line, "static ip_address=") != NULL) {        // static IP?
             currentIface->dhcpNotStatic = false;                // static config
             
-            ires = sscanf(line + 18, "%s/%d", tmp1, &cidr);     // try to read IP and netmask
-            
+            ires = sscanf(line + 18, "%[^/]/%d", tmp1, &cidr);     // try to read IP and netmask
+
             if(ires == 2) {
                 currentIface->address = tmp1;
                 
@@ -102,32 +105,38 @@ void NetworkSettings::loadOnRaspbian(void)
 
 void NetworkSettings::saveOnRaspbian(void)
 {
-    FILE *f = fopen(NETWORK_CONFIG_FILE, "wt");
-    
-    if(f) {         // could open file
-        // lo section
-        fprintf(f, "# The loopback network interface\n");
-        fprintf(f, "auto lo\n");
-        fprintf(f, "iface lo inet loopback\n\n");
-        
-        // eth section
-        fprintf(f, "# The primary network interface\n");
-        writeNetInterfaceSettingsRaspbian(f, &eth0, "eth0");
-        
-        // wlan section
-        fprintf(f, "# The wireless network interface\n");
-        writeNetInterfaceSettingsRaspbian(f, &wlan0, "wlan0");
-
-        fclose(f);
-    } else {        // couldn't open file
-        Debug::out(LOG_ERROR, "NetworkSettings::saveOnRaspbian - failed to open network settings file.\n");
-        return;
-    }
+    Debug::out(LOG_DEBUG, "NetworkSettings::saveOnRaspbian()");
+    saveDhcpcdRaspbian();
+    raspbianSaveToNetworkInterfaces();
     
     saveWpaSupplicant();
     saveNameserver();
+}
+
+void NetworkSettings::raspbianSaveToNetworkInterfaces(void)
+{
+    Debug::out(LOG_DEBUG, "NetworkSettings::raspbianSaveToNetworkInterfaces() - writing to file %s", NETWORK_CONFIG_FILE);
+    FILE *f = fopen(NETWORK_CONFIG_FILE, "wt");
     
-    saveDhcpcdRaspbian();
+    if(!f) {         // could open file
+        Debug::out(LOG_ERROR, "NetworkSettings::raspbianSaveToNetworkInterfaces - failed to open network settings file.\n");
+        return;
+    }
+
+    // lo section
+    fprintf(f, "# The loopback network interface\n");
+    fprintf(f, "auto lo\n");
+    fprintf(f, "iface lo inet loopback\n\n");
+    
+    // eth section
+    fprintf(f, "# The primary network interface\n");
+    writeNetInterfaceSettingsRaspbian(f, &eth0, "eth0");
+    
+    // wlan section
+    fprintf(f, "# The wireless network interface\n");
+    writeNetInterfaceSettingsRaspbian(f, &wlan0, "wlan0");
+
+    fclose(f);
 }
 
 void NetworkSettings::writeNetInterfaceSettingsRaspbian(FILE *f, TNetInterface *iface, const char *ifaceName)
@@ -148,6 +157,7 @@ void NetworkSettings::writeNetInterfaceSettingsRaspbian(FILE *f, TNetInterface *
 
 void NetworkSettings::saveDhcpcdRaspbian(void)
 {
+    Debug::out(LOG_DEBUG, "NetworkSettings::saveDhcpcdRaspbian() - writing to file %s", NETWORK_DHCPCD_FILE);
     FILE *f = fopen(NETWORK_DHCPCD_FILE, "wt");
 
     if(!f) {         // could open file
@@ -195,5 +205,4 @@ void NetworkSettings::writeDhcpcdSettingsRaspbian(FILE *f, TNetInterface *iface,
     fprintf(f, "static routers=%s\n",               iface->gateway.c_str());
     fprintf(f, "static domain_name_servers=%s\n\n", nameserver.c_str());
 }
-
 

@@ -33,7 +33,7 @@ public:
     void load(void);
     void save(void);
 
-    void updateResolvConf(void);
+    void updateResolvConf(bool autoLoadBeforeSave);
     
     TNetInterface   eth0;
     TNetInterface   wlan0;
@@ -47,6 +47,7 @@ private:
     void loadOnRaspbian(void);
     void saveOnRaspbian(void);
 
+    void raspbianSaveToNetworkInterfaces(void);
     void initNetSettings(TNetInterface *neti);
     void readString(const char *line, const char *tag, std::string &val, bool singleWordLine);
     void dumpSettings(void);
