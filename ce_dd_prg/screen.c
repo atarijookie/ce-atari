@@ -62,7 +62,8 @@ void screenworker(void)
 void sendScreenShot(void)
 {
 	WORD *pxPal         =    (WORD*)  0xffff8240;
-	BYTE *pxScreen      =   (BYTE *) (*((DWORD*) 0x44e));
+	/*BYTE *pxScreen      =   (BYTE *) (*((DWORD*) 0x44e));*/
+	BYTE *pxScreen      = (BYTE *)(((DWORD)*((BYTE*)0xffff8203) << 8) | ((DWORD)*((BYTE*)0xffff8201) << 16));
 	BYTE  screenMode    = (*((BYTE*)  0xffff8260)) & 3;
 
     //---------------------------
