@@ -145,12 +145,12 @@ depend:	$(DEPS)
 %.o:	%.cpp %.d
 
 %.d:	%.cpp
-	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -o $@ $<
 
 %.o:	%.c %.d
 
 %.d:	%.c
-	$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $<
 
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(MAKECMDGOALS),depclean)
