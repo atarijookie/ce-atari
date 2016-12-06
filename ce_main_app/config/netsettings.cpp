@@ -56,24 +56,27 @@ void NetworkSettings::replaceIPonDhcpIface(void)
         return;
     }
 
-    BYTE tmp[10];
-    Utils::getIpAdds(tmp);                                  // get real IPs
+    BYTE ips[10];
+    BYTE masks[10];
+    Utils::getIpAdds(ips, masks);                           // get real IPs
     
     if(eth0.dhcpNotStatic) {                                // eth0 is DHCP? replace config file values with real values
-        char addr[32];
-        sprintf(addr, "%d.%d.%d.%d", (int) tmp[1], (int) tmp[2], (int) tmp[3], (int) tmp[4]);
+        char addr[32], mask[32];
+        sprintf(addr, "%d.%d.%d.%d", (int) ips[1], (int) ips[2], (int) ips[3], (int) ips[4]);
+        sprintf(mask, "%d.%d.%d.%d", (int) masks[1], (int) masks[2], (int) masks[3], (int) masks[4]);
         
         eth0.address    = addr;
-        eth0.netmask    = "";
+        eth0.netmask    = mask;
         eth0.gateway    = "";
     }
     
     if(wlan0.dhcpNotStatic) {                                // wlan0 is DHCP? replace config file values with real values
-        char addr[32];
-        sprintf(addr, "%d.%d.%d.%d", (int) tmp[6], (int) tmp[7], (int) tmp[8], (int) tmp[9]);
+        char addr[32], mask[32];
+        sprintf(addr, "%d.%d.%d.%d", (int) ips[6], (int) ips[7], (int) ips[8], (int) ips[9]);
+        sprintf(mask, "%d.%d.%d.%d", (int) masks[6], (int) masks[7], (int) masks[8], (int) masks[9]);
         
         wlan0.address   = addr;
-        wlan0.netmask   = "";
+        wlan0.netmask   = mask;
         wlan0.gateway   = "";
     }
 }
