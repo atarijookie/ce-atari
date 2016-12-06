@@ -513,26 +513,33 @@ void sigint_handler(int sig)
 
 bool otherInstanceIsRunning(void)
 {
-    singleInstanceSocketFd = socket(AF_INET, SOCK_DGRAM, 0);
+#ifdef DISTRO_YOCTO
+    const char *countCosmosExCmd = "ps | grep cosmos | grep -v cosmos | wc -l > /tmp/cosmoscount";
+#else
+    const char *countCosmosExCmd = "ps -A | grep cosmos | wc -l > /tmp/cosmoscount";
+#endif
 
-    if(singleInstanceSocketFd == -1) {
-        Debug::out(LOG_ERROR, "otherInstanceIsRunning - failed to create socket");
-        return true;
+    // count how many cosmos processes are running, store it in /tmp/cosmoscount
+    system(countCosmosExCmd);
+    
+    FILE *f = fopen("/tmp/cosmoscount", "rt");
+    if(!f) {                                    // can't open file? other instance probably not running (or is, but can't figure out, so screw it)
+        Debug::out(LOG_DEBUG, "otherInstanceIsRunning - couldn't open /tmp/cosmoscount, returning false");
+        return false;
     }
     
-    struct sockaddr_in netAddrForBind;
-    netAddrForBind.sin_family       = AF_INET;
-    netAddrForBind.sin_port         = htons (32100);
-    netAddrForBind.sin_addr.s_addr  = htonl (INADDR_ANY);
-    int rc = bind(singleInstanceSocketFd, (struct sockaddr *) &netAddrForBind, sizeof (netAddrForBind));    
+    int res, cnt;
+    res = fscanf(f, "%d", &cnt);                // try to read the number
+    fclose(f);
     
-    if(rc == -1) {      // failed bind? other instance is running and using that port
-        Debug::out(LOG_ERROR, "otherInstanceIsRunning - bind() failed, so other instance is running");
-        return true;
+    if(res != 1) {                              // couldn't read the number? say we're not running more than once
+        Debug::out(LOG_DEBUG, "otherInstanceIsRunning - fscanf failed, returning false");
+        return false;
     }
     
-    // if came here, no other instance is running
-    Debug::out(LOG_ERROR, "otherInstanceIsRunning - bind() succeeded, so other instance is not running");
-    return false;
+    bool isOtherRunning = cnt > 1;              // more than 1 instance? other instance is running
+
+    Debug::out(LOG_DEBUG, "otherInstanceIsRunning - count of instances: %d, returning %s", cnt, isOtherRunning ? "true" : "false");
+    return isOtherRunning;
 }
 
