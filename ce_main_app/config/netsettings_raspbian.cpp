@@ -148,6 +148,16 @@ void NetworkSettings::writeNetInterfaceSettingsRaspbian(FILE *f, TNetInterface *
 
     fprintf(f, "iface %s inet %s\n", ifaceName, iface->dhcpNotStatic ? "dhcp" : "manual");
 
+    // this section doesn't need to go here, but in case you will stop using dhcp, then the old scripts might find the config here
+    if(iface->dhcpNotStatic) {
+        fprintf(f, "hostname %s\n", hostname.c_str());         // this should appear in dhcp client list 
+    } else {
+        fprintf(f, "hostname %s\n", hostname.c_str());         // not really used when not dhcp, but storing it to preserve it
+        fprintf(f, "address %s\n",  iface->address.c_str());
+        fprintf(f, "netmask %s\n",  iface->netmask.c_str()); 
+        fprintf(f, "gateway %s\n",  iface->gateway.c_str());
+    }
+
     if(isWlan) {
         fprintf(f, "    wpa-conf %s\n", WPA_SUPPLICANT_FILE);
     }
