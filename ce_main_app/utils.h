@@ -33,7 +33,7 @@ public:
     static void SWAPWORD(WORD &w);
     static WORD SWAPWORD2(WORD w);
 
-    static void getIpAdds(BYTE *bfr);
+    static void getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks=NULL);
     
     static void forceSync(void);
 

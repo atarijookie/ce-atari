@@ -71,7 +71,7 @@ depend:	$(DEPS)
 %.o: %.c %.d
 
 %.d:	%.c
-	$(AT)$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $^
+	$(AT)$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $<
 
 clean:	depclean
 	$(AT)$(RM) $(TARGET) *~ *.o

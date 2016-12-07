@@ -47,7 +47,7 @@ extern volatile bool floppyEncodingRunning;
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
     NetworkSettings ns;
-    ns.updateResolvConf();    
+    ns.updateResolvConf(true);
 
     Update::initialize();
 

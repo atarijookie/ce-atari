@@ -59,7 +59,7 @@ const char *distroString = "Raspbian";
 #endif
 
 bool otherInstanceIsRunning(void);
-int pidFileFd;
+int  singleInstanceSocketFd;
 
 int main(int argc, char *argv[])
 {
@@ -302,8 +302,8 @@ int main(int argc, char *argv[])
     printf("Downloader clean up before quit\n");
     Downloader::cleanupBeforeQuit();
 
-    if(pidFileFd > 0) {                                 // if we got the PID file, close it
-        close(pidFileFd);
+    if(singleInstanceSocketFd > 0) {                    // if we got the single instance socket, close it
+        close(singleInstanceSocketFd);
     }
     
     Debug::out(LOG_INFO, "CosmosEx terminated.");
@@ -513,21 +513,33 @@ void sigint_handler(int sig)
 
 bool otherInstanceIsRunning(void)
 {
-    // create pid file
-    pidFileFd = open("/var/run/cosmosex.pid", O_CREAT | O_RDWR, 0666);
+#ifdef DISTRO_YOCTO
+    const char *countCosmosExCmd = "ps | grep cosmos | grep -v cosmos | wc -l > /tmp/cosmoscount";
+#else
+    const char *countCosmosExCmd = "ps -A | grep cosmos | wc -l > /tmp/cosmoscount";
+#endif
+
+    // count how many cosmos processes are running, store it in /tmp/cosmoscount
+    system(countCosmosExCmd);
     
-    if(pidFileFd == -1) {   // failed to create pid file? other instance might be running
-        return true;
+    FILE *f = fopen("/tmp/cosmoscount", "rt");
+    if(!f) {                                    // can't open file? other instance probably not running (or is, but can't figure out, so screw it)
+        Debug::out(LOG_DEBUG, "otherInstanceIsRunning - couldn't open /tmp/cosmoscount, returning false");
+        return false;
     }
     
-    // lock pid file - exclusive, non blocking
-    int res = flock(pidFileFd, LOCK_EX | LOCK_NB);
+    int res, cnt;
+    res = fscanf(f, "%d", &cnt);                // try to read the number
+    fclose(f);
     
-    if(res == -1) {     // failed to lock the file? other instance might be running
-        return true;
+    if(res != 1) {                              // couldn't read the number? say we're not running more than once
+        Debug::out(LOG_DEBUG, "otherInstanceIsRunning - fscanf failed, returning false");
+        return false;
     }
     
-    // if came here, open and lock succeeded, no other instance is running
-    return false;
+    bool isOtherRunning = cnt > 1;              // more than 1 instance? other instance is running
+
+    Debug::out(LOG_DEBUG, "otherInstanceIsRunning - count of instances: %d, returning %s", cnt, isOtherRunning ? "true" : "false");
+    return isOtherRunning;
 }
 

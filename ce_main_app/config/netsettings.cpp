@@ -8,108 +8,46 @@
 
 #include "netsettings.h"
 
-#define NETWORK_CONFIG_FILE		"/etc/network/interfaces"
-#define NAMESERVER_FILE			"/etc/resolv.conf"
-
-#ifdef DISTRO_YOCTO
-    // for yocto
-    #define WPA_SUPPLICANT_FILE     "/etc/wpa_supplicant.conf"
-#else
-    // for raspbian
-    #define WPA_SUPPLICANT_FILE     "/etc/wpa_supplicant/wpa_supplicant.conf"
-#endif
-
 NetworkSettings::NetworkSettings(void)
 {
-	initNetSettings(&eth0);
-	initNetSettings(&wlan0);
-	
-	nameserver  = "";
+    initNetSettings(&eth0);
+    initNetSettings(&wlan0);
+    
+    nameserver  = "";
     hostname    = "CosmosEx";           // default hostname
 }
 
 void NetworkSettings::initNetSettings(TNetInterface *neti)
 {
-	neti->dhcpNotStatic	= true;
-	neti->address		= "";
-    neti->netmask		= "";
-    neti->gateway		= "";
-	
-	neti->wpaSsid		= "";
-	neti->wpaPsk		= "";
+    neti->dhcpNotStatic = true;
+    neti->address       = "";
+    neti->netmask       = "";
+    neti->gateway       = "";
+    
+    neti->wpaSsid       = "";
+    neti->wpaPsk        = "";
 }
 
 void NetworkSettings::load(void)
 {
-	FILE *f = fopen(NETWORK_CONFIG_FILE, "rt");
-	
-	if(!f) {
-		Debug::out(LOG_ERROR, (char *) "NetworkSettings::load - failed to open network settings file.\n");
-		return;
-	}
-	
-	initNetSettings(&eth0);
-	initNetSettings(&wlan0);
-	
-	#define MAX_LINE_LEN	1024
-	char line[MAX_LINE_LEN];
-	
-	TNetInterface *currentIface = NULL;							// store the settings to the struct pointed by this pointer
-	hostname = "CosmosEx";                                      // default hostname
-    
-	while(!feof(f)) {
-		char *res = fgets(line, MAX_LINE_LEN, f);				// get single line
-		
-		if(!res) {												// if failed to get the line
-			break;
-		}
-		
-		// found start of iface section?
-		if(strstr(line, "iface") != NULL) {
-			if(strstr(line, "eth0") != NULL) {					// found eth0 section?
-				currentIface = &eth0;
-				initNetSettings(currentIface);					// clear the struct
-			}
+    Debug::out(LOG_INFO, "NetworkSettings::load() - starting to load settings");
 
-			if(strstr(line, "wlan0") != NULL) {					// found wlan0 section?
-				currentIface = &wlan0;
-				initNetSettings(currentIface);					// clear the struct
-			}
+    #ifdef DISTRO_YOCTO
+    loadOnYocto();
+    #else
+    loadOnRaspbian();
+    #endif    
+}
 
-			if(!currentIface) {									// it wasn't eth0 and it wasn't wlan0?
-				continue;
-			}
-		
-			if(strstr(line, "inet dhcp") != NULL) {				// dhcp config?
-				currentIface->dhcpNotStatic = true;
-			}
+void NetworkSettings::save(void)
+{
+    Debug::out(LOG_INFO, "NetworkSettings::save() - starting to save settings");
 
-			if(strstr(line, "inet static") != NULL) {			// static config?
-				currentIface->dhcpNotStatic = false;
-			}
-		}
-
-        if(strstr(line, "hostname") != NULL) {			        // found hostname?
-            readString(line, (char *) "hostname", hostname, true);
-        }
-
-		if(!currentIface) {										// current interface not (yet) set? skip the rest
-			continue;
-		}
-
-		readString(line, (char *) "address",	currentIface->address, true);
-		readString(line, (char *) "netmask",	currentIface->netmask, true);
-		readString(line, (char *) "gateway",	currentIface->gateway, true);
-	}
-	
-	fclose(f);
-
-    loadWpaSupplicant();
-	loadNameserver();
-    
-    replaceIPonDhcpIface();
-    
-	dumpSettings();
+    #ifdef DISTRO_YOCTO
+    saveOnYocto();
+    #else
+    saveOnRaspbian();
+    #endif
 }
 
 void NetworkSettings::replaceIPonDhcpIface(void)
@@ -118,147 +56,129 @@ void NetworkSettings::replaceIPonDhcpIface(void)
         return;
     }
 
-    BYTE tmp[10];
-    Utils::getIpAdds(tmp);                                  // get real IPs
+    BYTE ips[10];
+    BYTE masks[10];
+    Utils::getIpAdds(ips, masks);                           // get real IPs
     
     if(eth0.dhcpNotStatic) {                                // eth0 is DHCP? replace config file values with real values
-        char addr[32];
-        sprintf(addr, "%d.%d.%d.%d", (int) tmp[1], (int) tmp[2], (int) tmp[3], (int) tmp[4]);
+        char addr[32], mask[32];
+        sprintf(addr, "%d.%d.%d.%d", (int) ips[1], (int) ips[2], (int) ips[3], (int) ips[4]);
+        sprintf(mask, "%d.%d.%d.%d", (int) masks[1], (int) masks[2], (int) masks[3], (int) masks[4]);
         
         eth0.address    = addr;
-        eth0.netmask	= "";
+        eth0.netmask    = mask;
         eth0.gateway    = "";
     }
     
     if(wlan0.dhcpNotStatic) {                                // wlan0 is DHCP? replace config file values with real values
-        char addr[32];
-        sprintf(addr, "%d.%d.%d.%d", (int) tmp[6], (int) tmp[7], (int) tmp[8], (int) tmp[9]);
+        char addr[32], mask[32];
+        sprintf(addr, "%d.%d.%d.%d", (int) ips[6], (int) ips[7], (int) ips[8], (int) ips[9]);
+        sprintf(mask, "%d.%d.%d.%d", (int) masks[6], (int) masks[7], (int) masks[8], (int) masks[9]);
         
         wlan0.address   = addr;
-        wlan0.netmask   = "";
+        wlan0.netmask   = mask;
         wlan0.gateway   = "";
     }
 }
 
-void NetworkSettings::readString(char *line, char *tag, std::string &val, bool singleWordLine)
+void NetworkSettings::readString(const char *line, const char *tag, std::string &val, bool singleWordLine)
 {
-	char *str = strstr(line, tag);					    // find tag position
+    const char *str = strstr(line, tag);                        // find tag position
 
-	if(str == NULL) {									// tag not present?
-		return;
-	}
-	
-	int tagLen = strlen(tag);							// get tag length
-	
-	char tmp[1024];
-	int ires;
+    if(str == NULL) {                                   // tag not present?
+        return;
+    }
+    
+    int tagLen = strlen(tag);                           // get tag length
+    
+    char tmp[1024];
+    int ires;
 
     if(singleWordLine) {                                // if line value is a single word - not containing spaces, use %s for reading
         ires = sscanf(str + tagLen + 1, "%s", tmp);
     } else {                                            // if line value might be more words (may contain spaces), use %[^\n] for reading of line
         ires = sscanf(str + tagLen + 1, "%[^\n]", tmp);
     }
-		
-	if(ires != 1) {										// reading value failed?
-		return;
-	}
+        
+    if(ires != 1) {                                     // reading value failed?
+        return;
+    }
 
-	val = tmp;											// store value
+    val = tmp;                                          // store value
 
-	if(val.length() < 1) {
-		return;
-	}
-	
-	if(val.at(0) == '"') {								// starts with double quotes? remove them
-		val.erase(0, 1);
-	}
-	
-	size_t pos = val.rfind("\"");						// find last occurrence or double quotes
-	if(pos != std::string::npos) {						// erase last double quotes
-		val.erase(pos, 1);
-	}	
+    if(val.length() < 1) {
+        return;
+    }
+    
+    if(val.at(0) == '"') {                              // starts with double quotes? remove them
+        val.erase(0, 1);
+    }
+    
+    size_t pos = val.rfind("\"");                       // find last occurrence or double quotes
+    if(pos != std::string::npos) {                      // erase last double quotes
+        val.erase(pos, 1);
+    }   
 }
 
 void NetworkSettings::dumpSettings(void)
 {
-	Debug::out(LOG_DEBUG, (char *) "Network settings");
-	Debug::out(LOG_DEBUG, (char *) "eth0:");
-	Debug::out(LOG_DEBUG, (char *) "      DHCP %s", eth0.dhcpNotStatic ? "enabled" : "disabled");
-	Debug::out(LOG_DEBUG, (char *) "  hostname %s", (char *) hostname.c_str());
-	Debug::out(LOG_DEBUG, (char *) "   address %s", (char *) eth0.address.c_str());
-	Debug::out(LOG_DEBUG, (char *) "   netmask %s", (char *) eth0.netmask.c_str());
-	Debug::out(LOG_DEBUG, (char *) "   gateway %s", (char *) eth0.gateway.c_str());
+    Debug::out(LOG_DEBUG, "Network settings");
+    Debug::out(LOG_DEBUG, "eth0:");
+    Debug::out(LOG_DEBUG, "      DHCP %s", eth0.dhcpNotStatic ? "enabled" : "disabled");
+    Debug::out(LOG_DEBUG, "  hostname %s", hostname.c_str());
+    Debug::out(LOG_DEBUG, "   address %s", eth0.address.c_str());
+    Debug::out(LOG_DEBUG, "   netmask %s", eth0.netmask.c_str());
+    Debug::out(LOG_DEBUG, "   gateway %s", eth0.gateway.c_str());
 
-	Debug::out(LOG_DEBUG, (char *) "");
-	Debug::out(LOG_DEBUG, (char *) "wlan0:");
-	Debug::out(LOG_DEBUG, (char *) "      DHCP %s", wlan0.dhcpNotStatic ? "enabled" : "disabled");
-	Debug::out(LOG_DEBUG, (char *) "  hostname %s", (char *) hostname.c_str());
-	Debug::out(LOG_DEBUG, (char *) "   address %s", (char *) wlan0.address.c_str());
-	Debug::out(LOG_DEBUG, (char *) "   netmask %s", (char *) wlan0.netmask.c_str());
-	Debug::out(LOG_DEBUG, (char *) "   gateway %s", (char *) wlan0.gateway.c_str());
-	Debug::out(LOG_DEBUG, (char *) "  wpa-ssid %s", (char *) wlan0.wpaSsid.c_str());
-	Debug::out(LOG_DEBUG, (char *) "   wpa-psk %s", (char *) wlan0.wpaPsk.c_str());
-	
-	Debug::out(LOG_DEBUG, (char *) "nameserver %s", (char *) nameserver.c_str());
-}
-
-void NetworkSettings::save(void)
-{
-	FILE *f = fopen(NETWORK_CONFIG_FILE, "wt");
-	
-	if(!f) {
-		Debug::out(LOG_ERROR, (char *) "NetworkSettings::save - failed to open network settings file.\n");
-		return;
-	}
-	
-	// lo section
-	fprintf(f, "# The loopback network interface\n");
-	fprintf(f, "auto lo\n");
-	fprintf(f, "iface lo inet loopback\n\n");
-	
-	// eth section
-	fprintf(f, "# The primary network interface\n");
-    writeNetInterfaceSettings(f, eth0, (char *) "eth0");
-	
-	// wlan section
-	fprintf(f, "# The wireless network interface\n");
-    writeNetInterfaceSettings(f, wlan0, (char *) "wlan0");
-
-  	fprintf(f, "wpa-conf %s \n\n", WPA_SUPPLICANT_FILE);
-	
-	fclose(f);
-	
-    saveWpaSupplicant();
-	saveNameserver();
-}
-
-void NetworkSettings::writeNetInterfaceSettings(FILE *f, TNetInterface &iface, char *ifaceName)
-{
-	fprintf(f, "auto %s\n", ifaceName);
-	fprintf(f, "iface %s inet ", ifaceName);
-	
-	if(iface.dhcpNotStatic) {
-		fprintf(f, "dhcp\n");
-        fprintf(f, "hostname %s\n", (char *) hostname.c_str());         // this should appear in dhcp client list 
-	} else {
-		fprintf(f, "static\n");
-        fprintf(f, "hostname %s\n", (char *) hostname.c_str());         // not really used when not dhcp, but storing it to preserve it
-	    fprintf(f, "address %s\n", (char *) iface.address.c_str());
-		fprintf(f, "netmask %s\n", (char *) iface.netmask.c_str()); 
-		fprintf(f, "gateway %s\n", (char *) iface.gateway.c_str());
-	}
+    Debug::out(LOG_DEBUG, "");
+    Debug::out(LOG_DEBUG, "wlan0:");
+    Debug::out(LOG_DEBUG, "      DHCP %s", wlan0.dhcpNotStatic ? "enabled" : "disabled");
+    Debug::out(LOG_DEBUG, "  hostname %s", hostname.c_str());
+    Debug::out(LOG_DEBUG, "   address %s", wlan0.address.c_str());
+    Debug::out(LOG_DEBUG, "   netmask %s", wlan0.netmask.c_str());
+    Debug::out(LOG_DEBUG, "   gateway %s", wlan0.gateway.c_str());
+    Debug::out(LOG_DEBUG, "  wpa-ssid %s", wlan0.wpaSsid.c_str());
+    Debug::out(LOG_DEBUG, "   wpa-psk %s", wlan0.wpaPsk.c_str());
     
-	fprintf(f, "\n");
+    Debug::out(LOG_DEBUG, "nameserver %s", nameserver.c_str());
+}
+
+int NetworkSettings::ipNetmaskToCIDRnetmask(const char *ipNetmask)
+{
+    int a,b,c,d, res;
+    
+    res = sscanf(ipNetmask, "%d.%d.%d.%d", &a, &b, &c, &d);
+
+    int cidr = 24;      // default: 24 - means 255.255.255.0
+    if(res == 4) {
+        if(a == 255 && b == 255 && c == 255 && d == 255) {
+            cidr = 32;
+        }
+
+        if(a == 255 && b == 255 && c == 255 && d == 0) {
+            cidr = 24;
+        }
+
+        if(a == 255 && b == 255 && c == 0   && d == 0) {
+            cidr = 16;
+        }
+
+        if(a == 255 && b == 0   && c == 0   && d == 0) {
+            cidr = 8;
+        }
+    } 
+    
+    return cidr;
 }
 
 void NetworkSettings::saveWpaSupplicant(void)
 {
-	FILE *f = fopen(WPA_SUPPLICANT_FILE, "wt");
-	
-	if(!f) {
-		Debug::out(LOG_ERROR, (char *) "NetworkSettings::saveWpaSupplicant - failed to open wpa supplication file.\n");
-		return;
-	}
+    FILE *f = fopen(WPA_SUPPLICANT_FILE, "wt");
+    
+    if(!f) {
+        Debug::out(LOG_ERROR, "NetworkSettings::saveWpaSupplicant - failed to open wpa supplication file.\n");
+        return;
+    }
     
 #ifdef DISTRO_YOCTO
     // do this for yocto
@@ -271,8 +191,8 @@ void NetworkSettings::saveWpaSupplicant(void)
 #endif
 
     fprintf(f, "network={\n");
-	fprintf(f, "    ssid=\"%s\"\n",	(char *) wlan0.wpaSsid.c_str()); 
-	fprintf(f, "    psk=\"%s\"\n",	(char *) wlan0.wpaPsk.c_str());
+    fprintf(f, "    ssid=\"%s\"\n", wlan0.wpaSsid.c_str()); 
+    fprintf(f, "    psk=\"%s\"\n",  wlan0.wpaPsk.c_str());
     fprintf(f, "}\n\n");
 
     fclose(f);
@@ -280,34 +200,34 @@ void NetworkSettings::saveWpaSupplicant(void)
 
 void NetworkSettings::loadWpaSupplicant(void)
 {
-	FILE *f = fopen(WPA_SUPPLICANT_FILE, "rt");
-	
-	if(!f) {
-		Debug::out(LOG_ERROR, (char *) "NetworkSettings::loadWpaSupplicant - failed to open wpa supplicant file, this might be OK\n");
-		return;
-	}
-	
-	#define MAX_LINE_LEN	1024
-	char line[MAX_LINE_LEN];
-	
-	while(!feof(f)) {
-		char *res = fgets(line, MAX_LINE_LEN, f);				// get single line
-		
-		if(!res) {												// if failed to get the line
-			break;
-		}
-		
+    FILE *f = fopen(WPA_SUPPLICANT_FILE, "rt");
+    
+    if(!f) {
+        Debug::out(LOG_ERROR, "NetworkSettings::loadWpaSupplicant - failed to open wpa supplicant file, this might be OK\n");
+        return;
+    }
+    
+    #define MAX_LINE_LEN    1024
+    char line[MAX_LINE_LEN];
+    
+    while(!feof(f)) {
+        char *res = fgets(line, MAX_LINE_LEN, f);               // get single line
+        
+        if(!res) {                                              // if failed to get the line
+            break;
+        }
+        
         char *p;
         
         p = strstr(line, "ssid");                               // it's a line with SSID?
         if(p != NULL) {
-            readString(line, (char *) "ssid", wlan0.wpaSsid, false);
+            readString(line, "ssid", wlan0.wpaSsid, false);
             continue;
         }
         
         p = strstr(line, "psk");                                // it's a line with PSK?
         if(p != NULL) {
-            readString(line, (char *) "psk", wlan0.wpaPsk, false);
+            readString(line, "psk", wlan0.wpaPsk, false);
             continue;
         }
     }
@@ -318,20 +238,22 @@ void NetworkSettings::loadWpaSupplicant(void)
 void NetworkSettings::loadNameserver(void)
 {
     Settings s;
-    nameserver = s.getString((char *) "NAMESERVER", (char *) "");
+    nameserver = s.getString("NAMESERVER", "");
 }
 
 void NetworkSettings::saveNameserver(void)
 {
     Settings s;
-    s.setString((char *) "NAMESERVER", (char *) nameserver.c_str());
+    s.setString("NAMESERVER", nameserver.c_str());
 
-    updateResolvConf();                                 // update resolv.conf
+    updateResolvConf(false);                            // update resolv.conf, no auto load
 }
 
-void NetworkSettings::updateResolvConf(void)
+void NetworkSettings::updateResolvConf(bool autoLoadBeforeSave)
 {
-    load();                                             // first load the settings
+    if(autoLoadBeforeSave) {
+        load();                                         // first load the settings
+    }
 
     if(eth0.dhcpNotStatic && wlan0.dhcpNotStatic) {     // if eth0 and wlan0 are DCHP, don't do anything
         Debug::out(LOG_ERROR, "NetworkSettings::updateResolvConf -- didn't update resolv.conf - network settings are DHCP");
@@ -352,7 +274,7 @@ void NetworkSettings::updateResolvConf(void)
     system("mv /etc/resolv.conf /tmp/resolv.old");          
     
     // now fill the (non-existing) resolv.conf with what we want
-    sprintf(cmd, "echo -e 'nameserver %s\n' > /etc/resolv.conf", (char *) nameserver.c_str());
+    sprintf(cmd, "echo -e 'nameserver %s\n' > /etc/resolv.conf", nameserver.c_str());
     system(cmd);
      
      // and append old resolv.conf to the new one

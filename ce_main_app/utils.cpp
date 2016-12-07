@@ -301,12 +301,16 @@ WORD Utils::SWAPWORD2(WORD w)
     return w;
 }
 
-void Utils::getIpAdds(BYTE *bfr)
+void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
 {
     struct ifaddrs *ifaddr, *ifa;
     int family, n;
 
-    memset(bfr, 0, 10);                                         // set to 0 - this means 'not present'
+    memset(bfrIPs, 0, 10);                                          // set to 0 - this means 'not present'
+    
+    if(bfrMasks) {
+        memset(bfrMasks, 0, 10);                                    // set to 0 - this means 'not present'
+    }
 
     if (getifaddrs(&ifaddr) == -1) {
         return;
@@ -323,27 +327,48 @@ void Utils::getIpAdds(BYTE *bfr)
             continue;
         }
 
-        sockaddr_in *sai    = (sockaddr_in *) ifa->ifa_addr;
-        DWORD ip            = sai->sin_addr.s_addr;
+        sockaddr_in *saiIp  = (sockaddr_in *) ifa->ifa_addr;
+        sockaddr_in *saiMsk = (sockaddr_in *) ifa->ifa_netmask;
+        
+        DWORD ip            = saiIp->sin_addr.s_addr;
+        DWORD mask          = saiMsk->sin_addr.s_addr;
 
-        BYTE *p = NULL;
+        BYTE *pIp   = NULL;
+        BYTE *pMsk  = NULL;
+        
         if(strcmp(ifa->ifa_name,"eth0")==0) {                   // for eth0 - store at offset 0
-            p = bfr;
+            pIp = bfrIPs;
+            
+            if(bfrMasks) {                                      // got masks buffer? store offset 0
+                pMsk = bfrMasks;
+            }
         }
 
         if(strcmp(ifa->ifa_name,"wlan0")==0) {                  // for wlan0 - store at offset 5
-            p = bfr + 5;
+            pIp = bfrIPs + 5;
+            
+            if(bfrMasks) {                                      // got masks buffer? store offset 5
+                pMsk = bfrMasks + 5;
+            }
         }
 
-        if(p == NULL) {                                         // if not an interface we're interested in, skip it
+        if(pIp == NULL) {                                       // if not an interface we're interested in, skip it
             continue;
         }
 
-        p[0] = 1;                                               // enabled?
-        p[1] = (BYTE)  ip;                                      // store the ip
-        p[2] = (BYTE) (ip >>  8);
-        p[3] = (BYTE) (ip >> 16);
-        p[4] = (BYTE) (ip >> 24);
+        pIp[0] = 1;                                             // enabled?
+        pIp[1] = (BYTE)  ip;                                    // store the ip
+        pIp[2] = (BYTE) (ip >>  8);
+        pIp[3] = (BYTE) (ip >> 16);
+        pIp[4] = (BYTE) (ip >> 24);
+        
+        if(pMsk) {
+            pMsk[0] = 1;                                        // enabled?
+            pMsk[1] = (BYTE)  mask;                             // store the mask
+            pMsk[2] = (BYTE) (mask >>  8);
+            pMsk[3] = (BYTE) (mask >> 16);
+            pMsk[4] = (BYTE) (mask >> 24);
+        }
     }
 
     freeifaddrs(ifaddr);
