@@ -9,7 +9,7 @@
 #define HEARTBEATSTATECHAR_COUNT    4
 char heartBeatStateChar[HEARTBEATSTATECHAR_COUNT] = {'|', '/', '-', '\\'}; 
 
-ConfigComponent::ConfigComponent(ConfigStream *parent, ComponentType type, std::string text, WORD maxLen, int x, int y, int gotoOffset)
+ConfigComponent::ConfigComponent(ConfigStream *parent, ComponentType type, std::string text, unsigned int maxLen, int x, int y, int gotoOffset)
 {
     confStream = parent;
 
@@ -17,6 +17,10 @@ ConfigComponent::ConfigComponent(ConfigStream *parent, ComponentType type, std::
     onChBEnter  = 0;
 
     cursorPos = 0;
+    
+    isLimitedShowSize   = false;
+    showSize            = maxLen;           // number of characters that this editline will show (e.g. maxLen is 63 chars, but we want to show only 15 chars at any time, and scroll the rest
+    showWindowStart     = 0;                // starting character where the shown window content is shown (e.g. when this is 20, maxLen is 63, showSize is 15, the component should show characters 20 to 35)
 
     heartBeatState  = 0;
     
@@ -64,7 +68,7 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
             bfr = terminal_addReverse(bfr, true);
         }
 
-        for(int i=0; i<maxLen; i++) {               // fill with spaces
+        for(int i=0; i<((int) maxLen); i++) {       // fill with spaces
             bfr[i] = ' ';
         }
 
@@ -87,10 +91,10 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
             bfr = terminal_addReverse(bfr, true);
         }
 
-        bfr[         0] = '[';
-        bfr[maxLen + 1] = ']';
+        bfr[           0] = '[';
+        bfr[showSize + 1] = ']';
 
-        for(int i=0; i<maxLen; i++) {                   // fill with spaces
+        for(int i=0; i<((int) showSize); i++) {         // pre-fill with spaces
             bfr[i+1] = ' ';
         }
 
@@ -100,8 +104,27 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
             displayText = std::string(text.length(), '*');
         }
 
-        strncpy((char *) bfr+1, displayText.c_str(), displayText.length()); // copy the text
-        bfr += maxLen + 2;                                                  // +2 because of [ and ]
+        if(showSize == maxLen) {                        // if full text is shown
+            strncpy((char *) bfr+1, displayText.c_str(), displayText.length()); // copy the text
+            bfr += maxLen + 2;                                                  // +2 because of [ and ]
+        } else {                                        // if partial text is shown
+            const char *pText   = displayText.c_str();
+            size_t textLen      = displayText.length();
+            
+            if(textLen > showWindowStart) {             // if the text is long enough to show after showing only part (starting at showWindowStart), show it
+                pText   += showWindowStart;
+                textLen -= showWindowStart;
+                
+                if(textLen > showSize) {                // if the text still would be long, then shorten it
+                    textLen = showSize;
+                }
+
+                strncpy((char *) bfr+1, pText, textLen);    // copy the text
+            }
+        
+            bfr += showSize + 2;                                                // +2 because of [ and ]
+        }
+        
 
         if(hasFocus) {                                  // if has focus, stop reverse
             bfr = terminal_addReverse(bfr, false);
@@ -200,7 +223,7 @@ void ConfigComponent::setIsChecked(bool isChecked)
     checked = isChecked;
 
     text.resize(maxLen);
-    for(int i=0; i<maxLen; i++) {               // fill with spaces
+    for(int i=0; i<((int) maxLen); i++) {       // fill with spaces
         text[i] = ' ';
     }
 
@@ -245,6 +268,7 @@ void ConfigComponent::onKeyPressed(BYTE key)
     if(type == editline || type == editline_pass) { // for editLine better use separate function
         changed = true;                             // mark that we got new data and we should display them
         handleEditLineKeyPress(key);
+        updateShownWindowPositionAccordingToCursor();   // update shown window position based on cursor position
     }
 }
 
@@ -289,7 +313,6 @@ void ConfigComponent::handleEditLineKeyPress(BYTE key)
                 cursorPos--;
             }
         }
-
         return;
     }
 
@@ -297,7 +320,6 @@ void ConfigComponent::handleEditLineKeyPress(BYTE key)
         if(text.length() > 0 && cursorPos < text.length()) {    // we got some text and we're not at the end of the line?
             text.erase(cursorPos, 1);                           // delete char at cursor
         }
-
         return;
     }
 
@@ -326,9 +348,40 @@ void ConfigComponent::handleEditLineKeyPress(BYTE key)
     }
 }
 
+void ConfigComponent::updateShownWindowPositionAccordingToCursor(void)
+{
+    if(cursorPos < showWindowStart) {               // if cursor would go LEFT out of shown window, move shown window start to left
+        showWindowStart--;
+    }
+
+    if(cursorPos > (showWindowStart + showSize)) {  // if cursor would go RIGHT out of shown window, move shown window start to right
+        showWindowStart++;
+    }
+
+    if(cursorPos == 0) {                            // cursor on start of line? shown window start to start of line
+        showWindowStart = 0;
+    }
+
+    if(cursorPos == text.length()) {                // cursor on the end of line? show window start to (end of line - showSize)
+        if(text.length() > showSize) {              // text is longer than what we can show? Show just last part.
+            showWindowStart = text.length() - showSize;
+        } else {                                    // text is shorter than what we can show? Show it all.
+            showWindowStart = 0;
+        }
+    }
+}
+
 void ConfigComponent::setTextOptions(int newOpts)
 {
     textOptions = newOpts;
+}
+
+// set how many characters we can see at one time
+void ConfigComponent::setLimitedShowSize(unsigned int newShowSize)
+{
+    showSize            = newShowSize;      // number of characters that this editline will show (e.g. maxLen is 63 chars, but we want to show only 15 chars at any time, and scroll the rest
+    showWindowStart     = 0;                // starting character where the shown window content is shown (e.g. when this is 20, maxLen is 63, showSize is 15, the component should show characters 20 to 35)
+    isLimitedShowSize   = true;
 }
 
 BYTE ConfigComponent::filterTextKey(BYTE key)
@@ -505,7 +558,14 @@ BYTE *ConfigComponent::terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt)
     bfr = terminal_addCursorOn(bfr, true);
     cnt += 2;
 
-    bfr = terminal_addGoto(bfr, posX + 1 + cursorPos, posY);      // add goto(x,y) at cursor position
+    int gotoCursorPos;
+    if(isLimitedShowSize) {                         // shown only limited text? calculate the on-screen cursor position
+        gotoCursorPos = cursorPos - showWindowStart;
+    } else {                                        // shown whole text? just go to cursor position
+        gotoCursorPos = cursorPos;
+    }
+    
+    bfr = terminal_addGoto(bfr, posX + 1 + gotoCursorPos, posY);      // add goto(x,y) at cursor position
     cnt += 4;
     
     return bfr;

@@ -22,7 +22,7 @@ public:
     enum ComponentType{ label, button, checkbox, editline, editline_pass, heartBeat };
 
     // maxLen is maximum length of text, that means that on screen it might have 2 more ('[' and ']')
-    ConfigComponent(ConfigStream *parent, ComponentType type, std::string text, WORD maxLen, int x, int y, int gotoOffset);
+    ConfigComponent(ConfigStream *parent, ComponentType type, std::string text, unsigned int maxLen, int x, int y, int gotoOffset);
     void setCheckboxGroupIds(int groupId, int checkboxId);
     void getCheckboxGroupIds(int& groupId, int& checkboxId);
     bool isGroupCheckBox(void);
@@ -39,6 +39,7 @@ public:
     void setText(std::string text);
     void getText(std::string &text);
     void setTextOptions(int newOpts);
+    void setLimitedShowSize(unsigned int newShowSize);                // set how many characters we can see at one time
 
     bool isFocused(void);
     bool isChecked(void);
@@ -63,15 +64,20 @@ private:
     ComponentType   type;
     int             posX, posY;
     int             gotoOffset;
-    WORD            maxLen;
+    unsigned int    maxLen;         // maximum number of characters that this component can contain
     std::string     text;
 
     int             componentId;
 
     // for editline
-    WORD            cursorPos;
+    unsigned int    cursorPos;
     int             textOptions;
 
+    // for editline, which has scrollable content
+    bool            isLimitedShowSize;
+    unsigned int    showSize;           // number of characters that this editline will show (e.g. maxLen is 63 chars, but we want to show only 15 chars at any time, and scroll the rest
+    unsigned int    showWindowStart;    // starting character where the shown window content is shown (e.g. when this is 20, maxLen is 63, showSize is 15, the component should show characters 20 to 35)
+    
     // for checkbox
     int             checkBoxGroup;
     int             checkBoxId;
@@ -94,6 +100,8 @@ private:
     bool isSmallLetter(BYTE key);
     bool isNumber(BYTE key);
     bool isOther(BYTE key);
+    
+    void updateShownWindowPositionAccordingToCursor(void);
 };
 
 #endif

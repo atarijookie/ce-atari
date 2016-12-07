@@ -241,16 +241,20 @@ void ConfigStream::createScreen_network(void)
     comp = new ConfigComponent(this, ConfigComponent::editline, "     ",	31, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_WIFI_SSID);
     comp->setTextOptions(TEXT_OPTION_ALLOW_ALL);
+    comp->setLimitedShowSize(15);               // limit to showing only 15 characters
     screen.push_back(comp);
 
-	comp = new ConfigComponent(this, ConfigComponent::label, "WPA PSK",		20,	col1x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "WPA PSK",	20,         col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline_pass, "      ",	63, col1x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline_pass, "      ",	63, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_WIFI_PSK);
     comp->setTextOptions(TEXT_OPTION_ALLOW_ALL);
+    comp->setLimitedShowSize(15);               // limit to showing only 15 characters
     screen.push_back(comp);
-	
+
+    row++;
+
     comp = new ConfigComponent(this, ConfigComponent::label, "Use DHCP",	10, col1x, row, gotoOffset);
     screen.push_back(comp);
 
