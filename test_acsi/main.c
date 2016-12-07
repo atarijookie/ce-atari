@@ -1106,7 +1106,7 @@ void speedTest(void)
     (void) Cconws("Read speed: ");
     
     DWORD now, until, diff;
-    now = *HZ_200;
+    now = getTicksAsUser();
     
     int i;
     
@@ -1125,7 +1125,7 @@ void speedTest(void)
         }
     }
     
-    until   = *HZ_200;
+    until   = getTicksAsUser();
     diff    = until - now;
 
     int timeMs  = (diff * 1000) / 200;

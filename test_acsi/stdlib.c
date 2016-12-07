@@ -132,3 +132,7 @@ DWORD getTicks(void)
 	return now;
 }
 
+DWORD getTicksAsUser(void)
+{
+    return Supexec(getTicks);
+}
