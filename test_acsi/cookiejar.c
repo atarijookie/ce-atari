@@ -1,3 +1,6 @@
+#include <mint/osbind.h> 
+#include <mint/linea.h> 
+
 #include "cookiejar.h"
 
 unsigned char CookieJarWrite(unsigned long name, unsigned long value)
@@ -16,6 +19,9 @@ unsigned char CookieJarWrite(unsigned long name, unsigned long value)
     return retvalue;
 }
 
+unsigned long  cj_name;
+unsigned long* cj_value;
+
 unsigned char CookieJarRead(unsigned long name, unsigned long* value)
 {
     register unsigned short retvalue asm("%d0"); 
@@ -30,4 +36,17 @@ unsigned char CookieJarRead(unsigned long name, unsigned long* value)
     : "a0" /* clobbered regs */
     );
     return retvalue;
+}
+
+unsigned char CookieJarReadAsSuper(vod)
+{
+    return CookieJarRead(cj_name, cj_value);
+}
+
+unsigned char CookieJarReadAsUser(unsigned long name, unsigned long* value)
+{
+    cj_name     = name;
+    cj_value    = value;
+    
+    return Supexec(CookieJarReadAsSuper);
 }
