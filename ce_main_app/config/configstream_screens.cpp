@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include <algorithm>
 
@@ -1790,10 +1793,25 @@ void ConfigStream::createScreen_shared(void)
 
 void ConfigStream::onHddImageSave(void)
 {
+    struct stat st;
     std::string path;
 
     getTextByComponentId(COMPID_HDDIMAGE_PATH, path);
 
+    if(!path.empty()) {
+        if(stat(path.c_str(), &st) < 0) {
+            showMessageScreen("Warning", "Cannot access file.\n\rPlease fix this and try again.");
+            return;
+        } else {
+            if(!S_ISREG(st.st_mode)) {
+                showMessageScreen("Warning", "File is not regular file.\n\rPlease fix this and try again.");
+                return;
+            }
+        }
+    }
+    if(path.find("/mnt/shared/") == 0) {
+        showMessageScreen("Warning", "It is not safe to mount HDD Image from\r\nnetwork.");
+    }
     Settings s;
     s.setString("HDDIMAGE", path.c_str());
 
