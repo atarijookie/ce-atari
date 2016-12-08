@@ -1604,15 +1604,21 @@ void ConfigStream::createScreen_hddimage(void)
     row++;
 
     comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ",
-                               8, /*15*/ 9, row, gotoOffset);
+                               8, 3, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_HDDIMAGE_SAVE);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ",
-                               8, /*27*/ 21, row, gotoOffset);
+                               8, 15, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Clear ",
+                               8, 27, row, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_HDDIMAGE_CLEAR);
+    comp->setComponentId(COMPID_BTN_CLEAR);
     screen.push_back(comp);
     row += 2;
 
@@ -1797,6 +1803,12 @@ void ConfigStream::onHddImageSave(void)
     Utils::forceSync();                                     // tell system to flush the filesystem caches
 
     createScreen_homeScreen();      // now back to the home screen
+}
+
+void ConfigStream::onHddImageClear(void)
+{
+    std::string path("");
+    setTextByComponentId(COMPID_HDDIMAGE_PATH, path);
 }
 
 void ConfigStream::onSharedTest(void)
