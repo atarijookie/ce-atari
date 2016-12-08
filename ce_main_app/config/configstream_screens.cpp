@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include <algorithm>
 
@@ -1606,22 +1609,29 @@ void ConfigStream::createScreen_hddimage(void)
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::editline, " ",
-                               38, 0, row++, gotoOffset);
+                               255, 0, row++, gotoOffset);
+    comp->setLimitedShowSize(38);   /* only show 38 characters */
     comp->setComponentId(COMPID_HDDIMAGE_PATH);
     screen.push_back(comp);
 
     row++;
 
     comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ",
-                               8, /*15*/ 9, row, gotoOffset);
+                               8, 3, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_HDDIMAGE_SAVE);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ",
-                               8, /*27*/ 21, row, gotoOffset);
+                               8, 15, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Clear ",
+                               8, 27, row, gotoOffset);
+    comp->setOnEnterFunctionCode(CS_HDDIMAGE_CLEAR);
+    comp->setComponentId(COMPID_BTN_CLEAR);
     screen.push_back(comp);
     row += 2;
 
@@ -1792,10 +1802,25 @@ void ConfigStream::createScreen_shared(void)
 
 void ConfigStream::onHddImageSave(void)
 {
+    struct stat st;
     std::string path;
 
     getTextByComponentId(COMPID_HDDIMAGE_PATH, path);
 
+    if(!path.empty()) {
+        if(stat(path.c_str(), &st) < 0) {
+            showMessageScreen("Warning", "Cannot access file.\n\rPlease fix this and try again.");
+            return;
+        } else {
+            if(!S_ISREG(st.st_mode)) {
+                showMessageScreen("Warning", "File is not regular file.\n\rPlease fix this and try again.");
+                return;
+            }
+        }
+    }
+    if(path.find("/mnt/shared/") == 0) {
+        showMessageScreen("Warning", "It is not safe to mount HDD Image from\r\nnetwork.");
+    }
     Settings s;
     s.setString("HDDIMAGE", path.c_str());
 
@@ -1806,6 +1831,12 @@ void ConfigStream::onHddImageSave(void)
     Utils::forceSync();                                     // tell system to flush the filesystem caches
 
     createScreen_homeScreen();      // now back to the home screen
+}
+
+void ConfigStream::onHddImageClear(void)
+{
+    std::string path("");
+    setTextByComponentId(COMPID_HDDIMAGE_PATH, path);
 }
 
 void ConfigStream::onSharedTest(void)

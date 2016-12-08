@@ -729,6 +729,7 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_SEND_SETTINGS:      onSendSettings();           break;
 
     case CS_HDDIMAGE_SAVE:      onHddImageSave();           break;
+    case CS_HDDIMAGE_CLEAR:     onHddImageClear();          break;
 //  case CS_SHARED_TEST:        onSharedTest();             break;
     case CS_SHARED_SAVE:        onSharedSave();             break;
 
