@@ -1,3 +1,4 @@
+// vim: expandtab shiftwidth=4 tabstop=4
 #include <mint/osbind.h>
 #include "hdd_if.h"
 #include "stdlib.h"
@@ -61,28 +62,26 @@ void screenworker(void)
   
 void sendScreenShot(void)
 {
+    #define ST_PALETTE_SIZE     (16 * 2)
+    static WORD prevPal[ST_PALETTE_SIZE/2] = { 0 };   // previous palette which was sent
 	WORD *pxPal         =    (WORD*)  0xffff8240;
 	/*BYTE *pxScreen      =   (BYTE *) (*((DWORD*) 0x44e));*/
 	BYTE *pxScreen      = (BYTE *)(((DWORD)*((BYTE*)0xffff8203) << 8) | ((DWORD)*((BYTE*)0xffff8201) << 16));
 	BYTE  screenMode    = (*((BYTE*)  0xffff8260)) & 3;
 
     //---------------------------
-    // send screen memory 
-	writeScreen(TRAN_CMD_SENDSCREENCAST, screenMode, pxScreen, 32000);
-	
-    //---------------------------
     // send 16 ST palette entries 
-    #define ST_PALETTE_SIZE     (16 * 2)
+    memcpy(pDmaBuffer, pxPal, ST_PALETTE_SIZE);                 // copy palette from Video chip to RAM
     
-	memcpy(pDmaBuffer, pxPal, ST_PALETTE_SIZE);                 // copy palette from Video chip to RAM
-    
-    static BYTE prevPal[ST_PALETTE_SIZE] = { 0 };               // previous palette which was sent
-    int changed = memcmp(pDmaBuffer, prevPal, ST_PALETTE_SIZE); // see if pallete changed since last time
-
-    if(changed) {                                               // palette changed, send it
+    if(memcmp(pDmaBuffer, prevPal, ST_PALETTE_SIZE) != 0) {
+        // palette changed, send it
         memcpy(prevPal, pDmaBuffer, ST_PALETTE_SIZE);           // make copy of this palette, so we won't send it next time if it won't change
         writeScreen(TRAN_CMD_SCREENCASTPALETTE, screenMode, pDmaBuffer, ST_PALETTE_SIZE);
     }
+
+    //---------------------------
+    // send screen memory
+	writeScreen(TRAN_CMD_SENDSCREENCAST, screenMode, pxScreen, 32000);
 }  
    
 void writeScreen(BYTE command, BYTE screenmode, BYTE *bfr, DWORD cnt)
