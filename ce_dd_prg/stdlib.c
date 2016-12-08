@@ -98,7 +98,10 @@ int strncmp ( const char * str1, const char * str2, int num )
 	return 0;							// if came here, all chars matching
 }
 
-DWORD sleepTics;
+
+/*  sleep() and msleep() functions */
+
+static DWORD sleepTics;
 static void sleepInSupervisor(void);
 
 void msleepInSuper(int ms)
@@ -138,20 +141,13 @@ static void sleepInSupervisor(void)
 	now = getTicks();						// get current ticks
 	until = now + sleepTics;    			// calc value timer must get to
 
-	while(1) {
+	while(now < until) {
 		now = getTicks();					// get current ticks
-		
-		if(now >= until) {
-			break;
-		}
 	}
 }
 
 DWORD getTicks(void)
 {
-	DWORD now;
-	
-	now = *HZ_200;
-	return now;
+	/* return system 200Hz counter value */
+	return (*HZ_200);
 }
-

@@ -444,7 +444,7 @@ void showIpAddress(BYTE *bfr)
 
 void showAppVersion(void)
 {
-    char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    static char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     char const *buildDate = __DATE__;
     
     int year = 0, month = 0, day = 0;
@@ -494,9 +494,7 @@ int getIntFromStr(const char *str, int len)
 // Adjust GEMDOS/BIOS trap handler offsets
 void set_longframe(void)
 {
-    WORD longFrame = *_longframe;
-
-	if(longFrame != 0) {                // If != 0 then the cpu isn't 68000, so stack frame adjustment required
+	if(*_longframe != 0) {                // If != 0 then the cpu isn't 68000, so stack frame adjustment required
 		trap_extra_offset=2;
     }
 }
