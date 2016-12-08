@@ -385,39 +385,29 @@ void showDateTime(void)
 
 void showInt(int value, int length)
 {
+    int negative;
     char tmp[10];
-    memset(tmp, 0, 10);
+    char * p = tmp + sizeof(tmp);
 
-    if(length == -1) {                      // determine length?
-        int i, div = 10;
+    if(value < 0) {
+        value = -value;
+        negative = 1;
+    } else {
+        negative = 0;
+    }
+    *(--p) = '\0';    // null terminator
+    do {
+        // write all digits, starting at the right
+        *(--p) = (value % 10) + '0';
+        value = value / 10;
+        length--;
+    } while(value != 0 || length > 0);
 
-        for(i=1; i<6; i++) {                // try from 10 to 1000000
-            if((value / div) == 0) {        // after division the result is zero? we got the length
-                length = i;
-                break;
-            }
-
-            div = div * 10;                 // increase the divisor by 10
-        }
-
-        if(length == -1) {                  // length undetermined? use length 6
-            length = 6;
-        }
+    if(negative) {
+        *(--p) = '-';
     }
 
-    int i;
-    for(i=0; i<length; i++) {               // go through the int lenght and get the digits
-        int val, mod;
-
-        val = value / 10;
-        mod = value % 10;
-
-        tmp[length - 1 - i] = mod + 48;     // store the current digit
-
-        value = val;
-    }
-
-    (void) Cconws(tmp);                     // write it out
+    (void) Cconws(p);                     // write it out
 }
 
 void showNetworkIPs(void)
