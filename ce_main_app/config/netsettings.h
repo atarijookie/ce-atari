@@ -16,6 +16,8 @@
 #endif
 
 typedef struct {
+    bool        isEnabled;
+
     bool        dhcpNotStatic;
     std::string address;
     std::string netmask;
@@ -32,6 +34,8 @@ public:
 
     void load(void);
     void save(void);
+
+    bool isDifferentThan(NetworkSettings &other);
 
     void updateResolvConf(bool autoLoadBeforeSave);
     

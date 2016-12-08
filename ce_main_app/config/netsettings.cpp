@@ -36,7 +36,10 @@ void NetworkSettings::load(void)
     loadOnYocto();
     #else
     loadOnRaspbian();
-    #endif    
+    #endif
+
+    Settings s;
+    wlan0.isEnabled = s.getBool("WIFI_ENABLED", true);          // wifi enabled by default
 }
 
 void NetworkSettings::save(void)
@@ -48,6 +51,9 @@ void NetworkSettings::save(void)
     #else
     saveOnRaspbian();
     #endif
+
+    Settings s;
+    s.setBool("WIFI_ENABLED", wlan0.isEnabled);                 // store wifi enabled flag
 }
 
 void NetworkSettings::replaceIPonDhcpIface(void)
@@ -174,12 +180,12 @@ int NetworkSettings::ipNetmaskToCIDRnetmask(const char *ipNetmask)
 void NetworkSettings::saveWpaSupplicant(void)
 {
     FILE *f = fopen(WPA_SUPPLICANT_FILE, "wt");
-    
+
     if(!f) {
         Debug::out(LOG_ERROR, "NetworkSettings::saveWpaSupplicant - failed to open wpa supplication file.\n");
         return;
     }
-    
+
 #ifdef DISTRO_YOCTO
     // do this for yocto
     fprintf(f, "ctrl_interface=/var/run/wpa_supplicant\n");               // this is needed for wpa_cli to work
@@ -281,4 +287,36 @@ void NetworkSettings::updateResolvConf(bool autoLoadBeforeSave)
     system("cat /tmp/resolv.old >> /etc/resolv.conf");
 }
 
+bool NetworkSettings::isDifferentThan(NetworkSettings &other)
+{
+    // check general settings
+    if(nameserver   != other.nameserver)                    return true;
+    if(hostname     != other.hostname)                      return true;
 
+    //------------------------
+    // check ethernet settings
+    if(eth0.dhcpNotStatic != other.eth0.dhcpNotStatic)      return true;        // use DHCP settings changed?
+
+    if(!eth0.dhcpNotStatic) {       // if using static settings
+        if(eth0.address != other.eth0.address)              return true;
+        if(eth0.netmask != other.eth0.netmask)              return true;
+        if(eth0.gateway != other.eth0.gateway)              return true;
+    }
+
+    //------------------------
+    // check wifi settings
+    if(wlan0.isEnabled      != other.wlan0.isEnabled)       return true;
+    if(wlan0.dhcpNotStatic  != other.wlan0.dhcpNotStatic)   return true;
+    if(wlan0.wpaSsid        != other.wlan0.wpaSsid)         return true;
+    if(wlan0.wpaPsk         != other.wlan0.wpaPsk)          return true;
+
+    if(!wlan0.dhcpNotStatic) {      // if using static settings
+        if(wlan0.address != other.wlan0.address)            return true;
+        if(wlan0.netmask != other.wlan0.netmask)            return true;
+        if(wlan0.gateway != other.wlan0.gateway)            return true;
+    }
+
+    //--------
+    // if came here, nothing changed
+    return false;
+}

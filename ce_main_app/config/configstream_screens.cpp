@@ -177,9 +177,9 @@ void ConfigStream::createScreen_network(void)
 
     ConfigComponent *comp;
 
-	int col0x = 0;
-	int col1x = 3;
-	int col2x = 16;
+	int col0x = 3;
+	int col1x = 6;
+	int col2x = 19;
 	
     // hostname setting
 	int row = 3;
@@ -191,10 +191,19 @@ void ConfigStream::createScreen_network(void)
     comp->setComponentId(COMPID_HOSTNAME);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_ALLOW_NUMBERS);
     screen.push_back(comp);
+
+    // DNS
+    comp = new ConfigComponent(this, ConfigComponent::label, "DNS",			40, col0x, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row, gotoOffset);
+    comp->setComponentId(COMPID_NET_DNS);
+    comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
+    screen.push_back(comp);
+
+    row += 2;
     
-    row++;
-    
-	// settings for ethernet
+    // settings for ethernet
     comp = new ConfigComponent(this, ConfigComponent::label, "Ethernet",	10,	col0x, row++, gotoOffset);
     screen.push_back(comp);
 
@@ -229,10 +238,17 @@ void ConfigStream::createScreen_network(void)
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
 
-	row += 2;
-	
-	// settings for wifi
+    row += 2;
+
+    // settings for wifi
     comp = new ConfigComponent(this, ConfigComponent::label, "Wifi",		10,	col0x, row++, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "Enable",      10, col1x, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, " ",         1, col2x, row++, gotoOffset);
+    comp->setComponentId(COMPID_WIFI_ENABLE);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::label, "WPA SSID",	20,	col1x, row, gotoOffset);
@@ -285,18 +301,7 @@ void ConfigStream::createScreen_network(void)
     comp->setComponentId(COMPID_WIFI_GATEWAY);
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
-		
-	// dns settings
-	row += 2;
-	
-    comp = new ConfigComponent(this, ConfigComponent::label, "DNS",			40, col1x, row, gotoOffset);
-    screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row, gotoOffset);
-    comp->setComponentId(COMPID_NET_DNS);
-    comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
-    screen.push_back(comp);
-	
 	row += 2;
 	// buttons
 
@@ -322,6 +327,7 @@ void ConfigStream::createScreen_network(void)
     setTextByComponentId(COMPID_NET_MASK,		ns.eth0.netmask);
     setTextByComponentId(COMPID_NET_GATEWAY,	ns.eth0.gateway);
 
+    setBoolByComponentId(COMPID_WIFI_ENABLE,    ns.wlan0.isEnabled);
     setBoolByComponentId(COMPID_WIFI_DHCP,		ns.wlan0.dhcpNotStatic);
     setTextByComponentId(COMPID_WIFI_IP,		ns.wlan0.address);
     setTextByComponentId(COMPID_WIFI_MASK,		ns.wlan0.netmask);
@@ -329,7 +335,7 @@ void ConfigStream::createScreen_network(void)
 
     setTextByComponentId(COMPID_WIFI_SSID,		ns.wlan0.wpaSsid);
     setTextByComponentId(COMPID_WIFI_PSK,		ns.wlan0.wpaPsk);
-	
+
     setFocusToFirstFocusable();
 }
 
@@ -638,7 +644,7 @@ void ConfigStream::onNetwork_save(void)
 
 	// for wlan0
     std::string ip2, mask2, gateway2;
-    bool useDhcp2;
+    bool useDhcp2, wifiIsEnabled;
 	
 	std::string dns, hostname;
 
@@ -647,8 +653,9 @@ void ConfigStream::onNetwork_save(void)
     getTextByComponentId(COMPID_NET_IP,			ip);
     getTextByComponentId(COMPID_NET_MASK,		mask);
     getTextByComponentId(COMPID_NET_GATEWAY,	gateway);
-	
-	getBoolByComponentId(COMPID_WIFI_DHCP,		useDhcp2);
+
+    getBoolByComponentId(COMPID_WIFI_ENABLE,    wifiIsEnabled);
+    getBoolByComponentId(COMPID_WIFI_DHCP,		useDhcp2);
     getTextByComponentId(COMPID_WIFI_IP,		ip2);
     getTextByComponentId(COMPID_WIFI_MASK,		mask2);
     getTextByComponentId(COMPID_WIFI_GATEWAY,	gateway2);
@@ -674,8 +681,8 @@ void ConfigStream::onNetwork_save(void)
             return;
         }
     }
-	
-	if(!useDhcp2) {          // but verify settings only when not using dhcp
+
+    if(!useDhcp2) {          // but verify settings only when not using dhcp
         bool a,b,c;
 
         a = verifyAndFixIPaddress(ip2,       ip2,         false);
@@ -688,44 +695,50 @@ void ConfigStream::onNetwork_save(void)
         }
     }
 
-	//-------------------------
+    //-------------------------
     // store the settings
-	NetworkSettings ns;
-	ns.load();						// load the current values
+    NetworkSettings nsNew, nsOld;
+    nsNew.load();                       // load the current values
+    nsOld.load();                       // load the current values
 
-    ns.nameserver   = dns;
-    ns.hostname     = hostname;
-	
-	ns.eth0.dhcpNotStatic = useDhcp;
+    nsNew.nameserver   = dns;
+    nsNew.hostname     = hostname;
 
-    if(!useDhcp) {          		// if not using dhcp, store also the network settings
-        ns.eth0.address = ip;
-        ns.eth0.netmask = mask;
-        ns.eth0.gateway = gateway;
+    nsNew.eth0.dhcpNotStatic = useDhcp;
+
+    if(!useDhcp) {                      // if not using dhcp, store also the network settings
+        nsNew.eth0.address = ip;
+        nsNew.eth0.netmask = mask;
+        nsNew.eth0.gateway = gateway;
     }
 
-	getTextByComponentId(COMPID_WIFI_SSID,		ns.wlan0.wpaSsid);
-	getTextByComponentId(COMPID_WIFI_PSK,		ns.wlan0.wpaPsk);
+    nsNew.wlan0.isEnabled = wifiIsEnabled;
 
-	ns.wlan0.dhcpNotStatic = useDhcp2;
+    getTextByComponentId(COMPID_WIFI_SSID,  nsNew.wlan0.wpaSsid);
+    getTextByComponentId(COMPID_WIFI_PSK,   nsNew.wlan0.wpaPsk);
 
-    if(!useDhcp2) {          		// if not using dhcp, store also the network settings
-        ns.wlan0.address = ip2;
-        ns.wlan0.netmask = mask2;
-        ns.wlan0.gateway = gateway2;
+    nsNew.wlan0.dhcpNotStatic = useDhcp2;
+
+    if(!useDhcp2) {                     // if not using dhcp, store also the network settings
+        nsNew.wlan0.address = ip2;
+        nsNew.wlan0.netmask = mask2;
+        nsNew.wlan0.gateway = gateway2;
     }
 
-	ns.save();						// store the new values
-	
-	//-------------------------
-	// now request network restart
-	TMounterRequest tmr;			
-	tmr.action	= MOUNTER_ACTION_RESTARTNETWORK;								
-	mountAdd(tmr);
-	
-    Utils::forceSync();                                     // tell system to flush the filesystem caches
+    //-------------------------
+    // check if some network setting changed, and do save and restart network (otherwise just ignore it)
+    if(nsNew.isDifferentThan(nsOld)) {
+        nsNew.save();                   // store the new values
 
-	//-------------------------
+        // now request network restart
+        TMounterRequest tmr;
+        tmr.action = MOUNTER_ACTION_RESTARTNETWORK;
+        mountAdd(tmr);
+
+        Utils::forceSync();             // tell system to flush the filesystem caches
+    }
+
+    //-------------------------
     createScreen_homeScreen();		// now back to the home screen
 }
 
