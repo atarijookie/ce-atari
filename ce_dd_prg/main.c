@@ -1,3 +1,4 @@
+// vim: expandtab shiftwidth=4 tabstop=4
 #include <mint/sysbind.h>
 #include <mint/osbind.h>
 #include <mint/basepage.h>
@@ -58,7 +59,7 @@ void msleep(int ms);
 
 void possiblyFixCurrentDrive(void);
 
-BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
+WORD dmaBuffer[DMA_BUFFER_SIZE/2];
 
 BYTE *pDmaBuffer;
 
@@ -70,7 +71,7 @@ BYTE commandLong[CMD_LENGTH_LONG]	= {0x1f,	0, 'C', 'E', HOSTMOD_TRANSLATED_DISK,
 BYTE *pDta;
 BYTE tempDta[45];
 
-BYTE dtaBuffer[DTA_BUFFER_SIZE + 2];
+WORD dtaBuffer[DTA_BUFFER_SIZE/2];
 BYTE *pDtaBuffer;
 BYTE fsnextIsForUs;
 
@@ -139,14 +140,11 @@ int main( int argc, char* argv[] )
     //--------------------------------    
     (void) Cconws("\33q\r\n" );
 	
-	// create buffer pointer to even address 
-	pDmaBuffer = &dmaBuffer[2];
-	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);		// remove odd bit if the address was odd 
+	pDmaBuffer = (BYTE *)dmaBuffer;
 
 	// initialize internal stuff for Fsfirst and Fsnext 
-	fsnextIsForUs		= 0;
-	pDtaBuffer		= &dtaBuffer[2];
-	pDtaBuffer		= (BYTE *) (((DWORD) pDtaBuffer) & 0xfffffffe);		// remove odd bit if the address was odd 
+	fsnextIsForUs	= 0;
+	pDtaBuffer	= (BYTE *)dtaBuffer;
 
 	// search for CosmosEx on ACSI bus
 	found = Supexec(findDevice);

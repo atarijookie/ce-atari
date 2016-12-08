@@ -30,7 +30,6 @@ extern int32_t (  *bios_table[256])( void* sp );
 // ------------------------------------------------------------------ 
 // CosmosEx and Gemdos part - Jookie 
 
-extern BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
 extern BYTE *pDmaBuffer;
 
 extern BYTE deviceID;
@@ -40,7 +39,6 @@ extern BYTE commandLong[CMD_LENGTH_LONG];
 extern BYTE *pDta;
 extern BYTE tempDta[45];
 
-extern BYTE dtaBuffer[DTA_BUFFER_SIZE + 2];
 extern BYTE *pDtaBuffer;
 extern BYTE fsnextIsForUs;
 
