@@ -87,17 +87,13 @@ void sendScreenShot(void)
 void writeScreen(BYTE command, BYTE screenmode, BYTE *bfr, DWORD cnt)
 {
     commandLong[5] = command;
-    commandLong[6] = screenmode;                                        // screenmode
+    commandLong[6] = screenmode;         // screenmode
 
-    commandLong[7] = cnt >> 16;                                            // store byte count
+    commandLong[7] = cnt >> 16;          // store byte count
     commandLong[8] = cnt >>  8;
     commandLong[9] = cnt  & 0xff;
 
-    WORD sectorCount = cnt / 512;                                        // calculate how many sectors should we transfer
-
-    if((cnt % 512) != 0) {                                                // and if we have more than full sector(s) in buffer, send one more!
-        sectorCount++;
-    }
+    WORD sectorCount = (cnt + 511) >> 9; // calculate how many sectors should we transfer
 
     (*hdIf.cmd_nolock)(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount);    // send command to host over ACSI
 }
