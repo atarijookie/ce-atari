@@ -387,12 +387,18 @@ void Scsi::loadSettings(void)
         attachToHostPath(empty, SOURCETYPE_SD_CARD, SCSI_ACCESSTYPE_FULL);
     }
 
+    // attach Translated bootmedia
+    attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
+
+    // TODO : attach RAW usb drives again
+#if 0
     // and now reattach everything back according to new ACSI ID settings
     for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {
         if(attachedMedia[i].dataMedia != NULL) {            // if there's some media to use
             attachMediaToACSIid(i, attachedMedia[i].hostSourceType, attachedMedia[i].accessType);
         }
     }
+#endif
 
     std::string img;
     img = s.getString("HDDIMAGE", "");

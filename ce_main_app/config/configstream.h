@@ -22,7 +22,7 @@ enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED
                  CS_CREATE_FLOPPY_CONF, CS_CREATE_IKBD,         CS_CREATE_HDDIMAGE,
                  CS_CREATE_NETWORK,     CS_CREATE_UPDATE,       CS_CREATE_OTHER,
                  CS_SAVE_ACSI,          CS_SAVE_TRANSLATED,     CS_SAVE_NETWORK,
-                 CS_HDDIMAGE_SAVE,
+                 CS_HDDIMAGE_SAVE,      CS_HDDIMAGE_CLEAR,
                  CS_HIDE_MSG_SCREEN,    CS_GO_HOME,
                  CS_UPDATE_CHECK,       CS_UPDATE_CHECK_USB,    CS_UPDATE_UPDATE,
                  CS_SHARED_TEST,        CS_SHARED_SAVE,
@@ -34,7 +34,7 @@ enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED
 
 enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_TRAN_CONFDRIVE,
                 COMPID_MOUNT_RAW_NOT_TRANS, 
-                COMPID_BTN_SAVE,            COMPID_BTN_CANCEL,
+                COMPID_BTN_SAVE,            COMPID_BTN_CANCEL,          COMPID_BTN_CLEAR,
                 COMPID_USE_ZIP_DIR_NOT_FILE,
 
                 COMPID_HOSTNAME,
@@ -173,6 +173,7 @@ private:
     void getProgressLine(int index, std::string &lines, std::string &line);
 
     void onHddImageSave(void);
+    void onHddImageClear(void);
 
     void onSharedTest(void);
     void onSharedSave(void);
