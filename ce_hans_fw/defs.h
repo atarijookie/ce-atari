@@ -8,6 +8,24 @@
 #define TRUE	1
 #define FALSE	0
 
+#define CMDLOGGING
+
+#ifdef CMDLOGGING
+	void cmdLog_onStart(void);
+	void cmdLog_storeResults(BYTE bridgeStatus, BYTE scsiStatus);
+	void cmdLog_onEnd(void);
+#endif
+
+typedef struct {
+	DWORD cmdSeqNo;
+	
+	BYTE	cmd[14];
+	BYTE 	cmdLen;
+	
+	BYTE	scsiStatusByte;
+	BYTE	bridgeStatus;
+} TCmdLogItem;
+
 typedef struct 
 {
 	WORD buffer[550 / 2];			// buffer for the written data - with some (38 bytes) reserve at the end in case of overflow

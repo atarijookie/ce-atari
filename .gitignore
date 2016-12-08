@@ -5,3 +5,12 @@
 ce_dd_bootsectors/convertor
 *.d
 test_sting/test_server
+*.crf
+*.__i
+*.map
+*.lst
+*.lnp
+*.plg
+*.sct
+*.tra
+*.dep

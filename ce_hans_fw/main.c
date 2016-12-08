@@ -134,9 +134,27 @@ WORD smallDataBuffer[2];
 
 WORD cmdBuffer[CMD_BUFFER_LENGTH];
 
+//----------
 BYTE cmd[14];                                                   // received command bytes
 BYTE cmdLen;                                                    // length of received command
 BYTE brStat;                                                    // status from bridge
+
+//----------
+#ifdef CMDLOGGING
+	#define CMDLOG_COUNT	256
+	TCmdLogItem cmdLog[CMDLOG_COUNT];
+
+	DWORD cmdSeqNo;
+	DWORD cmdLogIndex;
+	
+	void memcpy(char *dest, char *src, int cnt);
+	
+	void cmdLog_onStart(void);
+	void cmdLog_storeResults(BYTE bridgeStatus, BYTE scsiStatus);
+	void cmdLog_onEnd(void);
+	
+#endif
+//----------
 
 BYTE enabledIDs[8];                                             // when 1, Hanz will react on that ACSI ID #
 
@@ -229,6 +247,11 @@ struct {
 int main(void)
 {
     LOG_ERROR(0);           // no error
+	
+#ifdef CMDLOGGING	
+		cmdSeqNo		= 0;
+		cmdLogIndex	= 0;
+#endif	
     
     initAllStuff();         // now init everything
     
@@ -632,7 +655,15 @@ void onGetCommand(void)
         good = onGetCommandScsi();
     }
 
+#ifdef CMDLOGGING
+		cmdLog_onStart();
+#endif
+		
     if(!good) {                                 // if failed to get the cmd, quit
+#ifdef CMDLOGGING
+				cmdLog_storeResults(brStat, 0xff);
+				cmdLog_onEnd();
+#endif
         return;
     }
     
@@ -1679,3 +1710,36 @@ BYTE isBusIdle(void)                    // get if the SCSI bus is idle (BSY high
     getXilinxStatus();
     return xilinxBusIdle;
 }
+
+#ifdef CMDLOGGING
+
+// start some command logging (if enabled)
+void cmdLog_onStart(void)
+{
+	cmdLog[cmdLogIndex].cmdSeqNo				= cmdSeqNo;							// store sequence number of command
+	memcpy((char *) cmdLog[cmdLogIndex].cmd, (char *) cmd, 14);	// copy the whole command
+	cmdLog[cmdLogIndex].cmdLen					= cmdLen;								// also store the length
+	cmdLog[cmdLogIndex].bridgeStatus		= brStat;								// store the bridge status byte
+	cmdLog[cmdLogIndex].scsiStatusByte	= 0xff;									// and also some fake SCSI status byte (other than zero, which is for no-error)
+}
+
+void cmdLog_storeResults(BYTE bridgeStatus, BYTE scsiStatus)
+{
+	// update these retults
+	cmdLog[cmdLogIndex].bridgeStatus		= bridgeStatus;
+	cmdLog[cmdLogIndex].scsiStatusByte	= scsiStatus;
+}
+
+// finish some command logging on end of command (if enabled)
+void cmdLog_onEnd(void)
+{
+	// update sequence number
+	cmdSeqNo++;
+	
+	// update log field index
+	cmdLogIndex++;
+	if(cmdLogIndex >= CMDLOG_COUNT) {
+		cmdLogIndex = 0;
+	}
+}
+#endif
