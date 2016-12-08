@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "ce_dd_prg.h"
 #include "xbra.h"
 #include "acsi.h"
 #include "translated.h"
@@ -30,22 +31,8 @@ extern int32_t (  *bios_table[256])( void* sp );
 // ------------------------------------------------------------------ 
 // CosmosEx and Gemdos part - Jookie 
 
-extern BYTE *pDmaBuffer;
-
-extern BYTE deviceID;
-extern BYTE commandShort[CMD_LENGTH_SHORT];
-extern BYTE commandLong[CMD_LENGTH_LONG];
-
-extern BYTE *pDta;
-extern BYTE tempDta[45];
-
-extern BYTE *pDtaBuffer;
-extern BYTE fsnextIsForUs;
-
 BYTE getNextDTAsFromHost(void);
 DWORD copyNextDtaToAtari(void);
-
-extern BYTE currentDrive;
 
 #define PE_LOADGO		0
 #define PE_LOAD			3

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "ce_dd_prg.h"
 #include "acsi.h"
 #include "hdd_if.h"
 #include "translated.h"
@@ -17,16 +18,9 @@
 #include "main.h"
 
 extern int16_t useOldBiosHandler;
-#ifdef MANUAL_PEXEC
+#ifdef MANUAL_PEXEC /* else it is defined in harddrive_lowlevel.s */
 WORD ceDrives;
-#else
-extern WORD ceDrives;	/* defined in harddrive_lowlevel.s */
 #endif
-extern WORD ceMediach;
-
-extern BYTE commandShort[CMD_LENGTH_SHORT];
-extern BYTE commandLong[CMD_LENGTH_LONG];
-extern BYTE *pDmaBuffer;
 
 int32_t custom_mediach( void *sp )
 {

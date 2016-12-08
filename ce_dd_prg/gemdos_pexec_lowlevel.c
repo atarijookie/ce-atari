@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "ce_dd_prg.h"
 #include "xbra.h"
 #include "acsi.h"
 #include "translated.h"
@@ -30,17 +31,6 @@ extern int32_t (  *bios_table[256])( void* sp );
 
 // ------------------------------------------------------------------ 
 // CosmosEx and Gemdos part - Jookie 
-
-extern BYTE *pDmaBuffer;
-
-extern BYTE deviceID;
-extern BYTE commandShort[CMD_LENGTH_SHORT];
-extern BYTE commandLong[CMD_LENGTH_LONG];
-
-extern WORD ceDrives;
-extern WORD ceMediach;
-
-extern BYTE currentDrive;
 
 #define PE_LOADGO		0
 #define PE_LOAD			3

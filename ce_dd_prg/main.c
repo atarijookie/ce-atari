@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "ce_dd_prg.h"
 #include "xbra.h"
 #include "acsi.h"
 #include "hdd_if.h"
@@ -75,7 +76,7 @@ WORD dtaBuffer[DTA_BUFFER_SIZE/2];
 BYTE *pDtaBuffer;
 BYTE fsnextIsForUs;
 
-extern WORD ceDrives;
+/* WORD ceDrives; definied in either harddrive_lowlevel.s or bios.c */
 WORD ceMediach;
 BYTE currentDrive;
 WORD driveMap;

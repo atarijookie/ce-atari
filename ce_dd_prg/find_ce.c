@@ -8,15 +8,12 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "ce_dd_prg.h"
 #include "stdlib.h"
 #include "acsi.h"
 #include "find_ce.h"
 #include "hdd_if.h"
 #include "translated.h"
-
-extern BYTE  deviceID;
-extern BYTE  cosmosExNotCosmoSolo;
-extern BYTE *pDmaBuffer;
 
 BYTE findCE(BYTE hddIf);
 BYTE ce_identify(BYTE id, BYTE hddIf);
