@@ -124,7 +124,6 @@ void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyServi
 
     shared.scsi        = new Scsi();
     shared.scsi->setAcsiDataTrans(dataTrans);
-    shared.scsi->attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
 
     shared.translated = new TranslatedDisk(dataTrans, configService, screencastService);
     shared.translated->setSettingsReloadProxy(&settingsReloadProxy);
