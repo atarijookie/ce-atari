@@ -1597,7 +1597,8 @@ void ConfigStream::createScreen_hddimage(void)
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::editline, " ",
-                               38, 0, row++, gotoOffset);
+                               255, 0, row++, gotoOffset);
+    comp->setLimitedShowSize(38);   /* only show 38 characters */
     comp->setComponentId(COMPID_HDDIMAGE_PATH);
     screen.push_back(comp);
 
