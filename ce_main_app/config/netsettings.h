@@ -35,7 +35,9 @@ public:
     void load(void);
     void save(void);
 
-    bool isDifferentThan(NetworkSettings &other);
+    bool isDifferentThan        (NetworkSettings &other);
+    bool eth0IsDifferentThan    (NetworkSettings &other);
+    bool wlan0IsDifferentThan   (NetworkSettings &other);
 
     void updateResolvConf(bool autoLoadBeforeSave);
     

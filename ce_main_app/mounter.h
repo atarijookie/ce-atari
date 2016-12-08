@@ -4,11 +4,12 @@
 #include <string>
 #include "datatypes.h"
 
-#define MOUNTER_ACTION_MOUNT			0
-#define MOUNTER_ACTION_UMOUNT			1
-#define MOUNTER_ACTION_RESTARTNETWORK	2
-#define MOUNTER_ACTION_SYNC             3
-#define MOUNTER_ACTION_MOUNT_ZIP        4
+#define MOUNTER_ACTION_MOUNT                0
+#define MOUNTER_ACTION_UMOUNT               1
+#define MOUNTER_ACTION_RESTARTNETWORK_ETH0  2
+#define MOUNTER_ACTION_RESTARTNETWORK_WLAN0 3
+#define MOUNTER_ACTION_SYNC                 4
+#define MOUNTER_ACTION_MOUNT_ZIP            5
 
 #define MOUNTACTION_STATE_NOT_STARTED   0
 #define MOUNTACTION_STATE_IN_PROGRESS   1
@@ -53,7 +54,8 @@ public:
 	bool mountDevice(const char *devicePath, const char *mountDir);
     void mountZipFile(const char *zipFilePath, const char *mountDir);
 	void umountIfMounted(const char *mountDir);
-	void restartNetwork(void);
+	void restartNetworkEth0(void);
+	void restartNetworkWlan0(void);
 	void sync(void);
 
 private:
@@ -69,6 +71,7 @@ private:
 	bool mountDumpContains(const char *searchedString);
     bool wlan0IsPresent(void);
 	bool checkIfUp( const char* ifname );
+    bool getWpaSupplicantRunning(void);
 
     void copyTextFileToLog(const char *path);
 };

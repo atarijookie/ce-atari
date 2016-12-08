@@ -293,8 +293,14 @@ bool NetworkSettings::isDifferentThan(NetworkSettings &other)
     if(nameserver   != other.nameserver)                    return true;
     if(hostname     != other.hostname)                      return true;
 
-    //------------------------
-    // check ethernet settings
+    bool eht0IsDifferent    = eth0IsDifferentThan(other);   // check ethernet settings
+    bool wlan0IsDifferent   = wlan0IsDifferentThan(other);  // check wifi settings
+
+    return (eht0IsDifferent | wlan0IsDifferent);            // if eth0 or wlan0 is different, then whole setting is different
+}
+
+bool NetworkSettings::eth0IsDifferentThan(NetworkSettings &other)
+{
     if(eth0.dhcpNotStatic != other.eth0.dhcpNotStatic)      return true;        // use DHCP settings changed?
 
     if(!eth0.dhcpNotStatic) {       // if using static settings
@@ -303,8 +309,11 @@ bool NetworkSettings::isDifferentThan(NetworkSettings &other)
         if(eth0.gateway != other.eth0.gateway)              return true;
     }
 
-    //------------------------
-    // check wifi settings
+    // if came here, nothing changed
+    return false;
+}
+bool NetworkSettings::wlan0IsDifferentThan(NetworkSettings &other)
+{
     if(wlan0.isEnabled      != other.wlan0.isEnabled)       return true;
     if(wlan0.dhcpNotStatic  != other.wlan0.dhcpNotStatic)   return true;
     if(wlan0.wpaSsid        != other.wlan0.wpaSsid)         return true;
@@ -316,7 +325,6 @@ bool NetworkSettings::isDifferentThan(NetworkSettings &other)
         if(wlan0.gateway != other.wlan0.gateway)            return true;
     }
 
-    //--------
     // if came here, nothing changed
     return false;
 }

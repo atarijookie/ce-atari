@@ -728,14 +728,23 @@ void ConfigStream::onNetwork_save(void)
     //-------------------------
     // check if some network setting changed, and do save and restart network (otherwise just ignore it)
     if(nsNew.isDifferentThan(nsOld)) {
+        bool eth0IsDifferent    = nsNew.eth0IsDifferentThan(nsOld);
+        bool wlan0IsDifferent   = nsNew.wlan0IsDifferentThan(nsOld);
+
         nsNew.save();                   // store the new values
-
-        // now request network restart
-        TMounterRequest tmr;
-        tmr.action = MOUNTER_ACTION_RESTARTNETWORK;
-        mountAdd(tmr);
-
         Utils::forceSync();             // tell system to flush the filesystem caches
+
+        if(eth0IsDifferent) {           // restart eth0 if needed
+            TMounterRequest tmr;
+            tmr.action = MOUNTER_ACTION_RESTARTNETWORK_ETH0;
+            mountAdd(tmr);
+        }
+
+        if(wlan0IsDifferent) {          // restart wlan0 if needed
+            TMounterRequest tmr;
+            tmr.action = MOUNTER_ACTION_RESTARTNETWORK_WLAN0;
+            mountAdd(tmr);
+        }
     }
 
     //-------------------------
