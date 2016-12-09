@@ -8,9 +8,11 @@
 #define TRUE	1
 #define FALSE	0
 
-#define CMDLOGGING
+//#define CMDLOGGING
 
 #ifdef CMDLOGGING
+	//#define CMDLOGGING_ONLY_ERROR
+
 	void cmdLog_onStart(void);
 	void cmdLog_storeResults(BYTE bridgeStatus, BYTE scsiStatus);
 	void cmdLog_onEnd(void);
@@ -131,8 +133,10 @@ GPIOC_14 - card detect
 //#define DO_LOG_ERROR
 
 #ifdef DO_LOG_ERROR
-    extern BYTE lastErr;
-    #define LOG_ERROR(X)    lastErr = X;
+    extern BYTE lastErr[32];
+		extern BYTE lastErrIndex;
+		
+    #define LOG_ERROR(X)    { lastErr[lastErrIndex] = X; lastErrIndex++; if(lastErrIndex >= 32) lastErrIndex = 0; }
 #else
     #define LOG_ERROR(X)
 #endif

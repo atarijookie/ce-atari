@@ -138,6 +138,7 @@ WORD cmdBuffer[CMD_BUFFER_LENGTH];
 BYTE cmd[14];                                                   // received command bytes
 BYTE cmdLen;                                                    // length of received command
 BYTE brStat;                                                    // status from bridge
+BYTE lastScsiStatusByte;
 
 //----------
 #ifdef CMDLOGGING
@@ -209,7 +210,8 @@ void updateEnabledIDsInSoloMode(void);
 
 BYTE tryProcessLocally(void);
 
-BYTE lastErr;
+BYTE lastErr[32];
+BYTE lastErrIndex;
 
 DWORD toStart;
 DWORD lastStart, lastEnd;
@@ -500,6 +502,11 @@ void handleAcsiCommand(void)
         }
     }
 
+#ifdef CMDLOGGING
+		cmdLog_storeResults(brStat, lastScsiStatusByte);
+		cmdLog_onEnd();
+#endif		
+		
     //---------------
     // if something was wrong, reset XILINX so it won't get stuck 
     if(brStat != E_OK) {
@@ -656,14 +663,12 @@ void onGetCommand(void)
     }
 
 #ifdef CMDLOGGING
+		// store the cmd, cmdLen, bridge status after transfering CMD bytes in
 		cmdLog_onStart();
+		lastScsiStatusByte = 0xfa;									// you will get this fake SCSI status code, if you fail before you manage to send status byte
 #endif
 		
     if(!good) {                                 // if failed to get the cmd, quit
-#ifdef CMDLOGGING
-				cmdLog_storeResults(brStat, 0xff);
-				cmdLog_onEnd();
-#endif
         return;
     }
     
@@ -1733,6 +1738,13 @@ void cmdLog_storeResults(BYTE bridgeStatus, BYTE scsiStatus)
 // finish some command logging on end of command (if enabled)
 void cmdLog_onEnd(void)
 {
+	#ifdef CMDLOGGING_ONLY_ERROR
+	// if bridge didn't fail, and there wasn't an scsi error status byte, skip moving to next CMD LOG item - we're logging only on error
+	if(cmdLog[cmdLogIndex].bridgeStatus == E_OK && cmdLog[cmdLogIndex].scsiStatusByte == 0) {
+		return;
+	}
+	#endif
+	
 	// update sequence number
 	cmdSeqNo++;
 	
