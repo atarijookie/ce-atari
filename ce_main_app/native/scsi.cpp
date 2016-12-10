@@ -70,23 +70,23 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
             res = attachMediaToACSIid(index, hostSourceType, accessType);          // attach media to ACSI ID
 
             if(res) {
-                Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s - media was already attached, attached to ACSI ID %d", hostPath.c_str(), attachedMedia[index].devInfoIndex);
+                Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s(%s) - media was already attached, attached to ACSI ID %d", hostPath.c_str(), SourceTypeStr(hostSourceType), attachedMedia[index].devInfoIndex);
             } else {
-                Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s - media was already attached, but still not attached to ACSI ID!", hostPath.c_str());
+                Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s(%s) - media was already attached, but still not attached to ACSI ID!", hostPath.c_str(), SourceTypeStr(hostSourceType));
             }
 
             return res;
         }
 
         // well, we have the media attached and we're also attached to ACSI ID
-        Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s - media was already attached, not doing anything.", hostPath.c_str());
+        Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s(%s) - media was already attached to ACSI ID %d, not doing anything.", hostPath.c_str(), SourceTypeStr(hostSourceType), attachedMedia[index].devInfoIndex);
         return true;
     }
 
     index = findEmptyAttachSlot();                              // find where we can store it
 
     if(index == -1) {                                               // no more place to store it?
-        Debug::out(LOG_ERROR, "Scsi::attachToHostPath - %s - no empty slot! Not attaching.", hostPath.c_str());
+        Debug::out(LOG_ERROR, "Scsi::attachToHostPath - %s(%s) - no empty slot! Not attaching.", hostPath.c_str(), SourceTypeStr(hostSourceType));
         return false;
     }
 
@@ -1213,4 +1213,17 @@ void Scsi::updateTranslatedBootMedia(void)
     }
 
     tranBootMedia.updateBootsectorConfigWithACSIid(idOnBus);
+}
+
+const char * Scsi::SourceTypeStr(int sourceType)
+{
+    switch(sourceType) {
+    case SOURCETYPE_NONE:       return "NONE";
+    case SOURCETYPE_IMAGE:      return "IMAGE";
+    case SOURCETYPE_IMAGE_TRANSLATEDBOOT:   return "TRANSLATEDBOOT";
+    case SOURCETYPE_DEVICE:     return "DEVICE";
+    case SOURCETYPE_SD_CARD:    return "SD_CARD";
+    case SOURCETYPE_TESTMEDIA:  return "TESTMEDIA";
+    default:                    return "*UNKNOWN*";
+    }
 }
