@@ -183,54 +183,32 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
 bool Scsi::attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessType)
 {
     for(int i=0; i<8; i++) {                                                // find empty and proper ACSI ID
-
-        // if we shouldn't use this ACSI ID
-        if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_OFF) {
-            continue;
-        }
-
         // if this index is already used, skip it
         if(devInfo[i].attachedMediaIndex != -1) {
             continue;
         }
-
-        // if this ACSI ID is for SD card and we're attaching SD card
-        if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_SD && hostSourceType == SOURCETYPE_SD_CARD) {
+        bool canAttach;
+        switch(acsiIdInfo.acsiIDdevType[i]) {
+        case DEVTYPE_SD:    // only attaching SD CARDs
+            canAttach = (hostSourceType == SOURCETYPE_SD_CARD);
+            break;
+        case DEVTYPE_RAW:   // attaching everything except SD CARDs and Translated boot
+            canAttach = (hostSourceType != SOURCETYPE_SD_CARD) && (hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT);
+            break;
+        case DEVTYPE_TRANSLATED:    // only attaching TRANSLATEDBOOT
+            canAttach = (hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT);
+            break;
+        default:
+            canAttach = false;
+        }
+        if(canAttach) {
             devInfo[i].attachedMediaIndex   = mediaIndex;
             devInfo[i].accessType           = accessType;
-
-            attachedMedia[mediaIndex].devInfoIndex = i;
-            return true;
-        }
-
-        // if this is SD card and it wasn't attached in previous IF, don't go further - you would attach it to wrong ACSI ID
-        if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_SD) {
-            continue;
-        }
-
-        // if this ACSI ID is for translated drive, and we're attaching translated boot image
-        if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_TRANSLATED && hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
-            devInfo[i].attachedMediaIndex   = mediaIndex;
-            devInfo[i].accessType           = accessType;
-
             attachedMedia[mediaIndex].devInfoIndex = i;
 
-            tranBootMedia.updateBootsectorConfigWithACSIid(i);        // and update boot sector config with ACSI ID to which this has been attached
-
-            return true;
-        }
-
-        // if this is TRANSLATED device ACSI ID and it wasn't attached in previous IF, don't go further - you would attach it to wrong ACSI ID
-        if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_TRANSLATED) {
-            continue;
-        }
-
-        // if this ACSI ID is NOT for translated drive, and we're NOT attaching translated boot image
-        if(acsiIdInfo.acsiIDdevType[i] != DEVTYPE_TRANSLATED && hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
-            devInfo[i].attachedMediaIndex   = mediaIndex;
-            devInfo[i].accessType           = accessType;
-
-            attachedMedia[mediaIndex].devInfoIndex = i;
+            if(hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
+                tranBootMedia.updateBootsectorConfigWithACSIid(i);        // and update boot sector config with ACSI ID to which this has been attached
+            }
             return true;
         }
     }
