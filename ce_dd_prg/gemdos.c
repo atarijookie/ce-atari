@@ -89,8 +89,7 @@ int32_t custom_dsetdrv( void *sp )
 		force = 0;
 	}
 
-	DWORD res = Drvmap();											        // BIOS call - get drives bitmap - this will also communicate with CE
-    return res;
+	return custom_drvmap(sp);        // BIOS call - get drives bitmap - this will also communicate with CE
 }
 
 int32_t custom_dfree( void *sp )
@@ -134,7 +133,7 @@ int32_t custom_dcreate( void *sp )
 	commandShort[5] = 0;									
 	
 	memset(pDmaBuffer, 0, 512);
-	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		    // copy in the path 
+	strncpy((char *) pDmaBuffer, pPath, DMA_BUFFER_SIZE);		    // copy in the path
 	
 	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1); // send command to host over ACSI 
 
