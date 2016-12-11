@@ -47,7 +47,7 @@ extern WORD pexec_callOrig;
 static BYTE readRwabsSectors(WORD startingSector, WORD sectorCount, BYTE *pBuffer);
 extern BYTE FastRAMBuffer[]; 
 
-char fakePrgPath[256];
+static char fakePrgPath[256];
 
 // ------------------------------------------------------------------ 
 // LONG Pexec( mode, fname, cmdline, envstr )

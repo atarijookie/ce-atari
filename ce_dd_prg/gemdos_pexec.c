@@ -31,9 +31,6 @@ extern int32_t (  *bios_table[256])( void* sp );
 // ------------------------------------------------------------------ 
 // CosmosEx and Gemdos part - Jookie 
 
-BYTE getNextDTAsFromHost(void);
-DWORD copyNextDtaToAtari(void);
-
 #define PE_LOADGO		0
 #define PE_LOAD			3
 #define PE_GO			4
@@ -70,7 +67,7 @@ typedef struct __attribute__ ((__packed__))
 
 void freeTheBasePage(TBasePage *basePage);
 
-BYTE *pLastBasePage = 0;
+static BYTE *pLastBasePage = 0;
 
 extern WORD pexec_postProc;
 extern WORD pexec_callOrig;
