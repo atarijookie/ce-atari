@@ -111,7 +111,7 @@ typedef struct
 
 void initFunctionTable(void);
 
-WORD getDriveFromPath(char *path);
+WORD getDriveFromPath(const char *path);
 BYTE isOurDrive(WORD drive, BYTE withCurrentDrive);
 
 int32_t custom_fread ( void *sp );

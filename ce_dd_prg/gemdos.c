@@ -40,7 +40,7 @@ BYTE  getNextDTAsFromHost(void);
 DWORD copyNextDtaToAtari(void);
 void  onFsnext_last(void);
 
-void sendStLog(char *str);
+void sendStLog(const char *str);
 
 extern TFileBuffer fileBufs[MAX_FILES];
 
@@ -134,7 +134,7 @@ int32_t custom_dcreate( void *sp )
 	DWORD res;
     char *pPath	= (char *) *((DWORD *) sp);
 
-	WORD drive = getDriveFromPath((char *) pPath);
+	WORD drive = getDriveFromPath(pPath);
 	
 	if(!isOurDrive(drive, 0)) {											    // not our drive? 
 		CALL_OLD_GD( Dcreate, pPath);
@@ -160,7 +160,7 @@ int32_t custom_ddelete( void *sp )
 	DWORD res;
     char *pPath	= (char *) *((DWORD *) sp);
 	
-	WORD drive = getDriveFromPath((char *) pPath);
+	WORD drive = getDriveFromPath(pPath);
 	
 	if(!isOurDrive(drive, 0)) {											    // not our drive? 
 		CALL_OLD_GD( Ddelete, pPath);
@@ -170,7 +170,7 @@ int32_t custom_ddelete( void *sp )
 	commandShort[5] = 0;									
 	
 	memset(pDmaBuffer, 0, 512);
-	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		    // copy in the path 
+	strncpy((char *) pDmaBuffer, pPath, DMA_BUFFER_SIZE);		    // copy in the path 
 	
 	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1); // send command to host over ACSI 
 
@@ -186,7 +186,7 @@ int32_t custom_fdelete( void *sp )
 	DWORD res;
     char *pPath	= (char *) *((DWORD *) sp);
 	
-	WORD drive = getDriveFromPath((char *) pPath);
+	WORD drive = getDriveFromPath(pPath);
 	
 	if(!isOurDrive(drive, 0)) {											    // not our drive? 
 		CALL_OLD_GD( Fdelete, pPath);
@@ -196,7 +196,7 @@ int32_t custom_fdelete( void *sp )
 	commandShort[5] = 0;									
 	
 	memset(pDmaBuffer, 0, 512);
-	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		    // copy in the path 
+	strncpy((char *) pDmaBuffer, pPath, DMA_BUFFER_SIZE);		    // copy in the path 
 	
 	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1); // send command to host over ACSI 
 
@@ -212,7 +212,7 @@ int32_t custom_dsetpath( void *sp )
 	DWORD res;
     char *pPath	= (char *) *((DWORD *) sp);
 	
-	WORD drive = getDriveFromPath((char *) pPath);
+	WORD drive = getDriveFromPath(pPath);
 	
 	if(!isOurDrive(drive, 0)) {											    // not our drive? 
 		CALL_OLD_GD( Dsetpath, pPath);
@@ -222,7 +222,7 @@ int32_t custom_dsetpath( void *sp )
 	commandShort[5] = 0;									
 	
 	memset(pDmaBuffer, 0, 512);
-	strncpy((char *) pDmaBuffer, (char *) pPath, DMA_BUFFER_SIZE);		    // copy in the path 
+	strncpy((char *) pDmaBuffer, pPath, DMA_BUFFER_SIZE);		    // copy in the path 
 	
     while(1) {
         (*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1); // send command to host over ACSI 
@@ -282,7 +282,7 @@ int32_t custom_frename( void *sp )
 	params += 4;
 	char *newName	= (char *)	*((DWORD *) params);
 	
-	WORD drive = getDriveFromPath((char *) oldName);
+	WORD drive = getDriveFromPath(oldName);
 	
 	if(!isOurDrive(drive, 0)) {											    // not our drive? 
 		CALL_OLD_GD( Frename, 0, oldName, newName);
@@ -319,7 +319,7 @@ int32_t custom_fattrib( void *sp )
 	params += 2;
 	WORD attr		= (WORD)	*((WORD *)  params);
 	
-	WORD drive = getDriveFromPath((char *) fileName);
+	WORD drive = getDriveFromPath(fileName);
 	
 	if(!isOurDrive(drive, 0)) {											    // not our drive? 
 		CALL_OLD_GD( Fattrib, fileName, flag, attr);
@@ -370,7 +370,7 @@ int32_t custom_fsfirst( void *sp )
 	params += 4;
 	WORD attribs	= (WORD)	*((WORD *)  params);
 	
-	WORD drive = getDriveFromPath((char *) fspec);
+	WORD drive = getDriveFromPath(fspec);
 	
 	if(!isOurDrive(drive, 0)) {											// not our drive? 
 		fsnextIsForUs = FALSE;
@@ -563,7 +563,7 @@ int32_t custom_fcreate( void *sp )
 	params += 4;
 	WORD attr		= (WORD)	*((WORD *)  params);
 	
-	WORD drive = getDriveFromPath((char *) fileName);
+	WORD drive = getDriveFromPath(fileName);
 	
 	if(!isOurDrive(drive, 0)) {											    // not our drive? 
 		CALL_OLD_GD( Fcreate, fileName, attr);
@@ -609,7 +609,7 @@ int32_t custom_fopen( void *sp )
 	params += 4;
 	WORD mode		= (WORD)	*((WORD *)  params);
 	
-	WORD drive = getDriveFromPath((char *) fileName);
+	WORD drive = getDriveFromPath(fileName);
 	
 	if(!isOurDrive(drive, 0)) {											// not our drive? 
 		CALL_OLD_GD( Fopen, fileName, mode);
@@ -823,7 +823,7 @@ int32_t custom_fdatime( void *sp )
     return extendByteToDword(EINTRN);											// in other cases - Internal Error - this shouldn't happen 
 }
 
-void sendStLog(char *str)
+void sendStLog(const char *str)
 {
 	// set the params to buffer 
 	commandShort[4] = ST_LOG_TEXT;											    // store GEMDOS function number 
@@ -835,7 +835,7 @@ void sendStLog(char *str)
 
 // ------------------------------------------------------------------ 
 // helper functions 
-WORD getDriveFromPath(char *path)
+WORD getDriveFromPath(const char *path)
 {
 	if(strlen(path) < 3) {												// if the path is too short to be full path, e.g. 'C:\DIR', just return currentDrive 
 		return currentDrive;
@@ -888,7 +888,7 @@ BYTE isOurDrive(WORD drive, BYTE withCurrentDrive)
 void showWaitSymbol(BYTE showNotHide)
 {
     static BYTE isShown = 0;
-    static char progChars[4] = {'|', '/', '-', '\\'};
+    static const char progChars[4] = {'|', '/', '-', '\\'};
     static BYTE progress = 0;
 
     if(showNotHide) {   // show wait symbol
