@@ -65,41 +65,31 @@ int32_t custom_dgetdrv( void *sp )
 
 	if(!isOurDrive(currentDrive, 0)) {									// if the current drive is not our drive 
 		CALL_OLD_GD_NORET(Dgetdrv);
-	
-		currentDrive = res;												// store the current drive 
-		return res;
-	}
-	
-	commandShort[4] = GEMDOS_Dgetdrv;									// store GEMDOS function number 
-	commandShort[5] = 0;										
-	
-	(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);  // send command to host over ACSI 
-
-    if(!hdIf.success || hdIf.statusByte == E_NOTHANDLED) {				// not handled or error? 
-		CALL_OLD_GD_NORET(Dgetdrv);
 
 		currentDrive = res;												// store the current drive 
-		return res;														// return the value returned from old handler 
 	}
-
-	currentDrive = hdIf.statusByte;										// store the current drive 
-    return hdIf.statusByte;												// return the result 
+	
+	return currentDrive;
 }
 
 int32_t custom_dsetdrv( void *sp )
 {
+	static BYTE force = 1;	/* force the call to CE the 1st time */
 	// get the drive # from stack 
-	WORD drive = (WORD) *((WORD *) sp);
-	currentDrive = drive;												    // store the drive - GEMDOS seems to let you set even invalid drive 
-	
-    useOldGDHandler = 1;
-    Dsetdrv(drive);                                                         // let TOS know the current drive
+	WORD drive = *((WORD *) sp);
+	if(force || ((BYTE)drive != currentDrive)) {
+		currentDrive = (BYTE)drive;												    // store the drive - GEMDOS seems to let you set even invalid drive
 
-    commandShort[4] = GEMDOS_Dsetdrv;										// store GEMDOS function number 
-    commandShort[5] = (BYTE) drive;											// store drive number 
-    (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// send command to host over ACSI 
+        useOldGDHandler = 1;
+        Dsetdrv(drive);                                                         // let TOS know the current drive
 
-	DWORD res = Drvmap();											        // BIOS call - get drives bitmap - this will also communicate with CE 
+        commandShort[4] = GEMDOS_Dsetdrv;										// store GEMDOS function number
+        commandShort[5] = (BYTE)drive;											// store drive number
+        (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);	// send command to host over ACSI
+		force = 0;
+	}
+
+	DWORD res = Drvmap();											        // BIOS call - get drives bitmap - this will also communicate with CE
     return res;
 }
 
