@@ -144,7 +144,8 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 		function( __VA_ARGS__ );
 		
 // if sign bit is set, extend the sign to whole DWORD
-#define extendByteToDword(X)    ( ((X & 0x80)==0) ? X : (0xffffff00 | X) )
+//#define extendByteToDword(X)    ( ((X & 0x80)==0) ? X : (0xffffff00 | X) )
+#define extendByteToDword(B)    ((int32_t)((int8_t)(B)))
 
 // macros for getting data from buffer - defined for big and little endian
 // big endian (atari)
