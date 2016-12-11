@@ -374,11 +374,7 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt)
 	commandLong[5] = GEMDOS_Fwrite;										// store GEMDOS function number 
 	commandLong[6] = ceHandle;											// store file handle 
 
-    WORD sectorCount = cnt / 512;										// calculate how many sectors should we transfer 
-
-    if((cnt % 512) != 0) {												// and if we have more than full sector(s) in buffer, send one more! 
-        sectorCount++;
-    }
+    WORD sectorCount = (cnt + 511) >> 9;								// calculate how many sectors should we transfer
 
     commandLong[7] = cnt >> 16;											// store byte count 
     commandLong[8] = cnt >>  8;
@@ -440,12 +436,8 @@ DWORD readData(WORD ceHandle, BYTE *bfr, DWORD cnt, BYTE seekOffset)
 	
 	commandLong[10] = seekOffset;										// seek offset before read
 	
-	WORD sectorCount = cnt / 512;										// calculate how many sectors should we transfer 
+	WORD sectorCount = (cnt + 511) >> 9;								// calculate how many sectors should we transfer
 	DWORD count=0;
-
-	if((cnt % 512) != 0) {												// and if we have more than full sector(s) in buffer, send one more! 
-		sectorCount++;
-	}
 
     commandLong[7] = cnt >> 16;											// store byte count 
     commandLong[8] = cnt >>  8;
