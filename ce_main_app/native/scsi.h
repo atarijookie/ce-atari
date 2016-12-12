@@ -78,6 +78,8 @@ public:
 		if(devInfo[id].attachedMediaIndex < 0) return NULL;
 		return &attachedMedia[devInfo[id].attachedMediaIndex];
 	}
+
+	static const char * SourceTypeStr(int sourceType);
     
 private:
     AcsiDataTrans   *dataTrans;
