@@ -3,6 +3,7 @@
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "translated.h"
+#include "stdlib.h"
 
 #include "screen.h"
 
@@ -21,13 +22,13 @@ void screenworker()
 {
 	/* save DMA address - in case some DMA using programm is resuing its set DMA address */
 	DWORD dmaadr=getdma();
-	WORD* pxPal=(WORD*)0xffff8240;
-	DWORD* pxScreen=*((DWORD*)0x44e);
+	WORD* pxPal     = (WORD *)            0xffff8240;
+	BYTE* pxScreen  = (BYTE *) *((DWORD*) 0x44e);
 	/* send screen memory */
-	writeScreen(TRAN_CMD_SENDSCREENCAST,(*((BYTE*)0xffff8260))&3,pxScreen,32000);
+	writeScreen(TRAN_CMD_SENDSCREENCAST,(*((BYTE*)0xffff8260))&3, (BYTE *) pxScreen,32000);
 	/* send 16 ST palette entries */
 	memcpy(pBuffer,pxPal,16*2);
-	writeScreen(TRAN_CMD_SCREENCASTPALETTE,(*((BYTE*)0xffff8260))&3,pBuffer,16*2);
+	writeScreen(TRAN_CMD_SCREENCASTPALETTE,(*((BYTE*)0xffff8260))&3, (BYTE *) pBuffer,16*2);
 	/* set old DMA address */
 	setdma(dmaadr);
 }  

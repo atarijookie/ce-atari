@@ -22,6 +22,8 @@ extern void getConfig(void);
 
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
 BYTE ce_identify(BYTE ACSI_id);
+
+void init_screencapture(void);
 /*--------------------------------------------------*/
 BYTE      deviceID;
 
@@ -46,7 +48,7 @@ BYTE prevCommandFailed;
 #define DATE_ERROR                           2
 #define DATE_DATETIME_UNKNOWN                4
 
-#define Clear_home()    Cconws("\33E")
+#define Clear_home()    (void) Cconws("\33E")
 
 WORD ceTranslatedDriveMap;
 
@@ -59,9 +61,6 @@ char *version = "2014-08-17";
 /*--------------------------------------------------*/
 int main(void)
 {
-	
-	DWORD scancode;
-	BYTE key, vkey, res;
 	DWORD toEven;
 	void *OldSP;
 
@@ -99,23 +98,7 @@ int main(void)
 	commandLong[0] = (deviceID << 5) | 0x1f;			/* cmd[0] = ACSI_id + ICD command marker (0x1f)	*/
 	commandLong[1] = 0xA0;								/* cmd[1] = command length group (5 << 5) + TEST UNIT READY (0) */ 	
 
-    WORD currentDrive		= Dgetdrv();						/* get the current drive from system */ 
     getDriveConfig();                                     /* get translated disk configuration */ 
-   
-    
-    if(ceTranslatedDriveMap & (1 << currentDrive))      /* did we start from translated drive? */ 
-    {
-        /* abort, ptermres isn't working from translated drives */				
-        Cconws("Could not start driver from translated\r\n"); 
-        Cconws("drive.\r\n");
-        Cconws("Please copy this driver to e.g. drive C:\r\n");
-        Cconws("and start it from there.\r\n");
-        Cconws("TSRs can only be reliably loaded from\r\n");
-        Cconws("SD card or raw drives.\r\n");
-        Cconws("\33pAborted.\33q\r\n");
-        Cconin();
-    	return 0;
-	}
         
 	//only transfer screen every 10th VBL
 	_vblskipscreen=10;
@@ -157,7 +140,7 @@ BYTE ce_identify(BYTE ACSI_id)
 void showConnectionErrorMessage(void)
 {
 //	Clear_home();
-	Cconws("Communication with CosmosEx failed.\nWill try to reconnect in a while.\n\nTo quit to desktop, press F10\n");
+	(void) Cconws("Communication with CosmosEx failed.\nWill try to reconnect in a while.\n\nTo quit to desktop, press F10\n");
 	
 	prevCommandFailed = 1;
 }
@@ -165,12 +148,12 @@ void showConnectionErrorMessage(void)
 BYTE findDevice()
 {
 	BYTE i;
-	BYTE key, vkey, res;
+	BYTE key, res;
 	BYTE deviceID = 0;
 	char bfr[2];
 
 	bfr[1] = 0; 
-	Cconws("Looking for CosmosEx: ");
+	(void) Cconws("Looking for CosmosEx: ");
 
 	while(1) {
 		for(i=0; i<8; i++) {
@@ -189,7 +172,7 @@ BYTE findDevice()
 			break;
 		}
       
-		Cconws(" - not found.\r\nPress any key to retry or 'Q' to quit.\r\n");
+		(void) Cconws(" - not found.\r\nPress any key to retry or 'Q' to quit.\r\n");
 		key = Cnecin();
     
 		if(key == 'Q' || key=='q') {
@@ -198,9 +181,9 @@ BYTE findDevice()
 	}
   
 	bfr[0] = deviceID + '0';
-	Cconws("\r\nCosmosEx ACSI ID: ");
-	Cconws(bfr);
-	Cconws("\r\n\r\n");
+	(void) Cconws("\r\nCosmosEx ACSI ID: ");
+	(void) Cconws(bfr);
+	(void) Cconws("\r\n\r\n");
 	return deviceID;
 }
 
