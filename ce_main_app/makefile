@@ -81,7 +81,6 @@ SRCS += $(wildcard $(SUBDIR11)/*.cpp)
 SRCS += $(wildcard $(SUBDIR12)/*.cpp)
 
 HDRS  = $(wildcard *.h)
-HDRS += newscripts_zip.h
 HDRS += $(wildcard $(SUBDIR1)/*.h)
 HDRS += $(wildcard $(SUBDIR2)/*.h)
 HDRS += $(wildcard $(SUBDIR3)/*.h)
@@ -129,11 +128,6 @@ $(WEB_JS_PATH)/zepto-combined.js.gz: $(WEB_JS_PATH)/zepto.js $(WEB_JS_PATH)/zept
 
 $(WEB_JS_PATH)/jquery-combined.js.gz: $(WEB_JS_PATH)/jquery.js ${WEB_JS_MODULES}
 	$(AT)cat $^ | gzip -f > $@
-
-newscripts_zip.h:	$(wildcard bash_scripts/*.sh) \
-					$(wildcard bash_scripts/*.xsvf) \
-					bash_scripts/initd_cosmosex
-	$(MAKE) -C bash_scripts
 
 .PHONY:	clean depclean
 

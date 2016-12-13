@@ -15,8 +15,6 @@
 #include "mounter.h"
 #include "dir2fdd/cdirectory.h"
 
-#include "newscripts_zip.h"
-
 Versions Update::versions;
 int   Update::currentState          = UPDATE_STATE_IDLE;
 DWORD Update::whenCanStartInstall   = 0xffffffff;
@@ -476,48 +474,13 @@ void Update::createNewScripts(void)
     }
     
     //------------
-    // create config drive floppy image
-    
-    Debug::out(LOG_INFO, "Update::createNewScripts() - creating config floppy image from config drive");
-    printf("Creating config floppy image from config drive.\n");
-    CDirectory::dir2fdd((char *) "/ce/app/configdrive", (char *) CE_CONF_FDD_IMAGE_PATH_AND_FILENAME);
-
-    //------------
-    // create floppy test image
-    Debug::out(LOG_INFO, "Update::createNewScripts() - creating floppy test image");
-    printf("Creating floppy test image\n");
-    createFloppyTestImage();
-    
-    //------------
-    Debug::out(LOG_INFO, "Update::createNewScripts() - creating config floppy tar archive");
-    printf("Creating config floppy tar archive.\n");
-    system("rm -f /ce/app/ce_conf.tar");
-    system("tar cf /ce/app/ce_conf.tar /ce/app/configdrive/");
-    
-    //------------
-    // ok, it seems that we should update the scripts, so update them
+    // it seems that we should update the scripts, so update them
     printf("Will try to update scripts\n");
     Debug::out(LOG_DEBUG, "Update::createNewScripts() - will try to update scripts");
     
-    // write the data to file
-    FILE *f = fopen("/tmp/newscripts.zip", "wb");
-    
-    if(!f) {
-        Debug::out(LOG_ERROR, "Update::createNewScripts() - failed to open output file!");
-        return;
-    }
-
-    fwrite(newscripts_zip, 1, newscripts_zip_len, f);
-    fclose(f);
-    
-    system("sync");
-    
     // run the script
-    system("rm -rf /tmp/newscripts");                                       // remove dir if it exists
-    system("mkdir -p /tmp/newscripts");                                     // create dir
-    system("unzip -o /tmp/newscripts.zip -d /tmp/newscripts > /dev/null");  // extract script there
-    system("chmod 755 /tmp/newscripts/copynewscripts.sh");                  // make the copying script executable
-    system("/tmp/newscripts/copynewscripts.sh ");                           // execute the copying script
+    system("chmod 755 /ce/app/shellscripts/copynewscripts.sh");             // make the copying script executable
+    system("/ce/app/shellscripts/copynewscripts.sh ");                      // execute the copying script
     
     //------------
     // last step: mark the version of the scripts we now have

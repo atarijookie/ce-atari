@@ -30,18 +30,18 @@ mkdir -p /ce/update
 # first copy all the scripts which are the same for both Raspbian and Yocto
 
 #compareAndCopy  local file                      new file
-compareAndCopy   "/ce/cesuper.sh"                "/tmp/newscripts/cesuper.sh"
-compareAndCopy   "/ce/ce_conf.sh"                "/tmp/newscripts/ce_conf.sh"
-compareAndCopy   "/ce/ce_start.sh"               "/tmp/newscripts/ce_start.sh"
-compareAndCopy   "/ce/ce_stop.sh"                "/tmp/newscripts/ce_stop.sh"
-compareAndCopy   "/ce/ce_firstfw.sh"             "/tmp/newscripts/ce_firstfw.sh"
-compareAndCopy   "/ce/ce_update.sh"              "/tmp/newscripts/ce_update.sh"
-compareAndCopy   "/ce/update/test_xc9536xl.xsvf" "/tmp/newscripts/test_xc9536xl.xsvf"
-compareAndCopy   "/ce/update/test_xc9572xl.xsvf" "/tmp/newscripts/test_xc9572xl.xsvf"
-compareAndCopy   "/ce/update/update_app.sh"      "/tmp/newscripts/update_app.sh"
-compareAndCopy   "/ce/update/update_franz.sh"    "/tmp/newscripts/update_franz.sh"
-compareAndCopy   "/ce/update/update_hans.sh"     "/tmp/newscripts/update_hans.sh"
-compareAndCopy   "/ce/update/update_xilinx.sh"   "/tmp/newscripts/update_xilinx.sh"
+compareAndCopy   "/ce/cesuper.sh"                "/ce/app/shellscripts/cesuper.sh"
+compareAndCopy   "/ce/ce_conf.sh"                "/ce/app/shellscripts/ce_conf.sh"
+compareAndCopy   "/ce/ce_start.sh"               "/ce/app/shellscripts/ce_start.sh"
+compareAndCopy   "/ce/ce_stop.sh"                "/ce/app/shellscripts/ce_stop.sh"
+compareAndCopy   "/ce/ce_firstfw.sh"             "/ce/app/shellscripts/ce_firstfw.sh"
+compareAndCopy   "/ce/ce_update.sh"              "/ce/app/shellscripts/ce_update.sh"
+compareAndCopy   "/ce/update/test_xc9536xl.xsvf" "/ce/app/shellscripts/test_xc9536xl.xsvf"
+compareAndCopy   "/ce/update/test_xc9572xl.xsvf" "/ce/app/shellscripts/test_xc9572xl.xsvf"
+compareAndCopy   "/ce/update/update_app.sh"      "/ce/app/shellscripts/update_app.sh"
+compareAndCopy   "/ce/update/update_franz.sh"    "/ce/app/shellscripts/update_franz.sh"
+compareAndCopy   "/ce/update/update_hans.sh"     "/ce/app/shellscripts/update_hans.sh"
+compareAndCopy   "/ce/update/update_xilinx.sh"   "/ce/app/shellscripts/update_xilinx.sh"
 
 #---------------------------------------------------------------------------
 # then copy the scripts which are different for Raspbian and Yocto
@@ -50,12 +50,12 @@ issue=$( cat /etc/issue | grep -o "Yocto" | wc -l )
 # If at least once the Yocto was found, it's Yocto
 if [ "$issue" -gt "0" ]; then
     # for yocto
-    compareAndCopy   "/ce/wifisuper.sh"          "/tmp/newscripts/wifisuper.sh"         # update wifisuper.sh
+    compareAndCopy   "/ce/wifisuper.sh"          "/ce/app/shellscripts/wifisuper.sh"         # update wifisuper.sh
 else
     # for raspbian
 	rm -f /ce/wifisuper.sh                                                              # remove wifisuper.sh
-    compareAndCopy   "/ce/ceboot.sh"             "/tmp/newscripts/ceboot.sh"
-    compareAndCopy   "/etc/init.d/cosmosex"      "/tmp/newscripts/initd_cosmosex"       # update init.d script
+    compareAndCopy   "/ce/ceboot.sh"             "/ce/app/shellscripts/ceboot.sh"
+    compareAndCopy   "/etc/init.d/cosmosex"      "/ce/app/shellscripts/initd_cosmosex"       # update init.d script
 fi
 
 echo "Doing sync..."

@@ -112,11 +112,11 @@ extern InterProcessEvents events;
 #define SPECIAL_FDD_IMAGE_CE_CONF       100
 #define SPECIAL_FDD_IMAGE_FDD_TEST      101
 
-#define CE_CONF_FDD_IMAGE_PATH_AND_FILENAME "/ce/app/ce_conf.msa"
-#define CE_CONF_FDD_IMAGE_JUST_FILENAME     "ce_conf.msa"
+#define CE_CONF_FDD_IMAGE_PATH_AND_FILENAME "/ce/app/ce_conf.st"
+#define CE_CONF_FDD_IMAGE_JUST_FILENAME     "ce_conf.st"
 
-#define CE_CONF_TAR_PATH_AND_FILENAME       "/ce/app/ce_conf.tar"
-#define CE_CONF_TAR_JUST_FILENAME           "ce_conf.tar"
+#define CE_CONF_TAR_PATH_AND_FILENAME       "/ce/app/ce_conf.zip"
+#define CE_CONF_TAR_JUST_FILENAME           "ce_conf.zip"
 
 #define FDD_TEST_IMAGE_PATH_AND_FILENAME    "/ce/app/fdd_test.st"
 #define FDD_TEST_IMAGE_JUST_FILENAME        "fdd_test.st"
