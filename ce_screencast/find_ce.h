@@ -7,5 +7,10 @@
 
 BYTE findDevice(void);
 
+#define MACHINECONFIG_HAS_STE_SCRADR_LOWBYTE 1
+#define MACHINECONFIG_HAS_VIDEL 			 2
+#define MACHINECONFIG_HAS_TT_VIDEO           4
+#define MACHINECONFIG_HAS_BLITTER            8
+
 #endif
 

@@ -62,6 +62,7 @@ extern WORD _vblskipscreen;
 extern WORD _vblskipconfig;
 
 extern BYTE machine;
+extern volatile DWORD machineconfig;
 
 char *version = "2016-05-08"; 
 
@@ -207,7 +208,8 @@ BYTE checkForSupportedResolution(void)
 	switch(machine)
 	{
 		case MACHINE_FALCON:
-			//check screen buffer size
+			//check screen buffer size, simple, yet crude way to rule out VIDEL resolutions and fall through to
+			//ST compatible resolutions
 			if( VgetSize( VsetMode(-1) )!=32000 )
 			{
 				return FALSE;

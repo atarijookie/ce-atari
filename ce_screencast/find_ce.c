@@ -24,7 +24,8 @@ BYTE ce_identify(BYTE id, BYTE hddIf);
 //--------------------------------------------------
 
 BYTE getMachineType(void);
-BYTE machine;
+BYTE machine;                //general machine type (ST(e)/TT/Falcon)
+extern volatile DWORD machineconfig; //explicit subsystem information
 
 //--------------------------------------------------
 
@@ -127,6 +128,8 @@ BYTE getMachineType(void)
 {
     DWORD *cookieJarAddr    = (DWORD *) 0x05A0;
     DWORD *cookieJar        = (DWORD *) *cookieJarAddr;     // get address of cookie jar
+
+    machine_check(); 			//check capabilities on hardware level
     
     if(cookieJar == 0) {                        // no cookie jar? it's an old ST
         return MACHINE_ST;
@@ -146,8 +149,20 @@ BYTE getMachineType(void)
             WORD machine = cookieValue >> 16;
             
             switch(machine) {                   // depending on machine, either it's TT or FALCON
-                case 2: return MACHINE_TT;
-                case 3: return MACHINE_FALCON;
+                case 1:
+					//STE has $fff820d 
+                	machineconfig|=MACHINECONFIG_HAS_STE_SCRADR_LOWBYTE;
+					return MACHINE_ST;
+                case 2: 
+					//TT also has $fff820d 
+                	machineconfig|=MACHINECONFIG_HAS_STE_SCRADR_LOWBYTE;
+                	machineconfig|=MACHINECONFIG_HAS_TT_VIDEO;
+					return MACHINE_TT;
+                case 3: 
+					//F030 also has $fff820d 
+                	machineconfig|=MACHINECONFIG_HAS_STE_SCRADR_LOWBYTE;
+                	machineconfig|=MACHINECONFIG_HAS_VIDEL;
+					return MACHINE_FALCON;
             }
             
             break;                              // or it's ST

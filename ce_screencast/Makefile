@@ -9,18 +9,18 @@ LDFLAGS	= -Wl,--traditional-format -lgem
 
 HDR	= $(wildcard *.h)
 CSRC	= $(wildcard *.c) 
-SSRC	= screenirq.s cache030.s
+SSRC	= screenirq.s cache030.s machineconfig.s
 STARTUP	= startup.s
 
 OBJS    = $(patsubst %.c,%.o,$(CRCS))
 
 CFLAGS	+= -nostdlib -DSLIM 
 
-OBJS	 = $(patsubst %.c,%.o,$(CSRC)) screenirq.o cache030.o
+OBJS	 = $(patsubst %.c,%.o,$(CSRC)) screenirq.o cache030.o machineconfig.o
 
 $(TARGET): $(STARTUP) $(OBJS) $(HDR)
 	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(OBJS) $(LDFLAGS)
-	$(STRIP) -s $@
+#	$(STRIP) -s $@
 	$(PRGFLAGS) $@ --mno-fastram --mno-fastalloc --mno-fastload 
 
 %.o: %.c 

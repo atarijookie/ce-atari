@@ -6,6 +6,8 @@
 #include "translated.h"
 
 #include "screen.h"
+#include "mutex.h"
+#include "find_ce.h"
 
 extern BYTE commandShort[CMD_LENGTH_SHORT]; 
 extern BYTE commandLong[CMD_LENGTH_LONG]; 
@@ -17,16 +19,31 @@ extern BYTE deviceID;
 
 DWORD writeScreen(BYTE command, BYTE screenmode, BYTE *bfr, DWORD cnt);
 int getConfig(void);
+
+extern volatile mutex mtx;
+extern volatile DWORD machineconfig; //explicit subsystem information
   
 void screenworker()
 {
+	//do not send Screenshot if there's any other HD_IF operation in progress
+    if( mutex_trylock(&mtx)==0 ){
+        return;
+    }
+
 	WORD* pxPal=(WORD*)0xffff8240;
-	DWORD* pxScreen=*((DWORD*)0x44e);
-	/* send screen resolution and screen memory */
-	writeScreen(TRAN_CMD_SENDSCREENCAST,(*((BYTE*)0xffff8260))&3,pxScreen,32000);
+    /*BYTE *pxScreen   =   (BYTE *) (*((DWORD*) 0x44e));*/
+    BYTE *pxScreen   = (BYTE *)(((DWORD)*((BYTE*)0xffff8203) << 8) | ((DWORD)*((BYTE*)0xffff8201) << 16));
+    //handle STE screen address
+    if( machineconfig&MACHINECONFIG_HAS_STE_SCRADR_LOWBYTE!=0 ){
+	    pxScreen   = (BYTE *)(((DWORD)*((BYTE*)0xffff820d)) | ((DWORD)*((BYTE*)0xffff8203) << 8) | ((DWORD)*((BYTE*)0xffff8201) << 16));
+	} 	 
 	/* send 16 ST palette entries */
 	memcpy(pDmaBuffer,pxPal,16*2);
 	writeScreen(TRAN_CMD_SCREENCASTPALETTE,(*((BYTE*)0xffff8260))&3,pDmaBuffer,16*2);
+	/* send screen resolution and screen memory */
+	writeScreen(TRAN_CMD_SENDSCREENCAST,(*((BYTE*)0xffff8260))&3,pxScreen,32000);
+
+    mutex_unlock(&mtx);
 }  
    
 void configworker()
@@ -62,7 +79,7 @@ DWORD writeScreen(BYTE command, BYTE screenmode, BYTE *bfr, DWORD cnt)
 	}
 
     hdIf.forceFlock = 1;                    // let HD IF force FLOCK, as this FLOCK has been acquired in the asm code before this function 	hdIf.forceFlock=TRUE;
-	(*hdIf.cmd)(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount); 
+	(*hdIf.cmd_nolock)(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount); 
     hdIf.forceFlock = 0;
 	//acsi_cmd2(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, bfr, sectorCount); 
 	/* if all data transfered, return count of all data */
@@ -79,7 +96,7 @@ int getConfig(void)
 	commandShort[4] = GD_CUSTOM_getConfig;
   
     hdIf.forceFlock = 1;                    // let HD IF force FLOCK, as this FLOCK has been acquired in the asm code before this function 	hdIf.forceFlock=TRUE;
-	(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);		// issue the command and check the result
+	(*hdIf.cmd_nolock)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);		// issue the command and check the result
     hdIf.forceFlock = 0;
 	//acsi_cmd2(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);		// issue the command and check the result
     
