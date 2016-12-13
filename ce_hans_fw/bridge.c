@@ -3,6 +3,7 @@
 
 extern BYTE brStat;                                                         // status from bridge
 extern BYTE isAcsiNotScsi;
+extern BYTE lastScsiStatusByte;
 
 void resetXilinx(void);
 
@@ -82,10 +83,11 @@ BYTE PIO_write(void)
 }
 
 // send status byte to host, and on SCSI also to MSG IN byte
-void PIO_read(BYTE val)
+void PIO_read(BYTE scsiStatusByte)
 {
-    if(brStat != E_TimeOut) {       // if we didn't have bridge timeout, we can try to send STATUS byte
-        PIO_read_solely(val);       // this sends only STATUS byte to host - both in ACSI and SCSI
+    if(brStat != E_TimeOut) {       				// if we didn't have bridge timeout, we can try to send STATUS byte
+			lastScsiStatusByte = scsiStatusByte;	// store last SCSI status byte - for debugging purpose
+			PIO_read_solely(scsiStatusByte);			// this sends only STATUS byte to host - both in ACSI and SCSI
     }
     
     if(!isAcsiNotScsi) {            // if it's SCSI, send also MSG IN to host

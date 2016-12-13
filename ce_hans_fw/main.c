@@ -134,9 +134,28 @@ WORD smallDataBuffer[2];
 
 WORD cmdBuffer[CMD_BUFFER_LENGTH];
 
+//----------
 BYTE cmd[14];                                                   // received command bytes
 BYTE cmdLen;                                                    // length of received command
 BYTE brStat;                                                    // status from bridge
+BYTE lastScsiStatusByte;
+
+//----------
+#ifdef CMDLOGGING
+	#define CMDLOG_COUNT	256
+	TCmdLogItem cmdLog[CMDLOG_COUNT];
+
+	DWORD cmdSeqNo;
+	DWORD cmdLogIndex;
+	
+	void memcpy(char *dest, char *src, int cnt);
+	
+	void cmdLog_onStart(void);
+	void cmdLog_storeResults(BYTE bridgeStatus, BYTE scsiStatus);
+	void cmdLog_onEnd(void);
+	
+#endif
+//----------
 
 BYTE enabledIDs[8];                                             // when 1, Hanz will react on that ACSI ID #
 
@@ -191,7 +210,8 @@ void updateEnabledIDsInSoloMode(void);
 
 BYTE tryProcessLocally(void);
 
-BYTE lastErr;
+BYTE lastErr[32];
+BYTE lastErrIndex;
 
 DWORD toStart;
 DWORD lastStart, lastEnd;
@@ -229,6 +249,11 @@ struct {
 int main(void)
 {
     LOG_ERROR(0);           // no error
+	
+#ifdef CMDLOGGING	
+		cmdSeqNo		= 0;
+		cmdLogIndex	= 0;
+#endif	
     
     initAllStuff();         // now init everything
     
@@ -477,6 +502,11 @@ void handleAcsiCommand(void)
         }
     }
 
+#ifdef CMDLOGGING
+		cmdLog_storeResults(brStat, lastScsiStatusByte);
+		cmdLog_onEnd();
+#endif		
+		
     //---------------
     // if something was wrong, reset XILINX so it won't get stuck 
     if(brStat != E_OK) {
@@ -632,6 +662,12 @@ void onGetCommand(void)
         good = onGetCommandScsi();
     }
 
+#ifdef CMDLOGGING
+		// store the cmd, cmdLen, bridge status after transfering CMD bytes in
+		cmdLog_onStart();
+		lastScsiStatusByte = 0xfa;									// you will get this fake SCSI status code, if you fail before you manage to send status byte
+#endif
+		
     if(!good) {                                 // if failed to get the cmd, quit
         return;
     }
@@ -1679,3 +1715,43 @@ BYTE isBusIdle(void)                    // get if the SCSI bus is idle (BSY high
     getXilinxStatus();
     return xilinxBusIdle;
 }
+
+#ifdef CMDLOGGING
+
+// start some command logging (if enabled)
+void cmdLog_onStart(void)
+{
+	cmdLog[cmdLogIndex].cmdSeqNo				= cmdSeqNo;							// store sequence number of command
+	memcpy((char *) cmdLog[cmdLogIndex].cmd, (char *) cmd, 14);	// copy the whole command
+	cmdLog[cmdLogIndex].cmdLen					= cmdLen;								// also store the length
+	cmdLog[cmdLogIndex].bridgeStatus		= brStat;								// store the bridge status byte
+	cmdLog[cmdLogIndex].scsiStatusByte	= 0xff;									// and also some fake SCSI status byte (other than zero, which is for no-error)
+}
+
+void cmdLog_storeResults(BYTE bridgeStatus, BYTE scsiStatus)
+{
+	// update these retults
+	cmdLog[cmdLogIndex].bridgeStatus		= bridgeStatus;
+	cmdLog[cmdLogIndex].scsiStatusByte	= scsiStatus;
+}
+
+// finish some command logging on end of command (if enabled)
+void cmdLog_onEnd(void)
+{
+	#ifdef CMDLOGGING_ONLY_ERROR
+	// if bridge didn't fail, and there wasn't an scsi error status byte, skip moving to next CMD LOG item - we're logging only on error
+	if(cmdLog[cmdLogIndex].bridgeStatus == E_OK && cmdLog[cmdLogIndex].scsiStatusByte == 0) {
+		return;
+	}
+	#endif
+	
+	// update sequence number
+	cmdSeqNo++;
+	
+	// update log field index
+	cmdLogIndex++;
+	if(cmdLogIndex >= CMDLOG_COUNT) {
+		cmdLogIndex = 0;
+	}
+}
+#endif

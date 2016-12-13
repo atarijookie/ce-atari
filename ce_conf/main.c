@@ -3,6 +3,7 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
+#include <mint/linea.h>
 #include <support.h>
 
 #include <stdint.h>
@@ -71,11 +72,12 @@ int main(void)
     
     prevCommandFailed = 0;
     
+    lineaa();                   // hide mouse
     // ---------------------- 
     // create buffer pointer to even address 
     toEven = (DWORD) &myBuffer[0];
   
-    if(toEven & 0x0001)       // not even number? 
+    if(toEven & 0x0001)         // not even number? 
         toEven++;
   
     pBuffer = (BYTE *) toEven; 
@@ -88,6 +90,7 @@ int main(void)
     res = Supexec(findDevice);
 
     if(res != TRUE) {
+        linea9();               // show mouse
         return 0;
     }
     
@@ -95,6 +98,7 @@ int main(void)
     // if the device is CosmoSolo, go this way
     if(cosmosExNotCosmoSolo == FALSE) {
         cosmoSoloConfig();
+        linea9();               // show mouse
         return 0;
     }
     
@@ -167,6 +171,7 @@ int main(void)
         lastShowStreamTime = getTicksAsUser();                      // we just shown the stream, no need for refresh
     }
     
+    linea9();               // show mouse
     return 0;
 }
 //--------------------------------------------------

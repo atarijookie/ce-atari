@@ -70,23 +70,23 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
             res = attachMediaToACSIid(index, hostSourceType, accessType);          // attach media to ACSI ID
 
             if(res) {
-                Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s - media was already attached, attached to ACSI ID %d", hostPath.c_str(), attachedMedia[index].devInfoIndex);
+                Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s(%s) - media was already attached, attached to ACSI ID %d", hostPath.c_str(), SourceTypeStr(hostSourceType), attachedMedia[index].devInfoIndex);
             } else {
-                Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s - media was already attached, but still not attached to ACSI ID!", hostPath.c_str());
+                Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s(%s) - media was already attached, but still not attached to ACSI ID!", hostPath.c_str(), SourceTypeStr(hostSourceType));
             }
 
             return res;
         }
 
         // well, we have the media attached and we're also attached to ACSI ID
-        Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s - media was already attached, not doing anything.", hostPath.c_str());
+        Debug::out(LOG_DEBUG, "Scsi::attachToHostPath - %s(%s) - media was already attached to ACSI ID %d, not doing anything.", hostPath.c_str(), SourceTypeStr(hostSourceType), attachedMedia[index].devInfoIndex);
         return true;
     }
 
     index = findEmptyAttachSlot();                              // find where we can store it
 
     if(index == -1) {                                               // no more place to store it?
-        Debug::out(LOG_ERROR, "Scsi::attachToHostPath - %s - no empty slot! Not attaching.", hostPath.c_str());
+        Debug::out(LOG_ERROR, "Scsi::attachToHostPath - %s(%s) - no empty slot! Not attaching.", hostPath.c_str(), SourceTypeStr(hostSourceType));
         return false;
     }
 
@@ -183,54 +183,32 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
 bool Scsi::attachMediaToACSIid(int mediaIndex, int hostSourceType, int accessType)
 {
     for(int i=0; i<8; i++) {                                                // find empty and proper ACSI ID
-
-        // if we shouldn't use this ACSI ID
-        if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_OFF) {
-            continue;
-        }
-
         // if this index is already used, skip it
         if(devInfo[i].attachedMediaIndex != -1) {
             continue;
         }
-
-        // if this ACSI ID is for SD card and we're attaching SD card
-        if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_SD && hostSourceType == SOURCETYPE_SD_CARD) {
+        bool canAttach;
+        switch(acsiIdInfo.acsiIDdevType[i]) {
+        case DEVTYPE_SD:    // only attaching SD CARDs
+            canAttach = (hostSourceType == SOURCETYPE_SD_CARD);
+            break;
+        case DEVTYPE_RAW:   // attaching everything except SD CARDs and Translated boot
+            canAttach = (hostSourceType != SOURCETYPE_SD_CARD) && (hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT);
+            break;
+        case DEVTYPE_TRANSLATED:    // only attaching TRANSLATEDBOOT
+            canAttach = (hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT);
+            break;
+        default:
+            canAttach = false;
+        }
+        if(canAttach) {
             devInfo[i].attachedMediaIndex   = mediaIndex;
             devInfo[i].accessType           = accessType;
-
-            attachedMedia[mediaIndex].devInfoIndex = i;
-            return true;
-        }
-
-        // if this is SD card and it wasn't attached in previous IF, don't go further - you would attach it to wrong ACSI ID
-        if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_SD) {
-            continue;
-        }
-
-        // if this ACSI ID is for translated drive, and we're attaching translated boot image
-        if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_TRANSLATED && hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
-            devInfo[i].attachedMediaIndex   = mediaIndex;
-            devInfo[i].accessType           = accessType;
-
             attachedMedia[mediaIndex].devInfoIndex = i;
 
-            tranBootMedia.updateBootsectorConfigWithACSIid(i);        // and update boot sector config with ACSI ID to which this has been attached
-
-            return true;
-        }
-
-        // if this is TRANSLATED device ACSI ID and it wasn't attached in previous IF, don't go further - you would attach it to wrong ACSI ID
-        if(acsiIdInfo.acsiIDdevType[i] == DEVTYPE_TRANSLATED) {
-            continue;
-        }
-
-        // if this ACSI ID is NOT for translated drive, and we're NOT attaching translated boot image
-        if(acsiIdInfo.acsiIDdevType[i] != DEVTYPE_TRANSLATED && hostSourceType != SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
-            devInfo[i].attachedMediaIndex   = mediaIndex;
-            devInfo[i].accessType           = accessType;
-
-            attachedMedia[mediaIndex].devInfoIndex = i;
+            if(hostSourceType == SOURCETYPE_IMAGE_TRANSLATEDBOOT) {
+                tranBootMedia.updateBootsectorConfigWithACSIid(i);        // and update boot sector config with ACSI ID to which this has been attached
+            }
             return true;
         }
     }
@@ -387,12 +365,18 @@ void Scsi::loadSettings(void)
         attachToHostPath(empty, SOURCETYPE_SD_CARD, SCSI_ACCESSTYPE_FULL);
     }
 
+    // attach Translated bootmedia
+    attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
+
+    // TODO : attach RAW usb drives again
+#if 0
     // and now reattach everything back according to new ACSI ID settings
     for(int i=0; i<MAX_ATTACHED_MEDIA; i++) {
         if(attachedMedia[i].dataMedia != NULL) {            // if there's some media to use
             attachMediaToACSIid(i, attachedMedia[i].hostSourceType, attachedMedia[i].accessType);
         }
     }
+#endif
 
     std::string img;
     img = s.getString("HDDIMAGE", "");
@@ -1207,4 +1191,17 @@ void Scsi::updateTranslatedBootMedia(void)
     }
 
     tranBootMedia.updateBootsectorConfigWithACSIid(idOnBus);
+}
+
+const char * Scsi::SourceTypeStr(int sourceType)
+{
+    switch(sourceType) {
+    case SOURCETYPE_NONE:       return "NONE";
+    case SOURCETYPE_IMAGE:      return "IMAGE";
+    case SOURCETYPE_IMAGE_TRANSLATEDBOOT:   return "TRANSLATEDBOOT";
+    case SOURCETYPE_DEVICE:     return "DEVICE";
+    case SOURCETYPE_SD_CARD:    return "SD_CARD";
+    case SOURCETYPE_TESTMEDIA:  return "TESTMEDIA";
+    default:                    return "*UNKNOWN*";
+    }
 }

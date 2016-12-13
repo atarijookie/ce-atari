@@ -47,7 +47,14 @@ extern volatile bool floppyEncodingRunning;
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
     NetworkSettings ns;
-    ns.updateResolvConf(true);
+    ns.load();
+    ns.updateResolvConf(false);     // update resolv.conf
+
+    if(!ns.wlan0.isEnabled) {       // if wlan0 not enabled, send one wlan0 restart, which might bring the wlan0 down
+        TMounterRequest tmr;
+        tmr.action = MOUNTER_ACTION_RESTARTNETWORK_WLAN0;
+        mountAdd(tmr);
+    }
 
     Update::initialize();
 
@@ -124,7 +131,6 @@ void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyServi
 
     shared.scsi        = new Scsi();
     shared.scsi->setAcsiDataTrans(dataTrans);
-    shared.scsi->attachToHostPath(TRANSLATEDBOOTMEDIA_FAKEPATH, SOURCETYPE_IMAGE_TRANSLATEDBOOT, SCSI_ACCESSTYPE_FULL);
 
     shared.translated = new TranslatedDisk(dataTrans, configService, screencastService);
     shared.translated->setSettingsReloadProxy(&settingsReloadProxy);

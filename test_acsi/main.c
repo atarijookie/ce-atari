@@ -30,6 +30,7 @@ void showHexDword(DWORD val);
 void logMsg(char *logMsg);
 void deleteErrorLines(void);
 void speedTest(void);
+void generateDataOnPartition(void);
 
 BYTE ce_identify(BYTE ACSI_id);
 //--------------------------------------------------
@@ -72,6 +73,8 @@ BYTE ifUsed;
 int errorLine = 0;
 BYTE simpleNotDetailedErrReport = 1;
 
+void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+
 typedef struct {
     DWORD goodPlain;
     DWORD goodWithRetry;
@@ -93,12 +96,21 @@ void printOpResult(int res);
 
 void testDataReliability(void);
 void testContinousRead  (BYTE testReadNotSDcard);
+
+WORD getTOSversion(void)
+{
+    // detect TOS version and try to automatically choose the interface
+    BYTE  *pSysBase     = (BYTE *) 0x000004F2;
+    BYTE  *ppSysBase    = (BYTE *)  ((DWORD )  *pSysBase);                      // get pointer to TOS address
+    WORD  tosVersion    = (WORD  ) *(( WORD *) (ppSysBase + 2));                // TOS +2: TOS version
+    return tosVersion;
+}
+
 //--------------------------------------------------
 int main(void)
 {
     BYTE key;
     DWORD toEven;
-    void *OldSP;
 
     //----------------------
     // read all the keys which are waiting, so we can ignore them
@@ -111,8 +123,7 @@ int main(void)
     }
     //----------------------
     
-    OldSP = (void *) Super((void *)0);              // supervisor mode 
-    lineaa();   // hide mouse    
+    lineaa();   // hide mouse
     
     prevCommandFailed = 0;
     
@@ -142,10 +153,10 @@ int main(void)
     (void) Cconws(" Helpful to detect possible DMA problems\r\n");      
     (void) Cconws(" your ST hardware might have. See:\r\n");        
     (void) Cconws(" http://joo.kie.sk/?page_id=250 and \r\n");
-    (void) Cconws(" http://goo.gl/23AqXk for infos+fixes.\r\n\r\n");        
+    (void) Cconws(" https://goo.gl/bKcbNV for infos+fixes.\r\n\r\n");        
     
     unsigned long *cescreencast_cookie=0;
-    if( CookieJarRead(0x43455343,(unsigned long *) &cescreencast_cookie)!=0 ) // Cookie "CESC" 
+    if(CookieJarReadAsUser(0x43455343,(unsigned long *) &cescreencast_cookie) != 0) // Cookie "CESC" 
     { 
         (void) Cconws("\r\n");
         (void) Cconws(" CosmosEx Screencast is active. Please\r\n");
@@ -154,15 +165,12 @@ int main(void)
         (void) Cconws("Quit.");         
         
         linea9();   
-        Super((void *)OldSP);                 // user mode 
         return 0;
     }
     
     //----------------------
     // detect TOS version and try to automatically choose the interface
-    BYTE  *pSysBase     = (BYTE *) 0x000004F2;
-    BYTE  *ppSysBase    = (BYTE *)  ((DWORD )  *pSysBase);                      // get pointer to TOS address
-    WORD  tosVersion    = (WORD  ) *(( WORD *) (ppSysBase + 2));                // TOS +2: TOS version
+    WORD  tosVersion    = Supexec(getTOSversion);
     BYTE  tosMajor      = tosVersion >> 8;
     
     if(tosMajor == 1 || tosMajor == 2) {                // TOS 1.xx or TOS 2.xx -- running on ST
@@ -216,7 +224,6 @@ int main(void)
         (void) Cconws("Quit.");         
 
         linea9();   
-        Super((void *)OldSP);                 // user mode 
         return 0;
     }
   
@@ -225,51 +232,44 @@ int main(void)
     commandLong [0] = (deviceID << 5) | 0x1f;           // cmd[0] = ACSI_id + ICD command marker (0x1f) 
 
     // ----------------- 
-    // do a simple speed test
-    speedTest();
-
-    // ----------------- 
-    VT52_Clear_home();
-    
-    (void) Cconws("Choose test type:\r\n");
-    (void) Cconws("[D] - data from RPi     validity check\r\n");
-    (void) Cconws("[C] - data from RPI     continous read\r\n");
-    (void) Cconws("[S] - data from SD card continous read\r\n");
-    (void) Cconws("[Q] - quit\r\n");
 
     while(1) {
-        key = Cnecin();
-            
-        if(key == 'q' || key == 'Q') {
-            break;
-        }
+        VT52_Clear_home();
         
-        if(key == 'd' || key == 'D') {          // data check test?
-            testDataReliability();
+        (void) Cconws("Choose test type:\r\n");
+        (void) Cconws("[E] - short speed test\r\n");
+        (void) Cconws("[D] - data from RPi     validity check\r\n");
+        (void) Cconws("[C] - data from RPI     continous read\r\n");
+        (void) Cconws("[S] - data from SD card continous read\r\n");
+        (void) Cconws("[G] - generated data on GEMDOS partition\r\n");
+        (void) Cconws("[Q] - quit\r\n");
+
+        key = Cnecin();
+        
+        if(key >= 'A' && key <= 'Z') {          // upper case letter? to lower case
+            key += 32;
+        }
+            
+        if(key == 'q') {                        // quit
             break;
         }
 
-        if(key == 'c' || key == 'C') {          // stress test - continous read?
-            testContinousRead(1);
-            break;
-        }
-
-        if(key == 's' || key == 'S') {          // SD card continous read?
-            testContinousRead(0);
-            break;
+        switch(key) {
+            case 'e':   speedTest();                break;  // short speed test
+            case 'd':   testDataReliability();      break;  // data validity check from RPi
+            case 'c':   testContinousRead(1);       break;  // stress test - continous read
+            case 's':   testContinousRead(0);       break;  // SD card continous read
+            case 'g':   generateDataOnPartition();  break;  // higher level data generation 
         }
     }
     
     // ----------------- 
-
     
     linea9();                                       // show mouse    
-    Super((void *)OldSP);                           // user mode 
-
     return 0;
 }
 
-BYTE showQuestionGetBool(const char *question)
+BYTE showQuestionGetBool(const char *question, BYTE trueKey, const char *trueWord, BYTE falseKey, const char *falseWord)
 {
     // show question
     (void) Cconws(question);
@@ -277,16 +277,168 @@ BYTE showQuestionGetBool(const char *question)
     while(1) {
         BYTE key = Cnecin();
 
-        if(key == 'y' || key == 'Y') {          // yes
-            (void) Cconws(" YES\r\n");
+        if(key >= 'A' && key <= 'Z') {          // upper case letter? to lower case
+            key += 32;
+        }
+
+        if(key == trueKey) {                    // yes
+            (void) Cconws(" ");
+            (void) Cconws(trueWord);
+            (void) Cconws("\r\n");
             return 1;
         }
 
-        if(key == 'n' || key == 'N') {          // no
-            (void) Cconws(" NO\r\n");
+        if(key == falseKey) {                   // no
+            (void) Cconws(" ");
+            (void) Cconws(falseWord);
+            (void) Cconws("\r\n");
             return 0;
         }
     }
+}
+
+BYTE getIntFromUser(BYTE allowZero)
+{
+    while(1) {
+        BYTE key = Cnecin();
+
+        if(key < '0' || key > '9') {            // out of char range? try again
+            continue;
+        }
+        
+        if(!allowZero && key == '0') {          // if zero is not allowed, and it's zero, try again
+            continue;
+        }
+
+        Cconout(key);
+        (void) Cconws("\r\n");
+        
+        return (key - '0');                     // return the number
+    }
+}
+
+void generateDataOnPartition(void)
+{
+    VT52_Clear_home();
+    (void) Cconws("Generated data on GEMDOS partition\r\n");
+
+    BYTE writeNotVerify = showQuestionGetBool("Write data or verify data? W/V", 'w', "WRITE", 'v', "VERIFY");
+
+    //----------
+    // choose drive for testing
+    WORD drives = Drvmap();
+    (void) Cconws("Choose drive: ");
+    int i;
+    for(i=2; i<16; i++) {
+        if(drives & (1 << i)) {     // drive exists? show letter
+            Cconout('A' + i);
+        }
+    }
+    Cconout(' ');
+
+    BYTE testDrive;
+    while(1) {
+        BYTE key = Cnecin();
+
+        if(key >= 'a' && key <= 'z') {          // lower case letter? to upper case
+            key -= 32;
+        }
+
+        if(key < 'A' ||key > 'P') {             // out of char range? try again
+            continue;
+        }
+
+        int driveNo = key - 'A';                // transform char into index
+        if(drives & (1 << driveNo)) {           // drive with that index exists? good
+            testDrive = key;
+            break;
+        }
+    }
+
+    Cconout(testDrive);
+    (void) Cconws("\r\n");
+    
+    //----------
+    (void) Cconws("Choose test file size in MB: ");
+    int testFileSizeMb = getIntFromUser(0);
+
+    (void) Cconws("Choose test files count: ");
+    int testFileCount = getIntFromUser(0);
+
+    BYTE *pGenerated = wBuffer;
+    int j; 
+    for(i=0; i<MAXSECTORS; i++) {       // for all the sectors
+        for(j=0; j<512; j++) {          // for all bytes in sector
+            if(j == 0) {                // index 0: sector #
+                *pGenerated = i;
+            } else {                    // other indices: index in sector
+                *pGenerated = j;
+            }
+            pGenerated++;
+        }
+    }
+
+    int fileSizeInBuffers = testFileSizeMb * 8;     // 8 write buffers per MB -> total buffers per whole file size
+    for(i=0; i<testFileCount; i++) {                // for all files
+        char testFilePath[32] = "X:\\TSTFILEY.BIN"; // pattern for filename
+        
+        testFilePath[ 0] = testDrive;               // store test drive letter
+        testFilePath[10] = i + '0';                 // store index to filename
+
+        int f;
+        if(writeNotVerify) {                        // for write
+            (void) Cconws("Writing ");
+            (void) Cconws(testFilePath);
+            (void) Cconws(": ");
+            
+            f = Fcreate(testFilePath, 0);           // create for writing
+        } else {                                    // for read
+            (void) Cconws("Verifying ");
+            (void) Cconws(testFilePath);
+            (void) Cconws(": ");
+
+            f = Fopen(testFilePath, 0);             // open for reading
+        }
+
+        if(f < 0) {                                 // if failed
+            (void) Cconws("fail\r\n");
+            continue;
+        }
+
+        int res;
+        int bufferSize = MAXSECTORS * 512;
+        for(j=0; j<fileSizeInBuffers; j++) {
+            if(writeNotVerify) {                    // for write
+                res = Fwrite(f, bufferSize, wBuffer);
+
+                if(res == bufferSize) {             // written everything? good
+                    (void) Cconws("*");
+                } else {                            // something not written? fail
+                    (void) Cconws("-");
+                }
+            } else {                                // for read
+                res = Fread(f, bufferSize, rBuffer);
+
+                if(res == bufferSize) {             // read everything? check the content
+                    res = memcomp(rBuffer, wBuffer, bufferSize);
+
+                    if(res == 0) {                  // everything fine? 
+                        (void) Cconws("*");
+                    } else {                        // some mismatch?
+                        (void) Cconws("c");
+                    }
+                } else {                            // something not read? fail
+                    (void) Cconws("-");
+                }
+            }
+        }
+
+        Fclose(f);                                  // close file
+        (void) Cconws("\r\n");
+    }
+
+    (void) Cconws("\r\nDone. Press any key to continue.\r\n");
+    Cnecin();
 }
 
 void scsi_reset(void);
@@ -298,7 +450,7 @@ BYTE getSDcardId(void)
     cmd[0] = (deviceID << 5);                                       // cmd[0] = deviceID + TEST UNIT READY (0)   
     memset(rBuffer, 0, 512);                                        // clear the buffer 
 
-    (*hdIf.cmd) (ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);
+    hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);
     if(!hdIf.success || hdIf.statusByte != 0) {                     // if command failed, return -1 (0xff)
         return 0xff;
     }
@@ -319,9 +471,9 @@ void testContinousRead(BYTE testReadNotSDcard)
     VT52_Wrap_on();
     (void) Cconws("Continous read without data checking\r\n");
 
-    BYTE pauseUntilKeypressAfterFail    = showQuestionGetBool("On fail - pause until key pressed? Y/N");
-    BYTE doScsiResetAfterFail           = showQuestionGetBool("On fail - do SCSI reset?           Y/N");
-    BYTE showGoodResultAsterisk         = showQuestionGetBool("Show asterisk after good result?   Y/N");
+    BYTE pauseUntilKeypressAfterFail    = showQuestionGetBool("On fail - pause until key pressed? Y/N", 'y', "YES", 'n', "NO");
+    BYTE doScsiResetAfterFail           = showQuestionGetBool("On fail - do SCSI reset?           Y/N", 'y', "YES", 'n', "NO");
+    BYTE showGoodResultAsterisk         = showQuestionGetBool("Show asterisk after good result?   Y/N", 'y', "YES", 'n', "NO");
 
     hdIf.maxRetriesCount = 0;                           // disable retries
 
@@ -381,14 +533,14 @@ void testContinousRead(BYTE testReadNotSDcard)
         }
 
         if(testReadNotSDcard) {     // should do test on CE generated data?
-            (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, MAXSECTORS);    // issue the command and check the result
+            hdIfCmdAsUser(ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, MAXSECTORS);    // issue the command and check the result
         } else {                    // should do test on SD card?
             DWORD randomSectorNo = getTicks();
 
             sdReadCmd[2] = (BYTE) (randomSectorNo >> 8);    // sector # high
             sdReadCmd[3] = (BYTE) (randomSectorNo     );    // sector # low
 
-            (*hdIf.cmd) (ACSI_READ, sdReadCmd, CMD_LENGTH_SHORT, rBuffer, MAXSECTORS);      // issue the command and check the result
+            hdIfCmdAsUser(ACSI_READ, sdReadCmd, CMD_LENGTH_SHORT, rBuffer, MAXSECTORS);      // issue the command and check the result
         }
 
         if(!hdIf.success || hdIf.statusByte != 0) { // failed?
@@ -691,7 +843,7 @@ BYTE ce_identify(BYTE ACSI_id)
   cmd[0] = (ACSI_id << 5);                  // cmd[0] = ACSI_id + TEST UNIT READY (0)   
   memset(rBuffer, 0, 512);                  // clear the buffer 
 
-  (*hdIf.cmd) (ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);   // issue the identify command and check the result 
+  hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);   // issue the identify command and check the result 
     
   if(!hdIf.success || hdIf.statusByte != 0) {                   // if failed, return FALSE 
     return 0;
@@ -783,7 +935,7 @@ int readHansTest(DWORD byteCount, WORD xorVal )
 
     memset(rBuffer, 0, 8);                  // clear first few bytes so we can detect if the data was really read, or it was only retained from last write in the buffer    
         
-    (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, (byteCount+511)>>9 );        // issue the command and check the result
+    hdIfCmdAsUser(ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, (byteCount+511)>>9 );        // issue the command and check the result
     
     if(!hdIf.success) {                     // FAIL? quit...
         return -1;
@@ -858,7 +1010,7 @@ int writeHansTest(DWORD byteCount, WORD xorVal)
         }
     }
 
-    (*hdIf.cmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, wBuffer, (byteCount+511)>>9 );       // issue the command and check the result
+    hdIfCmdAsUser(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, wBuffer, (byteCount+511)>>9 );       // issue the command and check the result
     
     if(!hdIf.success) {                 // fail?
 logMsg("writeHansTest: not success");
@@ -954,12 +1106,12 @@ void speedTest(void)
     (void) Cconws("Read speed: ");
     
     DWORD now, until, diff;
-    now = *HZ_200;
+    now = getTicksAsUser();
     
     int i;
     
     for(i=0; i<20; i++) {
-        (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, MAXSECTORS );  // issue the command and check the result
+        hdIfCmdAsUser(ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, MAXSECTORS );  // issue the command and check the result
 
         if(!hdIf.success) {                     // ACSI ERROR?
             (void) Cconws("fail -- on ");
@@ -973,7 +1125,7 @@ void speedTest(void)
         }
     }
     
-    until   = *HZ_200;
+    until   = getTicksAsUser();
     diff    = until - now;
 
     int timeMs  = (diff * 1000) / 200;
@@ -984,4 +1136,29 @@ void speedTest(void)
     
     (void) Cconws("Press any key to continue...\n\r");
     (void) Cnecin();
+}
+
+//--------------------------------------------------
+// global variables, later used for calling hdIfCmdAsSuper
+BYTE __readNotWrite, __cmdLength;
+WORD __sectorCount;
+BYTE *__cmd, *__buffer;
+
+void hdIfCmdAsSuper(void)
+{
+    // this should be called through Supexec()
+    (*hdIf.cmd)(__readNotWrite, __cmd, __cmdLength, __buffer, __sectorCount);
+}
+
+void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+{
+    // store params to global vars
+    __readNotWrite  = readNotWrite;
+    __cmd           = cmd;
+    __cmdLength     = cmdLength;
+    __buffer        = buffer;
+    __sectorCount   = sectorCount;    
+    
+    // call the function which does the real work, and uses those global vars
+    Supexec(hdIfCmdAsSuper);
 }

@@ -25,6 +25,7 @@
 #include "utils.h"
 #include "debug.h"
 #include "update.h"
+#include "config/netsettings.h"
 
 pthread_mutex_t mountThreadMutex = PTHREAD_MUTEX_INITIALIZER;
 std::queue<TMounterRequest> mountQueue;
@@ -143,9 +144,13 @@ void *mountThreadCode(void *ptr)
 			mounter.umountIfMounted(tmr.mountDir.c_str());
 		}
 		
-		if(tmr.action == MOUNTER_ACTION_RESTARTNETWORK) {   // restart network?
-			mounter.restartNetwork();
-		}
+        if(tmr.action == MOUNTER_ACTION_RESTARTNETWORK_ETH0) {  // restart eth0 network?
+            mounter.restartNetworkEth0();
+        }
+
+        if(tmr.action == MOUNTER_ACTION_RESTARTNETWORK_WLAN0) { // restart wlan0 network?
+            mounter.restartNetworkWlan0();
+        }
 
         if(tmr.action == MOUNTER_ACTION_SYNC) {             // sync system caches?
             mounter.sync();
@@ -481,40 +486,115 @@ void Mounter::umountIfMounted(const char *mountDir)
 	}
 }
 
-void Mounter::restartNetwork(void)
+void Mounter::restartNetworkEth0(void)
 {
-	Debug::out(LOG_DEBUG, "Mounter::restartNetwork - starting to restart the network\n");
+    Debug::out(LOG_DEBUG, "Mounter::restartNetworkEth0 - starting to restart the network\n");
 
-    ::sync();                                                 // first sync the filesystem caches...
+    system("ifconfig eth0 down");               // shut down ethernet
+    system("ifconfig eth0 up");                 // bring up ethernet
 
-    bool gotWlan0 = wlan0IsPresent();                               // first find out if we got wlan0 or not
+    Debug::out(LOG_DEBUG, "Mounter::restartNetworkEth0 - done\n");
+}
 
-	system("ifconfig eth0 down");                                   // shut down ethernet
+void Mounter::restartNetworkWlan0(void)
+{
+    Debug::out(LOG_DEBUG, "Mounter::restartNetworkWlan0 - starting to restart the network\n");
 
-    if(gotWlan0) {                                                  // if got wlan, shut it down
+    //-------------
+    // first find out if we got wlan0 or not
+    bool gotWlan0 = wlan0IsPresent();
+
+    if(!gotWlan0) {
+        Debug::out(LOG_DEBUG, "Mounter::restartNetworkWlan0 - no wlan0 adapter, so done\n");
+        return;
+    }
+
+    //-------------
+    // bring wlan0 down
+#ifdef DISTRO_YOCTO
+    // do this for yocto
+    system("ifconfig wlan0 down > /dev/null 2> /dev/null");
+#else
+    // do this for raspbian
+    system("ifdown wlan0        > /dev/null 2> /dev/null");
+#endif
+
+    //-------------
+    // now check if we should bring wlan0 back (if enabled), or should we totally stop it
+    NetworkSettings ns;
+    ns.load();
+
+    if(!ns.wlan0.isEnabled) {                   // wlan0 not enabled? bring it down, stop wpa_supplicant
+        Debug::out(LOG_DEBUG, "Mounter::restartNetworkWlan0 - wlan0 not enabled, bringing down\n");
+
 #ifdef DISTRO_YOCTO
         // do this for yocto
-        system("ifconfig wlan0 down");
-        system("wpa_cli reconfigure");                              // also try to reconnect to wifi AP (wifi settings might have changed)
+        system("killall -9 wifisuper.sh > /dev/null 2> /dev/null");
+        system("ifconfig wlan0 down     > /dev/null 2> /dev/null");
 #else
         // do this for raspbian
-        system("ifdown wlan0");
+        system("ifdown wlan0            > /dev/null 2> /dev/null");
 #endif
-    }
 
-	system("ifconfig eth0 up");                                     // bring up ethernet
+        // do this on both linuxes
+        system("wpa_cli terminate       > /dev/null 2> /dev/null");
+        Debug::out(LOG_DEBUG, "Mounter::restartNetworkWlan0 - wlan0 is down, done\n");
+        return;
+    } else {                                    // wlan0 is enabled? check if wpa_supplicant is on, possibly start it
+        bool isWpaSupplicantRunning = getWpaSupplicantRunning();
 
-    if(gotWlan0) {                                                  // if got wlan, bring it up
+        if(!isWpaSupplicantRunning) {           // if wpa supplicant is not running, run it
 #ifdef DISTRO_YOCTO
-        // for yocto
-        system("ifconfig wlan0 up");
+            system("/ce/wifisuper.sh & > /dev/null 2> /dev/null");  // on yocto just start the wifi supervisor script and it will do everything needed
+            sleep(6);                           // wifisuper.sh needs around 5 seconds to start wpa_supplicant
 #else
-        // for raspbian
-        system("ifup wlan0");
+            // on Raspbian turn on wpa_supplicant on manually
+            system("wpa_supplicant -B -iwlan0 -c/etc/wpa_supplicant/wpa_supplicant.conf");
 #endif
+        }
     }
-	
-	Debug::out(LOG_DEBUG, "Mounter::restartNetwork - done\n");
+
+    // if came to this place, wlan0 is present in the system, wlan0 is enabled in CE config, wpa supplicant should be running, time to bring it back to life
+#ifdef DISTRO_YOCTO
+    // for yocto
+    system("wpa_cli reconfigure");
+    system("ifconfig wlan0 up");
+#else
+    // for raspbian
+    system("ifup wlan0");
+#endif
+
+    Debug::out(LOG_DEBUG, "Mounter::restartNetworkWlan0 - done\n");
+}
+
+bool Mounter::getWpaSupplicantRunning(void)
+{
+#ifdef DISTRO_YOCTO
+    // for yocto
+    system("ps | grep 'wpa_supplicant' | grep -v 'grep' | wc -l > /tmp/wpasupplicantcount");
+#else
+    // for raspbian
+    system("ps -A | grep 'wpa_supplicant' | grep -v 'grep' | wc -l > /tmp/wpasupplicantcount");
+#endif
+
+    // try to open the file with count of wpa supplicants running
+    FILE *f = fopen("/tmp/wpasupplicantcount", "rt");
+
+    // couldn't open file? pretend - not running
+    if(!f) {
+        return false;
+    }
+
+    // try to read the number from file
+    int cnt, ires;
+    ires = fscanf(f, "%d", &cnt);
+    fclose(f);
+
+    if(ires != 1) {     // couldn't read the number? pretend - not running
+        return false;
+    }
+
+    return (cnt > 0);   // if cnt is non-zero, wpa supplicant is running
 }
 
 bool Mounter::wlan0IsPresent(void)

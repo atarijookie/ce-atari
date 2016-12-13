@@ -8,6 +8,26 @@
 #define TRUE	1
 #define FALSE	0
 
+//#define CMDLOGGING
+
+#ifdef CMDLOGGING
+	//#define CMDLOGGING_ONLY_ERROR
+
+	void cmdLog_onStart(void);
+	void cmdLog_storeResults(BYTE bridgeStatus, BYTE scsiStatus);
+	void cmdLog_onEnd(void);
+#endif
+
+typedef struct {
+	DWORD cmdSeqNo;
+	
+	BYTE	cmd[14];
+	BYTE 	cmdLen;
+	
+	BYTE	scsiStatusByte;
+	BYTE	bridgeStatus;
+} TCmdLogItem;
+
 typedef struct 
 {
 	WORD buffer[550 / 2];			// buffer for the written data - with some (38 bytes) reserve at the end in case of overflow
@@ -113,8 +133,10 @@ GPIOC_14 - card detect
 //#define DO_LOG_ERROR
 
 #ifdef DO_LOG_ERROR
-    extern BYTE lastErr;
-    #define LOG_ERROR(X)    lastErr = X;
+    extern BYTE lastErr[32];
+		extern BYTE lastErrIndex;
+		
+    #define LOG_ERROR(X)    { lastErr[lastErrIndex] = X; lastErrIndex++; if(lastErrIndex >= 32) lastErrIndex = 0; }
 #else
     #define LOG_ERROR(X)
 #endif

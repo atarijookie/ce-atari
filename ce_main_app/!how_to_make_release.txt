@@ -1,0 +1,20 @@
+This is a short description on how to make a new CosmosEx release
+-----------------------------------------------------------------
+
+1. download the file: http://joo.kie.sk/cosmosex/update/app.zip
+   ...and extract it to some directory - to preserve the previous structure, and files which don't need changing. 
+
+2. if config drive changed, use mtools or steem to create new app/ce_conf.msa
+   ...and use tar to create net app/ce_conf.tar
+   ...and also copy them to app/configdrive (if you didn't do thart in step 2)
+
+3. if shell scripts changed, update them in app/newscripts
+
+4. build binary on Yocto and on Raspbian, place them in app/ dir
+
+5. copy ce_rename_for_distro.sh to app/cosmosex , so the first run on ce_main_app will result in using the right binary for the distro
+
+6. create an app.zip from that directory
+
+7. upload it to ftp, run checksums.php 
+

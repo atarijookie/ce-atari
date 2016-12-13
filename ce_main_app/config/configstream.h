@@ -22,7 +22,7 @@ enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED
                  CS_CREATE_FLOPPY_CONF, CS_CREATE_IKBD,         CS_CREATE_HDDIMAGE,
                  CS_CREATE_NETWORK,     CS_CREATE_UPDATE,       CS_CREATE_OTHER,
                  CS_SAVE_ACSI,          CS_SAVE_TRANSLATED,     CS_SAVE_NETWORK,
-                 CS_HDDIMAGE_SAVE,
+                 CS_HDDIMAGE_SAVE,      CS_HDDIMAGE_CLEAR,
                  CS_HIDE_MSG_SCREEN,    CS_GO_HOME,
                  CS_UPDATE_CHECK,       CS_UPDATE_CHECK_USB,    CS_UPDATE_UPDATE,
                  CS_SHARED_TEST,        CS_SHARED_SAVE,
@@ -34,23 +34,24 @@ enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED
 
 enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_TRAN_CONFDRIVE,
                 COMPID_MOUNT_RAW_NOT_TRANS, 
-                COMPID_BTN_SAVE,            COMPID_BTN_CANCEL,
+                COMPID_BTN_SAVE,            COMPID_BTN_CANCEL,          COMPID_BTN_CLEAR,
                 COMPID_USE_ZIP_DIR_NOT_FILE,
 
                 COMPID_HOSTNAME,
                 COMPID_NET_IP,              COMPID_NET_MASK,            COMPID_NET_GATEWAY,
                 COMPID_NET_DNS,             COMPID_NET_DHCP,            
-				
-				COMPID_WIFI_IP,             COMPID_WIFI_MASK,           COMPID_WIFI_GATEWAY,
-				COMPID_WIFI_DHCP,			COMPID_WIFI_SSID,			COMPID_WIFI_PSK,
-                
-				COMPID_UPDATE_COSMOSEX,     COMPID_UPDATE_LOCATION,
+
+                COMPID_WIFI_IP,             COMPID_WIFI_MASK,           COMPID_WIFI_GATEWAY,
+                COMPID_WIFI_DHCP,           COMPID_WIFI_SSID,           COMPID_WIFI_PSK,
+                COMPID_WIFI_ENABLE,
+
+                COMPID_UPDATE_COSMOSEX,     COMPID_UPDATE_LOCATION,
                 COMPID_UPDATE_FRANZ,        COMPID_UPDATE_HANZ,             COMPID_UPDATE_XILINX,
                 COMPID_UPDATE_BTN_CHECK,    COMPID_UPDATE_BTN_CHECK_USB,    COMPID_SHARED_BTN_TEST,     
-				
+
                 COMPID_HDDIMAGE_PATH,
-				COMPID_SHARED_IP,           COMPID_SHARED_PATH, 		COMPID_SHARED_ENABLED, 
-				COMPID_SHARED_NFS_NOT_SAMBA,    COMPID_USERNAME,        COMPID_PASSWORD,
+                COMPID_SHARED_IP,           COMPID_SHARED_PATH,         COMPID_SHARED_ENABLED, 
+                COMPID_SHARED_NFS_NOT_SAMBA,    COMPID_USERNAME,        COMPID_PASSWORD,
 
                 COMPID_FLOPCONF_ENABLED,    COMPID_FLOPCONF_ID,         COMPID_FLOPCONF_WRPROT,
 
@@ -172,6 +173,7 @@ private:
     void getProgressLine(int index, std::string &lines, std::string &line);
 
     void onHddImageSave(void);
+    void onHddImageClear(void);
 
     void onSharedTest(void);
     void onSharedSave(void);
