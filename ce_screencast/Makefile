@@ -20,7 +20,7 @@ OBJS	 = $(patsubst %.c,%.o,$(CSRC)) screenirq.o cache030.o machineconfig.o
 
 $(TARGET): $(STARTUP) $(OBJS) $(HDR)
 	$(CC) $(CFLAGS) -o $@ $(STARTUP) $(OBJS) $(LDFLAGS)
-#	$(STRIP) -s $@
+	$(STRIP) -s $@
 	$(PRGFLAGS) $@ --mno-fastram --mno-fastalloc --mno-fastload 
 
 %.o: %.c 
