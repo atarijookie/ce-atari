@@ -855,6 +855,9 @@ void ConfigStream::createConfigDump(void)
 
     createScreen_other();
     dumpScreenToFile(f);
+    
+    createScreen_update();
+    dumpScreenToFile(f);
 
     fclose(f);
 }
