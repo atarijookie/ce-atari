@@ -31,7 +31,7 @@
 
 #define VERSION_STRING          "CosmosEx v2.10 (by Jookie)"
 #define VERSION_STRING_SHORT    "2.10"
-#define DATE_STRING             "02/15/16"
+#define DATE_STRING             "12/13/16"
                                 // MM/DD/YY
 
 
@@ -130,12 +130,12 @@ extern InterProcessEvents events;
 #define PATH_CE_DD_PRG_PATH_AND_FILENAME    "/ce/app/configdrive/drivers/ce_dd.prg"
 #define PATH_CE_DD_PRG_JUST_FILENAME        "ce_dd.prg"
 
-#define PATH_CE_CONF_PRG_PATH_AND_FILENAME  "/ce/app/configdrive/tools/ce_conf.tos"
+#define PATH_CE_CONF_PRG_PATH_AND_FILENAME  "/ce/app/configdrive/ce_conf.tos"
 #define PATH_CE_CONF_PRG_JUST_FILENAME      "ce_conf.tos"
 
-#define PATH_ATARI_CE_FDD_TTP               "TOOLS\\CE_FDD.TTP"
-#define PATH_ATARI_CE_HDIMG_TTP             "TOOLS\\CE_HDIMG.TTP"
-#define PATH_ATARI_CE_MEDIAPLAY             "TOOLS\\CEMEDIAP.TTP"
+#define PATH_ATARI_CE_FDD_TTP               "CE_FDD.TTP"
+#define PATH_ATARI_CE_HDIMG_TTP             "CE_HDIMG.TTP"
+#define PATH_ATARI_CE_MEDIAPLAY             "CEMEDIAP.TTP"
 
 #endif // GLOBAL_H
 
