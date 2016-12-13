@@ -1,4 +1,4 @@
-    #include "debugcontroller.h"
+#include "debugcontroller.h"
 #include <string>
 #include <sstream>
 #include <fstream>
@@ -6,6 +6,7 @@
 #include "version.h"
 #include "statusreport.h"
 #include "../../../config/configstream.h"
+#include "../../../global.h"
 
 DebugController::DebugController(ConfigService* pxDateService, FloppyService* pxFloppyService):pxDateService(pxDateService),pxFloppyService(pxFloppyService)
 {
@@ -83,36 +84,36 @@ bool DebugController::getConfigAction(mg_connection *conn, mg_request_info *req_
 
 bool DebugController::action_get_ceconf_prg(mg_connection *conn, mg_request_info *req_info)
 {
-    std::string sDownloadedFileName = "ce_conf.prg";
+    std::string sDownloadedFileName = PATH_CE_CONF_PRG_JUST_FILENAME;
     std::string sFileType           = "application/octet-stream";
-    std::string sCeFilePath         = "/ce/app/configdrive/ce_conf.prg";
+    std::string sCeFilePath         = PATH_CE_CONF_PRG_PATH_AND_FILENAME;
     
     return getFile(conn, sDownloadedFileName, sFileType, sCeFilePath, true);
 }
 
 bool DebugController::action_get_ceconf_msa(mg_connection *conn, mg_request_info *req_info)
 {
-    std::string sDownloadedFileName = "ce_conf.msa";
+    std::string sDownloadedFileName = CE_CONF_FDD_IMAGE_JUST_FILENAME;
     std::string sFileType           = "application/octet-stream";
-    std::string sCeFilePath         = "/ce/app/ce_conf.msa";
+    std::string sCeFilePath         = CE_CONF_FDD_IMAGE_PATH_AND_FILENAME;
     
     return getFile(conn, sDownloadedFileName, sFileType, sCeFilePath, true);
 }
 
 bool DebugController::action_get_ceconf_tar(mg_connection *conn, mg_request_info *req_info)
 {
-    std::string sDownloadedFileName = "ce_conf.tar";
+    std::string sDownloadedFileName = CE_CONF_TAR_JUST_FILENAME;
     std::string sFileType           = "application/octet-stream";
-    std::string sCeFilePath         = "/ce/app/ce_conf.tar";
+    std::string sCeFilePath         = CE_CONF_TAR_PATH_AND_FILENAME;
     
     return getFile(conn, sDownloadedFileName, sFileType, sCeFilePath, true);
 }
 
 bool DebugController::action_get_cedd(mg_connection *conn, mg_request_info *req_info)
 {
-    std::string sDownloadedFileName = "ce_dd.prg";
+    std::string sDownloadedFileName = PATH_CE_DD_PRG_JUST_FILENAME;
     std::string sFileType           = "application/octet-stream";
-    std::string sCeFilePath         = "/ce/app/configdrive/ce_dd.prg";
+    std::string sCeFilePath         = PATH_CE_DD_PRG_PATH_AND_FILENAME;
     
     return getFile(conn, sDownloadedFileName, sFileType, sCeFilePath, true);
 }

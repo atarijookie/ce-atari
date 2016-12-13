@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "../global.h"
 #include "../debug.h"
 #include "desktopcreator.h"
 
@@ -128,13 +129,13 @@ char *DesktopCreator::storeExecutables(char *bfr, DesktopConfig *dc)
 char *DesktopCreator::storeFloppyImageLauncher(char *bfr, DesktopConfig *dc)
 {
     // add app for opening .ST images
-    bfr += sprintf(bfr, "#G 03 04   %c:\\CE_FDD.TTP@ *.ST@ \r\n", 'A' + dc->configDrive);
+    bfr += sprintf(bfr, "#G 03 04   %c:\\%s@ *.ST@ \r\n", 'A' + dc->configDrive, PATH_ATARI_CE_FDD_TTP);
 
     // add app for opening .MSA images
-    bfr += sprintf(bfr, "#G 03 04   %c:\\CE_FDD.TTP@ *.MSA@ \r\n", 'A' + dc->configDrive);
+    bfr += sprintf(bfr, "#G 03 04   %c:\\%s@ *.MSA@ \r\n", 'A' + dc->configDrive, PATH_ATARI_CE_FDD_TTP);
 
 	// add app for mounting .IMG hard disk images
-	bfr += sprintf(bfr, "#G 03 04   %c:\\CE_HDIMG.TTP@ *.IMG@ \r\n", 'A' + dc->configDrive);
+	bfr += sprintf(bfr, "#G 03 04   %c:\\%s@ *.IMG@ \r\n", 'A' + dc->configDrive, PATH_ATARI_CE_HDIMG_TTP);
 
     return bfr;
 }
@@ -142,16 +143,16 @@ char *DesktopCreator::storeFloppyImageLauncher(char *bfr, DesktopConfig *dc)
 char *DesktopCreator::storeMediaPlayers(char *bfr, DesktopConfig *dc)
 {
 	bfr += sprintf(bfr,
-	               "#P 03 04   %c:\\STEAUPLY.TTP@ *.AU@ \r\n", 'A' + dc->configDrive);
+	               "#P 03 04   %c:\\%s@ *.AU@ \r\n", 'A' + dc->configDrive, PATH_ATARI_CE_MEDIAPLAY);
 
 	bfr += sprintf(bfr,
-	               "#P 03 04   %c:\\CEMEDIAP.TTP@ *.MP3@ \r\n", 'A' + dc->configDrive);
+	               "#P 03 04   %c:\\%s@ *.MP3@ \r\n", 'A' + dc->configDrive, PATH_ATARI_CE_MEDIAPLAY);
 
 	bfr += sprintf(bfr,
-	               "#P 03 04   %c:\\CEMEDIAP.TTP@ *.WMA@ \r\n", 'A' + dc->configDrive);
+	               "#P 03 04   %c:\\%s@ *.WMA@ \r\n", 'A' + dc->configDrive, PATH_ATARI_CE_MEDIAPLAY);
 
 	bfr += sprintf(bfr,
-	               "#P 03 04   %c:\\CEMEDIAP.TTP@ *.OGG@ \r\n", 'A' + dc->configDrive);
+	               "#P 03 04   %c:\\%s@ *.OGG@ \r\n", 'A' + dc->configDrive, PATH_ATARI_CE_MEDIAPLAY);
 	return bfr;
 }
 

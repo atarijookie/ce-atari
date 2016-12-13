@@ -115,11 +115,27 @@ extern InterProcessEvents events;
 #define CE_CONF_FDD_IMAGE_PATH_AND_FILENAME "/ce/app/ce_conf.msa"
 #define CE_CONF_FDD_IMAGE_JUST_FILENAME     "ce_conf.msa"
 
+#define CE_CONF_TAR_PATH_AND_FILENAME       "/ce/app/ce_conf.tar"
+#define CE_CONF_TAR_JUST_FILENAME           "ce_conf.tar"
+
 #define FDD_TEST_IMAGE_PATH_AND_FILENAME    "/ce/app/fdd_test.st"
 #define FDD_TEST_IMAGE_JUST_FILENAME        "fdd_test.st"
 
-#define MAX_ZIPDIR_ZIPFILE_SIZE         (5*1024*1024)
-#define MAX_ZIPDIR_NESTING              3
+#define MAX_ZIPDIR_ZIPFILE_SIZE             (5*1024*1024)
+#define MAX_ZIPDIR_NESTING                  3
+
+#define PATH_CE_DD_BS_L1                    "/ce/app/configdrive/drivers/ce_dd.bs"
+#define PATH_CE_DD_BS_L2                    "/ce/app/configdrive/drivers/ce_dd_l2.bs"
+
+#define PATH_CE_DD_PRG_PATH_AND_FILENAME    "/ce/app/configdrive/drivers/ce_dd.prg"
+#define PATH_CE_DD_PRG_JUST_FILENAME        "ce_dd.prg"
+
+#define PATH_CE_CONF_PRG_PATH_AND_FILENAME  "/ce/app/configdrive/tools/ce_conf.tos"
+#define PATH_CE_CONF_PRG_JUST_FILENAME      "ce_conf.tos"
+
+#define PATH_ATARI_CE_FDD_TTP               "TOOLS\\CE_FDD.TTP"
+#define PATH_ATARI_CE_HDIMG_TTP             "TOOLS\\CE_HDIMG.TTP"
+#define PATH_ATARI_CE_MEDIAPLAY             "TOOLS\\CEMEDIAP.TTP"
 
 #endif // GLOBAL_H
 

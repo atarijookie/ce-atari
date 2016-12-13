@@ -1,4 +1,4 @@
-TARGET	= ce_conf.prg
+TARGET	= ce_conf.tos
 
 CC		= m68k-atari-mint-gcc
 STRIP	= m68k-atari-mint-strip

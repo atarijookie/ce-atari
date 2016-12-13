@@ -72,7 +72,6 @@ int main(void)
     
     prevCommandFailed = 0;
     
-    lineaa();                   // hide mouse
     // ---------------------- 
     // create buffer pointer to even address 
     toEven = (DWORD) &myBuffer[0];
@@ -90,7 +89,6 @@ int main(void)
     res = Supexec(findDevice);
 
     if(res != TRUE) {
-        linea9();               // show mouse
         return 0;
     }
     
@@ -98,7 +96,6 @@ int main(void)
     // if the device is CosmoSolo, go this way
     if(cosmosExNotCosmoSolo == FALSE) {
         cosmoSoloConfig();
-        linea9();               // show mouse
         return 0;
     }
     
@@ -171,7 +168,6 @@ int main(void)
         lastShowStreamTime = getTicksAsUser();                      // we just shown the stream, no need for refresh
     }
     
-    linea9();               // show mouse
     return 0;
 }
 //--------------------------------------------------
