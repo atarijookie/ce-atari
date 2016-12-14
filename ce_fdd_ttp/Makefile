@@ -6,7 +6,7 @@ PRGFLAGS    = m68k-atari-mint-flags
 CFLAGS      = -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 CFLAGS030   = -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar
 
-LDFLAGS	= -Wl,--traditional-format -lgem -lgcc
+LDFLAGS	= -Wl,--traditional-format -lgcc
 
 HDR     = $(wildcard *.h)
 CSRC	= $(wildcard *.c) 
