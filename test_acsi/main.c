@@ -8,7 +8,7 @@
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "VT52.h"
-#include "Cookiejar.h"
+#include "cookiejar.h"
 #include "version.h"
 #include "hdd_if.h"
 #include "stdlib.h"
