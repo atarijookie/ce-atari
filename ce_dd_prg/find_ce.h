@@ -8,4 +8,3 @@
 BYTE findDevice(void);
 
 #endif
-

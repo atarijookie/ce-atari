@@ -36,18 +36,18 @@ typedef struct {
     BYTE                success;
     BYTE                statusByte;
     BYTE                phaseChanged;
-    
+
     int                 retriesDoneCount;
     int                 maxRetriesCount;
-    
+
     BYTE                forceFlock;
-    
+
     TsetReg             pSetReg;
     TgetReg             pGetReg;
 
     TdmaDataTx_prepare  pDmaDataTx_prepare;
     TdmaDataTx_do       pDmaDataTx_do;
-    
+
     BYTE                scsiHostId;
 } THDif;
 

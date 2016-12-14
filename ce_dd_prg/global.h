@@ -17,6 +17,6 @@
         #define TRUE		1
     #endif
 
-#define HZ_200     ((volatile DWORD *) 0x04BA) /* 200 Hz system clock */ 
+#define HZ_200     ((volatile DWORD *) 0x04BA) /* 200 Hz system clock */
 
 #endif

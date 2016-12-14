@@ -142,7 +142,7 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 #define CALL_OLD_GD_VOIDRET( function, ... )	\
 		useOldGDHandler = 1;			\
 		function( __VA_ARGS__ );
-		
+
 // if sign bit is set, extend the sign to whole DWORD
 //#define extendByteToDword(X)    ( ((X & 0x80)==0) ? X : (0xffffff00 | X) )
 #define extendByteToDword(B)    ((int32_t)((int8_t)(B)))
@@ -157,11 +157,11 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 //#define getDword(POINTER)       ( (((DWORD) *POINTER)<<24) | (((DWORD) *(POINTER+1))<<16) | (((DWORD) *(POINTER+2))<<8) | (((DWORD) *(POINTER+3))) )
 
 #define GET_WORD(PTR)           (((WORD) (PTR)[0]) << 8) | ((WORD) (PTR)[1])
-#define SET_WORD(PTR,VALUE)     (PTR)[0] = (BYTE) (VALUE >> 8); (PTR)[1] = (BYTE) VALUE; 
-		
+#define SET_WORD(PTR,VALUE)     (PTR)[0] = (BYTE) (VALUE >> 8); (PTR)[1] = (BYTE) VALUE;
+
 // The following macros are used to convert atari handle numbers which are WORDs
 // to CosmosEx ex handle numbers, which are only BYTEs; and back.
-// To mark the difference between normal Atari handle and handle which came 
+// To mark the difference between normal Atari handle and handle which came
 // from CosmosEx I've added some offset to CosmosEx handles.
 
 // CosmosEx file handle (internally): 0 ...  40
@@ -169,13 +169,13 @@ DWORD writeData(BYTE ceHandle, BYTE *bfr, DWORD cnt);
 // Atari handle for CosmosEx files:  80 ... 120
 #define handleIsFromCE(X)		(X >= 80 && X <= 120)
 #define handleAtariToCE(X)		(X  - 80)
-#define handleCEtoAtari(X)		(X  + 80)		
+#define handleCEtoAtari(X)		(X  + 80)
 
-//----------------------		
+//----------------------
 // the following buffer type is used for file reading and writing
 #define RW_BUFFER_SIZE		512
 
-typedef struct 
+typedef struct
 {
     BYTE isOpen;                    // if non-zero, the file is open
 
@@ -185,11 +185,11 @@ typedef struct
 
     DWORD currentPos;               // current position in the stream, from the start of the file
     DWORD bytesToEOF;               // count of bytes until the EOF
-    BYTE  bytesToEOFinvalid;        // flag that marks that before any READ operation you should 
-    
+    BYTE  bytesToEOFinvalid;        // flag that marks that before any READ operation you should
+
 	WORD wCount;					// how much data we have in this buffer
 	BYTE wBuf[RW_BUFFER_SIZE];
-	
+
 } TFileBuffer;
-        
+
 #endif // GEMDOS_H
