@@ -4,6 +4,16 @@
 
 #define DMA_BUFFER_SIZE		512
 
+/* TODO : use the system provided buffer through _FRB Cookie
+ * http://toshyp.atari.org/en/003007.html#Cookie_2C_20_FRB
+ * this is a 64 KByte buffer in ST-RAM that can be used by an
+ * Atari TT for ACSI-DMA transfers.
+ * access is coordinated via the system variable flock.
+ *
+ * We should also study the XFRB cookie provided by HDDriver
+ * http://toshyp.atari.org/en/003007.html#Cookie_2C_20XFRB
+ */
+
 // If you intend to change FASTRAM_BUFFER_SIZE,
 // also change the .comm FastRAMBuffer value directly below
 //
