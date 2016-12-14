@@ -10,7 +10,7 @@ issue=$( cat /etc/issue | grep -o "Yocto" | wc -l )
 # If at least once the Yocto was found, it's Yocto
 if [ "$issue" -gt "0" ]; then   # on Yocto
     # Count how many instances are running
-    cnt=$( ps | grep cosmosex | grep -v cosmos | wc -l )
+    cnt=$( ps | grep cosmosex | grep -v grep | wc -l )
 else                            # on Raspbian
     # Count how many instances are running
     cnt=$( ps -A | grep cosmosex | wc -l )

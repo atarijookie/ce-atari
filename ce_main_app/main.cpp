@@ -514,7 +514,7 @@ void sigint_handler(int sig)
 bool otherInstanceIsRunning(void)
 {
 #ifdef DISTRO_YOCTO
-    const char *countCosmosExCmd = "ps | grep cosmos | grep -v cosmos | wc -l > /tmp/cosmoscount";
+    const char *countCosmosExCmd = "ps | grep cosmos | grep -v grep | wc -l > /tmp/cosmoscount";
 #else
     const char *countCosmosExCmd = "ps -A | grep cosmos | wc -l > /tmp/cosmoscount";
 #endif
