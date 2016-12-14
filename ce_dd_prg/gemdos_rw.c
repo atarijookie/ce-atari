@@ -184,7 +184,7 @@ DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
     }
     
     // Second phase of BIG fread: transfer data by blocks of size 512 bytes, buffer must be EVEN
-    BYTE  toFastRam = (((int)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
+    BYTE  toFastRam = (((DWORD)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
     DWORD blockSize = toFastRam ? FASTRAM_BUFFER_SIZE : (MAXSECTORS * 512); // size of block, which we will read
     
     DWORD res;
