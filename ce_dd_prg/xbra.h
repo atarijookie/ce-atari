@@ -1,9 +1,15 @@
 #ifndef XBRA_H
 #define XBRA_H
 
+#ifndef WORD
 typedef short WORD;
+#endif
+#ifndef LONG
 typedef long LONG;
+#endif
+#ifndef VOID
 typedef void VOID;
+#endif
 
 typedef struct xbra
 {
@@ -15,4 +21,3 @@ typedef struct xbra
 LONG unhook_xbra( WORD vecnum, LONG app_id );
 
 #endif
-

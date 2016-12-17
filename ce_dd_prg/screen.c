@@ -4,14 +4,10 @@
 #include "stdlib.h"
 #include "translated.h"
 
+#include "ce_dd_prg.h"
 #include "main.h"
 #include "screen.h"
 #include "mutex.h"
-
-extern BYTE deviceID;
-extern BYTE *pDmaBuffer;
-extern BYTE commandShort[CMD_LENGTH_SHORT];
-extern BYTE commandLong[CMD_LENGTH_LONG];
 
 extern volatile ScreenShots screenShots;    // screenshots config
 

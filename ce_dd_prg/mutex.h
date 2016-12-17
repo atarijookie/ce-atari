@@ -3,7 +3,7 @@
 /*
 Poor mans mutex
 */
-#include "global.h" 
+#include "global.h"
 
 typedef volatile BYTE mutex;
 

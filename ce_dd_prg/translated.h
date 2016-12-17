@@ -12,4 +12,3 @@
 #define TRAN_CMD_SCREENSHOT_CONFIG  4
 
 // ...other commands are just function codes from gemdos.h
-

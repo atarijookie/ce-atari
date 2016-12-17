@@ -10,7 +10,7 @@ unhook_xbra( WORD vecnum, LONG app_id )
 
     vecadr = (LONG)Setexc( vecnum, VEC_INQUIRE );
     rx = (XBRA *)(vecadr - sizeof( XBRA ));
-    
+
     if( (vecadr >= 0x00E00000 && vecadr <= 0x00EFFFFF)
 	|| (vecadr >= 0x00FA0000 && vecadr <= 0x00FEFFFF) )
     {
@@ -54,4 +54,3 @@ unhook_xbra( WORD vecnum, LONG app_id )
     Super( savessp );
     return lret;
 }
-
