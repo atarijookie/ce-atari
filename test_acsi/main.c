@@ -319,12 +319,12 @@ void generateDataOnPartition(void)
     VT52_Clear_home();
     (void) Cconws("Generated data on GEMDOS partition\r\n");
 
-    BYTE writeNotVerify = showQuestionGetBool("Write data or verify data? W/V", 'w', "WRITE", 'v', "VERIFY");
+    BYTE writeNotVerify = showQuestionGetBool("Write data or verify data  : W/V", 'w', "WRITE", 'v', "VERIFY");
 
     //----------
     // choose drive for testing
     WORD drives = Drvmap();
-    (void) Cconws("Choose drive: ");
+    (void) Cconws("Choose drive               : ");
     int i;
     for(i=2; i<16; i++) {
         if(drives & (1 << i)) {     // drive exists? show letter
@@ -359,8 +359,15 @@ void generateDataOnPartition(void)
     (void) Cconws("Choose test file size in MB: ");
     int testFileSizeMb = getIntFromUser(0);
 
-    (void) Cconws("Choose test files count: ");
+    (void) Cconws("Choose test files count    : ");
     int testFileCount = getIntFromUser(0);
+
+    (void) Cconws("Enter data modifier key    : ");
+    BYTE dataModifier = Cconin();
+    (void) Cconws("\r\n");
+
+    //----------
+    // generate the data buffer
 
     BYTE *pGenerated = wBuffer;
     int j; 
@@ -368,9 +375,18 @@ void generateDataOnPartition(void)
         for(j=0; j<512; j++) {          // for all bytes in sector
             if(j == 0) {                // index 0: sector #
                 *pGenerated = i;
-            } else {                    // other indices: index in sector
-                *pGenerated = j;
+                pGenerated++;
+                continue;
             }
+
+            if(j == 1) {                // index 1: data modifier - a byte which user might specify to make written data different to previous data
+                *pGenerated = dataModifier;
+                pGenerated++;
+                continue;
+            }
+
+            // other indices: index in sector
+            *pGenerated = j;
             pGenerated++;
         }
     }
@@ -386,13 +402,13 @@ void generateDataOnPartition(void)
         if(writeNotVerify) {                        // for write
             (void) Cconws("Writing ");
             (void) Cconws(testFilePath);
-            (void) Cconws(": ");
+            (void) Cconws("    : ");
             
             f = Fcreate(testFilePath, 0);           // create for writing
         } else {                                    // for read
             (void) Cconws("Verifying ");
             (void) Cconws(testFilePath);
-            (void) Cconws(": ");
+            (void) Cconws("  : ");
 
             f = Fopen(testFilePath, 0);             // open for reading
         }
@@ -406,10 +422,19 @@ void generateDataOnPartition(void)
         int bufferSize = MAXSECTORS * 512;
         for(j=0; j<fileSizeInBuffers; j++) {
             if(writeNotVerify) {                    // for write
+                DWORD before, after;
+                before = getTicksAsUser();
+
                 res = Fwrite(f, bufferSize, wBuffer);
 
+                after = getTicksAsUser();
+
                 if(res == bufferSize) {             // written everything? good
-                    (void) Cconws("*");
+                    if((after - before) > 132) {    // if write took too long (132 ticks of 200 HZ is 660 ms)
+                        (void) Cconws("L");
+                    } else {
+                        (void) Cconws("*");
+                    }
                 } else {                            // something not written? fail
                     (void) Cconws("-");
                 }
@@ -871,7 +896,7 @@ BYTE findDevice(void)
     hdIf.maxRetriesCount = 0;           // disable retries - we are expecting that the devices won't answer on every ID
     
     bfr[1] = 0; 
-    (void) Cconws("Looking for CosmosEx on ");
+    (void) Cconws("CosmosEx on ");
     
     switch(ifUsed) {
         case IF_ACSI:           (void) Cconws("ACSI: ");        break;
