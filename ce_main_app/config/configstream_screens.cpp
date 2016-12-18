@@ -1739,8 +1739,9 @@ void ConfigStream::createScreen_shared(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "Username",				                    40, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, " ",										15, col2x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",										40, col2x, row, gotoOffset);
     comp->setComponentId(COMPID_USERNAME);
+    comp->setLimitedShowSize(20);               // limit to showing only 20 characters
     screen.push_back(comp);
 
 	row++;
@@ -1748,8 +1749,9 @@ void ConfigStream::createScreen_shared(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "Password",				                    40, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline_pass, " ",									15, col2x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline_pass, " ",									40, col2x, row, gotoOffset);
     comp->setComponentId(COMPID_PASSWORD);
+    comp->setLimitedShowSize(20);               // limit to showing only 20 characters
     screen.push_back(comp);
 
 	row += 2;
