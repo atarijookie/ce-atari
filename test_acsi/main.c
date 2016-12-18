@@ -422,7 +422,7 @@ void generateDataOnPartition(void)
         int bufferSize = MAXSECTORS * 512;
         for(j=0; j<fileSizeInBuffers; j++) {
             if(writeNotVerify) {                    // for write
-                DWORD before, after;
+                DWORD before, after, diff;
                 before = getTicksAsUser();
 
                 res = Fwrite(f, bufferSize, wBuffer);
@@ -430,11 +430,13 @@ void generateDataOnPartition(void)
                 after = getTicksAsUser();
 
                 if(res == bufferSize) {             // written everything? good
-                    if((after - before) > 132) {    // if write took too long (132 ticks of 200 HZ is 660 ms)
-                        (void) Cconws("L");
-                    } else {
-                        (void) Cconws("*");
+                    diff = (after - before);
+                    diff = diff / 25;
+                    if(diff > 25) {
+                        diff = 25;
                     }
+
+                    Cconout('A' + diff);
                 } else {                            // something not written? fail
                     (void) Cconws("-");
                 }
