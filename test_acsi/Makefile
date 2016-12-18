@@ -1,4 +1,4 @@
-TARGET	= ce_tsthd.prg
+TARGET	= ce_tsthd.tos
 
 CC	= m68k-atari-mint-gcc
 AS	= m68k-atari-mint-as

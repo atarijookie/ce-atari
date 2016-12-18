@@ -123,8 +123,6 @@ int main(void)
     }
     //----------------------
     
-    lineaa();   // hide mouse
-    
     prevCommandFailed = 0;
     
     // ---------------------- 
@@ -164,7 +162,6 @@ int main(void)
         Cnecin();
         (void) Cconws("Quit.");         
         
-        linea9();   
         return 0;
     }
     
@@ -174,12 +171,12 @@ int main(void)
     BYTE  tosMajor      = tosVersion >> 8;
     
     if(tosMajor == 1 || tosMajor == 2) {                // TOS 1.xx or TOS 2.xx -- running on ST
-        (void) Cconws("Running on ST, choosing ACSI interface.");
+        (void) Cconws("Running on ST, choosing ACSI interface.\n\r");
     
         hdd_if_select(IF_ACSI);
         ifUsed      = IF_ACSI;
     } else if(tosMajor == 4) {                          // TOS 4.xx -- running on Falcon
-        (void) Cconws("Running on Falcon, choosing SCSI interface.");
+        (void) Cconws("Running on Falcon, choosing SCSI interface.\n\r");
     
         hdd_if_select(IF_SCSI_FALCON);
         ifUsed      = IF_SCSI_FALCON;
@@ -206,16 +203,6 @@ int main(void)
     }
 
     // ---------------------- 
-    (void) Cconws("\r\n\r\n[S]imple or [D]etailed error report?\r\n");
-    
-    key = Cnecin();
-    if(key == 'D' || key == 'd') {      // detailed?
-        simpleNotDetailedErrReport = 0;
-    } else {                            // simple!
-        simpleNotDetailedErrReport = 1;
-    }
-    
-    // ---------------------- 
     // search for device on the ACSI bus 
     deviceID = findDevice();
 
@@ -223,7 +210,6 @@ int main(void)
     {
         (void) Cconws("Quit.");         
 
-        linea9();   
         return 0;
     }
   
@@ -242,6 +228,17 @@ int main(void)
         (void) Cconws("[C] - data from RPI     continous read\r\n");
         (void) Cconws("[S] - data from SD card continous read\r\n");
         (void) Cconws("[G] - generated data on GEMDOS partition\r\n");
+
+        (void) Cconws("[Z] - toggle ");
+        if(simpleNotDetailedErrReport) VT52_Rev_on();
+        (void) Cconws("simple");
+        if(simpleNotDetailedErrReport) VT52_Rev_off();
+        (void) Cconws(" / ");
+        if(!simpleNotDetailedErrReport) VT52_Rev_on();
+        (void) Cconws("detailed");
+        if(!simpleNotDetailedErrReport) VT52_Rev_off();
+        (void) Cconws(" error report\r\n");
+
         (void) Cconws("[Q] - quit\r\n");
 
         key = Cnecin();
@@ -260,12 +257,12 @@ int main(void)
             case 'c':   testContinousRead(1);       break;  // stress test - continous read
             case 's':   testContinousRead(0);       break;  // SD card continous read
             case 'g':   generateDataOnPartition();  break;  // higher level data generation 
+            case 'z':   simpleNotDetailedErrReport = !simpleNotDetailedErrReport; break;        // toggle simple / detailed error report
         }
     }
     
     // ----------------- 
     
-    linea9();                                       // show mouse    
     return 0;
 }
 
@@ -900,9 +897,15 @@ BYTE findDevice(void)
         }
       
         (void) Cconws(" - not found.\r\nPress any key to retry or 'Q' to quit.\r\n");
+        (void) Cconws("Press 0-7 to manually select ACSI ID.\r\n");        
         key = Cnecin();        
     
-        if(key == 'Q' || key=='q') {
+        if(key >= '0' && key <= '7') {                  // manually select ID?
+            id = key - '0';
+            break;
+        }
+    
+        if(key == 'Q' || key=='q') {                    // quit?
             hdIf.maxRetriesCount = 16;                  // enable retries
             return 0xff;
         }
