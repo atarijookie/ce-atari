@@ -981,7 +981,17 @@ void ConfigStream::onUpdateCheckUsb(void)
 
 void ConfigStream::onUpdateUpdate(void)
 {
-    if(!Update::versions.updateListWasProcessed) {     // didn't process the update list yet? show message
+    if(shownOn == CONFIGSTREAM_IN_LINUX_CONSOLE) {               // when trying to do update from from linux console
+        showMessageScreen("STOP!", "Don't update the firmware using\n\rlinux console config tool!\n\r\n\rInstead run /ce/ce_update.sh or\n\rdo it using CE_CONF.TOS on Atari.");
+        return;
+    }
+
+    if(shownOn == CONFIGSTREAM_THROUGH_WEB) {                   // when trying to do update from from web console
+        showMessageScreen("STOP!", "Don't update the firmware using\n\rweb interface config tool!\n\r\n\rInstead run /ce/ce_update.sh or\n\rdo it using CE_CONF.TOS on Atari.");
+        return;
+    }
+
+    if(!Update::versions.updateListWasProcessed) {              // didn't process the update list yet? show message
         showMessageScreen("No updates info", "No update info was downloaded,\n\rplease press web / usb button and wait.");
         return;
     }
