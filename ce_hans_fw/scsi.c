@@ -137,8 +137,14 @@ void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun)
     
     // for sector write commands
     if(justCmd == SCSI_C_WRITE6 || justCmd == SCSI_C_WRITE10) {
+        TIM3->ARR = CMD_TIMEOUT_LONG;       // for SD write, set extra long timeout value
+
         res = mmcWrite_dma(sector, lenX);
         handled = TRUE;
+
+        TIM3->CNT = 0;                      // timer back to zero
+        TIM3->SR  = 0xfffe;                 // clear UIF flag
+        TIM3->ARR = CMD_TIMEOUT_SHORT;      // after write restore short timeout value
     }
     
     // return status for read and write command

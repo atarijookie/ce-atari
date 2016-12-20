@@ -183,7 +183,7 @@ BYTE mmcReset(void)
                     break;
                 }
                 
-                r1 = mmcSendCommand(55, 0);         // ACMD41 = CMD55 + CMD41
+                r1 = mmcSendCommand(SD_APP_CMD, 0); // ACMD41 = CMD55 + CMD41
 
                 if(r1 != 1)                         // if invalid reply to CMD55, then it's MMC card
                 {
@@ -191,7 +191,7 @@ BYTE mmcReset(void)
                     break;          
                 }
         
-                r1 = mmcSendCommand(41, 0x40000000); // ACMD41 = CMD55 + CMD41 ---  HCS (High Capacity Support) bit set
+                r1 = mmcSendCommand(SD_SEND_OP_COND, 0x40000000); // ACMD41 = CMD55 + CMD41 ---  HCS (High Capacity Support) bit set
 
                 if(r1 == 0)                         // if everything is OK, then it's SD card
                     break;
@@ -228,13 +228,13 @@ BYTE mmcReset(void)
     }
     //---------------
     while(retry) {
-        r1 = mmcSendCommand(55, 0);                 // ACMD41 = CMD55 + CMD41
+        r1 = mmcSendCommand(SD_APP_CMD, 0);         // ACMD41 = CMD55 + CMD41
         
         if(r1 != 1) {                               // if invalid reply to CMD55, then it's MMC card
             break;   
         }
         
-        r1 = mmcSendCommand(41, 0);                 // ACMD41 = CMD55 + CMD41
+        r1 = mmcSendCommand(SD_SEND_OP_COND, 0);    // ACMD41 = CMD55 + CMD41
         
         if(r1 == 0) {                               // if everything is OK, then it's SD card
             isSD = TRUE;
@@ -627,9 +627,9 @@ BYTE mmcWriteMore(DWORD sector, WORD count)
     // for SD and SDHC cards issue an SET_WR_BLK_ERASE_COUNT command
     if(sdCard.Type == DEVICETYPE_SDHC || sdCard.Type == DEVICETYPE_SD)      
     {
-        mmcCommand(55, 0);                      // ACMD23 = CMD55 + CMD23
-        mmcCommand(23, (DWORD) count);  
-    }       
+        mmcCommand(SD_APP_CMD, 0);                      // ACMD23 = CMD55 + CMD23
+        mmcCommand(SD_SET_BLOCK_COUNT, (DWORD) count);
+    }
 */
     //--------------------------
     // issue command

@@ -113,10 +113,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa016, 0x0426};                             // this means: hAns, 2016-04-26
+WORD version[2] = {0xa016, 0x1220};                             // this means: hAns, 2016-12-20
 
-char *VERSION_STRING_SHORT  = {"2.01"};
-char *DATE_STRING           = {"04/26/16"};
+char *VERSION_STRING_SHORT  = {"2.10"};
+char *DATE_STRING           = {"12/20/16"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
@@ -200,16 +200,13 @@ BYTE hwVersion;
 BYTE isAcsiNotScsi;
 BYTE xilinxBusIdle;
 
-#define MODE_UNKNOWN    0
-#define MODE_WITH_RPI   1
-#define MODE_SOLO       2
-
 BYTE timeOutCount   = 0;
 BYTE mode           = MODE_UNKNOWN;
 void updateEnabledIDsInSoloMode(void);
 
 BYTE tryProcessLocally(void);
 
+BYTE singleLastErr;
 BYTE lastErr[32];
 BYTE lastErrIndex;
 
@@ -244,6 +241,7 @@ struct {
     WORD fdd;
 } configWords;
 
+void sendFwToHost(void);
 //--------------------------
 
 int main(void)
@@ -251,9 +249,9 @@ int main(void)
     LOG_ERROR(0);           // no error
 	
 #ifdef CMDLOGGING	
-		cmdSeqNo		= 0;
-		cmdLogIndex	= 0;
-#endif	
+    cmdSeqNo    = 0;
+    cmdLogIndex = 0;
+#endif
     
     initAllStuff();         // now init everything
     
@@ -349,19 +347,7 @@ int main(void)
         if(spiDmaIsIdle && sendFwVersion) {
             serveButtonForRecoveryCmd();                                                    // handle long btn press for issuing recovery cmd
 
-            sendFwVersion = FALSE;
-            
-            timeoutStart();                                                                 // start timeout counter so we won't get stuck somewhere
-            atnSendFwVersion[6] = (((WORD) currentLed) << 8) | xilinxHwFw;                  // store the current LED status in the last WORD, and also XILINX info byte value
-            
-            atnSendFwVersion[7] = (configWords.acsi        );
-            atnSendFwVersion[8] = (configWords.fdd & 0xff00) | ((WORD) recoveryLevel_toHost);   // recovery code will be R, S or T
-            recoveryLevel_toHost = 0;
-            
-            spiDma_txRx(    ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0],     
-                            ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
-            
-            shouldProcessCommands = TRUE;                                                   // mark that we should process the commands on next SPI DMA idle time
+            sendFwToHost();
         }
         
         //---------------------------
@@ -377,6 +363,23 @@ int main(void)
             sendFwVersion = TRUE;
         }
     }
+}
+
+void sendFwToHost(void)
+{
+    sendFwVersion = FALSE;
+
+    timeoutStart();                                                                     // start timeout counter so we won't get stuck somewhere
+    atnSendFwVersion[6] = (((WORD) currentLed) << 8) | xilinxHwFw;                      // store the current LED status in the last WORD, and also XILINX info byte value
+
+    atnSendFwVersion[7] = (configWords.acsi        );
+    atnSendFwVersion[8] = (configWords.fdd & 0xff00) | ((WORD) recoveryLevel_toHost);   // recovery code will be R, S or T
+    recoveryLevel_toHost = 0;
+
+    spiDma_txRx(    ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0],
+                    ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
+
+    shouldProcessCommands = TRUE;                                                       // mark that we should process the commands on next SPI DMA idle time
 }
 
 void updateLEDs(void)
@@ -503,10 +506,20 @@ void handleAcsiCommand(void)
     }
 
 #ifdef CMDLOGGING
-		cmdLog_storeResults(brStat, lastScsiStatusByte);
-		cmdLog_onEnd();
-#endif		
-		
+    #ifdef CMDLOGGING_ONLY_ERROR
+    // log it only when bridge failed or there was an scsi error status byte
+    if(brStat != E_OK || lastScsiStatusByte != 0) {
+    #endif
+
+        cmdLog_storeResults(brStat, lastScsiStatusByte);
+        cmdLog_onEnd();
+
+    #ifdef CMDLOGGING_ONLY_ERROR
+    }
+    #endif
+
+#endif
+
     //---------------
     // if something was wrong, reset XILINX so it won't get stuck 
     if(brStat != E_OK) {
@@ -925,9 +938,10 @@ void onDataRead(void)
                 break;
             }
         }
-        
+
         if(dataMarkerFound == FALSE) {                      // didn't find the data marker?
-            PIO_read(0x02);                                 // send status: CHECK CONDITION and quit
+            LOG_ERROR(71);
+            PIO_read(SCSI_ST_CHECK_CONDITION);              // send status: CHECK CONDITION and quit
             return;
         }
 
@@ -1721,37 +1735,34 @@ BYTE isBusIdle(void)                    // get if the SCSI bus is idle (BSY high
 // start some command logging (if enabled)
 void cmdLog_onStart(void)
 {
-	cmdLog[cmdLogIndex].cmdSeqNo				= cmdSeqNo;							// store sequence number of command
-	memcpy((char *) cmdLog[cmdLogIndex].cmd, (char *) cmd, 14);	// copy the whole command
-	cmdLog[cmdLogIndex].cmdLen					= cmdLen;								// also store the length
-	cmdLog[cmdLogIndex].bridgeStatus		= brStat;								// store the bridge status byte
-	cmdLog[cmdLogIndex].scsiStatusByte	= 0xff;									// and also some fake SCSI status byte (other than zero, which is for no-error)
+    cmdLog[cmdLogIndex].cmdSeqNo        = cmdSeqNo;             // store sequence number of command
+    memcpy((char *) cmdLog[cmdLogIndex].cmd, (char *) cmd, 14); // copy the whole command
+    cmdLog[cmdLogIndex].cmdLen          = cmdLen;               // also store the length
+    cmdLog[cmdLogIndex].bridgeStatus    = brStat;               // store the bridge status byte
+    cmdLog[cmdLogIndex].scsiStatusByte  = 0xff;                 // and also some fake SCSI status byte (other than zero, which is for no-error)
 }
 
 void cmdLog_storeResults(BYTE bridgeStatus, BYTE scsiStatus)
 {
-	// update these retults
-	cmdLog[cmdLogIndex].bridgeStatus		= bridgeStatus;
-	cmdLog[cmdLogIndex].scsiStatusByte	= scsiStatus;
+    // update these retults
+    cmdLog[cmdLogIndex].bridgeStatus    = bridgeStatus;
+    cmdLog[cmdLogIndex].scsiStatusByte  = scsiStatus;
+    cmdLog[cmdLogIndex].scsiSenseCode   = sdCard.SCSI_SK;
+    cmdLog[cmdLogIndex].lastErrorPoint  = singleLastErr;    // store last err point
+
+    singleLastErr = 0;                                      // clear tha last err point
 }
 
 // finish some command logging on end of command (if enabled)
 void cmdLog_onEnd(void)
 {
-	#ifdef CMDLOGGING_ONLY_ERROR
-	// if bridge didn't fail, and there wasn't an scsi error status byte, skip moving to next CMD LOG item - we're logging only on error
-	if(cmdLog[cmdLogIndex].bridgeStatus == E_OK && cmdLog[cmdLogIndex].scsiStatusByte == 0) {
-		return;
-	}
-	#endif
-	
-	// update sequence number
-	cmdSeqNo++;
-	
-	// update log field index
-	cmdLogIndex++;
-	if(cmdLogIndex >= CMDLOG_COUNT) {
-		cmdLogIndex = 0;
-	}
+    // update sequence number
+    cmdSeqNo++;
+
+    // update log field index
+    cmdLogIndex++;
+    if(cmdLogIndex >= CMDLOG_COUNT) {
+        cmdLogIndex = 0;
+    }
 }
 #endif

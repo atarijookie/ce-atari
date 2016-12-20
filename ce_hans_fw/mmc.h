@@ -55,6 +55,7 @@ typedef struct _TDevice
 #define MMC_CRC_ON_OFF              59      // Turns CRC check on/off
 //-------------------------------------
 #define SD_APP_CMD                  55      // tells the SD card that the next command is application specific
+#define SD_SET_BLOCK_COUNT          23
 #define SD_SEND_OP_COND             41      // get card operational mode
 //-------------------------------------
 #define SDHC_SEND_IF_COND           8       // send interface condition

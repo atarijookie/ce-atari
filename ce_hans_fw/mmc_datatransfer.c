@@ -8,6 +8,10 @@ extern TDevice sdCard;
 extern unsigned char brStat;
 extern BYTE isAcsiNotScsi;
 
+extern BYTE mode;
+extern volatile BYTE spiDmaIsIdle;
+void sendFwToHost(void);
+
 #define SPIBUFSIZE  520
 BYTE spiTxBuff[SPIBUFSIZE];
 BYTE spiRxBuff1[SPIBUFSIZE];
@@ -53,7 +57,28 @@ void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
                 break;                      \
             }                               \
         }
-        
+
+BYTE waitForCardNotBusy(void)
+{
+    while(spi2_TxRx(0xFF) != 0xff) {                    // while card still returns something non-zero
+
+        if(mode != MODE_SOLO) {                         // do this only when we're NOT in solo mode
+            if(spiDmaIsIdle && (TIM2->SR & 0x0001)) {   // SPI DMA is idle, and it's time to send FW report
+                TIM2->SR = 0xfffe;                      // clear UIF flag
+
+                sendFwToHost();
+            }
+        }
+
+        if(timeout()) {                                 // if timeout happened, quit
+            LOG_ERROR(11);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 BYTE mmcRead_dma(DWORD sector, WORD count)
 {
     BYTE r1, quit, good;
@@ -191,9 +216,23 @@ BYTE mmcWrite_dma(DWORD sector, WORD count)
     DWORD thisSector;
     BYTE *pSend;
     BYTE *pData;
+//  BYTE r1a=0xff, r1b=0xff;
 
     timeoutStart();
     
+    //-----------
+/*
+    // for SD and SDHC, send SET BLOCK COUNT command before WRITE MULTIPLE BLOCKS
+    if(sdCard.Type == DEVICETYPE_SDHC || sdCard.Type == DEVICETYPE_SD) {
+        r1a = mmcSendCommand(SD_APP_CMD, 0);        // ACMD23 = CMD55 + CMD23
+
+        if(r1a < 2) {                               // good? send the rest
+            r1b = mmcSendCommand(SD_SET_BLOCK_COUNT, count);
+        }
+    }
+*/
+    //-----------
+
     // assert chip select
     spiCSlow();          // CS to L
 
@@ -210,6 +249,7 @@ BYTE mmcWrite_dma(DWORD sector, WORD count)
     if(r1 != 0x00) {
         spi2_TxRx(0xFF);
         spiCShigh();                            // CS to H
+        LOG_ERROR(60);
         return r1;
     }
     
@@ -222,8 +262,20 @@ BYTE mmcWrite_dma(DWORD sector, WORD count)
     pData = spiRxBuff1;                         // start storing to this buffer
     //--------------
     for(j=0; j<count; j++) {                    // read this many sectors
+        //--------------
+        // keep sending FW version to notify host that we're alive
+        if(mode != MODE_SOLO) {                         // do this only when we're NOT in solo mode
+            if(spiDmaIsIdle && (TIM2->SR & 0x0001)) {   // SPI DMA is idle, and it's time to send FW report
+                TIM2->SR = 0xfffe;                      // clear UIF flag
+
+                sendFwToHost();
+            }
+        }
+
+        //--------------
         if(thisSector >= sdCard.SCapacity) {    // sector out of range?
             quit = 1;
+            LOG_ERROR(61);
             break;                              // quit
         }
         //--------------    
@@ -239,6 +291,7 @@ BYTE mmcWrite_dma(DWORD sector, WORD count)
             
             if(brStat != E_OK) {                // if something was wrong
                 quit = 1;
+                LOG_ERROR(62);
                 break;                          // quit
             }
         }           
@@ -264,7 +317,7 @@ BYTE mmcWrite_dma(DWORD sector, WORD count)
         waitForSPI2idle();                          // now wait until SPI2 finishes
  
         // wait while busy
-        WAIT_FOR_CARD_NOT_BUSY
+        quit = waitForCardNotBusy();
             
         if(quit) {
             break;

@@ -1,4 +1,5 @@
 #include "timers.h"
+#include "defs.h"
 
 void timerSetup_buttonTimer(void)
 {
@@ -44,7 +45,7 @@ void timerSetup_cmdTimeout(void)
 
     // Time base configuration
     TIM_TimeBaseStructure.TIM_Prescaler         = 35999;            // prescale 72 MHz by 36 kHz = 2 kHz
-    TIM_TimeBaseStructure.TIM_Period            = 1000;             // with prescaler set to 2kHz, this period will be 0.5 second
+    TIM_TimeBaseStructure.TIM_Period            = CMD_TIMEOUT_SHORT;
     TIM_TimeBaseStructure.TIM_ClockDivision     = 0;
     TIM_TimeBaseStructure.TIM_CounterMode       = TIM_CounterMode_Up;
     TIM_TimeBaseStructure.TIM_RepetitionCounter	= 0;

@@ -8,10 +8,18 @@
 #define TRUE	1
 #define FALSE	0
 
+#define MODE_UNKNOWN    0
+#define MODE_WITH_RPI   1
+#define MODE_SOLO       2
+
+#define CMD_TIMEOUT_SHORT   1000    // with prescaler set to 2kHz, this period will be 0.5 second
+#define CMD_TIMEOUT_LONG    6000    // with prescaler set to 2kHz, this period will be 3.0 second
+
+
 //#define CMDLOGGING
 
 #ifdef CMDLOGGING
-	//#define CMDLOGGING_ONLY_ERROR
+	#define CMDLOGGING_ONLY_ERROR
 
 	void cmdLog_onStart(void);
 	void cmdLog_storeResults(BYTE bridgeStatus, BYTE scsiStatus);
@@ -19,13 +27,15 @@
 #endif
 
 typedef struct {
-	DWORD cmdSeqNo;
-	
-	BYTE	cmd[14];
-	BYTE 	cmdLen;
-	
-	BYTE	scsiStatusByte;
-	BYTE	bridgeStatus;
+    DWORD cmdSeqNo;
+
+    BYTE cmd[14];
+    BYTE cmdLen;
+
+    BYTE scsiStatusByte;
+    BYTE scsiSenseCode;
+    BYTE bridgeStatus;
+    BYTE lastErrorPoint;
 } TCmdLogItem;
 
 typedef struct 
@@ -133,10 +143,11 @@ GPIOC_14 - card detect
 //#define DO_LOG_ERROR
 
 #ifdef DO_LOG_ERROR
+		extern BYTE singleLastErr;
     extern BYTE lastErr[32];
 		extern BYTE lastErrIndex;
 		
-    #define LOG_ERROR(X)    { lastErr[lastErrIndex] = X; lastErrIndex++; if(lastErrIndex >= 32) lastErrIndex = 0; }
+    #define LOG_ERROR(X)    { singleLastErr = X; lastErr[lastErrIndex] = X; lastErrIndex++; if(lastErrIndex >= 32) lastErrIndex = 0; }
 #else
     #define LOG_ERROR(X)
 #endif
