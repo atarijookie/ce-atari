@@ -52,17 +52,28 @@ Folder DRIVERS\
 (only needed for advanced CosmosEx 
  functionality, NOT for basic HDD usage)
 
-ce_dd.prg    - This driver is only 
-               needed if you want to use
-               translated drives (e.g. 
-               windows thumb drives 
-               emulated as TOS drives or 
-               network drives), 
-               screenshots and current 
-               date. This is only needed
-               if you don't boot from 
-               CE_DD ACSI, then it loads 
-               automaticly (see manual).
+ce_dd.prg - You only need this in 
+            your AUTO folder if you 
+            boot from another 
+            harddrive or the CosmosEx
+            SD card. By default 
+            CosmosEx boots a builtin 
+            version of this - so 
+            normally you don't need 
+            to touch it. CE_DD 
+            (builtin and standalone)
+            handles the more advanced
+            features of your CosmosEx 
+            like accessing thumb drives, 
+            making screenshots and 
+            keeping the current date - 
+            it's kind of a supercharger
+            for TOS.
+            Neither version is needed 
+            if you only want to use the 
+            ATARI formatted SD card and 
+            none of the other features.
+
 
 ce_sting.prg - Highly experimental STiNG
                replacement for net-
