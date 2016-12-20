@@ -212,11 +212,14 @@ int main(void)
 
         return 0;
     }
-  
+
     // ----------------- 
     // now set up the acsi command bytes so we don't have to deal with this one anymore 
     commandLong [0] = (deviceID << 5) | 0x1f;           // cmd[0] = ACSI_id + ICD command marker (0x1f) 
 
+    // -----------------
+    (void) Cconws("\n\r\n\rPress any key to continue.\n\r");
+    Cnecin();
     // ----------------- 
 
     while(1) {
@@ -559,7 +562,7 @@ void testContinousRead(BYTE testReadNotSDcard)
         if(testReadNotSDcard) {     // should do test on CE generated data?
             hdIfCmdAsUser(ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, MAXSECTORS);    // issue the command and check the result
         } else {                    // should do test on SD card?
-            DWORD randomSectorNo = getTicks();
+            DWORD randomSectorNo = getTicksAsUser();
 
             sdReadCmd[2] = (BYTE) (randomSectorNo >> 8);    // sector # high
             sdReadCmd[3] = (BYTE) (randomSectorNo     );    // sector # low
