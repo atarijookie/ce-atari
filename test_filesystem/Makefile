@@ -1,4 +1,4 @@
-TARGET	= tst_fsys.prg
+TARGET	= tst_fsys.tos
 SLIM	= yes
 
 # control verbosity. use make V=1 to show commands
