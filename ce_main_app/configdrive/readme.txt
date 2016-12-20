@@ -28,7 +28,7 @@ This drive contains the following tools:
 
 General
 -------
-ce_conf.prg  - Configure your CosmosEx
+ce_conf.tos  - Configure your CosmosEx
 
 ce_fdd.prg   - Download and mount ST 
                files (Floppy Disk 
@@ -91,13 +91,13 @@ Folder TESTS\
 (Test tools for debugging issues that 
  may arise)
 
-ce_tsthd.prg - Tests ACSI/SCSI communi-
+ce_tsthd.tos - Tests ACSI/SCSI communi-
                cation with several tests
                (Stresstests, R/W checks-
                ums etc.)
 
-ce_tstfd.prg - Tests Floppy Disk Emu-
+ce_tstfd.tos - Tests Floppy Disk Emu-
                lation
 
-tst_fsys.prg - Tests File System (mainly
+tst_fsys.tos - Tests File System (mainly
                Translated Drives)
