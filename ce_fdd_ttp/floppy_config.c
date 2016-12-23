@@ -3,7 +3,6 @@
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
 #include <unistd.h>
-#include <gem.h>
 
 #include <stdint.h>
 #include <stdio.h>
