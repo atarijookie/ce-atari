@@ -18,9 +18,6 @@ extern BYTE firstConfigReceived;
 ScsiLogItem scsiLogs[SCSI_LOG_LENGTH];
 BYTE scsiLogNow;
 
-void processCosmoSoloCommands(void);
-void updateEnabledIDsInSoloMode(void);
-
 void memcpy(char *dest, char *src, int cnt);
 
 void processScsiLocaly(BYTE justCmd, BYTE isIcd)
@@ -28,11 +25,6 @@ void processScsiLocaly(BYTE justCmd, BYTE isIcd)
     BYTE lun;
 
     timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
-    
-    if(cmd[1] == 'C' && cmd[2] == 'S') {    // it's a Cosmo Solo command?
-        processCosmoSoloCommands();
-        return;
-    }
     
     // get the LUN from the command
     if(isIcd) {                             // for ICD commands
@@ -131,8 +123,14 @@ void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun)
     
     // for sector read commands
     if(justCmd == SCSI_C_READ6 || justCmd == SCSI_C_READ10) {
-        res = mmcRead_dma(sector, lenX);                                    // read data
+        TIM3->ARR = CMD_TIMEOUT_LONG;       // for SD read, set extra long timeout value
+
+        res = mmcRead_dma(sector, lenX);    // read data
         handled = TRUE;
+
+        TIM3->CNT = 0;                      // timer back to zero
+        TIM3->SR  = 0xfffe;                 // clear UIF flag
+        TIM3->ARR = CMD_TIMEOUT_SHORT;      // after read restore short timeout value
     }
     
     // for sector write commands
@@ -457,30 +455,6 @@ void scsi_log_add(void)
     
     scsiLogNow++;
     scsiLogNow = scsiLogNow & SCSI_LOG_MASK;
-}
-
-void processCosmoSoloCommands(void)
-{
-    BYTE good = FALSE;
-    
-    if(cmd[3] == sdCardID) {            // if the ID we want to change matches our sdCardID
-        BYTE newId = cmd[4];
-        
-        if(newId <= 7) {                // new ID must be between 0 and 7
-            sdCardID = newId;
-            EE_WriteVariable(EEPROM_OFFSET_SDCARD_ID, sdCardID);    // store the new SD card ID to fake EEPROM
-            
-            updateEnabledIDsInSoloMode();
-            
-            good = TRUE;                // mark success
-        }
-    }
-    
-    if(good) {                  // good?
-        scsi_sendOKstatus();
-    } else {                    // bad?
-        PIO_read(SCSI_ST_CHECK_CONDITION);
-    }    
 }
 
 void memcpy(char *dest, char *src, int cnt)

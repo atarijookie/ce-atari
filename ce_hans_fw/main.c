@@ -10,6 +10,7 @@
 #include "bridge.h"
 #include "datatransfer.h"
 #include "scsi.h"
+#include "cosmosolo.h"
 #include "mmc.h"
 #include "eeprom.h"
 
@@ -113,10 +114,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa016, 0x1220};                             // this means: hAns, 2016-12-20
+WORD version[2] = {0xa016, 0x1223};                             // this means: hAns, 2016-12-23
 
 char *VERSION_STRING_SHORT  = {"2.10"};
-char *DATE_STRING           = {"12/20/16"};
+char *DATE_STRING           = {"12/23/16"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
@@ -842,12 +843,15 @@ BYTE tryProcessLocally(void)
     if(cmdIsForCE == TRUE && tag1 == 'C' && tag2 == 'E') {  // this is a Cosmos Ex specific command? Don't process locally!
         return FALSE;                                       // didn't process local
     }
+
+    if(cmdIsForCE == TRUE && tag1 == 'C' && tag2 == 'S') {  // this is a Cosmos Solo specific command? Do process it locally!
+        processCosmoSoloCommands(isIcd);
+        return TRUE;                    // did process locally
+    }
     
     //---------
-    // if it's not CosmosEx custom command, process it locally
+    // if it's not CosmosEx custom command and not Cosmo Solo command, process it locally
     processScsiLocaly(justCmd, isIcd);
-    
-//  scsi_log_add();
     return TRUE;                        // did process locally
 }
 

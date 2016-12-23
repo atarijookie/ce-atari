@@ -156,6 +156,17 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
     last = count - 1;
     
     for(c=0; c<count; c++) {
+        //--------------
+        // keep sending FW version to notify host that we're alive
+        if(mode != MODE_SOLO) {                         // do this only when we're NOT in solo mode
+            if(spiDmaIsIdle && (TIM2->SR & 0x0001)) {   // SPI DMA is idle, and it's time to send FW report
+                TIM2->SR = 0xfffe;                      // clear UIF flag
+
+                sendFwToHost();
+            }
+        }
+        //--------------
+
         waitForSpi2Finish();                                    // wait until we have data
         waitForSPI2idle();                                      // now wait until SPI2 finishes
 

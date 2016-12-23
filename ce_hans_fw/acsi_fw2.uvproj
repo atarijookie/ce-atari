@@ -449,9 +449,9 @@
           </GroupOption>
           <Files>
             <File>
-              <FileName>startup_stm32f10x_md.s</FileName>
-              <FileType>2</FileType>
-              <FilePath>.\startup_stm32f10x_md.s</FilePath>
+              <FileName>defs.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\defs.h</FilePath>
             </File>
             <File>
               <FileName>main.c</FileName>
@@ -464,9 +464,9 @@
               <FilePath>.\system_stm32f10x.c</FilePath>
             </File>
             <File>
-              <FileName>defs.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\defs.h</FilePath>
+              <FileName>startup_stm32f10x_md.s</FileName>
+              <FileType>2</FileType>
+              <FilePath>.\startup_stm32f10x_md.s</FilePath>
             </File>
             <File>
               <FileName>stm32f10x_tim.h</FileName>
@@ -592,6 +592,16 @@
               <FileName>stm32f10x_flash.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\stm32f10x_flash.h</FilePath>
+            </File>
+            <File>
+              <FileName>cosmosolo.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\cosmosolo.c</FilePath>
+            </File>
+            <File>
+              <FileName>cosmosolo.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\cosmosolo.h</FilePath>
             </File>
           </Files>
         </Group>

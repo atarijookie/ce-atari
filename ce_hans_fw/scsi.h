@@ -17,11 +17,11 @@
 #define SCSI_C_WRITE6                           0x0a
 #define SCSI_C_READ6                            0x08
 #define SCSI_C_MODE_SENSE6                      0x1a
-#define SCSI_C_START_STOP_UNIT                  0x1b	
-#define SCSI_C_FORMAT_UNIT                      0x04	
-#define SCSI_C_INQUIRY                          0x12	
-#define SCSI_C_REQUEST_SENSE                    0x03	
-#define SCSI_C_TEST_UNIT_READY                  0x00	
+#define SCSI_C_START_STOP_UNIT                  0x1b
+#define SCSI_C_FORMAT_UNIT                      0x04
+#define SCSI_C_INQUIRY                          0x12
+#define SCSI_C_REQUEST_SENSE                    0x03
+#define SCSI_C_TEST_UNIT_READY                  0x00
 #define SCSI_C_SEND_DIAGNOSTIC                  0x1d
 #define SCSI_C_RESERVE                          0x16
 #define SCSI_C_RELEASE                          0x17
@@ -85,9 +85,9 @@
 #define SCSI_ASC_NOT_READY_TO_READY_TRANSITION  0x28
 //------------------------------------------------------
 
-void processScsiLocaly(BYTE justCmd, BYTE isIcd);
-void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun);
-void processScsiOther(BYTE justCmd, BYTE isIcd, BYTE lun);
+void processScsiLocaly       (BYTE justCmd, BYTE isIcd);
+void processScsiRW           (BYTE justCmd, BYTE isIcd, BYTE lun);
+void processScsiOther        (BYTE justCmd, BYTE isIcd, BYTE lun);
 
 void SCSI_FormatUnit(void);
 void SCSI_ReadCapacity(void);
