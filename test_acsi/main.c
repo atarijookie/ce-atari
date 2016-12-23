@@ -16,7 +16,7 @@
 //--------------------------------------------------
 
 void showConnectionErrorMessage(void);
-BYTE findDevice(void);
+
 int getConfig(void); 
 int readHansTest (DWORD byteCount, WORD xorVal );
 int writeHansTest(DWORD byteCount, WORD xorVal );
@@ -32,9 +32,13 @@ void deleteErrorLines(void);
 void speedTest(void);
 void generateDataOnPartition(void);
 
-BYTE ce_identify(BYTE ACSI_id);
+void scanBusForCE(void);
 //--------------------------------------------------
-BYTE deviceID;
+BYTE deviceID, sdCardId;
+BYTE isCEnotCS;
+BYTE sdCardPresent;
+
+BYTE ceFoundNotManual;
 
 BYTE commandLong [CMD_LENGTH_LONG ] = {0x1f, 0xA0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
 
@@ -43,26 +47,6 @@ BYTE writeBuffer[256 * 512];
 BYTE *rBuffer, *wBuffer;
 
 BYTE prevCommandFailed;
-
-#define HOSTMOD_CONFIG              1
-#define HOSTMOD_LINUX_TERMINAL      2
-#define HOSTMOD_TRANSLATED_DISK     3
-#define HOSTMOD_NETWORK_ADAPTER     4
-#define HOSTMOD_FDD_SETUP           5
-
-#define TRAN_CMD_IDENTIFY           0
-#define TRAN_CMD_GETDATETIME        1
-
-#define DATE_OK                     0
-#define DATE_ERROR                  2
-#define DATE_DATETIME_UNKNOWN       4
-
-#define DEVTYPE_OFF                 0
-#define DEVTYPE_SD                  1
-#define DEVTYPE_RAW                 2
-#define DEVTYPE_TRANSLATED          3
-
-#define Clear_home()    (void) Cconws("\33E")
 
 #define ERROR_LINE_START        10
 
@@ -96,15 +80,6 @@ void printOpResult(int res);
 
 void testDataReliability(void);
 void testContinousRead  (BYTE testReadNotSDcard);
-
-WORD getTOSversion(void)
-{
-    // detect TOS version and try to automatically choose the interface
-    BYTE  *pSysBase     = (BYTE *) 0x000004F2;
-    BYTE  *ppSysBase    = (BYTE *)  ((DWORD )  *pSysBase);                      // get pointer to TOS address
-    WORD  tosVersion    = (WORD  ) *(( WORD *) (ppSysBase + 2));                // TOS +2: TOS version
-    return tosVersion;
-}
 
 //--------------------------------------------------
 int main(void)
@@ -145,6 +120,18 @@ int main(void)
     Clear_home();
 
     // ---------------------- 
+    unsigned long *cescreencast_cookie=0;
+    if(CookieJarReadAsUser(0x43455343,(unsigned long *) &cescreencast_cookie) != 0) // Cookie "CESC" 
+    { 
+        (void) Cconws(" CosmosEx Screencast is active. Please\r\n");
+        (void) Cconws(" deactivate. \r\n\r\n Press any key to quit.\r\n");
+        Cnecin();
+        (void) Cconws("Quit.");         
+        
+        return 0;
+    }
+    // ---------------------- 
+    
     print_head();
     (void) Cconws("\r\n");
     (void) Cconws(" Non-destructive ACSI read/write test.\r\n");
@@ -153,85 +140,78 @@ int main(void)
     (void) Cconws(" http://joo.kie.sk/?page_id=250 and \r\n");
     (void) Cconws(" https://goo.gl/bKcbNV for infos+fixes.\r\n\r\n");        
     
-    unsigned long *cescreencast_cookie=0;
-    if(CookieJarReadAsUser(0x43455343,(unsigned long *) &cescreencast_cookie) != 0) // Cookie "CESC" 
-    { 
-        (void) Cconws("\r\n");
-        (void) Cconws(" CosmosEx Screencast is active. Please\r\n");
-        (void) Cconws(" deactivate. \r\n\r\n Press any key to quit.\r\n");
-        Cnecin();
-        (void) Cconws("Quit.");         
-        
-        return 0;
-    }
+    Cnecin();
     
     //----------------------
-    // detect TOS version and try to automatically choose the interface
-    WORD  tosVersion    = Supexec(getTOSversion);
-    BYTE  tosMajor      = tosVersion >> 8;
-    
-    if(tosMajor == 1 || tosMajor == 2) {                // TOS 1.xx or TOS 2.xx -- running on ST
-        (void) Cconws("Running on ST, choosing ACSI interface.\n\r");
-    
-        hdd_if_select(IF_ACSI);
-        ifUsed      = IF_ACSI;
-    } else if(tosMajor == 4) {                          // TOS 4.xx -- running on Falcon
-        (void) Cconws("Running on Falcon, choosing SCSI interface.\n\r");
-    
-        hdd_if_select(IF_SCSI_FALCON);
-        ifUsed      = IF_SCSI_FALCON;
-    } else {                                            // TOS 3.xx -- running on TT
-        (void) Cconws("Running on TT, plase choose [A]CSI or [S]CSI:");
-        
-        while(1) {
-            key = Cnecin();
-            
-            if(key == 'a' || key == 'A') {      // A pressed, choosing ACSI
-                (void) Cconws("\n\rACSI selected.\n\r");
-                hdd_if_select(IF_ACSI);
-                ifUsed      = IF_ACSI;
-                break;
-            }
-            
-            if(key == 's' || key == 'S') {      // S pressed, choosing SCSI
-                (void) Cconws("\n\rSCSI selected.\n\r");
-                hdd_if_select(IF_SCSI_TT);
-                ifUsed      = IF_SCSI_TT;
-                break;
-            }
-        }
-    }
+    // do bus scan for CE (or enter CS ID manually)
+    scanBusForCE();
 
-    // ---------------------- 
-    // search for device on the ACSI bus 
-    deviceID = findDevice();
-
-    if( deviceID == 0xff )
+    if(deviceID == 0xff)
     {
         (void) Cconws("Quit.");         
-
         return 0;
     }
 
     // ----------------- 
     // now set up the acsi command bytes so we don't have to deal with this one anymore 
-    commandLong [0] = (deviceID << 5) | 0x1f;           // cmd[0] = ACSI_id + ICD command marker (0x1f) 
-
-    // -----------------
-    (void) Cconws("\n\r\n\rPress any key to continue.\n\r");
-    Cnecin();
-    // ----------------- 
+    commandLong [0] = (deviceID << 5) | 0x1f;           // cmd[0] = ACSI_id + ICD command marker (0x1f)
+    commandLong [3] = 'E';                              // for CE
 
     while(1) {
         VT52_Clear_home();
-        
-        (void) Cconws("Choose test type:\r\n");
-        (void) Cconws("[E] - short speed test\r\n");
-        (void) Cconws("[D] - data from RPi     validity check\r\n");
-        (void) Cconws("[C] - data from RPI     continous read\r\n");
-        (void) Cconws("[S] - data from SD card continous read\r\n");
-        (void) Cconws("[G] - generated data on GEMDOS partition\r\n");
 
+        if(isCEnotCS) {                 // got full CE
+            (void) Cconws("Device type: CosmosEx\r\n");
+            
+            (void) Cconws("CE bus ID    : ");
+            Cconout('0' + deviceID);
+            (void) Cconws("\r\n");
+            
+            (void) Cconws("SD bus ID    : ");
+            
+            if(sdCardId == 0xff) {      // SD card not present on bus?
+                (void) Cconws("not present on bus");
+            } else {
+                Cconout('0' + sdCardId);
+            }
+            (void) Cconws("\r\n");
+        } else {                        // got only CS?
+            (void) Cconws("Device type  : CosmoSolo\r\n");
+            
+            (void) Cconws("CS bus ID    : ");
+            Cconout('0' + deviceID);
+            (void) Cconws("\r\n");
+        }
+
+        (void) Cconws("SD is present: ");
+        if(sdCardPresent) {
+            (void) Cconws("YES\r\n");
+        } else {
+            (void) Cconws("NO\r\n");
+        }
+        
+        (void) Cconws("\r\nChoose test type:\r\n");
+
+        // this should run on CE and CS
+        (void) Cconws("[E] - short speed test\r\n");
+        
+        // test for full CE only (RPi is needed)
+        if(isCEnotCS) {
+            (void) Cconws("[D] - data from RPi     validity check\r\n");
+            (void) Cconws("[C] - data from RPI     continous read\r\n");
+        }
+
+        // this runs either when we have full CE, or when we have SD card (can't generate data without it)
+        if(isCEnotCS || sdCardPresent) {
+            (void) Cconws("[G] - generated data on GEMDOS partition\r\n");
+        }
+
+        // this runs only when SD card is present
+        if(sdCardPresent) {
+            (void) Cconws("[S] - data from SD card continous read\r\n");
+        }
+
+        // this is just settings, works always
         (void) Cconws("[Z] - toggle ");
         if(simpleNotDetailedErrReport) VT52_Rev_on();
         (void) Cconws("simple");
@@ -241,6 +221,8 @@ int main(void)
         (void) Cconws("detailed");
         if(!simpleNotDetailedErrReport) VT52_Rev_off();
         (void) Cconws(" error report\r\n");
+
+        (void) Cconws("[R] - rescan bus for CE\r\n");
 
         (void) Cconws("[Q] - quit\r\n");
 
@@ -254,13 +236,35 @@ int main(void)
             break;
         }
 
-        switch(key) {
+        // this works only with RPi
+        if(isCEnotCS) {                         // CE only tests
+            switch(key) {
+                case 'd':   testDataReliability();  break;  // data validity check from RPi
+                case 'c':   testContinousRead(1);   break;  // stress test - continous read
+            }
+        }        
+        
+        // this works always
+        switch(key) {                           // CE and CS tests
             case 'e':   speedTest();                break;  // short speed test
-            case 'd':   testDataReliability();      break;  // data validity check from RPi
-            case 'c':   testContinousRead(1);       break;  // stress test - continous read
-            case 's':   testContinousRead(0);       break;  // SD card continous read
-            case 'g':   generateDataOnPartition();  break;  // higher level data generation 
+            case 'r':   scanBusForCE();             break;
             case 'z':   simpleNotDetailedErrReport = !simpleNotDetailedErrReport; break;        // toggle simple / detailed error report
+        }
+
+        // this works only when there's a writtable partition
+        if(isCEnotCS || sdCardPresent) {
+            if(key == 'g') {
+                generateDataOnPartition();      // higher level data generation 
+            }
+        }
+        
+        // this works only when SD card is present
+        if(key == 's' && sdCardPresent) {
+            testContinousRead(0);               // SD card continous read
+        }
+        
+        if(deviceID == 0xff) {                  // no device ID? quit
+            break;
         }
     }
     
@@ -470,28 +474,6 @@ void generateDataOnPartition(void)
 
 void scsi_reset(void);
 
-BYTE getSDcardId(void)
-{
-    BYTE cmd[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TEST_GET_ACSI_IDS, 0};
-
-    cmd[0] = (deviceID << 5);                                       // cmd[0] = deviceID + TEST UNIT READY (0)   
-    memset(rBuffer, 0, 512);                                        // clear the buffer 
-
-    hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);
-    if(!hdIf.success || hdIf.statusByte != 0) {                     // if command failed, return -1 (0xff)
-        return 0xff;
-    }
-    
-    int i;
-    for(i=0; i<8; i++) {                                            // go through ACSI IDs
-        if(rBuffer[i] == DEVTYPE_SD) {                              // if found SD card, good!
-            return i;
-        }
-    }
-    
-    return 0xff;                                                    // SD card ACSI ID not found
-}
-
 void testContinousRead(BYTE testReadNotSDcard)
 {
     VT52_Clear_home();
@@ -511,6 +493,7 @@ void testContinousRead(BYTE testReadNotSDcard)
 
         DWORD byteCount = ((DWORD) MAXSECTORS) << 9;    // convert sector count to byte count ( sc * 512 )
 
+        commandLong[3  ] = 'E';                         // for CE
         commandLong[4+1] = TEST_READ;
 
         // size to read
@@ -523,8 +506,6 @@ void testContinousRead(BYTE testReadNotSDcard)
         commandLong[9+1] = 0;
     } else {                                            // should do test on SD card?
         (void) Cconws("Data source: SD card\r\n");
-        
-        BYTE sdCardId = getSDcardId();
         
         if(sdCardId == 0xff) {                          // SD card not configured on ACSI bus?
             (void) Cconws("No ACSI/SCSI ID configured for SD card!\r\n");
@@ -863,26 +844,6 @@ void print_status(void)
 }
 
 //--------------------------------------------------
-BYTE ce_identify(BYTE ACSI_id)
-{
-  BYTE cmd[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TRAN_CMD_IDENTIFY, 0};
-  
-  cmd[0] = (ACSI_id << 5);                  // cmd[0] = ACSI_id + TEST UNIT READY (0)   
-  memset(rBuffer, 0, 512);                  // clear the buffer 
-
-  hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);   // issue the identify command and check the result 
-    
-  if(!hdIf.success || hdIf.statusByte != 0) {                   // if failed, return FALSE 
-    return 0;
-  }
-    
-  if(strncmp((char *) rBuffer, "CosmosEx translated disk", 24) != 0) {      // the identity string doesn't match? 
-    return 0;
-  }
-    
-  return 1;                             // success 
-}
-//--------------------------------------------------
 void showConnectionErrorMessage(void)
 {
 //  Clear_home();
@@ -890,71 +851,12 @@ void showConnectionErrorMessage(void)
     
     prevCommandFailed = 1;
 }
-//--------------------------------------------------
-BYTE findDevice(void)
-{
-    BYTE i;
-    BYTE key, res;
-    BYTE id = 0xff;
-    char bfr[2];
-
-    hdIf.maxRetriesCount = 0;           // disable retries - we are expecting that the devices won't answer on every ID
-    
-    bfr[1] = 0; 
-    (void) Cconws("CosmosEx on ");
-    
-    switch(ifUsed) {
-        case IF_ACSI:           (void) Cconws("ACSI: ");        break;
-        case IF_SCSI_TT:        (void) Cconws("TT SCSI: ");     break;
-        case IF_SCSI_FALCON:    (void) Cconws("Falcon SCSI: "); break;
-    }
-
-    while(1) {
-        for(i=0; i<8; i++) {
-            bfr[0] = i + '0';
-            (void) Cconws(bfr); 
-              
-            res = ce_identify(i);                       // try to read the IDENTITY string 
-      
-            if(res == 1) {                              // if found the CosmosEx 
-                id = i;                                 // store the ACSI ID of device 
-                break;
-            }
-        }
-  
-        if(res == 1) {                                  // if found, break 
-            break;
-        }
-      
-        (void) Cconws(" - not found.\r\nPress any key to retry or 'Q' to quit.\r\n");
-        (void) Cconws("Press 0-7 to manually select ACSI ID.\r\n");        
-        key = Cnecin();        
-    
-        if(key >= '0' && key <= '7') {                  // manually select ID?
-            id = key - '0';
-            break;
-        }
-    
-        if(key == 'Q' || key=='q') {                    // quit?
-            hdIf.maxRetriesCount = 16;                  // enable retries
-            return 0xff;
-        }
-    }
-  
-    hdIf.maxRetriesCount = 16;                          // enable retries
-    
-    bfr[0] = id + '0';
-    (void) Cconws("\r\nCosmosEx ID: ");
-    (void) Cconws(bfr);
-    (void) Cconws("\r\n\r\n");
-    
-    return id;
-}
 
 //--------------------------------------------------
 
 int readHansTest(DWORD byteCount, WORD xorVal )
 {
+    commandLong[3  ] = 'E';                         // for CE
     commandLong[4+1] = TEST_READ;
 
     // size to read
@@ -1013,6 +915,7 @@ int writeHansTest(DWORD byteCount, WORD xorVal)
 {
     static WORD prevXorVal = 0xffff;
     
+    commandLong[3  ] = 'E';                 // for CE
     commandLong[4+1] = TEST_WRITE;
 
   //size to read
@@ -1122,7 +1025,13 @@ void showHexDword(DWORD val)
 
 void speedTest(void)
 {
-    DWORD byteCount = ((DWORD) MAXSECTORS) << 9;     // convert sector count to byte count ( sc * 512 )
+    DWORD byteCount = ((DWORD) MAXSECTORS) << 9;    // convert sector count to byte count ( sc * 512 )
+
+    if(isCEnotCS) {
+        commandLong[3] = 'E';       // for CE
+    } else {
+        commandLong[3] = 'S';       // for CS
+    }
 
     commandLong[4+1] = TEST_READ;
 
