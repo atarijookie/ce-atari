@@ -97,7 +97,7 @@ void scanBusForCE(void)
         sdCardId = getSDcardId(TRUE);           // get SD card ID from CE
         
         if(sdCardId != 0xff) {                  // if the SD card ID is configured
-            getSDcardId(FALSE);                 // now use that SD card ID to talk to CS and get if card is present
+            sdCardId = getSDcardId(FALSE);      // now use that SD card ID to talk to CS and get if card is present
         } else {                                // SD card ID not configured? SD card not present
             sdCardPresent = FALSE;
         }
@@ -179,7 +179,7 @@ BYTE findDeviceSub(BYTE CEnotCS)
     bfr[1] = 0;
     
     if(CEnotCS) {                       // looking for CE
-        (void) Cconws("CosmosEx on ");
+        (void) Cconws("CosmosEx   on ");
     } else {                            // looking for CS
         (void) Cconws("CosmosSolo on ");
     }
@@ -270,21 +270,21 @@ BYTE getSDcardId(BYTE fromCEnotCS)
         hdIfCmdAsUser(ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, 1);        
     }
     
-    if(!hdIf.success || hdIf.statusByte != 0) {                     // if command failed, return -1 (0xff)
+    if(!hdIf.success || hdIf.statusByte != 0) {                         // if command failed, return -1 (0xff)
         return 0xff;
     }
     
     int i;
-    for(i=0; i<8; i++) {                                            // go through ACSI IDs
-        if(rBuffer[i] == DEVTYPE_SD) {                              // if found SD card, good!
-            return i;
+    for(i=0; i<8; i++) {                        // go through ACSI IDs
+        if(rBuffer[i] == DEVTYPE_SD) {          // if found SD card, good!
+            if(!fromCEnotCS) {                  // if data came from CS, then byte 10 contains if the card is init
+                sdCardPresent = rBuffer[10];
+            }
+   
+            return i;                           // return ID of SD card
         }
     }
     
-    if(!fromCEnotCS) {                                              // if data came from CS, then byte 10 contains if the card is init
-        sdCardPresent = rBuffer[10];
-    }
-    
-    return 0xff;                                                    // SD card ACSI ID not found
+    return 0xff;                                // SD card ACSI ID not found
 }
 
