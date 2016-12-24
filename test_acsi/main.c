@@ -18,18 +18,18 @@
 void showConnectionErrorMessage(void);
 
 int getConfig(void); 
-int readHansTest (DWORD byteCount, WORD xorVal );
-int writeHansTest(DWORD byteCount, WORD xorVal );
+int readHansTest (BYTE CEnotCS, DWORD byteCount, WORD xorVal );
+int writeHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal );
 void sleep(int seconds);
 
-void print_head(void);
+void print_head(BYTE CEnotCS);
 void print_status(void);
 
 void showHexByte(BYTE val);
 void showHexDword(DWORD val);
 void logMsg(char *logMsg);
 void deleteErrorLines(void);
-void speedTest(void);
+void speedTest(BYTE CEnotCS);
 void generateDataOnPartition(void);
 
 void scanBusForCE(void);
@@ -78,8 +78,10 @@ struct {
 void updateCounts(BYTE doingWriteNotRead, int res);
 void printOpResult(int res);
 
-void testDataReliability(void);
-void testContinousRead  (BYTE testReadNotSDcard);
+void testDataReliability(BYTE CEnotCS);
+void testContinousRead  (BYTE CEnotCS, BYTE testReadNotSDcard);
+
+void showTestName(char letter, BYTE doShow, const char *testTitle);
 
 //--------------------------------------------------
 int main(void)
@@ -132,13 +134,15 @@ int main(void)
     }
     // ---------------------- 
     
-    print_head();
+    print_head(TRUE);
     (void) Cconws("\r\n");
     (void) Cconws(" Non-destructive ACSI read/write test.\r\n");
     (void) Cconws(" Helpful to detect possible DMA problems\r\n");      
     (void) Cconws(" your ST hardware might have. See:\r\n");        
     (void) Cconws(" http://joo.kie.sk/?page_id=250 and \r\n");
     (void) Cconws(" https://goo.gl/bKcbNV for infos+fixes.\r\n\r\n");        
+
+    (void) Cconws(" Press any key to continue.\r\n");        
     
     Cnecin();
     
@@ -161,7 +165,7 @@ int main(void)
         VT52_Clear_home();
 
         if(isCEnotCS) {                 // got full CE
-            (void) Cconws("Device type: CosmosEx\r\n");
+            (void) Cconws("Device type  : CosmosEx\r\n");
             
             (void) Cconws("CE bus ID    : ");
             Cconout('0' + deviceID);
@@ -190,28 +194,33 @@ int main(void)
             (void) Cconws("NO\r\n");
         }
         
-        (void) Cconws("\r\nChoose test type:\r\n");
-
-        // this should run on CE and CS
-        (void) Cconws("[E] - short speed test\r\n");
+        (void) Cconws("\r\n");
         
         // test for full CE only (RPi is needed)
-        if(isCEnotCS) {
-            (void) Cconws("[D] - data from RPi     validity check\r\n");
-            (void) Cconws("[C] - data from RPI     continous read\r\n");
-        }
+        (void) Cconws("\33pTests which talk to RPi\33q\r\n");
+        showTestName('E', isCEnotCS, "short speed test from RPi");
+        showTestName('D', isCEnotCS, "data from RPi validity check");
+        showTestName('C', isCEnotCS, "data from RPi continous read");
+        (void) Cconws("\r\n");
+
+        // this work with CE and CS
+        (void) Cconws("\33pTests which talk to Hans\33q\r\n");
+        showTestName('F', TRUE, "short speed test from Hans");
+        showTestName('H', TRUE, "data from Hans validity check");
+        showTestName('I', TRUE, "data from Hans continous read");
+        (void) Cconws("\r\n");
 
         // this runs either when we have full CE, or when we have SD card (can't generate data without it)
-        if(isCEnotCS || sdCardPresent) {
-            (void) Cconws("[G] - generated data on GEMDOS partition\r\n");
-        }
+        (void) Cconws("\33pOther\33q\r\n");
+        BYTE hasWritablePartition = isCEnotCS || sdCardPresent;
+        showTestName('G', hasWritablePartition, "generated data on GEMDOS partition");
 
         // this runs only when SD card is present
-        if(sdCardPresent) {
-            (void) Cconws("[S] - data from SD card continous read\r\n");
-        }
+        showTestName('S', sdCardPresent, "data from SD card continous read");
+        (void) Cconws("\r\n");
 
         // this is just settings, works always
+        (void) Cconws("\33pGeneral\33q\r\n");
         (void) Cconws("[Z] - toggle ");
         if(simpleNotDetailedErrReport) VT52_Rev_on();
         (void) Cconws("simple");
@@ -239,20 +248,23 @@ int main(void)
         // this works only with RPi
         if(isCEnotCS) {                         // CE only tests
             switch(key) {
-                case 'd':   testDataReliability();  break;  // data validity check from RPi
-                case 'c':   testContinousRead(1);   break;  // stress test - continous read
+                case 'e':   speedTest(TRUE);            break;  // short speed test
+                case 'd':   testDataReliability(TRUE);  break;  // data validity check from RPi
+                case 'c':   testContinousRead(TRUE, 1); break;  // stress test - continous read
             }
         }        
         
         // this works always
         switch(key) {                           // CE and CS tests
-            case 'e':   speedTest();                break;  // short speed test
-            case 'r':   scanBusForCE();             break;
+            case 'f':   speedTest(FALSE);               break;  // short speed test
+            case 'h':   testDataReliability(FALSE);     break;  // data validity check from RPi
+            case 'i':   testContinousRead(FALSE, 1);    break;  // stress test - continous read
+            case 'r':   scanBusForCE();                 break;
             case 'z':   simpleNotDetailedErrReport = !simpleNotDetailedErrReport; break;        // toggle simple / detailed error report
         }
 
         // this works only when there's a writtable partition
-        if(isCEnotCS || sdCardPresent) {
+        if(hasWritablePartition) {
             if(key == 'g') {
                 generateDataOnPartition();      // higher level data generation 
             }
@@ -260,7 +272,7 @@ int main(void)
         
         // this works only when SD card is present
         if(key == 's' && sdCardPresent) {
-            testContinousRead(0);               // SD card continous read
+            testContinousRead(FALSE, 0);        // SD card continous read
         }
         
         if(deviceID == 0xff) {                  // no device ID? quit
@@ -271,6 +283,20 @@ int main(void)
     // ----------------- 
     
     return 0;
+}
+
+void showTestName(char letter, BYTE doShow, const char *testTitle)
+{
+    if(doShow) {
+        (void) Cconws("[");
+        Cconout(letter);
+        (void) Cconws("] - ");
+    } else {
+        (void) Cconws("    - ");
+    }
+    
+    (void) Cconws(testTitle);
+    (void) Cconws("\r\n");
 }
 
 BYTE showQuestionGetBool(const char *question, BYTE trueKey, const char *trueWord, BYTE falseKey, const char *falseWord)
@@ -474,7 +500,7 @@ void generateDataOnPartition(void)
 
 void scsi_reset(void);
 
-void testContinousRead(BYTE testReadNotSDcard)
+void testContinousRead(BYTE CEnotCS, BYTE testReadNotSDcard)
 {
     VT52_Clear_home();
     VT52_Wrap_on();
@@ -489,11 +515,20 @@ void testContinousRead(BYTE testReadNotSDcard)
     BYTE sdReadCmd[CMD_LENGTH_SHORT] = {0, 0, 0, 0, 0, 0};
 
     if(testReadNotSDcard) {                             // should do test on CE generated data?
-        (void) Cconws("Data source: Raspberry Pi\r\n");
+        if(CEnotCS) {
+            (void) Cconws("Data source: Raspberry Pi\r\n");
+        } else {
+            (void) Cconws("Data source: Hans\r\n");
+        }
 
         DWORD byteCount = ((DWORD) MAXSECTORS) << 9;    // convert sector count to byte count ( sc * 512 )
 
-        commandLong[3  ] = 'E';                         // for CE
+        if(CEnotCS) {
+            commandLong[3] = 'E';   // for CE
+        } else {
+            commandLong[3] = 'S';   // for CS
+        }
+        
         commandLong[4+1] = TEST_READ;
 
         // size to read
@@ -572,7 +607,7 @@ void testContinousRead(BYTE testReadNotSDcard)
     }
 }
 
-void testDataReliability(void)
+void testDataReliability(BYTE CEnotCS)
 {
     BYTE key;
     WORD xorVal=0xC0DE;
@@ -581,7 +616,7 @@ void testDataReliability(void)
 
     VT52_Clear_home();
 
-    print_head();
+    print_head(CEnotCS);
     print_status();
    
     VT52_Goto_pos(0, 22);
@@ -613,9 +648,9 @@ void testDataReliability(void)
         doingWriteNotRead = linecnt & 1;
   
         if( doingWriteNotRead ){
-            res = writeHansTest(MAXSECTORS * 512, xorVal);
+            res = writeHansTest(CEnotCS, MAXSECTORS * 512, xorVal);
         }else{
-            res = readHansTest (MAXSECTORS * 512, xorVal);
+            res = readHansTest (CEnotCS, MAXSECTORS * 512, xorVal);
         }
         
         xorVal++;  // change XOR value every time, so the data will be different every time (better for detecting errors)
@@ -629,7 +664,7 @@ void testDataReliability(void)
         charcnt++;
         
         print_status();
-        print_head();
+        print_head(CEnotCS);
 
         //--------------
         if(!simpleNotDetailedErrReport) {                           // if detailed error report with wait
@@ -743,11 +778,16 @@ void printOpResult(int res)
     }    
 }
 
-void print_head()
+void print_head(BYTE CEnotCS)
 {
     VT52_Goto_pos(0,0);
 
-    (void) Cconws("\33p[ CosmosEx HDD IF test  ver "); 
+    if(CEnotCS) {
+        (void) Cconws("\33p[ CosmosEx HDD IF test  ver "); 
+    } else {
+        (void) Cconws("\33p[ CosmoSoloHDD IF test  ver "); 
+    }
+        
     showAppVersion();
     (void) Cconws(" ]\33q\r\n");        
 }
@@ -854,9 +894,18 @@ void showConnectionErrorMessage(void)
 
 //--------------------------------------------------
 
-int readHansTest(DWORD byteCount, WORD xorVal )
+int readHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal)
 {
-    commandLong[3  ] = 'E';                         // for CE
+    if(CEnotCS) {
+        hdIf.maxRetriesCount = 16;                  // enable retries
+        commandLong[0] = (deviceID << 5) | 0x1f;    // CE device ID
+        commandLong[3] = 'E';                       // for CE
+    } else {
+        hdIf.maxRetriesCount = 0;                   // disable retries
+        commandLong[0] = (sdCardId << 5) | 0x1f;    // SD card device ID
+        commandLong[3] = 'S';                       // for CS
+    }
+
     commandLong[4+1] = TEST_READ;
 
     // size to read
@@ -911,19 +960,28 @@ int readHansTest(DWORD byteCount, WORD xorVal )
 
 //--------------------------------------------------
 
-int writeHansTest(DWORD byteCount, WORD xorVal)
+int writeHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal)
 {
     static WORD prevXorVal = 0xffff;
     
-    commandLong[3  ] = 'E';                 // for CE
+    if(CEnotCS) {
+        hdIf.maxRetriesCount = 16;                  // enable retries
+        commandLong[0] = (deviceID << 5) | 0x1f;    // CE device ID
+        commandLong[3] = 'E';                       // for CE
+    } else {
+        hdIf.maxRetriesCount = 0;                   // disable retries
+        commandLong[0] = (sdCardId << 5) | 0x1f;    // SD card device ID
+        commandLong[3] = 'S';                       // for CS
+    }
+
     commandLong[4+1] = TEST_WRITE;
 
-  //size to read
+    //size to read
     commandLong[5+1] = (byteCount >> 16) & 0xFF;
     commandLong[6+1] = (byteCount >> 8 ) & 0xFF;
     commandLong[7+1] = (byteCount      ) & 0xFF;
 
-  //Word to XOR with data on CE side
+    //Word to XOR with data on CE side
     commandLong[8+1] = (xorVal >> 8) & 0xFF;
     commandLong[9+1] = (xorVal     ) & 0xFF;
 
@@ -1023,16 +1081,20 @@ void showHexDword(DWORD val)
     showHexByte((BYTE)  val);
 }
 
-void speedTest(void)
+void speedTest(BYTE CEnotCS)
 {
     DWORD byteCount = ((DWORD) MAXSECTORS) << 9;    // convert sector count to byte count ( sc * 512 )
 
-    if(isCEnotCS) {
-        commandLong[3] = 'E';       // for CE
+    if(CEnotCS) {
+        hdIf.maxRetriesCount = 16;                  // enable retries
+        commandLong[0] = (deviceID << 5) | 0x1f;    // CE device ID
+        commandLong[3] = 'E';                       // for CE
     } else {
-        commandLong[3] = 'S';       // for CS
+        hdIf.maxRetriesCount = 0;                   // disable retries
+        commandLong[0] = (sdCardId << 5) | 0x1f;    // SD card device ID
+        commandLong[3] = 'S';                       // for CS
     }
-
+    
     commandLong[4+1] = TEST_READ;
 
     // size to read

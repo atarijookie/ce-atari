@@ -82,6 +82,12 @@ BYTE soloTestReadNotWrite(BYTE readNotWrite)
     xorVal     = xorVal << 8;
     xorVal    |= cmd[10];
 
+    if(readNotWrite) {          // read?
+        ACSI_DATADIR_READ();
+    } else {                    // write?
+        ACSI_DATADIR_WRITE();
+    }
+
     for(i=0; i<byteCount; i += 2) {
         WORD expectedData = counter ^ xorVal;       // create word, use it in hiByte-loByte order
 
@@ -136,6 +142,8 @@ BYTE soloTestGetACSIids(void)
     BYTE id=0;
     BYTE i;
 
+    ACSI_DATADIR_READ();
+
     // bytes 0..7
     for(id=0; id<8; id++) {                             // now store it one after another to buffer
         BYTE fakeDevType;
@@ -151,7 +159,6 @@ BYTE soloTestGetACSIids(void)
         } else {                                        // device disabled?
             fakeDevType = DEVTYPE_OFF;
         }
-
 
         DMA_read(fakeDevType);                          // return the (fake) device type
     }
