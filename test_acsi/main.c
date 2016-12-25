@@ -211,7 +211,7 @@ int main(void)
         (void) Cconws("\r\n");
 
         // this runs either when we have full CE, or when we have SD card (can't generate data without it)
-        (void) Cconws("\33pOther\33q\r\n");
+        (void) Cconws("\33pOther tests\33q\r\n");
         BYTE hasWritablePartition = isCEnotCS || sdCardPresent;
         showTestName('G', hasWritablePartition, "generated data on GEMDOS partition");
 

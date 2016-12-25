@@ -809,7 +809,7 @@ BYTE tryProcessLocally(void)
 {
     BYTE justCmd;
     BYTE tag1, tag2, isIcd;
-    BYTE cmdIsForCE = FALSE;
+    BYTE cmdIsForCE = FALSE;                // is the SCSI command valid for CE custom commands?
     
     //----------------------
     // figure out it this has CosmosEx custom command format
@@ -836,23 +836,21 @@ BYTE tryProcessLocally(void)
         tag2    = cmd[2];
     }
 
-    if(firstConfigReceived == FALSE) {      // no config received from host? Then process it localy.
-        cmdIsForCE = FALSE;
+    // config received from host, and this is a Cosmos Ex specific command? Don't process locally!
+    if(firstConfigReceived && cmdIsForCE == TRUE && tag1 == 'C' && tag2 == 'E') {  
+        return FALSE;                       // didn't process local
     }
 
-    if(cmdIsForCE == TRUE && tag1 == 'C' && tag2 == 'E') {  // this is a Cosmos Ex specific command? Don't process locally!
-        return FALSE;                                       // didn't process local
-    }
-
-    if(cmdIsForCE == TRUE && tag1 == 'C' && tag2 == 'S') {  // this is a Cosmos Solo specific command? Do process it locally!
+    // this is a Cosmos Solo specific command? Do process it locally!
+    if(cmdIsForCE == TRUE && tag1 == 'C' && tag2 == 'S') {  
         processCosmoSoloCommands(isIcd);
-        return TRUE;                    // did process locally
+        return TRUE;                        // did process locally
     }
     
     //---------
     // if it's not CosmosEx custom command and not Cosmo Solo command, process it locally
     processScsiLocaly(justCmd, isIcd);
-    return TRUE;                        // did process locally
+    return TRUE;                            // did process locally
 }
 
 // when in SOLO mode, eable and disable IDs according to sdCardID
