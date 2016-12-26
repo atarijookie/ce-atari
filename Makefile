@@ -1,8 +1,10 @@
 # global makefile
 
 
+.PHONY: default ce_main_app atari_progs update
+
 default:
-	@echo "usage :  make <atari_progs|ce_main_app>"
+	@echo "usage :  make <atari_progs|ce_main_app|update>"
 
 atari_progs:
 	$(MAKE) -C ce_dd_bootsectors
@@ -22,3 +24,6 @@ atari_progs:
 
 ce_main_app:
 	$(MAKE) -C ce_main_app
+
+update:
+	$(MAKE) -C update
