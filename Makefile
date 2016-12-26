@@ -13,7 +13,7 @@ atari_progs:
 	$(MAKE) -C ce_fdd_prg
 	$(MAKE) -C ce_fdd_ttp
 	$(MAKE) -C ce_mount_prg
-#	$(MAKE) -C ce_mount_acc
+	$(MAKE) -C ce_mount_acc
 	$(MAKE) -C test_floppy
 	$(MAKE) -C test_floppy_read
 	$(MAKE) -C test_filesystem
