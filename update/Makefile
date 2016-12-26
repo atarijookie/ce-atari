@@ -11,6 +11,7 @@ GZCAT = gunzip -c
 TOOLS = configdrive/ce_conf.tos \
 	configdrive/ce_fdd.prg \
 	configdrive/ce_fdd.ttp \
+	configdrive/ce_hdimg.ttp \
 	configdrive/ce_mount.tos
 
 DRIVERS = configdrive/drivers/ce_cast.prg \
@@ -135,6 +136,10 @@ configdrive/ce_fdd.prg:	../ce_fdd_prg/ce_fdd.prg
 	$(CP) $< $@
 
 configdrive/ce_fdd.ttp:	../ce_fdd_ttp/ce_fdd.ttp
+	mkdir -p configdrive
+	$(CP) $< $@
+
+configdrive/ce_hdimg.ttp:	../ce_hdimg_ttp/ce_hdimg.ttp
 	mkdir -p configdrive
 	$(CP) $< $@
 
