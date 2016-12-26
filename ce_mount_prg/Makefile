@@ -1,4 +1,4 @@
-TARGET	= ce_mount.prg
+TARGET	= ce_mount.tos
 
 # control verbosity. use make V=1 to show commands
 V = 0
