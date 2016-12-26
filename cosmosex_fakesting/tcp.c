@@ -11,8 +11,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include <gem.h>
-
 #include "globdefs.h"
 #include "tcp.h"
 #include "con_man.h"

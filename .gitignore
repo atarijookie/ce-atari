@@ -1,6 +1,8 @@
 *.o
 *.prg
 *.ttp
+*.tos
+*.acc
 *.bs
 ce_dd_bootsectors/convertor
 *.d

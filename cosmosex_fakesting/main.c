@@ -13,8 +13,6 @@
 #include <stdio.h>
 #include <ctype.h>
 
-#include <gem.h>
-
 #include "globdefs.h"
 #include "acsi.h"
 #include "ce_commands.h"
