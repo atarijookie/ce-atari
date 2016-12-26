@@ -113,9 +113,8 @@ ce_conf.st:	$(DRIVERS) $(TOOLS) $(TESTS) $(OTHERS)
 	MTOOLS_NO_VFAT=1 mcopy -i $@ -v $(DRIVERS) ::/DRIVERS
 	MTOOLS_NO_VFAT=1 mcopy -i $@ -v $(TESTS) ::/TESTS
 
-fdd_test.st:
-	$(RM) $@
-	$(GZCAT) blank.st.gz > $@
+fdd_test.st:	fdd_test.st.gz
+	$(GZCAT) $< > $@
 
 # zip options :
 # -k : MSDOS compatible names and attributes
