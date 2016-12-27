@@ -92,7 +92,7 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
 
     switch(hostSourceType) {                                                // try to open it depending on source type
     case SOURCETYPE_SD_CARD:
-        attachedMedia[index].hostPath       = "";
+        attachedMedia[index].hostPath       = hostPath;
         attachedMedia[index].hostSourceType = SOURCETYPE_SD_CARD;
         attachedMedia[index].dataMedia      = &sdMedia;
         attachedMedia[index].accessType     = SCSI_ACCESSTYPE_FULL;
@@ -100,7 +100,7 @@ bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int access
         break;
 
     case SOURCETYPE_NONE:
-        attachedMedia[index].hostPath       = "";
+        attachedMedia[index].hostPath       = hostPath;
         attachedMedia[index].hostSourceType = SOURCETYPE_NONE;
         attachedMedia[index].dataMedia      = &noMedia;
         attachedMedia[index].accessType     = SCSI_ACCESSTYPE_NO_DATA;
@@ -361,8 +361,8 @@ void Scsi::loadSettings(void)
     }
 
     if(acsiIdInfo.sdCardAcsiId != 0xff) {                // if we got ACSI ID for SD card, attach this SD card...
-        std::string empty;
-        attachToHostPath(empty, SOURCETYPE_SD_CARD, SCSI_ACCESSTYPE_FULL);
+        std::string sdCardHostPath("SD_CARD");
+        attachToHostPath(sdCardHostPath, SOURCETYPE_SD_CARD, SCSI_ACCESSTYPE_FULL);
     }
 
     // attach Translated bootmedia
