@@ -28,7 +28,6 @@ void NetworkSettings::loadOnRaspbian(void)
     int  ires, cidr;
     
     TNetInterface *currentIface = NULL;                         // store the settings to the struct pointed by this pointer
-    hostname = "CosmosEx";                                      // default hostname
     
     while(!feof(f)) {
         char *res = fgets(line, MAX_LINE_LEN, f);               // get single line
@@ -40,6 +39,8 @@ void NetworkSettings::loadOnRaspbian(void)
         if(line[0] == '#') {                                    // if it's a line with a comment, skip it
             continue;
         }
+        
+        removeEol(line);                                        // remove EOL from string
         
         if(strlen(line) < 2) {                                  // skip empty line
             continue;
@@ -100,12 +101,16 @@ void NetworkSettings::loadOnRaspbian(void)
     loadWpaSupplicant();
     replaceIPonDhcpIface();
     
+    loadHostname();
+    
     dumpSettings();
 }
 
 void NetworkSettings::saveOnRaspbian(void)
 {
     Debug::out(LOG_DEBUG, "NetworkSettings::saveOnRaspbian()");
+    saveHostname();
+
     saveDhcpcdRaspbian();
     raspbianSaveToNetworkInterfaces();
     
@@ -143,7 +148,6 @@ void NetworkSettings::writeNetInterfaceSettingsRaspbian(FILE *f, TNetInterface *
 {
     bool isWlan = (iface == &wlan0);
 
-    fprintf(f, "auto %s\n", ifaceName);                 // not sure if this is still needed, but in the past if eth0 didn't had this, it didn't start automatically
     fprintf(f, "allow-hotplug %s\n", ifaceName);
 
     fprintf(f, "iface %s inet %s\n", ifaceName, iface->dhcpNotStatic ? "dhcp" : "manual");

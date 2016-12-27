@@ -190,7 +190,7 @@ void ConfigStream::createScreen_network(void)
 	comp = new ConfigComponent(this, ConfigComponent::label, "Hostname",	10,	col0x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	10, col2x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_HOSTNAME);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_ALLOW_NUMBERS);
     screen.push_back(comp);
@@ -642,26 +642,26 @@ void ConfigStream::onTranslated_save(void)
 void ConfigStream::onNetwork_save(void)
 {
 	// for eth0
-    std::string ip, mask, gateway;
-    bool useDhcp;
+    std::string eIp, eMask, eGateway;
+    bool eUseDhcp;
 
 	// for wlan0
-    std::string ip2, mask2, gateway2;
-    bool useDhcp2, wifiIsEnabled;
+    std::string wIp, wMask, wGateway;
+    bool wUseDhcp, wifiIsEnabled;
 	
 	std::string dns, hostname;
 
     // read the settings from components
-    getBoolByComponentId(COMPID_NET_DHCP,		useDhcp);
-    getTextByComponentId(COMPID_NET_IP,			ip);
-    getTextByComponentId(COMPID_NET_MASK,		mask);
-    getTextByComponentId(COMPID_NET_GATEWAY,	gateway);
+    getBoolByComponentId(COMPID_NET_DHCP,		eUseDhcp);
+    getTextByComponentId(COMPID_NET_IP,			eIp);
+    getTextByComponentId(COMPID_NET_MASK,		eMask);
+    getTextByComponentId(COMPID_NET_GATEWAY,	eGateway);
 
     getBoolByComponentId(COMPID_WIFI_ENABLE,    wifiIsEnabled);
-    getBoolByComponentId(COMPID_WIFI_DHCP,		useDhcp2);
-    getTextByComponentId(COMPID_WIFI_IP,		ip2);
-    getTextByComponentId(COMPID_WIFI_MASK,		mask2);
-    getTextByComponentId(COMPID_WIFI_GATEWAY,	gateway2);
+    getBoolByComponentId(COMPID_WIFI_DHCP,		wUseDhcp);
+    getTextByComponentId(COMPID_WIFI_IP,		wIp);
+    getTextByComponentId(COMPID_WIFI_MASK,		wMask);
+    getTextByComponentId(COMPID_WIFI_GATEWAY,	wGateway);
 
     getTextByComponentId(COMPID_NET_DNS,		dns);
     getTextByComponentId(COMPID_HOSTNAME,       hostname);
@@ -670,30 +670,38 @@ void ConfigStream::onNetwork_save(void)
         hostname = "CosmosEx";
     }
 
-    // verify the settings for eth0
-    if(!useDhcp) {          // but verify settings only when not using dhcp
-        bool a,b,c,d;
-
-        a = verifyAndFixIPaddress(ip,       ip,         false);
-        b = verifyAndFixIPaddress(mask,     mask,       false);
-        c = verifyAndFixIPaddress(dns,      dns,        true);
-        d = verifyAndFixIPaddress(gateway,  gateway,    true);
-
-        if(!a || !b || !c || !d) {
-            showMessageScreen("Warning", "Some ethernet network address has invalid format.\n\rPlease fix this and try again.");
+    if(!eUseDhcp || !wUseDhcp) {    // if ethernet or wifi doesn't use DHCP, we must receive also DNS settings
+        bool a = verifyAndFixIPaddress(dns, dns, false);
+        
+        if(!a) {
+            showMessageScreen("Warning", "If ethermet or wifi doesn't use DHCP,\n\ryou must specify a valid DNS!\n\rPlease fix this and try again.");
             return;
         }
     }
 
-    if(!useDhcp2) {          // but verify settings only when not using dhcp
+    // verify the settings for eth0
+    if(!eUseDhcp) {             // but verify settings only when not using dhcp
         bool a,b,c;
 
-        a = verifyAndFixIPaddress(ip2,       ip2,         false);
-        b = verifyAndFixIPaddress(mask2,     mask2,       false);
-        c = verifyAndFixIPaddress(gateway2,  gateway2,    true);
+        a = verifyAndFixIPaddress(eIp,      eIp,        false);
+        b = verifyAndFixIPaddress(eMask,    eMask,      false);
+        c = verifyAndFixIPaddress(eGateway, eGateway,   false);
 
         if(!a || !b || !c) {
-            showMessageScreen("Warning", "Some wifi network address has invalid format.\n\rPlease fix this and try again.");
+            showMessageScreen("Warning", "Some ethernet network address\n\rhas invalid format or is empty.\n\rPlease fix this and try again.");
+            return;
+        }
+    }
+
+    if(!wUseDhcp) {             // but verify settings only when not using dhcp
+        bool a,b,c;
+
+        a = verifyAndFixIPaddress(wIp,       wIp,         false);
+        b = verifyAndFixIPaddress(wMask,     wMask,       false);
+        c = verifyAndFixIPaddress(wGateway,  wGateway,    false);
+
+        if(!a || !b || !c) {
+            showMessageScreen("Warning", "Some wifi network address\n\rhas invalid format or is empty.\n\rPlease fix this and try again.");
             return;
         }
     }
@@ -707,12 +715,12 @@ void ConfigStream::onNetwork_save(void)
     nsNew.nameserver   = dns;
     nsNew.hostname     = hostname;
 
-    nsNew.eth0.dhcpNotStatic = useDhcp;
+    nsNew.eth0.dhcpNotStatic = eUseDhcp;
 
-    if(!useDhcp) {                      // if not using dhcp, store also the network settings
-        nsNew.eth0.address = ip;
-        nsNew.eth0.netmask = mask;
-        nsNew.eth0.gateway = gateway;
+    if(!eUseDhcp) {                     // if not using dhcp, store also the network settings
+        nsNew.eth0.address = eIp;
+        nsNew.eth0.netmask = eMask;
+        nsNew.eth0.gateway = eGateway;
     }
 
     nsNew.wlan0.isEnabled = wifiIsEnabled;
@@ -720,12 +728,12 @@ void ConfigStream::onNetwork_save(void)
     getTextByComponentId(COMPID_WIFI_SSID,  nsNew.wlan0.wpaSsid);
     getTextByComponentId(COMPID_WIFI_PSK,   nsNew.wlan0.wpaPsk);
 
-    nsNew.wlan0.dhcpNotStatic = useDhcp2;
+    nsNew.wlan0.dhcpNotStatic = wUseDhcp;
 
-    if(!useDhcp2) {                     // if not using dhcp, store also the network settings
-        nsNew.wlan0.address = ip2;
-        nsNew.wlan0.netmask = mask2;
-        nsNew.wlan0.gateway = gateway2;
+    if(!wUseDhcp) {                     // if not using dhcp, store also the network settings
+        nsNew.wlan0.address = wIp;
+        nsNew.wlan0.netmask = wMask;
+        nsNew.wlan0.gateway = wGateway;
     }
 
     //-------------------------

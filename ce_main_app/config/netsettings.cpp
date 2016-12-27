@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "../debug.h"
 #include "../settings.h"
@@ -222,6 +223,8 @@ void NetworkSettings::loadWpaSupplicant(void)
         if(!res) {                                              // if failed to get the line
             break;
         }
+
+        removeEol(line);                                        // remove EOL from string
         
         char *p;
         
@@ -327,4 +330,101 @@ bool NetworkSettings::wlan0IsDifferentThan(NetworkSettings &other)
 
     // if came here, nothing changed
     return false;
+}
+
+void NetworkSettings::loadHostname(void)
+{
+    hostname = "CosmosEx";                  // default hostname
+
+    FILE *f = fopen("/etc/hostname", "rt");
+
+    if(!f) {                                // failed to open file? fail
+        return;
+    }
+
+    char tmpStr[33];
+    memset(tmpStr, 0, sizeof(tmpStr));
+    
+    char *pRes = fgets(tmpStr, 32, f);      // try to read the hostname
+    fclose(f);
+
+    if(!pRes) {                             // failed to get the line? fail
+        return;
+    }
+
+    removeEol(tmpStr);                      // remove EOL from string
+    hostname = tmpStr;                      // store the hostname    
+}
+
+void NetworkSettings::saveHostname(void)
+{
+    //----------------------------
+    // update hostname
+    FILE *f = fopen("/etc/hostname", "wt");
+
+    if(!f) {                                    // failed to open file? fail
+        return;
+    }
+
+    fprintf(f, "%s", hostname.c_str());         // write the hostname
+    fclose(f);
+
+    //----------------------------
+    // update hosts
+    f = fopen("/etc/hosts", "rt");              // current file for reading
+
+    if(!f) {
+        return;
+    }
+
+    FILE *g = fopen("/etc/hosts.new", "wt");    // new file for writing
+
+    if(!g) {
+        fclose(f);
+        return;
+    }
+
+    // first write two ip/names for our localhost
+    fprintf(g, "127.0.0.1\tlocalhost\n");
+    fprintf(g, "127.0.0.1\t%s\n", hostname.c_str());
+
+    // then copy the rest from current /etc/hosts
+    char inLine[256];
+    while(!feof(f)) {                           // while there is something in the file   
+        memset(inLine, 0, sizeof(inLine));  
+        char *pRes = fgets(inLine, 255, f);     // read it
+
+        if(!pRes) {                             // failed to read? try again
+            continue;
+        }
+
+        if(strlen(inLine) < 2) {                // line seems to be too short? try again
+            continue;            
+        }
+
+        if(strncmp(inLine, "127.0.0.1", 9) == 0) {  // if it's the old localhosts, skip it
+            continue;            
+        }
+
+        fputs(inLine, g);                       // if came here, it's a valid line, reuse it
+    }
+
+    fclose(f);
+    fclose(g);
+    
+    //-----------------------
+    unlink("/etc/hosts");                       // delete current hosts file
+    rename("/etc/hosts.new", "/etc/hosts");     // rename .new hosts file to correct name
+}
+
+void NetworkSettings::removeEol(char *str)
+{
+    while(*str != 0) {                          // while we're not at the end of string
+        if(*str == '\r' || *str == '\n') {      // if it's new line / end of line
+            *str = 0;                           // it's the new end of this string, quit
+            break;
+        }
+
+        str++;                                  // move to next char
+    }
 }

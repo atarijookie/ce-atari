@@ -61,6 +61,9 @@ private:
     void loadNameserver(void);
     void saveNameserver(void);
     
+    void loadHostname(void);
+    void saveHostname(void);
+    
     void saveDhcpcdRaspbian(void);
     void writeDhcpcdSettingsRaspbian(FILE *f, TNetInterface *iface, const char *ifaceName);
     
@@ -73,6 +76,8 @@ private:
     void replaceIPonDhcpIface(void);
     
     int  ipNetmaskToCIDRnetmask(const char *ipNetmask);
+    
+    void removeEol(char *str);
 };
 
 #endif
