@@ -1,0 +1,5 @@
+Makefile to build FFmpeg on RPi and make a binary package to be distributed.
+
+install_ffmpeg.sh is a shell script to be run on devices which check if the
+right version of FFmpeg is already installed in /usr/local/bin.
+If not, the packages is downloaded and installed.
