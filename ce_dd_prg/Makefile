@@ -74,7 +74,7 @@ $(TARGET): $(STARTUP) $(OBJS) $(OBJS030)
 	$(CC_LINK) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 	$(AT)$(STRIP) -s $@
 	$(AT)$(PRGFLAGS) $@ --mno-fastram --mno-fastalloc --mno-fastload
-	
+
 %030.o: %030.s
 	$(AS) $(ASFLAGS030) -c -o $@ $<
 
