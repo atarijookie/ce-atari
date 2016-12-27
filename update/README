@@ -1,0 +1,10 @@
+This directory contains the Makefile to build the app.zip package.
+
+Make sure you have the GNU Mtools https://www.gnu.org/software/mtools/ available
+to build the .ST floppy disk images.
+
+It supposes the ATARI programs and the ce_main_app are built.
+To do so, use "make atari_progs" on a PC with cross compiler to build
+the ATARI programs, and build both cosmosex_yocto and cosmosex_raspbian
+on a RPi.
+The cosmosex_* main app should be put in ce_main_app directory.
