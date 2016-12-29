@@ -18,7 +18,7 @@ BASEURL=http://nanard.free.fr/CosmosEx/
 
 if [ -f "${FFMPEG_BINARY}" ] && [ -x "${FFMPEG_BINARY}" ] ; then
 	INSTALLED_VERSION=$(${FFMPEG_BINARY} -version |head -n 1 | cut -f 3 -d ' ')
-	if [ "${INSTALLED_VERSION}" == "${VERSION_FFMPEG}" ] ; then
+	if [ "${INSTALLED_VERSION}" = "${VERSION_FFMPEG}" ] ; then
 		echo "FFmpeg version ${INSTALLED_VERSION} is already installed"
 		exit 0
 	fi
