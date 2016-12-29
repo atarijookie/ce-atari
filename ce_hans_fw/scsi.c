@@ -3,10 +3,15 @@
 #include "mmc.h"
 #include "bridge.h"
 #include "eeprom.h"
+#include "timers.h"
 
 extern BYTE cmd[14];									// received command bytes
 extern BYTE cmdLen;										// length of received command
 extern BYTE brStat;										// status from bridge
+extern BYTE pioReadFailed;
+
+WORD sdErrorCountWrite;                     // counter of failed SD writes
+WORD sdErrorCountRead;                      // counter of failed SD reads
 
 extern TDevice sdCard;
 extern BYTE sdCardID;
@@ -80,7 +85,9 @@ void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun)
     DWORD sector = 0, sectorEnd = 0;
     WORD lenX = 0;
     BYTE res = 0;
-    BYTE handled = FALSE;
+    BYTE handled    = FALSE;
+    BYTE wasRead    = FALSE;
+    BYTE wasWrite   = FALSE;
 
     // if it's 6 byte RW command
     if(justCmd == SCSI_C_WRITE6 || justCmd == SCSI_C_READ6) {
@@ -123,26 +130,24 @@ void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun)
     
     // for sector read commands
     if(justCmd == SCSI_C_READ6 || justCmd == SCSI_C_READ10) {
-        TIM3->ARR = CMD_TIMEOUT_LONG;       // for SD read, set extra long timeout value
+        timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_LONG);    // for SD access, set extra long timeout value
 
-        res = mmcRead_dma(sector, lenX);    // read data
+        res = mmcRead_dma(sector, lenX);                        // read data
         handled = TRUE;
+        wasRead = TRUE;
 
-        TIM3->CNT = 0;                      // timer back to zero
-        TIM3->SR  = 0xfffe;                 // clear UIF flag
-        TIM3->ARR = CMD_TIMEOUT_SHORT;      // after read restore short timeout value
+        timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);   // after SD access restore short timeout value
     }
     
     // for sector write commands
     if(justCmd == SCSI_C_WRITE6 || justCmd == SCSI_C_WRITE10) {
-        TIM3->ARR = CMD_TIMEOUT_LONG;       // for SD write, set extra long timeout value
+        timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_LONG);    // for SD access, set extra long timeout value
 
-        res = mmcWrite_dma(sector, lenX);
+        res = mmcWrite_dma(sector, lenX);                       // write data
         handled = TRUE;
+        wasWrite = TRUE;
 
-        TIM3->CNT = 0;                      // timer back to zero
-        TIM3->SR  = 0xfffe;                 // clear UIF flag
-        TIM3->ARR = CMD_TIMEOUT_SHORT;      // after write restore short timeout value
+        timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);   // after SD access restore short timeout value
     }
     
     // return status for read and write command
@@ -156,16 +161,26 @@ void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun)
             PIO_read(sdCard.LastStatus);                            // send status byte, long time-out
         }
     }
-    
+
+    if(res != 0 || pioReadFailed) {     // if the result was BAD, or PIO read was BAD
+        if(wasRead) {                   // on failed read, increment this counter
+            sdErrorCountRead++;
+        }
+
+        if(wasWrite) {                  // on failed write, increment that counter
+            sdErrorCountWrite++;
+        }
+    }
+
     // verify command handling
     if(justCmd == SCSI_C_VERIFY) {
         res = mmcCompareMore(sector, lenX);                         // compare sectors
         
         if(res != 0) {
-   			sdCard.LastStatus   = SCSI_ST_CHECK_CONDITION;
-			sdCard.SCSI_SK      = SCSI_E_Miscompare;
-		
-			PIO_read(sdCard.LastStatus);                            // send status byte
+            sdCard.LastStatus   = SCSI_ST_CHECK_CONDITION;
+            sdCard.SCSI_SK      = SCSI_E_Miscompare;
+        
+            PIO_read(sdCard.LastStatus);                            // send status byte
         } else {
             scsi_sendOKstatus();
         }
@@ -194,7 +209,7 @@ void processScsiOther(BYTE justCmd, BYTE isIcd, BYTE lun)
             SCSI_Inquiry(lun);                     
             return;
 
-		//----------------------------------------------------
+        //----------------------------------------------------
         default:  
             sdCard.LastStatus   = SCSI_ST_CHECK_CONDITION;
             sdCard.SCSI_SK      = SCSI_E_IllegalRequest;
@@ -203,7 +218,7 @@ void processScsiOther(BYTE justCmd, BYTE isIcd, BYTE lun)
 
             PIO_read(sdCard.LastStatus);   // send status byte
             break;
-	}
+    }
 }
 
 void scsi_sendOKstatus(void)
@@ -460,8 +475,9 @@ void scsi_log_add(void)
 void memcpy(char *dest, char *src, int cnt)
 {
     int i;
-    
+
     for(i=0; i<cnt; i++) {
         dest[i] = src[i];
     }
 }
+

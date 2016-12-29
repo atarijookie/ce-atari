@@ -31,8 +31,10 @@ void logMsg(char *logMsg);
 void deleteErrorLines(void);
 void speedTest(BYTE CEnotCS);
 void generateDataOnPartition(void);
+void doPartitionWriteOrVerify(BYTE writeNotVerify, BYTE testDrive, int testFileSizeMb, int testFileCount);
 
 void scanBusForCE(void);
+void getSDcardErrorCounters(BYTE doReset);
 //--------------------------------------------------
 BYTE deviceID, sdCardId;
 BYTE isCEnotCS;
@@ -45,6 +47,9 @@ BYTE commandLong [CMD_LENGTH_LONG ] = {0x1f, 0xA0, 'C', 'E', HOSTMOD_TRANSLATED_
 BYTE readBuffer [256 * 512];
 BYTE writeBuffer[256 * 512];
 BYTE *rBuffer, *wBuffer;
+
+extern WORD sdErrorCountWrite;
+extern WORD sdErrorCountRead;
 
 BYTE prevCommandFailed;
 
@@ -82,6 +87,7 @@ void testDataReliability(BYTE CEnotCS);
 void testContinousRead  (BYTE CEnotCS, BYTE testReadNotSDcard);
 
 void showTestName(char letter, BYTE doShow, const char *testTitle);
+void getSDinfo(void);
 
 //--------------------------------------------------
 int main(void)
@@ -164,32 +170,44 @@ int main(void)
     while(1) {
         VT52_Clear_home();
 
+        getSDinfo();
+        
         if(isCEnotCS) {                 // got full CE
-            (void) Cconws("Device type  : CosmosEx\r\n");
+            (void) Cconws("Device type: CosmosEx\r\n");
             
-            (void) Cconws("CE bus ID    : ");
+            (void) Cconws("CE ID: ");
             Cconout('0' + deviceID);
-            (void) Cconws("\r\n");
             
-            (void) Cconws("SD bus ID    : ");
+            (void) Cconws("     SD ID: ");
             
             if(sdCardId == 0xff) {      // SD card not present on bus?
-                (void) Cconws("not present on bus");
+                (void) Cconws("no");
             } else {
                 Cconout('0' + sdCardId);
             }
-            (void) Cconws("\r\n");
         } else {                        // got only CS?
-            (void) Cconws("Device type  : CosmoSolo\r\n");
+            (void) Cconws("Device type: CosmoSolo\r\n");
             
-            (void) Cconws("CS bus ID    : ");
+            (void) Cconws("CS ID: ");
             Cconout('0' + deviceID);
-            (void) Cconws("\r\n");
+            (void) Cconws("");
         }
 
-        (void) Cconws("SD is present: ");
+        (void) Cconws("     SD in: ");
         if(sdCardPresent) {
             (void) Cconws("YES\r\n");
+
+            //------
+            // if SD is present, show also SD read/write error counters
+            getSDcardErrorCounters(FALSE);
+
+            (void) Cconws("SD error on WRITE: ");
+            showInt(sdErrorCountWrite, 4);            
+
+            (void) Cconws(", on READ: ");
+            showInt(sdErrorCountRead, 4);            
+            
+            (void) Cconws("\r\n");
         } else {
             (void) Cconws("NO\r\n");
         }
@@ -232,7 +250,7 @@ int main(void)
         (void) Cconws(" error report\r\n");
 
         (void) Cconws("[R] - rescan bus for CE\r\n");
-
+        showTestName('X', sdCardPresent, "clear SD card error counters");
         (void) Cconws("[Q] - quit\r\n");
 
         key = Cnecin();
@@ -271,8 +289,11 @@ int main(void)
         }
         
         // this works only when SD card is present
-        if(key == 's' && sdCardPresent) {
-            testContinousRead(FALSE, 0);        // SD card continous read
+        if(sdCardPresent) {
+            switch(key) {
+                case 's': testContinousRead(FALSE, 0);  break;  // SD card continous read
+                case 'x': getSDcardErrorCounters(TRUE); break;  // clear SD card read/write error counters
+            }
         }
         
         if(deviceID == 0xff) {                  // no device ID? quit
@@ -352,8 +373,37 @@ void generateDataOnPartition(void)
     VT52_Clear_home();
     (void) Cconws("Generated data on GEMDOS partition\r\n");
 
-    BYTE writeNotVerify = showQuestionGetBool("Write data or verify data  : W/V", 'w', "WRITE", 'v', "VERIFY");
+        // show question
+    (void) Cconws("Data write, verify or both : W/V/B ");
 
+    BYTE testType;
+    while(1) {
+        testType = Cnecin();
+
+        if(testType >= 'A' && testType <= 'Z') {    // upper case letter? to lower case
+            testType += 32;
+        }
+
+        if(testType == 'w') {                       // write
+            (void) Cconws("WRITE\r\n");
+            break;
+        }
+
+        if(testType == 'v') {                        // verify
+            (void) Cconws("VERIFY\r\n");
+            break;
+        }
+
+        if(testType == 'b') {                        // write and verify
+            (void) Cconws("BOTH\r\n");
+            break;
+        }
+        
+        if(testType == 'q') {                        // quit?
+            return;
+        }
+    }
+    
     //----------
     // choose drive for testing
     WORD drives = Drvmap();
@@ -424,7 +474,36 @@ void generateDataOnPartition(void)
         }
     }
 
+    switch(testType) {
+        // write
+        case 'w':   doPartitionWriteOrVerify(TRUE,  testDrive, testFileSizeMb, testFileCount); break;
+        
+        // verify
+        case 'v':   doPartitionWriteOrVerify(FALSE, testDrive, testFileSizeMb, testFileCount); break;
+        
+        // both
+        case 'b':   doPartitionWriteOrVerify(TRUE,  testDrive, testFileSizeMb, testFileCount);
+                    doPartitionWriteOrVerify(FALSE, testDrive, testFileSizeMb, testFileCount);
+                    break;
+    }
+    
+    (void) Cconws("\r\nDone. Press any key to continue.\r\n");
+    Cnecin();
+}
+
+void doPartitionWriteOrVerify(BYTE writeNotVerify, BYTE testDrive, int testFileSizeMb, int testFileCount)
+{
+    int i, j;
     int fileSizeInBuffers = testFileSizeMb * 8;     // 8 write buffers per MB -> total buffers per whole file size
+    
+    (void) Cconws("\r\n");
+    VT52_Wrap_on();
+    
+    int times[26];
+    for(i=0; i<26; i++) {
+        times[i] = 0;
+    }
+    
     for(i=0; i<testFileCount; i++) {                // for all files
         char testFilePath[32] = "X:\\TSTFILEY.BIN"; // pattern for filename
         
@@ -469,6 +548,8 @@ void generateDataOnPartition(void)
                         diff = 25;
                     }
 
+                    times[diff]++;
+                    
                     Cconout('A' + diff);
                 } else {                            // something not written? fail
                     (void) Cconws("-");
@@ -493,9 +574,21 @@ void generateDataOnPartition(void)
         Fclose(f);                                  // close file
         (void) Cconws("\r\n");
     }
-
-    (void) Cconws("\r\nDone. Press any key to continue.\r\n");
-    Cnecin();
+    
+    // if it's a write, show also times count table
+    if(writeNotVerify) {
+        (void) Cconws("\r\nWrite time counts:\r\n");
+        for(i=0; i<26; i++) {
+            if(times[i] == 0) {         // skip times which did not occur
+                continue;
+            }
+            
+            Cconout('A' + i);
+            (void) Cconws(": ");
+            showInt(times[i], 3);            
+            (void) Cconws("\r\n");
+        }
+    }
 }
 
 void scsi_reset(void);

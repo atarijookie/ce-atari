@@ -30,6 +30,11 @@ BYTE ce_identify    (BYTE ACSI_id);
 BYTE cs_inquiry     (BYTE id);
 void hdIfCmdAsUser  (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 
+WORD sdErrorCountWrite;
+WORD sdErrorCountRead;
+
+void getSDinfo(void);
+
 //----------------------------
 WORD getTOSversion(void)
 {
@@ -93,18 +98,7 @@ void scanBusForCE(void)
     commandLong[0] = (deviceID << 5) | 0x1f;
     //----------------------
     // got the device, time to get more info from it
-    if(isCEnotCS) {                             // if it's CE
-        sdCardId = getSDcardId(TRUE);           // get SD card ID from CE
-        
-        if(sdCardId != 0xff) {                  // if the SD card ID is configured
-            sdCardId = getSDcardId(FALSE);      // now use that SD card ID to talk to CS and get if card is present
-        } else {                                // SD card ID not configured? SD card not present
-            sdCardPresent = FALSE;
-        }
-    } else {                                    // if it's CS
-        sdCardId = deviceID;                    // the SD card ID is the same as device ID
-        getSDcardId(FALSE);                     // now use that SD card ID to talk to CS and get if card is present
-    }
+    getSDinfo();
 }
 
 //----------------------------
@@ -263,10 +257,11 @@ BYTE getSDcardId(BYTE fromCEnotCS)
 
         hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);
     } else {                    // for CS
-        commandLong[0  ] = (sdCardId << 5) | 0x1f;                      // SD card device ID
-        commandLong[3  ] = 'S';                                         // for CS
-        commandLong[4+1] = TEST_GET_ACSI_IDS;
-
+        commandLong[0] = (sdCardId << 5) | 0x1f;                        // SD card device ID
+        commandLong[3] = 'S';                                           // for CS
+        commandLong[5] = TEST_GET_ACSI_IDS;
+        commandLong[6] = 0;                                             // don't reset SD error counters
+        
         hdIfCmdAsUser(ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, 1);        
     }
     
@@ -288,3 +283,50 @@ BYTE getSDcardId(BYTE fromCEnotCS)
     return 0xff;                                // SD card ACSI ID not found
 }
 
+//--------------------------------------------------
+void getSDcardErrorCounters(BYTE doReset)
+{
+    // init counters - we might not be able to get them
+    sdErrorCountWrite   = 0;
+    sdErrorCountRead    = 0;
+
+    if(sdCardId == 0xff) {                      // if the SD card ID is not configured, don't do anything
+        return;
+    }
+
+    commandLong[0] = (sdCardId << 5) | 0x1f;    // SD card device ID
+    commandLong[3] = 'S';                       // for CS
+    commandLong[5] = TEST_GET_ACSI_IDS;
+
+    if(doReset) {                               // do reset?
+        commandLong[6] = 'R';
+    } else {                                    // don't do reset?
+        commandLong[6] = 0;
+    }
+
+    hdIfCmdAsUser(ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, 1);        
+
+    if(!hdIf.success || hdIf.statusByte != 0) {                         // if command failed, return -1 (0xff)
+        return;
+    }
+
+    sdErrorCountWrite   = (rBuffer[11] << 8) | rBuffer[12];
+    sdErrorCountRead    = (rBuffer[13] << 8) | rBuffer[14];
+}
+
+//----------------------------------------------------
+void getSDinfo(void)
+{
+    if(isCEnotCS) {                             // if it's CE
+        sdCardId = getSDcardId(TRUE);           // get SD card ID from CE
+        
+        if(sdCardId != 0xff) {                  // if the SD card ID is configured
+            sdCardId = getSDcardId(FALSE);      // now use that SD card ID to talk to CS and get if card is present
+        } else {                                // SD card ID not configured? SD card not present
+            sdCardPresent = FALSE;
+        }
+    } else {                                    // if it's CS
+        sdCardId = deviceID;                    // the SD card ID is the same as device ID
+        getSDcardId(FALSE);                     // now use that SD card ID to talk to CS and get if card is present
+    }
+}

@@ -18,8 +18,15 @@ extern BYTE firstConfigReceived;
 
 extern BYTE enabledIDs[8];      // when 1, Hanz will react on that ACSI ID #
 extern BYTE sdCardID;
+extern WORD sdErrorCountWrite;
+extern WORD sdErrorCountRead;
 
 void updateEnabledIDsInSoloMode(void);
+
+#define SPIBUFSIZE  520
+extern BYTE spiTxBuff[SPIBUFSIZE];
+
+void memset(BYTE *dest, BYTE value, int count);
 
 void processCosmoSoloCommands(BYTE isIcd)
 {
@@ -142,7 +149,12 @@ BYTE soloTestGetACSIids(void)
     BYTE id=0;
     BYTE i;
 
-    ACSI_DATADIR_READ();
+    if(cmd[6] == 'R') {                                 // if command argument is 'R', then reset SD error counters also
+        sdErrorCountWrite   = 0;
+        sdErrorCountRead    = 0;
+    }
+
+    memset(spiTxBuff, 0, 16);                           // clear the buffer before using, so we don't have to clear the padding in the end
 
     // bytes 0..7
     for(id=0; id<8; id++) {                             // now store it one after another to buffer
@@ -160,21 +172,32 @@ BYTE soloTestGetACSIids(void)
             fakeDevType = DEVTYPE_OFF;
         }
 
-        DMA_read(fakeDevType);                          // return the (fake) device type
+        spiTxBuff[id] = fakeDevType;                    // store the (fake) device type
     }
 
-    // byte 8
-    DMA_read(enabledIdsBits);                           // store the enabled ACSI IDs
+    spiTxBuff[8]    = enabledIdsBits;                   // store the enabled ACSI IDs
 
     // bytes 9 and 10
-    DMA_read(sdCardID);                                 // store the SD card ID
-    DMA_read(sdCard.IsInit);                            // store if the SD card is present and initialized
+    spiTxBuff[9]    = sdCardID;                         // store the SD card ID
+    spiTxBuff[10]   = sdCard.IsInit;                    // store if the SD card is present and initialized
 
-    // we previously sent too few bytes to ST, so now we need to fill it up to 16 bytes so we can safely get it from DMA chip into ST
-    for(i=0; i<5; i++) {                                // pad to multiple of 16
-        DMA_read(0);
+    spiTxBuff[11]   = (BYTE) (sdErrorCountWrite >> 8);
+    spiTxBuff[12]   = (BYTE) (sdErrorCountWrite     );
+
+    spiTxBuff[13]   = (BYTE) (sdErrorCountRead >> 8);
+    spiTxBuff[14]   = (BYTE) (sdErrorCountRead     );
+
+    //-------------
+    // now transfer the buffer to ST
+    ACSI_DATADIR_READ();
+
+    for(i=0; i<16; i++) {
+        DMA_read(spiTxBuff[i]);
+
+        if(brStat != E_OK) {                            // if transfer failed, quit with error
+            return FALSE;
+        }
     }
 
     return TRUE;
 }
-

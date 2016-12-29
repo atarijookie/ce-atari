@@ -49,7 +49,7 @@ void timerSetup_cmdTimeout(void)
     TIM_TimeBaseStructure.TIM_ClockDivision     = 0;
     TIM_TimeBaseStructure.TIM_CounterMode       = TIM_CounterMode_Up;
     TIM_TimeBaseStructure.TIM_RepetitionCounter	= 0;
-	
+
     TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
     TIM_ARRPreloadConfig(TIM3, DISABLE);                            // disable preloading
 
@@ -57,3 +57,13 @@ void timerSetup_cmdTimeout(void)
     TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);                      // enable int from this timer
 }
 
+void timerSetup_cmdTimeoutChangeLength(uint16_t newPeriod)
+{
+    TIM_Cmd(TIM3, DISABLE);                     // disable timer
+
+    TIM3->CNT = 0;                              // timer back to zero
+    TIM3->SR  = 0xfffe;                         // clear UIF flag
+    TIM3->ARR = newPeriod;                      // set new timeout value
+
+    TIM_Cmd(TIM3, ENABLE);                      // enable timer
+}

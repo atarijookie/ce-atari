@@ -114,10 +114,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa016, 0x1223};                             // this means: hAns, 2016-12-23
+WORD version[2] = {0xa016, 0x1229};                             // this means: hAns, 2016-12-29
 
 char *VERSION_STRING_SHORT  = {"2.10"};
-char *DATE_STRING           = {"12/23/16"};
+char *DATE_STRING           = {"12/29/16"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
@@ -258,7 +258,7 @@ int main(void)
     
     getXilinxStatus();
     resetXilinx();
-    
+
     if(hwVersion != 2) {                    // for v.1 -- turn off MCO output
         GPIOA->CRH &= ~(0x0000000f);        // remove bits from GPIOA
         GPIOA->CRH |=   0x00000004;         // turn off MCO output on PA8 - leave it as floating input
@@ -1768,3 +1768,13 @@ void cmdLog_onEnd(void)
     }
 }
 #endif
+
+void memset(BYTE *dest, BYTE value, int count)
+{
+    int i;
+
+    for(i=0; i<count; i++) {
+        dest[i] = value;
+    }
+}
+

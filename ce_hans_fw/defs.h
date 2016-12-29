@@ -143,11 +143,12 @@ GPIOC_14 - card detect
 //#define DO_LOG_ERROR
 
 #ifdef DO_LOG_ERROR
-		extern BYTE singleLastErr;
+    extern BYTE singleLastErr;
     extern BYTE lastErr[32];
-		extern BYTE lastErrIndex;
-		
-    #define LOG_ERROR(X)    { singleLastErr = X; lastErr[lastErrIndex] = X; lastErrIndex++; if(lastErrIndex >= 32) lastErrIndex = 0; }
+    extern BYTE lastErrIndex;
+        
+    #define LOG_ERROR(X)    { singleLastErr = X; }
+//  #define LOG_ERROR(X)    { singleLastErr = X; lastErr[lastErrIndex] = X; lastErrIndex++; if(lastErrIndex >= 32) lastErrIndex = 0; }
 #else
     #define LOG_ERROR(X)
 #endif
