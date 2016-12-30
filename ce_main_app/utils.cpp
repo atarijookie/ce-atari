@@ -544,6 +544,7 @@ std::string Utils::getDeviceLabel(const std::string & devicePath)
 		label.replace(pos, 4, 1, (char)c);
 	}
 	return label;
+}
 
 void Utils::splitString(const std::string &s, char delim, std::vector<std::string> &elems) {
     std::stringstream ss;
