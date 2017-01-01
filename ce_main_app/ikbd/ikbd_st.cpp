@@ -117,7 +117,7 @@ void Ikbd::processStCommands(void)
         BYTE cmd = cbStCommands.peek();                         // get the data, but don't move the get pointer, because we might fail later
         int len = 0;
 
-        if((cmd & 0x80) == 0) {                                 // highest bit is 0? SET command
+        if(cmd == STCMD_RESET || (cmd & 0x80) == 0) {           // reset or highest bit is 0? SET command
             len = stCommandLen[cmd];                            // try to get the command length
         } else {                                                // highest bit is 1? GET command
             BYTE setEquivalent = cmd & 0x7f;                    // get the equivalent SET command (remove higherst bit)
@@ -147,7 +147,7 @@ void Ikbd::processStCommands(void)
         }
 
         if(len > cbStCommands.count) {                          // if we don't have enough data in the buffer, quit
-            ikbdLog( "Ikbd::processStCommands -- not enough data in buffer, quitting (%d > %d)", len, cbStCommands.count);
+            //ikbdLog( "Ikbd::processStCommands -- not enough data in buffer, quitting (%d > %d)", len, cbStCommands.count);
             return;
         }
 
@@ -161,7 +161,7 @@ void Ikbd::processStCommands(void)
             outputEnabled = true;
         }
 
-		if((cmd & 0x80) != 0) {									// is it a GET command?
+        if(cmd != STCMD_RESET && (cmd & 0x80) != 0) {			// is it a GET command?
 			processGetCommand(cmd);
 			continue;
 		}
@@ -170,18 +170,15 @@ void Ikbd::processStCommands(void)
             // other commands
             //--------------------------------------------
             case STCMD_RESET:                           // reset keyboard - set everything to default values
+            if (bfr[1] != 0x01) {
+                ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_RESET but not followed by 0x01, skipping");
+                break;
+            }
+
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_RESET");
 
             resetInternalIkbdVars();
-			
-			if(ceIkbdMode != CE_IKBDMODE_SOLO) {		// if we're not in solo mode, don't answer
-				break;
-			}
-
-			BYTE derp[2];
-			derp[0] = 0xf0;
-			
-			fdWrite(fdUart, derp, 1);					// send report that everything is OK 
+            // there's nothing more to do, the IKBD will send "0xF?" as reply and we just pass it forward
             break;
 
             //--------------------------------------------
@@ -352,6 +349,16 @@ void Ikbd::processStCommands(void)
 
             mouseEnabled = false;
             break;
+
+        default: {
+            char str[256] = "Ikbd::processStCommands -- ignoring ";
+            char tmp[16];
+            for (int i = 0; i < len; ++i) {
+                sprintf(tmp, "%02x ", bfr[i]);
+                strcat(str, tmp);
+            }
+            ikbdLog(str);
+        }
         }
     }
 }
@@ -491,6 +498,8 @@ void Ikbd::processKeyboardData(void)
 
     while(cbKeyboardData.count > 0) {                           // while there are some data, process
         BYTE val = cbKeyboardData.peek();                       // get the data, but don't move the get pointer, because we might fail later
+
+        ikbdLog( "Ikbd::processKeyboardData -- got %02x, cb contains %d bytes", val, cbKeyboardData.count);
 
         if(val >= KEYBDATA_SPECIAL_LOWEST && val <= 0xff) {     // if this a special code?
             BYTE index = val - KEYBDATA_SPECIAL_LOWEST;         // convert it to table index
@@ -773,5 +782,3 @@ bool Ikbd::handleStKeyAsKeybJoy(BYTE val)
     handleKeyAsKeybJoy(false, joyNumber, stKey, keyDown);   // handle this key press, and it comes from ST keys (therefore first param: false)
     return true;
 }
-
-    
