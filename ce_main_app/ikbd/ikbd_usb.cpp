@@ -539,8 +539,8 @@ void Ikbd::processJoystick(js_event *jse, int joyNumber)
         js->lastDir = dirTotal;
         js->lastBtn = button;
 
-        if(joyNumber == 1 && (mouseMode == MOUSEMODE_REL) && btnChanged) {  // if button state changed, send it as mouse packet
-            sendJoy0State();
+        if(joystickState == EnabledInMouseMode && btnChanged) {  // if button state changed, send it as mouse packet
+            sendJoyButtonsInMouseMode();
         } else {
             sendJoyState(joyNumber, button | dirTotal);                        // report current direction and buttons
         }

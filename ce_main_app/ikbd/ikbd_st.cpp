@@ -191,27 +191,49 @@ void Ikbd::processStCommands(void)
             //////////////////////////////////////////////
             // joystick related commands
             //--------------------------------------------
-            case STCMD_SET_JOYSTICK_EVENT_REPORTING:    // mouse mode: event reporting
+            case STCMD_SET_JOYSTICK_EVENT_REPORTING:    // joystick mode: event reporting
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_JOYSTICK_EVENT_REPORTING");
 
             joystickMode = JOYMODE_EVENT;
-            joystickEnabled = true;
+            joystickState = Enabled;
             break;
 
             //--------------------------------------------
-            case STCMD_SET_JOYSTICK_INTERROG_MODE:      // mouse mode: interrogation mode
+            case STCMD_SET_JOYSTICK_INTERROG_MODE:      // joystick mode: interrogation mode
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_JOYSTICK_INTERROG_MODE");
 
             joystickMode = JOYMODE_INTERROGATION;
-            joystickEnabled = true;
+            joystickState = Enabled;
+            break;
+
+            //--------------------------------------------
+            case STCMD_SET_JOYSTICK_MONITORING:      // joystick mode: monitoring
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_JOYSTICK_MONITORING");
+
+            joystickMode = JOYMODE_MONITORING;
+            joystickState = Enabled;
+            break;
+
+            //--------------------------------------------
+            case STCMD_SET_FIRE_BUTTON_MONITORING:      // joystick mode: fire button monitoring
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_FIRE_BUTTON_MONITORING");
+
+            joystickMode = JOYMODE_FIRE_MONITORING;
+            joystickState = Enabled;
+            break;
+
+            //--------------------------------------------
+            case STCMD_SET_JOYSTICK_KEYCODE_MODE:      // joystick mode: keycode
+            ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_JOYSTICK_KEYCODE_MODE");
+
+            joystickMode = JOYMODE_KEYCODE;
+            joystickState = Enabled;
             break;
 
             //--------------------------------------------
             case STCMD_JOYSTICK_INTERROGATION:
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_JOYSTICK_INTERROGATION");
             
-			joystickEnabled = true;
-			
 			if(ceIkbdMode != CE_IKBDMODE_SOLO) {		// if we're not in solo mode, don't answer (will be handled when the data from keyboard arrive)
 				break;
 			}
@@ -227,7 +249,7 @@ void Ikbd::processStCommands(void)
             case STCMD_DISABLE_JOYSTICKS:               // disable joystick; any valid joystick command enabled joystick
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_DISABLE_JOYSTICKS");
             
-            joystickEnabled = false;
+            joystickState = Disabled;
             break;
    
             //////////////////////////////////////////////
@@ -238,6 +260,7 @@ void Ikbd::processStCommands(void)
             
             mouseMode = MOUSEMODE_REL;
             mouseEnabled = true;
+            joystickState = EnabledInMouseMode;
             break;
 
             //--------------------------------------------
@@ -246,6 +269,7 @@ void Ikbd::processStCommands(void)
 
             mouseMode = MOUSEMODE_KEYCODE;
             mouseEnabled = true;
+            joystickState = EnabledInMouseMode;
             break;
 
             //--------------------------------------------
@@ -254,7 +278,6 @@ void Ikbd::processStCommands(void)
                         
 			relMouse.threshX	= bfr[1];
 			relMouse.threshY	= bfr[2];
-            mouseEnabled = true;
             break;
 			
             //--------------------------------------------
@@ -263,7 +286,6 @@ void Ikbd::processStCommands(void)
             
 			absMouse.scaleX		= bfr[1];
 			absMouse.scaleY		= bfr[2];
-            mouseEnabled = true;
             break;			
             
 			//--------------------------------------------
@@ -281,14 +303,13 @@ void Ikbd::processStCommands(void)
             fixAbsMousePos();                           // if absolute coordinates are out of bounds, fix them
 
             mouseEnabled = true;
+            joystickState = EnabledInMouseMode;
             break;
 
             //--------------------------------------------
 			case STCMD_INTERROGATE_MOUSE_POS:			// get the current absolute mouse position
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_INTERROGATE_MOUSE_POS");
         
-            mouseEnabled = true;
-
 			if(mouseMode != MOUSEMODE_ABS) {			// this is only valid in absolute mouse mode
                 ikbdLog( "Ikbd::processStCommands -- STCMD_INTERROGATE_MOUSE_POS -- not sending anything because not in ABS mouse mode");
 				break;
@@ -316,7 +337,6 @@ void Ikbd::processStCommands(void)
             ikbdLog( "new mouse pos  : [%04x, %04x]", absMouse.x, absMouse.y);
 
             fixAbsMousePos();                           // if absolute coordinates are out of bounds, fix them
-            mouseEnabled = true;
             break;
 
             //--------------------------------------------
@@ -324,7 +344,6 @@ void Ikbd::processStCommands(void)
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_MOUSE_BTN_ACTION - param: %02X", (int) bfr[1]);
             
             mouseAbsBtnAct = bfr[1];					// store flags what we should report
-            mouseEnabled = true;
             break;
 
             //--------------------------------------------
@@ -332,7 +351,6 @@ void Ikbd::processStCommands(void)
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_Y_AT_TOP");
             
             mouseY0atTop = true;
-            mouseEnabled = true;
             break;
 
             //--------------------------------------------
@@ -340,7 +358,6 @@ void Ikbd::processStCommands(void)
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_Y_AT_BOTTOM");
 
             mouseY0atTop = false;
-            mouseEnabled = true;
             break;
 
             //--------------------------------------------
@@ -433,7 +450,7 @@ void Ikbd::processGetCommand(BYTE getCmd)
 		case STCMD_DISABLE_JOYSTICKS:				// report if joystick is disabled
         ikbdLog( "Ikbd::processGetCommand -- STCMD_DISABLE_JOYSTICK");
 
-		bfr[1] = joystickEnabled ? 0 : STCMD_DISABLE_JOYSTICKS;
+        bfr[1] = joystickState != Disabled ? 0 : STCMD_DISABLE_JOYSTICKS;
 		send = true;
 		break;
 
@@ -625,7 +642,7 @@ void Ikbd::sendJoyState(int joyNumber, int dirTotal)
 }
 
 // this can be used to send joystick button states when joystick event reporting is not enabled (it reports joy buttons as mouse buttons)
-void Ikbd::sendJoy0State(void)
+void Ikbd::sendJoyButtonsInMouseMode(void)
 {
     int bothButtons = KEYBDATA_MOUSE_REL8;     // neutral position
     if(joystick[0].lastBtn) {

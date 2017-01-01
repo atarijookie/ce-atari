@@ -86,6 +86,12 @@ public:
     int     fdUart;
 
 private:
+    enum JoystickState {
+        Disabled,
+        EnabledInMouseMode, // joy1 direction works but its button is mapped as mouse; joy0 is treated as mouse
+        Enabled // joy1 and joy0 are treated as joysticks
+    };
+
     int        ceIkbdMode;
 
     bool    outputEnabled;
@@ -126,7 +132,7 @@ private:
 
     int             joystickMode;
     TJoystickState  joystick[2];
-    bool            joystickEnabled;
+    JoystickState   joystickState;
 
     CyclicBuff      cbStCommands;
     CyclicBuff      cbKeyboardData;
@@ -151,7 +157,7 @@ private:
     void processFoundDev(const char *linkName, const char *fullPath);
 
     void resetInternalIkbdVars(void);
-    void sendJoy0State(void);
+    void sendJoyButtonsInMouseMode(void);
     void sendJoyState(int joyNumber, int dirTotal);
     void sendBothJoyReport(void);
     void sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel);

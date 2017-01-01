@@ -270,7 +270,7 @@ void Ikbd::resetInternalIkbdVars(void)
     keycodeMouse.deltaY    = 0;
 
     joystickMode    = JOYMODE_EVENT;
-    joystickEnabled = true;
+    joystickState   = EnabledInMouseMode;
 }
 
 int Ikbd::serialSetup(termios *ts)
