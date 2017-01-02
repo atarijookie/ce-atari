@@ -27,7 +27,7 @@ BYTE setResolution(void);
 void showConnectionErrorMessage(void);
 void showMoreStreamIfNeeded(void);
 
-BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
+BYTE atariKeysToSingleByte(BYTE vkey, BYTE key, int, int);
 BYTE ce_identify(BYTE ACSI_id);
 
 BYTE retrieveIsUpdating    (void);
@@ -319,7 +319,7 @@ void showConnectionErrorMessage(void)
     prevCommandFailed = 1;
 }
 //--------------------------------------------------
-BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
+BYTE atariKeysToSingleByte(BYTE vkey, BYTE key, int shift, int ctrl)
 {
     WORD vkeyKey;
 
@@ -357,13 +357,9 @@ BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
         case 0x011b: return KEY_ESC;
         case 0x537f: return KEY_DELETE;
         case 0x0e08: return KEY_BACKSP;
-        case 0x0f09: return KEY_TAB;
+        case 0x0f09: return shift ? KEY_SHIFT_TAB : KEY_TAB;
         case 0x1c0d: return KEY_ENTER;
         case 0x720d: return KEY_ENTER;
-        case 0x2e03: return KEY_CTRL_C;
-        case 0x250b: return KEY_CTRL_K;
-        case 0x260c: return KEY_CTRL_L;
-        case 0x1615: return KEY_CTRL_U;
     }
 
     return 0;                           // unknown key 
@@ -571,7 +567,7 @@ void showFakeProgress(void)
 
 BYTE getKeyIfPossible(void)
 {
-    DWORD scancode;
+    DWORD scancode, special;
     BYTE key, vkey, res;
 
     res = Cconis();                             // see if there's something waiting from keyboard 
@@ -581,11 +577,12 @@ BYTE getKeyIfPossible(void)
     }
     
     scancode = Cnecin();                        // get char form keyboard, no echo on screen 
+    special  = Kbshift(-1);
 
     vkey    = (scancode>>16)    & 0xff;
     key     =  scancode         & 0xff;
 
-    key     = atariKeysToSingleByte(vkey, key); // transform BYTE pair into single BYTE
+    key     = atariKeysToSingleByte(vkey, key, special & 0x03, special & 0x04); // transform BYTE pair into single BYTE
     return key;
 }
 //--------------------------------------------------

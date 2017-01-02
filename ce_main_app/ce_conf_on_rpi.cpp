@@ -308,6 +308,8 @@ static BYTE getKey(int count)
                 }
                 break;
 
+            case 0x5a: return KEY_SHIFT_TAB;
+
             case 0x5b:
                 c = getchar();
                 switch(c) {

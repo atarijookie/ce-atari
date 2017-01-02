@@ -169,7 +169,7 @@ void ConfigStream::onKeyDown(BYTE key)
 {
     StupidVector &scr = showingMessage ? message : screen;		// if we should show message, set reference to message, otherwise set reference to screen
 
-    int focused = -1, firstFocusable = -1, lastFocusable = -1;
+    int focused = -1, firstFocusable = -1, lastFocusable = -1, firstButton = -1, lastButton = -1;
 
     // go through the current screen and find focused component, also first focusable component
     for(WORD i=0; i<scr.size(); i++) {
@@ -188,6 +188,16 @@ void ConfigStream::onKeyDown(BYTE key)
         if(c->canFocus()) {							// if this is focusable, then store it as last focusable (at the end it will contain the last focusable)
             lastFocusable = i;
         }
+
+        if (firstButton == -1) {
+            if (c->getComponentType() == ConfigComponent::button) {
+                firstButton = i;
+            }
+        }
+
+        if (c->getComponentType() == ConfigComponent::button) {
+            lastButton = i;
+        }
     }
 
     if(firstFocusable == -1) {						// nothing focusable? do nothing
@@ -202,6 +212,7 @@ void ConfigStream::onKeyDown(BYTE key)
     curr->setFocus(true);
 
     int prevFocusable = -1, nextFocusable = -1;		// now find previous and next focusable item in the list of components
+    int prevButton = -1, nextButton = -1;
     for(WORD i=0; i<scr.size(); i++) {
         ConfigComponent *c = (ConfigComponent *) scr[i];
 
@@ -211,11 +222,17 @@ void ConfigStream::onKeyDown(BYTE key)
 
         if(i < focused) {							// if we're bellow currently focused item, store each found index (go near focused component)
             prevFocusable = i;
+            if (c->getComponentType() == ConfigComponent::button) {
+                prevButton = i;
+            }
         }
 
         if(i > focused) {							// if we're above currently focused item, store only first found index (don't go far from focused component)
             if(nextFocusable == -1) {
                 nextFocusable = i;
+            }
+            if (c->getComponentType() == ConfigComponent::button && nextButton == -1) {
+                nextButton = i;
             }
         }
     }
@@ -230,21 +247,48 @@ void ConfigStream::onKeyDown(BYTE key)
         }
     }
 
-    if(key == KEY_LEFT || key == KEY_RIGHT || key == KEY_TAB) {     // in case of left, right, tab on SAVE and CANCEL
+    // if you press ENTER key on a editline, it's like you pressed arrow down
+    if(key == KEY_ENTER && (curr->getComponentType() == ConfigComponent::editline || curr->getComponentType() == ConfigComponent::editline_pass)) {
+        key = KEY_DOWN;
+    }
+
+    if(key == KEY_SHIFT_TAB) {
+        curr->setFocus(false);					// unfocus this component
+
+        if(prevButton != -1) {
+            curr = (ConfigComponent *) scr[prevButton];
+        } else if(lastButton != -1) {
+            curr = (ConfigComponent *) scr[lastButton];
+        }
+
+        curr->setFocus(true);					// focus this component
+
+        return;
+    }
+
+    if(key == KEY_TAB) {
+        curr->setFocus(false);					// unfocus this component
+
+        if(nextButton != -1) {
+            curr = (ConfigComponent *) scr[nextButton];
+        } else if(firstButton != -1) {
+            curr = (ConfigComponent *) scr[firstButton];
+        }
+
+        curr->setFocus(true);					// focus this component
+
+        return;
+    }
+
+    if(key == KEY_LEFT || key == KEY_RIGHT) {     // in case of left, right
         if(curr->getComponentType() == ConfigComponent::button) {
             if(key == KEY_LEFT) {
                 key = KEY_UP;
             }
-            
-            if(key == KEY_RIGHT || key == KEY_TAB) {
+            if(key == KEY_RIGHT) {
                 key = KEY_DOWN;
             }
         }
-    }
-    
-    // if you press ENTER key on a editline, it's like you pressed arrow down
-    if(key == KEY_ENTER && (curr->getComponentType() == ConfigComponent::editline || curr->getComponentType() == ConfigComponent::editline_pass)) {
-        key = KEY_DOWN;
     }
 
     if(key == KEY_UP) {							// arrow up
@@ -275,7 +319,7 @@ void ConfigStream::onKeyDown(BYTE key)
         return;
     }
 
-    if(key == KEY_ESC) {                        // esc as cancel
+    if(key == KEY_ESC || key == KEY_UNDO) {     // esc/undo as cancel
         enterKeyHandlerLater(CS_GO_HOME);
         return;
     }
