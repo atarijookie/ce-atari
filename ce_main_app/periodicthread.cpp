@@ -160,6 +160,10 @@ void *periodicThreadCode(void *ptr)
         }
 
         //------------------------------------
+        // check client command timestamp (we don't really care how often its done)
+        shared.clientConnected = (Utils::getCurrentMs() - shared.configStream.acsi->getLastCmdTimestamp() <= 2000);
+
+        //------------------------------------
         // config streams handling
         
         handleConfigStreams(shared.configStream.web,    shared.configPipes.web.fd1,     shared.configPipes.web.fd2);

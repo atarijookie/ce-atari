@@ -21,6 +21,7 @@
 #include "utils.h"
 #include "settings.h"
 #include "datatypes.h"
+#include "periodicthread.h"
 
 #include "ikbd.h"
 
@@ -30,6 +31,7 @@ extern volatile sig_atomic_t    sigintReceived;
        volatile bool            do_loadIkbdConfig = false;
 
 extern TFlags flags;                                // global flags from command line
+extern SharedObjects shared;
 
 void *ikbdThreadCode(void *ptr)
 {
@@ -134,7 +136,7 @@ void *ikbdThreadCode(void *ptr)
 
         if(ikbd.fdUart >= 0 && FD_ISSET(ikbd.fdUart, &readfds)) {
             // process the incomming data from original keyboard and from ST
-            ikbd.processReceivedCommands();
+            ikbd.processReceivedCommands(shared.clientConnected);
         }
 
         // process events from attached input devices

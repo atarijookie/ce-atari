@@ -11,7 +11,7 @@
 
 #include "ikbd.h"
 
-void Ikbd::processReceivedCommands(void)
+void Ikbd::processReceivedCommands(bool skipKeyboardTranslation)
 {
     if(fdUart == -1) {                                          // uart not open? quit
         return;
@@ -60,7 +60,7 @@ void Ikbd::processReceivedCommands(void)
         }
 
         if(cbKeyboardData.count > 0) {                          // got keyboard data? process them
-            processKeyboardData();
+            processKeyboardData(skipKeyboardTranslation);
         }
     #else                                                       // if spying on IKBD, just resend data
         if(cbStCommands.count > 0) {                            // got ST commands? process them
@@ -502,7 +502,7 @@ void Ikbd::fixAbsMousePos(void)
     }
 }
 
-void Ikbd::processKeyboardData(void)
+void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
 {
     BYTE bfr[128];
 
@@ -588,7 +588,7 @@ void Ikbd::processKeyboardData(void)
             val = cbKeyboardData.get();                             // get data from buffer
             bool wasHandledAsKeybJoy = false;                       // it wasn't handled as keyb joy (yet)
             
-            if(keybJoy0 || keybJoy1) {                              // if at least one keyboard joy is enabled
+            if(!skipKeyboardTranslation && (keybJoy0 || keybJoy1)) {// if at least one keyboard joy is enabled
                 wasHandledAsKeybJoy = handleStKeyAsKeybJoy(val);    // get if it was handled as keyb joy
             }
             

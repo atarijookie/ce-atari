@@ -81,7 +81,7 @@ public:
     void processJoystick(js_event *jse, int joyNumber);
     void markVirtualMouseEvenTime(void);
 
-    void processReceivedCommands(void);
+    void processReceivedCommands(bool skipKeyboardTranslation);
 
     int     fdUart;
 
@@ -166,7 +166,7 @@ private:
 
     void processStCommands(void);
     void processGetCommand(BYTE getCmd);
-    void processKeyboardData(void);
+    void processKeyboardData(bool skipKeyboardTranslation);
 
     bool gotUsbMouse(void);
     bool gotUsbJoy1(void);

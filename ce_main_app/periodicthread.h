@@ -38,6 +38,8 @@ typedef struct {
     
     bool devFinder_detachAndLook;
     bool devFinder_look;
+
+    volatile bool clientConnected;
     
 } SharedObjects;
 

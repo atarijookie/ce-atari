@@ -9,6 +9,7 @@
 #include "../translated/translateddisk.h"
 
 #include "../settings.h"
+#include "../utils.h"
 #include "keys.h"
 #include "configstream.h"
 #include "config_commands.h"
@@ -29,6 +30,8 @@ ConfigStream::ConfigStream(int whereItWillBeShown)
 
     dataTrans   = NULL;
     reloadProxy = NULL;
+
+    lastCmdTime = 0;
 
     message.clear();
     createScreen_homeScreen();
@@ -60,6 +63,8 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
     }
 
     dataTrans->clear();                 // clean data transporter before handling
+
+    lastCmdTime = Utils::getCurrentMs();
 
     switch(cmd[4]) {
     case CFG_CMD_IDENTIFY:          // identify?
