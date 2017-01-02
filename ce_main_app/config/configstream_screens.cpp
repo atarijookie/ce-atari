@@ -1255,110 +1255,89 @@ void ConfigStream::createScreen_ikbd(void)
 
     //----------------------
 
-    int col3 = 26;
-    
-    row += 1;
-    comp = new ConfigComponent(this, ConfigComponent::label, "Keyboard Joy 0 enabled",        40, col, row, gotoOffset);
+    int colButton   = col + 0;
+    int colLeft     = col + 0;
+    int colUpDown   = col + 12;
+    int colRight    = col + 24;
+
+    row += 2;
+    comp = new ConfigComponent(this, ConfigComponent::label, "Keyboard Joy 0 enabled",         40, col, row, gotoOffset);
     screen.push_back(comp);
-    
-    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                         3, col2, row++, gotoOffset);
+
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                          3, col2, row++, gotoOffset);
     comp->setComponentId(COMPID_KEYB_JOY0);
     screen.push_back(comp);
 
+    row++;
     // button
-    comp = new ConfigComponent(this, ConfigComponent::label, "BUTTON:",                       40, col, row, gotoOffset);
-    screen.push_back(comp);
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",                 10, col3, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colButton, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY0_BUTTON);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
-    
+
     // up
-    row++;
-    comp = new ConfigComponent(this, ConfigComponent::label, "UP:",                           40, col, row, gotoOffset);
-    screen.push_back(comp);
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, col3, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colUpDown, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY0_UP);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
-    // left
     row++;
-    comp = new ConfigComponent(this, ConfigComponent::label, "LEFT:",                         40, col, row, gotoOffset);
-    screen.push_back(comp);
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, col3, row, gotoOffset);
+    // left
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colLeft, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY0_LEFT);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
     // down
-    row++;
-    comp = new ConfigComponent(this, ConfigComponent::label, "DOWN:",                         40, col, row, gotoOffset);
-    screen.push_back(comp);
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, col3, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colUpDown, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY0_DOWN);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
     // right
-    row++;
-    comp = new ConfigComponent(this, ConfigComponent::label, "RIGHT:",                        40, col, row, gotoOffset);
-    screen.push_back(comp);
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, col3, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colRight, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY0_RIGHT);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
     //----------------------
 
-    row += 2;
-    comp = new ConfigComponent(this, ConfigComponent::label, "Keyboard Joy 1 enabled",       40, col, row, gotoOffset);
+    row += 3;
+    comp = new ConfigComponent(this, ConfigComponent::label, "Keyboard Joy 1 enabled",         40, col, row, gotoOffset);
     screen.push_back(comp);
-    
-    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                        3, col2, row++, gotoOffset);
+
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                          3, col2, row++, gotoOffset);
     comp->setComponentId(COMPID_KEYB_JOY1);
     screen.push_back(comp);
 
+    row++;
     // button
-    comp = new ConfigComponent(this, ConfigComponent::label, "BUTTON:",                       40, col, row, gotoOffset);
-    screen.push_back(comp);
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, col3, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colButton, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY1_BUTTON);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
-    
+
     // up
-    row++;
-    comp = new ConfigComponent(this, ConfigComponent::label, "UP:",                           40, col, row, gotoOffset);
-    screen.push_back(comp);
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, col3, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colUpDown, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY1_UP);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
-    // left
     row++;
-    comp = new ConfigComponent(this, ConfigComponent::label, "LEFT:",                         40, col, row, gotoOffset);
-    screen.push_back(comp);
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",                 10, col3, row, gotoOffset);
+    // left
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colLeft, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY1_LEFT);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
     // down
-    row++;
-    comp = new ConfigComponent(this, ConfigComponent::label, "DOWN:",                         40, col, row, gotoOffset);
-    screen.push_back(comp);
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, col3, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colUpDown, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY1_DOWN);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
     // right
-    row++;
-    comp = new ConfigComponent(this, ConfigComponent::label, "RIGHT:",                        40, col, row, gotoOffset);
-    screen.push_back(comp);
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, col3, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colRight, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY1_RIGHT);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);

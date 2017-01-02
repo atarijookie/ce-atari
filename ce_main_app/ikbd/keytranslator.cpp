@@ -113,6 +113,19 @@ void KeyTranslator::fillKeyTranslationTable(void)
     addToTable(KEY_PAGEUP,      0x61, "PAGEUP");
     addToTable(KEY_PAGEDOWN,    0x47, "PAGEDOWN");
 
+    // TODO: Eiffel keys
+    // SCROLL       $4C
+    // PAGE UP      $45
+    // PAGE DOWN    $46
+    // END          $55
+    // PRINT SCREEN $49
+    // PAUSE        $4F
+    // VERR NUM     $54
+    // LEFT WIN     $56
+    // RIGHT WIN    $57
+    // WIN POPUP    $58
+    // Tilde        $5B
+
     // TODO: these Atari keys have no equivalent
     // 61	UNDO
     // 62	HELP
