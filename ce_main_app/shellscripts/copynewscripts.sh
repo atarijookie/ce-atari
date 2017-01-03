@@ -43,6 +43,7 @@ compareAndCopy   "/ce/update/update_franz.sh"    "/ce/app/shellscripts/update_fr
 compareAndCopy   "/ce/update/update_hans.sh"     "/ce/app/shellscripts/update_hans.sh"
 compareAndCopy   "/ce/update/update_xilinx.sh"   "/ce/app/shellscripts/update_xilinx.sh"
 compareAndCopy   "/ce/install_ffmpeg.sh"         "/ce/app/shellscripts/install_ffmpeg.sh"
+compareAndCopy   "/ce/time.sh"                   "/ce/app/shellscripts/time.sh"
 
 #---------------------------------------------------------------------------
 # then copy the scripts which are different for Raspbian and Yocto
