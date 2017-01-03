@@ -414,25 +414,30 @@ void Ikbd::processKeyboard(input_event *ev)
         statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
         statuses.ikbdUsb.aliveSign = ALIVE_KEYDOWN;
 
+        int stKey = keyTranslator.pcKeyToSt(ev->code);          // translate PC key to ST key
         // ev->value -- 1: down, 2: auto repeat, 0: up
-        if(ev->code < KBD_KEY_COUNT) {
-            if(ev->value == 1) {    // key down
-                pressedKeys[ev->code] = true;
-                if(pressedKeys[KEY_LEFTCTRL] && pressedKeys[KEY_RIGHTCTRL] && pressedKeys[KEY_LEFTALT] && pressedKeys[KEY_RIGHTALT]) {
-                    toggleKeyboardExclusiveAccess();
-                }
-            } else if(ev->value == 0) { // key up
-                pressedKeys[ev->code] = false;
-            }
-        }
-
-        stKey = keyTranslator.pcKeyToSt(ev->code);          // translate PC key to ST key
-
-        if(stKey == 0 || fdUart == -1) {                        // key not found, no UART open? quit
+        if(ev->value == 0) {        // when key is released, ST scan code has the highest bit set
+            stKey = stKey | 0x80;
+            pressedKeys[ev->code] = false;
+        } else if (ev->value == 2) {
+            // auto repeat has no place on Atari! :)
             return;
         }
 
-        if(keybJoy0 && keyJoyKeys.isKeybJoyKeyPc(0, ev->code)) {    // Keyb joy 0 is enabled, and it's a keyb joy 0 key? Handle it specially.
+        pressedKeys[ev->code] = true;
+        if(pressedKeys[KEY_LEFTCTRL] && pressedKeys[KEY_RIGHTCTRL] && pressedKeys[KEY_LEFTALT] && pressedKeys[KEY_RIGHTALT]) {
+            toggleKeyboardExclusiveAccess();
+        }
+
+        if (handleSpecialHotkeys(ev->code, stKey)) {
+            return;
+        }
+
+        if(stKey == 0 || stKey == 0x80 || fdUart == -1) {           // key not found, no UART open? quit
+            return;
+        }
+
+        if(keybJoy0 && keyJoyKeys.isKeybJoyKeyPc(0, ev->code)) {    // Keyb joy 0 is enabled, and it's a keyb joy 0 key? Handle it specially. 
             handlePcKeyAsKeybJoy(0, ev->code, ev->value);
             return;
         }
@@ -440,11 +445,6 @@ void Ikbd::processKeyboard(input_event *ev)
         if(keybJoy1 && keyJoyKeys.isKeybJoyKeyPc(1, ev->code)) {    // Keyb joy 1 is enabled, and it's a keyb joy 1 key? Handle it specially.
             handlePcKeyAsKeybJoy(1, ev->code, ev->value);
             return;
-        }
-
-        // ev->value -- 1: down, 2: auto repeat, 0: up
-        if(ev->value == 0) {        // when key is released, ST scan code has the highest bit set
-            stKey = stKey | 0x80;
         }
 
         ikbdLog("\nEV_KEY: code %d, value %d, stKey: %02x", ev->code, ev->value, stKey);
@@ -660,4 +660,37 @@ void Ikbd::releaseExclusiveAccess(int fd)
     if(ioctl(fd, EVIOCGRAB, (void*)0) < 0) { // release
         logDebugAndIkbd(LOG_ERROR, "Ikbd::releaseExclusiveAccess() ioctl failed : ", strerror(errno));
     }
+}
+
+bool Ikbd::handleSpecialHotkeys(int pcKey, int stKey)
+{
+    if (pcKey == KEY_LEFTCTRL || pcKey == KEY_RIGHTCTRL) {
+        if (stKey & 0x80) {
+            ctrlsPressed--;
+        } else {
+            ctrlsPressed++;
+        }
+    }
+
+    if (pcKey == KEY_LEFTSHIFT || pcKey == KEY_RIGHTSHIFT) {
+        if (stKey & 0x80) {
+            shiftsPressed--;
+        } else {
+            shiftsPressed++;
+        }
+    }
+
+    if (shiftsPressed > 0 && ctrlsPressed > 0 && !(stKey & 0x80)) {   // pressed only
+        if (pcKey == KEY_F11 || stKey == 0x62) {
+            // TODO: toggle joy0 / joy1 (done on USB, missing on ST!)
+            ikbdLog( "Ikbd::processKeyboardData - toggle joy0 / joy1");
+            return true;
+        } else if (pcKey == KEY_F12 || stKey == 0x61) {
+            // TODO: toggle translation
+            ikbdLog( "Ikbd::processKeyboardData - toggle translation");
+            return true;
+        }
+    }
+
+    return false;
 }

@@ -586,13 +586,17 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
 			continue;
         } else {                                                    // if it's not special IKBD code, then it's just a key press
             val = cbKeyboardData.get();                             // get data from buffer
-            bool wasHandledAsKeybJoy = false;                       // it wasn't handled as keyb joy (yet)
+            bool wasHandled = false;                       // it wasn't handled as keyb joy (yet)
+
+            int pcKey = keyTranslator.stKeyToPc(val & 0x7f);
+            wasHandled = handleSpecialHotkeys(pcKey, val);
             
-            if(!skipKeyboardTranslation && (keybJoy0 || keybJoy1)) {// if at least one keyboard joy is enabled
-                wasHandledAsKeybJoy = handleStKeyAsKeybJoy(val);    // get if it was handled as keyb joy
+            if(!wasHandled && !skipKeyboardTranslation
+                    && (keybJoy0 || keybJoy1)) {           // if at least one keyboard joy is enabled
+                wasHandled = handleStKeyAsKeybJoy(val);    // get if it was handled as keyb joy
             }
             
-            if(!wasHandledAsKeybJoy) {                              // if not handled as keyb joy, send it to ST
+            if(!wasHandled) {                              // if not handled as keyb joy, send it to ST
                 fdWrite(fdUart, &val, 1);                           // send byte to ST
             }
         }

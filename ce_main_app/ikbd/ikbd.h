@@ -109,6 +109,9 @@ private:
     bool    keybJoy0;                       // if true, specific keys will act as joy 0
     bool    keybJoy1;                       // if true, specific keys will act as joy 1
 
+    int     shiftsPressed;  // how many SHIFTs are pressed (2x for each keyboard)
+    int     ctrlsPressed;   // how many C[ON]TR[O]Ls are pressed (2x for PC, 1x for Atari)
+
     KeybJoyKeys     keyJoyKeys;
     KeyTranslator   keyTranslator;
 
@@ -175,6 +178,7 @@ private:
     void handlePcKeyAsKeybJoy(int joyNumber, int pcKey, int eventValue);
     bool handleStKeyAsKeybJoy(BYTE val);
     void handleKeyAsKeybJoy  (bool pcNotSt, int joyNumber, int pcKey, bool keyDown);
+    bool handleSpecialHotkeys(int pcKey, int stKey);
 
     int fdWrite(int fd, BYTE *bfr, int cnt);
 

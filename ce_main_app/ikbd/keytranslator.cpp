@@ -191,7 +191,7 @@ int KeyTranslator::stKeyToPc(int stKey) const
     int i;
     for(i=0; i<KEY_TABLE_SIZE; i++) {               // go through pcToSt table, and find which pcKey (index) matches the st key, and return it
         if(tableKeysPcToSt[i] == stKey) {
-            return i;
+            return tableKeysPcToSt[i];
         }
     }
     

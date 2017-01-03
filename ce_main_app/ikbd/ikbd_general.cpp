@@ -218,6 +218,9 @@ Ikbd::Ikbd()
     gotHalfPair     = false;
     halfPairData    = 0;
 
+    shiftsPressed = 0;
+    ctrlsPressed  = 0;
+
     fillSpecialCodeLengthTable();
     fillStCommandsLengthTable();
 
