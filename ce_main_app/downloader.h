@@ -28,7 +28,7 @@ typedef struct {
 
     volatile BYTE *pStatusByte; // if set to non-null, will be updated with the download status DWNSTATUS_*
     
-    int downPercent;            // defines progress - from 0 to 100
+    volatile int downPercent;   // defines progress - from 0 to 100
 } TDownloadRequest;
 
 class Downloader

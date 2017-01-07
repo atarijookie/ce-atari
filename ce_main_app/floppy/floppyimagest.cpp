@@ -20,6 +20,8 @@ bool FloppyImageSt::open(char *fileName)
 {
     close();
 
+    strcpy(currentFileName, fileName);
+    
     fajl = fopen(fileName, "rb");
 
     if(fajl == NULL) {
@@ -168,3 +170,7 @@ bool FloppyImageSt::calcParams(void)
     return false;
 }
 
+char *FloppyImageSt::getFileName(void)
+{
+    return currentFileName;
+}

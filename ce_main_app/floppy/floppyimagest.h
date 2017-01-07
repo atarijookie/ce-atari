@@ -17,8 +17,11 @@ public:
     virtual void close();
     virtual bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
     virtual bool readSector(int track, int side, int sectorNo, BYTE *buffer);
+    virtual char *getFileName(void);
 
 private:
+    char currentFileName[512];
+
     bool openFlag;
 
     struct {

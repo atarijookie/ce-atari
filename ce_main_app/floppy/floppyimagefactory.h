@@ -19,6 +19,8 @@ private:
 
     void toLowerCase(char *orig, char *lower);
     char lowerCase(char in);
+    
+    bool handleZIPedImage(const char *inZipFilePath, char *outImageFilePath);
 };
 
 #endif // FLOPPYIMAGEFACTORY_H

@@ -64,9 +64,10 @@ CosmosEx.Floppy=function(){
     switch(ext){
       case "msa":
       case "st":
+      case "zip":
         break;
       default:
-        alert("Only file types MSA and ST are allowed.");
+        alert("Only file types MSA, ST and ZIP are allowed.");
         $(this).siblings(".upload").addClass("vis-hidden");
         return;
         break;

@@ -22,6 +22,8 @@ FloppyImageMsa::~FloppyImageMsa()
 bool FloppyImageMsa::open(char *fileName)
 {
     close();
+    
+    strcpy(currentFileName, fileName);
 
     fajl = fopen(fileName, "rb");
 
@@ -158,4 +160,8 @@ bool FloppyImageMsa::readSector(int track, int side, int sectorNo, BYTE *buffer)
     return true;
 }
 
+char *FloppyImageMsa::getFileName(void)
+{
+    return currentFileName;
+}
 

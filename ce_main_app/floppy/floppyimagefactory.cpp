@@ -1,4 +1,8 @@
 #include <string.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <dirent.h>
+ 
 #include "floppyimagefactory.h"
 #include "../debug.h"
 
@@ -23,24 +27,44 @@ FloppyImageFactory::~FloppyImageFactory()
 
 IFloppyImage *FloppyImageFactory::getImage(char *fileName)
 {
-    int len = strlen(fileName);
-    int pos = -1;
+    char *ext = strrchr(fileName, '.');     // find last '.'
 
-    for(int i=(len-1); i>=0; i--) {     // find last '.'
-        if(fileName[i] == '.') {
-            pos = i;
-            break;
-        }
-    }
-
-    if(pos == -1) {                     // last '.' not found? fail
+    if(ext == NULL) {                       // last '.' not found? fail
         return NULL;
     }
 
-    char ext[3];
-    toLowerCase(&fileName[pos+1], ext); // convert the extension to lower case
+    ext++;                                  // move beyond '.'
+    
+    //--------------
+    // if it's a ZIP file, chek if it contains an supported floppy image
+    char fileNameInZip[256];
+    memset(fileNameInZip, 0, sizeof(fileNameInZip));
 
-    if(strncmp(ext, "msa", 3) == 0) {   // msa image?
+    if(strcasecmp(ext, "zip") == 0) {       // if it's a ZIP file
+        Debug::out(LOG_DEBUG, "FloppyImageFactory -- file %s is a ZIP file, will search for supported image inside", fileName);
+        
+                                            // decompress the ZIP file and search for floppy image inside, return path to first valid image
+        bool foundValidImage = handleZIPedImage(fileName, fileNameInZip);
+        
+        if(!foundValidImage) {              // image not found in ZIP file, fail
+            Debug::out(LOG_DEBUG, "FloppyImageFactory -- ZIP file %s doesn't contain supported image inside", fileName);
+            return NULL;
+        }
+
+        Debug::out(LOG_DEBUG, "FloppyImageFactory -- ZIP file %s contains image: %s", fileName, fileNameInZip);
+        
+        fileName    = fileNameInZip;            // now the filename contains path to image extracted from ZIP file
+        ext         = strrchr(fileName, '.');   // find last '.'
+
+        if(ext == NULL) {                       // last '.' not found? fail
+            return NULL;
+        }
+        
+        ext++;
+    }    
+    
+    //--------------
+    if(strcasecmp(ext, "msa") == 0) {   // msa image?
         Debug::out(LOG_DEBUG, "FloppyImageFactory -- using MSA image on %s", fileName);
 
         if(!msa) {                      // not created yet?
@@ -53,7 +77,7 @@ IFloppyImage *FloppyImageFactory::getImage(char *fileName)
         return msa;                     // and return the pointer
     }
 
-    if(strncmp(ext, "st", 2) == 0) {    // st image?
+    if(strcasecmp(ext, "st") == 0) {    // st image?
         Debug::out(LOG_DEBUG, "FloppyImageFactory -- using ST image on %s", fileName);
 
         if(!st) {                       // not created yet?
@@ -69,19 +93,70 @@ IFloppyImage *FloppyImageFactory::getImage(char *fileName)
     return NULL;                        // unknown extension?
 }
 
-void FloppyImageFactory::toLowerCase(char *orig, char *lower)
+bool FloppyImageFactory::handleZIPedImage(const char *inZipFilePath, char *outImageFilePath)
 {
-    for(int i=0; i<3; i++) {
-        lower[i] = lowerCase(orig[i]);
+    outImageFilePath[0] = 0;                        // out path doesn't contain anything yet
+    
+    system("rm    -rf /tmp/zipedfloppy");           // delete this dir, if it exists
+    system("mkdir -p  /tmp/zipedfloppy");           // create that dir
+    
+    char unzipCommand[512];
+    sprintf(unzipCommand, "unzip -o %s -d /tmp/zipedfloppy > /dev/null 2> /dev/null", inZipFilePath);
+    system(unzipCommand);                           // unzip the downloaded ZIP file into that tmp directory
+    
+    // find the first usable floppy image
+    DIR *dir = opendir("/tmp/zipedfloppy");         // try to open the dir
+    
+    if(dir == NULL) {                               // not found?
+        Debug::out(LOG_DEBUG, "FloppyImageFactory::handleZIPedImage -- opendir() failed");
+        return false;
     }
-}
 
-char FloppyImageFactory::lowerCase(char in)
-{
-    if(in >= 65 && in <= 90) {      // if it's upper case, convert it to lower case
-        in = in + 32;
+    bool found          = false;
+    struct dirent *de   = NULL;
+    
+    char *pExt = NULL;
+    
+    while(1) {                                      // avoid buffer overflow
+        de = readdir(dir);                          // read the next directory entry
+    
+        if(de == NULL) {                            // no more entries?
+            break;
+        }
+
+        if(de->d_type != DT_REG) {                  // not a file? skip it
+            continue;
+        }
+
+        int fileNameLen = strlen(de->d_name);       // get length of filename
+
+        if(fileNameLen < 3) {                       // if it's too short, skip it
+            continue;
+        }
+
+        pExt = strrchr(de->d_name, '.');            // find last '.'
+
+        if(pExt == NULL) {                          // last '.' not found? skip it
+            continue;
+        }
+        pExt++;                                     // move beyond '.'
+        
+        if(strcasecmp(pExt, "st") == 0 || strcasecmp(pExt, "msa") == 0) {  // the extension of the file is valid for a floppy image? 
+            found = true;
+            break;
+        }
     }
 
-    return in;
+    closedir(dir);                                  // close the dir
+    
+    if(!found) {                                    // not found? return with a fail
+        return false;
+    }
+    
+    // construct path to unZIPed image
+    strcpy(outImageFilePath, "/tmp/zipedfloppy/");
+    strcat(outImageFilePath, de->d_name);
+    
+    return true;
 }
 

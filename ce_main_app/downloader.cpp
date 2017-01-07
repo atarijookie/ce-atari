@@ -72,6 +72,8 @@ void Downloader::formatStatus(TDownloadRequest &tdr, std::string &line)
     sprintf(percString, " % 3d %%", tdr.downPercent);
 
     line = fileName + percString;
+    
+    Debug::out(LOG_DEBUG, "Downloader::formatStatus() -- created status line: %s", line.c_str());
 }
 
 void Downloader::status(std::string &status, int downloadTypeMask)
@@ -83,20 +85,29 @@ void Downloader::status(std::string &status, int downloadTypeMask)
 
     // create status reports for things waiting to be downloaded
     int cnt = downloadQueue.size();
+    
+    Debug::out(LOG_DEBUG, "Downloader::status() -- there are %d items in download queue", cnt);
+    
     for(int i=0; i<cnt; i++) {
         TDownloadRequest &tdr = downloadQueue[i];
 
         if((tdr.downloadType & downloadTypeMask) == 0) {    // if the mask doesn't match the download type, skip it
+            Debug::out(LOG_DEBUG, "Downloader::status() -- skiping item %d", i);
             continue;
         }
 
+        Debug::out(LOG_DEBUG, "Downloader::status() -- format status for item %d", i);
         formatStatus(tdr, line);
         status += line + "\n";
     }    
 
     // and for the currently downloaded thing
     if(downloadCurrent.downPercent < 100) {
+        Debug::out(LOG_DEBUG, "Downloader::status() -- currently downloading something", cnt);
+        
         if((downloadCurrent.downloadType & downloadTypeMask) != 0) {    // if the mask matches the download type, add it
+            Debug::out(LOG_DEBUG, "Downloader::status() -- format status for currently downloaded item");
+        
             formatStatus(downloadCurrent, line);
             status += line + "\n";
         }
@@ -173,63 +184,6 @@ bool Downloader::verifyChecksum(char *filename, WORD checksum)
     Debug::out(LOG_DEBUG, "Downloader::verifyChecksum - file %s -- checksum is good: %d", filename, (int) checksumIsGood);
 
     return checksumIsGood;                // return if the calculated cs is equal to the provided cs
-}
-
-bool Downloader::handleZIPedImage(const char *destDirectory, const char *zipFilePath)
-{
-    system("rm    -rf /tmp/zipedfloppy");           // delete this dir, if it exists
-    system("mkdir -p  /tmp/zipedfloppy");           // create that dir
-    
-    char unzipCommand[512];
-    sprintf(unzipCommand, "unzip -o %s -d /tmp/zipedfloppy", zipFilePath);
-    system(unzipCommand);                           // unzip the downloaded ZIP file into that tmp directory
-    
-    // find the first usable floppy image
-    DIR *dir = opendir("/tmp/zipedfloppy");         // try to open the dir
-    
-    if(dir == NULL) {                               // not found?
-        return false;
-    }
-
-    bool found          = false;
-    struct dirent *de   = NULL;
-    
-    while(1) {                                      // avoid buffer overflow
-        de = readdir(dir);                          // read the next directory entry
-    
-        if(de == NULL) {                            // no more entries?
-            break;
-        }
-
-        if(de->d_type != DT_REG) {                  // not a file? skip it
-            continue;
-        }
-
-        int fileNameLen = strlen(de->d_name);       // get length of filename
-
-        if(fileNameLen < 3) {                       // if it's too short, skip it
-            continue;
-        }
-
-        char *pExt = de->d_name + fileNameLen - 3;  // get pointer to extension 
-
-        if(strcasecmp(pExt, ".st") == 0 || strcasecmp(pExt, "msa") == 0) {  // the extension of the file is valid for a floppy image? 
-            found = true;
-            break;
-        }
-    }
-
-    closedir(dir);                                  // close the dir
-    
-    if(found) {                                     // if we got some valid floppy image
-        unlink(zipFilePath);                        // delete the downloaded ZIP file
-        
-        char moveCommand[512];
-        sprintf(moveCommand, "mv -f /tmp/zipedfloppy/%s %s", de->d_name, destDirectory);
-        system(moveCommand);                        // move the file to destination directory
-    }
-    
-    return found;
 }
 
 static size_t my_write_func_reportVersions(void *ptr, size_t size, size_t nmemb, FILE *stream)
@@ -486,29 +440,11 @@ void *downloadThreadCode(void *ptr)
             
             //-----------
             // support for testing and automatic depacking of floppy images
-            bool isZIPedFloppyImage = false;
-            
-            if(downloadCurrent.downloadType == DWNTYPE_FLOPPYIMG) {                     // it's a floppy image download?
-                if(finalFile.length() >= 4) {                                           // if the length is long enough to contain '.zip' 
-                    std::string extension = finalFile.substr(finalFile.length() - 4);   // get last 4 characters
-                    int iRes = strcasecmp(extension.c_str(), ".zip");                   // compare the extension to .ZIP
-                    
-                    if(iRes == 0) {                                                     // if the extension is .ZIP, then it's a ZIPed floppy image
-                        isZIPedFloppyImage = true;
-                    }
-                }
-            }
-
-            //-----------
             
             bool b = Downloader::verifyChecksum((char *) tmpFile.c_str(), downloadCurrent.checksum);
 
             if(b) {             // checksum is OK?
-                if(isZIPedFloppyImage) {    // it's a ZIPed floppy?
-                    res = Downloader::handleZIPedImage(downloadCurrent.dstDir.c_str(), tmpFile.c_str());
-                } else {                    // not ZIPed floppy, just rename it
-                    res = rename(tmpFile.c_str(), finalFile.c_str());
-                }
+                res = rename(tmpFile.c_str(), finalFile.c_str());
 
                 if(res != 0) {  // download OK, checksum OK, rename BAD?
                     updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_FAIL);

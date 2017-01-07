@@ -70,11 +70,11 @@ void *floppyEncodeThreadCode(void *ptr)
 				// encode image - convert it from file to preprocessed stream for Franz
 				start = Utils::getCurrentMs();
 			
-				Debug::out(LOG_DEBUG, "Encoding image: %s", (char *) er.filename.c_str());
+				Debug::out(LOG_DEBUG, "Encoding image: %s", image->getFileName());
 				encImage.encodeAndCacheImage(image, true);
 
 				end = Utils::getCurrentMs();
-				Debug::out(LOG_DEBUG, "Encoding of image %s done, took %d ms", (char *) er.filename.c_str(), (int) (end - start));
+				Debug::out(LOG_DEBUG, "Encoding of image %s done, took %d ms", image->getFileName(), (int) (end - start));
 
 				//----------------
 				// copy the image from encode thread to main thread				
@@ -87,10 +87,10 @@ void *floppyEncodeThreadCode(void *ptr)
 				end = Utils::getCurrentMs();
 				Debug::out(LOG_DEBUG, "Copying between threads took %d ms", (int) (end - start));
 			} else {
-				Debug::out(LOG_DEBUG, "Encoding of image %s failed - image is not open", (char *) er.filename.c_str());
+				Debug::out(LOG_DEBUG, "Encoding of image %s failed - image is not open", image->getFileName());
 			}
 		} else {
-			Debug::out(LOG_DEBUG, "Encoding of image %S - Image file type not supported!", (char *) er.filename.c_str());
+			Debug::out(LOG_DEBUG, "Encoding of image %S - Image file type not supported!", image->getFileName());
 		}
 
         floppyEncodingRunning = false;

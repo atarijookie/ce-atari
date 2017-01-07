@@ -84,6 +84,8 @@ private:
     void getCurrentSlot(void);
     void setCurrentSlot(void);
     void getImageEncodingRunning(void);
+    
+    void logCmdName(BYTE cmdCode);
 };
 
 #endif

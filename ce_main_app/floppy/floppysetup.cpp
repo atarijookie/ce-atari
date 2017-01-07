@@ -78,6 +78,8 @@ void FloppySetup::processCommand(BYTE *command)
         return;
     }
 
+    logCmdName(cmd[4]);
+    
     switch(cmd[4]) {
         case FDD_CMD_IDENTIFY:                          // return identification string
             dataTrans->addDataBfr("CosmosEx floppy setup", 21, true);       // add identity string with padding
@@ -249,22 +251,30 @@ void FloppySetup::searchDownload(void)
     if(imgDnStatus == IMG_DN_STATUS_DOWNLOADING) {          // if we're downloading
         switch(currentImageDownloadStatus) {
             case DWNSTATUS_WAITING:                         // in this state just report we're working
+                Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- DWNSTATUS_WAITING");
+                
                 statusStr = inetDnFilename + ": waiting for start of download";
                 statusVal = FDD_DN_WORKING;
                 break;
                 
             case DWNSTATUS_DOWNLOADING:                     // in this state just report we're working
+                Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- DWNSTATUS_DOWNLOADING");
+
                 Downloader::status(statusStr, DWNTYPE_FLOPPYIMG);    
                 std::replace(statusStr.begin(), statusStr.end(), '\n', ' '); // replace all new line characters with spaces                
                 statusVal = FDD_DN_WORKING;
                 break;
                 
             case DWNSTATUS_VERIFYING:                       // in this state just report we're working
+                Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- DWNSTATUS_VERIFYING");
+
                 statusStr = inetDnFilename + ": verifying checksum";
                 statusVal = FDD_DN_WORKING;
                 break;
                 
             case DWNSTATUS_DOWNLOAD_OK:                     // report we've downloaded stuff, and go to DOWNLOADED state
+                Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- DWNSTATUS_DOWNLOAD_OK");
+
                 statusStr = inetDnFilename + ": download OK";
                 statusVal = FDD_DN_DONE;
                 
@@ -272,17 +282,23 @@ void FloppySetup::searchDownload(void)
                 break;
                 
             case DWNSTATUS_DOWNLOAD_FAIL:                   // when failed, report that we've failed and go to next download
+                Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- DWNSTATUS_DOWNLOAD_FAIL");
+
                 statusStr = inetDnFilename + ": download failed!\n\r\n\r";
                 
                 imgDnStatus = IMG_DN_STATUS_IDLE;           // go to this state                           
                 break;
 
             default:                                        // this should never happen
+                Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- default, wtf?");
+
                 statusStr = "WTF?";
                 break;
         }
         
         if(imgDnStatus != IMG_DN_STATUS_IDLE) {             // if it's not the case of failed download
+            Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- not IMG_DN_STATUS_IDLE, status: %s", statusStr.c_str());
+
             dataTrans->addDataBfr(statusStr.c_str(), statusStr.length(), true);
             dataTrans->setStatus(statusVal);
             return;
@@ -291,9 +307,13 @@ void FloppySetup::searchDownload(void)
 
     // if we came here, we either haven't been downloading yet, or the previous download failed
     if(imgDnStatus == IMG_DN_STATUS_IDLE) {                 // if we're idle, start to download
+        Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- is IMG_DN_STATUS_IDLE");
+
         res = imageList.getFirstMarkedImage(url, checksum, filename);   // see if we got anything marked for download
 
         if(res) {                                           // if got some image to download, start the download
+            Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- getFirstMarkedImage() returned %s, will download it", filename.c_str());
+            
             imgDnStatus     = IMG_DN_STATUS_DOWNLOADING;        // mark that we're downloading something
             inetDnFilename  = filename;                         // just filename of downloaded file    
             inetDnFilePath  = IMAGE_DOWNLOAD_DIR + filename;    // create full path and filename to the downloaded file
@@ -315,6 +335,8 @@ void FloppySetup::searchDownload(void)
 
             dataTrans->setStatus(FDD_DN_WORKING);           // tell ST we're downloading
         } else {                                            // nothing to download? say that to ST
+            Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- nothing (more) to download");
+
             dataTrans->setStatus(FDD_DN_NOTHING_MORE);
         }
     }
@@ -696,4 +718,41 @@ void FloppySetup::getImageEncodingRunning(void)
     dataTrans->setStatus(FDD_OK);
 }
 
+void FloppySetup::logCmdName(BYTE cmdCode)
+{
+    switch(cmdCode) {
+        case FDD_CMD_IDENTIFY:                  Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_IDENTIFY"); break;
+        case FDD_CMD_GETSILOCONTENT:            Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_GETSILOCONTENT"); break;
+
+        case FDD_CMD_UPLOADIMGBLOCK_START:      Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_UPLOADIMGBLOCK_START"); break;
+
+        case FDD_CMD_UPLOADIMGBLOCK_FULL:       Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_UPLOADIMGBLOCK_FULL"); break;
+        case FDD_CMD_UPLOADIMGBLOCK_PART:       Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_UPLOADIMGBLOCK_PART"); break;
+
+        case FDD_CMD_UPLOADIMGBLOCK_DONE_OK:    Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_UPLOADIMGBLOCK_DONE_OK"); break;
+        case FDD_CMD_UPLOADIMGBLOCK_DONE_FAIL:  Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_UPLOADIMGBLOCK_DONE_FAIL"); break;
+
+        case FDD_CMD_SWAPSLOTS:                 Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SWAPSLOTS"); break;
+        case FDD_CMD_REMOVESLOT:                Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_REMOVESLOT"); break;
+
+        case FDD_CMD_NEW_EMPTYIMAGE:            Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_NEW_EMPTYIMAGE"); break;
+        case FDD_CMD_GET_CURRENT_SLOT:          Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_GET_CURRENT_SLOT"); break;
+        case FDD_CMD_SET_CURRENT_SLOT:          Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SET_CURRENT_SLOT"); break;
+        case FDD_CMD_GET_IMAGE_ENCODING_RUNNING: Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_GET_IMAGE_ENCODING_RUNNING"); break;
+
+        case FDD_CMD_DOWNLOADIMG_START:         Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_DOWNLOADIMG_START"); break;
+        case FDD_CMD_DOWNLOADIMG_ONDEVICE:      Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_DOWNLOADIMG_ONDEVICE"); break;
+        case FDD_CMD_DOWNLOADIMG_GETBLOCK:      Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_DOWNLOADIMG_GETBLOCK"); break;
+        case FDD_CMD_DOWNLOADIMG_DONE:          Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_DOWNLOADIMG_DONE"); break;
+
+        case FDD_CMD_SEARCH_INIT:               Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_INIT"); break;
+        case FDD_CMD_SEARCH_STRING:             Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_STRING"); break;
+        case FDD_CMD_SEARCH_RESULTS:            Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_RESULTS"); break;
+        case FDD_CMD_SEARCH_MARK:               Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_MARK"); break;
+        case FDD_CMD_SEARCH_DOWNLOAD:           Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_DOWNLOAD"); break;
+        case FDD_CMD_SEARCH_REFRESHLIST:        Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_REFRESHLIST"); break;
+        
+        default:                                Debug::out(LOG_DEBUG, "floppySetup command: ???"); break;
+    }
+}
 
