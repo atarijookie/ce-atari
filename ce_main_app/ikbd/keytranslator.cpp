@@ -79,8 +79,10 @@ void KeyTranslator::fillKeyTranslationTable(void)
     addToTable(KEY_F8,          0x42, "F8");
     addToTable(KEY_F9,          0x43, "F9");
     addToTable(KEY_F10,         0x44, "F10");
+    addToTable(KEY_F11,         0x62, "F11");   // HELP
+    addToTable(KEY_F12,         0x61, "F12");   // UNDO
 
-    addToTable(KEY_HOME,        0x47, "HOME");  // 62???
+    addToTable(KEY_HOME,        0x47, "HOME");
     addToTable(KEY_UP,          0x48, "UP");
     addToTable(KEY_KPMINUS,     0x4a, "KPMINUS");
     addToTable(KEY_LEFT,        0x4b, "LEFT");
@@ -109,9 +111,6 @@ void KeyTranslator::fillKeyTranslationTable(void)
 
     addToTable(KEY_RIGHTCTRL,   0x1d, "RCTRL");
     addToTable(KEY_RIGHTALT,    0x38, "RALT");
-    // TODO: where those Atari codes come from?
-    addToTable(KEY_PAGEUP,      0x61, "PAGEUP");
-    addToTable(KEY_PAGEDOWN,    0x47, "PAGEDOWN");
 
     // TODO: Eiffel keys
     // SCROLL       $4C
@@ -126,20 +125,13 @@ void KeyTranslator::fillKeyTranslationTable(void)
     // WIN POPUP    $58
     // Tilde        $5B
 
-    // TODO: these Atari keys have no equivalent
-    // 61	UNDO
-    // 62	HELP
+    // TODO: allow multimaps, i.e. PAGEUP = SHIFT + UP
 }
 
 void KeyTranslator::addToTable(int pcKey, int stKey, const std::string& humanKey)
 {
     if(pcKey >= KEY_TABLE_SIZE) {
         Debug::out(LOG_ERROR, "addToTable -- Can't add pair %d - %d - out of range.", pcKey, stKey);
-        return;
-    }
-
-    if (humanKey.size() > 10) {
-        Debug::out(LOG_ERROR, "addToTable -- Can't add pair %d - %d - %s - human string too big.", pcKey, stKey, humanKey.c_str());
         return;
     }
 
@@ -180,7 +172,13 @@ int KeyTranslator::humanKeyToPc(const std::string& humanKey) const
 
 int KeyTranslator::humanKeyToSt(const std::string& humanKey) const
 {
-    int pcKey = humanKeyToPc(humanKey);
+    std::string humanKeyPatched = humanKey;
+    if (humanKey == "HELP") {
+        humanKeyPatched = "F11";
+    } else if (humanKey == "UNDO") {
+        humanKeyPatched = "F12";
+    }
+    int pcKey = humanKeyToPc(humanKeyPatched);
     int stKey = tableKeysPcToSt[pcKey];
     return stKey;
 }
@@ -191,9 +189,9 @@ int KeyTranslator::stKeyToPc(int stKey) const
     int i;
     for(i=0; i<KEY_TABLE_SIZE; i++) {               // go through pcToSt table, and find which pcKey (index) matches the st key, and return it
         if(tableKeysPcToSt[i] == stKey) {
-            return tableKeysPcToSt[i];
+            return i;
         }
     }
     
-    return tableKeysPcToSt[KEY_SPACE];
+    return KEY_SPACE;
 }

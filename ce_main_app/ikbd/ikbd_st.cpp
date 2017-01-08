@@ -589,13 +589,12 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
             bool wasHandled = false;                       // it wasn't handled as keyb joy (yet)
 
             int pcKey = keyTranslator.stKeyToPc(val & 0x7f);
-            wasHandled = handleSpecialHotkeys(pcKey, val);
-            
-            if(!wasHandled && !skipKeyboardTranslation
-                    && (keybJoy0 || keybJoy1)) {           // if at least one keyboard joy is enabled
+            skipKeyboardTranslation = handleHotkeys(pcKey, !(val & 0x80), skipKeyboardTranslation);
+
+            if (!skipKeyboardTranslation && !wasHandled) {
                 wasHandled = handleStKeyAsKeybJoy(val);    // get if it was handled as keyb joy
             }
-            
+
             if(!wasHandled) {                              // if not handled as keyb joy, send it to ST
                 fdWrite(fdUart, &val, 1);                           // send byte to ST
             }

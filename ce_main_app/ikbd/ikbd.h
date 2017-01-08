@@ -77,7 +77,7 @@ public:
     void deinitDev(int index);
 
     void processMouse(input_event *ev);
-    void processKeyboard(input_event *ev);
+    void processKeyboard(input_event *ev, bool skipKeyboardTranslation);
     void processJoystick(js_event *jse, int joyNumber);
     void markVirtualMouseEvenTime(void);
 
@@ -92,7 +92,7 @@ private:
         Enabled // joy1 and joy0 are treated as joysticks
     };
 
-    int        ceIkbdMode;
+    int     ceIkbdMode;
 
     bool    outputEnabled;
 
@@ -109,8 +109,14 @@ private:
     bool    keybJoy0;                       // if true, specific keys will act as joy 0
     bool    keybJoy1;                       // if true, specific keys will act as joy 1
 
-    int     shiftsPressed;  // how many SHIFTs are pressed (2x for each keyboard)
-    int     ctrlsPressed;   // how many C[ON]TR[O]Ls are pressed (2x for PC, 1x for Atari)
+    // this is basically all keys which are used for the hotswap, perhaps
+    // it should be made a bit more flexible, for different key combinations
+    int     leftShiftsPressed;  // how many LEFT SHIFTs are pressed (1x for PC, 1x for Atari)
+    int     rightShiftsPressed; // how many RIGHT SHIFTs are pressed (1x for PC, 1x for Atari)
+    int     ctrlsPressed;       // how many C[ON]TR[O]Ls are pressed (2x for PC, 1x for Atari)
+    int     f11sPressed;        // HELP on Atari, F11 on PC
+    int     f12sPressed;        // UNDO on Atari, F12 on PC
+    bool    waitingForHotkeyRelease;
 
     KeybJoyKeys     keyJoyKeys;
     KeyTranslator   keyTranslator;
@@ -178,7 +184,7 @@ private:
     void handlePcKeyAsKeybJoy(int joyNumber, int pcKey, int eventValue);
     bool handleStKeyAsKeybJoy(BYTE val);
     void handleKeyAsKeybJoy  (bool pcNotSt, int joyNumber, int pcKey, bool keyDown);
-    bool handleSpecialHotkeys(int pcKey, int stKey);
+    bool handleHotkeys(int pcKey, bool pressed, bool skipKeyboardTranslation);
 
     int fdWrite(int fd, BYTE *bfr, int cnt);
 

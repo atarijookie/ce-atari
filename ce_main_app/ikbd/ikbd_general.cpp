@@ -176,7 +176,7 @@ void *ikbdThreadCode(void *ptr)
                         break;
                     case INTYPE_KEYBOARD:
                     case INTYPE_VDEVKEYBOARD:
-                        ikbd.processKeyboard(&ev);
+                        ikbd.processKeyboard(&ev, shared.clientConnected);
                         break;
                     case INTYPE_JOYSTICK1:
                     case INTYPE_JOYSTICK2:
@@ -217,9 +217,6 @@ Ikbd::Ikbd()
 
     gotHalfPair     = false;
     halfPairData    = 0;
-
-    shiftsPressed = 0;
-    ctrlsPressed  = 0;
 
     fillSpecialCodeLengthTable();
     fillStCommandsLengthTable();
@@ -276,6 +273,13 @@ void Ikbd::resetInternalIkbdVars(void)
 
     joystickMode    = JOYMODE_EVENT;
     joystickState   = EnabledInMouseMode;
+
+    leftShiftsPressed  = 0;
+    rightShiftsPressed = 0;
+    ctrlsPressed       = 0;
+    f11sPressed        = 0;
+    f12sPressed        = 0;
+    waitingForHotkeyRelease = false;
 }
 
 int Ikbd::serialSetup(termios *ts)
