@@ -348,11 +348,23 @@ BYTE showQuestionGetBool(const char *question, BYTE trueKey, const char *trueWor
     }
 }
 
-BYTE getIntFromUser(BYTE allowZero)
+int getIntFromUser(BYTE allowZero, BYTE maxDigits)
 {
+    int intValue    = 0;
+    int gotDigits   = 0;
+    
     while(1) {
         BYTE key = Cnecin();
 
+        if((key == 13 && gotDigits > 0) ||      // it's enter and got at least 1 digit, quit
+            gotDigits >= maxDigits) {           // if got maxDigits digits count, quit
+            
+            if(intValue > 0) {                  // if the entered number is greated than 0 (to avoid typing '000'), return it, otherwise ignore it
+                (void) Cconws("\r\n");
+                return intValue;
+            }
+        }
+        
         if(key < '0' || key > '9') {            // out of char range? try again
             continue;
         }
@@ -361,10 +373,11 @@ BYTE getIntFromUser(BYTE allowZero)
             continue;
         }
 
-        Cconout(key);
-        (void) Cconws("\r\n");
+        Cconout(key);                           // show the digit
+        int digit = key - '0';                  // get digit from char
         
-        return (key - '0');                     // return the number
+        intValue = (intValue * 10) + digit;     // append new digit
+        gotDigits++;
     }
 }
 
@@ -440,10 +453,10 @@ void generateDataOnPartition(void)
     
     //----------
     (void) Cconws("Choose test file size in MB: ");
-    int testFileSizeMb = getIntFromUser(0);
+    int testFileSizeMb = getIntFromUser(1, 2);
 
     (void) Cconws("Choose test files count    : ");
-    int testFileCount = getIntFromUser(0);
+    int testFileCount = getIntFromUser(1, 2);
 
     (void) Cconws("Enter data modifier key    : ");
     BYTE dataModifier = Cconin();
