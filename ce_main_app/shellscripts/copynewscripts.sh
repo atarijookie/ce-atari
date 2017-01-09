@@ -95,6 +95,13 @@ else
         # we don't need to do anything for case D), where there is one core_freq there and it's correct
         echo "core_freq is ok in /boot/config.txt"
     fi
+
+    #------------------------
+    # disable ctrl-alt-del causing restart
+    ln -fs /dev/null /lib/systemd/system/ctrl-alt-del.target
+    
+    # disable auto-login
+    ln -fs /lib/systemd/system/getty@.service /etc/systemd/system/getty.target.wants/getty@tty1.service
 fi
 
 echo "Doing sync..."

@@ -414,7 +414,7 @@ const char *StatusReport::aliveSignIntToString(int aliveSign)
         case ALIVE_RW:          return "read or write cmd";
         case ALIVE_READ:        return "read command";
         case ALIVE_WRITE:       return "write command";
-        case ALIVE_IKBD_CMD:    return "IKBC command";
+        case ALIVE_IKBD_CMD:    return "IKBD command";
         case ALIVE_KEYDOWN:     return "key pressed";
         case ALIVE_MOUSEVENT:   return "mouse moved / clicked";
         case ALIVE_JOYEVENT:    return "joy moved / pressed";
