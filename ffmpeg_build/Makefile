@@ -10,6 +10,8 @@ BIN_PACKAGE = ffmpeg-$(VERSION_FFMPEG)-$(DISTRO)-bin.tar.bz2
 
 CONF_FLAGS_FFMPEG = --enable-gpl --disable-ffprobe --disable-ffserver \
                     --disable-debug --disable-doc
+CONF_FLAGS_FFMPEG += --disable-libxcb --disable-xlib
+
 VERSION_FFMPEG = 3.2.2
 ARCHIVE_FFMPEG = ffmpeg-$(VERSION_FFMPEG).tar.bz2
 
