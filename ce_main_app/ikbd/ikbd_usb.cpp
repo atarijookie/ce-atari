@@ -201,43 +201,35 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
     TInputDevice *in = NULL;
     const char *what;
 
-    if(strstr(linkName, "/tmp/vdev/mouse") != NULL && in==NULL) {             // it's a mouse
+    if(strstr(linkName, "/tmp/vdev/mouse") != NULL) {             // it's a mouse
         if(ikbdDevs[INTYPE_VDEVMOUSE].fd == -1) {             // don't have mouse?
             in = &ikbdDevs[INTYPE_VDEVMOUSE];
             what = "/tmp/vdev/mouse";
         } else {                                        // already have a mouse?
             return;
         }
-    }
-
-    if(strstr(linkName, "/tmp/vdev/kbd") != NULL && in==NULL) {               // it's a keyboard?
+    } else if(strstr(linkName, "/tmp/vdev/kbd") != NULL) {               // it's a keyboard?
         if(ikbdDevs[INTYPE_VDEVKEYBOARD].fd == -1) {          // don't have keyboard?
             in = &ikbdDevs[INTYPE_VDEVKEYBOARD];
             what = "/tmp/vdev/keyboard";
         } else {                                        // already have a keyboard?
             return;
         }
-    }
-
-    if(strstr(linkName, "mouse") != NULL && in==NULL) {             // it's a mouse
+    } else if(strstr(linkName, "mouse") != NULL) {             // it's a mouse
         if(ikbdDevs[INTYPE_MOUSE].fd == -1) {             // don't have mouse?
             in = &ikbdDevs[INTYPE_MOUSE];
             what = "mouse";
         } else {                                        // already have a mouse?
             return;
         }
-    }
-
-    if(strstr(linkName, "kbd") != NULL && in==NULL) {               // it's a keyboard?
+    } else if(strstr(linkName, "kbd") != NULL) {               // it's a keyboard?
         if(ikbdDevs[INTYPE_KEYBOARD].fd == -1) {          // don't have keyboard?
             in = &ikbdDevs[INTYPE_KEYBOARD];
             what = "keyboard";
         } else {                                        // already have a keyboard?
             return;
         }
-    }
-
-    if(strstr(linkName, "joystick") != NULL && in==NULL) {                  // it's a joystick?
+    } else if(strstr(linkName, "joystick") != NULL) {                  // it's a joystick?
         if(ikbdDevs[joy1st].fd == -1) {                                       // don't have joystick 1?
             if(strcmp(fullPath, ikbdDevs[joy2nd].devPath) == 0) {             // if this device is already connected as joystick 2, skip it
                 return;
@@ -255,9 +247,8 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
         } else {                                                            // already have a joystick?
             return;
         }
-    }
-
-    if(in == NULL) {                                                        // this isn't mouse, keyboard of joystick, quit!
+    } else {
+        // this isn't mouse, keyboard or joystick, quit!
         return;
     }
 
