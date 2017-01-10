@@ -162,6 +162,9 @@ private:
     void handleKeyAsKeybJoy  (bool pcNotSt, int joyNumber, int pcKey, bool keyDown);
     
     int fdWrite(int fd, BYTE *bfr, int cnt);
+
+	void grabExclusiveAccess(int fd);
+	void releaseExclusiveAccess(int fd);
     
     void dumpBuffer(bool fromStNotKeyboard);
 };

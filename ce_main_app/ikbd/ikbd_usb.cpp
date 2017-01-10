@@ -271,6 +271,8 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
     in->fd = fd;
     strcpy(in->devPath, fullPath);
     logDebugAndIkbd(LOG_DEBUG, "Got device (%s): %s", what, fullPath);
+
+    grabExclusiveAccess(fd);
 }
 
 void Ikbd::processMouse(input_event *ev)
@@ -602,4 +604,18 @@ void Ikbd::handleKeyAsKeybJoy(bool pcNotSt, int joyNumber, int pcKey, bool keyDo
     }
     
     processJoystick(&jse, joyNumber);
+}
+
+void Ikbd::grabExclusiveAccess(int fd)
+{
+    if(ioctl(fd, EVIOCGRAB, (void*)1) < 0) { // grab exclusive
+        logDebugAndIkbd(LOG_ERROR, "Ikbd::grabExclusiveAccess() ioctl failed : ", strerror(errno));
+    }
+}
+
+void Ikbd::releaseExclusiveAccess(int fd)
+{
+    if(ioctl(fd, EVIOCGRAB, (void*)0) < 0) { // release
+        logDebugAndIkbd(LOG_ERROR, "Ikbd::releaseExclusiveAccess() ioctl failed : ", strerror(errno));
+    }
 }
