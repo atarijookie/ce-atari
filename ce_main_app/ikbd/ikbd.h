@@ -139,7 +139,7 @@ private:
     void fillSpecialCodeLengthTable(void);
     void fillStCommandsLengthTable(void);
 
-    void processFoundDev(char *linkName, char *fullPath);
+    void processFoundDev(const char *linkName, const char *fullPath);
 
     void resetInternalIkbdVars(void);
     void sendJoy0State(void);

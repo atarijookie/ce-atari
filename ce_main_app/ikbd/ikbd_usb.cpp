@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -131,7 +132,7 @@ void Ikbd::findDevices(void)
 		Utils::splitFilenameFromPath(pathAndFile, path, file);		// get only file name, skip the path (which now is something like '../../')
 		file = "/dev/input/" + file;    							// create full path - /dev/input/event0
 		
-		processFoundDev((char *) de->d_name, (char *) file.c_str());    // and do something with that file
+		processFoundDev(de->d_name, file.c_str());    // and do something with that file
     }
 
 	closedir(dir);	
@@ -189,21 +190,21 @@ void Ikbd::findVirtualDevices(void)
         //file = "/dev/input/" + file;    							// create full path - /dev/input/event0
         file = "/tmp/vdev/"+file;    							// create full path - /dev/input/event0
 
-        processFoundDev((char *) file.c_str(), (char *) file.c_str());    // and do something with that file
+        processFoundDev(file.c_str(), file.c_str());    // and do something with that file
     }
 
-    closedir(dir);	
+    closedir(dir);
 }
 
-void Ikbd::processFoundDev(char *linkName, char *fullPath)
+void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
 {
     TInputDevice *in = NULL;
-    char *what;
+    const char *what;
 
     if(strstr(linkName, "/tmp/vdev/mouse") != NULL && in==NULL) {             // it's a mouse
         if(ikbdDevs[INTYPE_VDEVMOUSE].fd == -1) {             // don't have mouse?
             in = &ikbdDevs[INTYPE_VDEVMOUSE];
-            what = (char *) "/tmp/vdev/mouse";
+            what = "/tmp/vdev/mouse";
         } else {                                        // already have a mouse?
             return;
         }
@@ -212,7 +213,7 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
     if(strstr(linkName, "/tmp/vdev/kbd") != NULL && in==NULL) {               // it's a keyboard?
         if(ikbdDevs[INTYPE_VDEVKEYBOARD].fd == -1) {          // don't have keyboard?
             in = &ikbdDevs[INTYPE_VDEVKEYBOARD];
-            what = (char *) "/tmp/vdev/keyboard";         
+            what = "/tmp/vdev/keyboard";
         } else {                                        // already have a keyboard?
             return;
         }
@@ -220,8 +221,8 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
 
     if(strstr(linkName, "mouse") != NULL && in==NULL) {             // it's a mouse
         if(ikbdDevs[INTYPE_MOUSE].fd == -1) {             // don't have mouse?
-            in = &ikbdDevs[INTYPE_MOUSE];         
-            what = (char *) "mouse";
+            in = &ikbdDevs[INTYPE_MOUSE];
+            what = "mouse";
         } else {                                        // already have a mouse?
             return;
         }
@@ -230,7 +231,7 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
     if(strstr(linkName, "kbd") != NULL && in==NULL) {               // it's a keyboard?
         if(ikbdDevs[INTYPE_KEYBOARD].fd == -1) {          // don't have keyboard?
             in = &ikbdDevs[INTYPE_KEYBOARD];
-            what = (char *) "keyboard";         
+            what = "keyboard";
         } else {                                        // already have a keyboard?
             return;
         }
@@ -242,15 +243,15 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
                 return;
             }
 
-            in = &ikbdDevs[joy1st];         
-            what = (char *) "joystick1";
+            in = &ikbdDevs[joy1st];
+            what = "joystick1";
         } else if(ikbdDevs[joy2nd].fd == -1) {                                // don't have joystick 2?
             if(strcmp(fullPath, ikbdDevs[joy1st].devPath) == 0) {             // if this device is already connected as joystick 1, skip it
                 return;
             }
 
-            in = &ikbdDevs[joy2nd];         
-            what = (char *) "joystick2";
+            in = &ikbdDevs[joy2nd];
+            what = "joystick2";
         } else {                                                            // already have a joystick?
             return;
         }
@@ -263,7 +264,7 @@ void Ikbd::processFoundDev(char *linkName, char *fullPath)
     int fd = open(fullPath, O_RDONLY | O_NONBLOCK);
 
     if(fd < 0) {
-        logDebugAndIkbd(LOG_ERROR, "Failed to open input device (%s): %s", what, fullPath);
+        logDebugAndIkbd(LOG_ERROR, "Failed to open input device %s (%s) : %s ", fullPath, what, strerror(errno));
         return;
     }
 
