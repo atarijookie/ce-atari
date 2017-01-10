@@ -206,6 +206,7 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
             in = &ikbdDevs[INTYPE_VDEVMOUSE];
             what = "/tmp/vdev/mouse";
         } else {                                        // already have a mouse?
+            logDebugAndIkbd(LOG_DEBUG, "%s: already have a mouse", fullPath);
             return;
         }
     } else if(strstr(linkName, "/tmp/vdev/kbd") != NULL) {               // it's a keyboard?
@@ -213,6 +214,7 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
             in = &ikbdDevs[INTYPE_VDEVKEYBOARD];
             what = "/tmp/vdev/keyboard";
         } else {                                        // already have a keyboard?
+            logDebugAndIkbd(LOG_DEBUG, "%s: already have a keyboard", fullPath);
             return;
         }
     } else if(strstr(linkName, "mouse") != NULL) {             // it's a mouse
@@ -220,6 +222,7 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
             in = &ikbdDevs[INTYPE_MOUSE];
             what = "mouse";
         } else {                                        // already have a mouse?
+            logDebugAndIkbd(LOG_DEBUG, "%s: already have a mouse", fullPath);
             return;
         }
     } else if(strstr(linkName, "kbd") != NULL) {               // it's a keyboard?
@@ -227,11 +230,13 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
             in = &ikbdDevs[INTYPE_KEYBOARD];
             what = "keyboard";
         } else {                                        // already have a keyboard?
+            logDebugAndIkbd(LOG_DEBUG, "%s: already have a keyboard", fullPath);
             return;
         }
     } else if(strstr(linkName, "joystick") != NULL) {                  // it's a joystick?
         if(ikbdDevs[joy1st].fd == -1) {                                       // don't have joystick 1?
             if(strcmp(fullPath, ikbdDevs[joy2nd].devPath) == 0) {             // if this device is already connected as joystick 2, skip it
+                logDebugAndIkbd(LOG_DEBUG, "%s: already connected as joystick 2", fullPath);
                 return;
             }
 
@@ -239,12 +244,14 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
             what = "joystick1";
         } else if(ikbdDevs[joy2nd].fd == -1) {                                // don't have joystick 2?
             if(strcmp(fullPath, ikbdDevs[joy1st].devPath) == 0) {             // if this device is already connected as joystick 1, skip it
+                logDebugAndIkbd(LOG_DEBUG, "%s: already cannected as joystick 1", fullPath);
                 return;
             }
 
             in = &ikbdDevs[joy2nd];
             what = "joystick2";
         } else {                                                            // already have a joystick?
+            logDebugAndIkbd(LOG_DEBUG, "%s: already have both joysticks", fullPath);
             return;
         }
     } else {
