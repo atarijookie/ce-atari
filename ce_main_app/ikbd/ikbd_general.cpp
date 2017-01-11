@@ -35,11 +35,10 @@ void *ikbdThreadCode(void *ptr)
 {
     struct termios    termiosStruct;
     Ikbd ikbd;
-    //DWORD nextDevFindTime;
     int max_fd;
     int fd;
     fd_set readfds;
-    struct timeval timeout;
+    /*struct timeval timeout;*/
     int i;
     int inotifyFd;
     int wd1, wd2, wd3;
@@ -94,9 +93,9 @@ void *ikbdThreadCode(void *ptr)
             FD_SET(inotifyFd, &readfds);
             if(inotifyFd > max_fd) max_fd = inotifyFd;
         }
-        memset(&timeout, 0, sizeof(timeout));
-        timeout.tv_sec = 3;
-        if(select(max_fd + 1, &readfds, NULL, NULL, &timeout) < 0) {
+        //memset(&timeout, 0, sizeof(timeout));
+        //timeout.tv_sec = 3;
+        if(select(max_fd + 1, &readfds, NULL, NULL, NULL/*&timeout*/) < 0) {
             if(errno == EINTR) {
                 continue;   // a signal was delivered
             } else {
@@ -192,7 +191,7 @@ void *ikbdThreadCode(void *ptr)
     }
     ikbd.closeDevs();
 
-    ikbdLog("ikbdThreadCode has quit");
+    logDebugAndIkbd(LOG_DEBUG, "ikbdThreadCode has quit");
     return 0;
 }
 

@@ -1,3 +1,4 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
@@ -284,6 +285,7 @@ int main(int argc, char *argv[])
 
 #ifndef ONPC_NOTHING
     printf("Stoping ikbd thread\n");
+	pthread_kill(ikbdThreadInfo, SIGINT);               // stop the select()
     pthread_join(ikbdThreadInfo, NULL);                 // wait until ikbd      thread finishes
 #endif
 
