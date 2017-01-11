@@ -1,0 +1,14 @@
+language: c
+
+os:
+  - linux
+
+# container-based builds
+sudo: false
+
+compiler:
+  - gcc
+
+script:
+  - 'cd $TRAVIS_BUILD_DIR'
+  - 'make ce_main_app ONPC=yes'
