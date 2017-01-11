@@ -103,6 +103,15 @@ bool DeviceMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
         return false;
     }
 
+#if defined(_FILE_OFFSET_BITS) && (_FILE_OFFSET_BITS == 64)
+	off_t pos = sectorNo * 512;
+	off_t ofs = lseek(fdes, pos, SEEK_SET);
+	if(ofs != pos) {
+		Debug::out(LOG_ERROR, "DeviceMedia::readSectors - lseek failed %lld", (long long)ofs, strerror(errno));
+		return false;
+	}
+#else
+	/* Note : why not using lseek64() ? (#define _LARGEFILE64_SOURCE) */
     off64_t pos = sectorNo * ((int64_t)512);    // convert sector # to offset 
     loff_t loff;
     int res = syscall(__NR__llseek, fdes, (unsigned long) (pos >> 32), (unsigned long) pos, &loff, SEEK_SET);
@@ -111,6 +120,7 @@ bool DeviceMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
         Debug::out(LOG_DEBUG, "DeviceMedia::readSectors - lseek64() failed, errno: %d", errno);
         return false;
     }
+#endif
 
     size_t byteCount = count * 512;
 	size_t cnt = read(fdes, bfr, byteCount);	// try to read sector(s)
@@ -130,6 +140,14 @@ bool DeviceMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
         return false;
     }
 
+#if defined(_FILE_OFFSET_BITS) && (_FILE_OFFSET_BITS == 64)
+	off_t pos = sectorNo * 512;
+	off_t ofs = lseek(fdes, pos, SEEK_SET);
+	if(ofs != pos) {
+		Debug::out(LOG_ERROR, "DeviceMedia::writeSectors - lseek failed %lld", (long long)ofs, strerror(errno));
+		return false;
+	}
+#else
     off64_t pos = sectorNo * ((int64_t)512);    // convert sector # to offset 
     loff_t loff;
     int res = syscall(__NR__llseek, fdes, (unsigned long) (pos >> 32), (unsigned long) pos, &loff, SEEK_SET);
@@ -138,6 +156,7 @@ bool DeviceMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
         Debug::out(LOG_DEBUG, "DeviceMedia::writeSectors - lseek64() failed, errno: %d", errno);
         return false;
     }
+#endif
 
     size_t byteCount = count * 512;
 	size_t cnt = write(fdes, bfr, byteCount);	// try to write sector(s)
