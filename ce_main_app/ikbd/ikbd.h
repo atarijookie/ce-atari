@@ -83,10 +83,10 @@ public:
 
     void processReceivedCommands(void);
 
+    int     fdUart;
+
 private:
     int        ceIkbdMode;
-
-    int     fdUart;
 
     bool    outputEnabled;
 

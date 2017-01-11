@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <string>
 #include <unistd.h>
+#include <sys/select.h>
 
 #include <signal.h>
 #include <termios.h>
@@ -32,20 +33,24 @@ void *ikbdThreadCode(void *ptr)
 {
     struct termios    termiosStruct;
     Ikbd ikbd;
-    DWORD nextDevFindTime;
+    //DWORD nextDevFindTime;
+    int max_fd;
+    int fd;
+    fd_set readfds;
+    struct timeval timeout;
+    int i;
 
     ikbdLog("----------------------------------------------------------");
     ikbdLog("ikbdThreadCode will enter loop...");
 
     bcm2835_gpio_write(PIN_TX_SEL1N2, HIGH);        // TX_SEL1N2, switch the RX line to receive from Franz, which does the 9600 to 7812 baud translation
 
-    nextDevFindTime = Utils::getEndTime(3000);      // check the devices in 3 seconds
+    //nextDevFindTime = Utils::getEndTime(3000);      // check the devices in 3 seconds
     ikbd.findDevices();
     ikbd.findVirtualDevices();
 
     // open and set up uart
-    int res = ikbd.serialSetup(&termiosStruct);
-    if(res == -1) {
+    if(ikbd.serialSetup(&termiosStruct) == -1) {
         logDebugAndIkbd(LOG_ERROR, "ikbd.serialSetup failed, won't be able to send IKDB data");
     }
 
@@ -56,6 +61,31 @@ void *ikbdThreadCode(void *ptr)
             ikbd.loadSettings();
         }
 
+        max_fd = -1;
+        FD_ZERO(&readfds);
+        for(i = 0; i < 6; i++) {                                       // go through the input devices
+            fd = ikbd.getFdByIndex(i);
+            if(fd >= 0) {
+                FD_SET(fd, &readfds);
+                if(fd > max_fd) max_fd = fd;
+            }
+        }
+        if(ikbd.fdUart >= 0) {
+            FD_SET(ikbd.fdUart, &readfds);
+            if(ikbd.fdUart > max_fd) max_fd = ikbd.fdUart;
+        }
+        memset(&timeout, 0, sizeof(timeout));
+        timeout.tv_sec = 3;
+        if(select(max_fd + 1, &readfds, NULL, NULL, &timeout) < 0) {
+            if(errno == EINTR) {
+                continue;   // a signal was delivered
+            } else {
+                Debug::out(LOG_ERROR, "ikbdThreadCode() select: %s", strerror(errno));
+                continue;
+            }
+        }
+
+#if 0
         // look for new input devices
         if(Utils::getCurrentMs() >= nextDevFindTime) {      // should we check for new devices?
             nextDevFindTime = Utils::getEndTime(3000);      // check the devices in 3 seconds
@@ -63,62 +93,61 @@ void *ikbdThreadCode(void *ptr)
             ikbd.findDevices();
             ikbd.findVirtualDevices();
         }
+#endif
 
-        // process the incomming data from original keyboard and from ST
-        ikbd.processReceivedCommands();
+        if(ikbd.fdUart >= 0 && FD_ISSET(ikbd.fdUart, &readfds)) {
+            // process the incomming data from original keyboard and from ST
+            ikbd.processReceivedCommands();
+        }
 
         // process events from attached input devices
         struct input_event  ev;
         struct js_event     js;
 
         ssize_t res;
-        int i;
-        bool gotSomething = false;
 
-        for(i=0; i<6; i++) {                                        // go through the input devices
-            if(ikbd.getFdByIndex(i) == -1) {                        // device not attached? skip the rest
-                continue;
-            }
+        for(i = 0; i < 6; i++) {                                        // go through the input devices
+            fd = ikbd.getFdByIndex(i);
 
-            if(i < 2) {     // for keyboard and mouse
-                res = read(ikbd.getFdByIndex(i), &ev, sizeof(input_event));
-            } else if (i<4) {        // for joysticks
-                res = read(ikbd.getFdByIndex(i), &js, sizeof(js_event));
-            }
-            if( i==4 || i==5) {     // for virtual mouse and keyboard
-                res = read(ikbd.getFdByIndex(i), &ev, sizeof(input_event));
-            }
-            if(res < 0) {                                           // on error, skip the rest
-                if(errno == ENODEV) {                               // if device was removed, deinit it
-                    ikbd.deinitDev(i);
-                }
-
-                continue;
-            }
-            if( res==0 ) {                                           // on error, skip the rest
-                continue;
-            }
-
-            gotSomething = true;                                    // mark that reading of at least one device succeeded
-
-            switch(i) {
-                case INTYPE_MOUSE:          ikbd.processMouse(&ev);          break;
-
+            if(fd >= 0 && FD_ISSET(fd, &readfds)) {
+                switch(i) {
+                case INTYPE_MOUSE:
+                case INTYPE_KEYBOARD: // for keyboard and mouse
                 case INTYPE_VDEVMOUSE:
-                    ikbd.markVirtualMouseEvenTime();                // first mark the event time
-                    ikbd.processMouse(&ev);                         // then process the event
+                case INTYPE_VDEVKEYBOARD: // for virtual mouse and keyboard
+                    res = read(ikbd.getFdByIndex(i), &ev, sizeof(input_event));
                     break;
-
-                case INTYPE_KEYBOARD:       ikbd.processKeyboard(&ev);       break;
-                case INTYPE_VDEVKEYBOARD:   ikbd.processKeyboard(&ev);       break;
-                case INTYPE_JOYSTICK1:      ikbd.processJoystick(&js, 0);    break;
-                case INTYPE_JOYSTICK2:      ikbd.processJoystick(&js, 1);    break;
+                case INTYPE_JOYSTICK1:
+                case INTYPE_JOYSTICK2: // for joysticks
+                    res = read(ikbd.getFdByIndex(i), &js, sizeof(js_event));
+                    break;
+                }
+                if(res < 0) {                                           // on error, skip the rest
+                    if(errno == ENODEV) {                               // if device was removed, deinit it
+                        ikbd.deinitDev(i);
+                    } else {
+                        logDebugAndIkbd(LOG_ERROR, "ikbdThreadCode() read(%d) : %s", fd, strerror(errno));
+                    }
+                } else if( res==0 ) {                                           // on error, skip the rest
+                    logDebugAndIkbd(LOG_ERROR, "ikbdThreadCode() read(%d) returned 0", fd);
+                } else {
+                    switch(i) {
+                    case INTYPE_VDEVMOUSE:
+                        ikbd.markVirtualMouseEvenTime();                // first mark the event time
+                    case INTYPE_MOUSE:
+                        ikbd.processMouse(&ev);                         // then process the event
+                        break;
+                    case INTYPE_KEYBOARD:
+                    case INTYPE_VDEVKEYBOARD:
+                        ikbd.processKeyboard(&ev);
+                        break;
+                    case INTYPE_JOYSTICK1:
+                    case INTYPE_JOYSTICK2:
+                        ikbd.processJoystick(&js, i - INTYPE_JOYSTICK1);
+                        break;
+                    }
+                }
             }
-        }
-
-        if(!gotSomething) {                                         // didn't succeed with reading of any device?
-            usleep(10000);                                          // sleep for 10 ms
-            continue;
         }
     }
 
