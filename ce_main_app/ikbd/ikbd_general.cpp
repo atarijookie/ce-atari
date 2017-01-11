@@ -6,6 +6,8 @@
 #include <string>
 #include <unistd.h>
 #include <sys/select.h>
+#include <sys/inotify.h>
+#include <limits.h>
 
 #include <signal.h>
 #include <termios.h>
@@ -39,20 +41,34 @@ void *ikbdThreadCode(void *ptr)
     fd_set readfds;
     struct timeval timeout;
     int i;
+    int inotifyFd;
+    int wd1, wd2, wd3;
+    ssize_t res;
 
     ikbdLog("----------------------------------------------------------");
     ikbdLog("ikbdThreadCode will enter loop...");
 
     bcm2835_gpio_write(PIN_TX_SEL1N2, HIGH);        // TX_SEL1N2, switch the RX line to receive from Franz, which does the 9600 to 7812 baud translation
 
-    //nextDevFindTime = Utils::getEndTime(3000);      // check the devices in 3 seconds
-    ikbd.findDevices();
-    ikbd.findVirtualDevices();
-
     // open and set up uart
     if(ikbd.serialSetup(&termiosStruct) == -1) {
         logDebugAndIkbd(LOG_ERROR, "ikbd.serialSetup failed, won't be able to send IKDB data");
     }
+
+    inotifyFd = inotify_init();
+    if(inotifyFd < 0) {
+        logDebugAndIkbd(LOG_ERROR, "inotify_init() failed");
+    } else {
+        wd1 = inotify_add_watch(inotifyFd, "/dev/input", IN_CREATE);
+        if(wd1 < 0) Debug::out(LOG_ERROR, "inotify_add_watch(/dev/input, IN_CREATE) failed");
+        wd2 = inotify_add_watch(inotifyFd, "/dev/input/by-path", IN_CREATE | IN_DELETE_SELF);
+        if(wd2 < 0) Debug::out(LOG_ERROR, "inotify_add_watch(/dev/input/by-path, IN_CREATE | IN_DELETE_SELF)");
+        wd3 = inotify_add_watch(inotifyFd, "/tmp/vdev", IN_CREATE);
+        if(wd3 < 0) Debug::out(LOG_ERROR, "inotify_add_watch(/tmp/vdev, IN_CREATE)");
+    }
+
+    ikbd.findDevices();
+    ikbd.findVirtualDevices();
 
     while(sigintReceived == 0) {
         // reload config if needed
@@ -74,6 +90,10 @@ void *ikbdThreadCode(void *ptr)
             FD_SET(ikbd.fdUart, &readfds);
             if(ikbd.fdUart > max_fd) max_fd = ikbd.fdUart;
         }
+        if(inotifyFd >= 0) {
+            FD_SET(inotifyFd, &readfds);
+            if(inotifyFd > max_fd) max_fd = inotifyFd;
+        }
         memset(&timeout, 0, sizeof(timeout));
         timeout.tv_sec = 3;
         if(select(max_fd + 1, &readfds, NULL, NULL, &timeout) < 0) {
@@ -85,15 +105,33 @@ void *ikbdThreadCode(void *ptr)
             }
         }
 
-#if 0
-        // look for new input devices
-        if(Utils::getCurrentMs() >= nextDevFindTime) {      // should we check for new devices?
-            nextDevFindTime = Utils::getEndTime(3000);      // check the devices in 3 seconds
-
-            ikbd.findDevices();
-            ikbd.findVirtualDevices();
+        if(inotifyFd >= 0 && FD_ISSET(inotifyFd, &readfds)) {
+            char buf[sizeof(struct inotify_event) + NAME_MAX + 1];
+            res = read(inotifyFd, buf, sizeof(buf));
+            if(res < 0) {
+                Debug::out(LOG_ERROR, "read(inotifyFd) : %s", strerror(errno));
+            } else {
+                struct inotify_event *iev = (struct inotify_event *)buf;
+                Debug::out(LOG_DEBUG, "inotify msg %dbytes wd=%d mask=%04x name=%s", (int)res, iev->wd, iev->mask, (iev->len > 0) ? iev->name : "");
+                if(iev->wd == wd1) {
+                    if(iev->len > 0 && (0 == strcmp(iev->name, "by-path"))) {
+                        wd2 = inotify_add_watch(inotifyFd, "/dev/input/by-path", IN_CREATE | IN_DELETE_SELF);
+                        if(wd2 < 0) Debug::out(LOG_ERROR, "inotify_add_watch(/dev/input/by-path, IN_CREATE | IN_DELETE_SELF)");
+                    }
+                } else if(iev->wd == wd2) {
+                    if(iev->mask & IN_DELETE_SELF) {
+                        inotify_rm_watch(inotifyFd, wd2);
+                        wd2 = -1;
+                    } else {
+                        // look for new input devices
+                        ikbd.findDevices();
+                    }
+                } else if(iev->wd == wd3) {
+                    // look for new input devices
+                    ikbd.findVirtualDevices();
+                }
+            }
         }
-#endif
 
         if(ikbd.fdUart >= 0 && FD_ISSET(ikbd.fdUart, &readfds)) {
             // process the incomming data from original keyboard and from ST
@@ -103,8 +141,6 @@ void *ikbdThreadCode(void *ptr)
         // process events from attached input devices
         struct input_event  ev;
         struct js_event     js;
-
-        ssize_t res;
 
         for(i = 0; i < 6; i++) {                                        // go through the input devices
             fd = ikbd.getFdByIndex(i);
@@ -151,6 +187,9 @@ void *ikbdThreadCode(void *ptr)
         }
     }
 
+    if(inotifyFd >= 0) {
+        close(inotifyFd);
+    }
     ikbd.closeDevs();
 
     ikbdLog("ikbdThreadCode has quit");

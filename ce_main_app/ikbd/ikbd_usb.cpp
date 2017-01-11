@@ -201,12 +201,13 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
     TInputDevice *in = NULL;
     const char *what;
 
+    Debug::out(LOG_DEBUG, "Ikbd::processFoundDev(%s, %s)", linkName, fullPath);
     if(strstr(linkName, "/tmp/vdev/mouse") != NULL) {             // it's a mouse
         if(ikbdDevs[INTYPE_VDEVMOUSE].fd == -1) {             // don't have mouse?
             in = &ikbdDevs[INTYPE_VDEVMOUSE];
             what = "/tmp/vdev/mouse";
         } else {                                        // already have a mouse?
-            //logDebugAndIkbd(LOG_DEBUG, "%s: already have a mouse", fullPath);
+            logDebugAndIkbd(LOG_DEBUG, "%s: already have a mouse", fullPath);
             return;
         }
     } else if(strstr(linkName, "/tmp/vdev/kbd") != NULL) {               // it's a keyboard?
@@ -214,7 +215,7 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
             in = &ikbdDevs[INTYPE_VDEVKEYBOARD];
             what = "/tmp/vdev/keyboard";
         } else {                                        // already have a keyboard?
-            //logDebugAndIkbd(LOG_DEBUG, "%s: already have a keyboard", fullPath);
+            logDebugAndIkbd(LOG_DEBUG, "%s: already have a keyboard", fullPath);
             return;
         }
     } else if(strstr(linkName, "mouse") != NULL) {             // it's a mouse
