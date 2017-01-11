@@ -139,7 +139,7 @@ private:
     void fillSpecialCodeLengthTable(void);
     void fillStCommandsLengthTable(void);
 
-    void processFoundDev(char *linkName, char *fullPath);
+    void processFoundDev(const char *linkName, const char *fullPath);
 
     void resetInternalIkbdVars(void);
     void sendJoy0State(void);
@@ -162,6 +162,9 @@ private:
     void handleKeyAsKeybJoy  (bool pcNotSt, int joyNumber, int pcKey, bool keyDown);
     
     int fdWrite(int fd, BYTE *bfr, int cnt);
+
+	void grabExclusiveAccess(int fd);
+	void releaseExclusiveAccess(int fd);
     
     void dumpBuffer(bool fromStNotKeyboard);
 };
