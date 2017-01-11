@@ -1,8 +1,11 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #ifndef _IKBD_H_
 #define _IKBD_H_
 
-#include <termios.h> 
+#include <termios.h>
 #include <linux/joystick.h>
+
+#include <bitset>
 
 #include "ikbd_defs.h"
 #include "cyclicbuff.h"
@@ -11,9 +14,9 @@
 
 //#define SPYIKBD
 
-#define INPUT_LINKS_PATH	    "/dev/input/by-path"
+#define INPUT_LINKS_PATH        "/dev/input/by-path"
 #define HOSTPATH_SEPAR_STRING   "/"
-#define PATH_BUFF_SIZE		    1024
+#define PATH_BUFF_SIZE            1024
 
 typedef struct {
     char    devPath[256];
@@ -23,12 +26,15 @@ typedef struct {
 #define JOYAXIS             8
 #define JOYBUTTONS          12
 
+// count of key to check for key combination 
+#define KBD_KEY_COUNT   256
+
 #ifdef DISTRO_YOCTO
     // use this serial port on yocto
-    #define UARTFILE	        "/dev/ttyAMA0"
+    #define UARTFILE            "/dev/ttyAMA0"
 #else
     // use this serial port on Raspbian
-    #define UARTFILE	        "/dev/serial0" 
+    #define UARTFILE            "/dev/serial0"
 #endif
 
 #define UARTMARK_STCMD      0xAA
@@ -40,8 +46,8 @@ typedef struct {
 
     int lastDir;
     int lastBtn;
-	
-	int lastDirAndBtn;
+
+    int lastDirAndBtn;
 } TJoystickState;
 
 void *ikbdThreadCode(void *ptr);
@@ -73,12 +79,12 @@ public:
     void processMouse(input_event *ev);
     void processKeyboard(input_event *ev);
     void processJoystick(js_event *jse, int joyNumber);
-	void markVirtualMouseEvenTime(void);
+    void markVirtualMouseEvenTime(void);
 
     void processReceivedCommands(void);
 
 private:
-	int		ceIkbdMode;
+    int        ceIkbdMode;
 
     int     fdUart;
 
@@ -96,28 +102,28 @@ private:
     bool    mouseWheelAsArrowsUpDown;       // if true, mouse wheel up / down will be translated to arrow up / down
     bool    keybJoy0;                       // if true, specific keys will act as joy 0
     bool    keybJoy1;                       // if true, specific keys will act as joy 1
-    
+
     KeybJoyKeys     keyJoyKeys;
     KeyTranslator   keyTranslator;
-    
-	struct {
-		int		threshX, threshY;
-	} relMouse;
-	
+
     struct {
-        int		x,y;
-        int		maxX, maxY;
-		int		scaleX, scaleY;
-		BYTE	buttons;
+        int        threshX, threshY;
+    } relMouse;
+
+    struct {
+        int        x,y;
+        int        maxX, maxY;
+        int        scaleX, scaleY;
+        BYTE    buttons;
     } absMouse;
 
-	struct {
-		BYTE deltaX;
-		BYTE deltaY;
-	} keycodeMouse;
-	
+    struct {
+        BYTE deltaX;
+        BYTE deltaY;
+    } keycodeMouse;
+
     DWORD           lastVDevMouseEventTime;
-    
+
     int             joystickMode;
     TJoystickState  joystick[2];
     bool            joystickEnabled;
@@ -132,6 +138,9 @@ private:
 
     BYTE            stCommandLen[256];
 
+    std::bitset<KBD_KEY_COUNT> pressedKeys;
+    bool            keyboardExclusiveAccess;
+
     void initDevs(void);
     void initJoystickState(TJoystickState *joy);
     void fillKeyTranslationTable(void);
@@ -144,28 +153,29 @@ private:
     void resetInternalIkbdVars(void);
     void sendJoy0State(void);
     void sendJoyState(int joyNumber, int dirTotal);
-	void sendBothJoyReport(void);
+    void sendBothJoyReport(void);
     void sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel);
     void sendMousePosAbsolute(int fd, BYTE absButtons);
     void fixAbsMousePos(void);
 
     void processStCommands(void);
-	void processGetCommand(BYTE getCmd);
+    void processGetCommand(BYTE getCmd);
     void processKeyboardData(void);
 
-	bool gotUsbMouse(void);
-	bool gotUsbJoy1(void);
-	bool gotUsbJoy2(void);
-    
+    bool gotUsbMouse(void);
+    bool gotUsbJoy1(void);
+    bool gotUsbJoy2(void);
+
     void handlePcKeyAsKeybJoy(int joyNumber, int pcKey, int eventValue);
     bool handleStKeyAsKeybJoy(BYTE val);
     void handleKeyAsKeybJoy  (bool pcNotSt, int joyNumber, int pcKey, bool keyDown);
-    
+
     int fdWrite(int fd, BYTE *bfr, int cnt);
 
-	void grabExclusiveAccess(int fd);
-	void releaseExclusiveAccess(int fd);
-    
+    void toggleKeyboardExclusiveAccess(void);
+    void grabExclusiveAccess(int fd);
+    void releaseExclusiveAccess(int fd);
+
     void dumpBuffer(bool fromStNotKeyboard);
 };
 

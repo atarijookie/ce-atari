@@ -206,7 +206,7 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
             in = &ikbdDevs[INTYPE_VDEVMOUSE];
             what = "/tmp/vdev/mouse";
         } else {                                        // already have a mouse?
-            logDebugAndIkbd(LOG_DEBUG, "%s: already have a mouse", fullPath);
+            //logDebugAndIkbd(LOG_DEBUG, "%s: already have a mouse", fullPath);
             return;
         }
     } else if(strstr(linkName, "/tmp/vdev/kbd") != NULL) {               // it's a keyboard?
@@ -214,7 +214,7 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
             in = &ikbdDevs[INTYPE_VDEVKEYBOARD];
             what = "/tmp/vdev/keyboard";
         } else {                                        // already have a keyboard?
-            logDebugAndIkbd(LOG_DEBUG, "%s: already have a keyboard", fullPath);
+            //logDebugAndIkbd(LOG_DEBUG, "%s: already have a keyboard", fullPath);
             return;
         }
     } else if(strstr(linkName, "mouse") != NULL) {             // it's a mouse
@@ -266,11 +266,14 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
         return;
     }
 
+    // need to EVIOCSREP ?
+
     in->fd = fd;
     strcpy(in->devPath, fullPath);
     logDebugAndIkbd(LOG_DEBUG, "Got device (%s): %s", what, fullPath);
 
     grabExclusiveAccess(fd);
+    keyboardExclusiveAccess = true;
 }
 
 void Ikbd::processMouse(input_event *ev)
@@ -397,13 +400,32 @@ void Ikbd::processMouse(input_event *ev)
 
 void Ikbd::processKeyboard(input_event *ev)
 {
+    int stKey = 0;
+    int res;
 //    ikbdLog("processKeyboard");
 
-    if (ev->type == EV_KEY) {
+    switch(ev->type) {
+    case EV_SYN:
+        ikbdLog("Ikbd::processKeyboard() EV_SYN code=%04x\n", ev->code);
+        break;
+    case EV_KEY:
+        ikbdLog("Ikbd::processKeyboard() EV_KEY code=%04x ev->value=%d\n", ev->code, ev->value);
         statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
         statuses.ikbdUsb.aliveSign = ALIVE_KEYDOWN;
 
-        int stKey = keyTranslator.pcKeyToSt(ev->code);          // translate PC key to ST key
+        // ev->value -- 1: down, 2: auto repeat, 0: up
+        if(ev->code < KBD_KEY_COUNT) {
+            if(ev->value == 1) {    // key down
+                pressedKeys[ev->code] = true;
+                if(pressedKeys[KEY_LEFTCTRL] && pressedKeys[KEY_RIGHTCTRL] && pressedKeys[KEY_LEFTALT] && pressedKeys[KEY_RIGHTALT]) {
+                    toggleKeyboardExclusiveAccess();
+                }
+            } else if(ev->value == 0) { // key up
+                pressedKeys[ev->code] = false;
+            }
+        }
+
+        stKey = keyTranslator.pcKeyToSt(ev->code);          // translate PC key to ST key
 
         if(stKey == 0 || fdUart == -1) {                        // key not found, no UART open? quit
             return;
@@ -429,11 +451,17 @@ void Ikbd::processKeyboard(input_event *ev)
         BYTE bfr;
         bfr = stKey;
 
-        int res = fdWrite(fdUart, &bfr, 1);
+        res = fdWrite(fdUart, &bfr, 1);
 
         if(res < 0) {
             logDebugAndIkbd(LOG_ERROR, "processKeyboard - sending to ST failed, errno: %d", errno);
         }
+        break;
+    case EV_MSC:
+        ikbdLog("Ikbd::processKeyboard() EV_MSC code=%d value=0x%08x\n", ev->code, ev->value);
+        break;
+    default:
+        logDebugAndIkbd(LOG_DEBUG, "Ikbd::processKeyboard() ***UNKNOWN*** ev->type=%d ev->code=0x%04x ev->value=0x%08x\n", ev->type, ev->code, ev->value);
     }
 }
 
@@ -602,6 +630,21 @@ void Ikbd::handleKeyAsKeybJoy(bool pcNotSt, int joyNumber, int pcKey, bool keyDo
     }
 
     processJoystick(&jse, joyNumber);
+}
+
+void Ikbd::toggleKeyboardExclusiveAccess(void)
+{
+    int fd;
+    fd = getFdByIndex(INTYPE_KEYBOARD);
+    logDebugAndIkbd(LOG_DEBUG, "Ikbd::toggleKeyboardExclusiveAccess() fd=%d keyboardExclusiveAccess=%d\n", fd, keyboardExclusiveAccess);
+    if(fd < 0) return;
+
+    if(keyboardExclusiveAccess) {
+        releaseExclusiveAccess(fd);
+    } else {
+        grabExclusiveAccess(fd);
+    }
+    keyboardExclusiveAccess = !keyboardExclusiveAccess;
 }
 
 void Ikbd::grabExclusiveAccess(int fd)
