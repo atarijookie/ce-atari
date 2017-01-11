@@ -12,24 +12,27 @@ CXXFLAGS = $(CFLAGS)
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 # -M : with system headers, -MM : without
 
-LDFLAGS	= -Llib -lrt -lanl -lpthread -lcurl -ldl -lutil
+VPATH = ./lib
+LDFLAGS	= -Llib
+LDLIBS = -lrt -lanl -lpthread -lcurl -ldl -lutil
 
 ifeq ($(ONPC),yes)
     CFLAGS += -DONPC_NOTHING -I./
+    TARGET = cosmosex_onpc
+    LDLIBS += -lcivetweb_onpc
 else
-    LDFLAGS	+= -lbcm2835
+    LDLIBS	+= -lbcm2835
     CFLAGS += -I./
-endif
-
-DISTRO := $(shell ./whichdistro.sh)
-ifeq ($(DISTRO),yocto)
-	TARGET   =  cosmosex_yocto
-	LDFLAGS += -lcivetweb_yocto
-	CFLAGS  += -DDISTRO_YOCTO
-else
-	TARGET   =  cosmosex_raspbian
-	LDFLAGS += -lcivetweb_raspbian
-	CFLAGS += -DDISTRO_RASPBIAN
+    DISTRO := $(shell ./whichdistro.sh)
+    ifeq ($(DISTRO),yocto)
+        TARGET   =  cosmosex_yocto
+        LDLIBS += -lcivetweb_yocto
+        CFLAGS  += -DDISTRO_YOCTO
+    else
+        TARGET   =  cosmosex_raspbian
+        LDLIBS += -lcivetweb_raspbian
+        CFLAGS += -DDISTRO_RASPBIAN
+    endif
 endif
 
 # uncomment following line to get map file (ce.map)
@@ -116,8 +119,8 @@ WEBCOMPONENTS = $(WEB_CSS_PATH)/combined.css.gz $(WEB_JS_PATH)/jquery-combined.j
 
 all:	$(TARGET)
 
-$(TARGET): $(OBJS) $(HDRS) $(WEBCOMPONENTS)
-	$(CXX_LINK) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@
+$(TARGET): $(OBJS) $(HDRS) $(WEBCOMPONENTS) $(LDLIBS)
+	$(CXX_LINK) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@ $(LDLIBS)
 #	$(STRIP) -s $@
 
 $(WEB_CSS_PATH)/combined.css.gz: ${WEB_CSS_MODULES}
@@ -128,6 +131,17 @@ $(WEB_JS_PATH)/zepto-combined.js.gz: $(WEB_JS_PATH)/zepto.js $(WEB_JS_PATH)/zept
 
 $(WEB_JS_PATH)/jquery-combined.js.gz: $(WEB_JS_PATH)/jquery.js ${WEB_JS_MODULES}
 	$(AT)cat $^ | gzip -f > $@
+
+ifeq ($(ONPC),yes)
+-lcivetweb_onpc:	lib/libcivetweb_onpc.a
+
+lib/libcivetweb_onpc.a: lib/civetweb-master.zip
+	rm -rf lib/civetweb-master
+	cd lib && unzip civetweb-master.zip
+	$(MAKE) -C lib/civetweb-master lib WITH_CPP=1
+	mv lib/civetweb-master/libcivetweb.a $@
+	rm -rf lib/civetweb-master
+endif
 
 .PHONY:	clean depclean
 
