@@ -3,12 +3,16 @@ language: c
 os:
   - linux
 
-# container-based builds
-sudo: false
+sudo: required
+dist: trusty
 
 compiler:
   - gcc
 
+install: sh ./.install-cross-mint.sh
+
 script:
   - 'cd $TRAVIS_BUILD_DIR'
   - 'make ce_main_app ONPC=yes'
+  - 'make atari_progs'
+  - 'make update'
