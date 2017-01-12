@@ -242,7 +242,9 @@ void CCoreThread::run(void)
     lastFwInfoTime.hansResetTime    = Utils::getCurrentMs();
     lastFwInfoTime.franzResetTime   = Utils::getCurrentMs();
 
+#if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
     bool res;
+#endif
     
     DWORD nextFloppyEncodingCheck   = Utils::getEndTime(1000);
     bool prevFloppyEncodingRunning  = false;

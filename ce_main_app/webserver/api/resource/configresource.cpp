@@ -151,7 +151,7 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
         stringStream << "{\"config\":[";
         stringStream << "]}"; 
         std::string sJson=stringStream.str();
-        mg_printf(conn, "Content-Length: %d\r\n\r\n",sJson.length());   // Always set Content-Length
+        mg_printf(conn, "Content-Length: %lu\r\n\r\n",sJson.length());   // Always set Content-Length
         mg_write(conn, sJson.c_str(), sJson.length());                  // now send content
         return true;
     }
@@ -166,7 +166,7 @@ bool ConfigResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
 		std::string sJson;
 		StatusReport xStatusReport;
 		xStatusReport.createReport(sJson,REPORTFORMAT_JSON);  
-        mg_printf(conn, "Content-Length: %d\r\n\r\n",sJson.length());   // Always set Content-Length
+        mg_printf(conn, "Content-Length: %lu\r\n\r\n",sJson.length());   // Always set Content-Length
         mg_write(conn, sJson.c_str(), sJson.length());                  // now send content
         return true;
     }

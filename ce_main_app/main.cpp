@@ -67,7 +67,9 @@ int main(int argc, char *argv[])
     CCoreThread *core;
     pthread_t	mountThreadInfo;
     pthread_t	downloadThreadInfo;
+#ifndef ONPC_NOTHING
     pthread_t	ikbdThreadInfo;
+#endif
     pthread_t	floppyEncThreadInfo;
 	pthread_t	timesyncThreadInfo;
     pthread_t   networkThreadInfo;
