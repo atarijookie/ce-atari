@@ -9,7 +9,9 @@ dist: trusty
 compiler:
   - gcc
 
-install: sh ./.install-cross-mint.sh
+install:
+  - 'sh ./.install-cross-mint.sh'
+  - 'sudo apt-get install -ym mtools'
 
 script:
   - 'cd $TRAVIS_BUILD_DIR'
