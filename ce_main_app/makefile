@@ -19,7 +19,7 @@ LDLIBS = -lrt -lanl -lpthread -lcurl -ldl -lutil
 ifeq ($(ONPC),yes)
     CFLAGS += -DONPC_NOTHING -I./
     TARGET = cosmosex_onpc
-    LDLIBS += -lcivetweb_onpc
+    LDLIBS += -lcivetweb_onpc -ldl
 else
     LDLIBS	+= -lbcm2835
     CFLAGS += -I./

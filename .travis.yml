@@ -15,6 +15,6 @@ install:
 
 script:
   - 'cd $TRAVIS_BUILD_DIR'
-  - 'make ce_main_app ONPC=yes'
+  - 'make ce_main_app ONPC=yes V=1'
   - 'make atari_progs'
   - 'make update'
