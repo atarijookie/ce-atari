@@ -407,10 +407,10 @@ void Ikbd::processKeyboard(input_event *ev, bool skipKeyboardTranslation)
 
     switch(ev->type) {
     case EV_SYN:
-        ikbdLog("Ikbd::processKeyboard() EV_SYN code=%04x\n", ev->code);
+        //ikbdLog("Ikbd::processKeyboard() EV_SYN code=%04x\n", ev->code);
         break;
     case EV_KEY:
-        ikbdLog("Ikbd::processKeyboard() EV_KEY code=%04x ev->value=%d\n", ev->code, ev->value);
+        //ikbdLog("Ikbd::processKeyboard() EV_KEY code=%04x ev->value=%d\n", ev->code, ev->value);
         statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
         statuses.ikbdUsb.aliveSign = ALIVE_KEYDOWN;
 
@@ -458,7 +458,7 @@ void Ikbd::processKeyboard(input_event *ev, bool skipKeyboardTranslation)
         }
         break;
     case EV_MSC:
-        ikbdLog("Ikbd::processKeyboard() EV_MSC code=%d value=0x%08x\n", ev->code, ev->value);
+        //ikbdLog("Ikbd::processKeyboard() EV_MSC code=%d value=0x%08x\n", ev->code, ev->value);
         break;
     default:
         logDebugAndIkbd(LOG_DEBUG, "Ikbd::processKeyboard() ***UNKNOWN*** ev->type=%d ev->code=0x%04x ev->value=0x%08x\n", ev->type, ev->code, ev->value);
