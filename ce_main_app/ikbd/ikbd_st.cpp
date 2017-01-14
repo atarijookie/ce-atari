@@ -739,7 +739,7 @@ void Ikbd::sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
 
 	bfr[0] = 0xf8 | buttons;
 	bfr[1] = xRel;
-	bfr[2] = yRel;
+    bfr[2] = yRelVal;
 	
 	int res = fdWrite(fd, bfr, 3); 
 
