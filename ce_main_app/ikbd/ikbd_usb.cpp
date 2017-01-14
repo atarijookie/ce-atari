@@ -414,7 +414,7 @@ void Ikbd::processKeyboard(input_event *ev, bool skipKeyboardTranslation)
         statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
         statuses.ikbdUsb.aliveSign = ALIVE_KEYDOWN;
 
-        int stKey = keyTranslator.pcKeyToSt(ev->code);          // translate PC key to ST key
+        stKey = keyTranslator.pcKeyToSt(ev->code);          // translate PC key to ST key
         // ev->value -- 1: down, 2: auto repeat, 0: up
         if(ev->value == 0) {        // when key is released, ST scan code has the highest bit set
             stKey = stKey | 0x80;
