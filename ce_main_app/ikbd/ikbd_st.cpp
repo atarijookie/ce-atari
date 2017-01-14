@@ -559,19 +559,43 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
                 }
                 
 				break;
-				
+
+                case KEYBDATA_JOY0:
+                if (firstJoyIs0 && joystickState == Enabled) {   // don't translate mouse in port0 as port1
+                    bfr[0] = KEYBDATA_JOY1;
+                } else if (firstJoyIs0) {
+                    ikbdLog( "Ikbd::processKeyboardData - joy0->joy1 but not joystick mode is off, leaving as joy0");
+                } else {
+                    ikbdLog("firstJoy0: %d (joy0)", firstJoyIs0);
+                }
+                break;
+
+                case KEYBDATA_JOY1:
+                if (firstJoyIs0 && joystickState == Enabled) {   // don't map joy1 if joy0 is used as mouse
+                    bfr[0] = KEYBDATA_JOY0;
+                } else if (firstJoyIs0) {
+                    ikbdLog( "Ikbd::processKeyboardData - joy1->joy0 but not joystick mode is off, leaving as joy1");
+                } else {
+                    ikbdLog("firstJoy0: %d (joy1)", firstJoyIs0);
+                }
+                break;
+
 				//----------------------------------------------
 				case KEYBDATA_JOY_BOTH:							// ST asked for both joystick states (interrogation) and this is the response
                 ikbdLog( "Ikbd::processKeyboardData - keyboard says: KEYBDATA_JOY_BOTH");
             
-				if(gotUsbJoy1()) {								// got joy 1?
-					BYTE joy0state = joystick[0].lastDir | joystick[0].lastBtn;	// get state
+                if(gotUsbJoy1()) {								// got joy 1?
+                    BYTE joy0state = joystick[0].lastDir | joystick[0].lastBtn;	// get state
 					bfr[1] = joy0state;
+                } else if (firstJoyIs0 && joystickState == Enabled) {
+                    bfr[0] = KEYBDATA_JOY1;
 				}
 
 				if(gotUsbJoy2()) {								// got joy 2?
 					BYTE joy1state = joystick[1].lastDir | joystick[1].lastBtn;	// get state
 					bfr[2] = joy1state;
+                } else if (firstJoyIs0 && joystickState == Enabled) {
+                    bfr[0] = KEYBDATA_JOY0;
 				}
 				
 				break;
@@ -612,8 +636,8 @@ void Ikbd::sendBothJoyReport(void)
 	
 	bfr[0] = KEYBDATA_JOY_BOTH;
 
-	bfr[1] = joy0state;
-	bfr[2] = joy1state;
+    bfr[1] = !firstJoyIs0 ? joy0state : joy1state;
+    bfr[2] = !firstJoyIs0 ? joy1state : joy0state;
 	
 	res = fdWrite(fdUart, bfr, 3); 
 

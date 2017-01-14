@@ -105,6 +105,7 @@ private:
     int     joy1st;
     int     joy2nd;
 
+    bool    firstJoyIs0;                    // if true, joystick keyboard mapping and usb/atari joysticks are swapped
     bool    mouseWheelAsArrowsUpDown;       // if true, mouse wheel up / down will be translated to arrow up / down
     bool    keybJoy0;                       // if true, specific keys will act as joy 0
     bool    keybJoy1;                       // if true, specific keys will act as joy 1

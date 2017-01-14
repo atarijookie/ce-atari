@@ -712,8 +712,17 @@ bool Ikbd::handleHotkeys(int pcKey, bool pressed, bool skipKeyboardTranslation)
     if ((leftShiftsPressed > 0 || rightShiftsPressed > 0) && ctrlsPressed > 0 && pressed) {
         Settings s;
         if (f11sPressed > 0) {
-            // TODO: toggle joy0 / joy1 (done on USB, missing on ST!)
-            ikbdLog( "Ikbd::handleHotkeys - toggle joy0 / joy1");
+            firstJoyIs0 = !firstJoyIs0;
+            s.setBool("JOY_FIRST_IS_0", firstJoyIs0);
+            if(firstJoyIs0) {
+                joy1st = INTYPE_JOYSTICK1;
+                joy2nd = INTYPE_JOYSTICK2;
+            } else {
+                joy1st = INTYPE_JOYSTICK2;
+                joy2nd = INTYPE_JOYSTICK1;
+            }
+            ikbdLog( "Ikbd::handleHotkeys - joy0 <-> joy1 [before: %s, now: %s]",
+                     firstJoyIs0 ? "OFF" : "ON", firstJoyIs0 ? "ON" : "OFF");
         } else if (f12sPressed > 0) {
             if (leftShiftsPressed > 0) {
                 keybJoy0 = !keybJoy0;

@@ -227,7 +227,7 @@ Ikbd::Ikbd()
 void Ikbd::loadSettings(void)
 {
     Settings s;
-    bool firstJoyIs0 = s.getBool((char *) "JOY_FIRST_IS_0", false);
+    firstJoyIs0 = s.getBool((char *) "JOY_FIRST_IS_0", false);
 
     if(firstJoyIs0) {
         joy1st = INTYPE_JOYSTICK1;
