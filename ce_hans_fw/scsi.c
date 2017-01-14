@@ -130,7 +130,7 @@ void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun)
     
     // for sector read commands
     if(justCmd == SCSI_C_READ6 || justCmd == SCSI_C_READ10) {
-        timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_LONG);    // for SD access, set extra long timeout value
+        longTimeout_basedOnSectorCount(lenX);                   // set timeout time based on how many sectors are transfered
 
         res = mmcRead_dma(sector, lenX);                        // read data
         handled = TRUE;
@@ -141,10 +141,10 @@ void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun)
     
     // for sector write commands
     if(justCmd == SCSI_C_WRITE6 || justCmd == SCSI_C_WRITE10) {
-        timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_LONG);    // for SD access, set extra long timeout value
+        longTimeout_basedOnSectorCount(lenX);                   // set timeout time based on how many sectors are transfered
 
         res = mmcWrite_dma(sector, lenX);                       // write data
-        handled = TRUE;
+        handled  = TRUE;
         wasWrite = TRUE;
 
         timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);   // after SD access restore short timeout value

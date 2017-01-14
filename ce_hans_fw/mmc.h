@@ -152,5 +152,8 @@ BYTE EraseCard(void);
 
 void tryToEmptySdCardBuffer(void);
 
+// calculate and set long timeout
+void longTimeout_basedOnSectorCount(WORD sectorCount);
+
 #endif
 

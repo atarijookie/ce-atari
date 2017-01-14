@@ -11,7 +11,7 @@ void resetXilinx(void);
 
 void timeoutStart(void)
 {
-    // init the timer 4, which will serve for timeout measuring 
+    // init the timer 3, which will serve for timeout measuring 
     TIM_Cmd(TIM3, DISABLE);     // disable timer
     TIM3->CNT   = 0;            // set timer value to 0
     TIM3->SR    = 0xfffe;       // clear UIF flag
@@ -20,7 +20,7 @@ void timeoutStart(void)
 
 BYTE timeout(void)
 {
-    if((TIM3->SR & 0x0001) != 0) {  // overflow of TIM4 occured?
+    if((TIM3->SR & 0x0001) != 0) {  // overflow of TIM3 occured?
         TIM3->SR = 0xfffe;          // clear UIF flag
         return TRUE;
     }

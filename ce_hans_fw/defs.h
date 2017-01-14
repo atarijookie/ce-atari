@@ -12,9 +12,10 @@
 #define MODE_WITH_RPI   1
 #define MODE_SOLO       2
 
-#define CMD_TIMEOUT_SHORT   1000    // with prescaler set to 2kHz, this period will be 0.5 second
-#define CMD_TIMEOUT_LONG    6000    // with prescaler set to 2kHz, this period will be 3.0 second
-
+#define CMD_TIMEOUT_SECS_PER_MB 3
+#define CMD_TIMEOUT_ONESECOND   1098
+#define CMD_TIMEOUT_SHORT       (CMD_TIMEOUT_ONESECOND / 2)     // this period will be 0.5 second
+#define CMD_TIMEOUT_LONG        (CMD_TIMEOUT_ONESECOND * 3)     // this period will be 3.0 second
 
 //#define CMDLOGGING
 
@@ -143,13 +144,24 @@ GPIOC_14 - card detect
 //#define DO_LOG_ERROR
 
 #ifdef DO_LOG_ERROR
+//  #define LAST_ERR_MORE
+    #define LAST_ERR_COUNT      32
+
     extern BYTE singleLastErr;
-    extern BYTE lastErr[32];
-    extern BYTE lastErrIndex;
-        
-    #define LOG_ERROR(X)    { singleLastErr = X; }
-//  #define LOG_ERROR(X)    { singleLastErr = X; lastErr[lastErrIndex] = X; lastErrIndex++; if(lastErrIndex >= 32) lastErrIndex = 0; }
+
+    #ifdef LAST_ERR_MORE
+        // log more than one lastErr
+        extern BYTE lastErr[LAST_ERR_COUNT];
+        extern BYTE lastErrIndex;
+
+        #define LOG_ERROR(X)    { singleLastErr = X; lastErr[lastErrIndex] = X; lastErrIndex++; if(lastErrIndex >= LAST_ERR_COUNT) lastErrIndex = 0; }
+    #else
+        // log only single lastErr
+        #define LOG_ERROR(X)    { singleLastErr = X; }
+    #endif
+
 #else
+    // don't log errors at all
     #define LOG_ERROR(X)
 #endif
 

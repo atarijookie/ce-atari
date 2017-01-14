@@ -3,6 +3,7 @@
 #include "mmc.h"
 #include "defs.h"
 #include "bridge.h"
+#include "timers.h"
 
 extern TDevice sdCard;
 extern unsigned char brStat;
@@ -22,6 +23,9 @@ void waitForSpi2Finish(void);
 void stopSpi2Dma(void);
 void waitForSPI2idle(void);
 
+DWORD timeoutTotal;     // sum of counter, which equals to maximum large timeout value
+DWORD timeoutSum;       // current sum of counters
+
 void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 
 #define READ_BYTE_BFR \
@@ -35,7 +39,7 @@ void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 			if(timeout()) {\
                 LOG_ERROR(10);\
                 brStat = E_TimeOut; \
-                quit = 1;\
+                error = 1;\
                 break;\
 			}\
 			exti = EXTI->PR;\
@@ -44,7 +48,7 @@ void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 				break;\
 			}\
 		}\
-        if(quit) {\
+        if(error) {\
             break;\
         }
         
@@ -53,7 +57,7 @@ void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
         while(spi2_TxRx(0xFF) != 0xff) {    \
             if(timeout()) {                 \
                 LOG_ERROR(11);              \
-                quit = 1;                   \
+                error = 1;                  \
                 break;                      \
             }                               \
         }
@@ -81,7 +85,7 @@ BYTE waitForCardNotBusy(void)
 
 BYTE mmcRead_dma(DWORD sector, WORD count)
 {
-    BYTE r1, quit, good;
+    BYTE r1, error, good;
     WORD i,c, last;
     BYTE byte = 0;
     
@@ -96,7 +100,7 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
     // read in data
     ACSI_DATADIR_READ();
     
-    quit = 0;
+    error = 0;
 
     for(i=0; i<SPIBUFSIZE; i++) {                               // fill the TX buffer with FFs
         spiTxBuff[i] = 0xff;
@@ -105,8 +109,6 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
     pData     = spiRxBuff1;
     rxBuffNow = spiRxBuff1;
 
-    timeoutStart();
-    
     //---------------
     // try to start READ MULTIPLE BLOCKS with couple of retries
     for(retries=0; retries<5; retries++) {
@@ -150,17 +152,29 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
         return 0xff;
     }
     //---------------
-    
+
     spi2Dma_txRx(512, spiTxBuff, 512, rxBuffNow);               // start first transfer
 
-    last = count - 1;
-    
+    timeoutSum  = 0;                                            // currently no sum of timer counters
+    last        = count - 1;
+
     for(c=0; c<count; c++) {
         //--------------
+        // star the timeout for this operation, but keep counting the whole timeout value
+        timeoutSum += TIM3->CNT;                                // add current value to sum
+
+        if(timeoutSum >= timeoutTotal) {                        // if we've sumed more than allowed for total timeout, quit with error
+            error = 1;
+            break;
+        }
+
+        timeoutStart();                                         // clear current value, restart timer
+
+        //--------------
         // keep sending FW version to notify host that we're alive
-        if(mode != MODE_SOLO) {                         // do this only when we're NOT in solo mode
-            if(spiDmaIsIdle && (TIM2->SR & 0x0001)) {   // SPI DMA is idle, and it's time to send FW report
-                TIM2->SR = 0xfffe;                      // clear UIF flag
+        if(mode != MODE_SOLO) {                                 // do this only when we're NOT in solo mode
+            if(spiDmaIsIdle && (TIM2->SR & 0x0001)) {           // SPI DMA is idle, and it's time to send FW report
+                TIM2->SR = 0xfffe;                              // clear UIF flag
 
                 sendFwToHost();
             }
@@ -185,7 +199,7 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
             while(spi2_TxRx(0xFF) != MMC_STARTBLOCK_READ) {     // wait for STARTBLOCK
                 if(timeout()) {
                     LOG_ERROR(13);
-                    quit = 1;
+                    error = 1;
                     break;
                 }
             }
@@ -198,7 +212,7 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
             READ_BYTE_BFR
         }
         
-        if(quit) {                                              // if error happened
+        if(error) {                                             // if error happened
             break;
         }
     }
@@ -213,7 +227,7 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
     // release chip select
     spiCShigh();         // CS to H
 
-    if(quit) {                                              // if error happened
+    if(error) {                                             // if error happened
         return 0xff;                                        // error
     }
     
@@ -222,15 +236,13 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
 
 BYTE mmcWrite_dma(DWORD sector, WORD count)
 {
-    BYTE r1, quit;
+    BYTE r1, error;
     WORD i,j;
     DWORD thisSector;
     BYTE *pSend;
     BYTE *pData;
 //  BYTE r1a=0xff, r1b=0xff;
 
-    timeoutStart();
-    
     //-----------
 /*
     // for SD and SDHC, send SET BLOCK COUNT command before WRITE MULTIPLE BLOCKS
@@ -268,11 +280,23 @@ BYTE mmcWrite_dma(DWORD sector, WORD count)
     // read in data
     ACSI_DATADIR_WRITE();
     
-    quit = 0;
+    error       = 0;
+    timeoutSum  = 0;                            // currently no sum of timer counters
     
     pData = spiRxBuff1;                         // start storing to this buffer
     //--------------
     for(j=0; j<count; j++) {                    // read this many sectors
+        //--------------
+        // star the timeout for this operation, but keep counting the whole timeout value
+        timeoutSum += TIM3->CNT;                // add current value to sum
+
+        if(timeoutSum >= timeoutTotal) {        // if we've sumed more than allowed for total timeout, quit with error
+            error = 1;
+            break;
+        }
+
+        timeoutStart();                         // clear current value, restart timer
+
         //--------------
         // keep sending FW version to notify host that we're alive
         if(mode != MODE_SOLO) {                         // do this only when we're NOT in solo mode
@@ -285,7 +309,7 @@ BYTE mmcWrite_dma(DWORD sector, WORD count)
 
         //--------------
         if(thisSector >= sdCard.SCapacity) {    // sector out of range?
-            quit = 1;
+            error = 1;
             LOG_ERROR(61);
             break;                              // quit
         }
@@ -301,13 +325,13 @@ BYTE mmcWrite_dma(DWORD sector, WORD count)
             pData++;
             
             if(brStat != E_OK) {                // if something was wrong
-                quit = 1;
+                error = 1;
                 LOG_ERROR(62);
                 break;                          // quit
             }
         }           
 
-        if(quit) {                              // if error happened
+        if(error) {                             // if error happened
             break; 
         }
         
@@ -328,9 +352,9 @@ BYTE mmcWrite_dma(DWORD sector, WORD count)
         waitForSPI2idle();                          // now wait until SPI2 finishes
  
         // wait while busy
-        quit = waitForCardNotBusy();
+        error = waitForCardNotBusy();
             
-        if(quit) {
+        if(error) {
             break;
         }
         
@@ -362,7 +386,7 @@ BYTE mmcWrite_dma(DWORD sector, WORD count)
     spi2_TxRx(0xFF);
     spiCShigh();                                // CS to H
     
-    if(quit) {                                  // if failed, return error
+    if(error) {                                 // if failed, return error
         return 0xff;
     }
         
@@ -387,4 +411,15 @@ void stopSpi2Dma(void)
     DMA1_Channel4->CNDTR = 0;
     
     waitForSPI2idle();
+}
+
+void longTimeout_basedOnSectorCount(WORD sectorCount)
+{
+    DWORD mbCount       = (sectorCount >> 11) + 1;                  // convert sector count into megabytes (rounded up)
+    DWORD timeoutSecs   = mbCount       * CMD_TIMEOUT_SECS_PER_MB;  // convert MBs into seconds
+    
+    timeoutTotal        = timeoutSecs   * CMD_TIMEOUT_ONESECOND;    // and convert seconds into TIM3 total counter value
+    timeoutSum          = 0;
+
+    timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_ONESECOND);
 }

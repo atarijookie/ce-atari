@@ -15,7 +15,7 @@ BYTE dataReadCloop(WORD *pData, WORD dataCnt);
 
 __forceinline BYTE timeout(void)
 {
-	if((TIM3->SR & 0x0001) != 0) {		// overflow of TIM4 occured?
+	if((TIM3->SR & 0x0001) != 0) {		// overflow of TIM3 occured?
 		TIM3->SR = 0xfffe;							// clear UIF flag
 		return TRUE;
 	}

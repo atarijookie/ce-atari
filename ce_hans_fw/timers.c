@@ -39,12 +39,12 @@ void timerSetup_sendFw(void)
     TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);                      // enable int from this timer
 }
 
-void timerSetup_cmdTimeout(void)					
+void timerSetup_cmdTimeout(void)
 {
     TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
 
     // Time base configuration
-    TIM_TimeBaseStructure.TIM_Prescaler         = 35999;            // prescale 72 MHz by 36 kHz = 2 kHz
+    TIM_TimeBaseStructure.TIM_Prescaler         = 65535;            // prescale 72 MHz by 65 kHz = 1098 Hz
     TIM_TimeBaseStructure.TIM_Period            = CMD_TIMEOUT_SHORT;
     TIM_TimeBaseStructure.TIM_ClockDivision     = 0;
     TIM_TimeBaseStructure.TIM_CounterMode       = TIM_CounterMode_Up;
@@ -67,3 +67,4 @@ void timerSetup_cmdTimeoutChangeLength(uint16_t newPeriod)
 
     TIM_Cmd(TIM3, ENABLE);                      // enable timer
 }
+

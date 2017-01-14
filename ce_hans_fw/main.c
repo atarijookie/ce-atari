@@ -207,9 +207,15 @@ void updateEnabledIDsInSoloMode(void);
 
 BYTE tryProcessLocally(void);
 
+#ifdef DO_LOG_ERROR
 BYTE singleLastErr;
-BYTE lastErr[32];
-BYTE lastErrIndex;
+
+#ifdef LAST_ERR_MORE
+    BYTE lastErr[LAST_ERR_COUNT];
+    BYTE lastErrIndex;
+#endif
+
+#endif
 
 DWORD toStart;
 DWORD lastStart, lastEnd;
