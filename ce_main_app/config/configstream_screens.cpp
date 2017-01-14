@@ -1235,7 +1235,6 @@ void ConfigStream::createScreen_ikbd(void)
     int col2    = 33;
     
     //-----------
-    row++;
     comp = new ConfigComponent(this, ConfigComponent::label, "Attach 1st joy as JOY 0",     40, col, row, gotoOffset);
     screen.push_back(comp);
     
@@ -1243,9 +1242,12 @@ void ConfigStream::createScreen_ikbd(void)
     comp->setComponentId(COMPID_JOY0_FIRST);
     screen.push_back(comp);
 
+    comp = new ConfigComponent(this, ConfigComponent::label, "(hotkey: CTRL+any SHIFT+HELP/F11)",     40, col, row, gotoOffset);
+    screen.push_back(comp);
+
     //----------------------
 
-    row++;
+    row += 2;
     comp = new ConfigComponent(this, ConfigComponent::label, "Mouse wheel as arrow UP / DOWN", 40, col, row, gotoOffset);
     screen.push_back(comp);
     
@@ -1268,7 +1270,10 @@ void ConfigStream::createScreen_ikbd(void)
     comp->setComponentId(COMPID_KEYB_JOY0);
     screen.push_back(comp);
 
-    row++;
+    comp = new ConfigComponent(this, ConfigComponent::label, "(hotkey: CTRL+LSHIFT+UNDO/F12)",     40, col, row, gotoOffset);
+    screen.push_back(comp);
+
+    row += 2;
     // button
     comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colButton, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY0_BUTTON);
@@ -1310,7 +1315,10 @@ void ConfigStream::createScreen_ikbd(void)
     comp->setComponentId(COMPID_KEYB_JOY1);
     screen.push_back(comp);
 
-    row++;
+    comp = new ConfigComponent(this, ConfigComponent::label, "(hotkey: CTRL+RSHIFT+UNDO/F12)",     40, col, row, gotoOffset);
+    screen.push_back(comp);
+
+    row += 2;
     // button
     comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colButton, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY1_BUTTON);
