@@ -126,6 +126,10 @@ public:
     void enterKeyHandlerLater(int event);
 
     void setTranslatedDisk(TranslatedDisk *td) { this->translated = td; };
+
+    DWORD getLastCmdTimestamp() const {
+        return lastCmdTime;
+    }
 private:
     // properties
     int shownOn;
@@ -151,6 +155,8 @@ private:
     bool showingHomeScreen;
     bool showingMessage;
     bool screenChanged;
+
+    DWORD lastCmdTime;
 
     void enterKeyHandler(int event);
     

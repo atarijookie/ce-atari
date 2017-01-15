@@ -21,6 +21,7 @@
 #include "utils.h"
 #include "settings.h"
 #include "datatypes.h"
+#include "periodicthread.h"
 
 #include "ikbd.h"
 
@@ -30,6 +31,7 @@ extern volatile sig_atomic_t    sigintReceived;
        volatile bool            do_loadIkbdConfig = false;
 
 extern TFlags flags;                                // global flags from command line
+extern SharedObjects shared;
 
 void *ikbdThreadCode(void *ptr)
 {
@@ -134,7 +136,7 @@ void *ikbdThreadCode(void *ptr)
 
         if(ikbd.fdUart >= 0 && FD_ISSET(ikbd.fdUart, &readfds)) {
             // process the incomming data from original keyboard and from ST
-            ikbd.processReceivedCommands();
+            ikbd.processReceivedCommands(shared.clientConnected);
         }
 
         // process events from attached input devices
@@ -174,7 +176,7 @@ void *ikbdThreadCode(void *ptr)
                         break;
                     case INTYPE_KEYBOARD:
                     case INTYPE_VDEVKEYBOARD:
-                        ikbd.processKeyboard(&ev);
+                        ikbd.processKeyboard(&ev, shared.clientConnected);
                         break;
                     case INTYPE_JOYSTICK1:
                     case INTYPE_JOYSTICK2:
@@ -225,7 +227,7 @@ Ikbd::Ikbd()
 void Ikbd::loadSettings(void)
 {
     Settings s;
-    bool firstJoyIs0 = s.getBool((char *) "JOY_FIRST_IS_0", false);
+    firstJoyIs0 = s.getBool("JOY_FIRST_IS_0", false);
 
     if(firstJoyIs0) {
         joy1st = INTYPE_JOYSTICK1;
@@ -236,7 +238,7 @@ void Ikbd::loadSettings(void)
     }
 
     // get enabled flags for mouse wheel as keys
-    mouseWheelAsArrowsUpDown = s.getBool((char *) "MOUSE_WHEEL_AS_KEYS", true);
+    mouseWheelAsArrowsUpDown = s.getBool("MOUSE_WHEEL_AS_KEYS", true);
 
     // get enabled flags for keyb joys
     keybJoy0 = s.getBool("KEYBORD_JOY0", false);
@@ -270,7 +272,14 @@ void Ikbd::resetInternalIkbdVars(void)
     keycodeMouse.deltaY    = 0;
 
     joystickMode    = JOYMODE_EVENT;
-    joystickEnabled = true;
+    joystickState   = EnabledInMouseMode;
+
+    leftShiftsPressed  = 0;
+    rightShiftsPressed = 0;
+    ctrlsPressed       = 0;
+    f11sPressed        = 0;
+    f12sPressed        = 0;
+    waitingForHotkeyRelease = false;
 }
 
 int Ikbd::serialSetup(termios *ts)

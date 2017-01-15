@@ -29,6 +29,8 @@
 
 #define JOYMODE_EVENT               0x14
 #define JOYMODE_INTERROGATION       0x15
+#define JOYMODE_MONITORING          0x17
+#define JOYMODE_FIRE_MONITORING     0x18
 #define JOYMODE_KEYCODE			    0x19
 
 #define MOUSEABS_BTN_LEFT_UP		8

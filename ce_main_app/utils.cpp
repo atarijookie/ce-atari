@@ -1,12 +1,20 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
+#include "utils.h"
+
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
 #include <unistd.h>
-#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
-#include <errno.h>
 
 //--------
 // following includes are here for the code for getting IP address of interfaces
@@ -17,10 +25,6 @@
 #include <linux/if_link.h>
 //--------
 
-#include <sstream>
-#include <iostream>
-
-#include "utils.h"
 #include "translated/translatedhelper.h"
 #include "translated/gemdos.h"
 #include "debug.h"
@@ -540,4 +544,13 @@ std::string Utils::getDeviceLabel(const std::string & devicePath)
 		label.replace(pos, 4, 1, (char)c);
 	}
 	return label;
+}
+
+void Utils::splitString(const std::string &s, char delim, std::vector<std::string> &elems) {
+    std::stringstream ss;
+    ss.str(s);
+    std::string item;
+    while (std::getline(ss, item, delim)) {
+        elems.push_back(item);
+    }
 }

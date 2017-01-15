@@ -399,7 +399,7 @@ void Ikbd::processMouse(input_event *ev)
     }
 }
 
-void Ikbd::processKeyboard(input_event *ev)
+void Ikbd::processKeyboard(input_event *ev, bool skipKeyboardTranslation)
 {
     int stKey = 0;
     int res;
@@ -407,44 +407,47 @@ void Ikbd::processKeyboard(input_event *ev)
 
     switch(ev->type) {
     case EV_SYN:
-        ikbdLog("Ikbd::processKeyboard() EV_SYN code=%04x\n", ev->code);
+        //ikbdLog("Ikbd::processKeyboard() EV_SYN code=%04x\n", ev->code);
         break;
     case EV_KEY:
-        ikbdLog("Ikbd::processKeyboard() EV_KEY code=%04x ev->value=%d\n", ev->code, ev->value);
+        //ikbdLog("Ikbd::processKeyboard() EV_KEY code=%04x ev->value=%d\n", ev->code, ev->value);
         statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
         statuses.ikbdUsb.aliveSign = ALIVE_KEYDOWN;
 
-        // ev->value -- 1: down, 2: auto repeat, 0: up
-        if(ev->code < KBD_KEY_COUNT) {
-            if(ev->value == 1) {    // key down
-                pressedKeys[ev->code] = true;
-                if(pressedKeys[KEY_LEFTCTRL] && pressedKeys[KEY_RIGHTCTRL] && pressedKeys[KEY_LEFTALT] && pressedKeys[KEY_RIGHTALT]) {
-                    toggleKeyboardExclusiveAccess();
-                }
-            } else if(ev->value == 0) { // key up
-                pressedKeys[ev->code] = false;
-            }
+        if(ev->code >= KBD_KEY_COUNT) {
+            return;
         }
 
         stKey = keyTranslator.pcKeyToSt(ev->code);          // translate PC key to ST key
-
-        if(stKey == 0 || fdUart == -1) {                        // key not found, no UART open? quit
-            return;
-        }
-
-        if(keybJoy0 && keyJoyKeys.isKeybJoyKeyPc(0, ev->code)) {    // Keyb joy 0 is enabled, and it's a keyb joy 0 key? Handle it specially.
-            handlePcKeyAsKeybJoy(0, ev->code, ev->value);
-            return;
-        }
-
-        if(keybJoy1 && keyJoyKeys.isKeybJoyKeyPc(1, ev->code)) {    // Keyb joy 1 is enabled, and it's a keyb joy 1 key? Handle it specially.
-            handlePcKeyAsKeybJoy(1, ev->code, ev->value);
-            return;
-        }
-
         // ev->value -- 1: down, 2: auto repeat, 0: up
         if(ev->value == 0) {        // when key is released, ST scan code has the highest bit set
             stKey = stKey | 0x80;
+            pressedKeys[ev->code] = false;
+        } else if (ev->value == 1) {
+            pressedKeys[ev->code] = true;
+            if(pressedKeys[KEY_LEFTCTRL] && pressedKeys[KEY_RIGHTCTRL] && pressedKeys[KEY_LEFTALT] && pressedKeys[KEY_RIGHTALT]) {
+                toggleKeyboardExclusiveAccess();
+            }
+        } else if (ev->value == 2) {
+            // auto repeat has no place on Atari! :)
+            return;
+        }
+
+        if(stKey == 0 || stKey == 0x80 || fdUart == -1) {           // key not found, no UART open? quit
+            return;
+        }
+
+        skipKeyboardTranslation = handleHotkeys(ev->code, ev->value == 1, skipKeyboardTranslation);
+        if (!skipKeyboardTranslation) {
+            if(keybJoy0 && keyJoyKeys.isKeybJoyKeyPc(0, ev->code)) {    // Keyb joy 0 is enabled, and it's a keyb joy 0 key? Handle it specially.
+                handlePcKeyAsKeybJoy(0, ev->code, ev->value);
+                return;
+            }
+
+            if(keybJoy1 && keyJoyKeys.isKeybJoyKeyPc(1, ev->code)) {    // Keyb joy 1 is enabled, and it's a keyb joy 1 key? Handle it specially.
+                handlePcKeyAsKeybJoy(1, ev->code, ev->value);
+                return;
+            }
         }
 
         ikbdLog("\nEV_KEY: code %d, value %d, stKey: %02x", ev->code, ev->value, stKey);
@@ -459,7 +462,7 @@ void Ikbd::processKeyboard(input_event *ev)
         }
         break;
     case EV_MSC:
-        ikbdLog("Ikbd::processKeyboard() EV_MSC code=%d value=0x%08x\n", ev->code, ev->value);
+        //ikbdLog("Ikbd::processKeyboard() EV_MSC code=%d value=0x%08x\n", ev->code, ev->value);
         break;
     default:
         logDebugAndIkbd(LOG_DEBUG, "Ikbd::processKeyboard() ***UNKNOWN*** ev->type=%d ev->code=0x%04x ev->value=0x%08x\n", ev->type, ev->code, ev->value);
@@ -539,8 +542,8 @@ void Ikbd::processJoystick(js_event *jse, int joyNumber)
         js->lastDir = dirTotal;
         js->lastBtn = button;
 
-        if(joyNumber == 1 && (mouseMode == MOUSEMODE_REL) && btnChanged) {  // if button state changed, send it as mouse packet
-            sendJoy0State();
+        if(joystickState == EnabledInMouseMode && btnChanged) {  // if button state changed, send it as mouse packet
+            sendJoyButtonsInMouseMode();
         } else {
             sendJoyState(joyNumber, button | dirTotal);                        // report current direction and buttons
         }
@@ -659,5 +662,101 @@ void Ikbd::releaseExclusiveAccess(int fd)
 {
     if(ioctl(fd, EVIOCGRAB, (void*)0) < 0) { // release
         logDebugAndIkbd(LOG_ERROR, "Ikbd::releaseExclusiveAccess() ioctl failed : ", strerror(errno));
+    }
+}
+
+bool Ikbd::handleHotkeys(int pcKey, bool pressed, bool skipKeyboardTranslation)
+{
+    ikbdLog( "Ikbd::handleHotkeys - %d, %d, %d", pcKey, pressed, skipKeyboardTranslation);
+
+    if (pcKey == KEY_LEFTCTRL || pcKey == KEY_RIGHTCTRL) {
+        if (!pressed) {
+            ctrlsPressed--;
+        } else {
+            ctrlsPressed++;
+        }
+    }
+
+    if (pcKey == KEY_LEFTSHIFT) {
+        if (!pressed) {
+            leftShiftsPressed--;
+        } else {
+            leftShiftsPressed++;
+        }
+    }
+
+    if (pcKey == KEY_RIGHTSHIFT) {
+        if (!pressed) {
+            rightShiftsPressed--;
+        } else {
+            rightShiftsPressed++;
+        }
+    }
+
+    if (pcKey == KEY_F11) {
+        if (!pressed) {
+            f11sPressed--;
+        } else {
+            f11sPressed++;
+        }
+    }
+
+    if (pcKey == KEY_F12) {
+        if (!pressed) {
+            f12sPressed--;
+        } else {
+            f12sPressed++;
+        }
+    }
+
+    if (skipKeyboardTranslation) {
+        return true;
+    }
+
+    if ((leftShiftsPressed > 0 || rightShiftsPressed > 0) && ctrlsPressed > 0 && pressed) {
+        Settings s;
+        if (f11sPressed > 0) {
+            firstJoyIs0 = !firstJoyIs0;
+            s.setBool("JOY_FIRST_IS_0", firstJoyIs0);
+            if(firstJoyIs0) {
+                joy1st = INTYPE_JOYSTICK1;
+                joy2nd = INTYPE_JOYSTICK2;
+            } else {
+                joy1st = INTYPE_JOYSTICK2;
+                joy2nd = INTYPE_JOYSTICK1;
+            }
+            ikbdLog( "Ikbd::handleHotkeys - joy0 <-> joy1 [before: %s, now: %s]",
+                     firstJoyIs0 ? "OFF" : "ON", firstJoyIs0 ? "ON" : "OFF");
+        } else if (f12sPressed > 0) {
+            if (leftShiftsPressed > 0) {
+                keybJoy0 = !keybJoy0;
+                s.setBool("KEYBORD_JOY0", keybJoy0);
+                ikbdLog( "Ikbd::handleHotkeys - toggle joy0 translation [before: %s, now: %s]",
+                         keybJoy0 ? "OFF" : "ON", keybJoy0 ? "ON" : "OFF");
+                waitingForHotkeyRelease = true;
+            }
+            if (rightShiftsPressed > 0) {
+                keybJoy1 = !keybJoy1;
+                s.setBool("KEYBORD_JOY1", keybJoy1);
+                ikbdLog( "Ikbd::handleHotkeys - toggle joy1 translation [before: %s, now: %s]",
+                         keybJoy1 ? "OFF" : "ON", keybJoy1 ? "ON" : "OFF");
+                waitingForHotkeyRelease = true;
+            }
+        }
+    }
+
+    if (waitingForHotkeyRelease) {
+        bool oldWaitingForHotkeyRelease = waitingForHotkeyRelease;
+        waitingForHotkeyRelease =
+                leftShiftsPressed > 0 || rightShiftsPressed > 0 || ctrlsPressed > 0
+                || f11sPressed > 0 || f12sPressed > 0;
+        if (oldWaitingForHotkeyRelease == waitingForHotkeyRelease) {
+            ikbdLog( "Ikbd::handleHotkeys - hotkey release pending...");
+        } else {
+            ikbdLog( "Ikbd::handleHotkeys - hotkey release not pending anymore");
+        }
+        return true;
+    } else {
+        return false;
     }
 }

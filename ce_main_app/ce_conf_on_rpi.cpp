@@ -19,7 +19,7 @@
 #include "config/configstream.h"
 #include "config/keys.h"
 
-#include "ce_conf_on_rpi.h" 
+#include "ce_conf_on_rpi.h"
 #include "periodicthread.h"
 
 extern SharedObjects shared;
@@ -35,7 +35,7 @@ int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt)
     int i, t = 0;
 
     memset(tmp, 0, INBFR_SIZE);
-    
+
     for(i=0; i<cnt; ) {
         if(bfr[i] == 27) {
             switch(bfr[i + 1]) {
@@ -45,7 +45,7 @@ int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt)
                     strcat((char *) tmp, "\033[40m");        // background black
                     strcat((char *) tmp, "\033[2J");         // clear whole screen
                     strcat((char *) tmp, "\033[H");          // position cursor to 0,0
-                    
+
                     t += 5 + 5 + 4 + 3;
                     i += 2;
                     break;
@@ -54,7 +54,7 @@ int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt)
                     int x, y;
                     y = bfr[i+2] - 32;
                     x = bfr[i+3] - 32;
-                    
+
                     char tmp2[16];
                     sprintf(tmp2, "\033[%d;%dH", y, x);
                     strcat((char *) tmp, tmp2);
@@ -81,14 +81,14 @@ int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt)
                 //------------------------
                 case 'e':               // cursor on
                     strcat((char *) tmp, "\033[?25h");
-                    
+
                     t += 6;
                     i += 2;
                     break;
                 //------------------------
                 case 'f':               // cursor off
                     strcat((char *) tmp, "\033[?25l");
-                    
+
                     t += 6;
                     i += 2;
                     break;
@@ -97,12 +97,12 @@ int translateVT52toVT100(BYTE *bfr, BYTE *tmp, int cnt)
                     printf("Unknown ESC sequence: %02d %02d \n", bfr[i], bfr[i+1]);
                     i += 2;
                     break;
-            }            
+            }
         } else {
             tmp[t++] = bfr[i++];
         }
     }
-    
+
     memcpy(bfr, tmp, t);             // copy back the converted data
     return t;
 }
@@ -125,16 +125,16 @@ bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BYTE *tem
     bfr[0] = HOSTMOD_CONFIG;
     bfr[1] = cmd;
     bfr[2] = param;
-    
+
     res = write(fd1, bfr, 3);                                   // send command
-    
+
     if(res != 3) {
         printf("sendCmd -- write failed!\n");
         return false;
     }
 
     WORD howManyBytes;
-    
+
     bool bRes = receiveStream(2, (BYTE *) &howManyBytes, fd2);  // first receive byte count that we should read
 
     if(!bRes) {                                                 // didn't receive available byte count?
@@ -150,7 +150,7 @@ bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BYTE *tem
         }
 
         printf("sendCmd -- failed to receive byte count\n");
-        
+
         Debug::out(LOG_DEBUG, "sendCmd fail on receiving howManyBytes");
         return false;
     }
@@ -164,7 +164,7 @@ bool sendCmd(BYTE cmd, BYTE param, int fd1, int fd2, BYTE *dataBuffer, BYTE *tem
 
     if(bRes) {
         vt100byteCount = translateVT52toVT100(dataBuffer, tempBuffer, howManyBytes);    // translate VT52 stream to VT100 stream
-        
+
         Debug::out(LOG_DEBUG, "sendCmd success, %d bytes of VT52 translated to %d bytes of VT100", howManyBytes, vt100byteCount);
     } else {
         Debug::out(LOG_DEBUG, "sendCmd fail on getting VT52 stream");
@@ -193,15 +193,15 @@ static bool receiveStream(int byteCount, BYTE *data, int fd)
     DWORD timeOutTime = Utils::getEndTime(1000);
 
     int recvCount = 0;          // how many VT52  chars we already got
-    
+
     BYTE *ptr = data;
-    
+
     while(recvCount < byteCount) {                                          // receive all the data, wait up to 1 second to receive it
         if(Utils::getCurrentMs() >= timeOutTime) {                          // time out happened, nothing received within specified timeout? fail
             Debug::out(LOG_DEBUG, "receiveStream - fail, wanted %d and got only %d bytes", byteCount, recvCount);
             return false;
         }
-    
+
         int bytesAvailable;
         int res = ioctl(fd, FIONREAD, &bytesAvailable);                     // how many bytes we can read?
 
@@ -214,20 +214,29 @@ static bool receiveStream(int byteCount, BYTE *data, int fd)
 
             recvCount   += readCount;
             ptr             += readCount;
-            
+
             Debug::out(LOG_DEBUG, "receiveStream - readCount: %d", readCount);
         }
 
         Utils::sleepMs(10);     // sleep a little
     }
-    
+
     Debug::out(LOG_DEBUG, "receiveStream - success, %d bytes", byteCount);
-    return true;    
+    return true;
+}
+
+static int safe_getchar(int *count) {
+    if (*count > 0) {
+        --(*count);
+        return getchar();
+    } else {
+        return 0;
+    }
 }
 
 static BYTE getKey(int count)
 {
-    int c = getchar();
+    int c = safe_getchar(&count);
 
     if(c != 27) {           // not ESC sequence? just return value
         switch(c) {
@@ -235,93 +244,95 @@ static BYTE getKey(int count)
             case 0x7f:  return KEY_BACKSP;
             case 0x09:  return KEY_TAB;
         }
-    
+
         return c;
     }
 
     // if we came here, it's ESC or ESC sequence
-    if(count == 1) {        // just esc? return it
+    if(count == 0) {        // just esc? return it
         return KEY_ESC;
     }
+    int a = safe_getchar(&count);
+    int b = safe_getchar(&count);
 
-    int a, b;
-    a = getchar();
-    b = getchar();
-    
+    int res = 0;
     if(a == 0x5b) {
         switch(b) {
-            case 0x41:    return KEY_UP;
-            case 0x42:    return KEY_DOWN;
-            case 0x43:    return KEY_RIGHT;
-            case 0x44:    return KEY_LEFT;
-            
+            case 0x41: res = KEY_UP;    break;
+            case 0x42: res = KEY_DOWN;  break;
+            case 0x43: res = KEY_RIGHT; break;
+            case 0x44: res = KEY_LEFT;  break;
+
             case 0x31:
-                c = getchar();
+                c = safe_getchar(&count);
                 if(c == 0x7e) {
-                    return KEY_HOME;
-                } else if(c == 0x37) {
-                    c = getchar();
+                    res = KEY_HOME;
+                } else if(c == 0x35) {
+                    c = safe_getchar(&count);
                     if(c == 0x7e) {
-                        return KEY_F6;
+                        res = KEY_F5;
+                    }
+                } else if(c == 0x37) {
+                    c = safe_getchar(&count);
+                    if(c == 0x7e) {
+                        res = KEY_F6;
                     }
                 } else if(c == 0x38) {
-                    c = getchar();
+                    c = safe_getchar(&count);
                     if(c == 0x7e) {
-                        return KEY_F7;
+                        res = KEY_F7;
                     }
                 } else if(c == 0x39) {
-                    c = getchar();
+                    c = safe_getchar(&count);
                     if(c == 0x7e) {
-                        return KEY_F8;
+                        res =KEY_F8;
                     }
                 }
                 break;
 
             case 0x32:
-                c = getchar();
+                c = safe_getchar(&count);
                 if(c == 0x7e) {
-                    return KEY_INSERT;
+                    res =KEY_INSERT;
                 } else if(c == 0x30) {
-                    c = getchar();
+                    c = safe_getchar(&count);
                     if(c == 0x7e) {
-                        return KEY_F9;
+                        res = KEY_F9;
                     }
                 } else if(c == 0x31) {
-                    c = getchar();
+                    c = safe_getchar(&count);
                     if(c == 0x7e) {
-                        return KEY_F10;
+                        res = KEY_F10;
                     }
-                }
-                break;
-                
-            case 0x33:
-                c = getchar();
-                if(c == 0x7e) {
-                    return KEY_DELETE;
-                }
-                break;
-                
-            case 0x34:
-                c = getchar();
-                if(c == 0x7e) {
-                    return KEY_END;
                 }
                 break;
 
-            case 0x5b:
-                c = getchar();
-                switch(c) {
-                    case 0x41:  return KEY_F1;
-                    case 0x42:  return KEY_F2;
-                    case 0x43:  return KEY_F3;
-                    case 0x44:  return KEY_F4;
-                    case 0x45:  return KEY_F5;
+            case 0x33:
+                c = safe_getchar(&count);
+                if(c == 0x7e) {
+                    res = KEY_DELETE;
                 }
                 break;
+
+            case 0x34:
+                c = safe_getchar(&count);
+                if(c == 0x7e) {
+                    res = KEY_END;
+                }
+                break;
+
+            case 0x5a: res = KEY_SHIFT_TAB; break;
+        }
+    } else if (a == 0x4f) {
+        switch (b) {
+            case 0x50: res = KEY_F1; break;
+            case 0x51: res = KEY_F2; break;
+            case 0x52: res = KEY_F3; break;
+            case 0x53: res = KEY_F4; break;
         }
     }
 
-    return 0;
+    return count == 0 ? res : 0;
 }
 
 void ce_conf_mainLoop(void)
@@ -330,7 +341,7 @@ void ce_conf_mainLoop(void)
 
     inBfr   = new BYTE[INBFR_SIZE];
     tmpBfr  = new BYTE[INBFR_SIZE];
-    
+
     termFd1 = open(FIFO_TERM_PATH1, O_RDWR);             // will be used for writing only
     termFd2 = open(FIFO_TERM_PATH2, O_RDWR);             // will be used for reading only
 
@@ -338,46 +349,46 @@ void ce_conf_mainLoop(void)
         printf("ce_conf_mainLoop -- open() failed: %s\n", strerror(errno));
         return;
     }
-    
+
     bool res;
     int vt100count;
     res = sendCmd(CFG_CMD_SET_RESOLUTION, ST_RESOLUTION_HIGH, termFd1, termFd2, inBfr, tmpBfr, vt100count);
-    
+
     if(res) {
         write(STDOUT_FILENO, (char *) inBfr, vt100count);
     }
-    
-  	struct termios old_tio_in, new_tio_in;
-  	struct termios old_tio_out, new_tio_out;
 
-	tcgetattr(STDIN_FILENO, &old_tio_in);           // get the terminal settings for stdin
-	new_tio_in = old_tio_in;                        // we want to keep the old setting to restore them a the end
-	new_tio_in.c_lflag &= (~ICANON & ~ECHO);        // disable canonical mode (buffered i/o) and local echo
-	tcsetattr(STDIN_FILENO, TCSANOW, &new_tio_in);  // set the new settings immediately
+    struct termios old_tio_in, new_tio_in;
+    struct termios old_tio_out, new_tio_out;
 
-	tcgetattr(STDOUT_FILENO,&old_tio_out);          // get the terminal settings for stdout
-	new_tio_out = old_tio_out;                      // we want to keep the old setting to restore them a the end
-	new_tio_out.c_lflag &= (~ICANON);               // disable canonical mode (buffered i/o)
-	tcsetattr(STDOUT_FILENO,TCSANOW, &new_tio_out); // set the new settings immediately
-    
+    tcgetattr(STDIN_FILENO, &old_tio_in);           // get the terminal settings for stdin
+    new_tio_in = old_tio_in;                        // we want to keep the old setting to restore them a the end
+    new_tio_in.c_lflag &= (~ICANON & ~ECHO);        // disable canonical mode (buffered i/o) and local echo
+    tcsetattr(STDIN_FILENO, TCSANOW, &new_tio_in);  // set the new settings immediately
+
+    tcgetattr(STDOUT_FILENO,&old_tio_out);          // get the terminal settings for stdout
+    new_tio_out = old_tio_out;                      // we want to keep the old setting to restore them a the end
+    new_tio_out.c_lflag &= (~ICANON);               // disable canonical mode (buffered i/o)
+    tcsetattr(STDOUT_FILENO,TCSANOW, &new_tio_out); // set the new settings immediately
+
     DWORD lastUpdate = 0;
-    
+
     while(sigintReceived == 0) {
         bool didSomething = false;
-    
+
         // check if something waiting from keyboard, and if so, read it
         int bytesAvailable;
         int res = ioctl(STDIN_FILENO, FIONREAD, &bytesAvailable);   // how many bytes we can read from keyboard?
-    
+
         if(res != -1 && bytesAvailable > 0) {
             didSomething = true;
-            
+
             BYTE key = getKey(bytesAvailable);                      // get the key in format valid for config components
-            
+
             if(key == KEY_F10) {                                    // should quit? do it
                 break;
             }
-            
+
             if(key == KEY_F8) {                                     // if should switch between config view and linux console view
                 write(STDOUT_FILENO, "\033[37m", 5);                // foreground white
                 write(STDOUT_FILENO, "\033[40m", 5);                // background black
@@ -387,45 +398,45 @@ void ce_conf_mainLoop(void)
                 configNotLinuxConsole = !configNotLinuxConsole;
                 key = 0;
             }
-            
+
             if(key != 0) {                                          // if got the key, send key down event
                 res = sendCmd(configNotLinuxConsole ? CFG_CMD_KEYDOWN : CFG_CMD_LINUXCONSOLE_GETSTREAM, key, termFd1, termFd2, inBfr, tmpBfr, vt100count);
-                
+
                 if(res) {
-                    int len = strnlen((const char *) inBfr, vt100count);    // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator  
+                    int len = strnlen((const char *) inBfr, vt100count);    // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator
                     write(STDOUT_FILENO, (char *) inBfr, len);
                 }
-                
+
                 lastUpdate = Utils::getCurrentMs();                 // store current time as we just updated
             }
         }
-        
+
         //-----------
         // should do refresh or nothing?
         if(Utils::getCurrentMs() - lastUpdate >= 1000) {            // last update more than 1 second ago? refresh
             didSomething = true;
-        
+
             res = sendCmd(configNotLinuxConsole ? CFG_CMD_REFRESH : CFG_CMD_LINUXCONSOLE_GETSTREAM, 0, termFd1, termFd2, inBfr, tmpBfr, vt100count);
-        
+
             if(res) {
                 int len = strnlen((const char *) inBfr, vt100count);    // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator
                 write(STDOUT_FILENO, (char *) inBfr, len);
             }
 
             lastUpdate = Utils::getCurrentMs();                     // store current time as we just updated
-        } 
-        
+        }
+
         if(!didSomething) {         // if nothing happened in this loop, wait a little
             Utils::sleepMs(10);
         }
     }
-    
-	tcsetattr(STDIN_FILENO, TCSANOW, &old_tio_in);      // restore the former settings
-	tcsetattr(STDOUT_FILENO, TCSANOW, &old_tio_out);    // restore the former settings
-    
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &old_tio_in);      // restore the former settings
+    tcsetattr(STDOUT_FILENO, TCSANOW, &old_tio_out);    // restore the former settings
+
     delete []inBfr;
     delete []tmpBfr;
-    
+
     system("reset");
 }
 void ce_conf_createFifos(ConfigPipes *cp, char *path1, char *path2);
@@ -469,6 +480,6 @@ void ce_conf_createFifos(ConfigPipes *cp, char *path1, char *path2)
         Debug::out(LOG_ERROR, "ce_conf_createFifos -- fcntl() failed");
         return;
     }
-    
+
     Debug::out(LOG_DEBUG, "ce_conf FIFOs created");
 }

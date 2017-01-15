@@ -1,24 +1,26 @@
 #ifndef _KEYTRANSLATOR_H_
 #define _KEYTRANSLATOR_H_
 
+#include <string>
+
 #define KEY_TABLE_SIZE  256
 
 class KeyTranslator {
-    public:
-        KeyTranslator();
-    
-        int pcKeyToSt       (int pcKey);
-        int pcKeyToHuman    (int pcKey);
-        int humanKeyToPc    (int humanKey);
-        int humanKeyToSt    (int humanKey);
-        int stKeyToPc       (int stKey);
-    
-    private:
-        int  tableKeysPcToSt     [KEY_TABLE_SIZE];
-        int  tableKeysPcToHuman  [KEY_TABLE_SIZE];
+public:
+    KeyTranslator();
 
-        void fillKeyTranslationTable(void);
-        void addToTable(int pcKey, int stKey, int humanKey=0);
+    int pcKeyToSt                   (int pcKey) const;
+    const std::string& pcKeyToHuman (int pcKey) const;
+    int humanKeyToPc                (const std::string& humanKey) const;
+    int humanKeyToSt                (const std::string& humanKey) const;
+    int stKeyToPc                   (int stKey) const;
+
+private:
+    int         tableKeysPcToSt     [KEY_TABLE_SIZE];
+    std::string tableKeysPcToHuman  [KEY_TABLE_SIZE];
+
+    void fillKeyTranslationTable(void);
+    void addToTable(int pcKey, int stKey, const std::string& humanKey);
 };
 
 #endif

@@ -1,6 +1,8 @@
 #ifndef _KEYBJOYS_H_
 #define _KEYBJOYS_H_
 
+#include <string>
+
 #include "keytranslator.h"
 
 typedef struct {
@@ -12,9 +14,17 @@ typedef struct {
 } JoyKeys;
 
 typedef struct {
-    JoyKeys human;             // human readable keys, e.g. 'A' 
-    JoyKeys linuxx;            // linux key event codes, like KEY_A
-    JoyKeys atari;             // atari key codes, like 0x1e
+    std::string up;
+    std::string down;
+    std::string left;
+    std::string right;
+    std::string button;
+} JoyKeysHuman;
+
+typedef struct {
+    JoyKeysHuman human;             // human readable keys, e.g. "A" or "LCTRL"
+    JoyKeys      linuxx;            // linux key event codes, like KEY_A
+    JoyKeys      atari;             // atari key codes, like 0x1e
 } JoyKeysPcSt;
 
 class KeybJoyKeys {

@@ -27,3 +27,4 @@
 #define		KEY_F9		158
 #define		KEY_F10		159
 
+#define     KEY_SHIFT_TAB 160
