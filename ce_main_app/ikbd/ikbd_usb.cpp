@@ -414,19 +414,23 @@ void Ikbd::processKeyboard(input_event *ev, bool skipKeyboardTranslation)
         statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
         statuses.ikbdUsb.aliveSign = ALIVE_KEYDOWN;
 
+        if(ev->code >= KBD_KEY_COUNT) {
+            return;
+        }
+
         stKey = keyTranslator.pcKeyToSt(ev->code);          // translate PC key to ST key
         // ev->value -- 1: down, 2: auto repeat, 0: up
         if(ev->value == 0) {        // when key is released, ST scan code has the highest bit set
             stKey = stKey | 0x80;
             pressedKeys[ev->code] = false;
+        } else if (ev->value == 1) {
+            pressedKeys[ev->code] = true;
+            if(pressedKeys[KEY_LEFTCTRL] && pressedKeys[KEY_RIGHTCTRL] && pressedKeys[KEY_LEFTALT] && pressedKeys[KEY_RIGHTALT]) {
+                toggleKeyboardExclusiveAccess();
+            }
         } else if (ev->value == 2) {
             // auto repeat has no place on Atari! :)
             return;
-        }
-
-        pressedKeys[ev->code] = true;
-        if(pressedKeys[KEY_LEFTCTRL] && pressedKeys[KEY_RIGHTCTRL] && pressedKeys[KEY_LEFTALT] && pressedKeys[KEY_RIGHTALT]) {
-            toggleKeyboardExclusiveAccess();
         }
 
         if(stKey == 0 || stKey == 0x80 || fdUart == -1) {           // key not found, no UART open? quit

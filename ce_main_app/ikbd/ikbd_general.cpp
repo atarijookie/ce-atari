@@ -227,7 +227,7 @@ Ikbd::Ikbd()
 void Ikbd::loadSettings(void)
 {
     Settings s;
-    firstJoyIs0 = s.getBool((char *) "JOY_FIRST_IS_0", false);
+    firstJoyIs0 = s.getBool("JOY_FIRST_IS_0", false);
 
     if(firstJoyIs0) {
         joy1st = INTYPE_JOYSTICK1;
@@ -238,7 +238,7 @@ void Ikbd::loadSettings(void)
     }
 
     // get enabled flags for mouse wheel as keys
-    mouseWheelAsArrowsUpDown = s.getBool((char *) "MOUSE_WHEEL_AS_KEYS", true);
+    mouseWheelAsArrowsUpDown = s.getBool("MOUSE_WHEEL_AS_KEYS", true);
 
     // get enabled flags for keyb joys
     keybJoy0 = s.getBool("KEYBORD_JOY0", false);
