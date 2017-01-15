@@ -28,6 +28,7 @@ else
         TARGET   =  cosmosex_yocto
         LDLIBS += -lcivetweb_yocto
         CFLAGS  += -DDISTRO_YOCTO
+        VPATH += /usr/local/lib
     else
         TARGET   =  cosmosex_raspbian
         LDLIBS += -lcivetweb_raspbian
