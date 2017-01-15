@@ -301,6 +301,7 @@ int main(int argc, char *argv[])
     pthread_join(networkThreadInfo, NULL);              // wait until network   thread finishes
 
     printf("Stoping periodic thread\n");
+	pthread_kill(periodicThreadInfo, SIGINT);               // stop the select()
     pthread_join(periodicThreadInfo, NULL);             // wait until periodic  thread finishes
 
     printf("Downloader clean up before quit\n");

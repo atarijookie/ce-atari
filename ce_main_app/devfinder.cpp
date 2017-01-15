@@ -1,3 +1,4 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #include <stdio.h>
 #include <string.h>
 
@@ -7,7 +8,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#define DISK_LINKS_PATH		"/dev/disk/by-id"
 #define PATH_BUFF_SIZE		1024
 
 #include "translated/translatedhelper.h"
