@@ -327,8 +327,7 @@ bool TimeSync::syncByWeb(void)
     }
 
     // if we got here, the file got downloaded to tmp
-    system("chmod 777 /tmp/time.php");                              // change permissions to executable
-    system("/tmp/time.php > /dev/null 2> /dev/null");               // execute the script
+    system("date -s ` tail -n 1 /tmp/time.php | cut -d ' ' -f 3 ` > /tmp/timesync.log 2>&1");
 
     return true;                                                    // we're done
 }
