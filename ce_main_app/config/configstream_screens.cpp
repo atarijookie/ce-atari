@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <glob.h>
 
 #include <algorithm>
 
@@ -1659,13 +1660,13 @@ void ConfigStream::createScreen_hddimage(void)
     screen.push_back(comp);
     row += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Enter here full path to .IMG file. path",
+    comp = new ConfigComponent(this, ConfigComponent::label, "Enter here full path to .IMG file. Path",
                                40, 0, row++, gotoOffset);
     screen.push_back(comp);
     comp = new ConfigComponent(this, ConfigComponent::label, "beginning with shared or usb will be",
                                40, 0, row++, gotoOffset);
     screen.push_back(comp);
-    comp = new ConfigComponent(this, ConfigComponent::label, "autocompleted.",
+    comp = new ConfigComponent(this, ConfigComponent::label, "autocompleted. * wildcards are supported",
                                40, 0, row++, gotoOffset);
     screen.push_back(comp);
     comp = new ConfigComponent(this, ConfigComponent::label, "HDD Image will be mounted as RAW disk.  ",
@@ -1854,7 +1855,7 @@ void ConfigStream::onHddImageSave(void)
 
     if(path.substr(0, 3) == "usb") {
         std::string subpath = path.substr(3);
-        for(int i=2; i<MAX_DRIVES; i++) {
+        for(int i=MAX_DRIVES-1; i>= 2; i--) {
             if(shared.translated->driveIsEnabled(i)) {
                 const char * rootpath = shared.translated->driveGetHostPath(i);
                 if(rootpath) {
@@ -1868,6 +1869,18 @@ void ConfigStream::onHddImageSave(void)
         }
     } else if(path.substr(0, 6) == "shared") {
         path = "/mnt" + path;
+    }
+
+    if(!path.empty() && path.find("*") != std::string::npos) {
+        glob_t g;
+        memset(&g, 0, sizeof(g));
+        if(glob(path.c_str(), GLOB_NOSORT, NULL, &g) == 0) {
+            char msg[512];
+            snprintf(msg, sizeof(msg), "Resolved path %s\r\nto %s", path.c_str(), g.gl_pathv[0]);
+            showMessageScreen("Info", msg);
+            path = g.gl_pathv[0];
+        }
+        globfree(&g);
     }
 
     if(!path.empty()) {
