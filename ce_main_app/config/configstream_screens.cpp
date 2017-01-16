@@ -13,6 +13,8 @@
 #include "../native/scsi_defs.h"
 #include "../acsidatatrans.h"
 #include "../mounter.h"
+#include "../translated/translateddisk.h"
+#include "../periodicthread.h"  // for SharedObjects
 
 #include "../settings.h"
 #include "../utils.h"
@@ -31,6 +33,8 @@ extern THwConfig hwConfig;
 extern const char *distroString;
 
 extern RPiConfig rpiConfig;             // RPi info structure
+
+extern SharedObjects shared;
 
 //--------------------------
 // screen creation methods
@@ -1655,6 +1659,15 @@ void ConfigStream::createScreen_hddimage(void)
     screen.push_back(comp);
     row += 2;
 
+    comp = new ConfigComponent(this, ConfigComponent::label, "Enter here full path to .IMG file. path",
+                               40, 0, row++, gotoOffset);
+    screen.push_back(comp);
+    comp = new ConfigComponent(this, ConfigComponent::label, "beginning with shared or usb will be",
+                               40, 0, row++, gotoOffset);
+    screen.push_back(comp);
+    comp = new ConfigComponent(this, ConfigComponent::label, "autocompleted.",
+                               40, 0, row++, gotoOffset);
+    screen.push_back(comp);
     comp = new ConfigComponent(this, ConfigComponent::label, "HDD Image will be mounted as RAW disk.  ",
                                40, 0, row++, gotoOffset);
     screen.push_back(comp);
@@ -1662,6 +1675,16 @@ void ConfigStream::createScreen_hddimage(void)
                                40, 0, row++, gotoOffset);
     screen.push_back(comp);
     comp = new ConfigComponent(this, ConfigComponent::label, "configured as raw.",
+                               40, 0, row++, gotoOffset);
+    screen.push_back(comp);
+    row++;
+    comp = new ConfigComponent(this, ConfigComponent::label, "  Mounting is even easier from Atari :  ",
+                               40, 0, row++, gotoOffset);
+    screen.push_back(comp);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Double-click on .IMG on translated drive",
+                               40, 0, row++, gotoOffset);
+    screen.push_back(comp);
+    comp = new ConfigComponent(this, ConfigComponent::label, "to mount image using CE_HDIMG.TTP tool.",
                                40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
@@ -1828,6 +1851,24 @@ void ConfigStream::onHddImageSave(void)
     std::string path;
 
     getTextByComponentId(COMPID_HDDIMAGE_PATH, path);
+
+    if(path.substr(0, 3) == "usb") {
+        std::string subpath = path.substr(3);
+        for(int i=2; i<MAX_DRIVES; i++) {
+            if(shared.translated->driveIsEnabled(i)) {
+                const char * rootpath = shared.translated->driveGetHostPath(i);
+                if(rootpath) {
+                    path = rootpath + subpath;
+                    if(stat(path.c_str(), &st) >= 0) {
+                        // file exists
+                        break;
+                    }
+                }
+            }
+        }
+    } else if(path.substr(0, 6) == "shared") {
+        path = "/mnt" + path;
+    }
 
     if(!path.empty()) {
         if(stat(path.c_str(), &st) < 0) {

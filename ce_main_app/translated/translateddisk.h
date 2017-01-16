@@ -1,3 +1,4 @@
+// vim: expandtab shiftwidth=4 tabstop=4
 #ifndef TRANSLATEDDISK_H
 #define TRANSLATEDDISK_H
 
@@ -142,6 +143,10 @@ public:
     // for status report
     bool driveIsEnabled(int driveIndex);
     void driveGetReport(int driveIndex, std::string &reportString);
+	const char * driveGetHostPath(int driveIndex) const {
+		if(!conf[driveIndex].enabled) return NULL;
+		return conf[driveIndex].hostRootPath.c_str();
+	}
 
 private:
 	void mountAndAttachSharedDrive(void);
