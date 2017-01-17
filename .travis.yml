@@ -15,6 +15,7 @@ install:
   - 'sudo apt-get install -ym build-essential g++-arm-linux-gnueabihf'
 
 script:
+  - 'wget http://www.airspayce.com/mikem/bcm2835/bcm2835-1.50.tar.gz && tar xzf bcm2835-1.50.tar.gz && cd bcm2835-1.50 && CC=arm-linux-gnueabihf-gcc ./configure --prefix=/usr/arm-linux-gnueabihf --host=arm-linux-gnueabihf && make && sudo make install && cd ..'
   - 'cd $TRAVIS_BUILD_DIR'
   - 'make ce_main_app ONPC=yes'
   - 'make ce_main_app CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++ DISTRO=raspbian'
