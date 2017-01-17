@@ -12,11 +12,12 @@ compiler:
 install:
   - 'sh ./.install-cross-mint.sh'
   - 'sudo apt-get install -ym mtools'
+  - 'sudo apt-get install -ym build-essential g++-arm-linux-gnueabihf'
 
 script:
   - 'cd $TRAVIS_BUILD_DIR'
   - 'make ce_main_app ONPC=yes'
+  - 'make ce_main_app CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++ DISTRO=raspbian'
   - 'make atari_progs'
-  - 'cp ce_main_app/cosmosex_onpc ce_main_app/cosmosex_raspbian'
   - 'cp ce_main_app/cosmosex_onpc ce_main_app/cosmosex_yocto'
   - 'make update'
