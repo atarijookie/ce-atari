@@ -28,12 +28,18 @@ else
         TARGET   =  cosmosex_yocto
         LDLIBS += -lcivetweb_yocto
         CFLAGS  += -DDISTRO_YOCTO
-        VPATH += /usr/local/lib
     else
         TARGET   =  cosmosex_raspbian
         LDLIBS += -lcivetweb_raspbian
         CFLAGS += -DDISTRO_RASPBIAN
     endif
+    # add search path for libbcm2835.a
+    # /usr/local/bin on yocto or more exotic path when cross-compiling
+    VPATH += $(shell for d in `$(CC) -print-search-dirs | \
+                     sed '/^lib/b 1;d;:1;s,/[^/.][^/]*/\.\./,/,;t 1;s,:[^=]*=,:;,;s,;,;  ,g' | \
+                     tr ';' \\\\012 | tail -n 1 | tr ':' \\\\012 ` ; do \
+                       [ -f "$$d/libbcm2835.a" ] && echo $$d ; \
+                     done )
 endif
 
 # uncomment following line to get map file (ce.map)
