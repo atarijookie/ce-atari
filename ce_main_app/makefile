@@ -17,6 +17,7 @@ LDFLAGS	= -Llib
 LDLIBS = -lrt -lanl -lpthread -lcurl -ldl -lutil
 
 ifeq ($(ONPC),yes)
+    OBJDIR = obj/onpc
     CFLAGS += -DONPC_NOTHING -I./
     TARGET = cosmosex_onpc
     LDLIBS += -lcivetweb_onpc -ldl
@@ -25,10 +26,12 @@ else
     CFLAGS += -I./
     DISTRO := $(shell ./whichdistro.sh)
     ifeq ($(DISTRO),yocto)
+        OBJDIR = obj/yocto
         TARGET   =  cosmosex_yocto
         LDLIBS += -lcivetweb_yocto
         CFLAGS  += -DDISTRO_YOCTO
     else
+        OBJDIR = obj/raspbian
         TARGET   =  cosmosex_raspbian
         LDLIBS += -lcivetweb_raspbian
         CFLAGS += -DDISTRO_RASPBIAN
@@ -106,7 +109,7 @@ HDRS += $(wildcard $(SUBDIR10)/*.h)
 HDRS += $(wildcard $(SUBDIR11)/*.h)
 HDRS += $(wildcard $(SUBDIR12)/*.h)
 
-OBJS = $(patsubst %.cpp,%.o,$(SRCS:.c=.o))
+OBJS = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(SRCS:.c=.o)))
 DEPS = $(patsubst %.o,%.d,$(OBJS))
 
 #combine web scripts
@@ -163,14 +166,18 @@ depclean:
 
 depend:	$(DEPS)
 
-%.o:	%.cpp %.d
+$(OBJDIR)/%.o:	%.cpp $(OBJDIR)/%.d
+	$(COMPILE.cpp) $(OUTPUT_OPTION) $<
 
-%.d:	%.cpp
+$(OBJDIR)/%.d:	%.cpp
+	$(AT)mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -o $@ $<
 
-%.o:	%.c %.d
+$(OBJDIR)/%.o:	%.c $(OBJDIR)/%.d
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
 
-%.d:	%.c
+$(OBJDIR)/%.d:	%.c
+	$(AT)mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $<
 
 ifneq ($(MAKECMDGOALS),clean)
