@@ -283,6 +283,7 @@ int main(int argc, char *argv[])
 	pthread_join(mountThreadInfo, NULL);				// wait until mount     thread finishes
 
     printf("Stoping download thread\n");
+    Downloader::stop();
     pthread_join(downloadThreadInfo, NULL);             // wait until download  thread finishes
 
 #ifndef ONPC_NOTHING
