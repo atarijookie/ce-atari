@@ -33,7 +33,7 @@ else
     else
         OBJDIR = obj/raspbian
         TARGET   =  cosmosex_raspbian
-        LDLIBS += -lcivetweb_raspbian
+        LDLIBS += -lcivetweb_raspbian -ldl
         CFLAGS += -DDISTRO_RASPBIAN
     endif
     # add search path for libbcm2835.a
