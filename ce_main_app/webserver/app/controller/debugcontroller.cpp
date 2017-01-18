@@ -58,7 +58,7 @@ bool DebugController::indexAction(mg_connection *conn, mg_request_info *req_info
 
     mg_printf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n");
     mg_printf(conn, "Cache: no-cache\r\n");
-    mg_printf(conn, "Content-Length: %lu\r\n\r\n",sOutput.length());        // Always set Content-Length
+    mg_printf(conn, "Content-Length: %lu\r\n\r\n",(unsigned long)sOutput.length());        // Always set Content-Length
     mg_write(conn, sOutput.c_str(), sOutput.length());
     return true;
 }
