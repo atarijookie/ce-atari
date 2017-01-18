@@ -11,9 +11,6 @@
 #include <limits.h>
 #include <errno.h>
 
-#include <sys/ioctl.h>
-#include <net/if.h>
-
 #include <signal.h>
 #include <pthread.h>
 #include <queue>
@@ -34,6 +31,7 @@
 #include "ce_conf_on_rpi.h"
 
 #include "devfinder.h"
+#include "ifacewatcher.h"
 
 #include "periodicthread.h"
 
@@ -53,14 +51,11 @@ extern volatile BYTE updateListDownloadStatus;
 #define UPDATELIST_DOWNLOAD_TIME_ONFAIL     ( 1 * 60 * 1000)
 #define UPDATELIST_DOWNLOAD_TIME_ONSUCCESS  (30 * 60 * 1000)
 
-static bool inetIfaceReady(const char* ifrname);
-
 bool state_eth0     = false;
 bool state_wlan0    = false;
 
 static void handleConfigStreams(ConfigStream *cs, ConfigPipes &cp);
 static void updateUpdateState(void);
-static bool checkInetIfEnabled(void);
 
 void *periodicThreadCode(void *ptr)
 {
@@ -77,7 +72,6 @@ void *periodicThreadCode(void *ptr)
 	Debug::out(LOG_DEBUG, "Periodic thread starting...");
 
     DWORD nextUpdateCheckTime           = Utils::getEndTime(5000);          // create a time when update download status should be checked
-    DWORD nextInetIfaceCheckTime        = Utils::getEndTime(1000);          // create a time when we should check for inet interfaces that got ready
 
     DWORD nextUpdateListDownloadTime    = Utils::getEndTime(3000);          // try to download update list at this time
 
@@ -93,6 +87,8 @@ void *periodicThreadCode(void *ptr)
 
     DevFinder devFinder;
 	devFinder.lookForDevChanges();				            // look for devices attached / detached
+
+    IfaceWatcher ifaceWatcher;
 
 	while(sigintReceived == 0) {
         max_fd = -1;
@@ -128,24 +124,6 @@ void *periodicThreadCode(void *ptr)
             shared.devFinder_look           = false;
             continue;
         }
-
-        //------------------------------------
-        // should we check for inet interfaces that might came up?
-        if(now >= nextInetIfaceCheckTime) {
-            // TODO : use socket(PF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
-            // to monitor network interface going up/down
-            bool someIfChangedToEnabled = checkInetIfEnabled();
-            nextInetIfaceCheckTime  = Utils::getEndTime(INET_IFACE_CHECK_TIME);     // update the time when we should interfaces again
-
-            if(someIfChangedToEnabled) {                                            // if some IF has changed to enabled, try to download the update list again
-                Debug::out(LOG_DEBUG, "periodicThreadCode -- eth0 or wlan0 changed to up, will now download update list");
-                nextUpdateListDownloadTime = Utils::getEndTime(1000);
-            }
-            continue;
-		} else {
-            if(now + wait > nextInetIfaceCheckTime) wait = nextInetIfaceCheckTime - now;
-        }
-
 
         if(now >= nextUpdateListDownloadTime) {
             Debug::out(LOG_DEBUG, "periodicThreadCode -- will download update list now");
@@ -206,6 +184,10 @@ void *periodicThreadCode(void *ptr)
             FD_SET(inotifyFd, &readfds);
             if(inotifyFd > max_fd) max_fd = inotifyFd;
         }
+        if(ifaceWatcher.getFd() >= 0) {
+            FD_SET(ifaceWatcher.getFd(), &readfds);
+            if(ifaceWatcher.getFd() > max_fd) max_fd = ifaceWatcher.getFd();
+        }
         memset(&timeout, 0, sizeof(timeout));
         timeout.tv_sec = wait / 1000;           // sec
         timeout.tv_usec = (wait % 1000)*1000;   // usec
@@ -215,6 +197,22 @@ void *periodicThreadCode(void *ptr)
             } else {
                 Debug::out(LOG_ERROR, "peridic thread : select() %s", strerror(errno));
                 continue;
+            }
+        }
+
+        //------------------------------------
+        // Network interface watcher
+        if(ifaceWatcher.getFd() >= 0 && FD_ISSET(ifaceWatcher.getFd(), &readfds)) {
+            bool newIfaceUpAndRunning = false;
+            ifaceWatcher.processMsg(&newIfaceUpAndRunning);
+            if(newIfaceUpAndRunning) {
+                Debug::out(LOG_DEBUG, "Internet interface comes up: reload network mount settings");
+                pthread_mutex_lock(&shared.mtxTranslated);
+                shared.translated->reloadSettings(SETTINGSUSER_TRANSLATED);
+                pthread_mutex_unlock(&shared.mtxTranslated);
+
+                Debug::out(LOG_DEBUG, "periodicThreadCode -- eth0 or wlan0 changed to up, will now download update list");
+                nextUpdateListDownloadTime = Utils::getEndTime(1000);
             }
         }
 
@@ -247,30 +245,6 @@ void *periodicThreadCode(void *ptr)
 	
 	Debug::out(LOG_DEBUG, "Periodic thread terminated.");
 	return 0;
-}
-
-static bool checkInetIfEnabled(void)
-{
-	//up/running state of inet interfaces
-    bool state_temp 		= 	inetIfaceReady("eth0");
-    bool change_to_enabled	= 	(state_eth0!=state_temp)&&!state_eth0; 	    //was this iface disabled and current state changed to enabled?
-    state_eth0 				= 	state_temp;
-
-    state_temp 				= 	inetIfaceReady("wlan0");
-    change_to_enabled 		|= 	(state_wlan0!=state_temp)&&!state_wlan0;
-    state_wlan0 			= 	state_temp;
-
-    if( change_to_enabled ){
-        Debug::out(LOG_DEBUG, "Internet interface comes up: reload network mount settings");
-
-        pthread_mutex_lock(&shared.mtxTranslated);
-        shared.translated->reloadSettings(SETTINGSUSER_TRANSLATED);
-        pthread_mutex_unlock(&shared.mtxTranslated);
-
-        return true;            // some IF changed to enabled
-    }
-
-    return false;               // no IF changed to enabled
 }
 
 static void updateUpdateState(void)
@@ -377,43 +351,4 @@ static void handleConfigStreams(ConfigStream *cs, ConfigPipes &cp)
         cs->processCommand(cmd, cp.fd2);
         pthread_mutex_unlock(&shared.mtxConfigStreams);
     }
-}
-
-// Is a particular internet interface up, running and has an IP address?
-bool inetIfaceReady(const char* ifrname)
-{
-	struct ifreq ifr;
-	bool up_and_running;
-
-	//temporary socket
-	int socketfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
-    if (socketfd == -1){
-        return false;
-	}
-			
-	memset( &ifr, 0, sizeof(ifr) );
-	strcpy( ifr.ifr_name, ifrname );
-	
-	if( ioctl( socketfd, SIOCGIFFLAGS, &ifr ) != -1 ) {
-	    up_and_running = (ifr.ifr_flags & ( IFF_UP | IFF_RUNNING )) == ( IFF_UP | IFF_RUNNING );
-
-		//it's only ready and usable if it has an IP address
-        if( up_and_running && ioctl(socketfd, SIOCGIFADDR, &ifr) != -1 ){
-	        if( ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr==0 ){
-			    up_and_running = false;
-			}
-		} else {
-		    up_and_running = false;
-		}
-	    //Debug::out(LOG_DEBUG, "inetIfaceReady ip: %s %s", ifrname, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
-	} else {
-	    up_and_running = false;
-	}
-
-	int result=0;
-	do {
-        result = close(socketfd);
-    } while (result == -1 && errno == EINTR);	
-
-	return up_and_running;
 }
