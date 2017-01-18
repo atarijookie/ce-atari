@@ -38,10 +38,10 @@ else
     endif
     # add search path for libbcm2835.a
     # /usr/local/bin on yocto or more exotic path when cross-compiling
-    VPATH += $(shell for d in `$(CC) -print-search-dirs | \
+    VPATH += $(shell for d in `$(ACTUAL_CC) -print-search-dirs | \
                      sed '/^lib/b 1;d;:1;s,/[^/.][^/]*/\.\./,/,;t 1;s,:[^=]*=,:;,;s,;,;  ,g' | \
-                     tr ';' \\\\012 | tail -n 1 | tr ':' \\\\012 ` ; do \
-                       [ -f "$$d/libbcm2835.a" ] && echo $$d ; \
+                     tr ';' \\\\012 | tail -n 1 | tr ':' \\\\012 ` /usr/local/lib ; do \
+                       [ -f "$$d/libbcm2835.a" ] && echo $$d && break ; \
                      done )
 endif
 
@@ -148,7 +148,7 @@ ifeq ($(ONPC),yes)
 lib/libcivetweb_onpc.a: lib/civetweb-master.zip
 	rm -rf lib/civetweb-master
 	cd lib && unzip civetweb-master.zip
-	$(MAKE) -C lib/civetweb-master lib WITH_CPP=1
+	$(MAKE) -C lib/civetweb-master lib WITH_CPP=1 CC=$(ACTUAL_CC) CXX=$(ACTUAL_CXX)
 	mv lib/civetweb-master/libcivetweb.a $@
 	rm -rf lib/civetweb-master
 endif
