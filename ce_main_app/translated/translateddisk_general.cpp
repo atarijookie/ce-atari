@@ -206,7 +206,7 @@ void TranslatedDisk::mountAndAttachSharedDrive(void)
     tmr.shared.username     = username;
     tmr.shared.password     = password;
 	tmr.mountDir			= mountPath;
-	mountAdd(tmr);
+	Mounter::add(tmr);
 
     std::string devicePath;
     if(nfsNotSamba) {
@@ -530,7 +530,7 @@ void TranslatedDisk::onUnmountDrive(BYTE *cmd)
 	TMounterRequest tmr;
     tmr.action			= MOUNTER_ACTION_UMOUNT;							// action: umount
 	tmr.mountDir		= conf[drive].hostRootPath;							// e.g. /mnt/sda2
-	mountAdd(tmr);
+	Mounter::add(tmr);
 
     detachByIndex(drive);                                                   // detach drive from translated disk module
 
@@ -1518,7 +1518,7 @@ void TranslatedDisk::doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath
         tmr.action      = MOUNTER_ACTION_MOUNT_ZIP;         // action: mount ZIP file
         tmr.devicePath  = zipFilePath;                      // e.g. /mnt/shared/normal/archive.zip
         tmr.mountDir    = zipDirs[zipDirIndex]->mountPoint; // e.g. /tmp/zipdir2
-        int masId       = mountAdd(tmr);                    // add mounter action, get mount action state id
+        int masId       = Mounter::add(tmr);                // add mounter action, get mount action state id
         
         zipDirs[zipDirIndex]->mountActionStateId    = masId;    // store the mounter action state id, for future mount state query
         zipDirs[zipDirIndex]->isMounted             = false;    // not mounted yet
@@ -1532,7 +1532,7 @@ void TranslatedDisk::doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath
         Debug::out(LOG_DEBUG, "TranslatedDisk::doZipDirMountOrStateCheck -- file %s already mounted to %s, reusing and not mounting", zipFilePath, zipDirs[zipDirIndex]->mountPoint.c_str());
         
         if(!zipDirs[zipDirIndex]->isMounted) {                                      // if not mounted yet
-            int state = mas_getState(zipDirs[zipDirIndex]->mountActionStateId);     // get state of this mount action
+            int state = Mounter::mas_getState(zipDirs[zipDirIndex]->mountActionStateId);     // get state of this mount action
             
             if(state == MOUNTACTION_STATE_DONE) {                                   // if state is DONE, mark that it's mounted and continue
                 zipDirs[zipDirIndex]->isMounted = true;

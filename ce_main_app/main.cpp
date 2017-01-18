@@ -280,6 +280,7 @@ int main(int argc, char *argv[])
 	gpio_close();										// close gpio and spi
 
     printf("Stoping mount thread\n");
+    Mounter::stop();
 	pthread_join(mountThreadInfo, NULL);				// wait until mount     thread finishes
 
     printf("Stoping download thread\n");

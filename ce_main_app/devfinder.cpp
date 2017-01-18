@@ -363,7 +363,7 @@ void DevFinder::attachDevAsTranslated(std::string devName)
 		tmr.deviceNotShared	= true;												// mount as device
 		tmr.devicePath		= partitionDevice;									// e.g. /dev/sda2
 		tmr.mountDir		= mountPath;										// e.g. /mnt/sda2
-		mountAdd(tmr);
+		Mounter::add(tmr);
 
 		res = shared.translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL, partitionDevice);   // try to attach
 

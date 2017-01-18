@@ -53,7 +53,7 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     if(!ns.wlan0.isEnabled) {       // if wlan0 not enabled, send one wlan0 restart, which might bring the wlan0 down
         TMounterRequest tmr;
         tmr.action = MOUNTER_ACTION_RESTARTNETWORK_WLAN0;
-        mountAdd(tmr);
+        Mounter::add(tmr);
     }
 
     Update::initialize();
