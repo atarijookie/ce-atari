@@ -32,6 +32,7 @@
 
 #include "devfinder.h"
 #include "ifacewatcher.h"
+#include "timesync.h"
 
 #include "periodicthread.h"
 
@@ -90,6 +91,8 @@ void *periodicThreadCode(void *ptr)
 
     IfaceWatcher ifaceWatcher;
 
+    TimeSync timeSync;
+
 	while(sigintReceived == 0) {
         max_fd = -1;
         FD_ZERO(&readfds);
@@ -123,6 +126,12 @@ void *periodicThreadCode(void *ptr)
             shared.devFinder_detachAndLook  = false;
             shared.devFinder_look           = false;
             continue;
+        }
+
+        if(now >= timeSync.nextProcessTime) {
+            timeSync.process(false);
+        } else {
+            if(now + wait > timeSync.nextProcessTime) wait = timeSync.nextProcessTime - now;
         }
 
         if(now >= nextUpdateListDownloadTime) {
@@ -188,6 +197,10 @@ void *periodicThreadCode(void *ptr)
             FD_SET(ifaceWatcher.getFd(), &readfds);
             if(ifaceWatcher.getFd() > max_fd) max_fd = ifaceWatcher.getFd();
         }
+        if(timeSync.waitingForDataOnFd()) {
+            FD_SET(timeSync.getFd(), &readfds);
+            if(timeSync.getFd() > max_fd) max_fd = timeSync.getFd();
+        }
         memset(&timeout, 0, sizeof(timeout));
         timeout.tv_sec = wait / 1000;           // sec
         timeout.tv_usec = (wait % 1000)*1000;   // usec
@@ -240,6 +253,10 @@ void *periodicThreadCode(void *ptr)
             handleConfigStreams(shared.configStream.term, shared.configPipes.term);
         }
         //------------------------------------
+
+        if(timeSync.waitingForDataOnFd() && FD_ISSET(timeSync.getFd(), &readfds)) {
+            timeSync.process(true);
+        }
 
 	}
 	

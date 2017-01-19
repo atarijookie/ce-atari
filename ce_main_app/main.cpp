@@ -18,7 +18,6 @@
 #include "mounter.h"
 #include "downloader.h"
 #include "ikbd/ikbd.h"
-#include "timesync.h"
 #include "update.h"
 #include "version.h"
 #include "ce_conf_on_rpi.h"
@@ -71,7 +70,6 @@ int main(int argc, char *argv[])
     pthread_t	ikbdThreadInfo;
 #endif
     pthread_t	floppyEncThreadInfo;
-	pthread_t	timesyncThreadInfo;
     pthread_t   networkThreadInfo;
     pthread_t   periodicThreadInfo;
 
@@ -239,9 +237,6 @@ int main(int argc, char *argv[])
     res = pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL);	// create the floppy encoding thread and run it
 	handlePthreadCreate(res, "ce floppy encode", &floppyEncThreadInfo);
 
-    res = pthread_create(&timesyncThreadInfo, NULL, timesyncThreadCode, NULL);  // create the timesync thread and run it
-	handlePthreadCreate(res, "ce time sync", &timesyncThreadInfo);
-
     res = pthread_create(&networkThreadInfo, NULL, networkThreadCode, NULL);    // create the network thread and run it
 	handlePthreadCreate(res, "ce network", &networkThreadInfo);
 
@@ -295,9 +290,6 @@ int main(int argc, char *argv[])
 
     printf("Stoping floppy encoder thread\n");
     pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes
-
-    printf("Stoping time sync thread\n");
-    pthread_join(timesyncThreadInfo, NULL);             // wait until timesync  thread finishes
 
     printf("Stoping network thread\n");
     pthread_join(networkThreadInfo, NULL);              // wait until network   thread finishes
