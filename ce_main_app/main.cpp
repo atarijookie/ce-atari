@@ -113,8 +113,15 @@ int main(int argc, char *argv[])
         childPid = forkpty(&linuxConsole_fdMaster, NULL, NULL, NULL);
 
         if(childPid == 0) {                                         // code executed only by child
-            const char *shell = "/bin/sh";
-            execlp(shell, shell, (char *) NULL);
+            const char *shell = "/bin/sh";  // default shell
+            const char *term = "vt52";
+            shell = getenv("SHELL");
+            if(access("/etc/terminfo/a/atari", R_OK) == 0)
+                term = "atari";
+            if(setenv("TERM", term, 1) < 0) {
+                fprintf(stderr, "Failed to setenv(\"TERM\", \"%s\"): %s\n", term, strerror(errno));
+            }
+            execlp(shell, shell, "-i", (char *) NULL);  // -i for interactive
 
             return 0;
         } 

@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -7,6 +8,7 @@
 #include <sys/types.h>
 #include <utmp.h>
 #include <pty.h>
+#include <errno.h>
 
 #include "../global.h"
 #include "../native/scsi_defs.h"
@@ -28,29 +30,32 @@ void ConfigStream::linuxConsole_KeyDown(BYTE atariKey)
 
     char consoleKeys[10];
     int  consoleKeysLength = 0;
-    
+
     atariKeyToConsoleKey(atariKey, consoleKeys, consoleKeysLength);     // convert it from Atari pseudo key to console key
-    
-    write(linuxConsole_fdMaster, consoleKeys, consoleKeysLength);       // send the key
+
+    ssize_t n = write(linuxConsole_fdMaster, consoleKeys, consoleKeysLength);       // send the key
+    if(n < 0) {
+        Debug::out(LOG_ERROR, "ConfigStream::linuxConsole_KeyDown: write(linuxConsole_fdMaster=%d) failed: %s", linuxConsole_fdMaster, strerror(errno));
+    }
 }
 
 int ConfigStream::linuxConsole_getStream(BYTE *bfr, int maxLen)
 {
     int totalCnt = 0;
-    memset(bfr, 0, maxLen);								                // clear the buffer
-    
+    memset(bfr, 0, maxLen);                                                // clear the buffer
+
     bool maxData = false;                                               // flag that we will send full buffer
 
     if(linuxConsole_fdMaster <= 0) {                                    // can't read data from console? quit
         return 0;
     }
-    
+
     int bytesAvailable;
     int ires = ioctl(linuxConsole_fdMaster, FIONREAD, &bytesAvailable); // how many bytes we can read?
 
     if(ires != -1 && bytesAvailable > 0) {
         int readCount;
-        
+
         if(bytesAvailable <= (maxLen - 3)) {                            // can read less than buffer size?
             maxData         = false;
             readCount       = bytesAvailable;
@@ -70,13 +75,13 @@ int ConfigStream::linuxConsole_getStream(BYTE *bfr, int maxLen)
             bfr         += fcnt;                                        // advance in the buffer
         }
     }
-	
+
     totalCnt += 2;                                                      // two zeros at the end -- string terminator and THIS_IS_NOT_UPDATE_SCREEN flag
-    
+
     if(maxData) {                                                       // if sending full buffer, then set the count to max
         totalCnt = maxLen;
     }
-    
+
     return totalCnt;                                                    // return the count of bytes used
 }
 
@@ -99,7 +104,7 @@ int ConfigStream::filterVT100(char *bfr, int cnt)
                 tmp[j++] = 27;
                 tmp[j++] = 75;
                 move = 3;
-            } else if(bfr[i + 3] == 'K') {                              // clear line 
+            } else if(bfr[i + 3] == 'K') {                              // clear line
                 tmp[j++] = 27;
 
                 switch(bfr[i + 2]) {
@@ -109,7 +114,7 @@ int ConfigStream::filterVT100(char *bfr, int cnt)
                 }
 
                 move = 4;
-            } else if(strcmp(bfr + 2, "38;5;") == 0 || strcmp(bfr + 2, "48;5;") == 0) {     // it's 88 or 256 colors command? 
+            } else if(strcmp(bfr + 2, "38;5;") == 0 || strcmp(bfr + 2, "48;5;") == 0) {     // it's 88 or 256 colors command?
                 for(int k=7; k<14; k++) {                                                   // find the terminating 'm' character
                     if(bfr[i + k] == 'm') {                                                 // found? move one beyond that
                         move = k + 1;
@@ -129,7 +134,7 @@ int ConfigStream::filterVT100(char *bfr, int cnt)
         } else {                                                        // not VT100 cmd, copy it
             tmp[j] = bfr[i];
             i++;
-            j++;            
+            j++;
         }
     }
 
@@ -139,7 +144,9 @@ int ConfigStream::filterVT100(char *bfr, int cnt)
 
 void ConfigStream::atariKeyToConsoleKey(BYTE atariKey, char *bfr, int &cnt)
 {
-    // first handle special keys
+    // TODO : translate to ASCII ? (vt52 behaviour)
+    // DELETE = 0x7F  BACKSPACE = Ctrl+H = 0x08
+    // see https://en.wikipedia.org/wiki/VT52
     switch(atariKey) {
         case KEY_UP:        bfr[0] = 0x1b; bfr[1] = 0x5b; bfr[2] = 0x41; cnt = 3; return;
         case KEY_DOWN:      bfr[0] = 0x1b; bfr[1] = 0x5b; bfr[2] = 0x42; cnt = 3; return;
@@ -164,11 +171,11 @@ void ConfigStream::atariKeyToConsoleKey(BYTE atariKey, char *bfr, int &cnt)
         case KEY_F8:        bfr[0] = 0x1b; bfr[1] = 0x5b; bfr[2] = 0x31; bfr[3] = 0x39; bfr[4] = 0x7e; cnt = 5; return;
         case KEY_F9:        bfr[0] = 0x1b; bfr[1] = 0x5b; bfr[2] = 0x32; bfr[3] = 0x30; bfr[4] = 0x7e; cnt = 5; return;
         case KEY_F10:       bfr[0] = 0x1b; bfr[1] = 0x5b; bfr[2] = 0x32; bfr[3] = 0x31; bfr[4] = 0x7e; cnt = 5; return;
+        default:
+            // if came here, not a special key, just copy it
+            bfr[0] = atariKey;
+            cnt = 1;
     }
-    
-    // if came here, not a special key, just copy it
-    bfr[0] = atariKey;
-    cnt = 1;
 }
 
 
