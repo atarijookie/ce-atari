@@ -125,11 +125,14 @@ WEB_JS_MODULES = $(WEB_JS_PATH)/actual.js\
 					$(WEB_JS_PATH)/screen.js\
 					$(WEB_JS_PATH)/script.js
 
-WEBCOMPONENTS = $(WEB_CSS_PATH)/combined.css.gz $(WEB_JS_PATH)/jquery-combined.js.gz $(WEB_JS_PATH)/zepto-combined.js.gz
+WEBCOMPONENTS = $(WEB_CSS_PATH)/combined.css.gz \
+    $(WEB_JS_PATH)/jquery-combined.js.gz \
+    $(WEB_JS_PATH)/zepto-combined.js.gz \
+    $(WEB_JS_PATH)/log.js.gz
 
-all:	$(TARGET)
+all:	$(TARGET) $(WEBCOMPONENTS)
 
-$(TARGET): $(OBJS) $(HDRS) $(WEBCOMPONENTS) $(LDLIBS)
+$(TARGET): $(OBJS) $(HDRS) $(LDLIBS)
 	$(CXX_LINK) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@ $(LDLIBS)
 #	$(STRIP) -s $@
 
@@ -140,6 +143,9 @@ $(WEB_JS_PATH)/zepto-combined.js.gz: $(WEB_JS_PATH)/zepto.js $(WEB_JS_PATH)/zept
 	$(AT)cat $^ | gzip -f > $@
 
 $(WEB_JS_PATH)/jquery-combined.js.gz: $(WEB_JS_PATH)/jquery.js ${WEB_JS_MODULES}
+	$(AT)cat $^ | gzip -f > $@
+
+$(WEB_JS_PATH)/log.js.gz: $(WEB_JS_PATH)/log.js
 	$(AT)cat $^ | gzip -f > $@
 
 ifeq ($(ONPC),yes)
