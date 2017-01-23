@@ -2,7 +2,11 @@
 #ifndef _IMAGESILO_H_
 #define _IMAGESILO_H_
 
+#include <pthread.h>
+
 #include <string>
+#include <queue>
+
 #include "../datatypes.h"
 #include "../settingsreloadproxy.h"
 
@@ -19,19 +23,16 @@ typedef struct
 {
     std::string imageFile;
 } SiloSlotSimple;
-
-extern SiloSlotSimple  floppyImages[3];
-extern int             floppyImageSelected;
 //-------------------------------------------
 
 typedef struct
 {
-    std::string        imageFile;      // just file name:                     bla.st
+    std::string     imageFile;      // just file name:                     bla.st
     std::string     hostDestPath;   // where the file is stored when used: /tmp/bla.st
     std::string     atariSrcPath;   // from where the file was uploaded:   C:\gamez\bla.st
-    std::string        hostSrcPath;    // for translated disk, host path:     /mnt/sda/gamez/bla.st
+    std::string     hostSrcPath;    // for translated disk, host path:     /mnt/sda/gamez/bla.st
 
-    MfmCachedImage    encImage;
+    MfmCachedImage  encImage;
 } SiloSlot;
 
 typedef struct
@@ -48,6 +49,9 @@ class ImageSilo
 public:
     ImageSilo();
     ~ImageSilo();
+
+    static void run(void);
+    static void stop(void);
 
     void loadSettings(void);
     void saveSettings(void);
@@ -71,14 +75,28 @@ public:
 
     SiloSlot *getSiloSlot(int index);
 
+    static int getFloppyImageSelectedId(void);
+    static SiloSlotSimple * getFloppyImageSimple(int index);
+    static bool getFloppyEncodingRunning(void);
+
 private:
+    void clearSlot(int index);
+    static void addEncodeRequest(EncodeRequest &er);
+
     SiloSlot                slots[4];
     int                        currentSlot;
     SettingsReloadProxy     *reloadProxy;
 
     BYTE                    *emptyTrack;
 
-    void clearSlot(int index);
+    static pthread_mutex_t floppyEncodeQueueMutex;
+    static pthread_cond_t floppyEncodeQueueNotEmpty;
+    static std::queue<EncodeRequest> encodeQueue;
+    static volatile bool shouldStop;
+
+    static volatile bool floppyEncodingRunning;
+    static SiloSlotSimple floppyImages[3];
+    static int floppyImageSelected;
 };
 
 #endif

@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
@@ -23,7 +24,6 @@ extern TFlags       flags;
 extern DebugVars    dbgVars;
 
 extern SharedObjects shared;
-extern volatile bool floppyEncodingRunning;
 
 volatile TStatuses statuses;
 
@@ -145,8 +145,8 @@ void StatusReport::createReport(std::string &report, int reportFormat)
     startSection(report, "Floppy image slots", reportFormat);
 
     char tmp[32];
-    if(floppyImageSelected >= 0) {
-        sprintf(tmp, "%d", floppyImageSelected + 1);
+    if(ImageSilo::getFloppyImageSelectedId() >= 0) {
+        sprintf(tmp, "%d", ImageSilo::getFloppyImageSelectedId() + 1);
     } else {
         strcpy(tmp, "none");
     }
@@ -154,11 +154,11 @@ void StatusReport::createReport(std::string &report, int reportFormat)
     dumpPair(report, "Selected floppy image", tmp, reportFormat);
 
     for(int i=0; i<3; i++) {
-        bool selected = (i == floppyImageSelected);
+        bool selected = (i == ImageSilo::getFloppyImageSelectedId());
 
         sprintf(tmp, "Slot %d %s", i + 1, selected ? "<- selected" : "");
 
-        const char *imageFile = (floppyImages[i].imageFile.length() > 0) ? floppyImages[i].imageFile.c_str() : "(empty)";
+        const char *imageFile = (ImageSilo::getFloppyImageSimple(i)->imageFile.length() > 0) ? ImageSilo::getFloppyImageSimple(i)->imageFile.c_str() : "(empty)";
         dumpPair(report, tmp, imageFile, reportFormat);
     }
 

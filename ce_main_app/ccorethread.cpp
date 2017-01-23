@@ -42,7 +42,6 @@ extern TFlags       flags;
 extern DebugVars    dbgVars;
 
 extern SharedObjects shared;
-extern volatile bool floppyEncodingRunning;
 
 CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
@@ -329,7 +328,7 @@ void CCoreThread::run(void)
         if(now >= nextFloppyEncodingCheck) {
             nextFloppyEncodingCheck = Utils::getEndTime(1000);
             
-            if(prevFloppyEncodingRunning == true && floppyEncodingRunning == false) {   // if floppy encoding was running, but not it's not running
+            if(prevFloppyEncodingRunning && !ImageSilo::getFloppyEncodingRunning()) {   // if floppy encoding was running, but not it's not running
                 if(newFloppyImageLedAfterEncode != -2) {                                // if we should set the new newFloppyImageLed after encoding is done
                     setEnabledFloppyImgs    = true;
                     setNewFloppyImageLed    = true;
@@ -339,7 +338,7 @@ void CCoreThread::run(void)
                 } 
             } 
             
-            prevFloppyEncodingRunning = floppyEncodingRunning;
+            prevFloppyEncodingRunning = ImageSilo::getFloppyEncodingRunning();
         }
         
         load.busy.markStart();                          // mark the start of the busy part of the code
