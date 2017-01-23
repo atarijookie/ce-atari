@@ -1,3 +1,4 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
@@ -10,6 +11,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/select.h>
 #include <termios.h>
 
 #include "global.h"
@@ -190,38 +192,48 @@ static void emptyFd(int fd, BYTE *bfr)
 
 static bool receiveStream(int byteCount, BYTE *data, int fd)
 {
+	ssize_t n;
+	fd_set readfds;
+	struct timeval timeout;
     DWORD timeOutTime = Utils::getEndTime(1000);
 
     int recvCount = 0;          // how many VT52  chars we already got
 
-    BYTE *ptr = data;
-
     while(recvCount < byteCount) {                                          // receive all the data, wait up to 1 second to receive it
-        if(Utils::getCurrentMs() >= timeOutTime) {                          // time out happened, nothing received within specified timeout? fail
+		DWORD now = Utils::getCurrentMs();
+        if(now >= timeOutTime) {                          // time out happened, nothing received within specified timeout? fail
             Debug::out(LOG_DEBUG, "receiveStream - fail, wanted %d and got only %d bytes", byteCount, recvCount);
             return false;
         }
-
-        int bytesAvailable;
-        int res = ioctl(fd, FIONREAD, &bytesAvailable);                     // how many bytes we can read?
-
-        if(res != -1 && bytesAvailable > 0) {                               // ioctl success and something to read?
-            int restOfBytes = byteCount - recvCount;                        // calculate how many we still have to receive to match specified byteCount
-            int readCount   = (bytesAvailable < restOfBytes) ? bytesAvailable : restOfBytes;        // read everything if it's less of what we need; read just restOfBytes if we need less than what's available
-
-            memset(ptr, 0, readCount + 1);
-            read(fd, ptr, readCount);                                      // get the stream
-
-            recvCount   += readCount;
-            ptr             += readCount;
-
-            Debug::out(LOG_DEBUG, "receiveStream - readCount: %d", readCount);
-        }
-
-        Utils::sleepMs(10);     // sleep a little
+		memset(&timeout, 0, sizeof(timeout));
+		timeout.tv_sec = (timeOutTime - now) / 1000;
+		timeout.tv_usec = ((timeOutTime - now) % 1000) * 1000;
+		FD_ZERO(&readfds);
+		FD_SET(fd, &readfds);
+		if(select(fd + 1, &readfds, NULL, NULL, &timeout) < 0) {
+			Debug::out(LOG_ERROR, "receiveStream - select(): %s", strerror(errno));
+			continue;
+		}
+		if(FD_ISSET(fd, &readfds)) {
+			n = read(fd, data, (unsigned)(byteCount - recvCount));
+            Debug::out(LOG_DEBUG, "receiveStream - read: %d", (int)n);
+			if(n < 0) {
+				if(errno == EAGAIN)
+					continue;
+				Debug::out(LOG_ERROR, "receiveStream - read(): %s", strerror(errno));
+				return false;
+			} else if(n == 0) {
+				Debug::out(LOG_ERROR, "receiveStream - read(): no more to read");
+				return 0;
+			} else {
+				data += n;
+				recvCount += n;
+				data[0] = '\0';
+			}
+		}
     }
 
-    Debug::out(LOG_DEBUG, "receiveStream - success, %d bytes", byteCount);
+    Debug::out(LOG_DEBUG, "receiveStream - success, %d bytes", recvCount);
     return true;
 }
 
@@ -372,50 +384,68 @@ void ce_conf_mainLoop(void)
     tcsetattr(STDOUT_FILENO,TCSANOW, &new_tio_out); // set the new settings immediately
 
     DWORD lastUpdate = 0;
+	DWORD now;
 
     while(sigintReceived == 0) {
-        bool didSomething = false;
+		fd_set readfds;
+		struct timeval timeout;
+		long time_ms;
+		int max_fd;
 
-        // check if something waiting from keyboard, and if so, read it
-        int bytesAvailable;
-        int res = ioctl(STDIN_FILENO, FIONREAD, &bytesAvailable);   // how many bytes we can read from keyboard?
+		FD_ZERO(&readfds);
+		FD_SET(STDIN_FILENO, &readfds);
+		//FD_SET(fd, &readfds);
+		max_fd = STDIN_FILENO;  //max_fd = MAX(STDIN_FILENO, fd);
+		now = Utils::getCurrentMs();
+		time_ms = lastUpdate + 1000 - now;
+		if(time_ms < 0) time_ms = 0;
+		memset(&timeout, 0, sizeof(timeout));
+		timeout.tv_sec = time_ms / 1000;
+		timeout.tv_usec = (time_ms % 1000) * 1000;
+		if(select(max_fd + 1, &readfds, NULL, NULL, &timeout) < 0) {
+			if(errno != EINTR) {
+				Debug::out(LOG_ERROR, "ce_conf_mainLoop - select() %s", strerror(errno));
+			}
+			continue;
+		}
+		if(FD_ISSET(STDIN_FILENO, &readfds)) {
+	        // check if something waiting from keyboard, and if so, read it
+	        int bytesAvailable;
+            int res = ioctl(STDIN_FILENO, FIONREAD, &bytesAvailable);   // how many bytes we can read from keyboard?
 
-        if(res != -1 && bytesAvailable > 0) {
-            didSomething = true;
+            if(res != -1 && bytesAvailable > 0) {
+                BYTE key = getKey(bytesAvailable);                      // get the key in format valid for config components
 
-            BYTE key = getKey(bytesAvailable);                      // get the key in format valid for config components
-
-            if(key == KEY_F10) {                                    // should quit? do it
-                break;
-            }
-
-            if(key == KEY_F8) {                                     // if should switch between config view and linux console view
-                write(STDOUT_FILENO, "\033[37m", 5);                // foreground white
-                write(STDOUT_FILENO, "\033[40m", 5);                // background black
-                write(STDOUT_FILENO, "\033[2J" , 4);                // clear whole screen
-                write(STDOUT_FILENO, "\033[H"  , 3);                // position cursor to 0,0
-
-                configNotLinuxConsole = !configNotLinuxConsole;
-                key = 0;
-            }
-
-            if(key != 0) {                                          // if got the key, send key down event
-                res = sendCmd(configNotLinuxConsole ? CFG_CMD_KEYDOWN : CFG_CMD_LINUXCONSOLE_GETSTREAM, key, termFd1, termFd2, inBfr, tmpBfr, vt100count);
-
-                if(res) {
-                    int len = strnlen((const char *) inBfr, vt100count);    // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator
-                    write(STDOUT_FILENO, (char *) inBfr, len);
+                if(key == KEY_F10) {                                    // should quit? do it
+                    break;
                 }
 
-                lastUpdate = Utils::getCurrentMs();                 // store current time as we just updated
+                if(key == KEY_F8) {                                     // if should switch between config view and linux console view
+                    write(STDOUT_FILENO, "\033[37m", 5);                // foreground white
+                    write(STDOUT_FILENO, "\033[40m", 5);                // background black
+                    write(STDOUT_FILENO, "\033[2J" , 4);                // clear whole screen
+                    write(STDOUT_FILENO, "\033[H"  , 3);                // position cursor to 0,0
+
+                    configNotLinuxConsole = !configNotLinuxConsole;
+                    key = 0;
+                }
+
+                if(key != 0) {                                          // if got the key, send key down event
+                    res = sendCmd(configNotLinuxConsole ? CFG_CMD_KEYDOWN : CFG_CMD_LINUXCONSOLE_GETSTREAM, key, termFd1, termFd2, inBfr, tmpBfr, vt100count);
+
+                    if(res) {
+                        int len = strnlen((const char *) inBfr, vt100count);    // get real string length - might have 2 more bytes (isUpdateScreen, updateComponents) after string terminator
+                        write(STDOUT_FILENO, (char *) inBfr, len);
+                    }
+
+                    lastUpdate = Utils::getCurrentMs();                 // store current time as we just updated
+                }
             }
         }
 
         //-----------
         // should do refresh or nothing?
         if(Utils::getCurrentMs() - lastUpdate >= 1000) {            // last update more than 1 second ago? refresh
-            didSomething = true;
-
             res = sendCmd(configNotLinuxConsole ? CFG_CMD_REFRESH : CFG_CMD_LINUXCONSOLE_GETSTREAM, 0, termFd1, termFd2, inBfr, tmpBfr, vt100count);
 
             if(res) {
@@ -424,10 +454,6 @@ void ce_conf_mainLoop(void)
             }
 
             lastUpdate = Utils::getCurrentMs();                     // store current time as we just updated
-        }
-
-        if(!didSomething) {         // if nothing happened in this loop, wait a little
-            Utils::sleepMs(10);
         }
     }
 
