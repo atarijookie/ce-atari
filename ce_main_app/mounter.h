@@ -1,7 +1,9 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #ifndef _MOUNTER_H_
 #define _MOUNTER_H_
 
 #include <string>
+#include <queue>
 #include "datatypes.h"
 
 #define MOUNTER_ACTION_MOUNT                0
@@ -42,8 +44,6 @@ typedef struct {
 } TMounterRequest;
 
 extern "C" {
-	int   mountAdd(TMounterRequest &tmr);
-    int   mas_getState(int id);
 	void *mountThreadCode(void *ptr);
 }
 
@@ -57,6 +57,11 @@ public:
 	void restartNetworkEth0(void);
 	void restartNetworkWlan0(void);
 	void sync(void);
+
+	static int add(TMounterRequest &tmr);
+    static int mas_getState(int id);
+    void run(void);
+    static void stop(void);
 
 private:
 	bool mount(const char *mountCmd, const char *mountDir);
@@ -74,6 +79,11 @@ private:
     bool getWpaSupplicantRunning(void);
 
     void copyTextFileToLog(const char *path);
+
+    static pthread_mutex_t mountQueueMutex;
+    static pthread_cond_t mountQueueNotEmpty;
+    static std::queue<TMounterRequest> mountQueue;
+    static volatile bool shouldStop;
 };
 
 #endif

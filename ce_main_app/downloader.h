@@ -1,7 +1,11 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #ifndef _DOWNLOADER_H_
 #define _DOWNLOADER_H_
 
+#include <pthread.h>
+#include <curl/curl.h>
 #include <string>
+#include <vector>
 
 #define DWNTYPE_ANY             0xff
 #define DWNTYPE_UNKNOWN         0x00
@@ -42,14 +46,31 @@ public:
     static int  count(int downloadTypeMask);                            // count pending and running downloads according to mask
     static void status(std::string &status, int downloadTypeMask);      // create status report string of pending and running downloads according to mask
 
-    static bool verifyChecksum(char *filename, WORD checksum);
+    static bool verifyChecksum(const char *filename, WORD checksum);
     static bool handleZIPedImage(const char *destDirectory, const char *zipFilePath);
+
+    static void run(void);
+    static void stop(void);
 
 private:
     static void formatStatus(TDownloadRequest &tdr, std::string &line);
+    static void updateStatusByte(TDownloadRequest &tdr, BYTE newStatus);
+
+    static void handleReportVersions(CURL *curl, const char *reportUrl);
+    static size_t my_write_func_reportVersions(void *ptr, size_t size, size_t nmemb, FILE *stream);
+    static size_t my_write_func(void *ptr, size_t size, size_t nmemb, FILE *stream);
+    static size_t my_read_func(void *ptr, size_t size, size_t nmemb, FILE *stream);
+    static int my_progress_func(void *clientp, double downTotal, double downNow, double upTotal, double upNow);
+
+
+    static pthread_mutex_t                  downloadQueueMutex;
+    static pthread_cond_t                   downloadQueueNotEmpty;
+    static std::vector<TDownloadRequest>    downloadQueue;
+    static TDownloadRequest                 downloadCurrent;
+
+    static volatile bool shouldStop;
 };
 
 void *downloadThreadCode(void *ptr);
 
 #endif
-

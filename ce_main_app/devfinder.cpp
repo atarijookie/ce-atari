@@ -1,3 +1,4 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #include <stdio.h>
 #include <string.h>
 
@@ -7,7 +8,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#define DISK_LINKS_PATH		"/dev/disk/by-id"
 #define PATH_BUFF_SIZE		1024
 
 #include "translated/translatedhelper.h"
@@ -363,7 +363,7 @@ void DevFinder::attachDevAsTranslated(std::string devName)
 		tmr.deviceNotShared	= true;												// mount as device
 		tmr.devicePath		= partitionDevice;									// e.g. /dev/sda2
 		tmr.mountDir		= mountPath;										// e.g. /mnt/sda2
-		mountAdd(tmr);
+		Mounter::add(tmr);
 
 		res = shared.translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL, partitionDevice);   // try to attach
 

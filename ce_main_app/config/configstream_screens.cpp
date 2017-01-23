@@ -753,13 +753,13 @@ void ConfigStream::onNetwork_save(void)
         if(eth0IsDifferent) {           // restart eth0 if needed
             TMounterRequest tmr;
             tmr.action = MOUNTER_ACTION_RESTARTNETWORK_ETH0;
-            mountAdd(tmr);
+            Mounter::add(tmr);
         }
 
         if(wlan0IsDifferent) {          // restart wlan0 if needed
             TMounterRequest tmr;
             tmr.action = MOUNTER_ACTION_RESTARTNETWORK_WLAN0;
-            mountAdd(tmr);
+            Mounter::add(tmr);
         }
     }
 

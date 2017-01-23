@@ -1,3 +1,4 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #ifndef _DEVFINDER_H_
 #define _DEVFINDER_H_
 
@@ -8,6 +9,9 @@
 
 #include <stdio.h>
 #include <string.h>
+
+//#define DISK_LINKS_PATH     "/dev/disk/by-id"
+#define DISK_LINKS_PATH     "/dev/disk/by-uuid"
 
 class DevFinder {
 public:

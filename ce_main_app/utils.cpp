@@ -382,7 +382,7 @@ void Utils::forceSync(void)
 {
 	TMounterRequest tmr;			
 	tmr.action	= MOUNTER_ACTION_SYNC;                          // let the mounter thread do filesystem caches sync 						
-	mountAdd(tmr);
+	Mounter::add(tmr);
 }
 
 WORD Utils::getWord(BYTE *bfr)

@@ -1,3 +1,4 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -5,14 +6,14 @@
 #include <pwd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/select.h>
+#include <sys/inotify.h>
+#include <limits.h>
 #include <errno.h>
-
-#include <sys/ioctl.h>
-#include <net/if.h>
 
 #include <signal.h>
 #include <pthread.h>
-#include <queue>          
+#include <queue>
 
 #include "utils.h"
 #include "debug.h"
@@ -27,9 +28,11 @@
 #include "downloader.h"
 #include "update.h"
 #include "config/netsettings.h"
-#include "ce_conf_on_rpi.h" 
+#include "ce_conf_on_rpi.h"
 
 #include "devfinder.h"
+#include "ifacewatcher.h"
+#include "timesync.h"
 
 #include "periodicthread.h"
 
@@ -49,41 +52,58 @@ extern volatile BYTE updateListDownloadStatus;
 #define UPDATELIST_DOWNLOAD_TIME_ONFAIL     ( 1 * 60 * 1000)
 #define UPDATELIST_DOWNLOAD_TIME_ONSUCCESS  (30 * 60 * 1000)
 
-bool inetIfaceReady(const char* ifrname);
-
 bool state_eth0     = false;
 bool state_wlan0    = false;
 
-void handleConfigStreams(ConfigStream *cs, int fd1, int fd2);
-void updateUpdateState(void);
-bool checkInetIfEnabled(void);
+static void handleConfigStreams(ConfigStream *cs, ConfigPipes &cp);
+static void updateUpdateState(void);
 
 void *periodicThreadCode(void *ptr)
 {
+    fd_set readfds;
+    fd_set writefds;
+    int max_fd;
+    struct timeval timeout;
+    int inotifyFd;
+    int wd = -1;
+    ssize_t res;
+    unsigned long wait;
+    DWORD now;
+
 	Debug::out(LOG_DEBUG, "Periodic thread starting...");
 
-	DWORD nextDevFindTime               = Utils::getCurrentMs();            // create a time when the devices should be checked - and that time is now
     DWORD nextUpdateCheckTime           = Utils::getEndTime(5000);          // create a time when update download status should be checked
-    DWORD nextInetIfaceCheckTime        = Utils::getEndTime(1000);          // create a time when we should check for inet interfaces that got ready
-    
+
     DWORD nextUpdateListDownloadTime    = Utils::getEndTime(3000);          // try to download update list at this time
-    
+
     ce_conf_createFifos();                                                  // if should run normally, create the ce_conf FIFOs
-    
+
+    inotifyFd = inotify_init();
+    if(inotifyFd < 0) {
+        Debug::out(LOG_ERROR, "inotify_init() failed");
+    } else {
+        wd = inotify_add_watch(inotifyFd, DISK_LINKS_PATH, IN_CREATE|IN_DELETE);
+        if(wd < 0) Debug::out(LOG_ERROR, "inotify_add_watch(%s, IN_CREATE|IN_DELETE) failed", DISK_LINKS_PATH);
+    }
+
     DevFinder devFinder;
+	devFinder.lookForDevChanges();				            // look for devices attached / detached
+
+    IfaceWatcher ifaceWatcher;
+
+    TimeSync timeSync;
 
 	while(sigintReceived == 0) {
+        max_fd = -1;
+        FD_ZERO(&readfds);
+        FD_ZERO(&writefds);
+        wait = 10*1000; // max 10 sec ?
+
+        now = Utils::getCurrentMs();
+
         //------------------------------------
-        // should we check for inet interfaces that might came up?
-        if(Utils::getCurrentMs() >= nextInetIfaceCheckTime) {
-            bool someIfChangedToEnabled = checkInetIfEnabled();
-            nextInetIfaceCheckTime  = Utils::getEndTime(INET_IFACE_CHECK_TIME);     // update the time when we should interfaces again
-            
-            if(someIfChangedToEnabled) {                                            // if some IF has changed to enabled, try to download the update list again
-                Debug::out(LOG_DEBUG, "periodicThreadCode -- eth0 or wlan0 changed to up, will now download update list");
-                nextUpdateListDownloadTime = Utils::getEndTime(1000);
-            }
-		}
+        // check client command timestamp (we don't really care how often its done)
+        shared.clientConnected = (now - shared.configStream.acsi->getLastCmdTimestamp() <= 2000);
 
         //------------------------------------
         // should we do something related to devFinder?
@@ -98,48 +118,46 @@ void *periodicThreadCode(void *ptr)
                 pthread_mutex_unlock(&shared.mtxScsi);
                 pthread_mutex_unlock(&shared.mtxTranslated);
             }
-                
+
             // and now try to attach everything back
             devFinder.clearMap();						            // make all the devices appear as new
             devFinder.lookForDevChanges();					        // and now find all the devices
 
             shared.devFinder_detachAndLook  = false;
             shared.devFinder_look           = false;
-
-            nextDevFindTime = Utils::getEndTime(DEV_CHECK_TIME_MS); // update the time when devices should be checked
+            continue;
         }
-        
-        //------------------------------------
-        // should we check for the new devices?
-		if(Utils::getCurrentMs() >= nextDevFindTime) {
-			devFinder.lookForDevChanges();				            // look for devices attached / detached
 
-			nextDevFindTime = Utils::getEndTime(DEV_CHECK_TIME_MS); // update the time when devices should be checked
-		}
+        if(now >= timeSync.nextProcessTime) {
+            timeSync.process(false);
+        } else {
+            if(now + wait > timeSync.nextProcessTime) wait = timeSync.nextProcessTime - now;
+        }
 
-        if(Utils::getCurrentMs() >= nextUpdateListDownloadTime) {
+        if(now >= nextUpdateListDownloadTime) {
             Debug::out(LOG_DEBUG, "periodicThreadCode -- will download update list now");
             Update::downloadUpdateList(NULL);                                                           // download the list of components with the newest available versions
-            
+
             nextUpdateListDownloadTime = Utils::getEndTime(UPDATELIST_DOWNLOAD_TIME_ONSUCCESS);         // set the next download time in the future, so we won't do this immediately again
+            continue;
+        } else {
+            if(now + wait > nextUpdateListDownloadTime) wait = nextUpdateListDownloadTime - now;
         }
-        
+
         //------------------------------------
         // should check the update status?
-        if(Utils::getCurrentMs() >= nextUpdateCheckTime) {
+        if(now >= nextUpdateCheckTime) {
             nextUpdateCheckTime   = Utils::getEndTime(UPDATE_CHECK_TIME);                               // update the time when we should check update status again
 
             if(updateListDownloadStatus == DWNSTATUS_DOWNLOAD_FAIL) {                                   // download of update list fail?
                 updateListDownloadStatus    = DWNSTATUS_WAITING;
                 nextUpdateListDownloadTime  = Utils::getEndTime(UPDATELIST_DOWNLOAD_TIME_ONFAIL);       // set the next download time in the future, so we won't do this immediately again
                 Debug::out(LOG_DEBUG, "periodicThreadCode -- update list download failed, will retry in %d seconds", UPDATELIST_DOWNLOAD_TIME_ONFAIL / 1000);
-            }
-            
-            if(updateListDownloadStatus == DWNSTATUS_DOWNLOAD_OK) {                                     // download of update list good?
+            } else if(updateListDownloadStatus == DWNSTATUS_DOWNLOAD_OK) {                                     // download of update list good?
                 updateListDownloadStatus    = DWNSTATUS_WAITING;
                 nextUpdateListDownloadTime  = Utils::getEndTime(UPDATELIST_DOWNLOAD_TIME_ONSUCCESS);    // try to download the update list in longer time again
                 Debug::out(LOG_DEBUG, "periodicThreadCode -- update list download good, will retry in %d minutes", UPDATELIST_DOWNLOAD_TIME_ONSUCCESS / (60 * 1000));
-            
+
                 if(!Update::versions.updateListWasProcessed) {                                          // Didn't process update list yet? process it
                     Update::processUpdateList();
                 }
@@ -157,58 +175,103 @@ void *periodicThreadCode(void *ptr)
             }
 
             updateUpdateState();
+            continue;
+        } else {
+            if(now + wait > nextUpdateCheckTime) wait = nextUpdateCheckTime - now;
+        }
+
+        // file descriptors to "select"
+        if(shared.configPipes.web.fd1 >= 0) {
+            FD_SET(shared.configPipes.web.fd1, &readfds);
+            if(shared.configPipes.web.fd1 > max_fd) max_fd = shared.configPipes.web.fd1;
+        }
+        if(shared.configPipes.term.fd1 >= 0) {
+            FD_SET(shared.configPipes.term.fd1, &readfds);
+            if(shared.configPipes.term.fd1 > max_fd) max_fd = shared.configPipes.term.fd1;
+        }
+        if(inotifyFd >= 0) {
+            FD_SET(inotifyFd, &readfds);
+            if(inotifyFd > max_fd) max_fd = inotifyFd;
+        }
+        if(ifaceWatcher.getFd() >= 0) {
+            FD_SET(ifaceWatcher.getFd(), &readfds);
+            if(ifaceWatcher.getFd() > max_fd) max_fd = ifaceWatcher.getFd();
+        }
+        if(timeSync.waitingForDataOnFd()) {
+            FD_SET(timeSync.getFd(), &readfds);
+            if(timeSync.getFd() > max_fd) max_fd = timeSync.getFd();
+        }
+        memset(&timeout, 0, sizeof(timeout));
+        timeout.tv_sec = wait / 1000;           // sec
+        timeout.tv_usec = (wait % 1000)*1000;   // usec
+        if(select(max_fd + 1, &readfds, &writefds, NULL, &timeout) < 0) {
+            if(errno == EINTR) {
+                continue;
+            } else {
+                Debug::out(LOG_ERROR, "peridic thread : select() %s", strerror(errno));
+                continue;
+            }
         }
 
         //------------------------------------
-        // check client command timestamp (we don't really care how often its done)
-        shared.clientConnected = (Utils::getCurrentMs() - shared.configStream.acsi->getLastCmdTimestamp() <= 2000);
+        // Network interface watcher
+        if(ifaceWatcher.getFd() >= 0 && FD_ISSET(ifaceWatcher.getFd(), &readfds)) {
+            bool newIfaceUpAndRunning = false;
+            ifaceWatcher.processMsg(&newIfaceUpAndRunning);
+            if(newIfaceUpAndRunning) {
+                Debug::out(LOG_DEBUG, "Internet interface comes up: reload network mount settings");
+                pthread_mutex_lock(&shared.mtxTranslated);
+                shared.translated->reloadSettings(SETTINGSUSER_TRANSLATED);
+                pthread_mutex_unlock(&shared.mtxTranslated);
+
+                Debug::out(LOG_DEBUG, "periodicThreadCode -- eth0 or wlan0 changed to up, will now download update list");
+                nextUpdateListDownloadTime = Utils::getEndTime(1000);
+            }
+        }
+
+        //------------------------------------
+        // should we check for the new devices?
+		if(inotifyFd >= 0 && FD_ISSET(inotifyFd, &readfds)) {
+            char buf[sizeof(struct inotify_event) + NAME_MAX + 1];
+            res = read(inotifyFd, buf, sizeof(buf));
+            if(res < 0) {
+                Debug::out(LOG_ERROR, "read(inotifyFd) : %s", strerror(errno));
+            } else {
+                struct inotify_event *iev = (struct inotify_event *)buf;
+                Debug::out(LOG_DEBUG, "inotify msg %dbytes wd=%d mask=%04x name=%s", (int)res, iev->wd, iev->mask, (iev->len > 0) ? iev->name : "");
+                // if(iev->mask & IN_DELETE) / & IN_CREATE
+			    devFinder.lookForDevChanges();				            // look for devices attached / detached
+            }
+		}
 
         //------------------------------------
         // config streams handling
-        
-        handleConfigStreams(shared.configStream.web,    shared.configPipes.web.fd1,     shared.configPipes.web.fd2);
-        handleConfigStreams(shared.configStream.term,   shared.configPipes.term.fd1,    shared.configPipes.term.fd2);
+        if(shared.configPipes.web.fd1 >= 0 && FD_ISSET(shared.configPipes.web.fd1, &readfds)) {
+            handleConfigStreams(shared.configStream.web,  shared.configPipes.web);
+        }
+        if(shared.configPipes.term.fd1 >= 0 && FD_ISSET(shared.configPipes.term.fd1, &readfds)) {
+            handleConfigStreams(shared.configStream.term, shared.configPipes.term);
+        }
         //------------------------------------
-        
-        Utils::sleepMs(50);
+
+        if(timeSync.waitingForDataOnFd() && FD_ISSET(timeSync.getFd(), &readfds)) {
+            timeSync.process(true);
+        }
+
 	}
 	
 	Debug::out(LOG_DEBUG, "Periodic thread terminated.");
 	return 0;
 }
 
-bool checkInetIfEnabled(void)
-{
-	//up/running state of inet interfaces
-    bool state_temp 		= 	inetIfaceReady("eth0"); 
-    bool change_to_enabled	= 	(state_eth0!=state_temp)&&!state_eth0; 	    //was this iface disabled and current state changed to enabled?
-    state_eth0 				= 	state_temp; 
-
-    state_temp 				= 	inetIfaceReady("wlan0"); 
-    change_to_enabled 		|= 	(state_wlan0!=state_temp)&&!state_wlan0;
-    state_wlan0 			= 	state_temp; 
-    
-    if( change_to_enabled ){ 
-        Debug::out(LOG_DEBUG, "Internet interface comes up: reload network mount settings");
-        
-        pthread_mutex_lock(&shared.mtxTranslated);
-        shared.translated->reloadSettings(SETTINGSUSER_TRANSLATED);
-        pthread_mutex_unlock(&shared.mtxTranslated);
-        
-        return true;            // some IF changed to enabled
-    }
-    
-    return false;               // no IF changed to enabled
-}
-
-void updateUpdateState(void)
+static void updateUpdateState(void)
 {
     int updateState = Update::state();                              // get the update state
-    
+
     switch(updateState) {
         case UPDATE_STATE_DOWNLOADING:
         pthread_mutex_lock(&shared.mtxConfigStreams);
-        
+
         // refresh config screen with download status
         shared.configStream.acsi->fillUpdateDownloadWithProgress();
         shared.configStream.web->fillUpdateDownloadWithProgress();
@@ -220,7 +283,7 @@ void updateUpdateState(void)
         //-----------
         case UPDATE_STATE_DOWNLOAD_FAIL:
         pthread_mutex_lock(&shared.mtxConfigStreams);
-        
+
         // show fail message on config screen
         shared.configStream.acsi->showUpdateDownloadFail();
         shared.configStream.web->showUpdateDownloadFail();
@@ -241,9 +304,9 @@ void updateUpdateState(void)
             bool shownA = shared.configStream.acsi->isUpdateDownloadPageShown();
             bool shownW = shared.configStream.web->isUpdateDownloadPageShown();
             bool shownT = shared.configStream.term->isUpdateDownloadPageShown();
-            
+
             pthread_mutex_unlock(&shared.mtxConfigStreams);
-            
+
             if(!shownA && !shownW && !shownT) {         // if user is NOT waiting on download page (cancel pressed), don't update
                 Update::stateGoIdle();
                 Debug::out(LOG_DEBUG, "Update state - download OK, but user is not on download page - NOT doing update");
@@ -256,7 +319,7 @@ void updateUpdateState(void)
                     shared.configStream.acsi->showUpdateError();
                     shared.configStream.web->showUpdateError();
                     shared.configStream.term->showUpdateError();
-                    
+
                     pthread_mutex_unlock(&shared.mtxConfigStreams);
 
                     Debug::out(LOG_ERROR, "Update state - download OK, failed to create update script - NOT doing update");
@@ -268,7 +331,7 @@ void updateUpdateState(void)
             }
         break;
         }
-        
+
         //---------
         // are we waiting a while before the install?
         case UPDATE_STATE_WAITBEFOREINSTALL:
@@ -286,62 +349,23 @@ void updateUpdateState(void)
     }
 }
 
-void handleConfigStreams(ConfigStream *cs, int fd1, int fd2)
+static void handleConfigStreams(ConfigStream *cs, ConfigPipes &cp)
 {
-    if(fd1 <= 0 || fd2 <= 0) {                              // missing handle? fail
+    if(cp.fd1 < 0 || cp.fd2 < 0) {                              // missing handle? fail
         return;
     }
 
     int bytesAvailable;
-    int ires = ioctl(fd1, FIONREAD, &bytesAvailable);       // how many bytes we can read?
+    int ires = ioctl(cp.fd1, FIONREAD, &bytesAvailable);       // how many bytes we can read?
 
     if(ires != -1 && bytesAvailable >= 3) {                 // if there are at least 3 bytes waiting
         BYTE cmd[6] = {0, 'C', 'E', 0, 0, 0};
-        ires = read(fd1, cmd + 3, 3);                       // read the byte triplet
-        
+        ires = read(cp.fd1, cmd + 3, 3);                       // read the byte triplet
+
         Debug::out(LOG_DEBUG, "confStream - through FIFO: %02x %02x %02x (ires = %d)", cmd[3], cmd[4], cmd[5], ires);
-        
+
         pthread_mutex_lock(&shared.mtxConfigStreams);
-        cs->processCommand(cmd, fd2);
+        cs->processCommand(cmd, cp.fd2);
         pthread_mutex_unlock(&shared.mtxConfigStreams);
     }
-}
-
-// Is a particular internet interface up, running and has an IP address?
-bool inetIfaceReady(const char* ifrname)
-{
-	struct ifreq ifr;
-	bool up_and_running;
-
-	//temporary socket
-	int socketfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
-    if (socketfd == -1){
-        return false;
-	}
-			
-	memset( &ifr, 0, sizeof(ifr) );
-	strcpy( ifr.ifr_name, ifrname );
-	
-	if( ioctl( socketfd, SIOCGIFFLAGS, &ifr ) != -1 ) {
-	    up_and_running = (ifr.ifr_flags & ( IFF_UP | IFF_RUNNING )) == ( IFF_UP | IFF_RUNNING );
-	    
-		//it's only ready and usable if it has an IP address
-        if( up_and_running && ioctl(socketfd, SIOCGIFADDR, &ifr) != -1 ){
-	        if( ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr==0 ){
-			    up_and_running = false;
-			} 
-		} else {
-		    up_and_running = false;
-		}
-	    //Debug::out(LOG_DEBUG, "inetIfaceReady ip: %s %s", ifrname, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
-	} else {
-	    up_and_running = false;
-	}
-
-	int result=0;
-	do {
-        result = close(socketfd);
-    } while (result == -1 && errno == EINTR);	
-
-	return up_and_running; 
 }
