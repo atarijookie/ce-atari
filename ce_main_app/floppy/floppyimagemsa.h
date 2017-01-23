@@ -12,7 +12,7 @@ public:
     FloppyImageMsa();
     virtual ~FloppyImageMsa();
 
-    virtual bool open(char *fileName);
+    virtual bool open(const char *fileName);
     virtual bool isOpen(void);
     virtual void close();
     virtual bool getParams(int &tracks, int &sides, int &sectorsPerTrack);

@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #ifndef FLOPPYIMAGEST_H
 #define FLOPPYIMAGEST_H
 
@@ -12,7 +13,7 @@ public:
     FloppyImageSt();
     virtual ~FloppyImageSt();
 
-    virtual bool open(char *fileName);
+    virtual bool open(const char *fileName);
     virtual bool isOpen(void);
     virtual void close();
     virtual bool getParams(int &tracks, int &sides, int &sectorsPerTrack);

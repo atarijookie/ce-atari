@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <string.h>
 #include "floppyimagest.h"
 #include "../debug.h"
@@ -16,7 +17,7 @@ FloppyImageSt::~FloppyImageSt()
     close();
 }
 
-bool FloppyImageSt::open(char *fileName)
+bool FloppyImageSt::open(const char *fileName)
 {
     close();
 

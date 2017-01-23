@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #ifndef FLOPPYIMAGE_H
 #define FLOPPYIMAGE_H
 
@@ -9,7 +10,7 @@ class IFloppyImage
 public:
 	virtual ~IFloppyImage()	{ };
 
-    virtual bool open(char *fileName) = 0;
+    virtual bool open(const char *fileName) = 0;
     virtual bool isOpen(void) = 0;
     virtual void close() = 0;
     virtual bool getParams(int &tracks, int &sides, int &sectorsPerTrack) = 0;

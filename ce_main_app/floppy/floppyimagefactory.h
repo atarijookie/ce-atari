@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #ifndef FLOPPYIMAGEFACTORY_H
 #define FLOPPYIMAGEFACTORY_H
 
@@ -11,7 +12,7 @@ public:
     FloppyImageFactory();
     ~FloppyImageFactory();
 
-    IFloppyImage *getImage(char *fileName);
+    IFloppyImage *getImage(const char *fileName);
 
 private:
     FloppyImageMsa  *msa;
@@ -19,7 +20,7 @@ private:
 
     void toLowerCase(char *orig, char *lower);
     char lowerCase(char in);
-    
+
     bool handleZIPedImage(const char *inZipFilePath, char *outImageFilePath);
 };
 
