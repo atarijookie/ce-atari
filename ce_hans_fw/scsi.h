@@ -92,7 +92,7 @@ void processScsiOther        (BYTE justCmd, BYTE isIcd, BYTE lun);
 void SCSI_FormatUnit(void);
 void SCSI_ReadCapacity(void);
 void SCSI_Inquiry(BYTE lun);
-void SCSI_RequestSense(void);
+void SCSI_RequestSense(BYTE lun);
 
 void scsi_clearTheUnitAttention(void);
 void scsi_sendOKstatus(void);

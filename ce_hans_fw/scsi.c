@@ -30,25 +30,21 @@ void processScsiLocaly(BYTE justCmd, BYTE isIcd)
     BYTE lun;
 
     timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
-    
+
     // get the LUN from the command
     if(isIcd) {                             // for ICD commands
         lun		= cmd[2] >> 5;
     } else {                                // for SCSI6 commands
-        lun		= cmd[1] >> 5;					
+        lun		= cmd[1] >> 5;
     }
-                
-	// The following commands support LUN in command, check if it's valid
-	// Note: INQUIRY also supports LUNs, but it should report in a different way...
-	if( justCmd == SCSI_C_READ6				|| justCmd == SCSI_C_READ10             || 
-        justCmd == SCSI_C_FORMAT_UNIT       || justCmd == SCSI_C_TEST_UNIT_READY    ||
-        justCmd == SCSI_C_READ_CAPACITY) {
 
-		if(lun != 0) {					// LUN must be 0
-		    scsi_returnLUNnotSupported();
-			return;
-		}
-	}
+    // if LUN is not zero, reject command
+    if(lun != 0) {                          // LUN must be 0, fail immediatelly for all commands except REQUST SENSE and INQUIRY
+        if(justCmd != SCSI_C_REQUEST_SENSE && justCmd != SCSI_C_INQUIRY) {
+            scsi_returnLUNnotSupported();
+            return;
+        }
+    }
 
     // if the card is not init and the command is one of the following
    	if(sdCard.IsInit == FALSE) {
@@ -122,6 +118,8 @@ void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun)
         if( sector >= sdCard.SCapacity || sectorEnd >= sdCard.SCapacity ) { // are we out of range?
             sdCard.LastStatus   = SCSI_ST_CHECK_CONDITION;
             sdCard.SCSI_SK      = SCSI_E_IllegalRequest;
+            sdCard.SCSI_ASC     = SCSI_ASC_LBA_OUT_OF_RANGE;
+            sdCard.SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
             
             PIO_read(sdCard.LastStatus);                                    // return error
             return;
@@ -195,7 +193,7 @@ void processScsiOther(BYTE justCmd, BYTE isIcd, BYTE lun)
         case SCSI_C_RELEASE:
         case SCSI_C_TEST_UNIT_READY:    scsi_returnStatusAccordingToIsInit();   return;
 
-        case SCSI_C_REQUEST_SENSE:      SCSI_RequestSense();                    return;
+        case SCSI_C_REQUEST_SENSE:      SCSI_RequestSense(lun);                 return;
 
         case SCSI_C_FORMAT_UNIT:        SCSI_FormatUnit();                      return;
         
@@ -319,10 +317,21 @@ void SCSI_ReadCapacity(void)
 }
 
 // return the last error that occured
-void SCSI_RequestSense(void)
+void SCSI_RequestSense(BYTE lun)
 {
-    char i,xx; //, res;
+    TDevice *device;
+    TDevice badLunDevice;
+
+    char i,xx;
     BYTE val;
+
+    // pre-fill the bad device SC, ASC, ASCQ
+    badLunDevice.SCSI_SK    = SCSI_E_IllegalRequest;
+    badLunDevice.SCSI_ASC   = SCSI_ASC_LU_NOT_SUPPORTED;
+    badLunDevice.SCSI_ASCQ = 0;
+    
+    // if LUN is zero, use SD card info, if LUN is non-zero, use bad device info
+    device = (lun == 0) ? &sdCard : &badLunDevice;
 
     // this command clears the unit attention state
     if(sdCard.MediaChanged == TRUE)	{
@@ -333,15 +342,15 @@ void SCSI_RequestSense(void)
 
     ACSI_DATADIR_READ();
 
-    for(i=0; i<xx; i++)	{		  
+    for(i=0; i<xx; i++)	{
         switch(i) {
-            case  0:	val = 0xf0;             break;		// error code 
-            case  2:	val = sdCard.SCSI_SK;   break;		// sense key 
-            case  7:	val = xx-7;             break;		// AS length
-            case 12:	val = sdCard.SCSI_ASC;  break;		// additional sense code
-            case 13:	val = sdCard.SCSI_ASCQ; break;		// additional sense code qualifier
+            case  0:    val = 0xf0;                 break;  // error code 
+            case  2:    val = device->SCSI_SK;      break;  // sense key 
+            case  7:    val = xx-7;                 break;  // AS length
+            case 12:    val = device->SCSI_ASC;     break;  // additional sense code
+            case 13:    val = device->SCSI_ASCQ;    break;  // additional sense code qualifier
 
-            default:	val = 0;                break;
+            default:    val = 0;                break;
             }
             
         DMA_read(val);
@@ -372,13 +381,13 @@ void SCSI_Inquiry(BYTE lun)
     } else {
         inquiryName = inquiryNameSolo;
     }
-	
-	if(lun == 0) {						// for LUN 0
-		firstByte = 0;
-	} else {							// for other LUNs
-		firstByte = 0x7f;
-	}
-	
+
+    if(lun == 0) {          // for LUN 0
+        firstByte = 0;
+    } else {                // for other LUNs
+        firstByte = 0xff;   // peripheralQualifier = 0x03, deviceType = 0x1f
+    }
+
     // this command clears the unit attention state
     if(sdCard.MediaChanged == TRUE)	{
         scsi_clearTheUnitAttention();
