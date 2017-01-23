@@ -18,8 +18,6 @@
 
 volatile BYTE currentImageDownloadStatus;
 
-extern volatile bool floppyEncodingRunning;
-
 FloppySetup::FloppySetup()
 {
     dataTrans   = NULL;
@@ -711,7 +709,7 @@ void FloppySetup::getImageEncodingRunning(void)
 {
     BYTE encondingRunning;
 
-    encondingRunning = floppyEncodingRunning ? 1 : 0;
+    encondingRunning = ImageSilo::getFloppyEncodingRunning() ? 1 : 0;
 
     dataTrans->addDataByte(encondingRunning);           // return if the encoding thread is encoding some image
     dataTrans->padDataToMul16();

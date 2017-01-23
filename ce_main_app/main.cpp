@@ -296,6 +296,7 @@ int main(int argc, char *argv[])
 #endif
 
     printf("Stoping floppy encoder thread\n");
+    ImageSilo::stop();
     pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes
 
     printf("Stoping network thread\n");

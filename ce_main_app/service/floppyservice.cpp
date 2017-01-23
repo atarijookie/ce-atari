@@ -1,11 +1,10 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include "floppyservice.h"
 #include "floppy/imagesilo.h"
 #include "debug.h"
 #include "utils.h"
 #include "ccorethread.h" 
 
-extern volatile bool floppyEncodingRunning;
- 
 FloppyService::FloppyService():pxImageSilo(NULL),pxCoreThread(NULL),iInitState(INIT_NONE) 
 {
 }
@@ -83,11 +82,7 @@ bool FloppyService::setImage(int iSlot, std::string sLocalFileWPath)
 
 int FloppyService::getImageState()
 {
- 	if( floppyEncodingRunning ){
- 		return IMAGE_NOTREADY;
-	}else{
- 		return IMAGE_OK;
-	}
+    return (ImageSilo::getFloppyEncodingRunning() ? IMAGE_NOTREADY : IMAGE_OK);
 }
 
 bool FloppyService::isImageReady()

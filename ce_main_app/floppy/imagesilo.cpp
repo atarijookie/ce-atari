@@ -8,8 +8,6 @@
 #include <errno.h>
 
 #include <signal.h>
-#include <pthread.h>
-#include <queue>
 
 #include "../utils.h"
 #include "../debug.h"
@@ -18,48 +16,61 @@
 #include "imagesilo.h"
 #include "floppysetup.h"
 
-pthread_mutex_t floppyEncodeThreadMutex = PTHREAD_MUTEX_INITIALIZER;
-std::queue<EncodeRequest> encodeQueue;
+#define EMPTY_TRACK_SIZE (15000)
 
-SiloSlotSimple  floppyImages[3];
-int             floppyImageSelected = EMPTY_IMAGE_SLOT;
+pthread_mutex_t ImageSilo::floppyEncodeQueueMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t ImageSilo::floppyEncodeQueueNotEmpty = PTHREAD_COND_INITIALIZER;
+std::queue<EncodeRequest> ImageSilo::encodeQueue;
+volatile bool ImageSilo::shouldStop = false;
+
+SiloSlotSimple  ImageSilo::floppyImages[3];
+int ImageSilo::floppyImageSelected = EMPTY_IMAGE_SLOT;
 
 extern TFlags flags;
 
-volatile bool floppyEncodingRunning;
+volatile bool ImageSilo::floppyEncodingRunning = false;
 
-void encodeAdd(EncodeRequest &er)
+void ImageSilo::addEncodeRequest(EncodeRequest &er)
 {
     floppyEncodingRunning = true;
 
-    pthread_mutex_lock(&floppyEncodeThreadMutex);            // try to lock the mutex
+    pthread_mutex_lock(&floppyEncodeQueueMutex);            // try to lock the mutex
     encodeQueue.push(er);                                    // add this to queue
-    pthread_mutex_unlock(&floppyEncodeThreadMutex);            // unlock the mutex
+    pthread_cond_signal(&floppyEncodeQueueNotEmpty);
+    pthread_mutex_unlock(&floppyEncodeQueueMutex);            // unlock the mutex
 }
 
-void *floppyEncodeThreadCode(void *ptr)
+void ImageSilo::stop(void)
 {
-    Debug::out(LOG_DEBUG, "Floppy encode thread starting...");
+    pthread_mutex_lock(&floppyEncodeQueueMutex);            // try to lock the mutex
+    shouldStop = true;
+    pthread_cond_signal(&floppyEncodeQueueNotEmpty);
+    pthread_mutex_unlock(&floppyEncodeQueueMutex);            // unlock the mutex
+}
 
+void ImageSilo::run(void)
+{
     MfmCachedImage      encImage;
     FloppyImageFactory  imageFactory;
 
     floppyEncodingRunning = false;
 
-    while(sigintReceived == 0) {
-        pthread_mutex_lock(&floppyEncodeThreadMutex);        // lock the mutex
+    while(!shouldStop) {
+        pthread_mutex_lock(&floppyEncodeQueueMutex);        // lock the mutex
 
-        if(encodeQueue.size() == 0) {                        // nothing to do?
-            pthread_mutex_unlock(&floppyEncodeThreadMutex);    // unlock the mutex
-            sleep(1);                                        // wait 1 second and try again
-            continue;
+        while(encodeQueue.size() == 0 && !shouldStop) {
+            pthread_cond_wait(&floppyEncodeQueueNotEmpty, &floppyEncodeQueueMutex);
+        }
+        if(shouldStop) {
+            pthread_mutex_unlock(&floppyEncodeQueueMutex);        // unlock the mutex
+            break;
         }
 
         floppyEncodingRunning = true;
 
         EncodeRequest er = encodeQueue.front();                // get the 'oldest' element from queue
         encodeQueue.pop();                                    // and remove it form queue
-        pthread_mutex_unlock(&floppyEncodeThreadMutex);        // unlock the mutex
+        pthread_mutex_unlock(&floppyEncodeQueueMutex);        // unlock the mutex
 
         // try to open the image
         IFloppyImage *image = imageFactory.getImage(er.filename.c_str());
@@ -81,9 +92,9 @@ void *floppyEncodeThreadCode(void *ptr)
                 // copy the image from encode thread to main thread
                 start = Utils::getCurrentMs();
 
-                pthread_mutex_lock(&floppyEncodeThreadMutex);        // lock the mutex
+                pthread_mutex_lock(&floppyEncodeQueueMutex);        // lock the mutex
                 er.encImg->copyFromOther(encImage);                    // this is not thread safe as it copies data from one thread to another
-                pthread_mutex_unlock(&floppyEncodeThreadMutex);        // unlock the mutex
+                pthread_mutex_unlock(&floppyEncodeQueueMutex);        // unlock the mutex
 
                 end = Utils::getCurrentMs();
                 Debug::out(LOG_DEBUG, "Copying between threads took %d ms", (int) (end - start));
@@ -98,6 +109,13 @@ void *floppyEncodeThreadCode(void *ptr)
     }
 
     floppyEncodingRunning = false;
+}
+
+void *floppyEncodeThreadCode(void *ptr)
+{
+    Debug::out(LOG_DEBUG, "Floppy encode thread starting...");
+
+    ImageSilo::run();
 
     Debug::out(LOG_DEBUG, "Floppy encode thread terminated.");
     return 0;
@@ -107,11 +125,11 @@ ImageSilo::ImageSilo()
 {
     //-----------
     // create empty track, which can be used when the equested track is out of range (or image doesn't exist)
-    emptyTrack = new BYTE[15000];
-    memset(emptyTrack, 0, 15000);
+    emptyTrack = new BYTE[EMPTY_TRACK_SIZE];
+    memset(emptyTrack, 0, EMPTY_TRACK_SIZE);
 
     BYTE *p = emptyTrack;
-    for(int i=0; i<(15000/3); i++) {        // fill the empty track with 0x4e sync bytes
+    for(int i=0; i<(EMPTY_TRACK_SIZE/3); i++) {        // fill the empty track with 0x4e sync bytes
         *p++ = 0xa9;
         *p++ = 0x6a;
         *p++ = 0x96;
@@ -140,7 +158,7 @@ ImageSilo::ImageSilo()
         er.filename        = EMPTY_IMAGE_PATH;
         er.encImg        = &slots[EMPTY_IMAGE_SLOT].encImage;
 
-        encodeAdd(er);
+        addEncodeRequest(er);
 
     } else {
         Debug::out(LOG_DEBUG, "ImageSilo failed to create empty image! (for no selected image)");
@@ -254,7 +272,7 @@ void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostD
     er.filename        = hostDestPath;
     er.encImg        = &slots[positionIndex].encImage;
 
-    encodeAdd(er);
+    addEncodeRequest(er);
 
     if(saveToSettings) {                                    // should we save this to settings? (false when loading settings)
         saveSettings();
@@ -378,9 +396,9 @@ BYTE *ImageSilo::getEncodedTrack(int track, int side, int &bytesInBuffer)
 {
     BYTE *pTrack;
 
-    pthread_mutex_lock(&floppyEncodeThreadMutex);                                        // lock the mutex
+    pthread_mutex_lock(&floppyEncodeQueueMutex);                                        // lock the mutex
     pTrack = slots[currentSlot].encImage.getEncodedTrack(track, side, bytesInBuffer);    // get data from current slot
-    pthread_mutex_unlock(&floppyEncodeThreadMutex);                                        // unlock the mutex
+    pthread_mutex_unlock(&floppyEncodeQueueMutex);                                        // unlock the mutex
 
     return pTrack;
 }
@@ -422,3 +440,19 @@ SiloSlot *ImageSilo::getSiloSlot(int index)
     return &slots[index];
 }
 
+int ImageSilo::getFloppyImageSelectedId(void)
+{
+    return floppyImageSelected;
+}
+
+SiloSlotSimple * ImageSilo::getFloppyImageSimple(int index)
+{
+    if(index < 0 || index >= 3)
+        return NULL;
+    return &floppyImages[index];
+}
+
+bool ImageSilo::getFloppyEncodingRunning(void)
+{
+    return floppyEncodingRunning;
+}
