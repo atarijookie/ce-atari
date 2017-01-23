@@ -385,7 +385,7 @@ void SCSI_Inquiry(BYTE lun)
     if(lun == 0) {          // for LUN 0
         firstByte = 0;
     } else {                // for other LUNs
-        firstByte = 0xff;   // peripheralQualifier = 0x03, deviceType = 0x1f
+        firstByte = 0x7f;   // peripheralQualifier = 0x03, deviceType = 0x1f
     }
 
     // this command clears the unit attention state
