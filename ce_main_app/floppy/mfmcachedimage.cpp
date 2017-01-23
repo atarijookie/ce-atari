@@ -45,7 +45,7 @@ MfmCachedImage::~MfmCachedImage()
 
 // bufferOfBytes -- the data is transferred as WORDs, but are they stored as bytes?
 // If true, swap bytes, don't append zeros. If false, no swapping, but append zeros.
-void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img, bool bufferOfBytes)
+void MfmCachedImage::encodeAndCacheImage(FloppyImage *img, bool bufferOfBytes)
 {
     if(gotImage) {                  // got some older image? delete it from memory
         deleteCachedImage();
@@ -118,7 +118,7 @@ void MfmCachedImage::encodeAndCacheImage(IFloppyImage *img, bool bufferOfBytes)
     gotImage    = true;
 }
 
-void MfmCachedImage::encodeSingleTrack(IFloppyImage *img, int side, int track, int sectorsPerTrack, BYTE *buffer, int &bytesStored, bool bufferOfBytes)
+void MfmCachedImage::encodeSingleTrack(FloppyImage *img, int side, int track, int sectorsPerTrack, BYTE *buffer, int &bytesStored, bool bufferOfBytes)
 {
     int countInSect, countInTrack=0;
 
@@ -248,7 +248,7 @@ void MfmCachedImage::copyFromOther(MfmCachedImage &other)
     newContent  = true;      // we got new content!
 }
 
-bool MfmCachedImage::createMfmStream(IFloppyImage *img, int side, int track, int sector, BYTE *buffer, int &count)
+bool MfmCachedImage::createMfmStream(FloppyImage *img, int side, int track, int sector, BYTE *buffer, int &count)
 {
     bool res;
 

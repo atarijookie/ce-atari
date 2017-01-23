@@ -5,29 +5,13 @@
 #include <dirent.h>
 
 #include "floppyimagefactory.h"
+#include "floppyimagest.h"
+#include "floppyimagemsa.h"
 #include "../debug.h"
 
-FloppyImageFactory::FloppyImageFactory()
+FloppyImage *FloppyImageFactory::getImage(const char *fileName)
 {
-    msa = NULL;
-    st  = NULL;
-}
-
-FloppyImageFactory::~FloppyImageFactory()
-{
-    if(msa) {
-        msa->close();
-        delete msa;
-    }
-
-    if(st) {
-        st->close();
-        delete st;
-    }
-}
-
-IFloppyImage *FloppyImageFactory::getImage(const char *fileName)
-{
+    FloppyImage *img = NULL;
     const char *ext = strrchr(fileName, '.');     // find last '.'
 
     if(ext == NULL) {                       // last '.' not found? fail
@@ -67,31 +51,19 @@ IFloppyImage *FloppyImageFactory::getImage(const char *fileName)
     //--------------
     if(strcasecmp(ext, "msa") == 0) {   // msa image?
         Debug::out(LOG_DEBUG, "FloppyImageFactory -- using MSA image on %s", fileName);
+        img = new FloppyImageMsa();
 
-        if(!msa) {                      // not created yet?
-            msa = new FloppyImageMsa();
-        }
-
-        msa->close();
-        msa->open(fileName);            // open the new image
-
-        return msa;                     // and return the pointer
-    }
-
-    if(strcasecmp(ext, "st") == 0) {    // st image?
+    } else if(strcasecmp(ext, "st") == 0) {    // st image?
         Debug::out(LOG_DEBUG, "FloppyImageFactory -- using ST image on %s", fileName);
-
-        if(!st) {                       // not created yet?
-            st = new FloppyImageSt();
-        }
-
-        st->close();
-        st->open(fileName);             // open the new image
-
-        return st;                      // and return the pointer
+        img = new FloppyImageSt();
+    } else {
+        Debug::out(LOG_DEBUG, "FloppyImageFactory -- Image file %s type %s not supported", fileName, ext);
     }
 
-    return NULL;                        // unknown extension?
+    if(img) {
+        img->open(fileName);            // open the new image
+    }
+    return img;                        // unknown extension?
 }
 
 bool FloppyImageFactory::handleZIPedImage(const char *inZipFilePath, char *outImageFilePath)
