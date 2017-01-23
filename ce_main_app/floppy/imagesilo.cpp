@@ -1,3 +1,4 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #include <stdio.h>
 #include <string.h>
 
@@ -8,7 +9,7 @@
 
 #include <signal.h>
 #include <pthread.h>
-#include <queue>   
+#include <queue>
 
 #include "../utils.h"
 #include "../debug.h"
@@ -21,7 +22,7 @@ pthread_mutex_t floppyEncodeThreadMutex = PTHREAD_MUTEX_INITIALIZER;
 std::queue<EncodeRequest> encodeQueue;
 
 SiloSlotSimple  floppyImages[3];
-int             floppyImageSelected = EMPTY_IMAGE_SLOT;  
+int             floppyImageSelected = EMPTY_IMAGE_SLOT;
 
 extern TFlags flags;
 
@@ -29,77 +30,77 @@ volatile bool floppyEncodingRunning;
 
 void encodeAdd(EncodeRequest &er)
 {
-    floppyEncodingRunning = true;		
+    floppyEncodingRunning = true;
 
-	pthread_mutex_lock(&floppyEncodeThreadMutex);			// try to lock the mutex
-	encodeQueue.push(er);									// add this to queue
-	pthread_mutex_unlock(&floppyEncodeThreadMutex);			// unlock the mutex
+    pthread_mutex_lock(&floppyEncodeThreadMutex);            // try to lock the mutex
+    encodeQueue.push(er);                                    // add this to queue
+    pthread_mutex_unlock(&floppyEncodeThreadMutex);            // unlock the mutex
 }
 
 void *floppyEncodeThreadCode(void *ptr)
 {
-	Debug::out(LOG_DEBUG, "Floppy encode thread starting...");
+    Debug::out(LOG_DEBUG, "Floppy encode thread starting...");
 
     MfmCachedImage      encImage;
     FloppyImageFactory  imageFactory;
 
     floppyEncodingRunning = false;
 
-	while(sigintReceived == 0) {
-		pthread_mutex_lock(&floppyEncodeThreadMutex);		// lock the mutex
+    while(sigintReceived == 0) {
+        pthread_mutex_lock(&floppyEncodeThreadMutex);        // lock the mutex
 
-		if(encodeQueue.size() == 0) {						// nothing to do?
-			pthread_mutex_unlock(&floppyEncodeThreadMutex);	// unlock the mutex
-			sleep(1);										// wait 1 second and try again
-			continue;
-		}
+        if(encodeQueue.size() == 0) {                        // nothing to do?
+            pthread_mutex_unlock(&floppyEncodeThreadMutex);    // unlock the mutex
+            sleep(1);                                        // wait 1 second and try again
+            continue;
+        }
 
-        floppyEncodingRunning = true;		
+        floppyEncodingRunning = true;
 
-		EncodeRequest er = encodeQueue.front();				// get the 'oldest' element from queue
-		encodeQueue.pop();									// and remove it form queue
-		pthread_mutex_unlock(&floppyEncodeThreadMutex);		// unlock the mutex
+        EncodeRequest er = encodeQueue.front();                // get the 'oldest' element from queue
+        encodeQueue.pop();                                    // and remove it form queue
+        pthread_mutex_unlock(&floppyEncodeThreadMutex);        // unlock the mutex
 
-		// try to open the image
-		IFloppyImage *image = imageFactory.getImage((char *) er.filename.c_str());
+        // try to open the image
+        IFloppyImage *image = imageFactory.getImage(er.filename.c_str());
 
-		if(image) {
-			if(image->isOpen()) {
-				DWORD start, end;
-				
-				// encode image - convert it from file to preprocessed stream for Franz
-				start = Utils::getCurrentMs();
-			
-				Debug::out(LOG_DEBUG, "Encoding image: %s", image->getFileName());
-				encImage.encodeAndCacheImage(image, true);
+        if(image) {
+            if(image->isOpen()) {
+                DWORD start, end;
 
-				end = Utils::getCurrentMs();
-				Debug::out(LOG_DEBUG, "Encoding of image %s done, took %d ms", image->getFileName(), (int) (end - start));
+                // encode image - convert it from file to preprocessed stream for Franz
+                start = Utils::getCurrentMs();
 
-				//----------------
-				// copy the image from encode thread to main thread				
-				start = Utils::getCurrentMs();
+                Debug::out(LOG_DEBUG, "Encoding image: %s", image->getFileName());
+                encImage.encodeAndCacheImage(image, true);
 
-				pthread_mutex_lock(&floppyEncodeThreadMutex);		// lock the mutex
-				er.encImg->copyFromOther(encImage);					// this is not thread safe as it copies data from one thread to another
-				pthread_mutex_unlock(&floppyEncodeThreadMutex);		// unlock the mutex
+                end = Utils::getCurrentMs();
+                Debug::out(LOG_DEBUG, "Encoding of image %s done, took %d ms", image->getFileName(), (int) (end - start));
 
-				end = Utils::getCurrentMs();
-				Debug::out(LOG_DEBUG, "Copying between threads took %d ms", (int) (end - start));
-			} else {
-				Debug::out(LOG_DEBUG, "Encoding of image %s failed - image is not open", image->getFileName());
-			}
-		} else {
-			Debug::out(LOG_DEBUG, "Encoding of image %S - Image file type not supported!", image->getFileName());
-		}
+                //----------------
+                // copy the image from encode thread to main thread
+                start = Utils::getCurrentMs();
+
+                pthread_mutex_lock(&floppyEncodeThreadMutex);        // lock the mutex
+                er.encImg->copyFromOther(encImage);                    // this is not thread safe as it copies data from one thread to another
+                pthread_mutex_unlock(&floppyEncodeThreadMutex);        // unlock the mutex
+
+                end = Utils::getCurrentMs();
+                Debug::out(LOG_DEBUG, "Copying between threads took %d ms", (int) (end - start));
+            } else {
+                Debug::out(LOG_DEBUG, "Encoding of image %s failed - image is not open", image->getFileName());
+            }
+        } else {
+            Debug::out(LOG_DEBUG, "Encoding of image %S - Image file type not supported!", image->getFileName());
+        }
 
         floppyEncodingRunning = false;
-	}
+    }
 
     floppyEncodingRunning = false;
-	
-	Debug::out(LOG_DEBUG, "Floppy encode thread terminated.");
-	return 0;
+
+    Debug::out(LOG_DEBUG, "Floppy encode thread terminated.");
+    return 0;
 }
 
 ImageSilo::ImageSilo()
@@ -115,14 +116,14 @@ ImageSilo::ImageSilo()
         *p++ = 0x6a;
         *p++ = 0x96;
     }
-        
+
     //-----------
     // init slots
     for(int i=0; i<4; i++) {
         clearSlot(i);
     }
-	
-	currentSlot = EMPTY_IMAGE_SLOT;
+
+    currentSlot = EMPTY_IMAGE_SLOT;
     reloadProxy = NULL;
 
     floppyImageSelected = -1;
@@ -133,13 +134,13 @@ ImageSilo::ImageSilo()
     if(res) {                                                                   // if succeeded, encode this empty image
         Debug::out(LOG_DEBUG, "ImageSilo created empty image (for no selected image)");
 
-	    EncodeRequest er;
-	
-    	er.slotIndex	= EMPTY_IMAGE_SLOT;
-	    er.filename		= EMPTY_IMAGE_PATH;
-    	er.encImg		= &slots[EMPTY_IMAGE_SLOT].encImage;
-	
-    	encodeAdd(er);
+        EncodeRequest er;
+
+        er.slotIndex    = EMPTY_IMAGE_SLOT;
+        er.filename        = EMPTY_IMAGE_PATH;
+        er.encImg        = &slots[EMPTY_IMAGE_SLOT].encImage;
+
+        encodeAdd(er);
 
     } else {
         Debug::out(LOG_DEBUG, "ImageSilo failed to create empty image! (for no selected image)");
@@ -164,10 +165,10 @@ void ImageSilo::loadSettings(void)
     Settings s;
 
     char key[32];
-    for(int slot=0; slot<3; slot++) {							
-        sprintf(key, "FLOPPY_IMAGE_%d", slot);                                  // create settings key			
-        
-		char *img = s.getString(key, (char *) "");                              // try to read the value
+    for(int slot=0; slot<3; slot++) {
+        sprintf(key, "FLOPPY_IMAGE_%d", slot);                                  // create settings key
+
+        const char *img = s.getString(key, "");                              // try to read the value
 
         std::string pathAndFile, path, file;
         pathAndFile = img;
@@ -178,7 +179,7 @@ void ImageSilo::loadSettings(void)
             pathAndFile = CE_CONF_FDD_IMAGE_PATH_AND_FILENAME;
         }
         //-----------------------------
-        
+
         if(pathAndFile.empty()) {                                               // nothing stored? skip it
             continue;
         }
@@ -208,17 +209,17 @@ void ImageSilo::saveSettings(void)
     Settings s;
 
     char key[32];
-    for(int slot=0; slot<3; slot++) {							
-        sprintf(key, "FLOPPY_IMAGE_%d", slot);                                  // create settings key			
+    for(int slot=0; slot<3; slot++) {
+        sprintf(key, "FLOPPY_IMAGE_%d", slot);                                  // create settings key
 
-		char *oldVal = s.getString(key, (char *) "");                           // try to read the old value
-        std::string oldValStr = oldVal;        
+        const char *oldVal = s.getString(key, "");                           // try to read the old value
+        std::string oldValStr = oldVal;
 
         if(oldValStr == slots[slot].hostSrcPath) {                              // if old value matches what we would save, skip it
             continue;
         }
 
-		s.setString(key, (char *) slots[slot].hostSrcPath.c_str());             // store the value at that slot
+        s.setString(key, slots[slot].hostSrcPath.c_str());             // store the value at that slot
     }
 
     // if something changed and got settings reload proxy, invoke reload
@@ -238,22 +239,22 @@ void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostD
         return;
     }
 
-	// store the info about slot 
+    // store the info about slot
     slots[positionIndex].imageFile      = filename;         // just file name:                     bla.st
     slots[positionIndex].hostDestPath   = hostDestPath;     // where the file is stored when used: /tmp/bla.st
     slots[positionIndex].atariSrcPath   = atariSrcPath;     // from where the file was uploaded:   C:\gamez\bla.st
     slots[positionIndex].hostSrcPath    = hostSrcPath;      // for translated disk, host path:     /mnt/sda/gamez/bla.st
-	
+
     floppyImages[positionIndex].imageFile = filename;
 
-	// create and add floppy encode request
-	EncodeRequest er;
-	
-	er.slotIndex	= positionIndex;
-	er.filename		= hostDestPath;
-	er.encImg		= &slots[positionIndex].encImage;
-	
-	encodeAdd(er);
+    // create and add floppy encode request
+    EncodeRequest er;
+
+    er.slotIndex    = positionIndex;
+    er.filename        = hostDestPath;
+    er.encImg        = &slots[positionIndex].encImage;
+
+    encodeAdd(er);
 
     if(saveToSettings) {                                    // should we save this to settings? (false when loading settings)
         saveSettings();
@@ -267,7 +268,7 @@ void ImageSilo::swap(int index)
     }
 
     SiloSlot *a, *b;
-    
+
     // find out which two slots to swap
     switch(index) {
         case 0:
@@ -287,10 +288,10 @@ void ImageSilo::swap(int index)
     }
 
     // swap image files
-	a->imageFile.swap(b->imageFile);
-	a->hostDestPath.swap(b->hostDestPath);
-	a->atariSrcPath.swap(b->atariSrcPath);
-	a->hostSrcPath.swap(b->hostSrcPath);
+    a->imageFile.swap(b->imageFile);
+    a->hostDestPath.swap(b->hostDestPath);
+    a->atariSrcPath.swap(b->atariSrcPath);
+    a->hostSrcPath.swap(b->hostSrcPath);
 
     for(int i=0; i<3; i++) {
         floppyImages[i].imageFile = slots[i].imageFile;
@@ -308,14 +309,14 @@ void ImageSilo::remove(int index)                   // remove image at specified
 
     floppyImages[index].imageFile = "";
 
-	if(slots[index].imageFile.empty()) {			// no image in this slot? skip the rest
-		return;
-	}
-	
-	// delete the file from /tmp
-	unlink((char *) slots[index].hostDestPath.c_str());
-	
-	clearSlot(index);
+    if(slots[index].imageFile.empty()) {            // no image in this slot? skip the rest
+        return;
+    }
+
+    // delete the file from /tmp
+    unlink(slots[index].hostDestPath.c_str());
+
+    clearSlot(index);
 
     // save it to settings
     saveSettings();
@@ -326,16 +327,16 @@ void ImageSilo::dumpStringsToBuffer(BYTE *bfr)      // copy the strings to buffe
     memset(bfr, 0, 512);
 
     for(int i=0; i<3; i++) {
-        strncpy((char *) &bfr[(i * 160)     ], (char *) slots[i].imageFile.c_str(), 79);
+        strncpy((char *) &bfr[(i * 160)     ], slots[i].imageFile.c_str(), 79);
     }
 }
 
 void ImageSilo::clearSlot(int index)
 {
-	slots[index].imageFile.clear();
-	slots[index].hostDestPath.clear();
-	slots[index].atariSrcPath.clear();
-	slots[index].hostSrcPath.clear();
+    slots[index].imageFile.clear();
+    slots[index].hostDestPath.clear();
+    slots[index].atariSrcPath.clear();
+    slots[index].hostSrcPath.clear();
 
     if(index >= 0 && index < 3) {
         floppyImages[index].imageFile.clear();
@@ -344,27 +345,27 @@ void ImageSilo::clearSlot(int index)
 
 BYTE ImageSilo::getSlotBitmap(void)
 {
-	BYTE bmp = 0;
-	
-	for(int i=0; i<3; i++) {
-		if(!slots[i].imageFile.empty()) {		// if slot is used, set the bit
-			bmp |= (1 << i);
-		}
-	}
-	
-	return bmp;
+    BYTE bmp = 0;
+
+    for(int i=0; i<3; i++) {
+        if(!slots[i].imageFile.empty()) {        // if slot is used, set the bit
+            bmp |= (1 << i);
+        }
+    }
+
+    return bmp;
 }
 
 void ImageSilo::setCurrentSlot(int index)
 {
     if(index >= 0 && index <= 2) {                      // index good? use it
-    	currentSlot         = index;
+        currentSlot         = index;
         floppyImageSelected = index;
     } else {                                            // index bad? use slot with empty image
         currentSlot         = EMPTY_IMAGE_SLOT;
         floppyImageSelected = -1;
     }
-    
+
     slots[currentSlot].encImage.newContent = false;     // current slot content not changed
 }
 
@@ -375,31 +376,31 @@ int ImageSilo::getCurrentSlot(void)
 
 BYTE *ImageSilo::getEncodedTrack(int track, int side, int &bytesInBuffer)
 {
-	BYTE *pTrack;
-	
-	pthread_mutex_lock(&floppyEncodeThreadMutex);										// lock the mutex
-	pTrack = slots[currentSlot].encImage.getEncodedTrack(track, side, bytesInBuffer);	// get data from current slot
-	pthread_mutex_unlock(&floppyEncodeThreadMutex);										// unlock the mutex
+    BYTE *pTrack;
 
-	return pTrack;
+    pthread_mutex_lock(&floppyEncodeThreadMutex);                                        // lock the mutex
+    pTrack = slots[currentSlot].encImage.getEncodedTrack(track, side, bytesInBuffer);    // get data from current slot
+    pthread_mutex_unlock(&floppyEncodeThreadMutex);                                        // unlock the mutex
+
+    return pTrack;
 }
 
 bool ImageSilo::getParams(int &tracks, int &sides, int &sectorsPerTrack)
 {
-	return slots[currentSlot].encImage.getParams(tracks, sides, sectorsPerTrack);
+    return slots[currentSlot].encImage.getParams(tracks, sides, sectorsPerTrack);
 }
 
-bool ImageSilo::containsImage(char *filename)	// check if image with this filename exists in silo
+bool ImageSilo::containsImage(const char *filename)    // check if image with this filename exists in silo
 {
-	std::string fnameStr = filename;
+    std::string fnameStr = filename;
 
-	for(int i=0; i<3; i++) {
-		if(slots[i].imageFile == fnameStr) {
-			return true;
-		}
-	}
-	
-	return false;
+    for(int i=0; i<3; i++) {
+        if(slots[i].imageFile == fnameStr) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool ImageSilo::currentSlotHasNewContent(void)
@@ -408,7 +409,7 @@ bool ImageSilo::currentSlotHasNewContent(void)
         slots[currentSlot].encImage.newContent = false;     // set flag to false
         return true;                                        // return that the content is new
     }
-    
+
     return false;                                           // otherwise no new content
 }
 

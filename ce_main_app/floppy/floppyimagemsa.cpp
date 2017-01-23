@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <stdlib.h>
 #include <string.h>
 #include "floppyimagemsa.h"
@@ -19,7 +20,7 @@ FloppyImageMsa::~FloppyImageMsa()
     close();
 }
 
-bool FloppyImageMsa::open(char *fileName)
+bool FloppyImageMsa::open(const char *fileName)
 {
     close();
     
