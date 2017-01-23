@@ -328,12 +328,20 @@ int main(void)
         }
         
         if(mode == MODE_UNKNOWN && timeOutCount >= 3) {                 // if we had to use timeout 3 times consequently to make this work, then we're probably in SOLO mode
+            BYTE acsiScsiDefaultSoloId = isAcsiNotScsi ? 0 : 1;         // default SD card ID - 0 for ACSI, 1 for SCSI
+
             LEDs.goingSolo  = LED1 | LED2 | LED3;
             mode            = MODE_SOLO;
             state           = STATE_GET_COMMAND;
             sendFwVersion   = FALSE;
             
-            sdCardID = EE_ReadVariable(EEPROM_OFFSET_SDCARD_ID, 0);     // get SD card ID, with default value of 0
+            // get SD card ID, with default value depending on ACSI/SCSI bus type
+            sdCardID = EE_ReadVariable(EEPROM_OFFSET_SDCARD_ID, acsiScsiDefaultSoloId);
+
+            if((!isAcsiNotScsi) && sdCardID == 0) {                     // if running as SCSI, and SD card ID is 0, set it to 1 (because 0 is Falcon's SCSI initiator)
+                sdCardID = 1;
+            }
+
             updateEnabledIDsInSoloMode();   // update enabled IDs
         }
         
