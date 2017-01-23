@@ -17,7 +17,6 @@ Scsi::Scsi(void)
     int i;
 
     dataTrans = 0;
-    strcpy((char *) inquiryName, "CosmosEx");
 
     dataBuffer  = new BYTE[SCSI_BUFFER_SIZE];
     dataBuffer2 = new BYTE[SCSI_BUFFER_SIZE];
@@ -425,10 +424,31 @@ void Scsi::processCommand(BYTE *command)
         return;
     }
 
-    if(isICDcommand()) {                  // if it's a ICD command
-        ProcICD();
-    } else {                              // if it's a normal command
-        ProcScsi6();
+    bool isIcd      = isICDcommand();                           // check if it's ICD command or SCSI(6) command
+    BYTE lun        = isIcd ? (cmd[2] >> 5) : (cmd[1] >>   5);  // get LUN from command
+    BYTE justCmd    = isIcd ? (cmd[1]     ) : (cmd[0] & 0x1f);  // get just the command (remove ACSI ID)
+
+    if(lun != 0) {      // if LUN is not zero, the command is invalid 
+        if(justCmd == SCSI_C_REQUEST_SENSE) {                   // special handling in REQUEST SENSE
+            SCSI_RequestSense(lun);
+        } else if(justCmd == SCSI_C_INQUIRY) {                  // special handling in INQUIRY
+            SCSI_Inquiry(lun);
+        } else {                                                // invalid command for non-zero LUN, fail
+            devInfo[acsiId].LastStatus  = SCSI_ST_CHECK_CONDITION;
+            devInfo[acsiId].SCSI_SK     = SCSI_E_IllegalRequest;        // other devices = error
+            devInfo[acsiId].SCSI_ASC    = SCSI_ASC_LU_NOT_SUPPORTED;
+            devInfo[acsiId].SCSI_ASCQ   = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+
+            dataTrans->setStatus(devInfo[acsiId].LastStatus);           // send status byte
+
+            Debug::out(LOG_DEBUG, "Scsi::processCommand() - non-zero LUN, failing");
+        }
+    } else {            // if LUN is zero, we're fine
+        if(isIcd) {                         // if it's a ICD command
+            ProcICD     (lun, justCmd);
+        } else {                            // if it's a normal command
+            ProcScsi6   (lun, justCmd);
+        }
     }
 
     dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
@@ -443,25 +463,9 @@ bool Scsi::isICDcommand(void)
     return false;
 }
 
-void Scsi::ProcScsi6(void)
+void Scsi::ProcScsi6(BYTE lun, BYTE justCmd)
 {
-    BYTE justCmd;
-
     shitHasHappened = 0;
-
-    if((cmd[1] & 0xE0) != 0x00)                     // if LUN ID isn't ZERO
-    {
-        devInfo[acsiId].LastStatus    = SCSI_ST_CHECK_CONDITION;
-        devInfo[acsiId].SCSI_SK     = SCSI_E_IllegalRequest;
-        devInfo[acsiId].SCSI_ASC    = SCSI_ASC_LU_NOT_SUPPORTED;
-        devInfo[acsiId].SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-        dataTrans->setStatus(devInfo[acsiId].LastStatus);   // send status byte
-
-        return;
-    }
-
-    justCmd = cmd[0] & 0x1f;                // get only the command part of byte
 
     //----------------
     // now to solve the not initialized device
@@ -510,8 +514,8 @@ void Scsi::ProcScsi6(void)
 
     case SCSI_C_MODE_SENSE6:        SCSI_ModeSense6();                  break;
 
-    case SCSI_C_REQUEST_SENSE:      SCSI_RequestSense();                break;
-    case SCSI_C_INQUIRY:            SCSI_Inquiry();                     break;
+    case SCSI_C_REQUEST_SENSE:      SCSI_RequestSense(lun);             break;
+    case SCSI_C_INQUIRY:            SCSI_Inquiry(lun);                  break;
 
     case SCSI_C_FORMAT_UNIT:        SCSI_FormatUnit();                  break;
     case SCSI_C_READ6:              SCSI_ReadWrite6(true);              break;
@@ -644,23 +648,21 @@ void Scsi::ClearTheUnitAttention(void)
     dataMedia->setMediaChanged(false);
 }
 //----------------------------------------------
-void Scsi::SCSI_Inquiry(void)
+void Scsi::SCSI_Inquiry(BYTE lun)
 {
-    WORD i,xx;
-    BYTE val;
+    int inquiryLength;
 
-    BYTE *vendor = (BYTE *) "JOOKIE  ";
-    char type_str[5] = {' ', ' ', ' ', ' ', '\0'};
+    char type_str[5] = "    ";
 
     if(dataMedia->mediaChanged())                                   // this command clears the unit attention state
         ClearTheUnitAttention();
 
     if(cmd[1] & 0x01)                                               // EVPD bit is set? Request for vital data?
     {                                                               // vital data not suported
-        devInfo[acsiId].LastStatus    = SCSI_ST_CHECK_CONDITION;
+        devInfo[acsiId].LastStatus  = SCSI_ST_CHECK_CONDITION;
         devInfo[acsiId].SCSI_SK     = SCSI_E_IllegalRequest;
         devInfo[acsiId].SCSI_ASC    = SCSO_ASC_INVALID_FIELD_IN_CDB;
-        devInfo[acsiId].SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+        devInfo[acsiId].SCSI_ASCQ   = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
         dataTrans->setStatus(devInfo[acsiId].LastStatus);    // send status byte, long time-out
 
@@ -687,53 +689,28 @@ void Scsi::SCSI_Inquiry(void)
         }
     }
     //-----------
-    xx = cmd[4];                                              // how many bytes should be sent
+    inquiryLength = cmd[4];                             // how many bytes should be sent
 
-    for(i=0; i<xx; i++)
-    {
-        if(i >= 8 && i<=43) {           // if the returned byte is somewhere from ASCII part of data, init on 'space' character
-            val = ' ';
-        } else {                        // for other locations init on ZERO
-            val = 0;
+    //                      0   0   0   0   0   0   0   0   001111111111222222222233333333334444 
+    //                      0   1   2   3   4   5   6   7   890123456789012345678901234567890123 
+    char inquiryData[45] = "\x00\x80\x02\x02\x27\x00\x00\x00JOOKIE  CosmosEx 0 SD   2.0001/08/17";
+
+    inquiryData[ 0] = (lun == 0) ? 0 : 0x7f;            // for LUN 0 use 0, for other LUNs use peripheralQualifier = 0x03, deviceType = 0x1f (0x7f)
+    inquiryData[25] = '0' + acsiId;                     // send ACSI ID # (0 .. 7)
+    
+    memcpy(inquiryData + 27, type_str,              4); // IMG / CEDD / RAW / SD
+    memcpy(inquiryData + 32, VERSION_STRING_SHORT,  4); // version string
+    memcpy(inquiryData + 36, DATE_STRING,           8); // date string
+
+    if(inquiryLength <= 44) {                           // send less than whole buffer? just send all requested
+        dataTrans->addDataBfr(inquiryData, inquiryLength, false);
+    } else {                                            // send more than whole buffer?
+        dataTrans->addDataBfr(inquiryData, 44, false);  // send whole buffer
+        
+        int i;
+        for(i=0; i<(inquiryLength - 44); i++) {         // pad with zeros
+            dataTrans->addDataByte(0);
         }
-
-        if(i==1) {                      // 1st byte
-            val = 0x80;                 // removable (RMB) bit set
-        }
-
-        if(i==2 || i==3) {              // 2nd || 3rd byte
-            val = 0x02;                 // SCSI level || response data format
-        }
-
-        if(i==4) {
-            val = 0x27;                 // 4th byte = Additional length
-        }
-
-        if(i>=8 && i<=15) {             // send vendor (JOOKIE)
-            val = vendor[i-8];
-        }
-
-        if(i>=16 && i<=23) {            // send device name (CosmosEx)
-            val = inquiryName[i-16];
-        }
-
-        if(i == 25) {                   // send ACSI ID # (0 .. 7)
-            val = '0' + acsiId;
-        }
-
-        if(i>=27 && i<31) {             // send type
-            val = type_str[i-27];
-        }
-
-        if(i>=32 && i<=35) {            // version string
-            val = VERSION_STRING_SHORT[i-32];
-        }
-
-        if(i>=36 && i<=43) {            // date string
-            val = DATE_STRING[i-36];
-        }
-
-        dataTrans->addDataByte(val);
     }
 
     SendOKstatus();
@@ -809,7 +786,7 @@ void Scsi::SCSI_ModeSense6(void)
 }
 //----------------------------------------------
 // return the last error that occured
-void Scsi::SCSI_RequestSense(void)
+void Scsi::SCSI_RequestSense(BYTE lun)
 {
     char i,xx;
     unsigned char val;
@@ -819,17 +796,28 @@ void Scsi::SCSI_RequestSense(void)
 
     xx = cmd[4];                        // how many bytes should be sent
 
+    TDevInfo *device;
+    TDevInfo badLunDevice;
+
+    // pre-fill the bad device SC, ASC, ASCQ
+    badLunDevice.SCSI_SK    = SCSI_E_IllegalRequest;
+    badLunDevice.SCSI_ASC   = SCSI_ASC_LU_NOT_SUPPORTED;
+    badLunDevice.SCSI_ASCQ = 0;
+    
+    // if LUN is zero, use device info, if LUN is non-zero, use bad device info
+    device = (lun == 0) ? &devInfo[acsiId] : &badLunDevice;
+    
     for(i=0; i<xx; i++)
     {
         switch(i)
         {
-        case  0:    val = 0xf0;                         break;        // error code
-        case  2:    val = devInfo[acsiId].SCSI_SK;        break;        // sense key
-        case  7:    val = xx-7;                         break;        // AS length
-        case 12:    val = devInfo[acsiId].SCSI_ASC;     break;        // additional sense code
-        case 13:    val = devInfo[acsiId].SCSI_ASCQ;    break;        // additional sense code qualifier
+        case  0:    val = 0xf0;                 break;        // error code
+        case  2:    val = device->SCSI_SK;      break;        // sense key
+        case  7:    val = xx-7;                 break;        // AS length
+        case 12:    val = device->SCSI_ASC;     break;        // additional sense code
+        case 13:    val = device->SCSI_ASCQ;    break;        // additional sense code qualifier
 
-        default:    val = 0;                        break;
+        default:    val = 0;                    break;
         }
 
         dataTrans->addDataByte(val);
@@ -868,23 +856,10 @@ void Scsi::showCommand(WORD id, WORD length, WORD errCode)
     sprintf(tmp + len, "- %02x", errCode);
 }
 //----------------------------------------------
-void Scsi::ProcICD(void)
+void Scsi::ProcICD(BYTE lun, BYTE justCmd)
 {
     shitHasHappened = 0;
 
-    //----------------
-    if((cmd[2] & 0xE0) != 0x00)                                         // if device ID isn't ZERO
-    {
-        devInfo[acsiId].LastStatus    = SCSI_ST_CHECK_CONDITION;
-        devInfo[acsiId].SCSI_SK     = SCSI_E_IllegalRequest;        // other devices = error
-        devInfo[acsiId].SCSI_ASC    = SCSI_ASC_LU_NOT_SUPPORTED;
-        devInfo[acsiId].SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-        dataTrans->setStatus(devInfo[acsiId].LastStatus);           // send status byte
-
-        Debug::out(LOG_DEBUG, "Scsi::ProcICD - device ID isn't zero");
-        return;
-    }
     //----------------
     // now for the not present media
     if(!dataMedia->isInit())
@@ -910,9 +885,8 @@ void Scsi::ProcICD(void)
             return;
         }
     }
-    //----------------
-    BYTE justCmd = cmd[1];
 
+    //----------------
     // for read only devices - write not supported
     if(devInfo[acsiId].accessType == SCSI_ACCESSTYPE_READ_ONLY) {
         if(justCmd == SCSI_C_WRITE10) {
@@ -940,7 +914,7 @@ void Scsi::ProcICD(void)
 
     case SCSI_C_INQUIRY:
         ICD7_to_SCSI6();
-        SCSI_Inquiry();
+        SCSI_Inquiry(lun);
         break;
         //------------------------------
     case SCSI_C_READ10:                SCSI_ReadWrite10(true); break;

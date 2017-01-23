@@ -103,19 +103,18 @@ private:
 	AcsiIDinfo		acsiIdInfo;
 	
     BYTE *cmd;
-    BYTE inquiryName[10];
 
     bool isICDcommand(void);
 
 	// for 6-byte long commands - from scsi6
-    void ProcScsi6(void);
+    void ProcScsi6(BYTE lun, BYTE justCmd);
 
-	void SCSI_RequestSense(void);
+	void SCSI_RequestSense(BYTE lun);
 	void SCSI_FormatUnit(void);
 
     void SCSI_ReadWrite6(bool read);
 
-	void SCSI_Inquiry(void);
+	void SCSI_Inquiry(BYTE lun);
 	void SCSI_ModeSense6(void);
 
 	void SendOKstatus(void);
@@ -127,7 +126,7 @@ private:
 	void SendEmptySecotrs(WORD sectors);
 
 	// for commands longer than 6 bytes - from scsiICD
-	void ProcICD(void); 
+	void ProcICD(BYTE lun, BYTE justCmd);
 
 	void SCSI_ReadCapacity(void);
 	void ICD7_to_SCSI6(void);
