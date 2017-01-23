@@ -3,35 +3,11 @@
 #include "floppyimagest.h"
 #include "../debug.h"
 
-FloppyImageSt::FloppyImageSt()
-{
-    openFlag        = false;
-    params.isInit   = false;
-
-    image.data = NULL;
-    image.size = 0;
-}
-
-FloppyImageSt::~FloppyImageSt()
-{
-    close();
-}
-
 bool FloppyImageSt::open(const char *fileName)
 {
-    close();
-
-    strcpy(currentFileName, fileName);
-    
-    fajl = fopen(fileName, "rb");
-
-    if(fajl == NULL) {
-        Debug::out(LOG_ERROR, "Failed to open image file: %s", fileName);
-        openFlag = false;
+    if(!FloppyImage::open(fileName))
         return false;
-    }
 
-    openFlag = true;
     if(!loadImageIntoMemory()) {        // load the whole image in memory to avoid later disk access
         close();
         return false;
@@ -42,90 +18,6 @@ bool FloppyImageSt::open(const char *fileName)
     Debug::out(LOG_DEBUG, "ST Image opened: %s", fileName);
     Debug::out(LOG_DEBUG, "ST Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
 
-    return true;
-}
-
-bool FloppyImageSt::isOpen(void)
-{
-    return openFlag;                    // just return status
-}
-
-void FloppyImageSt::close()
-{
-    if(!openFlag) {                     // not open? nothing to do
-        return;
-    }
-
-    fclose(fajl);
-    fajl = NULL;
-    openFlag = false;
-    params.isInit = false;
-
-    if(image.data != NULL) {
-        delete []image.data;
-
-        image.data = NULL;
-        image.size = 0;
-    }
-}
-
-bool FloppyImageSt::loadImageIntoMemory(void)
-{
-    if(image.data != NULL) {
-        delete []image.data;
-        image.data = NULL;
-        image.size = 0;
-    }
-
-    fseek(fajl, 0, SEEK_END);           // move to the end of file
-    int cnt = ftell(fajl);              // get the file size
-
-    fseek(fajl, 0, SEEK_SET);           // move to the start of file
-
-    image.data = new BYTE[cnt];
-    int res = fread(image.data, 1, cnt, fajl);
-    image.size = cnt;
-
-    if(res != cnt) {
-        return false;
-    }
-
-    return true;
-}
-
-bool FloppyImageSt::getParams(int &tracks, int &sides, int &sectorsPerTrack)
-{
-    if(!openFlag) {
-        tracks          = 0;
-        sides           = 0;
-        sectorsPerTrack = 0;
-
-        return false;
-    }
-
-    tracks          = params.tracksNo;
-    sides           = params.sidesNo;
-    sectorsPerTrack = params.sectorsPerTrack;
-
-    return true;
-}
-
-bool FloppyImageSt::readSector(int track, int side, int sectorNo, BYTE *buffer)
-{
-    if(!openFlag) {                                             // not open?
-        return false;
-    }
-
-    if(sectorNo < 1 || sectorNo > params.sectorsPerTrack) {     // sector # out of range?
-        return false;
-    }
-
-    int offset   = track    * (params.sidesNo * params.sectorsPerTrack);    // move to the right track
-    offset      += side     * params.sectorsPerTrack;                       // then move to the right side
-    offset      += (sectorNo - 1);                                          // and move a little to the right sector
-    offset       = offset * 512;                                            // calculate ofsset in bytes
-
-    memcpy(buffer, &image.data[offset], 512);
     return true;
 }
 
@@ -169,9 +61,4 @@ bool FloppyImageSt::calcParams(void)
 
     Debug::out(LOG_ERROR, "Couldn't guess the floppy params :(");
     return false;
-}
-
-char *FloppyImageSt::getFileName(void)
-{
-    return currentFileName;
 }

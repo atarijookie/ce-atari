@@ -51,7 +51,6 @@ void ImageSilo::stop(void)
 void ImageSilo::run(void)
 {
     MfmCachedImage      encImage;
-    FloppyImageFactory  imageFactory;
 
     floppyEncodingRunning = false;
 
@@ -73,7 +72,7 @@ void ImageSilo::run(void)
         pthread_mutex_unlock(&floppyEncodeQueueMutex);        // unlock the mutex
 
         // try to open the image
-        IFloppyImage *image = imageFactory.getImage(er.filename.c_str());
+        FloppyImage *image = FloppyImageFactory::getImage(er.filename.c_str());
 
         if(image) {
             if(image->isOpen()) {
@@ -101,8 +100,8 @@ void ImageSilo::run(void)
             } else {
                 Debug::out(LOG_DEBUG, "Encoding of image %s failed - image is not open", image->getFileName());
             }
-        } else {
-            Debug::out(LOG_DEBUG, "Encoding of image %S - Image file type not supported!", image->getFileName());
+            delete image;
+            image = NULL;
         }
 
         floppyEncodingRunning = false;

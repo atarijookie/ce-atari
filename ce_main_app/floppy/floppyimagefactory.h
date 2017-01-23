@@ -2,26 +2,18 @@
 #ifndef FLOPPYIMAGEFACTORY_H
 #define FLOPPYIMAGEFACTORY_H
 
-#include "ifloppyimage.h"
-#include "floppyimagest.h"
-#include "floppyimagemsa.h"
+#include "floppyimage.h"
 
 class FloppyImageFactory
 {
 public:
-    FloppyImageFactory();
-    ~FloppyImageFactory();
-
-    IFloppyImage *getImage(const char *fileName);
+    static FloppyImage *getImage(const char *fileName);
 
 private:
-    FloppyImageMsa  *msa;
-    FloppyImageSt   *st;
+    static void toLowerCase(char *orig, char *lower);
+    static char lowerCase(char in);
 
-    void toLowerCase(char *orig, char *lower);
-    char lowerCase(char in);
-
-    bool handleZIPedImage(const char *inZipFilePath, char *outImageFilePath);
+    static bool handleZIPedImage(const char *inZipFilePath, char *outImageFilePath);
 };
 
 #endif // FLOPPYIMAGEFACTORY_H

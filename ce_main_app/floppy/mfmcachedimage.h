@@ -1,7 +1,7 @@
 #ifndef MFMCACHEDIMAGE_H
 #define MFMCACHEDIMAGE_H
 
-#include "ifloppyimage.h"
+#include "floppyimage.h"
 
 // maximum 2 sides, 85 tracks per side
 #define MAX_TRACKS      (2 * 85)
@@ -22,7 +22,7 @@ public:
 
     // bufferOfBytes -- the datas are transfered as WORDs, but are they stored as bytes?
     // If true, swap bytes, don't append zeros. If false, no swapping, but append zeros.
-    void encodeAndCacheImage(IFloppyImage *img, bool bufferOfBytes=false);
+    void encodeAndCacheImage(FloppyImage *img, bool bufferOfBytes=false);
     void deleteCachedImage(void);
     
 	BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
@@ -45,7 +45,7 @@ private:
     WORD                CRC;
 
     void initTracks(void);
-    void encodeSingleTrack(IFloppyImage *img, int side, int track, int sectorsPerTrack,  BYTE *buffer, int &bytesStored, bool bufferOfBytes=false);
+    void encodeSingleTrack(FloppyImage *img, int side, int track, int sectorsPerTrack,  BYTE *buffer, int &bytesStored, bool bufferOfBytes=false);
 
     void appendCurrentSectorCommand(int track, int side, int sector, BYTE *buffer, int &count);
     void appendRawByte(BYTE val, BYTE *bfr, int &cnt);
@@ -54,7 +54,7 @@ private:
     void appendChange(BYTE chg, BYTE *bfr, int &cnt);
     void appendTime(BYTE time, BYTE *bfr, int &cnt);
     void appendByteToStream(BYTE val, BYTE *bfr, int &cnt, bool doCalcCrc=true);
-    bool createMfmStream(IFloppyImage *img, int side, int track, int sector, BYTE *buffer, int &count);
+    bool createMfmStream(FloppyImage *img, int side, int track, int sector, BYTE *buffer, int &count);
     void fdc_add_to_crc(WORD &crc, BYTE data);
 };
 
