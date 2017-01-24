@@ -66,6 +66,7 @@
 #define SCSO_ASC_INVALID_FIELD_IN_CDB           0x24
 #define SCSI_ASC_VERIFY_MISCOMPARE              0x1d
 #define SCSI_ASC_MEDIUM_NOT_PRESENT             0x3A     
+#define SCSI_ASC_LBA_OUT_OF_RANGE               0x21
 
 // SCSI ADITIONAL SENSE CODE QUALIFIER
 #define SCSI_ASCQ_FORMAT_IN_PROGRESS            0x04

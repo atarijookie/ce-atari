@@ -9,9 +9,6 @@
 #include "devicemedia.h"
 #include "imagefilemedia.h"
 
-#define SCSI_BUFFER_SIZE             (1024*1024)
-#define BUFFER_SIZE_SECTORS         (SCSI_BUFFER_SIZE / 512)
-
 Scsi::Scsi(void)
 {
     int i;
@@ -46,11 +43,6 @@ Scsi::~Scsi()
 void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
 {
     dataTrans = dt;
-}
-
-void Scsi::setSdCardCapacity(DWORD capInSectors)
-{
-    sdMedia.setCurrentCapacity(capInSectors);
 }
 
 bool Scsi::attachToHostPath(std::string hostPath, int hostSourceType, int accessType)
@@ -434,12 +426,7 @@ void Scsi::processCommand(BYTE *command)
         } else if(justCmd == SCSI_C_INQUIRY) {                  // special handling in INQUIRY
             SCSI_Inquiry(lun);
         } else {                                                // invalid command for non-zero LUN, fail
-            devInfo[acsiId].LastStatus  = SCSI_ST_CHECK_CONDITION;
-            devInfo[acsiId].SCSI_SK     = SCSI_E_IllegalRequest;        // other devices = error
-            devInfo[acsiId].SCSI_ASC    = SCSI_ASC_LU_NOT_SUPPORTED;
-            devInfo[acsiId].SCSI_ASCQ   = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-            dataTrans->setStatus(devInfo[acsiId].LastStatus);           // send status byte
+            storeSenseAndSendStatus(SCSI_ST_CHECK_CONDITION, SCSI_E_IllegalRequest, SCSI_ASC_LU_NOT_SUPPORTED, SCSI_ASCQ_NO_ADDITIONAL_SENSE);
 
             Debug::out(LOG_DEBUG, "Scsi::processCommand() - non-zero LUN, failing");
         }
@@ -452,15 +439,6 @@ void Scsi::processCommand(BYTE *command)
     }
 
     dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
-}
-
-bool Scsi::isICDcommand(void)
-{
-    if((cmd[0] & 0x1f)==0x1f) {              // if the command is '0x1f'
-        return true;
-    }
-
-    return false;
 }
 
 void Scsi::ProcScsi6(BYTE lun, BYTE justCmd)
@@ -525,101 +503,6 @@ void Scsi::ProcScsi6(BYTE lun, BYTE justCmd)
     }
 }
 //----------------------------------------------
-void Scsi::returnInvalidCommand(void)
-{
-    devInfo[acsiId].LastStatus    = SCSI_ST_CHECK_CONDITION;
-    devInfo[acsiId].SCSI_SK        = SCSI_E_IllegalRequest;
-    devInfo[acsiId].SCSI_ASC    = SCSI_ASC_InvalidCommandOperationCode;
-    devInfo[acsiId].SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-    dataTrans->setStatus(devInfo[acsiId].LastStatus);   // send status byte
-}
-//----------------------------------------------
-void Scsi::ReturnUnitAttention(void)
-{
-    dataMedia->setMediaChanged(false);
-
-    devInfo[acsiId].LastStatus    = SCSI_ST_CHECK_CONDITION;
-    devInfo[acsiId].SCSI_SK     = SCSI_E_UnitAttention;
-    devInfo[acsiId].SCSI_ASC    = SCSI_ASC_NOT_READY_TO_READY_TRANSITION;
-    devInfo[acsiId].SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-    dataTrans->setStatus(devInfo[acsiId].LastStatus);   // send status byte
-}
-//----------------------------------------------
-void Scsi::ReturnStatusAccordingToIsInit(void)
-{
-    if(dataMedia->isInit())
-        SendOKstatus();
-    else
-    {
-        devInfo[acsiId].LastStatus    = SCSI_ST_CHECK_CONDITION;
-        devInfo[acsiId].SCSI_SK     = SCSI_E_NotReady;
-        devInfo[acsiId].SCSI_ASC    = SCSI_ASC_MEDIUM_NOT_PRESENT;
-        devInfo[acsiId].SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-#ifdef WRITEOUT
-        if(shitHasHappened)
-            showCommand(2, 6, devInfo[acsiId].LastStatus);
-
-        shitHasHappened = 0;
-#endif
-
-        dataTrans->setStatus(devInfo[acsiId].LastStatus);   // send status byte
-    }
-}
-//----------------------------------------------
-void Scsi::SendOKstatus(void)
-{
-    devInfo[acsiId].LastStatus    = SCSI_ST_OK;
-    devInfo[acsiId].SCSI_SK     = SCSI_E_NoSense;
-    devInfo[acsiId].SCSI_ASC    = SCSI_ASC_NO_ADDITIONAL_SENSE;
-    devInfo[acsiId].SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-#ifdef WRITEOUT
-    if(shitHasHappened)
-        showCommand(3, 6, devInfo[acsiId].LastStatus);
-
-    shitHasHappened = 0;
-#endif
-
-    dataTrans->setStatus(devInfo[acsiId].LastStatus);   // send status byte, long time-out
-}
-//----------------------------------------------
-void Scsi::SCSI_ReadWrite6(bool read)
-{
-    DWORD sector;
-    bool res;
-    WORD lenX;
-
-    sector  = (((DWORD)cmd[1] & 0x1f) << 16) | ((DWORD)cmd[2] << 8) | (DWORD)cmd[3];
-
-    lenX = (WORD)cmd[4];                         // get the # of sectors to read
-
-    if(lenX == 0) {
-        lenX = 256;
-    }
-
-    Debug::out(LOG_DEBUG, "Scsi::SCSI_ReadWrite6(%s) ID=%d sector=0x%06x lenX=0x%02x\n", read ? "READ":"WRITE", acsiId, sector, lenX);
-    //--------------------------------
-    if(read) {                  // if read
-        res = readSectors(sector, lenX);
-    } else {                    // if write
-        res = writeSectors(sector, lenX);
-    }
-    //--------------------------------
-    if(res) {                                            // if everything was OK
-        SendOKstatus();
-    } else {                                            // if error
-        devInfo[acsiId].LastStatus    = SCSI_ST_CHECK_CONDITION;
-        devInfo[acsiId].SCSI_SK        = SCSI_E_MediumError;
-        devInfo[acsiId].SCSI_ASC    = SCSI_ASC_NO_ADDITIONAL_SENSE;
-        devInfo[acsiId].SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-        dataTrans->setStatus(devInfo[acsiId].LastStatus);    // send status byte, long time-out
-    }
-}
-//----------------------------------------------
 void Scsi::SCSI_FormatUnit(void)
 {
     BYTE res = 0;
@@ -628,24 +511,9 @@ void Scsi::SCSI_FormatUnit(void)
     //---------------
     if(res) {                                            // if everything was OK
         SendOKstatus();
-    } else {                                          // if error
-        devInfo[acsiId].LastStatus    = SCSI_ST_CHECK_CONDITION;
-        devInfo[acsiId].SCSI_SK     = SCSI_E_MediumError;
-        devInfo[acsiId].SCSI_ASC    = SCSI_ASC_NO_ADDITIONAL_SENSE;
-        devInfo[acsiId].SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-        dataTrans->setStatus(devInfo[acsiId].LastStatus);    // send status byte, long time-out
+    } else {                                        // if error
+        storeSenseAndSendStatus(SCSI_ST_CHECK_CONDITION, SCSI_E_MediumError, SCSI_ASC_NO_ADDITIONAL_SENSE, SCSI_ASCQ_NO_ADDITIONAL_SENSE);
     }
-}
-//----------------------------------------------
-void Scsi::ClearTheUnitAttention(void)
-{
-    devInfo[acsiId].LastStatus    = SCSI_ST_OK;
-    devInfo[acsiId].SCSI_SK        = SCSI_E_NoSense;
-    devInfo[acsiId].SCSI_ASC    = SCSI_ASC_NO_ADDITIONAL_SENSE;
-    devInfo[acsiId].SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-    dataMedia->setMediaChanged(false);
 }
 //----------------------------------------------
 void Scsi::SCSI_Inquiry(BYTE lun)
@@ -659,13 +527,7 @@ void Scsi::SCSI_Inquiry(BYTE lun)
 
     if(cmd[1] & 0x01)                                               // EVPD bit is set? Request for vital data?
     {                                                               // vital data not suported
-        devInfo[acsiId].LastStatus  = SCSI_ST_CHECK_CONDITION;
-        devInfo[acsiId].SCSI_SK     = SCSI_E_IllegalRequest;
-        devInfo[acsiId].SCSI_ASC    = SCSO_ASC_INVALID_FIELD_IN_CDB;
-        devInfo[acsiId].SCSI_ASCQ   = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-        dataTrans->setStatus(devInfo[acsiId].LastStatus);    // send status byte, long time-out
-
+        storeSenseAndSendStatus(SCSI_ST_CHECK_CONDITION, SCSI_E_IllegalRequest, SCSO_ASC_INVALID_FIELD_IN_CDB, SCSI_ASCQ_NO_ADDITIONAL_SENSE);
         return;
     }
 
@@ -731,13 +593,7 @@ void Scsi::SCSI_ModeSense6(void)
     // page not supported?
     if(PageCode != 0x0a && PageCode != 0x0b && PageCode != 0x3f)
     {
-        devInfo[acsiId].LastStatus    = SCSI_ST_CHECK_CONDITION;
-        devInfo[acsiId].SCSI_SK     = SCSI_E_IllegalRequest;
-        devInfo[acsiId].SCSI_ASC    = SCSO_ASC_INVALID_FIELD_IN_CDB;
-        devInfo[acsiId].SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-        dataTrans->setStatus(devInfo[acsiId].LastStatus);    // send status byte, long time-out
-
+        storeSenseAndSendStatus(SCSI_ST_CHECK_CONDITION, SCSI_E_IllegalRequest, SCSO_ASC_INVALID_FIELD_IN_CDB, SCSI_ASCQ_NO_ADDITIONAL_SENSE);
         return;
     }
     //-----------------
@@ -839,23 +695,6 @@ void Scsi::SendEmptySecotrs(WORD sectors)
     }
 }
 //----------------------------------------------
-void Scsi::showCommand(WORD id, WORD length, WORD errCode)
-{
-    char tmp[64];
-
-    memset(tmp, 0, 64);
-    sprintf(tmp, "%d - ", id);
-
-    WORD i;
-
-    for(i=0; i<length; i++) {
-        sprintf(tmp + 4 + i*3, "%02x ", cmd[i]);
-    }
-
-    int len = strlen(tmp);
-    sprintf(tmp + len, "- %02x", errCode);
-}
-//----------------------------------------------
 void Scsi::ProcICD(BYTE lun, BYTE justCmd)
 {
     shitHasHappened = 0;
@@ -865,7 +704,7 @@ void Scsi::ProcICD(BYTE lun, BYTE justCmd)
     if(!dataMedia->isInit())
     {
         // for the next 3 commands the device is not ready
-        if((cmd[1] == SCSI_C_READ10) || (cmd[1] == SCSI_C_WRITE10) || (cmd[1] == SCSI_C_READ_CAPACITY))
+        if((justCmd == SCSI_C_READ10) || (justCmd == SCSI_C_WRITE10) || (justCmd == SCSI_C_READ_CAPACITY))
         {
             ReturnStatusAccordingToIsInit();
 
@@ -877,7 +716,7 @@ void Scsi::ProcICD(BYTE lun, BYTE justCmd)
     // if media changed, and the command is not INQUIRY and REQUEST SENSE
     if(dataMedia->mediaChanged())
     {
-        if(cmd[1] != SCSI_C_INQUIRY)
+        if(justCmd != SCSI_C_INQUIRY)
         {
             ReturnUnitAttention();
 
@@ -906,7 +745,7 @@ void Scsi::ProcICD(BYTE lun, BYTE justCmd)
     }
     //----------------
 
-    switch(cmd[1])
+    switch(justCmd)
     {
     case SCSI_C_READ_CAPACITY:
         SCSI_ReadCapacity();
@@ -917,51 +756,13 @@ void Scsi::ProcICD(BYTE lun, BYTE justCmd)
         SCSI_Inquiry(lun);
         break;
         //------------------------------
-    case SCSI_C_READ10:                SCSI_ReadWrite10(true); break;
-    case SCSI_C_WRITE10:            SCSI_ReadWrite10(false); break;
-        //----------------------------------------------------
-    case SCSI_C_VERIFY:                SCSI_Verify(); break;
-
+    case SCSI_C_READ10:     SCSI_ReadWrite10(true);     break;
+    case SCSI_C_WRITE10:    SCSI_ReadWrite10(false);    break;
+    case SCSI_C_VERIFY:     SCSI_Verify();              break;
         //----------------------------------------------------
     default:
         returnInvalidCommand();
         break;
-    }
-}
-//---------------------------------------------
-void Scsi::SCSI_Verify(void)
-{
-    DWORD sector;
-    BYTE res=0;
-    WORD lenX;
-
-    sector  = cmd[3];            // get starting sector #
-    sector  = sector << 8;
-    sector |= cmd[4];
-    sector  = sector << 8;
-    sector |= cmd[5];
-    sector  = sector << 8;
-    sector |= cmd[6];
-
-    lenX  = cmd[8];                     // get the # of sectors to read
-    lenX  = lenX << 8;
-    lenX |= cmd[9];
-
-    if((cmd[2] & 0x02) == 0x02) {           // BytChk == 1? : compare with data
-        res = compareSectors(sector, lenX);    // compare data
-
-        if(!res) {                            // problem when comparing?
-            devInfo[acsiId].LastStatus    = SCSI_ST_CHECK_CONDITION;
-            devInfo[acsiId].SCSI_SK     = SCSI_E_Miscompare;
-            devInfo[acsiId].SCSI_ASC    = SCSI_ASC_VERIFY_MISCOMPARE;
-            devInfo[acsiId].SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-            dataTrans->setStatus(devInfo[acsiId].LastStatus);   // send status byte
-        } else {                                    // no problem?
-            SendOKstatus();
-        }
-    } else {                        // BytChk == 0? : no data comparison
-        SendOKstatus();
     }
 }
 //---------------------------------------------
@@ -1001,133 +802,6 @@ void Scsi::SCSI_ReadCapacity(void)
     SendOKstatus();
 }
 //---------------------------------------------
-void Scsi::ICD7_to_SCSI6(void)
-{
-    cmd[0] = cmd[1];
-    cmd[1] = cmd[2];
-    cmd[2] = cmd[3];
-    cmd[3] = cmd[4];
-    cmd[4] = cmd[5];
-    cmd[5] = cmd[6];
-}
-//---------------------------------------------
-void Scsi::SCSI_ReadWrite10(bool read)
-{
-    DWORD sector;
-    bool res;
-    WORD lenX;
-
-    sector  = cmd[3];
-    sector  = sector << 8;
-    sector |= cmd[4];
-    sector  = sector << 8;
-    sector |= cmd[5];
-    sector  = sector << 8;
-    sector |= cmd[6];
-
-    lenX  = cmd[8];                     // get the # of sectors to read
-    lenX  = lenX << 8;
-    lenX |= cmd[9];
-
-    Debug::out(LOG_DEBUG, "Scsi::SCSI_ReadWrite10 - %s, sector: %08x, count: %02x", read ? "READ" : "WRITE", sector, lenX);
-    //--------------------------------
-    if(read) {                  // if read
-        res = readSectors(sector, lenX);
-    } else {                    // if write
-        res = writeSectors(sector, lenX);
-    }
-    //--------------------------------
-    if(res) {                                // if everything was OK
-        SendOKstatus();
-    } else {                                // if error
-        devInfo[acsiId].LastStatus    = SCSI_ST_CHECK_CONDITION;
-        devInfo[acsiId].SCSI_SK        = SCSI_E_MediumError;
-        devInfo[acsiId].SCSI_ASC    = SCSI_ASC_NO_ADDITIONAL_SENSE;
-        devInfo[acsiId].SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-
-        dataTrans->setStatus(devInfo[acsiId].LastStatus);    // send status byte, long time-out
-
-        Debug::out(LOG_DEBUG, "Scsi::SCSI_ReadWrite10 - failed, returning status %02x", devInfo[acsiId].LastStatus);
-    }
-}
-//----------------------------------------------
-bool Scsi::readSectors(DWORD sectorNo, DWORD count)
-{
-    bool res;
-
-    if(count > BUFFER_SIZE_SECTORS) {      // more than BUFFER_SIZE_SECTORS of data at once?
-        Debug::out(LOG_ERROR, "Scsi::readSectors -- tried to read more than BUFFER_SIZE_SECTORS at once, fail!");
-        return false;
-    }
-
-    res = dataMedia->readSectors(sectorNo, count, dataBuffer);
-
-    if(!res) {
-        return false;
-    }
-
-    DWORD byteCount = count * 512;
-    dataTrans->addDataBfr(dataBuffer, byteCount, false);
-
-    return true;
-}
-
-bool Scsi::writeSectors(DWORD sectorNo, DWORD count)
-{
-    bool res;
-
-    if(count > BUFFER_SIZE_SECTORS) {      // more than BUFFER_SIZE_SECTORS of data at once?
-        Debug::out(LOG_ERROR, "Scsi::writeSectors -- tried to write more than BUFFER_SIZE_SECTORS at once, fail!");
-        return false;
-    }
-
-    DWORD byteCount = count * 512;
-    res = dataTrans->recvData(dataBuffer, byteCount);           // get data from Hans
-
-    if(!res) {
-        return false;
-    }
-
-    res = dataMedia->writeSectors(sectorNo, count, dataBuffer); // write to media
-
-    if(!res) {
-        return false;
-    }
-
-    return true;
-}
-
-bool Scsi::compareSectors(DWORD sectorNo, DWORD count)
-{
-    bool res;
-
-    if(count > BUFFER_SIZE_SECTORS) {      // more than BUFFER_SIZE_SECTORS of data at once?
-        Debug::out(LOG_ERROR, "Scsi::compareSectors -- tried to compare more than BUFFER_SIZE_SECTORS at once, fail!");
-        return false;
-    }
-
-    res = dataTrans->recvData(dataBuffer, count);               // get data from Hans
-
-    if(!res) {
-        return false;
-    }
-
-    res = dataMedia->readSectors(sectorNo, count, dataBuffer2); // and get data from media
-
-    if(!res) {
-        return false;
-    }
-
-    DWORD byteCount = count * 512;
-    int iRes = memcmp(dataBuffer, dataBuffer2, byteCount);      // now compare the data
-
-    if(iRes != 0) {                                             // data is different?
-        return false;
-    }
-
-    return true;
-}
-
 bool Scsi::eraseMedia(void)
 {
     bool res;
@@ -1165,17 +839,4 @@ void Scsi::updateTranslatedBootMedia(void)
     }
 
     tranBootMedia.updateBootsectorConfigWithACSIid(idOnBus);
-}
-
-const char * Scsi::SourceTypeStr(int sourceType)
-{
-    switch(sourceType) {
-    case SOURCETYPE_NONE:       return "NONE";
-    case SOURCETYPE_IMAGE:      return "IMAGE";
-    case SOURCETYPE_IMAGE_TRANSLATEDBOOT:   return "TRANSLATEDBOOT";
-    case SOURCETYPE_DEVICE:     return "DEVICE";
-    case SOURCETYPE_SD_CARD:    return "SD_CARD";
-    case SOURCETYPE_TESTMEDIA:  return "TESTMEDIA";
-    default:                    return "*UNKNOWN*";
-    }
 }

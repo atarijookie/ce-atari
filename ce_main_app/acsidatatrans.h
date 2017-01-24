@@ -60,17 +60,23 @@ public:
     void addDataBfr(const void *data, DWORD cnt, bool padToMul16);
 
     void addDataCString(const char *data, bool padToMul16);	// including null terminator
-	
+
     void padDataToMul16(void);
 
     bool recvData(BYTE *data, DWORD cnt);
     void sendDataAndStatus(bool fromRetryModule = false);       // by default it's not a retry
     void sendDataToFd(int fd);
-    
-	void dumpDataOnce(void);
+
+    void dumpDataOnce(void);
 
     DWORD getCount(void);
-    
+
+    bool sendData_start         (DWORD totalDataCount, BYTE scsiStatus);
+    bool sendData_transferBlock (BYTE *pData, DWORD dataCount);
+
+    bool recvData_start         (DWORD totalDataCount);
+    bool recvData_transferBlock (BYTE *pData, DWORD dataCount);
+
 private:
     BYTE    *buffer;
     DWORD   count;

@@ -133,75 +133,17 @@ void AcsiDataTrans::padDataToMul16(void)
 // get data from Hans
 bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 {
-    if(!com) {
-        Debug::out(LOG_ERROR, "AcsiDataTrans::recvData -- no communication object, fail!");
+    bool res;
+
+    dataDirection = DATA_DIRECTION_WRITE;                   // let the higher function know that we've done data write -- 130 048 Bytes
+    res = recvData_start(cnt);                              // first send the command and tell Hans that we need WRITE data
+
+    if(!res) {                                              // failed to start? 
         return false;
     }
 
-    dataDirection = DATA_DIRECTION_WRITE;                   // let the higher function know that we've done data write -- 130 048 Bytes
-
-#if defined(ONPC_HIGHLEVEL)
-    memcpy(data, recvBuffer, cnt);
-    return true;
-#endif
-
-    // first send the command and tell Hans that we need WRITE data
-    BYTE devCommand[COMMAND_SIZE];
-    memset(devCommand, 0, COMMAND_SIZE);
-
-    devCommand[3] = CMD_DATA_WRITE;                         // store command - WRITE
-    devCommand[4] = cnt >> 16;                              // store data size
-    devCommand[5] = cnt >>  8;
-    devCommand[6] = cnt  & 0xff;
-    devCommand[7] = 0xff;                                   // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
-
-	com->txRx(SPI_CS_HANS, COMMAND_SIZE, devCommand, recvBuffer);        // transmit this command
-
-    memset(txBuffer, 0, TX_RX_BUFF_SIZE);                   // nothing to transmit, really...
-	BYTE inBuf[8];
-
-    while(cnt > 0) {
-        // request maximum 512 bytes from host
-        DWORD subCount = (cnt > 512) ? 512 : cnt;
-        cnt -= subCount;
-
-		bool res = com->waitForATN(SPI_CS_HANS, ATN_WRITE_MORE_DATA, 1000, inBuf);	// wait for ATN_WRITE_MORE_DATA
-
-        if(!res) {                                          // this didn't come? fuck!
-			clear(false);								    // clear all the variables - except dataDirection, which will be used for retry
-            return false;
-        }
-
-        com->txRx(SPI_CS_HANS, subCount + 8 - 4, txBuffer, rxBuffer);    // transmit data (size = subCount) + header and footer (size = 8) - already received 4 bytes
-        memcpy(data, rxBuffer + 2, subCount);               // copy just the data, skip sequence number
-
-        data += subCount;                                   // move in the buffer further
-
-        //----------------------
-        // just for dumping the data
-		if(dumpNextData) {
-			Debug::out(LOG_DEBUG, "recvData: %d bytes", subCount);
-			unsigned char *src = rxBuffer + 2;
-
-			for(int i=0; i<16; i++) {
-				char bfr[1024];
-				char *b = &bfr[0];
-
-				for(int j=0; j<32; j++) {
-					int val = (int) *src;
-					src++;
-					sprintf(b, "%02x ", val);
-					b += 3;
-				}
-
-				Debug::out(LOG_DEBUG, "%s", bfr);
-			}
-        }
-        //----------------------
-	}
-
-	dumpNextData = false;
-    return true;
+    res = recvData_transferBlock(data, cnt);                // get data from Hans
+    return res;
 }
 
 void AcsiDataTrans::dumpDataOnce(void)
@@ -318,45 +260,125 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
 	}
 	//---------------------------------------
     // first send the command
+    bool res;
+
+    res = sendData_start(count, status);            // try to start the read data transfer
+
+    if(!res) {
+        return;
+    }
+
+    res = sendData_transferBlock(buffer, count);    // transfer this block
+}
+
+bool AcsiDataTrans::sendData_start(DWORD totalDataCount, BYTE scsiStatus)
+{
+    if(!com) {
+        Debug::out(LOG_ERROR, "AcsiDataTrans::sendData_start -- no communication object, fail");
+        return false;
+    }
+
+    if(totalDataCount > 0xffffff) {
+        Debug::out(LOG_ERROR, "AcsiDataTrans::sendData_start -- trying to send more than 16 MB, fail");
+        return false;
+    }
+
     BYTE devCommand[COMMAND_SIZE];
     memset(devCommand, 0, COMMAND_SIZE);
 
-    devCommand[3] = CMD_DATA_READ;                          // store command
-    devCommand[4] = count >> 16;                            // store data size
-    devCommand[5] = count >>  8;
-    devCommand[6] = count  & 0xff;
-    devCommand[7] = status;                                 // store status
+    devCommand[3] = CMD_DATA_READ;                                  // store command
+    devCommand[4] = totalDataCount >> 16;                           // store data size
+    devCommand[5] = totalDataCount >>  8;
+    devCommand[6] = totalDataCount  & 0xff;
+    devCommand[7] = scsiStatus;                                     // store status
 
-    com->txRx(SPI_CS_HANS, COMMAND_SIZE, devCommand, recvBuffer);        // transmit this command
+    com->txRx(SPI_CS_HANS, COMMAND_SIZE, devCommand, recvBuffer);   // transmit this command
+    return true;
+}
 
-    // then send the data
-    BYTE *dataNow = buffer;
-
+bool AcsiDataTrans::sendData_transferBlock(BYTE *pData, DWORD dataCount)
+{
     txBuffer[0] = 0;
-    txBuffer[1] = CMD_DATA_MARKER;                          // mark the start of data
-	
-	BYTE inBuf[8];
-	
-    if((count & 1) != 0) {                                  // odd number of bytes? make it even, we're sending words...
-        count++;
+    txBuffer[1] = CMD_DATA_MARKER;                                  // mark the start of data
+
+    BYTE inBuf[8];
+
+    if((dataCount & 1) != 0) {                                      // odd number of bytes? make it even, we're sending words...
+        dataCount++;
     }
     
-    while(count > 0) {                                      // while there's something to send
-		bool res = com->waitForATN(SPI_CS_HANS, ATN_READ_MORE_DATA, 1000, inBuf);	// wait for ATN_READ_MORE_DATA
+    while(dataCount > 0) {                                          // while there's something to send
+        bool res = com->waitForATN(SPI_CS_HANS, ATN_READ_MORE_DATA, 1000, inBuf);	// wait for ATN_READ_MORE_DATA
 
-        if(!res) {                                          // this didn't come? fuck!
-			clear();										// clear all the variables
-            return;
+        if(!res) {                                                  // this didn't come? fuck!
+            clear();                                                // clear all the variables
+            return false;
         }
 
-        DWORD cntNow = (count > 512) ? 512 : count;         // max 512 bytes per transfer
-        count -= cntNow;
+        DWORD cntNow = (dataCount > 512) ? 512 : dataCount;         // max 512 bytes per transfer
 
-        memcpy(txBuffer + 2, dataNow, cntNow);              		// copy the data after the header (2 bytes)
+        memcpy(txBuffer + 2, pData, cntNow);                        // copy the data after the header (2 bytes)
         com->txRx(SPI_CS_HANS, cntNow + 4, txBuffer, rxBuffer);     // transmit this buffer with header + terminating zero (WORD)
 
-        dataNow += cntNow;                                  // move the data pointer further
+        pData       += cntNow;                                      // move the data pointer further
+        dataCount   -= cntNow;
     }
+    
+    return true;
+}
+
+bool AcsiDataTrans::recvData_start(DWORD totalDataCount)
+{
+    if(!com) {
+        Debug::out(LOG_ERROR, "AcsiDataTrans::recvData_start() -- no communication object, fail!");
+        return false;
+    }
+
+    if(totalDataCount > 0xffffff) {
+        Debug::out(LOG_ERROR, "AcsiDataTrans::recvData_start() -- trying to send more than 16 MB, fail");
+        return false;
+    }
+
+    dataDirection = DATA_DIRECTION_WRITE;                           // let the higher function know that we've done data write -- 130 048 Bytes
+
+    // first send the command and tell Hans that we need WRITE data
+    BYTE devCommand[COMMAND_SIZE];
+    memset(devCommand, 0, COMMAND_SIZE);
+
+    devCommand[3] = CMD_DATA_WRITE;                                 // store command - WRITE
+    devCommand[4] = totalDataCount >> 16;                           // store data size
+    devCommand[5] = totalDataCount >>  8;
+    devCommand[6] = totalDataCount  & 0xff;
+    devCommand[7] = 0xff;                                           // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
+
+    com->txRx(SPI_CS_HANS, COMMAND_SIZE, devCommand, recvBuffer);   // transmit this command
+    return true;
+}
+
+bool AcsiDataTrans::recvData_transferBlock(BYTE *pData, DWORD dataCount)
+{
+    memset(txBuffer, 0, TX_RX_BUFF_SIZE);                   // nothing to transmit, really...
+    BYTE inBuf[8];
+
+    while(dataCount > 0) {
+        // request maximum 512 bytes from host
+        DWORD subCount = (dataCount > 512) ? 512 : dataCount;
+
+        bool res = com->waitForATN(SPI_CS_HANS, ATN_WRITE_MORE_DATA, 1000, inBuf); // wait for ATN_WRITE_MORE_DATA
+
+        if(!res) {                                          // this didn't come? fuck!
+            clear(false);                                   // clear all the variables - except dataDirection, which will be used for retry
+            return false;
+        }
+
+        com->txRx(SPI_CS_HANS, subCount + 8 - 4, txBuffer, rxBuffer);    // transmit data (size = subCount) + header and footer (size = 8) - already received 4 bytes
+        memcpy(pData, rxBuffer + 2, subCount);              // copy just the data, skip sequence number
+
+        dataCount   -= subCount;                            // decreate the data counter
+        pData       += subCount;                            // move in the buffer further
+    }
+
+    return true;
 }
 
 void AcsiDataTrans::sendStatusAfterWrite(void)

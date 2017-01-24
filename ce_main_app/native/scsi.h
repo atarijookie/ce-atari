@@ -29,6 +29,15 @@
 
 #define TRANSLATEDBOOTMEDIA_FAKEPATH	"TRANSLATED BOOT MEDIA"
 
+#define RW_ERROR_OK                 0
+#define RW_ERROR_FAIL_TOO_BIG       1
+#define RW_ERROR_FAIL_OUT_OF_RANGE  2
+#define RW_ERROR_FAIL_RW_OPERATION  3
+#define RW_ERROR_VERIFY_MISCOMPARE  4
+
+#define SCSI_BUFFER_SIZE             (1024*1024)
+#define BUFFER_SIZE_SECTORS         (SCSI_BUFFER_SIZE / 512)
+
 typedef struct {
     std::string hostPath;                       // specifies host path to image file or device
     int         hostSourceType;                 // type: image or device
@@ -64,22 +73,20 @@ public:
 
     bool attachToHostPath(std::string hostPath, int hostSourceType, int accessType);
     void dettachFromHostPath(std::string hostPath);
-	void detachAll(void);
+    void detachAll(void);
     void detachAllUsbMedia(void);
-	
+
     void processCommand(BYTE *command);
 
-	void setSdCardCapacity(DWORD capInSectors);
-	
     void updateTranslatedBootMedia(void);
 
-	TScsiConf * getDevAttachedMedia(int id) {
-		if(id < 0 || id >= 8) return NULL;
-		if(devInfo[id].attachedMediaIndex < 0) return NULL;
-		return &attachedMedia[devInfo[id].attachedMediaIndex];
-	}
+    TScsiConf * getDevAttachedMedia(int id) {
+        if(id < 0 || id >= 8) return NULL;
+        if(devInfo[id].attachedMediaIndex < 0) return NULL;
+        return &attachedMedia[devInfo[id].attachedMediaIndex];
+    }
 
-	static const char * SourceTypeStr(int sourceType);
+    static const char * SourceTypeStr(int sourceType);
     
 private:
     AcsiDataTrans   *dataTrans;
@@ -101,7 +108,7 @@ private:
     TDevInfo        devInfo[8];
 
 	AcsiIDinfo		acsiIdInfo;
-	
+
     BYTE *cmd;
 
     bool isICDcommand(void);
@@ -112,7 +119,7 @@ private:
 	void SCSI_RequestSense(BYTE lun);
 	void SCSI_FormatUnit(void);
 
-    void SCSI_ReadWrite6(bool read);
+    void SCSI_ReadWrite6(bool readNotWrite);
 
 	void SCSI_Inquiry(BYTE lun);
 	void SCSI_ModeSense6(void);
@@ -130,16 +137,18 @@ private:
 
 	void SCSI_ReadCapacity(void);
 	void ICD7_to_SCSI6(void);
-    void SCSI_ReadWrite10(bool read);
+    void SCSI_ReadWrite10(bool readNotWrite);
 	void SCSI_Verify(void);
 	
 	void showCommand(WORD id, WORD length, WORD errCode);
 
-    bool readSectors(DWORD sectorNo, DWORD count);
-    bool writeSectors(DWORD sectorNo, DWORD count);
-    bool compareSectors(DWORD sectorNo, DWORD count);
-    bool eraseMedia(void);
+    void readWriteGeneric(bool readNotWrite, DWORD startingSector, DWORD sectorCount);
+    void storeSenseAndSendStatus(BYTE status, BYTE senseKey, BYTE additionalSenseCode, BYTE ascq);
 
+    bool readSectors    (DWORD startSectorNo, DWORD sectorCount);
+    bool writeSectors   (DWORD startSectorNo, DWORD sectorCount);
+    bool compareSectors (DWORD startSectorNo, DWORD sectorCount);
+    bool eraseMedia(void);
 
     void loadSettings(void);
 
