@@ -78,8 +78,8 @@ void processScsiLocaly(BYTE justCmd, BYTE isIcd)
 
 void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun)
 {
-    DWORD sector = 0, sectorEnd = 0;
-    WORD lenX = 0;
+    DWORD sectorStart = 0, sectorEnd = 0;
+    WORD  sectorCount = 0;
     BYTE res = 0;
     BYTE handled    = FALSE;
     BYTE wasRead    = FALSE;
@@ -87,67 +87,70 @@ void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun)
 
     // if it's 6 byte RW command
     if(justCmd == SCSI_C_WRITE6 || justCmd == SCSI_C_READ6) {
-        sector  = (cmd[1] & 0x1f);      // get the starting sector
-        sector  = sector << 8;
-        sector |= cmd[2];
-        sector  = sector << 8;
-        sector |= cmd[3];
+        sectorStart  = (cmd[1] & 0x1f);     // get the starting sector
+        sectorStart  = sectorStart << 8;
+        sectorStart |= cmd[2];
+        sectorStart  = sectorStart << 8;
+        sectorStart |= cmd[3];
 
-        lenX = cmd[4];	   	 	   	    // get the # of sectors to read
+        sectorCount = cmd[4];               // get the # of sectors to read
+
+        if(sectorCount == 0) {              // if sector count is zero, it's 256 sectors (shouldn't happen on ST, could happen on TT / Falcon)
+            sectorCount = 256;
+        }
     }
 
     // if it's 10 byte RW command
-    if( justCmd == SCSI_C_WRITE10 || justCmd == SCSI_C_READ10 || 
-        justCmd == SCSI_C_VERIFY) {
-        sector  = cmd[3];               // get the starting sector
-        sector  = sector << 8;
-        sector |= cmd[4];
-        sector  = sector << 8;
-        sector |= cmd[5];
-        sector  = sector << 8;
-        sector |= cmd[6];
+    if( justCmd == SCSI_C_WRITE10 || justCmd == SCSI_C_READ10 || justCmd == SCSI_C_VERIFY) {
+        sectorStart  = cmd[3];              // get the starting sector
+        sectorStart  = sectorStart << 8;
+        sectorStart |= cmd[4];
+        sectorStart  = sectorStart << 8;
+        sectorStart |= cmd[5];
+        sectorStart  = sectorStart << 8;
+        sectorStart |= cmd[6];
 
-        lenX  = cmd[8];	  	   		    // get the # of sectors to read
-        lenX  = lenX << 8;
-        lenX |= cmd[9];
+        sectorCount  = cmd[8];              // get the # of sectors to read
+        sectorCount  = sectorCount << 8;
+        sectorCount |= cmd[9];
     }
 
-    if(lenX != 0) {                     // for read / write / verify with length of more than 0 sectors
-        sectorEnd = sector + ((DWORD)lenX) - 1;                             // calculate ending sector
+    if(sectorCount != 0) {                     // for read / write / verify with length of more than 0 sectors
+        sectorEnd = sectorStart + ((DWORD)sectorCount) - 1;         // calculate ending sector
 
-        if( sector >= sdCard.SCapacity || sectorEnd >= sdCard.SCapacity ) { // are we out of range?
+        if( sectorStart >= sdCard.SCapacity || sectorEnd >= sdCard.SCapacity ) { // are we out of range?
             sdCard.LastStatus   = SCSI_ST_CHECK_CONDITION;
             sdCard.SCSI_SK      = SCSI_E_IllegalRequest;
             sdCard.SCSI_ASC     = SCSI_ASC_LBA_OUT_OF_RANGE;
             sdCard.SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
-            
-            PIO_read(sdCard.LastStatus);                                    // return error
+
+            PIO_read(sdCard.LastStatus);                            // return error
             return;
         }
     }
-    
+
     // for sector read commands
     if(justCmd == SCSI_C_READ6 || justCmd == SCSI_C_READ10) {
-        longTimeout_basedOnSectorCount(lenX);                   // set timeout time based on how many sectors are transfered
+        longTimeout_basedOnSectorCount(sectorCount);                // set timeout time based on how many sectors are transfered
 
-        res = mmcRead_dma(sector, lenX);                        // read data
+        res = mmcRead_dma(sectorStart, sectorCount);                // read data
         handled = TRUE;
         wasRead = TRUE;
 
-        timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);   // after SD access restore short timeout value
+        timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);       // after SD access restore short timeout value
     }
-    
+
     // for sector write commands
     if(justCmd == SCSI_C_WRITE6 || justCmd == SCSI_C_WRITE10) {
-        longTimeout_basedOnSectorCount(lenX);                   // set timeout time based on how many sectors are transfered
+        longTimeout_basedOnSectorCount(sectorCount);                // set timeout time based on how many sectors are transfered
 
-        res = mmcWrite_dma(sector, lenX);                       // write data
+        res = mmcWrite_dma(sectorStart, sectorCount);               // write data
         handled  = TRUE;
         wasWrite = TRUE;
 
-        timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);   // after SD access restore short timeout value
+        timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);       // after SD access restore short timeout value
     }
-    
+
     // return status for read and write command
     if(handled) {                                                   // if it was handled before - read and write command
         if(res==0) {                                                // if everything was OK
@@ -160,24 +163,28 @@ void processScsiRW(BYTE justCmd, BYTE isIcd, BYTE lun)
         }
     }
 
-    if(res != 0 || pioReadFailed) {     // if the result was BAD, or PIO read was BAD
-        if(wasRead) {                   // on failed read, increment this counter
+    if(res != 0 || pioReadFailed) {                                 // if the result was BAD, or PIO read was BAD
+        if(wasRead) {                                               // on failed read, increment this counter
             sdErrorCountRead++;
         }
 
-        if(wasWrite) {                  // on failed write, increment that counter
+        if(wasWrite) {                                              // on failed write, increment that counter
             sdErrorCountWrite++;
         }
     }
 
     // verify command handling
     if(justCmd == SCSI_C_VERIFY) {
-        res = mmcCompareMore(sector, lenX);                         // compare sectors
-        
+        longTimeout_basedOnSectorCount(sectorCount);                // set timeout time based on how many sectors are transfered
+
+        res = mmcCompareMore(sectorStart, sectorCount);             // compare sectors
+
+        timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);       // after SD access restore short timeout value
+
         if(res != 0) {
             sdCard.LastStatus   = SCSI_ST_CHECK_CONDITION;
             sdCard.SCSI_SK      = SCSI_E_Miscompare;
-        
+
             PIO_read(sdCard.LastStatus);                            // send status byte
         } else {
             scsi_sendOKstatus();
@@ -197,14 +204,14 @@ void processScsiOther(BYTE justCmd, BYTE isIcd, BYTE lun)
 
         case SCSI_C_FORMAT_UNIT:        SCSI_FormatUnit();                      return;
         
-       	case SCSI_C_READ_CAPACITY: 		SCSI_ReadCapacity();                    return;
+        case SCSI_C_READ_CAPACITY:      SCSI_ReadCapacity();                    return;
 
-        case SCSI_C_INQUIRY:            
+        case SCSI_C_INQUIRY:
             if(isIcd == TRUE) {
                 ICD7_to_SCSI6();
             }
-            
-            SCSI_Inquiry(lun);                     
+
+            SCSI_Inquiry(lun);
             return;
 
         //----------------------------------------------------
@@ -212,7 +219,7 @@ void processScsiOther(BYTE justCmd, BYTE isIcd, BYTE lun)
             sdCard.LastStatus   = SCSI_ST_CHECK_CONDITION;
             sdCard.SCSI_SK      = SCSI_E_IllegalRequest;
             sdCard.SCSI_ASC     = SCSI_ASC_INVALID_COMMAND_OPERATION_CODE;
-            sdCard.SCSI_ASCQ	= SCSI_ASCQ_NO_ADDITIONAL_SENSE;
+            sdCard.SCSI_ASCQ    = SCSI_ASCQ_NO_ADDITIONAL_SENSE;
 
             PIO_read(sdCard.LastStatus);   // send status byte
             break;
@@ -278,14 +285,14 @@ void scsi_clearTheUnitAttention(void)
 void ICD7_to_SCSI6(void)
 {
     int i;
-    
+
     for(i=0; i<6; i++) {
         cmd[i] = cmd[i + 1];
     }
 }
 
 void SCSI_ReadCapacity(void)
-{	 
+{
     // return disk capacity and sector size
     DWORD cap;
     BYTE hi = 0, midlo = 0, midhi = 0, lo = 0;
@@ -308,12 +315,12 @@ void SCSI_ReadCapacity(void)
     DMA_read(lo);           // Lo
 
     // return sector size
-    DMA_read(0);				 // fixed to 512 B	  
-    DMA_read(0);				 
+    DMA_read(0);            // fixed to 512 B
+    DMA_read(0);
     DMA_read(2);
     DMA_read(0);
 
-    scsi_sendOKstatus();				
+    scsi_sendOKstatus();
 }
 
 // return the last error that occured
@@ -329,7 +336,7 @@ void SCSI_RequestSense(BYTE lun)
     badLunDevice.SCSI_SK    = SCSI_E_IllegalRequest;
     badLunDevice.SCSI_ASC   = SCSI_ASC_LU_NOT_SUPPORTED;
     badLunDevice.SCSI_ASCQ = 0;
-    
+
     // if LUN is zero, use SD card info, if LUN is non-zero, use bad device info
     device = (lun == 0) ? &sdCard : &badLunDevice;
 
@@ -354,11 +361,11 @@ void SCSI_RequestSense(BYTE lun)
             }
             
         DMA_read(val);
-	
+
         if(brStat != E_OK) {                                // if something isn't OK
             return;                                         // quit this
-		}
-	}
+        }
+    }
 
     scsi_sendOKstatus();
 }

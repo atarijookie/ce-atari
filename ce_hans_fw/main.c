@@ -466,17 +466,19 @@ void handleAcsiCommand(void)
         // get the command from ACSI and send it to host
         // IN  STATE: STATE_GET_COMMAND
         // OUT STATE: WAIT_COMMAND_RESPONSE when GOOD, STATE_GET_COMMAND when FAIL
-        if(state == STATE_GET_COMMAND && PIO_gotFirstCmdByte()) {                   // if 1st CMD byte was received
+        if(state == STATE_GET_COMMAND && PIO_gotFirstCmdByte()) {   // if 1st CMD byte was received
             onGetCommand();
         }
-        
+
         // transfer the data - read (to ST)
         // IN  STATE: STATE_DATA_READ
         // OUT STATE: always STATE_GET_COMMAND, but if everything is well, it also does PIO_read()
         if(state == STATE_DATA_READ) {
-            timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
-            
+            longTimeout_basedOnSectorCount(dataCnt >> 9);           // set timeout time based on how many sectors are transfered
+
             onDataRead();
+
+            timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);   // after data transfer restore short timeout value
             break;                                  // at this point it's either success or fail, but we're finished here
         }
 
@@ -484,9 +486,11 @@ void handleAcsiCommand(void)
         // IN  STATE: STATE_DATA_WRITE
         // OUT STATE: STATE_READ_STATUS on success, STATE_GET_COMMAND on FAIL
         if(state == STATE_DATA_WRITE) {
-            timeoutStart();                         // start the timeout timer to give the rest of code full timeout time
-            
+            longTimeout_basedOnSectorCount(dataCnt >> 9);           // set timeout time based on how many sectors are transfered
+
             onDataWrite();
+
+            timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);   // after data transfer restore short timeout value
         }
         
         // this happens after WRITE - wait for status byte, send it to ST (read)
@@ -504,7 +508,7 @@ void handleAcsiCommand(void)
         // OUT STATE: STATE_DATA_WRITE, STATE_DATA_READ, or unchanged
         if(spiDmaIsIdle && shouldProcessCommands) {                                             // SPI DMA: nothing to Tx and nothing to Rx?
             processHostCommands();                                                              // and process all the received commands
-            
+
             shouldProcessCommands = FALSE;                                                      // mark that we don't need to process commands until next time
         }
         

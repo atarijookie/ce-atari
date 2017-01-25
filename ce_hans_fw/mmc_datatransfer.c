@@ -23,9 +23,6 @@ void waitForSpi2Finish(void);
 void stopSpi2Dma(void);
 void waitForSPI2idle(void);
 
-DWORD timeoutTotal;     // sum of counter, which equals to maximum large timeout value
-DWORD timeoutSum;       // current sum of counters
-
 void spi2Dma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr);
 
 #define READ_BYTE_BFR \
@@ -155,21 +152,9 @@ BYTE mmcRead_dma(DWORD sector, WORD count)
 
     spi2Dma_txRx(512, spiTxBuff, 512, rxBuffNow);               // start first transfer
 
-    timeoutSum  = 0;                                            // currently no sum of timer counters
     last        = count - 1;
 
     for(c=0; c<count; c++) {
-        //--------------
-        // star the timeout for this operation, but keep counting the whole timeout value
-        timeoutSum += TIM3->CNT;                                // add current value to sum
-
-        if(timeoutSum >= timeoutTotal) {                        // if we've sumed more than allowed for total timeout, quit with error
-            error = 1;
-            break;
-        }
-
-        timeoutStart();                                         // clear current value, restart timer
-
         //--------------
         // keep sending FW version to notify host that we're alive
         if(mode != MODE_SOLO) {                                 // do this only when we're NOT in solo mode
@@ -281,23 +266,10 @@ BYTE mmcWrite_dma(DWORD sector, WORD count)
     ACSI_DATADIR_WRITE();
     
     error       = 0;
-    timeoutSum  = 0;                            // currently no sum of timer counters
     
     pData = spiRxBuff1;                         // start storing to this buffer
     //--------------
     for(j=0; j<count; j++) {                    // read this many sectors
-        //--------------
-        // star the timeout for this operation, but keep counting the whole timeout value
-        timeoutSum += TIM3->CNT;                // add current value to sum
-
-        if(timeoutSum >= timeoutTotal) {        // if we've sumed more than allowed for total timeout, quit with error
-            error = 1;
-            break;
-        }
-
-        timeoutStart();                         // clear current value, restart timer
-
-        //--------------
         // keep sending FW version to notify host that we're alive
         if(mode != MODE_SOLO) {                         // do this only when we're NOT in solo mode
             if(spiDmaIsIdle && (TIM2->SR & 0x0001)) {   // SPI DMA is idle, and it's time to send FW report
@@ -417,9 +389,12 @@ void longTimeout_basedOnSectorCount(WORD sectorCount)
 {
     DWORD mbCount       = (sectorCount >> 11) + 1;                  // convert sector count into megabytes (rounded up)
     DWORD timeoutSecs   = mbCount       * CMD_TIMEOUT_SECS_PER_MB;  // convert MBs into seconds
-    
-    timeoutTotal        = timeoutSecs   * CMD_TIMEOUT_ONESECOND;    // and convert seconds into TIM3 total counter value
-    timeoutSum          = 0;
+    DWORD timeoutPeriod = timeoutSecs   * CMD_TIMEOUT_ONESECOND;    // and convert seconds into TIM3 total counter value
 
-    timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_ONESECOND);
+    // Now limit the timeout period to 64k, as the timer is 16bit and thus can count only up to 64k.
+    // With 3 seconds per transfered MB, and with 1098 timer ticks per second, this sets the limit to 19 MB maximum transfer size, 
+    // but as the maximum ST RAM is 14 MB, then it should be enough (even though SCSI READ(10), WRITE(10) allow up to 32 MB transfers).
+    timeoutPeriod       = (timeoutPeriod < 0xffff) ? timeoutPeriod : 0xffff;
+
+    timerSetup_cmdTimeoutChangeLength(timeoutPeriod);
 }
