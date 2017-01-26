@@ -104,6 +104,8 @@ private:
 
     BYTE            shitHasHappened;
 
+    bool            sendDataAndStatus_notJustStatus;
+    
     TScsiConf       attachedMedia[MAX_ATTACHED_MEDIA];
     TDevInfo        devInfo[8];
 

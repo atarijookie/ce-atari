@@ -14,13 +14,14 @@
 
 
 // commands sent from host to device
-#define CMD_ACSI_CONFIG					0x10
-#define CMD_DATA_WRITE					0x20
-#define CMD_DATA_READ					0x30
-#define CMD_SEND_STATUS					0x40
+#define CMD_ACSI_CONFIG                 0x10
+#define CMD_DATA_WRITE                  0x20
+#define CMD_DATA_READ_WITH_STATUS       0x30
+#define CMD_SEND_STATUS                 0x40
+#define CMD_DATA_READ_WITHOUT_STATUS    0x50
 #define CMD_FLOPPY_CONFIG               0x70
 #define CMD_FLOPPY_SWITCH               0x80
-#define CMD_DATA_MARKER					0xda
+#define CMD_DATA_MARKER                 0xda
 
 // data direction after command processing
 #define DATA_DIRECTION_UNKNOWN      0
@@ -47,6 +48,9 @@ public:
     void setCommunicationObject(CConSpi *comIn);
     void setRetryObject(RetryModule *retryModule);
 
+    //----------------
+    // following functions are for convenient gathering of data in handling functions, but work only up to ACSI_BUFFER_SIZE which is currently 1 MB
+
     void clear(bool clearAlsoDataDirection=true);
 
     void setStatus(BYTE stat);
@@ -71,11 +75,16 @@ public:
 
     DWORD getCount(void);
 
-    bool sendData_start         (DWORD totalDataCount, BYTE scsiStatus);
+    //----------------
+    // following functions are used for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
+    
+    bool sendData_start         (DWORD totalDataCount, BYTE scsiStatus, bool withStatus);
     bool sendData_transferBlock (BYTE *pData, DWORD dataCount);
 
     bool recvData_start         (DWORD totalDataCount);
     bool recvData_transferBlock (BYTE *pData, DWORD dataCount);
+
+    void sendStatusToHans       (BYTE statusByte);
 
 private:
     BYTE    *buffer;
@@ -94,8 +103,6 @@ private:
     BYTE    rxBuffer[TX_RX_BUFF_SIZE];
 	
 	bool	dumpNextData;
-
-    void sendStatusAfterWrite(void);
 };
 
 #endif // ACSIDATATRANS_H

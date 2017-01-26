@@ -40,7 +40,7 @@ void getCmdLengthFromCmdBytesAcsi(void);
 void getCmdLengthFromCmdBytesScsi(BYTE cmd);
 
 void onGetCommand(void);
-void onDataRead(void);
+void onDataRead(BYTE withStatus);
 void onDataWrite(void);
 void onReadStatus(void);
 
@@ -67,8 +67,9 @@ WORD t1, t2, dt;
 // commands sent from host to device
 #define CMD_ACSI_CONFIG                     0x10
 #define CMD_DATA_WRITE                      0x20
-#define CMD_DATA_READ                       0x30
+#define CMD_DATA_READ_WITH_STATUS           0x30
 #define CMD_SEND_STATUS                     0x40
+#define CMD_DATA_READ_WITHOUT_STATUS        0x50
 #define CMD_FLOPPY_CONFIG                   0x70
 #define CMD_FLOPPY_SWITCH                   0x80
 #define CMD_DATA_MARKER                     0xda
@@ -77,9 +78,10 @@ WORD t1, t2, dt;
 #define STATE_GET_COMMAND                       0
 #define STATE_SEND_COMMAND                      1
 #define STATE_WAIT_COMMAND_RESPONSE             2
-#define STATE_DATA_READ                         3
-#define STATE_DATA_WRITE                        4
-#define STATE_READ_STATUS                       5
+#define STATE_DATA_READ_WITH_STATUS             3
+#define STATE_DATA_READ_WITHOUT_STATUS          4
+#define STATE_DATA_WRITE                        5
+#define STATE_READ_STATUS                       6
 #define STATE_SEND_FW_VER                       10
 
 
@@ -471,12 +473,15 @@ void handleAcsiCommand(void)
         }
 
         // transfer the data - read (to ST)
-        // IN  STATE: STATE_DATA_READ
+        // IN  STATE: STATE_DATA_READ_WITH_STATUS
         // OUT STATE: always STATE_GET_COMMAND, but if everything is well, it also does PIO_read()
-        if(state == STATE_DATA_READ) {
+        // ...or...
+        // IN  STATE: STATE_DATA_READ_WITHOUT_STATUS
+        // OUT STATE: STATE_READ_STATUS on success, STATE_GET_COMMAND on FAIL (just like STATE_DATA_WRITE)
+        if(state == STATE_DATA_READ_WITH_STATUS || state == STATE_DATA_READ_WITHOUT_STATUS) {
             longTimeout_basedOnSectorCount(dataCnt >> 9);           // set timeout time based on how many sectors are transfered
 
-            onDataRead();
+            onDataRead(state == STATE_DATA_READ_WITH_STATUS);
 
             timerSetup_cmdTimeoutChangeLength(CMD_TIMEOUT_SHORT);   // after data transfer restore short timeout value
             break;                                  // at this point it's either success or fail, but we're finished here
@@ -505,7 +510,7 @@ void handleAcsiCommand(void)
 
         // sending and receiving data over SPI using DMA
         // IN  STATE: any
-        // OUT STATE: STATE_DATA_WRITE, STATE_DATA_READ, or unchanged
+        // OUT STATE: STATE_DATA_WRITE, STATE_DATA_READ_WITH_STATUS, STATE_DATA_READ_WITHOUT_STATUS, or unchanged
         if(spiDmaIsIdle && shouldProcessCommands) {                                             // SPI DMA: nothing to Tx and nothing to Rx?
             processHostCommands();                                                              // and process all the received commands
 
@@ -889,7 +894,7 @@ void updateEnabledIDsInSoloMode(void)
    }
 }
 
-void onDataRead(void)
+void onDataRead(BYTE withStatus)
 {
     WORD i, loopCount, l, dataBytesCount;
     BYTE dataMarkerFound;
@@ -898,10 +903,10 @@ void onDataRead(void)
     WORD *pData;
 
     seqNo = 0;
-    state = STATE_GET_COMMAND;                                                          // this will be the next state once this function finishes
+    state = STATE_GET_COMMAND;                                                          // this will be the next state once this function finishes with fail
     
-    // nothing to send? then just quit with status byte
-    if(dataCnt == 0) {                                                                  
+    // nothing to send AND should send status? then just quit with status byte
+    if(dataCnt == 0 && withStatus) {
         PIO_read(statusByte);
         return;
     }
@@ -961,7 +966,10 @@ void onDataRead(void)
 
         if(dataMarkerFound == FALSE) {                      // didn't find the data marker?
             LOG_ERROR(71);
-            PIO_read(SCSI_ST_CHECK_CONDITION);              // send status: CHECK CONDITION and quit
+            
+            if(withStatus) {
+                PIO_read(SCSI_ST_CHECK_CONDITION);          // send status: CHECK CONDITION and quit
+            }
             return;
         }
 
@@ -979,7 +987,12 @@ void onDataRead(void)
         rdBufNow = rdBufNow->next;                          // swap buffers
     }
     
-    PIO_read(statusByte);                                   // send the status to Atari
+    if(withStatus) {                                        // if should send status, then send status and go to STATE_GET_COMMAND
+        state = STATE_GET_COMMAND;
+        PIO_read(statusByte);                               // send the status to Atari
+    } else {                                                // if shouldn't send status here, switch to state STATE_READ_STATUS, which will retrieve status from RPi and send it to ST
+        state = STATE_READ_STATUS;
+    }
 }
 
 BYTE waitForSPIidle(void)
@@ -1399,8 +1412,12 @@ void processHostCommands(void)
                     state = STATE_DATA_WRITE;                       // go into DATA_WRITE state
                     i += 2;
                 break;
-                
-            case CMD_DATA_READ:     
+
+            case CMD_DATA_READ_WITH_STATUS:     
+            case CMD_DATA_READ_WITHOUT_STATUS:
+            {
+                    BYTE whichCommand   = cmdBuffer[i];
+
                     dataCnt             = cmdBuffer[i+1];           // store the count of bytes we should READ - highest and middle byte
                     dataCnt             = dataCnt << 8;
                     dataCnt             |= cmdBuffer[i+2] >> 8;     // lowest byte
@@ -1411,9 +1428,15 @@ void processHostCommands(void)
                         cmdBuffer[i + j] = 0;               
                     }
 
-                    state = STATE_DATA_READ;                        // go into DATA_READ state
+                    if(whichCommand == CMD_DATA_READ_WITH_STATUS) { // CMD_DATA_READ? go into STATE_DATA_READ_WITH_STATUS state
+                        state = STATE_DATA_READ_WITH_STATUS;
+                    } else {                                        // CMD_DATA_READ_WITHOUT_STATUS?
+                        state = STATE_DATA_READ_WITHOUT_STATUS;
+                    }
+
                     i += 2;
                 break;
+            }
         }
     }
 }

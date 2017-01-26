@@ -398,8 +398,8 @@ void Scsi::processCommand(BYTE *command)
 
     int attachedMediaIndex = devInfo[acsiId].attachedMediaIndex;
 
-    if(attachedMediaIndex != -1) {                                                      // if we got media attached to this ACSI ID
-        dataMedia = attachedMedia[ attachedMediaIndex ].dataMedia;                        // get pointer to dataMedia
+    if(attachedMediaIndex != -1) {                                  // if we got media attached to this ACSI ID
+        dataMedia = attachedMedia[ attachedMediaIndex ].dataMedia;  // get pointer to dataMedia
     }
 
     if(dataTrans == 0) {
@@ -407,7 +407,7 @@ void Scsi::processCommand(BYTE *command)
         return;
     }
 
-    dataTrans->clear();                 // clean data transporter before handling
+    dataTrans->clear();                                         // clean data transporter before handling
 
     if(dataMedia == 0) {
         Debug::out(LOG_ERROR, "Scsi::processCommand was called without valid dataMedia, will return error CHECK CONDITION acsiId=%d attachedMediaIndex=%d", acsiId, attachedMediaIndex);
@@ -420,6 +420,8 @@ void Scsi::processCommand(BYTE *command)
     BYTE lun        = isIcd ? (cmd[2] >> 5) : (cmd[1] >>   5);  // get LUN from command
     BYTE justCmd    = isIcd ? (cmd[1]     ) : (cmd[0] & 0x1f);  // get just the command (remove ACSI ID)
 
+    sendDataAndStatus_notJustStatus = true;                     // if this is set, let acsiDataTrans send data and status; if it's false then the data was already sent and we just need to send the status
+    
     if(lun != 0) {      // if LUN is not zero, the command is invalid 
         if(justCmd == SCSI_C_REQUEST_SENSE) {                   // special handling in REQUEST SENSE
             SCSI_RequestSense(lun);
@@ -438,7 +440,11 @@ void Scsi::processCommand(BYTE *command)
         }
     }
 
-    dataTrans->sendDataAndStatus();     // send all the stuff after handling, if we got any
+    if(sendDataAndStatus_notJustStatus) {                           // if this is set, let acsiDataTrans send data and status (like in most of the code)
+        dataTrans->sendDataAndStatus();                             // send all the stuff after handling, if we got any
+    } else {                                                        // if data was already sent (large blocks in readSectors() or writeSectors()), we just need to send the status
+        dataTrans->sendStatusToHans(devInfo[acsiId].LastStatus);
+    }
 }
 
 void Scsi::ProcScsi6(BYTE lun, BYTE justCmd)

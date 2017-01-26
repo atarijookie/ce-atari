@@ -125,21 +125,31 @@ bool Scsi::readSectors(DWORD startSectorNo, DWORD sectorCount)
 {
     bool res;
 
-    Debug::out(LOG_DEBUG, "Scsi::readSectors() - startSectorNo: %d, sectorCount: %d -- will do %d loops", startSectorNo, sectorCount, (sectorCount / BUFFER_SIZE_SECTORS) + 1);
+    Debug::out(LOG_DEBUG, "Scsi::readSectors() - startSectorNo: %x, sectorCount: %x -- will do %d loops", startSectorNo, sectorCount, (sectorCount / BUFFER_SIZE_SECTORS) + 1);
 
+    sendDataAndStatus_notJustStatus = false;                            // we're handling the _start(), _transferBlock() manually, so later we need to send the status manually
+    
     DWORD totalByteCount = sectorCount * 512;
-    res = dataTrans->sendData_start(totalByteCount, SCSI_ST_OK);    // try to start the read data transfer    
+    res = dataTrans->sendData_start(totalByteCount, SCSI_ST_OK, false); // try to start the read data transfer, without status
+
+    if(!res) {
+        Debug::out(LOG_ERROR, "Scsi::readSectors() - sendData_start() failed");
+        return false;
+    }
 
     // now transfer the data in big chunks of BUFFER_SIZE_SECTORS
     while(sectorCount > 0) {
         // maximum transfer size is BUFFER_SIZE_SECTORS, so transfer less or exactly that in loop
-        DWORD sectorCountNow = (sectorCount < BUFFER_SIZE_SECTORS) ? sectorCount : BUFFER_SIZE_SECTORS;
+        DWORD sectorCountNow    = (sectorCount < BUFFER_SIZE_SECTORS) ? sectorCount : BUFFER_SIZE_SECTORS;
+        DWORD byteCountNow      = sectorCountNow * 512;
+
+        Debug::out(LOG_DEBUG, "Scsi::readSectors() - will read sectorCountNow: %x, sectors to go: %x", sectorCountNow, sectorCount - sectorCountNow);
 
         // read sector from media
         res = dataMedia->readSectors(startSectorNo, sectorCountNow, dataBuffer);
 
         if(!res) {
-            Debug::out(LOG_DEBUG, "Scsi::readSectors() - readSectors() failed for startSectorNo: %d, sectorCountNow: %d", startSectorNo, sectorCountNow);
+            Debug::out(LOG_DEBUG, "Scsi::readSectors() - readSectors() failed for startSectorNo: %x, sectorCountNow: %x", startSectorNo, sectorCountNow);
             return false;
         }
 
@@ -148,10 +158,10 @@ bool Scsi::readSectors(DWORD startSectorNo, DWORD sectorCount)
         sectorCount     -= sectorCountNow;
 
         // now transfer this block, which is up to BUFFER_SIZE_SECTORS big
-        DWORD byteCountNow = sectorCountNow * 512;
         dataTrans->sendData_transferBlock(dataBuffer, byteCountNow);
     }
 
+    Debug::out(LOG_DEBUG, "Scsi::readSectors() - done with success");
     return true;
 }
 
@@ -160,7 +170,9 @@ bool Scsi::writeSectors(DWORD startSectorNo, DWORD sectorCount)
 {
     bool res;
 
-    Debug::out(LOG_DEBUG, "Scsi::writeSectors() - startSectorNo: %d, sectorCount: %d -- will do %d loops", startSectorNo, sectorCount, (sectorCount / BUFFER_SIZE_SECTORS) + 1);
+    Debug::out(LOG_DEBUG, "Scsi::writeSectors() - startSectorNo: %x, sectorCount: %x -- will do %d loops", startSectorNo, sectorCount, (sectorCount / BUFFER_SIZE_SECTORS) + 1);
+    
+    sendDataAndStatus_notJustStatus = false;                // we're handling the _start(), _transferBlock() manually, so later we need to send the status manually
 
     DWORD totalByteCount = sectorCount * 512;
     res = dataTrans->recvData_start(totalByteCount);        // try to start the write data transfer    
@@ -175,6 +187,8 @@ bool Scsi::writeSectors(DWORD startSectorNo, DWORD sectorCount)
         // maximum transfer size is BUFFER_SIZE_SECTORS, so transfer less or exactly that in loop
         DWORD sectorCountNow    = (sectorCount < BUFFER_SIZE_SECTORS) ? sectorCount : BUFFER_SIZE_SECTORS;
         DWORD byteCountNow      = sectorCountNow * 512;
+
+        Debug::out(LOG_DEBUG, "Scsi::writeSectors() - will write sectorCountNow: %x, sectors to go: %x", sectorCountNow, sectorCount - sectorCountNow);
 
         // get data from ST
         res = dataTrans->recvData_transferBlock(dataBuffer, byteCountNow);
@@ -196,6 +210,7 @@ bool Scsi::writeSectors(DWORD startSectorNo, DWORD sectorCount)
         sectorCount     -= sectorCountNow;
     }
 
+    Debug::out(LOG_DEBUG, "Scsi::writeSectors() - done with success");
     return true;
 }
 

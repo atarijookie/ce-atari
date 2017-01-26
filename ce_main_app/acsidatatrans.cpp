@@ -196,7 +196,7 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
 
     // for DATA write transmit just the status in a different way (on separate ATN)
     if(dataDirection == DATA_DIRECTION_WRITE) {
-        sendStatusAfterWrite();
+        sendStatusToHans(status);
         return;
     }
 
@@ -262,7 +262,7 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
     // first send the command
     bool res;
 
-    res = sendData_start(count, status);            // try to start the read data transfer
+    res = sendData_start(count, status, true);      // try to start the read data transfer, with status
 
     if(!res) {
         return;
@@ -271,7 +271,7 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
     res = sendData_transferBlock(buffer, count);    // transfer this block
 }
 
-bool AcsiDataTrans::sendData_start(DWORD totalDataCount, BYTE scsiStatus)
+bool AcsiDataTrans::sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool withStatus)
 {
     if(!com) {
         Debug::out(LOG_ERROR, "AcsiDataTrans::sendData_start -- no communication object, fail");
@@ -286,7 +286,7 @@ bool AcsiDataTrans::sendData_start(DWORD totalDataCount, BYTE scsiStatus)
     BYTE devCommand[COMMAND_SIZE];
     memset(devCommand, 0, COMMAND_SIZE);
 
-    devCommand[3] = CMD_DATA_READ;                                  // store command
+    devCommand[3] = withStatus ? CMD_DATA_READ_WITH_STATUS : CMD_DATA_READ_WITHOUT_STATUS;  // store command - with or without status
     devCommand[4] = totalDataCount >> 16;                           // store data size
     devCommand[5] = totalDataCount >>  8;
     devCommand[6] = totalDataCount  & 0xff;
@@ -381,28 +381,28 @@ bool AcsiDataTrans::recvData_transferBlock(BYTE *pData, DWORD dataCount)
     return true;
 }
 
-void AcsiDataTrans::sendStatusAfterWrite(void)
+void AcsiDataTrans::sendStatusToHans(BYTE statusByte)
 {
 #if defined(ONPC_HIGHLEVEL)        
-//    Debug::out(LOG_ERROR, "AcsiDataTrans::sendStatusAfterWrite -- sending status %02x", status);
+//    Debug::out(LOG_ERROR, "AcsiDataTrans::sendStatusToHans -- sending statusByte %02x", statusByte);
 
-    serverSocket_write(&status, 1);
+    serverSocket_write(&statusByte, 1);
 #elif defined(ONPC_NOTHING) 
     // nothing here
 #else
-	BYTE inBuf[8];
-	bool res = com->waitForATN(SPI_CS_HANS, ATN_GET_STATUS, 1000, inBuf);	// wait for ATN_GET_STATUS
+    BYTE inBuf[8];
+    bool res = com->waitForATN(SPI_CS_HANS, ATN_GET_STATUS, 1000, inBuf);   // wait for ATN_GET_STATUS
 
     if(!res) {
-		clear();											// clear all the variables
+        clear();                                            // clear all the variables
         return;
     }
 
     memset(txBuffer, 0, 16);                                // clear the tx buffer
-    txBuffer[1] = CMD_SEND_STATUS;                          // set the command and the status
-    txBuffer[2] = status;
+    txBuffer[1] = CMD_SEND_STATUS;                          // set the command and the statusByte
+    txBuffer[2] = statusByte;
 
-    com->txRx(SPI_CS_HANS, 16 - 8, txBuffer, rxBuffer);		// transmit the status (16 bytes total, but 8 already received)
+    com->txRx(SPI_CS_HANS, 16 - 8, txBuffer, rxBuffer);     // transmit the statusByte (16 bytes total, but 8 already received)
 #endif
 }
 
