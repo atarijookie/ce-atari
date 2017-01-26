@@ -10,8 +10,8 @@
 #include <stdio.h>
 #include <string.h>
 
-//#define DISK_LINKS_PATH     "/dev/disk/by-id"
-#define DISK_LINKS_PATH     "/dev/disk/by-uuid"
+#define DISK_LINKS_PATH_ID   "/dev/disk/by-id"
+#define DISK_LINKS_PATH_UUID "/dev/disk/by-uuid"
 
 class DevFinder {
 public:

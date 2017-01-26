@@ -31,10 +31,12 @@ void DevFinder::lookForDevChanges(void)
 {
 	char linkBuf[PATH_BUFF_SIZE];
 	char devBuf[PATH_BUFF_SIZE];
+    const char * devpath;
 	
 	someDevChanged = false;
+    devpath = shared.mountRawNotTrans ? DISK_LINKS_PATH_ID : DISK_LINKS_PATH_UUID;
 	
-	DIR *dir = opendir(DISK_LINKS_PATH);							// try to open the dir
+	DIR *dir = opendir(devpath);							// try to open the dir
 	
     if(dir == NULL) {                                 				// not found?
         return;
@@ -56,7 +58,7 @@ void DevFinder::lookForDevChanges(void)
 		memset(linkBuf,	0, PATH_BUFF_SIZE);
 		memset(devBuf,	0, PATH_BUFF_SIZE);
 		
-		strcpy(linkBuf, DISK_LINKS_PATH);
+		strcpy(linkBuf, devpath);
 		strcat(linkBuf, HOSTPATH_SEPAR_STRING);
 		strcat(linkBuf, de->d_name);
 		
@@ -106,8 +108,8 @@ void DevFinder::getDevPartitions(std::string devName, std::list<std::string> &pa
 	
 	char linkBuf[PATH_BUFF_SIZE];
 	char devBuf[PATH_BUFF_SIZE];
-	
-	DIR *dir = opendir(DISK_LINKS_PATH);							// try to open the dir
+
+	DIR *dir = opendir(DISK_LINKS_PATH_ID);							// try to open the dir
 	
     if(dir == NULL) {                                 				// not found?
         return;
@@ -127,7 +129,7 @@ void DevFinder::getDevPartitions(std::string devName, std::list<std::string> &pa
 		memset(linkBuf,	0, PATH_BUFF_SIZE);
 		memset(devBuf,	0, PATH_BUFF_SIZE);
 		
-		strcpy(linkBuf, DISK_LINKS_PATH);
+		strcpy(linkBuf, DISK_LINKS_PATH_ID);
 		strcat(linkBuf, HOSTPATH_SEPAR_STRING);
 		strcat(linkBuf, de->d_name);
 		
@@ -297,16 +299,16 @@ bool DevFinder::isAtariPartitionType(char *bfr)
 
 void DevFinder::onDevAttached(std::string devName, bool isAtariDrive)
 {
-	Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached: devName %s", devName.c_str());
+	Debug::out(LOG_DEBUG, "DevFinder::onDevAttached: devName %s", devName.c_str());
 
     pthread_mutex_lock(&shared.mtxScsi);
     pthread_mutex_lock(&shared.mtxTranslated);
    
     if(shared.mountRawNotTrans) {           // attach as raw?
-        Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- should mount USB media as raw, attaching as RAW");
+        Debug::out(LOG_DEBUG, "DevFinder::onDevAttached -- should mount USB media as raw, attaching as RAW");
 		shared.scsi->attachToHostPath(devName, SOURCETYPE_DEVICE, SCSI_ACCESSTYPE_FULL);
     } else {                                // attach as translated?
-        Debug::out(LOG_DEBUG, "CCoreThread::onDevAttached -- should mount USB media as translated, attaching as TRANSLATED");
+        Debug::out(LOG_DEBUG, "DevFinder::onDevAttached -- should mount USB media as translated, attaching as TRANSLATED");
         attachDevAsTranslated(devName);
     }
     

@@ -82,8 +82,10 @@ void *periodicThreadCode(void *ptr)
     if(inotifyFd < 0) {
         Debug::out(LOG_ERROR, "inotify_init() failed");
     } else {
-        wd = inotify_add_watch(inotifyFd, DISK_LINKS_PATH, IN_CREATE|IN_DELETE);
-        if(wd < 0) Debug::out(LOG_ERROR, "inotify_add_watch(%s, IN_CREATE|IN_DELETE) failed", DISK_LINKS_PATH);
+        // TODO : update wd when configuration is changed
+        const char * path = shared.mountRawNotTrans ? DISK_LINKS_PATH_ID : DISK_LINKS_PATH_UUID;
+        wd = inotify_add_watch(inotifyFd, path, IN_CREATE|IN_DELETE);
+        if(wd < 0) Debug::out(LOG_ERROR, "inotify_add_watch(%s, IN_CREATE|IN_DELETE) failed", path);
     }
 
     DevFinder devFinder;
