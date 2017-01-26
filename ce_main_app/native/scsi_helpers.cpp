@@ -110,3 +110,27 @@ const char * Scsi::SourceTypeStr(int sourceType)
         default:                                return "*UNKNOWN*";
     }
 }
+
+const char * Scsi::getCommandName(BYTE cmd)
+{
+    switch(cmd) {
+        case SCSI_C_WRITE6:             return "WRITE(6)";
+        case SCSI_C_READ6:              return "READ(6)";
+        case SCSI_C_MODE_SENSE6:        return "MODE_SENSE";
+        case SCSI_C_START_STOP_UNIT:    return "START_STOP_UNIT";
+        case SCSI_C_FORMAT_UNIT:        return "FORMAT_UNIT";
+        case SCSI_C_INQUIRY:            return "INQUIRY";
+        case SCSI_C_REQUEST_SENSE:      return "REQUEST_SENSE";
+        case SCSI_C_TEST_UNIT_READY:    return "TEST_UNIT_READY";
+        case SCSI_C_SEND_DIAGNOSTIC:    return "SEND_DIAGNOSTIC";
+        case SCSI_C_RESERVE:            return "RESERVE";
+        case SCSI_C_RELEASE:            return "RELEASE";
+        case SCSI_C_WRITE10:            return "WRITE(10)";
+        case SCSI_C_READ10:             return "READ(10)";
+        case SCSI_C_WRITE_LONG:         return "WRITE_LONG";
+        case SCSI_C_READ_LONG:          return "READ_LONG";
+        case SCSI_C_READ_CAPACITY:      return "READ_CAPACITY";
+        case SCSI_C_VERIFY:             return "VERIFY";
+        default:                        return "UNKNOWN";
+    }
+}

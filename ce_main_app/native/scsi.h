@@ -162,6 +162,8 @@ private:
     void detachMediaFromACSIidByIndex(int index);
 
     void initializeAttachedMediaVars(int index);
+    
+    const char *getCommandName(BYTE cmd);
 };
 
 #endif
