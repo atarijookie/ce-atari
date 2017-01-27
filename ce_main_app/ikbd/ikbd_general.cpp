@@ -166,7 +166,8 @@ void *ikbdThreadCode(void *ptr)
                         logDebugAndIkbd(LOG_ERROR, "ikbdThreadCode() read(%d) : %s", fd, strerror(errno));
                     }
                 } else if( res==0 ) {                                           // on error, skip the rest
-                    logDebugAndIkbd(LOG_ERROR, "ikbdThreadCode() read(%d) returned 0", fd);
+                    logDebugAndIkbd(LOG_ERROR, "ikbdThreadCode() read(%d) returned 0 (EOF) closing %d", fd, i);
+                    ikbd.deinitDev(i);
                 } else {
                     switch(i) {
                     case INTYPE_VDEVMOUSE:
