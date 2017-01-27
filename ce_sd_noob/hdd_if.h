@@ -51,7 +51,7 @@ typedef struct {
     BYTE                scsiHostId;
 } THDif;
 
-extern THDif hdIf;
+extern THDif *hdIf;
 
 //--------------------------------
 #define IF_NONE         0
