@@ -1,4 +1,4 @@
-TARGET     = tst_stng.prg
+TARGET     = tst_stng.tos
 SERVER     = test_server
 
 # control verbosity. use make V=1 to show commands

@@ -22,6 +22,7 @@ DRIVERS = configdrive/drivers/ce_cast.prg \
 
 TESTS = configdrive/tests/ce_tstfd.tos \
 	configdrive/tests/ce_tsthd.tos \
+	configdrive/tests/tst_stng.tos \
 	configdrive/tests/tst_fsys.tos
 
 OTHERS = configdrive/readme.txt
@@ -168,6 +169,10 @@ configdrive/tests/ce_tstfd.tos:	../test_floppy/ce_tstfd.tos
 	$(CP) $< $@
 
 configdrive/tests/ce_tsthd.tos:	../test_acsi/ce_tsthd.tos
+	mkdir -p configdrive/tests
+	$(CP) $< $@
+
+configdrive/tests/tst_stng.tos: ../test_sting/tst_stng.tos
 	mkdir -p configdrive/tests
 	$(CP) $< $@
 
