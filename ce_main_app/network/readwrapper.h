@@ -1,3 +1,4 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #ifndef _READWRAPPER_H_
 #define _READWRAPPER_H_
 
@@ -58,4 +59,3 @@ private:
 };
 
 #endif
-

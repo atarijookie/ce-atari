@@ -1,5 +1,11 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #ifndef _ICMP_H_
 #define _ICMP_H_
+
+#include <stdlib.h>
+#include <string.h>
+#include <netinet/ip.h>
+#include <linux/icmp.h>
 
 #include "../utils.h"
 #include "../global.h"
@@ -77,7 +83,7 @@ public:
 
         icmp->checksum = 0;                                                 // first set checksum to zero
         icmp->checksum = checksum((WORD *) icmp, sizeof(struct icmphdr));   // then calculate real checksum and store it
-        
+
         echoId = id;
     }
 
@@ -109,7 +115,7 @@ public:
     struct iphdr*   ip;
     struct icmphdr* icmp;
     BYTE*           data;
-    
+
     WORD            echoId;
 };
 
@@ -147,4 +153,3 @@ private:
 };
 
 #endif
-

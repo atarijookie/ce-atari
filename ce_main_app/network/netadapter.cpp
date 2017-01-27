@@ -6,20 +6,19 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <errno.h>
-#include <arpa/inet.h> 
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <poll.h>
-
-#include <signal.h>
-#include <pthread.h>
-#include <queue>    
 
 #include "../utils.h"
 #include "../global.h"
 #include "../debug.h"
+#include "../acsidatatrans.h"
+#include "../settings.h"
 
 #include "netadapter.h"
 #include "netadapter_commands.h"
@@ -27,52 +26,13 @@
 
 #define REQUIRED_NETADAPTER_VERSION     0x0100
 
+#ifndef MAX
+#define MAX(a,b)    ((a)<(b)?(b):(a))
+#endif
+
 //--------------------------------------------------------
 
-pthread_mutex_t networkThreadMutex = PTHREAD_MUTEX_INITIALIZER;
-std::queue<TNetReq> netReqQueue;
-
 DWORD localIp;
-
-void netReqAdd(TNetReq &tnr)
-{
-	pthread_mutex_lock(&networkThreadMutex);            // try to lock the mutex
-	netReqQueue.push(tnr);                              // add this to queue
-	pthread_mutex_unlock(&networkThreadMutex);          // unlock the mutex
-}
-
-void *networkThreadCode(void *ptr)
-{
-	Debug::out(LOG_DEBUG, "Network thread starting...");
-
-    // The following line is needed to allow root to create raw sockets for ICMP echo... 
-    // The problem with this is it allows only ICMP echo to be done.
-    system("sysctl -w net.ipv4.ping_group_range=\"0 0\" > /dev/null");  
-
-/*
-	while(sigintReceived == 0) {
-        pthread_mutex_lock(&networkThreadMutex);
-
-        pthread_mutex_unlock(&networkThreadMutex);
-        Utils::sleepMs(100); 						    // wait 100 ms and try again
-
-		pthread_mutex_lock(&networkThreadMutex);		// lock the mutex
-
-		if(netReqQueue.size() == 0) {					// nothing to do?
-			pthread_mutex_unlock(&networkThreadMutex);	// unlock the mutex
-			Utils::sleepMs(100); 						// wait 100 ms and try again
-			continue;
-		}
-		
-		TNetReq tnr = netReqQueue.front();		        // get the 'oldest' element from queue
-		netReqQueue.pop();								// and remove it form queue
-		pthread_mutex_unlock(&networkThreadMutex);		// unlock the mutex
-    }
-*/
-
-	Debug::out(LOG_DEBUG, "Network thread terminated.");
-	return 0;
-}
 
 //--------------------------------------------------------
 
@@ -129,9 +89,9 @@ void NetAdapter::processCommand(BYTE *command)
 
     // pCmd[1] & pCmd[2] are 'CE' tag, pCmd[3] is host module ID
     // pCmd[4] will be command, the rest will be params - depending on command type
-    
+
     logFunctionName(pCmd[4]);
-    
+
     switch(pCmd[4]) {
         case NET_CMD_IDENTIFY:              identify();         break;
 
@@ -183,22 +143,22 @@ void NetAdapter::identify(void)
 {
     //--------
     // as this happens on the start of fake STiNG driver, do some clean up from previous driver run
-    
+
     closeAndCleanAll();
     //--------
     dataTrans->addDataBfr("CosmosEx network module", 24, false);   // add 24 bytes which are the identification string
-    
+
     BYTE bfr[10];
     memset(bfr, 0, 8);
     dataTrans->addDataBfr(bfr, 8, false);                                   // add 8 bytes of padding, so the config data would be at offset 32
-    
+
     //---------
     // now comes the config, starting at offset 32
     dataTrans->addDataWord(REQUIRED_NETADAPTER_VERSION);                    // add WORD - protocol version
 
     Utils::getIpAdds(bfr);                          // get IP address for eth0 and wlan0
 
-    if(bfr[0] == 1) {                               // eth0 enabled? add its IP                         
+    if(bfr[0] == 1) {                               // eth0 enabled? add its IP
         dataTrans->addDataBfr(bfr + 1, 4, false);
         localIp = Utils::getDword(bfr + 1);         // store eth0 as local ip
     } else if(bfr[5] == 1) {                        // wlan0 enabled? add its IP
@@ -218,7 +178,7 @@ void NetAdapter::identify(void)
 //----------------------------------------------
 void NetAdapter::closeAndCleanAll(void)
 {
-    pthread_mutex_lock(&networkThreadMutex);        // try to lock the mutex
+//    pthread_mutex_lock(&networkThreadMutex);        // try to lock the mutex
 
     int i;
     for(i=0; i<NET_HANDLES_COUNT; i++) {            // close normal sockets
@@ -226,9 +186,9 @@ void NetAdapter::closeAndCleanAll(void)
         cons[i].cleanIt();
     }
 
-    icmpWrapper.closeAndClean();    
-    
-	pthread_mutex_unlock(&networkThreadMutex);      // unlock the mutex
+    icmpWrapper.closeAndClean();
+
+//	pthread_mutex_unlock(&networkThreadMutex);      // unlock the mutex
 }
 //----------------------------------------------
 void NetAdapter::conOpen(void)
@@ -254,7 +214,7 @@ void NetAdapter::conOpen(void)
     }
 
     int slot = findEmptyConnectionSlot();               // try to find empty slot
-    
+
     if(slot == -1) {
         Debug::out(LOG_DEBUG, "NetAdapter::conOpen - no more free handles");
         dataTrans->setStatus(E_CONNECTFAIL);
@@ -265,7 +225,7 @@ void NetAdapter::conOpen(void)
     DWORD remoteHost        = Utils::getDword(dataBuffer);
     WORD  remotePort        = Utils::getWord (dataBuffer + 4);
     bool  connectNotListen  = (remoteHost != 0);
-        
+
     // type of service (tos) is not used for now, buff_size is used for faking packet size in CNget_NDB()
     WORD  tos           = Utils::getWord (dataBuffer + 6);
     WORD  buff_size     = Utils::getWord (dataBuffer + 8);
@@ -287,19 +247,19 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, DWORD 
 {
     int ires;
     int fd;
-    
+
     if(tcpNotUdp) {     // TCP connection
         fd = socket(AF_INET, SOCK_STREAM, 0);
     } else {            // UDP connection
         fd = socket(AF_INET, SOCK_DGRAM, 0);
     }
-    
+
     if(fd < 0) {        // failed? quit
         Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - socket() failed");
         dataTrans->setStatus(E_CONNECTFAIL);
         return;
     }
-    
+
     if(tcpNotUdp) {                                                 // for TCP sockets
         int flags = fcntl(fd, F_GETFL, 0);                          // get flags
         ires = fcntl(fd, F_SETFL, flags | O_NONBLOCK);              // set it as non-blocking
@@ -308,37 +268,37 @@ void NetAdapter::conOpen_listen(int slot, bool tcpNotUdp, WORD localPort, DWORD 
             Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - setting O_NONBLOCK failed, but continuing");
         }
     }
-    
+
     //------------------
     int optval = 1;
     ires = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(int));
-    
+
     if(ires == -1) {
         Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - setsockopt(SO_REUSEADDR) failed with errno: %d", errno);
     }
     //------------------
-    
+
     // fill the local address info
     struct sockaddr_in local_addr;
-    memset(&local_addr, '0', sizeof(local_addr)); 
+    memset(&local_addr, '0', sizeof(local_addr));
     local_addr.sin_family        = AF_INET;
     local_addr.sin_addr.s_addr   = htonl(INADDR_ANY);
     local_addr.sin_port          = htons(localPort);                    // if localPort is 0, it will bind to random free port
-    
+
     ires = bind(fd, (struct sockaddr*) &local_addr, sizeof(local_addr));    // bind IP & port to this socket
-    
+
     if(ires == -1) {                                                    // if bind failed, quit
         close(fd);
-        
+
         Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - bind() failed with error: %d", errno);
         dataTrans->setStatus(E_CONNECTFAIL);
         return;
     }
-    
+
     listen(fd, 1);                                                      // mark this socket as listening, with queue length of 1
 
     if(localPort == 0) {                                                // should listen on 1st free port?
-        localPort = getLocalPort(fd);   
+        localPort = getLocalPort(fd);
         Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - now listening on first free port %d (hex: 0x%04x, dec: %d, %d)", localPort, localPort, localPort >> 8, localPort & 0xff);
     } else {
         Debug::out(LOG_DEBUG, "NetAdapter::conOpen_listen - now listening on specified port %d (hex: 0x%04x, dec: %d, %d)",  localPort, localPort, localPort >> 8, localPort & 0xff);
@@ -367,16 +327,16 @@ WORD NetAdapter::getLocalPort(int sockFd)
     WORD localPort = 0;
 
     struct sockaddr_in real_addr;
-    memset(&real_addr, '0', sizeof(sockaddr_in)); 
+    memset(&real_addr, '0', sizeof(sockaddr_in));
 
     socklen_t len = (socklen_t) sizeof(real_addr);
     int ires = getsockname(sockFd, (struct sockaddr*) &real_addr, &len);    // try to find out real local port number that was open / used
-    
+
     if(ires == -1) {
         Debug::out(LOG_DEBUG, "NetAdapter::getLocalPort - getsockname() failed with error: %d", errno);
         return 0;
     }
-    
+
     localPort = ntohs(real_addr.sin_port);                          // get the real local port
 
     Debug::out(LOG_DEBUG, "NetAdapter::getLocalPort - getsockname() returned local port: %d", localPort);
@@ -387,7 +347,7 @@ void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD
 {
     int ires;
     int fd;
-    
+
     if(tcpNotUdp) {     // TCP connection
         fd = socket(AF_INET, SOCK_STREAM, 0);
     } else {            // UDP connection
@@ -402,10 +362,10 @@ void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD
 
     // fill the remote host info
     struct sockaddr_in serv_addr;
-    memset(&serv_addr, '0', sizeof(serv_addr)); 
+    memset(&serv_addr, '0', sizeof(serv_addr));
     serv_addr.sin_family        = AF_INET;
     serv_addr.sin_addr.s_addr   = htonl(remoteHost);
-    serv_addr.sin_port          = htons(remotePort); 
+    serv_addr.sin_port          = htons(remotePort);
 
     if(tcpNotUdp) {                                             // for TCP sockets
         int flags = fcntl(fd, F_GETFL, 0);                      // get flags
@@ -417,7 +377,7 @@ void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD
     }
 
     // for TCP - try to connect, for UPD - set the default address where to send data
-    ires = connect(fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr));  
+    ires = connect(fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr));
 
     if(ires < 0 && errno != EINPROGRESS) {      // if connect failed, and it's not EINPROGRESS (because it's O_NONBLOCK)
         close(fd);
@@ -436,11 +396,11 @@ void NetAdapter::conOpen_connect(int slot, bool tcpNotUdp, WORD localPort, DWORD
         conStatus = TSYN_SENT;                  // for non-blocking TCP, this is 'we're trying to connect'
         Debug::out(LOG_DEBUG, "NetAdapter::conOpen_connect() - non-blocking TCP is connecting, going to TSYN_SENT status");
     }
-    
+
     if(localPort == 0) {                        // if local port not specified, find out current local port
         localPort = getLocalPort(fd);
     }
-    
+
     TNetConnection *nc = &cons[slot];
     nc->initVars();                             // init vars
 
@@ -515,7 +475,7 @@ void NetAdapter::conSend(void)
     }
 
     bool good = false;                                  // check if trying to do right type of send over right type of connection (TCP over TCP, UDP over UDP)
-    if( (cmdType == NET_CMD_TCP_SEND && cons[slot].type == TCP) || 
+    if( (cmdType == NET_CMD_TCP_SEND && cons[slot].type == TCP) ||
         (cmdType == NET_CMD_UDP_SEND && cons[slot].type == UDP)) {
         good = true;
     }
@@ -550,8 +510,8 @@ void NetAdapter::conSend(void)
     }
 
     Debug::out(LOG_DEBUG, "NetAdapter::conSend() -- sending %d bytes through connection %d (received %d from ST, isOdd: %d)", length, slot, lenRoundUp, isOdd);
-//  Debug::outBfr(pData, length);
-    
+    //Debug::outBfr(dataBuffer, length);
+
     int ires = write(cons[slot].fd, dataBuffer, length);  // try to send the data
 
     if(ires < length) {                                 // if written less than should, fail
@@ -570,17 +530,17 @@ void NetAdapter::conUpdateInfo(void)
     updateCons();                                           // update connections status and bytes to read
 
     int found = 0;
-    
+
     // fill the buffer
     for(i=0; i<NET_HANDLES_COUNT; i++) {                    // store how many bytes we can read from connections
         TNetConnection *ci = &cons[i];
         dataTrans->addDataDword(ci->bytesInSocket);
-        
+
         if(ci->bytesInSocket > 0) {                         // something to read?
             Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo [%d] connection has %d bytes waiting to be read", i, ci->bytesInSocket);
             found++;
         }
-        
+
         if(ci->status != TCLOSED) {                         // not closed?
             Debug::out(LOG_DEBUG, "NetAdapter::conUpdateInfo [%d] - status: %d, localPort: %d, remote: %08x:%d, bytesInSocket: %d", i, ci->status, ci->localPort, ntohl(ci->remote_adr.sin_addr.s_addr), ntohs(ci->remote_adr.sin_port), ci->bytesInSocket);
         }
@@ -630,7 +590,7 @@ void NetAdapter::icmpSend(void)
     int   icmpType  = cmd[9] >> 3;                                  // get ICMP type
     int   icmpCode  = cmd[9] & 0x07;                                // get ICMP code
     WORD  length    = Utils::getWord(cmd + 10);                     // get length of data to be sent
-    
+
     bool res = dataTrans->recvData(dataBuffer, length);             // get data from Hans
 
     if(!res) {                                                      // failed to get data? internal error!
@@ -651,13 +611,13 @@ void NetAdapter::icmpSend(void)
 //----------------------------------------------
 void NetAdapter::icmpGetDgrams(void)
 {
-    pthread_mutex_lock(&networkThreadMutex);
+    //pthread_mutex_lock(&networkThreadMutex);
 
     icmpWrapper.receiveAll();
-    DWORD icmpByteCount = icmpWrapper.calcDataByteCountTotal();    
+    DWORD icmpByteCount = icmpWrapper.calcDataByteCountTotal();
 
     if(icmpByteCount <= 0) {                                        // nothing to read? quit, no data
-        pthread_mutex_unlock(&networkThreadMutex);
+        //pthread_mutex_unlock(&networkThreadMutex);
 
         Debug::out(LOG_DEBUG, "NetAdapter::icmpGetDgrams -- no data, quit");
         dataTrans->setStatus(E_NODATA);
@@ -685,21 +645,21 @@ void NetAdapter::icmpGetDgrams(void)
 
         dataTrans->addDataWord(d->count);                           // add size of this dgram
         dataTrans->addDataBfr(d->data, d->count, false);   // add the dgram
-        
+
         Debug::out(LOG_DEBUG, "NetAdapter::icmpGetDgrams -- stored Dgram of length %d", d->count);
-        
+
         d->clear();                                                 // empty it
-    }   
+    }
 
     dataTrans->addDataWord(0);                                      // terminate with a zero, that means no other DGRAM
     dataTrans->padDataToMul16();                                    // pad to multiple of 16
     dataTrans->setStatus(E_NORMAL);
 
-    pthread_mutex_unlock(&networkThreadMutex);
+    //pthread_mutex_unlock(&networkThreadMutex);
 }
 //----------------------------------------------
 void NetAdapter::resolveStart(void)
-{    
+{
     bool res = dataTrans->recvData(dataBuffer, 512);    // get data from Hans
 
     if(!res) {                                          // failed to get data? internal error!
@@ -718,25 +678,25 @@ void NetAdapter::resolveStart(void)
         dataTrans->setStatus(E_CANTRESOLVE);
         return;
     }
-    
+
     bool foundNormalChar = false;
     for(i=0; i<len; i++) {      // find any normal alpha numeric char
-        
+
         if(isalnum((char) dataBuffer[i])) {
             foundNormalChar = true;
         }
     }
-    
+
     if(!foundNormalChar) {      // no normal char? fail
         Debug::out(LOG_DEBUG, "NetAdapter::resolveStart - host name doesn't contain any normal character");
         dataTrans->setStatus(E_CANTRESOLVE);
         return;
     }
-    
+
     //-------------------
-    
+
     Debug::out(LOG_DEBUG, "NetAdapter::resolveStart - will resolve: %s", dataBuffer);
-    
+
     int resolverHandle = resolver.addRequest((char *) dataBuffer);      // this is the input string param (the name)
     dataTrans->setStatus(resolverHandle);                               // return handle
 }
@@ -749,9 +709,9 @@ void NetAdapter::resolveGetResp(void)
         dataTrans->setStatus(E_PARAMETER);
         return;
     }
-    
+
     bool resolveDone = resolver.checkAndhandleSlot(index);      // check if resolved finished
-    
+
     if(!resolveDone) {                                  // if the resolve command didn't finish yet
         Debug::out(LOG_DEBUG, "NetAdapter::resolveGetResp -- the resolved didn't finish yet for slot %d", index);
         dataTrans->setStatus(RES_DIDNT_FINISH_YET);     // return this special status
@@ -759,7 +719,7 @@ void NetAdapter::resolveGetResp(void)
     }
 
     Tresolv *r = &resolver.requests[index];
-    
+
     // if resolve did finish
     BYTE empty[256];
     memset(empty, 0, 256);
@@ -774,7 +734,7 @@ void NetAdapter::resolveGetResp(void)
     dataTrans->addDataBfr(r->data, 4 * r->count, true);            // now store all the resolved data, and pad to multiple of 16
 
     Debug::out(LOG_DEBUG, "NetAdapter::resolveGetResp -- returned %d IPs", r->count);
-    
+
     resolver.clearSlot(index);                                              // clear the slot for next usage
     dataTrans->setStatus(E_NORMAL);
 }
@@ -797,16 +757,16 @@ void NetAdapter::updateCons(void)
 {
     int i;
 
-    for(i=0; i<NET_HANDLES_COUNT; i++) {            // update connection info                
+    for(i=0; i<NET_HANDLES_COUNT; i++) {            // update connection info
         if(cons[i].isClosed()) {                    // if connection closed, skip it
             continue;
         }
 
-        if(cons[i].activeNotPassive) {              // active? 
+        if(cons[i].activeNotPassive) {              // active?
             updateCons_active(i);
         } else {                                    // passive?
             updateCons_passive(i);
-        }      
+        }
     }
 }
 
@@ -819,51 +779,51 @@ void NetAdapter::updateCons_passive(int i)
 
     TNetConnection *nc = &cons[i];
 
-    if(nc->fd == -1 && nc->listenFd != -1) {                                // got listening socket, but not normal socket? 
+    if(nc->fd == -1 && nc->listenFd != -1) {                                // got listening socket, but not normal socket?
         struct sockaddr_storage remoteAddress;                              // this struct will receive the remote address if accept() succeeds
         socklen_t               addrSize;
         addrSize = sizeof(sockaddr);
         memset(&remoteAddress, 0, addrSize);
-        
+
         int fd = accept(nc->listenFd, (struct sockaddr*) &remoteAddress, &addrSize);    // try to accept
-        
+
         if(fd == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {         // failed, because nothing waiting? quit
             return;
         }
 
         Debug::out(LOG_DEBUG, "NetAdapter::updateCons_passive() -- connection %d - accept() succeeded, client connected", i);
 
-        //----------     
+        //----------
         setKeepAliveOptions(fd);                                // configure keep alive
 
         // ok, got the connection, store file descriptor and new state
         nc->fd      = fd;
         nc->status  = TESTABLISH;
-        
+
         nc->readWrapper.init(fd, nc->type, nc->buff_size);
 
         // also store the remote address that just connected to us
         if (remoteAddress.ss_family == AF_INET) {               // if it's IPv4
             struct sockaddr_in *s = (struct sockaddr_in *) &remoteAddress;
-        
+
             nc->remote_adr.sin_addr.s_addr  = s->sin_addr.s_addr;
             nc->remote_adr.sin_port         = s->sin_port;
 
             Debug::out(LOG_DEBUG, "NetAdapter::updateCons_passive() -- connection %d - got IP & port of remote host", i);
         }
-        
+
         return;
     }
-    
+
     if(nc->fd != -1) {
         nc->bytesInSocket = nc->readWrapper.getCount();         // try to get how many bytes can be read
         Debug::out(LOG_DEBUG, "NetAdapter::updateCons_passive(%d) -- bytesInSocket: %d, status: %d", i, nc->bytesInSocket, nc->status);
     }
-    
+
     // ok, so we have both sockets? did the data socket HUP?
     if(didSocketHangUp(i)) {
         Debug::out(LOG_DEBUG, "NetAdapter::updateCons_passive() -- connection %d - poll returned POLLRDHUP, so closing", i);
-    
+
         nc->status = TCLOSED;       // mark the state as TCLOSED
         nc->closeIt();
     }
@@ -879,10 +839,10 @@ void NetAdapter::updateCons_active(int i)
     // update how many bytes we can read from this sock
     nc->bytesInSocket = nc->readWrapper.getCount();         // try to get how many bytes can be read
     Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active(%d) -- bytesInSocket: %d, status: %d", i, nc->bytesInSocket, nc->status);
-    
+
     //---------
     // if it's not TCP connection, just pretend the state is 'connected' - it's only used for TCP connections, so it doesn't matter
-    if(nc->type != TCP) {    
+    if(nc->type != TCP) {
         Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- non-TCP connection %d -- now TESTABLISH", i);
         nc->status = TESTABLISH;
         return;
@@ -890,41 +850,41 @@ void NetAdapter::updateCons_active(int i)
 
     //---------
     // update connection status of TCP socket
-    
+
     if(nc->status == TSYN_SENT) {               // if this is TCP connection and it's in the 'connecting' state
         res = connect(nc->fd, (struct sockaddr *) &nc->remote_adr, sizeof(nc->remote_adr));   // try to connect again
 
         if(res < 0) {                           // error occured on connect, check what it was
             switch(errno) {
                 case EISCONN:
-                case EALREADY:      nc->status = TESTABLISH;    
+                case EALREADY:      nc->status = TESTABLISH;
                                     Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d is now TESTABLISH", i);
                                     break;  // ok, we're connected!
-                                    
-                case EINPROGRESS:   nc->status = TSYN_SENT;     
+
+                case EINPROGRESS:   nc->status = TSYN_SENT;
                                     Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d is now TSYN_SENT", i);
                                     break;  // still trying to connect
 
                  // on failures
                 case ETIMEDOUT:
                 case ENETUNREACH:
-                case ECONNREFUSED:  nc->status = TCLOSED;       
+                case ECONNREFUSED:  nc->status = TCLOSED;
                                     nc->closeIt();
                                     Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d is now TCLOSED", i);
                                     break;
-                                    
+
                 default:
                                     Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connect() returned error %d", errno);
                                     break;
             }
-        } else if(res == 0) {                   // no error occured? 
+        } else if(res == 0) {                   // no error occured?
             nc->status = TESTABLISH;
             Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d is now TESTABLISH - because no error", i);
         }
     } else {                                            // not connecting state? try to find out the state
         if(didSocketHangUp(i)) {
             Debug::out(LOG_DEBUG, "NetAdapter::updateCons_active() -- connection %d - poll returned POLLRDHUP, so closing", i);
-    
+
             nc->status = TCLOSED;   // mark the state as TCLOSED
             nc->closeIt();
         }
@@ -938,7 +898,7 @@ void NetAdapter::setKeepAliveOptions(int fd)
     setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &keepAliveEnabled, sizeof(int));
 
     // seting params of keepalive
-    int keepcnt     = 5;    // The maximum number of keepalive probes TCP should send before dropping the connection. 
+    int keepcnt     = 5;    // The maximum number of keepalive probes TCP should send before dropping the connection.
     int keepidle    = 30;   // The time (in seconds) the connection needs to remain idle before TCP starts sending keepalive probes
     int keepintvl   = 60;   // The time (in seconds) between individual keepalive probes.
 
@@ -999,6 +959,7 @@ void NetAdapter::conGetCharBuffer(void)
 
     Debug::out(LOG_DEBUG, "NetAdapter::conGetCharBuffer() [%d] will return buffer of %d bytes", slot, gotBytes);
     if(gotBytes > 0) {
+        //Debug::outBfr(dataBuffer, gotBytes);
         dataTrans->addDataBfr(dataBuffer, gotBytes, true);  // add that char buffer to data buffer, pad to mul 16
     }  else {
         // return a few 0's to pad transmission
@@ -1034,6 +995,7 @@ void NetAdapter::conGetNdb(void)
         int ndbSize = nc->readWrapper.getNdb(dataBuffer);   // read data from socket (wrapper)
 
         Debug::out(LOG_DEBUG, "NetAdapter::conGetNdb() -- returning NDB data, size %d bytes", ndbSize);
+        //Debug::outBfr(dataBuffer, ndbSize);
 
         dataTrans->addDataBfr(dataBuffer, ndbSize, true);   // add data buffer, pad to mul 16
         dataTrans->setStatus(E_NORMAL);
@@ -1091,8 +1053,9 @@ void NetAdapter::conGetBlock(void)
     nc->readWrapper.peekBlock(dataBuffer, wantedLength);    // peek   data from socket
     nc->readWrapper.removeBlock(wantedLength);              // remove data from socket
 
+    //Debug::outBfr(dataBuffer, wantedLength);
     dataTrans->addDataBfr(dataBuffer, wantedLength, true);  // add data buffer, pad to mul 16
-    dataTrans->setStatus(E_NORMAL);    
+    dataTrans->setStatus(E_NORMAL);
 }
 
 void NetAdapter::conGetString(void)
@@ -1100,7 +1063,7 @@ void NetAdapter::conGetString(void)
     // Long command
     // cmd[4] = NET_CMD_CNGETS
 
-    int handle      = cmd[5];                       // cmd[6]      - handle    
+    int handle      = cmd[5];                       // cmd[6]      - handle
     int maxLength   = Utils::getWord(cmd + 6);      // cmd[7 .. 8] - max length
     BYTE delim      = cmd[8];                       // cmd[9]      - string delimiter / terminator
 
@@ -1122,7 +1085,7 @@ void NetAdapter::conGetString(void)
     int streamLength    = nc->readWrapper.getCount();       // find out how many bytes we have
 
     nc->readWrapper.peekBlock(dataBuffer, streamLength);    // peek the whole stream
-    
+
     int i, foundIndex = -1;
     for(i=0; i<streamLength; i++) {                         // now search the whole stream for the delimiter
         if(dataBuffer[i] == delim) {
@@ -1149,14 +1112,14 @@ void NetAdapter::conGetString(void)
     Debug::out(LOG_DEBUG, "NetAdapter::conGetString() -- delimiter found at index %d, returning string '%s'", foundIndex, dataBuffer);
 
     nc->readWrapper.removeBlock(foundIndex + 1);            // remove the string from stream (and remove the delimiter)
-    dataTrans->setStatus(E_NORMAL);    
+    dataTrans->setStatus(E_NORMAL);
 }
 
 //----------------------------------------------
-void NetAdapter::logFunctionName(BYTE cmd) 
+void NetAdapter::logFunctionName(BYTE cmd)
 {
     switch(cmd){
-        case NET_CMD_IDENTIFY:              
+        case NET_CMD_IDENTIFY:
 
         // TCP functions
         case NET_CMD_TCP_OPEN:              Debug::out(LOG_DEBUG, "NET_CMD_TCP_OPEN");              break;
@@ -1195,10 +1158,7 @@ void NetAdapter::logFunctionName(BYTE cmd)
         case NET_CMD_OFF_PORT:              Debug::out(LOG_DEBUG, "NET_CMD_OFF_PORT");              break;
         case NET_CMD_QUERY_PORT:            Debug::out(LOG_DEBUG, "NET_CMD_QUERY_PORT");            break;
         case NET_CMD_CNTRL_PORT:            Debug::out(LOG_DEBUG, "NET_CMD_CNTRL_PORT");            break;
-        
+
         default:                            Debug::out(LOG_DEBUG, "NET_CMD - unknown command!");    break;
     }
 }
-
-
-

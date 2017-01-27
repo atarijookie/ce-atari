@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <sys/select.h>
 #include <sys/inotify.h>
+#include <sys/ioctl.h>
 #include <limits.h>
 #include <errno.h>
 

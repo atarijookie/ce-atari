@@ -8,6 +8,7 @@
 #include <queue>
 #include <pty.h>
 #include <sys/file.h>
+#include <errno.h>
  
 #include "config/configstream.h"
 #include "settings.h"
@@ -21,7 +22,6 @@
 #include "update.h"
 #include "version.h"
 #include "ce_conf_on_rpi.h"
-#include "network/netadapter.h"
 #include "periodicthread.h"
 
 #include "webserver/webserver.h"
@@ -70,7 +70,6 @@ int main(int argc, char *argv[])
     pthread_t	ikbdThreadInfo;
 #endif
     pthread_t	floppyEncThreadInfo;
-    pthread_t   networkThreadInfo;
     pthread_t   periodicThreadInfo;
 
     pthread_mutex_init(&shared.mtxScsi,             NULL);
@@ -244,9 +243,6 @@ int main(int argc, char *argv[])
     res = pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL);	// create the floppy encoding thread and run it
 	handlePthreadCreate(res, "ce floppy encode", &floppyEncThreadInfo);
 
-    res = pthread_create(&networkThreadInfo, NULL, networkThreadCode, NULL);    // create the network thread and run it
-	handlePthreadCreate(res, "ce network", &networkThreadInfo);
-
     res = pthread_create(&periodicThreadInfo, NULL, periodicThreadCode, NULL);  // create the periodic thread and run it
 	handlePthreadCreate(res, "periodic", &periodicThreadInfo);
     
@@ -298,9 +294,6 @@ int main(int argc, char *argv[])
     printf("Stoping floppy encoder thread\n");
     ImageSilo::stop();
     pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes
-
-    printf("Stoping network thread\n");
-    pthread_join(networkThreadInfo, NULL);              // wait until network   thread finishes
 
     printf("Stoping periodic thread\n");
 	pthread_kill(periodicThreadInfo, SIGINT);               // stop the select()

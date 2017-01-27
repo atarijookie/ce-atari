@@ -1,29 +1,17 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #ifndef _NETADAPTER_H_
 #define _NETADAPTER_H_
 
-#include <stdlib.h>
-#include <string>
-#include <string.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <linux/icmp.h>
 #include <unistd.h>
 
-#include "../acsidatatrans.h"
-#include "../settings.h"
-#include "../datatypes.h"
 #include "../isettingsuser.h"
 #include "resolver.h"
 #include "readwrapper.h"
 #include "icmpwrapper.h"
 
 #include "sting.h"
+
+class AcsiDataTrans;
 
 #define NET_HANDLES_COUNT       32
 #define NET_STARTING_HANDLE     0x50
@@ -49,11 +37,6 @@ typedef struct {
 } TNetReq;
 
 //-------------------------------------
-
-extern "C" {
-	void netReqAdd(TNetReq &tnr);
-	void *networkThreadCode(void *ptr);
-}
 
 class TNetConnection
 {
