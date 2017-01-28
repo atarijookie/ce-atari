@@ -28,7 +28,6 @@
 #include "mounter.h"
 #include "downloader.h"
 #include "update.h"
-#include "config/netsettings.h"
 #include "ce_conf_on_rpi.h"
 
 #include "devfinder.h"
@@ -103,10 +102,6 @@ void *periodicThreadCode(void *ptr)
         wait = 10*1000; // max 10 sec ?
 
         now = Utils::getCurrentMs();
-
-        //------------------------------------
-        // check client command timestamp (we don't really care how often its done)
-        shared.clientConnected = (now - shared.configStream.acsi->getLastCmdTimestamp() <= 2000);
 
         //------------------------------------
         // should we do something related to devFinder?
