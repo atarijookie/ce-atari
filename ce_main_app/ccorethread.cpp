@@ -26,6 +26,8 @@
 #include "service/floppyservice.h"
 #include "service/screencastservice.h"
 
+#include "mediastreaming/mediastreaming.h"
+
 #include "periodicthread.h"
 
 #if defined(ONPC_HIGHLEVEL)
@@ -119,6 +121,7 @@ CCoreThread::~CCoreThread()
     delete dataTrans;
     delete retryMod;
     
+    MediaStreaming::deleteInstance();
     sharedObjects_destroy();
 }
 
@@ -567,7 +570,7 @@ void CCoreThread::handleAcsiCommand(void)
 
         case HOSTMOD_MEDIA_STREAMING:
             wasHandled = true;
-            mediaStreaming.processCommand(pCmd, dataTrans);
+            MediaStreaming::getInstance()->processCommand(pCmd, dataTrans);
             break;
         }
     }

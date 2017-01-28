@@ -11,6 +11,8 @@
 #include "translated/translateddisk.h"
 #include <string>
 
+MediaStreaming * MediaStreaming::instance = NULL;
+
 // MediaStream implementation
 MediaStream::MediaStream(void)
 : f(NULL)
@@ -119,6 +121,19 @@ MediaStreaming::MediaStreaming(void)
 MediaStreaming::~MediaStreaming()
 {
 	// destructor
+}
+
+MediaStreaming * MediaStreaming::getInstance(void)
+{
+    if(!instance)
+        instance = new MediaStreaming();
+    return instance;
+}
+
+void MediaStreaming::deleteInstance(void)
+{
+    delete instance;
+    instance = NULL;
 }
 
 void MediaStreaming::processCommand(BYTE *command, AcsiDataTrans *dataTrans)
@@ -333,4 +348,3 @@ void MediaStreaming::getStreamInfo(BYTE streamHandle, AcsiDataTrans *dataTrans)
 	dataTrans->addZerosUntilSize(512);
 	dataTrans->setStatus(MEDIASTREAMING_OK);
 }
-
