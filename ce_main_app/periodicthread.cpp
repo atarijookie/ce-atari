@@ -107,14 +107,15 @@ void *periodicThreadCode(void *ptr)
         // should we do something related to devFinder?
         if(shared.devFinder_detachAndLook || shared.devFinder_look) {   // detach devices & look for them again, or just look for them?
             if(shared.devFinder_detachAndLook) {                    // if should also detach, do it
+                TranslatedDisk * translated = TranslatedDisk::getInstance();
                 pthread_mutex_lock(&shared.mtxScsi);
-                pthread_mutex_lock(&shared.mtxTranslated);
+                if(translated) translated->mutexLock();
 
-                shared.translated->detachAllUsbMedia();             // detach all translated USB media
+                if(translated) translated->detachAllUsbMedia();             // detach all translated USB media
                 shared.scsi->detachAllUsbMedia();                   // detach all RAW USB media
 
                 pthread_mutex_unlock(&shared.mtxScsi);
-                pthread_mutex_unlock(&shared.mtxTranslated);
+                if(translated) translated->mutexUnlock();
             }
 
             // and now try to attach everything back
@@ -218,9 +219,12 @@ void *periodicThreadCode(void *ptr)
             ifaceWatcher.processMsg(&newIfaceUpAndRunning);
             if(newIfaceUpAndRunning) {
                 Debug::out(LOG_DEBUG, "Internet interface comes up: reload network mount settings");
-                pthread_mutex_lock(&shared.mtxTranslated);
-                shared.translated->reloadSettings(SETTINGSUSER_TRANSLATED);
-                pthread_mutex_unlock(&shared.mtxTranslated);
+                TranslatedDisk * translated = TranslatedDisk::getInstance();
+                if(translated) {
+                    translated->mutexLock();
+                    translated->reloadSettings(SETTINGSUSER_TRANSLATED);
+                    translated->mutexUnlock();
+                }
 
                 Debug::out(LOG_DEBUG, "periodicThreadCode -- eth0 or wlan0 changed to up, will now download update list");
                 nextUpdateListDownloadTime = Utils::getEndTime(1000);

@@ -2,7 +2,6 @@
 #ifndef _PERIODICTHREAD_H_
 #define _PERIODICTHREAD_H_
 
-class TranslatedDisk;
 class AcsiDataTrans;
 class Scsi;
 class ConfigStream;
@@ -15,9 +14,6 @@ typedef struct {
 typedef struct {
     Scsi            *scsi;
     pthread_mutex_t mtxScsi;
-
-    TranslatedDisk  *translated;
-    pthread_mutex_t mtxTranslated;
 
     struct {
         ConfigStream    *acsi;

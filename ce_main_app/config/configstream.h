@@ -15,7 +15,6 @@
 #define CONFIGSTREAM_IN_LINUX_CONSOLE   1
 #define CONFIGSTREAM_THROUGH_WEB        2
 
-class TranslatedDisk;
 class AcsiDataTrans;
 
 enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED,
@@ -125,8 +124,6 @@ public:
 
     void enterKeyHandlerLater(int event);
 
-    void setTranslatedDisk(TranslatedDisk *td) { this->translated = td; };
-
     DWORD getLastCmdTimestamp() const {
         return lastCmdTime;
     }
@@ -146,7 +143,6 @@ private:
     
     AcsiDataTrans       *dataTrans;
     SettingsReloadProxy *reloadProxy;
-    TranslatedDisk      *translated;
 
     // private methods
     void onKeyDown(BYTE key);

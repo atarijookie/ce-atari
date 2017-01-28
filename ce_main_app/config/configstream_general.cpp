@@ -1041,6 +1041,7 @@ void ConfigStream::onSetCfgValue(void)
         unsigned int i = 6;
         BYTE type;
         while((type = buffer[i++]) != 0 && i < sizeof(buffer)) {
+            TranslatedDisk * translated = TranslatedDisk::getInstance();
             const char * key = (const char *)buffer + i;
             i += strlen(key) + 1;
             BYTE val_len = buffer[i++];

@@ -1856,8 +1856,8 @@ void ConfigStream::onHddImageSave(void)
     if(path.substr(0, 3) == "usb") {
         std::string subpath = path.substr(3);
         for(int i=MAX_DRIVES-1; i>= 2; i--) {
-            if(shared.translated->driveIsEnabled(i)) {
-                const char * rootpath = shared.translated->driveGetHostPath(i);
+            if(TranslatedDisk::getInstance()->driveIsEnabled(i)) {
+                const char * rootpath = TranslatedDisk::getInstance()->driveGetHostPath(i);
                 if(rootpath) {
                     path = rootpath + subpath;
                     if(stat(path.c_str(), &st) >= 0) {

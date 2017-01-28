@@ -23,7 +23,6 @@ FloppySetup::FloppySetup()
     dataTrans   = NULL;
     up          = NULL;
     imageSilo   = NULL;
-    translated  = NULL;
     reloadProxy = NULL;
 
     currentUpload.fh = NULL;
@@ -51,11 +50,6 @@ void FloppySetup::setAcsiDataTrans(AcsiDataTrans *dt)
 void FloppySetup::setImageSilo(ImageSilo *imgSilo)
 {
     imageSilo = imgSilo;
-}
-
-void FloppySetup::setTranslatedDisk(TranslatedDisk *td)
-{
-    translated = td;
 }
 
 void FloppySetup::processCommand(BYTE *command)
@@ -196,6 +190,7 @@ void FloppySetup::searchMark(void)
 
 void FloppySetup::downloadOnDevice(void)
 {
+	TranslatedDisk * translated = TranslatedDisk::getInstance();
     int index = cmd[5];
 
 	memset(bfr64k, 0, 512);
@@ -342,6 +337,7 @@ void FloppySetup::searchDownload(void)
 
 void FloppySetup::uploadStart(void)
 {
+	TranslatedDisk * translated = TranslatedDisk::getInstance();
     int index = cmd[5];
 
     if(index < 0 || index > 2) {                            // index out of range? fail
@@ -559,6 +555,7 @@ bool FloppySetup::createNewImage(std::string pathAndFile)
 
 void FloppySetup::getNewImageName(char *nameBfr)
 {
+	TranslatedDisk * translated = TranslatedDisk::getInstance();
 	char fileName[24];
 
 	for(int i=0; i<100; i++) {

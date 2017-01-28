@@ -119,9 +119,19 @@ class ZipDirEntry {
 
 class TranslatedDisk: public ISettingsUser
 {
-public:
+private:
+    static TranslatedDisk * instance;
+    static pthread_mutex_t mutex;
     TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs);
     virtual ~TranslatedDisk();
+
+public:
+    static TranslatedDisk * createInstance(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scsi);
+    static TranslatedDisk * getInstance(void);
+    static void deleteInstance(void);
+
+    void mutexLock(void);
+    void mutexUnlock(void);
 
     void processCommand(BYTE *cmd);
 

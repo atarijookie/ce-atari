@@ -36,7 +36,6 @@ public:
 
 	void processCommand(BYTE *command, AcsiDataTrans *dataTrans);
 
-	void setTranslatedDisk(TranslatedDisk *td) { this->translated = td; };
 private:
 	void openStream(AcsiDataTrans *dataTrans);
 	void getStreamInfo(BYTE streamHandle, AcsiDataTrans *dataTrans);
@@ -45,7 +44,6 @@ private:
 
 // properties
 	MediaStream streams[MEDIASTREAMING_MAXSTREAMS];
-	TranslatedDisk *translated;
 };
 
 #endif // MEDIASTREAMING_H
