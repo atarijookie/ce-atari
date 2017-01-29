@@ -420,7 +420,7 @@ void Scsi::processCommand(BYTE *command)
     BYTE lun        = isIcd ? (cmd[2] >> 5) : (cmd[1] >>   5);  // get LUN from command
     BYTE justCmd    = isIcd ? (cmd[1]     ) : (cmd[0] & 0x1f);  // get just the command (remove ACSI ID)
 
-    Debug::out(LOG_ERROR, "Scsi::processCommand -- isIcd: %d, ACSI ID: %d, LUN: %d, CMD: 0x%02x - %s", isIcd, acsiId, lun, justCmd, getCommandName(justCmd));
+    Debug::out(LOG_DEBUG, "Scsi::processCommand -- isIcd: %d, ACSI ID: %d, LUN: %d, CMD: 0x%02x - %s", isIcd, acsiId, lun, justCmd, getCommandName(justCmd));
     
     sendDataAndStatus_notJustStatus = true;                     // if this is set, let acsiDataTrans send data and status; if it's false then the data was already sent and we just need to send the status
     
@@ -443,10 +443,10 @@ void Scsi::processCommand(BYTE *command)
     }
 
     if(sendDataAndStatus_notJustStatus) {                           // if this is set, let acsiDataTrans send data and status (like in most of the code)
-        Debug::out(LOG_ERROR, "Scsi::processCommand -- now the acsiDataTrans will handle transfer to Hans");
+        Debug::out(LOG_DEBUG, "Scsi::processCommand -- now the acsiDataTrans will handle transfer to Hans");
         dataTrans->sendDataAndStatus();                             // send all the stuff after handling, if we got any
     } else {                                                        // if data was already sent (large blocks in readSectors() or writeSectors()), we just need to send the status
-        Debug::out(LOG_ERROR, "Scsi::processCommand -- data was already sent to Hans, just send status (0x%02x) to Hans", devInfo[acsiId].LastStatus);
+        Debug::out(LOG_DEBUG, "Scsi::processCommand -- data was already sent to Hans, just send status (0x%02x) to Hans", devInfo[acsiId].LastStatus);
         dataTrans->sendStatusToHans(devInfo[acsiId].LastStatus);
     }
 }
