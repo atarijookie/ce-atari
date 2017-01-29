@@ -3,10 +3,10 @@
 
 #include "global.h"
 
-BYTE scsi_cmd_TT           (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-BYTE scsi_cmd_Falcon       (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+void scsi_cmd_TT           (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+void scsi_cmd_Falcon       (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 
-typedef BYTE  (*THddIfCmd) (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+typedef void  (*THddIfCmd) (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 typedef void  (*TsetReg)   (int whichReg, DWORD value);
 typedef DWORD (*TgetReg)   (int whichReg);
 
@@ -29,14 +29,25 @@ BYTE dmaDataTx_prepare_Falcon   (BYTE readNotWrite, BYTE *buffer, DWORD dataByte
 BYTE dmaDataTx_do_Falcon        (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
 
 typedef struct {
-    THddIfCmd           cmd;
+    THddIfCmd		    cmd;
+    THddIfCmd		    cmd_nolock;
+    THddIfCmd           cmd_intern;
+
+    BYTE                success;
+    BYTE                statusByte;
+    BYTE                phaseChanged;
+
+    int                 retriesDoneCount;
+    int                 maxRetriesCount;
+
+    BYTE                forceFlock;
 
     TsetReg             pSetReg;
     TgetReg             pGetReg;
 
     TdmaDataTx_prepare  pDmaDataTx_prepare;
     TdmaDataTx_do       pDmaDataTx_do;
-    
+
     BYTE                scsiHostId;
 } THDif;
 

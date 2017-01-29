@@ -91,24 +91,24 @@
 #define WDSR                ((volatile BYTE *)  0xFFFF860F)       // STATUS Register
 
 // Falcon regs for READing
-#define SPCSD           0x88    // SPCSD      - R  Current SCSI Data           
-#define SPICR           0x89    // SPICR      - RW Initiator Command Register  
-#define SPMR2           0x8A    // SPMR2      - RW Mode Register 2             
-#define SPTCR           0x8B    // SPTCR      - RW Target Command Register     
-#define SPCSB           0x8C    // SPCSB      - R  Current SCSI Bus Status     
-#define SPBSR           0x8D    // SPBSR      - R  Bus and Status              
-#define SPIDR           0x8E    // SPIDR      - R  Input Data Register         
-#define SPRPI           0x8F    // SPRPI      - R  Reset Parity/Interrupts     
+#define SPCSD           0x88    // SPCSD      - R  Current SCSI Data
+#define SPICR           0x89    // SPICR      - RW Initiator Command Register
+#define SPMR2           0x8A    // SPMR2      - RW Mode Register 2
+#define SPTCR           0x8B    // SPTCR      - RW Target Command Register
+#define SPCSB           0x8C    // SPCSB      - R  Current SCSI Bus Status
+#define SPBSR           0x8D    // SPBSR      - R  Bus and Status
+#define SPIDR           0x8E    // SPIDR      - R  Input Data Register
+#define SPRPI           0x8F    // SPRPI      - R  Reset Parity/Interrupts
 
 // Falcon regs for writing
-#define SPODR           0x88    // SPODR      - W  Output Data Register        
-//#define SPICR         0x89    // SPICR      - RW Initiator Command Register  
-//#define SPMR2         0x8A    // SPMR2      - RW Mode Register 2             
-//#define SPTCR         0x8B    // SPTCR      - RW Target Command Register     
-#define SPSER           0x8C    // SPSER      - W  Select Enable Register      
-#define SPSDS           0x8D    // SPSDS      - W  Start DMA Send              
-#define SPSDT           0x8E    // SPSDT      - W  Start DMA Target Receive    
-#define SPSDI           0x8F    // SPSDI      - W  Start DMA Initiator Receive 
+#define SPODR           0x88    // SPODR      - W  Output Data Register
+//#define SPICR         0x89    // SPICR      - RW Initiator Command Register
+//#define SPMR2         0x8A    // SPMR2      - RW Mode Register 2
+//#define SPTCR         0x8B    // SPTCR      - RW Target Command Register
+#define SPSER           0x8C    // SPSER      - W  Select Enable Register
+#define SPSDS           0x8D    // SPSDS      - W  Start DMA Send
+#define SPSDT           0x8E    // SPSDT      - W  Start DMA Target Receive
+#define SPSDI           0x8F    // SPSDI      - W  Start DMA Initiator Receive
 
 #define MR_ARBIT        (1 << 0)
 #define MR_DMA          (1 << 1)
@@ -154,4 +154,3 @@
 //----------------------------------
 
 #endif
-

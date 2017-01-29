@@ -16,6 +16,9 @@
 #include "gemdos.h"
 
 #include "hdd_if.h"
+#include "mutex.h"
+
+#define SCSI_C_READ10       0x28
 
 //--------------------------------------------------
 
@@ -23,8 +26,10 @@
 #define E_CRC               0xfc	    // -4  // fc CRC error
 
 BYTE deviceID;                          // bus ID from 0 to 7
+volatile mutex mtx;
 
-#define BUFFER_SIZE         (256*512 + 4)
+#define BUFFER_SIZE         (10*1024*1024)
+//#define BUFFER_SIZE         (256*512 + 4)
 BYTE myBuffer[BUFFER_SIZE];
 BYTE *pBuffer;
 
@@ -41,6 +46,7 @@ void findDevice(void);
 void CEwrite(void);
 int  writeHansTest(int byteCount, WORD xorVal);
 void showInt(int value, int length);
+void largeRead(void);
 
 BYTE showLogs = 1;
 void showMenu(void);
@@ -50,15 +56,16 @@ void logMsg(char *logMsg);
 //#define RW_TEST_SIZE    50
 #define RW_TEST_SIZE    MAXSECTORS
 
+BYTE *pLargeMem;
+DWORD largeMemSizeInBytes;
+DWORD largeMemSizeInSectors;
+
 //--------------------------------------------------
 int main(void)
 {
 	DWORD scancode;
 	BYTE key;
 	DWORD toEven;
-	void *OldSP;
-
-	OldSP = (void *) Super((void *)0);  			                // supervisor mode  
 
 	// ---------------------- 
 	// create buffer pointer to even address 
@@ -72,6 +79,9 @@ int main(void)
 	// ---------------------- 
 	// search for device on the ACSI / SCSI bus 
 	deviceID = 0;
+    
+    //initialize lock
+    mutex_unlock(&mtx);
 
 	Clear_home();
     
@@ -100,30 +110,89 @@ int main(void)
 
     switch(key) {
         case 'a':   
-            (void) Cconws("Using ACSI...\r\n"); 		
+            (void) Cconws("Using ACSI...\r\n");
             hdd_if_select(IF_ACSI);
             deviceID = 0;           // ACSI ID 0
             break;
 
         case 't':
-            (void) Cconws("Using TT SCSI...\r\n"); 		
+            (void) Cconws("Using TT SCSI...\r\n");
             hdd_if_select(IF_SCSI_TT);
             deviceID = 0;           // SCSI ID 0
             break;
 
         case 'f':
-            (void) Cconws("Using Falcon SCSI...\r\n"); 		
+            (void) Cconws("Using Falcon SCSI...\r\n"); 
             hdd_if_select(IF_SCSI_FALCON);
             deviceID = 1;           // SCSI ID 1
+            
             break;
-	} 
+    } 
+
+    #define SIZE_13MB       (13 * 1024 * 1024)
+    #define SIZE_3MB        ( 3 * 1024 * 1024)
+    #define SIZE_1MB        ( 1 * 1024 * 1024)
+    #define SIZE_halfMB     (      500 * 1024)
+
+    pLargeMem           = 0;
+    largeMemSizeInBytes = 0;
+        
+    Clear_home();
+        
+    if(key == 't' || key == 'f') {
+        (void) Cconws("On TT or Falcon...\r\n");
+        
+        pLargeMem   = (BYTE *) Mxalloc(SIZE_13MB, 1);
+        
+        if(pLargeMem) {
+            largeMemSizeInBytes = SIZE_13MB;
+        } else {
+            pLargeMem   = (BYTE *) Mxalloc(SIZE_3MB, 1);
+            
+            if(pLargeMem) {
+                largeMemSizeInBytes = SIZE_3MB;
+            } else {
+                pLargeMem   = (BYTE *) Mxalloc(SIZE_1MB, 1);
+                
+                if(pLargeMem) {
+                    largeMemSizeInBytes = SIZE_1MB;
+                } else {
+                    largeMemSizeInBytes = 0;
+                }
+            }
+        }
+    } else {
+        (void) Cconws("On ST...\r\n");
+        
+        pLargeMem   = (BYTE *) Malloc(SIZE_halfMB);
+        
+        if(pLargeMem) {
+            largeMemSizeInBytes = SIZE_halfMB;
+        } else {
+            largeMemSizeInBytes = 0;
+        }
+    }
+    
+    if(!pLargeMem) {            // if failed to allocate, use myBuffer
+        pLargeMem           = pBuffer;
+        largeMemSizeInBytes = BUFFER_SIZE;
+    }
+    
+    largeMemSizeInSectors   = largeMemSizeInBytes >> 9;
+
+    (void) Cconws("\r\nLarge mem size (B): ");
+    showHexDword(largeMemSizeInBytes);
+    (void) Cconws("\r\nLarge mem size (s): ");
+    showHexDword(largeMemSizeInSectors);
+    (void) Cconws("\r\n\r\n");
+
+    showMenu();
 
     //-----------------
     // main menu loop
     while(1) {
-        scancode = Bconin(DEV_CONSOLE); 		                    // get char form keyboard, no echo on screen 
-
-        key		=  scancode & 0xff;
+        scancode    = Bconin(DEV_CONSOLE); 		                    // get char form keyboard, no echo on screen 
+        key         =  scancode & 0xff;
         
         if(key == 'q') {
             (void) Cconws("Terminating...\r\n");
@@ -199,6 +268,10 @@ int main(void)
             continue;
         }
 
+        if(key == 'l' || key == 'L') {
+            Supexec(largeRead);
+        }
+        
         if(key == 'f') {
             BYTE devId = deviceID;  // store the device ID to some temp var
         
@@ -217,19 +290,22 @@ int main(void)
         }
     }
 	
-    Super((void *)OldSP);  			      			                // user mode 
+    Mfree(pLargeMem);               // release the memory
 	return 0;
 }
 
 void showMenu(void)
 {
-    (void) Cconws("X - SCSI RESET \r\n");
-    (void) Cconws("I - SCSI Inquiry \r\n");
-    (void) Cconws("R - CE READ test  \r\n");
-    (void) Cconws("W - CE WRITE test \r\n");
-    (void) Cconws("F - Find device on SCSI\r\n");
-    (void) Cconws("C - clear screen\r\n");
-    (void) Cconws("Q - quit\r\n");
+    (void) Cconws("x - SCSI reset\r\n");
+    (void) Cconws("i -  1 x INQUIRY\r\n");
+    (void) Cconws("I - 10 x INQUIRY\r\n");
+    (void) Cconws("r -  1 x READ\r\n");
+    (void) Cconws("R - 10 x READ\r\n");
+    (void) Cconws("w - CE WRITE test\r\n");
+    (void) Cconws("L - large read\r\n");
+    (void) Cconws("f - Find device on SCSI\r\n");
+    (void) Cconws("c - clear screen\r\n");
+    (void) Cconws("Q - quit\r\n\r\n");
 }
 
 BYTE commandLong[CMD_LENGTH_LONG] = {0x1f,	0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
@@ -253,10 +329,40 @@ void CEread(BYTE verbose)
     }
 }
 
+void largeRead(void)
+{
+    DWORD mbCount       = (largeMemSizeInSectors      >> 11);   // sectors to mega bytes
+    DWORD timeoutSecs   = mbCount * 3;                          // mega bytes to seconds
+    
+    (void) Cconws("READ(10) - dev: ");
+    showInt(deviceID, 1);
+    (void) Cconws(", size: ");
+    showInt(mbCount, 2);
+    (void) Cconws(" MB, timeout: ");
+    showInt(timeoutSecs, 2);
+    (void) Cconws(" s\r\n");
+    
+    memset(commandLong, 0, sizeof(commandLong));
+
+    commandLong[0] = (deviceID << 5) | 0x1f;
+    commandLong[1] = SCSI_C_READ10;
+    
+    commandLong[8] = (BYTE) (largeMemSizeInSectors >> 8);
+    commandLong[9] = (BYTE) (largeMemSizeInSectors     );
+    
+    (*hdIf.cmd) (1, commandLong, 11, pLargeMem, largeMemSizeInSectors);
+
+    (void) Cconws("Command success: ");
+    showHexByte(hdIf.success);
+    (void) Cconws("\r\n");
+    
+    (void) Cconws("SCSI result    : ");
+    showHexByte(hdIf.statusByte);
+    (void) Cconws("\r\n");
+}
+
 int readHansTest(int byteCount, WORD xorVal, BYTE verbose)
 {
-    WORD res;
-    
 	commandLong[4+1] = TEST_READ;
 
     //size to read
@@ -272,9 +378,9 @@ int readHansTest(int byteCount, WORD xorVal, BYTE verbose)
         (void) Cconws("CE READ: ");
     }
     
-    res = (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, byteCount >> 9);      // issue the command and check the result
+    (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, byteCount >> 9);      // issue the command and check the result
     
-    if(res != OK) {                                                                                 // ACSI ERROR?
+    if(!hdIf.success) {                                                                  // ACSI ERROR?
         return -1;
     }
     
@@ -305,7 +411,7 @@ int readHansTest(int byteCount, WORD xorVal, BYTE verbose)
 
 void cs_inquiry(BYTE id, BYTE verbose)
 {
-	int res, i;
+	int i;
     BYTE cmd[6];
     
     memset(cmd, 0, 6);
@@ -317,19 +423,19 @@ void cs_inquiry(BYTE id, BYTE verbose)
     }    
     
     // issue the inquiry command and check the result 
-    res = (*hdIf.cmd) (1, cmd, 6, pBuffer, 1);
+    (*hdIf.cmd) (1, cmd, 6, pBuffer, 1);
 
-    if(res != 0 || verbose) {               // if fail or verbose, show result
+    if(!hdIf.success || verbose) {  // if fail or verbose, show result
         (void) Cconws("SCSI result : ");
-        showHexByte(res);
+        showHexByte(hdIf.statusByte);
         (void) Cconws("\r\n");
     }
     
-    if(res != 0) {          // if failed, don't dump anything, it would be just garbage
+    if(!hdIf.success) {             // if failed, don't dump anything, it would be just garbage
         return;
     }
     
-    if(!verbose) {          // not verbose? quit, because the rest is just being verbose...
+    if(!verbose) {                  // not verbose? quit, because the rest is just being verbose...
         return;
     }    
     //----------------------------
@@ -401,23 +507,22 @@ void showHexDword(DWORD val)
 
 BYTE ce_identify(BYTE bus_id)
 {
-  WORD res;
-  BYTE cmd[] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TRAN_CMD_IDENTIFY, 0};
-  
-  cmd[0] = (bus_id << 5); 					// cmd[0] = ACSI_id + TEST UNIT READY (0)	
-  memset(pBuffer, 0, 512);              	// clear the buffer 
+    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TRAN_CMD_IDENTIFY, 0};
 
-  res = (*hdIf.cmd)(1, cmd, 6, pBuffer, 1);	// issue the identify command and check the result 
-    
-  if(res != OK) {                        	// if failed, return FALSE 
-    return 0;
-  }
-    
-  if(strncmp((char *) pBuffer, "CosmosEx translated disk", 24) != 0) {		// the identity string doesn't match? 
-	 return 0;
-  }
-	
-  return 1;                             // success 
+    cmd[0] = (bus_id << 5);                   // cmd[0] = ACSI_id + TEST UNIT READY (0)	
+    memset(pBuffer, 0, 512);                  // clear the buffer 
+
+    (*hdIf.cmd)(1, cmd, 6, pBuffer, 1);       // issue the identify command and check the result 
+
+    if(!hdIf.success) {                       // if failed, return FALSE 
+        return 0;
+    }
+
+    if(strncmp((char *) pBuffer, "CosmosEx translated disk", 24) != 0) {		// the identity string doesn't match? 
+        return 0;
+    }
+
+    return 1;                             // success 
 }
 
 void findDevice(void)
@@ -465,18 +570,16 @@ void CEwrite(void)
         
 int writeHansTest(int byteCount, WORD xorVal)
 {
-    BYTE res;
-    
-	commandLong[4+1] = TEST_WRITE;
+    commandLong[4+1] = TEST_WRITE;
 
-  //size to read
-	commandLong[5+1] = (byteCount >> 16) & 0xFF;
-	commandLong[6+1] = (byteCount >>  8) & 0xFF;
-	commandLong[7+1] = (byteCount      ) & 0xFF;
+    //size to read
+    commandLong[5+1] = (byteCount >> 16) & 0xFF;
+    commandLong[6+1] = (byteCount >>  8) & 0xFF;
+    commandLong[7+1] = (byteCount      ) & 0xFF;
 
-  //Word to XOR with data on CE side
-	commandLong[8+1] = (xorVal >> 8) & 0xFF;
-	commandLong[9+1] = (xorVal     ) & 0xFF;
+    //Word to XOR with data on CE side
+    commandLong[8+1] = (xorVal >> 8) & 0xFF;
+    commandLong[9+1] = (xorVal     ) & 0xFF;
 
     int i;
     WORD counter = 0;
@@ -494,16 +597,16 @@ int writeHansTest(int byteCount, WORD xorVal)
     }
 
     (void) Cconws("CE WRITE: ");
-    res = (*hdIf.cmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBuffer, byteCount >> 9);     // issue the command and check the result
+    (*hdIf.cmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBuffer, byteCount >> 9);     // issue the command and check the result
     
-    if(res == E_CRC) {                                                            
+    if(hdIf.statusByte == E_CRC) {                                                            
         return -2;
     }
-    if(res != E_OK) {                                                             
+    if(!hdIf.success) {                                                             
         return -1;
     }
     
-	return 0;
+    return 0;
 }
 
 void logMsg(char *logMsg)
@@ -562,3 +665,4 @@ void showInt(int value, int length)
 
     (void) Cconws(tmp);                     // write it out
 }
+
