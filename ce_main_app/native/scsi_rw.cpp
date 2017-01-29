@@ -178,7 +178,7 @@ bool Scsi::readSectors_big(DWORD startSectorNo, DWORD sectorCount)
         res = dataMedia->readSectors(startSectorNo, sectorCountNow, dataBuffer);
 
         if(!res) {
-            Debug::out(LOG_DEBUG, "Scsi::readSectors() - readSectors() failed for startSectorNo: 0x%x, sectorCountNow: 0x%x", startSectorNo, sectorCountNow);
+            Debug::out(LOG_DEBUG, "Scsi::readSectors() - dataMedia->readSectors() failed for startSectorNo: 0x%x, sectorCountNow: 0x%x", startSectorNo, sectorCountNow);
             return false;
         }
 
@@ -187,7 +187,12 @@ bool Scsi::readSectors_big(DWORD startSectorNo, DWORD sectorCount)
         sectorCount     -= sectorCountNow;
 
         // now transfer this block, which is up to BUFFER_SIZE_SECTORS big
-        dataTrans->sendData_transferBlock(dataBuffer, byteCountNow);
+        res = dataTrans->sendData_transferBlock(dataBuffer, byteCountNow);
+
+        if(!res) {
+            Debug::out(LOG_DEBUG, "Scsi::readSectors() - dataTrans->sendData_transferBlock() failed for startSectorNo: 0x%x, sectorCountNow: 0x%x", startSectorNo, sectorCountNow);
+            return false;
+        }
     }
 
     Debug::out(LOG_DEBUG, "Scsi::readSectors() - done with success");
