@@ -45,6 +45,7 @@ void scanXCSIbus        (void);
 BYTE getCEid            (BYTE anyCEnotOnlySD);
 BYTE getSDcardInfo      (BYTE deviceID);
 void showSDcardCapacity (void);
+BYTE enableCEids        (BYTE ceId);
 
 struct {
     BYTE  id;                       // assigned ACSI ID
@@ -186,22 +187,21 @@ int main( int argc, char* argv[] )
     showSDcardCapacity();
 
     //-------------
-    // if SD is not enabled, assign some xCSI ID to to SD card
-    BYTE sdId = getCEid(FALSE);
+    // the following function should go through bus settings, fix ID order (if it's wrong), assing / enable IDs if they are not enabled
+    res = enableCEids(ceId);
 
-    if(sdId == 0xff) {          // SD is not enabled on xCSI bus? Configure it!
-
-
-
+    if(!res) {
+        // TODO: show error message
+        return 0;
     }
 
     // show SD ID to user
     (void) Cconws("SD ID on bus          : ");
-    showInt(sdId, 1);
+    showInt(SDcard.id, 1);
     (void) Cconws("\r\n");
 
     //-------------
-    // TODO: read boot sector from SD card, if if contains some other driver, warn user
+    // TODO: read boot sector from SD card, if it contains some other driver, warn user
 
     //-------------
     // TODO: warn user that if he will proceed, he will loose data
@@ -319,31 +319,138 @@ void scanXCSIbus(void)
 }
 
 //--------------------------------------------------
-// go through the already detected devices, and return xCSI ID of the first which is CE 
-BYTE getCEid(BYTE anyCEnotOnlySD)
+
+BYTE findFirstIDofType(BYTE devType, int startIndex)
 {
-    BYTE i;
+    int i;
 
-    for(i=0; i<8; i++) {        // go through the found IDs, if it's CE, return ID
-        // if it's SD dev type, we can return it no matter what anyCEnotOnlySD is
-        if(devicesOnBus[i] == DEVTYPE_SD) {
-            return i;
-        }
-
-        // if it's TRANSLATED dev type, we return it only if anyCEnotOnlySD is TRUE
-        if(devicesOnBus[i] == DEVTYPE_TRANSLATED && anyCEnotOnlySD) {
+    for(i=startIndex; i<8; i++) {           // go through IDs - ASCENDING
+        if(devicesOnBus[i] == devType) {    // found it? good
             return i;
         }
     }
-    
-    return 0xff;                // no CE ID found
+
+    return 0xff;                            // didn't find it? fail
+}
+
+//--------------------------------------------------
+// go through the already detected devices, and return xCSI ID of the first which is CE 
+BYTE getCEid(BYTE anyCEnotOnlySD)
+{
+    BYTE idCE = findFirstIDofType(DEVTYPE_TRANSLATED,   0);
+    BYTE idSD = findFirstIDofType(DEVTYPE_SD,           0);
+
+    if(anyCEnotOnlySD) {                    // if any CE ID will do, return the one which is not 0xff
+        if(idSD != 0xff) {                  // got SD ID? return it
+            return idSD;
+        }
+
+        return idCE;                        // if don't have SD ID, return CE ID (might end up with not having CE ID either)
+    } else {                                // if looking only for SD ID, return it (might end up with not having SD ID)
+        return idSD;
+    }
+}
+
+//--------------------------------------------------
+BYTE enableACSIidType(BYTE xCSIid, BYTE devType)
+{
+
+    // TODO: set xCSIid to devType in CE
+
+    return TRUE;
+}
+//--------------------------------------------------
+
+// find an ID which could be used as new SD card ID
+BYTE enableCEids(BYTE ceId)
+{
+    BYTE res;
+ 
+    // talk to CE to get more precise info about assigned devices (but no SD card info)
+    BYTE cmd[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TEST_GET_ACSI_IDS, 0};
+
+    cmd[0] = (ceId << 5);                                   // cmd[0] = CE ceId + TEST UNIT READY (0)   
+    memset(pDmaBuffer, 0, 512);                             // clear the buffer 
+
+    hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, pDmaBuffer, 1); 
+
+    if(!hdIf->success || hdIf->statusByte != 0) {           // if command failed...
+        // TODO: add error string 
+        return FALSE;
+    }
+
+    // go through the received device types, and if it's SD, RAW or CE_DD, update the devicesOnBus[] array with these more precise info
+    int i;
+    for(i=0; i<8; i++) {
+        if(pDmaBuffer[i] == DEVTYPE_SD || pDmaBuffer[i] == DEVTYPE_RAW || pDmaBuffer[i] == DEVTYPE_TRANSLATED) {        // this is what we wanted? if yes, store it
+            devicesOnBus[i] = pDmaBuffer[i];
+        }
+    }
+
+    //----------------
+    // find the CE_DD device ID
+    BYTE id_cedd = findFirstIDofType(DEVTYPE_TRANSLATED, 0); // find first CE_DD ID, which we would like to boot
+
+    // TODO: if CE_DD is found, but it's on ID 7, then the rest will fail
+
+    if(id_cedd == 0xff) {                                   // if CE_DD is not enabled on bus, we need to enable it first
+        BYTE emptyId;
+        emptyId = findFirstIDofType(DEVTYPE_NOTHING, 0);    // find an empty slot
+
+        if(emptyId == 0xff) {                               // couldn't find empty slot? fail!
+            // TODO: add error string 
+            return FALSE;
+        }
+
+        res = enableACSIidType(emptyId, DEVTYPE_TRANSLATED); // enable CE_DD on this ID
+
+        if(!res) {                                          // if failed to set this dev type to ID, fail
+            // TODO: add error string 
+            return FALSE;
+        }
+
+        id_cedd = emptyId;                                  // this is our CE_DD now
+        devicesOnBus[id_cedd] = DEVTYPE_TRANSLATED;         // store it in this field, too
+    }
+
+    //----------------
+    // find the SD ID
+    BYTE id_sd = findFirstIDofType(DEVTYPE_SD, id_cedd);    // find first SD ID, which we would like to access, and let it be after CE_DD ID (we want that to boot)
+
+    // TODO: the previous could also fail, if you set id_cedd to 7 (no free space behind it)
+    // this will return 0xff, if SD exists, but it's before CE_DD, which is wrong
+
+    if(id_sd == 0xff) {                                     // if SD is not enabled on bus, we need to enable it
+        BYTE emptyId;
+        emptyId = findFirstIDofType(DEVTYPE_NOTHING, id_cedd);  // find an empty slot after CE_DD ID (we want that to boot)
+
+        // TODO: the previous could also fail, if you set id_cedd to 7 (no free space behind it)
+
+        if(emptyId == 0xff) {                               // couldn't find empty slot? fail!
+            // TODO: add error string 
+            return FALSE;
+        }
+
+        res = enableACSIidType(emptyId, DEVTYPE_SD);        // enable SD on this ID
+
+        if(!res) {                                          // if failed to set this dev type to ID, fail
+            // TODO: add error string 
+            return FALSE;
+        }
+
+        id_sd = emptyId;                                    // this is our SD now
+        devicesOnBus[id_sd] = DEVTYPE_SD;                   // store it in this field, too
+    }
+
+    SDcard.id = id_sd;                                      // store the valid ID to the struct
+    return TRUE;
 }
 
 //--------------------------------------------------
 
 BYTE getSDcardInfo(BYTE deviceID)
 {
-    // issue CS command to get info
+    // talk to CS to get more precise info about SD card (but not precise info about assigned device types)
     commandLong[0] = (deviceID << 5) | 0x1f;    // SD card device ID
     commandLong[3] = 'S';                       // for CS
     commandLong[5] = TEST_GET_ACSI_IDS;
