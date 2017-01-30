@@ -11,6 +11,7 @@
 #include "stdlib.h"
 #include "hdd_if.h"
 #include "translated.h"
+#include "vt52.h"
 #include "main.h"
 
 // ------------------------------------------------------------------
@@ -39,8 +40,17 @@ void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, W
 #define DEVTYPE_NOTHING     10      // nothing   responded on this ID
 #define DEVTYPE_UNKNOWN     11      // something responded on this ID, but it's not CE
 
-BYTE devicesOnBus[8];       // contains DEVTYPE_ for all the xCSI IDs
-void scanXCSIbus(void);
+BYTE devicesOnBus[8];               // contains DEVTYPE_ for all the xCSI IDs
+void scanXCSIbus        (void);
+BYTE getCEid            (BYTE anyCEnotOnlySD);
+BYTE getSDcardInfo      (BYTE deviceID);
+void showSDcardCapacity (void);
+
+struct {
+    BYTE  id;                       // assigned ACSI ID
+    BYTE  isInit;                   // contains if the SD card is present and initialized
+    DWORD SCapacity;                // capacity of the card in sectors
+} SDcard;
 
 // ------------------------------------------------------------------
 int main( int argc, char* argv[] )
@@ -126,14 +136,69 @@ int main( int argc, char* argv[] )
     }
 
     //-------------
-    // TODO: use solo command to get if SD card is inserted, and its capacity, if not, loop until it's inserted
-    scanXCSIbus();
-    
-    
+    // Scan xCSI bus to find CE and CE_SD.
+    // Use solo command to get if SD card is inserted, and its capacity.
+    BYTE ceId;
+
+    scanXCSIbus();                  // scan xCSI bus and find everything (even non-CE devices)
+    ceId = getCEid(TRUE);           // get first ID which belongs to CE
+
+    if(ceId == 0xff) {              // no CE ID found? quit, fail
+        (void) Cconws("CosmosEx was not found on bus.\r\n");
+        (void) Cconws("Press any key to terminate...\r\n");
+
+        Cnecin();
+        return 0;
+    }
+
+    BYTE res;
+
+    while(1) {
+        res = getSDcardInfo(ceId);  // try to get the info about the card
+
+        if(!res) {                  // failed to get the info about the card? fail
+            (void) Cconws("Failed to get card info, fail.\r\n");
+            (void) Cconws("Press any key to terminate...\r\n");
+
+            Cnecin();
+            return 0;
+        }
+
+        (void) Cconws("SD card is inserted   : ");
+
+        if(SDcard.isInit) {             // if got the card, we can quit
+            (void) Cconws("YES\r\n");
+            break;
+        }
+
+        // don't have the card? try again
+        (void) Cconws("NO\r\n");
+        (void) Cconws("Please insert the SD card in slot.\r\n");
+
+        sleep(1);
+
+        VT52_Del_line();        // delete 2nd line
+        VT52_Cur_up();          // go line up
+        VT52_Del_line();        // delete 1st line
+    }
+
+    (void) Cconws("SD card capacity      : ");
+    showSDcardCapacity();
+
     //-------------
-    // TODO: get IDs from CE, find out if SD is enabled on ACSI BUS:
-    // if SD is enabled, do nothing
-    // if SD is not enabled, do ACSI bus scan, check for free ACSI IDs (so it wouldn't colide with any existing HDD or CE), set this ACSI ID to SD card
+    // if SD is not enabled, assign some xCSI ID to to SD card
+    BYTE sdId = getCEid(FALSE);
+
+    if(sdId == 0xff) {          // SD is not enabled on xCSI bus? Configure it!
+
+
+
+    }
+
+    // show SD ID to user
+    (void) Cconws("SD ID on bus          : ");
+    showInt(sdId, 1);
+    (void) Cconws("\r\n");
 
     //-------------
     // TODO: read boot sector from SD card, if if contains some other driver, warn user
@@ -208,38 +273,45 @@ BYTE cs_inquiry(BYTE id)
     return TRUE;
 }
 //--------------------------------------------
-
+// scan the xCSI bus and detect all the devices that are there
 void scanXCSIbus(void)
 {
-    BYTE i, res;
+    BYTE i, res, isCE;
 
     (void) Cconws("Bus scan              : ");
-        
+
     hdIf->maxRetriesCount = 0;                                  // disable retries - we are expecting that the devices won't answer on every ID
-    
+
     for(i=0; i<8; i++) {
-        Cconout(i + '0');
-          
         res = cs_inquiry(i);                                    // try to read the INQUIRY string
+
+        isCE            = FALSE;                                // it's not CE (at this moment)
+        devicesOnBus[i] = DEVTYPE_NOTHING;                      // nothing here
         
         if(res) {                                               // something responded
             if(memcmp(pDmaBuffer + 16, "CosmosEx", 8) == 0) {   // inquiry string contains 'CosmosEx'
-                (void) Cconws("\33p");
-                Cconout(i + '0');                               // White-on-Black - it's CE
-                (void) Cconws("\33q");
-            
+                isCE = TRUE;
+
                 if(memcmp(pDmaBuffer + 27, "SD", 2) == 0) {     // it's CosmosEx SD card
                     devicesOnBus[i] = DEVTYPE_SD;
                 } else {                                        // it's CosmosEx, but not SD card
                     devicesOnBus[i] = DEVTYPE_TRANSLATED;
-                }            
-            } else {                                            // it's not CosmosEx
-                Cconout(i + '0');                               // Black-on-White - not CE or not present
+                }
+            } else if(memcmp(pDmaBuffer + 16, "CosmoSolo", 9) == 0) {   // it's CosmoSolo, that's SD card
+                isCE = TRUE;
+
+                devicesOnBus[i] = DEVTYPE_SD;
+            } else {                                            // it's not CosmosEx and also not CosmoSolo
                 devicesOnBus[i] = DEVTYPE_UNKNOWN;              // we don't know what it is, but it's there
             }        
-        } else {                                                // no response
+        }
+
+        if(isCE) {
+            (void) Cconws("\33p");
+            Cconout(i + '0');                                   // White-on-Black - it's CE
+            (void) Cconws("\33q");
+        } else {
             Cconout(i + '0');                                   // Black-on-White - not CE or not present
-            devicesOnBus[i] = DEVTYPE_NOTHING;
         }
     }
 
@@ -247,58 +319,95 @@ void scanXCSIbus(void)
 }
 
 //--------------------------------------------------
-
-BYTE getSDcardId(BYTE deviceID, BYTE fromCEnotCS)
+// go through the already detected devices, and return xCSI ID of the first which is CE 
+BYTE getCEid(BYTE anyCEnotOnlySD)
 {
-    if(fromCEnotCS) {           // for CE
-        BYTE cmd[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TEST_GET_ACSI_IDS, 0};
+    BYTE i;
 
-        cmd[0] = (deviceID << 5);                   // cmd[0] = CE deviceID + TEST UNIT READY (0)   
-        memset(pDmaBuffer, 0, 512);                 // clear the buffer 
+    for(i=0; i<8; i++) {        // go through the found IDs, if it's CE, return ID
+        // if it's SD dev type, we can return it no matter what anyCEnotOnlySD is
+        if(devicesOnBus[i] == DEVTYPE_SD) {
+            return i;
+        }
 
-        hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, pDmaBuffer, 1);
-    } else {                    // for CS
-        commandLong[0] = (deviceID << 5) | 0x1f;    // SD card device ID
-        commandLong[3] = 'S';                       // for CS
-        commandLong[5] = TEST_GET_ACSI_IDS;
-        commandLong[6] = 0;                         // don't reset SD error counters
-        
-        hdIfCmdAsUser(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);        
-    }
-    
-    if(!hdIf->success || hdIf->statusByte != 0) {   // if command failed, return -1 (0xff)
-        return 0xff;
-    }
-    
-    int i;
-    for(i=0; i<8; i++) {                            // go through ACSI IDs
-        if(pDmaBuffer[i] == DEVTYPE_SD) {           // if found SD card, good!
-            if(!fromCEnotCS) {                      // if data came from CS, then byte 10 contains if the card is init
-//              sdCardPresent = rBuffer[10];
-            }
-   
-            return i;                               // return ID of SD card
+        // if it's TRANSLATED dev type, we return it only if anyCEnotOnlySD is TRUE
+        if(devicesOnBus[i] == DEVTYPE_TRANSLATED && anyCEnotOnlySD) {
+            return i;
         }
     }
     
-    return 0xff;                                    // SD card ACSI ID not found
+    return 0xff;                // no CE ID found
 }
 
 //--------------------------------------------------
-/*
-void getSDinfo(void)
+
+BYTE getSDcardInfo(BYTE deviceID)
 {
-    sdCardId = getSDcardId(TRUE);           // get SD card ID from CE
+    // issue CS command to get info
+    commandLong[0] = (deviceID << 5) | 0x1f;    // SD card device ID
+    commandLong[3] = 'S';                       // for CS
+    commandLong[5] = TEST_GET_ACSI_IDS;
+    commandLong[6] = 0;                         // don't reset SD error counters
+
+    hdIfCmdAsUser(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);
+
+    if(!hdIf->success || hdIf->statusByte != 0) {   // if command failed...
+        return FALSE;
+    }
+
+    SDcard.id       = pDmaBuffer[9];                // ID
+    SDcard.isInit   = pDmaBuffer[10];               // is init
     
-    if(sdCardId != 0xff) {                  // if the SD card ID is configured
-        sdCardId = getSDcardId(FALSE);      // now use that SD card ID to talk to CS and get if card is present
-    } else {                                // SD card ID not configured? SD card not present
-        sdCardPresent = FALSE;
+    SDcard.SCapacity  = pDmaBuffer[15];             // get SD card capacity
+    SDcard.SCapacity  = SDcard.SCapacity << 8;
+    SDcard.SCapacity |= pDmaBuffer[16];
+    SDcard.SCapacity  = SDcard.SCapacity << 8;
+    SDcard.SCapacity |= pDmaBuffer[17];
+    SDcard.SCapacity  = SDcard.SCapacity << 8;
+    SDcard.SCapacity |= pDmaBuffer[18];
+    
+    return TRUE;
+}
+
+//--------------------------------------------------
+void showSDcardCapacity(void)
+{
+    DWORD capacityMB = SDcard.SCapacity >> 11;      // sectors into MegaBytes
+
+    if(capacityMB < 1024) {                         // less than 1 GB? show on 4 digits
+        int length = 4;
+
+        if(capacityMB <= 999) {                     // if it's less than 1000, show on 3 digits
+            length = 3;
+        }
+
+        if(capacityMB <= 99) {                      // if it's less than 100, show on 2 digits
+            length = 2;
+        }
+
+        if(capacityMB <= 9) {                       // if it's less than 10, show on 1 digits
+            length = 1;
+        }
+
+        showInt(capacityMB, length);
+        (void) Cconws(" MB\r\n");
+    } else {                                        // more than 1 GB?
+        int capacityGB      = capacityMB / 1024;    // GB part
+        int capacityRest    = capacityMB % 1024;    // MB part
+
+        capacityRest = capacityRest / 100;          // get only 100s of MB part 
+
+        int length = (capacityGB <= 9) ? 1 : 2;     // if it's bellow 10, show 1 digit, otherwise show 2 digits
+
+        showInt(capacityGB, length);                // show GB part
+        (void) Cconws(".");
+        showInt(capacityRest, 1);                   // show 100s of MB part
+
+        (void) Cconws(" GB\r\n");
     }
 }
-*/
-//--------------------------------------------------
 
+//--------------------------------------------------
 // global variables, later used for calling hdIfCmdAsSuper
 BYTE __readNotWrite, __cmdLength;
 WORD __sectorCount;

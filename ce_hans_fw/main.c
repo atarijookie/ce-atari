@@ -712,7 +712,7 @@ void onGetCommand(void)
     id = (cmd[0] >> 5) & 0x07;                  // get only device ID
     //-----
     // if we came here, everything went OK
-    if(id == sdCardID) {                        // for SD card IDs
+    if(enabledIDs[id]) {                        // for this ID is enabled (to let the CS commands be handled by any CE ID, even the one not assigned to CE SD)
         BYTE processedLocally;
         processedLocally = tryProcessLocally(); // try to process command locally
         

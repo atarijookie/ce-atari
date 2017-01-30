@@ -154,7 +154,7 @@ BYTE soloTestGetACSIids(void)
         sdErrorCountRead    = 0;
     }
 
-    memset(spiTxBuff, 0, 16);                           // clear the buffer before using, so we don't have to clear the padding in the end
+    memset(spiTxBuff, 0, 32);                           // clear the buffer before using, so we don't have to clear the padding in the end
 
     // bytes 0..7
     for(id=0; id<8; id++) {                             // now store it one after another to buffer
@@ -187,11 +187,19 @@ BYTE soloTestGetACSIids(void)
     spiTxBuff[13]   = (BYTE) (sdErrorCountRead >> 8);
     spiTxBuff[14]   = (BYTE) (sdErrorCountRead     );
 
+    // bytes 15..18 - SD card capacity in sectors
+    if(sdCard.IsInit) {
+        spiTxBuff[15]   = (BYTE) (sdCard.SCapacity >> 24);
+        spiTxBuff[16]   = (BYTE) (sdCard.SCapacity >> 16);
+        spiTxBuff[17]   = (BYTE) (sdCard.SCapacity >>  8);
+        spiTxBuff[18]   = (BYTE) (sdCard.SCapacity      );
+    }
+
     //-------------
     // now transfer the buffer to ST
     ACSI_DATADIR_READ();
 
-    for(i=0; i<16; i++) {
+    for(i=0; i<32; i++) {
         DMA_read(spiTxBuff[i]);
 
         if(brStat != E_OK) {                            // if transfer failed, quit with error
