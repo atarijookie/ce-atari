@@ -26,9 +26,28 @@ BYTE *pDmaBuffer;
 BYTE commandShort[CMD_LENGTH_SHORT] = {      0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
 BYTE commandLong [CMD_LENGTH_LONG]  = {0x1f, 0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0};
 
+void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+
+//--------------------------
+// DEVTYPE values really sent from CE
+#define DEVTYPE_OFF         0
+#define DEVTYPE_SD          1
+#define DEVTYPE_RAW         2
+#define DEVTYPE_TRANSLATED  3
+
+// DEVTYPE values used in this app for making other states
+#define DEVTYPE_NOTHING     10      // nothing   responded on this ID
+#define DEVTYPE_UNKNOWN     11      // something responded on this ID, but it's not CE
+
+BYTE devicesOnBus[8];       // contains DEVTYPE_ for all the xCSI IDs
+void scanXCSIbus(void);
+
 // ------------------------------------------------------------------
 int main( int argc, char* argv[] )
 {
+    memset(devicesOnBus, 0, sizeof(devicesOnBus));
+    pDmaBuffer = (BYTE *) dmaBuffer;
+    
     // write some header out
     Clear_home();
     //                |                                        |
@@ -108,7 +127,9 @@ int main( int argc, char* argv[] )
 
     //-------------
     // TODO: use solo command to get if SD card is inserted, and its capacity, if not, loop until it's inserted
-
+    scanXCSIbus();
+    
+    
     //-------------
     // TODO: get IDs from CE, find out if SD is enabled on ACSI BUS:
     // if SD is enabled, do nothing
@@ -170,3 +191,135 @@ void getCE_API(void)
     }
 }
 //--------------------------------------------
+BYTE cs_inquiry(BYTE id)
+{
+    BYTE cmd[CMD_LENGTH_SHORT];
+    
+    memset(cmd, 0, 6);
+    cmd[0] = (id << 5) | (SCSI_CMD_INQUIRY & 0x1f);
+    cmd[4] = 32;                                                    // count of bytes we want from inquiry command to be returned
+    
+    hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, pDmaBuffer, 1); // issue the inquiry command and check the result 
+    
+    if(!hdIf->success || hdIf->statusByte != SCSI_STATUS_OK) {      // if failed, return FALSE 
+        return FALSE;
+    }
+
+    return TRUE;
+}
+//--------------------------------------------
+
+void scanXCSIbus(void)
+{
+    BYTE i, res;
+
+    (void) Cconws("Bus scan              : ");
+        
+    hdIf->maxRetriesCount = 0;                                  // disable retries - we are expecting that the devices won't answer on every ID
+    
+    for(i=0; i<8; i++) {
+        Cconout(i + '0');
+          
+        res = cs_inquiry(i);                                    // try to read the INQUIRY string
+        
+        if(res) {                                               // something responded
+            if(memcmp(pDmaBuffer + 16, "CosmosEx", 8) == 0) {   // inquiry string contains 'CosmosEx'
+                (void) Cconws("\33p");
+                Cconout(i + '0');                               // White-on-Black - it's CE
+                (void) Cconws("\33q");
+            
+                if(memcmp(pDmaBuffer + 27, "SD", 2) == 0) {     // it's CosmosEx SD card
+                    devicesOnBus[i] = DEVTYPE_SD;
+                } else {                                        // it's CosmosEx, but not SD card
+                    devicesOnBus[i] = DEVTYPE_TRANSLATED;
+                }            
+            } else {                                            // it's not CosmosEx
+                Cconout(i + '0');                               // Black-on-White - not CE or not present
+                devicesOnBus[i] = DEVTYPE_UNKNOWN;              // we don't know what it is, but it's there
+            }        
+        } else {                                                // no response
+            Cconout(i + '0');                                   // Black-on-White - not CE or not present
+            devicesOnBus[i] = DEVTYPE_NOTHING;
+        }
+    }
+
+    hdIf->maxRetriesCount = 10;                                 // enable retries
+}
+
+//--------------------------------------------------
+
+BYTE getSDcardId(BYTE deviceID, BYTE fromCEnotCS)
+{
+    if(fromCEnotCS) {           // for CE
+        BYTE cmd[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TEST_GET_ACSI_IDS, 0};
+
+        cmd[0] = (deviceID << 5);                   // cmd[0] = CE deviceID + TEST UNIT READY (0)   
+        memset(pDmaBuffer, 0, 512);                 // clear the buffer 
+
+        hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+    } else {                    // for CS
+        commandLong[0] = (deviceID << 5) | 0x1f;    // SD card device ID
+        commandLong[3] = 'S';                       // for CS
+        commandLong[5] = TEST_GET_ACSI_IDS;
+        commandLong[6] = 0;                         // don't reset SD error counters
+        
+        hdIfCmdAsUser(ACSI_READ, commandLong, CMD_LENGTH_LONG, pDmaBuffer, 1);        
+    }
+    
+    if(!hdIf->success || hdIf->statusByte != 0) {   // if command failed, return -1 (0xff)
+        return 0xff;
+    }
+    
+    int i;
+    for(i=0; i<8; i++) {                            // go through ACSI IDs
+        if(pDmaBuffer[i] == DEVTYPE_SD) {           // if found SD card, good!
+            if(!fromCEnotCS) {                      // if data came from CS, then byte 10 contains if the card is init
+//              sdCardPresent = rBuffer[10];
+            }
+   
+            return i;                               // return ID of SD card
+        }
+    }
+    
+    return 0xff;                                    // SD card ACSI ID not found
+}
+
+//--------------------------------------------------
+/*
+void getSDinfo(void)
+{
+    sdCardId = getSDcardId(TRUE);           // get SD card ID from CE
+    
+    if(sdCardId != 0xff) {                  // if the SD card ID is configured
+        sdCardId = getSDcardId(FALSE);      // now use that SD card ID to talk to CS and get if card is present
+    } else {                                // SD card ID not configured? SD card not present
+        sdCardPresent = FALSE;
+    }
+}
+*/
+//--------------------------------------------------
+
+// global variables, later used for calling hdIfCmdAsSuper
+BYTE __readNotWrite, __cmdLength;
+WORD __sectorCount;
+BYTE *__cmd, *__buffer;
+
+void hdIfCmdAsSuper(void)
+{
+    // this should be called through Supexec()
+    (*hdIf->cmd)(__readNotWrite, __cmd, __cmdLength, __buffer, __sectorCount);
+}
+
+void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+{
+    // store params to global vars
+    __readNotWrite  = readNotWrite;
+    __cmd           = cmd;
+    __cmdLength     = cmdLength;
+    __buffer        = buffer;
+    __sectorCount   = sectorCount;    
+    
+    // call the function which does the real work, and uses those global vars
+    Supexec(hdIfCmdAsSuper);
+}
+//--------------------------------------------------
