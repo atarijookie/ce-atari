@@ -1,18 +1,13 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #ifndef _VIRTUALKEYBOARDSERVICE_H_
 #define _VIRTUALKEYBOARDSERVICE_H_
 
-class VirtualKeyboardService
+#include "virtualinputservice.h"
+
+class VirtualKeyboardService : public VirtualInputService
 {
 public:
-  VirtualKeyboardService();
-	void start();
-	void stop();
+    VirtualKeyboardService();
     void sendPacket(int iKeyCode, int iValue);
-private:
-    void openFifo();
-    void closeFifo();
-    
-    int fifoHandle;
-    bool initialized;
 };
 #endif

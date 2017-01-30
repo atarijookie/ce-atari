@@ -1,83 +1,38 @@
-#include "virtualkeyboardservice.h"
-
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <stdio.h>
+#include <string.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <linux/input.h>
 #include <unistd.h>
 #include <pthread.h>
+
+#include "virtualkeyboardservice.h"
 
 #include "debug.h"
 
 pthread_mutex_t virtualKeyboardServiceMutex = PTHREAD_MUTEX_INITIALIZER;
 
-VirtualKeyboardService::VirtualKeyboardService():initialized(false){
-
-}
-
-void VirtualKeyboardService::start() 
+VirtualKeyboardService::VirtualKeyboardService()
+ : VirtualInputService("/tmp/vdev/kbd", "keyboard")
 {
-    if( initialized ){
-        return;
-    } 
-    openFifo();
 }
 
-void VirtualKeyboardService::stop() 
+void VirtualKeyboardService::sendPacket(int iKeyCode, int iState)
 {
-    if( !initialized ){
-        return;
-    } 
-    closeFifo();
-}
-
-void VirtualKeyboardService::openFifo() 
-{
-    int res;
-
-    res = mkdir("/tmp/vdev/",0666);
-    if (res == -1 && errno != EEXIST) {     // if failed to create dir, and it's not because it already exists
-        Debug::out(LOG_ERROR, "Virtual keyboard could not create /tmp/vdev/ - errno: %d", errno);
-    }
-    
-    Debug::out(LOG_DEBUG, "Virtual keyboard creating /tmp/vdev/kbd.");
-    
-    //try to remove if it's a file
-    unlink("/tmp/vdev/kbd");
-    int err = mkfifo("/tmp/vdev/kbd",0666);
-    if(err < 0) {
-        Debug::out(LOG_ERROR, "Virtual keyboard could not create /tmp/vdev/kbd - errno: %d", errno);
-		if(errno == EEXIST) {
-            Debug::out(LOG_ERROR, "    /tmp/vdev/kbd already exists.");
-		}
-	}    
-}
-
-void VirtualKeyboardService::closeFifo() 
-{
-    Debug::out(LOG_DEBUG, "Virtual keyboard closing /tmp/vdev/kbd.");
-    unlink("/tmp/vdev/kbd");
-}
-
-void VirtualKeyboardService::sendPacket(int iKeyCode, int iState){
-
+    ssize_t res;
     pthread_mutex_lock(&virtualKeyboardServiceMutex);    //we could be accessed from any thread, so better lcok this
-
-    int fd = open("/tmp/vdev/kbd", O_WRONLY | O_NONBLOCK);
 
     input_event xEvent;
     gettimeofday(&xEvent.time, NULL);
-    xEvent.type=EV_KEY;
-    xEvent.code=iKeyCode;
+    xEvent.type = EV_KEY;
+    xEvent.code = iKeyCode;
     // ev->value -- 1: down, 2: auto repeat, 0: up
-    xEvent.value=iState;
-    Debug::out(LOG_DEBUG, "write kbd");
-    write(fd, &xEvent, sizeof(xEvent));
-    
-    close(fd);
+    xEvent.value = iState;
+    res = write(fd, &xEvent, sizeof(xEvent));
+    Debug::out(LOG_DEBUG, "write kbd res=%d", (int)res);
+    if(res < 0) {
+        Debug::out(LOG_ERROR, "VirtualKeyboardService::sendPacket(0x%x, %d) write() : %s", iKeyCode, iState, strerror(errno));
+    }
 
     pthread_mutex_unlock(&virtualKeyboardServiceMutex);
-
 }
