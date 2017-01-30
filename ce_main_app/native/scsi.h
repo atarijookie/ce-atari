@@ -147,8 +147,12 @@ private:
     void readWriteGeneric(bool readNotWrite, DWORD startingSector, DWORD sectorCount);
     void storeSenseAndSendStatus(BYTE status, BYTE senseKey, BYTE additionalSenseCode, BYTE ascq);
 
-    bool readSectors    (DWORD startSectorNo, DWORD sectorCount);
-    bool writeSectors   (DWORD startSectorNo, DWORD sectorCount);
+    bool readSectors_small  (DWORD startSectorNo, DWORD sectorCount);
+    bool writeSectors_small (DWORD startSectorNo, DWORD sectorCount);
+
+    bool readSectors_big    (DWORD startSectorNo, DWORD sectorCount);
+    bool writeSectors_big   (DWORD startSectorNo, DWORD sectorCount);
+
     bool compareSectors (DWORD startSectorNo, DWORD sectorCount);
     bool eraseMedia(void);
 

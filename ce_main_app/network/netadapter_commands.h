@@ -1,3 +1,4 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #ifndef _NETADAPTER_COMMANDS_H_
 #define _NETADAPTER_COMMANDS_H_
 
@@ -142,5 +143,3 @@
 #define RES_DIDNT_FINISH_YET            0xdf
 
 #endif
-
-

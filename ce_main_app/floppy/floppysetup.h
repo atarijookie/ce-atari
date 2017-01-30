@@ -26,7 +26,6 @@ public:
 
     void setAcsiDataTrans(AcsiDataTrans *dt);
     void setImageSilo(ImageSilo *imgSilo);
-    void setTranslatedDisk(TranslatedDisk *td);
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
     static bool createNewImage(std::string pathAndFile);
@@ -34,7 +33,6 @@ public:
 private:
     AcsiDataTrans       *dataTrans;
     ImageSilo           *imageSilo;
-    TranslatedDisk      *translated;
     SettingsReloadProxy *reloadProxy;
     ImageList           imageList;    
 

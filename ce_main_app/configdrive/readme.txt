@@ -104,5 +104,7 @@ ce_tsthd.tos - Tests ACSI/SCSI communi-
 ce_tstfd.tos - Tests Floppy Disk Emu-
                lation
 
+tst_stng.tos - Test STiNG network driver
+
 tst_fsys.tos - Tests File System (mainly
                Translated Drives)

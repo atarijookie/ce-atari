@@ -11,8 +11,6 @@
 #include "floppy/floppysetup.h"
 #include "network/netadapter.h"
 
-#include "mediastreaming/mediastreaming.h"
-
 #include "version.h"
 
 class ConfigService;
@@ -117,9 +115,6 @@ private:
     // network adapter stuff
 
     NetAdapter          netAdapter;
-
-	// media streaming
-	MediaStreaming		mediaStreaming;
 
     //----------------------------------
     // recovery stuff

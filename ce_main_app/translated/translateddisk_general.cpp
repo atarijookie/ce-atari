@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <algorithm>
 #include <string>
 #include <string.h>
@@ -26,6 +27,37 @@
 
 extern THwConfig hwConfig;
 extern InterProcessEvents events;
+
+TranslatedDisk * TranslatedDisk::instance = NULL;
+
+pthread_mutex_t TranslatedDisk::mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void TranslatedDisk::mutexLock(void)
+{
+    pthread_mutex_lock(&mutex);
+}
+
+void TranslatedDisk::mutexUnlock(void)
+{
+    pthread_mutex_unlock(&mutex);
+}
+
+TranslatedDisk * TranslatedDisk::getInstance(void)
+{
+	return instance;
+}
+
+TranslatedDisk * TranslatedDisk::createInstance(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs)
+{
+    instance = new TranslatedDisk(dt, cs, scs);
+    return instance;
+}
+
+void TranslatedDisk::deleteInstance(void)
+{
+    delete instance;
+    instance = NULL;
+}
 
 TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs)
 {

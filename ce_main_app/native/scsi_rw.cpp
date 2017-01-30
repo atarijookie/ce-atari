@@ -76,10 +76,18 @@ void Scsi::readWriteGeneric(bool readNotWrite, DWORD startingSector, DWORD secto
     //--------------------------------
     bool res;
 
-    if(readNotWrite) {          // if read
-        res = readSectors   (startingSector, sectorCount);
-    } else {                    // if write
-        res = writeSectors  (startingSector, sectorCount);
+    if(sectorCount < 2048) {        // less than 1 MB?
+        if(readNotWrite) {          // if read
+            res = readSectors_small   (startingSector, sectorCount);
+        } else {                    // if write
+            res = writeSectors_small  (startingSector, sectorCount);
+        }
+    } else {                        // more than 1 MB?
+        if(readNotWrite) {          // if read
+            res = readSectors_big   (startingSector, sectorCount);
+        } else {                    // if write
+            res = writeSectors_big  (startingSector, sectorCount);
+        }
     }
 
     if(res) {                                            // if everything was OK
@@ -121,7 +129,28 @@ void Scsi::SCSI_Verify(void)
 }
 
 //---------------------------------------------
-bool Scsi::readSectors(DWORD startSectorNo, DWORD sectorCount)
+bool Scsi::readSectors_small(DWORD startSectorNo, DWORD sectorCount)
+{
+    bool res;
+
+    DWORD totalByteCount = sectorCount * 512;
+
+    Debug::out(LOG_DEBUG, "Scsi::readSectors_small() - startSectorNo: 0x%x, sectorCount: 0x%x", startSectorNo, sectorCount);
+
+    res = dataMedia->readSectors(startSectorNo, sectorCount, dataBuffer);
+
+    if(!res) {
+        Debug::out(LOG_DEBUG, "Scsi::readSectors_small() - failed for startSectorNo: 0x%x, sectorCountNow: 0x%x", startSectorNo, sectorCount);
+        return false;
+    }
+
+    dataTrans->addDataBfr(dataBuffer, totalByteCount, true);
+
+    Debug::out(LOG_DEBUG, "Scsi::readSectors_small() - done with success");
+    return true;
+}
+
+bool Scsi::readSectors_big(DWORD startSectorNo, DWORD sectorCount)
 {
     bool res;
 
@@ -149,7 +178,7 @@ bool Scsi::readSectors(DWORD startSectorNo, DWORD sectorCount)
         res = dataMedia->readSectors(startSectorNo, sectorCountNow, dataBuffer);
 
         if(!res) {
-            Debug::out(LOG_DEBUG, "Scsi::readSectors() - readSectors() failed for startSectorNo: 0x%x, sectorCountNow: 0x%x", startSectorNo, sectorCountNow);
+            Debug::out(LOG_DEBUG, "Scsi::readSectors() - dataMedia->readSectors() failed for startSectorNo: 0x%x, sectorCountNow: 0x%x", startSectorNo, sectorCountNow);
             return false;
         }
 
@@ -158,7 +187,12 @@ bool Scsi::readSectors(DWORD startSectorNo, DWORD sectorCount)
         sectorCount     -= sectorCountNow;
 
         // now transfer this block, which is up to BUFFER_SIZE_SECTORS big
-        dataTrans->sendData_transferBlock(dataBuffer, byteCountNow);
+        res = dataTrans->sendData_transferBlock(dataBuffer, byteCountNow);
+
+        if(!res) {
+            Debug::out(LOG_DEBUG, "Scsi::readSectors() - dataTrans->sendData_transferBlock() failed for startSectorNo: 0x%x, sectorCountNow: 0x%x", startSectorNo, sectorCountNow);
+            return false;
+        }
     }
 
     Debug::out(LOG_DEBUG, "Scsi::readSectors() - done with success");
@@ -166,7 +200,32 @@ bool Scsi::readSectors(DWORD startSectorNo, DWORD sectorCount)
 }
 
 //---------------------------------------------
-bool Scsi::writeSectors(DWORD startSectorNo, DWORD sectorCount)
+bool Scsi::writeSectors_small(DWORD startSectorNo, DWORD sectorCount)
+{
+    bool res;
+
+    Debug::out(LOG_DEBUG, "Scsi::writeSectors_small() - startSectorNo: 0x%x, sectorCount: 0x%x", startSectorNo, sectorCount);
+    
+    DWORD totalByteCount = sectorCount * 512;
+    res = dataTrans->recvData(dataBuffer, totalByteCount);
+
+    if(!res) {
+        Debug::out(LOG_ERROR, "Scsi::writeSectors() - recvData() failed");
+        return false;
+    }
+
+    res = dataMedia->writeSectors(startSectorNo, sectorCount, dataBuffer);   // write to media
+
+    if(!res) {
+        Debug::out(LOG_ERROR, "Scsi::writeSectors() - dataMedia->writeSectors() failed");
+        return false;
+    }
+
+    Debug::out(LOG_DEBUG, "Scsi::writeSectors() - done with success");
+    return true;
+}
+
+bool Scsi::writeSectors_big(DWORD startSectorNo, DWORD sectorCount)
 {
     bool res;
 

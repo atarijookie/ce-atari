@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 #include "global.h"
 #include "debug.h"
 #include "mediastreaming.h"
@@ -9,6 +10,8 @@
 #include "acsidatatrans.h"
 #include "translated/translateddisk.h"
 #include <string>
+
+MediaStreaming * MediaStreaming::instance = NULL;
 
 // MediaStream implementation
 MediaStream::MediaStream(void)
@@ -120,6 +123,19 @@ MediaStreaming::~MediaStreaming()
 	// destructor
 }
 
+MediaStreaming * MediaStreaming::getInstance(void)
+{
+    if(!instance)
+        instance = new MediaStreaming();
+    return instance;
+}
+
+void MediaStreaming::deleteInstance(void)
+{
+    delete instance;
+    instance = NULL;
+}
+
 void MediaStreaming::processCommand(BYTE *command, AcsiDataTrans *dataTrans)
 {
 	BYTE cmd = command[4];
@@ -148,6 +164,7 @@ void MediaStreaming::processCommand(BYTE *command, AcsiDataTrans *dataTrans)
 
 void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 {
+    TranslatedDisk * translated = TranslatedDisk::getInstance();
 	BYTE buffer[512];
 	MediaParams params;
 	const char * path_or_url;
@@ -211,6 +228,7 @@ void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 		path = (char *)buffer;
 	}
 
+	Debug::out(LOG_DEBUG, "MediaStreaming::openStream path='%s'", path);
 	// parse file path / url
 	if(memcmp(path, "http", 4) == 0) {
 		// url
@@ -230,6 +248,11 @@ void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 		translated->createFullHostPath(atariPath, driveIndex, hostPath, waitingForMount, zipDirNestingLevel);
 		Debug::out(LOG_DEBUG, "MediaStreaming::openStream %s => %s", path, hostPath.c_str());
 		path_or_url = hostPath.c_str();
+        if(access(path_or_url, R_OK) < 0) {
+            Debug::out(LOG_ERROR, "MediaStreaming::openStream access(%s) : %s", path_or_url, strerror(errno));
+			dataTrans->setStatus(MEDIASTREAMING_ERR_FILEACCESS);
+			return;
+        }
 	} else {
 		// relative file name
 		std::string partialAtariPath(path);
@@ -244,6 +267,11 @@ void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 		}
 		Debug::out(LOG_DEBUG, "MediaStreaming::openStream %s => %s", path, hostPath.c_str());
 		path_or_url = hostPath.c_str();
+        if(access(path_or_url, R_OK) < 0) {
+            Debug::out(LOG_ERROR, "MediaStreaming::openStream access(%s) : %s", path_or_url, strerror(errno));
+			dataTrans->setStatus(MEDIASTREAMING_ERR_FILEACCESS);
+			return;
+        }
 	}
 	// now we have the path or url, open the stream :
 	if(!streams[i].open(path_or_url, &params)) {
@@ -320,4 +348,3 @@ void MediaStreaming::getStreamInfo(BYTE streamHandle, AcsiDataTrans *dataTrans)
 	dataTrans->addZerosUntilSize(512);
 	dataTrans->setStatus(MEDIASTREAMING_OK);
 }
-

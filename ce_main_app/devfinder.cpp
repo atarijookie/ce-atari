@@ -302,7 +302,6 @@ void DevFinder::onDevAttached(std::string devName, bool isAtariDrive)
 	Debug::out(LOG_DEBUG, "DevFinder::onDevAttached: devName %s", devName.c_str());
 
     pthread_mutex_lock(&shared.mtxScsi);
-    pthread_mutex_lock(&shared.mtxTranslated);
    
     if(shared.mountRawNotTrans) {           // attach as raw?
         Debug::out(LOG_DEBUG, "DevFinder::onDevAttached -- should mount USB media as raw, attaching as RAW");
@@ -313,13 +312,11 @@ void DevFinder::onDevAttached(std::string devName, bool isAtariDrive)
     }
     
     pthread_mutex_unlock(&shared.mtxScsi);
-    pthread_mutex_unlock(&shared.mtxTranslated);
 }
 
 void DevFinder::onDevDetached(std::string devName)
 {
     pthread_mutex_lock(&shared.mtxScsi);
-    pthread_mutex_lock(&shared.mtxTranslated);
 
 	// try to detach the device - works if was attached as RAW, does nothing otherwise
 	shared.scsi->dettachFromHostPath(devName);
@@ -330,16 +327,19 @@ void DevFinder::onDevDetached(std::string devName)
 
 	ret = mapDeviceToHostPaths.equal_range(devName);				// find a range of host paths which are mapped to partitions found on this device
 
-	for (it = ret.first; it != ret.second; ++it) {					// now go through the list of device - host_path pairs and unmount them
-		std::string hostPath = it->second;							// retrieve just the host path
-
-		shared.translated->detachFromHostPath(hostPath);		    // now try to detach this from translated drives
-	}
+    TranslatedDisk * translated = TranslatedDisk::getInstance();
+    if(translated) {
+        translated->mutexLock();
+	    for (it = ret.first; it != ret.second; ++it) {					// now go through the list of device - host_path pairs and unmount them
+		    std::string hostPath = it->second;							// retrieve just the host path
+		    translated->detachFromHostPath(hostPath);		    // now try to detach this from translated drives
+    	}
+        translated->mutexUnlock();
+    }
 
 	mapDeviceToHostPaths.erase(ret.first, ret.second);				// and delete the whole device items from this multimap
     
     pthread_mutex_unlock(&shared.mtxScsi);
-    pthread_mutex_unlock(&shared.mtxTranslated);
 }
 
 void DevFinder::attachDevAsTranslated(std::string devName)
@@ -367,7 +367,7 @@ void DevFinder::attachDevAsTranslated(std::string devName)
 		tmr.mountDir		= mountPath;										// e.g. /mnt/sda2
 		Mounter::add(tmr);
 
-		res = shared.translated->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL, partitionDevice);   // try to attach
+		res = TranslatedDisk::getInstance()->attachToHostPath(mountPath, TRANSLATEDTYPE_NORMAL, partitionDevice);   // try to attach
 
 		if(!res) {																// if didn't attach, skip the rest
 			Debug::out(LOG_ERROR, "attachDevAsTranslated: failed to attach %s", mountPath.c_str());

@@ -226,6 +226,14 @@ bool IcmpWrapper::receive(void)
 BYTE IcmpWrapper::send(DWORD destinIP, int icmpType, int icmpCode, WORD length, BYTE *data)
 {
     if(rawSock->isClosed()) {                                       // we don't have RAW socket yet? create it
+        // grant right to open (AF_INET, SOCK_DGRAM, IPPROTO_ICMP) sockets
+        // also possible via sysctl
+        // system("sysctl -w net.ipv4.ping_group_range=\"0 0\" > /dev/null");
+        FILE * f = fopen("/proc/sys/net/ipv4/ping_group_range", "w");
+        if(f) {
+            fprintf(f, "0 0\n");
+            fclose(f);
+        }
         int rawFd = socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP);
         
         if(rawFd == -1) {                                           // failed to create RAW socket? 

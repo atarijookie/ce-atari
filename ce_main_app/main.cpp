@@ -8,6 +8,7 @@
 #include <queue>
 #include <pty.h>
 #include <sys/file.h>
+#include <errno.h>
  
 #include "config/configstream.h"
 #include "settings.h"
@@ -21,7 +22,6 @@
 #include "update.h"
 #include "version.h"
 #include "ce_conf_on_rpi.h"
-#include "network/netadapter.h"
 #include "periodicthread.h"
 
 #include "webserver/webserver.h"
@@ -31,6 +31,8 @@
 #include "service/virtualmouseservice.h"
 #include "service/configservice.h"
 #include "service/screencastservice.h"
+
+#define PIDFILE "/var/run/cosmosex.pid"
 
 volatile sig_atomic_t sigintReceived = 0;
 void sigint_handler(int sig);
@@ -70,11 +72,9 @@ int main(int argc, char *argv[])
     pthread_t	ikbdThreadInfo;
 #endif
     pthread_t	floppyEncThreadInfo;
-    pthread_t   networkThreadInfo;
     pthread_t   periodicThreadInfo;
 
     pthread_mutex_init(&shared.mtxScsi,             NULL);
-    pthread_mutex_init(&shared.mtxTranslated,       NULL);
     pthread_mutex_init(&shared.mtxConfigStreams,    NULL);
     
     printf("\033[H\033[2J\n");
@@ -244,9 +244,6 @@ int main(int argc, char *argv[])
     res = pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL);	// create the floppy encoding thread and run it
 	handlePthreadCreate(res, "ce floppy encode", &floppyEncThreadInfo);
 
-    res = pthread_create(&networkThreadInfo, NULL, networkThreadCode, NULL);    // create the network thread and run it
-	handlePthreadCreate(res, "ce network", &networkThreadInfo);
-
     res = pthread_create(&periodicThreadInfo, NULL, periodicThreadCode, NULL);  // create the periodic thread and run it
 	handlePthreadCreate(res, "periodic", &periodicThreadInfo);
     
@@ -299,9 +296,6 @@ int main(int argc, char *argv[])
     ImageSilo::stop();
     pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes
 
-    printf("Stoping network thread\n");
-    pthread_join(networkThreadInfo, NULL);              // wait until network   thread finishes
-
     printf("Stoping periodic thread\n");
 	pthread_kill(periodicThreadInfo, SIGINT);               // stop the select()
     pthread_join(periodicThreadInfo, NULL);             // wait until periodic  thread finishes
@@ -312,7 +306,8 @@ int main(int argc, char *argv[])
     if(singleInstanceSocketFd > 0) {                    // if we got the single instance socket, close it
         close(singleInstanceSocketFd);
     }
-    
+
+    unlink(PIDFILE);
     Debug::out(LOG_INFO, "CosmosEx terminated.");
     printf("Terminated\n");
     return 0;
@@ -520,33 +515,46 @@ void sigint_handler(int sig)
 
 bool otherInstanceIsRunning(void)
 {
-#ifdef DISTRO_YOCTO
-    const char *countCosmosExCmd = "ps | grep cosmos | grep -v grep | wc -l > /tmp/cosmoscount";
-#else
-    const char *countCosmosExCmd = "ps -A | grep cosmos | wc -l > /tmp/cosmoscount";
-#endif
+    FILE * f;
+    int other_pid = 0;
+    int self_pid = 0;
+    char proc_path[256];
+    char other_exe[PATH_MAX];
+    char self_exe[PATH_MAX];
 
-    // count how many cosmos processes are running, store it in /tmp/cosmoscount
-    system(countCosmosExCmd);
-    
-    FILE *f = fopen("/tmp/cosmoscount", "rt");
-    if(!f) {                                    // can't open file? other instance probably not running (or is, but can't figure out, so screw it)
-        Debug::out(LOG_DEBUG, "otherInstanceIsRunning - couldn't open /tmp/cosmoscount, returning false");
+    self_pid = getpid();
+    f = fopen(PIDFILE, "r");
+    if(!f) {    // can't open file? other instance probably not running (or is, but can't figure out, so screw it)
+        Debug::out(LOG_DEBUG, "otherInstanceIsRunning - couldn't open %s, returning false", PIDFILE);
+    } else {
+        int r = fscanf(f, "%d", &other_pid);
+        fclose(f);
+        if(r != 1) {
+            Debug::out(LOG_ERROR, "otherInstanceIsRunning - can't read pid in %s, returning false", PIDFILE);
+        } else {
+            Debug::out(LOG_DEBUG, "otherInstanceIsRunning - %s pid=%d (own pid=%d)", PIDFILE, other_pid, self_pid);
+            snprintf(proc_path, sizeof(proc_path), "/proc/%d/exe", other_pid);
+            if(readlink("/proc/self/exe", self_exe, sizeof(self_exe)) < 0) {
+                Debug::out(LOG_ERROR, "otherInstanceIsRunning readlink(%s): %s", "/proc/self/exe", strerror(errno));
+            } else if(readlink(proc_path, other_exe, sizeof(other_exe)) < 0) {
+                Debug::out(LOG_ERROR, "otherInstanceIsRunning readlink(%s): %s", proc_path, strerror(errno));
+            } else if(strcmp(other_exe, self_exe) == 0) {
+                // NOTE: is it needed to check the process status to discard zombies ???
+                Debug::out(LOG_DEBUG, "otherInstanceIsRunning - found another instance of %s with pid %d", other_exe, other_pid);
+                return true;
+            }
+        }
+    }
+    f = fopen(PIDFILE, "w");
+    if(!f) {
+        Debug::out(LOG_ERROR, "otherInstanceIsRunning - failed to open %s for writing", PIDFILE);
         return false;
     }
-    
-    int res, cnt;
-    res = fscanf(f, "%d", &cnt);                // try to read the number
-    fclose(f);
-    
-    if(res != 1) {                              // couldn't read the number? say we're not running more than once
-        Debug::out(LOG_DEBUG, "otherInstanceIsRunning - fscanf failed, returning false");
-        return false;
+    fprintf(f, "%d", self_pid);
+    if(fclose(f) == 0) {
+        Debug::out(LOG_DEBUG, "otherInstanceIsRunning -- pid %d written to %s", self_pid, PIDFILE);
+    } else {
+        Debug::out(LOG_ERROR, "otherInstanceIsRunning -- FAILED to write pid %d to %s : %s", self_pid, PIDFILE, strerror(errno));
     }
-    
-    bool isOtherRunning = cnt > 1;              // more than 1 instance? other instance is running
-
-    Debug::out(LOG_DEBUG, "otherInstanceIsRunning - count of instances: %d, returning %s", cnt, isOtherRunning ? "true" : "false");
-    return isOtherRunning;
+    return false;
 }
-

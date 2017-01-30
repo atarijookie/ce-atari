@@ -22,6 +22,7 @@
 #include "settings.h"
 #include "datatypes.h"
 #include "periodicthread.h"
+#include "config/configstream.h"
 
 #include "ikbd.h"
 
@@ -134,9 +135,11 @@ void *ikbdThreadCode(void *ptr)
             }
         }
 
+        bool clientConnected = ((Utils::getCurrentMs() - shared.configStream.acsi->getLastCmdTimestamp()) <= 2000);
+
         if(ikbd.fdUart >= 0 && FD_ISSET(ikbd.fdUart, &readfds)) {
             // process the incomming data from original keyboard and from ST
-            ikbd.processReceivedCommands(shared.clientConnected);
+            ikbd.processReceivedCommands(clientConnected);
         }
 
         // process events from attached input devices
@@ -166,7 +169,8 @@ void *ikbdThreadCode(void *ptr)
                         logDebugAndIkbd(LOG_ERROR, "ikbdThreadCode() read(%d) : %s", fd, strerror(errno));
                     }
                 } else if( res==0 ) {                                           // on error, skip the rest
-                    logDebugAndIkbd(LOG_ERROR, "ikbdThreadCode() read(%d) returned 0", fd);
+                    logDebugAndIkbd(LOG_ERROR, "ikbdThreadCode() read(%d) returned 0 (EOF) closing %d", fd, i);
+                    ikbd.deinitDev(i);
                 } else {
                     switch(i) {
                     case INTYPE_VDEVMOUSE:
@@ -176,7 +180,7 @@ void *ikbdThreadCode(void *ptr)
                         break;
                     case INTYPE_KEYBOARD:
                     case INTYPE_VDEVKEYBOARD:
-                        ikbd.processKeyboard(&ev, shared.clientConnected);
+                        ikbd.processKeyboard(&ev, clientConnected);
                         break;
                     case INTYPE_JOYSTICK1:
                     case INTYPE_JOYSTICK2:

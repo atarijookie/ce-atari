@@ -1,26 +1,8 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 #ifndef _RESOLVE_H_
 #define _RESOLVE_H_
 
-#include <time.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <netdb.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <arpa/inet.h> 
-#include <fcntl.h>
-#include <sys/ioctl.h>
-
-#include <poll.h>
-#include <signal.h>
-#include <pthread.h>
-
-#include <stdint.h>
 #include <string>
 
 #include "../datatypes.h"
@@ -60,4 +42,3 @@ private:
 };
 
 #endif
-

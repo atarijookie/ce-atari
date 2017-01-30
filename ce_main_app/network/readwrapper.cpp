@@ -127,6 +127,7 @@ int ReadWrapper::getNdb(BYTE *tmpBuffer)                // for UDP get one datag
     if(type == TCP) {
         res = recv(fd, tmpBuffer, size, MSG_DONTWAIT); // read the data
         Debug::out(LOG_DEBUG, "ReadWrapper::getNdb() - TCP recv: %d", res);
+		//Debug::outBfr(tmpBuffer, res);
         return res;
     }
 

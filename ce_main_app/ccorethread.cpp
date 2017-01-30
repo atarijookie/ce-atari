@@ -1,5 +1,6 @@
 // vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <unistd.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -24,6 +25,8 @@
 #include "service/configservice.h"
 #include "service/floppyservice.h"
 #include "service/screencastservice.h"
+
+#include "mediastreaming/mediastreaming.h"
 
 #include "periodicthread.h"
 
@@ -88,13 +91,12 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     
     settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.scsi,          SETTINGSUSER_ACSI);
 
-    settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.translated,    SETTINGSUSER_TRANSLATED);
-    settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.translated,    SETTINGSUSER_SHARED);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) TranslatedDisk::getInstance(), SETTINGSUSER_TRANSLATED);
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) TranslatedDisk::getInstance(), SETTINGSUSER_SHARED);
 
     // give floppy setup everything it needs
     floppySetup.setAcsiDataTrans(dataTrans);
     floppySetup.setImageSilo(&floppyImageSilo);
-    floppySetup.setTranslatedDisk(shared.translated);
     floppySetup.setSettingsReloadProxy(&settingsReloadProxy);
 
     // the floppy image silo might change settings (when images are changes), add settings reload proxy
@@ -111,7 +113,6 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     netAdapter.setAcsiDataTrans(dataTrans);
 
     // set up mediastreaming service
-    mediaStreaming.setTranslatedDisk(shared.translated);
 }
 
 CCoreThread::~CCoreThread()
@@ -120,6 +121,7 @@ CCoreThread::~CCoreThread()
     delete dataTrans;
     delete retryMod;
     
+    MediaStreaming::deleteInstance();
     sharedObjects_destroy();
 }
 
@@ -131,15 +133,14 @@ void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyServi
     shared.scsi        = new Scsi();
     shared.scsi->setAcsiDataTrans(dataTrans);
 
-    shared.translated = new TranslatedDisk(dataTrans, configService, screencastService);
-    shared.translated->setSettingsReloadProxy(&settingsReloadProxy);
+    TranslatedDisk * translated = TranslatedDisk::createInstance(dataTrans, configService, screencastService);
+    translated->setSettingsReloadProxy(&settingsReloadProxy);
 
     //-----------
     // create config stream for ACSI interface
     shared.configStream.acsi = new ConfigStream(CONFIGSTREAM_ON_ATARI);
     shared.configStream.acsi->setAcsiDataTrans(dataTrans);
     shared.configStream.acsi->setSettingsReloadProxy(&settingsReloadProxy);
-    shared.configStream.acsi->setTranslatedDisk(shared.translated);
     
     // create config stream for web interface
     shared.configStream.dataTransWeb    = new AcsiDataTrans();
@@ -158,10 +159,9 @@ void CCoreThread::sharedObjects_destroy(void)
 {
     delete shared.scsi;
     shared.scsi = NULL;
-    
-    delete shared.translated;
-    shared.translated = NULL;
-    
+
+    TranslatedDisk::deleteInstance();
+
     delete shared.configStream.acsi;
     shared.configStream.acsi = NULL;
 
@@ -548,9 +548,14 @@ void CCoreThread::handleAcsiCommand(void)
         case HOSTMOD_TRANSLATED_DISK:                   // translated disk command?
             wasHandled = true;
             
-            pthread_mutex_lock(&shared.mtxTranslated);
-            shared.translated->processCommand(pCmd);
-            pthread_mutex_unlock(&shared.mtxTranslated);
+            {
+                TranslatedDisk * translated = TranslatedDisk::getInstance();
+                if(translated) {
+                    translated->mutexLock();
+                    translated->processCommand(pCmd);
+                    translated->mutexUnlock();
+                }
+            }
             break;
 
         case HOSTMOD_FDD_SETUP:                         // floppy setup command?
@@ -565,7 +570,7 @@ void CCoreThread::handleAcsiCommand(void)
 
         case HOSTMOD_MEDIA_STREAMING:
             wasHandled = true;
-            mediaStreaming.processCommand(pCmd, dataTrans);
+            MediaStreaming::getInstance()->processCommand(pCmd, dataTrans);
             break;
         }
     }
