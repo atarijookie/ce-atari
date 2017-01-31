@@ -27,8 +27,16 @@ extern SharedObjects shared;
 
 volatile TStatuses statuses;
 
-extern bool state_eth0;
-extern bool state_wlan0;
+static const char * netIfStatus(const BYTE * p)
+{
+    static char str[64];
+    if(p[0] == 0 || (p[1] == 0 && p[2] == 0 && p[3] == 0 && p[4] == 0)) {
+        snprintf(str, sizeof(str), "no");
+    } else {
+        snprintf(str, sizeof(str), "yes : %d.%d.%d.%d", (int)p[1], (int)p[2], (int)p[3], (int)p[4]);
+    }
+    return str;
+}
 
 void StatusReport::createReport(std::string &report, int reportFormat)
 {
@@ -39,9 +47,12 @@ void StatusReport::createReport(std::string &report, int reportFormat)
     // general section
     startSection(report, "general status", reportFormat);
 
+    BYTE ipaddrs[10];
+    Utils::getIpAdds(ipaddrs);
+
     dumpPair(report, "HDD interface type",      (hwConfig.hddIface == HDD_IF_ACSI) ? "ACSI" : "SCSI", reportFormat);
-    dumpPair(report, "eth0  up and running",    state_eth0  ? "yes" : "no", reportFormat);
-    dumpPair(report, "wlan0 up and running",    state_wlan0 ? "yes" : "no", reportFormat);
+    dumpPair(report, "eth0  up and running",    netIfStatus(ipaddrs),   reportFormat);
+    dumpPair(report, "wlan0 up and running",    netIfStatus(ipaddrs+5), reportFormat);
 
     char humanTime[128];
     time_t t = time(NULL);

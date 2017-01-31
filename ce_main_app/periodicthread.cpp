@@ -52,9 +52,6 @@ extern volatile BYTE updateListDownloadStatus;
 #define UPDATELIST_DOWNLOAD_TIME_ONFAIL     ( 1 * 60 * 1000)
 #define UPDATELIST_DOWNLOAD_TIME_ONSUCCESS  (30 * 60 * 1000)
 
-bool state_eth0     = false;
-bool state_wlan0    = false;
-
 static void handleConfigStreams(ConfigStream *cs, ConfigPipes &cp);
 static void updateUpdateState(void);
 

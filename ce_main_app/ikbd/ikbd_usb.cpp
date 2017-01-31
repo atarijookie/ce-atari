@@ -140,8 +140,7 @@ void Ikbd::findDevices(void)
 
 void Ikbd::findVirtualDevices(void)
 {
-    char linkBuf[PATH_BUFF_SIZE];
-    char devBuf[PATH_BUFF_SIZE];
+    char devpath[PATH_BUFF_SIZE];
 
     DIR *dir = opendir("/tmp/vdev/");                            // try to open the dir
 
@@ -156,7 +155,7 @@ void Ikbd::findVirtualDevices(void)
             break;
         }
 
-    if(de->d_type != DT_FIFO) {                                    // if it's not a fifo, skip it
+        if(de->d_type != DT_FIFO) {                                    // if it's not a fifo, skip it
             continue;
         }
 
@@ -167,30 +166,9 @@ void Ikbd::findVirtualDevices(void)
             continue;
         }
 
-        memset(linkBuf,    0, PATH_BUFF_SIZE);
-        memset(devBuf,    0, PATH_BUFF_SIZE);
+        snprintf(devpath, sizeof(devpath), "/tmp/vdev/%s", de->d_name);
 
-        strcpy(linkBuf, "/tmp/vdev");                          // create path to link files, e.g. /dev/input/by-path/usb-kbd-event
-        strcat(linkBuf, HOSTPATH_SEPAR_STRING);
-        strcat(linkBuf, de->d_name);
-
-        /*
-        int ires = readlink(linkBuf, devBuf, PATH_BUFF_SIZE);        // try to resolve the filename from the link
-        if(ires == -1) {
-                continue;
-        }
-
-        std::string pathAndFile = devBuf;
-        std::string path, file;
-        */
-
-        std::string pathAndFile = linkBuf;
-        std::string path, file;
-        Utils::splitFilenameFromPath(pathAndFile, path, file);        // get only file name, skip the path (which now is something like '../../')
-        //file = "/dev/input/" + file;                                // create full path - /dev/input/event0
-        file = "/tmp/vdev/"+file;                                // create full path - /dev/input/event0
-
-        processFoundDev(file.c_str(), file.c_str());    // and do something with that file
+        processFoundDev(devpath, devpath);    // and do something with that file
     }
 
     closedir(dir);
@@ -200,12 +178,14 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
 {
     TInputDevice *in = NULL;
     const char *what;
+    bool virtualDevice = false;
 
     Debug::out(LOG_DEBUG, "Ikbd::processFoundDev(%s, %s)", linkName, fullPath);
     if(strstr(linkName, "/tmp/vdev/mouse") != NULL) {             // it's a mouse
         if(ikbdDevs[INTYPE_VDEVMOUSE].fd == -1) {             // don't have mouse?
             in = &ikbdDevs[INTYPE_VDEVMOUSE];
             what = "/tmp/vdev/mouse";
+            virtualDevice = true;
         } else {                                        // already have a mouse?
             logDebugAndIkbd(LOG_DEBUG, "%s: already have a mouse", fullPath);
             return;
@@ -214,6 +194,7 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
         if(ikbdDevs[INTYPE_VDEVKEYBOARD].fd == -1) {          // don't have keyboard?
             in = &ikbdDevs[INTYPE_VDEVKEYBOARD];
             what = "/tmp/vdev/keyboard";
+            virtualDevice = true;
         } else {                                        // already have a keyboard?
             logDebugAndIkbd(LOG_DEBUG, "%s: already have a keyboard", fullPath);
             return;
@@ -273,8 +254,10 @@ void Ikbd::processFoundDev(const char *linkName, const char *fullPath)
     strcpy(in->devPath, fullPath);
     logDebugAndIkbd(LOG_DEBUG, "Got device (%s): %s", what, fullPath);
 
-    grabExclusiveAccess(fd);
-    keyboardExclusiveAccess = true;
+    if(!virtualDevice) {
+        grabExclusiveAccess(fd);
+        keyboardExclusiveAccess = true;
+    }
 }
 
 void Ikbd::processMouse(input_event *ev)
@@ -654,14 +637,14 @@ void Ikbd::toggleKeyboardExclusiveAccess(void)
 void Ikbd::grabExclusiveAccess(int fd)
 {
     if(ioctl(fd, EVIOCGRAB, (void*)1) < 0) { // grab exclusive
-        logDebugAndIkbd(LOG_ERROR, "Ikbd::grabExclusiveAccess() ioctl failed : ", strerror(errno));
+        logDebugAndIkbd(LOG_ERROR, "Ikbd::grabExclusiveAccess() ioctl failed : %s", strerror(errno));
     }
 }
 
 void Ikbd::releaseExclusiveAccess(int fd)
 {
     if(ioctl(fd, EVIOCGRAB, (void*)0) < 0) { // release
-        logDebugAndIkbd(LOG_ERROR, "Ikbd::releaseExclusiveAccess() ioctl failed : ", strerror(errno));
+        logDebugAndIkbd(LOG_ERROR, "Ikbd::releaseExclusiveAccess() ioctl failed : %s", strerror(errno));
     }
 }
 
