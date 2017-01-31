@@ -46,6 +46,7 @@ BYTE getCEid            (BYTE anyCEnotOnlySD);
 BYTE getSDcardInfo      (BYTE deviceID);
 void showSDcardCapacity (void);
 BYTE enableCEids        (BYTE ceId);
+BYTE readBootsectorAndIdentifyContent(void);
 
 struct {
     BYTE  id;                       // assigned ACSI ID
@@ -203,19 +204,63 @@ int main( int argc, char* argv[] )
     (void) Cconws("\r\n");
 
     //-------------
-    // TODO: read boot sector from SD card, if it contains some other driver, warn user
+    // read boot sector from SD card and show what's in it
+    res = readBootsectorAndIdentifyContent();
+
+    if(!res) {
+        (void) Cconws("Press any key to terminate...\r\n");
+
+        Cnecin();
+        return 0;
+    }
 
     //-------------
-    // TODO: warn user that if he will proceed, he will loose data
+    // warn user that if he will proceed, he will loose data
+
+    (void) Cconws("\r\n");
+    //                |                                        |
+    (void) Cconws("\33p   [      Point of no return       ]    \33q\r\n");
+
+    //            |                                        |
+    (void) Cconws("We're ready to partition your card.      \r\n");
+    (void) Cconws("If you will proceed further, you will    \r\n");
+    (void) Cconws("loose any existing data on the SD card.  \r\n");
+    (void) Cconws("To continue, type YES (or 'q' to quit).  \r\n");
+
+    while(1) {
+        (void) Cconws("\r\nYour choice           : ");
+
+        char answer[12];
+        answer[0] = sizeof(answer - 1);     // how much characters can be entered
+        Cconrs(answer);
+
+        if(answer[1] == 0) {                // nothing entered? try again
+            continue;
+        }
+
+        if(answer[1] == 1 && (answer[2] == 'q' || answer[2] == 'Q')) {  // quit instead of write? 
+            (void) Cconws("Nothing was written to card and quitting\r\n");
+            sleep(3);
+            return 0;
+        }
+
+        if(answer[1] == 3 && memcmp(answer + 2, "YES", 3) == 0) {       // correct answer for continuing? good
+            break;
+        }
+    }
 
     //-------------
     // TODO: if continuing, write boot sector and everything needed for partitioning
 
-    //-------------
-    // TODO: show message that we're done and we need to reset the ST to apply new settings
 
     //-------------
+    // show message that we're done and we need to reset the ST to apply new settings
+    //            |                                        |
+    (void) Cconws("The SD card was paritioned and SD NOOB  \r\n");
+    (void) Cconws("driver was activated. Reset your ST to  \r\n");
+    (void) Cconws("access your card...\r\n");
 
+    Cnecin();
     return 0;
 }
 
@@ -258,6 +303,77 @@ void getCE_API(void)
     }
 }
 //--------------------------------------------
+BYTE readWriteSector(BYTE deviceId, BYTE readNotWrite, DWORD sectorNumber)
+{
+    BYTE cmd[CMD_LENGTH_SHORT];
+
+    memset(cmd, 0, 6);
+
+    if(readNotWrite) {      // read
+        cmd[0] = (deviceId << 5) | SCSI_C_READ6;
+    } else {                // write
+        cmd[0] = (deviceId << 5) | SCSI_C_WRITE6;
+    }
+
+    cmd[1] = (sectorNumber >> 16) & 0x1f;       // 5 bits only (1 GB limit)
+    cmd[2] = (sectorNumber >>  8);
+    cmd[3] = (sectorNumber      );
+
+    cmd[4] = 1;                                 // 1 sector at the time
+
+    hdIfCmdAsUser(readNotWrite, cmd, CMD_LENGTH_SHORT, pDmaBuffer, 1); // issue the inquiry command and check the result 
+
+    if(!hdIf->success || hdIf->statusByte != SCSI_STATUS_OK) {      // if failed, return FALSE 
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+//--------------------------------------------
+WORD calculateChecksum(WORD *pBfr)
+{
+    WORD sum = 0;
+    int  i;
+
+    for(i=0; i<256; i++) {  // sum WORDs of bootsector
+        sum += *pBfr;
+        pBfr++;
+    }
+
+    return sum;
+}
+
+//--------------------------------------------
+BYTE readBootsectorAndIdentifyContent(void)
+{
+    BYTE res;
+
+    res = readWriteSector(SDcard.id, TRUE, 0);
+
+    if(!res) {
+        (void) Cconws("Failed to read boot sector.\r\n");
+        return FALSE;
+    }
+
+    (void) Cconws("Boot sector content   : ");
+
+    WORD sum = calculateChecksum((WORD *) pDmaBuffer);
+
+    if(sum == 0x1234) {                                                 // atari bootsector checksum ok?
+        (void) Cconws("bootable code\r\n");
+    } else if(pDmaBuffer[510] == 0x55 && pDmaBuffer[511] == 0xaa) {     // PC boot signature?
+        (void) Cconws("PC partition\r\n");
+    } else if(memcmp(pDmaBuffer + 3, "SDNOO", 5) == 0) {                // SD noob signature?
+        (void) Cconws("SD NOOB signature\r\n");
+    } else {                                                            // there's something else in the boot sector
+        (void) Cconws("something else\r\n");
+    }
+
+    return TRUE;
+}
+//--------------------------------------------
+
 BYTE cs_inquiry(BYTE id)
 {
     BYTE cmd[CMD_LENGTH_SHORT];

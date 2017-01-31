@@ -7,6 +7,9 @@
 #define ACSI_READ           1
 #define ACSI_WRITE          0
 
+#define SCSI_C_WRITE6       0x0a
+#define SCSI_C_READ6        0x08
+
 #define TEST_GET_ACSI_IDS   0x92
 #define TEST_SET_ACSI_ID    0x93
 
