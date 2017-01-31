@@ -60,6 +60,8 @@ BYTE *pLargeMem;
 DWORD largeMemSizeInBytes;
 DWORD largeMemSizeInSectors;
 
+void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+
 //--------------------------------------------------
 int main(void)
 {
@@ -269,7 +271,7 @@ int main(void)
         }
 
         if(key == 'l' || key == 'L') {
-            Supexec(largeRead);
+            largeRead();
         }
         
         if(key == 'f') {
@@ -350,7 +352,7 @@ void largeRead(void)
     commandLong[8] = (BYTE) (largeMemSizeInSectors >> 8);
     commandLong[9] = (BYTE) (largeMemSizeInSectors     );
     
-    (*hdIf.cmd) (1, commandLong, 11, pLargeMem, largeMemSizeInSectors);
+    hdIfCmdAsUser(1, commandLong, 11, pLargeMem, largeMemSizeInSectors);
 
     (void) Cconws("Command success: ");
     showHexByte(hdIf.success);
@@ -378,7 +380,7 @@ int readHansTest(int byteCount, WORD xorVal, BYTE verbose)
         (void) Cconws("CE READ: ");
     }
     
-    (*hdIf.cmd) (ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, byteCount >> 9);      // issue the command and check the result
+    hdIfCmdAsUser(ACSI_READ, commandLong, CMD_LENGTH_LONG, pBuffer, byteCount >> 9);      // issue the command and check the result
     
     if(!hdIf.success) {                                                                  // ACSI ERROR?
         return -1;
@@ -423,7 +425,7 @@ void cs_inquiry(BYTE id, BYTE verbose)
     }    
     
     // issue the inquiry command and check the result 
-    (*hdIf.cmd) (1, cmd, 6, pBuffer, 1);
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);
 
     if(!hdIf.success || verbose) {  // if fail or verbose, show result
         (void) Cconws("SCSI result : ");
@@ -512,7 +514,7 @@ BYTE ce_identify(BYTE bus_id)
     cmd[0] = (bus_id << 5);                   // cmd[0] = ACSI_id + TEST UNIT READY (0)	
     memset(pBuffer, 0, 512);                  // clear the buffer 
 
-    (*hdIf.cmd)(1, cmd, 6, pBuffer, 1);       // issue the identify command and check the result 
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);       // issue the identify command and check the result 
 
     if(!hdIf.success) {                       // if failed, return FALSE 
         return 0;
@@ -597,7 +599,7 @@ int writeHansTest(int byteCount, WORD xorVal)
     }
 
     (void) Cconws("CE WRITE: ");
-    (*hdIf.cmd) (ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBuffer, byteCount >> 9);     // issue the command and check the result
+    hdIfCmdAsUser(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBuffer, byteCount >> 9);     // issue the command and check the result
     
     if(hdIf.statusByte == E_CRC) {                                                            
         return -2;
@@ -664,5 +666,30 @@ void showInt(int value, int length)
     }
 
     (void) Cconws(tmp);                     // write it out
+}
+
+//--------------------------------------------------
+// global variables, later used for calling hdIfCmdAsSuper
+BYTE __readNotWrite, __cmdLength;
+WORD __sectorCount;
+BYTE *__cmd, *__buffer;
+
+void hdIfCmdAsSuper(void)
+{
+    // this should be called through Supexec()
+    (*hdIf.cmd)(__readNotWrite, __cmd, __cmdLength, __buffer, __sectorCount);
+}
+
+void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
+{
+    // store params to global vars
+    __readNotWrite  = readNotWrite;
+    __cmd           = cmd;
+    __cmdLength     = cmdLength;
+    __buffer        = buffer;
+    __sectorCount   = sectorCount;    
+    
+    // call the function which does the real work, and uses those global vars
+    Supexec(hdIfCmdAsSuper);
 }
 
