@@ -8,6 +8,8 @@
 #define ACSI_WRITE          0
 
 #define TEST_GET_ACSI_IDS   0x92
+#define TEST_SET_ACSI_ID    0x93
+
 #define SCSI_CMD_INQUIRY    0x12
 
 #define SCSI_STATUS_OK      0

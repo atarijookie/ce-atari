@@ -8,6 +8,7 @@
 
 #include "dirtranslator.h"
 #include "../isettingsuser.h"
+#include "../settings.h"
 
 class ConfigService;
 class ScreencastService;
@@ -256,6 +257,10 @@ private:
     void onTestRead(BYTE *cmd);
     void onTestWrite(BYTE *cmd);
     void onTestGetACSIids(BYTE *cmd);
+    
+    void onSetACSIids(BYTE *cmd);
+    int  findCurrentIDforDevType(int devType, AcsiIDinfo *aii);
+    
     void getScreenShotConfig(BYTE *cmd);
     
     // helper functions

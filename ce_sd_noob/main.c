@@ -191,7 +191,9 @@ int main( int argc, char* argv[] )
     res = enableCEids(ceId);
 
     if(!res) {
-        // TODO: show error message
+        (void) Cconws("Press any key to terminate...\r\n");
+
+        Cnecin();
         return 0;
     }
 
@@ -352,10 +354,23 @@ BYTE getCEid(BYTE anyCEnotOnlySD)
 }
 
 //--------------------------------------------------
-BYTE enableACSIidType(BYTE xCSIid, BYTE devType)
+BYTE enableACSIidType(BYTE ceId, BYTE xCSIid, BYTE devType)
 {
+    // set xCSIid to devType in CE
+    
+    BYTE cmd[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TEST_SET_ACSI_ID, 0};
 
-    // TODO: set xCSIid to devType in CE
+    cmd[0] = (ceId << 5);                                   // cmd[0] = CE ceId + TEST UNIT READY (0)   
+    memset(pDmaBuffer, 0, 512);                             // clear the buffer 
+
+    pDmaBuffer[0] = xCSIid;                                 // set this ID...
+    pDmaBuffer[1] = devType;                                // ...to this device type
+    
+    hdIfCmdAsUser(ACSI_WRITE, cmd, CMD_LENGTH_SHORT, pDmaBuffer, 1); 
+
+    if(!hdIf->success || hdIf->statusByte != 0) {           // if command failed...
+        return FALSE;
+    }
 
     return TRUE;
 }
@@ -375,7 +390,7 @@ BYTE enableCEids(BYTE ceId)
     hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, pDmaBuffer, 1); 
 
     if(!hdIf->success || hdIf->statusByte != 0) {           // if command failed...
-        // TODO: add error string 
+        (void) Cconws("Failed to get info from CosmosEx\r\n");
         return FALSE;
     }
 
@@ -391,21 +406,48 @@ BYTE enableCEids(BYTE ceId)
     // find the CE_DD device ID
     BYTE id_cedd = findFirstIDofType(DEVTYPE_TRANSLATED, 0); // find first CE_DD ID, which we would like to boot
 
-    // TODO: if CE_DD is found, but it's on ID 7, then the rest will fail
+    // if CE_DD is found, but it's on ID 7 (or 6, on TT SCSI), move it to lower ID, so we will have free slot for SD
+    if(id_cedd >= 6) {
+        BYTE emptyId;
+        emptyId = findFirstIDofType(DEVTYPE_NOTHING, 0);    // find an empty slot
 
+        if(emptyId == 0xff) {                               // couldn't find empty slot? fail!
+            (void) Cconws("No free slot for reallocation of CE_DD!\r\n"); 
+            return FALSE;
+        }
+        
+        if(emptyId >= 6) {                                  // the new ID is still too high? fail
+            (void) Cconws("Reallocation of CE_DD failed.\r\n"); 
+            return FALSE;
+        }
+
+        res = enableACSIidType(ceId, emptyId, DEVTYPE_TRANSLATED);  // set new ID to CE_DD, that should also disable CE_DD on old ID
+
+        if(!res) {                                          // if failed to set this dev type to ID, fail
+            (void) Cconws("Failed to reallocate CE_DD on bus!\r\n");
+            return FALSE;
+        }
+        
+        devicesOnBus[id_cedd] = DEVTYPE_NOTHING;            // old slot: now nothing
+        devicesOnBus[emptyId] = DEVTYPE_TRANSLATED;         // new slot: now CE_DD
+        
+        id_cedd = emptyId;                                  // this is the new CE_DD ID
+    }
+
+    // if CE_DD wasn't found, try to enable it
     if(id_cedd == 0xff) {                                   // if CE_DD is not enabled on bus, we need to enable it first
         BYTE emptyId;
         emptyId = findFirstIDofType(DEVTYPE_NOTHING, 0);    // find an empty slot
 
         if(emptyId == 0xff) {                               // couldn't find empty slot? fail!
-            // TODO: add error string 
+            (void) Cconws("No free slot on bus for CE_DD!\r\n"); 
             return FALSE;
         }
 
-        res = enableACSIidType(emptyId, DEVTYPE_TRANSLATED); // enable CE_DD on this ID
+        res = enableACSIidType(ceId, emptyId, DEVTYPE_TRANSLATED);  // enable CE_DD on this ID
 
         if(!res) {                                          // if failed to set this dev type to ID, fail
-            // TODO: add error string 
+            (void) Cconws("Failed to enable CE_DD on bus!\r\n");
             return FALSE;
         }
 
@@ -417,24 +459,24 @@ BYTE enableCEids(BYTE ceId)
     // find the SD ID
     BYTE id_sd = findFirstIDofType(DEVTYPE_SD, id_cedd);    // find first SD ID, which we would like to access, and let it be after CE_DD ID (we want that to boot)
 
-    // TODO: the previous could also fail, if you set id_cedd to 7 (no free space behind it)
-    // this will return 0xff, if SD exists, but it's before CE_DD, which is wrong
+    // id_sd now might be:
+    // number 1 to 7 -- OK
+    // number 0xff   -- if SD isn't on bus at all
+    // number 0xff   -- if SD is on the bus, but it's on lower ID than id_cedd, which is not good for our situation - we need CE_DD first, then SD
 
-    if(id_sd == 0xff) {                                     // if SD is not enabled on bus, we need to enable it
+    if(id_sd == 0xff) {                                     // if SD is not enabled on bus (or is before CE_DD), we need to enable it (move it)
         BYTE emptyId;
         emptyId = findFirstIDofType(DEVTYPE_NOTHING, id_cedd);  // find an empty slot after CE_DD ID (we want that to boot)
 
-        // TODO: the previous could also fail, if you set id_cedd to 7 (no free space behind it)
-
         if(emptyId == 0xff) {                               // couldn't find empty slot? fail!
-            // TODO: add error string 
+            (void) Cconws("No free slot on bus for SD!\r\n");
             return FALSE;
         }
 
-        res = enableACSIidType(emptyId, DEVTYPE_SD);        // enable SD on this ID
+        res = enableACSIidType(ceId, emptyId, DEVTYPE_SD);  // enable SD on this ID
 
         if(!res) {                                          // if failed to set this dev type to ID, fail
-            // TODO: add error string 
+            (void) Cconws("Failed to enable SD on bus!\r\n");
             return FALSE;
         }
 
