@@ -29,6 +29,23 @@ BYTE commandLong [CMD_LENGTH_LONG]  = {0x1f, 0, 'C', 'E', HOSTMOD_TRANSLATED_DIS
 
 void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 
+// ------------------------------------------------------------------
+typedef struct {
+    DWORD maxSizeMB;
+    DWORD maxSizeSectors;
+
+    BYTE  sectorsPerCluster;
+    WORD  reservedSectors;
+    WORD  sectorsPerFat;
+    WORD  sectorsPerTrack;
+    WORD  numberOfHeads;
+    DWORD hiddenSectors;
+} TBpb;
+
+TBpb bpb0255 = { 256, 0x07F800, 0x10, 0x0009, 0x0040, 0x003a, 0x0009, 0x003a};
+TBpb bpb0511 = { 512, 0x0FF800, 0x20, 0x0011, 0x0080, 0x003e, 0x0011, 0x003e};
+TBpb bpb1023 = {1024, 0x1FF800, 0x40, 0x0021, 0x0080, 0x003f, 0x0021, 0x003f};
+
 //--------------------------
 // DEVTYPE values really sent from CE
 #define DEVTYPE_OFF         0
@@ -48,7 +65,7 @@ void showSDcardCapacity (void);
 BYTE enableCEids        (BYTE ceId);
 
 BYTE readBootsectorAndIdentifyContent   (void);
-BYTE writeBootAndOtherSectors           (DWORD partitionSizeMB);
+BYTE writeBootAndOtherSectors           (TBpb *partParams);
 
 struct {
     BYTE  id;                       // assigned ACSI ID
@@ -61,6 +78,8 @@ int main( int argc, char* argv[] )
 {
     memset(devicesOnBus, 0, sizeof(devicesOnBus));
     pDmaBuffer = (BYTE *) dmaBuffer;
+    
+    TBpb *partParams;
     
     // write some header out
     Clear_home();
@@ -110,16 +129,14 @@ int main( int argc, char* argv[] )
     // show maximum partition size
     (void) Cconws("Maximum partition size: ");
 
-    WORD maximumPartitionSizeMB;
-
     if(tosVersion <= 0x0102) {          // TOS 1.02 and older
-        maximumPartitionSizeMB =  256;
+        partParams = &bpb0255;
         (void) Cconws("256 MB\r\n");
     } else if(tosVersion < 0x0400) {    // TOS 1.04 - 3.0x
-        maximumPartitionSizeMB =  512;
+        partParams = &bpb0511;
         (void) Cconws("512 MB\r\n");
     } else {                            // TOS 4.0x
-        maximumPartitionSizeMB = 1024;
+        partParams = &bpb1023;
         (void) Cconws("1024 MB\r\n");
     } 
 
@@ -172,6 +189,19 @@ int main( int argc, char* argv[] )
 
         if(SDcard.isInit) {             // if got the card, we can quit
             (void) Cconws("YES\r\n");
+
+            DWORD capacityMB = SDcard.SCapacity >> 11;
+            if(capacityMB < partParams->maxSizeMB) {
+                (void) Cconws("SD card is smaller than max partition.\r\n");
+                (void) Cconws("Please insert larger SD card.\r\n");
+                
+                Cnecin();
+                VT52_Del_line();    VT52_Cur_up();
+                VT52_Del_line();    VT52_Cur_up();
+                VT52_Del_line();
+                continue;                
+            }
+
             break;
         }
 
@@ -253,7 +283,7 @@ int main( int argc, char* argv[] )
 
     //-------------
     // if continuing, write boot sector and everything needed for partitioning
-    res = writeBootAndOtherSectors(maximumPartitionSizeMB);
+    res = writeBootAndOtherSectors(partParams);
 
     if(!res) {
         (void) Cconws("Press any key to terminate...\r\n");
@@ -352,9 +382,22 @@ WORD calculateChecksum(WORD *pBfr)
 
     return sum;
 }
-
 //--------------------------------------------
-BYTE writeMBR(DWORD partitionSizeSectors)
+void storeIntelDword(BYTE *p, DWORD value)
+{
+    p[0] = (BYTE) (value      );
+    p[1] = (BYTE) (value >>  8);
+    p[2] = (BYTE) (value >> 16);
+    p[3] = (BYTE) (value >> 24);
+}
+//--------------------------------------------
+void storeIntelWord(BYTE *p, WORD value)
+{
+    p[0] = (BYTE) (value      );
+    p[1] = (BYTE) (value >>  8);
+}
+//--------------------------------------------
+BYTE writeMBR(TBpb *partParams)
 {
     BYTE res;
     
@@ -367,29 +410,19 @@ BYTE writeMBR(DWORD partitionSizeSectors)
     ////////////////////////
     // START: PC partition entry #1 - starting at 0x1be
     // CHS of first absolute sector in partition
-//  pDmaBuffer[0x1bf]
-//  pDmaBuffer[0x1c0]
-//  pDmaBuffer[0x1c1]
-
-    pDmaBuffer[0x1c2] = 0x06;       // partition type: FAT16B
+    memcpy(pDmaBuffer + 0x1bf, "\x01\x01\x00\x06", 4);  // head 1, sector 1, cylinder 0, partition type: FAT16B
 
     // CHS of last absolute sector in partition
 //  pDmaBuffer[0x1c3]
 //  pDmaBuffer[0x1c4]
 //  pDmaBuffer[0x1c5]
-/*
+
     // LBA of first absolute sector in partition
-    pDmaBuffer[0x1c6] = ;
-    pDmaBuffer[0x1c7] = ;
-    pDmaBuffer[0x1c8] = ;
-    pDmaBuffer[0x1c9] = ;
+    storeIntelDword(pDmaBuffer + 0x1c6, partParams->hiddenSectors);
 
     // number of sectors in partition
-    pDmaBuffer[0x1ca] = ;
-    pDmaBuffer[0x1cb] = ;
-    pDmaBuffer[0x1cc] = ;
-    pDmaBuffer[0x1cd] = ;
-*/
+    storeIntelDword(pDmaBuffer + 0x1ca, partParams->maxSizeSectors + 1);
+
     // END: PC partition entry #1 
     ////////////////////////
     // START: Atari Partition Header #2  - starting at 0x1d2
@@ -399,8 +432,8 @@ BYTE writeMBR(DWORD partitionSizeSectors)
     DWORD *p_st     = (DWORD *) (pDmaBuffer + 0x1e2);
     DWORD *p_size   = (DWORD *) (pDmaBuffer + 0x1e6);
 
-    *p_st   = 0x40;                         // p_st   - starting at sector 0x40
-    *p_size = partitionSizeSectors;         // p_size - store partition size in sectors
+    *p_st   = partParams->hiddenSectors + 1;    // p_st   - starting at sector - right after the PC starting sector
+    *p_size = partParams->maxSizeSectors;       // p_size - store partition size in sectors
     // END: Atari Partition Header #2
     ////////////////////////
     
@@ -417,19 +450,36 @@ BYTE writeMBR(DWORD partitionSizeSectors)
     return TRUE;
 }
 //--------------------------------------------
-BYTE writePcPartitionSector0(DWORD partitionSizeSectors)
+BYTE writePcPartitionSector0(TBpb *partParams)
 {
     BYTE res;
 
     memset(pDmaBuffer, 0, 512);
     
-    // FAT16 Boot Sector according to MS TechNet
+    // BPB Fields for FAT16 Volumes (according to MS TechNet)
+    memcpy         (pDmaBuffer + 0x000, "\xEB\x3C\x90MSDOS5.0\x00\x02", 13);    // jump instruction, OEM ID, bytes per sector
     
-    memcpy(pDmaBuffer + 0x000, "\xEB\x3C\x90MSDOS5.0", 11);     // jump instruction, OEM ID
+    pDmaBuffer[0x0d] = partParams->sectorsPerCluster;                   // sectors per cluster
+    storeIntelWord (pDmaBuffer + 0x0e, partParams->reservedSectors);    // reserved sectors
 
+    memcpy         (pDmaBuffer + 0x10, "\x02\x00\x02\x00\x00\xf8", 6);  // number of FATs, root entries, small sectors, media descriptor
     
+    storeIntelWord (pDmaBuffer + 0x16, partParams->sectorsPerFat);      // sectors per FAT
+    storeIntelWord (pDmaBuffer + 0x18, partParams->sectorsPerTrack);    // sectors per track
+    storeIntelWord (pDmaBuffer + 0x1a, partParams->numberOfHeads);      // number of heads
+    storeIntelDword(pDmaBuffer + 0x1c, partParams->hiddenSectors);      // hidden sectors
+    storeIntelDword(pDmaBuffer + 0x20, partParams->maxSizeSectors);     // Large Sectors
     
-    memcpy(pDmaBuffer + 0x1fe, "\x55\xAA", 2);                  // End of Sector Marker
+    // Extended BPB Fields for FAT16 Volumes
+    memcpy         (pDmaBuffer + 0x24, "\x80\x00\x29", 3);              // Physical Drive Number, Reserved, Extended boot signature
+    
+    DWORD serialNumber = Supexec(getTicks);                             // current 200 Hz timer value will be used as serial number
+    storeIntelDword(pDmaBuffer + 0x27, serialNumber);                   // serial number
+
+    memcpy         (pDmaBuffer + 0x24, "SD NOOB    ", 11);              // Volume Label. A field once used to store the volume label.
+    memcpy         (pDmaBuffer + 0x36, "FAT16   ",     8);              // File System Type, LONGLONG
+    
+    memcpy         (pDmaBuffer + 0x1fe, "\x55\xAA", 2);                 // End of Sector Marker
 
     res = readWriteSector(SDcard.id, FALSE, 0x3f);
     
@@ -442,26 +492,17 @@ BYTE writePcPartitionSector0(DWORD partitionSizeSectors)
 }
 
 //--------------------------------------------
-BYTE writeBootAndOtherSectors(DWORD partitionSizeMB)
+BYTE writeBootAndOtherSectors(TBpb *partParams)
 {
     BYTE res;
 
-    partitionSizeMB--;              // in comes the maximum partition size (e.g. 256 MB), but we will reduce by it 1 MB, to make it fit in the FAT (e.g. to 255 MB)
-    
-    DWORD partitionSizeSectors = partitionSizeMB << 11;             // convert MB into sectors
-    
-    if(partitionSizeSectors > SDcard.SCapacity) {                   // if the card is smaller than what we can maximally have...
-        partitionSizeSectors = SDcard.SCapacity - 2048;             // reduce it to (SD_card_size - 1 MB)
-        partitionSizeSectors = partitionSizeSectors & 0xfffff800;   // round it down to neares MB
-    }
-
-    res = writeMBR(partitionSizeSectors);
+    res = writeMBR(partParams);
     
     if(!res) {
         return FALSE;
     }
     
-    res = writePcPartitionSector0(partitionSizeSectors);
+    res = writePcPartitionSector0(partParams);
 
     if(!res) {
         return FALSE;
