@@ -400,13 +400,13 @@ void storeIntelWord(BYTE *p, WORD value)
 BYTE writeMBR(TBpb *partParams)
 {
     BYTE res;
-    
+
     //---------------------------
     // generate boot sector (MBR)
     memset(pDmaBuffer, 0, 512);
-    
+
     memcpy(pDmaBuffer + 3, "SDNOO", 5); // this is our signature, it will tell CE_DD to enable SD NOOB over this SD card
-    
+
     ////////////////////////
     // START: PC partition entry #1 - starting at 0x1be
     // CHS of first absolute sector in partition
@@ -428,7 +428,7 @@ BYTE writeMBR(TBpb *partParams)
     // START: Atari Partition Header #2  - starting at 0x1d2
     pDmaBuffer[0x1de] = 0x01;               // p_flg  - not bootable, does exist
     memcpy(pDmaBuffer + 0x1df, "BGM", 3);   // p_id   - BGM - bit partition
-    
+
     DWORD *p_st     = (DWORD *) (pDmaBuffer + 0x1e2);
     DWORD *p_size   = (DWORD *) (pDmaBuffer + 0x1e6);
 
@@ -436,17 +436,17 @@ BYTE writeMBR(TBpb *partParams)
     *p_size = partParams->maxSizeSectors;       // p_size - store partition size in sectors
     // END: Atari Partition Header #2
     ////////////////////////
-    
+
     pDmaBuffer[0x1fe] = 0x55;
     pDmaBuffer[0x1ff] = 0xaa;
-    
-    res = readWriteSector(SDcard.id, FALSE, 0);
-    
+
+    res = readWriteSector(SDcard.id, ACSI_WRITE, 0);
+
     if(!res) {
         (void) Cconws("Failed to write MBR!\r\n");
         return FALSE;
     }
-    
+
     return TRUE;
 }
 //--------------------------------------------
@@ -455,39 +455,63 @@ BYTE writePcPartitionSector0(TBpb *partParams)
     BYTE res;
 
     memset(pDmaBuffer, 0, 512);
-    
+
     // BPB Fields for FAT16 Volumes (according to MS TechNet)
     memcpy         (pDmaBuffer + 0x000, "\xEB\x3C\x90MSDOS5.0\x00\x02", 13);    // jump instruction, OEM ID, bytes per sector
-    
+
     pDmaBuffer[0x0d] = partParams->sectorsPerCluster;                   // sectors per cluster
     storeIntelWord (pDmaBuffer + 0x0e, partParams->reservedSectors);    // reserved sectors
 
     memcpy         (pDmaBuffer + 0x10, "\x02\x00\x02\x00\x00\xf8", 6);  // number of FATs, root entries, small sectors, media descriptor
-    
+
     storeIntelWord (pDmaBuffer + 0x16, partParams->sectorsPerFat);      // sectors per FAT
     storeIntelWord (pDmaBuffer + 0x18, partParams->sectorsPerTrack);    // sectors per track
     storeIntelWord (pDmaBuffer + 0x1a, partParams->numberOfHeads);      // number of heads
     storeIntelDword(pDmaBuffer + 0x1c, partParams->hiddenSectors);      // hidden sectors
     storeIntelDword(pDmaBuffer + 0x20, partParams->maxSizeSectors);     // Large Sectors
-    
+
     // Extended BPB Fields for FAT16 Volumes
     memcpy         (pDmaBuffer + 0x24, "\x80\x00\x29", 3);              // Physical Drive Number, Reserved, Extended boot signature
-    
+
     DWORD serialNumber = Supexec(getTicks);                             // current 200 Hz timer value will be used as serial number
     storeIntelDword(pDmaBuffer + 0x27, serialNumber);                   // serial number
 
     memcpy         (pDmaBuffer + 0x24, "SD NOOB    ", 11);              // Volume Label. A field once used to store the volume label.
     memcpy         (pDmaBuffer + 0x36, "FAT16   ",     8);              // File System Type, LONGLONG
-    
+
     memcpy         (pDmaBuffer + 0x1fe, "\x55\xAA", 2);                 // End of Sector Marker
 
-    res = readWriteSector(SDcard.id, FALSE, 0x3f);
-    
+    res = readWriteSector(SDcard.id, ACSI_WRITE, partParams->hiddenSectors);
+
     if(!res) {
         (void) Cconws("Failed to write PC part sector 0!\r\n");
         return FALSE;
     }
-    
+
+    return TRUE;
+}
+//--------------------------------------------
+BYTE writeAtariPartitionSector0(TBpb *partParams)
+{
+    BYTE res;
+
+    memset(pDmaBuffer, 0, 512);
+
+    // BPB Fields for FAT16 Volumes (according to MS TechNet)
+    memcpy         (pDmaBuffer + 0x000, "\xEB\x3C\x90MSDOS5.0", 11);    // jump instruction, OEM ID
+
+
+
+
+
+
+    res = readWriteSector(SDcard.id, ACSI_WRITE, partParams->hiddenSectors + 1);
+
+    if(!res) {
+        (void) Cconws("Failed to write Atari part sector 0!\r\n");
+        return FALSE;
+    }
+
     return TRUE;
 }
 
@@ -497,17 +521,23 @@ BYTE writeBootAndOtherSectors(TBpb *partParams)
     BYTE res;
 
     res = writeMBR(partParams);
-    
+
     if(!res) {
         return FALSE;
     }
-    
+
     res = writePcPartitionSector0(partParams);
 
     if(!res) {
         return FALSE;
     }
-    
+
+    res = writeAtariPartitionSector0(partParams);
+
+    if(!res) {
+        return FALSE;
+    }
+
     return TRUE;
 }
 
@@ -516,7 +546,7 @@ BYTE readBootsectorAndIdentifyContent(void)
 {
     BYTE res;
 
-    res = readWriteSector(SDcard.id, TRUE, 0);
+    res = readWriteSector(SDcard.id, ACSI_READ, 0);
 
     if(!res) {
         (void) Cconws("Failed to read boot sector.\r\n");
