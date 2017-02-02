@@ -46,7 +46,9 @@ BYTE getCEid            (BYTE anyCEnotOnlySD);
 BYTE getSDcardInfo      (BYTE deviceID);
 void showSDcardCapacity (void);
 BYTE enableCEids        (BYTE ceId);
-BYTE readBootsectorAndIdentifyContent(void);
+
+BYTE readBootsectorAndIdentifyContent   (void);
+BYTE writeBootAndOtherSectors           (DWORD partitionSizeMB);
 
 struct {
     BYTE  id;                       // assigned ACSI ID
@@ -108,16 +110,16 @@ int main( int argc, char* argv[] )
     // show maximum partition size
     (void) Cconws("Maximum partition size: ");
 
-    WORD partitionSizeMB;
+    WORD maximumPartitionSizeMB;
 
     if(tosVersion <= 0x0102) {          // TOS 1.02 and older
-        partitionSizeMB =  256;
+        maximumPartitionSizeMB =  256;
         (void) Cconws("256 MB\r\n");
     } else if(tosVersion < 0x0400) {    // TOS 1.04 - 3.0x
-        partitionSizeMB =  512;
+        maximumPartitionSizeMB =  512;
         (void) Cconws("512 MB\r\n");
     } else {                            // TOS 4.0x
-        partitionSizeMB = 1024;
+        maximumPartitionSizeMB = 1024;
         (void) Cconws("1024 MB\r\n");
     } 
 
@@ -250,8 +252,15 @@ int main( int argc, char* argv[] )
     }
 
     //-------------
-    // TODO: if continuing, write boot sector and everything needed for partitioning
+    // if continuing, write boot sector and everything needed for partitioning
+    res = writeBootAndOtherSectors(maximumPartitionSizeMB);
 
+    if(!res) {
+        (void) Cconws("Press any key to terminate...\r\n");
+
+        Cnecin();
+        return 0;
+    }
 
     //-------------
     // show message that we're done and we need to reset the ST to apply new settings
@@ -342,6 +351,123 @@ WORD calculateChecksum(WORD *pBfr)
     }
 
     return sum;
+}
+
+//--------------------------------------------
+BYTE writeMBR(DWORD partitionSizeSectors)
+{
+    BYTE res;
+    
+    //---------------------------
+    // generate boot sector (MBR)
+    memset(pDmaBuffer, 0, 512);
+    
+    memcpy(pDmaBuffer + 3, "SDNOO", 5); // this is our signature, it will tell CE_DD to enable SD NOOB over this SD card
+    
+    ////////////////////////
+    // START: PC partition entry #1 - starting at 0x1be
+    // CHS of first absolute sector in partition
+//  pDmaBuffer[0x1bf]
+//  pDmaBuffer[0x1c0]
+//  pDmaBuffer[0x1c1]
+
+    pDmaBuffer[0x1c2] = 0x06;       // partition type: FAT16B
+
+    // CHS of last absolute sector in partition
+//  pDmaBuffer[0x1c3]
+//  pDmaBuffer[0x1c4]
+//  pDmaBuffer[0x1c5]
+/*
+    // LBA of first absolute sector in partition
+    pDmaBuffer[0x1c6] = ;
+    pDmaBuffer[0x1c7] = ;
+    pDmaBuffer[0x1c8] = ;
+    pDmaBuffer[0x1c9] = ;
+
+    // number of sectors in partition
+    pDmaBuffer[0x1ca] = ;
+    pDmaBuffer[0x1cb] = ;
+    pDmaBuffer[0x1cc] = ;
+    pDmaBuffer[0x1cd] = ;
+*/
+    // END: PC partition entry #1 
+    ////////////////////////
+    // START: Atari Partition Header #2  - starting at 0x1d2
+    pDmaBuffer[0x1de] = 0x01;               // p_flg  - not bootable, does exist
+    memcpy(pDmaBuffer + 0x1df, "BGM", 3);   // p_id   - BGM - bit partition
+    
+    DWORD *p_st     = (DWORD *) (pDmaBuffer + 0x1e2);
+    DWORD *p_size   = (DWORD *) (pDmaBuffer + 0x1e6);
+
+    *p_st   = 0x40;                         // p_st   - starting at sector 0x40
+    *p_size = partitionSizeSectors;         // p_size - store partition size in sectors
+    // END: Atari Partition Header #2
+    ////////////////////////
+    
+    pDmaBuffer[0x1fe] = 0x55;
+    pDmaBuffer[0x1ff] = 0xaa;
+    
+    res = readWriteSector(SDcard.id, FALSE, 0);
+    
+    if(!res) {
+        (void) Cconws("Failed to write MBR!\r\n");
+        return FALSE;
+    }
+    
+    return TRUE;
+}
+//--------------------------------------------
+BYTE writePcPartitionSector0(DWORD partitionSizeSectors)
+{
+    BYTE res;
+
+    memset(pDmaBuffer, 0, 512);
+    
+    // FAT16 Boot Sector according to MS TechNet
+    
+    memcpy(pDmaBuffer + 0x000, "\xEB\x3C\x90MSDOS5.0", 11);     // jump instruction, OEM ID
+
+    
+    
+    memcpy(pDmaBuffer + 0x1fe, "\x55\xAA", 2);                  // End of Sector Marker
+
+    res = readWriteSector(SDcard.id, FALSE, 0x3f);
+    
+    if(!res) {
+        (void) Cconws("Failed to write PC part sector 0!\r\n");
+        return FALSE;
+    }
+    
+    return TRUE;
+}
+
+//--------------------------------------------
+BYTE writeBootAndOtherSectors(DWORD partitionSizeMB)
+{
+    BYTE res;
+
+    partitionSizeMB--;              // in comes the maximum partition size (e.g. 256 MB), but we will reduce by it 1 MB, to make it fit in the FAT (e.g. to 255 MB)
+    
+    DWORD partitionSizeSectors = partitionSizeMB << 11;             // convert MB into sectors
+    
+    if(partitionSizeSectors > SDcard.SCapacity) {                   // if the card is smaller than what we can maximally have...
+        partitionSizeSectors = SDcard.SCapacity - 2048;             // reduce it to (SD_card_size - 1 MB)
+        partitionSizeSectors = partitionSizeSectors & 0xfffff800;   // round it down to neares MB
+    }
+
+    res = writeMBR(partitionSizeSectors);
+    
+    if(!res) {
+        return FALSE;
+    }
+    
+    res = writePcPartitionSector0(partitionSizeSectors);
+
+    if(!res) {
+        return FALSE;
+    }
+    
+    return TRUE;
 }
 
 //--------------------------------------------
