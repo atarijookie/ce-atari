@@ -34,17 +34,25 @@ typedef struct {
     DWORD maxSizeMB;
     DWORD maxSizeSectors;
 
-    BYTE  sectorsPerCluster;
-    WORD  reservedSectors;
-    WORD  sectorsPerFat;
-    WORD  sectorsPerTrack;
-    WORD  numberOfHeads;
-    DWORD hiddenSectors;
+    // pc boot sector values
+    BYTE  pSectorsPerCluster;
+    WORD  pReservedSectors;
+    WORD  pSectorsPerFat;
+    WORD  pSectorsPerTrack;
+    WORD  pNumberOfHeads;
+    DWORD pHiddenSectors;
+
+    // atari boot sector values
+    WORD  aBytesPerSector;
+    BYTE  aSectorsPerCluster;
+    WORD  aSectorsPerFat;
 } TBpb;
 
-TBpb bpb0255 = { 256, 0x07F800, 0x10, 0x0009, 0x0040, 0x003a, 0x0009, 0x003a};
-TBpb bpb0511 = { 512, 0x0FF800, 0x20, 0x0011, 0x0080, 0x003e, 0x0011, 0x003e};
-TBpb bpb1023 = {1024, 0x1FF800, 0x40, 0x0021, 0x0080, 0x003f, 0x0021, 0x003f};
+TBpb bpb0255 = { 256, 0x07F800,   0x10, 0x0009, 0x0040, 0x003a, 0x0009, 0x003a,   0x2000, 0x02, 0x0004};
+TBpb bpb0511 = { 512, 0x0FF800,   0x20, 0x0011, 0x0080, 0x003e, 0x0011, 0x003e,   0x2000, 0x01, 0x0008};
+TBpb bpb1023 = {1024, 0x1FF800,   0x40, 0x0021, 0x0080, 0x003f, 0x0021, 0x003f,   0x4000, 0x02, 0x0004};
+
+DWORD serialNumber;                 // generated serial number of the drive
 
 //--------------------------
 // DEVTYPE values really sent from CE
@@ -66,6 +74,8 @@ BYTE enableCEids        (BYTE ceId);
 
 BYTE readBootsectorAndIdentifyContent   (void);
 BYTE writeBootAndOtherSectors           (TBpb *partParams);
+
+void showBpb(void);
 
 struct {
     BYTE  id;                       // assigned ACSI ID
@@ -248,6 +258,7 @@ int main( int argc, char* argv[] )
 
     //-------------
     // warn user that if he will proceed, he will loose data
+    serialNumber = Supexec(getTicks);       // current 200 Hz timer value will be used as serial number
 
     (void) Cconws("\r\n");
     //                |                                        |
@@ -383,6 +394,13 @@ WORD calculateChecksum(WORD *pBfr)
     return sum;
 }
 //--------------------------------------------
+void storeIntel24b(BYTE *p, DWORD value)
+{
+    p[0] = (BYTE) (value      );
+    p[1] = (BYTE) (value >>  8);
+    p[2] = (BYTE) (value >> 16);
+}
+//--------------------------------------------
 void storeIntelDword(BYTE *p, DWORD value)
 {
     p[0] = (BYTE) (value      );
@@ -418,7 +436,7 @@ BYTE writeMBR(TBpb *partParams)
 //  pDmaBuffer[0x1c5]
 
     // LBA of first absolute sector in partition
-    storeIntelDword(pDmaBuffer + 0x1c6, partParams->hiddenSectors);
+    storeIntelDword(pDmaBuffer + 0x1c6, partParams->pHiddenSectors);
 
     // number of sectors in partition
     storeIntelDword(pDmaBuffer + 0x1ca, partParams->maxSizeSectors + 1);
@@ -432,7 +450,7 @@ BYTE writeMBR(TBpb *partParams)
     DWORD *p_st     = (DWORD *) (pDmaBuffer + 0x1e2);
     DWORD *p_size   = (DWORD *) (pDmaBuffer + 0x1e6);
 
-    *p_st   = partParams->hiddenSectors + 1;    // p_st   - starting at sector - right after the PC starting sector
+    *p_st   = partParams->pHiddenSectors + 1;   // p_st   - starting at sector - right after the PC starting sector
     *p_size = partParams->maxSizeSectors;       // p_size - store partition size in sectors
     // END: Atari Partition Header #2
     ////////////////////////
@@ -459,21 +477,20 @@ BYTE writePcPartitionSector0(TBpb *partParams)
     // BPB Fields for FAT16 Volumes (according to MS TechNet)
     memcpy         (pDmaBuffer + 0x000, "\xEB\x3C\x90MSDOS5.0\x00\x02", 13);    // jump instruction, OEM ID, bytes per sector
 
-    pDmaBuffer[0x0d] = partParams->sectorsPerCluster;                   // sectors per cluster
-    storeIntelWord (pDmaBuffer + 0x0e, partParams->reservedSectors);    // reserved sectors
+    pDmaBuffer[0x0d] = partParams->pSectorsPerCluster;                  // sectors per cluster
+    storeIntelWord (pDmaBuffer + 0x0e, partParams->pReservedSectors);   // reserved sectors
 
     memcpy         (pDmaBuffer + 0x10, "\x02\x00\x02\x00\x00\xf8", 6);  // number of FATs, root entries, small sectors, media descriptor
 
-    storeIntelWord (pDmaBuffer + 0x16, partParams->sectorsPerFat);      // sectors per FAT
-    storeIntelWord (pDmaBuffer + 0x18, partParams->sectorsPerTrack);    // sectors per track
-    storeIntelWord (pDmaBuffer + 0x1a, partParams->numberOfHeads);      // number of heads
-    storeIntelDword(pDmaBuffer + 0x1c, partParams->hiddenSectors);      // hidden sectors
+    storeIntelWord (pDmaBuffer + 0x16, partParams->pSectorsPerFat);     // sectors per FAT
+    storeIntelWord (pDmaBuffer + 0x18, partParams->pSectorsPerTrack);   // sectors per track
+    storeIntelWord (pDmaBuffer + 0x1a, partParams->pNumberOfHeads);     // number of heads
+    storeIntelDword(pDmaBuffer + 0x1c, partParams->pHiddenSectors);     // hidden sectors
     storeIntelDword(pDmaBuffer + 0x20, partParams->maxSizeSectors);     // Large Sectors
 
     // Extended BPB Fields for FAT16 Volumes
     memcpy         (pDmaBuffer + 0x24, "\x80\x00\x29", 3);              // Physical Drive Number, Reserved, Extended boot signature
 
-    DWORD serialNumber = Supexec(getTicks);                             // current 200 Hz timer value will be used as serial number
     storeIntelDword(pDmaBuffer + 0x27, serialNumber);                   // serial number
 
     memcpy         (pDmaBuffer + 0x24, "SD NOOB    ", 11);              // Volume Label. A field once used to store the volume label.
@@ -481,7 +498,7 @@ BYTE writePcPartitionSector0(TBpb *partParams)
 
     memcpy         (pDmaBuffer + 0x1fe, "\x55\xAA", 2);                 // End of Sector Marker
 
-    res = readWriteSector(SDcard.id, ACSI_WRITE, partParams->hiddenSectors);
+    res = readWriteSector(SDcard.id, ACSI_WRITE, partParams->pHiddenSectors);
 
     if(!res) {
         (void) Cconws("Failed to write PC part sector 0!\r\n");
@@ -497,15 +514,25 @@ BYTE writeAtariPartitionSector0(TBpb *partParams)
 
     memset(pDmaBuffer, 0, 512);
 
-    // BPB Fields for FAT16 Volumes (according to MS TechNet)
-    memcpy         (pDmaBuffer + 0x000, "\xEB\x3C\x90MSDOS5.0", 11);    // jump instruction, OEM ID
+    DWORD realSectorsInAtariSector  = partParams->aBytesPerSector / 512;    // how much real (512 B) sectors there are in single Atari sector
+    DWORD atariSectorsCount         = partParams->maxSizeSectors  / realSectorsInAtariSector;   // convert real sector count into Atari sector count
 
+    // boot sector according to Atari Compendium
+    memcpy         (pDmaBuffer + 0x03, "SDNOO", 5);                         // OEM    - SD NOOB
+    storeIntel24b  (pDmaBuffer + 0x08, serialNumber);                       // serial number - just lower 24 bits 
+    storeIntelWord (pDmaBuffer + 0x0b, partParams->aBytesPerSector);        // BPS    - bytes per sector
+    pDmaBuffer     [             0x0d] = partParams->aSectorsPerCluster;    // SPC    - sectors per cluster
+    storeIntelWord (pDmaBuffer + 0x0e, 0x0001);                             // RES    - reserved sectors
+    pDmaBuffer     [             0x10] = 0x02;                              // NFATS  - number of FATs
+    storeIntelWord (pDmaBuffer + 0x11, 0x0200);                             // NDIRS  - number of root dir entries
+    storeIntelWord (pDmaBuffer + 0x13, atariSectorsCount);                  // NSECTS - number of sectors on disk
+    pDmaBuffer     [             0x15] = 0xf8;                              // MEDIA descriptor
+    storeIntelWord (pDmaBuffer + 0x16, partParams->aSectorsPerFat);         // SPF    - sectors per FAT
+    storeIntelWord (pDmaBuffer + 0x18, partParams->pSectorsPerTrack);       // SPT    - sectors per track (same as on PC)
+    storeIntelWord (pDmaBuffer + 0x1a, partParams->pNumberOfHeads);         // NSIDES - number of sides (heads)
+    storeIntelWord (pDmaBuffer + 0x1c, partParams->pHiddenSectors + 1);     // NHID   - number of hidden sectors
 
-
-
-
-
-    res = readWriteSector(SDcard.id, ACSI_WRITE, partParams->hiddenSectors + 1);
+    res = readWriteSector(SDcard.id, ACSI_WRITE, partParams->pHiddenSectors + 1);
 
     if(!res) {
         (void) Cconws("Failed to write Atari part sector 0!\r\n");
@@ -868,7 +895,6 @@ void showSDcardCapacity(void)
         (void) Cconws(" GB\r\n");
     }
 }
-
 //--------------------------------------------------
 // global variables, later used for calling hdIfCmdAsSuper
 BYTE __readNotWrite, __cmdLength;
@@ -892,5 +918,59 @@ void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, W
     
     // call the function which does the real work, and uses those global vars
     Supexec(hdIfCmdAsSuper);
+}
+//--------------------------------------------------
+void showHexByte(BYTE val)
+{
+    int hi, lo;
+    char tmp[3];
+    char table[16] = {"0123456789ABCDEF"};
+
+    hi = (val >> 4) & 0x0f;;
+    lo = (val     ) & 0x0f;
+
+    tmp[0] = table[hi];
+    tmp[1] = table[lo];
+    tmp[2] = 0;
+
+    (void) Cconws(tmp);
+}
+//--------------------------------------------------
+void showHexWord(WORD val)
+{
+    showHexByte((BYTE) (val >>  8));
+    showHexByte((BYTE)  val);
+}
+//--------------------------------------------------
+ void showBpb(void)
+{
+    _BPB *bpb = Getbpb(2);
+
+    if(bpb == NULL) {
+        (void) Cconws("Getbpbp(2) failed.\r\n");
+        Cnecin();
+        return;
+    }
+
+    (void) Cconws("\r\nrecsiz - bps: ");
+    showHexWord(bpb->recsiz);
+    (void) Cconws("\r\nclsiz  - spc: ");
+    showHexWord(bpb->clsiz);
+    (void) Cconws("\r\nclsizb - bpc: ");
+    showHexWord(bpb->clsizb);
+    (void) Cconws("\r\nrdlen  - rds: ");
+    showHexWord(bpb->rdlen);
+    (void) Cconws("\r\nfsiz   - sof: ");
+    showHexWord(bpb->fsiz);
+    (void) Cconws("\r\nfatrec - s2f: ");
+    showHexWord(bpb->fatrec);
+    (void) Cconws("\r\ndatrec - 1ds: ");
+    showHexWord(bpb->datrec);
+    (void) Cconws("\r\nnumcl  - noc: ");
+    showHexWord(bpb->numcl);
+    (void) Cconws("\r\nbflags - fla: ");
+    showHexWord(bpb->bflags);
+
+    Cnecin();
 }
 //--------------------------------------------------
