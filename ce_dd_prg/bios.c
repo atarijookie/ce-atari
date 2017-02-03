@@ -34,8 +34,12 @@ int32_t custom_mediach( void *sp )
     // if SD noob is enabled, and this request on that drive
     if(SDnoobPartition.enabled && SDnoobPartition.driveNo == drive) { 
         // TODO: detect media change on SD NOOB, return that value
-    
+
         // TODO: if media changed, reload partition info
+        /*
+            SDnoobPartition.verboseInit = FALSE;                        // quiet init - don't show messages
+            gotSDnoobCard();
+        */
 
         return res;
     }

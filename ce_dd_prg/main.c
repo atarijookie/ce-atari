@@ -168,6 +168,7 @@ int main( int argc, char* argv[] )
 
     //------------------------------
     // first check if we got the SD card and if it's SD NOOB, so if we have it, the ce_initialize() which will follow, will generate 'C' drive icon for SD card, too
+    SDnoobPartition.verboseInit = TRUE;                     // verobe init - show messages
     Supexec(gotSDnoobCard);
 
     //------------------------------

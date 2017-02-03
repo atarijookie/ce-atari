@@ -40,7 +40,8 @@ typedef struct {
     DWORD sectorCount;
 
     DWORD physicalPerAtariSector;   // how many physical sectors fit into single Atari sector (8, 16, 32)
-
+    BYTE  verboseInit;              // if true, then gotSDnoobCard() will not write info into console; if false, it will be silent
+    
     BYTE  enabled;
     BYTE  driveNo;                  // specifies the mounted device (A: = 0, B: = 1)
 } TSDnoobPartition;

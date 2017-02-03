@@ -166,24 +166,36 @@ BYTE gotSDnoobCard(void)
     res = getSDcardIDonBus();                       // find SD card on bus
 
     if(!res) {                                      // not found? quit
-        (void) Cconws("SD NOOB: no SD on bus, skipping\r\n");
+        if(SDnoobPartition.verboseInit) {
+            (void) Cconws("SD NOOB: no SD on bus, skipping\r\n");
+        }
+
         return FALSE;
     }
 
     res = getSDcardInfo();                          // try to get SD card info
 
     if(!res) {                                      // failed to get info? quit
-        (void) Cconws("SD NOOB: failed to get SD info\r\n");
+        if(SDnoobPartition.verboseInit) {
+            (void) Cconws("SD NOOB: failed to get SD info\r\n");
+        }
+
         return FALSE;
     }
 
     if(!SDcard.isInit) {                            // if card not initialized, quit
-        (void) Cconws("SD NOOB: card not present or not init\r\n");
+        if(SDnoobPartition.verboseInit) {
+            (void) Cconws("SD NOOB: card not present or not init\r\n");
+        }
+
         return FALSE;
     }
 
     if(SDcard.SCapacity < 0x64000) {                // card smaller than 200 MB? don't use it
-        (void) Cconws("SD NOOB: card too small, skipping\r\n");
+        if(SDnoobPartition.verboseInit) {
+            (void) Cconws("SD NOOB: card too small, skipping\r\n");
+        }
+
         return FALSE;
     }
 
@@ -192,12 +204,18 @@ BYTE gotSDnoobCard(void)
     res = readWriteSector(SDcard.id, ACSI_READ, 0, 1, pDmaBuffer);  // read MBR
 
     if(!res) {                                      // failed to get info? quit
-        (void) Cconws("SD NOOB: failed to read MBR\r\n");
+        if(SDnoobPartition.verboseInit) {
+            (void) Cconws("SD NOOB: failed to read MBR\r\n");
+        }
+
         return FALSE;
     }
 
     if(memcmp(pDmaBuffer + 3, "SDNOO", 5) != 0) {   // if it doesn't have SD NOOB marker, quit
-        (void) Cconws("SD NOOB: card not SD NOOB, skipping\r\n");
+        if(SDnoobPartition.verboseInit) {
+            (void) Cconws("SD NOOB: card not SD NOOB, skipping\r\n");
+        }
+
         return FALSE;
     }
 
@@ -210,7 +228,10 @@ BYTE gotSDnoobCard(void)
     res = readWriteSector(SDcard.id, ACSI_READ, SDnoobPartition.sectorStart, 1, pDmaBuffer);  // read Atari boot sector
 
     if(!res) {                                      // failed to get info? quit
-        (void) Cconws("SD NOOB: failed to read boot sector\r\n");
+        if(SDnoobPartition.verboseInit) {
+            (void) Cconws("SD NOOB: failed to read boot sector\r\n");
+        }
+
         return FALSE;
     }
 
@@ -235,13 +256,15 @@ BYTE gotSDnoobCard(void)
 
     //--------------------
     // we're ready to use the SD card
-    (void) Cconws("SD NOOB: drive \33p");
-    Cconout(SDnoobPartition.driveNo + 'A');
-    (void) Cconws("\33q, size: ");
+    if(SDnoobPartition.verboseInit) {
+        (void) Cconws("SD NOOB: drive \33p");
+        Cconout(SDnoobPartition.driveNo + 'A');
+        (void) Cconws("\33q, size: ");
 
-    DWORD megaBytes = SDnoobPartition.sectorCount >> 11;            // sectors into MegaBytes
-    showCapacity(megaBytes);
-    (void) Cconws("\r\n");
+        DWORD megaBytes = SDnoobPartition.sectorCount >> 11;            // sectors into MegaBytes
+        showCapacity(megaBytes);
+        (void) Cconws("\r\n");
+    }
 
     SDnoobPartition.physicalPerAtariSector = SDbpb.recsiz / 512;    // how many physical sectors fit into single Atari sector (8, 16, 32)
 
@@ -294,7 +317,7 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
         }
 
         if(!res) {                                          // if failed, fail and quit
-            return -11;                                     // Read fault
+            return (readNotWrite ? -11 : -10);              // read? read fault, otherwise write fault
         }
 
         physicalSectorCount     -= thisSectorCount;         // now we need to read less sectors
