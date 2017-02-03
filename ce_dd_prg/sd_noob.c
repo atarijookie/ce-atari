@@ -159,6 +159,7 @@ BYTE gotSDnoobCard(void)
     BYTE res;
 
     SDnoobPartition.enabled = FALSE;                // SD NOOB not enabled (yet)
+    SDnoobPartition.driveNo = 2;                    // now fixed as drive 'C' 
 
     //-------------
     // get the SD card ID, info, size, is init
@@ -215,7 +216,7 @@ BYTE gotSDnoobCard(void)
 
     //-----------------------
     // fill the BPB structure for usage 
-    SDbpb.recsiz            = getIntelWord(pDmaBuffer + 0x0b);      // bytes per sector
+    SDbpb.recsiz            = getIntelWord(pDmaBuffer + 0x0b);      // bytes per atari sector
     SDbpb.clsiz             = pDmaBuffer  [             0x0d];      // sectors per cluster 
     SDbpb.clsizb            = SDbpb.clsiz * SDbpb.recsiz;           // bytes per cluster = sectors per cluster * bytes per sector
     SDbpb.rdlen             = 2;                                    // sector length of root directory 
@@ -234,13 +235,74 @@ BYTE gotSDnoobCard(void)
 
     //--------------------
     // we're ready to use the SD card
-    (void) Cconws("SD NOOB: drive C, size: ");
+    (void) Cconws("SD NOOB: drive \33p");
+    Cconout(SDnoobPartition.driveNo + 'A');
+    (void) Cconws("\33q, size: ");
 
     DWORD megaBytes = SDnoobPartition.sectorCount >> 11;            // sectors into MegaBytes
     showCapacity(megaBytes);
     (void) Cconws("\r\n");
 
+    SDnoobPartition.physicalPerAtariSector = SDbpb.recsiz / 512;    // how many physical sectors fit into single Atari sector (8, 16, 32)
+
     SDnoobPartition.enabled = TRUE;                                 // SD NOOB is enabled
     return TRUE;
+}
+//--------------------------------------------------
+DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logicalStartingSector, WORD device)
+{
+    BYTE readNotWrite   = (mode & (1 << 0)) == 0;       // 0 = Read, 1 = Write
+    BYTE noRetries      = (mode & (1 << 2)) != 0;       // if non-zero, then no retries
+    BYTE noTranslate    = (mode & (1 << 3)) != 0;       // if non-zero, physical mode (if zero, logical mode)
+
+    if(noTranslate) {                                   // physical mode? bad request
+        return -5;
+    }
+
+    BYTE  toFastRam     =  (((DWORD) pBuffer) >= 0x1000000) ? TRUE  : FALSE;        // flag: are we reading to FAST RAM?
+    BYTE  bufAddrIsOdd  = ((((DWORD) pBuffer) & 1) == 0)    ? FALSE : TRUE;         // flag: buffer pointer is on ODD address?
+    BYTE  useMidBuffer  = (toFastRam || bufAddrIsOdd);                              // flag: is load to fast ram or on odd address, use middle buffer
+
+    DWORD maxSectorCount = useMidBuffer ? (FASTRAM_BUFFER_SIZE / 512) : MAXSECTORS; // how many sectors we can read at once - if going through middle buffer then middle buffer size, otherwise max sector coun
+    BYTE res;
+
+    WORD i, triesCount;
+    triesCount = noRetries ? 1 : 3;     // how many times we should try?
+
+    // physical starting sector = the starting sector of partition + physical sector of where we want to start reading
+    DWORD physicalStartingSector    = SDnoobPartition.sectorStart + (logicalStartingSector * SDnoobPartition.physicalPerAtariSector);
+    DWORD physicalSectorCount       = logicalSectorCount * SDnoobPartition.physicalPerAtariSector;
+
+    while(physicalSectorCount > 0) {
+        DWORD thisSectorCount   = (physicalSectorCount < maxSectorCount) ? physicalSectorCount : maxSectorCount;    // will the needed read size be within the blockSize, or not?
+        DWORD thisByteCount     = thisSectorCount << 9;
+
+        for(i=0; i<triesCount; i++) {
+            if(useMidBuffer) {                              // through middle buffer?
+                res = readWriteSector(SDcard.id, readNotWrite, physicalStartingSector, thisSectorCount, FastRAMBuffer);
+
+                if(res) {                                   // if succeeded, copy it to right place
+                    memcpy(pBuffer, FastRAMBuffer, thisByteCount);
+                }
+            } else {                                        // directly to final buffer?
+                res = readWriteSector(SDcard.id, readNotWrite, physicalStartingSector, thisSectorCount, pBuffer);
+            }
+
+            if(res) {                                       // if succeeded, break out of retries loop
+                break;
+            }
+        }
+
+        if(!res) {                                          // if failed, fail and quit
+            return -11;                                     // Read fault
+        }
+
+        physicalSectorCount     -= thisSectorCount;         // now we need to read less sectors
+        physicalStartingSector  += thisSectorCount;         // advance to next sectors
+
+        pBuffer                 += thisByteCount;           // advance in the buffer
+    }
+
+    return 0;
 }
 //--------------------------------------------------

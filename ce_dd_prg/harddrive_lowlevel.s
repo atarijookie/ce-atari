@@ -2,6 +2,7 @@
     .globl  _installHddLowLevelDriver
 
     .globl  _ceDrives
+    .globl  _ceDrivesWithSDNOOB
     .globl  _custom_getbpb
     .globl  _custom_mediach
     .globl  _myCRwabs
@@ -29,7 +30,7 @@ myAsmGetBpb:
     move.w  #1, d1
     lsl.w   d0, d1              | d1 = (1 << drive number) -- drive mask
     
-    move.w  _ceDrives, d0       | get drives to d0
+    move.w  _ceDrivesWithSDNOOB, d0     | get drives to d0
     and.w   d1, d0              | get only relevant drive bit
     
     movem.l saveregs, d1
@@ -66,7 +67,7 @@ myAsmMediach:
     move.w  #1, d1
     lsl.w   d0, d1              | d1 = (1 << drive number) -- drive mask
     
-    move.w  _ceDrives, d0       | get drives to d0
+    move.w  _ceDrivesWithSDNOOB, d0       | get drives to d0
     and.w   d1, d0              | get only relevant drive bit
     
     movem.l saveregs, d1
@@ -103,7 +104,7 @@ myAsmRwabs:
     move.w  #1, d1
     lsl.w   d0, d1              | d1 = (1 << drive number) -- drive mask
     
-    move.w  _ceDrives, d0       | get drives to d0
+    move.w  _ceDrivesWithSDNOOB, d0       | get drives to d0
     and.w   d1, d0              | get only relevant drive bit
     
     movem.l saveregs, d1
@@ -139,6 +140,7 @@ oldMediach:             .ds.l   1
 oldRwabs:               .ds.l   1
 
 _ceDrives:              .ds.w   1
+_ceDrivesWithSDNOOB:    .ds.w   1
 
 saveregs:               .ds.l   16    
 

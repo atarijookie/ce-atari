@@ -15,18 +15,31 @@
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "bios.h"
+#include "sd_noob.h"
 #include "main.h"
 
 extern int16_t useOldBiosHandler;
 #ifdef MANUAL_PEXEC /* else it is defined in harddrive_lowlevel.s */
 WORD ceDrives;
+WORD ceDrivesWithSDNOOB;
 #endif
 
 int32_t custom_mediach( void *sp )
 {
-    DWORD res;
+    DWORD res = 0;
 
     WORD drive = (WORD) *((WORD *) sp);
+
+    //-----------------------
+    // if SD noob is enabled, and this request on that drive
+    if(SDnoobPartition.enabled && SDnoobPartition.driveNo == drive) { 
+        // TODO: detect media change on SD NOOB, return that value
+    
+        // TODO: if media changed, reload partition info
+
+        return res;
+    }
+    //-----------------------
 
     updateCeDrives();                                                   // update the drives - once per 3 seconds
 
@@ -53,6 +66,13 @@ int32_t custom_drvmap( void *sp )
     CALL_OLD_BIOS(Drvmap);      // call the original Drvmap()
 
     res = res | ceDrives;       // return original drives + CE drives together
+
+    //-----------------------
+    if(SDnoobPartition.enabled) {                       // if SD NOOB is enabled, add it to Drv bitmap
+        res = res | (1 << SDnoobPartition.driveNo); 
+    }
+    //-----------------------
+
     return res;
 }
 
@@ -63,6 +83,14 @@ int32_t custom_getbpb( void *sp )
     static WORD bpb[20/2];    // declare as WORD to have it aligned to even address
 
     updateCeDrives();                                                   // update the drives - once per 3 seconds
+
+    //-----------------------
+    // if it's SD NOOB drive and enabled
+    if(SDnoobPartition.enabled && SDnoobPartition.driveNo == drive) {
+        memcpy(bpb, &SDbpb, 18);                                        // make copy of real SD NOOB BPB
+        return (DWORD) &bpb;                                            // return pointer to that BPB
+    }
+    //-----------------------
 
     if(!isOurDrive(drive, 0)) {                                         // if the drive is not our drive
         CALL_OLD_BIOS(Getbpb, drive);                                   // call the original function
@@ -115,6 +143,14 @@ void updateCeDrives(void)
     }
 
     ceDrives = getWord(pDmaBuffer);                                         // read drives from dma buffer
+
+    //------------------------------
+    // now update ceDrivesWithSDNOOB
+    if(SDnoobPartition.enabled) {       // SD NOOB enabled
+        ceDrivesWithSDNOOB = ceDrives | (1 << SDnoobPartition.driveNo);
+    } else {                            // SD NOOB disabled
+        ceDrivesWithSDNOOB = ceDrives;
+    }
 }
 
 void updateCeMediach(void)

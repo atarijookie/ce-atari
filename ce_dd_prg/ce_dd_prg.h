@@ -20,6 +20,7 @@ extern BYTE *pDtaBuffer;
 extern BYTE fsnextIsForUs;
 
 extern WORD ceDrives;
+extern WORD ceDrivesWithSDNOOB;
 extern WORD ceMediach;
 extern BYTE currentDrive;
 

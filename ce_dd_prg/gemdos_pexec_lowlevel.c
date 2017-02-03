@@ -17,6 +17,7 @@
 #include "bios.h"
 #include "main.h"
 #include "hdd_if.h"
+#include "sd_noob.h"
 
 // * CosmosEx GEMDOS driver by Jookie, 2013 & 2014
 // * GEMDOS hooks part (assembler and C) by MiKRO (Miro Kropacek), 2013
@@ -155,13 +156,25 @@ DWORD myCRwabs(BYTE *sp)
 	params += 2;
     WORD  device            =          *(( WORD *) params);
 
+    //-------------
+    if(mode & (1 << 3)) {                   // RW_NOTRANSLATE mode? not supported!
+        return -5;                          // Bad request
+    }
+
+    //-------------
+    // if SD noob is enabled and this is request for SD NOOB
+    if(SDnoobPartition.enabled && SDnoobPartition.driveNo == device) {
+        return SDnoobRwabs(mode, pBuffer, sectorCount, startingSector, device);
+    }
+    //-------------
+
     if((ceDrives & (1 << device)) == 0) {   // not our drive? fail
         return -5;                          // Bad request
-	}
+    }
 
     if(ceMediach & (1 << device)) {         // this drive has changed?
         return -14;                         // Media change detected
-	}
+    }
 
     if(mode & 1) {                          // write (from ST to drive)? Not supported.
         return -12;                         // Device is write protected

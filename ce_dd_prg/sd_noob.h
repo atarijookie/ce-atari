@@ -39,7 +39,10 @@ typedef struct {
     DWORD sectorStart;
     DWORD sectorCount;
 
+    DWORD physicalPerAtariSector;   // how many physical sectors fit into single Atari sector (8, 16, 32)
+
     BYTE  enabled;
+    BYTE  driveNo;                  // specifies the mounted device (A: = 0, B: = 1)
 } TSDnoobPartition;
 
 extern TSDcard          SDcard;
@@ -47,7 +50,8 @@ extern TSDnoobPartition SDnoobPartition;
 extern _BPB             SDbpb;
 
 //--------------------------------------------------
-BYTE gotSDnoobCard(void);
+BYTE  gotSDnoobCard(void);
+DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logicalStartingSector, WORD device);
 //--------------------------------------------------
 
 #endif
