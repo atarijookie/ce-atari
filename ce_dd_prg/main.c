@@ -19,6 +19,7 @@
 #include "bios.h"
 #include "main.h"
 #include "mutex.h"
+#include "sd_noob.h"
 
 /*
  * CosmosEx GEMDOS driver by Jookie, 2013-2016
@@ -165,6 +166,11 @@ int main( int argc, char* argv[] )
 	commandLong[0] = (deviceID << 5) | 0x1f;			    // cmd[0] = ACSI_id + ICD command marker (0x1f)
 	commandLong[1] = 0xA0;								    // cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)
 
+    //------------------------------
+    // first check if we got the SD card and if it's SD NOOB, so if we have it, the ce_initialize() which will follow, will generate 'C' drive icon for SD card, too
+    Supexec(gotSDnoobCard);
+
+    //------------------------------
 	// tell the device to initialize
 	Supexec(ce_initialize);
 
