@@ -28,6 +28,9 @@ BYTE *rBuffer, *wBuffer;
 void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 int  getIntFromUser(void);
 
+#define SCSI_C_WRITE6                           0x0a
+#define SCSI_C_READ6                            0x08
+
 //--------------------------------------------------
 int main(void)
 {
@@ -46,22 +49,22 @@ int main(void)
     //----------------------
     hdd_if_select(IF_ACSI);
     hdIf.maxRetriesCount = 0;
-    
+
     // ---------------------- 
     // create buffer pointer to even address 
     toEven = (DWORD) &readBuffer[0];
-  
+
     if(toEven & 0x0001)       // not even number? 
         toEven++;
-  
+
     rBuffer = (BYTE *) toEven; 
 
     //----------
     toEven = (DWORD) &writeBuffer[0];
-  
+
     if(toEven & 0x0001)       // not even number? 
         toEven++;
-  
+
     wBuffer = (BYTE *) toEven; 
 
     Clear_home();
@@ -70,7 +73,7 @@ int main(void)
     (void) Cconws("\33pDestructive continous R/W test.\33q\r\n");
     (void) Cconws("This will corrupt data on drive\r\n");
     (void) Cconws("above 100 MB. Press 'c' to continue.\r\n");
-    
+
     while(1) {
         key = Cnecin();
     
@@ -82,60 +85,68 @@ int main(void)
             return 0;
         }
     }
-    
+
     //-------------
 
     (void) Cconws("Enter ACSI ID of device: ");
     BYTE acsiId = getIntFromUser();
     (void) Cconws("\r\n");
-    
+
     //-------------
     // fill write buffer
     int i;
     for(i=0; i<512; i++) {
         wBuffer[i] = i;
     }
-    
+
     DWORD sectorStart   = 0x032000;     // starting sector: at 100 MB
     DWORD sectorEnd     = 0x1FFFFF;     // ending   sector: at   1 GB
-    
+
     DWORD sector        = sectorStart;
     BYTE cmd[6];
-    
+
     while(1) {
         if(sector >= sectorEnd) {       // if doing last sector
             sector = sectorStart;       // go to starting sector
         }
-        
-        cmd[0] = (acsiId << 5) | 0x08;  // read
-        
+
         cmd[1] = sector >> 16;          // sector number
         cmd[2] = sector >>  8;
         cmd[3] = sector      ;
-        
+
         cmd[4] = 1;                     // sector count
         cmd[5] = 0;                     // control byte
-     
-        sector++;                       // next time use next sector
-     
+
         wBuffer[0] = sector >> 16;      // store sector # at first bytes, so the data changes all the time
         wBuffer[1] = sector >>  8;
         wBuffer[2] = sector      ;
-        
+
+        sector++;                       // next time use next sector
+
+        //-----------------------
+        // WRITE DATA
+        cmd[0] = (acsiId << 5) | SCSI_C_WRITE6;         // WRITE
+
         hdIfCmdAsUser(ACSI_WRITE, cmd, CMD_LENGTH_SHORT, wBuffer, 1);
-    
+
         if(!hdIf.success || hdIf.statusByte != 0) {     // write failed?
             Cconout('W');
             continue;
         }
-    
+
+        //-----------------------
+        // READ DATA
+        cmd[0] = (acsiId << 5) | SCSI_C_READ6;          // read
+
         hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);
 
         if(!hdIf.success || hdIf.statusByte != 0) {     // read failed?
             Cconout('R');
             continue;
         }
-        
+
+        //-----------------------
+        // VERIFY DATA
         BYTE res = memcomp(wBuffer, rBuffer, 512);      // check data
 
         if(res == 0) {                                  // data OK?
@@ -144,7 +155,7 @@ int main(void)
             Cconout('x');
         }       
     }
-    
+
     return 0;
 }
 
