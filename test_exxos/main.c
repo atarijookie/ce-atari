@@ -138,6 +138,8 @@ int main(void)
         // READ DATA
         cmd[0] = (acsiId << 5) | SCSI_C_READ6;          // read
 
+        memset(rBuffer, 0, 512);                        // clear the read buffer, just to be sure...
+
         hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);
 
         if(!hdIf.success || hdIf.statusByte != 0) {     // read failed?
