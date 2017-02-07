@@ -21,8 +21,8 @@ void showHexDword(DWORD val);
 //--------------------------------------------------
 BYTE deviceID;
 
-BYTE readBuffer [2 * 512];
-BYTE writeBuffer[2 * 512];
+BYTE readBuffer [254 * 512 + 4];
+BYTE writeBuffer[254 * 512 + 4];
 BYTE *rBuffer, *wBuffer;
 
 void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
@@ -72,7 +72,7 @@ int main(void)
 
     (void) Cconws("\33pDestructive continous R/W test.\33q\r\n");
     (void) Cconws("This will corrupt data on drive\r\n");
-    (void) Cconws("above 100 MB. Press 'c' to continue.\r\n");
+    (void) Cconws("above 100 MB. Press 'c' to continue.\r\n\r\n");
 
     while(1) {
         key = Cnecin();
@@ -86,16 +86,31 @@ int main(void)
         }
     }
 
+    (void) Cconws("To quit any time, press Ctrl+C\r\n\r\n");
+    
     //-------------
 
-    (void) Cconws("Enter ACSI ID of device: ");
+    (void) Cconws("Enter ACSI ID of device          : ");
     BYTE acsiId = getIntFromUser();
     (void) Cconws("\r\n");
 
+    int sectorCount;
+    while(1) {
+        (void) Cconws("Enter sector count per op (1-254): ");
+        sectorCount = getIntFromUser();                     // how many sectors
+        (void) Cconws("\r\n\r\n");
+        
+        if(sectorCount >= 1 && sectorCount <= 254) {
+            break;
+        }
+    }
+
+    int byteCount   = sectorCount * 512;                    // how many bytes
+    
     //-------------
     // fill write buffer
     int i;
-    for(i=0; i<512; i++) {
+    for(i=0; i<byteCount; i++) {        // set buffer to counter values
         wBuffer[i] = i;
     }
 
@@ -114,7 +129,7 @@ int main(void)
         cmd[2] = sector >>  8;
         cmd[3] = sector      ;
 
-        cmd[4] = 1;                     // sector count
+        cmd[4] = sectorCount;           // sector count
         cmd[5] = 0;                     // control byte
 
         wBuffer[0] = sector >> 16;      // store sector # at first bytes, so the data changes all the time
@@ -127,7 +142,7 @@ int main(void)
         // WRITE DATA
         cmd[0] = (acsiId << 5) | SCSI_C_WRITE6;         // WRITE
 
-        hdIfCmdAsUser(ACSI_WRITE, cmd, CMD_LENGTH_SHORT, wBuffer, 1);
+        hdIfCmdAsUser(ACSI_WRITE, cmd, CMD_LENGTH_SHORT, wBuffer, sectorCount);
 
         if(!hdIf.success || hdIf.statusByte != 0) {     // write failed?
             Cconout('W');
@@ -138,9 +153,9 @@ int main(void)
         // READ DATA
         cmd[0] = (acsiId << 5) | SCSI_C_READ6;          // read
 
-        memset(rBuffer, 0, 512);                        // clear the read buffer, just to be sure...
+        memset(rBuffer, 0, byteCount);                  // clear the read buffer, just to be sure...
 
-        hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, 1);
+        hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, rBuffer, sectorCount);
 
         if(!hdIf.success || hdIf.statusByte != 0) {     // read failed?
             Cconout('R');
@@ -149,7 +164,7 @@ int main(void)
 
         //-----------------------
         // VERIFY DATA
-        BYTE res = memcomp(wBuffer, rBuffer, 512);      // check data
+        BYTE res = memcomp(wBuffer, rBuffer, byteCount);// check data
 
         if(res == 0) {                                  // data OK?
             Cconout('*');
@@ -191,18 +206,28 @@ BYTE showQuestionGetBool(const char *question, BYTE trueKey, const char *trueWor
 
 int getIntFromUser(void)
 {
+    int value = 0;
+
     BYTE key;
     
     while(1) {
         key = Cnecin();
 
-        if(key >= '0' && key <= '9') {
+        if(key == 13) {                     // enter? quit!
             break;
         }
+        
+        if(key < '0' && key > '9') {        // invalid number? 
+            continue;
+        }
+        
+        Cconout(key);                       // show it
+        
+        value = value * 10;
+        value = value + (key - '0');        // add current number to total value
     }
     
-    Cconout(key);
-    return (key - '0');
+    return value;
 }
 
 void showHexByte(BYTE val)
