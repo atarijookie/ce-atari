@@ -31,6 +31,9 @@ int  getIntFromUser(void);
 #define SCSI_C_WRITE6                           0x0a
 #define SCSI_C_READ6                            0x08
 
+void writeReadAbove100MB(BYTE acsiId);
+void justWriteKnownData256sectors(BYTE acsiId);
+
 //--------------------------------------------------
 int main(void)
 {
@@ -71,12 +74,12 @@ int main(void)
     VT52_Wrap_on();
 
     (void) Cconws("\33pDestructive continous R/W test.\33q\r\n");
-    (void) Cconws("This will corrupt data on drive\r\n");
-    (void) Cconws("above 100 MB. Press 'c' to continue.\r\n\r\n");
+    (void) Cconws("This will corrupt data on drive!!!\r\n");
+    (void) Cconws("Press 'c' to continue.\r\n\r\n");
 
     while(1) {
         key = Cnecin();
-    
+
         if(key == 'c' || key == 'C') {
             break;
         }
@@ -94,6 +97,75 @@ int main(void)
     BYTE acsiId = getIntFromUser();
     (void) Cconws("\r\n");
 
+    //-------------
+    (void) Cconws("\r\n\33pChoose test type :\33q\r\n");
+    (void) Cconws("\33pL\33q - write-read-verify loop\r\n");
+    (void) Cconws("\33pC\33q - fill first 256 sectors with counter\r\n");
+    (void) Cconws("\33pQ\33q - quit\r\n\r\n");
+
+    while(1) {
+        key = Cnecin();
+
+        if(key == 'l' || key == 'L') {
+            writeReadAbove100MB(acsiId);
+            break;
+        }
+
+        if(key == 'c' || key == 'C') {
+            justWriteKnownData256sectors(acsiId);
+            break;
+        }
+
+        if(key == 'q' || key == 'Q') {
+            break;
+        }
+    }
+    
+    return 0;
+}
+
+void justWriteKnownData256sectors(BYTE acsiId)
+{
+    //-------------
+    // fill write buffer
+    int i;
+    for(i=0; i<512; i++) {                              // set buffer to counter values
+        wBuffer[i] = i;
+    }
+
+    BYTE  cmd[6];
+    DWORD sector;
+
+    for(sector=0; sector<256; sector++) {
+        cmd[0] = (acsiId << 5) | SCSI_C_WRITE6;         // WRITE
+
+        cmd[1]      = sector >> 16;                     // sector number
+        cmd[2]      = sector >>  8;
+        cmd[3]      = sector      ;
+
+        cmd[4]      = 1;                                // only 1 sector 
+        cmd[5]      = 0;                                // control byte
+
+        wBuffer[0]  = sector >> 16;                     // store sector # at first bytes, so the data changes all the time
+        wBuffer[1]  = sector >>  8;
+        wBuffer[2]  = sector      ;
+
+        // WRITE DATA
+        hdIfCmdAsUser(ACSI_WRITE, cmd, CMD_LENGTH_SHORT, wBuffer, 1);
+
+        if(!hdIf.success || hdIf.statusByte != 0) {     // write failed?
+            Cconout('W');
+        } else {                                        // write OK?
+            Cconout('*');
+        }
+    }
+    
+    (void) Cconws("\r\nDone. Press any key to quit.\r\n");
+    Cnecin();
+}
+
+void writeReadAbove100MB(BYTE acsiId)
+{
     int sectorCount;
     while(1) {
         (void) Cconws("Enter sector count per op (1-254): ");
@@ -172,8 +244,6 @@ int main(void)
             Cconout('x');
         }       
     }
-
-    return 0;
 }
 
 BYTE showQuestionGetBool(const char *question, BYTE trueKey, const char *trueWord, BYTE falseKey, const char *falseWord)
