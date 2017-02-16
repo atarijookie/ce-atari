@@ -100,7 +100,7 @@ void out_result_string(BYTE result, char *errorStr)
     char *resultString = resultToString(result);
     outString(resultString);
     
-    outString(" err: ");
+    if(!result) outString(" err: ");
     outString(errorStr);
     outString("\n\r");
 }
@@ -110,7 +110,7 @@ void out_result_string_dw_w(BYTE result, char *errorStr, DWORD dw, WORD w)
     char *resultString = resultToString(result);
     outString(resultString);
     
-    outString(" err: ");
+    if(!result) outString(" err: ");
     outString(errorStr);
 
     char tmp[16];
