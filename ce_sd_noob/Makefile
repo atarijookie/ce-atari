@@ -1,4 +1,4 @@
-TARGET  = cesdnoob.prg
+TARGET  = ce_sdnob.prg
 SLIM    = yes
 
 # control verbosity. use make V=1 to show commands

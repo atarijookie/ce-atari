@@ -28,6 +28,7 @@ BYTE commandShort[CMD_LENGTH_SHORT] = {      0, 'C', 'E', HOSTMOD_TRANSLATED_DIS
 BYTE commandLong [CMD_LENGTH_LONG]  = {0x1f, 0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0};
 
 void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+void showHexWord  (WORD val);
 
 // ------------------------------------------------------------------
 typedef struct {
@@ -130,10 +131,10 @@ int main( int argc, char* argv[] )
     //            |                                        |
     // show TOS version
     (void) Cconws("Your TOS version      : ");
-    showInt((tosVersion >> 16) & 0xff, 1);
+    showInt((tosVersion >>  8) & 0x0f, 1);
     (void) Cconws(".");
-    showInt((tosVersion >>  8) & 0xff, 1);
-    showInt((tosVersion      ) & 0xff, 1);
+    showInt((tosVersion >>  4) & 0x0f, 1);
+    showInt((tosVersion      ) & 0x0f, 1);
     (void) Cconws("\r\n");
 
     // show maximum partition size
@@ -175,7 +176,7 @@ int main( int argc, char* argv[] )
     ceId = getCEid(TRUE);           // get first ID which belongs to CE
 
     if(ceId == 0xff) {              // no CE ID found? quit, fail
-        (void) Cconws("CosmosEx was not found on bus.\r\n");
+        (void) Cconws("\r\nCosmosEx was not found on bus.\r\n");
         (void) Cconws("Press any key to terminate...\r\n");
 
         Cnecin();
@@ -188,7 +189,7 @@ int main( int argc, char* argv[] )
         res = getSDcardInfo(ceId);  // try to get the info about the card
 
         if(!res) {                  // failed to get the info about the card? fail
-            (void) Cconws("Failed to get card info, fail.\r\n");
+            (void) Cconws("\r\nFailed to get card info, fail.\r\n");
             (void) Cconws("Press any key to terminate...\r\n");
 
             Cnecin();
@@ -234,7 +235,7 @@ int main( int argc, char* argv[] )
     res = enableCEids(ceId);
 
     if(!res) {
-        (void) Cconws("Press any key to terminate...\r\n");
+        (void) Cconws("\r\nPress any key to terminate...\r\n");
 
         Cnecin();
         return 0;
@@ -250,7 +251,7 @@ int main( int argc, char* argv[] )
     res = readBootsectorAndIdentifyContent();
 
     if(!res) {
-        (void) Cconws("Press any key to terminate...\r\n");
+        (void) Cconws("\r\nPress any key to terminate...\r\n");
 
         Cnecin();
         return 0;
@@ -297,7 +298,7 @@ int main( int argc, char* argv[] )
     res = writeBootAndOtherSectors(partParams);
 
     if(!res) {
-        (void) Cconws("Press any key to terminate...\r\n");
+        (void) Cconws("\r\nPress any key to terminate...\r\n");
 
         Cnecin();
         return 0;
@@ -657,6 +658,7 @@ void scanXCSIbus(void)
         }
     }
 
+    (void) Cconws("\r\n");
     hdIf->maxRetriesCount = 10;                                 // enable retries
 }
 
