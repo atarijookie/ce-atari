@@ -126,6 +126,7 @@ int main( int argc, char* argv[] )
     //-------------
     // if user decided to continue...
     Clear_home();
+    (void) Cconws("\33p   [ CosmosEx SD NOOB configurator ]    \33q\r\n\r\n");
     Supexec(getTosVersion);             // find out TOS version
 
     //            |                                        |
