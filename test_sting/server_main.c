@@ -80,6 +80,36 @@ void closeSock3   (int *dataFd, int port, Tsock3conf *sc,                int tcp
 void handleSock3  (int *dataFd, int port, Tsock3conf *sc,                int tcpNotUdp);
 
 void handleSocket20(void);
+
+//---------------------------------
+
+// utility function : write all bytes to the socket
+
+static ssize_t write_all(int fd, const void * buf, size_t nbytes)
+{
+    ssize_t res;
+    const char * p = (const char *)buf;
+    ssize_t written = 0;
+
+    do {
+        res = write(fd, p, nbytes);
+        if(res < 0) {
+            if(errno == EINTR) continue;    // interrupted : try again
+            if(errno == EAGAIN || errno == EWOULDBLOCK) continue;
+            fprintf(stderr, "write_all() failed after %d bytes : %s\n", (int)written, strerror(errno));
+            return res;
+        } else if(res == 0) {
+            fprintf(stderr, "write_all() closed after %d bytes\n", (int)written);
+            return res;
+        }
+        nbytes -= res;
+        written += res;
+        p += res;
+    } while(nbytes > 0);
+
+    return written;
+}
+
 //---------------------------------
 
 /*
@@ -194,7 +224,7 @@ void handleSocket0(int *dataFd, int port, int readCount, int tcpNotUdp)
     
     // write back
     if(tcpNotUdp) {
-        write (*dataFd, gBfrIn, res);                            
+        write_all (*dataFd, gBfrIn, res);
     } else {
         sendto(*dataFd, gBfrIn, res, 0, (struct sockaddr*) &si_other, slen);
     }
@@ -266,7 +296,7 @@ void sock1send(int *dataFd, int port, Tsock1conf *sc, int tcpNotUdp)
     }
 
     if(tcpNotUdp) {         // TCP?
-        write (*dataFd, gBfrOut, bl);                  // send data
+        write_all (*dataFd, gBfrOut, bl);                  // send data
     } else {                // UDP?
         sendto(*dataFd, gBfrOut, bl, 0, (struct sockaddr*) &sc->si_other, sc->slen);
     }
@@ -333,7 +363,7 @@ void handleSocket2(int *dataFd, int port, int readCount, int tcpNotUdp)
 
     // send in one big send, because otherwise Sting somehow fails to receive all the data...
     if(tcpNotUdp) {                         // TCP?
-        write (*dataFd, bigBuf,  len); // send length
+        write_all (*dataFd, bigBuf,  len); // send length
     } else {
         sendto(*dataFd, bigBuf,  len, 0, (struct sockaddr*) &si_other, slen);
     }
@@ -707,7 +737,7 @@ void testSock0(int portOffset, int tcpNotUdp)
         cntr++;
     }
 
-    write(s, gBfrOut, ECHO_SIZE);                               // send output buffer
+    write_all(s, gBfrOut, ECHO_SIZE);                               // send output buffer
 
     int gotBytes;
     memset(gBfrIn, 0, ECHO_SIZE);
@@ -743,7 +773,7 @@ void testSock1(int portOffset, int tcpNotUdp)
     gBfrOut[6] = (unsigned char) (SOCK1_BLOCKPAUSE >> 8);
     gBfrOut[7] = (unsigned char) (SOCK1_BLOCKPAUSE     );
 
-    write(s, gBfrOut, 8);                                       // send output buffer
+    write_all(s, gBfrOut, 8);                                       // send output buffer
 
     int gotBytes;
     memset(gBfrIn, 0, ECHO_SIZE);
@@ -795,7 +825,7 @@ void testSock2(int portOffset, int tcpNotUdp)
     gBfrOut[0] = (unsigned char) (SOCK2_LINE_COUNT >> 8);
     gBfrOut[1] = (unsigned char) (SOCK2_LINE_COUNT     );
 
-    write(s, gBfrOut, 2);                                   // send output buffer
+    write_all(s, gBfrOut, 2);                                   // send output buffer
 
     int gotBytes;
     memset(gBfrIn, 0, BFR_SIZE);
@@ -850,7 +880,7 @@ void testSock3(int portOffset, int tcpNotUdp)
 
     gBfrOut[0] = (unsigned char) (SOCK3_CLOSETIME >> 8);
     gBfrOut[1] = (unsigned char) (SOCK3_CLOSETIME     );
-    write(s, gBfrOut, 2);                                       // send output buffer
+    write_all(s, gBfrOut, 2);                                       // send output buffer
 
     int start           = getCurrentMs();
     int clientTimeOut   = start + (3 * SOCK3_CLOSETIME);
@@ -894,7 +924,7 @@ void testUdpReceiving(void)
     }
 
     for(i=0; i<3; i++) {
-        write(s, gBfrOut, 100);     // send output buffer
+        write_all(s, gBfrOut, 100);     // send output buffer
     }
 
     sleep(1);                       // wait a second, just to be sure
@@ -931,7 +961,7 @@ void testUdpReceiving(void)
     //------------------------
     int c1, c2;
 
-    write(s, gBfrOut, 100);     // send output buffer
+    write_all(s, gBfrOut, 100);     // send output buffer
     sleep(1);
     ioctl(s, FIONREAD, &c1);
     recvfrom(s, gBfrIn, 50, 0, (struct sockaddr *) &si_other, &slen);
@@ -1034,5 +1064,3 @@ int getCurrentMs(void)
 	int val = (tp.tv_sec * 1000) + (tp.tv_nsec / 1000000);	    // convert to milli seconds
 	return val;
 }
-
-
