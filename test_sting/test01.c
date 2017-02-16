@@ -232,12 +232,12 @@ int sendAndReceive(BYTE tcpNotUdp, DWORD blockSize, int handle, BYTE getBlockNot
 
                 if(ndb) {                               // if something retrieved
                     memcpy(pBuf, ndb->ndata, ndb->len); // copy in the data
-                    
-                    KRfree (ndb->ptr);                  // free the ram
-                    KRfree (ndb);
-                    
+
                     pBuf += ndb->len;                     // it was this many bytes
                     toGet -= ndb->len;
+
+                    KRfree (ndb->ptr);                  // free the ram
+                    KRfree (ndb);
                 }
             }
         }
