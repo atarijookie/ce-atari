@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 expandtab
 #include <mint/sysbind.h>
 #include <mint/osbind.h>
 #include <mint/basepage.h>
@@ -218,7 +219,7 @@ NDB *CNget_NDB(int16 handle)
 
     //-----------------
     // setup the NDB structure - but using direct access, as calling code uses different packing than gcc
-    storeDword(((BYTE *)pNdb) +  0, (DWORD) pNdb);          // pointer block start - for free()
+    storeDword(((BYTE *)pNdb) +  0, (DWORD) bfr);           // pointer to allocated data - for free()
     storeDword(((BYTE *)pNdb) +  4, (DWORD) bfr);           // pointer to data
     storeWord (((BYTE *)pNdb) +  8, (WORD)  readCount);     // length of data in buffer
     storeDword(((BYTE *)pNdb) + 10, (DWORD) 0);             // pointer to next NDB
