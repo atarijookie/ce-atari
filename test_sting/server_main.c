@@ -13,6 +13,7 @@
 #include <arpa/inet.h> 
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <signal.h>
 
 int createListeningSocket(int port, int tcpNotUdp);
 int acceptConnection(int listenFd);
@@ -136,6 +137,8 @@ unsigned char gBfrIn[BFR_SIZE];
 int main(int argc, char *argv[])
 {
 	printf("usage: %s [server]\ndefault is client mode\n\n", argv[0]);
+
+    signal(SIGPIPE, SIG_IGN);   /* ignore SIGPIPE so were are not killed during write() */
 
     int asClient = 1;
     if(argc > 1) {
