@@ -1,7 +1,13 @@
 # needs mtools to write MS-DOS (FAT) file systems.
 
-# -p to preserve files time stamps
+UNAMES = $(shell uname -s)
+
+ifeq (,$(findstring CYGWIN,$(UNAMES)))
+# -p to preserve files time stamps : not supported by Cygwin
 CP = cp -p
+else
+CP = cp
+endif
 ZIP = zip
 GZCAT = gunzip -c
 
