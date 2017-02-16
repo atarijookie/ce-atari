@@ -306,7 +306,7 @@ void sock1send(int *dataFd, int port, Tsock1conf *sc, int tcpNotUdp)
 
 void handleSocket2(int *dataFd, int port, int readCount, int tcpNotUdp)
 {
-    int i;
+    int i, n;
     size_t len;
     (void)port;
 
@@ -353,11 +353,16 @@ void handleSocket2(int *dataFd, int port, int readCount, int tcpNotUdp)
 
     len = 0;
     for(i=0; i<linesCount; i++) {               // send all required lines to client
-        int n;
         const char *line = lines[i % 10];          // get line
         n = snprintf(bigBuf + len, sizeof(bigBuf) - len, "%04u%s", (unsigned)strlen(line), line);
-        if(n >= (int)sizeof(bigBuf) - (int)len) break;
-        len += n;
+        if((n + (int)len) >= (int)sizeof(bigBuf)) {
+            if(!tcpNotUdp) break;
+            printf("partial send : %u bytes\n", (unsigned)len);
+            write_all (*dataFd, bigBuf,  len); // send length
+            len = snprintf(bigBuf, sizeof(bigBuf), "%04u%s", (unsigned)strlen(line), line);
+        } else {
+            len += n;
+        }
     }
     printf("sending %d lines %u bytes\n", i, (unsigned)len);
 
