@@ -1,3 +1,4 @@
+// vim: expandtab shiftwidth=4 tabstop=4
 #include <time.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -275,7 +276,9 @@ void sock1send(int *dataFd, int port, Tsock1conf *sc, int tcpNotUdp)
 
 void handleSocket2(int *dataFd, int port, int readCount, int tcpNotUdp)
 {
-	(void)port;
+    int i;
+    size_t len;
+    (void)port;
 
     if(readCount < 2) {
         printf("handleSocket2 - not enough data\n");
@@ -305,7 +308,7 @@ void handleSocket2(int *dataFd, int port, int readCount, int tcpNotUdp)
     
     printf("handleSocket2 - will send linesCount: %d\n", linesCount);
     
-    char *lines[10] = {
+    static const char *lines[10] = {
                         "Bacon ipsum dolor amet strip steak turducken meatball short loin rump ham ribeye ham hock turkey.\n", 
                         "Fatback shank turducken, drumstick chuck turkey pork belly prosciutto.\n",
                         "Beef ribs swine bresaola landjaeger tri-tip kevin rump meatball ground round shankle strip steak beef boudin filet mignon pork chop.\n",
@@ -317,31 +320,25 @@ void handleSocket2(int *dataFd, int port, int readCount, int tcpNotUdp)
                         "Jerky bacon porchetta meatball shoulder landjaeger.\n",
                         "Pig cow turducken bacon beef frankfurter.\n"
                        };
-    
-    int i, lineIndex = 0;
+
+    len = 0;
     for(i=0; i<linesCount; i++) {               // send all required lines to client
-        char *line = lines[lineIndex];          // get line
-
-        int len = strlen(line);
-        char tmp[200];
-        sprintf(tmp, "%04d%s", len, line);
-
-        strcat(bigBuf, tmp);
-
-        lineIndex++;
-        if(lineIndex > 9) {                     // move to next line
-            lineIndex = 0;
-        }
+        int n;
+        const char *line = lines[i % 10];          // get line
+        n = snprintf(bigBuf + len, sizeof(bigBuf) - len, "%04u%s", (unsigned)strlen(line), line);
+        if(n >= (int)sizeof(bigBuf) - (int)len) break;
+        len += n;
     }
-    
+    printf("sending %d lines %u bytes\n", i, (unsigned)len);
+
     // send in one big send, because otherwise Sting somehow fails to receive all the data...
     if(tcpNotUdp) {                         // TCP?
-        write (*dataFd, bigBuf,  strlen(bigBuf)); // send length
+        write (*dataFd, bigBuf,  len); // send length
     } else {
-        sendto(*dataFd, bigBuf,  strlen(bigBuf), 0, (struct sockaddr*) &si_other, slen);
+        sendto(*dataFd, bigBuf,  len, 0, (struct sockaddr*) &si_other, slen);
     }
 
-printf("Data sent: %lu (0x%lx)\n", strlen(bigBuf), strlen(bigBuf));
+printf("Data sent: %lu (0x%lx)\n", len, len);
 
 // close the socket
 closeSock2:
