@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #ifndef _TCP_H_
 #define _TCP_H_
 
@@ -10,4 +11,3 @@ int16 TCP_ack_wait      (int16 handle, int16 timeout);
 int16 TCP_info          (int16 handle, TCPIB *tcp_info);
 
 #endif
-

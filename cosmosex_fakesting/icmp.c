@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 //----------------------------------------
 // CosmosEx fake STiNG - by Jookie, 2014
 // Based on sources of original STiNG
@@ -60,7 +61,7 @@ int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_len
     commandLong[11] = (BYTE) (dat_length >> 8);                 // cmd[11, 12]  = length
     commandLong[12] = (BYTE) (dat_length     );
 
-    // prepare the command for buffer sending 
+    // prepare the command for buffer sending
     BYTE *pBfr  = (BYTE *) data;
     DWORD dwBfr = (DWORD) data;
 
@@ -70,18 +71,18 @@ int16 ICMP_send (uint32 dest, uint8 type, uint8 code, void *data, uint16 dat_len
     } else {                                        // buffer pointer is EVEN
         commandLong[5] = NET_CMD_ICMP_SEND_EVEN;    // cmd[5]       = command code -- sending from EVEN address
     }
-    
+
     // calculate sector count
     WORD sectorCount = dat_length / 512;            // get number of sectors we need to send
-    
+
     if((dat_length % 512) != 0) {                   // if the number of bytes is not multiple of 512, then we need to send one sector more
         sectorCount++;
     }
-    
+
     // send it to host
     hdIf.cmd(ACSI_WRITE, commandLong, CMD_LENGTH_LONG, pBfr, sectorCount);
 
-	if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // if failed, return FALSE 
+	if(!hdIf.success || hdIf.statusByte != E_NORMAL) {  // if failed, return FALSE
 		return E_LOSTCARRIER;
 	}
 
@@ -92,14 +93,14 @@ int16 ICMP_handler (int16 (* handler) (IP_DGRAM *), int16 flag)
 {
     int i;
     int existing = -1, empty = -1;
-    
+
     /*
-    // Don't avoid storing NULL to handlers - Sting allows that, so this is a compatibility thing, even if it seems wrong. 
+    // Don't avoid storing NULL to handlers - Sting allows that, so this is a compatibility thing, even if it seems wrong.
     if(handler == NULL) {                                   // empty pointer? nothing to do
         return FALSE;
     }
     */
-    
+
     //----------------
     // the following code is here just to pretend that having NULL handler is OK (Sting compatibility thing)
     if(((DWORD) handler) == 0) {
@@ -108,26 +109,26 @@ int16 ICMP_handler (int16 (* handler) (IP_DGRAM *), int16 flag)
             gotNullIcmpHandler = 1;
             return didSetIt;
         }
-        
+
         if(flag == HNDLR_QUERY) {
             return gotNullIcmpHandler;
         }
-    
+
         if(flag == HNDLR_REMOVE) {
             BYTE didRemoveIt = gotNullIcmpHandler ? 1 : 0;
             gotNullIcmpHandler = 0;
             return didRemoveIt;
         }
-        
+
         return 0;
     }
     //----------------
-    
+
     for(i=0; i<MAX_ICMP_HANDLERS; i++) {
         if(icmpHandlers[i] == (DWORD) handler) {            // if we got that handler, store it's index
             existing = i;
         }
-        
+
         if(icmpHandlers[i] == 0 && empty == -1) {           // if this handler slot is empty and we don't have the empty index stored, store it
             empty = i;
         }
@@ -148,16 +149,16 @@ int16 ICMP_handler (int16 (* handler) (IP_DGRAM *), int16 flag)
             }
             return TRUE;
         //--------------------------------
-        
+
         case HNDLR_REMOVE :                         // remove handler?
             if(existing == -1) {                    // but we don't have it? fail
                 return FALSE;
             }
-            
+
             icmpHandlers[existing] = (DWORD) NULL;  // clear handler
             return TRUE;
         //--------------------------------
-        
+
         case HNDLR_QUERY :                          // check if this handler is registered?
             if(existing == -1) {
                 return FALSE;
@@ -165,29 +166,29 @@ int16 ICMP_handler (int16 (* handler) (IP_DGRAM *), int16 flag)
                 return TRUE;
             }
       }
-      
+
     return FALSE;                                   // unknown request
 }
 
 void ICMP_discard (IP_DGRAM *dgram)
 {
     // probably do nothing now...
-    
+
 }
 
 void icmp_processData(uint32 bytesToReadIcmp)
 {
     bytesToReadIcmp = (bytesToReadIcmp <= DMA_BUFFER_SIZE) ? bytesToReadIcmp : DMA_BUFFER_SIZE;     // will the whole data fit in out DMA buffer? If not, make it shorter
-    
+
     DWORD sectors = bytesToReadIcmp / 512;                      // calculate how many sectors we need for the whole transfer
     if((bytesToReadIcmp % 512) != 0) {                          // if the byte count is not multiple of 512, add one more sector
         sectors++;
     }
-    
+
     // first store command code
     commandShort[4] = NET_CMD_ICMP_GET_DGRAMS;                  // store function number
     commandShort[5] = (BYTE) sectors;                           // and sector count
-    
+
     // send it to host
     hdIf.cmd(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, sectors);
 
@@ -198,20 +199,20 @@ void icmp_processData(uint32 bytesToReadIcmp)
     BYTE *pBfr = pDmaBuffer;
     while(1) {
         WORD cnt = getWord(pBfr);                               // get how many data is in the next DGRAM
-        
+
         if(cnt == 0) {                                          // no data means end of sequence
             break;
         }
-        
+
         pBfr += 2;                                              // advance to block of data beyond the count
 
         // pBfr now points to the Dgram structure, but we won't access it as a structure because of different gcc vs Pure C packing
         storeDword(pBfr + 26, (DWORD) (pBfr + 48));             // store data pointer - right after the header
         storeWord (pBfr + 30, (cnt > 48) ? (cnt - 48) : 0);     // got more data than just the header? calculate how many data we have, otherwise just return 0
         storeDword(pBfr + 44, 0);                               // store NEXT pointer - no next
-        
+
         passDatagramToAllHandlers((IP_DGRAM *) pBfr);           // now pass the datagram to all handlers
-        
+
         pBfr += cnt;                                            // advance to the next count of data
     }
 }
@@ -222,15 +223,15 @@ void passDatagramToAllHandlers(IP_DGRAM *dgram)
     typedef int16 (* THandler) (IP_DGRAM *);                    // define type THandler, which will be a function returning int16 and accepting IP_DGRAM pointer
     THandler hndlr;                                             // define a variable which will hold pointer to that function
     int16 res;
-    
-    for(i=0; i<MAX_ICMP_HANDLERS; i++) {            
+
+    for(i=0; i<MAX_ICMP_HANDLERS; i++) {
         if(icmpHandlers[i] == 0) {                              // this isn't a valid handler? skip it
             continue;
         }
-                
+
         hndlr   = (THandler) icmpHandlers[i];                   // cast DWORD to function pointer
         res     = (*hndlr) (dgram);                             // call the function
-        
+
         if(res == TRUE) {                                       // if the handler returns TRUE, then the DGRAM is processed and no other handler should process it
             break;
         }
@@ -240,12 +241,11 @@ void passDatagramToAllHandlers(IP_DGRAM *dgram)
 int icmpGotSomeHandler(void)                // return TRUE if there is a valid ICMP handler, return FALSE otherwise
 {
     int i;
-    for(i=0; i<MAX_ICMP_HANDLERS; i++) {            
+    for(i=0; i<MAX_ICMP_HANDLERS; i++) {
         if(icmpHandlers[i]) {               // this is a valid handler? return TRUE
             return TRUE;
         }
     }
-    
+
     return FALSE;
 }
-

@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #ifndef _HDD_IF_H_
 #define _HDD_IF_H_
 
@@ -35,16 +36,16 @@ typedef struct {
     BYTE                success;
     BYTE                statusByte;
     BYTE                phaseChanged;
-    
+
     int                 retriesDoneCount;
     int                 maxRetriesCount;
-    
+
     TsetReg             pSetReg;
     TgetReg             pGetReg;
 
     TdmaDataTx_prepare  pDmaDataTx_prepare;
     TdmaDataTx_do       pDmaDataTx_do;
-    
+
     BYTE                scsiHostId;
 } THDif;
 

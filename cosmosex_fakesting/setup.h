@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #ifndef _SETUP_H_
 #define _SETUP_H_
 
@@ -18,4 +19,3 @@ int32  KRgetfree_internal   (int16 block_flag);
 void  *KRrealloc_internal   (void *mem_block, int32 new_size);
 
 #endif
-

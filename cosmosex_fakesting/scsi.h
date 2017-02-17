@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 // based on AHDI 6.061 sources
 
 #ifndef _SCSI_H_
@@ -38,39 +39,39 @@
 #define REG_DMARES  0x10
 #define REG_DMACTL  0x11
 
-#define SDMARES		    ((volatile DWORD *)  0xFFFF8710)
-#define SDMACTL		    ((volatile WORD *)   0xFFFF8714)	// WORD
+#define SDMARES            ((volatile DWORD *)  0xFFFF8710)
+#define SDMACTL            ((volatile WORD *)   0xFFFF8714)    // WORD
 
 // SCSI Interface (NCR 5380) for READ operations
-#define SCSIDB	        ((volatile BYTE *)  0xFFFF8781)	// current SCSI data bus
-#define SCSIICR	        ((volatile BYTE *)  0xFFFF8783)	// initiator command register
-#define SCSIMR	        ((volatile BYTE *)  0xFFFF8785)	// mode register
-#define SCSITCR	        ((volatile BYTE *)  0xFFFF8787)	// target command register
-#define SCSICR	        ((volatile BYTE *)  0xFFFF8789)	// current SCSI control register
-#define SCSIDSR	        ((volatile BYTE *)  0xFFFF878B)	// DMA status register
-#define SCSIIDR	        ((volatile BYTE *)  0xFFFF878D)	// input data register
-#define SCSIREI	        ((volatile BYTE *)  0xFFFF878F)	// reset error / interrupt
+#define SCSIDB             ((volatile BYTE *)  0xFFFF8781)    // current SCSI data bus
+#define SCSIICR            ((volatile BYTE *)  0xFFFF8783)    // initiator command register
+#define SCSIMR             ((volatile BYTE *)  0xFFFF8785)    // mode register
+#define SCSITCR            ((volatile BYTE *)  0xFFFF8787)    // target command register
+#define SCSICR             ((volatile BYTE *)  0xFFFF8789)    // current SCSI control register
+#define SCSIDSR            ((volatile BYTE *)  0xFFFF878B)    // DMA status register
+#define SCSIIDR            ((volatile BYTE *)  0xFFFF878D)    // input data register
+#define SCSIREI            ((volatile BYTE *)  0xFFFF878F)    // reset error / interrupt
 
 // SCSI Interface (NCR 5380) for WRITE operations
-#define SCSIODR	        ((volatile BYTE *)  0xFFFF8781)	// output data register
-#define SCSIISR	        ((volatile BYTE *)  0xFFFF8789)	// ID select register
-#define SCSIDS	        ((volatile BYTE *)  0xFFFF878B)	// start DMA send
-#define SCSIDTR	        ((volatile BYTE *)  0xFFFF878D)	// start DMA target receive
-#define SCSIDIR	        ((volatile BYTE *)  0xFFFF878F)	// start DMA initiator receive
+#define SCSIODR            ((volatile BYTE *)  0xFFFF8781)    // output data register
+#define SCSIISR            ((volatile BYTE *)  0xFFFF8789)    // ID select register
+#define SCSIDS             ((volatile BYTE *)  0xFFFF878B)    // start DMA send
+#define SCSIDTR            ((volatile BYTE *)  0xFFFF878D)    // start DMA target receive
+#define SCSIDIR            ((volatile BYTE *)  0xFFFF878F)    // start DMA initiator receive
 
 // TT SCSI DMA Controller
 #define bSDMAPTR_hi     ((volatile BYTE *)  0xFFFF8701)
-#define bSDMAPTR_mid_hi	((volatile BYTE *)  0xFFFF8703)
-#define bSDMAPTR_mid_lo	((volatile BYTE *)  0xFFFF8705)
+#define bSDMAPTR_mid_hi ((volatile BYTE *)  0xFFFF8703)
+#define bSDMAPTR_mid_lo ((volatile BYTE *)  0xFFFF8705)
 #define bSDMAPTR_lo     ((volatile BYTE *)  0xFFFF8707)
 
-#define bSDMACNT_hi	    ((volatile BYTE *)  0xFFFF8709)
-#define bSDMACNT_mid_hi	((volatile BYTE *)  0xFFFF870B)
-#define bSDMACNT_mid_lo	((volatile BYTE *)  0xFFFF870D)
-#define bSDMACNT_lo	    ((volatile BYTE *)  0xFFFF870F)
+#define bSDMACNT_hi        ((volatile BYTE *)  0xFFFF8709)
+#define bSDMACNT_mid_hi    ((volatile BYTE *)  0xFFFF870B)
+#define bSDMACNT_mid_lo    ((volatile BYTE *)  0xFFFF870D)
+#define bSDMACNT_lo        ((volatile BYTE *)  0xFFFF870F)
 
-#define SDMARES		    ((volatile DWORD *)  0xFFFF8710)
-#define SDMACTL		    ((volatile WORD *)   0xFFFF8714)	// WORD
+#define SDMARES            ((volatile DWORD *)  0xFFFF8710)
+#define SDMACTL            ((volatile WORD *)   0xFFFF8714)    // WORD
 
 #define DMAIN   00
 #define DMAOUT  01
@@ -154,4 +155,3 @@
 //----------------------------------
 
 #endif
-

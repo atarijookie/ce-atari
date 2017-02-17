@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #ifndef _API_H_
 #define _API_H_
 
@@ -22,12 +23,12 @@ typedef struct udpib
 	uint32	reserve1;	/* reserved */
 	uint32	reserve2;	/* reserved */
 }	UDPIB;
-     
+
 typedef  struct client_layer {
     char *     module;      /* Specific string that can be searched for     */
     char *     author;      /* Any string                                   */
     char *     version;     /* Format `00.00' Version:Revision              */
-    
+
 	//-------------
 	// memory alloc / free functions
     int32 (* KRmalloc)      (void);
@@ -111,7 +112,7 @@ typedef  struct stx_layer {
     int16        (* get_route_entry) (int16, uint32 *, uint32 *, PORT **, uint32 *);
     int16        (* set_route_entry) (int16, uint32, uint32, PORT *, uint32);
  } __attribute__((packed)) STX_API;
- 
+
 long         init_cookie (void);
 DRV_HDR *    get_drv_func (char *drv_name);
 
