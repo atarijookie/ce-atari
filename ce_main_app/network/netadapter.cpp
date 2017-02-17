@@ -517,7 +517,11 @@ void NetAdapter::conSend(void)
         int ires = write(cons[slot].fd, dataBuffer + written, length - written);  // try to send the data
         if(ires < 0) {
             Debug::out(LOG_ERROR, "NetAdapter::conSend - slot %d : failed to write(). written %d out of %d : %s", slot, written, length, strerror(errno));
-            dataTrans->setStatus(E_OBUFFULL);
+            if(errno == EAGAIN || errno == EWOULDBLOCK) {
+                dataTrans->setStatus(E_OBUFFULL);
+            } else {
+                dataTrans->setStatus(E_RRESET);
+            }
             return;
         } else if(ires == 0) {
             Debug::out(LOG_ERROR, "NetAdapter::conSend - slot %d : write() remote closed connection. written %d out of %d", slot, written, length);
