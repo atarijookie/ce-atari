@@ -25,6 +25,7 @@ void doTest00(void);
 void doTest01(void);
 void doTest02(void);
 void doTest03(void);
+void doSpeedTest(void);
 
 BYTE readBuffer [130 * 1024];
 BYTE writeBuffer[130 * 1024];
