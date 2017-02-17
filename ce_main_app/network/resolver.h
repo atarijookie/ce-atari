@@ -27,12 +27,12 @@ struct Tresolv {
 
 class ResolverRequest {
 public:
-    int  addRequest         (char *hostName);       
+    int  addRequest         (const char *hostName);
     bool checkAndhandleSlot (int index);
     void showSlot           (int index);
     void clearSlot          (int index);
     bool slotIndexValid     (int index);
-    
+
     Tresolv requests[RESOLV_COUNT];
 
 private:

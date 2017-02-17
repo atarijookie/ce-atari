@@ -512,12 +512,19 @@ void NetAdapter::conSend(void)
     Debug::out(LOG_DEBUG, "NetAdapter::conSend() -- sending %d bytes through connection %d (received %d from ST, isOdd: %d)", length, slot, lenRoundUp, isOdd);
     //Debug::outBfr(dataBuffer, length);
 
-    int ires = write(cons[slot].fd, dataBuffer, length);  // try to send the data
-
-    if(ires < length) {                                 // if written less than should, fail
-        Debug::out(LOG_DEBUG, "NetAdapter::conSend - failed to write() all data");
-        dataTrans->setStatus(E_OBUFFULL);
-        return;
+    int written = 0;
+    while(written < length) {
+        int ires = write(cons[slot].fd, dataBuffer + written, length - written);  // try to send the data
+        if(ires < 0) {
+            Debug::out(LOG_ERROR, "NetAdapter::conSend - slot %d : failed to write(). written %d out of %d : %s", slot, written, length, strerror(errno));
+            dataTrans->setStatus(E_OBUFFULL);
+            return;
+        } else if(ires == 0) {
+            Debug::out(LOG_ERROR, "NetAdapter::conSend - slot %d : write() remote closed connection. written %d out of %d", slot, written, length);
+            dataTrans->setStatus(E_EOF);
+            return;
+        }
+        written += ires;
     }
 
     dataTrans->setStatus(E_NORMAL);
@@ -695,14 +702,14 @@ void NetAdapter::resolveStart(void)
 
     //-------------------
 
-    Debug::out(LOG_DEBUG, "NetAdapter::resolveStart - will resolve: %s", dataBuffer);
-
     int resolverHandle = resolver.addRequest((char *) dataBuffer);      // this is the input string param (the name)
+    Debug::out(LOG_DEBUG, "NetAdapter::resolveStart - will resolve: '%s' handle=%d", dataBuffer, resolverHandle);
     dataTrans->setStatus(resolverHandle);                               // return handle
 }
 //----------------------------------------------
 void NetAdapter::resolveGetResp(void)
 {
+    int i;
     int index = cmd[5];
 
     if(!resolver.slotIndexValid(index)) {                       // invalid index? E_PARAMETER
@@ -713,7 +720,7 @@ void NetAdapter::resolveGetResp(void)
     bool resolveDone = resolver.checkAndhandleSlot(index);      // check if resolved finished
 
     if(!resolveDone) {                                  // if the resolve command didn't finish yet
-        Debug::out(LOG_DEBUG, "NetAdapter::resolveGetResp -- the resolved didn't finish yet for slot %d", index);
+        Debug::out(LOG_DEBUG, "NetAdapter::resolveGetResp handle=%d -- the resolved didn't finish yet", index);
         dataTrans->setStatus(RES_DIDNT_FINISH_YET);     // return this special status
         return;
     }
@@ -733,7 +740,14 @@ void NetAdapter::resolveGetResp(void)
 
     dataTrans->addDataBfr(r->data, 4 * r->count, true);            // now store all the resolved data, and pad to multiple of 16
 
-    Debug::out(LOG_DEBUG, "NetAdapter::resolveGetResp -- returned %d IPs", r->count);
+    int len = 0;
+    char tmp[1024] = { 0 };
+    for(i = 0; i < r->count; i++) {
+        len += snprintf(tmp + len, sizeof(tmp) - len, "%d.%d.%d.%d ",
+                         r->data[i*4], r->data[i*4+1],  r->data[i*4+2],  r->data[i*4+3]);
+    }
+
+    Debug::out(LOG_DEBUG, "NetAdapter::resolveGetResp handle=%d -- returned %d IPs : %s", index, r->count, tmp);
 
     resolver.clearSlot(index);                                              // clear the slot for next usage
     dataTrans->setStatus(E_NORMAL);
@@ -987,23 +1001,23 @@ void NetAdapter::conGetNdb(void)
 
     int charsUsed = cmd[9];                             // cmd[10] - how many chars were used by calling CNget_char() - we need to remove them first
     if(charsUsed > 0) {                                 // some chars were used, remove them
-        Debug::out(LOG_DEBUG, "NetAdapter::conGetNdb() -- CNget_char() used %d bytes, removing them from socket", charsUsed);
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetNdb() -- slot %d CNget_char() used %d bytes, removing them from socket", slot, charsUsed);
         nc->readWrapper.removeBlock(charsUsed);
     }
 
     if(getNdbNotSize) {
         int ndbSize = nc->readWrapper.getNdb(dataBuffer);   // read data from socket (wrapper)
 
-        Debug::out(LOG_DEBUG, "NetAdapter::conGetNdb() -- returning NDB data, size %d bytes", ndbSize);
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetNdb() -- slot %d returning NDB data, size %d bytes", slot, ndbSize);
         //Debug::outBfr(dataBuffer, ndbSize);
 
         dataTrans->addDataBfr(dataBuffer, ndbSize, true);   // add data buffer, pad to mul 16
         dataTrans->setStatus(E_NORMAL);
     } else {
         int nextSizeBytes   = nc->readWrapper.getNextNdbSize();
-        int nextSizeSectors = (nextSizeBytes / 512) + ((nextSizeBytes % 512) == 0 ? 0 : 1);
+        int nextSizeSectors = (nextSizeBytes + 511) >> 9;
 
-        Debug::out(LOG_DEBUG, "NetAdapter::conGetNextNdbSize() -- returning NDB size, nextSizeBytes: %d, nextSizeSectors: %d", nextSizeBytes, nextSizeSectors);
+        Debug::out(LOG_DEBUG, "NetAdapter::conGetNdb() -- slot %d returning NDB size, nextSizeBytes: %d, nextSizeSectors: %d", slot, nextSizeBytes, nextSizeSectors);
 
         dataTrans->addDataDword(nextSizeBytes);             // send byte count
         dataTrans->addDataByte(nextSizeSectors);            // send sector count
