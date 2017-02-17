@@ -271,7 +271,7 @@ static BYTE getBlockSingle(TConInfo *ci, BYTE handle, BYTE *buffer, WORD byteCou
 static BYTE getBlockLong(TConInfo *ci, BYTE handle, BYTE *buffer, WORD byteCount, WORD sectorCount)
 {
     BYTE res;
-    BYTE toFastRam = (((int)buffer) >= 0x1000000) ? TRUE : FALSE;       // flag: are we reading to FAST RAM?
+    BYTE toFastRam = (((DWORD)buffer) >= 0x1000000) ? TRUE : FALSE;       // flag: are we reading to FAST RAM?
 
     if((((DWORD) buffer) & 1) != 0) {                                   // buffer address is odd? act like if reading to FAST RAM
         toFastRam = TRUE;
@@ -647,7 +647,7 @@ int16 connection_send(int tcpNotUdp, int16 handle, void *buffer, int16 length)
     }
 
     // transfer the remaining data in a loop
-    BYTE  toFastRam = (((int)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
+    BYTE  toFastRam = (((DWORD)buffer) >= 0x1000000) ? TRUE : FALSE;          // flag: are we reading to FAST RAM?
     DWORD blockSize = toFastRam ? FASTRAM_BUFFER_SIZE : (MAXSECTORS * 512); // size of block, which we will read
 
     while(length > 0) {                                            // while there's something to send
