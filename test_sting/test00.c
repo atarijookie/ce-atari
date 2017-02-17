@@ -250,7 +250,8 @@ void testResolve(void)
     }
     
     if(real != NULL) {             
-        out_result_error_string(ok, res, real);
+        if(!ok) out_result_error_string(ok, res, real);
+        else out_result_error(ok, res);
         KRfree(real);           // free real address
         real = NULL;
     } else {
