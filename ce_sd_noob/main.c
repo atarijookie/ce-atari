@@ -24,8 +24,8 @@ void getCE_API(void);
 WORD dmaBuffer[DMA_BUFFER_SIZE/2];  // declare as WORD buffer to force WORD alignment
 BYTE *pDmaBuffer;
 
-BYTE commandShort[CMD_LENGTH_SHORT] = {      0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
-BYTE commandLong [CMD_LENGTH_LONG]  = {0x1f, 0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0};
+BYTE commandShort[CMD_LENGTH_SHORT] = {         0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
+BYTE commandLong [CMD_LENGTH_LONG]  = {0x1f, 0xA0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0};
 
 void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 void showHexWord  (WORD val);
@@ -284,7 +284,7 @@ int main( int argc, char* argv[] )
         }
 
         if(answer[1] == 1 && (answer[2] == 'q' || answer[2] == 'Q')) {  // quit instead of write? 
-            (void) Cconws("Nothing was written to card and quitting\r\n");
+            (void) Cconws("\r\n\r\nNothing was written to card and quitting\r\n");
             sleep(3);
             return 0;
         }
@@ -293,6 +293,8 @@ int main( int argc, char* argv[] )
             break;
         }
     }
+
+    (void) Cconws("\r\n");
 
     //-------------
     // if continuing, write boot sector and everything needed for partitioning
