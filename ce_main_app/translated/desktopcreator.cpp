@@ -178,8 +178,13 @@ char *DesktopCreator::storeExistingDrives(char *bfr, DesktopConfig *dc)
             driveIcon = 0x09;
         } else {                                            // it's not a floppy, but...
             if((dc->translatedDrives & (1 << i)) == 0) {    // not translated drive?
-                driveName = "HARD DISK";
-                driveIcon = 0x0b;
+                if(dc->sdNoobEnabled && i == dc->sdNoobDriveNumber) {   // if SD NOOB is enabled and this is SD NOOB drive
+                    driveName = "SD NOOB";
+                    driveIcon = 0x0b;
+                } else {                                    // if SD NOOB is not enabled, or this is not SD NOOB drive, then it's just hard disk
+                    driveName = "HARD DISK";
+                    driveIcon = 0x0b;
+                }
             } else {                                        // it's a translated drive!
                 if(i == dc->configDrive) {                  // it's a config drive
                     driveName = "CONFIG DRIVE";

@@ -273,15 +273,19 @@ void ce_initialize(void)
     BYTE  *pSysBase     = (BYTE *) 0x000004F2;
     BYTE  *ppSysBase    = (BYTE *)  ((DWORD )  *pSysBase);                      // get pointer to TOS address
     WORD  tosVersion    = (WORD  ) *(( WORD *) (ppSysBase + 2));                // TOS +2: TOS version
-    SET_WORD(pDmaBuffer + 0, tosVersion);                                       // store tos version
+    SET_WORD(pDmaBuffer + 0, tosVersion);                                       //  0, 1: store tos version
 
     WORD resolution     = Getrez();
-    SET_WORD(pDmaBuffer + 2, resolution);                                       // store current screen resolution
+    SET_WORD(pDmaBuffer + 2, resolution);                                       //  2, 3: store current screen resolution
 
     WORD drives         = Drvmap();
-    SET_WORD(pDmaBuffer + 4, drives);                                           // store existing drives
+    SET_WORD(pDmaBuffer + 4, drives);                                           //  4, 5: store existing drives
 
-	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);        // issue the command and check the result
+    pDmaBuffer[6]       = SDnoobPartition.enabled;                              //  6   : SD card found, is SD NOOB card
+    SET_DWORD(pDmaBuffer +  7, SDnoobPartition.sectorCount);                    //  7-10: SD NOOB partition size in sectors
+    SET_DWORD(pDmaBuffer + 11, SDcard.SCapacity);                               // 11-14: SD card size in sectors
+    
+    (*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);     // issue the command and check the result
 }
 
 void getConfig(void)

@@ -663,9 +663,16 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     // get the current machine info and generate DESKTOP.INF file
     WORD tosVersion, curRes, drives;
     
-    tosVersion  = Utils::getWord(dataBuffer + 0);
-    curRes      = Utils::getWord(dataBuffer + 2);
-    drives      = Utils::getWord(dataBuffer + 4);
+    tosVersion  = Utils::getWord(dataBuffer + 0);           // 0, 1: TOS version
+    curRes      = Utils::getWord(dataBuffer + 2);           // 2, 3: current screen resolution
+    drives      = Utils::getWord(dataBuffer + 4);           // 4, 5: current TOS drives present
+    
+    bool  sdNoobEnabled;
+    DWORD sdNoobSizeSectors, sdCardSizeSectors;
+
+    sdNoobEnabled       = dataBuffer[6];                    //     6: is SD NOOB present and enabled?
+    sdNoobSizeSectors   = Utils::getDword(dataBuffer +  7); //  7-10: size of SD NOOB partition in sectors
+    sdCardSizeSectors   = Utils::getDword(dataBuffer + 11); // 11-14: size of SD card in sectors
     
     //------------------------------------
     // depending on TOS major version determine the machine, on which this SCSI device is used, and limit the available SCSI IDs depending on that
@@ -698,6 +705,10 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     dc.translatedDrives  = translatedDrives;             // just translated drives
     dc.configDrive       = driveLetters.confDrive;       // index of config drive
     dc.sharedDrive       = driveLetters.shared;          // index of shared drive
+    
+    dc.sdNoobEnabled     = sdNoobEnabled;                // is SD NOOB currently enabled?
+    dc.sdNoobSizeSectors = sdNoobSizeSectors;            // size of SD NOOB partition
+    dc.sdNoobDriveNumber = 2;                            // fixed to C now
     
     Settings s;
     dc.settingsResolution   = s.getInt("SCREEN_RESOLUTION", 1);
