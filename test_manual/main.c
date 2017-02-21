@@ -28,8 +28,8 @@
 BYTE deviceID;                          // bus ID from 0 to 7
 volatile mutex mtx;
 
-#define BUFFER_SIZE         (10*1024*1024)
-//#define BUFFER_SIZE         (256*512 + 4)
+//#define BUFFER_SIZE         (10*1024*1024)
+#define BUFFER_SIZE         (256*512 + 4)
 BYTE myBuffer[BUFFER_SIZE];
 BYTE *pBuffer;
 
@@ -47,6 +47,7 @@ void CEwrite(void);
 int  writeHansTest(int byteCount, WORD xorVal);
 void showInt(int value, int length);
 void largeRead(void);
+void SDread(void);
 
 BYTE showLogs = 1;
 void showMenu(void);
@@ -232,6 +233,11 @@ int main(void)
             
             continue;
         }
+
+        if(key == 's') {            // read 
+            SDread();
+            continue;
+        }
         
         if(key == 'r') {            // read 
             CEread(1);
@@ -275,13 +281,9 @@ int main(void)
         }
         
         if(key == 'f') {
-            BYTE devId = deviceID;  // store the device ID to some temp var
-        
             showLogs = 0;           // turn off logs - there will be errors on findDevice when device doesn't exist 
             Supexec(findDevice);
             showLogs = 1;           // turn on logs
-
-            deviceID = devId;       // put device ID back to normal
             continue;
         }
         
@@ -298,9 +300,14 @@ int main(void)
 
 void showMenu(void)
 {
+    (void) Cconws("Device ID: ");
+    showHexByte(deviceID);
+    (void) Cconws("\r\n");
+    
     (void) Cconws("x - SCSI reset\r\n");
     (void) Cconws("i -  1 x INQUIRY\r\n");
     (void) Cconws("I - 10 x INQUIRY\r\n");
+    (void) Cconws("s -  1 x SD card READ\r\n");
     (void) Cconws("r -  1 x READ\r\n");
     (void) Cconws("R - 10 x READ\r\n");
     (void) Cconws("w - CE WRITE test\r\n");
@@ -409,6 +416,57 @@ int readHansTest(int byteCount, WORD xorVal, BYTE verbose)
     }
     
 	return 0;
+}
+
+#define SCSI_C_READ6            0x08
+#define SCSI_C_REQUEST_SENSE    0x03
+
+void SDread(void)
+{
+    BYTE cmd[6];
+    
+    memset(cmd, 0, 6);
+    cmd[0] = (deviceID << 5) | SCSI_C_READ6;
+    cmd[4] = 1;
+    
+    (void) Cconws("SD READ...\r\n");
+    
+    // issue the inquiry command and check the result 
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);
+
+    (void) Cconws("  success: ");
+    showHexByte(hdIf.success);
+    (void) Cconws("\r\n");
+
+    (void) Cconws("  status : ");
+    showHexByte(hdIf.statusByte);
+    (void) Cconws("\r\n");
+
+    if(hdIf.success && hdIf.statusByte != 0) {
+        (void) Cconws("REQUEST SENSE...\r\n");
+
+        cmd[0] = (deviceID << 5) | SCSI_C_REQUEST_SENSE;
+        cmd[4] = 16;                                    // how many bytes should be sent
+
+        hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);
+        
+        if(!hdIf.success || hdIf.statusByte != 0) {
+            (void) Cconws("  ...fail...");
+            return;            
+        }
+
+        (void) Cconws("  SENSE KEY : ");
+        showHexByte(pBuffer[2]);
+        (void) Cconws("\r\n");
+
+        (void) Cconws("  SENSE CODE: ");
+        showHexByte(pBuffer[12]);
+        (void) Cconws("\r\n");
+
+        (void) Cconws("  ASCQ      : ");
+        showHexByte(pBuffer[13]);
+        (void) Cconws("\r\n");
+    }
 }
 
 void cs_inquiry(BYTE id, BYTE verbose)
@@ -527,39 +585,73 @@ BYTE ce_identify(BYTE bus_id)
     return 1;                             // success 
 }
 
+//--------------------------------------------
+BYTE cs_inquiry2(BYTE id)
+{
+    BYTE cmd[CMD_LENGTH_SHORT];
+    
+    memset(cmd, 0, 6);
+    cmd[0] = (id << 5) | (SCSI_CMD_INQUIRY & 0x1f);
+    cmd[4] = 32;                                                    // count of bytes we want from inquiry command to be returned
+    
+    hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, pBuffer, 1);    // issue the inquiry command and check the result 
+    
+    if(!hdIf.success || hdIf.statusByte != 0) {                     // if failed, return FALSE 
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+//--------------------------------------------
 void findDevice(void)
 {
-	BYTE i;
-	BYTE res;
-	char bfr[2];
+    BYTE i;
+    BYTE res;
+    char bfr[2];
 
-	bfr[1] = 0; 
-	(void) Cconws("Looking for CosmosEx\n\r");
+    bfr[1] = 0; 
+    (void) Cconws("Looking for CosmosEx\n\r");
 
+    deviceID = 0;
+    
     for(i=0; i<8; i++) {
         (void) Cconws("[ SCSI ");
 
-		bfr[0] = i + '0';
-		(void) Cconws(bfr);
+        bfr[0] = i + '0';
+        (void) Cconws(bfr);
         (void) Cconws("] : ");
-        		      
-		res = ce_identify(i);      					// try to read the IDENTITY string 
+                      
+        res = cs_inquiry2(i);                                       // try to read the IDENTITY string
+        
         if(res) {
-            (void) Cconws("OK\n\r");
+            if(memcmp(pBuffer + 16, "CosmosEx", 8) == 0) {          // inquiry string contains 'CosmosEx'
+                if(memcmp(pBuffer + 27, "SD", 2) == 0) {            // it's CosmosEx SD card
+                    (void) Cconws("CE SD\n\r");
+                    deviceID = i;
+                } else {                                            // it's CosmosEx, but not SD card
+                    (void) Cconws("CE DD\n\r");
+                }
+            } else if(memcmp(pBuffer + 16, "CosmoSolo", 9) == 0) {  // it's CosmoSolo, that's SD card
+                (void) Cconws("CS SD\n\r");
+                 deviceID = i;
+            }
+        
         } else {
             (void) Cconws("--\n\r");
         }
-	}
+    }
 }
 
+//--------------------------------------------
 void CEwrite(void)
 {
-  	commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
-	commandLong[1] = 0xA0;								// cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)  	
+    commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
+    commandLong[1] = 0xA0;								// cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)  	
 
     WORD xorVal=0xC0DE;
     
-  	int res = writeHansTest(RW_TEST_SIZE * 512, xorVal);
+    int res = writeHansTest(RW_TEST_SIZE * 512, xorVal);
     
     switch( res )
     {
