@@ -338,16 +338,32 @@ void fillReadStreamBufferWithDummyData(void)
 
 void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
 {
+    static WORD ATNcodePrev = 0;
+
     WORD *pTxBfr = (WORD *) txBfr;
-    
+
     // store TX and RX count so the host will know how much he should transfer
     pTxBfr[2] = txCount;
     pTxBfr[3] = rxCount;
-    
+
     spiDma_waitForFinish();                                             // make sure that the last DMA transfer has finished
 
     waitForSPIidle();                                                   // and make sure that SPI has finished, too
-    
+
+    //--------------
+    // at this place the previous SPI transfer must have ended - either by success, or by timeout
+    if(ATNcodePrev == ATN_FW_VERSION) {                                 // if the last ATN code was FW version (Franz hearthbeat / RPi alive)
+        if(DMA1_Channel3->CNDTR == 0 && DMA1_Channel2->CNDTR == 0) {    // if both SPI TX and SPI RX transmitted all the data, RPi is up
+            hostIsUp = TRUE;                                            // mark that RPi retrieved the data
+        } else {
+            hostIsUp = FALSE;                                           // mark that RPi didn't retrieve the data
+        }
+    }
+
+    ATNcodePrev = pTxBfr[1];                                            // store this current ATN code as previous code, so next time we know what ATN succeeded or failed
+
+    //--------------
+
     // disable both TX and RX channels
     DMA1_Channel3->CCR      &= 0xfffffffe;                              // disable DMA3 Channel transfer
     DMA1_Channel2->CCR      &= 0xfffffffe;                              // disable DMA2 Channel transfer
@@ -665,8 +681,6 @@ void updateStreamPositionByFloppyPosition(void)
 
 void processHostCommand(BYTE val)
 {
-    hostIsUp = TRUE;                        // mark that we've received 1st config
-
     switch(val) {
         case CMD_WRITE_PROTECT_OFF: isWriteProtected    = FALSE;    setupDiskChangeWriteProtect();  break;  // not write protected
         case CMD_WRITE_PROTECT_ON:  isWriteProtected    = TRUE;     setupDiskChangeWriteProtect();  break;  // is write protected
