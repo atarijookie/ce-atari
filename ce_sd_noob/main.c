@@ -226,6 +226,7 @@ int main( int argc, char* argv[] )
         VT52_Del_line();        // delete 2nd line
         VT52_Cur_up();          // go line up
         VT52_Del_line();        // delete 1st line
+        VT52_Cur_up();          // go line up
     }
 
     (void) Cconws("SD card capacity      : ");
@@ -310,6 +311,7 @@ int main( int argc, char* argv[] )
     //-------------
     // show message that we're done and we need to reset the ST to apply new settings
     //            |                                        |
+    (void) Cconws("\r\n");
     (void) Cconws("The SD card was paritioned and SD NOOB  \r\n");
     (void) Cconws("driver was activated. Reset your ST to  \r\n");
     (void) Cconws("access your card...\r\n");
@@ -357,6 +359,25 @@ void getCE_API(void)
     }
 }
 //--------------------------------------------
+WORD requestSense(BYTE deviceId)
+{
+    BYTE cmd[CMD_LENGTH_SHORT];
+
+    memset(cmd, 0, 6);
+    cmd[0] = (deviceId << 5) | SCSI_C_REQUEST_SENSE;
+    cmd[4] = 16;                                    // how many bytes should be sent
+
+    hdIfCmdAsUser(1, cmd, 6, pDmaBuffer, 1);
+
+    if(!hdIf->success || hdIf->statusByte != 0) {   // if command failed, or status byte is not OK, fail
+        return 0xffff;
+    }
+
+    WORD val;
+    val = (pDmaBuffer[2] << 8) | pDmaBuffer[12];    // WORD: senseKey is up, senseCode is down
+    return val;
+}
+//--------------------------------------------
 BYTE readWriteSector(BYTE deviceId, BYTE readNotWrite, DWORD sectorNumber)
 {
     BYTE cmd[CMD_LENGTH_SHORT];
@@ -375,10 +396,26 @@ BYTE readWriteSector(BYTE deviceId, BYTE readNotWrite, DWORD sectorNumber)
 
     cmd[4] = 1;                                 // 1 sector at the time
 
-    hdIfCmdAsUser(readNotWrite, cmd, CMD_LENGTH_SHORT, pDmaBuffer, 1); // issue the inquiry command and check the result 
+    hdIfCmdAsUser(readNotWrite, cmd, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-    if(!hdIf->success || hdIf->statusByte != SCSI_STATUS_OK) {      // if failed, return FALSE 
+    if(!hdIf->success) {                        // if failed to do the command, fail
         return FALSE;
+    }
+
+    if(hdIf->statusByte != 0) {                 // if status byte is not 0, it might be card not present or changed
+        WORD sense = requestSense(deviceId);
+
+        if(sense == 0x023A) {                   // the card is not present? fail
+            return FALSE;
+        }
+
+        if(sense == 0x0628) {                   // medium changed / inserted, try again
+            hdIfCmdAsUser(readNotWrite, cmd, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+
+            if(!hdIf->success || hdIf->statusByte != 0) {   // if failed to do the command, fail
+                return FALSE;
+            }
+        }
     }
 
     return TRUE;
