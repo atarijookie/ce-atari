@@ -626,10 +626,10 @@ BYTE readBootsectorAndIdentifyContent(void)
 
     if(sum == 0x1234) {                                                 // atari bootsector checksum ok?
         (void) Cconws("bootable code\r\n");
-    } else if(pDmaBuffer[510] == 0x55 && pDmaBuffer[511] == 0xaa) {     // PC boot signature?
-        (void) Cconws("PC partition\r\n");
     } else if(memcmp(pDmaBuffer + 3, "SDNOO", 5) == 0) {                // SD noob signature?
         (void) Cconws("SD NOOB signature\r\n");
+    } else if(pDmaBuffer[510] == 0x55 && pDmaBuffer[511] == 0xaa) {     // PC boot signature?
+        (void) Cconws("PC partition\r\n");
     } else {                                                            // there's something else in the boot sector
         (void) Cconws("something else\r\n");
     }
