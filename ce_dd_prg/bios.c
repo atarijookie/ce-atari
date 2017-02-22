@@ -32,16 +32,34 @@ int32_t custom_mediach( void *sp )
 
     //-----------------------
     // if SD noob is enabled, and this request on that drive
-    if(SDnoobPartition.enabled && SDnoobPartition.driveNo == drive) { 
-        // TODO: detect media change on SD NOOB, return that value
-
-        // TODO: if media changed, reload partition info
-        /*
+    if(SDnoobPartition.enabled && SDnoobPartition.driveNo == drive) {
+        if(SDcard.mediaChanged) {                                       // if media change detected in R/W function, reload partition info
             SDnoobPartition.verboseInit = FALSE;                        // quiet init - don't show messages
-            gotSDnoobCard();
-        */
+            gotSDnoobCard();                                            // access card to get info
 
-        return res;
+            SDcard.mediaChanged = FALSE;                                // reset this flag back to neutral
+            return MED_CHANGED;                                         // yes, media has changed
+        } else {                                                        // we didn't detect media change on R/W operation, we might check it now
+            static DWORD lastSDmediaCheck = 0;
+            DWORD now = *HZ_200;
+
+            if((now - lastSDmediaCheck) < 200) {                        // if the last media check was less than 1 seconds ago, don't check now
+                return MED_NOCHANGE;
+            }
+            lastSDmediaCheck = now;                                     // store that we just checked the media
+
+            WORD sense = requestSense(SDcard.id);                       // talk to CE to find out, if media really changed
+
+            if(sense == 0x0628) {                                       // if the sense key and sense code say, that media changed, reinit and return media_changed
+                SDnoobPartition.verboseInit = FALSE;                    // quiet init - don't show messages
+                gotSDnoobCard();                                        // access card to get info
+
+                SDcard.mediaChanged = FALSE;                            // reset this flag back to neutral
+                return MED_CHANGED;
+            }
+
+            return MED_NOCHANGE;                                        // if came here, didn't detect media change
+        }
     }
     //-----------------------
 

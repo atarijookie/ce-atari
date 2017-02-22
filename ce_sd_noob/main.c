@@ -390,35 +390,34 @@ BYTE readWriteSector(BYTE deviceId, BYTE readNotWrite, DWORD sectorNumber)
         cmd[0] = (deviceId << 5) | SCSI_C_WRITE6;
     }
 
-    cmd[1] = (sectorNumber >> 16) & 0x1f;       // 5 bits only (1 GB limit)
+    cmd[1] = (sectorNumber >> 16) & 0x1f;               // 5 bits only (1 GB limit)
     cmd[2] = (sectorNumber >>  8);
     cmd[3] = (sectorNumber      );
 
-    cmd[4] = 1;                                 // 1 sector at the time
+    cmd[4] = 1;                                         // 1 sector at the time
 
     hdIfCmdAsUser(readNotWrite, cmd, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-    if(!hdIf->success) {                        // if failed to do the command, fail
+    if(!hdIf->success) {                                // if failed to do the command, fail
         return FALSE;
     }
 
-    if(hdIf->statusByte != 0) {                 // if status byte is not 0, it might be card not present or changed
-        WORD sense = requestSense(deviceId);
+    if(hdIf->statusByte == 0) {                         // cmd succeeded, status is zero? good!
+        return TRUE;
+    }
 
-        if(sense == 0x023A) {                   // the card is not present? fail
-            return FALSE;
-        }
+    // if came here, then was able to do the command, but the status byte wasn't OK - maybe media changed, so let's request sense
+    WORD sense = requestSense(deviceId);
 
-        if(sense == 0x0628) {                   // medium changed / inserted, try again
-            hdIfCmdAsUser(readNotWrite, cmd, CMD_LENGTH_SHORT, pDmaBuffer, 1);
+    if(sense == 0x0628) {                               // medium changed / inserted, try again
+        hdIfCmdAsUser(readNotWrite, cmd, CMD_LENGTH_SHORT, pDmaBuffer, 1);
 
-            if(!hdIf->success || hdIf->statusByte != 0) {   // if failed to do the command, fail
-                return FALSE;
-            }
+        if(hdIf->success && hdIf->statusByte == 0) {    // if success, good
+            return TRUE;
         }
     }
 
-    return TRUE;
+    return FALSE;                                       // if sense is not medium_changed, or failed to get sense, or failed to do the R/W operation, fail
 }
 
 //--------------------------------------------

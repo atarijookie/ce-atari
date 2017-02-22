@@ -13,6 +13,7 @@
 
 // ------------------------------------------
 // some SCSI and CE commands
+#define SCSI_C_REQUEST_SENSE    0x03
 #define SCSI_C_WRITE6           0x0a
 #define SCSI_C_READ6            0x08
 
@@ -33,6 +34,8 @@ typedef struct {
     BYTE  id;                       // assigned ACSI ID
     BYTE  isInit;                   // contains if the SD card is present and initialized
     DWORD SCapacity;                // capacity of the card in sectors
+
+    BYTE  mediaChanged;             // set to non-zero, if media changed
 } TSDcard;
 
 typedef struct {
@@ -53,6 +56,8 @@ extern _BPB             SDbpb;
 //--------------------------------------------------
 BYTE  gotSDnoobCard(void);
 DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logicalStartingSector, WORD device);
+
+WORD  requestSense(BYTE deviceId);
 //--------------------------------------------------
 
 #endif

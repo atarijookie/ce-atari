@@ -63,6 +63,26 @@ void showCapacity(DWORD megaBytes)
     (void) Cconws(" MB");
 } 
 //--------------------------------------------------
+WORD requestSense(BYTE deviceId)
+{
+    BYTE cmd[CMD_LENGTH_SHORT];
+
+    memset(cmd, 0, 6);
+    cmd[0] = (deviceId << 5) | SCSI_C_REQUEST_SENSE;
+    cmd[4] = 16;                                    // how many bytes should be sent
+
+    (*hdIf.cmd)(1, cmd, 6, pDmaBuffer, 1);
+
+    if(!hdIf.success || hdIf.statusByte != 0) {     // if command failed, or status byte is not OK, fail
+        return 0xffff;
+    }
+
+    WORD val;
+    val = (pDmaBuffer[2] << 8) | pDmaBuffer[12];    // WORD: senseKey is up, senseCode is down
+    return val;
+}
+//--------------------------------------------------
+
 BYTE getSDcardIDonBus(void)
 {
     SDcard.id = 0xff;                               // no ID yet
@@ -126,7 +146,7 @@ BYTE getSDcardInfo(void)
 }
 
 //--------------------------------------------------
-BYTE readWriteSector(BYTE deviceId, BYTE readNotWrite, DWORD sectorNumber, BYTE sectorCount, BYTE *pBuffer)
+int readWriteSector(BYTE deviceId, BYTE readNotWrite, DWORD sectorNumber, BYTE sectorCount, BYTE *pBuffer)
 {
     BYTE cmd[CMD_LENGTH_SHORT];
 
@@ -146,17 +166,37 @@ BYTE readWriteSector(BYTE deviceId, BYTE readNotWrite, DWORD sectorNumber, BYTE 
 
     (*hdIf.cmd)(readNotWrite, cmd, CMD_LENGTH_SHORT, pBuffer, 1);
 
-    if(!hdIf.success || hdIf.statusByte != OK) {    // if failed, return FALSE 
-        return FALSE;
+    if(hdIf.success && hdIf.statusByte == OK) {     // if everything OK, success
+        return E_OK;
     }
 
-    return TRUE;
+    if(!hdIf.success) {                             // command failed? drive not ready
+        return EDRVNR;
+    }
+
+    //---------
+    // if came here, cmd succeeded, but returned something other than OK - let's request sense
+    WORD sense = requestSense(deviceId);            // request sense
+
+    if(sense == 0xffff || sense == 0x023A) {        // request sense failed or media not present? drive not ready
+        return EDRVNR;
+    }
+
+    if(sense == 0x0628) {                           // media changed? return media changed
+        return E_CHNG;
+    }
+
+    //--------
+    // if came here, couldn't identify any specific sense, so just return generic R/W error
+    return (readNotWrite ? EREADF : EWRITF);
 }
 
 //--------------------------------------------------
 BYTE gotSDnoobCard(void)
 {
     BYTE res;
+
+    SDcard.mediaChanged     = FALSE;                // we're (re)reading this, no media change 
 
     SDnoobPartition.enabled = FALSE;                // SD NOOB not enabled (yet)
     SDnoobPartition.driveNo = 2;                    // now fixed as drive 'C' 
@@ -201,9 +241,13 @@ BYTE gotSDnoobCard(void)
 
     //-------------
     // get MBR, find out if it's SD NOOB
-    res = readWriteSector(SDcard.id, ACSI_READ, 0, 1, pDmaBuffer);  // read MBR
+    int ires = readWriteSector(SDcard.id, ACSI_READ, 0, 1, pDmaBuffer); // read MBR
 
-    if(!res) {                                      // failed to get info? quit
+    if(ires == E_CHNG) {        // if first read ended with media change, try again, the 2nd read will probably succeed
+        ires = readWriteSector(SDcard.id, ACSI_READ, 0, 1, pDmaBuffer); // read MBR
+    }
+
+    if(ires != E_OK) {          // failed to get info? quit
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: failed to read MBR\r\n");
         }
@@ -225,9 +269,13 @@ BYTE gotSDnoobCard(void)
     SDnoobPartition.sectorStart = *p_st;            // p_st   - starting at sector - right after the PC starting sector
     SDnoobPartition.sectorCount = *p_size;          // p_size - store partition size in sectors
 
-    res = readWriteSector(SDcard.id, ACSI_READ, SDnoobPartition.sectorStart, 1, pDmaBuffer);  // read Atari boot sector
+    ires = readWriteSector(SDcard.id, ACSI_READ, SDnoobPartition.sectorStart, 1, pDmaBuffer);       // read Atari boot sector
 
-    if(!res) {                                      // failed to get info? quit
+    if(ires == E_CHNG) {                            // if first read ended with media change, try again, the 2nd read will probably succeed
+        ires = readWriteSector(SDcard.id, ACSI_READ, SDnoobPartition.sectorStart, 1, pDmaBuffer);   // again: read Atari boot sector
+    }
+
+    if(ires != E_OK) {                              // failed to get info? quit
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: failed to read boot sector\r\n");
         }
@@ -287,7 +335,7 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
     BYTE  useMidBuffer  = (toFastRam || bufAddrIsOdd);                              // flag: is load to fast ram or on odd address, use middle buffer
 
     DWORD maxSectorCount = useMidBuffer ? (FASTRAM_BUFFER_SIZE / 512) : MAXSECTORS; // how many sectors we can read at once - if going through middle buffer then middle buffer size, otherwise max sector coun
-    BYTE res;
+    int   ires;
 
     WORD i, triesCount;
     triesCount = noRetries ? 1 : 3;     // how many times we should try?
@@ -302,22 +350,27 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
 
         for(i=0; i<triesCount; i++) {
             if(useMidBuffer) {                              // through middle buffer?
-                res = readWriteSector(SDcard.id, readNotWrite, physicalStartingSector, thisSectorCount, FastRAMBuffer);
+                ires = readWriteSector(SDcard.id, readNotWrite, physicalStartingSector, thisSectorCount, FastRAMBuffer);
 
-                if(res) {                                   // if succeeded, copy it to right place
+                if(ires == E_OK) {                          // if succeeded, copy it to right place
                     memcpy(pBuffer, FastRAMBuffer, thisByteCount);
                 }
             } else {                                        // directly to final buffer?
-                res = readWriteSector(SDcard.id, readNotWrite, physicalStartingSector, thisSectorCount, pBuffer);
+                ires = readWriteSector(SDcard.id, readNotWrite, physicalStartingSector, thisSectorCount, pBuffer);
             }
 
-            if(res) {                                       // if succeeded, break out of retries loop
+            if(ires == E_OK) {                              // if succeeded, break out of retries loop
                 break;
+            }
+
+            if(ires == E_CHNG) {                            // if media changed, don't try anymore, tell TOS about this and he will hopefully re-read stuff
+                SDcard.mediaChanged = TRUE;
+                return E_CHNG;
             }
         }
 
-        if(!res) {                                          // if failed, fail and quit
-            return (readNotWrite ? -11 : -10);              // read? read fault, otherwise write fault
+        if(ires != E_OK) {                                  // if failed, quit, and just return what the R/W function returned
+            return ires;
         }
 
         physicalSectorCount     -= thisSectorCount;         // now we need to read less sectors
@@ -326,6 +379,6 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
         pBuffer                 += thisByteCount;           // advance in the buffer
     }
 
-    return 0;
+    return E_OK;                                            // if came here, everything is fine
 }
 //--------------------------------------------------
