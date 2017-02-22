@@ -22,16 +22,11 @@
 
 //--------------------------------------------------
 
-#define E_OK                0   	    // 00 No error
-#define E_CRC               0xfc	    // -4  // fc CRC error
+#define E_OK                0           // 00        = No error
+#define E_CRC               0xfc        // -4 = 0xfc = CRC error
 
 BYTE deviceID;                          // bus ID from 0 to 7
 volatile mutex mtx;
-
-#define BUFFER_SIZE         (10*1024*1024)
-//#define BUFFER_SIZE         (256*512 + 4)
-BYTE myBuffer[BUFFER_SIZE];
-BYTE *pBuffer;
 
 void showHexByte (BYTE val);
 void showHexWord (WORD val);
@@ -47,147 +42,221 @@ void CEwrite(void);
 int  writeHansTest(int byteCount, WORD xorVal);
 void showInt(int value, int length);
 void largeRead(void);
+void SDread(void);
 
 BYTE showLogs = 1;
 void showMenu(void);
 
 void logMsg(char *logMsg);
 
-//#define RW_TEST_SIZE    50
 #define RW_TEST_SIZE    MAXSECTORS
 
-BYTE *pLargeMem;
+BYTE  *pBufferOrig;
+BYTE  *pBuffer;
 DWORD largeMemSizeInBytes;
 DWORD largeMemSizeInSectors;
 
 void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 
+DWORD largestMemBlock;
+
+//-------------------------------------------------- 
+#define MACHINE_ST      0
+#define MACHINE_TT      2
+#define MACHINE_FALCON  3
+
+BYTE machineType = MACHINE_ST;
+//-------------------------------------------------- 
+void getMachineType(void)
+{
+    DWORD *cookieJarAddr    = (DWORD *) 0x05A0;
+    DWORD *cookieJar        = (DWORD *) *cookieJarAddr;     // get address of cookie jar
+
+    // by default - it's and ST
+    machineType = MACHINE_ST;
+
+    if(cookieJar == 0) {                        // no cookie jar? it's an old ST
+        return;
+    }
+
+    DWORD cookieKey, cookieValue;
+
+    while(1) {                                  // go through the list of cookies
+        cookieKey   = *cookieJar++;
+        cookieValue = *cookieJar++;
+
+        if(cookieKey == 0) {                    // end of cookie list? then cookie not found, it's an ST
+            break;
+        }
+
+        if(cookieKey == 0x5f4d4348) {           // is it _MCH key?
+            WORD machine = cookieValue >> 16;
+
+            switch(machine) {                   // depending on machine, either it's TT or FALCON
+                case 2: machineType = MACHINE_TT;       return;
+                case 3: machineType = MACHINE_FALCON;   return;
+            }
+
+            break;                              // or it's ST
+        }
+    }
+
+    // it's an ST
+}
+//-------------------------------------------------- 
+void getLargestMemBlock(void)
+{
+    _MPB mpb;
+
+    Getmpb(&mpb);                                   // get Memory parameter block
+    _MD *mpFree = mpb.mp_free;                      // get pointer to list of free blocks
+
+    largestMemBlock = 0;
+
+    while(mpFree != NULL) {                         // while there is a valid free block
+        DWORD blockStart    =  (DWORD) mpFree->md_start;    // get starting address
+        BYTE  isFastRam     =  (blockStart >= 0x1000000) ? TRUE  : FALSE;
+    
+        if(isFastRam) {                                     // if it's FAST RAM, ignore this block
+            continue;
+        }
+    
+        if(largestMemBlock < mpFree->md_length) {   // current block if larger than the largest found yet?
+            largestMemBlock = mpFree->md_length;
+        }
+
+        mpFree = mpFree->md_next;                   // move to next block
+    }
+}
+
 //--------------------------------------------------
 int main(void)
 {
-	DWORD scancode;
-	BYTE key;
-	DWORD toEven;
+    DWORD scancode;
+    BYTE key;
+    DWORD toEven;
 
-	// ---------------------- 
-	// create buffer pointer to even address 
-	toEven = (DWORD) &myBuffer[0];
-  
-	if(toEven & 0x0001)       // not even number? 
-		toEven++;
-  
-	pBuffer = (BYTE *) toEven; 
-	
-	// ---------------------- 
-	// search for device on the ACSI / SCSI bus 
-	deviceID = 0;
-    
-    //initialize lock
-    mutex_unlock(&mtx);
-
-	Clear_home();
-    
-    // choose the HDD interface
-    (void) Cconws("Choose HDD interface:\r\n");
-    
-    while(1) {
-        (void) Cconws("'A' - ACSI \r\n"); 		
-        (void) Cconws("'T' - TT SCSI \r\n"); 		
-        (void) Cconws("'F' - Falcon SCSI \r\n\r\n"); 
-
-        key = Cnecin();
-        if(key >= 'A' && key <= 'Z') {
-            key += 32;
-        }
-        
-        if(key == 't' || key == 'f' || key == 'a') {      // good key press? go on...
-            break;
-        }
-    }
-
-    //-----------------
-    // interface selection...    
-  	Clear_home();
-    showMenu();
-
-    switch(key) {
-        case 'a':   
-            (void) Cconws("Using ACSI...\r\n");
-            hdd_if_select(IF_ACSI);
-            deviceID = 0;           // ACSI ID 0
-            break;
-
-        case 't':
-            (void) Cconws("Using TT SCSI...\r\n");
-            hdd_if_select(IF_SCSI_TT);
-            deviceID = 0;           // SCSI ID 0
-            break;
-
-        case 'f':
-            (void) Cconws("Using Falcon SCSI...\r\n"); 
-            hdd_if_select(IF_SCSI_FALCON);
-            deviceID = 1;           // SCSI ID 1
-            
-            break;
-    } 
-
-    #define SIZE_13MB       (13 * 1024 * 1024)
-    #define SIZE_3MB        ( 3 * 1024 * 1024)
-    #define SIZE_1MB        ( 1 * 1024 * 1024)
-    #define SIZE_halfMB     (      500 * 1024)
-
-    pLargeMem           = 0;
-    largeMemSizeInBytes = 0;
-        
     Clear_home();
+    //                |                                        |             
+    (void) Cconws("\33p>>>>>> Manual HDD test tool <<<<<<\33q\r\n\r\n");
+    
+    //-----------------------
+    // find the largest free block of memory
+    Supexec(getLargestMemBlock);
+    
+    if(largestMemBlock < (MAXSECTORS * 512)) {
+        //            |                                        |             
+        (void) Cconws("Not enough free memory, expecting\r\n");
+        (void) Cconws("at least 128 kB free!\r\n");
+        (void) Cconws("Press any key to terminate.\r\n");
         
-    if(key == 't' || key == 'f') {
-        (void) Cconws("On TT or Falcon...\r\n");
-        
-        pLargeMem   = (BYTE *) Mxalloc(SIZE_13MB, 1);
-        
-        if(pLargeMem) {
-            largeMemSizeInBytes = SIZE_13MB;
-        } else {
-            pLargeMem   = (BYTE *) Mxalloc(SIZE_3MB, 1);
-            
-            if(pLargeMem) {
-                largeMemSizeInBytes = SIZE_3MB;
-            } else {
-                pLargeMem   = (BYTE *) Mxalloc(SIZE_1MB, 1);
-                
-                if(pLargeMem) {
-                    largeMemSizeInBytes = SIZE_1MB;
-                } else {
-                    largeMemSizeInBytes = 0;
-                }
-            }
-        }
-    } else {
-        (void) Cconws("On ST...\r\n");
-        
-        pLargeMem   = (BYTE *) Malloc(SIZE_halfMB);
-        
-        if(pLargeMem) {
-            largeMemSizeInBytes = SIZE_halfMB;
-        } else {
-            largeMemSizeInBytes = 0;
-        }
+        Cnecin();
+        return 0;
     }
     
-    if(!pLargeMem) {            // if failed to allocate, use myBuffer
-        pLargeMem           = pBuffer;
-        largeMemSizeInBytes = BUFFER_SIZE;
-    }
+    #define SIZE_13MB     (14 * 1024 * 1024)
+    #define SIZE_4MB      ( 4 * 1024 * 1024)
     
-    largeMemSizeInSectors   = largeMemSizeInBytes >> 9;
+    if(largestMemBlock >= SIZE_13MB) {                  // something is bigger than 13 MB? Limit it to 13 MB, which is near max ST RAM size
+        largestMemBlock = SIZE_13MB;
+    }
 
-    (void) Cconws("\r\nLarge mem size (B): ");
+    if(largestMemBlock < SIZE_4MB) {                    // less than 4 MB? use normal Malloc()
+        pBufferOrig = (BYTE *) Malloc(largestMemBlock);
+    } else {                                            // more than 4 MB? use Mxalloc(), so we can force it into ST RAM
+        pBufferOrig = (BYTE *) Mxalloc(largestMemBlock, 1);
+    }
+
+    if(pBufferOrig == NULL) {
+        //            |                                        |             
+        (void) Cconws("Failed to allocate memory!\r\n");
+        (void) Cconws("Press any key to terminate.\r\n");
+        
+        Cnecin();
+        return 0;
+    }
+    
+    largeMemSizeInBytes     = largestMemBlock;          // store how much we got - in bytes
+    largeMemSizeInSectors   = largeMemSizeInBytes >> 9; // how much we got       - in sectors
+
+    // ---------------------- 
+    // create buffer pointer to even address 
+    toEven = (DWORD) &pBufferOrig[0];
+
+    if(toEven & 0x0001) {       // not even number? 
+        toEven++;
+        largeMemSizeInBytes--;
+    }
+
+    pBuffer = (BYTE *) toEven; 
+
+    (void) Cconws("Large mem size (B): ");
     showHexDword(largeMemSizeInBytes);
     (void) Cconws("\r\nLarge mem size (s): ");
     showHexDword(largeMemSizeInSectors);
     (void) Cconws("\r\n\r\n");
 
+    // ---------------------- 
+    // get what machine we're running on
+    Supexec(getMachineType);
+    
+    // ---------------------- 
+    // search for device on the ACSI / SCSI bus 
+    deviceID = 0;
+    
+    //initialize lock
+    mutex_unlock(&mtx);
+    
+    if(machineType == MACHINE_ST) {             // if it's ST, use ACSI
+        key = 'a';
+    } else if(machineType == MACHINE_FALCON) {  // if it's Falcon, use SCSI
+        key = 'f';
+    } else {                                    // if it's TT, let user choose
+        (void) Cconws("Choose HDD interface:\r\n");
+        
+        while(1) {
+            (void) Cconws("'A' - ACSI \r\n");
+            (void) Cconws("'T' - TT SCSI \r\n");
+
+            key = Cnecin();
+            if(key >= 'A' && key <= 'Z') {
+                key += 32;
+            }
+            
+            if(key == 't' || key == 'a') {      // good key press? go on...
+                break;
+            }
+        }
+    }
+
+    (void) Cconws("\r\nHDD Interface: ");
+    
+    switch(key) {
+        case 'a':   
+            (void) Cconws("\33pACSI\33q");
+            hdd_if_select(IF_ACSI);
+            deviceID = 0;           // ACSI ID 0
+            break;
+
+        case 't':
+            (void) Cconws("\33pTT SCSI\33q");
+            hdd_if_select(IF_SCSI_TT);
+            deviceID = 0;           // SCSI ID 0
+            break;
+
+        case 'f':
+            (void) Cconws("\33pFalcon SCSI\33q");
+            hdd_if_select(IF_SCSI_FALCON);
+            deviceID = 1;           // SCSI ID 1
+            
+            break;
+    } 
+    (void) Cconws("\r\n\r\n");
+
+    showLogs = 0;                   // turn off logs - there will be errors on findDevice when device doesn't exist 
+    Supexec(findDevice);
+    showLogs = 1;                   // turn on logs
+            
     showMenu();
 
     //-----------------
@@ -195,7 +264,7 @@ int main(void)
     while(1) {
         scancode    = Bconin(DEV_CONSOLE); 		                    // get char form keyboard, no echo on screen 
         key         =  scancode & 0xff;
-        
+
         if(key == 'q') {
             (void) Cconws("Terminating...\r\n");
             sleep(1);
@@ -208,7 +277,7 @@ int main(void)
             (void) Cconws("done\r\n");
             continue;
         }
-        
+
         if(key == 'i') {            // INQUIRY command
             cs_inquiry(deviceID, 1);
             continue;
@@ -217,7 +286,7 @@ int main(void)
         if(key == 'I') {
             int i;
             DWORD start, end, diff;
-        
+
             start = getTicks();
             for(i=0; i<10; i++) {
                 cs_inquiry(deviceID, 0);
@@ -225,30 +294,35 @@ int main(void)
             end = getTicks();
             diff = end - start;
             int timeMs  = (diff * 1000) / 200;
-            
+
             (void) Cconws("\n\rINQUIRY x 10 took: ");
             showInt(timeMs, -1);
             (void) Cconws(" ms\n\r");
-            
+
             continue;
         }
-        
+
+        if(key == 's') {            // read 
+            SDread();
+            continue;
+        }
+
         if(key == 'r') {            // read 
             CEread(1);
             continue;
         }
-        
+
         if(key == 'R') {
             int i;
             DWORD start, end, diff;
-        
+
             start = getTicks();
             for(i=0; i<10; i++) {
                 CEread(0);
             }
             end = getTicks();
             diff = end - start;
-            
+
             diff    = end - start;
 
             int timeMs  = (diff * 1000) / 200;
@@ -261,10 +335,10 @@ int main(void)
             (void) Cconws("\n\rREAD x 10 speed: ");
             showInt(kbps, -1);
             (void) Cconws(" kB/s\n\r");
-    
+
             continue;
         }
-        
+
         if(key == 'w') {            // write
             CEwrite();
             continue;
@@ -273,34 +347,35 @@ int main(void)
         if(key == 'l' || key == 'L') {
             largeRead();
         }
-        
+
         if(key == 'f') {
-            BYTE devId = deviceID;  // store the device ID to some temp var
-        
             showLogs = 0;           // turn off logs - there will be errors on findDevice when device doesn't exist 
             Supexec(findDevice);
             showLogs = 1;           // turn on logs
-
-            deviceID = devId;       // put device ID back to normal
             continue;
         }
-        
+
         if(key == 'c') {            // clear screen and show menu again
             Clear_home();
             showMenu();
             continue;
         }
     }
-	
-    Mfree(pLargeMem);               // release the memory
-	return 0;
+
+    Mfree(pBufferOrig);             // release the memory
+    return 0;
 }
 
 void showMenu(void)
 {
+    (void) Cconws("Device ID: ");
+    showHexByte(deviceID);
+    (void) Cconws("\r\n");
+    
     (void) Cconws("x - SCSI reset\r\n");
     (void) Cconws("i -  1 x INQUIRY\r\n");
     (void) Cconws("I - 10 x INQUIRY\r\n");
+    (void) Cconws("s -  1 x SD card READ\r\n");
     (void) Cconws("r -  1 x READ\r\n");
     (void) Cconws("R - 10 x READ\r\n");
     (void) Cconws("w - CE WRITE test\r\n");
@@ -315,8 +390,8 @@ int readHansTest(int byteCount, WORD xorVal, BYTE verbose);
 
 void CEread(BYTE verbose)
 {
-  	commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
-	commandLong[1] = 0xA0;								// cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)  	
+    commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
+    commandLong[1] = 0xA0;								// cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)  	
 
     WORD xorVal=0xC0DE;
     
@@ -352,7 +427,7 @@ void largeRead(void)
     commandLong[8] = (BYTE) (largeMemSizeInSectors >> 8);
     commandLong[9] = (BYTE) (largeMemSizeInSectors     );
     
-    hdIfCmdAsUser(1, commandLong, 11, pLargeMem, largeMemSizeInSectors);
+    hdIfCmdAsUser(1, commandLong, 11, pBuffer, largeMemSizeInSectors);
 
     (void) Cconws("Command success: ");
     showHexByte(hdIf.success);
@@ -409,6 +484,57 @@ int readHansTest(int byteCount, WORD xorVal, BYTE verbose)
     }
     
 	return 0;
+}
+
+#define SCSI_C_READ6            0x08
+#define SCSI_C_REQUEST_SENSE    0x03
+
+void SDread(void)
+{
+    BYTE cmd[6];
+    
+    memset(cmd, 0, 6);
+    cmd[0] = (deviceID << 5) | SCSI_C_READ6;
+    cmd[4] = 1;
+    
+    (void) Cconws("SD READ...\r\n");
+    
+    // issue the inquiry command and check the result 
+    hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);
+
+    (void) Cconws("  success: ");
+    showHexByte(hdIf.success);
+    (void) Cconws("\r\n");
+
+    (void) Cconws("  status : ");
+    showHexByte(hdIf.statusByte);
+    (void) Cconws("\r\n");
+
+    if(hdIf.success && hdIf.statusByte != 0) {
+        (void) Cconws("REQUEST SENSE...\r\n");
+
+        cmd[0] = (deviceID << 5) | SCSI_C_REQUEST_SENSE;
+        cmd[4] = 16;                                    // how many bytes should be sent
+
+        hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);
+        
+        if(!hdIf.success || hdIf.statusByte != 0) {
+            (void) Cconws("  ...fail...");
+            return;            
+        }
+
+        (void) Cconws("  SENSE KEY : ");
+        showHexByte(pBuffer[2]);
+        (void) Cconws("\r\n");
+
+        (void) Cconws("  SENSE CODE: ");
+        showHexByte(pBuffer[12]);
+        (void) Cconws("\r\n");
+
+        (void) Cconws("  ASCQ      : ");
+        showHexByte(pBuffer[13]);
+        (void) Cconws("\r\n");
+    }
 }
 
 void cs_inquiry(BYTE id, BYTE verbose)
@@ -527,39 +653,73 @@ BYTE ce_identify(BYTE bus_id)
     return 1;                             // success 
 }
 
-void findDevice(void)
+//--------------------------------------------
+BYTE cs_inquiry2(BYTE id)
 {
-	BYTE i;
-	BYTE res;
-	char bfr[2];
+    BYTE cmd[CMD_LENGTH_SHORT];
+    
+    memset(cmd, 0, 6);
+    cmd[0] = (id << 5) | (SCSI_CMD_INQUIRY & 0x1f);
+    cmd[4] = 32;                                                    // count of bytes we want from inquiry command to be returned
+    
+    hdIfCmdAsUser(ACSI_READ, cmd, CMD_LENGTH_SHORT, pBuffer, 1);    // issue the inquiry command and check the result 
+    
+    if(!hdIf.success || hdIf.statusByte != 0) {                     // if failed, return FALSE 
+        return FALSE;
+    }
 
-	bfr[1] = 0; 
-	(void) Cconws("Looking for CosmosEx\n\r");
-
-    for(i=0; i<8; i++) {
-        (void) Cconws("[ SCSI ");
-
-		bfr[0] = i + '0';
-		(void) Cconws(bfr);
-        (void) Cconws("] : ");
-        		      
-		res = ce_identify(i);      					// try to read the IDENTITY string 
-        if(res) {
-            (void) Cconws("OK\n\r");
-        } else {
-            (void) Cconws("--\n\r");
-        }
-	}
+    return TRUE;
 }
 
+//--------------------------------------------
+void findDevice(void)
+{
+    BYTE i;
+    BYTE res;
+    (void) Cconws("Looking for CosmosEx: ");
+
+    deviceID = 0;
+    BYTE good;
+
+    for(i=0; i<8; i++) {
+        res     = cs_inquiry2(i);                                   // try to read the IDENTITY string
+        good    = FALSE;
+
+        if(res) {
+            if(memcmp(pBuffer + 16, "CosmosEx", 8) == 0) {          // inquiry string contains 'CosmosEx'
+                if(memcmp(pBuffer + 27, "SD", 2) == 0) {            // it's CosmosEx SD card
+                    good = TRUE;
+                } else {                                            // it's CosmosEx, but not SD card
+                    good = FALSE;
+                }
+            } else if(memcmp(pBuffer + 16, "CosmoSolo", 9) == 0) {  // it's CosmoSolo, that's SD card
+                good = TRUE;
+            }
+        }
+
+        if(good) {          // good
+            (void) Cconws("\33p");
+            Cconout('0' + i);
+            (void) Cconws("\33q");
+
+            deviceID = i;
+        } else {            // bad
+            Cconout('0' + i);
+        }
+    }
+    
+    (void) Cconws("\n\r");
+}
+
+//--------------------------------------------
 void CEwrite(void)
 {
-  	commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
-	commandLong[1] = 0xA0;								// cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)  	
+    commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
+    commandLong[1] = 0xA0;								// cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)  	
 
     WORD xorVal=0xC0DE;
     
-  	int res = writeHansTest(RW_TEST_SIZE * 512, xorVal);
+    int res = writeHansTest(RW_TEST_SIZE * 512, xorVal);
     
     switch( res )
     {
