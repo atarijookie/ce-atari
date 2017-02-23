@@ -46,7 +46,11 @@ void mapUsedSectors(void)
 
     int sector = 0;
     while(!feof(f)) {
-        fread(data, 1, 512, f);
+        size_t readCnt = fread(data, 1, 512, f);
+
+        if(readCnt < 512) {
+            continue;
+        }
 
         int isUsed = 0;
         int i;
@@ -58,7 +62,7 @@ void mapUsedSectors(void)
         }
 
         if(isUsed) {
-            printf("Used sector: %d\n", sector);
+            printf("Used sector: % 4d (%04x)\n", sector, sector);
             sectorsUsed++;
         } else {
             sectorsFree++;
