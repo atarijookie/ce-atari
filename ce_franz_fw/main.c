@@ -96,6 +96,8 @@ volatile BYTE spiDmaTXidle, spiDmaRXidle;       // flags set when the SPI DMA TX
 volatile TDrivePosition now, next, lastRequested, prev;
 volatile WORD lastRequestTime;
 
+BYTE hostIsUp;                                  // used to just pass through IKBD until RPi is up
+
 BYTE driveId;
 BYTE driveEnabled;
 
@@ -336,16 +338,32 @@ void fillReadStreamBufferWithDummyData(void)
 
 void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
 {
+    static WORD ATNcodePrev = 0;
+
     WORD *pTxBfr = (WORD *) txBfr;
-    
+
     // store TX and RX count so the host will know how much he should transfer
     pTxBfr[2] = txCount;
     pTxBfr[3] = rxCount;
-    
+
     spiDma_waitForFinish();                                             // make sure that the last DMA transfer has finished
 
     waitForSPIidle();                                                   // and make sure that SPI has finished, too
-    
+
+    //--------------
+    // at this place the previous SPI transfer must have ended - either by success, or by timeout
+    if(ATNcodePrev == ATN_FW_VERSION) {                                 // if the last ATN code was FW version (Franz hearthbeat / RPi alive)
+        if(DMA1_Channel3->CNDTR == 0 && DMA1_Channel2->CNDTR == 0) {    // if both SPI TX and SPI RX transmitted all the data, RPi is up
+            hostIsUp = TRUE;                                            // mark that RPi retrieved the data
+        } else {
+            hostIsUp = FALSE;                                           // mark that RPi didn't retrieve the data
+        }
+    }
+
+    ATNcodePrev = pTxBfr[1];                                            // store this current ATN code as previous code, so next time we know what ATN succeeded or failed
+
+    //--------------
+
     // disable both TX and RX channels
     DMA1_Channel3->CCR      &= 0xfffffffe;                              // disable DMA3 Channel transfer
     DMA1_Channel2->CCR      &= 0xfffffffe;                              // disable DMA2 Channel transfer
@@ -676,6 +694,23 @@ void processHostCommand(BYTE val)
     }
 }
 
+// --------------------------------------------------
+// UART 1 - TX and RX - connects Franz and RPi, 19200 baud
+// UART 2 - TX - data from RPi     - through buff0 - to IKBD
+// UART 2 - RX - data from IKBD    - through buff1 - to RPi (also connected with wire to ST keyb)
+// UART 3 - RX - data from ST keyb - through buff1 - to RPi
+//
+// Flow with RPi:
+// IKBD talks to ST keyboard (direct wire connection), and also talks through buff1 to RPi 
+// ST keyb talks through buff1 to RPi
+// RPi talks to IKBD through buff0
+//
+// Flow without RPi:
+// IKBD talks to ST keyboard - direct wire connection
+// ST keyb talks to IKBD - through buff0
+//
+// -------------------------------------------------- 
+
 void USART1_IRQHandler(void)                                            // USART1 is connected to RPi
 {
     if((USART1->SR & USART_FLAG_RXNE) != 0) {                           // if something received
@@ -697,7 +732,7 @@ void USART1_IRQHandler(void)                                            // USART
             USART1->CR1 &= ~USART_FLAG_TXE;                             // disable interrupt on USART2 TXE
         }
     }  
-}   
+}
 
 #define UARTMARK_STCMD      0xAA
 #define UARTMARK_KEYBDATA   0xBB
@@ -706,15 +741,19 @@ void USART2_IRQHandler(void)                                            // USART
 {
     if((USART2->SR & USART_FLAG_RXNE) != 0) {                           // if something received
         BYTE val = USART2->DR;                                          // read received value
-        
-        if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) {     // got data in buffer or usart1 can't TX right now? 
-            cicrularAdd(&buff1, UARTMARK_STCMD);                        // add to buffer - MARK
-        } else {                                                        // if no data in buffer and usart2 can TX
-            USART1->DR = UARTMARK_STCMD;                                // send to USART1 - MARK
-        }
 
-        cicrularAdd(&buff1, val);                                       // add to buffer - DATA
-        USART1->CR1 |= USART_FLAG_TXE;                                  // enable interrupt on USART TXE
+        if(hostIsUp) {                                                  // RPi is up - buffered send to RPi
+            if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart1 can't TX right now? 
+                cicrularAdd(&buff1, UARTMARK_STCMD);                    // add to buffer - MARK
+            } else {                                                    // if no data in buffer and usart2 can TX
+                USART1->DR = UARTMARK_STCMD;                            // send to USART1 - MARK
+            }
+
+            cicrularAdd(&buff1, val);                                   // add to buffer - DATA
+            USART1->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
+        } else {                                                        // if RPi is not up, something received from ST? 
+            // nothing to do, data should automatically continue to ST keyboard
+        }
     }
 
     if((USART2->SR & USART_FLAG_TXE) != 0) {                            // if can TX
@@ -732,16 +771,25 @@ void USART3_IRQHandler(void)                                            // USART
     if((USART3->SR & USART_FLAG_RXNE) != 0) {                           // if something received
         BYTE val = USART3->DR;                                          // read received value
 
-        if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) {     // got data in buffer or usart1 can't TX right now? 
-            cicrularAdd(&buff1, UARTMARK_KEYBDATA);                     // add to buffer - MARK
-        } else {                                                        // if no data in buffer and usart2 can TX
-            USART1->DR = UARTMARK_KEYBDATA;                             // send to USART1 - MARK
-        }
+        if(hostIsUp) {                                                  // RPi is up - buffered send to RPi
+            if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart1 can't TX right now? 
+                cicrularAdd(&buff1, UARTMARK_KEYBDATA);                 // add to buffer - MARK
+            } else {                                                    // if no data in buffer and usart2 can TX
+                USART1->DR = UARTMARK_KEYBDATA;                         // send to USART1 - MARK
+            }
 
-        cicrularAdd(&buff1, val);                                       // add to buffer - DATA
-        USART1->CR1 |= USART_FLAG_TXE;                                  // enable interrupt on USART TXE
+            cicrularAdd(&buff1, val);                                   // add to buffer - DATA
+            USART1->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
+        } else {                                                        // if RPi is not up - send it to IKBD (through buffer or immediatelly)
+            if(buff0.count > 0 || (USART2->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart2 can't TX right now? 
+                cicrularAdd(&buff0, val);                               // add to buffer
+                USART2->CR1 |= USART_FLAG_TXE;                          // enable interrupt on USART TXE
+            } else {                                                    // if no data in buffer and usart2 can TX
+                USART2->DR = val;                                       // send it to USART2
+            }
+        }
     }
-}   
+}
 
 void circularInit(volatile TCircBuffer *cb)
 {
