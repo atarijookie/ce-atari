@@ -21,9 +21,9 @@ BYTE timeout(void);
 #define ATN_SYNC_WORD						0xcafe
 
 // commands sent from device to host
-#define ATN_FW_VERSION					0x01							// followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
-#define ATN_SECTOR_WRITTEN      0x03               	                    // sent: 3, side (highest bit) + track #, current sector #
-#define ATN_SEND_TRACK          0x04            		                // send the whole track
+#define ATN_FW_VERSION          0x01        // followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
+#define ATN_SECTOR_WRITTEN      0x03        // sent: 3, side (highest bit) + track #, current sector #
+#define ATN_SEND_TRACK          0x04        // send the whole track
 
 // commands sent from host to device
 #define CMD_WRITE_PROTECT_OFF			0x10

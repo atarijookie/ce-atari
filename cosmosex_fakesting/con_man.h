@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #ifndef _CON_MAN_H_
 #define _CON_MAN_H_
 

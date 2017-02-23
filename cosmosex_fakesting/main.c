@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 //----------------------------------------
 // CosmosEx fake STiNG - by Jookie, 2014
 // Based on sources of original STiNG
@@ -50,7 +51,7 @@ BYTE deviceID;
 BYTE commandShort[CMD_LENGTH_SHORT]	= {      0x00, 'C', 'E', HOSTMOD_NETWORK_ADAPTER, 0, 0};
 BYTE commandLong[CMD_LENGTH_LONG]	= {0x1f, 0xA0, 'C', 'E', HOSTMOD_NETWORK_ADAPTER, 0, 0, 0, 0, 0, 0, 0, 0};
 
-BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];  
+BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
 BYTE *pDmaBuffer;
 
 //---------------------------------------
@@ -69,12 +70,12 @@ int main(void)
 
     showHex_toLogNotScreen = 0;                                 // showHex* to screen
     initJumpTable();                                            // fill the jump table with addresses of functions
-    
+
     (void) Cconws("\n\r\033p|    Fake STinG for CosmosEx    |\033q");
     (void) Cconws("\n\r\033p|   by Jookie, ver: ");
     showAppVersion();
     (void) Cconws("  |\033q\n\r");
-    
+
     init_con_info();                                            // init connection info structs
 
    	// create buffer pointer to even address
@@ -92,14 +93,14 @@ int main(void)
         (void) Cconws("\r\n\33pProtocol version mismatch !\33q\r\n" );
         (void) Cconws("Please use the newest version\r\n" );
         (void) Cconws("of \33pCE_STING.PRG\33q from config drive!\r\n" );
-        (void) Cconws("\r\nDriver not installed!\r\n" ); 
+        (void) Cconws("\r\nDriver not installed!\r\n" );
         sleep(3);
         return 0;
-    }    
+    }
 
     commandShort[0] = (deviceID << 5); 					        // cmd[0] = ACSI_id + TEST UNIT READY (0)
     commandLong[0]  = (deviceID << 5) | 0x1f;			        // cmd[0] = ACSI_id + ICD command marker (0x1f)
-   
+
     for (count = 0; count < MAX_SEMAPHOR; count++) {
         semaphors[count] = 0;
     }
@@ -115,7 +116,7 @@ int main(void)
         if (memory) {
             Mfree (memory);
         }
-        
+
         sleep(2);
         return 0;
 	}
@@ -128,14 +129,14 @@ int main(void)
     Supexec(install_vbl);
     vblEnabled = 1;
     */
-    
+
     (void) Cconws("Driver was installed...");
 
     showHex_toLogNotScreen = 1;                                 // showHex* to log
-    
+
 //    appl_init();                                                // init gem
     sleep(2);
-    
+
     Ptermres (_pgmsize, 0);
     return 0;
  }
@@ -151,7 +152,7 @@ int16 init_cfg (void)
 
 int16 setvstr (char  *name, char  *value)
 {
-    
+
     return TRUE;
 }
 
@@ -172,7 +173,7 @@ void showAppVersion(void)
 {
     char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     char const *buildDate = __DATE__;
-    
+
     int year = 0, month = 0, day = 0;
     int i;
     for(i=0; i<12; i++) {
@@ -181,10 +182,10 @@ void showAppVersion(void)
             break;
         }
     }
-    
+
     day     = getIntFromStr(buildDate + 4, 2);
     year    = getIntFromStr(buildDate + 7, 4);
-    
+
     if(day > 0 && month > 0 && year > 0) {
         showInt(year, 4);
         (void) Cconout('-');
@@ -200,20 +201,20 @@ int getIntFromStr(const char *str, int len)
 {
     int i;
     int val = 0;
-    
+
     for(i=0; i<len; i++) {
         int digit;
-        
+
         if(str[i] >= '0' && str[i] <= '9') {
             digit = str[i] - '0';
         } else {
             digit = 0;
         }
-    
+
         val *= 10;
         val += digit;
     }
-    
+
     return val;
 }
 

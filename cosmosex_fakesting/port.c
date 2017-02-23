@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 //----------------------------------------
 // CosmosEx fake STiNG - by Jookie, 2014
 // Based on sources of original STiNG
@@ -30,7 +31,7 @@ void  init_ports(void)
    my_driver.basepage   = (BASEPAGE *) _pbase;
    my_port.driver       = &my_driver;
 
-   conf.ports   = &my_port;   
+   conf.ports   = &my_port;
    conf.drivers = &my_driver;
 }
 
@@ -48,7 +49,7 @@ int16 on_port (char *port_name)
 
     /*
     // TODO: turn this port on
-    
+
     if ((*this->driver->set_state) (this, TRUE) == FALSE)
         return (FALSE);
     */
@@ -74,7 +75,7 @@ void off_port (char *port_name)
         return;
     }
 
-    /* 
+    /*
     // TODO: turn this port OFF
     (*this->driver->set_state) (this, FALSE);
     */
@@ -103,20 +104,20 @@ int16 cntrl_port(char *port_name, uint32 argument, int16 code)
     int16  result = E_NORMAL;
     PORT   *pOpaque, *pNext;
     char   *pPName, *pOName;
-   
+
    if (port_name == NULL) {
         switch (code) {
             case CTL_KERN_FIRST_PORT :
                 setDwordByByteOffset((void *) argument, PO_opaque, (DWORD) conf.ports);
-                
+
                 pPName      = getVoidpByByteOffset((void *) argument, PO_port_name);    // get pointer to name in PTNA
-                
+
                 pOpaque     = getVoidpByByteOffset((void *) argument, PO_opaque);       // first get pointer to port
                 pOName      = getVoidpByByteOffset(pOpaque,  PO_name);                  // then get pointer to name from PORT
-                
+
                 strncpy(pPName, pOName, getWordByByteOffset((void *) argument, PO_name_len));
                 return E_NORMAL;
-             
+
             case CTL_KERN_NEXT_PORT :
                 pOpaque     = getVoidpByByteOffset((void *) argument, PO_opaque);       // first get pointer to port
                 pNext       = getVoidpByByteOffset(pOpaque,  PO_next);                  // then get pointer to next port
@@ -124,19 +125,19 @@ int16 cntrl_port(char *port_name, uint32 argument, int16 code)
                 if (pNext == NULL) {                                                    // no next port? fail
                     return E_NODATA;
                 }
-                
+
                 pPName      = getVoidpByByteOffset((void *) argument, PO_port_name);    // get pointer to name in PNTA
                 pOName      = getVoidpByByteOffset(pOpaque, PO_name);                   // then get pointer to name from PORT
-                
+
                 strncpy (pPName, pOName, getWordByByteOffset((void *) argument, PO_name_len));
                 return E_NORMAL;
            }
-           
+
         return E_FNAVAIL;
     }
 
     this = search_port(port_name);
-    
+
     if (this == NULL) {
         return E_NODATA;
     }
@@ -144,34 +145,34 @@ int16 cntrl_port(char *port_name, uint32 argument, int16 code)
     switch (code) {
       case CTL_KERN_FIND_PORT :
         *((PORT **)  argument) = this;                                      break;
-        
+
       case CTL_GENERIC_GET_IP :
         *((uint32 *) argument) = getDwordByByteOffset(this, PO_ip_addr);    break;
-        
+
       case CTL_GENERIC_GET_MASK :
         *((uint32 *) argument) = getDwordByByteOffset(this, PO_sub_mask);   break;
-        
+
       case CTL_GENERIC_GET_MTU :
         *(( int16 *) argument) = getWordByByteOffset(this, PO_mtu);         break;
-        
+
       case CTL_GENERIC_GET_MMTU :
         *(( int16 *) argument) = getWordByByteOffset(this, PO_max_mtu);     break;
-        
+
       case CTL_GENERIC_GET_TYPE :
         *(( int16 *) argument) = getWordByByteOffset(this, PO_type);        break;
-        
+
       case CTL_GENERIC_GET_STAT :
         ((int32 *) argument)[0] = getWordByByteOffset (this, PO_stat_dropped);
         ((int32 *) argument)[1] = getDwordByByteOffset(this, PO_stat_sd_data);
         ((int32 *) argument)[2] = getDwordByByteOffset(this, PO_stat_rcv_data);
         break;
-        
+
       case CTL_GENERIC_CLR_STAT :
             setDwordByByteOffset(this, PO_stat_sd_data,  0);
             setDwordByByteOffset(this, PO_stat_rcv_data, 0);
             setWordByByteOffset (this, PO_stat_dropped,  0);
         break;
-        
+
       default :
       /*
         result = (*this->driver->cntrl) (this, argument, code);
@@ -185,22 +186,22 @@ int16 cntrl_port(char *port_name, uint32 argument, int16 code)
              if (argument > getWordByByteOffset(this, PO_max_mtu)) {
                 argument = getWordByByteOffset(this, PO_max_mtu);
              }
-             
+
              if (argument < 68) {
                 argument = 68;
              }
-             setWordByByteOffset(this, PO_mtu, (int16) argument);  
-             result = E_NORMAL;   
+             setWordByByteOffset(this, PO_mtu, (int16) argument);
+             result = E_NORMAL;
              break;
-             
+
             case CTL_GENERIC_SET_IP :
                 setDwordByByteOffset(this, PO_ip_addr, argument);
-                result = E_NORMAL;   
+                result = E_NORMAL;
                 break;
-                
+
             case CTL_GENERIC_SET_MASK :
                 setDwordByByteOffset(this, PO_sub_mask, argument);
-                result = E_NORMAL;   
+                result = E_NORMAL;
                 break;
            }
       }
@@ -214,7 +215,7 @@ PORT *search_port(char *port_name)
 
     for (walk = conf.ports; walk; walk = (PORT *) getDwordByByteOffset(walk, PO_next)) {
         char *pToName = ((char *) walk) + PO_name;
-        
+
         if (strcmp (pToName, port_name) == 0) {
             return walk;
         }

@@ -25,6 +25,7 @@ void doTest00(void);
 void doTest01(void);
 void doTest02(void);
 void doTest03(void);
+void doSpeedTest(void);
 
 BYTE readBuffer [130 * 1024];
 BYTE writeBuffer[130 * 1024];
@@ -64,6 +65,9 @@ int main(void)
 		case 'a':	// all tests
 			whichTests = 0xffff;
 			break;
+		case 's':
+			whichTests = 0x8000;
+			break;
 		case '0':
 		case '1':
 		case '2':
@@ -76,12 +80,13 @@ int main(void)
     if(whichTests & 2) doTest01();
     if(whichTests & 4) doTest02();
     if(whichTests & 8) doTest03();
+    if(whichTests & 0x8000) doSpeedTest();
 
     if(whichTests != 0) writeBufferToFile();
     deinitBuffer();
     
     sleep(3);
-	return 0;
+    return 0;
 }
 
 BYTE find_STiNG(void)
@@ -125,6 +130,7 @@ void showMenu(void)
     (void) Cconws(" \33p[ 1 ]\33q TCP/UDP echo + UDP datagrams\r\n");
     (void) Cconws(" \33p[ 2 ]\33q CNbyte_count / CNget_char / CNget_block / etc.\r\n");
     (void) Cconws(" \33p[ 3 ]\33q ICMP\r\n");
+    (void) Cconws(" \33p[ S ]\33q SPEED TEST\r\n");
     (void) Cconws(" \33p[ A ]\33q ALL TESTS\r\n");
     (void) Cconws(" \33p[ Q ]\33q QUIT\r\n");
 }

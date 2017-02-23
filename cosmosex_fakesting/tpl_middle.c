@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <mint/sysbind.h>
 #include <mint/osbind.h>
 #include <mint/basepage.h>
@@ -31,11 +32,11 @@ DWORD jumptable[40];
 void initJumpTable(void)
 {
     int i;
-    
+
     for(i=0; i<40; i++) {
         jumptable[i] = 0;
     }
-    
+
     i=0;
     jumptable[i++] = (DWORD) KRmalloc_mid;
     jumptable[i++] = (DWORD) KRfree_mid;
@@ -85,14 +86,14 @@ void *KRmalloc_mid(BYTE *sp)
     #endif
 
     void *res = KRmalloc_internal(size);
-    
+
     return res;
 }
 
 void KRfree_mid(BYTE *sp)
 {
     void *mem_block = getVoidPFromSP();
-    
+
     #ifdef DEBUG_STRING
     logStr("KRfree\n");
     #endif
@@ -122,12 +123,12 @@ void *KRrealloc_mid(BYTE *sp)
     #ifdef DEBUG_STRING
     logStr("KRrealloc\n");
     #endif
-    
+
     void *res = KRrealloc_internal(mem_block, new_size);
-    
+
     return res;
 }
-    
+
 char *get_error_text_mid(BYTE *sp)
 {
     int16 error_code = getWordFromSP();
@@ -137,7 +138,7 @@ char *get_error_text_mid(BYTE *sp)
     #endif
 
     char *res = get_error_text(error_code);
-    
+
     return res;
 }
 
@@ -148,7 +149,7 @@ char *getvstr_mid(BYTE *sp)
     #ifdef DEBUG_STRING
     logStr("getvstr\n");
     #endif
-    
+
     char *res = getvstr(name);
 
     return res;
@@ -163,7 +164,7 @@ int16 carrier_detect_mid(BYTE *sp)
 {
     // Do really nothing - obsolete
     return 1;
-} 
+}
 
 int16 TCP_open_mid(BYTE *sp)
 {
@@ -183,12 +184,12 @@ int16 TCP_open_mid(BYTE *sp)
     vblEnabled = 0;
     int16 res = connection_open(1, rem_host, rem_port, tos, buff_size);
     vblEnabled = 1;
-    
+
     #ifdef DEBUG_STRING
     showHexWord((WORD) res);
     logStr("\n");
     #endif
-    
+
     return res;
 }
 
@@ -211,7 +212,7 @@ int16 TCP_close_mid(BYTE *sp)
     showHexWord((WORD) res);
     logStr("\n");
     #endif
-    
+
     return res;
 }
 
@@ -230,14 +231,14 @@ int16 TCP_send_mid(BYTE *sp)
     showHexWord(length);
     logStr("\n");
     #endif
-    
+
     vblEnabled = 0;
     int16 res = TCP_send(handle, buffer, length);
     vblEnabled = 1;
 
     return res;
 }
-    
+
 int16 TCP_wait_state_mid(BYTE *sp)
 {
     int16 handle      = getWordFromSP();
@@ -251,14 +252,14 @@ int16 TCP_wait_state_mid(BYTE *sp)
     showHexByte(timeout);
     logStr("\n");
     #endif
-    
+
     vblEnabled = 0;
     int16 res = TCP_wait_state(handle, wantedState, timeout);
     vblEnabled = 1;
 
     return res;
 }
-    
+
 int16 TCP_ack_wait_mid(BYTE *sp)
 {
     int16 handle      = getWordFromSP();
@@ -274,7 +275,7 @@ int16 TCP_ack_wait_mid(BYTE *sp)
 
     return res;
 }
-    
+
 int16 TCP_info_mid(BYTE *sp)
 {
     int16 handle    = getWordFromSP();
@@ -283,13 +284,13 @@ int16 TCP_info_mid(BYTE *sp)
     #ifdef DEBUG_STRING
     logStr("TCP_info\n");
     #endif
-    
+
     vblEnabled = 0;
     int16 res = TCP_info(handle, tcp_info);
     vblEnabled = 1;
 
     return res;
-}    
+}
 
 int16 UDP_open_mid (BYTE *sp)
 {
@@ -303,7 +304,7 @@ int16 UDP_open_mid (BYTE *sp)
     vblEnabled = 0;
     int16 res = connection_open(0, rem_host, rem_port, 0, 0);
     vblEnabled = 1;
-    
+
     return res;
 }
 
@@ -314,11 +315,11 @@ int16 UDP_close_mid(BYTE *sp)
     #ifdef DEBUG_STRING
     logStr("UDP_close\n");
     #endif
-    
+
     vblEnabled = 0;
     int16 res = connection_close(0, handle, 0);
     vblEnabled = 1;
-    
+
     return res;
 }
 
@@ -331,14 +332,14 @@ int16 UDP_send_mid(BYTE *sp)
     #ifdef DEBUG_STRING
     logStr("UDP_send\n");
     #endif
-    
+
     vblEnabled = 0;
     int16 res = connection_send(0, handle, buffer, length);
     vblEnabled = 1;
-    
+
     return res;
 }
-    
+
 int16 CNkick_mid(BYTE *sp)
 {
     int16 handle = getWordFromSP();
@@ -346,7 +347,7 @@ int16 CNkick_mid(BYTE *sp)
     #ifdef DEBUG_STRING
     logStr("CNkick\n");
     #endif
-    
+
     vblEnabled = 0;
     int16 res = CNkick(handle);
     vblEnabled = 1;
@@ -372,12 +373,12 @@ int16 CNbyte_count_mid(BYTE *sp)
     showHexWord((DWORD) res);
     logStr("\n");
     #endif
-    
+
     return res;
 }
 
 int16 CNget_char_mid(BYTE *sp)
-{   
+{
     int16 handle = getWordFromSP();
 
     #ifdef DEBUG_STRING
@@ -390,17 +391,17 @@ int16 CNget_char_mid(BYTE *sp)
 
     #ifdef DEBUG_STRING
     showHexWord((DWORD) res);
-    
+
     if(res >= 0 && res <= 255) {
         char tmp[2];
-        
+
         logStr(" '");
         tmp[0] = (char) res;
         tmp[1] = 0;
         logStr(tmp);
         logStr("'");
     }
-    
+
     logStr("\n");
     #endif
 
@@ -414,13 +415,13 @@ NDB *CNget_NDB_mid(BYTE *sp)
     #ifdef DEBUG_STRING
     logStr("CNget_NDB\n");
     #endif
-    
+
     vblEnabled = 0;
     NDB *res = CNget_NDB (handle);
     vblEnabled = 1;
 
     return res;
-}    
+}
 
 int16 CNget_block_mid(BYTE *sp)
 {
@@ -475,14 +476,14 @@ int16 resolve_mid(BYTE *sp)
     #ifdef DEBUG_STRING
     logStr("resolve\n");
     #endif
-    
+
     vblEnabled = 0;
     int16 res = resolve(domain, real_domain, ip_list, ip_num);
     vblEnabled = 1;
-    
+
     return res;
 }
-    
+
 int16 set_flag_mid(BYTE *sp)
 {
     int16 flag = getWordFromSP();
@@ -490,11 +491,11 @@ int16 set_flag_mid(BYTE *sp)
     #ifdef DEBUG_STRING
     logStr("set_flag\n");
     #endif
-    
+
     int16 res = set_flag(flag);
 
     return res;
-}    
+}
 
 void clear_flag_mid(BYTE *sp)
 {
@@ -505,8 +506,8 @@ void clear_flag_mid(BYTE *sp)
     #endif
 
     clear_flag(flag);
-}    
-    
+}
+
 CIB *CNgetinfo_mid(BYTE *sp)
 {
     int16 handle = getWordFromSP();
@@ -528,7 +529,7 @@ CIB *CNgetinfo_mid(BYTE *sp)
 
     return res;
 }
-    
+
 int16 setvstr_mid(BYTE *sp)
 {
     char *name    = getVoidPFromSP();
@@ -537,7 +538,7 @@ int16 setvstr_mid(BYTE *sp)
     #ifdef DEBUG_STRING
     logStr("setvstr\n");
     #endif
-    
+
     int16 res = setvstr(name, value);
 
     return res;
@@ -572,7 +573,7 @@ int16 ICMP_send_mid(BYTE *sp)
     #ifdef DEBUG_STRING
     logStr("ICMP_send\n");
     #endif
-    
+
     vblEnabled = 0;
     int16 res = ICMP_send(dest, type, code, data, dat_length);
     vblEnabled = 1;
@@ -588,7 +589,7 @@ int16 ICMP_handler_mid(BYTE *sp)
     #ifdef DEBUG_STRING
     logStr("ICMP_handler\n");
     #endif
-    
+
     vblEnabled = 0;
     int16 res = ICMP_handler (handler, flag);
     vblEnabled = 1;
@@ -616,9 +617,9 @@ int16 on_port_mid(BYTE *sp)
     #ifdef DEBUG_STRING
     logStr("on_port\n");
     #endif
-    
+
     int16 res = on_port(port_name);
-    
+
     return res;
 }
 
@@ -640,7 +641,7 @@ int16 query_port_mid(BYTE *sp)
     #ifdef DEBUG_STRING
     logStr("query_port\n");
     #endif
-    
+
     int16 res = query_port(port_name);
 
     return res;

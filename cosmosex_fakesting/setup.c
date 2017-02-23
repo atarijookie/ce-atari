@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 //----------------------------------------
 // CosmosEx fake STiNG - by Jookie, 2014
 // Based on sources of original STiNG
@@ -278,20 +279,19 @@ void *KRrealloc_internal (void *mem_block, int32 new_size)
         KRfree_internal (mem_block);   return (new_block);
       }
 
-   if (n_units < blk->size) {
+    if (n_units < blk->size) {
         n_units = blk->size - n_units;   blk->size -= n_units;
         blk += blk->size;
         blk->size = n_units;   blk->mem_ptr = (MEM_HDR *) 'STiM';
         KRfree_internal (blk + 1);
-      }
+    }
 
-   return (mem_block);
- }
+    return (mem_block);
+}
 
- uint16	lock_exec(uint16 status)
- {
+uint16	lock_exec(uint16 status)
+{
 	// lock_exec stub, implementation needed
     
 	return 0;
- }
- 
+}

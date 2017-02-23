@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #ifndef _PORT_H_
 #define _PORT_H_
 
@@ -11,4 +12,3 @@ int16 my_set_state  (PORT *port, int16 state);
 int16 my_cntrl      (PORT *port, uint32 argument, int16 code);
 
 #endif
-

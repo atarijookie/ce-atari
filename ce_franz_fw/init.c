@@ -350,7 +350,7 @@ void initUsarts(void)
     usartStruct.USART_Mode                  = USART_Mode_Rx | USART_Mode_Tx;
     usartStruct.USART_HardwareFlowControl   = USART_HardwareFlowControl_None;
     
-    USART_Init(USART1, &usartStruct);               // Configure USART1 - 9600 baud -- for communication with RPi
+    USART_Init(USART1, &usartStruct);               // Configure USART1 - 19200 baud -- for communication with RPi
 
     usartStruct.USART_BaudRate              = 7812;   
     USART_Init(USART2, &usartStruct);               // Configure USART2 - 7812 baud  -- for communication with ST

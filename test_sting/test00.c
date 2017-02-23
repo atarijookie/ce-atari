@@ -1,3 +1,4 @@
+// vim: expandtab shiftwidth=4 tabstop=4
 //--------------------------------------------------
 #include <mint/osbind.h> 
 #include <stdio.h>
@@ -172,6 +173,7 @@ void testResolve(void)
     char *real = 0;
     DWORD adds[16];
     int res, ok;
+    char errstr[256];
     
     //-------------------------
     // resolve address with 2 results
@@ -179,25 +181,51 @@ void testResolve(void)
     res = resolve("www.sme.sk", &real, adds, 16);
     
     // 104.20.95.81 & 104.20.94.81 -> 0x68145f51 & 0x68145e51
+    // Feb 2017 :
+    // $ host www.sme.sk
+    // www.sme.sk is an alias for www.sme.sk.cdn.cloudflare.net.
+    // www.sme.sk.cdn.cloudflare.net has address 104.20.92.202 -> 0x68145cca
+    // www.sme.sk.cdn.cloudflare.net has address 104.20.93.202 -> 0x68145dca
     ok = 0;
+    errstr[0] = '\0';
     if(res == 2) {
-        if( (adds[0] == 0x68145f51 && adds[1] == 0x68145e51) ||
-            (adds[1] == 0x68145f51 && adds[0] == 0x68145e51) ) {
+        if( (adds[0] == 0x68145cca && adds[1] == 0x68145dca) ||
+            (adds[1] == 0x68145cca && adds[0] == 0x68145dca) ) {
     
             #define RESOLVE_REAL1   "www.sme.sk.cdn.cloudflare.net"
     
             if(real != 0) {
                 if(strncmp(real, RESOLVE_REAL1, strlen(RESOLVE_REAL1)) == 0) {
                     ok = 1;
+                } else {
+                    strcpy(errstr, real);
+                    strcat(errstr, " != ");
+                    strcat(errstr, RESOLVE_REAL1);
                 }
+            } else {
+                strcpy(errstr, "real is NULL");
+            }
+        } else {
+            int i, ofs;
+            const BYTE * p = (BYTE*)adds;
+            for(i = 0, ofs = 0; i < 8; i++) {
+                intToString(p[i], -1, errstr + ofs);
+                strcat(errstr, ((i & 3) == 3) ? " " : ".");
+                ofs = strlen(errstr);
             }
         }
+    } else {
+        strcpy(errstr, "res=");
+        errstr[4] = '0' + res;
+        errstr[5] = '\0';
     }
-    
     if(real != NULL) {             
-        out_result_error_string(ok, res, real);
         KRfree(real);           // free real address
         real = NULL;
+    }
+
+    if(!ok) {
+        out_result_error_string(ok, res, errstr);
     } else {
         out_result_error(ok, res);
     }
@@ -222,7 +250,8 @@ void testResolve(void)
     }
     
     if(real != NULL) {             
-        out_result_error_string(ok, res, real);
+        if(!ok) out_result_error_string(ok, res, real);
+        else out_result_error(ok, res);
         KRfree(real);           // free real address
         real = NULL;
     } else {

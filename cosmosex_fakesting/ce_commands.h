@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #ifndef _CE_COMMANDS_H_
 #define _CE_COMMANDS_H_
 
@@ -54,4 +55,3 @@
 #define RES_DIDNT_FINISH_YET            0xdf
 
 #endif
-

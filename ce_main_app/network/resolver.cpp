@@ -1,3 +1,4 @@
+// vim: expandtab shiftwidth=4 tabstop=4
 #include <time.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -27,7 +28,7 @@
 #define IS_VALID_IP_NUMBER(X)  (X >= 0 && X <= 255)
 
 //---------------------------------
-int ResolverRequest::addRequest(char *hostName)
+int ResolverRequest::addRequest(const char *hostName)
 {
     int i, emptyIndex = -1;
 

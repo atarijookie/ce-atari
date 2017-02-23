@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #ifndef _GLOBAL_H_
 #define _GLOBAL_H_
 
@@ -17,13 +18,13 @@
         #define TRUE		1
     #endif
 
-#define HZ_200     ((volatile DWORD *) 0x04BA) /* 200 Hz system clock */ 
+#define HZ_200     ((volatile DWORD *) 0x04BA) /* 200 Hz system clock */
 
 #define CMD_LENGTH_SHORT	6
 #define CMD_LENGTH_LONG		13
 
 extern BYTE commandShort[CMD_LENGTH_SHORT];
 extern BYTE commandLong[CMD_LENGTH_LONG];
-extern BYTE *pDmaBuffer;  
+extern BYTE *pDmaBuffer;
 
 #endif

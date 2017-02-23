@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #ifndef _GLOBDEFS_H_
 #define _GLOBDEFS_H_
 
@@ -7,7 +8,7 @@
 //----------------------------------------
 
 #include <mint/basepage.h>
- 
+
 #define  FALSE       0
 #define  TRUE        1
 
@@ -309,8 +310,8 @@ typedef  struct {
     PORT       *ports;          /* Pointer to first entry in PORT chain     */
     DRIVER     *drivers;        /* Pointer to first entry in DRIVER chain   */
     LAYER      *layers;         /* Pointer to first entry in LAYER chain    */
-    FUNC_LIST  *interupt;       /* List of application interupt handlers    */    
-    FUNC_LIST  *icmp;           /* List of application ICMP handlers        */    
+    FUNC_LIST  *interupt;       /* List of application interupt handlers    */
+    FUNC_LIST  *icmp;           /* List of application ICMP handlers        */
     int32      stat_all;        /* All datagrams that pass are counted here */
     int32      stat_lo_mem;     /* Dropped due to low memory                */
     int32      stat_ttl_excd;   /* Dropped due to Time-To-Live exceeded     */
@@ -401,7 +402,7 @@ typedef  struct {
  } __attribute__((packed)) PNTA;
 
 #define PO_opaque       0
-#define PO_name_len     4 
+#define PO_name_len     4
 #define PO_port_name    6
 
 #define  CTL_KERN_FIRST_PORT    ('K' << 8 | 'F')    /* Query first port     */
@@ -470,7 +471,7 @@ typedef  struct {
 /*--------------------------------------------------------------------------*/
 
 
-/* 
+/*
 Error return values:
 0    - OK
 0x50 - 0x6f -- connection handle - received from device
@@ -545,7 +546,7 @@ typedef struct {
     BYTE    tcpConnectionState;             // TCP connection states -- TCLOSED, TLISTEN, ...
     DWORD   buff_size;                      // send buffer size, valid only for TCP
     BYTE    activeNotPassive;               // zero for passive (incomming) connection, non-zero for active (outgoing) connection
-    
+
     BYTE charsUsed;                         // how many chars from this buffer was used by CNget_char()
     BYTE charsGot;                          // how many chars we have
     BYTE chars[READ_BUFFER_SIZE];
