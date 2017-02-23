@@ -139,12 +139,25 @@ int main(void)
     Clear_home();
     //                |                                        |             
     (void) Cconws("\33p>>>>>> Manual HDD test tool <<<<<<\33q\r\n\r\n");
+
+    #define SIZE_13MB       (14 * 1024 * 1024)
+    #define SIZE_4MB        ( 4 * 1024 * 1024)
+    #define SIZE_MAXSECTORS (MAXSECTORS * 512)
     
+    // ---------------------- 
+    // get what machine we're running on
+    Supexec(getMachineType);
+
     //-----------------------
     // find the largest free block of memory
     Supexec(getLargestMemBlock);
+
+    //            |                    |
+    (void) Cconws("Largest mem block   : ");
+    showHexDword(largestMemBlock);
+    (void) Cconws("\r\n");
     
-    if(largestMemBlock < (MAXSECTORS * 512)) {
+    if(largestMemBlock < SIZE_MAXSECTORS) {
         //            |                                        |             
         (void) Cconws("Not enough free memory, expecting\r\n");
         (void) Cconws("at least 128 kB free!\r\n");
@@ -154,16 +167,24 @@ int main(void)
         return 0;
     }
     
-    #define SIZE_13MB     (14 * 1024 * 1024)
-    #define SIZE_4MB      ( 4 * 1024 * 1024)
+    if(machineType == MACHINE_ST) {                     // for ST - just stick to max sectors size
+        largestMemBlock = SIZE_MAXSECTORS;
+    }
     
     if(largestMemBlock >= SIZE_13MB) {                  // something is bigger than 13 MB? Limit it to 13 MB, which is near max ST RAM size
         largestMemBlock = SIZE_13MB;
     }
 
+    //            |                    |
+    (void) Cconws("Will try to alloc   : ");
+    showHexDword(largestMemBlock);
+    (void) Cconws("\r\n");
+
     if(largestMemBlock < SIZE_4MB) {                    // less than 4 MB? use normal Malloc()
+        (void) Cconws("Doing Malloc()...\r\n");
         pBufferOrig = (BYTE *) Malloc(largestMemBlock);
     } else {                                            // more than 4 MB? use Mxalloc(), so we can force it into ST RAM
+        (void) Cconws("Doing Mxalloc()...\r\n");
         pBufferOrig = (BYTE *) Mxalloc(largestMemBlock, 1);
     }
 
@@ -190,16 +211,14 @@ int main(void)
 
     pBuffer = (BYTE *) toEven; 
 
-    (void) Cconws("Large mem size (B): ");
+     //           |                    |
+    (void) Cconws("Large mem size (B)  : ");
     showHexDword(largeMemSizeInBytes);
-    (void) Cconws("\r\nLarge mem size (s): ");
+    //                |                    |
+    (void) Cconws("\r\nLarge mem size (s)  : ");
     showHexDword(largeMemSizeInSectors);
-    (void) Cconws("\r\n\r\n");
+    (void) Cconws("\r\n");
 
-    // ---------------------- 
-    // get what machine we're running on
-    Supexec(getMachineType);
-    
     // ---------------------- 
     // search for device on the ACSI / SCSI bus 
     deviceID = 0;
@@ -212,6 +231,7 @@ int main(void)
     } else if(machineType == MACHINE_FALCON) {  // if it's Falcon, use SCSI
         key = 'f';
     } else {                                    // if it's TT, let user choose
+        //            |                    |
         (void) Cconws("Choose HDD interface:\r\n");
         
         while(1) {
@@ -229,7 +249,8 @@ int main(void)
         }
     }
 
-    (void) Cconws("\r\nHDD Interface: ");
+     //           |                    |
+    (void) Cconws("HDD Interface       : ");
     
     switch(key) {
         case 'a':   
@@ -251,7 +272,7 @@ int main(void)
             
             break;
     } 
-    (void) Cconws("\r\n\r\n");
+    (void) Cconws("\r\n");
 
     showLogs = 0;                   // turn off logs - there will be errors on findDevice when device doesn't exist 
     Supexec(findDevice);
@@ -390,8 +411,8 @@ int readHansTest(int byteCount, WORD xorVal, BYTE verbose);
 
 void CEread(BYTE verbose)
 {
-    commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
-    commandLong[1] = 0xA0;								// cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)  	
+  	commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
+	commandLong[1] = 0xA0;								// cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)  	
 
     WORD xorVal=0xC0DE;
     
@@ -676,6 +697,8 @@ void findDevice(void)
 {
     BYTE i;
     BYTE res;
+
+    //            |                    |
     (void) Cconws("Looking for CosmosEx: ");
 
     deviceID = 0;
