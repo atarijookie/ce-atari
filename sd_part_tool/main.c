@@ -3,6 +3,10 @@
 #include <string.h>
 #include <curses.h>
 
+#define  BYTE unsigned char
+#define  WORD unsigned short
+#define DWORD unsigned int
+
 void createEmptyImage(void)
 {
     printf("Creating image.\n");
@@ -13,15 +17,22 @@ void createEmptyImage(void)
         return;
     }
 
-    char sector[512];
-    memset(sector, 0, 512);
+    char data[512];
+    memset(data, 0, 512);
 
-    int i;
-    for(i=0; i<((260*1024*1024)/512); i++) {        // write all the sectors
-        fwrite(sector, 1, 512, f);
+    #define SIZE1MB     (1024 * 1024)
+    #define SIZE10MB    (10   * SIZE1MB)
 
-        if(i % ((1024*1024)/512) == 0) {
-            printf("Wrote %d MB\n", (i * 512) / (1024*1024));
+    int sectorCount = (260 * SIZE1MB) / 512;
+
+    int sectorNo;
+    for(sectorNo=0; sectorNo<sectorCount; sectorNo++) { // write all the sectors
+        fwrite(data, 1, 512, f);
+
+        int wroteBytes = sectorNo * 512;
+
+        if(wroteBytes % SIZE10MB == 0) {
+            printf("Wrote %d MB\n", wroteBytes / SIZE1MB);
         }        
     }
 
@@ -39,7 +50,7 @@ void mapUsedSectors(void)
         return;
     }
 
-    char data[512];
+    BYTE data[512];
     
     int sectorsUsed = 0;
     int sectorsFree = 0;
@@ -62,7 +73,9 @@ void mapUsedSectors(void)
         }
 
         if(isUsed) {
-            printf("Used sector: % 4d (%04x)\n", sector, sector);
+            printf("Used sector: % 4d (%04x): %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", sector, sector, 
+                    data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9]);
+
             sectorsUsed++;
         } else {
             sectorsFree++;
@@ -76,10 +89,6 @@ void mapUsedSectors(void)
     printf("Sectors free: %d\n", sectorsFree);
     printf("Done.\n\n");
 }
-
-#define  BYTE unsigned char
-#define  WORD unsigned short
-#define DWORD unsigned int
 
 typedef struct __attribute__((__packed__)) {
     BYTE status;
