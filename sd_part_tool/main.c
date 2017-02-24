@@ -133,6 +133,21 @@ typedef struct __attribute__((__packed__)) {
     
 } FAT16BS;
 
+typedef struct __attribute__((__packed__)) {
+    BYTE ignore[11];
+    WORD bps;
+    BYTE spc;
+    WORD res;
+    BYTE nfats;
+    WORD ndirs;
+    WORD nsects;
+    BYTE media;
+    WORD spf;
+    WORD spt;
+    WORD nsides;
+    WORD nhid;
+} AtariBootsector;
+
 void reverseDword(DWORD *dw)
 {
     BYTE *pB = (BYTE *) dw;
@@ -165,7 +180,6 @@ void analyzeBootSector(void)
     fread(data, 1, 512, f);
 
     PTE *pPte = (PTE *) &data[0x1BE];
-
 
     //----------------
     // show PC partition Entry
@@ -209,10 +223,11 @@ void analyzeBootSector(void)
 
     //----------------
     // show 0th PC partition sector
-    int firstPcSector = pPte->firstLBA;
+    int offset;
+    int firstPcSector       = pPte->firstLBA;
+    int firstAtariSector    = pAph->partStart;
 
-    int offset = firstPcSector * 512;
-
+    offset = firstPcSector * 512;
     fseek(f, offset, SEEK_SET);     // to 0th PC partition sector
     fread(data, 1, 512, f);
 
@@ -240,6 +255,30 @@ void analyzeBootSector(void)
     printf("serial #     : %08x\n",  pF16->extBPBP.serialNo);
     printf("volume label : %.11s\n", pF16->extBPBP.volumeLabel);
     printf("filesys type : %.8s\n",  pF16->extBPBP.fileSystemType);
+
+    printf("\n\n");
+
+    //----------------
+    // show 0th Atari partition sector
+    offset = firstAtariSector * 512;
+    fseek(f, offset, SEEK_SET);     // to 0th Atari partition sector
+    fread(data, 1, 512, f);
+
+    AtariBootsector *pAbs = (AtariBootsector *) data;
+
+    printf("Atari partition sector 0 (physical sector %08x):\n", firstAtariSector);
+
+    printf("bytes/sector : %d\n", pAbs->bps);
+    printf("sects/cluster: %d\n", pAbs->spc);
+    printf("reserved sect: %d\n", pAbs->res);
+    printf("n of FATs    : %d\n", pAbs->nfats);
+    printf("root entries : %d\n", pAbs->ndirs);
+    printf("n of sectors : %d (%08x)\n", pAbs->nsects, pAbs->nsects);
+    printf("media descr  : %02x\n", pAbs->media);
+    printf("sectors/FAT  : %d\n", pAbs->spf);
+    printf("sectors/track: %d\n", pAbs->spt);
+    printf("sides        : %d\n", pAbs->nsides);
+    printf("hidden sects : %d\n", pAbs->nhid);
 
     printf("\n\n");
     //----------------
