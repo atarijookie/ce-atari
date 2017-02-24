@@ -40,11 +40,11 @@ AT = $(AT_$(V))
 HDR      = mutex.h xbra.h acsi.h scsi.h \
            gemdos.h gemdos_errno.h translated.h \
            bios.h main.h find_ce.h \
-           hdd_if.h global.h screen.h sd_noob.h
+           hdd_if.h global.h screen.h sd_noob.h serial.h
 CSRC     = mutex.c xbra.c acsi.c scsi_falcon.c scsi_tt.c \
            gemdos.c gemdos_rw.c \
            bios.c main.c find_ce.c \
-           hdd_if.c screen.c sd_noob.c
+           hdd_if.c screen.c sd_noob.c serial.c
 SSRC     = gemdos_asm.s bios_asm.s screenirq.s
 
 ifeq ($(USE_LOWLEVEL_PEXEC),yes)

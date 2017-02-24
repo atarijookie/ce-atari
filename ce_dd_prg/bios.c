@@ -17,6 +17,7 @@
 #include "bios.h"
 #include "sd_noob.h"
 #include "main.h"
+#include "serial.h"
 
 extern int16_t useOldBiosHandler;
 #ifdef MANUAL_PEXEC /* else it is defined in harddrive_lowlevel.s */
@@ -33,17 +34,21 @@ int32_t custom_mediach( void *sp )
     //-----------------------
     // if SD noob is enabled, and this request on that drive
     if(SDnoobPartition.enabled && SDnoobPartition.driveNo == drive) {
+        if(SERIALDEBUG) { aux_sendString("custom_mediach "); }
+        
         if(SDcard.mediaChanged) {                                       // if media change detected in R/W function, reload partition info
             SDnoobPartition.verboseInit = FALSE;                        // quiet init - don't show messages
             gotSDnoobCard();                                            // access card to get info
 
             SDcard.mediaChanged = FALSE;                                // reset this flag back to neutral
+            if(SERIALDEBUG) { aux_sendString("MED_CHANGED\n"); }
             return MED_CHANGED;                                         // yes, media has changed
         } else {                                                        // we didn't detect media change on R/W operation, we might check it now
             static DWORD lastSDmediaCheck = 0;
             DWORD now = *HZ_200;
 
             if((now - lastSDmediaCheck) < 200) {                        // if the last media check was less than 1 seconds ago, don't check now
+                if(SERIALDEBUG) { aux_sendString("MED_NOCHANGE\n"); }
                 return MED_NOCHANGE;
             }
             lastSDmediaCheck = now;                                     // store that we just checked the media
@@ -55,9 +60,11 @@ int32_t custom_mediach( void *sp )
                 gotSDnoobCard();                                        // access card to get info
 
                 SDcard.mediaChanged = FALSE;                            // reset this flag back to neutral
+                if(SERIALDEBUG) { aux_sendString("reqSense->MED_CHANGED\n"); }
                 return MED_CHANGED;
             }
 
+            if(SERIALDEBUG) { aux_sendString("reqSense->MED_NOCHANGE\n"); }
             return MED_NOCHANGE;                                        // if came here, didn't detect media change
         }
     }
@@ -73,10 +80,10 @@ int32_t custom_mediach( void *sp )
     updateCeMediach();                                                  // update the mediach status - once per 3 seconds
 
     if((ceMediach & (1 << drive)) != 0) {                               // if bit is set, media changed
-        return 2;
+        return MED_CHANGED;
     }
 
-    return 0;                                                           // bit not set, media not changed
+    return MED_NOCHANGE;                                                // bit not set, media not changed
 }
 
 int32_t custom_drvmap( void *sp )
@@ -109,6 +116,7 @@ int32_t custom_getbpb( void *sp )
     //-----------------------
     // if it's SD NOOB drive and enabled
     if(SDnoobPartition.enabled && SDnoobPartition.driveNo == drive) {
+        if(SERIALDEBUG) { aux_sendString("custom_getbpb SD NOOB\n"); }
         memcpy(bpb, &SDbpb, 18);                                        // make copy of real SD NOOB BPB
         return (DWORD) &bpb;                                            // return pointer to that BPB
     }

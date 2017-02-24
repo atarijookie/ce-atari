@@ -18,6 +18,7 @@
 #include "main.h"
 #include "hdd_if.h"
 #include "sd_noob.h"
+#include "serial.h"
 
 // ------------------------------------------------------------------
 void showInt(int value, int length);
@@ -67,6 +68,8 @@ WORD requestSense(BYTE deviceId)
 {
     BYTE cmd[CMD_LENGTH_SHORT];
 
+    if(SERIALDEBUG) { aux_sendString("requestSense "); }
+    
     memset(cmd, 0, 6);
     cmd[0] = (deviceId << 5) | SCSI_C_REQUEST_SENSE;
     cmd[4] = 16;                                    // how many bytes should be sent
@@ -74,11 +77,14 @@ WORD requestSense(BYTE deviceId)
     (*hdIf.cmd)(1, cmd, 6, pDmaBuffer, 1);
 
     if(!hdIf.success || hdIf.statusByte != 0) {     // if command failed, or status byte is not OK, fail
+        if(SERIALDEBUG) { aux_sendString("FAILED\n"); }
         return 0xffff;
     }
 
     WORD val;
     val = (pDmaBuffer[2] << 8) | pDmaBuffer[12];    // WORD: senseKey is up, senseCode is down
+    
+    if(SERIALDEBUG) { aux_hexWord(val); aux_sendString("\n"); }
     return val;
 }
 //--------------------------------------------------
@@ -158,6 +164,12 @@ int readWriteSector(BYTE deviceId, BYTE readNotWrite, DWORD sectorNumber, BYTE s
         cmd[0] = (deviceId << 5) | SCSI_C_WRITE6;
     }
 
+    if(SERIALDEBUG) { aux_sendString("readWriteSector "); aux_hexByte(deviceId);            aux_sendChar(' '); 
+                                                          aux_hexByte(readNotWrite);        aux_sendChar(' '); 
+                                                          aux_hexDword(sectorNumber);       aux_sendChar(' '); 
+                                                          aux_hexDword(sectorCount);        aux_sendChar(' '); 
+                                                          aux_hexDword((DWORD) pBuffer);    aux_sendChar(' '); }
+    
     cmd[1] = (sectorNumber >> 16) & 0x1f;           // 5 bits only (1 GB limit)
     cmd[2] = (sectorNumber >>  8);
     cmd[3] = (sectorNumber      );
@@ -167,10 +179,12 @@ int readWriteSector(BYTE deviceId, BYTE readNotWrite, DWORD sectorNumber, BYTE s
     (*hdIf.cmd)(readNotWrite, cmd, CMD_LENGTH_SHORT, pBuffer, 1);
 
     if(hdIf.success && hdIf.statusByte == OK) {     // if everything OK, success
+        if(SERIALDEBUG) { aux_sendString(" E_OK\n"); }
         return E_OK;
     }
 
     if(!hdIf.success) {                             // command failed? drive not ready
+        if(SERIALDEBUG) { aux_sendString(" EDRVNR\n"); }
         return EDRVNR;
     }
 
@@ -179,15 +193,18 @@ int readWriteSector(BYTE deviceId, BYTE readNotWrite, DWORD sectorNumber, BYTE s
     WORD sense = requestSense(deviceId);            // request sense
 
     if(sense == 0xffff || sense == 0x023A) {        // request sense failed or media not present? drive not ready
+        if(SERIALDEBUG) { aux_sendString(" EDRVNR\n"); }
         return EDRVNR;
     }
 
     if(sense == 0x0628) {                           // media changed? return media changed
+        if(SERIALDEBUG) { aux_sendString(" E_CHNG\n"); }
         return E_CHNG;
     }
 
     //--------
     // if came here, couldn't identify any specific sense, so just return generic R/W error
+    if(SERIALDEBUG) { aux_sendString(" EREADF / EWRITF\n"); }
     return (readNotWrite ? EREADF : EWRITF);
 }
 
@@ -196,6 +213,8 @@ BYTE gotSDnoobCard(void)
 {
     BYTE res;
 
+    if(SERIALDEBUG) { aux_sendString("gotSDnoobCard "); }
+    
     SDcard.mediaChanged     = FALSE;                // we're (re)reading this, no media change 
 
     SDnoobPartition.enabled = FALSE;                // SD NOOB not enabled (yet)
@@ -206,6 +225,8 @@ BYTE gotSDnoobCard(void)
     res = getSDcardIDonBus();                       // find SD card on bus
 
     if(!res) {                                      // not found? quit
+        if(SERIALDEBUG) { aux_sendString("no SD on bus\n"); }
+        
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: no SD on bus, skipping\r\n");
         }
@@ -216,6 +237,8 @@ BYTE gotSDnoobCard(void)
     res = getSDcardInfo();                          // try to get SD card info
 
     if(!res) {                                      // failed to get info? quit
+        if(SERIALDEBUG) { aux_sendString("getSDcardInfo() failed\n"); }
+        
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: failed to get SD info\r\n");
         }
@@ -224,6 +247,8 @@ BYTE gotSDnoobCard(void)
     }
 
     if(!SDcard.isInit) {                            // if card not initialized, quit
+        if(SERIALDEBUG) { aux_sendString("!SDcard.isInit\n"); }
+        
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: card not present or not init\r\n");
         }
@@ -232,6 +257,8 @@ BYTE gotSDnoobCard(void)
     }
 
     if(SDcard.SCapacity < 0x64000) {                // card smaller than 200 MB? don't use it
+        if(SERIALDEBUG) { aux_sendString("SCapacity too small\n"); }
+    
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: card too small, skipping\r\n");
         }
@@ -248,6 +275,8 @@ BYTE gotSDnoobCard(void)
     }
 
     if(ires != E_OK) {          // failed to get info? quit
+        if(SERIALDEBUG) { aux_sendString("readWriteSector(MBR) failed\n"); }
+    
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: failed to read MBR\r\n");
         }
@@ -256,6 +285,8 @@ BYTE gotSDnoobCard(void)
     }
 
     if(memcmp(pDmaBuffer + 3, "SDNOO", 5) != 0) {   // if it doesn't have SD NOOB marker, quit
+        if(SERIALDEBUG) { aux_sendString("not SD NOOB\n"); }
+    
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: card not SD NOOB, skipping\r\n");
         }
@@ -276,6 +307,8 @@ BYTE gotSDnoobCard(void)
     }
 
     if(ires != E_OK) {                              // failed to get info? quit
+        if(SERIALDEBUG) { aux_sendString("readWriteSector(atariBootSector) failed\n"); }
+    
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: failed to read boot sector\r\n");
         }
@@ -302,6 +335,21 @@ BYTE gotSDnoobCard(void)
 
     SDbpb.bflags            = 1;                                    // bit 0=1 - 16 bit FAT, else 12 bit
 
+    if(SERIALDEBUG) { 
+        aux_sendString("\n  recsiz: "); aux_hexWord(SDbpb.recsiz);
+        aux_sendString("\n  clsiz : "); aux_hexWord(SDbpb.clsiz);
+        aux_sendString("\n  clsizb: "); aux_hexWord(SDbpb.clsizb);
+        aux_sendString("\n  rdlen : "); aux_hexWord(SDbpb.rdlen);
+        aux_sendString("\n  fsiz  : "); aux_hexWord(SDbpb.fsiz);
+        aux_sendString("\n  fatrec: "); aux_hexWord(SDbpb.fatrec);
+        aux_sendString("\n  datrec: "); aux_hexWord(SDbpb.datrec);
+        aux_sendString("\n  numcl : "); aux_hexWord(SDbpb.numcl);
+        aux_sendString("\n  bflags: "); aux_hexWord(SDbpb.bflags);
+        aux_sendString("\n");
+        aux_sendString("\n  drive : "); aux_sendChar(SDnoobPartition.driveNo + 'A');
+        aux_sendString("\n  size  : "); aux_hexWord (SDnoobPartition.sectorCount >> 11);
+        aux_sendString(" MB\n\n");
+    }
     //--------------------
     // we're ready to use the SD card
     if(SDnoobPartition.verboseInit) {
@@ -326,8 +374,16 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
     BYTE noRetries      = (mode & (1 << 2)) != 0;       // if non-zero, then no retries
     BYTE noTranslate    = (mode & (1 << 3)) != 0;       // if non-zero, physical mode (if zero, logical mode)
 
+    if(SERIALDEBUG) { 
+        aux_sendString("SDnoobRwabs");
+        aux_sendChar(' '); aux_hexNibble(readNotWrite);
+        aux_sendChar(' '); aux_hexNibble(noRetries);
+        aux_sendChar(' '); aux_hexNibble(noTranslate);
+    }
+
     if(noTranslate) {                                   // physical mode? bad request
-        return -5;
+        if(SERIALDEBUG) { aux_sendString(" EBADRQ\n"); }
+        return EBADRQ;
     }
 
     BYTE  toFastRam     =  (((DWORD) pBuffer) >= 0x1000000) ? TRUE  : FALSE;        // flag: are we reading to FAST RAM?
@@ -340,6 +396,11 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
     WORD i, triesCount;
     triesCount = noRetries ? 1 : 3;     // how many times we should try?
 
+    if(SERIALDEBUG) { 
+        aux_sendChar(' '); aux_hexNibble(useMidBuffer);
+        aux_sendChar(' '); aux_hexByte  (maxSectorCount);
+    }
+    
     // physical starting sector = the starting sector of partition + physical sector of where we want to start reading
     DWORD physicalStartingSector    = SDnoobPartition.sectorStart + (logicalStartingSector * SDnoobPartition.physicalPerAtariSector);
     DWORD physicalSectorCount       = logicalSectorCount * SDnoobPartition.physicalPerAtariSector;
@@ -365,11 +426,13 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
 
             if(ires == E_CHNG) {                            // if media changed, don't try anymore, tell TOS about this and he will hopefully re-read stuff
                 SDcard.mediaChanged = TRUE;
+                if(SERIALDEBUG) { aux_sendString(" E_CHNG\n"); }
                 return E_CHNG;
             }
         }
 
         if(ires != E_OK) {                                  // if failed, quit, and just return what the R/W function returned
+            if(SERIALDEBUG) { aux_sendString(" !E_OK\n"); }
             return ires;
         }
 
@@ -379,6 +442,7 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
         pBuffer                 += thisByteCount;           // advance in the buffer
     }
 
+    if(SERIALDEBUG) { aux_sendString(" E_OK\n"); }
     return E_OK;                                            // if came here, everything is fine
 }
 //--------------------------------------------------
