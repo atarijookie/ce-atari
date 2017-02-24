@@ -103,6 +103,36 @@ typedef struct __attribute__((__packed__)) {
     DWORD partSize;
 } APH;
 
+typedef struct __attribute__((__packed__)) {
+    BYTE jumpInst[3];
+    BYTE oemId[8];
+
+    struct __attribute__((__packed__)) {
+        WORD  bps;
+        BYTE  spc;
+        WORD  reservedSects;
+        BYTE  numOfFATs;
+        WORD  rootEntries;
+        WORD  smallSectors;
+        BYTE  mediaDescr;
+        WORD  sectorsPerFAT;
+        WORD  spt;
+        WORD  numOfHeads;
+        DWORD hiddenSectors;
+        DWORD largeSectors;
+    } BPB;
+
+    struct __attribute__((__packed__)) {
+        BYTE  physDriveNo;
+        BYTE  reserved;
+        BYTE  extBootSign;
+        DWORD serialNo;
+        BYTE  volumeLabel[11];
+        BYTE  fileSystemType[8];
+    } extBPBP;
+    
+} FAT16BS;
+
 void reverseDword(DWORD *dw)
 {
     BYTE *pB = (BYTE *) dw;
@@ -136,8 +166,11 @@ void analyzeBootSector(void)
 
     PTE *pPte = (PTE *) &data[0x1BE];
 
-    WORD cyl, sec;
 
+    //----------------
+    // show PC partition Entry
+
+    WORD cyl, sec;
     printf("PC Partition Entry #1:\n");
     printf("status       : %02x\n", pPte->status);
     
@@ -160,6 +193,7 @@ void analyzeBootSector(void)
     printf("\n\n");
 
     //----------------
+    // show Atari partition header
     APH *pAph = (APH *) &data[0x1DE];
 
     reverseDword(&pAph->partStart);
@@ -172,6 +206,43 @@ void analyzeBootSector(void)
     printf("part size    : %08x sectors (%d MB)\n", pAph->partSize, (pAph->partSize * 512) / (1024 * 1024));
 
     printf("\n\n");
+
+    //----------------
+    // show 0th PC partition sector
+    int firstPcSector = pPte->firstLBA;
+
+    int offset = firstPcSector * 512;
+
+    fseek(f, offset, SEEK_SET);     // to 0th PC partition sector
+    fread(data, 1, 512, f);
+
+    FAT16BS *pF16 = (FAT16BS *) data;
+
+    printf("PC partition sector 0 (physical sector %08x):\n", firstPcSector);
+
+    printf("jump instruct: %02x%02x%02x\n", pF16->jumpInst[0], pF16->jumpInst[1], pF16->jumpInst[2]);
+    printf("oemId        : %.8s\n",  pF16->oemId);
+    printf("bytes/sector : %d\n",    pF16->BPB.bps);
+    printf("sectors/clust: %d\n",    pF16->BPB.spc);
+    printf("reservedSects: %d\n",    pF16->BPB.reservedSects);
+    printf("num Of FATs  : %d\n",    pF16->BPB.numOfFATs);
+    printf("root entries : %d\n",    pF16->BPB.rootEntries);
+    printf("small sectors: %04x\n",  pF16->BPB.smallSectors);
+    printf("media descr  : %02x\n",  pF16->BPB.mediaDescr);
+    printf("sectors/FAT  : %04x\n",  pF16->BPB.sectorsPerFAT);
+    printf("sectors/track: %04x\n",  pF16->BPB.spt);
+    printf("# of heads   : %04x\n",  pF16->BPB.numOfHeads);
+    printf("hidden sects : %08x\n",  pF16->BPB.hiddenSectors);
+    printf("large  sects : %08x\n",  pF16->BPB.largeSectors);
+    printf("phys driveNo : %02x\n",  pF16->extBPBP.physDriveNo);
+    printf("reserved     : %02x\n",  pF16->extBPBP.reserved);
+    printf("extBootSign  : %02x\n",  pF16->extBPBP.extBootSign);
+    printf("serial #     : %08x\n",  pF16->extBPBP.serialNo);
+    printf("volume label : %.11s\n", pF16->extBPBP.volumeLabel);
+    printf("filesys type : %.8s\n",  pF16->extBPBP.fileSystemType);
+
+    printf("\n\n");
+    //----------------
 
     fclose(f);
 }
