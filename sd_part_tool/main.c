@@ -81,7 +81,6 @@ void mapUsedSectors(void)
 #define  WORD unsigned short
 #define DWORD unsigned int
 
-
 typedef struct __attribute__((__packed__)) {
     BYTE status;
     BYTE firstHead;
@@ -96,6 +95,29 @@ typedef struct __attribute__((__packed__)) {
     DWORD firstLBA;
     DWORD sectorCount;
 } PTE;
+
+typedef struct __attribute__((__packed__)) {
+    BYTE  flags;
+    BYTE  partType[3];
+    DWORD partStart;
+    DWORD partSize;
+} APH;
+
+void reverseDword(DWORD *dw)
+{
+    BYTE *pB = (BYTE *) dw;
+
+    BYTE a,b,c,d;
+    a = pB[0];
+    b = pB[1];
+    c = pB[2];
+    d = pB[3];
+
+    pB[0] = d;
+    pB[1] = c;
+    pB[2] = b;
+    pB[3] = a;
+}
 
 void analyzeBootSector(void)
 {
@@ -114,19 +136,43 @@ void analyzeBootSector(void)
 
     PTE *pPte = (PTE *) &data[0x1BE];
 
-    printf("Partition entry #1:\n");
-    printf("status       : %02x\n", pPte->status);
-    printf("1st  C       : %02x\n", pPte->firstCylSector);
-    printf("1st  H       : %02x\n", pPte->firstHead);
-    printf("1st  S       : %02x\n", pPte->firstCylinder);
-    printf("part type    : %02x\n", pPte->partType);
-    printf("last C       : %02x\n", pPte->lastCylSector);
-    printf("last H       : %02x\n", pPte->lastHead);
-    printf("last S       : %02x\n", pPte->lastCylinder);
-    printf("LBA 1st sect : %08x\n", pPte->firstLBA);
-    printf("LBA sect cnt : %08x\n", pPte->sectorCount);
+    WORD cyl, sec;
 
-    printf("\n\n", pPte->sectorCount);
+    printf("PC Partition Entry #1:\n");
+    printf("status       : %02x\n", pPte->status);
+    
+    cyl = ((pPte->firstCylSector & 0xc0)<<2) | pPte->firstCylinder;
+    sec =  (pPte->firstCylSector & 0x3f);
+    printf("1st  C       : %03x\n", cyl);
+    printf("1st  H       : %02x\n", pPte->firstHead);
+    printf("1st  S       : %02x\n", sec);
+
+    printf("part type    : %02x\n", pPte->partType);
+
+    cyl = ((pPte->lastCylSector & 0xc0)<<2) | pPte->lastCylinder;
+    sec =  (pPte->lastCylSector & 0x3f);
+    printf("last C       : %03x\n", cyl);
+    printf("last H       : %02x\n", pPte->lastHead);
+    printf("last S       : %02x\n", sec);
+    printf("LBA 1st sect : %08x\n", pPte->firstLBA);
+    printf("LBA sect cnt : %08x sectors (%d MB)\n", pPte->sectorCount, (pPte->sectorCount * 512) / (1024 * 1024));
+
+    printf("\n\n");
+
+    //----------------
+    APH *pAph = (APH *) &data[0x1DE];
+
+    reverseDword(&pAph->partStart);
+    reverseDword(&pAph->partSize);
+
+    printf("Atari Partition Header #2:\n");
+    printf("flags        : %02x\n", pAph->flags);
+    printf("part type    : %.3s\n", pAph->partType);
+    printf("part start   : %08x\n", pAph->partStart);
+    printf("part size    : %08x sectors (%d MB)\n", pAph->partSize, (pAph->partSize * 512) / (1024 * 1024));
+
+    printf("\n\n");
+
     fclose(f);
 }
 
