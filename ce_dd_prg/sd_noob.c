@@ -213,8 +213,6 @@ BYTE gotSDnoobCard(void)
 {
     BYTE res;
 
-    if(SERIALDEBUG) { aux_sendString("gotSDnoobCard "); }
-    
     SDcard.mediaChanged     = FALSE;                // we're (re)reading this, no media change 
 
     SDnoobPartition.enabled = FALSE;                // SD NOOB not enabled (yet)
@@ -225,7 +223,7 @@ BYTE gotSDnoobCard(void)
     res = getSDcardIDonBus();                       // find SD card on bus
 
     if(!res) {                                      // not found? quit
-        if(SERIALDEBUG) { aux_sendString("no SD on bus\n"); }
+        if(SERIALDEBUG) { aux_sendString("gotSDnoobCard - no SD on bus\n"); }
         
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: no SD on bus, skipping\r\n");
@@ -237,7 +235,7 @@ BYTE gotSDnoobCard(void)
     res = getSDcardInfo();                          // try to get SD card info
 
     if(!res) {                                      // failed to get info? quit
-        if(SERIALDEBUG) { aux_sendString("getSDcardInfo() failed\n"); }
+        if(SERIALDEBUG) { aux_sendString("gotSDnoobCard - getSDcardInfo() failed\n"); }
         
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: failed to get SD info\r\n");
@@ -247,7 +245,7 @@ BYTE gotSDnoobCard(void)
     }
 
     if(!SDcard.isInit) {                            // if card not initialized, quit
-        if(SERIALDEBUG) { aux_sendString("!SDcard.isInit\n"); }
+        if(SERIALDEBUG) { aux_sendString("gotSDnoobCard - !SDcard.isInit\n"); }
         
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: card not present or not init\r\n");
@@ -257,7 +255,7 @@ BYTE gotSDnoobCard(void)
     }
 
     if(SDcard.SCapacity < 0x64000) {                // card smaller than 200 MB? don't use it
-        if(SERIALDEBUG) { aux_sendString("SCapacity too small\n"); }
+        if(SERIALDEBUG) { aux_sendString("gotSDnoobCard - SCapacity too small\n"); }
     
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: card too small, skipping\r\n");
@@ -275,7 +273,7 @@ BYTE gotSDnoobCard(void)
     }
 
     if(ires != E_OK) {          // failed to get info? quit
-        if(SERIALDEBUG) { aux_sendString("readWriteSector(MBR) failed\n"); }
+        if(SERIALDEBUG) { aux_sendString("gotSDnoobCard - readWriteSector(MBR) failed\n"); }
     
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: failed to read MBR\r\n");
@@ -285,7 +283,7 @@ BYTE gotSDnoobCard(void)
     }
 
     if(memcmp(pDmaBuffer + 3, "SDNOO", 5) != 0) {   // if it doesn't have SD NOOB marker, quit
-        if(SERIALDEBUG) { aux_sendString("not SD NOOB\n"); }
+        if(SERIALDEBUG) { aux_sendString("gotSDnoobCard - not SD NOOB\n"); }
     
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: card not SD NOOB, skipping\r\n");
@@ -307,7 +305,7 @@ BYTE gotSDnoobCard(void)
     }
 
     if(ires != E_OK) {                              // failed to get info? quit
-        if(SERIALDEBUG) { aux_sendString("readWriteSector(atariBootSector) failed\n"); }
+        if(SERIALDEBUG) { aux_sendString("gotSDnoobCard - readWriteSector(atariBootSector) failed\n"); }
     
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: failed to read boot sector\r\n");
@@ -336,6 +334,7 @@ BYTE gotSDnoobCard(void)
     SDbpb.bflags            = 1;                                    // bit 0=1 - 16 bit FAT, else 12 bit
 
     if(SERIALDEBUG) { 
+        aux_sendString("gotSDnoobCard - BPB:");
         aux_sendString("\n  recsiz: "); aux_hexWord(SDbpb.recsiz);
         aux_sendString("\n  clsiz : "); aux_hexWord(SDbpb.clsiz);
         aux_sendString("\n  clsizb: "); aux_hexWord(SDbpb.clsizb);

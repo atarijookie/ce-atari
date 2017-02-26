@@ -20,6 +20,7 @@
 #include "main.h"
 #include "mutex.h"
 #include "sd_noob.h"
+#include "serial.h"
 
 /*
  * CosmosEx GEMDOS driver by Jookie, 2013-2016
@@ -121,6 +122,7 @@ int main( int argc, char* argv[] )
 
     Supexec(set_longframe);
 
+    if(SERIALDEBUG) { aux_sendString("\n\nCE_DD.PRG start\n"); }
     //--------------------------------
     // don't install the driver is CTRL, ALT or SHIFT is pressed
 	BYTE kbshift = Kbshift(-1);
@@ -256,6 +258,8 @@ int main( int argc, char* argv[] )
 	// wait for a while so the user could read the message and quit
 	sleep(1);
 
+    if(SERIALDEBUG) { aux_sendString("\n\nCE_DD.PRG end\n"); }
+    
 	if(_runFromBootsector == 0) {	// if the prg was not run from boot sector, terminate and stay resident (execution ends here)
 		Ptermres( 0x100 + _base->p_tlen + _base->p_dlen + _base->p_blen, 0 );
 	}
