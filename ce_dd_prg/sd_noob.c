@@ -156,18 +156,16 @@ int readWriteSector(BYTE deviceId, BYTE readNotWrite, DWORD sectorNumber, BYTE s
 {
     BYTE cmd[CMD_LENGTH_SHORT];
 
-    memset(cmd, 0, 6);
-
     if(readNotWrite) {                              // read
         cmd[0] = (deviceId << 5) | SCSI_C_READ6;
     } else {                                        // write
         cmd[0] = (deviceId << 5) | SCSI_C_WRITE6;
     }
 
-    if(SERIALDEBUG) { aux_sendString("readWriteSector "); aux_hexByte(deviceId);            aux_sendChar(' '); 
-                                                          aux_hexByte(readNotWrite);        aux_sendChar(' '); 
+    if(SERIALDEBUG) { aux_sendString("readWriteSector "); aux_hexNibble(deviceId);          aux_sendChar(' '); 
+                                                          aux_hexNibble(readNotWrite);      aux_sendChar(' '); 
                                                           aux_hexDword(sectorNumber);       aux_sendChar(' '); 
-                                                          aux_hexDword(sectorCount);        aux_sendChar(' '); 
+                                                          aux_hexByte (sectorCount);        aux_sendChar(' '); 
                                                           aux_hexDword((DWORD) pBuffer);    aux_sendChar(' '); }
     
     cmd[1] = (sectorNumber >> 16) & 0x1f;           // 5 bits only (1 GB limit)
@@ -175,8 +173,9 @@ int readWriteSector(BYTE deviceId, BYTE readNotWrite, DWORD sectorNumber, BYTE s
     cmd[3] = (sectorNumber      );
 
     cmd[4] = sectorCount;                           // sector count
-
-    (*hdIf.cmd)(readNotWrite, cmd, CMD_LENGTH_SHORT, pBuffer, 1);
+    cmd[5] = 0;                                     // control = zero
+    
+    (*hdIf.cmd)(readNotWrite, cmd, CMD_LENGTH_SHORT, pBuffer, sectorCount);
 
     if(hdIf.success && hdIf.statusByte == OK) {     // if everything OK, success
         if(SERIALDEBUG) { aux_sendString(" E_OK\n"); }
@@ -397,7 +396,7 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
 
     if(SERIALDEBUG) { 
         aux_sendChar(' '); aux_hexNibble(useMidBuffer);
-        aux_sendChar(' '); aux_hexByte  (maxSectorCount);
+        aux_sendChar('\n'); 
     }
     
     // physical starting sector = the starting sector of partition + physical sector of where we want to start reading
@@ -425,13 +424,13 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
 
             if(ires == E_CHNG) {                            // if media changed, don't try anymore, tell TOS about this and he will hopefully re-read stuff
                 SDcard.mediaChanged = TRUE;
-                if(SERIALDEBUG) { aux_sendString(" E_CHNG\n"); }
+                if(SERIALDEBUG) { aux_sendString("SDnoobRwabs - E_CHNG\n"); }
                 return E_CHNG;
             }
         }
 
         if(ires != E_OK) {                                  // if failed, quit, and just return what the R/W function returned
-            if(SERIALDEBUG) { aux_sendString(" !E_OK\n"); }
+            if(SERIALDEBUG) { aux_sendString("SDnoobRwabs - !E_OK\n"); }
             return ires;
         }
 
@@ -441,7 +440,7 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
         pBuffer                 += thisByteCount;           // advance in the buffer
     }
 
-    if(SERIALDEBUG) { aux_sendString(" E_OK\n"); }
+    if(SERIALDEBUG) { aux_sendString("SDnoobRwabs - E_OK\n"); }
     return E_OK;                                            // if came here, everything is fine
 }
 //--------------------------------------------------
