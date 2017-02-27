@@ -108,30 +108,37 @@ DWORD ceCookieJar[2 * COOKIEJARSIZE];       // this might be the new cookie jar,
 // ------------------------------------------------------------------
 int main( int argc, char* argv[] )
 {
-	BYTE found;
-	int i;
+    //initialize lock
+    mutex_unlock(&mtx);
 
-	//initialize lock
-	mutex_unlock(&mtx);
-
-	// write some header out
-	Clear_home();
-	(void) Cconws("\33p[ CosmosEx disk driver  ]\r\n[ by Jookie 2013 - 2016 ]\r\n[        ver ");
+    // write some header out
+    Clear_home();
+    (void) Cconws("\33p[ CosmosEx disk driver  ]\r\n[ by Jookie 2013 - 2016 ]\r\n[        ver ");
     showAppVersion();
     (void) Cconws(" ]\33q\r\n\r\n");
+
+    pDmaBuffer      = (BYTE *)dmaBuffer;
+
+    // initialize internal stuff for Fsfirst and Fsnext
+    fsnextIsForUs   = 0;
+    pDtaBuffer      = (BYTE *)dtaBuffer;
 
     Supexec(set_longframe);
 
     if(SERIALDEBUG) { aux_sendString("\n\nCE_DD.PRG start\n"); }
-    //--------------------------------
-    // don't install the driver is CTRL, ALT or SHIFT is pressed
-	BYTE kbshift = Kbshift(-1);
 
-	if((kbshift & 0x0f) != 0) {
+//#define JUST_CEPI
+    
+    //--------------------------------
+#ifndef JUST_CEPI    
+    // don't install the driver is CTRL, ALT or SHIFT is pressed
+    BYTE kbshift = Kbshift(-1);
+
+    if((kbshift & 0x0f) != 0) {
         (void) Cconws("CTRL / ALT / SHIFT key pressed, not installing!\r\n" );
-		sleep(2);
-		return 0;
-	}
+        sleep(2);
+        return 0;
+    }
 
     //--------------------------------
     // set boot drive and quit if requested by user -- but only if running from bootsector -- purpose: allow games to be launched from floppy
@@ -140,6 +147,7 @@ int main( int argc, char* argv[] )
 
         (void) Cconws("Set boot drive WITHOUT CE_DD: \33p" );
         didSet = setBootDriveManual(2);
+        (void) Cconws("\33q\r\n" );
 
         if(didSet) {
             sleep(1);
@@ -147,26 +155,17 @@ int main( int argc, char* argv[] )
         }
     }
     //--------------------------------
-    (void) Cconws("\33q\r\n" );
+    // search for CosmosEx on ACSI bus
+    BYTE found = Supexec(findDevice);
 
-	pDmaBuffer = (BYTE *)dmaBuffer;
+    if(!found) {                                            // not found? quit
+        sleep(3);
+        return 0;
+    }
 
-	// initialize internal stuff for Fsfirst and Fsnext
-	fsnextIsForUs	= 0;
-	pDtaBuffer	= (BYTE *)dtaBuffer;
-
-	// search for CosmosEx on ACSI bus
-	found = Supexec(findDevice);
-	if(!found) {								            // not found? quit
-		sleep(3);
-		return 0;
-	}
-
-	// now set up the acsi command bytes so we don't have to deal with this one anymore
-	commandShort[0] = (deviceID << 5); 					    // cmd[0] = ACSI_id + TEST UNIT READY (0)
-
-	commandLong[0] = (deviceID << 5) | 0x1f;			    // cmd[0] = ACSI_id + ICD command marker (0x1f)
-	commandLong[1] = 0xA0;								    // cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)
+    // now set up the acsi command bytes so we don't have to deal with this one anymore
+    commandShort[0] = (deviceID << 5);                      // cmd[0] = ACSI_id + TEST UNIT READY (0)
+    commandLong [0] = (deviceID << 5) | 0x1f;               // cmd[0] = ACSI_id + ICD command marker (0x1f)
 
     //------------------------------
     // first check if we got the SD card and if it's SD NOOB, so if we have it, the ce_initialize() which will follow, will generate 'C' drive icon for SD card, too
@@ -174,15 +173,13 @@ int main( int argc, char* argv[] )
     Supexec(gotSDnoobCard);
 
     //------------------------------
-	// tell the device to initialize
-	Supexec(ce_initialize);
+    // tell the device to initialize
+    Supexec(ce_initialize);
 
-	// now init our internal vars
-	pDta				= (BYTE *) &tempDta[0];				// use this buffer as temporary one for DTA - just in case
-
-	currentDrive		= Dgetdrv();						// get the current drive from system
-
-	driveMap	        = Drvmap();						    // get the pre-installation drive map
+    // now init our internal vars
+    pDta            = (BYTE *) &tempDta[0];                 // use this buffer as temporary one for DTA - just in case
+    currentDrive    = Dgetdrv();                            // get the current drive from system
+    driveMap        = Drvmap();                             // get the pre-installation drive map
 
     Supexec(getConfig);                                     // get translated disk configuration, including date and time
 
@@ -191,9 +188,9 @@ int main( int argc, char* argv[] )
         (void) Cconws("Please use the newest version\r\n" );
         (void) Cconws("of \33pCE_DD.PRG\33q from config drive!\r\n" );
         (void) Cconws("\r\nDriver not installed!\r\n" );
-		sleep(2);
+        sleep(2);
         (void) Cnecin();
-		return 0;
+        return 0;
     }
 
     if(setDate) {                                           // now if we should set new date/time, then set it
@@ -203,24 +200,25 @@ int main( int argc, char* argv[] )
 
     showNetworkIPs();                                       // show IP addresses if possible
 
-	Supexec(updateCeDrives);								// update the ceDrives variable
+    Supexec(updateCeDrives);                                // update the ceDrives variable
 
-	initFunctionTable();
+    initFunctionTable();
 
-	for(i=0; i<MAX_FILES; i++) {
-		initFileBuffer(i);									// init the file buffers
-	}
+    int i;
+    for(i=0; i<MAX_FILES; i++) {
+        initFileBuffer(i);                                  // init the file buffers
+    }
 
-	// either remove the old one or do nothing, old memory isn't released
-	if( unhook_xbra( VEC_GEMDOS, 'CEDD' ) == 0L && unhook_xbra( VEC_BIOS, 'CEDD' ) == 0L ) {
-		(void)Cconws( "\r\nDriver installed.\r\n" );
-	} else {
-		(void)Cconws( "\r\nDriver reinstalled, some memory was lost.\r\n" );
-	}
+    // either remove the old one or do nothing, old memory isn't released
+    if( unhook_xbra( VEC_GEMDOS, 'CEDD' ) == 0L && unhook_xbra( VEC_BIOS, 'CEDD' ) == 0L ) {
+        (void)Cconws( "\r\nDriver installed.\r\n" );
+    } else {
+        (void)Cconws( "\r\nDriver reinstalled, some memory was lost.\r\n" );
+    }
 
-	// and now place the new gemdos handler
-	old_gemdos_handler	= Setexc( VEC_GEMDOS,	gemdos_handler );
-	old_bios_handler	= Setexc( VEC_BIOS,		bios_handler );
+    // and now place the new gemdos handler
+    old_gemdos_handler  = Setexc( VEC_GEMDOS,   gemdos_handler );
+    old_bios_handler    = Setexc( VEC_BIOS,     bios_handler );
 
     _driverInstalled = 1;                                   // mark that the driver was installed (and we don't want to Mfree() this RAM)
 
@@ -251,21 +249,25 @@ int main( int argc, char* argv[] )
         (void) Cconws(">>> ScreenShots VBL installed. <<<\r\n" );
         Supexec(init_screencapture);
     }
-
+#else
+    // if just want CEPI installed
+    hdd_if_select(IF_ACSI);    
+#endif
+    
     Supexec(installCEPIcookie);         // install the CEPI cookie
 
     //-------------------------------------
-	// wait for a while so the user could read the message and quit
-	sleep(1);
+    // wait for a while so the user could read the message and quit
+    sleep(1);
 
     if(SERIALDEBUG) { aux_sendString("\n\nCE_DD.PRG end\n"); }
-    
-	if(_runFromBootsector == 0) {	// if the prg was not run from boot sector, terminate and stay resident (execution ends here)
-		Ptermres( 0x100 + _base->p_tlen + _base->p_dlen + _base->p_blen, 0 );
-	}
 
-	// if the prg was run from bootsector, we will return and the asm code will do rts
-	return 0;
+    if(_runFromBootsector == 0) {       // if the prg was not run from boot sector, terminate and stay resident (execution ends here)
+        Ptermres( 0x100 + _base->p_tlen + _base->p_dlen + _base->p_blen, 0 );
+    }
+
+    // if the prg was run from bootsector, we will return and the asm code will do rts
+    return 0;
 }
 
 // send INITIALIZE command to the CosmosEx device telling it to do all the stuff it needs at start

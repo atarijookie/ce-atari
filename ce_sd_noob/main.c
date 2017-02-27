@@ -168,11 +168,16 @@ int main( int argc, char* argv[] )
         return 0;
     }
 
+    BYTE res;
+
+//#define WITHPASTI    
+    
+#ifndef WITHPASTI
     //-------------
     // Scan xCSI bus to find CE and CE_SD.
     // Use solo command to get if SD card is inserted, and its capacity.
     BYTE ceId;
-
+    
     scanXCSIbus();                  // scan xCSI bus and find everything (even non-CE devices)
     ceId = getCEid(TRUE);           // get first ID which belongs to CE
 
@@ -183,8 +188,6 @@ int main( int argc, char* argv[] )
         Cnecin();
         return 0;
     }
-
-    BYTE res;
 
     while(1) {
         res = getSDcardInfo(ceId);  // try to get the info about the card
@@ -248,6 +251,11 @@ int main( int argc, char* argv[] )
     showInt(SDcard.id, 1);
     (void) Cconws("\r\n");
 
+#else
+    // when running with PASTI
+    SDcard.id   = 0;
+#endif    
+    
     //-------------
     // read boot sector from SD card and show what's in it
     res = readBootsectorAndIdentifyContent();
