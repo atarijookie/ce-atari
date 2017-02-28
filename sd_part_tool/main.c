@@ -7,11 +7,13 @@
 #define  WORD unsigned short
 #define DWORD unsigned int
 
+char filePath[1024];
+
 void createEmptyImage(void)
 {
     printf("Creating image.\n");
 
-    FILE *f = fopen("hdd.img", "wb");
+    FILE *f = fopen(filePath, "wb");
     if(!f) {
         printf("Failed to create file\n");
         return;
@@ -44,7 +46,7 @@ void mapUsedSectors(void)
 {
     printf("Mapping used sectors image.\n");
 
-    FILE *f = fopen("hdd.img", "rb");
+    FILE *f = fopen(filePath, "rb");
     if(!f) {
         printf("Failed to open file\n");
         return;
@@ -177,7 +179,7 @@ void analyzeBootSector(void)
 {
     printf("\n\nAnalyzing boot sector...\n");
 
-    FILE *f = fopen("hdd.img", "rb");
+    FILE *f = fopen(filePath, "rb");
     if(!f) {
         printf("Failed to open file\n");
         return;
@@ -305,9 +307,17 @@ void showMenu(void)
     printf("Please press a key (and enter)\n");    
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     printf("\n\nSD partition tool.\n");
+
+    memset(filePath, 0, sizeof(filePath));
+    if(argc > 1) {                          // got argument? 
+        strcpy(filePath, argv[1]);
+    } else {                                // no argument?
+        strcpy(filePath, "hdd.img");
+    }
+    printf("Will use image file: %s\n", filePath);
 
     showMenu();
 
