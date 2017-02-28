@@ -12,6 +12,7 @@
 #include "version.h"
 #include "hdd_if.h"
 #include "stdlib.h"
+#include "serial.h"
 
 //--------------------------------------------------
 
@@ -25,13 +26,15 @@ void sleep(int seconds);
 void print_head(BYTE CEnotCS);
 void print_status(void);
 
-void showHexByte(BYTE val);
+void showHexByte (BYTE val);
+void showHexWord (WORD val);
 void showHexDword(DWORD val);
 void logMsg(char *logMsg);
 void deleteErrorLines(void);
 void speedTest(BYTE CEnotCS);
 void generateDataOnPartition(void);
 void doPartitionWriteOrVerify(BYTE writeNotVerify, BYTE testDrive, int testFileSizeMb, int testFileCount);
+void showBpb(void);
 
 void scanBusForCE(void);
 void getSDcardErrorCounters(BYTE doReset);
@@ -228,10 +231,13 @@ int main(void)
         showTestName('I', TRUE, "data from Hans continous read");
         (void) Cconws("\r\n");
 
-        // this runs either when we have full CE, or when we have SD card (can't generate data without it)
+        // this runs either when we have GEMDOS drive, or when we have SD card (can't generate data without it)
         (void) Cconws("\33pOther tests\33q\r\n");
-        BYTE hasWritablePartition = isCEnotCS || sdCardPresent;
-        showTestName('G', hasWritablePartition, "generated data on GEMDOS partition");
+        WORD drives = Drvmap();
+        BYTE hasGemdosDrive = (drives & 0xfffc) != 0;     // if there's some drive, except A: and B:, it has writable drive
+
+        showTestName('G', hasGemdosDrive, "generated data on GEMDOS partition");
+        showTestName('B', hasGemdosDrive, "show BPB of drive");
 
         // this runs only when SD card is present
         showTestName('S', sdCardPresent, "data from SD card continous read");
@@ -282,9 +288,10 @@ int main(void)
         }
 
         // this works only when there's a writtable partition
-        if(hasWritablePartition) {
-            if(key == 'g') {
-                generateDataOnPartition();      // higher level data generation 
+        if(hasGemdosDrive) {
+            switch(key) {
+            case 'g':   generateDataOnPartition();      break;  // higher level data generation 
+            case 'b':   showBpb();                      break;
             }
         }
         
@@ -379,6 +386,72 @@ int getIntFromUser(BYTE allowZero, BYTE maxDigits)
         intValue = (intValue * 10) + digit;     // append new digit
         gotDigits++;
     }
+}
+
+void outString(char *str)
+{
+    (void)  Cconws(str);
+    aux_sendString(str);
+}
+
+void outHexWord(WORD val)
+{
+    showHexWord(val);
+    aux_hexWord(val);
+}
+
+void showBpb(void)
+{
+    VT52_Clear_home();
+    (void) Cconws("Show BPB of drive\r\n");
+
+    WORD drives = Drvmap();
+    (void) Cconws("Choose drive               : ");
+    int i;
+    for(i=2; i<16; i++) {
+        if(drives & (1 << i)) {     // drive exists? show letter
+            Cconout('A' + i);
+        }
+    }
+    Cconout(' ');
+
+    BYTE testDriveLetter;
+    int  testDriveNumber;
+    while(1) {
+        BYTE key = Cnecin();
+
+        if(key >= 'a' && key <= 'z') {          // lower case letter? to upper case
+            key -= 32;
+        }
+
+        if(key < 'A' ||key > 'P') {             // out of char range? try again
+            continue;
+        }
+
+        testDriveNumber = key - 'A';            // transform char into index
+        if(drives & (1 << testDriveNumber)) {   // drive with that index exists? good
+            testDriveLetter = key;
+            break;
+        }
+    }
+
+    Cconout(testDriveLetter);
+
+    _BPB *testBpb = Getbpb(testDriveNumber);
+
+    (void) outString("\r\n\r\nBPB:");
+    (void) outString("\r\n  recsiz: "); outHexWord(testBpb->recsiz);
+    (void) outString("\r\n  clsiz : "); outHexWord(testBpb->clsiz);
+    (void) outString("\r\n  clsizb: "); outHexWord(testBpb->clsizb);
+    (void) outString("\r\n  rdlen : "); outHexWord(testBpb->rdlen);
+    (void) outString("\r\n  fsiz  : "); outHexWord(testBpb->fsiz);
+    (void) outString("\r\n  fatrec: "); outHexWord(testBpb->fatrec);
+    (void) outString("\r\n  datrec: "); outHexWord(testBpb->datrec);
+    (void) outString("\r\n  numcl : "); outHexWord(testBpb->numcl);
+    (void) outString("\r\n  bflags: "); outHexWord(testBpb->bflags);
+    (void) outString("\r\n");
+    
+    Cnecin();
 }
 
 void generateDataOnPartition(void)
@@ -521,7 +594,7 @@ void doPartitionWriteOrVerify(BYTE writeNotVerify, BYTE testDrive, int testFileS
         char testFilePath[32] = "X:\\TSTFILEY.BIN"; // pattern for filename
         
         testFilePath[ 0] = testDrive;               // store test drive letter
-        testFilePath[10] = i + '0';                 // store index to filename
+        testFilePath[10] = i + 'A';                 // store index to filename
 
         int f;
         if(writeNotVerify) {                        // for write
@@ -1177,6 +1250,12 @@ void showHexByte(BYTE val)
     tmp[2] = 0;
     
     (void) Cconws(tmp);
+}
+
+void showHexWord(WORD val)
+{
+    showHexByte((BYTE) (val >>  8));
+    showHexByte((BYTE)  val);
 }
 
 void showHexDword(DWORD val)
