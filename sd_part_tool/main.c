@@ -175,21 +175,8 @@ void reverseDword(DWORD *dw)
     pB[3] = a;
 }
 
-void analyzeBootSector(void)
+void analyzeMbr(char *data, int *firstPcSector, int *firstAtariSector)
 {
-    printf("\n\nAnalyzing boot sector...\n");
-
-    FILE *f = fopen(filePath, "rb");
-    if(!f) {
-        printf("Failed to open file\n");
-        return;
-    }
-
-    char data[512];
-
-    fseek(f, 0L, SEEK_SET);             // to sector #0
-    fread(data, 1, 512, f);
-
     PTE *pPte = (PTE *) &data[0x1BE];
 
     //----------------
@@ -232,16 +219,12 @@ void analyzeBootSector(void)
 
     printf("\n\n");
 
-    //----------------
-    // show 0th PC partition sector
-    int offset;
-    int firstPcSector       = pPte->firstLBA;
-    int firstAtariSector    = pAph->partStart;
+    *firstPcSector       = pPte->firstLBA;
+    *firstAtariSector    = pAph->partStart;
+}
 
-    offset = firstPcSector * 512;
-    fseek(f, offset, SEEK_SET);     // to 0th PC partition sector
-    fread(data, 1, 512, f);
-
+void analyzePcBootsector(char *data, int firstPcSector)
+{
     FAT16BS *pF16 = (FAT16BS *) data;
 
     printf("PC partition sector 0 (physical sector %08x):\n", firstPcSector);
@@ -268,13 +251,10 @@ void analyzeBootSector(void)
     printf("filesys type : %.8s\n",  pF16->extBPBP.fileSystemType);
 
     printf("\n\n");
+}
 
-    //----------------
-    // show 0th Atari partition sector
-    offset = firstAtariSector * 512;
-    fseek(f, offset, SEEK_SET);     // to 0th Atari partition sector
-    fread(data, 1, 512, f);
-
+void analyzeAtariBootsector(char *data, int firstAtariSector)
+{
     AtariBootsector *pAbs = (AtariBootsector *) data;
 
     printf("Atari partition sector 0 (physical sector %08x):\n", firstAtariSector);
@@ -292,7 +272,67 @@ void analyzeBootSector(void)
     printf("hidden sects : %d\n", pAbs->nhid);
 
     printf("\n\n");
+}
+
+void analyzeBootSector(void)
+{
+    printf("\n\nAnalyzing normal HDD (MBR, partitions, bootsectors)\n");
+
+    FILE *f = fopen(filePath, "rb");
+    if(!f) {
+        printf("Failed to open file\n");
+        return;
+    }
+
+    char data[512];
+
+    fseek(f, 0L, SEEK_SET);         // to sector #0
+    fread(data, 1, 512, f);
+
+    int offset;
+    int firstPcSector, firstAtariSector;
+    analyzeMbr(data, &firstPcSector, &firstAtariSector);
+
     //----------------
+    // show 0th PC partition sector
+
+    offset = firstPcSector * 512;
+    fseek(f, offset, SEEK_SET);     // to 0th PC partition sector
+    fread(data, 1, 512, f);
+
+    analyzePcBootsector(data, firstPcSector);
+
+    //----------------
+    // show 0th Atari partition sector
+    offset = firstAtariSector * 512;
+    fseek(f, offset, SEEK_SET);     // to 0th Atari partition sector
+    fread(data, 1, 512, f);
+
+    analyzeAtariBootsector(data, firstAtariSector);
+    //----------------
+
+    fclose(f);
+}
+
+void analyzeSuperfloppy(void)
+{
+    printf("\n\nanalyze super floppy (single partition, no MBR)\n");
+
+    FILE *f = fopen(filePath, "rb");
+    if(!f) {
+        printf("Failed to open file\n");
+        return;
+    }
+
+    char data[512];
+
+    fseek(f, 0L, SEEK_SET);         // to sector #0
+    fread(data, 1, 512, f);
+
+    //----------------
+    // show 0th partition sector
+
+    analyzePcBootsector(data, 0);
 
     fclose(f);
 }
@@ -303,7 +343,8 @@ void showMenu(void)
     printf("Q - quit\n");
     printf("C - create empty image\n");
     printf("M - map which sectors are used\n");
-    printf("B - analyze boot sector\n");
+    printf("B - analyze normal HDD (MBR, partitions, bootsectors)\n");
+    printf("F - analyze super floppy (single partition, no MBR)\n");
     printf("Please press a key (and enter)\n");    
 }
 
@@ -341,6 +382,11 @@ int main(int argc, char **argv)
 
         if(key == 'b') {
             analyzeBootSector();
+            validKey = 1;
+        }
+
+        if(key == 'f') {
+            analyzeSuperfloppy();
             validKey = 1;
         }
 
