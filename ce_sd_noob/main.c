@@ -74,7 +74,8 @@ void showSDcardCapacity (void);
 BYTE enableCEids        (BYTE ceId);
 
 BYTE readBootsectorAndIdentifyContent   (void);
-BYTE writeBootAndOtherSectors           (TBpb *partParams);
+BYTE writeBootAndOtherSectors_likeHddriver  (TBpb *partParams);
+BYTE writeBootAndOtherSectors_likeWin7      (TBpb *partParams);
 
 void showBpb(void);
 
@@ -170,7 +171,7 @@ int main( int argc, char* argv[] )
 
     BYTE res;
 
-//#define WITHPASTI    
+#define WITHPASTI
     
 #ifndef WITHPASTI
     //-------------
@@ -279,7 +280,7 @@ int main( int argc, char* argv[] )
     (void) Cconws("We're ready to partition your card.      \r\n");
     (void) Cconws("If you will proceed further, you will    \r\n");
     (void) Cconws("loose any existing data on the SD card.  \r\n");
-    (void) Cconws("To continue, type YES (or 'q' to quit).  \r\n");
+    (void) Cconws("To continue, type \33pYES\33q (or \33pQ\33q to quit).\r\n");
 
     while(1) {
         (void) Cconws("\r\nYour choice           : ");
@@ -298,7 +299,8 @@ int main( int argc, char* argv[] )
             return 0;
         }
 
-        if(answer[1] == 3 && memcmp(answer + 2, "YES", 3) == 0) {       // correct answer for continuing? good
+        if(  answer[1] == 3 && 
+            (memcmp(answer + 2, "YES", 3) == 0 || memcmp(answer + 2, "yes", 3) == 0) ) {    // correct answer for continuing? good
             break;
         }
     }
@@ -307,7 +309,7 @@ int main( int argc, char* argv[] )
 
     //-------------
     // if continuing, write boot sector and everything needed for partitioning
-    res = writeBootAndOtherSectors(partParams);
+    res = writeBootAndOtherSectors_likeWin7(partParams);
 
     if(!res) {
         (void) Cconws("\r\nPress any key to terminate...\r\n");
@@ -320,9 +322,9 @@ int main( int argc, char* argv[] )
     // show message that we're done and we need to reset the ST to apply new settings
     //            |                                        |
     (void) Cconws("\r\n");
-    (void) Cconws("The SD card was paritioned and SD NOOB  \r\n");
-    (void) Cconws("driver was activated. Reset your ST to  \r\n");
-    (void) Cconws("access your card...\r\n");
+    (void) Cconws("SD card was paritioned.                 \r\n");
+    (void) Cconws("SD NOOB driver was activated.           \r\n");
+    (void) Cconws("Reset your ST to access your card...    \r\n");
 
     Cnecin();
     return 0;
@@ -516,7 +518,7 @@ BYTE writeMBR(TBpb *partParams)
     return TRUE;
 }
 //--------------------------------------------
-BYTE writePcPartitionSector0(TBpb *partParams)
+BYTE writePcPartitionSector0(TBpb *partParams, DWORD toSectorNumber)
 {
     BYTE res;
 
@@ -541,12 +543,12 @@ BYTE writePcPartitionSector0(TBpb *partParams)
 
     storeIntelDword(pDmaBuffer + 0x27, serialNumber);                   // serial number
 
-    memcpy         (pDmaBuffer + 0x24, "SD NOOB    ", 11);              // Volume Label. A field once used to store the volume label.
+    memcpy         (pDmaBuffer + 0x2b, "SD NOOB    ", 11);              // Volume Label. A field once used to store the volume label.
     memcpy         (pDmaBuffer + 0x36, "FAT16   ",     8);              // File System Type, LONGLONG
 
     memcpy         (pDmaBuffer + 0x1fe, "\x55\xAA", 2);                 // End of Sector Marker
 
-    res = readWriteSector(SDcard.id, ACSI_WRITE, partParams->pHiddenSectors);
+    res = readWriteSector(SDcard.id, ACSI_WRITE, toSectorNumber);
 
     if(!res) {
         (void) Cconws("Failed to write PC part sector 0!\r\n");
@@ -591,7 +593,20 @@ BYTE writeAtariPartitionSector0(TBpb *partParams)
 }
 
 //--------------------------------------------
-BYTE writeBootAndOtherSectors(TBpb *partParams)
+BYTE writeBootAndOtherSectors_likeWin7(TBpb *partParams)
+{
+    BYTE res;
+
+    res = writePcPartitionSector0(partParams, 0);
+
+    if(!res) {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+//--------------------------------------------
+BYTE writeBootAndOtherSectors_likeHddriver(TBpb *partParams)
 {
     BYTE res;
 
@@ -601,7 +616,7 @@ BYTE writeBootAndOtherSectors(TBpb *partParams)
         return FALSE;
     }
 
-    res = writePcPartitionSector0(partParams);
+    res = writePcPartitionSector0(partParams, partParams->pHiddenSectors);
 
     if(!res) {
         return FALSE;
@@ -615,7 +630,6 @@ BYTE writeBootAndOtherSectors(TBpb *partParams)
 
     return TRUE;
 }
-
 //--------------------------------------------
 BYTE readBootsectorAndIdentifyContent(void)
 {
