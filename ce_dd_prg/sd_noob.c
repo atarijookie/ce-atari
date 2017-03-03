@@ -24,6 +24,7 @@
 void showInt(int value, int length);
 
 extern BYTE FastRAMBuffer[];
+extern WORD tosVersion;
 
 //--------------------------------------------------
 
@@ -31,6 +32,21 @@ TSDcard          SDcard;
 TSDnoobPartition SDnoobPartition;
 _BPB             SDbpb;
 
+//--------------------------------------------------
+DWORD getIntelDword(BYTE *p)
+{
+    DWORD val;
+
+    val  = p[3];
+    val  = val << 8;
+    val |= p[2];
+    val  = val << 8;
+    val |= p[1];
+    val  = val << 8;
+    val |= p[0];
+
+    return val;
+}
 //--------------------------------------------------
 WORD getIntelWord(BYTE *p)
 {
@@ -281,9 +297,10 @@ BYTE gotSDnoobCard(void)
         return FALSE;
     }
 
-    if(memcmp(pDmaBuffer + 3, "SDNOO", 5) != 0) {   // if it doesn't have SD NOOB marker, quit
+    //if(memcmp(pDmaBuffer + 3, "SDNOO", 5) != 0) {         // HDDRIVER like: if it doesn't have SD NOOB marker, quit
+    if(memcmp(pDmaBuffer + 0x2b, "SD NOOB", 7) != 0) {      // Win7     like: if it doesn't have SD NOOB marker, quit
         if(SERIALDEBUG) { aux_sendString("gotSDnoobCard - not SD NOOB\n"); }
-    
+
         if(SDnoobPartition.verboseInit) {
             (void) Cconws("SD NOOB: card not SD NOOB, skipping\r\n");
         }
@@ -291,43 +308,28 @@ BYTE gotSDnoobCard(void)
         return FALSE;
     }
 
-    DWORD *p_st     = (DWORD *) (pDmaBuffer + 0x1e2);
-    DWORD *p_size   = (DWORD *) (pDmaBuffer + 0x1e6);
-
-    SDnoobPartition.sectorStart = *p_st;            // p_st   - starting at sector - right after the PC starting sector
-    SDnoobPartition.sectorCount = *p_size;          // p_size - store partition size in sectors
-
-    ires = readWriteSector(SDcard.id, ACSI_READ, SDnoobPartition.sectorStart, 1, pDmaBuffer);       // read Atari boot sector
-
-    if(ires == E_CHNG) {                            // if first read ended with media change, try again, the 2nd read will probably succeed
-        ires = readWriteSector(SDcard.id, ACSI_READ, SDnoobPartition.sectorStart, 1, pDmaBuffer);   // again: read Atari boot sector
-    }
-
-    if(ires != E_OK) {                              // failed to get info? quit
-        if(SERIALDEBUG) { aux_sendString("gotSDnoobCard - readWriteSector(atariBootSector) failed\n"); }
-    
-        if(SDnoobPartition.verboseInit) {
-            (void) Cconws("SD NOOB: failed to read boot sector\r\n");
-        }
-
-        return FALSE;
-    }
+    SDnoobPartition.sectorStart = getIntelWord (pDmaBuffer + 0x0e);     // reserved sectors - starting sector of partition
+    SDnoobPartition.sectorCount = getIntelDword(pDmaBuffer + 0x20);     // large sectors    - partition size in sectors
 
     //-----------------------
-    // fill the BPB structure for usage 
-    SDbpb.recsiz            = getIntelWord(pDmaBuffer + 0x0b);      // bytes per atari sector
-    SDbpb.clsiz             = pDmaBuffer  [             0x0d];      // sectors per cluster 
+    // fill the BPB structure for usage
+
+    WORD bytesPerSector = (tosVersion <= 0x102) ? 0x2000 : 0x1000;  // TOS 1.02 and less? 8kBPS, otherwise 4kBPS
+    WORD rootDirLength  = (tosVersion <= 0x102) ? 2      : 4;       // size of root dir entries in atari sectors
+    WORD fatSize        = (tosVersion <= 0x102) ? 0x04   : 0x10;    // size of FAT in Atari sectors
+
+    SDbpb.recsiz            = bytesPerSector;                       // bytes per atari sector
+    SDbpb.clsiz             = 2;                                    // sectors per cluster 
     SDbpb.clsizb            = SDbpb.clsiz * SDbpb.recsiz;           // bytes per cluster = sectors per cluster * bytes per sector
-    SDbpb.rdlen             = 2;                                    // sector length of root directory 
-    SDbpb.fsiz              = getIntelWord(pDmaBuffer + 0x16);      // sectors per FAT 
+    SDbpb.rdlen             = rootDirLength;                        // sector length of root directory 
+    SDbpb.fsiz              = fatSize;                              // sectors per FAT 
     SDbpb.fatrec            = 1 + SDbpb.fsiz;                       // starting sector of second FAT (boot sector on 0, then FAT1 of size fsiz)
 
-    WORD ndirs              = getIntelWord(pDmaBuffer + 0x11);      // NDIRS - number of ROOT directory entries
-    WORD rootDirSizeInAtariSectors = (ndirs * 32) / SDbpb.recsiz;   // size of ROOT directory, in Atari sectors = (count_of_root_dir_entries * 32B) / bytes_per_atari_sector
+    WORD rootDirSizeInAtariSectors = (512 * 32) / SDbpb.recsiz;     // size of ROOT directory, in Atari sectors = (count_of_root_dir_entries * 32B) / bytes_per_atari_sector
 
     SDbpb.datrec            = SDbpb.fatrec + SDbpb.fsiz + rootDirSizeInAtariSectors;    // start of data = start_of_FAT2 + size_of_FAT + size_of_root_dir_in_sectors
 
-    WORD atariSectorsCount  = getIntelWord(pDmaBuffer + 0x13);                          // how many Atari sectors we have (which have more than 1 real 512 B sectors)
+    WORD atariSectorsCount  = SDnoobPartition.sectorCount / bytesPerSector;             // how many Atari sectors we have (which have more than 1 real 512 B sectors)
     SDbpb.numcl             = (atariSectorsCount - SDbpb.datrec) / SDbpb.clsiz;         // number of clusters = (count_of_atari_sectors - sector_where_the_clusters_start) / sectors_per_cluster
 
     SDbpb.bflags            = 1;                                    // bit 0=1 - 16 bit FAT, else 12 bit

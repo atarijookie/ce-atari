@@ -86,6 +86,9 @@ BYTE currentDrive;
 WORD driveMap;
 BYTE configDrive;
 
+WORD tosVersion;
+void getTOSversion(void);
+
 BYTE setDate;
 int year, month, day, hours, minutes, seconds;
 BYTE netConfig[10];
@@ -119,6 +122,8 @@ int main( int argc, char* argv[] )
 
     pDmaBuffer      = (BYTE *)dmaBuffer;
 
+    Supexec(getTOSversion);
+    
     // initialize internal stuff for Fsfirst and Fsnext
     fsnextIsForUs   = 0;
     pDtaBuffer      = (BYTE *)dtaBuffer;
@@ -270,15 +275,19 @@ int main( int argc, char* argv[] )
     return 0;
 }
 
+void getTOSversion(void)
+{
+    BYTE  *pSysBase     = (BYTE *) 0x000004F2;
+    BYTE  *ppSysBase    = (BYTE *)  ((DWORD )  *pSysBase);                      // get pointer to TOS address
+    tosVersion    = (WORD  ) *(( WORD *) (ppSysBase + 2));                // TOS +2: TOS version
+}
+
 // send INITIALIZE command to the CosmosEx device telling it to do all the stuff it needs at start
 void ce_initialize(void)
 {
 	commandShort[0] = (deviceID << 5); 					                        // cmd[0] = ACSI_id + TEST UNIT READY (0)
 	commandShort[4] = GD_CUSTOM_initialize;
 
-    BYTE  *pSysBase     = (BYTE *) 0x000004F2;
-    BYTE  *ppSysBase    = (BYTE *)  ((DWORD )  *pSysBase);                      // get pointer to TOS address
-    WORD  tosVersion    = (WORD  ) *(( WORD *) (ppSysBase + 2));                // TOS +2: TOS version
     SET_WORD(pDmaBuffer + 0, tosVersion);                                       //  0, 1: store tos version
 
     WORD resolution     = Getrez();

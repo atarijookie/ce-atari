@@ -178,7 +178,7 @@ int main( int argc, char* argv[] )
 
     BYTE res;
 
-//#define WITHPASTI
+#define WITHPASTI
     
 #ifndef WITHPASTI
     //-------------
@@ -708,8 +708,9 @@ BYTE readBootsectorAndIdentifyContent(void)
 
     if(sum == 0x1234) {                                                 // atari bootsector checksum ok?
         (void) Cconws("bootable code\r\n");
-    } else if(memcmp(pDmaBuffer + 3, "SDNOO", 5) == 0) {                // SD noob signature?
-        (void) Cconws("SD NOOB signature\r\n");
+//  } else if(memcmp(pDmaBuffer + 3, "SDNOO", 5) == 0) {                // HDDRIVER like: SD noob signature?
+    } else if(memcmp(pDmaBuffer + 0x2b, "SD NOOB", 7) == 0) {           // Win7     like: SD noob signature?
+        (void) Cconws("SD NOOB part.\r\n");
     } else if(pDmaBuffer[510] == 0x55 && pDmaBuffer[511] == 0xaa) {     // PC boot signature?
         (void) Cconws("PC partition\r\n");
     } else {                                                            // there's something else in the boot sector
@@ -1063,37 +1064,5 @@ void showHexWord(WORD val)
 {
     showHexByte((BYTE) (val >>  8));
     showHexByte((BYTE)  val);
-}
-//--------------------------------------------------
- void showBpb(void)
-{
-    _BPB *bpb = Getbpb(2);
-
-    if(bpb == NULL) {
-        (void) Cconws("Getbpbp(2) failed.\r\n");
-        Cnecin();
-        return;
-    }
-
-    (void) Cconws("\r\nrecsiz - bps: ");
-    showHexWord(bpb->recsiz);
-    (void) Cconws("\r\nclsiz  - spc: ");
-    showHexWord(bpb->clsiz);
-    (void) Cconws("\r\nclsizb - bpc: ");
-    showHexWord(bpb->clsizb);
-    (void) Cconws("\r\nrdlen  - rds: ");
-    showHexWord(bpb->rdlen);
-    (void) Cconws("\r\nfsiz   - sof: ");
-    showHexWord(bpb->fsiz);
-    (void) Cconws("\r\nfatrec - s2f: ");
-    showHexWord(bpb->fatrec);
-    (void) Cconws("\r\ndatrec - 1ds: ");
-    showHexWord(bpb->datrec);
-    (void) Cconws("\r\nnumcl  - noc: ");
-    showHexWord(bpb->numcl);
-    (void) Cconws("\r\nbflags - fla: ");
-    showHexWord(bpb->bflags);
-
-    Cnecin();
 }
 //--------------------------------------------------
