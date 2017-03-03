@@ -311,6 +311,12 @@ BYTE gotSDnoobCard(void)
     SDnoobPartition.sectorStart = getIntelWord (pDmaBuffer + 0x0e);     // reserved sectors - starting sector of partition
     SDnoobPartition.sectorCount = getIntelDword(pDmaBuffer + 0x20);     // large sectors    - partition size in sectors
 
+    if(SERIALDEBUG) { 
+        aux_sendString("gotSDnoobCard() - part sector start: ");    aux_hexWord(SDnoobPartition.sectorStart);
+        aux_sendString(", count: ");                                aux_hexWord(SDnoobPartition.sectorCount);
+        aux_sendString("\n");
+    }
+
     //-----------------------
     // fill the BPB structure for usage
 
@@ -321,8 +327,8 @@ BYTE gotSDnoobCard(void)
     SDbpb.recsiz            = bytesPerSector;                       // bytes per atari sector
     SDbpb.clsiz             = 2;                                    // sectors per cluster 
     SDbpb.clsizb            = SDbpb.clsiz * SDbpb.recsiz;           // bytes per cluster = sectors per cluster * bytes per sector
-    SDbpb.rdlen             = rootDirLength;                        // sector length of root directory 
-    SDbpb.fsiz              = fatSize;                              // sectors per FAT 
+    SDbpb.rdlen             = rootDirLength;                        // sector length of root directory
+    SDbpb.fsiz              = fatSize;                              // sectors per FAT
     SDbpb.fatrec            = 1 + SDbpb.fsiz;                       // starting sector of second FAT (boot sector on 0, then FAT1 of size fsiz)
 
     WORD rootDirSizeInAtariSectors = (512 * 32) / SDbpb.recsiz;     // size of ROOT directory, in Atari sectors = (count_of_root_dir_entries * 32B) / bytes_per_atari_sector
@@ -404,6 +410,12 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
     // physical starting sector = the starting sector of partition + physical sector of where we want to start reading
     DWORD physicalStartingSector    = SDnoobPartition.sectorStart + (logicalStartingSector * SDnoobPartition.physicalPerAtariSector);
     DWORD physicalSectorCount       = logicalSectorCount * SDnoobPartition.physicalPerAtariSector;
+
+    if(SERIALDEBUG) { 
+        aux_sendString("sector start: "); aux_hexDword(physicalStartingSector);
+        aux_sendString(", count: ");      aux_hexDword(physicalSectorCount);
+        aux_sendChar('\n'); 
+    }
 
     while(physicalSectorCount > 0) {
         DWORD thisSectorCount   = (physicalSectorCount < maxSectorCount) ? physicalSectorCount : maxSectorCount;    // will the needed read size be within the blockSize, or not?

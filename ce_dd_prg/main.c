@@ -135,7 +135,7 @@ int main( int argc, char* argv[] )
 //#define JUST_CEPI
     
     //--------------------------------
-#ifndef JUST_CEPI    
+#ifndef JUST_CEPI
     // don't install the driver is CTRL, ALT or SHIFT is pressed
     BYTE kbshift = Kbshift(-1);
 

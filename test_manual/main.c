@@ -47,6 +47,9 @@ void SDread(void);
 BYTE showLogs = 1;
 void showMenu(void);
 
+void doRwabs(void);
+void showBpb(void);
+
 void logMsg(char *logMsg);
 
 #define RW_TEST_SIZE    MAXSECTORS
@@ -381,6 +384,16 @@ int main(void)
             showMenu();
             continue;
         }
+        
+        if(key == 'a') {
+            doRwabs();
+            continue;
+        }
+
+        if(key == 'b') {
+            showBpb();
+            continue;
+        }
     }
 
     Mfree(pBufferOrig);             // release the memory
@@ -402,6 +415,8 @@ void showMenu(void)
     (void) Cconws("w - CE WRITE test\r\n");
     (void) Cconws("L - large read\r\n");
     (void) Cconws("f - Find device on SCSI\r\n");
+    (void) Cconws("a - Rwabs, C:, 1 sector\r\n");
+    (void) Cconws("b - show BPB C:\r\n");
     (void) Cconws("c - clear screen\r\n");
     (void) Cconws("Q - quit\r\n\r\n");
 }
@@ -849,6 +864,77 @@ void showInt(int value, int length)
     }
 
     (void) Cconws(tmp);                     // write it out
+}
+
+//--------------------------------------------------
+void showBpb(void)
+{
+    _BPB *testBpb = Getbpb(2);
+
+    (void) Cconws("\r\n\r\nBPB:");
+    (void) Cconws("\r\n  recsiz: "); showHexWord(testBpb->recsiz);
+    (void) Cconws("\r\n  clsiz : "); showHexWord(testBpb->clsiz);
+    (void) Cconws("\r\n  clsizb: "); showHexWord(testBpb->clsizb);
+    (void) Cconws("\r\n  rdlen : "); showHexWord(testBpb->rdlen);
+    (void) Cconws("\r\n  fsiz  : "); showHexWord(testBpb->fsiz);
+    (void) Cconws("\r\n  fatrec: "); showHexWord(testBpb->fatrec);
+    (void) Cconws("\r\n  datrec: "); showHexWord(testBpb->datrec);
+    (void) Cconws("\r\n  numcl : "); showHexWord(testBpb->numcl);
+    (void) Cconws("\r\n  bflags: "); showHexWord(testBpb->bflags);
+    (void) Cconws("\r\n");
+}
+//--------------------------------------------------
+    
+BYTE isSectorUsed(BYTE *buffer, DWORD sectorNo, BYTE notUsedValue)
+{
+    int i;
+    
+    buffer += sectorNo * 512;               // move to the right sector in buffer
+    
+    for(i=0; i<512; i++) {
+        if(buffer[i] != notUsedValue) {     // if value found, which isn't not used value, it's used
+            return TRUE;
+        }
+    }
+    
+    return FALSE;                           // no other than notUsedValue found
+}
+
+void doRwabs(void)
+{
+    (void) Cconws("Rwabs() test.\r\n");
+    int res, i, used;
+
+    memset(pBuffer, 0, 64 * 1024);
+    res = Rwabs(0, pBuffer, 1, 0, 2);
+
+    (void) Cconws("Rwabs() returned       :");
+    showHexDword(res);
+    (void) Cconws("\r\n");
+
+    used = 0;
+    for(i=0; i<64; i++) {
+        if(isSectorUsed(pBuffer, i, 0)) {
+            used++;
+        }
+    }    
+    (void) Cconws("Found used sectors (00): ");
+    showHexByte(used);
+    (void) Cconws("\r\n");
+
+    //---------------------
+    memset(pBuffer, 0xff, 64 * 1024);
+    res = Rwabs(0, pBuffer, 1, 0, 2);
+
+    used = 0;
+    for(i=0; i<64; i++) {
+        if(isSectorUsed(pBuffer, i, 0xff)) {
+            used++;
+        }
+    }    
+    (void) Cconws("Found used sectors (ff): ");
+    showHexByte(used);
+    (void) Cconws("\r\n");
 }
 
 //--------------------------------------------------
