@@ -316,7 +316,7 @@ int main( int argc, char* argv[] )
 
     //-------------
     // if continuing, write boot sector and everything needed for partitioning
-    PcSectorsPosition pcSectPos = {0, 8, 136, 254};
+    PcSectorsPosition pcSectPos = {0, 8, 136, 264};
     res = writeBootAndOtherSectors_likeWin7(partParams, pcSectPos);
 
     if(!res) {
@@ -623,7 +623,7 @@ BYTE writeRootDirWithPartitionName(DWORD sectorNo)
 
     memset(pDmaBuffer     , 0, 512);
     memcpy(pDmaBuffer     , "SD NOOB    \x08", 12);                  // partition name and VOLUME LABEL flag
-    memcpy(pDmaBuffer + 16, "\xEF\x5B\x63\x4A", 4);                  // some fake date and time
+    memcpy(pDmaBuffer + 22, "\xEF\x5B\x63\x4A", 4);                  // some fake date and time
 
     res = readWriteSector(SDcard.id, ACSI_WRITE, sectorNo);
 
