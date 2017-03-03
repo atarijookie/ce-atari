@@ -49,6 +49,13 @@ typedef struct {
     WORD  aSectorsPerFat;
 } TBpb;
 
+typedef struct {
+    DWORD bootsector;
+    DWORD fat1;
+    DWORD fat2;
+    DWORD rootDirEntry;
+} PcSectorsPosition;
+
 TBpb bpb0255 = { 256, 0x07F800,   0x10, 0x0009, 0x0040, 0x003a, 0x0009, 0x003a,   0x2000, 0x02, 0x0004};
 TBpb bpb0511 = { 512, 0x0FF800,   0x20, 0x0011, 0x0080, 0x003e, 0x0011, 0x003e,   0x2000, 0x01, 0x0008};
 TBpb bpb1023 = {1024, 0x1FF800,   0x40, 0x0021, 0x0080, 0x003f, 0x0021, 0x003f,   0x4000, 0x02, 0x0004};
@@ -75,7 +82,7 @@ BYTE enableCEids        (BYTE ceId);
 
 BYTE readBootsectorAndIdentifyContent   (void);
 BYTE writeBootAndOtherSectors_likeHddriver  (TBpb *partParams);
-BYTE writeBootAndOtherSectors_likeWin7      (TBpb *partParams);
+BYTE writeBootAndOtherSectors_likeWin7      (TBpb *partParams, PcSectorsPosition pcSectPos);
 
 void showBpb(void);
 
@@ -171,7 +178,7 @@ int main( int argc, char* argv[] )
 
     BYTE res;
 
-#define WITHPASTI
+//#define WITHPASTI
     
 #ifndef WITHPASTI
     //-------------
@@ -309,7 +316,8 @@ int main( int argc, char* argv[] )
 
     //-------------
     // if continuing, write boot sector and everything needed for partitioning
-    res = writeBootAndOtherSectors_likeWin7(partParams);
+    PcSectorsPosition pcSectPos = {0, 8, 136, 254};
+    res = writeBootAndOtherSectors_likeWin7(partParams, pcSectPos);
 
     if(!res) {
         (void) Cconws("\r\nPress any key to terminate...\r\n");
@@ -591,13 +599,65 @@ BYTE writeAtariPartitionSector0(TBpb *partParams)
 
     return TRUE;
 }
-
 //--------------------------------------------
-BYTE writeBootAndOtherSectors_likeWin7(TBpb *partParams)
+BYTE writeFATtable(DWORD sectorNo)
 {
     BYTE res;
 
-    res = writePcPartitionSector0(partParams, 0);
+    memset(pDmaBuffer, 0, 512);
+    memcpy(pDmaBuffer, "\xF8\xFF\xFF\xFF", 4);
+
+    res = readWriteSector(SDcard.id, ACSI_WRITE, sectorNo);
+
+    if(!res) {
+        (void) Cconws("Failed to write FAT table!\r\n");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+//--------------------------------------------
+BYTE writeRootDirWithPartitionName(DWORD sectorNo)
+{
+    BYTE res;
+
+    memset(pDmaBuffer     , 0, 512);
+    memcpy(pDmaBuffer     , "SD NOOB    \x08", 12);                  // partition name and VOLUME LABEL flag
+    memcpy(pDmaBuffer + 16, "\xEF\x5B\x63\x4A", 4);                  // some fake date and time
+
+    res = readWriteSector(SDcard.id, ACSI_WRITE, sectorNo);
+
+    if(!res) {
+        (void) Cconws("Failed to write root dir entries.\r\n");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+//--------------------------------------------
+BYTE writeBootAndOtherSectors_likeWin7(TBpb *partParams, PcSectorsPosition pcSectPos)
+{
+    BYTE res;
+
+    res = writePcPartitionSector0(partParams, pcSectPos.bootsector);
+
+    if(!res) {
+        return FALSE;
+    }
+
+    res = writeFATtable(pcSectPos.fat1);
+
+    if(!res) {
+        return FALSE;
+    }
+
+    res = writeFATtable(pcSectPos.fat2);
+
+    if(!res) {
+        return FALSE;
+    }
+
+    res = writeRootDirWithPartitionName(pcSectPos.rootDirEntry);
 
     if(!res) {
         return FALSE;
