@@ -82,7 +82,7 @@ BYTE enableCEids        (BYTE ceId);
 
 BYTE readBootsectorAndIdentifyContent   (void);
 BYTE writeBootAndOtherSectors_likeHddriver  (TBpb *partParams);
-BYTE writeBootAndOtherSectors_likeWin7      (TBpb *partParams, PcSectorsPosition pcSectPos);
+BYTE writeBootAndOtherSectors_likeWin7      (TBpb *partParams);
 
 void showBpb(void);
 
@@ -178,8 +178,8 @@ int main( int argc, char* argv[] )
 
     BYTE res;
 
-#define WITHPASTI
-    
+//#define WITHPASTI
+
 #ifndef WITHPASTI
     //-------------
     // Scan xCSI bus to find CE and CE_SD.
@@ -316,8 +316,7 @@ int main( int argc, char* argv[] )
 
     //-------------
     // if continuing, write boot sector and everything needed for partitioning
-    PcSectorsPosition pcSectPos = {0, 8, 136, 264};
-    res = writeBootAndOtherSectors_likeWin7(partParams, pcSectPos);
+    res = writeBootAndOtherSectors_likeWin7(partParams);
 
     if(!res) {
         (void) Cconws("\r\nPress any key to terminate...\r\n");
@@ -635,9 +634,17 @@ BYTE writeRootDirWithPartitionName(DWORD sectorNo)
     return TRUE;
 }
 //--------------------------------------------
-BYTE writeBootAndOtherSectors_likeWin7(TBpb *partParams, PcSectorsPosition pcSectPos)
+BYTE writeBootAndOtherSectors_likeWin7(TBpb *partParams)
 {
     BYTE res;
+    
+    PcSectorsPosition pcSectPos;
+    pcSectPos.bootsector    = 0;
+    pcSectPos.fat1          = partParams->pReservedSectors;
+    pcSectPos.fat2          = pcSectPos.fat1 + partParams->pSectorsPerFat;
+    pcSectPos.rootDirEntry  = pcSectPos.fat2 + partParams->pSectorsPerFat;
+
+    partParams->pHiddenSectors = 0;     // This field should always be zero on media that are not partitioned.
 
     res = writePcPartitionSector0(partParams, pcSectPos.bootsector);
 
