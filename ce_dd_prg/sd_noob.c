@@ -312,33 +312,31 @@ BYTE gotSDnoobCard(void)
     SDnoobPartition.sectorCount = getIntelDword(pDmaBuffer + 0x20);     // large sectors    - partition size in sectors
 
     if(SERIALDEBUG) { 
-        aux_sendString("gotSDnoobCard() - part sector start: ");    aux_hexWord(SDnoobPartition.sectorStart);
-        aux_sendString(", count: ");                                aux_hexWord(SDnoobPartition.sectorCount);
+        aux_sendString("gotSDnoobCard() - part sector start: ");    aux_hexWord (SDnoobPartition.sectorStart);
+        aux_sendString(", count: ");                                aux_hexDword(SDnoobPartition.sectorCount);
         aux_sendString("\n");
     }
 
     //-----------------------
     // fill the BPB structure for usage
+    // note: AS stands for Atari Sectors (which are larger than normal 512 sectors)
+    WORD sectorsPerFat      = getIntelWord (pDmaBuffer + 0x16);                 // how many 512 B sectors will FAT have (0x40 or 0x80)
+    WORD sectorsPerAS       = (tosVersion <= 0x102) ? 16 : 8;                   // how many 512 B sectors will be in Atari sector? TOS 1.02 will have 16 s (8 kB), newer will have 8 s (4 kB)
+    WORD bytesPerAS         = sectorsPerAS * 512;                               // TOS 1.02 and less? 8kBPS, otherwise 4kBPS
+    WORD rootDirSizeAS      = (512 * 32) / bytesPerAS;                          // size of ROOT directory, in Atari sectors = (count_of_root_dir_entries * 32B) / bytes_per_atari_sector
 
-    WORD bytesPerSector = (tosVersion <= 0x102) ? 0x2000 : 0x1000;  // TOS 1.02 and less? 8kBPS, otherwise 4kBPS
-    WORD rootDirLength  = (tosVersion <= 0x102) ? 2      : 4;       // size of root dir entries in atari sectors
-    WORD fatSize        = (tosVersion <= 0x102) ? 0x04   : 0x10;    // size of FAT in Atari sectors
+    SDbpb.recsiz            = bytesPerAS;                                       // bytes per atari sector (8 kB / 4 kB)
+    SDbpb.clsiz             = 2;                                                // sectors per cluster 
+    SDbpb.clsizb            = SDbpb.clsiz * SDbpb.recsiz;                       // bytes per cluster = sectors per cluster * bytes per sector
+    SDbpb.rdlen             = rootDirSizeAS;                                    // sector length of root directory
+    SDbpb.fsiz              = sectorsPerFat / sectorsPerAS;                     // sectors per FAT
+    SDbpb.fatrec            = 1 + SDbpb.fsiz;                                   // starting sector of second FAT (boot sector on 0, then FAT1 of size fsiz)
+    SDbpb.datrec            = SDbpb.fatrec + SDbpb.fsiz + SDbpb.rdlen;          // start of data = start_of_FAT2 + size_of_FAT + size_of_root_dir_in_sectors
 
-    SDbpb.recsiz            = bytesPerSector;                       // bytes per atari sector
-    SDbpb.clsiz             = 2;                                    // sectors per cluster 
-    SDbpb.clsizb            = SDbpb.clsiz * SDbpb.recsiz;           // bytes per cluster = sectors per cluster * bytes per sector
-    SDbpb.rdlen             = rootDirLength;                        // sector length of root directory
-    SDbpb.fsiz              = fatSize;                              // sectors per FAT
-    SDbpb.fatrec            = 1 + SDbpb.fsiz;                       // starting sector of second FAT (boot sector on 0, then FAT1 of size fsiz)
+    WORD atariSectorsCount  = SDnoobPartition.sectorCount / sectorsPerAS;       // how many Atari sectors we have (which have more than 1 real 512 B sectors)
+    SDbpb.numcl             = (atariSectorsCount - SDbpb.datrec) / SDbpb.clsiz; // number of clusters = (count_of_atari_sectors - sector_where_the_clusters_start) / sectors_per_cluster
 
-    WORD rootDirSizeInAtariSectors = (512 * 32) / SDbpb.recsiz;     // size of ROOT directory, in Atari sectors = (count_of_root_dir_entries * 32B) / bytes_per_atari_sector
-
-    SDbpb.datrec            = SDbpb.fatrec + SDbpb.fsiz + rootDirSizeInAtariSectors;    // start of data = start_of_FAT2 + size_of_FAT + size_of_root_dir_in_sectors
-
-    WORD atariSectorsCount  = SDnoobPartition.sectorCount / bytesPerSector;             // how many Atari sectors we have (which have more than 1 real 512 B sectors)
-    SDbpb.numcl             = (atariSectorsCount - SDbpb.datrec) / SDbpb.clsiz;         // number of clusters = (count_of_atari_sectors - sector_where_the_clusters_start) / sectors_per_cluster
-
-    SDbpb.bflags            = 1;                                    // bit 0=1 - 16 bit FAT, else 12 bit
+    SDbpb.bflags            = 1;                                                // bit 0=1 - 16 bit FAT, else 12 bit
 
     if(SERIALDEBUG) { 
         aux_sendString("gotSDnoobCard - BPB:");

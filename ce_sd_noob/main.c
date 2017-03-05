@@ -158,8 +158,12 @@ int main( int argc, char* argv[] )
     } else {                            // TOS 4.0x
         partParams = &bpb1023;
         (void) Cconws("1024 MB\r\n");
-    } 
-
+    }
+    
+    WORD sectorsPerAS               = (tosVersion <= 0x102) ? 16 : 8;   // how many 512 B sectors will be in Atari sector? TOS 1.02 will have 16 s (8 kB), newer will have 8 s (4 kB)
+    partParams->pReservedSectors    = sectorsPerAS;                     // this is where FAT1 starts, needs to be on 1st Atari sector boundary
+    partParams->pSectorsPerCluster  = sectorsPerAS * 2;                 // to match SPC on Atari, this should be the same
+    
     //-------------
     // find CE_DD API in cookie jar
     Supexec(getCE_API);
