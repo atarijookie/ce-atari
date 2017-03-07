@@ -2,7 +2,6 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -22,6 +21,7 @@
 
 // ------------------------------------------------------------------
 void showInt(int value, int length);
+void msleepInSuper(int ms);
 
 extern BYTE FastRAMBuffer[];
 extern WORD tosVersion;
@@ -308,7 +308,7 @@ BYTE gotSDnoobCard(void)
         return FALSE;
     }
 
-    SDnoobPartition.sectorStart = getIntelWord (pDmaBuffer + 0x0e);     // reserved sectors - starting sector of partition
+    SDnoobPartition.sectorStart = 0;                                    // starting sector of partition - where the partition has boot sector 
     SDnoobPartition.sectorCount = getIntelDword(pDmaBuffer + 0x20);     // large sectors    - partition size in sectors
 
     if(SERIALDEBUG) { 
@@ -361,12 +361,12 @@ BYTE gotSDnoobCard(void)
         Cconout(SDnoobPartition.driveNo + 'A');
         (void) Cconws("\33q, size: ");
 
-        DWORD megaBytes = SDnoobPartition.sectorCount >> 11;            // sectors into MegaBytes
+        DWORD megaBytes = SDnoobPartition.sectorCount >> 11;        // sectors into MegaBytes
         showCapacity(megaBytes);
         (void) Cconws("\r\n");
     }
 
-    SDnoobPartition.physicalPerAtariSector = SDbpb.recsiz / 512;    // how many physical sectors fit into single Atari sector (8, 16, 32)
+    SDnoobPartition.physicalPerAtariSector = sectorsPerAS;          // how many physical sectors fit into single Atari sector (8, 16, 32)
 
     SDnoobPartition.enabled = TRUE;                                 // SD NOOB is enabled
     return TRUE;
@@ -379,10 +379,11 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
     BYTE noTranslate    = (mode & (1 << 3)) != 0;       // if non-zero, physical mode (if zero, logical mode)
 
     if(SERIALDEBUG) { 
-        aux_sendString("SDnoobRwabs");
-        aux_sendChar(' '); aux_hexNibble(readNotWrite);
-        aux_sendChar(' '); aux_hexNibble(noRetries);
-        aux_sendChar(' '); aux_hexNibble(noTranslate);
+        aux_sendString("SDnoobRwabs r/w:"); aux_hexNibble(readNotWrite);
+        aux_sendString(" noRet:");          aux_hexNibble(noRetries);
+        aux_sendString(" noTra:");          aux_hexNibble(noTranslate);
+        aux_sendString(" logStart:");       aux_hexWord(logicalStartingSector);
+        aux_sendString(" logCount:");       aux_hexWord(logicalSectorCount);
     }
 
     if(noTranslate) {                                   // physical mode? bad request
@@ -401,8 +402,11 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
     triesCount = noRetries ? 1 : 3;     // how many times we should try?
 
     if(SERIALDEBUG) { 
-        aux_sendChar(' '); aux_hexNibble(useMidBuffer);
-        aux_sendChar('\n'); 
+        aux_sendString(" midBuf:");         aux_hexNibble(useMidBuffer);
+
+        aux_sendString("\npart start: ");   aux_hexDword(SDnoobPartition.sectorStart);
+        aux_sendString(", ps/as: ");        aux_hexDword(SDnoobPartition.physicalPerAtariSector);
+        aux_sendChar('\n');
     }
     
     // physical starting sector = the starting sector of partition + physical sector of where we want to start reading
@@ -410,9 +414,9 @@ DWORD SDnoobRwabs(WORD mode, BYTE *pBuffer, WORD logicalSectorCount, WORD logica
     DWORD physicalSectorCount       = logicalSectorCount * SDnoobPartition.physicalPerAtariSector;
 
     if(SERIALDEBUG) { 
-        aux_sendString("sector start: "); aux_hexDword(physicalStartingSector);
-        aux_sendString(", count: ");      aux_hexDword(physicalSectorCount);
-        aux_sendChar('\n'); 
+        aux_sendString("phy start : ");     aux_hexDword(physicalStartingSector);
+        aux_sendString(", count: ");        aux_hexDword(physicalSectorCount);
+        aux_sendChar('\n');
     }
 
     while(physicalSectorCount > 0) {
