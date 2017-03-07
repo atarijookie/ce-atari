@@ -11,6 +11,22 @@ char filePath[1024];
 
 void createEmptyImage(void)
 {
+    printf("Enter desired image size in MB: \n");
+
+    int imgSizeMB = 0;
+    while(1) {
+        
+        int res = scanf("%d", &imgSizeMB);
+
+        if(res == 1) {
+            break;
+        }
+    }
+
+    if(imgSizeMB < 1) {
+        return;
+    }
+
     printf("Creating image.\n");
 
     FILE *f = fopen(filePath, "wb");
@@ -25,7 +41,7 @@ void createEmptyImage(void)
     #define SIZE1MB     (1024 * 1024)
     #define SIZE10MB    (10   * SIZE1MB)
 
-    int sectorCount = (260 * SIZE1MB) / 512;
+    int sectorCount = (imgSizeMB * SIZE1MB) / 512;
 
     int sectorNo;
     for(sectorNo=0; sectorNo<sectorCount; sectorNo++) { // write all the sectors
