@@ -159,6 +159,7 @@ char *DesktopCreator::storeMediaPlayers(char *bfr, DesktopConfig *dc)
 char *DesktopCreator::storeExistingDrives(char *bfr, DesktopConfig *dc)
 {
     char tmp[128];
+    char tmp2[32];
     int x = 0, y = 0;
     int cols = (dc->settingsResolution == 1) ? 4 : 8;       // LOW res: 4 cols for icons, MID & HI res: 8 cols for icons
     int rows = (dc->settingsResolution <  3) ? 4 : 8;       // LOW and MID res: 4 rows, HI res: 8 rows for icons
@@ -170,7 +171,7 @@ char *DesktopCreator::storeExistingDrives(char *bfr, DesktopConfig *dc)
         if((dc->drivesAll & (1 << i)) == 0) {               // drive not active? skip
             continue;
         }
-    
+
         //----------
         // get drive name
         if(i < 2) {                                         // it's a floppy?
@@ -178,8 +179,15 @@ char *DesktopCreator::storeExistingDrives(char *bfr, DesktopConfig *dc)
             driveIcon = 0x09;
         } else {                                            // it's not a floppy, but...
             if((dc->translatedDrives & (1 << i)) == 0) {    // not translated drive?
-                driveName = "HARD DISK";
-                driveIcon = 0x0b;
+                if(dc->sdNoobEnabled && i == dc->sdNoobDriveNumber) {       // if SD NOOB is enabled and this is SD NOOB drive
+                    sprintf(tmp2, "SD %d MB", dc->sdNoobSizeSectors >> 11); // shows SD and partition size, e.g. "SD 255 MB"
+                    driveName = tmp2;
+
+                    driveIcon = 0x0b;
+                } else {                                    // if SD NOOB is not enabled, or this is not SD NOOB drive, then it's just hard disk
+                    driveName = "HARD DISK";
+                    driveIcon = 0x0b;
+                }
             } else {                                        // it's a translated drive!
                 if(i == dc->configDrive) {                  // it's a config drive
                     driveName = "CONFIG DRIVE";
@@ -188,10 +196,12 @@ char *DesktopCreator::storeExistingDrives(char *bfr, DesktopConfig *dc)
                     driveName = "SHARED DRIVE";
                     driveIcon = 0x06;
                 } else {                                    // it's a usb drive
-                    if(!dc->label[i].empty())
+                    if(!dc->label[i].empty()) {
                         driveName = dc->label[i].c_str();
-                    else
+                    } else {
                         driveName = "USB DRIVE";
+                    }
+
                     driveIcon = 0x08;
                 }
             }

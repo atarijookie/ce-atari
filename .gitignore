@@ -16,3 +16,4 @@ test_sting/test_server
 *.sct
 *.tra
 *.dep
+*.bak
