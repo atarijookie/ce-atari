@@ -38,10 +38,10 @@ int32_t custom_mediach( void *sp )
     updateCeMediach();                                                  // update the mediach status - once per 3 seconds
 
     if((ceMediach & (1 << drive)) != 0) {                               // if bit is set, media changed
-        return 2;
+        return MED_CHANGED;
     }
 
-    return 0;                                                           // bit not set, media not changed
+    return MED_NOCHANGE;                                                // bit not set, media not changed
 }
 
 int32_t custom_drvmap( void *sp )

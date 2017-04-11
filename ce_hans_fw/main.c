@@ -712,7 +712,7 @@ void onGetCommand(void)
     id = (cmd[0] >> 5) & 0x07;                  // get only device ID
     //-----
     // if we came here, everything went OK
-    if(id == sdCardID) {                        // for SD card IDs
+    if(enabledIDs[id]) {                        // for this ID is enabled (to let the CS commands be handled by any CE ID, even the one not assigned to CE SD)
         BYTE processedLocally;
         processedLocally = tryProcessLocally(); // try to process command locally
         
@@ -830,13 +830,14 @@ BYTE onGetCommandScsi(void)
 
 BYTE tryProcessLocally(void)
 {
-    BYTE justCmd;
+    BYTE id, justCmd;
     BYTE tag1, tag2, isIcd;
     BYTE cmdIsForCE = FALSE;                // is the SCSI command valid for CE custom commands?
     
     //----------------------
     // figure out it this has CosmosEx custom command format
-    justCmd = cmd[0] & 0x1f;                // get just the command (remove ACSI ID)
+    id      = (cmd[0] >> 5) & 0x07;         // get only device ID
+    justCmd = (cmd[0]     ) & 0x1f;         // get just the command (remove ACSI ID)
 
     if(justCmd == 0x1f) {                   // if it's ICD command, get the next byte as command
         justCmd = cmd[1];                   // get just the command
@@ -871,9 +872,15 @@ BYTE tryProcessLocally(void)
     }
     
     //---------
-    // if it's not CosmosEx custom command and not Cosmo Solo command, process it locally
-    processScsiLocaly(justCmd, isIcd);
-    return TRUE;                            // did process locally
+    // it's for SD card? process locally
+    if(id == sdCardID) {
+        processScsiLocaly(justCmd, isIcd);
+        return TRUE;                        // did process locally
+    }
+
+    //---------
+    // not CE command, not CS command, not for SD card? Let RPi handle it.
+    return FALSE;
 }
 
 // when in SOLO mode, eable and disable IDs according to sdCardID

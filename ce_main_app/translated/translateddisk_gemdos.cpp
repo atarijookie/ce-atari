@@ -19,6 +19,7 @@
 #include "../debug.h"
 #include "../utils.h"
 #include "../settings.h"
+#include "../settingsreloadproxy.h"
 #include "acsidatatrans.h"
 #include "translateddisk.h"
 #include "translatedhelper.h"
@@ -1593,3 +1594,68 @@ void TranslatedDisk::onTestGetACSIids(BYTE *cmd)
     dataTrans->padDataToMul16();                                // pad to multiple of 16
     dataTrans->setStatus(E_OK);
 }
+
+int TranslatedDisk::findCurrentIDforDevType(int devType, AcsiIDinfo *aii)
+{
+    int id;
+
+    for(id=0; id<8; id++) {
+        if(aii->acsiIDdevType[id] == devType) {
+            return id;
+        }
+    }
+
+    return -1;
+}
+
+void TranslatedDisk::onSetACSIids(BYTE *cmd)
+{
+    bool res = dataTrans->recvData(dataBuffer, 16);         // get data from Hans
+
+    if(!res) {                                              // failed to get data? internal error!
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onSetACSIids - failed to receive data...");
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    int newId   = dataBuffer[0];                            // get new ID...
+    int devType = dataBuffer[1];                            // get desired dev type
+
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onSetACSIids - setting devType %d to ID %d", devType, newId);
+    
+    AcsiIDinfo  acsiIdInfo;
+    Settings    s;
+    s.loadAcsiIDs(&acsiIdInfo);                             // read the list of device types from settings
+
+    char key[32];
+
+    if(devType == DEVTYPE_TRANSLATED || devType == DEVTYPE_SD) {        // if the device type is one of these, then disable them on their current ID, because we can have only one of them
+        int currentId = findCurrentIDforDevType(devType, &acsiIdInfo);  // try to find it
+        
+        if(currentId == newId) {                            // ID not changed? quit
+            dataTrans->setStatus(E_OK);
+            Debug::out(LOG_DEBUG, "TranslatedDisk::onSetACSIids - ID not changed, not saving it (it's OK)");
+            return;
+        }
+        
+        if(currentId != -1) {                               // if it currently exists, disable it
+            sprintf(key, "ACSI_DEVTYPE_%d", currentId);     // create settings KEY, e.g. ACSI_DEVTYPE_0
+            s.setInt(key, DEVTYPE_OFF);
+            
+            Debug::out(LOG_DEBUG, "TranslatedDisk::onSetACSIids - the devType %d was already on ID %d, disabling it there", devType, currentId);
+        }
+    }
+    
+    sprintf (key, "ACSI_DEVTYPE_%d", newId);                // create settings KEY, e.g. ACSI_DEVTYPE_0
+    s.setInt(key, devType);                                 // save new devType for that ID
+
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onSetACSIids - new ID %d was set to devType %d", newId, devType);
+    dataTrans->setStatus(E_OK);
+    
+    if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
+        reloadProxy->reloadSettings(SETTINGSUSER_ACSI);
+    }
+
+    Utils::forceSync();                                     // tell system to flush the filesystem caches      
+}
+

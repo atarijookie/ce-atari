@@ -58,6 +58,8 @@ void setBootDriveAutomatic(void);
 int  setBootDriveManual(int seconds);
 void msleep(int ms);
 
+void installCEPIcookie(void);
+
 void possiblyFixCurrentDrive(void);
 
 WORD dmaBuffer[DMA_BUFFER_SIZE/2];	/* declare as WORD buffer to force WORD alignment */
@@ -66,8 +68,8 @@ BYTE *pDmaBuffer;
 
 BYTE deviceID;
 
-BYTE commandShort[CMD_LENGTH_SHORT]	= {			0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
-BYTE commandLong[CMD_LENGTH_LONG]	= {0x1f,	0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0};
+BYTE commandShort[CMD_LENGTH_SHORT] = {         0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0};
+BYTE commandLong [CMD_LENGTH_LONG]  = {0x1f, 0xA0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0};
 
 BYTE *pDta;
 BYTE tempDta[45];
@@ -81,6 +83,9 @@ WORD ceMediach;
 BYTE currentDrive;
 WORD driveMap;
 BYTE configDrive;
+
+WORD tosVersion;
+void getTOSversion(void);
 
 BYTE setDate;
 int year, month, day, hours, minutes, seconds;
@@ -98,22 +103,34 @@ void init_screencapture(void);
 
 volatile mutex mtx;
 
+#define COOKIEJARSIZE   16
+DWORD ceCookieJar[2 * COOKIEJARSIZE];       // this might be the new cookie jar, if any doesn't exist, or is full
+
 // ------------------------------------------------------------------
 int main( int argc, char* argv[] )
 {
-	BYTE found;
-	int i;
+    //initialize lock
+    mutex_unlock(&mtx);
 
-	//initialize lock
-	mutex_unlock(&mtx);
-
-	// write some header out
-	Clear_home();
-	(void) Cconws("\33p[ CosmosEx disk driver  ]\r\n[ by Jookie 2013 - 2016 ]\r\n[        ver ");
+    // write some header out
+    Clear_home();
+    (void) Cconws("\33p[ CosmosEx disk driver  ]\r\n[ by Jookie 2013 - 2017 ]\r\n[        ver ");
     showAppVersion();
     (void) Cconws(" ]\33q\r\n\r\n");
 
+    pDmaBuffer      = (BYTE *)dmaBuffer;
+
+    Supexec(getTOSversion);
+    
+    // initialize internal stuff for Fsfirst and Fsnext
+    fsnextIsForUs   = 0;
+    pDtaBuffer      = (BYTE *)dtaBuffer;
+
     Supexec(set_longframe);
+
+    pDta            = (BYTE *) &tempDta[0];                 // use this buffer as temporary one for DTA - just in case
+    currentDrive    = Dgetdrv();                            // get the current drive from system
+    driveMap        = Drvmap();                             // get the pre-installation drive map
 
     //--------------------------------
     // don't install the driver is CTRL, ALT or SHIFT is pressed
@@ -141,14 +158,8 @@ int main( int argc, char* argv[] )
     //--------------------------------
     (void) Cconws("\33q\r\n" );
 
-	pDmaBuffer = (BYTE *)dmaBuffer;
-
-	// initialize internal stuff for Fsfirst and Fsnext
-	fsnextIsForUs	= 0;
-	pDtaBuffer	= (BYTE *)dtaBuffer;
-
 	// search for CosmosEx on ACSI bus
-	found = Supexec(findDevice);
+	BYTE found = Supexec(findDevice);
 	if(!found) {								            // not found? quit
 		sleep(3);
 		return 0;
@@ -158,17 +169,9 @@ int main( int argc, char* argv[] )
 	commandShort[0] = (deviceID << 5); 					    // cmd[0] = ACSI_id + TEST UNIT READY (0)
 
 	commandLong[0] = (deviceID << 5) | 0x1f;			    // cmd[0] = ACSI_id + ICD command marker (0x1f)
-	commandLong[1] = 0xA0;								    // cmd[1] = command length group (5 << 5) + TEST UNIT READY (0)
 
 	// tell the device to initialize
 	Supexec(ce_initialize);
-
-	// now init our internal vars
-	pDta				= (BYTE *) &tempDta[0];				// use this buffer as temporary one for DTA - just in case
-
-	currentDrive		= Dgetdrv();						// get the current drive from system
-
-	driveMap	        = Drvmap();						    // get the pre-installation drive map
 
     Supexec(getConfig);                                     // get translated disk configuration, including date and time
 
@@ -177,9 +180,9 @@ int main( int argc, char* argv[] )
         (void) Cconws("Please use the newest version\r\n" );
         (void) Cconws("of \33pCE_DD.PRG\33q from config drive!\r\n" );
         (void) Cconws("\r\nDriver not installed!\r\n" );
-		sleep(2);
+        sleep(2);
         (void) Cnecin();
-		return 0;
+        return 0;
     }
 
     if(setDate) {                                           // now if we should set new date/time, then set it
@@ -189,24 +192,25 @@ int main( int argc, char* argv[] )
 
     showNetworkIPs();                                       // show IP addresses if possible
 
-	Supexec(updateCeDrives);								// update the ceDrives variable
+    Supexec(updateCeDrives);                                // update the ceDrives variable
 
-	initFunctionTable();
+    initFunctionTable();
 
-	for(i=0; i<MAX_FILES; i++) {
-		initFileBuffer(i);									// init the file buffers
-	}
+    int i;
+    for(i=0; i<MAX_FILES; i++) {
+        initFileBuffer(i);                                  // init the file buffers
+    }
 
-	// either remove the old one or do nothing, old memory isn't released
-	if( unhook_xbra( VEC_GEMDOS, 'CEDD' ) == 0L && unhook_xbra( VEC_BIOS, 'CEDD' ) == 0L ) {
-		(void)Cconws( "\r\nDriver installed.\r\n" );
-	} else {
-		(void)Cconws( "\r\nDriver reinstalled, some memory was lost.\r\n" );
-	}
+    // either remove the old one or do nothing, old memory isn't released
+    if( unhook_xbra( VEC_GEMDOS, 'CEDD' ) == 0L && unhook_xbra( VEC_BIOS, 'CEDD' ) == 0L ) {
+        (void)Cconws( "\r\nDriver installed.\r\n" );
+    } else {
+        (void)Cconws( "\r\nDriver reinstalled, some memory was lost.\r\n" );
+    }
 
-	// and now place the new gemdos handler
-	old_gemdos_handler	= Setexc( VEC_GEMDOS,	gemdos_handler );
-	old_bios_handler	= Setexc( VEC_BIOS,		bios_handler );
+    // and now place the new gemdos handler
+    old_gemdos_handler  = Setexc( VEC_GEMDOS,   gemdos_handler );
+    old_bios_handler    = Setexc( VEC_BIOS,     bios_handler );
 
     _driverInstalled = 1;                                   // mark that the driver was installed (and we don't want to Mfree() this RAM)
 
@@ -237,18 +241,26 @@ int main( int argc, char* argv[] )
         (void) Cconws(">>> ScreenShots VBL installed. <<<\r\n" );
         Supexec(init_screencapture);
     }
+    Supexec(installCEPIcookie);         // install the CEPI cookie
 
 
     //-------------------------------------
 	// wait for a while so the user could read the message and quit
 	sleep(1);
 
-	if(_runFromBootsector == 0) {	// if the prg was not run from boot sector, terminate and stay resident (execution ends here)
-		Ptermres( 0x100 + _base->p_tlen + _base->p_dlen + _base->p_blen, 0 );
-	}
+    if(_runFromBootsector == 0) {       // if the prg was not run from boot sector, terminate and stay resident (execution ends here)
+        Ptermres( 0x100 + _base->p_tlen + _base->p_dlen + _base->p_blen, 0 );
+    }
 
-	// if the prg was run from bootsector, we will return and the asm code will do rts
-	return 0;
+    // if the prg was run from bootsector, we will return and the asm code will do rts
+    return 0;
+}
+
+void getTOSversion(void)
+{
+    BYTE  *pSysBase     = (BYTE *) 0x000004F2;
+    BYTE  *ppSysBase    = (BYTE *)  ((DWORD )  *pSysBase);                      // get pointer to TOS address
+    tosVersion    = (WORD  ) *(( WORD *) (ppSysBase + 2));                // TOS +2: TOS version
 }
 
 // send INITIALIZE command to the CosmosEx device telling it to do all the stuff it needs at start
@@ -257,16 +269,13 @@ void ce_initialize(void)
 	commandShort[0] = (deviceID << 5); 					                        // cmd[0] = ACSI_id + TEST UNIT READY (0)
 	commandShort[4] = GD_CUSTOM_initialize;
 
-    BYTE  *pSysBase     = (BYTE *) 0x000004F2;
-    BYTE  *ppSysBase    = (BYTE *)  ((DWORD )  *pSysBase);                      // get pointer to TOS address
-    WORD  tosVersion    = (WORD  ) *(( WORD *) (ppSysBase + 2));                // TOS +2: TOS version
-    SET_WORD(pDmaBuffer + 0, tosVersion);                                       // store tos version
+    SET_WORD(pDmaBuffer + 0, tosVersion);                                       //  0, 1: store tos version
 
     WORD resolution     = Getrez();
-    SET_WORD(pDmaBuffer + 2, resolution);                                       // store current screen resolution
+    SET_WORD(pDmaBuffer + 2, resolution);                                       //  2, 3: store current screen resolution
 
     WORD drives         = Drvmap();
-    SET_WORD(pDmaBuffer + 4, drives);                                           // store existing drives
+    SET_WORD(pDmaBuffer + 4, drives);                                           //  4, 5: store existing drives
 
 	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, pDmaBuffer, 1);        // issue the command and check the result
 }
@@ -563,6 +572,124 @@ void possiblyFixCurrentDrive(void)
         }
 
         Dsetdrv(0);                     // no valid drive found, set A: just in case
+    }
+}
+
+BYTE installCookie(DWORD *cookieJar, DWORD key, DWORD value)
+{
+    DWORD cookieKey, cookieValue;
+
+    int pos = 0;
+    while(1) {                                  // go through the list of cookies
+        cookieKey   = *cookieJar++;
+        cookieValue = *cookieJar++;
+
+        pos++;
+
+        if(cookieKey != 0) {                    // cookie not empty? skip to next
+            continue;
+        }
+        
+        if(cookieKey == 0) {                    // if KEY is zero, it's LAST or EMPTY cookie
+            if(cookieValue == pos) {            // it's LAST cookie, if the current position is the same as cookie value - we need to reallocate it (fail for now)
+                return FALSE;
+            }
+        }
+
+        // if got here, we're on EMPTY cookie which is not LAST
+        cookieJar -= 2;                         // move 2 DWORDs back
+        
+        // next cookie - mark as last cookie
+        cookieJar[2] = 0;                       // next cookie KEY      = 0 (last cookie)
+        cookieJar[3] = cookieJar[1];            // next cookie VALUE    = cookie jar length (copied from current cookie)
+        
+        // this cookie - the store the new cookie value
+        cookieJar[0] = key;
+        cookieJar[1] = value;
+        
+        break;                                  // we're done
+    }
+    
+    return TRUE;                                // success!
+}
+
+BYTE reallocateCookieJar(void)
+{
+    DWORD *cookieJarAddr    = (DWORD *) 0x05A0;
+    DWORD *cookieJarOld     = (DWORD *) *cookieJarAddr;     // get pointer to current cookie jar
+
+    DWORD *cookieJarNew     = &ceCookieJar[0];              // get pointer to new cookie jar
+    
+    DWORD cookieKey, cookieValue;
+
+    int pos = 0;
+    while(1) {                                  // go through the old list of cookies
+        // read old cookie
+        pos++;
+
+        cookieKey   = *cookieJarOld++;          
+        cookieValue = *cookieJarOld++;
+
+        if(cookieKey == 0) {                    // no more cookies? quit, success
+            break;
+        }
+        
+        if(pos >= COOKIEJARSIZE) {              // if our new cookie jar is the same size (or smaller) as the old cookie jar, fail
+            return FALSE;
+        }
+        
+        // store the old cookie to new cookie jar
+        cookieJarNew[0]  = cookieKey;
+        cookieJarNew[1]  = cookieValue;
+        cookieJarNew    += 2;
+    }
+    
+    // store this to the last used cookie in new cookie jar
+    cookieJarNew[0]     = 0;                        // this is the last cookie
+    cookieJarNew[1]     = COOKIEJARSIZE;            // and this is the new cookie jar size
+    
+    *cookieJarAddr      = (DWORD) &ceCookieJar[0];  // update the pointer to cookie jar
+    
+    return TRUE;                                    // success!
+}
+
+void installCEPIcookie(void)
+{
+    // get address of cookie jar
+    DWORD *cookieJarAddr    = (DWORD *) 0x05A0;
+    DWORD *cookieJar        = (DWORD *) *cookieJarAddr;
+
+    //------------
+    // co cookie jar handling - allocation
+    if(cookieJar == NULL) {                         // no cookie jar (on old TOS)?
+        *cookieJarAddr  = (DWORD) &ceCookieJar[0];  // use our cookie jar as the new cookie jar
+        cookieJar       = (DWORD *) *cookieJarAddr; // re-read what is the new cookie jar now
+        
+        ceCookieJar[0]  = 0;                        // key      = 0 (0th item is the last item)
+        ceCookieJar[1]  = COOKIEJARSIZE;            // value    = size of cookie jar
+    }
+    //------------
+
+    BYTE res;
+    res = installCookie(cookieJar, 0x43455049, (DWORD) &hdIf);  // try to install CEPI cookie
+
+    if(!res) {                                          // if failed to store cookie, that means the current cookie jar is empty
+        res = reallocateCookieJar();
+        
+        if(!res) {                                      // failed to reallocate? quit with error
+            (void) Cconws("Failed to reallocate cookie jar.\r\n");
+            return;
+        }
+        
+        cookieJar = (DWORD *) *cookieJarAddr;           // re-read the cookie jar position
+    }
+    
+    res = installCookie(cookieJar, 0x43455049, (DWORD) &hdIf);  // try to install CEPI cookie
+    
+    if(!res) {
+        (void) Cconws("Failed to install CEPI cookie.\r\n");
+    } else {
+        (void) Cconws("CEPI cookie installed.\r\n");
     }
 }
 

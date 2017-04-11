@@ -157,11 +157,11 @@ DWORD myCRwabs(BYTE *sp)
 
     if((ceDrives & (1 << device)) == 0) {   // not our drive? fail
         return -5;                          // Bad request
-	}
+    }
 
     if(ceMediach & (1 << device)) {         // this drive has changed?
         return -14;                         // Media change detected
-	}
+    }
 
     if(mode & 1) {                          // write (from ST to drive)? Not supported.
         return -12;                         // Device is write protected
