@@ -74,7 +74,7 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 #define REQUEST_TRACK                       {   next.track = now.track; next.side = now.side; sendTrackRequest = TRUE; lastRequestTime = TIM4->CNT; trackStreamedCount = 0; }
 #define FORCE_REQUEST_TRACK                 {   REQUEST_TRACK;      lastRequestTime -= 35;      lastRequested.track = 0xff;     lastRequested.side = 0xff;                  }
 
-WORD version[2] = {0xf016, 0x0117};             // this means: Franz, 2016-01-17
+WORD version[2] = {0xf017, 0x0413};             // this means: Franz, 2017-04-13
 WORD drive_select;
 
 volatile BYTE sendFwVersion, sendTrackRequest;
