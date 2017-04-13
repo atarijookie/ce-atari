@@ -116,10 +116,10 @@ BYTE state;
 DWORD dataCnt;
 BYTE statusByte;
 
-WORD version[2] = {0xa016, 0x1229};                             // this means: hAns, 2016-12-29
+WORD version[2] = {0xa017, 0x0413};                             // this means: hAns, 2017-04-13
 
-char *VERSION_STRING_SHORT  = {"2.10"};
-char *DATE_STRING           = {"12/29/16"};
+char *VERSION_STRING_SHORT  = {"2.11"};
+char *DATE_STRING           = {"04/13/17"};
                              // MM/DD/YY
 
 volatile BYTE sendFwVersion;
