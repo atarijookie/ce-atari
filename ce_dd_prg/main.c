@@ -682,10 +682,10 @@ void installCEPIcookie(void)
         }
         
         cookieJar = (DWORD *) *cookieJarAddr;           // re-read the cookie jar position
+
+	res = installCookie(cookieJar, 0x43455049, (DWORD) &hdIf);  // try to install CEPI cookie
     }
-    
-    res = installCookie(cookieJar, 0x43455049, (DWORD) &hdIf);  // try to install CEPI cookie
-    
+
     if(!res) {
         (void) Cconws("Failed to install CEPI cookie.\r\n");
     } else {
