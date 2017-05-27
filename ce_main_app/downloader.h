@@ -16,6 +16,7 @@
 #define DWNTYPE_TIMESYNC        0x10
 #define DWNTYPE_SEND_CONFIG     0x20
 #define DWNTYPE_REPORT_VERSIONS 0x40
+#define DWNTYPE_LOG_HTTP        0x80
 
 #define DWNSTATUS_WAITING       0              
 #define DWNSTATUS_DOWNLOADING   1 

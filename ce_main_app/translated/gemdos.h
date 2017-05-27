@@ -234,6 +234,7 @@
 #define ACC_UNMOUNT_DRIVE       0x81
 
 #define ST_LOG_TEXT             0x85
+#define ST_LOG_HTTP             0x86
 
 #define TEST_READ               0x90
 #define TEST_WRITE              0x91

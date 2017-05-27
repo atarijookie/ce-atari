@@ -24,6 +24,7 @@
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "desktopcreator.h"
+#include "../downloader.h" 
 
 extern THwConfig hwConfig;
 extern InterProcessEvents events;
@@ -528,6 +529,7 @@ void TranslatedDisk::processCommand(BYTE *cmd)
 		case ACC_GET_MOUNTS:			onGetMounts(cmd);	            break;
         case ACC_UNMOUNT_DRIVE:         onUnmountDrive(cmd);            break;
         case ST_LOG_TEXT:               onStLog(cmd);                   break;
+        case ST_LOG_HTTP:               onStHttp(cmd);                  break;
         case TEST_READ:                 onTestRead(cmd);                break;
         case TEST_WRITE:                onTestWrite(cmd);               break;
         case TEST_GET_ACSI_IDS:         onTestGetACSIids(cmd);          break;
@@ -1213,6 +1215,33 @@ void TranslatedDisk::onStLog(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
+//do a simple HTTP GET request - for logging from ST to Http
+//ignore result
+void TranslatedDisk::onStHttp(BYTE *cmd)
+{
+    DWORD res;
+    res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
+
+    if(!res) {                                      // failed to get data? internal error!
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onStHttp - failed to receive data...");
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    TDownloadRequest tdr;
+    tdr.srcUrl          = std::string((const char*)dataBuffer);
+    tdr.dstDir          = "";
+    tdr.downloadType    = DWNTYPE_LOG_HTTP;
+    tdr.checksum        = 0;                        // special case - don't check checsum
+    tdr.pStatusByte     = NULL;      // update status byte
+    Downloader::add(tdr);
+    Debug::out(LOG_DEBUG, "TranslatedDisk::onStHttp() %s", dataBuffer);
+
+    Debug::out(LOG_DEBUG, "ST HTTP: %s", dataBuffer);
+    dataTrans->setStatus(E_OK);
+}
+
+
 const char *TranslatedDisk::functionCodeToName(int code)
 {
     switch(code) {
@@ -1222,6 +1251,7 @@ const char *TranslatedDisk::functionCodeToName(int code)
         case TRAN_CMD_SCREENCASTPALETTE:    return "TRAN_CMD_SCREENCASTPALETTE";
         case TRAN_CMD_SCREENSHOT_CONFIG:    return "TRAN_CMD_SCREENSHOT_CONFIG";
         case ST_LOG_TEXT:                   return "ST_LOG_TEXT";
+        case ST_LOG_HTTP:                   return "ST_LOG_HTTP";
         
         case GEMDOS_Dsetdrv:            return "GEMDOS_Dsetdrv";
         case GEMDOS_Dgetdrv:            return "GEMDOS_Dgetdrv";
