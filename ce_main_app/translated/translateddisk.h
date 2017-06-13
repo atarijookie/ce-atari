@@ -254,6 +254,7 @@ private:
 	void onGetMounts(BYTE *cmd);
     void onUnmountDrive(BYTE *cmd);
     void onStLog(BYTE *cmd);
+    void onStHttp(BYTE *cmd);
     void onTestRead(BYTE *cmd);
     void onTestWrite(BYTE *cmd);
     void onTestGetACSIids(BYTE *cmd);

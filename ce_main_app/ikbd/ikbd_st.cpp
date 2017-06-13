@@ -117,8 +117,11 @@ void Ikbd::processStCommands(void)
         BYTE cmd = cbStCommands.peek();                         // get the data, but don't move the get pointer, because we might fail later
         int len = 0;
 
+        ikbdLog( "Ikbd::processStCommands -- got command %02x", cmd);
+
         if(cmd == STCMD_RESET || (cmd & 0x80) == 0) {           // reset or highest bit is 0? SET command
             len = stCommandLen[cmd];                            // try to get the command length
+            ikbdLog( "Ikbd::processStCommands -- got command %02x, len %d", cmd, len);
         } else {                                                // highest bit is 1? GET command
             BYTE setEquivalent = cmd & 0x7f;                    // get the equivalent SET command (remove higherst bit)
             BYTE setLen = stCommandLen[setEquivalent];          // try to get the length of SET equivalent command
@@ -126,6 +129,8 @@ void Ikbd::processStCommands(void)
             if(setLen != 0) {                                   // if we got the SET equivalent command length, we support this command
                 len = 1;                                        // the length of command is 1
             }
+
+            ikbdLog( "Ikbd::processStCommands -- got command %02x (GET), len %d", cmd, len);
         }
 
         ikbdLog( "Ikbd::processStCommands -- got command %02x, len: %d, cb contains %d bytes", cmd, len, cbStCommands.count);

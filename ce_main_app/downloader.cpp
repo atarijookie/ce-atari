@@ -319,6 +319,32 @@ void handleSendConfig(const char *localConfigFile, const char *remoteUrl)
     curl_easy_cleanup(curl);
 }
 
+void handleLogHttp(const char *remoteUrl)
+{
+    CURL       *curl = curl_easy_init();
+    CURLcode    res;
+
+    if(!curl) {
+        Debug::out(LOG_ERROR, "CURL init failed, config was not sent to Jookie!");
+        return;
+    }
+
+    //-------------
+    // now fill curl stuff and do get
+    curl_easy_setopt(curl, CURLOPT_URL,             remoteUrl);         // GET will go to this URL
+    //curl_easy_setopt(curl, CURLOPT_POSTFIELDS,      bfrRaw);            // this is the data that will be sent
+
+    res = curl_easy_perform(curl);          // Perform the request, res will get the return code
+
+    if(res != CURLE_OK) {
+        Debug::out(LOG_ERROR, "CURL curl_easy_perform failed: %s", curl_easy_strerror(res));
+    } else {
+        Debug::out(LOG_DEBUG, "Config was sent to Jookie.");
+    }
+
+    curl_easy_cleanup(curl);
+}
+
 void Downloader::handleReportVersions(CURL *curl, const char *reportUrl)
 {
     // specify url
@@ -387,6 +413,8 @@ void Downloader::run(void)
                 handleUsbUpdateFile(downloadCurrent.srcUrl.c_str(), downloadCurrent.dstDir.c_str());
             } else if(downloadCurrent.downloadType == DWNTYPE_SEND_CONFIG) {            // if it should be local config upload / post
                 handleSendConfig(downloadCurrent.srcUrl.c_str(), downloadCurrent.dstDir.c_str());
+            } else if(downloadCurrent.downloadType == DWNTYPE_LOG_HTTP) {            // if it should be an http log request
+                handleLogHttp(downloadCurrent.srcUrl.c_str());
             }
             continue;
         }
