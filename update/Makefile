@@ -135,68 +135,52 @@ clean:
 	$(RM) *.zip *.st $(APPFILES)
 
 configdrive/ce_conf.tos:	../ce_conf/ce_conf.tos
-	mkdir -p configdrive
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 configdrive/ce_fdd.prg:	../ce_fdd_prg/ce_fdd.prg
-	mkdir -p configdrive
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 configdrive/ce_fdd.ttp:	../ce_fdd_ttp/ce_fdd.ttp
-	mkdir -p configdrive
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 configdrive/ce_hdimg.ttp:	../ce_hdimg_ttp/ce_hdimg.ttp
-	mkdir -p configdrive
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 configdrive/ce_mount.tos:	../ce_mount_prg/ce_mount.tos
-	mkdir -p configdrive
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 configdrive/drivers/ce_cast.prg:	../ce_screencast/ce_cast.prg
-	mkdir -p configdrive/drivers
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 configdrive/drivers/%.bs:	../ce_dd_bootsectors/%.bs
-	mkdir -p configdrive/drivers
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 configdrive/drivers/ce_dd.prg:	../ce_dd_prg/ce_dd.prg
-	mkdir -p configdrive/drivers
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 configdrive/drivers/ce_sting.prg:	../cosmosex_fakesting/ce_sting.prg
-	mkdir -p configdrive/drivers
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 configdrive/tests/ce_tstfd.tos:	../test_floppy/ce_tstfd.tos
-	mkdir -p configdrive/tests
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 configdrive/tests/ce_tsthd.tos:	../test_acsi/ce_tsthd.tos
-	mkdir -p configdrive/tests
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 configdrive/tests/tst_stng.tos: ../test_sting/tst_stng.tos
-	mkdir -p configdrive/tests
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 configdrive/tests/tst_fsys.tos:	../test_filesystem/tst_fsys.tos
-	mkdir -p configdrive/tests
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 configdrive/readme.txt:	../ce_main_app/configdrive/readme.txt
-	mkdir -p configdrive
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 shellscripts/%:	../ce_main_app/shellscripts/%
-	mkdir -p shellscripts
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 webroot/%:	../ce_main_app/webroot/%
-	mkdir -p $(shell dirname $@)
-	$(CP) $< $@
+	mkdir -p $(shell dirname $@) && $(CP) $< $@
 
 cosmosex:	../ce_main_app/shellscripts/ce_rename_for_distro.sh
 	$(CP) $< $@
