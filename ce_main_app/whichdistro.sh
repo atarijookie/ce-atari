@@ -1,5 +1,10 @@
 #!/bin/sh
 
+if [ ! -f /etc/issue ] ; then
+	echo "neither yocto nor raspbian"
+	exit
+fi
+
 # First count the lines of /etc/issue which contain word Yocto in it.
 # (Was done by comparing part of the string to Yocto, but this substring comparing worked differently on Yocto and Raspbian.)
 issue=$( cat /etc/issue | grep -o "Yocto" | wc -l )
