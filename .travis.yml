@@ -19,7 +19,7 @@ install:
 script:
   - 'cd $TRAVIS_BUILD_DIR'
   - 'make ce_main_app ONPC=yes'
-  - 'make ce_main_app CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++ DISTRO=raspbian'
+  - 'make ce_main_app ACTUAL_CC=arm-linux-gnueabihf-gcc ACTUAL_CXX=arm-linux-gnueabihf-g++ DISTRO=raspbian'
   - 'make atari_progs'
   - 'cp ce_main_app/cosmosex_onpc ce_main_app/cosmosex_yocto'
   - 'make update'
