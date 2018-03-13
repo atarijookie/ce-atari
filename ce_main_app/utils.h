@@ -8,7 +8,9 @@
 #include "datatypes.h"
 
 extern "C" volatile sig_atomic_t sigintReceived;
+#ifndef MIN
 #define MIN(x, y)	(((x) < (y)) ? (x) : (y))
+#endif
 
 class Utils {
 public:

@@ -24,7 +24,11 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <ifaddrs.h>
+#ifdef __linux__
 #include <linux/if_link.h>
+#else
+#include <netinet/in.h>
+#endif
 //--------
 
 #include "translated/translatedhelper.h"

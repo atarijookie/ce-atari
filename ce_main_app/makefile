@@ -104,6 +104,7 @@ SRCS += $(wildcard $(SUBDIR10)/*.cpp)
 SRCS += $(wildcard $(SUBDIR11)/*.cpp)
 SRCS += $(wildcard $(SUBDIR12)/*.cpp)
 SRCS += $(wildcard $(SUBDIR13)/*.cpp)
+TEST_SRCS = $(wildcard tests/*.cpp)
 
 HDRS  = $(wildcard *.h)
 HDRS += $(wildcard $(SUBDIR1)/*.h)
@@ -123,7 +124,8 @@ HDRS += $(wildcard $(SUBDIR12)/*.h)
 HDRS += $(wildcard $(SUBDIR13)/*.h)
 
 OBJS = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(SRCS:.c=.o)))
-DEPS = $(patsubst %.o,%.d,$(OBJS))
+TEST_OBJS = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(TEST_SRCS)))
+DEPS = $(patsubst %.o,%.d,$(OBJS) $(TEST_OBJS))
 
 #combine web scripts
 WEB_CSS_PATH=webroot/css
@@ -174,7 +176,17 @@ endif
 
 print-%:	; @echo $* = $($*)
 
-.PHONY:	clean depclean
+.PHONY:	clean depclean all tests
+
+TESTS_BINS = $(addprefix tests/, floppytest)
+
+tests:	$(TESTS_BINS)
+
+tests/floppytest:	$(OBJDIR)/tests/floppytest.o \
+	$(addprefix $(OBJDIR)/floppy/, $(patsubst %.cpp,%.o,floppyimage.cpp floppyimagemsa.cpp floppyimagest.cpp floppyimagefactory.cpp imagesilo.cpp mfmcachedimage.cpp msa.cpp)) \
+	$(OBJDIR)/utils.o $(OBJDIR)/gpio.o $(OBJDIR)/settings.o $(OBJDIR)/settingsreloadproxy.o \
+	$(OBJDIR)/tests/test_debug.o
+	$(CXX_LINK) $(CFLAGS) $^ $(LDFLAGS) -o $@ -lpthread #$(LDLIBS)
 
 clean:	depclean
 	$(AT)$(RM) $(WEB_JS_PATH)/*.gz
