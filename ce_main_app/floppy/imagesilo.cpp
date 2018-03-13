@@ -17,6 +17,7 @@
 #include "floppysetup.h"
 #include "floppyencoder.h"
 #include "../display/displaythread.h"
+#include "floppyimagest.h"
 
 extern pthread_mutex_t floppyEncoderMutex;
 extern pthread_cond_t  floppyEncoderShouldWork;
@@ -65,7 +66,7 @@ ImageSilo::ImageSilo()
     floppyImageSelected = -1;
     //-----------
     // create empty image and encode it (will be used when no slot is selected)
-    bool res = FloppySetup::createNewImage(EMPTY_IMAGE_PATH);                   // create empty image in /tmp/ directory
+    bool res = FloppyImageSt::createNewImage(EMPTY_IMAGE_PATH);                   // create empty image in /tmp/ directory
 
     if(res) {                                                                   // if succeeded, encode this empty image
         Debug::out(LOG_DEBUG, "ImageSilo created empty image (for no selected image)");

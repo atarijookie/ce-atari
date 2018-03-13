@@ -40,8 +40,6 @@ public:
 
     static void getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks=NULL);
 
-    static void forceSync(void);
-
     static WORD  getWord(BYTE *bfr);
     static DWORD getDword(BYTE *bfr);
     static DWORD get24bits(BYTE *bfr);

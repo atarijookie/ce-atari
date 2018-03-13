@@ -120,6 +120,13 @@ void Mounter::stop(void)
     pthread_mutex_unlock(&mountQueueMutex);
 }
 
+void Mounter::forceSync(void)
+{
+    TMounterRequest tmr;
+    tmr.action = MOUNTER_ACTION_SYNC;   // let the mounter thread do filesystem caches sync
+    add(tmr);
+}
+
 void Mounter::run(void)
 {
     while(!shouldStop) {

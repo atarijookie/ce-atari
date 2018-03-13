@@ -32,8 +32,6 @@ public:
     void setAcsiDataTrans(AcsiDataTrans *dt);
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
-    static bool createNewImage(std::string pathAndFile);
-
 private:
     int                 screenResolution;
     AcsiDataTrans       *dataTrans;
