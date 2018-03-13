@@ -21,6 +21,7 @@
 #include "../utils.h"
 #include "../settings.h"
 #include "../settingsreloadproxy.h"
+#include "../mounter.h"
 #include "acsidatatrans.h"
 #include "translateddisk.h"
 #include "translatedhelper.h"
@@ -1672,6 +1673,6 @@ void TranslatedDisk::onSetACSIids(BYTE *cmd)
         reloadProxy->reloadSettings(SETTINGSUSER_ACSI);
     }
 
-    Utils::forceSync();                                     // tell system to flush the filesystem caches      
+    Mounter::forceSync();                                   // tell system to flush the filesystem caches
 }
 
