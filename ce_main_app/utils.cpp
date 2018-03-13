@@ -488,20 +488,24 @@ void Utils::createTimezoneString(char *str)
 
 void Utils::setTimezoneVariable_inProfileScript(void)
 {
-    char utcOfsset[64];
-    createTimezoneString(utcOfsset);
-
-    char tzString[128];
-    sprintf(tzString, "echo 'export TZ=\"%s\"' > /etc/profile.d/set_timezone.sh", utcOfsset);
-
-    Debug::out(LOG_DEBUG, "Utils::setTimezoneVariable_inProfileScript() -- creating timezone setting script like this: %s\n", tzString);
+    const char * const timezone_script = "/etc/profile.d/set_timezone.sh";
+    char utcOffset[64];
+    createTimezoneString(utcOffset);
     
-	// TODO : do not use system() just to create a file...
-    system("mkdir -p /etc/profile.d");                          // if this dir doesn't exist, create it
-    system(tzString);                                           // now create the script in the dir above
-    system("chmod 755 /etc/profile.d/set_timezone.sh");         // make it executable
+    Debug::out(LOG_DEBUG, "Utils::setTimezoneVariable_inProfileScript() -- creating timezone setting script %s", timezone_script);
     
-    //forceSync();                                                // make sure it does to disk
+    mkdir("/etc/profile.d", 0755);             // if this dir doesn't exist, create it
+    FILE * f = fopen(timezone_script, "w");    // now create the script in the dir above
+    if (f == NULL) {
+        Debug::out(LOG_ERROR, "Utils::setTimezoneVariable_inProfileScript() failed to open %s", timezone_script);
+        return;
+    }
+    fprintf(f, "export TZ=\"%s\"\n", utcOffset);
+    if (fchmod(fileno(f), 0755) < 0) {         // make it executable
+        Debug::out(LOG_ERROR, "Utils::setTimezoneVariable_inProfileScript() fchmod(%s) failed : %s", timezone_script, strerror(errno));
+    }
+    fsync(fileno(f));                          // make sure it does to disk
+    fclose(f);
 }
 
 void Utils::setTimezoneVariable_inThisContext(void)
