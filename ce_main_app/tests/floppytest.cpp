@@ -9,6 +9,7 @@ TFlags flags;
 
 void test(const char * filename)
 {
+    int tracks, sides, sectorsPerTrack;
     ImageSilo* pxImageSilo = new ImageSilo();
     pxImageSilo->setCurrentSlot(0);
     int iSlot = pxImageSilo->getCurrentSlot();
@@ -23,7 +24,6 @@ void test(const char * filename)
     do
     {
         std::cout << "floppyEncodingRunning " << pxImageSilo->getFloppyEncodingRunning() << std::endl;
-        int tracks, sides, sectorsPerTrack;
         if (pxImageSilo->getParams(tracks, sides, sectorsPerTrack))
             std::cout << sides << " sides, " << tracks << " tracks of " << sectorsPerTrack << " sectors." << std::endl;
         else
@@ -31,12 +31,26 @@ void test(const char * filename)
         Utils::sleepMs(100);
         std::cout << "containsImage(" << sFile << ")=" << pxImageSilo->containsImage(sFile.c_str()) << std::endl;
     } while (pxImageSilo->getFloppyEncodingRunning());
-    int trackdatalen;
-    BYTE * trackdata = pxImageSilo->getEncodedTrack(0, 0, trackdatalen);
-    if (trackdata != NULL)
-        std::cout << "getEncodedTrack : " << trackdatalen << " bytes" << std::endl;
-    else
-        std::cout << "*** getEncodedTrack failed ***" << std::endl;
+    if (pxImageSilo->getParams(tracks, sides, sectorsPerTrack)) {
+        int track, side;
+        std::cout << sides << " sides, " << tracks << " tracks of " << sectorsPerTrack << " sectors." << std::endl;
+        for (track = 0; track < tracks; track++) {
+            for (side = 0; side < sides; side++) {
+                int trackdatalen;
+                BYTE * trackdata = pxImageSilo->getEncodedTrack(track, side, trackdatalen);
+                if (trackdata != NULL) {
+                    std::cout << "getEncodedTrack(" << track << ", " << side << ") : " << trackdatalen << " bytes" << std::endl;
+                    char tmp[256];
+                    snprintf(tmp, sizeof(tmp), "track%02d_s%d.mfm", track, side);
+                    FILE * f = fopen(tmp, "wb");
+                    fwrite(trackdata, 1, trackdatalen, f);
+                    fclose(f);
+                } else
+                    std::cout << "*** getEncodedTrack(" << track << ", " << side << ") failed ***" << std::endl;
+            }
+        }
+    } else
+        std::cout << "*** Failed to getParams() ***" << std::endl;
     delete pxImageSilo;
 }
 
