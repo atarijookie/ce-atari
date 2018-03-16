@@ -23,6 +23,7 @@
 #include "version.h"
 #include "ce_conf_on_rpi.h"
 #include "periodicthread.h"
+#include "display/displaythread.h"
 
 #include "webserver/webserver.h"
 #include "webserver/api/apimodule.h"
@@ -73,6 +74,7 @@ int main(int argc, char *argv[])
 #endif
     pthread_t	floppyEncThreadInfo;
     pthread_t   periodicThreadInfo;
+    pthread_t   displayThreadInfo;
 
     pthread_mutex_init(&shared.mtxScsi,             NULL);
     pthread_mutex_init(&shared.mtxConfigStreams,    NULL);
@@ -247,6 +249,9 @@ int main(int argc, char *argv[])
     res = pthread_create(&periodicThreadInfo, NULL, periodicThreadCode, NULL);  // create the periodic thread and run it
 	handlePthreadCreate(res, "periodic", &periodicThreadInfo);
     
+    res = pthread_create(&displayThreadInfo, NULL, displayThreadCode, NULL);  // create the display thread and run it
+    handlePthreadCreate(res, "display", &displayThreadInfo);
+        
     printf("Entering main loop...\n");
     
 	core->run();										// run the main thread
@@ -299,6 +304,8 @@ int main(int argc, char *argv[])
     printf("Stoping periodic thread\n");
 	pthread_kill(periodicThreadInfo, SIGINT);               // stop the select()
     pthread_join(periodicThreadInfo, NULL);             // wait until periodic  thread finishes
+
+    pthread_join(displayThreadInfo, NULL);             // wait until display thread finishes
 
     printf("Downloader clean up before quit\n");
     Downloader::cleanupBeforeQuit();
