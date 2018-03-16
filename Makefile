@@ -1,7 +1,7 @@
 # global makefile
 
 
-.PHONY: default ce_main_app atari_progs update
+.PHONY: default ce_main_app atari_progs update check
 
 default:
 	@echo "usage :  make <atari_progs|ce_main_app|update>"
@@ -28,3 +28,6 @@ ce_main_app:
 
 update:
 	$(MAKE) -C update
+
+check:
+	$(MAKE) -C ce_main_app check

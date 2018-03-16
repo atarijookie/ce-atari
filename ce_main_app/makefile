@@ -176,9 +176,12 @@ endif
 
 print-%:	; @echo $* = $($*)
 
-.PHONY:	clean depclean all tests
+.PHONY:	clean depclean all tests check
 
 TESTS_BINS = $(addprefix tests/, floppytest)
+
+check:	tests
+	tests/floppytest
 
 tests:	$(TESTS_BINS)
 
