@@ -14,7 +14,7 @@ install:
   - 'sudo apt-get install -ym mtools'
   - 'sudo apt-get install -ym build-essential g++-arm-linux-gnueabihf'
   - 'wget http://www.airspayce.com/mikem/bcm2835/bcm2835-1.50.tar.gz && tar xzf bcm2835-1.50.tar.gz && cd bcm2835-1.50 && CC=arm-linux-gnueabihf-gcc ./configure --prefix=/usr/arm-linux-gnueabihf --host=arm-linux-gnueabihf && make && sudo make install && cd ..'
-  - 'wget https://curl.haxx.se/download/curl-7.58.0.tar.bz2 && tar xjf curl-7.58.0.tar.bz2 && cd curl-7.58.0 && CC=arm-linux-gnueabihf-gcc ./configure --prefix=/usr/arm-linux-gnueabihf --host=arm-linux-gnueabihf --disable-shared --disable-manual && make && sudo make install && cd .. '
+  - 'HOST=arm-linux-gnueabihf sh ./.install-curl.sh'
 
 script:
   - 'cd $TRAVIS_BUILD_DIR'
