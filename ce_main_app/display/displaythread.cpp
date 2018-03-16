@@ -37,12 +37,16 @@ SoftI2CMaster *i2c;
 /*
  This we want to show on display:
  123456789012345678901
- 
+
  ACSI 01......
  FDD1 image_name_here
  IKBD Kbd Mouse J1 J2
  LAN  192.168.xxx.yyy
  */
+
+void display_init(void);
+void display_deinit(void);
+void display_print_center(char *str);
 
 void *displayThreadCode(void *ptr)
 {
@@ -51,11 +55,7 @@ void *displayThreadCode(void *ptr)
 
     Debug::out(LOG_DEBUG, "Display thread starting...");
 
-    i2c = new SoftI2CMaster();              // software I2C master on GPIO pins
-    
-    ssd1306_begin(SSD1306_SWITCHCAPVCC);    // low level OLED library  
-    ssd1306_clearDisplay();
-    ssd1306_display();
+    display_init();
 
     gfx = new Adafruit_GFX(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);    // font displaying library
 
@@ -65,15 +65,36 @@ void *displayThreadCode(void *ptr)
 
         Utils::sleepMs(100);
     }
-    
-    ssd1306_clearDisplay();
-    gfx->drawString(0, (SSD1306_LCDHEIGHT-CHAR_H)/2, "CosmosEx stopped");
-    ssd1306_display();
 
-    delete gfx;
-    delete i2c;
-    
+    display_print_center("CosmosEx stopped");
+    display_deinit();
+
     Debug::out(LOG_DEBUG, "Display thread terminated.");
     return 0;
 }
 
+void display_init(void)
+{
+    i2c = new SoftI2CMaster();              // software I2C master on GPIO pins
+
+    ssd1306_begin(SSD1306_SWITCHCAPVCC);    // low level OLED library
+    ssd1306_clearDisplay();
+    ssd1306_display();
+}
+
+void display_deinit(void)
+{
+    delete gfx;
+    delete i2c;
+}
+
+void display_print_center(char *str)
+{
+    int len = strlen(str);
+    int x = (SSD1306_LCDWIDTH - (CHAR_W * len)) / 2;
+    int y = (SSD1306_LCDHEIGHT - CHAR_H)/2;
+
+    ssd1306_clearDisplay();
+    gfx->drawString(x, y, str);
+    ssd1306_display();
+}
