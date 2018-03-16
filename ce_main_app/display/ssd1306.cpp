@@ -14,13 +14,15 @@ All text above, and the splash screen below must be included in any redistributi
 #include <string.h>
 
 #include "ssd1306.h"
-#include "gpio.h"
-#include "utils.h"
+#include "swi2c.h"
+#include "../gpio.h"
+#include "../utils.h"
 
-BYTE _i2caddr, _vccstate, sid, sclk, dc, rst, cs;
+BYTE _vccstate;
+
+extern SoftI2CMaster *i2c;
 
 // the memory buffer for the LCD
-
 static BYTE buffer[SSD1306_LCDHEIGHT * SSD1306_LCDWIDTH / 8];
 
 int getRotation(void)
@@ -136,17 +138,13 @@ void invertDisplay(BYTE i) {
 }
 
 void ssd1306_command(BYTE c) {
-    // I2C
-    BYTE control = 0x00;   // Co = 0, D/C = 0
-    
-    bcm2835_i2c_setSlaveAddress(SSD1306_I2C_ADDRESS);
-    //Wire.beginTransmission(_i2caddr);
-    
-    char bfr[2];
-    bfr[0] = control;
+    BYTE bfr[2];
+    bfr[0] = 0;
     bfr[1] = c;
     
-    bcm2835_i2c_write((const char *) bfr, 2);
+    i2c->beginTransmission(SSD1306_I2C_ADDRESS);
+    i2c->write(bfr, 2);
+    i2c->endTransmission();
 }
 
 // startscrollright
@@ -240,37 +238,28 @@ void dim(int dim) {
 
 void ssd1306_display(void) 
 {
-  ssd1306_command(SSD1306_COLUMNADDR);
-  ssd1306_command(0);   // Column start address (0 = reset)
-  ssd1306_command(SSD1306_LCDWIDTH-1); // Column end address (127 = reset)
+    ssd1306_command(SSD1306_COLUMNADDR);
+    ssd1306_command(0);   // Column start address (0 = reset)
+    ssd1306_command(SSD1306_LCDWIDTH-1); // Column end address (127 = reset)
 
-  ssd1306_command(SSD1306_PAGEADDR);
-  ssd1306_command(0); // Page start address (0 = reset)
-  #if SSD1306_LCDHEIGHT == 64
-    ssd1306_command(7); // Page end address
-  #endif
-  #if SSD1306_LCDHEIGHT == 32
+    ssd1306_command(SSD1306_PAGEADDR);
+    ssd1306_command(0); // Page start address (0 = reset)
+
+    // page end: 7 for 64px height, 3 for 32px height, 1 for 16px height
     ssd1306_command(3); // Page end address
-  #endif
-  #if SSD1306_LCDHEIGHT == 16
-    ssd1306_command(1); // Page end address
-  #endif
 
-    // I2C
     int y;
     for (y=0; y<SSD1306_LCDHEIGHT; y++) {
-      // send a bunch of data in one xmission
-      //Wire.beginTransmission(_i2caddr);
-      
-      BYTE bfr[17];
-
-      bfr[0] = 0x40;
-      memcpy(bfr + 1, buffer + (y * BYTES_PER_LINE), BYTES_PER_LINE);
-      bcm2835_i2c_write((const char *) bfr, 1 + BYTES_PER_LINE);
-  }
+        BYTE bfr[1 + BYTES_PER_LINE];
+        bfr[0] = 0x40;
+        memcpy(bfr + 1, buffer + (y * BYTES_PER_LINE), BYTES_PER_LINE);
+        
+        i2c->beginTransmission(SSD1306_I2C_ADDRESS);
+        i2c->write(bfr, 1 + BYTES_PER_LINE);
+        i2c->endTransmission();
+    }
 }
 
-// clear everything
 void ssd1306_clearDisplay(void) {
-  memset(buffer, 0, BYTES_PER_LINE * SSD1306_LCDHEIGHT);
+    memset(buffer, 0, BYTES_PER_LINE * SSD1306_LCDHEIGHT);
 }

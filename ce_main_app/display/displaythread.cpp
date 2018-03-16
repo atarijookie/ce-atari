@@ -25,12 +25,24 @@
 #include "ssd1306.h"
 #include "adafruit_gfx.h"
 #include "lcdfont.h"
+#include "swi2c.h"
 
 extern THwConfig hwConfig;
 extern TFlags    flags;
 extern DebugVars dbgVars;
 
 Adafruit_GFX *gfx;
+SoftI2CMaster *i2c;
+
+/*
+ This we want to show on display:
+ 123456789012345678901
+ 
+ ACSI 01......
+ FDD1 image_name_here
+ IKBD Kbd Mouse J1 J2
+ LAN  192.168.xxx.yyy
+ */
 
 void *displayThreadCode(void *ptr)
 {
@@ -39,11 +51,13 @@ void *displayThreadCode(void *ptr)
 
     Debug::out(LOG_DEBUG, "Display thread starting...");
 
-    ssd1306_begin(SSD1306_SWITCHCAPVCC);
+    i2c = new SoftI2CMaster();              // software I2C master on GPIO pins
+    
+    ssd1306_begin(SSD1306_SWITCHCAPVCC);    // low level OLED library  
     ssd1306_clearDisplay();
     ssd1306_display();
 
-    gfx = new Adafruit_GFX(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);
+    gfx = new Adafruit_GFX(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);    // font displaying library
 
     while(sigintReceived == 0) {
         max_fd = -1;
@@ -57,6 +71,8 @@ void *displayThreadCode(void *ptr)
     ssd1306_display();
 
     delete gfx;
+    delete i2c;
+    
     Debug::out(LOG_DEBUG, "Display thread terminated.");
     return 0;
 }

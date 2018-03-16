@@ -46,6 +46,9 @@
 #define SPI_ATN_HANS	PIN_ATN_HANS
 #define SPI_ATN_FRANZ	PIN_ATN_FRANZ
 
+#define PIN_SCL				RPI_V2_GPIO_P1_29
+#define PIN_SDA				RPI_V2_GPIO_P1_31
+
 #else
 // if compiling for PC
 
@@ -87,6 +90,9 @@
 #define BCM2835_SPI_CLOCK_DIVIDER_16		0
 #define BCM2835_SPI_CS0						0
 #define BCM2835_SPI_CS1						0
+
+#define PIN_SCL				29
+#define PIN_SDA				31
 
 void bcm2835_gpio_write(int a, int b);
 void bcmSpiAddData(int count, char *data);
