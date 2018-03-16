@@ -1,6 +1,6 @@
 #! /bin/sh
 
-VERSION=1.50
+VERSION=1.55
 BCM="bcm2835-${VERSION}"
 BCMARCHIVE="${BCM}.tar.gz"
 URL="http://www.airspayce.com/mikem/bcm2835/${BCMARCHIVE}"
