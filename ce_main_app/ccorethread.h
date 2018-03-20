@@ -26,11 +26,11 @@ public:
     CCoreThread(ConfigService* configService, FloppyService* floppyService, ScreencastService* screencastService);
     virtual ~CCoreThread();
 
-	void resetHansAndFranz(void);
+    void resetHansAndFranz(void);
     void run(void);
 
     void sendHalfWord(void);
-    virtual void reloadSettings(int type);    								// from ISettingsUser
+    virtual void reloadSettings(int type);                                  // from ISettingsUser
 
     void setFloppyImageLed(int ledNo);
 
@@ -52,9 +52,9 @@ private:
     //-----------------------------------
     // hard disk stuff
     bool            setEnabledIDbits;
-	AcsiIDinfo		acsiIdInfo;
+    AcsiIDinfo      acsiIdInfo;
     RetryModule     *retryMod;
-    
+
     void handleAcsiCommand(void);
     void handleConfigStream(BYTE *cmd);
 
@@ -76,18 +76,18 @@ private:
     void convertXilinxInfo(BYTE xilinxInfo);
     void saveHwConfig(void);
     void getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId);
-    
+
     struct {
         struct {
             WORD acsi;
             WORD fdd;
         } current;
-        
+
         struct {
             WORD acsi;
             WORD fdd;
         } next;
-        
+
         bool skipNextSet;
     } hansConfigWords;
 
@@ -107,7 +107,7 @@ private:
     bool                setNewFloppyImageLed;
     int                 newFloppyImageLed;
     int                 newFloppyImageLedAfterEncode;
-    
+
     void handleSendTrack(void);
     void handleSectorWritten(void);
 
@@ -125,13 +125,15 @@ private:
     //----------------------------------
     // other
     void showHwVersion(void);
-    
+
     void sharedObjects_create(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService);
     void sharedObjects_destroy(void);
+
+    void fillDisplayLines(void);
 };
 
 class LoadTracker {
-public: 
+public:
     struct {
         DWORD start;
         DWORD total;
@@ -149,25 +151,25 @@ public:
         DWORD start;
         DWORD total;
     } busy;
-    
+
     int     loadPercents;                               // contains 0 .. 100, meaning percentage of load
     bool    suspicious;                                 // if the last load percentage was high or cycle time was long, this will be true
-    
+
     LoadTracker(void) {
         clear();
     }
 
-    void calculate(void) {  // call this on the end of 1 second interval to calculate load 
+    void calculate(void) {  // call this on the end of 1 second interval to calculate load
         cycle.total     = Utils::getCurrentMs() - cycle.start;
         loadPercents    = (busy.total * 100) / cycle.total;
-        
+
         suspicious      = false;
-        
+
         if(cycle.total > 1100 || loadPercents > 90) {
             suspicious  = true;
         }
     }
-    
+
     void clear(void) {      // call this on the start of new 1 second interval to clear everything
         loadPercents= 0;
         suspicious  = false;

@@ -124,6 +124,7 @@ void display_setLine(int displayLineId, const char *newLineString)
     }
 
     char *line = display_line[displayLineId];           // get pointer
+    memset(line, ' ', DISP_LINE_MAXLEN);                // clear whole line
     strncpy(line, newLineString, DISP_LINE_MAXLEN);     // copy data
     line[DISP_LINE_MAXLEN] = 0;                         // zero terminate
 }

@@ -35,6 +35,7 @@
 #include "timesync.h"
 
 #include "periodicthread.h"
+#include "display/displaythread.h"
 
 extern THwConfig    hwConfig;
 extern TFlags       flags;
@@ -44,7 +45,7 @@ extern SharedObjects shared;
 
 extern volatile BYTE updateListDownloadStatus;
 
-#define DEV_CHECK_TIME_MS	        3000
+#define DEV_CHECK_TIME_MS           3000
 #define UPDATE_CHECK_TIME           1000
 #define INET_IFACE_CHECK_TIME       1000
 #define UPDATE_SCRIPTS_TIME         10000
@@ -54,6 +55,7 @@ extern volatile BYTE updateListDownloadStatus;
 
 static void handleConfigStreams(ConfigStream *cs, ConfigPipes &cp);
 static void updateUpdateState(void);
+static void fillNetworkDisplayLines(void);
 
 void *periodicThreadCode(void *ptr)
 {
@@ -67,7 +69,7 @@ void *periodicThreadCode(void *ptr)
     unsigned long wait;
     DWORD now;
 
-	Debug::out(LOG_DEBUG, "Periodic thread starting...");
+    Debug::out(LOG_DEBUG, "Periodic thread starting...");
 
     DWORD nextUpdateCheckTime           = Utils::getEndTime(5000);          // create a time when update download status should be checked
 
@@ -86,13 +88,13 @@ void *periodicThreadCode(void *ptr)
     }
 
     DevFinder devFinder;
-	devFinder.lookForDevChanges();				            // look for devices attached / detached
+    devFinder.lookForDevChanges();                          // look for devices attached / detached
 
     IfaceWatcher ifaceWatcher;
 
     TimeSync timeSync;
 
-	while(sigintReceived == 0) {
+    while(sigintReceived == 0) {
         max_fd = -1;
         FD_ZERO(&readfds);
         FD_ZERO(&writefds);
@@ -116,8 +118,8 @@ void *periodicThreadCode(void *ptr)
             }
 
             // and now try to attach everything back
-            devFinder.clearMap();						            // make all the devices appear as new
-            devFinder.lookForDevChanges();					        // and now find all the devices
+            devFinder.clearMap();                                   // make all the devices appear as new
+            devFinder.lookForDevChanges();                          // and now find all the devices
 
             shared.devFinder_detachAndLook  = false;
             shared.devFinder_look           = false;
@@ -226,11 +228,14 @@ void *periodicThreadCode(void *ptr)
                 Debug::out(LOG_DEBUG, "periodicThreadCode -- eth0 or wlan0 changed to up, will now download update list");
                 nextUpdateListDownloadTime = Utils::getEndTime(1000);
             }
+
+            // fill network into for display as we might have new address or something
+            fillNetworkDisplayLines();
         }
 
         //------------------------------------
         // should we check for the new devices?
-		if(inotifyFd >= 0 && FD_ISSET(inotifyFd, &readfds)) {
+        if(inotifyFd >= 0 && FD_ISSET(inotifyFd, &readfds)) {
             char buf[sizeof(struct inotify_event) + NAME_MAX + 1];
             res = read(inotifyFd, buf, sizeof(buf));
             if(res < 0) {
@@ -239,9 +244,9 @@ void *periodicThreadCode(void *ptr)
                 struct inotify_event *iev = (struct inotify_event *)buf;
                 Debug::out(LOG_DEBUG, "inotify msg %dbytes wd=%d mask=%04x name=%s", (int)res, iev->wd, iev->mask, (iev->len > 0) ? iev->name : "");
                 // if(iev->mask & IN_DELETE) / & IN_CREATE
-			    devFinder.lookForDevChanges();				            // look for devices attached / detached
+                devFinder.lookForDevChanges();                          // look for devices attached / detached
             }
-		}
+        }
 
         //------------------------------------
         // config streams handling
@@ -257,10 +262,10 @@ void *periodicThreadCode(void *ptr)
             timeSync.process(true);
         }
 
-	}
-	
-	Debug::out(LOG_DEBUG, "Periodic thread terminated.");
-	return 0;
+    }
+
+    Debug::out(LOG_DEBUG, "Periodic thread terminated.");
+    return 0;
 }
 
 static void updateUpdateState(void)
@@ -366,5 +371,27 @@ static void handleConfigStreams(ConfigStream *cs, ConfigPipes &cp)
         pthread_mutex_lock(&shared.mtxConfigStreams);
         cs->processCommand(cmd, cp.fd2);
         pthread_mutex_unlock(&shared.mtxConfigStreams);
+    }
+}
+
+static void fillNetworkDisplayLines(void)
+{
+    BYTE bfr[10];
+    Utils::getIpAdds(bfr);
+
+    char tmp[32];
+
+    if(bfr[0] == 1) {                               // eth0 enabled? add its IP
+        sprintf(tmp, "eth : %d.%d.%d.%d", (int) bfr[1], (int) bfr[2], (int) bfr[3], (int) bfr[4]);
+        display_setLine(DISP_LINE_LAN, tmp);
+    } else {
+        display_setLine(DISP_LINE_LAN, "eth : disabled");
+    }
+
+    if(bfr[5] == 1) {                               // wlan0 enabled? add its IP
+        sprintf(tmp, "wlan: %d.%d.%d.%d", (int) bfr[6], (int) bfr[7], (int) bfr[8], (int) bfr[9]);
+        display_setLine(DISP_LINE_WLAN, tmp);
+    } else {
+        display_setLine(DISP_LINE_WLAN, "wlan: disabled");
     }
 }
