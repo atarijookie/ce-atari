@@ -24,7 +24,7 @@ ifeq ($(ONPC),yes)
 else
     LDLIBS	+= -lbcm2835
     CFLAGS += -I./
-    DISTRO := $( ./whichdistro.sh )
+    DISTRO := $( shell ./whichdistro.sh )
     ifeq ($(DISTRO),yocto)
         OBJDIR = obj/yocto
         TARGET   =  cosmosex_yocto
