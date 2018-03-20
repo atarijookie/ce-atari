@@ -15,6 +15,7 @@
 #include "acsidatatrans.h"
 #include "imagesilo.h"
 #include "floppysetup.h"
+#include "../display/displaythread.h"
 
 #define EMPTY_TRACK_SIZE (15000)
 
@@ -384,6 +385,18 @@ void ImageSilo::setCurrentSlot(int index)
     }
 
     slots[currentSlot].encImage.newContent = false;     // current slot content not changed
+
+    // set the floppy line on display
+    char tmp[32];
+
+    if(currentSlot == EMPTY_IMAGE_SLOT) {		// empty floppy?
+        strcpy  (tmp,     "FDD : empty");
+    } else {									// something selected?
+        snprintf(tmp, 32, "FDD%d: %s", currentSlot, slots[currentSlot].imageFile.c_str());
+    }
+
+    display_setLine(DISP_LINE_FLOPPY, tmp);		// store the floppy display line
+	display_showNow(DISP_SCREEN_HDD1_IDX);		// show it right now - floppy image changed
 }
 
 int ImageSilo::getCurrentSlot(void)
