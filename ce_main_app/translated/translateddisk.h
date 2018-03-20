@@ -159,6 +159,8 @@ public:
 		return conf[driveIndex].hostRootPath.c_str();
 	}
 
+    void fillDisplayLines(void);
+
 private:
 	void mountAndAttachSharedDrive(void);
 	void attachConfigDrive(void);

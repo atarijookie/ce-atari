@@ -46,6 +46,11 @@ int displayPipeFd[2];
  FDD1 image_name_here
  IKBD Kbd Mouse J1 J2
  LAN  192.168.xxx.yyy
+
+ USB tran   ZIP dir
+ config O   shared N
+ drives: CDE
+ 2017-03-20 10:25
  */
 
 // the following array of strings holds every line that can be shown as a raw string, they are filled by rest of the app, and accessed by specified line type number
@@ -53,7 +58,7 @@ int displayPipeFd[2];
 char display_line[DISP_LINE_COUNT][DISP_LINE_MAXLEN + 1];
 
 // each screen here is a group of 4 line numbers, because display can show only 4 lines at the time, and this defines which screen shows which 4 lines
-int display_screens[DISP_SCREEN_COUNT][4] = {DISP_SCREEN_HDD1_LINES, DISP_SCREEN_HDD2_LINES};
+int display_screens[DISP_SCREEN_COUNT][4] = {DISP_SCREEN_HDD1_LINES, DISP_SCREEN_HDD2_LINES, DISP_SCREEN_TRANS_LINES};
 
 // this defines for each existing screen which will be the next screen - this allows us to create a loop between them, plus have extra screens which are not normally shown but switch back to loop
 int display_screens_next[DISP_SCREEN_COUNT];
@@ -72,8 +77,9 @@ void *displayThreadCode(void *ptr)
     int currentScreen = 0;
 
 	// this defines how the screens switch from one to another
-	display_screens_next[DISP_SCREEN_HDD1_IDX] = DISP_SCREEN_HDD2_IDX;
-	display_screens_next[DISP_SCREEN_HDD2_IDX] = DISP_SCREEN_HDD1_IDX;
+	display_screens_next[DISP_SCREEN_HDD1_IDX]  = DISP_SCREEN_HDD2_IDX;
+	display_screens_next[DISP_SCREEN_HDD2_IDX]  = DISP_SCREEN_TRANS_IDX;
+	display_screens_next[DISP_SCREEN_TRANS_IDX] = DISP_SCREEN_HDD1_IDX;
 
     Debug::out(LOG_DEBUG, "Display thread starting...");
 
@@ -175,7 +181,17 @@ static void display_drawScreen(int screenIndex)
 
     int i, y;
     for(i=0; i<4; i++) {
-        const char *lineStr = display_line[screenLines[i]]; // get pointer to string from screen definition
+        int screenLine = screenLines[i];        // which line we should show?
+
+        if(screenLine == DISP_LINE_DATETIME) {  // is it datetime? update it now
+            char humanTime[128];
+            time_t t = time(NULL);
+            struct tm tm = *localtime(&t);
+            sprintf(humanTime, "%04d-%02d-%02d, %02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min);
+            display_setLine(DISP_LINE_DATETIME, humanTime);
+        }
+
+        const char *lineStr = display_line[screenLine]; // get pointer to string from screen definition
         y = i * CHAR_H;
         gfx->drawString(0, y, lineStr);     // show it on display
     }

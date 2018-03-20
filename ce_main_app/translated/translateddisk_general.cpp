@@ -24,7 +24,8 @@
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "desktopcreator.h"
-#include "../downloader.h" 
+#include "../downloader.h"
+#include "../display/displaythread.h"
 
 extern THwConfig hwConfig;
 extern InterProcessEvents events;
@@ -152,8 +153,10 @@ void TranslatedDisk::loadSettings(void)
     if(driveLetters.confDrive >= 0 && driveLetters.confDrive <=15) {        // if got a valid drive letter for config drive
         driveLetters.readOnly = (1 << driveLetters.confDrive);              // make config drive read only
     }
-    
+
     useZipdirNotFile = s.getBool("USE_ZIP_DIR", 1);
+
+    fillDisplayLines();     // fill stuff which should be on display
 }
 
 void TranslatedDisk::reloadSettings(int type)
@@ -1674,4 +1677,32 @@ void TranslatedDisk::driveGetReport(int driveIndex, std::string &reportString)
         default:
             reportString = "unknown";
     }
+}
+
+void TranslatedDisk::fillDisplayLines(void)
+{
+    char tmp[64];
+
+    // mount USB drives as raw/translated + ZIP files are dirs/files
+    Settings s;
+    bool mountRawNotTrans = s.getBool("MOUNT_RAW_NOT_TRANS", 0);
+    strcpy(tmp, mountRawNotTrans ? "USB raw    " : "USB trans  ");
+    strcat(tmp, useZipdirNotFile ? "ZIP dir"     : "ZIP file");
+    display_setLine(DISP_LINE_TRAN_SETT, tmp);
+
+    // what letter is for config and shared drive?
+    sprintf(tmp, "config %c   shared %c", driveLetters.confDrive + 'A', driveLetters.shared + 'A');
+    display_setLine(DISP_LINE_CONF_SHAR, tmp);
+
+    // other drives
+    strcpy(tmp, "drvs: ");
+    for(int i=2; i<MAX_DRIVES; i++) {   // if drive is normal and enabled
+        if(conf[i].enabled && conf[i].translatedType == TRANSLATEDTYPE_NORMAL) {
+            char tmp2[2];
+            tmp2[0] = 'A' + i;  // drive letter
+            tmp2[1] = 0;        // string terminator
+            strcat(tmp, tmp2);  // append
+        }
+    }
+    display_setLine(DISP_LINE_TRAN_DRIV, tmp);
 }
