@@ -6,24 +6,32 @@
 
 #define  i2cbitdelay 50
 
-#define  I2C_ACK  1 
+#define  I2C_ACK  1
 #define  I2C_NAK  0
 
+#ifdef ONPC_NOTHING
+    #define i2c_scl_release() {}
+    #define i2c_sda_release() {}
+    #define i2c_scl_lo()      {}
+    #define i2c_sda_lo()      {}
+    #define i2c_scl_hi()      {}
+    #define i2c_sda_hi()      {}
+#else
+    #define i2c_scl_release() bcm2835_gpio_fsel(PIN_SCL, BCM2835_GPIO_FSEL_INPT);
+    #define i2c_sda_release() bcm2835_gpio_fsel(PIN_SDA, BCM2835_GPIO_FSEL_INPT);
 
-#define i2c_scl_release() bcm2835_gpio_fsel(PIN_SCL, BCM2835_GPIO_FSEL_INPT);
-#define i2c_sda_release() bcm2835_gpio_fsel(PIN_SDA, BCM2835_GPIO_FSEL_INPT);
+    // sets SCL low and drives output
+    #define i2c_scl_lo()    { bcm2835_gpio_write(PIN_SCL, LOW); bcm2835_gpio_fsel(PIN_SCL, BCM2835_GPIO_FSEL_OUTP); bcm2835_gpio_write(PIN_SCL, LOW); }
 
-// sets SCL low and drives output
-#define i2c_scl_lo()    { bcm2835_gpio_write(PIN_SCL, LOW); bcm2835_gpio_fsel(PIN_SCL, BCM2835_GPIO_FSEL_OUTP); bcm2835_gpio_write(PIN_SCL, LOW); }
+    // sets SDA low and drives output
+    #define i2c_sda_lo()    { bcm2835_gpio_write(PIN_SDA, LOW); bcm2835_gpio_fsel(PIN_SDA, BCM2835_GPIO_FSEL_OUTP); bcm2835_gpio_write(PIN_SDA, LOW); }
 
-// sets SDA low and drives output
-#define i2c_sda_lo()    { bcm2835_gpio_write(PIN_SDA, LOW); bcm2835_gpio_fsel(PIN_SDA, BCM2835_GPIO_FSEL_OUTP); bcm2835_gpio_write(PIN_SDA, LOW); }
+    // set SCL high and to input (releases pin) (i.e. change to input, turn on pull up)
+    #define i2c_scl_hi()    { bcm2835_gpio_write(PIN_SCL, HIGH); bcm2835_gpio_fsel(PIN_SCL, BCM2835_GPIO_FSEL_INPT); }
 
-// set SCL high and to input (releases pin) (i.e. change to input, turn on pull up)
-#define i2c_scl_hi()    { bcm2835_gpio_write(PIN_SCL, HIGH); bcm2835_gpio_fsel(PIN_SCL, BCM2835_GPIO_FSEL_INPT); }
-
-// set SDA high and to input (releases pin) (i.e. change to input,turn on pull up)
-#define i2c_sda_hi()    { bcm2835_gpio_write(PIN_SDA, HIGH); bcm2835_gpio_fsel(PIN_SDA, BCM2835_GPIO_FSEL_INPT); }
+    // set SDA high and to input (releases pin) (i.e. change to input,turn on pull up)
+    #define i2c_sda_hi()    { bcm2835_gpio_write(PIN_SDA, HIGH); bcm2835_gpio_fsel(PIN_SDA, BCM2835_GPIO_FSEL_INPT); }
+#endif
 
 //
 // Constructor
@@ -154,8 +162,12 @@ BYTE SoftI2CMaster::i2c_readbit(void)
     i2c_scl_hi();
     usleep(i2cbitdelay);
 
-    bcm2835_gpio_fsel(PIN_SDA, BCM2835_GPIO_FSEL_INPT); // SDA as input
-    BYTE c = bcm2835_gpio_lev(PIN_SDA);                 // read SDA level
+    #ifdef ONPC_NOTHING
+        BYTE c = HIGH;
+    #else
+        bcm2835_gpio_fsel(PIN_SDA, BCM2835_GPIO_FSEL_INPT); // SDA as input
+        BYTE c = bcm2835_gpio_lev(PIN_SDA);                 // read SDA level
+    #endif
 
     i2c_scl_lo();
     usleep(i2cbitdelay);
@@ -171,7 +183,7 @@ void SoftI2CMaster::i2c_init(void)
     //*_sclPortReg &=~ (_sdaBitMask | _sclBitMask);
     i2c_sda_hi();
     i2c_scl_hi();
-    
+
     usleep(i2cbitdelay);
 }
 
