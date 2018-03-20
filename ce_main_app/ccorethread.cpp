@@ -1076,9 +1076,9 @@ void CCoreThread::handleSendTrack(void)
     conSpi->txRx(SPI_CS_FRANZ, remaining, encodedTrack, iBuf);
 
     // now we should do some buzzing because of floppy seek
-    if(prevTrack != track) {						// track changed?
-        int trackDiff = abs(prevTrack - track);		// get how many tracks we've moved
-        beeper_floppySeek(trackDiff);				// do the beep
+    if(prevTrack != track) {                        // track changed?
+        int trackDiff = abs(prevTrack - track);     // get how many tracks we've moved
+        beeper_floppySeek(trackDiff);               // do the beep
         prevTrack = track;
     }
 }

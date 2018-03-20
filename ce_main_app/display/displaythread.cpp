@@ -71,16 +71,16 @@ static void display_drawScreen(int screenIndex);
 
 void *displayThreadCode(void *ptr)
 {
-	// create pipes as needed
+    // create pipes as needed
     pipe2(displayPipeFd, O_NONBLOCK);
     pipe2(beeperPipeFd, O_NONBLOCK);
 
     int currentScreen = 0;
 
-	// this defines how the screens switch from one to another
-	display_screens_next[DISP_SCREEN_HDD1_IDX]  = DISP_SCREEN_HDD2_IDX;
-	display_screens_next[DISP_SCREEN_HDD2_IDX]  = DISP_SCREEN_TRANS_IDX;
-	display_screens_next[DISP_SCREEN_TRANS_IDX] = DISP_SCREEN_HDD1_IDX;
+    // this defines how the screens switch from one to another
+    display_screens_next[DISP_SCREEN_HDD1_IDX]  = DISP_SCREEN_HDD2_IDX;
+    display_screens_next[DISP_SCREEN_HDD2_IDX]  = DISP_SCREEN_TRANS_IDX;
+    display_screens_next[DISP_SCREEN_TRANS_IDX] = DISP_SCREEN_HDD1_IDX;
 
     Debug::out(LOG_DEBUG, "Display thread starting...");
 
@@ -88,37 +88,37 @@ void *displayThreadCode(void *ptr)
 
     gfx = new Adafruit_GFX(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);    // font displaying library
 
-	// fd vars for select()
-	fd_set readfds;
+    // fd vars for select()
+    fd_set readfds;
     int max_fd = (displayPipeFd[0] > beeperPipeFd[0]) ? displayPipeFd[0] : beeperPipeFd[0];
-	struct timeval timeout;
+    struct timeval timeout;
 
     while(sigintReceived == 0) {
-		// set timeout - might be changed by select(), so set every time before select()
-		timeout.tv_sec = 5;
-		timeout.tv_usec = 0;
+        // set timeout - might be changed by select(), so set every time before select()
+        timeout.tv_sec = 5;
+        timeout.tv_usec = 0;
 
-	    // init fd set
-    	FD_ZERO(&readfds);
-	    FD_SET(displayPipeFd[0], &readfds);
-	    FD_SET(beeperPipeFd[0], &readfds);
+        // init fd set
+        FD_ZERO(&readfds);
+        FD_SET(displayPipeFd[0], &readfds);
+        FD_SET(beeperPipeFd[0], &readfds);
 
         // wait for pipe or timeout
         int res = select(max_fd + 1, &readfds, NULL, NULL, &timeout);
 
         bool redrawDisplay = false;
 
-		if(res > 0) {			// if some fd is ready
+        if(res > 0) {           // if some fd is ready
             // display trigger pipe is ready
             if(FD_ISSET(displayPipeFd[0], &readfds)) {
-				char newDisplayIndex = 0;
-				res = read(displayPipeFd[0], &newDisplayIndex, 1);	// try to read new display index
+                char newDisplayIndex = 0;
+                res = read(displayPipeFd[0], &newDisplayIndex, 1);  // try to read new display index
 
-				if(res != -1) {	// read good? store new display index
-    				currentScreen = newDisplayIndex;
+                if(res != -1) { // read good? store new display index
+                    currentScreen = newDisplayIndex;
                     redrawDisplay = true;
                 }
-			}
+            }
 
             // beeper pipe is ready?
             if(FD_ISSET(beeperPipeFd[0], &readfds)) {
@@ -129,7 +129,7 @@ void *displayThreadCode(void *ptr)
                     doBeep(beeperCommand);
                 }
             }
-		} else if(res == 0) {   // on timeout
+        } else if(res == 0) {   // on timeout
             redrawDisplay = true;
         }
 
@@ -139,18 +139,18 @@ void *displayThreadCode(void *ptr)
             display_drawScreen(currentScreen);
 
             // move to next screen
-    		currentScreen = display_screens_next[currentScreen];
+            currentScreen = display_screens_next[currentScreen];
         }
     }
 
     display_print_center("CosmosEx stopped");
     display_deinit();
 
-	// close the pipes
-	close(displayPipeFd[0]);
-	close(displayPipeFd[1]);
-	close(beeperPipeFd[0]);
-	close(beeperPipeFd[1]);
+    // close the pipes
+    close(displayPipeFd[0]);
+    close(displayPipeFd[1]);
+    close(beeperPipeFd[0]);
+    close(beeperPipeFd[1]);
 
     Debug::out(LOG_DEBUG, "Display thread terminated.");
     return 0;
@@ -253,16 +253,16 @@ static void display_drawScreen(int screenIndex)
 
 void display_showNow(int screenIndex)
 {
-	// bad screen index? do nothing
-	if(screenIndex < 0 || screenIndex >= DISP_SCREEN_COUNT) {
-		return;
-	}
+    // bad screen index? do nothing
+    if(screenIndex < 0 || screenIndex >= DISP_SCREEN_COUNT) {
+        return;
+    }
 
-	// got pipe?
-	if(displayPipeFd[1] != -1) {
-		char outBfr = (char) screenIndex;
-		write(displayPipeFd[1], &outBfr, 1);	// send screen index through pipe
-	}
+    // got pipe?
+    if(displayPipeFd[1] != -1) {
+        char outBfr = (char) screenIndex;
+        write(displayPipeFd[1], &outBfr, 1);    // send screen index through pipe
+    }
 }
 
 void beeper_beep(int beepLen)
@@ -272,11 +272,11 @@ void beeper_beep(int beepLen)
         return;
     }
 
-	// got pipe?
-	if(beeperPipeFd[1] != -1) {
-		char outBfr = (char) beepLen;
-		write(beeperPipeFd[1], &outBfr, 1);
-	}
+    // got pipe?
+    if(beeperPipeFd[1] != -1) {
+        char outBfr = (char) beepLen;
+        write(beeperPipeFd[1], &outBfr, 1);
+    }
 }
 
 void beeper_floppySeek(int trackCount)
@@ -286,9 +286,9 @@ void beeper_floppySeek(int trackCount)
         return;
     }
 
-	// got pipe?
-	if(beeperPipeFd[1] != -1) {
-		char outBfr = (char) (trackCount + BEEP_FLOPPY_SEEK);
-		write(beeperPipeFd[1], &outBfr, 1);
-	}
+    // got pipe?
+    if(beeperPipeFd[1] != -1) {
+        char outBfr = (char) (trackCount + BEEP_FLOPPY_SEEK);
+        write(beeperPipeFd[1], &outBfr, 1);
+    }
 }

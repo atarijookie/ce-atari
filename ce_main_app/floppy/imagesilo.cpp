@@ -389,14 +389,14 @@ void ImageSilo::setCurrentSlot(int index)
     // set the floppy line on display
     char tmp[32];
 
-    if(currentSlot == EMPTY_IMAGE_SLOT) {		// empty floppy?
+    if(currentSlot == EMPTY_IMAGE_SLOT) {       // empty floppy?
         strcpy  (tmp,     "FDD : empty");
-    } else {									// something selected?
+    } else {                                    // something selected?
         snprintf(tmp, 32, "FDD%d: %s", currentSlot, slots[currentSlot].imageFile.c_str());
     }
 
-    display_setLine(DISP_LINE_FLOPPY, tmp);		// store the floppy display line
-	display_showNow(DISP_SCREEN_HDD1_IDX);		// show it right now - floppy image changed
+    display_setLine(DISP_LINE_FLOPPY, tmp);     // store the floppy display line
+    display_showNow(DISP_SCREEN_HDD1_IDX);      // show it right now - floppy image changed
 
     beeper_beep(BEEP_SHORT);                    // do a beep on button press / changing floppy slot
 }
