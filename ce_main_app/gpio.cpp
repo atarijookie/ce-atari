@@ -49,7 +49,7 @@ void bcm2835_spi_transfernb(char *txBuf, char *rxBuf, int c) { }
 
 pthread_mutex_t tcpMutex = PTHREAD_MUTEX_INITIALIZER;
 
-void bcm2835_gpio_write(int a, int b) 
+void bcm2835_gpio_write(int a, int b)
 {
     pthread_mutex_lock(&tcpMutex);
 
@@ -195,8 +195,8 @@ bool gpio_open(void)
 		Debug::out(LOG_ERROR, "bcm2835_init failed, can't use GPIO.");
         return false;
 	}
-	
-	// pins for XILINX programming	
+
+	// pins for XILINX programming
 	// outputs: TDI (GPIO3), TCK (GPIO4), TMS (GPIO17)
 	bcm2835_gpio_fsel(PIN_TDI,	BCM2835_GPIO_FSEL_OUTP);		// TDI
 	bcm2835_gpio_fsel(PIN_TMS,	BCM2835_GPIO_FSEL_OUTP);		// TMS
@@ -206,35 +206,36 @@ bool gpio_open(void)
 
 	bcm2835_gpio_write(PIN_TDI,	LOW);
 	bcm2835_gpio_write(PIN_TMS,	LOW);
-	bcm2835_gpio_write(PIN_TCK,	LOW);	
-	
-	
-	// pins for both STM32 programming 
+	bcm2835_gpio_write(PIN_TCK,	LOW);
+
+
+	// pins for both STM32 programming
 	bcm2835_gpio_fsel(PIN_RESET_HANS,		BCM2835_GPIO_FSEL_OUTP);
 	bcm2835_gpio_fsel(PIN_RESET_FRANZ,		BCM2835_GPIO_FSEL_OUTP);
 //	bcm2835_gpio_fsel(PIN_TXD,				BCM2835_GPIO_FSEL_OUTP);
-//	bcm2835_gpio_fsel(PIN_RXD,				BCM2835_GPIO_FSEL_INPT);					
+//	bcm2835_gpio_fsel(PIN_RXD,				BCM2835_GPIO_FSEL_INPT);
 	bcm2835_gpio_fsel(PIN_TX_SEL1N2,		BCM2835_GPIO_FSEL_OUTP);
 	bcm2835_gpio_fsel(PIN_BOOT0_FRANZ_HANS,	BCM2835_GPIO_FSEL_OUTP);
 
 	bcm2835_gpio_write(PIN_TX_SEL1N2,			HIGH);
 	bcm2835_gpio_write(PIN_BOOT0_FRANZ_HANS,	LOW);		// BOOT0: L means boot from flash, H means boot the boot loader
-	
+
 	bcm2835_gpio_write(PIN_RESET_HANS,			HIGH);		// reset lines to RUN (not reset) state
 	bcm2835_gpio_write(PIN_RESET_FRANZ,			HIGH);
 
-	
+	bcm2835_gpio_fsel(PIN_BEEPER,           BCM2835_GPIO_FSEL_OUTP);
+
 	// pins for communication with Franz and Hans
-	bcm2835_gpio_fsel(PIN_ATN_HANS,			BCM2835_GPIO_FSEL_INPT);			
+	bcm2835_gpio_fsel(PIN_ATN_HANS,			BCM2835_GPIO_FSEL_INPT);
 	bcm2835_gpio_fsel(PIN_ATN_FRANZ,		BCM2835_GPIO_FSEL_INPT);
 //	bcm2835_gpio_fsel(PIN_CS_HANS,			BCM2835_GPIO_FSEL_OUTP);
 //	bcm2835_gpio_fsel(PIN_CS_FRANZ,			BCM2835_GPIO_FSEL_OUTP);
 //	bcm2835_gpio_fsel(PIN_MOSI,				BCM2835_GPIO_FSEL_OUTP);
 //	bcm2835_gpio_fsel(PIN_MISO,				BCM2835_GPIO_FSEL_INPT);
 //	bcm2835_gpio_fsel(PIN_SCK,				BCM2835_GPIO_FSEL_OUTP);
-	
+
 	spi_init();
-	
+
 	return true;
 }
 

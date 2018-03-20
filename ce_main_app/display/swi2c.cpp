@@ -4,7 +4,7 @@
 #include "../gpio.h"
 #include "swi2c.h"
 
-#define  i2cbitdelay 50
+#define  i2cbitdelay 5
 
 #define  I2C_ACK  1
 #define  I2C_NAK  0
@@ -198,7 +198,7 @@ void SoftI2CMaster::i2c_start(void)
     i2c_scl_hi();
 
     usleep(i2cbitdelay);
-   
+
     i2c_sda_lo();
     usleep(i2cbitdelay);
 
@@ -258,7 +258,7 @@ BYTE SoftI2CMaster::i2c_read( BYTE ack )
 
     for ( BYTE i=0;i<8;i++) {
         res <<= 1;
-        res |= i2c_readbit();  
+        res |= i2c_readbit();
     }
 
     if ( ack )

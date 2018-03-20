@@ -1047,6 +1047,7 @@ int CCoreThread::bcdToInt(int bcd)
 void CCoreThread::handleSendTrack(void)
 {
     BYTE oBuf[2], iBuf[15000];
+    static int prevTrack = 0;
 
     memset(oBuf, 0, 2);
     conSpi->txRx(SPI_CS_FRANZ, 2, oBuf, iBuf);
@@ -1073,6 +1074,13 @@ void CCoreThread::handleSendTrack(void)
     }
 
     conSpi->txRx(SPI_CS_FRANZ, remaining, encodedTrack, iBuf);
+
+    // now we should do some buzzing because of floppy seek
+    if(prevTrack != track) {						// track changed?
+        int trackDiff = abs(prevTrack - track);		// get how many tracks we've moved
+        beeper_floppySeek(trackDiff);				// do the beep
+        prevTrack = track;
+    }
 }
 
 void CCoreThread::handleSectorWritten(void)

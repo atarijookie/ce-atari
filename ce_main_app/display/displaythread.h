@@ -1,6 +1,8 @@
 #ifndef DISPLAYTHREAD_H
 #define DISPLAYTHREAD_H
 
+//----------------------------
+// display related stuff
 void display_init(void);
 void display_deinit(void);
 void display_print_center(const char *str);
@@ -30,6 +32,17 @@ void display_setLine(int displayLineId, const char *newLineString);
 void display_showNow(int screenIndex);
 
 void *displayThreadCode(void *ptr);
+
+//----------------------------
+// beeper related stuff
+#define BEEP_SHORT       0
+#define BEEP_MEDIUM      1
+#define BEEP_LONG        2
+
+#define BEEP_FLOPPY_SEEK 0x80
+
+void beeper_beep(int beepLen);
+void beeper_floppySeek(int trackCount);
 
 #endif /* DISPLAYTHREAD_H */
 

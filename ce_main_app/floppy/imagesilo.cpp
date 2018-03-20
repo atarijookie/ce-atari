@@ -397,6 +397,8 @@ void ImageSilo::setCurrentSlot(int index)
 
     display_setLine(DISP_LINE_FLOPPY, tmp);		// store the floppy display line
 	display_showNow(DISP_SCREEN_HDD1_IDX);		// show it right now - floppy image changed
+
+    beeper_beep(BEEP_SHORT);                    // do a beep on button press / changing floppy slot
 }
 
 int ImageSilo::getCurrentSlot(void)
