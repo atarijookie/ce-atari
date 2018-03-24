@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "../gpio.h"
 #include "swi2c.h"
@@ -179,8 +180,6 @@ BYTE SoftI2CMaster::i2c_readbit(void)
 //
 void SoftI2CMaster::i2c_init(void)
 {
-    //I2C_PORT &=~ (_BV( I2C_SDA ) | _BV( I2C_SCL ));
-    //*_sclPortReg &=~ (_sdaBitMask | _sclBitMask);
     i2c_sda_hi();
     i2c_scl_hi();
 
@@ -287,4 +286,23 @@ BYTE SoftI2CMaster::read()
 BYTE SoftI2CMaster::readLast()
 {
     return i2c_read( I2C_NAK );
+}
+
+void SoftI2CMaster::scan(void)
+{
+    printf("I2C scanner\n");
+
+    i2c_init();
+
+    int addr;
+    for(addr=0; addr<256; addr++) {
+        if(addr % 16 == 0) {
+            printf("\n%02x: ", addr);
+        }
+
+        int res = beginTransmission(addr);
+        endTransmission();
+
+        printf("%d ", res == 0);
+    }
 }

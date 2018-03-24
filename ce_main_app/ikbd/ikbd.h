@@ -67,6 +67,7 @@ public:
     Ikbd();
 
     void loadSettings(void);
+    void fillDisplayLine(void);
 
     void findDevices(void);
     void findVirtualDevices();
@@ -182,7 +183,6 @@ private:
     bool gotUsbKeyboard(void);
     bool gotUsbJoy1(void);
     bool gotUsbJoy2(void);
-	void fillDisplayLine(void);
 
     void handlePcKeyAsKeybJoy(int joyNumber, int pcKey, int eventValue);
     bool handleStKeyAsKeybJoy(BYTE val);

@@ -25,10 +25,12 @@ private:
   void i2c_stop(void);
   BYTE i2c_write( BYTE c );
   BYTE i2c_read( BYTE ack );
-  
+
 public:
   // public methods
   SoftI2CMaster();
+
+  void scan(void);
 
   BYTE beginTransmission(BYTE address);
   BYTE beginTransmission(int address);

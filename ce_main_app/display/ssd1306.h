@@ -86,12 +86,12 @@ All text above, and the splash screen must be included in any redistribution
 #define SSD1306_VERTICAL_AND_LEFT_HORIZONTAL_SCROLL 0x2A
 
 
-  void ssd1306_begin(BYTE vccstate);
+  bool ssd1306_begin(BYTE vccstate);
   void ssd1306_drawPixel(WORD x, WORD y, WORD color);
   void ssd1306_clearDisplay(void);
   void ssd1306_display(void);
 
-  void ssd1306_command(BYTE c);
+  int  ssd1306_command(BYTE c);
 
   void invertDisplay(BYTE i);
   void display();

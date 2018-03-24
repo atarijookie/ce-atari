@@ -658,7 +658,7 @@ void CCoreThread::fillDisplayLines(void)
     for(i=0; i<8; i++) {
         // first HDD line: just enabled IDs
         strcpy(tmp, "x ");
-        tmp[1] = (acsiIdInfo.enabledIDbits & (1 << i)) ? '0' + i : '-';    // show ID if enabled, dash if not enabled
+        tmp[0] = (acsiIdInfo.enabledIDbits & (1 << i)) ? '0' + i : '-';    // show ID if enabled, dash if not enabled
         strcat(tmpLine1, tmp);     // add to 1st line
 
         // second HDD line: IDs vs. device types

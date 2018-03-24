@@ -23,7 +23,7 @@ BYTE _vccstate;
 extern SoftI2CMaster *i2c;
 
 // the memory buffer for the LCD
-static BYTE buffer[SSD1306_LCDHEIGHT * SSD1306_LCDWIDTH / 8];
+static BYTE buffer[SSD1306_LCDHEIGHT * BYTES_PER_LINE];
 
 int getRotation(void)
 {
@@ -57,17 +57,23 @@ void ssd1306_drawPixel(WORD x, WORD y, WORD color)
   // x is which column
     switch (color)
     {
-      case WHITE:   buffer[x+ (y/8)*SSD1306_LCDWIDTH] |=  (1 << (y&7)); break;
-      case BLACK:   buffer[x+ (y/8)*SSD1306_LCDWIDTH] &= ~(1 << (y&7)); break;
-      case INVERSE: buffer[x+ (y/8)*SSD1306_LCDWIDTH] ^=  (1 << (y&7)); break;
+      case WHITE:   buffer[x+ y*BYTES_PER_LINE] |=  (1 << (y&7)); break;
+      case BLACK:   buffer[x+ y*BYTES_PER_LINE] &= ~(1 << (y&7)); break;
+      case INVERSE: buffer[x+ y*BYTES_PER_LINE] ^=  (1 << (y&7)); break;
     }
 }
 
-void ssd1306_begin(BYTE vccstate) {
+bool ssd1306_begin(BYTE vccstate) {
     _vccstate = vccstate;
 
+    int res;
+
   // Init sequence
-  ssd1306_command(SSD1306_DISPLAYOFF);                    // 0xAE
+  res = ssd1306_command(SSD1306_DISPLAYOFF);              // 0xAE
+
+  if(!res)      // if 1st command failed, don't bother with the rest
+      return false;
+
   ssd1306_command(SSD1306_SETDISPLAYCLOCKDIV);            // 0xD5
   ssd1306_command(0x80);                                  // the suggested ratio 0x80
 
@@ -78,10 +84,13 @@ void ssd1306_begin(BYTE vccstate) {
   ssd1306_command(0x0);                                   // no offset
   ssd1306_command(SSD1306_SETSTARTLINE | 0x0);            // line #0
   ssd1306_command(SSD1306_CHARGEPUMP);                    // 0x8D
-  if (vccstate == SSD1306_EXTERNALVCC)
-    { ssd1306_command(0x10); }
-  else
-    { ssd1306_command(0x14); }
+
+  if (vccstate == SSD1306_EXTERNALVCC) {
+    ssd1306_command(0x10);
+  } else {
+    ssd1306_command(0x14); 
+  }
+  
   ssd1306_command(SSD1306_MEMORYMODE);                    // 0x20
   ssd1306_command(0x00);                                  // 0x0 act like ks0108
   ssd1306_command(SSD1306_SEGREMAP | 0x1);
@@ -89,7 +98,7 @@ void ssd1306_begin(BYTE vccstate) {
 
  #if defined SSD1306_128_32
   ssd1306_command(SSD1306_SETCOMPINS);                    // 0xDA
-  ssd1306_command(0x02);
+  ssd1306_command(0x02); 
   ssd1306_command(SSD1306_SETCONTRAST);                   // 0x81
   ssd1306_command(0x8F);
 
@@ -125,7 +134,8 @@ void ssd1306_begin(BYTE vccstate) {
 
   ssd1306_command(SSD1306_DEACTIVATE_SCROLL);
 
-  ssd1306_command(SSD1306_DISPLAYON);//--turn on oled panel
+  ssd1306_command(SSD1306_DISPLAYON);                     // turn on oled panel
+  return true;
 }
 
 
@@ -137,14 +147,18 @@ void invertDisplay(BYTE i) {
   }
 }
 
-void ssd1306_command(BYTE c) {
+int ssd1306_command(BYTE c) {
     BYTE bfr[2];
     bfr[0] = 0;
     bfr[1] = c;
-    
-    i2c->beginTransmission(SSD1306_I2C_ADDRESS);
+
+    int res;
+
+    res = i2c->beginTransmission(SSD1306_I2C_ADDRESS);
     i2c->write(bfr, 2);
     i2c->endTransmission();
+
+    return (res == 0);      // if ACK bit on beginTransmission was 0, this command went OK
 }
 
 // startscrollright
@@ -236,7 +250,7 @@ void dim(int dim) {
   ssd1306_command(contrast);
 }
 
-void ssd1306_display(void) 
+void ssd1306_display(void)
 {
     ssd1306_command(SSD1306_COLUMNADDR);
     ssd1306_command(0);   // Column start address (0 = reset)
@@ -253,7 +267,7 @@ void ssd1306_display(void)
         BYTE bfr[1 + BYTES_PER_LINE];
         bfr[0] = 0x40;
         memcpy(bfr + 1, buffer + (y * BYTES_PER_LINE), BYTES_PER_LINE);
-        
+
         i2c->beginTransmission(SSD1306_I2C_ADDRESS);
         i2c->write(bfr, 1 + BYTES_PER_LINE);
         i2c->endTransmission();

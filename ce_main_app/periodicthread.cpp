@@ -87,6 +87,8 @@ void *periodicThreadCode(void *ptr)
         if(wd < 0) Debug::out(LOG_ERROR, "inotify_add_watch(%s, IN_CREATE|IN_DELETE) failed", path);
     }
 
+    fillNetworkDisplayLines();
+    
     DevFinder devFinder;
     devFinder.lookForDevChanges();                          // look for devices attached / detached
 
