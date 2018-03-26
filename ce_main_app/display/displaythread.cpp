@@ -57,8 +57,9 @@ static void doBeep(int beeperCommand);
  */
 
 // the following array of strings holds every line that can be shown as a raw string, they are filled by rest of the app, and accessed by specified line type number
-#define DISP_LINE_MAXLEN 21
-char display_line[DISP_LINE_COUNT][DISP_LINE_MAXLEN + 1];
+#define DISP_LINE_MAXLEN    21
+#define DISPLAY_LINES_SIZE  (DISP_LINE_COUNT * (DISP_LINE_MAXLEN + 1))
+char *display_line;
 
 // each screen here is a group of 4 line numbers, because display can show only 4 lines at the time, and this defines which screen shows which 4 lines
 int display_screens[DISP_SCREEN_COUNT][4] = {DISP_SCREEN_HDD1_LINES, DISP_SCREEN_HDD2_LINES, DISP_SCREEN_TRANS_LINES};
@@ -74,6 +75,9 @@ void *displayThreadCode(void *ptr)
     // create pipes as needed
     pipe2(displayPipeFd, O_NONBLOCK);
     pipe2(beeperPipeFd, O_NONBLOCK);
+
+    display_line = new char[DISPLAY_LINES_SIZE];
+    memset(display_line, 0, DISPLAY_LINES_SIZE);
 
     int currentScreen = 0;
 
@@ -105,6 +109,10 @@ void *displayThreadCode(void *ptr)
 
         // wait for pipe or timeout
         int res = select(max_fd + 1, &readfds, NULL, NULL, &timeout);
+
+        if(res < 0) {       // on select() error and signal received
+            continue;
+        }
 
         bool redrawDisplay = false;
 
@@ -143,14 +151,24 @@ void *displayThreadCode(void *ptr)
         }
     }
 
-    display_print_center("CosmosEx stopped");
+    // following line currently causes SEGFAULT
+    //display_print_center("CosmosEx stopped");
+
     display_deinit();
 
     // close the pipes
     close(displayPipeFd[0]);
+    displayPipeFd[0] = 0;
     close(displayPipeFd[1]);
+    displayPipeFd[1] = 0;
+
     close(beeperPipeFd[0]);
+    beeperPipeFd[0] = 0;
     close(beeperPipeFd[1]);
+    beeperPipeFd[1] = 0;
+
+    delete []display_line;
+    display_line = NULL;
 
     Debug::out(LOG_DEBUG, "Display thread terminated.");
     return 0;
@@ -159,8 +177,14 @@ void *displayThreadCode(void *ptr)
 void display_init(void)
 {
     i2c = new SoftI2CMaster();              // software I2C master on GPIO pins
+    bool res = ssd1306_begin(SSD1306_SWITCHCAPVCC);    // low level OLED library
 
-    ssd1306_begin(SSD1306_SWITCHCAPVCC);    // low level OLED library
+    Debug::out(LOG_INFO, "Front display init: %s", res ? "OK" : "FAILED");
+
+    if(!res) {
+        return;
+    }
+
     ssd1306_clearDisplay();
     ssd1306_display();
 }
@@ -173,7 +197,7 @@ void display_deinit(void)
 
 void display_print_center(const char *str)
 {
-    int len = strlen(str);
+    int len = strnlen(str, 32);
     int x = (SSD1306_LCDWIDTH - (CHAR_W * len)) / 2;
     int y = (SSD1306_LCDHEIGHT - CHAR_H)/2;
 
@@ -188,7 +212,11 @@ void display_setLine(int displayLineId, const char *newLineString)
          return;
     }
 
-    char *line = display_line[displayLineId];           // get pointer
+    if(display_line == NULL) {
+        return;
+    }
+
+    char *line = display_line + (displayLineId * (DISP_LINE_MAXLEN + 1)); // get pointer
     memset(line, ' ', DISP_LINE_MAXLEN);                // clear whole line
     strncpy(line, newLineString, DISP_LINE_MAXLEN);     // copy data
     line[DISP_LINE_MAXLEN] = 0;                         // zero terminate
@@ -230,6 +258,8 @@ static void doBeep(int beeperCommand)
 
 static void display_drawScreen(int screenIndex)
 {
+    ssd1306_clearDisplay();
+
     // get lines numbers from the specified screen number - this will be 4 indexes of lines in screenLines[]
     int *screenLines = (int *) &display_screens[screenIndex];
 
@@ -245,10 +275,13 @@ static void display_drawScreen(int screenIndex)
             display_setLine(DISP_LINE_DATETIME, humanTime);
         }
 
-        const char *lineStr = display_line[screenLine]; // get pointer to string from screen definition
+        char *lineStr = display_line + (screenLine * (DISP_LINE_MAXLEN + 1));   // get pointer to string from screen definition
+
         y = i * CHAR_H;
         gfx->drawString(0, y, lineStr);     // show it on display
     }
+
+    ssd1306_display();
 }
 
 void display_showNow(int screenIndex)
@@ -259,7 +292,7 @@ void display_showNow(int screenIndex)
     }
 
     // got pipe?
-    if(displayPipeFd[1] != -1) {
+    if(displayPipeFd[1] > 0) {
         char outBfr = (char) screenIndex;
         write(displayPipeFd[1], &outBfr, 1);    // send screen index through pipe
     }
@@ -273,7 +306,7 @@ void beeper_beep(int beepLen)
     }
 
     // got pipe?
-    if(beeperPipeFd[1] != -1) {
+    if(beeperPipeFd[1] > 0) {
         char outBfr = (char) beepLen;
         write(beeperPipeFd[1], &outBfr, 1);
     }
@@ -287,7 +320,7 @@ void beeper_floppySeek(int trackCount)
     }
 
     // got pipe?
-    if(beeperPipeFd[1] != -1) {
+    if(beeperPipeFd[1] > 0) {
         char outBfr = (char) (trackCount + BEEP_FLOPPY_SEEK);
         write(beeperPipeFd[1], &outBfr, 1);
     }

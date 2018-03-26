@@ -35,10 +35,8 @@ public:
   BYTE beginTransmission(BYTE address);
   BYTE beginTransmission(int address);
   BYTE endTransmission(void);
-  BYTE write(BYTE);
-  void write(BYTE*, BYTE);
-  void write(int);
-  void write(char*);
+  BYTE write(BYTE data);
+  void write(BYTE *data, BYTE len);
   void begin(void) {return;};
   BYTE requestFrom(int address);
   BYTE requestFrom(BYTE address);

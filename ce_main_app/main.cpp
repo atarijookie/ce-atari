@@ -247,14 +247,14 @@ int main(int argc, char *argv[])
 	handlePthreadCreate(res, "ce floppy encode", &floppyEncThreadInfo);
 
     res = pthread_create(&periodicThreadInfo, NULL, periodicThreadCode, NULL);  // create the periodic thread and run it
-	handlePthreadCreate(res, "periodic", &periodicThreadInfo);
+    handlePthreadCreate(res, "periodic", &periodicThreadInfo);
     
     res = pthread_create(&displayThreadInfo, NULL, displayThreadCode, NULL);  // create the display thread and run it
     handlePthreadCreate(res, "display", &displayThreadInfo);
         
     printf("Entering main loop...\n");
     
-	core->run();										// run the main thread
+    core->run();                // run the main thread
 
     printf("\n\nExit from main loop\n");
 
@@ -280,12 +280,12 @@ int main(int argc, char *argv[])
     pxVMouseService->stop();
     delete pxVMouseService;
 
-	delete core;
-	gpio_close();										// close gpio and spi
+    delete core;
+    gpio_close();										// close gpio and spi
 
     printf("Stoping mount thread\n");
     Mounter::stop();
-	pthread_join(mountThreadInfo, NULL);				// wait until mount     thread finishes
+    pthread_join(mountThreadInfo, NULL);				// wait until mount     thread finishes
 
     printf("Stoping download thread\n");
     Downloader::stop();
@@ -293,7 +293,7 @@ int main(int argc, char *argv[])
 
 #ifndef ONPC_NOTHING
     printf("Stoping ikbd thread\n");
-	pthread_kill(ikbdThreadInfo, SIGINT);               // stop the select()
+    pthread_kill(ikbdThreadInfo, SIGINT);               // stop the select()
     pthread_join(ikbdThreadInfo, NULL);                 // wait until ikbd      thread finishes
 #endif
 
@@ -302,9 +302,11 @@ int main(int argc, char *argv[])
     pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes
 
     printf("Stoping periodic thread\n");
-	pthread_kill(periodicThreadInfo, SIGINT);               // stop the select()
+    pthread_kill(periodicThreadInfo, SIGINT);           // stop the select()
     pthread_join(periodicThreadInfo, NULL);             // wait until periodic  thread finishes
 
+    printf("Stopping display thread\n");
+    pthread_kill(displayThreadInfo, SIGINT);           // stop the select()
     pthread_join(displayThreadInfo, NULL);             // wait until display thread finishes
 
     printf("Downloader clean up before quit\n");

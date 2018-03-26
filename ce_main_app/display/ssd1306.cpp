@@ -11,6 +11,7 @@ All text above, and the splash screen below must be included in any redistributi
 *********************************************************************/
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "ssd1306.h"
@@ -25,48 +26,33 @@ extern SoftI2CMaster *i2c;
 // the memory buffer for the LCD
 static BYTE buffer[SSD1306_LCDHEIGHT * BYTES_PER_LINE];
 
-int getRotation(void)
-{
-    return 0;
-}
-
 #define ssd1306_swap(a, b) { WORD t = a; a = b; b = t; }
 
 // the most basic function, set a single pixel
 void ssd1306_drawPixel(WORD x, WORD y, WORD color)
 {
-  if ((x < 0) || (x >= SSD1306_LCDWIDTH) || (y < 0) || (y >= SSD1306_LCDHEIGHT))
-    return;
+    if ((x < 0) || (x >= SSD1306_LCDWIDTH) || (y < 0) || (y >= SSD1306_LCDHEIGHT))
+        return;
 
-  // check rotation, move pixel around if necessary
-  switch (getRotation()) {
-  case 1:
-    ssd1306_swap(x, y);
-    x = SSD1306_LCDWIDTH - x - 1;
-    break;
-  case 2:
-    x = SSD1306_LCDWIDTH - x - 1;
-    y = SSD1306_LCDHEIGHT - y - 1;
-    break;
-  case 3:
-    ssd1306_swap(x, y);
-    y = SSD1306_LCDHEIGHT - y - 1;
-    break;
-  }
-
-  // x is which column
+    WORD idx = x + (y/8) * SSD1306_LCDWIDTH;
+  
+    if(idx >= sizeof(buffer)) {
+        return;
+    }
+  
+    // x is which column
     switch (color)
     {
-      case WHITE:   buffer[x+ y*BYTES_PER_LINE] |=  (1 << (y&7)); break;
-      case BLACK:   buffer[x+ y*BYTES_PER_LINE] &= ~(1 << (y&7)); break;
-      case INVERSE: buffer[x+ y*BYTES_PER_LINE] ^=  (1 << (y&7)); break;
+        case WHITE:   buffer[idx] |=  (1 << (y&7)); break;
+        case BLACK:   buffer[idx] &= ~(1 << (y&7)); break;
+        case INVERSE: buffer[idx] ^=  (1 << (y&7)); break;
     }
 }
 
 bool ssd1306_begin(BYTE vccstate) {
     _vccstate = vccstate;
 
-    int res;
+  int res;
 
   // Init sequence
   res = ssd1306_command(SSD1306_DISPLAYOFF);              // 0xAE
@@ -264,16 +250,17 @@ void ssd1306_display(void)
 
     int y;
     for (y=0; y<SSD1306_LCDHEIGHT; y++) {
-        BYTE bfr[1 + BYTES_PER_LINE];
+        BYTE bfr[BYTES_PER_LINE + 1];
+        
         bfr[0] = 0x40;
         memcpy(bfr + 1, buffer + (y * BYTES_PER_LINE), BYTES_PER_LINE);
 
         i2c->beginTransmission(SSD1306_I2C_ADDRESS);
-        i2c->write(bfr, 1 + BYTES_PER_LINE);
+        i2c->write(bfr, BYTES_PER_LINE + 1);
         i2c->endTransmission();
     }
 }
 
 void ssd1306_clearDisplay(void) {
-    memset(buffer, 0, BYTES_PER_LINE * SSD1306_LCDHEIGHT);
+    memset(buffer, 0, sizeof(buffer));
 }

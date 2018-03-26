@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "../gpio.h"
 #include "swi2c.h"
@@ -34,9 +35,8 @@
     #define i2c_sda_hi()    { bcm2835_gpio_write(PIN_SDA, HIGH); bcm2835_gpio_fsel(PIN_SDA, BCM2835_GPIO_FSEL_INPT); }
 #endif
 
-//
-// Constructor
-//
+#define sleep_func(X) bcm2835_delayMicroseconds(X)
+
 SoftI2CMaster::SoftI2CMaster()
 {
     i2c_init();
@@ -90,9 +90,6 @@ BYTE SoftI2CMaster::beginTransmission(int address)
     return beginTransmission((BYTE)address);
 }
 
-//
-//
-//
 BYTE SoftI2CMaster::endTransmission(void)
 {
     i2c_stop();
@@ -110,27 +107,11 @@ BYTE SoftI2CMaster::write(BYTE data)
 // must be called in:
 // slave tx event callback
 // or after beginTransmission(address)
-void SoftI2CMaster::write(BYTE* data, BYTE quantity)
+void SoftI2CMaster::write(BYTE* data, BYTE len)
 {
-    for(BYTE i = 0; i < quantity; ++i){
-        write(data[i]);
+    for(BYTE i = 0; i <len; ++i){
+        i2c_write(data[i]);
     }
-}
-
-// must be called in:
-// slave tx event callback
-// or after beginTransmission(address)
-void SoftI2CMaster::write(char* data)
-{
-    write((BYTE*)data, strlen(data));
-}
-
-// must be called in:
-// slave tx event callback
-// or after beginTransmission(address)
-void SoftI2CMaster::write(int data)
-{
-    write((BYTE)data);
 }
 
 //--------------------------------------------------------------------
@@ -145,15 +126,15 @@ void SoftI2CMaster::i2c_writebit( BYTE c )
     }
 
     i2c_scl_hi();
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 
     i2c_scl_lo();
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 
     if ( c > 0 ) {
         i2c_sda_lo();
     }
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 }
 
 //
@@ -161,7 +142,7 @@ BYTE SoftI2CMaster::i2c_readbit(void)
 {
     i2c_sda_hi();
     i2c_scl_hi();
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 
     #ifdef ONPC_NOTHING
         BYTE c = HIGH;
@@ -171,7 +152,7 @@ BYTE SoftI2CMaster::i2c_readbit(void)
     #endif
 
     i2c_scl_lo();
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 
     return (c == HIGH);
 }
@@ -183,7 +164,7 @@ void SoftI2CMaster::i2c_init(void)
     i2c_sda_hi();
     i2c_scl_hi();
 
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 }
 
 // Send a START Condition
@@ -196,13 +177,13 @@ void SoftI2CMaster::i2c_start(void)
     i2c_sda_hi();
     i2c_scl_hi();
 
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 
     i2c_sda_lo();
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 
     i2c_scl_lo();
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 }
 
 void SoftI2CMaster::i2c_repstart(void)
@@ -214,16 +195,16 @@ void SoftI2CMaster::i2c_repstart(void)
     i2c_scl_hi();
 
     i2c_scl_lo();                           // force SCL low
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 
     i2c_sda_release();                      // release SDA
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 
     i2c_scl_release();                      // release SCL
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 
     i2c_sda_lo();                           // force SDA low
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 }
 
 // Send a STOP Condition
@@ -231,10 +212,10 @@ void SoftI2CMaster::i2c_repstart(void)
 void SoftI2CMaster::i2c_stop(void)
 {
     i2c_scl_hi();
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 
     i2c_sda_hi();
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 }
 
 // write a byte to the I2C slave device
@@ -265,7 +246,7 @@ BYTE SoftI2CMaster::i2c_read( BYTE ack )
     else
         i2c_writebit( 1 );
 
-    usleep(i2cbitdelay);
+    sleep_func(i2cbitdelay);
 
     return res;
 }

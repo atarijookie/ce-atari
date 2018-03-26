@@ -31,6 +31,8 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdio.h>
+
 #include "../datatypes.h"
 #include "lcdfont.h"
 #include "adafruit_gfx.h"
@@ -51,7 +53,7 @@ void Adafruit_GFX::drawString(int x, int y, const char *text)
     while(*text != 0) {                 // while it's not the end of string
         drawChar(x, y, (BYTE) *text);   // draw one char
         text++;                         // move to next char
-        x += CHAR_W;        
+        x += CHAR_W;
     }
 }
 
@@ -63,11 +65,11 @@ void Adafruit_GFX::drawChar(int x, int y, BYTE c)
     }
 
     BYTE color;
-    
+
     for(int i=0; i<5; i++ ) { // Char bitmap = 5 columns
         const BYTE *pColumn = &font[c * 5 + i];         // get addr of column representing bit for char c
         BYTE columnBits = *pColumn;                     // get value from that addr
-        
+
         for(int j=0; j<8; j++, columnBits >>= 1) {
             color = (columnBits & 1) ? WHITE : BLACK;   // select color based on bit set or not
             ssd1306_drawPixel(x+i, y+j, color);         // draw it
@@ -87,7 +89,7 @@ void Adafruit_GFX::write(BYTE c)
         cursor_y += textsize * 8;          // advance y one line
         return;
     }
-    
+
     if(wrap && ((cursor_x + textsize * 6) > _width)) { // Off right?
         cursor_x  = 0;                 // Reset x to zero,
         cursor_y += textsize * 8;      // advance y one line
@@ -121,12 +123,12 @@ int Adafruit_GFX::height(void) const {
 void Adafruit_GFX::rect(int x, int y, int w, int h)
 {
     int i;
-    
+
     for(i=0; i<w; i++) {
         ssd1306_drawPixel(x+i, y,     WHITE);
         ssd1306_drawPixel(x+i, y+h-1, WHITE);
     }
-    
+
     for(i=0; i<h; i++) {
         ssd1306_drawPixel(x,     y+i, WHITE);
         ssd1306_drawPixel(x+w-1, y+i, WHITE);

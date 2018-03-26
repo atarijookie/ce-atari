@@ -381,19 +381,19 @@ static void fillNetworkDisplayLines(void)
     BYTE bfr[10];
     Utils::getIpAdds(bfr);
 
-    char tmp[32];
+    char tmp[64];
 
     if(bfr[0] == 1) {                               // eth0 enabled? add its IP
-        sprintf(tmp, "eth : %d.%d.%d.%d", (int) bfr[1], (int) bfr[2], (int) bfr[3], (int) bfr[4]);
+        sprintf(tmp, "LAN : %d.%d.%d.%d", (int) bfr[1], (int) bfr[2], (int) bfr[3], (int) bfr[4]);
         display_setLine(DISP_LINE_LAN, tmp);
     } else {
-        display_setLine(DISP_LINE_LAN, "eth : disabled");
+        display_setLine(DISP_LINE_LAN, "LAN : disabled");
     }
 
     if(bfr[5] == 1) {                               // wlan0 enabled? add its IP
-        sprintf(tmp, "wlan: %d.%d.%d.%d", (int) bfr[6], (int) bfr[7], (int) bfr[8], (int) bfr[9]);
+        sprintf(tmp, "WLAN: %d.%d.%d.%d", (int) bfr[6], (int) bfr[7], (int) bfr[8], (int) bfr[9]);
         display_setLine(DISP_LINE_WLAN, tmp);
     } else {
-        display_setLine(DISP_LINE_WLAN, "wlan: disabled");
+        display_setLine(DISP_LINE_WLAN, "WLAN: disabled");
     }
 }

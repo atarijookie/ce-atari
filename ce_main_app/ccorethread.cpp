@@ -647,9 +647,9 @@ void CCoreThread::fillDisplayLines(void)
     const char *devTypeString[MAX_DEV_TYPES] = {"OFF", "SD", "RAW", "CE"};
 
     if(hwConfig.hddIface == HDD_IF_ACSI) {  // is ACSI?
-        strcpy(tmpLine1, "ACSI ");
+        strcpy(tmpLine1, "ACSI: ");
     } else {                                // is SCSI?
-        strcpy(tmpLine1, "SCSI ");
+        strcpy(tmpLine1, "SCSI: ");
     }
 
     strcpy(tmpLine2, tmpLine1);
