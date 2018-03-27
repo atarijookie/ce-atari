@@ -187,7 +187,7 @@ void display_deinit(void)
     display = NULL;
 }
 
-void display_ce_logo(void)
+static void display_ce_logo(void)
 {
     const static BYTE logo[128] =
     { 0x00,0x00,0x00,0x00, 0x0f,0x80,0x01,0xf0, 0x0f,0x80,0x01,0xf0, 0x1c,0x07,0xe0,0x38, 0x18,0x38,0x1c,0x18, 0x38,0xc1,0x83,0x1c,
@@ -215,68 +215,93 @@ void display_ce_logo(void)
     }
 }
 
-void display_print_center(char *msg)
+#define LOGO_WIDTH          32
+#define MSG_MAX_WIDTH       (SSD1306_LCDWIDTH - LOGO_WIDTH)
+#define MSG_MAX_LINES       (SSD1306_LCDHEIGHT / CHAR_H)
+#define MSG_MAX_LINE_LENGTH (MSG_MAX_WIDTH / CHAR_W)
+
+static int getLineSplitLen(char *input)
 {
-    display->clearDisplay();
+    int len = strlen(input);            // get length of the string
+    if(len <= MSG_MAX_LINE_LENGTH) {    // if it would fit completely, return whole string length
+        return len;                     // could be zero on no more string
+    }
 
-    display_ce_logo();
+    // the string will not fit in one piece, find where we can split it
+    char *sepPrev = NULL;
+    char *sepNext = NULL;
+    sepNext = strstr(input, " ");       // find where the next separator is
 
-    #define LOGO_WIDTH      32
-    #define MSG_MAX_WIDTH   (SSD1306_LCDWIDTH - LOGO_WIDTH)
+    while(1) {
+        len = sepNext - input;          // length of string from begining to this separator
 
-    int len = strnlen(msg, 32);
-
-    int stringWidth = len * CHAR_W;     // string width = char count * char width
-    int yCenter = (SSD1306_LCDHEIGHT - CHAR_H)  / 2;
-
-    if(stringWidth <= MSG_MAX_WIDTH) {  // will fit without line wrap?
-        int x = (MSG_MAX_WIDTH - stringWidth) / 2;
-
-        gfx->drawString(LOGO_WIDTH + x, yCenter, msg);
-        display->display();
-    } else {                            // string will not fit without wrap?
-        int x, y=0;
-
-        while(true) {
-            char *pch = strstr(msg, "\n");  // try to find where the line should be split
-
-            if(pch == NULL) {               // if newline wasn't found
-                pch = strstr(msg, " ");     // try to split on space
+        if(len > MSG_MAX_LINE_LENGTH) { // if the string up to this separator will NOT fit
+            if(sepPrev != NULL) {       // got previous separator? return that length
+                return (sepPrev - input);
+            } else {                    // no previous separator? just cut it in the middle of the word
+                return MSG_MAX_LINE_LENGTH; // return maximum what can be cut from this line
             }
-
-            if(pch == NULL) {               // no split? print and quit
-                len = strlen(msg);
-                stringWidth = len * CHAR_W;
-
-                if(stringWidth <= MSG_MAX_WIDTH) {  // string narrower than what we can print? center it
-                    x = LOGO_WIDTH + (MSG_MAX_WIDTH - stringWidth) / 2;
-                } else {                            // wider than what we can print? print next to logo
-                    x = LOGO_WIDTH;
-                }
-
-                gfx->drawString(x, y, msg);
-                break;
-            }
-
-            // can split?
-            len = pch - msg;           // how many chars to new line separator?
-            #define LINELEN  16
-            char tmp[LINELEN];
-            int goodLen = MIN(len, (LINELEN-1));   // take whole string or just part which fits into tmp[]
-            strncpy(tmp, msg, goodLen);     // copy it
-            tmp[goodLen] = 0;               // terminate it
-
-            msg = pch + 1;                  // move behind line separator
-            len = strnlen(tmp, LINELEN);
-            stringWidth = len * CHAR_W;
-            x = LOGO_WIDTH + (MSG_MAX_WIDTH - stringWidth) / 2;
-
-            gfx->drawString(x, y, tmp);
-            y += CHAR_H;
         }
 
-        display->display();
+        // string still would fit
+        sepPrev = sepNext;
+        sepNext = strstr(sepPrev + 1, " "); // find next, starting from this one
     }
+}
+
+static int splitIntoLines(char *input, int linesCount)
+{
+    char *tmp = new char[MSG_MAX_LINE_LENGTH + 1];
+    int lc = 0;
+
+    int y=0;
+    if(linesCount != -1) {                              // if should draw, not just count
+        linesCount = MIN(linesCount, MSG_MAX_LINES);    // draw maximum 4 lines
+        y = (SSD1306_LCDHEIGHT - (linesCount * CHAR_H)) / 2;    // calculate at which y should we start to be centered
+    }
+
+    while(1) {
+        int len = getLineSplitLen(input);
+
+        if(len == 0) {                                  // end of string?
+            break;
+        }
+
+        if(linesCount != -1) {                          // if linesCount isn't -1, should draw on display
+            int skip = (input[0] == ' ') ? 1 : 0;       // skip first if it's blank
+
+            memset(tmp, 0, MSG_MAX_LINE_LENGTH + 1);    // clear buffer
+            memcpy(tmp, input + skip, len - skip);      // copy string part
+
+            int stringWidth = (len - skip) * CHAR_W;    // string width = char count * char width
+            int x = LOGO_WIDTH + (MSG_MAX_WIDTH - stringWidth) / 2;
+            gfx->drawString(x, y, tmp);                 // draw on screen
+
+            y += CHAR_H;                                // move to next line
+        }
+
+        lc++;
+
+        if(lc >= MSG_MAX_LINES) {                       // if it's more lines than we can draw, just quit
+            break;
+        }
+
+        input += len;                                   // move forward in string
+    }
+
+    delete []tmp;
+    return lc;
+}
+
+void display_print_center(char *msg)
+{
+    display->clearDisplay();    // clear display buffer
+    display_ce_logo();          // copy CE logo into buffer
+
+    int linesCount = splitIntoLines(msg, -1);           // call 1st time just to count lines (for y-centering)
+                     splitIntoLines(msg, linesCount);   // call 2nd time to draw those lines centered
+
+    display->display();         // show the buffer on display
 }
 
 char *get_displayLinePtr(int displayLineId)

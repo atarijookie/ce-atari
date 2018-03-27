@@ -98,6 +98,7 @@
 
 void bcm2835_gpio_write(int a, int b);
 void bcmSpiAddData(int count, char *data);
+void bcm2835_delayMicroseconds(DWORD a);
 
 #endif
 

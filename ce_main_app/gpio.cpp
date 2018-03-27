@@ -142,6 +142,7 @@ void bcm2835_close(void) {}
 void bcm2835_gpio_write(int a, int b) {}
 int  bcm2835_gpio_lev(int a) {return 0; }
 void bcm2835_spi_transfernb(char *txBuf, char *rxBuf, int c) { }
+void bcm2835_delayMicroseconds(DWORD a) {};
 void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf){}
 bool spi_atn(int whichSpiAtn) { return false; }
 #endif
