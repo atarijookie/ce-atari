@@ -26,15 +26,14 @@
 #include "ssd1306.h"
 #include "adafruit_gfx.h"
 #include "lcdfont.h"
-#include "swi2c.h"
 #include "displaythread.h"
 
 extern THwConfig hwConfig;
 extern TFlags    flags;
 extern DebugVars dbgVars;
 
+SSD1306 *display;
 Adafruit_GFX *gfx;
-SoftI2CMaster *i2c;
 
 int displayPipeFd[2];
 int beeperPipeFd[2];
@@ -59,7 +58,7 @@ static void doBeep(int beeperCommand);
 // the following array of strings holds every line that can be shown as a raw string, they are filled by rest of the app, and accessed by specified line type number
 #define DISP_LINE_MAXLEN    21
 #define DISPLAY_LINES_SIZE  (DISP_LINE_COUNT * (DISP_LINE_MAXLEN + 1))
-char *display_line;
+char display_lines[DISPLAY_LINES_SIZE];
 
 // each screen here is a group of 4 line numbers, because display can show only 4 lines at the time, and this defines which screen shows which 4 lines
 int display_screens[DISP_SCREEN_COUNT][4] = {DISP_SCREEN_HDD1_LINES, DISP_SCREEN_HDD2_LINES, DISP_SCREEN_TRANS_LINES};
@@ -70,14 +69,14 @@ int display_screens_next[DISP_SCREEN_COUNT];
 // draw specified screen on front display
 static void display_drawScreen(int screenIndex);
 
+// get pointer to buffer where the line string should be stored
+static char *get_displayLinePtr(int displayLineId);
+
 void *displayThreadCode(void *ptr)
 {
     // create pipes as needed
     pipe2(displayPipeFd, O_NONBLOCK);
     pipe2(beeperPipeFd, O_NONBLOCK);
-
-    display_line = new char[DISPLAY_LINES_SIZE];
-    memset(display_line, 0, DISPLAY_LINES_SIZE);
 
     int currentScreen = 0;
 
@@ -89,8 +88,6 @@ void *displayThreadCode(void *ptr)
     Debug::out(LOG_DEBUG, "Display thread starting...");
 
     display_init();
-
-    gfx = new Adafruit_GFX(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);    // font displaying library
 
     // fd vars for select()
     fd_set readfds;
@@ -151,9 +148,6 @@ void *displayThreadCode(void *ptr)
         }
     }
 
-    // following line currently causes SEGFAULT
-    //display_print_center("CosmosEx stopped");
-
     display_deinit();
 
     // close the pipes
@@ -167,32 +161,30 @@ void *displayThreadCode(void *ptr)
     close(beeperPipeFd[1]);
     beeperPipeFd[1] = 0;
 
-    delete []display_line;
-    display_line = NULL;
-
     Debug::out(LOG_DEBUG, "Display thread terminated.");
     return 0;
 }
 
 void display_init(void)
 {
-    i2c = new SoftI2CMaster();              // software I2C master on GPIO pins
-    bool res = ssd1306_begin(SSD1306_SWITCHCAPVCC);    // low level OLED library
+    display = new SSD1306();
+
+    bool res = display->begin(SSD1306_SWITCHCAPVCC);    // low level OLED library
+    display->clearDisplay();
+    display->display();
 
     Debug::out(LOG_INFO, "Front display init: %s", res ? "OK" : "FAILED");
 
-    if(!res) {
-        return;
-    }
-
-    ssd1306_clearDisplay();
-    ssd1306_display();
+    gfx = new Adafruit_GFX(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT, display);    // font displaying library
 }
 
 void display_deinit(void)
 {
     delete gfx;
-    delete i2c;
+    gfx = NULL;
+
+    delete display;
+    display = NULL;
 }
 
 void display_print_center(const char *str)
@@ -201,22 +193,33 @@ void display_print_center(const char *str)
     int x = (SSD1306_LCDWIDTH - (CHAR_W * len)) / 2;
     int y = (SSD1306_LCDHEIGHT - CHAR_H)/2;
 
-    ssd1306_clearDisplay();
+    display->clearDisplay();
     gfx->drawString(x, y, str);
-    ssd1306_display();
+    display->display();
+}
+
+char *get_displayLinePtr(int displayLineId)
+{
+    if(displayLineId < 0 || displayLineId >= DISP_LINE_COUNT) {  // verify array index validity
+         return NULL;
+    }
+
+    if(display_lines == NULL) {
+        return NULL;
+    }
+
+    char *line = display_lines + (displayLineId * (DISP_LINE_MAXLEN + 1)); // get pointer
+    return line;
 }
 
 void display_setLine(int displayLineId, const char *newLineString)
 {
-    if(displayLineId < 0 || displayLineId >= DISP_LINE_COUNT) {  // verify array index validity
-         return;
-    }
+    char *line = get_displayLinePtr(displayLineId);
 
-    if(display_line == NULL) {
+    if(line == NULL) {
         return;
     }
 
-    char *line = display_line + (displayLineId * (DISP_LINE_MAXLEN + 1)); // get pointer
     memset(line, ' ', DISP_LINE_MAXLEN);                // clear whole line
     strncpy(line, newLineString, DISP_LINE_MAXLEN);     // copy data
     line[DISP_LINE_MAXLEN] = 0;                         // zero terminate
@@ -258,7 +261,7 @@ static void doBeep(int beeperCommand)
 
 static void display_drawScreen(int screenIndex)
 {
-    ssd1306_clearDisplay();
+    display->clearDisplay();
 
     // get lines numbers from the specified screen number - this will be 4 indexes of lines in screenLines[]
     int *screenLines = (int *) &display_screens[screenIndex];
@@ -271,17 +274,21 @@ static void display_drawScreen(int screenIndex)
             char humanTime[128];
             time_t t = time(NULL);
             struct tm tm = *localtime(&t);
-            sprintf(humanTime, "%04d-%02d-%02d, %02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min);
+            sprintf(humanTime, "%04d-%02d-%02d    %02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min);
             display_setLine(DISP_LINE_DATETIME, humanTime);
         }
 
-        char *lineStr = display_line + (screenLine * (DISP_LINE_MAXLEN + 1));   // get pointer to string from screen definition
+        char *line = get_displayLinePtr(screenLine);
+
+        if(line == NULL) {
+            continue;
+        }
 
         y = i * CHAR_H;
-        gfx->drawString(0, y, lineStr);     // show it on display
+        gfx->drawString(0, y, line);            // show it on display
     }
 
-    ssd1306_display();
+    display->display();
 }
 
 void display_showNow(int screenIndex)

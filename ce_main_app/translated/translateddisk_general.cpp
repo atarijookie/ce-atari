@@ -1691,7 +1691,7 @@ void TranslatedDisk::fillDisplayLines(void)
     display_setLine(DISP_LINE_TRAN_SETT, tmp);
 
     // what letter is for config and shared drive?
-    sprintf(tmp, "config %c   shared %c", driveLetters.confDrive + 'A', driveLetters.shared + 'A');
+    sprintf(tmp, "config:%c   shared:%c", driveLetters.confDrive + 'A', driveLetters.shared + 'A');
     display_setLine(DISP_LINE_CONF_SHAR, tmp);
 
     // other drives

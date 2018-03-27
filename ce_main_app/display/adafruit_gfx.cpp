@@ -38,7 +38,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "adafruit_gfx.h"
 #include "ssd1306.h"
 
-Adafruit_GFX::Adafruit_GFX(int w, int h):
+Adafruit_GFX::Adafruit_GFX(int w, int h, SSD1306 *display):
 WIDTH(w), HEIGHT(h)
 {
     _width    = WIDTH;
@@ -46,6 +46,7 @@ WIDTH(w), HEIGHT(h)
     cursor_x  = 0;
     cursor_y  = 0;
     wrap      = true;
+    this->display = display;
 }
 
 void Adafruit_GFX::drawString(int x, int y, const char *text)
@@ -71,8 +72,8 @@ void Adafruit_GFX::drawChar(int x, int y, BYTE c)
         BYTE columnBits = *pColumn;                     // get value from that addr
 
         for(int j=0; j<8; j++, columnBits >>= 1) {
-            color = (columnBits & 1) ? WHITE : BLACK;   // select color based on bit set or not
-            ssd1306_drawPixel(x+i, y+j, color);         // draw it
+            color = (columnBits & 1) ? SSD1306_WHITE : SSD1306_BLACK;   // select color based on bit set or not
+            display->drawPixel(x+i, y+j, color);         // draw it
         }
     }
 }
@@ -125,12 +126,12 @@ void Adafruit_GFX::rect(int x, int y, int w, int h)
     int i;
 
     for(i=0; i<w; i++) {
-        ssd1306_drawPixel(x+i, y,     WHITE);
-        ssd1306_drawPixel(x+i, y+h-1, WHITE);
+        display->drawPixel(x+i, y,     SSD1306_WHITE);
+        display->drawPixel(x+i, y+h-1, SSD1306_WHITE);
     }
 
     for(i=0; i<h; i++) {
-        ssd1306_drawPixel(x,     y+i, WHITE);
-        ssd1306_drawPixel(x+w-1, y+i, WHITE);
+        display->drawPixel(x,     y+i, SSD1306_WHITE);
+        display->drawPixel(x+w-1, y+i, SSD1306_WHITE);
     }
 }

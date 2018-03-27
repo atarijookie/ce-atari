@@ -16,28 +16,29 @@ BSD license, check license.txt for more information
 All text above, and the splash screen must be included in any redistribution
 *********************************************************************/
 
-#ifndef _ssd1306_H_
-#define _ssd1306_H_
+#ifndef _SSD1306_H_
+#define _SSD1306_H_
 
 #include "../datatypes.h"
+#include "swi2c.h"
 
-#define BLACK 0
-#define WHITE 1
-#define INVERSE 2
+#define SSD1306_BLACK 0
+#define SSD1306_WHITE 1
+#define SSD1306_INVERSE 2
 
 #define SSD1306_I2C_ADDRESS   0x3C  // 011110+SA0+RW - 0x3C or 0x3D
 
 // Address for 128x32 is 0x3C
 // Address for 128x64 is 0x3D (default) or 0x3C (if SA0 is grounded)
 
-
-   #define SSD1306_128_32
 /*=========================================================================*/
 
-#define SSD1306_LCDWIDTH                  128
-#define SSD1306_LCDHEIGHT                 32
+#define SSD1306_LCDWIDTH        128
+#define SSD1306_LCDHEIGHT       32
 
-#define BYTES_PER_LINE      (SSD1306_LCDWIDTH/8)
+#define SSD1306_BYTES_PER_LINE  (SSD1306_LCDWIDTH/8)
+
+#define SSD1306_BUFFER_SIZE     (SSD1306_LCDHEIGHT * SSD1306_BYTES_PER_LINE)
 
 #define SSD1306_SETCONTRAST 0x81
 #define SSD1306_DISPLAYALLON_RESUME 0xA4
@@ -85,16 +86,18 @@ All text above, and the splash screen must be included in any redistribution
 #define SSD1306_VERTICAL_AND_RIGHT_HORIZONTAL_SCROLL 0x29
 #define SSD1306_VERTICAL_AND_LEFT_HORIZONTAL_SCROLL 0x2A
 
+class SSD1306 {
+public:
+  SSD1306();
+  ~SSD1306();
 
-  bool ssd1306_begin(BYTE vccstate);
-  void ssd1306_drawPixel(WORD x, WORD y, WORD color);
-  void ssd1306_clearDisplay(void);
-  void ssd1306_display(void);
-
-  int  ssd1306_command(BYTE c);
+  bool begin(BYTE vccstate);
+  void drawPixel(WORD x, WORD y, WORD color);
+  void clearDisplay(void);
+  void display(void);
+  int  command(BYTE c);
 
   void invertDisplay(BYTE i);
-  void display();
 
   void startscrollright(BYTE start, BYTE stop);
   void startscrollleft(BYTE start, BYTE stop);
@@ -105,12 +108,10 @@ All text above, and the splash screen must be included in any redistribution
 
   void dim(int dim);
 
-  void drawPixel(WORD x, WORD y, WORD color);
+private:
+    SoftI2CMaster *i2c;
+    BYTE *buffer;
+    BYTE vccstate;
+};
 
-  void drawFastVLine(WORD x, WORD y, WORD h, WORD color);
-  void drawFastHLine(WORD x, WORD y, WORD w, WORD color);
-
-  void drawFastVLineInternal(WORD x, WORD y, WORD h, WORD color);
-  void drawFastHLineInternal(WORD x, WORD y, WORD w, WORD color);
-
-#endif /* _ssd1306_H_ */
+#endif /* _SSD1306_H_ */

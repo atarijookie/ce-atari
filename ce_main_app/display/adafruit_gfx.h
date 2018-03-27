@@ -1,11 +1,13 @@
 #ifndef _ADAFRUIT_GFX_H
 #define _ADAFRUIT_GFX_H
 
+#include "ssd1306.h"
+
 class Adafruit_GFX {
 
  public:
 
-  Adafruit_GFX(int w, int h); // Constructor
+  Adafruit_GFX(int w, int h, SSD1306 *display); // Constructor
 
   void setCursor(int x, int y);
 
@@ -21,7 +23,7 @@ class Adafruit_GFX {
   // get current cursor position (get rotation safe maximum values, using: width() for x, height() for y)
   int getCursorX(void) const;
   int getCursorY(void) const;
-  
+
   void rect(int x, int y, int w, int h);
 
  protected:
@@ -30,8 +32,10 @@ class Adafruit_GFX {
   int cursor_x, cursor_y;
   BYTE textcolor, textbgcolor;
   BYTE textsize, rotation;
-  
+
   bool wrap;
+
+  SSD1306 *display;
 };
 
 #endif // _ADAFRUIT_GFX_H
