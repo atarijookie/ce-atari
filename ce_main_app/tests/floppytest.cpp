@@ -7,8 +7,10 @@
 volatile sig_atomic_t sigintReceived = 0;
 TFlags flags;
 
-void test(const char * filename)
+// returns 0 for success
+int test(const char * filename)
 {
+    int ret = 0;
     int tracks, sides, sectorsPerTrack;
     ImageSilo* pxImageSilo = new ImageSilo();
     pxImageSilo->setCurrentSlot(0);
@@ -28,12 +30,14 @@ void test(const char * filename)
             std::cout << sides << " sides, " << tracks << " tracks of " << sectorsPerTrack << " sectors." << std::endl;
         else
             std::cout << "*** Failed to getParams() ***" << std::endl;
-        Utils::sleepMs(100);
+        Utils::sleepMs(500);
         std::cout << "containsImage(" << sFile << ")=" << pxImageSilo->containsImage(sFile.c_str()) << std::endl;
     } while (pxImageSilo->getFloppyEncodingRunning());
     if (pxImageSilo->getParams(tracks, sides, sectorsPerTrack)) {
         int track, side;
         std::cout << sides << " sides, " << tracks << " tracks of " << sectorsPerTrack << " sectors." << std::endl;
+        if (tracks == 0 || sides == 0)
+            ret = 3;
         for (track = 0; track < tracks; track++) {
             for (side = 0; side < sides; side++) {
                 int trackdatalen;
@@ -45,18 +49,24 @@ void test(const char * filename)
                     FILE * f = fopen(tmp, "wb");
                     fwrite(trackdata, 1, trackdatalen, f);
                     fclose(f);
-                } else
+                } else {
                     std::cout << "*** getEncodedTrack(" << track << ", " << side << ") failed ***" << std::endl;
+                    ret = 2;
+                }
             }
         }
-    } else
+    } else {
         std::cout << "*** Failed to getParams() ***" << std::endl;
+        ret = 1;
+    }
     delete pxImageSilo;
+    return ret;
 }
 
 int main(int argc, char * * argv)
 {
-    const char * image_filename = "";
+    int r;
+    const char * image_filename = "/tmp/emptyimage.st";
     pthread_t  floppyEncThreadInfo;
 
     if (argc > 1)
@@ -64,10 +74,10 @@ int main(int argc, char * * argv)
     std::cout << "testing floppy code" << std::endl;
     if (pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL) != 0)
         std::cout << "pthread_create error" << std::endl;
-    test(image_filename);
+    r = test(image_filename);
     printf("Stoping floppy encoder thread\n");
     ImageSilo::stop();
     pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes
 
-    return 0;
+    return r;
 }
