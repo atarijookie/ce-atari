@@ -5,24 +5,24 @@
 
 // defines for Floppy part
 // commands sent from device to host
-#define ATN_FW_VERSION              0x01       		// followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
+#define ATN_FW_VERSION              0x01            // followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
 #define ATN_SEND_NEXT_SECTOR        0x02            // sent: 2, side, track #, current sector #, 0, 0, 0, 0 (length: 4 WORDs)
 #define ATN_SECTOR_WRITTEN          0x03            // sent: 3, side (highest bit) + track #, current sector #
 #define ATN_SEND_TRACK              0x04            // send the whole track
 
 // commands sent from host to device
-#define CMD_WRITE_PROTECT_OFF		0x10
-#define CMD_WRITE_PROTECT_ON		0x20
-#define CMD_DISK_CHANGE_OFF			0x30
-#define CMD_DISK_CHANGE_ON			0x40
-#define CMD_CURRENT_SECTOR			0x50								// followed by sector #
-#define CMD_GET_FW_VERSION			0x60
-#define CMD_SET_DRIVE_ID_0			0x70
-#define CMD_SET_DRIVE_ID_1			0x80
+#define CMD_WRITE_PROTECT_OFF       0x10
+#define CMD_WRITE_PROTECT_ON        0x20
+#define CMD_DISK_CHANGE_OFF         0x30
+#define CMD_DISK_CHANGE_ON          0x40
+#define CMD_CURRENT_SECTOR          0x50                                // followed by sector #
+#define CMD_GET_FW_VERSION          0x60
+#define CMD_SET_DRIVE_ID_0          0x70
+#define CMD_SET_DRIVE_ID_1          0x80
 #define CMD_CURRENT_TRACK           0x90                                // followed by track #
 #define CMD_DRIVE_ENABLED           0xa0
 #define CMD_DRIVE_DISABLED          0xb0
-#define CMD_MARK_READ				0xF000                              // this is not sent from host, but just a mark that this WORD has been read and you shouldn't continue to read further
+#define CMD_MARK_READ               0xF000                              // this is not sent from host, but just a mark that this WORD has been read and you shouldn't continue to read further
 
 #define MFM_4US     1
 #define MFM_6US     2
@@ -35,18 +35,18 @@
                                 // MM/DD/YY
 
 
-#define DEVTYPE_OFF					0
+#define DEVTYPE_OFF                 0
 #define DEVTYPE_SD                  1
-#define DEVTYPE_RAW					2
-#define DEVTYPE_TRANSLATED			3
+#define DEVTYPE_RAW                 2
+#define DEVTYPE_TRANSLATED          3
 
 // typed of devices / modules we support
-#define HOSTMOD_CONFIG				1
-#define HOSTMOD_LINUX_TERMINAL		2
-#define HOSTMOD_TRANSLATED_DISK		3
-#define HOSTMOD_NETWORK_ADAPTER		4
+#define HOSTMOD_CONFIG              1
+#define HOSTMOD_LINUX_TERMINAL      2
+#define HOSTMOD_TRANSLATED_DISK     3
+#define HOSTMOD_NETWORK_ADAPTER     4
 #define HOSTMOD_FDD_SETUP           5
-#define HOSTMOD_MEDIA_STREAMING		6
+#define HOSTMOD_MEDIA_STREAMING     6
 
 //////////////////////////////////////////////////////
 // commands for HOSTMOD_TRANSLATED_DISK
@@ -93,14 +93,15 @@ typedef struct {
     bool noFranz;               // if set to true, won't communicate with Franz
     bool ikbdLogs;              // if set to true, will generate ikbd logs file
     bool fakeOldApp;            // if set to true, will always return old app version, so you can test app installation over and over
-    
+    bool display;               // if set to true, show string on front display, if possible
+
     bool gotHansFwVersion;
     bool gotFranzFwVersion;
 } TFlags;
 
 typedef struct {
     volatile BYTE insertSpecialFloppyImageId;
-    
+
     volatile bool screenShotVblEnabled;
     volatile bool doScreenShot;
 } InterProcessEvents;

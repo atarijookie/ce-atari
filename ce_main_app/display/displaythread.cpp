@@ -187,15 +187,96 @@ void display_deinit(void)
     display = NULL;
 }
 
-void display_print_center(const char *str)
+void display_ce_logo(void)
 {
-    int len = strnlen(str, 32);
-    int x = (SSD1306_LCDWIDTH - (CHAR_W * len)) / 2;
-    int y = (SSD1306_LCDHEIGHT - CHAR_H)/2;
+    const static BYTE logo[128] =
+    { 0x00,0x00,0x00,0x00, 0x0f,0x80,0x01,0xf0, 0x0f,0x80,0x01,0xf0, 0x1c,0x07,0xe0,0x38, 0x18,0x38,0x1c,0x18, 0x38,0xc1,0x83,0x1c,
+      0x31,0x03,0xc0,0x8c, 0x32,0x07,0xe0,0x4c, 0x02,0x01,0x80,0x40, 0x04,0x01,0x80,0x20, 0x0b,0xc1,0x83,0xd0, 0x0b,0x81,0x81,0xd0,
+      0x0b,0xc1,0x83,0xd0, 0x12,0xf1,0x8f,0x48, 0x10,0x3d,0xbc,0x08, 0x10,0x0f,0xf0,0x08, 0x10,0x03,0xc0,0x08, 0x10,0x07,0xe0,0x08,
+      0x10,0x0e,0x70,0x08, 0x08,0x9c,0x39,0x10, 0x08,0xb8,0x1d,0x10, 0x08,0xf0,0x0f,0x10, 0x04,0xe0,0x07,0x20, 0x02,0xf8,0x1f,0x40,
+      0x32,0x00,0x00,0x4c, 0x31,0x80,0x01,0x8c, 0x38,0x40,0x02,0x1c, 0x18,0x38,0x1c,0x18, 0x1c,0x07,0xe0,0x38, 0x0f,0x80,0x01,0xf0,
+      0x0f,0x80,0x01,0xf0, 0x00,0x00,0x00,0x00};
 
+    int x,y, idx = 0, whichBit = 7;
+    BYTE byte, bit;
+    for(y=0; y<32; y++) {
+        for(x=0; x<32; x++) {
+            if(whichBit == 7) {                             // need to get another byte?
+                byte = logo[idx];
+                idx++;
+            }
+
+            bit = byte & (1 << whichBit);                   // get the right bit
+            whichBit = (whichBit > 0) ? (whichBit - 1) : 7; // move to next bit
+
+            WORD color = bit ? SSD1306_WHITE : SSD1306_BLACK;
+            display->drawPixel(x, y, color);                // draw it
+        }
+    }
+}
+
+void display_print_center(char *msg)
+{
     display->clearDisplay();
-    gfx->drawString(x, y, str);
-    display->display();
+
+    display_ce_logo();
+
+    #define LOGO_WIDTH      32
+    #define MSG_MAX_WIDTH   (SSD1306_LCDWIDTH - LOGO_WIDTH)
+
+    int len = strnlen(msg, 32);
+
+    int stringWidth = len * CHAR_W;     // string width = char count * char width
+    int yCenter = (SSD1306_LCDHEIGHT - CHAR_H)  / 2;
+
+    if(stringWidth <= MSG_MAX_WIDTH) {  // will fit without line wrap?
+        int x = (MSG_MAX_WIDTH - stringWidth) / 2;
+
+        gfx->drawString(LOGO_WIDTH + x, yCenter, msg);
+        display->display();
+    } else {                            // string will not fit without wrap?
+        int x, y=0;
+
+        while(true) {
+            char *pch = strstr(msg, "\n");  // try to find where the line should be split
+
+            if(pch == NULL) {               // if newline wasn't found
+                pch = strstr(msg, " ");     // try to split on space
+            }
+
+            if(pch == NULL) {               // no split? print and quit
+                len = strlen(msg);
+                stringWidth = len * CHAR_W;
+
+                if(stringWidth <= MSG_MAX_WIDTH) {  // string narrower than what we can print? center it
+                    x = LOGO_WIDTH + (MSG_MAX_WIDTH - stringWidth) / 2;
+                } else {                            // wider than what we can print? print next to logo
+                    x = LOGO_WIDTH;
+                }
+
+                gfx->drawString(x, y, msg);
+                break;
+            }
+
+            // can split?
+            len = pch - msg;           // how many chars to new line separator?
+            #define LINELEN  16
+            char tmp[LINELEN];
+            int goodLen = MIN(len, (LINELEN-1));   // take whole string or just part which fits into tmp[]
+            strncpy(tmp, msg, goodLen);     // copy it
+            tmp[goodLen] = 0;               // terminate it
+
+            msg = pch + 1;                  // move behind line separator
+            len = strnlen(tmp, LINELEN);
+            stringWidth = len * CHAR_W;
+            x = LOGO_WIDTH + (MSG_MAX_WIDTH - stringWidth) / 2;
+
+            gfx->drawString(x, y, tmp);
+            y += CHAR_H;
+        }
+
+        display->display();
+    }
 }
 
 char *get_displayLinePtr(int displayLineId)

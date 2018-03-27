@@ -5,7 +5,7 @@
 // display related stuff
 void display_init(void);
 void display_deinit(void);
-void display_print_center(const char *str);
+void display_print_center(char *str);
 
 #define DISP_LINE_HDD_IDS    0
 #define DISP_LINE_HDD_TYPES  1
