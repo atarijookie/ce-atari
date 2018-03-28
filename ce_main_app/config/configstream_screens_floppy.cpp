@@ -60,20 +60,20 @@ void ConfigStream::createScreen_floppy_config(void)
 
     row += 3;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Make seek sound", 15, col1, row, gotoOffset);
-    screen.push_back(comp);
-
-    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ", 3, col2, row, gotoOffset);
-    comp->setComponentId(COMPID_FLOPSOUND_ENABLED);
-    screen.push_back(comp);
-
-    row += 3;
-
     comp = new ConfigComponent(this, ConfigComponent::label, "Write protected", 15, col1, row, gotoOffset);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ", 3, col2, row, gotoOffset);
     comp->setComponentId(COMPID_FLOPCONF_WRPROT);
+    screen.push_back(comp);
+
+    row += 3;
+
+    comp = new ConfigComponent(this, ConfigComponent::label, "Make seek sound", 15, col1, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ", 3, col2, row, gotoOffset);
+    comp->setComponentId(COMPID_FLOPSOUND_ENABLED);
     screen.push_back(comp);
 
     row = 20;
