@@ -35,14 +35,17 @@ void *displayThreadCode(void *ptr);
 
 //----------------------------
 // beeper related stuff
-#define BEEP_SHORT       0
-#define BEEP_MEDIUM      1
-#define BEEP_LONG        2
+#define BEEP_SHORT              0
+#define BEEP_MEDIUM             1
+#define BEEP_LONG               2
 
-#define BEEP_FLOPPY_SEEK 0x80
+#define BEEP_RELOAD_SETTINGS    10
+
+#define BEEP_FLOPPY_SEEK        0x80
 
 void beeper_beep(int beepLen);
 void beeper_floppySeek(int trackCount);
+void beeper_reloadSettings(void);
 
 #endif /* DISPLAYTHREAD_H */
 

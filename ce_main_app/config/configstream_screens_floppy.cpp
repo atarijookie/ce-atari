@@ -6,6 +6,7 @@
 #include "../native/scsi_defs.h"
 #include "../acsidatatrans.h"
 #include "../mounter.h"
+#include "../display/displaythread.h"
 
 #include "../settings.h"
 #include "../utils.h"
@@ -26,7 +27,7 @@ void ConfigStream::createScreen_floppy_config(void)
 
     ConfigComponent *comp;
 
-    int row = 8;
+    int row = 6;
     int col1 = 5, col2 = 22, col3 = 30;
 
     comp = new ConfigComponent(this, ConfigComponent::label, "Floppy enabled", 15, col1, row, gotoOffset);
@@ -59,6 +60,15 @@ void ConfigStream::createScreen_floppy_config(void)
 
     row += 3;
 
+    comp = new ConfigComponent(this, ConfigComponent::label, "Make seek sound", 15, col1, row, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ", 3, col2, row, gotoOffset);
+    comp->setComponentId(COMPID_FLOPSOUND_ENABLED);
+    screen.push_back(comp);
+
+    row += 3;
+
     comp = new ConfigComponent(this, ConfigComponent::label, "Write protected", 15, col1, row, gotoOffset);
     screen.push_back(comp);
 
@@ -86,6 +96,7 @@ void ConfigStream::createScreen_floppy_config(void)
     setBoolByComponentId(COMPID_FLOPCONF_ENABLED,   fc.enabled);
     checkboxGroup_setCheckedId(COMPID_FLOPCONF_ID,  fc.id);
     setBoolByComponentId(COMPID_FLOPCONF_WRPROT,    fc.writeProtected);
+    setBoolByComponentId(COMPID_FLOPSOUND_ENABLED,  fc.soundEnabled);
 
     setFocusToFirstFocusable();
 }
@@ -99,16 +110,20 @@ void ConfigStream::onFloppyConfigSave(void)
     getBoolByComponentId(COMPID_FLOPCONF_ENABLED,   fc.enabled);
     getBoolByComponentId(COMPID_FLOPCONF_WRPROT,    fc.writeProtected);
     fc.id = checkboxGroup_getCheckedId(COMPID_FLOPCONF_ID);
+    getBoolByComponentId(COMPID_FLOPSOUND_ENABLED,  fc.soundEnabled);
 
     // store them to the settings files
     s.saveFloppyConfig(&fc);
 
     // if got settings reload proxy, invoke reload
-    if(reloadProxy) {                                       
+    if(reloadProxy) {
         reloadProxy->reloadSettings(SETTINGSUSER_FLOPPYCONF);
     }
 
+    // tell the beeper thread to reload settings
+    beeper_reloadSettings();
+
     // now back to the home screen
-    createScreen_homeScreen();		
+    createScreen_homeScreen();
 }
 

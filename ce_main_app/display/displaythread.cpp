@@ -19,6 +19,7 @@
 #include "utils.h"
 #include "debug.h"
 #include "update.h"
+#include "../settings.h"
 
 #include "global.h"
 #include "gpio.h"
@@ -38,7 +39,7 @@ Adafruit_GFX *gfx;
 int displayPipeFd[2];
 int beeperPipeFd[2];
 
-static void doBeep(int beeperCommand);
+static void handleBeeperCommand(int beeperCommand, FloppyConfig *fc);
 
 /*
  This we want to show on display:
@@ -74,6 +75,9 @@ static char *get_displayLinePtr(int displayLineId);
 
 void *displayThreadCode(void *ptr)
 {
+    FloppyConfig floppyConfig;                                  // this contains floppy sound settings
+    handleBeeperCommand(BEEP_RELOAD_SETTINGS, &floppyConfig);   // load settings
+
     // create pipes as needed
     pipe2(displayPipeFd, O_NONBLOCK);
     pipe2(beeperPipeFd, O_NONBLOCK);
@@ -131,7 +135,7 @@ void *displayThreadCode(void *ptr)
                 res = read(beeperPipeFd[0], &beeperCommand, 1);     // try to read beeper command
 
                 if(res != -1) { // read good? do beep
-                    doBeep(beeperCommand);
+                    handleBeeperCommand(beeperCommand, &floppyConfig);
                 }
             }
         } else if(res == 0) {   // on timeout
@@ -276,7 +280,6 @@ static int splitIntoLines(char *input, int linesCount)
             int stringWidth = (len - skip) * CHAR_W;    // string width = char count * char width
             int x = LOGO_WIDTH + (MSG_MAX_WIDTH - stringWidth) / 2;
             gfx->drawString(x, y, tmp);                 // draw on screen
-
             y += CHAR_H;                                // move to next line
         }
 
@@ -331,7 +334,7 @@ void display_setLine(int displayLineId, const char *newLineString)
     line[DISP_LINE_MAXLEN] = 0;                         // zero terminate
 }
 
-static void doBeep(int beeperCommand)
+static void handleBeeperCommand(int beeperCommand, FloppyConfig *fc)
 {
     // should be short-mid-long beep?
     if(beeperCommand >= BEEP_SHORT && beeperCommand <= BEEP_LONG) {
@@ -341,6 +344,7 @@ static void doBeep(int beeperCommand)
         bcm2835_gpio_write(PIN_BEEPER, HIGH);
         Utils::sleepMs(lengthMs);
         bcm2835_gpio_write(PIN_BEEPER, LOW);
+        return;
     }
 
     // should be floppy seek noise?
@@ -354,6 +358,10 @@ static void doBeep(int beeperCommand)
             trackCount = 80;
         }
 
+        if(!fc->soundEnabled) {     // if shouldn't make noises on floppy seek, just quit
+            return;
+        }
+
         // for each track seek do a short bzzzz, so in the end it's not a long beep, but a buzzing sound
         int i;
         for(i=0; i<trackCount; i++) {
@@ -362,6 +370,15 @@ static void doBeep(int beeperCommand)
             bcm2835_gpio_write(PIN_BEEPER, LOW);
             Utils::sleepMs(2);
         }
+
+        return;
+    }
+
+    // should just reload config?
+    if(beeperCommand == BEEP_RELOAD_SETTINGS) {
+        Settings s;
+        s.loadFloppyConfig(fc);
+        return;
     }
 }
 
@@ -435,6 +452,15 @@ void beeper_floppySeek(int trackCount)
     // got pipe?
     if(beeperPipeFd[1] > 0) {
         char outBfr = (char) (trackCount + BEEP_FLOPPY_SEEK);
+        write(beeperPipeFd[1], &outBfr, 1);
+    }
+}
+
+void beeper_reloadSettings(void)
+{
+    // got pipe?
+    if(beeperPipeFd[1] > 0) {
+        char outBfr = (char) BEEP_RELOAD_SETTINGS;
         write(beeperPipeFd[1], &outBfr, 1);
     }
 }
