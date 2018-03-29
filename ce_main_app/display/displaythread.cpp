@@ -237,6 +237,10 @@ static int getLineSplitLen(char *input)
     sepNext = strstr(input, " ");       // find where the next separator is
 
     while(1) {
+        if(sepNext == NULL) {           // string doesn't containt separator? return whole / part of the string
+            return MIN(len, MSG_MAX_LINE_LENGTH);
+        }
+
         len = sepNext - input;          // length of string from begining to this separator
 
         if(len > MSG_MAX_LINE_LENGTH) { // if the string up to this separator will NOT fit
@@ -368,7 +372,7 @@ static void handleBeeperCommand(int beeperCommand, FloppyConfig *fc)
             bcm2835_gpio_write(PIN_BEEPER, HIGH);
             Utils::sleepMs(1);
             bcm2835_gpio_write(PIN_BEEPER, LOW);
-            Utils::sleepMs(2);
+            Utils::sleepMs(5);
         }
 
         return;
