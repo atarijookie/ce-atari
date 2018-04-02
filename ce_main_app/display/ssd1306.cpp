@@ -7,7 +7,6 @@ products from Adafruit!
 
 Written by Limor Fried/Ladyada  for Adafruit Industries.
 BSD license, check license.txt for more information
-All text above, and the splash screen below must be included in any redistribution
 *********************************************************************/
 
 #include <stdlib.h>
@@ -15,14 +14,14 @@ All text above, and the splash screen below must be included in any redistributi
 #include <string.h>
 
 #include "ssd1306.h"
-#include "swi2c.h"
+#include "i2c2.h"
 #include "../gpio.h"
 #include "../utils.h"
 
 SSD1306::SSD1306()
 {
     buffer = new BYTE[SSD1306_BUFFER_SIZE];
-    i2c = new SoftI2CMaster();              // software I2C master on GPIO pins
+    i2c = new i2c2();
 }
 
 SSD1306::~SSD1306()
@@ -109,16 +108,8 @@ void SSD1306::invertDisplay(BYTE i) {
 }
 
 int SSD1306::command(BYTE c) {
-    BYTE bfr[2];
-    bfr[0] = 0;
-    bfr[1] = c;
-
     int res;
-
-    res = i2c->beginTransmission(SSD1306_I2C_ADDRESS);
-    i2c->write(bfr, 2);
-    i2c->endTransmission();
-
+    res = i2c->i2c_smbus_write_byte_data(SSD1306_I2C_ADDRESS, 0, c);
     return (res == 0);      // if ACK bit on beginTransmission was 0, this command went OK
 }
 
@@ -221,14 +212,8 @@ void SSD1306::display(void)
 
     int y;
     for (y=0; y<SSD1306_LCDHEIGHT; y++) {
-        BYTE bfr[SSD1306_BYTES_PER_LINE + 1];
-
-        bfr[0] = 0x40;
-        memcpy(bfr + 1, buffer + (y * SSD1306_BYTES_PER_LINE), SSD1306_BYTES_PER_LINE);
-
-        i2c->beginTransmission(SSD1306_I2C_ADDRESS);
-        i2c->write(bfr, SSD1306_BYTES_PER_LINE + 1);
-        i2c->endTransmission();
+        BYTE *data = buffer + (y * SSD1306_BYTES_PER_LINE);
+        i2c->i2c_smbus_write_i2c_block_data(SSD1306_I2C_ADDRESS, 0x40, SSD1306_BYTES_PER_LINE, data);
     }
 }
 

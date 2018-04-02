@@ -20,7 +20,7 @@ All text above, and the splash screen must be included in any redistribution
 #define _SSD1306_H_
 
 #include "../datatypes.h"
-#include "swi2c.h"
+#include "i2c2.h"
 
 #define SSD1306_BLACK 0
 #define SSD1306_WHITE 1
@@ -109,7 +109,8 @@ public:
   void dim(int dim);
 
 private:
-    SoftI2CMaster *i2c;
+    i2c2 *i2c;
+    
     BYTE *buffer;
     BYTE vccstate;
 };
