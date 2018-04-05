@@ -34,12 +34,6 @@
 #define PIN_MISO                RPI_V2_GPIO_P1_21
 #define PIN_SCK                 RPI_V2_GPIO_P1_23
 
-//#ifndef bool
-//  #define bool    int
-//  #define true    1
-//  #define false   0
-//#endif
-
 #define SPI_CS_HANS     BCM2835_SPI_CS0
 #define SPI_CS_FRANZ    BCM2835_SPI_CS1
 
@@ -49,6 +43,7 @@
 #define PIN_SCL             RPI_V2_GPIO_P1_29
 #define PIN_SDA             RPI_V2_GPIO_P1_31
 #define PIN_BEEPER          RPI_V2_GPIO_P1_32
+#define PIN_BUTTON          RPI_V2_GPIO_P1_33
 
 #else
 // if compiling for PC
@@ -95,6 +90,7 @@
 #define PIN_SCL             29
 #define PIN_SDA             31
 #define PIN_BEEPER          32
+#define PIN_BUTTON          33
 
 void bcm2835_gpio_write(int a, int b);
 void bcmSpiAddData(int count, char *data);

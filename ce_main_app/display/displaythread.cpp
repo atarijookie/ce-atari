@@ -40,6 +40,7 @@ int displayPipeFd[2];
 int beeperPipeFd[2];
 
 static void handleBeeperCommand(int beeperCommand, FloppyConfig *fc);
+static void fillLine_recovery(int buttonDownTime);
 
 /*
  This we want to show on display:
@@ -56,13 +57,16 @@ static void handleBeeperCommand(int beeperCommand, FloppyConfig *fc);
  2017-03-20 10:25
  */
 
+// how often we should show next screen, when no other command comes?
+#define NEXT_SCREEN_INTERVAL    5000
+
 // the following array of strings holds every line that can be shown as a raw string, they are filled by rest of the app, and accessed by specified line type number
 #define DISP_LINE_MAXLEN    21
 #define DISPLAY_LINES_SIZE  (DISP_LINE_COUNT * (DISP_LINE_MAXLEN + 1))
 char display_lines[DISPLAY_LINES_SIZE];
 
 // each screen here is a group of 4 line numbers, because display can show only 4 lines at the time, and this defines which screen shows which 4 lines
-int display_screens[DISP_SCREEN_COUNT][4] = {DISP_SCREEN_HDD1_LINES, DISP_SCREEN_HDD2_LINES, DISP_SCREEN_TRANS_LINES};
+int display_screens[DISP_SCREEN_COUNT][4] = {DISP_SCREEN_HDD1_LINES, DISP_SCREEN_HDD2_LINES, DISP_SCREEN_TRANS_LINES, DISP_SCREEN_RECOVERY_LINES};
 
 // this defines for each existing screen which will be the next screen - this allows us to create a loop between them, plus have extra screens which are not normally shown but switch back to loop
 int display_screens_next[DISP_SCREEN_COUNT];
@@ -75,6 +79,10 @@ static char *get_displayLinePtr(int displayLineId);
 
 void *displayThreadCode(void *ptr)
 {
+    bool  btnDownPrev = false;
+    DWORD btnDownStart = 0;
+    int   btnDownTime = 0, btnDownTimePrev = 0;
+
     FloppyConfig floppyConfig;                                  // this contains floppy sound settings
     handleBeeperCommand(BEEP_RELOAD_SETTINGS, &floppyConfig);   // load settings
 
@@ -88,6 +96,7 @@ void *displayThreadCode(void *ptr)
     display_screens_next[DISP_SCREEN_HDD1_IDX]  = DISP_SCREEN_HDD2_IDX;
     display_screens_next[DISP_SCREEN_HDD2_IDX]  = DISP_SCREEN_TRANS_IDX;
     display_screens_next[DISP_SCREEN_TRANS_IDX] = DISP_SCREEN_HDD1_IDX;
+    display_screens_next[DISP_SCREEN_RECOVERY]  = DISP_SCREEN_HDD1_IDX;		// if you show RECOVERY screen, next screen will be the 1st screen in the loop
 
     Debug::out(LOG_DEBUG, "Display thread starting...");
 
@@ -98,10 +107,12 @@ void *displayThreadCode(void *ptr)
     int max_fd = (displayPipeFd[0] > beeperPipeFd[0]) ? displayPipeFd[0] : beeperPipeFd[0];
     struct timeval timeout;
 
+    DWORD nextScreenTime = Utils::getEndTime(NEXT_SCREEN_INTERVAL);
+
     while(sigintReceived == 0) {
         // set timeout - might be changed by select(), so set every time before select()
-        timeout.tv_sec = 5;
-        timeout.tv_usec = 0;
+        timeout.tv_sec  = 0;
+        timeout.tv_usec = 100000;   // 100 ms
 
         // init fd set
         FD_ZERO(&readfds);
@@ -115,7 +126,40 @@ void *displayThreadCode(void *ptr)
             continue;
         }
 
+        DWORD now = Utils::getCurrentMs();
         bool redrawDisplay = false;
+
+        if(res == 0) {                  // on select timeout?
+            if(now >= nextScreenTime) { // did enough time pass to go to next screen?
+                nextScreenTime = Utils::getEndTime(NEXT_SCREEN_INTERVAL);
+                redrawDisplay  = true;
+            } else {                    // not enough time for next screen? check button state, possibly show recovery progress
+                #ifdef ONPC_NOTHING
+                    bool btnDown = false;
+                #else
+                    bool btnDown = bcm2835_gpio_lev(PIN_BUTTON) == LOW;
+                #endif
+
+                if(btnDown && !btnDownPrev) {           // if button was just pressed down (falling edge)
+                    btnDownStart = now;                 // store button down time
+                } else if(!btnDown && btnDownPrev) {    // if button was just released (rising edge)
+
+                }
+                btnDownPrev = btnDown;                  // store current button down state as previous state
+
+                if(btnDown) {
+                    btnDownTime = (now - btnDownStart) / 1000;  // calculate how long the button is down (in seconds)
+                    if(btnDownTime != btnDownTimePrev) {        // if button down time (in seconds) changed since the last time we've checked, update strings, show on screen
+                        btnDownTimePrev = btnDownTime;          // store this as previous time
+
+                        fillLine_recovery(btnDownTime);         // fill recovery screen lines
+                        display_showNow(DISP_SCREEN_RECOVERY);  // show the recovery screen
+                    }
+                }
+
+                continue;
+            }
+        }
 
         if(res > 0) {           // if some fd is ready
             // display trigger pipe is ready
@@ -138,8 +182,6 @@ void *displayThreadCode(void *ptr)
                     handleBeeperCommand(beeperCommand, &floppyConfig);
                 }
             }
-        } else if(res == 0) {   // on timeout
-            redrawDisplay = true;
         }
 
         // if should redraw display - on timeout or on request, do it
@@ -386,6 +428,49 @@ static void handleBeeperCommand(int beeperCommand, FloppyConfig *fc)
     }
 }
 
+static void fillLine_datetime(void)
+{
+    char humanTime[128];
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+    sprintf(humanTime, "%04d-%02d-%02d    %02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min);
+    display_setLine(DISP_LINE_DATETIME, humanTime);
+}
+
+static void fillLine_recovery(int buttonDownTime)
+{
+    int downTime      = MIN(buttonDownTime, 15);    // limit button down time to be max 15, which is used for maximum recovery level (3)
+    int recoveryLevel = downTime / 5;               // convert seconds to recovery level 0 - 3
+
+    char tmp[32];
+
+    // first line - current recovery level
+    sprintf(tmp, "  Recovery Level %d  ", recoveryLevel);
+    display_setLine(DISP_LINE_RECOVERY1, tmp);
+
+    // second line - showing progress of button down holding vs recovery level
+    memset(tmp, ' ', DISP_LINE_MAXLEN);
+    tmp[DISP_LINE_MAXLEN] = 0;
+
+    int i;
+    for(i=0; i<15; i++) {       // show up to all 15 seconds / progress dashes + recovery levels
+        if(i >= downTime) {
+            break;
+        }
+
+        char a;
+        if(((i+1) % 5) == 0) {  // for i 4,9,14 the related seconds are 5,10,15, so show 1,2,3 instead of dashes
+            a = '0' + (i + 1) / 5;
+        } else {                // other parts of progress - just show dash
+            a = '-';
+        }
+
+        tmp[3 + i] = a;         // fill progress / number
+    }
+
+    display_setLine(DISP_LINE_RECOVERY2, tmp);
+}
+
 static void display_drawScreen(int screenIndex)
 {
     display->clearDisplay();
@@ -398,11 +483,7 @@ static void display_drawScreen(int screenIndex)
         int screenLine = screenLines[i];        // which line we should show?
 
         if(screenLine == DISP_LINE_DATETIME) {  // is it datetime? update it now
-            char humanTime[128];
-            time_t t = time(NULL);
-            struct tm tm = *localtime(&t);
-            sprintf(humanTime, "%04d-%02d-%02d    %02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min);
-            display_setLine(DISP_LINE_DATETIME, humanTime);
+            fillLine_datetime();
         }
 
         char *line = get_displayLinePtr(screenLine);

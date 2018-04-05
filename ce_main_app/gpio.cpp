@@ -225,6 +225,7 @@ bool gpio_open(void)
     bcm2835_gpio_write(PIN_RESET_FRANZ,         HIGH);
 
     bcm2835_gpio_fsel(PIN_BEEPER,           BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_fsel(PIN_BUTTON,           BCM2835_GPIO_FSEL_INPT);
 
     // pins for communication with Franz and Hans
     bcm2835_gpio_fsel(PIN_ATN_HANS,         BCM2835_GPIO_FSEL_INPT);

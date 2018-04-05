@@ -6,8 +6,8 @@ i2c2::i2c2() : i2c_started(false)
 }
 
 #ifdef ONPC_NOTHING
-    bool i2c2::read_SCL()  {}
-    bool i2c2::read_SDA()  {}
+    bool i2c2::read_SCL()  {return true;}
+    bool i2c2::read_SDA()  {return true;}
     void i2c2::clear_SCL() {}
     void i2c2::clear_SDA() {}
 #else
