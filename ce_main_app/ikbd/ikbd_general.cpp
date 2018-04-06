@@ -70,7 +70,7 @@ void *ikbdThreadCode(void *ptr)
     }
 
     ikbd.fillDisplayLine();      // fill it for showing it on display
-    
+
     ikbd.findDevices();
     ikbd.findVirtualDevices();
 

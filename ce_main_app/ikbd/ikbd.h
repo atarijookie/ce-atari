@@ -26,7 +26,7 @@ typedef struct {
 #define JOYAXIS             8
 #define JOYBUTTONS          12
 
-// count of key to check for key combination 
+// count of key to check for key combination
 #define KBD_KEY_COUNT   256
 
 #ifdef DISTRO_YOCTO
