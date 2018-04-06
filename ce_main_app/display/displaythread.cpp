@@ -132,7 +132,10 @@ void *displayThreadCode(void *ptr)
         if(res == 0) {                  // on select timeout?
             if(now >= nextScreenTime) { // did enough time pass to go to next screen?
                 nextScreenTime = Utils::getEndTime(NEXT_SCREEN_INTERVAL);
-                redrawDisplay  = true;
+
+                if(btnDownTime < 1) {   // if not showing recovery progress thing, redraw display
+                    redrawDisplay  = true;
+                }
             } else {                    // not enough time for next screen? check button state, possibly show recovery progress
                 #ifdef ONPC_NOTHING
                     bool btnDown = false;
@@ -140,14 +143,11 @@ void *displayThreadCode(void *ptr)
                     bool btnDown = bcm2835_gpio_lev(PIN_BUTTON) == LOW;
                 #endif
 
-                if(btnDown && !btnDownPrev) {           // if button was just pressed down (falling edge)
-                    btnDownStart = now;                 // store button down time
-                } else if(!btnDown && btnDownPrev) {    // if button was just released (rising edge)
+                if(btnDown) {                                   // if button is pressed
+                    if(!btnDownPrev) {                          // it was just pressed down (falling edge)
+                        btnDownStart = now;                     // store button down time
+                    }
 
-                }
-                btnDownPrev = btnDown;                  // store current button down state as previous state
-
-                if(btnDown) {
                     btnDownTime = (now - btnDownStart) / 1000;  // calculate how long the button is down (in seconds)
                     if(btnDownTime != btnDownTimePrev) {        // if button down time (in seconds) changed since the last time we've checked, update strings, show on screen
                         btnDownTimePrev = btnDownTime;          // store this as previous time
@@ -155,8 +155,19 @@ void *displayThreadCode(void *ptr)
                         fillLine_recovery(btnDownTime);         // fill recovery screen lines
                         display_showNow(DISP_SCREEN_RECOVERY);  // show the recovery screen
                     }
+                } else if(!btnDown && btnDownPrev) {    // if button was just released (rising edge)
+                    // if user was holding button down, we should redraw the recovery screen to something normal
+                    if(btnDownTime > 0) {
+                        int refreshInterval = (btnDownTime < 5) ? 1000 : NEXT_SCREEN_INTERVAL;  // if not doing recovery, redraw in 1 second, otherwise in normal interval
+                        nextScreenTime = Utils::getEndTime(refreshInterval);
+                    }
+
+                    btnDownTime = 0;                    // not holding down button anymore, no button down time
+                    btnDownTimePrev = 0;
+                    beeper_beep(BEEP_SHORT);            // do a short beep as feedback
                 }
 
+                btnDownPrev = btnDown;                  // store current button down state as previous state
                 continue;
             }
         }
@@ -441,6 +452,12 @@ static void fillLine_recovery(int buttonDownTime)
 {
     int downTime      = MIN(buttonDownTime, 15);    // limit button down time to be max 15, which is used for maximum recovery level (3)
     int recoveryLevel = downTime / 5;               // convert seconds to recovery level 0 - 3
+    static int recoveryLevelPrev = 0;
+
+    if(recoveryLevelPrev != recoveryLevel) {        // if recovery level changed, do a short beep as feedback
+        beeper_beep(BEEP_SHORT);
+        recoveryLevelPrev = recoveryLevel;
+    }
 
     char tmp[32];
 
