@@ -935,6 +935,8 @@ void CCoreThread::convertXilinxInfo(BYTE xilinxInfo)
         pthread_mutex_lock(&shared.mtxScsi);
         shared.scsi->updateTranslatedBootMedia();                   // also update CE_DD bootsector with proper SCSI ID
         pthread_mutex_unlock(&shared.mtxScsi);
+
+        fillDisplayLines();                                         // fill lines for front display
     }
 
     if(memcmp(&hwConfigOld, &hwConfig, sizeof(THwConfig)) != 0) {    // config changed? save it
