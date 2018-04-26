@@ -9,7 +9,7 @@
 #include <pty.h>
 #include <sys/file.h>
 #include <errno.h>
- 
+
 #include "config/configstream.h"
 #include "settings.h"
 #include "global.h"
@@ -23,6 +23,7 @@
 #include "version.h"
 #include "ce_conf_on_rpi.h"
 #include "periodicthread.h"
+#include "display/displaythread.h"
 
 #include "webserver/webserver.h"
 #include "webserver/api/apimodule.h"
@@ -63,26 +64,34 @@ const char *distroString = "Raspbian";
 bool otherInstanceIsRunning(void);
 int  singleInstanceSocketFd;
 
+void showOnDisplay(int argc, char *argv[]);
+
 int main(int argc, char *argv[])
 {
     CCoreThread *core;
-    pthread_t	mountThreadInfo;
-    pthread_t	downloadThreadInfo;
+    pthread_t   mountThreadInfo;
+    pthread_t   downloadThreadInfo;
 #ifndef ONPC_NOTHING
-    pthread_t	ikbdThreadInfo;
+    pthread_t   ikbdThreadInfo;
 #endif
-    pthread_t	floppyEncThreadInfo;
+    pthread_t   floppyEncThreadInfo;
     pthread_t   periodicThreadInfo;
+    pthread_t   displayThreadInfo;
 
     pthread_mutex_init(&shared.mtxScsi,             NULL);
     pthread_mutex_init(&shared.mtxConfigStreams,    NULL);
-    
+
     printf("\033[H\033[2J\n");
 
-    initializeFlags();                                          // initialize flags 
-    
+    if(argc==3 && strcmp(argv[1], "display") == 0) {            // if should show some string on front display - right number of arguments and display command
+        showOnDisplay(argc, argv);
+        return 0;
+    }
+
+    initializeFlags();                                          // initialize flags
+
     Debug::setDefaultLogFile();
-    
+
     loadDefaultArgumentsFromFile();                             // first parse default arguments from file
     parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
 
@@ -90,19 +99,23 @@ int main(int argc, char *argv[])
         printfPossibleCmdLineArgs();
         return 0;
     }
-    
+
+    if(flags.display) {                                         // if should show some string on front display, but probably bad number of arguments, quit
+        return 0;
+    }
+
     loadLastHwConfig();                                         // load last found HW IF, HW version, SCSI machine
 
     printf("CosmosEx main app starting on %s...\n", distroString);
-    
+
     //------------------------------------
     // if not running as ce_conf, register signal handlers
-    if(!flags.actAsCeConf) {                                        
-        if(signal(SIGINT, sigint_handler) == SIG_ERR) {		    // register SIGINT handler
+    if(!flags.actAsCeConf) {
+        if(signal(SIGINT, sigint_handler) == SIG_ERR) {         // register SIGINT handler
             printf("Cannot register SIGINT handler!\n");
         }
 
-        if(signal(SIGHUP, sigint_handler) == SIG_ERR) {		    // register SIGHUP handler
+        if(signal(SIGHUP, sigint_handler) == SIG_ERR) {         // register SIGHUP handler
             printf("Cannot register SIGHUP handler!\n");
         }
     }
@@ -124,25 +137,25 @@ int main(int argc, char *argv[])
             execlp(shell, shell, "-i", (char *) NULL);  // -i for interactive
 
             return 0;
-        } 
-        
+        }
+
         // parent (full app) continues here
     }
-    
+
     //------------------------------------
     // if should run as ce_conf app, do this code instead
-    if(flags.actAsCeConf) {                                         
+    if(flags.actAsCeConf) {
         printf("CE_CONF tool - Raspberry Pi version.\nPress Ctrl+C to quit.\n");
-        
+
         Debug::setLogFile("/var/log/ce_conf.log");
         ce_conf_mainLoop();
         return 0;
     }
-    
+
     //------------------------------------
     // if should just get HW info, do a shorter / simpler version of app run
-    if(flags.getHwInfo) {                                           
-    	if(!gpio_open()) {									    // try to open GPIO and SPI on RPi
+    if(flags.getHwInfo) {
+        if(!gpio_open()) {                                      // try to open GPIO and SPI on RPi
             printf("\nHW_VER: UNKNOWN\n");
             printf("\nHDD_IF: UNKNOWN\n");
             return 0;
@@ -151,26 +164,26 @@ int main(int argc, char *argv[])
         Debug::out(LOG_INFO, ">>> Starting app as HW INFO tool <<<\n");
 
         core = new CCoreThread(NULL, NULL, NULL);               // create main thread
-        core->run();										    // run the main thread
-        
-		gpio_close();
-		return 0;
+        core->run();                                            // run the main thread
+
+        gpio_close();
+        return 0;
     }
-    
+
     //------------------------------------
     // normal app run follows
     Debug::printfLogLevelString();
 
     char appVersion[16];
     Version::getAppVersion(appVersion);
-    
+
     Debug::out(LOG_INFO, "\n\n---------------------------------------------------");
     Debug::out(LOG_INFO, "CosmosEx starting, version: %s", appVersion);
 
     Version::getRaspberryPiInfo();                                  // fetch model, revision, serial of RPi
     Update::createNewScripts();                                     // update the scripts if needed
-    
-//	system("sudo echo none > /sys/class/leds/led0/trigger");	    // disable usage of GPIO 23 (pin 16) by LED
+
+//  system("sudo echo none > /sys/class/leds/led0/trigger");        // disable usage of GPIO 23 (pin 16) by LED
 
     if(otherInstanceIsRunning()) {
         Debug::out(LOG_ERROR, "Other instance of CosmosEx is running, terminate it before starting a new one!");
@@ -178,23 +191,23 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-	if(!gpio_open()) {									            // try to open GPIO and SPI on RPi
-		return 0;
-	}
+    if(!gpio_open()) {                                              // try to open GPIO and SPI on RPi
+        return 0;
+    }
 
-	if(flags.justDoReset) {                                         // is this a reset command? (used with STM32 ST-Link debugger)
-		Utils::resetHansAndFranz();
-		gpio_close();
+    if(flags.justDoReset) {                                         // is this a reset command? (used with STM32 ST-Link debugger)
+        Utils::resetHansAndFranz();
+        gpio_close();
 
-		printf("\nJust did reset and quit...\n");
+        printf("\nJust did reset and quit...\n");
 
-		return 0;
-	}
+        return 0;
+    }
 
     printf("Starting threads\n");
 
     Utils::setTimezoneVariable_inThisContext();
-    
+
     Downloader::initBeforeThreads();
 
     //start up virtual devices
@@ -223,33 +236,36 @@ int main(int argc, char *argv[])
 
     //-------------
     // Copy the configdrive to /tmp so we can change the content as needed.
-    // This must be done before new CCoreThread because it reads the data from /tmp/configdrive 
+    // This must be done before new CCoreThread because it reads the data from /tmp/configdrive
     system("rm -rf /tmp/configdrive");                      // remove any old content
     system("mkdir /tmp/configdrive");                       // create dir
     system("cp -r /ce/app/configdrive/* /tmp/configdrive"); // copy new content
     //-------------
     core = new CCoreThread(pxDateService,pxFloppyService,pxScreencastService);
 
-	int res = pthread_create(&mountThreadInfo, NULL, mountThreadCode, NULL);	// create mount thread and run it
-	handlePthreadCreate(res, "ce mount", &mountThreadInfo);
+    int res = pthread_create(&mountThreadInfo, NULL, mountThreadCode, NULL);    // create mount thread and run it
+    handlePthreadCreate(res, "ce mount", &mountThreadInfo);
 
     res = pthread_create(&downloadThreadInfo, NULL, downloadThreadCode, NULL);  // create download thread and run it
-	handlePthreadCreate(res, "ce download", &downloadThreadInfo);
+    handlePthreadCreate(res, "ce download", &downloadThreadInfo);
 
 #ifndef ONPC_NOTHING
-    res = pthread_create(&ikbdThreadInfo, NULL, ikbdThreadCode, NULL);			// create the keyboard emulation thread and run it
-	handlePthreadCreate(res, "ce ikbd", &ikbdThreadInfo);
+    res = pthread_create(&ikbdThreadInfo, NULL, ikbdThreadCode, NULL);          // create the keyboard emulation thread and run it
+    handlePthreadCreate(res, "ce ikbd", &ikbdThreadInfo);
 #endif
 
-    res = pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL);	// create the floppy encoding thread and run it
-	handlePthreadCreate(res, "ce floppy encode", &floppyEncThreadInfo);
+    res = pthread_create(&floppyEncThreadInfo, NULL, floppyEncodeThreadCode, NULL); // create the floppy encoding thread and run it
+    handlePthreadCreate(res, "ce floppy encode", &floppyEncThreadInfo);
 
     res = pthread_create(&periodicThreadInfo, NULL, periodicThreadCode, NULL);  // create the periodic thread and run it
-	handlePthreadCreate(res, "periodic", &periodicThreadInfo);
-    
+    handlePthreadCreate(res, "periodic", &periodicThreadInfo);
+
+    res = pthread_create(&displayThreadInfo, NULL, displayThreadCode, NULL);  // create the display thread and run it
+    handlePthreadCreate(res, "display", &displayThreadInfo);
+
     printf("Entering main loop...\n");
-    
-	core->run();										// run the main thread
+
+    core->run();                // run the main thread
 
     printf("\n\nExit from main loop\n");
 
@@ -270,17 +286,17 @@ int main(int argc, char *argv[])
     printf("Stoping virtual keyboard service\n");
     pxVKbdService->stop();
     delete pxVKbdService;
-    
+
     printf("Stoping virtual mouse service\n");
     pxVMouseService->stop();
     delete pxVMouseService;
 
-	delete core;
-	gpio_close();										// close gpio and spi
+    delete core;
+    gpio_close();                                       // close gpio and spi
 
     printf("Stoping mount thread\n");
     Mounter::stop();
-	pthread_join(mountThreadInfo, NULL);				// wait until mount     thread finishes
+    pthread_join(mountThreadInfo, NULL);                // wait until mount     thread finishes
 
     printf("Stoping download thread\n");
     Downloader::stop();
@@ -288,7 +304,7 @@ int main(int argc, char *argv[])
 
 #ifndef ONPC_NOTHING
     printf("Stoping ikbd thread\n");
-	pthread_kill(ikbdThreadInfo, SIGINT);               // stop the select()
+    pthread_kill(ikbdThreadInfo, SIGINT);               // stop the select()
     pthread_join(ikbdThreadInfo, NULL);                 // wait until ikbd      thread finishes
 #endif
 
@@ -297,8 +313,12 @@ int main(int argc, char *argv[])
     pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes
 
     printf("Stoping periodic thread\n");
-	pthread_kill(periodicThreadInfo, SIGINT);               // stop the select()
+    pthread_kill(periodicThreadInfo, SIGINT);           // stop the select()
     pthread_join(periodicThreadInfo, NULL);             // wait until periodic  thread finishes
+
+    printf("Stopping display thread\n");
+    pthread_kill(displayThreadInfo, SIGINT);           // stop the select()
+    pthread_join(displayThreadInfo, NULL);             // wait until display thread finishes
 
     printf("Downloader clean up before quit\n");
     Downloader::cleanupBeforeQuit();
@@ -316,7 +336,7 @@ int main(int argc, char *argv[])
 void loadLastHwConfig(void)
 {
     Settings s;
-    
+
     hwConfig.version        = s.getInt("HW_VERSION",       1);
     hwConfig.hddIface       = s.getInt("HW_HDD_IFACE",     HDD_IF_ACSI);
     hwConfig.scsiMachine    = s.getInt("HW_SCSI_MACHINE",  SCSI_MACHINE_UNKNOWN);
@@ -335,7 +355,8 @@ void initializeFlags(void)
     flags.noFranz      = false;         // if set to true, won't communicate with Franz
     flags.ikbdLogs     = false;         // no ikbd logs by default
     flags.fakeOldApp   = false;         // don't fake old app by default
-    
+    flags.display      = false;         // if set to true, show string on front display, if possible
+
     flags.gotHansFwVersion  = false;
     flags.gotFranzFwVersion = false;
 }
@@ -343,17 +364,17 @@ void initializeFlags(void)
 void loadDefaultArgumentsFromFile(void)
 {
     FILE *f = fopen("/ce/default_args", "rt");  // try to open default args file
-    
+
     if(!f) {
         printf("No default app arguments.\n");
         return;
     }
-    
+
     char args[1024];
     memset(args, 0, 1024);
     fgets(args, 1024, f);                       // read line from file
     fclose(f);
-    
+
     int argc = 0;
     char *argv[64];
     memset(argv, 0, 64 * 4);                    // clear the future argv field
@@ -361,12 +382,12 @@ void loadDefaultArgumentsFromFile(void)
     argv[0] = (char *) "fake.exe";              // 0th argument is skipped, as it's usualy file name (when passed to main())
     argc    = 1;
     argv[1] = &args[0];                         // 1st argument starts at the start of the line
-    
+
     int len = strlen(args);
     for(int i=0; i<len; i++) {                  // go through the arguments line
         if(args[i] == ' ' || args[i]=='\n' || args[i] == '\r') {    // if found space or new line...
             args[i] = 0;                        // convert space to string terminator
-            
+
             argc++;
             if(argc >= 64) {                    // would be out of bondaries? quit
                 break;
@@ -375,11 +396,11 @@ void loadDefaultArgumentsFromFile(void)
             argv[argc] = &args[i + 1];          // store pointer to next string, increment count
         }
     }
-    
+
     if(len > 0) {                               // the alg above can't detect last argument, so just increment argument count
         argc++;
     }
-    
+
     parseCmdLineArguments(argc, argv);
 }
 
@@ -394,7 +415,7 @@ void parseCmdLineArguments(int argc, char *argv[])
         }
 
         bool isKnownTag = false;
-        
+
         // it's a LOG LEVEL change command (ll)
         if(strncmp(argv[i], "ll", 2) == 0) {
             isKnownTag = true;                                      // this is a known tag
@@ -420,7 +441,7 @@ void parseCmdLineArguments(int argc, char *argv[])
             flags.justShowHelp  = true;
             continue;
         }
-        
+
         // should we just reset Hans and Franz and quit? (used with STM32 ST-Link JTAG)
         if(strcmp(argv[i], "reset") == 0) {
             isKnownTag          = true;                             // this is a known tag
@@ -442,7 +463,7 @@ void parseCmdLineArguments(int argc, char *argv[])
             flags.test          = true;
             continue;
         }
-        
+
         // for running this app as ce_conf terminal
         if(strcmp(argv[i], "ce_conf") == 0) {
             isKnownTag          = true;                             // this is a known tag
@@ -460,7 +481,7 @@ void parseCmdLineArguments(int argc, char *argv[])
             isKnownTag          = true;                             // this is a known tag
             flags.noFranz       = true;
         }
-        
+
         // produce ikbd logs
         if(strcmp(argv[i], "ikbdlogs") == 0) {
             isKnownTag          = true;                             // this is a known tag
@@ -471,6 +492,11 @@ void parseCmdLineArguments(int argc, char *argv[])
         if(strcmp(argv[i], "fakeold") == 0) {
             isKnownTag          = true;                             // this is a known tag
             flags.fakeOldApp    = true;
+        }
+
+        if(strcmp(argv[i], "display") == 0) {
+            isKnownTag          = true;                             // this is a known tag
+            flags.display       = true;
         }
 
         if(!isKnownTag) {                                           // if tag unknown, show warning
@@ -490,23 +516,24 @@ void printfPossibleCmdLineArgs(void)
     printf("hwinfo   - get HW version and HDD interface type\n");
     printf("ikbdlogs - write IKBD logs to /var/log/ikbdlog.txt\n");
     printf("fakeold  - fake old app version for reinstall tests\n");
+    printf("display  - show string on front display, if possible\n");
 }
 
 void handlePthreadCreate(int res, const char *threadName, pthread_t *pThread)
 {
     if(res != 0) {
         Debug::out(LOG_ERROR, "Failed to create %s thread, %s won't work...", threadName, threadName);
-	} else {
-		Debug::out(LOG_DEBUG, "%s thread created", threadName);
+    } else {
+        Debug::out(LOG_DEBUG, "%s thread created", threadName);
         pthread_setname_np(*pThread, threadName);
-	}
+    }
 }
 
 void sigint_handler(int sig)
 {
     Debug::out(LOG_DEBUG, "Some SIGNAL received, terminating.");
-	sigintReceived = 1;
-    
+    sigintReceived = 1;
+
     if(childPid != 0) {             // in case we fork()ed, kill the child
         Debug::out(LOG_DEBUG, "Killing child with pid %d\n", childPid);
         kill(childPid, SIGKILL);
@@ -557,4 +584,21 @@ bool otherInstanceIsRunning(void)
         Debug::out(LOG_ERROR, "otherInstanceIsRunning -- FAILED to write pid %d to %s : %s", self_pid, PIDFILE, strerror(errno));
     }
     return false;
+}
+
+void showOnDisplay(int argc, char *argv[])
+{
+    if(argc != 3) {
+        printf("To use display command: %s display 'Your message'\n", argv[0]);
+        return;
+    }
+
+    if(!gpio_open()) {  // try to open GPIO and SPI on RPi
+        printf("Failed to open GPIO.\n");
+        return;
+    }
+
+    display_init();
+    display_print_center(argv[2]);
+    display_deinit();
 }

@@ -296,6 +296,7 @@ void Settings::loadFloppyConfig(FloppyConfig *fc)
     fc->enabled         = getBool("FLOPPYCONF_ENABLED",           true);
     fc->id              = getInt ("FLOPPYCONF_DRIVEID",           0);
     fc->writeProtected  = getBool("FLOPPYCONF_WRITEPROTECTED",    false);
+    fc->soundEnabled    = getBool("FLOPPYCONF_SOUND_ENABLED",     true);
 }
 
 void Settings::saveFloppyConfig(FloppyConfig *fc)
@@ -303,6 +304,7 @@ void Settings::saveFloppyConfig(FloppyConfig *fc)
     setBool("FLOPPYCONF_ENABLED",           fc->enabled);
     setInt ("FLOPPYCONF_DRIVEID",           fc->id);
     setBool("FLOPPYCONF_WRITEPROTECTED",    fc->writeProtected);
+    setBool("FLOPPYCONF_SOUND_ENABLED",     fc->soundEnabled);
 }
 //-------------------------
 FILE *Settings::sOpen(const char *key, bool readNotWrite)

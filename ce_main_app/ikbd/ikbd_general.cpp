@@ -69,6 +69,8 @@ void *ikbdThreadCode(void *ptr)
         if(wd3 < 0) Debug::out(LOG_ERROR, "inotify_add_watch(/tmp/vdev, IN_CREATE)");
     }
 
+    ikbd.fillDisplayLine();      // fill it for showing it on display
+
     ikbd.findDevices();
     ikbd.findVirtualDevices();
 

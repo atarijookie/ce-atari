@@ -24,7 +24,8 @@
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "desktopcreator.h"
-#include "../downloader.h" 
+#include "../downloader.h"
+#include "../display/displaythread.h"
 
 extern THwConfig hwConfig;
 extern InterProcessEvents events;
@@ -45,7 +46,7 @@ void TranslatedDisk::mutexUnlock(void)
 
 TranslatedDisk * TranslatedDisk::getInstance(void)
 {
-	return instance;
+    return instance;
 }
 
 TranslatedDisk * TranslatedDisk::createInstance(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs)
@@ -66,20 +67,20 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastS
     configService = cs;
 
     reloadProxy = NULL;
-    
+
     dataBuffer  = new BYTE[ACSI_BUFFER_SIZE];
     dataBuffer2 = new BYTE[ACSI_BUFFER_SIZE];
 
     pexecImage  = new BYTE[PEXEC_DRIVE_SIZE_BYTES];
     memset(pexecImage, 0, PEXEC_DRIVE_SIZE_BYTES);
-    
+
     pexecImageReadFlags = new BYTE[PEXEC_DRIVE_SIZE_SECTORS];
     memset(pexecImageReadFlags, 0, PEXEC_DRIVE_SIZE_SECTORS);
 
     prgSectorStart  = 0;
     prgSectorEnd    = PEXEC_DRIVE_SIZE_SECTORS;
     pexecDriveIndex = -1;
-    
+
     detachAll();
 
     for(int i=0; i<MAX_FILES; i++) {        // initialize host file structures
@@ -92,17 +93,17 @@ TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastS
 
     loadSettings();
 
-    mountAndAttachSharedDrive();					                    // if shared drive is enabled, try to mount it and attach it
+    mountAndAttachSharedDrive();                                        // if shared drive is enabled, try to mount it and attach it
     attachConfigDrive();                                                // if config drive is enabled, attach it
 
     //ACSI command "date"
     dateAcsiCommand         = new DateAcsiCommand(dataTrans,configService);
 
     //ACSI commands "screencast"
-	screencastAcsiCommand   = new ScreencastAcsiCommand(dataTrans,scs);
+    screencastAcsiCommand   = new ScreencastAcsiCommand(dataTrans,scs);
 
     initAsciiTranslationTable();
- 
+
     for(int i=0; i<MAX_ZIP_DIRS; i++) {                 // init the ZIP dirs
         zipDirs[i] = new ZipDirEntry(i);
     }
@@ -118,9 +119,9 @@ TranslatedDisk::~TranslatedDisk()
 
     delete []pexecImage;
     delete []pexecImageReadFlags;
-    
+
     destroyFindStorages();
-    
+
     for(int i=0; i<MAX_ZIP_DIRS; i++) {                 // init the ZIP dirs
         delete zipDirs[i];
     }
@@ -152,8 +153,10 @@ void TranslatedDisk::loadSettings(void)
     if(driveLetters.confDrive >= 0 && driveLetters.confDrive <=15) {        // if got a valid drive letter for config drive
         driveLetters.readOnly = (1 << driveLetters.confDrive);              // make config drive read only
     }
-    
+
     useZipdirNotFile = s.getBool("USE_ZIP_DIR", 1);
+
+    fillDisplayLines();     // fill stuff which should be on display
 }
 
 void TranslatedDisk::reloadSettings(int type)
@@ -204,42 +207,42 @@ void TranslatedDisk::reloadSettings(int type)
 
 void TranslatedDisk::mountAndAttachSharedDrive(void)
 {
-	std::string mountPath = SHARED_DRIVE_PATH;
+    std::string mountPath = SHARED_DRIVE_PATH;
 
     Settings s;
     std::string addr, path, username, password;
-	bool sharedEnabled;
-	bool nfsNotSamba;
+    bool sharedEnabled;
+    bool nfsNotSamba;
 
-    addr			= s.getString("SHARED_ADDRESS",  "");
-    path			= s.getString("SHARED_PATH",     "");
+    addr            = s.getString("SHARED_ADDRESS",  "");
+    path            = s.getString("SHARED_PATH",     "");
 
-    username		= s.getString("SHARED_USERNAME", "");
-    password		= s.getString("SHARED_PASSWORD", "");
+    username        = s.getString("SHARED_USERNAME", "");
+    password        = s.getString("SHARED_PASSWORD", "");
 
-	sharedEnabled	= s.getBool("SHARED_ENABLED", false);
-	nfsNotSamba		= s.getBool("SHARED_NFS_NOT_SAMBA", false);
+    sharedEnabled   = s.getBool("SHARED_ENABLED", false);
+    nfsNotSamba     = s.getBool("SHARED_NFS_NOT_SAMBA", false);
 
-	if(!sharedEnabled) {
-		Debug::out(LOG_DEBUG, "mountAndAttachSharedDrive: shared drive not enabled, not mounting and not attaching...");
-		return;
-	}
+    if(!sharedEnabled) {
+        Debug::out(LOG_DEBUG, "mountAndAttachSharedDrive: shared drive not enabled, not mounting and not attaching...");
+        return;
+    }
 
-	if(addr.empty() || path.empty()) {
-		Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: address or path is empty, this won't work!");
-		return;
-	}
+    if(addr.empty() || path.empty()) {
+        Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: address or path is empty, this won't work!");
+        return;
+    }
 
-	TMounterRequest tmr;													// fill this struct to mount something somewhere
-	tmr.action              = MOUNTER_ACTION_MOUNT;							// action: mount
-	tmr.deviceNotShared		= false;
-	tmr.shared.host			= addr;
-	tmr.shared.hostDir		= path;
-	tmr.shared.nfsNotSamba	= nfsNotSamba;
+    TMounterRequest tmr;                                                    // fill this struct to mount something somewhere
+    tmr.action              = MOUNTER_ACTION_MOUNT;                         // action: mount
+    tmr.deviceNotShared     = false;
+    tmr.shared.host         = addr;
+    tmr.shared.hostDir      = path;
+    tmr.shared.nfsNotSamba  = nfsNotSamba;
     tmr.shared.username     = username;
     tmr.shared.password     = password;
-	tmr.mountDir			= mountPath;
-	Mounter::add(tmr);
+    tmr.mountDir            = mountPath;
+    Mounter::add(tmr);
 
     std::string devicePath;
     if(nfsNotSamba) {
@@ -248,7 +251,7 @@ void TranslatedDisk::mountAndAttachSharedDrive(void)
         if(path.length() > 0 && (path[0] != '/' && path[0] != '\\')) {      // if the path doesn't end with slash, add it
             devicePath += "/";
         }
-        
+
         devicePath += path;                                                 // now add the path
         std::replace( devicePath.begin(), devicePath.end(), '\\', '/');
     } else {
@@ -261,22 +264,22 @@ void TranslatedDisk::mountAndAttachSharedDrive(void)
         devicePath += path;
         std::replace(devicePath.begin(), devicePath.end(), '/', '\\');
     }
-    
-	bool res = attachToHostPath(mountPath, TRANSLATEDTYPE_SHAREDDRIVE, devicePath);	// try to attach
 
-	if(!res) {																// if didn't attach, skip the rest
-		Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: failed to attach shared drive %s", mountPath.c_str());
-	}
+    bool res = attachToHostPath(mountPath, TRANSLATEDTYPE_SHAREDDRIVE, devicePath); // try to attach
+
+    if(!res) {                                                              // if didn't attach, skip the rest
+        Debug::out(LOG_ERROR, "mountAndAttachSharedDrive: failed to attach shared drive %s", mountPath.c_str());
+    }
 }
 
 void TranslatedDisk::attachConfigDrive(void)
 {
     std::string configDrivePath = CONFIG_DRIVE_PATH;
-	bool res = attachToHostPath(configDrivePath, TRANSLATEDTYPE_CONFIGDRIVE, configDrivePath);   // try to attach
+    bool res = attachToHostPath(configDrivePath, TRANSLATEDTYPE_CONFIGDRIVE, configDrivePath);   // try to attach
 
-	if(!res) {																                // if didn't attach, skip the rest
-		Debug::out(LOG_ERROR, "attachConfigDrive: failed to attach config drive %s", configDrivePath.c_str());
-	}
+    if(!res) {                                                                              // if didn't attach, skip the rest
+        Debug::out(LOG_ERROR, "attachConfigDrive: failed to attach config drive %s", configDrivePath.c_str());
+    }
 }
 
 bool TranslatedDisk::attachToHostPath(std::string hostRootPath, int translatedType, std::string devicePath)
@@ -348,7 +351,7 @@ void TranslatedDisk::attachToHostPathByIndex(int index, std::string hostRootPath
         return;
     }
 
-	conf[index].dirTranslator.clear();
+    conf[index].dirTranslator.clear();
     conf[index].enabled             = true;
     conf[index].devicePath          = devicePath;
     conf[index].hostRootPath        = hostRootPath;
@@ -358,6 +361,8 @@ void TranslatedDisk::attachToHostPathByIndex(int index, std::string hostRootPath
     conf[index].label = Utils::getDeviceLabel(devicePath);
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::attachToHostPath - path %s attached to index %d (letter %c)", hostRootPath.c_str(), index, 'A' + index);
+
+    fillDisplayLines();     // fill stuff which should be on display
 }
 
 bool TranslatedDisk::isAlreadyAttached(std::string hostRootPath)
@@ -386,8 +391,10 @@ void TranslatedDisk::detachByIndex(int index)
     conf[index].currentAtariPath    = HOSTPATH_SEPAR_STRING;
     conf[index].translatedType      = TRANSLATEDTYPE_NORMAL;
     conf[index].mediaChanged        = true;
-	conf[index].label.clear();
-	conf[index].dirTranslator.clear();
+    conf[index].label.clear();
+    conf[index].dirTranslator.clear();
+
+    fillDisplayLines();     // fill stuff which should be on display
 }
 
 void TranslatedDisk::detachAll(void)
@@ -398,6 +405,8 @@ void TranslatedDisk::detachAll(void)
 
     currentDriveLetter  = 'C';
     currentDriveIndex   = 0;
+
+    fillDisplayLines();     // fill stuff which should be on display
 }
 
 void TranslatedDisk::detachAllUsbMedia(void)
@@ -407,7 +416,7 @@ void TranslatedDisk::detachAllUsbMedia(void)
         if(conf[i].translatedType == TRANSLATEDTYPE_SHAREDDRIVE || conf[i].translatedType == TRANSLATEDTYPE_CONFIGDRIVE) {
             continue;
         }
-        
+
         detachByIndex(i);       // it's normal drive, detach
     }
 
@@ -434,7 +443,7 @@ void TranslatedDisk::detachFromHostPath(std::string hostRootPath)
         return;
     }
 
-	detachByIndex(index);
+    detachByIndex(index);
 
     // close all files which might be open on this host path
     for(int i=0; i<MAX_FILES; i++) {
@@ -459,7 +468,7 @@ void TranslatedDisk::processCommand(BYTE *cmd)
 
     const char *functionName = functionCodeToName(cmd[4]);
     Debug::out(LOG_DEBUG, "TranslatedDisk function - %s (%02x)", functionName, cmd[4]);
-	//>dataTrans->dumpDataOnce();
+    //>dataTrans->dumpDataOnce();
 
     // now do all the command handling
     switch(cmd[4]) {
@@ -473,13 +482,13 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         dateAcsiCommand->processCommand(cmd);
         break;
 
-		case TRAN_CMD_SCREENCASTPALETTE:
+        case TRAN_CMD_SCREENCASTPALETTE:
         case TRAN_CMD_SENDSCREENCAST:
-        	screencastAcsiCommand->processCommand(cmd);
-        	break;
+            screencastAcsiCommand->processCommand(cmd);
+            break;
 
         case TRAN_CMD_SCREENSHOT_CONFIG:    getScreenShotConfig(cmd);   break;
-            
+
         // path functions
         case GEMDOS_Dsetdrv:        onDsetdrv(cmd);     break;
         case GEMDOS_Dgetdrv:        onDgetdrv(cmd);     break;
@@ -525,8 +534,8 @@ void TranslatedDisk::processCommand(BYTE *cmd)
         case BIOS_Mediach:              onMediach(cmd);                 break;
         case BIOS_Getbpb:               onGetbpb(cmd);                  break;
 
-		// other functions
-		case ACC_GET_MOUNTS:			onGetMounts(cmd);	            break;
+        // other functions
+        case ACC_GET_MOUNTS:            onGetMounts(cmd);               break;
         case ACC_UNMOUNT_DRIVE:         onUnmountDrive(cmd);            break;
         case ST_LOG_TEXT:               onStLog(cmd);                   break;
         case ST_LOG_HTTP:               onStHttp(cmd);                  break;
@@ -562,10 +571,10 @@ void TranslatedDisk::onUnmountDrive(BYTE *cmd)
     Debug::out(LOG_DEBUG, "onUnmountDrive -- drive: %d, hostRootPath: %s", drive, conf[drive].hostRootPath.c_str());
 
     // send umount request
-	TMounterRequest tmr;
-    tmr.action			= MOUNTER_ACTION_UMOUNT;							// action: umount
-	tmr.mountDir		= conf[drive].hostRootPath;							// e.g. /mnt/sda2
-	Mounter::add(tmr);
+    TMounterRequest tmr;
+    tmr.action          = MOUNTER_ACTION_UMOUNT;                            // action: umount
+    tmr.mountDir        = conf[drive].hostRootPath;                         // e.g. /mnt/sda2
+    Mounter::add(tmr);
 
     detachByIndex(drive);                                                   // detach drive from translated disk module
 
@@ -574,32 +583,32 @@ void TranslatedDisk::onUnmountDrive(BYTE *cmd)
 
 void TranslatedDisk::onGetMounts(BYTE *cmd)
 {
-	char tmp[256];
-	std::string mounts;
-	int index;
+    char tmp[256];
+    std::string mounts;
+    int index;
 
-	static const char *trTypeStr[4] = {"", "USB drive", "shared drive", "config drive"};
-	const char *mountStr;
+    static const char *trTypeStr[4] = {"", "USB drive", "shared drive", "config drive"};
+    const char *mountStr;
 
     for(int i=2; i<MAX_DRIVES; i++) {       // create enabled drive bits
         if(conf[i].enabled) {
-			index = conf[i].translatedType + 1;
-		} else {
-			index = 0;
-		}
+            index = conf[i].translatedType + 1;
+        } else {
+            index = 0;
+        }
 
-		mountStr = trTypeStr[index];
-		if(conf[i].label.empty()) {
-			sprintf(tmp, "%c: %s\n", ('A' + i), mountStr);
-		} else {
-			sprintf(tmp, "%c: %s (%s)\n", ('A' + i), conf[i].label.c_str(), mountStr);
-		}
+        mountStr = trTypeStr[index];
+        if(conf[i].label.empty()) {
+            sprintf(tmp, "%c: %s\n", ('A' + i), mountStr);
+        } else {
+            sprintf(tmp, "%c: %s (%s)\n", ('A' + i), conf[i].label.c_str(), mountStr);
+        }
 
-		mounts += tmp;
+        mounts += tmp;
     }
 
-	dataTrans->addDataCString(mounts.c_str(), true);
-	dataTrans->setStatus(E_OK);
+    dataTrans->addDataCString(mounts.c_str(), true);
+    dataTrans->setStatus(E_OK);
 }
 
 WORD TranslatedDisk::getDrivesBitmap(void)
@@ -652,7 +661,7 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
 
     tempFindStorage.clear();
     clearFindStorages();
-    
+
     DWORD res;
     res = dataTrans->recvData(dataBuffer, 512);     // get data from Hans
 
@@ -664,28 +673,28 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
 
     // get the current machine info and generate DESKTOP.INF file
     WORD tosVersion, curRes, drives;
-    
+
     tosVersion  = Utils::getWord(dataBuffer + 0);           // 0, 1: TOS version
     curRes      = Utils::getWord(dataBuffer + 2);           // 2, 3: current screen resolution
     drives      = Utils::getWord(dataBuffer + 4);           // 4, 5: current TOS drives present
 
     Debug::out(LOG_DEBUG, "tosVersion: %x, drives: %04x", tosVersion, drives);
-    
+
     bool  sdNoobEnabled;
     DWORD sdNoobSizeSectors, sdCardSizeSectors;
 
     sdNoobEnabled       = dataBuffer[6];                    //     6: is SD NOOB present and enabled?
     sdNoobSizeSectors   = Utils::getDword(dataBuffer +  7); //  7-10: size of SD NOOB partition in sectors
     sdCardSizeSectors   = Utils::getDword(dataBuffer + 11); // 11-14: size of SD card in sectors
-    
+
     Debug::out(LOG_DEBUG, "SD NOOB enabled: %d, size: %d", sdNoobEnabled, sdNoobSizeSectors);
-    
+
     //------------------------------------
     // depending on TOS major version determine the machine, on which this SCSI device is used, and limit the available SCSI IDs depending on that
     BYTE tosVersionMajor = tosVersion >> 8;
-    
+
     int oldHwScsiMachine = hwConfig.scsiMachine;                // store the old value
-    
+
     if(tosVersionMajor == 3) {                                  // TOS 3 == TT
         hwConfig.scsiMachine = SCSI_MACHINE_TT;
     } else if(tosVersionMajor == 4) {                           // TOS 4 == Falcon
@@ -693,7 +702,7 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     } else {                                                    // other TOSes - probably not SCSI
         hwConfig.scsiMachine = SCSI_MACHINE_UNKNOWN;
     }
-    
+
     if(oldHwScsiMachine != hwConfig.scsiMachine) {              // SCSI machine changed? resend SCSI IDs to Hans
         if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
             Debug::out(LOG_DEBUG, "TranslatedDisk::onInitialize() - SCSI machine changed, will resend new SCSI IDs");
@@ -701,9 +710,9 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
         }
     }
     //------------------------------------
-    
+
     WORD translatedDrives = getDrivesBitmap();          // get bitmap of all translated drives we got
-    
+
     DesktopConfig dc;
     dc.tosVersion        = tosVersion;                   // TOS version as reported in TOS
     dc.currentResolution = curRes;                       // screen resolution as reported by Getrez()
@@ -711,7 +720,7 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     dc.translatedDrives  = translatedDrives;             // just translated drives
     dc.configDrive       = driveLetters.confDrive;       // index of config drive
     dc.sharedDrive       = driveLetters.shared;          // index of shared drive
-    
+
     dc.sdNoobEnabled     = sdNoobEnabled;                // is SD NOOB currently enabled?
     dc.sdNoobSizeSectors = sdNoobSizeSectors;            // size of SD NOOB partition
     dc.sdNoobDriveNumber = 2;                            // fixed to C now
@@ -719,7 +728,7 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     if(sdNoobEnabled) {                                  // if SD NOOB enabled, add it to all drives
         dc.drivesAll |= (1 << dc.sdNoobDriveNumber);
     }
-    
+
     Settings s;
     dc.settingsResolution   = s.getInt("SCREEN_RESOLUTION", 1);
     for(int i = 2; i < MAX_DRIVES; i++) {
@@ -783,13 +792,13 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     dataTrans->addDataBfr(tmp, 10, false);                      // store it to buffer - bytes 14 to 23 (byte 14 is eth0_enabled, byte 19 is wlan0_enabled)
     //------------------
 
-	//after sending screencast skip frameSkip frames
+    //after sending screencast skip frameSkip frames
     int frameSkip = s.getInt ("SCREENCAST_FRAMESKIP",        20);
-    dataTrans->addDataByte(frameSkip);                     		// byte 24 - frame skip for screencast
+    dataTrans->addDataByte(frameSkip);                          // byte 24 - frame skip for screencast
 
     //-----------------
     dataTrans->addDataWord(TRANSLATEDDISK_VERSION);             // byte 25 & 26 - version of translated disk interface / protocol -- driver will check this, and will refuse to work in cases of mismatch
-    
+
     //-----------------
     dataTrans->addDataByte(events.screenShotVblEnabled);        // byte 27: enable screenshot VBL?
     dataTrans->addDataByte(events.doScreenShot);                // byte 28: take screenshot?
@@ -827,12 +836,12 @@ bool TranslatedDisk::createFullAtariPathAndFullHostPath(const std::string &inPar
     zipDirNestingLevel  = 0;
 
     // convert partial atari path to full atari path
-    res = createFullAtariPath(inPartialAtariPath, outFullAtariPath, outAtariDriveIndex);        
-    
+    res = createFullAtariPath(inPartialAtariPath, outFullAtariPath, outAtariDriveIndex);
+
     if(!res) {                  // if createFullAtariPath() failed, don't do the rest
         return false;
     }
-    
+
     // got full atari path, now try to create full host path
     createFullHostPath(outFullAtariPath, outAtariDriveIndex, outFullHostPath, waitingForMount, zipDirNestingLevel);
     return true;
@@ -845,7 +854,7 @@ bool TranslatedDisk::createFullAtariPath(std::string inPartialAtariPath, std::st
     //Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - inPartialAtariPath: %s", inPartialAtariPath.c_str());
 
     pathSeparatorAtariToHost(inPartialAtariPath);
-    
+
     //---------------------
     // if it's full path including drive letter, outAtariDriveIndex is in the path
     if(inPartialAtariPath[1] == ':') {
@@ -857,7 +866,7 @@ bool TranslatedDisk::createFullAtariPath(std::string inPartialAtariPath, std::st
         }
 
         outFullAtariPath = inPartialAtariPath.substr(2);               // required atari path is absolute path, without drive letter and ':'
-        
+
         removeDoubleDots(outFullAtariPath);                            // search for '..' and simplify the path
         Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - with    drive letter, absolute path : %s, drive index: %d => %s", inPartialAtariPath.c_str(), outAtariDriveIndex, outFullAtariPath.c_str());
         return true;
@@ -871,18 +880,18 @@ bool TranslatedDisk::createFullAtariPath(std::string inPartialAtariPath, std::st
         Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - the current drive %d is not enabled (not translated drive)", currentDriveIndex);
         return false;
     }
-    
+
     if(startsWith(inPartialAtariPath, HOSTPATH_SEPAR_STRING)) {         // starts with backslash? absolute path on current drive
         outFullAtariPath = inPartialAtariPath.substr(1);
         removeDoubleDots(outFullAtariPath);                             // search for '..' and simplify the path
-        
+
         Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - without drive letter, absolute path : %s => %s ", inPartialAtariPath.c_str(), outFullAtariPath.c_str());
         return true;
     } else {                                                        // starts without backslash? relative path on current drive
         outFullAtariPath = conf[currentDriveIndex].currentAtariPath;
         Utils::mergeHostPaths(outFullAtariPath, inPartialAtariPath);
         removeDoubleDots(outFullAtariPath);                             // search for '..' and simplify the path
-        
+
         Debug::out(LOG_DEBUG, "TranslatedDisk::createFullAtariPath - without drive letter, relative path : %s => %s", inPartialAtariPath.c_str(), outFullAtariPath.c_str());
         return true;
     }
@@ -894,15 +903,15 @@ void TranslatedDisk::createFullHostPath(const std::string &inFullAtariPath, int 
     zipDirNestingLevel  = 0;                                        // no ZIP DIR nesting atm
 
     std::string root = conf[inAtariDriveIndex].hostRootPath;        // get root path
-    
+
     std::string partialLongHostPath;
-    conf[inAtariDriveIndex].dirTranslator.shortToLongPath(root, inFullAtariPath, partialLongHostPath);	// now convert short to long path
+    conf[inAtariDriveIndex].dirTranslator.shortToLongPath(root, inFullAtariPath, partialLongHostPath);  // now convert short to long path
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - dirTranslator.shortToLongPath -- root: %s, inFullAtariPath: %s -> partialLongHostPath: %s", root.c_str(), inFullAtariPath.c_str(), partialLongHostPath.c_str());
-    
+
     outFullHostPath = root;
-    Utils::mergeHostPaths(outFullHostPath, partialLongHostPath);    // merge 
-    
+    Utils::mergeHostPaths(outFullHostPath, partialLongHostPath);    // merge
+
     if(useZipdirNotFile) {                                          // if ZIP DIRs are enabled
         replaceHostPathWithZipDirPath(inAtariDriveIndex, outFullHostPath, waitingForMount, zipDirNestingLevel);
         Debug::out(LOG_DEBUG, "TranslatedDisk::createFullHostPath - replaceHostPathWithZipDirPath -- new outFullHostPath: %s , waitingForMount: %d, zipDirNestingLevel: %d", outFullHostPath.c_str(), (int) waitingForMount, zipDirNestingLevel);
@@ -988,7 +997,7 @@ void TranslatedDisk::removeDoubleDots(std::string &path)
             strings[i] = "";                // remove it
             continue;
         }
-    
+
         if(strings[i] == "..") {            // double dot found?
             strings[i] = "";                // remove it
 
@@ -1052,7 +1061,7 @@ int  TranslatedDisk::getZipDirByMountPoint(std::string &searchedMountPoint)
             return i;
         }
     }
-    
+
     return -1;                                                  // mount point not found
 }
 
@@ -1102,7 +1111,7 @@ int TranslatedDisk::deleteDirectoryPlain(const char *path)
 {
     // if the dir is empty, it will delete it, otherwise it will fail
     int res = rmdir(path);
-    
+
     if(res == 0) {              // on success return success
         return E_OK;
     }
@@ -1112,16 +1121,16 @@ int TranslatedDisk::deleteDirectoryPlain(const char *path)
 
 bool TranslatedDisk::isRootDir(std::string hostPath)
 {
-	// remove trailing '/' if needed
-	if(hostPath.size() > 0 && hostPath[hostPath.size() - 1] == HOSTPATH_SEPAR_CHAR) {
-		hostPath.erase(hostPath.size() - 1, 1);
-	}
+    // remove trailing '/' if needed
+    if(hostPath.size() > 0 && hostPath[hostPath.size() - 1] == HOSTPATH_SEPAR_CHAR) {
+        hostPath.erase(hostPath.size() - 1, 1);
+    }
 
     for(int i=2; i<MAX_DRIVES; i++) {                   // go through all translated drives
         if(!conf[i].enabled) {                          // skip disabled drives
             continue;
         }
-        
+
         //Debug::out(LOG_DEBUG, "TranslatedDisk::isRootDir - %s == %s ?", conf[i].hostRootPath.c_str(), hostPath.c_str());
         if(conf[i].hostRootPath == hostPath) {          // ok, this is root dir!
             Debug::out(LOG_DEBUG, "TranslatedDisk::isRootDir - hostPath: %s -- yes, it's a root dir", hostPath.c_str());
@@ -1162,7 +1171,7 @@ void TranslatedDisk::destroyFindStorages(void)          // use it at the end rel
 int TranslatedDisk::getEmptyFindStorageIndex(void)
 {
     // search allocated findStorages, see if some of them is allocated but not used
-    for(int i=0; i<MAX_FIND_STORAGES; i++) {                    
+    for(int i=0; i<MAX_FIND_STORAGES; i++) {
         if(findStorages[i] == NULL) {                           // skip not allocated findStorages
             continue;
         }
@@ -1173,12 +1182,12 @@ int TranslatedDisk::getEmptyFindStorageIndex(void)
     }
 
     // search for first non-allocated findStorage
-    for(int i=0; i<MAX_FIND_STORAGES; i++) {                    
+    for(int i=0; i<MAX_FIND_STORAGES; i++) {
         if(findStorages[i] != NULL) {                           // skip the allocated findStorages
             continue;
         }
 
-        findStorages[i] = new TFindStorage();                   // allocated    
+        findStorages[i] = new TFindStorage();                   // allocated
         return i;                                               // return index
     }
 
@@ -1245,14 +1254,14 @@ void TranslatedDisk::onStHttp(BYTE *cmd)
 const char *TranslatedDisk::functionCodeToName(int code)
 {
     switch(code) {
-        case TRAN_CMD_IDENTIFY:      	    return "TRAN_CMD_IDENTIFY";
+        case TRAN_CMD_IDENTIFY:             return "TRAN_CMD_IDENTIFY";
         case TRAN_CMD_GETDATETIME:          return "TRAN_CMD_GETDATETIME";
         case TRAN_CMD_SENDSCREENCAST:       return "TRAN_CMD_SENDSCREENCAST";
         case TRAN_CMD_SCREENCASTPALETTE:    return "TRAN_CMD_SCREENCASTPALETTE";
         case TRAN_CMD_SCREENSHOT_CONFIG:    return "TRAN_CMD_SCREENSHOT_CONFIG";
         case ST_LOG_TEXT:                   return "ST_LOG_TEXT";
         case ST_LOG_HTTP:                   return "ST_LOG_HTTP";
-        
+
         case GEMDOS_Dsetdrv:            return "GEMDOS_Dsetdrv";
         case GEMDOS_Dgetdrv:            return "GEMDOS_Dgetdrv";
         case GEMDOS_Dsetpath:           return "GEMDOS_Dsetpath";
@@ -1278,9 +1287,9 @@ const char *TranslatedDisk::functionCodeToName(int code)
         case GEMDOS_Tsetdate:           return "GEMDOS_Tsetdate";
         case GEMDOS_Tgettime:           return "GEMDOS_Tgettime";
         case GEMDOS_Tsettime:           return "GEMDOS_Tsettime";
-        
+
         case GEMDOS_Pexec:              return "GEMDOS_Pexec & sub commands";
-        
+
         case GD_CUSTOM_initialize:      return "GD_CUSTOM_initialize";
         case GD_CUSTOM_getConfig:       return "GD_CUSTOM_getConfig";
         case GD_CUSTOM_ftell:           return "GD_CUSTOM_ftell";
@@ -1290,7 +1299,7 @@ const char *TranslatedDisk::functionCodeToName(int code)
         case BIOS_Drvmap:               return "BIOS_Drvmap";
         case BIOS_Mediach:              return "BIOS_Mediach";
         case BIOS_Getbpb:               return "BIOS_Getbpb";
-        
+
         case TEST_READ:                 return "TEST_READ";
         case TEST_WRITE:                return "TEST_WRITE";
         default:                        return "unknown";
@@ -1366,7 +1375,7 @@ bool TranslatedDisk::pathContainsWildCards(const char *path)
             return true;
         }
     }
-    
+
     return false;                       // no wild card found
 }
 
@@ -1376,7 +1385,7 @@ void TranslatedDisk::convertAtariASCIItoPc(char *path)
 
     const char *allowed = "!#$%&'()~^@-_{}";
     #define ALLOWED_COUNT   15
-    
+
     len = strlen(path);
 
     if(len >= 2048) {                                                   // probably no terminating char? go only this far
@@ -1415,7 +1424,7 @@ void TranslatedDisk::convertAtariASCIItoPc(char *path)
 
         if(isAllowed) {                         // it's allowed char, let it be
             continue;
-        }        
+        }
 
         //------------------------
         // if it's not from the supported chars, try to convert it
@@ -1436,7 +1445,7 @@ void TranslatedDisk::getScreenShotConfig(BYTE *cmd)
 
     dataTrans->addDataByte(events.doScreenShot);
     events.doScreenShot = false;                                        // unset this flag so we will send only one screenshot
-    
+
     dataTrans->padDataToMul16();
     dataTrans->setStatus(E_OK);
 }
@@ -1452,13 +1461,13 @@ bool TranslatedDisk::zipDirAlreadyMounted(const char *zipFile, int &zipDirIndex)
             zipDirIndex = i;
             return true;
         }
-        
+
         if(minAccessTime > zipDirs[i]->lastAccessTime) {        // if found something that is younger than the currently youngest access time, store it
             minAccessTime   = zipDirs[i]->lastAccessTime;
             minAccessIndex  = i;
         }
     }
-    
+
     zipDirIndex = minAccessIndex;                               // mount point not found, return false and zipDirIndex contains place where mount info should be stored
     return false;
 }
@@ -1468,16 +1477,16 @@ void TranslatedDisk::replaceHostPathWithZipDirPath(int inAtariDriveIndex, std::s
     waitingForMount = false;
 
     int i;
-    
+
     for(i=0; i<MAX_ZIPDIR_NESTING; i++) {
         bool containsZip = false;                                   // flag marking if the path still contains a ZIP file and thus needs another iteration
-    
+
         replaceHostPathWithZipDirPath_internal(hostPath, waitingForMount, containsZip);
-        
+
         if(containsZip) {                                           // if the last call of replaceHostPathWithZipDirPath_internal() contained ZIP file, mark that the whole path contained at least one zip
             zipDirNestingLevel++;                                   // nesting level increased
         }
-        
+
         if(waitingForMount || !containsZip) {                       // if we're waiting for mount now, or it doesn't contain ZIP, quit
             return;
         }
@@ -1485,20 +1494,20 @@ void TranslatedDisk::replaceHostPathWithZipDirPath(int inAtariDriveIndex, std::s
         //------------------
         // if we got here, part of the path now has been replaced and the rest needs to be translated from short to long
         bool hasZipDirSubPath = (hostPath.length() > 13);           // if it's not just path to ZIP DIR (e.g. not only '/tmp/zipdir3' ), but it has some sub path (e.g. '/tmp/zipdir3/LONGFI~1.TXT' )
-        
+
         if(hasZipDirSubPath) {                                      // if the path contains at least one ZIP DIR, we need to do translation from short to long path again, as this is now a new path
             // hostPath is now something like /tmp/zipdir3/LONGFI~1.TXT , so we should break it into root ( '/tmp/zipdir3') and the rest
             std::string zipDirRoot      = hostPath.substr(0, 12);   // contains something like '/tmp/zipdir3'
             std::string zipDirSubPath   = hostPath.substr(13);      // contains the rest of the string, like 'LONGFI~1.TXT'
-            
+
             std::string partialLongHostZipDirPath;
             conf[inAtariDriveIndex].dirTranslator.shortToLongPath(zipDirRoot, zipDirSubPath, partialLongHostZipDirPath);    // now convert short to long path
-            
+
             hostPath = zipDirRoot;
             Utils::mergeHostPaths(hostPath, partialLongHostZipDirPath);     // merge and thus create /tmp/zipdir3/LongFileName.txt
-            
+
             Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath - after ZIP DIR translation: dirTranslator.shortToLongPath -- zipDirRoot: %s, zipDirSubPath: %s -> partialLongHostZipDirPath: %s", zipDirRoot.c_str(), zipDirSubPath.c_str(), partialLongHostZipDirPath.c_str());
-        }        
+        }
     }
 }
 
@@ -1507,11 +1516,11 @@ void TranslatedDisk::replaceHostPathWithZipDirPath_internal(std::string &hostPat
     const char *pHostPath = hostPath.c_str();
     waitingForMount = false;
     containsZip     = false;
- 
+
     //----------
     // first check if the host path contains '*.ZIP' part
     const char *pZip = strcasestr(pHostPath, ".ZIP");
-    
+
     if(pZip == NULL) {                                  // didn't find .ZIP string? just a normal path
         Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath_internal -- no ZIP file in hostPath: %s", pHostPath);
         containsZip = false;
@@ -1519,19 +1528,19 @@ void TranslatedDisk::replaceHostPathWithZipDirPath_internal(std::string &hostPat
     }
 
     int zipFilePathLen = (pZip - pHostPath) + 4;        // calculate the length of the full path to ZIP file
-    
+
     char zipFilePath[1024];
     strncpy(zipFilePath, pHostPath, zipFilePathLen);    // copy the path to ZIP file
     zipFilePath[zipFilePathLen] = 0;                    // terminate the string
-    
+
     Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath_internal -- hostPath: %s -> ZIP file: %s", pHostPath, zipFilePath);
-    
+
     //----------
     // check if there's a real .ZIP file at the place of where the pretended ZIP DIR is
     if(!isOkToMountThisAsZipDir(zipFilePath)) {
         containsZip = false;
         return;
-    }    
+    }
     //----------
     // check if the ZIP file is already mounted
     bool isMounted;
@@ -1540,20 +1549,20 @@ void TranslatedDisk::replaceHostPathWithZipDirPath_internal(std::string &hostPat
 
     if(!isMounted || !zipDirs[zipDirIndex]->isMounted) {
         doZipDirMountOrStateCheck(isMounted, zipFilePath, zipDirIndex, waitingForMount);
-        
+
         if(waitingForMount == true) {                               // return that we're waiting for mount to finish
             containsZip = true;
             return;
         }
     }
-    
+
     //----------
     // now replace the part of the host path with the alternative ZIP DIR path
     std::string pathInsideZipFile = hostPath.substr(zipFilePathLen);
     hostPath = zipDirs[zipDirIndex]->mountPoint + pathInsideZipFile;                // create new host path inside zip mount point
 
     zipDirs[zipDirIndex]->lastAccessTime = Utils::getCurrentMs();                   // mark the current time as the time of last access
-    
+
     Debug::out(LOG_DEBUG, "TranslatedDisk::replaceHostPathWithZipDirPath_internal -- new path now is %s", hostPath.c_str());
     containsZip = true;
 }
@@ -1562,30 +1571,30 @@ bool TranslatedDisk::isOkToMountThisAsZipDir(const char *zipFilePath)
 {
     struct stat attr;
     int res = stat(zipFilePath, &attr);                 // get the status of the possible zip file
-	
-	if(res != 0) {
-		Debug::out(LOG_ERROR, "TranslatedDisk::isOkToMountThisAsZipDir() -- stat() failed, file / dir doesn't exist?");
-		return false;		
-	}
-	
-	bool isDir  = (S_ISDIR(attr.st_mode) != 0);         // check if it's a directory
+
+    if(res != 0) {
+        Debug::out(LOG_ERROR, "TranslatedDisk::isOkToMountThisAsZipDir() -- stat() failed, file / dir doesn't exist?");
+        return false;
+    }
+
+    bool isDir  = (S_ISDIR(attr.st_mode) != 0);         // check if it's a directory
     bool isFile = (S_ISREG(attr.st_mode) != 0);         // check if it's a file
 
     if(isDir) {                                         // if it's a dir, quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::isOkToMountThisAsZipDir -- %s is a normal dir, path not replaced", zipFilePath);
         return false;
     }
-    
+
     if(!isFile) {                                       // if it's not a file, quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::isOkToMountThisAsZipDir -- %s is a NOT a file, WTF, path not replaced", zipFilePath);
         return false;
     }
-    
+
     if(attr.st_size > MAX_ZIPDIR_ZIPFILE_SIZE) {        // file too big? quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::isOkToMountThisAsZipDir -- file %s is too big, only files smaller than 5 MB are mounted, path not replaced", zipFilePath);
         return false;
     }
-    
+
     return true;
 }
 
@@ -1593,7 +1602,7 @@ void TranslatedDisk::doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath
 {
     if(!isMounted) {                                    // if ZIP file not mounted yet, mount it
         Debug::out(LOG_DEBUG, "TranslatedDisk::doZipDirMountOrStateCheck -- mounting file %s to dir %s", zipFilePath, zipDirs[zipDirIndex]->mountPoint.c_str());
-        
+
         //----------
         // issue mount request
         TMounterRequest tmr;
@@ -1601,21 +1610,21 @@ void TranslatedDisk::doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath
         tmr.devicePath  = zipFilePath;                      // e.g. /mnt/shared/normal/archive.zip
         tmr.mountDir    = zipDirs[zipDirIndex]->mountPoint; // e.g. /tmp/zipdir2
         int masId       = Mounter::add(tmr);                // add mounter action, get mount action state id
-        
+
         zipDirs[zipDirIndex]->mountActionStateId    = masId;    // store the mounter action state id, for future mount state query
         zipDirs[zipDirIndex]->isMounted             = false;    // not mounted yet
         //----------
         // mark this ZIP file as mounted
         zipDirs[zipDirIndex]->realHostPath = zipFilePath;   // store path to zip file - this will be marker that this zip file is mounted
-        
+
         waitingForMount = true;                             // return that we're waiting for mount to finish
         return;
     } else {
         Debug::out(LOG_DEBUG, "TranslatedDisk::doZipDirMountOrStateCheck -- file %s already mounted to %s, reusing and not mounting", zipFilePath, zipDirs[zipDirIndex]->mountPoint.c_str());
-        
+
         if(!zipDirs[zipDirIndex]->isMounted) {                                      // if not mounted yet
             int state = Mounter::mas_getState(zipDirs[zipDirIndex]->mountActionStateId);     // get state of this mount action
-            
+
             if(state == MOUNTACTION_STATE_DONE) {                                   // if state is DONE, mark that it's mounted and continue
                 zipDirs[zipDirIndex]->isMounted = true;
             } else {                                                                // state is NOT DONE yet
@@ -1623,7 +1632,7 @@ void TranslatedDisk::doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath
                 return;
             }
         }
-        
+
         // if mounted, it continues here
     }
 }
@@ -1649,7 +1658,7 @@ void TranslatedDisk::driveGetReport(int driveIndex, std::string &reportString)
         return;
     }
 
-  	int typeIndex  = conf[driveIndex].translatedType;
+    int typeIndex  = conf[driveIndex].translatedType;
 
     switch(typeIndex) {
         case TRANSLATEDTYPE_NORMAL:
@@ -1674,4 +1683,32 @@ void TranslatedDisk::driveGetReport(int driveIndex, std::string &reportString)
         default:
             reportString = "unknown";
     }
+}
+
+void TranslatedDisk::fillDisplayLines(void)
+{
+    char tmp[64];
+
+    // mount USB drives as raw/translated + ZIP files are dirs/files
+    Settings s;
+    bool mountRawNotTrans = s.getBool("MOUNT_RAW_NOT_TRANS", 0);
+    strcpy(tmp, mountRawNotTrans ? "USB raw    " : "USB trans  ");
+    strcat(tmp, useZipdirNotFile ? "ZIP dir"     : "ZIP file");
+    display_setLine(DISP_LINE_TRAN_SETT, tmp);
+
+    // what letter is for config and shared drive?
+    sprintf(tmp, "config:%c   shared:%c", driveLetters.confDrive + 'A', driveLetters.shared + 'A');
+    display_setLine(DISP_LINE_CONF_SHAR, tmp);
+
+    // other drives
+    strcpy(tmp, "drvs: ");
+    for(int i=2; i<MAX_DRIVES; i++) {   // if drive is normal and enabled
+        if(conf[i].enabled && conf[i].translatedType == TRANSLATEDTYPE_NORMAL) {
+            char tmp2[2];
+            tmp2[0] = 'A' + i;  // drive letter
+            tmp2[1] = 0;        // string terminator
+            strcat(tmp, tmp2);  // append
+        }
+    }
+    display_setLine(DISP_LINE_TRAN_DRIV, tmp);
 }

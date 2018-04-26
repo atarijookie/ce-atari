@@ -24,7 +24,7 @@ ifeq ($(ONPC),yes)
 else
     LDLIBS	+= -lbcm2835
     CFLAGS += -I./
-    DISTRO := $(shell ./whichdistro.sh)
+    DISTRO := $( shell ./whichdistro.sh )
     ifeq ($(DISTRO),yocto)
         OBJDIR = obj/yocto
         TARGET   =  cosmosex_yocto
@@ -76,6 +76,7 @@ SUBDIR9	= network
 SUBDIR10 = dir2fdd
 SUBDIR11 = ikbd
 SUBDIR12 = mediastreaming
+SUBDIR13 = display
 
 SRCS  = $(wildcard *.cpp) 
 SRCS += $(wildcard $(SUBDIR1)/*.cpp) 
@@ -92,6 +93,7 @@ SRCS += $(wildcard $(SUBDIR9)/*.cpp)
 SRCS += $(wildcard $(SUBDIR10)/*.cpp)
 SRCS += $(wildcard $(SUBDIR11)/*.cpp)
 SRCS += $(wildcard $(SUBDIR12)/*.cpp)
+SRCS += $(wildcard $(SUBDIR13)/*.cpp)
 
 HDRS  = $(wildcard *.h)
 HDRS += $(wildcard $(SUBDIR1)/*.h)
@@ -108,6 +110,7 @@ HDRS += $(wildcard $(SUBDIR9)/*.h)
 HDRS += $(wildcard $(SUBDIR10)/*.h)
 HDRS += $(wildcard $(SUBDIR11)/*.h)
 HDRS += $(wildcard $(SUBDIR12)/*.h)
+HDRS += $(wildcard $(SUBDIR13)/*.h)
 
 OBJS = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(SRCS:.c=.o)))
 DEPS = $(patsubst %.o,%.d,$(OBJS))

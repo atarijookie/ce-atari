@@ -19,9 +19,10 @@ typedef struct {
     bool enabled;
     int  id;
     bool writeProtected;
+    bool soundEnabled;
 } FloppyConfig;
 
-class Settings 
+class Settings
 {
 public:
 	Settings(void);
@@ -35,7 +36,7 @@ public:
 
 	float getFloat(const char *key, float defValue);
 	void  setFloat(const char *key, float value);
-	
+
 	char *getString(const char *key, const char *defValue);
 	void  setString(const char *key, const char *value);
 
@@ -46,11 +47,11 @@ public:
 
     void loadFloppyConfig(FloppyConfig *fc);
     void saveFloppyConfig(FloppyConfig *fc);
-	
+
 private:
 
 	FILE *sOpen(const char *key, bool readNotWrite);
-	
+
 	void storeDefaultValues(void);
 };
 

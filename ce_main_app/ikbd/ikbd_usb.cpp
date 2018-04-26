@@ -15,6 +15,7 @@
 #include "settings.h"
 #include "datatypes.h"
 #include "statusreport.h"
+#include "../display/displaythread.h"
 
 #include "ikbd.h"
 
@@ -53,6 +54,8 @@ void Ikbd::deinitDev(int index)
     if(index == INTYPE_JOYSTICK2) {         // for joy2 - init it
         initJoystickState(&joystick[1]);
     }
+
+    fillDisplayLine();                      // fill IKBD line for showing it on display
 }
 
 void Ikbd::initJoystickState(TJoystickState *joy)
@@ -79,6 +82,30 @@ void Ikbd::closeDevs(void)
             ikbdDevs[i].fd = -1;          // mark it as closed
         }
     }
+}
+
+void Ikbd::fillDisplayLine(void)
+{
+    char tmp[64];
+    strcpy(tmp, "IKBD: ");
+
+    if(gotUsbKeyboard()) {
+        strcat(tmp, "Keyb ");
+    }
+
+    if(gotUsbMouse()) {
+        strcat(tmp, "Mou ");
+    }
+
+    if(gotUsbJoy1()) {
+        strcat(tmp, "J1 ");
+    }
+
+    if(gotUsbJoy2()) {
+        strcat(tmp, "J2 ");
+    }
+
+    display_setLine(DISP_LINE_IKDB, tmp);
 }
 
 void Ikbd::findDevices(void)
@@ -136,6 +163,8 @@ void Ikbd::findDevices(void)
     }
 
     closedir(dir);
+
+    fillDisplayLine();      // fill it for showing it on display
 }
 
 void Ikbd::findVirtualDevices(void)
@@ -557,6 +586,15 @@ bool Ikbd::gotUsbMouse(void)
     }
 
     return false;                                   // no mouse present
+}
+
+bool Ikbd::gotUsbKeyboard(void)
+{
+    if(ikbdDevs[INTYPE_KEYBOARD].fd != -1) {
+        return true;
+    }
+
+    return false;
 }
 
 bool Ikbd::gotUsbJoy1(void)
