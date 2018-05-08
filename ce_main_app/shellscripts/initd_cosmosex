@@ -3,10 +3,10 @@
 
 ### BEGIN INIT INFO
 # Provides: cosmosex
-# Required-Start: mountall
+# Required-Start:    $local_fs $remote_fs
 # Required-Stop:
-# Default-Start: S
-# Default-Stop: 6
+# Default-Start:     S
+# Default-Stop:      0 1 6
 # Short-Description: Start Cosmosex run loop
 # Description: Cosmosex is started and monitored via cesuper.sh. 
 ### END INIT INFO
