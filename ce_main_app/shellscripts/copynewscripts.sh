@@ -56,8 +56,9 @@ if [ "$issue" -gt "0" ]; then
 else
     # for raspbian
     rm -f /ce/wifisuper.sh                                                                  # remove wifisuper.sh
-    compareAndCopy   "/ce/ceboot.sh"             "/ce/app/shellscripts/ceboot.sh"
-    compareAndCopy   "/etc/init.d/cosmosex"      "/ce/app/shellscripts/initd_cosmosex"      # update init.d script
+    compareAndCopy   "/ce/ceboot.sh"                        "/ce/app/shellscripts/ceboot.sh"
+    compareAndCopy   "/etc/init.d/cosmosex"                 "/ce/app/shellscripts/initd_cosmosex"   # update init.d script
+    compareAndCopy   "/etc/systemd/system/cosmosex.service" "/ce/app/shellscripts/cosmosex.service" # update systemd (systemctl) script
 
     #------------------------
     # now add / change the core_freq param in the boot config to avoid SPI clock issues
