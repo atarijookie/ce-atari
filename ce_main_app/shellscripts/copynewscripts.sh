@@ -34,6 +34,7 @@ compareAndCopy   "/ce/cesuper.sh"                "/ce/app/shellscripts/cesuper.s
 compareAndCopy   "/ce/ce_conf.sh"                "/ce/app/shellscripts/ce_conf.sh"
 compareAndCopy   "/ce/ce_start.sh"               "/ce/app/shellscripts/ce_start.sh"
 compareAndCopy   "/ce/ce_stop.sh"                "/ce/app/shellscripts/ce_stop.sh"
+compareAndCopy   "/ce/ce_running.sh"             "/ce/app/shellscripts/ce_running.sh"
 compareAndCopy   "/ce/ce_firstfw.sh"             "/ce/app/shellscripts/ce_firstfw.sh"
 compareAndCopy   "/ce/ce_update.sh"              "/ce/app/shellscripts/ce_update.sh"
 compareAndCopy   "/ce/update/test_xc9536xl.xsvf" "/ce/app/shellscripts/test_xc9536xl.xsvf"
