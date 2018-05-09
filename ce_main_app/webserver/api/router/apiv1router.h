@@ -11,6 +11,7 @@
 #include "../resource/kbdresource.h"
 #include "../resource/floppyresource.h"
 #include "../resource/configresource.h"
+#include "../resource/downloadresource.h"
 
 class ApiV1Router: public CivetHandler
 {
@@ -21,10 +22,11 @@ public:
     bool handlePost(CivetServer *server, struct mg_connection *conn);
     bool handlePut(CivetServer *server, struct mg_connection *conn);
 private:
-    MouseResource *pxMouse; 
+    MouseResource *pxMouse;
     KbdResource *pxKeyboard;
-    FloppyResource *pxFloppy; 
-    ConfigResource *pxConfig; 
+    FloppyResource *pxFloppy;
+    ConfigResource *pxConfig;
+	DownloadResource *pxDownload;
 };
 
 #endif

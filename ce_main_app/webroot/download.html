@@ -3,27 +3,29 @@
     <head>
         <meta http-equiv="content-type" content="text/html; charset=utf-8">
 	    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
-        <title>CosmosEx Floppy Emulation</title>
-        <!-- 
-        -->
+        <title>CosmosEx download page</title>
         <link rel="stylesheet" type="text/css" href="css/bootstrap.light.css">
-		    <script type="text/javascript" src="js/modernizr.custom.50426.js"></script>
+        <script type="text/javascript" src="js/modernizr.custom.50426.js"></script>
+
         <script type="text/javascript"> 
-        var version="160125";
-        //unfortunately we have to support IE<10, so decide on zepto/jquery here
-    		document.write('<script type="text/javascript" src=js/' + ('__proto__' in {} ? 'zepto' : 'jquery') + '.js?'+version+'><\/script>');
-    		document.write('<script type="text/javascript"">var jQuery=Zepto;<\/script>');
-    		document.write('<script type="text/javascript" src=js/floppy.js?'+version+'><\/script>');
-//        document.write('<link rel="stylesheet" type="text/css" href="css/combined.css?'+version+'">');
-        document.write('<link rel="stylesheet" type="text/css" href="css/style.css?'+version+'">');
-    		</script>
-       <script language="Javascript">
+            var version="180509";
+            document.write('<script type="text/javascript" src=js/jquery.js?'+version+'><\/script>');
+        	document.write('<script type="text/javascript" src=js/floppy.js?'+version+'><\/script>');
+            document.write('<link rel="stylesheet" type="text/css" href="css/style.css?'+version+'">');
+        </script>
+
+<script type="text/javascript">
+
+    var inList = [];        // image list of games / software (e.g. A001.zip, A002.zip, ...)
+    var gotList = [];       // list of files we already have downloaded
+    var input_lists = [];   // contains list of list names - e.g. automation games, dbug games, ...
+
 // this function takes the input csv with available online files and parses it into array of objects
 function parseInputCsv(inputCsv)
 {
     var items = [];
 
-    var lines = inputCsv.split('\n');     // split whole file into lines
+    var lines = inputCsv.split('\n');       // split whole file into lines
     for(var i=0; i<lines.length; i++) {     // go through all lines
         var item = new Object();
         var cols = lines[i].split(',');     // split single line into columns
@@ -43,10 +45,46 @@ function parseInputCsv(inputCsv)
     return items;
 }
 
-function parseGotFiles(gotFiles)
+function getHaveLists()
 {
-    var items = gotFiles.split(',');
-    return items;
+    // get list of games lists we can look through
+    $.ajax({
+        type: 'GET',
+        url: '/api/v1/download/havelists',
+        success: function(data){
+            input_lists = data.havelists;
+            fillInputListSelect()
+        }
+    })
+}
+
+function getHaveFiles()
+{
+    // get list of files we already have downloaded
+    $.ajax({
+        type: 'GET',
+        url: '/api/v1/download/havefiles',
+        success: function(data){
+            // data.havefiles is a list of files we have
+            gotList = data.havefiles;
+        }
+    })
+}
+
+function getInputCsv(list_filename)
+{
+    // get list of available online files 
+    $.ajax({
+        type: 'GET',
+        url: '/api/v1/download/imagelist',
+        success: function(data){
+            inList = parseInputCsv(data.imagelist);             // parse it
+            document.getElementById('search_input').value = ""; // clear the search string
+
+            // refresh the shown list on screen
+            onDelayedSearchStringChanged();
+        }
+    })
 }
 
 function insertStringAtPos(largeString, index, smallString)
@@ -197,89 +235,15 @@ function onDelayedSearchStringChanged()
 
 function fillInputListSelect()
 {
-    var lists = input_lists_csv.split('\n');    // split input into individual lines
-
     var select = document.getElementById('input_list_name');
     select.innerHTML = "";                      // clear the list
 
-    for (var i=0; i<lists.length; i++) {        // go through individual lists
-        cols = lists[i].split(",");             // split into column
-
-        if(cols.length < 3) {                   // if the row doesn't have enough data, skip it
-            continue;
-        }
-
-        list_is_floppy_images = cols[0];        // 0 if the list contains something else than floppy images (e.g. apps); 1 if the list contains floppy images which can be inserted
-        list_name_humanreadable = cols[1];      // human readable name - shown to user - like 'automation images hosted on exxos'
-        list_filename = cols[2];                // filename of .csv list - used to identify which one to load
-
+    for (var i=0; i<input_lists.length; i++) {          // go through individual lists
         var option = document.createElement('option');
-        option.innerHTML = list_name_humanreadable;
-        option.value = list_filename;           // filename as list name
-        option.selected = (i == 0);             // select 0th option
+        option.innerHTML = input_lists[i].list_name_humanreadable;
+        option.value = input_lists[i].list_filename;    // filename as list name
+        option.selected = (i == 0);                     // select 0th option
         select.append(option);
-    }
-}
-
-function getInputCsv(list_filename)
-{
-    if(list_filename == 'automation_exxos') {
-        return "http://www.exxoshost.co.uk/atari/games/automation/files/A_000.zip,0x0000,Sinbad and the Throne of the Falcon,Myth\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_001.zip,0x0000,Crystal Castles,Star Wars: The Empire Strikes Back,Northstar w/ docs,Star Raiders,Robotron: 2084,Trail Blazer,Football Manager: World Cup Edition\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_002.zip,0x0000,Into the Eagle's Nest,Trantor: The Last Stormtrooper,Extensor,Knightmare,Plutos,Virus,Joe Blade,Trifide II\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_003.zip,0x0000,Mercenary: Return to Targ,Mercenary: The Second City,Football Manager,Titus Arcade Classics Vol. 1,Rolling Thunder,Arkanoid II: Revenge of Doh,Delta Patrol,Super Huey\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_004.zip,0x0000,Mission Genocide,Computer Scrabble,Moon Patrol,Eden Blues,Xevious,Airball,Starquake,Missile Command (v1.0)\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_005.zip,0x0000,Typhoon Thompson in: Search for the Sea Child,Street Gang (1 meg),Deathstrike\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_006.zip,0x0000,Better Dead Than Alien,Missile Command (v2.0),Pinball Factory,Thundercats,Army Moves,Rockford,Joust\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_007.zip,0x0000,Asteriods Deluxe,Karate Kid II (1 meg),Diablo,Battleships,Vampire's Empire,Overlander\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_008.zip,0x0000,Backlash,Ninja,Goldrunner,Major Motion,Super Breakout,Revenge of the Mutant Camels II,QBall,Spook\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_009.zip,0x0000,Nebulus,Eliminator,Blue Angels,Enduro Racer,Chubby Gristle\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_010.zip,0x0000,Tournament Leader Board,Leader Board,Pengy,Veteran,Black Lamp,Whirligig\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_011.zip,0x0000,Championship Cricket (1 meg),Soccer Supremo,Tennis,Quadralien,The Lands of Havoc,Mudpies,Hotshot,Thrust,8 Ball\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_012.zip,0x0000,Beyond the Ice Palace,Space Killer,Time Bandit v2.1,Sky Chase,Deflektor,Shackled\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_013.zip,0x0000,Super Hang-On,Super Sprint,ST Karate,Pool (Microdeal)\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_014.zip,0x0000,Elite,Vixen,Star Goose!,Helter Skelter,Championship Baseball\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_015.zip,0x0000,Starray (1 meg),Return to Genesis (1 meg)\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_016.zip,0x0000,Federation of Free Traders,Football Manager II,Screaming Wings,Mousetrap,Bombjack\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_017.zip,0x0000,Magnetic Tank,Indiana Jones and the Temple of Doom,Spy vs. Spy,Tetra Quest,Garfield,Cybernoid: The Fighting Machine,Tetris\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_018.zip,0x0000,Buggy Boy,Floyd the Droid: \"On the Run\",Wizball,Eco: A Game of Survival,Phantasm,Dragon Lord\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_019.zip,0x0000,Where Time Stood Still,Battle Probe,Sorcery+,XOR\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_020.zip,0x0000,Artura,Garfield,Moonbase,Galax 3D\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_021.zip,0x0000,Nigel Mansell's Grand Prix,Fernandez Must Die,Battlezone,The Enforcer,Uridium,Altair\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_022.zip,0x0000,1943: Battle of Midway,Rampage,Captain America Defies the Doom Tube,Slap Fight,Leathernecks\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_023.zip,0x0000,Turbo Cup,Strip Poker 3,Snafux,Flying Shark\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_024.zip,0x0000,Return of the Jedi,Off Shore Warrior,Bank Buster,Two Game (Box the Dragon and Mastermind)\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_025.zip,0x0000,Pac-Mania,Solomon's Key,International Karate +,Mad Mix Game (Pepsi),Harrier Strike Mission w/ docs,Metro-Cross,Hellfire\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_026LG.zip,0x0000,Millipede,Driller (Space Station Oblivion),Mach 3,Truck\n\
-http://www.exxoshost.co.uk/atari/games/automation/files/A_027.zip,0x0000,James Bond 007: Live and Let Die,Foundation's Waste,ST-Protector,Pandora\n";
-    }
-
-    if(list_filename == 'stonish_games') {
-        return "http://www.stonish.net/download/ACO_A.ZIP,0x0000,Vroom,Grav,FastCopy Pro 1.0c,FastCopy Pro 1.0c (doc)\n\
-http://www.stonish.net/download/ACO_B.ZIP,0x0000,Flight Of The Intruder,Ripper 3.1,Musix Ripper 2.0,Low Res Grapic Ripper\n\
-http://www.stonish.net/download/ACE5.ZIP,0x0000,Boston Bomb Club,Head Over Heels,The Blues Brothers,Neochrome Master 2.25\n\
-http://www.stonish.net/download/ADM8.ZIP,0x0000,Hudson Hawk,Hot Wheels,Masterquiz I,UltraPacker 1.01\n\
-http://www.stonish.net/download/ADR00A.ZIP,0x0000,Demo Construction Kit,Demo Construction Kit (doc)\n\
-http://www.stonish.net/download/ADR00B.ZIP,0x0000,Demo Construction Kit (data)\n\
-http://www.stonish.net/download/ADR00C.ZIP,0x0000,Demo Construction Kit (data)\n\
-http://www.stonish.net/download/ADR01V1.ZIP,0x0000,Bug Bash,Oh-No! More Lemmings,Siegemaster,Chain Reaction (Paul Margetson) 1.6,Bug Bash (doc),Oh-No! More Lemmings (doc)\n\
-http://www.stonish.net/download/ADR01V2.ZIP,0x0000,Bug Bash,Oh-No! More Lemmings,Siegemaster,Chain Reaction (Paul Margetson) 1.6,Bug Bash (doc),Oh-No! More Lemmings (doc)\n\
-http://www.stonish.net/download/ADR02.ZIP,0x0000,World Cricket,Final Blow,Red Alert\n\
-http://www.stonish.net/download/ADR03.ZIP,0x0000,1st Division Manager,Teenage Mutant Hero Turtles - The Coin Up\n\
-http://www.stonish.net/download/ADR04V2.ZIP,0x0000,Kid Gloves II,Tip Off\n\
-http://www.stonish.net/download/ADR05.ZIP,0x0000,A320 Airbus,Cybercop\n\
-http://www.stonish.net/download/ADR06.ZIP,0x0000,Rubicon,Entombed\n\
-http://www.stonish.net/download/ADR07.ZIP,0x0000,Knights Of The Sky,Annihilator\n\
-http://www.stonish.net/download/ADR08.ZIP,0x0000,Apache Flight,The Mystic Well,Easy Rider 4.0,Jetsons - The Computer Game\n\
-http://www.stonish.net/download/ADR09.ZIP,0x0000,Shadowlands,Graeme Souness Soccer Manager,Knights Of The Sky (doc),Populous II (doc),Shadowlands (doc)\n\
-http://www.stonish.net/download/ADR10.ZIP,0x0000,Race Drivin',Plax Atax,Speed-packer 2.0,Plax Atax (doc),The Brilliant Boffin Brothers (doc),Crush!\n\
-http://www.stonish.net/download/ADR11.ZIP,0x0000,Psyborg,Third Reich\n\
-http://www.stonish.net/download/ADR12A.ZIP,0x0000,Alcatraz,F1 Tornado,Dizzy Panic,Zap,ADR Bootblock 1.0\n\
-http://www.stonish.net/download/ADR12B.ZIP,0x0000,Alcatraz (data)\n\
-http://www.stonish.net/download/ADR13A.ZIP,0x0000,Space Gun,Violence\n\
-http://www.stonish.net/download/ADR13B.ZIP,0x0000,Space Gun (data)\n\
-http://www.stonish.net/download/ADR14.ZIP,0x0000,John Barnes European Football [1 MB],Warriors Of Releyne,Megatizer 2.4 [1 MB],ADR Bootblock 1.0\n\
-http://www.stonish.net/download/ADR15.ZIP,0x0000,European Football Champ,CJ In The USA,Sooty & Sweep\n";
     }
 }
 
@@ -287,37 +251,19 @@ function onInputListChanged()
 {
     var selected = document.getElementById('input_list_name').value;
 
-    var lists = input_lists_csv.split('\n');    // split input into individual lines
-
-    for (var i=0; i<lists.length; i++) {        // go through individual lists
-        cols = lists[i].split(",");             // split into column
-
-        if(cols.length < 3) {                   // if the row doesn't have enough data, skip it
-            continue;
-        }
-
-        list_is_floppy_images = cols[0];        // 0 if the list contains something else than floppy images (e.g. apps); 1 if the list contains floppy images which can be inserted
-        list_name_humanreadable = cols[1];      // human readable name - shown to user - like 'automation images hosted on exxos'
-        list_filename = cols[2];                // filename of .csv list - used to identify which one to load
-
-        if(list_filename == selected) {                         // if found the list
-            inCsv = getInputCsv(list_filename);                 // get it from device
-            inList = parseInputCsv(inCsv);                      // parse it
-            document.getElementById('search_input').value = ""; // clear the search string
+    for (var i=0; i<input_lists.length; i++) {          // go through individual lists
+        if(input_lists[i].list_filename == selected) {  // if found the list
+            getInputCsv(input_lists[i].list_filename);  // get it from device
             break;
         }
     }
-
-    // refresh the shown list on screen
-    onDelayedSearchStringChanged();
 }
 
 $(document).ready(function(){
-//    inList     = parseInputCsv(input_csv);
-    gotList    = parseGotFiles(gotFiles);
+   
+    getHaveLists();     // get list of lists of games we have available
+    getHaveFiles();     // get list of files we already have downloaded
 
-    // fill input list selector, add handler on change
-    fillInputListSelect();
     var select = document.getElementById('input_list_name');
     select.onchange = function(){ onInputListChanged(); };
 
@@ -330,9 +276,10 @@ $(document).ready(function(){
     onInputListChanged();    
     onDelayedSearchStringChanged();
 });
+
         </script>     
-      </head>
-    <body>
+  </head>
+  <body>
     <div class="container">
         <div class="row">
             <div class="span10">
@@ -349,13 +296,13 @@ $(document).ready(function(){
         <h3>Download games and software</h3>
         <p>Search and download things you want to play and use.</p>
         
-<!-- ---------------------------- -->
-   <table border=1 cellspacing=0 cellpadding=5>
+    <!-- ---------------------------- -->
+    <table border=1 cellspacing=0 cellpadding=5>
       <tr><td>Select list: </td><td> <select id="input_list_name"></select> </td></tr>
       <tr><td>Search:      </td><td> <input type="text" id="search_input">  </td></tr>
       <tr><td colspan=2><p id='search_results'></p> </td></tr>
-   </table>        
+    </table>        
  
- </body>
+  </body>
 </html>
 
