@@ -18,7 +18,6 @@
 
     var inList = [];        // image list of games / software (e.g. A001.zip, A002.zip, ...)
     var gotList = [];       // list of files we already have downloaded
-    var input_lists = [];   // contains list of list names - e.g. automation games, dbug games, ...
 
 // this function takes the input csv with available online files and parses it into array of objects
 function parseInputCsv(inputCsv)
@@ -45,19 +44,6 @@ function parseInputCsv(inputCsv)
     return items;
 }
 
-function getHaveLists()
-{
-    // get list of games lists we can look through
-    $.ajax({
-        type: 'GET',
-        url: '/api/v1/download/havelists',
-        success: function(data){
-            input_lists = data.havelists;
-            fillInputListSelect()
-        }
-    })
-}
-
 function getHaveFiles()
 {
     // get list of files we already have downloaded
@@ -71,7 +57,7 @@ function getHaveFiles()
     })
 }
 
-function getInputCsv(list_filename)
+function getInputCsv()
 {
     // get list of available online files 
     $.ajax({
@@ -120,17 +106,17 @@ function generateSearchResultRow(matchingItem, whatWeHaveList, searchString)
     var insertIcons = "";           // nothing / insert into slot
 
     if(isDownloaded) {              // if file is downloaded
-        downloadIcon = generateHtmlIcon("./icon_is_downloaded.png");
+        downloadIcon = generateHtmlIcon("img/icon_is_downloaded.png");
 
         for(var i=1; i<4; i++) {    // insert into slot 1, 2, 3
-            var imagePath = "./icon_insert_".concat(i.toString(), ".png");
+            var imagePath = "img/icon_insert_".concat(i.toString(), ".png");
             insertIcons = insertIcons.concat(generateHtmlIcon(imagePath));
         }
     } else {                        // if file is not downloaded yet
-        downloadIcon = generateHtmlIcon("./icon_download.png");
+        downloadIcon = generateHtmlIcon("img/icon_download.png");
 
         for(var i=0; i<3; i++) {    // just 3 empty placeholders
-            insertIcons = insertIcons.concat(generateHtmlIcon("./icon_insert_empty.png"));
+            insertIcons = insertIcons.concat(generateHtmlIcon("img/icon_insert_empty.png"));
         }
     }
 
@@ -247,25 +233,9 @@ function fillInputListSelect()
     }
 }
 
-function onInputListChanged()
-{
-    var selected = document.getElementById('input_list_name').value;
-
-    for (var i=0; i<input_lists.length; i++) {          // go through individual lists
-        if(input_lists[i].list_filename == selected) {  // if found the list
-            getInputCsv(input_lists[i].list_filename);  // get it from device
-            break;
-        }
-    }
-}
-
 $(document).ready(function(){
-   
-    getHaveLists();     // get list of lists of games we have available
     getHaveFiles();     // get list of files we already have downloaded
-
-    var select = document.getElementById('input_list_name');
-    select.onchange = function(){ onInputListChanged(); };
+    getInputCsv();      // get list of files which can be searched and downloaded
 
     // add handler to search string change
     var search_input = document.getElementById('search_input')
@@ -273,7 +243,6 @@ $(document).ready(function(){
     search_input.onkeydown = function(){ onDelayedSearchStringChanged(); };
     search_input.onkeypress = function(){ onDelayedSearchStringChanged(); };
 
-    onInputListChanged();    
     onDelayedSearchStringChanged();
 });
 
@@ -298,7 +267,6 @@ $(document).ready(function(){
         
     <!-- ---------------------------- -->
     <table border=1 cellspacing=0 cellpadding=5>
-      <tr><td>Select list: </td><td> <select id="input_list_name"></select> </td></tr>
       <tr><td>Search:      </td><td> <input type="text" id="search_input">  </td></tr>
       <tr><td colspan=2><p id='search_results'></p> </td></tr>
     </table>        
