@@ -27,6 +27,7 @@
                     <li class="{{activeHome}}"><a href="/?v=5">Home</a></li>
                     <li><a href="http://joo.kie.sk/?page_id=415">Manual</a></li>
                     <li><a href="/floppy.html?v=5">Floppy</a></li>
+                    <li><a href="/download.html?v=5">Download</a></li>
                     <li><a href="/remote.html?v=5">Remote</a></li>
                     <li><a href="/screenshots.html?v=5">Screenshots</a></li>
                     <li><a href="/config.html?v=5">Config</a></li>
