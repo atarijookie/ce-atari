@@ -114,7 +114,7 @@ int main( int argc, char* argv[] )
 
     // write some header out
     Clear_home();
-    (void) Cconws("\33p[ CosmosEx disk driver  ]\r\n[ by Jookie 2013 - 2017 ]\r\n[        ver ");
+    (void) Cconws("\33p[ CosmosEx disk driver  ]\r\n[ by Jookie 2013 - 2018 ]\r\n[        ver ");
     showAppVersion();
     (void) Cconws(" ]\33q\r\n\r\n");
 
@@ -683,7 +683,7 @@ void installCEPIcookie(void)
         
         cookieJar = (DWORD *) *cookieJarAddr;           // re-read the cookie jar position
 
-	res = installCookie(cookieJar, 0x43455049, (DWORD) &hdIf);  // try to install CEPI cookie
+        res = installCookie(cookieJar, 0x43455049, (DWORD) &hdIf);  // try to install CEPI cookie
     }
 
     if(!res) {

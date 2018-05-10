@@ -29,9 +29,9 @@
 #define MFM_8US     3
 
 
-#define VERSION_STRING          "CosmosEx v2.10 (by Jookie)"
-#define VERSION_STRING_SHORT    "2.10"
-#define DATE_STRING             "12/13/16"
+#define VERSION_STRING          "CosmosEx v2.20 (by Jookie)"
+#define VERSION_STRING_SHORT    "2.20"
+#define DATE_STRING             "05/10/18"
                                 // MM/DD/YY
 
 

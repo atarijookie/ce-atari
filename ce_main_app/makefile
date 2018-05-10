@@ -24,7 +24,7 @@ ifeq ($(ONPC),yes)
 else
     LDLIBS	+= -lbcm2835
     CFLAGS += -I./
-    DISTRO := $( shell ./whichdistro.sh )
+    DISTRO := $(shell ./whichdistro.sh )
     ifeq ($(DISTRO),yocto)
         OBJDIR = obj/yocto
         TARGET = cosmosex_yocto
@@ -168,6 +168,8 @@ lib/libcivetweb_onpc.a: lib/civetweb-master.zip
 	mv lib/civetweb-master/libcivetweb.a $@
 	rm -rf lib/civetweb-master
 endif
+
+print-%:	; @echo $* = $($*)
 
 .PHONY:	clean depclean
 

@@ -216,8 +216,8 @@ void TimeSync::readNtpPacket(void)
     int year = gmTime.tm_year + 1900;
     Debug::out(LOG_DEBUG, "TimeSync: date from NTP is: %04d-%02d-%02d", year, gmTime.tm_mon + 1, gmTime.tm_mday);
 
-    if(year < 2016 || year > 2050) {
-        Debug::out(LOG_ERROR, "TimeSync: NTP year %04d seems to be invalid (it's not between 2016 and 2040), syncByNtp fail", year);
+    if(year < 2018 || year > 2050) {
+        Debug::out(LOG_ERROR, "TimeSync: NTP year %04d seems to be invalid (it's not between 2018 and 2050), syncByNtp fail", year);
         eState = NTP_FAILED;
         return;
     }
