@@ -24,17 +24,24 @@ ifeq ($(ONPC),yes)
 else
     LDLIBS	+= -lbcm2835
     CFLAGS += -I./
-    DISTRO := $( shell ./whichdistro.sh )
+    DISTRO := $(shell ./whichdistro.sh )
     ifeq ($(DISTRO),yocto)
         OBJDIR = obj/yocto
-        TARGET   =  cosmosex_yocto
+        TARGET = cosmosex_yocto
         LDLIBS += -lcivetweb_yocto
-        CFLAGS  += -DDISTRO_YOCTO
+        CFLAGS += -DDISTRO_YOCTO
     else
-        OBJDIR = obj/raspbian
-        TARGET   =  cosmosex_raspbian
-        LDLIBS += -lcivetweb_raspbian -ldl
-        CFLAGS += -DDISTRO_RASPBIAN
+        ifeq ($(DISTRO),raspbian_jessie)
+            OBJDIR = obj/raspbian_jessie
+            TARGET  =  cosmosex_raspbian_jessie
+            LDLIBS += -lcivetweb_raspbian_jessie -ldl
+            CFLAGS += -DDISTRO_RASPBIAN
+        else
+            OBJDIR = obj/raspbian_stretch
+            TARGET =  cosmosex_raspbian_stretch
+            LDLIBS += -lcivetweb_raspbian_stretch -ldl
+            CFLAGS += -DDISTRO_RASPBIAN
+        endif
     endif
     # add search path for libbcm2835.a
     # /usr/local/bin on yocto or more exotic path when cross-compiling
@@ -161,6 +168,8 @@ lib/libcivetweb_onpc.a: lib/civetweb-master.zip
 	mv lib/civetweb-master/libcivetweb.a $@
 	rm -rf lib/civetweb-master
 endif
+
+print-%:	; @echo $* = $($*)
 
 .PHONY:	clean depclean
 

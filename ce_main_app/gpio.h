@@ -40,10 +40,19 @@
 #define SPI_ATN_HANS    PIN_ATN_HANS
 #define SPI_ATN_FRANZ   PIN_ATN_FRANZ
 
-#define PIN_SCL             RPI_V2_GPIO_P1_29
-#define PIN_SDA             RPI_V2_GPIO_P1_31
-#define PIN_BEEPER          RPI_V2_GPIO_P1_32
-#define PIN_BUTTON          RPI_V2_GPIO_P1_33
+#ifndef DISTRO_YOCTO
+    // on Raspbian - display, button, beeper
+    #define PIN_SCL             RPI_V2_GPIO_P1_29
+    #define PIN_SDA             RPI_V2_GPIO_P1_31
+    #define PIN_BEEPER          RPI_V2_GPIO_P1_32
+    #define PIN_BUTTON          RPI_V2_GPIO_P1_33
+#else
+    // on yocto - no display, no button, no beeper
+    #define PIN_SCL             0
+    #define PIN_SDA             0
+    #define PIN_BEEPER          0
+    #define PIN_BUTTON          0
+#endif
 
 #else
 // if compiling for PC

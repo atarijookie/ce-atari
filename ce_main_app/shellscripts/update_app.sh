@@ -30,12 +30,35 @@ if [ "$issue" -gt "0" ]; then   # on Yocto - use yocto, remove raspbian
 
     mv -f /ce/app/cosmosex_yocto /ce/app/cosmosex
     rm -f /ce/app/cosmosex_raspbian
+    rm -f /ce/app/cosmosex_raspbian_jessie
+    rm -f /ce/app/cosmosex_raspbian_stretch
 else                            # on Raspbian - use raspbian, remove yocto
-    echo "Linux distro: Raspbian"
-    echo "Using binary: cosmosex_raspbian"
-
-    mv -f /ce/app/cosmosex_raspbian /ce/app/cosmosex
     rm -f /ce/app/cosmosex_yocto
+
+    # if we have a single cosmosex_raspbian binary, just use it no matter what raspbian (jessie/stretch) it is
+    if [ -f /ce/app/cosmosex_raspbian ]; then
+        echo "Linux distro: Raspbian (universal)"
+        echo "Using binary: cosmosex_raspbian"
+        mv -f /ce/app/cosmosex_raspbian /ce/app/cosmosex
+    else
+        # if we don't have the universal cosmosex_raspbian binary, assume we have multiple raspbian binaries
+        release=$( lsb_release -a 2>/dev/null )
+        stretch=$( echo $release | grep -o stretch | wc -l)
+        jessie=$( echo $release | grep -o jessie | wc -l)
+
+        if [ "$stretch" -gt "0" ]; then
+            echo "Linux distro: Raspbian Stretch"
+            echo "Using binary: cosmosex_raspbian_stretch"
+            mv -f /ce/app/cosmosex_raspbian_stretch /ce/app/cosmosex
+        elif [ "$jessie" -gt "0" ]; then
+            echo "Linux distro: Raspbian Jessie"
+            echo "Using binary: cosmosex_raspbian_jessie"
+            mv -f /ce/app/cosmosex_raspbian_jessie /ce/app/cosmosex
+        else
+            echo "Failed to match Raspbian release!"
+            exit
+        fi
+    fi
 fi
  
 #----------------------

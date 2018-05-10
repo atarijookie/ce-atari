@@ -705,7 +705,7 @@ void ConfigStream::screen_addHeaderAndFooter(StupidVector &scr, const char *scre
     ConfigComponent *comp;
 
     // insert header
-    comp = new ConfigComponent(this, ConfigComponent::label, ">> CosmosEx config tool - 2013 - 2016 <<", 40, 0, 0, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, ">> CosmosEx config tool - 2013 - 2018 <<", 40, 0, 0, gotoOffset);
     comp->setReverse(true);
     scr.push_back(comp);
 

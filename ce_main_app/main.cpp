@@ -260,9 +260,12 @@ int main(int argc, char *argv[])
     res = pthread_create(&periodicThreadInfo, NULL, periodicThreadCode, NULL);  // create the periodic thread and run it
     handlePthreadCreate(res, "periodic", &periodicThreadInfo);
 
+#ifndef DISTRO_YOCTO
+    // display thread - only on raspbian
     res = pthread_create(&displayThreadInfo, NULL, displayThreadCode, NULL);  // create the display thread and run it
     handlePthreadCreate(res, "display", &displayThreadInfo);
-
+#endif
+    
     printf("Entering main loop...\n");
 
     core->run();                // run the main thread
@@ -316,10 +319,13 @@ int main(int argc, char *argv[])
     pthread_kill(periodicThreadInfo, SIGINT);           // stop the select()
     pthread_join(periodicThreadInfo, NULL);             // wait until periodic  thread finishes
 
+#ifndef DISTRO_YOCTO
+    // on raspbian - kill display thread
     printf("Stopping display thread\n");
     pthread_kill(displayThreadInfo, SIGINT);           // stop the select()
     pthread_join(displayThreadInfo, NULL);             // wait until display thread finishes
-
+#endif
+    
     printf("Downloader clean up before quit\n");
     Downloader::cleanupBeforeQuit();
 
