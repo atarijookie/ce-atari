@@ -5,7 +5,7 @@ After=remote-fs.target
 [Service]
 Type=forking
 Restart=no
-ExecStart=/ce/ceboot.sh nosystemctl
+ExecStart=/ce/ce_start.sh nosystemctl
 ExecStop=/ce/ce_stop.sh nosystemctl
 StandardOutput=null
 StandardError=null

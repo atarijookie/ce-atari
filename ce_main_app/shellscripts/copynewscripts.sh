@@ -30,6 +30,7 @@ mkdir -p /ce/update
 # first copy all the scripts which are the same for both Raspbian and Yocto
 
 #compareAndCopy  local file                      new file
+compareAndCopy   "/ce/whichdistro.sh"            "/ce/app/shellscripts/whichdistro.sh"
 compareAndCopy   "/ce/cesuper.sh"                "/ce/app/shellscripts/cesuper.sh"
 compareAndCopy   "/ce/ce_conf.sh"                "/ce/app/shellscripts/ce_conf.sh"
 compareAndCopy   "/ce/ce_start.sh"               "/ce/app/shellscripts/ce_start.sh"
@@ -46,20 +47,33 @@ compareAndCopy   "/ce/update/update_xilinx.sh"   "/ce/app/shellscripts/update_xi
 compareAndCopy   "/ce/install_ffmpeg.sh"         "/ce/app/shellscripts/install_ffmpeg.sh"
 compareAndCopy   "/ce/time.sh"                   "/ce/app/shellscripts/time.sh"
 
+rm -f "/ce/ceboot.sh"
+
 #---------------------------------------------------------------------------
 # then copy the scripts which are different for Raspbian and Yocto
-issue=$( cat /etc/issue | grep -o "Yocto" | wc -l ) 
+distro=$( /ce/whichdistro.sh ) 
 
 # If at least once the Yocto was found, it's Yocto
-if [ "$issue" -gt "0" ]; then
+if [ "$distro" = "yocto" ]; then
     # for yocto
-    compareAndCopy   "/ce/wifisuper.sh"          "/ce/app/shellscripts/wifisuper.sh"        # update wifisuper.sh
+    compareAndCopy "/ce/wifisuper.sh" "/ce/app/shellscripts/wifisuper.sh"        # update wifisuper.sh
+    
+    #ln -fs /ce/ce_start.sh /etc/rc5.d/S80ce
 else
     # for raspbian
     rm -f /ce/wifisuper.sh                                                                  # remove wifisuper.sh
-    compareAndCopy   "/ce/ceboot.sh"                        "/ce/app/shellscripts/ceboot.sh"
-    compareAndCopy   "/etc/init.d/cosmosex"                 "/ce/app/shellscripts/initd_cosmosex"   # update init.d script
-    compareAndCopy   "/etc/systemd/system/cosmosex.service" "/ce/app/shellscripts/cosmosex.service" # update systemd (systemctl) script
+
+    # on jessie update SysV init script, remove systemctl service
+    if [ "$distro" = "raspbian_jessie" ]; then
+        compareAndCopy "/etc/init.d/cosmosex" "/ce/app/shellscripts/initd_cosmosex"
+        rm -f "/etc/systemd/system/cosmosex.service"
+    fi
+
+    # on stretch remove SysV init script, update systemctl service
+    if [ "$distro" = "raspbian_stretch" ]; then
+        rm -f "/etc/init.d/cosmosex"
+        compareAndCopy "/etc/systemd/system/cosmosex.service" "/ce/app/shellscripts/cosmosex.service"
+    fi
 
     #------------------------
     # now add / change the core_freq param in the boot config to avoid SPI clock issues

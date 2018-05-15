@@ -24,7 +24,7 @@ ce_is_running() {
 
 # first kill the cesuper.sh script so it won't restart cosmosex app
 echo "Terminating cesuper.sh"
-killall -9 cesuper.sh > /dev/null 2> /dev/null
+killall -9 cesuper.sh > /dev/null 2>&1
 
 # check if ce is running
 ce_is_running
@@ -36,16 +36,21 @@ if [ "$?" -eq "0" ]; then
 fi
 
 #------------------------
-# if should terminate (also) using systemctl, do it
-if [ "$1" != "nosystemctl" ]; then
-    # try to find out if cosmosex.service is installed
-    sysctl=$( systemctl status cosmosex )
-    sc_notfound=$( echo $sysctl | grep 'Loaded: not-found' | wc -l )
+# check for distro, run systemctl only on stretch
+distro=$( /ce/whichdistro.sh ) 
 
-    # if the cosmosex.service is installed (the not-found string was not found)
-    if [ "$sc_notfound" -eq "0" ]; then
-        # try to stop it using systemctl
-        systemctl stop cosmosex
+if [ "$distro" = "raspbian_stretch" ]; then
+    # if should terminate (also) using systemctl, do it
+    if [ "$1" != "nosystemctl" ]; then
+        # try to find out if cosmosex.service is installed
+        sysctl=$( systemctl status cosmosex )
+        sc_notfound=$( echo $sysctl | grep 'Loaded: not-found' | wc -l )
+
+        # if the cosmosex.service is installed (the not-found string was not found)
+        if [ "$sc_notfound" -eq "0" ]; then
+            # try to stop it using systemctl
+            systemctl stop cosmosex
+        fi
     fi
 fi
 

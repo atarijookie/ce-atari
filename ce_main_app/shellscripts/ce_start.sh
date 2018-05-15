@@ -28,17 +28,21 @@ ce_is_running() {
 # remove doupdate script
 rm -f /ce/update/doupdate.sh
 
-#------------------------
-# if should start using systemctl, do it
-if [ "$1" != "nosystemctl" ]; then
-    # try to find out if cosmosex.service is installed
-    sysctl=$( systemctl status cosmosex )
-    sc_notfound=$( echo $sysctl | grep 'Loaded: not-found' | wc -l )
+# check for distro, run systemctl only on stretch
+distro=$( /ce/whichdistro.sh ) 
 
-    # if the cosmosex.service is installed (the not-found string was not found)
-    if [ "$sc_notfound" -eq "0" ]; then
-        # try to start it using systemctl
-        systemctl start cosmosex
+if [ "$distro" = "raspbian_stretch" ]; then
+    # if should start using systemctl, do it
+    if [ "$1" != "nosystemctl" ]; then
+        # try to find out if cosmosex.service is installed
+        sysctl=$( systemctl status cosmosex )
+        sc_notfound=$( echo $sysctl | grep 'Loaded: not-found' | wc -l )
+
+        # if the cosmosex.service is installed (the not-found string was not found)
+        if [ "$sc_notfound" -eq "0" ]; then
+            # try to start it using systemctl
+            systemctl start cosmosex
+        fi
     fi
 fi
 
@@ -54,5 +58,5 @@ fi
 #------------------------
 # run the cesuper script on background
 echo "Starting CosmosEx supervisor script and CosmosEx app"
-/ce/cesuper.sh > /dev/null 2> /dev/null &
+/ce/cesuper.sh > /dev/null 2>&1 &
 

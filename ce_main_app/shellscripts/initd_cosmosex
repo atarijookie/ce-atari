@@ -18,8 +18,8 @@ case "$1" in
 start)
 echo "Starting cosmosex"
 # run application you want to start
-/ce/app/cosmosex > /dev/null 2> /dev/null & #start directly, shaves off some ms from boot
-/ce/ceboot.sh > /dev/null 2> /dev/null &
+/ce/app/cosmosex > /dev/null 2>&1 & #start directly, shaves off some ms from boot
+/ce/ce_start.sh  > /dev/null 2>&1 &
 ;;
 stop)
 echo "Stopping cosmosex"
