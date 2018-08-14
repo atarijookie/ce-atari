@@ -209,34 +209,10 @@ bool gpio_open(void)
     bcm2835_gpio_write(PIN_TMS, LOW);
     bcm2835_gpio_write(PIN_TCK, LOW);
 
-
     // pins for both STM32 programming
     bcm2835_gpio_fsel(PIN_RESET_HANS,       BCM2835_GPIO_FSEL_OUTP);
-    bcm2835_gpio_fsel(PIN_RESET_FRANZ,      BCM2835_GPIO_FSEL_OUTP);
-//  bcm2835_gpio_fsel(PIN_TXD,              BCM2835_GPIO_FSEL_OUTP);
-//  bcm2835_gpio_fsel(PIN_RXD,              BCM2835_GPIO_FSEL_INPT);
-    bcm2835_gpio_fsel(PIN_TX_SEL1N2,        BCM2835_GPIO_FSEL_OUTP);
-    bcm2835_gpio_fsel(PIN_BOOT0_FRANZ_HANS, BCM2835_GPIO_FSEL_OUTP);
 
-    bcm2835_gpio_write(PIN_TX_SEL1N2,           HIGH);
-    bcm2835_gpio_write(PIN_BOOT0_FRANZ_HANS,    LOW);       // BOOT0: L means boot from flash, H means boot the boot loader
-
-    bcm2835_gpio_write(PIN_RESET_HANS,          HIGH);      // reset lines to RUN (not reset) state
-    bcm2835_gpio_write(PIN_RESET_FRANZ,         HIGH);
-
-    bcm2835_gpio_fsel(PIN_BEEPER,           BCM2835_GPIO_FSEL_OUTP);
-    bcm2835_gpio_fsel(PIN_BUTTON,           BCM2835_GPIO_FSEL_INPT);
-
-    // pins for communication with Franz and Hans
-    bcm2835_gpio_fsel(PIN_ATN_HANS,         BCM2835_GPIO_FSEL_INPT);
-    bcm2835_gpio_fsel(PIN_ATN_FRANZ,        BCM2835_GPIO_FSEL_INPT);
-//  bcm2835_gpio_fsel(PIN_CS_HANS,          BCM2835_GPIO_FSEL_OUTP);
-//  bcm2835_gpio_fsel(PIN_CS_FRANZ,         BCM2835_GPIO_FSEL_OUTP);
-//  bcm2835_gpio_fsel(PIN_MOSI,             BCM2835_GPIO_FSEL_OUTP);
-//  bcm2835_gpio_fsel(PIN_MISO,             BCM2835_GPIO_FSEL_INPT);
-//  bcm2835_gpio_fsel(PIN_SCK,              BCM2835_GPIO_FSEL_OUTP);
-
-    spi_init();
+    // be sure to call DataTrans::configureHw() for full pin initialization
 
     return true;
 }

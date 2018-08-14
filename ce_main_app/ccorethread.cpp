@@ -74,6 +74,7 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     newFloppyImageLedAfterEncode = -2;
 
     dataTrans = new AcsiDataTrans();
+    dataTrans->configureHw();
 
     sharedObjects_create(configService, floppyService, screencastService);
 

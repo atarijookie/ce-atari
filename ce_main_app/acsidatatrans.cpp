@@ -15,36 +15,67 @@
 
 AcsiDataTrans::AcsiDataTrans()
 {
-    buffer          = new BYTE[ACSI_BUFFER_SIZE];        // 1 MB buffer
-    recvBuffer      = new BYTE[ACSI_BUFFER_SIZE];
-    
 #if defined(ONPC_HIGHLEVEL)
     bufferRead      = buffer;
     bufferWrite     = recvBuffer;
 #endif
 
-    memset(buffer,      0, ACSI_BUFFER_SIZE);            // init buffers to zero
-    memset(recvBuffer,  0, ACSI_BUFFER_SIZE);
-    
     memset(txBuffer, 0, TX_RX_BUFF_SIZE);
     memset(rxBuffer, 0, TX_RX_BUFF_SIZE);
     
-    count           = 0;
-    status          = SCSI_ST_OK;
-    statusWasSet    = false;
-    com             = NULL;
-    dataDirection   = DATA_DIRECTION_READ;
-
-    dumpNextData    = false;
-
     com = new CConSpi();
 }
 
 AcsiDataTrans::~AcsiDataTrans()
 {
-    delete []buffer;
-    delete []recvBuffer;
     delete com;
+}
+
+void AcsiDataTrans::configureHw(void)
+{
+#ifndef ONPC_NOTHING
+
+    // pins for XILINX programming
+    // outputs: TDI (GPIO3), TCK (GPIO4), TMS (GPIO17)
+    bcm2835_gpio_fsel(PIN_TDI,  BCM2835_GPIO_FSEL_OUTP);        // TDI
+    bcm2835_gpio_fsel(PIN_TMS,  BCM2835_GPIO_FSEL_OUTP);        // TMS
+    bcm2835_gpio_fsel(PIN_TCK,  BCM2835_GPIO_FSEL_OUTP);        // TCK
+    // inputs : TDO (GPIO2)
+    bcm2835_gpio_fsel(PIN_TDO,  BCM2835_GPIO_FSEL_INPT);        // TDO
+
+    bcm2835_gpio_write(PIN_TDI, LOW);
+    bcm2835_gpio_write(PIN_TMS, LOW);
+    bcm2835_gpio_write(PIN_TCK, LOW);
+
+
+    // pins for both STM32 programming
+    bcm2835_gpio_fsel(PIN_RESET_HANS,       BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_fsel(PIN_RESET_FRANZ,      BCM2835_GPIO_FSEL_OUTP);
+//  bcm2835_gpio_fsel(PIN_TXD,              BCM2835_GPIO_FSEL_OUTP);
+//  bcm2835_gpio_fsel(PIN_RXD,              BCM2835_GPIO_FSEL_INPT);
+    bcm2835_gpio_fsel(PIN_TX_SEL1N2,        BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_fsel(PIN_BOOT0_FRANZ_HANS, BCM2835_GPIO_FSEL_OUTP);
+
+    bcm2835_gpio_write(PIN_TX_SEL1N2,           HIGH);
+    bcm2835_gpio_write(PIN_BOOT0_FRANZ_HANS,    LOW);       // BOOT0: L means boot from flash, H means boot the boot loader
+
+    bcm2835_gpio_write(PIN_RESET_HANS,          HIGH);      // reset lines to RUN (not reset) state
+    bcm2835_gpio_write(PIN_RESET_FRANZ,         HIGH);
+
+    bcm2835_gpio_fsel(PIN_BEEPER,           BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_fsel(PIN_BUTTON,           BCM2835_GPIO_FSEL_INPT);
+
+    // pins for communication with Franz and Hans
+    bcm2835_gpio_fsel(PIN_ATN_HANS,         BCM2835_GPIO_FSEL_INPT);
+    bcm2835_gpio_fsel(PIN_ATN_FRANZ,        BCM2835_GPIO_FSEL_INPT);
+//  bcm2835_gpio_fsel(PIN_CS_HANS,          BCM2835_GPIO_FSEL_OUTP);
+//  bcm2835_gpio_fsel(PIN_CS_FRANZ,         BCM2835_GPIO_FSEL_OUTP);
+//  bcm2835_gpio_fsel(PIN_MOSI,             BCM2835_GPIO_FSEL_OUTP);
+//  bcm2835_gpio_fsel(PIN_MISO,             BCM2835_GPIO_FSEL_INPT);
+//  bcm2835_gpio_fsel(PIN_SCK,              BCM2835_GPIO_FSEL_OUTP);
+
+    spi_init();
+#endif
 }
 
 bool AcsiDataTrans::waitForATN(int whichSpiCs, BYTE *inBuf)
@@ -63,80 +94,6 @@ WORD AcsiDataTrans::getRemainingLength(void)
     return com->getRemainingLength();
 }
 
-void AcsiDataTrans::clear(bool clearAlsoDataDirection)
-{
-    count           = 0;
-    status          = SCSI_ST_OK;
-    statusWasSet    = false;
-    
-    if(clearAlsoDataDirection) {
-        dataDirection   = DATA_DIRECTION_READ;
-    }
-	
-	dumpNextData	= false;
-}
-
-void AcsiDataTrans::setStatus(BYTE stat)
-{
-    status          = stat;
-    statusWasSet    = true;
-}
-
-void AcsiDataTrans::addDataByte(BYTE val)
-{
-    buffer[count] = val;
-    count++;
-}
-
-void AcsiDataTrans::addDataDword(DWORD val)
-{
-    buffer[count    ] = (val >> 24) & 0xff;
-    buffer[count + 1] = (val >> 16) & 0xff;
-    buffer[count + 2] = (val >>  8) & 0xff;
-    buffer[count + 3] = (val      ) & 0xff;
-
-    count += 4;
-}
-
-void AcsiDataTrans::addDataWord(WORD val)
-{
-    buffer[count    ] = (val >> 8) & 0xff;
-    buffer[count + 1] = (val     ) & 0xff;
-
-    count += 2;
-}
-
-void AcsiDataTrans::addDataBfr(const void *data, DWORD cnt, bool padToMul16)
-{
-    memcpy(&buffer[count], data, cnt);
-    count += cnt;
-
-    if(padToMul16) {                    // if should pad to multiple of 16
-        padDataToMul16();
-    }
-}
-
-void AcsiDataTrans::addDataCString(const char *data, bool padToMul16)
-{
-	// include null terminator in byte count
-	addDataBfr(data, strlen(data) + 1, padToMul16);
-}
-
-void AcsiDataTrans::padDataToMul16(void)
-{
-    int mod = count % 16;           // how many we got in the last 1/16th part?
-    int pad = 16 - mod;             // how many we need to add to make count % 16 equal to 0?
-
-    if(mod != 0) {                  // if we should pad something
-        memset(&buffer[count], 0, pad); // set the padded bytes to zero and add this count
-        count += pad;
-
-	    // if((count % 512) != 0) {		// if it's not a full sector
-	    //     pad += 2;				// padding is greater than just to make mod16 == 0, to make the data go into ram
-    	// }
-    }
-}
-
 // get data from Hans
 bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 {
@@ -151,30 +108,6 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 
     res = recvData_transferBlock(data, cnt);                // get data from Hans
     return res;
-}
-
-void AcsiDataTrans::dumpDataOnce(void)
-{
-	dumpNextData = true;
-}
-
-void AcsiDataTrans::sendDataToFd(int fd)
-{
-    if(dataDirection == DATA_DIRECTION_WRITE) {
-        count = 0;
-        return;
-    }
-    
-    if(count == 0) {    // if there's no data to send, send single zero byte
-        buffer[0]   = 0;
-        count       = 1;
-    }
-    
-    WORD length = count;
-    write(fd, &length, 2);      // first word - length of data to be received
-    
-    write(fd, buffer, count);   // then the data...
-    count = 0;
 }
 
 // send all data to Hans, including status
@@ -234,35 +167,7 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
 #endif
 	//---------------------------------------
 	if(dumpNextData) {
-		Debug::out(LOG_DEBUG, "sendDataAndStatus: %d bytes", count);
-		BYTE *src = buffer;
-
-		WORD dumpCnt = 0;
-		
-		int lines = count / 32;
-		if((count % 32) != 0) {
-			lines++;
-		}
-	
-		for(int i=0; i<lines; i++) {
-			char bfr[1024];
-			char *b = &bfr[0];
-
-			for(int j=0; j<32; j++) {
-				int val = (int) *src;
-				src++;
-				sprintf(b, "%02x ", val);
-				b += 3;
-				
-				dumpCnt++;
-				if(dumpCnt >= count) {
-					break;
-				}
-			}
-
-			Debug::out(LOG_DEBUG, "%s", bfr);
-		}
-		
+        dumpData();
 		dumpNextData = false;
 	}
 	//---------------------------------------
@@ -413,14 +318,3 @@ void AcsiDataTrans::sendStatusToHans(BYTE statusByte)
 #endif
 }
 
-DWORD AcsiDataTrans::getCount(void)
-{
-    return count;
-}
-
-void AcsiDataTrans::addZerosUntilSize(DWORD finalBufferCnt)
-{
-    while(count < finalBufferCnt) {         // add zeros until we don't have enough
-        addDataByte(0);
-    }
-}

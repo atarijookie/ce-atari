@@ -38,13 +38,21 @@
 
 #define ACSI_MAX_TRANSFER_SIZE_BYTES    (254 * 512)
 
-class AcsiDataTrans: public DataTrans
+// bridge functions return value
+#define E_TimeOut           0
+#define E_OK                1
+#define E_OK_A1             2
+#define E_CARDCHANGE        3
+#define E_RESET             4
+#define E_FAIL_CMD_AGAIN    5
+
+class CartDataTrans: public DataTrans
 {
 public:
-    AcsiDataTrans();
-    ~AcsiDataTrans();
+    CartDataTrans();
+    ~CartDataTrans();
 
-    virtual void configureHw(void) = 0;
+    virtual void configureHw(void);
     //----------------
     // function for checking if the specified ATN is raised and if so, then get command bytes
     virtual bool waitForATN(int whichSpiCs, BYTE *inBuf);
@@ -55,11 +63,9 @@ public:
     // returns how many data there is still to be transfered
     virtual WORD getRemainingLength(void);
     //----------------
-    // following functions are for convenient gathering of data in handling functions, but work only up to ACSI_BUFFER_SIZE which is currently 1 MB
 
     virtual bool recvData(BYTE *data, DWORD cnt);
     virtual void sendDataAndStatus(bool fromRetryModule = false);       // by default it's not a retry
-    virtual void sendDataToFd(int fd);
 
     //----------------
     // following functions are used for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
@@ -73,10 +79,29 @@ public:
     virtual void sendStatusToHans       (BYTE statusByte);
 
 private:
-    CConSpi *com;
+    BYTE cmd[32];
+    int  cmdLen;
 
-    BYTE    txBuffer[TX_RX_BUFF_SIZE];
-    BYTE    rxBuffer[TX_RX_BUFF_SIZE];
+    DWORD timeoutTime;
+    BYTE brStat;
+
+    void hwDataDirection(bool readNotWrite);
+    void hwDirForRead(void);    // data pins direction read (from RPi to ST)
+    void hwDirForWrite(void);   // data pins direction write (from ST to RPi)
+
+    bool timeout(void);         // returns true if timeout
+    void dataWrite(BYTE val);   // sets value to data pins
+    BYTE dataRead(void);        // reads value from data pins
+
+    void getCmdLengthFromCmdBytesAcsi(void);
+    void getCommandFromST(BYTE *receiveBufer);
+
+    BYTE PIO_writeFirst(void);
+    BYTE PIO_write(void);
+    void PIO_read(BYTE val);
+    void DMA_read(BYTE val);
+    BYTE DMA_write(void);
+
 };
 
 #endif // ACSIDATATRANS_H
