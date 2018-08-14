@@ -7,14 +7,14 @@
 class ScreencastAcsiCommand
 {
 public:
-  	ScreencastAcsiCommand(AcsiDataTrans *dt, ScreencastService *scs);
+  	ScreencastAcsiCommand(DataTrans *dt, ScreencastService *scs);
   	~ScreencastAcsiCommand();
   	void processCommand(BYTE *command);
 private:
     void readScreen();
     void readPalette();
 	DWORD get24bits(BYTE *bfr);
-  	AcsiDataTrans       *dataTrans;
+  	DataTrans       *dataTrans;
     ScreencastService   *screencastService;
   	BYTE    *cmd;
 	BYTE	*dataBuffer; 

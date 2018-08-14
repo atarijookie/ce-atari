@@ -24,7 +24,7 @@ For WRITE operations:
 
 */
 
-class RetryModule 
+class RetryModule
 {
 public:
     RetryModule(void);
@@ -48,7 +48,7 @@ private:
     BYTE tag1, tag2;
     BYTE module;
 
-    // from AcsiDataTrans -- part of copied data which are available after successfull READ operation
+    // from AcsiDataTrans -- part of copied data which are available after successful READ operation
     int     dataDirection;
     DWORD   count;
     BYTE *  buffer;

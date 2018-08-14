@@ -2,7 +2,7 @@
 #include "global.h"
 #include "debug.h"
 
-DateAcsiCommand::DateAcsiCommand(AcsiDataTrans *dt, ConfigService *ds):dataTrans(dt),pxDateService(ds)
+DateAcsiCommand::DateAcsiCommand(DataTrans *dt, ConfigService *ds):dataTrans(dt),pxDateService(ds)
 {
 }
 

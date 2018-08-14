@@ -8,7 +8,7 @@
 
 #define SCREENCAST_BUFFER_SIZE (32000*2)
 
-ScreencastAcsiCommand::ScreencastAcsiCommand(AcsiDataTrans *dt, ScreencastService *scs):dataTrans(dt),screencastService(scs)
+ScreencastAcsiCommand::ScreencastAcsiCommand(DataTrans *dt, ScreencastService *scs):dataTrans(dt),screencastService(scs)
 {
     dataBuffer  = new BYTE[SCREENCAST_BUFFER_SIZE];
 }

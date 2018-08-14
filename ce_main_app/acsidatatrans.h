@@ -1,6 +1,7 @@
 #ifndef ACSIDATATRANS_H
 #define ACSIDATATRANS_H
 
+#include "datatrans.h"
 #include "conspi.h"
 #include "datatypes.h"
 
@@ -37,54 +38,59 @@
 
 #define ACSI_MAX_TRANSFER_SIZE_BYTES    (254 * 512)
 
-#include "retrymodule.h"
 
-class AcsiDataTrans
+class AcsiDataTrans: public DataTrans
 {
 public:
     AcsiDataTrans();
     ~AcsiDataTrans();
 
-    void setCommunicationObject(CConSpi *comIn);
-    void setRetryObject(RetryModule *retryModule);
+    //----------------
+    // function for checking if the specified ATN is raised and if so, then get command bytes
+    virtual bool waitForATN(int whichSpiCs, BYTE *inBuf);
 
+    // function for sending / receiving data from/to lower levels of communication (e.g. to SPI)
+    virtual void txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBufer);
+
+    // returns how many data there is still to be transfered
+    virtual WORD getRemainingLength(void);
     //----------------
     // following functions are for convenient gathering of data in handling functions, but work only up to ACSI_BUFFER_SIZE which is currently 1 MB
 
-    void clear(bool clearAlsoDataDirection=true);
+    virtual void clear(bool clearAlsoDataDirection=true);
 
-    void setStatus(BYTE stat);
+    virtual void setStatus(BYTE stat);
 
-    void addDataByte(BYTE val);
-    void addDataWord(WORD val);
-    void addDataDword(DWORD val);
+    virtual void addDataByte(BYTE val);
+    virtual void addDataWord(WORD val);
+    virtual void addDataDword(DWORD val);
     
-    void addZerosUntilSize(DWORD finalBufferCnt);
+    virtual void addZerosUntilSize(DWORD finalBufferCnt);
 
-    void addDataBfr(const void *data, DWORD cnt, bool padToMul16);
+    virtual void addDataBfr(const void *data, DWORD cnt, bool padToMul16);
 
-    void addDataCString(const char *data, bool padToMul16);	// including null terminator
+    virtual void addDataCString(const char *data, bool padToMul16);	// including null terminator
 
-    void padDataToMul16(void);
+    virtual void padDataToMul16(void);
 
-    bool recvData(BYTE *data, DWORD cnt);
-    void sendDataAndStatus(bool fromRetryModule = false);       // by default it's not a retry
-    void sendDataToFd(int fd);
+    virtual bool recvData(BYTE *data, DWORD cnt);
+    virtual void sendDataAndStatus(bool fromRetryModule = false);       // by default it's not a retry
+    virtual void sendDataToFd(int fd);
 
-    void dumpDataOnce(void);
+    virtual void dumpDataOnce(void);
 
-    DWORD getCount(void);
+    virtual DWORD getCount(void);
 
     //----------------
     // following functions are used for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
     
-    bool sendData_start         (DWORD totalDataCount, BYTE scsiStatus, bool withStatus);
-    bool sendData_transferBlock (BYTE *pData, DWORD dataCount);
+    virtual bool sendData_start         (DWORD totalDataCount, BYTE scsiStatus, bool withStatus);
+    virtual bool sendData_transferBlock (BYTE *pData, DWORD dataCount);
 
-    bool recvData_start         (DWORD totalDataCount);
-    bool recvData_transferBlock (BYTE *pData, DWORD dataCount);
+    virtual bool recvData_start         (DWORD totalDataCount);
+    virtual bool recvData_transferBlock (BYTE *pData, DWORD dataCount);
 
-    void sendStatusToHans       (BYTE statusByte);
+    virtual void sendStatusToHans       (BYTE statusByte);
 
 private:
     BYTE    *buffer;
@@ -94,8 +100,7 @@ private:
     bool    statusWasSet;
     int     dataDirection;
 
-    CConSpi     *com;
-    RetryModule *retryMod;
+    CConSpi *com;
 
     BYTE    *recvBuffer;
 

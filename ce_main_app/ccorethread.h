@@ -3,6 +3,7 @@
 
 #include "global.h"
 #include "settings.h"
+#include "datatrans.h"
 
 #include "settingsreloadproxy.h"
 #include "isettingsuser.h"
@@ -16,9 +17,7 @@
 class ConfigService;
 class FloppyService;
 class ScreencastService;
-class AcsiDataTrans;
-class CConSpi;
-class RetryModule;
+class DataTrans;
 
 class CCoreThread: public ISettingsUser
 {
@@ -39,9 +38,8 @@ private:
     bool running;
 
     //-----------------------------------
-    // data connection to STM32 slaves over SPI
-    CConSpi         *conSpi;
-    AcsiDataTrans   *dataTrans;
+    // data transportation object
+    DataTrans *dataTrans;
 
     //-----------------------------------
     // settings and config stuff
@@ -53,7 +51,6 @@ private:
     // hard disk stuff
     bool            setEnabledIDbits;
     AcsiIDinfo      acsiIdInfo;
-    RetryModule     *retryMod;
 
     void handleAcsiCommand(void);
     void handleConfigStream(BYTE *cmd);

@@ -455,6 +455,14 @@ void parseCmdLineArguments(int argc, char *argv[])
             continue;
         }
 
+        // use cartridge interface instead of SPI interface
+        if(strcmp(argv[i], "cart") == 0) {
+            isKnownTag          = true;                             // this is a known tag
+            flags.noFranz       = true;
+            hwConfig.hddIface   = HDD_IF_CART;
+            continue;
+        }
+
         // don't resetHans and Franz on start (used with STM32 ST-Link JTAG)
         if(strcmp(argv[i], "noreset") == 0) {
             isKnownTag          = true;                             // this is a known tag

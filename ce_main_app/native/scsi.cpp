@@ -40,7 +40,7 @@ Scsi::~Scsi()
     }
 }
 
-void Scsi::setAcsiDataTrans(AcsiDataTrans *dt)
+void Scsi::setDataTrans(DataTrans *dt)
 {
     dataTrans = dt;
 }

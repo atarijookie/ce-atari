@@ -5,7 +5,7 @@
 #include "datatypes.h"
 
 class TranslatedDisk;
-class AcsiDataTrans;
+class DataTrans;
 
 #define MEDIASTREAMING_MAXSTREAMS    4
 
@@ -39,13 +39,13 @@ public:
     static MediaStreaming * getInstance(void);
     static void deleteInstance(void);
 
-    void processCommand(BYTE *command, AcsiDataTrans *dataTrans);
+    void processCommand(BYTE *command, DataTrans *dataTrans);
 
 private:
-    void openStream(AcsiDataTrans *dataTrans);
-    void getStreamInfo(BYTE streamHandle, AcsiDataTrans *dataTrans);
-    void readStream(BYTE arg, AcsiDataTrans *dataTrans);
-    void closeStream(BYTE streamHandle, AcsiDataTrans *dataTrans);
+    void openStream(DataTrans *dataTrans);
+    void getStreamInfo(BYTE streamHandle, DataTrans *dataTrans);
+    void readStream(BYTE arg, DataTrans *dataTrans);
+    void closeStream(BYTE streamHandle, DataTrans *dataTrans);
 
 // properties
     MediaStream streams[MEDIASTREAMING_MAXSTREAMS];

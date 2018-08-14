@@ -15,7 +15,7 @@
 #define CONFIGSTREAM_IN_LINUX_CONSOLE   1
 #define CONFIGSTREAM_THROUGH_WEB        2
 
-class AcsiDataTrans;
+class DataTrans;
 
 enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED,
                  CS_CREATE_FLOPPY_CONF, CS_CREATE_IKBD,         CS_CREATE_HDDIMAGE,
@@ -78,7 +78,7 @@ public:
 
     // functions which are called from the main loop
     void processCommand(BYTE *cmd, int writeToFd=-1);
-    void setAcsiDataTrans(AcsiDataTrans *dt);
+    void setDataTrans(DataTrans *dt);
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
     void fillUpdateWithCurrentVersions(void);
@@ -142,7 +142,7 @@ private:
     
     int enterKeyEventLater;
     
-    AcsiDataTrans       *dataTrans;
+    DataTrans       *dataTrans;
     SettingsReloadProxy *reloadProxy;
 
     // private methods

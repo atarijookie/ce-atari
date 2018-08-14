@@ -42,7 +42,7 @@ void FloppySetup::setSettingsReloadProxy(SettingsReloadProxy *rp)
     reloadProxy = rp;
 }
 
-void FloppySetup::setAcsiDataTrans(AcsiDataTrans *dt)
+void FloppySetup::setDataTrans(DataTrans *dt)
 {
     dataTrans = dt;
 }

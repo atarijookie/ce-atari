@@ -62,6 +62,7 @@
 // HDD interface types
 #define HDD_IF_ACSI     1
 #define HDD_IF_SCSI     2
+#define HDD_IF_CART     3
 
 #define SCSI_MACHINE_UNKNOWN    0
 #define SCSI_MACHINE_TT         1

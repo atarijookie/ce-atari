@@ -43,7 +43,7 @@ ConfigStream::~ConfigStream()
     destroyScreen(message);
 }
 
-void ConfigStream::setAcsiDataTrans(AcsiDataTrans *dt)
+void ConfigStream::setDataTrans(DataTrans *dt)
 {
     dataTrans = dt;
 }

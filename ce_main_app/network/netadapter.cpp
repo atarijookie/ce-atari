@@ -50,7 +50,7 @@ NetAdapter::~NetAdapter()
     delete []dataBuffer;
 }
 
-void NetAdapter::setAcsiDataTrans(AcsiDataTrans *dt)
+void NetAdapter::setDataTrans(DataTrans *dt)
 {
     dataTrans = dt;
 }

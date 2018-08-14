@@ -14,7 +14,7 @@ class ConfigService;
 class ScreencastService;
 class DateAcsiCommand;
 class ScreencastAcsiCommand;
-class AcsiDataTrans;
+class DataTrans;
 class SettingsReloadProxy;
 
 #define CONFIG_DRIVE_PATH       "/tmp/configdrive"
@@ -123,11 +123,11 @@ class TranslatedDisk: public ISettingsUser
 private:
     static TranslatedDisk * instance;
     static pthread_mutex_t mutex;
-    TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs);
+    TranslatedDisk(DataTrans *dt, ConfigService *cs, ScreencastService *scs);
     virtual ~TranslatedDisk();
 
 public:
-    static TranslatedDisk * createInstance(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scsi);
+    static TranslatedDisk * createInstance(DataTrans *dt, ConfigService *cs, ScreencastService *scsi);
     static TranslatedDisk * getInstance(void);
     static void deleteInstance(void);
 
@@ -165,7 +165,7 @@ private:
 	void mountAndAttachSharedDrive(void);
 	void attachConfigDrive(void);
 
-    AcsiDataTrans       *dataTrans;
+    DataTrans       *dataTrans;
     SettingsReloadProxy *reloadProxy;
 
     BYTE            *dataBuffer;

@@ -69,7 +69,7 @@ public:
 
     void reloadSettings(int type);
 
-    void setAcsiDataTrans(AcsiDataTrans *dt);
+    void setDataTrans(DataTrans *dt);
 
     bool attachToHostPath(std::string hostPath, int hostSourceType, int accessType);
     void dettachFromHostPath(std::string hostPath);
@@ -89,7 +89,7 @@ public:
     static const char * SourceTypeStr(int sourceType);
     
 private:
-    AcsiDataTrans   *dataTrans;
+    DataTrans *dataTrans;
 
     BYTE            acsiId;                 // current acsi ID for the command
     IMedia          *dataMedia;             // current data media valid for current ACSI ID

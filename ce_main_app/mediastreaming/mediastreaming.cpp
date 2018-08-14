@@ -136,7 +136,7 @@ void MediaStreaming::deleteInstance(void)
     instance = NULL;
 }
 
-void MediaStreaming::processCommand(BYTE *command, AcsiDataTrans *dataTrans)
+void MediaStreaming::processCommand(BYTE *command, DataTrans *dataTrans)
 {
 	BYTE cmd = command[4];
 	BYTE arg = command[5];
@@ -162,7 +162,7 @@ void MediaStreaming::processCommand(BYTE *command, AcsiDataTrans *dataTrans)
 	dataTrans->sendDataAndStatus();
 }
 
-void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
+void MediaStreaming::openStream(DataTrans *dataTrans)
 {
     TranslatedDisk * translated = TranslatedDisk::getInstance();
 	BYTE buffer[512];
@@ -281,7 +281,7 @@ void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 	dataTrans->setStatus(i + 1);
 }
 
-void MediaStreaming::closeStream(BYTE streamHandle, AcsiDataTrans *dataTrans)
+void MediaStreaming::closeStream(BYTE streamHandle, DataTrans *dataTrans)
 {
 	int index = streamHandle - 1;
 	if(index >= MEDIASTREAMING_MAXSTREAMS || streams[index].isFree()) {
@@ -294,7 +294,7 @@ void MediaStreaming::closeStream(BYTE streamHandle, AcsiDataTrans *dataTrans)
 	dataTrans->setStatus(MEDIASTREAMING_OK);
 }
 
-void MediaStreaming::readStream(BYTE arg, AcsiDataTrans *dataTrans)
+void MediaStreaming::readStream(BYTE arg, DataTrans *dataTrans)
 {
 	BYTE streamHandle = arg & 0x1f;
 	int index = streamHandle - 1;
@@ -325,7 +325,7 @@ void MediaStreaming::readStream(BYTE arg, AcsiDataTrans *dataTrans)
 	}
 }
 
-void MediaStreaming::getStreamInfo(BYTE streamHandle, AcsiDataTrans *dataTrans)
+void MediaStreaming::getStreamInfo(BYTE streamHandle, DataTrans *dataTrans)
 {
 	int index = streamHandle - 1;
 	if(index >= MEDIASTREAMING_MAXSTREAMS || streams[index].isFree()) {

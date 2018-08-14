@@ -73,12 +73,7 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     lastFloppyImageLed      = -1;
     newFloppyImageLedAfterEncode = -2;
 
-    conSpi        = new CConSpi();
-    retryMod    = new RetryModule();
-
-    dataTrans   = new AcsiDataTrans();
-    dataTrans->setCommunicationObject(conSpi);
-    dataTrans->setRetryObject(retryMod);
+    dataTrans = new AcsiDataTrans();
 
     sharedObjects_create(configService, floppyService, screencastService);
 
@@ -96,7 +91,7 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     settingsReloadProxy.addSettingsUser((ISettingsUser *) TranslatedDisk::getInstance(), SETTINGSUSER_SHARED);
 
     // give floppy setup everything it needs
-    floppySetup.setAcsiDataTrans(dataTrans);
+    floppySetup.setDataTrans(dataTrans);
     floppySetup.setImageSilo(&floppyImageSilo);
     floppySetup.setSettingsReloadProxy(&settingsReloadProxy);
 
@@ -111,16 +106,14 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     }
 
     // set up network adapter stuff
-    netAdapter.setAcsiDataTrans(dataTrans);
+    netAdapter.setDataTrans(dataTrans);
 
     // set up mediastreaming service
 }
 
 CCoreThread::~CCoreThread()
 {
-    delete conSpi;
     delete dataTrans;
-    delete retryMod;
 
     MediaStreaming::deleteInstance();
     sharedObjects_destroy();
@@ -132,7 +125,7 @@ void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyServi
     shared.devFinder_look           = false;
 
     shared.scsi        = new Scsi();
-    shared.scsi->setAcsiDataTrans(dataTrans);
+    shared.scsi->setDataTrans(dataTrans);
 
     TranslatedDisk * translated = TranslatedDisk::createInstance(dataTrans, configService, screencastService);
     translated->setSettingsReloadProxy(&settingsReloadProxy);
@@ -140,19 +133,19 @@ void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyServi
     //-----------
     // create config stream for ACSI interface
     shared.configStream.acsi = new ConfigStream(CONFIGSTREAM_ON_ATARI);
-    shared.configStream.acsi->setAcsiDataTrans(dataTrans);
+    shared.configStream.acsi->setDataTrans(dataTrans);
     shared.configStream.acsi->setSettingsReloadProxy(&settingsReloadProxy);
 
     // create config stream for web interface
     shared.configStream.dataTransWeb    = new AcsiDataTrans();
     shared.configStream.web             = new ConfigStream(CONFIGSTREAM_THROUGH_WEB);
-    shared.configStream.web->setAcsiDataTrans(shared.configStream.dataTransWeb);
+    shared.configStream.web->setDataTrans(shared.configStream.dataTransWeb);
     shared.configStream.web->setSettingsReloadProxy(&settingsReloadProxy);
 
     // create config stream for linux terminal
     shared.configStream.dataTransTerm   = new AcsiDataTrans();
     shared.configStream.term            = new ConfigStream(CONFIGSTREAM_IN_LINUX_CONSOLE);
-    shared.configStream.term->setAcsiDataTrans(shared.configStream.dataTransTerm);
+    shared.configStream.term->setDataTrans(shared.configStream.dataTransTerm);
     shared.configStream.term->setSettingsReloadProxy(&settingsReloadProxy);
 }
 
@@ -346,7 +339,7 @@ void CCoreThread::run(void)
 
 #if !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
         // check for any ATN code waiting from Hans
-        res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);
+        res = dataTrans->waitForATN(SPI_CS_HANS, inBuff);
 
         if(res) {    // HANS is signaling attention?
             gotAtn = true;  // we've some ATN
@@ -399,7 +392,7 @@ void CCoreThread::run(void)
         if(flags.noFranz) {                         // if running without Franz, don't communicate
             res = false;
         } else {                                    // running with Franz - check for any ATN
-            res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuff);
+            res = dataTrans->waitForATN(SPI_CS_FRANZ, inBuff);
         }
 
         if(res) {                                    // FRANZ is signaling attention?
@@ -466,7 +459,7 @@ void CCoreThread::handleAcsiCommand(void)
 #if defined(ONPC_HIGHLEVEL)
     memcpy(bufIn, header, 14);                          // get the cmd from received header
 #else
-    conSpi->txRx(SPI_CS_HANS, 14, bufOut, bufIn);       // get 14 cmd bytes
+    dataTrans->txRx(SPI_CS_HANS, 14, bufOut, bufIn);       // get 14 cmd bytes
 #endif
 
     BYTE justCmd, tag1, tag2, module;
@@ -509,15 +502,15 @@ void CCoreThread::handleAcsiCommand(void)
             bufIn[4] = bufIn[4] & 0x7f;         // remove RETRY bit from HOSTMOD_ code
         }
 
-        bool gotThisCmd = retryMod->gotThisCmd(bufIn, isIcd);       // first check if we got this command buffered, or not
+        bool gotThisCmd = dataTrans->retryMod->gotThisCmd(bufIn, isIcd);       // first check if we got this command buffered, or not
 
         if(gotThisCmd) {                                    // if got this command buffered
-            retryMod->restoreCmdFromCopy(bufIn, isIcd, justCmd, tag1, tag2, module);
+            dataTrans->retryMod->restoreCmdFromCopy(bufIn, isIcd, justCmd, tag1, tag2, module);
             pCmd = (!isIcd) ? bufIn : (bufIn + 1);          // get the pointer to where the command starts
 
             Debug::out(LOG_DEBUG, "handleAcsiCommand -- doing retry for cmd: %02x %02x %02x %02x %02x %02x", bufIn[0], bufIn[1], bufIn[2], bufIn[3], bufIn[4], bufIn[5]);
 
-            int dataDir = retryMod->getDataDirection();
+            int dataDir = dataTrans->retryMod->getDataDirection();
             if(dataDir == DATA_DIRECTION_READ) {            // if it's READ operation, retry using stored data and don't let the right module to handle it
                 dataTrans->sendDataAndStatus(true);         // send data and status using data stored in RETRY module
                 wasHandled = true;
@@ -527,10 +520,10 @@ void CCoreThread::handleAcsiCommand(void)
             // if it got here, it's a WRITE operation, let the right module to handle it
         } else {                                            // if this command was not buffered, we have received it for the first time and we need to process it like usually
             // as we didn't process it yet, make copy of it
-            retryMod->makeCmdCopy(bufIn, isIcd, justCmd, tag1, tag2, module);
+            dataTrans->retryMod->makeCmdCopy(bufIn, isIcd, justCmd, tag1, tag2, module);
         }
     } else {            // if it's not retry module, make copy of everything
-        retryMod->makeCmdCopy(bufIn, isIcd, justCmd, tag1, tag2, module);
+        dataTrans->retryMod->makeCmdCopy(bufIn, isIcd, justCmd, tag1, tag2, module);
     }
 
     // ok, so the ID is right, let's see what we can do
@@ -737,7 +730,7 @@ void CCoreThread::handleFwVersion_hans(void)
         setNewFloppyImageLed = false;                           // and don't sent this anymore (until needed)
     }
 
-    conSpi->txRx(SPI_CS_HANS, cmdLength, oBuf, fwVer);
+    dataTrans->txRx(SPI_CS_HANS, cmdLength, oBuf, fwVer);
 
     int year = bcdToInt(fwVer[1]) + 2000;
 
@@ -834,7 +827,7 @@ void CCoreThread::handleFwVersion_franz(void)
 
     franzHandledOnce = true;
 
-    conSpi->txRx(SPI_CS_FRANZ, cmdLength, oBuf, fwVer);
+    dataTrans->txRx(SPI_CS_FRANZ, cmdLength, oBuf, fwVer);
 
     int year = bcdToInt(fwVer[1]) + 2000;
     Update::versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
@@ -1052,7 +1045,7 @@ void CCoreThread::handleSendTrack(void)
     static int prevTrack = 0;
 
     memset(oBuf, 0, 2);
-    conSpi->txRx(SPI_CS_FRANZ, 2, oBuf, iBuf);
+    dataTrans->txRx(SPI_CS_FRANZ, 2, oBuf, iBuf);
 
     int side    = iBuf[0];                      // now read the current floppy position
     int track   = iBuf[1];
@@ -1075,7 +1068,7 @@ void CCoreThread::handleSendTrack(void)
         encodedTrack = floppyImageSilo.getEncodedTrack(track, side, countInTrack);
     }
 
-    conSpi->txRx(SPI_CS_FRANZ, remaining, encodedTrack, iBuf);
+    dataTrans->txRx(SPI_CS_FRANZ, remaining, encodedTrack, iBuf);
 
     // now we should do some buzzing because of floppy seek
     if(prevTrack != track) {                        // track changed?
@@ -1092,8 +1085,8 @@ void CCoreThread::handleSectorWritten(void)
 
     memset(oBuf, 0, BUFFSIZE);
 
-    WORD remainingSize = conSpi->getRemainingLength();              // get how many data we still have
-    conSpi->txRx(SPI_CS_FRANZ, remainingSize, oBuf, iBuf);          // get all the remaining data
+    WORD remainingSize = dataTrans->getRemainingLength();           // get how many data we still have
+    dataTrans->txRx(SPI_CS_FRANZ, remainingSize, oBuf, iBuf);       // get all the remaining data
 
     // get the written sector, side, track number
     int sector  = iBuf[0];

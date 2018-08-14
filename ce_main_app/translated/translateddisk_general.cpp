@@ -49,7 +49,7 @@ TranslatedDisk * TranslatedDisk::getInstance(void)
     return instance;
 }
 
-TranslatedDisk * TranslatedDisk::createInstance(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs)
+TranslatedDisk * TranslatedDisk::createInstance(DataTrans *dt, ConfigService *cs, ScreencastService *scs)
 {
     instance = new TranslatedDisk(dt, cs, scs);
     return instance;
@@ -61,7 +61,7 @@ void TranslatedDisk::deleteInstance(void)
     instance = NULL;
 }
 
-TranslatedDisk::TranslatedDisk(AcsiDataTrans *dt, ConfigService *cs, ScreencastService *scs)
+TranslatedDisk::TranslatedDisk(DataTrans *dt, ConfigService *cs, ScreencastService *scs)
 {
     dataTrans = dt;
     configService = cs;

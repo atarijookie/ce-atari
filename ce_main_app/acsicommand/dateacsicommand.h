@@ -1,7 +1,7 @@
 #ifndef _DATEACSICOMMAND_H_
 #define _DATEACSICOMMAND_H_
 
-#include "../acsidatatrans.h"
+#include "../datatrans.h"
 
 #include "../service/configservice.h"
 
@@ -15,11 +15,11 @@
 class DateAcsiCommand
 {
 public:
-  DateAcsiCommand(AcsiDataTrans *dt, ConfigService *ds);
+  DateAcsiCommand(DataTrans *dt, ConfigService *ds);
   ~DateAcsiCommand();
   void processCommand(BYTE *command);
 private:
-  AcsiDataTrans       *dataTrans;
+  DataTrans       *dataTrans;
   ConfigService   *pxDateService;
   BYTE    *cmd;
 };

@@ -11,7 +11,7 @@
 
 #include "sting.h"
 
-class AcsiDataTrans;
+class DataTrans;
 
 #define NET_HANDLES_COUNT       32
 #define NET_STARTING_HANDLE     0x50
@@ -118,13 +118,13 @@ public:
     virtual ~NetAdapter();
 
     void reloadSettings(int type);
-    void setAcsiDataTrans(AcsiDataTrans *dt);
+    void setDataTrans(DataTrans *dt);
 
     void processCommand(BYTE *command);
 	
 private:
     BYTE            *cmd;
-    AcsiDataTrans   *dataTrans;
+    DataTrans       *dataTrans;
     BYTE            *dataBuffer;
 
     TNetConnection  cons[NET_HANDLES_COUNT];    // for handling of TCP and UDP connections

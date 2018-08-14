@@ -14,7 +14,7 @@
 #define IMG_DN_STATUS_DOWNLOADING   1
 #define IMG_DN_STATUS_DOWNLOADED    2
 
-class AcsiDataTrans;
+class DataTrans;
 
 class FloppySetup
 {
@@ -24,14 +24,14 @@ public:
 
     void processCommand(BYTE *command);
 
-    void setAcsiDataTrans(AcsiDataTrans *dt);
+    void setDataTrans(DataTrans *dt);
     void setImageSilo(ImageSilo *imgSilo);
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
     static bool createNewImage(std::string pathAndFile);
 
 private:
-    AcsiDataTrans       *dataTrans;
+    DataTrans       *dataTrans;
     ImageSilo           *imageSilo;
     SettingsReloadProxy *reloadProxy;
     ImageList           imageList;    

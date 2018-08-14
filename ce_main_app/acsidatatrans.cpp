@@ -34,26 +34,33 @@ AcsiDataTrans::AcsiDataTrans()
     statusWasSet    = false;
     com             = NULL;
     dataDirection   = DATA_DIRECTION_READ;
-	
-	dumpNextData	= false;
-    
-    retryMod        = NULL;
+
+    dumpNextData    = false;
+
+    com = new CConSpi();
 }
 
 AcsiDataTrans::~AcsiDataTrans()
 {
     delete []buffer;
     delete []recvBuffer;
+    delete com;
 }
 
-void AcsiDataTrans::setCommunicationObject(CConSpi *comIn)
+bool AcsiDataTrans::waitForATN(int whichSpiCs, BYTE *inBuf)
 {
-    com = comIn;
+    return com->waitForATN(whichSpiCs, (BYTE) ATN_ANY, 0, inBuf);
 }
 
-void AcsiDataTrans::setRetryObject(RetryModule *retryModule)
+// function for sending / receiving data from/to lower levels of communication (e.g. to SPI)
+void AcsiDataTrans::txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBufer)
 {
-    retryMod = retryModule;
+    com->txRx(whichSpiCs, count, sendBuffer, receiveBufer);
+}
+
+WORD AcsiDataTrans::getRemainingLength(void)
+{
+    return com->getRemainingLength();
 }
 
 void AcsiDataTrans::clear(bool clearAlsoDataDirection)
