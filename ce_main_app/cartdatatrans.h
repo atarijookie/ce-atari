@@ -1,5 +1,5 @@
-#ifndef ACSIDATATRANS_H
-#define ACSIDATATRANS_H
+#ifndef CARTDATATRANS_H
+#define CARTDATATRANS_H
 
 #include "datatrans.h"
 #include "conspi.h"
@@ -60,10 +60,6 @@ public:
     // returns how many data there is still to be transfered
     virtual WORD getRemainingLength(void);
     //----------------
-
-    virtual void sendDataAndStatus(bool fromRetryModule = false);       // by default it's not a retry
-
-    //----------------
     // following functions are used for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
     
     virtual bool sendData_start         (DWORD totalDataCount, BYTE scsiStatus, bool withStatus);
@@ -77,6 +73,7 @@ public:
 private:
     BYTE cmd[32];
     int  cmdLen;
+    bool gotCmd;
 
     DWORD timeoutTime;
     BYTE brStat;
@@ -88,8 +85,9 @@ private:
     bool timeout(void);         // returns true if timeout
     void writeDataToGPIO(BYTE val); // sets value to data pins
     BYTE readDataFromGPIO(void);    // reads value from data pins
+    void resetCpld(void);
 
-    void getCmdLengthFromCmdBytesAcsi(void);
+    int getCmdLengthFromCmdBytesAcsi(void);
     void getCommandFromST(void);
 
     BYTE PIO_writeFirst(void);
@@ -100,4 +98,4 @@ private:
 
 };
 
-#endif // ACSIDATATRANS_H
+#endif // CARTDATATRANS_H

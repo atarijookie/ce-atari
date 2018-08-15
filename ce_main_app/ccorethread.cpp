@@ -23,6 +23,7 @@
 #include "statusreport.h"
 #include "display/displaythread.h"
 #include "acsidatatrans.h"
+#include "cartdatatrans.h"
 
 #include "service/configservice.h"
 #include "service/floppyservice.h"
@@ -74,8 +75,13 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     lastFloppyImageLed      = -1;
     newFloppyImageLedAfterEncode = -2;
 
-    dataTrans = new AcsiDataTrans();
-    dataTrans->configureHw();
+    if(hwConfig.hddIface == HDD_IF_CART) {  // cartridge interface? use this data transporter
+        dataTrans = new CartDataTrans();
+    } else {                                // ACSI or SCSI interface? use that classical data transporter
+        dataTrans = new AcsiDataTrans();
+    }
+
+    dataTrans->configureHw();               // init pins as needed
 
     sharedObjects_create(configService, floppyService, screencastService);
 
@@ -86,6 +92,8 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_FLOPPY_SLOT);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_TRANSLATED);
     settingsReloadProxy.addSettingsUser((ISettingsUser *) this,          SETTINGSUSER_SCSI_IDS);
+
+    settingsReloadProxy.addSettingsUser((ISettingsUser *) dataTrans,     SETTINGSUSER_ACSI);
 
     settingsReloadProxy.addSettingsUser((ISettingsUser *) shared.scsi,          SETTINGSUSER_ACSI);
 

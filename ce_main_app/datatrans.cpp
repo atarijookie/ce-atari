@@ -8,6 +8,7 @@
 #include "gpio.h"
 #include "datatrans.h"
 #include "native/scsi_defs.h"
+#include "settingsreloadproxy.h"
 
 DataTrans::DataTrans()
 {
@@ -25,6 +26,8 @@ DataTrans::DataTrans()
     dataDirection   = DATA_DIRECTION_READ;
 
     dumpNextData    = false;
+
+    loadSettings();
 }
 
 DataTrans::~DataTrans()
@@ -32,6 +35,21 @@ DataTrans::~DataTrans()
     delete retryMod;
     delete []buffer;
     delete []recvBuffer;
+}
+
+void DataTrans::loadSettings(void)
+{
+    Settings s;
+    s.loadAcsiIDs(&acsiIdInfo);
+}
+
+void DataTrans::reloadSettings(int type)
+{
+    // if just SCSI IDs changed (
+    if(type == SETTINGSUSER_ACSI) {
+        loadSettings();
+        return;
+    }
 }
 
 void DataTrans::clear(bool clearAlsoDataDirection)
@@ -158,6 +176,41 @@ void DataTrans::sendDataToFd(int fd)
 
     write(fd, buffer, count);   // then the data...
     count = 0;
+}
+
+void DataTrans::sendDataAndStatus(bool fromRetryModule)
+{
+    if(fromRetryModule) {   // if it's a RETRY, get the copy of data and proceed like it would be from real module
+        retryMod->restoreDataAndStatus(dataDirection, count, buffer, statusWasSet, status);
+    } else {                // if it's normal run (not a RETRY), let the retry module do a copy of data
+        retryMod->copyDataAndStatus(dataDirection, count, buffer, statusWasSet, status);
+    }
+
+    // for DATA write transmit just the status in a different way (on separate ATN)
+    if(dataDirection == DATA_DIRECTION_WRITE) {
+        sendStatusToHans(status);
+        return;
+    }
+
+    if(count == 0 && !statusWasSet) {       // if no data was added and no status was set, nothing to send then
+        return;
+    }
+    //---------------------------------------
+    if(dumpNextData) {
+        dumpData();
+        dumpNextData = false;
+    }
+    //---------------------------------------
+    // first send the command
+    bool res;
+
+    res = sendData_start(count, status, true);      // try to start the read data transfer, with status
+
+    if(!res) {
+        return;
+    }
+
+    res = sendData_transferBlock(buffer, count);    // transfer this block
 }
 
 void DataTrans::dumpData(void)

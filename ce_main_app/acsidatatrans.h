@@ -25,10 +25,6 @@ public:
 
     // returns how many data there is still to be transfered
     virtual WORD getRemainingLength(void);
-    //----------------
-    // following functions are for convenient gathering of data in handling functions, but work only up to ACSI_BUFFER_SIZE which is currently 1 MB
-
-    virtual void sendDataAndStatus(bool fromRetryModule = false);       // by default it's not a retry
 
     //----------------
     // following functions are used for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above

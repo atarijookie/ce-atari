@@ -3,6 +3,8 @@
 
 #include "conspi.h"
 #include "datatypes.h"
+#include "isettingsuser.h"
+#include "settings.h"
 
 // commands sent from host to device
 #define CMD_ACSI_CONFIG                 0x10
@@ -34,13 +36,16 @@
 
 #include "retrymodule.h"
 
-class DataTrans
+class DataTrans: public ISettingsUser
 {
 public:
     DataTrans();
     virtual ~DataTrans();
 
-    virtual void configureHw(void) = 0;
+    void loadSettings(void);
+    virtual void reloadSettings(int type);  // from ISettingsUser
+
+    virtual void configureHw(void) = 0;     // configure all the GPIO pins as needed
 
     //----------------
     // function for checking if the specified ATN is raised and if so, then get command bytes
@@ -70,7 +75,7 @@ public:
     void dumpData(void);        // does that dump
     //----------------
     bool recvData(BYTE *data, DWORD cnt);   // uses recvData_start() and recvData_transferBlock(), so it can be implemented here
-    virtual void sendDataAndStatus(bool fromRetryModule = false) = 0;       // by default it's not a retry
+    void sendDataAndStatus(bool fromRetryModule = false);   // by default it's not a retry
 
     //----------------
     // following functions are used for large (>1 MB) block transfers (Scsi::readSectors(), Scsi::writeSectors()) and also by the convenient functions above
@@ -86,6 +91,8 @@ public:
     RetryModule *retryMod;
 
 protected:
+    AcsiIDinfo acsiIdInfo;
+
     BYTE    *buffer;
     BYTE    *recvBuffer;
 

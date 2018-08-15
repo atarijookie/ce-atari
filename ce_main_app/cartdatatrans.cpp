@@ -28,7 +28,8 @@
 
 CartDataTrans::CartDataTrans()
 {
-
+    gotCmd = false;     // initially - we don't have a command
+    memset(cmd, 0, sizeof(cmd));
 }
 
 CartDataTrans::~CartDataTrans()
@@ -120,55 +121,68 @@ bool CartDataTrans::waitForATN(int whichSpiCs, BYTE *inBuf)
     }
 
     BYTE val = bcm2835_gpio_lev(PIN_ATN_HANS);  // read ATN pin
-    return (val == HIGH);                       // ATN true if high
+    if (val == HIGH) {                          // ATN true if high
+        getCommandFromST(); // try to get command from ST
+        return gotCmd;      // if managed to get cmd, return we got the ATN
+    }
+
+    return false;           // if came here, no ATN
 }
 
-void CartDataTrans::getCmdLengthFromCmdBytesAcsi(void)
+int CartDataTrans::getCmdLengthFromCmdBytesAcsi(void)
 {
     // now it's time to set up the receiver buffer and length
-    if((cmd[0] & 0x1f)==0x1f)   {                           // if the command is '0x1f'
-        switch((cmd[1] & 0xe0)>>5)                          // get the length of the command
+    if((cmd[0] & 0x1f)==0x1f)   {       // if the command is '0x1f'
+        switch((cmd[1] & 0xe0)>>5)      // get the length of the command
         {
-            case  0: cmdLen =  7; break;
-            case  1: cmdLen = 11; break;
-            case  2: cmdLen = 11; break;
-            case  5: cmdLen = 13; break;
-            default: cmdLen =  7; break;
+            case  0: return  7; break;
+            case  1: return 11; break;
+            case  2: return 11; break;
+            case  5: return 13; break;
+            default: return  7; break;
         }
-    } else {                                                // if it isn't a ICD command
-        cmdLen   = 6;                                       // then length is 6 bytes
+    } else {                            // if it isn't a ICD command
+        return 6;                       // then length is 6 bytes
     }
+}
+
+void CartDataTrans::resetCpld(void)
+{
+    bcm2835_gpio_write(PIN_RESET_HANS, LOW);
+    bcm2835_gpio_write(PIN_RESET_HANS, HIGH);
 }
 
 void CartDataTrans::getCommandFromST(void)
 {
-    hwDirForWrite();
+    gotCmd = false;                 // initially no command
+    memset(cmd, 0, sizeof(cmd));
 
-    /*
-    cmd[0]  = PIO_writeFirst();                     // get byte from ST (waiting for the 1st byte)
-    id      = (cmd[0] >> 5) & 0x07;                 // get only device ID
+    cmd[0] = PIO_writeFirst();      // get byte from ST (waiting for the 1st byte)
+    int id = (cmd[0] >> 5) & 0x07;  // get only device ID
 
     //----------------------
-    if(!enabledIDs[id]) {                           // if this ID is not enabled, quit
-        return 0;
+    if((acsiIdInfo.enabledIDbits & (1 << id)) == 0) {   // if this ID is not enabled, quit
+        resetCpld();
+        return;
     }
 
     cmdLen = 6;                                     // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
+    int i;
 
     for(i=1; i<cmdLen; i++) {                       // receive the next command bytes
         cmd[i] = PIO_write();                       // drop down IRQ, get byte
 
         if(brStat != E_OK) {                        // if something was wrong, quit, failed
-            resetXilinx();
-            return 0;
+            resetCpld();
+            return;
         }
 
-        if(i == 1) {                                // if we got also the 2nd byte
-            getCmdLengthFromCmdBytesAcsi();         // we set up the length of command, etc.
+        if(i == 1) {                                    // if we got also the 2nd byte
+            cmdLen = getCmdLengthFromCmdBytesAcsi();    // we set up the length of command, etc.
         }
     }
-*/
-    return;
+
+    gotCmd = true;
 }
 
 // function for sending / receiving data from/to lower levels of communication (e.g. to SPI)
@@ -190,40 +204,6 @@ void CartDataTrans::txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *rece
     }
 }
 
-// send all data to Hans, including status
-void CartDataTrans::sendDataAndStatus(bool fromRetryModule)
-{
-    if(fromRetryModule) {   // if it's a RETRY, get the copy of data and proceed like it would be from real module
-        retryMod->restoreDataAndStatus(dataDirection, count, buffer, statusWasSet, status);
-    } else {                // if it's normal run (not a RETRY), let the retry module do a copy of data
-        retryMod->copyDataAndStatus(dataDirection, count, buffer, statusWasSet, status);
-    }
-    
-    // for DATA write transmit just the status (the data is already read by app)
-    if(dataDirection == DATA_DIRECTION_WRITE) {
-        sendStatusToHans(status);
-        return;
-    }
-
-    if(count == 0 && !statusWasSet) {       // if no data was added and no status was set, nothing to send then
-        return;
-    }
-	//---------------------------------------
-	if(dumpNextData) {
-	    dumpData();
-		dumpNextData = false;
-	}
-	//---------------------------------------
-    // first send the command
-    bool res;
-
-    res = sendData_transferBlock(buffer, count);    // transfer this block
-
-    if(res) {               // if transfer block went OK, send status - this is different from AcsiDataTrans, where the status was sent sooner
-        sendStatusToHans(status);
-    }
-}
-
 bool CartDataTrans::sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool withStatus)
 {
     if(totalDataCount > 0xffffff) {
@@ -231,8 +211,6 @@ bool CartDataTrans::sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool w
         return false;
     }
 
-//    devCommand[3] = withStatus ? CMD_DATA_READ_WITH_STATUS : CMD_DATA_READ_WITHOUT_STATUS;  // store command - with or without status
-//    devCommand[7] = scsiStatus;                                     // store status
     return true;
 }
 
