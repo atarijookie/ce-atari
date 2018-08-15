@@ -30,6 +30,8 @@ CartDataTrans::CartDataTrans()
 {
     gotCmd = false;     // initially - we don't have a command
     memset(cmd, 0, sizeof(cmd));
+
+    nextFakeFwAtn = Utils::getEndTime(1000);
 }
 
 CartDataTrans::~CartDataTrans()
@@ -116,14 +118,28 @@ WORD CartDataTrans::getRemainingLength(void)
 
 bool CartDataTrans::waitForATN(int whichSpiCs, BYTE *inBuf)
 {
+    inBuf[3] = 0;                       // no ATN at this moment
+
     if(whichSpiCs == SPI_CS_FRANZ) {    // no communication with Franz, just quit
         return false;
     }
 
+    DWORD now = Utils::getCurrentMs();          // get current time
+
+    if(now >= nextFakeFwAtn) {                  // if we should send next fake FW ATN
+        nextFakeFwAtn = Utils::getEndTime(1000); // get next time we should do the same
+        inBuf[3] = ATN_FW_VERSION;              // pretend it's FW version ATN
+        return true;
+    }
+
     BYTE val = bcm2835_gpio_lev(PIN_ATN_HANS);  // read ATN pin
     if (val == HIGH) {                          // ATN true if high
-        getCommandFromST(); // try to get command from ST
-        return gotCmd;      // if managed to get cmd, return we got the ATN
+        getCommandFromST();                     // try to get command from ST
+
+        if(gotCmd) {
+            inBuf[3] = ATN_ACSI_COMMAND;        // pretend it's ACSI command ATN
+            return true;
+        }
     }
 
     return false;           // if came here, no ATN

@@ -78,6 +78,8 @@ private:
     DWORD timeoutTime;
     BYTE brStat;
 
+    DWORD nextFakeFwAtn;
+
     void hwDataDirection(bool readNotWrite);
     void hwDirForRead(void);    // data pins direction read (from RPi to ST)
     void hwDirForWrite(void);   // data pins direction write (from ST to RPi)
