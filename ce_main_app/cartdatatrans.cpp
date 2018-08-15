@@ -24,31 +24,16 @@
 #define PIN_D6              RPI_V2_GPIO_P1_22
 #define PIN_D7              RPI_V2_GPIO_P1_37
 
-#define DATA_MASK ((1 << D7) | (1 << D6) | (1 << D5) | (1 << D4) | (1 << D3) | (1 << D2) | (1 << D1) | (1 << D0))
+#define DATA_MASK ((1 << PIN_D7) | (1 << PIN_D6) | (1 << PIN_D5) | (1 << PIN_D4) | (1 << PIN_D3) | (1 << PIN_D2) | (1 << PIN_D1) | (1 << PIN_D0))
 
 CartDataTrans::CartDataTrans()
 {
-    buffer          = new BYTE[ACSI_BUFFER_SIZE];        // 1 MB buffer
-    recvBuffer      = new BYTE[ACSI_BUFFER_SIZE];
-    
-    memset(buffer,      0, ACSI_BUFFER_SIZE);            // init buffers to zero
-    memset(recvBuffer,  0, ACSI_BUFFER_SIZE);
-    
-    memset(txBuffer, 0, TX_RX_BUFF_SIZE);
-    memset(rxBuffer, 0, TX_RX_BUFF_SIZE);
-    
-    count           = 0;
-    status          = SCSI_ST_OK;
-    statusWasSet    = false;
-    dataDirection   = DATA_DIRECTION_READ;
 
-    dumpNextData    = false;
 }
 
 CartDataTrans::~CartDataTrans()
 {
-    delete []buffer;
-    delete []recvBuffer;
+
 }
 
 void CartDataTrans::hwDirForRead(void)
@@ -159,6 +144,7 @@ void CartDataTrans::getCommandFromST(void)
 {
     hwDirForWrite();
 
+    /*
     cmd[0]  = PIO_writeFirst();                     // get byte from ST (waiting for the 1st byte)
     id      = (cmd[0] >> 5) & 0x07;                 // get only device ID
 
@@ -181,8 +167,8 @@ void CartDataTrans::getCommandFromST(void)
             getCmdLengthFromCmdBytesAcsi();         // we set up the length of command, etc.
         }
     }
-
-    return 1;
+*/
+    return;
 }
 
 // function for sending / receiving data from/to lower levels of communication (e.g. to SPI)
@@ -252,6 +238,8 @@ bool CartDataTrans::sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool w
 
 bool CartDataTrans::sendData_transferBlock(BYTE *pData, DWORD dataCount)
 {
+    hwDirForRead();             // data as outputs (ST does data READ)
+
     if((dataCount & 1) != 0) {  // odd number of bytes? make it even, we're sending words...
         dataCount++;
     }
@@ -282,10 +270,10 @@ bool CartDataTrans::recvData_start(DWORD totalDataCount)
 
 bool CartDataTrans::recvData_transferBlock(BYTE *pData, DWORD dataCount)
 {
-    BYTE inBuf[8];
+    hwDirForWrite();            // data as inputs (ST does data WRITE)
 
     while(dataCount > 0) {      // while there's something to get from ST
-        *pData = DMA_write();   // get one byte from ST and sttore it
+        *pData = DMA_write();   // get one byte from ST and store it
         pData++;                // move further in buffer
         dataCount--;            // decrement byte counter
 
@@ -308,14 +296,14 @@ bool CartDataTrans::timeout(void)
     return (now >= timeoutTime);            // it's an timeout, if timeout time is now
 }
 
-void dataWrite(BYTE val)
+void CartDataTrans::writeDataToGPIO(BYTE val)
 {
     // GPIO 26-24 + 22-18 of RPi are used as data port, split and shift data into right position
     DWORD value = ((((DWORD) val) & 0xe0) << 19) | ((((DWORD) val) & 0x1f) << 18);
     bcm2835_gpio_write_mask(value, DATA_MASK);
 }
 
-BYTE dataRead(void)
+BYTE CartDataTrans::readDataFromGPIO(void)
 {
     // get whole gpio by single read -- taken from bcm library
     volatile DWORD* paddr = bcm2835_gpio + BCM2835_GPLEV0/4;
@@ -332,18 +320,16 @@ BYTE dataRead(void)
 // get 1st CMD byte from ST  -- without setting INT
 BYTE CartDataTrans::PIO_writeFirst(void)
 {
-    hwDirForWrite();                        // data as inputs (write)
+    hwDirForWrite();                        // data as inputs (ST does data WRITE)
     brStat = E_OK;
     timeoutTime = Utils::getEndTime(1000);  // start the timeout timer
 
-    return dataRead();
+    return readDataFromGPIO();
 }
 
 // get next CMD byte from ST -- with setting INT to LOW and waiting for CS
 BYTE CartDataTrans::PIO_write(void)
 {
-    BYTE val = 0;
-
     // create rising edge on XPIO
     bcm2835_gpio_write(PIN_XPIO, HIGH);     // to HIGH
     bcm2835_gpio_write(PIN_XPIO, LOW);      // to LOW
@@ -352,7 +338,7 @@ BYTE CartDataTrans::PIO_write(void)
         BYTE xdone = bcm2835_gpio_lev(PIN_XDONE);
 
         if(xdone == HIGH) {     // if CS arrived, read and quit
-            return dataRead();
+            return readDataFromGPIO();
         }
 
         if(timeout()) {         // if timeout happened
@@ -365,8 +351,8 @@ BYTE CartDataTrans::PIO_write(void)
 // send status byte to host
 void CartDataTrans::PIO_read(BYTE val)
 {
-    hwDirForRead();                         // data as inputs (write)
-    dataWrite(val);                         // write the data to output data register
+    hwDirForRead();                         // data as outputs (ST does data READ)
+    writeDataToGPIO(val);                   // write the data to output data register
 
     // create rising edge on XPIO
     bcm2835_gpio_write(PIN_XPIO, HIGH);     // to HIGH
@@ -391,7 +377,7 @@ void CartDataTrans::PIO_read(BYTE val)
 
 void CartDataTrans::DMA_read(BYTE val)
 {
-    dataWrite(val);                         // write the data to output data register
+    writeDataToGPIO(val);                   // write the data to output data register
 
     // create rising edge on aDMA
     bcm2835_gpio_write(PIN_XDMA, HIGH);     // to HIGH
@@ -421,7 +407,7 @@ BYTE CartDataTrans::DMA_write(void)
         BYTE xdone = bcm2835_gpio_lev(PIN_XDONE);
 
         if(xdone == HIGH) {     // if CS arrived, read and quit
-            return dataRead();
+            return readDataFromGPIO();
         }
 
         if(timeout()) {         // if timeout happened

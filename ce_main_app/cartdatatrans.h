@@ -31,9 +31,6 @@
 
 #define TX_RX_BUFF_SIZE             600
 
-#define ACSI_CMD_SIZE               14
-
-#define ACSI_BUFFER_SIZE            (1024*1024)
 #define COMMAND_SIZE                10
 
 #define ACSI_MAX_TRANSFER_SIZE_BYTES    (254 * 512)
@@ -64,7 +61,6 @@ public:
     virtual WORD getRemainingLength(void);
     //----------------
 
-    virtual bool recvData(BYTE *data, DWORD cnt);
     virtual void sendDataAndStatus(bool fromRetryModule = false);       // by default it's not a retry
 
     //----------------
@@ -90,11 +86,11 @@ private:
     void hwDirForWrite(void);   // data pins direction write (from ST to RPi)
 
     bool timeout(void);         // returns true if timeout
-    void dataWrite(BYTE val);   // sets value to data pins
-    BYTE dataRead(void);        // reads value from data pins
+    void writeDataToGPIO(BYTE val); // sets value to data pins
+    BYTE readDataFromGPIO(void);    // reads value from data pins
 
     void getCmdLengthFromCmdBytesAcsi(void);
-    void getCommandFromST(BYTE *receiveBufer);
+    void getCommandFromST(void);
 
     BYTE PIO_writeFirst(void);
     BYTE PIO_write(void);

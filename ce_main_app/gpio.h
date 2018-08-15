@@ -111,6 +111,8 @@ void bcm2835_delayMicroseconds(DWORD a);
 bool gpio_open(void);
 void gpio_close(void);
 
+void spi_init(void);
+
 void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf);
 bool spi_atn(int whichSpiAtn);
 

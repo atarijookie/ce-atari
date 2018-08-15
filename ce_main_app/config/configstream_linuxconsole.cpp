@@ -12,7 +12,7 @@
 
 #include "../global.h"
 #include "../native/scsi_defs.h"
-#include "../acsidatatrans.h"
+#include "../datatrans.h"
 
 #include "../settings.h"
 #include "keys.h"

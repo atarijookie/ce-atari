@@ -12,7 +12,7 @@
 #include "../global.h"
 #include "../debug.h"
 #include "../native/scsi_defs.h"
-#include "../acsidatatrans.h"
+#include "../datatrans.h"
 #include "../mounter.h"
 #include "../translated/translateddisk.h"
 #include "../periodicthread.h"  // for SharedObjects

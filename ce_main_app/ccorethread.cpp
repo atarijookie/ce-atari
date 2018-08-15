@@ -22,6 +22,7 @@
 #include "ce_conf_on_rpi.h"
 #include "statusreport.h"
 #include "display/displaythread.h"
+#include "acsidatatrans.h"
 
 #include "service/configservice.h"
 #include "service/floppyservice.h"

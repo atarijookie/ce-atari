@@ -12,7 +12,7 @@
 #include "../utils.h"
 #include "../debug.h"
 #include "../settings.h"
-#include "acsidatatrans.h"
+#include "datatrans.h"
 #include "imagesilo.h"
 #include "floppysetup.h"
 #include "../display/displaythread.h"

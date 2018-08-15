@@ -20,7 +20,7 @@
 #include "../utils.h"
 #include "../settings.h"
 #include "../settingsreloadproxy.h"
-#include "acsidatatrans.h"
+#include "datatrans.h"
 #include "translateddisk.h"
 #include "translatedhelper.h"
 #include "gemdos.h"

@@ -15,7 +15,7 @@
 #include "../settings.h"
 #include "../utils.h"
 #include "../mounter.h"
-#include "acsidatatrans.h"
+#include "datatrans.h"
 #include "acsicommand/screencastacsicommand.h"
 #include "acsicommand/dateacsicommand.h"
 #include "settingsreloadproxy.h"

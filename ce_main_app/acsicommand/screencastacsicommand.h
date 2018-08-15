@@ -1,7 +1,7 @@
 #ifndef _SCREENCASTACSICOMMAND_H_
 #define _SCREENCASTACSICOMMAND_H_
 
-#include "../acsidatatrans.h" 
+#include "../datatrans.h"
 #include "service/screencastservice.h"
 
 class ScreencastAcsiCommand

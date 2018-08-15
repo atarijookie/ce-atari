@@ -94,22 +94,6 @@ WORD AcsiDataTrans::getRemainingLength(void)
     return com->getRemainingLength();
 }
 
-// get data from Hans
-bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
-{
-    bool res;
-
-    dataDirection = DATA_DIRECTION_WRITE;                   // let the higher function know that we've done data write -- 130 048 Bytes
-    res = recvData_start(cnt);                              // first send the command and tell Hans that we need WRITE data
-
-    if(!res) {                                              // failed to start? 
-        return false;
-    }
-
-    res = recvData_transferBlock(data, cnt);                // get data from Hans
-    return res;
-}
-
 // send all data to Hans, including status
 void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
 {

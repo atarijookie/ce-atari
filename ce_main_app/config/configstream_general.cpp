@@ -4,7 +4,7 @@
 
 #include "../global.h"
 #include "../native/scsi_defs.h"
-#include "../acsidatatrans.h"
+#include "../datatrans.h"
 #include "../update.h"
 #include "../translated/translateddisk.h"
 

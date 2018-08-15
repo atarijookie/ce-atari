@@ -7,8 +7,6 @@
 #include "gpio.h"
 #include "debug.h"
 
-void spi_init(void);
-
 /* Notes:
 
 Pins states remain the same even after bcm2835_close() and even after prog termination.

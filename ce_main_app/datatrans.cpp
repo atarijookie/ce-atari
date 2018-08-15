@@ -1,14 +1,13 @@
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <time.h>
+
 #include "debug.h"
 #include "utils.h"
 #include "gpio.h"
 #include "datatrans.h"
-
-#include "debug.h"
-#include "utils.h"
-#include "gpio.h"
 #include "native/scsi_defs.h"
-
-#define ACSI_BUFFER_SIZE (1024*1024)
 
 DataTrans::DataTrans()
 {
@@ -30,11 +29,7 @@ DataTrans::DataTrans()
 
 DataTrans::~DataTrans()
 {
-    if(retryMod) {
-        delete retryMod;
-        retryMod = NULL;
-    }
-
+    delete retryMod;
     delete []buffer;
     delete []recvBuffer;
 }
@@ -125,6 +120,21 @@ void DataTrans::addZerosUntilSize(DWORD finalBufferCnt)
     }
 }
 
+// get data from Hans
+bool DataTrans::recvData(BYTE *data, DWORD cnt)
+{
+    bool res;
+
+    dataDirection = DATA_DIRECTION_WRITE;                   // let the higher function know that we've done data write -- 130 048 Bytes
+    res = recvData_start(cnt);                              // first send the command and tell Hans that we need WRITE data
+
+    if(!res) {                                              // failed to start?
+        return false;
+    }
+
+    res = recvData_transferBlock(data, cnt);                // get data from Hans
+    return res;
+}
 
 void DataTrans::dumpDataOnce(void)
 {

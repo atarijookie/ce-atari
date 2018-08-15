@@ -8,7 +8,7 @@
 #include "../global.h"
 #include "../debug.h"
 #include "../utils.h"
-#include "../acsidatatrans.h"
+#include "../datatrans.h"
 #include "../translated/gemdos_errno.h"
 #include "../downloader.h"
 #include "floppysetup.h"
