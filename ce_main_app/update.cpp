@@ -59,6 +59,8 @@ void Update::processUpdateList(void)
         return;
     }
 
+    const char *ifFwName = getPropperXilinxTag();        // return xilinx | xlnx2s | xlnx2a | xlnx2c depending on HW version and IF type
+
     char line[1024];
     char what[32], ver[32], url[256], crc[32];
     while(!feof(f)) {
@@ -75,7 +77,7 @@ void Update::processUpdateList(void)
             continue;
         }
 
-        // now store the Update::versions where they bellong
+        // now store the Update::versions where they belong
         if(strncmp(what, "app", 3) == 0) {
             Update::versions.onServer.app.fromString(ver);
             Update::versions.onServer.app.setUrlAndChecksum(url, crc);
@@ -88,29 +90,17 @@ void Update::processUpdateList(void)
             continue;
         }
 
-        if(hwConfig.version == 1 && strncmp(what, "xilinx", 6) == 0) {                                      // HW version 1: use original xilinx version
-            Update::versions.onServer.xilinx.fromString(ver);
-            Update::versions.onServer.xilinx.setUrlAndChecksum(url, crc);
-            continue;
-        }
-
-        if(hwConfig.version == 2 && hwConfig.hddIface == HDD_IF_ACSI && strncmp(what, "xlnx2a", 6) == 0) {  // HW ver 2 + ACSI IF: use xlnx2a
-            Update::versions.onServer.xilinx.fromString(ver);
-            Update::versions.onServer.xilinx.setUrlAndChecksum(url, crc);
-            continue;
-        } 
-
-        if(hwConfig.version == 2 && hwConfig.hddIface == HDD_IF_SCSI && strncmp(what, "xlnx2s", 6) == 0) {  // HW ver 2 + SCSI IF: use xlnx2s
-            Update::versions.onServer.xilinx.fromString(ver);
-            Update::versions.onServer.xilinx.setUrlAndChecksum(url, crc);
-            continue;
-        }
-
         if(strncmp(what, "franz", 5) == 0) {
             Update::versions.onServer.franz.fromString(ver);
             Update::versions.onServer.franz.setUrlAndChecksum(url, crc);
             continue;
         }
+
+        if(strncmp(what, ifFwName, 6) == 0) {      // if this row has the xilinx firmware version for our device type, use it
+            Update::versions.onServer.xilinx.fromString(ver);
+            Update::versions.onServer.xilinx.setUrlAndChecksum(url, crc);
+            continue;
+        } 
     }
 
     fclose(f);
@@ -148,6 +138,7 @@ void Update::deleteLocalUpdateComponents(void)
     unlink("/ce/update/xilinx.xsvf");       // xilinx - v.1
     unlink("/ce/update/xlnx2a.xsvf");       // xilinx - v.2 ACSI
     unlink("/ce/update/xlnx2s.xsvf");       // xilinx - v.2 SCSI
+    unlink("/ce/update/xlnx2c.xsvf");       // xilinx - v.2 SCSI
 
     system("rm -f /ce/update/*.hex /ce/update/*.zip");
     system("rm -f /tmp/*.hex /tmp/*.zip /tmp/*.xsvf");
@@ -348,6 +339,7 @@ bool Update::createUpdateXilinxScript(void)
     fprintf(f, "cp -f /ce/firstfw/xilinx.xsvf /tmp/ \n");
     fprintf(f, "cp -f /ce/firstfw/xlnx2a.xsvf /tmp/ \n");
     fprintf(f, "cp -f /ce/firstfw/xlnx2s.xsvf /tmp/ \n");
+    fprintf(f, "cp -f /ce/firstfw/xlnx2c.xsvf /tmp/ \n");
     
     // execute the xilinx update script
     fprintf(f, "/ce/update/update_xilinx.sh \n");
@@ -435,14 +427,14 @@ const char *Update::getPropperXilinxTag(void)
 {
     if(hwConfig.version == 1) {                 // v.1 ? it's xilinx
         return "xilinx";
-    } else {                                    // v.2 ?
-        if(hwConfig.hddIface == HDD_IF_ACSI) {  // v.2 and ACSI? it's xlnx2a
-            return "xlnx2a";
-        } else {                                // v.2 and SCSI? it's xlnx2s
-            return "xlnx2s";
+    } else if(hwConfig.version == 2) {          // v.2 ?
+        switch(hwConfig.hddIface) {
+            case HDD_IF_SCSI: return "xlnx2s";
+            case HDD_IF_ACSI: return "xlnx2a";
+            case HDD_IF_CART: return "xlnx2c";
         }
     }
-    
+
     return "??wtf??";
 }
 

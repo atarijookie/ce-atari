@@ -52,7 +52,9 @@ void ConfigStream::createScreen_homeScreen(void)
 
     int line = 4;
     
-    const char *idConfigLabel = (hwConfig.hddIface == HDD_IF_SCSI) ? " SCSI IDs config " : " ACSI IDs config ";
+    char idConfigLabel[32];
+    Utils::IFintToStringFormatted(hwConfig.hddIface, idConfigLabel, " %s IDs config ");
+
     comp = new ConfigComponent(this, ConfigComponent::button, idConfigLabel,	    18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_ACSI);
     screen.push_back(comp);
@@ -108,7 +110,10 @@ void ConfigStream::createScreen_acsiConfig(void)
     screenChanged		= true;			// mark that the screen has changed
     showingHomeScreen	= false;		// mark that we're NOT showing the home screen
 
-    const char *idHeaderLabel = (hwConfig.hddIface == HDD_IF_SCSI) ? " SCSI IDs config " : " ACSI IDs config ";
+
+    char idHeaderLabel[32];
+    Utils::IFintToStringFormatted(hwConfig.hddIface, idConfigLabel, " %s IDs config ");
+
     screen_addHeaderAndFooter(screen, idHeaderLabel);
 
     ConfigComponent *comp;
@@ -796,7 +801,7 @@ void ConfigStream::createScreen_update(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "HDD interface type: ", 22, cl1, line, gotoOffset);
     screen.push_back(comp);
 
-    const char *hddIf = (hwConfig.hddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI";
+    const char *hddIf = Utils::IFintToString(hwConfig.hddIface);
 
     comp = new ConfigComponent(this, ConfigComponent::label, hddIf, 10, cl2, line, gotoOffset);
     screen.push_back(comp);

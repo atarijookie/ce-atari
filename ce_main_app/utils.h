@@ -53,6 +53,9 @@ public:
 
     static void splitString(const std::string &s, char delim, std::vector<std::string> &elems);
 
+    static const char*IFintToString(int IFtype);
+    static       void IFintToStringFormatted(int IFtype, char *outBuffer, char *format);
+
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
 

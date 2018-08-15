@@ -50,7 +50,9 @@ void StatusReport::createReport(std::string &report, int reportFormat)
     BYTE ipaddrs[10];
     Utils::getIpAdds(ipaddrs);
 
-    dumpPair(report, "HDD interface type",      (hwConfig.hddIface == HDD_IF_ACSI) ? "ACSI" : "SCSI", reportFormat);
+    const char *hddIf = Utils::IFintToString(hwConfig.hddIface);
+
+    dumpPair(report, "HDD interface type",      hddIf, reportFormat);
     dumpPair(report, "eth0  up and running",    netIfStatus(ipaddrs),   reportFormat);
     dumpPair(report, "wlan0 up and running",    netIfStatus(ipaddrs+5), reportFormat);
 

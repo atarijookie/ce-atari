@@ -649,12 +649,8 @@ void CCoreThread::fillDisplayLines(void)
     #define MAX_DEV_TYPES       4
     const char *devTypeString[MAX_DEV_TYPES] = {"OFF", "SD", "RAW", "CE"};
 
-    if(hwConfig.hddIface == HDD_IF_ACSI) {  // is ACSI?
-        strcpy(tmpLine1, "ACSI: ");
-    } else {                                // is SCSI?
-        strcpy(tmpLine1, "SCSI: ");
-    }
 
+    Utils::IFintToStringFormatted(hwConfig.hddIface, tmpLine1, "%s: ");
     strcpy(tmpLine2, tmpLine1);
 
     int i;
@@ -984,7 +980,8 @@ void CCoreThread::showHwVersion(void)
     Debug::out(LOG_INFO, "   %s", tmp);    // show in log file
 
     // HDD interface is either SCSI, or defaults to ACSI
-    sprintf(tmp, "HDD_IF: %s", (hwConfig.hddIface == HDD_IF_SCSI) ? "SCSI" : "ACSI");
+    Utils::IFintToStringFormatted(hwConfig.hddIface, tmp, "HDD_IF: %s");
+
     printf("\n%s\n", tmp);                  // show on stdout
     Debug::out(LOG_INFO, "   %s", tmp);    // show in log file
 

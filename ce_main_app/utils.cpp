@@ -33,6 +33,7 @@
 #include "gpio.h"
 #include "mounter.h"
 #include "settings.h"
+#include "global.h"
 
 DWORD Utils::getCurrentMs(void)
 {
@@ -553,4 +554,20 @@ void Utils::splitString(const std::string &s, char delim, std::vector<std::strin
     while (std::getline(ss, item, delim)) {
         elems.push_back(item);
     }
+}
+
+const char*Utils::IFintToString(int IFtype)
+{
+    switch(IFtype) {
+        case HDD_IF_SCSI: return "SCSI";
+        case HDD_IF_ACSI: return "ACSI";
+        case HDD_IF_CART: return "CART";
+        default: return "????";
+    }
+}
+
+void Utils::IFintToStringFormatted(int IFtype, char *outBuffer, char *format)
+{
+    const char *ifString = Utils::IFintToString(IFtype);
+    sprintf(outBuffer, format, ifString);
 }

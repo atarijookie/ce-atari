@@ -57,11 +57,12 @@ fi
 
 # for XC9572 - first check the HDD IF - if it's SCSI or ACSI
 if [ "$is72" -eq "1" ]; then
-    echo "Detected XC9572 chip, now will detect if it's ACSI or SCSI"
+    echo "Detected XC9572 chip, now will detect if it's ACSI or SCSI or CART"
     out=$( /ce/app/cosmosex hwinfo )
     
     isAcsi=$( echo "$out" | grep 'ACSI' )
     isScsi=$( echo "$out" | grep 'SCSI' )
+    isCart=$( echo "$out" | grep 'CART' )
     
     # if it's ACSI version
     if [ -n "$isAcsi" ]; then
@@ -76,6 +77,14 @@ if [ "$is72" -eq "1" ]; then
         echo "Detected XC9572 chip and SCSI interface, will write firmware"
         /ce/update/flash_xilinx /tmp/xlnx2s.xsvf
         cat /tmp/updatelist_copy.csv | grep 'xlnx2s' | awk -F ',' '{print $2}' > /ce/update/xilinx_current.txt 
+        exit
+    fi
+
+    # if it's CART version
+    if [ -n "$isCart" ]; then
+        echo "Detected XC9572 chip and CARTRIDGE interface, will write firmware"
+        /ce/update/flash_xilinx /tmp/xlnx2c.xsvf
+        cat /tmp/updatelist_copy.csv | grep 'xlnx2c' | awk -F ',' '{print $2}' > /ce/update/xilinx_current.txt 
         exit
     fi
     

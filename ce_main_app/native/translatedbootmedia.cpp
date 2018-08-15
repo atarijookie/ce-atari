@@ -191,7 +191,7 @@ void TranslatedBootMedia::updateBootsectorConfigWithACSIid(BYTE acsiId)
 	}
 	
     BYTE id;
-    if(hwConfig.hddIface == HDD_IF_ACSI) {     // for ACSI - it's the ID (0 .. 7)
+    if(hwConfig.hddIface == HDD_IF_ACSI || hwConfig.hddIface == HDD_IF_CART) {     // for ACSI - it's the ID (0 .. 7)
         id = acsiId;
 
     	Debug::out(LOG_DEBUG, "TranslatedBootMedia::updateBootsectorConfigWithACSIid() - hddIface is ACSI, bootsector ID set to: %d", (int) id);
