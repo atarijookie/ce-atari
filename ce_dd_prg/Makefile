@@ -18,7 +18,7 @@ CFLAGSCOM   += -fno-common
 CFLAGS      = -O2 -m68000 $(CFLAGSCOM)
 CFLAGS030   = -O2 -m68030 $(CFLAGSCOM)
 LDFLAGS  = -Wl,--traditional-format
-LDLIBS   = -lgcc ../ce_hdd_if/ce_hdd_if.a
+LDLIBS   = ../ce_hdd_if/ce_hdd_if.a -lgcc
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 ACTUAL_CC := $(CC)

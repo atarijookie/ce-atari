@@ -2,11 +2,9 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 
 #include "ce_dd_prg.h"
 #include "xbra.h"
@@ -16,6 +14,7 @@
 #include "bios.h"
 #include "main.h"
 #include "../ce_hdd_if/hdd_if.h"
+#include "../ce_hdd_if/stdlib.h"
 
 // * CosmosEx GEMDOS driver by Jookie, 2013 & 2014
 // * GEMDOS hooks part (assembler and C) by MiKRO (Miro Kropacek), 2013

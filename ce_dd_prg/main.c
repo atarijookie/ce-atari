@@ -3,15 +3,14 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 #include <support.h>
 
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 
 #include "ce_dd_prg.h"
 #include "xbra.h"
+#include "../ce_hdd_if/stdlib.h"
 #include "../ce_hdd_if/hdd_if.h"
 #include "translated.h"
 #include "gemdos.h"
@@ -45,7 +44,6 @@ void ce_initialize(void);
 void getConfig(void);
 BYTE setDateTime(void);
 void showDateTime(void);
-void showInt(int value, int length);
 void showNetworkIPs(void);
 void showIpAddress(BYTE *bfr);
 void showAppVersion(void);
@@ -387,33 +385,6 @@ void showDateTime(void)
     (void) Cconout(':');
     showInt(seconds, 2);
     (void) Cconws(" (HH:MM:SS)\n\r");
-}
-
-void showInt(int value, int length)
-{
-    int negative;
-    char tmp[10];
-    char * p = tmp + sizeof(tmp);
-
-    if(value < 0) {
-        value = -value;
-        negative = 1;
-    } else {
-        negative = 0;
-    }
-    *(--p) = '\0';    // null terminator
-    do {
-        // write all digits, starting at the right
-        *(--p) = (value % 10) + '0';
-        value = value / 10;
-        length--;
-    } while(value != 0 || length > 0);
-
-    if(negative) {
-        *(--p) = '-';
-    }
-
-    (void) Cconws(p);                     // write it out
 }
 
 void showNetworkIPs(void)
