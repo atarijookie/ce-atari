@@ -56,6 +56,12 @@ int strlen ( const char * str )
 	return 0;
 }
 
+char *strcpy( char * destination, const char * source)
+{
+    int len = strlen(source);
+    return strncpy(destination, source, len+1);
+}
+
 char *strncpy ( char * destination, const char * source, int num )
 {
 	int i;
@@ -69,6 +75,15 @@ char *strncpy ( char * destination, const char * source, int num )
 	}
 
 	return destination;
+}
+
+char *strcat( char * destination, const char * source)
+{
+    int len = strlen(destination);
+
+    strcpy(destination + len, source);
+
+    return destination;
 }
 
 int strncmp ( const char * str1, const char * str2, int num )

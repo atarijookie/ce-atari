@@ -2,20 +2,18 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 #include <gem.h>
 
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 
-#include "acsi.h"
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
+
 #include "main.h"
 #include "hostmoddefs.h"
 #include "keys.h"
 #include "defs.h"
-#include "find_ce.h"
-#include "hdd_if.h"
        
 // ------------------------------------------------------------------ 
 BYTE deviceID;
@@ -41,8 +39,6 @@ BYTE loopForDownload(void);
 // ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
 {
-	BYTE found;
-  
     appl_init();										            // init AES 
     
 	pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
@@ -70,19 +66,19 @@ int main( int argc, char* argv[] )
 	(void) Clear_home();
 	(void) Cconws("\33p[ CosmosEx floppy setup ]\r\n[    by Jookie 2014     ]\33q\r\n\r\n");
 
-	// search for CosmosEx on ACSI & SCSI bus
-	found = Supexec(findDevice);
+    // search for CosmosEx on ACSI & SCSI bus
+    deviceID = Supexec(findDevice);
 
-	if(!found) {								            // not found? quit
-		sleep(3);
-		return 0;
-	} 
+    if(deviceID == DEVICE_NOT_FOUND) {
+        sleep(3);
+        return 0;
+    }
     
 	// now set up the acsi command bytes so we don't have to deal with this one anymore 
 	commandShort[0] = (deviceID << 5); 					            // cmd[0] = ACSI_id + TEST UNIT READY (0)	
 
 	graf_mouse(M_OFF, 0);
-	
+
 
     while(1) {
         BYTE key;

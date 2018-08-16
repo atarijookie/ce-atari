@@ -2,14 +2,14 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 #include <gem.h>
 
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 
-#include "acsi.h"
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
+
 #include "main.h"
 #include "hostmoddefs.h"
 #include "keys.h"
