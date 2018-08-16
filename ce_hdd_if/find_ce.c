@@ -12,6 +12,7 @@
 #include "acsi.h"
 #include "find_ce.h"
 #include "hdd_if.h"
+#include "hdd_if_lowlevel.h"
 #include "translated.h"
 
 BYTE findCE(BYTE hddIf);
@@ -26,7 +27,7 @@ BYTE machine;
 
 BYTE findDevice(void)
 {
-    BYTE found = 0;
+    BYTE deviceId = 0;
     BYTE key;
 
     hdIf.maxRetriesCount = 0;                           // disable retries - we are expecting that the devices won't answer on every ID
@@ -34,25 +35,29 @@ BYTE findDevice(void)
     machine = getMachineType();
 
     while(1) {
+        // for ST - try only ACSI
         if(machine == MACHINE_ST) {                     // for ST
-            found = findCE(IF_ACSI);                    // CE on ACSI
+            deviceId = findCE(IF_ACSI);                 // CE on ACSI
         }
 
+        // for TT - 1st try ACSI, then try TT SCSI
         if(machine == MACHINE_TT) {                     // for TT
-            found = findCE(IF_ACSI);                    // CE on ACSI
+            deviceId = findCE(IF_ACSI);                 // CE on ACSI
 
-            if(!found) {
-                found = findCE(IF_SCSI_TT);             // CE on SCSI TT
+            if(deviceId == DEVICE_NOT_FOUND) {          // if not found
+                deviceId = findCE(IF_SCSI_TT);          // CE on SCSI TT
             }
         }
 
+        // for Falcon - just try Falcon's SCSI
         if(machine == MACHINE_FALCON) {                 // for Falcon
-            found = findCE(IF_SCSI_FALCON);             // CE on SCSI FALCON
+            deviceId = findCE(IF_SCSI_FALCON);          // CE on SCSI FALCON
         }
 
-        if(found) {
+        // if device was found, enable retries and quit
+        if(deviceId != DEVICE_NOT_FOUND) {
             hdIf.maxRetriesCount = 16;                  // enable retries
-            return TRUE;
+            return deviceId;
         }
         //---------------------
   		(void) Cconws("\n\rDevice not found.\n\rPress any key to retry or 'Q' to quit.\n\r");
@@ -60,12 +65,12 @@ BYTE findDevice(void)
 
 		if(key == 'Q' || key=='q') {
             hdIf.maxRetriesCount = 16;                  // enable retries
-			return FALSE;
+			return DEVICE_NOT_FOUND;
 		}
     }
 
     hdIf.maxRetriesCount = 16;                          // enable retries
-    return FALSE;                                       // this should never happen
+    return DEVICE_NOT_FOUND;                            // this should never happen
 }
 
 //--------------------------------------------------
@@ -91,11 +96,11 @@ BYTE findCE(BYTE hddIf)
 
         if(res == 1) {                                  // if found the CosmosEx
             (void) Cconws(" <-- found!\n\r");
-            return id;  // return device ID (0 - 7)
+            return id;              // return device ID (0 - 7)
         }
     }
 
-    return 0xff;        // device not found
+    return DEVICE_NOT_FOUND;        // device not found
 }
 //--------------------------------------------------
 BYTE ce_identify(BYTE id, BYTE hddIf)

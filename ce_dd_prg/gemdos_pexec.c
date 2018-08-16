@@ -10,7 +10,7 @@
 
 #include "ce_dd_prg.h"
 #include "xbra.h"
-#include "acsi.h"
+#include "../ce_hdd_if/hdd_if.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"

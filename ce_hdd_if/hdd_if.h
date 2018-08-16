@@ -3,8 +3,7 @@
 
 #include "global.h"
 
-void scsi_cmd_TT           (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
-void scsi_cmd_Falcon       (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
+// These is higher level API which should be used in apps using this lib.
 
 typedef void  (*THddIfCmd) (BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount);
 typedef void  (*TsetReg)   (int whichReg, DWORD value);
@@ -13,24 +12,17 @@ typedef DWORD (*TgetReg)   (int whichReg);
 typedef BYTE  (*TdmaDataTx_prepare) (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
 typedef BYTE  (*TdmaDataTx_do)      (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
 
-DWORD scsi_getReg_TT(int whichReg);
-void  scsi_setReg_TT(int whichReg, DWORD value);
+//--------------------------------
+typedef volatile BYTE mutex;
 
-DWORD scsi_getReg_Falcon(int whichReg);
-void  scsi_setReg_Falcon(int whichReg, DWORD value);
-
-void  scsi_clrBit(int whichReg, DWORD bitMask);
-void  scsi_setBit(int whichReg, DWORD bitMask);
-
-BYTE dmaDataTx_prepare_TT       (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
-BYTE dmaDataTx_do_TT            (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
-
-BYTE dmaDataTx_prepare_Falcon   (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
-BYTE dmaDataTx_do_Falcon        (BYTE readNotWrite, BYTE *buffer, DWORD dataByteCount);
+// return 1 if lock could be aquired, 0 if it was already locked
+inline BYTE mutex_trylock(mutex *mtx);
+inline void mutex_unlock(mutex *mtx);
+//--------------------------------
 
 typedef struct {
-    THddIfCmd		    cmd;
-    THddIfCmd		    cmd_nolock;
+    THddIfCmd           cmd;
+    THddIfCmd           cmd_nolock;
     THddIfCmd           cmd_intern;
 
     BYTE                success;
@@ -49,6 +41,7 @@ typedef struct {
     TdmaDataTx_do       pDmaDataTx_do;
 
     BYTE                scsiHostId;
+    volatile mutex      mtx;            // used for avoiding colision between main and interrupt progs accessing disk
 } THDif;
 
 extern THDif hdIf;
@@ -59,7 +52,24 @@ extern THDif hdIf;
 #define IF_SCSI_TT      2
 #define IF_SCSI_FALCON  3
 
-void hdd_if_select(int ifType);     // call this function with above define as a param to init the pointers depending on that interface
+void hdd_if_select(int ifType); // call this function with above define as a param to init the pointers depending on that interface
+
+#define DEVICE_NOT_FOUND    0xff
+BYTE findDevice(void);          // returns device ID (0-7) or DEVICE_NOT_FOUND (0xff)
+
+//--------------------------------
+
+#define OK          0           // OK status
+#define ACSIERROR   0xff        // ERROR status (timeout)
+
+#define MAXSECTORS          254 // Max # sectors for a DMA
+
+#define ACSI_READ           1
+#define ACSI_WRITE          0
+
+#define CMD_LENGTH_SHORT    6
+#define CMD_LENGTH_LONG     13
+
 //--------------------------------
 
 #endif

@@ -1,6 +1,7 @@
 // based on AHDI 6.061 sources
 
 #include "hdd_if.h"
+#include "hdd_if_lowlevel.h"
 #include "scsi.h"
 #include "acsi.h"
 #include "stdlib.h"

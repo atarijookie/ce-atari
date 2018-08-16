@@ -3,6 +3,7 @@
 #include "acsi.h"
 
 #include "hdd_if.h"
+#include "hdd_if_lowlevel.h"
 #include "stdlib.h"
 
 // --------------------------------------

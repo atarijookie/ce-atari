@@ -10,13 +10,12 @@
 
 #include "ce_dd_prg.h"
 #include "xbra.h"
-#include "acsi.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "bios.h"
 #include "main.h"
-#include "hdd_if.h"
+#include "../ce_hdd_if/hdd_if.h"
 
 // * CosmosEx GEMDOS driver by Jookie, 2013 & 2014
 // * GEMDOS hooks part (assembler and C) by MiKRO (Miro Kropacek), 2013

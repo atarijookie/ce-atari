@@ -5,11 +5,6 @@
 
 // ------------------------------------------
 
-#define OK			0           // OK status
-#define ACSIERROR	0xff        // ERROR status (timeout)
-
-#define MAXSECTORS	254         // Max # sectors for a DMA
-
 // Timing constants
 #define LTIMEOUT	600L        // long-timeout 3 sec
 #define STIMEOUT	20L         // short-timeout 100 msec
@@ -52,13 +47,8 @@
 
 #define FLOCK      ((volatile WORD  *) 0x043E) // Floppy lock variable
 
-#define ACSI_READ	1
-#define ACSI_WRITE	0
-
 #define SCSI_CMD_INQUIRY	0x12
 
-#define CMD_LENGTH_SHORT	6
-#define CMD_LENGTH_LONG		13
 //---------------------------------------
 BYTE wait_dma_cmpl(DWORD t_ticks);
 BYTE fdone(void);

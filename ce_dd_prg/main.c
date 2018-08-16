@@ -12,13 +12,11 @@
 
 #include "ce_dd_prg.h"
 #include "xbra.h"
-#include "acsi.h"
-#include "hdd_if.h"
+#include "../ce_hdd_if/hdd_if.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "bios.h"
 #include "main.h"
-#include "mutex.h"
 
 /*
  * CosmosEx GEMDOS driver by Jookie, 2013-2016
@@ -101,8 +99,6 @@ WORD transDiskProtocolVersion;              // this will hold the protocol versi
 volatile ScreenShots screenShots;           // screenshots config
 void init_screencapture(void);
 
-volatile mutex mtx;
-
 #define COOKIEJARSIZE   16
 DWORD ceCookieJar[2 * COOKIEJARSIZE];       // this might be the new cookie jar, if any doesn't exist, or is full
 
@@ -110,7 +106,7 @@ DWORD ceCookieJar[2 * COOKIEJARSIZE];       // this might be the new cookie jar,
 int main( int argc, char* argv[] )
 {
     //initialize lock
-    mutex_unlock(&mtx);
+    mutex_unlock(&hdIf.mtx);
 
     // write some header out
     Clear_home();
@@ -159,8 +155,8 @@ int main( int argc, char* argv[] )
     (void) Cconws("\33q\r\n" );
 
 	// search for CosmosEx on ACSI bus
-	BYTE found = Supexec(findDevice);
-	if(!found) {								            // not found? quit
+	deviceID = Supexec(findDevice);
+	if(deviceID == DEVICE_NOT_FOUND) {      // not found? quit
 		sleep(3);
 		return 0;
 	}

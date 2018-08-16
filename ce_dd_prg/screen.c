@@ -1,19 +1,17 @@
 // vim: expandtab shiftwidth=4 tabstop=4
 #include <mint/osbind.h>
-#include "hdd_if.h"
+#include "../ce_hdd_if/hdd_if.h"
+#include "../ce_hdd_if/stdlib.h"
 #include "stdlib.h"
 #include "translated.h"
 
 #include "ce_dd_prg.h"
 #include "main.h"
 #include "screen.h"
-#include "mutex.h"
 
 extern volatile ScreenShots screenShots;    // screenshots config
 
 void writeScreen(BYTE command, BYTE screenmode, BYTE *bfr, DWORD cnt);
-
-extern volatile mutex mtx;
 
 void screenworker(void)
 {
@@ -22,7 +20,7 @@ void screenworker(void)
         return;
     }
 
-    if( mutex_trylock(&mtx)==0 ){
+    if( mutex_trylock(&hdIf.mtx)==0 ){
         return;
     }
 
@@ -36,7 +34,7 @@ void screenworker(void)
 
     if(!hdIf.success) {                     // error?
         hdIf.forceFlock = 0;                // force FLOCK back to normal
-        mutex_unlock(&mtx);
+        mutex_unlock(&hdIf.mtx);
         return;
     }
 
@@ -47,13 +45,13 @@ void screenworker(void)
     // now take screenshot if requested
     if(!screenShots.take) {                 // don't take screenshot? quit
         hdIf.forceFlock = 0;                // force FLOCK back to normal
-        mutex_unlock(&mtx);
+        mutex_unlock(&hdIf.mtx);
         return;
     }
 
     sendScreenShot();                       // send screenshot
     hdIf.forceFlock = 0;                    // force FLOCK back to normal
-    mutex_unlock(&mtx);
+    mutex_unlock(&hdIf.mtx);
 }
 
 void sendScreenShot(void)

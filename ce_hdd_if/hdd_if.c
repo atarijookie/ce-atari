@@ -9,12 +9,12 @@
 
 #include "acsi.h"
 #include "hdd_if.h"
+#include "hdd_if_lowlevel.h"
 #include "translated.h"
 #include "stdlib.h"
 #include "mutex.h"
 
 THDif hdIf;
-extern volatile mutex mtx;
 void hddIfCmd_withRetries_worker(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount, BYTE lock);
 
 void hddIfCmd_withRetries_lock(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount)
@@ -30,8 +30,8 @@ void hddIfCmd_withRetries_nolock(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, B
 void hddIfCmd_withRetries_worker(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD sectorCount, BYTE lock)
 {
 	if( lock ){
-		while( mtx!=0 ){}
-		mutex_trylock( &mtx );
+		while( hdIf.mtx!=0 ){}
+		mutex_trylock( &hdIf.mtx );
 	}
 
     hdIf.retriesDoneCount = 0;              // set retries count to zero
@@ -43,7 +43,7 @@ void hddIfCmd_withRetries_worker(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, B
     if(scsiId == hdIf.scsiHostId) {         // Trying to access reserved SCSI ID? Fail... (skip)
         hdIf.success = FALSE;
 		if( lock ){
-			mutex_unlock(&mtx);
+			mutex_unlock(&hdIf.mtx);
 		}
         return;
     }
@@ -54,14 +54,14 @@ void hddIfCmd_withRetries_worker(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, B
 
     if(hdIf.success) {                      // if succeeded on the 1st time, quit
 		if( lock ){
-			mutex_unlock(&mtx);
+			mutex_unlock(&hdIf.mtx);
 		}
         return;
     }
 
     if(hdIf.maxRetriesCount < 1) {          // retries are disabled? quit
 		if( lock ){
-			mutex_unlock(&mtx);
+			mutex_unlock(&hdIf.mtx);
 		}
         return;
     }
@@ -80,7 +80,7 @@ void hddIfCmd_withRetries_worker(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, B
     while(1) {
         if(hdIf.retriesDoneCount >= hdIf.maxRetriesCount) {     // did we reach the maximum number of retries? quit
 			if( lock ){
-				mutex_unlock(&mtx);
+				mutex_unlock(&hdIf.mtx);
 			}
             return;
         }
@@ -91,7 +91,7 @@ void hddIfCmd_withRetries_worker(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, B
 
         if(hdIf.success) {                  // if succeeded, quit
 			if( lock ){
-				mutex_unlock(&mtx);
+				mutex_unlock(&hdIf.mtx);
 			}
             return;
         }
