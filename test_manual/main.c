@@ -9,14 +9,13 @@
 #include <stdio.h>
 
 #include "stdlib.h"
-#include "acsi.h"
-#include "scsi.h"
 #include "global.h"
 #include "translated.h"
 #include "gemdos.h"
 
-#include "hdd_if.h"
-#include "mutex.h"
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
+#include "../ce_hdd_if/find_ce.h"
 
 #define SCSI_C_READ10       0x28
 
@@ -36,11 +35,9 @@ void scsi_reset(void);
 
 void cs_inquiry(BYTE id, BYTE verbose);
 void CEread(BYTE verbose);
-void findDevice(void);
 
 void CEwrite(void);
 int  writeHansTest(int byteCount, WORD xorVal);
-void showInt(int value, int length);
 void largeRead(void);
 void SDread(void);
 
@@ -60,49 +57,8 @@ void hdIfCmdAsUser(BYTE readNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, W
 
 DWORD largestMemBlock;
 
-//-------------------------------------------------- 
-#define MACHINE_ST      0
-#define MACHINE_TT      2
-#define MACHINE_FALCON  3
-
 BYTE machineType = MACHINE_ST;
-//-------------------------------------------------- 
-void getMachineType(void)
-{
-    DWORD *cookieJarAddr    = (DWORD *) 0x05A0;
-    DWORD *cookieJar        = (DWORD *) *cookieJarAddr;     // get address of cookie jar
 
-    // by default - it's and ST
-    machineType = MACHINE_ST;
-
-    if(cookieJar == 0) {                        // no cookie jar? it's an old ST
-        return;
-    }
-
-    DWORD cookieKey, cookieValue;
-
-    while(1) {                                  // go through the list of cookies
-        cookieKey   = *cookieJar++;
-        cookieValue = *cookieJar++;
-
-        if(cookieKey == 0) {                    // end of cookie list? then cookie not found, it's an ST
-            break;
-        }
-
-        if(cookieKey == 0x5f4d4348) {           // is it _MCH key?
-            WORD machine = cookieValue >> 16;
-
-            switch(machine) {                   // depending on machine, either it's TT or FALCON
-                case 2: machineType = MACHINE_TT;       return;
-                case 3: machineType = MACHINE_FALCON;   return;
-            }
-
-            break;                              // or it's ST
-        }
-    }
-
-    // it's an ST
-}
 //-------------------------------------------------- 
 void getLargestMemBlock(void)
 {
@@ -223,9 +179,6 @@ int main(void)
     // search for device on the ACSI / SCSI bus 
     deviceID = 0;
     
-    //initialize lock
-    mutex_unlock(&mtx);
-    
     if(machineType == MACHINE_ST) {             // if it's ST, use ACSI
         key = 'a';
     } else if(machineType == MACHINE_FALCON) {  // if it's Falcon, use SCSI
@@ -275,7 +228,15 @@ int main(void)
     (void) Cconws("\r\n");
 
     showLogs = 0;                   // turn off logs - there will be errors on findDevice when device doesn't exist 
-    Supexec(findDevice);
+
+    // search for CosmosEx on ACSI & SCSI bus
+    deviceID = Supexec(findDevice);
+
+    if(deviceID == DEVICE_NOT_FOUND) {
+        sleep(3);
+        return 0;
+    }
+
     showLogs = 1;                   // turn on logs
             
     showMenu();
@@ -654,26 +615,6 @@ void showHexDword(DWORD val)
     showHexByte(d);
 }
 
-BYTE ce_identify(BYTE bus_id)
-{
-    BYTE cmd[] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TRAN_CMD_IDENTIFY, 0};
-
-    cmd[0] = (bus_id << 5);                   // cmd[0] = ACSI_id + TEST UNIT READY (0)	
-    memset(pBuffer, 0, 512);                  // clear the buffer 
-
-    hdIfCmdAsUser(1, cmd, 6, pBuffer, 1);       // issue the identify command and check the result 
-
-    if(!hdIf.success) {                       // if failed, return FALSE 
-        return 0;
-    }
-
-    if(strncmp((char *) pBuffer, "CosmosEx translated disk", 24) != 0) {		// the identity string doesn't match? 
-        return 0;
-    }
-
-    return 1;                             // success 
-}
-
 //--------------------------------------------
 BYTE cs_inquiry2(BYTE id)
 {
@@ -693,48 +634,7 @@ BYTE cs_inquiry2(BYTE id)
 }
 
 //--------------------------------------------
-void findDevice(void)
-{
-    BYTE i;
-    BYTE res;
 
-    //            |                    |
-    (void) Cconws("Looking for CosmosEx: ");
-
-    deviceID = 0;
-    BYTE good;
-
-    for(i=0; i<8; i++) {
-        res     = cs_inquiry2(i);                                   // try to read the IDENTITY string
-        good    = FALSE;
-
-        if(res) {
-            if(memcmp(pBuffer + 16, "CosmosEx", 8) == 0) {          // inquiry string contains 'CosmosEx'
-                if(memcmp(pBuffer + 27, "SD", 2) == 0) {            // it's CosmosEx SD card
-                    good = TRUE;
-                } else {                                            // it's CosmosEx, but not SD card
-                    good = FALSE;
-                }
-            } else if(memcmp(pBuffer + 16, "CosmoSolo", 9) == 0) {  // it's CosmoSolo, that's SD card
-                good = TRUE;
-            }
-        }
-
-        if(good) {          // good
-            (void) Cconws("\33p");
-            Cconout('0' + i);
-            (void) Cconws("\33q");
-
-            deviceID = i;
-        } else {            // bad
-            Cconout('0' + i);
-        }
-    }
-    
-    (void) Cconws("\n\r");
-}
-
-//--------------------------------------------
 void CEwrite(void)
 {
     commandLong[0] = (deviceID << 5) | 0x1f;			// cmd[0] = ACSI_id + ICD command marker (0x1f)	
@@ -812,43 +712,6 @@ void logMsgProgress(DWORD current, DWORD total)
     (void) Cconws(" out of ");
     showHexDword(total);
     (void) Cconws("\n\r");
-}
-
-void showInt(int value, int length)
-{
-    char tmp[10];
-    memset(tmp, 0, 10);
-
-    if(length == -1) {                      // determine length?
-        int i, div = 10;
-
-        for(i=1; i<6; i++) {                // try from 10 to 1000000
-            if((value / div) == 0) {        // after division the result is zero? we got the length
-                length = i;
-                break;
-            }
-
-            div = div * 10;                 // increase the divisor by 10
-        }
-
-        if(length == -1) {                  // length undetermined? use length 6
-            length = 6;
-        }
-    }
-
-    int i;
-    for(i=0; i<length; i++) {               // go through the int lenght and get the digits
-        int val, mod;
-
-        val = value / 10;
-        mod = value % 10;
-
-        tmp[length - 1 - i] = mod + 48;     // store the current digit
-
-        value = val;
-    }
-
-    (void) Cconws(tmp);                     // write it out
 }
 
 //--------------------------------------------------

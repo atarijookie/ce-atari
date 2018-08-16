@@ -6,5 +6,6 @@
 #define MACHINE_FALCON  3
 
 BYTE findDevice(void);
+BYTE getMachineType(void);
 
 #endif
