@@ -11,7 +11,7 @@ ASFLAGS = -m68000
 CFLAGS		= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 CFLAGS030	= -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS	= -Wl,--traditional-format
-LDLIBS  = -lgcc
+LDLIBS   = ../ce_hdd_if/ce_hdd_if.a -lgcc
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 ACTUAL_CC := $(CC)
@@ -37,7 +37,7 @@ STARTUP	= startup.s
 
 DEPS    = $(CSRC:.c=.d)
 OBJS    = $(CSRC:.c=.o) $(SSRC:.s=.o)
-OBJS030	= cache030.o
+OBJS030	= 
 
 CFLAGS	+= -nostdlib -DSLIM 
 

@@ -46,7 +46,6 @@ BYTE setDateTime(void);
 void showDateTime(void);
 void showNetworkIPs(void);
 void showIpAddress(BYTE *bfr);
-void showAppVersion(void);
 int getIntFromStr(const char *str, int len);
 
 void set_longframe(void);
@@ -416,55 +415,6 @@ void showIpAddress(BYTE *bfr)
     showInt((int) bfr[2], -1);
     (void) Cconout('.');
     showInt((int) bfr[3], -1);
-}
-
-void showAppVersion(void)
-{
-    static const char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-    char const *buildDate = __DATE__;
-
-    int year = 0, month = 0, day = 0;
-    int i;
-    for(i=0; i<12; i++) {
-        if(strncmp(months[i], buildDate, 3) == 0) {
-            month = i + 1;
-            break;
-        }
-    }
-
-    day     = getIntFromStr(buildDate + 4, 2);
-    year    = getIntFromStr(buildDate + 7, 4);
-
-    if(day > 0 && month > 0 && year > 0) {
-        showInt(year, 4);
-        (void) Cconout('-');
-        showInt(month, 2);
-        (void) Cconout('-');
-        showInt(day, 2);
-    } else {
-        (void) Cconws("YYYY-MM-DD");
-    }
-}
-
-int getIntFromStr(const char *str, int len)
-{
-    int i;
-    int val = 0;
-
-    for(i=0; i<len; i++) {
-        int digit;
-
-        if(str[i] >= '0' && str[i] <= '9') {
-            digit = str[i] - '0';
-        } else {
-            digit = 0;
-        }
-
-        val *= 10;
-        val += digit;
-    }
-
-    return val;
 }
 
 // Adjust GEMDOS/BIOS trap handler offsets

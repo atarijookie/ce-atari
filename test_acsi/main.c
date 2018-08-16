@@ -3,15 +3,15 @@
 #include <mint/linea.h> 
 #include <stdio.h>
 
-#include "acsi.h"
+#include "global.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"
 #include "VT52.h"
 #include "cookiejar.h"
 #include "version.h"
-#include "hdd_if.h"
-#include "stdlib.h"
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
 
 //--------------------------------------------------
 
@@ -571,7 +571,7 @@ void doPartitionWriteOrVerify(BYTE writeNotVerify, BYTE testDrive, int testFileS
                 res = Fread(f, bufferSize, rBuffer);
 
                 if(res == bufferSize) {             // read everything? check the content
-                    res = memcomp(rBuffer, wBuffer, bufferSize);
+                    res = memcmp(rBuffer, wBuffer, bufferSize);
 
                     if(res == 0) {                  // everything fine? 
                         (void) Cconws("*");

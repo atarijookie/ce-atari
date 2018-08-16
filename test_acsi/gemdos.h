@@ -1,6 +1,8 @@
 #ifndef GEMDOS_H
 #define GEMDOS_H
 
+#include "global.h"
+
 // path functions
 #define GEMDOS_Dsetdrv      0x0e
 #define GEMDOS_Dgetdrv      0x19

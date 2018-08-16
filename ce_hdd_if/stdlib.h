@@ -19,6 +19,12 @@ void    msleepInSuper(int ms);
 DWORD getTicks(void);
 DWORD getTicksAsUser(void);
 
+int  countIntDigits(int value);
 void showInt(int value, int length);
+void showIntWithPrepadding(int value, int fullLength, char prepadChar);
+void intToString(int value, int length, char *tmp);
+
+void showAppVersion(void);
+int  getIntFromStr(const char *str, int len);
 
 #endif
