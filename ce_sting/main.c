@@ -9,19 +9,22 @@
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
 #include <support.h>
-#include <stdint.h>
 
+#include <stdint.h>
 #include <stdio.h>
 #include <ctype.h>
 
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
+
 #include "globdefs.h"
-#include "acsi.h"
 #include "ce_commands.h"
 #include "con_man.h"
 #include "stdlib.h"
 #include "setup.h"
-#include "find_ce.h"
 #include "vbl.h"
+
+#define REQUIRED_NETADAPTER_VERSION     0x0100
 
 void showAppVersion(void);
 int  getIntFromStr(const char *str, int len);
@@ -79,12 +82,13 @@ int main(void)
     init_con_info();                                            // init connection info structs
 
    	// create buffer pointer to even address
-	pDmaBuffer = &dmaBuffer[2];
-	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);  // remove odd bit if the address was odd
+    pDmaBuffer = &dmaBuffer[2];
+    pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);  // remove odd bit if the address was odd
 
-	BYTE found = Supexec(findDevice);                           // try to find the CosmosEx device on ACSI bus
+    // search for CosmosEx on ACSI & SCSI bus
+    deviceID = Supexec(findDevice);
 
-    if(!found) {								                // not found? quit
+    if(deviceID == DEVICE_NOT_FOUND) {
         sleep(3);
         return 0;
     }
@@ -216,26 +220,6 @@ int getIntFromStr(const char *str, int len)
     }
 
     return val;
-}
-
-void showInt(int value, int length)
-{
-    char tmp[10];
-    memset(tmp, 0, 10);
-
-    int i;
-    for(i=0; i<length; i++) {               // go through the int lenght and get the digits
-        int val, mod;
-
-        val = value / 10;
-        mod = value % 10;
-
-        tmp[length - 1 - i] = mod + 48;     // store the current digit
-
-        value = val;
-    }
-
-    (void) Cconws(tmp);                     // write it out
 }
 
 void logMsg(char *logMsg)

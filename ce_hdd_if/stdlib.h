@@ -1,5 +1,5 @@
-#ifndef _STDLIB_H_
-#define _STDLIB_H_
+#ifndef _STDLIB_CE_HDD_IF_H_
+#define _STDLIB_CE_HDD_IF_H_
 
 #include "acsi.h"
 
@@ -10,6 +10,7 @@ int     strlen  ( const char * str );
 char *  strcpy  ( char * destination, const char * source);
 char *  strncpy ( char * destination, const char * source, int num );
 char *  strcat  ( char * destination, const char * source);
+int     strcmp  ( const char * str1, const char * str2);
 int     strncmp ( const char * str1, const char * str2, int num );
 void    sleep   ( int seconds );
 void    msleep  ( int ms );

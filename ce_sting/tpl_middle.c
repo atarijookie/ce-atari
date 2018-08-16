@@ -7,6 +7,7 @@
 #include <stdint.h>
 
 #include "globdefs.h"
+#include "../ce_hdd_if/stdlib.h"
 #include "stdlib.h"
 #include "tpl_middle.h"
 #include "setup.h"

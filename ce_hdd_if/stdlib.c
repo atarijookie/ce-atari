@@ -86,6 +86,15 @@ char *strcat( char * destination, const char * source)
     return destination;
 }
 
+int strcmp( const char * str1, const char * str2)
+{
+    int len1 = strlen(str1);
+    int len2 = strlen(str1);
+    int len = (len1 > len2) ? len1 : len2;
+
+    return strncmp(str1, str2, len);
+}
+
 int strncmp ( const char * str1, const char * str2, int num )
 {
 	int i;

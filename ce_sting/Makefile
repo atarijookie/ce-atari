@@ -12,7 +12,7 @@ CFLAGS030 = -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar -nostdlib -DSL
 ASFLAGS   = -m68000
 ASFLAGS030= -m68030
 LDFLAGS   = -Wl,--traditional-format
-LDLIBS    = -lgcc
+LDLIBS   = ../ce_hdd_if/ce_hdd_if.a -lgcc
 DEPFLAGS  = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 ACTUAL_CC := $(CC)
@@ -38,7 +38,7 @@ STARTUP = startup.s
 
 DEPS = $(CSRC:.c=.d)
 OBJS = $(CSRC:.c=.o) $(SSRC:.s=.o)
-OBJS030 = cache030.o
+OBJS030 = 
 
 $(TARGET): $(STARTUP) $(OBJS) $(OBJS030)
 	$(CC_LINK) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)

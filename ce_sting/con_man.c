@@ -7,8 +7,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "stdlib.h"
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
 #include "globdefs.h"
-#include "hdd_if.h"
 #include "con_man.h"
 #include "icmp.h"
 #include "setup.h"
@@ -16,7 +18,6 @@
 
 //---------------------
 // ACSI / CosmosEx stuff
-#include "acsi.h"
 #include "ce_commands.h"
 #include "stdlib.h"
 
@@ -438,7 +439,7 @@ int handle_valid(int16 handle)
 void update_con_info(BYTE forceUpdate)
 {
     static DWORD lastUpdate = 0;
-    DWORD now = getTicks();
+    DWORD now = custom_getTicks();
 
     if(!forceUpdate) {                                                      // if shouldn't force update, check last update time, and possibly ignore update
         if((now - lastUpdate) < 20) {                                        // if the last update was less than 100 ms ago, don't update
@@ -738,11 +739,11 @@ int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
     commandShort[4] = NET_CMD_RESOLVE_GET_RESPONSE;
     commandShort[5] = resolverHandle;
 
-    DWORD end = getTicks() + 10 * 200;                                  // 10 second timeout
+    DWORD end = custom_getTicks() + 10 * 200;                           // 10 second timeout
 
     while(1) {                                                          // repeat this command few times, as it might reply with 'I didn't finish yet'
-        sleepMs(250);                                               // wait 250 ms before trying again
-        if(getTicks() >= end) {                                         // if timeout
+        msleep(250);                                                    // wait 250 ms before trying again
+        if(custom_getTicks() >= end) {                                  // if timeout
             return E_CANTRESOLVE;
         }
 

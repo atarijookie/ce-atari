@@ -18,7 +18,6 @@
 
 //---------------------
 // ACSI / CosmosEx stuff
-#include "acsi.h"
 #include "ce_commands.h"
 #include "stdlib.h"
 
@@ -42,15 +41,15 @@ int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
     }
     int slot = network_handleToSlot(handle);
 
-    DWORD timeStart = getTicks();
+    DWORD timeStart = custom_getTicks();
     DWORD timeout2 = timeout * 200;
-    DWORD nextConUpdate = getTicks() + 100;
+    DWORD nextConUpdate = custom_getTicks() + 100;
 
     while(1) {
         // the connection info should be updated in VBL using update_con_info()
-        if(getTicks() >= nextConUpdate) {                           // if half a second passed since last connection state check
+        if(custom_getTicks() >= nextConUpdate) {                    // if half a second passed since last connection state check
             update_con_info(FALSE);
-            nextConUpdate = getTicks() + 100;
+            nextConUpdate = custom_getTicks() + 100;
         }
 
         WORD currentState = conInfo[slot].tcpConnectionState;       // get the current state
@@ -74,7 +73,7 @@ int16 TCP_wait_state(int16 handle, int16 wantedState, int16 timeout)
             break;
         }
 
-        if((getTicks() - timeStart) >= timeout2) {              // if timed out, fail
+        if((custom_getTicks() - timeStart) >= timeout2) {         // if timed out, fail
             return E_CNTIMEOUT;
         }
 
