@@ -9,12 +9,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "stdlib.h"
-#include "acsi.h"
-#include "hdd_if.h"
-#include "keys.h"
 #include "global.h"
-#include "find_ce.h"
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
+#include "keys.h"
 #include "vt52.h"
 
 //--------------------------------------------------
@@ -61,7 +59,7 @@ BYTE prevCommandFailed;
 //--------------------------------------------------
 int main(void)
 {
-    BYTE key, res;
+    BYTE key;
     DWORD toEven;
     BYTE keyDownCommand = CFG_CMD_KEYDOWN;
     DWORD lastUpdateCheckTime = 0;
@@ -83,12 +81,11 @@ int main(void)
     
     // ---------------------- 
     // search for device on the ACSI / SCSI bus 
-    deviceID = 0;
 
     Clear_home();
-    res = Supexec(findDevice);
+    deviceID = Supexec(findDevice);
 
-    if(res != TRUE) {
+    if(deviceID == DEVICE_NOT_FOUND) {
         return 0;
     }
     
