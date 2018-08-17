@@ -1,0 +1,18 @@
+C2_RESET_HANS - GPIO 27 - gpio pin 13 - reset_hans - P99 
+C4_ATN_HANS   - GPIO 23 - gpio pin 16 - XCMD       - P14
+
+C8  - GPIO  7 - gpio pin 26 -- XDONE -- P10
+C7  - GPIO  8 - gpio pin 24 -- XPIO  -- P11
+C9  - GPIO 12 - gpio pin 32 -- XDMA  -- P9
+C10 - GPIO 13 - gpio pin 33 -- XRnW  -- P8
+C12 - GPIO 16 - gpio pin 36 -- XDataNotStatus  -- P4
+
+C1  - GPIO 18 - gpio pin 12 - DATA2<0> - P17
+C11 - GPIO 19 - gpio pin 35 - DATA2<1> - P6
+C14 - GPIO 20 - gpio pin 38 - DATA2<2> - P97
+C15 - GPIO 21 - gpio pin 40 - DATA2<3> - P96
+C3  - GPIO 22 - gpio pin 15 - DATA2<4> - P15
+C5  - GPIO 24 - gpio pin 18 - DATA2<5> - P13
+C6  - GPIO 25 - gpio pin 22 - DATA2<6> - P12
+C13 - GPIO 26 - gpio pin 37 - DATA2<7> - P1
+
