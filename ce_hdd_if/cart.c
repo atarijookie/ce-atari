@@ -116,7 +116,7 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
                 return;
             }
 
-            if((val & STATUS_INTstate) != STATUS_INTstate) {    // if INT is low, quit DMA write because status byte follows
+            if((val & STATUS_INT) != STATUS_INT) {    // if INT is low, quit DMA write because status byte follows
                 break;
             }
 
@@ -130,7 +130,7 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 
     //-------------------
     // transfer status byte
-    if(wait_for_INT_DRQ(STATUS_INTstate) == WAIT_ERROR) {   // wait for INT, and if that didn't come, fail
+    if(wait_for_INT_DRQ(STATUS_INT) == WAIT_ERROR) {   // wait for INT, and if that didn't come, fail
         return;
     }
 

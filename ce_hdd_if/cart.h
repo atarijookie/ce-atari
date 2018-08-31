@@ -19,10 +19,10 @@
 #define pDMAwrite   ((volatile WORD *)(CART_BASE + CC_CART_OFFSET + ofs_cmd_dma_write))
 #define pDMAread    ((volatile WORD *)(CART_BASE + CC_CART_OFFSET + ofs_cmd_dma_read))
 
-#define STATUS_CMDstate (1 << 2)    // 1st cmd byte was just sent by ST, cleared by RPi
-#define STATUS_DRQstate (1 << 1)    // RPi wants to send/receive in DMA mode -- set by RPi, cleared by ST
-#define STATUS_INTstate (1 << 0)    // RPi wants to send/receive in PIO mode -- set by RPi, cleared by ST
-#define STATUS_INT_DRQ  (STATUS_DRQstate | STATUS_INTstate)
+#define STATUS_CMD      (1 << 2)    // 1st cmd byte was just sent by ST, cleared by RPi
+#define STATUS_DRQ      (1 << 1)    // RPi wants to send/receive in DMA mode -- set by RPi, cleared by ST
+#define STATUS_INT      (1 << 0)    // RPi wants to send/receive in PIO mode -- set by RPi, cleared by ST
+#define STATUS_INT_DRQ  (STATUS_DRQ | STATUS_INT)
 
 #define STATUS2_DataIsPIOread   (1 << 17)   // when H, the read byte was the last byte - ST status byte (transfered using PIO read)
 #define STATUS2_DataChanged     (1 << 16)   // this bit changes every time the data changed
