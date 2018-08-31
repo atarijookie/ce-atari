@@ -51,6 +51,7 @@ extern THDif hdIf;
 #define IF_ACSI         1
 #define IF_SCSI_TT      2
 #define IF_SCSI_FALCON  3
+#define IF_CART         4
 
 void hdd_if_select(int ifType); // call this function with above define as a param to init the pointers depending on that interface
 

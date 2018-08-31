@@ -35,9 +35,13 @@ BYTE findDevice(void)
     machine = getMachineType();
 
     while(1) {
-        // for ST - try only ACSI
+        // for ST - try ACSI, then cart
         if(machine == MACHINE_ST) {                     // for ST
             deviceId = findCE(IF_ACSI);                 // CE on ACSI
+
+            if(deviceId == DEVICE_NOT_FOUND) {          // if not found
+                deviceId = findCE(IF_CART);             // CE on SCSI TT
+            }
         }
 
         // for TT - 1st try ACSI, then try TT SCSI
@@ -79,12 +83,17 @@ BYTE findCE(BYTE hddIf)
 {
     BYTE id, res;
 
-	(void) Cconws("\n\rLooking for CosmosEx on ");
+    (void) Cconws("\n\rLooking for CosmosEx on ");
 
-    if(hddIf == IF_ACSI) {                              // ACSI?
-        (void) Cconws("ACSI: ");
-    } else {                                            // SCSI?
-        (void) Cconws("SCSI: ");
+    switch(hddIf) {
+        case IF_ACSI:           (void) Cconws("ACSI: "); break;
+
+        case IF_SCSI_TT:
+        case IF_SCSI_FALCON:    (void) Cconws("SCSI: "); break;
+
+        case IF_CART:           (void) Cconws("CART: "); break;
+
+        default:                (void) Cconws("????: "); break;
     }
 
     hdd_if_select(hddIf);                               // select HDD IF

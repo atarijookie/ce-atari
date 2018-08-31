@@ -8,6 +8,7 @@
 #include <stdio.h>
 
 #include "acsi.h"
+#include "cart.h"
 #include "hdd_if.h"
 #include "hdd_if_lowlevel.h"
 #include "translated.h"
@@ -132,6 +133,15 @@ void hdd_if_select(int ifType)
             hdIf.pDmaDataTx_do      = (TdmaDataTx_do)       dmaDataTx_do_Falcon;
 
             hdIf.scsiHostId         = 0;               // SCSI ID 0 is reserved by host
+            break;
+
+        case IF_CART:           // for ACSI
+            hdIf.cmd_intern         = (THddIfCmd) cart_cmd;
+            hdIf.pSetReg            = NULL;
+            hdIf.pGetReg            = NULL;
+            hdIf.pDmaDataTx_prepare = NULL;
+            hdIf.pDmaDataTx_do      = NULL;
+            hdIf.scsiHostId         = 0xff;
             break;
 
         default:
