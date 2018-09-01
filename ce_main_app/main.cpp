@@ -343,8 +343,11 @@ void loadLastHwConfig(void)
 {
     Settings s;
 
-    hwConfig.version        = s.getInt("HW_VERSION",       1);
-    hwConfig.hddIface       = s.getInt("HW_HDD_IFACE",     HDD_IF_ACSI);
+    if(hwConfig.hddIface != HDD_IF_CART) {  // load last HW IF only when not running in CART IF mode
+        hwConfig.hddIface   = s.getInt("HW_HDD_IFACE", HDD_IF_ACSI);
+        hwConfig.version    = s.getInt("HW_VERSION",   1);
+    }
+
     hwConfig.scsiMachine    = s.getInt("HW_SCSI_MACHINE",  SCSI_MACHINE_UNKNOWN);
     hwConfig.fwMismatch     = false;
 }
@@ -459,6 +462,7 @@ void parseCmdLineArguments(int argc, char *argv[])
         if(strcmp(argv[i], "cart") == 0) {
             isKnownTag          = true;                             // this is a known tag
             flags.noFranz       = true;
+            hwConfig.version    = 2;
             hwConfig.hddIface   = HDD_IF_CART;
             continue;
         }
@@ -530,6 +534,7 @@ void printfPossibleCmdLineArgs(void)
     printf("hwinfo   - get HW version and HDD interface type\n");
     printf("ikbdlogs - write IKBD logs to /var/log/ikbdlog.txt\n");
     printf("fakeold  - fake old app version for reinstall tests\n");
+    printf("cart     - use cartridge IF via CPLD instead of Hans via SPI\n");
     printf("display  - show string on front display, if possible\n");
 }
 

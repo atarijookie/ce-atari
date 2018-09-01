@@ -76,8 +76,12 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     newFloppyImageLedAfterEncode = -2;
 
     if(hwConfig.hddIface == HDD_IF_CART) {  // cartridge interface? use this data transporter
+        printf("Data Transporter: CART\n");
+        Debug::out(LOG_INFO, "Data Transporter: CART");
         dataTrans = new CartDataTrans();
     } else {                                // ACSI or SCSI interface? use that classical data transporter
+        printf("Data Transporter: SPI\n");
+        Debug::out(LOG_INFO, "Data Transporter: SPI");
         dataTrans = new AcsiDataTrans();
     }
 
@@ -223,7 +227,7 @@ void CCoreThread::run(void)
     Debug::out(LOG_DEBUG, "Will check for Hans and Franz alive: %s", (shouldCheckHansFranzAlive ? "yes" : "no") );
     //------------------------------
 
-    DWORD getHwInfoTimeout      = Utils::getEndTime(3000);                  // create a time when we already should have info about HW, and if we don't have that by that time, then fail
+    DWORD getHwInfoTimeout = Utils::getEndTime(3000);                   // create a time when we already should have info about HW, and if we don't have that by that time, then fail
 
     struct {
         DWORD hans;
@@ -289,7 +293,15 @@ void CCoreThread::run(void)
             bool hansAlive  = (hansTime < 3.0f);
             bool franzAlive = (franzTime < 3.0f);
 
-            printf("\033[2K  [ %c ]  Hans: %s, Franz: %s\033[A\n", progChars[lastFwInfoTime.progress], hansAlive ? "LIVE" : "DEAD", franzAlive ? "LIVE" : "DEAD");
+            // get the right Franz alive string - dead or alive or absent
+            const char *franzAliveString;
+            if(flags.noFranz) {
+                franzAliveString = "ABSENT";
+            } else {
+                franzAliveString = franzAlive ? "LIVE" : "DEAD";
+            }
+
+            printf("\033[2K  [ %c ]  Hans: %s, Franz: %s\033[A\n", progChars[lastFwInfoTime.progress], hansAlive ? "LIVE" : "DEAD", franzAliveString);
 
             lastFwInfoTime.progress = (lastFwInfoTime.progress + 1) % 4;
 
@@ -300,7 +312,8 @@ void CCoreThread::run(void)
                 Utils::resetHans();
             }
 
-            if(!franzAlive && !flags.noReset && (now - lastFwInfoTime.franzResetTime) >= 3000) {
+            // reset Franz if we got one, he's not alive, and we are allowed to reset him
+            if(!flags.noFranz && !franzAlive && !flags.noReset && (now - lastFwInfoTime.franzResetTime) >= 3000) {
                 printf("\033[2KFranz not alive, resetting Franz.\n");
                 Debug::out(LOG_INFO, "Franz not alive, resetting Franz.");
                 lastFwInfoTime.franzResetTime = now;
@@ -901,6 +914,12 @@ void CCoreThread::convertXilinxInfo(BYTE xilinxInfo)
         // GOOD
         case 0x22:  hwConfig.version        = 2;                        // v.2
                     hwConfig.hddIface       = HDD_IF_SCSI;              // HDD int: SCSI
+                    hwConfig.fwMismatch     = false;
+                    break;
+
+        // GOOD
+        case 0x23:  hwConfig.version        = 2;                        // v.2
+                    hwConfig.hddIface       = HDD_IF_CART;              // HDD int: CART
                     hwConfig.fwMismatch     = false;
                     break;
 

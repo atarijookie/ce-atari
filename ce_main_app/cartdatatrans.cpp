@@ -2,6 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/time.h>
 
 #include "debug.h"
 #include "utils.h"
@@ -32,6 +33,17 @@ CartDataTrans::CartDataTrans()
     memset(cmd, 0, sizeof(cmd));
 
     nextFakeFwAtn = Utils::getEndTime(1000);
+
+    // get current date, so we can fake that Hans has today's version (to never update Hans, which isn't present anyway)
+    struct timeval tv;
+    if(gettimeofday(&tv, NULL) < 0) {    // failure
+        memset(&tv, 0, sizeof(tv));
+    }
+    struct tm tm = *localtime(&tv.tv_sec);
+
+    fwYear = tm.tm_year - 100;  // yeat starting from 1900 -> means 118 for year 2018 -> to only last 2 digits
+    fwMonth = tm.tm_mon + 1;
+    fwDay = tm.tm_mday;
 }
 
 CartDataTrans::~CartDataTrans()
@@ -213,8 +225,8 @@ void CartDataTrans::txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *rece
         return;
     }
 
-    if(count == 12) {       // if it's GET FW VERSION, fill *receiveBuffer with fake fw version
-        BYTE version[12] = {0xa0, 0x16, 0x01, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    if(count == 12) {       // if it's GET FW VERSION, fill *receiveBuffer with fake fw version (FW with current date, Xilinx info with CART IF)
+        BYTE version[12] = {0xa0, fwYear, fwMonth, fwDay, 0x00, 0x23, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
         memcpy(receiveBufer, version, count);
         return;
     }

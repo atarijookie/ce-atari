@@ -80,6 +80,8 @@ private:
 
     DWORD nextFakeFwAtn;
 
+    BYTE fwYear, fwMonth, fwDay;    // fake Hans version - current date, to never update (not present) Hans
+
     void hwDataDirection(bool readNotWrite);
     void hwDirForRead(void);    // data pins direction read (from RPi to ST)
     void hwDirForWrite(void);   // data pins direction write (from ST to RPi)
