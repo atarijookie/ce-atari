@@ -41,9 +41,9 @@ CartDataTrans::CartDataTrans()
     }
     struct tm tm = *localtime(&tv.tv_sec);
 
-    fwYear = tm.tm_year - 100;  // yeat starting from 1900 -> means 118 for year 2018 -> to only last 2 digits
-    fwMonth = tm.tm_mon + 1;
-    fwDay = tm.tm_mday;
+    fwYear = Utils::decToBCD(tm.tm_year - 100);     // year starting from 1900 -> means 118 for year 2018 -> to only last 2 digits, store as bcd
+    fwMonth = Utils::decToBCD(tm.tm_mon + 1);
+    fwDay = Utils::decToBCD(tm.tm_mday);
 }
 
 CartDataTrans::~CartDataTrans()

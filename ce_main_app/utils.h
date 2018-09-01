@@ -59,6 +59,9 @@ public:
     static const char*IFintToString(int IFtype);
     static       void IFintToStringFormatted(int IFtype, char *outBuffer, const char *format);
 
+    static BYTE bcdToDec(BYTE bcd);
+    static BYTE decToBCD(BYTE dec);
+    
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
 

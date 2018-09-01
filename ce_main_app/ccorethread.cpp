@@ -750,9 +750,9 @@ void CCoreThread::handleFwVersion_hans(void)
 
     dataTrans->txRx(SPI_CS_HANS, cmdLength, oBuf, fwVer);
 
-    int year = bcdToInt(fwVer[1]) + 2000;
+    int year = Utils::bcdToDec(fwVer[1]) + 2000;
 
-    Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));       // store found FW version of Hans
+    Update::versions.current.hans.fromInts(year, Utils::bcdToDec(fwVer[2]), Utils::bcdToDec(fwVer[3]));       // store found FW version of Hans
     flags.gotHansFwVersion = true;
 
     int  currentLed = fwVer[4];
@@ -770,7 +770,7 @@ void CCoreThread::handleFwVersion_hans(void)
 
     convertXilinxInfo(xilinxInfo);
 
-    Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d, XI: 0x%02x", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed, xilinxInfo);
+    Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d, XI: 0x%02x", year, Utils::bcdToDec(fwVer[2]), Utils::bcdToDec(fwVer[3]), currentLed, xilinxInfo);
 
     if(floppyImageSilo.currentSlotHasNewContent()) {    // the content of current slot changed?
         Debug::out(LOG_DEBUG, "Content of current floppy image slot changed, forcing disk change", currentLed);
@@ -847,11 +847,11 @@ void CCoreThread::handleFwVersion_franz(void)
 
     dataTrans->txRx(SPI_CS_FRANZ, cmdLength, oBuf, fwVer);
 
-    int year = bcdToInt(fwVer[1]) + 2000;
-    Update::versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
+    int year = Utils::bcdToDec(fwVer[1]) + 2000;
+    Update::versions.current.franz.fromInts(year, Utils::bcdToDec(fwVer[2]), Utils::bcdToDec(fwVer[3]));              // store found FW version of Franz
     flags.gotFranzFwVersion = true;
 
-    Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+    Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", year, Utils::bcdToDec(fwVer[2]), Utils::bcdToDec(fwVer[3]));
 }
 
 void CCoreThread::getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId)
@@ -1052,16 +1052,6 @@ void CCoreThread::setFloppyImageLed(int ledNo)
         newFloppyImageLed       = ledNo;
         setNewFloppyImageLed    = true;
     }
-}
-
-int CCoreThread::bcdToInt(int bcd)
-{
-    int a,b;
-
-    a = bcd >> 4;       // upper nibble
-    b = bcd &  0x0f;    // lower nibble
-
-    return ((a * 10) + b);
 }
 
 void CCoreThread::handleSendTrack(void)

@@ -194,7 +194,7 @@ void TranslatedBootMedia::updateBootsectorConfigWithACSIid(BYTE acsiId)
     if(hwConfig.hddIface == HDD_IF_ACSI || hwConfig.hddIface == HDD_IF_CART) {     // for ACSI - it's the ID (0 .. 7)
         id = acsiId;
 
-    	Debug::out(LOG_DEBUG, "TranslatedBootMedia::updateBootsectorConfigWithACSIid() - hddIface is ACSI, bootsector ID set to: %d", (int) id);
+    	Debug::out(LOG_DEBUG, "TranslatedBootMedia::updateBootsectorConfigWithACSIid() - hddIface is ACSI or CART, bootsector ID set to: %d", (int) id);
     } else {                            // for SCSI - it's 8 ... 15 (XBIOS 42 DMAread, see http://toshyp.atari.org/en/00400d.html#DMAread)
         id = (acsiId+8);
 

@@ -59,7 +59,6 @@ private:
     // handle FW version
     void handleFwVersion_hans(void);
     void handleFwVersion_franz(void);
-    int bcdToInt(int bcd);
 
     void responseStart(int bufferLengthInBytes);
     void responseAddWord(BYTE *bfr, WORD value);

@@ -35,6 +35,8 @@
 #include "settings.h"
 #include "global.h"
 
+extern TFlags flags;
+
 DWORD Utils::getCurrentMs(void)
 {
 	struct timespec tp;
@@ -191,31 +193,41 @@ void Utils::sleepMs(DWORD ms)
 
 void Utils::resetHansAndFranz(void)
 {
-	bcm2835_gpio_write(PIN_RESET_HANS,			LOW);		// reset lines to RESET state
-	bcm2835_gpio_write(PIN_RESET_FRANZ,			LOW);
+    bcm2835_gpio_write(PIN_RESET_HANS,          LOW);       // reset lines to RESET state
 
-	Utils::sleepMs(10);										// wait a while to let the reset work
-	
-	bcm2835_gpio_write(PIN_RESET_HANS,			HIGH);		// reset lines to RUN (not reset) state
-	bcm2835_gpio_write(PIN_RESET_FRANZ,			HIGH);
-	
-	Utils::sleepMs(50);										// wait a while to let the devices boot
+    if(!flags.noFranz) {                                    // have Franz?
+        bcm2835_gpio_write(PIN_RESET_FRANZ,     LOW);
+    }
+
+    Utils::sleepMs(10);	                                    // wait a while to let the reset work
+
+    bcm2835_gpio_write(PIN_RESET_HANS,          HIGH);      // reset lines to RUN (not reset) state
+
+    if(!flags.noFranz) {                                    // have Franz?
+        bcm2835_gpio_write(PIN_RESET_FRANZ,     HIGH);
+    }
+
+    Utils::sleepMs(50);                                     // wait a while to let the devices boot
 }
 
 void Utils::resetHans(void)
 {
-	bcm2835_gpio_write(PIN_RESET_HANS,			LOW);		// reset lines to RESET state
-	Utils::sleepMs(10);										// wait a while to let the reset work
-	bcm2835_gpio_write(PIN_RESET_HANS,			HIGH);		// reset lines to RUN (not reset) state
-	Utils::sleepMs(50);										// wait a while to let the devices boot
+    bcm2835_gpio_write(PIN_RESET_HANS,  LOW);   // reset lines to RESET state
+    Utils::sleepMs(10);                         // wait a while to let the reset work
+    bcm2835_gpio_write(PIN_RESET_HANS,  HIGH);  // reset lines to RUN (not reset) state
+    Utils::sleepMs(50);                         // wait a while to let the devices boot
 }
 
 void Utils::resetFranz(void)
 {
-	bcm2835_gpio_write(PIN_RESET_FRANZ,			LOW);
-	Utils::sleepMs(10);										// wait a while to let the reset work
-	bcm2835_gpio_write(PIN_RESET_FRANZ,			HIGH);
-	Utils::sleepMs(50);										// wait a while to let the devices boot
+    if(flags.noFranz) {                     // no franz? quit
+        return;
+    }
+
+    bcm2835_gpio_write(PIN_RESET_FRANZ, LOW);
+    Utils::sleepMs(10);                     // wait a while to let the reset work
+    bcm2835_gpio_write(PIN_RESET_FRANZ, HIGH);
+    Utils::sleepMs(50);                     // wait a while to let the devices boot
 }
 
 bool Utils::copyFile(std::string &src, std::string &dst)
@@ -570,4 +582,19 @@ void Utils::IFintToStringFormatted(int IFtype, char *outBuffer, const char *form
 {
     const char *ifString = Utils::IFintToString(IFtype);
     sprintf(outBuffer, format, ifString);
+}
+
+BYTE Utils::bcdToDec(BYTE bcd)
+{
+    int a,b;
+
+    a = bcd >> 4;       // upper nibble
+    b = bcd &  0x0f;    // lower nibble
+
+    return ((a * 10) + b);
+}
+
+BYTE Utils::decToBCD(BYTE dec)
+{
+    return ((dec / 10) << 4) | (dec % 10);
 }
