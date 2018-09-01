@@ -116,22 +116,45 @@ void ConfigStream::createScreen_acsiConfig(void)
 
     ConfigComponent *comp;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "ID         off   sd    raw  ce_dd", 40, 0, 3, gotoOffset);
+    const char *header;
+    if(hwConfig.hddIface == HDD_IF_CART) {  // with CART IF - no SD column
+        header = "   ID         off   raw  ce_dd";
+    } else {                                // not CART IF - show SD column
+        header = "ID         off   sd    raw  ce_dd";
+    }
+
+    comp = new ConfigComponent(this, ConfigComponent::label, header, 40, 0, 3, gotoOffset);
     comp->setReverse(true);
     screen.push_back(comp);
 
     int row;
+    int shiftLeft = 0;
+    int colOfset = (hwConfig.hddIface == HDD_IF_CART) ? 3 : 0;
+    int btnOfset = (hwConfig.hddIface == HDD_IF_CART) ? 2 : 0;
 
     for(row=0; row<8; row++) {			// now make 8 rows of checkboxes
         char bfr[5];
         sprintf(bfr, "%d", row);
 
-        comp = new ConfigComponent(this, ConfigComponent::label, bfr, 2, 1, row + 4, gotoOffset);
+        comp = new ConfigComponent(this, ConfigComponent::label, bfr, 2, 1 + colOfset, row + 4, gotoOffset);
         screen.push_back(comp);
 
         for(int col=0; col<4; col++) {
-            comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ", 3, 10 + (col * 6), row + 4, gotoOffset);			// create and place checkbox on screen
-            comp->setCheckboxGroupIds(row, col);																// set checkbox group id to row, and checbox id to col
+            if(hwConfig.hddIface == HDD_IF_CART) {      // special handling with CART IF - no SD column (#1), move cols 2 & 3 back a bit
+                if(col == 1) {                          // no SD column
+                    continue;
+                }
+
+                switch(col) {
+                    case 0: shiftLeft = 0; break;       // don't shift 0th (off) column
+
+                    case 2:
+                    case 3: shiftLeft = -6; break;      // do shift 2nd and 3rd column (raw & ce_dd)
+                }
+            }
+
+            comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ", 3, 10 + colOfset + (col * 6) + shiftLeft, row + 4, gotoOffset); // create and place checkbox on screen
+            comp->setCheckboxGroupIds(row, col);        // set checkbox group id to row, and checbox id to col
             screen.push_back(comp);
         }
     }
@@ -141,8 +164,10 @@ void ConfigStream::createScreen_acsiConfig(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "off   - turned off, not responding here",      40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "sd    - SD card               (only one)",    40, 0, row++, gotoOffset);
-    screen.push_back(comp);
+    if(hwConfig.hddIface != HDD_IF_CART) {  // show SD only when not CART IF
+        comp = new ConfigComponent(this, ConfigComponent::label, "sd    - SD card               (only one)",    40, 0, row++, gotoOffset);
+        screen.push_back(comp);
+    }
 
     comp = new ConfigComponent(this, ConfigComponent::label, "raw   - raw sector access (use HDDr/ICD)",     40, 0, row++, gotoOffset);
     screen.push_back(comp);
@@ -150,12 +175,12 @@ void ConfigStream::createScreen_acsiConfig(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "ce_dd - for booting CE_DD driver",	40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  9, 13, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  btnOfset + 9, 13, gotoOffset);
     comp->setOnEnterFunctionCode(CS_SAVE_ACSI);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, 20, 13, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ", 8, btnOfset + 20, 13, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
@@ -525,6 +550,10 @@ void ConfigStream::onAcsiConfig_save(void)
 
         if(devTypes[id] != DEVTYPE_OFF) {					// if found something which is not OFF
             somethingActive = true;
+        }
+
+        if(hwConfig.hddIface == HDD_IF_CART && devTypes[id] == DEVTYPE_SD) {    // on CART IF - if user selected SD, turn that ID off
+            devTypes[id] = DEVTYPE_OFF;
         }
 
         switch(devTypes[id]) {								// count the shared drives, network adapters, config drives
