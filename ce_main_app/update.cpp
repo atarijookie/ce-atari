@@ -312,12 +312,14 @@ bool Update::createUpdateScript(void)
         fprintf(f, "/ce/update/update_xilinx.sh\n");
     }
 
-    if(Update::versions.current.hans.isOlderThan( Update::versions.onServer.hans )) {
-        fprintf(f, "/ce/update/update_hans.sh\n");
-    }
+    if(hwConfig.hddIface != HDD_IF_CART) {    // update Hans and Franz only when it's not CART IF (they are missing in cart IF)
+        if(Update::versions.current.hans.isOlderThan( Update::versions.onServer.hans )) {
+            fprintf(f, "/ce/update/update_hans.sh\n");
+        }
 
-    if(Update::versions.current.franz.isOlderThan( Update::versions.onServer.franz )) {
-        fprintf(f, "/ce/update/update_franz.sh\n");
+        if(Update::versions.current.franz.isOlderThan( Update::versions.onServer.franz )) {
+            fprintf(f, "/ce/update/update_franz.sh\n");
+        }
     }
 
     fclose(f);

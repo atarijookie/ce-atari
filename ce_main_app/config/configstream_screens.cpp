@@ -862,21 +862,23 @@ void ConfigStream::createScreen_update(void)
     screen.push_back(comp);
     line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Franz", 12, 		col1, line, gotoOffset);
-    screen.push_back(comp);
+    if(hwConfig.hddIface != HDD_IF_CART) {  // show this only when not CART IF
+        comp = new ConfigComponent(this, ConfigComponent::label, "Franz", 12, 		col1, line, gotoOffset);
+        screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 			col2, line, gotoOffset);
-    comp->setComponentId(COMPID_UPDATE_FRANZ);
-    screen.push_back(comp);
-    line++;
+        comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 			col2, line, gotoOffset);
+        comp->setComponentId(COMPID_UPDATE_FRANZ);
+        screen.push_back(comp);
+        line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Hans", 12,		col1, line, gotoOffset);
-    screen.push_back(comp);
+        comp = new ConfigComponent(this, ConfigComponent::label, "Hans", 12,		col1, line, gotoOffset);
+        screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, line, gotoOffset);
-    comp->setComponentId(COMPID_UPDATE_HANZ);
-    screen.push_back(comp);
-    line++;
+        comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, line, gotoOffset);
+        comp->setComponentId(COMPID_UPDATE_HANZ);
+        screen.push_back(comp);
+        line++;
+    }
 
     comp = new ConfigComponent(this, ConfigComponent::label, "Xilinx", 12,		col1, line, gotoOffset);
     screen.push_back(comp);
@@ -886,6 +888,10 @@ void ConfigStream::createScreen_update(void)
     screen.push_back(comp);
     
     line += 2;
+
+    if(hwConfig.hddIface == HDD_IF_CART) {    // with CART IF - skip 2 lines
+        line += 2;
+    }
 
     comp = new ConfigComponent(this, ConfigComponent::button, " From web ", 10,  6, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_CHECK);
