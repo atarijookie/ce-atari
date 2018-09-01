@@ -591,3 +591,22 @@ int ConfigComponent::getComponentType(void)
     return type;
 }
 
+int ConfigComponent::getPosX(void)
+{
+    return posX;
+}
+
+int ConfigComponent::getPosY(void)
+{
+    return posY;
+}
+
+int ConfigComponent::getCol(void)
+{
+    return posX;
+}
+
+int ConfigComponent::getRow(void)
+{
+    return posY;
+}

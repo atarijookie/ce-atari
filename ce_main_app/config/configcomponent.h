@@ -52,6 +52,12 @@ public:
 
     BYTE *terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt);    // then add +cnt to bfr (might be 0 or 4)
 
+    int getPosX(void);
+    int getPosY(void);
+
+    int getCol(void);
+    int getRow(void);
+
 private:
     ConfigStream    *confStream;
 

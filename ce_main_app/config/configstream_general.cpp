@@ -165,10 +165,14 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
     }
 }
 
+StupidVector & ConfigStream::getCurrentScreenVector(void)
+{
+    return showingMessage ? message : screen;   // if we should show message, set reference to message, otherwise set reference to screen
+}
+
 void ConfigStream::onKeyDown(BYTE key)
 {
-    StupidVector &scr = showingMessage ? message : screen;		// if we should show message, set reference to message, otherwise set reference to screen
-
+    StupidVector &scr = getCurrentScreenVector();
     int focused = -1, firstFocusable = -1, lastFocusable = -1, firstButton = -1, lastButton = -1;
 
     // go through the current screen and find focused component, also first focusable component
@@ -238,13 +242,15 @@ void ConfigStream::onKeyDown(BYTE key)
     }
 
     if(curr->isGroupCheckBox()) {                           // for group check boxes
-        int groupid, chbid;
-        curr->getCheckboxGroupIds(groupid, chbid);          // ge the checkbox group IDs
+//        int groupid, chbid;
+//        curr->getCheckboxGroupIds(groupid, chbid);          // ge the checkbox group IDs
 
-        if(focusNextCheckboxGroup(key, groupid, chbid)) {   // and try to move there
-            curr->setFocus(false);                          // and unfocus the previous one
-            return;
-        }
+        focusNextFocusable(key, focused, firstFocusable, lastFocusable);
+        return;
+//        if(focusNextCheckboxGroup(key, groupid, chbid)) {   // and try to move there
+//            curr->setFocus(false);                          // and unfocus the previous one
+//            return;
+//        }
     }
 
     // if you press ENTER key on a editline, it's like you pressed arrow down
@@ -616,9 +622,174 @@ void ConfigStream::focusByComponentId(int componentId)
     c->setFocus(true);
 }
 
+void ConfigStream::getFirstAndLastInRow(int prevRow, int *idxFirstInRow, int *idxLastInRow)
+{
+    StupidVector &scr = getCurrentScreenVector();
+    int minIdx = -1, minCol = 100;
+    int maxIdx = -1, maxCol = -1;
+
+    for(int i=0; i < scr.size(); i++) {     // go through whole screen
+        ConfigComponent *c = (ConfigComponent *) scr[i];
+
+        if(!c->canFocus()) {                // can't focus? skip this
+            continue;
+        }
+
+        if(c->getRow() != prevRow) {        // not the row we want? skip it
+            continue;
+        }
+
+        if(minCol > c->getCol()) {          // found smaller col? store it
+            minCol = c->getCol();
+            minIdx = i;
+        }
+
+        if(maxCol < c->getCol()) {          // found bigger col? store it
+            maxCol = c->getCol();
+            maxIdx = i;
+        }
+    }
+
+    *idxFirstInRow = minIdx;
+    *idxLastInRow = maxIdx;
+}
+
+int ConfigStream::findComponentAtCoordinates(int col, int row)
+{
+    StupidVector &scr = getCurrentScreenVector();
+
+    for(int i=0; i < scr.size(); i++) {     // go through whole screen
+        ConfigComponent *c = (ConfigComponent *) scr[i];
+
+        if(c->getCol() == col && c->getRow() == row) {  // found component with matching coordinates? good
+            return i;
+        }
+    }
+
+    return -1;  // no component found
+}
+
+int ConfigStream::findNextRow(int idxFocused)
+{
+    StupidVector &scr = getCurrentScreenVector();
+    ConfigComponent *cur = (ConfigComponent *) scr[idxFocused];
+
+    for(int i=idxFocused; i < scr.size(); i++) {     // start from focused component, further to end
+        ConfigComponent *c = (ConfigComponent *) scr[i];
+
+        if(!c->canFocus()) {                // can't focus? skip this
+            continue;
+        }
+
+        if(c->getRow() <= cur->getRow()) {  // the component is on same or previous line? skip it
+            continue;
+        }
+
+        return c->getRow();                 // this is the previous row
+    }
+
+    return -1;                              // not found
+}
+
+int ConfigStream::findPrevRow(int idxFocused)
+{
+    StupidVector &scr = getCurrentScreenVector();
+    ConfigComponent *cur = (ConfigComponent *) scr[idxFocused];
+
+    for(int i=idxFocused; i>=0; i--) {     // start from focused component, go back to start, find prev row
+        ConfigComponent *c = (ConfigComponent *) scr[i];
+
+        if(!c->canFocus()) {                // can't focus? skip this
+            continue;
+        }
+
+        if(c->getRow() >= cur->getRow()) {  // the component is on same or next line? skip it
+            continue;
+        }
+
+        return c->getRow();                 // this is the previous row
+    }
+
+    return -1;                              // not found
+}
+
+int ConfigStream::getUpDownFocusable(bool upNotDown, int idxFocused, int idxFirstFocusable, int idxLastFocusable)
+{
+    StupidVector &scr = getCurrentScreenVector();
+    ConfigComponent *c = (ConfigComponent *) scr[idxFocused];
+
+    int curCol = c->getCol();
+    int otherRow;
+
+    if(upNotDown) {     // searching UP row
+        otherRow = findPrevRow(idxFocused);     // get previous row
+        if(otherRow == -1) {
+            return idxLastFocusable;            // no previous row? use last focusable
+        }
+    } else {            // searching DOWN row
+        otherRow = findNextRow(idxFocused);     // get next row
+
+        if(otherRow == -1) {
+            return idxFirstFocusable;            // no next row? use first focusable
+        }
+    }
+
+    // try to find component at exact coordinates
+    int idxExactUpDown = findComponentAtCoordinates(curCol, otherRow);
+
+    if(idxExactUpDown != -1) {                  // found exact up/down? return it
+        return idxExactUpDown;
+    }
+
+    // don't have exact up, try last in previous row
+    int idxLastInRow, idxFirstInRow;
+    getFirstAndLastInRow(otherRow, &idxFirstInRow, &idxLastInRow);
+
+    if(upNotDown) {     // searching UP row
+        return (idxLastInRow != -1) ? idxLastInRow : idxLastFocusable;
+    } else {            // searching DOWN row
+        return (idxFirstInRow != -1) ? idxFirstInRow : idxFirstFocusable;
+    }
+}
+
+bool ConfigStream::focusNextFocusable(BYTE key, int idxFocused, int idxFirstFocusable, int idxLastFocusable)
+{
+    int nextIdx = -1;
+
+    switch(key) {
+        // find focusable in prev row, same col; if not found then last in prev row; if now possible then use last focusable
+        case KEY_UP:
+            nextIdx = getUpDownFocusable(true, idxFocused, idxFirstFocusable, idxLastFocusable);
+            break;
+
+        // find focusable in next row, same col; if not found then first in next row; if now possible then use first focusable
+        case KEY_DOWN:
+            nextIdx = getUpDownFocusable(false, idxFocused, idxFirstFocusable, idxLastFocusable);
+            break;
+
+        // find focusable in prev col, same row; if not found then last in prev row; if now possible then use last focusable
+        case KEY_LEFT:
+            break;
+
+        // find focusable in next col, same row; if not found then first in next row; if now possible then use first focusable
+        case KEY_RIGHT:
+            break;
+    }
+
+    // if was able to find something, focus it
+    if(nextIdx != -1) {
+        StupidVector &scr = getCurrentScreenVector();
+        ((ConfigComponent *) scr[idxFocused])->setFocus(false);     // unfocus current
+        ((ConfigComponent *) scr[nextIdx])->setFocus(true);         // focus next
+        return true;
+    }
+
+    return false;
+}
+
 bool ConfigStream::focusNextCheckboxGroup(BYTE key, int groupid, int chbid)
 {
-    for(WORD i=0; i<screen.size(); i++) {			// go through the current screen
+    for(int i=0; i<screen.size(); i++) {			// go through the current screen
         ConfigComponent *c = (ConfigComponent *) screen[i];
 
         if(c->isGroupCheckBox()) {
