@@ -681,11 +681,12 @@ void TranslatedDisk::onInitialize(void)     // this method is called on the star
     Debug::out(LOG_DEBUG, "tosVersion: %x, drives: %04x", tosVersion, drives);
 
     bool  sdNoobEnabled;
-    DWORD sdNoobSizeSectors, sdCardSizeSectors;
+    DWORD sdNoobSizeSectors;
+    //DWORD sdCardSizeSectors;
 
     sdNoobEnabled       = dataBuffer[6];                    //     6: is SD NOOB present and enabled?
     sdNoobSizeSectors   = Utils::getDword(dataBuffer +  7); //  7-10: size of SD NOOB partition in sectors
-    sdCardSizeSectors   = Utils::getDword(dataBuffer + 11); // 11-14: size of SD card in sectors
+    //sdCardSizeSectors   = Utils::getDword(dataBuffer + 11); // 11-14: size of SD card in sectors
 
     Debug::out(LOG_DEBUG, "SD NOOB enabled: %d, size: %d", sdNoobEnabled, sdNoobSizeSectors);
 

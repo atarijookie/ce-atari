@@ -41,10 +41,11 @@ bool FloppyImageMsa::open(const char *fileName)
 
 bool FloppyImageMsa::loadImageIntoMemory(void)
 {
-    if(!FloppyImage::loadImageIntoMemory())
+    if(!FloppyImage::loadImageIntoMemory()) {
         return false;
+    }
 
-	long imageSize = 0;
+    long imageSize = 0;
     BYTE *pDiskBuffer = MSA_UnCompress(image.data, &imageSize);
 
     free(image.data);                           // free the memory which was used for file reading

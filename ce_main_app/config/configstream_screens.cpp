@@ -42,9 +42,9 @@ extern SharedObjects shared;
 void ConfigStream::createScreen_homeScreen(void)
 {
     // the following 3 lines should be at start of each createScreen_ method
-    destroyCurrentScreen();				// destroy current components
-    screenChanged		= true;			// mark that the screen has changed
-    showingHomeScreen	= true;			// mark that we're showing the home screen
+    destroyCurrentScreen();     // destroy current components
+    screenChanged       = true; // mark that the screen has changed
+    showingHomeScreen   = true; // mark that we're showing the home screen
 
     screen_addHeaderAndFooter(screen, "Main menu");
 
@@ -55,7 +55,7 @@ void ConfigStream::createScreen_homeScreen(void)
     char idConfigLabel[32];
     Utils::IFintToStringFormatted(hwConfig.hddIface, idConfigLabel, " %s IDs config ");
 
-    comp = new ConfigComponent(this, ConfigComponent::button, idConfigLabel,	    18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, idConfigLabel,        18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_ACSI);
     screen.push_back(comp);
     line += 2;
@@ -70,32 +70,32 @@ void ConfigStream::createScreen_homeScreen(void)
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Shared drive ",		18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Shared drive ",     18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_SHARED);
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Floppy config ",	18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Floppy config ",    18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_FLOPPY_CONF);
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Network settings ",	18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Network settings ", 18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_NETWORK);
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " IKBD ",	            18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " IKBD ",             18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_IKBD);
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Other ",	        18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Other ",            18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_OTHER);
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Update software ",	18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Update software ",  18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_UPDATE);
     screen.push_back(comp);
     line += 2;
@@ -110,10 +110,8 @@ void ConfigStream::createScreen_acsiConfig(void)
     screenChanged		= true;			// mark that the screen has changed
     showingHomeScreen	= false;		// mark that we're NOT showing the home screen
 
-
     char idHeaderLabel[32];
-    Utils::IFintToStringFormatted(hwConfig.hddIface, idConfigLabel, " %s IDs config ");
-
+    Utils::IFintToStringFormatted(hwConfig.hddIface, idHeaderLabel, " %s IDs config ");
     screen_addHeaderAndFooter(screen, idHeaderLabel);
 
     ConfigComponent *comp;

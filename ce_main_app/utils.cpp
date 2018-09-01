@@ -566,7 +566,7 @@ const char*Utils::IFintToString(int IFtype)
     }
 }
 
-void Utils::IFintToStringFormatted(int IFtype, char *outBuffer, char *format)
+void Utils::IFintToStringFormatted(int IFtype, char *outBuffer, const char *format)
 {
     const char *ifString = Utils::IFintToString(IFtype);
     sprintf(outBuffer, format, ifString);

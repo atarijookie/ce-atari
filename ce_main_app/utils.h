@@ -8,7 +8,10 @@
 #include "datatypes.h"
 
 extern "C" volatile sig_atomic_t sigintReceived;
-#define MIN(x, y)	(((x) < (y)) ? (x) : (y))
+
+#ifndef MIN
+    #define MIN(x, y)   (((x) < (y)) ? (x) : (y))
+#endif
 
 class Utils {
 public:
@@ -54,7 +57,7 @@ public:
     static void splitString(const std::string &s, char delim, std::vector<std::string> &elems);
 
     static const char*IFintToString(int IFtype);
-    static       void IFintToStringFormatted(int IFtype, char *outBuffer, char *format);
+    static       void IFintToStringFormatted(int IFtype, char *outBuffer, const char *format);
 
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);

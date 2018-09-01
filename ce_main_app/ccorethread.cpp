@@ -649,7 +649,6 @@ void CCoreThread::fillDisplayLines(void)
     #define MAX_DEV_TYPES       4
     const char *devTypeString[MAX_DEV_TYPES] = {"OFF", "SD", "RAW", "CE"};
 
-
     Utils::IFintToStringFormatted(hwConfig.hddIface, tmpLine1, "%s: ");
     strcpy(tmpLine2, tmpLine1);
 
