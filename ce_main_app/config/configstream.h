@@ -131,11 +131,13 @@ public:
 
     StupidVector & getCurrentScreenVector(void);
 
+    void getLeftAndRightInRow(int idxFocused, int *idxLeft, int *idxRight);
     void getFirstAndLastInRow(int prevRow, int *idxFirstInRow, int *idxLastInRow);
     int  findComponentAtCoordinates(int col, int row);
     int  findNextRow(int idxFocused);
     int  findPrevRow(int idxFocused);
     int  getUpDownFocusable(bool upNotDown, int idxFocused, int idxFirstFocusable, int idxLastFocusable);
+    int  getLeftRightFocusable(bool leftNotRight, int idxFocused, int idxFirstFocusable, int idxLastFocusable);
     bool focusNextFocusable(BYTE key, int idxFocused, int idxFirstFocusable, int idxLastFocusable);
 
 private:

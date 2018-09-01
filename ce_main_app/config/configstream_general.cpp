@@ -622,6 +622,62 @@ void ConfigStream::focusByComponentId(int componentId)
     c->setFocus(true);
 }
 
+int int_cmp(const void *a, const void *b)
+{
+    const int *ia = (const int *)a; // casting pointer types
+    const int *ib = (const int *)b;
+    return *ia  - *ib; 	            // integer comparison: returns negative if b > a and positive if a > b
+}
+
+void ConfigStream::getLeftAndRightInRow(int idxFocused, int *idxLeft, int *idxRight)
+{
+    StupidVector &scr = getCurrentScreenVector();
+    ConfigComponent *cur = (ConfigComponent *) scr[idxFocused];
+    int curRow = cur->getRow();
+    int curCol = cur->getCol();
+
+    #define MAXCOLS 40
+    int cols[MAXCOLS] = {0};
+    int n = 0;
+
+    // go through whole screen, store col numbers from the row we're searching through
+    for(int i=0; i < scr.size(); i++) {
+        ConfigComponent *c = (ConfigComponent *) scr[i];
+
+        if(!c->canFocus()) {                // can't focus? skip this
+            continue;
+        }
+
+        if(c->getRow() != curRow) {         // the component is from other row?
+            continue;
+        }
+
+        cols[n] = c->getCol();              // store col of this component
+        n++;                                // advance in field
+    }
+
+    // sort from lowest to highest col number
+    qsort(cols, n, sizeof(int), int_cmp);
+
+    int i;
+    for(i=0; i<n; i++) {            // find our component
+        if(cols[i] == curCol) {     // found our component?
+            break;
+        }
+    }
+
+    if(i==0) {              // our component is the left-most, nothing on left
+        *idxLeft = -1;
+        *idxRight = findComponentAtCoordinates(cols[i+1], curRow);
+    } else if(i == (n-1)) { // out components is the right-most, nothing on right
+        *idxRight = -1;
+        *idxLeft = findComponentAtCoordinates(cols[i-1], curRow);
+    } else {                // our component is somewhere in the middle
+        *idxLeft = findComponentAtCoordinates(cols[i-1], curRow);
+        *idxRight = findComponentAtCoordinates(cols[i+1], curRow);
+    }
+}
+
 void ConfigStream::getFirstAndLastInRow(int prevRow, int *idxFirstInRow, int *idxLastInRow)
 {
     StupidVector &scr = getCurrentScreenVector();
@@ -713,6 +769,47 @@ int ConfigStream::findPrevRow(int idxFocused)
     return -1;                              // not found
 }
 
+int ConfigStream::getLeftRightFocusable(bool leftNotRight, int idxFocused, int idxFirstFocusable, int idxLastFocusable)
+{
+    int idxLeft, idxRight;
+    int otherRow;
+
+    // find left and right neighbor
+    getLeftAndRightInRow(idxFocused, &idxLeft, &idxRight);
+
+    if(leftNotRight) {      // should find left neighbor?
+        if(idxLeft != -1) { // has left neighbor?
+            return idxLeft;
+        }
+
+        otherRow = findPrevRow(idxFocused);    // get prev row
+
+        if(otherRow == -1) {                    // no prev row? use last focusable
+            return idxLastFocusable;
+        }
+    } else {                    // should find right neighbor?
+        if(idxRight != -1) {    // has right neighbor?
+            return idxRight;
+        }
+
+        otherRow = findNextRow(idxFocused);     // get next row
+
+        if(otherRow == -1) {                    // no next row? use first focusable
+            return idxFirstFocusable;
+        }
+    }
+
+    // get first and last in that other row
+    int idxLastInRow, idxFirstInRow;
+    getFirstAndLastInRow(otherRow, &idxFirstInRow, &idxLastInRow);
+
+    if(leftNotRight) {     // should find left neighbor?
+        return idxLastInRow;
+    } else {               // should find right neigbor?
+        return idxFirstInRow;
+    }
+}
+
 int ConfigStream::getUpDownFocusable(bool upNotDown, int idxFocused, int idxFirstFocusable, int idxLastFocusable)
 {
     StupidVector &scr = getCurrentScreenVector();
@@ -769,10 +866,12 @@ bool ConfigStream::focusNextFocusable(BYTE key, int idxFocused, int idxFirstFocu
 
         // find focusable in prev col, same row; if not found then last in prev row; if now possible then use last focusable
         case KEY_LEFT:
+            nextIdx = getLeftRightFocusable(true, idxFocused, idxFirstFocusable, idxLastFocusable);
             break;
 
         // find focusable in next col, same row; if not found then first in next row; if now possible then use first focusable
         case KEY_RIGHT:
+            nextIdx = getLeftRightFocusable(false, idxFocused, idxFirstFocusable, idxLastFocusable);
             break;
     }
 
