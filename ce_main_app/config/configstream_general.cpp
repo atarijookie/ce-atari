@@ -33,6 +33,8 @@ ConfigStream::ConfigStream(int whereItWillBeShown)
 
     lastCmdTime = 0;
 
+    lastShowScreenAction = CS_CREATE_ACSI;
+
     message.clear();
     createScreen_homeScreen();
 }
@@ -273,26 +275,26 @@ void ConfigStream::onKeyDown(BYTE key)
 int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
 {
     int totalCnt = 0;
-    
-    if(showingMessage) {								// if we're showing the message
-        if(homeScreen) {								// but we should show home screen
-            hideMessageScreen();						// hide the message
+
+    if(showingMessage) {                // if we're showing the message
+        if(homeScreen) {                // but we should show home screen
+            hideMessageScreen();        // hide the message
         }
     }
 
-    if(homeScreen) {									// if we should show the stream for homescreen
-        if(!showingHomeScreen) {						// and we're not showing it yet
-            createScreen_homeScreen();					// create homescreen
+    if(homeScreen) {                    // if we should show the stream for homescreen
+        if(!showingHomeScreen) {        // and we're not showing it yet
+            createScreen_homeScreen();  // create homescreen
         }
 
-        screenChanged = true;                                           // mark that the screen has changed
+        screenChanged = true;           // mark that the screen has changed
     }
 
-    if(screen.size() == 0) {							// if we wanted to show current screen, but there is nothing, just show home screen
+    if(screen.size() == 0) {            // if we wanted to show current screen, but there is nothing, just show home screen
         createScreen_homeScreen();
     }
 
-    memset(bfr, 0, maxLen);								// clear the buffer
+    memset(bfr, 0, maxLen);             // clear the buffer
 
     StupidVector &scr = showingMessage ? message : screen;		// if we should show message, set reference to message, otherwise set reference to screen
 
@@ -918,15 +920,15 @@ void ConfigStream::enterKeyHandler(int event)
 {
     switch(event) {
     case CS_GO_HOME:            createScreen_homeScreen();      break;
-    case CS_CREATE_ACSI:        createScreen_acsiConfig();      break;
-    case CS_CREATE_TRANSLATED:  createScreen_translated();      break;
-    case CS_CREATE_HDDIMAGE:    createScreen_hddimage();        break;
-    case CS_CREATE_SHARED:      createScreen_shared();          break;
-    case CS_CREATE_FLOPPY_CONF: createScreen_floppy_config();   break;
-    case CS_CREATE_NETWORK:     createScreen_network();         break;
-    case CS_CREATE_IKBD:        createScreen_ikbd();            break;
-    case CS_CREATE_OTHER:       createScreen_other();           break;
-    case CS_CREATE_UPDATE:      createScreen_update();          break;
+    case CS_CREATE_ACSI:        createScreen_acsiConfig();      lastShowScreenAction = event; break;
+    case CS_CREATE_TRANSLATED:  createScreen_translated();      lastShowScreenAction = event; break;
+    case CS_CREATE_HDDIMAGE:    createScreen_hddimage();        lastShowScreenAction = event; break;
+    case CS_CREATE_SHARED:      createScreen_shared();          lastShowScreenAction = event; break;
+    case CS_CREATE_FLOPPY_CONF: createScreen_floppy_config();   lastShowScreenAction = event; break;
+    case CS_CREATE_NETWORK:     createScreen_network();         lastShowScreenAction = event; break;
+    case CS_CREATE_IKBD:        createScreen_ikbd();            lastShowScreenAction = event; break;
+    case CS_CREATE_OTHER:       createScreen_other();           lastShowScreenAction = event; break;
+    case CS_CREATE_UPDATE:      createScreen_update();          lastShowScreenAction = event; break;
 
     case CS_HIDE_MSG_SCREEN:    hideMessageScreen();        break;
 

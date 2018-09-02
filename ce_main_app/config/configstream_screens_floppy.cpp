@@ -126,4 +126,3 @@ void ConfigStream::onFloppyConfigSave(void)
     // now back to the home screen
     createScreen_homeScreen();
 }
-

@@ -163,6 +163,7 @@ private:
     bool showingHomeScreen;
     bool showingMessage;
     bool screenChanged;
+    int  lastShowScreenAction;
 
     DWORD lastCmdTime;
 

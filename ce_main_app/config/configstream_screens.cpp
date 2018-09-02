@@ -57,50 +57,61 @@ void ConfigStream::createScreen_homeScreen(void)
 
     comp = new ConfigComponent(this, ConfigComponent::button, idConfigLabel,        18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_ACSI);
+    comp->setFocus(lastShowScreenAction == CS_CREATE_ACSI);    // focus this component if requested
     screen.push_back(comp);
     line += 2;
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Translated disks ",	18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_TRANSLATED);
+    comp->setFocus(lastShowScreenAction == CS_CREATE_TRANSLATED);    // focus this component if requested
     screen.push_back(comp);
     line += 2;
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Hard Disk Image ", 18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_HDDIMAGE);
+    comp->setFocus(lastShowScreenAction == CS_CREATE_HDDIMAGE);    // focus this component if requested
     screen.push_back(comp);
     line += 2;
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Shared drive ",     18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_SHARED);
+    comp->setFocus(lastShowScreenAction == CS_CREATE_SHARED);    // focus this component if requested
     screen.push_back(comp);
     line += 2;
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Floppy config ",    18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_FLOPPY_CONF);
+    comp->setFocus(lastShowScreenAction == CS_CREATE_FLOPPY_CONF);    // focus this component if requested
     screen.push_back(comp);
     line += 2;
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Network settings ", 18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_NETWORK);
+    comp->setFocus(lastShowScreenAction == CS_CREATE_NETWORK);    // focus this component if requested
     screen.push_back(comp);
     line += 2;
 
     comp = new ConfigComponent(this, ConfigComponent::button, " IKBD ",             18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_IKBD);
+    comp->setFocus(lastShowScreenAction == CS_CREATE_IKBD);    // focus this component if requested
     screen.push_back(comp);
     line += 2;
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Other ",            18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_OTHER);
+    comp->setFocus(lastShowScreenAction == CS_CREATE_OTHER);    // focus this component if requested
     screen.push_back(comp);
     line += 2;
 
     comp = new ConfigComponent(this, ConfigComponent::button, " Update software ",  18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_UPDATE);
+    comp->setFocus(lastShowScreenAction == CS_CREATE_UPDATE);    // focus this component if requested
     screen.push_back(comp);
     line += 2;
 
-    setFocusToFirstFocusable();
+    if(lastShowScreenAction < 1) {             // nothing valid was focused? focus on first thing
+        setFocusToFirstFocusable();
+    }
 }
 
 void ConfigStream::createScreen_acsiConfig(void)
@@ -604,7 +615,7 @@ void ConfigStream::onAcsiConfig_save(void)
 
     Utils::forceSync();                                     // tell system to flush the filesystem caches
 
-    createScreen_homeScreen();		// now back to the home screen
+    createScreen_homeScreen();                // now back to the home screen
 }
 
 void ConfigStream::onTranslated_save(void)
@@ -673,7 +684,7 @@ void ConfigStream::onTranslated_save(void)
 
     Utils::forceSync();                                     // tell system to flush the filesystem caches
 
-    createScreen_homeScreen();		// now back to the home screen
+    createScreen_homeScreen();          // now back to the home screen
 }
 
 void ConfigStream::onNetwork_save(void)
@@ -796,7 +807,7 @@ void ConfigStream::onNetwork_save(void)
     }
 
     //-------------------------
-    createScreen_homeScreen();		// now back to the home screen
+    createScreen_homeScreen(); // now back to the home screen
 }
 
 void ConfigStream::createScreen_update(void)
@@ -1259,7 +1270,7 @@ void ConfigStream::onOtherSave(void)
     Utils::setTimezoneVariable_inProfileScript();   // create the timezone setting script, because TIME_UTC_OFFSET could possibly change
     Utils::setTimezoneVariable_inThisContext();     // and also set the TZ variable for this context, so the change for this app would be immediate
     
-    createScreen_homeScreen();		// now back to the home screen
+    createScreen_homeScreen();   // now back to the home screen
 }
 
 void ConfigStream::createScreen_ikbd(void)
@@ -1553,7 +1564,7 @@ void ConfigStream::onIkbdSave(void)
     
     do_loadIkbdConfig   = true;     // reload ikbd config
 
-    createScreen_homeScreen();		// now back to the home screen
+    createScreen_homeScreen();    // now back to the home screen
 }
 
 void ConfigStream::fillUpdateDownloadWithProgress(void)
@@ -1944,7 +1955,7 @@ void ConfigStream::onHddImageSave(void)
 
     Utils::forceSync();                                     // tell system to flush the filesystem caches
 
-    createScreen_homeScreen();      // now back to the home screen
+    createScreen_homeScreen();            // now back to the home screen
 }
 
 void ConfigStream::onHddImageClear(void)
@@ -2008,12 +2019,12 @@ void ConfigStream::onSharedSave(void)
 
     Utils::forceSync();                                     // tell system to flush the filesystem caches
 
-    createScreen_homeScreen();		// now back to the home screen
+    createScreen_homeScreen();              // now back to the home screen
 }
 
 void ConfigStream::onResetSettings(void)
 {
-    createScreen_homeScreen();		// now back to the home screen
+    createScreen_homeScreen();               // now back to the home screen
 
     showMessageScreen("Reset all settings", "All settings have been reset to default.\n\rReseting your ST might be a good idea...");
 
