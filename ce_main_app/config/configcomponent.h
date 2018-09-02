@@ -47,8 +47,10 @@ public:
 
     void setComponentId(int newId);
     int  getComponentId(void);
-    
+
     int getComponentType(void);
+
+    bool isEditLine(void);
 
     BYTE *terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt);    // then add +cnt to bfr (might be 0 or 4)
 

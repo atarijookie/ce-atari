@@ -174,88 +174,64 @@ void ConfigStream::onKeyDown(BYTE key)
 {
     StupidVector &scr = getCurrentScreenVector();
     int focused = -1, firstFocusable = -1, lastFocusable = -1, firstButton = -1, lastButton = -1;
+    int prevButton = -1, nextButton = -1, tmpButtonIndex = -1;
 
     // go through the current screen and find focused component, also first focusable component
     for(WORD i=0; i<scr.size(); i++) {
         ConfigComponent *c = (ConfigComponent *) scr[i];
 
-        if(c->isFocused()) {						// if found focused component, store index
+        if(c->isFocused()) {                // if found focused component, store index
             focused = i;
+
+            prevButton = tmpButtonIndex;    // while we're on a focused item, the last found button is the previus button
         }
 
-        if(firstFocusable == -1) {					// if found focusable component, store index
-            if(c->canFocus()) {
-                firstFocusable = i;
-            }
-        }
-
-        if(c->canFocus()) {							// if this is focusable, then store it as last focusable (at the end it will contain the last focusable)
+        if(c->canFocus()) {             // if found focusable component, store index as last focusable
             lastFocusable = i;
+
+            if(firstFocusable == -1) {  // if don't have first focusable, store this as first focusable
+                    firstFocusable = i;
+                }
         }
 
-        if (firstButton == -1) {
-            if (c->getComponentType() == ConfigComponent::button) {
+        if(c->getComponentType() == ConfigComponent::button) {  // it's a button?
+            lastButton = i;             // store index as last button
+            tmpButtonIndex = i;         // store this as temp button index (for finding previous button index)
+
+            if(firstButton == -1) {     // don't have 1st button? store as 1st button
                 firstButton = i;
             }
-        }
 
-        if (c->getComponentType() == ConfigComponent::button) {
-            lastButton = i;
-        }
-    }
-
-    if(firstFocusable == -1) {						// nothing focusable? do nothing
-        return;
-    }
-
-    if(focused == -1) {								// there is something focusable, but nothing has focus? focus it
-        focused = firstFocusable;
-    }
-
-    ConfigComponent *curr = (ConfigComponent *) scr[focused];		// focus this component
-    curr->setFocus(true);
-
-    int prevFocusable = -1, nextFocusable = -1;		// now find previous and next focusable item in the list of components
-    int prevButton = -1, nextButton = -1;
-    for(WORD i=0; i<scr.size(); i++) {
-        ConfigComponent *c = (ConfigComponent *) scr[i];
-
-        if(!c->canFocus()) {						// can't focus? fuck you!
-            continue;
-        }
-
-        if(i < focused) {							// if we're bellow currently focused item, store each found index (go near focused component)
-            prevFocusable = i;
-            if (c->getComponentType() == ConfigComponent::button) {
-                prevButton = i;
-            }
-        }
-
-        if(i > focused) {							// if we're above currently focused item, store only first found index (don't go far from focused component)
-            if(nextFocusable == -1) {
-                nextFocusable = i;
-            }
-            if (c->getComponentType() == ConfigComponent::button && nextButton == -1) {
+            if(focused != -1 && i > focused && nextButton == -1) { // if we're beyond focused item, store first found button
                 nextButton = i;
             }
         }
     }
 
-    if(curr->isGroupCheckBox()) {                           // for group check boxes
-//        int groupid, chbid;
-//        curr->getCheckboxGroupIds(groupid, chbid);          // ge the checkbox group IDs
-
-        focusNextFocusable(key, focused, firstFocusable, lastFocusable);
+    if(firstFocusable == -1) {          // nothing focusable? do nothing
         return;
-//        if(focusNextCheckboxGroup(key, groupid, chbid)) {   // and try to move there
-//            curr->setFocus(false);                          // and unfocus the previous one
-//            return;
-//        }
     }
 
-    // if you press ENTER key on a editline, it's like you pressed arrow down
-    if(key == KEY_ENTER && (curr->getComponentType() == ConfigComponent::editline || curr->getComponentType() == ConfigComponent::editline_pass)) {
+    if(focused == -1) {                 // there is something focusable, but nothing has focus? focus it
+        focused = firstFocusable;
+    }
+
+    ConfigComponent *curr = (ConfigComponent *) scr[focused];   // focus this component
+    curr->setFocus(true);
+
+   // if you press ENTER key on a editline, it's like you pressed arrow down
+    if(key == KEY_ENTER && curr->isEditLine()) {
         key = KEY_DOWN;
+    }
+
+    bool isAnyArrowKeys = (key == KEY_UP) || (key == KEY_DOWN) || (key == KEY_LEFT) || (key == KEY_RIGHT);
+    bool isUpDownArrowKeys = (key == KEY_UP) || (key == KEY_DOWN);
+
+    // when it   IS  editline, change focus on up/down keys (don't change focus on left/right keys as they are the part of editline editing)
+    // when it's NOT editline, change focus on any arrow keys (no editing of content possible, don't handle left/right in a special way)
+    if((curr->isEditLine() && isUpDownArrowKeys) || (!curr->isEditLine() && isAnyArrowKeys)) {
+        focusNextFocusable(key, focused, firstFocusable, lastFocusable);
+        return;
     }
 
     if(key == KEY_SHIFT_TAB) {
@@ -268,7 +244,6 @@ void ConfigStream::onKeyDown(BYTE key)
         }
 
         curr->setFocus(true);					// focus this component
-
         return;
     }
 
@@ -279,45 +254,6 @@ void ConfigStream::onKeyDown(BYTE key)
             curr = (ConfigComponent *) scr[nextButton];
         } else if(firstButton != -1) {
             curr = (ConfigComponent *) scr[firstButton];
-        }
-
-        curr->setFocus(true);					// focus this component
-
-        return;
-    }
-
-    if(key == KEY_LEFT || key == KEY_RIGHT) {     // in case of left, right
-        if(curr->getComponentType() == ConfigComponent::button) {
-            if(key == KEY_LEFT) {
-                key = KEY_UP;
-            }
-            if(key == KEY_RIGHT) {
-                key = KEY_DOWN;
-            }
-        }
-    }
-
-    if(key == KEY_UP) {							// arrow up
-        curr->setFocus(false);					// unfocus this component
-
-        if(prevFocusable != -1) {				                    // got previous focusable item?
-            curr = (ConfigComponent *) scr[prevFocusable];          // move to the previous component
-        } else if(lastFocusable != -1) {		                    // got last focusable?
-            curr = (ConfigComponent *) scr[lastFocusable];          // move to the last component (wrap around)
-        }
-
-        curr->setFocus(true);					// focus this component
-
-        return;
-    }
-
-    if(key == KEY_DOWN) {							// arrow down
-        curr->setFocus(false);					// unfocus this component
-
-        if(nextFocusable != -1) {				                // got next focusable item?
-            curr = (ConfigComponent *) scr[nextFocusable];		// move to the next component
-        } else if(firstFocusable != -1) {		                // got first focusable?
-            curr = (ConfigComponent *) scr[firstFocusable];		// move to the first component (wrap around)
         }
 
         curr->setFocus(true);					// focus this component
@@ -881,45 +817,6 @@ bool ConfigStream::focusNextFocusable(BYTE key, int idxFocused, int idxFirstFocu
         ((ConfigComponent *) scr[idxFocused])->setFocus(false);     // unfocus current
         ((ConfigComponent *) scr[nextIdx])->setFocus(true);         // focus next
         return true;
-    }
-
-    return false;
-}
-
-bool ConfigStream::focusNextCheckboxGroup(BYTE key, int groupid, int chbid)
-{
-    for(int i=0; i<screen.size(); i++) {			// go through the current screen
-        ConfigComponent *c = (ConfigComponent *) screen[i];
-
-        if(c->isGroupCheckBox()) {
-            int groupid2, chbid2;
-
-            c->getCheckboxGroupIds(groupid2, chbid2);
-
-            // on key UP find groupid which is smaller by 1
-            if(key == KEY_UP && groupid == (groupid2 + 1) && chbid == chbid2) {
-                c->setFocus(true);
-                return true;
-            }
-
-            // on key DOWN find groupid which is greater by 1
-            if(key == KEY_DOWN && groupid == (groupid2 - 1) && chbid == chbid2) {
-                c->setFocus(true);
-                return true;
-            }
-
-            // on key LEFT just find smaller chbid
-            if(key == KEY_LEFT && groupid == groupid2 && chbid == (chbid2 + 1)) {
-                c->setFocus(true);
-                return true;
-            }
-
-            // on key RIGHT just find greater chbid
-            if(key == KEY_RIGHT && groupid == groupid2 && chbid == (chbid2 - 1)) {
-                c->setFocus(true);
-                return true;
-            }
-        }
     }
 
     return false;

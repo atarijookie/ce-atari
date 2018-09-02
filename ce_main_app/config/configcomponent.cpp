@@ -610,3 +610,9 @@ int ConfigComponent::getRow(void)
 {
     return posY;
 }
+
+bool ConfigComponent::isEditLine(void)
+{
+    return (type == ConfigComponent::editline) || (type == ConfigComponent::editline_pass);
+}
+

@@ -119,7 +119,6 @@ public:
     bool getFloatByComponentId(int componentId, float &value);
 
     void focusByComponentId(int componentId);
-    bool focusNextCheckboxGroup(BYTE key, int groupid, int chbid);
 
     void onCheckboxGroupEnter(int groupId, int checkboxId);
 
