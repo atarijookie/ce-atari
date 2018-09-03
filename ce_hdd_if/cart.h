@@ -13,10 +13,10 @@
 #define ofs_cmd_dma_read        0x0200
 
 #define pCmdStatus  ((volatile WORD *)(CART_BASE + CC_CART_OFFSET + ofs_cmd_status))
-#define pPIOfirst   ((volatile WORD *)(CART_BASE + CC_CART_OFFSET + ofs_cmd_pio_1st_byte))
-#define pPIOwrite   ((volatile WORD *)(CART_BASE + CC_CART_OFFSET + ofs_cmd_pio_write))
+#define pPIOfirst                     (CART_BASE + CC_CART_OFFSET + ofs_cmd_pio_1st_byte)
+#define pPIOwrite                     (CART_BASE + CC_CART_OFFSET + ofs_cmd_pio_write)
 #define pPIOread    ((volatile WORD *)(CART_BASE + CC_CART_OFFSET + ofs_cmd_pio_read))
-#define pDMAwrite   ((volatile WORD *)(CART_BASE + CC_CART_OFFSET + ofs_cmd_dma_write))
+#define pDMAwrite                     (CART_BASE + CC_CART_OFFSET + ofs_cmd_dma_write)
 #define pDMAread    ((volatile WORD *)(CART_BASE + CC_CART_OFFSET + ofs_cmd_dma_read))
 
 #define STATUS_CMD      (1 << 2)    // 1st cmd byte was just sent by ST, cleared by RPi

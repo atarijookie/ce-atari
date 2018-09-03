@@ -74,18 +74,19 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 
     //------------------
     // transfer 0th cmd byte
-    val = ((WORD)cmd[0]) << 1;      // prepare cmd byte
-    val = *(pPIOfirst + val);       // write 1st byte (0)
+    val = ((WORD)cmd[0]) << 1;                      // prepare cmd byte
+    val = *((volatile WORD *)(pPIOfirst + val));    // write 1st byte (0)
 
     //------------------
     // transfer remaining cmd bytes
     for(i=1; i<cmdLength; i++) {
         if(wait_for_INT_DRQ(STATUS_INT_DRQ) == WAIT_ERROR) {    // wait for INT, and if that didn't come, fail
+            *FLOCK = 0;             // release FLOCK
             return;
         }
 
-        val = ((WORD)cmd[i]) << 1;  // prepare cmd byte
-        val = *(pPIOwrite + val);   // write other cmd byte
+        val = ((WORD)cmd[i]) << 1;                      // prepare cmd byte
+        val = *((volatile WORD *)(pPIOwrite + val));    // write other cmd byte
     }
 
     //------------------
@@ -93,6 +94,7 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     if(ReadNotWrite) {                          // on read
         for(i=0; i<byteCount; i++) {
             if(wait_for_INT_DRQ(STATUS_INT_DRQ) == WAIT_ERROR) {    // wait for DRQ or INT, and if that didn't come, fail
+                *FLOCK = 0;                     // release FLOCK
                 return;
             }
 
@@ -101,6 +103,7 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
             if(val & STATUS2_DataIsPIOread) {   // if this wasn't data, but the last (status) byte, store it and quit
                 hdIf.statusByte = val & 0xff;
                 hdIf.success = TRUE;
+                *FLOCK = 0;                     // release FLOCK
                 return;
             }
 
@@ -113,6 +116,7 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
         for(i=0; i<byteCount; i++) {
             val = wait_for_INT_DRQ(STATUS_INT_DRQ); // wait for DRQ or INT
             if(val == WAIT_ERROR) {                 // if signal didn't come, fail
+                *FLOCK = 0;                     // release FLOCK
                 return;
             }
 
@@ -122,7 +126,7 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 
             val = *buffer;                      // get data from buffer
             buffer++;
-            val = *(pDMAwrite + (val << 1));    // try to do DMA write
+            val = *((volatile WORD *)(pDMAwrite + (val << 1)));    // try to do DMA write
         }
 
         // if whole sector(s) was read, read status at the end
@@ -131,12 +135,15 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     //-------------------
     // transfer status byte
     if(wait_for_INT_DRQ(STATUS_INT) == WAIT_ERROR) {   // wait for INT, and if that didn't come, fail
+        *FLOCK = 0;                 // release FLOCK
         return;
     }
 
     val = *pPIOread;                // get it
     hdIf.statusByte = val & 0xff;   // store it
     hdIf.success = TRUE;            // success!
+
+    *FLOCK = 0;                     // release FLOCK
 }
 
 //**************************************************************************

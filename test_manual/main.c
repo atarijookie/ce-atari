@@ -177,39 +177,55 @@ int main(void)
 
     // ---------------------- 
     // search for device on the ACSI / SCSI bus 
+    (void) Cconws("Choose HDD interface:\r\n");
     deviceID = 0;
-    
-    if(machineType == MACHINE_ST) {             // if it's ST, use ACSI
-        key = 'a';
-    } else if(machineType == MACHINE_FALCON) {  // if it's Falcon, use SCSI
-        key = 'f';
-    } else {                                    // if it's TT, let user choose
-        //            |                    |
-        (void) Cconws("Choose HDD interface:\r\n");
-        
-        while(1) {
-            (void) Cconws("'A' - ACSI \r\n");
-            (void) Cconws("'T' - TT SCSI \r\n");
 
-            key = Cnecin();
-            if(key >= 'A' && key <= 'Z') {
-                key += 32;
-            }
-            
-            if(key == 't' || key == 'a') {      // good key press? go on...
-                break;
-            }
+    if(machineType == MACHINE_ST || machineType == MACHINE_TT) {    // machine with ACSI?
+       (void) Cconws("'A' - ACSI \r\n");
+    }
+
+    if(machineType == MACHINE_TT) {    // TT?
+       (void) Cconws("'T' - TT SCSI \r\n");
+    }
+
+    if(machineType == MACHINE_FALCON) {  // if it's Falcon, use SCSI
+        (void) Cconws("'F' - Falcon SCSI \r\n");
+    } 
+
+   (void) Cconws("'C' - CART \r\n");
+   (void) Cconws("'Q' - quit \r\n");
+
+    while(1) {
+        key = Cnecin();
+        if(key >= 'A' && key <= 'Z') {
+            key += 32;
+        }
+        
+        // good key press? go on...
+        if(key == 't' || key == 'a' || key == 'f' || key == 'c') {
+            break;
+        }
+
+        if(key == 'q') {
+            Mfree(pBufferOrig);             // release the memory
+            return 0;
         }
     }
 
      //           |                    |
     (void) Cconws("HDD Interface       : ");
-    
+
     switch(key) {
-        case 'a':   
+        case 'a':
             (void) Cconws("\33pACSI\33q");
             hdd_if_select(IF_ACSI);
             deviceID = 0;           // ACSI ID 0
+            break;
+
+        case 'c':
+            (void) Cconws("\33pCART\33q");
+            hdd_if_select(IF_CART);
+            deviceID = 0;           // CART ID 0
             break;
 
         case 't':
@@ -224,7 +240,7 @@ int main(void)
             deviceID = 1;           // SCSI ID 1
             
             break;
-    } 
+    }
     (void) Cconws("\r\n");
 
     showLogs = 0;                   // turn off logs - there will be errors on findDevice when device doesn't exist 
@@ -238,14 +254,14 @@ int main(void)
     }
 
     showLogs = 1;                   // turn on logs
-            
+
     showMenu();
 
     //-----------------
     // main menu loop
     while(1) {
-        scancode    = Bconin(DEV_CONSOLE); 		                    // get char form keyboard, no echo on screen 
-        key         =  scancode & 0xff;
+        scancode = Bconin(DEV_CONSOLE);         // get char form keyboard, no echo on screen 
+        key      = scancode & 0xff;
 
         if(key == 'q') {
             (void) Cconws("Terminating...\r\n");
