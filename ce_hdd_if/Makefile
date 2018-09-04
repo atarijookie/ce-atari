@@ -42,7 +42,7 @@ HDR      = mutex.h acsi.h scsi.h cart.h \
            hdd_if.h hdd_if_lowlevel.h global.h 
 CSRC     = mutex.c acsi.c cart.c scsi_falcon.c scsi_tt.c \
            find_ce.c hdd_if.c
-#SSRC     = 
+SSRC     = cart_asm.s
 
 ifeq ($(SLIM),yes)
     CFLAGS    += -nostdlib -DSLIM

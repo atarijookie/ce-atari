@@ -9,6 +9,11 @@
 
 #define WAIT_ERROR  0xff
 
+extern volatile BYTE cart_status_byte;
+extern volatile BYTE cart_success;
+
+void cart_dma_read(BYTE *buffer, DWORD byteCount);
+
 //**************************************************************************
 static BYTE wait_for_INT_DRQ(WORD mask)
 {
@@ -90,6 +95,9 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     }
 
     //------------------
+//#define CART_ASM
+
+#ifndef CART_ASM
     // transfer data
     if(ReadNotWrite) {                          // on read
         for(i=0; i<byteCount; i++) {
@@ -142,6 +150,17 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     val = *pPIOread;                // get it
     hdIf.statusByte = val & 0xff;   // store it
     hdIf.success = TRUE;            // success!
+
+#else
+    if(ReadNotWrite) {              // on read
+        cart_dma_read(buffer, byteCount);
+    } else {                        // on write
+
+    }
+
+    hdIf.statusByte = cart_status_byte;
+    hdIf.success = cart_success;
+#endif
 
     *FLOCK = 0;                     // release FLOCK
 }
