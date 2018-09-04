@@ -2,7 +2,7 @@
 #ifndef _PERIODICTHREAD_H_
 #define _PERIODICTHREAD_H_
 
-class AcsiDataTrans;
+class DataTrans;
 class Scsi;
 class ConfigStream;
 
@@ -20,8 +20,8 @@ typedef struct {
         ConfigStream    *web;
         ConfigStream    *term;
 
-        AcsiDataTrans   *dataTransWeb;
-        AcsiDataTrans   *dataTransTerm;
+        DataTrans       *dataTransWeb;
+        DataTrans       *dataTransTerm;
     } configStream;
 
     struct {

@@ -96,7 +96,7 @@ public:
     void hideMessageScreen(void);
 
     void createConfigDump(void);
-    
+
     void createScreen_homeScreen(void);
     void createScreen_acsiConfig(void);
     void createScreen_translated(void);
@@ -150,9 +150,9 @@ private:
     int gotoOffset;
 
     bool updateFromWebNotUsb;
-    
+
     int enterKeyEventLater;
-    
+
     DataTrans       *dataTrans;
     SettingsReloadProxy *reloadProxy;
 
@@ -168,7 +168,7 @@ private:
     DWORD lastCmdTime;
 
     void enterKeyHandler(int event);
-    
+
     void destroyCurrentScreen(void);
     void setFocusToFirstFocusable(void);
 
@@ -199,18 +199,18 @@ private:
     void onIkbdSave(void);
     void onResetSettings(void);
     void onSendSettings(void);
-    
+
     bool verifyAndFixIPaddress(std::string &in, std::string &out, bool emptyIsOk);
 
     void replaceNewLineWithGoto(std::string &line, int startX, int startY);
-    
+
     void translateVT52rawConsole(const BYTE *vt52stream, int vt52cnt, char *rawConsole, int rawConsoleSize);
     void dumpScreenToFile(FILE *f);
     //-------------
     // remote console stuff
     void linuxConsole_KeyDown(BYTE atariKey);
     int  linuxConsole_getStream(BYTE *bfr, int maxLen);
-    
+
     int  filterVT100(char *bfr, int cnt);
     void atariKeyToConsoleKey(BYTE atariKey, char *bfr, int &cnt);
     // Set values

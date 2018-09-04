@@ -23,7 +23,7 @@ ConfigStream::ConfigStream(int whereItWillBeShown)
     gotoOffset      = 0;
 
     enterKeyEventLater = 0;
-    
+
     showingHomeScreen	= false;
     showingMessage		= false;
     screenChanged		= true;
@@ -76,7 +76,7 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
 
     case CFG_CMD_KEYDOWN:
         onKeyDown(cmd[5]);                                                // first send the key down signal
-        
+
         if(enterKeyEventLater) {                                            // if we should handle some event 
             enterKeyHandler(enterKeyEventLater);                            // handle it
             enterKeyEventLater = 0;                                         // and don't let it handle next time
@@ -114,17 +114,17 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
     {
         BYTE isUpdateStartingFlag               = (Update::state() == UPDATE_STATE_WAITBEFOREINSTALL) ? 1 : 0;
         BYTE updateComponentsWithValidityNibble = 0xC0 | Update::getUpdateComponents();
-        
+
         dataTrans->addDataByte(isUpdateStartingFlag);
         dataTrans->addDataByte(updateComponentsWithValidityNibble);
         dataTrans->padDataToMul16();
-        
+
         dataTrans->setStatus(SCSI_ST_OK);
-        
+
         Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_UPDATING_QUERY -- isUpdateStartingFlag: %d, updateComponentsWithValidityNibble: %x", isUpdateStartingFlag, updateComponentsWithValidityNibble);
         break;
     }
-        
+
     case CFG_CMD_REFRESH:
         screenChanged = true;                                           // get full stream, not only differences
         streamCount = getStream(false, readBuffer, READ_BUFFER_SIZE);   // then get current screen stream
@@ -143,18 +143,18 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
 
         Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_GO_HOME -- %d bytes", streamCount);
         break;
-        
+
     case CFG_CMD_LINUXCONSOLE_GETSTREAM:                                // get the current bash console stream
         if(cmd[5] != 0) {                                               // if it's a real key, send it
             linuxConsole_KeyDown(cmd[5]);
         }
-            
+
         streamCount = linuxConsole_getStream(readBuffer, 3 * 512);      // get the stream from shell
         dataTrans->addDataBfr(readBuffer, streamCount, true);           // add data and status, with padding to multiple of 16 bytes
         dataTrans->setStatus(SCSI_ST_OK);
-        
+
         break;
-        
+
     default:                            // other cases: error
         dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
         break;

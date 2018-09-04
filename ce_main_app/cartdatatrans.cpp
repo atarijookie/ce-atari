@@ -7,23 +7,40 @@
 #include "debug.h"
 #include "utils.h"
 #include "gpio.h"
-#include "CartDataTrans.h"
+#include "cartdatatrans.h"
 #include "native/scsi_defs.h"
 
-#define PIN_XDONE           RPI_V2_GPIO_P1_26
-#define PIN_XPIO            RPI_V2_GPIO_P1_24
-#define PIN_XDMA            RPI_V2_GPIO_P1_32
-#define PIN_XRnW            RPI_V2_GPIO_P1_33
-#define PIN_XDataNotStatus  RPI_V2_GPIO_P1_36
+#ifndef ONPC_NOTHING
+    #define PIN_XDONE           RPI_V2_GPIO_P1_26
+    #define PIN_XPIO            RPI_V2_GPIO_P1_24
+    #define PIN_XDMA            RPI_V2_GPIO_P1_32
+    #define PIN_XRnW            RPI_V2_GPIO_P1_33
+    #define PIN_XDataNotStatus  RPI_V2_GPIO_P1_36
 
-#define PIN_D0              RPI_V2_GPIO_P1_12
-#define PIN_D1              RPI_V2_GPIO_P1_35
-#define PIN_D2              RPI_V2_GPIO_P1_38
-#define PIN_D3              RPI_V2_GPIO_P1_40
-#define PIN_D4              RPI_V2_GPIO_P1_15
-#define PIN_D5              RPI_V2_GPIO_P1_18
-#define PIN_D6              RPI_V2_GPIO_P1_22
-#define PIN_D7              RPI_V2_GPIO_P1_37
+    #define PIN_D0              RPI_V2_GPIO_P1_12
+    #define PIN_D1              RPI_V2_GPIO_P1_35
+    #define PIN_D2              RPI_V2_GPIO_P1_38
+    #define PIN_D3              RPI_V2_GPIO_P1_40
+    #define PIN_D4              RPI_V2_GPIO_P1_15
+    #define PIN_D5              RPI_V2_GPIO_P1_18
+    #define PIN_D6              RPI_V2_GPIO_P1_22
+    #define PIN_D7              RPI_V2_GPIO_P1_37
+#else
+    #define PIN_XDONE           0
+    #define PIN_XPIO            0
+    #define PIN_XDMA            0
+    #define PIN_XRnW            0
+    #define PIN_XDataNotStatus  0
+
+    #define PIN_D0              0
+    #define PIN_D1              0
+    #define PIN_D2              0
+    #define PIN_D3              0
+    #define PIN_D4              0
+    #define PIN_D5              0
+    #define PIN_D6              0
+    #define PIN_D7              0
+#endif
 
 #define DATA_MASK ((1 << PIN_D7) | (1 << PIN_D6) | (1 << PIN_D5) | (1 << PIN_D4) | (1 << PIN_D3) | (1 << PIN_D2) | (1 << PIN_D1) | (1 << PIN_D0))
 
@@ -249,7 +266,7 @@ bool CartDataTrans::sendData_transferBlock(BYTE *pData, DWORD dataCount)
     if((dataCount & 1) != 0) {  // odd number of bytes? make it even, we're sending words...
         dataCount++;
     }
-    
+
     while(dataCount > 0) {      // while there's something to send
         DMA_read(*pData);       // let ST read byte
         pData++;                // move to next byte
@@ -259,7 +276,7 @@ bool CartDataTrans::sendData_transferBlock(BYTE *pData, DWORD dataCount)
             return false;
         }
     }
-    
+
     return true;                // if got here, all is ok
 }
 
@@ -304,13 +321,16 @@ bool CartDataTrans::timeout(void)
 
 void CartDataTrans::writeDataToGPIO(BYTE val)
 {
+#ifndef ONPC_NOTHING
     // GPIO 26-24 + 22-18 of RPi are used as data port, split and shift data into right position
     DWORD value = ((((DWORD) val) & 0xe0) << 19) | ((((DWORD) val) & 0x1f) << 18);
     bcm2835_gpio_write_mask(value, DATA_MASK);
+#endif
 }
 
 BYTE CartDataTrans::readDataFromGPIO(void)
 {
+#ifndef ONPC_NOTHING
     // get whole gpio by single read -- taken from bcm library
     volatile DWORD* paddr = bcm2835_gpio + BCM2835_GPLEV0/4;
     DWORD value = bcm2835_peri_read(paddr);
@@ -321,6 +341,9 @@ BYTE CartDataTrans::readDataFromGPIO(void)
 
     BYTE val = upper | lower;   // combine upper and lower part together
     return val;
+#else
+    return 0;
+#endif
 }
 
 // get 1st CMD byte from ST  -- without setting INT

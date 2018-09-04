@@ -24,6 +24,7 @@
 #include "display/displaythread.h"
 #include "acsidatatrans.h"
 #include "cartdatatrans.h"
+#include "memdatatrans.h"
 
 #include "service/configservice.h"
 #include "service/floppyservice.h"
@@ -151,13 +152,13 @@ void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyServi
     shared.configStream.acsi->setSettingsReloadProxy(&settingsReloadProxy);
 
     // create config stream for web interface
-    shared.configStream.dataTransWeb    = new AcsiDataTrans();
+    shared.configStream.dataTransWeb    = new MemDataTrans();
     shared.configStream.web             = new ConfigStream(CONFIGSTREAM_THROUGH_WEB);
     shared.configStream.web->setDataTrans(shared.configStream.dataTransWeb);
     shared.configStream.web->setSettingsReloadProxy(&settingsReloadProxy);
 
     // create config stream for linux terminal
-    shared.configStream.dataTransTerm   = new AcsiDataTrans();
+    shared.configStream.dataTransTerm   = new MemDataTrans();
     shared.configStream.term            = new ConfigStream(CONFIGSTREAM_IN_LINUX_CONSOLE);
     shared.configStream.term->setDataTrans(shared.configStream.dataTransTerm);
     shared.configStream.term->setSettingsReloadProxy(&settingsReloadProxy);
