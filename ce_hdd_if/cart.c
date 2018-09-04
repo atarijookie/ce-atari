@@ -13,6 +13,7 @@ extern volatile BYTE cart_status_byte;
 extern volatile BYTE cart_success;
 
 void cart_dma_read(BYTE *buffer, DWORD byteCount);
+void cart_dma_write(BYTE *buffer, DWORD byteCount);
 
 //**************************************************************************
 static BYTE wait_for_INT_DRQ(WORD mask)
@@ -155,7 +156,7 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     if(ReadNotWrite) {              // on read
         cart_dma_read(buffer, byteCount);
     } else {                        // on write
-
+        cart_dma_write(buffer, byteCount);
     }
 
     hdIf.statusByte = cart_status_byte;

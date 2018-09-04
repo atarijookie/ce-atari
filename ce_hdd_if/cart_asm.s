@@ -71,6 +71,46 @@ on_timeout:
     rts
 
 | ------------------------------------------------------
+_cart_dma_write:
+    movem.l D0-D3/A0-A3,-(SP)   | save regs
+
+    | input args:
+    move.l  4(sp), a0       | A0 - buffer pointer to store data
+    move.l  8(sp), d1       | D1 - byte count to transfer
+
+    move.l  #0x04BA, a3     | pointer to 200 Hz timer
+    move.l  (a3), d2        | current 200 HZ counter value
+    add.l   #200, d2        | timeout counter value
+
+    move.l  #0xfbc000, A1   | address for DMA write
+    move.l  #0xfbd200, A2   | address for reading CPLD status
+
+write_another:
+    move.l  (a3), d3        | read current value of 200 Hz timer
+    cmp.l   d2, d3          | compare if timeout time (d2) was reached by current time (d3)
+    beq     on_timeout
+
+    move.w  (a2), d0        | read cpld status
+
+    btst    #0, d0          | test INT
+    beq     get_status_byte | if INT is 0, end DMA write and read PIO status byte
+
+    btst    #1, d0          | test DRQ
+    bne     write_another   | if DRQ is 1, wait some more
+
+    clr.l   d0              | make sure that whole register is clear
+    move.b  (a0)+, d0       | get data from buffer - in the lowest byte of the register
+    move.w  (a1, d0.l), d0  | do a data write by reading from DMA write address + offset
+
+    sub.l   #1,D1           | byteCount--
+    tst.l   D1              | check if we have something more to read
+    bne     write_another   | still something do to, go again
+
+    | if we got here, we transfered whole sector, so now we need to read the status byte
+    jmp     get_status_byte | continue with the same end as with card_dma_read
+
+| ------------------------------------------------------
+
     .bss
 _cart_status_byte:  .ds.b   1
 _cart_success:      .ds.b   1
