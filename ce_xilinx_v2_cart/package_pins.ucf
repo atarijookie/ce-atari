@@ -14,42 +14,37 @@ NET "ADDR<5>"  LOC = "P61"  ;
 NET "ADDR<6>"  LOC = "P64"  ;
 NET "ADDR<7>"  LOC = "P66"  ;
 NET "ADDR<8>"  LOC = "P68"  ;
-NET "ADDR<9>"  LOC = "P65"  ;
-NET "ADDR<10>"  LOC = "P63"  ;
-NET "ADDR<11>"  LOC = "P59"  ;
-NET "ADDR<12>"  LOC = "P60"  ;
-NET "ADDR<13>"  LOC = "P71"  ;
-NET "ADDR<14>"  LOC = "P67"  ;
-NET "ADDR<15>"  LOC = "P70"  ;
+#NET "ADDR<9>"  LOC = "P65"  ;
+#NET "ADDR<10>"  LOC = "P63"  ;
+#NET "ADDR<11>"  LOC = "P59"  ;
+#NET "ADDR<12>"  LOC = "P60"  ;
 
-NET "DATA1<0>"  LOC = "P74"  ;
-NET "DATA1<1>"  LOC = "P72"  ;
-NET "DATA1<2>"  LOC = "P77"  ;
-NET "DATA1<3>"  LOC = "P76"  ;
-NET "DATA1<4>"  LOC = "P79"  ;
-NET "DATA1<5>"  LOC = "P78"  ;
-NET "DATA1<6>"  LOC = "P82"  ;
-NET "DATA1<7>"  LOC = "P81"  ;
+NET "DATA_ST_LOWER<0>"  LOC = "P74"  ;
+NET "DATA_ST_LOWER<1>"  LOC = "P72"  ;
+NET "DATA_ST_LOWER<2>"  LOC = "P77"  ;
+NET "DATA_ST_LOWER<3>"  LOC = "P76"  ;
+NET "DATA_ST_LOWER<4>"  LOC = "P79"  ;
+NET "DATA_ST_LOWER<5>"  LOC = "P78"  ;
+NET "DATA_ST_LOWER<6>"  LOC = "P82"  ;
+NET "DATA_ST_LOWER<7>"  LOC = "P81"  ;
 
-NET "DATA1s<0>"  LOC = "P85"  ;
-NET "DATA1s<1>"  LOC = "P86"  ;
+NET "DATA_ST_UPPER<0>"  LOC = "P85"  ;
+NET "DATA_ST_UPPER<1>"  LOC = "P86"  ;
+NET "DATA_ST_UPPER<2>"  LOC = "P87"  ;
 
-NET "DATA2<0>"  LOC = "P17"  ;
-NET "DATA2<1>"  LOC = "P6"  ;
-NET "DATA2<2>"  LOC = "P97"  ;
-NET "DATA2<3>"  LOC = "P96"  ;
-NET "DATA2<4>"  LOC = "P15"  ;
-NET "DATA2<5>"  LOC = "P13"  ;
-NET "DATA2<6>"  LOC = "P12"  ;
-NET "DATA2<7>"  LOC = "P1"  ;
+NET "DATA_RPI<0>"  LOC = "P17"  ;
+NET "DATA_RPI<1>"  LOC = "P6"  ;
+NET "DATA_RPI<2>"  LOC = "P97"  ;
+NET "DATA_RPI<3>"  LOC = "P96"  ;
+NET "DATA_RPI<4>"  LOC = "P15"  ;
+NET "DATA_RPI<5>"  LOC = "P13"  ;
+NET "DATA_RPI<6>"  LOC = "P12"  ;
+NET "DATA_RPI<7>"  LOC = "P1"  ;
 
-NET "reset_hans"  LOC = "P99"  ;
-NET "XCMD"  LOC = "P14"  ;
-NET "XDONE"  LOC = "P10"  ;
-NET "XPIO"  LOC = "P11"  ;
-NET "XDMA"  LOC = "P9"  ;
+NET "STdidTransfer"  LOC = "P14"  ;
+NET "XNEXT"  LOC = "P11"  ;
+NET "XRESET"  LOC = "P99"  ;
 NET "XRnW"  LOC = "P8"  ;
-NET "XDataNotStatus"  LOC = "P4"  ;
 
 #PACE: Start of PACE Area Constraints
 
