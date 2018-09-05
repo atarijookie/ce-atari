@@ -11,11 +11,10 @@
 #include "native/scsi_defs.h"
 
 #ifndef ONPC_NOTHING
-    #define PIN_XDONE           RPI_V2_GPIO_P1_26
-    #define PIN_XPIO            RPI_V2_GPIO_P1_24
-    #define PIN_XDMA            RPI_V2_GPIO_P1_32
+    #define PIN_ST_DID_TRANSFER PIN_ATN_HANS
+    #define PIN_XRESET          PIN_RESET_HANS
+    #define PIN_XNEXT           RPI_V2_GPIO_P1_24
     #define PIN_XRnW            RPI_V2_GPIO_P1_33
-    #define PIN_XDataNotStatus  RPI_V2_GPIO_P1_36
 
     #define PIN_D0              RPI_V2_GPIO_P1_12
     #define PIN_D1              RPI_V2_GPIO_P1_35
@@ -26,11 +25,10 @@
     #define PIN_D6              RPI_V2_GPIO_P1_22
     #define PIN_D7              RPI_V2_GPIO_P1_37
 #else
-    #define PIN_XDONE           0
-    #define PIN_XPIO            0
-    #define PIN_XDMA            0
+    #define PIN_ST_DID_TRANSFER 0
+    #define PIN_XRESET          0
+    #define PIN_XNEXT           0
     #define PIN_XRnW            0
-    #define PIN_XDataNotStatus  0
 
     #define PIN_D0              0
     #define PIN_D1              0
@@ -86,7 +84,6 @@ void CartDataTrans::hwDataDirection(bool readNotWrite)
 
     if(readNotWrite) {      // on READ (data from RPi to ST) - 1st set CPLD to read, then data pins to output
         bcm2835_gpio_write(PIN_XRnW, HIGH);
-        bcm2835_gpio_write(PIN_XDataNotStatus, HIGH);
     }
 
     for(i=0; i<8; i++) {    // set direction of data pins
@@ -95,15 +92,14 @@ void CartDataTrans::hwDataDirection(bool readNotWrite)
 
     if(!readNotWrite) {      // on WRITE (data from ST to RPi) - 1st set data pins to input, then CPLD to output
         bcm2835_gpio_write(PIN_XRnW, LOW);
-        bcm2835_gpio_write(PIN_XDataNotStatus, HIGH);
     }
 }
 
 void CartDataTrans::configureHw(void)
 {
 #ifndef ONPC_NOTHING
-    bcm2835_gpio_fsel(PIN_RESET_HANS,  BCM2835_GPIO_FSEL_OUTP);
-    bcm2835_gpio_write(PIN_RESET_HANS, LOW);      // reset lines to RESET
+    bcm2835_gpio_fsel(PIN_XRESET,  BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_write(PIN_XRESET, LOW);      // reset lines to RESET
 
     // pins for XILINX programming
     // outputs: TDI (GPIO3), TCK (GPIO4), TMS (GPIO17)
@@ -119,24 +115,20 @@ void CartDataTrans::configureHw(void)
 
     // cpld interface
     // these 2 are the same with the SPI version of CE
-    bcm2835_gpio_fsel(PIN_RESET_HANS,       BCM2835_GPIO_FSEL_OUTP);
-    bcm2835_gpio_fsel(PIN_ATN_HANS,         BCM2835_GPIO_FSEL_INPT);
+    bcm2835_gpio_fsel(PIN_ST_DID_TRANSFER,  BCM2835_GPIO_FSEL_INPT);
+    bcm2835_gpio_fsel(PIN_XRESET,           BCM2835_GPIO_FSEL_OUTP);
 
     // the rest is different to SPI version of CE
-    bcm2835_gpio_fsel(PIN_XDONE,            BCM2835_GPIO_FSEL_INPT);
-    bcm2835_gpio_fsel(PIN_XPIO,             BCM2835_GPIO_FSEL_OUTP);
-    bcm2835_gpio_fsel(PIN_XDMA,             BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_fsel(PIN_XNEXT,            BCM2835_GPIO_FSEL_OUTP);
     bcm2835_gpio_fsel(PIN_XRnW,             BCM2835_GPIO_FSEL_OUTP);
-    bcm2835_gpio_fsel(PIN_XDataNotStatus,   BCM2835_GPIO_FSEL_OUTP);
 
-    // XPIO and XDMA to idle level
-    bcm2835_gpio_write(PIN_XPIO, LOW);
-    bcm2835_gpio_write(PIN_XDMA, LOW);
+    // XNEXT to idle level
+    bcm2835_gpio_write(PIN_XNEXT, LOW);
 
     // set data pins to WRITE direction (from ST to RPi)
     hwDirForWrite();
 
-    bcm2835_gpio_write(PIN_RESET_HANS, HIGH);      // reset lines to RUN (not reset) state
+    bcm2835_gpio_write(PIN_XRESET, HIGH);      // reset lines to RUN (not reset) state
 #endif
 }
 
@@ -161,7 +153,7 @@ bool CartDataTrans::waitForATN(int whichSpiCs, BYTE *inBuf)
         return true;
     }
 
-    BYTE val = bcm2835_gpio_lev(PIN_ATN_HANS);  // read ATN pin
+    BYTE val = bcm2835_gpio_lev(PIN_ST_DID_TRANSFER);  // read ATN pin
     if (val == HIGH) {                          // ATN true if high
         getCommandFromST();                     // try to get command from ST
 
@@ -193,8 +185,8 @@ int CartDataTrans::getCmdLengthFromCmdBytesAcsi(void)
 
 void CartDataTrans::resetCpld(void)
 {
-    bcm2835_gpio_write(PIN_RESET_HANS, LOW);
-    bcm2835_gpio_write(PIN_RESET_HANS, HIGH);
+    bcm2835_gpio_write(PIN_XRESET, LOW);
+    bcm2835_gpio_write(PIN_XRESET, HIGH);
 }
 
 void CartDataTrans::getCommandFromST(void)
@@ -359,14 +351,14 @@ BYTE CartDataTrans::PIO_writeFirst(void)
 // get next CMD byte from ST -- with setting INT to LOW and waiting for CS
 BYTE CartDataTrans::PIO_write(void)
 {
-    // create rising edge on XPIO
-    bcm2835_gpio_write(PIN_XPIO, HIGH);     // to HIGH
-    bcm2835_gpio_write(PIN_XPIO, LOW);      // to LOW
+    // create rising edge on XNEXT
+    bcm2835_gpio_write(PIN_XNEXT, HIGH);     // to HIGH
+    bcm2835_gpio_write(PIN_XNEXT, LOW);      // to LOW
 
     while(1) {                  // wait for CS or timeout
-        BYTE xdone = bcm2835_gpio_lev(PIN_XDONE);
+        BYTE done = bcm2835_gpio_lev(PIN_ST_DID_TRANSFER);
 
-        if(xdone == HIGH) {     // if CS arrived, read and quit
+        if(done == HIGH) {     // if CS arrived, read and quit
             return readDataFromGPIO();
         }
 
@@ -383,14 +375,14 @@ void CartDataTrans::PIO_read(BYTE val)
     hwDirForRead();                         // data as outputs (ST does data READ)
     writeDataToGPIO(val);                   // write the data to output data register
 
-    // create rising edge on XPIO
-    bcm2835_gpio_write(PIN_XPIO, HIGH);     // to HIGH
-    bcm2835_gpio_write(PIN_XPIO, LOW);      // to LOW
+    // create rising edge on XNEXT
+    bcm2835_gpio_write(PIN_XNEXT, HIGH);     // to HIGH
+    bcm2835_gpio_write(PIN_XNEXT, LOW);      // to LOW
 
     while(1) {                                                              // wait for CS or timeout
-        BYTE xdone = bcm2835_gpio_lev(PIN_XDONE);
+        BYTE done = bcm2835_gpio_lev(PIN_ST_DID_TRANSFER);
 
-        if(xdone == HIGH) {     // if CS arrived
+        if(done == HIGH) {     // if CS arrived
             break;
         }
 
@@ -408,14 +400,14 @@ void CartDataTrans::DMA_read(BYTE val)
 {
     writeDataToGPIO(val);                   // write the data to output data register
 
-    // create rising edge on aDMA
-    bcm2835_gpio_write(PIN_XDMA, HIGH);     // to HIGH
-    bcm2835_gpio_write(PIN_XDMA, LOW);      // to LOW
+    // create rising edge on XNEXT
+    bcm2835_gpio_write(PIN_XNEXT, HIGH);     // to HIGH
+    bcm2835_gpio_write(PIN_XNEXT, LOW);      // to LOW
 
     while(1) {                                                              // wait for ACK or timeout
-        BYTE xdone = bcm2835_gpio_lev(PIN_XDONE);
+        BYTE done = bcm2835_gpio_lev(PIN_ST_DID_TRANSFER);
 
-        if(xdone == HIGH) {     // if CS arrived
+        if(done == HIGH) {     // if CS arrived
             break;
         }
 
@@ -428,14 +420,14 @@ void CartDataTrans::DMA_read(BYTE val)
 
 BYTE CartDataTrans::DMA_write(void)
 {
-    // create rising edge on aDMA
-    bcm2835_gpio_write(PIN_XDMA, HIGH);     // to HIGH
-    bcm2835_gpio_write(PIN_XDMA, LOW);      // to LOW
+    // create rising edge on XNEXT
+    bcm2835_gpio_write(PIN_XNEXT, HIGH);     // to HIGH
+    bcm2835_gpio_write(PIN_XNEXT, LOW);      // to LOW
 
     while(1) {                                                              // wait for ACK or timeout
-        BYTE xdone = bcm2835_gpio_lev(PIN_XDONE);
+        BYTE done = bcm2835_gpio_lev(PIN_ST_DID_TRANSFER);
 
-        if(xdone == HIGH) {     // if CS arrived, read and quit
+        if(done == HIGH) {     // if CS arrived, read and quit
             return readDataFromGPIO();
         }
 
