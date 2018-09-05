@@ -63,7 +63,8 @@ begin
     begin
         if(XRESET='0' or XNEXT='1') then            -- on end of transfer (XRESET='0') or before next byte transfer (XNEXT='1') reset this -- RPi will use this to wait for 1st or any other byte
             STdidTransferState <= '0';
-        elsif rising_edge(READ_CART_LDS) then       -- when ST accesses LDS (data read or write), we know that we got 1st or any other byte
+        elsif falling_edge(READ_CART_LDS) then      -- when ST accesses LDS (data read or write), we know that we got 1st or any other byte
+                                                    -- do this on falling edge of this signal (which is inv. of ROM signal), so the RPi will know it can stop driving data port on READ operations
             STdidTransferState <= '1';
         end if;
 
