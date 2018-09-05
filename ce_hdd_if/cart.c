@@ -7,7 +7,8 @@
 #include "hdd_if_lowlevel.h"
 #include "stdlib.h"
 
-#define WAIT_ERROR  0xff
+#define WAIT_TIMEOUT    0xff
+#define WAIT_EOF        0xfe
 
 extern volatile BYTE cart_status_byte;
 extern volatile BYTE cart_success;
@@ -15,31 +16,38 @@ extern volatile BYTE cart_success;
 void cart_dma_read(BYTE *buffer, DWORD byteCount);
 void cart_dma_write(BYTE *buffer, DWORD byteCount);
 
+DWORD timeout_time;
+
+static BYTE lastReadData;
 //**************************************************************************
-static BYTE wait_for_INT_DRQ(WORD mask)
+static BYTE wait_for_next(void)
 {
-    DWORD now, until;
+    DWORD now;
     WORD val;
 
-    now = *HZ_200;
-    until = TIMEOUT + now;          // calc value timer must get to
-
     while(1) {
-        val = *pCmdStatus;          // read status
-        val = val & mask;           // get only wanted bits
+        val = *pCartStatus;                 // read status
 
-        if (val != mask) {          // if some of the masked bits are not high, we got what we wanted, good
-            return val;             // return value of bits for further evaluation
+        if(val & STATUS_B_RPIwantsMore) {   // RPi wants more data?
+            return 0;
+        }
+
+        if(val & STATUS_B_RPIisIdle) {      // RPi went idle?
+            hdIf.statusByte = lastReadData; // lastReadData is the SCSI status byte
+            hdIf.success = TRUE;
+            *FLOCK = 0;                     // release FLOCK, so we can just quit cart_cmd() after this function
+            return WAIT_EOF;
         }
 
         now = *HZ_200;
 
-        if(now >= until) {          // timeout? fail
+        if(now >= timeout_time) {           // timeout? fail
             break;
         }
     }
 
-    return WAIT_ERROR;              // no interrupt, and timer expired, return all bits set
+    *FLOCK = 0;                             // release FLOCK, so we can just quit cart_cmd() after this function
+    return WAIT_TIMEOUT;                    // no interrupt and timer expired? return error
 }
 
 // --------------------------------------
@@ -60,8 +68,7 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
         *FLOCK = -1;                                // disable FDC operations
     } else {                                        // should wait before acquiring FLOCK? wait...
         // try to acquire FLOCK if possible
-        DWORD end = getTicks() + 200;               // calculate the terminating tick count, where we should stop looking for unlocked FLOCK
-
+        timeout_time = getTicks() + TIMEOUT;        // timeout for FLOCK at this time
         WORD locked;
         while(1) {                                  // while not time out, try again
             locked = *FLOCK;                        // read current lock value
@@ -71,28 +78,30 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
                 break;
             }
 
-            if(getTicks() >= end) {                 // on time out - fail, return ACSIERROR
+            if(getTicks() >= timeout_time) {        // on time out - fail, return ACSIERROR
                 return;
             }
         }
     }
     // FLOCK acquired, continue with rest
 
+    timeout_time = getTicks() + TIMEOUT;            // timeout for whole R/W operation at this time
+
     //------------------
     // transfer 0th cmd byte
     val = ((WORD)cmd[0]) << 1;                      // prepare cmd byte
-    val = *((volatile WORD *)(pPIOfirst + val));    // write 1st byte (0)
+    val = *((volatile BYTE *)(CART_DATA + val));    // write 1st byte (0)
 
     //------------------
     // transfer remaining cmd bytes
     for(i=1; i<cmdLength; i++) {
-        if(wait_for_INT_DRQ(STATUS_INT_DRQ) == WAIT_ERROR) {    // wait for INT, and if that didn't come, fail
-            *FLOCK = 0;             // release FLOCK
+        if(wait_for_next()) {                       // if next didn't come, fail
+            hdIf.success = FALSE;                   // this was set wait_for_next() to TRUE, we need to fix it (don't change wait_for_next(), it's usefull at data transfers)
             return;
         }
 
         val = ((WORD)cmd[i]) << 1;                      // prepare cmd byte
-        val = *((volatile WORD *)(pPIOwrite + val));    // write other cmd byte
+        val = *((volatile BYTE *)(CART_DATA + val));    // write other cmd byte
     }
 
     //------------------
@@ -100,42 +109,29 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 
 #ifndef CART_ASM
     // transfer data
+    lastReadData = 0;
+
     if(ReadNotWrite) {                          // on read
         for(i=0; i<byteCount; i++) {
-            if(wait_for_INT_DRQ(STATUS_INT_DRQ) == WAIT_ERROR) {    // wait for DRQ or INT, and if that didn't come, fail
-                *FLOCK = 0;                     // release FLOCK
+            if(wait_for_next()) {               // wait for next byte, and if it's timeout or idle, it was handled and we can quit
                 return;
             }
 
-            val = *pDMAread;                    // try to do DMA read
-
-            if(val & STATUS2_DataIsPIOread) {   // if this wasn't data, but the last (status) byte, store it and quit
-                hdIf.statusByte = val & 0xff;
-                hdIf.success = TRUE;
-                *FLOCK = 0;                     // release FLOCK
-                return;
-            }
-
-            *buffer = val & 0xff;               // store data, go further
+            lastReadData = *pCartData;          // try to do read -- store it to lastReadData, because it might be SCSI status byte
+            *buffer = lastReadData;             // store data, go further
             buffer++;
         }
 
         // if whole sector(s) was read, read status at the end
-    } else {                                        // on write
+    } else {                                    // on write
         for(i=0; i<byteCount; i++) {
-            val = wait_for_INT_DRQ(STATUS_INT_DRQ); // wait for DRQ or INT
-            if(val == WAIT_ERROR) {                 // if signal didn't come, fail
-                *FLOCK = 0;                     // release FLOCK
+            if(wait_for_next()) {               // wait for next byte, and if it's timeout or idle, it was handled and we can quit
                 return;
             }
 
-            if((val & STATUS_INT) != STATUS_INT) {    // if INT is low, quit DMA write because status byte follows
-                break;
-            }
-
-            val = *buffer;                      // get data from buffer
+            val = ((WORD) (*buffer)) << 1;                  // get data from buffer
             buffer++;
-            val = *((volatile WORD *)(pDMAwrite + (val << 1)));    // try to do DMA write
+            lastReadData = *((volatile BYTE *)(CART_DATA + val));   // write other cmd byte, store it to lastReadData, because it might be SCSI status byte
         }
 
         // if whole sector(s) was read, read status at the end
@@ -143,13 +139,11 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
 
     //-------------------
     // transfer status byte
-    if(wait_for_INT_DRQ(STATUS_INT) == WAIT_ERROR) {   // wait for INT, and if that didn't come, fail
-        *FLOCK = 0;                 // release FLOCK
+    if(wait_for_next()) {           // wait for next byte, and if it's timeout or idle, it was handled and we can quit
         return;
     }
 
-    val = *pPIOread;                // get it
-    hdIf.statusByte = val & 0xff;   // store it
+    hdIf.statusByte = *pCartData;   // get it and store it
     hdIf.success = TRUE;            // success!
 
 #else

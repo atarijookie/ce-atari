@@ -3,29 +3,28 @@
 
 #include "global.h"
 
-#define CART_BASE             0xFB0000
-#define CC_CART_OFFSET        0x00C000
-#define ofs_cmd_status          0x1200
-#define ofs_cmd_pio_1st_byte    0x0c00
-#define ofs_cmd_pio_write       0x0400
-#define ofs_cmd_pio_read        0x0600
-#define ofs_cmd_dma_write       0x0000
-#define ofs_cmd_dma_read        0x0200
+// from https://www.atarimagazines.com/st-log/issue27/138_1_A_16-BIT_CARTRIDGE_PORT_INTERFACE.php
+// "UDS for even bytes, and LDS for odd"
+// Cart status is on UDS - even byte.
+// Cart data   is on LDS - odd byte.
 
-#define pCmdStatus  ((volatile WORD *)(CART_BASE + CC_CART_OFFSET + ofs_cmd_status))
-#define pPIOfirst                     (CART_BASE + CC_CART_OFFSET + ofs_cmd_pio_1st_byte)
-#define pPIOwrite                     (CART_BASE + CC_CART_OFFSET + ofs_cmd_pio_write)
-#define pPIOread    ((volatile WORD *)(CART_BASE + CC_CART_OFFSET + ofs_cmd_pio_read))
-#define pDMAwrite                     (CART_BASE + CC_CART_OFFSET + ofs_cmd_dma_write)
-#define pDMAread    ((volatile WORD *)(CART_BASE + CC_CART_OFFSET + ofs_cmd_dma_read))
+#define CART_BASE               0xFB0000
 
-#define STATUS_CMD      (1 << 2)    // 1st cmd byte was just sent by ST, cleared by RPi
-#define STATUS_DRQ      (1 << 1)    // RPi wants to send/receive in DMA mode -- set by RPi, cleared by ST
-#define STATUS_INT      (1 << 0)    // RPi wants to send/receive in PIO mode -- set by RPi, cleared by ST
-#define STATUS_INT_DRQ  (STATUS_DRQ | STATUS_INT)
+#define CART_STATUS             0xFB0000
+#define CART_DATA               0xFB0001
 
-#define STATUS2_DataIsPIOread   (1 << 17)   // when H, the read byte was the last byte - ST status byte (transfered using PIO read)
-#define STATUS2_DataChanged     (1 << 16)   // this bit changes every time the data changed
+#define pCartStatus ((volatile BYTE *) CART_STATUS)
+#define pCartData   ((volatile BYTE *) CART_DATA)
+
+// status bits when cart is read as WORD
+#define STATUS_W_RPIisIdle      (1 << 10)   // 1 when RPi doesn't do any further transfer (last byte was status byte)
+#define STATUS_W_RPIwantsMore   (1 <<  9)   // 1 when ST should transfer another byte (read or write)
+#define STATUS_W_DataChanged    (1 <<  8)   // this bit changes every time the data changed (0->1, 1->0)
+
+// status bits when cart is read as BYTE
+#define STATUS_B_RPIisIdle      (1 <<  2)   // 1 when RPi doesn't do any further transfer (last byte was status byte)
+#define STATUS_B_RPIwantsMore   (1 <<  1)   // 1 when ST should transfer another byte (read or write)
+#define STATUS_B_DataChanged    (1 <<  0)   // this bit changes every time the data changed (0->1, 1->0)
 
 #define TIMEOUT         200         // timeout 1 sec
 
