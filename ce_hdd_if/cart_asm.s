@@ -7,7 +7,7 @@
     .text
 
 _cart_dma_read:
-    movem.l D0-D3/A0-A3,-(SP)   | save regs
+    movem.l D0-D4/A0-A3,-(SP)   | save regs
 
     | input args:
     move.l  4(sp), a0       | A0 - buffer pointer to store data
@@ -17,44 +17,51 @@ _cart_dma_read:
     move.l  (a3), d2        | current 200 HZ counter value
     add.l   #200, d2        | timeout counter value
 
-    move.l  #0xfbc200, A1   | address for DMA read
-    move.l  #0xfbd200, A2   | address for reading CPLD status
+    move.l  #0xFB0001, A1   | address for data
+    move.l  #0xFB0000, A2   | address for CPLD status
 
-read_another:
+| ------------------------------------------------------
+    jmp     start_of_read_loop  | jump do the dbra, because it counts to -1 (not 0)
+
+wait_for_read:
+    move.b  (a2), d4        | read status
+    btst    #1, d4          | test RPIwantsMore
+    bne     do_read_byte    | if RPIwantsMore is 1, should transfer byte
+
+    btst    #2, d4                  | test RPIisIdle
+    bne     store_status_and_quit   | if RPIisIdle is 1, then RPi went idle and last read byte was status
+
     move.l  (a3), d3        | read current value of 200 Hz timer
     cmp.l   d2, d3          | compare if timeout time (d2) was reached by current time (d3)
     beq     on_timeout
 
-    move.w  (a2), d0        | read status
-    btst    #1, d0          | test DRQ
-    bne     read_another    | if DRQ is 1, wait some more
+    jmp     wait_for_read   | if came here, we need to wait some more
 
-    move.w  (a1), d0        | read data from cart
-
-    btst    #17, d0         | if STATUS2_DataIsPIOread is set, this wasn't data but the status byte
-    bne     store_status_and_quit
-
+do_read_byte:
+    move.b  (a1), d0        | read data from cart
     move.b  d0,(a0)+        | store data to buffer
 
-    sub.l   #1,D1           | byteCount--
-    tst.l   D1              | check if we have something more to read
-    bne     read_another    | still something do to, go again
+start_of_read_loop:
+    dbra    d1, wait_for_read  | check if we have something more to read
 
     | if we got here, we transfered whole sector, so now we need to read the status byte
 
-get_status_byte:
-    move.l  #0xfbc600, a1   | address for PIO read
-
 wait_for_status:
+    move.b  (a2), d4        | read status
+    btst    #1, d4          | test RPIwantsMore
+    bne     read_status     | if RPIwantsMore is 1, we can now read the status
+
+    btst    #2, d4                  | test RPIisIdle
+    bne     store_status_and_quit   | if RPIisIdle is 1, then RPi went idle and last read byte was status
+
     move.l  (a3), d3        | read current value of 200 Hz timer
     cmp.l   d2, d3          | compare if timeout time (d2) was reached by current time (d3)
     beq     on_timeout
 
-    move.w  (a2), d0        | read status
-    btst    #0, d0          | test INT
-    bne     wait_for_status | if INT is 1, wait some more
+    jmp     wait_for_status
 
-    move.w  (a1), d0        | do a PIO read (status byte)
+read_status:
+    move.b  (a1), d0        | do a PIO read (status byte)
 
 store_status_and_quit:
     | success -- 0: false; 1 -- true
@@ -62,17 +69,17 @@ store_status_and_quit:
     move.b  d0, _cart_status_byte   | store status byte
     move.b  #1, _cart_success       | this was a success
 
-    movem.l (SP)+, D0-D3/A0-A3      | restore regs
+    movem.l (SP)+, D0-D4/A0-A3      | restore regs
     rts
 
 on_timeout:
     move.b  #0, _cart_success       | this was a fail
-    movem.l (SP)+, D0-D3/A0-A3      | restore regs
+    movem.l (SP)+, D0-D4/A0-A3      | restore regs
     rts
 
 | ------------------------------------------------------
 _cart_dma_write:
-    movem.l D0-D3/A0-A3,-(SP)   | save regs
+    movem.l D0-D4/A0-A3,-(SP)   | save regs
 
     | input args:
     move.l  4(sp), a0       | A0 - buffer pointer to store data
@@ -82,32 +89,36 @@ _cart_dma_write:
     move.l  (a3), d2        | current 200 HZ counter value
     add.l   #200, d2        | timeout counter value
 
-    move.l  #0xfbc000, A1   | address for DMA write
-    move.l  #0xfbd200, A2   | address for reading CPLD status
+    move.l  #0xFB0001, A1   | address for data
+    move.l  #0xFB0000, A2   | address for CPLD status
 
-write_another:
+| ------------------------------------------------------
+    jmp     start_of_write_loop     | jump do the dbra, because it counts to -1 (not 0)
+
+wait_for_write:
+    move.b  (a2), d4        | read status
+    btst    #1, d4          | test RPIwantsMore
+    bne     do_write_byte   | if RPIwantsMore is 1, should transfer byte
+
+    btst    #2, d4                  | test RPIisIdle
+    bne     store_status_and_quit   | if RPIisIdle is 1, then RPi went idle and last read byte was status
+
     move.l  (a3), d3        | read current value of 200 Hz timer
     cmp.l   d2, d3          | compare if timeout time (d2) was reached by current time (d3)
     beq     on_timeout
 
-    move.w  (a2), d0        | read cpld status
+    jmp     wait_for_write  | if came here, we need to wait some more
 
-    btst    #0, d0          | test INT
-    beq     get_status_byte | if INT is 0, end DMA write and read PIO status byte
-
-    btst    #1, d0          | test DRQ
-    bne     write_another   | if DRQ is 1, wait some more
-
+do_write_byte:
     clr.l   d0              | make sure that whole register is clear
     move.b  (a0)+, d0       | get data from buffer - in the lowest byte of the register
-    move.w  (a1, d0.l), d0  | do a data write by reading from DMA write address + offset
+    move.b  (a1, d0.l), d0  | do a data write by reading from DMA write address + offset, d0 holds the last read byte
 
-    sub.l   #1,D1           | byteCount--
-    tst.l   D1              | check if we have something more to read
-    bne     write_another   | still something do to, go again
+start_of_write_loop:
+    dbra    d1, wait_for_write  | check if we have something more to write
 
     | if we got here, we transfered whole sector, so now we need to read the status byte
-    jmp     get_status_byte | continue with the same end as with card_dma_read
+    jmp     wait_for_status | continue with the same end as with card_dma_read
 
 | ------------------------------------------------------
 
