@@ -199,9 +199,12 @@ void CartDataTrans::getCommandFromST(void)
 
     //----------------------
     if((acsiIdInfo.enabledIDbits & (1 << id)) == 0) {   // if this ID is not enabled, quit
+        Debug::out(LOG_DEBUG, "getCommandFromST - cmd[0]: %02X, skipping as id %d not enabled", cmd[0], id);
         resetCpld();
         return;
     }
+
+    Debug::out(LOG_DEBUG, "getCommandFromST - cmd[0]: %02X", cmd[0]);
 
     cmdLen = 6;                                     // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
     int i;
@@ -210,6 +213,7 @@ void CartDataTrans::getCommandFromST(void)
         cmd[i] = PIO_write();                       // drop down IRQ, get byte
 
         if(brStat != E_OK) {                        // if something was wrong, quit, failed
+            Debug::out(LOG_DEBUG, "getCommandFromST - failed getting cmd at i=%d", i);
             resetCpld();
             return;
         }
@@ -219,6 +223,7 @@ void CartDataTrans::getCommandFromST(void)
         }
     }
 
+    Debug::out(LOG_DEBUG, "getCommandFromST - got whole cmd, good");
     gotCmd = true;
 }
 
