@@ -17,7 +17,8 @@
 #include "../ce_hdd_if/hdd_if.h"
 #include "../ce_hdd_if/find_ce.h"
 
-#define SCSI_C_READ10       0x28
+#define SCSI_CMD_READ10     0x28
+#define SCSI_CMD_INQUIRY    0x12
 
 //--------------------------------------------------
 
@@ -86,6 +87,20 @@ void getLargestMemBlock(void)
 }
 
 //--------------------------------------------------
+#define CART_STATUS 0xFB0000
+//#define CART_DATA   0xFB0001
+#define CART_DATA   0xFB0155
+
+volatile BYTE *pReadWhat = 0;
+
+BYTE readCartByte(void)
+{
+    BYTE val;
+    val = *pReadWhat;
+    return val;
+}
+//--------------------------------------------------
+
 int main(void)
 {
     DWORD scancode;
@@ -269,6 +284,20 @@ int main(void)
             break;
         }
 
+        if(key == '0') {
+            (void) Cconws("Cart STATUS\r\n");
+            pReadWhat = (volatile BYTE *) CART_STATUS;
+            Supexec(readCartByte);
+            continue;
+        }
+
+        if(key == '1') {
+            (void) Cconws("Cart DATA\r\n");
+            pReadWhat = (volatile BYTE *) CART_DATA;
+            Supexec(readCartByte);
+            continue;
+        }
+
         if(key == 'x') {
             (void) Cconws("SCSI reset...");
             scsi_reset();
@@ -420,7 +449,7 @@ void largeRead(void)
     memset(commandLong, 0, sizeof(commandLong));
 
     commandLong[0] = (deviceID << 5) | 0x1f;
-    commandLong[1] = SCSI_C_READ10;
+    commandLong[1] = SCSI_CMD_READ10;
     
     commandLong[8] = (BYTE) (largeMemSizeInSectors >> 8);
     commandLong[9] = (BYTE) (largeMemSizeInSectors     );

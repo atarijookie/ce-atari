@@ -78,7 +78,7 @@ void CartDataTrans::hwDirForWrite(void)
 
 void CartDataTrans::hwDataDirection(bool readNotWrite)
 {
-    int dir = readNotWrite ? BCM2835_GPIO_FSEL_INPT : BCM2835_GPIO_FSEL_OUTP;
+    int dir = readNotWrite ? BCM2835_GPIO_FSEL_OUTP : BCM2835_GPIO_FSEL_INPT;
     int dataPins[8] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7};
     int i;
 
@@ -317,6 +317,15 @@ void CartDataTrans::writeDataToGPIO(BYTE val)
     // GPIO 26-24 + 22-18 of RPi are used as data port, split and shift data into right position
     DWORD value = ((((DWORD) val) & 0xe0) << 19) | ((((DWORD) val) & 0x1f) << 18);
     bcm2835_gpio_write_mask(value, DATA_MASK);
+    /*
+    int dataPins[8] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7};
+    int i, lev;
+
+    for(i=0; i<8; i++) {
+        lev = (val & (1 << i)) ? HIGH : LOW;
+        bcm2835_gpio_write(dataPins[i], lev);
+    }
+    */
 #endif
 }
 
@@ -333,6 +342,23 @@ BYTE CartDataTrans::readDataFromGPIO(void)
 
     BYTE val = upper | lower;   // combine upper and lower part together
     return val;
+
+/*
+    int dataPins[8] = {PIN_D0, PIN_D1, PIN_D2, PIN_D3, PIN_D4, PIN_D5, PIN_D6, PIN_D7};
+    int i, lev;
+    BYTE val = 0;
+
+    for(i=0; i<8; i++) {
+        lev = bcm2835_gpio_lev(dataPins[i]);
+
+        if(lev == HIGH) {
+            val = val | (1 << i);
+        }
+    }
+
+    return val;
+*/
+
 #else
     return 0;
 #endif

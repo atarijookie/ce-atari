@@ -12,7 +12,7 @@ entity main is
            XRnW          : in std_logic;        -- defines data direction (1 (READ): DATA1 <- DATA2 (from RPi to ST),  0 (WRITE): DATA1 -> DATA2 (from ST to RPi))
 
         -- DATA_ST_LOWER and DATA_ST_UPPER is connected to cartridge port, DATA_RPI connects to RPI and is driven when XRnW is L
-           DATA_ST_UPPER: out   std_logic_vector(2 downto 0);
+           DATA_ST_UPPER: out   std_logic_vector(1 downto 0);
            DATA_ST_LOWER: out   std_logic_vector(7 downto 0);
            DATA_RPI     : inout std_logic_vector(7 downto 0);
 
@@ -30,8 +30,7 @@ end main;
 architecture Behavioral of main is
     signal RPIisIdle        : std_logic;
     signal RPIwantsMoreState: std_logic;
-    signal DataChangedState : std_logic;     -- toggles every time RPi changes data (on XNEXT)
-    signal statusReg        : std_logic_vector(2 downto 0);
+    signal statusReg        : std_logic_vector(1 downto 0);
 
     signal STdidTransferState: std_logic;
 
@@ -46,15 +45,12 @@ begin
     READ_CART_LDS <= ((not ROM3) and (not LDS));  -- H when LDS and ROM3 are L
     READ_CART_UDS <= ((not ROM3) and (not UDS));  -- H when UDS and ROM3 are L
 
-    -- DataChangedState should help with faster read on ST - you can keep reading data and when this toggles (1->0, 0->1), you've just read new data
     --  RPIisIdle tells if RPi has finished last transfer byte (RPIisIdle='1'), or RPi waits for transfer to happen (RPIisIdle='0')
     DataChanged: process(XRESET, XNEXT) is
     begin
         if(XRESET='0') then                      -- reset from RPI? this flag goes to 0
-            DataChangedState <= '0';
             RPIisIdle <= '1';
         elsif rising_edge(XNEXT) then            -- if RPi does starts PIO or DMA transfer, the data has changed
-            DataChangedState <= not DataChangedState;
             RPIisIdle <= '0';
         end if;
     end process;
@@ -93,14 +89,13 @@ begin
     DATA_ST_LOWER <= DATA_RPI when st_doing_read='1' else   -- on reading data directly from RPi
                      "ZZZZZZZZ";                            -- otherwise don't drive this
 
-    -- status register for ST - DataChangedState toggles every time RPi changes the data (stays the same when data not changed)
-    statusReg(2) <= RPIisIdle;          -- when H, RPi doesn't do any further transfer (last byte was status byte)
-    statusReg(1) <= RPIwantsMoreState;  -- H when ST should transfer another byte (read or write)
-    statusReg(0) <= DataChangedState;   -- H when RPi changed data
+    -- status register for ST
+    statusReg(1) <= RPIisIdle;          -- when H, RPi doesn't do any further transfer (last byte was status byte)
+    statusReg(0) <= RPIwantsMoreState;  -- H when ST should transfer another byte (read or write)
 
     -- DATA_ST_UPPER is connected to ST DATA(9 downto 8)
     DATA_ST_UPPER <= statusReg when READ_CART_UDS='1' else  -- UD - status
-                     "ZZZ";
+                     "ZZ";
 
     -- DATA_RPI is connected to RPi, data goes out when going from ST to MCU (WRITE operation)
     DATA_RPI <= st_data_latched when XRnW='0'   else  -- on writing data from ST to RPi

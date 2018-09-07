@@ -1,7 +1,7 @@
 #ifndef _STDLIB_CE_HDD_IF_H_
 #define _STDLIB_CE_HDD_IF_H_
 
-#include "acsi.h"
+#include "global.h"
 
 void *  memcpy  ( void * destination, const void * source, int num );
 int     memcmp  ( const void *a, const void *b, int num );

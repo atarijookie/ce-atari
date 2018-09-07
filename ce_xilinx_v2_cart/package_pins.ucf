@@ -30,7 +30,6 @@ NET "DATA_ST_LOWER<7>"  LOC = "P81"  ;
 
 NET "DATA_ST_UPPER<0>"  LOC = "P85"  ;
 NET "DATA_ST_UPPER<1>"  LOC = "P86"  ;
-NET "DATA_ST_UPPER<2>"  LOC = "P87"  ;
 
 NET "DATA_RPI<0>"  LOC = "P17"  ;
 NET "DATA_RPI<1>"  LOC = "P6"  ;

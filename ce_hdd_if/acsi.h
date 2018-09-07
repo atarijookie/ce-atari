@@ -47,8 +47,6 @@
 
 #define FLOCK      ((volatile WORD  *) 0x043E) // Floppy lock variable
 
-#define SCSI_CMD_INQUIRY	0x12
-
 //---------------------------------------
 BYTE wait_dma_cmpl(DWORD t_ticks);
 BYTE fdone(void);

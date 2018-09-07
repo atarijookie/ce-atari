@@ -25,7 +25,7 @@ _cart_dma_read:
 
 wait_for_read:
     move.b  (a2), d4        | read status
-    btst    #1, d4          | test RPIwantsMore
+    btst    #0, d4          | test RPIwantsMore
     bne     do_read_byte    | if RPIwantsMore is 1, should transfer byte
 
     btst    #2, d4                  | test RPIisIdle
@@ -48,7 +48,7 @@ start_of_read_loop:
 
 wait_for_status:
     move.b  (a2), d4        | read status
-    btst    #1, d4          | test RPIwantsMore
+    btst    #0, d4          | test RPIwantsMore
     bne     read_status     | if RPIwantsMore is 1, we can now read the status
 
     btst    #2, d4                  | test RPIisIdle
@@ -97,7 +97,7 @@ _cart_dma_write:
 
 wait_for_write:
     move.b  (a2), d4        | read status
-    btst    #1, d4          | test RPIwantsMore
+    btst    #0, d4          | test RPIwantsMore
     bne     do_write_byte   | if RPIwantsMore is 1, should transfer byte
 
     btst    #2, d4                  | test RPIisIdle
