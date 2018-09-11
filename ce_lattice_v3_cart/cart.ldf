@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<BaliProject version="3.2" title="cart" device="LCMXO2-640HC-6TG100C" default_implementation="impl1">
+    <Options/>
+    <Implementation title="impl1" dir="impl1" description="impl1" synthesis="lse" default_strategy="Strategy1">
+        <Options def_top="main"/>
+        <Source name="main.vhd" type="VHDL" type_short="VHDL">
+            <Options top_module="main"/>
+        </Source>
+        <Source name="cart.lpf" type="Logic Preference" type_short="LPF">
+            <Options/>
+        </Source>
+    </Implementation>
+    <Strategy name="Strategy1" file="cart1.sty"/>
+</BaliProject>
