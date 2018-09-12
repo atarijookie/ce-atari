@@ -1,14 +1,13 @@
 /*--------------------------------------------------*/
-//#include <tos.h>
 #include <mint/osbind.h> 
 #include <stdio.h>
-//>#include <screen.h>
-#include <string.h>
-#include <stdlib.h>
 
 #include "acsi.h"
 #include "translated.h"
 #include "gemdos.h"
+
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
 /*--------------------------------------------------*/
 
 void showHomeScreen(void);
@@ -16,7 +15,6 @@ void sendKeyDown(BYTE key);
 void refreshScreen(void);							
 void setResolution(void);
 void showConnectionErrorMessage(void);
-BYTE findDevice(void);
 void getDriveConfig(void);
 extern void getConfig(void); 
 
@@ -64,10 +62,8 @@ int main(void)
 	DWORD toEven;
 	void *OldSP;
 
-	OldSP = (void *) Super((void *)0);  			/* supervisor mode */ 
-	
 	prevCommandFailed = 0;
-	
+
 	/* ---------------------- */
 	/* create buffer pointer to even address */
 	toEven = (DWORD) &myBuffer[0];
@@ -84,13 +80,13 @@ int main(void)
     (void) Cconws(" ]\33q\r\n"); 		
 	/* ---------------------- */
 	/* search for device on the ACSI bus */
-	deviceID=findDevice();
-	if( deviceID == (BYTE)-1 ){
-    	(void) Cconws("Quit."); 		
-	    Super((void *)OldSP);  			      /* user mode */
+	deviceID = findDevice(IF_ANY, DEV_CE);
+	if( deviceID == DEVICE_NOT_FOUND){
+    	(void) Cconws("Quit.");
 		return 0;
 	}
 	/* ----------------- */
+	OldSP = (void *) Super((void *)0);  			/* supervisor mode */ 
 
 	/* now set up the acsi command bytes so we don't have to deal with this one anymore */
 	commandShort[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
@@ -145,47 +141,6 @@ void showConnectionErrorMessage(void)
 	prevCommandFailed = 1;
 }
 /*--------------------------------------------------*/
-BYTE findDevice()
-{
-	BYTE i;
-	BYTE key, res;
-	BYTE deviceID = 0;
-	char bfr[2];
-
-	bfr[1] = 0; 
-	(void) Cconws("Looking for CosmosEx: ");
-
-	while(1) {
-		for(i=0; i<8; i++) {
-			bfr[0] = i + '0';
-			(void) Cconws(bfr); 
-		      
-			res = ce_identify(i);      					/* try to read the IDENTITY string */
-      
-			if(res == 1) {                           	/* if found the CosmosEx */
-				deviceID = i;                     		/* store the ACSI ID of device */
-				break;
-			}
-		}
-  
-		if(res == 1) {                             		/* if found, break */
-			break;
-		}
-      
-		(void) Cconws(" - not found.\r\nPress any key to retry or 'Q' to quit.\r\n");
-		key = Cnecin();
-    
-		if(key == 'Q' || key=='q') {
-			return -1;
-		}
-	}
-  
-	bfr[0] = deviceID + '0';
-	(void) Cconws("\r\nCosmosEx ACSI ID: ");
-	(void) Cconws(bfr);
-	(void) Cconws("\r\n\r\n");
-	return deviceID;
-}
 
 void getDriveConfig(void)
 {
@@ -193,4 +148,21 @@ void getDriveConfig(void)
  
     ceTranslatedDriveMap = pBuffer[0]<<8|pBuffer[1];
 
+}
+
+//--------------------------------------------------
+void logMsg(char *logMsg)
+{
+//    if(showLogs) {
+//        (void) Cconws(logMsg);
+//    }
+}
+//--------------------------------------------------
+void logMsgProgress(DWORD current, DWORD total)
+{
+//    (void) Cconws("Progress: ");
+//    showHexDword(current);
+//    (void) Cconws(" out of ");
+//    showHexDword(total);
+//    (void) Cconws("\n\r");
 }

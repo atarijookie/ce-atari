@@ -176,9 +176,9 @@ int16 TCP_open_mid(BYTE *sp)
 
     #ifdef DEBUG_STRING
     logStr("TCP_open - rem_host: ");
-    showHexDword(rem_host);
+    _showHexDword(rem_host);
     logStr(", rem_port: ");
-    showHexWord(rem_port);
+    _showHexWord(rem_port);
     logStr(", res: ");
     #endif
 
@@ -187,7 +187,7 @@ int16 TCP_open_mid(BYTE *sp)
     vblEnabled = 1;
 
     #ifdef DEBUG_STRING
-    showHexWord((WORD) res);
+    _showHexWord((WORD) res);
     logStr("\n");
     #endif
 
@@ -201,7 +201,7 @@ int16 TCP_close_mid(BYTE *sp)
 
     #ifdef DEBUG_STRING
     logStr("TCP_close - handle: ");
-    showHexByte(handle);
+    _showHexByte(handle);
     logStr(", res: ");
     #endif
 
@@ -210,7 +210,7 @@ int16 TCP_close_mid(BYTE *sp)
     vblEnabled = 1;
 
     #ifdef DEBUG_STRING
-    showHexWord((WORD) res);
+    _showHexWord((WORD) res);
     logStr("\n");
     #endif
 
@@ -225,11 +225,11 @@ int16 TCP_send_mid(BYTE *sp)
 
     #ifdef DEBUG_STRING
     logStr("TCP_send -- handle: ");
-    showHexWord(handle);
+    _showHexWord(handle);
     logStr(", buffer: ");
-    showHexDword((DWORD) buffer);
+    _showHexDword((DWORD) buffer);
     logStr(", length: ");
-    showHexWord(length);
+    _showHexWord(length);
     logStr("\n");
     #endif
 
@@ -248,9 +248,9 @@ int16 TCP_wait_state_mid(BYTE *sp)
 
     #ifdef DEBUG_STRING
     logStr("TCP_wait_state - wantedState: ");
-    showHexByte(wantedState);
+    _showHexByte(wantedState);
     logStr(", timeout: ");
-    showHexByte(timeout);
+    _showHexByte(timeout);
     logStr("\n");
     #endif
 
@@ -362,7 +362,7 @@ int16 CNbyte_count_mid(BYTE *sp)
 
     #ifdef DEBUG_STRING
     logStr("CNbyte_count - handle: ");
-    showHexByte((BYTE) handle);
+    _showHexByte((BYTE) handle);
     logStr(", res: ");
     #endif
 
@@ -371,7 +371,7 @@ int16 CNbyte_count_mid(BYTE *sp)
     vblEnabled = 1;
 
     #ifdef DEBUG_STRING
-    showHexWord((DWORD) res);
+    _showHexWord((DWORD) res);
     logStr("\n");
     #endif
 
@@ -391,7 +391,7 @@ int16 CNget_char_mid(BYTE *sp)
     vblEnabled = 1;
 
     #ifdef DEBUG_STRING
-    showHexWord((DWORD) res);
+    _showHexWord((DWORD) res);
 
     if(res >= 0 && res <= 255) {
         char tmp[2];
@@ -432,11 +432,11 @@ int16 CNget_block_mid(BYTE *sp)
 
     #ifdef DEBUG_STRING
     logStr("CNget_block - handle: ");
-    showHexByte(handle);
+    _showHexByte(handle);
     logStr(", buffer: ");
-    showHexDword((DWORD) buffer);
+    _showHexDword((DWORD) buffer);
     logStr(", length: ");
-    showHexWord(length);
+    _showHexWord(length);
     logStr(", res: ");
     #endif
 
@@ -445,17 +445,17 @@ int16 CNget_block_mid(BYTE *sp)
     vblEnabled = 1;
 
     #ifdef DEBUG_STRING
-    showHexWord(res);
+    _showHexWord(res);
     logStr("\n");
 
     // show last 4 bytes
     BYTE *p = (BYTE *) buffer;
 
     logStr("last 4 bytes: ");
-    if(res >= 4) { showHexByte(p[res - 4]); logStr(" "); }
-    if(res >= 3) { showHexByte(p[res - 3]); logStr(" "); }
-    if(res >= 2) { showHexByte(p[res - 2]); logStr(" "); }
-    if(res >= 1) { showHexByte(p[res - 1]); logStr(" "); }
+    if(res >= 4) { _showHexByte(p[res - 4]); logStr(" "); }
+    if(res >= 3) { _showHexByte(p[res - 3]); logStr(" "); }
+    if(res >= 2) { _showHexByte(p[res - 2]); logStr(" "); }
+    if(res >= 1) { _showHexByte(p[res - 1]); logStr(" "); }
     logStr("\n");
     #endif
 
@@ -515,7 +515,7 @@ CIB *CNgetinfo_mid(BYTE *sp)
 
     #ifdef DEBUG_STRING
     logStr("CNgetinfo - handle: ");
-    showHexWord(handle);
+    _showHexWord(handle);
     logStr(", res: ");
     #endif
 
@@ -524,7 +524,7 @@ CIB *CNgetinfo_mid(BYTE *sp)
     vblEnabled = 1;
 
     #ifdef DEBUG_STRING
-    showHexDword((DWORD) res);
+    _showHexDword((DWORD) res);
     logStr("\n");
     #endif
 

@@ -53,7 +53,7 @@ int main( int argc, char* argv[] )
     (void) Cconws("\r\n");
     
     // search for CosmosEx on ACSI & SCSI bus
-    deviceID = Supexec(findDevice);
+    deviceID = findDevice(IF_ANY, DEV_CE);
 
     if(deviceID == DEVICE_NOT_FOUND) {
         sleep(3);

@@ -86,7 +86,7 @@ DWORD getDword(BYTE *bfr)
     return val;
 }
 
-void showHexByte(int val)
+void _showHexByte(int val)
 {
     int hi, lo;
     char tmp[3];
@@ -108,17 +108,17 @@ void showHexByte(int val)
     }
 }
 
-void showHexWord(WORD val)
+void _showHexWord(WORD val)
 {
     BYTE a,b;
     a = val >>  8;
     b = val;
 
-    showHexByte(a);
-    showHexByte(b);
+    _showHexByte(a);
+    _showHexByte(b);
 }
 
-void showHexDword(DWORD val)
+void _showHexDword(DWORD val)
 {
     BYTE a,b,c,d;
     a = val >> 24;
@@ -126,10 +126,10 @@ void showHexDword(DWORD val)
     c = val >>  8;
     d = val;
 
-    showHexByte(a);
-    showHexByte(b);
-    showHexByte(c);
-    showHexByte(d);
+    _showHexByte(a);
+    _showHexByte(b);
+    _showHexByte(c);
+    _showHexByte(d);
 }
 
 WORD getWordByByteOffset(void *base, int ofs)
@@ -200,7 +200,7 @@ void logBfr(BYTE *bfr, int len)
     logStr("\n");
 
     for(i=0; i<len; i++) {
-        showHexByte(bfr[i]);
+        _showHexByte(bfr[i]);
         logStr(" ");
     }
 

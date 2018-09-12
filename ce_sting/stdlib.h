@@ -14,9 +14,9 @@ BYTE *storeDword(BYTE *bfr, DWORD value);
 WORD  getWord(BYTE *bfr);
 DWORD getDword(BYTE *bfr);
 
-void showHexByte(int val);
-void showHexWord(WORD val);
-void showHexDword(DWORD val);
+void _showHexByte(int val);
+void _showHexWord(WORD val);
+void _showHexDword(DWORD val);
 
 WORD   getWordByByteOffset (void *base, int ofs);
 DWORD  getDwordByByteOffset(void *base, int ofs);

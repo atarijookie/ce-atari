@@ -257,7 +257,7 @@ int main(void)
     showLogs = 0;                   // turn off logs - there will be errors on findDevice when device doesn't exist 
 
     // search for CosmosEx on ACSI & SCSI bus
-    deviceID = Supexec(findDevice);
+    deviceID = findDevice(IF_ANY, DEV_CE);
 
     if(deviceID == DEVICE_NOT_FOUND) {
         sleep(3);

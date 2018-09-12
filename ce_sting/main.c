@@ -82,7 +82,7 @@ int main(void)
     pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);  // remove odd bit if the address was odd
 
     // search for CosmosEx on ACSI & SCSI bus
-    deviceID = Supexec(findDevice);
+    deviceID = findDevice(IF_ANY, DEV_CE);
 
     if(deviceID == DEVICE_NOT_FOUND) {
         sleep(3);

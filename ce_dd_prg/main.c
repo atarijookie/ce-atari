@@ -37,7 +37,6 @@ int32_t (*bios_table[256])( void* sp ) = { 0 };
 int16_t useOldBiosHandler = 0;								// 0: use new handlers, 1: use old handlers
 // ------------------------------------------------------------------
 // CosmosEx and Gemdos part - Jookie
-BYTE findDevice(void);
 
 BYTE ce_findId(void);
 void ce_initialize(void);
@@ -152,7 +151,7 @@ int main( int argc, char* argv[] )
     (void) Cconws("\33q\r\n" );
 
 	// search for CosmosEx on ACSI bus
-	deviceID = Supexec(findDevice);
+	deviceID = findDevice(IF_ANY, DEV_CE);
 	if(deviceID == DEVICE_NOT_FOUND) {      // not found? quit
 		sleep(3);
 		return 0;

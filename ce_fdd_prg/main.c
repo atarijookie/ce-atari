@@ -67,7 +67,7 @@ int main( int argc, char* argv[] )
 	(void) Cconws("\33p[ CosmosEx floppy setup ]\r\n[    by Jookie 2014     ]\33q\r\n\r\n");
 
     // search for CosmosEx on ACSI & SCSI bus
-    deviceID = Supexec(findDevice);
+    deviceID = findDevice(IF_ANY, DEV_CE);
 
     if(deviceID == DEVICE_NOT_FOUND) {
         sleep(3);

@@ -47,7 +47,6 @@ void showFakeProgress(void);
 void cosmoSoloConfig(void);
 //--------------------------------------------------
 BYTE deviceID;                          // bus ID from 0 to 7
-BYTE cosmosExNotCosmoSolo;              // 0 means CosmoSolo, 1 means CosmosEx
 //--------------------------------------------------
 
 #define BUFFER_SIZE         (4*512)
@@ -63,6 +62,7 @@ int main(void)
     DWORD toEven;
     BYTE keyDownCommand = CFG_CMD_KEYDOWN;
     DWORD lastUpdateCheckTime = 0;
+    BYTE devTypeFound;
 
     ceIsUpdating        = FALSE;
     isUpdateScreen      = FALSE;
@@ -83,15 +83,17 @@ int main(void)
     // search for device on the ACSI / SCSI bus 
 
     Clear_home();
-    deviceID = Supexec(findDevice);
+    deviceID = findDevice(IF_ANY, (DEV_CE | DEV_CS));
 
     if(deviceID == DEVICE_NOT_FOUND) {
         return 0;
     }
-    
+
     //------------------
     // if the device is CosmoSolo, go this way
-    if(cosmosExNotCosmoSolo == FALSE) {
+    devTypeFound = getDevTypeFound();
+
+    if(devTypeFound == DEV_CS) {
         cosmoSoloConfig();
         return 0;
     }
