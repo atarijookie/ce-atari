@@ -17,8 +17,8 @@
 #define pCartData   ((volatile BYTE *) CART_DATA)
 
 // status bits when cart is read as WORD
-#define STATUS_W_RPIisIdle      (1 << 9)    // 1 when RPi doesn't do any further transfer (last byte was status byte)
-#define STATUS_W_RPIwantsMore   (1 << 8)    // 1 when ST should transfer another byte (read or write)
+//#define STATUS_W_RPIisIdle      (1 << 9)    // 1 when RPi doesn't do any further transfer (last byte was status byte)
+//#define STATUS_W_RPIwantsMore   (1 << 8)    // 1 when ST should transfer another byte (read or write)
 
 // status bits when cart is read as BYTE
 #define STATUS_B_RPIisIdle      (1 << 1)    // 1 when RPi doesn't do any further transfer (last byte was status byte)

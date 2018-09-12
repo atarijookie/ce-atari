@@ -270,10 +270,12 @@ bool CartDataTrans::sendData_transferBlock(BYTE *pData, DWORD dataCount)
         dataCount--;            // decrement byte counter
 
         if(brStat != E_OK) {    // if not ok, return fail
+            resetCpld();
             return false;
         }
     }
 
+    sendStatusToHans(status);   // now additionally (compared to recvData_transferBlock()) - transfer the status byte and reset cpld
     return true;                // if got here, all is ok
 }
 
@@ -298,16 +300,19 @@ bool CartDataTrans::recvData_transferBlock(BYTE *pData, DWORD dataCount)
         dataCount--;            // decrement byte counter
 
         if(brStat != E_OK) {    // if not ok, return fail
+            resetCpld();
             return false;
         }
     }
 
+    // don't call resetCpld(); on success here, because additional sendStatusToHans() will be called and we will do it there
     return true;                // if got gere, all is OK
 }
 
 void CartDataTrans::sendStatusToHans(BYTE statusByte)
 {
     PIO_read(statusByte);
+    resetCpld();
 }
 
 bool CartDataTrans::timeout(void)

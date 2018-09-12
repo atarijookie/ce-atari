@@ -20,6 +20,54 @@ DWORD timeout_time;
 
 static BYTE lastReadData;
 //**************************************************************************
+// this function will wait after 0th cmd byte for RPi to stop being idle and then for 1st cmd byte to become available
+static BYTE wait_after_first(void)
+{
+    DWORD now;
+    WORD val;
+
+    // 1st wait -- RPI was idle when we sent the 0th command and it might take up to 1 ms until it notices that we sent something, 
+    // and then it stops being idle and starts accepting more data
+    while(1) {
+        val = *pCartStatus;                     // read status
+
+        if((val & STATUS_B_RPIisIdle) == 0) {   // if RPi stopped being idle, we can continue with the rest
+            break;
+        }
+
+        now = *HZ_200;
+
+        if(now >= timeout_time) {           // timeout? fail
+            *FLOCK = 0;                     // release FLOCK, so we can just quit cart_cmd() after this function
+            return WAIT_TIMEOUT;
+        }
+    }
+
+    // RPi stopped being idle, good! now wait for RPiwantsMore flag
+    while(1) {
+        val = *pCartStatus;                 // read status
+
+        if(val & STATUS_B_RPIwantsMore) {   // RPi wants more data?
+            return 0;
+        }
+
+        if(val & STATUS_B_RPIisIdle) {      // RPi went idle?
+            *FLOCK = 0;                     // release FLOCK, so we can just quit cart_cmd() after this function
+            return WAIT_EOF;
+        }
+
+        now = *HZ_200;
+
+        if(now >= timeout_time) {           // timeout? fail
+            *FLOCK = 0;                             // release FLOCK, so we can just quit cart_cmd() after this function
+            return WAIT_TIMEOUT;                    // no interrupt and timer expired? return error
+        }
+    }
+
+    *FLOCK = 0;                             // release FLOCK, so we can just quit cart_cmd() after this function
+    return WAIT_TIMEOUT;                    // no interrupt and timer expired? return error
+}
+
 static BYTE wait_for_next(void)
 {
     DWORD now;
@@ -42,7 +90,8 @@ static BYTE wait_for_next(void)
         now = *HZ_200;
 
         if(now >= timeout_time) {           // timeout? fail
-            break;
+            *FLOCK = 0;                             // release FLOCK, so we can just quit cart_cmd() after this function
+            return WAIT_TIMEOUT;                    // no interrupt and timer expired? return error
         }
     }
 
@@ -92,11 +141,15 @@ void cart_cmd(BYTE ReadNotWrite, BYTE *cmd, BYTE cmdLength, BYTE *buffer, WORD s
     val = ((WORD)cmd[0]) << 1;                      // prepare cmd byte
     val = *((volatile BYTE *)(CART_DATA + val));    // write 1st byte (0)
 
+    if(wait_after_first()) {
+        return;
+    }
+    
     //------------------
     // transfer remaining cmd bytes
     for(i=1; i<cmdLength; i++) {
         if(wait_for_next()) {                       // if next didn't come, fail
-            hdIf.success = FALSE;                   // this was set wait_for_next() to TRUE, we need to fix it (don't change wait_for_next(), it's usefull at data transfers)
+            hdIf.success = FALSE;                   // this was set in wait_for_next() to TRUE, we need to replace the value (don't change wait_for_next(), it's usefull at data transfers)
             return;
         }
 

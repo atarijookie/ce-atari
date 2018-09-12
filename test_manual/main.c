@@ -28,10 +28,6 @@
 BYTE deviceID;                          // bus ID from 0 to 7
 volatile mutex mtx;
 
-void showHexByte (BYTE val);
-void showHexWord (WORD val);
-void showHexDword(DWORD val);
-
 void scsi_reset(void);
 
 void cs_inquiry(BYTE id, BYTE verbose);
@@ -314,11 +310,11 @@ int main(void)
             int i;
             DWORD start, end, diff;
 
-            start = getTicks();
+            start = getTicksAsUser();
             for(i=0; i<10; i++) {
                 cs_inquiry(deviceID, 0);
             }
-            end = getTicks();
+            end = getTicksAsUser();
             diff = end - start;
             int timeMs  = (diff * 1000) / 200;
 
@@ -343,11 +339,11 @@ int main(void)
             int i;
             DWORD start, end, diff;
 
-            start = getTicks();
+            start = getTicksAsUser();
             for(i=0; i<10; i++) {
                 CEread(0);
             }
-            end = getTicks();
+            end = getTicksAsUser();
             diff = end - start;
 
             diff    = end - start;
@@ -618,46 +614,6 @@ void cs_inquiry(BYTE id, BYTE verbose)
     }
     
     (void) Cconws("\r\n");
-}
-//--------------------------------------------------
-void showHexByte(BYTE val)
-{
-    int hi, lo;
-    char tmp[3];
-    char table[16] = {"0123456789ABCDEF"};
-    
-    hi = (val >> 4) & 0x0f;;
-    lo = (val     ) & 0x0f;
-
-    tmp[0] = table[hi];
-    tmp[1] = table[lo];
-    tmp[2] = 0;
-    
-    (void) Cconws(tmp);
-}
-
-void showHexWord(WORD val)
-{
-    BYTE a,b;
-    a = val >>  8;
-    b = val;
-    
-    showHexByte(a);
-    showHexByte(b);
-}
-
-void showHexDword(DWORD val)
-{
-    BYTE a,b,c,d;
-    a = val >> 24;
-    b = val >> 16;
-    c = val >>  8;
-    d = val;
-    
-    showHexByte(a);
-    showHexByte(b);
-    showHexByte(c);
-    showHexByte(d);
 }
 
 //--------------------------------------------

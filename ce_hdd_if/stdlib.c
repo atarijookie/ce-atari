@@ -287,8 +287,6 @@ int getIntFromStr(const char *str, int len)
     return val;
 }
 
-/*--------------------------------------------------*/
-
 void showIntWithPrepadding(int value, int fullLength, char prepadChar)
 {
     int i, padCount;
@@ -302,7 +300,6 @@ void showIntWithPrepadding(int value, int fullLength, char prepadChar)
     
     showInt(value, digitsLength);               // display the rest
 }
-
 
 void intToString(int value, int length, char *tmp)
 {
@@ -335,4 +332,44 @@ void intToString(int value, int length, char *tmp)
     }
 
     tmp[length] = 0;                        // terminate string
+}
+
+void showHexByte(int val)
+{
+    int hi, lo;
+    char tmp[3];
+    char table[16] = {"0123456789ABCDEF"};
+
+    hi = (val >> 4) & 0x0f;;
+    lo = (val     ) & 0x0f;
+
+    tmp[0] = table[hi];
+    tmp[1] = table[lo];
+    tmp[2] = 0;
+
+    (void) Cconws(tmp);
+}
+
+void showHexWord(WORD val)
+{
+    BYTE a,b;
+    a = val >>  8;
+    b = val;
+
+    showHexByte(a);
+    showHexByte(b);
+}
+
+void showHexDword(DWORD val)
+{
+    BYTE a,b,c,d;
+    a = val >> 24;
+    b = val >> 16;
+    c = val >>  8;
+    d = val;
+
+    showHexByte(a);
+    showHexByte(b);
+    showHexByte(c);
+    showHexByte(d);
 }
