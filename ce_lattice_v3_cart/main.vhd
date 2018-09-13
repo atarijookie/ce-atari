@@ -3,13 +3,17 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
+library machxo2;
+use machxo2.all;
+
 entity main is
-    Port ( 
+    Port (
         -- signals connected to RPI
-           STdidTransfer : out std_logic;       -- goes H on 1st byte or any other bytes from ST
-           XNEXT         : in std_logic;        -- RPi tells ST that it wants more data
-           XRESET        : in std_logic;        -- RPi sets CPLD to idle state, ST will know that no more data should be transfered
-           XRnW          : in std_logic;        -- defines data direction (1 (READ): DATA1 <- DATA2 (from RPi to ST),  0 (WRITE): DATA1 -> DATA2 (from ST to RPi))
+		XATN		: out std_logic;	-- goes H on 1st byte or when there are other bytes to transfer
+		XRnW		: in std_logic;		-- defines data direction (1 (READ): DATA1 <- DATA2 (from RPi to ST),  0 (WRITE): DATA1 -> DATA2 (from ST to RPi))
+		XDnC		: in std_logic;		-- Data/Config selection: 1 means data register is selected, 0 means config register is selected
+		XNEXT		: in std_logic;		-- RPi tells ST that it wants more data
+		XRESET		: in std_logic;		-- RPi sets CPLD to idle state, ST will know that no more data should be transfered
 
         -- DATA_ST_LOWER and DATA_ST_UPPER is connected to cartridge port, DATA_RPI connects to RPI and is driven when XRnW is L
            DATA_ST_UPPER: out   std_logic_vector(2 downto 0);
@@ -28,24 +32,103 @@ entity main is
 end main;
 
 architecture Behavioral of main is
+	signal clk				: std_logic;
+	signal stdby_sed		: std_logic;
+
     signal RPIisIdle        : std_logic;
     signal RPIwantsMoreState: std_logic;
     signal DataChangedState : std_logic;     -- toggles every time RPi changes data (on XNEXT)
     signal statusReg        : std_logic_vector(2 downto 0);
 
-    signal STdidTransferState: std_logic;
+    signal XATNState		: std_logic;
+	signal XNext1, XNext2, XNext3: std_logic;
 
+	signal XRnW1, XRnW2: std_logic;
+	signal XDnC1, XDnC2: std_logic;
+	
     signal st_data_latched: std_logic_vector(7 downto 0);
     signal st_latch_clock: std_logic;
     signal st_doing_read: std_logic;
 
     signal READ_CART_LDS : std_logic;
     signal READ_CART_UDS : std_logic;
+	
+	signal ROM31, ROM32	: std_logic;
+	signal LDS1, LDS2	: std_logic;
+	signal UDS1, UDS2	: std_logic;
+
+	COMPONENT OSCH
+	   GENERIC(
+			 NOM_FREQ: string := "16.63"); -- 16.63MHz
+	   PORT(
+			 STDBY    : IN  STD_LOGIC;     --'0' OSC output is active, '1' OSC output off
+			 OSC      : OUT STD_LOGIC;     -- the oscillator output
+			 SEDSTDBY : OUT STD_LOGIC);    -- required only for simulation when using standby
+	END COMPONENT;
+
+    signal configReg: std_logic_vector(3 downto 0);
+	-- config:
+	--  0: PIO write 1st - waiting for 1st cmd byte, XATN shows FIFO-not-empty (can read)
+	--  1: PIO write - data from ST to RPi, XATN shows FIFO-not-empty (can read)
+	--  2: DMA write - data from ST to RPi, XATN shows FIFO-not-empty (can read)
+	--  3: MSG write - data from ST to RPi, XATN shows FIFO-not-empty (can read)
+	--  4: PIO read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
+	--  5: DMA read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
+	--  6: MSG read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
+	--  7: SRAM_write - store another byte into boot SRAM (index register is reset to zero with reset)
+	--  8: current IF - to determine, if it's ACSI, SCSI or CART (because SCSI needs extra MSG phases)
+	--  9: current version - to determine, if this chip needs update or not
 
 begin
-    READ_CART_LDS <= ((not ROM3) and (not LDS));  -- H when LDS and ROM3 are L
-    READ_CART_UDS <= ((not ROM3) and (not UDS));  -- H when UDS and ROM3 are L
+	-- OSCH Instantiation
+	OSCInst0: OSCH
+	-- synthesis translate_off
+		GENERIC MAP( NOM_FREQ => "16.63" )
+	-- synthesis translate_on
+		PORT MAP (STDBY=> '0', OSC => clk, SEDSTDBY => stdby_sed);
 
+	InputSynchronizer: process(clk) is
+    begin
+        if rising_edge(clk) then
+			-- RPi signals sync
+			XNext1 <= XNEXT;		
+			XNext2 <= XNext1;
+			XNext3 <= XNext2;
+
+			XRnW1 <= XRnW;
+			XRnW2 <= XRnW1;
+
+			XDnC1 <= XDnC;
+			XDnC2 <= XDnC1;
+
+			-- cart signals sync
+			ROM31 <= ROM3;
+			ROM32 <= ROM31;
+		
+			LDS1 <= LDS;
+			LDS2 <= LDS1;
+
+			UDS1 <= UDS;
+			UDS2 <= UDS1;
+		end if;
+    end process;
+
+    READ_CART_LDS <= ((not ROM32) and (not LDS2));  -- H when LDS and ROM3 are L
+    READ_CART_UDS <= ((not ROM32) and (not UDS2));  -- H when UDS and ROM3 are L
+
+	RPiHandling: process(clk, XNext2, XNext3) is
+    begin
+        if XNext2='1' and XNext3='0' then			-- on rising edge of XNext
+			if XDnC2='1' then						-- if it's data access
+			
+			else									-- if it's config access
+				if XRnW2='1' then					-- if it's config WRITE (XRnW like for ST READ = 1), read and store it from RPi
+					configReg <= DATA_RPI(3 downto 0);
+				end if;
+			end if;
+		end if;
+    end process;
+	
     -- DataChangedState should help with faster read on ST - you can keep reading data and when this toggles (1->0, 0->1), you've just read new data
     --  RPIisIdle tells if RPi has finished last transfer byte (RPIisIdle='1'), or RPi waits for transfer to happen (RPIisIdle='0')
     DataChanged: process(XRESET, XNEXT) is
@@ -62,9 +145,9 @@ begin
     AccessRequest: process(XRESET, XNEXT, READ_CART_LDS) is
     begin
         if(XRESET='0' or XNEXT='1') then            -- on end of transfer (XRESET='0') or before next byte transfer (XNEXT='1') reset this -- RPi will use this to wait for 1st or any other byte
-            STdidTransferState <= '0';
+            XATNState <= '0';
         elsif rising_edge(READ_CART_LDS) then       -- when ST accesses LDS (data read or write), we know that we got 1st or any other byte
-            STdidTransferState <= '1';
+            XATNState <= '1';
         end if;
 
         if(XRESET='0' or READ_CART_LDS='1') then    -- reset from RPI or access to data from ST? reset this flag
@@ -86,7 +169,7 @@ begin
         end if;
     end process;
 
-    STdidTransfer <= STdidTransferState;    -- if H, RPi can transfer 1st / next byte
+    XATN <= XATNState;    -- if H, RPi can transfer 1st / next byte
 
     -- DATA_ST_LOWER is connected to ST DATA(7 downto 0)
     DATA_ST_LOWER <= DATA_RPI when st_doing_read='1' else   -- on reading data directly from RPi
