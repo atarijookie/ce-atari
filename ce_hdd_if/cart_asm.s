@@ -7,11 +7,11 @@
     .text
 
 _cart_dma_read:
-    movem.l D0-D4/A0-A3,-(SP)   | save regs
-
-    | input args:
+    | first get input args from stack (before movem)
     move.l  4(sp), a0       | A0 - buffer pointer to store data
     move.l  8(sp), d1       | D1 - byte count to transfer
+
+    movem.l D0-D4/A0-A3,-(SP)   | save regs
 
     move.l  #0x04BA, a3     | pointer to 200 Hz timer
     move.l  (a3), d2        | current 200 HZ counter value
@@ -79,11 +79,11 @@ on_timeout:
 
 | ------------------------------------------------------
 _cart_dma_write:
-    movem.l D0-D4/A0-A3,-(SP)   | save regs
-
-    | input args:
+    | first get input args from stack (before movem)
     move.l  4(sp), a0       | A0 - buffer pointer to store data
     move.l  8(sp), d1       | D1 - byte count to transfer
+
+    movem.l D0-D4/A0-A3,-(SP)   | save regs
 
     move.l  #0x04BA, a3     | pointer to 200 Hz timer
     move.l  (a3), d2        | current 200 HZ counter value
@@ -119,7 +119,6 @@ start_of_write_loop:
 
     | if we got here, we transfered whole sector, so now we need to read the status byte
     jmp     wait_for_status | continue with the same end as with card_dma_read
-
 | ------------------------------------------------------
 
     .bss
