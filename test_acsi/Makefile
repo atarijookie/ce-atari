@@ -57,7 +57,7 @@ depend:	$(DEPS)
 	$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $<
 
 clean:	depclean
-	$(AT)$(RM) $(TARGET) *~ $(OBJS) $(OBJS030)
+	$(AT)$(RM) $(TARGET) *~ $(OBJS) $(OBJS030) *.d *.o
 
 depclean:
 	$(AT)$(RM) $(DEPS)

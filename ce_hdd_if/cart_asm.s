@@ -1,6 +1,7 @@
 | ------------------------------------------------------
 
     .globl  _cart_dma_read
+    .globl  _cart_dma_write
     .globl  _cart_status_byte
     .globl  _cart_success
 

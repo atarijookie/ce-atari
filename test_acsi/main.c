@@ -25,8 +25,6 @@ void sleep(int seconds);
 void print_head(BYTE CEnotCS);
 void print_status(void);
 
-void showHexByte(BYTE val);
-void showHexDword(DWORD val);
 void logMsg(char *logMsg);
 void deleteErrorLines(void);
 void speedTest(BYTE CEnotCS);
@@ -39,8 +37,6 @@ void getSDcardErrorCounters(BYTE doReset);
 BYTE deviceID, sdCardId;
 BYTE isCEnotCS;
 BYTE sdCardPresent;
-
-BYTE ceFoundNotManual;
 
 BYTE commandLong [CMD_LENGTH_LONG ] = {0x1f, 0xA0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, 0, 0, 0, 0, 0, 0, 0, 0}; 
 
@@ -154,13 +150,20 @@ int main(void)
     
     //----------------------
     // do bus scan for CE (or enter CS ID manually)
-    scanBusForCE();
+    deviceID = findDevice(IF_ANY, (DEV_CE | DEV_CS));
 
-    if(deviceID == 0xff)
+    if(deviceID == DEVICE_NOT_FOUND)
     {
-        (void) Cconws("Quit.");         
+        (void) Cconws("Quit.");
         return 0;
     }
+
+    commandLong[0] = (deviceID << 5) | 0x1f;
+
+    isCEnotCS = (getDevTypeFound() == DEV_CE);
+
+    // got the device, time to get more info from it
+    getSDinfo();
 
     // ----------------- 
     // now set up the acsi command bytes so we don't have to deal with this one anymore 
@@ -277,7 +280,14 @@ int main(void)
             case 'f':   speedTest(FALSE);               break;  // short speed test
             case 'h':   testDataReliability(FALSE);     break;  // data validity check from RPi
             case 'i':   testContinousRead(FALSE, 1);    break;  // stress test - continous read
-            case 'r':   scanBusForCE();                 break;
+            
+            case 'r':   deviceID = findDevice(IF_CART, (DEV_CE | DEV_CS));
+                        if(deviceID != DEVICE_NOT_FOUND) {
+                            commandLong[0] = (deviceID << 5) | 0x1f;
+                            isCEnotCS = (getDevTypeFound() == DEV_CE);
+                        }
+                        break;
+
             case 'z':   simpleNotDetailedErrReport = !simpleNotDetailedErrReport; break;        // toggle simple / detailed error report
         }
 
@@ -1161,30 +1171,6 @@ void logMsgProgress(DWORD current, DWORD total)
     (void) Cconws(" out of ");
     showHexDword(total);
     (void) Cconws("\n\r");
-}
-
-void showHexByte(BYTE val)
-{
-    int hi, lo;
-    char tmp[3];
-    char table[16] = {"0123456789ABCDEF"};
-    
-    hi = (val >> 4) & 0x0f;;
-    lo = (val     ) & 0x0f;
-
-    tmp[0] = table[hi];
-    tmp[1] = table[lo];
-    tmp[2] = 0;
-    
-    (void) Cconws(tmp);
-}
-
-void showHexDword(DWORD val)
-{
-    showHexByte((BYTE) (val >> 24));
-    showHexByte((BYTE) (val >> 16));
-    showHexByte((BYTE) (val >>  8));
-    showHexByte((BYTE)  val);
 }
 
 void speedTest(BYTE CEnotCS)
