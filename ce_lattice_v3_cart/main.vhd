@@ -15,19 +15,19 @@ entity main is
 		XNEXT		: in std_logic;		-- RPi tells ST that it wants more data
 		XRESET		: in std_logic;		-- RPi sets CPLD to idle state, ST will know that no more data should be transfered
 
-        -- DATA_ST_LOWER and DATA_ST_UPPER is connected to cartridge port, DATA_RPI connects to RPI and is driven when XRnW is L
-           DATA_ST_UPPER: out   std_logic_vector(2 downto 0);
-           DATA_ST_LOWER: out   std_logic_vector(7 downto 0);
-           DATA_RPI     : inout std_logic_vector(7 downto 0);
+		-- DATA_ST_LOWER and DATA_ST_UPPER is connected to cartridge port, DATA_RPI connects to RPI and is driven when XRnW is L
+		DATA_ST_UPPER: out   std_logic_vector(2 downto 0);
+		DATA_ST_LOWER: out   std_logic_vector(7 downto 0);
+		DATA_RPI     : inout std_logic_vector(7 downto 0);
 
-        -- ADDR are the address lines from cartridge port
-           ADDR    : in std_logic_vector(8 downto 1);
+		-- ADDR are the address lines from cartridge port
+		ADDR    : in std_logic_vector(8 downto 1);
 
-        -- cartridge port signals for accessing the right areas
-           LDS     : in std_logic;
-           UDS     : in std_logic;
-           ROM3    : in std_logic
---         ROM4    : in std_logic
+		-- cartridge port signals for accessing the right areas
+		LDS     : in std_logic;
+		UDS     : in std_logic;
+		ROM3    : in std_logic
+--		ROM4    : in std_logic
         );
 end main;
 
@@ -56,6 +56,16 @@ architecture Behavioral of main is
 	signal ROM31, ROM32	: std_logic;
 	signal LDS1, LDS2	: std_logic;
 	signal UDS1, UDS2	: std_logic;
+	
+	signal data_read: std_logic;
+	signal data_write: std_logic;
+	signal rpi_strobe: std_logic;
+	signal config_read_op: std_logic;
+	signal config_write_op: std_logic;
+	signal config_read: std_logic;
+	signal config_write: std_logic;
+	signal rpi_writing_to_fifo: std_logic;
+	signal rpi_reading_from_fifo: std_logic;
 
 	COMPONENT OSCH
 	   GENERIC(
@@ -65,28 +75,53 @@ architecture Behavioral of main is
 			 OSC      : OUT STD_LOGIC;     -- the oscillator output
 			 SEDSTDBY : OUT STD_LOGIC);    -- required only for simulation when using standby
 	END COMPONENT;
+	
+	-- FIFO_DC component declaration
+	component fifo_dc
+		port (Data: in  std_logic_vector(7 downto 0); WrClock: in  std_logic; 
+			RdClock: in  std_logic; WrEn: in  std_logic; RdEn: in  std_logic; 
+			Reset: in  std_logic; RPReset: in  std_logic; 
+			Q: out  std_logic_vector(7 downto 0); Empty: out  std_logic; 
+			Full: out  std_logic; AlmostEmpty: out  std_logic; 
+			AlmostFull: out  std_logic);
+	end component;
 
-    signal configReg: std_logic_vector(3 downto 0);
+	signal fifo_data_in: std_logic_vector(7 downto 0); 
+	signal fifo_data_out: std_logic_vector(7 downto 0); 
+	signal fifo_WrEn: std_logic; 
+	signal fifo_RdEn: std_logic; 
+	signal fifo_Empty: std_logic; 
+	signal fifo_Full: std_logic; 
+	signal fifo_AlmostEmpty: std_logic; 
+	signal fifo_AlmostFull: std_logic;
+
 	-- config:
-	--  0: PIO write 1st - waiting for 1st cmd byte, XATN shows FIFO-not-empty (can read)
-	--  1: PIO write - data from ST to RPi, XATN shows FIFO-not-empty (can read)
-	--  2: DMA write - data from ST to RPi, XATN shows FIFO-not-empty (can read)
-	--  3: MSG write - data from ST to RPi, XATN shows FIFO-not-empty (can read)
-	--  4: PIO read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
-	--  5: DMA read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
-	--  6: MSG read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
-	--  7: SRAM_write - store another byte into boot SRAM (index register is reset to zero with reset)
-	--  8: current IF - to determine, if it's ACSI, SCSI or CART (because SCSI needs extra MSG phases)
-	--  9: current version - to determine, if this chip needs update or not
+	--  0 - 0000: PIO write 1st - waiting for 1st cmd byte, XATN shows FIFO-not-empty (can read)
+	--  1 - 0001: PIO write - data from ST to RPi, XATN shows FIFO-not-empty (can read)
+	--  2 - 0010: DMA write - data from ST to RPi, XATN shows FIFO-not-empty (can read)
+	--  3 - 0011: MSG write - data from ST to RPi, XATN shows FIFO-not-empty (can read)
+	--  4 - 0100: PIO read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
+	--  5 - 0101: DMA read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
+	--  6 - 0110: MSG read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
+	--  7 - 0111: SRAM_write - store another byte into boot SRAM (index register is reset to zero with reset)
+	--  8 - 1000: current IF - to determine, if it's ACSI, SCSI or CART (because SCSI needs extra MSG phases)
+	--  9 - 1001: current version - to determine, if this chip needs update or not
+    signal configReg: std_logic_vector(3 downto 0);
 
 begin
 	-- OSCH Instantiation
-	OSCInst0: OSCH
+	OSCInst: OSCH
 	-- synthesis translate_off
 		GENERIC MAP( NOM_FREQ => "16.63" )
 	-- synthesis translate_on
 		PORT MAP (STDBY=> '0', OSC => clk, SEDSTDBY => stdby_sed);
-
+	
+	-- FIFO_DC Instantiation
+	FIFO: fifo_dc
+		port map (Data(7 downto 0)=>fifo_data_in, WrClock=>clk, RdClock=>clk, WrEn=>fifo_WrEn, 
+			RdEn=>fifo_RdEn, Reset=>XRESET, RPReset=>XRESET, Q(7 downto 0)=>fifo_data_out, Empty=>fifo_Empty, 
+			Full=>fifo_Full, AlmostEmpty=>fifo_AlmostEmpty, AlmostFull=>fifo_AlmostFull);	
+	
 	InputSynchronizer: process(clk) is
     begin
         if rising_edge(clk) then
@@ -113,19 +148,37 @@ begin
 		end if;
     end process;
 
-    READ_CART_LDS <= ((not ROM32) and (not LDS2));  -- H when LDS and ROM3 are L
-    READ_CART_UDS <= ((not ROM32) and (not UDS2));  -- H when UDS and ROM3 are L
+    READ_CART_LDS <= ((not ROM32) and (not LDS2));  	-- H when LDS and ROM3 are L
+    READ_CART_UDS <= ((not ROM32) and (not UDS2));  	-- H when UDS and ROM3 are L
 
-	RPiHandling: process(clk, XNext2, XNext3) is
+	rpi_strobe     <= XNext2 and (not XNext3);			-- on rising edge of XNext
+	data_read      <= XDnC2 and XRnW2;					-- on data read (read direction is from RPi to ST)
+	data_write     <= XDnC2 and (not XRnW2);			-- on data write (write direction is from ST to RPi)
+	config_write   <= (not XDnC2) and XRnW2;			-- on config write (read direction is from RPi to logic)
+	config_read    <= (not XDnC2) and (not XRnW2);		-- on config read  (write direction is from logic to RPi)
+	config_read_op  <= '1' when (configReg="0100" or configReg="0101" or configReg="0110") else '0';							-- on config set to PIO, DMA or MSG read
+	config_write_op <= '1' when (configReg="0000" or configReg="0001" or configReg="0010" or configReg="0011") else '0';		-- on config set to PIO 1st, PIO other, DMA or MSG write
+
+	rpi_writing_to_fifo   <= '1' when (data_read='1'  and config_read_op='1'  and rpi_strobe='1') else '0';
+	rpi_reading_from_fifo <= '1' when (data_write='1' and config_write_op='1' and rpi_strobe='1') else '0';
+	
+	fifo_data_in <= DATA_RPI when rpi_writing_to_fifo='1' else "00000000";
+	fifo_WrEn    <= '1'      when rpi_writing_to_fifo='1' else '0';
+	fifo_RdEn    <= '1'      when rpi_reading_from_fifo='1' else '0';
+
+	DATA_RPI <= fifo_data_out when (data_write='1'  and config_write_op='1') else -- RPi can read FIFO data when configured data write and the operation in config is write operations
+				"00000011"    when (config_read='1' and configReg="1000") else    -- RPi can read IF type (1 is ACSI, 2 is SCSI, 3 is CART)
+				"00000001"    when (config_read='1' and configReg="1001") else    -- RPi can read current version - to determine, if this chip needs update or not
+				"ZZZZZZZZ";
+				
+    XATN <= (not fifo_Empty) when (config_write_op='1') else		-- on write operations - showing not-empty (can get data out of it)
+			(not fifo_Full)  when (config_read_op='1') else 		-- on read  operations - showing not-full  (can store data into it)
+			'0';
+
+	RPiHandling: process(clk, rpi_strobe, config_write) is
     begin
-        if XNext2='1' and XNext3='0' then			-- on rising edge of XNext
-			if XDnC2='1' then						-- if it's data access
-			
-			else									-- if it's config access
-				if XRnW2='1' then					-- if it's config WRITE (XRnW like for ST READ = 1), read and store it from RPi
-					configReg <= DATA_RPI(3 downto 0);
-				end if;
-			end if;
+		if rpi_strobe='1' and config_write='1' then		-- when doing config write and got rpi strobe, store new config
+			configReg <= DATA_RPI(3 downto 0);
 		end if;
     end process;
 	
@@ -168,8 +221,6 @@ begin
             st_data_latched <= ADDR(8 downto 1);
         end if;
     end process;
-
-    XATN <= XATNState;    -- if H, RPi can transfer 1st / next byte
 
     -- DATA_ST_LOWER is connected to ST DATA(7 downto 0)
     DATA_ST_LOWER <= DATA_RPI when st_doing_read='1' else   -- on reading data directly from RPi

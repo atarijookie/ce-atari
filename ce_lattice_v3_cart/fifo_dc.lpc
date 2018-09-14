@@ -1,0 +1,53 @@
+[Device]
+Family=machxo2
+PartType=LCMXO2-640HC
+PartName=LCMXO2-640HC-6TG100C
+SpeedGrade=6
+Package=TQFP100
+OperatingCondition=COM
+Status=S
+
+[IP]
+VendorName=Lattice Semiconductor Corporation
+CoreType=LPM
+CoreStatus=Demo
+CoreName=FIFO_DC
+CoreRevision=5.8
+ModuleName=fifo_dc
+SourceFormat=VHDL
+ParameterFileVersion=1.0
+Date=09/13/2018
+Time=14:19:49
+
+[Parameters]
+Verilog=0
+VHDL=1
+EDIF=1
+Destination=Synplicity
+Expression=BusA(0 to 7)
+Order=Big Endian [MSB:LSB]
+IO=0
+FIFOImp=EBR Only
+RDepth=1024
+RWidth=8
+WDepth=1024
+WWidth=8
+regout=0
+CtrlByRdEn=0
+ClockEn=0
+EmpFlg=1
+PeMode=Static - Single Threshold
+PeAssert=10
+PeDeassert=12
+FullFlg=1
+PfMode=Static - Single Threshold
+PfAssert=508
+PfDeassert=506
+Reset=Async
+Reset1=Sync
+RDataCount=0
+WDataCount=0
+EnECC=0
+
+[Command]
+cmd_line= -w -n fifo_dc -lang vhdl -synth lse -bus_exp 7 -bb -arch xo2c00 -type ebfifo -depth 1024 -width 8 -rwidth 8 -no_enable -pe 10 -pf 508
