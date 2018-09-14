@@ -57,10 +57,10 @@ depend:	$(DEPS)
 	$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $<
 
 clean:	depclean
-	$(AT)$(RM) $(TARGET) *~ $(OBJS) $(OBJS030) *.d *.o
+	$(AT)$(RM) $(TARGET) *~ $(OBJS) $(OBJS030) *.o
 
 depclean:
-	$(AT)$(RM) $(DEPS)
+	$(AT)$(RM) $(DEPS) *.d
 
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(MAKECMDGOALS),depclean)
