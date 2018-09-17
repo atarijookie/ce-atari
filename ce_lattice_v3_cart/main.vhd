@@ -16,7 +16,7 @@ entity main is
 		XRESET		: in std_logic;		-- RPi sets CPLD to idle state, ST will know that no more data should be transfered
 
 		-- DATA_ST_LOWER and DATA_ST_UPPER is connected to cartridge port, DATA_RPI connects to RPI and is driven when XRnW is L
-		DATA_ST_UPPER: out   std_logic_vector(2 downto 0);
+		DATA_ST_UPPER: out   std_logic_vector(7 downto 0);
 		DATA_ST_LOWER: out   std_logic_vector(7 downto 0);
 		DATA_RPI     : inout std_logic_vector(7 downto 0);
 
@@ -26,8 +26,8 @@ entity main is
 		-- cartridge port signals for accessing the right areas
 		LDS     : in std_logic;
 		UDS     : in std_logic;
-		ROM3    : in std_logic
---		ROM4    : in std_logic
+		ROM3    : in std_logic;			-- at ST address 0xFB0000 -- for CE transfers
+		ROM4    : in std_logic			-- at ST address 0xFA0000 -- for driver booting
         );
 end main;
 
@@ -37,8 +37,7 @@ architecture Behavioral of main is
 
     signal RPIisIdle        : std_logic;
     signal RPIwantsMoreState: std_logic;
-    signal DataChangedState : std_logic;     -- toggles every time RPi changes data (on XNEXT)
-    signal statusReg        : std_logic_vector(2 downto 0);
+    signal statusReg        : std_logic_vector(7 downto 0);
 
     signal XATNState		: std_logic;
 	signal XNext1, XNext2, XNext3: std_logic;
@@ -46,14 +45,15 @@ architecture Behavioral of main is
 	signal XRnW1, XRnW2: std_logic;
 	signal XDnC1, XDnC2: std_logic;
 	
-    signal st_data_latched: std_logic_vector(7 downto 0);
-    signal st_latch_clock: std_logic;
     signal st_doing_read: std_logic;
 
-    signal READ_CART_LDS : std_logic;
+    signal READ_CART_LDS, READ_CART_LDS1: std_logic;
     signal READ_CART_UDS : std_logic;
-	
+    signal BOOT_CART_LDS : std_logic;
+    signal BOOT_CART_UDS : std_logic;
+
 	signal ROM31, ROM32	: std_logic;
+	signal ROM41, ROM42	: std_logic;
 	signal LDS1, LDS2	: std_logic;
 	signal UDS1, UDS2	: std_logic;
 	
@@ -66,6 +66,10 @@ architecture Behavioral of main is
 	signal config_write: std_logic;
 	signal rpi_writing_to_fifo: std_logic;
 	signal rpi_reading_from_fifo: std_logic;
+
+	signal st_strobe: std_logic;
+	signal st_writing_to_fifo: std_logic;
+	signal st_reading_from_fifo: std_logic;
 
 	COMPONENT OSCH
 	   GENERIC(
@@ -108,6 +112,8 @@ architecture Behavioral of main is
 	--  9 - 1001: current version - to determine, if this chip needs update or not
     signal configReg: std_logic_vector(3 downto 0);
 
+	-- ROM3 - CE transfers, ROM4 - driver boot from cart
+
 begin
 	-- OSCH Instantiation
 	OSCInst: OSCH
@@ -139,32 +145,52 @@ begin
 			-- cart signals sync
 			ROM31 <= ROM3;
 			ROM32 <= ROM31;
-		
+
+			ROM41 <= ROM4;
+			ROM42 <= ROM41;
+
 			LDS1 <= LDS;
 			LDS2 <= LDS1;
 
 			UDS1 <= UDS;
 			UDS2 <= UDS1;
+			
+			READ_CART_LDS <= ((not ROM32) and (not LDS2));  	-- H when LDS and ROM3 are L
+			READ_CART_UDS <= ((not ROM32) and (not UDS2));  	-- H when UDS and ROM3 are L
+			READ_CART_LDS1 <= READ_CART_LDS;					-- prev value
+
+			BOOT_CART_LDS <= ((not ROM42) and (not LDS2));  	-- H when LDS and ROM4 are L
+			BOOT_CART_UDS <= ((not ROM42) and (not UDS2));  	-- H when UDS and ROM4 are L
 		end if;
     end process;
 
-    READ_CART_LDS <= ((not ROM32) and (not LDS2));  	-- H when LDS and ROM3 are L
-    READ_CART_UDS <= ((not ROM32) and (not UDS2));  	-- H when UDS and ROM3 are L
-
-	rpi_strobe     <= XNext2 and (not XNext3);			-- on rising edge of XNext
-	data_read      <= XDnC2 and XRnW2;					-- on data read (read direction is from RPi to ST)
-	data_write     <= XDnC2 and (not XRnW2);			-- on data write (write direction is from ST to RPi)
-	config_write   <= (not XDnC2) and XRnW2;			-- on config write (read direction is from RPi to logic)
-	config_read    <= (not XDnC2) and (not XRnW2);		-- on config read  (write direction is from logic to RPi)
+	rpi_strobe      <= XNext2 and (not XNext3);			-- on rising edge of XNext
+	data_read       <= XDnC2 and XRnW2;					-- on data read (read direction is from RPi to ST)
+	data_write      <= XDnC2 and (not XRnW2);			-- on data write (write direction is from ST to RPi)
+	config_write    <= (not XDnC2) and XRnW2;			-- on config write (read direction is from RPi to logic)
+	config_read     <= (not XDnC2) and (not XRnW2);		-- on config read  (write direction is from logic to RPi)
 	config_read_op  <= '1' when (configReg="0100" or configReg="0101" or configReg="0110") else '0';							-- on config set to PIO, DMA or MSG read
 	config_write_op <= '1' when (configReg="0000" or configReg="0001" or configReg="0010" or configReg="0011") else '0';		-- on config set to PIO 1st, PIO other, DMA or MSG write
+	RPIisIdle       <= '1' when configReg="0000" else '0';		-- when RPi is waiting for 1st cmd byte, it's idle
 
 	rpi_writing_to_fifo   <= '1' when (data_read='1'  and config_read_op='1'  and rpi_strobe='1') else '0';
 	rpi_reading_from_fifo <= '1' when (data_write='1' and config_write_op='1' and rpi_strobe='1') else '0';
-	
-	fifo_data_in <= DATA_RPI when rpi_writing_to_fifo='1' else "00000000";
-	fifo_WrEn    <= '1'      when rpi_writing_to_fifo='1' else '0';
-	fifo_RdEn    <= '1'      when rpi_reading_from_fifo='1' else '0';
+
+	st_strobe            <= '1' when (READ_CART_LDS='1' and READ_CART_LDS1='0') else '0';		-- on rising edge of READ_CART_LDS
+	st_writing_to_fifo   <= '1' when (config_write_op='1' and READ_CART_LDS='1') else '0';		-- when configured for WRITE and LDS is active
+	st_reading_from_fifo <= '1' when (config_read_op='1'  and READ_CART_LDS='1') else '0';		-- when configured for READ  and LDS is active
+
+	fifo_data_in <= DATA_RPI         when rpi_writing_to_fifo='1' else	-- when RPi is writing to FIFO
+					ADDR(8 downto 1) when st_writing_to_fifo='1'  else	-- when ST  is writing to FIFO
+					"00000000";
+					
+	fifo_WrEn <= '1' when (rpi_writing_to_fifo='1') else				-- when RPi is writing to FIFO
+				'1' when (config_write_op='1' and st_strobe='1') else	-- when ST  is writing to FIFO
+				'0';
+
+	fifo_RdEn <= '1' when (rpi_reading_from_fifo='1') else				-- when RPi is reading from FIFO
+				'1' when (config_read_op='1' and st_strobe='1') else	-- when ST  is reading from FIFO
+				'0';
 
 	DATA_RPI <= fifo_data_out when (data_write='1'  and config_write_op='1') else -- RPi can read FIFO data when configured data write and the operation in config is write operations
 				"00000011"    when (config_read='1' and configReg="1000") else    -- RPi can read IF type (1 is ACSI, 2 is SCSI, 3 is CART)
@@ -181,62 +207,19 @@ begin
 			configReg <= DATA_RPI(3 downto 0);
 		end if;
     end process;
-	
-    -- DataChangedState should help with faster read on ST - you can keep reading data and when this toggles (1->0, 0->1), you've just read new data
-    --  RPIisIdle tells if RPi has finished last transfer byte (RPIisIdle='1'), or RPi waits for transfer to happen (RPIisIdle='0')
-    DataChanged: process(XRESET, XNEXT) is
-    begin
-        if(XRESET='0') then                      -- reset from RPI? this flag goes to 0
-            DataChangedState <= '0';
-            RPIisIdle <= '1';
-        elsif rising_edge(XNEXT) then            -- if RPi does starts PIO or DMA transfer, the data has changed
-            DataChangedState <= not DataChangedState;
-            RPIisIdle <= '0';
-        end if;
-    end process;
-
-    AccessRequest: process(XRESET, XNEXT, READ_CART_LDS) is
-    begin
-        if(XRESET='0' or XNEXT='1') then            -- on end of transfer (XRESET='0') or before next byte transfer (XNEXT='1') reset this -- RPi will use this to wait for 1st or any other byte
-            XATNState <= '0';
-        elsif rising_edge(READ_CART_LDS) then       -- when ST accesses LDS (data read or write), we know that we got 1st or any other byte
-            XATNState <= '1';
-        end if;
-
-        if(XRESET='0' or READ_CART_LDS='1') then    -- reset from RPI or access to data from ST? reset this flag
-            RPIwantsMoreState <= '0';
-        elsif rising_edge(XNEXT) then               -- RPi wants next byte to be transfered, set this flag
-            RPIwantsMoreState <= '1';
-        end if;
-    end process;
-
-    st_latch_clock <= READ_CART_LDS and (not XRnW); -- when RPi sets WRITE direction (from ST to RPi) and ST does READ_CART_LDS, then this latch clock goes H
-    st_doing_read <=  READ_CART_LDS and      XRnW;  -- when RPi sets READ direction (from RPi to ST) and ST does READ_CART_LDS, then this goes H
-
-    -- 8-bit latch register
-    -- latch data from ST on falling edge of st_write_latch, which is CS and ACK
-    dataLatch: process(st_latch_clock) is
-    begin 
-        if (rising_edge(st_latch_clock)) then
-            st_data_latched <= ADDR(8 downto 1);
-        end if;
-    end process;
 
     -- DATA_ST_LOWER is connected to ST DATA(7 downto 0)
-    DATA_ST_LOWER <= DATA_RPI when st_doing_read='1' else   -- on reading data directly from RPi
-                     "ZZZZZZZZ";                            -- otherwise don't drive this
+    DATA_ST_LOWER <= fifo_data_out when READ_CART_LDS='1' else 	-- give ST the FIFO data 
+					"00000000" when BOOT_CART_LDS='1' else 		-- give ST the boot data
+					"ZZZZZZZZ";
 
-    -- status register for ST - DataChangedState toggles every time RPi changes the data (stays the same when data not changed)
-    statusReg(2) <= RPIisIdle;          -- when H, RPi doesn't do any further transfer (last byte was status byte)
-    statusReg(1) <= RPIwantsMoreState;  -- H when ST should transfer another byte (read or write)
-    statusReg(0) <= DataChangedState;   -- H when RPi changed data
-
-    -- DATA_ST_UPPER is connected to ST DATA(9 downto 8)
-    DATA_ST_UPPER <= statusReg when READ_CART_UDS='1' else  -- UD - status
-                     "ZZZ";
-
-    -- DATA_RPI is connected to RPi, data goes out when going from ST to MCU (WRITE operation)
-    DATA_RPI <= st_data_latched when XRnW='0'   else  -- on writing data from ST to RPi
-                "ZZZZZZZZ";                           -- otherwise don't drive this
+    -- status register for ST
+    statusReg(7) <= RPIisIdle;          	-- when H, RPi doesn't do any further transfer (last byte was status byte)
+	statusReg(6 downto 0) <= "0000000";		-- count of bytes we can transfer (0-127)
+	
+    -- DATA_ST_UPPER is connected to ST DATA(15 downto 8)
+    DATA_ST_UPPER <= statusReg when READ_CART_UDS='1' else	-- upper data - status byte
+					"00000000" when BOOT_CART_UDS='1' else	-- upper data - boot data
+					"ZZZZZZZZ";
 
 end Behavioral;
