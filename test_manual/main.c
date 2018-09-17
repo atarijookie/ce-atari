@@ -100,7 +100,7 @@ BYTE readCartByte(void)
 int main(void)
 {
     DWORD scancode;
-    BYTE key;
+    BYTE key, whichIF;
     DWORD toEven;
 
     Clear_home();
@@ -176,7 +176,7 @@ int main(void)
         largeMemSizeInBytes--;
     }
 
-    pBuffer = (BYTE *) toEven; 
+    pBuffer = (BYTE *) toEven;
 
      //           |                    |
     (void) Cconws("Large mem size (B)  : ");
@@ -187,9 +187,11 @@ int main(void)
     (void) Cconws("\r\n");
 
     // ---------------------- 
-    // search for device on the ACSI / SCSI bus 
+    // let user select the HDD IF for all the tests
+    deviceID = DEVICE_NOT_FOUND;            // if user doesn't pre-select device ID, auto-scan will follow the IF selection
+    whichIF = IF_ANY;
+
     (void) Cconws("Choose HDD interface:\r\n");
-    deviceID = 0;
 
     if(machineType == MACHINE_ST || machineType == MACHINE_TT) {    // machine with ACSI?
        (void) Cconws("'A' - ACSI \r\n");
@@ -201,9 +203,10 @@ int main(void)
 
     if(machineType == MACHINE_FALCON) {  // if it's Falcon, use SCSI
         (void) Cconws("'F' - Falcon SCSI \r\n");
-    } 
+    }
 
    (void) Cconws("'C' - CART \r\n");
+   (void) Cconws("0-7 - pre-select device ID\r\n");
    (void) Cconws("'Q' - quit \r\n");
 
     while(1) {
@@ -211,7 +214,15 @@ int main(void)
         if(key >= 'A' && key <= 'Z') {
             key += 32;
         }
-        
+
+        if(key >= '0' && key <= '7') {  // if pre-selecting device ID
+            deviceID = key - '0';
+            (void) Cconws("Pre-selected device ID: ");
+            Cconout(key);
+            (void) Cconws("\r\n");
+            continue;
+        }
+
         // good key press? go on...
         if(key == 't' || key == 'a' || key == 'f' || key == 'c') {
             break;
@@ -230,46 +241,48 @@ int main(void)
         case 'a':
             (void) Cconws("\33pACSI\33q");
             hdd_if_select(IF_ACSI);
-            deviceID = 0;           // ACSI ID 0
+            whichIF = IF_ACSI;
             break;
 
         case 'c':
             (void) Cconws("\33pCART\33q");
             hdd_if_select(IF_CART);
-            deviceID = 0;           // CART ID 0
+            whichIF = IF_CART;
             break;
 
         case 't':
             (void) Cconws("\33pTT SCSI\33q");
             hdd_if_select(IF_SCSI_TT);
-            deviceID = 0;           // SCSI ID 0
+            whichIF = IF_SCSI_TT;
             break;
 
         case 'f':
             (void) Cconws("\33pFalcon SCSI\33q");
             hdd_if_select(IF_SCSI_FALCON);
-            deviceID = 1;           // SCSI ID 1
-            
+            whichIF = IF_SCSI_FALCON;
             break;
     }
     (void) Cconws("\r\n");
 
-    showLogs = 0;                   // turn off logs - there will be errors on findDevice when device doesn't exist 
-
-    // search for CosmosEx on ACSI & SCSI bus
-    deviceID = findDevice(IF_ANY, DEV_CE);
-
+    //-----------------
+    // if device ID wasn't pre-selected, search for CosmosEx on selected bus
     if(deviceID == DEVICE_NOT_FOUND) {
-        sleep(3);
-        return 0;
+        showLogs = 0;                   // turn off logs - there will be errors on findDevice when device doesn't exist 
+
+        deviceID = findDevice(whichIF, DEV_CE);
+
+        if(deviceID == DEVICE_NOT_FOUND) {
+            sleep(3);
+            return 0;
+        }
+
+        showLogs = 1;                   // turn on logs
     }
-
-    showLogs = 1;                   // turn on logs
-
-    showMenu();
 
     //-----------------
     // main menu loop
+    showMenu();
+
     while(1) {
         scancode = Bconin(DEV_CONSOLE);         // get char form keyboard, no echo on screen 
         key      = scancode & 0xff;

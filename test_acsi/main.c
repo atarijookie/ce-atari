@@ -1010,6 +1010,8 @@ void showConnectionErrorMessage(void)
 
 //--------------------------------------------------
 
+//#define DETAILED_ERROR  1
+
 int readHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal)
 {
     if(CEnotCS) {
@@ -1038,6 +1040,9 @@ int readHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal)
     hdIfCmdAsUser(ACSI_READ, commandLong, CMD_LENGTH_LONG, rBuffer, (byteCount+511)>>9 );        // issue the command and check the result
     
     if(!hdIf.success) {                     // FAIL? quit...
+        #ifdef DETAILED_ERROR
+        (void) Cconws("-1-");
+        #endif
         return -1;
     }
     
@@ -1046,6 +1051,9 @@ int readHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal)
     if(hdIf.success && hdIf.statusByte == OK) { // no error - at the end just return 0
         retVal = 0;
     } else {            // some error - at the end return -1
+        #ifdef DETAILED_ERROR
+        (void) Cconws("-2-");
+        #endif
         retVal = -1;
     }
     
@@ -1055,6 +1063,14 @@ int readHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal)
     for(i=0; i<byteCount; i += 2) {
         data = counter ^ xorVal;       // create word
         if( !(rBuffer[i]==(data>>8) && rBuffer[i+1]==(data&0xFF)) ){
+            #ifdef DETAILED_ERROR
+            (void) Cconws("-3: ");
+            showHexDword(i);
+            (void) Cconws("/");
+            showHexDword(byteCount);
+            (void) Cconws("\r\n");
+            #endif
+
             return -2;
         }  
         counter++;
@@ -1063,6 +1079,9 @@ int readHansTest(BYTE CEnotCS, DWORD byteCount, WORD xorVal)
     if(byteCount & 1) {                                 // odd number of bytes? add last byte
         BYTE lastByte = (counter ^ xorVal) >> 8;
         if( rBuffer[byteCount-1]!=lastByte ){
+            #ifdef DETAILED_ERROR
+            (void) Cconws("-4-");
+            #endif
             return -2;
         }  
     }
