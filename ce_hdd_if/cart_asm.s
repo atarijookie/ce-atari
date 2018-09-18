@@ -29,7 +29,7 @@ wait_for_read:
     btst    #0, d4          | test RPIwantsMore
     bne     do_read_byte    | if RPIwantsMore is 1, should transfer byte
 
-    btst    #2, d4                  | test RPIisIdle
+    btst    #1, d4          | test RPIisIdle
     bne     store_status_and_quit   | if RPIisIdle is 1, then RPi went idle and last read byte was status
 
     move.l  (a3), d3        | read current value of 200 Hz timer
@@ -52,7 +52,7 @@ wait_for_status:
     btst    #0, d4          | test RPIwantsMore
     bne     read_status     | if RPIwantsMore is 1, we can now read the status
 
-    btst    #2, d4                  | test RPIisIdle
+    btst    #1, d4          | test RPIisIdle
     bne     store_status_and_quit   | if RPIisIdle is 1, then RPi went idle and last read byte was status
 
     move.l  (a3), d3        | read current value of 200 Hz timer
@@ -101,7 +101,7 @@ wait_for_write:
     btst    #0, d4          | test RPIwantsMore
     bne     do_write_byte   | if RPIwantsMore is 1, should transfer byte
 
-    btst    #2, d4                  | test RPIisIdle
+    btst    #1, d4                  | test RPIisIdle
     bne     store_status_and_quit   | if RPIisIdle is 1, then RPi went idle and last read byte was status
 
     move.l  (a3), d3        | read current value of 200 Hz timer
