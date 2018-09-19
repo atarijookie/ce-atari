@@ -18,16 +18,22 @@ entity main is
 		-- DATA_ST_LOWER and DATA_ST_UPPER is connected to cartridge port, DATA_RPI connects to RPI and is driven when XRnW is L
 		DATA_ST_UPPER: out   std_logic_vector(7 downto 0);
 		DATA_ST_LOWER: out   std_logic_vector(7 downto 0);
+		ENABLE_LOW : out std_logic;		-- enable DATA_ST_LOWER signal for external bus driver
+		ENABLE_HIGH: out std_logic;		-- enable DATA_ST_UPPER signal for external bus driver
+		
 		DATA_RPI     : inout std_logic_vector(7 downto 0);
 
 		-- ADDR are the address lines from cartridge port
-		ADDR    : in std_logic_vector(8 downto 1);
+		ADDR    : in std_logic_vector(9 downto 1);
 
 		-- cartridge port signals for accessing the right areas
 		LDS     : in std_logic;
 		UDS     : in std_logic;
 		ROM3    : in std_logic;			-- at ST address 0xFB0000 -- for CE transfers
-		ROM4    : in std_logic			-- at ST address 0xFA0000 -- for driver booting
+		ROM4    : in std_logic;			-- at ST address 0xFA0000 -- for driver booting
+		
+		-- other
+		TP1, TP2, TP3: out std_logic	-- either test point signals, or future (development) usage
         );
 end main;
 
@@ -183,7 +189,7 @@ begin
 	fifo_data_in <= DATA_RPI         when rpi_writing_to_fifo='1' else	-- when RPi is writing to FIFO
 					ADDR(8 downto 1) when st_writing_to_fifo='1'  else	-- when ST  is writing to FIFO
 					"00000000";
-					
+
 	fifo_WrEn <= '1' when (rpi_writing_to_fifo='1') else				-- when RPi is writing to FIFO
 				'1' when (config_write_op='1' and st_strobe='1') else	-- when ST  is writing to FIFO
 				'0';
@@ -216,7 +222,7 @@ begin
     -- status register for ST
     statusReg(7) <= RPIisIdle;          	-- when H, RPi doesn't do any further transfer (last byte was status byte)
 	statusReg(6 downto 0) <= "0000000";		-- count of bytes we can transfer (0-127)
-	
+
     -- DATA_ST_UPPER is connected to ST DATA(15 downto 8)
     DATA_ST_UPPER <= statusReg when READ_CART_UDS='1' else	-- upper data - status byte
 					"00000000" when BOOT_CART_UDS='1' else	-- upper data - boot data
