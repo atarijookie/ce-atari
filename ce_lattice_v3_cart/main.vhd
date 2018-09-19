@@ -105,6 +105,10 @@ architecture Behavioral of main is
 	signal fifo_AlmostEmpty: std_logic; 
 	signal fifo_AlmostFull: std_logic;
 
+	signal fifo_byte_count: unsigned(10 downto 0) := "00000000000";	-- 1024 bytes in FIFO -- needs 11 bits to store number 1024
+	signal fifo_byte_count8b: unsigned(7 downto 0);					-- count of bytes, rounded to 8 bits (e.g. when there are 256 and more bytes in fifo, this will return 255)
+	signal fifo_byte_count7b: unsigned(6 downto 0);					-- count of bytes, rounded to 7 bits (e.g. when there are 128 and more bytes in fifo, this will return 127)
+
 	-- config:
 	--  0 - 0000: PIO write 1st - waiting for 1st cmd byte, XATN shows FIFO-not-empty (can read)
 	--  1 - 0001: PIO write - data from ST to RPi, XATN shows FIFO-not-empty (can read)
@@ -113,10 +117,12 @@ architecture Behavioral of main is
 	--  4 - 0100: PIO read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
 	--  5 - 0101: DMA read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
 	--  6 - 0110: MSG read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
-	--  7 - 0111: SRAM_write - store another byte into boot SRAM (index register is reset to zero with reset)
-	--  8 - 1000: current IF - to determine, if it's ACSI, SCSI or CART (because SCSI needs extra MSG phases)
-	--  9 - 1001: current version - to determine, if this chip needs update or not
-    signal configReg: std_logic_vector(3 downto 0);
+	--  7 - 0111: read fifo_byte_count -- how many bytes are stored in FIFO and can be read out
+	--
+	-- 13 - 1101: SRAM_write - store another byte into boot SRAM (index register is reset to zero with reset)
+	-- 14 - 1110: current IF - to determine, if it's ACSI, SCSI or CART (because SCSI needs extra MSG phases)
+	-- 15 - 1111: current version - to determine, if this chip needs update or not
+    signal configReg: std_logic_vector(3 downto 0) := "0000";
 
 	-- ROM3 - CE transfers, ROM4 - driver boot from cart
 
@@ -165,6 +171,9 @@ begin
 			READ_CART_UDS <= ((not ROM32) and (not UDS2));  	-- H when UDS and ROM3 are L
 			READ_CART_LDS1 <= READ_CART_LDS;					-- prev value
 
+			ENABLE_LOW <= not READ_CART_LDS;					-- enable is active LOW - when READ_CART_LDS is active
+			ENABLE_HIGH <= not READ_CART_UDS;					-- enable is active LOW - when READ_CART_UDS is active
+
 			BOOT_CART_LDS <= ((not ROM42) and (not LDS2));  	-- H when LDS and ROM4 are L
 			BOOT_CART_UDS <= ((not ROM42) and (not UDS2));  	-- H when UDS and ROM4 are L
 		end if;
@@ -198,18 +207,38 @@ begin
 				'1' when (config_read_op='1' and st_strobe='1') else	-- when ST  is reading from FIFO
 				'0';
 
+	fifo_byte_count8b <= fifo_byte_count(7 downto 0) when (fifo_byte_count < 256) else "11111111";	-- if it's 255 or less, return that value, otherwise limit it to 255
+	fifo_byte_count7b <= fifo_byte_count(6 downto 0) when (fifo_byte_count < 128) else  "1111111";	-- if it's 127 or less, return that value, otherwise limit it to 127
+
 	DATA_RPI <= fifo_data_out when (data_write='1'  and config_write_op='1') else -- RPi can read FIFO data when configured data write and the operation in config is write operations
-				"00000011"    when (config_read='1' and configReg="1000") else    -- RPi can read IF type (1 is ACSI, 2 is SCSI, 3 is CART)
-				"00000001"    when (config_read='1' and configReg="1001") else    -- RPi can read current version - to determine, if this chip needs update or not
+				std_logic_vector(fifo_byte_count8b) when (config_read='1' and configReg="0111") else	-- when reading fifo_byte_count, return this
+				"00000011"    when (config_read='1' and configReg="1110") else    -- RPi can read IF type (1 is ACSI, 2 is SCSI, 3 is CART)
+				"00000001"    when (config_read='1' and configReg="1111") else    -- RPi can read current version - to determine, if this chip needs update or not
 				"ZZZZZZZZ";
 				
     XATN <= (not fifo_Empty) when (config_write_op='1') else		-- on write operations - showing not-empty (can get data out of it)
 			(not fifo_Full)  when (config_read_op='1') else 		-- on read  operations - showing not-full  (can store data into it)
 			'0';
 
+	FIFObyteCounter: process(clk, XRESET, fifo_WrEn, fifo_RdEn) is
+    begin
+		if XRESET='1' then						-- on reset - no bytes in FIFO
+			fifo_byte_count <= "00000000000";
+        elsif rising_edge(clk) then
+			-- if both read and write happen at the same clock, don't change the value
+			if    fifo_WrEn='1' and fifo_RdEn='0' then			-- on write: +1 byte in FIFO
+				fifo_byte_count <= fifo_byte_count + 1;
+			elsif fifo_WrEn='0' and fifo_RdEn='1' then			-- on read:  -1 byte in FIFO
+				fifo_byte_count <= fifo_byte_count - 1;
+			end if;
+		end if;
+	end process;
+
 	RPiHandling: process(clk, rpi_strobe, config_write) is
     begin
-		if rpi_strobe='1' and config_write='1' then		-- when doing config write and got rpi strobe, store new config
+		if XRESET='1' then									-- reset brings the config to 'PIO write 1st'
+			configReg <= "0000";
+		elsif rpi_strobe='1' and config_write='1' then		-- when doing config write and got rpi strobe, store new config
 			configReg <= DATA_RPI(3 downto 0);
 		end if;
     end process;
@@ -220,8 +249,8 @@ begin
 					"ZZZZZZZZ";
 
     -- status register for ST
-    statusReg(7) <= RPIisIdle;          	-- when H, RPi doesn't do any further transfer (last byte was status byte)
-	statusReg(6 downto 0) <= "0000000";		-- count of bytes we can transfer (0-127)
+    statusReg(7) <= RPIisIdle;          							-- when H, RPi doesn't do any further transfer (last byte was status byte)
+	statusReg(6 downto 0) <= std_logic_vector(fifo_byte_count7b);	-- count of bytes we can transfer (0-127)
 
     -- DATA_ST_UPPER is connected to ST DATA(15 downto 8)
     DATA_ST_UPPER <= statusReg when READ_CART_UDS='1' else	-- upper data - status byte
