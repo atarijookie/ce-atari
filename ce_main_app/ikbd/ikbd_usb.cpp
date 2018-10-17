@@ -15,11 +15,14 @@
 #include "settings.h"
 #include "datatypes.h"
 #include "statusreport.h"
+#include "../periodicthread.h"
+#include "../config/configstream.h"
 #include "../display/displaythread.h"
 
 #include "ikbd.h"
 
 extern TInputDevice ikbdDevs[INTYPE_MAX+1];
+extern SharedObjects shared;
 
 void Ikbd::initDevs(void)
 {
@@ -293,6 +296,15 @@ void Ikbd::processMouse(input_event *ev)
 {
     if(ev->type == EV_KEY) {        // on button press
         int btnNew = mouseBtnNow;
+
+        // Following block checks if it's not a mouse button, and if it's not, it will let the keyboard code 
+        // handle this EV_KEY event. This is because Logitech K400 on RPi appears only as mouse device instead of mouse device + keyboard device,
+        // but the EV_KEY events are still sent - through that single mouse device.
+        if(ev->code != BTN_LEFT && ev->code != BTN_RIGHT) {
+            bool clientConnected = ((Utils::getCurrentMs() - shared.configStream.acsi->getLastCmdTimestamp()) <= 2000); 
+            processKeyboard(ev, clientConnected);
+            return;
+        }
 
         statuses.ikbdUsb.aliveTime = Utils::getCurrentMs();
         statuses.ikbdUsb.aliveSign = ALIVE_MOUSEVENT;
