@@ -43,6 +43,52 @@
 #define E_RESET             4
 #define E_FAIL_CMD_AGAIN    5
 
+// definition of configuration bytes for FPGA
+#define CNF_PIO_WRITE_FIRST 0   // PIO write 1st - waiting for 1st cmd byte, XATN shows FIFO-not-empty (can read)
+#define CNF_PIO_WRITE       1   // PIO write - data from ST to RPi, XATN shows FIFO-not-empty (can read)
+#define CNF_DMA_WRITE       2   // DMA write - data from ST to RPi, XATN shows FIFO-not-empty (can read)
+#define CNF_MSG_WRITE       3   // MSG write - data from ST to RPi, XATN shows FIFO-not-empty (can read)
+#define CNF_PIO_READ        4   // PIO read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
+#define CNF_DMA_READ        5   // DMA read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
+#define CNF_MSG_READ        6   // MSG read  - data from RPi to ST, XATN shows FIFO-not-full  (can write)
+#define CNF_GET_FIFO_CNT    7   // read fifo_byte_count -- how many bytes are stored in FIFO and can be read out
+#define CNF_SRAM_WRITE      13  // SRAM_write - store another byte into boot SRAM (index register is reset to zero with reset)
+#define CNF_CURRENT_IF      14  // current IF - to determine, if it's ACSI, SCSI or CART (because SCSI needs extra MSG phases)
+#define CNF_CURRENT_VERSION 15  // current version - to determine, if this chip needs update or not
+
+// definition of FPGA pins
+#ifndef ONPC_NOTHING
+    #define PIN_XATN            PIN_ATN_HANS
+    #define PIN_XDnC            RPI_V2_GPIO_P1_32
+    #define PIN_XRnW            RPI_V2_GPIO_P1_26
+    #define PIN_XRESET          PIN_RESET_HANS
+    #define PIN_XNEXT           RPI_V2_GPIO_P1_24
+
+    #define PIN_D0              RPI_V2_GPIO_P1_12
+    #define PIN_D1              RPI_V2_GPIO_P1_35
+    #define PIN_D2              RPI_V2_GPIO_P1_38
+    #define PIN_D3              RPI_V2_GPIO_P1_40
+    #define PIN_D4              RPI_V2_GPIO_P1_15
+    #define PIN_D5              RPI_V2_GPIO_P1_18
+    #define PIN_D6              RPI_V2_GPIO_P1_22
+    #define PIN_D7              RPI_V2_GPIO_P1_37
+#else
+    #define PIN_XATN            0
+    #define PIN_XDnC            0
+    #define PIN_XRnW            0
+    #define PIN_XRESET          0
+    #define PIN_XNEXT           0
+
+    #define PIN_D0              0
+    #define PIN_D1              0
+    #define PIN_D2              0
+    #define PIN_D3              0
+    #define PIN_D4              0
+    #define PIN_D5              0
+    #define PIN_D6              0
+    #define PIN_D7              0
+#endif
+
 class CartDataTrans: public DataTrans
 {
 public:
@@ -86,9 +132,10 @@ private:
     void hwDirForRead(void);    // data pins direction read (from RPi to ST)
     void hwDirForWrite(void);   // data pins direction write (from ST to RPi)
 
-    bool timeout(void);         // returns true if timeout
-    void writeDataToGPIO(BYTE val); // sets value to data pins
-    BYTE readDataFromGPIO(void);    // reads value from data pins
+    bool timeout(void);                 // returns true if timeout
+    void setFPGAconfigByte(BYTE cnf);   // sets the config byte of FPGA to tell it what it should do
+    void writeDataToGPIO(BYTE val);     // sets value to data pins
+    BYTE readDataFromGPIO(void);        // reads value from data pins
     void resetCpld(void);
 
     int getCmdLengthFromCmdBytesAcsi(void);

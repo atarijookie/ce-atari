@@ -10,36 +10,6 @@
 #include "cartdatatrans.h"
 #include "native/scsi_defs.h"
 
-#ifndef ONPC_NOTHING
-    #define PIN_ST_DID_TRANSFER PIN_ATN_HANS
-    #define PIN_XRESET          PIN_RESET_HANS
-    #define PIN_XNEXT           RPI_V2_GPIO_P1_24
-    #define PIN_XRnW            RPI_V2_GPIO_P1_33
-
-    #define PIN_D0              RPI_V2_GPIO_P1_12
-    #define PIN_D1              RPI_V2_GPIO_P1_35
-    #define PIN_D2              RPI_V2_GPIO_P1_38
-    #define PIN_D3              RPI_V2_GPIO_P1_40
-    #define PIN_D4              RPI_V2_GPIO_P1_15
-    #define PIN_D5              RPI_V2_GPIO_P1_18
-    #define PIN_D6              RPI_V2_GPIO_P1_22
-    #define PIN_D7              RPI_V2_GPIO_P1_37
-#else
-    #define PIN_ST_DID_TRANSFER 0
-    #define PIN_XRESET          0
-    #define PIN_XNEXT           0
-    #define PIN_XRnW            0
-
-    #define PIN_D0              0
-    #define PIN_D1              0
-    #define PIN_D2              0
-    #define PIN_D3              0
-    #define PIN_D4              0
-    #define PIN_D5              0
-    #define PIN_D6              0
-    #define PIN_D7              0
-#endif
-
 #define DATA_MASK ((1 << PIN_D7) | (1 << PIN_D6) | (1 << PIN_D5) | (1 << PIN_D4) | (1 << PIN_D3) | (1 << PIN_D2) | (1 << PIN_D1) | (1 << PIN_D0))
 
 CartDataTrans::CartDataTrans()
@@ -115,12 +85,13 @@ void CartDataTrans::configureHw(void)
 
     // cpld interface
     // these 2 are the same with the SPI version of CE
-    bcm2835_gpio_fsel(PIN_ST_DID_TRANSFER,  BCM2835_GPIO_FSEL_INPT);
-    bcm2835_gpio_fsel(PIN_XRESET,           BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_fsel(PIN_XATN,   BCM2835_GPIO_FSEL_INPT);
+    bcm2835_gpio_fsel(PIN_XRESET, BCM2835_GPIO_FSEL_OUTP);
 
     // the rest is different to SPI version of CE
-    bcm2835_gpio_fsel(PIN_XNEXT,            BCM2835_GPIO_FSEL_OUTP);
-    bcm2835_gpio_fsel(PIN_XRnW,             BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_fsel(PIN_XNEXT, BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_fsel(PIN_XRnW,  BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_fsel(PIN_XDnC,  BCM2835_GPIO_FSEL_OUTP);
 
     // XNEXT to idle level
     bcm2835_gpio_write(PIN_XNEXT, LOW);
@@ -153,7 +124,7 @@ bool CartDataTrans::waitForATN(int whichSpiCs, BYTE *inBuf)
         return true;
     }
 
-    BYTE val = bcm2835_gpio_lev(PIN_ST_DID_TRANSFER);  // read ATN pin
+    BYTE val = bcm2835_gpio_lev(PIN_XATN);  // read ATN pin
     if (val == HIGH) {                          // ATN true if high
         getCommandFromST();                     // try to get command from ST
 
@@ -209,6 +180,8 @@ void CartDataTrans::getCommandFromST(void)
     cmdLen = 6;                                     // maximum 6 bytes at start, but this might change in getCmdLengthFromCmdBytes()
     int i;
 
+    setFPGAconfigByte(CNF_PIO_WRITE);               // we will be doing PIO WRITE (done outside of PIO_write() so we won't do it before each PIO write byte)
+
     for(i=1; i<cmdLen; i++) {                       // receive the next command bytes
         cmd[i] = PIO_write();                       // drop down IRQ, get byte
 
@@ -258,6 +231,7 @@ bool CartDataTrans::sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool w
 
 bool CartDataTrans::sendData_transferBlock(BYTE *pData, DWORD dataCount)
 {
+    setFPGAconfigByte(CNF_DMA_READ);   // we will be doing DMA READ
     hwDirForRead();             // data as outputs (ST does data READ)
 
     if((dataCount & 1) != 0) {  // odd number of bytes? make it even, we're sending words...
@@ -292,6 +266,7 @@ bool CartDataTrans::recvData_start(DWORD totalDataCount)
 
 bool CartDataTrans::recvData_transferBlock(BYTE *pData, DWORD dataCount)
 {
+    setFPGAconfigByte(CNF_DMA_WRITE);   // we will be doing DMA WRITE
     hwDirForWrite();            // data as inputs (ST does data WRITE)
 
     while(dataCount > 0) {      // while there's something to get from ST
@@ -374,9 +349,25 @@ BYTE CartDataTrans::readDataFromGPIO(void)
 #endif
 }
 
+void CartDataTrans::setFPGAconfigByte(BYTE cnf)
+{
+    bcm2835_gpio_write(PIN_XDnC, LOW);      // PIN_XDnC to LOW - it's a Command
+    hwDirForRead();                         // data as outputs (RPi will talk to FPGA)
+
+    writeDataToGPIO(cnf);                   // write the data to output data register
+
+    // create rising edge on XNEXT
+    bcm2835_gpio_write(PIN_XNEXT, HIGH);    // to HIGH
+    bcm2835_gpio_write(PIN_XNEXT, LOW);     // to LOW
+
+    bcm2835_gpio_write(PIN_XDnC, HIGH);     // PIN_XDnC to HIGH - it's Data
+}
+
 // get 1st CMD byte from ST  -- without setting INT
 BYTE CartDataTrans::PIO_writeFirst(void)
 {
+    setFPGAconfigByte(CNF_PIO_WRITE_FIRST); // config FPGA that we will be reading 1st PIO byte)
+
     hwDirForWrite();                        // data as inputs (ST does data WRITE)
     brStat = E_OK;
     timeoutTime = Utils::getEndTime(1000);  // start the timeout timer
@@ -392,7 +383,7 @@ BYTE CartDataTrans::PIO_write(void)
     bcm2835_gpio_write(PIN_XNEXT, LOW);      // to LOW
 
     while(1) {                  // wait for CS or timeout
-        BYTE done = bcm2835_gpio_lev(PIN_ST_DID_TRANSFER);
+        BYTE done = bcm2835_gpio_lev(PIN_XATN);
 
         if(done == HIGH) {     // if CS arrived, read and quit
             return readDataFromGPIO();
@@ -408,6 +399,7 @@ BYTE CartDataTrans::PIO_write(void)
 // send status byte to host
 void CartDataTrans::PIO_read(BYTE val)
 {
+    setFPGAconfigByte(CNF_PIO_READ);        // we will be doing PIO READ
     hwDirForRead();                         // data as outputs (ST does data READ)
     writeDataToGPIO(val);                   // write the data to output data register
 
@@ -416,7 +408,7 @@ void CartDataTrans::PIO_read(BYTE val)
     bcm2835_gpio_write(PIN_XNEXT, LOW);      // to LOW
 
     while(1) {                                                              // wait for CS or timeout
-        BYTE done = bcm2835_gpio_lev(PIN_ST_DID_TRANSFER);
+        BYTE done = bcm2835_gpio_lev(PIN_XATN);
 
         if(done == HIGH) {     // if CS arrived
             break;
@@ -431,7 +423,6 @@ void CartDataTrans::PIO_read(BYTE val)
     hwDirForWrite();       // data as inputs (write)
 }
 
-
 void CartDataTrans::DMA_read(BYTE val)
 {
     writeDataToGPIO(val);                   // write the data to output data register
@@ -441,7 +432,7 @@ void CartDataTrans::DMA_read(BYTE val)
     bcm2835_gpio_write(PIN_XNEXT, LOW);      // to LOW
 
     while(1) {                                                              // wait for ACK or timeout
-        BYTE done = bcm2835_gpio_lev(PIN_ST_DID_TRANSFER);
+        BYTE done = bcm2835_gpio_lev(PIN_XATN);
 
         if(done == HIGH) {     // if CS arrived
             break;
@@ -461,7 +452,7 @@ BYTE CartDataTrans::DMA_write(void)
     bcm2835_gpio_write(PIN_XNEXT, LOW);      // to LOW
 
     while(1) {                                                              // wait for ACK or timeout
-        BYTE done = bcm2835_gpio_lev(PIN_ST_DID_TRANSFER);
+        BYTE done = bcm2835_gpio_lev(PIN_XATN);
 
         if(done == HIGH) {     // if CS arrived, read and quit
             return readDataFromGPIO();
