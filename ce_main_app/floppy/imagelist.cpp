@@ -24,7 +24,7 @@ bool ImageList::exists(void)
     if(res == 0) {
         return true;
     }
-    
+
     // ok, so the file does not exist
 
     std::string status;
@@ -32,7 +32,7 @@ bool ImageList::exists(void)
 
     if(!status.empty()) {                               // the file is being downloaded, but we don't have it yet
         return false;
-    }    
+    }
 
     // start the download
     TDownloadRequest tdr;
@@ -66,11 +66,11 @@ bool ImageList::loadList(void)
         memset(tmp, 0, 1024);
 
         char *c = fgets(tmp, 1023, f);                  // read one line
-        
+
         if(c == NULL) {                                 // didn't read anything?
             continue;
         }
-        
+
         char *tok;
         tok = strtok(tmp, ",");                         // init strtok by passing pointer to string
 
@@ -100,14 +100,14 @@ bool ImageList::loadList(void)
         li.checksum = checksum;                         // store checksum
 
         while(1) {                                      // now move beyond checksum by looking for 0 as string terminator
-            if(*tok == 0) {     
+            if(*tok == 0) {
                 break;
             }
             tok++;
         }
 
         tok++;                                          // tok now points to the start of games string
-    
+
         if(*tok == 0) {                                 // nothing in this image? skip it
             continue;
         }
@@ -117,7 +117,7 @@ bool ImageList::loadList(void)
         li.marked = false;
 
         vectorOfImages.push_back(li);                   // store it in vector
-    }    
+    }
 
     fclose(f);
 
@@ -125,7 +125,7 @@ bool ImageList::loadList(void)
     return true;
 }
 
-void ImageList::search(char *part)
+void ImageList::search(const char *part)
 {
     std::string sPart = part;
     std::transform(sPart.begin(), sPart.end(), sPart.begin(), ::tolower);                   // convert to lowercase
@@ -135,21 +135,21 @@ void ImageList::search(char *part)
     int cnt = vectorOfImages.size();
 
     // if not loaded, or the list is empty
-    if(!isLoaded || cnt < 1) {                                      
+    if(!isLoaded || cnt < 1) {
         return;
     }
 
     // if search string is too short
     bool searchTooShort = false;
-    if(strlen(part) < 2) {                                          
+    if(strlen(part) < 2) {
         searchTooShort = true;
     }
 
     // go through the list of images, copy the right ones
     for(int i=0; i<cnt; i++) {
-        std::string &games = vectorOfImages[i].games;       
+        std::string &games = vectorOfImages[i].games;
         std::string game;
-        SearchResult sr;                                            
+        SearchResult sr;
 
         if(searchTooShort) {
             sr.game         = games;                                // store stuff in search result structure
@@ -209,18 +209,18 @@ void ImageList::getSingleGame(std::string &games, std::string &game, size_t pos)
     if(start >= (size_t) len) {                                                 // if start would be out of range, fix it
         start = len - 1;
     }
-    
+
     if(end >= (size_t) len) {                                                   // if end would be out of range, fix it
         end = len - 1;
     }
-    
+
     game = games.substr(start, (end - start + 1));                              // get only the single game
 }
 
 void ImageList::getResultByIndex(int index, char *bfr)
 {
     memset(bfr, 0, 68);                                                         // clear the memory
-    
+
     if(index < 0 || index >= (int) vectorOfResults.size()) {                    // if out of range
         return;
     }
@@ -228,16 +228,16 @@ void ImageList::getResultByIndex(int index, char *bfr)
     int imageIndex = vectorOfResults[index].imageIndex;
 
     strncpy(bfr, vectorOfImages[imageIndex].imageName.c_str(), 64);             // copy in the name of image
-    
+
     int len = strlen(bfr);
     if(len < 12) {                                                              // pad the file name with spaces to 12 chars total
         int i;
-        
+
         for(i=len; i<12; i++) {
             bfr[i] = ' ';
         }
     }
-    
+
     if(vectorOfImages[imageIndex].marked) {                                     // if image is marked for download
         strcat(bfr, " * ");                                                     // add ' * ' string
     } else {
@@ -257,11 +257,11 @@ void ImageList::markImage(int index)
     }
 
     int imageIndex = vectorOfResults[index].imageIndex;                         // get image index for selected result
-    
+
     if(imageIndex < 0 || imageIndex >= (int) vectorOfImages.size()) {           // if out of range
         return;
     }
-    
+
     vectorOfImages[imageIndex].marked = !vectorOfImages[imageIndex].marked;     // toggle the marked flag
 }
 
@@ -278,7 +278,7 @@ bool ImageList::getFirstMarkedImage(std::string &url, int &checksum, std::string
         if(vectorOfImages[i].marked) {
             url         = vectorOfImages[i].url;
             checksum    = vectorOfImages[i].checksum;
-            filename    = vectorOfImages[i].imageName;           
+            filename    = vectorOfImages[i].imageName;
 
             vectorOfImages[i].marked = false;                                   // unmark it, return success
             return true;
@@ -301,5 +301,3 @@ void ImageList::refreshList(void)
 
     exists();                               // this should now start the new image list download
 }
-
-

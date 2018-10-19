@@ -23,7 +23,7 @@ typedef struct {
     int         imageIndex;
 } SearchResult;
 
-class ImageList 
+class ImageList
 {
 public:
     ImageList(void);
@@ -31,7 +31,7 @@ public:
     bool exists(void);
     bool loadList(void);
 
-    void search(char *part);
+    void search(const char *part);
 
     int  getSearchResultsCount(void);
     void getResultByIndex(int index, char *bfr);
