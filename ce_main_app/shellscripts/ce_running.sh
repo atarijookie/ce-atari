@@ -26,12 +26,6 @@ ce_is_running() {
 ce_is_running
 ce_running=$?
 
-# check status through systemctl 
-sysctl=$( systemctl status cosmosex )
-sc_notfound=$( echo $sysctl | grep 'Loaded: not-found' | wc -l )
-sc_running=$( echo $sysctl | grep 'Active: active' | wc -l )
-sc_notrunning=$( echo $sysctl | grep 'Active: failed' | wc -l )
-
 # if CE not running, quit right away
 if [ "$ce_running" -eq "0" ]; then
     echo "cosmosex NOT running"
@@ -39,16 +33,26 @@ else
     echo "cosmosex IS running"
 fi
 
-# now show the systemd service status
-if [ "$sc_notfound" -eq "1" ]; then
-    echo "cosmosex not installed as systemd service"
-else
-    if [ "$sc_running" -eq "1" ]; then
-        echo "cosmosex IS running as systemd service"
-    fi
+distro=$( /ce/whichdistro.sh ) 
 
-    if [ "$sc_notrunning" -eq "1" ]; then
-        echo "cosmosex NOT running as systemd service"
+if [ "$distro" = "raspbian_stretch" ]; then
+    # check status through systemctl 
+    sysctl=$( systemctl status cosmosex )
+    sc_notfound=$( echo $sysctl | grep 'Loaded: not-found' | wc -l )
+    sc_running=$( echo $sysctl | grep 'Active: active' | wc -l )
+    sc_notrunning=$( echo $sysctl | grep 'Active: failed' | wc -l )
+
+
+    # now show the systemd service status
+    if [ "$sc_notfound" -eq "1" ]; then
+        echo "cosmosex not installed as systemd service"
+    else
+        if [ "$sc_running" -eq "1" ]; then
+            echo "cosmosex IS running as systemd service"
+        fi
+
+        if [ "$sc_notrunning" -eq "1" ]; then
+            echo "cosmosex NOT running as systemd service"
+        fi
     fi
 fi
-
