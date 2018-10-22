@@ -17,17 +17,19 @@
 #include "global.h"
 #include "downloadresource.h"
 #include "../../../floppy/imagelist.h"
+#include "../../../floppy/imagestorage.h"
 #include "../../../utils.h"
 #include "../../../downloader.h"
+#include "../../../periodicthread.h"
+
+extern SharedObjects shared;
 
 DownloadResource::DownloadResource()
 {
-    imageList = new ImageList();
 }
 
 DownloadResource::~DownloadResource()
 {
-    delete imageList;
 }
 
 void DownloadResource::sendResponse(mg_connection *conn, std::ostringstream &stringStream)
@@ -41,13 +43,13 @@ void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_
 {
     std::ostringstream stringStream;
 
-    if(!imageList->exists()) {               // if the file does not yet exist, tell ST that we're downloading
+    if(!shared.imageList->exists()) {               // if the file does not yet exist, tell ST that we're downloading
         stringStream << "{\"imagelist\": \"not_exists\", \"totalPages\": 0, \"currentPage\": 0}";
         sendResponse(conn, stringStream);
         return;
     }
 
-    if(!imageList->loadList()) {      // try to load the list, if failed, error
+    if(!shared.imageList->loadList()) {      // try to load the list, if failed, error
         stringStream << "{\"imagelist\": \"not_loaded\", \"totalPages\": 0, \"currentPage\": 0}";
         sendResponse(conn, stringStream);
         return;
@@ -66,9 +68,9 @@ void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_
     }
 
     if(res > 0) {   // if got valid search string
-        imageList->search(searchString);
+        shared.imageList->search(searchString);
     } else {        // invalid search string
-        imageList->search("");
+        shared.imageList->search("");
     }
 
     int page = 0;
@@ -89,7 +91,7 @@ void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_
     int pageStart = page * pageSize;            // starting index of this page
     int pageEnd = (page + 1) * pageSize;        // ending index of this page (actually start of new page)
 
-    int results = imageList->getSearchResultsCount();
+    int results = shared.imageList->getSearchResultsCount();
 
     pageStart = MIN(pageStart, results);
     pageEnd = MIN(pageEnd, results);
@@ -102,7 +104,7 @@ void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_
     stringStream << "\"imageList\": ["; // start of image list
 
     for(int i=pageStart; i<pageEnd; i++) {  // fill in the image list
-        imageList->getResultByIndex(i, stringStream);
+        shared.imageList->getResultByIndex(i, stringStream);
     }
 
     stringStream << "]}";               // end of image list
@@ -145,14 +147,30 @@ void DownloadResource::onDownloadItem(mg_connection *conn, mg_request_info *req_
         stringStream << "{\"status\": \"error\", \"reason\": \"no image name\"}";
         sendResponse(conn, stringStream);
         return;
+     }
+
+    // check if there is some storage available
+    bool bres = shared.imageStorage->doWeHaveStorage();
+
+    if(!bres) {
+        stringStream << "{\"status\": \"error\", \"reason\": \"no storage available\"}";
+        sendResponse(conn, stringStream);
+        return;
     }
 
-    // TODO: check if we got this floppy image file, and if we do, just return OK
-    bool bres;
+    // check if we got this floppy image file, and if we do, just return OK
+    bres = shared.imageStorage->weHaveThisImage(imageName);
+
+    if(bres) {      // we got this image, no need to download
+        stringStream << "{\"status\": \"ok\"}";
+        sendResponse(conn, stringStream);
+        return;
+    }
 
     // get full image url into download request url
     TDownloadRequest tdr;
-    bres = imageList->getImageUrl(imageName, tdr.srcUrl);   // try to get source URL
+
+    bres = shared.imageList->getImageUrl(imageName, tdr.srcUrl);   // try to get source URL
 
     if(!bres) {     // failed to get URL? fail
         stringStream << "{\"status\": \"error\", \"reason\": \"couldn't get url\"}";
@@ -160,11 +178,14 @@ void DownloadResource::onDownloadItem(mg_connection *conn, mg_request_info *req_
         return;
     }
 
+    std::string storagePath;
+    shared.imageStorage->getStoragePath(storagePath);   // get path of where we should store the images
+
     // start downloading the image
-    tdr.checksum        = 0;                        // special case - don't check checsum
-//  tdr.dstDir          = UPDATE_LOCALPATH;         // TODO: get path to floppy image storage
+    tdr.checksum        = 0;                    // special case - don't check checsum
+    tdr.dstDir          = storagePath;          // save it here
     tdr.downloadType    = DWNTYPE_FLOPPYIMG;
-    tdr.pStatusByte     = NULL;                     // don't update this status byte
+    tdr.pStatusByte     = NULL;                 // don't update this status byte
     Downloader::add(tdr);
 
     // return the response
@@ -218,9 +239,23 @@ void DownloadResource::onInsertItem(mg_connection *conn, mg_request_info *req_in
         return;
     }
 
-    // TODO: check if we got this floppy image file
+    // check if we got this floppy image file
+    bool bres = shared.imageStorage->weHaveThisImage(imageName);
+
+    if(!bres) { // we don't have this image downloaded? fail
+        stringStream << "{\"status\": \"error\", \"reason\": \"we don't have this image downloaded\"}";
+        sendResponse(conn, stringStream);
+        return;
+    }
+
+    // get local path for this image
+    std::string localImagePath;
+    shared.imageStorage->getImageLocalPath(imageName, localImagePath);
+
 
     // TODO: set floppy image to slot
+
+
 
     // return the response
     stringStream << "{\"status\": \"ok\"}";
@@ -245,22 +280,38 @@ bool DownloadResource::dispatch(mg_connection *conn, mg_request_info *req_info, 
         mg_printf(conn, "Cache: no-cache\r\n");
 
         if(strcmp(path, "imagelist") == 0) {		// url: download/imagelist -- return list images which we can search trhough
+            pthread_mutex_lock(&shared.mtxImages);      // lock images objects - download resource is using them
+
             onGetImageList(conn, req_info, sResourceInfo);
+
+            pthread_mutex_unlock(&shared.mtxImages);    // unlock images objects
             return true;
         }
 
         if(strcmp(path, "downloading") == 0) {		// url: download/downloading -- return list images which are now downloaded
+            pthread_mutex_lock(&shared.mtxImages);      // lock images objects - download resource is using them
+
             onGetDownloadingList(conn, req_info, sResourceInfo);
+
+            pthread_mutex_unlock(&shared.mtxImages);    // unlock images objects
             return true;
         }
 
         if(strcmp(path, "download") == 0) {		    // url: download/download -- download this file from the image list
+            pthread_mutex_lock(&shared.mtxImages);      // lock images objects - download resource is using them
+
             onDownloadItem(conn, req_info, sResourceInfo);
+
+            pthread_mutex_unlock(&shared.mtxImages);    // unlock images objects
             return true;
         }
 
         if(strcmp(path, "insert") == 0) {		    // url: download/insert -- insert this file from the image list into specified floppy slot
+            pthread_mutex_lock(&shared.mtxImages);      // lock images objects - download resource is using them
+
             onInsertItem(conn, req_info, sResourceInfo);
+
+            pthread_mutex_unlock(&shared.mtxImages);    // unlock images objects
             return true;
         }
 	}

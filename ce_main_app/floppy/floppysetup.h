@@ -34,7 +34,6 @@ private:
     AcsiDataTrans       *dataTrans;
     ImageSilo           *imageSilo;
     SettingsReloadProxy *reloadProxy;
-    ImageList           imageList;    
 
     FILE    *up;
     BYTE    *cmd;

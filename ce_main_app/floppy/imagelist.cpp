@@ -10,9 +10,13 @@
 #include <unistd.h>
 
 #include "imagelist.h"
+#include "imagestorage.h"
 #include "../utils.h"
+#include "../periodicthread.h"
 #include "../downloader.h"
 #include "../debug.h"
+
+extern SharedObjects shared;
 
 ImageList::ImageList(void)
 {
@@ -288,9 +292,11 @@ void ImageList::getResultByIndex(int index, std::ostringstream &stream)
     stream << vectorOfImages[imageIndex].imageName.c_str();	// copy in the name of image
 	stream << "\",";
 
-	// TODO: check if we got this image downloaded, set true/false according to that bellow
+	// check if we got this image downloaded, set true/false according to that bellow
+	bool weHaveThisImage = shared.imageStorage->weHaveThisImage(vectorOfImages[imageIndex].imageName.c_str());
+
 	stream << "\"haveIt\": ";
-    if(false) {										// if image is downloaded and is ready for insertion
+    if(weHaveThisImage) {									// if image is downloaded and is ready for insertion
         stream << "true";
     } else {
         stream << "false";

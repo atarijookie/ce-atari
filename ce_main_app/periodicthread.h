@@ -5,6 +5,8 @@
 class AcsiDataTrans;
 class Scsi;
 class ConfigStream;
+class ImageList;
+class ImageStorage;
 
 typedef struct {
     int fd1;
@@ -14,6 +16,10 @@ typedef struct {
 typedef struct {
     Scsi            *scsi;
     pthread_mutex_t mtxScsi;
+
+    ImageList       *imageList;
+    ImageStorage    *imageStorage;
+    pthread_mutex_t  mtxImages;
 
     struct {
         ConfigStream    *acsi;

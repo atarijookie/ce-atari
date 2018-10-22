@@ -27,6 +27,9 @@
 #include "service/floppyservice.h"
 #include "service/screencastservice.h"
 
+#include "floppy/imagelist.h"
+#include "floppy/imagestorage.h"
+
 #include "mediastreaming/mediastreaming.h"
 
 #include "periodicthread.h"
@@ -128,14 +131,17 @@ CCoreThread::~CCoreThread()
 
 void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
-    shared.devFinder_detachAndLook  = false;
-    shared.devFinder_look           = false;
+    shared.devFinder_detachAndLook = false;
+    shared.devFinder_look = false;
 
-    shared.scsi        = new Scsi();
+    shared.scsi = new Scsi();
     shared.scsi->setAcsiDataTrans(dataTrans);
 
     TranslatedDisk * translated = TranslatedDisk::createInstance(dataTrans, configService, screencastService);
     translated->setSettingsReloadProxy(&settingsReloadProxy);
+
+    shared.imageList = new ImageList();
+    shared.imageStorage = new ImageStorage();
 
     //-----------
     // create config stream for ACSI interface
@@ -162,6 +168,12 @@ void CCoreThread::sharedObjects_destroy(void)
     shared.scsi = NULL;
 
     TranslatedDisk::deleteInstance();
+
+    delete shared.imageList;
+    shared.imageList = NULL;
+
+    delete shared.imageStorage;
+    shared.imageStorage = NULL;
 
     delete shared.configStream.acsi;
     shared.configStream.acsi = NULL;
@@ -561,7 +573,9 @@ void CCoreThread::handleAcsiCommand(void)
 
         case HOSTMOD_FDD_SETUP:                         // floppy setup command?
             wasHandled = true;
+            pthread_mutex_lock(&shared.mtxImages);      // lock floppy images shared objects -- now used by floppy setup object
             floppySetup.processCommand(pCmd);
+            pthread_mutex_unlock(&shared.mtxImages);    // unlock floppy images shared objects
             break;
 
         case HOSTMOD_NETWORK_ADAPTER:
