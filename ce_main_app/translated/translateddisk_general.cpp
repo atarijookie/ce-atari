@@ -1715,39 +1715,34 @@ void TranslatedDisk::fillDisplayLines(void)
 
 bool TranslatedDisk::getPathToUsbDriveOrSharedDrive(std::string &hostRootPath)
 {
-    int i;
+    int i, sharedDriveIndex = -1;
     hostRootPath.clear();
 
-    // first look for any USB drive
-    for(i=0; i<MAX_DRIVES; i++) {               // go through the drives, skip shared + config drive
-        if(conf[i].translatedType == TRANSLATEDTYPE_SHAREDDRIVE || conf[i].translatedType == TRANSLATEDTYPE_CONFIGDRIVE) {
+    // first look for any USB drive, if not found, use shared drive
+    for(i=0; i<MAX_DRIVES; i++) {	// go through the drives
+        // not enabled or it's config drive? skip it
+        if(!conf[i].enabled || conf[i].translatedType == TRANSLATEDTYPE_CONFIGDRIVE) {
             continue;
         }
 
-        if(!conf[i].enabled) {  // skip if not enabled
-            continue;
+        // if got some USB drive, return path to its root, success
+        if(conf[i].translatedType == TRANSLATEDTYPE_NORMAL) {
+            hostRootPath = conf[i].hostRootPath;
+            return true;
         }
 
-        // got some USB drive, return path to its root, success
-        hostRootPath = conf[i].hostRootPath;
-        return true;
+        // if got shared drive, mark down its index
+        if(conf[i].translatedType == TRANSLATEDTYPE_SHAREDDRIVE) {
+            sharedDriveIndex = i;
+        }
     }
 
-    // then look for shared drive
-    for(i=0; i<MAX_DRIVES; i++) {               // go through the drives, skip if not shared
-        if(conf[i].translatedType != TRANSLATEDTYPE_SHAREDDRIVE) {
-            continue;
-        }
-
-        if(!conf[i].enabled) {  // skip if not enabled
-            continue;
-        }
-
-        // got shared drive, return path to its root, success
-        hostRootPath = conf[i].hostRootPath;
+    // if came here, couldn't find USB
+    if(sharedDriveIndex != -1) {    // got shared drive? good
+        hostRootPath = conf[sharedDriveIndex].hostRootPath;
         return true;
-    }
+	}
 
-    // if came here, couldn't find USB or shared drive
+    // no usb drive, no shared drive? fail
     return false;
 }
