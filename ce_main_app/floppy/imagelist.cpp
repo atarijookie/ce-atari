@@ -264,6 +264,7 @@ void ImageList::getResultByIndex(int index, std::ostringstream &stream)
     stream << vectorOfImages[imageIndex].imageName.c_str();	// copy in the name of image
 	stream << "\",";
 
+	// TODO: check if we got this image downloaded, set true/false according to that bellow
 	stream << "\"haveIt\": ";
     if(false) {										// if image is downloaded and is ready for insertion
         stream << "true";
