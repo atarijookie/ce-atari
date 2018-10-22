@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <sstream>
 
 #define IMAGELIST_URL       "http://joo.kie.sk/cosmosex/update/imagelist.csv"
 #define IMAGELIST_LOCAL_DIR "/ce/app/"
@@ -35,6 +36,7 @@ public:
 
     int  getSearchResultsCount(void);
     void getResultByIndex(int index, char *bfr);
+    void getResultByIndex(int index, std::ostringstream &stream);
     void markImage(int index);
     bool getFirstMarkedImage(std::string &url, int &checksum, std::string &filename);
     void refreshList(void);

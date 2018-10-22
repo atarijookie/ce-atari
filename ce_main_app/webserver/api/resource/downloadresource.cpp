@@ -17,6 +17,7 @@
 #include "global.h"
 #include "downloadresource.h"
 #include "../../../floppy/imagelist.h"
+#include "../../../utils.h"
 
 DownloadResource::DownloadResource()
 {
@@ -33,19 +34,19 @@ void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_
     std::ostringstream stringStream;
 
     if(!imageList->exists()) {               // if the file does not yet exist, tell ST that we're downloading
-        stringStream << "{\"imagelist\": \"not_exists\"}";
+        stringStream << "{\"imagelist\": \"not_exists\", \"totalPages\": 0, \"currentPage\": 0}";
     } else if(!imageList->loadList()) {      // try to load the list, if failed, error
-        stringStream << "{\"imagelist\": \"not_loaded\"}";
+        stringStream << "{\"imagelist\": \"not_loaded\", \"totalPages\": 0, \"currentPage\": 0}";
     } else {                                // list exists and is loaded, we can work with it
         const char *qs = req_info->query_string;
         int qs_len = (qs == NULL) ? 0 : strlen(qs);     // get length of query string
 
-        char searchString[64];
+        char searchString[128];
         memset(searchString, 0, sizeof(searchString));  // clear the buffer which will receive the search string
 
         int res = -1;
         if(qs_len > 0) {    // if the query string contains something, we can try to get some vars
-            res = mg_get_var(qs, qs_len, "search", searchString, sizeof(searchString - 1)); // try to get the search string
+            res = mg_get_var(qs, qs_len, "search", searchString, sizeof(searchString) - 1); // try to get the search string
         }
 
         if(res > 0) {   // if got valid search string
@@ -54,12 +55,41 @@ void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_
             imageList->search("");
         }
 
-        // TODO:
-        // - retrieve page from request
-        // - retrieve search result from imageList and pass it to stringStream
+        int page = 0;
+        if(qs_len > 0) {    // if the query string contains something, we can try to get some vars
+            char pageString[4];
+            memset(pageString, 0, sizeof(pageString));
 
+            res = mg_get_var(qs, qs_len, "page", pageString, sizeof(pageString) - 1); // try to get the page string
 
-        stringStream << "{\"imagelist\": \"http://www.exxoshost.co.uk/atari/games/automation/files/A_000.zip,0x0000,Sinbad and the Throne of the Falcon,Myth\\nhttp://www.exxoshost.co.uk/atari/games/automation/files/A_001.zip,0x0000,Crystal Castles,Star Wars: The Empire Strikes Back,Northstar w/ docs,Star Raiders,Robotron: 2084,Trail Blazer,Football Manager: World Cup Edition\\nhttp://www.exxoshost.co.uk/atari/games/automation/files/A_002.zip,0x0000,Into the Eagle's Nest,Trantor: The Last Stormtrooper,Extensor,Knightmare,Plutos,Virus,Joe Blade,Trifide II\\n\"}";
+            if(res > 0) {   // if page string was found, try to get it as int
+                res = sscanf(pageString, "%d", &page);
+            }
+        }
+
+        // future improvement: get pageSize from request
+        int pageSize = 15;
+
+        int pageStart = page * pageSize;            // starting index of this page
+        int pageEnd = (page + 1) * pageSize;        // ending index of this page (actually start of new page)
+
+        int results = imageList->getSearchResultsCount();
+
+        pageStart = MIN(pageStart, results);
+        pageEnd = MIN(pageEnd, results);
+
+        int realPage = pageStart / pageSize;         // calculate the real page number
+        int totalPages = (results / pageSize) + 1;   // calculate the count of pages we have
+
+        stringStream << "{\"totalPages\": " << totalPages << ", ";
+        stringStream << "\"currentPage\": " << realPage << ", ";
+        stringStream << "\"imageList\": ["; // start of image list
+
+        for(int i=pageStart; i<pageEnd; i++) {  // fill in the image list
+            imageList->getResultByIndex(i, stringStream);
+        }
+
+        stringStream << "]}";               // end of image list
     }
 
     std::string sJson = stringStream.str();

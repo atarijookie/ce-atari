@@ -3,6 +3,8 @@
 #include <string.h>
 
 #include <string>
+#include <iostream>
+#include <sstream>
 #include <algorithm>
 
 #include <unistd.h>
@@ -248,6 +250,32 @@ void ImageList::getResultByIndex(int index, char *bfr)
     int lenOfRest = 67 - imgNameLen;
 
     strncpy(bfr + imgNameLen, vectorOfResults[index].game.c_str(), lenOfRest);  // copy in the name of game
+}
+
+void ImageList::getResultByIndex(int index, std::ostringstream &stream)
+{
+    if(index < 0 || index >= (int) vectorOfResults.size()) {	// if out of range
+        return;
+    }
+
+    int imageIndex = vectorOfResults[index].imageIndex;
+
+	stream << "{ \"imageName\": \"";
+    stream << vectorOfImages[imageIndex].imageName.c_str();	// copy in the name of image
+	stream << "\",";
+
+	stream << "\"haveIt\": ";
+    if(false) {										// if image is downloaded and is ready for insertion
+        stream << "true";
+    } else {
+        stream << "false";
+    }
+
+	stream << ", \"content\": \"";
+
+    stream <<vectorOfResults[index].game.c_str();	// copy in the name of game
+
+	stream << "\"}, ";
 }
 
 void ImageList::markImage(int index)
