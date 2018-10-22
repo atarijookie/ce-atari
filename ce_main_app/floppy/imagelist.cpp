@@ -181,6 +181,30 @@ void ImageList::search(const char *part)
     }
 }
 
+bool ImageList::getImageUrl(const char *imageFileName, std::string &url)
+{
+    std::string filename = imageFileName;
+    url.clear();
+
+    int cnt = vectorOfImages.size();
+
+    // if not loaded, or the list is empty
+    if(!isLoaded || cnt < 1) {
+        return false;
+    }
+
+    // go through the list of images, look for filename
+    for(int i=0; i<cnt; i++) {
+        if(filename.compare(vectorOfImages[i].imageName) == 0) {    // if input filename and image name in list match, success
+            url = vectorOfImages[i].url;                            // copy url and quit
+            return true;
+        }
+    }
+
+    // if came here, image not found
+    return false;
+}
+
 void ImageList::getSingleGame(std::string &games, std::string &game, size_t pos)
 {
     int len = games.length();

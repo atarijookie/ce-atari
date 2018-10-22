@@ -148,12 +148,19 @@ void DownloadResource::onDownloadItem(mg_connection *conn, mg_request_info *req_
     }
 
     // TODO: check if we got this floppy image file, and if we do, just return OK
+    bool bres;
 
-    // TODO: get full image url
+    // get full image url into download request url
+    TDownloadRequest tdr;
+    bres = imageList->getImageUrl(imageName, tdr.srcUrl);   // try to get source URL
+
+    if(!bres) {     // failed to get URL? fail
+        stringStream << "{\"status\": \"error\", \"reason\": \"couldn't get url\"}";
+        sendResponse(conn, stringStream);
+        return;
+    }
 
     // start downloading the image
-    TDownloadRequest tdr;
-    tdr.srcUrl          = "fake_image.msa";         // TODO: set the correct image url
     tdr.checksum        = 0;                        // special case - don't check checsum
 //  tdr.dstDir          = UPDATE_LOCALPATH;         // TODO: get path to floppy image storage
     tdr.downloadType    = DWNTYPE_FLOPPYIMG;

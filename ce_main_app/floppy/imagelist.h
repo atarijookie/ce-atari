@@ -40,6 +40,7 @@ public:
     void markImage(int index);
     bool getFirstMarkedImage(std::string &url, int &checksum, std::string &filename);
     void refreshList(void);
+    bool getImageUrl(const char *imageFileName, std::string &url);
 
 private:
     std::vector<ImageListItem>      vectorOfImages;
