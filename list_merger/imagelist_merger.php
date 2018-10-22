@@ -92,8 +92,7 @@ function saveValueToFile($key, $value)
 
 function saveMergedFileWithDate($merged)
 {
-    // TODO: remove ! from filename to start overwriting production files
-    $new_list = fopen("!imagelist.csv", "w");    // open file
+    $new_list = fopen("imagelist.csv", "w");    // open file
 
     if($new_list !== FALSE) {           // couldn't open file? quit
         $date = date('Y-m-d');
@@ -176,8 +175,7 @@ function updateTheUpdateList()
 
         if($cols[0] == "imglist") {     // this is the row with imglist
             $date = date('Y-m-d');
-            // TODO: remove ! from filename to start overwriting production files
-            $checksum = checksum("!imagelist.csv");  // calc our custom checksum
+            $checksum = checksum("imagelist.csv");  // calc our custom checksum
             $new_row = "imglist,$date,http://joo.kie.sk/cosmosex/update/imagelist.csv,$checksum";
 
             array_push($new_rows, $new_row);        // add this modified row to new rows
@@ -189,8 +187,7 @@ function updateTheUpdateList()
     array_push($new_rows, " ");             // empty row at the end
     $new_csv = implode("\n", $new_rows);    // join new rows together into new csv
 
-    // TODO: remove ! from filename to start overwriting production files
-    file_put_contents("!updatelist.csv", $new_csv);  // save to file
+    file_put_contents("updatelist.csv", $new_csv);  // save to file
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
