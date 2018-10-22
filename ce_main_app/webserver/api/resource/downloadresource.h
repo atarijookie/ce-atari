@@ -16,6 +16,7 @@ public:
     bool dispatch(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo="" );
 
     void onGetImageList(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo);
+    void onGetDownloadingList(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo);
 
 private:
     ImageList *imageList;

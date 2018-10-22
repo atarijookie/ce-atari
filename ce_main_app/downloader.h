@@ -6,10 +6,12 @@
 #include <curl/curl.h>
 #include <string>
 #include <vector>
+#include <sstream>
+#include <iostream>
 
 #define DWNTYPE_ANY             0xff
 #define DWNTYPE_UNKNOWN         0x00
-#define DWNTYPE_UPDATE_LIST     0x01     
+#define DWNTYPE_UPDATE_LIST     0x01
 #define DWNTYPE_UPDATE_COMP     0x02
 #define DWNTYPE_FLOPPYIMG_LIST  0x04
 #define DWNTYPE_FLOPPYIMG       0x08
@@ -18,11 +20,11 @@
 #define DWNTYPE_REPORT_VERSIONS 0x40
 #define DWNTYPE_LOG_HTTP        0x80
 
-#define DWNSTATUS_WAITING       0              
-#define DWNSTATUS_DOWNLOADING   1 
+#define DWNSTATUS_WAITING       0
+#define DWNSTATUS_DOWNLOADING   1
 #define DWNSTATUS_VERIFYING     2
-#define DWNSTATUS_DOWNLOAD_OK   3              
-#define DWNSTATUS_DOWNLOAD_FAIL 4              
+#define DWNSTATUS_DOWNLOAD_OK   3
+#define DWNSTATUS_DOWNLOAD_FAIL 4
 
 typedef struct {
     std::string srcUrl;         // src url, e.g. http://whatever.com/file.zip
@@ -32,7 +34,7 @@ typedef struct {
     WORD checksum;              // used to verify file integrity after download
 
     volatile BYTE *pStatusByte; // if set to non-null, will be updated with the download status DWNSTATUS_*
-    
+
     volatile int downPercent;   // defines progress - from 0 to 100
 } TDownloadRequest;
 
@@ -46,6 +48,7 @@ public:
 
     static int  count(int downloadTypeMask);                            // count pending and running downloads according to mask
     static void status(std::string &status, int downloadTypeMask);      // create status report string of pending and running downloads according to mask
+	static void statusJson(std::ostringstream &status, int downloadTypeMask);	// same as status(), but returned as json
 
     static bool verifyChecksum(const char *filename, WORD checksum);
     static bool handleZIPedImage(const char *destDirectory, const char *zipFilePath);
@@ -55,6 +58,7 @@ public:
 
 private:
     static void formatStatus(TDownloadRequest &tdr, std::string &line);
+    static void formatStatusJson(TDownloadRequest &tdr, std::ostringstream &status);
     static void updateStatusByte(TDownloadRequest &tdr, BYTE newStatus);
 
     static void handleReportVersions(CURL *curl, const char *reportUrl);

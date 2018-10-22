@@ -58,6 +58,18 @@ void Downloader::add(TDownloadRequest &tdr)
     pthread_mutex_unlock(&downloadQueueMutex);             // unlock the mutex
 }
 
+void Downloader::formatStatusJson(TDownloadRequest &tdr, std::ostringstream &status)
+{
+    std::string urlPath, fileName;
+    Utils::splitFilenameFromPath(tdr.srcUrl, urlPath, fileName);
+
+    status << "{ \"fileName\": \"";
+    status << fileName;
+    status << "\", \"progress\": ";
+    status << tdr.downPercent;
+    status << "}";
+}
+
 void Downloader::formatStatus(TDownloadRequest &tdr, std::string &line)
 {
     char percString[16];
@@ -114,6 +126,43 @@ void Downloader::status(std::string &status, int downloadTypeMask)
             formatStatus(downloadCurrent, line);
             status += line + "\n";
         }
+    }
+
+    pthread_mutex_unlock(&downloadQueueMutex);             // unlock the mutex
+}
+
+void Downloader::statusJson(std::ostringstream &status, int downloadTypeMask)
+{
+    pthread_mutex_lock(&downloadQueueMutex);               // try to lock the mutex
+
+    status.clear();
+
+    bool hasItem = false;       // list doesn't have anyitem yet
+
+    // create status for the currently downloaded thing
+    if(downloadCurrent.downPercent < 100) {
+        if((downloadCurrent.downloadType & downloadTypeMask) != 0) {    // if the mask matches the download type, add it
+            formatStatusJson(downloadCurrent, status);
+            hasItem = true;     // we have one item now
+        }
+    }
+
+    // create status reports for things waiting to be downloaded
+    int cnt = downloadQueue.size();
+
+    for(int i=0; i<cnt; i++) {
+        TDownloadRequest &tdr = downloadQueue[i];
+
+        if((tdr.downloadType & downloadTypeMask) == 0) {    // if the mask doesn't match the download type, skip it
+            continue;
+        }
+
+        if(hasItem) {           // if something is in array, add separator
+            status << ",";
+            hasItem = true;     // list has at least 1 item
+        }
+
+        formatStatusJson(tdr, status);
     }
 
     pthread_mutex_unlock(&downloadQueueMutex);             // unlock the mutex

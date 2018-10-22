@@ -18,6 +18,7 @@
 #include "downloadresource.h"
 #include "../../../floppy/imagelist.h"
 #include "../../../utils.h"
+#include "../../../downloader.h"
 
 DownloadResource::DownloadResource()
 {
@@ -98,6 +99,22 @@ void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_
     return;
 }
 
+void DownloadResource::onGetDownloadingList(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo)
+{
+    std::ostringstream stringStream;
+
+    stringStream << "{\"downloading\": ["; // start of list
+
+    Downloader::statusJson(stringStream, DWNTYPE_FLOPPYIMG);    // get list of what is now downloading
+
+    stringStream << "]}";               // end of list
+
+    std::string sJson = stringStream.str();
+    mg_printf(conn, "Content-Length: %lu\r\n\r\n",(unsigned long) sJson.length());	// Always set Content-Length
+    mg_write(conn, sJson.c_str(), sJson.length());	// send content
+    return;
+}
+
 bool DownloadResource::dispatch(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo)
 {
 	const char *path = sResourceInfo.c_str();
@@ -125,8 +142,13 @@ bool DownloadResource::dispatch(mg_connection *conn, mg_request_info *req_info, 
             return true;
         }
 
-        if(strcmp(path, "imagelist") == 0) {		// download/imagelist -- return list images which we can search trhough
+        if(strcmp(path, "imagelist") == 0) {		// url: download/imagelist -- return list images which we can search trhough
             onGetImageList(conn, req_info, sResourceInfo);
+            return true;
+        }
+
+        if(strcmp(path, "downloading") == 0) {		// url: download/downloading -- return list images which are now downloaded
+            onGetDownloadingList(conn, req_info, sResourceInfo);
             return true;
         }
 	}
