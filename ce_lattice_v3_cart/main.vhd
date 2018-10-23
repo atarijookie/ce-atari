@@ -195,8 +195,8 @@ begin
 	st_writing_to_fifo   <= '1' when (config_write_op='1' and READ_CART_LDS='1') else '0';		-- when configured for WRITE and LDS is active
 	st_reading_from_fifo <= '1' when (config_read_op='1'  and READ_CART_LDS='1') else '0';		-- when configured for READ  and LDS is active
 
-	fifo_data_in <= DATA_RPI         when rpi_writing_to_fifo='1' else	-- when RPi is writing to FIFO
-					ADDR(8 downto 1) when st_writing_to_fifo='1'  else	-- when ST  is writing to FIFO
+	fifo_data_in <= DATA_RPI         when config_read_op ='1' else	-- when RPi is writing to FIFO (on READ  - from RPi to ST)
+					ADDR(8 downto 1) when config_write_op='1' else	-- when ST  is writing to FIFO (on WRITE - from ST to RPi)
 					"00000000";
 
 	fifo_WrEn <= '1' when (rpi_writing_to_fifo='1') else				-- when RPi is writing to FIFO
