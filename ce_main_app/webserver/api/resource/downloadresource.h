@@ -26,6 +26,8 @@ private:
 
     void onDownloadItem(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo);
     void onInsertItem(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo);
+
+    void onGetStatus(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo);
 };
 
 #endif

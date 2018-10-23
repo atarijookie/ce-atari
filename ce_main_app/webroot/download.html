@@ -15,6 +15,8 @@
     var imageList = [];        // image list of games / software (e.g. A001.zip, A002.zip, ...)
     var totalPages = 0;
     var currentPage = 0;
+    var do_we_have_storage = true;
+    var prevDownloadingCount = 0;
 
 function getSearchResults(searchString)
 {
@@ -55,6 +57,54 @@ var IconType = {
   DUMMY: 3
 };
 
+function showNoStorageWarning(show)
+{
+    if(show) {
+        var message = "<font color='#ff0000'><b>You have no USB drive or shared drive attached to your device.<br>This function requires it and can't be used without it.</b></font>";
+    } else {
+        var message = "";
+    }
+
+    var warning = document.getElementById('no_storage_warning');
+    warning.innerHTML = message;
+}
+
+// check if image is converted / downloaded
+function onCheckTimer() {
+    $.ajax({
+        type: 'GET',
+        url: '/api/v1/download/status',
+        success: function(data){
+            var hideNotWait = true;    // on encoding_ready or undefined -- hide
+
+            if( typeof(data.encoding_ready)!=='undefined') {    // encoding_ready is available, use it
+                hideNotWait = data.encoding_ready;
+            }
+
+            if(data.downloading_count > 0) {    // if still downloading something do wait some more
+                hideNotWait = false;
+            }
+
+            if(data.downloading_count == 0 && prevDownloadingCount > 0) {   // if we were downloading something, but we arent't downloading anymore
+                onSearchStringChanged();                    // fake search string change to reload the download/insert icons
+            }
+            prevDownloadingCount = data.downloading_count;  // store current value so we would be able to detect end of downloading
+
+            if(hideNotWait) {          // hide?
+                $(".overlay").hide(); 
+            } else {                    // wait?
+                setTimeout(onCheckTimer, 1000);
+            }
+
+            do_we_have_storage = data.do_we_have_storage;
+            showNoStorageWarning(!data.do_we_have_storage);  // show / hide no storage message
+        },
+        error: function(){              // when failed to get info, just hide overlay
+            $(".overlay").hide();    
+        }
+    });
+}
+
 function onInsert(imageName, slotNo)
 {
     url = "/api/v1/download/insert?image=" + imageName + "&slot=" + slotNo;
@@ -65,6 +115,9 @@ function onInsert(imageName, slotNo)
         dataType: 'json',
         success: function(data){
             console.log("Insert Success");
+
+            $(".overlay").show();           // show overlay
+            setTimeout(onCheckTimer, 1000); // check every while
         },
         error: function (xhr) {
             console.log("Insert Error: " + xhr.statusText);
@@ -82,6 +135,10 @@ function onDownload(imageName)
         dataType: 'json',
         success: function(data){
             console.log("Download Success");
+
+            prevDownloadingCount = 1;       // downloading at least one thing (helps to refresh on fast downloads where timer doesn't happen before download still running)
+            $(".overlay").show();           // show overlay
+            setTimeout(onCheckTimer, 1000); // check every while
         },
         error: function (xhr) {
             console.log("Download Error: " + xhr.statusText);
@@ -91,6 +148,10 @@ function onDownload(imageName)
 
 function generateHtmlIcon(imgSrc, iconType, slotNo, imageName)
 {
+    if(do_we_have_storage == false) {   // no storage? no action button
+        return "";
+    }
+
     var func = "";
     if(iconType == IconType.INSERT) {
         func = "onInsert('" + imageName + "', " + slotNo + ");";
@@ -204,6 +265,8 @@ $(document).ready(function(){
     search_input.onchange = function(){ onDelayedSearchStringChanged(); };
     search_input.onkeydown = function(){ onDelayedSearchStringChanged(); };
     search_input.onkeypress = function(){ onDelayedSearchStringChanged(); };
+
+    onCheckTimer();     // load all the statuses
 });
 
         </script>     
@@ -227,9 +290,13 @@ $(document).ready(function(){
         
     <!-- ---------------------------- -->
     <table border=1 cellspacing=0 cellpadding=5>
-      <tr><td>Search:      </td><td> <input type="text" id="search_input">  </td></tr>
+      <tr><td colspan=2><p id='no_storage_warning'> </p> </td></tr>
+
+      <tr><td>Search: </td><td> <input type="text" id="search_input">  </td></tr>
       <tr><td colspan=2><p id='search_results'></p> </td></tr>
     </table>        
+
+	<div class="overlay"><h3>Converting Disk Image...</h3><div class="loader">Working...</div></div>
  
   </body>
 </html>

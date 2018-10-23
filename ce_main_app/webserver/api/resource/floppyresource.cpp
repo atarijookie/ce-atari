@@ -20,15 +20,15 @@
 #include "service/floppyservice.h"
 #include "floppy/imagesilo.h"
 
-FloppyResource::FloppyResource(FloppyService *pxFloppyService) : pxFloppyService(pxFloppyService)  
+FloppyResource::FloppyResource(FloppyService *pxFloppyService) : pxFloppyService(pxFloppyService)
 {
 }
 
-FloppyResource::~FloppyResource() 
+FloppyResource::~FloppyResource()
 {
 }
 
-bool FloppyResource::dispatch(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo /*=""*/ ) 
+bool FloppyResource::dispatch(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo /*=""*/ )
 {
     Debug::out(LOG_DEBUG, "FloppyResource::dispatch");
 

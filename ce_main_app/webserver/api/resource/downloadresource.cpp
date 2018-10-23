@@ -133,6 +133,24 @@ void DownloadResource::onGetDownloadingList(mg_connection *conn, mg_request_info
     sendResponse(conn, stringStream);
 }
 
+void DownloadResource::onGetStatus(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo)
+{
+    std::ostringstream stringStream;
+
+    stringStream << "{\"encoding_ready\": ";                        // get if floppy image is currently being encoded
+    stringStream << (pxFloppyService->isImageReady() ? "true" : "false");
+
+    int downloadingCount = Downloader::count( DWNTYPE_FLOPPYIMG);   // get count of what is now downloading
+    stringStream << ", \"downloading_count\": ";
+    stringStream << downloadingCount;
+
+    stringStream << ", \"do_we_have_storage\": ";                   // do we have the storage or not?
+    stringStream << (shared.imageStorage->doWeHaveStorage() ? "true" : "false");
+
+    stringStream << "}\r\n";
+    sendResponse(conn, stringStream);
+}
+
 void DownloadResource::onDownloadItem(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo)
 {
     std::ostringstream stringStream;
@@ -318,6 +336,15 @@ bool DownloadResource::dispatch(mg_connection *conn, mg_request_info *req_info, 
             pthread_mutex_lock(&shared.mtxImages);      // lock images objects - download resource is using them
 
             onInsertItem(conn, req_info, sResourceInfo);
+
+            pthread_mutex_unlock(&shared.mtxImages);    // unlock images objects
+            return true;
+        }
+
+        if(strcmp(path, "status") == 0) {		        // url: download/status -- check downloading status and encoding status
+            pthread_mutex_lock(&shared.mtxImages);      // lock images objects - download resource is using them
+
+            onGetStatus(conn, req_info, sResourceInfo);
 
             pthread_mutex_unlock(&shared.mtxImages);    // unlock images objects
             return true;
