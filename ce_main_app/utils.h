@@ -15,12 +15,12 @@ public:
 	static DWORD getCurrentMs(void);
 	static DWORD getEndTime(DWORD offsetFromNow);
 	static void  sleepMs(DWORD ms);
-	
+
 	static void attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari);
 	static void fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *ptm);
 	static WORD fileTimeToAtariTime(struct tm *ptm);
 	static WORD fileTimeToAtariDate(struct tm *ptm);
-	
+
 	static void mergeHostPaths(std::string &dest, const std::string &tail);
 	static void splitFilenameFromPath(const std::string &pathAndFile, std::string &path, std::string &file);
 
@@ -30,12 +30,13 @@ public:
 
     static bool copyFile(std::string &src, std::string &dst);
     static bool copyFile(FILE *from, std::string &dst);
+    static int  mkpath(const char *dir, mode_t mode);
 
     static void SWAPWORD(WORD &w);
     static WORD SWAPWORD2(WORD w);
 
     static void getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks=NULL);
-    
+
     static void forceSync(void);
 
     static WORD  getWord(BYTE *bfr);

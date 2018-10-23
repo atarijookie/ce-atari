@@ -39,6 +39,7 @@ void DownloadResource::sendResponse(mg_connection *conn, std::ostringstream &str
     std::string sJson = stringStream.str();
     mg_printf(conn, "Content-Length: %lu\r\n\r\n",(unsigned long) sJson.length());	// Always set Content-Length
     mg_write(conn, sJson.c_str(), sJson.length());	// send content
+    Debug::out(LOG_DEBUG, "DownloadResouce::sendResponse: %s", sJson.c_str());
 }
 
 void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo)
@@ -46,13 +47,13 @@ void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_
     std::ostringstream stringStream;
 
     if(!shared.imageList->exists()) {               // if the file does not yet exist, tell ST that we're downloading
-        stringStream << "{\"imagelist\": \"not_exists\", \"totalPages\": 0, \"currentPage\": 0}";
+        stringStream << "{\"imagelist\": \"not_exists\", \"totalPages\": 0, \"currentPage\": 0}\r\n";
         sendResponse(conn, stringStream);
         return;
     }
 
     if(!shared.imageList->loadList()) {      // try to load the list, if failed, error
-        stringStream << "{\"imagelist\": \"not_loaded\", \"totalPages\": 0, \"currentPage\": 0}";
+        stringStream << "{\"imagelist\": \"not_loaded\", \"totalPages\": 0, \"currentPage\": 0}\r\n";
         sendResponse(conn, stringStream);
         return;
     }
@@ -105,11 +106,18 @@ void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_
     stringStream << "\"currentPage\": " << realPage << ", ";
     stringStream << "\"imageList\": ["; // start of image list
 
+    bool hasItem = false;                   // flag if we have item and need a separator - to generate valid JSON
+
     for(int i=pageStart; i<pageEnd; i++) {  // fill in the image list
+        if(hasItem) {
+            stringStream << ",";            // add separator, but only after 1st item
+        }
+        hasItem = true;                     // now add separators in next loops if needed
+
         shared.imageList->getResultByIndex(i, stringStream);
     }
 
-    stringStream << "]}";               // end of image list
+    stringStream << "]}\r\n";               // end of image list
     sendResponse(conn, stringStream);
 }
 
@@ -121,7 +129,7 @@ void DownloadResource::onGetDownloadingList(mg_connection *conn, mg_request_info
 
     Downloader::statusJson(stringStream, DWNTYPE_FLOPPYIMG);    // get list of what is now downloading
 
-    stringStream << "]}";               // end of list
+    stringStream << "]}\r\n";               // end of list
     sendResponse(conn, stringStream);
 }
 
@@ -133,7 +141,7 @@ void DownloadResource::onDownloadItem(mg_connection *conn, mg_request_info *req_
     int qs_len = (qs == NULL) ? 0 : strlen(qs);     // get length of query string
 
     if(qs_len == 0) {   // no query string? fail
-        stringStream << "{\"status\": \"error\", \"reason\": \"no query string\"}";
+        stringStream << "{\"status\": \"error\", \"reason\": \"no query string\"}\r\n";
         sendResponse(conn, stringStream);
         return;
     }
@@ -146,7 +154,7 @@ void DownloadResource::onDownloadItem(mg_connection *conn, mg_request_info *req_
     res = mg_get_var(qs, qs_len, "image", imageName, sizeof(imageName) - 1);
 
     if(res < 0) {   // failed?
-        stringStream << "{\"status\": \"error\", \"reason\": \"no image name\"}";
+        stringStream << "{\"status\": \"error\", \"reason\": \"no image name\"}\r\n";
         sendResponse(conn, stringStream);
         return;
      }
@@ -155,7 +163,7 @@ void DownloadResource::onDownloadItem(mg_connection *conn, mg_request_info *req_
     bool bres = shared.imageStorage->doWeHaveStorage();
 
     if(!bres) {
-        stringStream << "{\"status\": \"error\", \"reason\": \"no storage available\"}";
+        stringStream << "{\"status\": \"error\", \"reason\": \"no storage available\"}\r\n";
         sendResponse(conn, stringStream);
         return;
     }
@@ -175,7 +183,7 @@ void DownloadResource::onDownloadItem(mg_connection *conn, mg_request_info *req_
     bres = shared.imageList->getImageUrl(imageName, tdr.srcUrl);   // try to get source URL
 
     if(!bres) {     // failed to get URL? fail
-        stringStream << "{\"status\": \"error\", \"reason\": \"couldn't get url\"}";
+        stringStream << "{\"status\": \"error\", \"reason\": \"couldn't get url\"}\r\n";
         sendResponse(conn, stringStream);
         return;
     }
@@ -191,7 +199,7 @@ void DownloadResource::onDownloadItem(mg_connection *conn, mg_request_info *req_
     Downloader::add(tdr);
 
     // return the response
-    stringStream << "{\"status\": \"ok\"}";
+    stringStream << "{\"status\": \"ok\"}\r\n";
     sendResponse(conn, stringStream);
 }
 
@@ -203,7 +211,7 @@ void DownloadResource::onInsertItem(mg_connection *conn, mg_request_info *req_in
     int qs_len = (qs == NULL) ? 0 : strlen(qs);     // get length of query string
 
     if(qs_len == 0) {   // no query string? fail
-        stringStream << "{\"status\": \"error\", \"reason\": \"no query string\"}";
+        stringStream << "{\"status\": \"error\", \"reason\": \"no query string\"}\r\n";
         sendResponse(conn, stringStream);
         return;
     }
@@ -216,7 +224,7 @@ void DownloadResource::onInsertItem(mg_connection *conn, mg_request_info *req_in
     res = mg_get_var(qs, qs_len, "image", imageName, sizeof(imageName) - 1);
 
     if(res < 0) {   // failed?
-        stringStream << "{\"status\": \"error\", \"reason\": \"no image name\"}";
+        stringStream << "{\"status\": \"error\", \"reason\": \"no image name\"}\r\n";
         sendResponse(conn, stringStream);
         return;
     }
@@ -227,7 +235,7 @@ void DownloadResource::onInsertItem(mg_connection *conn, mg_request_info *req_in
     res = mg_get_var(qs, qs_len, "slot", slotString, sizeof(slotString) - 1);
 
     if(res < 0) {   // failed?
-        stringStream << "{\"status\": \"error\", \"reason\": \"no slot number\"}";
+        stringStream << "{\"status\": \"error\", \"reason\": \"no slot number\"}\r\n";
         sendResponse(conn, stringStream);
         return;
     }
@@ -236,7 +244,7 @@ void DownloadResource::onInsertItem(mg_connection *conn, mg_request_info *req_in
     res = sscanf(slotString, "%d", &slotNo);
 
     if(res < 1 || slotNo < 0 || slotNo > 2) {   // failed to convert string to int or bad slot number? fail
-        stringStream << "{\"status\": \"error\", \"reason\": \"slot string to int failed\"}";
+        stringStream << "{\"status\": \"error\", \"reason\": \"slot string to int failed\"}\r\n";
         sendResponse(conn, stringStream);
         return;
     }
@@ -245,7 +253,7 @@ void DownloadResource::onInsertItem(mg_connection *conn, mg_request_info *req_in
     bool bres = shared.imageStorage->weHaveThisImage(imageName);
 
     if(!bres) { // we don't have this image downloaded? fail
-        stringStream << "{\"status\": \"error\", \"reason\": \"we don't have this image downloaded\"}";
+        stringStream << "{\"status\": \"error\", \"reason\": \"we don't have this image downloaded\"}\r\n";
         sendResponse(conn, stringStream);
         return;
     }
@@ -258,7 +266,7 @@ void DownloadResource::onInsertItem(mg_connection *conn, mg_request_info *req_in
     pxFloppyService->setImage(slotNo, localImagePath);
 
     // return the response
-    stringStream << "{\"status\": \"ok\"}";
+    stringStream << "{\"status\": \"ok\"}\r\n";
     sendResponse(conn, stringStream);
 }
 

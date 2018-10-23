@@ -6,70 +6,41 @@
         <title>CosmosEx download page</title>
         <link rel="stylesheet" type="text/css" href="css/bootstrap.light.css">
         <script type="text/javascript" src="js/modernizr.custom.50426.js"></script>
-
-        <script type="text/javascript"> 
-            var version="180509";
-            document.write('<script type="text/javascript" src=js/jquery.js?'+version+'><\/script>');
-        	document.write('<script type="text/javascript" src=js/floppy.js?'+version+'><\/script>');
-            document.write('<link rel="stylesheet" type="text/css" href="css/style.css?'+version+'">');
-        </script>
+        <script type="text/javascript" src="js/jquery.js?180509"> </script>
+        <script type="text/javascript" src="js/floppy.js?180509"> </script>
+        <link rel="stylesheet" type="text/css" href="css/style.css?180509">
 
 <script type="text/javascript">
 
-    var inList = [];        // image list of games / software (e.g. A001.zip, A002.zip, ...)
-    var gotList = [];       // list of files we already have downloaded
+    var imageList = [];        // image list of games / software (e.g. A001.zip, A002.zip, ...)
+    var totalPages = 0;
+    var currentPage = 0;
 
-// this function takes the input csv with available online files and parses it into array of objects
-function parseInputCsv(inputCsv)
+function getSearchResults(searchString)
 {
-    var items = [];
+    url = '/api/v1/download/imagelist'; // base url
 
-    var lines = inputCsv.split('\n');       // split whole file into lines
-    for(var i=0; i<lines.length; i++) {     // go through all lines
-        var item = new Object();
-        var cols = lines[i].split(',');     // split single line into columns
-
-        if(cols.length < 3) {               // if it doesn't contain at least one content, skip it
-            continue;
-        }
-
-        item.url = cols[0];                     // col 0 is URL for download
-        item.file = item.url.split('/').pop();  // get only file name
-        item.crc = cols[1];                     // col 1 is CRC
-        item.content = cols.slice(2);           // remaining cols are content of the file
-
-        items.push(item);
+    if(searchString.length > 0) {       // some search string was specified?
+        url = url + "?search=" + searchString;
     }
 
-    return items;
-}
-
-function getHaveFiles()
-{
-    // get list of files we already have downloaded
-    $.ajax({
-        type: 'GET',
-        url: '/api/v1/download/havefiles',
-        success: function(data){
-            // data.havefiles is a list of files we have
-            gotList = data.havefiles;
-        }
-    })
-}
-
-function getInputCsv()
-{
     // get list of available online files 
     $.ajax({
+        url: url,
         type: 'GET',
-        url: '/api/v1/download/imagelist',
+        dataType: 'json',
         success: function(data){
-            inList = parseInputCsv(data.imagelist);             // parse it
-            document.getElementById('search_input').value = ""; // clear the search string
-
+            // retrieve data from response
+            totalPages = data.totalPages;
+            currentPage = data.currentPate;
+            imageList = data.imageList;
+			
             // refresh the shown list on screen
-            onDelayedSearchStringChanged();
-        }
+            generateSearchResultsTable();
+        },
+        error: function (xhr) {
+            console.log("Error: " + xhr.statusText);
+        },
     })
 }
 
@@ -78,53 +49,87 @@ function insertStringAtPos(largeString, index, smallString)
     return largeString.substr(0, index) + smallString + largeString.substr(index);
 }
 
-function generateHtmlIcon(imgSrc)
+var IconType = {
+  DOWNLOAD: 1,
+  INSERT: 2,
+  DUMMY: 3
+};
+
+function onInsert(imageName, slotNo)
 {
-    var icon = "<img width='32' height='32' src='";
-    icon = icon.concat(imgSrc);
-    icon = icon.concat("'>");
+    url = "/api/v1/download/insert?image=" + imageName + "&slot=" + slotNo;
+
+    $.ajax({
+        url: url,
+        type: 'GET',
+        dataType: 'json',
+        success: function(data){
+            console.log("Insert Success");
+        },
+        error: function (xhr) {
+            console.log("Insert Error: " + xhr.statusText);
+        }
+    })
+}
+
+function onDownload(imageName)
+{
+    url = "/api/v1/download/download?image=" + imageName;
+
+    $.ajax({
+        url: url,
+        type: 'GET',
+        dataType: 'json',
+        success: function(data){
+            console.log("Download Success");
+        },
+        error: function (xhr) {
+            console.log("Download Error: " + xhr.statusText);
+        }
+    })
+}
+
+function generateHtmlIcon(imgSrc, iconType, slotNo, imageName)
+{
+    var func = "";
+    if(iconType == IconType.INSERT) {
+        func = "onInsert('" + imageName + "', " + slotNo + ");";
+    }
+
+    if(iconType == IconType.DOWNLOAD) {
+        func = "onDownload('" + imageName + "');";
+    }
+
+    var icon = "<img width='32' height='32' src='" + imgSrc + "' onclick=\"" + func + "\">";
     return icon;
 }
 
 // generate one row from this matching item
-function generateSearchResultRow(matchingItem, whatWeHaveList, searchString)
+function generateSearchResultRow(item, searchString)
 {
-    // search string to lower case
-    searchString = searchString.toLowerCase();
-
-    // find out if the item is already downloaded
-    var isDownloaded = false;
-    for(var i=0; i<whatWeHaveList.length; i++) {
-        if(whatWeHaveList[i].toLowerCase() == matchingItem.file.toLowerCase()) {
-            isDownloaded = true;
-            break;
-        }
-    }
-
     // use right image for showing download / is downloaded
     var downloadIcon = "";          // download action / is downloaded notification
     var insertIcons = "";           // nothing / insert into slot
 
-    if(isDownloaded) {              // if file is downloaded
-        downloadIcon = generateHtmlIcon("img/icon_is_downloaded.png");
+    if(item.haveIt) {               // if file is downloaded
+        downloadIcon = generateHtmlIcon("img/icon_is_downloaded.png", IconType.DUMMY, 0, "");
 
         for(var i=1; i<4; i++) {    // insert into slot 1, 2, 3
             var imagePath = "img/icon_insert_".concat(i.toString(), ".png");
-            insertIcons = insertIcons.concat(generateHtmlIcon(imagePath));
+            insertIcons = insertIcons.concat(generateHtmlIcon(imagePath, IconType.INSERT, i-1, item.imageName));
         }
     } else {                        // if file is not downloaded yet
-        downloadIcon = generateHtmlIcon("img/icon_download.png");
+        downloadIcon = generateHtmlIcon("img/icon_download.png", IconType.DOWNLOAD, 0, item.imageName);
 
         for(var i=0; i<3; i++) {    // just 3 empty placeholders
-            insertIcons = insertIcons.concat(generateHtmlIcon("img/icon_insert_empty.png"));
+            insertIcons = insertIcons.concat(generateHtmlIcon("img/icon_insert_empty.png", IconType.DUMMY, 0, ""));
         }
     }
 
     // create a string containing download + insert operations if possible
     var imageOps = downloadIcon.concat(insertIcons);
 
-    // create string out of image content array
-    content = matchingItem.content.join(", ");
+    content = item.content;             // modified content with possible highlighting
 
     if(searchString.length > 0) {       // if the searchstring was supplied
         contentLC = content.toLowerCase();
@@ -139,7 +144,7 @@ function generateSearchResultRow(matchingItem, whatWeHaveList, searchString)
 
     // generate html table row
     var row = "<tr><td>";
-    row = row.concat(matchingItem.file);
+    row = row.concat(item.imageName);
     row = row.concat("</td><td>");
     row = row.concat(imageOps);
     row = row.concat("</td><td>");
@@ -148,70 +153,39 @@ function generateSearchResultRow(matchingItem, whatWeHaveList, searchString)
     return row;
 }
 
-// go through the input list, find matching items, generate one page of results table 
-function generateSearchResultsTable(inputList, whatWeHaveList, searchString, itemsPerPage, pageNumber)
+// render the image list on screen 
+function generateSearchResultsTable()
 {
     var resultsTable = "<table border=1 cellspacing=0 cellpadding=5>";
 
+    var searchString = document.getElementById('search_input').value;   // get search string
     searchString = searchString.toLowerCase();     // search string to lower case
-    var matchingItemNumber = 0;                                     // number of current matching imte
-    var matchingItemNumberMin = itemsPerPage * (pageNumber    );    // with respect to page number - at which matching item number should we START outputting items?
-    var matchingItemNumberMax = itemsPerPage * (pageNumber + 1);    // with respect to page number - at which matching item number should we STOP  outputting items?
-
-    for(var i=0; i<inputList.length; i++) {         // go through input list
-        var item = inputList[i];
-
-        var matching = false;
-
-        if(searchString.length < 1) {               // no search string? everything matches
-            matching = true;
-        } else {                                    // search string provided? try to look for it
-            for(var c=0; c<item.content.length; c++) {                          // go through all the content in that item
-                if(item.content[c].toLowerCase().indexOf(searchString) != -1) { // if search string was found in the content
-                    matching = true;
-                    break;
-                }
-            }
-        }
-
-        // if the search string didn't match any of the content, skip the rest
-        if(!matching) {
-            continue;
-        }
-
-        // if the matching item fits to the right page, output it
-        if(matchingItemNumber >= matchingItemNumberMin && matchingItemNumber < matchingItemNumberMax) {
-            resultRow = generateSearchResultRow(item, whatWeHaveList, searchString);        // generate one row from this matching item
-            resultsTable = resultsTable.concat(resultRow);
-        }
-
-        matchingItemNumber++;
-    }
-
-    // calculate total number to pages based on how many items were matching
-    var totalPages = Math.ceil(matchingItemNumber / itemsPerPage);
 
     // nothing found?
-    if(matchingItemNumber == 0) {
+    if(totalPages == 0) {
         resultRow = "<tr><td>nothing matches your search input</td></tr>";
         resultsTable = resultsTable.concat(resultRow);
+    } else {
+        for(var i=0; i<imageList.length; i++) {         // go through input list
+            var item = imageList[i];
+
+            // if the matching item fits to the right page, output it
+            resultRow = generateSearchResultRow(item, searchString);        // generate one row from this matching item
+            resultsTable = resultsTable.concat(resultRow);
+        }
     }
 
     resultsTable = resultsTable.concat("</table>");
-    return resultsTable;    // return the results table
+
+    var results = document.getElementById('search_results');    // find table
+    results.innerHTML = resultsTable;                           // set content of the results table    
 }
 
 function onSearchStringChanged()
 {
     // read search string
-    var searchString = document.getElementById('search_input').value;
-
-    // search the input
-    var searchList = generateSearchResultsTable(inList, gotList, searchString, 15, 0);
-    
-    // output the results to page
-    var results = document.getElementById('search_results');
-    results.innerHTML = searchList;
+    var searchString = document.getElementById('search_input').value;   // get search string
+    getSearchResults(searchString);     // get list of files after applying search string
 }
 
 function onDelayedSearchStringChanged()
@@ -219,31 +193,14 @@ function onDelayedSearchStringChanged()
     setTimeout(function(){ onSearchStringChanged(); }, 100);
 }
 
-function fillInputListSelect()
-{
-    var select = document.getElementById('input_list_name');
-    select.innerHTML = "";                      // clear the list
-
-    for (var i=0; i<input_lists.length; i++) {          // go through individual lists
-        var option = document.createElement('option');
-        option.innerHTML = input_lists[i].list_name_humanreadable;
-        option.value = input_lists[i].list_filename;    // filename as list name
-        option.selected = (i == 0);                     // select 0th option
-        select.append(option);
-    }
-}
-
 $(document).ready(function(){
-    getHaveFiles();     // get list of files we already have downloaded
-    getInputCsv();      // get list of files which can be searched and downloaded
+    getSearchResults(""); // get list of files
 
     // add handler to search string change
     var search_input = document.getElementById('search_input')
     search_input.onchange = function(){ onDelayedSearchStringChanged(); };
     search_input.onkeydown = function(){ onDelayedSearchStringChanged(); };
     search_input.onkeypress = function(){ onDelayedSearchStringChanged(); };
-
-    onDelayedSearchStringChanged();
 });
 
         </script>     

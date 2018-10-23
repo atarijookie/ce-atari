@@ -77,6 +77,14 @@ bool ImageList::loadList(void)
             continue;
         }
 
+        int len = strlen(tmp);      // get length of string
+        int i;
+        for(i=0; i<len; i++) {      // replace all line terminators with zero
+            if(tmp[i] == '\n' || tmp[i] == '\r') {
+                tmp[i] = 0;
+            }
+        }
+
         char *tok;
         tok = strtok(tmp, ",");                         // init strtok by passing pointer to string
 
@@ -306,7 +314,7 @@ void ImageList::getResultByIndex(int index, std::ostringstream &stream)
 
     stream <<vectorOfResults[index].game.c_str();	// copy in the name of game
 
-	stream << "\"}, ";
+	stream << "\"}";
 }
 
 void ImageList::markImage(int index)

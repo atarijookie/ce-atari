@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include <string>
 #include <iostream>
 #include <sstream>
@@ -23,7 +26,11 @@ ImageStorage::ImageStorage(void)
 bool ImageStorage::doWeHaveStorage(void)                         // returns true if shared drive or usb drive is attached, returns false if not (can't download images then)
 {
     std::string hostRootPath;               // path to where we will store data
-    return getStoragePath(hostRootPath);    // get path of first USB drive or to shared drive
+    bool res = getStoragePath(hostRootPath);    // get path of first USB drive or to shared drive
+
+    Debug::out(LOG_DEBUG, "ImageStorage::doWeHaveStorate() -> %d", res);
+
+    return res;
 }
 
 bool ImageStorage::getStoragePath(std::string &storagePath)             // returns where the images are now stored
@@ -62,9 +69,21 @@ bool ImageStorage::getStoragePath(std::string &storagePath)             // retur
     std::string subdir = IMAGE_STORAGE_SUBDIR;
     Utils::mergeHostPaths(storagePath, subdir);     // to the storage root path add the subdir
 
+    // try to access the dir
+    int ires = access(storagePath.c_str(), F_OK);
+
+    if(ires == -1) {        // can't access? try to create it
+        ires = Utils::mkpath(storagePath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);        // mod: 0x775
+
+        if(ires == -1) {    // failed to create dir? fail
+            return false;
+        }
+    }
+
     lastStoragePath = storagePath;  // store last returned storage path and result for faster use next time
     lastGotStorage = true;
 
+    Debug::out(LOG_DEBUG, "ImageStorage::getStoragePath() -> %s", storagePath.c_str());
     return true;
 }
 
