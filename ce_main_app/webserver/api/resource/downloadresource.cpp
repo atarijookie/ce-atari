@@ -16,6 +16,7 @@
 #include "debug.h"
 #include "global.h"
 #include "downloadresource.h"
+#include "service/floppyservice.h"
 #include "../../../floppy/imagelist.h"
 #include "../../../floppy/imagestorage.h"
 #include "../../../utils.h"
@@ -24,8 +25,9 @@
 
 extern SharedObjects shared;
 
-DownloadResource::DownloadResource()
+DownloadResource::DownloadResource(FloppyService *pxFloppyService)
 {
+    this->pxFloppyService = pxFloppyService;
 }
 
 DownloadResource::~DownloadResource()
@@ -252,10 +254,8 @@ void DownloadResource::onInsertItem(mg_connection *conn, mg_request_info *req_in
     std::string localImagePath;
     shared.imageStorage->getImageLocalPath(imageName, localImagePath);
 
-
-    // TODO: set floppy image to slot
-
-
+    // set floppy image to slot
+    pxFloppyService->setImage(slotNo, localImagePath);
 
     // return the response
     stringStream << "{\"status\": \"ok\"}";

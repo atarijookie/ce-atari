@@ -8,14 +8,17 @@
 #include "iapiresource.h"
 
 class ImageList;
+class FloppyService;
 
 class DownloadResource : public IApiResource {
 public:
-    DownloadResource(void);
+    DownloadResource(FloppyService *pxFloppyService);
     virtual ~DownloadResource();
     bool dispatch(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo="" );
 
 private:
+    FloppyService *pxFloppyService;
+
     void sendResponse(mg_connection *conn, std::ostringstream &stringStream);
 
     void onGetImageList(mg_connection *conn, mg_request_info *req_info, std::string sResourceInfo);

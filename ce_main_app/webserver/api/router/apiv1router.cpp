@@ -16,8 +16,8 @@ ApiV1Router::ApiV1Router(VirtualKeyboardService* pxVKbdService,VirtualMouseServi
     pxMouse=new MouseResource(pxVMouseService);
     pxKeyboard=new KbdResource(pxVKbdService);
     pxFloppy=new FloppyResource(pxFloppyService);
+    pxDownload=new DownloadResource(pxFloppyService);
     pxConfig=new ConfigResource();
-    pxDownload=new DownloadResource();
 }
 
 ApiV1Router::~ApiV1Router()

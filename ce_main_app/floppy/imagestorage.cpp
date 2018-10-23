@@ -28,7 +28,22 @@ bool ImageStorage::doWeHaveStorage(void)                         // returns true
 
 bool ImageStorage::getStoragePath(std::string &storagePath)             // returns where the images are now stored
 {
-    storagePath.clear();
+    static DWORD lastStorageCheck = 0;
+    static bool  lastGotStorage = false;
+    static std::string lastStoragePath;
+
+    DWORD now = Utils::getCurrentMs();      // get current time
+
+    if((now - lastStorageCheck) < 3000) {   // if last check was done less then 3 seconds ago, just reuse last results
+        storagePath = lastStoragePath;      // return last storage path
+        return lastGotStorage;              // return last got storage
+    }
+    lastStorageCheck = now;                 // last check was some time ago, so let's check it now
+
+    storagePath.clear();                    // clear new path
+
+    lastStoragePath.clear();                // clear last storage path and flag
+    lastGotStorage = false;
 
     TranslatedDisk * translated = TranslatedDisk::getInstance();
 
@@ -47,6 +62,9 @@ bool ImageStorage::getStoragePath(std::string &storagePath)             // retur
     std::string subdir = IMAGE_STORAGE_SUBDIR;
     Utils::mergeHostPaths(storagePath, subdir);     // to the storage root path add the subdir
 
+    lastStoragePath = storagePath;  // store last returned storage path and result for faster use next time
+    lastGotStorage = true;
+
     return true;
 }
 
@@ -63,24 +81,8 @@ bool ImageStorage::getImageLocalPath(const char *imageFileName, std::string &pat
     return res;
 }
 
-void ImageStorage::scanStorageForImages(void)                    // go through the storage and find all the floppy images there
-{
-    std::string path;
-
-    bool res = getStoragePath(path);        // get path to storage
-    if(!res) {                              // no path? fail
-        return;
-    }
-
-
-
-    // TODO: implement scan
-}
-
 bool ImageStorage::weHaveThisImage(const char *imageFileName)    // returns if floppy image with this filename is stored in our storage
 {
-    // TODO: remake by checking agains the list of files retrieved by scanStorageForImages()
-
     std::string path;
     getImageLocalPath(imageFileName, path); // create full local path out of filename
 

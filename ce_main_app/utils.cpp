@@ -38,13 +38,13 @@ DWORD Utils::getCurrentMs(void)
 {
 	struct timespec tp;
 	int res;
-	
+
 	res = clock_gettime(CLOCK_MONOTONIC, &tp);					// get current time
-	
+
 	if(res != 0) {												// if failed, fail
 		return 0;
 	}
-	
+
 	DWORD val = (tp.tv_sec * 1000) + (tp.tv_nsec / 1000000);	// convert to milli seconds
 	return val;
 }
@@ -52,9 +52,9 @@ DWORD Utils::getCurrentMs(void)
 DWORD Utils::getEndTime(DWORD offsetFromNow)
 {
 	DWORD val;
-	
+
 	val = getCurrentMs() + offsetFromNow;
-	
+
 	return val;
 }
 
@@ -71,24 +71,24 @@ void Utils::attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari)
 
     if(attrHost & FILE_ATTRIBUTE_SYSTEM)
         attrAtari |= FA_SYSTEM;
-		
+
     if(attrHost &                      )
 		attrAtari |= FA_VOLUME;
 */
-	
+
     if(isDir)
         attrAtari |= FA_DIR;
 
 /*
     if(attrHost & FILE_ATTRIBUTE_ARCHIVE)
         attrAtari |= FA_ARCHIVE;
-*/		
+*/
 }
 
 WORD Utils::fileTimeToAtariDate(struct tm *ptm)
 {
     WORD atariDate = 0;
-	
+
 	if(ptm == NULL) {
 		return 0;
 	}
@@ -107,7 +107,7 @@ WORD Utils::fileTimeToAtariTime(struct tm *ptm)
 	if(ptm == NULL) {
 		return 0;
 	}
-	
+
     atariTime |= (ptm->tm_hour		) << 11;        // hours
     atariTime |= (ptm->tm_min		) << 5;         // minutes
     atariTime |= (ptm->tm_sec	/ 2	);              // seconds
@@ -127,12 +127,12 @@ void Utils::fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *pt
     hours   =  (atariTime >> 11) & 0x1f;	// 0-23
     minutes =  (atariTime >>  5) & 0x3f;	// 0-59
     seconds = ( atariTime        & 0x1f) * 2;	// in unit of two
-	
+
 	memset(ptm, 0, sizeof(struct tm));
 	ptm->tm_year	= year - 1900;		// number of years since 1900.
 	ptm->tm_mon		= month - 1;	// The number of months since January, in the range 0 to 11
 	ptm->tm_mday	= day;		// The day of the month, in the range 1 to 31.
-	
+
 	ptm->tm_hour	= hours;	// The number of hours past midnight, in the range 0 to 23
 	ptm->tm_min		= minutes;	// The number of minutes after the hour, in the range 0 to 59
 	ptm->tm_sec		= seconds;	// The number of seconds after the minute, normally in the range 0 to 59,
@@ -184,7 +184,7 @@ void Utils::splitFilenameFromPath(const std::string &pathAndFile, std::string &p
 void Utils::sleepMs(DWORD ms)
 {
 	DWORD us = ms * 1000;
-	
+
 	usleep(us);
 }
 
@@ -194,10 +194,10 @@ void Utils::resetHansAndFranz(void)
 	bcm2835_gpio_write(PIN_RESET_FRANZ,			LOW);
 
 	Utils::sleepMs(10);										// wait a while to let the reset work
-	
+
 	bcm2835_gpio_write(PIN_RESET_HANS,			HIGH);		// reset lines to RUN (not reset) state
 	bcm2835_gpio_write(PIN_RESET_FRANZ,			HIGH);
-	
+
 	Utils::sleepMs(50);										// wait a while to let the devices boot
 }
 
@@ -311,7 +311,7 @@ void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
     int family, n;
 
     memset(bfrIPs, 0, 10);                                          // set to 0 - this means 'not present'
-    
+
     if(bfrMasks) {
         memset(bfrMasks, 0, 10);                                    // set to 0 - this means 'not present'
     }
@@ -333,16 +333,16 @@ void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
 
         sockaddr_in *saiIp  = (sockaddr_in *) ifa->ifa_addr;
         sockaddr_in *saiMsk = (sockaddr_in *) ifa->ifa_netmask;
-        
+
         DWORD ip            = saiIp->sin_addr.s_addr;
         DWORD mask          = saiMsk->sin_addr.s_addr;
 
         BYTE *pIp   = NULL;
         BYTE *pMsk  = NULL;
-        
+
         if(strcmp(ifa->ifa_name,"eth0")==0) {                   // for eth0 - store at offset 0
             pIp = bfrIPs;
-            
+
             if(bfrMasks) {                                      // got masks buffer? store offset 0
                 pMsk = bfrMasks;
             }
@@ -350,7 +350,7 @@ void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
 
         if(strcmp(ifa->ifa_name,"wlan0")==0) {                  // for wlan0 - store at offset 5
             pIp = bfrIPs + 5;
-            
+
             if(bfrMasks) {                                      // got masks buffer? store offset 5
                 pMsk = bfrMasks + 5;
             }
@@ -365,7 +365,7 @@ void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
         pIp[2] = (BYTE) (ip >>  8);
         pIp[3] = (BYTE) (ip >> 16);
         pIp[4] = (BYTE) (ip >> 24);
-        
+
         if(pMsk) {
             pMsk[0] = 1;                                        // enabled?
             pMsk[1] = (BYTE)  mask;                             // store the mask
@@ -380,8 +380,8 @@ void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
 
 void Utils::forceSync(void)
 {
-	TMounterRequest tmr;			
-	tmr.action	= MOUNTER_ACTION_SYNC;                          // let the mounter thread do filesystem caches sync 						
+	TMounterRequest tmr;
+	tmr.action	= MOUNTER_ACTION_SYNC;                          // let the mounter thread do filesystem caches sync
 	Mounter::add(tmr);
 }
 
@@ -453,18 +453,18 @@ void Utils::createTimezoneString(char *str)
     char  signChar;
     int   ofsHours, ofsMinutes;
     float fOfsHours;
-    
+
     if(utcOffset >= 0.0f) {         // is UTC offset positive? (e.g. Berlin is +1 / +2) TZ should have '-' because it's east of Prime Meridian
         signChar = '-';
     } else {                        // is UTC offset negative? (e.g. New York is -5 / -4) TZ should have '+' because it's west of Prime Meridian
         signChar = '+';
     }
-    
+
     ofsHours    = (int)   utcOffset;                            // int  : hours only    (including sign)
     fOfsHours   = (float) ofsHours;                             // float: hours only    (including sign)
     ofsHours    = abs(ofsHours);                                // int  : hours only    (without   sign)
     ofsMinutes  = abs((int) ((utcOffset - fOfsHours) * 60.0f)); // not get only minutes (without   sign)
-    
+
     if(ofsHours != 0 && ofsMinutes != 0) {                      // got offset - both hours and minutes?
         sprintf(str, "UTC%c%02d:%02d", signChar, ofsHours, ofsMinutes);
     } else if(ofsHours != 0 && ofsMinutes == 0) {               // got offset - only hours (no minutes)
@@ -478,16 +478,16 @@ void Utils::setTimezoneVariable_inProfileScript(void)
 {
     char utcOfsset[64];
     createTimezoneString(utcOfsset);
-    
+
     char tzString[128];
     sprintf(tzString, "echo 'export TZ=\"%s\"' > /etc/profile.d/set_timezone.sh", utcOfsset);
-    
+
     Debug::out(LOG_DEBUG, "Utils::setTimezoneVariable_inProfileScript() -- creating timezone setting script like this: %s\n", tzString);
-    
+
     system("mkdir -p /etc/profile.d");                          // if this dir doesn't exist, create it
     system(tzString);                                           // now create the script in the dir above
     system("chmod 755 /etc/profile.d/set_timezone.sh");         // make it executable
-    
+
     forceSync();                                                // make sure it does to disk
 }
 
@@ -497,7 +497,7 @@ void Utils::setTimezoneVariable_inThisContext(void)
     createTimezoneString(utcOfsset);
 
     Debug::out(LOG_DEBUG, "Utils::setTimezoneVariable_inThisContext() -- setting TZ variable to: %s\n", utcOfsset);
-    
+
     setenv("TZ", utcOfsset, 1);
 }
 
