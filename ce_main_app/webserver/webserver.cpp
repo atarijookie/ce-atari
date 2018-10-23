@@ -6,7 +6,7 @@
 #include "../debug.h"
 
 #define DOCUMENT_ROOT "/ce/app/webroot/"
-#define PORT "81"
+#define PORT "80"
 
 std::string WebServer::sLastUploadedFile;
 
