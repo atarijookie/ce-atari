@@ -146,23 +146,23 @@ function onDownload(imageName)
     })
 }
 
-function generateHtmlIcon(imgSrc, iconType, slotNo, imageName)
+function generateHtmlIcon(iconType, slotNo, imageName)
 {
-    if(do_we_have_storage == false) {   // no storage? no action button
-        return "";
+    // this dummy is just a place holder with size of normal button
+    var dummy = "<a href='#' class='btnDownload btnHidden' onclick=\"\"\> </a>";
+
+    if(do_we_have_storage == false) {           // no storage? no action button
+        return dummy;
     }
 
-    var func = "";
-    if(iconType == IconType.INSERT) {
-        func = "onInsert('" + imageName + "', " + slotNo + ");";
+    if(iconType == IconType.INSERT) {           // insert button?
+        slotNoPlusOne = slotNo + 1;
+        return "<a href='#' class='btnDownload btnInsert' onclick=\"onInsert('" + imageName + "', " + slotNo + ");\"\>" + slotNoPlusOne + "</a>";
+    } else if(iconType == IconType.DOWNLOAD) {  // download button?
+        return "<a href='#' class='btnDownload' onclick=\"onDownload('" + imageName + "');\"\>V</a>";
     }
 
-    if(iconType == IconType.DOWNLOAD) {
-        func = "onDownload('" + imageName + "');";
-    }
-
-    var icon = "<img width='32' height='32' src='" + imgSrc + "' onclick=\"" + func + "\">";
-    return icon;
+	return dummy;                               // other button?
 }
 
 // generate one row from this matching item
@@ -173,17 +173,16 @@ function generateSearchResultRow(item, searchString)
     var insertIcons = "";           // nothing / insert into slot
 
     if(item.haveIt) {               // if file is downloaded
-        downloadIcon = generateHtmlIcon("img/icon_is_downloaded.png", IconType.DUMMY, 0, "");
+        downloadIcon = generateHtmlIcon(IconType.DUMMY, 0, "");
 
-        for(var i=1; i<4; i++) {    // insert into slot 1, 2, 3
-            var imagePath = "img/icon_insert_".concat(i.toString(), ".png");
-            insertIcons = insertIcons.concat(generateHtmlIcon(imagePath, IconType.INSERT, i-1, item.imageName));
+        for(var i=0; i<3; i++) {    // insert into slot 1, 2, 3
+            insertIcons = insertIcons.concat(generateHtmlIcon(IconType.INSERT, i, item.imageName));
         }
     } else {                        // if file is not downloaded yet
-        downloadIcon = generateHtmlIcon("img/icon_download.png", IconType.DOWNLOAD, 0, item.imageName);
+        downloadIcon = generateHtmlIcon(IconType.DOWNLOAD, 0, item.imageName);
 
         for(var i=0; i<3; i++) {    // just 3 empty placeholders
-            insertIcons = insertIcons.concat(generateHtmlIcon("img/icon_insert_empty.png", IconType.DUMMY, 0, ""));
+            insertIcons = insertIcons.concat(generateHtmlIcon(IconType.DUMMY, 0, ""));
         }
     }
 
