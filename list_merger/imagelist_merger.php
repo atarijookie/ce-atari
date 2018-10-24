@@ -267,9 +267,13 @@ if($prev_hash != $new_hash) {               // hash changed
     if($good) {     // if succeeded to save merged file with date
         saveValueToFile("prev_merged_hash", $new_hash);  // store this hash to file
         updateTheUpdateList();
+        saveValueToFile("last_run_message", "runned at $date, merged is different, updated the list :)");
+    } else {
+        saveValueToFile("last_run_message", "runned at $date, merged is different, failed to save merged file :(");
     }
 } else {
     echo "hash of new merged file are the same\n";
+    saveValueToFile("last_run_message", "runned at $date, merged is same, not updating the list");
 }
 
 echo "-----------------------------------------------------------\n";
