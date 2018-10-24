@@ -93,6 +93,12 @@ progress{
   margin: 2em auto;
   text-align: center;
 }
+
+.overlay_dwnld{
+  top: 67%;
+  height: 33%;
+}
+
 /* http://projects.lukehaas.me/css-loaders/ */
 .loader:before,
 .loader:after,
@@ -232,7 +238,11 @@ td.valueLeft   {
 }
 
 .btnHidden {
-    visibility: hidden;
+    opacity: 0.0;
+}
+
+.btnHidden:hover {
+    opacity: 0.0;
 }
 
 .btnInsert {
@@ -265,15 +275,18 @@ table.tableDownload {
   border: 1px solid #1C6EA4;
   background-color: #EEEEEE;
   width: 100%;
+  table-layout: fixed;
   text-align: left;
   border-collapse: collapse;
 }
 table.tableDownload td, table.tableDownload th {
   border: 1px solid #AAAAAA;
   padding: 3px 2px;
+  vertical-align: middle;
 }
 table.tableDownload tbody td {
   font-size: 13px;
+  vertical-align: middle;
 }
 table.tableDownload tr:nth-child(even) {
   background: #D0E4F5;
@@ -317,4 +330,14 @@ table.tableDownload tfoot .links a{
   color: #FFFFFF;
   padding: 2px 8px;
   border-radius: 5px;
+}
+
+.col_filename {
+  width: 20%;
+}
+.col_actions {
+  width: 20%;
+}
+.col_content {
+  width: 60%;
 }

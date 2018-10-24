@@ -69,38 +69,72 @@ function showNoStorageWarning(show)
     warning.innerHTML = message;
 }
 
+function handleShowOverlay(encoding_ready)
+{
+    if(typeof(encoding_ready)==='undefined') {  // if don't have variable, hide overlay
+        $(".over_convert").hide();
+        return false;               // don't check again
+    }
+
+    if(encoding_ready) {            // encoding ready?
+        $(".over_convert").hide();
+        return false;               // don't check again
+    } else {                        // still not ready?
+        $(".over_convert").show();
+        return true;                // check again in a while!
+    }
+}
+
+function handleShowDownloading(downloading_count)
+{
+    if(typeof(downloading_count)==='undefined') {  // if don't have variable, hide overlay
+        $(".overlay_dwnld").hide();
+        return false;               // don't check again
+    }
+
+    var check_again = false;        // don't check again
+
+    if(downloading_count == 0) {    // not downloading?
+        $(".overlay_dwnld").hide();
+    } else {                        // still downloading?
+        var msgText = "<h3>Downloading " + downloading_count + " disk images...</h3>";
+
+        var msg = document.getElementById('download_msg');  // find message
+        msg.innerHTML = msgText;                            // set content of message
+
+        $(".overlay_dwnld").show();
+        check_again = true;         // check again in a while!
+    }
+
+    // if we were downloading something, but we arent't downloading anymore
+    if(downloading_count == 0 && prevDownloadingCount > 0) {
+        onSearchStringChanged();                // fake search string change to reload the download/insert icons
+    }
+    prevDownloadingCount = downloading_count;   // store current value so we would be able to detect end of downloading
+
+    return check_again;             // return if we should check again in a while or not
+}
+
 // check if image is converted / downloaded
 function onCheckTimer() {
     $.ajax({
         type: 'GET',
         url: '/api/v1/download/status',
         success: function(data){
-            var hideNotWait = true;    // on encoding_ready or undefined -- hide
-
-            if( typeof(data.encoding_ready)!=='undefined') {    // encoding_ready is available, use it
-                hideNotWait = data.encoding_ready;
-            }
-
-            if(data.downloading_count > 0) {    // if still downloading something do wait some more
-                hideNotWait = false;
-            }
-
-            if(data.downloading_count == 0 && prevDownloadingCount > 0) {   // if we were downloading something, but we arent't downloading anymore
-                onSearchStringChanged();                    // fake search string change to reload the download/insert icons
-            }
-            prevDownloadingCount = data.downloading_count;  // store current value so we would be able to detect end of downloading
-
-            if(hideNotWait) {          // hide?
-                $(".overlay").hide(); 
-            } else {                    // wait?
-                setTimeout(onCheckTimer, 1000);
-            }
+            var check1 = handleShowOverlay(data.encoding_ready);         // encoding?
+            var check2 = handleShowDownloading(data.downloading_count);  // downloading?
 
             do_we_have_storage = data.do_we_have_storage;
             showNoStorageWarning(!data.do_we_have_storage);  // show / hide no storage message
+            
+            if(check1 || check2) {              // if we should check again, start timer again
+                setTimeout(onCheckTimer, 1000);
+            }
+
         },
         error: function(){              // when failed to get info, just hide overlay
-            $(".overlay").hide();    
+            $(".over_convert").hide();    
+            $(".overlay_dwnld").show();
         }
     });
 }
@@ -116,7 +150,7 @@ function onInsert(imageName, slotNo)
         success: function(data){
             console.log("Insert Success");
 
-            $(".overlay").show();           // show overlay
+            $(".over_convert").show();           // show overlay
             setTimeout(onCheckTimer, 1000); // check every while
         },
         error: function (xhr) {
@@ -136,8 +170,8 @@ function onDownload(imageName)
         success: function(data){
             console.log("Download Success");
 
-            prevDownloadingCount = 1;       // downloading at least one thing (helps to refresh on fast downloads where timer doesn't happen before download still running)
-            $(".overlay").show();           // show overlay
+            prevDownloadingCount++;       // downloading at least one thing (helps to refresh on fast downloads where timer doesn't happen before download still running)
+            handleShowDownloading(prevDownloadingCount);
             setTimeout(onCheckTimer, 1000); // check every while
         },
         error: function (xhr) {
@@ -149,13 +183,15 @@ function onDownload(imageName)
 function generateHtmlIcon(iconType, slotNo, imageName)
 {
     // this dummy is just a place holder with size of normal button
-    var dummy = "<a href='#' class='btnDownload btnHidden' onclick=\"\"\> </a>";
+    var dummy = "<a href='#' class='btnDownload btnHidden' onclick=\"\"\>X</a>";
 
     if(do_we_have_storage == false) {           // no storage? no action button
         return dummy;
     }
 
     if(iconType == IconType.INSERT) {           // insert button?
+        // TODO: if this imageName is already inserted in this slotNo, highlight button, disable button click
+
         slotNoPlusOne = slotNo + 1;
         return "<a href='#' class='btnDownload btnInsert' onclick=\"onInsert('" + imageName + "', " + slotNo + ");\"\>" + slotNoPlusOne + "</a>";
     } else if(iconType == IconType.DOWNLOAD) {  // download button?
@@ -221,14 +257,14 @@ function generateSearchResultsTable()
     var searchString = document.getElementById('search_input').value;   // get search string
     searchString = searchString.toLowerCase();     // search string to lower case
 
+    var header = "<thead><tr><th class='col_filename'>Image name</th><th class='col_actions'>Download / Insert</th><th class='col_content'>Content</th></tr></thead> <tbody>";
+    resultsTable = resultsTable.concat(header);
+
     // nothing found?
     if(totalPages == 0) {
-        resultRow = "<thead><tr><th>nothing matches your search input</th></tr></thead>";
+        resultRow = "<tr><td colspan=\"3\">nothing matches your search input</td></tr></tbody>";
         resultsTable = resultsTable.concat(resultRow);
     } else {
-        var header = "<thead><tr><th>Image name</th><th>Download / Insert</th><th>Content</th></tr></thead> <tbody>";
-        resultsTable = resultsTable.concat(header);
-
         for(var i=0; i<imageList.length; i++) {         // go through input list
             var item = imageList[i];
 
@@ -237,7 +273,11 @@ function generateSearchResultsTable()
             resultsTable = resultsTable.concat(resultRow);
         }
 
-        var footer = "</tbody> <tfoot><tr><td colspan=\"3\"><div class=\"links\"><a href=\"#\">&laquo;</a> <a class=\"active\" href=\"#\">1</a> <a href=\"#\">2</a> <a href=\"#\">3</a> <a href=\"#\">4</a> <a href=\"#\">&raquo;</a></div></td></tr></tfoot>";
+        // TODO: add code for page switching (backend already supports pages)
+        //var footer = "</tbody> <tfoot><tr><td colspan=\"3\"><div class=\"links\"><a href=\"#\">&laquo;</a> <a class=\"active\" href=\"#\">1</a> <a href=\"#\">2</a> <a href=\"#\">3</a> <a href=\"#\">4</a> <a href=\"#\">&raquo;</a></div></td></tr></tfoot>";
+
+        // temporary: no page switching footer
+        var footer = "</tbody> <tfoot><tr><td colspan=\"3\"> </td></tr></tfoot>";
         resultsTable = resultsTable.concat(footer);
     }
 
@@ -287,8 +327,8 @@ $(document).ready(function(){
                     <li><a href="/config.html?v=6">Config</a></li>
                     <li><a href="/app/status/?v=6">Status</a></li>
                 </ul>
-        <h3>Download games and software</h3>
-        <p>Search and download things you want to play and use.</p>
+        <h3>Search and download games</h3>
+        <p>Search and download by their name and then simply insert them in floppy slot.</p>
         
     <!-- ---------------------------- -->
     <table border=1 cellspacing=0 cellpadding=5>
@@ -298,7 +338,13 @@ $(document).ready(function(){
       <tr><td colspan=2><p id='search_results'></p> </td></tr>
     </table>        
 
-	<div class="overlay"><h3>Converting Disk Image...</h3><div class="loader">Working...</div></div>
+	<div class="overlay over_convert"><h3>Converting Disk Image...</h3>
+        <div class="loader">...</div>
+    </div>
+
+	<div class="overlay overlay_dwnld" id='download_msg'><h3>Downloading X disk images...</h3>
+        <div class="loader">...</div>
+    </div>
  
   </body>
 </html>

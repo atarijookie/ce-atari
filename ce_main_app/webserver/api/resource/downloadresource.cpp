@@ -100,7 +100,7 @@ void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_
     pageEnd = MIN(pageEnd, results);
 
     int realPage = pageStart / pageSize;         // calculate the real page number
-    int totalPages = (results / pageSize) + 1;   // calculate the count of pages we have
+    int totalPages = (results > 0) ? (results / pageSize) + 1 : 0;	// calculate the count of pages we have
 
     stringStream << "{\"totalPages\": " << totalPages << ", ";
     stringStream << "\"currentPage\": " << realPage << ", ";
