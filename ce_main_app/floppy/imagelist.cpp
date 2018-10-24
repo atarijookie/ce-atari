@@ -83,6 +83,10 @@ bool ImageList::loadList(void)
             if(tmp[i] == '\n' || tmp[i] == '\r') {
                 tmp[i] = 0;
             }
+
+            if(tmp[i] == '"') {    // if it's double quote, replace with single quote (double quote is used in json)
+                tmp[i] = '\'';
+            }
         }
 
         char *tok;

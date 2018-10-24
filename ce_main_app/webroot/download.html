@@ -19,13 +19,20 @@
     var do_we_have_storage = true;
     var prevDownloadingCount = 0;
     var prev_encoding_ready = true;
+    var prevSearchString = "";
 
 function getSearchResults(searchString)
 {
+    if(prevSearchString != searchString) {  // if the search string changed, reset current page number to zero
+        currentPage = 0;
+    }
+    prevSearchString = searchString;
+
     url = '/api/v1/download/imagelist'; // base url
+    url = url + "?page=" + currentPage; // add page
 
     if(searchString.length > 0) {       // some search string was specified?
-        url = url + "?search=" + searchString;
+        url = url + "&search=" + searchString;
     }
 
     // get list of available online files 
@@ -36,7 +43,7 @@ function getSearchResults(searchString)
         success: function(data){
             // retrieve data from response
             totalPages = data.totalPages;
-            currentPage = data.currentPate;
+            currentPage = data.currentPage;
             imageList = data.imageList;
             slots = data.slots;
 			
@@ -193,7 +200,41 @@ function onDownload(imageName)
     })
 }
 
-function generateHtmlIcon(iconType, slotNo, imageName)
+function onGoToPage(pageNumber)
+{
+    currentPage = pageNumber;   // set new current page
+    onSearchStringChanged();    // get new page content
+}
+
+function generatePageSwitchButton(prevNotNext)
+{
+    var pageNumber = 0;
+    var buttonSymbol = "X";
+    var buttonClass = "btnHidden";
+    var onClickFunction = "";
+
+    if(prevNotNext) {                           // prev page?
+        if(currentPage != 0) {                  // we're not on first page?
+            pageNumber = currentPage - 1;
+            onClickFunction = "onGoToPage(" + pageNumber + ");"
+
+            buttonSymbol = "&laquo;";
+            buttonClass = "active";
+        }
+    } else {                                    // next page?
+        if(currentPage < (totalPages - 1)) {    // we're not on the last page?
+            pageNumber = currentPage + 1;
+            onClickFunction = "onGoToPage(" + pageNumber + ");"
+
+            buttonSymbol = "&raquo;";
+            buttonClass = "active";
+        }
+    }
+
+    return "<a href='#' class='" + buttonClass + "' onclick=\"" + onClickFunction + "\"\>" + buttonSymbol + "</a>";
+}
+
+function generateActionButton(iconType, slotNo, imageName)
 {
     // this dummy is just a place holder with size of normal button
     var dummy = "<a href='#' class='btnDownload btnHidden' onclick=\"\"\>X</a>";
@@ -238,16 +279,16 @@ function generateSearchResultRow(item, searchString)
     var insertIcons = "";           // nothing / insert into slot
 
     if(item.haveIt) {               // if file is downloaded
-        downloadIcon = generateHtmlIcon(IconType.DUMMY, 0, "");
+        downloadIcon = generateActionButton(IconType.DUMMY, 0, "");
 
         for(var i=0; i<3; i++) {    // insert into slot 1, 2, 3
-            insertIcons = insertIcons.concat(generateHtmlIcon(IconType.INSERT, i, item.imageName));
+            insertIcons = insertIcons.concat(generateActionButton(IconType.INSERT, i, item.imageName));
         }
     } else {                        // if file is not downloaded yet
-        downloadIcon = generateHtmlIcon(IconType.DOWNLOAD, 0, item.imageName);
+        downloadIcon = generateActionButton(IconType.DOWNLOAD, 0, item.imageName);
 
         for(var i=0; i<3; i++) {    // just 3 empty placeholders
-            insertIcons = insertIcons.concat(generateHtmlIcon(IconType.DUMMY, 0, ""));
+            insertIcons = insertIcons.concat(generateActionButton(IconType.DUMMY, 0, ""));
         }
     }
 
@@ -302,11 +343,11 @@ function generateSearchResultsTable()
             resultsTable = resultsTable.concat(resultRow);
         }
 
-        // TODO: add code for page switching (backend already supports pages)
-        //var footer = "</tbody> <tfoot><tr><td colspan=\"3\"><div class=\"links\"><a href=\"#\">&laquo;</a> <a class=\"active\" href=\"#\">1</a> <a href=\"#\">2</a> <a href=\"#\">3</a> <a href=\"#\">4</a> <a href=\"#\">&raquo;</a></div></td></tr></tfoot>";
+        // code for page switching
+        var btnPrev = generatePageSwitchButton(true);
+        var btnNext = generatePageSwitchButton(false);
 
-        // temporary: no page switching footer
-        var footer = "</tbody> <tfoot><tr><td colspan=\"3\"> </td></tr></tfoot>";
+        var footer = "</tbody> <tfoot><tr><td colspan='3'><div class='links'>Pages: " + btnPrev + "&nbsp; " + (currentPage + 1) + " &nbsp; / &nbsp; " + totalPages + " &nbsp; " + btnNext + "</div></td></tr></tfoot>";
         resultsTable = resultsTable.concat(footer);
     }
 

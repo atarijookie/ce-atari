@@ -327,6 +327,7 @@ table.tableDownload tfoot td {
 }
 table.tableDownload tfoot .links {
   text-align: right;
+  color: #000000;
 }
 table.tableDownload tfoot .links a{
   display: inline-block;
