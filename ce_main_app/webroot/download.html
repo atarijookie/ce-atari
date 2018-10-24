@@ -216,17 +216,17 @@ function generateSearchResultRow(item, searchString)
 // render the image list on screen 
 function generateSearchResultsTable()
 {
-    var resultsTable = "<table border=1 cellspacing=0 cellpadding=5>";
+    var resultsTable = "<table class=\"tableDownload\">";
 
     var searchString = document.getElementById('search_input').value;   // get search string
     searchString = searchString.toLowerCase();     // search string to lower case
 
     // nothing found?
     if(totalPages == 0) {
-        resultRow = "<tr><td>nothing matches your search input</td></tr>";
+        resultRow = "<thead><tr><th>nothing matches your search input</th></tr></thead>";
         resultsTable = resultsTable.concat(resultRow);
     } else {
-        var header = "<tr><td style='width: 20%;'>Image name</td><td style='width: 20%;'>Action</td><td>Content</td></tr>";
+        var header = "<thead><tr><th>Image name</th><th>Download / Insert</th><th>Content</th></tr></thead> <tbody>";
         resultsTable = resultsTable.concat(header);
 
         for(var i=0; i<imageList.length; i++) {         // go through input list
@@ -236,6 +236,9 @@ function generateSearchResultsTable()
             resultRow = generateSearchResultRow(item, searchString);        // generate one row from this matching item
             resultsTable = resultsTable.concat(resultRow);
         }
+
+        var footer = "</tbody> <tfoot><tr><td colspan=\"3\"><div class=\"links\"><a href=\"#\">&laquo;</a> <a class=\"active\" href=\"#\">1</a> <a href=\"#\">2</a> <a href=\"#\">3</a> <a href=\"#\">4</a> <a href=\"#\">&raquo;</a></div></td></tr></tfoot>";
+        resultsTable = resultsTable.concat(footer);
     }
 
     resultsTable = resultsTable.concat("</table>");
