@@ -12,11 +12,13 @@
 
 <script type="text/javascript">
 
-    var imageList = [];        // image list of games / software (e.g. A001.zip, A002.zip, ...)
+    var imageList = [];         // image list of games / software (e.g. A001.zip, A002.zip, ...)
+    var slots = [];             // this holds fileNames of currently loaded images in slots
     var totalPages = 0;
     var currentPage = 0;
     var do_we_have_storage = true;
     var prevDownloadingCount = 0;
+    var prev_encoding_ready = true;
 
 function getSearchResults(searchString)
 {
@@ -36,6 +38,7 @@ function getSearchResults(searchString)
             totalPages = data.totalPages;
             currentPage = data.currentPate;
             imageList = data.imageList;
+            slots = data.slots;
 			
             // refresh the shown list on screen
             generateSearchResultsTable();
@@ -76,13 +79,22 @@ function handleShowOverlay(encoding_ready)
         return false;               // don't check again
     }
 
+    var check_again = false;        // don't check again
+    
     if(encoding_ready) {            // encoding ready?
         $(".over_convert").hide();
-        return false;               // don't check again
     } else {                        // still not ready?
         $(".over_convert").show();
-        return true;                // check again in a while!
+        check_again = true;         // check again in a while!
     }
+
+    if(!prev_encoding_ready && encoding_ready) {    // if we just finished encoding, reload page to show what image is inserted where
+        onSearchStringChanged();                // fake search string change to reload the download/insert icons
+    }
+    prev_encoding_ready = encoding_ready;
+
+
+    return check_again;             // return if we should check again in a while
 }
 
 function handleShowDownloading(downloading_count)
@@ -150,7 +162,8 @@ function onInsert(imageName, slotNo)
         success: function(data){
             console.log("Insert Success");
 
-            $(".over_convert").show();           // show overlay
+            prev_encoding_ready = false;    // now we're encoding, so not ready now
+            $(".over_convert").show();      // show overlay
             setTimeout(onCheckTimer, 1000); // check every while
         },
         error: function (xhr) {
@@ -190,10 +203,26 @@ function generateHtmlIcon(iconType, slotNo, imageName)
     }
 
     if(iconType == IconType.INSERT) {           // insert button?
-        // TODO: if this imageName is already inserted in this slotNo, highlight button, disable button click
+        // if this imageName is already inserted in this slotNo, highlight button, disable button click
+        var isLoadedStyle = "";                 // not loaded by default
+        var isLoaded = false;
+
+        if(slots.length == 3) {                 // if we do have slots contents
+            var imageInSlot = slots[slotNo];    // get name of image in this slot
+
+            if(imageInSlot == imageName) {      // if the name matches what we're showing here, it's already loaded
+                isLoadedStyle = "btnInserted";  // not loaded by default
+                isLoaded = true;
+            }
+        }
+
+        var onInsertFunction = "";
+        if(!isLoaded) {             // allow click when not loaded
+            onInsertFunction = "onInsert('" + imageName + "', " + slotNo + ");";
+        }
 
         slotNoPlusOne = slotNo + 1;
-        return "<a href='#' class='btnDownload btnInsert' onclick=\"onInsert('" + imageName + "', " + slotNo + ");\"\>" + slotNoPlusOne + "</a>";
+        return "<a href='#' class='btnDownload btnInsert " + isLoadedStyle + "' onclick=\"" + onInsertFunction + "\"\>" + slotNoPlusOne + "</a>";
     } else if(iconType == IconType.DOWNLOAD) {  // download button?
         return "<a href='#' class='btnDownload' onclick=\"onDownload('" + imageName + "');\"\>V</a>";
     }

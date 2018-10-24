@@ -104,6 +104,14 @@ void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_
 
     stringStream << "{\"totalPages\": " << totalPages << ", ";
     stringStream << "\"currentPage\": " << realPage << ", ";
+
+    // send also currently loaded images
+    stringStream << "\"slots\":[";
+    stringStream << "\"" << pxFloppyService->getImageName(0) << "\",";
+    stringStream << "\"" << pxFloppyService->getImageName(1) << "\",";
+    stringStream << "\"" << pxFloppyService->getImageName(2) << "\"";
+    stringStream << "],";
+
     stringStream << "\"imageList\": ["; // start of image list
 
     bool hasItem = false;                   // flag if we have item and need a separator - to generate valid JSON

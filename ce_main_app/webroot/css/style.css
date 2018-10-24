@@ -271,6 +271,10 @@ td.valueLeft   {
     background-color:#fb9e25;
 }
 
+.btnInserted {
+    filter: brightness(65%);
+}
+
 table.tableDownload {
   border: 1px solid #1C6EA4;
   background-color: #EEEEEE;
