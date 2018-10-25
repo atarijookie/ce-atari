@@ -182,6 +182,19 @@ void Utils::splitFilenameFromPath(const std::string &pathAndFile, std::string &p
     }
 }
 
+void Utils::splitFilenameFromExt(const std::string &filenameAndExt, std::string &filename, std::string &ext)
+{
+    size_t sepPos = filenameAndExt.rfind('.');
+
+    if(sepPos == std::string::npos) {                   		// not found?
+        filename = filenameAndExt;                              // pretend we don't have extension, just filename
+        ext.clear();
+    } else {                                                    // separator found?
+        filename = filenameAndExt.substr(0, sepPos);            // filename is before separator
+        ext      = filenameAndExt.substr(sepPos + 1);           // extension is after separator
+    }
+}
+
 void Utils::sleepMs(DWORD ms)
 {
 	DWORD us = ms * 1000;
@@ -573,3 +586,85 @@ int Utils::mkpath(const char *dir, mode_t mode)
 
     return mkdir(dir, mode);
 }
+
+bool Utils::unZIPfloppyImageAndReturnFirstImage(const char *inZipFilePath, std::string &outImageFilePath)
+{
+    outImageFilePath.clear();                       // out path doesn't contain anything yet
+
+    system("rm    -rf /tmp/zipedfloppy");           // delete this dir, if it exists
+    system("mkdir -p  /tmp/zipedfloppy");           // create that dir
+
+    char unzipCommand[512];
+    sprintf(unzipCommand, "unzip -o '%s' -d /tmp/zipedfloppy > /dev/null 2> /dev/null", inZipFilePath);
+    system(unzipCommand);                           // unzip the downloaded ZIP file into that tmp directory
+
+    // find the first usable floppy image
+    DIR *dir = opendir("/tmp/zipedfloppy");         // try to open the dir
+
+    if(dir == NULL) {                               // not found?
+        Debug::out(LOG_DEBUG, "Utils::unZIPfloppyImageAndReturnFirstImage -- opendir() failed");
+        return false;
+    }
+
+    bool found          = false;
+    struct dirent *de   = NULL;
+
+    const char *pExt = NULL;
+
+    while(1) {                                      // avoid buffer overflow
+        de = readdir(dir);                          // read the next directory entry
+
+        if(de == NULL) {                            // no more entries?
+            break;
+        }
+
+        if(de->d_type != DT_REG) {                  // not a file? skip it
+            continue;
+        }
+
+        int fileNameLen = strlen(de->d_name);       // get length of filename
+
+        if(fileNameLen < 3) {                       // if it's too short, skip it
+            continue;
+        }
+
+        pExt = getExtension(de->d_name);            // get where the extension starts
+
+        if(pExt == NULL) {                          // extension not found? skip it
+            continue;
+        }
+
+        if(strcasecmp(pExt, "st") == 0 || strcasecmp(pExt, "msa") == 0) {  // the extension of the file is valid for a floppy image?
+            found = true;
+            break;
+        }
+    }
+
+    closedir(dir);                                  // close the dir
+
+    if(!found) {                                    // not found? return with a fail
+        Debug::out(LOG_DEBUG, "Utils::unZIPfloppyImageAndReturnFirstImage -- couldn't find an image inside of %s", inZipFilePath);
+        return false;
+    }
+
+    // construct path to unZIPed image
+    outImageFilePath = "/tmp/zipedfloppy/";
+    outImageFilePath.append(de->d_name);
+
+    Debug::out(LOG_DEBUG, "Utils::unZIPfloppyImageAndReturnFirstImage -- this ZIP file: %s contains this floppy image file: %s", inZipFilePath, outImageFilePath.c_str());
+    return true;
+}
+
+const char *Utils::getExtension(const char *fileName)
+{
+    const char *pExt;
+    pExt = strrchr(fileName, '.');  // find last '.'
+
+    if(pExt == NULL) {              // last '.' not found? skip it
+        return NULL;
+    }
+
+    pExt++;                         // move beyond '.'
+    return pExt;
+}
+

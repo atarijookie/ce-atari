@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <dirent.h>
+#include <algorithm>
 
 #include <signal.h>
 #include <pthread.h>
@@ -236,6 +237,52 @@ bool Downloader::verifyChecksum(const char *filename, WORD checksum)
     Debug::out(LOG_DEBUG, "Downloader::verifyChecksum - file %s -- checksum is good: %d", filename, (int) checksumIsGood);
 
     return checksumIsGood;                // return if the calculated cs is equal to the provided cs
+}
+
+// ZIPed floppy file image needs some extracting, searching and renaming of content
+void Downloader::handleZIPedFloppyImage(std::string &fileName)
+{
+    // try to extract content and find 1st image usable in there
+    std::string firstImage;
+    bool res = Utils::unZIPfloppyImageAndReturnFirstImage(fileName.c_str(), firstImage);
+
+    if(!res) {                  // failed to find image inside zip? quit
+        Debug::out(LOG_DEBUG, "Downloader::handleZIPedFloppyImage - no valid image found in ZIP, not doing anything else");
+        return;
+    }
+
+    // get extension of the 1st image
+    const char *firstImageExt = Utils::getExtension(firstImage.c_str());
+
+    if(firstImageExt == NULL) {
+        Debug::out(LOG_DEBUG, "Downloader::handleZIPedFloppyImage - failed to get extension of first image, not doing anything else");
+        return;
+    }
+
+    // delete original ZIP file
+    unlink(fileName.c_str());
+
+    // split original input ZIP file into path and file
+    std::string origPathAndFile = fileName;
+    std::string origPath, origFileAndExt;
+    Utils::splitFilenameFromPath(origPathAndFile, origPath, origFileAndExt);
+
+    // split original filename with ext into filename and ext
+    std::string origFile, origExt;
+    Utils::splitFilenameFromExt(origFileAndExt, origFile, origExt);
+
+    // create new file path: original path, original filename, but extension from first found image
+    std::string firstImageExtLower = firstImageExt;
+    std::transform(firstImageExtLower.begin(), firstImageExtLower.end(), firstImageExtLower.begin(), ::tolower);                   // convert to lowercase
+
+    std::string newFileName = origFile + std::string(".") + firstImageExtLower;    // new filename = original filename + 1st image file extension
+    std::string newFilePathAndFile = origPath;
+    Utils::mergeHostPaths(newFilePathAndFile, newFileName); // merge path with filename
+
+    // move the first image into the place of downloaded ZIPed image
+    std::string moveCmd = std::string("mv ") + firstImage + std::string(" ") + newFilePathAndFile;
+    Debug::out(LOG_DEBUG, "Downloader::handleZIPedFloppyImage - %s", moveCmd.c_str());
+    system(moveCmd.c_str());
 }
 
 size_t Downloader::my_write_func_reportVersions(void *ptr, size_t size, size_t nmemb, FILE *stream)
@@ -528,6 +575,14 @@ void Downloader::run(void)
             bool b = Downloader::verifyChecksum(tmpFile.c_str(), downloadCurrent.checksum);
 
             if(b) {             // checksum is OK?
+                bool isZIPfile = false;
+                const char *ext = Utils::getExtension(finalFile.c_str());     // find last '.'
+
+                if(ext != NULL) {                               // last '.' found?
+                    isZIPfile = (strcasecmp(ext, "zip") == 0);  // if it's a ZIP file?
+                }
+                Debug::out(LOG_ERROR, "Downloader - finalFile: %s, ext: %s, isZIPfile: %d", finalFile.c_str(), ext, isZIPfile);
+
                 res = rename(tmpFile.c_str(), finalFile.c_str());
 
                 if(res != 0) {  // download OK, checksum OK, rename BAD?
@@ -535,7 +590,12 @@ void Downloader::run(void)
                     Debug::out(LOG_ERROR, "Downloader - failed to rename %s to %s after download", tmpFile.c_str(), finalFile.c_str());
                 } else {        // download OK, checksum OK, rename OK?
                     updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_OK);
-                    Debug::out(LOG_DEBUG, "Downloader - file %s was downloaded with success.", downloadCurrent.srcUrl.c_str());
+                    Debug::out(LOG_DEBUG, "Downloader - file %s was downloaded with success, is FLOPPYIMG: %d, is ZIP file: %d.", downloadCurrent.srcUrl.c_str(), downloadCurrent.downloadType == DWNTYPE_FLOPPYIMG, isZIPfile);
+
+                    // if it's a floppy image download and it's a ZIP file
+                    if(downloadCurrent.downloadType == DWNTYPE_FLOPPYIMG && isZIPfile) {
+                        handleZIPedFloppyImage(finalFile);
+                    }
                 }
             } else {            // download OK, checksum bad?
                 updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_FAIL);

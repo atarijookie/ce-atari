@@ -67,6 +67,7 @@ private:
     static size_t my_read_func(void *ptr, size_t size, size_t nmemb, FILE *stream);
     static int my_progress_func(void *clientp, double downTotal, double downNow, double upTotal, double upNow);
 
+    static void handleZIPedFloppyImage(std::string &fileName);
 
     static pthread_mutex_t                  downloadQueueMutex;
     static pthread_cond_t                   downloadQueueNotEmpty;

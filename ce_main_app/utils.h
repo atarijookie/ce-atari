@@ -23,6 +23,7 @@ public:
 
 	static void mergeHostPaths(std::string &dest, const std::string &tail);
 	static void splitFilenameFromPath(const std::string &pathAndFile, std::string &path, std::string &file);
+    static void splitFilenameFromExt(const std::string &filenameAndExt, std::string &filename, std::string &ext);
 
 	static void resetHansAndFranz(void);
     static void resetHans(void);
@@ -53,6 +54,9 @@ public:
     static std::string getDeviceLabel(const std::string & devicePath);
 
     static void splitString(const std::string &s, char delim, std::vector<std::string> &elems);
+
+    static bool unZIPfloppyImageAndReturnFirstImage(const char *inZipFilePath, std::string &outImageFilePath);
+    static const char *getExtension(const char *fileName);
 
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
