@@ -34,9 +34,8 @@ extern RPiConfig rpiConfig;             // RPi info structure
 pthread_mutex_t Downloader::downloadQueueMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t Downloader::downloadQueueNotEmpty = PTHREAD_COND_INITIALIZER;
 volatile bool Downloader::shouldStop = false;
-std::vector<TDownloadRequest>    Downloader::downloadQueue;
-TDownloadRequest                Downloader::downloadCurrent;
-
+std::vector<TDownloadRequest> Downloader::downloadQueue;
+TDownloadRequest              Downloader::downloadCurrent;
 
 void Downloader::initBeforeThreads(void)
 {
@@ -90,6 +89,14 @@ void Downloader::formatStatus(TDownloadRequest &tdr, std::string &line)
     line = fileName + percString;
 
     Debug::out(LOG_DEBUG, "Downloader::formatStatus() -- created status line: %s", line.c_str());
+}
+
+int Downloader::progressOfCurrentDownload(void)
+{
+    pthread_mutex_lock(&downloadQueueMutex);               // try to lock the mutex
+    int prog = downloadCurrent.downPercent;                // get percent of current download
+    pthread_mutex_unlock(&downloadQueueMutex);             // unlock the mutex
+    return prog;
 }
 
 void Downloader::status(std::string &status, int downloadTypeMask)

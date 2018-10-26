@@ -13,6 +13,7 @@
 #include "../translated/gemdos_errno.h"
 #include "../downloader.h"
 #include "floppysetup.h"
+#include "imagestorage.h"
 #include "floppysetup_commands.h"
 
 #define UPLOAD_PATH "/tmp/"
@@ -73,7 +74,7 @@ void FloppySetup::processCommand(BYTE *command)
     }
 
     logCmdName(cmd[4]);
-    
+
     switch(cmd[4]) {
         case FDD_CMD_IDENTIFY:                          // return identification string
             dataTrans->addDataBfr("CosmosEx floppy setup", 21, true);       // add identity string with padding
@@ -706,11 +707,11 @@ void FloppySetup::setCurrentSlot(void)
 
 void FloppySetup::getImageEncodingRunning(void)
 {
-    BYTE encondingRunning;
+    dataTrans->addDataByte(ImageSilo::getFloppyEncodingRunning());      // is the encoding thread is encoding some image?
+    dataTrans->addDataByte(shared.imageStorage->doWeHaveStorage());     // do have image storage or not?
+    dataTrans->addDataByte(Downloader::count(DWNTYPE_FLOPPYIMG));       // count of items now downloading
+    dataTrans->addDataByte(Downloader::progressOfCurrentDownload());    // download progress of current download
 
-    encondingRunning = ImageSilo::getFloppyEncodingRunning() ? 1 : 0;
-
-    dataTrans->addDataByte(encondingRunning);           // return if the encoding thread is encoding some image
     dataTrans->padDataToMul16();
     dataTrans->setStatus(FDD_OK);
 }

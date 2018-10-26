@@ -47,6 +47,7 @@ public:
     static void add(TDownloadRequest &tdr);                             // add download request for single file
 
     static int  count(int downloadTypeMask);                            // count pending and running downloads according to mask
+    static int  progressOfCurrentDownload(void);
     static void status(std::string &status, int downloadTypeMask);      // create status report string of pending and running downloads according to mask
 	static void statusJson(std::ostringstream &status, int downloadTypeMask);	// same as status(), but returned as json
 
