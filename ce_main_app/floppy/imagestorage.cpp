@@ -93,11 +93,37 @@ bool ImageStorage::getImageLocalPath(const char *imageFileName, std::string &pat
 
     bool res = getStoragePath(path);        // get path to storage
     if(!res) {                              // no path? fail
+        Debug::out(LOG_DEBUG, "ImageStorage::getImageLocalPath() - fail, no storage path");
         return res;
     }
 
-    Utils::mergeHostPaths(path, filename);  // merge path and filename
-    return res;
+    Utils::mergeHostPaths(path, filename);  // merge path and filename (path+filename is now in path)
+
+	// get extension, and if the extension of image is ZIP, check if we have the same file but with .msa or .st extension (it might be already extracted)
+    bool isZIPfile = Utils::isZIPfile(imageFileName);
+
+    if(isZIPfile) {                                     // if it's ZIP file, additional handling happens
+        std::string pathMsa, pathSt;
+        Utils::createPathWithOtherExtension(path, "msa", pathMsa);  // create filename with .msa extension
+
+        if(Utils::fileExists(pathMsa)) {    // the .msa file exists? store it and use it
+            path = pathMsa;
+            Debug::out(LOG_DEBUG, "ImageStorage::getImageLocalPath() - found MSA: %s -> %s", imageFileName, path.c_str());
+            return true;
+        }
+
+        Utils::createPathWithOtherExtension(path, "st", pathSt);    // create filename with .st extension
+
+        if(Utils::fileExists(pathSt)) {     // the .st file exists? store it and use it
+            path = pathSt;
+            Debug::out(LOG_DEBUG, "ImageStorage::getImageLocalPath() - found ST: %s -> %s", imageFileName, path.c_str());
+            return true;
+        }
+    }
+
+    // if got here, it's either not ZIP file, or the expected extracted image files don't exist -- just return the generated path
+    Debug::out(LOG_DEBUG, "ImageStorage::getImageLocalPath() - %s -> %s", imageFileName, path.c_str());
+    return true;
 }
 
 bool ImageStorage::weHaveThisImage(const char *imageFileName)    // returns if floppy image with this filename is stored in our storage

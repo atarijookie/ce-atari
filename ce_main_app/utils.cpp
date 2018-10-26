@@ -668,3 +668,38 @@ const char *Utils::getExtension(const char *fileName)
     return pExt;
 }
 
+bool Utils::isZIPfile(const char *fileName)
+{
+    const char *ext = Utils::getExtension(fileName);     // find extension
+
+    if(ext == NULL) {                       // no extension? not a ZIP file then
+        return false;
+    }
+
+    return (strcasecmp(ext, "zip") == 0);   // it's a ZIP file when the extension is this
+}
+
+void Utils::createPathWithOtherExtension(std::string &inPathWithOriginalExt, const char *otherExtension, std::string &outPathWithOtherExtension)
+{
+    outPathWithOtherExtension = inPathWithOriginalExt;  // first just copy the input path
+
+    const char *originalExt = Utils::getExtension(inPathWithOriginalExt.c_str());
+
+    if(originalExt == NULL) {                           // failed to find extension? fail
+        return;
+    }
+    int originalExtLen = strlen(originalExt);           // get length of original extension
+
+    if(outPathWithOtherExtension.size() < ((size_t) originalExtLen)) { // path shorter than extension? (how could this happen???) fail
+        return;
+    }
+
+    outPathWithOtherExtension.resize(outPathWithOtherExtension.size() - originalExtLen);    // remove original extension
+    outPathWithOtherExtension = outPathWithOtherExtension + std::string(otherExtension);    // append other extension
+}
+
+bool Utils::fileExists(std::string &hostPath)
+{
+    int res = access(hostPath.c_str(), F_OK);
+    return (res != -1);     // if not error, file exists
+}

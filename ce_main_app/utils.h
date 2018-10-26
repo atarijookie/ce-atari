@@ -57,6 +57,9 @@ public:
 
     static bool unZIPfloppyImageAndReturnFirstImage(const char *inZipFilePath, std::string &outImageFilePath);
     static const char *getExtension(const char *fileName);
+    static bool isZIPfile(const char *fileName);
+    static void createPathWithOtherExtension(std::string &inPathWithOriginalExt, const char *otherExtension, std::string &outPathWithOtherExtension);
+    static bool fileExists(std::string &hostPath);
 
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);

@@ -240,11 +240,11 @@ bool Downloader::verifyChecksum(const char *filename, WORD checksum)
 }
 
 // ZIPed floppy file image needs some extracting, searching and renaming of content
-void Downloader::handleZIPedFloppyImage(std::string &fileName)
+void Downloader::handleZIPedFloppyImage(std::string &zipFileName)
 {
     // try to extract content and find 1st image usable in there
     std::string firstImage;
-    bool res = Utils::unZIPfloppyImageAndReturnFirstImage(fileName.c_str(), firstImage);
+    bool res = Utils::unZIPfloppyImageAndReturnFirstImage(zipFileName.c_str(), firstImage);
 
     if(!res) {                  // failed to find image inside zip? quit
         Debug::out(LOG_DEBUG, "Downloader::handleZIPedFloppyImage - no valid image found in ZIP, not doing anything else");
@@ -259,28 +259,18 @@ void Downloader::handleZIPedFloppyImage(std::string &fileName)
         return;
     }
 
+    // replace the extension of input ZIP file with image file extension
+    std::string firstImageExtLower = firstImageExt; // char * to std::string
+    std::transform(firstImageExtLower.begin(), firstImageExtLower.end(), firstImageExtLower.begin(), ::tolower);    // convert to lowercase
+
+    std::string newFileName;
+    Utils::createPathWithOtherExtension(zipFileName, firstImageExtLower.c_str(), newFileName);  // create filename with the new extension
+
     // delete original ZIP file
-    unlink(fileName.c_str());
-
-    // split original input ZIP file into path and file
-    std::string origPathAndFile = fileName;
-    std::string origPath, origFileAndExt;
-    Utils::splitFilenameFromPath(origPathAndFile, origPath, origFileAndExt);
-
-    // split original filename with ext into filename and ext
-    std::string origFile, origExt;
-    Utils::splitFilenameFromExt(origFileAndExt, origFile, origExt);
-
-    // create new file path: original path, original filename, but extension from first found image
-    std::string firstImageExtLower = firstImageExt;
-    std::transform(firstImageExtLower.begin(), firstImageExtLower.end(), firstImageExtLower.begin(), ::tolower);                   // convert to lowercase
-
-    std::string newFileName = origFile + std::string(".") + firstImageExtLower;    // new filename = original filename + 1st image file extension
-    std::string newFilePathAndFile = origPath;
-    Utils::mergeHostPaths(newFilePathAndFile, newFileName); // merge path with filename
+    unlink(zipFileName.c_str());
 
     // move the first image into the place of downloaded ZIPed image
-    std::string moveCmd = std::string("mv ") + firstImage + std::string(" ") + newFilePathAndFile;
+    std::string moveCmd = std::string("mv ") + firstImage + std::string(" ") + newFileName;
     Debug::out(LOG_DEBUG, "Downloader::handleZIPedFloppyImage - %s", moveCmd.c_str());
     system(moveCmd.c_str());
 }
@@ -575,13 +565,9 @@ void Downloader::run(void)
             bool b = Downloader::verifyChecksum(tmpFile.c_str(), downloadCurrent.checksum);
 
             if(b) {             // checksum is OK?
-                bool isZIPfile = false;
-                const char *ext = Utils::getExtension(finalFile.c_str());     // find last '.'
+                bool isZIPfile = Utils::isZIPfile(finalFile.c_str());
 
-                if(ext != NULL) {                               // last '.' found?
-                    isZIPfile = (strcasecmp(ext, "zip") == 0);  // if it's a ZIP file?
-                }
-                Debug::out(LOG_ERROR, "Downloader - finalFile: %s, ext: %s, isZIPfile: %d", finalFile.c_str(), ext, isZIPfile);
+                Debug::out(LOG_ERROR, "Downloader - finalFile: %s, isZIPfile: %d", finalFile.c_str(), isZIPfile);
 
                 res = rename(tmpFile.c_str(), finalFile.c_str());
 

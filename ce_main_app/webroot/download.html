@@ -234,6 +234,16 @@ function generatePageSwitchButton(prevNotNext)
     return "<a href='#' class='" + buttonClass + "' onclick=\"" + onClickFunction + "\"\>" + buttonSymbol + "</a>";
 }
 
+function getFileNameWithoutExtension(fileNameWithExt)
+{
+    if(fileNameWithExt.length < 3) {  // if filename too short, just return it
+        return fileNameWithExt;
+    }
+
+    var output = fileNameWithExt.split('.');   // split to filename and extension
+    return output[0];                 // return 0th path (before dot)
+}
+
 function generateActionButton(iconType, slotNo, imageName)
 {
     // this dummy is just a place holder with size of normal button
@@ -250,8 +260,10 @@ function generateActionButton(iconType, slotNo, imageName)
 
         if(slots.length == 3) {                 // if we do have slots contents
             var imageInSlot = slots[slotNo];    // get name of image in this slot
+            imageInSlot = getFileNameWithoutExtension(imageInSlot);
+            imageNameWOext = getFileNameWithoutExtension(imageName);
 
-            if(imageInSlot == imageName) {      // if the name matches what we're showing here, it's already loaded
+            if(imageInSlot == imageNameWOext) {      // if the name matches what we're showing here, it's already loaded
                 isLoadedStyle = "btnInserted";  // not loaded by default
                 isLoaded = true;
             }
