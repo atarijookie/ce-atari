@@ -465,6 +465,21 @@ void ImageSilo::containsImageInSlots(std::string &filenameWExt, std::string &out
     }
 }
 
+// check if image with this filename exists in silo and eject it from each slot it is in
+void ImageSilo::removeByFileName(std::string &filenameWExt)
+{
+    std::string filename, ext;
+    Utils::splitFilenameFromExt(filenameWExt, filename, ext);   // create filename without extension (ZIPed image in list might be extracted under different extension)
+
+    for(int i=0; i<3; i++) {
+        bool isInSlot = (slots[i].imageFileNoExt == filename);  // if this file is in this slot
+
+        if(isInSlot) {                                          // if image is in slot
+             remove(i);
+        }
+    }
+}
+
 bool ImageSilo::currentSlotHasNewContent(void)
 {
     if(slots[currentSlot].encImage.newContent) {            // if the current slot has new content

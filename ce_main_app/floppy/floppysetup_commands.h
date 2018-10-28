@@ -32,6 +32,7 @@
 
 #define FDD_CMD_SEARCH_DOWNLOAD2STORAGE     50      // start immediate background download
 #define FDD_CMD_SEARCH_INSERT2SLOT          51      // insert floppy image from search to slot
+#define FDD_CMD_SEARCH_DELETEFROMSTORAGE    52      // if this image is in storage, delete it
 
 #define FDD_OK                              0
 #define FDD_ERROR                           2

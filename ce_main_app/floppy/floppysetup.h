@@ -76,6 +76,7 @@ private:
 
     void searchDownload2Storage(void);
     void searchInsertToSlot(void);
+    void searchDeleteFromStorage(void);
 
     void getCurrentSlot(void);
     void setCurrentSlot(void);
@@ -85,4 +86,5 @@ private:
 };
 
 #endif
+
 

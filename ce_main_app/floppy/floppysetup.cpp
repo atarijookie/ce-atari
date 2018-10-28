@@ -108,6 +108,7 @@ void FloppySetup::processCommand(BYTE *command)
 
         case FDD_CMD_SEARCH_DOWNLOAD2STORAGE:   searchDownload2Storage();   break;
         case FDD_CMD_SEARCH_INSERT2SLOT:        searchInsertToSlot();       break;
+        case FDD_CMD_SEARCH_DELETEFROMSTORAGE:  searchDeleteFromStorage();  break;
     }
 
     dataTrans->sendDataAndStatus();         // send all the stuff after handling, if we got any
@@ -234,6 +235,55 @@ void FloppySetup::searchDownload2Storage(void)
     tdr.downloadType    = DWNTYPE_FLOPPYIMG;
     tdr.pStatusByte     = NULL;                 // don't update this status byte
     Downloader::add(tdr);
+
+    dataTrans->setStatus(FDD_OK);               // done
+}
+
+void FloppySetup::searchDeleteFromStorage(void)
+{
+    dataTrans->recvData(bfr64k, 512);   // read data
+
+    bool bres = shared.imageStorage->doWeHaveStorage();
+
+    if(!bres) {                 // don't have storage? fail
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    int page = (int) bfr64k[0];
+    int item = (int) bfr64k[1];
+
+    int itemIndex = (page * PAGESIZE) + item;
+
+    std::string imageName;      // get image name by index of item
+    bres = shared.imageList->getImageNameFromResultsByIndex(itemIndex, imageName);
+
+    if(!bres) {         // couldn't get image name? fail
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    // check if we got this floppy image file, and if we don't, fail
+    bres = shared.imageStorage->weHaveThisImage(imageName.c_str());
+
+    if(!bres) {          // we don't have this image, quit
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    // try to get local path for this image
+    std::string localPath;
+    bres = shared.imageStorage->getImageLocalPath(imageName.c_str(), localPath);
+
+    if(!bres) {                                 // we don't have this image, quit
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    unlink(localPath.c_str());                  // delete file
+
+    // if this image was inserted in some slot(s), eject it from it / them
+    shared.imageSilo->removeByFileName(imageName);
 
     dataTrans->setStatus(FDD_OK);               // done
 }
@@ -873,6 +923,7 @@ void FloppySetup::logCmdName(BYTE cmdCode)
 
         case FDD_CMD_SEARCH_DOWNLOAD2STORAGE:   Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_DOWNLOAD2STORAGE"); break;
         case FDD_CMD_SEARCH_INSERT2SLOT:        Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_INSERT2SLOT"); break;
+        case FDD_CMD_SEARCH_DELETEFROMSTORAGE:  Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_DELETEFROMSTORAGE"); break;
 
         default:                                Debug::out(LOG_DEBUG, "floppySetup command: ???"); break;
     }

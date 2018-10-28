@@ -71,6 +71,7 @@ public:
 
     bool containsImage(const char *filename);
     void containsImageInSlots(std::string &filenameWExt, std::string &bfr);
+    void removeByFileName(std::string &filenameWExt);
     bool currentSlotHasNewContent(void);
 
     void dumpStringsToBuffer(BYTE *bfr);
