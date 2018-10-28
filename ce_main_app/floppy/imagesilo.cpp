@@ -257,8 +257,12 @@ void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostD
         return;
     }
 
+    std::string filenameNoExt, ext;
+    Utils::splitFilenameFromExt(filename, filenameNoExt, ext);   // create filename without extension (ZIPed image in list might be extracted under different extension)
+
     // store the info about slot
     slots[positionIndex].imageFile      = filename;         // just file name:                     bla.st
+    slots[positionIndex].imageFileNoExt = filenameNoExt;    // just file name without extension:   bla
     slots[positionIndex].hostDestPath   = hostDestPath;     // where the file is stored when used: /tmp/bla.st
     slots[positionIndex].atariSrcPath   = atariSrcPath;     // from where the file was uploaded:   C:\gamez\bla.st
     slots[positionIndex].hostSrcPath    = hostSrcPath;      // for translated disk, host path:     /mnt/sda/gamez/bla.st
@@ -433,6 +437,32 @@ bool ImageSilo::containsImage(const char *filename)    // check if image with th
     }
 
     return false;
+}
+
+// check if image with this filename exists in silo and fill buffer with string on which slots it's inserted
+void ImageSilo::containsImageInSlots(std::string &filenameWExt, std::string &out)
+{
+    std::string filename, ext;
+    Utils::splitFilenameFromExt(filenameWExt, filename, ext);   // create filename without extension (ZIPed image in list might be extracted under different extension)
+
+    for(int i=0; i<3; i++) {
+        bool isInSlot = (slots[i].imageFileNoExt == filename);  // if this file is in this slot
+        bool isSlotSelected = (i == currentSlot);               // if this slot is selecter
+
+        if(isInSlot) {                                          // if image is in slot
+            if(isSlotSelected) {                                // if this slot is selected
+                out += "\033p";                                 // inverse on
+            }
+
+            out += std::to_string(i + 1);                       // slot number
+
+            if(isSlotSelected) {                                // if this slot is selected
+                out += "\033q";                                 // inverse off
+            }
+        } else {                                                // if this image is not in this slot
+            out += ".";                                         // insert just place holder
+        }
+    }
 }
 
 bool ImageSilo::currentSlotHasNewContent(void)

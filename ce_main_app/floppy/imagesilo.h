@@ -28,6 +28,7 @@ typedef struct
 typedef struct
 {
     std::string     imageFile;      // just file name:                     bla.st
+    std::string     imageFileNoExt; // file name without extension:        bla
     std::string     hostDestPath;   // where the file is stored when used: /tmp/bla.st
     std::string     atariSrcPath;   // from where the file was uploaded:   C:\gamez\bla.st
     std::string     hostSrcPath;    // for translated disk, host path:     /mnt/sda/gamez/bla.st
@@ -69,6 +70,7 @@ public:
     void remove(int index);
 
     bool containsImage(const char *filename);
+    void containsImageInSlots(std::string &filenameWExt, std::string &bfr);
     bool currentSlotHasNewContent(void);
 
     void dumpStringsToBuffer(BYTE *bfr);

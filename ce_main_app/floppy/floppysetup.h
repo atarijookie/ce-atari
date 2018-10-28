@@ -7,8 +7,6 @@
 #include "../datatypes.h"
 #include "../translated/translateddisk.h"
 #include "../settingsreloadproxy.h"
-#include "imagesilo.h"
-#include "imagelist.h"
 
 #define IMG_DN_STATUS_IDLE          0
 #define IMG_DN_STATUS_DOWNLOADING   1
@@ -25,14 +23,12 @@ public:
     void processCommand(BYTE *command);
 
     void setAcsiDataTrans(AcsiDataTrans *dt);
-    void setImageSilo(ImageSilo *imgSilo);
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
     static bool createNewImage(std::string pathAndFile);
 
 private:
     AcsiDataTrans       *dataTrans;
-    ImageSilo           *imageSilo;
     SettingsReloadProxy *reloadProxy;
 
     FILE    *up;
@@ -79,6 +75,7 @@ private:
     void searchRefreshList(void);
 
     void searchDownload2Storage(void);
+    void searchInsertToSlot(void);
 
     void getCurrentSlot(void);
     void setCurrentSlot(void);

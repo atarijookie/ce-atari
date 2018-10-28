@@ -7,6 +7,7 @@ class Scsi;
 class ConfigStream;
 class ImageList;
 class ImageStorage;
+class ImageSilo;
 
 typedef struct {
     int fd1;
@@ -19,6 +20,7 @@ typedef struct {
 
     ImageList       *imageList;
     ImageStorage    *imageStorage;
+    ImageSilo       *imageSilo;
     pthread_mutex_t  mtxImages;
 
     struct {

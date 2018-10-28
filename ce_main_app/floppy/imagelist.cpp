@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "imagelist.h"
+#include "imagesilo.h"
 #include "imagestorage.h"
 #include "../utils.h"
 #include "../periodicthread.h"
@@ -261,35 +262,50 @@ void ImageList::getSingleGame(std::string &games, std::string &game, size_t pos)
 
 void ImageList::getResultByIndex(int index, char *bfr)
 {
-    memset(bfr, 0, 68);                                                         // clear the memory
+    #define SIZE_OF_RESULT      68
+    memset(bfr, 0, SIZE_OF_RESULT);                                             // clear the memory
+    std::string out;
 
     if(index < 0 || index >= (int) vectorOfResults.size()) {                    // if out of range
         return;
     }
 
     int imageIndex = vectorOfResults[index].imageIndex;
+    std::string imageName = vectorOfImages[imageIndex].imageName;
 
-    strncpy(bfr, vectorOfImages[imageIndex].imageName.c_str(), 64);             // copy in the name of image
+    bool weHaveThisImage = shared.imageStorage->weHaveThisImage(imageName.c_str());
 
-    int len = strlen(bfr);
-    if(len < 12) {                                                              // pad the file name with spaces to 12 chars total
-        int i;
-
-        for(i=len; i<12; i++) {
-            bfr[i] = ' ';
-        }
+    if(weHaveThisImage) {                       // if we have this image, hightlight name (reverse on)
+        out += "\033p";
     }
 
-    if(vectorOfImages[imageIndex].marked) {                                     // if image is marked for download
-        strcat(bfr, " * ");                                                     // add ' * ' string
-    } else {
-        strcat(bfr, " - ");                                                     // add ' - ' string
+    int len = imageName.length();               // get the lenght of this filename
+
+    if(len < 12) {                              // name shorter than 8+3? pad to length
+        out += imageName;                       // add whole filename
+        out.append(12 - len, ' ');              // pad with spaces
+    } else if(len > 12) {                       // name too long? insert only first part of name
+        out += imageName.substr(0, 12);
     }
 
-    int imgNameLen = strlen(bfr);
-    int lenOfRest = 67 - imgNameLen;
+    if(weHaveThisImage) {                       // if we have this image, reverse off
+        out += "\033q";
+    }
 
-    strncpy(bfr + imgNameLen, vectorOfResults[index].game.c_str(), lenOfRest);  // copy in the name of game
+    out += " ";                                                 // space between filename and slots
+
+    shared.imageSilo->containsImageInSlots(imageName, out);     // slots info
+
+    out += " ";                                                 // space slots and list of games
+
+    size_t lenOfRest = SIZE_OF_RESULT - 1 - out.length();       // how much can we fit in ;
+    if(vectorOfResults[index].game.length() <= lenOfRest) {     // games will fit in that buffer?
+        out += vectorOfResults[index].game;                     // add all content there
+    } else {                                                    // content won't fit? copy just part
+        out += vectorOfResults[index].game.substr(0, lenOfRest);
+    }
+
+    strncpy(bfr, out.c_str(), SIZE_OF_RESULT - 1);              // the output in the buffer
 }
 
 void ImageList::getResultByIndex(int index, std::ostringstream &stream)

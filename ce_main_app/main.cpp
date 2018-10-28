@@ -24,6 +24,7 @@
 #include "ce_conf_on_rpi.h"
 #include "periodicthread.h"
 #include "display/displaythread.h"
+#include "floppy/imagesilo.h"
 
 #include "webserver/webserver.h"
 #include "webserver/api/apimodule.h"

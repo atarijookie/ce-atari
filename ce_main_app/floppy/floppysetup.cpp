@@ -13,6 +13,8 @@
 #include "../translated/gemdos_errno.h"
 #include "../downloader.h"
 #include "floppysetup.h"
+#include "imagesilo.h"
+#include "imagelist.h"
 #include "imagestorage.h"
 #include "floppysetup_commands.h"
 
@@ -25,7 +27,6 @@ FloppySetup::FloppySetup()
 {
     dataTrans   = NULL;
     up          = NULL;
-    imageSilo   = NULL;
     reloadProxy = NULL;
 
     currentUpload.fh = NULL;
@@ -50,11 +51,6 @@ void FloppySetup::setAcsiDataTrans(AcsiDataTrans *dt)
     dataTrans = dt;
 }
 
-void FloppySetup::setImageSilo(ImageSilo *imgSilo)
-{
-    imageSilo = imgSilo;
-}
-
 void FloppySetup::processCommand(BYTE *command)
 {
     cmd = command;
@@ -66,13 +62,6 @@ void FloppySetup::processCommand(BYTE *command)
 
     dataTrans->clear();                 // clean data transporter before handling
 
-    if(imageSilo == 0) {
-        Debug::out(LOG_ERROR, "FloppySetup::processCommand was called without valid imageSilo, can't do image setup stuff!");
-        dataTrans->setStatus(FDD_ERROR);
-        dataTrans->sendDataAndStatus();
-        return;
-    }
-
     logCmdName(cmd[4]);
 
     switch(cmd[4]) {
@@ -83,7 +72,7 @@ void FloppySetup::processCommand(BYTE *command)
 
         case FDD_CMD_GETSILOCONTENT:                    // return the filenames and contents of current floppy images in silo
             BYTE bfr[512];
-            imageSilo->dumpStringsToBuffer(bfr);
+            shared.imageSilo->dumpStringsToBuffer(bfr);
 
             dataTrans->addDataBfr(bfr, 512, true);
             dataTrans->setStatus(FDD_OK);
@@ -97,8 +86,8 @@ void FloppySetup::processCommand(BYTE *command)
         case FDD_CMD_UPLOADIMGBLOCK_DONE_OK:
         case FDD_CMD_UPLOADIMGBLOCK_DONE_FAIL:  uploadEnd(false);           break;
 
-        case FDD_CMD_SWAPSLOTS:                 imageSilo->swap(cmd[5]);    dataTrans->setStatus(FDD_OK);	break;
-        case FDD_CMD_REMOVESLOT:                imageSilo->remove(cmd[5]);  dataTrans->setStatus(FDD_OK);	break;
+        case FDD_CMD_SWAPSLOTS:                 shared.imageSilo->swap(cmd[5]);    dataTrans->setStatus(FDD_OK);	break;
+        case FDD_CMD_REMOVESLOT:                shared.imageSilo->remove(cmd[5]);  dataTrans->setStatus(FDD_OK);	break;
 
         case FDD_CMD_NEW_EMPTYIMAGE:            newImage();                 break;
         case FDD_CMD_GET_CURRENT_SLOT:          getCurrentSlot();           break;
@@ -118,6 +107,7 @@ void FloppySetup::processCommand(BYTE *command)
         case FDD_CMD_SEARCH_REFRESHLIST:        searchRefreshList();        break;
 
         case FDD_CMD_SEARCH_DOWNLOAD2STORAGE:   searchDownload2Storage();   break;
+        case FDD_CMD_SEARCH_INSERT2SLOT:        searchInsertToSlot();       break;
     }
 
     dataTrans->sendDataAndStatus();         // send all the stuff after handling, if we got any
@@ -244,6 +234,56 @@ void FloppySetup::searchDownload2Storage(void)
     tdr.downloadType    = DWNTYPE_FLOPPYIMG;
     tdr.pStatusByte     = NULL;                 // don't update this status byte
     Downloader::add(tdr);
+
+    dataTrans->setStatus(FDD_OK);               // done
+}
+
+void FloppySetup::searchInsertToSlot(void)
+{
+    dataTrans->recvData(bfr64k, 512);   // read data
+
+    bool bres = shared.imageStorage->doWeHaveStorage();
+
+    if(!bres) {         // don't have storage? fail
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    int page = (int) bfr64k[0];
+    int item = (int) bfr64k[1];
+    int slotNo = (int) bfr64k[2];
+
+    if(slotNo < 0 || slotNo > 2) {         // slot out of range? fail
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    int itemIndex = (page * PAGESIZE) + item;
+
+    std::string imageName;      // get image name by index of item
+    bres = shared.imageList->getImageNameFromResultsByIndex(itemIndex, imageName);
+
+    if(!bres) {         // couldn't get image name? fail
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    // check if we got this floppy image file, and if we don't - fail
+    bres = shared.imageStorage->weHaveThisImage(imageName.c_str());
+
+    if(!bres) {          // we don't have this image, quit
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    // get local path for this image
+    std::string localImagePath;
+    shared.imageStorage->getImageLocalPath(imageName.c_str(), localImagePath);
+
+    // set floppy image to slot
+    std::string sPath, sFile, sEmpty;
+    Utils::splitFilenameFromPath(localImagePath, sPath, sFile);
+    shared.imageSilo->add(slotNo, sFile, localImagePath, sEmpty, sEmpty, true);
 
     dataTrans->setStatus(FDD_OK);               // done
 }
@@ -413,7 +453,7 @@ void FloppySetup::uploadStart(void)
         fclose(currentUpload.fh);
     }
 
-	memset(bfr64k, 0, 512);
+    memset(bfr64k, 0, 512);
     dataTrans->recvData(bfr64k, 512);                       // receive file name into this buffer
     std::string atariFilePath = (char *) bfr64k;
     std::string hostPath;
@@ -536,7 +576,7 @@ void FloppySetup::uploadEnd(bool isOnDeviceCopy)
     }
 
     // we're here, the image upload succeeded, the following will also encode the image...
-    imageSilo->add(currentUpload.slotIndex, currentUpload.file, currentUpload.hostDestinationPath, currentUpload.atariSourcePath, currentUpload.hostSourcePath, true);
+    shared.imageSilo->add(currentUpload.slotIndex, currentUpload.file, currentUpload.hostDestinationPath, currentUpload.atariSourcePath, currentUpload.hostSourcePath, true);
 
     // now finish with OK status
     if(isOnDeviceCopy) {                                        // for on-device-copy send special status
@@ -573,7 +613,7 @@ void FloppySetup::newImage(void)
 
     // we're here, the image creation succeeded
     std::string empty;
-    imageSilo->add(index, justFile, pathAndFile, empty, empty, true);
+    shared.imageSilo->add(index, justFile, pathAndFile, empty, empty, true);
 
     dataTrans->setStatus(FDD_OK);
 }
@@ -624,7 +664,7 @@ void FloppySetup::getNewImageName(char *nameBfr)
 		std::string fnameWithPath = UPLOAD_PATH;
 		fnameWithPath += fileName;									// this will be filename with path
 
-		if(imageSilo->containsImage(fileName)) {					// if this file is already in silo, skip it
+		if(shared.imageSilo->containsImage(fileName)) {					// if this file is already in silo, skip it
 			continue;
 		}
 
@@ -649,7 +689,7 @@ void FloppySetup::downloadStart(void)
     }
 
     if(index >=0 && index <=2) {                            // downloading from image slot?
-        SiloSlot *ss = imageSilo->getSiloSlot(index);       // get silo slot
+        SiloSlot *ss = shared.imageSilo->getSiloSlot(index);       // get silo slot
 
         if(ss->imageFile.empty()) {                         // silo slot is empty?
             dataTrans->setStatus(FDD_ERROR);
@@ -743,7 +783,7 @@ void FloppySetup::searchRefreshList(void)
 
 void FloppySetup::getCurrentSlot(void)
 {
-    BYTE currentSlot = imageSilo->getCurrentSlot();     // get the current slot
+    BYTE currentSlot = shared.imageSilo->getCurrentSlot();     // get the current slot
 
     dataTrans->addDataByte(currentSlot);
     dataTrans->padDataToMul16();
@@ -754,7 +794,7 @@ void FloppySetup::setCurrentSlot(void)
 {
     int newSlot = (int) cmd[5];
 
-    imageSilo->setCurrentSlot(newSlot);                 // set the slot for valid index, set the empty image for invalid slot
+    shared.imageSilo->setCurrentSlot(newSlot);                 // set the slot for valid index, set the empty image for invalid slot
     dataTrans->setStatus(FDD_OK);
 
     if(reloadProxy) {                                   // if got settings reload proxy, invoke reload
@@ -832,6 +872,7 @@ void FloppySetup::logCmdName(BYTE cmdCode)
         case FDD_CMD_SEARCH_REFRESHLIST:        Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_REFRESHLIST"); break;
 
         case FDD_CMD_SEARCH_DOWNLOAD2STORAGE:   Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_DOWNLOAD2STORAGE"); break;
+        case FDD_CMD_SEARCH_INSERT2SLOT:        Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_INSERT2SLOT"); break;
 
         default:                                Debug::out(LOG_DEBUG, "floppySetup command: ???"); break;
     }
