@@ -116,6 +116,8 @@ void FloppySetup::processCommand(BYTE *command)
         case FDD_CMD_SEARCH_MARK:               searchMark();               break;
         case FDD_CMD_SEARCH_DOWNLOAD:           searchDownload();           break;
         case FDD_CMD_SEARCH_REFRESHLIST:        searchRefreshList();        break;
+
+        case FDD_CMD_SEARCH_DOWNLOAD2STORAGE:   searchDownload2Storage();   break;
     }
 
     dataTrans->sendDataAndStatus();         // send all the stuff after handling, if we got any
@@ -189,6 +191,61 @@ void FloppySetup::searchMark(void)
     shared.imageList->markImage(itemIndex);                 // (un)mark this image
 
     dataTrans->setStatus(FDD_OK);                   // done
+}
+
+void FloppySetup::searchDownload2Storage(void)
+{
+    dataTrans->recvData(bfr64k, 512);   // read data
+
+    bool bres = shared.imageStorage->doWeHaveStorage();
+
+    if(!bres) {         // don't have storage? fail
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    int page = (int) bfr64k[0];
+    int item = (int) bfr64k[1];
+
+    int itemIndex = (page * PAGESIZE) + item;
+
+    std::string imageName;      // get image name by index of item
+    bres = shared.imageList->getImageNameFromResultsByIndex(itemIndex, imageName);
+
+    if(!bres) {         // couldn't get image name? fail
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    // check if we got this floppy image file, and if we do, just return OK
+    bres = shared.imageStorage->weHaveThisImage(imageName.c_str());
+
+    if(bres) {          // we have this image, quit
+        dataTrans->setStatus(FDD_OK);
+        return;
+    }
+
+    // get full image url into download request url
+    TDownloadRequest tdr;
+
+    bres = shared.imageList->getImageUrl(imageName.c_str(), tdr.srcUrl);   // try to get source URL
+
+    if(!bres) {     // failed to get URL? fail
+        dataTrans->setStatus(FDD_ERROR);
+        return;
+    }
+
+    std::string storagePath;
+    shared.imageStorage->getStoragePath(storagePath);   // get path of where we should store the images
+
+    // start downloading the image
+    tdr.checksum        = 0;                    // special case - don't check checsum
+    tdr.dstDir          = storagePath;          // save it here
+    tdr.downloadType    = DWNTYPE_FLOPPYIMG;
+    tdr.pStatusByte     = NULL;                 // don't update this status byte
+    Downloader::add(tdr);
+
+    dataTrans->setStatus(FDD_OK);               // done
 }
 
 void FloppySetup::downloadOnDevice(void)
@@ -707,12 +764,36 @@ void FloppySetup::setCurrentSlot(void)
 
 void FloppySetup::getImageEncodingRunning(void)
 {
-    dataTrans->addDataByte(ImageSilo::getFloppyEncodingRunning());      // is the encoding thread is encoding some image?
-    dataTrans->addDataByte(shared.imageStorage->doWeHaveStorage());     // do have image storage or not?
-    dataTrans->addDataByte(Downloader::count(DWNTYPE_FLOPPYIMG));       // count of items now downloading
-    dataTrans->addDataByte(Downloader::progressOfCurrentDownload());    // download progress of current download
+    bool encoding = ImageSilo::getFloppyEncodingRunning();
+    int  downloadCount = Downloader::count(DWNTYPE_FLOPPYIMG);
+    int  downloadProgr = Downloader::progressOfCurrentDownload();
 
-    dataTrans->padDataToMul16();
+    dataTrans->addDataByte(encoding);            // is the encoding thread is encoding some image?
+    dataTrans->addDataByte(shared.imageStorage->doWeHaveStorage());     // do have image storage or not?
+    dataTrans->addDataByte(downloadCount);       // count of items now downloading
+    dataTrans->addDataByte(downloadProgr);       // download progress of current download
+
+    std::string status;
+
+    if(encoding) {              // if encoding
+        status += std::string("Encoding image");
+
+        if(downloadCount > 0) { // if also downloading, add column
+            status += std::string(", ");
+        }
+    }
+
+    if(downloadCount > 1) {             // more than 1 file?
+        status += std::string("Downloading ") + std::to_string(downloadCount) + std::string(" files");
+    } else if(downloadCount == 1) {     // downloading 1 file?
+        status += std::string("Downloading file: ") + std::to_string(downloadProgr) + std::string("%");
+    }
+
+    if(status.length() < 40) {          // if status is shorter than whole line, fill it overwrite whole previous line
+        status.append(40 - status.length(), ' ');
+    }
+
+    dataTrans->addDataBfr(status.c_str(), status.length() + 1, true);   // add the status with terminating zero
     dataTrans->setStatus(FDD_OK);
 }
 
@@ -749,6 +830,8 @@ void FloppySetup::logCmdName(BYTE cmdCode)
         case FDD_CMD_SEARCH_MARK:               Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_MARK"); break;
         case FDD_CMD_SEARCH_DOWNLOAD:           Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_DOWNLOAD"); break;
         case FDD_CMD_SEARCH_REFRESHLIST:        Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_REFRESHLIST"); break;
+
+        case FDD_CMD_SEARCH_DOWNLOAD2STORAGE:   Debug::out(LOG_DEBUG, "floppySetup command: FDD_CMD_SEARCH_DOWNLOAD2STORAGE"); break;
 
         default:                                Debug::out(LOG_DEBUG, "floppySetup command: ???"); break;
     }

@@ -41,6 +41,7 @@ public:
     bool getFirstMarkedImage(std::string &url, int &checksum, std::string &filename);
     void refreshList(void);
     bool getImageUrl(const char *imageFileName, std::string &url);
+    bool getImageNameFromResultsByIndex(int index, std::string &imageName);
 
 private:
     std::vector<ImageListItem>      vectorOfImages;

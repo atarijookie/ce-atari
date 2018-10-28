@@ -64,7 +64,7 @@ private:
     void uploadEnd(bool isOnDeviceCopy);
 
     void newImage(void);
-	void getNewImageName(char *nameBfr);
+    void getNewImageName(char *nameBfr);
 
     void downloadStart(void);
     void downloadGetBlock(void);
@@ -78,10 +78,12 @@ private:
     void searchDownload(void);
     void searchRefreshList(void);
 
+    void searchDownload2Storage(void);
+
     void getCurrentSlot(void);
     void setCurrentSlot(void);
     void getImageEncodingRunning(void);
-    
+
     void logCmdName(BYTE cmdCode);
 };
 

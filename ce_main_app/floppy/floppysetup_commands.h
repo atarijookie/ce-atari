@@ -30,6 +30,8 @@
 #define FDD_CMD_SEARCH_DOWNLOAD             45      // start / check the download process
 #define FDD_CMD_SEARCH_REFRESHLIST          48      // delete old image list, download a new one
 
+#define FDD_CMD_SEARCH_DOWNLOAD2STORAGE     50      // start immediate background download
+
 #define FDD_OK                              0
 #define FDD_ERROR                           2
 #define FDD_DN_LIST                         4

@@ -336,6 +336,24 @@ void ImageList::markImage(int index)
     vectorOfImages[imageIndex].marked = !vectorOfImages[imageIndex].marked;     // toggle the marked flag
 }
 
+bool ImageList::getImageNameFromResultsByIndex(int index, std::string &imageName)
+{
+    imageName.clear();
+
+    if(index < 0 || index >= (int) vectorOfResults.size()) {                    // if out of range
+        return false;
+    }
+
+    int imageIndex = vectorOfResults[index].imageIndex;                         // get image index for selected result
+
+    if(imageIndex < 0 || imageIndex >= (int) vectorOfImages.size()) {           // if out of range
+        return false;
+    }
+
+    imageName = vectorOfImages[imageIndex].imageName;	// get image name into string
+    return true;
+}
+
 int ImageList::getSearchResultsCount(void)
 {
     return vectorOfResults.size();
