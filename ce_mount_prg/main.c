@@ -2,19 +2,16 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 
 #include "translated.h"
-#include "acsi.h"
 #include "keys.h"
-#include "find_ce.h"
-#include "hdd_if.h"
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
 
-#define DMA_BUFFER_SIZE		512
+#define DMA_BUFFER_SIZE     512
 
 BYTE dmaBuffer[DMA_BUFFER_SIZE + 2];
 BYTE *pDmaBuffer;
@@ -39,23 +36,21 @@ void ce_unmount(void);
 /* ------------------------------------------------------------------ */
 int main( int argc, char* argv[] )
 {
-	BYTE found;
-
 	/* create buffer pointer to even address */
 	pDmaBuffer = &dmaBuffer[2];
 	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);		/* remove odd bit if the address was odd */
 
-	// search for CosmosEx on ACSI & SCSI bus
-	found = Supexec(findDevice);
+    // search for CosmosEx on ACSI & SCSI bus
+    deviceID = findDevice(IF_ANY, DEV_CE);
 
-	if(!found) {								            // not found? quit
-		sleep(3);
-		return 0;
-	} 
-    
-	/* now set up the acsi command bytes so we don't have to deal with this one anymore */
-	commandShort[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
-	
+    if(deviceID == DEVICE_NOT_FOUND) {
+        sleep(3);
+        return 0;
+    }
+
+    /* now set up the acsi command bytes so we don't have to deal with this one anymore */
+    commandShort[0] = (deviceID << 5); 					/* cmd[0] = ACSI_id + TEST UNIT READY (0)	*/
+
     showMenu();
     
     while(1) {

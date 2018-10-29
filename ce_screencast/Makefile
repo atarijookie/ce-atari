@@ -9,7 +9,7 @@ STRIP	= m68k-atari-mint-strip
 PRGFLAGS= m68k-atari-mint-flags 
 CFLAGS	= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS	= -Wl,--traditional-format
-LDLIBS  = -lgcc
+LDLIBS  = ../ce_hdd_if/ce_hdd_if.a -lgcc
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 ACTUAL_CC := $(CC)

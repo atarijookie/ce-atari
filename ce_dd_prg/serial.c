@@ -2,11 +2,10 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
+#include "../ce_hdd_if/stdlib.h"
 
 #include "serial.h"
 

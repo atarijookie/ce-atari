@@ -2,16 +2,14 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 
 #include "ce_dd_prg.h"
 #include "xbra.h"
-#include "acsi.h"
-#include "hdd_if.h"
+#include "../ce_hdd_if/hdd_if.h"
+#include "../ce_hdd_if/stdlib.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "gemdos_errno.h"

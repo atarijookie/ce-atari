@@ -3,22 +3,19 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 #include <support.h>
 
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 
 #include "ce_dd_prg.h"
 #include "xbra.h"
-#include "acsi.h"
-#include "hdd_if.h"
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
 #include "translated.h"
 #include "gemdos.h"
 #include "bios.h"
 #include "main.h"
-#include "mutex.h"
 
 /*
  * CosmosEx GEMDOS driver by Jookie, 2013-2016
@@ -40,17 +37,14 @@ int32_t (*bios_table[256])( void* sp ) = { 0 };
 int16_t useOldBiosHandler = 0;								// 0: use new handlers, 1: use old handlers
 // ------------------------------------------------------------------
 // CosmosEx and Gemdos part - Jookie
-BYTE findDevice(void);
 
 BYTE ce_findId(void);
 void ce_initialize(void);
 void getConfig(void);
 BYTE setDateTime(void);
 void showDateTime(void);
-void showInt(int value, int length);
 void showNetworkIPs(void);
 void showIpAddress(BYTE *bfr);
-void showAppVersion(void);
 int getIntFromStr(const char *str, int len);
 
 void set_longframe(void);
@@ -101,8 +95,6 @@ WORD transDiskProtocolVersion;              // this will hold the protocol versi
 volatile ScreenShots screenShots;           // screenshots config
 void init_screencapture(void);
 
-volatile mutex mtx;
-
 #define COOKIEJARSIZE   16
 DWORD ceCookieJar[2 * COOKIEJARSIZE];       // this might be the new cookie jar, if any doesn't exist, or is full
 
@@ -110,7 +102,7 @@ DWORD ceCookieJar[2 * COOKIEJARSIZE];       // this might be the new cookie jar,
 int main( int argc, char* argv[] )
 {
     //initialize lock
-    mutex_unlock(&mtx);
+    mutex_unlock(&hdIf.mtx);
 
     // write some header out
     Clear_home();
@@ -159,8 +151,8 @@ int main( int argc, char* argv[] )
     (void) Cconws("\33q\r\n" );
 
 	// search for CosmosEx on ACSI bus
-	BYTE found = Supexec(findDevice);
-	if(!found) {								            // not found? quit
+	deviceID = findDevice(IF_ANY, DEV_CE);
+	if(deviceID == DEVICE_NOT_FOUND) {      // not found? quit
 		sleep(3);
 		return 0;
 	}
@@ -393,33 +385,6 @@ void showDateTime(void)
     (void) Cconws(" (HH:MM:SS)\n\r");
 }
 
-void showInt(int value, int length)
-{
-    int negative;
-    char tmp[10];
-    char * p = tmp + sizeof(tmp);
-
-    if(value < 0) {
-        value = -value;
-        negative = 1;
-    } else {
-        negative = 0;
-    }
-    *(--p) = '\0';    // null terminator
-    do {
-        // write all digits, starting at the right
-        *(--p) = (value % 10) + '0';
-        value = value / 10;
-        length--;
-    } while(value != 0 || length > 0);
-
-    if(negative) {
-        *(--p) = '-';
-    }
-
-    (void) Cconws(p);                     // write it out
-}
-
 void showNetworkIPs(void)
 {
     if(netConfig[0] == 0 && netConfig[5] == 0) {                // no interface up?
@@ -449,55 +414,6 @@ void showIpAddress(BYTE *bfr)
     showInt((int) bfr[2], -1);
     (void) Cconout('.');
     showInt((int) bfr[3], -1);
-}
-
-void showAppVersion(void)
-{
-    static const char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-    char const *buildDate = __DATE__;
-
-    int year = 0, month = 0, day = 0;
-    int i;
-    for(i=0; i<12; i++) {
-        if(strncmp(months[i], buildDate, 3) == 0) {
-            month = i + 1;
-            break;
-        }
-    }
-
-    day     = getIntFromStr(buildDate + 4, 2);
-    year    = getIntFromStr(buildDate + 7, 4);
-
-    if(day > 0 && month > 0 && year > 0) {
-        showInt(year, 4);
-        (void) Cconout('-');
-        showInt(month, 2);
-        (void) Cconout('-');
-        showInt(day, 2);
-    } else {
-        (void) Cconws("YYYY-MM-DD");
-    }
-}
-
-int getIntFromStr(const char *str, int len)
-{
-    int i;
-    int val = 0;
-
-    for(i=0; i<len; i++) {
-        int digit;
-
-        if(str[i] >= '0' && str[i] <= '9') {
-            digit = str[i] - '0';
-        } else {
-            digit = 0;
-        }
-
-        val *= 10;
-        val += digit;
-    }
-
-    return val;
 }
 
 // Adjust GEMDOS/BIOS trap handler offsets

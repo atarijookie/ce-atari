@@ -9,12 +9,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "stdlib.h"
-#include "acsi.h"
-#include "hdd_if.h"
-#include "keys.h"
 #include "global.h"
-#include "find_ce.h"
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
+#include "keys.h"
 #include "vt52.h"
 
 //--------------------------------------------------
@@ -49,7 +47,6 @@ void showFakeProgress(void);
 void cosmoSoloConfig(void);
 //--------------------------------------------------
 BYTE deviceID;                          // bus ID from 0 to 7
-BYTE cosmosExNotCosmoSolo;              // 0 means CosmoSolo, 1 means CosmosEx
 //--------------------------------------------------
 
 #define BUFFER_SIZE         (4*512)
@@ -61,10 +58,11 @@ BYTE prevCommandFailed;
 //--------------------------------------------------
 int main(void)
 {
-    BYTE key, res;
+    BYTE key;
     DWORD toEven;
     BYTE keyDownCommand = CFG_CMD_KEYDOWN;
     DWORD lastUpdateCheckTime = 0;
+    BYTE devTypeFound;
 
     ceIsUpdating        = FALSE;
     isUpdateScreen      = FALSE;
@@ -83,18 +81,19 @@ int main(void)
     
     // ---------------------- 
     // search for device on the ACSI / SCSI bus 
-    deviceID = 0;
 
     Clear_home();
-    res = Supexec(findDevice);
+    deviceID = findDevice(IF_ANY, (DEV_CE | DEV_CS));
 
-    if(res != TRUE) {
+    if(deviceID == DEVICE_NOT_FOUND) {
         return 0;
     }
-    
+
     //------------------
     // if the device is CosmoSolo, go this way
-    if(cosmosExNotCosmoSolo == FALSE) {
+    devTypeFound = getDevTypeFound();
+
+    if(devTypeFound == DEV_CS) {
         cosmoSoloConfig();
         return 0;
     }

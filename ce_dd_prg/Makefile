@@ -18,7 +18,7 @@ CFLAGSCOM   += -fno-common
 CFLAGS      = -O2 -m68000 $(CFLAGSCOM)
 CFLAGS030   = -O2 -m68030 $(CFLAGSCOM)
 LDFLAGS  = -Wl,--traditional-format
-LDLIBS   = -lgcc
+LDLIBS   = ../ce_hdd_if/ce_hdd_if.a -lgcc
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 ACTUAL_CC := $(CC)
@@ -37,14 +37,11 @@ AT_0 := @
 AT_1 :=
 AT = $(AT_$(V))
 
-HDR      = mutex.h xbra.h acsi.h scsi.h \
+HDR      = xbra.h bios.h main.h \
            gemdos.h gemdos_errno.h translated.h \
-           bios.h main.h find_ce.h \
-           hdd_if.h global.h screen.h
-CSRC     = mutex.c xbra.c acsi.c scsi_falcon.c scsi_tt.c \
-           gemdos.c gemdos_rw.c \
-           bios.c main.c find_ce.c \
-           hdd_if.c screen.c
+           ../ce_hdd_if/hdd_if.h global.h screen.h
+CSRC     = xbra.c gemdos.c gemdos_rw.c \
+           bios.c main.c screen.c
 SSRC     = gemdos_asm.s bios_asm.s screenirq.s
 
 ifeq ($(USE_LOWLEVEL_PEXEC),yes)
@@ -58,8 +55,8 @@ endif
 ifeq ($(SLIM),yes)
     CFLAGS    += -nostdlib -DSLIM
     STARTUP    = startup.s
-    CSRC      += stdlib.c
-    HDR       += stdlib.h
+#   CSRC      += stdlib.c
+#   HDR       += stdlib.h
 endif
 
 ifeq ($(ONPC),yes)
@@ -68,7 +65,6 @@ endif
 
 DEPS    = $(CSRC:.c=.d)
 OBJS    = $(CSRC:.c=.o) $(SSRC:.s=.o)
-OBJS030 = cache030.o
 
 $(TARGET): $(STARTUP) $(OBJS) $(OBJS030)
 	$(CC_LINK) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
@@ -86,10 +82,10 @@ depend:	$(DEPS)
 	$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $<
 
 clean:	depclean
-	$(AT)$(RM) $(TARGET) *~ $(OBJS) $(OBJS030)
+	$(AT)$(RM) $(TARGET) *~ $(OBJS) $(OBJS030) *.o
 
 depclean:
-	$(AT)$(RM) $(DEPS)
+	$(AT)$(RM) $(DEPS) *.d
 
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(MAKECMDGOALS),depclean)

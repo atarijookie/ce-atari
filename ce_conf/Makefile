@@ -12,7 +12,7 @@ ASFLAGS030  = -m68030
 CFLAGS		= -O2 -m68000 -fomit-frame-pointer -Wall -Wno-multichar
 CFLAGS030	= -O2 -m68030 -fomit-frame-pointer -Wall -Wno-multichar
 LDFLAGS	= -Wl,--traditional-format
-LDLIBS	= -lgcc
+LDLIBS	= ../ce_hdd_if/ce_hdd_if.a -lgcc 
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 ACTUAL_CC := $(CC)
@@ -31,17 +31,15 @@ AT_0 := @
 AT_1 :=
 AT = $(AT_$(V))
 
-HDR		= acsi.h scsi.h
-HDR		+= hdd_if.h find_ce.h keys.h stdlib.h
-CSRC	= acsi.c scsi_falcon.c scsi_tt.c
-CSRC	+= hdd_if.c find_ce.c main.c stdlib.c
+HDR		= ../ce_hdd_if/hdd_if.h ../ce_hdd_if/stdlib.h find_ce.h keys.h
+CSRC	= main.c
 
 CFLAGS	+= -nostdlib
 STARTUP	= startup.s
 
 DEPS = $(CSRC:.c=.d)
 OBJS = $(patsubst %.c,%.o,$(CSRC))
-OBJS030	= cache030.o
+OBJS030	= 
 
 $(TARGET): $(STARTUP) $(OBJS) $(OBJS030)
 	$(CC_LINK) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
@@ -57,10 +55,10 @@ $(TARGET): $(STARTUP) $(OBJS) $(OBJS030)
 	$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $<
 
 clean:	depclean
-	$(AT)$(RM) $(TARGET) *~ $(OBJS) $(OBJS030)
+	$(AT)$(RM) $(TARGET) *~ $(OBJS) $(OBJS030) *.o
 
 depclean:
-	$(AT)$(RM) $(DEPS)
+	$(AT)$(RM) $(DEPS) *.d
 
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(MAKECMDGOALS),depclean)
