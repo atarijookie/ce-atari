@@ -19,6 +19,7 @@ public:
     const char *getFileName(void);
 
     virtual bool open(const char *fileName);
+    virtual bool save(const char *fileName) = 0;
     virtual void close();
     virtual bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
     virtual bool readSector(int track, int side, int sectorNo, BYTE *buffer);

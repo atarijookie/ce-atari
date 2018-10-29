@@ -31,7 +31,6 @@ const char MSA_fileid[] = "Hatari msa.c : " __DATE__ " " __TIME__;
 #include <stdlib.h>
 #include <string.h>
 
-#define Uint16  WORD
 #define NUMBYTESPERSECTOR 512					/* All supported disk images are 512 bytes per sector */
 
 /*
@@ -262,7 +261,7 @@ Uint8 *MSA_ReadDisk(const char *pszFileName, long *pImageSize)
  * Return number of bytes of the same byte in the passed buffer
  * If we return '0' this means no run (or end of buffer)
  */
-/*
+
 static int MSA_FindRunOfBytes(Uint8 *pBuffer, int nBytesInBuffer)
 {
 	Uint8 ScannedByte;
@@ -300,13 +299,13 @@ static int MSA_FindRunOfBytes(Uint8 *pBuffer, int nBytesInBuffer)
 
 	return nTotalRun;
 }
-*/
+
 
 /*-----------------------------------------------------------------------*/
 /**
  * Save compressed .MSA file from memory buffer. Returns true is all OK
  */
-/*
+
 bool MSA_WriteDisk(const char *pszFileName, Uint8 *pBuffer, int ImageSize)
 {
 	MSAHEADERSTRUCT *pMSAHeader;
@@ -367,7 +366,7 @@ bool MSA_WriteDisk(const char *pszFileName, Uint8 *pBuffer, int ImageSize)
 					// Store run!
 					*pMSABuffer++ = 0xE5;               // Marker 
 					*pMSABuffer++ = *pImageBuffer;      // Byte, and follow with 16-bit length
-					do_put_mem_word(pMSABuffer, nBytesRun);
+					Utils::storeWord(pMSABuffer, nBytesRun);
 					pMSABuffer += sizeof(Uint16);
 					pImageBuffer += nBytesRun;
 					nCompressedBytes += 4;
@@ -379,12 +378,12 @@ bool MSA_WriteDisk(const char *pszFileName, Uint8 *pBuffer, int ImageSize)
 			if (nCompressedBytes < nBytesPerTrack)
 			{
 				// Yes, store size
-				do_put_mem_word(pMSADataLength, nCompressedBytes);
+				Utils::storeWord(pMSABuffer, nCompressedBytes);
 			}
 			else
 			{
 				// No, just store uncompressed track
-				do_put_mem_word(pMSADataLength, nBytesPerTrack);
+				Utils::storeWord(pMSABuffer, nBytesPerTrack);
 				pMSABuffer = ((Uint8 *)pMSADataLength) + 2;
 				pImageBuffer = pBuffer + (nBytesPerTrack*Side) + ((nBytesPerTrack*nSides)*Track);
 				memcpy(pMSABuffer,pImageBuffer, nBytesPerTrack);
@@ -394,13 +393,148 @@ bool MSA_WriteDisk(const char *pszFileName, Uint8 *pBuffer, int ImageSize)
 	}
 
 	// And save to file!
-	nRet = File_Save(pszFileName,pMSAImageBuffer, pMSABuffer-pMSAImageBuffer, false);
+	nRet = File_Save(pszFileName,pMSAImageBuffer, pMSABuffer-pMSAImageBuffer);
 
-	// Free workspace
-	free(pMSAImageBuffer);
+	// don't free memory -- it will be freed in close();
+	//free(pMSAImageBuffer); 
 
 	return nRet;
 }
+
+/*-----------------------------------------------------------------------*/
+/**
+* Save file to disk, return FALSE if errors
 */
+bool File_Save(const char *pszFileName, const Uint8 *pAddress, int Size)
+{
+	bool bRet = false;
 
+ #if HAVE_LIBZ
+ 	/* Normal file or gzipped file? */
+ 	if (File_DoesFileExtensionMatch(pszFileName, ".gz"))
+ 	{
+ 		gzFile hGzFile;
+ 		/* Create a gzipped file: */
+ 		hGzFile = gzopen(pszFileName, "wb");
+ 		if (hGzFile != NULL)
+ 		{
+ 			/* Write data, set success flag */
+ 			if (gzwrite(hGzFile, pAddress, Size) == (int)Size)
+ 				bRet = true;
 
+ 			gzclose(hGzFile);
+ 		}
+ 	}
+ 	else
+ #endif  /* HAVE_LIBZ */
+ 	{
+ 		FILE *hDiskFile;
+ 		/* Create a normal file: */
+ 		hDiskFile = fopen(pszFileName, "wb");
+ 		if (hDiskFile != NULL)
+ 		{
+ 			/* Write data, set success flag */
+            size_t uSize = (size_t) Size;
+
+ 			if (fwrite(pAddress, 1, uSize, hDiskFile) == uSize) {
+ 				bRet = true;
+            }
+
+ 			fclose(hDiskFile);
+ 		}
+ 	}
+
+ 	return bRet;
+}
+
+/*-----------------------------------------------------------------------*/
+/**
+  * Find details of disk image. We need to do this via a function as sometimes the boot-block
+  * is not actually correct with the image - some demos/game disks have incorrect bytes in the
+  * boot sector and this attempts to find the correct values.
+  */
+ void Floppy_FindDiskDetails(const Uint8 *pBuffer, int nImageBytes,
+                             Uint16 *pnSectorsPerTrack, Uint16 *pnSides)
+ {
+ 	Uint16 nSectorsPerTrack, nSides, nSectorsPerDisk;
+
+ 	/* First do check to find number of sectors and bytes per sector */
+	nSectorsPerTrack = *((const Uint16 *)(pBuffer + 24));
+ 	Utils::SWAPWORD2(nSectorsPerTrack);   		// SPT
+ 	nSides = *((const Uint16 *)(pBuffer + 26));     // SIDE
+ 	Utils::SWAPWORD2(nSides);             		// SIDE
+ 	nSectorsPerDisk = pBuffer[19] | (pBuffer[20] << 8);               /* total sectors */
+
+ 	/* If the number of sectors announced is incorrect, the boot-sector may
+ 	 * contain incorrect information, eg the 'Eat.st' demo, or wrongly imaged
+ 	 * single/double sided floppies... */
+ 	if (nSectorsPerDisk != nImageBytes / 512)
+ 		Floppy_DoubleCheckFormat(nImageBytes, nSectorsPerDisk, &nSides, &nSectorsPerTrack);
+ 	/* And set values */
+ 	if (pnSectorsPerTrack)
+		*pnSectorsPerTrack = nSectorsPerTrack;
+ 	if (pnSides)
+		*pnSides = nSides;
+ }
+
+ /*-----------------------------------------------------------------------*/
+/**
+  * Double-check information read from boot-sector as this is sometimes found to
+  * be incorrect. The .ST image file should be divisible by the sector size,
+  * the sectors per track. the number of tracks and the number of sides.
+  * NOTE - Pass information from boot-sector to this function (if we can't
+  * decide we leave it alone).
+  */
+void Floppy_DoubleCheckFormat(long nDiskSize, long nSectorsPerDisk, Uint16 *pnSides, Uint16 *pnSectorsPerTrack)
+{
+ 	long	TotalSectors;
+ 	int	Sides_fixed;
+ 	int	SectorsPerTrack_fixed;
+
+ 	/* Now guess at number of sides */
+ 	if (nDiskSize < (500 * 1024))				/* If size >500k assume 2 sides */
+ 		Sides_fixed = 1;
+ 	else
+ 		Sides_fixed = 2;
+
+ 	/* Number of 512 bytes sectors for this disk image */
+ 	TotalSectors = nDiskSize / 512;
+
+ 	/* Check some common values */
+ 	if (TotalSectors == 80 * 9 * Sides_fixed) { SectorsPerTrack_fixed = 9; }
+ 	else if (TotalSectors == 81 * 9 * Sides_fixed) { SectorsPerTrack_fixed = 9; }
+ 	else if (TotalSectors == 82 * 9 * Sides_fixed) { SectorsPerTrack_fixed = 9; }
+ 	else if (TotalSectors == 83 * 9 * Sides_fixed) { SectorsPerTrack_fixed = 9; }
+ 	else if (TotalSectors == 84 * 9 * Sides_fixed) { SectorsPerTrack_fixed = 9; }
+ 	else if (TotalSectors == 80 * 10 * Sides_fixed) { SectorsPerTrack_fixed = 10; }
+ 	else if (TotalSectors == 81 * 10 * Sides_fixed) { SectorsPerTrack_fixed = 10; }
+ 	else if (TotalSectors == 82 * 10 * Sides_fixed) { SectorsPerTrack_fixed = 10; }
+ 	else if (TotalSectors == 83 * 10 * Sides_fixed) { SectorsPerTrack_fixed = 10; }
+ 	else if (TotalSectors == 84 * 10 * Sides_fixed) { SectorsPerTrack_fixed = 10; }
+ 	else if (TotalSectors == 80 * 11 * Sides_fixed) { SectorsPerTrack_fixed = 11; }
+ 	else if (TotalSectors == 81 * 11 * Sides_fixed) { SectorsPerTrack_fixed = 11; }
+ 	else if (TotalSectors == 82 * 11 * Sides_fixed) { SectorsPerTrack_fixed = 11; }
+ 	else if (TotalSectors == 83 * 11 * Sides_fixed) { SectorsPerTrack_fixed = 11; }
+ 	else if (TotalSectors == 84 * 11 * Sides_fixed) { SectorsPerTrack_fixed = 11; }
+ 	else if (TotalSectors == 80 * 12 * Sides_fixed) { SectorsPerTrack_fixed = 12; }
+ 	else if (TotalSectors == 81 * 12 * Sides_fixed) { SectorsPerTrack_fixed = 12; }
+ 	else if (TotalSectors == 82 * 12 * Sides_fixed) { SectorsPerTrack_fixed = 12; }
+ 	else if (TotalSectors == 83 * 12 * Sides_fixed) { SectorsPerTrack_fixed = 12; }
+ 	else if (TotalSectors == 84 * 12 * Sides_fixed) { SectorsPerTrack_fixed = 12; }
+
+ 	/* unknown combination, assume boot sector is correct */
+ 	else { SectorsPerTrack_fixed = *pnSectorsPerTrack; }
+
+ 	/* Valid new values if necessary */
+ 	if ((*pnSides != Sides_fixed) || (*pnSectorsPerTrack != SectorsPerTrack_fixed))
+ 	{
+ #if 0
+ 		int TracksPerDisk_fixed = TotalSectors / (SectorsPerTrack_fixed * Sides_fixed);
+ 		Log_Printf(LOG_WARN, "Floppy_DoubleCheckFormat: boot sector doesn't match disk image's size :"
+ 			" total sectors %ld->%ld sides %d->%d sectors %d->%d tracks %d\n",
+ 			nSectorsPerDisk, TotalSectors, *pnSides, Sides_fixed, *pnSectorsPerTrack, SectorsPerTrack_fixed, TracksPerDisk_fixed);
+ #endif
+	*pnSides = Sides_fixed;
+	*pnSectorsPerTrack = SectorsPerTrack_fixed;
+ 	}
+}

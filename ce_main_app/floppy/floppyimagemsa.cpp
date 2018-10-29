@@ -41,20 +41,28 @@ bool FloppyImageMsa::open(const char *fileName)
 
 bool FloppyImageMsa::loadImageIntoMemory(void)
 {
-    if(!FloppyImage::loadImageIntoMemory())
+    if(!FloppyImage::loadImageIntoMemory()) {
         return false;
+    }
 
-	long imageSize = 0;
+    long imageSize = 0;
     BYTE *pDiskBuffer = MSA_UnCompress(image.data, &imageSize);
 
     free(image.data);                           // free the memory which was used for file reading
 
     image.data = pDiskBuffer;                   // store pointer to buffer with decompressed image and size
     image.size = imageSize;
-    
+
     if(image.data == NULL) {                    // if the MSA_UnCompress failed, error
         return false;
-    }       
+    }
 
     return true;
 }
+
+bool FloppyImageMsa::save(const char *fileName)
+{
+	return MSA_WriteDisk(fileName, image.data, image.size);
+}
+
+
