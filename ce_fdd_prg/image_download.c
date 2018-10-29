@@ -91,6 +91,9 @@ BYTE loopForDownload(void)
         return KEY_F8;
     }
 
+    getStatus();
+    lastStatusCheckTime = getTicksAsUser();                         // fill status.doWeHaveStorage before 1st showMenuDownload()
+
     imageSearch();
     showMenuDownload(SHOWMENU_ALL);
 
@@ -152,7 +155,7 @@ BYTE loopForDownload(void)
             
             if(res) {                                               // if the search string changed, search for images
                 imageSearch();
-                
+
                 showMenuMask = SHOWMENU_SEARCHSTRING | SHOWMENU_RESULTS_ALL;
             }
         }
@@ -316,6 +319,10 @@ void markCurrentRow(void)   // OBSOLETE
 
 void insertCurrentIntoSlot(BYTE key)
 {
+    if(!status.doWeHaveStorage) {                               // no storage? do nothing
+        return;
+    }
+
     commandShort[4] = FDD_CMD_SEARCH_INSERT2SLOT;
     commandShort[5] = 0;
 
@@ -338,6 +345,10 @@ void insertCurrentIntoSlot(BYTE key)
 
 void downloadCurrentToStorage(void)
 {
+    if(!status.doWeHaveStorage) {                               // no storage? do nothing
+        return;
+    }
+
     commandShort[4] = FDD_CMD_SEARCH_DOWNLOAD2STORAGE;
     commandShort[5] = 0;
 
@@ -450,8 +461,15 @@ void showMenuDownload(BYTE showMask)
     if(showMask & SHOWMENU_STATICTEXT) {
         Goto_pos(0, 19);
         (void) Cconws("\33pA..Z\33q - search, \33p(shift) arrows\33q - move\r\n");
-        (void) Cconws("\33pF1, F2, F3\33q - insert into slot 1, 2, 3\r\n");
-        (void) Cconws("\33pF4\33q   - download,     \33pF5\33q  - refresh list,\r\n");
+
+        if(status.doWeHaveStorage) {    // with storage
+            (void) Cconws("\33pF1, F2, F3\33q - insert into slot 1, 2, 3\r\n");
+            (void) Cconws("\33pF4\33q   - download,     \33pF5\33q  - refresh list,\r\n");
+        } else {                        // without storage
+            (void) Cconws("\33p                                         \r\n");
+            (void) Cconws("                     \33pF5\33q  - refresh list,\r\n");
+        }
+
         (void) Cconws("\33pF8\33q   - setup screen, \33pF10\33q - quit\r\n");
     }
 }
