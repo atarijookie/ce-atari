@@ -434,8 +434,11 @@ bool File_Save(const char *pszFileName, const Uint8 *pAddress, int Size)
  		if (hDiskFile != NULL)
  		{
  			/* Write data, set success flag */
- 			if (fwrite(pAddress, 1, Size, hDiskFile) == Size)
+            size_t uSize = (size_t) Size;
+
+ 			if (fwrite(pAddress, 1, uSize, hDiskFile) == uSize) {
  				bRet = true;
+            }
 
  			fclose(hDiskFile);
  		}
@@ -482,7 +485,7 @@ bool File_Save(const char *pszFileName, const Uint8 *pAddress, int Size)
   * NOTE - Pass information from boot-sector to this function (if we can't
   * decide we leave it alone).
   */
-static void Floppy_DoubleCheckFormat(long nDiskSize, long nSectorsPerDisk, Uint16 *pnSides, Uint16 *pnSectorsPerTrack)
+void Floppy_DoubleCheckFormat(long nDiskSize, long nSectorsPerDisk, Uint16 *pnSides, Uint16 *pnSectorsPerTrack)
 {
  	long	TotalSectors;
  	int	Sides_fixed;
@@ -535,5 +538,3 @@ static void Floppy_DoubleCheckFormat(long nDiskSize, long nSectorsPerDisk, Uint1
 	*pnSectorsPerTrack = SectorsPerTrack_fixed;
  	}
 }
-
-

@@ -63,8 +63,8 @@ bool FloppyImageSt::calcParams(void)
     return false;
 }
 
-bool FloppyImageSt::saveImage()
+bool FloppyImageSt::save(const char *fileName)
 {
-    //TODO
+    //TODO: implement this later
     return true;
 }
