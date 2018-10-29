@@ -855,31 +855,38 @@ void FloppySetup::setCurrentSlot(void)
 void FloppySetup::getImageEncodingRunning(void)
 {
     bool encoding = ImageSilo::getFloppyEncodingRunning();
+    bool doWeHaveStorage = shared.imageStorage->doWeHaveStorage();
     int  downloadCount = Downloader::count(DWNTYPE_FLOPPYIMG);
     int  downloadProgr = Downloader::progressOfCurrentDownload();
 
     dataTrans->addDataByte(encoding);            // is the encoding thread is encoding some image?
-    dataTrans->addDataByte(shared.imageStorage->doWeHaveStorage());     // do have image storage or not?
+    dataTrans->addDataByte(doWeHaveStorage);     // do have image storage or not?
     dataTrans->addDataByte(downloadCount);       // count of items now downloading
     dataTrans->addDataByte(downloadProgr);       // download progress of current download
 
     std::string status;
 
-    if(encoding) {              // if encoding
-        status += std::string("Encoding image");
+    if(doWeHaveStorage) {               // if got storage
+        if(encoding) {                  // if encoding
+            status += std::string("Encoding image");
 
-        if(downloadCount > 0) { // if also downloading, add column
-            status += std::string(", ");
+            if(downloadCount > 0) {     // if also downloading, add column
+                status += std::string(", ");
+            }
         }
+
+        if(downloadCount > 1) {         // more than 1 file?
+            status += std::string("Downloading ") + std::to_string(downloadCount) + std::string(" files");
+        } else if(downloadCount == 1) { // downloading 1 file?
+            status += std::string("Downloading file: ") + std::to_string(downloadProgr) + std::string("%");
+        }
+    } else {                            // don't have storage? add warning
+        status += std::string("No USB or shared storage, ops limited!");
     }
 
-    if(downloadCount > 1) {             // more than 1 file?
-        status += std::string("Downloading ") + std::to_string(downloadCount) + std::string(" files");
-    } else if(downloadCount == 1) {     // downloading 1 file?
-        status += std::string("Downloading file: ") + std::to_string(downloadProgr) + std::string("%");
-    }
-
-    if(status.length() < 40) {          // if status is shorter than whole line, fill it overwrite whole previous line
+    if(status.length() > 40) {          // if status is longer than screen line, shorten it
+        status.resize(40);
+    } else if(status.length() < 40) {   // if status is shorter than whole line, fill it overwrite whole previous line
         status.append(40 - status.length(), ' ');
     }
 
