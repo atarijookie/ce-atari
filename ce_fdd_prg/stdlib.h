@@ -9,5 +9,6 @@ char *  strcat( char * destination, const char * source);
 int		strncmp ( const char * str1, const char * str2, int num );
 void	sleep(int seconds);
 DWORD   getTicks(void);
+DWORD getTicksAsUser(void);
 
 

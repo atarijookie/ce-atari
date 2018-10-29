@@ -21,7 +21,6 @@
 BYTE deviceID;
 BYTE commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
 
-void showComError(void);
 void createFullPath(char *fullPath, char *filePath, char *fileName);
 
 char filePath[256], fileName[256];
@@ -132,16 +131,36 @@ void intToStr(int val, char *str)
 
 BYTE getKey(void)
 {
-	DWORD scancode;
-	BYTE key, vkey;
+    DWORD scancode;
+    BYTE key, vkey;
 
-    scancode = Cnecin();					/* get char form keyboard, no echo on screen */
+    scancode = Cnecin();                        /* get char form keyboard, no echo on screen */
 
-	vkey	= (scancode >> 16)  & 0xff;
-    key		=  scancode         & 0xff;
+    vkey    = (scancode >> 16)  & 0xff;
+    key     =  scancode         & 0xff;
 
-    key		= atariKeysToSingleByte(vkey, key);	/* transform BYTE pair into single BYTE */
+    key     = atariKeysToSingleByte(vkey, key);	/* transform BYTE pair into single BYTE */
     
+    return key;
+}
+
+BYTE getKeyIfPossible(void)
+{
+    DWORD scancode;
+    BYTE key, vkey, res;
+
+    res = Cconis();                             // see if there's something waiting from keyboard 
+
+    if(res == 0) {                              // nothing waiting from keyboard?
+        return 0;
+    }
+    
+    scancode = Cnecin();                        // get char form keyboard, no echo on screen 
+
+    vkey = (scancode>>16) & 0xff;
+    key  =  scancode      & 0xff;
+
+    key = atariKeysToSingleByte(vkey, key);     // transform BYTE pair into single BYTE
     return key;
 }
 
@@ -206,11 +225,16 @@ BYTE getLowestDrive(void)
     return 'A';
 }
 
-void showComError(void)
+void showError(const char *error)
 {
     (void) Clear_home();
-    (void) Cconws("Error in CosmosEx communication!\r\n");
+    (void) Cconws(error);
     Cnecin();
+}
+
+void showComError(void)
+{
+    showError("Error in CosmosEx communication!\r\n");
 }
 
 void createFullPath(char *fullPath, char *filePath, char *fileName)

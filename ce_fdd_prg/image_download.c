@@ -1,19 +1,12 @@
-#include <mint/sysbind.h>
 #include <mint/osbind.h>
-#include <mint/basepage.h>
-#include <mint/ostruct.h>
-#include <unistd.h>
 #include <gem.h>
-
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
 
 #include "acsi.h"
 #include "main.h"
 #include "hostmoddefs.h"
 #include "keys.h"
 #include "defs.h"
+#include "stdlib.h"
        
 // ------------------------------------------------------------------ 
 extern BYTE deviceID;
@@ -36,11 +29,16 @@ void showPageNumber(void);
 void imageSearch(void);
 void getResultsPage(int page);
 void showResults(BYTE showMask);
-void setSelectedRow(int row);
-void markCurrentRow(void);
-void handleImagesDownload(void);
 void selectDestinationDir(void);
 BYTE refreshImageList(void);
+void setSelectedRow(int row);
+
+void markCurrentRow(void);              // OBSOLETE
+void handleImagesDownload(void);        // OBSOLETE
+
+void getStatus(void);
+void insertCurrentIntoSlot(BYTE key);   // uses imageStorage
+void downloadCurrentToStorage(void);    // uses imageStorage
 
 BYTE searchContent[2 * 512];
 
@@ -58,6 +56,11 @@ struct {
 
 TDestDir destDir;
 
+struct {
+    BYTE encoding;
+    BYTE doWeHaveStorage;
+} status;
+
 void downloadImage(int index);
 
 // ------------------------------------------------------------------ 
@@ -71,6 +74,8 @@ void downloadImage(int index);
 
 BYTE loopForDownload(void)
 {
+    DWORD lastStatusCheckTime = 0;
+
     search.len = 0;                                                 // clear search string
     memset(search.text, 0, MAX_SEARCHTEXT_LEN + 1);
     search.pageCurrent  = 0;
@@ -79,45 +84,51 @@ BYTE loopForDownload(void)
     search.prevRow      = 0;
 
     destDir.isSet = 0;
-    
+
     BYTE res = searchInit();                                        // try to initialize
-    
+
     if(res == 0) {                                                  // failed to initialize? return to floppy config screen
         return KEY_F8;
     }
-    
+
     imageSearch();
     showMenuDownload(SHOWMENU_ALL);
 
     BYTE showMenuMask;
     BYTE gotoPrevPage, gotoNextPage;
-    
+
     while(1) {
         BYTE key, kbshift;
-        
+        DWORD now = getTicksAsUser();
+
+        if(now >= (lastStatusCheckTime + 200)) {                    // if last check was at least a second ago, do new check
+            lastStatusCheckTime = now;
+            getStatus();                                            // talk to CE to see the status
+        }
+
         gotoPrevPage = 0;
         gotoNextPage = 0;
         showMenuMask = 0;
-        
-        key     = getKey();
+
+        key = getKeyIfPossible();                                   // get key if one is waiting or just return 0 if no key is waiting
+
+        if(key == 0) {                                              // no key? just go back to start
+            continue;
+        }
+
         kbshift = Kbshift(-1);
-        
+
         if(key == KEY_F10 || key == KEY_F8) {                       // should quit or switch mode? 
             return key;
         }
-        
-        if(key == KEY_F1) {                                         // mark current row? 
-            markCurrentRow();
+
+        if(key == KEY_F1 || key == KEY_F2 || key == KEY_F3) {       // insert image into slot 1, 2, 3?
+            insertCurrentIntoSlot(key);
             showMenuMask = SHOWMENU_RESULTS_ROW;
         }
 
-        if(key == KEY_F2) {                                         // select destination directory?
-            selectDestinationDir();
-            showMenuMask = SHOWMENU_ALL;
-        }
-        
-        if(key == KEY_F3) {                                         // start downloading images?
-            handleImagesDownload();
+        if(key == KEY_F4) {                                         // start downloading images?
+            downloadCurrentToStorage();
             getResultsPage(search.pageCurrent);                     // refresh current page (will unselect the selected images)
             showMenuMask = SHOWMENU_ALL;
         }
@@ -128,13 +139,13 @@ BYTE loopForDownload(void)
             if(res == 0) {                                          // failed? switch to config screen
                 return KEY_F8;
             }
-            
+
             showMenuMask = SHOWMENU_ALL;
         }
-        
-   		if(key >= 'A' && key <= 'Z') {								// upper case letter? to lower case!
-			key += 32;
-		}
+
+        if(key >= 'A' && key <= 'Z') {								// upper case letter? to lower case!
+            key += 32;
+        }
 
         if((key >= 'a' && key <='z') || key == ' ' || (key >= 0 && key <= 9) || key == KEY_ESC || key == KEY_BACKSP) {
             res = handleWriteSearch(key);
@@ -145,7 +156,7 @@ BYTE loopForDownload(void)
                 showMenuMask = SHOWMENU_SEARCHSTRING | SHOWMENU_RESULTS_ALL;
             }
         }
-        
+
         if((kbshift & (K_RSHIFT | K_LSHIFT)) != 0) {                // shift pressed? 
             if(key == KEY_PAGEUP) {                                 // shift + arrow up = page up
                 gotoPrevPage = 1;
@@ -173,7 +184,7 @@ BYTE loopForDownload(void)
                 }
             }
         }
-        
+
         if(gotoPrevPage) {
             if(search.pageCurrent > 0) {                            // not the first page? move to previous page
                 search.pageCurrent--;                               // 
@@ -183,7 +194,7 @@ BYTE loopForDownload(void)
                 setSelectedRow(14);                                 // move to last row
             }
         }
-        
+
         if(gotoNextPage) {
             if(search.pageCurrent < (search.pagesCount - 1)) {      // not the last page? move to next page
                 search.pageCurrent++;                               // 
@@ -193,7 +204,7 @@ BYTE loopForDownload(void)
                 setSelectedRow(0);                                  // move to first row
             }
         }
-        
+
         showMenuDownload(showMenuMask);
     }
 }
@@ -242,7 +253,7 @@ void selectDestinationDir(void)
     strcpy(destDir.path, path);                 // copy in the destination dir
 }
 
-void handleImagesDownload(void)
+void handleImagesDownload(void) // OBSOLETE
 {
     if(destDir.isSet == 0) {                    // destination dir not set?
         selectDestinationDir();
@@ -265,7 +276,7 @@ void handleImagesDownload(void)
         commandShort[5] = 0;
         sectorCount = 1;                        // read 1 sector
         res = Supexec(ce_acsiReadCommand);
-		
+
         if(res == FDD_DN_WORKING) {             // if downloading
             (void) Cconws(pBfr);                // write out status string
             (void) Cconws("\n\r");
@@ -282,7 +293,7 @@ void handleImagesDownload(void)
     }
 }
 
-void markCurrentRow(void)
+void markCurrentRow(void)   // OBSOLETE
 {
     commandShort[4] = FDD_CMD_SEARCH_MARK;
     commandShort[5] = 0;
@@ -297,6 +308,49 @@ void markCurrentRow(void)
     
 	if(res != FDD_OK) {                                         // bad? write error
         showComError();
+        return;
+    }
+
+    getResultsPage(search.pageCurrent);                         // reload current page from host
+}
+
+void insertCurrentIntoSlot(BYTE key)
+{
+    commandShort[4] = FDD_CMD_SEARCH_INSERT2SLOT;
+    commandShort[5] = 0;
+
+    p64kBlock = pBfr;                                           // use this buffer for writing
+    pBfr[0] = search.pageCurrent;                               // store page #
+    pBfr[1] = search.row;                                       // store item #
+    pBfr[2] = key - KEY_F1;                                     // slot number - transform F1-F3 to 0-2
+
+    sectorCount = 1;                                            // write just one sector
+
+    BYTE res = Supexec(ce_acsiWriteBlockCommand); 
+
+    if(res != FDD_OK) {                                         // bad? write error
+        showError("Failed to insert image into slot.\r\n");
+        return;
+    }
+
+    getResultsPage(search.pageCurrent);                         // reload current page from host
+}
+
+void downloadCurrentToStorage(void)
+{
+    commandShort[4] = FDD_CMD_SEARCH_DOWNLOAD2STORAGE;
+    commandShort[5] = 0;
+
+    p64kBlock = pBfr;                                           // use this buffer for writing
+    pBfr[0] = search.pageCurrent;                               // store page #
+    pBfr[1] = search.row;                                       // store item #
+    
+    sectorCount = 1;                                            // write just one sector
+    
+    BYTE res = Supexec(ce_acsiWriteBlockCommand); 
+    
+    if(res != FDD_OK) {                                         // bad? write error
+        showError("Failed to start download to storage.\r\n");
         return;
     }
 
@@ -380,24 +434,24 @@ void showMenuDownload(BYTE showMask)
 {
     if(showMask & SHOWMENU_STATICTEXT) {
         (void) Clear_home();
-        (void) Cconws("\33p[CosmosEx image download by Jookie 2014]\33q\r\n");
+        (void) Cconws("\33p[Floppy image download,  Jookie 2014-18]\33q\r\n");
     }
-	
+
     if(showMask & SHOWMENU_SEARCHSTRING) {
         showSearchString();
     }
-    
+
     if(showMask & SHOWMENU_RESULTS_ALL) {
         showPageNumber();
     }
-    
+
     showResults(showMask);
-    
+
     if(showMask & SHOWMENU_STATICTEXT) {
-        Goto_pos(0, 20);
+        Goto_pos(0, 19);
         (void) Cconws("\33pA..Z\33q - search, \33p(shift) arrows\33q - move\r\n");
-        (void) Cconws("\33pF1\33q   - mark,         \33pF2\33q  - dest. dir,\r\n");
-        (void) Cconws("\33pF3\33q   - download,     \33pF5\33q  - refresh list,\r\n");
+        (void) Cconws("\33pF1, F2, F3\33q - insert into slot 1, 2, 3\r\n");
+        (void) Cconws("\33pF4\33q   - download,     \33pF5\33q  - refresh list,\r\n");
         (void) Cconws("\33pF8\33q   - setup screen, \33pF10\33q - quit\r\n");
     }
 }
@@ -488,16 +542,16 @@ BYTE searchInit(void)
 {
     commandShort[4] = FDD_CMD_SEARCH_INIT;
     commandShort[5] = 0;
-    
+
     sectorCount = 1;                            // read 1 sector
     BYTE res;
-    
+
     (void) Clear_home();
     (void) Cconws("Initializing... Press ESC to stop.\n\r\n\r");
-    
+
     while(1) {
-        res = Supexec(ce_acsiReadCommand); 
-		
+        res = Supexec(ce_acsiReadCommand);
+
         if(res == FDD_DN_LIST) {
             (void) Cconws("Downloading list of floppy images...\n\r");
         } else if(res == FDD_ERROR) {
@@ -510,18 +564,38 @@ BYTE searchInit(void)
         } else {
             (void) Cconws("CosmosEx device communication problem!\n\r");
         }
-        
+
         WORD val = Cconis();            // see if there is some char waiting
         if(val != 0) {                  // char waiting?
             BYTE key = getKey();
-            
+
             if(key == KEY_ESC) {
                 (void) Cconws("Init terminated by user. Press any key.\n\r");
                 Cnecin();
                 return 0;
             }
         }
-        
+
         sleep(1);
     }
+}
+
+void getStatus(void)
+{
+    commandShort[4] = FDD_CMD_GET_IMAGE_ENCODING_RUNNING;
+    commandShort[5] = 0;
+
+    sectorCount = 1;                            // read 1 sector
+
+    BYTE res = Supexec(ce_acsiReadCommand); 
+
+    if(res != FDD_OK) {                         // fail? just quit
+        return;
+    }
+
+    status.encoding = pBfr[0];                  // isRunning - 1: is running, 0: is not running
+    status.doWeHaveStorage = pBfr[1];           // do we have storage on RPi attached?
+
+    Goto_pos(0, 23);                            // show status line
+    (void) Cconws((const char *) (pBfr + 4));
 }

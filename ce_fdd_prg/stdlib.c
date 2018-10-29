@@ -136,9 +136,14 @@ static void sleepInSupervisor(void)
 
 DWORD getTicks(void)
 {
-	DWORD now;
-	
-	now = *HZ_200;
-	return now;
+    DWORD now;
+    now = *HZ_200;
+    return now;
+}
+
+DWORD getTicksAsUser(void)
+{
+    DWORD res = Supexec(getTicks);
+    return res;
 }
 
