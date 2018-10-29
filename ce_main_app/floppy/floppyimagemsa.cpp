@@ -52,10 +52,17 @@ bool FloppyImageMsa::loadImageIntoMemory(void)
 
     image.data = pDiskBuffer;                   // store pointer to buffer with decompressed image and size
     image.size = imageSize;
-    
+
     if(image.data == NULL) {                    // if the MSA_UnCompress failed, error
         return false;
-    }       
+    }
 
     return true;
 }
+
+bool FloppyImageMsa::save(const char *fileName)
+{
+	return MSA_WriteDisk(fileName, image.data, image.size);
+}
+
+
