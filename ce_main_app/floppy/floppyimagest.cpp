@@ -62,3 +62,9 @@ bool FloppyImageSt::calcParams(void)
     Debug::out(LOG_ERROR, "Couldn't guess the floppy params :(");
     return false;
 }
+
+bool FloppyImageSt::saveImage()
+{
+    //TODO
+    return true;
+}

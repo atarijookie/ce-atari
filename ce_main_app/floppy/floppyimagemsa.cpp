@@ -58,3 +58,10 @@ bool FloppyImageMsa::loadImageIntoMemory(void)
 
     return true;
 }
+
+bool FloppyImageMsa::saveImage()
+{
+	return MSA_WriteDisk("A_019_output.MSA", image.data, image.size);
+}
+
+
