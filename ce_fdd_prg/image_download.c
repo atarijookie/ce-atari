@@ -63,6 +63,8 @@ struct {
 
 void downloadImage(int index);
 
+#define ROW_LENGTH  68
+
 // ------------------------------------------------------------------ 
 
 #define SHOWMENU_STATICTEXT     1
@@ -335,8 +337,7 @@ void insertCurrentIntoSlot(BYTE key)
 
     BYTE res = Supexec(ce_acsiWriteBlockCommand); 
 
-    if(res != FDD_OK) {                                         // bad? write error
-        showError("Failed to insert image into slot.\r\n");
+    if(res != FDD_OK) {                                         // bad? just be silent, CE_FDD.PRG doesn't know if this image is downloaded, so don't show warning
         return;
     }
 
@@ -409,7 +410,7 @@ void getResultsPage(int page)
     search.pageCurrent  = (int) pBfr[0];        // get page #
     search.pagesCount   = (int) pBfr[1];        // get total page count
 
-    memcpy(searchContent, pBfr + 2, 15 * 68);   // copy the data
+    memcpy(searchContent, pBfr + 2, 15 * ROW_LENGTH);   // copy the data
 }
 
 BYTE handleWriteSearch(BYTE key)
@@ -478,51 +479,59 @@ void showResults(BYTE showMask)
 {
     int i;
     char *pRow;
+    char rowCopy[ROW_LENGTH];
 
     if(showMask & SHOWMENU_RESULTS_ALL) {               // if should redraw all results
         (void) Cconws("\33w");                          // disable line wrap
-    
+
         for(i=0; i<15; i++) {
-            pRow = (char *) (searchContent + (i * 68));
+            pRow = (char *) (searchContent + (i * ROW_LENGTH));
 
             BYTE selected = (i == search.row);
-        
+
             Goto_pos(0, 3 + i);
             (void) Cconws("\33K");                      // clear line from cursor to right
-        
+
             if(selected) {                              // for selected row
                 (void) Cconws("\33p");
-            }   
-        
+            }
+
             (void) Cconws(pRow);
 
             if(selected) {                              // for selected row
                 (void) Cconws("\33q");
             }
         }
-        
+
         (void) Cconws("\33v");                          // enable line wrap
         return;
     }
-    
+
     if(showMask & SHOWMENU_RESULTS_ROW) {               // if should redraw only selected line
         (void) Cconws("\33w");                          // disable line wrap
 
         // draw previous line without inversion
         Goto_pos(0, 3 + search.prevRow);
 
-        pRow = (char *) (searchContent + (search.prevRow * 68));
+        pRow = (char *) (searchContent + (search.prevRow * ROW_LENGTH));
         (void) Cconws(pRow);
 
         // draw current line with inversion
         Goto_pos(0, 3 + search.row);
 
-        pRow = (char *) (searchContent + (search.row * 68));
-        
+        pRow = (char *) (searchContent + (search.row * ROW_LENGTH));
+
+        memcpy(rowCopy, pRow, ROW_LENGTH);              // make a copy of row
+        for(i=0; i<ROW_LENGTH; i++) {                   // find and replace all 'inverse off' with 'inverse on' codes to keep the line reversed
+            if(rowCopy[i] == 27 && rowCopy[i + 1] == 'q') { // is 'inserve off'?
+                rowCopy[i + 1] = 'p';                       // now it's inverse on
+            }
+        }
+
         (void) Cconws("\33p");
-        (void) Cconws(pRow);
+        (void) Cconws(rowCopy);                         // show current but altered row
         (void) Cconws("\33q");
-        
+
         (void) Cconws("\33v");                          // enable line wrap
 
         return;
@@ -536,7 +545,7 @@ void showPageNumber(void)
     Goto_pos(19, 2);
 
     char tmp[10];
-    intToStr(search.pageCurrent, tmp);
+    intToStr(search.pageCurrent + 1, tmp);
     tmp[3] = '/';
     intToStr(search.pagesCount, tmp + 4);
     (void) Cconws(tmp);

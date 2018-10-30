@@ -570,7 +570,7 @@ void Utils::splitString(const std::string &s, char delim, std::vector<std::strin
 }
 
 // make dir recursively (like mkdir -p)
-int Utils::mkpath(const char *dir, mode_t mode)
+int Utils::mkpath(const char *dir, int mode)
 {
     struct stat sb;
 

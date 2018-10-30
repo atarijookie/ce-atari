@@ -875,10 +875,13 @@ void FloppySetup::getImageEncodingRunning(void)
             }
         }
 
+        char tmp[32];
         if(downloadCount > 1) {         // more than 1 file?
-            status += std::string("Downloading ") + std::to_string(downloadCount) + std::string(" files");
+            sprintf(tmp, "%d", downloadCount);   // integer to string (std::to_string not present on Jessie)
+            status += std::string("Downloading ") + tmp + std::string(" files");
         } else if(downloadCount == 1) { // downloading 1 file?
-            status += std::string("Downloading file: ") + std::to_string(downloadProgr) + std::string("%");
+            sprintf(tmp, "%d", downloadProgr);   // integer to string (std::to_string not present on Jessie)
+            status += std::string("Downloading file: ") + tmp + std::string("%");
         }
     } else {                            // don't have storage? add warning
         status += std::string("No USB or shared storage, ops limited!");

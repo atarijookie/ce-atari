@@ -31,7 +31,7 @@ public:
 
     static bool copyFile(std::string &src, std::string &dst);
     static bool copyFile(FILE *from, std::string &dst);
-    static int  mkpath(const char *dir, mode_t mode);
+    static int  mkpath(const char *dir, int mode);
 
     static void SWAPWORD(WORD &w);
     static WORD SWAPWORD2(WORD w);

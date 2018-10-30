@@ -444,6 +444,7 @@ void ImageSilo::containsImageInSlots(std::string &filenameWExt, std::string &out
 {
     std::string filename, ext;
     Utils::splitFilenameFromExt(filenameWExt, filename, ext);   // create filename without extension (ZIPed image in list might be extracted under different extension)
+    char tmp[32];
 
     for(int i=0; i<3; i++) {
         bool isInSlot = (slots[i].imageFileNoExt == filename);  // if this file is in this slot
@@ -454,7 +455,8 @@ void ImageSilo::containsImageInSlots(std::string &filenameWExt, std::string &out
                 out += "\033p";                                 // inverse on
             }
 
-            out += std::to_string(i + 1);                       // slot number
+            sprintf(tmp, "%d", i + 1);                          // slot number - integer to string (std::to_string not present on Jessie)
+            out += tmp;                                         // add slot number
 
             if(isSlotSelected) {                                // if this slot is selected
                 out += "\033q";                                 // inverse off
