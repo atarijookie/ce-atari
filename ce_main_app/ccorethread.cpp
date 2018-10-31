@@ -30,6 +30,10 @@
 #include "service/floppyservice.h"
 #include "service/screencastservice.h"
 
+#include "floppy/imagelist.h"
+#include "floppy/imagesilo.h"
+#include "floppy/imagestorage.h"
+
 #include "mediastreaming/mediastreaming.h"
 
 #include "periodicthread.h"
@@ -73,7 +77,7 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
 
     memset(&hansConfigWords, 0, sizeof(hansConfigWords));
 
-    lastFloppyImageLed      = -1;
+    lastFloppyImageLed = -1;
     newFloppyImageLedAfterEncode = -2;
 
     if(hwConfig.hddIface == HDD_IF_CART) {  // cartridge interface? use this data transporter
@@ -107,16 +111,15 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
 
     // give floppy setup everything it needs
     floppySetup.setDataTrans(dataTrans);
-    floppySetup.setImageSilo(&floppyImageSilo);
     floppySetup.setSettingsReloadProxy(&settingsReloadProxy);
 
     // the floppy image silo might change settings (when images are changes), add settings reload proxy
-    floppyImageSilo.setSettingsReloadProxy(&settingsReloadProxy);
+    shared.imageSilo->setSettingsReloadProxy(&settingsReloadProxy);
     settingsReloadProxy.reloadSettings(SETTINGSUSER_FLOPPYIMGS);            // mark that floppy settings changed (when imageSilo loaded the settings)
 
     //Floppy Service needs access to floppysilo and this thread
     if(floppyService) {
-        floppyService->setImageSilo(&floppyImageSilo);
+        floppyService->setImageSilo(shared.imageSilo);
         floppyService->setCoreThread(this);
     }
 
@@ -136,14 +139,18 @@ CCoreThread::~CCoreThread()
 
 void CCoreThread::sharedObjects_create(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService)
 {
-    shared.devFinder_detachAndLook  = false;
-    shared.devFinder_look           = false;
+    shared.devFinder_detachAndLook = false;
+    shared.devFinder_look = false;
 
-    shared.scsi        = new Scsi();
+    shared.scsi = new Scsi();
     shared.scsi->setDataTrans(dataTrans);
 
     TranslatedDisk * translated = TranslatedDisk::createInstance(dataTrans, configService, screencastService);
     translated->setSettingsReloadProxy(&settingsReloadProxy);
+
+    shared.imageList = new ImageList();
+    shared.imageSilo = new ImageSilo();
+    shared.imageStorage = new ImageStorage();
 
     //-----------
     // create config stream for ACSI interface
@@ -170,6 +177,15 @@ void CCoreThread::sharedObjects_destroy(void)
     shared.scsi = NULL;
 
     TranslatedDisk::deleteInstance();
+
+    delete shared.imageList;
+    shared.imageList = NULL;
+
+    delete shared.imageSilo;
+    shared.imageSilo = NULL;
+
+    delete shared.imageStorage;
+    shared.imageStorage = NULL;
 
     delete shared.configStream.acsi;
     shared.configStream.acsi = NULL;
@@ -578,7 +594,9 @@ void CCoreThread::handleAcsiCommand(void)
 
         case HOSTMOD_FDD_SETUP:                         // floppy setup command?
             wasHandled = true;
+            pthread_mutex_lock(&shared.mtxImages);      // lock floppy images shared objects -- now used by floppy setup object
             floppySetup.processCommand(pCmd);
+            pthread_mutex_unlock(&shared.mtxImages);    // unlock floppy images shared objects
             break;
 
         case HOSTMOD_NETWORK_ADAPTER:
@@ -640,7 +658,7 @@ void CCoreThread::reloadSettings(int type)
     }
 
     if(type == SETTINGSUSER_FLOPPY_SLOT) {
-        setFloppyImageLed(floppyImageSilo.getCurrentSlot());
+        setFloppyImageLed(shared.imageSilo->getCurrentSlot());
         return;
     }
 
@@ -724,7 +742,7 @@ void CCoreThread::handleFwVersion_hans(void)
     getIdBits(enabledIDbits, sdCardAcsiId);                                 // get the enabled IDs
 
     hansConfigWords.next.acsi   = MAKEWORD(enabledIDbits,                   sdCardAcsiId);
-    hansConfigWords.next.fdd    = MAKEWORD(floppyImageSilo.getSlotBitmap(), 0);
+    hansConfigWords.next.fdd    = MAKEWORD(shared.imageSilo->getSlotBitmap(), 0);
 
     if( (hansConfigWords.next.acsi  != hansConfigWords.current.acsi) ||
         (hansConfigWords.next.fdd   != hansConfigWords.current.fdd )) {
@@ -745,7 +763,7 @@ void CCoreThread::handleFwVersion_hans(void)
 
     if(setNewFloppyImageLed) {
         responseAddWord(oBuf, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
-        responseAddWord(oBuf, MAKEWORD(floppyImageSilo.getSlotBitmap(), newFloppyImageLed));  // store which floppy images LED should be on
+        responseAddWord(oBuf, MAKEWORD(shared.imageSilo->getSlotBitmap(), newFloppyImageLed));  // store which floppy images LED should be on
         setNewFloppyImageLed = false;                           // and don't sent this anymore (until needed)
     }
 
@@ -773,7 +791,7 @@ void CCoreThread::handleFwVersion_hans(void)
 
     Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d, XI: 0x%02x", year, Utils::bcdToDec(fwVer[2]), Utils::bcdToDec(fwVer[3]), currentLed, xilinxInfo);
 
-    if(floppyImageSilo.currentSlotHasNewContent()) {    // the content of current slot changed?
+    if(shared.imageSilo->currentSlotHasNewContent()) {    // the content of current slot changed?
         Debug::out(LOG_DEBUG, "Content of current floppy image slot changed, forcing disk change", currentLed);
 
         diskChanged     = true;                         // tell Franz that floppy changed
@@ -785,7 +803,7 @@ void CCoreThread::handleFwVersion_hans(void)
 
         Debug::out(LOG_DEBUG, "Floppy image changed to %d, forcing disk change", currentLed);
 
-        floppyImageSilo.setCurrentSlot(currentLed);     // switch the floppy image
+        shared.imageSilo->setCurrentSlot(currentLed);     // switch the floppy image
 
         diskChanged     = true;                         // also tell Franz that floppy changed
         setDiskChanged  = true;
@@ -1039,7 +1057,7 @@ void CCoreThread::responseAddByte(BYTE *bfr, BYTE value)        // add a BYTE to
 void CCoreThread::setFloppyImageLed(int ledNo)
 {
     if(ledNo >=0 && ledNo < 3) {                    // if the LED # is within expected range
-        BYTE enabledImgs    = floppyImageSilo.getSlotBitmap();
+        BYTE enabledImgs = shared.imageSilo->getSlotBitmap();
 
         if(enabledImgs & (1 << ledNo)) {            // if the required LED # is enabled, set it
             Debug::out(LOG_DEBUG, "Setting new floppy image LED to %d", ledNo);
@@ -1069,7 +1087,7 @@ void CCoreThread::handleSendTrack(void)
     int remaining   = 15000 - (4*2) - 2;        // this much bytes remain to send after the received ATN
 
     int tr, si, spt;
-    floppyImageSilo.getParams(tr, si, spt);      // read the floppy image params
+    shared.imageSilo->getParams(tr, si, spt);      // read the floppy image params
 
     Debug::out(LOG_DEBUG, "ATN_SEND_TRACK -- Franz wants: [track %d, side %d]. Current image has: [track %d, side %d, sectors/track: %d]", track, side, tr, si, spt);
 
@@ -1079,9 +1097,9 @@ void CCoreThread::handleSendTrack(void)
     if(side < 0 || side > 1 || track < 0 || track >= tr) {      // side / track out of range? use empty track
         Debug::out(LOG_ERROR, "Side / Track out of range, returning empty track. Franz wants: [track %d, side %d], but current image has only: [track %d, side %d, sectors/track: %d]", track, side, tr, si, spt);
 
-        encodedTrack = floppyImageSilo.getEmptyTrack();
+        encodedTrack = shared.imageSilo->getEmptyTrack();
     } else {                                                    // side + track within range? use encoded track
-        encodedTrack = floppyImageSilo.getEncodedTrack(track, side, countInTrack);
+        encodedTrack = shared.imageSilo->getEncodedTrack(track, side, countInTrack);
     }
 
     dataTrans->txRx(SPI_CS_FRANZ, remaining, encodedTrack, iBuf);
@@ -1172,10 +1190,10 @@ void CCoreThread::insertSpecialFloppyImage(int specialImageId)
     }
 
     // encode MSA config image to MFM stream - in slot #0
-    floppyImageSilo.add(0, ceConfFilename, ceConfFullPath, dummy, dummy, false);
+    shared.imageSilo->add(0, ceConfFilename, ceConfFullPath, dummy, dummy, false);
 
     // set the current to slot #0
-    floppyImageSilo.setCurrentSlot(0);
+    shared.imageSilo->setCurrentSlot(0);
 
     // when encoding stops, set this FDD image LED
     newFloppyImageLedAfterEncode = 0;

@@ -5,7 +5,9 @@ BYTE ce_acsiReadCommand(void);
 BYTE ce_acsiWriteBlockCommand(void);
 
 BYTE getKey(void);
+BYTE getKeyIfPossible(void);
 void showComError(void);
+void showError(const char *error);
 void intToStr(int val, char *str);
 void removeLastPartUntilBackslash(char *str);
 BYTE getLowestDrive(void);

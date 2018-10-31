@@ -28,6 +28,7 @@ const char MSA_fileid[] = "Hatari msa.c : " __DATE__ " " __TIME__;
 #include "../utils.h"
 #include "../debug.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 

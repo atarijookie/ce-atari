@@ -90,7 +90,6 @@ private:
     //-----------------------------------
     // floppy stuff
     FloppySetup         floppySetup;
-    ImageSilo           floppyImageSilo;
     bool                setEnabledFloppyImgs;
     int                 lastFloppyImageLed;
 

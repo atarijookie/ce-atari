@@ -1713,3 +1713,37 @@ void TranslatedDisk::fillDisplayLines(void)
     }
     display_setLine(DISP_LINE_TRAN_DRIV, tmp);
 }
+
+bool TranslatedDisk::getPathToUsbDriveOrSharedDrive(std::string &hostRootPath)
+{
+    int i, sharedDriveIndex = -1;
+    hostRootPath.clear();
+
+    // first look for any USB drive, if not found, use shared drive
+    for(i=0; i<MAX_DRIVES; i++) {	// go through the drives
+        // not enabled or it's config drive? skip it
+        if(!conf[i].enabled || conf[i].translatedType == TRANSLATEDTYPE_CONFIGDRIVE) {
+            continue;
+        }
+
+        // if got some USB drive, return path to its root, success
+        if(conf[i].translatedType == TRANSLATEDTYPE_NORMAL) {
+            hostRootPath = conf[i].hostRootPath;
+            return true;
+        }
+
+        // if got shared drive, mark down its index
+        if(conf[i].translatedType == TRANSLATEDTYPE_SHAREDDRIVE) {
+            sharedDriveIndex = i;
+        }
+    }
+
+    // if came here, couldn't find USB
+    if(sharedDriveIndex != -1) {    // got shared drive? good
+        hostRootPath = conf[sharedDriveIndex].hostRootPath;
+        return true;
+	}
+
+    // no usb drive, no shared drive? fail
+    return false;
+}

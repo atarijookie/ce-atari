@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <sstream>
 
 #define IMAGELIST_URL       "http://joo.kie.sk/cosmosex/update/imagelist.csv"
 #define IMAGELIST_LOCAL_DIR "/ce/app/"
@@ -23,21 +24,27 @@ typedef struct {
     int         imageIndex;
 } SearchResult;
 
-class ImageList 
+class ImageList
 {
 public:
     ImageList(void);
 
+    static void downloadFromWeb(void);
+
     bool exists(void);
     bool loadList(void);
+    bool getIsLoaded(void);
 
-    void search(char *part);
+    void search(const char *part);
 
     int  getSearchResultsCount(void);
     void getResultByIndex(int index, char *bfr);
+    void getResultByIndex(int index, std::ostringstream &stream);
     void markImage(int index);
     bool getFirstMarkedImage(std::string &url, int &checksum, std::string &filename);
     void refreshList(void);
+    bool getImageUrl(const char *imageFileName, std::string &url);
+    bool getImageNameFromResultsByIndex(int index, std::string &imageName);
 
 private:
     std::vector<ImageListItem>      vectorOfImages;

@@ -18,14 +18,15 @@ public:
 	static DWORD getCurrentMs(void);
 	static DWORD getEndTime(DWORD offsetFromNow);
 	static void  sleepMs(DWORD ms);
-	
+
 	static void attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari);
 	static void fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *ptm);
 	static WORD fileTimeToAtariTime(struct tm *ptm);
 	static WORD fileTimeToAtariDate(struct tm *ptm);
-	
+
 	static void mergeHostPaths(std::string &dest, const std::string &tail);
 	static void splitFilenameFromPath(const std::string &pathAndFile, std::string &path, std::string &file);
+    static void splitFilenameFromExt(const std::string &filenameAndExt, std::string &filename, std::string &ext);
 
 	static void resetHansAndFranz(void);
     static void resetHans(void);
@@ -33,12 +34,13 @@ public:
 
     static bool copyFile(std::string &src, std::string &dst);
     static bool copyFile(FILE *from, std::string &dst);
+    static int  mkpath(const char *dir, int mode);
 
     static void SWAPWORD(WORD &w);
     static WORD SWAPWORD2(WORD w);
 
     static void getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks=NULL);
-    
+
     static void forceSync(void);
 
     static WORD  getWord(BYTE *bfr);
@@ -61,7 +63,13 @@ public:
 
     static BYTE bcdToDec(BYTE bcd);
     static BYTE decToBCD(BYTE dec);
-    
+
+    static bool unZIPfloppyImageAndReturnFirstImage(const char *inZipFilePath, std::string &outImageFilePath);
+    static const char *getExtension(const char *fileName);
+    static bool isZIPfile(const char *fileName);
+    static void createPathWithOtherExtension(std::string &inPathWithOriginalExt, const char *otherExtension, std::string &outPathWithOtherExtension);
+    static bool fileExists(std::string &hostPath);
+
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
 

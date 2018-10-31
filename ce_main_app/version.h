@@ -10,7 +10,7 @@ class Version
 {
 public:
     static void getAppVersion(char *bfr);
-    
+
     static void getRaspberryPiInfo(void);
     static void readLineFromFile  (const char *filename, char *buffer, int maxLen, const char *defValue);
 
@@ -30,7 +30,7 @@ public:
     bool isEqualTo(const Version &other);
 
     volatile BYTE downloadStatus;
-    
+
 private:
     int year;
     int month;
@@ -46,6 +46,7 @@ typedef struct {
             Version hans;
             Version xilinx;
             Version franz;
+            Version imageList;
         } current;
 
         struct {
@@ -53,6 +54,7 @@ typedef struct {
             Version hans;
             Version xilinx;
             Version franz;
+            Version imageList;
         } onServer;
 
         bool updateListWasProcessed;

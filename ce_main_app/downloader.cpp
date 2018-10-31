@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <dirent.h>
+#include <algorithm>
 
 #include <signal.h>
 #include <pthread.h>
@@ -33,9 +34,8 @@ extern RPiConfig rpiConfig;             // RPi info structure
 pthread_mutex_t Downloader::downloadQueueMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t Downloader::downloadQueueNotEmpty = PTHREAD_COND_INITIALIZER;
 volatile bool Downloader::shouldStop = false;
-std::vector<TDownloadRequest>    Downloader::downloadQueue;
-TDownloadRequest                Downloader::downloadCurrent;
-
+std::vector<TDownloadRequest> Downloader::downloadQueue;
+TDownloadRequest              Downloader::downloadCurrent;
 
 void Downloader::initBeforeThreads(void)
 {
@@ -58,6 +58,18 @@ void Downloader::add(TDownloadRequest &tdr)
     pthread_mutex_unlock(&downloadQueueMutex);             // unlock the mutex
 }
 
+void Downloader::formatStatusJson(TDownloadRequest &tdr, std::ostringstream &status)
+{
+    std::string urlPath, fileName;
+    Utils::splitFilenameFromPath(tdr.srcUrl, urlPath, fileName);
+
+    status << "{ \"fileName\": \"";
+    status << fileName;
+    status << "\", \"progress\": ";
+    status << tdr.downPercent;
+    status << "}";
+}
+
 void Downloader::formatStatus(TDownloadRequest &tdr, std::string &line)
 {
     char percString[16];
@@ -77,6 +89,14 @@ void Downloader::formatStatus(TDownloadRequest &tdr, std::string &line)
     line = fileName + percString;
 
     Debug::out(LOG_DEBUG, "Downloader::formatStatus() -- created status line: %s", line.c_str());
+}
+
+int Downloader::progressOfCurrentDownload(void)
+{
+    pthread_mutex_lock(&downloadQueueMutex);               // try to lock the mutex
+    int prog = downloadCurrent.downPercent;                // get percent of current download
+    pthread_mutex_unlock(&downloadQueueMutex);             // unlock the mutex
+    return prog;
 }
 
 void Downloader::status(std::string &status, int downloadTypeMask)
@@ -119,6 +139,43 @@ void Downloader::status(std::string &status, int downloadTypeMask)
     pthread_mutex_unlock(&downloadQueueMutex);             // unlock the mutex
 }
 
+void Downloader::statusJson(std::ostringstream &status, int downloadTypeMask)
+{
+    pthread_mutex_lock(&downloadQueueMutex);               // try to lock the mutex
+
+    status.clear();
+
+    bool hasItem = false;       // list doesn't have anyitem yet
+
+    // create status for the currently downloaded thing
+    if(downloadCurrent.statusByte != DWNSTATUS_DOWNLOAD_OK && downloadCurrent.statusByte != DWNSTATUS_DOWNLOAD_FAIL) {  // if the download didn't finish (with OK or FAIL)
+        if((downloadCurrent.downloadType & downloadTypeMask) != 0) {    // if the mask matches the download type, add it
+            formatStatusJson(downloadCurrent, status);
+            hasItem = true;     // we have one item now
+        }
+    }
+
+    // create status reports for things waiting to be downloaded
+    int cnt = downloadQueue.size();
+
+    for(int i=0; i<cnt; i++) {
+        TDownloadRequest &tdr = downloadQueue[i];
+
+        if((tdr.downloadType & downloadTypeMask) == 0) {    // if the mask doesn't match the download type, skip it
+            continue;
+        }
+
+        if(hasItem) {           // if something is in array, add separator
+            status << ",";
+            hasItem = true;     // list has at least 1 item
+        }
+
+        formatStatusJson(tdr, status);
+    }
+
+    pthread_mutex_unlock(&downloadQueueMutex);             // unlock the mutex
+}
+
 int Downloader::count(int downloadTypeMask)
 {
     pthread_mutex_lock(&downloadQueueMutex);               // try to lock the mutex
@@ -138,7 +195,7 @@ int Downloader::count(int downloadTypeMask)
     }
 
     // and for the currently downloaded thing
-    if(downloadCurrent.downPercent < 100) {
+    if(downloadCurrent.statusByte != DWNSTATUS_DOWNLOAD_OK && downloadCurrent.statusByte != DWNSTATUS_DOWNLOAD_FAIL) {  // if the download didn't finish (with OK or FAIL)
         if((downloadCurrent.downloadType & downloadTypeMask) != 0) {    // if the mask matches the download type, add it
             typeCnt++;                                      // increment count
         }
@@ -187,6 +244,42 @@ bool Downloader::verifyChecksum(const char *filename, WORD checksum)
     Debug::out(LOG_DEBUG, "Downloader::verifyChecksum - file %s -- checksum is good: %d", filename, (int) checksumIsGood);
 
     return checksumIsGood;                // return if the calculated cs is equal to the provided cs
+}
+
+// ZIPed floppy file image needs some extracting, searching and renaming of content
+void Downloader::handleZIPedFloppyImage(std::string &zipFileName)
+{
+    // try to extract content and find 1st image usable in there
+    std::string firstImage;
+    bool res = Utils::unZIPfloppyImageAndReturnFirstImage(zipFileName.c_str(), firstImage);
+
+    if(!res) {                  // failed to find image inside zip? quit
+        Debug::out(LOG_DEBUG, "Downloader::handleZIPedFloppyImage - no valid image found in ZIP, not doing anything else");
+        return;
+    }
+
+    // get extension of the 1st image
+    const char *firstImageExt = Utils::getExtension(firstImage.c_str());
+
+    if(firstImageExt == NULL) {
+        Debug::out(LOG_DEBUG, "Downloader::handleZIPedFloppyImage - failed to get extension of first image, not doing anything else");
+        return;
+    }
+
+    // replace the extension of input ZIP file with image file extension
+    std::string firstImageExtLower = firstImageExt; // char * to std::string
+    std::transform(firstImageExtLower.begin(), firstImageExtLower.end(), firstImageExtLower.begin(), ::tolower);    // convert to lowercase
+
+    std::string newFileName;
+    Utils::createPathWithOtherExtension(zipFileName, firstImageExtLower.c_str(), newFileName);  // create filename with the new extension
+
+    // delete original ZIP file
+    unlink(zipFileName.c_str());
+
+    // move the first image into the place of downloaded ZIPed image
+    std::string moveCmd = std::string("mv ") + firstImage + std::string(" ") + newFileName;
+    Debug::out(LOG_DEBUG, "Downloader::handleZIPedFloppyImage - %s", moveCmd.c_str());
+    system(moveCmd.c_str());
 }
 
 size_t Downloader::my_write_func_reportVersions(void *ptr, size_t size, size_t nmemb, FILE *stream)
@@ -241,7 +334,9 @@ int Downloader::my_progress_func(void *clientp, double downTotal, double downNow
 
 void Downloader::updateStatusByte(TDownloadRequest &tdr, BYTE newStatus)
 {
-    if(tdr.pStatusByte != NULL) {
+    tdr.statusByte = newStatus;                 // update the local status byte
+
+    if(tdr.pStatusByte != NULL) {               // if got pointer to remote status byte
         *tdr.pStatusByte = newStatus;           // store the new status
     }
 }
@@ -479,6 +574,10 @@ void Downloader::run(void)
             bool b = Downloader::verifyChecksum(tmpFile.c_str(), downloadCurrent.checksum);
 
             if(b) {             // checksum is OK?
+                bool isZIPfile = Utils::isZIPfile(finalFile.c_str());
+
+                Debug::out(LOG_ERROR, "Downloader - finalFile: %s, isZIPfile: %d", finalFile.c_str(), isZIPfile);
+
                 res = rename(tmpFile.c_str(), finalFile.c_str());
 
                 if(res != 0) {  // download OK, checksum OK, rename BAD?
@@ -486,7 +585,12 @@ void Downloader::run(void)
                     Debug::out(LOG_ERROR, "Downloader - failed to rename %s to %s after download", tmpFile.c_str(), finalFile.c_str());
                 } else {        // download OK, checksum OK, rename OK?
                     updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_OK);
-                    Debug::out(LOG_DEBUG, "Downloader - file %s was downloaded with success.", downloadCurrent.srcUrl.c_str());
+                    Debug::out(LOG_DEBUG, "Downloader - file %s was downloaded with success, is FLOPPYIMG: %d, is ZIP file: %d.", downloadCurrent.srcUrl.c_str(), downloadCurrent.downloadType == DWNTYPE_FLOPPYIMG, isZIPfile);
+
+                    // if it's a floppy image download and it's a ZIP file
+                    if(downloadCurrent.downloadType == DWNTYPE_FLOPPYIMG && isZIPfile) {
+                        handleZIPedFloppyImage(finalFile);
+                    }
                 }
             } else {            // download OK, checksum bad?
                 updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_FAIL);
