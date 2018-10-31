@@ -57,8 +57,11 @@ struct {
 TDestDir destDir;
 
 struct {
-    BYTE encoding;
-    BYTE doWeHaveStorage;
+    BYTE encoding;              // is the RPi encoding the image or being idle?
+    BYTE doWeHaveStorage;       // do we have storage for floppy images?
+
+    BYTE downloadCount;         // how many files are now being downloaded?
+    BYTE prevDownloadCount;     // previous value of downloadCount
 } status;
 
 void downloadImage(int index);
@@ -106,14 +109,19 @@ BYTE loopForDownload(void)
         BYTE key, kbshift;
         DWORD now = getTicksAsUser();
 
-        if(now >= (lastStatusCheckTime + 200)) {                    // if last check was at least a second ago, do new check
-            lastStatusCheckTime = now;
-            getStatus();                                            // talk to CE to see the status
-        }
-
         gotoPrevPage = 0;
         gotoNextPage = 0;
         showMenuMask = 0;
+
+        if(now >= (lastStatusCheckTime + 200)) {                    // if last check was at least a second ago, do new check
+            lastStatusCheckTime = now;
+            getStatus();                                            // talk to CE to see the status
+
+            if(status.downloadCount == 0 && status.prevDownloadCount > 0) {     // if we just finished downloading (not downloading now, but were downloading a while ago)
+                getResultsPage(search.pageCurrent);                 // refresh current page data
+                showMenuDownload(SHOWMENU_ALL);                     // draw all on screen
+            }
+        }
 
         key = getKeyIfPossible();                                   // get key if one is waiting or just return 0 if no key is waiting
 
@@ -129,23 +137,19 @@ BYTE loopForDownload(void)
 
         if(key == KEY_F1 || key == KEY_F2 || key == KEY_F3) {       // insert image into slot 1, 2, 3?
             insertCurrentIntoSlot(key);
-            showMenuMask = SHOWMENU_RESULTS_ROW;
+            showMenuDownload(SHOWMENU_RESULTS_ROW);
+            continue;
         }
 
         if(key == KEY_F4) {                                         // start downloading images?
-            downloadCurrentToStorage();
-            getResultsPage(search.pageCurrent);                     // refresh current page (will unselect the selected images)
-            showMenuMask = SHOWMENU_ALL;
+            downloadCurrentToStorage();                             // start download
+            continue;
         }
 
         if(key == KEY_F5) {                                         // refresh the list of images
-            res = refreshImageList();
-            
-            if(res == 0) {                                          // failed? switch to config screen
-                return KEY_F8;
-            }
-
-            showMenuMask = SHOWMENU_ALL;
+            getResultsPage(search.pageCurrent);                     // refresh current page data
+            showMenuDownload(SHOWMENU_ALL);                         // draw all on screen
+            continue;
         }
 
         if(key >= 'A' && key <= 'Z') {								// upper case letter? to lower case!
@@ -399,10 +403,9 @@ void getResultsPage(int page)
     commandShort[5] = (BYTE) page;
 
     sectorCount = 2;                            // read 2 sectors
-    
     BYTE res = Supexec(ce_acsiReadCommand); 
-		
-	if(res != FDD_OK) {                         // bad? write error
+
+    if(res != FDD_OK) {                         // bad? write error
         showComError();
         return;
     }
@@ -623,6 +626,11 @@ void getStatus(void)
     status.encoding = pBfr[0];                  // isRunning - 1: is running, 0: is not running
     status.doWeHaveStorage = pBfr[1];           // do we have storage on RPi attached?
 
+    status.prevDownloadCount = status.downloadCount;    // make a copy of previous download files count 
+    status.downloadCount = pBfr[2];             // how many files are still downloading?
+
     Goto_pos(0, 23);                            // show status line
-    (void) Cconws((const char *) (pBfr + 4));
+    (void) Cconws("\33p");                      // inverse on
+    (void) Cconws((const char *) (pBfr + 4));   // status string
+    (void) Cconws("\33q");                      // inverse off
 }
