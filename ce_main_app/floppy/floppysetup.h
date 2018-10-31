@@ -70,11 +70,12 @@ private:
     void searchInit(void);
     void searchString(void);
     void searchResult(void);
-    void searchMark(void);
-    void searchDownload(void);
     void searchRefreshList(void);
 
-    void searchDownload2Storage(void);
+    void searchMark(void);              // OBSOLETE
+    void searchDownload(void);          // OBSOLETE
+
+    void searchDownload2Storage(void);  // CURRENT WAY OF DOWNLOADING
     void searchInsertToSlot(void);
     void searchDeleteFromStorage(void);
 

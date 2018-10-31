@@ -32,7 +32,7 @@ class Update
 {
 public:
     static Versions versions;
-	
+
     static void initialize(void);
     static void deleteLocalUpdateComponents(void);
     static void downloadUpdateList(const char *remoteUrl);
@@ -43,14 +43,14 @@ public:
     static int  state(void);
     static void stateGoIdle(void);
     static void stateGoDownloadOK(void);
-    
+
     static void stateGoWaitBeforeInstall(void);
     static bool canStartInstall(void);
 
     static bool createUpdateScript(void);
     static bool createFlashFirstFwScript(bool withLinuxRestart);
     static bool createUpdateXilinxScript(void);
-    
+
     static bool checkForUpdateListOnUsb(std::string &updateFilePath);
 
     static void createNewScripts(void);                 // this does script update - blocking other processing
@@ -58,7 +58,7 @@ public:
 
     static void startPackageDownloadIfAnyComponentNewer(void);
     static BYTE getUpdateComponents(void);
-    
+
 private:
     static int      currentState;
     static DWORD    whenCanStartInstall;

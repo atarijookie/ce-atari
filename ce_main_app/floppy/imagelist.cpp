@@ -33,14 +33,18 @@ bool ImageList::exists(void)
     }
 
     // ok, so the file does not exist
+    int cnt = Downloader::count(DWNTYPE_FLOPPYIMG_LIST); // check if it's downloaded at this moment
 
-    std::string status;
-    Downloader::status(status, DWNTYPE_FLOPPYIMG_LIST); // check if it's downloaded at this moment
-
-    if(!status.empty()) {                               // the file is being downloaded, but we don't have it yet
+    if(cnt > 0) {                                       // the file is being downloaded, but we don't have it yet
         return false;
     }
 
+    downloadFromWeb();      // don't have it, not downloading? download!
+    return false;
+}
+
+void ImageList::downloadFromWeb(void)
+{
     // start the download
     TDownloadRequest tdr;
     tdr.srcUrl          = IMAGELIST_URL;
@@ -49,8 +53,6 @@ bool ImageList::exists(void)
     tdr.downloadType    = DWNTYPE_FLOPPYIMG_LIST;
     tdr.pStatusByte     = NULL;                     // don't update this status byte
     Downloader::add(tdr);
-
-    return false;
 }
 
 bool ImageList::getIsLoaded(void)

@@ -29,6 +29,8 @@ class ImageList
 public:
     ImageList(void);
 
+    static void downloadFromWeb(void);
+
     bool exists(void);
     bool loadList(void);
     bool getIsLoaded(void);
