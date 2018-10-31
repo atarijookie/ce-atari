@@ -52,10 +52,12 @@ void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_
         return;
     }
 
-    if(!shared.imageList->loadList()) {      // try to load the list, if failed, error
-        stringStream << "{\"imagelist\": \"not_loaded\", \"totalPages\": 0, \"currentPage\": 0}\r\n";
-        sendResponse(conn, stringStream);
-        return;
+    if(!shared.imageList->getIsLoaded()) {   // if list not loaded, load it
+        if(!shared.imageList->loadList()) {  // try to load the list, if failed, error
+            stringStream << "{\"imagelist\": \"not_loaded\", \"totalPages\": 0, \"currentPage\": 0}\r\n";
+            sendResponse(conn, stringStream);
+            return;
+        }
     }
 
     // list exists and is loaded, we can work with it
@@ -78,7 +80,7 @@ void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_
 
     int page = 0;
     if(qs_len > 0) {    // if the query string contains something, we can try to get some vars
-        char pageString[4];
+        char pageString[16];
         memset(pageString, 0, sizeof(pageString));
 
         res = mg_get_var(qs, qs_len, "page", pageString, sizeof(pageString) - 1); // try to get the page string
@@ -87,6 +89,8 @@ void DownloadResource::onGetImageList(mg_connection *conn, mg_request_info *req_
             res = sscanf(pageString, "%d", &page);
         }
     }
+
+    Debug::out(LOG_DEBUG, "DownloadResouce::onGetImageList: searchString: %s, page: %d", searchString, page);
 
     // future improvement: get pageSize from request
     int pageSize = 15;

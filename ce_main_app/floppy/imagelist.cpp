@@ -53,6 +53,11 @@ bool ImageList::exists(void)
     return false;
 }
 
+bool ImageList::getIsLoaded(void)
+{
+    return isLoaded;
+}
+
 bool ImageList::loadList(void)
 {
     vectorOfImages.clear();
@@ -68,8 +73,10 @@ bool ImageList::loadList(void)
     fgets(tmp, 1023, f);                                // skip version line
 
     ImageListItem li;                                   // store url and checksum in structure
+    int n=0;
 
     while(!feof(f)) {
+        n++;
         memset(tmp, 0, 1024);
 
         char *c = fgets(tmp, 1023, f);                  // read one line
@@ -133,7 +140,12 @@ bool ImageList::loadList(void)
 
         li.games = tok;                                                                     // store games
         std::transform(li.games.begin(), li.games.end(), li.games.begin(), ::tolower);      // convert them to lowercase
+        std::replace(li.games.begin(), li.games.end(), '\t', ' ');
+        std::replace(li.games.begin(), li.games.end(), '\\', ' ');
+        std::replace(li.games.begin(), li.games.end(), '/', ' ');
         li.marked = false;
+
+//      Debug::out(LOG_DEBUG, "[%d] - %s - %s - %s", n, li.url.c_str(), li.imageName.c_str(), li.games.c_str());
 
         vectorOfImages.push_back(li);                   // store it in vector
     }

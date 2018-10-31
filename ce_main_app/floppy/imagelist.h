@@ -31,6 +31,7 @@ public:
 
     bool exists(void);
     bool loadList(void);
+    bool getIsLoaded(void);
 
     void search(const char *part);
 
