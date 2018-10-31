@@ -219,7 +219,7 @@ function generatePageSwitchButton(prevNotNext)
             onClickFunction = "onGoToPage(" + pageNumber + ");"
 
             buttonSymbol = "&laquo;";
-            buttonClass = "active";
+            buttonClass = "btnDownload";
         }
     } else {                                    // next page?
         if(currentPage < (totalPages - 1)) {    // we're not on the last page?
@@ -227,7 +227,7 @@ function generatePageSwitchButton(prevNotNext)
             onClickFunction = "onGoToPage(" + pageNumber + ");"
 
             buttonSymbol = "&raquo;";
-            buttonClass = "active";
+            buttonClass = "btnDownload";
         }
     }
 
@@ -339,7 +339,16 @@ function generateSearchResultsTable()
     var searchString = document.getElementById('search_input').value;   // get search string
     searchString = searchString.toLowerCase();     // search string to lower case
 
-    var header = "<thead><tr><th class='col_filename'>Image name</th><th class='col_actions'>Download / Insert</th><th class='col_content'>Content</th></tr></thead> <tbody>";
+    // code for page switching
+    var btnPrev = generatePageSwitchButton(true);
+    var btnNext = generatePageSwitchButton(false);
+
+    var pagesButtons = "";
+    if(totalPages > 0) {        // if something was found, show page switching buttons, otherwise don't show them
+        var pagesButtons = "<div class='pageSwitcher'>Pages: " + btnPrev + "&nbsp; " + (currentPage + 1) + " &nbsp; / &nbsp; " + totalPages + " &nbsp; " + btnNext + "</div>";
+    }
+
+    var header = "<thead><tr><th class='col_filename'>Image name</th><th class='col_actions'>Download / Insert</th><th class='col_content'>Content" + pagesButtons + "</th></tr></thead> <tbody>";
     resultsTable = resultsTable.concat(header);
 
     // nothing found?
@@ -355,12 +364,8 @@ function generateSearchResultsTable()
             resultsTable = resultsTable.concat(resultRow);
         }
 
-        // code for page switching
-        var btnPrev = generatePageSwitchButton(true);
-        var btnNext = generatePageSwitchButton(false);
 
-        var footer = "</tbody> <tfoot><tr><td colspan='3'><div class='links'>Pages: " + btnPrev + "&nbsp; " + (currentPage + 1) + " &nbsp; / &nbsp; " + totalPages + " &nbsp; " + btnNext + "</div></td></tr></tfoot>";
-        resultsTable = resultsTable.concat(footer);
+        resultsTable = resultsTable.concat("</tbody>");
     }
 
     resultsTable = resultsTable.concat("</table>");
