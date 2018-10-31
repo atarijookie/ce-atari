@@ -1,5 +1,6 @@
 #include "utils.h"
 
+#include <libgen.h>
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
@@ -38,13 +39,13 @@ DWORD Utils::getCurrentMs(void)
 {
 	struct timespec tp;
 	int res;
-	
+
 	res = clock_gettime(CLOCK_MONOTONIC, &tp);					// get current time
-	
+
 	if(res != 0) {												// if failed, fail
 		return 0;
 	}
-	
+
 	DWORD val = (tp.tv_sec * 1000) + (tp.tv_nsec / 1000000);	// convert to milli seconds
 	return val;
 }
@@ -52,9 +53,9 @@ DWORD Utils::getCurrentMs(void)
 DWORD Utils::getEndTime(DWORD offsetFromNow)
 {
 	DWORD val;
-	
+
 	val = getCurrentMs() + offsetFromNow;
-	
+
 	return val;
 }
 
@@ -71,24 +72,24 @@ void Utils::attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari)
 
     if(attrHost & FILE_ATTRIBUTE_SYSTEM)
         attrAtari |= FA_SYSTEM;
-		
+
     if(attrHost &                      )
 		attrAtari |= FA_VOLUME;
 */
-	
+
     if(isDir)
         attrAtari |= FA_DIR;
 
 /*
     if(attrHost & FILE_ATTRIBUTE_ARCHIVE)
         attrAtari |= FA_ARCHIVE;
-*/		
+*/
 }
 
 WORD Utils::fileTimeToAtariDate(struct tm *ptm)
 {
     WORD atariDate = 0;
-	
+
 	if(ptm == NULL) {
 		return 0;
 	}
@@ -107,7 +108,7 @@ WORD Utils::fileTimeToAtariTime(struct tm *ptm)
 	if(ptm == NULL) {
 		return 0;
 	}
-	
+
     atariTime |= (ptm->tm_hour		) << 11;        // hours
     atariTime |= (ptm->tm_min		) << 5;         // minutes
     atariTime |= (ptm->tm_sec	/ 2	);              // seconds
@@ -127,12 +128,12 @@ void Utils::fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *pt
     hours   =  (atariTime >> 11) & 0x1f;	// 0-23
     minutes =  (atariTime >>  5) & 0x3f;	// 0-59
     seconds = ( atariTime        & 0x1f) * 2;	// in unit of two
-	
+
 	memset(ptm, 0, sizeof(struct tm));
 	ptm->tm_year	= year - 1900;		// number of years since 1900.
 	ptm->tm_mon		= month - 1;	// The number of months since January, in the range 0 to 11
 	ptm->tm_mday	= day;		// The day of the month, in the range 1 to 31.
-	
+
 	ptm->tm_hour	= hours;	// The number of hours past midnight, in the range 0 to 23
 	ptm->tm_min		= minutes;	// The number of minutes after the hour, in the range 0 to 59
 	ptm->tm_sec		= seconds;	// The number of seconds after the minute, normally in the range 0 to 59,
@@ -181,10 +182,23 @@ void Utils::splitFilenameFromPath(const std::string &pathAndFile, std::string &p
     }
 }
 
+void Utils::splitFilenameFromExt(const std::string &filenameAndExt, std::string &filename, std::string &ext)
+{
+    size_t sepPos = filenameAndExt.rfind('.');
+
+    if(sepPos == std::string::npos) {                   		// not found?
+        filename = filenameAndExt;                              // pretend we don't have extension, just filename
+        ext.clear();
+    } else {                                                    // separator found?
+        filename = filenameAndExt.substr(0, sepPos);            // filename is before separator
+        ext      = filenameAndExt.substr(sepPos + 1);           // extension is after separator
+    }
+}
+
 void Utils::sleepMs(DWORD ms)
 {
 	DWORD us = ms * 1000;
-	
+
 	usleep(us);
 }
 
@@ -194,10 +208,10 @@ void Utils::resetHansAndFranz(void)
 	bcm2835_gpio_write(PIN_RESET_FRANZ,			LOW);
 
 	Utils::sleepMs(10);										// wait a while to let the reset work
-	
+
 	bcm2835_gpio_write(PIN_RESET_HANS,			HIGH);		// reset lines to RUN (not reset) state
 	bcm2835_gpio_write(PIN_RESET_FRANZ,			HIGH);
-	
+
 	Utils::sleepMs(50);										// wait a while to let the devices boot
 }
 
@@ -311,7 +325,7 @@ void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
     int family, n;
 
     memset(bfrIPs, 0, 10);                                          // set to 0 - this means 'not present'
-    
+
     if(bfrMasks) {
         memset(bfrMasks, 0, 10);                                    // set to 0 - this means 'not present'
     }
@@ -333,16 +347,16 @@ void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
 
         sockaddr_in *saiIp  = (sockaddr_in *) ifa->ifa_addr;
         sockaddr_in *saiMsk = (sockaddr_in *) ifa->ifa_netmask;
-        
+
         DWORD ip            = saiIp->sin_addr.s_addr;
         DWORD mask          = saiMsk->sin_addr.s_addr;
 
         BYTE *pIp   = NULL;
         BYTE *pMsk  = NULL;
-        
+
         if(strcmp(ifa->ifa_name,"eth0")==0) {                   // for eth0 - store at offset 0
             pIp = bfrIPs;
-            
+
             if(bfrMasks) {                                      // got masks buffer? store offset 0
                 pMsk = bfrMasks;
             }
@@ -350,7 +364,7 @@ void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
 
         if(strcmp(ifa->ifa_name,"wlan0")==0) {                  // for wlan0 - store at offset 5
             pIp = bfrIPs + 5;
-            
+
             if(bfrMasks) {                                      // got masks buffer? store offset 5
                 pMsk = bfrMasks + 5;
             }
@@ -365,7 +379,7 @@ void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
         pIp[2] = (BYTE) (ip >>  8);
         pIp[3] = (BYTE) (ip >> 16);
         pIp[4] = (BYTE) (ip >> 24);
-        
+
         if(pMsk) {
             pMsk[0] = 1;                                        // enabled?
             pMsk[1] = (BYTE)  mask;                             // store the mask
@@ -380,8 +394,8 @@ void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
 
 void Utils::forceSync(void)
 {
-	TMounterRequest tmr;			
-	tmr.action	= MOUNTER_ACTION_SYNC;                          // let the mounter thread do filesystem caches sync 						
+	TMounterRequest tmr;
+	tmr.action	= MOUNTER_ACTION_SYNC;                          // let the mounter thread do filesystem caches sync
 	Mounter::add(tmr);
 }
 
@@ -453,18 +467,18 @@ void Utils::createTimezoneString(char *str)
     char  signChar;
     int   ofsHours, ofsMinutes;
     float fOfsHours;
-    
+
     if(utcOffset >= 0.0f) {         // is UTC offset positive? (e.g. Berlin is +1 / +2) TZ should have '-' because it's east of Prime Meridian
         signChar = '-';
     } else {                        // is UTC offset negative? (e.g. New York is -5 / -4) TZ should have '+' because it's west of Prime Meridian
         signChar = '+';
     }
-    
+
     ofsHours    = (int)   utcOffset;                            // int  : hours only    (including sign)
     fOfsHours   = (float) ofsHours;                             // float: hours only    (including sign)
     ofsHours    = abs(ofsHours);                                // int  : hours only    (without   sign)
     ofsMinutes  = abs((int) ((utcOffset - fOfsHours) * 60.0f)); // not get only minutes (without   sign)
-    
+
     if(ofsHours != 0 && ofsMinutes != 0) {                      // got offset - both hours and minutes?
         sprintf(str, "UTC%c%02d:%02d", signChar, ofsHours, ofsMinutes);
     } else if(ofsHours != 0 && ofsMinutes == 0) {               // got offset - only hours (no minutes)
@@ -478,16 +492,16 @@ void Utils::setTimezoneVariable_inProfileScript(void)
 {
     char utcOfsset[64];
     createTimezoneString(utcOfsset);
-    
+
     char tzString[128];
     sprintf(tzString, "echo 'export TZ=\"%s\"' > /etc/profile.d/set_timezone.sh", utcOfsset);
-    
+
     Debug::out(LOG_DEBUG, "Utils::setTimezoneVariable_inProfileScript() -- creating timezone setting script like this: %s\n", tzString);
-    
+
     system("mkdir -p /etc/profile.d");                          // if this dir doesn't exist, create it
     system(tzString);                                           // now create the script in the dir above
     system("chmod 755 /etc/profile.d/set_timezone.sh");         // make it executable
-    
+
     forceSync();                                                // make sure it does to disk
 }
 
@@ -497,7 +511,7 @@ void Utils::setTimezoneVariable_inThisContext(void)
     createTimezoneString(utcOfsset);
 
     Debug::out(LOG_DEBUG, "Utils::setTimezoneVariable_inThisContext() -- setting TZ variable to: %s\n", utcOfsset);
-    
+
     setenv("TZ", utcOfsset, 1);
 }
 
@@ -553,4 +567,139 @@ void Utils::splitString(const std::string &s, char delim, std::vector<std::strin
     while (std::getline(ss, item, delim)) {
         elems.push_back(item);
     }
+}
+
+// make dir recursively (like mkdir -p)
+int Utils::mkpath(const char *dir, int mode)
+{
+    struct stat sb;
+
+    if (!dir) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (!stat(dir, &sb))
+        return 0;
+
+    mkpath(dirname(strdupa(dir)), mode);
+
+    return mkdir(dir, mode);
+}
+
+bool Utils::unZIPfloppyImageAndReturnFirstImage(const char *inZipFilePath, std::string &outImageFilePath)
+{
+    outImageFilePath.clear();                       // out path doesn't contain anything yet
+
+    system("rm    -rf /tmp/zipedfloppy");           // delete this dir, if it exists
+    system("mkdir -p  /tmp/zipedfloppy");           // create that dir
+
+    char unzipCommand[512];
+    sprintf(unzipCommand, "unzip -o '%s' -d /tmp/zipedfloppy > /dev/null 2> /dev/null", inZipFilePath);
+    system(unzipCommand);                           // unzip the downloaded ZIP file into that tmp directory
+
+    // find the first usable floppy image
+    DIR *dir = opendir("/tmp/zipedfloppy");         // try to open the dir
+
+    if(dir == NULL) {                               // not found?
+        Debug::out(LOG_DEBUG, "Utils::unZIPfloppyImageAndReturnFirstImage -- opendir() failed");
+        return false;
+    }
+
+    bool found          = false;
+    struct dirent *de   = NULL;
+
+    const char *pExt = NULL;
+
+    while(1) {                                      // avoid buffer overflow
+        de = readdir(dir);                          // read the next directory entry
+
+        if(de == NULL) {                            // no more entries?
+            break;
+        }
+
+        if(de->d_type != DT_REG) {                  // not a file? skip it
+            continue;
+        }
+
+        int fileNameLen = strlen(de->d_name);       // get length of filename
+
+        if(fileNameLen < 3) {                       // if it's too short, skip it
+            continue;
+        }
+
+        pExt = getExtension(de->d_name);            // get where the extension starts
+
+        if(pExt == NULL) {                          // extension not found? skip it
+            continue;
+        }
+
+        if(strcasecmp(pExt, "st") == 0 || strcasecmp(pExt, "msa") == 0) {  // the extension of the file is valid for a floppy image?
+            found = true;
+            break;
+        }
+    }
+
+    closedir(dir);                                  // close the dir
+
+    if(!found) {                                    // not found? return with a fail
+        Debug::out(LOG_DEBUG, "Utils::unZIPfloppyImageAndReturnFirstImage -- couldn't find an image inside of %s", inZipFilePath);
+        return false;
+    }
+
+    // construct path to unZIPed image
+    outImageFilePath = "/tmp/zipedfloppy/";
+    outImageFilePath.append(de->d_name);
+
+    Debug::out(LOG_DEBUG, "Utils::unZIPfloppyImageAndReturnFirstImage -- this ZIP file: %s contains this floppy image file: %s", inZipFilePath, outImageFilePath.c_str());
+    return true;
+}
+
+const char *Utils::getExtension(const char *fileName)
+{
+    const char *pExt;
+    pExt = strrchr(fileName, '.');  // find last '.'
+
+    if(pExt == NULL) {              // last '.' not found? skip it
+        return NULL;
+    }
+
+    pExt++;                         // move beyond '.'
+    return pExt;
+}
+
+bool Utils::isZIPfile(const char *fileName)
+{
+    const char *ext = Utils::getExtension(fileName);     // find extension
+
+    if(ext == NULL) {                       // no extension? not a ZIP file then
+        return false;
+    }
+
+    return (strcasecmp(ext, "zip") == 0);   // it's a ZIP file when the extension is this
+}
+
+void Utils::createPathWithOtherExtension(std::string &inPathWithOriginalExt, const char *otherExtension, std::string &outPathWithOtherExtension)
+{
+    outPathWithOtherExtension = inPathWithOriginalExt;  // first just copy the input path
+
+    const char *originalExt = Utils::getExtension(inPathWithOriginalExt.c_str());
+
+    if(originalExt == NULL) {                           // failed to find extension? fail
+        return;
+    }
+    int originalExtLen = strlen(originalExt);           // get length of original extension
+
+    if(outPathWithOtherExtension.size() < ((size_t) originalExtLen)) { // path shorter than extension? (how could this happen???) fail
+        return;
+    }
+
+    outPathWithOtherExtension.resize(outPathWithOtherExtension.size() - originalExtLen);    // remove original extension
+    outPathWithOtherExtension = outPathWithOtherExtension + std::string(otherExtension);    // append other extension
+}
+
+bool Utils::fileExists(std::string &hostPath)
+{
+    int res = access(hostPath.c_str(), F_OK);
+    return (res != -1);     // if not error, file exists
 }

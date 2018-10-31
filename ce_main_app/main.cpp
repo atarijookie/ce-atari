@@ -24,6 +24,7 @@
 #include "ce_conf_on_rpi.h"
 #include "periodicthread.h"
 #include "display/displaythread.h"
+#include "floppy/imagesilo.h"
 
 #include "webserver/webserver.h"
 #include "webserver/api/apimodule.h"
@@ -80,6 +81,7 @@ int main(int argc, char *argv[])
 
     pthread_mutex_init(&shared.mtxScsi,             NULL);
     pthread_mutex_init(&shared.mtxConfigStreams,    NULL);
+    pthread_mutex_init(&shared.mtxImages,           NULL);
 
     printf("\033[H\033[2J\n");
 

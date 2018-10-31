@@ -142,14 +142,16 @@ public:
     void detachAllUsbMedia(void);
 
     virtual void reloadSettings(int type);      // from ISettingsUser
-    
+
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
     static bool hostPathExists(std::string hostPath);
     static void pathSeparatorAtariToHost(std::string &path);
-    
+
     bool createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
     void createFullHostPath (const std::string &inFullAtariPath, int inAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);
+
+    bool getPathToUsbDriveOrSharedDrive(std::string &hostRootPath);
 
     // for status report
     bool driveIsEnabled(int driveIndex);
