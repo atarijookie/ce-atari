@@ -148,7 +148,7 @@ void Downloader::statusJson(std::ostringstream &status, int downloadTypeMask)
     bool hasItem = false;       // list doesn't have anyitem yet
 
     // create status for the currently downloaded thing
-    if(downloadCurrent.downPercent < 100) {
+    if(downloadCurrent.statusByte != DWNSTATUS_DOWNLOAD_OK && downloadCurrent.statusByte != DWNSTATUS_DOWNLOAD_FAIL) {  // if the download didn't finish (with OK or FAIL)
         if((downloadCurrent.downloadType & downloadTypeMask) != 0) {    // if the mask matches the download type, add it
             formatStatusJson(downloadCurrent, status);
             hasItem = true;     // we have one item now
@@ -195,7 +195,7 @@ int Downloader::count(int downloadTypeMask)
     }
 
     // and for the currently downloaded thing
-    if(downloadCurrent.downPercent < 100) {
+    if(downloadCurrent.statusByte != DWNSTATUS_DOWNLOAD_OK && downloadCurrent.statusByte != DWNSTATUS_DOWNLOAD_FAIL) {  // if the download didn't finish (with OK or FAIL)
         if((downloadCurrent.downloadType & downloadTypeMask) != 0) {    // if the mask matches the download type, add it
             typeCnt++;                                      // increment count
         }
@@ -334,7 +334,9 @@ int Downloader::my_progress_func(void *clientp, double downTotal, double downNow
 
 void Downloader::updateStatusByte(TDownloadRequest &tdr, BYTE newStatus)
 {
-    if(tdr.pStatusByte != NULL) {
+    tdr.statusByte = newStatus;                 // update the local status byte
+
+    if(tdr.pStatusByte != NULL) {               // if got pointer to remote status byte
         *tdr.pStatusByte = newStatus;           // store the new status
     }
 }

@@ -33,6 +33,7 @@ typedef struct {
     int downloadType;           // defines what is downloaded - update, floppy image, ...
     WORD checksum;              // used to verify file integrity after download
 
+    volatile BYTE statusByte;   // this will be used for storing status, even if not read by other thread, for purpose of counting files in queue
     volatile BYTE *pStatusByte; // if set to non-null, will be updated with the download status DWNSTATUS_*
 
     volatile int downPercent;   // defines progress - from 0 to 100
