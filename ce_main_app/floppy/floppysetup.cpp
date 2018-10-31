@@ -121,9 +121,11 @@ void FloppySetup::searchInit(void)
         return;
     }
 
-    if(!shared.imageList->loadList()) {      // try to load the list, if failed, error
-        dataTrans->setStatus(FDD_ERROR);
-        return;
+    if(!shared.imageList->getIsLoaded()) {  // if list is not loaded yet
+        if(!shared.imageList->loadList()) { // try to load the list, if failed, error
+            dataTrans->setStatus(FDD_ERROR);
+            return;
+        }
     }
 
     dataTrans->setStatus(FDD_OK);           // done
@@ -340,10 +342,10 @@ void FloppySetup::searchInsertToSlot(void)
 
 void FloppySetup::downloadOnDevice(void)
 {
-	TranslatedDisk * translated = TranslatedDisk::getInstance();
+    TranslatedDisk * translated = TranslatedDisk::getInstance();
     int index = cmd[5];
 
-	memset(bfr64k, 0, 512);
+    memset(bfr64k, 0, 512);
     dataTrans->recvData(bfr64k, 512);                       // receive file name into this buffer
     std::string atariFilePath = (char *) bfr64k;
     std::string hostPath;
@@ -487,7 +489,7 @@ void FloppySetup::searchDownload(void)
 
 void FloppySetup::uploadStart(void)
 {
-	TranslatedDisk * translated = TranslatedDisk::getInstance();
+    TranslatedDisk * translated = TranslatedDisk::getInstance();
     int index = cmd[5];
 
     if(index < 0 || index > 2) {                            // index out of range? fail
@@ -650,7 +652,7 @@ void FloppySetup::newImage(void)
     }
 
     char file[128];
-	getNewImageName(file);
+    getNewImageName(file);
     std::string justFile = file;
     std::string pathAndFile = UPLOAD_PATH + justFile;
 
@@ -705,27 +707,27 @@ bool FloppySetup::createNewImage(std::string pathAndFile)
 
 void FloppySetup::getNewImageName(char *nameBfr)
 {
-	TranslatedDisk * translated = TranslatedDisk::getInstance();
-	char fileName[24];
+    TranslatedDisk * translated = TranslatedDisk::getInstance();
+    char fileName[24];
 
-	for(int i=0; i<100; i++) {
-		sprintf(fileName, "newimg%d.st", i);						// create new filename
+    for(int i=0; i<100; i++) {
+        sprintf(fileName, "newimg%d.st", i);						// create new filename
 
-		std::string fnameWithPath = UPLOAD_PATH;
-		fnameWithPath += fileName;									// this will be filename with path
+        std::string fnameWithPath = UPLOAD_PATH;
+        fnameWithPath += fileName;									// this will be filename with path
 
-		if(shared.imageSilo->containsImage(fileName)) {					// if this file is already in silo, skip it
-			continue;
-		}
+        if(shared.imageSilo->containsImage(fileName)) {					// if this file is already in silo, skip it
+            continue;
+        }
 
-		if(translated->hostPathExists(fnameWithPath)) {				// if this file does exist, delete it (it's not in silo)
-			unlink(fnameWithPath.c_str());
-		}
+        if(translated->hostPathExists(fnameWithPath)) {				// if this file does exist, delete it (it's not in silo)
+            unlink(fnameWithPath.c_str());
+        }
 
-		break;														// break this cycle and thus use this filename
-	}
+        break;														// break this cycle and thus use this filename
+    }
 
-	strcpy(nameBfr, fileName);
+    strcpy(nameBfr, fileName);
 }
 
 void FloppySetup::downloadStart(void)
@@ -868,20 +870,25 @@ void FloppySetup::getImageEncodingRunning(void)
 
     if(doWeHaveStorage) {               // if got storage
         if(encoding) {                  // if encoding
-            status += std::string("Encoding image");
+            status += std::string("Encoding");
 
             if(downloadCount > 0) {     // if also downloading, add column
                 status += std::string(", ");
             }
         }
 
-        char tmp[32];
+        char tmp[50];
         if(downloadCount > 1) {         // more than 1 file?
-            sprintf(tmp, "%d", downloadCount);   // integer to string (std::to_string not present on Jessie)
-            status += std::string("Downloading ") + tmp + std::string(" files");
+            if(encoding) {				// and also encoding? shorter download status
+                sprintf(tmp, "Download: %d files, now: %d %%", downloadCount, downloadProgr);
+            } else {					// not encoding? longer download status
+                sprintf(tmp, "Downloading %d files, current: %d %%", downloadCount, downloadProgr);
+            }
+
+            status += tmp;
         } else if(downloadCount == 1) { // downloading 1 file?
-            sprintf(tmp, "%d", downloadProgr);   // integer to string (std::to_string not present on Jessie)
-            status += std::string("Downloading file: ") + tmp + std::string("%");
+            sprintf(tmp, "Downloading file: %d %%", downloadProgr);
+            status += tmp;
         }
     } else {                            // don't have storage? add warning
         status += std::string("No USB or shared storage, ops limited!");

@@ -156,6 +156,10 @@ void DownloadResource::onGetStatus(mg_connection *conn, mg_request_info *req_inf
     stringStream << ", \"downloading_count\": ";
     stringStream << downloadingCount;
 
+    int downloadProgr = Downloader::progressOfCurrentDownload();
+    stringStream << ", \"downloading_progress\": ";
+    stringStream << downloadProgr;
+
     stringStream << ", \"do_we_have_storage\": ";                   // do we have the storage or not?
     stringStream << (shared.imageStorage->doWeHaveStorage() ? "true" : "false");
 

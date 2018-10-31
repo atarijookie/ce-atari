@@ -104,7 +104,7 @@ function handleShowOverlay(encoding_ready)
     return check_again;             // return if we should check again in a while
 }
 
-function handleShowDownloading(downloading_count)
+function handleShowDownloading(downloading_count, downloading_progress)
 {
     if(typeof(downloading_count)==='undefined') {  // if don't have variable, hide overlay
         $(".overlay_dwnld").hide();
@@ -116,7 +116,7 @@ function handleShowDownloading(downloading_count)
     if(downloading_count == 0) {    // not downloading?
         $(".overlay_dwnld").hide();
     } else {                        // still downloading?
-        var msgText = "<h3>Downloading " + downloading_count + " disk images...</h3>";
+        var msgText = "<h3>Downloading " + downloading_count + " disk images...<br>Current file: " + downloading_progress + " %</h3>";
 
         var msg = document.getElementById('download_msg');  // find message
         msg.innerHTML = msgText;                            // set content of message
@@ -141,13 +141,13 @@ function onCheckTimer() {
         url: '/api/v1/download/status',
         success: function(data){
             var check1 = handleShowOverlay(data.encoding_ready);         // encoding?
-            var check2 = handleShowDownloading(data.downloading_count);  // downloading?
+            var check2 = handleShowDownloading(data.downloading_count, data.downloading_progress);  // downloading?
 
             do_we_have_storage = data.do_we_have_storage;
             showNoStorageWarning(!data.do_we_have_storage);  // show / hide no storage message
             
             if(check1 || check2) {              // if we should check again, start timer again
-                setTimeout(onCheckTimer, 1000);
+                setTimeout(onCheckTimer, 333);
             }
 
         },
@@ -171,7 +171,7 @@ function onInsert(imageName, slotNo)
 
             prev_encoding_ready = false;    // now we're encoding, so not ready now
             $(".over_convert").show();      // show overlay
-            setTimeout(onCheckTimer, 1000); // check every while
+            setTimeout(onCheckTimer, 333); // check every while
         },
         error: function (xhr) {
             console.log("Insert Error: " + xhr.statusText);
@@ -191,8 +191,8 @@ function onDownload(imageName)
             console.log("Download Success");
 
             prevDownloadingCount++;       // downloading at least one thing (helps to refresh on fast downloads where timer doesn't happen before download still running)
-            handleShowDownloading(prevDownloadingCount);
-            setTimeout(onCheckTimer, 1000); // check every while
+            handleShowDownloading(prevDownloadingCount, 0);
+            setTimeout(onCheckTimer, 333); // check every while
         },
         error: function (xhr) {
             console.log("Download Error: " + xhr.statusText);
@@ -210,7 +210,7 @@ function generatePageSwitchButton(prevNotNext)
 {
     var pageNumber = 0;
     var buttonSymbol = "X";
-    var buttonClass = "btnHidden";
+    var buttonClass = "btnDownload btnHidden";
     var onClickFunction = "";
 
     if(prevNotNext) {                           // prev page?

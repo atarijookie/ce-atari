@@ -167,8 +167,14 @@ void ImageList::search(const char *part)
 
     int cnt = vectorOfImages.size();
 
-    // if not loaded, or the list is empty
-    if(!isLoaded || cnt < 1) {
+    // if not loaded, try to load
+    if(!isLoaded) {
+        if(!loadList()) {   // try to load list, but if failed, quit
+            return;
+        }
+    }
+
+    if(cnt < 1) {           // list empty? quit
         return;
     }
 
@@ -276,6 +282,13 @@ void ImageList::getSingleGame(std::string &games, std::string &game, size_t pos)
 
 void ImageList::getResultByIndex(int index, char *bfr)
 {
+    // if not loaded, try to load
+    if(!isLoaded) {
+        if(!loadList()) {    // try to load list, but if failed, quit
+            return;
+        }
+    }
+
     #define SIZE_OF_RESULT      68
     memset(bfr, 0, SIZE_OF_RESULT);                                             // clear the memory
     std::string out;
