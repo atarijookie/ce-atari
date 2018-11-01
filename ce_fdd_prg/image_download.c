@@ -7,7 +7,7 @@
 #include "keys.h"
 #include "defs.h"
 #include "stdlib.h"
-       
+
 // ------------------------------------------------------------------ 
 extern BYTE deviceID;
 extern BYTE commandShort[CMD_LENGTH_SHORT];
@@ -59,6 +59,7 @@ TDestDir destDir;
 struct {
     BYTE encoding;              // is the RPi encoding the image or being idle?
     BYTE doWeHaveStorage;       // do we have storage for floppy images?
+    BYTE prevDoWeHaveStorage;   // previous value of doWeHaveStorage
 
     BYTE downloadCount;         // how many files are now being downloaded?
     BYTE prevDownloadCount;     // previous value of downloadCount
@@ -114,10 +115,20 @@ BYTE loopForDownload(void)
         showMenuMask = 0;
 
         if(now >= (lastStatusCheckTime + 200)) {                    // if last check was at least a second ago, do new check
+            BYTE refreshDataAndRedraw = FALSE;
+
             lastStatusCheckTime = now;
             getStatus();                                            // talk to CE to see the status
 
             if(status.downloadCount == 0 && status.prevDownloadCount > 0) {     // if we just finished downloading (not downloading now, but were downloading a while ago)
+                refreshDataAndRedraw = TRUE;                            // do a refresh
+            }
+
+            if(status.doWeHaveStorage != status.prevDoWeHaveStorage) {  // if user attached / detached drive, redraw all
+                refreshDataAndRedraw = TRUE;                            // do a refresh
+            }
+
+            if(refreshDataAndRedraw) {                              // should do a refresh?
                 getResultsPage(search.pageCurrent);                 // refresh current page data
                 showMenuDownload(SHOWMENU_ALL);                     // draw all on screen
             }
@@ -470,7 +481,7 @@ void showMenuDownload(BYTE showMask)
             (void) Cconws("\33pF1, F2, F3\33q - insert into slot 1, 2, 3\r\n");
             (void) Cconws("\33pF4\33q   - download,     \33pF5\33q  - refresh list,\r\n");
         } else {                        // without storage
-            (void) Cconws("\33p                                         \r\n");
+            (void) Cconws("                                         \r\n");
             (void) Cconws("                     \33pF5\33q  - refresh list,\r\n");
         }
 
@@ -624,9 +635,11 @@ void getStatus(void)
     }
 
     status.encoding = pBfr[0];                  // isRunning - 1: is running, 0: is not running
+
+    status.prevDoWeHaveStorage = status.doWeHaveStorage;    // make a copy of previous value
     status.doWeHaveStorage = pBfr[1];           // do we have storage on RPi attached?
 
-    status.prevDownloadCount = status.downloadCount;    // make a copy of previous download files count 
+    status.prevDownloadCount = status.downloadCount;        // make a copy of previous download files count 
     status.downloadCount = pBfr[2];             // how many files are still downloading?
 
     Goto_pos(0, 23);                            // show status line

@@ -308,10 +308,10 @@ void ImageList::getResultByIndex(int index, char *bfr)
 
     int len = imageName.length();               // get the lenght of this filename
 
-    if(len < 12) {                              // name shorter than 8+3? pad to length
+    if(len <= 12) {                             // name shorter than 8+3? pad to length
         out += imageName;                       // add whole filename
         out.append(12 - len, ' ');              // pad with spaces
-    } else if(len > 12) {                       // name too long? insert only first part of name
+    } else {                                    // name too long? insert only first part of name
         out += imageName.substr(0, 12);
     }
 
