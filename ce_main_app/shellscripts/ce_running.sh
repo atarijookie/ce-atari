@@ -33,7 +33,7 @@ else
     echo "cosmosex IS running"
 fi
 
-distro=$( /ce/whichdistro.sh ) 
+distro=$( /ce/whichdistro.sh )
 
 if [ "$distro" = "raspbian_stretch" ]; then
     # check status through systemctl 
