@@ -37,7 +37,6 @@ OTHERS = configdrive/readme.txt
 # shell scripts :
 
 SHELLSCRIPTS = \
-shellscripts/ceboot.sh \
 shellscripts/cesuper.sh \
 shellscripts/ce_conf.sh \
 shellscripts/ce_firstfw.sh \
@@ -52,6 +51,7 @@ shellscripts/update_app.sh \
 shellscripts/update_franz.sh \
 shellscripts/update_hans.sh \
 shellscripts/update_xilinx.sh \
+shellscripts/whichdistro.sh \
 shellscripts/wifisuper.sh
 
 
