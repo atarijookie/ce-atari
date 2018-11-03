@@ -37,7 +37,6 @@ OTHERS = configdrive/readme.txt
 # shell scripts :
 
 SHELLSCRIPTS = \
-shellscripts/ceboot.sh \
 shellscripts/cesuper.sh \
 shellscripts/ce_conf.sh \
 shellscripts/ce_firstfw.sh \
@@ -52,6 +51,7 @@ shellscripts/update_app.sh \
 shellscripts/update_franz.sh \
 shellscripts/update_hans.sh \
 shellscripts/update_xilinx.sh \
+shellscripts/whichdistro.sh \
 shellscripts/wifisuper.sh
 
 
@@ -96,7 +96,7 @@ webroot/templates/status.tpl
 
 # CE main App
 
-APPFILES = cosmosex cosmosex_raspbian cosmosex_yocto
+APPFILES = cosmosex cosmosex_raspbian_jessie cosmosex_raspbian_stretch cosmosex_yocto
 
 
 #  make targets
@@ -185,7 +185,10 @@ webroot/%:	../ce_main_app/webroot/%
 cosmosex:	../ce_main_app/shellscripts/ce_rename_for_distro.sh
 	$(CP) $< $@
 
-cosmosex_raspbian:	../ce_main_app/cosmosex_raspbian
+cosmosex_raspbian_jessie:	../ce_main_app/cosmosex_raspbian_jessie
+	$(CP) $< $@
+
+cosmosex_raspbian_stretch:	../ce_main_app/cosmosex_raspbian_stretch
 	$(CP) $< $@
 
 cosmosex_yocto:	../ce_main_app/cosmosex_yocto

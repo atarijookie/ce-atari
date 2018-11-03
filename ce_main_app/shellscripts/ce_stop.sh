@@ -37,7 +37,7 @@ fi
 
 #------------------------
 # check for distro, run systemctl only on stretch
-distro=$( /ce/whichdistro.sh ) 
+distro=$( /ce/whichdistro.sh )
 
 if [ "$distro" = "raspbian_stretch" ]; then
     # if should terminate (also) using systemctl, do it

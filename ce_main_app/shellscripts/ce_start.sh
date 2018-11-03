@@ -29,7 +29,7 @@ ce_is_running() {
 rm -f /ce/update/doupdate.sh
 
 # check for distro, run systemctl only on stretch
-distro=$( /ce/whichdistro.sh ) 
+distro=$( /ce/whichdistro.sh )
 
 if [ "$distro" = "raspbian_stretch" ]; then
     # if should start using systemctl, do it
