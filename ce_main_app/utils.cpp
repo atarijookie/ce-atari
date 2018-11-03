@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include "utils.h"
 
 #include <libgen.h>
@@ -573,18 +574,23 @@ void Utils::splitString(const std::string &s, char delim, std::vector<std::strin
 int Utils::mkpath(const char *dir, int mode)
 {
     struct stat sb;
+    char * dircopy;
 
-    if (!dir) {
+    if (dir == NULL) {
         errno = EINVAL;
         return -1;
     }
 
-    if (!stat(dir, &sb))
-        return 0;
+    if (stat(dir, &sb) == 0) {
+        return 0;   // the directory already exists
+    }
 
-    mkpath(dirname(strdupa(dir)), mode);
+    // strdup() dir because some implementations of dirname() store the result in the input buffer
+    dircopy = strdup(dir);
+    mkpath(dirname(dircopy), mode); // create (recursively) parent directory
+    free(dircopy);
 
-    return mkdir(dir, mode);
+    return mkdir(dir, mode);    // create directory itself, once all parents are created
 }
 
 bool Utils::unZIPfloppyImageAndReturnFirstImage(const char *inZipFilePath, std::string &outImageFilePath)
