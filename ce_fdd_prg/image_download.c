@@ -616,7 +616,7 @@ void setSelectedRow(int row)
 BYTE searchInit(void)
 {
     commandShort[4] = FDD_CMD_SEARCH_INIT;
-    commandShort[5] = 0;
+    commandShort[5] = scrRez;                   // screen resolution
 
     sectorCount = 1;                            // read 1 sector
     BYTE res;
