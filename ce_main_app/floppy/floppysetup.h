@@ -28,6 +28,7 @@ public:
     static bool createNewImage(std::string pathAndFile);
 
 private:
+    int                 screenResolution;
     AcsiDataTrans       *dataTrans;
     SettingsReloadProxy *reloadProxy;
 
@@ -36,7 +37,7 @@ private:
 
     BYTE    bfr64k[64 * 1024 + 4];
 
-    int         imgDnStatus;
+    //int         imgDnStatus;
     std::string inetDnFilePath;
     std::string inetDnFilename;
 
@@ -72,8 +73,8 @@ private:
     void searchResult(void);
     void searchRefreshList(void);
 
-    void searchMark(void);              // OBSOLETE
-    void searchDownload(void);          // OBSOLETE
+//  void searchMark(void);              // OBSOLETE
+//  void searchDownload(void);          // OBSOLETE
 
     void searchDownload2Storage(void);  // CURRENT WAY OF DOWNLOADING
     void searchInsertToSlot(void);

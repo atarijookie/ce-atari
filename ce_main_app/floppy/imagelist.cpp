@@ -280,7 +280,7 @@ void ImageList::getSingleGame(std::string &games, std::string &game, size_t pos)
     game = games.substr(start, (end - start + 1));                              // get only the single game
 }
 
-void ImageList::getResultByIndex(int index, char *bfr)
+void ImageList::getResultByIndex(int index, char *bfr, int screenResolution)
 {
     // if not loaded, try to load
     if(!isLoaded) {
@@ -302,10 +302,6 @@ void ImageList::getResultByIndex(int index, char *bfr)
 
     bool weHaveThisImage = shared.imageStorage->weHaveThisImage(imageName.c_str());
 
-    if(weHaveThisImage) {                       // if we have this image, hightlight name (reverse on)
-        out += "\033p";
-    }
-
     int len = imageName.length();               // get the lenght of this filename
 
     if(len <= 12) {                             // name shorter than 8+3? pad to length
@@ -315,17 +311,19 @@ void ImageList::getResultByIndex(int index, char *bfr)
         out += imageName.substr(0, 12);
     }
 
-    if(weHaveThisImage) {                       // if we have this image, reverse off
-        out += "\033q";
+    if(weHaveThisImage) {                       // if we have this image, show tick
+        out += " \010 ";
+    } else {                                    // don't have it, don't show tick
+        out += "   ";
     }
-
-    out += " ";                                                 // space between filename and slots
 
     shared.imageSilo->containsImageInSlots(imageName, out);     // slots info
 
     out += " ";                                                 // space slots and list of games
 
-    size_t lenOfRest = SIZE_OF_RESULT - 1 - out.length();       // how much can we fit in ;
+    size_t colCount = (screenResolution == 0) ? 40 : SIZE_OF_RESULT;    // low res has 40 cols, mid and high res has 80 cols
+
+    size_t lenOfRest = colCount - 1 - out.length();             // how much can we fit in ;
     if(vectorOfResults[index].game.length() <= lenOfRest) {     // games will fit in that buffer?
         out += vectorOfResults[index].game;                     // add all content there
     } else {                                                    // content won't fit? copy just part

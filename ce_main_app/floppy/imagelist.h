@@ -38,7 +38,7 @@ public:
     void search(const char *part);
 
     int  getSearchResultsCount(void);
-    void getResultByIndex(int index, char *bfr);
+    void getResultByIndex(int index, char *bfr, int screenResolution);
     void getResultByIndex(int index, std::ostringstream &stream);
     void markImage(int index);
     bool getFirstMarkedImage(std::string &url, int &checksum, std::string &filename);

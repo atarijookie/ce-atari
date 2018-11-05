@@ -33,7 +33,8 @@ FloppySetup::FloppySetup()
 
     currentDownload.fh = NULL;
 
-    imgDnStatus = IMG_DN_STATUS_IDLE;
+    //imgDnStatus = IMG_DN_STATUS_IDLE;
+    screenResolution = 1;
 }
 
 FloppySetup::~FloppySetup()
@@ -102,8 +103,8 @@ void FloppySetup::processCommand(BYTE *command)
         case FDD_CMD_SEARCH_INIT:               searchInit();               break;
         case FDD_CMD_SEARCH_STRING:             searchString();             break;
         case FDD_CMD_SEARCH_RESULTS:            searchResult();             break;
-        case FDD_CMD_SEARCH_MARK:               searchMark();               break;
-        case FDD_CMD_SEARCH_DOWNLOAD:           searchDownload();           break;
+//      case FDD_CMD_SEARCH_MARK:               searchMark();               break;  // OBSOLETE
+//      case FDD_CMD_SEARCH_DOWNLOAD:           searchDownload();           break;  // OBSOLETE
         case FDD_CMD_SEARCH_REFRESHLIST:        searchRefreshList();        break;
 
         case FDD_CMD_SEARCH_DOWNLOAD2STORAGE:   searchDownload2Storage();   break;
@@ -116,6 +117,8 @@ void FloppySetup::processCommand(BYTE *command)
 
 void FloppySetup::searchInit(void)
 {
+    screenResolution = cmd[5];              // current resolution on Atari ST
+
     if(!shared.imageList->exists()) {        // if the file does not yet exist, tell ST that we're downloading
         dataTrans->setStatus(FDD_DN_LIST);
         return;
@@ -164,7 +167,7 @@ void FloppySetup::searchResult(void)
     // now get the search results - 68 bytes per line
     int offset = 0;
     for(int i=pageStart; i<pageEnd; i++) {
-        shared.imageList->getResultByIndex(i, (char *) (bfr64k + offset));
+        shared.imageList->getResultByIndex(i, (char *) (bfr64k + offset), screenResolution);
         offset += 68;
     }
 
@@ -172,6 +175,7 @@ void FloppySetup::searchResult(void)
     dataTrans->setStatus(FDD_OK);                   // done
 }
 
+/*
 void FloppySetup::searchMark(void)
 {
     dataTrans->recvData(bfr64k, 512);               // read data
@@ -185,6 +189,7 @@ void FloppySetup::searchMark(void)
 
     dataTrans->setStatus(FDD_OK);                   // done
 }
+*/
 
 void FloppySetup::searchDownload2Storage(void)
 {
@@ -368,7 +373,7 @@ void FloppySetup::downloadOnDevice(void)
 
             if(index == 10) {                                   // if we just saved the downloaded file
                 unlink(inetDnFilePath.c_str());                 // delete it from RPi
-                imgDnStatus = IMG_DN_STATUS_IDLE;               // the download is now idle
+                //imgDnStatus = IMG_DN_STATUS_IDLE;               // the download is now idle
             }
 
             dataTrans->setStatus(FDD_RES_ONDEVICECOPY);
@@ -383,6 +388,7 @@ void FloppySetup::downloadOnDevice(void)
     dataTrans->setStatus(FDD_ERROR);                        // if came here, on device copy didn't succeed
 }
 
+/*
 void FloppySetup::searchDownload(void)
 {
     std::string url, filename;
@@ -486,6 +492,7 @@ void FloppySetup::searchDownload(void)
         }
     }
 }
+*/
 
 void FloppySetup::uploadStart(void)
 {
@@ -820,7 +827,7 @@ void FloppySetup::downloadDone(void)
 
     if(index == 10) {                                   // if we just saved the downloaded file
         unlink(inetDnFilePath.c_str());                 // delete it from RPi
-        imgDnStatus = IMG_DN_STATUS_IDLE;               // the download is now idle
+        //imgDnStatus = IMG_DN_STATUS_IDLE;               // the download is now idle
     }
 
     dataTrans->setStatus(FDD_OK);
