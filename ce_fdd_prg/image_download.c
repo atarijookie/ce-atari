@@ -33,8 +33,8 @@ void selectDestinationDir(void);
 BYTE refreshImageList(void);
 void setSelectedRow(int row);
 
-void markCurrentRow(void);              // OBSOLETE
-void handleImagesDownload(void);        // OBSOLETE
+//void markCurrentRow(void);              // OBSOLETE
+//void handleImagesDownload(void);        // OBSOLETE
 
 void getStatus(void);
 void insertCurrentIntoSlot(BYTE key);   // uses imageStorage
@@ -69,6 +69,8 @@ void downloadImage(int index);
 
 #define ROW_LENGTH  68
 
+BYTE scrRez;
+
 // ------------------------------------------------------------------ 
 
 #define SHOWMENU_STATICTEXT     1
@@ -90,6 +92,8 @@ BYTE loopForDownload(void)
     search.prevRow      = 0;
 
     destDir.isSet = 0;
+
+    scrRez = Getrez();                                              // get screen resolution into variable
 
     BYTE res = searchInit();                                        // try to initialize
 
@@ -186,6 +190,14 @@ BYTE loopForDownload(void)
                 gotoNextPage = 1;
             }
         } else {                                                    // shift not pressed?
+            if(key == KEY_LEFT) {                                   // arrow left = prev page
+                gotoPrevPage = 1;
+            }
+
+            if(key == KEY_RIGHT) {                                  // arrow right = next page
+                gotoNextPage = 1;
+            }
+
             if(key == KEY_UP) {                                     // arrow up?
                 if(search.row > 0) {                                // not the top most line? move one line up
                     setSelectedRow(search.row - 1);
@@ -273,6 +285,7 @@ void selectDestinationDir(void)
     strcpy(destDir.path, path);                 // copy in the destination dir
 }
 
+/*
 void handleImagesDownload(void) // OBSOLETE
 {
     if(destDir.isSet == 0) {                    // destination dir not set?
@@ -333,6 +346,7 @@ void markCurrentRow(void)   // OBSOLETE
 
     getResultsPage(search.pageCurrent);                         // reload current page from host
 }
+*/
 
 void insertCurrentIntoSlot(BYTE key)
 {
@@ -456,11 +470,22 @@ BYTE handleWriteSearch(BYTE key)
     return 1;                                                           // search string changed
 }
 
+void addPaddingIfNeeded(void)
+{
+    if(scrRez) {                                // on mid/high res
+        (void) Cconws("                    ");  // add extra spaces
+    }
+}
+
 void showMenuDownload(BYTE showMask)
 {
     if(showMask & SHOWMENU_STATICTEXT) {
         (void) Clear_home();
-        (void) Cconws("\33p[Floppy image download,  Jookie 2014-18]\33q\r\n");
+        (void) Cconws("\33p");
+        addPaddingIfNeeded();
+        (void) Cconws("[Floppy image download,  Jookie 2014-18]");
+        addPaddingIfNeeded();
+        (void) Cconws("\33q\r\n");
     }
 
     if(showMask & SHOWMENU_SEARCHSTRING) {
@@ -475,17 +500,26 @@ void showMenuDownload(BYTE showMask)
 
     if(showMask & SHOWMENU_STATICTEXT) {
         Goto_pos(0, 19);
-        (void) Cconws("\33pA..Z\33q - search, \33p(shift) arrows\33q - move\r\n");
+
+        addPaddingIfNeeded();
+        (void) Cconws("\33pA..Z\33q search          \33parrows\33q move\r\n");
 
         if(status.doWeHaveStorage) {    // with storage
-            (void) Cconws("\33pF1, F2, F3\33q - insert into slot 1, 2, 3\r\n");
-            (void) Cconws("\33pF4\33q   - download,     \33pF5\33q  - refresh list,\r\n");
+            addPaddingIfNeeded();
+            (void) Cconws("\33pF1, F2, F3\33q -> insert into slot 1, 2, 3\r\n");
+
+            addPaddingIfNeeded();
+            (void) Cconws("\33pF4\33q   download        \33pF5\33q  refresh list\r\n");
         } else {                        // without storage
+            addPaddingIfNeeded();
             (void) Cconws("                                         \r\n");
-            (void) Cconws("                     \33pF5\33q  - refresh list,\r\n");
+
+            addPaddingIfNeeded();
+            (void) Cconws("                     \33pF5\33q  refresh list\r\n");
         }
 
-        (void) Cconws("\33pF8\33q   - setup screen, \33pF10\33q - quit\r\n");
+        addPaddingIfNeeded();
+        (void) Cconws("\33pF8\33q   setup screen    \33pF10\33q - quit\r\n");
     }
 }
 
@@ -554,9 +588,9 @@ void showResults(BYTE showMask)
 
 void showPageNumber(void)
 {
-    Goto_pos(13, 2);
-    (void) Cconws("Page:        ");
-    Goto_pos(19, 2);
+    Goto_pos(0, 2);
+    (void) Cconws("Page  :        ");
+    Goto_pos(8, 2);
 
     char tmp[10];
     intToStr(search.pageCurrent + 1, tmp);
@@ -644,6 +678,8 @@ void getStatus(void)
 
     Goto_pos(0, 23);                            // show status line
     (void) Cconws("\33p");                      // inverse on
+    addPaddingIfNeeded();
     (void) Cconws((const char *) (pBfr + 4));   // status string
+    addPaddingIfNeeded();
     (void) Cconws("\33q");                      // inverse off
 }
