@@ -1,4 +1,5 @@
 #include <mint/osbind.h>
+#include <mint/ostruct.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -33,11 +34,14 @@ BYTE setCurrentSlot(BYTE newSlot);
 BYTE currentSlot;
 
 BYTE uploadImage(int index, char *path);
+char *findFirstImageInFolder(void);
 
 BYTE getIsImageBeingEncoded(void);
 #define ENCODING_DONE       0
 #define ENCODING_RUNNING    1
 #define ENCODING_FAIL       2
+
+_DTA ourDta;     // used in findFirstImageInFolder() 
 
 // ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
@@ -50,18 +54,35 @@ int main( int argc, char* argv[] )
     (void) Clear_home();
     (void) Cconws("\33p[  CosmosEx floppy TTP  ]\r\n[  by Jookie 2014-2018  ]\33q\r\n\r\n");
 
-    char *params        = (char *) argv;                            // get pointer to params (path to file)
+    char *params        = (char *) argv;            // get pointer to params (path to file)
     int paramsLength    = (int) params[0];
     char *path          = params + 1;
 
-    if(paramsLength == 0) {
-        (void) Cconws("This is a drap-and-drop, upload\r\n");
-        (void) Cconws("and run floppy tool.\r\n\r\n");
-        (void) Cconws("\33pArgument is path to floppy image.\33q\r\n\r\n");
-        (void) Cconws("For menu driven floppy config\r\n");
-        (void) Cconws("run the CE_FDD.PRG\r\n");
-        getKey();
-        return 0;
+    if(paramsLength == 0) {                         // no TTP argument given?
+        path = findFirstImageInFolder();            // try to find first valid ST / MSA image in the same folder (e.g. used like this for compo presentation)
+
+        if(path == NULL) {                          // no floppy image found?
+            (void) Cconws("This is a drap-and-drop, upload\r\n");
+            (void) Cconws("and run floppy tool.\r\n\r\n");
+            (void) Cconws("\33pArgument is path to floppy image.\33q\r\n\r\n");
+
+            (void) Cconws("If no argument is specified, this tool\r\n");
+            (void) Cconws("will try to find first image in folder.\r\n\r\n");
+
+            (void) Cconws("If no image was found in the folder,\r\n");
+            (void) Cconws("this message is shown instead.\r\n\r\n");
+
+            (void) Cconws("For menu driven floppy config\r\n");
+            (void) Cconws("run the CE_FDD.PRG\r\n");
+            getKey();
+            return 0;
+        }
+
+        paramsLength = strlen(path);                // get path length
+
+        (void) Cconws("Found image: ");
+        (void) Cconws(path);
+        (void) Cconws("\r\n");
     }
 
     path[paramsLength]  = 0;                        // terminate path
@@ -196,6 +217,32 @@ void intToStr(int val, char *str)
     }
     
     str[3] = 0;                     // terminating zero
+}
+
+char *findFirstImageInFolder(void)
+{
+    _DTA *oldDta;
+    int res;
+
+    oldDta = Fgetdta();         // get original DTA
+    Fsetdta(&ourDta);           // set our temporary DTA
+
+    res = Fsfirst("*.MSA", 0);  // find MSA image
+
+    if(res == 0) {              // if file was found
+        Fsetdta(oldDta);        // restore the original DTA
+        return ourDta.dta_name;
+    }
+
+    res = Fsfirst("*.ST", 0);  // find ST image
+
+    if(res == 0) {              // if file was found
+        Fsetdta(oldDta);        // restore the original DTA
+        return ourDta.dta_name;
+    }
+
+    Fsetdta(oldDta);            // restore the original DTA
+    return NULL;                // nothing found
 }
 
 BYTE getKey(void)
