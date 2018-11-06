@@ -11,6 +11,9 @@ char *  strcpy( char * destination, const char * source);
 char *  strcat( char * destination, const char * source);
 int		strncmp ( const char * str1, const char * str2, int num );
 void	sleep(int seconds);
+void    msleep  ( int ms );
 DWORD   getTicks(void);
+BYTE    atariKeysToSingleByte(BYTE vkey, BYTE key);
+BYTE    getKeyIfPossible(void);
 
 #endif

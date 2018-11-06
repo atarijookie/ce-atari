@@ -1,25 +1,21 @@
-#include <mint/sysbind.h>
 #include <mint/osbind.h>
-#include <mint/basepage.h>
-#include <mint/ostruct.h>
-#include <unistd.h>
 
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 
 #include "acsi.h"
 #include "main.h"
 #include "hostmoddefs.h"
-#include "keys.h"
 #include "defs.h"
 #include "hdd_if.h"
 #include "find_ce.h"
-       
+#include "vt52.h"
+#include "stdlib.h"
+
 // ------------------------------------------------------------------ 
 
 BYTE deviceID;
-BYTE commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
+BYTE commandShort[CMD_LENGTH_SHORT] = { 0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
 
 void showComError(void);
 
@@ -46,16 +42,18 @@ BYTE getIsImageBeingEncoded(void);
 // ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
 {
-	BYTE found, setSlot;
+    BYTE found;
 
-	// write some header out
-	(void) Clear_home();
-	(void) Cconws("\33p[  CosmosEx floppy TTP  ]\r\n[    by Jookie 2014     ]\33q\r\n\r\n");
-    
+    // write some header out
+    VT52_Cur_off();
+
+    (void) Clear_home();
+    (void) Cconws("\33p[  CosmosEx floppy TTP  ]\r\n[  by Jookie 2014-2018  ]\33q\r\n\r\n");
+
     char *params        = (char *) argv;                            // get pointer to params (path to file)
     int paramsLength    = (int) params[0];
     char *path          = params + 1;
-   
+
     if(paramsLength == 0) {
         (void) Cconws("This is a drap-and-drop, upload\r\n");
         (void) Cconws("and run floppy tool.\r\n\r\n");
@@ -66,49 +64,83 @@ int main( int argc, char* argv[] )
         return 0;
     }
 
-    path[paramsLength]  = 0;                                        // terminate path
+    path[paramsLength]  = 0;                        // terminate path
     
-	pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
-	
-	if(pBfrOrig == NULL) {
-		(void) Cconws("\r\nMalloc failed!\r\n");
-		sleep(3);
-		return 0;
-	}
+    pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
 
-	DWORD val = (DWORD) pBfrOrig;
-	pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);     				// create even pointer
-    pBfrCnt   = pBfr - 2;											// this is previous pointer - size of WORD 
-	
+    if(pBfrOrig == NULL) {
+        (void) Cconws("\r\nMalloc failed!\r\n");
+        sleep(3);
+        return 0;
+    }
+
+    DWORD val = (DWORD) pBfrOrig;
+    pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);  // create even pointer
+    pBfrCnt   = pBfr - 2;                           // this is previous pointer - size of WORD 
+
     pDmaBuffer = pBfr;
-    
-	// search for CosmosEx on ACSI bus
-	found = Supexec(findDevice);
 
-	if(!found) {								            // not found? quit
-		sleep(3);
-		return 0;
-	}
- 
-	// now set up the acsi command bytes so we don't have to deal with this one anymore 
-	commandShort[0] = (deviceID << 5); 					            // cmd[0] = ACSI_id + TEST UNIT READY (0)	
+    // search for CosmosEx on ACSI bus
+    found = Supexec(findDevice);
 
-    BYTE res = getCurrentSlot();                                    // get the current slot
+    if(!found) {                                    // not found? quit
+        sleep(3);
+        return 0;
+    }
+
+    // now set up the acsi command bytes so we don't have to deal with this one anymore 
+    commandShort[0] = (deviceID << 5);              // cmd[0] = ACSI_id + TEST UNIT READY (0)   
+
+    BYTE res = getCurrentSlot();                    // get the current slot
     
     if(!res) {
         Mfree(pBfrOrig);
         return 0;
     }
 
-    setSlot = 0;
-    if(currentSlot > 2) {                                           // current slot is out of index? (probably empty slot selected) Upload to slot #0
+    (void) Cconws("\r\n");                          // extra line between CE find output and rest
+
+    if(currentSlot > 2) {                           // current slot is out of index? (probably empty slot selected) Upload to slot #0
         currentSlot = 0;
-        setSlot     = 1;                                            // we need to update the slot after upload and encode
     }
-    
+
+    // allow changing floppy uload slot before upload
+    int slotChangeTime = 9;
+
+    while(slotChangeTime >= 0) {
+        int i;
+        BYTE key = getKeyIfPossible();                  // get key if one is waiting or just return 0 if no key is waiting
+
+        if(key == '1' || key == '2' || key == '3') {    // valid key? good
+            currentSlot = key - '1';
+            slotChangeTime = 0;
+        }
+
+        (void) Cconws("\r\33qFloppy slot: ");           // show label
+
+        if(slotChangeTime > 0) {                        // if still waiting for key, inverse colors
+            (void) Cconws("\33p");
+        }
+
+        Cconout(currentSlot + '1');                     // show current slot
+
+        for(i=0; i<9; i++) {                            // show 'progress bar'
+            if(i == slotChangeTime) {                   // turn inverse colors off after displaying remaining time (and display rest for clearing previous)
+                (void) Cconws("\33q");
+            }
+
+            Cconout(' ');
+        }
+
+        slotChangeTime--;
+        msleep(330);
+    }
+
+    (void) Cconws("\r\n");
+
     // upload the image to CosmosEx
-    res = uploadImage((int) currentSlot, path);                     // now try to upload
-    
+    res = uploadImage((int) currentSlot, path);     // now try to upload
+
     if(!res) {
         (void) Cconws("Image upload failed, press key to terminate.\r\n");
         getKey();
@@ -117,34 +149,31 @@ int main( int argc, char* argv[] )
     }
 
     // wait until image is being encoded
-    (void) Cconws("Please wait, processing image: ");
-    
+    (void) Cconws("Encoding   : ");
+
     while(1) {
         res = getIsImageBeingEncoded();
-    
+
         if(res == ENCODING_DONE) {                                  // encoding went OK
-            if(setSlot) {                                           // if we uploaded to slot #0 when empty slot was selected, switch to slot #0
-                setCurrentSlot(currentSlot);
-            }
-        
-            (void) Cconws("\n\rDone. Reset ST to boot from the uploaded floppy.\r\n");
+            setCurrentSlot(currentSlot);
+
+            (void) Cconws("\n\r\n\rDone. Reset ST to boot from the uploaded floppy.\r\n");
             getKey();
             break;
         }
 
         if(res == ENCODING_FAIL) {                                  // encoding failed
-            (void) Cconws("\n\rFinal phase failed, press key to terminate.\r\n");
+            (void) Cconws("\n\r\n\rFinal phase failed, press key to terminate.\r\n");
             getKey();
             break;
         }
-        
-        sleep(1);                                                   // encoding still running
-        (void) Cconws("*");
+
+        msleep(500);                                                // encoding still running
+        (void) Cconws("\33p \33q");                                 // show progress...
     }
-    
-	Mfree(pBfrOrig);
-	
-	return 0;		
+
+    Mfree(pBfrOrig);
+    return 0;
 }
 
 void intToStr(int val, char *str)
@@ -171,61 +200,61 @@ void intToStr(int val, char *str)
 
 BYTE getKey(void)
 {
-	DWORD scancode;
-	BYTE key, vkey;
+    DWORD scancode;
+    BYTE key, vkey;
 
-    scancode = Cnecin();					/* get char form keyboard, no echo on screen */
+    scancode = Cnecin();                    /* get char form keyboard, no echo on screen */
 
-	vkey	= (scancode >> 16)  & 0xff;
-    key		=  scancode         & 0xff;
+    vkey    = (scancode >> 16)  & 0xff;
+    key     =  scancode         & 0xff;
 
-    key		= atariKeysToSingleByte(vkey, key);	/* transform BYTE pair into single BYTE */
+    key     = atariKeysToSingleByte(vkey, key); /* transform BYTE pair into single BYTE */
     
     return key;
 }
 
 void removeLastPartUntilBackslash(char *str)
 {
-	int i, len;
-	
-	len = strlen(str);
-	
-	for(i=(len-1); i>= 0; i--) {
-		if(str[i] == '\\') {
-			break;
-		}
-	
-		str[i] = 0;
-	}
+    int i, len;
+    
+    len = strlen(str);
+    
+    for(i=(len-1); i>= 0; i--) {
+        if(str[i] == '\\') {
+            break;
+        }
+    
+        str[i] = 0;
+    }
 }
 
 // make single ACSI read command by the params set in the commandShort buffer
 BYTE ce_acsiReadCommand(void)
 {
-	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
+    commandShort[0] = (deviceID << 5);                                          // cmd[0] = ACSI_id + TEST UNIT READY (0)   
   
-	memset(pBfr, 0, 512);              											// clear the buffer 
+    memset(pBfr, 0, 512);                                                       // clear the buffer 
 
-	(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, sectorCount);   // issue the command and check the result 
+    (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, sectorCount);   // issue the command and check the result 
 
     if(!hdIf.success) {
         return 0xff;
     }
     
-	return hdIf.statusByte;
+    return hdIf.statusByte;
 }
 
 BYTE ce_acsiWriteBlockCommand(void)
 {
-	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
+    commandShort[0] = (deviceID << 5);                                          // cmd[0] = ACSI_id + TEST UNIT READY (0)   
   
-	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, sectorCount);	// issue the command and check the result 
+    (*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, sectorCount);    // issue the command and check the result 
 
     if(!hdIf.success) {
         return 0xff;
     }
     
-	return hdIf.statusByte;
+    return hdIf.statusByte;
 }
 
 BYTE getLowestDrive(void)
@@ -255,66 +284,16 @@ void showComError(void)
 void createFullPath(char *fullPath, char *filePath, char *fileName)
 {
     strcpy(fullPath, filePath);
-	
-	removeLastPartUntilBackslash(fullPath);				// remove the search wildcards from the end
+    
+    removeLastPartUntilBackslash(fullPath);             // remove the search wildcards from the end
 
-	if(strlen(fullPath) > 0) {							
-		if(fullPath[ strlen(fullPath) - 1] != '\\') {	// if the string doesn't end with backslash, add it
-			strcat(fullPath, "\\");
-		}
-	}
-	
-    strcat(fullPath, fileName);							// add the filename
-}
-
-BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
-{
-	WORD vkeyKey;
-	vkeyKey = (((WORD) vkey) << 8) | ((WORD) key);		/* create a WORD with vkey and key together */
-
-    switch(vkeyKey) {
-        case 0x5032: return KEY_PAGEDOWN;
-        case 0x4838: return KEY_PAGEUP;
+    if(strlen(fullPath) > 0) {                          
+        if(fullPath[ strlen(fullPath) - 1] != '\\') {   // if the string doesn't end with backslash, add it
+            strcat(fullPath, "\\");
+        }
     }
-
-	if(key >= 32 && key < 127) {		/* printable ASCII key? just return it */
-		return key;
-	}
-	
-	if(key == 0) {						/* will this be some non-ASCII key? convert it */
-		switch(vkey) {
-			case 0x48: return KEY_UP;
-			case 0x50: return KEY_DOWN;
-			case 0x4b: return KEY_LEFT;
-			case 0x4d: return KEY_RIGHT;
-			case 0x52: return KEY_INSERT;
-			case 0x47: return KEY_HOME;
-			case 0x62: return KEY_HELP;
-			case 0x61: return KEY_UNDO;
-			case 0x3b: return KEY_F1;
-			case 0x3c: return KEY_F2;
-			case 0x3d: return KEY_F3;
-			case 0x3e: return KEY_F4;
-			case 0x3f: return KEY_F5;
-			case 0x40: return KEY_F6;
-			case 0x41: return KEY_F7;
-			case 0x42: return KEY_F8;
-			case 0x43: return KEY_F9;
-			case 0x44: return KEY_F10;
-			default: return 0;			/* unknown key */
-		}
-	}
-	
-	switch(vkeyKey) {					/* some other no-ASCII key, but check with vkey too */
-		case 0x011b: return KEY_ESC;
-		case 0x537f: return KEY_DELETE;
-		case 0x0e08: return KEY_BACKSP;
-		case 0x0f09: return KEY_TAB;
-		case 0x1c0d: return KEY_ENTER;
-		case 0x720d: return KEY_ENTER;
-	}
-
-	return 0;							/* unknown key */
+    
+    strcat(fullPath, fileName);                         // add the filename
 }
 
 BYTE getCurrentSlot(void)
@@ -324,8 +303,8 @@ BYTE getCurrentSlot(void)
     sectorCount = 1;                            // read 1 sector
 
     BYTE res = Supexec(ce_acsiReadCommand); 
-		
-	if(res == FDD_OK) {                         // good? copy in the results
+        
+    if(res == FDD_OK) {                         // good? copy in the results
         currentSlot = pBfr[0];
         return 1;
     } 
@@ -343,8 +322,8 @@ BYTE setCurrentSlot(BYTE newSlot)
     sectorCount = 1;                            // read 1 sector
 
     BYTE res = Supexec(ce_acsiReadCommand); 
-		
-	if(res == FDD_OK) {                         // good? copy in the results
+        
+    if(res == FDD_OK) {                         // good? copy in the results
         return 1;
     } 
     
@@ -361,8 +340,8 @@ BYTE getIsImageBeingEncoded(void)
     sectorCount = 1;                            // read 1 sector
 
     BYTE res = Supexec(ce_acsiReadCommand); 
-		
-	if(res == FDD_OK) {                         // good? copy in the results
+        
+    if(res == FDD_OK) {                         // good? copy in the results
         BYTE isRunning = pBfr[0];               // isRunning - 1: is running, 0: is not running
         return isRunning;
     } 

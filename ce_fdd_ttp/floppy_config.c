@@ -40,6 +40,10 @@ BYTE uploadImage(int index, char *path)
         return 0;
     }
 
+    (void) Cconws("File       : ");
+    (void) Cconws(path);
+    (void) Cconws("\r\n");
+
     //---------------
     // tell the device the path and filename of the source image
     
@@ -53,7 +57,7 @@ BYTE uploadImage(int index, char *path)
     
     BYTE res;
     res = Supexec(ce_acsiWriteBlockCommand); 
-		
+
     if(res == FDD_RES_ONDEVICECOPY) {                           // if the device returned this code, it means that it could do the image upload / copy on device, no need to upload it from ST!
         Fclose(fh);
         return 1;
@@ -67,18 +71,16 @@ BYTE uploadImage(int index, char *path)
     }
     //---------------
     // upload the image by 64kB blocks
-    
-    (void) Cconws("Uploading file:\r\n");
-    (void) Cconws(path);
-    (void) Cconws("\r\n");
-    
+
+    (void) Cconws("Uploading  : ");
+
     BYTE good = 1;
     BYTE blockNo = 0;
-    
+
     sectorCount = 128;                                          // write 128 sectors (64 kB)
-    
+
     while(1) {
-        Cconout('*');                                           // show progress...
+        (void) Cconws("\33p \33q");                             // show progress...
 
         long len = Fread(fh, SIZE64K, pBfr);
    
