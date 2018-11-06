@@ -863,6 +863,9 @@ void FloppySetup::setCurrentSlot(void)
 
 void FloppySetup::getImageEncodingRunning(void)
 {
+    static int progress = 0;
+    char progChars[4] = {'|', '/', '-', '\\'};
+
     bool encoding = ImageSilo::getFloppyEncodingRunning();
     bool doWeHaveStorage = shared.imageStorage->doWeHaveStorage();
     int  downloadCount = Downloader::count(DWNTYPE_FLOPPYIMG);
@@ -881,14 +884,18 @@ void FloppySetup::getImageEncodingRunning(void)
 
             if(downloadCount > 0) {     // if also downloading, add column
                 status += std::string(", ");
+            } else {                    // not downloading, add heartbeat symbol
+                status.push_back(' ');
+                status.push_back(progChars[progress]);
+                progress = (progress + 1) % 4;
             }
         }
 
         char tmp[50];
         if(downloadCount > 1) {         // more than 1 file?
-            if(encoding) {				// and also encoding? shorter download status
+            if(encoding) {              // and also encoding? shorter download status
                 sprintf(tmp, "Download: %d files, now: %d %%", downloadCount, downloadProgr);
-            } else {					// not encoding? longer download status
+            } else {                    // not encoding? longer download status
                 sprintf(tmp, "Downloading %d files, current: %d %%", downloadCount, downloadProgr);
             }
 

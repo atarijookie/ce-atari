@@ -312,7 +312,7 @@ void ImageList::getResultByIndex(int index, char *bfr, int screenResolution)
     }
 
     if(weHaveThisImage) {                       // if we have this image, show tick
-        out += " \010 ";
+        out += " * ";
     } else {                                    // don't have it, don't show tick
         out += "   ";
     }

@@ -118,7 +118,7 @@ BYTE loopForDownload(void)
         gotoNextPage = 0;
         showMenuMask = 0;
 
-        if(now >= (lastStatusCheckTime + 200)) {                    // if last check was at least a second ago, do new check
+        if(now >= (lastStatusCheckTime + 100)) {                    // if last check was at least a while ago, do new check
             BYTE refreshDataAndRedraw = FALSE;
 
             lastStatusCheckTime = now;
@@ -153,11 +153,13 @@ BYTE loopForDownload(void)
         if(key == KEY_F1 || key == KEY_F2 || key == KEY_F3) {       // insert image into slot 1, 2, 3?
             insertCurrentIntoSlot(key);
             showMenuDownload(SHOWMENU_RESULTS_ROW);
+            lastStatusCheckTime = 0;                                // force immediate status check and display
             continue;
         }
 
         if(key == KEY_F4) {                                         // start downloading images?
             downloadCurrentToStorage();                             // start download
+            lastStatusCheckTime = 0;                                // force immediate status check and display
             continue;
         }
 
@@ -519,7 +521,7 @@ void showMenuDownload(BYTE showMask)
         }
 
         addPaddingIfNeeded();
-        (void) Cconws("\33pF8\33q   setup screen    \33pF10\33q - quit\r\n");
+        (void) Cconws("\33pF8\33q   setup screen    \33pF10\33q quit\r\n");
     }
 }
 
@@ -527,7 +529,6 @@ void showResults(BYTE showMask)
 {
     int i;
     char *pRow;
-    char rowCopy[ROW_LENGTH];
 
     if(showMask & SHOWMENU_RESULTS_ALL) {               // if should redraw all results
         (void) Cconws("\33w");                          // disable line wrap
@@ -569,15 +570,8 @@ void showResults(BYTE showMask)
 
         pRow = (char *) (searchContent + (search.row * ROW_LENGTH));
 
-        memcpy(rowCopy, pRow, ROW_LENGTH);              // make a copy of row
-        for(i=0; i<ROW_LENGTH; i++) {                   // find and replace all 'inverse off' with 'inverse on' codes to keep the line reversed
-            if(rowCopy[i] == 27 && rowCopy[i + 1] == 'q') { // is 'inserve off'?
-                rowCopy[i + 1] = 'p';                       // now it's inverse on
-            }
-        }
-
         (void) Cconws("\33p");
-        (void) Cconws(rowCopy);                         // show current but altered row
+        (void) Cconws(pRow);                            // show current but altered row
         (void) Cconws("\33q");
 
         (void) Cconws("\33v");                          // enable line wrap
@@ -588,9 +582,9 @@ void showResults(BYTE showMask)
 
 void showPageNumber(void)
 {
-    Goto_pos(0, 2);
-    (void) Cconws("Page  :        ");
-    Goto_pos(8, 2);
+    Goto_pos(19, 2);
+    (void) Cconws("\33pPage  :\33q        ");
+    Goto_pos(27, 2);
 
     char tmp[10];
     intToStr(search.pageCurrent + 1, tmp);
@@ -601,9 +595,9 @@ void showPageNumber(void)
 
 void showSearchString(void)
 {
-    Goto_pos(0, 1);
-    (void) Cconws("Search:                              ");
-    Goto_pos(8, 1);
+    Goto_pos(19, 1);
+    (void) Cconws("\33pSearch:\33q             ");
+    Goto_pos(27, 1);
     (void) Cconws(search.text);
 }
 
