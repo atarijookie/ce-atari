@@ -20,9 +20,7 @@ public:
     MfmCachedImage();
     virtual ~MfmCachedImage();
 
-    // bufferOfBytes -- the datas are transfered as WORDs, but are they stored as bytes?
-    // If true, swap bytes, don't append zeros. If false, no swapping, but append zeros.
-    void encodeAndCacheImage(FloppyImage *img, bool bufferOfBytes=false);
+    void encodeAndCacheImage(FloppyImage *img);
     void deleteCachedImage(void);
 
 	BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
@@ -43,17 +41,18 @@ private:
     TCachedTrack tracks[MAX_TRACKS];
     WORD crc;
 
-    void initTracks(void);
-    void encodeSingleTrack(FloppyImage *img, int side, int track, int sectorsPerTrack,  BYTE *buffer, int &bytesStored, bool bufferOfBytes=false);
+    BYTE encodeBuffer[20480];   // buffer where the encoding of single track will happen
+    BYTE *bfr;                  // pointer to where we are in the buffer
 
-    void appendCurrentSectorCommand(int track, int side, int sector, BYTE *buffer, int &count);
-    void appendRawByte(BYTE val, BYTE *bfr, int &cnt);
-    void appendZeroIfNeededToMakeEven(BYTE *bfr, int &cnt);
-    void appendA1MarkToStream(BYTE *bfr, int &cnt);
-    void appendChange(BYTE chg, BYTE *bfr, int &cnt);
-    void appendTime(BYTE time, BYTE *bfr, int &cnt);
-    void appendByteToStream(BYTE val, BYTE *bfr, int &cnt, bool doCalcCrc=true);
-    bool createMfmStream(FloppyImage *img, int side, int track, int sector, BYTE *buffer, int &count);
+    void initTracks(void);
+    void encodeSingleTrack(FloppyImage *img, int side, int track, int sectorsPerTrack);
+
+    void appendCurrentSectorCommand(int track, int side, int sector);
+    void appendRawByte(BYTE val);
+    void appendA1MarkToStream(void);
+    void appendByteToStream(BYTE val, bool doCalcCrc=true);
+    void appendChange(const BYTE chg);
+    bool createMfmStream(FloppyImage *img, int side, int track, int sector);
 
     void updateCrcSlow(BYTE data);
     void updateCrcFast(BYTE data);

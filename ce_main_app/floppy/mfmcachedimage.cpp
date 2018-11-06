@@ -79,9 +79,7 @@ MfmCachedImage::~MfmCachedImage()
     #endif
 }
 
-// bufferOfBytes -- the data is transferred as WORDs, but are they stored as bytes?
-// If true, swap bytes, don't append zeros. If false, no swapping, but append zeros.
-void MfmCachedImage::encodeAndCacheImage(FloppyImage *img, bool bufferOfBytes)
+void MfmCachedImage::encodeAndCacheImage(FloppyImage *img)
 {
     if(gotImage) {                  // got some older image? delete it from memory
         deleteCachedImage();
@@ -98,10 +96,7 @@ void MfmCachedImage::encodeAndCacheImage(FloppyImage *img, bool bufferOfBytes)
 	params.tracks	= tracksNo;
 	params.sides	= sides;
 	params.spt		= spt;
-	
-    BYTE buffer[20480];
-    int bytesStored;
-	
+
 	DWORD after50ms = Utils::getEndTime(50);								// this will help to add pauses at least every 50 ms to allow other threads to do stuff
 
     for(int t=0; t<tracksNo; t++) {                                         // go through the whole image and encode it
@@ -110,14 +105,16 @@ void MfmCachedImage::encodeAndCacheImage(FloppyImage *img, bool bufferOfBytes)
 				Utils::sleepMs(5);
 				after50ms = Utils::getEndTime(50);
 			}
-		
+
             #ifdef DUMPTOFILE
             if(f) {
                 fprintf(f, "Track: %d, side: %d\n", t, s);
             }
             #endif
 
-            encodeSingleTrack(img, s, t, spt, buffer, bytesStored, bufferOfBytes);
+            bfr = encodeBuffer;     // move pointer to start of encodeBuffer
+
+            encodeSingleTrack(img, s, t, spt);
 
    			if(sigintReceived) {                                            // app terminated? quit
                 return;
@@ -128,18 +125,17 @@ void MfmCachedImage::encodeAndCacheImage(FloppyImage *img, bool bufferOfBytes)
                 continue;
             }
 
-            tracks[index].bytesInStream = bytesStored;                      // store the data count
+            int cnt = bfr - encodeBuffer;                                   // data count = current position - start
+            tracks[index].bytesInStream = cnt;                              // store the data count
             tracks[index].mfmStream     = new BYTE[15000];                  // allocate memory -- we're transfering 15'000 bytes, so allocate this much
 
             memset(tracks[index].mfmStream, 0, 15000);                      // set other to 0
-            memcpy(tracks[index].mfmStream, buffer, bytesStored);           // copy the memory block
+            memcpy(tracks[index].mfmStream, encodeBuffer, cnt);             // copy the memory block
 
-            if(bufferOfBytes) {                                            // if not working on buffer of bytes, swap BYTEs in WORD
-                for(int i=0; i<15000; i += 2) {
-                    BYTE tmp                        = tracks[index].mfmStream[i + 0];
-                    tracks[index].mfmStream[i + 0]  = tracks[index].mfmStream[i + 1];
-                    tracks[index].mfmStream[i + 1]  = tmp;
-                }
+            for(int i=0; i<15000; i += 2) {
+                BYTE tmp                        = tracks[index].mfmStream[i + 0];
+                tracks[index].mfmStream[i + 0]  = tracks[index].mfmStream[i + 1];
+                tracks[index].mfmStream[i + 1]  = tmp;
             }
 
             #ifdef DUMPTOFILE
@@ -154,36 +150,23 @@ void MfmCachedImage::encodeAndCacheImage(FloppyImage *img, bool bufferOfBytes)
     gotImage    = true;
 }
 
-void MfmCachedImage::encodeSingleTrack(FloppyImage *img, int side, int track, int sectorsPerTrack, BYTE *buffer, int &bytesStored, bool bufferOfBytes)
+void MfmCachedImage::encodeSingleTrack(FloppyImage *img, int side, int track, int sectorsPerTrack)
 {
-    int countInSect, countInTrack=0;
-
     // start of the track -- we should stream 60* 0x4e
     for(int i=0; i<60; i++) {
-        appendByteToStream(0x4e, buffer, countInTrack);
+        appendByteToStream(0x4e);
     }
 
     for(int sect=1; sect <= sectorsPerTrack; sect++) {
-        if(!bufferOfBytes) {                                                            // buffer of WORDs? append to WORD
-            appendZeroIfNeededToMakeEven(buffer, countInTrack);                         // this should make the sector start on even position (on full WORD, not in half)
-        }
+        createMfmStream(img, side, track, sect);	    // then create the right MFM stream
 
-        createMfmStream(img, side, track, sect, buffer + countInTrack, countInSect);	// then create the right MFM stream
-        countInTrack += countInSect;
-
-        if(sigintReceived) {                                            // app terminated? quit
+        if(sigintReceived) {                            // app terminated? quit
             return;
         }
     }
 
-    if(!bufferOfBytes) {                                                            // buffer of WORDs? append to WORD
-        appendZeroIfNeededToMakeEven(buffer, countInTrack);
-    }
-
-    appendRawByte(0xF0, buffer, countInTrack);			// append this - this is a mark of track stream end
-    appendRawByte(0x00, buffer, countInTrack);
-
-    bytesStored = countInTrack;
+    appendRawByte(0xF0);			// append this - this is a mark of track stream end
+    appendRawByte(0x00);
 }
 
 void MfmCachedImage::deleteCachedImage(void)
@@ -235,12 +218,12 @@ void MfmCachedImage::initTracks(void)
 void MfmCachedImage::copyFromOther(MfmCachedImage &other)
 {
 	initTracks();
-	
+
 	DWORD after50ms = Utils::getEndTime(50);							// this will help to add pauses at least every 50 ms to allow other threads to do stuff
-	
+
 	other.getParams(params.tracks, params.sides, params.spt);			// get the params from other image
 	gotImage = true;													// and mark that we got the image
-	
+
     for(int side=0; side<2; side++) {									// copy both sides
 		for(int track=0; track<params.tracks; track++) {				// copy all the tracks
 			if(Utils::getCurrentMs() > after50ms) {						// if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
@@ -251,15 +234,15 @@ void MfmCachedImage::copyFromOther(MfmCachedImage &other)
    			if(sigintReceived) {                                        // app terminated? quit
                 return;
             }
-            
+
 			int bytesInBuffer;
 			BYTE *src = other.getEncodedTrack(track, side, bytesInBuffer);	// get pointer to source track
-	
+
 			int index = track * 2 + side;
 			if(index >= MAX_TRACKS) {                                   // index out of bounds?
 				continue;
 			}
-			
+
 			TCachedTrack *dest = &tracks[index];						// get pointer to destination track
 
 			if(src == NULL) {											// skip this empty SOURCE track
@@ -267,28 +250,26 @@ void MfmCachedImage::copyFromOther(MfmCachedImage &other)
 					memset(dest->mfmStream, 0, 15000);					// ....but clear it
 					dest->bytesInStream = 0;
 				}
-				
+
 				continue;
 			}
-			
-			if(dest->mfmStream == NULL) {								// destination not allocated? 
+
+			if(dest->mfmStream == NULL) {								// destination not allocated?
 				dest->mfmStream = new BYTE[15000];						// allocate memory -- we're transferring 15'000 bytes, so allocate this much
 				memset(dest->mfmStream, 0, 15000);						// set other to 0
 			}
-			
+
 			memcpy(dest->mfmStream, src, bytesInBuffer);				// copy data and copy the data count
 			dest->bytesInStream = bytesInBuffer;
 		}
     }
-    
+
     newContent  = true;      // we got new content!
 }
 
-bool MfmCachedImage::createMfmStream(FloppyImage *img, int side, int track, int sector, BYTE *buffer, int &count)
+bool MfmCachedImage::createMfmStream(FloppyImage *img, int side, int track, int sector)
 {
     bool res;
-
-    count = 0;                                              // no data yet
 
     BYTE data[512];
     res = img->readSector(track, side, sector, data);     // read data into 'data'
@@ -297,50 +278,50 @@ bool MfmCachedImage::createMfmStream(FloppyImage *img, int side, int track, int 
         return false;
     }
 
-    appendCurrentSectorCommand(track, side, sector, buffer, count);     // append this sector mark so we would know what are we streaming out
+    appendCurrentSectorCommand(track, side, sector);     // append this sector mark so we would know what are we streaming out
 
     int i;
     for(i=0; i<12; i++) {                                   // GAP 2: 12 * 0x00
-        appendByteToStream(0, buffer, count);
+        appendByteToStream(0);
     }
 
     crc = 0xffff;                                           // init CRC
     for(i=0; i<3; i++) {                                    // GAP 2: 3 * A1 mark
-        appendA1MarkToStream(buffer, count);
+        appendA1MarkToStream();
     }
 
-    appendByteToStream( 0xfe,    buffer, count);            // ID record
-    appendByteToStream( track,   buffer, count);
-    appendByteToStream( side,    buffer, count);
-    appendByteToStream( sector,  buffer, count);
-    appendByteToStream( 0x02,    buffer, count);            // size -- 2 == 512 B per sector
-    appendByteToStream( HIBYTE(crc), buffer, count, false);        // crc1
-    appendByteToStream( LOBYTE(crc), buffer, count, false);        // crc2
+    appendByteToStream( 0xfe );            // ID record
+    appendByteToStream( track );
+    appendByteToStream( side );
+    appendByteToStream( sector );
+    appendByteToStream( 0x02 );            // size -- 2 == 512 B per sector
+    appendByteToStream( HIBYTE(crc), false);        // crc1
+    appendByteToStream( LOBYTE(crc), false);        // crc2
 
     for(i=0; i<22; i++) {                                   // GAP 3a: 22 * 0x4e
-        appendByteToStream(0x4e, buffer, count);
+        appendByteToStream(0x4e);
     }
 
     for(i=0; i<12; i++) {                                   // GAP 3b: 12 * 0x00
-        appendByteToStream(0, buffer, count);
+        appendByteToStream(0);
     }
 
     crc = 0xffff;                                           // init CRC
     for(i=0; i<3; i++) {                                    // GAP 3b: 3 * A1 mark
-        appendA1MarkToStream(buffer, count);
+        appendA1MarkToStream();
     }
 
-    appendByteToStream( 0xfb, buffer, count);               // DAM mark
+    appendByteToStream(0xfb);               // DAM mark
 
     for(i=0; i<512; i++) {                                  // data
-        appendByteToStream( data[i], buffer, count);
+        appendByteToStream(data[i]);
     }
 
-    appendByteToStream(HIBYTE(crc), buffer, count, false);         // crc1
-    appendByteToStream(LOBYTE(crc), buffer, count, false);         // crc2
+    appendByteToStream(HIBYTE(crc), false);         // crc1
+    appendByteToStream(LOBYTE(crc), false);         // crc2
 
     for(i=0; i<40; i++) {                                   // GAP 4: 40 * 0x4e
-        appendByteToStream(0x4e, buffer, count);
+        appendByteToStream(0x4e);
     }
 
     #ifdef DUMPTOFILE
@@ -352,7 +333,7 @@ bool MfmCachedImage::createMfmStream(FloppyImage *img, int side, int track, int 
     return true;
 }
 
-void MfmCachedImage::appendByteToStream(BYTE val, BYTE *bfr, int &cnt, bool doCalcCrc)
+void MfmCachedImage::appendByteToStream(BYTE val, bool doCalcCrc)
 {
     #ifdef DUMPTOFILE
     if(f) {
@@ -372,22 +353,22 @@ void MfmCachedImage::appendByteToStream(BYTE val, BYTE *bfr, int &cnt, bool doCa
 
         if(bit == 0) {                              // current bit is 0?
             if(prevBit == 0) {                      // append 0 after 0?
-                appendChange(1, bfr, cnt);  // R
-                appendChange(0, bfr, cnt);  // N
+                appendChange(1);    // R
+                appendChange(0);    // N
             } else {                                // append 0 after 1?
-                appendChange(0, bfr, cnt);  // N
-                appendChange(0, bfr, cnt);  // N
+                appendChange(0);    // N
+                appendChange(0);    // N
             }
         } else {                                    // current bit is 1?
-            appendChange(0, bfr, cnt);              // N
-            appendChange(1, bfr, cnt);              // R
+            appendChange(0);        // N
+            appendChange(1);        // R
         }
 
         prevBit = bit;                              // store this bit for next cycle
     }
 }
 
-void MfmCachedImage::appendChange(BYTE chg, BYTE *bfr, int &cnt)
+void MfmCachedImage::appendChange(const BYTE chg)
 {
     static BYTE changes = 0;
 
@@ -426,20 +407,20 @@ void MfmCachedImage::appendChange(BYTE chg, BYTE *bfr, int &cnt)
     if(timesCnt == 4) {                 // we have 4 times (whole byte), store it
         timesCnt = 0;
 
-        bfr[cnt] = times;               // store times
-        cnt++;                          // increment counter of stored times
+        *bfr = times;                   // store times
+        bfr++;                          // move forward in buffer
     }
 }
 
-void MfmCachedImage::appendCurrentSectorCommand(int track, int side, int sector, BYTE *buffer, int &count)
+void MfmCachedImage::appendCurrentSectorCommand(int track, int side, int sector)
 {
-    appendRawByte(CMD_CURRENT_SECTOR,   buffer, count);
-    appendRawByte(side,                 buffer, count);
-    appendRawByte(track,                buffer, count);
-    appendRawByte(sector,               buffer, count);
+    appendRawByte(CMD_CURRENT_SECTOR);
+    appendRawByte(side);
+    appendRawByte(track);
+    appendRawByte(sector);
 }
 
-void MfmCachedImage::appendRawByte(BYTE val, BYTE *bfr, int &cnt)
+void MfmCachedImage::appendRawByte(BYTE val)
 {
     #ifdef DUMPTOFILE
     if(f) {
@@ -447,18 +428,11 @@ void MfmCachedImage::appendRawByte(BYTE val, BYTE *bfr, int &cnt)
     }
     #endif
 
-    bfr[cnt] = val;                 // just store this byte, no processing
-    cnt++;                          // increment counter of data in buffer
+    *bfr = val;     // just store this byte, no processing
+    bfr++;          // move further in buffer
 }
 
-void MfmCachedImage::appendZeroIfNeededToMakeEven(BYTE *bfr, int &cnt)
-{
-    if((cnt & 1) != 0) {                       // odd number of bytes in the buffer? add one to make it even!
-        appendRawByte(0x00, bfr, cnt);
-   }
-}
-
-void MfmCachedImage::appendA1MarkToStream(BYTE *bfr, int &cnt)
+void MfmCachedImage::appendA1MarkToStream(void)
 {
     #ifdef DUMPTOFILE
     if(f) {
@@ -468,28 +442,28 @@ void MfmCachedImage::appendA1MarkToStream(BYTE *bfr, int &cnt)
 
     // append A1 mark in stream, which is 8-6-8-6 in MFM (normaly would been 8-6-4-4-6)
     // 8 us
-    appendChange(0, bfr, cnt);  // N
-    appendChange(1, bfr, cnt);  // R
-    appendChange(0, bfr, cnt);  // N
-    appendChange(0, bfr, cnt);  // N
-    appendChange(0, bfr, cnt);  // N
+    appendChange(0);  // N
+    appendChange(1);  // R
+    appendChange(0);  // N
+    appendChange(0);  // N
+    appendChange(0);  // N
 
     // 6 us
-    appendChange(1, bfr, cnt);  // R
-    appendChange(0, bfr, cnt);  // N
-    appendChange(0, bfr, cnt);  // N
+    appendChange(1);  // R
+    appendChange(0);  // N
+    appendChange(0);  // N
 
     // 8 us
-    appendChange(1, bfr, cnt);  // R
-    appendChange(0, bfr, cnt);  // N
-    appendChange(0, bfr, cnt);  // N
-    appendChange(0, bfr, cnt);  // N
+    appendChange(1);  // R
+    appendChange(0);  // N
+    appendChange(0);  // N
+    appendChange(0);  // N
 
     // 6 us
-    appendChange(1, bfr, cnt);  // R
-    appendChange(0, bfr, cnt);  // N
-    appendChange(0, bfr, cnt);  // N
-    appendChange(1, bfr, cnt);  // R
+    appendChange(1);  // R
+    appendChange(0);  // N
+    appendChange(0);  // N
+    appendChange(1);  // R
 
     updateCrcFast(0xa1);
 }

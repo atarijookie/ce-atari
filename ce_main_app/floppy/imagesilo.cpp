@@ -83,7 +83,7 @@ void ImageSilo::run(void)
                 start = Utils::getCurrentMs();
 
                 Debug::out(LOG_DEBUG, "Encoding image: %s", image->getFileName());
-                encImage.encodeAndCacheImage(image, true);
+                encImage.encodeAndCacheImage(image);
 
                 end = Utils::getCurrentMs();
                 Debug::out(LOG_DEBUG, "Encoding of image %s done, took %d ms", image->getFileName(), (int) (end - start));
