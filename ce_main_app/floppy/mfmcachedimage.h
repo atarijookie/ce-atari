@@ -24,14 +24,13 @@ public:
     // If true, swap bytes, don't append zeros. If false, no swapping, but append zeros.
     void encodeAndCacheImage(FloppyImage *img, bool bufferOfBytes=false);
     void deleteCachedImage(void);
-    
+
 	BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
 	bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
 
 	void copyFromOther(MfmCachedImage &other);
-	
     bool newContent;
-    
+
 private:
     bool gotImage;
 
@@ -40,9 +39,9 @@ private:
 		int sides;
 		int spt;
 	} params;
-	
+
     TCachedTrack tracks[MAX_TRACKS];
-    WORD                CRC;
+    WORD crc;
 
     void initTracks(void);
     void encodeSingleTrack(FloppyImage *img, int side, int track, int sectorsPerTrack,  BYTE *buffer, int &bytesStored, bool bufferOfBytes=false);
@@ -55,7 +54,9 @@ private:
     void appendTime(BYTE time, BYTE *bfr, int &cnt);
     void appendByteToStream(BYTE val, BYTE *bfr, int &cnt, bool doCalcCrc=true);
     bool createMfmStream(FloppyImage *img, int side, int track, int sector, BYTE *buffer, int &count);
-    void fdc_add_to_crc(WORD &crc, BYTE data);
+
+    void updateCrcSlow(BYTE data);
+    void updateCrcFast(BYTE data);
 };
 
 #endif // MFMCACHEDIMAGE_H
