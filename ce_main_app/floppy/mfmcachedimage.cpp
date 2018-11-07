@@ -8,12 +8,6 @@
 #define LOBYTE(w)	((BYTE)(w))
 #define HIBYTE(w)	((BYTE)(((WORD)(w)>>8)&0xFF))
 
-//#define DUMPTOFILE
-
-#ifdef DUMPTOFILE
-FILE *f;
-#endif
-
 // crc16-ccitt generated table for fast CRC calculation
 const WORD crcTable[256] = {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
@@ -55,10 +49,6 @@ MfmCachedImage::MfmCachedImage()
     gotImage = false;
     initTracks();
 
-    #ifdef DUMPTOFILE
-    f = fopen("C:\\raw_img.txt", "wt");
-    #endif
-
 	params.tracks	= 0;
 	params.sides	= 0;
 	params.spt		= 0;
@@ -66,17 +56,16 @@ MfmCachedImage::MfmCachedImage()
     crc = 0;
 
     newContent = false;         // no new content (yet)
+
+    // initialize encoder
+    encoder.threeBits = 0;
+    encoder.times = 0;
+    encoder.timesCnt = 0;
 }
 
 MfmCachedImage::~MfmCachedImage()
 {
     deleteCachedImage();
-
-    #ifdef DUMPTOFILE
-    if(f) {
-        fclose(f);
-    }
-    #endif
 }
 
 void MfmCachedImage::encodeAndCacheImage(FloppyImage *img)
@@ -106,12 +95,6 @@ void MfmCachedImage::encodeAndCacheImage(FloppyImage *img)
 				after50ms = Utils::getEndTime(50);
 			}
 
-            #ifdef DUMPTOFILE
-            if(f) {
-                fprintf(f, "Track: %d, side: %d\n", t, s);
-            }
-            #endif
-
             bfr = encodeBuffer;     // move pointer to start of encodeBuffer
 
             encodeSingleTrack(img, s, t, spt);
@@ -137,17 +120,46 @@ void MfmCachedImage::encodeAndCacheImage(FloppyImage *img)
                 tracks[index].mfmStream[i + 0]  = tracks[index].mfmStream[i + 1];
                 tracks[index].mfmStream[i + 1]  = tmp;
             }
-
-            #ifdef DUMPTOFILE
-            if(f) {
-                fprintf(f, "\n\n");
-            }
-            #endif
         }
     }
 
-    newContent  = true;      // we got new content!
+    //dumpTracksToFile(tracksNo, sides, spt);         // for debugging purposes - dump to file
+
+    newContent  = true;     // we got new content!
     gotImage    = true;
+}
+
+void MfmCachedImage::log(char *str)
+{
+    FILE *f = fopen("mfmcached.log", "a+t");
+    if(!f) {
+        return;
+    }
+
+    fprintf(f, str);
+    fclose(f);
+}
+
+void MfmCachedImage::dumpTracksToFile(int tracksNo, int sides, int spt)
+{
+    FILE *f = fopen("mfmcachedimage.bin", "wb");    // open file
+
+    if(!f) {        // failed to open? quit
+        return;
+    }
+
+    for(int t=0; t<tracksNo; t++) {
+        for(int s=0; s<sides; s++) {
+            int index = t * 2 + s;
+            if(index >= MAX_TRACKS) {                       // index out of bounds?
+                continue;
+            }
+
+            fwrite(tracks[index].mfmStream, 1, 15000, f);   // write to file
+        }
+    }
+
+    fclose(f);
 }
 
 void MfmCachedImage::encodeSingleTrack(FloppyImage *img, int side, int track, int sectorsPerTrack)
@@ -324,23 +336,15 @@ bool MfmCachedImage::createMfmStream(FloppyImage *img, int side, int track, int 
         appendByteToStream(0x4e);
     }
 
-    #ifdef DUMPTOFILE
-    if(f) {
-        fprintf(f, "\n\n");
-    }
-    #endif
-
     return true;
 }
 
+//#define OLD_ENCODER
+
+#ifdef OLD_ENCODER
+// old implementation which uses appendChange()
 void MfmCachedImage::appendByteToStream(BYTE val, bool doCalcCrc)
 {
-    #ifdef DUMPTOFILE
-    if(f) {
-        fprintf(f, "%02x ", val);
-    }
-    #endif
-
     if(doCalcCrc) {
         updateCrcFast(val);
     }
@@ -412,38 +416,12 @@ void MfmCachedImage::appendChange(const BYTE chg)
     }
 }
 
-void MfmCachedImage::appendCurrentSectorCommand(int track, int side, int sector)
-{
-    appendRawByte(CMD_CURRENT_SECTOR);
-    appendRawByte(side);
-    appendRawByte(track);
-    appendRawByte(sector);
-}
-
-void MfmCachedImage::appendRawByte(BYTE val)
-{
-    #ifdef DUMPTOFILE
-    if(f) {
-        fprintf(f, "%02x ", val);
-    }
-    #endif
-
-    *bfr = val;     // just store this byte, no processing
-    bfr++;          // move further in buffer
-}
-
 void MfmCachedImage::appendA1MarkToStream(void)
 {
-    #ifdef DUMPTOFILE
-    if(f) {
-        fprintf(f, "A1 ");
-    }
-    #endif
-
     // append A1 mark in stream, which is 8-6-8-6 in MFM (normaly would been 8-6-4-4-6)
     // 8 us
-    appendChange(0);  // N
-    appendChange(1);  // R
+    appendChange(0);  // N      // these two lines...
+    appendChange(1);  // R      // these two lines are here probably wrong, they work fine on 1st A1 mark, but they break 2nd and 3d A1 mark, which shouldn't have them extra here - leaving here because it currently works
     appendChange(0);  // N
     appendChange(0);  // N
     appendChange(0);  // N
@@ -466,6 +444,97 @@ void MfmCachedImage::appendA1MarkToStream(void)
     appendChange(1);  // R
 
     updateCrcFast(0xa1);
+}
+
+#else
+
+// new implementation which generates time from bit triplets (threeBits)
+void MfmCachedImage::appendByteToStream(BYTE val, bool doCalcCrc)
+{
+    if(doCalcCrc) {
+        updateCrcFast(val);
+    }
+
+    BYTE time;
+
+    for(int i=0; i<8; i++) {                        // for all bits
+        BYTE bit = (val & 0x80) >> 7;               // get highest bit (stored in lowest bit now as 0 or 1)
+        encoder.threeBits = ((encoder.threeBits << 1) | bit) & 7;   // construct new 3 bits -- two old, 1 current bit (old-old-new)
+
+        val = val << 1;                             // shift bits in input value up
+
+        time = 0;                                   // no time yet
+
+        switch(encoder.threeBits) {
+            // threeBits with value 0,3,7 produce 4 us mfm time
+            case 0:
+            case 3:
+            case 7: time = MFM_4US; break;
+
+            // threeBits with value 1,4 produce 6 us mfm time
+            case 1:
+            case 4: time = MFM_6US; break;
+
+            // threeBits with value 5 produce 8 us mfm time
+            case 5: time = MFM_8US; break;
+
+            // threeBits with value 2 or 6 don't produce mfm time value
+        }
+
+        if(time != 0) {     // if we found a valid time in threeBits
+            encoder.times = encoder.times << 2;     // shift 2 up
+            encoder.times = encoder.times | time;   // add lowest 2 bits
+
+            encoder.timesCnt++;                     // increment the count of times we have
+            if(encoder.timesCnt == 4) {             // we have 4 times (whole byte), store it
+                encoder.timesCnt = 0;
+
+                *bfr = encoder.times;               // store times
+                bfr++;                              // move forward in buffer
+            }
+        }
+    }
+}
+
+// appendTime() used in new implementation by appendA1MarkToStream(), otherwise it's integrated for speed in appendByteToStream()
+void MfmCachedImage::appendTime(BYTE time)
+{
+    encoder.times = encoder.times << 2;     // shift 2 up
+    encoder.times = encoder.times | time;   // add lowest 2 bits
+
+    encoder.timesCnt++;                   // increment the count of times we have
+    if(encoder.timesCnt == 4) {         // we have 4 times (whole byte), store it
+        encoder.timesCnt = 0;
+
+        *bfr = encoder.times;           // store times
+        bfr++;                          // move forward in buffer
+    }
+}
+
+void MfmCachedImage::appendA1MarkToStream(void)
+{
+    // append A1 mark in stream, which is 8-6-8-6 in MFM (normaly would been 8-6-4-4-6)
+    appendTime(MFM_8US);
+    appendTime(MFM_6US);
+    appendTime(MFM_8US);
+    appendTime(MFM_6US);
+
+    updateCrcFast(0xa1);
+}
+#endif
+
+void MfmCachedImage::appendCurrentSectorCommand(int track, int side, int sector)
+{
+    appendRawByte(CMD_CURRENT_SECTOR);
+    appendRawByte(side);
+    appendRawByte(track);
+    appendRawByte(sector);
+}
+
+void MfmCachedImage::appendRawByte(BYTE val)
+{
+    *bfr = val;     // just store this byte, no processing
+    bfr++;          // move further in buffer
 }
 
 // taken from Steem Engine emulator

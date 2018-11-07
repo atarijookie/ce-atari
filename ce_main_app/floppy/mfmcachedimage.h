@@ -38,6 +38,12 @@ private:
 		int spt;
 	} params;
 
+    struct {
+        BYTE threeBits;
+        BYTE times;
+        BYTE timesCnt;
+    } encoder;
+
     TCachedTrack tracks[MAX_TRACKS];
     WORD crc;
 
@@ -50,12 +56,16 @@ private:
     void appendCurrentSectorCommand(int track, int side, int sector);
     void appendRawByte(BYTE val);
     void appendA1MarkToStream(void);
+    void appendTime(BYTE time);
     void appendByteToStream(BYTE val, bool doCalcCrc=true);
     void appendChange(const BYTE chg);
     bool createMfmStream(FloppyImage *img, int side, int track, int sector);
 
     void updateCrcSlow(BYTE data);
     void updateCrcFast(BYTE data);
+
+    void dumpTracksToFile(int tracksNo, int sides, int spt);
+    void log(char *str);
 };
 
 #endif // MFMCACHEDIMAGE_H
