@@ -5,8 +5,8 @@
 
 #include "mfmcachedimage.h"
 
-#define LOBYTE(w)	((BYTE)(w))
-#define HIBYTE(w)	((BYTE)(((WORD)(w)>>8)&0xFF))
+#define LOBYTE(w)   ((BYTE)(w))
+#define HIBYTE(w)   ((BYTE)(((WORD)(w)>>8)&0xFF))
 
 // crc16-ccitt generated table for fast CRC calculation
 const WORD crcTable[256] = {
@@ -49,16 +49,16 @@ MfmCachedImage::MfmCachedImage()
     gotImage = false;
     initTracks();
 
-	params.tracks	= 0;
-	params.sides	= 0;
-	params.spt		= 0;
+    params.tracks   = 0;
+    params.sides    = 0;
+    params.spt      = 0;
 
     crc = 0;
 
     newContent = false;         // no new content (yet)
 
     // initialize encoder
-    encoder.threeBits = 0;
+    encoder.threeBits = 1;
     encoder.times = 0;
     encoder.timesCnt = 0;
 }
@@ -81,25 +81,25 @@ void MfmCachedImage::encodeAndCacheImage(FloppyImage *img)
     int tracksNo, sides, spt;
     img->getParams(tracksNo, sides, spt);    // read the floppy image params
 
-	// store params for later usage
-	params.tracks	= tracksNo;
-	params.sides	= sides;
-	params.spt		= spt;
+    // store params for later usage
+    params.tracks   = tracksNo;
+    params.sides    = sides;
+    params.spt      = spt;
 
-	DWORD after50ms = Utils::getEndTime(50);								// this will help to add pauses at least every 50 ms to allow other threads to do stuff
+    DWORD after50ms = Utils::getEndTime(50);                                // this will help to add pauses at least every 50 ms to allow other threads to do stuff
 
     for(int t=0; t<tracksNo; t++) {                                         // go through the whole image and encode it
         for(int s=0; s<sides; s++) {
-			if(Utils::getCurrentMs() > after50ms) {							// if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
-				Utils::sleepMs(5);
-				after50ms = Utils::getEndTime(50);
-			}
+            if(Utils::getCurrentMs() > after50ms) {                         // if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
+                Utils::sleepMs(5);
+                after50ms = Utils::getEndTime(50);
+            }
 
             bfr = encodeBuffer;     // move pointer to start of encodeBuffer
 
             encodeSingleTrack(img, s, t, spt);
 
-   			if(sigintReceived) {                                            // app terminated? quit
+            if(sigintReceived) {                                            // app terminated? quit
                 return;
             }
 
@@ -170,14 +170,14 @@ void MfmCachedImage::encodeSingleTrack(FloppyImage *img, int side, int track, in
     }
 
     for(int sect=1; sect <= sectorsPerTrack; sect++) {
-        createMfmStream(img, side, track, sect);	    // then create the right MFM stream
+        createMfmStream(img, side, track, sect);        // then create the right MFM stream
 
         if(sigintReceived) {                            // app terminated? quit
             return;
         }
     }
 
-    appendRawByte(0xF0);			// append this - this is a mark of track stream end
+    appendRawByte(0xF0);            // append this - this is a mark of track stream end
     appendRawByte(0x00);
 }
 
@@ -229,51 +229,51 @@ void MfmCachedImage::initTracks(void)
 
 void MfmCachedImage::copyFromOther(MfmCachedImage &other)
 {
-	initTracks();
+    initTracks();
 
-	DWORD after50ms = Utils::getEndTime(50);							// this will help to add pauses at least every 50 ms to allow other threads to do stuff
+    DWORD after50ms = Utils::getEndTime(50);                            // this will help to add pauses at least every 50 ms to allow other threads to do stuff
 
-	other.getParams(params.tracks, params.sides, params.spt);			// get the params from other image
-	gotImage = true;													// and mark that we got the image
+    other.getParams(params.tracks, params.sides, params.spt);           // get the params from other image
+    gotImage = true;                                                    // and mark that we got the image
 
-    for(int side=0; side<2; side++) {									// copy both sides
-		for(int track=0; track<params.tracks; track++) {				// copy all the tracks
-			if(Utils::getCurrentMs() > after50ms) {						// if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
-				Utils::sleepMs(5);
-				after50ms = Utils::getEndTime(50);
-			}
+    for(int side=0; side<2; side++) {                                   // copy both sides
+        for(int track=0; track<params.tracks; track++) {                // copy all the tracks
+            if(Utils::getCurrentMs() > after50ms) {                     // if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
+                Utils::sleepMs(5);
+                after50ms = Utils::getEndTime(50);
+            }
 
-   			if(sigintReceived) {                                        // app terminated? quit
+            if(sigintReceived) {                                        // app terminated? quit
                 return;
             }
 
-			int bytesInBuffer;
-			BYTE *src = other.getEncodedTrack(track, side, bytesInBuffer);	// get pointer to source track
+            int bytesInBuffer;
+            BYTE *src = other.getEncodedTrack(track, side, bytesInBuffer);  // get pointer to source track
 
-			int index = track * 2 + side;
-			if(index >= MAX_TRACKS) {                                   // index out of bounds?
-				continue;
-			}
+            int index = track * 2 + side;
+            if(index >= MAX_TRACKS) {                                   // index out of bounds?
+                continue;
+            }
 
-			TCachedTrack *dest = &tracks[index];						// get pointer to destination track
+            TCachedTrack *dest = &tracks[index];                        // get pointer to destination track
 
-			if(src == NULL) {											// skip this empty SOURCE track
-				if(dest->mfmStream != NULL) {
-					memset(dest->mfmStream, 0, 15000);					// ....but clear it
-					dest->bytesInStream = 0;
-				}
+            if(src == NULL) {                                           // skip this empty SOURCE track
+                if(dest->mfmStream != NULL) {
+                    memset(dest->mfmStream, 0, 15000);                  // ....but clear it
+                    dest->bytesInStream = 0;
+                }
 
-				continue;
-			}
+                continue;
+            }
 
-			if(dest->mfmStream == NULL) {								// destination not allocated?
-				dest->mfmStream = new BYTE[15000];						// allocate memory -- we're transferring 15'000 bytes, so allocate this much
-				memset(dest->mfmStream, 0, 15000);						// set other to 0
-			}
+            if(dest->mfmStream == NULL) {                               // destination not allocated?
+                dest->mfmStream = new BYTE[15000];                      // allocate memory -- we're transferring 15'000 bytes, so allocate this much
+                memset(dest->mfmStream, 0, 15000);                      // set other to 0
+            }
 
-			memcpy(dest->mfmStream, src, bytesInBuffer);				// copy data and copy the data count
-			dest->bytesInStream = bytesInBuffer;
-		}
+            memcpy(dest->mfmStream, src, bytesInBuffer);                // copy data and copy the data count
+            dest->bytesInStream = bytesInBuffer;
+        }
     }
 
     newContent  = true;      // we got new content!
@@ -420,8 +420,8 @@ void MfmCachedImage::appendA1MarkToStream(void)
 {
     // append A1 mark in stream, which is 8-6-8-6 in MFM (normaly would been 8-6-4-4-6)
     // 8 us
-    appendChange(0);  // N      // these two lines...
-    appendChange(1);  // R      // these two lines are here probably wrong, they work fine on 1st A1 mark, but they break 2nd and 3d A1 mark, which shouldn't have them extra here - leaving here because it currently works
+    appendChange(0);  // N
+    appendChange(1);  // R
     appendChange(0);  // N
     appendChange(0);  // N
     appendChange(0);  // N
@@ -513,6 +513,15 @@ void MfmCachedImage::appendTime(BYTE time)
 
 void MfmCachedImage::appendA1MarkToStream(void)
 {
+    // the start of A1 mark depends on previous bits
+    if(encoder.threeBits == 0 || encoder.threeBits == 4) {
+        appendTime(MFM_6US);    // 0,4 -> 6 us
+    } else if(encoder.threeBits == 2 || encoder.threeBits == 6) {
+        appendTime(MFM_8US);    // 2,6 -> 8 us
+    } else {
+        appendTime(MFM_4US);    // 1,3,5,7 -> 4 us
+    }
+
     // append A1 mark in stream, which is 8-6-8-6 in MFM (normaly would been 8-6-4-4-6)
     appendTime(MFM_8US);
     appendTime(MFM_6US);
@@ -520,6 +529,8 @@ void MfmCachedImage::appendA1MarkToStream(void)
     appendTime(MFM_6US);
 
     updateCrcFast(0xa1);
+
+    encoder.threeBits = 1;      // the end of A1 is 01 in binary, so initialize threeBits to that
 }
 #endif
 
