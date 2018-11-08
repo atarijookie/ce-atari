@@ -25,6 +25,9 @@ typedef struct
 } SiloSlotSimple;
 //-------------------------------------------
 
+#define ACTION_LOAD_AND_ENCODE  1
+#define ACTION_REENCODE_CHANGED 2
+
 typedef struct
 {
     std::string     imageFile;      // just file name:                     bla.st
@@ -33,14 +36,14 @@ typedef struct
     std::string     atariSrcPath;   // from where the file was uploaded:   C:\gamez\bla.st
     std::string     hostSrcPath;    // for translated disk, host path:     /mnt/sda/gamez/bla.st
 
-    MfmCachedImage  encImage;
+    FloppyImage     *image;         // this holds object with the loaded floppy image (in normaln data form)
+    MfmCachedImage  encImage;       // this holds the MFM encoded image ready to be streamed
 } SiloSlot;
 
 typedef struct
 {
-    int                slotIndex;                // number of slot for which this is done
-    std::string        filename;                // file name and path where the image is located
-    MfmCachedImage    *encImg;                // pointer to where this image should be stored after encoding
+    int         action;     // stores ACTION_LOAD_AND_ENCODE or ACTION_REENCODE_CHANGED
+    SiloSlot    *slot;      // pointer to where this image should be stored after encoding
 } EncodeRequest;
 
 void *floppyEncodeThreadCode(void *ptr);

@@ -1,12 +1,16 @@
 #ifndef MFMCACHEDIMAGE_H
 #define MFMCACHEDIMAGE_H
 
+#include <atomic>
 #include "floppyimage.h"
 
 // maximum 2 sides, 85 tracks per side
 #define MAX_TRACKS      (2 * 85)
+#define MFM_STREAM_SIZE 15000
 
 typedef struct {
+    volatile std::atomic<bool> isReady;    // set to false if this track can't be streamed yet (e.g. not encoded yet or encoding at that moment)
+
     int     track;
     int     side;
 
@@ -20,16 +24,20 @@ public:
     MfmCachedImage();
     virtual ~MfmCachedImage();
 
-    void encodeAndCacheImage(FloppyImage *img);
-    void deleteCachedImage(void);
+    void clearWholeCachedImage(void);           // go and memset() all the cached tracks - used on new image (not on reencode)
+    void encodeAndCacheImage(FloppyImage *img); // go through the image and encode tracks
 
 	BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
 	bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
 
-	void copyFromOther(MfmCachedImage &other);
     bool newContent;
 
+    static void trackAndSideToIndex(const int track, const int side, int &index);
+    static void indexToTrackAndSide(const int index, int &track, int &side);
+
 private:
+    int nextIndex;      // set this to force encoding of some track sooner than would go
+
     bool gotImage;
 
 	struct {
@@ -45,12 +53,10 @@ private:
     } encoder;
 
     TCachedTrack tracks[MAX_TRACKS];
-    WORD crc;
+    WORD crc;       // current value of CRC calculator
+    BYTE *bfr;      // pointer to where we are storing data in the buffer
 
-    BYTE encodeBuffer[20480];   // buffer where the encoding of single track will happen
-    BYTE *bfr;                  // pointer to where we are in the buffer
-
-    void initTracks(void);
+    int  getNextIndexToEncode(void);
     void encodeSingleTrack(FloppyImage *img, int side, int track, int sectorsPerTrack);
 
     void appendCurrentSectorCommand(int track, int side, int sector);

@@ -51,8 +51,6 @@ void ImageSilo::stop(void)
 
 void ImageSilo::run(void)
 {
-    MfmCachedImage      encImage;
-
     floppyEncodingRunning = false;
 
     while(!shouldStop) {
@@ -61,49 +59,51 @@ void ImageSilo::run(void)
         while(encodeQueue.size() == 0 && !shouldStop) {
             pthread_cond_wait(&floppyEncodeQueueNotEmpty, &floppyEncodeQueueMutex);
         }
+
         if(shouldStop) {
-            pthread_mutex_unlock(&floppyEncodeQueueMutex);        // unlock the mutex
+            pthread_mutex_unlock(&floppyEncodeQueueMutex);  // unlock the mutex
             break;
         }
 
         floppyEncodingRunning = true;
 
-        EncodeRequest er = encodeQueue.front();                // get the 'oldest' element from queue
-        encodeQueue.pop();                                    // and remove it form queue
-        pthread_mutex_unlock(&floppyEncodeQueueMutex);        // unlock the mutex
+        EncodeRequest er = encodeQueue.front();         // get the 'oldest' element from queue
+        encodeQueue.pop();                              // and remove it form queue
+        pthread_mutex_unlock(&floppyEncodeQueueMutex);  // unlock the mutex
 
-        // try to open the image
-        FloppyImage *image = FloppyImageFactory::getImage(er.filename.c_str());
-
-        if(image) {
-            if(image->isOpen()) {
-                DWORD start, end;
-
-                // encode image - convert it from file to preprocessed stream for Franz
-                start = Utils::getCurrentMs();
-
-                Debug::out(LOG_DEBUG, "Encoding image: %s", image->getFileName());
-                encImage.encodeAndCacheImage(image);
-
-                end = Utils::getCurrentMs();
-                Debug::out(LOG_DEBUG, "Encoding of image %s done, took %d ms", image->getFileName(), (int) (end - start));
-
-                //----------------
-                // copy the image from encode thread to main thread
-                start = Utils::getCurrentMs();
-
-                pthread_mutex_lock(&floppyEncodeQueueMutex);        // lock the mutex
-                er.encImg->copyFromOther(encImage);                    // this is not thread safe as it copies data from one thread to another
-                pthread_mutex_unlock(&floppyEncodeQueueMutex);        // unlock the mutex
-
-                end = Utils::getCurrentMs();
-                Debug::out(LOG_DEBUG, "Copying between threads took %d ms", (int) (end - start));
-            } else {
-                Debug::out(LOG_DEBUG, "Encoding of image %s failed - image is not open", image->getFileName());
+        if(er.action == ACTION_LOAD_AND_ENCODE) {       // if should load and encode new image, get it through image factory
+            if(er.slot->image) {                        // if already contains image, get rid of it
+                delete er.slot->image;
             }
-            delete image;
-            image = NULL;
+
+            er.slot->image = FloppyImageFactory::getImage(er.slot->hostDestPath.c_str());
+            er.slot->encImage.clearWholeCachedImage();  // clear the whole image
         }
+
+        // if got here, new image was just loaded or we want to reencode already opened image
+        if(!er.slot->image || !er.slot->image->isOpen()) {  // not supported image format or failed to open file?
+            Debug::out(LOG_DEBUG, "Failed to load image %s", er.slot->image->getFileName());
+
+            if(er.slot->image) {            // if got the object, but failed to open, destory object and set pointer to null
+                delete er.slot->image;
+                er.slot->image = NULL;
+            }
+
+            floppyEncodingRunning = false;  // not encoding anymore
+            continue;
+        }
+
+        // encode image - convert it from file to preprocessed stream for Franz
+
+        Debug::out(LOG_DEBUG, "Encoding image: %s", er.slot->image->getFileName());
+        DWORD start = Utils::getCurrentMs();
+
+        er.slot->encImage.encodeAndCacheImage(er.slot->image);
+
+        DWORD end = Utils::getCurrentMs();
+        Debug::out(LOG_DEBUG, "Encoding of image %s done, took %d ms", er.slot->image->getFileName(), (int) (end - start));
+
+//      pthread_mutex_lock(&floppyEncodeQueueMutex);        // lock the mutex
 
         floppyEncodingRunning = false;
     }
@@ -153,13 +153,9 @@ ImageSilo::ImageSilo()
         Debug::out(LOG_DEBUG, "ImageSilo created empty image (for no selected image)");
 
         EncodeRequest er;
-
-        er.slotIndex    = EMPTY_IMAGE_SLOT;
-        er.filename        = EMPTY_IMAGE_PATH;
-        er.encImg        = &slots[EMPTY_IMAGE_SLOT].encImage;
-
+        er.action = ACTION_LOAD_AND_ENCODE;     // load and encode new image
+        er.slot = &slots[EMPTY_IMAGE_SLOT];
         addEncodeRequest(er);
-
     } else {
         Debug::out(LOG_DEBUG, "ImageSilo failed to create empty image! (for no selected image)");
     }
@@ -271,14 +267,11 @@ void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostD
 
     // create and add floppy encode request
     EncodeRequest er;
-
-    er.slotIndex    = positionIndex;
-    er.filename        = hostDestPath;
-    er.encImg        = &slots[positionIndex].encImage;
-
+    er.action = ACTION_LOAD_AND_ENCODE;     // load and encode this new image
+    er.slot = &slots[positionIndex];
     addEncodeRequest(er);
 
-    if(saveToSettings) {                                    // should we save this to settings? (false when loading settings)
+    if(saveToSettings) {                    // should we save this to settings? (false when loading settings)
         saveSettings();
     }
 }

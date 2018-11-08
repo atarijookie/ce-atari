@@ -47,7 +47,14 @@ const WORD crcTable[256] = {
 MfmCachedImage::MfmCachedImage()
 {
     gotImage = false;
-    initTracks();
+
+    // allocate tracks
+    for(int i=0; i<MAX_TRACKS; i++) {
+        tracks[i].mfmStream = new BYTE[MFM_STREAM_SIZE];  // allocate memory -- we're transfering 15'000 bytes, so allocate this much
+    }
+
+    // clear tracks
+    clearWholeCachedImage();
 
     params.tracks   = 0;
     params.sides    = 0;
@@ -65,21 +72,51 @@ MfmCachedImage::MfmCachedImage()
 
 MfmCachedImage::~MfmCachedImage()
 {
-    deleteCachedImage();
+    for(int i=0; i<MAX_TRACKS; i++) {
+        delete []tracks[i].mfmStream;
+        tracks[i].mfmStream = NULL;
+    }
+}
+
+// just clear tracks
+void MfmCachedImage::clearWholeCachedImage(void)    // go and memset() all the cached tracks - used on new image (not on reencode)
+{
+    nextIndex = 0;                      // start encoding from track 0
+
+    for(int i=0; i<MAX_TRACKS; i++) {
+        tracks[i].isReady = false;      // not ready yet
+        tracks[i].bytesInStream = 0;
+        memset(tracks[i].mfmStream, 0, MFM_STREAM_SIZE);
+    }
+}
+
+// This method should return next track index we should encode.
+// In case we need to encode specific track first (e.g. Franz wants it right now), take it from nextIndex
+// If we sequentialy encode the whole image, store and restore the index to nextIndex
+int MfmCachedImage::getNextIndexToEncode(void)
+{
+    int maxIndex;
+    trackAndSideToIndex(params.tracks - 1, params.sides - 1, maxIndex); // get maximal track index, which is still allowed
+
+    // if got valid next index and that track is not already encoded, use it
+    if(nextIndex != -1 && nextIndex <= maxIndex && !tracks[nextIndex].isReady) {
+        return nextIndex;
+    }
+
+    // if nextIndex not valid, go through whole image and try to find something which is not ready
+
+
+    return -1;      // if wasn't able to find valid next index
 }
 
 void MfmCachedImage::encodeAndCacheImage(FloppyImage *img)
 {
-    if(gotImage) {                  // got some older image? delete it from memory
-        deleteCachedImage();
-    }
-
-    if(!img->isOpen()) {            // image file not open? quit
+    if(!img->isOpen()) {                    // image file not open? quit
         return;
     }
 
     int tracksNo, sides, spt;
-    img->getParams(tracksNo, sides, spt);    // read the floppy image params
+    img->getParams(tracksNo, sides, spt);   // read the floppy image params
 
     // store params for later usage
     params.tracks   = tracksNo;
@@ -95,31 +132,34 @@ void MfmCachedImage::encodeAndCacheImage(FloppyImage *img)
                 after50ms = Utils::getEndTime(50);
             }
 
-            bfr = encodeBuffer;     // move pointer to start of encodeBuffer
+            int index;
+            trackAndSideToIndex(t, s, index);
 
-            encodeSingleTrack(img, s, t, spt);
-
-            if(sigintReceived) {                                            // app terminated? quit
-                return;
-            }
-
-            int index = t * 2 + s;
-            if(index >= MAX_TRACKS) {                                       // index out of bounds?
+            if(index == -1) {                           // index out of bounds?
                 continue;
             }
 
-            int cnt = bfr - encodeBuffer;                                   // data count = current position - start
-            tracks[index].bytesInStream = cnt;                              // store the data count
-            tracks[index].mfmStream     = new BYTE[15000];                  // allocate memory -- we're transfering 15'000 bytes, so allocate this much
+            tracks[index].isReady = false;              // track not ready to be streamed - will be encoded
 
-            memset(tracks[index].mfmStream, 0, 15000);                      // set other to 0
-            memcpy(tracks[index].mfmStream, encodeBuffer, cnt);             // copy the memory block
+            memset(tracks[index].mfmStream, 0, MFM_STREAM_SIZE);    // initialize MFM stream
+            bfr = tracks[index].mfmStream;                          // move pointer to start of track buffer
 
-            for(int i=0; i<15000; i += 2) {
+            encodeSingleTrack(img, s, t, spt);          // encode single track
+
+            if(sigintReceived) {                        // app terminated? quit
+                return;
+            }
+
+            int cnt = bfr - tracks[index].mfmStream;    // data count = current position - start
+            tracks[index].bytesInStream = cnt;          // store the data count
+
+            for(int i=0; i<MFM_STREAM_SIZE; i += 2) {   // swap bytes - Franz has other endiannes
                 BYTE tmp                        = tracks[index].mfmStream[i + 0];
                 tracks[index].mfmStream[i + 0]  = tracks[index].mfmStream[i + 1];
                 tracks[index].mfmStream[i + 1]  = tmp;
             }
+
+            tracks[index].isReady = true;               // track is now ready to be streamed
         }
     }
 
@@ -127,6 +167,27 @@ void MfmCachedImage::encodeAndCacheImage(FloppyImage *img)
 
     newContent  = true;     // we got new content!
     gotImage    = true;
+}
+
+void MfmCachedImage::trackAndSideToIndex(const int track, const int side, int &index)
+{
+    index = track * 2 + side;       // calculate index from track and side
+
+    if(index >= MAX_TRACKS) {       // index out of bounds?
+        index = -1;
+    }
+}
+
+void MfmCachedImage::indexToTrackAndSide(const int index, int &track, int &side)
+{
+    if(index >= MAX_TRACKS) {       // index out of bounds?
+        track = -1;
+        side = -1;
+        return;
+    }
+
+    side = index & 1;   // lowest bit is side
+    track = index / 2;
 }
 
 void MfmCachedImage::log(char *str)
@@ -150,12 +211,14 @@ void MfmCachedImage::dumpTracksToFile(int tracksNo, int sides, int spt)
 
     for(int t=0; t<tracksNo; t++) {
         for(int s=0; s<sides; s++) {
-            int index = t * 2 + s;
-            if(index >= MAX_TRACKS) {                       // index out of bounds?
+            int index;
+            trackAndSideToIndex(t, s, index);
+
+            if(index == -1) {       // index out of bounds?
                 continue;
             }
 
-            fwrite(tracks[index].mfmStream, 1, 15000, f);   // write to file
+            fwrite(tracks[index].mfmStream, 1, MFM_STREAM_SIZE, f);   // write to file
         }
     }
 
@@ -181,22 +244,6 @@ void MfmCachedImage::encodeSingleTrack(FloppyImage *img, int side, int track, in
     appendRawByte(0x00);
 }
 
-void MfmCachedImage::deleteCachedImage(void)
-{
-    if(!gotImage) {
-        return;
-    }
-
-    for(int i=0; i<MAX_TRACKS; i++) {
-        delete []tracks[i].mfmStream;
-
-        tracks[i].bytesInStream = 0;
-        tracks[i].mfmStream     = NULL;
-    }
-
-    gotImage = false;
-}
-
 BYTE *MfmCachedImage::getEncodedTrack(int track, int side, int &bytesInBuffer)
 {
     if(!gotImage) {                                             // if don't have the cached stuff yet
@@ -209,74 +256,16 @@ BYTE *MfmCachedImage::getEncodedTrack(int track, int side, int &bytesInBuffer)
         return NULL;
     }
 
-    int index = track * 2 + side;
-    if(index >= MAX_TRACKS) {                                   // index out of bounds?
+    int index;
+    trackAndSideToIndex(track, side, index);
+
+    if(index == -1) {                                           // index out of bounds?
         bytesInBuffer = 0;
         return NULL;
     }
 
     bytesInBuffer = tracks[index].bytesInStream;                // return that track
     return tracks[index].mfmStream;
-}
-
-void MfmCachedImage::initTracks(void)
-{
-    for(int i=0; i<MAX_TRACKS; i++) {
-        tracks[i].bytesInStream = 0;
-        tracks[i].mfmStream     = NULL;
-    }
-}
-
-void MfmCachedImage::copyFromOther(MfmCachedImage &other)
-{
-    initTracks();
-
-    DWORD after50ms = Utils::getEndTime(50);                            // this will help to add pauses at least every 50 ms to allow other threads to do stuff
-
-    other.getParams(params.tracks, params.sides, params.spt);           // get the params from other image
-    gotImage = true;                                                    // and mark that we got the image
-
-    for(int side=0; side<2; side++) {                                   // copy both sides
-        for(int track=0; track<params.tracks; track++) {                // copy all the tracks
-            if(Utils::getCurrentMs() > after50ms) {                     // if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
-                Utils::sleepMs(5);
-                after50ms = Utils::getEndTime(50);
-            }
-
-            if(sigintReceived) {                                        // app terminated? quit
-                return;
-            }
-
-            int bytesInBuffer;
-            BYTE *src = other.getEncodedTrack(track, side, bytesInBuffer);  // get pointer to source track
-
-            int index = track * 2 + side;
-            if(index >= MAX_TRACKS) {                                   // index out of bounds?
-                continue;
-            }
-
-            TCachedTrack *dest = &tracks[index];                        // get pointer to destination track
-
-            if(src == NULL) {                                           // skip this empty SOURCE track
-                if(dest->mfmStream != NULL) {
-                    memset(dest->mfmStream, 0, 15000);                  // ....but clear it
-                    dest->bytesInStream = 0;
-                }
-
-                continue;
-            }
-
-            if(dest->mfmStream == NULL) {                               // destination not allocated?
-                dest->mfmStream = new BYTE[15000];                      // allocate memory -- we're transferring 15'000 bytes, so allocate this much
-                memset(dest->mfmStream, 0, 15000);                      // set other to 0
-            }
-
-            memcpy(dest->mfmStream, src, bytesInBuffer);                // copy data and copy the data count
-            dest->bytesInStream = bytesInBuffer;
-        }
-    }
-
-    newContent  = true;      // we got new content!
 }
 
 bool MfmCachedImage::createMfmStream(FloppyImage *img, int side, int track, int sector)
