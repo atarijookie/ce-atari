@@ -8,6 +8,7 @@
 #include <errno.h>
 
 #include <signal.h>
+#include <atomic>
 
 #include "../utils.h"
 #include "../debug.h"
@@ -26,12 +27,13 @@ volatile bool shouldStop;
 //-------------------------------
 // silo slots are global objects now, as CCoreThread needs to stream from them and
 // encoder thread needs to check all of them for tracks that need (re)encoding.
-// Access is protected by siloSlotsMutex.
+// Access is protected by floppyEncoderMutex.
 // Individual tracks in slot can be streamed without using mutex when: slot.encImage.tracks[index].isReady
 // (that means we're not encoding that track at that moment).
 
-SiloSlot    slots[SLOT_COUNT];
-int         currentSlot;
+volatile std::atomic<int> currentSlot;
+
+SiloSlot slots[SLOT_COUNT];
 //-------------------------------
 
 SiloSlotSimple  ImageSilo::floppyImages[3];
@@ -443,7 +445,7 @@ void ImageSilo::setCurrentSlot(int index)
     if(currentSlot == EMPTY_IMAGE_SLOT) {       // empty floppy?
         strcpy  (tmp,     "FDD : empty");
     } else {                                    // something selected?
-        snprintf(tmp, 32, "FDD%d: %s", currentSlot, slots[currentSlot].imageFile.c_str());
+        snprintf(tmp, 32, "FDD%d: %s", (int) currentSlot, slots[currentSlot].imageFile.c_str());
     }
 
     display_setLine(DISP_LINE_FLOPPY, tmp);     // store the floppy display line
