@@ -25,7 +25,8 @@ public:
     virtual ~MfmCachedImage();
 
     void clearWholeCachedImage(void);           // go and memset() all the cached tracks - used on new image (not on reencode)
-    void encodeAndCacheImage(FloppyImage *img); // go through the image and encode tracks
+    void encodeWholeImage(FloppyImage *img);    // go through whole image and encode tracks, returns true if something encoded
+    bool findNotReadyTrackAndEncodeIt(FloppyImage *img);    // find a single track and encode it, or fail to find it and return false
 
 	BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
 	bool getParams(int &tracks, int &sides, int &sectorsPerTrack);

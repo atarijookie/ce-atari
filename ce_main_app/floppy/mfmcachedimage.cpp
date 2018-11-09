@@ -104,69 +104,88 @@ int MfmCachedImage::getNextIndexToEncode(void)
     }
 
     // if nextIndex not valid, go through whole image and try to find something which is not ready
-
-
-    return -1;      // if wasn't able to find valid next index
-}
-
-void MfmCachedImage::encodeAndCacheImage(FloppyImage *img)
-{
-    if(!img->isOpen()) {                    // image file not open? quit
-        return;
-    }
-
-    int tracksNo, sides, spt;
-    img->getParams(tracksNo, sides, spt);   // read the floppy image params
-
-    // store params for later usage
-    params.tracks   = tracksNo;
-    params.sides    = sides;
-    params.spt      = spt;
-
-    DWORD after50ms = Utils::getEndTime(50);                                // this will help to add pauses at least every 50 ms to allow other threads to do stuff
-
-    for(int t=0; t<tracksNo; t++) {                                         // go through the whole image and encode it
-        for(int s=0; s<sides; s++) {
-            if(Utils::getCurrentMs() > after50ms) {                         // if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
-                Utils::sleepMs(5);
-                after50ms = Utils::getEndTime(50);
-            }
-
-            int index;
-            trackAndSideToIndex(t, s, index);
-
-            if(index == -1) {                           // index out of bounds?
-                continue;
-            }
-
-            tracks[index].isReady = false;              // track not ready to be streamed - will be encoded
-
-            memset(tracks[index].mfmStream, 0, MFM_STREAM_SIZE);    // initialize MFM stream
-            bfr = tracks[index].mfmStream;                          // move pointer to start of track buffer
-
-            encodeSingleTrack(img, s, t, spt);          // encode single track
-
-            if(sigintReceived) {                        // app terminated? quit
-                return;
-            }
-
-            int cnt = bfr - tracks[index].mfmStream;    // data count = current position - start
-            tracks[index].bytesInStream = cnt;          // store the data count
-
-            for(int i=0; i<MFM_STREAM_SIZE; i += 2) {   // swap bytes - Franz has other endiannes
-                BYTE tmp                        = tracks[index].mfmStream[i + 0];
-                tracks[index].mfmStream[i + 0]  = tracks[index].mfmStream[i + 1];
-                tracks[index].mfmStream[i + 1]  = tmp;
-            }
-
-            tracks[index].isReady = true;               // track is now ready to be streamed
+    for(int i=0; i <= maxIndex; i++) {
+        if(!tracks[i].isReady) {            // this track is not ready? return index
+            return i;
         }
     }
 
-    //dumpTracksToFile(tracksNo, sides, spt);         // for debugging purposes - dump to file
+    // if wasn't able to find valid next index
+    return -1;
+}
 
-    newContent  = true;     // we got new content!
+void MfmCachedImage::encodeWholeImage(FloppyImage *img)
+{
+    if(!img->isOpen()) {                            // image file not open? quit
+        return;
+    }
+
+    img->getParams(params.tracks, params.sides, params.spt);    // read the floppy image params
+
+    DWORD after50ms = Utils::getEndTime(50);        // this will help to add pauses at least every 50 ms to allow other threads to do stuff
+
+    bool res = true;
+    while(res) {                                    // while there still is something to encode
+        if(Utils::getCurrentMs() > after50ms) {     // if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
+            Utils::sleepMs(5);
+            after50ms = Utils::getEndTime(50);
+        }
+
+        if(sigintReceived) {                        // app terminated? quit
+            return;
+        }
+
+        res = findNotReadyTrackAndEncodeIt(img);    // try to find and encode single track, and if not possible, quit
+    }
+
+    //dumpTracksToFile(tracksNo, sides, spt);       // for debugging purposes - dump to file
+
+    newContent  = true;                             // we got new content!
     gotImage    = true;
+}
+
+bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img)
+{
+    if(!img->isOpen()) {                // image file not open? quit
+        return false;
+    }
+
+    img->getParams(params.tracks, params.sides, params.spt);    // read the floppy image params
+
+    int index = getNextIndexToEncode(); // get next index for encoding, or -1 if there's nothing to encode
+
+    if(index == -1) {                   // nothing to do? quit
+        nextIndex = -1;                 // store that we don't expect anything to be encoded next
+        return false;
+    }
+
+    nextIndex = index + 1;              // encoding track at index, encoding nextIndex in next loop
+
+    int t, s;
+    indexToTrackAndSide(index, t, s);
+
+    if(t == -1) {                       // track out of bounds?
+        return false;
+    }
+
+    tracks[index].isReady = false;      // track not ready to be streamed - will be encoded
+
+    memset(tracks[index].mfmStream, 0, MFM_STREAM_SIZE);    // initialize MFM stream
+    bfr = tracks[index].mfmStream;                          // move pointer to start of track buffer
+
+    encodeSingleTrack(img, s, t, params.spt);   // encode single track
+
+    int cnt = bfr - tracks[index].mfmStream;    // data count = current position - start
+    tracks[index].bytesInStream = cnt;          // store the data count
+
+    for(int i=0; i<MFM_STREAM_SIZE; i += 2) {   // swap bytes - Franz has other endiannes
+        BYTE tmp                        = tracks[index].mfmStream[i + 0];
+        tracks[index].mfmStream[i + 0]  = tracks[index].mfmStream[i + 1];
+        tracks[index].mfmStream[i + 1]  = tmp;
+    }
+
+    tracks[index].isReady = true;               // track is now ready to be streamed
+    return true;
 }
 
 void MfmCachedImage::trackAndSideToIndex(const int track, const int side, int &index)

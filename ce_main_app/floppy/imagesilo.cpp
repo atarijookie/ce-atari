@@ -98,7 +98,7 @@ void ImageSilo::run(void)
         Debug::out(LOG_DEBUG, "Encoding image: %s", er.slot->image->getFileName());
         DWORD start = Utils::getCurrentMs();
 
-        er.slot->encImage.encodeAndCacheImage(er.slot->image);
+        er.slot->encImage.encodeWholeImage(er.slot->image);
 
         DWORD end = Utils::getCurrentMs();
         Debug::out(LOG_DEBUG, "Encoding of image %s done, took %d ms", er.slot->image->getFileName(), (int) (end - start));
