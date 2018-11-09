@@ -17,105 +17,156 @@
 #include "floppysetup.h"
 #include "../display/displaythread.h"
 
-#define EMPTY_TRACK_SIZE (15000)
+pthread_mutex_t floppyEncoderMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t  floppyEncoderShouldWork = PTHREAD_COND_INITIALIZER;
 
-pthread_mutex_t ImageSilo::floppyEncodeQueueMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t ImageSilo::floppyEncodeQueueNotEmpty = PTHREAD_COND_INITIALIZER;
-std::queue<EncodeRequest> ImageSilo::encodeQueue;
-volatile bool ImageSilo::shouldStop = false;
+volatile bool floppyEncodingRunning = false;
+volatile bool shouldStop;
+
+//-------------------------------
+// silo slots are global objects now, as CCoreThread needs to stream from them and
+// encoder thread needs to check all of them for tracks that need (re)encoding.
+// Access is protected by siloSlotsMutex.
+// Individual tracks in slot can be streamed without using mutex when: slot.encImage.tracks[index].isReady
+// (that means we're not encoding that track at that moment).
+
+SiloSlot    slots[SLOT_COUNT];
+int         currentSlot;
+//-------------------------------
 
 SiloSlotSimple  ImageSilo::floppyImages[3];
 int ImageSilo::floppyImageSelected = EMPTY_IMAGE_SLOT;
 
 extern TFlags flags;
 
-volatile bool ImageSilo::floppyEncodingRunning = false;
-
-void ImageSilo::addEncodeRequest(EncodeRequest &er)
+void ImageSilo::addEncodeWholeImageRequest(int slotNo)
 {
     floppyEncodingRunning = true;
 
-    pthread_mutex_lock(&floppyEncodeQueueMutex);            // try to lock the mutex
-    encodeQueue.push(er);                                    // add this to queue
-    pthread_cond_signal(&floppyEncodeQueueNotEmpty);
-    pthread_mutex_unlock(&floppyEncodeQueueMutex);            // unlock the mutex
+    pthread_mutex_lock(&floppyEncoderMutex);    // lock the mutex
+    SiloSlot *slot = &slots[slotNo];            // get pointer to the right slot
+
+    slot->encImage.clearWholeCachedImage();     // clear remains of previous stream
+
+    if(slot->image) {                           // if slot already contains image, get rid of it
+        delete slot->image;
+    }
+
+    // try to load image from disk
+    slot->image = FloppyImageFactory::getImage(slot->hostDestPath.c_str());
+
+    if(!slot->image || !slot->image->isOpen()) { // not supported image format or failed to open file?
+        Debug::out(LOG_DEBUG, "Failed to load image %s", slot->image->getFileName());
+
+        if(slot->image) {                       // if got the object, but failed to open, destory object and set pointer to null
+            delete slot->image;
+            slot->image = NULL;
+        }
+    } else {                                    // image loaded? good
+        slot->encImage.storeImageParams(slot->image);   // sets tracksToBeEncoded to all tracks count
+    }
+
+    pthread_cond_signal(&floppyEncoderShouldWork);  // wake up encoder
+    pthread_mutex_unlock(&floppyEncoderMutex);      // unlock the mutex
+}
+
+void ImageSilo::addReencodeTrackRequest(int slotNo, int track, int side)
+{
+    pthread_mutex_lock(&floppyEncoderMutex);        // lock the mutex
+
+    SiloSlot *slot = &slots[slotNo];                // get pointer to the right slot
+    slot->encImage.askToReencodeTrack(track, side); // this specific track needs to be reencoded
+
+    pthread_cond_signal(&floppyEncoderShouldWork);  // wake up encoder
+    pthread_mutex_unlock(&floppyEncoderMutex);      // unlock the mutex
 }
 
 void ImageSilo::stop(void)
 {
-    pthread_mutex_lock(&floppyEncodeQueueMutex);            // try to lock the mutex
+    pthread_mutex_lock(&floppyEncoderMutex);        // lock the mutex
+
     shouldStop = true;
-    pthread_cond_signal(&floppyEncodeQueueNotEmpty);
-    pthread_mutex_unlock(&floppyEncodeQueueMutex);            // unlock the mutex
+
+    pthread_cond_signal(&floppyEncoderShouldWork);  // wake up encoder
+    pthread_mutex_unlock(&floppyEncoderMutex);      // unlock the mutex
 }
 
-void ImageSilo::run(void)
+SiloSlot *findSlotToEncode(void)
 {
-    floppyEncodingRunning = false;
-
-    while(!shouldStop) {
-        pthread_mutex_lock(&floppyEncodeQueueMutex);        // lock the mutex
-
-        while(encodeQueue.size() == 0 && !shouldStop) {
-            pthread_cond_wait(&floppyEncodeQueueNotEmpty, &floppyEncodeQueueMutex);
-        }
-
-        if(shouldStop) {
-            pthread_mutex_unlock(&floppyEncodeQueueMutex);  // unlock the mutex
-            break;
-        }
-
-        floppyEncodingRunning = true;
-
-        EncodeRequest er = encodeQueue.front();         // get the 'oldest' element from queue
-        encodeQueue.pop();                              // and remove it form queue
-        pthread_mutex_unlock(&floppyEncodeQueueMutex);  // unlock the mutex
-
-        if(er.action == ACTION_LOAD_AND_ENCODE) {       // if should load and encode new image, get it through image factory
-            if(er.slot->image) {                        // if already contains image, get rid of it
-                delete er.slot->image;
-            }
-
-            er.slot->image = FloppyImageFactory::getImage(er.slot->hostDestPath.c_str());
-            er.slot->encImage.clearWholeCachedImage();  // clear the whole image
-        }
-
-        // if got here, new image was just loaded or we want to reencode already opened image
-        if(!er.slot->image || !er.slot->image->isOpen()) {  // not supported image format or failed to open file?
-            Debug::out(LOG_DEBUG, "Failed to load image %s", er.slot->image->getFileName());
-
-            if(er.slot->image) {            // if got the object, but failed to open, destory object and set pointer to null
-                delete er.slot->image;
-                er.slot->image = NULL;
-            }
-
-            floppyEncodingRunning = false;  // not encoding anymore
-            continue;
-        }
-
-        // encode image - convert it from file to preprocessed stream for Franz
-
-        Debug::out(LOG_DEBUG, "Encoding image: %s", er.slot->image->getFileName());
-        DWORD start = Utils::getCurrentMs();
-
-        er.slot->encImage.encodeWholeImage(er.slot->image);
-
-        DWORD end = Utils::getCurrentMs();
-        Debug::out(LOG_DEBUG, "Encoding of image %s done, took %d ms", er.slot->image->getFileName(), (int) (end - start));
-
-//      pthread_mutex_lock(&floppyEncodeQueueMutex);        // lock the mutex
-
-        floppyEncodingRunning = false;
+    // if the current slot has something to be encoded, return it - this is now priority (to be available for streaming)
+    if(slots[currentSlot].encImage.somethingToBeEncoded()) {
+        return &slots[currentSlot];
     }
 
-    floppyEncodingRunning = false;
+    // go through the other slots, if one of them has something for encoding, return that
+    for(int i=0; i<SLOT_COUNT; i++) {
+        if(slots[i].encImage.somethingToBeEncoded()) {
+            return &slots[i];
+        }
+    }
+
+    // nothing found for encoding
+    return NULL;
 }
 
 void *floppyEncodeThreadCode(void *ptr)
 {
     Debug::out(LOG_DEBUG, "Floppy encode thread starting...");
 
-    ImageSilo::run();
+//void ImageSilo::run(void)
+//{
+    pthread_mutex_lock(&floppyEncoderMutex);    // lock the mutex
+
+    while(true) {                               // while we shouldn't stop
+        // code should come to the start of this loop when there is nothing to be encoded and the encoder should sleep
+        floppyEncodingRunning = false;              // not encoding right now
+
+        // unlock mutex, wait until should work. When should work, lock mutex and continue
+        pthread_cond_wait(&floppyEncoderShouldWork, &floppyEncoderMutex);
+
+        if(shouldStop) {    // if we should already stop
+            pthread_mutex_unlock(&floppyEncoderMutex);  // unlock the mutex
+            Debug::out(LOG_DEBUG, "Floppy encode thread terminated.");
+            return 0;
+        }
+
+        floppyEncodingRunning = true;               // we're encoding
+
+        // the following code should encode all the slots, but one track at the time, so when there are multiple not encoded images,
+        // the one which is selected for streaming, will be encoded first, and then the rest. This should also act fine if you switch
+        // current slot in the middle of encoding image (to prioritize the selected one)
+        SiloSlot *slot;
+        DWORD after50ms = Utils::getEndTime(50);    // this will help to add pauses at least every 50 ms to allow other threads to do stuff
+
+        while(true) {
+            slot = findSlotToEncode();  // find some slot which needs encoding
+
+            if(!slot) {                 // nothing to encode or should stop? quit loop and sleep
+                floppyEncodingRunning = false;              // not encoding right now
+                break;
+            }
+
+            if(shouldStop) {            // if we should stop, unlock mutex and quit
+                floppyEncodingRunning = false;              // not encoding right now
+                pthread_mutex_unlock(&floppyEncoderMutex);  // unlock the mutex
+                Debug::out(LOG_DEBUG, "Floppy encode thread terminated.");
+                return 0;
+            }
+
+            if(Utils::getCurrentMs() > after50ms) {     // if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
+                Utils::sleepMs(5);
+                after50ms = Utils::getEndTime(50);
+            }
+
+            // encode single track in image
+            DWORD start = Utils::getCurrentMs();
+
+            slot->encImage.findNotReadyTrackAndEncodeIt(slot->image);
+
+            DWORD end = Utils::getCurrentMs();
+            Debug::out(LOG_DEBUG, "Encoding of track of image %s done, took %d ms", slot->image->getFileName(), (int) (end - start));
+        }
+    }
 
     Debug::out(LOG_DEBUG, "Floppy encode thread terminated.");
     return 0;
@@ -125,11 +176,11 @@ ImageSilo::ImageSilo()
 {
     //-----------
     // create empty track, which can be used when the equested track is out of range (or image doesn't exist)
-    emptyTrack = new BYTE[EMPTY_TRACK_SIZE];
-    memset(emptyTrack, 0, EMPTY_TRACK_SIZE);
+    emptyTrack = new BYTE[MFM_STREAM_SIZE];
+    memset(emptyTrack, 0, MFM_STREAM_SIZE);
 
     BYTE *p = emptyTrack;
-    for(int i=0; i<(EMPTY_TRACK_SIZE/3); i++) {        // fill the empty track with 0x4e sync bytes
+    for(int i=0; i<(MFM_STREAM_SIZE/3); i++) {        // fill the empty track with 0x4e sync bytes
         *p++ = 0xa9;
         *p++ = 0x6a;
         *p++ = 0x96;
@@ -137,7 +188,7 @@ ImageSilo::ImageSilo()
 
     //-----------
     // init slots
-    for(int i=0; i<4; i++) {
+    for(int i=0; i<SLOT_COUNT; i++) {
         clearSlot(i);
     }
 
@@ -151,11 +202,7 @@ ImageSilo::ImageSilo()
 
     if(res) {                                                                   // if succeeded, encode this empty image
         Debug::out(LOG_DEBUG, "ImageSilo created empty image (for no selected image)");
-
-        EncodeRequest er;
-        er.action = ACTION_LOAD_AND_ENCODE;     // load and encode new image
-        er.slot = &slots[EMPTY_IMAGE_SLOT];
-        addEncodeRequest(er);
+        addEncodeWholeImageRequest(EMPTY_IMAGE_SLOT);
     } else {
         Debug::out(LOG_DEBUG, "ImageSilo failed to create empty image! (for no selected image)");
     }
@@ -266,10 +313,7 @@ void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostD
     floppyImages[positionIndex].imageFile = filename;
 
     // create and add floppy encode request
-    EncodeRequest er;
-    er.action = ACTION_LOAD_AND_ENCODE;     // load and encode this new image
-    er.slot = &slots[positionIndex];
-    addEncodeRequest(er);
+    addEncodeWholeImageRequest(positionIndex);
 
     if(saveToSettings) {                    // should we save this to settings? (false when loading settings)
         saveSettings();
@@ -407,10 +451,28 @@ BYTE *ImageSilo::getEncodedTrack(int track, int side, int &bytesInBuffer)
 {
     BYTE *pTrack;
 
-    pthread_mutex_lock(&floppyEncodeQueueMutex);                                        // lock the mutex
-    pTrack = slots[currentSlot].encImage.getEncodedTrack(track, side, bytesInBuffer);    // get data from current slot
-    pthread_mutex_unlock(&floppyEncodeQueueMutex);                                        // unlock the mutex
+    if(!slots[currentSlot].encImage.encodedTrackIsReady(track, side)) { // track not ready?
+        addReencodeTrackRequest(currentSlot, track, side);              // ask for reencoding
 
+        // wait short while to see if the image gets encoded
+        DWORD endTime = Utils::getEndTime(500);
+        bool isReady = false;
+
+        while(Utils::getCurrentMs() < endTime) {    // still should wait?
+            isReady = slots[currentSlot].encImage.encodedTrackIsReady(track, side); // check if it's ready
+
+            if(isReady) {   // ready? quit loop
+                break;
+            }
+        }
+
+        if(!isReady) {      // not ready? return empty track
+            return emptyTrack;
+        }
+    }
+
+    // is ready? return that track
+    pTrack = slots[currentSlot].encImage.getEncodedTrack(track, side, bytesInBuffer);   // get data from current slot
     return pTrack;
 }
 

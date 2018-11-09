@@ -90,6 +90,44 @@ void MfmCachedImage::clearWholeCachedImage(void)    // go and memset() all the c
     }
 }
 
+// call this after opening the FloppyImage, before encoding
+void MfmCachedImage::storeImageParams(FloppyImage *img)
+{
+    // clear the params first
+    params.tracks = 0;
+    params.sides = 0;
+    params.spt = 0;
+
+    if(!img->isOpen()) {    // image file not open? quit
+        return;
+    }
+
+    // read the floppy image params
+    img->getParams(params.tracks, params.sides, params.spt);
+
+    // calculate how many tracks we need to process
+    tracksToBeEncoded = params.tracks * params.sides;
+}
+
+void MfmCachedImage::askToReencodeTrack(int track, int side)
+{
+    int index;
+    trackAndSideToIndex(track, side, index);    // try to get index from track and side
+
+    if(index == -1) {               // failed to get index?
+        return;
+    }
+
+    tracks[index].isReady = false;  // the reencoding didn't happen yet
+    nextIndex = index;              // store this as next index that needs reencoding
+    tracksToBeEncoded++;            // increment count of tracks that need reencoding
+}
+
+bool MfmCachedImage::somethingToBeEncoded(void)
+{
+    return(tracksToBeEncoded > 0);  // if count of tracks to be encoded is not zero, we still need to run encoding on this image
+}
+
 // This method should return next track index we should encode.
 // In case we need to encode specific track first (e.g. Franz wants it right now), take it from nextIndex
 // If we sequentialy encode the whole image, store and restore the index to nextIndex
@@ -120,7 +158,7 @@ void MfmCachedImage::encodeWholeImage(FloppyImage *img)
         return;
     }
 
-    img->getParams(params.tracks, params.sides, params.spt);    // read the floppy image params
+    storeImageParams(img);
 
     DWORD after50ms = Utils::getEndTime(50);        // this will help to add pauses at least every 50 ms to allow other threads to do stuff
 
@@ -150,11 +188,10 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img)
         return false;
     }
 
-    img->getParams(params.tracks, params.sides, params.spt);    // read the floppy image params
-
     int index = getNextIndexToEncode(); // get next index for encoding, or -1 if there's nothing to encode
 
     if(index == -1) {                   // nothing to do? quit
+        tracksToBeEncoded = 0;          // nothing more to encode
         nextIndex = -1;                 // store that we don't expect anything to be encoded next
         return false;
     }
@@ -261,6 +298,22 @@ void MfmCachedImage::encodeSingleTrack(FloppyImage *img, int side, int track, in
 
     appendRawByte(0xF0);            // append this - this is a mark of track stream end
     appendRawByte(0x00);
+}
+
+bool MfmCachedImage::encodedTrackIsReady(int track, int side)
+{
+    if(!gotImage || track < 0 || track > 85 || side < 0 || side > 1) {  // invalid args?
+        return false;   // not ready
+    }
+
+    int index;
+    trackAndSideToIndex(track, side, index);
+
+    if(index == -1) {   // index out of bounds?
+        return false;   // not ready
+    }
+
+    return tracks[index].isReady;   // return if ready
 }
 
 BYTE *MfmCachedImage::getEncodedTrack(int track, int side, int &bytesInBuffer)

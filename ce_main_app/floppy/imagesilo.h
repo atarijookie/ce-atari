@@ -14,8 +14,10 @@
 #include "mfmdecoder.h"
 #include "mfmcachedimage.h"
 
-#define EMPTY_IMAGE_SLOT        3
-#define EMPTY_IMAGE_PATH        "/tmp/emptyimage.st"
+#define SLOT_COUNT          4
+
+#define EMPTY_IMAGE_SLOT    3
+#define EMPTY_IMAGE_PATH    "/tmp/emptyimage.st"
 
 //-------------------------------------------
 // these globals here are just for status report
@@ -42,8 +44,11 @@ typedef struct
 
 typedef struct
 {
-    int         action;     // stores ACTION_LOAD_AND_ENCODE or ACTION_REENCODE_CHANGED
-    SiloSlot    *slot;      // pointer to where this image should be stored after encoding
+    int action;     // stores ACTION_LOAD_AND_ENCODE or ACTION_REENCODE_CHANGED
+    int slotNo;     // nomber of slot which should get the new stream
+
+    int track;      // if it's ACTION_REENCODE_CHANGED, we need to specify which track and side changed
+    int side;
 } EncodeRequest;
 
 void *floppyEncodeThreadCode(void *ptr);
@@ -87,20 +92,13 @@ public:
 
 private:
     void clearSlot(int index);
-    static void addEncodeRequest(EncodeRequest &er);
+    static void addEncodeWholeImageRequest(int slotNo);
+    static void addReencodeTrackRequest(int slotNo, int track, int side);
 
-    SiloSlot                slots[4];
-    int                        currentSlot;
     SettingsReloadProxy     *reloadProxy;
 
     BYTE                    *emptyTrack;
 
-    static pthread_mutex_t floppyEncodeQueueMutex;
-    static pthread_cond_t floppyEncodeQueueNotEmpty;
-    static std::queue<EncodeRequest> encodeQueue;
-    static volatile bool shouldStop;
-
-    static volatile bool floppyEncodingRunning;
     static SiloSlotSimple floppyImages[3];
     static int floppyImageSelected;
 };
