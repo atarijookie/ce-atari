@@ -27,9 +27,6 @@ typedef struct
 } SiloSlotSimple;
 //-------------------------------------------
 
-#define ACTION_LOAD_AND_ENCODE  1
-#define ACTION_REENCODE_CHANGED 2
-
 typedef struct
 {
     std::string     imageFile;      // just file name:                     bla.st
@@ -41,15 +38,6 @@ typedef struct
     FloppyImage     *image;         // this holds object with the loaded floppy image (in normaln data form)
     MfmCachedImage  encImage;       // this holds the MFM encoded image ready to be streamed
 } SiloSlot;
-
-typedef struct
-{
-    int action;     // stores ACTION_LOAD_AND_ENCODE or ACTION_REENCODE_CHANGED
-    int slotNo;     // nomber of slot which should get the new stream
-
-    int track;      // if it's ACTION_REENCODE_CHANGED, we need to specify which track and side changed
-    int side;
-} EncodeRequest;
 
 void *floppyEncodeThreadCode(void *ptr);
 
@@ -92,7 +80,7 @@ public:
 
 private:
     void clearSlot(int index);
-    static void addEncodeWholeImageRequest(int slotNo);
+    static void addEncodeWholeImageRequest(int slotNo, const char *imageFileName);
     static void addReencodeTrackRequest(int slotNo, int track, int side);
 
     SettingsReloadProxy     *reloadProxy;

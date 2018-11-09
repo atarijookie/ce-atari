@@ -39,8 +39,10 @@ int ImageSilo::floppyImageSelected = EMPTY_IMAGE_SLOT;
 
 extern TFlags flags;
 
-void ImageSilo::addEncodeWholeImageRequest(int slotNo)
+void ImageSilo::addEncodeWholeImageRequest(int slotNo, const char *imageFileName)
 {
+    Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest -- slotNo: %d, image: %s", slotNo, imageFileName);
+
     floppyEncodingRunning = true;
 
     pthread_mutex_lock(&floppyEncoderMutex);    // lock the mutex
@@ -49,20 +51,22 @@ void ImageSilo::addEncodeWholeImageRequest(int slotNo)
     slot->encImage.clearWholeCachedImage();     // clear remains of previous stream
 
     if(slot->image) {                           // if slot already contains image, get rid of it
+        Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest -- deleting old image from memory", slotNo);
         delete slot->image;
     }
 
     // try to load image from disk
-    slot->image = FloppyImageFactory::getImage(slot->hostDestPath.c_str());
+    slot->image = FloppyImageFactory::getImage(imageFileName);
 
     if(!slot->image || !slot->image->isOpen()) { // not supported image format or failed to open file?
-        Debug::out(LOG_DEBUG, "Failed to load image %s", slot->image->getFileName());
+        Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest - failed to load image %s", imageFileName);
 
         if(slot->image) {                       // if got the object, but failed to open, destory object and set pointer to null
             delete slot->image;
             slot->image = NULL;
         }
     } else {                                    // image loaded? good
+        Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest - image %s loaded", imageFileName);
         slot->encImage.storeImageParams(slot->image);   // sets tracksToBeEncoded to all tracks count
     }
 
@@ -72,6 +76,8 @@ void ImageSilo::addEncodeWholeImageRequest(int slotNo)
 
 void ImageSilo::addReencodeTrackRequest(int slotNo, int track, int side)
 {
+    Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest");
+
     pthread_mutex_lock(&floppyEncoderMutex);        // lock the mutex
 
     SiloSlot *slot = &slots[slotNo];                // get pointer to the right slot
@@ -113,16 +119,18 @@ void *floppyEncodeThreadCode(void *ptr)
 {
     Debug::out(LOG_DEBUG, "Floppy encode thread starting...");
 
-//void ImageSilo::run(void)
-//{
     pthread_mutex_lock(&floppyEncoderMutex);    // lock the mutex
 
     while(true) {                               // while we shouldn't stop
         // code should come to the start of this loop when there is nothing to be encoded and the encoder should sleep
         floppyEncodingRunning = false;              // not encoding right now
 
-        // unlock mutex, wait until should work. When should work, lock mutex and continue
-        pthread_cond_wait(&floppyEncoderShouldWork, &floppyEncoderMutex);
+        SiloSlot *slot = findSlotToEncode();    // check if there is something to encode
+
+        if(!slot) {                             // nothing to encode? sleep
+            // unlock mutex, wait until should work. When should work, lock mutex and continue
+            pthread_cond_wait(&floppyEncoderShouldWork, &floppyEncoderMutex);
+        }
 
         if(shouldStop) {    // if we should already stop
             pthread_mutex_unlock(&floppyEncoderMutex);  // unlock the mutex
@@ -135,7 +143,6 @@ void *floppyEncodeThreadCode(void *ptr)
         // the following code should encode all the slots, but one track at the time, so when there are multiple not encoded images,
         // the one which is selected for streaming, will be encoded first, and then the rest. This should also act fine if you switch
         // current slot in the middle of encoding image (to prioritize the selected one)
-        SiloSlot *slot;
         DWORD after50ms = Utils::getEndTime(50);    // this will help to add pauses at least every 50 ms to allow other threads to do stuff
 
         while(true) {
@@ -161,10 +168,13 @@ void *floppyEncodeThreadCode(void *ptr)
             // encode single track in image
             DWORD start = Utils::getCurrentMs();
 
-            slot->encImage.findNotReadyTrackAndEncodeIt(slot->image);
+            int track, side;
+            slot->encImage.findNotReadyTrackAndEncodeIt(slot->image, track, side);
 
-            DWORD end = Utils::getCurrentMs();
-            Debug::out(LOG_DEBUG, "Encoding of track of image %s done, took %d ms", slot->image->getFileName(), (int) (end - start));
+            if(track != -1) {       // if something was encoded, dump it to log
+                DWORD end = Utils::getCurrentMs();
+                Debug::out(LOG_DEBUG, "Encoding of [track %d, side %d] of image %s done, took %d ms", track, side, slot->image->getFileName(), (int) (end - start));
+            }
         }
     }
 
@@ -202,7 +212,7 @@ ImageSilo::ImageSilo()
 
     if(res) {                                                                   // if succeeded, encode this empty image
         Debug::out(LOG_DEBUG, "ImageSilo created empty image (for no selected image)");
-        addEncodeWholeImageRequest(EMPTY_IMAGE_SLOT);
+        addEncodeWholeImageRequest(EMPTY_IMAGE_SLOT, EMPTY_IMAGE_PATH);
     } else {
         Debug::out(LOG_DEBUG, "ImageSilo failed to create empty image! (for no selected image)");
     }
@@ -313,7 +323,7 @@ void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostD
     floppyImages[positionIndex].imageFile = filename;
 
     // create and add floppy encode request
-    addEncodeWholeImageRequest(positionIndex);
+    addEncodeWholeImageRequest(positionIndex, hostDestPath.c_str());
 
     if(saveToSettings) {                    // should we save this to settings? (false when loading settings)
         saveSettings();

@@ -173,7 +173,8 @@ void MfmCachedImage::encodeWholeImage(FloppyImage *img)
             return;
         }
 
-        res = findNotReadyTrackAndEncodeIt(img);    // try to find and encode single track, and if not possible, quit
+        int t,s;
+        res = findNotReadyTrackAndEncodeIt(img, t, s); // try to find and encode single track, and if not possible, quit
     }
 
     //dumpTracksToFile(tracksNo, sides, spt);       // for debugging purposes - dump to file
@@ -182,8 +183,11 @@ void MfmCachedImage::encodeWholeImage(FloppyImage *img)
     gotImage    = true;
 }
 
-bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img)
+bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, int &side)
 {
+    track = -1;                         // nothing encoded
+    side = -1;
+
     if(!img->isOpen()) {                // image file not open? quit
         return false;
     }
@@ -204,6 +208,9 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img)
     if(t == -1) {                       // track out of bounds?
         return false;
     }
+
+    track = t;                          // store track+side for caller
+    side = s;
 
     tracks[index].isReady = false;      // track not ready to be streamed - will be encoded
 

@@ -30,7 +30,7 @@ public:
     void askToReencodeTrack(int track, int side);
 
     void encodeWholeImage(FloppyImage *img);    // go through whole image and encode tracks, returns true if something encoded
-    bool findNotReadyTrackAndEncodeIt(FloppyImage *img);    // find a single track and encode it, or fail to find it and return false
+    bool findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, int &side);    // find a single track and encode it, or fail to find it and return false
 
     bool encodedTrackIsReady(int track, int side);
 	BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
