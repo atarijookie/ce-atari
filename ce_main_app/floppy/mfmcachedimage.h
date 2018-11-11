@@ -1,7 +1,6 @@
 #ifndef MFMCACHEDIMAGE_H
 #define MFMCACHEDIMAGE_H
 
-#include <atomic>
 #include "floppyimage.h"
 
 // maximum 2 sides, 85 tracks per side
@@ -9,7 +8,7 @@
 #define MFM_STREAM_SIZE 15000
 
 typedef struct {
-    volatile std::atomic<bool> isReady;    // set to false if this track can't be streamed yet (e.g. not encoded yet or encoding at that moment)
+    volatile bool isReady;    // set to false if this track can't be streamed yet (e.g. not encoded yet or encoding at that moment)
 
     int     track;
     int     side;

@@ -24,7 +24,7 @@
 #include "ce_conf_on_rpi.h"
 #include "periodicthread.h"
 #include "display/displaythread.h"
-#include "floppy/imagesilo.h"
+#include "floppy/floppyencoder.h"
 
 #include "webserver/webserver.h"
 #include "webserver/api/apimodule.h"
@@ -314,7 +314,7 @@ int main(int argc, char *argv[])
 #endif
 
     printf("Stoping floppy encoder thread\n");
-    ImageSilo::stop();
+    floppyEncoder_stop();
     pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes
 
     printf("Stoping periodic thread\n");

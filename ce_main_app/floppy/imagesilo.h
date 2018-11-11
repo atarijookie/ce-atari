@@ -39,8 +39,6 @@ typedef struct
     MfmCachedImage  encImage;       // this holds the MFM encoded image ready to be streamed
 } SiloSlot;
 
-void *floppyEncodeThreadCode(void *ptr);
-
 class ImageSilo
 {
 public:
@@ -80,8 +78,6 @@ public:
 
 private:
     void clearSlot(int index);
-    static void addEncodeWholeImageRequest(int slotNo, const char *imageFileName);
-    static void addReencodeTrackRequest(int slotNo, int track, int side);
 
     SettingsReloadProxy     *reloadProxy;
 
