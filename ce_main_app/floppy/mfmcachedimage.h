@@ -35,8 +35,8 @@ public:
     bool findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, int &side);    // find a single track and encode it, or fail to find it and return false
 
     bool encodedTrackIsReady(int track, int side);
-	BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
-	bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
+    BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
+    bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
 
     bool newContent;
 
@@ -48,11 +48,11 @@ private:
 
     bool gotImage;
 
-	struct {
-		int tracks;
-		int sides;
-		int spt;
-	} params;
+    struct {
+        int tracks;
+        int sides;
+        int spt;
+    } params;
 
     int tracksToBeEncoded;  // holds how many tracks we still need to process
 
