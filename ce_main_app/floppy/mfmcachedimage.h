@@ -10,6 +10,9 @@
 typedef struct {
     volatile bool isReady;    // set to false if this track can't be streamed yet (e.g. not encoded yet or encoding at that moment)
 
+    volatile DWORD  encodeRequestTime;  // timestamp when other thread requested encoding of this track
+    volatile DWORD  encodeActionTime;   // timestamp when encoder did start to encode the track. If at the end of encoding requestTime > actionTime, another request was placed and encode needs to repeat
+
     int     track;
     int     side;
 

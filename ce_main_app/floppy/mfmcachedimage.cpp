@@ -8,6 +8,8 @@
 #define LOBYTE(w)   ((BYTE)(w))
 #define HIBYTE(w)   ((BYTE)(((WORD)(w)>>8)&0xFF))
 
+extern pthread_mutex_t floppyEncoderMutex;
+
 // crc16-ccitt generated table for fast CRC calculation
 const WORD crcTable[256] = {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
@@ -118,6 +120,7 @@ void MfmCachedImage::askToReencodeTrack(int track, int side)
         return;
     }
 
+    tracks[index].encodeRequestTime = Utils::getCurrentMs();    // mark time when this request was placed
     tracks[index].isReady = false;  // the reencoding didn't happen yet
     nextIndex = index;              // store this as next index that needs reencoding
     tracksToBeEncoded++;            // increment count of tracks that need reencoding
@@ -212,7 +215,14 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
     track = t;                          // store track+side for caller
     side = s;
 
+    //-----
+    pthread_mutex_lock(&floppyEncoderMutex);      // unlock the mutex
+
+    tracks[index].encodeActionTime = Utils::getCurrentMs(); // mark time when we started to process this track
     tracks[index].isReady = false;      // track not ready to be streamed - will be encoded
+
+    pthread_mutex_unlock(&floppyEncoderMutex);      // unlock the mutex
+    //-----
 
     memset(tracks[index].mfmStream, 0, MFM_STREAM_SIZE);    // initialize MFM stream
     bfr = tracks[index].mfmStream;                          // move pointer to start of track buffer
@@ -228,7 +238,16 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
         tracks[index].mfmStream[i + 1]  = tmp;
     }
 
-    tracks[index].isReady = true;               // track is now ready to be streamed
+    //-----
+    pthread_mutex_lock(&floppyEncoderMutex);      // unlock the mutex
+
+    if(tracks[index].encodeRequestTime < tracks[index].encodeActionTime) {  // if there wasn't any request since we started to encode this track, it's ready (otherwise needs reencoding)
+        tracks[index].isReady = true;               // track is now ready to be streamed
+    }
+
+    pthread_mutex_unlock(&floppyEncoderMutex);      // unlock the mutex
+    //-----
+
     return true;
 }
 

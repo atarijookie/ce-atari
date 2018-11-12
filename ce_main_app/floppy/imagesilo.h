@@ -35,7 +35,11 @@ typedef struct
     std::string     atariSrcPath;   // from where the file was uploaded:   C:\gamez\bla.st
     std::string     hostSrcPath;    // for translated disk, host path:     /mnt/sda/gamez/bla.st
 
-    FloppyImage     *image;         // this holds object with the loaded floppy image (in normaln data form)
+    volatile DWORD  openRequestTime; // timestamp when other thread requested opening of image
+    volatile DWORD  openActionTime; // timestamp when encoder did really open the file
+    std::string     imageFileName;  // file name of image to open next
+    FloppyImage     *image;         // this holds object with the loaded floppy image (in normal data form)
+
     MfmCachedImage  encImage;       // this holds the MFM encoded image ready to be streamed
 } SiloSlot;
 

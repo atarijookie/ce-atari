@@ -41,35 +41,14 @@ void floppyEncoder_addEncodeWholeImageRequest(int slotNo, const char *imageFileN
 {
     Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest -- slotNo: %d, image: %s", slotNo, imageFileName);
 
-    floppyEncodingRunning = true;
+    pthread_mutex_lock(&floppyEncoderMutex);    		// lock the mutex
 
-    pthread_mutex_lock(&floppyEncoderMutex);    // lock the mutex
-    SiloSlot *slot = &slots[slotNo];            // get pointer to the right slot
+    SiloSlot *slot = &slots[slotNo];            		// get pointer to the right slot
+	slot->openRequestTime = Utils::getCurrentMs();		// mark time when we requested opening of file
+	slot->imageFileName = std::string(imageFileName);	// store image file name
 
-    slot->encImage.clearWholeCachedImage();     // clear remains of previous stream
-
-    if(slot->image) {                           // if slot already contains image, get rid of it
-        Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest -- deleting old image from memory", slotNo);
-        delete slot->image;
-    }
-
-    // try to load image from disk
-    slot->image = FloppyImageFactory::getImage(imageFileName);
-
-    if(!slot->image || !slot->image->isOpen()) { // not supported image format or failed to open file?
-        Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest - failed to load image %s", imageFileName);
-
-        if(slot->image) {                       // if got the object, but failed to open, destory object and set pointer to null
-            delete slot->image;
-            slot->image = NULL;
-        }
-    } else {                                    // image loaded? good
-        Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest - image %s loaded", imageFileName);
-        slot->encImage.storeImageParams(slot->image);   // sets tracksToBeEncoded to all tracks count
-    }
-
-    pthread_cond_signal(&floppyEncoderShouldWork);  // wake up encoder
-    pthread_mutex_unlock(&floppyEncoderMutex);      // unlock the mutex
+    pthread_cond_signal(&floppyEncoderShouldWork);  	// wake up encoder
+    pthread_mutex_unlock(&floppyEncoderMutex);      	// unlock the mutex
 }
 
 void floppyEncoder_addReencodeTrackRequest(int slotNo, int track, int side)
@@ -95,6 +74,57 @@ void floppyEncoder_stop(void)
     pthread_mutex_unlock(&floppyEncoderMutex);      // unlock the mutex
 }
 
+static void floppyEncoder_handleOpenFiles(void)
+{
+	for(int i=0; i<SLOT_COUNT; i++) {
+    	pthread_mutex_lock(&floppyEncoderMutex);            // lock the mutex
+
+		SiloSlot *slot = &slots[i];					        // get one slot
+
+		if(slot->openRequestTime <= slot->openActionTime) {	// if image open request is older than open action, this image has already been open, skip it
+    		pthread_mutex_unlock(&floppyEncoderMutex);	    // unlock the mutex - not doing anything here, no reason to protect
+			continue;
+		}
+
+	    slot->encImage.clearWholeCachedImage();             // clear remains of previous stream
+        slot->openActionTime = Utils::getCurrentMs();       // store that we're opening the file now
+        std::string imageFileName = slot->imageFileName;    // make a copy of the image file name, so we can unlock mutex but still work with the filename
+
+		pthread_mutex_unlock(&floppyEncoderMutex);	        // unlock the mutex - the open bellow might take long, but slot->image is not touched by any other thread than floppyEncoder, so don't leave it locked
+
+    	if(slot->image) {                                   // if slot already contains image, get rid of it
+			// TODO: check if image contains unwritten data and write it to disk
+
+        	Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest -- deleting old image from memory");
+	        delete slot->image;
+    	}
+
+	    // try to load image from disk
+    	slot->image = FloppyImageFactory::getImage(imageFileName.c_str());
+
+	    if(!slot->image || !slot->image->isOpen()) { // not supported image format or failed to open file?
+    	    Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest - failed to load image %s", imageFileName);
+
+        	if(slot->image) {                       // if got the object, but failed to open, destory object and set pointer to null
+            	delete slot->image;
+	            slot->image = NULL;
+    	    }
+	    } else {                                    // image loaded? good
+    	    Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest - image %s loaded", imageFileName);
+        	slot->encImage.storeImageParams(slot->image);   // sets tracksToBeEncoded to all tracks count
+	    }
+	}
+}
+
+static void floppyEncoder_doBeforeTerminating(void)
+{
+    floppyEncodingRunning = false;              // not encoding right now
+
+	// TODO: check if image contains unwritten data and write it to disk
+
+    Debug::out(LOG_DEBUG, "Floppy encode thread terminated.");
+}
+
 SiloSlot *findSlotToEncode(void)
 {
     // if the current slot has something to be encoded, return it - this is now priority (to be available for streaming)
@@ -117,22 +147,23 @@ void *floppyEncodeThreadCode(void *ptr)
 {
     Debug::out(LOG_DEBUG, "Floppy encode thread starting...");
 
-    pthread_mutex_lock(&floppyEncoderMutex);    // lock the mutex
-
-    while(true) {                               // while we shouldn't stop
+    while(true) {                                   // while we shouldn't stop
         // code should come to the start of this loop when there is nothing to be encoded and the encoder should sleep
         floppyEncodingRunning = false;              // not encoding right now
 
-        SiloSlot *slot = findSlotToEncode();    // check if there is something to encode
+        SiloSlot *slot = findSlotToEncode();        // check if there is something to encode
 
-        if(!slot) {                             // nothing to encode? sleep
+        if(!slot) {                                 // nothing to encode? sleep
+            pthread_mutex_lock(&floppyEncoderMutex); // lock the mutex
+
             // unlock mutex, wait until should work. When should work, lock mutex and continue
             pthread_cond_wait(&floppyEncoderShouldWork, &floppyEncoderMutex);
+
+            pthread_mutex_unlock(&floppyEncoderMutex);  // unlock the mutex
         }
 
         if(shouldStop) {    // if we should already stop
-            pthread_mutex_unlock(&floppyEncoderMutex);  // unlock the mutex
-            Debug::out(LOG_DEBUG, "Floppy encode thread terminated.");
+            floppyEncoder_doBeforeTerminating();
             return 0;
         }
 
@@ -144,6 +175,8 @@ void *floppyEncodeThreadCode(void *ptr)
         DWORD after50ms = Utils::getEndTime(50);    // this will help to add pauses at least every 50 ms to allow other threads to do stuff
 
         while(true) {
+    		floppyEncoder_handleOpenFiles();	// check if some file needs loading and then load it
+
             slot = findSlotToEncode();  // find some slot which needs encoding
 
             if(!slot) {                 // nothing to encode or should stop? quit loop and sleep
@@ -152,9 +185,7 @@ void *floppyEncodeThreadCode(void *ptr)
             }
 
             if(shouldStop) {            // if we should stop, unlock mutex and quit
-                floppyEncodingRunning = false;              // not encoding right now
-                pthread_mutex_unlock(&floppyEncoderMutex);  // unlock the mutex
-                Debug::out(LOG_DEBUG, "Floppy encode thread terminated.");
+                floppyEncoder_doBeforeTerminating();
                 return 0;
             }
 
@@ -176,6 +207,6 @@ void *floppyEncodeThreadCode(void *ptr)
         }
     }
 
-    Debug::out(LOG_DEBUG, "Floppy encode thread terminated.");
+    floppyEncoder_doBeforeTerminating();
     return 0;
 }
