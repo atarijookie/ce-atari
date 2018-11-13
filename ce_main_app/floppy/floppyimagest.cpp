@@ -8,8 +8,11 @@ bool FloppyImageSt::open(const char *fileName)
     if(!FloppyImage::open(fileName))
         return false;
 
-    if(!loadImageIntoMemory()) {        // load the whole image in memory to avoid later disk access
-        close();
+    bool res = loadImageIntoMemory();   // load the whole image in memory to avoid later disk access
+    close();                            // close the file, all the needed data is now in memory
+
+    if(!res) {                          // if failed to load image, quit and fail
+        clear();
         return false;
     }
 
@@ -65,6 +68,18 @@ bool FloppyImageSt::calcParams(void)
 
 bool FloppyImageSt::save(const char *fileName)
 {
-    //TODO: implement this later
-    return true;
+    if(!isLoaded()) {                   // nothing in memory? fail
+        return false;
+    }
+
+    FILE *f = fopen(fileName, "wb");    // open
+
+    if(!f) {                            // failed?
+        return false;
+    }
+
+    int res = fwrite(image.data, 1, image.size, f); // write
+
+    fclose(f);                          // close
+    return (res == image.size);         // success if written as much as should
 }

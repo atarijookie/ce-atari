@@ -15,12 +15,14 @@ public:
     FloppyImage();
     virtual ~FloppyImage();
 
-    bool isOpen(void);
+    bool isLoaded(void);
     const char *getFileName(void);
 
-    virtual bool open(const char *fileName);
-    virtual bool save(const char *fileName) = 0;
-    virtual void close();
+    virtual bool open(const char *fileName);        // open filename for reading
+    virtual void close(void);                       // close file handle if open
+
+    virtual bool save(const char *fileName) = 0;    // save data into file
+    virtual void clear(void);                       // clear the data in memory
     virtual bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
     virtual bool readSector(int track, int side, int sectorNo, BYTE *buffer);
 
@@ -43,7 +45,7 @@ protected:
 
 private:
     std::string currentFileName;
-    bool openFlag;
+    bool loadedFlag;
 };
 
 #endif // FLOPPYIMAGE_H

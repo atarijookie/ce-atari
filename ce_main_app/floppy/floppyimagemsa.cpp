@@ -20,7 +20,8 @@ bool FloppyImageMsa::open(const char *fileName)
     fread(&trackEnd,    2,1,fajl);      Utils::SWAPWORD(trackEnd);
 
     if(id != 0x0e0f) {          // MSA ID mismatch?
-        close();
+        close();                // close file
+        clear();                // clear memory
         return false;
     }
     params.tracksNo         = trackEnd - trackStart + 1;
@@ -28,8 +29,11 @@ bool FloppyImageMsa::open(const char *fileName)
     params.sectorsPerTrack  = spt;
     params.isInit           = true;
 
-    if(!loadImageIntoMemory()) {        // load the whole image in memory to avoid later disk access
-        close();
+    bool res = loadImageIntoMemory();   // load the whole image in memory to avoid later disk access
+    close();                            // close file - no need for it to be open
+
+    if(!res) {              // load failed?
+        clear();            // clear memory
         return false;
     }
 
@@ -64,5 +68,3 @@ bool FloppyImageMsa::save(const char *fileName)
 {
 	return MSA_WriteDisk(fileName, image.data, image.size);
 }
-
-

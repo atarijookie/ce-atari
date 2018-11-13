@@ -7,7 +7,7 @@
 
 FloppyImage::FloppyImage()
 {
-	openFlag        = false;
+	loadedFlag      = false;
     params.isInit   = false;
 
     image.data = NULL;
@@ -16,23 +16,31 @@ FloppyImage::FloppyImage()
 
 FloppyImage::~FloppyImage()
 {
-	close();
+	clear();
 }
 
-bool FloppyImage::isOpen(void)
+bool FloppyImage::isLoaded(void)
 {
-	return openFlag;
+	return loadedFlag;
 }
 
-void FloppyImage::close()
+void FloppyImage::close(void)               // just close the file handle if open
 {
-    if(!openFlag) {                     // not open? nothing to do
+    if(fajl) {                              // if file still open, close it
+        fclose(fajl);
+        fajl = NULL;
+    }
+}
+
+void FloppyImage::clear(void)           // close and clear / free memory
+{
+    close();                            // if file still open, close it
+
+    if(!loadedFlag) {                   // not loaded? nothing to do
         return;
     }
 
-    fclose(fajl);
-    fajl = NULL;
-    openFlag = false;
+    loadedFlag = false;
     params.isInit = false;
 
     if(image.data != NULL) {
@@ -44,7 +52,7 @@ void FloppyImage::close()
 
 bool FloppyImage::getParams(int &tracks, int &sides, int &sectorsPerTrack)
 {
-    if(!openFlag) {
+    if(!loadedFlag) {
         tracks          = 0;
         sides           = 0;
         sectorsPerTrack = 0;
@@ -61,7 +69,7 @@ bool FloppyImage::getParams(int &tracks, int &sides, int &sectorsPerTrack)
 
 bool FloppyImage::readSector(int track, int side, int sectorNo, BYTE *buffer)
 {
-    if(!openFlag) {                                             // not open?
+    if(!loadedFlag) {   // not loaded?
         return false;
     }
 
@@ -85,7 +93,7 @@ const char *FloppyImage::getFileName(void)
 
 bool FloppyImage::open(const char *fileName)
 {
-    close();
+    clear();
 
     currentFileName = fileName;
 
@@ -93,11 +101,10 @@ bool FloppyImage::open(const char *fileName)
 
     if(fajl == NULL) {
         Debug::out(LOG_ERROR, "Failed to open image file: %s", fileName);
-        openFlag = false;
-    } else {
-        openFlag = true;
+        return false;
     }
-    return openFlag;
+
+    return true;
 }
 
 bool FloppyImage::loadImageIntoMemory(void)

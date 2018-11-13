@@ -100,7 +100,7 @@ void MfmCachedImage::storeImageParams(FloppyImage *img)
     params.sides = 0;
     params.spt = 0;
 
-    if(!img->isOpen()) {    // image file not open? quit
+    if(!img->isLoaded()) {    // image file not open? quit
         return;
     }
 
@@ -157,7 +157,7 @@ int MfmCachedImage::getNextIndexToEncode(void)
 
 void MfmCachedImage::encodeWholeImage(FloppyImage *img)
 {
-    if(!img->isOpen()) {                            // image file not open? quit
+    if(!img->isLoaded()) {                            // image file not open? quit
         return;
     }
 
@@ -191,7 +191,7 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
     track = -1;                         // nothing encoded
     side = -1;
 
-    if(!img->isOpen()) {                // image file not open? quit
+    if(!img->isLoaded()) {              // image file not open? quit
         return false;
     }
 

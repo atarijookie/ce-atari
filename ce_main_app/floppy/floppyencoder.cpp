@@ -102,7 +102,7 @@ static void floppyEncoder_handleOpenFiles(void)
         // try to load image from disk
         slot->image = FloppyImageFactory::getImage(imageFileName.c_str());
 
-        if(!slot->image || !slot->image->isOpen()) { // not supported image format or failed to open file?
+        if(!slot->image || !slot->image->isLoaded()) { // not supported image format or failed to open file?
             Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest - failed to load image %s", imageFileName);
 
             if(slot->image) {                       // if got the object, but failed to open, destory object and set pointer to null
