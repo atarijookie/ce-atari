@@ -93,10 +93,8 @@ static void floppyEncoder_handleOpenFiles(void)
         pthread_mutex_unlock(&floppyEncoderMutex);	        // unlock the mutex - the open bellow might take long, but slot->image is not touched by any other thread than floppyEncoder, so don't leave it locked
 
         if(slot->image) {                                   // if slot already contains image, get rid of it
-            // TODO: check if image contains unwritten data and write it to disk
-
             Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest -- deleting old image from memory");
-            delete slot->image;
+            delete slot->image;                             // floppy image destructor will check if something needs to be written and does write if some changes need to be written
         }
 
         // try to load image from disk
@@ -120,7 +118,13 @@ static void floppyEncoder_doBeforeTerminating(void)
 {
     floppyEncodingRunning = false;              // not encoding right now
 
-    // TODO: check if image contains unwritten data and write it to disk
+    for(int i=0; i<SLOT_COUNT; i++) {
+        if(slots[i].image) {                    // if image in this slot is present
+            slots[i].image->clear();            // save image if some unwritten data needs to be saved, free memory
+            delete slots[i].image;              // delete image
+            slots[i].image = NULL;
+        }
+    }
 
     Debug::out(LOG_DEBUG, "Floppy encode thread terminated.");
 }

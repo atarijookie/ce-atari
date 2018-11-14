@@ -64,7 +64,8 @@ bool FloppyImageMsa::loadImageIntoMemory(void)
     return true;
 }
 
-bool FloppyImageMsa::save(const char *fileName)
+bool FloppyImageMsa::save(void)
 {
-	return MSA_WriteDisk(fileName, image.data, image.size);
+    sectorsWritten = 0;                         // clear unwritten sectors counter
+	return MSA_WriteDisk(currentFileName.c_str(), image.data, image.size);
 }

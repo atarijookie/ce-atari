@@ -66,13 +66,15 @@ bool FloppyImageSt::calcParams(void)
     return false;
 }
 
-bool FloppyImageSt::save(const char *fileName)
+bool FloppyImageSt::save(void)
 {
+    sectorsWritten = 0;                 // clear unwritten sectors counter
+
     if(!isLoaded()) {                   // nothing in memory? fail
         return false;
     }
 
-    FILE *f = fopen(fileName, "wb");    // open
+    FILE *f = fopen(currentFileName.c_str(), "wb");    // open
 
     if(!f) {                            // failed?
         return false;
