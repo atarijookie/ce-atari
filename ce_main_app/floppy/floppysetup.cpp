@@ -18,8 +18,6 @@
 #include "imagestorage.h"
 #include "floppysetup_commands.h"
 
-#define UPLOAD_PATH "/tmp/"
-
 volatile BYTE currentImageDownloadStatus;
 extern SharedObjects shared;
 
@@ -340,7 +338,7 @@ void FloppySetup::searchInsertToSlot(void)
     // set floppy image to slot
     std::string sPath, sFile, sEmpty;
     Utils::splitFilenameFromPath(localImagePath, sPath, sFile);
-    shared.imageSilo->add(slotNo, sFile, localImagePath, sEmpty, sEmpty, true);
+    shared.imageSilo->add(slotNo, sFile, localImagePath, sEmpty, true);
 
     dataTrans->setStatus(FDD_OK);               // done
 }
@@ -544,7 +542,7 @@ void FloppySetup::uploadStart(void)
     std::string path, file;
     Utils::splitFilenameFromPath(pathWithHostSeparators, path, file);
 
-    path = UPLOAD_PATH + file;
+    path = FLOPPY_UPLOAD_PATH + file;
 
     FILE *f = NULL;
 
@@ -563,14 +561,11 @@ void FloppySetup::uploadStart(void)
     currentUpload.slotIndex             = index;
     currentUpload.fh                    = f;
     currentUpload.atariSourcePath       = atariFilePath;            // atari path:                      C:\bla.st
-    currentUpload.hostSourcePath        = hostPath;                 // host path for translated drives: /mnt/sda/bla.st
-    currentUpload.hostDestinationPath   = path;                     // host destination:                /tmp/bla.st -- for translated drives use directly where it is (hostSourcePath), for uploaded from SD card use /tmp/
+    currentUpload.hostPath              = hostPath;                 // host path for translated drives: /mnt/sda/bla.st, or /tmp/bla.st if it was uploaded from ST drive
     currentUpload.file                  = file;                     // just file name:                  bla.st
 
     // do on-device-copy if needed
     if(doOnDeviceCopy) {                                            // if doing on-device-copy...
-        currentUpload.hostDestinationPath = currentUpload.hostSourcePath;   // we're using file from translated drive, don't copy, just use the file from where it is
-
         if(res) {                                                   // if file was copied
             cmd[4] = FDD_CMD_UPLOADIMGBLOCK_DONE_OK;
             cmd[5] = index;
@@ -635,7 +630,7 @@ void FloppySetup::uploadEnd(bool isOnDeviceCopy)
     }
 
     // we're here, the image upload succeeded, the following will also encode the image...
-    shared.imageSilo->add(currentUpload.slotIndex, currentUpload.file, currentUpload.hostDestinationPath, currentUpload.atariSourcePath, currentUpload.hostSourcePath, true);
+    shared.imageSilo->add(currentUpload.slotIndex, currentUpload.file, currentUpload.hostPath, currentUpload.atariSourcePath, true);
 
     // now finish with OK status
     if(isOnDeviceCopy) {                                        // for on-device-copy send special status
@@ -661,7 +656,7 @@ void FloppySetup::newImage(void)
     char file[128];
     getNewImageName(file);
     std::string justFile = file;
-    std::string pathAndFile = UPLOAD_PATH + justFile;
+    std::string pathAndFile = FLOPPY_UPLOAD_PATH + justFile;
 
     bool res = createNewImage(pathAndFile);             // create the new image on disk
 
@@ -672,7 +667,7 @@ void FloppySetup::newImage(void)
 
     // we're here, the image creation succeeded
     std::string empty;
-    shared.imageSilo->add(index, justFile, pathAndFile, empty, empty, true);
+    shared.imageSilo->add(index, justFile, pathAndFile, empty, true);
 
     dataTrans->setStatus(FDD_OK);
 }
@@ -720,7 +715,7 @@ void FloppySetup::getNewImageName(char *nameBfr)
     for(int i=0; i<100; i++) {
         sprintf(fileName, "newimg%d.st", i);						// create new filename
 
-        std::string fnameWithPath = UPLOAD_PATH;
+        std::string fnameWithPath = FLOPPY_UPLOAD_PATH;
         fnameWithPath += fileName;									// this will be filename with path
 
         if(shared.imageSilo->containsImage(fileName)) {					// if this file is already in silo, skip it
@@ -755,7 +750,7 @@ void FloppySetup::downloadStart(void)
             return;
         }
 
-        hostPath        = ss->hostDestPath;                 // where on RPi is the file (e.g. /tmp/disk.img)
+        hostPath        = ss->hostPath;                     // where on RPi is the file (e.g. /tmp/disk.img or /mnt/sda/gamez.bla.st)
         justFileName    = ss->imageFile;                    // just the filename (e.g. disk.img)
     } else if(index == 10) {                                // downloading from inet download file?
         hostPath        = inetDnFilePath;                   // where on RPi is the file (e.g. /tmp/A_001.st)

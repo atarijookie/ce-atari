@@ -31,9 +31,9 @@ typedef struct
 {
     std::string     imageFile;      // just file name:                     bla.st
     std::string     imageFileNoExt; // file name without extension:        bla
-    std::string     hostDestPath;   // where the file is stored when used: /tmp/bla.st
     std::string     atariSrcPath;   // from where the file was uploaded:   C:\gamez\bla.st
-    std::string     hostSrcPath;    // for translated disk, host path:     /mnt/sda/gamez/bla.st
+    std::string     hostPath;       // for translated disk, host path:     /mnt/sda/gamez/bla.st
+                                    // or where uploaded disk where is stored: /tmp/bla.st
 
     volatile DWORD  openRequestTime; // timestamp when other thread requested opening of image
     volatile DWORD  openActionTime; // timestamp when encoder did really open the file
@@ -63,7 +63,7 @@ public:
     bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
     BYTE *getEmptyTrack(void);
 
-    void add(int positionIndex, std::string &filename, std::string &hostDestPath, std::string &atariSrcPath, std::string &hostSrcPath, bool saveToSettings);
+    void add(int positionIndex, std::string &filename, std::string &hostPath, std::string &atariSrcPath, bool saveToSettings);
     void swap(int index);
     void remove(int index);
 

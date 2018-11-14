@@ -94,9 +94,9 @@ void ImageSilo::loadSettings(void)
 
     char key[32];
     for(int slot=0; slot<3; slot++) {
-        sprintf(key, "FLOPPY_IMAGE_%d", slot);                                  // create settings key
+        sprintf(key, "FLOPPY_IMAGE_%d", slot);      // create settings key
 
-        const char *img = s.getString(key, "");                              // try to read the value
+        const char *img = s.getString(key, "");     // try to read the value
 
         std::string pathAndFile, path, file;
         pathAndFile = img;
@@ -108,22 +108,12 @@ void ImageSilo::loadSettings(void)
         }
         //-----------------------------
 
-        if(pathAndFile.empty()) {                                               // nothing stored? skip it
+        if(pathAndFile.empty()) {                   // nothing stored? skip it
             continue;
         }
 
-        Utils::splitFilenameFromPath(pathAndFile, path, file);                  // split path from file
-        std::string fileInTmp = "/tmp/" + file;
         std::string empty;
-
-        bool res = Utils::copyFile(pathAndFile, fileInTmp);                     // copy the file to /tmp/
-
-        if(!res) {                                                              // failed to copy?
-            Debug::out(LOG_ERROR, "ImageSilo::loadSettings - didn't load image %s", img);
-            continue;
-        }
-
-        add(slot, file, fileInTmp, empty, pathAndFile, false);                  // add this image, don't save to settings
+        add(slot, file, pathAndFile, empty, false); // add this image, don't save to settings
     }
 
     // now tell the core thread that floppy images have changed
@@ -143,11 +133,11 @@ void ImageSilo::saveSettings(void)
         const char *oldVal = s.getString(key, "");                           // try to read the old value
         std::string oldValStr = oldVal;
 
-        if(oldValStr == slots[slot].hostSrcPath) {                              // if old value matches what we would save, skip it
+        if(oldValStr == slots[slot].hostPath) {                              // if old value matches what we would save, skip it
             continue;
         }
 
-        s.setString(key, slots[slot].hostSrcPath.c_str());             // store the value at that slot
+        s.setString(key, slots[slot].hostPath.c_str());             // store the value at that slot
     }
 
     // if something changed and got settings reload proxy, invoke reload
@@ -161,7 +151,7 @@ void ImageSilo::setSettingsReloadProxy(SettingsReloadProxy *rp)
     reloadProxy = rp;
 }
 
-void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostDestPath, std::string &atariSrcPath, std::string &hostSrcPath, bool saveToSettings)
+void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostPath, std::string &atariSrcPath, bool saveToSettings)
 {
     if(positionIndex < 0 || positionIndex > 2) {
         return;
@@ -173,14 +163,13 @@ void ImageSilo::add(int positionIndex, std::string &filename, std::string &hostD
     // store the info about slot
     slots[positionIndex].imageFile      = filename;         // just file name:                     bla.st
     slots[positionIndex].imageFileNoExt = filenameNoExt;    // just file name without extension:   bla
-    slots[positionIndex].hostDestPath   = hostDestPath;     // where the file is stored when used: /tmp/bla.st
+    slots[positionIndex].hostPath       = hostPath;         // where the file is stored on translated drive (/mnt/sda/gamez/bla.st) or where the image is uploaded from atari (/tmp/bla.st)
     slots[positionIndex].atariSrcPath   = atariSrcPath;     // from where the file was uploaded:   C:\gamez\bla.st
-    slots[positionIndex].hostSrcPath    = hostSrcPath;      // for translated disk, host path:     /mnt/sda/gamez/bla.st
 
     floppyImages[positionIndex].imageFile = filename;
 
     // create and add floppy encode request
-    floppyEncoder_addEncodeWholeImageRequest(positionIndex, hostDestPath.c_str());
+    floppyEncoder_addEncodeWholeImageRequest(positionIndex, hostPath.c_str());
 
     if(saveToSettings) {                    // should we save this to settings? (false when loading settings)
         saveSettings();
@@ -215,9 +204,8 @@ void ImageSilo::swap(int index)
 
     // swap image files
     a->imageFile.swap(b->imageFile);
-    a->hostDestPath.swap(b->hostDestPath);
+    a->hostPath.swap(b->hostPath);
     a->atariSrcPath.swap(b->atariSrcPath);
-    a->hostSrcPath.swap(b->hostSrcPath);
 
     for(int i=0; i<3; i++) {
         floppyImages[i].imageFile = slots[i].imageFile;
@@ -239,8 +227,11 @@ void ImageSilo::remove(int index)                   // remove image at specified
         return;
     }
 
-    // delete the file from /tmp
-    unlink(slots[index].hostDestPath.c_str());
+    // if this file is not from translated drive, but it was uploaded in floppy upload path from ST, delete it
+    if(slots[index].hostPath.compare(0, strlen(FLOPPY_UPLOAD_PATH), std::string(FLOPPY_UPLOAD_PATH)) == 0) {
+        // delete the file from /tmp
+        unlink(slots[index].hostPath.c_str());
+    }
 
     clearSlot(index);
 
@@ -260,9 +251,8 @@ void ImageSilo::dumpStringsToBuffer(BYTE *bfr)      // copy the strings to buffe
 void ImageSilo::clearSlot(int index)
 {
     slots[index].imageFile.clear();
-    slots[index].hostDestPath.clear();
+    slots[index].hostPath.clear();
     slots[index].atariSrcPath.clear();
-    slots[index].hostSrcPath.clear();
 
     if(index >= 0 && index < 3) {
         floppyImages[index].imageFile.clear();

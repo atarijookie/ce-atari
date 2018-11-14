@@ -8,6 +8,8 @@
 #include "../translated/translateddisk.h"
 #include "../settingsreloadproxy.h"
 
+#define FLOPPY_UPLOAD_PATH          "/tmp/"
+
 #define IMG_DN_STATUS_IDLE          0
 #define IMG_DN_STATUS_DOWNLOADING   1
 #define IMG_DN_STATUS_DOWNLOADED    2
@@ -44,14 +46,13 @@ private:
     struct {
         int         slotIndex;
         std::string atariSourcePath;
-        std::string hostSourcePath;
-        std::string hostDestinationPath;
+        std::string hostPath;
         std::string file;
         FILE *fh;
     } currentUpload;
 
     struct {
-        std::string hostDestPath;
+        std::string hostPath;
         std::string imageFile;
         FILE *fh;
     } currentDownload;

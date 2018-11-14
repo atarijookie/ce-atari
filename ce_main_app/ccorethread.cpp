@@ -1181,7 +1181,7 @@ void CCoreThread::insertSpecialFloppyImage(int specialImageId)
     }
 
     // encode MSA config image to MFM stream - in slot #0
-    shared.imageSilo->add(0, ceConfFilename, ceConfFullPath, dummy, dummy, false);
+    shared.imageSilo->add(0, ceConfFilename, ceConfFullPath, dummy, false);
 
     // set the current to slot #0
     shared.imageSilo->setCurrentSlot(0);
