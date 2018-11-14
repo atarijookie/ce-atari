@@ -564,12 +564,12 @@ void FloppySetup::uploadStart(void)
     currentUpload.fh                    = f;
     currentUpload.atariSourcePath       = atariFilePath;            // atari path:                      C:\bla.st
     currentUpload.hostSourcePath        = hostPath;                 // host path for translated drives: /mnt/sda/bla.st
-    currentUpload.hostDestinationPath   = path;                     // host destination:                /tmp/bla.st
+    currentUpload.hostDestinationPath   = path;                     // host destination:                /tmp/bla.st -- for translated drives use directly where it is (hostSourcePath), for uploaded from SD card use /tmp/
     currentUpload.file                  = file;                     // just file name:                  bla.st
 
     // do on-device-copy if needed
     if(doOnDeviceCopy) {                                            // if doing on-device-copy...
-        res = Utils::copyFile(hostPath, path);                      // copy the file
+        currentUpload.hostDestinationPath = currentUpload.hostSourcePath;   // we're using file from translated drive, don't copy, just use the file from where it is
 
         if(res) {                                                   // if file was copied
             cmd[4] = FDD_CMD_UPLOADIMGBLOCK_DONE_OK;
