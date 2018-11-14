@@ -114,6 +114,28 @@ static void floppyEncoder_handleOpenFiles(void)
     }
 }
 
+static void floppyEncoder_handleSaveFiles(void)
+{
+    DWORD now = Utils::getCurrentMs();              // current time
+
+    for(int i=0; i<SLOT_COUNT; i++) {
+        if(slots[i].image == NULL) {                // if image in this slot not present, skip it
+            continue;
+        }
+
+        if(!slots[i].image->gotUnsavedChanges()) {  // if this image doesn't have unsaved changes, skip it
+            continue;
+        }
+
+        DWORD timeSinceLastWrite = now - slots[i].image->getLastWriteTime();
+        if(timeSinceLastWrite < 5000) {             // if last write happened too recently, wait with the write
+            continue;
+        }
+
+        slots[i].image->save();                     // save the changes
+    }
+}
+
 static void floppyEncoder_doBeforeTerminating(void)
 {
     floppyEncodingRunning = false;              // not encoding right now
@@ -166,10 +188,12 @@ void *floppyEncodeThreadCode(void *ptr)
             pthread_mutex_unlock(&floppyEncoderMutex);  // unlock the mutex
         }
 
-        if(shouldStop) {    // if we should already stop
+        if(shouldStop) {                            // if we should already stop
             floppyEncoder_doBeforeTerminating();
             return 0;
         }
+
+        floppyEncoder_handleSaveFiles();            // save all those images which need to be saved
 
         floppyEncodingRunning = true;               // we're encoding
 

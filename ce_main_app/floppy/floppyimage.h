@@ -18,6 +18,7 @@ public:
     bool isLoaded(void);
     const char *getFileName(void);
     bool gotUnsavedChanges(void);                   // return if we should call save before clear()
+    DWORD getLastWriteTime(void);                   // return time when last write happened
 
     virtual bool open(const char *fileName);        // open filename for reading
     virtual void close(void);                       // close file handle if open
@@ -49,7 +50,9 @@ protected:
 
     std::string currentFileName;
     bool loadedFlag;
+
     int  sectorsWritten;        // count of sectors that have been written to image in memory and not written yet - cleared by save()
+    DWORD lastWriteTime;        // when did the last write occure (to avoid saving to disk too often)
 };
 
 #endif // FLOPPYIMAGE_H

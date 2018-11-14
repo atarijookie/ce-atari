@@ -4,6 +4,7 @@
 
 #include "floppyimage.h"
 #include "../debug.h"
+#include "../utils.h"
 
 FloppyImage::FloppyImage()
 {
@@ -13,7 +14,8 @@ FloppyImage::FloppyImage()
     image.data = NULL;
     image.size = 0;
 
-    sectorsWritten = 0;                 // nothing written yet
+    sectorsWritten = 0;                     // nothing written yet
+    lastWriteTime = Utils::getCurrentMs();  // pretend that writeSector() just happened
 }
 
 FloppyImage::~FloppyImage()
@@ -50,6 +52,8 @@ void FloppyImage::clear(void)           // save file if needed, free the memory
         image.data = NULL;
         image.size = 0;
     }
+
+    lastWriteTime = Utils::getCurrentMs();  // pretend that writeSector() just happened
 }
 
 bool FloppyImage::getParams(int &tracks, int &sides, int &sectorsPerTrack)
@@ -93,11 +97,17 @@ bool FloppyImage::readNotWriteSector(bool readNotWrite, int track, int side, int
     if(readNotWrite) {      // read - from image to buffer
         memcpy(buffer, &image.data[offset], 512);
     } else {                // write - from buffer to image
-        sectorsWritten++;   // one more unwritten sector
+        sectorsWritten++;                       // one more unwritten sector
+        lastWriteTime = Utils::getCurrentMs();  // store when the writeSector() happened
         memcpy(&image.data[offset], buffer, 512);
     }
 
     return true;
+}
+
+DWORD FloppyImage::getLastWriteTime(void)
+{
+    return lastWriteTime;
 }
 
 // convenience function for reading sector
