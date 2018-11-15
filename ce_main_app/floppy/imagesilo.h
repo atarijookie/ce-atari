@@ -35,6 +35,7 @@ typedef struct
     std::string     hostPath;       // for translated disk, host path:     /mnt/sda/gamez/bla.st
                                     // or where uploaded disk where is stored: /tmp/bla.st
 
+    volatile bool   openRequested;  // set to true when doing open file request, set to false after successful open
     volatile DWORD  openRequestTime; // timestamp when other thread requested opening of image
     volatile DWORD  openActionTime; // timestamp when encoder did really open the file
     std::string     imageFileName;  // file name of image to open next

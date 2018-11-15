@@ -47,6 +47,7 @@ void floppyEncoder_addEncodeWholeImageRequest(int slotNo, const char *imageFileN
     pthread_mutex_lock(&floppyEncoderMutex);    		// lock the mutex
 
     SiloSlot *slot = &slots[slotNo];            		// get pointer to the right slot
+    slot->openRequested = true;
     slot->openRequestTime = Utils::getCurrentMs();		// mark time when we requested opening of file
     slot->imageFileName = std::string(imageFileName);	// store image file name
 
@@ -150,17 +151,16 @@ void floppyEncoder_stop(void)
     pthread_mutex_unlock(&floppyEncoderMutex);      // unlock the mutex
 }
 
-static void floppyEncoder_handleOpenFiles(void)
+static void floppyEncoder_handleLoadFiles(void)
 {
     for(int i=0; i<SLOT_COUNT; i++) {
-        pthread_mutex_lock(&floppyEncoderMutex);            // lock the mutex
-
         SiloSlot *slot = &slots[i];					        // get one slot
 
-        if(slot->openRequestTime <= slot->openActionTime) {	// if image open request is older than open action, this image has already been open, skip it
-            pthread_mutex_unlock(&floppyEncoderMutex);	    // unlock the mutex - not doing anything here, no reason to protect
+        if(!slot->openRequested) {	                        // if image open not request, skip it
             continue;
         }
+
+        pthread_mutex_lock(&floppyEncoderMutex);            // lock the mutex
 
         slot->encImage.clearWholeCachedImage();             // clear remains of previous stream
         slot->openActionTime = Utils::getCurrentMs();       // store that we're opening the file now
@@ -186,6 +186,11 @@ static void floppyEncoder_handleOpenFiles(void)
         } else {                                    // image loaded? good
             Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest - image %s loaded", imageFileName);
             slot->encImage.storeImageParams(slot->image);   // sets tracksToBeEncoded to all tracks count
+        }
+
+        // if no open request happened during the encoding (since openActionTime), clear the openRequested flag and we're done here
+        if(slot->openRequestTime <= slot->openActionTime) {
+            slot->openRequested = false;
         }
     }
 }
@@ -214,8 +219,6 @@ static void floppyEncoder_handleSaveFiles(void)
 
 static void floppyEncoder_doBeforeTerminating(void)
 {
-    floppyEncodingRunning = false;              // not encoding right now
-
     for(int i=0; i<SLOT_COUNT; i++) {
         if(slots[i].image) {                    // if image in this slot is present
             slots[i].image->clear();            // save image if some unwritten data needs to be saved, free memory
@@ -251,19 +254,24 @@ void *floppyEncodeThreadCode(void *ptr)
 {
     Debug::out(LOG_DEBUG, "Floppy encode thread starting...");
 
-    while(true) {                                   // while we shouldn't stop
-        // code should come to the start of this loop when there is nothing to be encoded and the encoder should sleep
-        floppyEncodingRunning = false;              // not encoding right now
+    // the following code should encode all the slots, but one track at the time, so when there are multiple not encoded images,
+    // the one which is selected for streaming, will be encoded first, and then the rest. This should also act fine if you switch
+    // current slot in the middle of encoding image (to prioritize the selected one)
+    DWORD after50ms = Utils::getEndTime(50);        // this will help to add pauses at least every 50 ms to allow other threads to do stuff
+
+    while(true) {
+        floppyEncoder_handleSaveFiles();            // save all those images which need to be saved
+        floppyEncoder_handleLoadFiles();            // check if some file needs loading and then load it
 
         SiloSlot *slot = findSlotToEncode();        // check if there is something to encode
+        int writtenIdx = findWrittenSectorForProcessing();  // check if something was written
 
-        if(!slot) {                                 // nothing to encode? sleep
-            pthread_mutex_lock(&floppyEncoderMutex); // lock the mutex
-
-            // unlock mutex, wait until should work. When should work, lock mutex and continue
-            pthread_cond_wait(&floppyEncoderShouldWork, &floppyEncoderMutex);
-
+        if(!slot && writtenIdx == -1) {              // nothing to encode and nothing to decode after write? sleep
+            pthread_mutex_lock(&floppyEncoderMutex);    // lock the mutex
+            pthread_cond_wait(&floppyEncoderShouldWork, &floppyEncoderMutex);   // unlock, sleep; wake up, lock
             pthread_mutex_unlock(&floppyEncoderMutex);  // unlock the mutex
+
+            after50ms = Utils::getEndTime(50);      // after sleep - work for some time without pause
         }
 
         if(shouldStop) {                            // if we should already stop
@@ -271,45 +279,30 @@ void *floppyEncodeThreadCode(void *ptr)
             return 0;
         }
 
-        floppyEncoder_handleSaveFiles();            // save all those images which need to be saved
+        if(Utils::getCurrentMs() > after50ms) {     // if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
+            Utils::sleepMs(5);
+            after50ms = Utils::getEndTime(50);
+        }
 
-        floppyEncodingRunning = true;               // we're encoding
+        slot = findSlotToEncode();  // find some slot which needs encoding
 
-        // the following code should encode all the slots, but one track at the time, so when there are multiple not encoded images,
-        // the one which is selected for streaming, will be encoded first, and then the rest. This should also act fine if you switch
-        // current slot in the middle of encoding image (to prioritize the selected one)
-        DWORD after50ms = Utils::getEndTime(50);    // this will help to add pauses at least every 50 ms to allow other threads to do stuff
-
-        while(true) {
-            floppyEncoder_handleOpenFiles();	// check if some file needs loading and then load it
-
-            slot = findSlotToEncode();  // find some slot which needs encoding
-
-            if(!slot) {                 // nothing to encode or should stop? quit loop and sleep
-                floppyEncodingRunning = false;              // not encoding right now
-                break;
-            }
-
-            if(shouldStop) {            // if we should stop, unlock mutex and quit
-                floppyEncoder_doBeforeTerminating();
-                return 0;
-            }
-
-            if(Utils::getCurrentMs() > after50ms) {     // if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
-                Utils::sleepMs(5);
-                after50ms = Utils::getEndTime(50);
-            }
-
-            // encode single track in image
-            DWORD start = Utils::getCurrentMs();
+        if(slot) {                  // if some slot needs encoding, do it, otherwise skip encoding
+            floppyEncodingRunning = true;
 
             int track, side;
             slot->encImage.findNotReadyTrackAndEncodeIt(slot->image, track, side);
 
             if(track != -1) {       // if something was encoded, dump it to log
-                DWORD end = Utils::getCurrentMs();
-                Debug::out(LOG_DEBUG, "Encoding of [track %d, side %d] of image %s done, took %d ms", track, side, slot->image->getFileName(), (int) (end - start));
+                Debug::out(LOG_DEBUG, "Encoding of [track %d, side %d] of image %s done", track, side, slot->image->getFileName());
             }
+
+            floppyEncodingRunning = false;
+        }
+
+        writtenIdx = findWrittenSectorForProcessing();  // check if something was written
+
+        if(writtenIdx != -1) {                          // something was written? decode, write to image
+            // TODO: mfm decoding
         }
     }
 
