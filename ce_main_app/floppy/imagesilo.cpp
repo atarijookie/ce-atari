@@ -309,7 +309,7 @@ BYTE *ImageSilo::getEncodedTrack(int track, int side, int &bytesInBuffer)
     BYTE *pTrack;
 
     if(!slots[currentSlot].encImage.encodedTrackIsReady(track, side)) { // track not ready?
-        floppyEncoder_addReencodeTrackRequest(currentSlot, track, side);              // ask for reencoding
+        floppyEncoder_addReencodeTrackRequest(track, side);             // ask for reencoding
 
         // wait short while to see if the image gets encoded
         DWORD endTime = Utils::getEndTime(500);

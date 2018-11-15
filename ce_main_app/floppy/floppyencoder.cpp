@@ -15,6 +15,7 @@
 #include "acsidatatrans.h"
 #include "imagesilo.h"
 #include "floppysetup.h"
+#include "floppyencoder.h"
 #include "../display/displaythread.h"
 
 pthread_mutex_t floppyEncoderMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -24,7 +25,7 @@ volatile bool floppyEncodingRunning = false;
 volatile bool shouldStop;
 
 //-------------------------------
-// silo slots are global objects now, as CCoreThread needs to stream from them and
+// silo slots are global objects, as CCoreThread needs to stream from them and
 // encoder thread needs to check all of them for tracks that need (re)encoding.
 // Access is protected by floppyEncoderMutex.
 // Individual tracks in slot can be streamed without using mutex when: slot.encImage.tracks[index].isReady
@@ -33,13 +34,15 @@ volatile bool shouldStop;
 volatile int currentSlot;
 
 SiloSlot slots[SLOT_COUNT];
+
+WrittenMfmSector writtenSectors[WRITTENMFMSECTOR_COUNT];
 //-------------------------------
 
 extern TFlags flags;
 
 void floppyEncoder_addEncodeWholeImageRequest(int slotNo, const char *imageFileName)
 {
-    Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest -- slotNo: %d, image: %s", slotNo, imageFileName);
+    Debug::out(LOG_DEBUG, "floppyEncoder_addEncodeWholeImageRequest -- slotNo: %d, image: %s", slotNo, imageFileName);
 
     pthread_mutex_lock(&floppyEncoderMutex);    		// lock the mutex
 
@@ -51,14 +54,87 @@ void floppyEncoder_addEncodeWholeImageRequest(int slotNo, const char *imageFileN
     pthread_mutex_unlock(&floppyEncoderMutex);      	// unlock the mutex
 }
 
-void floppyEncoder_addReencodeTrackRequest(int slotNo, int track, int side)
+void floppyEncoder_addReencodeTrackRequest(int track, int side)
 {
-    Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest");
+    Debug::out(LOG_DEBUG, "floppyEncoder_addReencodeTrackRequest - track: %d, side: %d", track, side);
 
     pthread_mutex_lock(&floppyEncoderMutex);        // lock the mutex
 
-    SiloSlot *slot = &slots[slotNo];                // get pointer to the right slot
+    SiloSlot *slot = &slots[currentSlot];           // get pointer to the right slot
     slot->encImage.askToReencodeTrack(track, side); // this specific track needs to be reencoded
+
+    pthread_cond_signal(&floppyEncoderShouldWork);  // wake up encoder
+    pthread_mutex_unlock(&floppyEncoderMutex);      // unlock the mutex
+}
+
+static int findEmptyWrittenSector(void)
+{
+    int i;
+    for(i=0; i<WRITTENMFMSECTOR_COUNT; i++) {           // go through the written sector storage
+        if(!writtenSectors[i].hasData) {                // this one doesn't have data? use it
+            if(writtenSectors[i].data == NULL) {        // buffer not allocated? allocate!
+                writtenSectors[i].data = (BYTE *) malloc(WRITTENMFMSECTOR_SIZE);
+            }
+
+            memset(writtenSectors[i].data, 0, WRITTENMFMSECTOR_SIZE);
+            return i;       // return index to this sector
+        }
+    }
+
+    // if came here, no empty sector in storage found
+    return -1;
+}
+
+static int findWrittenSectorForProcessing(void)
+{
+    int i;
+    for(i=0; i<WRITTENMFMSECTOR_COUNT; i++) {           // go through the written sector storage
+        if(writtenSectors[i].hasData) {                 // this one has data? use it
+            return i;       // return index to this sector
+        }
+    }
+
+    // if came here, no empty sector in storage found
+    return -1;
+}
+
+static void freeWrittenSectorStorage(void)
+{
+    int i;
+    for(i=0; i<WRITTENMFMSECTOR_COUNT; i++) {       // go through the written sector storage
+        if(writtenSectors[i].data != NULL) {        // buffer allocated? free it
+            free(writtenSectors[i].data);
+        }
+    }
+}
+
+void floppyEncoder_decodeMfmWrittenSector(int track, int side, int sector, BYTE *data, DWORD size)
+{
+    Debug::out(LOG_DEBUG, "floppyEncoder_decodeMfmWrittenSector - track: %d, side: %d, sector: %d, size: %d", track, side, sector, size);
+
+    if(size > WRITTENMFMSECTOR_SIZE) {              // if data too big to fit, fail
+        Debug::out(LOG_ERROR, "floppyEncoder_decodeMfmWrittenSector - size: %d > %d !!! sector not stored", size, WRITTENMFMSECTOR_SIZE);
+        return;
+    }
+
+    pthread_mutex_lock(&floppyEncoderMutex);        // lock the mutex
+
+    int index = findEmptyWrittenSector();           // try to find where this new sector could be stored
+
+    if(index != -1) {                               // if was able to find empty place for this sector, store it
+        WrittenMfmSector *wrSector = &writtenSectors[index];    // get pointer to it and store data and params
+        wrSector->hasData = true;
+        wrSector->slotNo = currentSlot;
+        wrSector->track = track;
+        wrSector->side = side;
+        wrSector->sector = sector;
+
+        memcpy(wrSector->data, data, size);         // copy in the data
+        wrSector->size = size;
+
+        SiloSlot *slot = &slots[currentSlot];           // get pointer to the right slot
+        slot->encImage.askToReencodeTrack(track, side); // this specific track needs to be reencoded
+    }
 
     pthread_cond_signal(&floppyEncoderShouldWork);  // wake up encoder
     pthread_mutex_unlock(&floppyEncoderMutex);      // unlock the mutex
@@ -147,6 +223,8 @@ static void floppyEncoder_doBeforeTerminating(void)
             slots[i].image = NULL;
         }
     }
+
+    freeWrittenSectorStorage();                 // free the storage for written sectors
 
     Debug::out(LOG_DEBUG, "Floppy encode thread terminated.");
 }

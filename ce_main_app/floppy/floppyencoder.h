@@ -14,10 +14,27 @@
 #include "mfmdecoder.h"
 #include "mfmcachedimage.h"
 
+#define WRITTENMFMSECTOR_COUNT  128
+#define WRITTENMFMSECTOR_SIZE   2048
+
+typedef struct {
+    bool hasData;
+
+    int slotNo;
+
+    int track;
+    int side;
+    int sector;
+
+    BYTE *data;
+    DWORD size;
+} WrittenMfmSector;
+
 void *floppyEncodeThreadCode(void *ptr);
 
 void floppyEncoder_stop(void);
 void floppyEncoder_addEncodeWholeImageRequest(int slotNo, const char *imageFileName);
-void floppyEncoder_addReencodeTrackRequest(int slotNo, int track, int side);
+void floppyEncoder_addReencodeTrackRequest(int track, int side);
+void floppyEncoder_decodeMfmWrittenSector(int track, int side, int sector, BYTE *data, DWORD size);
 
 #endif

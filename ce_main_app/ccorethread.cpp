@@ -30,6 +30,7 @@
 #include "floppy/imagelist.h"
 #include "floppy/imagesilo.h"
 #include "floppy/imagestorage.h"
+#include "floppy/floppyencoder.h"
 
 #include "mediastreaming/mediastreaming.h"
 
@@ -1105,10 +1106,9 @@ void CCoreThread::handleSendTrack(void)
 
 void CCoreThread::handleSectorWritten(void)
 {
-    #define BUFFSIZE    2048
-    BYTE oBuf[BUFFSIZE], iBuf[BUFFSIZE];
+    BYTE oBuf[WRITTENMFMSECTOR_SIZE], iBuf[WRITTENMFMSECTOR_SIZE];
 
-    memset(oBuf, 0, BUFFSIZE);
+    memset(oBuf, 0, WRITTENMFMSECTOR_SIZE);
 
     WORD remainingSize = conSpi->getRemainingLength();              // get how many data we still have
     conSpi->txRx(SPI_CS_FRANZ, remainingSize, oBuf, iBuf);          // get all the remaining data
@@ -1118,10 +1118,9 @@ void CCoreThread::handleSectorWritten(void)
     int track   = iBuf[1] & 0x7f;
     int side    = (iBuf[1] & 0x80) ? 1 : 0;
 
-    Debug::out(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d -- TODO!!!", track, side, sector);
+    floppyEncoder_decodeMfmWrittenSector(track, side, sector, iBuf, remainingSize); // let floppy encoder handle decoding, reencoding, saving
 
-    // TODO:
-    // do the written sector processing
+    Debug::out(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d", track, side, sector);
 }
 
 void CCoreThread::handleRecoveryCommands(int recoveryLevel)
