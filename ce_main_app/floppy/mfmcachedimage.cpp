@@ -315,7 +315,7 @@ void MfmCachedImage::encodeSingleTrack(FloppyImage *img, int side, int track, in
     }
 
     for(int sect=1; sect <= sectorsPerTrack; sect++) {
-        createMfmStream(img, side, track, sect);        // then create the right MFM stream
+        encodeSingleSector(img, side, track, sect);        // then create the right MFM stream
 
         if(sigintReceived) {                            // app terminated? quit
             return;
@@ -366,7 +366,7 @@ BYTE *MfmCachedImage::getEncodedTrack(int track, int side, int &bytesInBuffer)
     return tracks[index].mfmStream;
 }
 
-bool MfmCachedImage::createMfmStream(FloppyImage *img, int side, int track, int sector)
+bool MfmCachedImage::encodeSingleSector(FloppyImage *img, int side, int track, int sector)
 {
     bool res;
 

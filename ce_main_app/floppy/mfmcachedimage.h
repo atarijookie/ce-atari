@@ -75,7 +75,7 @@ private:
     void appendTime(BYTE time);
     void appendByteToStream(BYTE val, bool doCalcCrc=true);
     void appendChange(const BYTE chg);
-    bool createMfmStream(FloppyImage *img, int side, int track, int sector);
+    bool encodeSingleSector(FloppyImage *img, int side, int track, int sector);
 
     void updateCrcSlow(BYTE data);
     void updateCrcFast(BYTE data);
