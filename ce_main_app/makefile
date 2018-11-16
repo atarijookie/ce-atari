@@ -1,23 +1,22 @@
 # control verbosity. use make V=1
 V = 0
 
-#ONPC    = yes
+ONPC    = yes
 # in the CFLAGS use ONPC_GPIO or ONPC_HIGHLEVEL or ONPC_NOTHING
 
 CXX	    = g++
 CC	    = gcc
 #STRIP	= strip
-CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
+CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -fprofile-arcs -ftest-coverage
 CXXFLAGS = $(CFLAGS)
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 # -M : with system headers, -MM : without
 
 VPATH = ./lib
-LDFLAGS	= -Llib
+LDFLAGS	= -Llib -lgcov
 LDLIBS = -lrt -lanl -lpthread -lcurl -ldl -lutil
 
 ifeq ($(ONPC),yes)
-    OBJDIR = obj/onpc
     CFLAGS += -DONPC_NOTHING -I./
     TARGET = cosmosex_onpc
     LDLIBS += -lcivetweb_onpc -ldl
@@ -26,18 +25,15 @@ else
     CFLAGS += -I./
     DISTRO := $(shell ./whichdistro.sh )
     ifeq ($(DISTRO),yocto)
-        OBJDIR = obj/yocto
         TARGET = cosmosex_yocto
         LDLIBS += -lcivetweb_yocto
         CFLAGS += -DDISTRO_YOCTO
     else
         ifeq ($(DISTRO),raspbian_jessie)
-            OBJDIR = obj/raspbian_jessie
             TARGET  =  cosmosex_raspbian_jessie
             LDLIBS += -lcivetweb_raspbian_jessie -ldl
             CFLAGS += -DDISTRO_RASPBIAN
         else
-            OBJDIR = obj/raspbian_stretch
             TARGET =  cosmosex_raspbian_stretch
             LDLIBS += -lcivetweb_raspbian_stretch -ldl
             CFLAGS += -DDISTRO_RASPBIAN
@@ -119,7 +115,7 @@ HDRS += $(wildcard $(SUBDIR11)/*.h)
 HDRS += $(wildcard $(SUBDIR12)/*.h)
 HDRS += $(wildcard $(SUBDIR13)/*.h)
 
-OBJS = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(SRCS:.c=.o)))
+OBJS = $(patsubst %.cpp,%.o,$(SRCS:.c=.o))
 DEPS = $(patsubst %.o,%.d,$(OBJS))
 
 #combine web scripts
@@ -184,17 +180,17 @@ depclean:
 
 depend:	$(DEPS)
 
-$(OBJDIR)/%.o:	%.cpp $(OBJDIR)/%.d
+%.o:	%.cpp %.d
 	$(COMPILE.cpp) $(OUTPUT_OPTION) $<
 
-$(OBJDIR)/%.d:	%.cpp
+%.d:	%.cpp
 	$(AT)mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -o $@ $<
 
-$(OBJDIR)/%.o:	%.c $(OBJDIR)/%.d
+%.o:	%.c %.d
 	$(COMPILE.c) $(OUTPUT_OPTION) $<
 
-$(OBJDIR)/%.d:	%.c
+%.d:	%.c
 	$(AT)mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $<
 

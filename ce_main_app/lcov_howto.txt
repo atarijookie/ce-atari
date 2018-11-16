@@ -1,0 +1,23 @@
+Building:
+compile with flags: -fprofile-arcs -ftest-coverage  (already done in makefile)
+link    with flags: -lgcov                          (already done in makefile)
+
+makefile has been modified to not use obj/ subdir to make the usage of lcov easier.
+Without that modification it should be possible, but you should pass some args to lcov to do that.
+
+
+Using:
+
+1) build the app with compiler and linker flags: make clean ; make
+
+2) clear the counters of tests runned by running:
+lcov --directory . --zerocounters
+
+3) run the tests (even multiple times) by running the app with the right args:
+./cosmosex_onpc run-tests (not implemented yet)
+
+4) process the coverage report:
+lcov --no-external --base-directory . --directory . --capture --output-file ce.info
+
+5) generate the html report and simple report by running:
+genhtml -o /tmp/ce-coverage/ ce.info
