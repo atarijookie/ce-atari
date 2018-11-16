@@ -111,6 +111,11 @@ static void freeWrittenSectorStorage(void)
 
 void floppyEncoder_decodeMfmWrittenSector(int track, int side, int sector, BYTE *data, DWORD size)
 {
+    if(currentSlot == EMPTY_IMAGE_SLOT) {           // if this is the empty image slot (used when no slot is selected), don't write
+        Debug::out(LOG_DEBUG, "floppyEncoder_decodeMfmWrittenSector - NOT writing to empty image slot");
+        return;
+    }
+
     Debug::out(LOG_DEBUG, "floppyEncoder_decodeMfmWrittenSector - track: %d, side: %d, sector: %d, size: %d", track, side, sector, size);
 
     if(size > WRITTENMFMSECTOR_SIZE) {              // if data too big to fit, fail
