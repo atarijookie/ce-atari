@@ -302,7 +302,18 @@ void *floppyEncodeThreadCode(void *ptr)
         writtenIdx = findWrittenSectorForProcessing();  // check if something was written
 
         if(writtenIdx != -1) {                          // something was written? decode, write to image
-            // TODO: mfm decoding
+            WrittenMfmSector *ws = &writtenSectors[writtenIdx];     // get pointer to written sector
+            SiloSlot *ss = &slots[ws->slotNo];                      // get pointer to slot where the sector should be stored
+
+            BYTE sectorData[512];
+            bool good;
+            good = ss->encImage.decodeMfmBuffer(ws->data, ws->size, sectorData);   // decode written sector data
+
+            if(good && ss->image) {     // if got the image pointer, write new sector data
+                ss->image->writeSector(ws->track, ws->side, ws->sector, sectorData);
+            }
+
+            ws->hasData = false;        // this written sector doesn't hold any data anymore
         }
     }
 

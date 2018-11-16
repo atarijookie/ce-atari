@@ -38,6 +38,8 @@ public:
     BYTE *getEncodedTrack(int track, int side, int &bytesInBuffer);
     bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
 
+    bool decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr);     // decode single MFM encoded sector
+
     bool newContent;
 
     static void trackAndSideToIndex(const int track, const int side, int &index);
@@ -62,6 +64,26 @@ private:
         BYTE timesCnt;
     } encoder;
 
+    struct {
+        BYTE *mfmData;
+        int   count;
+
+        BYTE *pBfr;
+        int  usedTimesFromByte;
+
+        int  byteOffset;            // offset of decoded byte after 3x A1 mark
+        int  bCount;                // how many bits we have now decoded in current byte
+        bool remainder;             // if we got some reminder from previous decoded time
+        BYTE dByte;
+        BYTE *oBfr;                 // where the output data will be stored
+
+        WORD calcedCrc;
+        WORD recvedCrc;
+
+        bool done;                  // set to true when received did finish this sector
+        bool good;                  // status of sector decoding, which should be returned to caller
+    } decoder;
+
     TCachedTrack tracks[MAX_TRACKS];
     WORD crc;       // current value of CRC calculator
     BYTE *bfr;      // pointer to where we are storing data in the buffer
@@ -79,6 +101,14 @@ private:
 
     void updateCrcSlow(BYTE data);
     void updateCrcFast(BYTE data);
+
+    //-------------------
+    // methods used for mfm decoding of written sector
+    inline BYTE getMfmTime(void);
+    inline void addOneBit(BYTE bit, bool newRemainder);
+    inline void addTwoBits(BYTE bits, bool newRemainder);
+    inline void handleDecodedByte(void);
+    //-------------------
 
     void dumpTracksToFile(int tracksNo, int sides, int spt);
     void log(char *str);

@@ -658,3 +658,143 @@ bool MfmCachedImage::getParams(int &tracks, int &sides, int &sectorsPerTrack)
     return true;
 }
 
+BYTE MfmCachedImage::getMfmTime(void)
+{
+    if(decoder.usedTimesFromByte >= 4) {    // if used all 4 MFM times from byte
+        decoder.usedTimesFromByte = 0;      // reset uset times counter
+        decoder.pBfr++;                     // move to next byte
+        decoder.count--;                    // decrement data count in buffer
+
+        if(decoder.count == 0) {            // nothing more to process? we're done
+            decoder.done = true;
+        }
+    }
+
+    BYTE val = ((*decoder.pBfr) >> 6) & 0x03;   // get highest 2 bits
+    *decoder.pBfr = (*decoder.pBfr) << 2;       // shift other bits up
+    decoder.usedTimesFromByte++;                // increment how many times we used
+
+    return val;                                 // return highest 2 bits
+}
+
+void MfmCachedImage::addOneBit(BYTE bit, bool newRemainder)
+{
+    decoder.dByte = (decoder.dByte << 1) | bit;
+    decoder.bCount++;
+    decoder.remainder = newRemainder;
+}
+
+void MfmCachedImage::addTwoBits(BYTE bits, bool newRemainder)
+{
+    if(decoder.bCount < 7) {    // if we got 6 or less bits, we can add both bits immediatelly
+        decoder.dByte = (decoder.dByte << 2) | bits;
+        decoder.bCount += 2;
+    } else {                    // if we got 7 bits, we need to add then individually
+        decoder.dByte = (decoder.dByte << 1) | (bits >> 1); // add upper bit
+        decoder.bCount++;       // now we got 8 bits
+
+        handleDecodedByte();    // store byte where it should go
+
+        decoder.dByte = (bits & 1);                         // add lower bit
+        decoder.bCount = 1;     // now we got 1 bit
+    }
+
+    decoder.remainder = newRemainder;
+}
+
+void MfmCachedImage::handleDecodedByte(void)
+{
+    decoder.bCount = 0;
+
+    if(decoder.byteOffset == 0 && decoder.dByte != 0xfb) {      // if DAM mark position, but wrong DAM mark?
+        decoder.done = true;
+        decoder.good = false;
+    }
+
+    if(decoder.byteOffset >= 1 && decoder.byteOffset <= 512) {  // if we're in the data offset, store data in buffer
+        *decoder.oBfr = decoder.dByte;
+        decoder.oBfr++;
+    }
+
+    if(decoder.byteOffset <= 512) {     // if we're within DAM marker and data
+        updateCrcFast(decoder.dByte);   // update CRC
+    }
+
+    if(decoder.byteOffset == 513) {     // position of CRC HI? store calced crc and upper part of received crc
+        decoder.calcedCrc = crc;
+        decoder.recvedCrc = ((WORD) decoder.dByte) << 8;
+    }
+
+    if(decoder.byteOffset == 514) {     // position of CRC LO? store lower part of received crc and compare to calced crc
+        decoder.recvedCrc |= (WORD) decoder.dByte;
+
+        decoder.done = true;            // received CRC? nothing more to be done
+        decoder.good = (decoder.calcedCrc == decoder.recvedCrc);    // everything good when received and calced crc are th same
+    }
+
+    decoder.byteOffset++;
+}
+
+bool MfmCachedImage::decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr)
+{
+    // initialize decoder
+    decoder.mfmData = inBfr;        // where the mfm data start
+    decoder.count = inCnt;          // much much bytes we got
+    decoder.pBfr = inBfr;           // where are we decoding now
+    decoder.usedTimesFromByte = 0;  // how many times (double-bits) we used from current byte (0..3)
+    decoder.oBfr = outBfr;          // where the output data will be stored
+    decoder.done = false;           // we're not done yet
+    decoder.good = true;            // status returned to caller
+
+    // first loop - find 3x A1 sync symbols
+    BYTE time;
+    DWORD sync = 0;
+    bool syncFound = false;
+    while(decoder.count >= 0) {     // while there is something in buffer
+        time = getMfmTime();
+        sync = sync << 2;
+        sync = sync | time;
+        sync = sync & 0x0fffffff;   // leave place only for 3x A1 sync bytes
+
+        if(sync == 0xee7b9ee) {     // 3x A1 found?
+            syncFound = true;
+            break;
+        }
+    }
+
+    if(!syncFound) {                // if sync not found, skip the rest
+        return false;
+    }
+
+    crc = 0xcdb4;                   // init crc - same as if would init to 0xffff and then update with 3x A1
+
+    decoder.byteOffset = 0;         // what byte offset we have now in the decoded data after 3x A1 marker?
+    decoder.bCount = 0;             // how many bits we have now decoded in current byte
+    decoder.remainder = false;      // if we got some reminder from previous decoded time
+
+    decoder.dByte = 0;
+    while(!decoder.done) {          // still something to decode?
+        if(decoder.bCount == 8) {   // got full byte? store and move to next
+            handleDecodedByte();    // store byte where it should go
+        }
+
+        time = getMfmTime();
+
+        if(decoder.remainder) {     // with remainder of '1' from previous time
+            switch(time) {
+                case MFM_4US: addOneBit (0, true);  break;
+                case MFM_6US: addTwoBits(1, false); break;
+                case MFM_8US: addTwoBits(0, true);  break;
+            }
+        } else {                    // no remainder from previous time
+            switch(time) {
+                case MFM_4US: addOneBit (1, false); break;
+                case MFM_6US: addOneBit (0, true);  break;
+                case MFM_8US: addTwoBits(1, false); break;
+            }
+        }
+    }
+
+    return decoder.good;
+}
+
