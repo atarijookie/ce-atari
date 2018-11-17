@@ -5,6 +5,8 @@
 
 bool FloppyImageSt::open(const char *fileName)
 {
+    loadedFlag = false;
+
     if(!FloppyImage::open(fileName))
         return false;
 
@@ -17,6 +19,8 @@ bool FloppyImageSt::open(const char *fileName)
     }
 
     calcParams();                       // calculate the params of this floppy
+
+    loadedFlag = true;
 
     Debug::out(LOG_DEBUG, "ST Image opened: %s", fileName);
     Debug::out(LOG_DEBUG, "ST Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);

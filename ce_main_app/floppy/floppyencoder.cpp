@@ -174,7 +174,7 @@ static void floppyEncoder_handleLoadFiles(void)
         pthread_mutex_unlock(&floppyEncoderMutex);	        // unlock the mutex - the open bellow might take long, but slot->image is not touched by any other thread than floppyEncoder, so don't leave it locked
 
         if(slot->image) {                                   // if slot already contains image, get rid of it
-            Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest -- deleting old image from memory");
+            Debug::out(LOG_DEBUG, "floppyEncoder_handleLoadFiles -- deleting old image from memory");
             delete slot->image;                             // floppy image destructor will check if something needs to be written and does write if some changes need to be written
         }
 
@@ -182,14 +182,14 @@ static void floppyEncoder_handleLoadFiles(void)
         slot->image = FloppyImageFactory::getImage(imageFileName.c_str());
 
         if(!slot->image || !slot->image->isLoaded()) { // not supported image format or failed to open file?
-            Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest - failed to load image %s", imageFileName);
+            Debug::out(LOG_DEBUG, "floppyEncoder_handleLoadFiles - failed to load image %s", imageFileName.c_str());
 
             if(slot->image) {                       // if got the object, but failed to open, destory object and set pointer to null
                 delete slot->image;
                 slot->image = NULL;
             }
         } else {                                    // image loaded? good
-            Debug::out(LOG_DEBUG, "ImageSilo::addEncodeWholeImageRequest - image %s loaded", imageFileName);
+            Debug::out(LOG_DEBUG, "floppyEncoder_handleLoadFiles - image %s loaded", imageFileName.c_str());
             slot->encImage.storeImageParams(slot->image);   // sets tracksToBeEncoded to all tracks count
         }
 

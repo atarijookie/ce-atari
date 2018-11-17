@@ -8,6 +8,8 @@
 
 bool FloppyImageMsa::open(const char *fileName)
 {
+    loadedFlag = false;
+
     if(!FloppyImage::open(fileName))
         return false;
 
@@ -36,6 +38,8 @@ bool FloppyImageMsa::open(const char *fileName)
         clear();            // clear memory
         return false;
     }
+
+    loadedFlag = true;
 
     Debug::out(LOG_DEBUG, "MSA Image opened: %s", fileName);
     Debug::out(LOG_DEBUG, "MSA Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
