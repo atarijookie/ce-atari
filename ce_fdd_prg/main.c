@@ -4,6 +4,7 @@
 #include <mint/ostruct.h>
 #include <unistd.h>
 #include <gem.h>
+#include <mt_gem.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -16,8 +17,9 @@
 #include "defs.h"
 #include "find_ce.h"
 #include "hdd_if.h"
-       
-// ------------------------------------------------------------------ 
+#include "FDD.H"
+
+// ------------------------------------------------------------------
 BYTE deviceID;
 BYTE commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
 
@@ -37,15 +39,76 @@ BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
 BYTE loopForSetup(void);
 BYTE loopForDownload(void);
 
-// ------------------------------------------------------------------ 
+// ------------------------------------------------------------------
 int main( int argc, char* argv[] )
 {
 	BYTE found;
-  
-    appl_init();										            // init AES 
-    
+
+    //-------------------------------------
+    int16_t work_in[11], i, work_out[64];
+    gl_apid = appl_init();
+
+    if (gl_apid == -1) {
+        (void) Cconws("appl_init() failed\r\n");
+        return 0;
+    }
+
+    wind_update(BEG_UPDATE);
+    graf_mouse(HOURGLASS, 0);
+
+    int16_t res = rsrc_load("FDD.RSC");
+    graf_mouse(ARROW, 0);
+
+    if(!res) {
+        (void) Cconws("rsrc_load() failed\r\n");
+        return 0;
+    }
+
+    for(i=0; i<10; i++) {
+        work_in[i]= i;
+    }
+
+    work_in[10] = 2;
+
+    int16_t gem_handle, vdi_handle;
+    int16_t gl_wchar, gl_hchar, gl_wbox, gl_hbox;
+
+    gem_handle = graf_handle(&gl_wchar, &gl_hchar, &gl_wbox, &gl_hbox);
+    vdi_handle = gem_handle;
+    v_opnvwk(work_in, &vdi_handle, work_out);
+
+    if (vdi_handle == 0) {
+        (void) Cconws("v_opnvwk() failed\r\n");
+        return 0;
+    }
+
+    int32_t tree;
+    int16_t tr_obj, nobj;
+    rsrc_gaddr(R_TREE, FDD, &tree);                                             // get address of dialog tree
+
+    int16_t xdial, ydial, wdial, hdial, exitobj, xtype;
+    form_center((OBJECT *) tree, &xdial, &ydial, &wdial, &hdial);               // center object
+    form_dial(0, 0, 0, 0, 0, xdial, ydial, wdial, hdial);                      // reserve screen space for dialog
+    objc_draw((OBJECT *) tree, ROOT, MAX_DEPTH, xdial, ydial, wdial, hdial);    // draw object tree
+
+    while(1) {
+        exitobj = form_do((OBJECT *) tree, 0) & 0x7FFF;
+
+        if(exitobj == BTN_EXIT) {
+            break;
+        }
+    }
+
+    form_dial (3, 0, 0, 0, 0, xdial, ydial, wdial, hdial);      // release screen space
+    rsrc_free();            // free resource from memory
+
+    return 0;
+
+
+    //-------------------------------------
+
 	pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
-	
+
 	if(pBfrOrig == NULL) {
 		(void) Cconws("\r\nMalloc failed!\r\n");
 		sleep(3);
@@ -55,16 +118,16 @@ int main( int argc, char* argv[] )
 	DWORD val = (DWORD) pBfrOrig;
 	pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);     				// create even pointer
     pBfrCnt   = pBfr - 2;											// this is previous pointer - size of WORD 
-	
+
     pDmaBuffer = pBfr;
-    
+
     // init fileselector path
-    strcpy(filePath, "C:\\*.*");                            
-    memset(fileName, 0, 256);          
-    
+    strcpy(filePath, "C:\\*.*");
+    memset(fileName, 0, 256);
+
     BYTE drive = getLowestDrive();                                  // get the lowest HDD letter and use it in the file selector
     filePath[0] = drive;
-    
+
 	// write some header out
 	(void) Clear_home();
 	(void) Cconws("\33p[ CosmosEx floppy setup ]\r\n[    by Jookie 2014     ]\33q\r\n\r\n");
@@ -75,36 +138,35 @@ int main( int argc, char* argv[] )
 	if(!found) {								            // not found? quit
 		sleep(3);
 		return 0;
-	} 
-    
-	// now set up the acsi command bytes so we don't have to deal with this one anymore 
-	commandShort[0] = (deviceID << 5); 					            // cmd[0] = ACSI_id + TEST UNIT READY (0)	
+	}
+
+	// now set up the acsi command bytes so we don't have to deal with this one anymore
+	commandShort[0] = (deviceID << 5); 					            // cmd[0] = ACSI_id + TEST UNIT READY (0)
 
 	graf_mouse(M_OFF, 0);
-	
 
     while(1) {
         BYTE key;
-        
+
         key = loopForSetup();
-        
+
         if(key == KEY_F10) {                // should quit?
             break;
         }
-    
+
         key = loopForDownload();
-    
+
         if(key == KEY_F10) {                // should quit?
             break;
         }
-    }    
-    
+    }
+
 	graf_mouse(M_ON, 0);
 	appl_exit();
 
 	Mfree(pBfrOrig);
-	
-	return 0;		
+
+	return 0;
 }
 
 void intToStr(int val, char *str)
@@ -121,11 +183,11 @@ void intToStr(int val, char *str)
     if(val < 100) {
         str[0] = ' ';
     }
-    
+
     if(val < 10) {
         str[1] = ' ';
     }
-    
+
     str[3] = 0;                     // terminating zero
 }
 
@@ -140,7 +202,7 @@ BYTE getKey(void)
     key     =  scancode         & 0xff;
 
     key     = atariKeysToSingleByte(vkey, key);	/* transform BYTE pair into single BYTE */
-    
+
     return key;
 }
 
@@ -149,13 +211,13 @@ BYTE getKeyIfPossible(void)
     DWORD scancode;
     BYTE key, vkey, res;
 
-    res = Cconis();                             // see if there's something waiting from keyboard 
+    res = Cconis();                             // see if there's something waiting from keyboard
 
     if(res == 0) {                              // nothing waiting from keyboard?
         return 0;
     }
-    
-    scancode = Cnecin();                        // get char form keyboard, no echo on screen 
+
+    scancode = Cnecin();                        // get char form keyboard, no echo on screen
 
     vkey = (scancode>>16) & 0xff;
     key  =  scancode      & 0xff;
@@ -167,14 +229,14 @@ BYTE getKeyIfPossible(void)
 void removeLastPartUntilBackslash(char *str)
 {
 	int i, len;
-	
+
 	len = strlen(str);
-	
+
 	for(i=(len-1); i>= 0; i--) {
 		if(str[i] == '\\') {
 			break;
 		}
-	
+
 		str[i] = 0;
 	}
 }
@@ -182,29 +244,29 @@ void removeLastPartUntilBackslash(char *str)
 // make single ACSI read command by the params set in the commandShort buffer
 BYTE ce_acsiReadCommand(void)
 {
-	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
-  
-	memset(pBfr, 0, 512);              											// clear the buffer 
+	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)
+
+	memset(pBfr, 0, 512);              											// clear the buffer
 
 	(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, sectorCount);   // issue the command and check the result 
 
     if(!hdIf.success) {
         return 0xff;
     }
-    
+
 	return hdIf.statusByte;
 }
 
 BYTE ce_acsiWriteBlockCommand(void)
 {
-	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
-  
+	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)
+
 	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, sectorCount);	// issue the command and check the result 
 
     if(!hdIf.success) {
         return 0xff;
     }
-    
+
 	return hdIf.statusByte;
 }
 
@@ -213,15 +275,15 @@ BYTE getLowestDrive(void)
     BYTE i;
     DWORD drvs = Drvmap();
     DWORD mask;
-    
+
     for(i=2; i<16; i++) {                                                       // go through the available drives
         mask = (1 << i);
-        
+
         if((drvs & mask) != 0) {                                                // drive is available?
             return ('A' + i);
         }
     }
-    
+
     return 'A';
 }
 
@@ -240,15 +302,15 @@ void showComError(void)
 void createFullPath(char *fullPath, char *filePath, char *fileName)
 {
     strcpy(fullPath, filePath);
-	
+
 	removeLastPartUntilBackslash(fullPath);				// remove the search wildcards from the end
 
-	if(strlen(fullPath) > 0) {							
+	if(strlen(fullPath) > 0) {
 		if(fullPath[ strlen(fullPath) - 1] != '\\') {	// if the string doesn't end with backslash, add it
 			strcat(fullPath, "\\");
 		}
 	}
-	
+
     strcat(fullPath, fileName);							// add the filename
 }
 
@@ -265,7 +327,7 @@ BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
 	if(key >= 32 && key < 127) {		/* printable ASCII key? just return it */
 		return key;
 	}
-	
+
 	if(key == 0) {						/* will this be some non-ASCII key? convert it */
 		switch(vkey) {
 			case 0x48: return KEY_UP;
@@ -289,7 +351,7 @@ BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
 			default: return 0;			/* unknown key */
 		}
 	}
-	
+
 	switch(vkeyKey) {					/* some other no-ASCII key, but check with vkey too */
 		case 0x011b: return KEY_ESC;
 		case 0x537f: return KEY_DELETE;
