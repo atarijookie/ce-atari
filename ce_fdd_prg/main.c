@@ -39,71 +39,43 @@ BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
 BYTE loopForSetup(void);
 BYTE loopForDownload(void);
 
+
+BYTE gem_init(void);
+void gem_deinit(void);
+BYTE gem_floppySetup(void);
+
+void uploadImage(int index);
+void removeImage(int index);
+void newImage(int index);
+void downloadImage(int index);
+
 // ------------------------------------------------------------------
 int main( int argc, char* argv[] )
 {
 	BYTE found;
 
-    //-------------------------------------
-    int16_t work_in[11], i, work_out[64];
-    gl_apid = appl_init();
+    BYTE res = gem_init();  // initialize GEM stuff
 
-    if (gl_apid == -1) {
-        (void) Cconws("appl_init() failed\r\n");
+    if(!res) {              // gem init failed? quit then
         return 0;
     }
-
-    wind_update(BEG_UPDATE);
-    graf_mouse(HOURGLASS, 0);
-
-    int16_t res = rsrc_load("FDD.RSC");
-    graf_mouse(ARROW, 0);
-
-    if(!res) {
-        (void) Cconws("rsrc_load() failed\r\n");
-        return 0;
-    }
-
-    for(i=0; i<10; i++) {
-        work_in[i]= i;
-    }
-
-    work_in[10] = 2;
-
-    int16_t gem_handle, vdi_handle;
-    int16_t gl_wchar, gl_hchar, gl_wbox, gl_hbox;
-
-    gem_handle = graf_handle(&gl_wchar, &gl_hchar, &gl_wbox, &gl_hbox);
-    vdi_handle = gem_handle;
-    v_opnvwk(work_in, &vdi_handle, work_out);
-
-    if (vdi_handle == 0) {
-        (void) Cconws("v_opnvwk() failed\r\n");
-        return 0;
-    }
-
-    int32_t tree;
-    int16_t tr_obj, nobj;
-    rsrc_gaddr(R_TREE, FDD, &tree);                                             // get address of dialog tree
-
-    int16_t xdial, ydial, wdial, hdial, exitobj, xtype;
-    form_center((OBJECT *) tree, &xdial, &ydial, &wdial, &hdial);               // center object
-    form_dial(0, 0, 0, 0, 0, xdial, ydial, wdial, hdial);                      // reserve screen space for dialog
-    objc_draw((OBJECT *) tree, ROOT, MAX_DEPTH, xdial, ydial, wdial, hdial);    // draw object tree
 
     while(1) {
-        exitobj = form_do((OBJECT *) tree, 0) & 0x7FFF;
+        res = gem_floppySetup();    // show and handle floppy setup via dialog
 
-        if(exitobj == BTN_EXIT) {
+        if(res == KEY_F10) {        // should quit?
+            break;
+        }
+
+        res = loopForDownload();    // show and handle floppy image download
+
+        if(res == KEY_F10) {        // should quit?
             break;
         }
     }
 
-    form_dial (3, 0, 0, 0, 0, xdial, ydial, wdial, hdial);      // release screen space
-    rsrc_free();            // free resource from memory
-
+    gem_deinit();                   // deinit GEM
     return 0;
-
 
     //-------------------------------------
 
@@ -384,3 +356,138 @@ void logMsgProgress(DWORD current, DWORD total)
 //    (void) Cconws("\n\r");
 }
 
+BYTE gem_init(void)
+{
+    //-------------------------------------
+    int16_t work_in[11], i, work_out[64];
+    gl_apid = appl_init();
+
+    if (gl_apid == -1) {
+        (void) Cconws("appl_init() failed\r\n");
+        return FALSE;
+    }
+
+    wind_update(BEG_UPDATE);
+    graf_mouse(HOURGLASS, 0);
+
+    int16_t res = rsrc_load("FDD.RSC");
+    graf_mouse(ARROW, 0);
+
+    if(!res) {
+        (void) Cconws("rsrc_load() failed\r\n");
+        return FALSE;
+    }
+
+    for(i=0; i<10; i++) {
+        work_in[i]= i;
+    }
+
+    work_in[10] = 2;
+
+    int16_t gem_handle, vdi_handle;
+    int16_t gl_wchar, gl_hchar, gl_wbox, gl_hbox;
+
+    gem_handle = graf_handle(&gl_wchar, &gl_hchar, &gl_wbox, &gl_hbox);
+    vdi_handle = gem_handle;
+    v_opnvwk(work_in, &vdi_handle, work_out);
+
+    if (vdi_handle == 0) {
+        (void) Cconws("v_opnvwk() failed\r\n");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+void gem_deinit(void)
+{
+    rsrc_free();            // free resource from memory
+}
+
+BYTE getSelectedSlotNo(void)
+{
+    int32_t s1, s2, s3;
+    rsrc_gaddr(R_OBJECT, RADIO_SLOT1, &s1);
+    rsrc_gaddr(R_OBJECT, RADIO_SLOT2, &s2);
+    rsrc_gaddr(R_OBJECT, RADIO_SLOT3, &s3);
+
+    if(!s1 || !s2 || !s3) {
+        return 0;
+    }
+
+    OBJECT *o1 = (OBJECT *) s1;
+    OBJECT *o2 = (OBJECT *) s2;
+    OBJECT *o3 = (OBJECT *) s3;
+
+    if(o1->ob_state & OS_SELECTED) {
+        return 1;
+    }
+
+    if(o2->ob_state & OS_SELECTED) {
+        return 2;
+    }
+
+    if(o3->ob_state & OS_SELECTED) {
+        return 3;
+    }
+
+    return 0;
+}
+
+BYTE gem_floppySetup(void)
+{
+    int32_t tree;
+    rsrc_gaddr(R_TREE, FDD, &tree);                                             // get address of dialog tree
+
+    int16_t xdial, ydial, wdial, hdial, exitobj;
+    form_center((OBJECT *) tree, &xdial, &ydial, &wdial, &hdial);               // center object
+    form_dial(0, 0, 0, 0, 0, xdial, ydial, wdial, hdial);                      // reserve screen space for dialog
+    objc_draw((OBJECT *) tree, ROOT, MAX_DEPTH, xdial, ydial, wdial, hdial);    // draw object tree
+
+    BYTE retVal = KEY_F10;
+
+    while(1) {
+        exitobj = form_do((OBJECT *) tree, 0) & 0x7FFF;
+
+        if(exitobj == BTN_EXIT) {
+            retVal = KEY_F10;   // KEY_F10 - quit
+            break;
+        }
+
+        if(exitobj == BTN_INTERNET) {
+            retVal = KEY_F9;   // KEY_F9 -- download images from internet
+            break;
+        }
+
+        // TODO: unselect button
+
+        BYTE slotNo = getSelectedSlotNo();
+
+        if(!slotNo) {               // failed to get slot number? try once again
+            continue;
+        }
+
+        if(exitobj == BTN_LOAD) {   // load image into slot
+            uploadImage(slotNo - 1);
+            continue;
+        }
+
+        if(exitobj == BTN_CLEAR) {  // remove image from slot
+            removeImage(slotNo - 1);
+            continue;
+        }
+
+        if(exitobj == BTN_NEW) {    // create new empty image in slot
+            newImage(slotNo - 1);
+            continue;
+        }
+
+        if(exitobj == BTN_SAVE) {   // save content of slot to file
+            downloadImage(slotNo - 1);
+            continue;
+        }
+    }
+
+    form_dial (3, 0, 0, 0, 0, xdial, ydial, wdial, hdial);      // release screen space
+    return retVal;
+}
