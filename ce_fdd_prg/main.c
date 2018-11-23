@@ -21,7 +21,7 @@
 
 // ------------------------------------------------------------------
 BYTE deviceID;
-BYTE commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
+BYTE commandShort[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
 
 void createFullPath(char *fullPath, char *filePath, char *fileName);
 
@@ -404,90 +404,4 @@ void gem_deinit(void)
     rsrc_free();            // free resource from memory
 }
 
-BYTE getSelectedSlotNo(void)
-{
-    int32_t s1, s2, s3;
-    rsrc_gaddr(R_OBJECT, RADIO_SLOT1, &s1);
-    rsrc_gaddr(R_OBJECT, RADIO_SLOT2, &s2);
-    rsrc_gaddr(R_OBJECT, RADIO_SLOT3, &s3);
 
-    if(!s1 || !s2 || !s3) {
-        return 0;
-    }
-
-    OBJECT *o1 = (OBJECT *) s1;
-    OBJECT *o2 = (OBJECT *) s2;
-    OBJECT *o3 = (OBJECT *) s3;
-
-    if(o1->ob_state & OS_SELECTED) {
-        return 1;
-    }
-
-    if(o2->ob_state & OS_SELECTED) {
-        return 2;
-    }
-
-    if(o3->ob_state & OS_SELECTED) {
-        return 3;
-    }
-
-    return 0;
-}
-
-BYTE gem_floppySetup(void)
-{
-    int32_t tree;
-    rsrc_gaddr(R_TREE, FDD, &tree);                                             // get address of dialog tree
-
-    int16_t xdial, ydial, wdial, hdial, exitobj;
-    form_center((OBJECT *) tree, &xdial, &ydial, &wdial, &hdial);               // center object
-    form_dial(0, 0, 0, 0, 0, xdial, ydial, wdial, hdial);                      // reserve screen space for dialog
-    objc_draw((OBJECT *) tree, ROOT, MAX_DEPTH, xdial, ydial, wdial, hdial);    // draw object tree
-
-    BYTE retVal = KEY_F10;
-
-    while(1) {
-        exitobj = form_do((OBJECT *) tree, 0) & 0x7FFF;
-
-        if(exitobj == BTN_EXIT) {
-            retVal = KEY_F10;   // KEY_F10 - quit
-            break;
-        }
-
-        if(exitobj == BTN_INTERNET) {
-            retVal = KEY_F9;   // KEY_F9 -- download images from internet
-            break;
-        }
-
-        // TODO: unselect button
-
-        BYTE slotNo = getSelectedSlotNo();
-
-        if(!slotNo) {               // failed to get slot number? try once again
-            continue;
-        }
-
-        if(exitobj == BTN_LOAD) {   // load image into slot
-            uploadImage(slotNo - 1);
-            continue;
-        }
-
-        if(exitobj == BTN_CLEAR) {  // remove image from slot
-            removeImage(slotNo - 1);
-            continue;
-        }
-
-        if(exitobj == BTN_NEW) {    // create new empty image in slot
-            newImage(slotNo - 1);
-            continue;
-        }
-
-        if(exitobj == BTN_SAVE) {   // save content of slot to file
-            downloadImage(slotNo - 1);
-            continue;
-        }
-    }
-
-    form_dial (3, 0, 0, 0, 0, xdial, ydial, wdial, hdial);      // release screen space
-    return retVal;
-}

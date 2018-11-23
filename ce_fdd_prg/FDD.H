@@ -1,4 +1,4 @@
-/* Resource Datei Indizes for FDD */
+/* Resource Datei Indizes fÅr FDD */
 
 #define FDD              0   /* Formular/Dialog */
 #define RADIO_SLOT1      2   /* BUTTON in Baum FDD */
@@ -13,3 +13,5 @@
 #define BTN_SAVE         11  /* BUTTON in Baum FDD */
 #define BTN_INTERNET     12  /* BUTTON in Baum FDD */
 #define BTN_EXIT         13  /* BUTTON in Baum FDD */
+#define STR_FILENAME     14  /* STRING in Baum FDD */
+#define STR_PROGRESS     15  /* STRING in Baum FDD */

@@ -4,6 +4,7 @@
 #include <mint/ostruct.h>
 #include <unistd.h>
 #include <gem.h>
+#include <mt_gem.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -14,8 +15,9 @@
 #include "hostmoddefs.h"
 #include "keys.h"
 #include "defs.h"
+#include "FDD.H"
 
-// ------------------------------------------------------------------ 
+// ------------------------------------------------------------------
 extern BYTE deviceID;
 extern BYTE commandShort[CMD_LENGTH_SHORT];
 
@@ -44,6 +46,117 @@ void getSiloContent(void);
 
 extern TDestDir destDir;
 
+BYTE getSelectedSlotNo(void)
+{
+    int32_t s1, s2, s3;
+    rsrc_gaddr(R_OBJECT, RADIO_SLOT1, &s1);
+    rsrc_gaddr(R_OBJECT, RADIO_SLOT2, &s2);
+    rsrc_gaddr(R_OBJECT, RADIO_SLOT3, &s3);
+
+    if(!s1 || !s2 || !s3) {
+        return 0;
+    }
+
+    OBJECT *o1 = (OBJECT *) s1;
+    OBJECT *o2 = (OBJECT *) s2;
+    OBJECT *o3 = (OBJECT *) s3;
+
+    if(o1->ob_state & OS_SELECTED) {
+        return 1;
+    }
+
+    if(o2->ob_state & OS_SELECTED) {
+        return 2;
+    }
+
+    if(o3->ob_state & OS_SELECTED) {
+        return 3;
+    }
+
+    return 0;
+}
+
+typedef struct {
+    OBJECT *tree;   // pointer to the tree
+    int16_t xdial, ydial, wdial, hdial; // dimensions and position of dialog
+} Dialog;
+
+void unselectButton(Dialog *d, int btnIdx)
+{
+    int32_t addr;
+    rsrc_gaddr(R_OBJECT, btnIdx, &addr);    // get address of button
+
+    if(!addr) {     // object not found? quit
+        return;
+    }
+
+    OBJECT *btn = (OBJECT *) addr;
+    btn->ob_state = btn->ob_state & (~OS_SELECTED);     // remove SELECTED flag
+
+    objc_draw(d->tree, btnIdx, 0, d->xdial, d->ydial, d->wdial, d->hdial);    // draw object tree - starting with the button
+}
+
+BYTE gem_floppySetup(void)
+{
+    int32_t treeAddr;
+    rsrc_gaddr(R_TREE, FDD, &treeAddr); // get address of dialog tree
+
+    Dialog dialog;      // for easier passing to helper functions store everything needed in the struct
+    dialog.tree = (OBJECT *) treeAddr;
+
+    int16_t exitobj;
+    form_center(dialog.tree, &dialog.xdial, &dialog.ydial, &dialog.wdial, &dialog.hdial);  // center object
+    form_dial(0, 0, 0, 0, 0, dialog.xdial, dialog.ydial, dialog.wdial, dialog.hdial);          // reserve screen space for dialog
+    objc_draw(dialog.tree, ROOT, MAX_DEPTH, dialog.xdial, dialog.ydial, dialog.wdial, dialog.hdial);  // draw object tree
+
+    BYTE retVal = KEY_F10;
+
+    while(1) {
+        exitobj = form_do(dialog.tree, 0) & 0x7FFF;
+
+        if(exitobj == BTN_EXIT) {
+            retVal = KEY_F10;   // KEY_F10 - quit
+            break;
+        }
+
+        if(exitobj == BTN_INTERNET) {
+            retVal = KEY_F9;   // KEY_F9 -- download images from internet
+            break;
+        }
+
+        // unselect button
+        unselectButton(&dialog, exitobj);
+
+        BYTE slotNo = getSelectedSlotNo();
+
+        if(!slotNo) {               // failed to get slot number? try once again
+            continue;
+        }
+
+        if(exitobj == BTN_LOAD) {   // load image into slot
+//            uploadImage(slotNo - 1);
+            continue;
+        }
+
+        if(exitobj == BTN_CLEAR) {  // remove image from slot
+//            removeImage(slotNo - 1);
+            continue;
+        }
+
+        if(exitobj == BTN_NEW) {    // create new empty image in slot
+//            newImage(slotNo - 1);
+            continue;
+        }
+
+        if(exitobj == BTN_SAVE) {   // save content of slot to file
+ //           downloadImage(slotNo - 1);
+            continue;
+        }
+    }
+
+    form_dial (3, 0, 0, 0, 0, dialog.xdial, dialog.ydial, dialog.wdial, dialog.hdial);      // release screen space
+    return retVal;
+}
 // ------------------------------------------------------------------ 
 BYTE loopForSetup(void)
 {
