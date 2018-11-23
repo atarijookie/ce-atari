@@ -129,6 +129,31 @@ void showImageFileName(Dialog *d, int slot, const char *filename)
     setObjectString(d, textIdx, filename);  // set net text
 }
 
+void showProgress(Dialog *d, int percent)
+{
+    char progress[24];
+
+    if(percent < 0) {   // if should hide progress
+        memset(progress, ' ', 20);  // set empty string
+        setObjectString(d, STR_PROGRESS, progress);
+        return;
+    }
+
+    if(percent > 100) { // progress value too high?
+        percent = 100;
+    }
+
+    percent = percent / 10;
+
+    strcpy(progress, "Progress: "); // start with this
+    int i;
+    for(i=0; i<percent; i++) {      // for each 10% draw one asterisk
+        strcat(progress, "*");
+    }
+
+    setObjectString(d, STR_PROGRESS, progress); // update string
+}
+
 BYTE gem_floppySetup(void)
 {
     Dialog dialog;      // for easier passing to helper functions store everything needed in the struct
@@ -144,6 +169,8 @@ BYTE gem_floppySetup(void)
     for(i=0; i<3; i++) {        // initialize image filenames to EMPTY
         showImageFileName(&dialog, i, NULL);
     }
+
+    showProgress(&dialog, -1);  // hide progress bar
 
     BYTE retVal = KEY_F10;
 
