@@ -135,6 +135,7 @@ void showProgress(Dialog *d, int percent)
 
     if(percent < 0) {   // if should hide progress
         memset(progress, ' ', 20);  // set empty string
+        progress[20] = 0;
         setObjectString(d, STR_PROGRESS, progress);
         return;
     }
@@ -150,8 +151,17 @@ void showProgress(Dialog *d, int percent)
     for(i=0; i<percent; i++) {      // for each 10% draw one asterisk
         strcat(progress, "*");
     }
+    progress[20] = 0;
 
     setObjectString(d, STR_PROGRESS, progress); // update string
+}
+
+void showFilename(Dialog *d, const char *filename)
+{
+    char fname[24];
+
+
+    setObjectString(d, STR_FILENAME, fname); // update string
 }
 
 BYTE gem_floppySetup(void)
