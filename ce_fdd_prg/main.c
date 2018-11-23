@@ -403,5 +403,3 @@ void gem_deinit(void)
 {
     rsrc_free();            // free resource from memory
 }
-
-

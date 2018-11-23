@@ -46,9 +46,6 @@ void getSiloContent(void);
 
 extern TDestDir destDir;
 
-#define FILENAME_LEN    (8 + 1 + 3 + 1) // filename + dot + extension + terminating zero
-char imgFilename[3 * FILENAME_LEN];     // storage place for strings with slots image filenames
-
 BYTE getSelectedSlotNo(void)
 {
     int32_t s1, s2, s3;
@@ -98,6 +95,22 @@ void unselectButton(Dialog *d, int btnIdx)
     objc_draw(d->tree, btnIdx, 0, d->xdial, d->ydial, d->wdial, d->hdial);    // draw object tree - starting with the button
 }
 
+void setObjectString(Dialog *d, int16_t objId, const char *newString)
+{
+    OBJECT *obj;
+    rsrc_gaddr(R_OBJECT, objId, &obj);  // get address of object
+
+    if(!obj) {                          // object not found? quit
+        return;
+    }
+
+    int16_t ox, oy;
+    objc_offset(d->tree, objId, &ox, &oy);          // get current screen coordinates of object
+
+    strcpy(obj->ob_spec.free_string, newString);    // copy in the string
+    objc_draw(d->tree, ROOT, MAX_DEPTH, ox, oy, obj->ob_width, obj->ob_height); // draw object tree, but clip only to text position and size
+}
+
 void showImageFileName(Dialog *d, int slot, const char *filename)
 {
     int16_t textIdx;
@@ -113,19 +126,7 @@ void showImageFileName(Dialog *d, int slot, const char *filename)
         filename = " [ empty ] ";
     }
 
-    char *fname = imgFilename + (slot * FILENAME_LEN);  // get pointer to where we will store the string for displaying
-    memset(fname, 0, FILENAME_LEN);             // clear it
-    strncpy(fname, filename, FILENAME_LEN - 1); // copy in the string
-
-    OBJECT *obj;
-    rsrc_gaddr(R_OBJECT, textIdx, &obj);        // get address of text
-
-    if(!obj) {              // object not found? quit
-        return;
-    }
-
-    obj->ob_spec.free_string = fname;   // now the string points to new filename
-    objc_draw(d->tree, textIdx, 0, d->xdial, d->ydial, d->wdial, d->hdial);    // draw object tree - starting with the text
+    setObjectString(d, textIdx, filename);  // set net text
 }
 
 BYTE gem_floppySetup(void)
@@ -139,12 +140,10 @@ BYTE gem_floppySetup(void)
     form_dial(0, 0, 0, 0, 0, dialog.xdial, dialog.ydial, dialog.wdial, dialog.hdial);          // reserve screen space for dialog
     objc_draw(dialog.tree, ROOT, MAX_DEPTH, dialog.xdial, dialog.ydial, dialog.wdial, dialog.hdial);  // draw object tree
 
-/*
     int i;
     for(i=0; i<3; i++) {        // initialize image filenames to EMPTY
         showImageFileName(&dialog, i, NULL);
     }
-*/
 
     BYTE retVal = KEY_F10;
 
