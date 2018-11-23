@@ -46,6 +46,9 @@ void getSiloContent(void);
 
 extern TDestDir destDir;
 
+#define FILENAME_LEN    (8 + 1 + 3 + 1) // filename + dot + extension + terminating zero
+char imgFilename[3 * FILENAME_LEN];     // storage place for strings with slots image filenames
+
 BYTE getSelectedSlotNo(void)
 {
     int32_t s1, s2, s3;
@@ -83,31 +86,65 @@ typedef struct {
 
 void unselectButton(Dialog *d, int btnIdx)
 {
-    int32_t addr;
-    rsrc_gaddr(R_OBJECT, btnIdx, &addr);    // get address of button
+    OBJECT *btn;
+    rsrc_gaddr(R_OBJECT, btnIdx, &btn);    // get address of button
 
-    if(!addr) {     // object not found? quit
+    if(!btn) {      // object not found? quit
         return;
     }
 
-    OBJECT *btn = (OBJECT *) addr;
     btn->ob_state = btn->ob_state & (~OS_SELECTED);     // remove SELECTED flag
 
     objc_draw(d->tree, btnIdx, 0, d->xdial, d->ydial, d->wdial, d->hdial);    // draw object tree - starting with the button
 }
 
+void showImageFileName(Dialog *d, int slot, const char *filename)
+{
+    int16_t textIdx;
+
+    switch(slot) {  // convert slot to object index
+        case 0: textIdx = IMAGENAME1; break;
+        case 1: textIdx = IMAGENAME2; break;
+        case 2: textIdx = IMAGENAME3; break;
+        default: return;
+    }
+
+    if(!filename) { // if filename not specified, set 'empty' to it
+        filename = " [ empty ] ";
+    }
+
+    char *fname = imgFilename + (slot * FILENAME_LEN);  // get pointer to where we will store the string for displaying
+    memset(fname, 0, FILENAME_LEN);             // clear it
+    strncpy(fname, filename, FILENAME_LEN - 1); // copy in the string
+
+    OBJECT *obj;
+    rsrc_gaddr(R_OBJECT, textIdx, &obj);        // get address of text
+
+    if(!obj) {              // object not found? quit
+        return;
+    }
+
+    obj->ob_spec.free_string = fname;   // now the string points to new filename
+    objc_draw(d->tree, textIdx, 0, d->xdial, d->ydial, d->wdial, d->hdial);    // draw object tree - starting with the text
+}
+
 BYTE gem_floppySetup(void)
 {
-    int32_t treeAddr;
-    rsrc_gaddr(R_TREE, FDD, &treeAddr); // get address of dialog tree
-
     Dialog dialog;      // for easier passing to helper functions store everything needed in the struct
-    dialog.tree = (OBJECT *) treeAddr;
+
+    rsrc_gaddr(R_TREE, FDD, &dialog.tree); // get address of dialog tree
 
     int16_t exitobj;
     form_center(dialog.tree, &dialog.xdial, &dialog.ydial, &dialog.wdial, &dialog.hdial);  // center object
     form_dial(0, 0, 0, 0, 0, dialog.xdial, dialog.ydial, dialog.wdial, dialog.hdial);          // reserve screen space for dialog
     objc_draw(dialog.tree, ROOT, MAX_DEPTH, dialog.xdial, dialog.ydial, dialog.wdial, dialog.hdial);  // draw object tree
+
+/*
+    int i;
+    for(i=0; i<3; i++) {        // initialize image filenames to EMPTY
+        showImageFileName(&dialog, i, NULL);
+    }
+*/
 
     BYTE retVal = KEY_F10;
 
