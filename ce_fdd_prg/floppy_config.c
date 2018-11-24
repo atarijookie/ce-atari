@@ -135,7 +135,7 @@ void showProgress(Dialog *d, int percent)
 
     if(percent < 0) {   // if should hide progress
         memset(progress, ' ', 20);  // set empty string
-        progress[20] = 0;
+        progress[20] = 0;           // terminate string
         setObjectString(d, STR_PROGRESS, progress);
         return;
     }
@@ -151,7 +151,7 @@ void showProgress(Dialog *d, int percent)
     for(i=0; i<percent; i++) {      // for each 10% draw one asterisk
         strcat(progress, "*");
     }
-    progress[20] = 0;
+    progress[20] = 0;               // terminate string
 
     setObjectString(d, STR_PROGRESS, progress); // update string
 }
@@ -160,6 +160,14 @@ void showFilename(Dialog *d, const char *filename)
 {
     char fname[24];
 
+    if(filename) {  // filename specified? show it with label
+        strcpy(fname, "FileName: ");    // copy in label
+        strcat(fname, filename);        // copy in filename
+        fname[22] = 0;                  // terminate string
+    } else {        // filename not specified? hide label
+        memset(fname, ' ', 22);         // fill with spaces
+        fname[22] = 0;                  // terminate string
+    }
 
     setObjectString(d, STR_FILENAME, fname); // update string
 }
@@ -176,11 +184,12 @@ BYTE gem_floppySetup(void)
     objc_draw(dialog.tree, ROOT, MAX_DEPTH, dialog.xdial, dialog.ydial, dialog.wdial, dialog.hdial);  // draw object tree
 
     int i;
-    for(i=0; i<3; i++) {        // initialize image filenames to EMPTY
+    for(i=0; i<3; i++) {            // initialize image filenames to EMPTY
         showImageFileName(&dialog, i, NULL);
     }
 
-    showProgress(&dialog, -1);  // hide progress bar
+    showProgress(&dialog, -1);      // hide progress bar
+    showFilename(&dialog, NULL);    // hide load/save filename
 
     BYTE retVal = KEY_F10;
 
@@ -230,7 +239,7 @@ BYTE gem_floppySetup(void)
     form_dial (3, 0, 0, 0, 0, dialog.xdial, dialog.ydial, dialog.wdial, dialog.hdial);      // release screen space
     return retVal;
 }
-// ------------------------------------------------------------------ 
+// ------------------------------------------------------------------
 BYTE loopForSetup(void)
 {
 	BYTE nextMenuRedrawIsFull = 0;
@@ -245,17 +254,17 @@ BYTE loopForSetup(void)
 		if(key >= 'A' && key <= 'Z') {								// upper case letter? to lower case!
 			key += 32;
 		}
-		
-        if(key == KEY_F10 || key == KEY_F9) {                       // should quit or switch mode? 
+
+        if(key == KEY_F10 || key == KEY_F9) {                       // should quit or switch mode?
             return key;
         }
-        
+
         if(key >= '1' && key <= '3') {                              // upload image
             uploadImage(key - '1');
 			nextMenuRedrawIsFull = 1;
             handled = 1;
         }
-        
+
         if(key >= '4' && key <= '6') {                              // swap image
             swapImage(key - '4');
             handled = 1;
@@ -265,7 +274,7 @@ BYTE loopForSetup(void)
             removeImage(key - '7');
             handled = 1;
         }
-		
+
 		if(key >= 'n' && key <= 'p') {								// create new image
 			newImage(key - 'n');
 			handled = 1;
@@ -276,7 +285,7 @@ BYTE loopForSetup(void)
             nextMenuRedrawIsFull = 1;
 			handled = 1;
 		}
-        
+
         if(handled) {
             showMenu(nextMenuRedrawIsFull);
 			nextMenuRedrawIsFull = 0;
@@ -296,12 +305,12 @@ void showMenu(char fullNotPartial)
     	(void) Cconws("\33pslot 2\33q:   2     5     8     O     E\r\n");
     	(void) Cconws("\33pslot 3\33q:   3     6     9     P     F\r\n");
     }
-	
+
     getSiloContent();
     showImage(0);
     showImage(1);
     showImage(2);
-    
+
     if(fullNotPartial) {
         Goto_pos(0, 20);
     	(void) Cconws("\r\n\33pF9\33q  to get images from internet.");
@@ -314,7 +323,7 @@ void showImage(int index)
     if(index < 0 || index > 2) {
         return;
     }
-    
+
     // data is stored in siloContent like this:
     // offset   0: filename 1
     // offset  80: content  1
@@ -322,12 +331,12 @@ void showImage(int index)
     // offset 240: content  2
     // offset 320: filename 3
     // offset 400: content  3
-    
+
     BYTE *filename  = &siloContent[(index * 160)];
 //    BYTE *content   = &siloContent[(index * 160) + 80];
-    
+
 	Goto_pos(0, 12 + index);
-	
+
     (void) Cconws("Image ");
     Cconout(index + '1');
     (void) Cconws(":                        ");
@@ -350,9 +359,9 @@ void newImage(int index)
     commandShort[5] = index;
 
     sectorCount = 1;                                        // read 1 sector
-    
-    BYTE res = Supexec(ce_acsiReadCommand); 
-		
+
+    BYTE res = Supexec(ce_acsiReadCommand);
+
 	if(res != FDD_OK) {                                     // bad? write error
         showComError();
     }
@@ -369,70 +378,70 @@ void downloadImage(int index)
     commandShort[5] = index;
 
     sectorCount = 1;                                        // read 1 sector
-    
-    BYTE res = Supexec(ce_acsiReadCommand); 
-		
+
+    BYTE res = Supexec(ce_acsiReadCommand);
+
 	if(res == FDD_OK) {                                     // good? copy in the results
         strcpy(fileName, (char *) pBfr);                    // pBfr should contain original file name
     } else {                                                // bad? show error
         showComError();
         return;
     }
-    
+
     //--------------------------------
     char fullPath[512];
 
     if(index == 10) {                                       // for internet download just use predefined destination dir
         strcpy(fullPath, destDir.path);                     // create path, e.g. 'C:\destdir\images\A_001.ST'
-        
+
         int len = strlen(fullPath);
         if(fullPath[len - 1] != '\\') {                     // if the path doesn't end with \\, add it there
             strcat(fullPath, "\\");
         }
-        
-        strcat(fullPath, fileName); 
+
+        strcat(fullPath, fileName);
     } else {                                                // for ordinary floppy slots open file selector
         // open fileselector and get path
         graf_mouse(M_ON, 0);
-        short button;  
+        short button;
         fsel_input(filePath, fileName, &button);            // show file selector
         graf_mouse(M_OFF, 0);
-  
+
         if(button != 1) {                                   // if OK was not pressed
             commandShort[4] = FDD_CMD_DOWNLOADIMG_DONE;
             commandShort[5] = index;
 
             sectorCount = 1;                                // read 1 sector
-        
-            res = Supexec(ce_acsiReadCommand); 
-		
+
+            res = Supexec(ce_acsiReadCommand);
+
             if(res != FDD_OK) {
                 showComError();
             }
             return;
         }
-        
+
       	// fileName contains the filename
         // filePath contains the path with search wildcards, e.g.: C:\\*.*
-  
+
         // create full path
         createFullPath(fullPath, filePath, fileName);       // fullPath = filePath + fileName
 
         (void) Clear_home();
     }
-    
+
     //--------------------
     // check if can do on device copy, and do it if possible
     commandShort[4] = FDD_CMD_DOWNLOADIMG_ONDEVICE;
     commandShort[5] = index;
 
     sectorCount = 1;                                        // write 1 sector
-        
+
     p64kBlock   = pBfr;                                     // use this buffer for writing
     strcpy((char *) pBfr, fullPath);                        // and copy in the full path
-    
+
     res = Supexec(ce_acsiWriteBlockCommand);                // send atari path to host, so host can check if it's ON DEVICE COPY
-    
+
     if(res == FDD_RES_ONDEVICECOPY) {                       // if host replied with this, the file is copied, nothing to do
         (void) Cconws("Saving: ");
         (void) Cconws(fileName);
@@ -444,15 +453,15 @@ void downloadImage(int index)
     (void) Cconws("Saving: ");
     (void) Cconws(fileName);
     (void) Cconws(" -> ");
-    
+
     short fh = Fcreate(fullPath, 0);               		    // open file for writing
-    
+
     if(fh < 0) {
         (void) Clear_home();
         (void) Cconws("Failed to create the file:\r\n");
         (void) Cconws(fullPath);
         (void) Cconws("\r\n");
-    
+
         Cnecin();
         return;
     }
@@ -460,57 +469,57 @@ void downloadImage(int index)
     // do the transfer
     int32_t blockNo, len, ires;
     BYTE failed = 0;
-    
+
     for(blockNo=0; blockNo<64; blockNo++) {                 // try to get all blocks
         (void) Cconws(".");
-    
+
         commandShort[4] = FDD_CMD_DOWNLOADIMG_GETBLOCK;     // receiving block
         commandShort[5] = (index << 6) | (blockNo & 0x3f);  // for this index and block #
-        
+
         sectorCount = 128;                                  // read 128 sectors (64 kB)
-        
+
         res = Supexec(ce_acsiReadCommand);                  // get the data
-		
+
         if(res != FDD_OK) {                                 // error? write error
             showComError();
-            
+
             failed = 1;
             break;
         }
-        
+
         len = (((WORD) pBfr[0]) << 8) | ((WORD) pBfr[1]);   // retrieve count of data in buffer
 
         if(len > 0) {                                       // something to write?
             ires = Fwrite(fh, len, pBfr + 2);
-            
+
             if(ires < 0 || ires != len) {                   // failed to write?
                 (void) Cconws("Writing to file failed!\r\n");
                 Cnecin();
-                
+
                 failed = 1;
                 break;
             }
         }
-        
+
         if(len < (65536 - 2)) {                             // if received less than full 64kB block, then this was the last block
             break;
         }
     }
-    
+
     // finish the transfer and close the file
-    Fclose(fh);    
-    
+    Fclose(fh);
+
     commandShort[4] = FDD_CMD_DOWNLOADIMG_DONE;
     commandShort[5] = index;
-    
+
     sectorCount = 1;                            // read 1 sector
 
-    res = Supexec(ce_acsiReadCommand); 
-		
+    res = Supexec(ce_acsiReadCommand);
+
     if(res != FDD_OK) {
         showComError();
     }
-    
+
     // in case of error delete the probably incomplete file
     if(failed) {
         Fdelete(fullPath);
@@ -523,8 +532,8 @@ void getSiloContent(void)
 
     sectorCount = 1;                            // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand); 
-		
+    BYTE res = Supexec(ce_acsiReadCommand);
+
 	if(res == FDD_OK) {                         // good? copy in the results
         memcpy(siloContent, pBfr, 512);
     } else {                                    // bad? show error
@@ -542,9 +551,9 @@ void swapImage(int index)
     commandShort[5] = index;
 
     sectorCount = 1;                            // read 1 sector
-    
-    BYTE res = Supexec(ce_acsiReadCommand); 
-		
+
+    BYTE res = Supexec(ce_acsiReadCommand);
+
 	if(res != FDD_OK) {                         // bad? write error
         showComError();
     }
@@ -560,9 +569,9 @@ void removeImage(int index)
     commandShort[5] = index;
 
     sectorCount = 1;                            // read 1 sector
-    
-    BYTE res = Supexec(ce_acsiReadCommand); 
-		
+
+    BYTE res = Supexec(ce_acsiReadCommand);
+
 	if(res != FDD_OK) {                         // bad? write error
         showComError();
     }
@@ -574,87 +583,87 @@ void uploadImage(int index)
         return;
     }
 
-    short button;  
-  
+    short button;
+
     // open fileselector and get path
 	graf_mouse(M_ON, 0);
     fsel_input(filePath, fileName, &button);    // show file selector
 	graf_mouse(M_OFF, 0);
-  
+
     if(button != 1) {                           // if OK was not pressed
         return;
     }
-  
+
 	// fileName contains the filename
 	// filePath contains the path with search wildcards, e.g.: C:\\*.*
-  
+
     // create full path
     char fullPath[512];
-    createFullPath(fullPath, filePath, fileName);       // fullPath = filePath + fileName  
-    
+    createFullPath(fullPath, filePath, fileName);       // fullPath = filePath + fileName
+
     short fh = Fopen(fullPath, 0);               		// open file for reading
-  
+
     if(fh < 0) {
         (void) Clear_home();
         (void) Cconws("Failed to open the file:\r\n");
         (void) Cconws(fullPath);
         (void) Cconws("\r\n");
-    
+
         Cnecin();
         return;
     }
 
     //---------------
     // tell the device the path and filename of the source image
-    
+
     commandShort[4] = FDD_CMD_UPLOADIMGBLOCK_START;             // starting image upload
     commandShort[5] = index;                                    // for this index
-    
+
     p64kBlock       = pBfr;                                     // use this buffer for writing
     strcpy((char *) pBfr, fullPath);                            // and copy in the full path
-    
+
     sectorCount     = 1;                                        // write just one sector
-    
+
     BYTE res;
-    res = Supexec(ce_acsiWriteBlockCommand); 
-		
+    res = Supexec(ce_acsiWriteBlockCommand);
+
     if(res == FDD_RES_ONDEVICECOPY) {                           // if the device returned this code, it means that it could do the image upload / copy on device, no need to upload it from ST!
         Fclose(fh);
         return;
     }
-        
+
     if(res != FDD_OK) {                                         // bad? write error
         showComError();
-                
+
         Fclose(fh);                                             // close file and quit
         return;
     }
     //---------------
     // upload the image by 64kB blocks
-    
+
     (void) Clear_home();
     (void) Cconws("Uploading file:\r\n");
     (void) Cconws(fullPath);
     (void) Cconws("\r\n");
-    
+
     BYTE good = 1;
     BYTE blockNo = 0;
-    
+
     sectorCount = 128;                                          // write 128 sectors (64 kB)
-    
+
     while(1) {
         Cconout('*');                                           // show progress...
 
         long len = Fread(fh, SIZE64K, pBfr);
-   
+
         if(len < 0) {                                           // error while reading the file?
             good = 0;                                           // mark that upload didn't finish good
             break;
         }
-        
+
         if(len == SIZE64K) {                                    // full block was read?
             p64kBlock = pBfr;                                   // write data to ACSI from this address
-            
+
             commandShort[4] = FDD_CMD_UPLOADIMGBLOCK_FULL;      // sending full block
             commandShort[5] = (index << 6) | (blockNo & 0x3f);  // for this index and block #
         } else {                                                // partial block was read?
@@ -662,29 +671,29 @@ void uploadImage(int index)
 
             commandShort[4] = FDD_CMD_UPLOADIMGBLOCK_PART;      // sending full block
             commandShort[5] = (index << 6) | (blockNo & 0x3f);  // for this index and block #
-            
+
             pBfrCnt[0] = len >> 8;
             pBfrCnt[1] = len & 0xff;
         }
 
         res = Supexec(ce_acsiWriteBlockCommand);                // send the data
-		
+
         if(res != FDD_OK) {                                     // error? write error
             showComError();
-               
+
             good = 0;                                           // mark that upload didn't finish good
             break;
         }
-       
-        // write of block was OK, and this was the partial (last) block? 
+
+        // write of block was OK, and this was the partial (last) block?
         if(commandShort[4] == FDD_CMD_UPLOADIMGBLOCK_PART) {
             good = 1;
             break;
         }
-        
+
         blockNo++;
-    }    
-    
+    }
+
     Fclose(fh);                                 // close the file
 
     // now tell the device if it went good or bad
@@ -693,12 +702,12 @@ void uploadImage(int index)
     } else {
         commandShort[4] = FDD_CMD_UPLOADIMGBLOCK_DONE_FAIL;
     }
-    
+
     commandShort[5] = index;
 
     sectorCount = 1;                            // read 1 sector
-    
-    res = Supexec(ce_acsiReadCommand);     
+
+    res = Supexec(ce_acsiReadCommand);
 
     if(res != FDD_OK) {                         // bad? write error
         (void) Clear_home();
@@ -706,4 +715,3 @@ void uploadImage(int index)
         Cnecin();
     }
 }
-
