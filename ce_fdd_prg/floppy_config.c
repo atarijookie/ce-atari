@@ -81,6 +81,8 @@ typedef struct {
     int16_t xdial, ydial, wdial, hdial; // dimensions and position of dialog
 } Dialog;
 
+Dialog dialog;      // for easier passing to helper functions store everything needed in the struct
+
 void unselectButton(Dialog *d, int btnIdx)
 {
     OBJECT *btn;
@@ -172,16 +174,41 @@ void showFilename(Dialog *d, const char *filename)
     setObjectString(d, STR_FILENAME, fname); // update string
 }
 
+void showSetupDialog(Dialog *d, BYTE show)
+{
+    if(show) {  // on show
+        form_center(d->tree, &d->xdial, &d->ydial, &d->wdial, &d->hdial);       // center object
+        form_dial(0, 0, 0, 0, 0, d->xdial, d->ydial, d->wdial, d->hdial);       // reserve screen space for dialog
+        objc_draw(d->tree, ROOT, MAX_DEPTH, d->xdial, d->ydial, d->wdial, d->hdial);  // draw object tree
+    } else {    // on hide
+        form_dial (3, 0, 0, 0, 0, d->xdial, d->ydial, d->wdial, d->hdial);      // release screen space
+    }
+}
+
+void showErrorDialog(char *errorText)
+{
+    showSetupDialog(&dialog, FALSE);    // hide dialog
+
+    char tmp[256];
+    strcpy(tmp, "[3][");                // STOP icon
+    strcat(tmp, errorText);             // error text
+    strcat(tmp, "][ OK ]");             // OK button
+
+    form_alert(1, tmp);                 // show alert dialog, 1st button as default one, with text and buttons in tmp[]
+
+    showSetupDialog(&dialog, TRUE);     // show dialog
+}
+
+void showComErrorDialog(void)
+{
+    showErrorDialog("Error in CosmosEx communication!");
+}
+
 BYTE gem_floppySetup(void)
 {
-    Dialog dialog;      // for easier passing to helper functions store everything needed in the struct
-
     rsrc_gaddr(R_TREE, FDD, &dialog.tree); // get address of dialog tree
 
-    int16_t exitobj;
-    form_center(dialog.tree, &dialog.xdial, &dialog.ydial, &dialog.wdial, &dialog.hdial);  // center object
-    form_dial(0, 0, 0, 0, 0, dialog.xdial, dialog.ydial, dialog.wdial, dialog.hdial);          // reserve screen space for dialog
-    objc_draw(dialog.tree, ROOT, MAX_DEPTH, dialog.xdial, dialog.ydial, dialog.wdial, dialog.hdial);  // draw object tree
+    showSetupDialog(&dialog, TRUE); // show dialog
 
     int i;
     for(i=0; i<3; i++) {            // initialize image filenames to EMPTY
@@ -194,7 +221,7 @@ BYTE gem_floppySetup(void)
     BYTE retVal = KEY_F10;
 
     while(1) {
-        exitobj = form_do(dialog.tree, 0) & 0x7FFF;
+        int16_t exitobj = form_do(dialog.tree, 0) & 0x7FFF;
 
         if(exitobj == BTN_EXIT) {
             retVal = KEY_F10;   // KEY_F10 - quit
@@ -217,6 +244,9 @@ BYTE gem_floppySetup(void)
 
         if(exitobj == BTN_LOAD) {   // load image into slot
 //            uploadImage(slotNo - 1);
+
+            showProgress(&dialog, -1);      // hide progress bar
+            showFilename(&dialog, NULL);    // hide load/save filename
             continue;
         }
 
@@ -232,11 +262,13 @@ BYTE gem_floppySetup(void)
 
         if(exitobj == BTN_SAVE) {   // save content of slot to file
  //           downloadImage(slotNo - 1);
+            showProgress(&dialog, -1);      // hide progress bar
+            showFilename(&dialog, NULL);    // hide load/save filename
             continue;
         }
     }
 
-    form_dial (3, 0, 0, 0, 0, dialog.xdial, dialog.ydial, dialog.wdial, dialog.hdial);      // release screen space
+    showSetupDialog(&dialog, FALSE); // hide dialog
     return retVal;
 }
 // ------------------------------------------------------------------
@@ -363,7 +395,7 @@ void newImage(int index)
     BYTE res = Supexec(ce_acsiReadCommand);
 
 	if(res != FDD_OK) {                                     // bad? write error
-        showComError();
+        showComErrorDialog();
     }
 }
 
@@ -384,7 +416,7 @@ void downloadImage(int index)
 	if(res == FDD_OK) {                                     // good? copy in the results
         strcpy(fileName, (char *) pBfr);                    // pBfr should contain original file name
     } else {                                                // bad? show error
-        showComError();
+        showComErrorDialog();
         return;
     }
 
@@ -401,11 +433,13 @@ void downloadImage(int index)
 
         strcat(fullPath, fileName);
     } else {                                                // for ordinary floppy slots open file selector
-        // open fileselector and get path
-        graf_mouse(M_ON, 0);
+       // open fileselector and get path
+        showSetupDialog(&dialog, FALSE);                    // hide dialog
+
         short button;
         fsel_input(filePath, fileName, &button);            // show file selector
-        graf_mouse(M_OFF, 0);
+
+        showSetupDialog(&dialog, TRUE);                     // show dialog
 
         if(button != 1) {                                   // if OK was not pressed
             commandShort[4] = FDD_CMD_DOWNLOADIMG_DONE;
@@ -416,10 +450,12 @@ void downloadImage(int index)
             res = Supexec(ce_acsiReadCommand);
 
             if(res != FDD_OK) {
-                showComError();
+                showComErrorDialog();
             }
             return;
         }
+
+        showFilename(&dialog, fileName);            // show filename in dialog
 
       	// fileName contains the filename
         // filePath contains the path with search wildcards, e.g.: C:\\*.*
@@ -443,35 +479,24 @@ void downloadImage(int index)
     res = Supexec(ce_acsiWriteBlockCommand);                // send atari path to host, so host can check if it's ON DEVICE COPY
 
     if(res == FDD_RES_ONDEVICECOPY) {                       // if host replied with this, the file is copied, nothing to do
-        (void) Cconws("Saving: ");
-        (void) Cconws(fileName);
-        (void) Cconws("\r\n");
         return;
     }
     //--------------------
 
-    (void) Cconws("Saving: ");
-    (void) Cconws(fileName);
-    (void) Cconws(" -> ");
-
     short fh = Fcreate(fullPath, 0);               		    // open file for writing
 
     if(fh < 0) {
-        (void) Clear_home();
-        (void) Cconws("Failed to create the file:\r\n");
-        (void) Cconws(fullPath);
-        (void) Cconws("\r\n");
-
-        Cnecin();
+        showErrorDialog("Failed to create the file.");
         return;
     }
 
     // do the transfer
     int32_t blockNo, len, ires;
     BYTE failed = 0;
+    int progress = 0;
 
     for(blockNo=0; blockNo<64; blockNo++) {                 // try to get all blocks
-        (void) Cconws(".");
+        showProgress(&dialog, progress);                    // update progress bar
 
         commandShort[4] = FDD_CMD_DOWNLOADIMG_GETBLOCK;     // receiving block
         commandShort[5] = (index << 6) | (blockNo & 0x3f);  // for this index and block #
@@ -481,7 +506,7 @@ void downloadImage(int index)
         res = Supexec(ce_acsiReadCommand);                  // get the data
 
         if(res != FDD_OK) {                                 // error? write error
-            showComError();
+            showComErrorDialog();
 
             failed = 1;
             break;
@@ -493,9 +518,7 @@ void downloadImage(int index)
             ires = Fwrite(fh, len, pBfr + 2);
 
             if(ires < 0 || ires != len) {                   // failed to write?
-                (void) Cconws("Writing to file failed!\r\n");
-                Cnecin();
-
+                showErrorDialog("Writing to file failed!");
                 failed = 1;
                 break;
             }
@@ -517,7 +540,7 @@ void downloadImage(int index)
     res = Supexec(ce_acsiReadCommand);
 
     if(res != FDD_OK) {
-        showComError();
+        showComErrorDialog();
     }
 
     // in case of error delete the probably incomplete file
@@ -537,7 +560,7 @@ void getSiloContent(void)
 	if(res == FDD_OK) {                         // good? copy in the results
         memcpy(siloContent, pBfr, 512);
     } else {                                    // bad? show error
-        showComError();
+        showComErrorDialog();
     }
 }
 
@@ -555,7 +578,7 @@ void swapImage(int index)
     BYTE res = Supexec(ce_acsiReadCommand);
 
 	if(res != FDD_OK) {                         // bad? write error
-        showComError();
+        showComErrorDialog();
     }
 }
 
@@ -573,7 +596,7 @@ void removeImage(int index)
     BYTE res = Supexec(ce_acsiReadCommand);
 
 	if(res != FDD_OK) {                         // bad? write error
-        showComError();
+        showComErrorDialog();
     }
 }
 
@@ -583,16 +606,19 @@ void uploadImage(int index)
         return;
     }
 
-    short button;
-
     // open fileselector and get path
-	graf_mouse(M_ON, 0);
+    showSetupDialog(&dialog, FALSE);            // hide dialog
+
+    short button;
     fsel_input(filePath, fileName, &button);    // show file selector
-	graf_mouse(M_OFF, 0);
+
+    showSetupDialog(&dialog, TRUE);             // show dialog
 
     if(button != 1) {                           // if OK was not pressed
         return;
     }
+
+    showFilename(&dialog, fileName);            // show filename in dialog
 
 	// fileName contains the filename
 	// filePath contains the path with search wildcards, e.g.: C:\\*.*
@@ -604,12 +630,7 @@ void uploadImage(int index)
     short fh = Fopen(fullPath, 0);               		// open file for reading
 
     if(fh < 0) {
-        (void) Clear_home();
-        (void) Cconws("Failed to open the file:\r\n");
-        (void) Cconws(fullPath);
-        (void) Cconws("\r\n");
-
-        Cnecin();
+        showErrorDialog("Failed to open the file.");
         return;
     }
 
@@ -633,26 +654,21 @@ void uploadImage(int index)
     }
 
     if(res != FDD_OK) {                                         // bad? write error
-        showComError();
+        showComErrorDialog();
 
         Fclose(fh);                                             // close file and quit
         return;
     }
     //---------------
     // upload the image by 64kB blocks
-
-    (void) Clear_home();
-    (void) Cconws("Uploading file:\r\n");
-    (void) Cconws(fullPath);
-    (void) Cconws("\r\n");
-
     BYTE good = 1;
     BYTE blockNo = 0;
 
     sectorCount = 128;                                          // write 128 sectors (64 kB)
+    int progress = 0;
 
     while(1) {
-        Cconout('*');                                           // show progress...
+        showProgress(&dialog, progress);                        // update progress bar
 
         long len = Fread(fh, SIZE64K, pBfr);
 
@@ -679,7 +695,7 @@ void uploadImage(int index)
         res = Supexec(ce_acsiWriteBlockCommand);                // send the data
 
         if(res != FDD_OK) {                                     // error? write error
-            showComError();
+            showComErrorDialog();
 
             good = 0;                                           // mark that upload didn't finish good
             break;
@@ -710,8 +726,6 @@ void uploadImage(int index)
     res = Supexec(ce_acsiReadCommand);
 
     if(res != FDD_OK) {                         // bad? write error
-        (void) Clear_home();
-        (void) Cconws("Failed to finish upload...\r\n");
-        Cnecin();
+        showErrorDialog("Failed to finish upload.");
     }
 }
