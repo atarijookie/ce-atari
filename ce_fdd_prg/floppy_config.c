@@ -124,7 +124,7 @@ void showImageFileName(Dialog *d, int slot, const char *filename)
         default: return;
     }
 
-    if(!filename) { // if filename not specified, set 'empty' to it
+    if(!filename || filename[0] == 0) { // if filename null of empty string, set 'empty' to it
         filename = " [ empty ] ";
     }
 
@@ -174,6 +174,16 @@ void showFilename(Dialog *d, const char *filename)
     setObjectString(d, STR_FILENAME, fname); // update string
 }
 
+void getAndShowSiloContent(void)
+{
+    getSiloContent();       // get content from device
+
+    int i;
+    for(i=0; i<3; i++) {    // show it
+        showImage(i);
+    }
+}
+
 void showSetupDialog(Dialog *d, BYTE show)
 {
     if(show) {  // on show
@@ -210,10 +220,7 @@ BYTE gem_floppySetup(void)
 
     showSetupDialog(&dialog, TRUE); // show dialog
 
-    int i;
-    for(i=0; i<3; i++) {            // initialize image filenames to EMPTY
-        showImageFileName(&dialog, i, NULL);
-    }
+    getAndShowSiloContent();        // get and show current content of slots
 
     showProgress(&dialog, -1);      // hide progress bar
     showFilename(&dialog, NULL);    // hide load/save filename
@@ -247,16 +254,19 @@ BYTE gem_floppySetup(void)
 
             showProgress(&dialog, -1);      // hide progress bar
             showFilename(&dialog, NULL);    // hide load/save filename
+            getAndShowSiloContent();        // get and show current content of slots
             continue;
         }
 
         if(exitobj == BTN_CLEAR) {  // remove image from slot
 //            removeImage(slotNo - 1);
+            getAndShowSiloContent();        // get and show current content of slots
             continue;
         }
 
         if(exitobj == BTN_NEW) {    // create new empty image in slot
 //            newImage(slotNo - 1);
+            getAndShowSiloContent();        // get and show current content of slots
             continue;
         }
 
@@ -272,84 +282,6 @@ BYTE gem_floppySetup(void)
     return retVal;
 }
 // ------------------------------------------------------------------
-BYTE loopForSetup(void)
-{
-	BYTE nextMenuRedrawIsFull = 0;
-    showMenu(1);
-
-    while(1) {
-        BYTE key;
-        BYTE  handled = 0;
-
-		key =  getKey();
-
-		if(key >= 'A' && key <= 'Z') {								// upper case letter? to lower case!
-			key += 32;
-		}
-
-        if(key == KEY_F10 || key == KEY_F9) {                       // should quit or switch mode?
-            return key;
-        }
-
-        if(key >= '1' && key <= '3') {                              // upload image
-            uploadImage(key - '1');
-			nextMenuRedrawIsFull = 1;
-            handled = 1;
-        }
-
-        if(key >= '4' && key <= '6') {                              // swap image
-            swapImage(key - '4');
-            handled = 1;
-        }
-
-        if(key >= '7' && key <= '9') {                              // remove image
-            removeImage(key - '7');
-            handled = 1;
-        }
-
-		if(key >= 'n' && key <= 'p') {								// create new image
-			newImage(key - 'n');
-			handled = 1;
-		}
-
-		if(key >= 'd' && key <= 'f') {								// download image
-			downloadImage(key - 'd');
-            nextMenuRedrawIsFull = 1;
-			handled = 1;
-		}
-
-        if(handled) {
-            showMenu(nextMenuRedrawIsFull);
-			nextMenuRedrawIsFull = 0;
-        }
-    }
-}
-
-void showMenu(char fullNotPartial)
-{
-    if(fullNotPartial) {
-		(void) Clear_home();
-		(void) Cconws("\33p[CosmosEx floppy config, by Jookie 2014]\33q\r\n");
-	    (void) Cconws("\r\n");
-		(void) Cconws("Menu:\r\n");
-    	(void) Cconws("       upload swap remove new  download\r\n");
-    	(void) Cconws("\33pslot 1\33q:   1     4     7     N     D\r\n");
-    	(void) Cconws("\33pslot 2\33q:   2     5     8     O     E\r\n");
-    	(void) Cconws("\33pslot 3\33q:   3     6     9     P     F\r\n");
-    }
-
-    getSiloContent();
-    showImage(0);
-    showImage(1);
-    showImage(2);
-
-    if(fullNotPartial) {
-        Goto_pos(0, 20);
-    	(void) Cconws("\r\n\33pF9\33q  to get images from internet.");
-    	(void) Cconws("\r\n\33pF10\33q to quit.");
-    }
-}
-
 void showImage(int index)
 {
     if(index < 0 || index > 2) {
@@ -365,20 +297,7 @@ void showImage(int index)
     // offset 400: content  3
 
     BYTE *filename  = &siloContent[(index * 160)];
-//    BYTE *content   = &siloContent[(index * 160) + 80];
-
-	Goto_pos(0, 12 + index);
-
-    (void) Cconws("Image ");
-    Cconout(index + '1');
-    (void) Cconws(":                        ");
-
-	Goto_pos(11, 12 + index);
-    (void) Cconws(filename);
-    (void) Cconws("\r\n");
-
-//    (void) Cconws(content);
-//    (void) Cconws("\r\n\r\n");
+    showImageFileName(&dialog, index, (const char *) filename);
 }
 
 void newImage(int index)
