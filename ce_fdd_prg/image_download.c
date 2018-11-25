@@ -7,8 +7,10 @@
 #include "keys.h"
 #include "defs.h"
 #include "stdlib.h"
+#include "aes.h"
+#include "CE_FDD.H"
 
-// ------------------------------------------------------------------ 
+// ------------------------------------------------------------------
 extern BYTE deviceID;
 extern BYTE commandShort[CMD_LENGTH_SHORT];
 
@@ -67,7 +69,7 @@ struct {
 
 BYTE scrRez;
 
-// ------------------------------------------------------------------ 
+// ------------------------------------------------------------------
 
 #define SHOWMENU_STATICTEXT     1
 #define SHOWMENU_SEARCHSTRING   2
@@ -75,6 +77,47 @@ BYTE scrRez;
 #define SHOWMENU_RESULTS_ROW    8
 
 #define SHOWMENU_ALL            0xff
+
+// ------------------------------------------------------------------
+Dialog dialogDownload;              // dialog with image download content
+
+BYTE gem_imageDownload(void)
+{
+    rsrc_gaddr(R_TREE, DOWNLOAD, &dialogDownload.tree); // get address of dialog tree
+    cd = &dialogDownload;           // set pointer to current dialog, so all helper functions will work with that dialog
+
+    showDialog(TRUE);               // show dialog
+
+    BYTE retVal = KEY_F10;
+
+    while(1) {
+        int16_t exitobj = form_do(dialogDownload.tree, 0) & 0x7FFF;
+
+        if(exitobj == BTN_EXIT2) {
+            retVal = KEY_F10;   // KEY_F10 - quit
+            break;
+        }
+
+        if(exitobj == BTN_LOADER) {
+            retVal = KEY_F9;   // KEY_F9 -- back to images loading / config dialog
+            break;
+        }
+
+        // unselect button
+        unselectButton(exitobj);
+
+        if(exitobj == BTN_LOAD) {   // load image into slot
+
+            continue;
+        }
+
+
+    }
+
+    showDialog(FALSE); // hide dialog
+    return retVal;
+}
+// ------------------------------------------------------------------
 
 BYTE loopForDownload(void)
 {

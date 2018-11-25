@@ -16,6 +16,7 @@
 #include "keys.h"
 #include "defs.h"
 #include "CE_FDD.H"
+#include "aes.h"
 
 // ------------------------------------------------------------------
 extern BYTE deviceID;
@@ -73,44 +74,9 @@ BYTE getSelectedSlotNo(void)
     return 0;
 }
 
-typedef struct {
-    OBJECT *tree;   // pointer to the tree
-    int16_t xdial, ydial, wdial, hdial; // dimensions and position of dialog
-} Dialog;
+Dialog dialogConfig;        // dialog with floppy image config
 
-Dialog dialog;      // for easier passing to helper functions store everything needed in the struct
-
-void unselectButton(Dialog *d, int btnIdx)
-{
-    OBJECT *btn;
-    rsrc_gaddr(R_OBJECT, btnIdx, &btn);    // get address of button
-
-    if(!btn) {      // object not found? quit
-        return;
-    }
-
-    btn->ob_state = btn->ob_state & (~OS_SELECTED);     // remove SELECTED flag
-
-    objc_draw(d->tree, btnIdx, 0, d->xdial, d->ydial, d->wdial, d->hdial);    // draw object tree - starting with the button
-}
-
-void setObjectString(Dialog *d, int16_t objId, const char *newString)
-{
-    OBJECT *obj;
-    rsrc_gaddr(R_OBJECT, objId, &obj);  // get address of object
-
-    if(!obj) {                          // object not found? quit
-        return;
-    }
-
-    int16_t ox, oy;
-    objc_offset(d->tree, objId, &ox, &oy);          // get current screen coordinates of object
-
-    strcpy(obj->ob_spec.free_string, newString);    // copy in the string
-    objc_draw(d->tree, ROOT, MAX_DEPTH, ox, oy, obj->ob_width, obj->ob_height); // draw object tree, but clip only to text position and size
-}
-
-void showImageFileName(Dialog *d, int slot, const char *filename)
+void showImageFileName(int slot, const char *filename)
 {
     int16_t textIdx;
 
@@ -125,17 +91,17 @@ void showImageFileName(Dialog *d, int slot, const char *filename)
         filename = " [ empty ] ";
     }
 
-    setObjectString(d, textIdx, filename);  // set net text
+    setObjectString(textIdx, filename);  // set net text
 }
 
-void showProgress(Dialog *d, int percent)
+void showProgress(int percent)
 {
     char progress[24];
 
     if(percent < 0) {   // if should hide progress
         memset(progress, ' ', 20);  // set empty string
         progress[20] = 0;           // terminate string
-        setObjectString(d, STR_PROGRESS, progress);
+        setObjectString(STR_PROGRESS, progress);
         return;
     }
 
@@ -152,10 +118,10 @@ void showProgress(Dialog *d, int percent)
     }
     progress[20] = 0;               // terminate string
 
-    setObjectString(d, STR_PROGRESS, progress); // update string
+    setObjectString(STR_PROGRESS, progress); // update string
 }
 
-void showFilename(Dialog *d, const char *filename)
+void showFilename(const char *filename)
 {
     char fname[24];
 
@@ -168,7 +134,7 @@ void showFilename(Dialog *d, const char *filename)
         fname[22] = 0;                  // terminate string
     }
 
-    setObjectString(d, STR_FILENAME, fname); // update string
+    setObjectString(STR_FILENAME, fname); // update string
 }
 
 void getAndShowSiloContent(void)
@@ -181,51 +147,22 @@ void getAndShowSiloContent(void)
     }
 }
 
-void showSetupDialog(Dialog *d, BYTE show)
-{
-    if(show) {  // on show
-        form_center(d->tree, &d->xdial, &d->ydial, &d->wdial, &d->hdial);       // center object
-        form_dial(0, 0, 0, 0, 0, d->xdial, d->ydial, d->wdial, d->hdial);       // reserve screen space for dialog
-        objc_draw(d->tree, ROOT, MAX_DEPTH, d->xdial, d->ydial, d->wdial, d->hdial);  // draw object tree
-    } else {    // on hide
-        form_dial (3, 0, 0, 0, 0, d->xdial, d->ydial, d->wdial, d->hdial);      // release screen space
-    }
-}
-
-void showErrorDialog(char *errorText)
-{
-    showSetupDialog(&dialog, FALSE);    // hide dialog
-
-    char tmp[256];
-    strcpy(tmp, "[3][");                // STOP icon
-    strcat(tmp, errorText);             // error text
-    strcat(tmp, "][ OK ]");             // OK button
-
-    form_alert(1, tmp);                 // show alert dialog, 1st button as default one, with text and buttons in tmp[]
-
-    showSetupDialog(&dialog, TRUE);     // show dialog
-}
-
-void showComErrorDialog(void)
-{
-    showErrorDialog("Error in CosmosEx communication!");
-}
-
 BYTE gem_floppySetup(void)
 {
-    rsrc_gaddr(R_TREE, FDD, &dialog.tree); // get address of dialog tree
+    rsrc_gaddr(R_TREE, DOWNLOAD, &dialogConfig.tree); // get address of dialog tree
+    cd = &dialogConfig;             // set pointer to current dialog, so all helper functions will work with that dialog
 
-    showSetupDialog(&dialog, TRUE); // show dialog
-
+    showDialog(TRUE);               // show dialog
+/*
     getAndShowSiloContent();        // get and show current content of slots
 
-    showProgress(&dialog, -1);      // hide progress bar
-    showFilename(&dialog, NULL);    // hide load/save filename
-
+    showProgress(-1);      // hide progress bar
+    showFilename(NULL);    // hide load/save filename
+*/
     BYTE retVal = KEY_F10;
 
     while(1) {
-        int16_t exitobj = form_do(dialog.tree, 0) & 0x7FFF;
+        int16_t exitobj = form_do(dialogConfig.tree, 0) & 0x7FFF;
 
         if(exitobj == BTN_EXIT) {
             retVal = KEY_F10;   // KEY_F10 - quit
@@ -238,7 +175,7 @@ BYTE gem_floppySetup(void)
         }
 
         // unselect button
-        unselectButton(&dialog, exitobj);
+        unselectButton(exitobj);
 
         BYTE slotNo = getSelectedSlotNo();
 
@@ -249,16 +186,16 @@ BYTE gem_floppySetup(void)
         if(exitobj == BTN_LOAD) {   // load image into slot
 //            uploadImage(slotNo - 1);
 
-            showProgress(&dialog, -1);      // hide progress bar
-            showFilename(&dialog, NULL);    // hide load/save filename
+            showProgress(-1);      // hide progress bar
+            showFilename(NULL);    // hide load/save filename
             getAndShowSiloContent();        // get and show current content of slots
             continue;
         }
 
         if(exitobj == BTN_SAVE) {   // save content of slot to file
  //           downloadImage(slotNo - 1);
-            showProgress(&dialog, -1);      // hide progress bar
-            showFilename(&dialog, NULL);    // hide load/save filename
+            showProgress(-1);      // hide progress bar
+            showFilename(NULL);    // hide load/save filename
             continue;
         }
 
@@ -275,7 +212,7 @@ BYTE gem_floppySetup(void)
         }
     }
 
-    showSetupDialog(&dialog, FALSE); // hide dialog
+    showDialog(FALSE); // hide dialog
     return retVal;
 }
 // ------------------------------------------------------------------
@@ -294,7 +231,7 @@ void showImage(int index)
     // offset 400: content  3
 
     BYTE *filename  = &siloContent[(index * 160)];
-    showImageFileName(&dialog, index, (const char *) filename);
+    showImageFileName(index, (const char *) filename);
 }
 
 void newImage(int index)
@@ -340,12 +277,12 @@ void downloadImage(int index)
     char fullPath[512];
 
     // open fileselector and get path
-    showSetupDialog(&dialog, FALSE);                    // hide dialog
+    showDialog(FALSE);                    // hide dialog
 
     short button;
     fsel_input(filePath, fileName, &button);            // show file selector
 
-    showSetupDialog(&dialog, TRUE);                     // show dialog
+    showDialog(TRUE);                     // show dialog
 
     if(button != 1) {                                   // if OK was not pressed
         commandShort[4] = FDD_CMD_DOWNLOADIMG_DONE;
@@ -361,7 +298,7 @@ void downloadImage(int index)
         return;
     }
 
-    showFilename(&dialog, fileName);            // show filename in dialog
+    showFilename(fileName);            // show filename in dialog
 
     // fileName contains the filename
     // filePath contains the path with search wildcards, e.g.: C:\\*.*
@@ -399,7 +336,7 @@ void downloadImage(int index)
     int progress = 0;
 
     for(blockNo=0; blockNo<64; blockNo++) {                 // try to get all blocks
-        showProgress(&dialog, progress);                    // update progress bar
+        showProgress(progress);                    // update progress bar
         progress += 9;                                      // 720 kB image is made of 11.25 blocks of 64k, each is 8.8% of whole
 
         commandShort[4] = FDD_CMD_DOWNLOADIMG_GETBLOCK;     // receiving block
@@ -511,18 +448,18 @@ void uploadImage(int index)
     }
 
     // open fileselector and get path
-    showSetupDialog(&dialog, FALSE);            // hide dialog
+    showDialog(FALSE);            // hide dialog
 
     short button;
     fsel_input(filePath, fileName, &button);    // show file selector
 
-    showSetupDialog(&dialog, TRUE);             // show dialog
+    showDialog(TRUE);             // show dialog
 
     if(button != 1) {                           // if OK was not pressed
         return;
     }
 
-    showFilename(&dialog, fileName);            // show filename in dialog
+    showFilename(fileName);            // show filename in dialog
 
 	// fileName contains the filename
 	// filePath contains the path with search wildcards, e.g.: C:\\*.*
@@ -572,7 +509,7 @@ void uploadImage(int index)
     int progress = 0;
 
     while(1) {
-        showProgress(&dialog, progress);                        // update progress bar
+        showProgress(progress);                        // update progress bar
         progress += 9;                                          // 720 kB image is made of 11.25 blocks of 64k, each is 8.8% of whole
 
         long len = Fread(fh, SIZE64K, pBfr);
