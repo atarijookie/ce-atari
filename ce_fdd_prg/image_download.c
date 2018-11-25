@@ -156,11 +156,11 @@ void handlePrevNextPage(int16_t btn)
     }
 
     if(search.pageCurrent == 0) {   // first page? disable prev button
-
+        // TODO: disable button
     }
 
     if(search.pageCurrent >= (search.pagesCount -1)) {  // last page? disable next button
-
+        // TODO: disable button
     }
 }
 
@@ -174,9 +174,15 @@ BYTE gem_imageDownload(void)
     BYTE retVal = KEY_F10;
 
     while(1) {
+        // TODO: on search string change + actual search
+        // TODO: shorten / initialize search string
+        // TODO: get and show status (limit to chars)
+        // TODO: sent PAGE to RPi as WORD (now it's BYTE)
+        // TODO: change page size for PRG retrieving to 8 items (now it's 15)
+        // TODO: add displaying of individual results rows
         int16_t exitobj = form_do(dialogDownload.tree, 0) & 0x7FFF;
 
-        // unselect button
+        // TODO: fix unselect button
         unselectButton(exitobj);
 
         if(exitobj == BTN_EXIT2) {
