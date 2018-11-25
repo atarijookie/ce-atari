@@ -36,18 +36,11 @@ BYTE *pDmaBuffer;
 
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
 
-BYTE loopForSetup(void);
 BYTE loopForDownload(void);
-
 
 BYTE gem_init(void);
 void gem_deinit(void);
 BYTE gem_floppySetup(void);
-
-void uploadImage(int index);
-void removeImage(int index);
-void newImage(int index);
-void downloadImage(int index);
 
 // ------------------------------------------------------------------
 int main( int argc, char* argv[] )
@@ -89,7 +82,7 @@ int main( int argc, char* argv[] )
 
 	DWORD val = (DWORD) pBfrOrig;
 	pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);     				// create even pointer
-    pBfrCnt   = pBfr - 2;											// this is previous pointer - size of WORD 
+    pBfrCnt   = pBfr - 2;											// this is previous pointer - size of WORD
 
     pDmaBuffer = pBfr;
 
@@ -120,7 +113,7 @@ int main( int argc, char* argv[] )
     while(1) {
         BYTE key;
 
-        key = loopForSetup();
+        key = gem_floppySetup();            // show and handle floppy setup via dialog
 
         if(key == KEY_F10) {                // should quit?
             break;

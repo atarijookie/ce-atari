@@ -39,12 +39,9 @@ void downloadImage(int index);
 
 void createFullPath(char *fullPath, char *filePath, char *fileName);
 
-BYTE loopForSetup(void);
 void showMenu(char fullNotPartial);
 void showImage(int index);
 void getSiloContent(void);
-
-extern TDestDir destDir;
 
 BYTE getSelectedSlotNo(void)
 {
@@ -258,6 +255,13 @@ BYTE gem_floppySetup(void)
             continue;
         }
 
+        if(exitobj == BTN_SAVE) {   // save content of slot to file
+ //           downloadImage(slotNo - 1);
+            showProgress(&dialog, -1);      // hide progress bar
+            showFilename(&dialog, NULL);    // hide load/save filename
+            continue;
+        }
+
         if(exitobj == BTN_CLEAR) {  // remove image from slot
 //            removeImage(slotNo - 1);
             getAndShowSiloContent();        // get and show current content of slots
@@ -267,13 +271,6 @@ BYTE gem_floppySetup(void)
         if(exitobj == BTN_NEW) {    // create new empty image in slot
 //            newImage(slotNo - 1);
             getAndShowSiloContent();        // get and show current content of slots
-            continue;
-        }
-
-        if(exitobj == BTN_SAVE) {   // save content of slot to file
- //           downloadImage(slotNo - 1);
-            showProgress(&dialog, -1);      // hide progress bar
-            showFilename(&dialog, NULL);    // hide load/save filename
             continue;
         }
     }
@@ -320,7 +317,7 @@ void newImage(int index)
 
 void downloadImage(int index)
 {
-    if((index < 0 || index > 2) && index != 10) {           // if it's not normal floppy index and not internet download index
+    if(index < 0 || index > 2) {        // floppy index out of range?
         return;
     }
 
@@ -342,48 +339,35 @@ void downloadImage(int index)
     //--------------------------------
     char fullPath[512];
 
-    if(index == 10) {                                       // for internet download just use predefined destination dir
-        strcpy(fullPath, destDir.path);                     // create path, e.g. 'C:\destdir\images\A_001.ST'
+    // open fileselector and get path
+    showSetupDialog(&dialog, FALSE);                    // hide dialog
 
-        int len = strlen(fullPath);
-        if(fullPath[len - 1] != '\\') {                     // if the path doesn't end with \\, add it there
-            strcat(fullPath, "\\");
+    short button;
+    fsel_input(filePath, fileName, &button);            // show file selector
+
+    showSetupDialog(&dialog, TRUE);                     // show dialog
+
+    if(button != 1) {                                   // if OK was not pressed
+        commandShort[4] = FDD_CMD_DOWNLOADIMG_DONE;
+        commandShort[5] = index;
+
+        sectorCount = 1;                                // read 1 sector
+
+        res = Supexec(ce_acsiReadCommand);
+
+        if(res != FDD_OK) {
+            showComErrorDialog();
         }
-
-        strcat(fullPath, fileName);
-    } else {                                                // for ordinary floppy slots open file selector
-       // open fileselector and get path
-        showSetupDialog(&dialog, FALSE);                    // hide dialog
-
-        short button;
-        fsel_input(filePath, fileName, &button);            // show file selector
-
-        showSetupDialog(&dialog, TRUE);                     // show dialog
-
-        if(button != 1) {                                   // if OK was not pressed
-            commandShort[4] = FDD_CMD_DOWNLOADIMG_DONE;
-            commandShort[5] = index;
-
-            sectorCount = 1;                                // read 1 sector
-
-            res = Supexec(ce_acsiReadCommand);
-
-            if(res != FDD_OK) {
-                showComErrorDialog();
-            }
-            return;
-        }
-
-        showFilename(&dialog, fileName);            // show filename in dialog
-
-      	// fileName contains the filename
-        // filePath contains the path with search wildcards, e.g.: C:\\*.*
-
-        // create full path
-        createFullPath(fullPath, filePath, fileName);       // fullPath = filePath + fileName
-
-        (void) Clear_home();
+        return;
     }
+
+    showFilename(&dialog, fileName);            // show filename in dialog
+
+    // fileName contains the filename
+    // filePath contains the path with search wildcards, e.g.: C:\\*.*
+
+    // create full path
+    createFullPath(fullPath, filePath, fileName);       // fullPath = filePath + fileName
 
     //--------------------
     // check if can do on device copy, and do it if possible
@@ -416,6 +400,7 @@ void downloadImage(int index)
 
     for(blockNo=0; blockNo<64; blockNo++) {                 // try to get all blocks
         showProgress(&dialog, progress);                    // update progress bar
+        progress += 9;                                      // 720 kB image is made of 11.25 blocks of 64k, each is 8.8% of whole
 
         commandShort[4] = FDD_CMD_DOWNLOADIMG_GETBLOCK;     // receiving block
         commandShort[5] = (index << 6) | (blockNo & 0x3f);  // for this index and block #
@@ -588,6 +573,7 @@ void uploadImage(int index)
 
     while(1) {
         showProgress(&dialog, progress);                        // update progress bar
+        progress += 9;                                          // 720 kB image is made of 11.25 blocks of 64k, each is 8.8% of whole
 
         long len = Fread(fh, SIZE64K, pBfr);
 

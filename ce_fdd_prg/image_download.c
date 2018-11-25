@@ -46,15 +46,13 @@ BYTE searchContent[2 * 512];
 struct {
     char    text[MAX_SEARCHTEXT_LEN + 1];
     int     len;
-    
+
     int     pageCurrent;
     int     pagesCount;
-    
+
     int     row;
     int     prevRow;
 } search;
-
-TDestDir destDir;
 
 struct {
     BYTE encoding;              // is the RPi encoding the image or being idle?
@@ -64,8 +62,6 @@ struct {
     BYTE downloadCount;         // how many files are now being downloaded?
     BYTE prevDownloadCount;     // previous value of downloadCount
 } status;
-
-void downloadImage(int index);
 
 #define ROW_LENGTH  68
 
@@ -90,8 +86,6 @@ BYTE loopForDownload(void)
     search.pagesCount   = 0;
     search.row          = 0;
     search.prevRow      = 0;
-
-    destDir.isSet = 0;
 
     scrRez = Getrez();                                              // get screen resolution into variable
 
@@ -247,10 +241,10 @@ BYTE refreshImageList(void)
 {
     commandShort[4] = FDD_CMD_SEARCH_REFRESHLIST;                   // tell the host that it should refresh image list
     commandShort[5] = 0;
-    
+
     sectorCount = 1;                                                // read 1 sector
-    
-    BYTE res = Supexec(ce_acsiReadCommand); 
+
+    BYTE res = Supexec(ce_acsiReadCommand);
 
     if(res != FDD_OK) {
         showComError();
@@ -260,95 +254,6 @@ BYTE refreshImageList(void)
     res = searchInit();                                             // try to initialize
     return res;
 }
-
-void selectDestinationDir(void)
-{
-    short button;
-    char path[256], fname[256];
-
-    memset(path,    0, 256);
-    memset(fname,   0, 256);
-    
-    strcpy(path, "C:\\*.*");                            
-    BYTE drive = getLowestDrive();              // get the lowest HDD letter and use it in the file selector
-    path[0] = drive;
-    
-    graf_mouse(M_ON, 0);
-    fsel_input(path, fname, &button);           // show file selector
-    graf_mouse(M_OFF, 0);
-  
-    if(button != 1) {                           // if OK was not pressed
-        return;
-    }
-
-    removeLastPartUntilBackslash(path);         // remove part behind the last separator (most probably wild card)
-
-    destDir.isSet = 1;
-    strcpy(destDir.path, path);                 // copy in the destination dir
-}
-
-/*
-void handleImagesDownload(void) // OBSOLETE
-{
-    if(destDir.isSet == 0) {                    // destination dir not set?
-        selectDestinationDir();
-        
-        if(destDir.isSet == 0) {                // destination dir still not set?
-            (void) Clear_home();
-            (void) Cconws("You have to select destination dir!\r\nPress any key to continue.\n\r");
-            getKey();
-            return;
-        }
-    }
-    
-    BYTE res;
-    
-    (void) Clear_home();
-    (void) Cconws("Downloading selected images...\r\n");
-
-    while(1) {
-        commandShort[4] = FDD_CMD_SEARCH_DOWNLOAD;
-        commandShort[5] = 0;
-        sectorCount = 1;                        // read 1 sector
-        res = Supexec(ce_acsiReadCommand);
-
-        if(res == FDD_DN_WORKING) {             // if downloading
-            (void) Cconws(pBfr);                // write out status string
-            (void) Cconws("\n\r");
-        } else if(res == FDD_DN_NOTHING_MORE) { // if nothing more to download
-            (void) Cconws("All selected images downloaded.\r\nPress any key to continue.\n\r");
-            getKey();
-            break;
-        } else if(res == FDD_DN_DONE) {         // if this image finished downloading
-            downloadImage(10);                  // store this downloaded image
-            (void) Cconws("\n\r\n\r");
-        } 
-
-        sleep(1);                               // wait a second
-    }
-}
-
-void markCurrentRow(void)   // OBSOLETE
-{
-    commandShort[4] = FDD_CMD_SEARCH_MARK;
-    commandShort[5] = 0;
-
-    p64kBlock = pBfr;                                           // use this buffer for writing
-    pBfr[0] = search.pageCurrent;                               // store page #
-    pBfr[1] = search.row;                                       // store item #
-    
-    sectorCount = 1;                                            // write just one sector
-    
-    BYTE res = Supexec(ce_acsiWriteBlockCommand); 
-    
-	if(res != FDD_OK) {                                         // bad? write error
-        showComError();
-        return;
-    }
-
-    getResultsPage(search.pageCurrent);                         // reload current page from host
-}
-*/
 
 void insertCurrentIntoSlot(BYTE key)
 {
@@ -366,7 +271,7 @@ void insertCurrentIntoSlot(BYTE key)
 
     sectorCount = 1;                                            // write just one sector
 
-    BYTE res = Supexec(ce_acsiWriteBlockCommand); 
+    BYTE res = Supexec(ce_acsiWriteBlockCommand);
 
     if(res != FDD_OK) {                                         // bad? just be silent, CE_FDD.PRG doesn't know if this image is downloaded, so don't show warning
         return;
