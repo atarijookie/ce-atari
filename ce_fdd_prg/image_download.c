@@ -78,6 +78,9 @@ BYTE scrRez;
 
 #define SHOWMENU_ALL            0xff
 
+void insertPageRowIntoSlot(WORD page, BYTE row, BYTE slot);
+void downloadPageRowToStorage(WORD page, BYTE row);
+
 // ------------------------------------------------------------------
 Dialog dialogDownload;              // dialog with image download content
 
@@ -138,6 +141,29 @@ void getInsertButtonRowAndSLot(const int16_t btn, int *row, int *slot)
     *row = -1;
 }
 
+void handlePrevNextPage(int16_t btn)
+{
+    if(btn == BTN_PAGE_PREV) {      // prev page?
+        if(search.pageCurrent > 0) {                            // not the first page? move to previous page
+            search.pageCurrent--;                               //
+            getResultsPage(search.pageCurrent);                 // get previous results
+        }
+    } else {                        // next page?
+        if(search.pageCurrent < (search.pagesCount - 1)) {      // not the last page? move to next page
+           search.pageCurrent++;                               //
+           getResultsPage(search.pageCurrent);                 // get next results
+        }
+    }
+
+    if(search.pageCurrent == 0) {   // first page? disable prev button
+
+    }
+
+    if(search.pageCurrent >= (search.pagesCount -1)) {  // last page? disable next button
+
+    }
+}
+
 BYTE gem_imageDownload(void)
 {
     rsrc_gaddr(R_TREE, DOWNLOAD, &dialogDownload.tree); // get address of dialog tree
@@ -163,24 +189,23 @@ BYTE gem_imageDownload(void)
             break;
         }
 
+        if(exitobj == BTN_PAGE_PREV || exitobj == BTN_PAGE_NEXT) {  // prev/next page button pressed?
+            handlePrevNextPage(exitobj);
+            continue;
+        }
+
         int row, slot;
         getDownloadButtonRow(exitobj, &row);    // was this download button press?
 
         if(row != -1) {         // handle download press
-
+            //downloadPageRowToStorage(search.pageCurrent, row);
             continue;
         }
 
         getInsertButtonRowAndSLot(exitobj, &row, &slot);    // was this insert button press?
 
         if(row != -1) {         // handle insert press
-
-            continue;
-        }
-
-
-        if(exitobj == BTN_LOAD) {   // load image into slot
-
+            //insertPageRowIntoSlot(search.pageCurrent, row, slot);
             continue;
         }
     }
@@ -369,7 +394,7 @@ BYTE refreshImageList(void)
     return res;
 }
 
-void insertCurrentIntoSlot(BYTE key)
+void insertPageRowIntoSlot(WORD page, BYTE row, BYTE slot)
 {
     if(!status.doWeHaveStorage) {                               // no storage? do nothing
         return;
@@ -378,10 +403,10 @@ void insertCurrentIntoSlot(BYTE key)
     commandShort[4] = FDD_CMD_SEARCH_INSERT2SLOT;
     commandShort[5] = 0;
 
-    p64kBlock = pBfr;                                           // use this buffer for writing
-    pBfr[0] = search.pageCurrent;                               // store page #
-    pBfr[1] = search.row;                                       // store item #
-    pBfr[2] = key - KEY_F1;                                     // slot number - transform F1-F3 to 0-2
+    p64kBlock = pBfr;       // use this buffer for writing
+    pBfr[0] = page;         // store page #
+    pBfr[1] = row;          // store item #
+    pBfr[2] = slot;         // store slot #
 
     sectorCount = 1;                                            // write just one sector
 
@@ -394,7 +419,12 @@ void insertCurrentIntoSlot(BYTE key)
     getResultsPage(search.pageCurrent);                         // reload current page from host
 }
 
-void downloadCurrentToStorage(void)
+void insertCurrentIntoSlot(BYTE key)
+{
+    insertPageRowIntoSlot(search.pageCurrent, search.row, key - KEY_F1);
+}
+
+void downloadPageRowToStorage(WORD page, BYTE row)
 {
     if(!status.doWeHaveStorage) {                               // no storage? do nothing
         return;
@@ -404,8 +434,8 @@ void downloadCurrentToStorage(void)
     commandShort[5] = 0;
 
     p64kBlock = pBfr;                                           // use this buffer for writing
-    pBfr[0] = search.pageCurrent;                               // store page #
-    pBfr[1] = search.row;                                       // store item #
+    pBfr[0] = page;                               // store page #
+    pBfr[1] = row;                                // store item #
 
     sectorCount = 1;                                            // write just one sector
 
@@ -417,6 +447,11 @@ void downloadCurrentToStorage(void)
     }
 
     getResultsPage(search.pageCurrent);                         // reload current page from host
+}
+
+void downloadCurrentToStorage(void)
+{
+    downloadPageRowToStorage(search.pageCurrent, search.row);
 }
 
 void imageSearch(void)
