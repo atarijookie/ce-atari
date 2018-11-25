@@ -149,7 +149,7 @@ void getAndShowSiloContent(void)
 
 BYTE gem_floppySetup(void)
 {
-    rsrc_gaddr(R_TREE, DOWNLOAD, &dialogConfig.tree); // get address of dialog tree
+    rsrc_gaddr(R_TREE, FDD, &dialogConfig.tree); // get address of dialog tree
     cd = &dialogConfig;             // set pointer to current dialog, so all helper functions will work with that dialog
 
     showDialog(TRUE);               // show dialog
@@ -164,6 +164,9 @@ BYTE gem_floppySetup(void)
     while(1) {
         int16_t exitobj = form_do(dialogConfig.tree, 0) & 0x7FFF;
 
+        // unselect button
+        unselectButton(exitobj);
+
         if(exitobj == BTN_EXIT) {
             retVal = KEY_F10;   // KEY_F10 - quit
             break;
@@ -173,9 +176,6 @@ BYTE gem_floppySetup(void)
             retVal = KEY_F9;   // KEY_F9 -- download images from internet
             break;
         }
-
-        // unselect button
-        unselectButton(exitobj);
 
         BYTE slotNo = getSelectedSlotNo();
 

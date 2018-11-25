@@ -41,6 +41,7 @@ BYTE loopForDownload(void);
 BYTE gem_init(void);
 void gem_deinit(void);
 BYTE gem_floppySetup(void);
+BYTE gem_imageDownload(void);
 
 // ------------------------------------------------------------------
 int main( int argc, char* argv[] )
@@ -54,13 +55,14 @@ int main( int argc, char* argv[] )
     }
 
     while(1) {
+/*
         res = gem_floppySetup();    // show and handle floppy setup via dialog
 
         if(res == KEY_F10) {        // should quit?
             break;
         }
-
-        res = loopForDownload();    // show and handle floppy image download
+*/
+        res = gem_imageDownload();    // show and handle floppy image download
 
         if(res == KEY_F10) {        // should quit?
             break;

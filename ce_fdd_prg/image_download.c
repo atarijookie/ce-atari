@@ -81,6 +81,63 @@ BYTE scrRez;
 // ------------------------------------------------------------------
 Dialog dialogDownload;              // dialog with image download content
 
+#define ITEM_ROWS  8
+const int16_t btnsDownload[ITEM_ROWS] = { D0,  D1,  D2,  D3,  D4,  D5,  D6,  D7};
+const int16_t btnsInsert1[ITEM_ROWS]  = {I01, I11, I21, I31, I41, I51, I61, I71};
+const int16_t btnsInsert2[ITEM_ROWS]  = {I02, I12, I22, I32, I42, I52, I62, I72};
+const int16_t btnsInsert3[ITEM_ROWS]  = {I03, I13, I23, I33, I43, I53, I63, I73};
+const int16_t btnsContent[ITEM_ROWS]  = { C0,  C1,  C2,  C3,  C4,  C5,  C6,  C7};
+
+int16_t getIndexOfItem(const int16_t item, const int16_t *array)
+{
+    int i;
+    for(i=0; i<ITEM_ROWS; i++) {
+        if(array[i] == item) {          // if this item was found in the array, return index
+            return i;
+        }
+    }
+
+    return -1;          // not found, return -1
+}
+
+void getDownloadButtonRow(const int16_t btn, int *row)
+{
+    int idx = getIndexOfItem(btn, btnsDownload);    // try to get index
+    *row = idx;     // 0-ITEM_ROWS if found, -1 if not found
+}
+
+void getInsertButtonRowAndSLot(const int16_t btn, int *row, int *slot)
+{
+    int idx;
+    idx = getIndexOfItem(btn, btnsInsert1);
+
+    if(idx != -1) { // if found in this column
+        *slot = 1;
+        *row = idx;
+        return;
+    }
+
+    idx = getIndexOfItem(btn, btnsInsert2);
+
+    if(idx != -1) { // if found in this column
+        *slot = 2;
+        *row = idx;
+        return;
+    }
+
+    idx = getIndexOfItem(btn, btnsInsert3);
+
+    if(idx != -1) { // if found in this column
+        *slot = 3;
+        *row = idx;
+        return;
+    }
+
+    // if not found, return -1
+    *slot = -1;
+    *row = -1;
+}
+
 BYTE gem_imageDownload(void)
 {
     rsrc_gaddr(R_TREE, DOWNLOAD, &dialogDownload.tree); // get address of dialog tree
@@ -93,6 +150,9 @@ BYTE gem_imageDownload(void)
     while(1) {
         int16_t exitobj = form_do(dialogDownload.tree, 0) & 0x7FFF;
 
+        // unselect button
+        unselectButton(exitobj);
+
         if(exitobj == BTN_EXIT2) {
             retVal = KEY_F10;   // KEY_F10 - quit
             break;
@@ -103,15 +163,26 @@ BYTE gem_imageDownload(void)
             break;
         }
 
-        // unselect button
-        unselectButton(exitobj);
+        int row, slot;
+        getDownloadButtonRow(exitobj, &row);    // was this download button press?
 
-        if(exitobj == BTN_LOAD) {   // load image into slot
+        if(row != -1) {         // handle download press
+
+            continue;
+        }
+
+        getInsertButtonRowAndSLot(exitobj, &row, &slot);    // was this insert button press?
+
+        if(row != -1) {         // handle insert press
 
             continue;
         }
 
 
+        if(exitobj == BTN_LOAD) {   // load image into slot
+
+            continue;
+        }
     }
 
     showDialog(FALSE); // hide dialog
@@ -212,7 +283,7 @@ BYTE loopForDownload(void)
 
         if((key >= 'a' && key <='z') || key == ' ' || (key >= 0 && key <= 9) || key == KEY_ESC || key == KEY_BACKSP) {
             res = handleWriteSearch(key);
-            
+
             if(res) {                                               // if the search string changed, search for images
                 imageSearch();
 
@@ -258,8 +329,8 @@ BYTE loopForDownload(void)
 
         if(gotoPrevPage) {
             if(search.pageCurrent > 0) {                            // not the first page? move to previous page
-                search.pageCurrent--;                               // 
-                     
+                search.pageCurrent--;                               //
+
                 getResultsPage(search.pageCurrent);                 // get previous results
                 showMenuMask = SHOWMENU_RESULTS_ALL;                // redraw all results
                 setSelectedRow(14);                                 // move to last row
@@ -268,8 +339,8 @@ BYTE loopForDownload(void)
 
         if(gotoNextPage) {
             if(search.pageCurrent < (search.pagesCount - 1)) {      // not the last page? move to next page
-                search.pageCurrent++;                               // 
-                     
+                search.pageCurrent++;                               //
+
                 getResultsPage(search.pageCurrent);                 // get next results
                 showMenuMask = SHOWMENU_RESULTS_ALL;                // redraw all results
                 setSelectedRow(0);                                  // move to first row
@@ -290,7 +361,7 @@ BYTE refreshImageList(void)
     BYTE res = Supexec(ce_acsiReadCommand);
 
     if(res != FDD_OK) {
-        showComError();
+        showComErrorDialog();
         return 0;
     }
 
@@ -335,11 +406,11 @@ void downloadCurrentToStorage(void)
     p64kBlock = pBfr;                                           // use this buffer for writing
     pBfr[0] = search.pageCurrent;                               // store page #
     pBfr[1] = search.row;                                       // store item #
-    
+
     sectorCount = 1;                                            // write just one sector
-    
-    BYTE res = Supexec(ce_acsiWriteBlockCommand); 
-    
+
+    BYTE res = Supexec(ce_acsiWriteBlockCommand);
+
     if(res != FDD_OK) {                                         // bad? write error
         showError("Failed to start download to storage.\r\n");
         return;
@@ -356,19 +427,19 @@ void imageSearch(void)
 
     p64kBlock       = pBfr;                                     // use this buffer for writing
     strcpy((char *) pBfr, search.text);                         // and copy in the search string
-    
+
     sectorCount = 1;                                            // write just one sector
-    
-    BYTE res = Supexec(ce_acsiWriteBlockCommand); 
-    
+
+    BYTE res = Supexec(ce_acsiWriteBlockCommand);
+
 	if(res != FDD_OK) {                                         // bad? write error
-        showComError();
+        showComErrorDialog();
         return;
     }
 
     search.row      = 0;
     search.prevRow  = 0;
-    
+
     getResultsPage(0);
 }
 
@@ -378,10 +449,10 @@ void getResultsPage(int page)
     commandShort[5] = (BYTE) page;
 
     sectorCount = 2;                            // read 2 sectors
-    BYTE res = Supexec(ce_acsiReadCommand); 
+    BYTE res = Supexec(ce_acsiReadCommand);
 
     if(res != FDD_OK) {                         // bad? write error
-        showComError();
+        showComErrorDialog();
         return;
     }
 
@@ -398,21 +469,21 @@ BYTE handleWriteSearch(BYTE key)
         memset(search.text, 0, MAX_SEARCHTEXT_LEN + 1);
         return 1;                                                       // search string changed
     }
-    
+
     if(key == KEY_BACKSP) {                                             // backspace - delete single char
         if(search.len > 0) {
             search.len--;
             search.text[search.len] = 0;
             return 1;                                                   // search string changed
         }
-        
+
         return 0;                                                       // search string NOT changed
     }
-    
+
     if(search.len >= MAX_SEARCHTEXT_LEN) {                              // if the entered string is at maximum length
         return 0;                                                       // search string NOT changed
     }
-    
+
     search.text[search.len] = key;                                      // add this key
     search.len++;                                                       // increase length
     search.text[search.len] = 0;                                        // terminate with zero
@@ -579,7 +650,7 @@ BYTE searchInit(void)
             (void) Cconws("Done.\n\r");
             return 1;
         } else {
-            (void) Cconws("CosmosEx device communication problem!\n\r");
+            showComErrorDialog();
         }
 
         WORD val = Cconis();            // see if there is some char waiting
@@ -604,7 +675,7 @@ void getStatus(void)
 
     sectorCount = 1;                            // read 1 sector
 
-    BYTE res = Supexec(ce_acsiReadCommand); 
+    BYTE res = Supexec(ce_acsiReadCommand);
 
     if(res != FDD_OK) {                         // fail? just quit
         return;
@@ -615,7 +686,7 @@ void getStatus(void)
     status.prevDoWeHaveStorage = status.doWeHaveStorage;    // make a copy of previous value
     status.doWeHaveStorage = pBfr[1];           // do we have storage on RPi attached?
 
-    status.prevDownloadCount = status.downloadCount;        // make a copy of previous download files count 
+    status.prevDownloadCount = status.downloadCount;        // make a copy of previous download files count
     status.downloadCount = pBfr[2];             // how many files are still downloading?
 
     Goto_pos(0, 23);                            // show status line
