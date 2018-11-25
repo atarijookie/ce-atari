@@ -17,7 +17,7 @@
 #include "defs.h"
 #include "find_ce.h"
 #include "hdd_if.h"
-#include "FDD.H"
+#include "CE_FDD.H"
 
 // ------------------------------------------------------------------
 BYTE deviceID;
@@ -363,7 +363,7 @@ BYTE gem_init(void)
     wind_update(BEG_UPDATE);
     graf_mouse(HOURGLASS, 0);
 
-    int16_t res = rsrc_load("FDD.RSC");
+    int16_t res = rsrc_load("CE_FDD.RSC");
     graf_mouse(ARROW, 0);
 
     if(!res) {

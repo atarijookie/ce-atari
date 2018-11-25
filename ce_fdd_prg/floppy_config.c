@@ -15,7 +15,7 @@
 #include "hostmoddefs.h"
 #include "keys.h"
 #include "defs.h"
-#include "FDD.H"
+#include "CE_FDD.H"
 
 // ------------------------------------------------------------------
 extern BYTE deviceID;
@@ -173,7 +173,7 @@ void showFilename(Dialog *d, const char *filename)
 
 void getAndShowSiloContent(void)
 {
-    getSiloContent();       // get content from device
+//    getSiloContent();       // get content from device
 
     int i;
     for(i=0; i<3; i++) {    // show it

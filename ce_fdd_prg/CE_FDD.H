@@ -1,4 +1,4 @@
-/* Resource Datei Indizes fÅr FDD */
+/* Resource Datei Indizes fÅr CE_FDD */
 
 #define FDD              0   /* Formular/Dialog */
 #define RADIO_SLOT1      2   /* BUTTON in Baum FDD */
