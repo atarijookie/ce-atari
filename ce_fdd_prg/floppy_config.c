@@ -156,7 +156,7 @@ BYTE gem_floppySetup(void)
         int16_t exitobj = form_do(dialogConfig.tree, 0) & 0x7FFF;
 
         // unselect button
-        unselectButton(exitobj);
+        selectButton(exitobj, FALSE);
 
         if(exitobj == BTN_EXIT) {
             retVal = KEY_F10;   // KEY_F10 - quit

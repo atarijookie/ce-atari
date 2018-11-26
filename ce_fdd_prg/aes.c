@@ -24,10 +24,15 @@ typedef struct {
 Dialog dialog;      // for easier passing to helper functions store everything needed in the struct
 Dialog *cd;         // cd - pointer to current dialog, so we don't have to pass dialog pointer to functions
 
-void unselectButton(int btnIdx)
+void selectButton(int btnIdx, BYTE select)
 {
     OBJECT *btn = &cd->tree[btnIdx];
-    btn->ob_state = btn->ob_state & (~OS_SELECTED);     // remove SELECTED flag
+
+    if(select) {
+        btn->ob_state = btn->ob_state | OS_SELECTED;        // add SELECTED flag
+    } else {
+        btn->ob_state = btn->ob_state & (~OS_SELECTED);     // remove SELECTED flag
+    }
 
     objc_draw(cd->tree, btnIdx, 0, cd->xdial, cd->ydial, cd->wdial, cd->hdial);    // draw object tree - starting with the button
 }

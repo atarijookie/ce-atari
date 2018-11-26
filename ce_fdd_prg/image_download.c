@@ -81,6 +81,9 @@ void downloadPageRowToStorage(WORD page, BYTE row);
 // ------------------------------------------------------------------
 Dialog dialogDownload;              // dialog with image download content
 
+#define WAITFOR_PRESSED     1
+#define WAITFOR_RELEASED    0
+
 #define ITEM_ROWS  8
 const int16_t btnsDownload[ITEM_ROWS] = { D0,  D1,  D2,  D3,  D4,  D5,  D6,  D7};
 const int16_t btnsInsert1[ITEM_ROWS]  = {I01, I11, I21, I31, I41, I51, I61, I71};
@@ -160,8 +163,73 @@ void handlePrevNextPage(int16_t btn)
     showPageNumber();
 }
 
+void showSearchString(void)
+{
+    char tmp[32];
+    strcpy(tmp, "Search: ");
+    strcat(tmp, search.text);
+
+    if(search.len < MAX_SEARCHTEXT_LEN) {   // if some char still can be added to search string
+        int i;
+        for(i=0; i<(MAX_SEARCHTEXT_LEN - search.len); i++) {    // add place holders
+            strcat(tmp, "_");
+        }
+    }
+
+    setObjectString(STR_SEARCH, tmp);
+}
+
+void downloadHandleKeyPress(int16_t key)
+{
+    key = atariKeysToSingleByte(key >> 8, key);
+
+    if(key >= 'A' && key <= 'Z') {  // upper case letter? to lower case!
+        key += 32;
+    }
+
+    if((key >= 'a' && key <='z') || key == ' ' || (key >= 0 && key <= 9) || key == KEY_ESC || key == KEY_BACKSP) {
+        BYTE changed = handleWriteSearch(key);
+
+        if(changed) {               // if the search string changed, search for images
+            showSearchString();
+            // imageSearch();
+        }
+    }
+}
+
+int16_t downloadHandleMouseButton(int16_t ev_mmbutton, int16_t ev_mmox, int16_t ev_mmoy, int16_t *btnWaitFor)
+{
+    int16_t exitobj = -1;
+    static int16_t btnIsPressed = FALSE;    // current presset state
+
+    if(btnIsPressed == FALSE) { // stored state = not pressed
+        if(ev_mmbutton == 1) {   // button was pressed?
+            btnIsPressed = TRUE;
+            *btnWaitFor = WAITFOR_RELEASED;
+        }
+    } else {                    // stored state = is pressed
+        if(ev_mmbutton == 0) {  // button was released?
+            btnIsPressed = FALSE;
+            *btnWaitFor = WAITFOR_PRESSED;
+
+            exitobj = objc_find(dialogDownload.tree, ROOT, MAX_DEPTH, ev_mmox, ev_mmoy);   // find out index of object that was clicked
+        }
+    }
+
+    return exitobj;
+}
+
 BYTE gem_imageDownload(void)
 {
+    search.len = 0;                                                 // clear search string
+    memset(search.text, 0, MAX_SEARCHTEXT_LEN + 1);
+    search.pageCurrent  = 0;
+    search.pagesCount   = 0;
+    search.row          = 0;
+    search.prevRow      = 0;
+
+    scrRez = Getrez();                                              // get screen resolution into variable
+
     rsrc_gaddr(R_TREE, DOWNLOAD, &dialogDownload.tree); // get address of dialog tree
     cd = &dialogDownload;           // set pointer to current dialog, so all helper functions will work with that dialog
 
@@ -169,22 +237,13 @@ BYTE gem_imageDownload(void)
 
     BYTE retVal = KEY_F10;
 
-    #define WAITFOR_PRESSED     1
-    #define WAITFOR_RELEASED    0
-
-    int16_t btnIsPressed = FALSE;
     int16_t btnWaitFor = WAITFOR_PRESSED;
 
     while(1) {
-        // TODO: on search string change + actual search
-        // TODO: shorten / initialize search string
         // TODO: get and show status (limit to chars)
         // TODO: send PAGE to RPi as WORD (now it's BYTE)
         // TODO: change page size for PRG retrieving to 8 items (now it's 15)
         // TODO: add displaying of individual results rows
-        
-        // unselect button
-        //unselectButton(exitobj);
 
         int16_t msg_buf[8];
         int16_t dum, key, event_type;
@@ -200,50 +259,18 @@ BYTE gem_imageDownload(void)
             &dum,           // int *ev_mmokstate,                                                               | short *KeyState,
             &key, &dum);    // int *ev_mkreturn, int *ev_mbreturn                                               | short *Key, short *ReturnCount
 
-        if (event_type & MU_KEYBD) {
-/*
-            key = atariKeysToSingleByte(key >> 16, key);
+        if (event_type & MU_KEYBD) {    // on key pressed
+            downloadHandleKeyPress(key);
+        }
 
-            if(key >= 'A' && key <= 'Z') {  // upper case letter? to lower case!
-                key += 32;
-            }
-
-            if((key >= 'a' && key <='z') || key == ' ' || (key >= 0 && key <= 9) || key == KEY_ESC || key == KEY_BACKSP) {
-                BYTE changed = handleWriteSearch(key);
-
-                if(changed) {               // if the search string changed, search for images
-                    char tmp[32];
-                    strcpy(tmp, "Search: ____________");
-                    strcpy(tmp + 8, search.text);
-
-                    setObjectString(STR_SEARCH, tmp);
-
-                    // imageSearch();
-                }
-            }
-*/
+        if (event_type & MU_TIMER) {    // on timer, get status from device and show it
+            getStatus();                // talk to CE to see the status
         }
 
         int16_t exitobj = -1;           // no exit object yet
 
         if (event_type & MU_BUTTON) {   // left button event?
-            if(btnIsPressed == FALSE) { // stored state = not pressed
-               if(ev_mmbutton == 1) {   // button was pressed?
-                    btnIsPressed = TRUE;
-                    btnWaitFor = WAITFOR_RELEASED;
-                }
-            } else {                    // stored state = is pressed
-                if(ev_mmbutton == 0) {  // button was released?
-                    btnIsPressed = FALSE;
-                    btnWaitFor = WAITFOR_PRESSED;
-
-                    exitobj = objc_find(dialogDownload.tree, ROOT, MAX_DEPTH, ev_mmox, ev_mmoy);   // find out index of object that was clicked
-                }
-            }
-        }
-
-        if (event_type & MU_TIMER) {    // on timer, get status from device and show it
-
+            exitobj = downloadHandleMouseButton(ev_mmbutton, ev_mmox, ev_mmoy, &btnWaitFor);
         }
 
         if(exitobj == -1) {     // if no exit object was specified, skip handling the rest
@@ -269,6 +296,7 @@ BYTE gem_imageDownload(void)
         getDownloadButtonRow(exitobj, &row);    // was this download button press?
 
         if(row != -1) {         // handle download press
+            selectButton(exitobj, TRUE);        // mark button as selected to tell user we're downloading it 
             //downloadPageRowToStorage(search.pageCurrent, row);
             continue;
         }
@@ -309,7 +337,6 @@ BYTE loopForDownload(void)
     lastStatusCheckTime = getTicksAsUser();                         // fill status.doWeHaveStorage before 1st showMenuDownload()
 
     imageSearch();
-    showMenuDownload(SHOWMENU_ALL);
 
     BYTE showMenuMask;
     BYTE gotoPrevPage, gotoNextPage;
@@ -338,7 +365,6 @@ BYTE loopForDownload(void)
 
             if(refreshDataAndRedraw) {                              // should do a refresh?
                 getResultsPage(search.pageCurrent);                 // refresh current page data
-                showMenuDownload(SHOWMENU_ALL);                     // draw all on screen
             }
         }
 
@@ -349,101 +375,6 @@ BYTE loopForDownload(void)
         }
 
         kbshift = Kbshift(-1);
-
-        if(key == KEY_F10 || key == KEY_F8) {                       // should quit or switch mode?
-            return key;
-        }
-
-        if(key == KEY_F1 || key == KEY_F2 || key == KEY_F3) {       // insert image into slot 1, 2, 3?
-            insertCurrentIntoSlot(key);
-            showMenuDownload(SHOWMENU_RESULTS_ROW);
-            lastStatusCheckTime = 0;                                // force immediate status check and display
-            continue;
-        }
-
-        if(key == KEY_F4) {                                         // start downloading images?
-            downloadCurrentToStorage();                             // start download
-            lastStatusCheckTime = 0;                                // force immediate status check and display
-            continue;
-        }
-
-        if(key == KEY_F5) {                                         // refresh the list of images
-            getResultsPage(search.pageCurrent);                     // refresh current page data
-            showMenuDownload(SHOWMENU_ALL);                         // draw all on screen
-            continue;
-        }
-
-        if(key >= 'A' && key <= 'Z') {								// upper case letter? to lower case!
-            key += 32;
-        }
-
-        if((key >= 'a' && key <='z') || key == ' ' || (key >= 0 && key <= 9) || key == KEY_ESC || key == KEY_BACKSP) {
-            res = handleWriteSearch(key);
-
-            if(res) {                                               // if the search string changed, search for images
-                imageSearch();
-
-                showMenuMask = SHOWMENU_SEARCHSTRING | SHOWMENU_RESULTS_ALL;
-            }
-        }
-
-        if((kbshift & (K_RSHIFT | K_LSHIFT)) != 0) {                // shift pressed? 
-            if(key == KEY_PAGEUP) {                                 // shift + arrow up = page up
-                gotoPrevPage = 1;
-            }
-
-            if(key == KEY_PAGEDOWN) {                               // shift + arrow down = page down
-                gotoNextPage = 1;
-            }
-        } else {                                                    // shift not pressed?
-            if(key == KEY_LEFT) {                                   // arrow left = prev page
-                gotoPrevPage = 1;
-            }
-
-            if(key == KEY_RIGHT) {                                  // arrow right = next page
-                gotoNextPage = 1;
-            }
-
-            if(key == KEY_UP) {                                     // arrow up?
-                if(search.row > 0) {                                // not the top most line? move one line up
-                    setSelectedRow(search.row - 1);
-                    showMenuMask = SHOWMENU_RESULTS_ROW;            // just change the row highlighting
-                } else {                                            // this is the top most line
-                    gotoPrevPage = 1;
-                }
-            }
-
-            if(key == KEY_DOWN) {                                   // arrow up?
-                if(search.row < 14) {                               // not the bottom line? move one line down
-                    setSelectedRow(search.row + 1);
-                    showMenuMask = SHOWMENU_RESULTS_ROW;            // just change the row highlighting
-                } else {                                            // this is the top most line
-                    gotoNextPage = 1;
-                }
-            }
-        }
-
-        if(gotoPrevPage) {
-            if(search.pageCurrent > 0) {                            // not the first page? move to previous page
-                search.pageCurrent--;                               //
-
-                getResultsPage(search.pageCurrent);                 // get previous results
-                showMenuMask = SHOWMENU_RESULTS_ALL;                // redraw all results
-                setSelectedRow(14);                                 // move to last row
-            }
-        }
-
-        if(gotoNextPage) {
-            if(search.pageCurrent < (search.pagesCount - 1)) {      // not the last page? move to next page
-                search.pageCurrent++;                               //
-
-                getResultsPage(search.pageCurrent);                 // get next results
-                showMenuMask = SHOWMENU_RESULTS_ALL;                // redraw all results
-                setSelectedRow(0);                                  // move to first row
-            }
-        }
-
-        showMenuDownload(showMenuMask);
     }
 }
 
@@ -597,59 +528,6 @@ BYTE handleWriteSearch(BYTE key)
     return 1;                                                           // search string changed
 }
 
-void addPaddingIfNeeded(void)
-{
-    if(scrRez) {                                // on mid/high res
-        (void) Cconws("                    ");  // add extra spaces
-    }
-}
-
-void showMenuDownload(BYTE showMask)
-{
-    if(showMask & SHOWMENU_STATICTEXT) {
-        (void) Clear_home();
-        (void) Cconws("\33p");
-        addPaddingIfNeeded();
-        (void) Cconws("[Floppy image download,  Jookie 2014-18]");
-        addPaddingIfNeeded();
-        (void) Cconws("\33q\r\n");
-    }
-
-    if(showMask & SHOWMENU_SEARCHSTRING) {
-        showSearchString();
-    }
-
-    if(showMask & SHOWMENU_RESULTS_ALL) {
-        showPageNumber();
-    }
-
-    showResults(showMask);
-
-    if(showMask & SHOWMENU_STATICTEXT) {
-        Goto_pos(0, 19);
-
-        addPaddingIfNeeded();
-        (void) Cconws("\33pA..Z\33q search          \33parrows\33q move\r\n");
-
-        if(status.doWeHaveStorage) {    // with storage
-            addPaddingIfNeeded();
-            (void) Cconws("\33pF1, F2, F3\33q -> insert into slot 1, 2, 3\r\n");
-
-            addPaddingIfNeeded();
-            (void) Cconws("\33pF4\33q   download        \33pF5\33q  refresh list\r\n");
-        } else {                        // without storage
-            addPaddingIfNeeded();
-            (void) Cconws("                                         \r\n");
-
-            addPaddingIfNeeded();
-            (void) Cconws("                     \33pF5\33q  refresh list\r\n");
-        }
-
-        addPaddingIfNeeded();
-        (void) Cconws("\33pF8\33q   setup screen    \33pF10\33q quit\r\n");
-    }
-}
-
 void showResults(BYTE showMask)
 {
     int i;
@@ -714,14 +592,6 @@ void showPageNumber(void)
     tmp[7] = 0;
 
     setObjectString(STR_PAGES, tmp);    // update string
-}
-
-void showSearchString(void)
-{
-    Goto_pos(19, 1);
-    (void) Cconws("\33pSearch:\33q             ");
-    Goto_pos(27, 1);
-    (void) Cconws(search.text);
 }
 
 void setSelectedRow(int row)
@@ -793,10 +663,5 @@ void getStatus(void)
     status.prevDownloadCount = status.downloadCount;        // make a copy of previous download files count
     status.downloadCount = pBfr[2];             // how many files are still downloading?
 
-    Goto_pos(0, 23);                            // show status line
-    (void) Cconws("\33p");                      // inverse on
-    addPaddingIfNeeded();
-    (void) Cconws((const char *) (pBfr + 4));   // status string
-    addPaddingIfNeeded();
-    (void) Cconws("\33q");                      // inverse off
+    setObjectString(STR_STATUS, (const char *) (pBfr + 4)); // show status line
 }

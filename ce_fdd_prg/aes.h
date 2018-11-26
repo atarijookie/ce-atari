@@ -11,7 +11,7 @@ typedef struct {
 
 extern Dialog *cd;  // cd - pointer to Current Dialog, so we don't have to pass dialog pointer to functions
 
-void unselectButton(int btnIdx);
+void selectButton(int btnIdx, BYTE select);
 void enableButton(int btnIdx, BYTE enabled);
 void setObjectString(int16_t objId, const char *newString);
 void showDialog(BYTE show);
