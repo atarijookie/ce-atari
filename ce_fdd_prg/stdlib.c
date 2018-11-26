@@ -147,3 +147,33 @@ DWORD getTicksAsUser(void)
     return res;
 }
 
+void showHexByte(BYTE val)
+{
+    int hi, lo;
+    char tmp[3];
+    char table[16] = {"0123456789ABCDEF"};
+
+    hi = (val >> 4) & 0x0f;;
+    lo = (val     ) & 0x0f;
+
+    tmp[0] = table[hi];
+    tmp[1] = table[lo];
+    tmp[2] = 0;
+
+    (void) Cconws(tmp);
+}
+
+void showHexWord(WORD val)
+{
+    showHexByte(val >> 8);
+    showHexByte(val & 0xff);
+}
+
+void showHexDword(DWORD val)
+{
+    showHexByte(val >> 24);
+    showHexByte(val >> 16);
+    showHexByte(val >>  8);
+    showHexByte(val      );
+}
+

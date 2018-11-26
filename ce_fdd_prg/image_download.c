@@ -144,24 +144,23 @@ void getInsertButtonRowAndSLot(const int16_t btn, int *row, int *slot)
 void handlePrevNextPage(int16_t btn)
 {
     if(btn == BTN_PAGE_PREV) {      // prev page?
-        if(search.pageCurrent > 0) {                            // not the first page? move to previous page
-            search.pageCurrent--;                               //
-            getResultsPage(search.pageCurrent);                 // get previous results
-        }
-    } else {                        // next page?
-        if(search.pageCurrent < (search.pagesCount - 1)) {      // not the last page? move to next page
-           search.pageCurrent++;                               //
-           getResultsPage(search.pageCurrent);                 // get next results
+        if(search.pageCurrent > 0) {            // not the first page? move to previous page
+            search.pageCurrent--;
+//            getResultsPage(search.pageCurrent); // get previous results
         }
     }
 
-    if(search.pageCurrent == 0) {   // first page? disable prev button
-        // TODO: disable button
+    if(btn == BTN_PAGE_NEXT) {      // next page?
+        if(search.pageCurrent < (search.pagesCount - 1)) {  // not the last page? move to next page
+           search.pageCurrent++;
+//           getResultsPage(search.pageCurrent);  // get next results
+        }
     }
 
-    if(search.pageCurrent >= (search.pagesCount -1)) {  // last page? disable next button
-        // TODO: disable button
-    }
+    enableButton(BTN_PAGE_PREV, search.pageCurrent != 0);   // enable PREV button if not 0th page
+    enableButton(BTN_PAGE_NEXT, search.pageCurrent < (search.pagesCount -1));   // enable NEXT button if not last page
+
+    showPageNumber();
 }
 
 BYTE gem_imageDownload(void)
@@ -177,12 +176,12 @@ BYTE gem_imageDownload(void)
         // TODO: on search string change + actual search
         // TODO: shorten / initialize search string
         // TODO: get and show status (limit to chars)
-        // TODO: sent PAGE to RPi as WORD (now it's BYTE)
+        // TODO: send PAGE to RPi as WORD (now it's BYTE)
         // TODO: change page size for PRG retrieving to 8 items (now it's 15)
         // TODO: add displaying of individual results rows
         int16_t exitobj = form_do(dialogDownload.tree, 0) & 0x7FFF;
 
-        // TODO: fix unselect button
+        // unselect button
         unselectButton(exitobj);
 
         if(exitobj == BTN_EXIT2) {
@@ -285,7 +284,7 @@ BYTE loopForDownload(void)
 
         kbshift = Kbshift(-1);
 
-        if(key == KEY_F10 || key == KEY_F8) {                       // should quit or switch mode? 
+        if(key == KEY_F10 || key == KEY_F8) {                       // should quit or switch mode?
             return key;
         }
 
@@ -642,15 +641,13 @@ void showResults(BYTE showMask)
 
 void showPageNumber(void)
 {
-    Goto_pos(19, 2);
-    (void) Cconws("\33pPage  :\33q        ");
-    Goto_pos(27, 2);
-
     char tmp[10];
     intToStr(search.pageCurrent + 1, tmp);
     tmp[3] = '/';
     intToStr(search.pagesCount, tmp + 4);
-    (void) Cconws(tmp);
+    tmp[7] = 0;
+
+    setObjectString(STR_PAGES, tmp);    // update string
 }
 
 void showSearchString(void)

@@ -18,6 +18,7 @@
 #include "find_ce.h"
 #include "hdd_if.h"
 #include "CE_FDD.H"
+#include "aes.h"
 
 // ------------------------------------------------------------------
 BYTE deviceID;
@@ -55,13 +56,12 @@ int main( int argc, char* argv[] )
     }
 
     while(1) {
-/*
         res = gem_floppySetup();    // show and handle floppy setup via dialog
 
         if(res == KEY_F10) {        // should quit?
             break;
         }
-*/
+
         res = gem_imageDownload();    // show and handle floppy image download
 
         if(res == KEY_F10) {        // should quit?

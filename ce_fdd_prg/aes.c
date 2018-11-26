@@ -2,14 +2,13 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
-#include <unistd.h>
 #include <gem.h>
 #include <mt_gem.h>
 
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 
+#include "stdlib.h"
 #include "acsi.h"
 #include "main.h"
 #include "hostmoddefs.h"
@@ -27,26 +26,28 @@ Dialog *cd;         // cd - pointer to current dialog, so we don't have to pass 
 
 void unselectButton(int btnIdx)
 {
-    OBJECT *btn;
-    rsrc_gaddr(R_OBJECT, btnIdx, &btn);    // get address of button
-
-    if(!btn) {      // object not found? quit
-        return;
-    }
-
+    OBJECT *btn = &cd->tree[btnIdx];
     btn->ob_state = btn->ob_state & (~OS_SELECTED);     // remove SELECTED flag
+
+    objc_draw(cd->tree, btnIdx, 0, cd->xdial, cd->ydial, cd->wdial, cd->hdial);    // draw object tree - starting with the button
+}
+
+void enableButton(int btnIdx, BYTE enabled)
+{
+    OBJECT *btn = &cd->tree[btnIdx];
+
+    if(enabled) {   // if enabled, remove DISABLED flag
+        btn->ob_state = btn->ob_state & (~OS_DISABLED);
+    } else {        // if disabled, add DISABLED flag
+        btn->ob_state = btn->ob_state | OS_DISABLED;
+    }
 
     objc_draw(cd->tree, btnIdx, 0, cd->xdial, cd->ydial, cd->wdial, cd->hdial);    // draw object tree - starting with the button
 }
 
 void setObjectString(int16_t objId, const char *newString)
 {
-    OBJECT *obj;
-    rsrc_gaddr(R_OBJECT, objId, &obj);  // get address of object
-
-    if(!obj) {                          // object not found? quit
-        return;
-    }
+    OBJECT *obj = &cd->tree[objId];
 
     int16_t ox, oy;
     objc_offset(cd->tree, objId, &ox, &oy);          // get current screen coordinates of object

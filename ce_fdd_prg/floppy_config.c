@@ -44,20 +44,13 @@ void showMenu(char fullNotPartial);
 void showImage(int index);
 void getSiloContent(void);
 
+Dialog dialogConfig;        // dialog with floppy image config
+
 BYTE getSelectedSlotNo(void)
 {
-    int32_t s1, s2, s3;
-    rsrc_gaddr(R_OBJECT, RADIO_SLOT1, &s1);
-    rsrc_gaddr(R_OBJECT, RADIO_SLOT2, &s2);
-    rsrc_gaddr(R_OBJECT, RADIO_SLOT3, &s3);
-
-    if(!s1 || !s2 || !s3) {
-        return 0;
-    }
-
-    OBJECT *o1 = (OBJECT *) s1;
-    OBJECT *o2 = (OBJECT *) s2;
-    OBJECT *o3 = (OBJECT *) s3;
+    OBJECT *o1 = (OBJECT *) &dialogConfig.tree[RADIO_SLOT1];
+    OBJECT *o2 = (OBJECT *) &dialogConfig.tree[RADIO_SLOT2];
+    OBJECT *o3 = (OBJECT *) &dialogConfig.tree[RADIO_SLOT3];
 
     if(o1->ob_state & OS_SELECTED) {
         return 1;
@@ -73,8 +66,6 @@ BYTE getSelectedSlotNo(void)
 
     return 0;
 }
-
-Dialog dialogConfig;        // dialog with floppy image config
 
 void showImageFileName(int slot, const char *filename)
 {
