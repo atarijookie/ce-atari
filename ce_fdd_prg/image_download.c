@@ -35,16 +35,13 @@ void selectDestinationDir(void);
 BYTE refreshImageList(void);
 void setSelectedRow(int row);
 
-//void markCurrentRow(void);              // OBSOLETE
-//void handleImagesDownload(void);        // OBSOLETE
-
 void getStatus(void);
 void insertCurrentIntoSlot(BYTE key);   // uses imageStorage
 void downloadCurrentToStorage(void);    // uses imageStorage
 
 BYTE searchContent[2 * 512];
 
-#define MAX_SEARCHTEXT_LEN      20
+#define MAX_SEARCHTEXT_LEN      12
 struct {
     char    text[MAX_SEARCHTEXT_LEN + 1];
     int     len;
@@ -109,7 +106,7 @@ void getDownloadButtonRow(const int16_t btn, int *row)
     *row = idx;     // 0-ITEM_ROWS if found, -1 if not found
 }
 
-void getInsertButtonRowAndSLot(const int16_t btn, int *row, int *slot)
+void getInsertButtonRowAndSlot(const int16_t btn, int *row, int *slot)
 {
     int idx;
     idx = getIndexOfItem(btn, btnsInsert1);
@@ -172,6 +169,12 @@ BYTE gem_imageDownload(void)
 
     BYTE retVal = KEY_F10;
 
+    #define WAITFOR_PRESSED     1
+    #define WAITFOR_RELEASED    0
+
+    int16_t btnIsPressed = FALSE;
+    int16_t btnWaitFor = WAITFOR_PRESSED;
+
     while(1) {
         // TODO: on search string change + actual search
         // TODO: shorten / initialize search string
@@ -179,10 +182,73 @@ BYTE gem_imageDownload(void)
         // TODO: send PAGE to RPi as WORD (now it's BYTE)
         // TODO: change page size for PRG retrieving to 8 items (now it's 15)
         // TODO: add displaying of individual results rows
-        int16_t exitobj = form_do(dialogDownload.tree, 0) & 0x7FFF;
-
+        
         // unselect button
-        unselectButton(exitobj);
+        //unselectButton(exitobj);
+
+        int16_t msg_buf[8];
+        int16_t dum, key, event_type;
+        int16_t ev_mmox, ev_mmoy, ev_mmbutton;
+
+        event_type = evnt_multi(MU_TIMER | MU_BUTTON | MU_KEYBD,   // int ev_mflags                             | short Type
+            1, 1, btnWaitFor,// int ev_mbclicks, int ev_mbmask, int ev_mbstate,                                 | short Clicks, short WhichButton, short WhichState,
+            0,0,0,0,0,      // int ev_mm1flags, int ev_mm1x, int ev_mm1y, int ev_mm1width, int ev_mm1height,    | short EnterExit1, short In1X, short In1Y, short In1W, short In1H,
+            0,0,0,0,0,      // int ev_mm2flags, int ev_mm2x, int ev_mm2y, int ev_mm2width, int ev_mm2height,    | short EnterExit2, short In2X, short In2Y, short In2W, short In2H,
+            msg_buf,        // int *ev_mmgpbuff,                                                                | short MesagBuf[],
+            1000,           // original TOS has this as 2 * int16_t, crossmint has this as unsigned long -- int ev_mtlocount, int ev_mthicount, | unsigned long Interval,
+            &ev_mmox, &ev_mmoy, &ev_mmbutton,   // int *ev_mmox, int *ev_mmoy, int *ev_mmbutton,                | short *OutX, short *OutY, short *ButtonState
+            &dum,           // int *ev_mmokstate,                                                               | short *KeyState,
+            &key, &dum);    // int *ev_mkreturn, int *ev_mbreturn                                               | short *Key, short *ReturnCount
+
+        if (event_type & MU_KEYBD) {
+/*
+            key = atariKeysToSingleByte(key >> 16, key);
+
+            if(key >= 'A' && key <= 'Z') {  // upper case letter? to lower case!
+                key += 32;
+            }
+
+            if((key >= 'a' && key <='z') || key == ' ' || (key >= 0 && key <= 9) || key == KEY_ESC || key == KEY_BACKSP) {
+                BYTE changed = handleWriteSearch(key);
+
+                if(changed) {               // if the search string changed, search for images
+                    char tmp[32];
+                    strcpy(tmp, "Search: ____________");
+                    strcpy(tmp + 8, search.text);
+
+                    setObjectString(STR_SEARCH, tmp);
+
+                    // imageSearch();
+                }
+            }
+*/
+        }
+
+        int16_t exitobj = -1;           // no exit object yet
+
+        if (event_type & MU_BUTTON) {   // left button event?
+            if(btnIsPressed == FALSE) { // stored state = not pressed
+               if(ev_mmbutton == 1) {   // button was pressed?
+                    btnIsPressed = TRUE;
+                    btnWaitFor = WAITFOR_RELEASED;
+                }
+            } else {                    // stored state = is pressed
+                if(ev_mmbutton == 0) {  // button was released?
+                    btnIsPressed = FALSE;
+                    btnWaitFor = WAITFOR_PRESSED;
+
+                    exitobj = objc_find(dialogDownload.tree, ROOT, MAX_DEPTH, ev_mmox, ev_mmoy);   // find out index of object that was clicked
+                }
+            }
+        }
+
+        if (event_type & MU_TIMER) {    // on timer, get status from device and show it
+
+        }
+
+        if(exitobj == -1) {     // if no exit object was specified, skip handling the rest
+            continue;
+        }
 
         if(exitobj == BTN_EXIT2) {
             retVal = KEY_F10;   // KEY_F10 - quit
@@ -207,7 +273,7 @@ BYTE gem_imageDownload(void)
             continue;
         }
 
-        getInsertButtonRowAndSLot(exitobj, &row, &slot);    // was this insert button press?
+        getInsertButtonRowAndSlot(exitobj, &row, &slot);    // was this insert button press?
 
         if(row != -1) {         // handle insert press
             //insertPageRowIntoSlot(search.pageCurrent, row, slot);

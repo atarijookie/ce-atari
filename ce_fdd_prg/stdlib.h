@@ -13,4 +13,4 @@ DWORD getTicksAsUser(void);
 void showHexByte(BYTE val);
 void showHexWord(WORD val);
 void showHexDword(DWORD val);
-
+BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
