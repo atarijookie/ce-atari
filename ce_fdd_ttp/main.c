@@ -43,15 +43,16 @@ BYTE getIsImageBeingEncoded(void);
 
 _DTA ourDta;     // used in findFirstImageInFolder() 
 
+void waitBeforeReset(void);
+
 // ------------------------------------------------------------------ 
 int main( int argc, char* argv[] )
 {
     BYTE found;
 
     // write some header out
-    VT52_Cur_off();
-
     (void) Clear_home();
+    (void) Cconws("\33f");      // cursor off
     (void) Cconws("\33p[  CosmosEx floppy TTP  ]\r\n[  by Jookie 2014-2018  ]\33q\r\n\r\n");
 
     char *params        = (char *) argv;            // get pointer to params (path to file)
@@ -177,9 +178,7 @@ int main( int argc, char* argv[] )
 
         if(res == ENCODING_DONE) {                                  // encoding went OK
             setCurrentSlot(currentSlot);
-
-            (void) Cconws("\n\r\n\rDone. Reset ST to boot from the uploaded floppy.\r\n");
-            getKey();
+            waitBeforeReset();                                      // auto-reset after a short while, but give user a chance to cancel reset
             break;
         }
 
@@ -195,6 +194,50 @@ int main( int argc, char* argv[] )
 
     Mfree(pBfrOrig);
     return 0;
+}
+
+void resetST(void)
+{
+    asm("move.w  #0x2700,sr\n\t"
+        "move.l   0x0004.w,a0\n\t"
+        "jmp     (a0)\n\t");
+}
+
+void waitBeforeReset(void)
+{
+    (void) Cconws("\33f");      // cursor off
+    (void) Cconws("\n\r\n\rDone.\r\n\r\nST will reset itself soon.\r\nPress any key to cancel!\r\n");
+
+    // if user doesn't press anything, the ST will reset itself...
+    #define CANCEL_TIME     6
+    int cancelTime = CANCEL_TIME;
+
+    while(cancelTime >= 0) {
+        int i;
+        BYTE key = getKeyIfPossible();              // get key if one is waiting or just return 0 if no key is waiting
+
+        if(key != 0) {                              // valid key? don't reset ST and quit
+            (void) Cconws("\33q\n\rReset canceled by user.\r\nTerminating and returning to desktop.\r\n");
+            sleep(1);
+            return;
+        }
+
+        (void) Cconws("\r\33qRESET: \33p");         // show label
+
+        for(i=0; i<CANCEL_TIME; i++) {              // show 'progress bar'
+            if(i == cancelTime) {                   // turn inverse colors off after displaying remaining time (and display rest for clearing previous)
+                (void) Cconws("\33q");
+            }
+
+            Cconout(' ');
+        }
+
+        cancelTime--;
+        msleep(330);
+    }
+
+    // reset the ST now!
+    Supexec(resetST);
 }
 
 void intToStr(int val, char *str)
