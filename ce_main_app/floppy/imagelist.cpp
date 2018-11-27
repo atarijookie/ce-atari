@@ -12,6 +12,7 @@
 #include "imagelist.h"
 #include "imagesilo.h"
 #include "imagestorage.h"
+#include "floppysetup.h"
 #include "../utils.h"
 #include "../periodicthread.h"
 #include "../downloader.h"
@@ -302,35 +303,33 @@ void ImageList::getResultByIndex(int index, char *bfr, int screenResolution)
 
     bool weHaveThisImage = shared.imageStorage->weHaveThisImage(imageName.c_str());
 
+    bfr[0] = weHaveThisImage ? ROW_OBJ_HIDDEN : ROW_OBJ_VISIBLE;        // bfr[0] - download button - hidden if we have this image
+
+    if(weHaveThisImage) {                       // have image? show insert buttons
+        shared.imageSilo->containsImageInSlots(imageName, bfr + 1);     // bfr[1,2,3] - insert buttons - fill with VISIBLE / SELECTED depending on if image is in slot
+    } else {                                    // don't have image? hide insert buttons
+        for(int i=1; i<4; i++) {                // bfr[1,2,3] - all INSERT buttons HIDDEN
+            bfr[i] = ROW_OBJ_HIDDEN;
+        }
+    }
+
+    bfr[4] = ROW_OBJ_VISIBLE;                   // content string - should be visible if we got here
+
+    memset(bfr + 5, ' ', 13);                   // pre-fill imagename with spaces
+
     int len = imageName.length();               // get the lenght of this filename
+    int copyLen = MIN(12, len);                 // if filename shorter or equal 12 chars, copy it whole; otherwise copy only first 12 chars
+    memcpy(bfr + 5, imageName.c_str(), copyLen);
 
-    if(len <= 12) {                             // name shorter than 8+3? pad to length
-        out += imageName;                       // add whole filename
-        out.append(12 - len, ' ');              // pad with spaces
-    } else {                                    // name too long? insert only first part of name
-        out += imageName.substr(0, 12);
-    }
+    #define FLAGS_PLUS_FILENAME (5 + 13)
 
-    if(weHaveThisImage) {                       // if we have this image, show tick
-        out += " * ";
-    } else {                                    // don't have it, don't show tick
-        out += "   ";
-    }
+    //size_t colCount = (screenResolution == 0) ? 40 : SIZE_OF_RESULT;    // low res has 40 cols, mid and high res has 80 cols
 
-    shared.imageSilo->containsImageInSlots(imageName, out);     // slots info
+    // copy the content after the flags and filename
+    size_t lenOfRest = SIZE_OF_RESULT - FLAGS_PLUS_FILENAME - 1; // how much can we fit in
+    strncpy(bfr + FLAGS_PLUS_FILENAME, vectorOfResults[index].game.c_str(), lenOfRest);
 
-    out += " ";                                                 // space slots and list of games
-
-    size_t colCount = (screenResolution == 0) ? 40 : SIZE_OF_RESULT;    // low res has 40 cols, mid and high res has 80 cols
-
-    size_t lenOfRest = colCount - 1 - out.length();             // how much can we fit in ;
-    if(vectorOfResults[index].game.length() <= lenOfRest) {     // games will fit in that buffer?
-        out += vectorOfResults[index].game;                     // add all content there
-    } else {                                                    // content won't fit? copy just part
-        out += vectorOfResults[index].game.substr(0, lenOfRest);
-    }
-
-    strncpy(bfr, out.c_str(), SIZE_OF_RESULT - 1);              // the output in the buffer
+    bfr[SIZE_OF_RESULT - 1] = 0;                // zero terminate string (just in case...)
 }
 
 void ImageList::getResultByIndex(int index, std::ostringstream &stream)

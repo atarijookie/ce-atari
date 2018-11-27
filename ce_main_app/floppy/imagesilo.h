@@ -69,7 +69,7 @@ public:
     void remove(int index);
 
     bool containsImage(const char *filename);
-    void containsImageInSlots(std::string &filenameWExt, std::string &bfr);
+    void containsImageInSlots(std::string &filenameWExt, char *bfr);
     void removeByFileName(std::string &filenameWExt);
     bool currentSlotHasNewContent(void);
 

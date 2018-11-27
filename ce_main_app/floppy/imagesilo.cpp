@@ -351,31 +351,17 @@ bool ImageSilo::containsImage(const char *filename)    // check if image with th
     return false;
 }
 
-// check if image with this filename exists in silo and fill buffer with string on which slots it's inserted
-void ImageSilo::containsImageInSlots(std::string &filenameWExt, std::string &out)
+// check if image with this filename exists in silo and fill buffer with ROW_OBJ_VISIBLE / ROW_OBJ_SELECTED if it's inserted
+void ImageSilo::containsImageInSlots(std::string &filenameWExt, char *bfr)
 {
     std::string filename, ext;
     Utils::splitFilenameFromExt(filenameWExt, filename, ext);   // create filename without extension (ZIPed image in list might be extracted under different extension)
-    char tmp[32];
 
     for(int i=0; i<3; i++) {
         bool isInSlot = (slots[i].imageFileNoExt == filename);  // if this file is in this slot
-        bool isSlotSelected = (i == currentSlot);               // if this slot is selecter
+        //bool isSlotSelected = (i == currentSlot);             // if this slot is selecter
 
-        if(isInSlot) {                                          // if image is in slot
-            if(isSlotSelected) {                                // if this slot is selected
-                out += "\033p";                                 // inverse on
-            }
-
-            sprintf(tmp, "%d", i + 1);                          // slot number - integer to string (std::to_string not present on Jessie)
-            out += tmp;                                         // add slot number
-
-            if(isSlotSelected) {                                // if this slot is selected
-                out += "\033q";                                 // inverse off
-            }
-        } else {                                                // if this image is not in this slot
-            out += ".";                                         // insert just place holder
-        }
+        bfr[i] = isInSlot ? ROW_OBJ_SELECTED : ROW_OBJ_VISIBLE; // if in slot - selected, not in slot - visible
     }
 }
 

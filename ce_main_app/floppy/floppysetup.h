@@ -14,6 +14,11 @@
 #define IMG_DN_STATUS_DOWNLOADING   1
 #define IMG_DN_STATUS_DOWNLOADED    2
 
+// these are used to define if download and insert buttons are visible in download app
+#define ROW_OBJ_HIDDEN      0
+#define ROW_OBJ_VISIBLE     1
+#define ROW_OBJ_SELECTED    2
+
 class AcsiDataTrans;
 
 class FloppySetup
