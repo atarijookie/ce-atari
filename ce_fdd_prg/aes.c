@@ -24,6 +24,16 @@ typedef struct {
 Dialog dialog;      // for easier passing to helper functions store everything needed in the struct
 Dialog *cd;         // cd - pointer to current dialog, so we don't have to pass dialog pointer to functions
 
+void redrawObject(int16_t objId)
+{
+    OBJECT *obj = &cd->tree[objId];
+
+    int16_t ox, oy;
+    objc_offset(cd->tree, objId, &ox, &oy);          // get current screen coordinates of object
+
+    objc_draw(cd->tree, ROOT, MAX_DEPTH, ox - 2, oy - 2, obj->ob_width + 4, obj->ob_height + 4); // draw object tree, but clip only to text position and size + some pixels more around to hide button completely
+}
+
 void selectButton(int btnIdx, BYTE select)
 {
     OBJECT *btn = &cd->tree[btnIdx];
@@ -34,7 +44,7 @@ void selectButton(int btnIdx, BYTE select)
         btn->ob_state = btn->ob_state & (~OS_SELECTED);     // remove SELECTED flag
     }
 
-    objc_draw(cd->tree, btnIdx, 0, cd->xdial, cd->ydial, cd->wdial, cd->hdial);    // draw object tree - starting with the button
+    redrawObject(btnIdx);
 }
 
 void enableButton(int btnIdx, BYTE enabled)
@@ -47,18 +57,16 @@ void enableButton(int btnIdx, BYTE enabled)
         btn->ob_state = btn->ob_state | OS_DISABLED;
     }
 
-    objc_draw(cd->tree, btnIdx, 0, cd->xdial, cd->ydial, cd->wdial, cd->hdial);    // draw object tree - starting with the button
+    redrawObject(btnIdx);
 }
 
 void setObjectString(int16_t objId, const char *newString)
 {
     OBJECT *obj = &cd->tree[objId];
 
-    int16_t ox, oy;
-    objc_offset(cd->tree, objId, &ox, &oy);          // get current screen coordinates of object
-
     strcpy(obj->ob_spec.free_string, newString);    // copy in the string
-    objc_draw(cd->tree, ROOT, MAX_DEPTH, ox, oy, obj->ob_width, obj->ob_height); // draw object tree, but clip only to text position and size
+
+    redrawObject(objId);
 }
 
 void showDialog(BYTE show)

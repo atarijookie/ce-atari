@@ -1,5 +1,6 @@
 #include <mint/osbind.h>
 #include <gem.h>
+#include <mt_gem.h>
 
 #include "acsi.h"
 #include "main.h"
@@ -24,13 +25,12 @@ extern BYTE kbshift;
 BYTE searchInit(void);
 
 BYTE loopForDownload(void);
-void showMenuDownload(BYTE showMask);
 BYTE handleWriteSearch(BYTE key);
 void showSearchString(void);
 void showPageNumber(void);
 void imageSearch(void);
 void getResultsPage(int page);
-void showResults(BYTE showMask);
+void showResults(void);
 void selectDestinationDir(void);
 BYTE refreshImageList(void);
 void setSelectedRow(int row);
@@ -90,6 +90,53 @@ const int16_t btnsInsert1[ITEM_ROWS]  = {I01, I11, I21, I31, I41, I51, I61, I71}
 const int16_t btnsInsert2[ITEM_ROWS]  = {I02, I12, I22, I32, I42, I52, I62, I72};
 const int16_t btnsInsert3[ITEM_ROWS]  = {I03, I13, I23, I33, I43, I53, I63, I73};
 const int16_t btnsContent[ITEM_ROWS]  = { C0,  C1,  C2,  C3,  C4,  C5,  C6,  C7};
+
+#define ROW_OBJ_HIDDEN      0
+#define ROW_OBJ_VISIBLE     1
+#define ROW_OBJ_SELECTED    2
+
+void showResultsRow(int rowNo, char *content)
+{
+    if(rowNo < 0 || rowNo >= ITEM_ROWS) {       // index out of range? quit
+        return;
+    }
+
+    #define OBJS_IN_ROW     5
+    int16_t i, idx[OBJS_IN_ROW];
+
+    // get index for each button and string in this row
+    idx[0] = btnsDownload[rowNo];
+    idx[1] = btnsInsert1[rowNo];
+    idx[2] = btnsInsert2[rowNo];
+    idx[3] = btnsInsert3[rowNo];
+    idx[4] = btnsContent[rowNo];
+
+    for(i=0; i<OBJS_IN_ROW; i++) {  // based on the ROW_OBJ_ flags for each button / string do hide, show, or select item
+        switch(content[i]) {
+            // hidden object? set HIDE flag
+            case ROW_OBJ_HIDDEN:    cd->tree[ idx[i] ].ob_flags |= OF_HIDETREE;
+                                    break;
+
+            // visible but not selected? remove HIDE flag, remove SELECTED state
+            case ROW_OBJ_VISIBLE:   cd->tree[ idx[i] ].ob_flags &= (~OF_HIDETREE);
+                                    cd->tree[ idx[i] ].ob_state &= (~OS_SELECTED);
+                                    break;
+
+            // visible and selected? remove HIDE flag, set SELECTED flag
+            case ROW_OBJ_SELECTED:  cd->tree[ idx[i] ].ob_flags &= (~OF_HIDETREE);
+                                    cd->tree[ idx[i] ].ob_state |= OS_SELECTED;
+                                    break;
+        }
+
+        // if we're processing content object and it's not hidden, set also new string
+        if(i == 4 && content[4] != ROW_OBJ_HIDDEN) {
+            setObjectString( idx[i], content + 5);
+        }
+
+        // now redraw object
+        redrawObject( idx[i] );
+    }
+}
 
 int16_t getIndexOfItem(const int16_t item, const int16_t *array)
 {
@@ -235,6 +282,8 @@ BYTE gem_imageDownload(void)
 
     showDialog(TRUE);               // show dialog
 
+    showResults();
+
     BYTE retVal = KEY_F10;
 
     int16_t btnWaitFor = WAITFOR_PRESSED;
@@ -243,7 +292,6 @@ BYTE gem_imageDownload(void)
         // TODO: get and show status (limit to chars)
         // TODO: send PAGE to RPi as WORD (now it's BYTE)
         // TODO: change page size for PRG retrieving to 8 items (now it's 15)
-        // TODO: add displaying of individual results rows
 
         int16_t msg_buf[8];
         int16_t dum, key, event_type;
@@ -264,7 +312,7 @@ BYTE gem_imageDownload(void)
         }
 
         if (event_type & MU_TIMER) {    // on timer, get status from device and show it
-            getStatus();                // talk to CE to see the status
+//          getStatus();                // talk to CE to see the status
         }
 
         int16_t exitobj = -1;           // no exit object yet
@@ -496,7 +544,7 @@ void getResultsPage(int page)
     search.pageCurrent  = (int) pBfr[0];        // get page #
     search.pagesCount   = (int) pBfr[1];        // get total page count
 
-    memcpy(searchContent, pBfr + 2, 15 * ROW_LENGTH);   // copy the data
+    memcpy(searchContent, pBfr + 2, ITEM_ROWS * ROW_LENGTH);   // copy the data
 }
 
 BYTE handleWriteSearch(BYTE key)
@@ -528,58 +576,14 @@ BYTE handleWriteSearch(BYTE key)
     return 1;                                                           // search string changed
 }
 
-void showResults(BYTE showMask)
+void showResults(void)
 {
     int i;
     char *pRow;
 
-    if(showMask & SHOWMENU_RESULTS_ALL) {               // if should redraw all results
-        (void) Cconws("\33w");                          // disable line wrap
-
-        for(i=0; i<15; i++) {
-            pRow = (char *) (searchContent + (i * ROW_LENGTH));
-
-            BYTE selected = (i == search.row);
-
-            Goto_pos(0, 3 + i);
-            (void) Cconws("\33K");                      // clear line from cursor to right
-
-            if(selected) {                              // for selected row
-                (void) Cconws("\33p");
-            }
-
-            (void) Cconws(pRow);
-
-            if(selected) {                              // for selected row
-                (void) Cconws("\33q");
-            }
-        }
-
-        (void) Cconws("\33v");                          // enable line wrap
-        return;
-    }
-
-    if(showMask & SHOWMENU_RESULTS_ROW) {               // if should redraw only selected line
-        (void) Cconws("\33w");                          // disable line wrap
-
-        // draw previous line without inversion
-        Goto_pos(0, 3 + search.prevRow);
-
-        pRow = (char *) (searchContent + (search.prevRow * ROW_LENGTH));
-        (void) Cconws(pRow);
-
-        // draw current line with inversion
-        Goto_pos(0, 3 + search.row);
-
-        pRow = (char *) (searchContent + (search.row * ROW_LENGTH));
-
-        (void) Cconws("\33p");
-        (void) Cconws(pRow);                            // show current but altered row
-        (void) Cconws("\33q");
-
-        (void) Cconws("\33v");                          // enable line wrap
-
-        return;
+    for(i=0; i<ITEM_ROWS; i++) {
+        pRow = (char *) (searchContent + (i * ROW_LENGTH));
+        showResultsRow(i, pRow);
     }
 }
 
