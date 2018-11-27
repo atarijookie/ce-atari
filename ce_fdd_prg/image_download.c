@@ -14,6 +14,7 @@
 // ------------------------------------------------------------------
 extern BYTE deviceID;
 extern BYTE commandShort[CMD_LENGTH_SHORT];
+extern BYTE commandLong [CMD_LENGTH_LONG];
 
 extern BYTE *p64kBlock;
 extern BYTE sectorCount;
@@ -302,9 +303,7 @@ BYTE gem_imageDownload(void)
     int16_t btnWaitFor = WAITFOR_PRESSED;
 
     while(1) {
-        // TODO: get and show status (limit to chars)
-        // TODO: send PAGE to RPi as WORD (now it's BYTE)
-        // TODO: change page size for PRG retrieving to 8 items (now it's 15)
+        // TODO: make result content longer - for hi and mid res, possibly cropping on low res
 
         int16_t msg_buf[8];
         int16_t dum, key, event_type;
@@ -419,9 +418,11 @@ void insertPageRowIntoSlot(WORD page, BYTE row, BYTE slot)
     commandShort[5] = 0;
 
     p64kBlock = pBfr;       // use this buffer for writing
-    pBfr[0] = page;         // store page #
-    pBfr[1] = row;          // store item #
-    pBfr[2] = slot;         // store slot #
+    pBfr[0] = ITEM_ROWS;            // items per page
+    pBfr[1] = (BYTE) (page >> 8);   // store page # high
+    pBfr[2] = (BYTE) (page     );   // store page # low
+    pBfr[3] = row;                  // store item #
+    pBfr[4] = slot;                 // store slot #
 
     sectorCount = 1;                                            // write just one sector
 
@@ -449,8 +450,10 @@ void downloadPageRowToStorage(WORD page, BYTE row)
     commandShort[5] = 0;
 
     p64kBlock = pBfr;                                           // use this buffer for writing
-    pBfr[0] = page;                               // store page #
-    pBfr[1] = row;                                // store item #
+    pBfr[0] = ITEM_ROWS;            // items per page
+    pBfr[1] = (BYTE) (page >> 8);   // store page # high
+    pBfr[2] = (BYTE) (page     );   // store page # low
+    pBfr[3] = row;                  // store item #
 
     sectorCount = 1;                                            // write just one sector
 
@@ -493,23 +496,28 @@ void imageSearch(void)
     getResultsPage(0);
 }
 
+#define BYTES_TO_INT(HI,LO)    ( (((int) HI) << 8) | ((int) LO) )
+BYTE ce_acsiReadCommandLong(void);
+
 void getResultsPage(int page)
 {
-    commandShort[4] = FDD_CMD_SEARCH_RESULTS;
-    commandShort[5] = (BYTE) page;
+    commandLong[5] = FDD_CMD_SEARCH_RESULTS;
+    commandLong[6] = ITEM_ROWS;             // items per page
+    commandLong[7] = (BYTE) (page >> 8);    // page high
+    commandLong[8] = (BYTE) (page     );    // page low
 
     sectorCount = 2;                            // read 2 sectors
-    BYTE res = Supexec(ce_acsiReadCommand);
+    BYTE res = Supexec(ce_acsiReadCommandLong);
 
     if(res != FDD_OK) {                         // bad? write error
         showComErrorDialog();
         return;
     }
 
-    search.pageCurrent  = (int) pBfr[0];        // get page #
-    search.pagesCount   = (int) pBfr[1];        // get total page count
+    search.pageCurrent = BYTES_TO_INT(pBfr[0], pBfr[1]);   // get page #
+    search.pagesCount  = BYTES_TO_INT(pBfr[2], pBfr[3]);   // get total page count
 
-    memcpy(searchContent, pBfr + 2, ITEM_ROWS * ROW_LENGTH);   // copy the data
+    memcpy(searchContent, pBfr + 4, ITEM_ROWS * ROW_LENGTH);    // copy the data
 }
 
 BYTE handleWriteSearch(BYTE key)

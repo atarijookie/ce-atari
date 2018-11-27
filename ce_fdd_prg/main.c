@@ -22,7 +22,8 @@
 
 // ------------------------------------------------------------------
 BYTE deviceID;
-BYTE commandShort[CMD_LENGTH_SHORT] = {0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
+BYTE commandShort[CMD_LENGTH_SHORT] = {         0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
+BYTE commandLong [CMD_LENGTH_LONG]  = {0x1f, 0xA0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0, 0, 0, 0, 0, 0, 0};
 
 void createFullPath(char *fullPath, char *filePath, char *fileName);
 
@@ -107,8 +108,9 @@ int main( int argc, char* argv[] )
 		return 0;
 	}
 
-	// now set up the acsi command bytes so we don't have to deal with this one anymore
-	commandShort[0] = (deviceID << 5); 					            // cmd[0] = ACSI_id + TEST UNIT READY (0)
+    // now set up the acsi command bytes so we don't have to deal with this one anymore
+    commandShort[0] = (deviceID << 5);          // cmd[0] = ACSI_id + TEST UNIT READY (0)
+    commandLong[0]  = (deviceID << 5) | 0x1f;   // cmd[0] = ACSI_id + ICD command marker (0x1f)
 
 	graf_mouse(M_OFF, 0);
 
@@ -208,20 +210,34 @@ void removeLastPartUntilBackslash(char *str)
 	}
 }
 
-// make single ACSI read command by the params set in the commandShort buffer
-BYTE ce_acsiReadCommand(void)
+// make single ACSI read command by the params set in the commandLong buffer
+BYTE ce_acsiReadCommandLong(void)
 {
-	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)
+    memset(pBfr, 0, 512);               // clear the buffer
 
-	memset(pBfr, 0, 512);              											// clear the buffer
-
-	(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, sectorCount);   // issue the command and check the result 
+    (*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, pBfr, sectorCount);   // issue the command and check the result 
 
     if(!hdIf.success) {
         return 0xff;
     }
 
-	return hdIf.statusByte;
+    return hdIf.statusByte;
+}
+
+// make single ACSI read command by the params set in the commandShort buffer
+BYTE ce_acsiReadCommand(void)
+{
+    commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)
+
+    memset(pBfr, 0, 512);              											// clear the buffer
+
+    (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, sectorCount);   // issue the command and check the result 
+
+    if(!hdIf.success) {
+        return 0xff;
+    }
+
+    return hdIf.statusByte;
 }
 
 BYTE ce_acsiWriteBlockCommand(void)
