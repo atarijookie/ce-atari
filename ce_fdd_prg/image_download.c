@@ -277,10 +277,23 @@ BYTE gem_imageDownload(void)
 
     scrRez = Getrez();                                              // get screen resolution into variable
 
+/*
+    BYTE res = searchInit();                                        // try to initialize
+
+    if(res == 0) {                                                  // failed to initialize? return to floppy config screen
+        return KEY_F9;
+    }
+*/
+
     rsrc_gaddr(R_TREE, DOWNLOAD, &dialogDownload.tree); // get address of dialog tree
     cd = &dialogDownload;           // set pointer to current dialog, so all helper functions will work with that dialog
 
     showDialog(TRUE);               // show dialog
+
+/*
+    getStatus();
+    imageSearch();
+*/
 
     showResults();
 
@@ -312,7 +325,23 @@ BYTE gem_imageDownload(void)
         }
 
         if (event_type & MU_TIMER) {    // on timer, get status from device and show it
-//          getStatus();                // talk to CE to see the status
+/*
+            BYTE refreshDataAndRedraw = FALSE;
+
+            getStatus();                            // talk to CE to see the status
+
+            if(status.downloadCount == 0 && status.prevDownloadCount > 0) {     // if we just finished downloading (not downloading now, but were downloading a while ago)
+                refreshDataAndRedraw = TRUE;        // do a refresh
+            }
+
+            if(status.doWeHaveStorage != status.prevDoWeHaveStorage) {  // if user attached / detached drive, redraw all
+                refreshDataAndRedraw = TRUE;        // do a refresh
+            }
+
+            if(refreshDataAndRedraw) {              // should do a refresh?
+                getResultsPage(search.pageCurrent); // refresh current page data
+            }
+*/
         }
 
         int16_t exitobj = -1;           // no exit object yet
@@ -361,70 +390,6 @@ BYTE gem_imageDownload(void)
     return retVal;
 }
 // ------------------------------------------------------------------
-
-BYTE loopForDownload(void)
-{
-    DWORD lastStatusCheckTime = 0;
-
-    search.len = 0;                                                 // clear search string
-    memset(search.text, 0, MAX_SEARCHTEXT_LEN + 1);
-    search.pageCurrent  = 0;
-    search.pagesCount   = 0;
-    search.row          = 0;
-    search.prevRow      = 0;
-
-    scrRez = Getrez();                                              // get screen resolution into variable
-
-    BYTE res = searchInit();                                        // try to initialize
-
-    if(res == 0) {                                                  // failed to initialize? return to floppy config screen
-        return KEY_F8;
-    }
-
-    getStatus();
-    lastStatusCheckTime = getTicksAsUser();                         // fill status.doWeHaveStorage before 1st showMenuDownload()
-
-    imageSearch();
-
-    BYTE showMenuMask;
-    BYTE gotoPrevPage, gotoNextPage;
-
-    while(1) {
-        BYTE key, kbshift;
-        DWORD now = getTicksAsUser();
-
-        gotoPrevPage = 0;
-        gotoNextPage = 0;
-        showMenuMask = 0;
-
-        if(now >= (lastStatusCheckTime + 100)) {                    // if last check was at least a while ago, do new check
-            BYTE refreshDataAndRedraw = FALSE;
-
-            lastStatusCheckTime = now;
-            getStatus();                                            // talk to CE to see the status
-
-            if(status.downloadCount == 0 && status.prevDownloadCount > 0) {     // if we just finished downloading (not downloading now, but were downloading a while ago)
-                refreshDataAndRedraw = TRUE;                            // do a refresh
-            }
-
-            if(status.doWeHaveStorage != status.prevDoWeHaveStorage) {  // if user attached / detached drive, redraw all
-                refreshDataAndRedraw = TRUE;                            // do a refresh
-            }
-
-            if(refreshDataAndRedraw) {                              // should do a refresh?
-                getResultsPage(search.pageCurrent);                 // refresh current page data
-            }
-        }
-
-        key = getKeyIfPossible();                                   // get key if one is waiting or just return 0 if no key is waiting
-
-        if(key == 0) {                                              // no key? just go back to start
-            continue;
-        }
-
-        kbshift = Kbshift(-1);
-    }
-}
 
 BYTE refreshImageList(void)
 {
@@ -612,38 +577,20 @@ BYTE searchInit(void)
     sectorCount = 1;                            // read 1 sector
     BYTE res;
 
-    (void) Clear_home();
-    (void) Cconws("Initializing... Press ESC to stop.\n\r\n\r");
+    res = Supexec(ce_acsiReadCommand);
 
-    while(1) {
-        res = Supexec(ce_acsiReadCommand);
+    if(res == FDD_DN_LIST) {
+        showErrorDialog("Still downloading list of images...");
+        return FALSE;       // can't show images yet
+    } else if(res == FDD_ERROR) {
+        showErrorDialog("Failed to initialize list.");
+        return FALSE;
+    } else if(res == FDD_OK) {
+        return TRUE;        // everything OK
+    } 
 
-        if(res == FDD_DN_LIST) {
-            (void) Cconws("Downloading list of floppy images...\n\r");
-        } else if(res == FDD_ERROR) {
-            (void) Cconws("Failed to initialize! Press any key.\n\r");
-            Cnecin();
-            return 0;
-        } else if(res == FDD_OK) {
-            (void) Cconws("Done.\n\r");
-            return 1;
-        } else {
-            showComErrorDialog();
-        }
-
-        WORD val = Cconis();            // see if there is some char waiting
-        if(val != 0) {                  // char waiting?
-            BYTE key = getKey();
-
-            if(key == KEY_ESC) {
-                (void) Cconws("Init terminated by user. Press any key.\n\r");
-                Cnecin();
-                return 0;
-            }
-        }
-
-        sleep(1);
-    }
+    showComErrorDialog();   // some other error?
+    return FALSE;
 }
 
 void getStatus(void)
