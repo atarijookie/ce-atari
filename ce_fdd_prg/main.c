@@ -40,40 +40,20 @@ BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
 
 BYTE loopForDownload(void);
 
-BYTE gem_init(void);
-void gem_deinit(void);
 BYTE gem_floppySetup(void);
 BYTE gem_imageDownload(void);
+
+// uncomment following for development without device
+//#define NODEVICE
 
 // ------------------------------------------------------------------
 int main( int argc, char* argv[] )
 {
-	BYTE found;
-
     BYTE res = gem_init();  // initialize GEM stuff
 
     if(!res) {              // gem init failed? quit then
         return 0;
     }
-
-    while(1) {
-        res = gem_floppySetup();    // show and handle floppy setup via dialog
-
-        if(res == KEY_F10) {        // should quit?
-            break;
-        }
-
-        res = gem_imageDownload();    // show and handle floppy image download
-
-        if(res == KEY_F10) {        // should quit?
-            break;
-        }
-    }
-
-    gem_deinit();                   // deinit GEM
-    return 0;
-
-    //-------------------------------------
 
 	pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
 
@@ -96,45 +76,35 @@ int main( int argc, char* argv[] )
     BYTE drive = getLowestDrive();                                  // get the lowest HDD letter and use it in the file selector
     filePath[0] = drive;
 
-	// write some header out
-	(void) Clear_home();
-	(void) Cconws("\33p[ CosmosEx floppy setup ]\r\n[    by Jookie 2014     ]\33q\r\n\r\n");
-
+#ifndef NODEVICE
 	// search for CosmosEx on ACSI & SCSI bus
-	found = Supexec(findDevice);
+	BYTE found = Supexec(findDevice);
 
 	if(!found) {								            // not found? quit
-		sleep(3);
 		return 0;
 	}
+#endif
 
     // now set up the acsi command bytes so we don't have to deal with this one anymore
     commandShort[0] = (deviceID << 5);          // cmd[0] = ACSI_id + TEST UNIT READY (0)
     commandLong[0]  = (deviceID << 5) | 0x1f;   // cmd[0] = ACSI_id + ICD command marker (0x1f)
 
-	graf_mouse(M_OFF, 0);
-
     while(1) {
-        BYTE key;
+        res = gem_floppySetup();    // show and handle floppy setup via dialog
 
-        key = gem_floppySetup();            // show and handle floppy setup via dialog
-
-        if(key == KEY_F10) {                // should quit?
+        if(res == KEY_F10) {        // should quit?
             break;
         }
 
-        key = loopForDownload();
+        res = gem_imageDownload();    // show and handle floppy image download
 
-        if(key == KEY_F10) {                // should quit?
+        if(res == KEY_F10) {        // should quit?
             break;
         }
     }
 
-	graf_mouse(M_ON, 0);
-	appl_exit();
-
+    gem_deinit();                   // deinit GEM
 	Mfree(pBfrOrig);
-
 	return 0;
 }
 
@@ -160,41 +130,6 @@ void intToStr(int val, char *str)
     str[3] = 0;                     // terminating zero
 }
 
-BYTE getKey(void)
-{
-    DWORD scancode;
-    BYTE key, vkey;
-
-    scancode = Cnecin();                        /* get char form keyboard, no echo on screen */
-
-    vkey    = (scancode >> 16)  & 0xff;
-    key     =  scancode         & 0xff;
-
-    key     = atariKeysToSingleByte(vkey, key);	/* transform BYTE pair into single BYTE */
-
-    return key;
-}
-
-BYTE getKeyIfPossible(void)
-{
-    DWORD scancode;
-    BYTE key, vkey, res;
-
-    res = Cconis();                             // see if there's something waiting from keyboard
-
-    if(res == 0) {                              // nothing waiting from keyboard?
-        return 0;
-    }
-
-    scancode = Cnecin();                        // get char form keyboard, no echo on screen
-
-    vkey = (scancode>>16) & 0xff;
-    key  =  scancode      & 0xff;
-
-    key = atariKeysToSingleByte(vkey, key);     // transform BYTE pair into single BYTE
-    return key;
-}
-
 void removeLastPartUntilBackslash(char *str)
 {
 	int i, len;
@@ -215,7 +150,11 @@ BYTE ce_acsiReadCommandLong(void)
 {
     memset(pBfr, 0, 512);               // clear the buffer
 
-    (*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, pBfr, sectorCount);   // issue the command and check the result 
+#ifdef NODEVICE
+    return 0;
+#endif
+
+    (*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, pBfr, sectorCount);   // issue the command and check the result
 
     if(!hdIf.success) {
         return 0xff;
@@ -227,9 +166,11 @@ BYTE ce_acsiReadCommandLong(void)
 // make single ACSI read command by the params set in the commandShort buffer
 BYTE ce_acsiReadCommand(void)
 {
-    commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)
-
     memset(pBfr, 0, 512);              											// clear the buffer
+
+#ifdef NODEVICE
+    return 0;
+#endif
 
     (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, sectorCount);   // issue the command and check the result 
 
@@ -242,7 +183,9 @@ BYTE ce_acsiReadCommand(void)
 
 BYTE ce_acsiWriteBlockCommand(void)
 {
-	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)
+#ifdef NODEVICE
+    return 0;
+#endif
 
 	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, sectorCount);	// issue the command and check the result 
 
@@ -268,18 +211,6 @@ BYTE getLowestDrive(void)
     }
 
     return 'A';
-}
-
-void showError(const char *error)
-{
-    (void) Clear_home();
-    (void) Cconws(error);
-    Cnecin();
-}
-
-void showComError(void)
-{
-    showError("Error in CosmosEx communication!\r\n");
 }
 
 void createFullPath(char *fullPath, char *filePath, char *fileName)
@@ -317,50 +248,3 @@ void logMsgProgress(DWORD current, DWORD total)
 //    (void) Cconws("\n\r");
 }
 
-BYTE gem_init(void)
-{
-    //-------------------------------------
-    int16_t work_in[11], i, work_out[64];
-    gl_apid = appl_init();
-
-    if (gl_apid == -1) {
-        (void) Cconws("appl_init() failed\r\n");
-        return FALSE;
-    }
-
-    wind_update(BEG_UPDATE);
-    graf_mouse(HOURGLASS, 0);
-
-    int16_t res = rsrc_load("CE_FDD.RSC");
-    graf_mouse(ARROW, 0);
-
-    if(!res) {
-        (void) Cconws("rsrc_load() failed\r\n");
-        return FALSE;
-    }
-
-    for(i=0; i<10; i++) {
-        work_in[i]= i;
-    }
-
-    work_in[10] = 2;
-
-    int16_t gem_handle, vdi_handle;
-    int16_t gl_wchar, gl_hchar, gl_wbox, gl_hbox;
-
-    gem_handle = graf_handle(&gl_wchar, &gl_hchar, &gl_wbox, &gl_hbox);
-    vdi_handle = gem_handle;
-    v_opnvwk(work_in, &vdi_handle, work_out);
-
-    if (vdi_handle == 0) {
-        (void) Cconws("v_opnvwk() failed\r\n");
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
-void gem_deinit(void)
-{
-    rsrc_free();            // free resource from memory
-}

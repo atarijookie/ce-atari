@@ -14,15 +14,8 @@
 #include "hostmoddefs.h"
 #include "keys.h"
 #include "defs.h"
+#include "aes.h"
 #include "CE_FDD.H"
-
-typedef struct {
-    OBJECT *tree;   // pointer to the tree
-    int16_t xdial, ydial, wdial, hdial; // dimensions and position of dialog
-
-    #define MAX_STRING_LEN_COUNT    64
-    BYTE maxStringLen[MAX_STRING_LEN_COUNT];    // holds max string length for string at specified index (or zero when length not found yet)
-} Dialog;
 
 Dialog *cd;         // cd - pointer to current dialog, so we don't have to pass dialog pointer to functions
 
@@ -34,6 +27,22 @@ void redrawObject(int16_t objId)
     objc_offset(cd->tree, objId, &ox, &oy);          // get current screen coordinates of object
 
     objc_draw(cd->tree, ROOT, MAX_DEPTH, ox - 2, oy - 2, obj->ob_width + 4, obj->ob_height + 4); // draw object tree, but clip only to text position and size + some pixels more around to hide button completely
+}
+
+void setVisible(int objId, BYTE visible)
+{
+    // object was visible, if the flag HIDETREE is zero
+    BYTE wasVisible = (cd->tree[ objId ].ob_flags & OF_HIDETREE) == 0;
+
+    if(visible) {   // show? remove flag
+        cd->tree[ objId ].ob_flags &= (~OF_HIDETREE);
+    } else {        // hide? add flag
+        cd->tree[ objId ].ob_flags |= OF_HIDETREE;
+    }
+
+    if((wasVisible && !visible) || (!wasVisible && visible)) {  // if visibility changed, redraw
+        redrawObject(objId);
+    }
 }
 
 void selectButton(int btnIdx, BYTE select)
@@ -119,3 +128,52 @@ void showComErrorDialog(void)
 {
     showErrorDialog("Error in CosmosEx communication!");
 }
+
+BYTE gem_init(void)
+{
+    int16_t work_in[11], i, work_out[64];
+    gl_apid = appl_init();
+
+    if (gl_apid == -1) {
+        (void) Cconws("appl_init() failed\r\n");
+        return FALSE;
+    }
+
+    wind_update(BEG_UPDATE);
+    graf_mouse(HOURGLASS, 0);
+
+    int16_t res = rsrc_load("CE_FDD.RSC");
+    graf_mouse(ARROW, 0);
+
+    if(!res) {
+        (void) Cconws("rsrc_load() failed\r\n");
+        return FALSE;
+    }
+
+    for(i=0; i<10; i++) {
+        work_in[i]= i;
+    }
+
+    work_in[10] = 2;
+
+    int16_t gem_handle, vdi_handle;
+    int16_t gl_wchar, gl_hchar, gl_wbox, gl_hbox;
+
+    gem_handle = graf_handle(&gl_wchar, &gl_hchar, &gl_wbox, &gl_hbox);
+    vdi_handle = gem_handle;
+    v_opnvwk(work_in, &vdi_handle, work_out);
+
+    if (vdi_handle == 0) {
+        (void) Cconws("v_opnvwk() failed\r\n");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+void gem_deinit(void)
+{
+    rsrc_free();            // free resource from memory
+    appl_exit();
+}
+

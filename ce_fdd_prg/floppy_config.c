@@ -130,7 +130,7 @@ void showFilename(const char *filename)
 
 void getAndShowSiloContent(void)
 {
-//    getSiloContent();       // get content from device
+    getSiloContent();       // get content from device
 
     int i;
     for(i=0; i<3; i++) {    // show it
@@ -144,12 +144,12 @@ BYTE gem_floppySetup(void)
     cd = &dialogConfig;             // set pointer to current dialog, so all helper functions will work with that dialog
 
     showDialog(TRUE);               // show dialog
-/*
+
     getAndShowSiloContent();        // get and show current content of slots
 
     showProgress(-1);      // hide progress bar
     showFilename(NULL);    // hide load/save filename
-*/
+
     BYTE retVal = KEY_F10;
 
     while(1) {
@@ -175,7 +175,7 @@ BYTE gem_floppySetup(void)
         }
 
         if(exitobj == BTN_LOAD) {   // load image into slot
-//            uploadImage(slotNo - 1);
+            uploadImage(slotNo - 1);
 
             showProgress(-1);      // hide progress bar
             showFilename(NULL);    // hide load/save filename
@@ -184,20 +184,20 @@ BYTE gem_floppySetup(void)
         }
 
         if(exitobj == BTN_SAVE) {   // save content of slot to file
- //           downloadImage(slotNo - 1);
+            downloadImage(slotNo - 1);
             showProgress(-1);      // hide progress bar
             showFilename(NULL);    // hide load/save filename
             continue;
         }
 
         if(exitobj == BTN_CLEAR) {  // remove image from slot
-//            removeImage(slotNo - 1);
+            removeImage(slotNo - 1);
             getAndShowSiloContent();        // get and show current content of slots
             continue;
         }
 
         if(exitobj == BTN_NEW) {    // create new empty image in slot
-//            newImage(slotNo - 1);
+            newImage(slotNo - 1);
             getAndShowSiloContent();        // get and show current content of slots
             continue;
         }

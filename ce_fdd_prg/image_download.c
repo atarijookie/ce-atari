@@ -34,11 +34,8 @@ void getResultsPage(int page);
 void showResults(void);
 void selectDestinationDir(void);
 BYTE refreshImageList(void);
-void setSelectedRow(int row);
 
 void getStatus(void);
-void insertCurrentIntoSlot(BYTE key);   // uses imageStorage
-void downloadCurrentToStorage(void);    // uses imageStorage
 
 BYTE searchContent[2 * 512];
 
@@ -49,9 +46,6 @@ struct {
 
     int     pageCurrent;
     int     pagesCount;
-
-    int     row;
-    int     prevRow;
 } search;
 
 struct {
@@ -194,14 +188,14 @@ void handlePrevNextPage(int16_t btn)
     if(btn == BTN_PAGE_PREV) {      // prev page?
         if(search.pageCurrent > 0) {            // not the first page? move to previous page
             search.pageCurrent--;
-//            getResultsPage(search.pageCurrent); // get previous results
+            getResultsPage(search.pageCurrent); // get previous results
         }
     }
 
     if(btn == BTN_PAGE_NEXT) {      // next page?
         if(search.pageCurrent < (search.pagesCount - 1)) {  // not the last page? move to next page
            search.pageCurrent++;
-//           getResultsPage(search.pageCurrent);  // get next results
+           getResultsPage(search.pageCurrent);  // get next results
         }
     }
 
@@ -240,7 +234,7 @@ void downloadHandleKeyPress(int16_t key)
 
         if(changed) {               // if the search string changed, search for images
             showSearchString();
-            // imageSearch();
+            imageSearch();
         }
     }
 }
@@ -273,29 +267,23 @@ BYTE gem_imageDownload(void)
     memset(search.text, 0, MAX_SEARCHTEXT_LEN + 1);
     search.pageCurrent  = 0;
     search.pagesCount   = 0;
-    search.row          = 0;
-    search.prevRow      = 0;
 
     scrRez = Getrez();                                              // get screen resolution into variable
 
-/*
     BYTE res = searchInit();                                        // try to initialize
 
     if(res == 0) {                                                  // failed to initialize? return to floppy config screen
         return KEY_F9;
     }
-*/
 
     rsrc_gaddr(R_TREE, DOWNLOAD, &dialogDownload.tree); // get address of dialog tree
     cd = &dialogDownload;           // set pointer to current dialog, so all helper functions will work with that dialog
 
     showDialog(TRUE);               // show dialog
 
-/*
+    showPageNumber();
     getStatus();
     imageSearch();
-*/
-
     showResults();
 
     BYTE retVal = KEY_F10;
@@ -324,7 +312,6 @@ BYTE gem_imageDownload(void)
         }
 
         if (event_type & MU_TIMER) {    // on timer, get status from device and show it
-/*
             BYTE refreshDataAndRedraw = FALSE;
 
             getStatus();                            // talk to CE to see the status
@@ -340,7 +327,6 @@ BYTE gem_imageDownload(void)
             if(refreshDataAndRedraw) {              // should do a refresh?
                 getResultsPage(search.pageCurrent); // refresh current page data
             }
-*/
         }
 
         int16_t exitobj = -1;           // no exit object yet
@@ -372,15 +358,15 @@ BYTE gem_imageDownload(void)
         getDownloadButtonRow(exitobj, &row);    // was this download button press?
 
         if(row != -1) {         // handle download press
-            selectButton(exitobj, TRUE);        // mark button as selected to tell user we're downloading it 
-            //downloadPageRowToStorage(search.pageCurrent, row);
+            selectButton(exitobj, TRUE);        // mark button as selected to tell user we're downloading it
+            downloadPageRowToStorage(search.pageCurrent, row);
             continue;
         }
 
         getInsertButtonRowAndSlot(exitobj, &row, &slot);    // was this insert button press?
 
         if(row != -1) {         // handle insert press
-            //insertPageRowIntoSlot(search.pageCurrent, row, slot);
+            insertPageRowIntoSlot(search.pageCurrent, row, slot);
             continue;
         }
     }
@@ -435,11 +421,6 @@ void insertPageRowIntoSlot(WORD page, BYTE row, BYTE slot)
     getResultsPage(search.pageCurrent);                         // reload current page from host
 }
 
-void insertCurrentIntoSlot(BYTE key)
-{
-    insertPageRowIntoSlot(search.pageCurrent, search.row, key - KEY_F1);
-}
-
 void downloadPageRowToStorage(WORD page, BYTE row)
 {
     if(!status.doWeHaveStorage) {                               // no storage? do nothing
@@ -460,16 +441,11 @@ void downloadPageRowToStorage(WORD page, BYTE row)
     BYTE res = Supexec(ce_acsiWriteBlockCommand);
 
     if(res != FDD_OK) {                                         // bad? write error
-        showError("Failed to start download to storage.\r\n");
+        showErrorDialog("Failed to start download to storage.\r\n");
         return;
     }
 
     getResultsPage(search.pageCurrent);                         // reload current page from host
-}
-
-void downloadCurrentToStorage(void)
-{
-    downloadPageRowToStorage(search.pageCurrent, search.row);
 }
 
 void imageSearch(void)
@@ -489,9 +465,6 @@ void imageSearch(void)
         showComErrorDialog();
         return;
     }
-
-    search.row      = 0;
-    search.prevRow  = 0;
 
     getResultsPage(0);
 }
@@ -562,19 +535,24 @@ void showResults(void)
 
 void showPageNumber(void)
 {
-    char tmp[10];
-    intToStr(search.pageCurrent + 1, tmp);
-    tmp[3] = '/';
-    intToStr(search.pagesCount, tmp + 4);
-    tmp[7] = 0;
+    BYTE pagesUiVisible = FALSE;    // assume that we don't have any results
 
-    setObjectString(STR_PAGES, tmp);    // update string
-}
+    if(search.pagesCount != 0) {    // if got some results
+        pagesUiVisible = TRUE;
 
-void setSelectedRow(int row)
-{
-    search.prevRow  = search.row;           // store current line as previous one
-    search.row      = row;                  // store new line as the current one
+        char tmp[12];
+        intToStr(search.pageCurrent + 1, tmp);
+        tmp[3] = '/';
+        intToStr(search.pagesCount, tmp + 4);
+        tmp[7] = 0;
+
+        setObjectString(STR_PAGES, tmp);    // update string
+    }
+
+    // hide/show string and buttons
+    setVisible(STR_PAGES, pagesUiVisible);
+    setVisible(BTN_PAGE_PREV, pagesUiVisible);
+    setVisible(BTN_PAGE_NEXT, pagesUiVisible);
 }
 
 BYTE searchInit(void)
@@ -595,7 +573,7 @@ BYTE searchInit(void)
         return FALSE;
     } else if(res == FDD_OK) {
         return TRUE;        // everything OK
-    } 
+    }
 
     showComErrorDialog();   // some other error?
     return FALSE;
