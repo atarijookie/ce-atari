@@ -37,7 +37,8 @@ BYTE refreshImageList(void);
 
 void getStatus(void);
 
-BYTE searchContent[2 * 512];
+BYTE searchContent[2 * 512];        // currently shown content
+BYTE prevSearchContent[2 * 512];    // previously shown content
 
 #define MAX_SEARCHTEXT_LEN      12
 struct {
@@ -114,7 +115,7 @@ const int16_t *otherObjs;
 #define ROW_OBJ_VISIBLE     1
 #define ROW_OBJ_SELECTED    2
 
-void showResultsRow(int rowNo, char *content)
+void showResultsRow(int rowNo, char *content, char *prevContent)
 {
     if(rowNo < 0 || rowNo >= ITEM_ROWS) {       // index out of range? quit
         return;
@@ -130,7 +131,14 @@ void showResultsRow(int rowNo, char *content)
     idx[3] = btnsInsert3[rowNo];
     idx[4] = btnsContent[rowNo];
 
+    #define IDX_OF_CONTENT      4
+    #define CONTENT_OFFSET      5
+
     for(i=0; i<OBJS_IN_ROW; i++) {     // based on the ROW_OBJ_ flags for each button / string do hide, show, or select item
+        if(i != IDX_OF_CONTENT && content[i] == prevContent[i]) {   // if this is not the position of content string  (it's a button) and hidden / visible / selected hasn't changed, don't redraw
+            continue;
+        }
+
         switch(content[i]) {
             // hidden object? set HIDE flag
             case ROW_OBJ_HIDDEN:    cd->tree[ idx[i] ].ob_flags |= OF_HIDETREE;
@@ -147,9 +155,15 @@ void showResultsRow(int rowNo, char *content)
                                     break;
         }
 
-        // if we're processing content object and it's not hidden, set also new string
-        if(i == 4 && content[4] != ROW_OBJ_HIDDEN) {
-            setObjectString( idx[i], content + 5);
+        // if we're processing content string
+        if(i == IDX_OF_CONTENT) {
+            int stringsDifferent = strcmp(content + CONTENT_OFFSET, prevContent + CONTENT_OFFSET);        // compare new and old string
+
+            if(content[IDX_OF_CONTENT] == ROW_OBJ_HIDDEN || !stringsDifferent) {    // if content is hidden or strings not different, skip set and redraw
+                continue;
+            }
+
+            setObjectString( idx[i], content + CONTENT_OFFSET);
         }
 
         // now redraw object
@@ -362,8 +376,9 @@ BYTE gem_imageDownload(void)
     int16_t btnWaitFor = WAITFOR_PRESSED;
 
     while(1) {
-        // TODO: download redraw only row 
+        // TODO: download redraw only row
         // TODO: keep previous search results, after retrieving new ones redraw only changed items
+        // TODO: maybe first fill all the rows using showResults() and then do a single redraw of whole form instead of individual items?
         // TODO: search redraw after each letter too slow
 
         int16_t msg_buf[8];
@@ -565,7 +580,8 @@ void getResultsPage(int page)
     search.pageCurrent = BYTES_TO_INT(pBfr[0], pBfr[1]);   // get page #
     search.pagesCount  = BYTES_TO_INT(pBfr[2], pBfr[3]);   // get total page count
 
-    memcpy(searchContent, pBfr + 4, ITEM_ROWS * ROW_LENGTH);    // copy the data
+    memcpy(prevSearchContent, searchContent, ITEM_ROWS * ROW_LENGTH);   // remember previously shown content
+    memcpy(searchContent, pBfr + 4, ITEM_ROWS * ROW_LENGTH);            // copy in new content
 }
 
 void getResultsAndUpdatePageObjects(int page)
@@ -608,11 +624,12 @@ BYTE handleWriteSearch(BYTE key)
 void showResults(void)
 {
     int i;
-    char *pRow;
 
     for(i=0; i<ITEM_ROWS; i++) {
-        pRow = (char *) (searchContent + (i * ROW_LENGTH));
-        showResultsRow(i, pRow);
+        char *pPrevRow    = (char *) (prevSearchContent + (i * ROW_LENGTH));
+        char *pCurrentRow = (char *) (searchContent     + (i * ROW_LENGTH));
+
+        showResultsRow(i, pCurrentRow, pPrevRow);
     }
 }
 
