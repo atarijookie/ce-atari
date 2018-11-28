@@ -43,22 +43,19 @@ BYTE loopForDownload(void);
 BYTE gem_floppySetup(void);
 BYTE gem_imageDownload(void);
 
+void handleCmdlineUpload(char *path, int paramsLength);
+
 // uncomment following for development without device
 //#define NODEVICE
 
 // ------------------------------------------------------------------
 int main( int argc, char* argv[] )
 {
-    BYTE res = gem_init();  // initialize GEM stuff
-
-    if(!res) {              // gem init failed? quit then
-        return 0;
-    }
-
+    Goto_pos(0,0);
     pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
 
     if(pBfrOrig == NULL) {
-        (void) Cconws("\r\nMalloc failed!\r\n");
+        (void) Cconws("Malloc failed!\r\n");
         sleep(3);
         return 0;
     }
@@ -76,13 +73,33 @@ int main( int argc, char* argv[] )
     BYTE drive = getLowestDrive();                                  // get the lowest HDD letter and use it in the file selector
     filePath[0] = drive;
 
-#ifndef NODEVICE
-    Goto_pos(0,0);
+    char *params        = (char *) argv;            // get pointer to params (path to file)
+    int paramsLength    = (int) params[0];
+    char *path          = params + 1;
 
+    // some argument was given? use as TTP
+    if(paramsLength != 0) {
+        handleCmdlineUpload(path, paramsLength);
+        Mfree(pBfrOrig);
+        return 0;
+    }
+
+    // no argument was given? use as PRG with GEM GUI
+
+    BYTE res = gem_init();          // initialize GEM stuff
+
+    if(!res) {                      // gem init failed? quit then
+        Mfree(pBfrOrig);
+        return 0;
+    }
+
+#ifndef NODEVICE
     // search for CosmosEx on ACSI & SCSI bus
     BYTE found = Supexec(findDevice);
 
-    if(!found) {        // not found? quit
+    if(!found) {                    // not found? quit
+        gem_deinit();               // deinit GEM
+        Mfree(pBfrOrig);
         return 0;
     }
 #endif

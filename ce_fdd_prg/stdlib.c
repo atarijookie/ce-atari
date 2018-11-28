@@ -122,37 +122,57 @@ int strncmp ( const char * str1, const char * str2, int num )
     return 0;                           // if came here, all chars matching
 }
 
-int sleepSeconds;
+/*  sleep() and msleep() functions */
+
+static DWORD sleepTics;
 static void sleepInSupervisor(void);
+
+void msleepInSuper(int ms)
+{
+    DWORD fiveMsCount = ms / 5;         // convert mili-seconds to 5-milisecond intervals (because 200 HZ timer has a 5 ms resolution)
+
+    if(fiveMsCount == 0) {              // for less than 5 ms sleep - do at least 5 ms sleep
+        fiveMsCount++;
+    }
+
+    sleepTics = fiveMsCount;
+    sleepInSupervisor();                // wait
+}
+
+void msleep(int ms)
+{
+    DWORD fiveMsCount = ms / 5;         // convert mili-seconds to 5-milisecond intervals (because 200 HZ timer has a 5 ms resolution)
+
+    if(fiveMsCount == 0) {              // for less than 5 ms sleep - do at least 5 ms sleep
+        fiveMsCount++;
+    }
+
+    sleepTics = fiveMsCount;
+    Supexec(sleepInSupervisor);         // wait
+}
 
 void sleep(int seconds)
 {
-    sleepSeconds = seconds;
+    sleepTics = seconds * 200;
     Supexec(sleepInSupervisor);
+}
+
+DWORD getTicks(void)
+{
+    /* return system 200Hz counter value */
+    return (*HZ_200);
 }
 
 static void sleepInSupervisor(void)
 {
     DWORD now, until;
-    DWORD tics = sleepSeconds * 200;
 
     now = getTicks();                       // get current ticks
-    until = now + tics;                     // calc value timer must get to
+    until = now + sleepTics;                // calc value timer must get to
 
-    while(1) {
+    while(now < until) {
         now = getTicks();                   // get current ticks
-        
-        if(now >= until) {
-            break;
-        }
     }
-}
-
-DWORD getTicks(void)
-{
-    DWORD now;
-    now = *HZ_200;
-    return now;
 }
 
 DWORD getTicksAsUser(void)
@@ -189,6 +209,41 @@ void showHexDword(DWORD val)
     showHexByte(val >> 16);
     showHexByte(val >>  8);
     showHexByte(val      );
+}
+
+BYTE getKey(void)
+{
+    DWORD scancode;
+    BYTE key, vkey;
+
+    scancode = Cnecin();                    /* get char form keyboard, no echo on screen */
+
+    vkey    = (scancode >> 16)  & 0xff;
+    key     =  scancode         & 0xff;
+
+    key     = atariKeysToSingleByte(vkey, key); /* transform BYTE pair into single BYTE */
+    
+    return key;
+}
+
+BYTE getKeyIfPossible(void)
+{
+    DWORD scancode;
+    BYTE key, vkey, res;
+
+    res = Cconis();                             // see if there's something waiting from keyboard 
+
+    if(res == 0) {                              // nothing waiting from keyboard?
+        return 0;
+    }
+    
+    scancode = Cnecin();                        // get char form keyboard, no echo on screen 
+
+    vkey = (scancode>>16) & 0xff;
+    key  =  scancode      & 0xff;
+
+    key = atariKeysToSingleByte(vkey, key);     // transform BYTE pair into single BYTE
+    return key;
 }
 
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)

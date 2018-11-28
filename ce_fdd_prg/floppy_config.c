@@ -31,7 +31,7 @@ extern char filePath[256], fileName[256];
 
 BYTE siloContent[512];
 
-void uploadImage(int index);
+BYTE uploadImage(int index, char *customPath);
 void swapImage(int index);
 void removeImage(int index);
 
@@ -109,7 +109,12 @@ void showProgress(int percent)
     }
     progress[20] = 0;               // terminate string
 
-    setObjectString(STR_PROGRESS, progress); // update string
+    if(cd) {                        // if got current dialog specified
+        setObjectString(STR_PROGRESS, progress); // update string
+    } else {                        // no current dialog, output to console only
+        (void) Cconws("\r");        // start of line
+        (void) Cconws(progress);    // show progress string
+    }
 }
 
 void showFilename(const char *filename)
@@ -175,7 +180,7 @@ BYTE gem_floppySetup(void)
         }
 
         if(exitobj == BTN_LOAD) {   // load image into slot
-            uploadImage(slotNo - 1);
+            uploadImage(slotNo - 1, NULL);
 
             showProgress(-1);      // hide progress bar
             showFilename(NULL);    // hide load/save filename
@@ -257,7 +262,7 @@ void downloadImage(int index)
 
     BYTE res = Supexec(ce_acsiReadCommand);
 
-	if(res == FDD_OK) {                                     // good? copy in the results
+    if(res == FDD_OK) {                                     // good? copy in the results
         strcpy(fileName, (char *) pBfr);                    // pBfr should contain original file name
     } else {                                                // bad? show error
         showComErrorDialog();
@@ -265,8 +270,6 @@ void downloadImage(int index)
     }
 
     //--------------------------------
-    char fullPath[512];
-
     // open fileselector and get path
     showDialog(FALSE);                    // hide dialog
 
@@ -295,6 +298,7 @@ void downloadImage(int index)
     // filePath contains the path with search wildcards, e.g.: C:\\*.*
 
     // create full path
+    char fullPath[512];
     createFullPath(fullPath, filePath, fileName);       // fullPath = filePath + fileName
 
     //--------------------
@@ -427,43 +431,48 @@ void removeImage(int index)
 
     BYTE res = Supexec(ce_acsiReadCommand);
 
-	if(res != FDD_OK) {                         // bad? write error
+    if(res != FDD_OK) {                         // bad? write error
         showComErrorDialog();
     }
 }
 
-void uploadImage(int index)
+BYTE uploadImage(int index, char *customPath)
 {
     if(index < 0 || index > 2) {
-        return;
+        return FALSE;
     }
 
-    // open fileselector and get path
-    showDialog(FALSE);            // hide dialog
-
-    short button;
-    fsel_input(filePath, fileName, &button);    // show file selector
-
-    showDialog(TRUE);             // show dialog
-
-    if(button != 1) {                           // if OK was not pressed
-        return;
-    }
-
-    showFilename(fileName);            // show filename in dialog
-
-	// fileName contains the filename
-	// filePath contains the path with search wildcards, e.g.: C:\\*.*
-
-    // create full path
     char fullPath[512];
-    createFullPath(fullPath, filePath, fileName);       // fullPath = filePath + fileName
+    short fh = -1;
 
-    short fh = Fopen(fullPath, 0);               		// open file for reading
+    if(!customPath) {                       // if customPath not specified, ask for it from user
+        // open fileselector and get path
+        showDialog(FALSE);                  // hide dialog
+
+        short button;
+        fsel_input(filePath, fileName, &button);    // show file selector
+
+        showDialog(TRUE);                   // show dialog
+
+        if(button != 1) {                   // if OK was not pressed
+            return FALSE;
+        }
+
+        showFilename(fileName);             // show filename in dialog
+
+        // fileName contains the filename
+        // filePath contains the path with search wildcards, e.g.: C:\\*.*
+
+        // create full path
+        createFullPath(fullPath, filePath, fileName);       // fullPath = filePath + fileName
+        fh = Fopen(fullPath, 0);            // open file for reading
+    } else {                                // if got custom path
+        fh = Fopen(customPath, 0);          // open file for reading
+    }
 
     if(fh < 0) {
         showErrorDialog("Failed to open the file.");
-        return;
+        return FALSE;
     }
 
     //---------------
@@ -473,7 +482,12 @@ void uploadImage(int index)
     commandShort[5] = index;                                    // for this index
 
     p64kBlock       = pBfr;                                     // use this buffer for writing
-    strcpy((char *) pBfr, fullPath);                            // and copy in the full path
+
+    if(customPath) {        // got custom path?
+        strcpy((char *) pBfr, customPath);                      // copy in the custom path
+    } else {                // don't have custom path?
+        strcpy((char *) pBfr, fullPath);                        // copy in the user path
+    }
 
     sectorCount     = 1;                                        // write just one sector
 
@@ -482,14 +496,14 @@ void uploadImage(int index)
 
     if(res == FDD_RES_ONDEVICECOPY) {                           // if the device returned this code, it means that it could do the image upload / copy on device, no need to upload it from ST!
         Fclose(fh);
-        return;
+        return TRUE;
     }
 
     if(res != FDD_OK) {                                         // bad? write error
         showComErrorDialog();
 
         Fclose(fh);                                             // close file and quit
-        return;
+        return FALSE;
     }
     //---------------
     // upload the image by 64kB blocks
@@ -561,4 +575,6 @@ void uploadImage(int index)
     if(res != FDD_OK) {                         // bad? write error
         showErrorDialog("Failed to finish upload.");
     }
+
+    return TRUE;
 }

@@ -118,6 +118,14 @@ void showDialog(BYTE show)
 
 void showErrorDialog(char *errorText)
 {
+    if(!cd) {           // don't have current dialog specified? error to console
+        (void) Cconws("\r");
+        (void) Cconws(errorText);
+        (void) Cconws("\r\n");
+        Cnecin();
+        return;
+    }
+
     showDialog(FALSE);   // hide dialog
 
     char tmp[256];
