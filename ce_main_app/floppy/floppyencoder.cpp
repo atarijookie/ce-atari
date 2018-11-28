@@ -1,4 +1,5 @@
 // vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 

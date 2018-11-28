@@ -55,17 +55,17 @@ int main( int argc, char* argv[] )
         return 0;
     }
 
-	pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
+    pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
 
-	if(pBfrOrig == NULL) {
-		(void) Cconws("\r\nMalloc failed!\r\n");
-		sleep(3);
-		return 0;
-	}
+    if(pBfrOrig == NULL) {
+        (void) Cconws("\r\nMalloc failed!\r\n");
+        sleep(3);
+        return 0;
+    }
 
-	DWORD val = (DWORD) pBfrOrig;
-	pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);     				// create even pointer
-    pBfrCnt   = pBfr - 2;											// this is previous pointer - size of WORD
+    DWORD val = (DWORD) pBfrOrig;
+    pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);                  // create even pointer
+    pBfrCnt   = pBfr - 2;                                           // this is previous pointer - size of WORD
 
     pDmaBuffer = pBfr;
 
@@ -77,12 +77,14 @@ int main( int argc, char* argv[] )
     filePath[0] = drive;
 
 #ifndef NODEVICE
-	// search for CosmosEx on ACSI & SCSI bus
-	BYTE found = Supexec(findDevice);
+    Goto_pos(0,0);
 
-	if(!found) {								            // not found? quit
-		return 0;
-	}
+    // search for CosmosEx on ACSI & SCSI bus
+    BYTE found = Supexec(findDevice);
+
+    if(!found) {        // not found? quit
+        return 0;
+    }
 #endif
 
     // now set up the acsi command bytes so we don't have to deal with this one anymore
@@ -104,8 +106,8 @@ int main( int argc, char* argv[] )
     }
 
     gem_deinit();                   // deinit GEM
-	Mfree(pBfrOrig);
-	return 0;
+    Mfree(pBfrOrig);
+    return 0;
 }
 
 void intToStr(int val, char *str)
@@ -132,17 +134,17 @@ void intToStr(int val, char *str)
 
 void removeLastPartUntilBackslash(char *str)
 {
-	int i, len;
+    int i, len;
 
-	len = strlen(str);
+    len = strlen(str);
 
-	for(i=(len-1); i>= 0; i--) {
-		if(str[i] == '\\') {
-			break;
-		}
+    for(i=(len-1); i>= 0; i--) {
+        if(str[i] == '\\') {
+            break;
+        }
 
-		str[i] = 0;
-	}
+        str[i] = 0;
+    }
 }
 
 // make single ACSI read command by the params set in the commandLong buffer
@@ -166,7 +168,7 @@ BYTE ce_acsiReadCommandLong(void)
 // make single ACSI read command by the params set in the commandShort buffer
 BYTE ce_acsiReadCommand(void)
 {
-    memset(pBfr, 0, 512);              											// clear the buffer
+    memset(pBfr, 0, 512);                                                       // clear the buffer
 
 #ifdef NODEVICE
     return 0;
@@ -187,13 +189,13 @@ BYTE ce_acsiWriteBlockCommand(void)
     return 0;
 #endif
 
-	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, sectorCount);	// issue the command and check the result 
+    (*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, sectorCount);    // issue the command and check the result 
 
     if(!hdIf.success) {
         return 0xff;
     }
 
-	return hdIf.statusByte;
+    return hdIf.statusByte;
 }
 
 BYTE getLowestDrive(void)
@@ -217,15 +219,15 @@ void createFullPath(char *fullPath, char *filePath, char *fileName)
 {
     strcpy(fullPath, filePath);
 
-	removeLastPartUntilBackslash(fullPath);				// remove the search wildcards from the end
+    removeLastPartUntilBackslash(fullPath);             // remove the search wildcards from the end
 
-	if(strlen(fullPath) > 0) {
-		if(fullPath[ strlen(fullPath) - 1] != '\\') {	// if the string doesn't end with backslash, add it
-			strcat(fullPath, "\\");
-		}
-	}
+    if(strlen(fullPath) > 0) {
+        if(fullPath[ strlen(fullPath) - 1] != '\\') {   // if the string doesn't end with backslash, add it
+            strcat(fullPath, "\\");
+        }
+    }
 
-    strcat(fullPath, fileName);							// add the filename
+    strcat(fullPath, fileName);                         // add the filename
 }
 
 void logMsg(char *logMsg)

@@ -45,6 +45,12 @@ void setVisible(int objId, BYTE visible)
     }
 }
 
+BYTE isSelected(int objIdx)
+{
+    OBJECT *obj = &cd->tree[objIdx];
+    return (obj->ob_state & OS_SELECTED) != 0;  // is selected if selected bit not zero
+}
+
 void selectButton(int btnIdx, BYTE select)
 {
     OBJECT *btn = &cd->tree[btnIdx];

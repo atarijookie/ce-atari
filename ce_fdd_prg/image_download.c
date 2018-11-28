@@ -30,7 +30,7 @@ BYTE handleWriteSearch(BYTE key);
 void showSearchString(void);
 void showPageNumber(void);
 void imageSearch(void);
-void getResultsPage(int page);
+void getResultsAndUpdatePageObjects(int page);
 void showResults(void);
 void selectDestinationDir(void);
 BYTE refreshImageList(void);
@@ -130,7 +130,7 @@ void showResultsRow(int rowNo, char *content)
     idx[3] = btnsInsert3[rowNo];
     idx[4] = btnsContent[rowNo];
 
-    for(i=0; i<OBJS_IN_ROW; i++) {  // based on the ROW_OBJ_ flags for each button / string do hide, show, or select item
+    for(i=0; i<OBJS_IN_ROW; i++) {     // based on the ROW_OBJ_ flags for each button / string do hide, show, or select item
         switch(content[i]) {
             // hidden object? set HIDE flag
             case ROW_OBJ_HIDDEN:    cd->tree[ idx[i] ].ob_flags |= OF_HIDETREE;
@@ -207,26 +207,28 @@ void getInsertButtonRowAndSlot(const int16_t btn, int *row, int *slot)
     *row = -1;
 }
 
+void enablePageButtons(void)
+{
+    enableButton(otherObjs[PAGE_PREV], search.pageCurrent != 0);   // enable PREV button if not 0th page
+    enableButton(otherObjs[PAGE_NEXT], search.pageCurrent < (search.pagesCount -1));   // enable NEXT button if not last page
+}
+
+// handles page prev / page next click
 void handlePrevNextPage(int16_t btn)
 {
     if(btn == otherObjs[PAGE_PREV]) {      // prev page?
         if(search.pageCurrent > 0) {            // not the first page? move to previous page
             search.pageCurrent--;
-            getResultsPage(search.pageCurrent); // get previous results
+            getResultsAndUpdatePageObjects(search.pageCurrent); // get previous results
         }
     }
 
     if(btn == otherObjs[PAGE_NEXT]) {      // next page?
         if(search.pageCurrent < (search.pagesCount - 1)) {  // not the last page? move to next page
            search.pageCurrent++;
-           getResultsPage(search.pageCurrent);  // get next results
+           getResultsAndUpdatePageObjects(search.pageCurrent);  // get next results
         }
     }
-
-    enableButton(otherObjs[PAGE_PREV], search.pageCurrent != 0);   // enable PREV button if not 0th page
-    enableButton(otherObjs[PAGE_NEXT], search.pageCurrent < (search.pagesCount -1));   // enable NEXT button if not last page
-
-    showPageNumber();
 }
 
 void showSearchString(void)
@@ -243,6 +245,35 @@ void showSearchString(void)
     }
 
     setObjectString(otherObjs[SEARCH], tmp);
+}
+
+BYTE unselectOldSelectNewImage(int newRow, int slot)
+{
+    const int16_t *btnsInsert;
+
+    // get pointer to array which holds obj indexes for this slot (column of buttons)
+    switch(slot) {
+        case 1: btnsInsert = btnsInsert1; break;
+        case 2: btnsInsert = btnsInsert2; break;
+        case 3: btnsInsert = btnsInsert3; break;
+        default: return FALSE;
+    }
+
+    int i, oldRow = -1;                 // no old row found yet
+    for(i=0; i<ITEM_ROWS; i++) {        // try to find old (currently selected) button
+        if(isSelected(btnsInsert[i])) { // this one is selected? good, store row and quit
+            oldRow = i;
+            break;
+        }
+    }
+
+    if(oldRow != newRow) {              // if old row and new row are not the same
+        selectButton(btnsInsert[oldRow], FALSE);    // unselect old
+        selectButton(btnsInsert[newRow], TRUE);     // select new
+        return TRUE;                    // selection changed
+    }
+
+    return FALSE;                       // selection not changed
 }
 
 void downloadHandleKeyPress(int16_t key)
@@ -322,17 +353,18 @@ BYTE gem_imageDownload(void)
 
     showDialog(TRUE);               // show dialog
 
-    showPageNumber();
-    getStatus();
     imageSearch();
-    showResults();
+    getResultsAndUpdatePageObjects(0);
+    getStatus();
 
     BYTE retVal = KEY_F10;
 
     int16_t btnWaitFor = WAITFOR_PRESSED;
 
     while(1) {
-        // TODO: make result content longer - for hi and mid res, possibly cropping on low res
+        // TODO: download redraw only row 
+        // TODO: keep previous search results, after retrieving new ones redraw only changed items
+        // TODO: search redraw after each letter too slow
 
         int16_t msg_buf[8];
         int16_t dum, key, event_type;
@@ -366,7 +398,7 @@ BYTE gem_imageDownload(void)
             }
 
             if(refreshDataAndRedraw) {              // should do a refresh?
-                getResultsPage(search.pageCurrent); // refresh current page data
+                getResultsAndUpdatePageObjects(search.pageCurrent); // refresh current page data
             }
         }
 
@@ -406,8 +438,12 @@ BYTE gem_imageDownload(void)
 
         getInsertButtonRowAndSlot(exitobj, &row, &slot);    // was this insert button press?
 
-        if(row != -1) {         // handle insert press
-            insertPageRowIntoSlot(search.pageCurrent, row, slot);
+        if(row != -1) {             // handle insert press
+            BYTE selectionChanged = unselectOldSelectNewImage(row, slot);
+
+            if(selectionChanged) {  // insert only if selection changed
+                insertPageRowIntoSlot(search.pageCurrent, row, slot - 1);
+            }
             continue;
         }
     }
@@ -458,8 +494,6 @@ void insertPageRowIntoSlot(WORD page, BYTE row, BYTE slot)
     if(res != FDD_OK) {                                         // bad? just be silent, CE_FDD.PRG doesn't know if this image is downloaded, so don't show warning
         return;
     }
-
-    getResultsPage(search.pageCurrent);                         // reload current page from host
 }
 
 void downloadPageRowToStorage(WORD page, BYTE row)
@@ -486,7 +520,7 @@ void downloadPageRowToStorage(WORD page, BYTE row)
         return;
     }
 
-    getResultsPage(search.pageCurrent);                         // reload current page from host
+    getResultsAndUpdatePageObjects(search.pageCurrent);         // reload current page from host
 }
 
 void imageSearch(void)
@@ -507,7 +541,7 @@ void imageSearch(void)
         return;
     }
 
-    getResultsPage(0);
+    getResultsAndUpdatePageObjects(0);
 }
 
 #define BYTES_TO_INT(HI,LO)    ( (((int) HI) << 8) | ((int) LO) )
@@ -532,6 +566,14 @@ void getResultsPage(int page)
     search.pagesCount  = BYTES_TO_INT(pBfr[2], pBfr[3]);   // get total page count
 
     memcpy(searchContent, pBfr + 4, ITEM_ROWS * ROW_LENGTH);    // copy the data
+}
+
+void getResultsAndUpdatePageObjects(int page)
+{
+    getResultsPage(page);
+    enablePageButtons();
+    showPageNumber();
+    showResults();
 }
 
 BYTE handleWriteSearch(BYTE key)

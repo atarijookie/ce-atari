@@ -17,6 +17,7 @@ extern Dialog *cd;  // cd - pointer to Current Dialog, so we don't have to pass 
 
 void redrawObject(int16_t objId);
 void setVisible(int objId, BYTE visible);
+BYTE isSelected(int objIdx);
 void selectButton(int btnIdx, BYTE select);
 void enableButton(int btnIdx, BYTE enabled);
 void setObjectString(int16_t objId, const char *newString);
