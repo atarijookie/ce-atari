@@ -79,12 +79,36 @@ Dialog dialogDownload;              // dialog with image download content
 #define WAITFOR_PRESSED     1
 #define WAITFOR_RELEASED    0
 
+// helper indices in otherObjs
+#define EXIT2       0
+#define LOADER      1
+#define PAGE_PREV   2
+#define PAGES       3
+#define PAGE_NEXT   4
+#define STATUS      5
+#define SEARCH      6
+
 #define ITEM_ROWS  8
-const int16_t btnsDownload[ITEM_ROWS] = { D0,  D1,  D2,  D3,  D4,  D5,  D6,  D7};
-const int16_t btnsInsert1[ITEM_ROWS]  = {I01, I11, I21, I31, I41, I51, I61, I71};
-const int16_t btnsInsert2[ITEM_ROWS]  = {I02, I12, I22, I32, I42, I52, I62, I72};
-const int16_t btnsInsert3[ITEM_ROWS]  = {I03, I13, I23, I33, I43, I53, I63, I73};
-const int16_t btnsContent[ITEM_ROWS]  = { C0,  C1,  C2,  C3,  C4,  C5,  C6,  C7};
+const int16_t btnsDownloadNarrow[ITEM_ROWS] = { D0,  D1,  D2,  D3,  D4,  D5,  D6,  D7};
+const int16_t btnsInsert1Narrow[ITEM_ROWS]  = {I01, I11, I21, I31, I41, I51, I61, I71};
+const int16_t btnsInsert2Narrow[ITEM_ROWS]  = {I02, I12, I22, I32, I42, I52, I62, I72};
+const int16_t btnsInsert3Narrow[ITEM_ROWS]  = {I03, I13, I23, I33, I43, I53, I63, I73};
+const int16_t btnsContentNarrow[ITEM_ROWS]  = { C0,  C1,  C2,  C3,  C4,  C5,  C6,  C7};
+const int16_t otherObjsNarrow[7] = {BTN_EXIT2, BTN_LOADER, BTN_PAGE_PREV, STR_PAGES, BTN_PAGE_NEXT, STR_STATUS, STR_SEARCH};
+
+const int16_t btnsDownloadWide[ITEM_ROWS] = { D0W,  D1W,  D2W,  D3W,  D4W,  D5W,  D6W,  D7W};
+const int16_t btnsInsert1Wide[ITEM_ROWS]  = {I01W, I11W, I21W, I31W, I41W, I51W, I61W, I71W};
+const int16_t btnsInsert2Wide[ITEM_ROWS]  = {I02W, I12W, I22W, I32W, I42W, I52W, I62W, I72W};
+const int16_t btnsInsert3Wide[ITEM_ROWS]  = {I03W, I13W, I23W, I33W, I43W, I53W, I63W, I73W};
+const int16_t btnsContentWide[ITEM_ROWS]  = { C0W,  C1W,  C2W,  C3W,  C4W,  C5W,  C6W,  C7W};
+const int16_t otherObjsWide[7] = {BTN_EXIT2W, BTN_LOADERW, BTN_PAGE_PREVW, STR_PAGESW, BTN_PAGE_NEXTW, STR_STATUSW, STR_SEARCHW};
+
+const int16_t *btnsDownload;
+const int16_t *btnsInsert1;
+const int16_t *btnsInsert2;
+const int16_t *btnsInsert3;
+const int16_t *btnsContent;
+const int16_t *otherObjs;
 
 #define ROW_OBJ_HIDDEN      0
 #define ROW_OBJ_VISIBLE     1
@@ -185,22 +209,22 @@ void getInsertButtonRowAndSlot(const int16_t btn, int *row, int *slot)
 
 void handlePrevNextPage(int16_t btn)
 {
-    if(btn == BTN_PAGE_PREV) {      // prev page?
+    if(btn == otherObjs[PAGE_PREV]) {      // prev page?
         if(search.pageCurrent > 0) {            // not the first page? move to previous page
             search.pageCurrent--;
             getResultsPage(search.pageCurrent); // get previous results
         }
     }
 
-    if(btn == BTN_PAGE_NEXT) {      // next page?
+    if(btn == otherObjs[PAGE_NEXT]) {      // next page?
         if(search.pageCurrent < (search.pagesCount - 1)) {  // not the last page? move to next page
            search.pageCurrent++;
            getResultsPage(search.pageCurrent);  // get next results
         }
     }
 
-    enableButton(BTN_PAGE_PREV, search.pageCurrent != 0);   // enable PREV button if not 0th page
-    enableButton(BTN_PAGE_NEXT, search.pageCurrent < (search.pagesCount -1));   // enable NEXT button if not last page
+    enableButton(otherObjs[PAGE_PREV], search.pageCurrent != 0);   // enable PREV button if not 0th page
+    enableButton(otherObjs[PAGE_NEXT], search.pageCurrent < (search.pagesCount -1));   // enable NEXT button if not last page
 
     showPageNumber();
 }
@@ -218,7 +242,7 @@ void showSearchString(void)
         }
     }
 
-    setObjectString(STR_SEARCH, tmp);
+    setObjectString(otherObjs[SEARCH], tmp);
 }
 
 void downloadHandleKeyPress(int16_t key)
@@ -270,13 +294,30 @@ BYTE gem_imageDownload(void)
 
     scrRez = Getrez();                                              // get screen resolution into variable
 
+    if(scrRez == 0) {   // low res - narrow dialog
+        btnsDownload = btnsDownloadNarrow;
+        btnsInsert1 = btnsInsert1Narrow;
+        btnsInsert2 = btnsInsert2Narrow;
+        btnsInsert3 = btnsInsert3Narrow;
+        btnsContent = btnsContentNarrow;
+        otherObjs = otherObjsNarrow;
+    } else {            // other res - wide dialog
+        btnsDownload = btnsDownloadWide;
+        btnsInsert1 = btnsInsert1Wide;
+        btnsInsert2 = btnsInsert2Wide;
+        btnsInsert3 = btnsInsert3Wide;
+        btnsContent = btnsContentWide;
+        otherObjs = otherObjsWide;
+    }
+
     BYTE res = searchInit();                                        // try to initialize
 
     if(res == 0) {                                                  // failed to initialize? return to floppy config screen
         return KEY_F9;
     }
 
-    rsrc_gaddr(R_TREE, DOWNLOAD, &dialogDownload.tree); // get address of dialog tree
+    int16_t treeId = (scrRez == 0) ? DOWNLOAD : DOWNLOAD_WIDE;
+    rsrc_gaddr(R_TREE, treeId, &dialogDownload.tree); // get address of dialog tree
     cd = &dialogDownload;           // set pointer to current dialog, so all helper functions will work with that dialog
 
     showDialog(TRUE);               // show dialog
@@ -339,17 +380,17 @@ BYTE gem_imageDownload(void)
             continue;
         }
 
-        if(exitobj == BTN_EXIT2) {
+        if(exitobj == otherObjs[EXIT2]) {
             retVal = KEY_F10;   // KEY_F10 - quit
             break;
         }
 
-        if(exitobj == BTN_LOADER) {
+        if(exitobj == otherObjs[LOADER]) {
             retVal = KEY_F9;   // KEY_F9 -- back to images loading / config dialog
             break;
         }
 
-        if(exitobj == BTN_PAGE_PREV || exitobj == BTN_PAGE_NEXT) {  // prev/next page button pressed?
+        if(exitobj == otherObjs[PAGE_PREV] || exitobj == otherObjs[PAGE_NEXT]) {  // prev/next page button pressed?
             handlePrevNextPage(exitobj);
             continue;
         }
@@ -550,9 +591,9 @@ void showPageNumber(void)
     }
 
     // hide/show string and buttons
-    setVisible(STR_PAGES, pagesUiVisible);
-    setVisible(BTN_PAGE_PREV, pagesUiVisible);
-    setVisible(BTN_PAGE_NEXT, pagesUiVisible);
+    setVisible(otherObjs[PAGES], pagesUiVisible);
+    setVisible(otherObjs[PAGE_PREV], pagesUiVisible);
+    setVisible(otherObjs[PAGE_NEXT], pagesUiVisible);
 }
 
 BYTE searchInit(void)
@@ -600,5 +641,5 @@ void getStatus(void)
     status.prevDownloadCount = status.downloadCount;        // make a copy of previous download files count
     status.downloadCount = pBfr[2];             // how many files are still downloading?
 
-    setObjectString(STR_STATUS, (const char *) (pBfr + 4)); // show status line
+    setObjectString(otherObjs[STATUS], (const char *) (pBfr + 4)); // show status line
 }
