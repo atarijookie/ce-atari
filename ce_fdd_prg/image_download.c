@@ -146,6 +146,10 @@ void showResultsRow(int rowNo, char *content, char *prevContent)
             continue;
         }
 
+        if(idx[i] < 0 || idx[i] > cd->tree->ob_tail) {    // index too small or too big? skip it
+            continue;
+        }
+
         switch(content[i]) {
             // hidden object? set HIDE flag
             case ROW_OBJ_HIDDEN:    cd->tree[ idx[i] ].ob_flags |= OF_HIDETREE;
@@ -382,7 +386,6 @@ BYTE gem_imageDownload(void)
     while(1) {
         // TODO: download redraw only row
         // TODO: fix redraw width and height - now it's whole dialog width and height, should be only component width and height
-        // TODO: add checking of index on object access to avoid data corruption
 
         int16_t msg_buf[8];
         int16_t dum, key, event_type;

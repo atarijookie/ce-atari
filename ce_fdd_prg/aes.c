@@ -25,6 +25,10 @@ void redrawObject(int16_t objId)
         return;
     }
 
+    if(objId < 0 || objId > cd->tree->ob_tail) {    // index too small or too big? quit
+        return;
+    }
+
     OBJECT *obj = &cd->tree[objId];
 
     int16_t ox, oy;
@@ -39,11 +43,19 @@ void redrawDialog(void)
         return;
     }
 
+    if(!cd || !cd->tree) {          // no current dialog or tree?
+        return;
+    }
+
     objc_draw(cd->tree, ROOT, MAX_DEPTH, cd->xdial, cd->ydial, cd->wdial, cd->hdial);
 }
 
 void setVisible(int objId, BYTE visible)
 {
+    if(objId < 0 || objId > cd->tree->ob_tail) {    // index too small or too big? quit
+        return;
+    }
+
     // object was visible, if the flag HIDETREE is zero
     BYTE wasVisible = (cd->tree[ objId ].ob_flags & OF_HIDETREE) == 0;
 
@@ -60,12 +72,20 @@ void setVisible(int objId, BYTE visible)
 
 BYTE isSelected(int objIdx)
 {
+    if(objIdx < 0 || objIdx > cd->tree->ob_tail) {    // index too small or too big? quit
+        return FALSE;
+    }
+
     OBJECT *obj = &cd->tree[objIdx];
     return (obj->ob_state & OS_SELECTED) != 0;  // is selected if selected bit not zero
 }
 
 void selectButton(int btnIdx, BYTE select)
 {
+    if(btnIdx < 0 || btnIdx > cd->tree->ob_tail) {    // index too small or too big? quit
+        return;
+    }
+
     OBJECT *btn = &cd->tree[btnIdx];
 
     if(select) {
@@ -79,6 +99,10 @@ void selectButton(int btnIdx, BYTE select)
 
 void enableButton(int btnIdx, BYTE enabled)
 {
+    if(btnIdx < 0 || btnIdx > cd->tree->ob_tail) {    // index too small or too big? quit
+        return;
+    }
+
     OBJECT *btn = &cd->tree[btnIdx];
 
     if(enabled) {   // if enabled, remove DISABLED flag
@@ -92,6 +116,10 @@ void enableButton(int btnIdx, BYTE enabled)
 
 void setObjectString(int16_t objId, const char *newString)
 {
+    if(objId < 0 || objId > cd->tree->ob_tail) {    // index too small or too big? quit
+        return;
+    }
+
     OBJECT *obj = &cd->tree[objId];
     int maxLen = 0;                             // no allowed length until we find out
 
@@ -120,6 +148,10 @@ void setObjectString(int16_t objId, const char *newString)
 
 void showDialog(BYTE show)
 {
+    if(!cd || !cd->tree) {  // if current dialog not set or tree not set, quit
+        return;
+    }
+
     if(show) {  // on show
         form_center(cd->tree, &cd->xdial, &cd->ydial, &cd->wdial, &cd->hdial);  // center object
         form_dial(0, 0, 0, 0, 0, cd->xdial, cd->ydial, cd->wdial, cd->hdial);   // reserve screen space for dialog
@@ -203,4 +235,3 @@ void gem_deinit(void)
     rsrc_free();            // free resource from memory
     appl_exit();
 }
-
