@@ -190,8 +190,6 @@ void showComErrorDialog(void)
 
 BYTE gem_init(void)
 {
-    graf_mouse(M_ON, 0);            // Display the mouse cursor
-
     int16_t work_in[11], i, work_out[64];
     gl_apid = appl_init();
 

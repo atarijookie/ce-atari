@@ -73,23 +73,18 @@ int main(int argc, char** argv)
     BYTE drive = getLowestDrive();  // get the lowest HDD letter and use it in the file selector
     filePath[0] = drive;
 
-    char *params = (char *) argv;   // get pointer to params (path to file)
-    int paramsLength = 0;
-    char *path = NULL;
+#ifdef OUTPUT_TTP
+    // if compiled with OUTPUT_TTP, this app will work without GEM UI - as the TTP
+    char *params = (char *) argv;           // get pointer to params (path to file)
+    int   paramsLength = (int) params[0];   // 0th byte -- strlen(arguments)
+    char *path = params + 1;                // path to file
 
-    if(params) {                    // if got valid pointer to args
-        paramsLength = (int) params[0];
-        path = params + 1;
-    }
+    handleCmdlineUpload(path, paramsLength);
+    Mfree(pBfrOrig);
+    return 0;
+#endif
 
-    // some argument was given? use as TTP
-    if(paramsLength != 0) {
-        handleCmdlineUpload(path, paramsLength);
-        Mfree(pBfrOrig);
-        return 0;
-    }
-
-    // no argument was given? use as PRG with GEM GUI
+    // if compiled without OUTPUT_TTP, this app will work with GEM UI - as the PRG
     BYTE res = gem_init();          // initialize GEM stuff
 
     if(!res) {                      // gem init failed? quit then

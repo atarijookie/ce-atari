@@ -50,7 +50,7 @@ void handleCmdlineUpload(char *path, int paramsLength)
     (void) Cconws("\33f");      // cursor off
     (void) Cconws("\33p[  CosmosEx floppy TTP  ]\r\n[  by Jookie 2014-2018  ]\33q\r\n\r\n");
 
-    path[paramsLength] = 0;                     // terminate path
+    path[paramsLength] = 0;                 // terminate path
 
     // if path is 0 or 1 byte, try to find first image in folder
     // if path is 2 or more bytes, try to load it directly as is
