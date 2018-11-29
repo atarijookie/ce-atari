@@ -384,9 +384,6 @@ BYTE gem_imageDownload(void)
     int16_t btnWaitFor = WAITFOR_PRESSED;
 
     while(1) {
-        // TODO: download redraw only row
-        // TODO: fix redraw width and height - now it's whole dialog width and height, should be only component width and height
-
         int16_t msg_buf[8];
         int16_t dum, key, event_type;
         int16_t ev_mmox, ev_mmoy, ev_mmbutton;

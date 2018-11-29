@@ -86,7 +86,6 @@ void handleCmdlineUpload(char *path, int paramsLength)
     found = Supexec(findDevice);
 
     if(!found) {                                    // not found? quit
-        sleep(3);
         return;
     }
 

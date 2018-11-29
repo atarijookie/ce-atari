@@ -190,6 +190,8 @@ void showComErrorDialog(void)
 
 BYTE gem_init(void)
 {
+    graf_mouse(M_ON, 0);            // Display the mouse cursor
+
     int16_t work_in[11], i, work_out[64];
     gl_apid = appl_init();
 
@@ -199,10 +201,10 @@ BYTE gem_init(void)
     }
 
     wind_update(BEG_UPDATE);
-    graf_mouse(HOURGLASS, 0);
+    graf_mouse(BUSY_BEE, 0);        // Change the current mouse cursor shape.
 
     int16_t res = rsrc_load("CE_FDD.RSC");
-    graf_mouse(ARROW, 0);
+    graf_mouse(ARROW, 0);           // Change the current mouse cursor shape.
 
     if(!res) {
         (void) Cconws("rsrc_load() failed\r\n");

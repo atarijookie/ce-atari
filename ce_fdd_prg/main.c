@@ -61,8 +61,8 @@ int main(int argc, char** argv)
     }
 
     DWORD val = (DWORD) pBfrOrig;
-    pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);                  // create even pointer
-    pBfrCnt   = pBfr - 2;                                           // this is previous pointer - size of WORD
+    pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);  // create even pointer
+    pBfrCnt   = pBfr - 2;           // this is previous pointer - size of WORD
 
     pDmaBuffer = pBfr;
 
@@ -70,7 +70,7 @@ int main(int argc, char** argv)
     strcpy(filePath, "C:\\*.*");
     memset(fileName, 0, 256);
 
-    BYTE drive = getLowestDrive();                                  // get the lowest HDD letter and use it in the file selector
+    BYTE drive = getLowestDrive();  // get the lowest HDD letter and use it in the file selector
     filePath[0] = drive;
 
     char *params = (char *) argv;   // get pointer to params (path to file)
