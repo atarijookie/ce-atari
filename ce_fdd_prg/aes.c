@@ -21,12 +21,25 @@ Dialog *cd;         // cd - pointer to current dialog, so we don't have to pass 
 
 void redrawObject(int16_t objId)
 {
+    if(cd->drawingDisabled) {       // if drawing now disabled, don't do anything
+        return;
+    }
+
     OBJECT *obj = &cd->tree[objId];
 
     int16_t ox, oy;
     objc_offset(cd->tree, objId, &ox, &oy);          // get current screen coordinates of object
 
     objc_draw(cd->tree, ROOT, MAX_DEPTH, ox - 2, oy - 2, obj->ob_width + 4, obj->ob_height + 4); // draw object tree, but clip only to text position and size + some pixels more around to hide button completely
+}
+
+void redrawDialog(void)
+{
+    if(cd->drawingDisabled) {       // if drawing now disabled, don't do anything
+        return;
+    }
+
+    objc_draw(cd->tree, ROOT, MAX_DEPTH, cd->xdial, cd->ydial, cd->wdial, cd->hdial);
 }
 
 void setVisible(int objId, BYTE visible)
@@ -108,8 +121,8 @@ void setObjectString(int16_t objId, const char *newString)
 void showDialog(BYTE show)
 {
     if(show) {  // on show
-        form_center(cd->tree, &cd->xdial, &cd->ydial, &cd->wdial, &cd->hdial);       // center object
-        form_dial(0, 0, 0, 0, 0, cd->xdial, cd->ydial, cd->wdial, cd->hdial);       // reserve screen space for dialog
+        form_center(cd->tree, &cd->xdial, &cd->ydial, &cd->wdial, &cd->hdial);  // center object
+        form_dial(0, 0, 0, 0, 0, cd->xdial, cd->ydial, cd->wdial, cd->hdial);   // reserve screen space for dialog
         objc_draw(cd->tree, ROOT, MAX_DEPTH, cd->xdial, cd->ydial, cd->wdial, cd->hdial);  // draw object tree
     } else {    // on hide
         form_dial (3, 0, 0, 0, 0, cd->xdial, cd->ydial, cd->wdial, cd->hdial);      // release screen space

@@ -413,7 +413,7 @@ void swapImage(int index)
 
     BYTE res = Supexec(ce_acsiReadCommand);
 
-	if(res != FDD_OK) {                         // bad? write error
+    if(res != FDD_OK) {                         // bad? write error
         showComErrorDialog();
     }
 }

@@ -165,9 +165,6 @@ void showResultsRow(int rowNo, char *content, char *prevContent)
 
             setObjectString( idx[i], content + CONTENT_OFFSET);
         }
-
-        // now redraw object
-        redrawObject( idx[i] );
     }
 }
 
@@ -363,12 +360,11 @@ BYTE gem_imageDownload(void)
 
     int16_t treeId = (scrRez == 0) ? DOWNLOAD : DOWNLOAD_WIDE;
     rsrc_gaddr(R_TREE, treeId, &dialogDownload.tree); // get address of dialog tree
-    cd = &dialogDownload;           // set pointer to current dialog, so all helper functions will work with that dialog
+    cd = &dialogDownload;   // set pointer to current dialog, so all helper functions will work with that dialog
 
-    showDialog(TRUE);               // show dialog
+    showDialog(TRUE);
 
-    imageSearch();
-    getResultsAndUpdatePageObjects(0);
+    imageSearch();          // get first results, fill it to dialog, (first) drawing of dialog
     getStatus();
 
     BYTE retVal = KEY_F10;
@@ -586,10 +582,16 @@ void getResultsPage(int page)
 
 void getResultsAndUpdatePageObjects(int page)
 {
-    getResultsPage(page);
-    enablePageButtons();
-    showPageNumber();
-    showResults();
+    getResultsPage(page);           // get results from device
+
+    cd->drawingDisabled = TRUE;     // disable partial redraws
+
+    enablePageButtons();            // enable / disable page buttons
+    showPageNumber();               // show page numbers
+    showResults();                  // display results in dialog
+
+    cd->drawingDisabled = FALSE;    // enable redrawing
+    redrawDialog();                 // redraw dialog
 }
 
 BYTE handleWriteSearch(BYTE key)

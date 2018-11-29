@@ -49,7 +49,7 @@ void handleCmdlineUpload(char *path, int paramsLength);
 //#define NODEVICE
 
 // ------------------------------------------------------------------
-int main( int argc, char* argv[] )
+int main(int argc, char** argv)
 {
     Goto_pos(0,0);
     pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
@@ -73,9 +73,14 @@ int main( int argc, char* argv[] )
     BYTE drive = getLowestDrive();                                  // get the lowest HDD letter and use it in the file selector
     filePath[0] = drive;
 
-    char *params        = (char *) argv;            // get pointer to params (path to file)
-    int paramsLength    = (int) params[0];
-    char *path          = params + 1;
+    char *params = (char *) argv;   // get pointer to params (path to file)
+    int paramsLength = 0;
+    char *path = NULL;
+
+    if(params) {                    // if got valid pointer to args
+        paramsLength = (int) params[0];
+        path = params + 1;
+    }
 
     // some argument was given? use as TTP
     if(paramsLength != 0) {
@@ -85,7 +90,6 @@ int main( int argc, char* argv[] )
     }
 
     // no argument was given? use as PRG with GEM GUI
-
     BYTE res = gem_init();          // initialize GEM stuff
 
     if(!res) {                      // gem init failed? quit then
