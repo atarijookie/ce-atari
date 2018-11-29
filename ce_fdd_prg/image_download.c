@@ -75,6 +75,13 @@ void insertPageRowIntoSlot(WORD page, BYTE row, BYTE slot);
 void downloadPageRowToStorage(WORD page, BYTE row);
 
 // ------------------------------------------------------------------
+
+DWORD lastKeyPressTime;     // last time the key was pressed
+BYTE searchNotApplied;      // set to TRUE when (after passing some time after last key press) should retrieve search results
+
+DWORD lastStatusUpdate;     // last time when we checked and showed status
+
+// ------------------------------------------------------------------
 Dialog dialogDownload;              // dialog with image download content
 
 #define WAITFOR_PRESSED     1
@@ -298,9 +305,10 @@ void downloadHandleKeyPress(int16_t key)
     if((key >= 'a' && key <='z') || key == ' ' || (key >= 0 && key <= 9) || key == KEY_ESC || key == KEY_BACKSP) {
         BYTE changed = handleWriteSearch(key);
 
-        if(changed) {               // if the search string changed, search for images
+        if(changed) {                               // if the search string changed, search for images after some while
+            lastKeyPressTime = getTicksAsUser();    // last time the key was pressed
+            searchNotApplied = TRUE;                // should do imageSearch() soon
             showSearchString();
-            imageSearch();
         }
     }
 }
@@ -364,7 +372,7 @@ BYTE gem_imageDownload(void)
 
     showDialog(TRUE);
 
-    imageSearch();          // get first results, fill it to dialog, (first) drawing of dialog
+    imageSearch();          // get first results, fill it to dialog, drawing of dialog
     getStatus();
 
     BYTE retVal = KEY_F10;
@@ -373,9 +381,8 @@ BYTE gem_imageDownload(void)
 
     while(1) {
         // TODO: download redraw only row
-        // TODO: keep previous search results, after retrieving new ones redraw only changed items
-        // TODO: maybe first fill all the rows using showResults() and then do a single redraw of whole form instead of individual items?
-        // TODO: search redraw after each letter too slow
+        // TODO: fix redraw width and height - now it's whole dialog width and height, should be only component width and height
+        // TODO: add checking of index on object access to avoid data corruption
 
         int16_t msg_buf[8];
         int16_t dum, key, event_type;
@@ -386,7 +393,7 @@ BYTE gem_imageDownload(void)
             0,0,0,0,0,      // int ev_mm1flags, int ev_mm1x, int ev_mm1y, int ev_mm1width, int ev_mm1height,    | short EnterExit1, short In1X, short In1Y, short In1W, short In1H,
             0,0,0,0,0,      // int ev_mm2flags, int ev_mm2x, int ev_mm2y, int ev_mm2width, int ev_mm2height,    | short EnterExit2, short In2X, short In2Y, short In2W, short In2H,
             msg_buf,        // int *ev_mmgpbuff,                                                                | short MesagBuf[],
-            1000,           // original TOS has this as 2 * int16_t, crossmint has this as unsigned long -- int ev_mtlocount, int ev_mthicount, | unsigned long Interval,
+            200,            // original TOS has this as 2 * int16_t, crossmint has this as unsigned long -- int ev_mtlocount, int ev_mthicount, | unsigned long Interval,
             &ev_mmox, &ev_mmoy, &ev_mmbutton,   // int *ev_mmox, int *ev_mmoy, int *ev_mmbutton,                | short *OutX, short *OutY, short *ButtonState
             &dum,           // int *ev_mmokstate,                                                               | short *KeyState,
             &key, &dum);    // int *ev_mkreturn, int *ev_mbreturn                                               | short *Key, short *ReturnCount
@@ -396,20 +403,33 @@ BYTE gem_imageDownload(void)
         }
 
         if (event_type & MU_TIMER) {    // on timer, get status from device and show it
-            BYTE refreshDataAndRedraw = FALSE;
+            DWORD now = getTicksAsUser();
 
-            getStatus();                            // talk to CE to see the status
+            if((now - lastStatusUpdate) >= 200) {       // if typical period passed since the last status check, do it
+                lastStatusUpdate = now;                 // we're getting status now
+                BYTE refreshDataAndRedraw = FALSE;
 
-            if(status.downloadCount == 0 && status.prevDownloadCount > 0) {     // if we just finished downloading (not downloading now, but were downloading a while ago)
-                refreshDataAndRedraw = TRUE;        // do a refresh
+                getStatus();                            // talk to CE to see the status
+
+                if(status.downloadCount == 0 && status.prevDownloadCount > 0) {     // if we just finished downloading (not downloading now, but were downloading a while ago)
+                    refreshDataAndRedraw = TRUE;        // do a refresh
+                }
+
+                if(status.doWeHaveStorage != status.prevDoWeHaveStorage) {  // if user attached / detached drive, redraw all
+                    refreshDataAndRedraw = TRUE;        // do a refresh
+                }
+
+                if(refreshDataAndRedraw) {              // should do a refresh?
+                    getResultsAndUpdatePageObjects(search.pageCurrent); // refresh current page data
+                }
             }
+        }
 
-            if(status.doWeHaveStorage != status.prevDoWeHaveStorage) {  // if user attached / detached drive, redraw all
-                refreshDataAndRedraw = TRUE;        // do a refresh
-            }
-
-            if(refreshDataAndRedraw) {              // should do a refresh?
-                getResultsAndUpdatePageObjects(search.pageCurrent); // refresh current page data
+        if(searchNotApplied) {                      // if we need to apply the search
+            DWORD now = getTicksAsUser();           // get current time
+            if((now - lastKeyPressTime) >= 100) {   // if enough time passed since the last key press, handle it
+                searchNotApplied = FALSE;           // we're just handling this search
+                imageSearch();
             }
         }
 
