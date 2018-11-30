@@ -251,6 +251,7 @@ void ImageSilo::dumpStringsToBuffer(BYTE *bfr)      // copy the strings to buffe
 void ImageSilo::clearSlot(int index)
 {
     slots[index].imageFile.clear();
+    slots[index].imageFileNoExt.clear();
     slots[index].hostPath.clear();
     slots[index].atariSrcPath.clear();
 

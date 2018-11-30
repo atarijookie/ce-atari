@@ -142,10 +142,6 @@ void showResultsRow(int rowNo, char *content, char *prevContent)
     #define CONTENT_OFFSET      5
 
     for(i=0; i<OBJS_IN_ROW; i++) {     // based on the ROW_OBJ_ flags for each button / string do hide, show, or select item
-        if(i != IDX_OF_CONTENT && content[i] == prevContent[i]) {   // if this is not the position of content string  (it's a button) and hidden / visible / selected hasn't changed, don't redraw
-            continue;
-        }
-
         if(idx[i] < 0 || idx[i] > cd->tree->ob_tail) {    // index too small or too big? skip it
             continue;
         }
@@ -165,15 +161,8 @@ void showResultsRow(int rowNo, char *content, char *prevContent)
                                     cd->tree[ idx[i] ].ob_state |= OS_SELECTED;
                                     break;
         }
-
         // if we're processing content string
         if(i == IDX_OF_CONTENT) {
-            int stringsDifferent = strcmp(content + CONTENT_OFFSET, prevContent + CONTENT_OFFSET);        // compare new and old string
-
-            if(content[IDX_OF_CONTENT] == ROW_OBJ_HIDDEN || !stringsDifferent) {    // if content is hidden or strings not different, skip set and redraw
-                continue;
-            }
-
             setObjectString( idx[i], content + CONTENT_OFFSET);
         }
     }
@@ -376,6 +365,7 @@ BYTE gem_imageDownload(void)
 
     showDialog(TRUE);
 
+    showSearchString();     // show the empty search string (if switched to already once opened form)
     imageSearch();          // get first results, fill it to dialog, drawing of dialog
     getStatus();
 
@@ -462,6 +452,9 @@ BYTE gem_imageDownload(void)
         getDownloadButtonRow(exitobj, &row);    // was this download button press?
 
         if(row != -1) {         // handle download press
+            status.downloadCount++;             // now downloading at least one thing
+            lastStatusUpdate = getTicksAsUser(); // delay the status check a bit - fake that we've just retrieved the status
+
             selectButton(exitobj, TRUE);        // mark button as selected to tell user we're downloading it
             downloadPageRowToStorage(search.pageCurrent, row);
             continue;
