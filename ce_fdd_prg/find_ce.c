@@ -138,6 +138,7 @@ BYTE findDevice(void)
         if(scanDialogTree) {    // got dialog? show in dialog
             showStatusInGem("Device not found.");
             key = 'Q';
+            sleep(1);
         } else {                // no dialog? show in console
             (void) Cconws("\n\rDevice not found.\n\rPress any key to retry or 'Q' to quit.\n\r");
             key = Cnecin();
@@ -160,12 +161,7 @@ BYTE findCE(BYTE hddIf)
 
     if(!scanDialogTree) {           // no dialog?
         (void) Cconws("\n\rLooking for CosmosEx on ");
-
-        if(hddIf == IF_ACSI) {
-            (void) Cconws("ACSI: ");
-        } else {
-            (void) Cconws("SCSI: ");
-        }
+        (void) Cconws((hddIf == IF_ACSI) ? "ACSI: " : "SCSI: ");
     }
 
     hdd_if_select(hddIf);                               // select HDD IF
@@ -181,12 +177,16 @@ BYTE findCE(BYTE hddIf)
         } else {                // no dialog? show in console
             Cconout('0' + id);                          // write out BUS ID
         }
-    
+
         res = ce_identify(id, hddIf);                   // try to read the IDENTITY string 
-  
+
         if(res == 1) {                                  // if found the CosmosEx 
             if(scanDialogTree) {    // got dialog? show in dialog
-                showStatusInGem("Device found...");
+                char tmp[20];
+                strcpy(tmp, "Found on xCSI X ");
+                tmp[9] = (hddIf == IF_ACSI) ? 'A' : 'S';    // ACSI / SCSI 
+                tmp[14] = '0' + id;  // ID
+                showStatusInGem(tmp);
             } else {                // no dialog? show in console
                 (void) Cconws(" <-- found!\n\r");
             }
