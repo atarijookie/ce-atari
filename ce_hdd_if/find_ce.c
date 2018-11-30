@@ -16,21 +16,25 @@
 #include "translated.h"
 
 //--------------------------------------------------
-
-BYTE getMachineType(void);
+void getMachineType(void);
 BYTE machine;
 
 // following static vars are used for passing arguments from user-mode findDevice to supervisor-mode findDevice()
-static BYTE __whichIF, __whichDevType, __devTypeFound;
+static BYTE __whichIF, __whichDevType, __devTypeFound, __mode;
+
+void showStatusInGem(char *status);
+extern OBJECT *scanDialogTree;     // this gets filled by getScanDialogTree() and then used when scanning
 
 //--------------------------------------------------
 // do a generic SCSI INQUIRY command, return TRUE on success
-static BYTE scsi_inquiry(BYTE id)
+BYTE __id;
+
+static BYTE __scsi_inquiry(void)
 {
     #define SCSI_CMD_INQUIRY    0x12
 
     BYTE cmd[6] = {SCSI_CMD_INQUIRY, 0, 0, 0, 32, 0};
-    cmd[0] = (id << 5) | SCSI_CMD_INQUIRY;
+    cmd[0] = (__id << 5) | SCSI_CMD_INQUIRY;
 
     WORD dmaBuffer[256];                            // declare as WORD buffer to force WORD alignment
     BYTE *pDmaBuffer = (BYTE *)dmaBuffer;
@@ -51,15 +55,27 @@ static BYTE scsi_inquiry(BYTE id)
 
     return DEV_OTHER;                               // inquiry success, but it's somehting else than CE and CS
 }
+
+static BYTE scsi_inquiry(BYTE id)
+{
+    __id = id;
+
+    if(__mode == SUP_USER) {              // If the processor is in user mode - SUP_USER
+        return Supexec(__scsi_inquiry); // call through Supexec()
+    } else {                            // If the processor is in supervisor mode - SUP_SUPER
+        return __scsi_inquiry();        // call directly
+    }
+}
+
 //--------------------------------------------------
-static BYTE ce_identify(BYTE id)
+static BYTE __ce_identify(void)
 {
     BYTE cmd[] = {0, 'C', 'E', HOSTMOD_TRANSLATED_DISK, TRAN_CMD_IDENTIFY, 0};
 
     WORD dmaBuffer[256];                            // declare as WORD buffer to force WORD alignment
     BYTE *pDmaBuffer = (BYTE *)dmaBuffer;
 
-    cmd[0] = (id << 5);                             // cmd[0] = ACSI_id + TEST UNIT READY (0)
+    cmd[0] = (__id << 5);                           // cmd[0] = ACSI_id + TEST UNIT READY (0)
     memset(pDmaBuffer, 0, 512);                     // clear the buffer
 
     (*hdIf.cmd)(1, cmd, 6, pDmaBuffer, 1);          // issue the identify command and check the result
@@ -74,6 +90,49 @@ static BYTE ce_identify(BYTE id)
 
     return TRUE;                                    // success
 }
+
+static BYTE ce_identify(BYTE id)
+{
+    __id = id;
+
+    if(__mode == SUP_USER) {              // If the processor is in user mode - SUP_USER
+        return Supexec(__ce_identify);  // call through Supexec()
+    } else {                            // If the processor is in supervisor mode - SUP_SUPER
+        return __ce_identify();         // call directly
+    }
+}
+
+const char *hddIfToString(BYTE hddIf)
+{
+    switch(hddIf) {
+        case IF_ACSI:           return "ACSI";
+
+        case IF_SCSI_TT:
+        case IF_SCSI_FALCON:    return "SCSI";
+
+        case IF_CART:           return "CART";
+
+        default:                return "????";
+    }
+}
+
+void showGemFoundMessage(BYTE hddIf, BYTE id)
+{
+    if(!scanDialogTree) {
+        return;
+    }
+
+    char tmp[20];
+    strcpy(tmp, "Found on ");
+    strcat(tmp, hddIfToString(hddIf));
+    strcat(tmp, " X");          // placeholder for ID
+
+    int len = strlen(tmp);      // get length
+    tmp[len - 1] = '0' + id;    // store ID at the end
+
+    showStatusInGem(tmp);
+}
+
 //--------------------------------------------------
 // whichDevType -- which dev type we want to find DEV_CE, DEV_CS, DEV_OTHER
 // returns device ID (0 - 7), or -1 (0xff) if not found
@@ -82,23 +141,20 @@ BYTE findDeviceOnSingleIF(BYTE hddIf, BYTE whichDevType)
     BYTE id;
     BYTE devTypeFound;
 
-    (void) Cconws("\n\rLooking for device on ");
-
-    switch(hddIf) {
-        case IF_ACSI:           (void) Cconws("ACSI: "); break;
-
-        case IF_SCSI_TT:
-        case IF_SCSI_FALCON:    (void) Cconws("SCSI: "); break;
-
-        case IF_CART:           (void) Cconws("CART: "); break;
-
-        default:                (void) Cconws("????: "); break;
+    if(!scanDialogTree) {
+        (void) Cconws("\n\rLooking for device on ");
+        (void) Cconws(hddIfToString(hddIf));
+        (void) Cconws(": ");
     }
 
     hdd_if_select(hddIf);           // select HDD IF
 
     for(id=0; id<8; id++) {         // try to talk to all ACSI devices
-        Cconout('0' + id);          // write out BUS ID
+        if(!scanDialogTree) {
+            Cconout('0' + id);          // write out BUS ID
+        } else {
+
+        }
 
         devTypeFound = scsi_inquiry(id);    // do generic SCSI INQUIRY to find out if this device lives or not
         if(devTypeFound == DEV_NONE) {      // device not alive, skip further checks
@@ -109,7 +165,12 @@ BYTE findDeviceOnSingleIF(BYTE hddIf, BYTE whichDevType)
             BYTE res = ce_identify(id);    // try to read the IDENTITY string
 
             if(res == TRUE) {               // if found
-                (void) Cconws(" <-- found CE\n\r");
+                if(!scanDialogTree) {
+                    (void) Cconws(" <-- found CE\n\r");
+                } else {
+                    showGemFoundMessage(hddIf, id);
+                }
+
                 __devTypeFound = DEV_CE;    // found this dev type
                 return id;                  // return device ID (0 - 7)
             }
@@ -117,14 +178,24 @@ BYTE findDeviceOnSingleIF(BYTE hddIf, BYTE whichDevType)
 
         if(whichDevType & DEV_CS) {         // should be looking for CS?
             if(devTypeFound == DEV_CS) {    // if found
-                (void) Cconws(" <-- found CS\n\r");
+                if(!scanDialogTree) {
+                    (void) Cconws(" <-- found CS\n\r");
+                } else {
+                    showGemFoundMessage(hddIf, id);
+                }
+
                 __devTypeFound = DEV_CS;    // found this dev type
                 return id;                  // return device ID (0 - 7)
             }
         }
 
         if(whichDevType & DEV_OTHER) {      // should be looking for other device types? if it came here, it's not CE and not CS, so it's OTHER
-            (void) Cconws(" <-- found OTHER\n\r");
+            if(!scanDialogTree) {
+                (void) Cconws(" <-- found OTHER\n\r");
+            } else {
+                showGemFoundMessage(hddIf, id);
+            }
+
             __devTypeFound = DEV_OTHER;     // found this dev type
             return id;
         }
@@ -133,13 +204,14 @@ BYTE findDeviceOnSingleIF(BYTE hddIf, BYTE whichDevType)
     return DEVICE_NOT_FOUND;        // device not found
 }
 //--------------------------------------------------
-BYTE getMachineType(void)
+void getMachineType(void)
 {
     DWORD *cookieJarAddr    = (DWORD *) 0x05A0;
     DWORD *cookieJar        = (DWORD *) *cookieJarAddr;     // get address of cookie jar
 
     if(cookieJar == 0) {                        // no cookie jar? it's an old ST
-        return MACHINE_ST;
+        machine = MACHINE_ST;
+        return;
     }
 
     DWORD cookieKey, cookieValue;
@@ -156,18 +228,18 @@ BYTE getMachineType(void)
             WORD machine = cookieValue >> 16;
 
             switch(machine) {                   // depending on machine, either it's TT or FALCON
-                case 2: return MACHINE_TT;
-                case 3: return MACHINE_FALCON;
+                case 2: machine = MACHINE_TT;     return;
+                case 3: machine = MACHINE_FALCON; return;
             }
 
             break;                              // or it's ST
         }
     }
 
-    return MACHINE_ST;                          // it's an ST
+    machine = MACHINE_ST;                       // it's an ST
 }
 //--------------------------------------------------
-BYTE findDeviceInSupervisor(void)
+BYTE __findDevice(void)
 {
     BYTE deviceId = 0;
     BYTE key;
@@ -176,7 +248,12 @@ BYTE findDeviceInSupervisor(void)
     hdIf.maxRetriesCount = 0;                           // disable retries - we are expecting that the devices won't answer on every ID
 
     // based on machine type determine which IF should we search through -- all allowed on running machine
-    machine = getMachineType();
+    if(__mode == SUP_USER) {            // If the processor is in user mode - SUP_USER
+        Supexec(getMachineType); // call through Supexec()
+    } else {                            // If the processor is in supervisor mode - SUP_SUPER
+        getMachineType();        // call directly
+    }
+
     BYTE searchIF = IF_NONE;
 
     switch(machine) {
@@ -208,8 +285,14 @@ BYTE findDeviceInSupervisor(void)
             }
         }
 
-        (void) Cconws("\n\rDevice not found.\n\rPress any key to retry or 'Q' to quit.\n\r");
-        key = Cnecin();
+        if(!scanDialogTree) {
+            (void) Cconws("\n\rDevice not found.\n\rPress any key to retry or 'Q' to quit.\n\r");
+            key = Cnecin();
+        } else {
+            showStatusInGem("Device not found.");
+            key = 'Q';
+            sleep(1);
+        }
 
         if(key == 'Q' || key=='q') {
             hdIf.maxRetriesCount = 16;                  // enable retries
@@ -230,14 +313,9 @@ BYTE findDevice(BYTE whichIF, BYTE whichDevType)
     __whichIF      = whichIF;
     __whichDevType = whichDevType;
     __devTypeFound = DEV_NONE;          // no device found (yet)
+    __mode         = Super(SUP_INQUIRE);
 
-    DWORD mode = Super(SUP_INQUIRE);
-
-    if(mode == SUP_USER) {                      // If the processor is in user mode - SUP_USER
-        return Supexec(findDeviceInSupervisor); // call through Supexec()
-    } else {                                    // If the processor is in supervisor mode - SUP_SUPER
-        return findDeviceInSupervisor();        // call directly
-    }
+    return __findDevice();
 }
 //--------------------------------------------------
 // return found device type which was found when findDevice() did run last time

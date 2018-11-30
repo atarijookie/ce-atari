@@ -18,7 +18,7 @@ CFLAGSCOM   += -fno-common
 CFLAGS      = -O2 -m68000 $(CFLAGSCOM)
 CFLAGS030   = -O2 -m68030 $(CFLAGSCOM)
 LDFLAGS  = -Wl,--traditional-format
-LDLIBS   = -lgcc
+LDLIBS   = -lgem -lgcc
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 
 ACTUAL_CC := $(CC)
@@ -41,7 +41,7 @@ HDR      = mutex.h acsi.h scsi.h cart.h \
            translated.h find_ce.h \
            hdd_if.h hdd_if_lowlevel.h global.h 
 CSRC     = mutex.c acsi.c cart.c scsi_falcon.c scsi_tt.c \
-           find_ce.c hdd_if.c
+           find_ce.c hdd_if.c gem.c
 SSRC     = cart_asm.s
 
 ifeq ($(SLIM),yes)
@@ -59,7 +59,7 @@ OBJS    = $(CSRC:.c=.o) $(SSRC:.s=.o)
 OBJS030 = cache030.o
 
 $(TARGET): $(OBJS) $(OBJS030)
-	$(AR) rcs $(TARGET) $@ $^
+	$(AR) rcs $(TARGET) $@ $^ $(LDLIBS)
 
 %030.o: %030.s
 	$(AS) $(ASFLAGS030) -c -o $@ $<
