@@ -561,7 +561,6 @@ void imageSearch(void)
     getResultsAndUpdatePageObjects(0);
 }
 
-#define BYTES_TO_INT(HI,LO)    ( (((int) HI) << 8) | ((int) LO) )
 BYTE ce_acsiReadCommandLong(void);
 
 void getResultsPage(int page)

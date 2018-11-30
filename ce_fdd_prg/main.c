@@ -48,6 +48,8 @@ void handleCmdlineUpload(char *path, int paramsLength);
 // uncomment following for development without device
 //#define NODEVICE
 
+OBJECT *getScanDialogTree(void);
+
 // ------------------------------------------------------------------
 int main(int argc, char** argv)
 {
@@ -93,8 +95,21 @@ int main(int argc, char** argv)
     }
 
 #ifndef NODEVICE
+/*
+    Scanning with GEM currently disabled, as this findDevice() is used all in supervisor mode
+    and that is probably causing the crash on return. The findDevice() should be altered to 
+    run in user mode and switch to supervisor only for hw access...
+    Dialog scanDialog;
+    scanDialog.tree = getScanDialogTree();   // get pointer to GEM dialog definition
+    cd = &scanDialog;
+
+    showDialog(TRUE);                           // show GEM dialog
+*/
+
     // search for CosmosEx on ACSI & SCSI bus
     BYTE found = Supexec(findDevice);
+
+//  showDialog(FALSE);                          // hide GEM dialog
 
     if(!found) {                    // not found? quit
         gem_deinit();               // deinit GEM

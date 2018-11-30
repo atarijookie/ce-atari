@@ -1,4 +1,9 @@
+#ifndef __STDLIB_H__
+#define __STDLIB_H__
+
 #include "global.h"
+
+#define BYTES_TO_INT(HI,LO)    ( (((int) HI) << 8) | ((int) LO) )
 
 void *  memcpy ( void * destination, const void * source, int num );
 void *  memset ( void * ptr, int value, int num );
@@ -16,7 +21,8 @@ void showHexByte(BYTE val);
 void showHexWord(WORD val);
 void showHexDword(DWORD val);
 
-
 BYTE getKey(void);
 BYTE getKeyIfPossible(void);
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
+
+#endif
