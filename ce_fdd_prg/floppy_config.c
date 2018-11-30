@@ -44,6 +44,9 @@ void showMenu(char fullNotPartial);
 void showImage(int index);
 void getSiloContent(void);
 
+void getStatus(void);
+extern Status status;
+
 Dialog dialogConfig;        // dialog with floppy image config
 
 BYTE getSelectedSlotNo(void)
@@ -168,9 +171,15 @@ BYTE gem_floppySetup(void)
             break;
         }
 
-        if(exitobj == BTN_INTERNET) {
-            retVal = KEY_F9;   // KEY_F9 -- download images from internet
-            break;
+        if(exitobj == BTN_INTERNET) {   // user wants to download images from internet?
+            getStatus();                // talk to CE to see the status
+
+            if(status.doWeHaveStorage) { // if we have storage
+                retVal = KEY_F9;        // KEY_F9 -- download images from internet
+                break;
+            } else {                    // if we don't have storage
+                showErrorDialog("No USB or network storage!|Attach USB drive and try again.");
+            }
         }
 
         BYTE slotNo = getSelectedSlotNo();
