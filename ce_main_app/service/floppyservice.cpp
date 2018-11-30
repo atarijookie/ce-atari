@@ -5,15 +5,15 @@
 #include "utils.h"
 #include "ccorethread.h" 
 
-FloppyService::FloppyService():pxImageSilo(NULL),pxCoreThread(NULL),iInitState(INIT_NONE) 
+FloppyService::FloppyService():pxImageSilo(NULL),pxCoreThread(NULL),iInitState(INIT_NONE)
 {
 }
 
-void FloppyService::start() 
+void FloppyService::start()
 {
 }
 
-void FloppyService::stop() 
+void FloppyService::stop()
 {
 }
 
@@ -65,18 +65,18 @@ bool FloppyService::setImage(int iSlot, std::string sLocalFileWPath)
     {
         return false;
     }
-    if( iSlot < 0 || iSlot > 2 ) 
-    {                        
+    if( iSlot < 0 || iSlot > 2 )
+    {
         return false;        // index out of range? fail
-    } 
-    
+    }
+
     std::string sPath;
     std::string sFile;
     Utils::splitFilenameFromPath(sLocalFileWPath, sPath, sFile);
-    
+
     std::string sEmpty;
-    pxImageSilo->add(iSlot, sFile, sLocalFileWPath, sEmpty, sEmpty, true); 
-        
+    pxImageSilo->add(iSlot, sFile, sLocalFileWPath, sEmpty, true);
+
     return true;
 }
 

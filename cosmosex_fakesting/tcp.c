@@ -18,10 +18,9 @@
 
 //---------------------
 // ACSI / CosmosEx stuff
-#include "acsi.h"
 #include "ce_commands.h"
-#include "stdlib.h"
-
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
 //---------------------
 
 extern TConInfo conInfo[MAX_HANDLE];                   // this holds info about each connection

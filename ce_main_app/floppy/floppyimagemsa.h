@@ -8,7 +8,7 @@ class FloppyImageMsa: public FloppyImage
 {
 public:
     virtual bool open(const char *fileName);
-    virtual bool save(const char *fileName);
+    virtual bool save(void);
 
 protected:
     virtual bool loadImageIntoMemory(void);

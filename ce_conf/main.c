@@ -25,7 +25,6 @@ BYTE setResolution(void);
 void showConnectionErrorMessage(void);
 void showMoreStreamIfNeeded(void);
 
-BYTE atariKeysToSingleByte(BYTE vkey, BYTE key, int, int);
 BYTE ce_identify(BYTE ACSI_id);
 
 BYTE retrieveIsUpdating    (void);
@@ -41,7 +40,6 @@ BYTE ceIsUpdating;
 
 BYTE updateComponents;
 
-BYTE getKeyIfPossible(void);
 void showFakeProgress(void);
 
 void cosmoSoloConfig(void);
@@ -318,52 +316,6 @@ void showConnectionErrorMessage(void)
     prevCommandFailed = 1;
 }
 //--------------------------------------------------
-BYTE atariKeysToSingleByte(BYTE vkey, BYTE key, int shift, int ctrl)
-{
-    WORD vkeyKey;
-
-    if(key >= 32 && key < 127) {        // printable ASCII key? just return it 
-        return key;
-    }
-    
-    if(key == 0) {                      // will this be some non-ASCII key? convert it 
-        switch(vkey) {
-            case 0x48: return KEY_UP;
-            case 0x50: return KEY_DOWN;
-            case 0x4b: return KEY_LEFT;
-            case 0x4d: return KEY_RIGHT;
-            case 0x52: return KEY_INSERT;
-            case 0x47: return KEY_HOME;
-            case 0x62: return KEY_HELP;
-            case 0x61: return KEY_UNDO;
-            case 0x3b: return KEY_F1;
-            case 0x3c: return KEY_F2;
-            case 0x3d: return KEY_F3;
-            case 0x3e: return KEY_F4;
-            case 0x3f: return KEY_F5;
-            case 0x40: return KEY_F6;
-            case 0x41: return KEY_F7;
-            case 0x42: return KEY_F8;
-            case 0x43: return KEY_F9;
-            case 0x44: return KEY_F10;
-            default: return 0;          // unknown key 
-        }
-    }
-    
-    vkeyKey = (((WORD) vkey) << 8) | ((WORD) key);      // create a WORD with vkey and key together 
-    
-    switch(vkeyKey) {                   // some other no-ASCII key, but check with vkey too 
-        case 0x011b: return KEY_ESC;
-        case 0x537f: return KEY_DELETE;
-        case 0x0e08: return KEY_BACKSP;
-        case 0x0f09: return shift ? KEY_SHIFT_TAB : KEY_TAB;
-        case 0x1c0d: return KEY_ENTER;
-        case 0x720d: return KEY_ENTER;
-    }
-
-    return 0;                           // unknown key 
-}
-//--------------------------------------------------
 BYTE processUpdateComponentsFlags(BYTE inByteWithFlags)
 {
     BYTE components     =  inByteWithFlags;     // get where the update components should be stored
@@ -458,22 +410,6 @@ void cosmoSoloConfig(void)
     sleep(3);
 }
 //--------------------------------------------------
-void logMsg(char *logMsg)
-{
-//    if(showLogs) {
-//        (void) Cconws(logMsg);
-//    }
-}
-//--------------------------------------------------
-void logMsgProgress(DWORD current, DWORD total)
-{
-//    (void) Cconws("Progress: ");
-//    showHexDword(current);
-//    (void) Cconws(" out of ");
-//    showHexDword(total);
-//    (void) Cconws("\n\r");
-}
-//--------------------------------------------------
 void showFakeProgressOfItem(const char *title, int timeout)
 {
     (void) Cconws(title);           // show what we are updating
@@ -562,27 +498,6 @@ void showFakeProgress(void)
     }
     
     hdIf.maxRetriesCount = 1;                               // enable retry, but just once
-}
-
-BYTE getKeyIfPossible(void)
-{
-    DWORD scancode, special;
-    BYTE key, vkey, res;
-
-    res = Cconis();                             // see if there's something waiting from keyboard 
-
-    if(res == 0) {                              // nothing waiting from keyboard?
-        return 0;
-    }
-    
-    scancode = Cnecin();                        // get char form keyboard, no echo on screen 
-    special  = Kbshift(-1);
-
-    vkey    = (scancode>>16)    & 0xff;
-    key     =  scancode         & 0xff;
-
-    key     = atariKeysToSingleByte(vkey, key, special & 0x03, special & 0x04); // transform BYTE pair into single BYTE
-    return key;
 }
 //--------------------------------------------------
 // global variables, later used for calling hdIfCmdAsSuper

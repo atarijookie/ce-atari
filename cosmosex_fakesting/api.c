@@ -12,8 +12,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
+
 #include "globdefs.h"
-#include "stdlib.h"
 #include "api.h"
 #include "tcp.h"
 #include "icmp.h"

@@ -2,6 +2,7 @@
 #include <mint/osbind.h>
 
 #include "stdlib.h"
+#include "keys.h"
 
 void *memcpy ( void * destination, const void * source, int num )
 {
@@ -372,4 +373,186 @@ void showHexDword(DWORD val)
     showHexByte(b);
     showHexByte(c);
     showHexByte(d);
+}
+
+BYTE getKey(void)
+{
+    DWORD scancode;
+    BYTE key, vkey;
+
+    scancode = Cnecin();                    /* get char form keyboard, no echo on screen */
+
+    vkey    = (scancode >> 16)  & 0xff;
+    key     =  scancode         & 0xff;
+
+    key     = atariKeysToSingleByte(vkey, key); /* transform BYTE pair into single BYTE */
+    
+    return key;
+}
+
+BYTE getKeyIfPossible(void)
+{
+    DWORD scancode;
+    BYTE key, vkey, res;
+
+    res = Cconis();                             // see if there's something waiting from keyboard 
+
+    if(res == 0) {                              // nothing waiting from keyboard?
+        return 0;
+    }
+    
+    scancode = Cnecin();                        // get char form keyboard, no echo on screen 
+
+    vkey = (scancode>>16) & 0xff;
+    key  =  scancode      & 0xff;
+
+    key = atariKeysToSingleByte(vkey, key);     // transform BYTE pair into single BYTE
+    return key;
+}
+
+BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
+{
+    WORD vkeyKey;
+    vkeyKey = (((WORD) vkey) << 8) | ((WORD) key);      /* create a WORD with vkey and key together */
+
+    switch(vkeyKey) {
+        case 0x5032: return KEY_PAGEDOWN;
+        case 0x4838: return KEY_PAGEUP;
+    }
+
+    if(key >= 32 && key < 127) {        /* printable ASCII key? just return it */
+        return key;
+    }
+
+    if(key == 0) {                      /* will this be some non-ASCII key? convert it */
+        switch(vkey) {
+            case 0x48: return KEY_UP;
+            case 0x50: return KEY_DOWN;
+            case 0x4b: return KEY_LEFT;
+            case 0x4d: return KEY_RIGHT;
+            case 0x52: return KEY_INSERT;
+            case 0x47: return KEY_HOME;
+            case 0x62: return KEY_HELP;
+            case 0x61: return KEY_UNDO;
+            case 0x3b: return KEY_F1;
+            case 0x3c: return KEY_F2;
+            case 0x3d: return KEY_F3;
+            case 0x3e: return KEY_F4;
+            case 0x3f: return KEY_F5;
+            case 0x40: return KEY_F6;
+            case 0x41: return KEY_F7;
+            case 0x42: return KEY_F8;
+            case 0x43: return KEY_F9;
+            case 0x44: return KEY_F10;
+            default: return 0;          /* unknown key */
+        }
+    }
+
+    int shift  = Kbshift(-1) & 0x03;
+
+    switch(vkeyKey) {                   /* some other no-ASCII key, but check with vkey too */
+        case 0x011b: return KEY_ESC;
+        case 0x537f: return KEY_DELETE;
+        case 0x0e08: return KEY_BACKSP;
+        case 0x0f09: return shift ? KEY_SHIFT_TAB : KEY_TAB;
+        case 0x1c0d: return KEY_ENTER;
+        case 0x720d: return KEY_ENTER;
+    }
+
+    return 0;                           /* unknown key */
+}
+
+BYTE *storeByte(BYTE *bfr, BYTE value)
+{
+    *bfr = (BYTE) value;                // store byte
+    bfr++;                              // advance to next byte
+
+    return bfr;                         // return the updated buffer address
+}
+
+BYTE *storeWord(BYTE *bfr, WORD value)
+{
+    *bfr = (BYTE) (value >> 8);         // store higher part
+    bfr++;                              // advance to next byte
+
+    *bfr = (BYTE) (value);              // store lower part
+    bfr++;                              // advance to next byte
+
+    return bfr;                         // return the updated buffer address
+}
+
+BYTE *storeDword(BYTE *bfr, DWORD value)
+{
+    *bfr = (BYTE) (value >> 24);        // store highest part
+    bfr++;                              // advance to next byte
+
+    *bfr = (BYTE) (value >> 16);        // store mid hi part
+    bfr++;                              // advance to next byte
+
+    *bfr = (BYTE) (value >>  8);        // store mid low part
+    bfr++;                              // advance to next byte
+
+    *bfr = (BYTE) (value);              // store lowest part
+    bfr++;                              // advance to next byte
+
+    return bfr;                         // return the updated buffer address
+}
+
+WORD getWord(BYTE *bfr)
+{
+    WORD val;
+
+    val = ((WORD) bfr[0]) << 8;         // get upper part
+    val = val | ((WORD) bfr[1]);        // get lower part
+
+    return val;
+}
+
+DWORD getDword(BYTE *bfr)
+{
+    DWORD val;
+
+    val =       ((DWORD) bfr[0]) << 24;
+    val = val | ((DWORD) bfr[1]) << 16;
+    val = val | ((DWORD) bfr[2]) <<  8;
+    val = val | ((DWORD) bfr[3]);
+
+    return val;
+}
+
+WORD getWordByByteOffset(void *base, int ofs)
+{
+    BYTE *pByte     = (BYTE *) base;
+    WORD *pWord     = (WORD *) (pByte + ofs);
+    WORD val        = *pWord;
+    return val;
+}
+
+DWORD getDwordByByteOffset(void *base, int ofs)
+{
+    BYTE  *pByte    = (BYTE  *)  base;
+    DWORD *pDword   = (DWORD *) (pByte + ofs);
+    DWORD val       = *pDword;
+    return val;
+}
+
+void *getVoidpByByteOffset(void *base, int ofs)
+{
+    void *p = (void *) getDwordByByteOffset(base, ofs);
+    return p;
+}
+
+
+void setWordByByteOffset(void *base, int ofs, WORD val)
+{
+    BYTE *pByte  = (BYTE *)  base;
+    WORD *pWord     = (WORD *) (pByte + ofs);
+    *pWord          = val;
+}
+
+void setDwordByByteOffset(void *base, int ofs, DWORD val)
+{
+    BYTE *pByte     = (BYTE *) base;
+    DWORD *pDword   = (DWORD *) (pByte + ofs);
+    *pDword         = val;
 }

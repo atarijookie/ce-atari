@@ -10,27 +10,24 @@
 #include "main.h"
 #include "hostmoddefs.h"
 #include "defs.h"
+#include "vt52.h"
+
 // ------------------------------------------------------------------ 
 
-BYTE deviceID;
-BYTE commandShort[CMD_LENGTH_SHORT] = { 0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
+extern BYTE deviceID;
+extern BYTE commandShort[CMD_LENGTH_SHORT];
+extern BYTE commandLong [CMD_LENGTH_LONG];
 
-void showComError(void);
+void showComErrorDialog(void);
 
-BYTE *p64kBlock;
-BYTE sectorCount;
-
-BYTE *pBfrOrig;
-BYTE *pBfr, *pBfrCnt;
-BYTE *pDmaBuffer;
-
-BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
+extern BYTE sectorCount;
+extern BYTE *pBfr, *pBfrCnt;
 
 BYTE getCurrentSlot(void);
 BYTE setCurrentSlot(BYTE newSlot);
 BYTE currentSlot;
 
-BYTE uploadImage(int index, char *path);
+BYTE uploadImage(int index, char *customPath);
 char *findFirstImageInFolder(void);
 
 BYTE getIsImageBeingEncoded(void);
@@ -43,76 +40,62 @@ _DTA ourDta;     // used in findFirstImageInFolder()
 void waitBeforeReset(void);
 
 // ------------------------------------------------------------------ 
-int main( int argc, char* argv[] )
+void handleCmdlineUpload(char *path, int paramsLength)
 {
+    BYTE found;
+
     // write some header out
     (void) Clear_home();
     (void) Cconws("\33f");      // cursor off
     (void) Cconws("\33p[  CosmosEx floppy TTP  ]\r\n[  by Jookie 2014-2018  ]\33q\r\n\r\n");
 
-    char *params        = (char *) argv;            // get pointer to params (path to file)
-    int paramsLength    = (int) params[0];
-    char *path          = params + 1;
+    path[paramsLength] = 0;                 // terminate path
 
-    if(paramsLength == 0) {                         // no TTP argument given?
-        path = findFirstImageInFolder();            // try to find first valid ST / MSA image in the same folder (e.g. used like this for compo presentation)
+    // if path is 0 or 1 byte, try to find first image in folder
+    // if path is 2 or more bytes, try to load it directly as is
 
-        if(path == NULL) {                          // no floppy image found?
-            (void) Cconws("This is a drap-and-drop, upload\r\n");
-            (void) Cconws("and run floppy tool.\r\n\r\n");
-            (void) Cconws("\33pArgument is path to floppy image.\33q\r\n\r\n");
-
-            (void) Cconws("If no argument is specified, this tool\r\n");
-            (void) Cconws("will try to find first image in folder.\r\n\r\n");
-
-            (void) Cconws("If no image was found in the folder,\r\n");
-            (void) Cconws("this message is shown instead.\r\n\r\n");
-
-            (void) Cconws("For menu driven floppy config\r\n");
-            (void) Cconws("run the CE_FDD.PRG\r\n");
-            getKey();
-            return 0;
-        }
-
-        paramsLength = strlen(path);                // get path length
-
-        (void) Cconws("Found image: ");
-        (void) Cconws(path);
-        (void) Cconws("\r\n");
+    if(paramsLength <= 1) {                     // single char argument given?
+        path = findFirstImageInFolder();        // try to find first valid ST / MSA image in the same folder (e.g. used like this for compo presentation)
     }
 
-    path[paramsLength]  = 0;                        // terminate path
-    
-    pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
+    if(path == NULL) {                          // no floppy image found?
+        (void) Cconws("This is a drap-and-drop, upload\r\n");
+        (void) Cconws("and run floppy tool.\r\n\r\n");
+        (void) Cconws("\33pArgument is path to floppy image.\33q\r\n\r\n");
 
-    if(pBfrOrig == NULL) {
-        (void) Cconws("\r\nMalloc failed!\r\n");
-        sleep(3);
-        return 0;
+        (void) Cconws("If no argument is specified, this tool\r\n");
+        (void) Cconws("will try to find first image in folder.\r\n\r\n");
+
+        (void) Cconws("If no image was found in the folder,\r\n");
+        (void) Cconws("this message is shown instead.\r\n\r\n");
+
+        (void) Cconws("For menu driven floppy config\r\n");
+        (void) Cconws("run the CE_FDD.PRG\r\n");
+        getKey();
+        return;
     }
 
-    DWORD val = (DWORD) pBfrOrig;
-    pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);  // create even pointer
-    pBfrCnt   = pBfr - 2;                           // this is previous pointer - size of WORD 
+    paramsLength = strlen(path);                // get path length (if found by findFirstImageInFolder(), it needs to be updated)
 
-    pDmaBuffer = pBfr;
+    (void) Cconws("Filename   : ");
+    (void) Cconws(path);
+    (void) Cconws("\r\n");
     
-    // search for CosmosEx on ACSI & SCSI bus
-    deviceID = findDevice(IF_ANY, DEV_CE);
+    // search for CosmosEx on ACSI bus
+    found = Supexec(findDevice);
 
-    if(deviceID == DEVICE_NOT_FOUND) {
-        sleep(3);
-        return 0;
+    if(!found) {                                    // not found? quit
+        return;
     }
 
     // now set up the acsi command bytes so we don't have to deal with this one anymore 
-    commandShort[0] = (deviceID << 5);              // cmd[0] = ACSI_id + TEST UNIT READY (0)   
+    commandShort[0] = (deviceID << 5);              // cmd[0] = ACSI_id + TEST UNIT READY (0)
+    commandLong[0]  = (deviceID << 5) | 0x1f;       // cmd[0] = ACSI_id + ICD command marker (0x1f)
 
     BYTE res = getCurrentSlot();                    // get the current slot
     
     if(!res) {
-        Mfree(pBfrOrig);
-        return 0;
+        return;
     }
 
     (void) Cconws("\r\n");                          // extra line between CE find output and rest
@@ -161,8 +144,7 @@ int main( int argc, char* argv[] )
     if(!res) {
         (void) Cconws("Image upload failed, press key to terminate.\r\n");
         getKey();
-        Mfree(pBfrOrig);
-        return 0;
+        return;
     }
 
     // wait until image is being encoded
@@ -187,8 +169,7 @@ int main( int argc, char* argv[] )
         (void) Cconws("\33p \33q");                                 // show progress...
     }
 
-    Mfree(pBfrOrig);
-    return 0;
+    return;
 }
 
 void resetST(void)
@@ -235,28 +216,6 @@ void waitBeforeReset(void)
     Supexec(resetST);
 }
 
-void intToStr(int val, char *str)
-{
-    int i3, i2, i1;
-    i3 = (val / 100);               // 123 / 100 = 1
-    i2 = (val % 100) / 10;          // (123 % 100) = 23, 23 / 10 = 2
-    i1 = (val % 10);                // 123 % 10 = 3
-
-    str[0] = i3 + '0';
-    str[1] = i2 + '0';
-    str[2] = i1 + '0';
-
-    if(val < 100) {
-        str[0] = ' ';
-    }
-    
-    if(val < 10) {
-        str[1] = ' ';
-    }
-    
-    str[3] = 0;                     // terminating zero
-}
-
 char *findFirstImageInFolder(void)
 {
     _DTA *oldDta;
@@ -283,89 +242,6 @@ char *findFirstImageInFolder(void)
     return NULL;                // nothing found
 }
 
-void removeLastPartUntilBackslash(char *str)
-{
-    int i, len;
-    
-    len = strlen(str);
-    
-    for(i=(len-1); i>= 0; i--) {
-        if(str[i] == '\\') {
-            break;
-        }
-    
-        str[i] = 0;
-    }
-}
-
-// make single ACSI read command by the params set in the commandShort buffer
-BYTE ce_acsiReadCommand(void)
-{
-    commandShort[0] = (deviceID << 5);                                          // cmd[0] = ACSI_id + TEST UNIT READY (0)   
-  
-    memset(pBfr, 0, 512);                                                       // clear the buffer 
-
-    (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, sectorCount);   // issue the command and check the result 
-
-    if(!hdIf.success) {
-        return 0xff;
-    }
-    
-    return hdIf.statusByte;
-}
-
-BYTE ce_acsiWriteBlockCommand(void)
-{
-    commandShort[0] = (deviceID << 5);                                          // cmd[0] = ACSI_id + TEST UNIT READY (0)   
-  
-    (*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, sectorCount);    // issue the command and check the result 
-
-    if(!hdIf.success) {
-        return 0xff;
-    }
-    
-    return hdIf.statusByte;
-}
-
-BYTE getLowestDrive(void)
-{
-    BYTE i;
-    DWORD drvs = Drvmap();
-    DWORD mask;
-    
-    for(i=2; i<16; i++) {                                                       // go through the available drives
-        mask = (1 << i);
-        
-        if((drvs & mask) != 0) {                                                // drive is available?
-            return ('A' + i);
-        }
-    }
-    
-    return 'A';
-}
-
-void showComError(void)
-{
-    (void) Clear_home();
-    (void) Cconws("Error in CosmosEx communication!\r\n");
-    Cnecin();
-}
-
-void createFullPath(char *fullPath, char *filePath, char *fileName)
-{
-    strcpy(fullPath, filePath);
-    
-    removeLastPartUntilBackslash(fullPath);             // remove the search wildcards from the end
-
-    if(strlen(fullPath) > 0) {                          
-        if(fullPath[ strlen(fullPath) - 1] != '\\') {   // if the string doesn't end with backslash, add it
-            strcat(fullPath, "\\");
-        }
-    }
-    
-    strcat(fullPath, fileName);                         // add the filename
-}
-
 BYTE getCurrentSlot(void)
 {
     commandShort[4] = FDD_CMD_GET_CURRENT_SLOT;
@@ -380,7 +256,7 @@ BYTE getCurrentSlot(void)
     } 
     
     // bad? show error
-    showComError();
+    showComErrorDialog();
     return 0;
 }
 
@@ -398,7 +274,7 @@ BYTE setCurrentSlot(BYTE newSlot)
     } 
     
     // bad? show error
-    showComError();
+    showComErrorDialog();
     return 0;
 }
 
@@ -417,6 +293,7 @@ BYTE getIsImageBeingEncoded(void)
     } 
     
     // fail?
-    showComError();                             // show error
+    showComErrorDialog();                             // show error
     return ENCODING_FAIL;
 }
+

@@ -4,10 +4,6 @@
 BYTE ce_acsiReadCommand(void);
 BYTE ce_acsiWriteBlockCommand(void);
 
-BYTE getKey(void);
-BYTE getKeyIfPossible(void);
-void showComError(void);
-void showError(const char *error);
 void intToStr(int val, char *str);
 void removeLastPartUntilBackslash(char *str);
 BYTE getLowestDrive(void);
@@ -22,5 +18,13 @@ typedef struct {
     char path[256];
 } TDestDir;
 
+typedef struct {
+    BYTE encoding;              // is the RPi encoding the image or being idle?
+    BYTE doWeHaveStorage;       // do we have storage for floppy images?
+    BYTE prevDoWeHaveStorage;   // previous value of doWeHaveStorage
+
+    BYTE downloadCount;         // how many files are now being downloaded?
+    BYTE prevDownloadCount;     // previous value of downloadCount
+} Status;
 
 #endif

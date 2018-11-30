@@ -3,6 +3,8 @@
 
 #include "global.h"
 
+#define BYTES_TO_INT(HI,LO)    ( (((int) HI) << 8) | ((int) LO) )
+
 void *  memcpy  ( void * destination, const void * source, int num );
 int     memcmp  ( const void *a, const void *b, int num );
 void *  memset  ( void * ptr, int value, int num );
@@ -30,5 +32,20 @@ void showHexDword(DWORD val);
 
 void showAppVersion(void);
 int  getIntFromStr(const char *str, int len);
+
+BYTE getKey(void);
+BYTE getKeyIfPossible(void);
+BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
+
+BYTE *storeByte(BYTE *bfr, BYTE value);
+BYTE *storeWord(BYTE *bfr, WORD value);
+BYTE *storeDword(BYTE *bfr, DWORD value);
+WORD getWord(BYTE *bfr);
+DWORD getDword(BYTE *bfr);
+WORD getWordByByteOffset(void *base, int ofs);
+DWORD getDwordByByteOffset(void *base, int ofs);
+void *getVoidpByByteOffset(void *base, int ofs);
+void setWordByByteOffset(void *base, int ofs, WORD val);
+void setDwordByByteOffset(void *base, int ofs, DWORD val);
 
 #endif

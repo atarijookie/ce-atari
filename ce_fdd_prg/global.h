@@ -19,4 +19,13 @@
 
 #define HZ_200     ((volatile DWORD *) 0x04BA) /* 200 Hz system clock */ 
 
+typedef struct {
+    BYTE encoding;              // is the RPi encoding the image or being idle?
+    BYTE doWeHaveStorage;       // do we have storage for floppy images?
+    BYTE prevDoWeHaveStorage;   // previous value of doWeHaveStorage
+
+    BYTE downloadCount;         // how many files are now being downloaded?
+    BYTE prevDownloadCount;     // previous value of downloadCount
+} Status;
+
 #endif

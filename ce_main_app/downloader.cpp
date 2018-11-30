@@ -584,13 +584,14 @@ void Downloader::run(void)
                     updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_FAIL);
                     Debug::out(LOG_ERROR, "Downloader - failed to rename %s to %s after download", tmpFile.c_str(), finalFile.c_str());
                 } else {        // download OK, checksum OK, rename OK?
-                    updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_OK);
                     Debug::out(LOG_DEBUG, "Downloader - file %s was downloaded with success, is FLOPPYIMG: %d, is ZIP file: %d.", downloadCurrent.srcUrl.c_str(), downloadCurrent.downloadType == DWNTYPE_FLOPPYIMG, isZIPfile);
 
                     // if it's a floppy image download and it's a ZIP file
                     if(downloadCurrent.downloadType == DWNTYPE_FLOPPYIMG && isZIPfile) {
                         handleZIPedFloppyImage(finalFile);
                     }
+
+                    updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_OK);
                 }
             } else {            // download OK, checksum bad?
                 updateStatusByte(downloadCurrent, DWNSTATUS_DOWNLOAD_FAIL);

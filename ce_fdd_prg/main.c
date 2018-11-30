@@ -3,6 +3,7 @@
 #include <mint/basepage.h>
 #include <mint/ostruct.h>
 #include <gem.h>
+#include <mt_gem.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -14,10 +15,12 @@
 #include "hostmoddefs.h"
 #include "keys.h"
 #include "defs.h"
-       
-// ------------------------------------------------------------------ 
+#include "CE_FDD.H"
+#include "aes.h"
+
 BYTE deviceID;
-BYTE commandShort[CMD_LENGTH_SHORT]	= {	0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
+BYTE commandShort[CMD_LENGTH_SHORT] = {         0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0};
+BYTE commandLong [CMD_LENGTH_LONG]  = {0x1f, 0xA0, 'C', 'E', HOSTMOD_FDD_SETUP, 0, 0, 0, 0, 0, 0, 0, 0};
 
 void createFullPath(char *fullPath, char *filePath, char *fileName);
 
@@ -32,75 +35,109 @@ BYTE *pDmaBuffer;
 
 BYTE atariKeysToSingleByte(BYTE vkey, BYTE key);
 
-BYTE loopForSetup(void);
 BYTE loopForDownload(void);
 
-// ------------------------------------------------------------------ 
-int main( int argc, char* argv[] )
-{
-    appl_init();										            // init AES 
-    
-	pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
-	
-	if(pBfrOrig == NULL) {
-		(void) Cconws("\r\nMalloc failed!\r\n");
-		sleep(3);
-		return 0;
-	}
+BYTE gem_floppySetup(void);
+BYTE gem_imageDownload(void);
 
-	DWORD val = (DWORD) pBfrOrig;
-	pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);     				// create even pointer
-    pBfrCnt   = pBfr - 2;											// this is previous pointer - size of WORD 
-	
+void handleCmdlineUpload(char *path, int paramsLength);
+
+// uncomment following for development without device
+//#define NODEVICE
+
+OBJECT *getScanDialogTree(void);
+
+// ------------------------------------------------------------------
+int main(int argc, char** argv)
+{
+    Goto_pos(0,0);
+    pBfrOrig = (BYTE *) Malloc(SIZE64K + 4);
+
+    if(pBfrOrig == NULL) {
+        (void) Cconws("Malloc failed!\r\n");
+        sleep(3);
+        return 0;
+    }
+
+    DWORD val = (DWORD) pBfrOrig;
+    pBfr      = (BYTE *) ((val + 4) & 0xfffffffe);  // create even pointer
+    pBfrCnt   = pBfr - 2;           // this is previous pointer - size of WORD
+
     pDmaBuffer = pBfr;
-    
+
     // init fileselector path
-    strcpy(filePath, "C:\\*.*");                            
-    memset(fileName, 0, 256);          
-    
-    BYTE drive = getLowestDrive();                                  // get the lowest HDD letter and use it in the file selector
+    strcpy(filePath, "C:\\*.*");
+    memset(fileName, 0, 256);
+
+    BYTE drive = getLowestDrive();  // get the lowest HDD letter and use it in the file selector
     filePath[0] = drive;
-    
-	// write some header out
-	(void) Clear_home();
-	(void) Cconws("\33p[ CosmosEx floppy setup ]\r\n[    by Jookie 2014     ]\33q\r\n\r\n");
+
+#ifdef OUTPUT_TTP
+    // if compiled with OUTPUT_TTP, this app will work without GEM UI - as the TTP
+    char *params = (char *) argv;           // get pointer to params (path to file)
+    int   paramsLength = (int) params[0];   // 0th byte -- strlen(arguments)
+    char *path = params + 1;                // path to file
+
+    handleCmdlineUpload(path, paramsLength);
+    Mfree(pBfrOrig);
+    return 0;
+#endif
+
+    // if compiled without OUTPUT_TTP, this app will work with GEM UI - as the PRG
+    BYTE res = gem_init();          // initialize GEM stuff
+
+    if(!res) {                      // gem init failed? quit then
+        Mfree(pBfrOrig);
+        return 0;
+    }
+
+#ifndef NODEVICE
+/*
+    Scanning with GEM currently disabled, as this findDevice() is used all in supervisor mode
+    and that is probably causing the crash on return. The findDevice() should be altered to 
+    run in user mode and switch to supervisor only for hw access...
+
+    Dialog scanDialog;
+    scanDialog.tree = getScanDialogTree();   // get pointer to GEM dialog definition
+    cd = &scanDialog;
+
+    showDialog(TRUE);                           // show GEM dialog
+*/
 
     // search for CosmosEx on ACSI & SCSI bus
     deviceID = findDevice(IF_ANY, DEV_CE);
 
     if(deviceID == DEVICE_NOT_FOUND) {
-        sleep(3);
+        gem_deinit();               // deinit GEM
+        Mfree(pBfrOrig);
         return 0;
     }
-    
-	// now set up the acsi command bytes so we don't have to deal with this one anymore 
-	commandShort[0] = (deviceID << 5); 					            // cmd[0] = ACSI_id + TEST UNIT READY (0)	
 
-	graf_mouse(M_OFF, 0);
+//  showDialog(FALSE);                          // hide GEM dialog
 
+#endif
+
+    // now set up the acsi command bytes so we don't have to deal with this one anymore
+    commandShort[0] = (deviceID << 5);          // cmd[0] = ACSI_id + TEST UNIT READY (0)
+    commandLong[0]  = (deviceID << 5) | 0x1f;   // cmd[0] = ACSI_id + ICD command marker (0x1f)
 
     while(1) {
-        BYTE key;
-        
-        key = loopForSetup();
-        
-        if(key == KEY_F10) {                // should quit?
-            break;
-        }
-    
-        key = loopForDownload();
-    
-        if(key == KEY_F10) {                // should quit?
-            break;
-        }
-    }    
-    
-	graf_mouse(M_ON, 0);
-	appl_exit();
+        res = gem_floppySetup();    // show and handle floppy setup via dialog
 
-	Mfree(pBfrOrig);
-	
-	return 0;		
+        if(res == KEY_F10) {        // should quit?
+            break;
+        }
+
+        res = gem_imageDownload();    // show and handle floppy image download
+
+        if(res == KEY_F10) {        // should quit?
+            break;
+        }
+    }
+
+    gem_deinit();                   // deinit GEM
+    Mfree(pBfrOrig);
+    return 0;
 }
 
 void intToStr(int val, char *str)
@@ -117,91 +154,78 @@ void intToStr(int val, char *str)
     if(val < 100) {
         str[0] = ' ';
     }
-    
+
     if(val < 10) {
         str[1] = ' ';
     }
-    
+
     str[3] = 0;                     // terminating zero
-}
-
-BYTE getKey(void)
-{
-    DWORD scancode;
-    BYTE key, vkey;
-
-    scancode = Cnecin();                        /* get char form keyboard, no echo on screen */
-
-    vkey    = (scancode >> 16)  & 0xff;
-    key     =  scancode         & 0xff;
-
-    key     = atariKeysToSingleByte(vkey, key);	/* transform BYTE pair into single BYTE */
-    
-    return key;
-}
-
-BYTE getKeyIfPossible(void)
-{
-    DWORD scancode;
-    BYTE key, vkey, res;
-
-    res = Cconis();                             // see if there's something waiting from keyboard 
-
-    if(res == 0) {                              // nothing waiting from keyboard?
-        return 0;
-    }
-    
-    scancode = Cnecin();                        // get char form keyboard, no echo on screen 
-
-    vkey = (scancode>>16) & 0xff;
-    key  =  scancode      & 0xff;
-
-    key = atariKeysToSingleByte(vkey, key);     // transform BYTE pair into single BYTE
-    return key;
 }
 
 void removeLastPartUntilBackslash(char *str)
 {
-	int i, len;
-	
-	len = strlen(str);
-	
-	for(i=(len-1); i>= 0; i--) {
-		if(str[i] == '\\') {
-			break;
-		}
-	
-		str[i] = 0;
-	}
+    int i, len;
+
+    len = strlen(str);
+
+    for(i=(len-1); i>= 0; i--) {
+        if(str[i] == '\\') {
+            break;
+        }
+
+        str[i] = 0;
+    }
+}
+
+// make single ACSI read command by the params set in the commandLong buffer
+BYTE ce_acsiReadCommandLong(void)
+{
+    memset(pBfr, 0, 512);               // clear the buffer
+
+#ifdef NODEVICE
+    return 0;
+#endif
+
+    (*hdIf.cmd)(ACSI_READ, commandLong, CMD_LENGTH_LONG, pBfr, sectorCount);   // issue the command and check the result
+
+    if(!hdIf.success) {
+        return 0xff;
+    }
+
+    return hdIf.statusByte;
 }
 
 // make single ACSI read command by the params set in the commandShort buffer
 BYTE ce_acsiReadCommand(void)
 {
-	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
-  
-	memset(pBfr, 0, 512);              											// clear the buffer 
+    memset(pBfr, 0, 512);                                                       // clear the buffer
 
-	(*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, sectorCount);   // issue the command and check the result 
+#ifdef NODEVICE
+    return 0;
+#endif
+
+    (*hdIf.cmd)(ACSI_READ, commandShort, CMD_LENGTH_SHORT, pBfr, sectorCount);   // issue the command and check the result 
 
     if(!hdIf.success) {
         return 0xff;
     }
-    
-	return hdIf.statusByte;
+
+    return hdIf.statusByte;
 }
 
 BYTE ce_acsiWriteBlockCommand(void)
 {
-	commandShort[0] = (deviceID << 5); 											// cmd[0] = ACSI_id + TEST UNIT READY (0)	
-  
-	(*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, sectorCount);	// issue the command and check the result 
+#ifdef NODEVICE
+    return 0;
+#endif
+
+    (*hdIf.cmd)(ACSI_WRITE, commandShort, CMD_LENGTH_SHORT, p64kBlock, sectorCount);    // issue the command and check the result 
 
     if(!hdIf.success) {
         return 0xff;
     }
-    
-	return hdIf.statusByte;
+
+    return hdIf.statusByte;
 }
 
 BYTE getLowestDrive(void)
@@ -209,112 +233,29 @@ BYTE getLowestDrive(void)
     BYTE i;
     DWORD drvs = Drvmap();
     DWORD mask;
-    
+
     for(i=2; i<16; i++) {                                                       // go through the available drives
         mask = (1 << i);
-        
+
         if((drvs & mask) != 0) {                                                // drive is available?
             return ('A' + i);
         }
     }
-    
+
     return 'A';
-}
-
-void showError(const char *error)
-{
-    (void) Clear_home();
-    (void) Cconws(error);
-    Cnecin();
-}
-
-void showComError(void)
-{
-    showError("Error in CosmosEx communication!\r\n");
 }
 
 void createFullPath(char *fullPath, char *filePath, char *fileName)
 {
     strcpy(fullPath, filePath);
-	
-	removeLastPartUntilBackslash(fullPath);				// remove the search wildcards from the end
 
-	if(strlen(fullPath) > 0) {							
-		if(fullPath[ strlen(fullPath) - 1] != '\\') {	// if the string doesn't end with backslash, add it
-			strcat(fullPath, "\\");
-		}
-	}
-	
-    strcat(fullPath, fileName);							// add the filename
-}
+    removeLastPartUntilBackslash(fullPath);             // remove the search wildcards from the end
 
-BYTE atariKeysToSingleByte(BYTE vkey, BYTE key)
-{
-	WORD vkeyKey;
-	vkeyKey = (((WORD) vkey) << 8) | ((WORD) key);		/* create a WORD with vkey and key together */
-
-    switch(vkeyKey) {
-        case 0x5032: return KEY_PAGEDOWN;
-        case 0x4838: return KEY_PAGEUP;
+    if(strlen(fullPath) > 0) {
+        if(fullPath[ strlen(fullPath) - 1] != '\\') {   // if the string doesn't end with backslash, add it
+            strcat(fullPath, "\\");
+        }
     }
 
-	if(key >= 32 && key < 127) {		/* printable ASCII key? just return it */
-		return key;
-	}
-	
-	if(key == 0) {						/* will this be some non-ASCII key? convert it */
-		switch(vkey) {
-			case 0x48: return KEY_UP;
-			case 0x50: return KEY_DOWN;
-			case 0x4b: return KEY_LEFT;
-			case 0x4d: return KEY_RIGHT;
-			case 0x52: return KEY_INSERT;
-			case 0x47: return KEY_HOME;
-			case 0x62: return KEY_HELP;
-			case 0x61: return KEY_UNDO;
-			case 0x3b: return KEY_F1;
-			case 0x3c: return KEY_F2;
-			case 0x3d: return KEY_F3;
-			case 0x3e: return KEY_F4;
-			case 0x3f: return KEY_F5;
-			case 0x40: return KEY_F6;
-			case 0x41: return KEY_F7;
-			case 0x42: return KEY_F8;
-			case 0x43: return KEY_F9;
-			case 0x44: return KEY_F10;
-			default: return 0;			/* unknown key */
-		}
-	}
-	
-	switch(vkeyKey) {					/* some other no-ASCII key, but check with vkey too */
-		case 0x011b: return KEY_ESC;
-		case 0x537f: return KEY_DELETE;
-		case 0x0e08: return KEY_BACKSP;
-		case 0x0f09: return KEY_TAB;
-		case 0x1c0d: return KEY_ENTER;
-		case 0x720d: return KEY_ENTER;
-	}
-
-	return 0;							/* unknown key */
+    strcat(fullPath, fileName);                         // add the filename
 }
-
-void logMsg(char *logMsg)
-{
-//    if(showLogs) {
-//        (void) Cconws(logMsg);
-//    }
-}
-
-void logMsgProgress(DWORD current, DWORD total)
-{
-//    if(!showLogs) {
-//        return;
-//    }
-
-//    (void) Cconws("Progress: ");
-//    showHexDword(current);
-//    (void) Cconws(" out of ");
-//    showHexDword(total);
-//    (void) Cconws("\n\r");
-}
-

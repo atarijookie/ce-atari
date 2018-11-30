@@ -7,8 +7,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
+
 #include "globdefs.h"
-#include "hdd_if.h"
 #include "con_man.h"
 #include "icmp.h"
 #include "setup.h"
@@ -16,9 +18,7 @@
 
 //---------------------
 // ACSI / CosmosEx stuff
-#include "acsi.h"
 #include "ce_commands.h"
-#include "stdlib.h"
 
 //--------------------------------------
 // The following variable should be used to force update_con_info() when there was some reading / writing to socket.
@@ -741,7 +741,7 @@ int16 resolve (char *domain, char **real_domain, uint32 *ip_list, int16 ip_num)
     DWORD end = getTicks() + 10 * 200;                                  // 10 second timeout
 
     while(1) {                                                          // repeat this command few times, as it might reply with 'I didn't finish yet'
-        sleepMs(250);                                               // wait 250 ms before trying again
+        msleep(250);                                                    // wait 250 ms before trying again
         if(getTicks() >= end) {                                         // if timeout
             return E_CANTRESOLVE;
         }

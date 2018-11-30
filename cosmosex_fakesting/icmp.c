@@ -12,10 +12,12 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
+
 #include "globdefs.h"
 #include "icmp.h"
 #include "con_man.h"
-#include "hdd_if.h"
 #include "vbl.h"
 
 #define  M_YEAR    16
@@ -37,9 +39,7 @@ uint16      icmp_id = 0;
 
 //---------------------
 // ACSI / CosmosEx stuff
-#include "acsi.h"
 #include "ce_commands.h"
-#include "stdlib.h"
 
 //---------------------
 

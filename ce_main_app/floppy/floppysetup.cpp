@@ -18,8 +18,6 @@
 #include "imagestorage.h"
 #include "floppysetup_commands.h"
 
-#define UPLOAD_PATH "/tmp/"
-
 volatile BYTE currentImageDownloadStatus;
 extern SharedObjects shared;
 
@@ -33,7 +31,7 @@ FloppySetup::FloppySetup()
 
     currentDownload.fh = NULL;
 
-    imgDnStatus = IMG_DN_STATUS_IDLE;
+    screenResolution = 1;
 }
 
 FloppySetup::~FloppySetup()
@@ -102,8 +100,6 @@ void FloppySetup::processCommand(BYTE *command)
         case FDD_CMD_SEARCH_INIT:               searchInit();               break;
         case FDD_CMD_SEARCH_STRING:             searchString();             break;
         case FDD_CMD_SEARCH_RESULTS:            searchResult();             break;
-        case FDD_CMD_SEARCH_MARK:               searchMark();               break;
-        case FDD_CMD_SEARCH_DOWNLOAD:           searchDownload();           break;
         case FDD_CMD_SEARCH_REFRESHLIST:        searchRefreshList();        break;
 
         case FDD_CMD_SEARCH_DOWNLOAD2STORAGE:   searchDownload2Storage();   break;
@@ -116,6 +112,8 @@ void FloppySetup::processCommand(BYTE *command)
 
 void FloppySetup::searchInit(void)
 {
+    screenResolution = cmd[5];              // current resolution on Atari ST
+
     if(!shared.imageList->exists()) {        // if the file does not yet exist, tell ST that we're downloading
         dataTrans->setStatus(FDD_DN_LIST);
         return;
@@ -140,49 +138,35 @@ void FloppySetup::searchString(void)
     dataTrans->setStatus(FDD_OK);           // done
 }
 
-#define PAGESIZE    15
 void FloppySetup::searchResult(void)
 {
-    int page = cmd[5];                              // retrieve # of page (0 .. max page - 1)
+	int pageSize = cmd[5];              // page size
+    int page = Utils::getWord(cmd + 6); // retrieve # of page (0 .. max page - 1)
 
-    int pageStart   = page * PAGESIZE;              // starting index of this page
-    int pageEnd     = (page + 1) * PAGESIZE;        // ending index of this page (actually start of new page)
+    int pageStart   = page * pageSize;              // starting index of this page
+    int pageEnd     = (page + 1) * pageSize;        // ending index of this page (actually start of new page)
 
     int results = shared.imageList->getSearchResultsCount();
 
     pageStart   = MIN(pageStart,    results);
     pageEnd     = MIN(pageEnd,      results);
 
-    int realPage    = pageStart / PAGESIZE;         // calculate the real page number
-    int totalPages  = (results   / PAGESIZE) + 1;   // calculate the count of pages we have
+    int realPage    = pageStart / pageSize;         // calculate the real page number
+    int totalPages  = (results   / pageSize) + 1;   // calculate the count of pages we have
 
-    dataTrans->addDataByte((BYTE) realPage);        // byte 0: real page
-    dataTrans->addDataByte((BYTE) totalPages);      // byte 1: total pages
+    dataTrans->addDataWord((WORD) realPage);        // byte 0, 1: real page
+    dataTrans->addDataWord((WORD) totalPages);      // byte 2, 3: total pages
 
     memset(bfr64k, 0, 1024);
 
     // now get the search results - 68 bytes per line
     int offset = 0;
     for(int i=pageStart; i<pageEnd; i++) {
-        shared.imageList->getResultByIndex(i, (char *) (bfr64k + offset));
+        shared.imageList->getResultByIndex(i, (char *) (bfr64k + offset), screenResolution);
         offset += 68;
     }
 
-    dataTrans->addDataBfr(bfr64k, 15 * 68, true);
-    dataTrans->setStatus(FDD_OK);                   // done
-}
-
-void FloppySetup::searchMark(void)
-{
-    dataTrans->recvData(bfr64k, 512);               // read data
-
-    int page = (int) bfr64k[0];
-    int item = (int) bfr64k[1];
-
-    int itemIndex = (page * PAGESIZE) + item;
-
-    shared.imageList->markImage(itemIndex);                 // (un)mark this image
-
+    dataTrans->addDataBfr(bfr64k, pageSize * 68, true);
     dataTrans->setStatus(FDD_OK);                   // done
 }
 
@@ -197,10 +181,11 @@ void FloppySetup::searchDownload2Storage(void)
         return;
     }
 
-    int page = (int) bfr64k[0];
-    int item = (int) bfr64k[1];
+    int pageSize = (int) bfr64k[0];         // 0   : items per page
+    int page = Utils::getWord(bfr64k + 1);  // 1, 2: page number
+    int rowNo = (int) bfr64k[3];            // 3   : row number
 
-    int itemIndex = (page * PAGESIZE) + item;
+    int itemIndex = (page * pageSize) + rowNo;
 
     std::string imageName;      // get image name by index of item
     bres = shared.imageList->getImageNameFromResultsByIndex(itemIndex, imageName);
@@ -252,10 +237,11 @@ void FloppySetup::searchDeleteFromStorage(void)
         return;
     }
 
-    int page = (int) bfr64k[0];
-    int item = (int) bfr64k[1];
+    int pageSize = (int) bfr64k[0];			// items per page
+    int page = Utils::getWord(bfr64k + 1);	// page number
+    int rowNo = (int) bfr64k[3];			// row number
 
-    int itemIndex = (page * PAGESIZE) + item;
+    int itemIndex = (page * pageSize) + rowNo;
 
     std::string imageName;      // get image name by index of item
     bres = shared.imageList->getImageNameFromResultsByIndex(itemIndex, imageName);
@@ -301,16 +287,17 @@ void FloppySetup::searchInsertToSlot(void)
         return;
     }
 
-    int page = (int) bfr64k[0];
-    int item = (int) bfr64k[1];
-    int slotNo = (int) bfr64k[2];
+	int pageSize = (int) bfr64k[0];			// 0   : items per page
+    int page = Utils::getWord(bfr64k + 1);	// 1, 2: page number
+    int rowNo = (int) bfr64k[3];			// 3   : row number on page
+    int slotNo = (int) bfr64k[4];			// 4   : slot number
 
     if(slotNo < 0 || slotNo > 2) {         // slot out of range? fail
         dataTrans->setStatus(FDD_ERROR);
         return;
     }
 
-    int itemIndex = (page * PAGESIZE) + item;
+    int itemIndex = (page * pageSize) + rowNo;
 
     std::string imageName;      // get image name by index of item
     bres = shared.imageList->getImageNameFromResultsByIndex(itemIndex, imageName);
@@ -335,7 +322,7 @@ void FloppySetup::searchInsertToSlot(void)
     // set floppy image to slot
     std::string sPath, sFile, sEmpty;
     Utils::splitFilenameFromPath(localImagePath, sPath, sFile);
-    shared.imageSilo->add(slotNo, sFile, localImagePath, sEmpty, sEmpty, true);
+    shared.imageSilo->add(slotNo, sFile, localImagePath, sEmpty, true);
 
     dataTrans->setStatus(FDD_OK);               // done
 }
@@ -368,7 +355,6 @@ void FloppySetup::downloadOnDevice(void)
 
             if(index == 10) {                                   // if we just saved the downloaded file
                 unlink(inetDnFilePath.c_str());                 // delete it from RPi
-                imgDnStatus = IMG_DN_STATUS_IDLE;               // the download is now idle
             }
 
             dataTrans->setStatus(FDD_RES_ONDEVICECOPY);
@@ -381,110 +367,6 @@ void FloppySetup::downloadOnDevice(void)
     }
 
     dataTrans->setStatus(FDD_ERROR);                        // if came here, on device copy didn't succeed
-}
-
-void FloppySetup::searchDownload(void)
-{
-    std::string url, filename;
-    int         checksum;
-    bool        res;
-    std::string statusStr;
-    BYTE        statusVal;
-
-    statusStr.clear();                                      // clear status - might contain something in case of DOWNLOAD_FAIL
-
-    if(imgDnStatus == IMG_DN_STATUS_DOWNLOADING) {          // if we're downloading
-        switch(currentImageDownloadStatus) {
-            case DWNSTATUS_WAITING:                         // in this state just report we're working
-                Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- DWNSTATUS_WAITING");
-
-                statusStr = inetDnFilename + ": waiting for start of download";
-                statusVal = FDD_DN_WORKING;
-                break;
-
-            case DWNSTATUS_DOWNLOADING:                     // in this state just report we're working
-                Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- DWNSTATUS_DOWNLOADING");
-
-                Downloader::status(statusStr, DWNTYPE_FLOPPYIMG);
-                std::replace(statusStr.begin(), statusStr.end(), '\n', ' '); // replace all new line characters with spaces
-                statusVal = FDD_DN_WORKING;
-                break;
-
-            case DWNSTATUS_VERIFYING:                       // in this state just report we're working
-                Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- DWNSTATUS_VERIFYING");
-
-                statusStr = inetDnFilename + ": verifying checksum";
-                statusVal = FDD_DN_WORKING;
-                break;
-
-            case DWNSTATUS_DOWNLOAD_OK:                     // report we've downloaded stuff, and go to DOWNLOADED state
-                Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- DWNSTATUS_DOWNLOAD_OK");
-
-                statusStr = inetDnFilename + ": download OK";
-                statusVal = FDD_DN_DONE;
-
-                imgDnStatus = IMG_DN_STATUS_DOWNLOADED;     // go to this state
-                break;
-
-            case DWNSTATUS_DOWNLOAD_FAIL:                   // when failed, report that we've failed and go to next download
-                Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- DWNSTATUS_DOWNLOAD_FAIL");
-
-                statusStr = inetDnFilename + ": download failed!\n\r\n\r";
-
-                imgDnStatus = IMG_DN_STATUS_IDLE;           // go to this state
-                break;
-
-            default:                                        // this should never happen
-                Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- default, wtf?");
-
-                statusStr = "WTF?";
-                break;
-        }
-
-        if(imgDnStatus != IMG_DN_STATUS_IDLE) {             // if it's not the case of failed download
-            Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- not IMG_DN_STATUS_IDLE, status: %s", statusStr.c_str());
-
-            dataTrans->addDataBfr(statusStr.c_str(), statusStr.length(), true);
-            dataTrans->setStatus(statusVal);
-            return;
-        }
-    }
-
-    // if we came here, we either haven't been downloading yet, or the previous download failed
-    if(imgDnStatus == IMG_DN_STATUS_IDLE) {                 // if we're idle, start to download
-        Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- is IMG_DN_STATUS_IDLE");
-
-        res = shared.imageList->getFirstMarkedImage(url, checksum, filename);   // see if we got anything marked for download
-
-        if(res) {                                           // if got some image to download, start the download
-            Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- getFirstMarkedImage() returned %s, will download it", filename.c_str());
-
-            imgDnStatus     = IMG_DN_STATUS_DOWNLOADING;        // mark that we're downloading something
-            inetDnFilename  = filename;                         // just filename of downloaded file
-            inetDnFilePath  = IMAGE_DOWNLOAD_DIR + filename;    // create full path and filename to the downloaded file
-
-            unlink(inetDnFilePath.c_str());                     // if this file exists on the drive, delete it
-            //------
-            currentImageDownloadStatus = DWNSTATUS_WAITING;
-
-            TDownloadRequest tdr;
-            tdr.srcUrl          = url;
-            tdr.checksum        = checksum;
-            tdr.dstDir          = IMAGE_DOWNLOAD_DIR;
-            tdr.downloadType    = DWNTYPE_FLOPPYIMG;            // we're downloading floppy image
-            tdr.pStatusByte     = &currentImageDownloadStatus;  // update this variable with current status
-            Downloader::add(tdr);
-
-            statusStr += "Downloading: " + url;
-            dataTrans->addDataBfr(statusStr.c_str(), statusStr.length(), true);
-
-            dataTrans->setStatus(FDD_DN_WORKING);           // tell ST we're downloading
-        } else {                                            // nothing to download? say that to ST
-            Debug::out(LOG_DEBUG, "FloppySetup::searchDownload -- nothing (more) to download");
-
-            dataTrans->setStatus(FDD_DN_NOTHING_MORE);
-        }
-    }
 }
 
 void FloppySetup::uploadStart(void)
@@ -537,7 +419,7 @@ void FloppySetup::uploadStart(void)
     std::string path, file;
     Utils::splitFilenameFromPath(pathWithHostSeparators, path, file);
 
-    path = UPLOAD_PATH + file;
+    path = FLOPPY_UPLOAD_PATH + file;
 
     FILE *f = NULL;
 
@@ -556,14 +438,11 @@ void FloppySetup::uploadStart(void)
     currentUpload.slotIndex             = index;
     currentUpload.fh                    = f;
     currentUpload.atariSourcePath       = atariFilePath;            // atari path:                      C:\bla.st
-    currentUpload.hostSourcePath        = hostPath;                 // host path for translated drives: /mnt/sda/bla.st
-    currentUpload.hostDestinationPath   = path;                     // host destination:                /tmp/bla.st
+    currentUpload.hostPath              = hostPath;                 // host path for translated drives: /mnt/sda/bla.st, or /tmp/bla.st if it was uploaded from ST drive
     currentUpload.file                  = file;                     // just file name:                  bla.st
 
     // do on-device-copy if needed
     if(doOnDeviceCopy) {                                            // if doing on-device-copy...
-        res = Utils::copyFile(hostPath, path);                      // copy the file
-
         if(res) {                                                   // if file was copied
             cmd[4] = FDD_CMD_UPLOADIMGBLOCK_DONE_OK;
             cmd[5] = index;
@@ -628,7 +507,7 @@ void FloppySetup::uploadEnd(bool isOnDeviceCopy)
     }
 
     // we're here, the image upload succeeded, the following will also encode the image...
-    shared.imageSilo->add(currentUpload.slotIndex, currentUpload.file, currentUpload.hostDestinationPath, currentUpload.atariSourcePath, currentUpload.hostSourcePath, true);
+    shared.imageSilo->add(currentUpload.slotIndex, currentUpload.file, currentUpload.hostPath, currentUpload.atariSourcePath, true);
 
     // now finish with OK status
     if(isOnDeviceCopy) {                                        // for on-device-copy send special status
@@ -654,7 +533,7 @@ void FloppySetup::newImage(void)
     char file[128];
     getNewImageName(file);
     std::string justFile = file;
-    std::string pathAndFile = UPLOAD_PATH + justFile;
+    std::string pathAndFile = FLOPPY_UPLOAD_PATH + justFile;
 
     bool res = createNewImage(pathAndFile);             // create the new image on disk
 
@@ -665,7 +544,7 @@ void FloppySetup::newImage(void)
 
     // we're here, the image creation succeeded
     std::string empty;
-    shared.imageSilo->add(index, justFile, pathAndFile, empty, empty, true);
+    shared.imageSilo->add(index, justFile, pathAndFile, empty, true);
 
     dataTrans->setStatus(FDD_OK);
 }
@@ -713,7 +592,7 @@ void FloppySetup::getNewImageName(char *nameBfr)
     for(int i=0; i<100; i++) {
         sprintf(fileName, "newimg%d.st", i);						// create new filename
 
-        std::string fnameWithPath = UPLOAD_PATH;
+        std::string fnameWithPath = FLOPPY_UPLOAD_PATH;
         fnameWithPath += fileName;									// this will be filename with path
 
         if(shared.imageSilo->containsImage(fileName)) {					// if this file is already in silo, skip it
@@ -748,7 +627,7 @@ void FloppySetup::downloadStart(void)
             return;
         }
 
-        hostPath        = ss->hostDestPath;                 // where on RPi is the file (e.g. /tmp/disk.img)
+        hostPath        = ss->hostPath;                     // where on RPi is the file (e.g. /tmp/disk.img or /mnt/sda/gamez.bla.st)
         justFileName    = ss->imageFile;                    // just the filename (e.g. disk.img)
     } else if(index == 10) {                                // downloading from inet download file?
         hostPath        = inetDnFilePath;                   // where on RPi is the file (e.g. /tmp/A_001.st)
@@ -820,7 +699,6 @@ void FloppySetup::downloadDone(void)
 
     if(index == 10) {                                   // if we just saved the downloaded file
         unlink(inetDnFilePath.c_str());                 // delete it from RPi
-        imgDnStatus = IMG_DN_STATUS_IDLE;               // the download is now idle
     }
 
     dataTrans->setStatus(FDD_OK);
@@ -856,6 +734,9 @@ void FloppySetup::setCurrentSlot(void)
 
 void FloppySetup::getImageEncodingRunning(void)
 {
+    static int progress = 0;
+    char progChars[4] = {'|', '/', '-', '\\'};
+
     bool encoding = ImageSilo::getFloppyEncodingRunning();
     bool doWeHaveStorage = shared.imageStorage->doWeHaveStorage();
     int  downloadCount = Downloader::count(DWNTYPE_FLOPPYIMG);
@@ -874,14 +755,18 @@ void FloppySetup::getImageEncodingRunning(void)
 
             if(downloadCount > 0) {     // if also downloading, add column
                 status += std::string(", ");
+            } else {                    // not downloading, add heartbeat symbol
+                status.push_back(' ');
+                status.push_back(progChars[progress]);
+                progress = (progress + 1) % 4;
             }
         }
 
         char tmp[50];
         if(downloadCount > 1) {         // more than 1 file?
-            if(encoding) {				// and also encoding? shorter download status
+            if(encoding) {              // and also encoding? shorter download status
                 sprintf(tmp, "Download: %d files, now: %d %%", downloadCount, downloadProgr);
-            } else {					// not encoding? longer download status
+            } else {                    // not encoding? longer download status
                 sprintf(tmp, "Downloading %d files, current: %d %%", downloadCount, downloadProgr);
             }
 

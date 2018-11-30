@@ -14,8 +14,10 @@
 #include "mfmdecoder.h"
 #include "mfmcachedimage.h"
 
-#define EMPTY_IMAGE_SLOT        3
-#define EMPTY_IMAGE_PATH        "/tmp/emptyimage.st"
+#define SLOT_COUNT          4
+
+#define EMPTY_IMAGE_SLOT    3
+#define EMPTY_IMAGE_PATH    "/tmp/emptyimage.st"
 
 //-------------------------------------------
 // these globals here are just for status report
@@ -29,21 +31,18 @@ typedef struct
 {
     std::string     imageFile;      // just file name:                     bla.st
     std::string     imageFileNoExt; // file name without extension:        bla
-    std::string     hostDestPath;   // where the file is stored when used: /tmp/bla.st
     std::string     atariSrcPath;   // from where the file was uploaded:   C:\gamez\bla.st
-    std::string     hostSrcPath;    // for translated disk, host path:     /mnt/sda/gamez/bla.st
+    std::string     hostPath;       // for translated disk, host path:     /mnt/sda/gamez/bla.st
+                                    // or where uploaded disk where is stored: /tmp/bla.st
 
-    MfmCachedImage  encImage;
+    volatile bool   openRequested;  // set to true when doing open file request, set to false after successful open
+    volatile DWORD  openRequestTime; // timestamp when other thread requested opening of image
+    volatile DWORD  openActionTime; // timestamp when encoder did really open the file
+    std::string     imageFileName;  // file name of image to open next
+    FloppyImage     *image;         // this holds object with the loaded floppy image (in normal data form)
+
+    MfmCachedImage  encImage;       // this holds the MFM encoded image ready to be streamed
 } SiloSlot;
-
-typedef struct
-{
-    int                slotIndex;                // number of slot for which this is done
-    std::string        filename;                // file name and path where the image is located
-    MfmCachedImage    *encImg;                // pointer to where this image should be stored after encoding
-} EncodeRequest;
-
-void *floppyEncodeThreadCode(void *ptr);
 
 class ImageSilo
 {
@@ -65,12 +64,12 @@ public:
     bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
     BYTE *getEmptyTrack(void);
 
-    void add(int positionIndex, std::string &filename, std::string &hostDestPath, std::string &atariSrcPath, std::string &hostSrcPath, bool saveToSettings);
+    void add(int positionIndex, std::string &filename, std::string &hostPath, std::string &atariSrcPath, bool saveToSettings);
     void swap(int index);
     void remove(int index);
 
     bool containsImage(const char *filename);
-    void containsImageInSlots(std::string &filenameWExt, std::string &bfr);
+    void containsImageInSlots(std::string &filenameWExt, char *bfr);
     void removeByFileName(std::string &filenameWExt);
     bool currentSlotHasNewContent(void);
 
@@ -84,20 +83,11 @@ public:
 
 private:
     void clearSlot(int index);
-    static void addEncodeRequest(EncodeRequest &er);
 
-    SiloSlot                slots[4];
-    int                        currentSlot;
     SettingsReloadProxy     *reloadProxy;
 
     BYTE                    *emptyTrack;
 
-    static pthread_mutex_t floppyEncodeQueueMutex;
-    static pthread_cond_t floppyEncodeQueueNotEmpty;
-    static std::queue<EncodeRequest> encodeQueue;
-    static volatile bool shouldStop;
-
-    static volatile bool floppyEncodingRunning;
     static SiloSlotSimple floppyImages[3];
     static int floppyImageSelected;
 };

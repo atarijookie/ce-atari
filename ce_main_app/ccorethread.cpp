@@ -30,6 +30,7 @@
 #include "floppy/imagelist.h"
 #include "floppy/imagesilo.h"
 #include "floppy/imagestorage.h"
+#include "floppy/floppyencoder.h"
 
 #include "mediastreaming/mediastreaming.h"
 
@@ -1105,10 +1106,9 @@ void CCoreThread::handleSendTrack(void)
 
 void CCoreThread::handleSectorWritten(void)
 {
-    #define BUFFSIZE    2048
-    BYTE oBuf[BUFFSIZE], iBuf[BUFFSIZE];
+    BYTE oBuf[WRITTENMFMSECTOR_SIZE], iBuf[WRITTENMFMSECTOR_SIZE];
 
-    memset(oBuf, 0, BUFFSIZE);
+    memset(oBuf, 0, WRITTENMFMSECTOR_SIZE);
 
     WORD remainingSize = conSpi->getRemainingLength();              // get how many data we still have
     conSpi->txRx(SPI_CS_FRANZ, remainingSize, oBuf, iBuf);          // get all the remaining data
@@ -1118,10 +1118,12 @@ void CCoreThread::handleSectorWritten(void)
     int track   = iBuf[1] & 0x7f;
     int side    = (iBuf[1] & 0x80) ? 1 : 0;
 
-    Debug::out(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d -- TODO!!!", track, side, sector);
-
-    // TODO:
-    // do the written sector processing
+    if(!floppyConfig.writeProtected) {  // not write protected? write
+        floppyEncoder_decodeMfmWrittenSector(track, side, sector, iBuf, remainingSize); // let floppy encoder handle decoding, reencoding, saving
+        Debug::out(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d", track, side, sector);
+    } else {                            // is write protected? don't write
+        Debug::out(LOG_DEBUG, "handleSectorWritten -- floppy is write protected, not writing");
+    }
 }
 
 void CCoreThread::handleRecoveryCommands(int recoveryLevel)
@@ -1181,7 +1183,7 @@ void CCoreThread::insertSpecialFloppyImage(int specialImageId)
     }
 
     // encode MSA config image to MFM stream - in slot #0
-    shared.imageSilo->add(0, ceConfFilename, ceConfFullPath, dummy, dummy, false);
+    shared.imageSilo->add(0, ceConfFilename, ceConfFullPath, dummy, false);
 
     // set the current to slot #0
     shared.imageSilo->setCurrentSlot(0);

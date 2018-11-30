@@ -5,15 +5,22 @@
 
 bool FloppyImageSt::open(const char *fileName)
 {
+    loadedFlag = false;
+
     if(!FloppyImage::open(fileName))
         return false;
 
-    if(!loadImageIntoMemory()) {        // load the whole image in memory to avoid later disk access
-        close();
+    bool res = loadImageIntoMemory();   // load the whole image in memory to avoid later disk access
+    close();                            // close the file, all the needed data is now in memory
+
+    if(!res) {                          // if failed to load image, quit and fail
+        clear();
         return false;
     }
 
     calcParams();                       // calculate the params of this floppy
+
+    loadedFlag = true;
 
     Debug::out(LOG_DEBUG, "ST Image opened: %s", fileName);
     Debug::out(LOG_DEBUG, "ST Image params - %d tracks, %d sides, %d sectors per track", params.tracksNo, params.sidesNo, params.sectorsPerTrack);
@@ -63,8 +70,22 @@ bool FloppyImageSt::calcParams(void)
     return false;
 }
 
-bool FloppyImageSt::save(const char *fileName)
+bool FloppyImageSt::save(void)
 {
-    //TODO: implement this later
-    return true;
+    sectorsWritten = 0;                 // clear unwritten sectors counter
+
+    if(!isLoaded()) {                   // nothing in memory? fail
+        return false;
+    }
+
+    FILE *f = fopen(currentFileName.c_str(), "wb");    // open
+
+    if(!f) {                            // failed?
+        return false;
+    }
+
+    int res = fwrite(image.data, 1, image.size, f); // write
+
+    fclose(f);                          // close
+    return (res == image.size);         // success if written as much as should
 }

@@ -16,7 +16,7 @@
     var slots = [];             // this holds fileNames of currently loaded images in slots
     var totalPages = 0;
     var currentPage = 0;
-    var do_we_have_storage = true;
+    var do_we_have_storage = false;
     var prevDownloadingCount = 0;
     var prev_encoding_ready = true;
     var prevSearchString = "";
@@ -387,15 +387,14 @@ function onDelayedSearchStringChanged()
 }
 
 $(document).ready(function(){
-    getSearchResults(""); // get list of files
+    onCheckTimer();         // load all the status variables
+    getSearchResults("");   // get list of files and show it
 
     // add handler to search string change
     var search_input = document.getElementById('search_input')
     search_input.onchange = function(){ onDelayedSearchStringChanged(); };
     search_input.onkeydown = function(){ onDelayedSearchStringChanged(); };
     search_input.onkeypress = function(){ onDelayedSearchStringChanged(); };
-
-    onCheckTimer();     // load all the statuses
 });
 
         </script>     

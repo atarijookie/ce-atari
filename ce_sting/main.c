@@ -169,23 +169,3 @@ char *getvstr (char *name)
 	return "0";
 }
 
-void logMsg(char *logMsg)
-{
-//    if(showLogs) {
-//        (void) Cconws(logMsg);
-//    }
-}
-
-void logMsgProgress(DWORD current, DWORD total)
-{
-//    if(!showLogs) {
-//        return;
-//    }
-
-//    (void) Cconws("Progress: ");
-//    showHexDword(current);
-//    (void) Cconws(" out of ");
-//    showHexDword(total);
-//    (void) Cconws("\n\r");
-}
-

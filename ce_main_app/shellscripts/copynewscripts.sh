@@ -51,13 +51,13 @@ rm -f "/ce/ceboot.sh"
 
 #---------------------------------------------------------------------------
 # then copy the scripts which are different for Raspbian and Yocto
-distro=$( /ce/whichdistro.sh ) 
+distro=$( /ce/whichdistro.sh )
 
 # If at least once the Yocto was found, it's Yocto
 if [ "$distro" = "yocto" ]; then
     # for yocto
     compareAndCopy "/ce/wifisuper.sh" "/ce/app/shellscripts/wifisuper.sh"        # update wifisuper.sh
-    
+
     #ln -fs /ce/ce_start.sh /etc/rc5.d/S80ce
 else
     # for raspbian
@@ -115,7 +115,7 @@ else
     #------------------------
     # disable ctrl-alt-del causing restart
     ln -fs /dev/null /lib/systemd/system/ctrl-alt-del.target
-    
+
     # disable auto-login
     ln -fs /lib/systemd/system/getty@.service /etc/systemd/system/getty.target.wants/getty@tty1.service
 fi

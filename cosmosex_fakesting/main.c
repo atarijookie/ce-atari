@@ -14,13 +14,13 @@
 #include <stdio.h>
 #include <ctype.h>
 
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
+
 #include "globdefs.h"
-#include "acsi.h"
 #include "ce_commands.h"
 #include "con_man.h"
-#include "stdlib.h"
 #include "setup.h"
-#include "find_ce.h"
 #include "vbl.h"
 
 void showAppVersion(void);
@@ -62,13 +62,12 @@ WORD  requiredVersion;
 void initJumpTable(void);
 
 //---------------------------------------
-extern BYTE showHex_toLogNotScreen;
+#define REQUIRED_NETADAPTER_VERSION     0x0100
 
 int main(void)
 {
     int   count;
 
-    showHex_toLogNotScreen = 0;                                 // showHex* to screen
     initJumpTable();                                            // fill the jump table with addresses of functions
 
     (void) Cconws("\n\r\033p|    Fake STinG for CosmosEx    |\033q");
@@ -82,9 +81,9 @@ int main(void)
 	pDmaBuffer = &dmaBuffer[2];
 	pDmaBuffer = (BYTE *) (((DWORD) pDmaBuffer) & 0xfffffffe);  // remove odd bit if the address was odd
 
-	BYTE found = Supexec(findDevice);                           // try to find the CosmosEx device on ACSI bus
+    deviceID = findDevice(0, 0);
 
-    if(!found) {								                // not found? quit
+    if(deviceID == DEVICE_NOT_FOUND) {
         sleep(3);
         return 0;
     }
@@ -132,9 +131,6 @@ int main(void)
 
     (void) Cconws("Driver was installed...");
 
-    showHex_toLogNotScreen = 1;                                 // showHex* to log
-
-//    appl_init();                                                // init gem
     sleep(2);
 
     Ptermres (_pgmsize, 0);
@@ -168,93 +164,3 @@ char *getvstr (char *name)
 	
 	return "0";
 }
-
-void showAppVersion(void)
-{
-    char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-    char const *buildDate = __DATE__;
-
-    int year = 0, month = 0, day = 0;
-    int i;
-    for(i=0; i<12; i++) {
-        if(strncmp(months[i], buildDate, 3) == 0) {
-            month = i + 1;
-            break;
-        }
-    }
-
-    day     = getIntFromStr(buildDate + 4, 2);
-    year    = getIntFromStr(buildDate + 7, 4);
-
-    if(day > 0 && month > 0 && year > 0) {
-        showInt(year, 4);
-        (void) Cconout('-');
-        showInt(month, 2);
-        (void) Cconout('-');
-        showInt(day, 2);
-    } else {
-        (void) Cconws("YYYY-MM-DD");
-    }
-}
-
-int getIntFromStr(const char *str, int len)
-{
-    int i;
-    int val = 0;
-
-    for(i=0; i<len; i++) {
-        int digit;
-
-        if(str[i] >= '0' && str[i] <= '9') {
-            digit = str[i] - '0';
-        } else {
-            digit = 0;
-        }
-
-        val *= 10;
-        val += digit;
-    }
-
-    return val;
-}
-
-void showInt(int value, int length)
-{
-    char tmp[10];
-    memset(tmp, 0, 10);
-
-    int i;
-    for(i=0; i<length; i++) {               // go through the int lenght and get the digits
-        int val, mod;
-
-        val = value / 10;
-        mod = value % 10;
-
-        tmp[length - 1 - i] = mod + 48;     // store the current digit
-
-        value = val;
-    }
-
-    (void) Cconws(tmp);                     // write it out
-}
-
-void logMsg(char *logMsg)
-{
-//    if(showLogs) {
-//        (void) Cconws(logMsg);
-//    }
-}
-
-void logMsgProgress(DWORD current, DWORD total)
-{
-//    if(!showLogs) {
-//        return;
-//    }
-
-//    (void) Cconws("Progress: ");
-//    showHexDword(current);
-//    (void) Cconws(" out of ");
-//    showHexDword(total);
-//    (void) Cconws("\n\r");
-}
-
