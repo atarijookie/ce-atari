@@ -67,6 +67,9 @@ BYTE findDevice(BYTE whichIF, BYTE whichDevType);
 // return found device type which was found when findDevice() did run last time
 BYTE getDevTypeFound(void);
 
+typedef void (*StatusDisplayer)(const char *status);
+void setStatusDisplayer(void *func);
+
 //--------------------------------
 // specify which device should be found - CosmosEx, CosmoSolo, any other SCSI / ACSI device
 #define DEV_NONE    0           // if nothing was found

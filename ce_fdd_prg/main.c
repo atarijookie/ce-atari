@@ -8,8 +8,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "../ce_hdd_if/stdlib.h"
 #include "../ce_hdd_if/hdd_if.h"
+#include "../ce_hdd_if/stdlib.h"
 
 #include "main.h"
 #include "hostmoddefs.h"
@@ -46,6 +46,9 @@ void handleCmdlineUpload(char *path, int paramsLength);
 //#define NODEVICE
 
 OBJECT *getScanDialogTree(void);
+
+void showStatusInGem(char *status);
+extern OBJECT *scanDialogTree;     // this gets filled by getScanDialogTree() and then used when scanning
 
 // ------------------------------------------------------------------
 int main(int argc, char** argv)
@@ -92,28 +95,23 @@ int main(int argc, char** argv)
     }
 
 #ifndef NODEVICE
-/*
-    Scanning with GEM currently disabled, as this findDevice() is used all in supervisor mode
-    and that is probably causing the crash on return. The findDevice() should be altered to 
-    run in user mode and switch to supervisor only for hw access...
-*/
     Dialog scanDialog;
-    scanDialog.tree = getScanDialogTree();   // get pointer to GEM dialog definition
+    scanDialog.tree = getScanDialogTree();  // get pointer to GEM dialog definition
     cd = &scanDialog;
+    setStatusDisplayer(showStatusInGem);    // set displaying function
 
-    showDialog(TRUE);                           // show GEM dialog
+    showDialog(TRUE);                       // show GEM dialog
 
     // search for CosmosEx on ACSI & SCSI bus
     deviceID = findDevice(IF_ANY, DEV_CE);
 
     if(deviceID == DEVICE_NOT_FOUND) {
-        gem_deinit();               // deinit GEM
+        gem_deinit();                       // deinit GEM
         Mfree(pBfrOrig);
         return 0;
     }
 
-    showDialog(FALSE);                          // hide GEM dialog
-
+    showDialog(FALSE);                      // hide GEM dialog
 #endif
 
     // now set up the acsi command bytes so we don't have to deal with this one anymore

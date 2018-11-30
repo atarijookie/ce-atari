@@ -1,9 +1,4 @@
 //--------------------------------------------------
-#include <mint/sysbind.h>
-#include <mint/osbind.h>
-#include <mint/basepage.h>
-#include <mint/ostruct.h>
-#include <support.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -11,7 +6,8 @@
 #include <gem.h>
 #include <mt_gem.h>
 
-#include "stdlib.h"
+#include "../ce_hdd_if/stdlib.h"
+#include "../ce_hdd_if/hdd_if.h"
 
 //--------------------------------------------------
 // following code is used to define a simple dialog for showing progress of scan using GEM

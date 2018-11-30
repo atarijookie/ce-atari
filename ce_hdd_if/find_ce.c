@@ -22,8 +22,12 @@ BYTE machine;
 // following static vars are used for passing arguments from user-mode findDevice to supervisor-mode findDevice()
 static BYTE __whichIF, __whichDevType, __devTypeFound, __mode;
 
-void showStatusInGem(char *status);
-extern OBJECT *scanDialogTree;     // this gets filled by getScanDialogTree() and then used when scanning
+StatusDisplayer statusDisplayer;
+
+void setStatusDisplayer(void *func)
+{
+    statusDisplayer = (StatusDisplayer) func;
+}
 
 //--------------------------------------------------
 // do a generic SCSI INQUIRY command, return TRUE on success
@@ -116,9 +120,9 @@ const char *hddIfToString(BYTE hddIf)
     }
 }
 
-void showGemFoundMessage(BYTE hddIf, BYTE id)
+void showFoundMessageThroughDisplayer(BYTE hddIf, BYTE id)
 {
-    if(!scanDialogTree) {
+    if(!statusDisplayer) {
         return;
     }
 
@@ -130,7 +134,23 @@ void showGemFoundMessage(BYTE hddIf, BYTE id)
     int len = strlen(tmp);      // get length
     tmp[len - 1] = '0' + id;    // store ID at the end
 
-    showStatusInGem(tmp);
+    (*statusDisplayer)(tmp);
+}
+
+void showSearchMessageThroughDisplayer(BYTE hddIf, BYTE id)
+{
+    if(!statusDisplayer) {
+        return;
+    }
+
+    char tmp[20];
+    strcpy(tmp, hddIfToString(hddIf));
+    strcat(tmp, " X");          // placeholder for ID
+
+    int len = strlen(tmp);      // get length
+    tmp[len - 1] = '0' + id;    // store ID at the end
+
+    (*statusDisplayer)(tmp);
 }
 
 //--------------------------------------------------
@@ -141,7 +161,7 @@ BYTE findDeviceOnSingleIF(BYTE hddIf, BYTE whichDevType)
     BYTE id;
     BYTE devTypeFound;
 
-    if(!scanDialogTree) {
+    if(!statusDisplayer) {
         (void) Cconws("\n\rLooking for device on ");
         (void) Cconws(hddIfToString(hddIf));
         (void) Cconws(": ");
@@ -150,10 +170,10 @@ BYTE findDeviceOnSingleIF(BYTE hddIf, BYTE whichDevType)
     hdd_if_select(hddIf);           // select HDD IF
 
     for(id=0; id<8; id++) {         // try to talk to all ACSI devices
-        if(!scanDialogTree) {
+        if(!statusDisplayer) {
             Cconout('0' + id);          // write out BUS ID
         } else {
-
+            showSearchMessageThroughDisplayer(hddIf, id);
         }
 
         devTypeFound = scsi_inquiry(id);    // do generic SCSI INQUIRY to find out if this device lives or not
@@ -165,10 +185,10 @@ BYTE findDeviceOnSingleIF(BYTE hddIf, BYTE whichDevType)
             BYTE res = ce_identify(id);    // try to read the IDENTITY string
 
             if(res == TRUE) {               // if found
-                if(!scanDialogTree) {
+                if(!statusDisplayer) {
                     (void) Cconws(" <-- found CE\n\r");
                 } else {
-                    showGemFoundMessage(hddIf, id);
+                    showFoundMessageThroughDisplayer(hddIf, id);
                 }
 
                 __devTypeFound = DEV_CE;    // found this dev type
@@ -178,10 +198,10 @@ BYTE findDeviceOnSingleIF(BYTE hddIf, BYTE whichDevType)
 
         if(whichDevType & DEV_CS) {         // should be looking for CS?
             if(devTypeFound == DEV_CS) {    // if found
-                if(!scanDialogTree) {
+                if(!statusDisplayer) {
                     (void) Cconws(" <-- found CS\n\r");
                 } else {
-                    showGemFoundMessage(hddIf, id);
+                    showFoundMessageThroughDisplayer(hddIf, id);
                 }
 
                 __devTypeFound = DEV_CS;    // found this dev type
@@ -190,10 +210,10 @@ BYTE findDeviceOnSingleIF(BYTE hddIf, BYTE whichDevType)
         }
 
         if(whichDevType & DEV_OTHER) {      // should be looking for other device types? if it came here, it's not CE and not CS, so it's OTHER
-            if(!scanDialogTree) {
+            if(!statusDisplayer) {
                 (void) Cconws(" <-- found OTHER\n\r");
             } else {
-                showGemFoundMessage(hddIf, id);
+                showFoundMessageThroughDisplayer(hddIf, id);
             }
 
             __devTypeFound = DEV_OTHER;     // found this dev type
@@ -257,7 +277,8 @@ BYTE __findDevice(void)
     BYTE searchIF = IF_NONE;
 
     switch(machine) {
-        case MACHINE_ST:        searchIF = (IF_ACSI | IF_CART);     break;
+        case MACHINE_ST:        searchIF =  IF_ACSI ;               break;  // IF_CART disabled 
+        //case MACHINE_ST:        searchIF = (IF_ACSI | IF_CART);   break;  // IF_CART enabled
         case MACHINE_TT:        searchIF = (IF_ACSI | IF_SCSI_TT);  break;
         case MACHINE_FALCON:    searchIF = (IF_SCSI_FALCON);        break;
     }
@@ -285,11 +306,11 @@ BYTE __findDevice(void)
             }
         }
 
-        if(!scanDialogTree) {
+        if(!statusDisplayer) {
             (void) Cconws("\n\rDevice not found.\n\rPress any key to retry or 'Q' to quit.\n\r");
             key = Cnecin();
         } else {
-            showStatusInGem("Device not found.");
+            (*statusDisplayer)("Device not found.");
             key = 'Q';
             sleep(1);
         }
