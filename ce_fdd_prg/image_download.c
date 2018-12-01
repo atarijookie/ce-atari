@@ -35,7 +35,7 @@ void showResults(void);
 void selectDestinationDir(void);
 BYTE refreshImageList(void);
 
-void getStatus(void);
+void getStatus(BYTE alsoShow);
 
 BYTE searchContent[2 * 512];        // currently shown content
 BYTE prevSearchContent[2 * 512];    // previously shown content
@@ -360,7 +360,7 @@ BYTE gem_imageDownload(void)
 
     showSearchString();     // show the empty search string (if switched to already once opened form)
     imageSearch();          // get first results, fill it to dialog, drawing of dialog
-    getStatus();
+    getStatus(TRUE);
 
     BYTE retVal = KEY_F10;
 
@@ -392,7 +392,7 @@ BYTE gem_imageDownload(void)
                 lastStatusUpdate = now;                 // we're getting status now
                 BYTE refreshDataAndRedraw = FALSE;
 
-                getStatus();                            // talk to CE to see the status
+                getStatus(TRUE);                        // talk to CE to see the status
 
                 if(status.downloadCount == 0 && status.prevDownloadCount > 0) {     // if we just finished downloading (not downloading now, but were downloading a while ago)
                     refreshDataAndRedraw = TRUE;        // do a refresh
@@ -686,7 +686,7 @@ BYTE searchInit(void)
     return FALSE;
 }
 
-void getStatus(void)
+void getStatus(BYTE alsoShow)
 {
     commandShort[4] = FDD_CMD_GET_IMAGE_ENCODING_RUNNING;
     commandShort[5] = 0;
@@ -707,5 +707,7 @@ void getStatus(void)
     status.prevDownloadCount = status.downloadCount;        // make a copy of previous download files count
     status.downloadCount = pBfr[2];             // how many files are still downloading?
 
-    setObjectString(otherObjs[STATUS], (const char *) (pBfr + 4)); // show status line
+    if(alsoShow) {
+        setObjectString(otherObjs[STATUS], (const char *) (pBfr + 4)); // show status line
+    }
 }
