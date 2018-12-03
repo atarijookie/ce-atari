@@ -245,7 +245,7 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
     //-----
     pthread_mutex_lock(&floppyEncoderMutex);      // unlock the mutex
 
-    if(tracks[index].encodeRequestTime < tracks[index].encodeActionTime) {  // if there wasn't any request since we started to encode this track, it's ready (otherwise needs reencoding)
+    if(tracks[index].encodeRequestTime <= tracks[index].encodeActionTime) {  // if there wasn't any request since we started to encode this track, it's ready (otherwise needs reencoding)
         tracks[index].isReady = true;               // track is now ready to be streamed
     }
 
