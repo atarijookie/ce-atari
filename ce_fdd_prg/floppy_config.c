@@ -44,7 +44,7 @@ void showMenu(char fullNotPartial);
 void showImage(int index);
 void getSiloContent(void);
 
-void getStatus(void);
+void getStatus(BYTE alsoShow);
 extern Status status;
 
 Dialog dialogConfig;        // dialog with floppy image config
@@ -172,7 +172,7 @@ BYTE gem_floppySetup(void)
         }
 
         if(exitobj == BTN_INTERNET) {   // user wants to download images from internet?
-            getStatus();                // talk to CE to see the status
+            getStatus(FALSE);           // talk to CE to see the status
 
             if(status.doWeHaveStorage) { // if we have storage
                 retVal = KEY_F9;        // KEY_F9 -- download images from internet

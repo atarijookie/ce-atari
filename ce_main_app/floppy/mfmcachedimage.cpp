@@ -84,6 +84,7 @@ MfmCachedImage::~MfmCachedImage()
 void MfmCachedImage::clearWholeCachedImage(void)    // go and memset() all the cached tracks - used on new image (not on reencode)
 {
     nextIndex = 0;                      // start encoding from track 0
+    gotImage = false;
 
     for(int i=0; i<MAX_TRACKS; i++) {
         tracks[i].isReady = false;      // not ready yet
@@ -109,6 +110,7 @@ void MfmCachedImage::storeImageParams(FloppyImage *img)
 
     // calculate how many tracks we need to process
     tracksToBeEncoded = params.tracks * params.sides;
+    gotImage = true;           // we got the image, we just need to encode it 
 }
 
 void MfmCachedImage::askToReencodeTrack(int track, int side)
@@ -155,6 +157,7 @@ int MfmCachedImage::getNextIndexToEncode(void)
     return -1;
 }
 
+/*
 void MfmCachedImage::encodeWholeImage(FloppyImage *img)
 {
     if(!img->isLoaded()) {                            // image file not open? quit
@@ -185,6 +188,7 @@ void MfmCachedImage::encodeWholeImage(FloppyImage *img)
     newContent  = true;                             // we got new content!
     gotImage    = true;
 }
+*/
 
 bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, int &side)
 {
@@ -241,7 +245,7 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
     //-----
     pthread_mutex_lock(&floppyEncoderMutex);      // unlock the mutex
 
-    if(tracks[index].encodeRequestTime < tracks[index].encodeActionTime) {  // if there wasn't any request since we started to encode this track, it's ready (otherwise needs reencoding)
+    if(tracks[index].encodeRequestTime <= tracks[index].encodeActionTime) {  // if there wasn't any request since we started to encode this track, it's ready (otherwise needs reencoding)
         tracks[index].isReady = true;               // track is now ready to be streamed
     }
 
@@ -329,6 +333,7 @@ void MfmCachedImage::encodeSingleTrack(FloppyImage *img, int side, int track, in
 bool MfmCachedImage::encodedTrackIsReady(int track, int side)
 {
     if(!gotImage || track < 0 || track > 85 || side < 0 || side > 1) {  // invalid args?
+        //Debug::out(LOG_DEBUG, "MfmCachedImage::encodedTrackIsReady FALSE -- gotImage: %d, track: %d, side: %d", gotImage, track, side);
         return false;   // not ready
     }
 
@@ -336,9 +341,11 @@ bool MfmCachedImage::encodedTrackIsReady(int track, int side)
     trackAndSideToIndex(track, side, index);
 
     if(index == -1) {   // index out of bounds?
+        //Debug::out(LOG_DEBUG, "MfmCachedImage::encodedTrackIsReady FALSE -- index == 1");
         return false;   // not ready
     }
 
+    //Debug::out(LOG_DEBUG, "MfmCachedImage::encodedTrackIsReady [%d] = %d", index, tracks[index].isReady);
     return tracks[index].isReady;   // return if ready
 }
 

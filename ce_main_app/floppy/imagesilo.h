@@ -29,6 +29,8 @@ typedef struct
 
 typedef struct
 {
+    int slotNo;                     // slot number of this slot (used for debugging)
+
     std::string     imageFile;      // just file name:                     bla.st
     std::string     imageFileNoExt; // file name without extension:        bla
     std::string     atariSrcPath;   // from where the file was uploaded:   C:\gamez\bla.st
