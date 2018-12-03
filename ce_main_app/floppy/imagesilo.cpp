@@ -309,6 +309,9 @@ BYTE *ImageSilo::getEncodedTrack(int track, int side, int &bytesInBuffer)
 {
     BYTE *pTrack;
 
+    //Debug::out(LOG_DEBUG, "ImageSilo::getEncodedTrack - track: %d, side: %d, currentSlot: %d, isReady: %d", track, side, currentSlot, slots[currentSlot].encImage.encodedTrackIsReady(track, side));
+    //DWORD start = Utils::getCurrentMs();
+
     if(!slots[currentSlot].encImage.encodedTrackIsReady(track, side)) { // track not ready?
         floppyEncoder_addReencodeTrackRequest(track, side);             // ask for reencoding
 
@@ -325,10 +328,13 @@ BYTE *ImageSilo::getEncodedTrack(int track, int side, int &bytesInBuffer)
         }
 
         if(!isReady) {      // not ready? return empty track
+            //Debug::out(LOG_DEBUG, "ImageSilo::getEncodedTrack - finishing with isReady: %d after %d ms", isReady, Utils::getCurrentMs() - start);
             return emptyTrack;
         }
     }
 
+    //Debug::out(LOG_DEBUG, "ImageSilo::getEncodedTrack - finishing with isReady: %d after %d ms", true, Utils::getCurrentMs() - start);
+    
     // is ready? return that track
     pTrack = slots[currentSlot].encImage.getEncodedTrack(track, side, bytesInBuffer);   // get data from current slot
     return pTrack;

@@ -260,6 +260,10 @@ void *floppyEncodeThreadCode(void *ptr)
 {
     Debug::out(LOG_DEBUG, "Floppy encode thread starting...");
 
+    for(int i=0; i<SLOT_COUNT; i++) {
+        slots[i].slotNo = i;        // store own slot # for debugging purposes - some functions here return pointers to slots, this will tell us the slot # in that case
+    }
+
     // the following code should encode all the slots, but one track at the time, so when there are multiple not encoded images,
     // the one which is selected for streaming, will be encoded first, and then the rest. This should also act fine if you switch
     // current slot in the middle of encoding image (to prioritize the selected one)
@@ -299,7 +303,7 @@ void *floppyEncodeThreadCode(void *ptr)
             slot->encImage.findNotReadyTrackAndEncodeIt(slot->image, track, side);
 
             if(track != -1) {       // if something was encoded, dump it to log
-                Debug::out(LOG_DEBUG, "Encoding of [track %d, side %d] of image %s done", track, side, slot->image->getFileName());
+                //Debug::out(LOG_DEBUG, "Encoding of [slot: %d, track %d, side %d] of image %s done", slot->slotNo, track, side, slot->image->getFileName());
             }
 
             floppyEncodingRunning = false;
