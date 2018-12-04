@@ -110,7 +110,9 @@ void MfmCachedImage::storeImageParams(FloppyImage *img)
 
     // calculate how many tracks we need to process
     tracksToBeEncoded = params.tracks * params.sides;
-    gotImage = true;           // we got the image, we just need to encode it 
+
+    gotImage = true;            // we got the image, we just need to encode it
+    newContent = true;          // we got new content!
 }
 
 void MfmCachedImage::askToReencodeTrack(int track, int side)
