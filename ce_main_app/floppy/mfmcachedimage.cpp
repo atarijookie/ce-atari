@@ -159,39 +159,6 @@ int MfmCachedImage::getNextIndexToEncode(void)
     return -1;
 }
 
-/*
-void MfmCachedImage::encodeWholeImage(FloppyImage *img)
-{
-    if(!img->isLoaded()) {                            // image file not open? quit
-        return;
-    }
-
-    storeImageParams(img);
-
-    DWORD after50ms = Utils::getEndTime(50);        // this will help to add pauses at least every 50 ms to allow other threads to do stuff
-
-    bool res = true;
-    while(res) {                                    // while there still is something to encode
-        if(Utils::getCurrentMs() > after50ms) {     // if at least 50 ms passed since start or previous pause, add a small pause so other threads could do stuff
-            Utils::sleepMs(5);
-            after50ms = Utils::getEndTime(50);
-        }
-
-        if(sigintReceived) {                        // app terminated? quit
-            return;
-        }
-
-        int t,s;
-        res = findNotReadyTrackAndEncodeIt(img, t, s); // try to find and encode single track, and if not possible, quit
-    }
-
-    //dumpTracksToFile(tracksNo, sides, spt);       // for debugging purposes - dump to file
-
-    newContent  = true;                             // we got new content!
-    gotImage    = true;
-}
-*/
-
 bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, int &side)
 {
     track = -1;                         // nothing encoded
@@ -749,6 +716,13 @@ void MfmCachedImage::handleDecodedByte(void)
 
 bool MfmCachedImage::decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr)
 {
+    // swap bytes - Franz has other endiannes
+    for(int i=0; i<=inCnt; i += 2) {
+        BYTE tmp     = inBfr[i + 0];
+        inBfr[i + 0] = inBfr[i + 1];
+        inBfr[i + 1] = tmp;
+    }
+
     // initialize decoder
     decoder.mfmData = inBfr;        // where the mfm data start
     decoder.count = inCnt;          // much much bytes we got
@@ -764,6 +738,11 @@ bool MfmCachedImage::decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr)
     bool syncFound = false;
     while(decoder.count >= 0) {     // while there is something in buffer
         time = getMfmTime();
+
+        if(time != MFM_4US && time != MFM_6US && time != MFM_8US) {	// invalid time? skip it
+            continue;
+        }
+
         sync = sync << 2;
         sync = sync | time;
         sync = sync & 0x0fffffff;   // leave place only for 3x A1 sync bytes
