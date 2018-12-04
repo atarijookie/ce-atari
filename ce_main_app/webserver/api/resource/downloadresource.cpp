@@ -150,7 +150,8 @@ void DownloadResource::onGetStatus(mg_connection *conn, mg_request_info *req_inf
     std::ostringstream stringStream;
 
     stringStream << "{\"encoding_ready\": ";                        // get if floppy image is currently being encoded
-    stringStream << (pxFloppyService->isImageReady() ? "true" : "false");
+    //stringStream << (pxFloppyService->isImageReady() ? "true" : "false");
+    stringStream << "true";     // encoding not always ready
 
     int downloadingCount = Downloader::count( DWNTYPE_FLOPPYIMG);   // get count of what is now downloading
     stringStream << ", \"downloading_count\": ";

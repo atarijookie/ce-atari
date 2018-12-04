@@ -81,7 +81,7 @@ public:
 
     static int getFloppyImageSelectedId(void);
     static SiloSlotSimple * getFloppyImageSimple(int index);
-    static bool getFloppyEncodingRunning(void);
+    //static bool getFloppyEncodingRunning(void);
 
 private:
     void clearSlot(int index);

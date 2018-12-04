@@ -53,19 +53,23 @@ bool FloppyResource::dispatch(mg_connection *conn, mg_request_info *req_info, st
           stringStream << "\"active\":" << pxFloppyService->getActiveSlot();
         }
         stringStream << ","; 
-        stringStream << "\"encoding_ready\":"; 
+        stringStream << "\"encoding_ready\":";
+
+        /*
         if( pxFloppyService->isImageReady() ){
           stringStream << "true";
         }else{
           stringStream << "false";
-        }
-        stringStream << "}"; 
+        }*/
+        stringStream << "true";     // always ready now (encoding not blocking usage of image)
+
+        stringStream << "}";
         std::string sJson=stringStream.str();
         mg_printf(conn, "Content-Length: %lu\r\n\r\n",(unsigned long)sJson.length());   // Always set Content-Length
         mg_write(conn, sJson.c_str(), sJson.length());                  // send content
         return true;
     }
-     
+
     //upload image to slot
     if( strstr(req_info->request_method,"POST")>0 ){
         Debug::out(LOG_DEBUG, "/floppy POST");

@@ -20,7 +20,7 @@
 
 extern pthread_mutex_t floppyEncoderMutex;
 extern pthread_cond_t  floppyEncoderShouldWork;
-extern volatile bool   floppyEncodingRunning;
+//extern volatile bool   floppyEncodingRunning;
 
 //-------------------------------
 // silo slots are global objects now, as CCoreThread needs to stream from them and
@@ -418,7 +418,9 @@ SiloSlotSimple * ImageSilo::getFloppyImageSimple(int index)
     return &floppyImages[index];
 }
 
+/*
 bool ImageSilo::getFloppyEncodingRunning(void)
 {
     return floppyEncodingRunning;
 }
+*/

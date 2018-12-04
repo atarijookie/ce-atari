@@ -737,7 +737,7 @@ void FloppySetup::getImageEncodingRunning(void)
     static int progress = 0;
     char progChars[4] = {'|', '/', '-', '\\'};
 
-    bool encoding = ImageSilo::getFloppyEncodingRunning();
+    bool encoding = false;	// don't show encoding status - now encoding should not slow down floppy access. Was: ImageSilo::getFloppyEncodingRunning();
     bool doWeHaveStorage = shared.imageStorage->doWeHaveStorage();
     int  downloadCount = Downloader::count(DWNTYPE_FLOPPYIMG);
     int  downloadProgr = Downloader::progressOfCurrentDownload();

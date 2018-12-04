@@ -264,7 +264,7 @@ void CCoreThread::run(void)
 #endif
 
     DWORD nextFloppyEncodingCheck   = Utils::getEndTime(1000);
-    bool prevFloppyEncodingRunning  = false;
+    //bool prevFloppyEncodingRunning  = false;
 
     LoadTracker load;
 
@@ -346,7 +346,7 @@ void CCoreThread::run(void)
         if(now >= nextFloppyEncodingCheck) {
             nextFloppyEncodingCheck = Utils::getEndTime(1000);
 
-            if(prevFloppyEncodingRunning && !ImageSilo::getFloppyEncodingRunning()) {   // if floppy encoding was running, but not it's not running
+            //if(prevFloppyEncodingRunning && !ImageSilo::getFloppyEncodingRunning()) {   // if floppy encoding was running, but not it's not running
                 if(newFloppyImageLedAfterEncode != -2) {                                // if we should set the new newFloppyImageLed after encoding is done
                     setEnabledFloppyImgs    = true;
                     setNewFloppyImageLed    = true;
@@ -354,9 +354,8 @@ void CCoreThread::run(void)
 
                     newFloppyImageLedAfterEncode = -2;
                 }
-            }
-
-            prevFloppyEncodingRunning = ImageSilo::getFloppyEncodingRunning();
+            //}
+            //prevFloppyEncodingRunning = ImageSilo::getFloppyEncodingRunning();
         }
 
         load.busy.markStart();                          // mark the start of the busy part of the code
@@ -1114,9 +1113,9 @@ void CCoreThread::handleSectorWritten(void)
     conSpi->txRx(SPI_CS_FRANZ, remainingSize, oBuf, iBuf);          // get all the remaining data
 
     // get the written sector, side, track number
-    int sector  = iBuf[0];
-    int track   = iBuf[1] & 0x7f;
-    int side    = (iBuf[1] & 0x80) ? 1 : 0;
+    int sector  = iBuf[1];
+    int track   = iBuf[0] & 0x7f;
+    int side    = (iBuf[0] & 0x80) ? 1 : 0;
 
     if(!floppyConfig.writeProtected) {  // not write protected? write
         Debug::out(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d", track, side, sector);

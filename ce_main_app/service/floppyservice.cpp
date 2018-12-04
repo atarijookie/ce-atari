@@ -82,7 +82,8 @@ bool FloppyService::setImage(int iSlot, std::string sLocalFileWPath)
 
 int FloppyService::getImageState()
 {
-    return (ImageSilo::getFloppyEncodingRunning() ? IMAGE_NOTREADY : IMAGE_OK);
+    return IMAGE_OK;
+//  return (ImageSilo::getFloppyEncodingRunning() ? IMAGE_NOTREADY : IMAGE_OK);
 }
 
 bool FloppyService::isImageReady()

@@ -22,7 +22,7 @@
 pthread_mutex_t floppyEncoderMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t  floppyEncoderShouldWork = PTHREAD_COND_INITIALIZER;
 
-volatile bool floppyEncodingRunning = false;
+//volatile bool floppyEncodingRunning = false;
 volatile bool shouldStop;
 
 //-------------------------------
@@ -296,7 +296,7 @@ void *floppyEncodeThreadCode(void *ptr)
         slot = findSlotToEncode();  // find some slot which needs encoding
 
         if(slot) {                  // if some slot needs encoding, do it, otherwise skip encoding
-            floppyEncodingRunning = true;
+            //floppyEncodingRunning = true;
 
             int track, side;
             slot->encImage.findNotReadyTrackAndEncodeIt(slot->image, track, side);
@@ -305,7 +305,7 @@ void *floppyEncodeThreadCode(void *ptr)
                 //Debug::out(LOG_DEBUG, "Encoding of [slot: %d, track %d, side %d] of image %s done", slot->slotNo, track, side, slot->image->getFileName());
             }
 
-            floppyEncodingRunning = false;
+            //floppyEncodingRunning = false;
         }
 
         writtenIdx = findWrittenSectorForProcessing();  // check if something was written
