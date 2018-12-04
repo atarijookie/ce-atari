@@ -117,8 +117,6 @@ void floppyEncoder_decodeMfmWrittenSector(int track, int side, int sector, BYTE 
         return;
     }
 
-    Debug::out(LOG_DEBUG, "floppyEncoder_decodeMfmWrittenSector - track: %d, side: %d, sector: %d, size: %d", track, side, sector, size);
-
     if(size > WRITTENMFMSECTOR_SIZE) {              // if data too big to fit, fail
         Debug::out(LOG_ERROR, "floppyEncoder_decodeMfmWrittenSector - size: %d > %d !!! sector not stored", size, WRITTENMFMSECTOR_SIZE);
         return;
@@ -127,6 +125,7 @@ void floppyEncoder_decodeMfmWrittenSector(int track, int side, int sector, BYTE 
     pthread_mutex_lock(&floppyEncoderMutex);        // lock the mutex
 
     int index = findEmptyWrittenSector();           // try to find where this new sector could be stored
+    Debug::out(LOG_DEBUG, "floppyEncoder_decodeMfmWrittenSector - track: %d, side: %d, sector: %d, size: %d -> writtenSector index: %d", track, side, sector, size, index);
 
     if(index != -1) {                               // if was able to find empty place for this sector, store it
         WrittenMfmSector *wrSector = &writtenSectors[index];    // get pointer to it and store data and params
@@ -318,6 +317,8 @@ void *floppyEncodeThreadCode(void *ptr)
             BYTE sectorData[512];
             bool good;
             good = ss->encImage.decodeMfmBuffer(ws->data, ws->size, sectorData);   // decode written sector data
+
+            Debug::out(LOG_DEBUG, "Written sector at index: %d decoded, good: %d", writtenIdx, good);
 
             if(good && ss->image) {     // if got the image pointer, write new sector data
                 ss->image->writeSector(ws->track, ws->side, ws->sector, sectorData);

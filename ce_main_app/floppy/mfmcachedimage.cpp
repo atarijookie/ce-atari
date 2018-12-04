@@ -716,6 +716,7 @@ void MfmCachedImage::handleDecodedByte(void)
     if(decoder.byteOffset == 0 && decoder.dByte != 0xfb) {      // if DAM mark position, but wrong DAM mark?
         decoder.done = true;
         decoder.good = false;
+        Debug::out(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - wrong DAM mark: %02X", decoder.dByte);
     }
 
     if(decoder.byteOffset >= 1 && decoder.byteOffset <= 512) {  // if we're in the data offset, store data in buffer
@@ -737,6 +738,8 @@ void MfmCachedImage::handleDecodedByte(void)
 
         decoder.done = true;            // received CRC? nothing more to be done
         decoder.good = (decoder.calcedCrc == decoder.recvedCrc);    // everything good when received and calced crc are th same
+
+        Debug::out(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - received CRC: %02x, calculated CRC: %02x, good: %d", decoder.recvedCrc, decoder.calcedCrc, decoder.good);
     }
 
     decoder.byteOffset++;
@@ -770,6 +773,7 @@ bool MfmCachedImage::decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr)
     }
 
     if(!syncFound) {                // if sync not found, skip the rest
+        Debug::out(LOG_DEBUG, "MfmCachedImage::decodeMfmBuffer - sync not found");
         return false;
     }
 
