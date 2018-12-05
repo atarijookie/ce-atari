@@ -82,7 +82,7 @@ void timerSetup_mfmWrite(void)
 {
     // TIM3_CH1 can be used with DMA1_CH6
     TIM_TimeBaseInitTypeDef     TIM_TimeBaseStructure;
-    TIM_ICInitTypeDef           TIM_CH1_ICInitStructure;
+    //TIM_ICInitTypeDef           TIM_CH1_ICInitStructure;
 
     // Time base configuration
     TIM_TimeBaseStructure.TIM_Period            = 0xff;                     // never let it go to 0xffff
@@ -94,6 +94,7 @@ void timerSetup_mfmWrite(void)
     TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
     TIM_ARRPreloadConfig(TIM3, DISABLE);                                    // disable preloading
 
+/*    
     // setup input capture
     TIM_CH1_ICInitStructure.TIM_Channel         = TIM_Channel_1;
     TIM_CH1_ICInitStructure.TIM_ICPolarity      = TIM_ICPolarity_Falling;
@@ -101,10 +102,11 @@ void timerSetup_mfmWrite(void)
     TIM_CH1_ICInitStructure.TIM_ICPrescaler     = TIM_ICPSC_DIV1;
     TIM_CH1_ICInitStructure.TIM_ICFilter        = 0;
     TIM_ICInit(TIM3, &TIM_CH1_ICInitStructure);
-    
+
     // set TIM1 DMA control register (TIMx_DCR) as: DBL (<<8) =0 (1 transfer), DBA (<<0) = 13   (0x34 TIMx_CCR1)
     TIM3->DCR = 13;
     TIM_ITConfig(TIM3, (1 <<  9), ENABLE);                                  // enable Bit 9 - CC1DE: Capture/Compare 1 DMA request enable (CC1 DMA request enabled)
+*/  
     
     TIM_Cmd(TIM3, ENABLE);                                                  // enable timer
 }

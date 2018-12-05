@@ -13,13 +13,6 @@
 #include "init.h"
 
 
-/*
-TODO:
- - POZOR! STEP moze robit / robi ked neni drive selected, ale len MOTOR ON
- - test TIM3 input capture bez DMA, potom s DMA
- - pomeranie kolko trvaju jednotlive casti kodu
-*/
-
 // 1 sector with all headers, gaps, data and crc: 614 B of data needed to stream -> 4912 bits to stream -> with 4 bits encoded to 1 byte: 1228 of encoded data
 // Each sector takes around 22ms to stream out, so you have this time to ask for new one and get it in... the SPI transfer of 1228 B should take 0,8 ms.
 
@@ -38,7 +31,7 @@ SStreamed streamed;
 WORD mfmReadStreamBuffer[16];                           // 16 words - 16 mfm times. Half of buffer is 8 times - at least 32 us (8 * 4us),
 
 WORD mfmWriteStreamBuffer[16];
-WORD lastMfmWriteTC;
+//WORD lastMfmWriteTC;
 
 // cycle measure: t1 = TIM3->CNT;   t2 = TIM3->CNT; dt = t2 - t1; -- subtrack 0x12 because that's how much measuring takes
 WORD t1, t2, dt; 
@@ -120,10 +113,12 @@ TOutputFlags outFlags;
 
 void updateStreamPositionByFloppyPosition(void);
 
+void handleFloppyWrite(void);
+
 int main (void) 
 {
     BYTE indexCount     = 0;
-    WORD prevWGate      = WGATE, WGate;
+    WORD WGate;
     BYTE spiDmaIsIdle   = TRUE;
 
     prevIntTime = 0;
@@ -240,38 +235,12 @@ int main (void)
         outFlags.stWantsTheStream = ((inputs & drive_select) == 0); // if motor is enabled and drive is selected, ST wants the stream
         
         //-------------------------------------------------
-      
+
         WGate = inputs & WGATE;                                         // get current WGATE value
-        if(prevWGate != WGate) {                                        // if WGate changed
-            
-            if(WGate == 0) {                                            // on falling edge of WGATE
-                WORD wval;
 
-                lastMfmWriteTC = TIM3->CNT;                             // set lastMfmWriteTC to current TC value on WRITE start
-                wrNow->readyToSend = FALSE;                             // mark this buffer as not ready to be sent yet
-                
-                wval = (streamed.track << 8) | streamed.sector;         // next word (buffer[4]) is side, track, sector
-                
-                if(streamed.side != 0) {                                // if side is not 0, set the highest bit
-                    wval |= 0x8000;
-                }
-                
-                wrBuffer_add(wval);                                     // add this side track sector WORD
-            } else {                                                    // on rising edge
-                wrBuffer_add(0);                                        // last word: 0
-                
-                wrNow->readyToSend = TRUE;                              // mark this buffer as ready to be sent
-            }           
-            
-            prevWGate = WGate;                                          // store WGATE value
-        }
-        
         if(WGate == 0) {                                                // when write gate is low, the data is written to floppy
-            if((DMA1->ISR & (DMA1_IT_TC6 | DMA1_IT_HT6)) != 0) {        // MFM write stream: TC or HT interrupt? we've streamed half of circular buffer!
-                getMfmWriteTimes();
-            }
+            handleFloppyWrite();
         }
-
 
         // fillMfmTimesForDMA -- execution time: 7 us - 16 us (16 us rarely, at the start / end)
         // times between two calls: 16 us - 53 us (16 us rarely, probably start / end of track)
@@ -521,56 +490,72 @@ void EXTI3_IRQHandler(void)
   }
 }
 
-void getMfmWriteTimes(void)
+void handleFloppyWrite(void)
 {
-    WORD ind1 = 0, ind2 = 7, i, tmp, val = 0, wval;
-    
-    // check for half transfer or transfer complete IF
-    if((DMA1->ISR & DMA1_IT_HT6) != 0) {                // HTIF6 -- Half Transfer IF 6
-        DMA1->IFCR = DMA1_IT_HT6;                       // clear HTIF6 flag
-        ind1 = 7;
-        ind2 = 0;
-    } else if((DMA1->ISR & DMA1_IT_TC6) != 0) {         // TCIF6 -- Transfer Complete IF 6
-        DMA1->IFCR = DMA1_IT_TC6;                       // clear TCIF6 flag
-        ind1 = 15;
-        ind2 = 8;
+    WORD inputs = GPIOB->IDR;
+    WORD wData = inputs & WDATA;    // initialize wData and wDataPrev
+    WORD wDataPrev = wData;
+    WORD times = 0, timesCount = 0;
+    WORD wval;
+
+    TIM3->CNT = 0;                  // initialize pulse width counter
+
+    wrNow->readyToSend = FALSE;     // mark this buffer as not ready to be sent yet
+    wrNow->count = 4;               // at the start we already have 4 WORDs in buffer - SYNC, ATN code, TX len, RX len
+
+    wval = (streamed.track << 8) | streamed.sector; // next word (buffer[4]) is side, track, sector
+
+    if(streamed.side != 0) {        // if side is not 0, set the highest bit
+        wval |= 0x8000;
     }
 
-    // TODO: change this, because the data in the buffer are not WORDs anymore, but BYTEs, The values in the for cycle have been already changed.
-    
-    tmp = mfmWriteStreamBuffer[ind1];                   // store the last one, we will move it to lastMfmWriteTC later
-    
-    for(i=0; i<7; i++) {                                // create differences: this = this - previous; but only for 7 values
-        mfmWriteStreamBuffer[ind1] = mfmWriteStreamBuffer[ind1] - mfmWriteStreamBuffer[ind1-1];
-        ind1--;
-    }
+    wrBuffer_add(wval);             // add this side track sector WORD
 
-    mfmWriteStreamBuffer[ind1] = mfmWriteStreamBuffer[ind1] - lastMfmWriteTC;   // buffer[0] = buffer[0] - previousBuffer[15];  or buffer[8] = buffer[8] - previousBuffer[7];
-    lastMfmWriteTC = tmp;                                                       // store current last item as last
-    
-    wval = 0;                                                                   // init to zero
-    
-    for(i=0; i<8; i++) {                                                        // now convert timer counter times to MFM times / codes
-        tmp = mfmWriteStreamBuffer[ind2];
-        ind2++;
-        
-        if(tmp < 20) {              // too short? skip it
-            continue;
-        } else if(tmp < 36) {       // 4 us?
-            val = MFM_4US;
-        } else if(tmp < 50) {       // 6 us?
-            val = MFM_6US;
-        } else if(tmp < 65) {       // 8 us?
-            val = MFM_8US;
-        } else {                    // too long?
-            continue;
+    while(1) {
+        inputs = GPIOB->IDR;        // read inputs
+
+        if(inputs & WGATE) {        // if WGATE isn't L, writing finished
+            break;
         }
-        
-        wval = wval << 2;           // shift and add to the WORD 
-        wval = wval | val;
+
+        wData = inputs & WDATA;         // get current wData
+
+        if(wDataPrev != wData) {        // WDATA changed?
+            WORD newTime = 0;
+            WORD duration = TIM3->CNT;  // get current pulse duration
+
+            wDataPrev = wData;          // store current state of WDATA
+
+            if(duration > 20) {             // if this pulse is wide enough
+                TIM3->CNT = 0;              // reset timer back to zero
+
+                newTime = 0;
+
+                if(duration < 36) {         // 4 us?
+                    newTime = MFM_4US;
+                } else if(duration < 50) {  // 6 us?
+                    newTime = MFM_6US;
+                } else if(duration < 65) {  // 8 us?
+                    newTime = MFM_8US;
+                }
+
+                if(newTime) {           // if got valid new time
+                    times = times << 2;
+                    times |= newTime;   // append new time
+
+                    timesCount++;
+                    if(timesCount >= 8) {   // if already got 8 times stored
+                        timesCount =0;
+                        wrBuffer_add(times); // add to write buffer
+                    }
+                }
+            }
+        }
     }
-    
-    wrBuffer_add(wval);             // add to write buffer
+
+    // writing finished
+    wrBuffer_add(0);                                    // last word: 0
+    wrNow->readyToSend = TRUE;                          // mark this buffer as ready to be sent
 }
 
 void fillMfmTimesForDMA(void)
