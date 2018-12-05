@@ -55,7 +55,7 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 // circular buffer 
 // watch out, these macros take 0.73 us for _add, and 0.83 us for _get operation!
 
-#define     wrBuffer_add(X)                 { if(wrNow->count  < 550)   {       wrNow->buffer[wrNow->count]     = X;    wrNow->count++;     }   }
+#define     wrBuffer_add(X)                 { if(wrNow->count  < WRITEBUFFER_SIZE)   {  wrNow->buffer[wrNow->count]     = X;    wrNow->count++;     }   }
 
 #define     readTrackData_goToStart()       {                                                                                                           inIndexGet = 0;    }
 #define     readTrackData_get(X)            { X = readTrackData[inIndexGet];                inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) {  inIndexGet = 0; }; }
@@ -67,7 +67,7 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 #define REQUEST_TRACK                       {   next.track = now.track; next.side = now.side; sendTrackRequest = TRUE; lastRequestTime = TIM4->CNT; trackStreamedCount = 0; }
 #define FORCE_REQUEST_TRACK                 {   REQUEST_TRACK;      lastRequestTime -= 35;      lastRequested.track = 0xff;     lastRequested.side = 0xff;                  }
 
-WORD version[2] = {0xf017, 0x0413};             // this means: Franz, 2017-04-13
+WORD version[2] = {0xf018, 0x1205};             // this means: Franz, 2018-12-05
 WORD drive_select;
 
 volatile BYTE sendFwVersion, sendTrackRequest;
@@ -496,7 +496,7 @@ void handleFloppyWrite(void)
     WORD wData = inputs & WDATA;    // initialize wData and wDataPrev
     WORD wDataPrev = wData;
     WORD times = 0, timesCount = 0;
-    WORD wval;
+    WORD wval, newTime, duration;
 
     TIM3->CNT = 0;                  // initialize pulse width counter
 
@@ -508,8 +508,9 @@ void handleFloppyWrite(void)
     if(streamed.side != 0) {        // if side is not 0, set the highest bit
         wval |= 0x8000;
     }
-
+    
     wrBuffer_add(wval);             // add this side track sector WORD
+    wrBuffer_add(inIndexGet);       // store inIndexGet in the stream, so RPi can guess the right sector from our stream position when write happened
 
     while(1) {
         inputs = GPIOB->IDR;        // read inputs
@@ -518,44 +519,62 @@ void handleFloppyWrite(void)
             break;
         }
 
-        wData = inputs & WDATA;         // get current wData
+        wData = inputs & WDATA;     // get current wData
 
-        if(wDataPrev != wData) {        // WDATA changed?
-            WORD newTime = 0;
-            WORD duration = TIM3->CNT;  // get current pulse duration
+        if(wDataPrev == wData) {    // WDATA not changed?
+            continue;
+        }
 
-            wDataPrev = wData;          // store current state of WDATA
+        newTime = 0;
+        duration = TIM3->CNT;       // get current pulse duration
 
-            if(duration > 20) {             // if this pulse is wide enough
-                TIM3->CNT = 0;              // reset timer back to zero
+        wDataPrev = wData;          // store current state of WDATA
 
-                newTime = 0;
+        if(duration < 20) {         // if this pulse is too short
+            continue;
+        }
 
-                if(duration < 36) {         // 4 us?
-                    newTime = MFM_4US;
-                } else if(duration < 50) {  // 6 us?
-                    newTime = MFM_6US;
-                } else if(duration < 65) {  // 8 us?
-                    newTime = MFM_8US;
-                }
+        TIM3->CNT = 0;              // reset timer back to zero
+        newTime = 0;
 
-                if(newTime) {           // if got valid new time
-                    times = times << 2;
-                    times |= newTime;   // append new time
+        if(duration < 36) {         // 4 us?
+            newTime = MFM_4US;
+        } else if(duration < 50) {  // 6 us?
+            newTime = MFM_6US;
+        } else if(duration < 65) {  // 8 us?
+            newTime = MFM_8US;
+        }
 
-                    timesCount++;
-                    if(timesCount >= 8) {   // if already got 8 times stored
-                        timesCount =0;
-                        wrBuffer_add(times); // add to write buffer
-                    }
-                }
+        // TODO: if duration was too long, look at what happened
+
+        if(!newTime) {           // don't have valid new time? skip rest
+            continue;
+        }
+
+        times = times << 2;
+        times |= newTime;   // append new time
+
+        timesCount++;
+        if(timesCount >= 8) {   // if already got 8 times stored
+            timesCount = 0;
+            wrBuffer_add(times); // add to write buffer
+
+            if(wrNow->count >= WRITEBUFFER_SIZE) {  // no more space in write buffer, send it to host
+                break;
             }
         }
     }
 
     // writing finished
+    if(timesCount > 0) {        // if there was something captured but not stored at the end
+        wrBuffer_add(times);    // add to write buffer
+    }
+
     wrBuffer_add(0);                                    // last word: 0
     wrNow->readyToSend = TRUE;                          // mark this buffer as ready to be sent
+
+    // move READ pointer further, as we weren't moving it while write was active
+    updateStreamPositionByFloppyPosition();
 }
 
 void fillMfmTimesForDMA(void)
