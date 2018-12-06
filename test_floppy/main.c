@@ -127,7 +127,7 @@ struct {
 } imgGeometry;
 
 void writeReadVerifyTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnce);
-void writeTest();
+void writeSingleSectorTest(void);
 void readTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnce);
 BYTE stopAfterError = 0;
 
@@ -224,8 +224,7 @@ int main(void)
             writeReadVerifyTest(0,1,0);
         }
         if(req == 'o'){             // write sector to disk
-            guessImageGeometry();
-            writeTest();
+            writeSingleSectorTest();
         }
         removeAllWaitingKeys(); // read all the possibly waiting keys, so we can ignore them...
     }
@@ -249,111 +248,29 @@ void removeAllWaitingKeys(void)
     }
 }
 
-void writeTest(){
+void writeSingleSectorTest(void)
+{
     // set the buffer such that each byte is known thing
     int i;
     for(i=0; i<512; i++) {
         writeBfr[i] = (BYTE) i;
     }
 
-    VT52_Clear_home();
-    print_status_write();
-
-    VT52_Goto_pos(0, 24);
+    WORD tics = getTicks();
+    writeBfr[510] = (BYTE) (tics >> 8);     // last two bytes are 'random' to keep the content changing
+    writeBfr[511] = (BYTE) (tics     );
 
     floppy_seekRate(0, seekRate);           // set SEEK RATE
-
-    int isAfterStartOrError;
-
-    while(1) {
-        //---------------------------------
-        // code for termination of test by keyboard
-        BYTE res = Cconis();                // see if there's something waiting from keyboard
-
-        if(res != 0) {                      // something waiting?
-            char req = Cnecin();
-
-            if(req  >= 'A' && req <= 'Z') {
-                req = req + 32;             // upper to lower case
-            }
-
-            if(req == 'q' || req == 'c') {  // quit?
-                floppy_off(writeBfr, 0);         // turn floppy off
-                break;
-            }
-        }
-
-        // write
-        BYTE bRes = floppy_write(writeBfr, 0, fl.sector, fl.track, fl.side, 1);
-
-        int x = 11;
-        VT52_Goto_pos(x, 24);
-
-        BYTE showDebugInfo = 0;
-        BYTE resultChar;
-
-        if(bRes){
-            Cconout('*');
-            resultChar = '*';
-            counts.good++;
-        } else {
-            Cconout('!');
-            resultChar = '!';
-            showDebugInfo = 1;
-            counts.errData++;
-        }
-
-        if(showDebugInfo && stopAfterError) {
-            BYTE quit = showDebugInfoFunc(resultChar, 0, 0, 0);
-            isAfterStartOrError = 1;
-
-            if(quit) {
-                break;
-            }
-        }
-
-        print_status_write();
-
-        //---------------------------------
-        // update the next floppy position for writing
-        updateFloppyPosition(1, 0);
-
-        if(fl.finish) {                         // if should quit after this
-            deleteOneProgressLine();
-
-            (void) Cconws("Finished.");
-            print_status_write();
-
-            floppy_off(writeBfr, 0);                 // turn floppy off
-            Cnecin();
-            break;
-        }
-
-        if(fl.newLine) {                        // should start new line?
-            fl.newLine = 0;
-
-            deleteOneProgressLine();
-            x = 11;
-
-            showLineStartWrite(1, fl.track);
-        } else {                                // just go to next char
-            x++;
-        }
-
-        if(fl.space) {
-            fl.space = 0;
-            x++;
-        }
-    }
+    floppy_write(writeBfr, 0, 3, 2, 1, 1);  // side 1, track 2, sector 3
 }
 
 void writeReadVerifyTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE endlessNotOnce)
 {
     // init stuff
-    BYTE bfr[512];                                                                   // buffer for one sector
-    BYTE initval=0;                                                                  // not sure yet
+    BYTE bfr[512];                                                                  // buffer for one sector
+    BYTE initval=0;                                                                 // not sure yet
 
-    counts.runs     = 0;                                                             // keep track of number of runs
+    counts.runs     = 0;                                                            // keep track of number of runs
     counts.good     = 0;                                                            // number of runs passed
     counts.lazy     = 0;                                                            // ?
     counts.errWrite = 0;                                                            // number of write error
@@ -419,20 +336,28 @@ void writeReadVerifyTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE en
 
         memset(bfr, initval++, 512);    //just to make sure we are not looking at data from the last read attempt on a failure
 
+        WORD tics = getTicks();
+        writeBfr[510] = (BYTE) (tics >> 8);     // last two bytes are 'random' to keep the content changing
+        writeBfr[511] = (BYTE) (tics     );
+
         // write
-        BYTE bRes = floppy_write(writeBfr, 0, fl.sector, fl.track, fl.side, 1);
+        BYTE wRes = floppy_write(writeBfr, 0, fl.sector, fl.track, fl.side, 1);
 
         // read
-        bRes = floppy_read(bfr, 0, fl.sector, fl.track, fl.side, 1);
+        BYTE rRes = floppy_read(bfr, 0, fl.sector, fl.track, fl.side, 1);
 
-        // verify
-        int i;
         int verifyOk = 1;
-        for(i=0; i<512; i++){
-            if(bfr[i] != writeBfr[i])
-            {
-                verifyOk = 0;
-                break;
+
+        if(wRes || rRes) {                  // if write or read failed, not ok
+            verifyOk = 0;
+        } else {                            // if write and read succeeded, time to verify data
+            int i;
+            for(i=0; i<512; i++){           // verify
+                if(bfr[i] != writeBfr[i])
+                {
+                    verifyOk = 0;
+                    break;
+                }
             }
         }
 
@@ -446,7 +371,7 @@ void writeReadVerifyTest(BYTE sequentialNotRandom, BYTE imageTestNotAny, BYTE en
 
         if(verifyOk){
             Cconout('*');
-           resultChar = '*';
+            resultChar = '*';
             counts.good++;
         } else {
             Cconout('!');
@@ -997,7 +922,7 @@ void showMenu(void)
     (void)Cconws(" \33p[ S ]\33q - sequential read test ONCE\r\n");
 
     (void)Cconws(" \33p[ I ]\33q - write read verify test ONCE\r\n");
-    (void)Cconws(" \33p[ O ]\33q - write sector to disk\r\n");
+    (void)Cconws(" \33p[ O ]\33q - write 1 sector to disk\r\n");
 
     (void)Cconws("\r\n");
     (void)Cconws("Tests for \33pANY\33q floppy image:\r\n");
@@ -1205,7 +1130,7 @@ int floppy_write(BYTE *wrbuf, WORD dev, WORD sector, WORD track, WORD side, WORD
 
     if(fddViaTos){
         // we do it via tos shit
-        result = Flopwr(wrbuf, 0, 0, sector, track, side, count);
+        result = Flopwr(wrbuf, 0, dev, sector, track, side, count);
     }
     else{
         // 1). seek
