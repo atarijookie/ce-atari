@@ -81,10 +81,12 @@ bool FloppyImage::gotUnsavedChanges(void)
 bool FloppyImage::readNotWriteSector(bool readNotWrite, int track, int side, int sectorNo, BYTE *buffer)
 {
     if(!loadedFlag) {   // not loaded?
+        Debug::out(LOG_DEBUG, "FloppyImage::readNotWriteSector -- not loadedFlag");
         return false;
     }
 
     if(sectorNo < 1 || sectorNo > params.sectorsPerTrack) {                 // sector # out of range?
+        Debug::out(LOG_DEBUG, "FloppyImage::readNotWriteSector -- sector # out of range");
         return false;
     }
 
@@ -93,13 +95,14 @@ bool FloppyImage::readNotWriteSector(bool readNotWrite, int track, int side, int
     offset      += (sectorNo - 1);                                          // and move a little to the right sector
     offset       = offset * 512;                                            // calculate ofsset in bytes
 
-
     if(readNotWrite) {      // read - from image to buffer
         memcpy(buffer, &image.data[offset], 512);
     } else {                // write - from buffer to image
         sectorsWritten++;                       // one more unwritten sector
         lastWriteTime = Utils::getCurrentMs();  // store when the writeSector() happened
         memcpy(&image.data[offset], buffer, 512);
+
+        Debug::out(LOG_DEBUG, "FloppyImage::readNotWriteSector -- sectorsWritten: %d, lastWriteTime: %08x", sectorsWritten, lastWriteTime);
     }
 
     return true;

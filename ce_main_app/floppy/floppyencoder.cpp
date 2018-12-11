@@ -137,9 +137,6 @@ void floppyEncoder_decodeMfmWrittenSector(int track, int side, int sector, BYTE 
 
         memcpy(wrSector->data, data, size);         // copy in the data
         wrSector->size = size;
-
-        SiloSlot *slot = &slots[currentSlot];           // get pointer to the right slot
-        slot->encImage.askToReencodeTrack(track, side); // this specific track needs to be reencoded
     }
 
     pthread_cond_signal(&floppyEncoderShouldWork);  // wake up encoder
@@ -214,10 +211,12 @@ static void floppyEncoder_handleSaveFiles(void)
         }
 
         DWORD timeSinceLastWrite = now - slots[i].image->getLastWriteTime();
+
         if(timeSinceLastWrite < 5000) {             // if last write happened too recently, wait with the write
             continue;
         }
 
+        Debug::out(LOG_DEBUG, "floppyEncoder_handleSaveFiles -- saving slot %d", i);
         slots[i].image->save();                     // save the changes
     }
 }
@@ -276,8 +275,12 @@ void *floppyEncodeThreadCode(void *ptr)
         int writtenIdx = findWrittenSectorForProcessing();  // check if something was written
 
         if(!slot && writtenIdx == -1) {              // nothing to encode and nothing to decode after write? sleep
+            struct timespec max_wait = {0, 0};
+            clock_gettime(CLOCK_REALTIME, &max_wait);
+            max_wait.tv_sec += 2;                   // wake up in this interval to check for late saving
+
             pthread_mutex_lock(&floppyEncoderMutex);    // lock the mutex
-            pthread_cond_wait(&floppyEncoderShouldWork, &floppyEncoderMutex);   // unlock, sleep; wake up, lock
+            pthread_cond_timedwait(&floppyEncoderShouldWork, &floppyEncoderMutex, &max_wait);   // unlock, sleep; wake up, lock
             pthread_mutex_unlock(&floppyEncoderMutex);  // unlock the mutex
 
             after50ms = Utils::getEndTime(50);      // after sleep - work for some time without pause
@@ -322,6 +325,7 @@ void *floppyEncodeThreadCode(void *ptr)
 
             if(good && ss->image) {     // if got the image pointer, write new sector data
                 ss->image->writeSector(ws->track, ws->side, ws->sector, sectorData);
+                ss->encImage.askToReencodeTrack(ws->track, ws->side);   // this specific track needs to be reencoded
             }
 
             ws->hasData = false;        // this written sector doesn't hold any data anymore
