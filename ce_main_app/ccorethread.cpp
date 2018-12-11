@@ -1119,7 +1119,6 @@ void CCoreThread::handleSectorWritten(void)
 
     if(!floppyConfig.writeProtected) {  // not write protected? write
         Debug::out(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d", track, side, sector);
-        Debug::outBfr(iBuf, remainingSize);
         floppyEncoder_decodeMfmWrittenSector(track, side, sector, iBuf, remainingSize); // let floppy encoder handle decoding, reencoding, saving
     } else {                            // is write protected? don't write
         Debug::out(LOG_DEBUG, "handleSectorWritten -- floppy is write protected, not writing");

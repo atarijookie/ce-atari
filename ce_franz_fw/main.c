@@ -145,7 +145,7 @@ int main (void)
 
     while(1) {
         WORD inputs;
-        
+
         if(sendTrackRequest) {                          // if we're already waiting for the new TRACK to be sent, consider this as we are already receiving new track data
             fillReadStreamBufferWithDummyData();        // fill MFM stream with dummy data so we won't stream any junk
             outFlags.weAreReceivingTrack = TRUE;        // mark that we are receiving TRACK data, and thus shouldn't stream
@@ -519,16 +519,14 @@ void handleFloppyWrite(void)
             break;
         }
 
-        wData = inputs & WDATA;     // get current wData
+        wDataPrev = wData;          // store previous state of WDATA
+        wData = inputs & WDATA;     // get   current  state of WDATA
 
-        if(wDataPrev == wData) {    // WDATA not changed?
+        if(wDataPrev != WDATA || wData != 0) {    // not falling edge or WDATA? try again (we want 1,0; anything else is ignored)
             continue;
         }
 
-        newTime = 0;
         duration = TIM3->CNT;       // get current pulse duration
-
-        wDataPrev = wData;          // store current state of WDATA
 
         if(duration < 20) {         // if this pulse is too short
             continue;
@@ -574,7 +572,22 @@ void handleFloppyWrite(void)
     wrNow->readyToSend = TRUE;                          // mark this buffer as ready to be sent
 
     // move READ pointer further, as we weren't moving it while write was active
-    updateStreamPositionByFloppyPosition();
+		{
+			int i;
+			int start = inIndexGet;
+			int end = inIndexGet + 1200;
+			for(i=start; i<end; i++) {		// try to find next sector marker
+				if(readTrackData[i] == CMD_TRACK_STREAM_END_BYTE) {		// didn't find next sector, but end of stream?
+					inIndexGet = i - 8;				// store this as new index
+					break;
+				}
+
+				if(readTrackData[i] == CMD_CURRENT_SECTOR) {	// found start of new sector?
+					inIndexGet = i - 30;			// start streaming again few bytes before new / next sector
+					break;
+				}
+			}
+		}
 }
 
 void fillMfmTimesForDMA(void)

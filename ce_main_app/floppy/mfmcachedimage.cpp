@@ -709,6 +709,7 @@ void MfmCachedImage::handleDecodedByte(void)
         decoder.good = (decoder.calcedCrc == decoder.recvedCrc);    // everything good when received and calced crc are th same
 
         Debug::out(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - received CRC: %02x, calculated CRC: %02x, good: %d", decoder.recvedCrc, decoder.calcedCrc, decoder.good);
+        //Debug::outBfr(decoder.oBfr - 512, 512);
     }
 
     decoder.byteOffset++;
@@ -716,13 +717,6 @@ void MfmCachedImage::handleDecodedByte(void)
 
 bool MfmCachedImage::decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr)
 {
-    // swap bytes - Franz has other endiannes
-    for(int i=0; i<=inCnt; i += 2) {
-        BYTE tmp     = inBfr[i + 0];
-        inBfr[i + 0] = inBfr[i + 1];
-        inBfr[i + 1] = tmp;
-    }
-
     // initialize decoder
     decoder.mfmData = inBfr;        // where the mfm data start
     decoder.count = inCnt;          // much much bytes we got
