@@ -115,6 +115,8 @@ void updateStreamPositionByFloppyPosition(void);
 
 void handleFloppyWrite(void);
 
+BYTE sectorsWritten;            // how many sectors were written during the last media rotation - if something was written, we need to get the re-encoded track
+
 int main (void) 
 {
     BYTE indexCount     = 0;
@@ -122,6 +124,7 @@ int main (void)
     BYTE spiDmaIsIdle   = TRUE;
 
     prevIntTime = 0;
+    sectorsWritten = 0;         // nothing written yet
     
     sendFwVersion       = FALSE;
     sendTrackRequest    = FALSE;
@@ -240,6 +243,7 @@ int main (void)
 
         if(WGate == 0) {                                                // when write gate is low, the data is written to floppy
             handleFloppyWrite();
+            sectorsWritten++;                                       // one sector was written, request updated track at the end of stream
         }
 
         // fillMfmTimesForDMA -- execution time: 7 us - 16 us (16 us rarely, at the start / end)
@@ -256,9 +260,15 @@ int main (void)
             readTrackData_goToStart();          // move the pointer in the track stream to start
 
             //-----------
+            if(sectorsWritten > 0) {        // if some sectors were written to floppy, we need to get the new stream now
+                sectorsWritten = 0;         // nothing written now
+                REQUEST_TRACK;              // ask for track data
+            }
+
+            //-----------
             // the following section of code should request track again if even after 2 rotations of floppy we're not streaming what we should
             trackStreamedCount++;               // increment the count of how many times we've streamed this track
-            
+
             if(trackStreamedCount >= 2) {       // if since the last request 2 rotations happened
                 if(streamed.track != now.track || streamed.side != now.side) {  // and we're not streaming what we really want to stream
                     REQUEST_TRACK;              // ask for track data (again?)
@@ -267,18 +277,18 @@ int main (void)
             streamed.track  = (BYTE) -1;        // after the end of track mark that we're not streaming anything
             streamed.side   = (BYTE) -1;
             //-----------
-            
+
             fillReadStreamBufferWithDummyData();
-            
+
             // the following few lines send the FW version to host every 5 index pulses, this is used for transfer of commands from host to Franz
             indexCount++;
-            
+
             if(indexCount == 5) {
                 indexCount = 0;
                 sendFwVersion = TRUE;
             }
         }
-        
+
         //--------
         // NOTE! Handling of STEP and SIDE only when MOTOR is ON, but the drive doesn't have to be selected and it must handle the control anyway
         if((inputs & MOTOR_ENABLE) != 0) {      // motor not enabled? Skip the following code.
@@ -292,7 +302,6 @@ int main (void)
             REQUEST_TRACK;                      // we need track from the right side
             prev.side = now.side;
         }
-
     }
 }
 
@@ -572,22 +581,22 @@ void handleFloppyWrite(void)
     wrNow->readyToSend = TRUE;                          // mark this buffer as ready to be sent
 
     // move READ pointer further, as we weren't moving it while write was active
-		{
-			int i;
-			int start = inIndexGet;
-			int end = inIndexGet + 1200;
-			for(i=start; i<end; i++) {		// try to find next sector marker
-				if(readTrackData[i] == CMD_TRACK_STREAM_END_BYTE) {		// didn't find next sector, but end of stream?
-					inIndexGet = i - 8;				// store this as new index
-					break;
-				}
+    {
+        int i;
+        int start = inIndexGet;
+        int end = inIndexGet + 1200;
+        for(i=start; i<end; i++) {      // try to find next sector marker
+            if(readTrackData[i] == CMD_TRACK_STREAM_END_BYTE) {     // didn't find next sector, but end of stream?
+                inIndexGet = i - 8;     // store this as new index
+                break;
+            }
 
-				if(readTrackData[i] == CMD_CURRENT_SECTOR) {	// found start of new sector?
-					inIndexGet = i - 30;			// start streaming again few bytes before new / next sector
-					break;
-				}
-			}
-		}
+            if(readTrackData[i] == CMD_CURRENT_SECTOR) {    // found start of new sector?
+                inIndexGet = i - 30;    // start streaming again few bytes before new / next sector
+                break;
+            }
+        }
+    }
 }
 
 void fillMfmTimesForDMA(void)
@@ -627,8 +636,6 @@ void fillMfmTimesWithDummy(void)
 
 BYTE getNextMFMbyte(void)
 {
-    static BYTE gap[3] = {0xa9, 0x6a, 0x96};
-    static BYTE gapIndex = 0;
     BYTE val;
 
     WORD maxLoops = 15000;
@@ -658,21 +665,13 @@ BYTE getNextMFMbyte(void)
             readTrackData_get(streamed.track);      // store track  #
             readTrackData_get(streamed.sector);     // store sector #
         } else {                                                        // not a command? return it
-            gapIndex = 0;       
             return val;
         }
     }
 
     //---------
-    // if we got here, we have no data to stream
-    val = gap[gapIndex];                            // stream this GAP byte
-    gapIndex++;
-
-    if(gapIndex > 2) {                              // we got only 3 gap WORD times, go back to 0
-        gapIndex = 0;
-    }
-
-    return val;
+    // if we got here, we have no data to stream - just stream encoded zeros like in GAP 2 or GAP 3b
+    return 0x55;
 }
 
 void updateStreamPositionByFloppyPosition(void)
