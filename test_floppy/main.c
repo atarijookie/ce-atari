@@ -35,7 +35,8 @@ void print_status_write(void);
 void setImageGeometry(int tracks, int sides, int sectors);
 void guessImageGeometry(void);
 
-BYTE writeBfr[512];
+BYTE bfr     [9*512];
+BYTE writeBfr[9*512];
 
 void removeAllWaitingKeys(void);
 BYTE showDebugInfoFunc(BYTE resultChar, int ms, int howManyTracksSeeked, int lazyTime);
@@ -124,7 +125,7 @@ struct {
     int totalSectors;
 } imgGeometry;
 
-void writeReadVerifyTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce);
+void writeReadVerifyTest(BYTE linearNotRandom, BYTE foreverNotOnce);
 void writeSingleSectorTest(void);
 void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce);
 
@@ -135,6 +136,7 @@ struct {
     BYTE linearNotRandom;
     BYTE imageTestNotAny;
     BYTE foreverNotOnce;
+    BYTE sectorsAtOnce;
 } testConf;
 
 void showMenu(void)
@@ -143,25 +145,21 @@ void showMenu(void)
 
     (void)Cconws("\33p[ Floppy test tool      ver ");
     showAppVersion();
-    (void)Cconws(" ]\33q\r\n");
+    (void)Cconws(" ]\33q\r\n\r\n");
 
-    (void)Cconws("\r\n\33p");
-    testConf.linearNotRandom ? (void)Cconws("Linear ")     : (void)Cconws("Random ");
-    testConf.readNotWrite    ? (void)Cconws("Read  of ")   : (void)Cconws("Write of ");
-    testConf.imageTestNotAny ? (void)Cconws("Test image ") : (void)Cconws("Any image  ");
-    testConf.foreverNotOnce  ? (void)Cconws("forEver ")    : (void)Cconws("Once    ");
-    (void)Cconws("\33q\r\n");
+    testConf.linearNotRandom    ? (void)Cconws(" \33pLinear\33q ")       : (void)Cconws(" \33pL\33qinear ");
+    testConf.readNotWrite       ? (void)Cconws("\33pRead \33q ")         : (void)Cconws("\33pR\33qead  ");
+    testConf.imageTestNotAny    ? (void)Cconws("of \33ptest Image\33q ") : (void)Cconws("of test \33pI\33qmage ");
+    testConf.foreverNotOnce     ? (void)Cconws("\33pforEver\33q\r\n")    : (void)Cconws("for\33pE\33qver\r\n");
 
-    (void)Cconws("\33pL\33qinear \33pR\33qead     test \33pI\33qmage for\33pE\33qver\r\n");
-    (void)Cconws("ra\33pN\33qdom \33pW\33qrite    \33pA\33qny  image \33pO\33qnce   \r\n");
-    
+    (!testConf.linearNotRandom) ? (void)Cconws(" \33praNdom\33q ")       : (void)Cconws(" ra\33pN\33qdom ");
+    (!testConf.readNotWrite)    ? (void)Cconws("\33pWrite\33q ")         : (void)Cconws("\33pW\33qrite ");
+    (!testConf.imageTestNotAny) ? (void)Cconws("of \33pAny  image\33q ") : (void)Cconws("of \33pA\33qny  image ");
+    (!testConf.foreverNotOnce)  ? (void)Cconws("\33pOnce   \33q\r\n")    : (void)Cconws("\33pO\33qnce   \r\n");
+
     (void)Cconws("\r\n");
-    (void)Cconws(" \33p[ T ]\33q - ");
-    if(testConf.fddViaTos) (void)Cconws("\33p");
-    (void)Cconws("use TOS function Floprd\33q\r\n");
-    (void)Cconws(" \33p[ F ]\33q - ");
-    if(!testConf.fddViaTos) (void)Cconws("\33p");
-    (void)Cconws("use custom FDC function\33q\r\n");
+    (void)Cconws(" \33p[ + -  ]\33q - sectors at once: ");
+    showInt(testConf.sectorsAtOnce, 1);
 
     (void)Cconws("\r\n");
     (void)Cconws(" \33p[ 236c ]\33q - seek rate:");
@@ -173,6 +171,17 @@ void showMenu(void)
     (void)Cconws(" 6 \33q/");
     if(seekRate == RATE_12) (void)Cconws("\33p");
     (void)Cconws(" 12 \33qms\r\n");
+
+    (void)Cconws("\r\n \33p[Return]\33q - execute test\r\n");
+
+    (void)Cconws("\r\n");
+    (void)Cconws(" \33p[ T ]\33q - ");
+    if(testConf.fddViaTos) (void)Cconws("\33p");
+    (void)Cconws("use TOS function Floprd\33q\r\n");
+    (void)Cconws(" \33p[ F ]\33q - ");
+    if(!testConf.fddViaTos) (void)Cconws("\33p");
+    (void)Cconws("use custom FDC function\33q\r\n");
+
 
     (void)Cconws("\r\n");
     (void)Cconws(" \33p[ Y ]\33q - toggle stop after error - ");
@@ -197,11 +206,9 @@ int main(void)
     testConf.linearNotRandom = 1;
     testConf.imageTestNotAny = 1;
     testConf.foreverNotOnce = 0;
+    testConf.sectorsAtOnce = 1;
 
-    int i;
-    for(i=0; i<512; i++) {
-        writeBfr[i] = (BYTE) i;
-    }
+    setImageGeometry(80, 2, 9);
 
     removeAllWaitingKeys();                                             // read all the possibly waiting keys, so we can ignore them...
 
@@ -246,11 +253,19 @@ int main(void)
             case 'e': testConf.foreverNotOnce = (req == 'e');               break;
         }
 
+        if(req == '+' && testConf.sectorsAtOnce < 9) {
+            testConf.sectorsAtOnce++;
+        }
+
+        if(req == '-' && testConf.sectorsAtOnce > 1) {
+            testConf.sectorsAtOnce--;
+        }
+
         if(req == 13) {         // on ENTER
             if(testConf.readNotWrite) {     // read
                 readTest(testConf.linearNotRandom, testConf.imageTestNotAny, testConf.foreverNotOnce);
             } else {                        // write
-                writeReadVerifyTest(testConf.linearNotRandom, testConf.imageTestNotAny, testConf.foreverNotOnce);
+                writeReadVerifyTest(testConf.linearNotRandom, testConf.foreverNotOnce);
             }
         }
 
@@ -292,30 +307,20 @@ void writeSingleSectorTest(void)
     floppy_write(writeBfr, 0, 3, 2, 1, 1);  // side 1, track 2, sector 3
 }
 
-void writeReadVerifyTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
+void writeReadVerifyTest(BYTE linearNotRandom, BYTE foreverNotOnce)
 {
     // init stuff
-    BYTE bfr[512];                                                                  // buffer for one sector
-    BYTE initval=0;                                                                 // not sure yet
+    BYTE initval=0;             // not sure yet
 
-    counts.runs     = 0;                                                            // keep track of number of runs
-    counts.good     = 0;                                                            // number of runs passed
-    counts.lazy     = 0;                                                            // ?
-    counts.errWrite = 0;                                                            // number of write error
-    counts.errData  = 0;                                                            // number of data incorrectly read
+    counts.runs     = 0;        // keep track of number of runs
+    counts.good     = 0;        // number of runs passed
+    counts.lazy     = 0;        // ?
+    counts.errWrite = 0;        // number of write error
+    counts.errData  = 0;        // number of data incorrectly read
 
-    times.min   = 32000;                                                            // min time
-    times.max   = 0;                                                                // max time
-    times.avg   = 0;                                                                // avg time
-
-    int sect,tr,si;
-    for(si=0; si<imgGeometry.sides; si++) {
-        for(tr=0; tr<imgGeometry.tracks; tr++) {
-            for(sect=0; sect<imgGeometry.sectors; sect++) {
-                checksums[tr][si][sect] = 0;                                       // set all reference checksum data to 0
-            }
-        }
-    }
+    times.min   = 32000;        // min time
+    times.max   = 0;            // max time
+    times.avg   = 0;            // avg time
 
     VT52_Clear_home();
     print_status_write();
@@ -335,11 +340,11 @@ void writeReadVerifyTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreve
 
     showLineStartWrite(linearNotRandom, fl.track);
 
-    BYTE isAfterStartOrError = 1;
+    //BYTE isAfterStartOrError = 1;
 
     floppy_seekRate(0, seekRate);           // set SEEK RATE
     floppy_on(bfr, 0);                      // seek to TRACK #0, leave motor on
-    int prevTrack = 0;                      // previous track is now 0
+    //int prevTrack = 0;                    // previous track is now 0
 
     while(1) {
         //---------------------------------
@@ -362,17 +367,21 @@ void writeReadVerifyTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreve
         //---------------------------------
         // execute the read test
 
-        memset(bfr, initval++, 512);    //just to make sure we are not looking at data from the last read attempt on a failure
+        memset(bfr, initval++, testConf.sectorsAtOnce * 512);   //just to make sure we are not looking at data from the last read attempt on a failure
 
         WORD tics = getTicks();
-        writeBfr[510] = (BYTE) (tics >> 8);     // last two bytes are 'random' to keep the content changing
-        writeBfr[511] = (BYTE) (tics     );
+
+        int i;
+        for(i=0; i<testConf.sectorsAtOnce; i++) {               // for each written sector
+            writeBfr[(i*512) + 510] = (BYTE) (tics >> 8);       // last two bytes are 'random' to keep the content changing
+            writeBfr[(i*512) + 511] = (BYTE) (tics     );
+        }
 
         // write
-        BYTE wRes = floppy_write(writeBfr, 0, fl.sector, fl.track, fl.side, 1);
+        BYTE wRes = floppy_write(writeBfr, 0, fl.sector, fl.track, fl.side, testConf.sectorsAtOnce);
 
         // read
-        BYTE rRes = floppy_read(bfr, 0, fl.sector, fl.track, fl.side, 1);
+        BYTE rRes = floppy_read(bfr, 0, fl.sector, fl.track, fl.side, testConf.sectorsAtOnce);
 
         int verifyOk = 1;
 
@@ -380,7 +389,7 @@ void writeReadVerifyTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreve
             verifyOk = 0;
         } else {                            // if write and read succeeded, time to verify data
             int i;
-            for(i=0; i<512; i++){           // verify
+            for(i=0; i<testConf.sectorsAtOnce * 512; i++){           // verify
                 if(bfr[i] != writeBfr[i])
                 {
                     verifyOk = 0;
@@ -410,13 +419,13 @@ void writeReadVerifyTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreve
 
         if(showDebugInfo && testConf.stopAfterError) {
             BYTE quit = showDebugInfoFunc(resultChar, 0, 0, 0);
-            isAfterStartOrError = 1;
+            //isAfterStartOrError = 1;
 
             if(quit) {
                 break;
             }
         }
-        prevTrack = fl.track;
+        //prevTrack = fl.track;
 
         print_status_write();
 
@@ -456,7 +465,6 @@ void writeReadVerifyTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreve
 
 void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
 {
-    BYTE bfr[512];                                                                   // buffer for one sector
     BYTE initval=0;                                                                  // not sure yet
 
     counts.runs     = 0;                                                             // keep track of number of runs
@@ -523,7 +531,7 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
         //---------------------------------
         // execute the read test
 
-        memset(bfr, initval++, 512);    //just to make sure we are not looking at data from the last read attempt on a failure
+        memset(bfr, initval++, testConf.sectorsAtOnce*512);    //just to make sure we are not looking at data from the last read attempt on a failure
 
         DWORD start, end;
         start       = getTicks();
@@ -721,10 +729,13 @@ void showLineStartWrite(BYTE linearNotRandom, int trNo)
 
 void updateFloppyPosition(BYTE linearNotRandom, BYTE foreverNotOnce)
 {
+    // if trying to write N sectors, the last one you should try is N sectors from the end of track
+    int maxSectorForSectorsAtOnce = imgGeometry.sectors + 1 - testConf.sectorsAtOnce;
+
     //-----------------
     // for random order
     if(!linearNotRandom) {
-        fl.sector  = (Random() % imgGeometry.sectors) + 1;
+        fl.sector  = (Random() % maxSectorForSectorsAtOnce) + 1;
         fl.side    = (Random() % imgGeometry.sides);
         fl.track   = (Random() % imgGeometry.tracks);
 
@@ -747,7 +758,7 @@ void updateFloppyPosition(BYTE linearNotRandom, BYTE foreverNotOnce)
 
     //-----------------
     // for sequential order
-    if(fl.sector < imgGeometry.sectors) {   // not last sector? next sector
+    if(fl.sector < maxSectorForSectorsAtOnce) {   // not last sector? next sector
         fl.sector++;
     } else {                            // last sector?
         fl.sector = 1;
@@ -774,7 +785,6 @@ void updateFloppyPosition(BYTE linearNotRandom, BYTE foreverNotOnce)
 
 BYTE readSector(int sector, int track, int side, BYTE checkData)    // 0 means good, 1 means failed READ operation, 2 means READ good but DATA bad
 {
-    BYTE bfr[512];
     int res, i;
 
     res = floppy_read(bfr, 0, sector, track, side, 1);
@@ -918,7 +928,7 @@ void print_status_write(void)
 {
     VT52_Goto_pos(0,0);
 
-    (void) Cconws("\33p[ CosmosEx FDD test.     Writes: ");
+    (void) Cconws("\33p[ CosmosEx FDD test.    Writes: ");
     showInt(counts.runs, 4);
     (void) Cconws("   ]\33q\r\n");
 
