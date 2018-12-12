@@ -11,6 +11,7 @@
     .globl  _argTrack
     .globl  _argSide
     .globl  _argSector
+    .globl  _argCount
     .globl  _argLeaveOn
     .globl  _argBufferPtr
     .globl  _argSuccess
@@ -42,6 +43,7 @@ _runFdcAsm:
     move.l  _argSide,d2         | side
     move.l  _argDrive,d3        | drive
     move.l  _argLeaveOn,d4      | leave drive on
+    move.l  _argCount,d5        | sector count
     move.l  _argFuncId,d7       | function number
     move.l  _argBufferPtr,a0    | pointer to buffer where the data will go
 
@@ -57,6 +59,7 @@ _runFdcAsm:
 |  d2=side
 |  d3=drive
 |  d4=turn drive off after operation (0=turn it off 1=leave it on)
+|  d5=sector count
 |  d7=function number (replaced with 0(no error) or -1(timeout) )
 |  a0=where to write/read data to/from
 
@@ -166,7 +169,7 @@ Read:
     move    #0x90,(a2)          | set dma to read status
     move    #0x190,(a2)
     move    #0x90,(a2)
-    move    #1,(a1)             | read one sector
+    move    d5,(a1)             | set sector count
 
     move    #0x80,(a2)          | select command register
     move    #0x80,(a1)          | read one sector
@@ -189,7 +192,7 @@ Write:
     move    #0x190,(a2)         | set dma to write status
     move    #0x90,(a2)
     move    #0x190,(a2)
-    move    #1,(a1)             | write one sector
+    move    d5,(a1)             | set sector count
 
     move    #0x180,(a2)         | select command register
     move    #0xa0,(a1)          | write one sector
@@ -304,6 +307,7 @@ _argDrive:      .ds.l   1
 _argTrack:      .ds.l   1
 _argSide:       .ds.l   1
 _argSector:     .ds.l   1
+_argCount:      .ds.l   1
 _argLeaveOn:    .ds.l   1
 _argBufferPtr:  .ds.l   1
 _argSuccess:    .ds.l   1

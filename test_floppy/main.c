@@ -68,6 +68,7 @@ extern DWORD argDrive;
 extern DWORD argTrack;
 extern DWORD argSide;
 extern DWORD argSector;
+extern DWORD argCount;
 extern DWORD argLeaveOn;
 extern DWORD argBufferPtr;
 extern DWORD argSuccess;
@@ -1119,6 +1120,7 @@ int floppy_write(BYTE *wrbuf, WORD dev, WORD sector, WORD track, WORD side, WORD
         argTrack        = track;
         argSide         = side;
         argSector       = sector;
+        argCount        = count;
         argLeaveOn      = 1;
         argBufferPtr    = (DWORD) wrbuf;
         runFdcAsm();                            // do the requested action
@@ -1149,6 +1151,7 @@ int floppy_read(BYTE *buf, WORD dev, WORD sector, WORD track, WORD side, WORD co
         argTrack        = track;
         argSide         = side;
         argSector       = sector;
+        argCount        = count;
         argLeaveOn      = 1;
         argBufferPtr    = (DWORD) buf;
 
@@ -1184,6 +1187,7 @@ void floppy_on(BYTE *buf, WORD dev)
         argTrack        = 0;
         argSide         = 0;
         argSector       = 1;
+        argCount        = 1;
         argLeaveOn      = 1;                // leave MOTOR ON
         argBufferPtr    = (DWORD) buf;
 
@@ -1199,6 +1203,7 @@ void floppy_off(BYTE *buf, WORD dev)
         argTrack        = 0;
         argSide         = 0;
         argSector       = 1;
+        argCount        = 1;
         argLeaveOn      = 0;                // turn MOTOR OFF
         argBufferPtr    = (DWORD) buf;
 
