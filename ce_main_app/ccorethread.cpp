@@ -1066,7 +1066,7 @@ int CCoreThread::bcdToInt(int bcd)
 
 void CCoreThread::handleSendTrack(void)
 {
-    BYTE oBuf[2], iBuf[15000];
+    BYTE oBuf[2], iBuf[MFM_STREAM_SIZE];
     static int prevTrack = 0;
 
     memset(oBuf, 0, 2);
@@ -1075,7 +1075,7 @@ void CCoreThread::handleSendTrack(void)
     int side    = iBuf[0];                      // now read the current floppy position
     int track   = iBuf[1];
 
-    int remaining   = 15000 - (4*2) - 2;        // this much bytes remain to send after the received ATN
+    int remaining   = MFM_STREAM_SIZE - (4*2) - 2;  // this much bytes remain to send after the received ATN
 
     int tr, si, spt;
     shared.imageSilo->getParams(tr, si, spt);      // read the floppy image params

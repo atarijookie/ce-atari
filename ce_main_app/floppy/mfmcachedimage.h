@@ -5,7 +5,13 @@
 
 // maximum 2 sides, 85 tracks per side
 #define MAX_TRACKS      (2 * 85)
-#define MFM_STREAM_SIZE 15000
+
+// Most of the normal games have tracks from 11000 bytes to 12019 bytes of encoded stream.
+// With Bad_Brew_Crew/BBC11.ZIP (11 sectors per track?) the resulting stream was 13205 bytes big, I didn't see anything more yet (but there might be something bigger).
+// In theory the 11 sectors per track could be up to 13720 bytes big, so 13800 should be enough here.
+// In case something bigger appears (e.g. 12 sectors per track), consider shortening GAP 2, GAP 3a, GAP 3B, GAP 4, which take 774 bytes before encoding, 1548 bytes after encoding,
+// so if more space for real data would be needed, some adaptive reducing of GAPs sizes could be added (to a point where WD1772 still considers those GAPs to be valid to catch the sync there)
+#define MFM_STREAM_SIZE 13800
 
 typedef struct {
     volatile bool isReady;    // set to false if this track can't be streamed yet (e.g. not encoded yet or encoding at that moment)
