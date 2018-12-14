@@ -55,7 +55,7 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 // circular buffer 
 // watch out, these macros take 0.73 us for _add, and 0.83 us for _get operation!
 
-#define     wrBuffer_add(X)                 { if(wrNow->count  < WRITEBUFFER_SIZE)   {  wrNow->buffer[wrNow->count]     = X;    wrNow->count++;     }   }
+#define     wrBuffer_add(X)                 { if(wrNow->count  < WRITEBUFFER_SIZE) { wrNow->buffer[wrNow->count] = X; wrNow->count++; } }
 
 #define     readTrackData_goToStart()       {                                                                                                           inIndexGet = 0;    }
 #define     readTrackData_get(X)            { X = readTrackData[inIndexGet];                inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) {  inIndexGet = 0; }; }
@@ -502,10 +502,20 @@ void EXTI3_IRQHandler(void)
 void handleFloppyWrite(void)
 {
     WORD inputs = GPIOB->IDR;
-    WORD wData = inputs & WDATA;    // initialize wData and wDataPrev
-    WORD wDataPrev = wData;
     WORD times = 0, timesCount = 0;
     WORD wval, newTime, duration;
+
+//#define SW_WRITE
+
+#ifdef SW_WRITE                     // software write capturing
+    WORD wData = inputs & WDATA;    // initialize wData and wDataPrev
+    WORD wDataPrev = wData;
+#else                               // hardware write capturing
+    DWORD dval;
+    WORD i, end, prevTime = 0;
+
+    DMA1->IFCR = DMA1_IT_HT6 | DMA1_IT_TC6; // clear HT & TC flags
+#endif
 
     TIM3->CNT = 0;                  // initialize pulse width counter
 
@@ -528,6 +538,13 @@ void handleFloppyWrite(void)
             break;
         }
 
+        if(wrNow->count >= WRITEBUFFER_SIZE) {  // no more space in write buffer, send it to host
+            break;
+        }
+
+///////////////////////////////////////
+// software WRITE capturing - might be prone to errors due to interrupts
+#ifdef SW_WRITE
         wDataPrev = wData;          // store previous state of WDATA
         wData = inputs & WDATA;     // get   current  state of WDATA
 
@@ -553,7 +570,6 @@ void handleFloppyWrite(void)
         }
 
         // TODO: if duration was too long, look at what happened
-
         if(!newTime) {           // don't have valid new time? skip rest
             continue;
         }
@@ -565,11 +581,53 @@ void handleFloppyWrite(void)
         if(timesCount >= 8) {   // if already got 8 times stored
             timesCount = 0;
             wrBuffer_add(times); // add to write buffer
+        }
+///////////////////////////////////////
+#else   // hardware WRITE capturing
+        // check for half transfer or transfer complete IF
+        dval = DMA1->ISR & (DMA1_IT_HT6 | DMA1_IT_TC6);     // get only Half-Transfer and Transfer-Complete flags
+        if(!dval) {     // no HT and TC flag set, try again later
+            continue;
+        }
 
-            if(wrNow->count >= WRITEBUFFER_SIZE) {  // no more space in write buffer, send it to host
-                break;
+        if(dval & DMA1_IT_HT6) {        // HTIF6 -- Half Transfer IF 6 -- words 0-7
+            DMA1->IFCR = DMA1_IT_HT6;   // clear HTIF6 flag
+            i = 0;
+            end = 8;
+        } else {                        // TCIF6 -- Transfer Complete IF 6 -- words 8-15
+            DMA1->IFCR = DMA1_IT_TC6;   // clear TCIF6 flag
+            i = 8;
+            end = 16;
+        }
+
+        for(; i<end; i++) {             // go through the stored values (either 0-7 or 8-15), calculate duration
+            duration = mfmWriteStreamBuffer[i] - prevTime;
+            prevTime = mfmWriteStreamBuffer[i];
+
+            newTime = 0;                // convert timer time to pulse duration enum
+
+            if(duration < 36) {         // 4 us?
+                newTime = MFM_4US;
+            } else if(duration < 50) {  // 6 us?
+                newTime = MFM_6US;
+            } else if(duration < 65) {  // 8 us?
+                newTime = MFM_8US;
+            }
+
+            if(!newTime) {              // don't have valid new time? skip rest
+                continue;
+            }
+
+            times = times << 2;
+            times |= newTime;           // append new time
+
+            timesCount++;
+            if(timesCount >= 8) {       // if already got 8 times stored
+                timesCount = 0;
+                wrBuffer_add(times);    // add to write buffer
             }
         }
+#endif
     }
 
     // writing finished

@@ -82,7 +82,6 @@ void dma_mfmRead_init(void)
     DMA_Cmd(DMA1_Channel5, ENABLE);
 }
 
-/*
 void dma_mfmWrite_init(void)
 {
     DMA_InitTypeDef DMA_InitStructure;
@@ -110,7 +109,6 @@ void dma_mfmWrite_init(void)
     // Enable DMA1 Channel6 transfer
     DMA_Cmd(DMA1_Channel6, ENABLE);
 }
-*/
 
 void dma_spi_init(void)
 {
@@ -275,13 +273,13 @@ void init_hw_sw(void)
     
     //----------
     AFIO->MAPR |= 0x02000000;                                       // SWJ_CFG[2:0] (Bits 26:24) -- 010: JTAG-DP Disabled and SW-DP Enabled
-//  AFIO->MAPR |= 0x00000800;                                       // TIM3_REMAP -- Partial remap (CH1/PB4, CH2/PB5, CH3/PB0, CH4/PB1)
+    AFIO->MAPR |= 0x00000800;                                       // TIM3_REMAP -- Partial remap (CH1/PB4, CH2/PB5, CH3/PB0, CH4/PB1)
     //----------
     
     timerSetup_index();
     
     timerSetup_mfmWrite();
-    //dma_mfmWrite_init();
+    dma_mfmWrite_init();
 
     //--------------
     // DMA + SPI initialization
