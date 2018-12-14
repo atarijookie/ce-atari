@@ -262,7 +262,7 @@ int main (void)
             //-----------
             if(sectorsWritten > 0) {        // if some sectors were written to floppy, we need to get the new stream now
                 sectorsWritten = 0;         // nothing written now
-                REQUEST_TRACK;              // ask for track data
+                FORCE_REQUEST_TRACK;        // ask for the changed track data, but force it - get it immediatelly
             }
 
             //-----------
