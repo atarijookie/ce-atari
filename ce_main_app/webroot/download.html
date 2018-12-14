@@ -100,7 +100,6 @@ function handleShowOverlay(encoding_ready)
     }
     prev_encoding_ready = encoding_ready;
 
-
     return check_again;             // return if we should check again in a while
 }
 
@@ -169,9 +168,11 @@ function onInsert(imageName, slotNo)
         success: function(data){
             console.log("Insert Success");
 
-            prev_encoding_ready = false;    // now we're encoding, so not ready now
-            $(".over_convert").show();      // show overlay
-            setTimeout(onCheckTimer, 333); // check every while
+//          prev_encoding_ready = false;    // now we're encoding, so not ready now
+//          $(".over_convert").show();      // show overlay
+//          setTimeout(onCheckTimer, 333);  // check every while
+
+            onSearchStringChanged();        // fake search string change to reload the download/insert icons
         },
         error: function (xhr) {
             console.log("Insert Error: " + xhr.statusText);

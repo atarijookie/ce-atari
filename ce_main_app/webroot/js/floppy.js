@@ -7,7 +7,7 @@
 
   /api/v1/floppy/[slot# 0-2] 	POST
   Upload file
-  
+
   /api/v1/floppy/[slot# 0-2] 	PUT
   Activate slot - all others are deactivated
 
@@ -16,7 +16,7 @@
 
   ----------------------------------------------------------------*/
 //TODO:
-  
+
 var CosmosEx = CosmosEx || {};
 
 CosmosEx.Floppy=function(){
@@ -38,7 +38,7 @@ CosmosEx.Floppy=function(){
             }
             $("span.file-"+i).html(file);
           }
-        }  
+        }
         if( data.active!=null ){
           $("input[type=checkbox][data-slot='"+data.active+"']").prop('checked', true);
         }
@@ -92,7 +92,7 @@ CosmosEx.Floppy=function(){
         cache: false,
         contentType: false,
         processData: false
-    });    
+    });
   }
   //check if image is converted
   var onTimer=function(e){
@@ -102,7 +102,7 @@ CosmosEx.Floppy=function(){
       success: function(data){
 		if( typeof(data.encoding_ready)!=='undefined' ){
 	        if( data.encoding_ready ){
-			  $(".overlay").hide();	
+			  $(".overlay").hide();
 	        }else{
 	          setTimeout(onTimer, 1000);
 	        }
@@ -112,7 +112,7 @@ CosmosEx.Floppy=function(){
 		}
       },
       error: function(){
-		$overlay.hide();	
+		$overlay.hide();
       }
   	});
   }
@@ -124,14 +124,14 @@ CosmosEx.Floppy=function(){
     var $button=$(this);
     var slotid=$(this).data("slot");
     var formData = new FormData($form[0]);
-    
+
     if(slotid == 100 || slotid == 101) {    // special case: insert config image or insert floppy test image
         $.ajax({
             url: '/api/v1/floppy/'+slotid,  //Server script to process data
             type: 'PUT',
             success: function(){
                 refreshFilenames();
-                $overlay.show(); 
+                //$overlay.show();
                 setTimeout(onTimer, 1000);
             },
             error: function(){
@@ -141,16 +141,16 @@ CosmosEx.Floppy=function(){
             cache: false,
             contentType: false,
             processData: false
-        });    
-    
+        });
+
         return false;
     }
-    
+
     function progressHandlingFunction(e){
       if(e.lengthComputable){
         $progress.attr({value:e.loaded,max:e.total});
       }
-    }; 
+    };
     $.ajax({
         url: '/api/v1/floppy/'+slotid,  //Server script to process data
         type: 'POST',
@@ -164,20 +164,20 @@ CosmosEx.Floppy=function(){
         //Ajax events
         beforeSend: function(){
           $progress.show();
-          $filename.hide();  
+          $filename.hide();
         },
         success: function(){
           $progress.hide();
-          $button.addClass("vis-hidden");  
+          $button.addClass("vis-hidden");
           refreshFilenames();
 	      $filename.show();
-		  $overlay.show(); 
+		  //$overlay.show();
 	      setTimeout(onTimer, 1000);
         },
         error: function(){
-          $progress.hide();  
-          $button.addClass("vis-hidden");  
-          refreshFilenames();  
+          $progress.hide();
+          $button.addClass("vis-hidden");
+          refreshFilenames();
           $filename.show();
         },
         // Form data
@@ -186,17 +186,17 @@ CosmosEx.Floppy=function(){
         cache: false,
         contentType: false,
         processData: false
-    });    
+    });
     e.preventDefault();
     return false;
   };
-  
+
   return {
     init:function(){
         refreshFilenames();
         $("input[type='submit']").click(onSubmit);
         $('.input-file').change(onFileChange);
         $("input[type='checkbox']").change(onActivate);
-      } 
+      }
   };
 }();
