@@ -92,6 +92,7 @@ private:
     TCachedTrack tracks[MAX_TRACKS];
     WORD crc;       // current value of CRC calculator
     BYTE *bfr;      // pointer to where we are storing data in the buffer
+    int  bytesInBfr;    // how many bytes we already stored in buffer
 
     int  getNextIndexToEncode(void);
     void encodeSingleTrack(FloppyImage *img, int side, int track, int sectorsPerTrack);

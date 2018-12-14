@@ -199,11 +199,11 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
 
     memset(tracks[index].mfmStream, 0, MFM_STREAM_SIZE);    // initialize MFM stream
     bfr = tracks[index].mfmStream;                          // move pointer to start of track buffer
+    bytesInBfr = 0;                             // no bytes in stream yet
 
     encodeSingleTrack(img, s, t, params.spt);   // encode single track
 
-    int cnt = bfr - tracks[index].mfmStream;    // data count = current position - start
-    tracks[index].bytesInStream = cnt;          // store the data count
+    tracks[index].bytesInStream = bytesInBfr;   // store the data count
 
     for(int i=0; i<MFM_STREAM_SIZE; i += 2) {   // swap bytes - Franz has other endiannes
         BYTE tmp                        = tracks[index].mfmStream[i + 0];
@@ -402,115 +402,6 @@ bool MfmCachedImage::encodeSingleSector(FloppyImage *img, int side, int track, i
     return true;
 }
 
-//#define OLD_ENCODER
-
-#ifdef OLD_ENCODER
-// old implementation which uses appendChange()
-void MfmCachedImage::appendByteToStream(BYTE val, bool doCalcCrc)
-{
-    if(doCalcCrc) {
-        updateCrcFast(val);
-    }
-
-    static BYTE prevBit = 0;
-
-    for(int i=0; i<8; i++) {                        // for all bits
-        BYTE bit = val & 0x80;                      // get highest bit
-        val = val << 1;                             // shift up
-
-        if(bit == 0) {                              // current bit is 0?
-            if(prevBit == 0) {                      // append 0 after 0?
-                appendChange(1);    // R
-                appendChange(0);    // N
-            } else {                                // append 0 after 1?
-                appendChange(0);    // N
-                appendChange(0);    // N
-            }
-        } else {                                    // current bit is 1?
-            appendChange(0);        // N
-            appendChange(1);        // R
-        }
-
-        prevBit = bit;                              // store this bit for next cycle
-    }
-}
-
-void MfmCachedImage::appendChange(const BYTE chg)
-{
-    static BYTE changes = 0;
-
-    changes = changes << 1;             // shift up
-    changes = changes | chg;            // append change
-
-    if(changes == 0 || changes == 1) {  // no 1 or single 1 found, quit
-        return;
-    }
-
-    if(chg != 1) {                      // not adding 1 right now? quit
-        return;
-    }
-
-    BYTE time = 0;
-
-    switch(changes) {
-    case 0x05:  time = MFM_4US; break;        // 4 us - stored as 1
-    case 0x09:  time = MFM_6US; break;        // 6 us - stored as 2
-    case 0x11:  time = MFM_8US; break;        // 8 us - stored as 3
-
-    default:
-        Debug::out(LOG_ERROR, "appendChange -- this shouldn't happen!");
-        return;
-    }
-
-    changes = 0x01;                     // leave only lowest change
-
-    static BYTE times       = 0;
-    static BYTE timesCnt    = 0;
-
-    times = times << 2;                 // shift 2 up
-    times = times | time;               // add lowest 2 bits
-
-    timesCnt++;                         // increment the count of times we have
-    if(timesCnt == 4) {                 // we have 4 times (whole byte), store it
-        timesCnt = 0;
-
-        *bfr = times;                   // store times
-        bfr++;                          // move forward in buffer
-    }
-}
-
-void MfmCachedImage::appendA1MarkToStream(void)
-{
-    // append A1 mark in stream, which is 8-6-8-6 in MFM (normaly would been 8-6-4-4-6)
-    // 8 us
-    appendChange(0);  // N
-    appendChange(1);  // R
-    appendChange(0);  // N
-    appendChange(0);  // N
-    appendChange(0);  // N
-
-    // 6 us
-    appendChange(1);  // R
-    appendChange(0);  // N
-    appendChange(0);  // N
-
-    // 8 us
-    appendChange(1);  // R
-    appendChange(0);  // N
-    appendChange(0);  // N
-    appendChange(0);  // N
-
-    // 6 us
-    appendChange(1);  // R
-    appendChange(0);  // N
-    appendChange(0);  // N
-    appendChange(1);  // R
-
-    updateCrcFast(0xa1);
-}
-
-#else
-
 // new implementation which generates time from bit triplets (threeBits)
 void MfmCachedImage::appendByteToStream(BYTE val, bool doCalcCrc)
 {
@@ -552,8 +443,12 @@ void MfmCachedImage::appendByteToStream(BYTE val, bool doCalcCrc)
             if(encoder.timesCnt == 4) {             // we have 4 times (whole byte), store it
                 encoder.timesCnt = 0;
 
-                *bfr = encoder.times;               // store times
-                bfr++;                              // move forward in buffer
+                if(bytesInBfr < MFM_STREAM_SIZE) {  // still have some space in buffer? store value
+                    bytesInBfr++;
+
+                    *bfr = encoder.times;           // store times
+                    bfr++;                          // move forward in buffer
+                }
             }
         }
     }
@@ -569,8 +464,12 @@ void MfmCachedImage::appendTime(BYTE time)
     if(encoder.timesCnt == 4) {         // we have 4 times (whole byte), store it
         encoder.timesCnt = 0;
 
-        *bfr = encoder.times;           // store times
-        bfr++;                          // move forward in buffer
+        if(bytesInBfr < MFM_STREAM_SIZE) {  // still have some space in buffer? store value
+            bytesInBfr++;
+
+            *bfr = encoder.times;           // store times
+            bfr++;                          // move forward in buffer
+        }
     }
 }
 
@@ -595,7 +494,6 @@ void MfmCachedImage::appendA1MarkToStream(void)
 
     encoder.threeBits = 1;      // the end of A1 is 01 in binary, so initialize threeBits to that
 }
-#endif
 
 void MfmCachedImage::appendCurrentSectorCommand(int track, int side, int sector)
 {
@@ -607,8 +505,12 @@ void MfmCachedImage::appendCurrentSectorCommand(int track, int side, int sector)
 
 void MfmCachedImage::appendRawByte(BYTE val)
 {
-    *bfr = val;     // just store this byte, no processing
-    bfr++;          // move further in buffer
+    if(bytesInBfr < MFM_STREAM_SIZE) {  // still have some space in buffer? store value
+        bytesInBfr++;
+
+        *bfr = val;     // just store this byte, no processing
+        bfr++;          // move further in buffer
+    }
 }
 
 // taken from Steem Engine emulator
