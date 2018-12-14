@@ -49,7 +49,7 @@ BYTE timeout(void);
 //-----------------------------------------
 // lengths of buffers on SPI TX and RX
 // read track data buffer is in BYTEs, but REQ_LEN_RX is in WORDs
-#define READTRACKDATA_SIZE					15000
+#define READTRACKDATA_SIZE					13800
 
 #define ATN_SENDFWVERSION_LEN_TX		8
 #define ATN_SENDFWVERSION_LEN_RX		8

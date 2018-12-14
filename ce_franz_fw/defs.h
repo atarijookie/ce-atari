@@ -8,7 +8,7 @@
 #define TRUE    1
 #define FALSE   0
 
-#define WRITEBUFFER_SIZE        550
+#define WRITEBUFFER_SIZE        650
 
 typedef struct 
 {

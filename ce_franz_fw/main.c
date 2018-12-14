@@ -638,7 +638,7 @@ BYTE getNextMFMbyte(void)
 {
     BYTE val;
 
-    WORD maxLoops = 15000;
+    WORD maxLoops = READTRACKDATA_SIZE;
 
     while(1) {                                      // go through readTrackData to process commands and to find some data
         maxLoops--;
