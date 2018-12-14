@@ -685,7 +685,7 @@ void MfmCachedImage::handleDecodedByte(void)
     if(decoder.byteOffset == 0 && decoder.dByte != 0xfb) {      // if DAM mark position, but wrong DAM mark?
         decoder.done = true;
         decoder.good = false;
-        Debug::out(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - wrong DAM mark: %02X", decoder.dByte);
+        Debug::out(LOG_ERROR, "MfmCachedImage::handleDecodedByte - wrong DAM mark: %02X", decoder.dByte);
     }
 
     if(decoder.byteOffset >= 1 && decoder.byteOffset <= 512) {  // if we're in the data offset, store data in buffer
@@ -708,7 +708,8 @@ void MfmCachedImage::handleDecodedByte(void)
         decoder.done = true;            // received CRC? nothing more to be done
         decoder.good = (decoder.calcedCrc == decoder.recvedCrc);    // everything good when received and calced crc are th same
 
-        Debug::out(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - received CRC: %02x, calculated CRC: %02x, good: %d", decoder.recvedCrc, decoder.calcedCrc, decoder.good);
+        int logLevel = decoder.good ? LOG_DEBUG : LOG_ERROR;        // if good then show only on debug log level; if bad then show on error log level
+        Debug::out(logLevel, "MfmCachedImage::handleDecodedByte - received CRC: %02x, calculated CRC: %02x, good: %d", decoder.recvedCrc, decoder.calcedCrc, decoder.good);
         //Debug::outBfr(decoder.oBfr - 512, 512);
     }
 
@@ -748,7 +749,7 @@ bool MfmCachedImage::decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr)
     }
 
     if(!syncFound) {                // if sync not found, skip the rest
-        Debug::out(LOG_DEBUG, "MfmCachedImage::decodeMfmBuffer - sync not found");
+        Debug::out(LOG_ERROR, "MfmCachedImage::decodeMfmBuffer - sync not found");
         return false;
     }
 
