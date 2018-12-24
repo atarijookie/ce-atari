@@ -503,7 +503,8 @@ void handleFloppyWrite(void)
 {
     WORD inputs = GPIOB->IDR;
     WORD times = 0, timesCount = 0;
-    WORD wval, newTime, duration;
+    WORD wval;
+    register WORD newTime, duration;
 
 //#define SW_WRITE
 
@@ -512,7 +513,9 @@ void handleFloppyWrite(void)
     WORD wDataPrev = wData;
 #else                               // hardware write capturing
     DWORD dval;
-    WORD i, end, prevTime = 0;
+    WORD i, start;
+    register WORD prevTime = 0;
+    WORD *pMfmWriteStreamBuffer;
 
     DMA1->IFCR = DMA1_IT_HT6 | DMA1_IT_TC6; // clear HT & TC flags
 #endif
@@ -589,20 +592,20 @@ void handleFloppyWrite(void)
         if(!dval) {     // no HT and TC flag set, try again later
             continue;
         }
+        DMA1->IFCR = DMA1_IT_HT6 | DMA1_IT_TC6; // clear HTIF6 flags
 
-        if(dval & DMA1_IT_HT6) {        // HTIF6 -- Half Transfer IF 6 -- words 0-7
-            DMA1->IFCR = DMA1_IT_HT6;   // clear HTIF6 flag
-            i = 0;
-            end = 8;
-        } else {                        // TCIF6 -- Transfer Complete IF 6 -- words 8-15
-            DMA1->IFCR = DMA1_IT_TC6;   // clear TCIF6 flag
-            i = 8;
-            end = 16;
-        }
+        start = (dval & DMA1_IT_HT6) ? 0 : 8;   // HT is words 0..7, TC is words 8..15
 
-        for(; i<end; i++) {             // go through the stored values (either 0-7 or 8-15), calculate duration
-            duration = mfmWriteStreamBuffer[i] - prevTime;
-            prevTime = mfmWriteStreamBuffer[i];
+        // using pointer to write buffer is faster than using index (twice):
+        // duration + prevTime using index: 2.75 us, the same using pointer: 1.62 us, the sae using pointer acces only once: 1.25 us
+        // whole loop: 3.51 us on 4 us pulse without storing, 3.87 us on 8 us pulse without storing, aditional 7.51 us for storing using wrBuffer_add()
+        pMfmWriteStreamBuffer = &mfmWriteStreamBuffer[start];
+
+        for(i=0; i<8; i++) {             // go through the stored values (either 0-7 or 8-15), calculate duration
+            wval     = *pMfmWriteStreamBuffer;
+            duration = wval - prevTime;
+            prevTime = wval;
+            pMfmWriteStreamBuffer++;
 
             newTime = 0;                // convert timer time to pulse duration enum
 
@@ -622,6 +625,8 @@ void handleFloppyWrite(void)
             times |= newTime;           // append new time
 
             timesCount++;
+
+            // the following storing takes 7.51 us, which is too much -- FIX ME!
             if(timesCount >= 8) {       // if already got 8 times stored
                 timesCount = 0;
                 wrBuffer_add(times);    // add to write buffer
