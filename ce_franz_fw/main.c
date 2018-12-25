@@ -505,6 +505,7 @@ void handleFloppyWrite(void)
     WORD times = 0, timesCount = 0;
     WORD wval;
     register WORD newTime, duration;
+    WORD *pWriteNow, *pWriteEnd;
 
 //#define SW_WRITE
 
@@ -525,14 +526,20 @@ void handleFloppyWrite(void)
     wrNow->readyToSend = FALSE;     // mark this buffer as not ready to be sent yet
     wrNow->count = 4;               // at the start we already have 4 WORDs in buffer - SYNC, ATN code, TX len, RX len
 
+    pWriteNow = &wrNow->buffer[wrNow->count];           // where we want to store current written data (using pointer instead of index for speed reasons)
+    pWriteEnd = &wrNow->buffer[WRITEBUFFER_SIZE - 4];   // end of write buffer - terminate write loop if we get here (minus some space at the end for additional data)
+
     wval = (streamed.track << 8) | streamed.sector; // next word (buffer[4]) is side, track, sector
 
     if(streamed.side != 0) {        // if side is not 0, set the highest bit
         wval |= 0x8000;
     }
-    
-    wrBuffer_add(wval);             // add this side track sector WORD
-    wrBuffer_add(inIndexGet);       // store inIndexGet in the stream, so RPi can guess the right sector from our stream position when write happened
+
+    *pWriteNow = wval;              // add this side track sector WORD
+    pWriteNow++;
+
+    *pWriteNow = inIndexGet;        // store inIndexGet in the stream, so RPi can guess the right sector from our stream position when write happened
+    pWriteNow++;
 
     while(1) {
         inputs = GPIOB->IDR;        // read inputs
@@ -541,7 +548,7 @@ void handleFloppyWrite(void)
             break;
         }
 
-        if(wrNow->count >= WRITEBUFFER_SIZE) {  // no more space in write buffer, send it to host
+        if(pWriteNow >= pWriteEnd) {            // no more space in write buffer, send it to host
             break;
         }
 
@@ -583,7 +590,9 @@ void handleFloppyWrite(void)
         timesCount++;
         if(timesCount >= 8) {   // if already got 8 times stored
             timesCount = 0;
-            wrBuffer_add(times); // add to write buffer
+
+            *pWriteNow = times; // add to write buffer
+            pWriteNow++;
         }
 ///////////////////////////////////////
 #else   // hardware WRITE capturing
@@ -626,10 +635,12 @@ void handleFloppyWrite(void)
 
             timesCount++;
 
-            // the following storing takes 7.51 us, which is too much -- FIX ME!
+            // the following storing takes 0.62 us (was 7.5 us using the wrBuffer_add() macro)
             if(timesCount >= 8) {       // if already got 8 times stored
                 timesCount = 0;
-                wrBuffer_add(times);    // add to write buffer
+
+                *pWriteNow = times;     // add to write buffer
+                pWriteNow++;
             }
         }
 #endif
@@ -637,10 +648,15 @@ void handleFloppyWrite(void)
 
     // writing finished
     if(timesCount > 0) {        // if there was something captured but not stored at the end
-        wrBuffer_add(times);    // add to write buffer
+        *pWriteNow = times;     // add to write buffer
+        pWriteNow++;
     }
 
-    wrBuffer_add(0);                                    // last word: 0
+    *pWriteNow = 0;             // last word: 0
+    pWriteNow++;
+
+    wrNow->count = (pWriteNow - wrNow->buffer);         // calculate how many words we got in write buffer (pointer subtraction gives the number of elements between the two pointers)
+
     wrNow->readyToSend = TRUE;                          // mark this buffer as ready to be sent
 
     // move READ pointer further, as we weren't moving it while write was active
