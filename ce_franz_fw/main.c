@@ -499,6 +499,38 @@ void EXTI3_IRQHandler(void)
   }
 }
 
+void moveReadIndexToNextSector(void)
+{
+    // move READ pointer further, as we weren't moving it while write was active
+    BYTE *pStart = &readTrackData[0];                       // where the stream starts
+    BYTE *pNow = &readTrackData[inIndexGet];                // where we are now
+    BYTE *pEnd = &readTrackData[inIndexGet + 1200];         // where should we end the search
+    BYTE *pMax = &readTrackData[READTRACKDATA_SIZE - 1];    // end of track - if we got here, nothing more to search through
+
+    if(pEnd > pMax) {               // if we would be going out of track buffer, limit it here to end of track buffer
+        pEnd = pMax;
+    }
+
+    while(pNow <= pEnd) {           // try to find next sector marker
+        BYTE val = *pNow;
+        
+        if(val == CMD_TRACK_STREAM_END_BYTE) {  // didn't find next sector, but end of stream?
+            inIndexGet = (pNow - pStart) - 8;   // store this as new index, let the other part of streaming find the end of track
+            break;
+        }
+
+        if(val == CMD_CURRENT_SECTOR) {         // found start of new sector?
+            inIndexGet = (pNow - pStart) - 30;  // start streaming again few bytes before new / next sector
+            break;
+        }
+
+        pNow++;                     // move further
+    }
+}
+
+#define SW_WRITE
+
+#ifdef SW_WRITE
 void handleFloppyWrite(void)
 {
     WORD inputs = GPIOB->IDR;
@@ -507,19 +539,11 @@ void handleFloppyWrite(void)
     register WORD newTime, duration;
     WORD *pWriteNow, *pWriteEnd;
 
-//#define SW_WRITE
-
-#ifdef SW_WRITE                     // software write capturing
+    // software write capturing
     WORD wData = inputs & WDATA;    // initialize wData and wDataPrev
     WORD wDataPrev = wData;
-#else                               // hardware write capturing
-    DWORD dval;
-    WORD i, start;
-    register WORD prevTime = 0;
-    WORD *pMfmWriteStreamBuffer;
 
-    DMA1->IFCR = DMA1_IT_HT6 | DMA1_IT_TC6; // clear HT & TC flags
-#endif
+    __disable_irq();                // disable interrupts
 
     TIM3->CNT = 0;                  // initialize pulse width counter
 
@@ -552,9 +576,7 @@ void handleFloppyWrite(void)
             break;
         }
 
-///////////////////////////////////////
-// software WRITE capturing - might be prone to errors due to interrupts
-#ifdef SW_WRITE
+        // software WRITE capturing - might be prone to errors due to interrupts
         wDataPrev = wData;          // store previous state of WDATA
         wData = inputs & WDATA;     // get   current  state of WDATA
 
@@ -579,13 +601,12 @@ void handleFloppyWrite(void)
             newTime = MFM_8US;
         }
 
-        // TODO: if duration was too long, look at what happened
         if(!newTime) {           // don't have valid new time? skip rest
             continue;
         }
 
         times = times << 2;
-        times |= newTime;   // append new time
+        times |= newTime;       // append new time
 
         timesCount++;
         if(timesCount >= 8) {   // if already got 8 times stored
@@ -594,8 +615,73 @@ void handleFloppyWrite(void)
             *pWriteNow = times; // add to write buffer
             pWriteNow++;
         }
-///////////////////////////////////////
-#else   // hardware WRITE capturing
+    }
+
+    __enable_irq();                // enable interrupts
+
+    // writing finished
+    if(timesCount > 0) {        // if there was something captured but not stored at the end
+        *pWriteNow = times;     // add to write buffer
+        pWriteNow++;
+    }
+
+    *pWriteNow = 0;             // last word: 0
+    pWriteNow++;
+
+    wrNow->count = (pWriteNow - wrNow->buffer);         // calculate how many words we got in write buffer (pointer subtraction gives the number of elements between the two pointers)
+
+    wrNow->readyToSend = TRUE;                          // mark this buffer as ready to be sent
+
+    moveReadIndexToNextSector();
+}
+#else
+void handleFloppyWrite(void)
+{
+    WORD inputs = GPIOB->IDR;
+    WORD times = 0, timesCount = 0;
+    WORD wval;
+    register WORD newTime, duration;
+    WORD *pWriteNow, *pWriteEnd;
+
+    DWORD dval;
+    WORD i, start;
+    register WORD prevTime = 0;
+    WORD *pMfmWriteStreamBuffer;
+
+    DMA1->IFCR = DMA1_IT_HT6 | DMA1_IT_TC6; // clear HT & TC flags
+
+    TIM3->CNT = 0;                  // initialize pulse width counter
+
+    wrNow->readyToSend = FALSE;     // mark this buffer as not ready to be sent yet
+    wrNow->count = 4;               // at the start we already have 4 WORDs in buffer - SYNC, ATN code, TX len, RX len
+
+    pWriteNow = &wrNow->buffer[wrNow->count];           // where we want to store current written data (using pointer instead of index for speed reasons)
+    pWriteEnd = &wrNow->buffer[WRITEBUFFER_SIZE - 4];   // end of write buffer - terminate write loop if we get here (minus some space at the end for additional data)
+
+    wval = (streamed.track << 8) | streamed.sector; // next word (buffer[4]) is side, track, sector
+
+    if(streamed.side != 0) {        // if side is not 0, set the highest bit
+        wval |= 0x8000;
+    }
+
+    *pWriteNow = wval;              // add this side track sector WORD
+    pWriteNow++;
+
+    *pWriteNow = inIndexGet;        // store inIndexGet in the stream, so RPi can guess the right sector from our stream position when write happened
+    pWriteNow++;
+
+    while(1) {
+        inputs = GPIOB->IDR;        // read inputs
+
+        if(inputs & WGATE) {        // if WGATE isn't L, writing finished
+            break;
+        }
+
+        if(pWriteNow >= pWriteEnd) {            // no more space in write buffer, send it to host
+            break;
+        }
+
+        // hardware WRITE capturing
         // check for half transfer or transfer complete IF
         dval = DMA1->ISR & (DMA1_IT_HT6 | DMA1_IT_TC6);     // get only Half-Transfer and Transfer-Complete flags
         if(!dval) {     // no HT and TC flag set, try again later
@@ -607,7 +693,7 @@ void handleFloppyWrite(void)
 
         // using pointer to write buffer is faster than using index (twice):
         // duration + prevTime using index: 2.75 us, the same using pointer: 1.62 us, the sae using pointer acces only once: 1.25 us
-        // whole loop: 3.51 us on 4 us pulse without storing, 3.87 us on 8 us pulse without storing, aditional 7.51 us for storing using wrBuffer_add()
+        // whole loop: 3.51 us on 4 us pulse without storing, 3.87 us on 8 us pulse without storing, aditional 0.62 us us for storing
         pMfmWriteStreamBuffer = &mfmWriteStreamBuffer[start];
 
         for(i=0; i<8; i++) {             // go through the stored values (either 0-7 or 8-15), calculate duration
@@ -643,7 +729,6 @@ void handleFloppyWrite(void)
                 pWriteNow++;
             }
         }
-#endif
     }
 
     // writing finished
@@ -659,24 +744,9 @@ void handleFloppyWrite(void)
 
     wrNow->readyToSend = TRUE;                          // mark this buffer as ready to be sent
 
-    // move READ pointer further, as we weren't moving it while write was active
-    {
-        int i;
-        int start = inIndexGet;
-        int end = inIndexGet + 1200;
-        for(i=start; i<end; i++) {      // try to find next sector marker
-            if(readTrackData[i] == CMD_TRACK_STREAM_END_BYTE) {     // didn't find next sector, but end of stream?
-                inIndexGet = i - 8;     // store this as new index
-                break;
-            }
-
-            if(readTrackData[i] == CMD_CURRENT_SECTOR) {    // found start of new sector?
-                inIndexGet = i - 30;    // start streaming again few bytes before new / next sector
-                break;
-            }
-        }
-    }
+    moveReadIndexToNextSector();
 }
+#endif
 
 void fillMfmTimesForDMA(void)
 {
@@ -860,7 +930,7 @@ void USART2_IRQHandler(void)                                            // USART
         }
     }  
 }   
-     
+
 void USART3_IRQHandler(void)                                            // USART3 is connected to original ST keyboard
 {
     if((USART3->SR & USART_FLAG_RXNE) != 0) {                           // if something received
