@@ -832,23 +832,28 @@ BYTE getNextMFMbyte(void)
 
 void updateStreamPositionByFloppyPosition(void)
 {
-    DWORD i, mediaPosition, pos;
+    DWORD steamSize, mediaPosition;
 
-    // find end of stream, i will hold the last index where we can go (= LENGTH OF STREAM in bytes)
-    for(i=0; i<READTRACKDATA_SIZE; i++) {
-        if(readTrackData[i] == CMD_TRACK_STREAM_END_BYTE) {
+    BYTE *pStart = &readTrackData[0];                       // where the stream starts
+    BYTE *pEnd = &readTrackData[READTRACKDATA_SIZE - 1];    // end of track - if we got here, nothing more to search through
+    BYTE *pNow = pStart;                                    // where we will start the search
+
+    // find end of stream, it will hold the last index where we can go (= LENGTH OF STREAM in bytes)
+    while(pNow < pEnd) {
+        if(*pNow == CMD_TRACK_STREAM_END_BYTE) {
+            streamSize = pNow - pStart;      // calculate index of end of stream
             break;
         }
+
+        pNow++;                     // advance to next position
     }
 
     // read the current position - from 0 to 400
-    mediaPosition   = TIM2->CNT;
+    mediaPosition = TIM2->CNT;
 
     // calculate index where we should place sream reading index -
     // current position is between 0 and 400, that is from 0 to 100%, so place it between 0 and LENGTH OF STREAM position
-    pos             = (i * mediaPosition) / 400;
-
-    inIndexGet = pos;
+    inIndexGet = (streamSize * mediaPosition) / 400;
 }
 
 void processHostCommand(BYTE val)
