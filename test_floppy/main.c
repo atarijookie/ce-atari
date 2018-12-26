@@ -132,6 +132,7 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce);
 
 struct {
     BYTE fddViaTos;
+    BYTE dataRandNotCnt;
     BYTE stopAfterError;
     BYTE readNotWrite;
     BYTE linearNotRandom;
@@ -176,15 +177,20 @@ void showMenu(void)
     (void)Cconws("\r\n \33p[Return]\33q - execute test\r\n");
 
     (void)Cconws("\r\n");
-    (void)Cconws(" \33p[ T ]\33q - ");
-    if(testConf.fddViaTos) (void)Cconws("\33p");
-    (void)Cconws("use TOS function Floprd\33q\r\n");
-    (void)Cconws(" \33p[ F ]\33q - ");
-    if(!testConf.fddViaTos) (void)Cconws("\33p");
-    (void)Cconws("use custom FDC function\33q\r\n");
+    (void)Cconws(" \33p[ F ]\33q - use ");
+    if(testConf.fddViaTos) {
+        (void)Cconws("\33pTOS\33q/custom functions\r\n");
+    } else {
+        (void)Cconws("TOS/\33pcustom\33q functions\r\n");
+    }
 
+    (void)Cconws(" \33p[ D ]\33q - write data are ");
+    if(testConf.dataRandNotCnt) {
+        (void)Cconws("\33prandom\33q/counter\r\n");
+    } else {
+        (void)Cconws("random/\33pcounter\33q\r\n");
+    }
 
-    (void)Cconws("\r\n");
     (void)Cconws(" \33p[ Y ]\33q - toggle stop after error - ");
     if(testConf.stopAfterError) (void)Cconws("\33p");
     (void)Cconws("YES\33q/");
@@ -201,6 +207,7 @@ int main(void)
 {
     DWORD oldSp = Super(0);
 
+    testConf.dataRandNotCnt = 1;
     testConf.fddViaTos = 1;
     testConf.stopAfterError = 0;
     testConf.readNotWrite = 1;
@@ -238,8 +245,9 @@ int main(void)
             case 's': writeSingleSectorTest();                              break;
             case 'm': makeFloppy();                                         break;
 
-            case 'f':
-            case 't': testConf.fddViaTos = (req == 't');                    break;
+            case 'd': testConf.dataRandNotCnt = !testConf.dataRandNotCnt;   break;
+
+            case 'f': testConf.fddViaTos = !testConf.fddViaTos;             break;
 
             case 'w':
             case 'r': testConf.readNotWrite = (req == 'r');                 break;
@@ -292,17 +300,24 @@ void removeAllWaitingKeys(void)
     }
 }
 
+void generateWriteData(void)
+{
+    BYTE randValue = Random();
+    int byteCount = testConf.sectorsAtOnce * 512;
+    int i;
+
+    for(i=0; i<byteCount; i++) {            // go through the write buffer, write data
+        if(testConf.dataRandNotCnt) {       // random data?
+            writeBfr[i] = i ^ randValue;
+        } else {                            // counter data?
+            writeBfr[i] = i;
+        }
+    }
+}
+
 void writeSingleSectorTest(void)
 {
-    // set the buffer such that each byte is known thing
-    int i;
-    for(i=0; i<512; i++) {
-        writeBfr[i] = (BYTE) i;
-    }
-
-    WORD tics = getTicks();
-    writeBfr[510] = (BYTE) (tics >> 8);     // last two bytes are 'random' to keep the content changing
-    writeBfr[511] = (BYTE) (tics     );
+    generateWriteData();                    // generate write data
 
     floppy_seekRate(0, seekRate);           // set SEEK RATE
     floppy_write(writeBfr, 0, 3, 2, 1, 1);  // side 1, track 2, sector 3
@@ -370,13 +385,7 @@ void writeReadVerifyTest(BYTE linearNotRandom, BYTE foreverNotOnce)
 
         memset(bfr, initval++, testConf.sectorsAtOnce * 512);   //just to make sure we are not looking at data from the last read attempt on a failure
 
-        WORD tics = getTicks();
-
-        int i;
-        for(i=0; i<testConf.sectorsAtOnce; i++) {               // for each written sector
-            writeBfr[(i*512) + 510] = (BYTE) (tics >> 8);       // last two bytes are 'random' to keep the content changing
-            writeBfr[(i*512) + 511] = (BYTE) (tics     );
-        }
+        generateWriteData();
 
         // write
         BYTE wRes = floppy_write(writeBfr, 0, fl.sector, fl.track, fl.side, testConf.sectorsAtOnce);
@@ -404,8 +413,8 @@ void writeReadVerifyTest(BYTE linearNotRandom, BYTE foreverNotOnce)
 
         VT52_Goto_pos(x, 24);
 
-        BYTE showDebugInfo = 0;
         BYTE resultChar;
+        BYTE showDebugInfo = 0;
 
         if(verifyOk){
             Cconout('*');
@@ -414,7 +423,7 @@ void writeReadVerifyTest(BYTE linearNotRandom, BYTE foreverNotOnce)
         } else {
             Cconout('!');
             resultChar = '!';
-            showDebugInfo   = 1;
+            showDebugInfo = 1;
             counts.errData++;
         }
 
