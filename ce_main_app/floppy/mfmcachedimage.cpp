@@ -198,12 +198,21 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
     //-----
 
     memset(tracks[index].mfmStream, 0, MFM_STREAM_SIZE);    // initialize MFM stream
-    bfr = tracks[index].mfmStream;                          // move pointer to start of track buffer
-    bytesInBfr = 0;                             // no bytes in stream yet
+    currentStreamStart = tracks[index].mfmStream;   // where the stream starts
+
+    #define STREAM_TABLE_ITEMS  20
+    #define STREAM_TABLE_SIZE   (2 * STREAM_TABLE_ITEMS)
+    bfr = currentStreamStart + STREAM_TABLE_SIZE;   // where the MFM data will start (after initial table)
+    bytesInBfr = STREAM_TABLE_SIZE;             // no bytes in stream yet
+
+    for(int i=0; i<STREAM_TABLE_ITEMS; i++) {   // init the table for all sectors to start (if sector missing, will restart stream)
+        setRawWordAtIndex(i, STREAM_TABLE_SIZE);
+    }
 
     encodeSingleTrack(img, s, t, params.spt);   // encode single track
 
     tracks[index].bytesInStream = bytesInBfr;   // store the data count
+    setRawWordAtIndex(0, bytesInBfr);           // stream table - index 0: stream size in bytes
 
     for(int i=0; i<MFM_STREAM_SIZE; i += 2) {   // swap bytes - Franz has other endiannes
         BYTE tmp                        = tracks[index].mfmStream[i + 0];
@@ -288,7 +297,9 @@ void MfmCachedImage::encodeSingleTrack(FloppyImage *img, int side, int track, in
     }
 
     for(int sect=1; sect <= sectorsPerTrack; sect++) {
-        encodeSingleSector(img, side, track, sect);        // then create the right MFM stream
+        setRawWordAtIndex(sect, bytesInBfr);            // stream table - index #sector: offset to this sector
+
+        encodeSingleSector(img, side, track, sect);     // then create the right MFM stream
 
         if(sigintReceived) {                            // app terminated? quit
             return;
@@ -501,6 +512,13 @@ void MfmCachedImage::appendCurrentSectorCommand(int track, int side, int sector)
     appendRawByte(side);
     appendRawByte(track);
     appendRawByte(sector);
+}
+
+void MfmCachedImage::setRawWordAtIndex(int index, WORD val)
+{
+    WORD *pWord = (WORD *) currentStreamStart;  // get word pointer to start of current stream
+    pWord += index;                             // move pointer to the wanted offset (at index)
+    *pWord = val;                               // store the value
 }
 
 void MfmCachedImage::appendRawByte(BYTE val)

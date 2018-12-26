@@ -57,11 +57,14 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 
 //#define     wrBuffer_add(X)                 { if(wrNow->count  < WRITEBUFFER_SIZE) { wrNow->buffer[wrNow->count] = X; wrNow->count++; } }
 
-#define     readTrackData_goToStart()       {                                                                                                           inIndexGet = 0;    }
-#define     readTrackData_get(X)            { X = readTrackData[inIndexGet];                inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) {  inIndexGet = 0; }; }
+#define STREAM_TABLE_ITEMS  20
+#define STREAM_TABLE_SIZE   (2 * STREAM_TABLE_ITEMS)
+
+#define     readTrackData_goToStart()       { inIndexGet = STREAM_TABLE_SIZE; }
+#define     readTrackData_get(X)            { X = readTrackData[inIndexGet];                inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) {  inIndexGet = STREAM_TABLE_SIZE; }; }
 #define     readTrackData_get_noMove(X)     { X = readTrackData[inIndexGet];                                                                                                                                    }
 //#define       readTrackData_markAndmove() { readTrackData[inIndexGet] = CMD_MARK_READ;    inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) {  inIndexGet = 0; };   }
-#define     readTrackData_justMove()        {                                                                                       inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) { inIndexGet = 0; };   }
+#define     readTrackData_justMove()        {                                                                                       inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) { inIndexGet = STREAM_TABLE_SIZE; };   }
 //--------------
 
 #define REQUEST_TRACK                       {   next.track = now.track; next.side = now.side; sendTrackRequest = TRUE; lastRequestTime = TIM4->CNT; trackStreamedCount = 0; }
@@ -502,30 +505,15 @@ void EXTI3_IRQHandler(void)
 
 void moveReadIndexToNextSector(void)
 {
-    // move READ pointer further, as we weren't moving it while write was active
-    BYTE *pStart = &readTrackData[0];                       // where the stream starts
-    BYTE *pNow = &readTrackData[inIndexGet];                // where we are now
-    BYTE *pEnd = &readTrackData[inIndexGet + 1200];         // where should we end the search
-    BYTE *pMax = &readTrackData[READTRACKDATA_SIZE - 1];    // end of track - if we got here, nothing more to search through
+    inIndexGet = STREAM_TABLE_SIZE;     // set get index to stream start in case we fail to find next sector index
 
-    if(pEnd > pMax) {               // if we would be going out of track buffer, limit it here to end of track buffer
-        pEnd = pMax;
-    }
+    if(streamed.sector >= 1 && streamed.sector < STREAM_TABLE_ITEMS) {  // if streamed sector seems to be valid (will fit in stream table)
+        WORD *pStreamTable = (WORD *) &readTrackData[0];                // get pointer to stream table
+        WORD nextSectorIndex = pStreamTable[streamed.sector + 1];       // get index of next sector from stream table
 
-    while(pNow <= pEnd) {           // try to find next sector marker
-        BYTE val = *pNow;
-
-        if(val == CMD_TRACK_STREAM_END_BYTE) {  // didn't find next sector, but end of stream?
-            inIndexGet = (pNow - pStart) - 8;   // store this as new index, let the other part of streaming find the end of track
-            break;
+        if(nextSectorIndex < (READTRACKDATA_SIZE - 1)) {    // if next sector index seems to be valid, use it
+            inIndexGet = nextSectorIndex;
         }
-
-        if(val == CMD_CURRENT_SECTOR) {         // found start of new sector?
-            inIndexGet = (pNow - pStart) - 30;  // start streaming again few bytes before new / next sector
-            break;
-        }
-
-        pNow++;                     // move further
     }
 }
 
@@ -832,21 +820,9 @@ BYTE getNextMFMbyte(void)
 
 void updateStreamPositionByFloppyPosition(void)
 {
-    DWORD steamSize, mediaPosition;
-
-    BYTE *pStart = &readTrackData[0];                       // where the stream starts
-    BYTE *pEnd = &readTrackData[READTRACKDATA_SIZE - 1];    // end of track - if we got here, nothing more to search through
-    BYTE *pNow = pStart;                                    // where we will start the search
-
-    // find end of stream, it will hold the last index where we can go (= LENGTH OF STREAM in bytes)
-    while(pNow < pEnd) {
-        if(*pNow == CMD_TRACK_STREAM_END_BYTE) {
-            streamSize = pNow - pStart;      // calculate index of end of stream
-            break;
-        }
-
-        pNow++;                     // advance to next position
-    }
+    DWORD mediaPosition;
+    WORD *pStreamTable = (WORD *) &readTrackData[0];        // get pointer to stream table
+    DWORD steamSize = pStreamTable[0];                      // get stream size (in bytes) from stream table at index 0
 
     // read the current position - from 0 to 400
     mediaPosition = TIM2->CNT;

@@ -92,6 +92,7 @@ private:
     TCachedTrack tracks[MAX_TRACKS];
     WORD crc;       // current value of CRC calculator
     BYTE *bfr;      // pointer to where we are storing data in the buffer
+    BYTE *currentStreamStart;
     int  bytesInBfr;    // how many bytes we already stored in buffer
 
     int  getNextIndexToEncode(void);
@@ -99,6 +100,7 @@ private:
 
     void appendCurrentSectorCommand(int track, int side, int sector);
     void appendRawByte(BYTE val);
+    void setRawWordAtIndex(int index, WORD val);
     void appendA1MarkToStream(void);
     void appendTime(BYTE time);
     void appendByteToStream(BYTE val, bool doCalcCrc=true);
