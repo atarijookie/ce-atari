@@ -34,11 +34,11 @@ WORD mfmWriteStreamBuffer[16];
 //WORD lastMfmWriteTC;
 
 // cycle measure: t1 = TIM3->CNT;   t2 = TIM3->CNT; dt = t2 - t1; -- subtrack 0x12 because that's how much measuring takes
-WORD t1, t2, dt; 
+WORD t1, t2, dt;
 
 // digital osciloscope time measure on GPIO B0:
 //          GPIOB->BSRR = 1;    // 1
-//          GPIOB->BRR = 1;     // 0            
+//          GPIOB->BRR = 1;     // 0
 
 /* Franz to host communication:
 A) send   : ATN_SEND_TRACK with the track # and side # -- 2 WORDs + zeros = 3 WORDs
@@ -46,16 +46,16 @@ A) send   : ATN_SEND_TRACK with the track # and side # -- 2 WORDs + zeros = 3 WO
 
 B) send   : ATN_SECTOR_WRITTEN with the track, side, sector # + captured data, up to 1500 B
    receive: nothing (or don't care)
-     
+
 C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + empty WORDs
    receive: commands possibly received -- receive 6 WORDs (3 empty, 3 with possible commands)
 */
 
 //--------------
-// circular buffer 
+// circular buffer
 // watch out, these macros take 0.73 us for _add, and 0.83 us for _get operation!
 
-#define     wrBuffer_add(X)                 { if(wrNow->count  < WRITEBUFFER_SIZE) { wrNow->buffer[wrNow->count] = X; wrNow->count++; } }
+//#define     wrBuffer_add(X)                 { if(wrNow->count  < WRITEBUFFER_SIZE) { wrNow->buffer[wrNow->count] = X; wrNow->count++; } }
 
 #define     readTrackData_goToStart()       {                                                                                                           inIndexGet = 0;    }
 #define     readTrackData_get(X)            { X = readTrackData[inIndexGet];                inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) {  inIndexGet = 0; }; }
@@ -116,8 +116,9 @@ void updateStreamPositionByFloppyPosition(void);
 void handleFloppyWrite(void);
 
 BYTE sectorsWritten;            // how many sectors were written during the last media rotation - if something was written, we need to get the re-encoded track
+WORD wrPulseShort, wrPulseLong; // if write pulse is too short of too long, increment here
 
-int main (void) 
+int main (void)
 {
     BYTE indexCount     = 0;
     WORD WGate;
@@ -125,21 +126,21 @@ int main (void)
 
     prevIntTime = 0;
     sectorsWritten = 0;         // nothing written yet
-    
+
     sendFwVersion       = FALSE;
     sendTrackRequest    = FALSE;
-    
+
     setupAtnBuffers();
     init_hw_sw();                                   // init GPIO pins, timers, DMA, global variables
-    
+
     circularInit(&buff0);
     circularInit(&buff1);
 
     setupDriveSelect();                             // the drive select bits which should be LOW if the drive is selected
-    
+
     // init floppy signals
     GPIOB->BSRR = (WR_PROTECT | DISK_CHANGE);       // not write protected
-    GPIOB->BRR = TRACK0 | DISK_CHANGE;              // TRACK 0 signal to L, DISK_CHANGE to LOW      
+    GPIOB->BRR = TRACK0 | DISK_CHANGE;              // TRACK 0 signal to L, DISK_CHANGE to LOW
     GPIOB->BRR = ATN;                               // ATTENTION bit low - nothing to read
 
     setupDiskChangeWriteProtect();                  // init write-protect and disk-change pins
@@ -153,25 +154,25 @@ int main (void)
             fillReadStreamBufferWithDummyData();        // fill MFM stream with dummy data so we won't stream any junk
             outFlags.weAreReceivingTrack = TRUE;        // mark that we are receiving TRACK data, and thus shouldn't stream
         }
-        
+
         if(outFlags.updatePosition) {
             outFlags.updatePosition = FALSE;
             updateStreamPositionByFloppyPosition();     // place the read marker on the right place in the stream
         }
-        
+
         // ST wants the stream and we are not receiving TRACK data? ENABLE stream
         if(outFlags.stWantsTheStream && !outFlags.weAreReceivingTrack) {
-            if(!outFlags.outputsAreEnabled) {           // the outputs are not enabled yet? 
+            if(!outFlags.outputsAreEnabled) {           // the outputs are not enabled yet?
                 FloppyOut_Enable();                     // enable them
                 outFlags.outputsAreEnabled = TRUE;      // mark that we enabled them
             }
         } else {    // other cases? DISABLE stream
-            if(outFlags.outputsAreEnabled) {            // the outputs are enabled? 
+            if(outFlags.outputsAreEnabled) {            // the outputs are enabled?
                 FloppyOut_Disable();                    // disable them
                 outFlags.outputsAreEnabled = FALSE;     // mark that we disabled them
             }
         }
-        
+
         // sending and receiving data over SPI using DMA
         if(spiDmaIsIdle == TRUE) {                                                              // SPI DMA: nothing to Tx and nothing to Rx?
             if(sendFwVersion) {                                                                 // should send FW version? this is a window for receiving commands
@@ -179,25 +180,25 @@ int main (void)
                     isDiskChanged = FALSE;
                     setupDiskChangeWriteProtect();
                 }
-                
+
                 timeoutStart();                                                                 // start a time-out timer
-                
+
                 spiDma_txRx(ATN_SENDFWVERSION_LEN_TX, (BYTE *) &atnSendFwVersion[0], ATN_SENDFWVERSION_LEN_RX, (BYTE *) &cmdBuffer[0]);
-                
+
                 sendFwVersion   = FALSE;
             } else if(sendTrackRequest) {                                                       // if should send track request
                 // check how much time passed since the request was created
                 WORD timeNow    = TIM4->CNT;
                 WORD diff       = timeNow - lastRequestTime;
-                
+
                 if(diff >= 30) {                                                                // and at least 15 ms passed since the request (30 / 2000 s)
                     sendTrackRequest    = FALSE;
-                
+
                     // first check if this isn't what we've requested last time
                     if(next.track != lastRequested.track || next.side != lastRequested.side) {  // if track or side changed -- same track request limiter
                         lastRequested.track = next.track;                                       // mark what we've requested last time
                         lastRequested.side  = next.side;
-                
+
                         timeoutStart();                                                         // start a time-out timer
 
                         atnSendTrackRequest[4] = (((WORD)next.side) << 8) | (next.track);
@@ -212,31 +213,31 @@ int main (void)
                 spiDma_txRx(wrNow->count, (BYTE *) &wrNow->buffer[0], 1, (BYTE *) &fakeBuffer);
 
                 wrNow->readyToSend  = FALSE;                                                    // mark the current buffer as not ready to send (so we won't send this one again)
-                
+
                 wrNow               = wrNow->next;                                              // and now we will select the next buffer as current
                 wrNow->readyToSend  = FALSE;                                                    // the next buffer is not ready to send (yet)
                 wrNow->count        = 4;                                                        // at the start we already have 4 WORDs in buffer - SYNC, ATN code, TX len, RX len
             }
         }
-        
+
         //-------------------------------------------------
         // if we got something in the cmd buffer, we should process it
         if(spiDmaIsIdle == TRUE && cmdBuffer[0] != CMD_MARK_READ_BYTE) {                        // if we're not sending (receiving) and the cmd buffer is not read
             int i;
-            
+
             for(i=0; i<12; i++) {
                 processHostCommand(cmdBuffer[i]);
             }
-            
+
             cmdBuffer[0] = CMD_MARK_READ_BYTE;                                                  // mark that this cmd buffer is already read
         }
-        
+
         //-------------------------------------------------
         inputs = GPIOB->IDR;                                        // read floppy inputs
 
         // now check if the drive is ON or OFF and handle it
         outFlags.stWantsTheStream = ((inputs & drive_select) == 0); // if motor is enabled and drive is selected, ST wants the stream
-        
+
         //-------------------------------------------------
 
         WGate = inputs & WGATE;                                         // get current WGATE value
@@ -256,7 +257,7 @@ int main (void)
         // check INDEX pulse as needed
         if((TIM2->SR & 0x0001) != 0) {          // overflow of TIM1 occured?
             TIM2->SR = 0xfffe;                  // clear UIF flag
-    
+
             readTrackData_goToStart();          // move the pointer in the track stream to start
 
             //-----------
@@ -308,7 +309,7 @@ int main (void)
 void fillReadStreamBufferWithDummyData(void)
 {
     int i=0;
-    
+
     for(i=0; i<16; i++) {               // copy 'all 4 us' pulses into current streaming buffer to allow shortest possible switch to start of track
         mfmReadStreamBuffer[i] = 7;
     }
@@ -350,22 +351,22 @@ void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
     // The next simple 'if' is here to help the last word of block loss (first word of block not present),
     // it doesn't do much (just gets a byte from RX register if there is one waiting), but it helps the situation -
     // without it the problem occures, with it it seems to be gone (can't reproduce). This might be caused just
-    // by the adding the delay between disabling and enabling DMA by this extra code. 
-    
+    // by the adding the delay between disabling and enabling DMA by this extra code.
+
     if((SPI1->SR & SPI_SR_RXNE) != 0) {                                 // if there's something still in SPI DR, read it
         WORD dummy = SPI1->DR;
     }
     //-------------------
-    
+
     // set the software flags of SPI DMA being idle
     spiDmaTXidle = (txCount == 0) ? TRUE : FALSE;                       // if nothing to send, then IDLE; if something to send, then FALSE
     spiDmaRXidle = (rxCount == 0) ? TRUE : FALSE;                       // if nothing to receive, then IDLE; if something to receive, then FALSE
     spiDmaIsIdle = FALSE;                                               // SPI DMA is busy
-    
+
     // config SPI1_TX -- DMA1_CH3
     DMA1_Channel3->CMAR     = (uint32_t) txBfr;                         // from this buffer located in memory
     DMA1_Channel3->CNDTR    = txCount;                                  // this much data
-    
+
     // config SPI1_RX -- DMA1_CH2
     DMA1_Channel2->CMAR     = (uint32_t) rxBfr;                         // to this buffer located in memory
     DMA1_Channel2->CNDTR    = rxCount;                                  // this much data
@@ -373,7 +374,7 @@ void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
     // enable both TX and RX channels
     DMA1_Channel3->CCR      |= 1;                                       // enable  DMA1 Channel transfer
     DMA1_Channel2->CCR      |= 1;                                       // enable  DMA1 Channel transfer
-    
+
     // now set the ATN pin accordingly
     if(txCount != 0) {                                                  // something to send over SPI?
         GPIOB->BSRR = ATN;                                              // ATTENTION bit high - got something to read
@@ -390,7 +391,7 @@ void spiDma_waitForFinish(void)
                 outFlags.weAreReceivingTrack    = FALSE;                // mark that we're not receiving it anymore
                 outFlags.updatePosition         = TRUE;
             }
-                
+
             break;
         }
     }
@@ -419,7 +420,7 @@ void DMA1_Channel3_IRQHandler(void)
     GPIOB->BRR = ATN;                                                   // ATTENTION bit low  - nothing to read
 
     spiDmaTXidle = TRUE;                                                // SPI DMA TX now idle
-    
+
     if(spiDmaRXidle == TRUE) {                                          // and if even the SPI DMA RX is idle, SPI is idle completely
         spiDmaIsIdle = TRUE;                                            // SPI DMA is busy
 
@@ -436,7 +437,7 @@ void DMA1_Channel2_IRQHandler(void)
     DMA_ClearITPendingBit(DMA1_IT_TC2);                                 // possibly DMA1_IT_GL2 | DMA1_IT_TC2
 
     spiDmaRXidle = TRUE;                                                // SPI DMA RX now idle
-    
+
     if(spiDmaTXidle == TRUE) {                                          // and if even the SPI DMA TX is idle, SPI is idle completely
         spiDmaIsIdle = TRUE;                                            // SPI DMA is busy
 
@@ -453,15 +454,15 @@ void EXTI3_IRQHandler(void)
         WORD inputs;
         WORD curIntTime, difIntTime;
         static WORD prevIntTime = 0;
-        
-        EXTI_ClearITPendingBit(EXTI_Line3);             // Clear the EXTI line pending bit 
+
+        EXTI_ClearITPendingBit(EXTI_Line3);             // Clear the EXTI line pending bit
         inputs = GPIOB->IDR;
-        
+
         //---------
         // now check if the step pulse isn't too soon after the previous one
         curIntTime = TIM4->CNT;                         // get current time -- 2 kHz timer
         difIntTime = curIntTime - prevIntTime;          // calc only difference
-      
+
         if(difIntTime > 255) {
             difIntTime = 255;
         }
@@ -469,14 +470,14 @@ void EXTI3_IRQHandler(void)
         if(difIntTime < 2) {                            // if the difference is less than 1 ms, quit
                 return;
         }
-        
+
         prevIntTime = curIntTime;                       // store as previous time
         //---------
-        
+
         if((inputs & MOTOR_ENABLE) != 0) {              // motor not enabled? Skip the following code.
             return;
         }
-        
+
         if(inputs & DIR) {                              // direction is High? track--
             if(now.track > 0) {
                 now.track--;
@@ -490,9 +491,9 @@ void EXTI3_IRQHandler(void)
                 REQUEST_TRACK;
             }
         }
-        
+
         if(now.track == 0) {                            // if track is 0
-            GPIOB->BRR = TRACK0;                        // TRACK 0 signal to L          
+            GPIOB->BRR = TRACK0;                        // TRACK 0 signal to L
         } else {                                                    // if track is not 0
             GPIOB->BSRR = TRACK0;                       // TRACK 0 signal is H
         }
@@ -513,7 +514,7 @@ void moveReadIndexToNextSector(void)
 
     while(pNow <= pEnd) {           // try to find next sector marker
         BYTE val = *pNow;
-        
+
         if(val == CMD_TRACK_STREAM_END_BYTE) {  // didn't find next sector, but end of stream?
             inIndexGet = (pNow - pStart) - 8;   // store this as new index, let the other part of streaming find the end of track
             break;
@@ -572,10 +573,6 @@ void handleFloppyWrite(void)
             break;
         }
 
-        if(pWriteNow >= pWriteEnd) {            // no more space in write buffer, send it to host
-            break;
-        }
-
         // software WRITE capturing - might be prone to errors due to interrupts
         wDataPrev = wData;          // store previous state of WDATA
         wData = inputs & WDATA;     // get   current  state of WDATA
@@ -587,11 +584,17 @@ void handleFloppyWrite(void)
         duration = TIM3->CNT;       // get current pulse duration
 
         if(duration < 20) {         // if this pulse is too short
+            wrPulseShort++;
             continue;
         }
 
         TIM3->CNT = 0;              // reset timer back to zero
         newTime = 0;
+
+        if(duration >= 65) {        // if the pulse is too long
+             wrPulseLong++;
+             continue;
+        }
 
         if(duration < 36) {         // 4 us?
             newTime = MFM_4US;
@@ -614,6 +617,10 @@ void handleFloppyWrite(void)
 
             *pWriteNow = times; // add to write buffer
             pWriteNow++;
+
+            if(pWriteNow >= pWriteEnd) {    // no more space in write buffer, send it to host
+                break;
+            }
         }
     }
 
@@ -762,13 +769,13 @@ void fillMfmTimesForDMA(void)
     }
 
     DMA1->IFCR = DMA1_IT_TC5 | DMA1_IT_HT5;         // clear HT5 and TC5 flag
-    
+
     for(i=0; i<8; i++) {                            // convert all 4 codes to ARR values
         if(i==0 || i==4) {
             times4 = getNextMFMbyte();              // get next BYTE
         }
-        
-        time        = times4 >> 6;                  // get bits 15,14 (and then 13,12 ... 1,0) 
+
+        time        = times4 >> 6;                  // get bits 15,14 (and then 13,12 ... 1,0)
         time        = mfmTimes[time];               // convert to ARR value
         times4  = times4 << 2;                      // shift 2 bits higher so we would get lower bits next time
 
@@ -791,23 +798,23 @@ BYTE getNextMFMbyte(void)
 
     while(1) {                                      // go through readTrackData to process commands and to find some data
         maxLoops--;
-        
+
         if(maxLoops == 0) {                         // didn't quit the loop for 15k cycles? quit now!
             break;
         }
-        
+
         readTrackData_get_noMove(val);              // get BYTE from buffer, but don't move
-        
+
         if(val == CMD_TRACK_STREAM_END_BYTE) {      // we've hit the end of track stream? quit loop
             break;
         }
-            
+
         readTrackData_justMove();                   // just move to the next position
-            
+
         if(val == 0) {                              // skip empty WORDs
             continue;
         }
-        
+
         // lower nibble == 0? it's a command from host - if we should turn on/off the write protect or disk change
         if(val == CMD_CURRENT_SECTOR) {             // it's a command?
             readTrackData_get(streamed.side);       // store side   #
@@ -826,21 +833,21 @@ BYTE getNextMFMbyte(void)
 void updateStreamPositionByFloppyPosition(void)
 {
     DWORD i, mediaPosition, pos;
-    
+
     // find end of stream, i will hold the last index where we can go (= LENGTH OF STREAM in bytes)
-    for(i=0; i<READTRACKDATA_SIZE; i++) {                   
+    for(i=0; i<READTRACKDATA_SIZE; i++) {
         if(readTrackData[i] == CMD_TRACK_STREAM_END_BYTE) {
             break;
         }
     }
-    
+
     // read the current position - from 0 to 400
-    mediaPosition   = TIM2->CNT;        
-    
-    // calculate index where we should place sream reading index - 
+    mediaPosition   = TIM2->CNT;
+
+    // calculate index where we should place sream reading index -
     // current position is between 0 and 400, that is from 0 to 100%, so place it between 0 and LENGTH OF STREAM position
     pos             = (i * mediaPosition) / 400;
-    
+
     inIndexGet = pos;
 }
 
@@ -866,7 +873,7 @@ void processHostCommand(BYTE val)
 // UART 3 - RX - data from ST keyb - through buff1 - to RPi
 //
 // Flow with RPi:
-// IKBD talks to ST keyboard (direct wire connection), and also talks through buff1 to RPi 
+// IKBD talks to ST keyboard (direct wire connection), and also talks through buff1 to RPi
 // ST keyb talks through buff1 to RPi
 // RPi talks to IKBD through buff0
 //
@@ -874,14 +881,14 @@ void processHostCommand(BYTE val)
 // IKBD talks to ST keyboard - direct wire connection
 // ST keyb talks to IKBD - through buff0
 //
-// -------------------------------------------------- 
+// --------------------------------------------------
 
 void USART1_IRQHandler(void)                                            // USART1 is connected to RPi
 {
     if((USART1->SR & USART_FLAG_RXNE) != 0) {                           // if something received
         BYTE val = USART1->DR;                                          // read received value
-        
-        if(buff0.count > 0 || (USART2->SR & USART_FLAG_TXE) == 0) {     // got data in buffer or usart2 can't TX right now? 
+
+        if(buff0.count > 0 || (USART2->SR & USART_FLAG_TXE) == 0) {     // got data in buffer or usart2 can't TX right now?
             cicrularAdd(&buff0, val);                                   // add to buffer
             USART2->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
         } else {                                                        // if no data in buffer and usart2 can TX
@@ -896,7 +903,7 @@ void USART1_IRQHandler(void)                                            // USART
         } else {                                                        // and there's nothing to TX
             USART1->CR1 &= ~USART_FLAG_TXE;                             // disable interrupt on USART2 TXE
         }
-    }  
+    }
 }
 
 #define UARTMARK_STCMD      0xAA
@@ -908,7 +915,7 @@ void USART2_IRQHandler(void)                                            // USART
         BYTE val = USART2->DR;                                          // read received value
 
         if(hostIsUp) {                                                  // RPi is up - buffered send to RPi
-            if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart1 can't TX right now? 
+            if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart1 can't TX right now?
                 cicrularAdd(&buff1, UARTMARK_STCMD);                    // add to buffer - MARK
             } else {                                                    // if no data in buffer and usart2 can TX
                 USART1->DR = UARTMARK_STCMD;                            // send to USART1 - MARK
@@ -916,7 +923,7 @@ void USART2_IRQHandler(void)                                            // USART
 
             cicrularAdd(&buff1, val);                                   // add to buffer - DATA
             USART1->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
-        } else {                                                        // if RPi is not up, something received from ST? 
+        } else {                                                        // if RPi is not up, something received from ST?
             // nothing to do, data should automatically continue to ST keyboard
         }
     }
@@ -928,8 +935,8 @@ void USART2_IRQHandler(void)                                            // USART
         } else {                                                        // and there's nothing to TX
             USART2->CR1 &= ~USART_FLAG_TXE;                             // disable interrupt on USART2 TXE
         }
-    }  
-}   
+    }
+}
 
 void USART3_IRQHandler(void)                                            // USART3 is connected to original ST keyboard
 {
@@ -937,7 +944,7 @@ void USART3_IRQHandler(void)                                            // USART
         BYTE val = USART3->DR;                                          // read received value
 
         if(hostIsUp) {                                                  // RPi is up - buffered send to RPi
-            if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart1 can't TX right now? 
+            if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart1 can't TX right now?
                 cicrularAdd(&buff1, UARTMARK_KEYBDATA);                 // add to buffer - MARK
             } else {                                                    // if no data in buffer and usart2 can TX
                 USART1->DR = UARTMARK_KEYBDATA;                         // send to USART1 - MARK
@@ -946,7 +953,7 @@ void USART3_IRQHandler(void)                                            // USART
             cicrularAdd(&buff1, val);                                   // add to buffer - DATA
             USART1->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
         } else {                                                        // if RPi is not up - send it to IKBD (through buffer or immediatelly)
-            if(buff0.count > 0 || (USART2->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart2 can't TX right now? 
+            if(buff0.count > 0 || (USART2->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart2 can't TX right now?
                 cicrularAdd(&buff0, val);                               // add to buffer
                 USART2->CR1 |= USART_FLAG_TXE;                          // enable interrupt on USART TXE
             } else {                                                    // if no data in buffer and usart2 can TX
@@ -1014,7 +1021,7 @@ void setupDriveSelect(void)
         drive_select = 0xffff;
         return;
     }
-    
+
     // if we got here, drive is enabled
     if(driveId == 0) {              // when drive ID is 0
         drive_select = MOTOR_ENABLE | DRIVE_SELECT0;
@@ -1038,7 +1045,7 @@ void setupDiskChangeWriteProtect(void)
         } else {
             GPIOB->BSRR     = WR_PROTECT;   // WR PROTECT to 1
         }
-        
+
         GPIOB->BSRR         = DISK_CHANGE;  // DISK_CHANGE to 1
     }
 }
