@@ -202,17 +202,21 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
 
     #define STREAM_TABLE_ITEMS  20
     #define STREAM_TABLE_SIZE   (2 * STREAM_TABLE_ITEMS)
+
+    #define STREAM_TABLE_OFFSET 10              // the stream table in Franz starts at this offset, because first 5 words are empty (ATN + sizes + other)
+    #define STREAM_START_OFFSET (STREAM_TABLE_OFFSET + STREAM_TABLE_SIZE)
+
     bfr = currentStreamStart + STREAM_TABLE_SIZE;   // where the MFM data will start (after initial table)
     bytesInBfr = STREAM_TABLE_SIZE;             // no bytes in stream yet
 
     for(int i=0; i<STREAM_TABLE_ITEMS; i++) {   // init the table for all sectors to start (if sector missing, will restart stream)
-        setRawWordAtIndex(i, STREAM_TABLE_SIZE);
+        setRawWordAtIndex(i, STREAM_START_OFFSET);
     }
 
     encodeSingleTrack(img, s, t, params.spt);   // encode single track
 
     tracks[index].bytesInStream = bytesInBfr;   // store the data count
-    setRawWordAtIndex(0, bytesInBfr);           // stream table - index 0: stream size in bytes
+    setRawWordAtIndex(0, STREAM_TABLE_OFFSET + bytesInBfr);     // stream table - index 0: stream size in bytes (include those extra 5 empty WORDs on start in Franz)
 
     for(int i=0; i<MFM_STREAM_SIZE; i += 2) {   // swap bytes - Franz has other endiannes
         BYTE tmp                        = tracks[index].mfmStream[i + 0];

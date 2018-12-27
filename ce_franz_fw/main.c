@@ -60,11 +60,14 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 #define STREAM_TABLE_ITEMS  20
 #define STREAM_TABLE_SIZE   (2 * STREAM_TABLE_ITEMS)
 
-#define     readTrackData_goToStart()       { inIndexGet = STREAM_TABLE_SIZE; }
-#define     readTrackData_get(X)            { X = readTrackData[inIndexGet];                inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) {  inIndexGet = STREAM_TABLE_SIZE; }; }
+#define STREAM_TABLE_OFFSET 10              // the stream table starts at this offset, because first 5 words are empty (ATN + sizes + other)
+#define STREAM_START_OFFSET (STREAM_TABLE_OFFSET + STREAM_TABLE_SIZE)
+
+#define     readTrackData_goToStart()       { inIndexGet = STREAM_START_OFFSET; }
+#define     readTrackData_get(X)            { X = readTrackData[inIndexGet];                inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) {  inIndexGet = STREAM_START_OFFSET; }; }
 #define     readTrackData_get_noMove(X)     { X = readTrackData[inIndexGet];                                                                                                                                    }
 //#define       readTrackData_markAndmove() { readTrackData[inIndexGet] = CMD_MARK_READ;    inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) {  inIndexGet = 0; };   }
-#define     readTrackData_justMove()        {                                                                                       inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) { inIndexGet = STREAM_TABLE_SIZE; };   }
+#define     readTrackData_justMove()        {                                                                                       inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) { inIndexGet = STREAM_START_OFFSET; };   }
 //--------------
 
 #define REQUEST_TRACK                       {   next.track = now.track; next.side = now.side; sendTrackRequest = TRUE; lastRequestTime = TIM4->CNT; trackStreamedCount = 0; }
@@ -505,11 +508,11 @@ void EXTI3_IRQHandler(void)
 
 void moveReadIndexToNextSector(void)
 {
-    inIndexGet = STREAM_TABLE_SIZE;     // set get index to stream start in case we fail to find next sector index
+    inIndexGet = STREAM_START_OFFSET;           // set get index to stream start in case we fail to find next sector index
 
-    if(streamed.sector >= 1 && streamed.sector < STREAM_TABLE_ITEMS) {  // if streamed sector seems to be valid (will fit in stream table)
-        WORD *pStreamTable = (WORD *) &readTrackData[0];                // get pointer to stream table
-        WORD nextSectorIndex = pStreamTable[streamed.sector + 1];       // get index of next sector from stream table
+    if(streamed.sector >= 1 && streamed.sector < STREAM_TABLE_ITEMS) {          // if streamed sector seems to be valid (will fit in stream table)
+        WORD *pStreamTable = (WORD *) (readTrackData + STREAM_TABLE_OFFSET);    // get pointer to stream table
+        WORD nextSectorIndex = pStreamTable[streamed.sector + 1];               // get index of next sector from stream table
 
         if(nextSectorIndex < (READTRACKDATA_SIZE - 1)) {    // if next sector index seems to be valid, use it
             inIndexGet = nextSectorIndex;
@@ -821,8 +824,8 @@ BYTE getNextMFMbyte(void)
 void updateStreamPositionByFloppyPosition(void)
 {
     DWORD mediaPosition;
-    WORD *pStreamTable = (WORD *) &readTrackData[0];        // get pointer to stream table
-    DWORD steamSize = pStreamTable[0];                      // get stream size (in bytes) from stream table at index 0
+    WORD *pStreamTable = (WORD *) (readTrackData + STREAM_TABLE_OFFSET);    // get pointer to stream table
+    DWORD streamSize = pStreamTable[0];                      // get stream size (in bytes) from stream table at index 0
 
     // read the current position - from 0 to 400
     mediaPosition = TIM2->CNT;
