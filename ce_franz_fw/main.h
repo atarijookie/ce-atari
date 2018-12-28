@@ -1,6 +1,9 @@
 #ifndef _MAIN_H_
 #define _MAIN_H_
 
+// for usage of SW WRITE capturing have a SW_WRITE defined. HW WRITE doesn't work now, but code still kept for future tests / changes / improvements
+#define SW_WRITE
+
 void setupAtnBuffers(void);
 
 void fillMfmTimesForDMA(void);

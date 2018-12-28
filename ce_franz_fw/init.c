@@ -82,6 +82,8 @@ void dma_mfmRead_init(void)
     DMA_Cmd(DMA1_Channel5, ENABLE);
 }
 
+// init DMA capturing for HW WRITE
+#ifndef SW_WRITE
 void dma_mfmWrite_init(void)
 {
     DMA_InitTypeDef DMA_InitStructure;
@@ -109,6 +111,7 @@ void dma_mfmWrite_init(void)
     // Enable DMA1 Channel6 transfer
     DMA_Cmd(DMA1_Channel6, ENABLE);
 }
+#endif
 
 void dma_spi_init(void)
 {
@@ -279,7 +282,11 @@ void init_hw_sw(void)
     timerSetup_index();
     
     timerSetup_mfmWrite();
+
+#ifndef SW_WRITE
+    // init DMA for HW WRITE
     dma_mfmWrite_init();
+#endif
 
     //--------------
     // DMA + SPI initialization
@@ -335,7 +342,7 @@ void init_hw_sw(void)
 void initUsarts(void)
 {
     USART_InitTypeDef usartStruct;
-	
+
     USART_Cmd(USART1, ENABLE);
     USART_Cmd(USART2, ENABLE);
     USART_Cmd(USART3, ENABLE);

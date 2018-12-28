@@ -520,7 +520,8 @@ void moveReadIndexToNextSector(void)
     }
 }
 
-#define SW_WRITE
+// The SW_WRITE is defined in main.h, where it also enables/disabled HW capturing DMA
+// The HW WRITE doesn't work (misses few bits / bytes), but still is here for possible future usage / improvements
 
 #ifdef SW_WRITE
 void handleFloppyWrite(void)
