@@ -1162,18 +1162,25 @@ void CCoreThread::handleRecoveryCommands(int recoveryLevel)
 
 void CCoreThread::insertSpecialFloppyImage(int specialImageId)
 {
-    std::string ceConfFilename;
-    std::string ceConfFullPath;
+    std::string imgFilename;
+    std::string imgSrcPath;
+    std::string imgFullPath;
     std::string dummy;
 
-    if(specialImageId == SPECIAL_FDD_IMAGE_CE_CONF) {               // CE CONF image
-        ceConfFilename = CE_CONF_FDD_IMAGE_JUST_FILENAME;
-        ceConfFullPath = CE_CONF_FDD_IMAGE_PATH_AND_FILENAME;
+    if(specialImageId == SPECIAL_FDD_IMAGE_CE_CONF) {           // CE CONF image
+        imgFilename = CE_CONF_FDD_IMAGE_JUST_FILENAME;
+        imgSrcPath  = CE_CONF_FDD_IMAGE_PATH_AND_FILENAME;      // image in /ce/app dir
+        imgFullPath = CE_CONF_FDD_IMAGE_PATH_AND_FILENAME_TMP;  // image in /tmp dir
+
+        Utils::copyFile(imgSrcPath, imgFullPath);               // copy from /ce/app to /tmp to allow writing, but don't preserve changes
 
         Debug::out(LOG_INFO, "Will insert special FDD image: CE_CONF image");
-    } else if(specialImageId == SPECIAL_FDD_IMAGE_FDD_TEST) {       // FDD TEST image
-        ceConfFilename = FDD_TEST_IMAGE_JUST_FILENAME;
-        ceConfFullPath = FDD_TEST_IMAGE_PATH_AND_FILENAME;
+    } else if(specialImageId == SPECIAL_FDD_IMAGE_FDD_TEST) {   // FDD TEST image
+        imgFilename = FDD_TEST_IMAGE_JUST_FILENAME;
+        imgSrcPath  = FDD_TEST_IMAGE_PATH_AND_FILENAME;         // image in /ce/app dir
+        imgFullPath = FDD_TEST_IMAGE_PATH_AND_FILENAME_TMP;     // image in /tmp dir
+
+        Utils::copyFile(imgSrcPath, imgFullPath);               // copy from /ce/app to /tmp to allow writing, but don't preserve changes
 
         Debug::out(LOG_INFO, "Will insert special FDD image: FDD TEST image");
     } else {
@@ -1182,7 +1189,7 @@ void CCoreThread::insertSpecialFloppyImage(int specialImageId)
     }
 
     // encode MSA config image to MFM stream - in slot #0
-    shared.imageSilo->add(0, ceConfFilename, ceConfFullPath, dummy, false);
+    shared.imageSilo->add(0, imgFilename, imgFullPath, dummy, false);
 
     // set the current to slot #0
     shared.imageSilo->setCurrentSlot(0);
