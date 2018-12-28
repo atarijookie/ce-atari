@@ -528,7 +528,7 @@ std::string Utils::getDeviceLabel(const std::string & devicePath)
 		//FILE *f = fopen("/tmp/labels.txt", "w");
 		//fprintf(f, "%s\n", devShort.c_str());
 		struct dirent * de;
-		char link_path[256];
+		char link_path[288];
 		char link_target[256];
 		while((de = readdir(d)) != NULL) {
 			if(de->d_type == DT_LNK) {	// symbolic link

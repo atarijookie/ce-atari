@@ -44,6 +44,7 @@ public:
     bool getParams(int &tracks, int &sides, int &sectorsPerTrack);
 
     bool decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr);     // decode single MFM encoded sector
+    bool lastBufferWasFormatTrack(void);    // get if last decodeMfmBuffer() was sector write or format track
 
     bool newContent;
 
@@ -87,6 +88,7 @@ private:
 
         bool done;                  // set to true when received did finish this sector
         bool good;                  // status of sector decoding, which should be returned to caller
+        bool isFormatTrack;         // when MFM decoder finds write to ID part of track (not data part), it's format track command
     } decoder;
 
     TCachedTrack tracks[MAX_TRACKS];

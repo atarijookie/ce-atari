@@ -321,10 +321,25 @@ void *floppyEncodeThreadCode(void *ptr)
             bool good;
             good = ss->encImage.decodeMfmBuffer(ws->data, ws->size, sectorData);   // decode written sector data
 
-            Debug::out(LOG_DEBUG, "Written sector at index: %d decoded, good: %d", writtenIdx, good);
+            Debug::out(LOG_DEBUG, "Written sector at index: %d decoded, good: %d, got image: %d", writtenIdx, good, ss->image != NULL);
 
-            if(good && ss->image) {     // if got the image pointer, write new sector data
-                ss->image->writeSector(ws->track, ws->side, ws->sector, sectorData);
+            if(good && ss->image) {     // if decode was good and got the image pointer
+                if(ss->encImage.lastBufferWasFormatTrack()) {   // if it was FORMAT TRACK
+                    Debug::out(LOG_DEBUG, "Detected FORMAT TRACK");
+
+                    int tracks, sides, sectorsPerTrack;
+                    ss->image->getParams(tracks, sides, sectorsPerTrack);   // get how many sectors one track has
+
+                    memset(sectorData, 0, 512);                 // clear data buffer
+                    for(int i=1; i<=sectorsPerTrack; i++) {     // for all sectors write empty data
+                        ss->image->writeSector(ws->track, ws->side, i, sectorData);
+                    }
+                } else {                                        // if it was WRITE SECTOR
+                    Debug::out(LOG_DEBUG, "Detected WRITE SECTOR");
+
+                    ss->image->writeSector(ws->track, ws->side, ws->sector, sectorData);
+                }
+
                 ss->encImage.askToReencodeTrack(ws->track, ws->side);   // this specific track needs to be reencoded
             }
 

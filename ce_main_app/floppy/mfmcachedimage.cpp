@@ -10,6 +10,9 @@
 
 extern pthread_mutex_t floppyEncoderMutex;
 
+#define DAM_MARK    0xfb
+#define ID_MARK     0xfe
+
 // crc16-ccitt generated table for fast CRC calculation
 const WORD crcTable[256] = {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
@@ -380,7 +383,7 @@ bool MfmCachedImage::encodeSingleSector(FloppyImage *img, int side, int track, i
         appendA1MarkToStream();
     }
 
-    appendByteToStream( 0xfe );            // ID record
+    appendByteToStream( ID_MARK );            // ID record
     appendByteToStream( track );
     appendByteToStream( side );
     appendByteToStream( sector );
@@ -401,7 +404,7 @@ bool MfmCachedImage::encodeSingleSector(FloppyImage *img, int side, int track, i
         appendA1MarkToStream();
     }
 
-    appendByteToStream(0xfb);               // DAM mark
+    appendByteToStream(DAM_MARK);               // DAM mark
 
     for(i=0; i<512; i++) {                                  // data
         appendByteToStream(data[i]);
@@ -606,10 +609,17 @@ void MfmCachedImage::handleDecodedByte(void)
 {
     decoder.bCount = 0;
 
-    if(decoder.byteOffset == 0 && decoder.dByte != 0xfb) {      // if DAM mark position, but wrong DAM mark?
-        decoder.done = true;
-        decoder.good = false;
-        Debug::out(LOG_ERROR, "MfmCachedImage::handleDecodedByte - wrong DAM mark: %02X", decoder.dByte);
+    if(decoder.byteOffset == 0) {                   // right after A1 sync bytes look for ID MARK or DAM MARK
+        if(decoder.dByte == ID_MARK) {              // if found ID mark, it's a FORMAT TRACK
+            decoder.done = true;
+            decoder.good = true;
+            decoder.isFormatTrack = true;           // the track if being formatted
+            Debug::out(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - found ID MARK, assuming track format");
+        } else if(decoder.dByte != DAM_MARK) {      // not ID mark (FORMAT TRACK) and not DAM mark (SECTOR WRITE)? fail
+            decoder.done = true;
+            decoder.good = false;
+            Debug::out(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - wrong DAM mark: %02X", decoder.dByte);
+        }
     }
 
     if(decoder.byteOffset >= 1 && decoder.byteOffset <= 512) {  // if we're in the data offset, store data in buffer
@@ -651,6 +661,11 @@ void MfmCachedImage::handleDecodedByte(void)
     decoder.byteOffset++;
 }
 
+bool MfmCachedImage::lastBufferWasFormatTrack(void)
+{
+    return decoder.isFormatTrack;   // return last state of this flag to tell called if it was sector write or track format
+}
+
 bool MfmCachedImage::decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr)
 {
     // initialize decoder
@@ -661,6 +676,7 @@ bool MfmCachedImage::decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr)
     decoder.oBfr = outBfr;          // where the output data will be stored
     decoder.done = false;           // we're not done yet
     decoder.good = true;            // status returned to caller
+    decoder.isFormatTrack = false;  // this will be set if the decoded data seem to be format track stream
 
     // first loop - find 3x A1 sync symbols
     BYTE time;
