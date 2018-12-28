@@ -26,6 +26,7 @@ void showHexWord(WORD val);
 
 void showDecimal(int num);
 void showDiff(BYTE* bfr, int track, int side, int sector, char*range);
+void dumpBuffer(BYTE *bfr, WORD count, WORD itemsPerRow);
 
 DWORD getTicks(void);
 
@@ -689,7 +690,7 @@ BYTE showDebugInfoFunc(BYTE resultChar, int ms, int howManyTracksSeeked, int laz
     showInt(lazyTime, 4);
     (void) Cconws("  \r\n");
 
-    char req = Cnecin();
+    char req = Cnecin();    // wait for key
 
     if(req  >= 'A' && req <= 'Z') {
         req = req + 32;     // upper to lower case
@@ -697,8 +698,18 @@ BYTE showDebugInfoFunc(BYTE resultChar, int ms, int howManyTracksSeeked, int laz
 
     VT52_Goto_pos(0, 5);
     int i;
-    for(i=0; i<6; i++) {
+    for(i=0; i<6; i++) {    // clear debug output
         (void) Cconws("                      \r\n");
+    }
+
+    if(req == 'r') {        // on R - dump read buffer
+        dumpBuffer(bfr, 512, 32);
+        Cnecin();
+    }
+
+    if(req == 'w') {        // on W - dump write buffer
+        dumpBuffer(writeBfr, 512, 32);
+        Cnecin();
     }
 
     if(req == 'q' || req == 'c') {
@@ -1217,5 +1228,40 @@ void floppy_off(BYTE *buf, WORD dev)
         argBufferPtr    = (DWORD) buf;
 
         runFdcAsm();                        // do the requested action
+    }
+}
+
+void dumpBuffer(BYTE *bfr, WORD count, WORD itemsPerRow)
+{
+    int i, j;
+    int rows = (count / itemsPerRow) + (((count % itemsPerRow) == 0) ? 0 : 1);
+
+    (void)Cconws("\r\n");
+
+    for(i=0; i<rows; i++) {
+        int ofs = i * itemsPerRow;
+
+        for(j=0; j<itemsPerRow; j++) {
+            if((ofs + j) < count) {
+                showHexByte(bfr[ofs + j]);
+            } else {
+                (void)Cconws("  ");
+            }
+        }
+
+        //(void)Cconws(" | ");
+
+        for(j=0; j<itemsPerRow; j++) {
+            char v = bfr[ofs + j];
+            v = (v >= 32 && v <= 126) ? v : '.';
+
+            if((ofs + j) < count) {
+                Cconout(v);
+            } else {
+                Cconout(' ');
+            }
+        }
+
+        (void)Cconws("\r\n");
     }
 }

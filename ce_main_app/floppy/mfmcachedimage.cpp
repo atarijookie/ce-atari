@@ -632,9 +632,20 @@ void MfmCachedImage::handleDecodedByte(void)
         decoder.done = true;            // received CRC? nothing more to be done
         decoder.good = (decoder.calcedCrc == decoder.recvedCrc);    // everything good when received and calced crc are th same
 
+        // known issue handling - in some cases the received CRC is different from calculated CRC by 1, but the data is still valid (tested with write-read test on ST)
+        // so in this case we pretend that the CRC is fine...
+        if((decoder.recvedCrc - decoder.calcedCrc) == 1) {
+            Debug::out(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - CRC is off by 1, faking good CRC");
+            decoder.good = true;
+        }
+
         int logLevel = decoder.good ? LOG_DEBUG : LOG_ERROR;        // if good then show only on debug log level; if bad then show on error log level
         Debug::out(logLevel, "MfmCachedImage::handleDecodedByte - received CRC: %02x, calculated CRC: %02x, good: %d", decoder.recvedCrc, decoder.calcedCrc, decoder.good);
-        //Debug::outBfr(decoder.oBfr - 512, 512);
+
+// uncomment following lines for dumping decoded data to log on error - for manual data inspection
+//      if(!decoder.good) {
+//          Debug::outBfr(decoder.oBfr - 512, 512);
+//      }
     }
 
     decoder.byteOffset++;
