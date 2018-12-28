@@ -20,7 +20,6 @@ BYTE writeSector(int sector, int track, int side);
 
 void deleteOneProgressLine(void);
 void calcCheckSum(BYTE *bfr, int sector, int track, int side);
-WORD getWholeCheckSum(BYTE linearNotRandom);
 void showHexByte(int val);
 void showHexWord(WORD val);
 
@@ -115,9 +114,6 @@ struct {
     int track;
     int side;
 } fl;
-
-//             TRACK SIDE SECTOR
-BYTE checksums[90][2][15];
 
 struct {
     int sectors;
@@ -391,44 +387,45 @@ void writeReadVerifyTest(BYTE linearNotRandom, BYTE foreverNotOnce)
         // write
         BYTE wRes = floppy_write(writeBfr, 0, fl.sector, fl.track, fl.side, testConf.sectorsAtOnce);
 
-        // read
-        BYTE rRes = floppy_read(bfr, 0, fl.sector, fl.track, fl.side, testConf.sectorsAtOnce);
+        BYTE rRes = 0;
+        if(!wRes) {     // if write was OK, do read
+            rRes = floppy_read(bfr, 0, fl.sector, fl.track, fl.side, testConf.sectorsAtOnce);
+        }
 
-        int verifyOk = 1;
+        int testOk = 1;                     // default: no error
+        BYTE resultChar = '*';              // default result: no error
 
         if(wRes || rRes) {                  // if write or read failed, not ok
-            verifyOk = 0;
+            testOk = 0;
+
+            if(wRes) resultChar = 'W';      // if write failed
+            if(rRes) resultChar = 'R';      // if read failed
         } else {                            // if write and read succeeded, time to verify data
             int i;
             for(i=0; i<testConf.sectorsAtOnce * 512; i++){           // verify
                 if(bfr[i] != writeBfr[i])
                 {
-                    verifyOk = 0;
+                    testOk = 0;
+                    resultChar = 'D';       // if data mismatch
                     break;
                 }
             }
         }
 
-        //---------------------------------        // evaluate the result
+        //--------------------------------- // evaluate the result
         counts.runs++;                      // increment the count of runs
 
         VT52_Goto_pos(x, 24);
 
-        BYTE resultChar;
-        BYTE showDebugInfo = 0;
+        Cconout(resultChar);                // show result char
 
-        if(verifyOk){
-            Cconout('*');
-            resultChar = '*';
+        if(testOk){
             counts.good++;
         } else {
-            Cconout('!');
-            resultChar = '!';
-            showDebugInfo = 1;
             counts.errData++;
         }
 
-        if(showDebugInfo && testConf.stopAfterError) {
+        if(!testOk && testConf.stopAfterError) {
             BYTE quit = showDebugInfoFunc(resultChar, 0, 0, 0);
             //isAfterStartOrError = 1;
 
@@ -487,15 +484,6 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
     times.min   = 32000;                                                            // min time
     times.max   = 0;                                                                // max time
     times.avg   = 0;                                                                // avg time
-
-    int sect,tr,si;
-    for(si=0; si<imgGeometry.sides; si++) {
-        for(tr=0; tr<imgGeometry.tracks; tr++) {
-            for(sect=0; sect<imgGeometry.sectors; sect++) {
-                checksums[tr][si][sect] = 0;                                       // set all reference checksum data to 0
-            }
-        }
-    }
 
     VT52_Clear_home();
     print_status_read();
@@ -571,18 +559,16 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
         VT52_Goto_pos(x, 24);
 
         BYTE showDebugInfo = 0;
-        BYTE resultChar;
+        BYTE resultChar = '*';
 
         if(bRes == 0) {                     // read and DATA good
             if(ms > lazyTime && !isAfterStartOrError) { // operation was taking too much time? Too lazy! (but only if it's not after error or start, that way lazy is expected)
                 counts.lazy++;
-                Cconout('L');
 
                 resultChar      = 'L';
                 showDebugInfo   = 1;
             } else {                        // operation was fast enough
                 counts.good++;
-                Cconout('*');
 
                 resultChar      = '*';
                 showDebugInfo   = 0;
@@ -591,7 +577,6 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
             isAfterStartOrError = 0;        // mark that error didn't happen, so next lazy read is really lazy read
         } else if(bRes == 1) {              // operation failed - Floprd failed
             counts.errRead++;
-            Cconout('!');
 
             resultChar      = '!';
             showDebugInfo   = 1;
@@ -599,13 +584,14 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
             isAfterStartOrError = 1;        // mark that error happened, next read might be lazy and it will be OK (floppy needs some time to get back to normal)
         } else if(bRes == 2) {              // operation failed - data mismatch
             counts.errData++;
-            Cconout('D');
 
             resultChar      = 'D';
             showDebugInfo   = 1;
 
             isAfterStartOrError = 0;        // mark that error didn't happen, so next lazy read is really lazy read
         }
+
+        Cconout(resultChar);                // show result of this operation
 
         if(showDebugInfo && testConf.stopAfterError) {
             BYTE quit = showDebugInfoFunc(resultChar, ms, howManyTracksSeeked, lazyTime);
@@ -626,13 +612,7 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
         if(fl.finish) {                         // if should quit after this
             deleteOneProgressLine();
 
-            (void) Cconws("Finished.");
-
-            (void) Cconws("\r\n");
-            WORD cs = getWholeCheckSum(linearNotRandom);
-            (void)Cconws("\r\nImage checksum: ");
-            showHexWord(cs);
-            (void)Cconws("\r\n");
+            (void) Cconws("Finished.\r\n");
 
             (void) Cconws("\r\nTime min: ");
             showInt(times.min, 4);
@@ -808,88 +788,34 @@ BYTE readSector(int sector, int track, int side, BYTE checkData)    // 0 means g
 {
     int res, i;
 
-    res = floppy_read(bfr, 0, sector, track, side, 1);
+    res = floppy_read(bfr, 0, sector, track, side, testConf.sectorsAtOnce);
 
     if(res != 0) {                  // failed?
         return 1;                   // 1 means READ operation failed
     }
 
-    calcCheckSum(bfr, sector, track, side);
-
     if(!checkData) {                // shouldn't check data? quit with success
         return 0;
     }
                                     // track / side / sector bytes in data don't match? Return BAD DATA.
-    if(bfr[0] != track || bfr[1] != side || bfr[2] != sector) {
-        return 2;
-    }
+    int s;
+    for(s=0; s<testConf.sectorsAtOnce; s++) {
+        int curSector = sector + s; // current sector number = starting sector + sector number in test
+        int ofs = s * 512;          // offset to start of this sector
+        BYTE *b = bfr + ofs;        // pointer to current sector
 
-    for(i=3; i<512; i++) {
-        if(bfr[i] != ((BYTE) i)) {  // data mismatch? return DATA BAD
+        if(b[0] != track || b[1] != side || b[2] != curSector) {
             return 2;
         }
-    }
 
-    return 0;                       // if came here, everything is OK
-}
-
-void calcCheckSum(BYTE *bfr, int sector, int track, int side)
-{
-    if(track < 0 || track > 85) {
-        return;
-    }
-
-    if(sector < 1 || sector > 15) {
-        return;
-    }
-
-    if(side < 0 || side > 1) {
-        return;
-    }
-
-    BYTE cs = 0;
-    int i;
-
-    for(i=0; i<512; i++) {
-        cs += bfr[i];                           // add this value to checksum
-    }
-
-    checksums[track][side][sector - 1] = cs;    // store the whole checksum
-}
-
-WORD getWholeCheckSum(BYTE linearNotRandom)
-{
-    WORD cs = 0;
-    int rest = 0;
-
-    if(!linearNotRandom) {
-        (void)Cconws("\r\nAfter random test will read");
-        (void)Cconws("\r\nall the missed sectors:\r\n");
-    }
-
-    int sect,tr,si;
-    for(si=0; si<imgGeometry.sides; si++) {
-        for(tr=0; tr<imgGeometry.tracks; tr++) {
-            for(sect=0; sect<imgGeometry.sectors; sect++) {
-                if(!linearNotRandom) {              // if random test, read the missing sectors
-                    if(checksums[tr][si][sect] == 0) {  // no checksum for this sector? read and calculate it now
-                        readSector(sect + 1, tr, si, 0);
-                        Cconout('.');
-
-                        rest++;
-                        if(rest >= 40) {                // if would go out of screen, add new line
-                            (void) Cconws("\r\n");
-                            rest = 0;
-                        }
-                    }
-                }
-
-                cs += (WORD) checksums[tr][si][sect];   // add to the whole checksum
+        for(i=3; i<512; i++) {
+            if(b[i] != ((BYTE) i)) {  // data mismatch? return DATA BAD
+                return 2;
             }
         }
     }
 
-    return cs;
+    return 0;                       // if came here, everything is OK
 }
 
 BYTE writeSector(int sector, int track, int side){
@@ -1149,7 +1075,7 @@ int floppy_write(BYTE *wrbuf, WORD dev, WORD sector, WORD track, WORD side, WORD
         }
         else{
             // 2). write
-            argFuncId       = FDC_FUN_WRITE;    // now write the sector
+            argFuncId = FDC_FUN_WRITE;          // now write the sector
             runFdcAsm();                        // do the requested action
             result = argSuccess;                // return success / failure
         }
