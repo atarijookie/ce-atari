@@ -1053,67 +1053,88 @@ void guessImageGeometry(void)
 //  2). given no error, write bfr (512 bytes) to set sector, return result code
 int floppy_write(BYTE *wrbuf, WORD dev, WORD sector, WORD track, WORD side, WORD count)
 {
-    int result;
-
+    // floppy write via TOS?
     if(testConf.fddViaTos){
-        // we do it via tos shit
-        result = Flopwr(wrbuf, 0, dev, sector, track, side, count);
+        return Flopwr(wrbuf, 0, dev, sector, track, side, count);
     }
-    else{
-        // 1). seek
-        argFuncId       = FDC_FUN_SEEK; // seek to the right track
-        argDrive        = dev;
-        argTrack        = track;
-        argSide         = side;
-        argSector       = sector;
-        argCount        = count;
-        argLeaveOn      = 1;
-        argBufferPtr    = (DWORD) wrbuf;
-        runFdcAsm();                            // do the requested action
-        if(argSuccess != 0) {                   // failed?
-            result = argSuccess;                // return that error
-        }
-        else{
-            // 2). write
-            argFuncId = FDC_FUN_WRITE;          // now write the sector
-            runFdcAsm();                        // do the requested action
-            result = argSuccess;                // return success / failure
+
+    // floppy write via custom routines
+    // 1). seek
+    argFuncId       = FDC_FUN_SEEK; // seek to the right track
+    argDrive        = dev;
+    argTrack        = track;
+    argSide         = side;
+    argLeaveOn      = 1;
+    argBufferPtr    = (DWORD) wrbuf;
+    runFdcAsm();                            // do the requested action
+
+    if(argSuccess != 0) {                   // failed?
+        return argSuccess;                  // return that error
+    }
+
+    // 2). write
+    argFuncId = FDC_FUN_WRITE;          // now write the sector
+    argCount = 1;                       // write one sector at a time, count times
+
+    int i;
+    for(i=0; i<count; i++) {            // work around for write multiple sectors not working by doing multiple single sector writes
+        argBufferPtr = (DWORD) (wrbuf + (i * 512)); // pointer to the right buffer
+        argSector = sector + i;                     // sector number
+
+        runFdcAsm();                    // do the requested action
+
+        if(argSuccess != 0) {           // if op failed, quit loop
+            break;
         }
     }
-    return result;
+
+    return argSuccess;                  // return success / failure
 }
 
 int floppy_read(BYTE *buf, WORD dev, WORD sector, WORD track, WORD side, WORD count)
 {
-    int res;
-
+    // floppy read via TOS?
     if(testConf.fddViaTos) {
-        res = Floprd(buf, 0, dev, sector, track, side, count);
-    } else {
-        //-------------
-        // first seek
-        argFuncId       = FDC_FUN_SEEK; // seek to the right track
-        argDrive        = dev;
-        argTrack        = track;
-        argSide         = side;
-        argSector       = sector;
-        argCount        = count;
-        argLeaveOn      = 1;
-        argBufferPtr    = (DWORD) buf;
-
-        runFdcAsm();                    // do the requested action
-
-        if(argSuccess != 0) {           // failed?
-            return argSuccess;          // return that error
-        }
-        //-------------
-        // then read
-        argFuncId       = FDC_FUN_READ; // now read the sector
-        runFdcAsm();                    // do the requested action
-        res = argSuccess;               // return success / failure
+        return Floprd(buf, 0, dev, sector, track, side, count);
     }
 
-    return res;
+    //-------------
+    // floppy read via custom functions?
+    // first seek
+    argFuncId       = FDC_FUN_SEEK; // seek to the right track
+    argDrive        = dev;
+    argTrack        = track;
+    argSide         = side;
+    argSector       = sector;
+    argCount        = count;
+    argLeaveOn      = 1;
+    argBufferPtr    = (DWORD) buf;
+
+    runFdcAsm();                    // do the requested action
+
+    if(argSuccess != 0) {           // failed?
+        return argSuccess;          // return that error
+    }
+
+    //-------------
+    // then read
+
+    argFuncId = FDC_FUN_READ;          // now read the sector
+    argCount = 1;                      // read one sector at a time, count times
+
+    int i;
+    for(i=0; i<count; i++) {
+        argBufferPtr = (DWORD) (buf + (i * 512));   // pointer to the right buffer
+        argSector = sector + i;                     // sector number
+
+        runFdcAsm();                    // do the requested action
+
+        if(argSuccess != 0) {           // if op failed, quit loop
+            break;
+        }
+    }
+
+    return argSuccess;                  // return success / failure
 }
 
 void floppy_seekRate(WORD dev, WORD rate)
