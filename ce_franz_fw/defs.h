@@ -8,6 +8,9 @@
 #define TRUE    1
 #define FALSE   0
 
+#define STREAM_TABLE_ITEMS  20
+#define STREAM_TABLE_SIZE   (2 * STREAM_TABLE_ITEMS)
+
 #define WRITEBUFFER_SIZE        650
 
 typedef struct 

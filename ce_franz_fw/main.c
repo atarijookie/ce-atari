@@ -12,17 +12,6 @@
 #include "floppyhelpers.h"
 #include "init.h"
 
-
-// 1 sector with all headers, gaps, data and crc: 614 B of data needed to stream -> 4912 bits to stream -> with 4 bits encoded to 1 byte: 1228 of encoded data
-// Each sector takes around 22ms to stream out, so you have this time to ask for new one and get it in... the SPI transfer of 1228 B should take 0,8 ms.
-
-// gap byte 0x4e == 666446 us = 222112 times = 10'10'10'01'01'10 = 0xa96
-// first gap (60 * 0x4e) takes 1920 us (1.9 ms)
-
-// This ARM is little endian, e.g. 0x1234 is stored in RAM as 34 12, but when working with WORDs, it's OK
-
-// maximum params from .ST images seem to be: 84 tracks (0-83), 10 sectors/track
-
 TWriteBuffer wrBuffer[2];                           // two buffers for written sectors
 TWriteBuffer *wrNow;
 
@@ -57,17 +46,11 @@ C) send   : ATN_FW_VERSION with the FW version + empty bytes == 3 WORD for FW + 
 
 //#define     wrBuffer_add(X)                 { if(wrNow->count  < WRITEBUFFER_SIZE) { wrNow->buffer[wrNow->count] = X; wrNow->count++; } }
 
-#define STREAM_TABLE_ITEMS  20
-#define STREAM_TABLE_SIZE   (2 * STREAM_TABLE_ITEMS)
-
-#define STREAM_TABLE_OFFSET 10              // the stream table starts at this offset, because first 5 words are empty (ATN + sizes + other)
-#define STREAM_START_OFFSET (STREAM_TABLE_OFFSET + STREAM_TABLE_SIZE)
-
-#define     readTrackData_goToStart()       { inIndexGet = STREAM_START_OFFSET; }
-#define     readTrackData_get(X)            { X = readTrackData[inIndexGet];                inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) {  inIndexGet = STREAM_START_OFFSET; }; }
+#define     readTrackData_goToStart()       { inIndexGet = streamStartOffset; }
+#define     readTrackData_get(X)            { X = readTrackData[inIndexGet];                inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) {  inIndexGet = streamStartOffset; }; }
 #define     readTrackData_get_noMove(X)     { X = readTrackData[inIndexGet];                                                                                                                                    }
 //#define       readTrackData_markAndmove() { readTrackData[inIndexGet] = CMD_MARK_READ;    inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) {  inIndexGet = 0; };   }
-#define     readTrackData_justMove()        {                                                                                       inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) { inIndexGet = STREAM_START_OFFSET; };   }
+#define     readTrackData_justMove()        {                                                                                       inIndexGet++;       if(inIndexGet >= READTRACKDATA_SIZE) { inIndexGet = streamStartOffset; };   }
 //--------------
 
 #define REQUEST_TRACK                       {   next.track = now.track; next.side = now.side; sendTrackRequest = TRUE; lastRequestTime = TIM4->CNT; trackStreamedCount = 0; }
@@ -105,10 +88,8 @@ BYTE isWriteProtected;
 
 WORD trackStreamedCount = 0;
 
-volatile TCircBuffer buff0, buff1;
+extern volatile TCircBuffer buff0, buff1;
 void circularInit(volatile TCircBuffer *cb);
-void cicrularAdd(volatile TCircBuffer *cb, BYTE val);
-BYTE cicrularGet(volatile TCircBuffer *cb);
 
 void setupDriveSelect(void);
 void setupDiskChangeWriteProtect(void);
@@ -123,6 +104,10 @@ void handleFloppyWrite(void);
 
 BYTE sectorsWritten;            // how many sectors were written during the last media rotation - if something was written, we need to get the re-encoded track
 WORD wrPulseShort, wrPulseLong; // if write pulse is too short of too long, increment here
+
+WORD streamTableOffset = 10;              // the stream table starts at this offset, because first 5 words are empty (ATN + sizes + other)
+WORD streamStartOffset = 10 + STREAM_TABLE_SIZE;
+void findStreamTableOffset(void);
 
 int main (void)
 {
@@ -161,8 +146,11 @@ int main (void)
             outFlags.weAreReceivingTrack = TRUE;        // mark that we are receiving TRACK data, and thus shouldn't stream
         }
 
-        if(outFlags.updatePosition) {
+        if(outFlags.updatePosition) {                   // this happens when we received new track and we need to update our position in read stream
             outFlags.updatePosition = FALSE;
+
+            findStreamTableOffset();                    // stream table has mostly 10 bytes offset, but could be one word more or less
+
             updateStreamPositionByFloppyPosition();     // place the read marker on the right place in the stream
         }
 
@@ -321,139 +309,6 @@ void fillReadStreamBufferWithDummyData(void)
     }
 }
 
-void spiDma_txRx(WORD txCount, BYTE *txBfr, WORD rxCount, BYTE *rxBfr)
-{
-    static WORD ATNcodePrev = 0;
-
-    WORD *pTxBfr = (WORD *) txBfr;
-
-    // store TX and RX count so the host will know how much he should transfer
-    pTxBfr[2] = txCount;
-    pTxBfr[3] = rxCount;
-
-    spiDma_waitForFinish();                                             // make sure that the last DMA transfer has finished
-
-    waitForSPIidle();                                                   // and make sure that SPI has finished, too
-
-    //--------------
-    // at this place the previous SPI transfer must have ended - either by success, or by timeout
-    if(ATNcodePrev == ATN_FW_VERSION) {                                 // if the last ATN code was FW version (Franz hearthbeat / RPi alive)
-        if(DMA1_Channel3->CNDTR == 0 && DMA1_Channel2->CNDTR == 0) {    // if both SPI TX and SPI RX transmitted all the data, RPi is up
-            hostIsUp = TRUE;                                            // mark that RPi retrieved the data
-        } else {
-            hostIsUp = FALSE;                                           // mark that RPi didn't retrieve the data
-        }
-    }
-
-    ATNcodePrev = pTxBfr[1];                                            // store this current ATN code as previous code, so next time we know what ATN succeeded or failed
-
-    //--------------
-
-    // disable both TX and RX channels
-    DMA1_Channel3->CCR      &= 0xfffffffe;                              // disable DMA3 Channel transfer
-    DMA1_Channel2->CCR      &= 0xfffffffe;                              // disable DMA2 Channel transfer
-
-    //-------------------
-    // The next simple 'if' is here to help the last word of block loss (first word of block not present),
-    // it doesn't do much (just gets a byte from RX register if there is one waiting), but it helps the situation -
-    // without it the problem occures, with it it seems to be gone (can't reproduce). This might be caused just
-    // by the adding the delay between disabling and enabling DMA by this extra code.
-
-    if((SPI1->SR & SPI_SR_RXNE) != 0) {                                 // if there's something still in SPI DR, read it
-        WORD dummy = SPI1->DR;
-    }
-    //-------------------
-
-    // set the software flags of SPI DMA being idle
-    spiDmaTXidle = (txCount == 0) ? TRUE : FALSE;                       // if nothing to send, then IDLE; if something to send, then FALSE
-    spiDmaRXidle = (rxCount == 0) ? TRUE : FALSE;                       // if nothing to receive, then IDLE; if something to receive, then FALSE
-    spiDmaIsIdle = FALSE;                                               // SPI DMA is busy
-
-    // config SPI1_TX -- DMA1_CH3
-    DMA1_Channel3->CMAR     = (uint32_t) txBfr;                         // from this buffer located in memory
-    DMA1_Channel3->CNDTR    = txCount;                                  // this much data
-
-    // config SPI1_RX -- DMA1_CH2
-    DMA1_Channel2->CMAR     = (uint32_t) rxBfr;                         // to this buffer located in memory
-    DMA1_Channel2->CNDTR    = rxCount;                                  // this much data
-
-    // enable both TX and RX channels
-    DMA1_Channel3->CCR      |= 1;                                       // enable  DMA1 Channel transfer
-    DMA1_Channel2->CCR      |= 1;                                       // enable  DMA1 Channel transfer
-
-    // now set the ATN pin accordingly
-    if(txCount != 0) {                                                  // something to send over SPI?
-        GPIOB->BSRR = ATN;                                              // ATTENTION bit high - got something to read
-    }
-}
-
-void spiDma_waitForFinish(void)
-{
-    while(spiDmaIsIdle != TRUE) {                                       // wait until it will become idle
-        if(timeout()) {                                                 // if timeout happened (and we got stuck here), quit
-            spiDmaIsIdle = TRUE;
-
-            if(outFlags.weAreReceivingTrack) {                          // if we were receiving a track
-                outFlags.weAreReceivingTrack    = FALSE;                // mark that we're not receiving it anymore
-                outFlags.updatePosition         = TRUE;
-            }
-
-            break;
-        }
-    }
-}
-
-void waitForSPIidle(void)
-{
-    while((SPI1->SR & SPI_SR_TXE) == 0) {                               // wait while TXE flag is 0 (TX is not empty)
-        if(timeout()) {
-            return;
-        }
-    }
-
-    while((SPI1->SR & SPI_SR_BSY) != 0) {                               // wait while BSY flag is 1 (SPI is busy)
-        if(timeout()) {
-            return;
-        }
-    }
-}
-
-// the interrupt on DMA SPI TX finished should minimize the need for checking and reseting ATN pin
-void DMA1_Channel3_IRQHandler(void)
-{
-    DMA_ClearITPendingBit(DMA1_IT_TC3);                                 // possibly DMA1_IT_GL3 | DMA1_IT_TC3
-
-    GPIOB->BRR = ATN;                                                   // ATTENTION bit low  - nothing to read
-
-    spiDmaTXidle = TRUE;                                                // SPI DMA TX now idle
-
-    if(spiDmaRXidle == TRUE) {                                          // and if even the SPI DMA RX is idle, SPI is idle completely
-        spiDmaIsIdle = TRUE;                                            // SPI DMA is busy
-
-        if(outFlags.weAreReceivingTrack) {                              // if we were receiving a track
-            outFlags.weAreReceivingTrack    = FALSE;                    // mark that we're not receiving it anymore
-            outFlags.updatePosition         = TRUE;
-        }
-    }
-}
-
-// interrupt on Transfer Complete of SPI DMA RX channel
-void DMA1_Channel2_IRQHandler(void)
-{
-    DMA_ClearITPendingBit(DMA1_IT_TC2);                                 // possibly DMA1_IT_GL2 | DMA1_IT_TC2
-
-    spiDmaRXidle = TRUE;                                                // SPI DMA RX now idle
-
-    if(spiDmaTXidle == TRUE) {                                          // and if even the SPI DMA TX is idle, SPI is idle completely
-        spiDmaIsIdle = TRUE;                                            // SPI DMA is busy
-
-        if(outFlags.weAreReceivingTrack) {                              // if we were receiving a track
-            outFlags.weAreReceivingTrack    = FALSE;                    // mark that we're not receiving it anymore
-            outFlags.updatePosition         = TRUE;
-        }
-    }
-}
-
 void EXTI3_IRQHandler(void)
 {
   if(EXTI_GetITStatus(EXTI_Line3) != RESET) {
@@ -505,247 +360,6 @@ void EXTI3_IRQHandler(void)
         }
   }
 }
-
-void moveReadIndexToNextSector(void)
-{
-    inIndexGet = STREAM_START_OFFSET;           // set get index to stream start in case we fail to find next sector index
-
-    if(streamed.sector >= 1 && streamed.sector < STREAM_TABLE_ITEMS) {          // if streamed sector seems to be valid (will fit in stream table)
-        WORD *pStreamTable = (WORD *) (readTrackData + STREAM_TABLE_OFFSET);    // get pointer to stream table
-        WORD nextSectorIndex = pStreamTable[streamed.sector + 1];               // get index of next sector from stream table
-
-        if(nextSectorIndex < (READTRACKDATA_SIZE - 1)) {    // if next sector index seems to be valid, use it
-            inIndexGet = nextSectorIndex;
-        }
-    }
-}
-
-// The SW_WRITE is defined in main.h, where it also enables/disabled HW capturing DMA
-// The HW WRITE doesn't work (misses few bits / bytes), but still is here for possible future usage / improvements
-
-#ifdef SW_WRITE
-void handleFloppyWrite(void)
-{
-    WORD inputs = GPIOB->IDR;
-    WORD times = 0, timesCount = 0;
-    WORD wval;
-    register WORD newTime, duration;
-    WORD *pWriteNow, *pWriteEnd;
-
-    // software write capturing
-    WORD wData = inputs & WDATA;    // initialize wData and wDataPrev
-    WORD wDataPrev = wData;
-
-    __disable_irq();                // disable interrupts
-
-    TIM3->CNT = 0;                  // initialize pulse width counter
-
-    wrNow->readyToSend = FALSE;     // mark this buffer as not ready to be sent yet
-    wrNow->count = 4;               // at the start we already have 4 WORDs in buffer - SYNC, ATN code, TX len, RX len
-
-    pWriteNow = &wrNow->buffer[wrNow->count];           // where we want to store current written data (using pointer instead of index for speed reasons)
-    pWriteEnd = &wrNow->buffer[WRITEBUFFER_SIZE - 4];   // end of write buffer - terminate write loop if we get here (minus some space at the end for additional data)
-
-    wval = (streamed.track << 8) | streamed.sector; // next word (buffer[4]) is side, track, sector
-
-    if(streamed.side != 0) {        // if side is not 0, set the highest bit
-        wval |= 0x8000;
-    }
-
-    *pWriteNow = wval;              // add this side track sector WORD
-    pWriteNow++;
-
-    *pWriteNow = inIndexGet;        // store inIndexGet in the stream, so RPi can guess the right sector from our stream position when write happened
-    pWriteNow++;
-
-    while(1) {
-        inputs = GPIOB->IDR;        // read inputs
-
-        if(inputs & WGATE) {        // if WGATE isn't L, writing finished
-            break;
-        }
-
-        // software WRITE capturing - might be prone to errors due to interrupts
-        wDataPrev = wData;          // store previous state of WDATA
-        wData = inputs & WDATA;     // get   current  state of WDATA
-
-        if(wDataPrev != WDATA || wData != 0) {    // not falling edge or WDATA? try again (we want 1,0; anything else is ignored)
-            continue;
-        }
-
-        duration = TIM3->CNT;       // get current pulse duration
-
-        if(duration < 20) {         // if this pulse is too short
-            wrPulseShort++;
-            continue;
-        }
-
-        TIM3->CNT = 0;              // reset timer back to zero
-        newTime = 0;
-
-        if(duration >= 65) {        // if the pulse is too long
-             wrPulseLong++;
-             continue;
-        }
-
-        if(duration < 36) {         // 4 us?
-            newTime = MFM_4US;
-        } else if(duration < 50) {  // 6 us?
-            newTime = MFM_6US;
-        } else if(duration < 65) {  // 8 us?
-            newTime = MFM_8US;
-        }
-
-        if(!newTime) {           // don't have valid new time? skip rest
-            continue;
-        }
-
-        times = times << 2;
-        times |= newTime;       // append new time
-
-        timesCount++;
-        if(timesCount >= 8) {   // if already got 8 times stored
-            timesCount = 0;
-
-            *pWriteNow = times; // add to write buffer
-            pWriteNow++;
-
-            if(pWriteNow >= pWriteEnd) {    // no more space in write buffer, send it to host
-                break;
-            }
-        }
-    }
-
-    __enable_irq();                // enable interrupts
-
-    // writing finished
-    if(timesCount > 0) {        // if there was something captured but not stored at the end
-        *pWriteNow = times;     // add to write buffer
-        pWriteNow++;
-    }
-
-    *pWriteNow = 0;             // last word: 0
-    pWriteNow++;
-
-    wrNow->count = (pWriteNow - wrNow->buffer);         // calculate how many words we got in write buffer (pointer subtraction gives the number of elements between the two pointers)
-
-    wrNow->readyToSend = TRUE;                          // mark this buffer as ready to be sent
-
-    moveReadIndexToNextSector();
-}
-#else
-void handleFloppyWrite(void)
-{
-    WORD inputs = GPIOB->IDR;
-    WORD times = 0, timesCount = 0;
-    WORD wval;
-    register WORD newTime, duration;
-    WORD *pWriteNow, *pWriteEnd;
-
-    DWORD dval;
-    WORD i, start;
-    register WORD prevTime = 0;
-    WORD *pMfmWriteStreamBuffer;
-
-    DMA1->IFCR = DMA1_IT_HT6 | DMA1_IT_TC6; // clear HT & TC flags
-
-    TIM3->CNT = 0;                  // initialize pulse width counter
-
-    wrNow->readyToSend = FALSE;     // mark this buffer as not ready to be sent yet
-    wrNow->count = 4;               // at the start we already have 4 WORDs in buffer - SYNC, ATN code, TX len, RX len
-
-    pWriteNow = &wrNow->buffer[wrNow->count];           // where we want to store current written data (using pointer instead of index for speed reasons)
-    pWriteEnd = &wrNow->buffer[WRITEBUFFER_SIZE - 4];   // end of write buffer - terminate write loop if we get here (minus some space at the end for additional data)
-
-    wval = (streamed.track << 8) | streamed.sector; // next word (buffer[4]) is side, track, sector
-
-    if(streamed.side != 0) {        // if side is not 0, set the highest bit
-        wval |= 0x8000;
-    }
-
-    *pWriteNow = wval;              // add this side track sector WORD
-    pWriteNow++;
-
-    *pWriteNow = inIndexGet;        // store inIndexGet in the stream, so RPi can guess the right sector from our stream position when write happened
-    pWriteNow++;
-
-    while(1) {
-        inputs = GPIOB->IDR;        // read inputs
-
-        if(inputs & WGATE) {        // if WGATE isn't L, writing finished
-            break;
-        }
-
-        if(pWriteNow >= pWriteEnd) {            // no more space in write buffer, send it to host
-            break;
-        }
-
-        // hardware WRITE capturing
-        // check for half transfer or transfer complete IF
-        dval = DMA1->ISR & (DMA1_IT_HT6 | DMA1_IT_TC6);     // get only Half-Transfer and Transfer-Complete flags
-        if(!dval) {     // no HT and TC flag set, try again later
-            continue;
-        }
-        DMA1->IFCR = DMA1_IT_HT6 | DMA1_IT_TC6; // clear HTIF6 flags
-
-        start = (dval & DMA1_IT_HT6) ? 0 : 8;   // HT is words 0..7, TC is words 8..15
-
-        // using pointer to write buffer is faster than using index (twice):
-        // duration + prevTime using index: 2.75 us, the same using pointer: 1.62 us, the sae using pointer acces only once: 1.25 us
-        // whole loop: 3.51 us on 4 us pulse without storing, 3.87 us on 8 us pulse without storing, aditional 0.62 us us for storing
-        pMfmWriteStreamBuffer = &mfmWriteStreamBuffer[start];
-
-        for(i=0; i<8; i++) {             // go through the stored values (either 0-7 or 8-15), calculate duration
-            wval     = *pMfmWriteStreamBuffer;
-            duration = wval - prevTime;
-            prevTime = wval;
-            pMfmWriteStreamBuffer++;
-
-            newTime = 0;                // convert timer time to pulse duration enum
-
-            if(duration < 36) {         // 4 us?
-                newTime = MFM_4US;
-            } else if(duration < 50) {  // 6 us?
-                newTime = MFM_6US;
-            } else if(duration < 65) {  // 8 us?
-                newTime = MFM_8US;
-            }
-
-            if(!newTime) {              // don't have valid new time? skip rest
-                continue;
-            }
-
-            times = times << 2;
-            times |= newTime;           // append new time
-
-            timesCount++;
-
-            // the following storing takes 0.62 us (was 7.5 us using the wrBuffer_add() macro)
-            if(timesCount >= 8) {       // if already got 8 times stored
-                timesCount = 0;
-
-                *pWriteNow = times;     // add to write buffer
-                pWriteNow++;
-            }
-        }
-    }
-
-    // writing finished
-    if(timesCount > 0) {        // if there was something captured but not stored at the end
-        *pWriteNow = times;     // add to write buffer
-        pWriteNow++;
-    }
-
-    *pWriteNow = 0;             // last word: 0
-    pWriteNow++;
-
-    wrNow->count = (pWriteNow - wrNow->buffer);         // calculate how many words we got in write buffer (pointer subtraction gives the number of elements between the two pointers)
-
-    wrNow->readyToSend = TRUE;                          // mark this buffer as ready to be sent
-
-    moveReadIndexToNextSector();
-}
-#endif
 
 void fillMfmTimesForDMA(void)
 {
@@ -822,10 +436,32 @@ BYTE getNextMFMbyte(void)
     return 0x55;
 }
 
+void findStreamTableOffset(void)
+{
+    int i;
+
+    // load some default values
+    streamTableOffset = 10;             // the stream table starts at this offset, because first 5 words are empty (ATN + sizes + other)
+    streamStartOffset = streamTableOffset + STREAM_TABLE_SIZE;
+
+    for(i=0; i<16; i++) {               // go through the read track data, find first non-zero value
+        if(readTrackData[i]) {          // something non-zero at this index? this is the offset to stream table then
+            streamTableOffset = i;
+            streamStartOffset = streamTableOffset + STREAM_TABLE_SIZE;
+            
+            if(streamTableOffset != 10) {
+                streamTableOffset = 10;
+            }
+            
+            break;
+        }
+    }
+}
+
 void updateStreamPositionByFloppyPosition(void)
 {
     DWORD mediaPosition;
-    WORD *pStreamTable = (WORD *) (readTrackData + STREAM_TABLE_OFFSET);    // get pointer to stream table
+    WORD *pStreamTable = (WORD *) (readTrackData + streamTableOffset);    // get pointer to stream table
     DWORD streamSize = pStreamTable[0];                      // get stream size (in bytes) from stream table at index 0
 
     // read the current position - from 0 to 400
@@ -849,155 +485,6 @@ void processHostCommand(BYTE val)
         case CMD_DRIVE_ENABLED:     driveEnabled        = TRUE;     setupDriveSelect();             break;  // drive is now enabled
         case CMD_DRIVE_DISABLED:    driveEnabled        = FALSE;    setupDriveSelect();             break;  // drive is now disabled
     }
-}
-
-// --------------------------------------------------
-// UART 1 - TX and RX - connects Franz and RPi, 19200 baud
-// UART 2 - TX - data from RPi     - through buff0 - to IKBD
-// UART 2 - RX - data from IKBD    - through buff1 - to RPi (also connected with wire to ST keyb)
-// UART 3 - RX - data from ST keyb - through buff1 - to RPi
-//
-// Flow with RPi:
-// IKBD talks to ST keyboard (direct wire connection), and also talks through buff1 to RPi
-// ST keyb talks through buff1 to RPi
-// RPi talks to IKBD through buff0
-//
-// Flow without RPi:
-// IKBD talks to ST keyboard - direct wire connection
-// ST keyb talks to IKBD - through buff0
-//
-// --------------------------------------------------
-
-void USART1_IRQHandler(void)                                            // USART1 is connected to RPi
-{
-    if((USART1->SR & USART_FLAG_RXNE) != 0) {                           // if something received
-        BYTE val = USART1->DR;                                          // read received value
-
-        if(buff0.count > 0 || (USART2->SR & USART_FLAG_TXE) == 0) {     // got data in buffer or usart2 can't TX right now?
-            cicrularAdd(&buff0, val);                                   // add to buffer
-            USART2->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
-        } else {                                                        // if no data in buffer and usart2 can TX
-            USART2->DR = val;                                           // send it to USART2
-        }
-    }
-
-    if((USART1->SR & USART_FLAG_TXE) != 0) {                            // if can TX
-        if(buff1.count > 0) {                                           // and there is something to TX
-            BYTE val = cicrularGet(&buff1);
-            USART1->DR = val;
-        } else {                                                        // and there's nothing to TX
-            USART1->CR1 &= ~USART_FLAG_TXE;                             // disable interrupt on USART2 TXE
-        }
-    }
-}
-
-#define UARTMARK_STCMD      0xAA
-#define UARTMARK_KEYBDATA   0xBB
-
-void USART2_IRQHandler(void)                                            // USART2 is connected to ST IKBD port
-{
-    if((USART2->SR & USART_FLAG_RXNE) != 0) {                           // if something received
-        BYTE val = USART2->DR;                                          // read received value
-
-        if(hostIsUp) {                                                  // RPi is up - buffered send to RPi
-            if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart1 can't TX right now?
-                cicrularAdd(&buff1, UARTMARK_STCMD);                    // add to buffer - MARK
-            } else {                                                    // if no data in buffer and usart2 can TX
-                USART1->DR = UARTMARK_STCMD;                            // send to USART1 - MARK
-            }
-
-            cicrularAdd(&buff1, val);                                   // add to buffer - DATA
-            USART1->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
-        } else {                                                        // if RPi is not up, something received from ST?
-            // nothing to do, data should automatically continue to ST keyboard
-        }
-    }
-
-    if((USART2->SR & USART_FLAG_TXE) != 0) {                            // if can TX
-        if(buff0.count > 0) {                                           // and there is something to TX
-            BYTE val = cicrularGet(&buff0);
-            USART2->DR = val;
-        } else {                                                        // and there's nothing to TX
-            USART2->CR1 &= ~USART_FLAG_TXE;                             // disable interrupt on USART2 TXE
-        }
-    }
-}
-
-void USART3_IRQHandler(void)                                            // USART3 is connected to original ST keyboard
-{
-    if((USART3->SR & USART_FLAG_RXNE) != 0) {                           // if something received
-        BYTE val = USART3->DR;                                          // read received value
-
-        if(hostIsUp) {                                                  // RPi is up - buffered send to RPi
-            if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart1 can't TX right now?
-                cicrularAdd(&buff1, UARTMARK_KEYBDATA);                 // add to buffer - MARK
-            } else {                                                    // if no data in buffer and usart2 can TX
-                USART1->DR = UARTMARK_KEYBDATA;                         // send to USART1 - MARK
-            }
-
-            cicrularAdd(&buff1, val);                                   // add to buffer - DATA
-            USART1->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
-        } else {                                                        // if RPi is not up - send it to IKBD (through buffer or immediatelly)
-            if(buff0.count > 0 || (USART2->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart2 can't TX right now?
-                cicrularAdd(&buff0, val);                               // add to buffer
-                USART2->CR1 |= USART_FLAG_TXE;                          // enable interrupt on USART TXE
-            } else {                                                    // if no data in buffer and usart2 can TX
-                USART2->DR = val;                                       // send it to USART2
-            }
-        }
-    }
-}
-
-void circularInit(volatile TCircBuffer *cb)
-{
-	BYTE i;
-
-	// set vars to zero
-	cb->addPos = 0;
-	cb->getPos = 0;
-	cb->count = 0;
-
-	// fill data with zeros
-	for(i=0; i<CIRCBUFFER_SIZE; i++) {
-		cb->data[i] = 0;
-	}
-}
-
-void cicrularAdd(volatile TCircBuffer *cb, BYTE val)
-{
-	// if buffer full, fail
-	if(cb->count >= CIRCBUFFER_SIZE) {
-        return;
-	}
-    cb->count++;
-
-	// store data at the right position
-	cb->data[ cb->addPos ] = val;
-
-	// increment and fix the add position
-	cb->addPos++;
-	cb->addPos = cb->addPos & CIRCBUFFER_POSMASK;
-}
-
-BYTE cicrularGet(volatile TCircBuffer *cb)
-{
-	BYTE val;
-
-	// if buffer empty, fail
-	if(cb->count == 0) {
-		return 0;
-	}
-    cb->count--;
-
-	// buffer not empty, get data
-	val = cb->data[ cb->getPos ];
-
-	// increment and fix the get position
-	cb->getPos++;
-	cb->getPos = cb->getPos & CIRCBUFFER_POSMASK;
-
-	// return value from buffer
-	return val;
 }
 
 void setupDriveSelect(void)
