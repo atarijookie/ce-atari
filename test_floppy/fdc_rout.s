@@ -30,7 +30,7 @@ read        = 5   | read sector
 write       = 6   | write sector
 readid      = 7   | get ID fields ( NOT DONE )
 readtrk     = 8   | read track
-writetrk    = 9   | 
+writetrk    = 9   |
 
 | ------------------------------------------------------
     .text
@@ -172,7 +172,9 @@ Read:
     move    d5,(a1)             | set sector count
 
     move    #0x80,(a2)          | select command register
-    move    #0x80,(a1)          | read one sector
+
+#   move    #0x80,(a1)          | read one sector (m=0)
+    move    #0x90,(a1)          | read multiple sectors (m=1)
 
     bsr     wfeoc               | wait for end of command
     move.l  d6,d7
@@ -195,7 +197,9 @@ Write:
     move    d5,(a1)             | set sector count
 
     move    #0x180,(a2)         | select command register
-    move    #0xa0,(a1)          | write one sector
+
+#   move    #0xa0,(a1)          | write one sector (m=0)
+    move    #0xb0,(a1)          | write multiple sectors (m=1)
 
     bsr     wfeoc               | wait for end of command
     move.l  d6,d7

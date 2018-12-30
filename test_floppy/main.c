@@ -17,7 +17,6 @@ void updateFloppyPosition(BYTE linearNotRandom, BYTE foreverNotOnce);
 void showInt(int value, int length);
 BYTE readSector(int sector, int track, int side, BYTE checkData);       // 0 means good, 1 means failed READ operation, 2 means READ good but DATA bad
 BYTE checkReadDataForTestImage(int sector, int track, int side);
-BYTE writeSector(int sector, int track, int side);
 
 void deleteOneProgressLine(void);
 void calcCheckSum(BYTE *bfr, int sector, int track, int side);
@@ -34,7 +33,6 @@ void print_status_read(void);
 void print_status_write(void);
 
 void setImageGeometry(int tracks, int sides, int sectors);
-void guessImageGeometry(void);
 
 BYTE bfr     [9*512];
 BYTE writeBfr[9*512];
@@ -128,9 +126,13 @@ void writeReadVerifyTest(BYTE linearNotRandom, BYTE foreverNotOnce);
 void writeSingleSectorTest(void);
 void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce);
 
+#define DATATYPE_RANDOM     0
+#define DATATYPE_COUNTER    1
+#define DATATYPE_TRSISE     2
+
 struct {
     BYTE fddViaTos;
-    BYTE dataRandNotCnt;
+    BYTE dataType;
     BYTE stopAfterError;
     BYTE readNotWrite;
     BYTE linearNotRandom;
@@ -182,11 +184,11 @@ void showMenu(void)
         (void)Cconws("TOS/\33pcustom\33q functions\r\n");
     }
 
-    (void)Cconws(" \33p[ D ]\33q - write data are ");
-    if(testConf.dataRandNotCnt) {
-        (void)Cconws("\33prandom\33q/counter\r\n");
-    } else {
-        (void)Cconws("random/\33pcounter\33q\r\n");
+    (void)Cconws(" \33p[ D ]\33q - data ");
+    switch(testConf.dataType) {
+        case DATATYPE_RANDOM:   (void)Cconws("\33prandom\33q/counter/TrSiSe\r\n"); break;
+        case DATATYPE_COUNTER:  (void)Cconws("random/\33pcounter\33q/TrSiSe\r\n"); break;
+        case DATATYPE_TRSISE:   (void)Cconws("random/counter/\33pTrSiSe\33q\r\n"); break;
     }
 
     (void)Cconws(" \33p[ Y ]\33q - toggle stop after error - ");
@@ -205,7 +207,7 @@ int main(void)
 {
     DWORD oldSp = Super(0);
 
-    testConf.dataRandNotCnt = 1;
+    testConf.dataType = DATATYPE_RANDOM;
     testConf.fddViaTos = 1;
     testConf.stopAfterError = 0;
     testConf.readNotWrite = 1;
@@ -243,7 +245,13 @@ int main(void)
             case 's': writeSingleSectorTest();                              break;
             case 'm': makeFloppy();                                         break;
 
-            case 'd': testConf.dataRandNotCnt = !testConf.dataRandNotCnt;   break;
+            case 'd': {
+                testConf.dataType++;
+                if(testConf.dataType > DATATYPE_TRSISE) {
+                    testConf.dataType = DATATYPE_RANDOM;
+                }
+            }
+            break;
 
             case 'f': testConf.fddViaTos = !testConf.fddViaTos;             break;
 
@@ -301,24 +309,37 @@ void removeAllWaitingKeys(void)
 void generateWriteData(void)
 {
     BYTE randValue = Random();
-    int byteCount = testConf.sectorsAtOnce * 512;
-    int i;
+    int i, s;
 
-    for(i=0; i<byteCount; i++) {            // go through the write buffer, write data
-        if(testConf.dataRandNotCnt) {       // random data?
-            writeBfr[i] = i ^ randValue;
-        } else {                            // counter data?
-            writeBfr[i] = i;
+    for(s=0; s<testConf.sectorsAtOnce; s++) {           // for all sectors in test
+        BYTE *b = writeBfr + (s * 512);                 // pointer to buffer for specific sector
+
+        for(i=0; i<512; i++) {                          // go through the write buffer, write data
+            if(testConf.dataType == DATATYPE_RANDOM) {  // random data?
+                b[i] = i ^ randValue;
+            } else {                                    // counter data or TrSiSe data?
+                b[i] = i;
+            }
+        }
+
+        if(testConf.dataType == DATATYPE_TRSISE) {      // add TrSiSe data
+            b[0] = fl.track;
+            b[1] = fl.side;
+            b[2] = fl.sector + s;
         }
     }
 }
 
 void writeSingleSectorTest(void)
 {
+    fl.track = 3;
+    fl.side = 0;
+    fl.sector = 1;
+
     generateWriteData();                    // generate write data
 
     floppy_seekRate(0, seekRate);           // set SEEK RATE
-    floppy_write(writeBfr, 0, 1, 3, 0, testConf.sectorsAtOnce);  // sector 1, track 3, side 0
+    floppy_write(writeBfr, 0, fl.sector, fl.track, fl.side, testConf.sectorsAtOnce);  // sector 1, track 3, side 0
 }
 
 void writeReadVerifyTest(BYTE linearNotRandom, BYTE foreverNotOnce)
@@ -543,7 +564,15 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
         }
 
         if(bRes == 0 && imageTestNotAny) {  // if test image, we can also check data validity
-            bRes = checkReadDataForTestImage(fl.sector, fl.track, fl.side);
+            testConf.dataType = DATATYPE_TRSISE;    // for test image - use TrSiSe data
+            generateWriteData();                    // generate write data
+
+            int i, byteCount = testConf.sectorsAtOnce * 512;
+            for(i=0; i<byteCount; i++) {
+                if(bfr[i] != writeBfr[i]) { // data mismatch? fail
+                    bRes = 2;
+                }
+            }
         }
 
         DWORD ms = (end - start) * 5;
@@ -662,12 +691,12 @@ BYTE showDebugInfoFunc(BYTE resultChar, int ms, int howManyTracksSeeked, int laz
 {
     VT52_Goto_pos(0, 5);
 
-    (void) Cconws("Sector    : ");
+    (void) Cconws("Tr, Si, Se: ");
     showInt(fl.track, 2);
     (void) Cconws(",");
-    showInt(fl.sector, 2);
-    (void) Cconws(",");
     showInt(fl.side, 1);
+    (void) Cconws(",");
+    showInt(fl.sector, 1);
 
     (void) Cconws("  \r\nOp result :    ");
     Cconout(resultChar);
@@ -795,41 +824,6 @@ void updateFloppyPosition(BYTE linearNotRandom, BYTE foreverNotOnce)
     }
 }
 
-BYTE checkReadDataForTestImage(int sector, int track, int side)
-{
-    int s, i;
-
-    for(s=0; s<testConf.sectorsAtOnce; s++) {
-        int curSector = sector + s; // current sector number = starting sector + sector number in test
-        int ofs = s * 512;          // offset to start of this sector
-        BYTE *b = bfr + ofs;        // pointer to current sector
-
-        if(b[0] != track || b[1] != side || b[2] != curSector) {
-            return 2;
-        }
-
-        for(i=3; i<512; i++) {
-            if(b[i] != ((BYTE) i)) {  // data mismatch? return DATA BAD
-                return 2;
-            }
-        }
-    }
-
-    return 0;                       // data OK
-}
-
-BYTE writeSector(int sector, int track, int side){
-    // customize write data
-    writeBfr[0] = track;
-    writeBfr[1] = side;
-    writeBfr[2] = sector;
-
-    // issue write command
-    int result;
-    result = Flopwr(writeBfr, 0, 0, sector, track, side, 1);
-    return result;
-}
-
 void showInt(int value, int length)
 {
     char tmp[10];
@@ -894,7 +888,7 @@ void print_status_write(void)
 
 void makeFloppy(void)
 {
-    int sector, track, side;
+    int track, side, sector;
 
     VT52_Clear_home();
     (void)Cconws("Writing TEST floppy...\r\n");
@@ -905,8 +899,23 @@ void makeFloppy(void)
         (void)Cconws(": ");
 
         for(side=0; side<2; side++) {
-            for(sector=1; sector<=10; sector++) {
-                writeSector(sector, track, side);
+            testConf.dataType = DATATYPE_TRSISE;
+
+            fl.track = track;
+            fl.side = side;
+
+            for(sector=1; sector<=9; sector++) {
+                fl.sector = sector;
+
+                if(Cconis()) {
+                    Cnecin();
+                    (void) Cconws("\r\nCanceled...\r\n");
+                    return;
+                }
+
+                generateWriteData();                    // generate write data
+
+                floppy_write(writeBfr, 0, fl.sector, fl.track, fl.side, 1);
                 (void)Cconws(".");
             }
         }
@@ -997,55 +1006,6 @@ void setImageGeometry(int tracks, int sides, int sectors)
     imgGeometry.sides   = sides;
 
     imgGeometry.totalSectors = sectors * tracks * sides;
-}
-
-void guessImageGeometry(void)
-{
-    BYTE res;
-
-    int spt, tracks;
-
-    VT52_Clear_home();
-    (void) Cconws("Estimating floppy geometry");
-
-    imgGeometry.sectors = 9;
-    for(spt=9; spt<15; spt++) {
-        res = floppy_read(bfr, 0, spt, 0, 0, 1);
-
-        if(res != 0) {                          // if failed to read this sector, than it has this many sectors per track
-            imgGeometry.sectors = spt - 1;
-            break;
-        }
-
-        Cconout('.');
-    }
-
-    imgGeometry.tracks = 80;
-    for(tracks=78; tracks<85; tracks++) {
-        res = floppy_read(bfr, 0, 1, tracks, 0, 1);
-
-        if(res != 0) {                          // if failed to read this track, than it has this many tracks
-            imgGeometry.tracks = tracks;
-            break;
-        }
-        Cconout('.');
-    }
-
-    imgGeometry.sides = 2;
-
-    // show the geometry to user
-    (void) Cconws("\r\nEstimated geometry: ");
-    showInt(imgGeometry.tracks, 2);
-    (void) Cconws(",");
-    int decimals = (imgGeometry.sectors < 10) ? 1 : 2;
-    showInt(imgGeometry.sectors, decimals);
-    (void) Cconws(",");
-    showInt(imgGeometry.sides, 1);
-    (void) Cconws("\r\n");
-
-    imgGeometry.totalSectors = imgGeometry.sectors * imgGeometry.tracks * imgGeometry.sides;        // calculate how many sectors there are on this floppy
-
-    Cnecin();
 }
 
 // given set implementation (TOS/asm), will:
