@@ -16,6 +16,7 @@ void updateFloppyPosition(BYTE linearNotRandom, BYTE foreverNotOnce);
 
 void showInt(int value, int length);
 BYTE readSector(int sector, int track, int side, BYTE checkData);       // 0 means good, 1 means failed READ operation, 2 means READ good but DATA bad
+BYTE checkReadDataForTestImage(int sector, int track, int side);
 BYTE writeSector(int sector, int track, int side);
 
 void deleteOneProgressLine(void);
@@ -196,7 +197,7 @@ void showMenu(void)
 
     (void)Cconws("\r\n");
     (void)Cconws(" \33p[ M ]\33q - make TEST floppy image\r\n");
-    (void)Cconws(" \33p[ S ]\33q - write side 1, track 2, sector 3\r\n");
+    (void)Cconws(" \33p[ S ]\33q - write sector 1, track 3, side 0\r\n");
     (void)Cconws(" \33p[ Q ]\33q - quit this app\r\n");
 }
 
@@ -317,7 +318,7 @@ void writeSingleSectorTest(void)
     generateWriteData();                    // generate write data
 
     floppy_seekRate(0, seekRate);           // set SEEK RATE
-    floppy_write(writeBfr, 0, 3, 2, 1, 1);  // side 1, track 2, sector 3
+    floppy_write(writeBfr, 0, 1, 3, 0, testConf.sectorsAtOnce);  // sector 1, track 3, side 0
 }
 
 void writeReadVerifyTest(BYTE linearNotRandom, BYTE foreverNotOnce)
@@ -534,8 +535,16 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
 
         DWORD start, end;
         start       = getTicks();
-        BYTE bRes   = readSector(fl.sector, fl.track, fl.side, imageTestNotAny);
+        BYTE bRes   = floppy_read(bfr, 0, fl.sector, fl.track, fl.side, testConf.sectorsAtOnce);
         end         = getTicks();
+
+        if(bRes) {                          // on any floppy error in floppy_read, change result to 1
+            bRes = 1;
+        }
+
+        if(bRes == 0 && imageTestNotAny) {  // if test image, we can also check data validity
+            bRes = checkReadDataForTestImage(fl.sector, fl.track, fl.side);
+        }
 
         DWORD ms = (end - start) * 5;
 
@@ -550,7 +559,9 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
         //---------------------------------
         // calculate lazy seek time treshold
         int howManyTracksSeeked = (prevTrack > fl.track) ? (prevTrack - fl.track) : (fl.track - prevTrack); // calculate how many sectors we had to seek
-        DWORD lazyTime = (howManyTracksSeeked * seekRateMs) + 400;  // calculate how many time will be considered as lazy seek - if it's more than SEEK TO TRACK time + 2 floppy spin times, it's too lazy
+
+        // calculate how many time will be considered as lazy seek - if it's more than SEEK TO TRACK time + time to read all the sectors (22 ms per sector) + 2 floppy spin times, it's too lazy
+        DWORD lazyTime = (testConf.sectorsAtOnce * 22) + (howManyTracksSeeked * seekRateMs) + 400;
 
         //---------------------------------
         // evaluate the result
@@ -784,21 +795,10 @@ void updateFloppyPosition(BYTE linearNotRandom, BYTE foreverNotOnce)
     }
 }
 
-BYTE readSector(int sector, int track, int side, BYTE checkData)    // 0 means good, 1 means failed READ operation, 2 means READ good but DATA bad
+BYTE checkReadDataForTestImage(int sector, int track, int side)
 {
-    int res, i;
+    int s, i;
 
-    res = floppy_read(bfr, 0, sector, track, side, testConf.sectorsAtOnce);
-
-    if(res != 0) {                  // failed?
-        return 1;                   // 1 means READ operation failed
-    }
-
-    if(!checkData) {                // shouldn't check data? quit with success
-        return 0;
-    }
-                                    // track / side / sector bytes in data don't match? Return BAD DATA.
-    int s;
     for(s=0; s<testConf.sectorsAtOnce; s++) {
         int curSector = sector + s; // current sector number = starting sector + sector number in test
         int ofs = s * 512;          // offset to start of this sector
@@ -815,7 +815,7 @@ BYTE readSector(int sector, int track, int side, BYTE checkData)    // 0 means g
         }
     }
 
-    return 0;                       // if came here, everything is OK
+    return 0;                       // data OK
 }
 
 BYTE writeSector(int sector, int track, int side){
@@ -1010,7 +1010,7 @@ void guessImageGeometry(void)
 
     imgGeometry.sectors = 9;
     for(spt=9; spt<15; spt++) {
-        res = readSector(spt, 1, 0, 0);
+        res = floppy_read(bfr, 0, spt, 0, 0, 1);
 
         if(res != 0) {                          // if failed to read this sector, than it has this many sectors per track
             imgGeometry.sectors = spt - 1;
@@ -1022,7 +1022,7 @@ void guessImageGeometry(void)
 
     imgGeometry.tracks = 80;
     for(tracks=78; tracks<85; tracks++) {
-        res = readSector(1, tracks, 0, 0);
+        res = floppy_read(bfr, 0, 1, tracks, 0, 1);
 
         if(res != 0) {                          // if failed to read this track, than it has this many tracks
             imgGeometry.tracks = tracks;
@@ -1072,6 +1072,15 @@ int floppy_write(BYTE *wrbuf, WORD dev, WORD sector, WORD track, WORD side, WORD
         return argSuccess;                  // return that error
     }
 
+#define WRITE_ALL_IN_ONE_CALL
+
+#ifdef WRITE_ALL_IN_ONE_CALL
+    argFuncId = FDC_FUN_WRITE;          // now write the sector
+    argCount = count;                   // write COUNT sectors at once
+    argSector = sector;                 // sector number
+
+    runFdcAsm();                        // do the requested action
+#else
     // 2). write
     argFuncId = FDC_FUN_WRITE;          // now write the sector
     argCount = 1;                       // write one sector at a time, count times
@@ -1087,6 +1096,7 @@ int floppy_write(BYTE *wrbuf, WORD dev, WORD sector, WORD track, WORD side, WORD
             break;
         }
     }
+#endif
 
     return argSuccess;                  // return success / failure
 }
@@ -1118,7 +1128,14 @@ int floppy_read(BYTE *buf, WORD dev, WORD sector, WORD track, WORD side, WORD co
 
     //-------------
     // then read
+#define READ_ALL_IN_ONE_CALL
 
+#ifdef READ_ALL_IN_ONE_CALL
+    argFuncId = FDC_FUN_READ;          // now read the sector
+    argCount = count;                  // read one sector at a time, count times
+
+    runFdcAsm();                        // do the requested action
+#else
     argFuncId = FDC_FUN_READ;          // now read the sector
     argCount = 1;                      // read one sector at a time, count times
 
@@ -1133,6 +1150,7 @@ int floppy_read(BYTE *buf, WORD dev, WORD sector, WORD track, WORD side, WORD co
             break;
         }
     }
+#endif
 
     return argSuccess;                  // return success / failure
 }
