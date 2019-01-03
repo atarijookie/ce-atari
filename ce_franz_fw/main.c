@@ -54,12 +54,19 @@ void trackRequest(BYTE forceRequest)
     next.side = now.side;
     trackStreamedCount = 0; 
 
-    if(forceRequest) {
+    if(forceRequest) {  // force request - do it immediatelly, don't cancel even if we asked for the same track last time (e.g. we want this after written sectors)
         lastRequestTime -= 35;
         lastRequested.track = 0xff;
         lastRequested.side = 0xff;
-    } else {
+    } else {            // normal request - add small delay before really talking to host, as there might be another request incomming
         lastRequestTime = TIM4->CNT;
+
+        // if what we're asking next is what we were asking last time, cancel track request - we have it already
+        if(next.track == lastRequested.track && next.side == lastRequested.side) {
+            sendTrackRequest = FALSE;
+            outFlags.weAreReceivingTrack = FALSE;
+            return;
+        }
     }
 
     sendTrackRequest = TRUE;
@@ -160,18 +167,16 @@ int main(void)
                 WORD diff       = timeNow - lastRequestTime;
 
                 if(diff >= 30) {                                                                // and at least 15 ms passed since the request (30 / 2000 s)
-                    sendTrackRequest    = FALSE;
+                    sendTrackRequest = FALSE;
 
                     // first check if this isn't what we've requested last time
-                    if(next.track != lastRequested.track || next.side != lastRequested.side) {  // if track or side changed -- same track request limiter
-                        lastRequested.track = next.track;                                       // mark what we've requested last time
-                        lastRequested.side  = next.side;
+                    lastRequested.track = next.track;                                       // mark what we've requested last time
+                    lastRequested.side  = next.side;
 
-                        atnSendTrackRequest[4] = (((WORD)next.side) << 8) | (next.track);
-                        spiDma_txRx(ATN_SENDTRACK_REQ_LEN_TX, atnSendTrackRequest, ATN_SENDTRACK_REQ_LEN_RX, readTrackDataBfr);
+                    atnSendTrackRequest[4] = (((WORD)next.side) << 8) | (next.track);
+                    spiDma_txRx(ATN_SENDTRACK_REQ_LEN_TX, atnSendTrackRequest, ATN_SENDTRACK_REQ_LEN_RX, readTrackDataBfr);
 
-                        outFlags.weAreReceivingTrack = TRUE;                                    // mark that we started to receive TRACK data
-                    }
+                    outFlags.weAreReceivingTrack = TRUE;                                    // mark that we started to receive TRACK data
                 }
             } else if(wrNow->readyToSend) {                                                     // not sending any ATN right now? and current write buffer has something?
                 spiDma_txRx(wrNow->count, wrNow->buffer, 1, &fakeBuffer);
