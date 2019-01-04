@@ -190,7 +190,6 @@ BYTE gem_floppySetup(void)
 
         if(exitobj == BTN_LOAD) {   // load image into slot
             uploadImage(slotNo - 1, NULL);
-
             showProgress(-1);      // hide progress bar
             showFilename(NULL);    // hide load/save filename
             getAndShowSiloContent();        // get and show current content of slots
@@ -340,7 +339,7 @@ void downloadImage(int index)
     int progress = 0;
 
     for(blockNo=0; blockNo<64; blockNo++) {                 // try to get all blocks
-        showProgress(progress);                    // update progress bar
+        showProgress(progress);                             // update progress bar
         progress += 9;                                      // 720 kB image is made of 11.25 blocks of 64k, each is 8.8% of whole
 
         commandShort[4] = FDD_CMD_DOWNLOADIMG_GETBLOCK;     // receiving block
