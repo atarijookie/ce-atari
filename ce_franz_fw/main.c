@@ -47,6 +47,7 @@ void updateStreamPositionByFloppyPosition(void);
 void handleFloppyWrite(void);
 
 void circularInit(volatile TCircBuffer *cb);
+BYTE cicrularGet(volatile TCircBuffer *cb);
 
 void trackRequest(BYTE forceRequest) 
 {
@@ -107,6 +108,16 @@ int main(void)
 
     while(1) {
         WORD inputs;
+
+        if(buff1.count > 0 && (USART1->SR & USART_FLAG_TXE) != 0) {     // if there's something in the buffer and we can TX
+            BYTE val = cicrularGet(&buff1);
+            USART1->DR = val;
+        }
+
+        if(buff0.count > 0 && (USART2->SR & USART_FLAG_TXE) != 0) {     // if there's something in the buffer and we can TX
+            BYTE val = cicrularGet(&buff0);
+            USART2->DR = val;
+        }
 
         if(outFlags.updatePosition) {
             outFlags.updatePosition = FALSE;
