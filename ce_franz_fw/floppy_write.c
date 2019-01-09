@@ -11,6 +11,7 @@
 #include "main.h"
 #include "floppyhelpers.h"
 #include "init.h"
+#include "ikbd.h"
 #include "global_vars.h"
 
 void handleFloppyWrite(void);

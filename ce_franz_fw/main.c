@@ -12,6 +12,7 @@
 #include "floppyhelpers.h"
 #include "init.h"
 #include "global_vars.h"
+#include "ikbd.h"
 
 /* Franz to host communication:
 A) send   : ATN_SEND_TRACK with the track # and side # -- 2 WORDs + zeros = 3 WORDs
@@ -45,9 +46,6 @@ void fillMfmTimesWithDummy(void);
 void updateStreamPositionByFloppyPosition(void);
 
 void handleFloppyWrite(void);
-
-void circularInit(volatile TCircBuffer *cb);
-BYTE cicrularGet(volatile TCircBuffer *cb);
 
 void trackRequest(BYTE forceRequest) 
 {
@@ -517,6 +515,11 @@ void updateStreamPositionByFloppyPosition(void)
 {
     DWORD mediaPosition;
     DWORD streamSize = readTrackDataBfr[STREAM_TABLE_OFFSET];       // get stream size (in bytes) from stream table at index 0
+
+    if(streamSize >= (READTRACKDATA_SIZE_BYTES - 1)) {              // if stream size is invalid (is bigger than where we store read track data)
+        inIndexGet = STREAM_START_OFFSET;                           // just go to the start of stream
+        return;
+    }
 
     // read the current position - from 0 to 400
     mediaPosition = TIM2->CNT;

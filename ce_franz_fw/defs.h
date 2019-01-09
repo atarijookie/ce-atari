@@ -13,11 +13,11 @@
 typedef struct 
 {
     WORD buffer[WRITEBUFFER_SIZE];  // buffer for the written data
-    WORD count;                                         // count of WORDs in buffer 
+    WORD count;                     // count of WORDs in buffer 
     
-    BYTE readyToSend;                               // until we store all the data, don't 
+    BYTE readyToSend;               // until we store all the data, don't 
     
-    void *next;                                         // pointer to the next available TAtnBuffer
+    void *next;                     // pointer to the next available TAtnBuffer
 } TWriteBuffer;
 
 typedef struct {
@@ -31,15 +31,15 @@ typedef struct {
     BYTE sector;
 } SStreamed;
 
-#define CIRCBUFFER_SIZE		64
-#define CIRCBUFFER_POSMASK	0x3f
+#define CIRCBUFFER_SIZE        64
+#define CIRCBUFFER_POSMASK    0x3f
 
 typedef struct {
-	BYTE addPos;
-	BYTE getPos;
-	BYTE count;
+    BYTE addPos;
+    BYTE getPos;
+    BYTE count;
 
-	BYTE data[CIRCBUFFER_SIZE];
+    BYTE data[CIRCBUFFER_SIZE];
 } TCircBuffer;
 
 typedef struct {
@@ -50,6 +50,9 @@ typedef struct {
     
     BYTE outputsAreEnabled;         // this says whether currently the output pins are streaming the MFM stream or not    
 } TOutputFlags;
+
+#define UARTMARK_STCMD      0xAA
+#define UARTMARK_KEYBDATA   0xBB
 
 /*
 reserved:
@@ -96,7 +99,7 @@ GPIOB_15 - ATTENTION (need more data / data available to retrieve)
 
 
 // on GPIOA
-//#define   RDATA               (1 <<   8)
+//#define   RDATA       (1 <<   8)
 
 
 // on GPIOB

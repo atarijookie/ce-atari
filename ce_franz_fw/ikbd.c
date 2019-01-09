@@ -11,12 +11,9 @@
 #include "main.h"
 #include "floppyhelpers.h"
 #include "init.h"
+#include "ikbd.h"
 #include "global_vars.h"
 
-
-void circularInit(volatile TCircBuffer *cb);
-void cicrularAdd(volatile TCircBuffer *cb, BYTE val);
-BYTE cicrularGet(volatile TCircBuffer *cb);
 
 // --------------------------------------------------
 // UART 1 - TX and RX - connects Franz and RPi, 19200 baud
@@ -43,9 +40,6 @@ void USART1_IRQHandler(void)                                            // USART
     }
 }
 
-#define UARTMARK_STCMD      0xAA
-#define UARTMARK_KEYBDATA   0xBB
-
 void USART2_IRQHandler(void)                                            // USART2 is connected to ST IKBD port
 {
     if((USART2->SR & USART_FLAG_RXNE) != 0) {                           // if something received
@@ -67,7 +61,7 @@ void USART3_IRQHandler(void)                                            // USART
             cicrularAdd(&buff1, UARTMARK_KEYBDATA);                     // add to buffer - MARK
             cicrularAdd(&buff1, val);                                   // add to buffer - DATA
         } else {                                                        // if RPi is not up - send it to IKBD (through buffer or immediatelly)
-            cicrularAdd(&buff0, val);                               // add to buffer
+            cicrularAdd(&buff0, val);                                   // add to buffer
         }
     }
 }
