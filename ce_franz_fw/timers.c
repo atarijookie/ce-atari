@@ -4,11 +4,11 @@ void timerSetup_index(void)
 {
     TIM_TimeBaseInitTypeDef     TIM_TimeBaseStructure;
     TIM_OCInitTypeDef           TIM_OCInitStructure;
-    
+
     uint16_t PrescalerValue = 0;
     uint16_t period         = 2000 / 5;                                 // this is length of 1 period in clock ticks when timer is prescaled to 2000 Hz
-    
-    // Compute the prescaler value
+
+    // Compute the prescaler value - works fine for 72 MHz and 64 Mhz
     PrescalerValue = (uint16_t) (SystemCoreClock / 2000) - 1;           // prescale to 2000 Hz - 1 tick is 0.5 ms
     
     // Time base configuration
@@ -17,7 +17,7 @@ void timerSetup_index(void)
     TIM_TimeBaseStructure.TIM_ClockDivision     = 0;
     TIM_TimeBaseStructure.TIM_CounterMode       = TIM_CounterMode_Up;
     TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
-    
+
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
 
     // PWM1 Mode configuration: Channel2
@@ -28,7 +28,7 @@ void timerSetup_index(void)
 
     TIM_OC2Init(TIM2, &TIM_OCInitStructure);
     TIM_OC2PreloadConfig(TIM2, TIM_OCPreload_Enable);
-    
+
     TIM_ARRPreloadConfig(TIM2, ENABLE);
 
     TIM_Cmd(TIM2, ENABLE);                                              // enable timer
@@ -39,13 +39,13 @@ void timerSetup_mfmRead(void)
 {
     TIM_TimeBaseInitTypeDef     TIM_TimeBaseStructure;
     TIM_OCInitTypeDef           TIM_OCInitStructure;
-    
+
     uint16_t PrescalerValue     = 0;
     uint16_t period             = 8;                                    // 4us - length of 1 period in clock ticks when timer is prescaled to 2 MHz
-    
-    // Compute the prescaler value
+
+    // Compute the prescaler value - works fine for 72 MHz and 64 Mhz
     PrescalerValue = (uint16_t) (SystemCoreClock / 2000000) - 1;        // prescale to 2 MHz - 1 tick is 0.5 us
-    
+
     // Time base configuration
     TIM_TimeBaseStructure.TIM_Period            = period - 1;           // count of tick per period for MFM stream
     TIM_TimeBaseStructure.TIM_Prescaler         = PrescalerValue;
@@ -84,13 +84,16 @@ void timerSetup_mfmWrite(void)
     TIM_TimeBaseInitTypeDef     TIM_TimeBaseStructure;
     TIM_ICInitTypeDef           TIM_CH1_ICInitStructure;
 
+    // Compute the prescaler value
+    uint16_t PrescalerValue = (uint16_t) (SystemCoreClock / 8000000) - 1;   // prescale to 8 MHz - 1 tick is 0.125 us
+
     // Time base configuration
     TIM_TimeBaseStructure.TIM_Period            = 0xff;                     // never let it go to 0xffff
-    TIM_TimeBaseStructure.TIM_Prescaler         = 9;                        // prescale: 10, this means 7.2 MHz
+    TIM_TimeBaseStructure.TIM_Prescaler         = PrescalerValue;           // prescale to 8 MHz
     TIM_TimeBaseStructure.TIM_ClockDivision     = 0;
     TIM_TimeBaseStructure.TIM_CounterMode       = TIM_CounterMode_Up;
     TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
-    
+
     TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
     TIM_ARRPreloadConfig(TIM3, DISABLE);                                    // disable preloading
 
@@ -116,9 +119,12 @@ void timerSetup_stepLimiter(void)
     // TIM4
     TIM_TimeBaseInitTypeDef     TIM_TimeBaseStructure;
 
+    // Compute the prescaler value
+    uint16_t PrescalerValue = (uint16_t) (SystemCoreClock / 2000) - 1;      // prescale to 2000 Hz - 1 tick is 0.5 ms
+
     // Time base configuration
     TIM_TimeBaseStructure.TIM_Period            = 0xffff;                   
-    TIM_TimeBaseStructure.TIM_Prescaler         = 35999;                    // prescale 72 MHz by 36 kHz = 2 kHz
+    TIM_TimeBaseStructure.TIM_Prescaler         = PrescalerValue;           // prescale to 2 kHz
     TIM_TimeBaseStructure.TIM_ClockDivision     = 0;
     TIM_TimeBaseStructure.TIM_CounterMode       = TIM_CounterMode_Up;
     TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
@@ -129,54 +135,20 @@ void timerSetup_stepLimiter(void)
     TIM_Cmd(TIM4, ENABLE);                                                  // enable timer
 }
 
-/*
-void timerSetup_cmdTimeout(void)                    
-{
-    TIM_TimeBaseInitTypeDef     TIM_TimeBaseStructure;
-
-  // Time base configuration
-  TIM_TimeBaseStructure.TIM_Prescaler                   = 35999;            // prescale 72 MHz by 36 kHz = 2 kHz
-  TIM_TimeBaseStructure.TIM_Period                      = 2000;             // with prescaler set to 2kHz, this period will be 1 second
-  TIM_TimeBaseStructure.TIM_ClockDivision           = 0;
-  TIM_TimeBaseStructure.TIM_CounterMode             = TIM_CounterMode_Up;
-    TIM_TimeBaseStructure.TIM_RepetitionCounter =   0;
-    
-  TIM_TimeBaseInit(TIM5, &TIM_TimeBaseStructure);
-  TIM_ARRPreloadConfig(TIM5, DISABLE);                          // disable preloading
-
-  TIM_Cmd(TIM5, ENABLE);                                                        // enable timer
-    TIM_ITConfig(TIM5, TIM_IT_Update, ENABLE);              // enable int from this timer
-}
-*/
-
-WORD start;
+WORD timeoutStartCnt;
 
 void timeoutStart(void)
 {
-/*  
-    // init the timer 4, which will serve for timeout measuring 
-  TIM_Cmd(TIM5, DISABLE);                                               // disable timer
-    TIM5->CNT   = 0;                                                                // set timer value to 0
-    TIM5->SR    = 0xfffe;                                                       // clear UIF flag
-  TIM_Cmd(TIM5, ENABLE);                                                // enable timer
-*/
-    start = TIM4->CNT;
-}   
+    timeoutStartCnt = TIM4->CNT;
+}
 
 
 BYTE timeout(void)
 {
-    /*
-    if((TIM5->SR & 0x0001) != 0) {      // overflow of TIM4 occured?
-        TIM5->SR = 0xfffe;                          // clear UIF flag
-        return TRUE;
-    }
-    */
-
     WORD diff, now;
     
     now = TIM4->CNT;
-    diff = now - start;
+    diff = now - timeoutStartCnt;
     
     if(diff > 2000) {
         return TRUE;

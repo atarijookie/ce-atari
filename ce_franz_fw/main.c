@@ -87,6 +87,8 @@ int main(void)
     sendFwVersion       = FALSE;
     sendTrackRequest    = FALSE;
 
+    SystemCoreClockUpdate();        // get and calculate SystemCoreClock based on current configuration - we're running at 72 MHz or 64 MHz
+
     setupAtnBuffers();
     init_hw_sw();                                   // init GPIO pins, timers, DMA, global variables
 

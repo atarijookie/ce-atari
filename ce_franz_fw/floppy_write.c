@@ -84,7 +84,7 @@ void handleFloppyWrite(void)
 
         duration = TIM3->CNT;       // get current pulse duration
 
-        if(duration < 20) {         // if this pulse is too short
+        if(duration < 22) {         // if this pulse is too short (less than 2.7 us long)
             wrPulseShort++;
             continue;
         }
@@ -92,16 +92,16 @@ void handleFloppyWrite(void)
         TIM3->CNT = 0;              // reset timer back to zero
         newTime = 0;
 
-        if(duration >= 65) {        // if the pulse is too long
+        if(duration >= 72) {        // if the pulse is too long (longer than 9 us)
              wrPulseLong++;
              continue;
         }
 
-        if(duration < 36) {         // 4 us?
+        if(duration < 40) {         // 4 us? (interval 2.7 us - 5.0 us) (40 pulses of 0.125 us)
             newTime = MFM_4US;
-        } else if(duration < 50) {  // 6 us?
+        } else if(duration < 56) {  // 6 us? (interval 5.0 us - 7.0 us) (56 pulses of 0.125 us)
             newTime = MFM_6US;
-        } else if(duration < 65) {  // 8 us?
+        } else if(duration < 72) {  // 8 us? (interval 7.0 us - 9.0 us) (72 pulses of 0.125 us)
             newTime = MFM_8US;
         }
 
