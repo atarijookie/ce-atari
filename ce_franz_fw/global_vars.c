@@ -47,4 +47,3 @@ volatile TCircBuffer buff0, buff1;
 TOutputFlags outFlags;
 
 BYTE sectorsWritten;            // how many sectors were written during the last media rotation - if something was written, we need to get the re-encoded track
-WORD wrPulseShort, wrPulseLong; // if write pulse is too short of too long, increment here

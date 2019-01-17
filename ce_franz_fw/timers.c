@@ -97,7 +97,6 @@ void timerSetup_mfmWrite(void)
     TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
     TIM_ARRPreloadConfig(TIM3, DISABLE);                                    // disable preloading
 
-#ifndef SW_WRITE
     // setup input capture
     TIM_CH1_ICInitStructure.TIM_Channel         = TIM_Channel_1;
     TIM_CH1_ICInitStructure.TIM_ICPolarity      = TIM_ICPolarity_Falling;
@@ -106,6 +105,7 @@ void timerSetup_mfmWrite(void)
     TIM_CH1_ICInitStructure.TIM_ICFilter        = 0;
     TIM_ICInit(TIM3, &TIM_CH1_ICInitStructure);
 
+#ifndef SW_WRITE
     // set TIM1 DMA control register (TIMx_DCR) as: DBL (<<8) =0 (1 transfer), DBA (<<0) = 13   (0x34 TIMx_CCR1)
     TIM3->DCR = 13;
     TIM_ITConfig(TIM3, (1 <<  9), ENABLE);                                  // enable Bit 9 - CC1DE: Capture/Compare 1 DMA request enable (CC1 DMA request enabled)

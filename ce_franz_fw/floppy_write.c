@@ -41,9 +41,23 @@ void handleFloppyWrite(void)
     register WORD newTime, duration;
     WORD *pWriteNow, *pWriteEnd;
 
+//#define SW_CAPTURE
+
+#ifdef SW_CAPTURE
     // software write capturing
     WORD wData = inputs & WDATA;    // initialize wData and wDataPrev
     WORD wDataPrev = wData;
+
+    #define PULSE_TOO_SHORT 22
+    #define PULSE_4US       40
+    #define PULSE_6US       56
+    #define PULSE_8US       72
+#else
+    #define PULSE_TOO_SHORT 18
+    #define PULSE_4US       36
+    #define PULSE_6US       52
+    #define PULSE_8US       72
+#endif
 
     __disable_irq();                // disable interrupts
 
@@ -74,6 +88,7 @@ void handleFloppyWrite(void)
             break;
         }
 
+#ifdef SW_CAPTURE
         // software WRITE capturing - might be prone to errors due to interrupts
         wDataPrev = wData;          // store previous state of WDATA
         wData = inputs & WDATA;     // get   current  state of WDATA
@@ -83,25 +98,31 @@ void handleFloppyWrite(void)
         }
 
         duration = TIM3->CNT;       // get current pulse duration
+#else
+        // capturing using Timer Input Capture
+        if(!(TIM3->SR & TIM_FLAG_CC1)) {    // CC1IF flag NOT set? wait some more
+            continue;
+        }
 
-        if(duration < 22) {         // if this pulse is too short (less than 2.7 us long)
-            wrPulseShort++;
+        duration =  TIM3->CCR1;     // get current pulse duration
+#endif
+
+        if(duration < PULSE_TOO_SHORT) {  // if this pulse is too short (less than 2.7 us long)
             continue;
         }
 
         TIM3->CNT = 0;              // reset timer back to zero
         newTime = 0;
 
-        if(duration >= 72) {        // if the pulse is too long (longer than 9 us)
-             wrPulseLong++;
+        if(duration >= PULSE_8US) { // if the pulse is too long (longer than 9 us)
              continue;
         }
 
-        if(duration < 40) {         // 4 us? (interval 2.7 us - 5.0 us) (40 pulses of 0.125 us)
+        if(duration < PULSE_4US) {         // 4 us? (interval 2.7 us - 5.0 us) (40 pulses of 0.125 us)
             newTime = MFM_4US;
-        } else if(duration < 56) {  // 6 us? (interval 5.0 us - 7.0 us) (56 pulses of 0.125 us)
+        } else if(duration < PULSE_6US) {  // 6 us? (interval 5.0 us - 7.0 us) (56 pulses of 0.125 us)
             newTime = MFM_6US;
-        } else if(duration < 72) {  // 8 us? (interval 7.0 us - 9.0 us) (72 pulses of 0.125 us)
+        } else if(duration < PULSE_8US) {  // 8 us? (interval 7.0 us - 9.0 us) (72 pulses of 0.125 us)
             newTime = MFM_8US;
         }
 
