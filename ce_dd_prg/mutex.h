@@ -29,5 +29,8 @@ __extension__							\
 	retv;								\
 })
 
-inline void mutex_unlock(mutex *mtx);
+static inline void mutex_unlock(mutex *mtx)
+{
+	*mtx=0;
+}
 #endif
