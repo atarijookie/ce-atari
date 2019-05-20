@@ -903,9 +903,23 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     FILE *f = fopen(hostName.c_str(), "wb+");                       // write/update - create empty / truncate existing
 
     if(!f) {
-        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - fopen failed", hostName.c_str());
+        int error = errno;
+        int status;
 
-        dataTrans->setStatus(EACCDN);                               // if failed to create, access error
+        switch(error) {
+            case ENFILE:
+            case EMFILE:
+                status = ENHNDL;                       // no more file handles left
+                break;
+            case ENOENT:
+                status = EPTHNF;                       // Access path is incorrect
+                break;
+            default:
+                status = EACCDN;                       // if failed to create, access error
+        }
+
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - fopen failed : %s (ERROR %d)", hostName.c_str(), strerror(errno), status);
+        dataTrans->setStatus(status);
         return;
     }
 
