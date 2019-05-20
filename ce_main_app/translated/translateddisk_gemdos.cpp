@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <string>
 #include <string.h>
 #include <stdio.h>
@@ -792,6 +793,7 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
 				if(dosattrs & ATTR_SYS) oldAttrAtari |= FA_SYSTEM;
 				//if(dosattrs & ATTR_ARCH) oldAttrAtari |= FA_ARCHIVE;
 			}
+			close(fd);
 		}
 	}
 	
