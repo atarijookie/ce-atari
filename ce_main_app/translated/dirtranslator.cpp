@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <stdio.h>
 #include <string.h>
 
@@ -190,6 +191,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
 	DIR *dir = opendir(hostPath.c_str());							// try to open the dir
 	
     if(dir == NULL) {                                 				// not found?
+		Debug::out(LOG_DEBUG, "DirTranslator::buildGemdosFindstorageData - opendir(\"%s\") FAILED", hostPath.c_str());
         return false;
     }
 
@@ -244,7 +246,7 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
             }
         }
         
-		// finnaly append to the find storage
+		// finally append to the find storage
 		appendFoundToFindStorage(hostPath, searchString.c_str(), fs, de, findAttribs);
     }
 
@@ -313,7 +315,7 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
 	res = stat(fullEntryPath.c_str(), &attr);					// get the file status
 	
 	if(res != 0) {
-		Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- stat() failed, errno %d", errno);
+		Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- stat(%s) failed, errno %d", fullEntryPath.c_str(), errno);
 		return;		
 	}
 
@@ -328,14 +330,13 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
     WORD atariDate = Utils::fileTimeToAtariDate(timestr);
 
     // now convert the short 'FILE.C' to 'FILE    .C  '
-    char shortFnameExtended[14];
-    FilenameShortener::extendWithSpaces(shortFname.c_str(), shortFnameExtended);
+    //char shortFnameExtended[14];
+    //FilenameShortener::extendWithSpaces(shortFname.c_str(), shortFnameExtended);
 
     // check the current name against searchString using fnmatch
-	int ires = compareSearchStringAndFilename(searchString, shortFname.c_str());
-		
-	if(ires != 0) {     // not matching? quit
-		return;
+	if (compareSearchStringAndFilename(searchString, shortFname.c_str()) != 0) {
+		Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- %s - %s does not match pattern %s", fullEntryPath.c_str(), shortFname.c_str(), searchString);
+		return; // not matching? quit
 	}
 
 	// get MS-DOS VFAT attributes
@@ -464,6 +465,7 @@ void DirTranslator::toUpperCaseString(std::string &st)
 	}
 }
 
+/// Return 0 for a match, -1 for no match
 int DirTranslator::compareSearchStringAndFilename(const char *searchString, const char *filename)
 {
 	char ss1[16], ss2[16];
