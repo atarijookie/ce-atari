@@ -7,7 +7,9 @@ V = 0
 CXX	    = g++
 CC	    = gcc
 #STRIP	= strip
+ifneq ($(ONPC),yes)
 CPU_FLAGS   = -march=armv6 -mtune=arm1176jzf-s -mfpu=vfp -mfloat-abi=hard -marm
+endif
 CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE $(CPU_FLAGS)
 CXXFLAGS = $(CFLAGS)
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
