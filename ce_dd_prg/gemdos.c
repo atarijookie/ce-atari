@@ -617,7 +617,7 @@ int32_t custom_fopen( void *sp )
 		CALL_OLD_GD( Fopen, fileName, mode);
 	}
 
-	if(hdIf.statusByte == ENHNDL || hdIf.statusByte == EACCDN || hdIf.statusByte == EINTRN || hdIf.statusByte == EFILNF) {		// if some other error, just return it
+	if(hdIf.statusByte == EPTHNF || hdIf.statusByte == ENHNDL || hdIf.statusByte == EACCDN || hdIf.statusByte == EINTRN || hdIf.statusByte == EFILNF) {		// if some other error, just return it
         return extendByteToDword(hdIf.statusByte);								    // but append lots of FFs to make negative integer out of it
 	}
 
