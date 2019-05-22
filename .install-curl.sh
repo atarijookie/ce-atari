@@ -1,6 +1,6 @@
 #! /bin/sh
 
-VERSION=7.59.0
+VERSION=7.65.0
 CURL="curl-${VERSION}"
 CURLARCHIVE="${CURL}.tar.bz2"
 URL="https://curl.haxx.se/download/${CURLARCHIVE}"
