@@ -7,13 +7,14 @@ V = 0
 CXX	    = g++
 CC	    = gcc
 #STRIP	= strip
-CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
+CPU_FLAGS   = -march=armv6 -mtune=arm1176jzf-s -mfpu=vfp -mfloat-abi=hard -marm
+CFLAGS	= -Wall -g -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE $(CPU_FLAGS)
 CXXFLAGS = $(CFLAGS)
 DEPFLAGS = -MM -MT $(patsubst %.d,%.o,$@) -MT $@
 # -M : with system headers, -MM : without
 
 VPATH = ./lib
-LDFLAGS	= -Llib
+LDFLAGS	= -Llib $(CPU_FLAGS)
 LDLIBS = -lrt -lanl -lpthread -lcurl -ldl -lutil
 
 ifeq ($(ONPC),yes)
