@@ -2,6 +2,7 @@
 #include <signal.h>
 #include <iostream>
 #include "../floppy/imagesilo.h"
+#include "../floppy/floppyencoder.h"
 #include "../utils.h"
 
 volatile sig_atomic_t sigintReceived = 0;
@@ -19,20 +20,18 @@ int test(const char * filename)
     std::string sEmpty;
     std::string sLocalFileWPath(filename);
     std::string sFile(filename);
-    std::cout << "floppyEncodingRunning " << pxImageSilo->getFloppyEncodingRunning() << std::endl;
+    //std::cout << "floppyEncodingRunning " << pxImageSilo->getFloppyEncodingRunning() << std::endl;
     std::cout << "containsImage(" << sFile << ")=" << pxImageSilo->containsImage(sFile.c_str()) << std::endl;
-    pxImageSilo->add(iSlot, sFile, sLocalFileWPath, sEmpty, sEmpty, true);
+    pxImageSilo->add(iSlot, sFile, sLocalFileWPath, sEmpty, true);
+    Utils::sleepMs(500);
     std::cout << "containsImage(" << sFile << ")=" << pxImageSilo->containsImage(sFile.c_str()) << std::endl;
-    do
-    {
-        std::cout << "floppyEncodingRunning " << pxImageSilo->getFloppyEncodingRunning() << std::endl;
-        if (pxImageSilo->getParams(tracks, sides, sectorsPerTrack))
-            std::cout << sides << " sides, " << tracks << " tracks of " << sectorsPerTrack << " sectors." << std::endl;
-        else
-            std::cout << "*** Failed to getParams() ***" << std::endl;
-        Utils::sleepMs(500);
-        std::cout << "containsImage(" << sFile << ")=" << pxImageSilo->containsImage(sFile.c_str()) << std::endl;
-    } while (pxImageSilo->getFloppyEncodingRunning());
+    //std::cout << "floppyEncodingRunning " << pxImageSilo->getFloppyEncodingRunning() << std::endl;
+    if (pxImageSilo->getParams(tracks, sides, sectorsPerTrack))
+        std::cout << sides << " sides, " << tracks << " tracks of " << sectorsPerTrack << " sectors." << std::endl;
+    else
+        std::cout << "*** Failed to getParams() ***" << std::endl;
+    Utils::sleepMs(500);
+    std::cout << "containsImage(" << sFile << ")=" << pxImageSilo->containsImage(sFile.c_str()) << std::endl;
     if (pxImageSilo->getParams(tracks, sides, sectorsPerTrack)) {
         int track, side;
         std::cout << sides << " sides, " << tracks << " tracks of " << sectorsPerTrack << " sectors." << std::endl;
@@ -76,7 +75,7 @@ int main(int argc, char * * argv)
         std::cout << "pthread_create error" << std::endl;
     r = test(image_filename);
     printf("Stoping floppy encoder thread\n");
-    ImageSilo::stop();
+    floppyEncoder_stop();
     pthread_join(floppyEncThreadInfo, NULL);            // wait until floppy encode thread finishes
 
     return r;

@@ -186,9 +186,10 @@ check:	tests
 tests:	$(TESTS_BINS)
 
 tests/floppytest:	$(OBJDIR)/tests/floppytest.o \
-	$(addprefix $(OBJDIR)/floppy/, $(patsubst %.cpp,%.o,floppyimage.cpp floppyimagemsa.cpp floppyimagest.cpp floppyimagefactory.cpp imagesilo.cpp mfmcachedimage.cpp msa.cpp)) \
+	$(addprefix $(OBJDIR)/floppy/, $(patsubst %.cpp,%.o,floppyencoder.cpp floppyimage.cpp floppyimagemsa.cpp floppyimagest.cpp floppyimagefactory.cpp imagesilo.cpp mfmcachedimage.cpp msa.cpp)) \
 	$(OBJDIR)/utils.o $(OBJDIR)/gpio.o $(OBJDIR)/settings.o $(OBJDIR)/settingsreloadproxy.o \
-	$(OBJDIR)/tests/test_debug.o
+	$(OBJDIR)/tests/test_debug.o \
+	$(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(wildcard display/*.cpp)))
 	$(CXX_LINK) $(CFLAGS) $^ $(LDFLAGS) -o $@ -lpthread #$(LDLIBS)
 
 clean:	depclean
