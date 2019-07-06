@@ -201,6 +201,7 @@ DWORD fread_big(WORD ceHandle, DWORD countNeeded, BYTE *buffer)
         } else {            // if reading to ST RAM, just read directly there
             res = readData(ceHandle, buffer, thisReadSizeBytes, seekOffset);
         }
+		seekOffset = 0;                                                 // seek offset must be reset by now!
 
 		countDone	    += res;											// update the bytes read variable
 		buffer		    += res;											// update the buffer pointer

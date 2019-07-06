@@ -1,8 +1,20 @@
 #!/bin/sh
 
-cat <<EOF | sudo apt-key add -
+SUDO=$(which sudo || echo "")
+if [ -z "$SUDO" ] ; then
+  echo "no sudo"
+else
+  echo "sudo: $SUDO"
+fi
+
+DISTRIB=$(awk 'NR==1{print $0}' /etc/issue)
+echo "DISTRIB=$DISTRIB"
+
+
+cat <<EOF | $SUDO apt-key add -
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 Version: GnuPG v1.4.10 (GNU/Linux)
+
 mQENBEvdU9gBCACzsGfqY8sucAudjQCzloQW4WJ8mUheNbJEqKkaxf4fZg5Y4D1k
 MiN+bMIoQiTODV23uVY9DIXIMxwp+mzAEI67H7meyJRn7wKeAxbEB0UNGXvf+szV
 epHbufXlHcQFieT4pciheQiab76hDbXARCOap160/YmDDc3UxZwxeF2qdQHvKEOB
@@ -34,7 +46,18 @@ EOF
 
 # Vincent Rivière's m68k-atari-mint cross-tools
 # http://vincent.riviere.free.fr/soft/m68k-atari-mint/ubuntu.php
-sudo add-apt-repository -y ppa:vriviere/ppa
+if echo "$DISTRIB" | grep Ubuntu ; then
+	$SUDO add-apt-repository -y ppa:vriviere/ppa
+else
+	# assume Debian/Stretch (9.x)
+	if [ -z "$SUDO" ] ; then
+		echo "deb http://vincent.riviere.free.fr/apt/ stretch contrib" >> /etc/apt/sources.list
+		echo "deb-src http://vincent.riviere.free.fr/apt/ stretch contrib" >> /etc/apt/sources.list
+	else
+		echo "deb http://vincent.riviere.free.fr/apt/ stretch contrib" | $SUDO tee -a /etc/apt/sources.list
+		echo "deb-src http://vincent.riviere.free.fr/apt/ stretch contrib" | $SUDO tee -a /etc/apt/sources.list
+	fi
+fi
 
-sudo apt-get update -ym
-sudo apt-get install -ym cross-mint-essential
+$SUDO apt-get update -ym
+$SUDO apt-get install -ym cross-mint-essential

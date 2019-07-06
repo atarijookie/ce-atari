@@ -571,7 +571,7 @@ int32_t custom_fcreate( void *sp )
 		CALL_OLD_GD( Fcreate, fileName, attr);
 	}
 
-	if(hdIf.statusByte == ENHNDL || hdIf.statusByte == EACCDN || hdIf.statusByte == EINTRN) {   // if some other error, just return it
+	if(hdIf.statusByte == EPTHNF || hdIf.statusByte == ENHNDL || hdIf.statusByte == EACCDN || hdIf.statusByte == EINTRN) {   // if some other error, just return it
         return extendByteToDword(hdIf.statusByte);									            // but append lots of FFs to make negative integer out of it
 	}
 
@@ -617,7 +617,7 @@ int32_t custom_fopen( void *sp )
 		CALL_OLD_GD( Fopen, fileName, mode);
 	}
 
-	if(hdIf.statusByte == ENHNDL || hdIf.statusByte == EACCDN || hdIf.statusByte == EINTRN || hdIf.statusByte == EFILNF) {		// if some other error, just return it
+	if(hdIf.statusByte == EPTHNF || hdIf.statusByte == ENHNDL || hdIf.statusByte == EACCDN || hdIf.statusByte == EINTRN || hdIf.statusByte == EFILNF) {		// if some other error, just return it
         return extendByteToDword(hdIf.statusByte);								    // but append lots of FFs to make negative integer out of it
 	}
 

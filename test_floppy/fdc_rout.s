@@ -4,7 +4,7 @@
 | https://github.com/ggnkua/Atari_ST_Sources/blob/master/ASM/Various/FDC_ROUT.S
 |
 | ------------------------------------------------------
-| Routines for handling FDC directly, not through Floprd() TOS function. 
+| Routines for handling FDC directly, not through Floprd() TOS function.
 
     .globl  _argFuncId
     .globl  _argDrive
@@ -16,7 +16,7 @@
     .globl  _argBufferPtr
     .globl  _argSuccess
     .globl  _fdcStatus
-    
+
     .globl  _runFdcAsm
 
     .globl  _seekRate
@@ -30,12 +30,12 @@ read        = 5   | read sector
 write       = 6   | write sector
 readid      = 7   | get ID fields ( NOT DONE )
 readtrk     = 8   | read track
-writetrk    = 9   | 
+writetrk    = 9   |
 
 | ------------------------------------------------------
     .text
 
-_runFdcAsm:    
+_runFdcAsm:
     movem.l d1-d7/a0-a6,-(sp)
 
     move.l  _argSector,d0       | sector
@@ -49,10 +49,10 @@ _runFdcAsm:
 
     bsr     RunFDC
     move.l  d7, _argSuccess | copy return code from D7 to global variable
-    
+
     movem.l (sp)+,d1-d7/a0-a6
     rts
-    
+
 | ------------------------------------------------------
 |  d0=sector
 |  d1=track
@@ -103,7 +103,7 @@ functiontable:
     dc.l    Write               | 6 - write sector
     dc.l    ReadID              | 7 - get ID fields ( NOT DONE )
     dc.l    ReadTrk             | 8 - read track
-    dc.l    WriteTrk            | 9  
+    dc.l    WriteTrk            | 9
 
 | ------------------------------------------------------
 |  d6 id used by wfeoc to signal a time out
@@ -113,7 +113,7 @@ Restore:
     clr.l   d6
     move.b  _seekRate,d6        | get seek rate
     or.b    #0,d6               | add command RESTORE (0) to seek rate (I know this is useless, this is just to make this more readable)
-    
+
     move    #0x80,(a2)          | select command register
     move    d6,(a1)             | do restore - with desired seek rate
     bsr     wfeoc               | wait for end of command
@@ -124,18 +124,18 @@ Seek:
     move    #0x86,(a2)          | select data register
     move    d1,(a1)             | write track to it
     move    (a2),stat
-    
+
     clr.l   d6
     move.b  _seekRate,d6        | get seek rate
     or.b    #0x10,d6            | add command SEEK (0x10) to seek rate
-    
+
     move    #0x80,(a2)          | select command register
     move    d6,(a1)             | perform seek - with desired seek rate
     bsr     wfeoc               | wait for end of command
     move.l  d6,d7
     rts
 | ------------------------------------------------------
-Step:   
+Step:
     move    #0x80,(a2)          | select command register
     move    #0x31,(a1)          | perform step
     bsr     wfeoc               | wait for end of command
@@ -172,7 +172,9 @@ Read:
     move    d5,(a1)             | set sector count
 
     move    #0x80,(a2)          | select command register
-    move    #0x80,(a1)          | read one sector
+
+#   move    #0x80,(a1)          | read one sector (m=0)
+    move    #0x90,(a1)          | read multiple sectors (m=1)
 
     bsr     wfeoc               | wait for end of command
     move.l  d6,d7
@@ -195,7 +197,9 @@ Write:
     move    d5,(a1)             | set sector count
 
     move    #0x180,(a2)         | select command register
-    move    #0xa0,(a1)          | write one sector
+
+#   move    #0xa0,(a1)          | write one sector (m=0)
+    move    #0xb0,(a1)          | write multiple sectors (m=1)
 
     bsr     wfeoc               | wait for end of command
     move.l  d6,d7

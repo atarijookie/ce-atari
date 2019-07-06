@@ -11,42 +11,19 @@
 #include "init.h"
 #include "floppyhelpers.h"
 #include "timers.h"
+#include "global_vars.h"
 
-extern WORD inIndexGet;
-extern SStreamed streamed;
+SPI_InitTypeDef spiStruct;
 
-extern TWriteBuffer wrBuffer[2];                                                    // two buffers for written sectors
-extern TWriteBuffer *wrNow;
-extern SStreamed streamed;
-extern WORD mfmReadStreamBuffer[16];                                                // 16 words - 16 mfm times. Half of buffer is 8 times - at least 32 us (8 * 4us),
-extern WORD mfmWriteStreamBuffer[16];
-extern WORD drive_select;
-extern volatile BYTE sendFwVersion, sendTrackRequest;
-extern WORD atnSendFwVersion        [ATN_SENDFWVERSION_LEN_TX];
-extern BYTE cmdBuffer               [ATN_SENDFWVERSION_LEN_RX * 2];
-extern WORD atnSendTrackRequest     [ATN_SENDTRACK_REQ_LEN_TX];
-extern BYTE readTrackData           [READTRACKDATA_SIZE];
-extern WORD inIndexGet;
-extern WORD fakeBuffer;
-extern WORD version[2];
-extern volatile BYTE spiDmaIsIdle;
-extern volatile BYTE spiDmaTXidle, spiDmaRXidle;                                    // flags set when the SPI DMA TX or RX is idle
-extern volatile TDrivePosition now, next, lastRequested, prev;
-extern volatile WORD lastRequestTime;
-
-extern BYTE driveId;
-extern BYTE driveEnabled;
-extern BYTE isDiskChanged;
-extern BYTE isWriteProtected;
-
-void spi_init(void)
+void spi_fillInitStruct(void)
 {
-    SPI_InitTypeDef spiStruct;
-
-    SPI_Cmd(SPI1, DISABLE);
-    
     SPI_StructInit(&spiStruct);
     spiStruct.SPI_DataSize = SPI_DataSize_16b;                                      // use 16b data size to lower the MCU load
+}
+
+void spi_init(void)     // init SPI -- you should call spi_fillInitStruct() once before this
+{
+    SPI_Cmd(SPI1, DISABLE);
     
     SPI_Init(SPI1, &spiStruct);
     SPI1->CR2 |= (1 << 7) | (1 << 6) | SPI_I2S_DMAReq_Tx | SPI_I2S_DMAReq_Rx;       // enable TXEIE, RXNEIE, TXDMAEN, RXDMAEN
@@ -82,6 +59,8 @@ void dma_mfmRead_init(void)
     DMA_Cmd(DMA1_Channel5, ENABLE);
 }
 
+// init DMA capturing for HW WRITE
+#ifndef SW_WRITE
 void dma_mfmWrite_init(void)
 {
     DMA_InitTypeDef DMA_InitStructure;
@@ -109,6 +88,7 @@ void dma_mfmWrite_init(void)
     // Enable DMA1 Channel6 transfer
     DMA_Cmd(DMA1_Channel6, ENABLE);
 }
+#endif
 
 void dma_spi_init(void)
 {
@@ -279,11 +259,15 @@ void init_hw_sw(void)
     timerSetup_index();
     
     timerSetup_mfmWrite();
+
+#ifndef SW_WRITE
+    // init DMA for HW WRITE
     dma_mfmWrite_init();
+#endif
 
     //--------------
     // DMA + SPI initialization
-    for(i=0; i<READTRACKDATA_SIZE; i++) {                           // fill the readTrackData with CMD_TRACK_STREAM_END_BYTE, which will tell that every byte is END OF STREAM (shouldn't read further)
+    for(i=0; i<READTRACKDATA_SIZE_WORDS; i++) {                           // fill the readTrackData with CMD_TRACK_STREAM_END_BYTE, which will tell that every byte is END OF STREAM (shouldn't read further)
         readTrackData[i] = CMD_TRACK_STREAM_END_BYTE;
     }
     
@@ -291,7 +275,8 @@ void init_hw_sw(void)
     spiDmaTXidle = TRUE;
     spiDmaRXidle = TRUE;
     
-    spi_init();                                                     // init SPI interface
+    spi_fillInitStruct();   // fill SPI init struct with wanted values
+    spi_init();             // init SPI interface
     dma_spi_init();
 
     //--------------
@@ -335,7 +320,7 @@ void init_hw_sw(void)
 void initUsarts(void)
 {
     USART_InitTypeDef usartStruct;
-    
+
     USART_Cmd(USART1, ENABLE);
     USART_Cmd(USART2, ENABLE);
     USART_Cmd(USART3, ENABLE);

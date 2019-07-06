@@ -335,8 +335,8 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>4</Optim>
-            <oTime>1</oTime>
+            <Optim>1</Optim>
+            <oTime>0</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>0</OneElfS>
             <Strict>0</Strict>
@@ -572,6 +572,26 @@
               <FileName>startup_stm32f10x_md.s</FileName>
               <FileType>2</FileType>
               <FilePath>.\startup_stm32f10x_md.s</FilePath>
+            </File>
+            <File>
+              <FileName>ikbd.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\ikbd.c</FilePath>
+            </File>
+            <File>
+              <FileName>floppy_write.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\floppy_write.c</FilePath>
+            </File>
+            <File>
+              <FileName>global_vars.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\global_vars.c</FilePath>
+            </File>
+            <File>
+              <FileName>global_vars.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\global_vars.h</FilePath>
             </File>
           </Files>
         </Group>

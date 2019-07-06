@@ -1,3 +1,4 @@
+// vim: shiftwidth=4 softtabstop=4 tabstop=4 expandtab
 #include <stdio.h>
 #include <string.h>
 
@@ -184,80 +185,91 @@ bool DirTranslator::buildGemdosFindstorageData(TFindStorage *fs, std::string hos
     
     Utils::splitFilenameFromPath(hostSearchPathAndWildcards, hostPath, searchString);
 
-	toUpperCaseString(searchString);
-	
-    // then build the found files list
-	DIR *dir = opendir(hostPath.c_str());							// try to open the dir
-	
-    if(dir == NULL) {                                 				// not found?
-        return false;
-    }
+    // here we handle the special case where the search string contains no wildcard but
+    // matches one particular file
+    // see https://github.com/atarijookie/ce-atari/issues/190
+    if (searchString.find('*') == std::string::npos && searchString.find('?') == std::string::npos) {
+        struct stat attr;
+        Debug::out(LOG_DEBUG, "DirTranslator::buildGemdosFindstorageData - no wildcard in %s, checking %s", searchString.c_str(), hostSearchPathAndWildcards.c_str());
+        if (stat(hostSearchPathAndWildcards.c_str(), &attr) == 0) {
+            appendFoundToFindStorage(hostPath, "*.*", fs, searchString.c_str(), S_ISDIR(attr.st_mode), findAttribs);
+        }
+    } else {
+        toUpperCaseString(searchString);
 
-    // initialize find storage in case anything goes bad
-    fs->clear();
+        // then build the found files list
+        DIR *dir = opendir(hostPath.c_str());							// try to open the dir
 
-    while(fs->count < fs->maxCount) {	        					// avoid buffer overflow
-		struct dirent *de = readdir(dir);							// read the next directory entry
-	
-		if(de == NULL) {											// no more entries?
-			break;
-		}
+        if(dir == NULL) {                                 				// not found?
+            Debug::out(LOG_DEBUG, "DirTranslator::buildGemdosFindstorageData - opendir(\"%s\") FAILED", hostPath.c_str());
+            return false;
+        }
 
-		if(de->d_type != DT_DIR && de->d_type != DT_REG) {			// not a file, not a directory?
-			Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
-			continue;
-		}
+        // initialize find storage in case anything goes bad
+        fs->clear();
 
-		std::string longFname = de->d_name;
+        while(fs->count < fs->maxCount) {        // avoid buffer overflow
+            struct dirent *de = readdir(dir);    // read the next directory entry
 
-        // special handling of '.' and '..'
-		if(longFname == "." || longFname == "..") {
-			if((isRootDir)||((findAttribs&FA_DIR)==0)) {    // for root dir or when no subdirs are requested (FA_DIR) - don't add '.' or '..'
+            if(de == NULL) {                     // no more entries?
+                break;
+            }
+
+            if(de->d_type != DT_DIR && de->d_type != DT_REG) {  // not a file, not a directory?
+                Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst -- skipped %s because the type %d is not supported!", de->d_name, de->d_type);
                 continue;
-            } else {                                        // for non-root dir                                       - must add '.' or '..' (TOS does this, and it makes the TOS dir copying work)
-                appendFoundToFindStorage_dirUpDirCurr(hostPath, searchString.c_str(), fs, de, findAttribs);
-                continue;
-            }            
-		}	
-		
-        // if ZIP directories are supported
-        if(useZipdirNotFile) {                                                  // if ZIP DIRs are enabled
-            if(de->d_type == DT_REG) {                                          // if it's a file
-                int len = strlen(de->d_name);                                   // get filename length
+            }
+
+            std::string longFname = de->d_name;
+
+            // special handling of '.' and '..'
+            if(longFname == "." || longFname == "..") {
+                if((isRootDir)||((findAttribs&FA_DIR)==0)) {    // for root dir or when no subdirs are requested (FA_DIR) - don't add '.' or '..'
+                    continue;
+                } else {                                        // for non-root dir                                       - must add '.' or '..' (TOS does this, and it makes the TOS dir copying work)
+                    appendFoundToFindStorage_dirUpDirCurr(hostPath, searchString.c_str(), fs, de, findAttribs);
+                    continue;
+                }
+            }
+
+            // if ZIP directories are supported
+            if(useZipdirNotFile) {                                                  // if ZIP DIRs are enabled
+                if(de->d_type == DT_REG) {                                          // if it's a file
+                    int len = strlen(de->d_name);                                   // get filename length
                 
-                if(len > 4) {                                                   // if filename is at least 5 chars long
-                    char *found = strcasestr(de->d_name + len - 4, ".ZIP");    // see if it ends with .ZIP
+                    if(len > 4) {                                                   // if filename is at least 5 chars long
+                        char *found = strcasestr(de->d_name + len - 4, ".ZIP");    // see if it ends with .ZIP
 
-                    if(found != NULL) {                                         // if filename ends with .ZIP
-                        std::string fullZipPath = hostPath + "/" + longFname;   // create full path to that zip file
+                        if(found != NULL) {                                         // if filename ends with .ZIP
+                            std::string fullZipPath = hostPath + "/" + longFname;   // create full path to that zip file
                     
-                        struct stat attr;
-                        int res = stat(fullZipPath.c_str(), &attr);    // get the status of the possible zip file
-
-                        if(res == 0) {                                          // if stat() succeeded
-                            if(attr.st_size <= MAX_ZIPDIR_ZIPFILE_SIZE) {       // file not too big? change flags from file to dir
-                                de->d_type = DT_DIR;
+                            struct stat attr;
+                            // get the status of the possible zip file
+                            if (stat(fullZipPath.c_str(), &attr) == 0) {            // if stat() succeeded
+                                if(attr.st_size <= MAX_ZIPDIR_ZIPFILE_SIZE) {       // file not too big? change flags from file to dir
+                                    de->d_type = DT_DIR;
+                                }
                             }
                         }
                     }
                 }
             }
+
+            // finally append to the find storage
+            appendFoundToFindStorage(hostPath, searchString.c_str(), fs, de, findAttribs);
         }
-        
-		// finnaly append to the find storage
-		appendFoundToFindStorage(hostPath, searchString.c_str(), fs, de, findAttribs);
+
+        closedir(dir);
     }
 
-	closedir(dir);
-    
     // now in the end merge found dirs and found files
     int dirsSize    = fsDirs.count  * 23;
     int filesSize   = fsFiles.count * 23;
-    
+
     memcpy(fs->buffer,              fsDirs.buffer,  dirsSize);          // copy to total find search - first the dirs
     memcpy(fs->buffer + dirsSize,   fsFiles.buffer, filesSize);         // copy to total find search - then the files
-    
-	return true;
+
+    return true;
 }
 
 void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs)
@@ -267,8 +279,6 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
     // TOS 1.04 searches with findAttribs set to 0x10, that's INCLUDE DIRs
 
     // first verify if the file attributes are OK
-	// TODO: do support for checking the READ ONLY flag on linux
-	bool isReadOnly = false;
 //    if((found->dwFileAttributes & FILE_ATTRIBUTE_READONLY)!=0   && (findAttribs & FA_READONLY)==0)  // is read only, but not searching for that
 //        return;
 
@@ -288,7 +298,13 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
 //    // this one is now disabled as on Win almost everything has archive bit set, and thus TOS didn't show any files
 //    if((found->dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)!=0    && (findAttribs & FA_ARCHIVE)==0)   // is archive, but not searching for that
 //        return;
+    appendFoundToFindStorage(hostPath, searchString, fs, de->d_name, isDir, findAttribs);
+}
 
+void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *searchString, TFindStorage *fs, const char *name, bool isDir, BYTE findAttribs)
+{
+    // TODO: do support for checking the READ ONLY flag on linux
+    bool isReadOnly = false;
     //--------
     // add this file
     TFindStorage *fsPart = isDir ? &fsDirs : &fsFiles;          // get the pointer to partial find storage to separate dirs from files when searching
@@ -299,10 +315,10 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
     BYTE atariAttribs;								            // convert host to atari attribs
     Utils::attributesHostToAtari(isReadOnly, isDir, atariAttribs);
 
-	if(de->d_name[0] == '.') atariAttribs |= FA_HIDDEN;		// enforce Mac/Unix convention of hidding files startings with '.'
+	if(name[0] == '.') atariAttribs |= FA_HIDDEN;		// enforce Mac/Unix convention of hidding files startings with '.'
 
 	std::string fullEntryPath 	= hostPath;
-	std::string longFname		= de->d_name;
+	std::string longFname		= name;
 	Utils::mergeHostPaths(fullEntryPath, longFname);
 	
 	int res;
@@ -313,7 +329,7 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
 	res = stat(fullEntryPath.c_str(), &attr);					// get the file status
 	
 	if(res != 0) {
-		Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- stat() failed, errno %d", errno);
+		Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- stat(%s) failed, errno %d", fullEntryPath.c_str(), errno);
 		return;		
 	}
 
@@ -328,14 +344,13 @@ void DirTranslator::appendFoundToFindStorage(std::string &hostPath, const char *
     WORD atariDate = Utils::fileTimeToAtariDate(timestr);
 
     // now convert the short 'FILE.C' to 'FILE    .C  '
-    char shortFnameExtended[14];
-    FilenameShortener::extendWithSpaces(shortFname.c_str(), shortFnameExtended);
+    //char shortFnameExtended[14];
+    //FilenameShortener::extendWithSpaces(shortFname.c_str(), shortFnameExtended);
 
     // check the current name against searchString using fnmatch
-	int ires = compareSearchStringAndFilename(searchString, shortFname.c_str());
-		
-	if(ires != 0) {     // not matching? quit
-		return;
+	if (compareSearchStringAndFilename(searchString, shortFname.c_str()) != 0) {
+		Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- %s - %s does not match pattern %s", fullEntryPath.c_str(), shortFname.c_str(), searchString);
+		return; // not matching? quit
 	}
 
 	// get MS-DOS VFAT attributes
@@ -464,6 +479,7 @@ void DirTranslator::toUpperCaseString(std::string &st)
 	}
 }
 
+/// Return 0 for a match, -1 for no match
 int DirTranslator::compareSearchStringAndFilename(const char *searchString, const char *filename)
 {
 	char ss1[16], ss2[16];

@@ -136,12 +136,11 @@ static void SetSysClockTo72(void)
   } while((HSEStatus == 0) && (StartUpCounter != HSE_STARTUP_TIMEOUT));
 
   if ((RCC->CR & RCC_CR_HSERDY) != RESET) {
-    HSEStatus = (uint32_t)0x01;
+    HSEStatus = 1;      // HSE started fine
   } else {
-    HSEStatus = (uint32_t)0x00;
-  }  
+    HSEStatus = 0;      // HSE failed to start
+  }
 
-  if (HSEStatus == (uint32_t)0x01) {
     /* Enable Prefetch Buffer */
     FLASH->ACR |= FLASH_ACR_PRFTBE;
 
@@ -149,19 +148,26 @@ static void SetSysClockTo72(void)
     FLASH->ACR &= (uint32_t)((uint32_t)~FLASH_ACR_LATENCY);
     FLASH->ACR |= (uint32_t)FLASH_ACR_LATENCY_2;    
 
- 
     /* HCLK = SYSCLK */
     RCC->CFGR |= (uint32_t)RCC_CFGR_HPRE_DIV1;
       
     /* PCLK2 = HCLK */
     RCC->CFGR |= (uint32_t)RCC_CFGR_PPRE2_DIV1;
-    
+
     /* PCLK1 = HCLK */
     RCC->CFGR |= (uint32_t)RCC_CFGR_PPRE1_DIV2;
 
-    /*  PLL configuration: PLLCLK = HSE * 9 = 72 MHz */
-    RCC->CFGR &= (uint32_t)((uint32_t)~(RCC_CFGR_PLLSRC | RCC_CFGR_PLLXTPRE | RCC_CFGR_PLLMULL));
-    RCC->CFGR |= (uint32_t)(RCC_CFGR_PLLSRC_HSE | RCC_CFGR_PLLMULL9);
+    if(HSEStatus) { // if HSE started fine, use HSE
+        /*  PLL configuration: PLLCLK = HSE * 9 = 72 MHz */
+        RCC->CFGR &= (uint32_t)((uint32_t)~(RCC_CFGR_PLLSRC | RCC_CFGR_PLLXTPRE | RCC_CFGR_PLLMULL));
+        RCC->CFGR |= (uint32_t)(RCC_CFGR_PLLSRC_HSE | RCC_CFGR_PLLMULL9);
+        // call SystemCoreClockUpdate() in main() to set the SystemCoreClock to right value - setting it here will get overwritten before entering main()
+    } else {        // if HSE failed to start, use HSI
+        /*  PLL configuration: PLLCLK = (HSI/2) * 16 = 64 MHz */
+        RCC->CFGR &= (uint32_t)((uint32_t)~(RCC_CFGR_PLLSRC | RCC_CFGR_PLLXTPRE | RCC_CFGR_PLLMULL));
+        RCC->CFGR |= (uint32_t)(RCC_CFGR_PLLSRC_HSI_Div2 | RCC_CFGR_PLLMULL16);
+        // call SystemCoreClockUpdate() in main() to set the SystemCoreClock to right value - setting it here will get overwritten before entering main()
+    }
 
     /* Enable PLL */
     RCC->CR |= RCC_CR_PLLON;
@@ -179,11 +185,6 @@ static void SetSysClockTo72(void)
     while ((RCC->CFGR & (uint32_t)RCC_CFGR_SWS) != (uint32_t)0x08)
     {
     }
-  }
-  else
-  { /* If HSE fails to start-up, the application will have wrong clock 
-         configuration. User can add here some code to deal with this error */
-  }
 }
 
 /******************* (C) COPYRIGHT 2011 STMicroelectronics *****END OF FILE****/

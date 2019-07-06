@@ -10,6 +10,9 @@
 
 extern pthread_mutex_t floppyEncoderMutex;
 
+#define DAM_MARK    0xfb
+#define ID_MARK     0xfe
+
 // crc16-ccitt generated table for fast CRC calculation
 const WORD crcTable[256] = {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
@@ -198,12 +201,25 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
     //-----
 
     memset(tracks[index].mfmStream, 0, MFM_STREAM_SIZE);    // initialize MFM stream
-    bfr = tracks[index].mfmStream;                          // move pointer to start of track buffer
-    bytesInBfr = 0;                             // no bytes in stream yet
+    currentStreamStart = tracks[index].mfmStream;   // where the stream starts
+
+    #define STREAM_TABLE_ITEMS  20
+    #define STREAM_TABLE_SIZE   (2 * STREAM_TABLE_ITEMS)
+
+    #define STREAM_TABLE_OFFSET 10              // the stream table in Franz starts at this offset, because first 5 words are empty (ATN + sizes + other)
+    #define STREAM_START_OFFSET (STREAM_TABLE_OFFSET + STREAM_TABLE_SIZE)
+
+    bfr = currentStreamStart + STREAM_TABLE_SIZE;   // where the MFM data will start (after initial table)
+    bytesInBfr = STREAM_TABLE_SIZE;             // no bytes in stream yet
+
+    for(int i=0; i<STREAM_TABLE_ITEMS; i++) {   // init the table for all sectors to start (if sector missing, will restart stream)
+        setRawWordAtIndex(i, STREAM_START_OFFSET);
+    }
 
     encodeSingleTrack(img, s, t, params.spt);   // encode single track
 
     tracks[index].bytesInStream = bytesInBfr;   // store the data count
+    setRawWordAtIndex(0, STREAM_TABLE_OFFSET + bytesInBfr);     // stream table - index 0: stream size in bytes (include those extra 5 empty WORDs on start in Franz)
 
     for(int i=0; i<MFM_STREAM_SIZE; i += 2) {   // swap bytes - Franz has other endiannes
         BYTE tmp                        = tracks[index].mfmStream[i + 0];
@@ -288,7 +304,9 @@ void MfmCachedImage::encodeSingleTrack(FloppyImage *img, int side, int track, in
     }
 
     for(int sect=1; sect <= sectorsPerTrack; sect++) {
-        encodeSingleSector(img, side, track, sect);        // then create the right MFM stream
+        setRawWordAtIndex(sect, bytesInBfr);            // stream table - index #sector: offset to this sector
+
+        encodeSingleSector(img, side, track, sect);     // then create the right MFM stream
 
         if(sigintReceived) {                            // app terminated? quit
             return;
@@ -365,7 +383,7 @@ bool MfmCachedImage::encodeSingleSector(FloppyImage *img, int side, int track, i
         appendA1MarkToStream();
     }
 
-    appendByteToStream( 0xfe );            // ID record
+    appendByteToStream( ID_MARK );            // ID record
     appendByteToStream( track );
     appendByteToStream( side );
     appendByteToStream( sector );
@@ -386,7 +404,7 @@ bool MfmCachedImage::encodeSingleSector(FloppyImage *img, int side, int track, i
         appendA1MarkToStream();
     }
 
-    appendByteToStream(0xfb);               // DAM mark
+    appendByteToStream(DAM_MARK);               // DAM mark
 
     for(i=0; i<512; i++) {                                  // data
         appendByteToStream(data[i]);
@@ -503,6 +521,13 @@ void MfmCachedImage::appendCurrentSectorCommand(int track, int side, int sector)
     appendRawByte(sector);
 }
 
+void MfmCachedImage::setRawWordAtIndex(int index, WORD val)
+{
+    WORD *pWord = (WORD *) currentStreamStart;  // get word pointer to start of current stream
+    pWord += index;                             // move pointer to the wanted offset (at index)
+    *pWord = val;                               // store the value
+}
+
 void MfmCachedImage::appendRawByte(BYTE val)
 {
     if(bytesInBfr < MFM_STREAM_SIZE) {  // still have some space in buffer? store value
@@ -584,10 +609,17 @@ void MfmCachedImage::handleDecodedByte(void)
 {
     decoder.bCount = 0;
 
-    if(decoder.byteOffset == 0 && decoder.dByte != 0xfb) {      // if DAM mark position, but wrong DAM mark?
-        decoder.done = true;
-        decoder.good = false;
-        Debug::out(LOG_ERROR, "MfmCachedImage::handleDecodedByte - wrong DAM mark: %02X", decoder.dByte);
+    if(decoder.byteOffset == 0) {                   // right after A1 sync bytes look for ID MARK or DAM MARK
+        if(decoder.dByte == ID_MARK) {              // if found ID mark, it's a FORMAT TRACK
+            decoder.done = true;
+            decoder.good = true;
+            decoder.isFormatTrack = true;           // the track if being formatted
+            Debug::out(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - found ID MARK, assuming track format");
+        } else if(decoder.dByte != DAM_MARK) {      // not ID mark (FORMAT TRACK) and not DAM mark (SECTOR WRITE)? fail
+            decoder.done = true;
+            decoder.good = false;
+            Debug::out(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - wrong DAM mark: %02X", decoder.dByte);
+        }
     }
 
     if(decoder.byteOffset >= 1 && decoder.byteOffset <= 512) {  // if we're in the data offset, store data in buffer
@@ -610,12 +642,28 @@ void MfmCachedImage::handleDecodedByte(void)
         decoder.done = true;            // received CRC? nothing more to be done
         decoder.good = (decoder.calcedCrc == decoder.recvedCrc);    // everything good when received and calced crc are th same
 
+        // known issue handling - in some cases the received CRC is different from calculated CRC by 1, but the data is still valid (tested with write-read test on ST)
+        // so in this case we pretend that the CRC is fine...
+        if((decoder.recvedCrc - decoder.calcedCrc) == 1) {
+            Debug::out(LOG_DEBUG, "MfmCachedImage::handleDecodedByte - CRC is off by 1, faking good CRC");
+            decoder.good = true;
+        }
+
         int logLevel = decoder.good ? LOG_DEBUG : LOG_ERROR;        // if good then show only on debug log level; if bad then show on error log level
         Debug::out(logLevel, "MfmCachedImage::handleDecodedByte - received CRC: %02x, calculated CRC: %02x, good: %d", decoder.recvedCrc, decoder.calcedCrc, decoder.good);
-        //Debug::outBfr(decoder.oBfr - 512, 512);
+
+// uncomment following lines for dumping decoded data to log on error - for manual data inspection
+//      if(!decoder.good) {
+//          Debug::outBfr(decoder.oBfr - 512, 512);
+//      }
     }
 
     decoder.byteOffset++;
+}
+
+bool MfmCachedImage::lastBufferWasFormatTrack(void)
+{
+    return decoder.isFormatTrack;   // return last state of this flag to tell called if it was sector write or track format
 }
 
 bool MfmCachedImage::decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr)
@@ -628,6 +676,7 @@ bool MfmCachedImage::decodeMfmBuffer(BYTE *inBfr, int inCnt, BYTE *outBfr)
     decoder.oBfr = outBfr;          // where the output data will be stored
     decoder.done = false;           // we're not done yet
     decoder.good = true;            // status returned to caller
+    decoder.isFormatTrack = false;  // this will be set if the decoded data seem to be format track stream
 
     // first loop - find 3x A1 sync symbols
     BYTE time;
