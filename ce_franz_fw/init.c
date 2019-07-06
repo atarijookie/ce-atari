@@ -232,7 +232,7 @@ void init_hw_sw(void)
 
     GPIOB->CRL &= ~(0xf0000f00);                                    // remove bits from GPIOB for GPIOB2 and GPIOB7
     GPIOB->CRL |=   0x80000800;                                     // set GPIOB as --- CNF1:0 -- 10 (pull up/down input), MODE1:0 -- 00 (input)
-    GPIOB->BSRR = DIR | WGATE;                         				// set DIR, WGATE to 1 in ODR == pull up
+    GPIOB->BSRR = DIR | WGATE;                                      // set DIR, WGATE to 1 in ODR == pull up
 
     driveId         = 0;
     driveEnabled    = TRUE;
@@ -335,7 +335,7 @@ void init_hw_sw(void)
 void initUsarts(void)
 {
     USART_InitTypeDef usartStruct;
-	
+    
     USART_Cmd(USART1, ENABLE);
     USART_Cmd(USART2, ENABLE);
     USART_Cmd(USART3, ENABLE);

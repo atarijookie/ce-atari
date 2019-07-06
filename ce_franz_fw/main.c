@@ -958,54 +958,54 @@ void USART3_IRQHandler(void)                                            // USART
 
 void circularInit(volatile TCircBuffer *cb)
 {
-	BYTE i;
+    BYTE i;
 
-	// set vars to zero
-	cb->addPos = 0;
-	cb->getPos = 0;
-	cb->count = 0;
+    // set vars to zero
+    cb->addPos = 0;
+    cb->getPos = 0;
+    cb->count = 0;
 
-	// fill data with zeros
-	for(i=0; i<CIRCBUFFER_SIZE; i++) {
-		cb->data[i] = 0;
-	}
+    // fill data with zeros
+    for(i=0; i<CIRCBUFFER_SIZE; i++) {
+        cb->data[i] = 0;
+    }
 }
 
 void cicrularAdd(volatile TCircBuffer *cb, BYTE val)
 {
-	// if buffer full, fail
-	if(cb->count >= CIRCBUFFER_SIZE) {
+    // if buffer full, fail
+    if(cb->count >= CIRCBUFFER_SIZE) {
         return;
-	}
+    }
     cb->count++;
 
-	// store data at the right position
-	cb->data[ cb->addPos ] = val;
+    // store data at the right position
+    cb->data[ cb->addPos ] = val;
 
-	// increment and fix the add position
-	cb->addPos++;
-	cb->addPos = cb->addPos & CIRCBUFFER_POSMASK;
+    // increment and fix the add position
+    cb->addPos++;
+    cb->addPos = cb->addPos & CIRCBUFFER_POSMASK;
 }
 
 BYTE cicrularGet(volatile TCircBuffer *cb)
 {
-	BYTE val;
+    BYTE val;
 
-	// if buffer empty, fail
-	if(cb->count == 0) {
-		return 0;
-	}
+    // if buffer empty, fail
+    if(cb->count == 0) {
+        return 0;
+    }
     cb->count--;
 
-	// buffer not empty, get data
-	val = cb->data[ cb->getPos ];
+    // buffer not empty, get data
+    val = cb->data[ cb->getPos ];
 
-	// increment and fix the get position
-	cb->getPos++;
-	cb->getPos = cb->getPos & CIRCBUFFER_POSMASK;
+    // increment and fix the get position
+    cb->getPos++;
+    cb->getPos = cb->getPos & CIRCBUFFER_POSMASK;
 
-	// return value from buffer
-	return val;
+    // return value from buffer
+    return val;
 }
 
 void setupDriveSelect(void)
