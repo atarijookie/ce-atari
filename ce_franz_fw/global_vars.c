@@ -42,7 +42,7 @@ BYTE isWriteProtected;
 
 WORD trackStreamedCount = 0;
 
-volatile TCircBuffer buff0, buff1;
+TCircBuffer buff0, buff1;
 
 TOutputFlags outFlags;
 

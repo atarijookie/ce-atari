@@ -32,14 +32,14 @@ typedef struct {
 } SStreamed;
 
 #define CIRCBUFFER_SIZE        64
-#define CIRCBUFFER_POSMASK    0x3f
 
 typedef struct {
-    BYTE addPos;
-    BYTE getPos;
-    BYTE count;
+    volatile BYTE count;    // count of data stored
 
-    BYTE data[CIRCBUFFER_SIZE];
+    volatile BYTE *pAdd;    // pointer where data will be stored
+    volatile BYTE *pGet;    // pointer from where data will be get
+
+    volatile BYTE data[CIRCBUFFER_SIZE];
 } TCircBuffer;
 
 typedef struct {

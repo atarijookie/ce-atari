@@ -5,8 +5,8 @@
 #include "main.h"
 #include "global_vars.h"
 
-void circularInit(volatile TCircBuffer *cb);
-void cicrularAdd(volatile TCircBuffer *cb, BYTE val);
-BYTE cicrularGet(volatile TCircBuffer *cb);
+void circularInit(TCircBuffer *cb);
+void cicrularAdd(TCircBuffer *cb, BYTE val);
+BYTE cicrularGet(TCircBuffer *cb);
 
 #endif

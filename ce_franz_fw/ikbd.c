@@ -31,12 +31,26 @@
 // ST keyb talks to IKBD - through buff0
 //
 // --------------------------------------------------
-
 void USART1_IRQHandler(void)                                            // USART1 is connected to RPi
 {
     if((USART1->SR & USART_FLAG_RXNE) != 0) {                           // if something received
         BYTE val = USART1->DR;                                          // read received value
-        cicrularAdd(&buff0, val);                                       // add to buffer
+
+        if(buff0.count > 0 || (USART2->SR & USART_FLAG_TXE) == 0) {     // got data in buffer or usart2 can't TX right now?
+            cicrularAdd(&buff0, val);                                   // add to buffer
+            USART2->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
+        } else {                                                        // if no data in buffer and usart2 can TX
+            USART2->DR = val;                                           // send it to USART2
+        }
+    }
+
+    if((USART1->SR & USART_FLAG_TXE) != 0) {                            // if can TX
+        if(buff1.count > 0) {                                           // and there is something to TX
+            BYTE val = cicrularGet(&buff1);
+            USART1->DR = val;
+        } else {                                                        // and there's nothing to TX
+            USART1->CR1 &= ~USART_FLAG_TXE;                             // disable interrupt on USART2 TXE
+        }
     }
 }
 
@@ -46,8 +60,25 @@ void USART2_IRQHandler(void)                                            // USART
         BYTE val = USART2->DR;                                          // read received value
 
         if(hostIsUp) {                                                  // RPi is up - buffered send to RPi
-            cicrularAdd(&buff1, UARTMARK_STCMD);                        // add to buffer - MARK
+            if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart1 can't TX right now?
+                cicrularAdd(&buff1, UARTMARK_STCMD);                    // add to buffer - MARK
+            } else {                                                    // if no data in buffer and usart2 can TX
+                USART1->DR = UARTMARK_STCMD;                            // send to USART1 - MARK
+            }
+
             cicrularAdd(&buff1, val);                                   // add to buffer - DATA
+            USART1->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
+        } else {                                                        // if RPi is not up, something received from ST?
+            // nothing to do, data should automatically continue to ST keyboard
+        }
+    }
+
+    if((USART2->SR & USART_FLAG_TXE) != 0) {                            // if can TX
+        if(buff0.count > 0) {                                           // and there is something to TX
+            BYTE val = cicrularGet(&buff0);
+            USART2->DR = val;
+        } else {                                                        // and there's nothing to TX
+            USART2->CR1 &= ~USART_FLAG_TXE;                             // disable interrupt on USART2 TXE
         }
     }
 }
@@ -58,22 +89,33 @@ void USART3_IRQHandler(void)                                            // USART
         BYTE val = USART3->DR;                                          // read received value
 
         if(hostIsUp) {                                                  // RPi is up - buffered send to RPi
-            cicrularAdd(&buff1, UARTMARK_KEYBDATA);                     // add to buffer - MARK
+            if(buff1.count > 0 || (USART1->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart1 can't TX right now?
+                cicrularAdd(&buff1, UARTMARK_KEYBDATA);                 // add to buffer - MARK
+            } else {                                                    // if no data in buffer and usart2 can TX
+                USART1->DR = UARTMARK_KEYBDATA;                         // send to USART1 - MARK
+            }
+
             cicrularAdd(&buff1, val);                                   // add to buffer - DATA
+            USART1->CR1 |= USART_FLAG_TXE;                              // enable interrupt on USART TXE
         } else {                                                        // if RPi is not up - send it to IKBD (through buffer or immediatelly)
-            cicrularAdd(&buff0, val);                                   // add to buffer
+            if(buff0.count > 0 || (USART2->SR & USART_FLAG_TXE) == 0) { // got data in buffer or usart2 can't TX right now?
+                cicrularAdd(&buff0, val);                               // add to buffer
+                USART2->CR1 |= USART_FLAG_TXE;                          // enable interrupt on USART TXE
+            } else {                                                    // if no data in buffer and usart2 can TX
+                USART2->DR = val;                                       // send it to USART2
+            }
         }
     }
 }
 
-void circularInit(volatile TCircBuffer *cb)
+void circularInit(TCircBuffer *cb)
 {
     BYTE i;
 
-    // set vars to zero
-    cb->addPos = 0;
-    cb->getPos = 0;
-    cb->count = 0;
+    cb->count = 0;              // buffer now empty
+
+    cb->pAdd = &cb->data[0];    // 'add' pointer on start
+    cb->pGet = &cb->data[0];    // 'get' pointer on start
 
     // fill data with zeros
     for(i=0; i<CIRCBUFFER_SIZE; i++) {
@@ -81,38 +123,34 @@ void circularInit(volatile TCircBuffer *cb)
     }
 }
 
-void cicrularAdd(volatile TCircBuffer *cb, BYTE val)
+__attribute__( ( always_inline ) ) void cicrularAdd(TCircBuffer *cb, BYTE val)
 {
-    // if buffer full, fail
-    if(cb->count >= CIRCBUFFER_SIZE) {
-        return;
-    }
+    // intentionally removed check of cb->count, as full buffer will fail by not storing (with check) or with overwrite (without check)
     cb->count++;
 
     // store data at the right position
-    cb->data[ cb->addPos ] = val;
+    *cb->pAdd = val;
+    cb->pAdd++;
 
-    // increment and fix the add position
-    cb->addPos++;
-    cb->addPos = cb->addPos & CIRCBUFFER_POSMASK;
+    if(cb->pAdd >= &cb->data[CIRCBUFFER_SIZE]) {    // if reached end of buffer
+        cb->pAdd = &cb->data[0];                    // go to start of buffer
+    }
 }
 
-BYTE cicrularGet(volatile TCircBuffer *cb)
+__attribute__( ( always_inline ) ) BYTE cicrularGet(TCircBuffer *cb)
 {
     BYTE val;
 
-    // if buffer empty, fail
-    if(cb->count == 0) {
-        return 0;
-    }
+    // intentionally removed check of cb->count, as that is checked where circularGet() is used
     cb->count--;
 
     // buffer not empty, get data
-    val = cb->data[ cb->getPos ];
+    val = *cb->pGet;
+    cb->pGet++;
 
-    // increment and fix the get position
-    cb->getPos++;
-    cb->getPos = cb->getPos & CIRCBUFFER_POSMASK;
+    if(cb->pGet >= &cb->data[CIRCBUFFER_SIZE]) {    // if reached end of buffer
+        cb->pGet = &cb->data[0];                    // go to start of buffer
+    }
 
     // return value from buffer
     return val;

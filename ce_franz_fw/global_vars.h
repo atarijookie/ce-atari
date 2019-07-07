@@ -49,7 +49,7 @@ extern BYTE isWriteProtected;
 
 extern WORD trackStreamedCount;
 
-extern volatile TCircBuffer buff0, buff1;
+extern TCircBuffer buff0, buff1;
 
 extern TOutputFlags outFlags;
 
