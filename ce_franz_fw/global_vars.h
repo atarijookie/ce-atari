@@ -10,7 +10,9 @@ extern SStreamed streamed;
 
 extern WORD mfmReadStreamBuffer[16];                           // 16 words - 16 mfm times. Half of buffer is 8 times - at least 32 us (8 * 4us),
 
-extern WORD mfmWriteStreamBuffer[16];
+#define MFM_WRITE_STREAM_SIZE           64
+#define MFM_WRITE_STREAM_SIZE_HALF      (MFM_WRITE_STREAM_SIZE / 2)
+extern WORD mfmWriteStreamBuffer[MFM_WRITE_STREAM_SIZE];
 
 extern WORD version[2];
 extern WORD drive_select;

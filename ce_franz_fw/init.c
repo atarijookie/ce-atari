@@ -71,7 +71,7 @@ void dma_mfmWrite_init(void)
     DMA_InitStructure.DMA_PeripheralBaseAddr  = (uint32_t) &(TIM3->DMAR);           // from this peripheral address
     DMA_InitStructure.DMA_MemoryBaseAddr      = (uint32_t) mfmWriteStreamBuffer;    // to this buffer located in memory
     DMA_InitStructure.DMA_DIR                 = DMA_DIR_PeripheralSRC;              // dir: from periph to mem
-    DMA_InitStructure.DMA_BufferSize          = 16;                                 // 16 datas to transfer
+    DMA_InitStructure.DMA_BufferSize          = MFM_WRITE_STREAM_SIZE;              // size of whole buffer
     DMA_InitStructure.DMA_PeripheralInc       = DMA_PeripheralInc_Disable;          // PINC = 0 -- don't icrement, always read from DMAR register
     DMA_InitStructure.DMA_MemoryInc           = DMA_MemoryInc_Enable;               // MINC = 1 -- increment in memory -- go though buffer
     DMA_InitStructure.DMA_PeripheralDataSize  = DMA_PeripheralDataSize_HalfWord;    // each data item: 16 bits 

@@ -1,5 +1,6 @@
 #include "defs.h"
 #include "main.h"
+#include "global_vars.h"
 
 TWriteBuffer wrBuffer[2];                           // two buffers for written sectors
 TWriteBuffer *wrNow;
@@ -8,7 +9,7 @@ SStreamed streamed;
 
 WORD mfmReadStreamBuffer[16];                           // 16 words - 16 mfm times. Half of buffer is 8 times - at least 32 us (8 * 4us),
 
-WORD mfmWriteStreamBuffer[16];
+WORD mfmWriteStreamBuffer[MFM_WRITE_STREAM_SIZE];
 
 WORD version[2] = {0xf018, 0x1205};             // this means: Franz, 2018-12-05
 WORD drive_select;

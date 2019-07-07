@@ -164,22 +164,84 @@ void handleFloppyWrite(void)
     moveReadIndexToNextSector();
 }
 #else
+
+WORD *pWriteNow, *pWriteEnd;
+
+__attribute__( ( always_inline ) ) void processMfmWriteBuffer(DWORD DMA1_ISR, BYTE flushRest)
+{
+    WORD i, wval;
+    WORD *pMfmWriteStreamBuffer;
+    static WORD start = 0;      // where we will start processing buffer. Also holds last position where we started to process (for flushRest)
+    static WORD prevTime = 0;   // previous capture time for calculating duration
+    static WORD times = 0, timesCount = 0;
+    register WORD newTime, duration;
+
+    if(flushRest) {     // flushRest processing - start position is the opposite of previous start position (if 0 then half, if half then 0)
+        start = (start == 0) ? MFM_WRITE_STREAM_SIZE_HALF : 0;
+    } else {            // normal processing - find out start position based on the supplied TC flags
+        start = (DMA1_ISR & DMA1_IT_HT6) ? 0 : MFM_WRITE_STREAM_SIZE_HALF;   // HT is words 0..half, TC is words half..end
+    }
+
+    // using pointer to write buffer is faster than using index (twice):
+    // duration + prevTime using index: 2.75 us, the same using pointer: 1.62 us, the same using pointer acces only once: 1.25 us
+    // whole loop: 3.51 us on 4 us pulse without storing, 3.87 us on 8 us pulse without storing, aditional 0.62 us us for storing
+    pMfmWriteStreamBuffer = &mfmWriteStreamBuffer[start];
+
+    for(i=0; i<MFM_WRITE_STREAM_SIZE_HALF; i++) {   // go through the stored values (first half or second half), calculate duration
+        wval     = *pMfmWriteStreamBuffer;
+        duration = wval - prevTime;
+        prevTime = wval;
+        pMfmWriteStreamBuffer++;
+
+        newTime = 0;                        // convert timer time to pulse duration enum
+
+        if(duration < 36) {                 // 4 us?
+            newTime = MFM_4US;
+        } else if(duration < 50) {          // 6 us?
+            newTime = MFM_6US;
+        } else if(duration < 65) {          // 8 us?
+            newTime = MFM_8US;
+        }
+
+        if(!newTime) {                      // don't have valid new time? skip rest
+            continue;
+        }
+
+        times = times << 2;
+        times |= newTime;                   // append new time
+
+        timesCount++;
+
+        // the following storing takes 0.62 us (was 7.5 us using the wrBuffer_add() macro)
+        if(timesCount >= 8) {               // if already got 8 times stored
+            timesCount = 0;
+
+            *pWriteNow = times;             // add to write buffer
+            pWriteNow++;
+
+            if(pWriteNow >= pWriteEnd) {    // no more space in write buffer, send it to host
+                break;
+            }
+        }
+    }
+
+    if(flushRest) {             // if writing finished and should flush the rest
+        if(timesCount > 0) {        // if there was something captured but not stored at the end
+            *pWriteNow = times;     // add to write buffer
+            pWriteNow++;
+        }
+    }
+}
+
 void handleFloppyWrite(void)
 {
     WORD inputs = GPIOB->IDR;
-    WORD times = 0, timesCount = 0;
     WORD wval;
-    register WORD newTime, duration;
-    WORD *pWriteNow, *pWriteEnd;
-
-    DWORD dval;
-    WORD i, start;
-    register WORD prevTime = 0;
-    WORD *pMfmWriteStreamBuffer;
+    DWORD DMA1_ISR;
 
     DMA1->IFCR = DMA1_IT_HT6 | DMA1_IT_TC6; // clear HT & TC flags
 
-    TIM3->CNT = 0;                  // initialize pulse width counter
+    TIM3->CNT = 0;                  // this might be wrong: initialize pulse width counter
 
     wrNow->readyToSend = FALSE;     // mark this buffer as not ready to be sent yet
     wrNow->count = 4;               // at the start we already have 4 WORDs in buffer - SYNC, ATN code, TX len, RX len
@@ -206,71 +268,29 @@ void handleFloppyWrite(void)
             break;
         }
 
-        if(pWriteNow >= pWriteEnd) {            // no more space in write buffer, send it to host
+        if(pWriteNow >= pWriteEnd) {                    // no more space in write buffer, send it to host
             break;
         }
 
         // hardware WRITE capturing
         // check for half transfer or transfer complete IF
-        dval = DMA1->ISR & (DMA1_IT_HT6 | DMA1_IT_TC6);     // get only Half-Transfer and Transfer-Complete flags
-        if(!dval) {     // no HT and TC flag set, try again later
+        DMA1_ISR = DMA1->ISR & (DMA1_IT_HT6 | DMA1_IT_TC6);     // get only Half-Transfer and Transfer-Complete flags
+
+        if(!DMA1_ISR) {                                 // no HT and TC flag set, try again later
             continue;
         }
-        DMA1->IFCR = DMA1_IT_HT6 | DMA1_IT_TC6; // clear HTIF6 flags
 
-        start = (dval & DMA1_IT_HT6) ? 0 : 8;   // HT is words 0..7, TC is words 8..15
+        DMA1->IFCR = DMA1_IT_HT6 | DMA1_IT_TC6;         // clear HTIF6 flags
 
-        // using pointer to write buffer is faster than using index (twice):
-        // duration + prevTime using index: 2.75 us, the same using pointer: 1.62 us, the sae using pointer acces only once: 1.25 us
-        // whole loop: 3.51 us on 4 us pulse without storing, 3.87 us on 8 us pulse without storing, aditional 0.62 us us for storing
-        pMfmWriteStreamBuffer = &mfmWriteStreamBuffer[start];
-
-        for(i=0; i<8; i++) {             // go through the stored values (either 0-7 or 8-15), calculate duration
-            wval     = *pMfmWriteStreamBuffer;
-            duration = wval - prevTime;
-            prevTime = wval;
-            pMfmWriteStreamBuffer++;
-
-            newTime = 0;                // convert timer time to pulse duration enum
-
-            if(duration < 36) {         // 4 us?
-                newTime = MFM_4US;
-            } else if(duration < 50) {  // 6 us?
-                newTime = MFM_6US;
-            } else if(duration < 65) {  // 8 us?
-                newTime = MFM_8US;
-            }
-
-            if(!newTime) {              // don't have valid new time? skip rest
-                continue;
-            }
-
-            times = times << 2;
-            times |= newTime;           // append new time
-
-            timesCount++;
-
-            // the following storing takes 0.62 us (was 7.5 us using the wrBuffer_add() macro)
-            if(timesCount >= 8) {       // if already got 8 times stored
-                timesCount = 0;
-
-                *pWriteNow = times;     // add to write buffer
-                pWriteNow++;
-            }
-        }
+        processMfmWriteBuffer(DMA1_ISR, FALSE);         // process half buffer, don't flush rest
     }
 
-    // writing finished
-    if(timesCount > 0) {        // if there was something captured but not stored at the end
-        *pWriteNow = times;     // add to write buffer
-        pWriteNow++;
-    }
+    processMfmWriteBuffer(0, TRUE);                     // process remaining half buffer, flush rest
 
     *pWriteNow = 0;             // last word: 0
     pWriteNow++;
 
     wrNow->count = (pWriteNow - wrNow->buffer);         // calculate how many words we got in write buffer (pointer subtraction gives the number of elements between the two pointers)
-
     wrNow->readyToSend = TRUE;                          // mark this buffer as ready to be sent
 
     moveReadIndexToNextSector();
