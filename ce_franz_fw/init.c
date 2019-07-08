@@ -86,7 +86,7 @@ void dma_mfmWrite_init(void)
     DMA_ITConfig(DMA1_Channel6, DMA_IT_TC, ENABLE);                                 // interrupt on Transfer Complete (TC)
 
     // Enable DMA1 Channel6 transfer
-    DMA_Cmd(DMA1_Channel6, ENABLE);
+    //DMA_Cmd(DMA1_Channel6, ENABLE);
 }
 #endif
 

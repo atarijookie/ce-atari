@@ -195,16 +195,16 @@ __attribute__( ( always_inline ) ) void processMfmWriteBuffer(DWORD DMA1_ISR, BY
 
         newTime = 0;                        // convert timer time to pulse duration enum
 
-        if(duration < 36) {                 // 4 us?
-            newTime = MFM_4US;
-        } else if(duration < 50) {          // 6 us?
-            newTime = MFM_6US;
-        } else if(duration < 65) {          // 8 us?
-            newTime = MFM_8US;
+        if(duration < 8 || duration >= 72) {    // too short (< 1.0 us) or too long (8.75 us)? ignore
+            continue;
         }
 
-        if(!newTime) {                      // don't have valid new time? skip rest
-            continue;
+        if(duration < 39) {         // 4 us? (usualy 3.5 - 4.0 us -- 28-32 ticks)
+            newTime = MFM_4US;
+        } else if(duration < 57) {  // 6 us? (usualy 5.8 - 6.4 us -- 47-51 ticks)
+            newTime = MFM_6US;
+        } else if(duration < 72) {  // 8 us? (usualy 7.8 - 8.4 us -- 63-67 ticks)
+            newTime = MFM_8US;
         }
 
         times = times << 2;
@@ -241,7 +241,9 @@ void handleFloppyWrite(void)
 
     DMA1->IFCR = DMA1_IT_HT6 | DMA1_IT_TC6; // clear HT & TC flags
 
-    TIM3->CNT = 0;                  // this might be wrong: initialize pulse width counter
+    TIM3->CNT = 0;                                  // initialize pulse width capturer
+    DMA1_Channel6->CNDTR = MFM_WRITE_STREAM_SIZE;   // set CNDTR back to original full value so it would start storing data at start of buffer
+    DMA_Cmd(DMA1_Channel6, ENABLE);                 // enable DMA
 
     wrNow->readyToSend = FALSE;     // mark this buffer as not ready to be sent yet
     wrNow->count = 4;               // at the start we already have 4 WORDs in buffer - SYNC, ATN code, TX len, RX len
@@ -272,7 +274,6 @@ void handleFloppyWrite(void)
             break;
         }
 
-        // hardware WRITE capturing
         // check for half transfer or transfer complete IF
         DMA1_ISR = DMA1->ISR & (DMA1_IT_HT6 | DMA1_IT_TC6);     // get only Half-Transfer and Transfer-Complete flags
 
@@ -286,6 +287,8 @@ void handleFloppyWrite(void)
     }
 
     processMfmWriteBuffer(0, TRUE);                     // process remaining half buffer, flush rest
+
+    DMA_Cmd(DMA1_Channel6, DISABLE);                    // disable DMA
 
     *pWriteNow = 0;             // last word: 0
     pWriteNow++;
