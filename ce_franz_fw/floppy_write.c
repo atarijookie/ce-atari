@@ -30,7 +30,8 @@ void moveReadIndexToNextSector(void)
 }
 
 // The SW_WRITE is defined in main.h, where it also enables/disabled HW capturing DMA
-// The HW WRITE doesn't work (misses few bits / bytes), but still is here for possible future usage / improvements
+// The SW_WRITE can't handle IKBD UARTs and WRITE at the same time, but it's kept here for now.
+// Use HW WRITE (that means comment out SW_WRITE in main.h)
 
 #ifdef SW_WRITE
 void handleFloppyWrite(void)
@@ -58,8 +59,6 @@ void handleFloppyWrite(void)
     #define PULSE_6US       52
     #define PULSE_8US       72
 #endif
-
-    __disable_irq();                // disable interrupts
 
     TIM3->CNT = 0;                  // initialize pulse width counter
 
@@ -146,8 +145,6 @@ void handleFloppyWrite(void)
         }
     }
 
-    __enable_irq();                // enable interrupts
-
     // writing finished
     if(timesCount > 0) {        // if there was something captured but not stored at the end
         *pWriteNow = times;     // add to write buffer
@@ -163,7 +160,11 @@ void handleFloppyWrite(void)
 
     moveReadIndexToNextSector();
 }
-#else
+#else       // if not SW_WRITE (thus it's HW WRITE)
+
+// HW floppy write capturing
+// TIM3_CH1 captures the time when pulse happened, this value is transfered to cyclic buffer using DMA1_CH6.
+// This loads off the MCU enough to manage writted data to be OK and to be able to transfer IKDB UARTs during the free time.
 
 WORD *pWriteNow, *pWriteEnd;
 

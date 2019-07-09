@@ -88,7 +88,7 @@ void timerSetup_mfmWrite(void)
     uint16_t PrescalerValue = (uint16_t) (SystemCoreClock / 8000000) - 1;   // prescale to 8 MHz - 1 tick is 0.125 us
 
     // Time base configuration
-    TIM_TimeBaseStructure.TIM_Period            = 0xff;                     // never let it go to 0xffff
+    TIM_TimeBaseStructure.TIM_Period            = 0xffff;
     TIM_TimeBaseStructure.TIM_Prescaler         = PrescalerValue;           // prescale to 8 MHz
     TIM_TimeBaseStructure.TIM_ClockDivision     = 0;
     TIM_TimeBaseStructure.TIM_CounterMode       = TIM_CounterMode_Up;
