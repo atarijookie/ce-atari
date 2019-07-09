@@ -1,7 +1,8 @@
 #ifndef _MAIN_H_
 #define _MAIN_H_
 
-// for usage of SW WRITE capturing have a SW_WRITE defined. HW WRITE doesn't work now, but code still kept for future tests / changes / improvements
+// For usage of HW WRITE comment out (disable) the SW_WRITE. With HW capturing the written data is fine and and IKBD UARTs work fine during that.
+// For usage of SW WRITE capturing have a SW_WRITE defined, but it either corrupts floppy data when moving mouse or screws up mouse during write.
 //#define SW_WRITE
 
 void setupAtnBuffers(void);
