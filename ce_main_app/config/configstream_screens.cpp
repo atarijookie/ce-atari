@@ -822,12 +822,12 @@ void ConfigStream::createScreen_update(void)
     #else
     comp = new ConfigComponent(this, ConfigComponent::label, "RPi revision: ", 22, cl1, line, gotoOffset);
     #endif
-    
+
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::label, rpiConfig.revision, 20, cl2, line, gotoOffset);
     screen.push_back(comp);
-    
+
     line++;
     //-------
     #ifndef DISTRO_YOCTO
@@ -837,20 +837,15 @@ void ConfigStream::createScreen_update(void)
 
     line += 2;
     //-------
-    
-    comp = new ConfigComponent(this, ConfigComponent::label, " part       your version   ", 27, 0, line, gotoOffset);
+
+    comp = new ConfigComponent(this, ConfigComponent::label, " part       your version ", 27, 7, line, gotoOffset);
     comp->setReverse(true);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "on web", 13, 27, line, gotoOffset);
-    comp->setComponentId(COMPID_UPDATE_LOCATION);
-    comp->setReverse(true);
-    screen.push_back(comp);
-    
     line += 2;
 
-	int col1 = 1, col2 = 13;
-		
+	int col1 = 8, col2 = 21;
+
     comp = new ConfigComponent(this, ConfigComponent::label, "Main App", 12,	col1, line, gotoOffset);
     screen.push_back(comp);
 
@@ -881,7 +876,7 @@ void ConfigStream::createScreen_update(void)
     comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_XILINX);
     screen.push_back(comp);
-    
+
     line += 2;
 
     comp = new ConfigComponent(this, ConfigComponent::button, " From web ", 10,  6, line, gotoOffset);
@@ -912,35 +907,28 @@ void ConfigStream::createScreen_update(void)
 
 void ConfigStream::fillUpdateWithCurrentVersions(void)
 {
-    std::string str;    
+    std::string str;
 
-    datesToStrings(Update::versions.current.app,       Update::versions.onServer.app,     str);
+    datesToStrings(Update::versions.current.app, str);
     setTextByComponentId(COMPID_UPDATE_COSMOSEX, str);      // set it to component
 
-    datesToStrings(Update::versions.current.franz,     Update::versions.onServer.franz,   str);
+    datesToStrings(Update::versions.current.franz, str);
     setTextByComponentId(COMPID_UPDATE_FRANZ, str);         // set it to component
 
-    datesToStrings(Update::versions.current.hans,      Update::versions.onServer.hans,    str);
+    datesToStrings(Update::versions.current.hans, str);
     setTextByComponentId(COMPID_UPDATE_HANZ, str);          // set it to component
 
-    datesToStrings(Update::versions.current.xilinx,    Update::versions.onServer.xilinx,  str);
+    datesToStrings(Update::versions.current.xilinx, str);
     setTextByComponentId(COMPID_UPDATE_XILINX, str);        // set it to component
 }
 
-void ConfigStream::datesToStrings(Version &v1, Version &v2, std::string &str)
+void ConfigStream::datesToStrings(Version &v1, std::string &str)
 {
     char ver[40];
-   
+
     v1.toString(ver);           // get single version
     str = ver;                  // put it in string
     str.resize(14, ' ');        // and expand it to length of 14 with spaces
-
-    if(v1.isEqualTo(v2)) {      // if the other version is the same as the first, just write some info
-        str += "the same";
-    } else {                    // if the versions are different, write the other version
-        v2.toString(ver);       // get another single version
-        str += ver;             // append it to the previous version string
-    }
 }
 
 void ConfigStream::onUpdateCheck(void)
@@ -955,7 +943,6 @@ void ConfigStream::onUpdateCheck(void)
     setTextByComponentId(COMPID_UPDATE_FRANZ,       empty);
     setTextByComponentId(COMPID_UPDATE_HANZ,        empty);
     setTextByComponentId(COMPID_UPDATE_XILINX,      empty);
-    setTextByComponentId(COMPID_UPDATE_LOCATION,    location);
 
     // download the stuff again
     Update::versions.updateListWasProcessed = false;    // mark that the new update list wasn't updated
@@ -974,11 +961,10 @@ void ConfigStream::onUpdateCheckUsb(void)
     setTextByComponentId(COMPID_UPDATE_FRANZ,       empty);
     setTextByComponentId(COMPID_UPDATE_HANZ,        empty);
     setTextByComponentId(COMPID_UPDATE_XILINX,      empty);
-    setTextByComponentId(COMPID_UPDATE_LOCATION,    location);
 
     // try to find the update
     std::string pathToUpdateFile;
-    
+
     bool found = Update::checkForUpdateListOnUsb(pathToUpdateFile);
 
     if(!found) {

@@ -44,7 +44,7 @@ enum COMPIDS {  COMPID_TRAN_FIRST = 1,      COMPID_TRAN_SHARED,         COMPID_T
                 COMPID_WIFI_DHCP,           COMPID_WIFI_SSID,           COMPID_WIFI_PSK,
                 COMPID_WIFI_ENABLE,
 
-                COMPID_UPDATE_COSMOSEX,     COMPID_UPDATE_LOCATION,
+                COMPID_UPDATE_COSMOSEX,
                 COMPID_UPDATE_FRANZ,        COMPID_UPDATE_HANZ,             COMPID_UPDATE_XILINX,
                 COMPID_UPDATE_BTN_CHECK,    COMPID_UPDATE_BTN_CHECK_USB,    COMPID_SHARED_BTN_TEST,
 
@@ -171,7 +171,7 @@ private:
     void onUpdateCheckUsb(void);
     void onUpdateUpdate(void);
     BYTE isUpdateScreen(void);
-    void datesToStrings(Version &v1, Version &v2, std::string &str);
+    void datesToStrings(Version &v1, std::string &str);
     void createScreen_update_download(void);
     void getProgressLine(int index, std::string &lines, std::string &line);
 
