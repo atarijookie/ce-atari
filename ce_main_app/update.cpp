@@ -157,18 +157,6 @@ void Update::processUpdateList(void)
     Debug::out(LOG_DEBUG, "processUpdateList - done");
 }
 
-void Update::deleteLocalUpdateComponents(void)
-{
-    unlink(UPDATE_LOCALLIST);
-
-    unlink("/ce/update/xilinx.xsvf");       // xilinx - v.1
-    unlink("/ce/update/xlnx2a.xsvf");       // xilinx - v.2 ACSI
-    unlink("/ce/update/xlnx2s.xsvf");       // xilinx - v.2 SCSI
-
-    system("rm -f /ce/update/*.hex /ce/update/*.zip");
-    system("rm -f /tmp/*.hex /tmp/*.zip /tmp/*.xsvf");
-}
-
 void Update::downloadUpdateList(const char *remoteUrl)
 {
     // check for existence and possibly create update dir
@@ -329,10 +317,6 @@ bool Update::createUpdateScript(void)
         return false;
     }
 
-    if(Update::versions.current.app.isOlderThan( Update::versions.onServer.app )) {
-        fprintf(f, "/ce/update/update_app.sh\n");
-    }
-
     if(Update::versions.current.xilinx.isOlderThan( Update::versions.onServer.xilinx )) {
         fprintf(f, "/ce/update/update_xilinx.sh\n");
     }
@@ -358,13 +342,6 @@ bool Update::createUpdateXilinxScript(void)
         return false;
     }
 
-    // copy files needed for xilinx update to tmp
-    fprintf(f, "cp -f /ce/firstfw/updatelist.csv /tmp/ \n");
-    fprintf(f, "cp -f /ce/firstfw/ce_update.zip /tmp/ \n");
-    fprintf(f, "cp -f /ce/firstfw/xilinx.xsvf /tmp/ \n");
-    fprintf(f, "cp -f /ce/firstfw/xlnx2a.xsvf /tmp/ \n");
-    fprintf(f, "cp -f /ce/firstfw/xlnx2s.xsvf /tmp/ \n");
-
     // execute the xilinx update script
     fprintf(f, "/ce/update/update_xilinx.sh \n");
 
@@ -381,7 +358,7 @@ bool Update::createFlashFirstFwScript(bool withLinuxRestart)
         return false;
     }
 
-    fprintf(f, "/ce/ce_firstfw.sh nokill \n");  // only thing needed is to run this first FW writing script
+    fprintf(f, "/ce/ce_update.sh nokill \n");  // only thing needed is to run this first FW writing script
 
     if(withLinuxRestart) {                      // if should also restart linux, add reboot
         fprintf(f, "reboot \n");

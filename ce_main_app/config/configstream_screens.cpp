@@ -938,7 +938,6 @@ void ConfigStream::onUpdateCheck(void)
     // update config screen
     std::string empty;
     std::string location = "on web";
-    Update::deleteLocalUpdateComponents();
     setTextByComponentId(COMPID_UPDATE_COSMOSEX,    empty);
     setTextByComponentId(COMPID_UPDATE_FRANZ,       empty);
     setTextByComponentId(COMPID_UPDATE_HANZ,        empty);
@@ -956,7 +955,6 @@ void ConfigStream::onUpdateCheckUsb(void)
     // update config screen
     std::string empty;
     std::string location = "on USB";
-    Update::deleteLocalUpdateComponents();
     setTextByComponentId(COMPID_UPDATE_COSMOSEX,    empty);
     setTextByComponentId(COMPID_UPDATE_FRANZ,       empty);
     setTextByComponentId(COMPID_UPDATE_HANZ,        empty);

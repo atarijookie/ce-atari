@@ -34,7 +34,6 @@ public:
     static Versions versions;
 
     static void initialize(void);
-    static void deleteLocalUpdateComponents(void);
     static void downloadUpdateList(const char *remoteUrl);
     static void processUpdateList(void);
 
