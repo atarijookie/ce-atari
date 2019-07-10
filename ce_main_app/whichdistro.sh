@@ -1,7 +1,7 @@
 #!/bin/sh
 
 if [ ! -f /etc/issue ] ; then
-    echo "neither yocto nor raspbian"
+    echo "unknown"
     exit
 fi
 
@@ -18,15 +18,15 @@ else
     jessie=$( echo $release | grep -o jessie | wc -l)
 
     if [ "$stretch" -gt "0" ]; then
-        echo "raspbian_stretch"
+        echo "stretch"
         exit
     fi
 
     if [ "$jessie" -gt "0" ]; then
-        echo "raspbian_jessie"
+        echo "jessie"
         exit
     fi
 
-    echo "raspbian_unknown"
+    echo "unknown"
 fi
 
