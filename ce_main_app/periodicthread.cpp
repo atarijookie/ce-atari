@@ -54,7 +54,6 @@ extern volatile BYTE updateListDownloadStatus;
 #define UPDATELIST_DOWNLOAD_TIME_ONSUCCESS  (30 * 60 * 1000)
 
 static void handleConfigStreams(ConfigStream *cs, ConfigPipes &cp);
-static void updateUpdateState(void);
 static void fillNetworkDisplayLines(void);
 
 void *periodicThreadCode(void *ptr)

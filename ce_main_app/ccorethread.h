@@ -124,6 +124,7 @@ private:
     //----------------------------------
     // other
     void showHwVersion(void);
+    void writeFWversionToFile(bool hansNotFranz, int year, int month, int day);
 
     void sharedObjects_create(ConfigService* configService, FloppyService *floppyService, ScreencastService* screencastService);
     void sharedObjects_destroy(void);

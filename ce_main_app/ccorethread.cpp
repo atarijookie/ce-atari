@@ -760,6 +760,11 @@ void CCoreThread::handleFwVersion_hans(void)
     int year = bcdToInt(fwVer[1]) + 2000;
 
     Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));       // store found FW version of Hans
+
+    if(!flags.gotHansFwVersion) {   // if didn't have FW version before, store it (and thus store it only once per app run)
+        writeFWversionToFile(true, year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+    }
+
     flags.gotHansFwVersion = true;
 
     int  currentLed = fwVer[4];
@@ -856,6 +861,11 @@ void CCoreThread::handleFwVersion_franz(void)
 
     int year = bcdToInt(fwVer[1]) + 2000;
     Update::versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
+
+    if(!flags.gotFranzFwVersion) {   // if didn't have FW version before, store it (and thus store it only once per app run)
+        writeFWversionToFile(false, year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+    }
+
     flags.gotFranzFwVersion = true;
 
     Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
@@ -1212,4 +1222,17 @@ void CCoreThread::deleteSettingAndSetNetworkToDhcp(void)
 
     // sync to write stuff to card
     system("sync");
+}
+
+void CCoreThread::writeFWversionToFile(bool hansNotFranz, int year, int month, int day)
+{
+    const char *path = hansNotFranz ? "/tmp/FW_CURRENT_HANS" : "/tmp/FW_CURRENT_FRANZ";
+    FILE *file = fopen(path, "wt");
+
+    if(!file) {     // failed to open file? quit
+        return;
+    }
+
+    fprintf(file, "%04d%02d%02d", year, month, day);    // store year-month-day without dash (as a large number)
+    fclose(file);
 }
