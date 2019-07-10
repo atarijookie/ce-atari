@@ -71,10 +71,6 @@ void *periodicThreadCode(void *ptr)
 
     Debug::out(LOG_DEBUG, "Periodic thread starting...");
 
-    DWORD nextUpdateCheckTime           = Utils::getEndTime(5000);          // create a time when update download status should be checked
-
-    DWORD nextUpdateListDownloadTime    = Utils::getEndTime(3000);          // try to download update list at this time
-
     ce_conf_createFifos();                                                  // if should run normally, create the ce_conf FIFOs
 
     inotifyFd = inotify_init();
@@ -88,7 +84,7 @@ void *periodicThreadCode(void *ptr)
     }
 
     fillNetworkDisplayLines();
-    
+
     DevFinder devFinder;
     devFinder.lookForDevChanges();                          // look for devices attached / detached
 
@@ -132,52 +128,6 @@ void *periodicThreadCode(void *ptr)
             timeSync.process(false);
         } else {
             if(now + wait > timeSync.nextProcessTime) wait = timeSync.nextProcessTime - now;
-        }
-
-        if(now >= nextUpdateListDownloadTime) {
-            Debug::out(LOG_DEBUG, "periodicThreadCode -- will download update list now");
-            Update::downloadUpdateList(NULL);                                                           // download the list of components with the newest available versions
-
-            nextUpdateListDownloadTime = Utils::getEndTime(UPDATELIST_DOWNLOAD_TIME_ONSUCCESS);         // set the next download time in the future, so we won't do this immediately again
-            continue;
-        } else {
-            if(now + wait > nextUpdateListDownloadTime) wait = nextUpdateListDownloadTime - now;
-        }
-
-        //------------------------------------
-        // should check the update status?
-        if(now >= nextUpdateCheckTime) {
-            nextUpdateCheckTime   = Utils::getEndTime(UPDATE_CHECK_TIME);                               // update the time when we should check update status again
-
-            if(updateListDownloadStatus == DWNSTATUS_DOWNLOAD_FAIL) {                                   // download of update list fail?
-                updateListDownloadStatus    = DWNSTATUS_WAITING;
-                nextUpdateListDownloadTime  = Utils::getEndTime(UPDATELIST_DOWNLOAD_TIME_ONFAIL);       // set the next download time in the future, so we won't do this immediately again
-                Debug::out(LOG_DEBUG, "periodicThreadCode -- update list download failed, will retry in %d seconds", UPDATELIST_DOWNLOAD_TIME_ONFAIL / 1000);
-            } else if(updateListDownloadStatus == DWNSTATUS_DOWNLOAD_OK) {                                     // download of update list good?
-                updateListDownloadStatus    = DWNSTATUS_WAITING;
-                nextUpdateListDownloadTime  = Utils::getEndTime(UPDATELIST_DOWNLOAD_TIME_ONSUCCESS);    // try to download the update list in longer time again
-                Debug::out(LOG_DEBUG, "periodicThreadCode -- update list download good, will retry in %d minutes", UPDATELIST_DOWNLOAD_TIME_ONSUCCESS / (60 * 1000));
-
-                if(!Update::versions.updateListWasProcessed) {                                          // Didn't process update list yet? process it
-                    Update::processUpdateList();
-                }
-
-                if(Update::versions.updateListWasProcessed) {                                           // if we processed the list, update config stream
-                    // if the config screen is shown, then update info on it
-                    pthread_mutex_lock(&shared.mtxConfigStreams);
-
-                    shared.configStream.acsi->fillUpdateWithCurrentVersions();
-                    shared.configStream.web->fillUpdateWithCurrentVersions();
-                    shared.configStream.term->fillUpdateWithCurrentVersions();
-
-                    pthread_mutex_unlock(&shared.mtxConfigStreams);
-                }
-            }
-
-            updateUpdateState();
-            continue;
-        } else {
-            if(now + wait > nextUpdateCheckTime) wait = nextUpdateCheckTime - now;
         }
 
         // file descriptors to "select"
@@ -228,7 +178,6 @@ void *periodicThreadCode(void *ptr)
                 }
 
                 Debug::out(LOG_DEBUG, "periodicThreadCode -- eth0 or wlan0 changed to up, will now download update list");
-                nextUpdateListDownloadTime = Utils::getEndTime(1000);
             }
 
             // fill network into for display as we might have new address or something
@@ -268,91 +217,6 @@ void *periodicThreadCode(void *ptr)
 
     Debug::out(LOG_DEBUG, "Periodic thread terminated.");
     return 0;
-}
-
-static void updateUpdateState(void)
-{
-    int updateState = Update::state();                              // get the update state
-
-    switch(updateState) {
-        case UPDATE_STATE_DOWNLOADING:
-        pthread_mutex_lock(&shared.mtxConfigStreams);
-
-        // refresh config screen with download status
-        shared.configStream.acsi->fillUpdateDownloadWithProgress();
-        shared.configStream.web->fillUpdateDownloadWithProgress();
-        shared.configStream.term->fillUpdateDownloadWithProgress();
-
-        pthread_mutex_unlock(&shared.mtxConfigStreams);
-        break;
-
-        //-----------
-        case UPDATE_STATE_DOWNLOAD_FAIL:
-        pthread_mutex_lock(&shared.mtxConfigStreams);
-
-        // show fail message on config screen
-        shared.configStream.acsi->showUpdateDownloadFail();
-        shared.configStream.web->showUpdateDownloadFail();
-        shared.configStream.term->showUpdateDownloadFail();
-
-        pthread_mutex_unlock(&shared.mtxConfigStreams);
-
-        Update::stateGoIdle();
-        Debug::out(LOG_ERROR, "Update state - download failed");
-        break;
-
-        //-----------
-        case UPDATE_STATE_DOWNLOAD_OK:
-        {
-            pthread_mutex_lock(&shared.mtxConfigStreams);
-
-            // check if any of the config streams shows download page
-            bool shownA = shared.configStream.acsi->isUpdateDownloadPageShown();
-            bool shownW = shared.configStream.web->isUpdateDownloadPageShown();
-            bool shownT = shared.configStream.term->isUpdateDownloadPageShown();
-
-            pthread_mutex_unlock(&shared.mtxConfigStreams);
-
-            if(!shownA && !shownW && !shownT) {         // if user is NOT waiting on download page (cancel pressed), don't update
-                Update::stateGoIdle();
-                Debug::out(LOG_DEBUG, "Update state - download OK, but user is not on download page - NOT doing update");
-            } else {                                    // if user is waiting on download page, apply update
-                bool res = Update::createUpdateScript();
-
-                if(!res) {                              // if failed to create update script, fail and go to update idle state
-                    pthread_mutex_lock(&shared.mtxConfigStreams);
-
-                    shared.configStream.acsi->showUpdateError();
-                    shared.configStream.web->showUpdateError();
-                    shared.configStream.term->showUpdateError();
-
-                    pthread_mutex_unlock(&shared.mtxConfigStreams);
-
-                    Debug::out(LOG_ERROR, "Update state - download OK, failed to create update script - NOT doing update");
-                    Update::stateGoIdle();
-                } else {                                // update downloaded, user is on download page, update script created - now wait a while before doing the install
-                    Debug::out(LOG_INFO, "Update state - download OK, update script created, will wait before install");
-                    Update::stateGoWaitBeforeInstall();
-                }
-            }
-        break;
-        }
-
-        //---------
-        // are we waiting a while before the install?
-        case UPDATE_STATE_WAITBEFOREINSTALL:
-            shared.configStream.acsi->fillUpdateDownloadWithFinish();
-            shared.configStream.web->fillUpdateDownloadWithFinish();
-            shared.configStream.term->fillUpdateDownloadWithFinish();
-
-            if(Update::canStartInstall()) {
-                Debug::out(LOG_INFO, "Update state - waiting before install - can start install, will quit and install!");
-                sigintReceived = 1;
-            } else {
-                Debug::out(LOG_INFO, "Update state - waiting before install, not starting install yet");
-            }
-        break;
-    }
 }
 
 static void handleConfigStreams(ConfigStream *cs, ConfigPipes &cp)

@@ -944,8 +944,7 @@ void ConfigStream::onUpdateCheck(void)
     setTextByComponentId(COMPID_UPDATE_XILINX,      empty);
 
     // download the stuff again
-    Update::versions.updateListWasProcessed = false;    // mark that the new update list wasn't updated
-    Update::downloadUpdateList(NULL);                   // download the list of components with the newest available versions
+	// TODO ?
 }
 
 void ConfigStream::onUpdateCheckUsb(void)
@@ -969,11 +968,10 @@ void ConfigStream::onUpdateCheckUsb(void)
         showMessageScreen("Update from USB", "File ce_update.zip not found.\n\rCan't update from USB.\n\r");
         return;
     }
-    
+
     // copy and unzip the update
-    Update::downloadUpdateList(pathToUpdateFile.c_str());
-    
-    Update::versions.updateListWasProcessed = false;            // mark that the new update list wasn't updated
+
+	// TODO something here
 }
 
 void ConfigStream::onUpdateUpdate(void)
@@ -988,20 +986,10 @@ void ConfigStream::onUpdateUpdate(void)
         return;
     }
 
-    if(!Update::versions.updateListWasProcessed) {              // didn't process the update list yet? show message
-        showMessageScreen("No updates info", "No update info was downloaded,\n\rplease press web / usb button and wait.");
-        return;
-    }
-
-    if(!Update::versions.gotUpdate) {
-        showMessageScreen("No update needed", "All your components are up to date.");
-        return;
-    }
-
     if(updateFromWebNotUsb) {           // if should update from web
         createScreen_update_download();
     } else {                            // if should update from usb
-        Update::stateGoDownloadOK();    // tell the core thread that we got the files already
+//      Update::stateGoDownloadOK();    // tell the core thread that we got the files already
     }
 }
 
@@ -1035,8 +1023,6 @@ void ConfigStream::createScreen_update_download(void)
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
-
-    Update::downloadNewComponents();            // start the download
 
     setFocusToFirstFocusable();
 }

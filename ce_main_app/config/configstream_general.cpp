@@ -23,7 +23,7 @@ ConfigStream::ConfigStream(int whereItWillBeShown)
     gotoOffset      = 0;
 
     enterKeyEventLater = 0;
-    
+
     showingHomeScreen	= false;
     showingMessage		= false;
     screenChanged		= true;
@@ -74,7 +74,7 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
 
     case CFG_CMD_KEYDOWN:
         onKeyDown(cmd[5]);                                                // first send the key down signal
-        
+
         if(enterKeyEventLater) {                                            // if we should handle some event 
             enterKeyHandler(enterKeyEventLater);                            // handle it
             enterKeyEventLater = 0;                                         // and don't let it handle next time
@@ -110,19 +110,19 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
 
     case CFG_CMD_UPDATING_QUERY:
     {
-        BYTE isUpdateStartingFlag               = (Update::state() == UPDATE_STATE_WAITBEFOREINSTALL) ? 1 : 0;
-        BYTE updateComponentsWithValidityNibble = 0xC0 | Update::getUpdateComponents();
-        
+        BYTE isUpdateStartingFlag               = 0;
+        BYTE updateComponentsWithValidityNibble = 0xC0 | 0x0f;			// for now pretend all needs to be updated
+
         dataTrans->addDataByte(isUpdateStartingFlag);
         dataTrans->addDataByte(updateComponentsWithValidityNibble);
         dataTrans->padDataToMul16();
-        
+
         dataTrans->setStatus(SCSI_ST_OK);
-        
+
         Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_UPDATING_QUERY -- isUpdateStartingFlag: %d, updateComponentsWithValidityNibble: %x", isUpdateStartingFlag, updateComponentsWithValidityNibble);
         break;
     }
-        
+
     case CFG_CMD_REFRESH:
         screenChanged = true;                                           // get full stream, not only differences
         streamCount = getStream(false, readBuffer, READ_BUFFER_SIZE);   // then get current screen stream
@@ -141,18 +141,18 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
 
         Debug::out(LOG_DEBUG, "handleConfigStream -- CFG_CMD_GO_HOME -- %d bytes", streamCount);
         break;
-        
+
     case CFG_CMD_LINUXCONSOLE_GETSTREAM:                                // get the current bash console stream
         if(cmd[5] != 0) {                                               // if it's a real key, send it
             linuxConsole_KeyDown(cmd[5]);
         }
-            
+
         streamCount = linuxConsole_getStream(readBuffer, 3 * 512);      // get the stream from shell
         dataTrans->addDataBfr(readBuffer, streamCount, true);           // add data and status, with padding to multiple of 16 bytes
         dataTrans->setStatus(SCSI_ST_OK);
-        
+
         break;
-        
+
     default:                            // other cases: error
         dataTrans->setStatus(SCSI_ST_CHECK_CONDITION);
         break;
@@ -331,7 +331,7 @@ void ConfigStream::onKeyDown(BYTE key)
 int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
 {
     int totalCnt = 0;
-    
+
     if(showingMessage) {								// if we're showing the message
         if(homeScreen) {								// but we should show home screen
             hideMessageScreen();						// hide the message
@@ -391,7 +391,7 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
     }
 
     screenChanged = false;
-    
+
     *bfr++ = 0;									        // add string terminator
     totalCnt++;
 
@@ -404,14 +404,13 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
     //-------
     // get update components, if on update screen
     if(isUpdScreen) {
-        BYTE updateComponents = Update::getUpdateComponents();  // get which components are newer
-        *bfr++ = 0xC0 | updateComponents;                       // store update components and the validity nibble
+        *bfr++ = 0xC0 | 0x0f;	// store update components and the validity nibble -- for now pretend all needs to be updated
     } else {
         *bfr++ = 0;     // store update components - not updating anything
     }
     totalCnt++;
     //-------
-    
+
     return totalCnt;                                    // return the count of bytes used
 }
 
