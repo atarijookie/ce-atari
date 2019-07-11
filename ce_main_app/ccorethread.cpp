@@ -1226,7 +1226,7 @@ void CCoreThread::deleteSettingAndSetNetworkToDhcp(void)
 
 void CCoreThread::writeFWversionToFile(bool hansNotFranz, int year, int month, int day)
 {
-    const char *path = hansNotFranz ? "/tmp/FW_CURRENT_HANS" : "/tmp/FW_CURRENT_FRANZ";
+    const char *path = hansNotFranz ? "/tmp/FW_HANS_CURRENT" : "/tmp/FW_FRANZ_CURRENT";
     FILE *file = fopen(path, "wt");
 
     if(!file) {     // failed to open file? quit

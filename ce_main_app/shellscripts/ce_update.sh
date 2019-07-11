@@ -14,6 +14,15 @@ path_to_repo_archive="https://github.com/atarijookie/ce-atari-releases/archive/"
 path_to_zip_update="$path_to_repo_archive$distro.zip"
 path_to_tmp_update="/tmp/$distro.zip"
 
+#---------------------------
+# TODO: check if should do update from USB
+
+
+
+
+#---------------------------
+# first part: download update from internet, by git or wget
+
 # check if got git installed
 got_git=$( gix --version 2>/dev/null | grep 'git version' | wc -l )
 
@@ -51,14 +60,61 @@ else                                                # git is present
     fi
 fi
 
+#--------------------------
+# check what chips we really need to flash
+
+hans_curr=$( echo /tmp/FW_HANS_CURRENT )            # get current versions
+franz_curr=$( echo /tmp/FW_FRANZ_CURRENT )
+
+hans_new=$( echo /ce/update/FW_HANS_NEW )           # get new versions
+franz_new=$( echo /ce/update/FW_FRANZ_NEW )
+
+update_hans=0
+update_franz=0
+update_xilinx=0
+
+if [ "$hans_new" -gt "$hans_curr"]; then            # got newer FW than current? do update
+    update_hans=1
+fi
+
+if [ "$franz_new" -gt "$franz_curr"]; then          # got newer FW than current? do update
+    update_franz=1
+fi
+
+# TODO: check if should flash xilinx
+
+
+
+
+if [ -f /tmp/FW_FLASH_ALL ]; then       # if we're forcing to flash all chips (e.g. on new device)
+    rm -f /tmp/FW_FLASH_ALL             # delete file so we won't force flash all next time
+    update_hans=1
+    update_franz=1
+    update_xilinx=1
+fi
+
+if [ -f /tmp/FW_FLASH_XILINX ]; then    # if we're forcing to flash Xilinx (e.g. on SCSI / ACSI interface change )
+    rm -f /tmp/FW_FLASH_XILINX          # delete file so we won't force flash all next time
+    update_xilinx=1
+fi
+
+#--------------------------
+# do the actual chip flashing
+
 # update xilinx
-/ce/update/update_xilinx.sh
+if·[·"$update_xilinx"·-gt·"0"·];·then
+    /ce/update/update_xilinx.sh
+fi
 
 # update hans
-/ce/update/update_hans.sh
+if [ "$update_hanz" -gt "0" ]; then
+    /ce/update/update_hans.sh
+fi
 
 # update franz
-/ce/update/update_franz.sh
+if [ "$update_franz" -gt "0" ]; then
+    /ce/update/update_franz.sh
+fi
 
 #--------------
 # check if it's now HW vs FW mismatch, which might need another Xilinx flashing
