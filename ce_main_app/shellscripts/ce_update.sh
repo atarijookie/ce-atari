@@ -9,9 +9,47 @@ echo "DO NOT POWER OFF THE DEVICE!!!"
 echo " "
 
 distro=$( /ce/whichdistro.sh )
+url_to_git_repo="https://github.com/atarijookie/ce-atari-releases.git"
+path_to_repo_archive="https://github.com/atarijookie/ce-atari-releases/archive/"
+path_to_zip_update="$path_to_repo_archive$distro.zip"
+path_to_tmp_update="/tmp/$distro.zip"
 
-# get changed files from repo
-git pull 
+# check if got git installed
+got_git=$( gix --version 2>/dev/null | grep 'git version' | wc -l )
+
+if [ "$got_git" -eq "0" ]; then                     # if don't have git
+    echo "Will try to install missing git"
+
+    apt-get update
+    apt-get --yes --force-yes install git           # try to install git
+fi
+
+# try to check for git after possible installation
+got_git=$( gix --version 2>/dev/null | grep 'git version' | wc -l )
+
+if [ "$got_git" -eq "0" ]; then                     # if still don't have git, do it through wget
+    echo "git is still missing, will use wget"
+
+    rm -f $path_to_tmp_update                       # delete if file exists
+    wget -O $path_to_tmp_update $path_to_zip_update # download to /tmp/yocto.zip
+
+    unzip -o $path_to_tmp_update -d /ce             # unzip update into /ce directory, overwrite without prompting
+else                                                # git is present
+    echo "doing git pull..."
+
+    cd /ce/                                         # go to /ce directory
+    output=$( git pull )                            # try git pull
+    output=$( echo $output | grep 'Not a git repo' | wc -l )    # check if git complained that this is not a repo
+
+    if [ "$output" -gt "0" ]; then                  # git complained that this is not a repo? as it is not empty, simple 'git clone' might fail
+        cd /ce/
+        git init                                    # make this dir a repo
+        git remote add origin $url_to_git_repo      # set origin to url to repo
+        git fetch --depth=1                         # fetch, but only 1 commit deep
+        git checkout $distro                        # switch to the right repo
+        git pull                                    # just to be sure :)
+    fi
+fi
 
 # update xilinx
 /ce/update/update_xilinx.sh
@@ -30,7 +68,7 @@ mm=$( echo "$out" | grep 'HWFWMM' )
 # if MISMATCH detected, flash xilinx again -- without programmed Hans the HW reporting from app could be wrong, and thus this one is needed to fix the situation
 if [ "$mm" = "HWFWMM: MISMATCH" ]; then
     /ce/update/update_xilinx.sh
-fi 
+fi
 #--------------
 
 # on jessie update SysV init script, remove systemctl service
