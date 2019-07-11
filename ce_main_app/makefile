@@ -34,7 +34,7 @@ else
         LDLIBS += -lcivetweb_yocto
         CFLAGS += -DDISTRO_YOCTO
     else
-        ifeq ($(DISTRO),raspbian_jessie)
+        ifeq ($(DISTRO),jessie)
             OBJDIR = obj/raspbian_jessie
             TARGET  =  cosmosex_raspbian_jessie
             LDLIBS += -lcivetweb_raspbian_jessie -ldl

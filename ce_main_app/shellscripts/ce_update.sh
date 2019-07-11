@@ -34,13 +34,13 @@ fi
 #--------------
 
 # on jessie update SysV init script, remove systemctl service
-if [ "$distro" = "raspbian_jessie" ]; then
+if [ "$distro" = "jessie" ]; then
     cp "/ce/initd_cosmosex" "/etc/init.d/cosmosex"
     rm -f "/etc/systemd/system/cosmosex.service"
 fi
 
 # on stretch remove SysV init script, update systemctl service
-if [ "$distro" = "raspbian_stretch" ]; then
+if [ "$distro" = "stretch" ]; then
     rm -f "/etc/init.d/cosmosex"
     cp "/ce/cosmosex.service" "/etc/systemd/system/cosmosex.service"
 fi

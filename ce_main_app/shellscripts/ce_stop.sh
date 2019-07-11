@@ -39,7 +39,7 @@ fi
 # check for distro, run systemctl only on stretch
 distro=$( /ce/whichdistro.sh )
 
-if [ "$distro" = "raspbian_stretch" ]; then
+if [ "$distro" = "stretch" ]; then
     # if should terminate (also) using systemctl, do it
     if [ "$1" != "nosystemctl" ]; then
         # try to find out if cosmosex.service is installed
@@ -58,11 +58,7 @@ fi
 
 # send SIGINT to allow terminate the app nicely
 echo "Terminating cosmosex - SIGINT"
-killall -2 cosmosex                  > /dev/null 2> /dev/null
-killall -2 cosmosex_raspbian         > /dev/null 2> /dev/null
-killall -2 cosmosex_raspbian_stretch > /dev/null 2> /dev/null
-killall -2 cosmosex_raspbian_jessie  > /dev/null 2> /dev/null
-killall -2 cosmosex_yocto            > /dev/null 2> /dev/null
+killall -2 cosmosex* > /dev/null 2> /dev/null
 
 # wait a while
 echo "Waiting for cosmosex to terminate nicely..."
@@ -91,8 +87,4 @@ sleep 1
 
 # send SIGKILL to terminate the app if it didn't stop nicely
 echo "Terminating cosmosex - SIGKILL"
-killall -9 cosmosex                  > /dev/null 2> /dev/null
-killall -9 cosmosex_raspbian         > /dev/null 2> /dev/null
-killall -9 cosmosex_raspbian_stretch > /dev/null 2> /dev/null
-killall -9 cosmosex_raspbian_jessie  > /dev/null 2> /dev/null
-killall -9 cosmosex_yocto            > /dev/null 2> /dev/null
+killall -9 cosmosex* > /dev/null 2> /dev/null
