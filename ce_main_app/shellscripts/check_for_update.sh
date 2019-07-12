@@ -4,10 +4,6 @@ echo " "
 echo "Checking for update..."
 
 distro=$( /ce/whichdistro.sh )
-url_to_git_repo="https://github.com/atarijookie/ce-atari-releases.git"
-path_to_repo_archive="https://github.com/atarijookie/ce-atari-releases/archive/"
-path_to_zip_update="$path_to_repo_archive$distro.zip"
-path_to_tmp_update="/tmp/$distro.zip"
 
 # delete both update_pending answer files
 rm -f /tmp/UPDATE_PENDING_YES
@@ -21,9 +17,9 @@ if [ "$distro" = "yocto" ]; then
 fi
 
 # check if got git installed
-got_git=$( git --version 2>/dev/null | grep 'git version' | wc -l )
+git --version
 
-if [ "$got_git" -eq "0" ]; then         # if don't have git, then run the update, which will try to install git
+if [ "$?" -ne "0" ]; then           # if don't have git, then run the update, which will try to install git
     echo "don't have git, do update"
     touch /tmp/UPDATE_PENDING_YES
     exit
@@ -32,10 +28,9 @@ fi
 echo "checking for new files"
 
 cd /ce/                             # go to /ce directory
-output=$( git remote update )       # try git remote update
-output=$( echo $output | grep 'Not a git repo' | wc -l )    # check if git complained that this is not a repo
+git remote update                   # try git remote update
 
-if [ "$output" -gt "0" ]; then      # git complained that this is not a repo? run the update
+if [ "$?" -ne "0" ]; then           # git complained that this is not a repo? run the update
     echo "/ce/ is not a git repo yet, do update"
     touch /tmp/UPDATE_PENDING_YES
     exit

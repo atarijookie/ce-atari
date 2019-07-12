@@ -24,9 +24,9 @@ if [ -f /tmp/UPDATE_FROM_USB ]; then                    # if we're doing update 
     unzip -o $path_to_usb_update -d /ce                 # unzip update into /ce directory, overwrite without prompting
 else    # download update from internet, by git or wget
     # check if got git installed
-    got_git=$( gix --version 2>/dev/null | grep 'git version' | wc -l )
+    git --version
 
-    if [ "$got_git" -eq "0" ]; then                     # if don't have git
+    if [ "$?" -ne "0" ]; then                           # if don't have git
         echo "Will try to install missing git"
 
         apt-get update
@@ -34,9 +34,9 @@ else    # download update from internet, by git or wget
     fi
 
     # try to check for git after possible installation
-    got_git=$( gix --version 2>/dev/null | grep 'git version' | wc -l )
+    git --version
 
-    if [ "$got_git" -eq "0" ]; then                     # git still missing, do it through wget
+    if [ "$?" -ne "0" ]; then                           # git still missing, do it through wget
         echo "git is still missing, will use wget"
 
         rm -f $path_to_tmp_update                       # delete if file exists
@@ -47,18 +47,19 @@ else    # download update from internet, by git or wget
         echo "doing git pull..."
 
         cd /ce/                                         # go to /ce directory
-        output=$( git pull )                            # try git pull
-        output=$( echo $output | grep 'Not a git repo' | wc -l )    # check if git complained that this is not a repo
 
-        if [ "$output" -gt "0" ]; then                  # git complained that this is not a repo? as it is not empty, simple 'git clone' might fail
+        git reset --hard origin/$distro                 # reset all tracked files so git won't complain
+        git pull origin $distro                         # try git pull
+
+        if [ "$?" -ne "0" ]; then                       # git complained that this is not a repo? as it is not empty, simple 'git clone' might fail
             echo "doing git fetch..."
 
             cd /ce/
             git init                                    # make this dir a repo
             git remote add origin $url_to_git_repo      # set origin to url to repo
             git fetch --depth=1                         # fetch, but only 1 commit deep
-            git checkout $distro                        # switch to the right repo
-            git pull                                    # just to be sure :)
+            git checkout -f $distro                     # switch to the right repo
+            git pull origin $distro                     # just to be sure :)
         fi
     fi
 fi
@@ -67,7 +68,7 @@ fi
 # add execute permissions to scripts and binaries (if they don't have them yet)
 chmod +x /ce/app/cosmosex
 chmod +x /ce/update/flash_stm32
-chmod +x /ce/flash_xilinx
+chmod +x /ce/update/flash_xilinx
 chmod +x /ce/*.sh
 chmod +x /ce/update/*.sh
 
