@@ -74,29 +74,34 @@ chmod +x /ce/update/*.sh
 #--------------------------
 # check what chips we really need to flash
 
-hans_curr=$( echo /tmp/FW_HANS_CURRENT )            # get current versions
-franz_curr=$( echo /tmp/FW_FRANZ_CURRENT )
+hans_curr=$( cat /ce/update/FW_HANS_CURRENT )       # get current versions
+franz_curr=$( cat /ce/update/FW_FRANZ_CURRENT )
+xilinx_curr=$( cat /ce/update/xilinx_current.txt )
 
-hans_new=$( echo /ce/update/FW_HANS_NEW )           # get new versions
-franz_new=$( echo /ce/update/FW_FRANZ_NEW )
+hans_new=$( cat /ce/update/FW_HANS_NEW )            # get new versions
+franz_new=$( cat /ce/update/FW_FRANZ_NEW )
+xilinx_new=$( cat /ce/update/xilinx_used.version )  # get new version for last used xilinx type by using this symlink
 
 update_hans=0
 update_franz=0
 update_xilinx=0
 
-if [ "$hans_new" -gt "$hans_curr"]; then            # got newer FW than current? do update
+# check if Hans has new FW available
+if [ "$hans_new" -ne "$hans_curr" ]; then           # got different FW than current? do update (don't check for newer only, as someone might want to use older version)
     update_hans=1
 fi
 
-if [ "$franz_new" -gt "$franz_curr"]; then          # got newer FW than current? do update
+# check if Franz has new FW available
+if [ "$franz_new" -ne "$franz_curr" ]; then         # got different FW than current? do update (don't check for newer only, as someone might want to use older version)
     update_franz=1
 fi
 
-# TODO: check if should flash xilinx
+# check if Xilinx has new FW available
+if [ "$xilinx_new" -ne "$xilinx_curr" ]; then       # got different FW than current? do update (don't check for newer only, as someone might want to use older version)
+    update_xilinx=1
+fi
 
-
-
-
+# check if forcing flash all
 if [ -f /tmp/FW_FLASH_ALL ]; then       # if we're forcing to flash all chips (e.g. on new device)
     rm -f /tmp/FW_FLASH_ALL             # delete file so we won't force flash all next time
     update_hans=1
@@ -104,6 +109,7 @@ if [ -f /tmp/FW_FLASH_ALL ]; then       # if we're forcing to flash all chips (e
     update_xilinx=1
 fi
 
+# check if forcing xilinx re-flash
 if [ -f /tmp/FW_FLASH_XILINX ]; then    # if we're forcing to flash Xilinx (e.g. on SCSI / ACSI interface change )
     rm -f /tmp/FW_FLASH_XILINX          # delete file so we won't force flash all next time
     update_xilinx=1
@@ -113,18 +119,20 @@ fi
 # do the actual chip flashing
 
 # update xilinx
-if·[·"$update_xilinx"·-gt·"0"·];·then
+if [ "$update_xilinx" -gt "0" ]; then
     /ce/update/update_xilinx.sh
 fi
 
 # update hans
 if [ "$update_hanz" -gt "0" ]; then
     /ce/update/update_hans.sh
+    cp -f /ce/update/FW_HANS_NEW /ce/update/FW_HANS_CURRENT     # copy version the file to CURRENT so we'll know what we have flashed
 fi
 
 # update franz
 if [ "$update_franz" -gt "0" ]; then
     /ce/update/update_franz.sh
+    cp -f /ce/update/FW_FRANZ_NEW /ce/update/FW_FRANZ_CURRENT   # copy version the file to CURRENT so we'll know what we have flashed
 fi
 
 #--------------
