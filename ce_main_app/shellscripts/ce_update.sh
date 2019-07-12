@@ -14,6 +14,17 @@ path_to_repo_archive="https://github.com/atarijookie/ce-atari-releases/archive/"
 path_to_zip_update="$path_to_repo_archive$distro.zip"
 path_to_tmp_update="/tmp/$distro.zip"
 
+read_from_file()
+{
+    if [ -f $1 ]; then      # does the file exist? read value from file
+        val=$( cat $1 )
+    else                    # file doesn't exist? use default value
+        val=$2
+    fi
+
+    echo $val               # display the value
+}
+
 #---------------------------
 # check if should do update from USB
 
@@ -75,30 +86,30 @@ chmod +x /ce/update/*.sh
 #--------------------------
 # check what chips we really need to flash
 
-hans_curr=$( cat /ce/update/FW_HANS_CURRENT )       # get current versions
-franz_curr=$( cat /ce/update/FW_FRANZ_CURRENT )
-xilinx_curr=$( cat /ce/update/xilinx_current.txt )
+hans_curr=$( read_from_file /ce/update/FW_HANS_CURRENT 0 )
+franz_curr=$( read_from_file /ce/update/FW_FRANZ_CURRENT 0 )
+xilinx_curr=$( read_from_file /ce/update/xilinx_current.txt 0 )
 
-hans_new=$( cat /ce/update/FW_HANS_NEW )            # get new versions
-franz_new=$( cat /ce/update/FW_FRANZ_NEW )
-xilinx_new=$( cat /ce/update/xilinx_used.version )  # get new version for last used xilinx type by using this symlink
+hans_new=$( read_from_file /ce/update/FW_HANS_NEW 1 )
+franz_new=$( read_from_file /ce/update/FW_FRANZ_NEW 1 )
+xilinx_new=$( read_from_file /ce/update/xilinx_used.version 1 ) # get new version for last used xilinx type by using this symlink
 
 update_hans=0
 update_franz=0
 update_xilinx=0
 
 # check if Hans has new FW available
-if [ "$hans_new" -ne "$hans_curr" ]; then           # got different FW than current? do update (don't check for newer only, as someone might want to use older version)
+if [ "$hans_new" != "$hans_curr" ]; then           # got different FW than current? do update (don't check for newer only, as someone might want to use older version)
     update_hans=1
 fi
 
 # check if Franz has new FW available
-if [ "$franz_new" -ne "$franz_curr" ]; then         # got different FW than current? do update (don't check for newer only, as someone might want to use older version)
+if [ "$franz_new" != "$franz_curr" ]; then         # got different FW than current? do update (don't check for newer only, as someone might want to use older version)
     update_franz=1
 fi
 
 # check if Xilinx has new FW available
-if [ "$xilinx_new" -ne "$xilinx_curr" ]; then       # got different FW than current? do update (don't check for newer only, as someone might want to use older version)
+if [ "$xilinx_new" != "$xilinx_curr" ]; then       # got different FW than current? do update (don't check for newer only, as someone might want to use older version)
     update_xilinx=1
 fi
 
@@ -125,7 +136,7 @@ if [ "$update_xilinx" -gt "0" ]; then
 fi
 
 # update hans
-if [ "$update_hanz" -gt "0" ]; then
+if [ "$update_hans" -gt "0" ]; then
     /ce/update/update_hans.sh
     cp -f /ce/update/FW_HANS_NEW /ce/update/FW_HANS_CURRENT     # copy version the file to CURRENT so we'll know what we have flashed
 fi
