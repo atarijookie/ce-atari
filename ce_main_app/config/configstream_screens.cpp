@@ -653,8 +653,8 @@ void ConfigStream::onNetwork_save(void)
 	// for wlan0
     std::string wIp, wMask, wGateway;
     bool wUseDhcp, wifiIsEnabled;
-	
-	std::string dns, hostname;
+
+    std::string dns, hostname;
 
     // read the settings from components
     getBoolByComponentId(COMPID_NET_DHCP,		eUseDhcp);
@@ -670,14 +670,14 @@ void ConfigStream::onNetwork_save(void)
 
     getTextByComponentId(COMPID_NET_DNS,		dns);
     getTextByComponentId(COMPID_HOSTNAME,       hostname);
-    
+
     if(hostname.empty()) {
         hostname = "CosmosEx";
     }
 
     if(!eUseDhcp || !wUseDhcp) {    // if ethernet or wifi doesn't use DHCP, we must receive also DNS settings
         bool a = verifyAndFixIPaddress(dns, dns, false);
-        
+
         if(!a) {
             showMessageScreen("Warning", "If ethermet or wifi doesn't use DHCP,\n\ryou must specify a valid DNS!\n\rPlease fix this and try again.");
             return;
@@ -777,12 +777,12 @@ void ConfigStream::createScreen_update(void)
     screen_addHeaderAndFooter(screen, "Software & Firmware updates");
 
     updateFromWebNotUsb = true;         // do update from web
-    
+
     ConfigComponent *comp;
 
     int cl1 = 5;
     int cl2 = 27;
-    
+
     int line = 4;
     comp = new ConfigComponent(this, ConfigComponent::label, "Hardware version  : ", 22, cl1, line, gotoOffset);
     screen.push_back(comp);
@@ -801,14 +801,14 @@ void ConfigStream::createScreen_update(void)
     comp = new ConfigComponent(this, ConfigComponent::label, hddIf, 10, cl2, line, gotoOffset);
     screen.push_back(comp);
     line++;
-    
+
     //-------
     comp = new ConfigComponent(this, ConfigComponent::label, "Linux distribution: ", 22, cl1, line, gotoOffset);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::label, distroString, 10, cl2, line, gotoOffset);
     screen.push_back(comp);
-    
+
     line++;
     //-------
     #ifndef DISTRO_YOCTO
@@ -879,23 +879,17 @@ void ConfigStream::createScreen_update(void)
 
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " From web ", 10,  6, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " From web ", 10,  2, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_CHECK);
     comp->setComponentId(COMPID_UPDATE_BTN_CHECK);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " From USB ", 10,  22, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " From USB ", 10,  15, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_CHECK_USB);
     comp->setComponentId(COMPID_UPDATE_BTN_CHECK_USB);
     screen.push_back(comp);
-    line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Update  ", 10,  6, line, gotoOffset);
-    comp->setOnEnterFunctionCode(CS_UPDATE_UPDATE);
-    comp->setComponentId(COMPID_BTN_SAVE);
-    screen.push_back(comp);
-
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Cancel  ", 10,  22, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Cancel  ", 10,  28, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
@@ -959,7 +953,9 @@ void ConfigStream::onUpdateCheckUsb(void)
     bool found = Update::checkForUpdateListOnUsb(pathToUpdateFile);
 
     if(!found) {
-        showMessageScreen("Update from USB", "File ce_update.zip not found.\n\rCan't update from USB.\n\r");
+        char msg[256];
+        sprintf(msg, "File %s not found.\n\rCan't update from USB.\n\r", Update::getUsbArchiveName());
+        showMessageScreen("Update from USB", msg);
         return;
     }
 
