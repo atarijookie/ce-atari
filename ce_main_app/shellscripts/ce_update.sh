@@ -15,50 +15,61 @@ path_to_zip_update="$path_to_repo_archive$distro.zip"
 path_to_tmp_update="/tmp/$distro.zip"
 
 #---------------------------
-# TODO: check if should do update from USB
+# check if should do update from USB
 
+if [ -f /tmp/UPDATE_FROM_USB ]; then                    # if we're doing update from USB
+    path_to_usb_update=$( cat /tmp/UPDATE_FROM_USB )    # get content of file into variable
+    rm -f /tmp/UPDATE_FROM_USB                          # delete file so we won't do it again next time
 
+    unzip -o $path_to_usb_update -d /ce                 # unzip update into /ce directory, overwrite without prompting
+else    # download update from internet, by git or wget
+    # check if got git installed
+    got_git=$( gix --version 2>/dev/null | grep 'git version' | wc -l )
 
+    if [ "$got_git" -eq "0" ]; then                     # if don't have git
+        echo "Will try to install missing git"
 
-#---------------------------
-# first part: download update from internet, by git or wget
+        apt-get update
+        apt-get --yes --force-yes install git           # try to install git
+    fi
 
-# check if got git installed
-got_git=$( gix --version 2>/dev/null | grep 'git version' | wc -l )
+    # try to check for git after possible installation
+    got_git=$( gix --version 2>/dev/null | grep 'git version' | wc -l )
 
-if [ "$got_git" -eq "0" ]; then                     # if don't have git
-    echo "Will try to install missing git"
+    if [ "$got_git" -eq "0" ]; then                     # git still missing, do it through wget
+        echo "git is still missing, will use wget"
 
-    apt-get update
-    apt-get --yes --force-yes install git           # try to install git
-fi
+        rm -f $path_to_tmp_update                       # delete if file exists
+        wget -O $path_to_tmp_update $path_to_zip_update # download to /tmp/yocto.zip
 
-# try to check for git after possible installation
-got_git=$( gix --version 2>/dev/null | grep 'git version' | wc -l )
+        unzip -o $path_to_tmp_update -d /ce             # unzip update into /ce directory, overwrite without prompting
+    else                                                # git is present
+        echo "doing git pull..."
 
-if [ "$got_git" -eq "0" ]; then                     # if still don't have git, do it through wget
-    echo "git is still missing, will use wget"
+        cd /ce/                                         # go to /ce directory
+        output=$( git pull )                            # try git pull
+        output=$( echo $output | grep 'Not a git repo' | wc -l )    # check if git complained that this is not a repo
 
-    rm -f $path_to_tmp_update                       # delete if file exists
-    wget -O $path_to_tmp_update $path_to_zip_update # download to /tmp/yocto.zip
+        if [ "$output" -gt "0" ]; then                  # git complained that this is not a repo? as it is not empty, simple 'git clone' might fail
+            echo "doing git fetch..."
 
-    unzip -o $path_to_tmp_update -d /ce             # unzip update into /ce directory, overwrite without prompting
-else                                                # git is present
-    echo "doing git pull..."
-
-    cd /ce/                                         # go to /ce directory
-    output=$( git pull )                            # try git pull
-    output=$( echo $output | grep 'Not a git repo' | wc -l )    # check if git complained that this is not a repo
-
-    if [ "$output" -gt "0" ]; then                  # git complained that this is not a repo? as it is not empty, simple 'git clone' might fail
-        cd /ce/
-        git init                                    # make this dir a repo
-        git remote add origin $url_to_git_repo      # set origin to url to repo
-        git fetch --depth=1                         # fetch, but only 1 commit deep
-        git checkout $distro                        # switch to the right repo
-        git pull                                    # just to be sure :)
+            cd /ce/
+            git init                                    # make this dir a repo
+            git remote add origin $url_to_git_repo      # set origin to url to repo
+            git fetch --depth=1                         # fetch, but only 1 commit deep
+            git checkout $distro                        # switch to the right repo
+            git pull                                    # just to be sure :)
+        fi
     fi
 fi
+
+#--------------------------
+# add execute permissions to scripts and binaries (if they don't have them yet)
+chmod +x /ce/app/cosmosex
+chmod +x /ce/update/flash_stm32
+chmod +x /ce/flash_xilinx
+chmod +x /ce/*.sh
+chmod +x /ce/update/*.sh
 
 #--------------------------
 # check what chips we really need to flash
@@ -184,6 +195,13 @@ ln -fs /dev/null /lib/systemd/system/ctrl-alt-del.target
 ln -fs /lib/systemd/system/getty@.service /etc/systemd/system/getty.target.wants/getty@tty1.service
 
 sync
+
+#------------------------
+# if should reboot after this (e.g. due to network settings reset), do it now
+if [ -f /tmp/REBOOT_AFTER_UPDATE ]; then
+    rm -f /tmp/REBOOT_AFTER_UPDATE          # delete file so we won't do it again next time
+    reboot now
+fi
 
 echo " "
 echo "Update done, you may start the /ce/ce_start.sh now!";
