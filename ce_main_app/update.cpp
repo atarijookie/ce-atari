@@ -53,21 +53,13 @@ bool Update::createUpdateXilinxScript(void)
 
 bool Update::createFlashFirstFwScript(bool withLinuxRestart)
 {
-    FILE *f = fopen(UPDATE_SCRIPT, "wt");
-
-    if(!f) {
-        Debug::out(LOG_ERROR, "Update::createFlashFirstFwScript failed to create update script - %s", UPDATE_SCRIPT);
-        return false;
-    }
-
-    fprintf(f, "/ce/ce_update.sh nokill \n");  // only thing needed is to run this first FW writing script
+    bool res = writeSimpleTextFile(UPDATE_SCRIPT, "#!/bin/sh\n/ce/ce_update.sh\n");
 
     if(withLinuxRestart) {                      // if should also restart linux, add reboot
-        fprintf(f, "reboot \n");
+        writeSimpleTextFile(UPDATE_REBOOT_FILE, NULL);
     }
 
-    fclose(f);
-    return true;
+    return res;
 }
 
 bool Update::checkForUpdateListOnUsb(std::string &updateFilePath)
@@ -104,7 +96,7 @@ bool Update::checkForUpdateListOnUsb(std::string &updateFilePath)
         strcpy(path, "/mnt/");
         strcat(path, de->d_name);
         strcat(path, "/");
-        strcat(path, UPDATE_USBFILE);
+        strcat(path, getUsbArchiveName());
 
         int res = access(path, F_OK);
 
@@ -119,11 +111,29 @@ bool Update::checkForUpdateListOnUsb(std::string &updateFilePath)
     if(found) {
         Debug::out(LOG_DEBUG, "Update::checkForUpdateListOnUsb -- update found: %s", path);
         updateFilePath = path;
+        writeSimpleTextFile(UPDATE_USBFILE, path);              // also write this path to predefined file for ce_update.sh script
     } else {
         Debug::out(LOG_DEBUG, "Update::checkForUpdateListOnUsb -- update not found on usb");
     }
 
     return found;
+}
+
+const char *Update::getUsbArchiveName(void)
+{
+    #ifdef DISTRO_YOCTO
+        return "yocto.zip";
+    #endif
+
+    #ifdef DISTRO_JESSIE
+        return "jessie.zip";
+    #endif
+
+    #ifdef DISTRO_STRETCH
+        return "stretch.zip";
+    #endif
+
+    return "unknown.zip";
 }
 
 const char *Update::getPropperXilinxTag(void)
@@ -176,4 +186,21 @@ void Update::createFloppyTestImage(void)
 
     // close file and we're done
     fclose(f);
+}
+
+bool Update::writeSimpleTextFile(const char *path, const char *content)
+{
+    FILE *f = fopen(path, "wt");
+
+    if(!f) {                // if couldn't open file, quit
+        Debug::out(LOG_ERROR, "Update::writeSimpleTextFile failed to create file: %s", path);
+        return false;
+    }
+
+    if(content) {           // if content specified, write it (otherwise empty file)
+        fputs(content, f);
+    }
+
+    fclose(f);
+    return true;
 }

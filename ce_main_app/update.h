@@ -11,8 +11,8 @@
 #define UPDATE_LOCALLIST    "/tmp/updatelist.csv"
 #define UPDATE_SCRIPT       "/ce/update/doupdate.sh"
 #define UPDATE_APP_PATH     "/ce/app"
-
-#define UPDATE_USBFILE      "ce_update.zip"
+#define UPDATE_REBOOT_FILE  "/tmp/REBOOT_AFTER_UPDATE"
+#define UPDATE_USBFILE      "/tmp/UPDATE_FROM_USB"
 
 #define REPORT_URL          "http://joo.kie.sk/cosmosex/update/report.php"
 
@@ -29,6 +29,8 @@ public:
     static bool checkForUpdateListOnUsb(std::string &updateFilePath);
 
     static void createFloppyTestImage(void);
+    static bool writeSimpleTextFile(const char *path, const char *content);
+    static const char *getUsbArchiveName(void);
 
 private:
     static DWORD    whenCanStartInstall;

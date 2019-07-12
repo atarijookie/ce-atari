@@ -935,29 +935,23 @@ void ConfigStream::onUpdateCheck(void)
 {
     updateFromWebNotUsb = true;         // do update from web
 
-    // update config screen
-    std::string empty;
-    std::string location = "on web";
-    setTextByComponentId(COMPID_UPDATE_COSMOSEX,    empty);
-    setTextByComponentId(COMPID_UPDATE_FRANZ,       empty);
-    setTextByComponentId(COMPID_UPDATE_HANZ,        empty);
-    setTextByComponentId(COMPID_UPDATE_XILINX,      empty);
+    #ifdef DISTRO_YOCTO
+        showMessageScreen("Info", "On Yocto without git can't check if update\n\rrealy needed, so will update every time.\n\r");
+    #else
+        // TODO: check if update needed
 
-    // download the stuff again
-	// TODO ?
+
+
+
+    #endif
+
+    // if update needed, do the actual update
+    onUpdateUpdate();
 }
 
 void ConfigStream::onUpdateCheckUsb(void)
 {
     updateFromWebNotUsb = false;         // do update from usb
-
-    // update config screen
-    std::string empty;
-    std::string location = "on USB";
-    setTextByComponentId(COMPID_UPDATE_COSMOSEX,    empty);
-    setTextByComponentId(COMPID_UPDATE_FRANZ,       empty);
-    setTextByComponentId(COMPID_UPDATE_HANZ,        empty);
-    setTextByComponentId(COMPID_UPDATE_XILINX,      empty);
 
     // try to find the update
     std::string pathToUpdateFile;
@@ -969,9 +963,8 @@ void ConfigStream::onUpdateCheckUsb(void)
         return;
     }
 
-    // copy and unzip the update
-
-	// TODO something here
+    // if found, do the actual update
+    onUpdateUpdate();
 }
 
 void ConfigStream::onUpdateUpdate(void)

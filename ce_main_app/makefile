@@ -1,7 +1,7 @@
 # control verbosity. use make V=1
 V = 0
 
-#ONPC    = yes
+#ONPC   = yes
 # in the CFLAGS use ONPC_GPIO or ONPC_HIGHLEVEL or ONPC_NOTHING
 
 CXX	    = g++
@@ -39,11 +39,13 @@ else
             TARGET  =  cosmosex_raspbian_jessie
             LDLIBS += -lcivetweb_raspbian_jessie -ldl
             CFLAGS += -DDISTRO_RASPBIAN
+            CFLAGS += -DDISTRO_JESSIE
         else
             OBJDIR = obj/raspbian_stretch
             TARGET =  cosmosex_raspbian_stretch
             LDLIBS += -lcivetweb_raspbian_stretch -ldl
             CFLAGS += -DDISTRO_RASPBIAN
+            CFLAGS += -DDISTRO_STRETCH
         endif
     endif
     # add search path for libbcm2835.a
