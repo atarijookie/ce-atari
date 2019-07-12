@@ -6,9 +6,7 @@
 #include "global.h"
 #include "version.h"
 
-#define UPDATE_REMOTEURL    "http://joo.kie.sk/cosmosex/update/updatelist.csv"
 #define UPDATE_LOCALPATH    "/tmp"
-#define UPDATE_LOCALLIST    "/tmp/updatelist.csv"
 #define UPDATE_SCRIPT       "/ce/update/doupdate.sh"
 #define UPDATE_APP_PATH     "/ce/app"
 #define UPDATE_REBOOT_FILE  "/tmp/REBOOT_AFTER_UPDATE"

@@ -341,13 +341,6 @@ void Downloader::updateStatusByte(TDownloadRequest &tdr, BYTE newStatus)
     }
 }
 
-void handleUsbUpdateFile(const char *localZipFile, const char *localDestDir)
-{
-    char command[1024];
-    snprintf(command, 1023, "unzip -o '%s' -d /tmp/", localZipFile);          // unzip the update file to ce_update folder
-    system(command);
-}
-
 void handleSendConfig(const char *localConfigFile, const char *remoteUrl)
 {
     CURL       *curl = curl_easy_init();
@@ -503,12 +496,10 @@ void Downloader::run(void)
         // check if this isn't local file, and if it is, do the rest localy
         res = access(downloadCurrent.srcUrl.c_str(), F_OK);
 
-        if(res != -1) {                                                         // it's a local file!
-            if(downloadCurrent.downloadType == DWNTYPE_UPDATE_LIST) {           // if it's a 'update list'
-                handleUsbUpdateFile(downloadCurrent.srcUrl.c_str(), downloadCurrent.dstDir.c_str());
-            } else if(downloadCurrent.downloadType == DWNTYPE_SEND_CONFIG) {            // if it should be local config upload / post
+        if(res != -1) {                                                          // it's a local file!
+            if(downloadCurrent.downloadType == DWNTYPE_SEND_CONFIG) {            // if it should be local config upload / post
                 handleSendConfig(downloadCurrent.srcUrl.c_str(), downloadCurrent.dstDir.c_str());
-            } else if(downloadCurrent.downloadType == DWNTYPE_LOG_HTTP) {            // if it should be an http log request
+            } else if(downloadCurrent.downloadType == DWNTYPE_LOG_HTTP) {        // if it should be an http log request
                 handleLogHttp(downloadCurrent.srcUrl.c_str());
             }
             continue;
