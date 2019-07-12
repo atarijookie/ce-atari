@@ -2,11 +2,6 @@
 
 echo "XILINX firmware writing script."
 
-# if the updatelist.csv file exists, make a copy of it, because running '/ce/app/cosmosex hwinfo' will delete it, and we need it!
-if [ -f /tmp/updatelist.csv ]; then
-    cp -f /tmp/updatelist.csv /tmp/updatelist_copy.csv
-fi
-
 # initialize variables
 is36=0
 is72=0
