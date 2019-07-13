@@ -24,7 +24,11 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <ifaddrs.h>
+#ifdef __linux__
 #include <linux/if_link.h>
+#else
+#include <netinet/in.h>
+#endif
 //--------
 
 #include "translated/translatedhelper.h"
@@ -393,13 +397,6 @@ void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
     freeifaddrs(ifaddr);
 }
 
-void Utils::forceSync(void)
-{
-	TMounterRequest tmr;
-	tmr.action	= MOUNTER_ACTION_SYNC;                          // let the mounter thread do filesystem caches sync
-	Mounter::add(tmr);
-}
-
 WORD Utils::getWord(BYTE *bfr)
 {
     WORD val = 0;
@@ -491,19 +488,24 @@ void Utils::createTimezoneString(char *str)
 
 void Utils::setTimezoneVariable_inProfileScript(void)
 {
-    char utcOfsset[64];
-    createTimezoneString(utcOfsset);
-
-    char tzString[128];
-    sprintf(tzString, "echo 'export TZ=\"%s\"' > /etc/profile.d/set_timezone.sh", utcOfsset);
-
-    Debug::out(LOG_DEBUG, "Utils::setTimezoneVariable_inProfileScript() -- creating timezone setting script like this: %s\n", tzString);
-
-    system("mkdir -p /etc/profile.d");                          // if this dir doesn't exist, create it
-    system(tzString);                                           // now create the script in the dir above
-    system("chmod 755 /etc/profile.d/set_timezone.sh");         // make it executable
-
-    forceSync();                                                // make sure it does to disk
+    const char * const timezone_script = "/etc/profile.d/set_timezone.sh";
+    char utcOffset[64];
+    createTimezoneString(utcOffset);
+    
+    Debug::out(LOG_DEBUG, "Utils::setTimezoneVariable_inProfileScript() -- creating timezone setting script %s", timezone_script);
+    
+    mkdir("/etc/profile.d", 0755);             // if this dir doesn't exist, create it
+    FILE * f = fopen(timezone_script, "w");    // now create the script in the dir above
+    if (f == NULL) {
+        Debug::out(LOG_ERROR, "Utils::setTimezoneVariable_inProfileScript() failed to open %s", timezone_script);
+        return;
+    }
+    fprintf(f, "export TZ=\"%s\"\n", utcOffset);
+    if (fchmod(fileno(f), 0755) < 0) {         // make it executable
+        Debug::out(LOG_ERROR, "Utils::setTimezoneVariable_inProfileScript() fchmod(%s) failed : %s", timezone_script, strerror(errno));
+    }
+    fsync(fileno(f));                          // make sure it does to disk
+    fclose(f);
 }
 
 void Utils::setTimezoneVariable_inThisContext(void)

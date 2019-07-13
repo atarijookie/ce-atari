@@ -570,7 +570,7 @@ void ConfigStream::onAcsiConfig_save(void)
         reloadProxy->reloadSettings(SETTINGSUSER_ACSI);
     }
 
-    Utils::forceSync();                                     // tell system to flush the filesystem caches
+    Mounter::forceSync();                                     // tell system to flush the filesystem caches
 
     createScreen_homeScreen();		// now back to the home screen
 }
@@ -639,7 +639,7 @@ void ConfigStream::onTranslated_save(void)
         reloadProxy->reloadSettings(SETTINGSUSER_TRANSLATED);
     }
 
-    Utils::forceSync();                                     // tell system to flush the filesystem caches
+    Mounter::forceSync();                                     // tell system to flush the filesystem caches
 
     createScreen_homeScreen();		// now back to the home screen
 }
@@ -748,7 +748,7 @@ void ConfigStream::onNetwork_save(void)
         bool wlan0IsDifferent   = nsNew.wlan0IsDifferentThan(nsOld);
 
         nsNew.save();                   // store the new values
-        Utils::forceSync();             // tell system to flush the filesystem caches
+        Mounter::forceSync();             // tell system to flush the filesystem caches
 
         if(eth0IsDifferent) {           // restart eth0 if needed
             TMounterRequest tmr;
@@ -1217,7 +1217,7 @@ void ConfigStream::onOtherSave(void)
 
     do_timeSync         = true;     // do time sync again
 
-    Utils::forceSync();             // tell system to flush the filesystem caches
+    Mounter::forceSync();             // tell system to flush the filesystem caches
     Utils::setTimezoneVariable_inProfileScript();   // create the timezone setting script, because TIME_UTC_OFFSET could possibly change
     Utils::setTimezoneVariable_inThisContext();     // and also set the TZ variable for this context, so the change for this app would be immediate
     
@@ -1904,7 +1904,7 @@ void ConfigStream::onHddImageSave(void)
         reloadProxy->reloadSettings(SETTINGSUSER_ACSI);     // reload SCSI / ACSI settings
     }
 
-    Utils::forceSync();                                     // tell system to flush the filesystem caches
+    Mounter::forceSync();                                     // tell system to flush the filesystem caches
 
     createScreen_homeScreen();      // now back to the home screen
 }
@@ -1968,7 +1968,7 @@ void ConfigStream::onSharedSave(void)
         reloadProxy->reloadSettings(SETTINGSUSER_SHARED);
 	}
 
-    Utils::forceSync();                                     // tell system to flush the filesystem caches
+    Mounter::forceSync();                                     // tell system to flush the filesystem caches
 
     createScreen_homeScreen();		// now back to the home screen
 }
@@ -1980,7 +1980,7 @@ void ConfigStream::onResetSettings(void)
     showMessageScreen("Reset all settings", "All settings have been reset to default.\n\rReseting your ST might be a good idea...");
 
     system("rm -f /ce/settings/*");
-    Utils::forceSync();                                     // tell system to flush the filesystem caches
+    Mounter::forceSync();                                     // tell system to flush the filesystem caches
 }
 
 void ConfigStream::onSendSettings(void)

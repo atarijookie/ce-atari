@@ -8,7 +8,9 @@
 #include "datatypes.h"
 
 extern "C" volatile sig_atomic_t sigintReceived;
+#ifndef MIN
 #define MIN(x, y)	(((x) < (y)) ? (x) : (y))
+#endif
 
 class Utils {
 public:
@@ -37,8 +39,6 @@ public:
     static WORD SWAPWORD2(WORD w);
 
     static void getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks=NULL);
-
-    static void forceSync(void);
 
     static WORD  getWord(BYTE *bfr);
     static DWORD getDword(BYTE *bfr);

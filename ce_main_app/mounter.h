@@ -63,6 +63,8 @@ public:
     void run(void);
     static void stop(void);
 
+    static void forceSync(void);
+
 private:
 	bool mount(const char *mountCmd, const char *mountDir);
 	bool mount(const char*, const char*, const char*, const char*);

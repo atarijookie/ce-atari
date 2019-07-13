@@ -17,6 +17,7 @@
 #include "imagelist.h"
 #include "imagestorage.h"
 #include "floppysetup_commands.h"
+#include "floppyimagest.h"
 
 volatile BYTE currentImageDownloadStatus;
 extern SharedObjects shared;
@@ -535,7 +536,7 @@ void FloppySetup::newImage(void)
     std::string justFile = file;
     std::string pathAndFile = FLOPPY_UPLOAD_PATH + justFile;
 
-    bool res = createNewImage(pathAndFile);             // create the new image on disk
+    bool res = FloppyImageSt::createNewImage(pathAndFile);             // create the new image on disk
 
     if(!res) {                                          // failed to create? fail
         dataTrans->setStatus(FDD_ERROR);
@@ -547,41 +548,6 @@ void FloppySetup::newImage(void)
     shared.imageSilo->add(index, justFile, pathAndFile, empty, true);
 
     dataTrans->setStatus(FDD_OK);
-}
-
-bool FloppySetup::createNewImage(std::string pathAndFile)
-{
-    // open the file
-    FILE *f = fopen((char *) pathAndFile.c_str(), "wb");
-
-    if(!f) {                                            // failed to open file?
-        Debug::out(LOG_ERROR, "FloppySetup::newImage - failed to open file %s", (char *) pathAndFile.c_str());
-        return false;
-    }
-
-    // create default boot sector (copied from blank .st image created in Steem)
-    BYTE sect0start[]   = {0xeb, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc8, 0x82, 0x75, 0x00, 0x02, 0x02, 0x01, 0x00, 0x02, 0x70, 0x00, 0xa0, 0x05, 0xf9, 0x05, 0x00, 0x09, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00};
-    BYTE sect0end[]     = {0x00, 0x97, 0xc7};
-
-    BYTE bfr[512];
-    memset(bfr, 0, 512);
-
-    memcpy(bfr, sect0start, sizeof(sect0start));                        // copy the start of default boot sector to start of buffer
-    memcpy(bfr + 512 - sizeof(sect0end), sect0end, sizeof(sect0end));   // copy the end of default boot sector to end of buffer
-
-    fwrite(bfr, 1, 512, f);
-
-    // create the empty rest of the file
-    memset(bfr, 0, 512);
-
-    int totalSectorCount = (9*80*2) - 1;                                // calculate the count of sectors on a floppy - 2 sides, 80 tracks, 9 spt, minus the already written boot sector
-
-    for(int i=0; i<totalSectorCount; i++) {
-        fwrite(bfr, 1, 512, f);
-    }
-
-    fclose(f);
-    return true;
 }
 
 void FloppySetup::getNewImageName(char *nameBfr)
