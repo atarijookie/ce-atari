@@ -86,12 +86,12 @@ chmod +x /ce/update/*.sh
 #--------------------------
 # check what chips we really need to flash
 
-hans_curr=$( read_from_file /ce/update/FW_HANS_CURRENT 0 )
-franz_curr=$( read_from_file /ce/update/FW_FRANZ_CURRENT 0 )
-xilinx_curr=$( read_from_file /ce/update/xilinx_current.txt 0 )
+hans_curr=$( read_from_file /ce/update/hans.curent 0 )
+franz_curr=$( read_from_file /ce/update/franz.current 0 )
+xilinx_curr=$( read_from_file /ce/update/xilinx.current 0 )
 
-hans_new=$( read_from_file /ce/update/FW_HANS_NEW 1 )
-franz_new=$( read_from_file /ce/update/FW_FRANZ_NEW 1 )
+hans_new=$( read_from_file /ce/update/hans.version 1 )
+franz_new=$( read_from_file /ce/update/franz.version 1 )
 xilinx_new=$( read_from_file /ce/update/xilinx_used.version 1 ) # get new version for last used xilinx type by using this symlink
 
 update_hans=0
@@ -138,13 +138,13 @@ fi
 # update hans
 if [ "$update_hans" -gt "0" ]; then
     /ce/update/update_hans.sh
-    cp -f /ce/update/FW_HANS_NEW /ce/update/FW_HANS_CURRENT     # copy version the file to CURRENT so we'll know what we have flashed
+    cp -f /ce/update/hans.version /ce/update/hans.current     # copy version the file to CURRENT so we'll know what we have flashed
 fi
 
 # update franz
 if [ "$update_franz" -gt "0" ]; then
     /ce/update/update_franz.sh
-    cp -f /ce/update/FW_FRANZ_NEW /ce/update/FW_FRANZ_CURRENT   # copy version the file to CURRENT so we'll know what we have flashed
+    cp -f /ce/update/franz.version /ce/update/franz.current   # copy version the file to CURRENT so we'll know what we have flashed
 fi
 
 #--------------
