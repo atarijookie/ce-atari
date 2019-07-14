@@ -1,20 +1,37 @@
 This is a short description on how to make a new CosmosEx release
 -----------------------------------------------------------------
 
-1. download the file: http://joo.kie.sk/cosmosex/update/app.zip
-   ...and extract it to some directory - to preserve the previous structure, and files which don't need changing. 
+The releases for all the distros are here:
+https://github.com/atarijookie/ce-atari-releases.git
 
-2. if config drive changed, use mtools or steem to create new app/ce_conf.msa
-   ...and use tar to create net app/ce_conf.tar
-   ...and also copy them to app/configdrive (if you didn't do thart in step 2)
+The current branches (distros) are:
+- yocto
+- jessie
+- stretch
 
-3. if shell scripts changed, update them in app/newscripts
+Do a clone of that distro:
+git clone https://github.com/atarijookie/ce-atari-releases.git
 
-4. build binary on Yocto and on Raspbian, place them in app/ dir
+...and switch to the branch (distro) you are changing:
+git checkout your_distro
 
-5. copy ce_rename_for_distro.sh to app/cosmosex , so the first run on ce_main_app will result in using the right binary for the distro
+You will do a release for the general public by git commit and git push to the desired branch. 
+If you don't have permission for that, create a pull request and someone who has the permission might merge it.
 
-6. create an app.zip from that directory
+Files specific for single distro are only in the branch for that distro.
+Files which are shared by multiple distros can / have to be copies to all the branches.
 
-7. upload it to ftp, run checksums.php 
+Branch master is currently unused.
+
+When you are releasing new firmware file for chips, you might need to update (or create) .version file:
+franz.version
+hans.version
+xilinx.version
+xlnx2a.version
+xlnx2s.version
+
+There files contain date of the firmware release for each individual file, without dashes, like this:
+20161130
+- this means year 2016, month 11, day 30.
+(The version with dashes like this 2016-11-30 was used before, but it's hard to compare in shell.)
 
