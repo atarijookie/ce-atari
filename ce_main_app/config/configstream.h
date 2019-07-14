@@ -23,7 +23,7 @@ enum CS_ACTION { CS_CREATE_ACSI = 1,    CS_CREATE_TRANSLATED,   CS_CREATE_SHARED
                  CS_SAVE_ACSI,          CS_SAVE_TRANSLATED,     CS_SAVE_NETWORK,
                  CS_HDDIMAGE_SAVE,      CS_HDDIMAGE_CLEAR,
                  CS_HIDE_MSG_SCREEN,    CS_GO_HOME,
-                 CS_UPDATE_CHECK,       CS_UPDATE_CHECK_USB,    CS_UPDATE_UPDATE,
+                 CS_UPDATE_ONLINE,      CS_UPDATE_USB,          CS_UPDATE_UPDATE,
                  CS_SHARED_TEST,        CS_SHARED_SAVE,
                  CS_FLOPPY_IMAGE_SAVE,  CS_FLOPPY_CONFIG_SAVE,
                  CS_OTHER_SAVE,         CS_RESET_SETTINGS,      CS_SEND_SETTINGS,
@@ -138,10 +138,8 @@ private:
     int stScreenWidth;
     int gotoOffset;
 
-    bool updateFromWebNotUsb;
-    
     int enterKeyEventLater;
-    
+
     AcsiDataTrans       *dataTrans;
     SettingsReloadProxy *reloadProxy;
 
@@ -156,7 +154,7 @@ private:
     DWORD lastCmdTime;
 
     void enterKeyHandler(int event);
-    
+
     void destroyCurrentScreen(void);
     void setFocusToFirstFocusable(void);
 
@@ -167,9 +165,9 @@ private:
     void onTranslated_save(void);
     void onNetwork_save(void);
 
-    void onUpdateCheck(void);
-    void onUpdateCheckUsb(void);
-    void onUpdateUpdate(void);
+    void updateOnline(void);
+    void updateFromFile(void);
+    void updateStart(void);
     BYTE isUpdateScreen(void);
     void datesToStrings(Version &v1, std::string &str);
     void createScreen_update_download(void);

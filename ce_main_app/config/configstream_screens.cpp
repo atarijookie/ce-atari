@@ -42,9 +42,9 @@ extern SharedObjects shared;
 void ConfigStream::createScreen_homeScreen(void)
 {
     // the following 3 lines should be at start of each createScreen_ method
-    destroyCurrentScreen();				// destroy current components
-    screenChanged		= true;			// mark that the screen has changed
-    showingHomeScreen	= true;			// mark that we're showing the home screen
+    destroyCurrentScreen();             // destroy current components
+    screenChanged       = true;         // mark that the screen has changed
+    showingHomeScreen   = true;         // mark that we're showing the home screen
 
     screen_addHeaderAndFooter(screen, "Main menu");
 
@@ -53,12 +53,12 @@ void ConfigStream::createScreen_homeScreen(void)
     int line = 4;
     
     const char *idConfigLabel = (hwConfig.hddIface == HDD_IF_SCSI) ? " SCSI IDs config " : " ACSI IDs config ";
-    comp = new ConfigComponent(this, ConfigComponent::button, idConfigLabel,	    18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, idConfigLabel,        18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_ACSI);
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Translated disks ",	18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Translated disks ", 18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_TRANSLATED);
     screen.push_back(comp);
     line += 2;
@@ -68,32 +68,32 @@ void ConfigStream::createScreen_homeScreen(void)
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Shared drive ",		18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Shared drive ",     18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_SHARED);
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Floppy config ",	18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Floppy config ",    18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_FLOPPY_CONF);
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Network settings ",	18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Network settings ", 18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_NETWORK);
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " IKBD ",	            18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " IKBD ",             18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_IKBD);
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Other ",	        18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Other ",            18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_OTHER);
     screen.push_back(comp);
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Update software ",	18, 10, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Update software ",  18, 10, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_CREATE_UPDATE);
     screen.push_back(comp);
     line += 2;
@@ -104,9 +104,9 @@ void ConfigStream::createScreen_homeScreen(void)
 void ConfigStream::createScreen_acsiConfig(void)
 {
     // the following 3 lines should be at start of each createScreen_ method
-    destroyCurrentScreen();				// destroy current components
-    screenChanged		= true;			// mark that the screen has changed
-    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+    destroyCurrentScreen();             // destroy current components
+    screenChanged       = true;         // mark that the screen has changed
+    showingHomeScreen   = false;        // mark that we're NOT showing the home screen
 
     const char *idHeaderLabel = (hwConfig.hddIface == HDD_IF_SCSI) ? " SCSI IDs config " : " ACSI IDs config ";
     screen_addHeaderAndFooter(screen, idHeaderLabel);
@@ -119,7 +119,7 @@ void ConfigStream::createScreen_acsiConfig(void)
 
     int row;
 
-    for(row=0; row<8; row++) {			// now make 8 rows of checkboxes
+    for(row=0; row<8; row++) {          // now make 8 rows of checkboxes
         char bfr[5];
         sprintf(bfr, "%d", row);
 
@@ -127,8 +127,8 @@ void ConfigStream::createScreen_acsiConfig(void)
         screen.push_back(comp);
 
         for(int col=0; col<4; col++) {
-            comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ", 3, 10 + (col * 6), row + 4, gotoOffset);			// create and place checkbox on screen
-            comp->setCheckboxGroupIds(row, col);																// set checkbox group id to row, and checbox id to col
+            comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ", 3, 10 + (col * 6), row + 4, gotoOffset);         // create and place checkbox on screen
+            comp->setCheckboxGroupIds(row, col);                                                                // set checkbox group id to row, and checbox id to col
             screen.push_back(comp);
         }
     }
@@ -144,7 +144,7 @@ void ConfigStream::createScreen_acsiConfig(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "raw   - raw sector access (use HDDr/ICD)",     40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "ce_dd - for booting CE_DD driver",	40, 0, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "ce_dd - for booting CE_DD driver",    40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  9, 13, gotoOffset);
@@ -160,15 +160,15 @@ void ConfigStream::createScreen_acsiConfig(void)
     Settings s;
 
     char key[32];
-    for(int id=0; id<8; id++) {							// read the list of device types from settings
-        sprintf(key, "ACSI_DEVTYPE_%d", id);			// create settings KEY, e.g. ACSI_DEVTYPE_0
+    for(int id=0; id<8; id++) {                         // read the list of device types from settings
+        sprintf(key, "ACSI_DEVTYPE_%d", id);            // create settings KEY, e.g. ACSI_DEVTYPE_0
         int devType = s.getInt(key, DEVTYPE_OFF);
 
         if(devType < 0) {
             devType = DEVTYPE_OFF;
         }
 
-        checkboxGroup_setCheckedId(id, devType);		// set the checkboxes according to settings
+        checkboxGroup_setCheckedId(id, devType);        // set the checkboxes according to settings
     }
 
     setFocusToFirstFocusable();
@@ -177,34 +177,34 @@ void ConfigStream::createScreen_acsiConfig(void)
 void ConfigStream::createScreen_network(void)
 {
     // the following 3 lines should be at start of each createScreen_ method
-    destroyCurrentScreen();				// destroy current components
-    screenChanged	= true;			// mark that the screen has changed
-    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+    destroyCurrentScreen();             // destroy current components
+    screenChanged   = true;         // mark that the screen has changed
+    showingHomeScreen   = false;        // mark that we're NOT showing the home screen
 
     screen_addHeaderAndFooter(screen, "Network settings");
 
     ConfigComponent *comp;
 
-	int col0x = 3;
-	int col1x = 6;
-	int col2x = 19;
-	
+    int col0x = 3;
+    int col1x = 6;
+    int col2x = 19;
+    
     // hostname setting
-	int row = 3;
-	
-	comp = new ConfigComponent(this, ConfigComponent::label, "Hostname",	10,	col0x, row, gotoOffset);
+    int row = 3;
+    
+    comp = new ConfigComponent(this, ConfigComponent::label, "Hostname",    10, col0x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",   15, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_HOSTNAME);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_ALLOW_NUMBERS);
     screen.push_back(comp);
 
     // DNS
-    comp = new ConfigComponent(this, ConfigComponent::label, "DNS",			40, col0x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "DNS",         40, col0x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",   15, col2x, row, gotoOffset);
     comp->setComponentId(COMPID_NET_DNS);
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
@@ -212,36 +212,36 @@ void ConfigStream::createScreen_network(void)
     row += 2;
     
     // settings for ethernet
-    comp = new ConfigComponent(this, ConfigComponent::label, "Ethernet",	10,	col0x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Ethernet",    10, col0x, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Use DHCP",	10, col1x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Use DHCP",    10, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::checkbox, " ",		1,	col2x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, " ",        1,  col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_NET_DHCP);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "IP address",	40,	col1x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "IP address",  40, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",   15, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_NET_IP);
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Mask",		40, col1x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Mask",        40, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",   15, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_NET_MASK);
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Gateway",		40, col1x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Gateway",     40, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",   15, col2x, row, gotoOffset);
     comp->setComponentId(COMPID_NET_GATEWAY);
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
@@ -249,7 +249,7 @@ void ConfigStream::createScreen_network(void)
     row += 2;
 
     // settings for wifi
-    comp = new ConfigComponent(this, ConfigComponent::label, "Wifi",		10,	col0x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Wifi",        10, col0x, row++, gotoOffset);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::label, "Enable",      10, col1x, row, gotoOffset);
@@ -259,19 +259,19 @@ void ConfigStream::createScreen_network(void)
     comp->setComponentId(COMPID_WIFI_ENABLE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "WPA SSID",	20,	col1x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "WPA SSID",    20, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "     ",	31, col2x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "     ",    31, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_WIFI_SSID);
     comp->setTextOptions(TEXT_OPTION_ALLOW_ALL);
     comp->setLimitedShowSize(15);               // limit to showing only 15 characters
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "WPA PSK",	20,         col1x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "WPA PSK", 20,         col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline_pass, "      ",	63, col2x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline_pass, "      ",  63, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_WIFI_PSK);
     comp->setTextOptions(TEXT_OPTION_ALLOW_ALL);
     comp->setLimitedShowSize(15);               // limit to showing only 15 characters
@@ -279,39 +279,39 @@ void ConfigStream::createScreen_network(void)
 
     row++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Use DHCP",	10, col1x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Use DHCP",    10, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::checkbox, " ",		1,	col2x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, " ",        1,  col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_WIFI_DHCP);
     screen.push_back(comp);
-	
-    comp = new ConfigComponent(this, ConfigComponent::label, "IP address",	40,	col1x, row, gotoOffset);
+    
+    comp = new ConfigComponent(this, ConfigComponent::label, "IP address",  40, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",   15, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_WIFI_IP);
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Mask",		40, col1x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Mask",        40, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",   15, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_WIFI_MASK);
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Gateway",		40, col1x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Gateway",     40, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",	15, col2x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "      ",   15, col2x, row, gotoOffset);
     comp->setComponentId(COMPID_WIFI_GATEWAY);
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
 
-	row += 2;
-	// buttons
+    row += 2;
+    // buttons
 
     comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  9, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_SAVE_NETWORK);
@@ -324,25 +324,25 @@ void ConfigStream::createScreen_network(void)
     screen.push_back(comp);
 
     // get the settings, store them to components
-	NetworkSettings ns;
-	ns.load();						// load the current values
+    NetworkSettings ns;
+    ns.load();                      // load the current values
 
     setTextByComponentId(COMPID_HOSTNAME,       ns.hostname);
-    setTextByComponentId(COMPID_NET_DNS,		ns.nameserver);
+    setTextByComponentId(COMPID_NET_DNS,        ns.nameserver);
 
-    setBoolByComponentId(COMPID_NET_DHCP,		ns.eth0.dhcpNotStatic);
-    setTextByComponentId(COMPID_NET_IP,			ns.eth0.address);
-    setTextByComponentId(COMPID_NET_MASK,		ns.eth0.netmask);
-    setTextByComponentId(COMPID_NET_GATEWAY,	ns.eth0.gateway);
+    setBoolByComponentId(COMPID_NET_DHCP,       ns.eth0.dhcpNotStatic);
+    setTextByComponentId(COMPID_NET_IP,         ns.eth0.address);
+    setTextByComponentId(COMPID_NET_MASK,       ns.eth0.netmask);
+    setTextByComponentId(COMPID_NET_GATEWAY,    ns.eth0.gateway);
 
     setBoolByComponentId(COMPID_WIFI_ENABLE,    ns.wlan0.isEnabled);
-    setBoolByComponentId(COMPID_WIFI_DHCP,		ns.wlan0.dhcpNotStatic);
-    setTextByComponentId(COMPID_WIFI_IP,		ns.wlan0.address);
-    setTextByComponentId(COMPID_WIFI_MASK,		ns.wlan0.netmask);
-    setTextByComponentId(COMPID_WIFI_GATEWAY,	ns.wlan0.gateway);
+    setBoolByComponentId(COMPID_WIFI_DHCP,      ns.wlan0.dhcpNotStatic);
+    setTextByComponentId(COMPID_WIFI_IP,        ns.wlan0.address);
+    setTextByComponentId(COMPID_WIFI_MASK,      ns.wlan0.netmask);
+    setTextByComponentId(COMPID_WIFI_GATEWAY,   ns.wlan0.gateway);
 
-    setTextByComponentId(COMPID_WIFI_SSID,		ns.wlan0.wpaSsid);
-    setTextByComponentId(COMPID_WIFI_PSK,		ns.wlan0.wpaPsk);
+    setTextByComponentId(COMPID_WIFI_SSID,      ns.wlan0.wpaSsid);
+    setTextByComponentId(COMPID_WIFI_PSK,       ns.wlan0.wpaPsk);
 
     setFocusToFirstFocusable();
 }
@@ -350,9 +350,9 @@ void ConfigStream::createScreen_network(void)
 void ConfigStream::createScreen_translated(void)
 {
     // the following 3 lines should be at start of each createScreen_ method
-    destroyCurrentScreen();				// destroy current components
-    screenChanged		= true;			// mark that the screen has changed
-    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+    destroyCurrentScreen();             // destroy current components
+    screenChanged       = true;         // mark that the screen has changed
+    showingHomeScreen   = false;        // mark that we're NOT showing the home screen
 
     screen_addHeaderAndFooter(screen, "Translated disk");
 
@@ -368,7 +368,7 @@ void ConfigStream::createScreen_translated(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "First translated drive",  23, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                1, col3x + 3, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",                    1, col3x + 3, row++, gotoOffset);
     comp->setComponentId(COMPID_TRAN_FIRST);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
@@ -377,7 +377,7 @@ void ConfigStream::createScreen_translated(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "Shared drive",            23, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                1, col3x + 3, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",                    1, col3x + 3, row++, gotoOffset);
     comp->setComponentId(COMPID_TRAN_SHARED);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
@@ -385,7 +385,7 @@ void ConfigStream::createScreen_translated(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "Config drive",            23, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, " ",	                1, col3x + 3, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",                    1, col3x + 3, row++, gotoOffset);
     comp->setComponentId(COMPID_TRAN_CONFDRIVE);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
@@ -397,44 +397,44 @@ void ConfigStream::createScreen_translated(void)
     screen.push_back(comp);
     row++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Mount USB media as",							40, col1x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Mount USB media as",                          40, col1x, row, gotoOffset);
     screen.push_back(comp);
-	
-	comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",										3,	col2x, row, gotoOffset);
+    
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                                      3,  col2x, row, gotoOffset);
     comp->setCheckboxGroupIds(COMPID_MOUNT_RAW_NOT_TRANS, 0);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "translated",  								40,	col3x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "translated",                                  40, col3x, row++, gotoOffset);
     screen.push_back(comp);
-	
-	comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",										3,	col2x, row, gotoOffset);
+    
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                                      3,  col2x, row, gotoOffset);
     comp->setCheckboxGroupIds(COMPID_MOUNT_RAW_NOT_TRANS, 1);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "RAW",						                    40,	col3x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "RAW",                                         40, col3x, row++, gotoOffset);
     screen.push_back(comp);
 
-	row++;
+    row++;
     //------------
     
-    comp = new ConfigComponent(this, ConfigComponent::label, "Access ZIP files as",							40, col1x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Access ZIP files as",                         40, col1x, row, gotoOffset);
     screen.push_back(comp);
-	
-	comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",										3,	col2x, row, gotoOffset);
+    
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                                      3,  col2x, row, gotoOffset);
     comp->setCheckboxGroupIds(COMPID_USE_ZIP_DIR_NOT_FILE, 0);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "files",  								        40,	col3x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "files",                                       40, col3x, row++, gotoOffset);
     screen.push_back(comp);
-	
-	comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",										3,	col2x, row, gotoOffset);
+    
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                                      3,  col2x, row, gotoOffset);
     comp->setCheckboxGroupIds(COMPID_USE_ZIP_DIR_NOT_FILE, 1);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "dirs", 			                            40,	col3x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "dirs",                                        40, col3x, row++, gotoOffset);
     screen.push_back(comp);
 
-	row++;
+    row++;
     //------------
     
     comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ", 8,  9, row, gotoOffset);
@@ -446,7 +446,7 @@ void ConfigStream::createScreen_translated(void)
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
-	row++;
+    row++;
 
     //------------
     comp = new ConfigComponent(this, ConfigComponent::label, "If you use also raw disks (Atari native ",    40, 0, row++, gotoOffset);
@@ -458,7 +458,7 @@ void ConfigStream::createScreen_translated(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "letters from C: to leave some space for",     40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "them.",	40, 0, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "them.",   40, 0, row++, gotoOffset);
     screen.push_back(comp);
     row++;
     //------------
@@ -490,20 +490,20 @@ void ConfigStream::createScreen_translated(void)
     //---------
     mountRawNotTrans = s.getBool("MOUNT_RAW_NOT_TRANS", 0);
 
- 	if(mountRawNotTrans) {
-		checkboxGroup_setCheckedId(COMPID_MOUNT_RAW_NOT_TRANS, 1);			// select RAW
-	} else {
-		checkboxGroup_setCheckedId(COMPID_MOUNT_RAW_NOT_TRANS, 0);			// select TRANS
-	}
+    if(mountRawNotTrans) {
+        checkboxGroup_setCheckedId(COMPID_MOUNT_RAW_NOT_TRANS, 1);          // select RAW
+    } else {
+        checkboxGroup_setCheckedId(COMPID_MOUNT_RAW_NOT_TRANS, 0);          // select TRANS
+    }
     
     //---------
     bool useZipdirNotFile = s.getBool("USE_ZIP_DIR", 1);           // use ZIP DIRs, enabled by default
 
- 	if(useZipdirNotFile) {
-		checkboxGroup_setCheckedId(COMPID_USE_ZIP_DIR_NOT_FILE, 1);			// ZIP DIRs enabled
-	} else {
-		checkboxGroup_setCheckedId(COMPID_USE_ZIP_DIR_NOT_FILE, 0);			// ZIP DIRs disabled
-	}
+    if(useZipdirNotFile) {
+        checkboxGroup_setCheckedId(COMPID_USE_ZIP_DIR_NOT_FILE, 1);         // ZIP DIRs enabled
+    } else {
+        checkboxGroup_setCheckedId(COMPID_USE_ZIP_DIR_NOT_FILE, 0);         // ZIP DIRs disabled
+    }
     //---------
 
     setFocusToFirstFocusable();
@@ -517,36 +517,36 @@ void ConfigStream::onAcsiConfig_save(void)
     bool somethingInvalid = false;
     int tranCnt = 0, sdCnt = 0;
 
-    for(int id=0; id<8; id++) {								// get all selected types from checkbox groups
+    for(int id=0; id<8; id++) {                             // get all selected types from checkbox groups
         devTypes[id] = checkboxGroup_getCheckedId(id);
 
-        if(devTypes[id] != DEVTYPE_OFF) {					// if found something which is not OFF
+        if(devTypes[id] != DEVTYPE_OFF) {                   // if found something which is not OFF
             somethingActive = true;
         }
 
-        switch(devTypes[id]) {								// count the shared drives, network adapters, config drives
-        case DEVTYPE_TRANSLATED:	tranCnt++;					break;
+        switch(devTypes[id]) {                              // count the shared drives, network adapters, config drives
+        case DEVTYPE_TRANSLATED:    tranCnt++;                  break;
         case DEVTYPE_SD:            sdCnt++;                    break;
-        case -1:					somethingInvalid = true;	break;
+        case -1:                    somethingInvalid = true;    break;
         }
     }
 
-    if(somethingInvalid) {									// if everything is set to OFF
+    if(somethingInvalid) {                                  // if everything is set to OFF
         showMessageScreen("Warning", "Some ACSI/SCSI ID has no selected type.\n\rGo and select something!");
         return;
     }
 
-    if(!somethingActive) {									// if everything is set to OFF
+    if(!somethingActive) {                                  // if everything is set to OFF
         showMessageScreen("Warning", "All ACSI/SCSI IDs are set to 'OFF',\n\rit is invalid and would brick the device.\n\rSelect at least one active ACSI/SCSI ID.");
         return;
     }
 
-    if(tranCnt > 1) {										// more than 1 of this type?
+    if(tranCnt > 1) {                                       // more than 1 of this type?
         showMessageScreen("Warning", "You have more than 1 CE_DD selected.\n\rUnselect some to leave only\n\r1 active.");
         return;
     }
 
-    if(sdCnt > 1) {										    // more than 1 of this type?
+    if(sdCnt > 1) {                                         // more than 1 of this type?
         showMessageScreen("Warning", "You have more than 1 SD cards\n\rselected. Unselect some to leave only\n\r1 active.");
         return;
     }
@@ -561,8 +561,8 @@ void ConfigStream::onAcsiConfig_save(void)
     Settings s;
     char key[32];
 
-    for(int id=0; id<8; id++) {								// write all the ACSI IDs to settings
-        sprintf(key, "ACSI_DEVTYPE_%d", id);				// create settings KEY, e.g. ACSI_DEVTYPE_0
+    for(int id=0; id<8; id++) {                             // write all the ACSI IDs to settings
+        sprintf(key, "ACSI_DEVTYPE_%d", id);                // create settings KEY, e.g. ACSI_DEVTYPE_0
         s.setInt(key, devTypes[id]);
     }
 
@@ -572,7 +572,7 @@ void ConfigStream::onAcsiConfig_save(void)
 
     Utils::forceSync();                                     // tell system to flush the filesystem caches
 
-    createScreen_homeScreen();		// now back to the home screen
+    createScreen_homeScreen();      // now back to the home screen
 }
 
 void ConfigStream::onTranslated_save(void)
@@ -641,34 +641,34 @@ void ConfigStream::onTranslated_save(void)
 
     Utils::forceSync();                                     // tell system to flush the filesystem caches
 
-    createScreen_homeScreen();		// now back to the home screen
+    createScreen_homeScreen();      // now back to the home screen
 }
 
 void ConfigStream::onNetwork_save(void)
 {
-	// for eth0
+    // for eth0
     std::string eIp, eMask, eGateway;
     bool eUseDhcp;
 
-	// for wlan0
+    // for wlan0
     std::string wIp, wMask, wGateway;
     bool wUseDhcp, wifiIsEnabled;
 
     std::string dns, hostname;
 
     // read the settings from components
-    getBoolByComponentId(COMPID_NET_DHCP,		eUseDhcp);
-    getTextByComponentId(COMPID_NET_IP,			eIp);
-    getTextByComponentId(COMPID_NET_MASK,		eMask);
-    getTextByComponentId(COMPID_NET_GATEWAY,	eGateway);
+    getBoolByComponentId(COMPID_NET_DHCP,       eUseDhcp);
+    getTextByComponentId(COMPID_NET_IP,         eIp);
+    getTextByComponentId(COMPID_NET_MASK,       eMask);
+    getTextByComponentId(COMPID_NET_GATEWAY,    eGateway);
 
     getBoolByComponentId(COMPID_WIFI_ENABLE,    wifiIsEnabled);
-    getBoolByComponentId(COMPID_WIFI_DHCP,		wUseDhcp);
-    getTextByComponentId(COMPID_WIFI_IP,		wIp);
-    getTextByComponentId(COMPID_WIFI_MASK,		wMask);
-    getTextByComponentId(COMPID_WIFI_GATEWAY,	wGateway);
+    getBoolByComponentId(COMPID_WIFI_DHCP,      wUseDhcp);
+    getTextByComponentId(COMPID_WIFI_IP,        wIp);
+    getTextByComponentId(COMPID_WIFI_MASK,      wMask);
+    getTextByComponentId(COMPID_WIFI_GATEWAY,   wGateway);
 
-    getTextByComponentId(COMPID_NET_DNS,		dns);
+    getTextByComponentId(COMPID_NET_DNS,        dns);
     getTextByComponentId(COMPID_HOSTNAME,       hostname);
 
     if(hostname.empty()) {
@@ -764,19 +764,29 @@ void ConfigStream::onNetwork_save(void)
     }
 
     //-------------------------
-    createScreen_homeScreen();		// now back to the home screen
+    createScreen_homeScreen();      // now back to the home screen
 }
 
 void ConfigStream::createScreen_update(void)
 {
+    #define MIN_CHECK_PAUSE         (5 * 60 * 1000)
+
+    static DWORD lastUpdateCheck = 0;               // this holds the ime when we've last checked for update
+    DWORD now;
+
+    now = Utils::getCurrentMs(); 
+
+    if((now - lastUpdateCheck) >= MIN_CHECK_PAUSE) { // check for update, but not too often
+        lastUpdateCheck = now;
+        system("/ce/check_for_update.sh &");
+    }
+
     // the following 3 lines should be at start of each createScreen_ method
-    destroyCurrentScreen();			// destroy current components
-    screenChanged	= true;			// mark that the screen has changed
-    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+    destroyCurrentScreen();         // destroy current components
+    screenChanged   = true;         // mark that the screen has changed
+    showingHomeScreen   = false;        // mark that we're NOT showing the home screen
 
     screen_addHeaderAndFooter(screen, "Software & Firmware updates");
-
-    updateFromWebNotUsb = true;         // do update from web
 
     ConfigComponent *comp;
 
@@ -844,48 +854,48 @@ void ConfigStream::createScreen_update(void)
 
     line += 2;
 
-	int col1 = 8, col2 = 21;
+    int col1 = 8, col2 = 21;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Main App", 12,	col1, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Main App", 12,    col1, line, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,           col2, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_COSMOSEX);
     screen.push_back(comp);
     line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Franz", 12, 		col1, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Franz", 12,       col1, line, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26, 			col2, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,           col2, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_FRANZ);
     screen.push_back(comp);
     line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Hans", 12,		col1, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Hans", 12,        col1, line, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,           col2, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_HANZ);
     screen.push_back(comp);
     line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Xilinx", 12,		col1, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Xilinx", 12,      col1, line, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,			col2, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,           col2, line, gotoOffset);
     comp->setComponentId(COMPID_UPDATE_XILINX);
     screen.push_back(comp);
 
     line += 2;
 
     comp = new ConfigComponent(this, ConfigComponent::button, " From web ", 10,  2, line, gotoOffset);
-    comp->setOnEnterFunctionCode(CS_UPDATE_CHECK);
+    comp->setOnEnterFunctionCode(CS_UPDATE_ONLINE);
     comp->setComponentId(COMPID_UPDATE_BTN_CHECK);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::button, " From USB ", 10,  15, line, gotoOffset);
-    comp->setOnEnterFunctionCode(CS_UPDATE_CHECK_USB);
+    comp->setOnEnterFunctionCode(CS_UPDATE_USB);
     comp->setComponentId(COMPID_UPDATE_BTN_CHECK_USB);
     screen.push_back(comp);
 
@@ -925,28 +935,24 @@ void ConfigStream::datesToStrings(Version &v1, std::string &str)
     str.resize(14, ' ');        // and expand it to length of 14 with spaces
 }
 
-void ConfigStream::onUpdateCheck(void)
+void ConfigStream::updateOnline(void)
 {
-    updateFromWebNotUsb = true;         // do update from web
+    Update::removeSimpleTextFile(UPDATE_USBFILE);       // remove this file to avoid trying to update from USB
+    
+    if(Utils::fileExists("/tmp/UPDATE_PENDING_NO")) {   // check_for_update.sh returned NO update pending
+        showMessageScreen("Update from USB", "Everything seems to be up-to-date.\n\rNot doing update.\n\r");
+        return;
+    }
 
-    #ifdef DISTRO_YOCTO
-        showMessageScreen("Info", "On Yocto without git can't check if update\n\rrealy needed, so will update every time.\n\r");
-    #else
-        // TODO: check if update needed
-
-
-
-
-    #endif
-
-    // if update needed, do the actual update
-    onUpdateUpdate();
+    if(Utils::fileExists("/tmp/UPDATE_PENDING_YES")) {  // check_for_update.sh returned that there is update pending
+        updateStart();                                  // start the update
+    } else {                                            // check_for_update.sh not returned anything yet
+        showMessageScreen("Update Online", "Still checking for update.\n\rPlease try again in a while.\n\r");
+    }
 }
 
-void ConfigStream::onUpdateCheckUsb(void)
+void ConfigStream::updateFromFile(void)
 {
-    updateFromWebNotUsb = false;         // do update from usb
-
     // try to find the update
     std::string pathToUpdateFile;
 
@@ -959,11 +965,11 @@ void ConfigStream::onUpdateCheckUsb(void)
         return;
     }
 
-    // if found, do the actual update
-    onUpdateUpdate();
+    // if found, do the actual update (and path to it will be stored in UPDATE_USBFILE)
+    updateStart();
 }
 
-void ConfigStream::onUpdateUpdate(void)
+void ConfigStream::updateStart(void)
 {
     if(shownOn == CONFIGSTREAM_IN_LINUX_CONSOLE) {               // when trying to do update from from linux console
         showMessageScreen("STOP!", "Don't update the firmware using\n\rlinux console config tool!\n\r\n\rInstead run /ce/ce_update.sh or\n\rdo it using CE_CONF.TOS on Atari.");
@@ -975,19 +981,18 @@ void ConfigStream::onUpdateUpdate(void)
         return;
     }
 
-    if(updateFromWebNotUsb) {           // if should update from web
-        createScreen_update_download();
-    } else {                            // if should update from usb
-//      Update::stateGoDownloadOK();    // tell the core thread that we got the files already
-    }
+    // TODO: terminate app and do the update
+
+
+
 }
 
 void ConfigStream::createScreen_update_download(void)
 {
     // the following 3 lines should be at start of each createScreen_ method
-    destroyCurrentScreen();			    // destroy current components
-    screenChanged	    = true;			// mark that the screen has changed
-    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+    destroyCurrentScreen();             // destroy current components
+    screenChanged       = true;         // mark that the screen has changed
+    showingHomeScreen   = false;        // mark that we're NOT showing the home screen
 
     screen_addHeaderAndFooter(screen, "Download of update");
 
@@ -1019,9 +1024,9 @@ void ConfigStream::createScreen_update_download(void)
 void ConfigStream::createScreen_other(void)
 {
     // the following 3 lines should be at start of each createScreen_ method
-    destroyCurrentScreen();			    // destroy current components
-    screenChanged	    = true;			// mark that the screen has changed
-    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+    destroyCurrentScreen();             // destroy current components
+    screenChanged       = true;         // mark that the screen has changed
+    showingHomeScreen   = false;        // mark that we're NOT showing the home screen
 
     screen_addHeaderAndFooter(screen, "Other settings");
 
@@ -1045,14 +1050,14 @@ void ConfigStream::createScreen_other(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "NTP server",                  40, col + 2, row, gotoOffset);
     screen.push_back(comp);
     
-    comp = new ConfigComponent(this, ConfigComponent::editline, " ",					    15, col2, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",                        15, col2, row++, gotoOffset);
     comp->setComponentId(COMPID_TIMESYNC_NTP_SERVER);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::label, "UTC offset",                  40, col + 2, row, gotoOffset);
     screen.push_back(comp);
     
-    comp = new ConfigComponent(this, ConfigComponent::editline, " ",					    4, col2, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",                        4, col2, row++, gotoOffset);
     comp->setComponentId(COMPID_TIMESYNC_UTC_OFFSET);
     screen.push_back(comp);
 
@@ -1115,7 +1120,7 @@ void ConfigStream::createScreen_other(void)
     bool        setDateTime;
     float       utcOffset;
     std::string ntpServer;
-    int			frameSkip;
+    int         frameSkip;
     int         screenRes;
     
     setDateTime = s.getBool     ("TIME_SET",             true);
@@ -1150,7 +1155,7 @@ void ConfigStream::onOtherSave(void)
     bool        setDateTime = false;
     float       utcOffset   = 0;
     std::string ntpServer;
-    int			frameSkip;
+    int         frameSkip;
     int         screenRes;
     
     getBoolByComponentId(COMPID_TIMESYNC_ENABLE,        setDateTime);
@@ -1180,15 +1185,15 @@ void ConfigStream::onOtherSave(void)
     Utils::setTimezoneVariable_inProfileScript();   // create the timezone setting script, because TIME_UTC_OFFSET could possibly change
     Utils::setTimezoneVariable_inThisContext();     // and also set the TZ variable for this context, so the change for this app would be immediate
     
-    createScreen_homeScreen();		// now back to the home screen
+    createScreen_homeScreen();      // now back to the home screen
 }
 
 void ConfigStream::createScreen_ikbd(void)
 {
     // the following 3 lines should be at start of each createScreen_ method
-    destroyCurrentScreen();			    // destroy current components
-    screenChanged	    = true;			// mark that the screen has changed
-    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+    destroyCurrentScreen();             // destroy current components
+    screenChanged       = true;         // mark that the screen has changed
+    showingHomeScreen   = false;        // mark that we're NOT showing the home screen
 
     screen_addHeaderAndFooter(screen, "IKBD settings");
 
@@ -1239,32 +1244,32 @@ void ConfigStream::createScreen_ikbd(void)
 
     row += 2;
     // button
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colButton, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",                 10, colButton, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY0_BUTTON);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
     // up
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colUpDown, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",                 10, colUpDown, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY0_UP);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
     row++;
     // left
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colLeft, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",                 10, colLeft, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY0_LEFT);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
     // down
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colUpDown, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",                 10, colUpDown, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY0_DOWN);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
     // right
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colRight, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",                 10, colRight, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY0_RIGHT);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
@@ -1284,32 +1289,32 @@ void ConfigStream::createScreen_ikbd(void)
 
     row += 2;
     // button
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colButton, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",                 10, colButton, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY1_BUTTON);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
     // up
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colUpDown, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",                 10, colUpDown, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY1_UP);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
     row++;
     // left
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colLeft, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",                 10, colLeft, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY1_LEFT);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
     // down
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colUpDown, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",                 10, colUpDown, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY1_DOWN);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
 
     // right
-    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",	              10, colRight, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, "          ",                 10, colRight, row, gotoOffset);
     comp->setComponentId(COMPID_KEYBJOY1_RIGHT);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
@@ -1474,7 +1479,7 @@ void ConfigStream::onIkbdSave(void)
     
     do_loadIkbdConfig   = true;     // reload ikbd config
 
-    createScreen_homeScreen();		// now back to the home screen
+    createScreen_homeScreen();      // now back to the home screen
 }
 
 void ConfigStream::fillUpdateDownloadWithProgress(void)
@@ -1560,10 +1565,6 @@ void ConfigStream::showUpdateError(void)
 
 bool ConfigStream::isUpdateDownloadPageShown(void)
 {
-    if(!updateFromWebNotUsb) {                          // if updating from USB key, there's no download page, so say yes
-        return true;
-    }
-
     ConfigComponent *c = findComponentById(COMPID_DL1); // find a component which is on update download page
 
     if(c == NULL) {                                     // not on update download page? 
@@ -1577,9 +1578,9 @@ bool ConfigStream::isUpdateDownloadPageShown(void)
 void ConfigStream::createScreen_hddimage(void)
 {
     // the following 3 lines should be at start of each createScreen_ method
-    destroyCurrentScreen();			// destroy current components
-    screenChanged	= true;			// mark that the screen has changed
-    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+    destroyCurrentScreen();         // destroy current components
+    screenChanged   = true;         // mark that the screen has changed
+    showingHomeScreen   = false;        // mark that we're NOT showing the home screen
 
     screen_addHeaderAndFooter(screen, "Disk Image settings");
 
@@ -1660,125 +1661,125 @@ void ConfigStream::createScreen_hddimage(void)
 void ConfigStream::createScreen_shared(void)
 {
     // the following 3 lines should be at start of each createScreen_ method
-    destroyCurrentScreen();			// destroy current components
-    screenChanged	= true;			// mark that the screen has changed
-    showingHomeScreen	= false;		// mark that we're NOT showing the home screen
+    destroyCurrentScreen();         // destroy current components
+    screenChanged   = true;         // mark that the screen has changed
+    showingHomeScreen   = false;        // mark that we're NOT showing the home screen
 
     screen_addHeaderAndFooter(screen, "Shared drive settings");
 
     ConfigComponent *comp;
 
-	int row = 3;
-	
-	int col1x = 0;
-	int col2x = 10;
-	int col3x = col2x + 6;
-	
-	// description on the top
-    comp = new ConfigComponent(this, ConfigComponent::label, "Define what folder on which machine will",	40, 0, row++, gotoOffset);
+    int row = 3;
+    
+    int col1x = 0;
+    int col2x = 10;
+    int col3x = col2x + 6;
+    
+    // description on the top
+    comp = new ConfigComponent(this, ConfigComponent::label, "Define what folder on which machine will",    40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "be used as drive mounted through network",	40, 0, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "be used as drive mounted through network",    40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "on CosmosEx. Works in translated mode.",		40, 0, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "on CosmosEx. Works in translated mode.",      40, 0, row++, gotoOffset);
     screen.push_back(comp);
 
-	row++;
-	
-	// enabled checkbox
-    comp = new ConfigComponent(this, ConfigComponent::label, "Enabled",										40,	col1x, row, gotoOffset);
+    row++;
+    
+    // enabled checkbox
+    comp = new ConfigComponent(this, ConfigComponent::label, "Enabled",                                     40, col1x, row, gotoOffset);
     screen.push_back(comp);
-	
-    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ", 										3,	col2x, row++, gotoOffset);
+    
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                                      3,  col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_SHARED_ENABLED);
     screen.push_back(comp);
 
-	row++;
-	
-	// sharing protocol checkbox group
-    comp = new ConfigComponent(this, ConfigComponent::label, "Sharing protocol",							40, col1x, row++, gotoOffset);
+    row++;
+    
+    // sharing protocol checkbox group
+    comp = new ConfigComponent(this, ConfigComponent::label, "Sharing protocol",                            40, col1x, row++, gotoOffset);
     screen.push_back(comp);
-	
-	comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",										3,	col2x, row, gotoOffset);
-    comp->setCheckboxGroupIds(COMPID_SHARED_NFS_NOT_SAMBA, 1);																// set checkbox group id COMPID_SHARED_NFS_NOT_SAMBA, and checbox id 1 for NFS (variable SHARED_NFS_NOT_SAMBA)
-    screen.push_back(comp);
-
-    comp = new ConfigComponent(this, ConfigComponent::label, "NFS",											40,	col3x, row++, gotoOffset);
-    screen.push_back(comp);
-	
-	comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",										3,	col2x, row, gotoOffset);
-    comp->setCheckboxGroupIds(COMPID_SHARED_NFS_NOT_SAMBA, 0);																// set checkbox group id COMPID_SHARED_NFS_NOT_SAMBA, and checbox id 0 for Samba (variable SHARED_NFS_NOT_SAMBA)
+    
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                                      3,  col2x, row, gotoOffset);
+    comp->setCheckboxGroupIds(COMPID_SHARED_NFS_NOT_SAMBA, 1);                                                              // set checkbox group id COMPID_SHARED_NFS_NOT_SAMBA, and checbox id 1 for NFS (variable SHARED_NFS_NOT_SAMBA)
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Samba / cifs / windows",						40,	col3x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "NFS",                                         40, col3x, row++, gotoOffset);
+    screen.push_back(comp);
+    
+    comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                                      3,  col2x, row, gotoOffset);
+    comp->setCheckboxGroupIds(COMPID_SHARED_NFS_NOT_SAMBA, 0);                                                              // set checkbox group id COMPID_SHARED_NFS_NOT_SAMBA, and checbox id 0 for Samba (variable SHARED_NFS_NOT_SAMBA)
     screen.push_back(comp);
 
-	row++;
-	
-	
-	// ip address edit line
-    comp = new ConfigComponent(this, ConfigComponent::label, "IP address of server", 						40, col1x, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Samba / cifs / windows",                      40, col3x, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, " ",										15, col2x, row++, gotoOffset);
+    row++;
+    
+    
+    // ip address edit line
+    comp = new ConfigComponent(this, ConfigComponent::label, "IP address of server",                        40, col1x, row++, gotoOffset);
+    screen.push_back(comp);
+
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",                                        15, col2x, row++, gotoOffset);
     comp->setComponentId(COMPID_SHARED_IP);
     comp->setTextOptions(TEXT_OPTION_ALLOW_NUMBERS | TEXT_OPTION_ALLOW_DOT);
     screen.push_back(comp);
 
-	row++;
-	
-	// folder on server
-    comp = new ConfigComponent(this, ConfigComponent::label, "Shared folder path on server",				40, col1x, row++, gotoOffset);
+    row++;
+    
+    // folder on server
+    comp = new ConfigComponent(this, ConfigComponent::label, "Shared folder path on server",                40, col1x, row++, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, " ",										35, 2, row++, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",                                        35, 2, row++, gotoOffset);
     comp->setComponentId(COMPID_SHARED_PATH);
     screen.push_back(comp);
-	
-	row++;
+    
+    row++;
     
     // username and password
-    comp = new ConfigComponent(this, ConfigComponent::label, "Username",				                    40, col1x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Username",                                    40, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline, " ",										40, col2x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline, " ",                                        40, col2x, row, gotoOffset);
     comp->setComponentId(COMPID_USERNAME);
     comp->setLimitedShowSize(20);               // limit to showing only 20 characters
     screen.push_back(comp);
 
-	row++;
+    row++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Password",				                    40, col1x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "Password",                                    40, col1x, row, gotoOffset);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::editline_pass, " ",									40, col2x, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::editline_pass, " ",                                   40, col2x, row, gotoOffset);
     comp->setComponentId(COMPID_PASSWORD);
     comp->setLimitedShowSize(20);               // limit to showing only 20 characters
     screen.push_back(comp);
 
-	row += 2;
-	
-	// buttons
+    row += 2;
+    
+    // buttons
 /*
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Test  ",									8,  4, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Test  ",                                   8,  4, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_SHARED_TEST);
     comp->setComponentId(COMPID_SHARED_BTN_TEST);
     screen.push_back(comp);
 */
-    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ",									8, /*15*/ 9, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "  Save  ",                                   8, /*15*/ 9, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_SHARED_SAVE);
     comp->setComponentId(COMPID_BTN_SAVE);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ",									8, /*27*/ 21, row, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " Cancel ",                                   8, /*27*/ 21, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_GO_HOME);
     comp->setComponentId(COMPID_BTN_CANCEL);
     screen.push_back(comp);
 
     Settings s;
     std::string addr, path, username, password;
-	bool enabled, nfsNotSamba;
+    bool enabled, nfsNotSamba;
 
     addr = s.getString("SHARED_ADDRESS",  "");
     path = s.getString("SHARED_PATH",     "");
@@ -1786,21 +1787,21 @@ void ConfigStream::createScreen_shared(void)
     username = s.getString("SHARED_USERNAME",  "");
     password = s.getString("SHARED_PASSWORD",  "");
 
-	enabled		= s.getBool("SHARED_ENABLED",			false);
-	nfsNotSamba	= s.getBool("SHARED_NFS_NOT_SAMBA",	true);
+    enabled     = s.getBool("SHARED_ENABLED",           false);
+    nfsNotSamba = s.getBool("SHARED_NFS_NOT_SAMBA", true);
 
     setTextByComponentId(COMPID_SHARED_IP,      addr);
     setTextByComponentId(COMPID_SHARED_PATH,    path);
-	setBoolByComponentId(COMPID_SHARED_ENABLED,	enabled);
+    setBoolByComponentId(COMPID_SHARED_ENABLED, enabled);
 
     setTextByComponentId(COMPID_USERNAME,       username);
     setTextByComponentId(COMPID_PASSWORD,       password);
-	
-	if(nfsNotSamba) {
-		checkboxGroup_setCheckedId(COMPID_SHARED_NFS_NOT_SAMBA, 1);			// select NFS
-	} else {
-		checkboxGroup_setCheckedId(COMPID_SHARED_NFS_NOT_SAMBA, 0);			// select samba
-	}
+    
+    if(nfsNotSamba) {
+        checkboxGroup_setCheckedId(COMPID_SHARED_NFS_NOT_SAMBA, 1);         // select NFS
+    } else {
+        checkboxGroup_setCheckedId(COMPID_SHARED_NFS_NOT_SAMBA, 0);         // select samba
+    }
 
     setFocusToFirstFocusable();
 }
@@ -1882,27 +1883,27 @@ void ConfigStream::onSharedTest(void)
 void ConfigStream::onSharedSave(void)
 {
     std::string ip, path, username, password;
-	bool enabled, nfsNotSamba;
+    bool enabled, nfsNotSamba;
 
     getTextByComponentId(COMPID_SHARED_IP,      ip);
     getTextByComponentId(COMPID_SHARED_PATH,    path);
-	getBoolByComponentId(COMPID_SHARED_ENABLED,	enabled);
-	nfsNotSamba = (bool) checkboxGroup_getCheckedId(COMPID_SHARED_NFS_NOT_SAMBA);
+    getBoolByComponentId(COMPID_SHARED_ENABLED, enabled);
+    nfsNotSamba = (bool) checkboxGroup_getCheckedId(COMPID_SHARED_NFS_NOT_SAMBA);
 
     getTextByComponentId(COMPID_USERNAME,       username);
     getTextByComponentId(COMPID_PASSWORD,       password);
 
-	if(enabled) {										// if enabled, do validity checks, othewise let it just pass
-		if(!verifyAndFixIPaddress(ip, ip, false)) {
-			showMessageScreen("Warning", "Server address seems to be invalid.\n\rPlease fix this and try again.");
-			return;
-		}
+    if(enabled) {                                       // if enabled, do validity checks, othewise let it just pass
+        if(!verifyAndFixIPaddress(ip, ip, false)) {
+            showMessageScreen("Warning", "Server address seems to be invalid.\n\rPlease fix this and try again.");
+            return;
+        }
 
-		if(path.length() < 1) {
-			showMessageScreen("Warning", "Path for server is empty.\n\rPlease fix this and try again.");
-			return;
-		}
-	}
+        if(path.length() < 1) {
+            showMessageScreen("Warning", "Path for server is empty.\n\rPlease fix this and try again.");
+            return;
+        }
+    }
     
     #ifndef DISTRO_YOCTO
     // on Raspbian - warn about NFS
@@ -1915,26 +1916,26 @@ void ConfigStream::onSharedSave(void)
 
     Settings s;
 
-	s.setBool	("SHARED_ENABLED",			enabled);
-	s.setBool	("SHARED_NFS_NOT_SAMBA",	nfsNotSamba);
-    s.setString	("SHARED_ADDRESS",  		ip.c_str());
-    s.setString	("SHARED_PATH",     		path.c_str());
+    s.setBool   ("SHARED_ENABLED",          enabled);
+    s.setBool   ("SHARED_NFS_NOT_SAMBA",    nfsNotSamba);
+    s.setString ("SHARED_ADDRESS",          ip.c_str());
+    s.setString ("SHARED_PATH",             path.c_str());
 
-    s.setString	("SHARED_USERNAME",  		username.c_str());
-    s.setString	("SHARED_PASSWORD",     	password.c_str());
+    s.setString ("SHARED_USERNAME",         username.c_str());
+    s.setString ("SHARED_PASSWORD",         password.c_str());
 
     if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
         reloadProxy->reloadSettings(SETTINGSUSER_SHARED);
-	}
+    }
 
     Utils::forceSync();                                     // tell system to flush the filesystem caches
 
-    createScreen_homeScreen();		// now back to the home screen
+    createScreen_homeScreen();      // now back to the home screen
 }
 
 void ConfigStream::onResetSettings(void)
 {
-    createScreen_homeScreen();		// now back to the home screen
+    createScreen_homeScreen();      // now back to the home screen
 
     showMessageScreen("Reset all settings", "All settings have been reset to default.\n\rReseting your ST might be a good idea...");
 

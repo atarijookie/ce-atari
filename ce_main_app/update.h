@@ -28,6 +28,7 @@ public:
 
     static void createFloppyTestImage(void);
     static bool writeSimpleTextFile(const char *path, const char *content);
+    static void removeSimpleTextFile(const char *path);
     static const char *getUsbArchiveName(void);
 
 private:

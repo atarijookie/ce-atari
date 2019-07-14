@@ -38,26 +38,26 @@
 
 DWORD Utils::getCurrentMs(void)
 {
-	struct timespec tp;
-	int res;
+    struct timespec tp;
+    int res;
 
-	res = clock_gettime(CLOCK_MONOTONIC, &tp);					// get current time
+    res = clock_gettime(CLOCK_MONOTONIC, &tp);                  // get current time
 
-	if(res != 0) {												// if failed, fail
-		return 0;
-	}
+    if(res != 0) {                                              // if failed, fail
+        return 0;
+    }
 
-	DWORD val = (tp.tv_sec * 1000) + (tp.tv_nsec / 1000000);	// convert to milli seconds
-	return val;
+    DWORD val = (tp.tv_sec * 1000) + (tp.tv_nsec / 1000000);    // convert to milli seconds
+    return val;
 }
 
 DWORD Utils::getEndTime(DWORD offsetFromNow)
 {
-	DWORD val;
+    DWORD val;
 
-	val = getCurrentMs() + offsetFromNow;
+    val = getCurrentMs() + offsetFromNow;
 
-	return val;
+    return val;
 }
 
 void Utils::attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari)
@@ -75,7 +75,7 @@ void Utils::attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari)
         attrAtari |= FA_SYSTEM;
 
     if(attrHost &                      )
-		attrAtari |= FA_VOLUME;
+        attrAtari |= FA_VOLUME;
 */
 
     if(isDir)
@@ -91,9 +91,9 @@ WORD Utils::fileTimeToAtariDate(struct tm *ptm)
 {
     WORD atariDate = 0;
 
-	if(ptm == NULL) {
-		return 0;
-	}
+    if(ptm == NULL) {
+        return 0;
+    }
 
     atariDate |= (ptm->tm_year - 80) << 9;            // year (tm_year is 'years since 1900', we want 'years since 1980', so the difference is -80
     atariDate |= (ptm->tm_mon  +  1) << 5;            // month
@@ -106,13 +106,13 @@ WORD Utils::fileTimeToAtariTime(struct tm *ptm)
 {
     WORD atariTime = 0;
 
-	if(ptm == NULL) {
-		return 0;
-	}
+    if(ptm == NULL) {
+        return 0;
+    }
 
-    atariTime |= (ptm->tm_hour		) << 11;        // hours
-    atariTime |= (ptm->tm_min		) << 5;         // minutes
-    atariTime |= (ptm->tm_sec	/ 2	);              // seconds
+    atariTime |= (ptm->tm_hour      ) << 11;        // hours
+    atariTime |= (ptm->tm_min       ) << 5;         // minutes
+    atariTime |= (ptm->tm_sec   / 2 );              // seconds
 
     return atariTime;
 }
@@ -126,19 +126,19 @@ void Utils::fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *pt
     month   = (atariDate >> 5)   & 0x0f; // 1-12
     day     =  atariDate         & 0x1f; // 1-31
 
-    hours   =  (atariTime >> 11) & 0x1f;	// 0-23
-    minutes =  (atariTime >>  5) & 0x3f;	// 0-59
-    seconds = ( atariTime        & 0x1f) * 2;	// in unit of two
+    hours   =  (atariTime >> 11) & 0x1f;    // 0-23
+    minutes =  (atariTime >>  5) & 0x3f;    // 0-59
+    seconds = ( atariTime        & 0x1f) * 2;   // in unit of two
 
-	memset(ptm, 0, sizeof(struct tm));
-	ptm->tm_year	= year - 1900;		// number of years since 1900.
-	ptm->tm_mon		= month - 1;	// The number of months since January, in the range 0 to 11
-	ptm->tm_mday	= day;		// The day of the month, in the range 1 to 31.
+    memset(ptm, 0, sizeof(struct tm));
+    ptm->tm_year    = year - 1900;      // number of years since 1900.
+    ptm->tm_mon     = month - 1;    // The number of months since January, in the range 0 to 11
+    ptm->tm_mday    = day;      // The day of the month, in the range 1 to 31.
 
-	ptm->tm_hour	= hours;	// The number of hours past midnight, in the range 0 to 23
-	ptm->tm_min		= minutes;	// The number of minutes after the hour, in the range 0 to 59
-	ptm->tm_sec		= seconds;	// The number of seconds after the minute, normally in the range 0 to 59,
-								//  but can be up to 60 to allow for leap seconds.
+    ptm->tm_hour    = hours;    // The number of hours past midnight, in the range 0 to 23
+    ptm->tm_min     = minutes;  // The number of minutes after the hour, in the range 0 to 59
+    ptm->tm_sec     = seconds;  // The number of seconds after the minute, normally in the range 0 to 59,
+                                //  but can be up to 60 to allow for leap seconds.
 }
 
 void Utils::mergeHostPaths(std::string &dest, const std::string &tail)
@@ -187,7 +187,7 @@ void Utils::splitFilenameFromExt(const std::string &filenameAndExt, std::string 
 {
     size_t sepPos = filenameAndExt.rfind('.');
 
-    if(sepPos == std::string::npos) {                   		// not found?
+    if(sepPos == std::string::npos) {                           // not found?
         filename = filenameAndExt;                              // pretend we don't have extension, just filename
         ext.clear();
     } else {                                                    // separator found?
@@ -198,38 +198,38 @@ void Utils::splitFilenameFromExt(const std::string &filenameAndExt, std::string 
 
 void Utils::sleepMs(DWORD ms)
 {
-	DWORD us = ms * 1000;
+    DWORD us = ms * 1000;
 
-	usleep(us);
+    usleep(us);
 }
 
 void Utils::resetHansAndFranz(void)
 {
-	bcm2835_gpio_write(PIN_RESET_HANS,			LOW);		// reset lines to RESET state
-	bcm2835_gpio_write(PIN_RESET_FRANZ,			LOW);
+    bcm2835_gpio_write(PIN_RESET_HANS,          LOW);       // reset lines to RESET state
+    bcm2835_gpio_write(PIN_RESET_FRANZ,         LOW);
 
-	Utils::sleepMs(10);										// wait a while to let the reset work
+    Utils::sleepMs(10);                                     // wait a while to let the reset work
 
-	bcm2835_gpio_write(PIN_RESET_HANS,			HIGH);		// reset lines to RUN (not reset) state
-	bcm2835_gpio_write(PIN_RESET_FRANZ,			HIGH);
+    bcm2835_gpio_write(PIN_RESET_HANS,          HIGH);      // reset lines to RUN (not reset) state
+    bcm2835_gpio_write(PIN_RESET_FRANZ,         HIGH);
 
-	Utils::sleepMs(50);										// wait a while to let the devices boot
+    Utils::sleepMs(50);                                     // wait a while to let the devices boot
 }
 
 void Utils::resetHans(void)
 {
-	bcm2835_gpio_write(PIN_RESET_HANS,			LOW);		// reset lines to RESET state
-	Utils::sleepMs(10);										// wait a while to let the reset work
-	bcm2835_gpio_write(PIN_RESET_HANS,			HIGH);		// reset lines to RUN (not reset) state
-	Utils::sleepMs(50);										// wait a while to let the devices boot
+    bcm2835_gpio_write(PIN_RESET_HANS,          LOW);       // reset lines to RESET state
+    Utils::sleepMs(10);                                     // wait a while to let the reset work
+    bcm2835_gpio_write(PIN_RESET_HANS,          HIGH);      // reset lines to RUN (not reset) state
+    Utils::sleepMs(50);                                     // wait a while to let the devices boot
 }
 
 void Utils::resetFranz(void)
 {
-	bcm2835_gpio_write(PIN_RESET_FRANZ,			LOW);
-	Utils::sleepMs(10);										// wait a while to let the reset work
-	bcm2835_gpio_write(PIN_RESET_FRANZ,			HIGH);
-	Utils::sleepMs(50);										// wait a while to let the devices boot
+    bcm2835_gpio_write(PIN_RESET_FRANZ,         LOW);
+    Utils::sleepMs(10);                                     // wait a while to let the reset work
+    bcm2835_gpio_write(PIN_RESET_FRANZ,         HIGH);
+    Utils::sleepMs(50);                                     // wait a while to let the devices boot
 }
 
 bool Utils::copyFile(std::string &src, std::string &dst)
@@ -395,9 +395,9 @@ void Utils::getIpAdds(BYTE *bfrIPs, BYTE *bfrMasks)
 
 void Utils::forceSync(void)
 {
-	TMounterRequest tmr;
-	tmr.action	= MOUNTER_ACTION_SYNC;                          // let the mounter thread do filesystem caches sync
-	Mounter::add(tmr);
+    TMounterRequest tmr;
+    tmr.action  = MOUNTER_ACTION_SYNC;                          // let the mounter thread do filesystem caches sync
+    Mounter::add(tmr);
 }
 
 WORD Utils::getWord(BYTE *bfr)
@@ -519,46 +519,46 @@ void Utils::setTimezoneVariable_inThisContext(void)
 std::string Utils::getDeviceLabel(const std::string & devicePath)
 {
 #define DEV_BY_LABEL_PATH "/dev/disk/by-label/"
-	std::string label("");
+    std::string label("");
 
-	if(devicePath.substr(0,5) != "/dev/") return label;
-	std::string devShort = devicePath.substr(5);
+    if(devicePath.substr(0,5) != "/dev/") return label;
+    std::string devShort = devicePath.substr(5);
 
-	DIR *d = opendir(DEV_BY_LABEL_PATH);
-	if(d != NULL) {
-		//FILE *f = fopen("/tmp/labels.txt", "w");
-		//fprintf(f, "%s\n", devShort.c_str());
-		struct dirent * de;
-		char link_path[288];
-		char link_target[256];
-		while((de = readdir(d)) != NULL) {
-			if(de->d_type == DT_LNK) {	// symbolic link
-				snprintf(link_path, sizeof(link_path), "%s%s", DEV_BY_LABEL_PATH, de->d_name);
-				ssize_t n = readlink(link_path, link_target, sizeof(link_target) - 1);
-				//fprintf(f, "%s %d\n", link_path, (int)n);
-				if(n >= 0) {
-					link_target[n] = '\0';
-					char * target_short = strrchr(link_target, '/');
-					if(target_short != NULL) {
-						target_short++;
-						if(devShort == target_short) label = de->d_name;
-						//fprintf(f, "%x %s %s\n", de->d_type, de->d_name, target_short);
-					}
-				}
-			}
-		}
-		//fclose(f);
-		closedir(d);
-	}
-	size_t pos;
-	while((pos = label.find("\\x")) != std::string::npos) {
-		int c;
-		std::stringstream ss;
-		ss << std::hex << label.substr(pos + 2, 2);
-		ss >> c;
-		label.replace(pos, 4, 1, (char)c);
-	}
-	return label;
+    DIR *d = opendir(DEV_BY_LABEL_PATH);
+    if(d != NULL) {
+        //FILE *f = fopen("/tmp/labels.txt", "w");
+        //fprintf(f, "%s\n", devShort.c_str());
+        struct dirent * de;
+        char link_path[288];
+        char link_target[256];
+        while((de = readdir(d)) != NULL) {
+            if(de->d_type == DT_LNK) {  // symbolic link
+                snprintf(link_path, sizeof(link_path), "%s%s", DEV_BY_LABEL_PATH, de->d_name);
+                ssize_t n = readlink(link_path, link_target, sizeof(link_target) - 1);
+                //fprintf(f, "%s %d\n", link_path, (int)n);
+                if(n >= 0) {
+                    link_target[n] = '\0';
+                    char * target_short = strrchr(link_target, '/');
+                    if(target_short != NULL) {
+                        target_short++;
+                        if(devShort == target_short) label = de->d_name;
+                        //fprintf(f, "%x %s %s\n", de->d_type, de->d_name, target_short);
+                    }
+                }
+            }
+        }
+        //fclose(f);
+        closedir(d);
+    }
+    size_t pos;
+    while((pos = label.find("\\x")) != std::string::npos) {
+        int c;
+        std::stringstream ss;
+        ss << std::hex << label.substr(pos + 2, 2);
+        ss >> c;
+        label.replace(pos, 4, 1, (char)c);
+    }
+    return label;
 }
 
 void Utils::splitString(const std::string &s, char delim, std::vector<std::string> &elems) {
@@ -709,3 +709,10 @@ bool Utils::fileExists(std::string &hostPath)
     int res = access(hostPath.c_str(), F_OK);
     return (res != -1);     // if not error, file exists
 }
+
+bool Utils::fileExists(const char *hostPath)
+{
+    int res = access(hostPath, F_OK);
+    return (res != -1);     // if not error, file exists
+}
+

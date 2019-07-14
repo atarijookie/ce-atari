@@ -64,11 +64,11 @@ bool Update::createFlashFirstFwScript(bool withLinuxRestart)
 
 bool Update::checkForUpdateListOnUsb(std::string &updateFilePath)
 {
-	DIR *dir = opendir((char *) "/mnt/");						    // try to open the dir
+    DIR *dir = opendir((char *) "/mnt/");                           // try to open the dir
 
     updateFilePath.clear();
 
-    if(dir == NULL) {                                 				// not found?
+    if(dir == NULL) {                                               // not found?
         Debug::out(LOG_DEBUG, "Update::checkForUpdateListOnUsb -- /mnt/ dir not found, fail");
         return false;
     }
@@ -77,16 +77,16 @@ bool Update::checkForUpdateListOnUsb(std::string &updateFilePath)
     memset(path, 0, 512);
     bool found = false;
 
-    while(1) {                                                  	// while there are more files, store them
-		struct dirent *de = readdir(dir);							// read the next directory entry
+    while(1) {                                                      // while there are more files, store them
+        struct dirent *de = readdir(dir);                           // read the next directory entry
 
-		if(de == NULL) {											// no more entries?
-			break;
-		}
+        if(de == NULL) {                                            // no more entries?
+            break;
+        }
 
-		if(de->d_type != DT_DIR && de->d_type != DT_REG) {			// not a file, not a directory?
-			continue;
-		}
+        if(de->d_type != DT_DIR && de->d_type != DT_REG) {          // not a file, not a directory?
+            continue;
+        }
 
         if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) {
             continue;
@@ -106,7 +106,7 @@ bool Update::checkForUpdateListOnUsb(std::string &updateFilePath)
         }
     }
 
-	closedir(dir);
+    closedir(dir);
 
     if(found) {
         Debug::out(LOG_DEBUG, "Update::checkForUpdateListOnUsb -- update found: %s", path);
@@ -203,4 +203,9 @@ bool Update::writeSimpleTextFile(const char *path, const char *content)
 
     fclose(f);
     return true;
+}
+
+void Update::removeSimpleTextFile(const char *path)
+{
+    unlink(path);
 }

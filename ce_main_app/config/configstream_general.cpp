@@ -766,9 +766,8 @@ void ConfigStream::enterKeyHandler(int event)
     case CS_SAVE_TRANSLATED:    onTranslated_save();        break;
     case CS_SAVE_NETWORK:       onNetwork_save();           break;
 
-    case CS_UPDATE_CHECK:       onUpdateCheck();            break;
-    case CS_UPDATE_CHECK_USB:   onUpdateCheckUsb();         break;
-    case CS_UPDATE_UPDATE:      onUpdateUpdate();           break;
+    case CS_UPDATE_ONLINE:      updateOnline();             break;
+    case CS_UPDATE_USB:         updateFromFile();           break;
 
     case CS_OTHER_SAVE:         onOtherSave();              break;
     case CS_IKBD_SAVE:          onIkbdSave();               break;

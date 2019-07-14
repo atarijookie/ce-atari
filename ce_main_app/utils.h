@@ -8,24 +8,24 @@
 #include "datatypes.h"
 
 extern "C" volatile sig_atomic_t sigintReceived;
-#define MIN(x, y)	(((x) < (y)) ? (x) : (y))
+#define MIN(x, y)   (((x) < (y)) ? (x) : (y))
 
 class Utils {
 public:
-	static DWORD getCurrentMs(void);
-	static DWORD getEndTime(DWORD offsetFromNow);
-	static void  sleepMs(DWORD ms);
+    static DWORD getCurrentMs(void);
+    static DWORD getEndTime(DWORD offsetFromNow);
+    static void  sleepMs(DWORD ms);
 
-	static void attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari);
-	static void fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *ptm);
-	static WORD fileTimeToAtariTime(struct tm *ptm);
-	static WORD fileTimeToAtariDate(struct tm *ptm);
+    static void attributesHostToAtari(bool isReadOnly, bool isDir, BYTE &attrAtari);
+    static void fileDateTimeToHostTime(WORD atariDate, WORD atariTime, struct tm *ptm);
+    static WORD fileTimeToAtariTime(struct tm *ptm);
+    static WORD fileTimeToAtariDate(struct tm *ptm);
 
-	static void mergeHostPaths(std::string &dest, const std::string &tail);
-	static void splitFilenameFromPath(const std::string &pathAndFile, std::string &path, std::string &file);
+    static void mergeHostPaths(std::string &dest, const std::string &tail);
+    static void splitFilenameFromPath(const std::string &pathAndFile, std::string &path, std::string &file);
     static void splitFilenameFromExt(const std::string &filenameAndExt, std::string &filename, std::string &ext);
 
-	static void resetHansAndFranz(void);
+    static void resetHansAndFranz(void);
     static void resetHans(void);
     static void resetFranz(void);
 
@@ -60,6 +60,7 @@ public:
     static bool isZIPfile(const char *fileName);
     static void createPathWithOtherExtension(std::string &inPathWithOriginalExt, const char *otherExtension, std::string &outPathWithOtherExtension);
     static bool fileExists(std::string &hostPath);
+    static bool fileExists(const char *hostPath);
 
 private:
     static bool copyFileByHandles(FILE *from, FILE *to);
