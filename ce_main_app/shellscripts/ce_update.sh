@@ -10,8 +10,9 @@ echo " "
 
 distro=$( /ce/whichdistro.sh )
 url_to_git_repo="https://github.com/atarijookie/ce-atari-releases.git"
-path_to_repo_archive="https://github.com/atarijookie/ce-atari-releases/archive/"
-path_to_zip_update="$path_to_repo_archive$distro.zip"
+url_to_git_api="https://api.github.com/repos/atarijookie/ce-atari-releases/commits/$distro"
+url_to_repo_archive="https://github.com/atarijookie/ce-atari-releases/archive/"
+url_to_zip_update="$url_to_repo_archive$distro.zip"
 path_to_tmp_update="/tmp/$distro.zip"
 
 read_from_file()
@@ -35,7 +36,7 @@ if [ -f /tmp/UPDATE_FROM_USB ]; then                    # if we're doing update 
     unzip -o $path_to_usb_update -d /ce                 # unzip update into /ce directory, overwrite without prompting
 else    # download update from internet, by git or wget
     # check if got git installed
-    git --version
+    git --version 2> /dev/null
 
     if [ "$?" -ne "0" ]; then                           # if don't have git
         echo "Will try to install missing git"
@@ -45,15 +46,19 @@ else    # download update from internet, by git or wget
     fi
 
     # try to check for git after possible installation
-    git --version
+    git --version 2> /dev/null
 
     if [ "$?" -ne "0" ]; then                           # git still missing, do it through wget
         echo "git is still missing, will use wget"
 
         rm -f $path_to_tmp_update                       # delete if file exists
-        wget -O $path_to_tmp_update $path_to_zip_update # download to /tmp/yocto.zip
+        wget -O $path_to_tmp_update $url_to_zip_update # download to /tmp/yocto.zip
 
         unzip -o $path_to_tmp_update -d /ce             # unzip update into /ce directory, overwrite without prompting
+
+        # get last online commit in the branch for this distro and store it where we will expect it next time we'll check_for_update (.sh)
+        wget -O- $url_to_git_api 2> /dev/null | grep -m 1 'sha' | sed 's/sha//g' | sed 's/[\" \t\n:,]//g' > /ce/update/commit.curent
+
     else                                                # git is present
         echo "doing git pull..."
 
