@@ -823,8 +823,8 @@ void ConfigStream::createScreen_update(void)
     //-------
     #ifndef DISTRO_YOCTO
     line++;
-    cl1 = 2;
-    cl2 = 17;
+    cl1 = 5;
+    cl2 = 20;
     #endif
 
     #ifdef DISTRO_YOCTO
@@ -848,7 +848,7 @@ void ConfigStream::createScreen_update(void)
     line += 2;
     //-------
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " part       your version ", 27, 7, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, " part         your version ", 27, 7, line, gotoOffset);
     comp->setReverse(true);
     screen.push_back(comp);
 
@@ -889,12 +889,12 @@ void ConfigStream::createScreen_update(void)
 
     line += 2;
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " From web ", 10,  2, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, " OnlineUp ", 10, 0, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_ONLINE);
     comp->setComponentId(COMPID_UPDATE_BTN_CHECK);
     screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::button, " From USB ", 10,  15, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::button, "   USB   ", 10, 14, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_USB);
     comp->setComponentId(COMPID_UPDATE_BTN_CHECK_USB);
     screen.push_back(comp);
@@ -940,14 +940,14 @@ void ConfigStream::updateOnline(void)
     Update::removeSimpleTextFile(UPDATE_USBFILE);       // remove this file to avoid trying to update from USB
     
     if(Utils::fileExists("/tmp/UPDATE_PENDING_NO")) {   // check_for_update.sh returned NO update pending
-        showMessageScreen("Update from USB", "Everything seems to be up-to-date.\n\rNot doing update.\n\r");
+        showMessageScreen("Online Update", "Everything seems to be up-to-date.\n\rNot doing update.\n\r");
         return;
     }
 
     if(Utils::fileExists("/tmp/UPDATE_PENDING_YES")) {  // check_for_update.sh returned that there is update pending
         updateStart();                                  // start the update
     } else {                                            // check_for_update.sh not returned anything yet
-        showMessageScreen("Update Online", "Still checking for update.\n\rPlease try again in a while.\n\r");
+        showMessageScreen("Online Update", "Still checking for update.\n\rPlease try again in a while.\n\r");
     }
 }
 
