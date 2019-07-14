@@ -35,30 +35,41 @@ void Update::initialize(void)
     Update::versions.gotUpdate              = false;
 }
 
-bool Update::createUpdateXilinxScript(void)
+bool Update::createUpdateScript(bool withLinuxRestart, bool withForceXilinx)
 {
-    FILE *f = fopen(UPDATE_SCRIPT, "wt");
+    bool res;
 
-    if(!f) {
-        Debug::out(LOG_ERROR, "Update::createUpdateXilinxScript() failed to create update script - %s", UPDATE_SCRIPT);
-        return false;
+    if(withForceXilinx) {       // should force xilinx flash?
+        res = writeSimpleTextFile(UPDATE_FLASH_XILINX, NULL);     // create this file to force xilinx flash
+
+        if(!res) {              // if failed to create first file, just quit already
+            return res;
+        }
     }
 
-    // execute the xilinx update script
-    fprintf(f, "/ce/update/update_xilinx.sh \n");
+    // write the main update script command
+    res = writeSimpleTextFile(UPDATE_SCRIPT, "#!/bin/sh\n/ce/ce_update.sh\n");
 
-    fclose(f);
-    return true;
+    if(!res) {                  // if failed to create first file, just quit already
+        return res;
+    }
+
+    if(withLinuxRestart) {      // if should also restart linux, add reboot
+        res = writeSimpleTextFile(UPDATE_REBOOT_FILE, NULL);
+    }
+
+    return res;
+}
+
+bool Update::createUpdateXilinxScript(void)
+{
+    bool res = createUpdateScript(false, true);     // don't reboot, force xilinx flash
+    return res;
 }
 
 bool Update::createFlashFirstFwScript(bool withLinuxRestart)
 {
-    bool res = writeSimpleTextFile(UPDATE_SCRIPT, "#!/bin/sh\n/ce/ce_update.sh\n");
-
-    if(withLinuxRestart) {                      // if should also restart linux, add reboot
-        writeSimpleTextFile(UPDATE_REBOOT_FILE, NULL);
-    }
-
+    bool res = createUpdateScript(withLinuxRestart, false);     // reboot if requested, don't force xilinx flash
     return res;
 }
 

@@ -971,20 +971,22 @@ void ConfigStream::updateFromFile(void)
 
 void ConfigStream::updateStart(void)
 {
-    if(shownOn == CONFIGSTREAM_IN_LINUX_CONSOLE) {               // when trying to do update from from linux console
+    if(shownOn == CONFIGSTREAM_IN_LINUX_CONSOLE) {  // when trying to do update from from linux console
         showMessageScreen("STOP!", "Don't update the firmware using\n\rlinux console config tool!\n\r\n\rInstead run /ce/ce_update.sh or\n\rdo it using CE_CONF.TOS on Atari.");
         return;
     }
 
-    if(shownOn == CONFIGSTREAM_THROUGH_WEB) {                   // when trying to do update from from web console
+    if(shownOn == CONFIGSTREAM_THROUGH_WEB) {       // when trying to do update from from web console
         showMessageScreen("STOP!", "Don't update the firmware using\n\rweb interface config tool!\n\r\n\rInstead run /ce/ce_update.sh or\n\rdo it using CE_CONF.TOS on Atari.");
         return;
     }
 
-    // TODO: terminate app and do the update
+    // write update script, no linux reboot, don't force xilinx flash
+    Update::createUpdateScript(false, false);
 
-
-
+    // terminate app and do the update
+    Debug::out(LOG_INFO, ">>> Terminating app, because user requests update and update was found. <<<\n");
+    sigintReceived = 1;     // quit
 }
 
 void ConfigStream::createScreen_update_download(void)

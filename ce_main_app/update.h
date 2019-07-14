@@ -11,6 +11,7 @@
 #define UPDATE_APP_PATH     "/ce/app"
 #define UPDATE_REBOOT_FILE  "/tmp/REBOOT_AFTER_UPDATE"
 #define UPDATE_USBFILE      "/tmp/UPDATE_FROM_USB"
+#define UPDATE_FLASH_XILINX "/tmp/FW_FLASH_XILINX"
 
 #define REPORT_URL          "http://joo.kie.sk/cosmosex/update/report.php"
 
@@ -21,6 +22,7 @@ public:
 
     static void initialize(void);
 
+    static bool createUpdateScript(bool withLinuxRestart, bool withForceXilinx);
     static bool createFlashFirstFwScript(bool withLinuxRestart);
     static bool createUpdateXilinxScript(void);
 
