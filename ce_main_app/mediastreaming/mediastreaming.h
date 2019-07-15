@@ -49,8 +49,20 @@ private:
 
     void getScreen(BYTE arg, AcsiDataTrans *dataTrans);
 
+    void get_framebufferdata(char *device, struct fb_var_screeninfo *fb_varinfo_p, int verbose);
+    void read_framebuffer(char *device, size_t bytes, unsigned char *buf_p, int skip_bytes);
+    void convert1555to32(int width, int height, unsigned char *inbuffer, unsigned char *outbuffer);
+    void convert565to32(int width, int height, unsigned char *inbuffer, unsigned char *outbuffer);
+    void convert888to32(int width, int height, unsigned char *inbuffer, unsigned char *outbuffer);
+    void convert8888to32(int width, int height, unsigned char *inbuffer, unsigned char *outbuffer);
+
 // properties
     MediaStream streams[MEDIASTREAMING_MAXSTREAMS];
+
+    int srcBlue;
+    int srcGreen;
+    int srcRed;
+    int srcAlpha;
 };
 
 #endif // MEDIASTREAMING_H
