@@ -175,16 +175,18 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
         strcpy((char *) bfr, "Status: ");               // copy in label
         bfr += len;                                     // advance in buffer
 
+        int rest = (maxLen - len);                      // only this much we can use for showing status
+
         FILE *f = fopen("/tmp/UPDATE_STATUS", "rt");    // try to open status file
         if(f) {                                         // opening file went fine
-            len = fread(bfr, 1, (maxLen - len), f);     // read up to remaining size of status component
-            bfr += len;
+            len = fread(bfr, 1, rest, f);               // read up to remaining size of status component
             fclose(f);                                  // close the status file
         } else{                                         // if failed to open the file
             len = strlen("unknown");
             strcpy((char *) bfr, "unknown");            // copy string saying 'we don't know'
-            bfr += len;
         }
+
+        bfr += len;                                     // advance at the full length of this status to overwrite any previous status
 
         if(isReverse) {                                 // if reversed, stop reverse
             bfr = terminal_addReverse(bfr, false);

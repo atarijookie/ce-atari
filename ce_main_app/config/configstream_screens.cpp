@@ -848,7 +848,7 @@ void ConfigStream::createScreen_update(void)
     line += 2;
     //-------
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " part         your version ", 27, 7, line, gotoOffset);
+    comp = new ConfigComponent(this, ConfigComponent::label, "   part         your version ", 29, 5, line, gotoOffset);
     comp->setReverse(true);
     screen.push_back(comp);
 
