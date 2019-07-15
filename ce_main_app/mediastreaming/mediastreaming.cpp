@@ -156,6 +156,9 @@ void MediaStreaming::processCommand(BYTE *command, AcsiDataTrans *dataTrans)
 	case MEDIASTREAMING_CMD_CLOSESTREAM:
 		closeStream(arg, dataTrans);
 		break;
+    case MEDIASTREAMING_CMD_GET_SCREEN:
+        getScreen(arg, dataTrans);
+        break;
 	default:
 		dataTrans->setStatus(MEDIASTREAMING_ERR_INVALIDCOMMAND);	// ERROR
 	}
@@ -277,7 +280,7 @@ void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 	if(!streams[i].open(path_or_url, &params)) {
 		dataTrans->setStatus(MEDIASTREAMING_ERR_INTERNAL);
 		return;
-	} 
+	}
 	dataTrans->setStatus(i + 1);
 }
 
@@ -348,3 +351,10 @@ void MediaStreaming::getStreamInfo(BYTE streamHandle, AcsiDataTrans *dataTrans)
 	dataTrans->addZerosUntilSize(512);
 	dataTrans->setStatus(MEDIASTREAMING_OK);
 }
+
+void MediaStreaming::getScreen(BYTE arg, AcsiDataTrans *dataTrans)
+{
+	dataTrans->addZerosUntilSize(64 * 512);     // dummy data
+	dataTrans->setStatus(MEDIASTREAMING_OK);
+}
+

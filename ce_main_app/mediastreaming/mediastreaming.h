@@ -47,6 +47,8 @@ private:
     void readStream(BYTE arg, AcsiDataTrans *dataTrans);
     void closeStream(BYTE streamHandle, AcsiDataTrans *dataTrans);
 
+    void getScreen(BYTE arg, AcsiDataTrans *dataTrans);
+
 // properties
     MediaStream streams[MEDIASTREAMING_MAXSTREAMS];
 };
