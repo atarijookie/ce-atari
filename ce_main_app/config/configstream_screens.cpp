@@ -774,7 +774,7 @@ void ConfigStream::createScreen_update(void)
     static DWORD lastUpdateCheck = 0;               // this holds the ime when we've last checked for update
     DWORD now;
 
-    now = Utils::getCurrentMs(); 
+    now = Utils::getCurrentMs();
 
     if((now - lastUpdateCheck) >= MIN_CHECK_PAUSE) { // check for update, but not too often
         lastUpdateCheck = now;
@@ -889,6 +889,13 @@ void ConfigStream::createScreen_update(void)
 
     line += 2;
 
+    // this updateStatus component shows content of update status file
+    comp = new ConfigComponent(this, ConfigComponent::updateStatus, " ", 30, 5, line, gotoOffset);
+    comp->setReverse(true);
+    screen.push_back(comp);
+
+    line += 2;
+
     comp = new ConfigComponent(this, ConfigComponent::button, " OnlineUp ", 10, 0, line, gotoOffset);
     comp->setOnEnterFunctionCode(CS_UPDATE_ONLINE);
     comp->setComponentId(COMPID_UPDATE_BTN_CHECK);
@@ -938,7 +945,7 @@ void ConfigStream::datesToStrings(Version &v1, std::string &str)
 void ConfigStream::updateOnline(void)
 {
     Update::removeSimpleTextFile(UPDATE_USBFILE);       // remove this file to avoid trying to update from USB
-    
+
     if(Utils::fileExists("/tmp/UPDATE_PENDING_NO")) {   // check_for_update.sh returned NO update pending
         showMessageScreen("Online Update", "Everything seems to be up-to-date.\n\rNot doing update.\n\r");
         return;
@@ -1037,28 +1044,28 @@ void ConfigStream::createScreen_other(void)
     int row     = 5;
     int col     = 7;
     int col2    = 20;
-    
+
     //----------------------
     comp = new ConfigComponent(this, ConfigComponent::label, "Update time from internet",   40, col, row++, gotoOffset);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::label, "Enable",                      40, col + 2, row, gotoOffset);
     screen.push_back(comp);
-    
+
     comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                      3,  col2, row++, gotoOffset);
     comp->setComponentId(COMPID_TIMESYNC_ENABLE);
     screen.push_back(comp);
-    
+
     comp = new ConfigComponent(this, ConfigComponent::label, "NTP server",                  40, col + 2, row, gotoOffset);
     screen.push_back(comp);
-    
+
     comp = new ConfigComponent(this, ConfigComponent::editline, " ",                        15, col2, row++, gotoOffset);
     comp->setComponentId(COMPID_TIMESYNC_NTP_SERVER);
     screen.push_back(comp);
 
     comp = new ConfigComponent(this, ConfigComponent::label, "UTC offset",                  40, col + 2, row, gotoOffset);
     screen.push_back(comp);
-    
+
     comp = new ConfigComponent(this, ConfigComponent::editline, " ",                        4, col2, row++, gotoOffset);
     comp->setComponentId(COMPID_TIMESYNC_UTC_OFFSET);
     screen.push_back(comp);
@@ -1079,7 +1086,7 @@ void ConfigStream::createScreen_other(void)
 
     comp = new ConfigComponent(this, ConfigComponent::label, "Low",                         40, col + 2, row, gotoOffset);
     screen.push_back(comp);
-    
+
     comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                       3, col2, row++, gotoOffset);
     comp->setCheckboxGroupIds(COMPID_SCREEN_RESOLUTION, 1);
     screen.push_back(comp);
@@ -1104,7 +1111,7 @@ void ConfigStream::createScreen_other(void)
     comp->setOnEnterFunctionCode(CS_RESET_SETTINGS);
     screen.push_back(comp);
     //----------------------
-    
+
     row++;
     comp = new ConfigComponent(this, ConfigComponent::button, "   Save   ",                 10,  6, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_OTHER_SAVE);
@@ -1118,19 +1125,19 @@ void ConfigStream::createScreen_other(void)
 
     //------------------------
     Settings s;
-    
+
     bool        setDateTime;
     float       utcOffset;
     std::string ntpServer;
     int         frameSkip;
     int         screenRes;
-    
+
     setDateTime = s.getBool     ("TIME_SET",             true);
     utcOffset   = s.getFloat    ("TIME_UTC_OFFSET",      0);
     ntpServer   = s.getString   ("TIME_NTP_SERVER",      "200.20.186.76");
     frameSkip   = s.getInt      ("SCREENCAST_FRAMESKIP", 20);
     screenRes   = s.getInt      ("SCREEN_RESOLUTION",    1);
-    
+
     if( frameSkip<10 )
     {
         frameSkip=10;
@@ -1139,14 +1146,14 @@ void ConfigStream::createScreen_other(void)
     {
         frameSkip=255;
     }
-    
+
     setBoolByComponentId(COMPID_TIMESYNC_ENABLE,        setDateTime);
     setFloatByComponentId(COMPID_TIMESYNC_UTC_OFFSET,   utcOffset);
     setTextByComponentId(COMPID_TIMESYNC_NTP_SERVER,    ntpServer);
     setIntByComponentId(COMPID_SCREENCAST_FRAMESKIP,    frameSkip);
     checkboxGroup_setCheckedId(COMPID_SCREEN_RESOLUTION, screenRes);
     //------------------------
-    
+
     setFocusToFirstFocusable();
 }
 
@@ -1159,13 +1166,13 @@ void ConfigStream::onOtherSave(void)
     std::string ntpServer;
     int         frameSkip;
     int         screenRes;
-    
+
     getBoolByComponentId(COMPID_TIMESYNC_ENABLE,        setDateTime);
     getFloatByComponentId(COMPID_TIMESYNC_UTC_OFFSET,   utcOffset);
     getTextByComponentId(COMPID_TIMESYNC_NTP_SERVER,    ntpServer);
     getIntByComponentId(COMPID_SCREENCAST_FRAMESKIP,    frameSkip);
     screenRes = checkboxGroup_getCheckedId(COMPID_SCREEN_RESOLUTION);
-    
+
     if( frameSkip<10 )
     {
         frameSkip=10;
@@ -1174,7 +1181,7 @@ void ConfigStream::onOtherSave(void)
     {
         frameSkip=255;
     }
-    
+
     s.setBool     ("TIME_SET",             setDateTime);
     s.setFloat    ("TIME_UTC_OFFSET",      utcOffset);
     s.setString   ("TIME_NTP_SERVER",      ntpServer.c_str());
@@ -1186,7 +1193,7 @@ void ConfigStream::onOtherSave(void)
     Utils::forceSync();             // tell system to flush the filesystem caches
     Utils::setTimezoneVariable_inProfileScript();   // create the timezone setting script, because TIME_UTC_OFFSET could possibly change
     Utils::setTimezoneVariable_inThisContext();     // and also set the TZ variable for this context, so the change for this app would be immediate
-    
+
     createScreen_homeScreen();      // now back to the home screen
 }
 
@@ -1204,11 +1211,11 @@ void ConfigStream::createScreen_ikbd(void)
     int row     = 3;
     int col     = 2;
     int col2    = 33;
-    
+
     //-----------
     comp = new ConfigComponent(this, ConfigComponent::label, "Attach 1st joy as JOY 0",     40, col, row, gotoOffset);
     screen.push_back(comp);
-    
+
     comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                      3, col2, row++, gotoOffset);
     comp->setComponentId(COMPID_JOY0_FIRST);
     screen.push_back(comp);
@@ -1221,7 +1228,7 @@ void ConfigStream::createScreen_ikbd(void)
     row += 2;
     comp = new ConfigComponent(this, ConfigComponent::label, "Mouse wheel as arrow UP / DOWN", 40, col, row, gotoOffset);
     screen.push_back(comp);
-    
+
     comp = new ConfigComponent(this, ConfigComponent::checkbox, "   ",                          3, col2, row++, gotoOffset);
     comp->setComponentId(COMPID_MOUSEWHEEL_ENABLED);
     screen.push_back(comp);
@@ -1320,9 +1327,9 @@ void ConfigStream::createScreen_ikbd(void)
     comp->setComponentId(COMPID_KEYBJOY1_RIGHT);
     comp->setTextOptions(TEXT_OPTION_ALLOW_LETTERS | TEXT_OPTION_LETTERS_ONLY_UPPERCASE);
     screen.push_back(comp);
-    
+
     //----------------------
-    
+
     row += 2;
     comp = new ConfigComponent(this, ConfigComponent::button, "   Save   ",                 10,  6, row, gotoOffset);
     comp->setOnEnterFunctionCode(CS_IKBD_SAVE);
@@ -1336,26 +1343,26 @@ void ConfigStream::createScreen_ikbd(void)
 
     //------------------------
     Settings s;
-    
+
     bool joy0First;
     bool mouseWheelEnabled;
     bool keybJoy0, keybJoy1;
-    
+
     joy0First           = s.getBool("JOY_FIRST_IS_0",       false);
     mouseWheelEnabled   = s.getBool("MOUSE_WHEEL_AS_KEYS",  true);
     keybJoy0            = s.getBool("KEYBORD_JOY0",         false);
     keybJoy1            = s.getBool("KEYBORD_JOY1",         false);
-    
+
     setBoolByComponentId(COMPID_JOY0_FIRST,         joy0First);
     setBoolByComponentId(COMPID_MOUSEWHEEL_ENABLED, mouseWheelEnabled);
     setBoolByComponentId(COMPID_KEYB_JOY0,          keybJoy0);
     setBoolByComponentId(COMPID_KEYB_JOY1,          keybJoy1);
-    
+
     //------------------------
     // now fill the keyb joys config
     KeybJoyKeys     keyJoyKeys;
     KeyTranslator   keyTranslator;
-    
+
     keyJoyKeys.setKeyTranslator(&keyTranslator);        // first set the translator
     keyJoyKeys.loadKeys();                              // then load the keys
 
@@ -1363,7 +1370,7 @@ void ConfigStream::createScreen_ikbd(void)
 
     joyString = keyJoyKeys.joyKeys[0].human.button;
     setTextByComponentId(COMPID_KEYBJOY0_BUTTON, joyString);
-    
+
     joyString = keyJoyKeys.joyKeys[0].human.left;
     setTextByComponentId(COMPID_KEYBJOY0_LEFT, joyString);
 

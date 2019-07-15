@@ -7,7 +7,7 @@
 #include "keys.h"
 
 #define HEARTBEATSTATECHAR_COUNT    4
-char heartBeatStateChar[HEARTBEATSTATECHAR_COUNT] = {'|', '/', '-', '\\'}; 
+char heartBeatStateChar[HEARTBEATSTATECHAR_COUNT] = {'|', '/', '-', '\\'};
 
 ConfigComponent::ConfigComponent(ConfigStream *parent, ComponentType type, std::string text, unsigned int maxLen, int x, int y, int gotoOffset)
 {
@@ -17,13 +17,13 @@ ConfigComponent::ConfigComponent(ConfigStream *parent, ComponentType type, std::
     onChBEnter  = 0;
 
     cursorPos = 0;
-    
+
     isLimitedShowSize   = false;
     showSize            = maxLen;           // number of characters that this editline will show (e.g. maxLen is 63 chars, but we want to show only 15 chars at any time, and scroll the rest
     showWindowStart     = 0;                // starting character where the shown window content is shown (e.g. when this is 20, maxLen is 63, showSize is 15, the component should show characters 20 to 35)
 
     heartBeatState  = 0;
-    
+
     checkBoxGroup   = -1;
     checkBoxId      = -1;
 
@@ -110,21 +110,20 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
         } else {                                        // if partial text is shown
             const char *pText   = displayText.c_str();
             size_t textLen      = displayText.length();
-            
+
             if(textLen > showWindowStart) {             // if the text is long enough to show after showing only part (starting at showWindowStart), show it
                 pText   += showWindowStart;
                 textLen -= showWindowStart;
-                
+
                 if(textLen > showSize) {                // if the text still would be long, then shorten it
                     textLen = showSize;
                 }
 
                 strncpy((char *) bfr+1, pText, textLen);    // copy the text
             }
-        
+
             bfr += showSize + 2;                                                // +2 because of [ and ]
         }
-        
 
         if(hasFocus) {                                  // if has focus, stop reverse
             bfr = terminal_addReverse(bfr, false);
@@ -133,30 +132,64 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
         len = bfr - bfrStart;                           // we printed this much
         return;
     }
-    
+
     //-----
     // for heartbeat
     if(type == heartBeat) {
         changed = true;                                 // this heartbeat always changes
 
         bfr = terminal_addGoto(bfr, posX, posY);        // goto(x,y)
-        
+
         if(isReverse) {                                 // if reversed, start reverse
             bfr = terminal_addReverse(bfr, true);
         }
 
         bfr[0] = heartBeatStateChar[heartBeatState];    // store heartbeat char
         bfr++;
-        
+
         heartBeatState++;                               // move to next heartbeat state
         if(heartBeatState >= HEARTBEATSTATECHAR_COUNT) {
             heartBeatState = 0;
         }
-        
+
         if(isReverse) {                                 // if reversed, stop reverse
             bfr = terminal_addReverse(bfr, false);
         }
-        
+
+        len = bfr - bfrStart;                           // we printed this much
+        return;
+    }
+
+    //-----
+    // for updateStatus
+    if(type == updateStatus) {
+        changed = true;                                 // this heartbeat always changes
+
+        bfr = terminal_addGoto(bfr, posX, posY);        // goto(x,y)
+
+        if(isReverse) {                                 // if reversed, start reverse
+            bfr = terminal_addReverse(bfr, true);
+        }
+
+        len = strlen("Status: ");
+        strcpy((char *) bfr, "Status: ");               // copy in label
+        bfr += len;                                     // advance in buffer
+
+        FILE *f = fopen("/tmp/UPDATE_STATUS", "rt");    // try to open status file
+        if(f) {                                         // opening file went fine
+            len = fread(bfr, 1, (maxLen - len), f);     // read up to remaining size of status component
+            bfr += len;
+            fclose(f);                                  // close the status file
+        } else{                                         // if failed to open the file
+            len = strlen("unknown");
+            strcpy((char *) bfr, "unknown");            // copy string saying 'we don't know'
+            bfr += len;
+        }
+
+        if(isReverse) {                                 // if reversed, stop reverse
+            bfr = terminal_addReverse(bfr, false);
+        }
+
         len = bfr - bfrStart;                           // we printed this much
         return;
     }
@@ -186,7 +219,7 @@ void ConfigComponent::getCheckboxGroupIds(int& groupId, int& checkboxId)
 
 void ConfigComponent::setFocus(bool hasFocus)
 {
-    if(type == label || type == heartBeat) {    // can't focus on label and heartBeat
+    if(type == label || type == heartBeat || type == updateStatus) {    // can't focus on these components
         return;
     }
 
@@ -199,7 +232,7 @@ void ConfigComponent::setFocus(bool hasFocus)
 
 void ConfigComponent::setReverse(bool isReverse)
 {
-    if(type != label && type != heartBeat) {    // reverse works only on label and heartBeat
+    if(type != label && type != heartBeat && type != updateStatus ) {    // reverse works only on some components
         return;
     }
 
@@ -244,7 +277,7 @@ bool ConfigComponent::isChecked(void)
 
 void ConfigComponent::onKeyPressed(BYTE key)
 {
-    if(type == label || type == heartBeat) {    // do nothing on key pressed for label and heartBeat
+    if(type == label || type == heartBeat || type == updateStatus) {    // do nothing on key pressed for these components
         return;
     }
 
@@ -500,7 +533,7 @@ bool ConfigComponent::isFocused(void)
 
 bool ConfigComponent::canFocus(void)
 {
-    return (type != label && type != heartBeat);        // can focus if not label and not hearBeat
+    return (type != label && type != heartBeat && type != updateStatus);        // can focus if not one of these components
 }
 
 BYTE *ConfigComponent::terminal_addGoto(BYTE *bfr, int x, int y)
@@ -509,7 +542,7 @@ BYTE *ConfigComponent::terminal_addGoto(BYTE *bfr, int x, int y)
     bfr[1] = 'Y';
     bfr[2] = ' ' + y;
     bfr[3] = ' ' + x + gotoOffset;
-    
+
     return (bfr + 4);
 }
 
@@ -522,7 +555,7 @@ BYTE *ConfigComponent::terminal_addReverse(BYTE *bfr, bool onNotOff)
     } else {
         bfr[1] = 'q';
     }
-    
+
     return (bfr + 2);
 }
 
@@ -535,7 +568,7 @@ BYTE *ConfigComponent::terminal_addCursorOn(BYTE *bfr, bool on)
     } else {
         bfr[1] = 'f';       // CUR_OFF
     }
-    
+
     return (bfr + 2);
 }
 
@@ -564,10 +597,10 @@ BYTE *ConfigComponent::terminal_addGotoCurrentCursor(BYTE *bfr, int &cnt)
     } else {                                        // shown whole text? just go to cursor position
         gotoCursorPos = cursorPos;
     }
-    
+
     bfr = terminal_addGoto(bfr, posX + 1 + gotoCursorPos, posY);      // add goto(x,y) at cursor position
     cnt += 4;
-    
+
     return bfr;
 }
 
