@@ -5,9 +5,12 @@
 #include "configcomponent.h"
 #include "configstream.h"
 #include "keys.h"
+#include "../utils.h"
 
 #define HEARTBEATSTATECHAR_COUNT    4
 char heartBeatStateChar[HEARTBEATSTATECHAR_COUNT] = {'|', '/', '-', '\\'};
+
+extern DWORD lastUpdateCheck;
 
 ConfigComponent::ConfigComponent(ConfigStream *parent, ComponentType type, std::string text, unsigned int maxLen, int x, int y, int gotoOffset)
 {
@@ -182,8 +185,15 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
             len = fread(bfr, 1, rest, f);               // read up to remaining size of status component
             fclose(f);                                  // close the status file
         } else{                                         // if failed to open the file
-            len = strlen("unknown");
-            strcpy((char *) bfr, "unknown");            // copy string saying 'we don't know'
+            DWORD now = Utils::getCurrentMs();
+
+            if((now - lastUpdateCheck) < FAILED_UPDATE_CHECK_TIME) {    // if within valid time for checking for update
+                len = strlen("unknown");
+                strcpy((char *) bfr, "unknown");        // copy string saying 'we don't know'
+            } else {                                    // if checking for update probably failed, proceed anyway
+                len = strlen("check for update failed");
+                strcpy((char *) bfr, "check for update failed");
+            }
         }
 
         bfr += len;                                     // advance at the full length of this status to overwrite any previous status
