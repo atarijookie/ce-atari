@@ -767,18 +767,18 @@ void ConfigStream::onNetwork_save(void)
     createScreen_homeScreen();      // now back to the home screen
 }
 
+#define MIN_CHECK_PAUSE             (5 * 60 * 1000)
+DWORD lastUpdateCheck = 0;          // this holds the ime when we've last checked for update
+
 void ConfigStream::createScreen_update(void)
 {
-    #define MIN_CHECK_PAUSE         (5 * 60 * 1000)
-
-    static DWORD lastUpdateCheck = 0;               // this holds the ime when we've last checked for update
     DWORD now;
-
     now = Utils::getCurrentMs();
 
     if((now - lastUpdateCheck) >= MIN_CHECK_PAUSE) { // check for update, but not too often
         lastUpdateCheck = now;
-        system("/ce/check_for_update.sh &");
+        unlink(UPDATE_STATUS_FILE);
+        system("/ce/update/check_for_update.sh &");
     }
 
     // the following 3 lines should be at start of each createScreen_ method
@@ -954,7 +954,13 @@ void ConfigStream::updateOnline(void)
     if(Utils::fileExists("/tmp/UPDATE_PENDING_YES")) {  // check_for_update.sh returned that there is update pending
         updateStart();                                  // start the update
     } else {                                            // check_for_update.sh not returned anything yet
-        showMessageScreen("Online Update", "Still checking for update.\n\rPlease try again in a while.\n\r");
+        DWORD now = Utils::getCurrentMs();
+
+        if((now - lastUpdateCheck) < FAILED_UPDATE_CHECK_TIME) {    // if within valid time for checking for update
+            showMessageScreen("Online Update", "Still checking for update.\n\rPlease try again in a while.\n\r");
+        } else {                // if checking for update probably failed, proceed anyway
+            updateStart();      // start the update
+        }
     }
 }
 
@@ -1956,18 +1962,18 @@ void ConfigStream::onSendSettings(void)
 {
     ConfigStream cs(CONFIGSTREAM_THROUGH_WEB);
     cs.createConfigDump();
-    
+
     // add request for download of the update list
     TDownloadRequest tdr;
-    
+
     tdr.srcUrl          = CONFIG_TEXT_FILE;
     tdr.dstDir          = "http://joo.kie.sk/cosmosex/sendconfig/sendconfig.php";
     tdr.downloadType    = DWNTYPE_SEND_CONFIG;
     tdr.checksum        = 0;                        // special case - don't check checsum
     tdr.pStatusByte     = NULL;                     // don't update this status byte
     Downloader::add(tdr);
-    
-    showMessageScreen("Send config", "Sending your configuration to Jookie.\n\rThis will take a while.\n\rInternet connection needed.");    
+
+    showMessageScreen("Send config", "Sending your configuration to Jookie.\n\rThis will take a while.\n\rInternet connection needed.");
 }
 
 

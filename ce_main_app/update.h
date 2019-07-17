@@ -12,6 +12,7 @@
 #define UPDATE_REBOOT_FILE  "/tmp/REBOOT_AFTER_UPDATE"
 #define UPDATE_USBFILE      "/tmp/UPDATE_FROM_USB"
 #define UPDATE_FLASH_XILINX "/tmp/FW_FLASH_XILINX"
+#define UPDATE_STATUS_FILE  "/tmp/UPDATE_STATUS"
 
 #define REPORT_URL          "http://joo.kie.sk/cosmosex/update/report.php"
 
@@ -32,6 +33,8 @@ public:
     static bool writeSimpleTextFile(const char *path, const char *content);
     static void removeSimpleTextFile(const char *path);
     static const char *getUsbArchiveName(void);
+
+    static void createNewScripts(void);
 
 private:
     static DWORD    whenCanStartInstall;

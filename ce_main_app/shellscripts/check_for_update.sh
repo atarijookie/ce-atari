@@ -35,7 +35,7 @@ if [ "$distro" = "yocto" ]; then
     last_online_commit=$( wget -O- $url_to_git_api 2> /dev/null | grep -m 1 'sha' | sed 's/sha//g' | sed 's/[\" \t\n:,]//g' )
 
     # try to read currently stored (used) commit from file
-    commit_curr=$( read_from_file /ce/update/commit.curent 0 )
+    commit_curr=$( read_from_file /ce/update/commit.current 0 )
 
     if [ "$commit_curr" != "$last_online_commit" ]; then    # commits are different? do update
         echo "Found new commit online, will update"
