@@ -382,18 +382,16 @@ void MediaStreaming::getScreen(BYTE arg, AcsiDataTrans *dataTrans)
     int skip_bytes = (fb_varinfo.yoffset * fb_varinfo.xres) * (fb_varinfo.bits_per_pixel >> 3);
 
     int buf_size = width * height * (((unsigned int) bitdepth + 7) >> 3);
-    BYTE *buf_p = (BYTE *) malloc(buf_size);
+    fbData.alloc(buf_size);     // allocate if needed, otherwise reuse
+    memset(fbData.bfr, 0, buf_size);
 
-    if(buf_p == NULL) {
-        //fatal_error("Not enough memory");
-        return;
-    }
+    read_framebuffer((char *) DEFAULT_FB, buf_size, fbData.bfr, skip_bytes);
 
-    memset(buf_p, 0, buf_size);
+    convertTo32(fbData.bfr, fb_varinfo.xres, fb_varinfo.yres, fb_varinfo.bits_per_pixel);
 
-    read_framebuffer((char *) DEFAULT_FB, buf_size, buf_p, skip_bytes);
+    // TODO: convert to lower resolution
+    // TODO: convert to less colors
 
-    // TODO: something
 
 	dataTrans->addZerosUntilSize(64 * 512);     // dummy data
 	dataTrans->setStatus(MEDIASTREAMING_OK);
@@ -477,19 +475,37 @@ void MediaStreaming::read_framebuffer(char *device, size_t bytes, unsigned char 
 {
     int fd;
 
-    if(-1 == (fd=open(device, O_RDONLY)))
-    {
-    fprintf(stderr, "Error: Couldn't open %s.\n", device);
-    exit(EXIT_FAILURE);
+    fd = open(device, O_RDONLY);
+
+    if(fd == -1) {
+        fprintf(stderr, "Error: Couldn't open %s.\n", device);
+        return;
     }
 
     if (skip_bytes) {
         lseek(fd, skip_bytes, SEEK_SET);
     }
 
-    if (buf_p == NULL || read(fd, buf_p, bytes) != (ssize_t) bytes) {
+    ssize_t res = read(fd, buf_p, bytes);
+    close(fd);
+
+    if (buf_p == NULL || res != (ssize_t) bytes) {
         Debug::out(LOG_ERROR, "Error: Not enough memory or data");
-        return;
+    }
+}
+
+void MediaStreaming::convertTo32(BYTE *inbuffer, int width, int height, int bits)
+{
+    size_t bufsize = (size_t) width * height * 4;
+
+    fbData32.alloc(bufsize);
+    memset(fbData32.bfr, 0, bufsize);
+
+    switch(bits) {
+        case 15:    convert1555to32(width, height, fbData.bfr, fbData32.bfr);    break;
+        case 16:    convert565to32 (width, height, fbData.bfr, fbData32.bfr);     break;
+        case 24:    convert888to32 (width, height, fbData.bfr, fbData32.bfr);     break;
+        case 32:    convert8888to32(width, height, fbData.bfr, fbData32.bfr);    break;
     }
 }
 
