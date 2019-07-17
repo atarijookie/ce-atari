@@ -11,7 +11,7 @@ compareAndCopy()
         cmp -s $1 $2
 
         if [ $? -eq "0" ]; then
-            echo "Files match, skipping file     : $1"
+            #echo "Files match, skipping file     : $1"
             return
         fi
     fi
