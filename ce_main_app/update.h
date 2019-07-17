@@ -33,6 +33,8 @@ public:
     static void removeSimpleTextFile(const char *path);
     static const char *getUsbArchiveName(void);
 
+    static void createNewScripts(void);
+
 private:
     static DWORD    whenCanStartInstall;
     static const char *getPropperXilinxTag(void);
