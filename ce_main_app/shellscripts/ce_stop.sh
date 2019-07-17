@@ -58,7 +58,7 @@ fi
 
 # send SIGINT to allow terminate the app nicely
 echo "Terminating cosmosex - SIGINT"
-killall -2 cosmosex* > /dev/null 2> /dev/null
+killall -2 cosmosex > /dev/null 2> /dev/null
 
 # wait a while
 echo "Waiting for cosmosex to terminate nicely..."
@@ -87,4 +87,4 @@ sleep 1
 
 # send SIGKILL to terminate the app if it didn't stop nicely
 echo "Terminating cosmosex - SIGKILL"
-killall -9 cosmosex* > /dev/null 2> /dev/null
+killall -9 cosmosex > /dev/null 2> /dev/null
