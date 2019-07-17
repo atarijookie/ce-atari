@@ -91,7 +91,7 @@ chmod +x /ce/update/*.sh
 #--------------------------
 # check what chips we really need to flash
 
-hans_curr=$( read_from_file /ce/update/hans.curent 0 )
+hans_curr=$( read_from_file /ce/update/hans.current 0 )
 franz_curr=$( read_from_file /ce/update/franz.current 0 )
 xilinx_curr=$( read_from_file /ce/update/xilinx.current 0 )
 
