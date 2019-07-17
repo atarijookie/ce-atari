@@ -6,6 +6,7 @@
 #include "configstream.h"
 #include "keys.h"
 #include "../utils.h"
+#include "../update.h"
 
 #define HEARTBEATSTATECHAR_COUNT    4
 char heartBeatStateChar[HEARTBEATSTATECHAR_COUNT] = {'|', '/', '-', '\\'};
@@ -180,10 +181,16 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
 
         int rest = (maxLen - len);                      // only this much we can use for showing status
 
-        FILE *f = fopen("/tmp/UPDATE_STATUS", "rt");    // try to open status file
+        FILE *f = fopen(UPDATE_STATUS_FILE, "rt");    // try to open status file
         if(f) {                                         // opening file went fine
             len = fread(bfr, 1, rest, f);               // read up to remaining size of status component
             fclose(f);                                  // close the status file
+
+            for(int i=0; i<len; i++) {
+                if(bfr[i] == '\n' || bfr[i] == '\r') {  // replace new line with space
+                    bfr[i] = ' ';
+                }
+            }
         } else{                                         // if failed to open the file
             DWORD now = Utils::getCurrentMs();
 
@@ -191,12 +198,20 @@ void ConfigComponent::getStream(bool fullNotChange, BYTE *bfr, int &len)
                 len = strlen("unknown");
                 strcpy((char *) bfr, "unknown");        // copy string saying 'we don't know'
             } else {                                    // if checking for update probably failed, proceed anyway
-                len = strlen("check for update failed");
-                strcpy((char *) bfr, "check for update failed");
+                len = strlen("check failed");
+                strcpy((char *) bfr, "check failed");
             }
         }
 
         bfr += len;                                     // advance at the full length of this status to overwrite any previous status
+
+        int padCnt = rest - len;
+        if(padCnt > 0) {                                // if didn't fill the whole updateStatus string
+            for(int i=0; i<padCnt; i++) {               // fill the rest with spaces
+                *bfr = ' ';
+                bfr++;
+            }
+        }
 
         if(isReverse) {                                 // if reversed, stop reverse
             bfr = terminal_addReverse(bfr, false);

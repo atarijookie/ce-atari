@@ -777,6 +777,7 @@ void ConfigStream::createScreen_update(void)
 
     if((now - lastUpdateCheck) >= MIN_CHECK_PAUSE) { // check for update, but not too often
         lastUpdateCheck = now;
+        unlink(UPDATE_STATUS_FILE);
         system("/ce/update/check_for_update.sh &");
     }
 
@@ -1961,18 +1962,18 @@ void ConfigStream::onSendSettings(void)
 {
     ConfigStream cs(CONFIGSTREAM_THROUGH_WEB);
     cs.createConfigDump();
-    
+
     // add request for download of the update list
     TDownloadRequest tdr;
-    
+
     tdr.srcUrl          = CONFIG_TEXT_FILE;
     tdr.dstDir          = "http://joo.kie.sk/cosmosex/sendconfig/sendconfig.php";
     tdr.downloadType    = DWNTYPE_SEND_CONFIG;
     tdr.checksum        = 0;                        // special case - don't check checsum
     tdr.pStatusByte     = NULL;                     // don't update this status byte
     Downloader::add(tdr);
-    
-    showMessageScreen("Send config", "Sending your configuration to Jookie.\n\rThis will take a while.\n\rInternet connection needed.");    
+
+    showMessageScreen("Send config", "Sending your configuration to Jookie.\n\rThis will take a while.\n\rInternet connection needed.");
 }
 
 
