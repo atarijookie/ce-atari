@@ -57,7 +57,7 @@ else    # download update from internet, by git or wget
         unzip -o $path_to_tmp_update -d /ce             # unzip update into /ce directory, overwrite without prompting
 
         # get last online commit in the branch for this distro and store it where we will expect it next time we'll check_for_update (.sh)
-        wget -O- $url_to_git_api 2> /dev/null | grep -m 1 'sha' | sed 's/sha//g' | sed 's/[\" \t\n:,]//g' > /ce/update/commit.curent
+        wget -O- $url_to_git_api 2> /dev/null | grep -m 1 'sha' | sed 's/sha//g' | sed 's/[\" \t\n:,]//g' > /ce/update/commit.current
 
     else                                                # git is present
         echo "doing git pull..."
