@@ -6,7 +6,7 @@
 #include "version.h"
 #include "debug.h"
 
-extern TFlags flags;			// global flags from command line
+extern TFlags flags;            // global flags from command line
 extern RPiConfig rpiConfig;
 
 Version::Version()
@@ -171,7 +171,7 @@ void Version::getAppVersion(char *bfr)
     
     i = sscanf(buildDate + 4, "%d %d", &day, &year);
     
-    if(flags.fakeOldApp) {		// if should fake that the app is old, subtract 2 years from app year
+    if(flags.fakeOldApp) {      // if should fake that the app is old, subtract 2 years from app year
         year -= 2;
     }
 
@@ -187,8 +187,13 @@ void Version::getRaspberryPiInfo(void)
     // first parse the files, so we won't have to do this in C 
     system("cat /proc/cpuinfo | grep 'Serial' | tr -d ' ' | awk -F ':' '{print $2}' > /tmp/rpiserial.txt");
     system("cat /proc/cpuinfo | grep 'Revision' | tr -d ' ' | awk -F ':' '{print $2}' > /tmp/rpirevision.txt");
+
+    #ifdef DISTRO_STRETCH
+    system("dmesg | grep 'Machine model' | awk -F 'model: ' '{print $2}' > /tmp/rpimodel.txt");
+    #else
     system("dmesg | grep 'Machine model' | awk -F ': ' '{print $2}' > /tmp/rpimodel.txt");
-    
+    #endif
+
     // read in the data
     readLineFromFile("/tmp/rpiserial.txt",      rpiConfig.serial,   20, "unknown");
     readLineFromFile("/tmp/rpirevision.txt",    rpiConfig.revision,  8, "unknown");
