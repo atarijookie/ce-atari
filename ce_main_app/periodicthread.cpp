@@ -56,6 +56,8 @@ extern volatile BYTE updateListDownloadStatus;
 static void handleConfigStreams(ConfigStream *cs, ConfigPipes &cp);
 static void fillNetworkDisplayLines(void);
 
+volatile DWORD whenCanStartInstall;         // if this DWORD has non-zero value, then it's a time when this app should be terminated for installing update
+
 void *periodicThreadCode(void *ptr)
 {
     fd_set readfds;
@@ -95,9 +97,17 @@ void *periodicThreadCode(void *ptr)
         max_fd = -1;
         FD_ZERO(&readfds);
         FD_ZERO(&writefds);
-        wait = 10*1000; // max 10 sec ?
+        wait = 1*1000;      // max 1 sec, so we can often enough check for whenCanStartInstall and then terminate app for update
 
         now = Utils::getCurrentMs();
+
+        // the next block is executed a couple of times after user starts update, but we need to let the app run for a second or two more to get info about update
+        if(whenCanStartInstall) {               // if it's non-zero, we should check if it's time to do the update
+            if(now >= whenCanStartInstall) {
+                Debug::out(LOG_INFO, ">>> Terminating app, because user requests update and update was found. <<<\n");
+                sigintReceived = 1;     // quit
+            }
+        }
 
         //------------------------------------
         // should we do something related to devFinder?
@@ -157,7 +167,7 @@ void *periodicThreadCode(void *ptr)
             if(errno == EINTR) {
                 continue;
             } else {
-                Debug::out(LOG_ERROR, "peridic thread : select() %s", strerror(errno));
+                Debug::out(LOG_ERROR, "periodic thread : select() %s", strerror(errno));
                 continue;
             }
         }

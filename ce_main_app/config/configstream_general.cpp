@@ -15,6 +15,8 @@
 #include "config_commands.h"
 #include "../debug.h"
 
+BYTE isUpdateStartingFlag = 0;
+
 ConfigStream::ConfigStream(int whereItWillBeShown)
 {
     shownOn = whereItWillBeShown;
@@ -24,9 +26,9 @@ ConfigStream::ConfigStream(int whereItWillBeShown)
 
     enterKeyEventLater = 0;
 
-    showingHomeScreen	= false;
-    showingMessage		= false;
-    screenChanged		= true;
+    showingHomeScreen   = false;
+    showingMessage      = false;
+    screenChanged       = true;
 
     dataTrans   = NULL;
     reloadProxy = NULL;
@@ -110,8 +112,7 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
 
     case CFG_CMD_UPDATING_QUERY:
     {
-        BYTE isUpdateStartingFlag               = 0;
-        BYTE updateComponentsWithValidityNibble = 0xC0 | 0x0f;			// for now pretend all needs to be updated
+        BYTE updateComponentsWithValidityNibble = 0xC0 | 0x0f;          // for now pretend all needs to be updated
 
         dataTrans->addDataByte(isUpdateStartingFlag);
         dataTrans->addDataByte(updateComponentsWithValidityNibble);
@@ -167,7 +168,7 @@ void ConfigStream::processCommand(BYTE *cmd, int writeToFd)
 
 void ConfigStream::onKeyDown(BYTE key)
 {
-    StupidVector &scr = showingMessage ? message : screen;		// if we should show message, set reference to message, otherwise set reference to screen
+    StupidVector &scr = showingMessage ? message : screen;      // if we should show message, set reference to message, otherwise set reference to screen
 
     int focused = -1, firstFocusable = -1, lastFocusable = -1, firstButton = -1, lastButton = -1;
 
@@ -175,17 +176,17 @@ void ConfigStream::onKeyDown(BYTE key)
     for(WORD i=0; i<scr.size(); i++) {
         ConfigComponent *c = (ConfigComponent *) scr[i];
 
-        if(c->isFocused()) {						// if found focused component, store index
+        if(c->isFocused()) {                        // if found focused component, store index
             focused = i;
         }
 
-        if(firstFocusable == -1) {					// if found focusable component, store index
+        if(firstFocusable == -1) {                  // if found focusable component, store index
             if(c->canFocus()) {
                 firstFocusable = i;
             }
         }
 
-        if(c->canFocus()) {							// if this is focusable, then store it as last focusable (at the end it will contain the last focusable)
+        if(c->canFocus()) {                         // if this is focusable, then store it as last focusable (at the end it will contain the last focusable)
             lastFocusable = i;
         }
 
@@ -200,34 +201,34 @@ void ConfigStream::onKeyDown(BYTE key)
         }
     }
 
-    if(firstFocusable == -1) {						// nothing focusable? do nothing
+    if(firstFocusable == -1) {                      // nothing focusable? do nothing
         return;
     }
 
-    if(focused == -1) {								// there is something focusable, but nothing has focus? focus it
+    if(focused == -1) {                             // there is something focusable, but nothing has focus? focus it
         focused = firstFocusable;
     }
 
-    ConfigComponent *curr = (ConfigComponent *) scr[focused];		// focus this component
+    ConfigComponent *curr = (ConfigComponent *) scr[focused];       // focus this component
     curr->setFocus(true);
 
-    int prevFocusable = -1, nextFocusable = -1;		// now find previous and next focusable item in the list of components
+    int prevFocusable = -1, nextFocusable = -1;     // now find previous and next focusable item in the list of components
     int prevButton = -1, nextButton = -1;
     for(WORD i=0; i<scr.size(); i++) {
         ConfigComponent *c = (ConfigComponent *) scr[i];
 
-        if(!c->canFocus()) {						// can't focus? fuck you!
+        if(!c->canFocus()) {                        // can't focus? fuck you!
             continue;
         }
 
-        if(i < focused) {							// if we're bellow currently focused item, store each found index (go near focused component)
+        if(i < focused) {                           // if we're bellow currently focused item, store each found index (go near focused component)
             prevFocusable = i;
             if (c->getComponentType() == ConfigComponent::button) {
                 prevButton = i;
             }
         }
 
-        if(i > focused) {							// if we're above currently focused item, store only first found index (don't go far from focused component)
+        if(i > focused) {                           // if we're above currently focused item, store only first found index (don't go far from focused component)
             if(nextFocusable == -1) {
                 nextFocusable = i;
             }
@@ -253,7 +254,7 @@ void ConfigStream::onKeyDown(BYTE key)
     }
 
     if(key == KEY_SHIFT_TAB) {
-        curr->setFocus(false);					// unfocus this component
+        curr->setFocus(false);                  // unfocus this component
 
         if(prevButton != -1) {
             curr = (ConfigComponent *) scr[prevButton];
@@ -261,13 +262,13 @@ void ConfigStream::onKeyDown(BYTE key)
             curr = (ConfigComponent *) scr[lastButton];
         }
 
-        curr->setFocus(true);					// focus this component
+        curr->setFocus(true);                   // focus this component
 
         return;
     }
 
     if(key == KEY_TAB) {
-        curr->setFocus(false);					// unfocus this component
+        curr->setFocus(false);                  // unfocus this component
 
         if(nextButton != -1) {
             curr = (ConfigComponent *) scr[nextButton];
@@ -275,7 +276,7 @@ void ConfigStream::onKeyDown(BYTE key)
             curr = (ConfigComponent *) scr[firstButton];
         }
 
-        curr->setFocus(true);					// focus this component
+        curr->setFocus(true);                   // focus this component
 
         return;
     }
@@ -291,30 +292,30 @@ void ConfigStream::onKeyDown(BYTE key)
         }
     }
 
-    if(key == KEY_UP) {							// arrow up
-        curr->setFocus(false);					// unfocus this component
+    if(key == KEY_UP) {                         // arrow up
+        curr->setFocus(false);                  // unfocus this component
 
-        if(prevFocusable != -1) {				                    // got previous focusable item?
+        if(prevFocusable != -1) {                                   // got previous focusable item?
             curr = (ConfigComponent *) scr[prevFocusable];          // move to the previous component
-        } else if(lastFocusable != -1) {		                    // got last focusable?
+        } else if(lastFocusable != -1) {                            // got last focusable?
             curr = (ConfigComponent *) scr[lastFocusable];          // move to the last component (wrap around)
         }
 
-        curr->setFocus(true);					// focus this component
+        curr->setFocus(true);                   // focus this component
 
         return;
     }
 
-    if(key == KEY_DOWN) {							// arrow down
-        curr->setFocus(false);					// unfocus this component
+    if(key == KEY_DOWN) {                           // arrow down
+        curr->setFocus(false);                  // unfocus this component
 
-        if(nextFocusable != -1) {				                // got next focusable item?
-            curr = (ConfigComponent *) scr[nextFocusable];		// move to the next component
-        } else if(firstFocusable != -1) {		                // got first focusable?
-            curr = (ConfigComponent *) scr[firstFocusable];		// move to the first component (wrap around)
+        if(nextFocusable != -1) {                               // got next focusable item?
+            curr = (ConfigComponent *) scr[nextFocusable];      // move to the next component
+        } else if(firstFocusable != -1) {                       // got first focusable?
+            curr = (ConfigComponent *) scr[firstFocusable];     // move to the first component (wrap around)
         }
 
-        curr->setFocus(true);					// focus this component
+        curr->setFocus(true);                   // focus this component
 
         return;
     }
@@ -332,34 +333,34 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
 {
     int totalCnt = 0;
 
-    if(showingMessage) {								// if we're showing the message
-        if(homeScreen) {								// but we should show home screen
-            hideMessageScreen();						// hide the message
+    if(showingMessage) {                                // if we're showing the message
+        if(homeScreen) {                                // but we should show home screen
+            hideMessageScreen();                        // hide the message
         }
     }
 
-    if(homeScreen) {									// if we should show the stream for homescreen
-        if(!showingHomeScreen) {						// and we're not showing it yet
-            createScreen_homeScreen();					// create homescreen
+    if(homeScreen) {                                    // if we should show the stream for homescreen
+        if(!showingHomeScreen) {                        // and we're not showing it yet
+            createScreen_homeScreen();                  // create homescreen
         }
 
         screenChanged = true;                                           // mark that the screen has changed
     }
 
-    if(screen.size() == 0) {							// if we wanted to show current screen, but there is nothing, just show home screen
+    if(screen.size() == 0) {                            // if we wanted to show current screen, but there is nothing, just show home screen
         createScreen_homeScreen();
     }
 
-    memset(bfr, 0, maxLen);								// clear the buffer
+    memset(bfr, 0, maxLen);                             // clear the buffer
 
-    StupidVector &scr = showingMessage ? message : screen;		// if we should show message, set reference to message, otherwise set reference to screen
+    StupidVector &scr = showingMessage ? message : screen;      // if we should show message, set reference to message, otherwise set reference to screen
 
     // first turn off the cursor to avoid cursor blinking on the screen
     *bfr++ = 27;
     *bfr++ = 'f';       // CUR_OFF
     totalCnt += 2;
 
-    if(screenChanged) {									// if screen changed, clear screen (CLEAR_HOME) and draw it all
+    if(screenChanged) {                                 // if screen changed, clear screen (CLEAR_HOME) and draw it all
         *bfr++ = 27;
         *bfr++ = 'E';   // CLEAR_HOME
         totalCnt += 2;
@@ -368,31 +369,31 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
     //--------
     int focused = -1;
 
-    for(WORD i=0; i<scr.size(); i++) {				// go through all the components of screen and gather their streams
+    for(WORD i=0; i<scr.size(); i++) {              // go through all the components of screen and gather their streams
         ConfigComponent *c = (ConfigComponent *) scr[i];
 
-        if(c->isFocused()) {							// if this component has focus, store it's index
+        if(c->isFocused()) {                            // if this component has focus, store it's index
             focused = i;
         }
 
         int gotLen;
-        c->getStream(screenChanged, bfr, gotLen);		// if screenChanged, will get full stream, not only change
+        c->getStream(screenChanged, bfr, gotLen);       // if screenChanged, will get full stream, not only change
         bfr += gotLen;
 
         totalCnt += gotLen;
     }
 
-    if(focused != -1) {									// if got some component with focus
+    if(focused != -1) {                                 // if got some component with focus
         int gotLen;
         ConfigComponent *c = (ConfigComponent *) scr[focused];
-        bfr = c->terminal_addGotoCurrentCursor(bfr, gotLen);	// position the cursor at the right place
+        bfr = c->terminal_addGotoCurrentCursor(bfr, gotLen);    // position the cursor at the right place
 
         totalCnt    += gotLen;
     }
 
     screenChanged = false;
 
-    *bfr++ = 0;									        // add string terminator
+    *bfr++ = 0;                                         // add string terminator
     totalCnt++;
 
     //-------
@@ -404,7 +405,7 @@ int ConfigStream::getStream(bool homeScreen, BYTE *bfr, int maxLen)
     //-------
     // get update components, if on update screen
     if(isUpdScreen) {
-        *bfr++ = 0xC0 | 0x0f;	// store update components and the validity nibble -- for now pretend all needs to be updated
+        *bfr++ = 0xC0 | 0x0f;   // store update components and the validity nibble -- for now pretend all needs to be updated
     } else {
         *bfr++ = 0;     // store update components - not updating anything
     }
@@ -454,17 +455,17 @@ void ConfigStream::destroyCurrentScreen(void)
 
 void ConfigStream::destroyScreen(StupidVector &scr)
 {
-    for(WORD i=0; i<scr.size(); i++) {				// go through this screen, delete all components
+    for(WORD i=0; i<scr.size(); i++) {              // go through this screen, delete all components
         ConfigComponent *c = (ConfigComponent *) scr[i];
         delete c;
     }
 
-    scr.clear();									// now clear the list
+    scr.clear();                                    // now clear the list
 }
 
 void ConfigStream::setFocusToFirstFocusable(void)
 {
-    for(WORD i=0; i<screen.size(); i++) {			// go through the current screen
+    for(WORD i=0; i<screen.size(); i++) {           // go through the current screen
         ConfigComponent *c = (ConfigComponent *) screen[i];
 
         if(c->canFocus()) {
@@ -476,7 +477,7 @@ void ConfigStream::setFocusToFirstFocusable(void)
 
 ConfigComponent *ConfigStream::findComponentById(int compId)
 {
-    for(WORD i=0; i<screen.size(); i++) {			// go through the current screen
+    for(WORD i=0; i<screen.size(); i++) {           // go through the current screen
         ConfigComponent *c = (ConfigComponent *) screen[i];
 
         if(c->getComponentId() == compId) {                     // found the component?
@@ -617,7 +618,7 @@ void ConfigStream::focusByComponentId(int componentId)
 
 bool ConfigStream::focusNextCheckboxGroup(BYTE key, int groupid, int chbid)
 {
-    for(WORD i=0; i<screen.size(); i++) {			// go through the current screen
+    for(WORD i=0; i<screen.size(); i++) {           // go through the current screen
         ConfigComponent *c = (ConfigComponent *) screen[i];
 
         if(c->isGroupCheckBox()) {
@@ -656,17 +657,17 @@ bool ConfigStream::focusNextCheckboxGroup(BYTE key, int groupid, int chbid)
 
 int ConfigStream::checkboxGroup_getCheckedId(int groupId) 
 {
-    for(WORD i=0; i<screen.size(); i++) {					// go through the current screen and find the checked checkbox
+    for(WORD i=0; i<screen.size(); i++) {                   // go through the current screen and find the checked checkbox
         ConfigComponent *c = (ConfigComponent *) screen[i];
 
         int thisGroupId, checkboxId;
-        c->getCheckboxGroupIds(thisGroupId, checkboxId);	// get the IDs
+        c->getCheckboxGroupIds(thisGroupId, checkboxId);    // get the IDs
 
-        if(thisGroupId != groupId) {        				// if the group ID doesn't match, skip
+        if(thisGroupId != groupId) {                        // if the group ID doesn't match, skip
             continue;
         }
 
-        if(c->isChecked()) {								// is checked and from the group?
+        if(c->isChecked()) {                                // is checked and from the group?
             return checkboxId;
         }
     }
@@ -676,19 +677,19 @@ int ConfigStream::checkboxGroup_getCheckedId(int groupId)
 
 void ConfigStream::checkboxGroup_setCheckedId(int groupId, int checkedId)
 {
-    for(WORD i=0; i<screen.size(); i++) {					// go through the current screen and find the checked checkbox
+    for(WORD i=0; i<screen.size(); i++) {                   // go through the current screen and find the checked checkbox
         ConfigComponent *c = (ConfigComponent *) screen[i];
 
         int thisGroupId, checkboxId;
-        c->getCheckboxGroupIds(thisGroupId, checkboxId);	// get the IDs
+        c->getCheckboxGroupIds(thisGroupId, checkboxId);    // get the IDs
 
-        if(thisGroupId != groupId) {        				// if the group ID doesn't match, skip
+        if(thisGroupId != groupId) {                        // if the group ID doesn't match, skip
             continue;
         }
 
-        if(checkboxId == checkedId) {						// for the matching id - check
+        if(checkboxId == checkedId) {                       // for the matching id - check
             c->setIsChecked(true);
-        } else {											// for mismatching id - uncheck
+        } else {                                            // for mismatching id - uncheck
             c->setIsChecked(false);
         }
     }
@@ -724,12 +725,12 @@ void ConfigStream::screen_addHeaderAndFooter(StupidVector &scr, const char *scre
 
     // insert screen name as part of header
     char bfr[41];
-    memset(bfr, 32, 40);					// fill with spaces (0 - 39)
-    bfr[40] = 0;							// terminate with a zero
+    memset(bfr, 32, 40);                    // fill with spaces (0 - 39)
+    bfr[40] = 0;                            // terminate with a zero
 
     int len = strlen(screenName);
-    int pos = (40 / 2) - (len / 2);			// calculate the position in the middle of screen
-    strncpy(bfr + pos, screenName, len);	// copy the string in the middle, withouth the terminating zero
+    int pos = (40 / 2) - (len / 2);         // calculate the position in the middle of screen
+    strncpy(bfr + pos, screenName, len);    // copy the string in the middle, withouth the terminating zero
 
     comp = new ConfigComponent(this, ConfigComponent::label, bfr, 39, 0, 1, gotoOffset);
     comp->setReverse(true);

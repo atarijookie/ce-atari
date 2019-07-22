@@ -37,6 +37,9 @@ extern RPiConfig rpiConfig;             // RPi info structure
 
 extern SharedObjects shared;
 
+extern BYTE isUpdateStartingFlag;           // set to 1 to notify ST that the update is starting and it should show 'fake updating progress' screen
+extern volatile DWORD whenCanStartInstall;  // if this DWORD has non-zero value, then it's a time when this app should be terminated for installing update
+
 //--------------------------
 // screen creation methods
 void ConfigStream::createScreen_homeScreen(void)
@@ -998,8 +1001,10 @@ void ConfigStream::updateStart(void)
     Update::createUpdateScript(false, false);
 
     // terminate app and do the update
-    Debug::out(LOG_INFO, ">>> Terminating app, because user requests update and update was found. <<<\n");
-    sigintReceived = 1;     // quit
+    isUpdateStartingFlag = 1;                       // set this flag, but don't terminate yet so ST will be able to ask for update status and retrieves this flag
+    whenCanStartInstall = Utils::getEndTime(3000);  // we can start install after 3 seconds from now on
+
+    Debug::out(LOG_INFO, ">>> User requests update, the app will be terminated in a 3 seconds. <<<\n");
 }
 
 void ConfigStream::createScreen_update_download(void)
