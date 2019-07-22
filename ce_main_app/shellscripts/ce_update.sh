@@ -41,8 +41,8 @@ else    # download update from internet, by git or wget
     if [ "$?" -ne "0" ]; then                           # if don't have git
         echo "Will try to install missing git"
 
-        apt-get update
-        apt-get --yes --force-yes install git           # try to install git
+        apt-get update 2> /dev/null
+        apt-get --yes --force-yes install git 2> /dev/null # try to install git
     fi
 
     # try to check for git after possible installation
