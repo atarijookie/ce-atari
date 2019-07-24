@@ -73,6 +73,8 @@ typedef struct {
     char serial  [20];
     char revision[8];
     char model   [40];
+
+    DWORD revisionInt;
 } RPiConfig;
 
 typedef struct {

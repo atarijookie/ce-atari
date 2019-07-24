@@ -262,12 +262,18 @@ int main(int argc, char *argv[])
     res = pthread_create(&periodicThreadInfo, NULL, periodicThreadCode, NULL);  // create the periodic thread and run it
     handlePthreadCreate(res, "periodic", &periodicThreadInfo);
 
-#ifndef DISTRO_YOCTO
-    // display thread - only on raspbian
-    res = pthread_create(&displayThreadInfo, NULL, displayThreadCode, NULL);  // create the display thread and run it
-    handlePthreadCreate(res, "display", &displayThreadInfo);
-#endif
-    
+    if(rpiConfig.revisionInt >= 0xa01041) {   // display thread - only on RPi 2 or newer (RPi 1 doesn't have the extra GPIO pins and this then kills eth + usb on RPi1)
+        Debug::out(LOG_INFO, "Running on RPi 2 or newer (%x), starting displayThread.", rpiConfig.revisionInt);
+
+        bcm2835_gpio_fsel(PIN_BEEPER, BCM2835_GPIO_FSEL_OUTP);  // config these extra GPIO pins here (not in the gpio_open())
+        bcm2835_gpio_fsel(PIN_BUTTON, BCM2835_GPIO_FSEL_INPT);
+
+        res = pthread_create(&displayThreadInfo, NULL, displayThreadCode, NULL);  // create the display thread and run it
+        handlePthreadCreate(res, "display", &displayThreadInfo);
+    } else {
+        Debug::out(LOG_INFO, "Running on RPi 1 (%x), not starting displayThread.", rpiConfig.revisionInt);
+    }
+
     printf("Entering main loop...\n");
 
     core->run();                // run the main thread
@@ -321,13 +327,12 @@ int main(int argc, char *argv[])
     pthread_kill(periodicThreadInfo, SIGINT);           // stop the select()
     pthread_join(periodicThreadInfo, NULL);             // wait until periodic  thread finishes
 
-#ifndef DISTRO_YOCTO
-    // on raspbian - kill display thread
-    printf("Stopping display thread\n");
-    pthread_kill(displayThreadInfo, SIGINT);           // stop the select()
-    pthread_join(displayThreadInfo, NULL);             // wait until display thread finishes
-#endif
-    
+    if(rpiConfig.revisionInt >= 0xa01041) {             // kill display thread - only on RPi 2 or newer
+        printf("Stopping display thread\n");
+        pthread_kill(displayThreadInfo, SIGINT);        // stop the select()
+        pthread_join(displayThreadInfo, NULL);          // wait until display thread finishes
+    }
+
     printf("Downloader clean up before quit\n");
     Downloader::cleanupBeforeQuit();
 

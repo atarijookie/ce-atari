@@ -198,11 +198,18 @@ void Version::getRaspberryPiInfo(void)
     readLineFromFile("/tmp/rpiserial.txt",      rpiConfig.serial,   20, "unknown");
     readLineFromFile("/tmp/rpirevision.txt",    rpiConfig.revision,  8, "unknown");
     readLineFromFile("/tmp/rpimodel.txt",       rpiConfig.model,    40, "Raspberry Pi unknown model");
-    
+
     // print to log file in debug mode
     Debug::out(LOG_DEBUG, "RPi serial  : %s", rpiConfig.serial);
     Debug::out(LOG_DEBUG, "RPi revision: %s", rpiConfig.revision);
     Debug::out(LOG_DEBUG, "RPi model   : %s", rpiConfig.model);
+
+    // now try to convert revision from hex string to int, for easy comparing
+    int res = sscanf(rpiConfig.revision, "%x", &rpiConfig.revisionInt);
+
+    if(res != 1) {      // failed to get int from string? set zero
+        rpiConfig.revisionInt = 0;
+    }
 }
 
 void Version::readLineFromFile(const char *filename, char *buffer, int maxLen, const char *defValue)
