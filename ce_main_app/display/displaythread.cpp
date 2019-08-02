@@ -83,6 +83,11 @@ void *displayThreadCode(void *ptr)
     DWORD btnDownStart = 0;
     int   btnDownTime = 0, btnDownTimePrev = 0;
 
+#ifndef ONPC_NOTHING
+    bcm2835_gpio_fsel(PIN_BEEPER, BCM2835_GPIO_FSEL_OUTP);      // config these extra GPIO pins here (not in the gpio_open())
+    bcm2835_gpio_fsel(PIN_BUTTON, BCM2835_GPIO_FSEL_INPT);
+#endif
+
     FloppyConfig floppyConfig;                                  // this contains floppy sound settings
     handleBeeperCommand(BEEP_RELOAD_SETTINGS, &floppyConfig);   // load settings
 

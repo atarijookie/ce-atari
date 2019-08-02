@@ -265,9 +265,6 @@ int main(int argc, char *argv[])
     if(rpiConfig.revisionInt >= 0xa01041) {   // display thread - only on RPi 2 or newer (RPi 1 doesn't have the extra GPIO pins and this then kills eth + usb on RPi1)
         Debug::out(LOG_INFO, "Running on RPi 2 or newer (%x), starting displayThread.", rpiConfig.revisionInt);
 
-        bcm2835_gpio_fsel(PIN_BEEPER, BCM2835_GPIO_FSEL_OUTP);  // config these extra GPIO pins here (not in the gpio_open())
-        bcm2835_gpio_fsel(PIN_BUTTON, BCM2835_GPIO_FSEL_INPT);
-
         res = pthread_create(&displayThreadInfo, NULL, displayThreadCode, NULL);  // create the display thread and run it
         handlePthreadCreate(res, "display", &displayThreadInfo);
     } else {

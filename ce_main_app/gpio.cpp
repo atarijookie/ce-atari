@@ -209,7 +209,6 @@ bool gpio_open(void)
     bcm2835_gpio_write(PIN_TMS, LOW);
     bcm2835_gpio_write(PIN_TCK, LOW);
 
-
     // pins for both STM32 programming
     bcm2835_gpio_fsel(PIN_RESET_HANS,       BCM2835_GPIO_FSEL_OUTP);
     bcm2835_gpio_fsel(PIN_RESET_FRANZ,      BCM2835_GPIO_FSEL_OUTP);

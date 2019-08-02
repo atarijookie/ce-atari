@@ -29,7 +29,7 @@ void Update::initialize(void)
     Version::getAppVersion(appVersion);
 
     Update::versions.current.app.fromString(                (char *) appVersion);
-    Update::versions.current.xilinx.fromFirstLineOfFile(    (char *) XILINX_VERSION_FILE);
+    Update::versions.current.xilinx.fromFirstLineOfFile(    (char *) XILINX_VERSION_FILE, false);   // xilinx version file without dashes
     Update::versions.current.imageList.fromFirstLineOfFile( (char *) IMAGELIST_LOCAL);
     Update::versions.updateListWasProcessed = false;
     Update::versions.gotUpdate              = false;
