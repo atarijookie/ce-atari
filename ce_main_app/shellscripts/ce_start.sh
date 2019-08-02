@@ -28,6 +28,9 @@ ce_is_running() {
 # remove doupdate script
 rm -f /ce/update/doupdate.sh
 
+# check if some chips need to be flashed, possibly force flash, and do the flashing (e.g. after new SD card being written)
+/ce/update/check_and_flash_chips.sh
+
 # check for distro, run systemctl only on stretch
 distro=$( /ce/whichdistro.sh )
 
