@@ -4,7 +4,7 @@
 #include <string>
 #include "datatypes.h"
 
-#define XILINX_VERSION_FILE		"/ce/update/xilinx_current.txt"
+#define XILINX_VERSION_FILE		"/ce/update/xilinx.current"
 
 class Version
 {
@@ -16,8 +16,9 @@ public:
 
     Version();
     void fromString(char *str);
+    void fromStringWithoutDashes(char *str);
     void fromInts(int y, int m, int d);
-    void fromFirstLineOfFile(char *filePath);
+    void fromFirstLineOfFile(char *filePath, bool withDashes=true);
     void clear(void);
 
     void        setUrlAndChecksum(char *pUrl, char *chs);
@@ -25,9 +26,6 @@ public:
     WORD        getChecksum(void);
 
     void toString(char *str);
-
-    bool isOlderThan(const Version &other);
-    bool isEqualTo(const Version &other);
 
     volatile BYTE downloadStatus;
 
@@ -48,14 +46,6 @@ typedef struct {
             Version franz;
             Version imageList;
         } current;
-
-        struct {
-            Version app;
-            Version hans;
-            Version xilinx;
-            Version franz;
-            Version imageList;
-        } onServer;
 
         bool updateListWasProcessed;
         bool gotUpdate;

@@ -6,7 +6,7 @@
 #include "version.h"
 #include "debug.h"
 
-extern TFlags flags;			// global flags from command line
+extern TFlags flags;        // global flags from command line
 extern RPiConfig rpiConfig;
 
 Version::Version()
@@ -27,6 +27,28 @@ void Version::fromString(char *str)
     if(res != 3) {
         return;
     }
+
+    fromInts(y, m, d);
+}
+
+void Version::fromStringWithoutDashes(char *str)
+{
+    int y,m,d, all, rest;
+
+    clear();
+
+    // read it
+    int res = sscanf(str, "%d", &all);
+
+    // if failed to read
+    if(res != 1) {
+        return;
+    }
+
+    y    = all / 10000; // get year part
+    rest = all % 10000;
+    m = rest / 100;     // get month
+    d = rest % 100;     // get day
 
     fromInts(y, m, d);
 }
@@ -61,55 +83,7 @@ void Version::clear(void)
     checksum = 0;
 }
 
-bool Version::isOlderThan(const Version &other)
-{
-    if(year < 2013 && other.year < 2013) {  // both years unavailable? 
-        return false;
-    }
-
-    if(year < 2013 && other.year >= 2013) {  // this year not available, other year available? 
-        return true;
-    }
-
-    if(year >= 2013 && other.year < 2013) {  // this year available, other year not available?
-        return false;
-    }
-
-    // calculate fake day of the year, compare them
-    int fakeDayOfYearThis, fakeDayOfYearOther;
-
-    #define FAKEDAYS_PER_MONTH  (31)
-    #define FAKEDAYS_PER_YEAR   (12 * FAKEDAYS_PER_MONTH)
-
-    fakeDayOfYearThis = ((year - 2013) * FAKEDAYS_PER_YEAR) + ((month - 1) * FAKEDAYS_PER_MONTH) + day;
-    fakeDayOfYearOther = ((other.year - 2013) * FAKEDAYS_PER_YEAR) + ((other.month - 1) * FAKEDAYS_PER_MONTH) + other.day;
-
-    if(fakeDayOfYearOther > fakeDayOfYearThis) {            // if the other date is greater than this one, then the this is older than other
-        return true;
-    }
-
-    return false;
-}
-
-bool Version::isEqualTo(const Version &other)
-{
-    if(year != other.year) {        // year doesn't match?
-        return false;
-    }
-
-    if(month != other.month) {      // month doesn't match?
-        return false;
-    }
-
-    if(day != other.day) {          // day doesn't match?
-        return false;
-    }
-
-    // everything matches
-    return true;
-}
-
-void Version::fromFirstLineOfFile(char *filePath)
+void Version::fromFirstLineOfFile(char *filePath, bool withDashes)
 {
     clear();
 
@@ -128,13 +102,17 @@ void Version::fromFirstLineOfFile(char *filePath)
 
     fclose(f);                                  // close the file
 
-    fromString(line);                           // try to parse the line
+    if(withDashes) {                            // with dashes
+        fromString(line);                       // try to parse the line
+    } else {                                    // without dashes
+        fromStringWithoutDashes(line);
+    }
 }
 
 void Version::setUrlAndChecksum(char *pUrl, char *chs)
 {
     url = pUrl;
-    
+
     int res, val;
     res = sscanf(chs, "0x%x", &val);
 
@@ -159,7 +137,7 @@ void Version::getAppVersion(char *bfr)
 {
     char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     char const *buildDate = __DATE__;
-    
+
     int year = 0, month = 0, day = 0;
     int i;
     for(i=0; i<12; i++) {
@@ -168,9 +146,9 @@ void Version::getAppVersion(char *bfr)
             break;
         }
     }
-    
+
     i = sscanf(buildDate + 4, "%d %d", &day, &year);
-    
+
     if(flags.fakeOldApp) {		// if should fake that the app is old, subtract 2 years from app year
         year -= 2;
     }
@@ -188,12 +166,12 @@ void Version::getRaspberryPiInfo(void)
     system("cat /proc/cpuinfo | grep 'Serial' | tr -d ' ' | awk -F ':' '{print $2}' > /tmp/rpiserial.txt");
     system("cat /proc/cpuinfo | grep 'Revision' | tr -d ' ' | awk -F ':' '{print $2}' > /tmp/rpirevision.txt");
     system("dmesg | grep 'Machine model' | awk -F ': ' '{print $2}' > /tmp/rpimodel.txt");
-    
+
     // read in the data
     readLineFromFile("/tmp/rpiserial.txt",      rpiConfig.serial,   20, "unknown");
     readLineFromFile("/tmp/rpirevision.txt",    rpiConfig.revision,  8, "unknown");
     readLineFromFile("/tmp/rpimodel.txt",       rpiConfig.model,    40, "Raspberry Pi unknown model");
-    
+
     // print to log file in debug mode
     Debug::out(LOG_DEBUG, "RPi serial  : %s", rpiConfig.serial);
     Debug::out(LOG_DEBUG, "RPi revision: %s", rpiConfig.revision);
@@ -203,7 +181,7 @@ void Version::getRaspberryPiInfo(void)
 void Version::readLineFromFile(const char *filename, char *buffer, int maxLen, const char *defValue)
 {
     memset(buffer, 0, maxLen);                  // clear the buffer where the value should be stored
-    
+
     FILE *f = fopen(filename, "rt");            // open the file
     
     if(!f) {                                    // if failed to open, copy in the default value
@@ -212,14 +190,14 @@ void Version::readLineFromFile(const char *filename, char *buffer, int maxLen, c
     }
 
     char *res = fgets(buffer, maxLen - 1, f);   // try to read the line
-    
+
     if(res == NULL) {
         strncpy(buffer, defValue, maxLen - 1);  // failed to read the line? use default value
         return;
     }
-    
+
     int len = strlen(buffer);
-    
+
     if(len > 0) {                                                   // got at least 1 character?
         if(buffer[len - 1] == '\n' || buffer[len - 1] == '\r') {    // if it's new line, remove it
             buffer[len - 1] = 0;
@@ -234,5 +212,3 @@ void Version::readLineFromFile(const char *filename, char *buffer, int maxLen, c
 
     fclose(f);                                  // close the file
 }
-
-
