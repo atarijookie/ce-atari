@@ -477,14 +477,25 @@ void logMsgProgress(DWORD current, DWORD total)
 //--------------------------------------------------
 void showFakeProgressOfItem(const char *title, int timeout)
 {
-    (void) Cconws(title);           // show what we are updating
+    (void) Cconws(title);               // show what we are updating
+
+    int i, j;
+    for(i=0; i<=timeout; i++) {         // wait the whole timeout
+        showInt(i, 3);                  // show current time (progress)
+        (void) Cconws(" s");            // show time unit
+        sleep(1);                       // wait 1 second
+
+        for(j=0; j<5; j++) {            // delete the displayed time, intentionally using multiple individual Cconws() instead of one longer one, as VT52 seems to break when IKBD data isn't handled (due to Franz being updated and ce_main_app not running)
+            (void) Cconws("\33D");
+        }
+
+        if((i % 5) == 0) {              // every 5 seconds, check if device is alive
+            BYTE res = setResolution(); // issue a simple command
     
-    int i;
-    for(i=0; i<=timeout; i++) {     // wait the whole timeout
-        showInt(i, 2);              // show current time (progress)
-        (void) Cconws(" s");        // show time unit
-        sleep(1);                   // wait 1 second
-        (void) Cconws("\33D\33D\33D\33D");
+            if(res) {                   // if succeeded, we quit fake progress
+                break;
+            }
+        }
     }
 
     (void) Cconws("\r\n");          // move to next line
@@ -492,58 +503,23 @@ void showFakeProgressOfItem(const char *title, int timeout)
 
 void showFakeProgress(void)
 {
-    // retrieve individual update components flags
-    BYTE updatingApp    = updateComponents & UPDATECOMPONENT_APP;
-    BYTE updatingXilinx = updateComponents & UPDATECOMPONENT_XILINX;
-    BYTE updatingHans   = updateComponents & UPDATECOMPONENT_HANS;
-    BYTE updatingFranz  = updateComponents & UPDATECOMPONENT_FRANZ;
-
     // show title saying we're updating
     Clear_home();
     VT52_Rev_on();
     (void) Cconws(">>>   Your device is updating.  <<<\n\r");
     (void) Cconws(">>> Do NOT turn the device off! <<<\n\r\n\r");
     VT52_Rev_off();
-    
-    const char *titleUpdateApp      = "Updating app    ( 5 s): ";
-    const char *titleUpdateXilinx   = "Updating Xilinx (50 s): ";
-    const char *titleUpdateHans     = "Updating Hans   (10 s): ";
-    const char *titleUpdateFranz    = "Updating Franz  (10 s): ";
-    const char *titleRestartingApp  = "Restarting app  (15 s): ";
 
-    // first show titles, so user will know how long it will all take and what will be updated
-    if(updatingApp)     { (void) Cconws(titleUpdateApp);        (void) Cconws("\r\n"); }
-    if(updatingXilinx)  { (void) Cconws(titleUpdateXilinx);     (void) Cconws("\r\n"); }
-    if(updatingHans)    { (void) Cconws(titleUpdateHans);       (void) Cconws("\r\n"); }
-    if(updatingFranz)   { (void) Cconws(titleUpdateFranz);      (void) Cconws("\r\n"); }
-                          (void) Cconws(titleRestartingApp);    
-    VT52_Goto_pos(0, 3);
-    
-    // now possibly wait for each component to be done
-    if(updatingApp) {
-        showFakeProgressOfItem(titleUpdateApp, 5);
-    }
+    (void) Cconws("The update might take up to 5 minutes\r\n");
+    (void) Cconws("if installing something bigger.\r\n\r\n");
 
-    if(updatingXilinx) {
-        showFakeProgressOfItem(titleUpdateXilinx, 50);
-    }
+    hdIf.maxRetriesCount = 0;                               // don't retry - we're still might be updating
 
-    if(updatingHans) {
-        showFakeProgressOfItem(titleUpdateHans, 10);
-    }
+    showFakeProgressOfItem("Updating: ", 5*60);
 
-    if(updatingFranz) {
-        showFakeProgressOfItem(titleUpdateFranz, 10);
-    }
-
-    // everything installed, but main app needs to start and possibly update script
-    showFakeProgressOfItem(titleRestartingApp, 15);
-    
     // we're done, try to reconnect.
     (void) Cconws("\r\nIf everything went well,\r\nwill connect back soon.\r\n");
-    
-    hdIf.maxRetriesCount = 0;                               // don't retry - we're still might be updating
-    
+
     int i;
     for(i=0; i<15; i++) {
         BYTE res = showHomeScreenSimple();                  // try to reconnect and show home screen
