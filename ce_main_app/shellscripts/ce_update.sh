@@ -1,5 +1,8 @@
 #!/bin/sh
 
+start=$( date )
+echo "ce_update.sh started at : $start"     # show start time
+
 # first stop any cosmosex process (script or app)
 /ce/ce_stop.sh
 
@@ -153,4 +156,5 @@ echo " "
 echo "Update done, you may start the /ce/ce_start.sh now!";
 echo " "
 
-
+stop=$( date )
+echo "ce_update.sh finished at: $stop"     # show stop time
