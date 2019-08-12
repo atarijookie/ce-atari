@@ -1,6 +1,10 @@
 #!/bin/sh
 
 echo " "
+
+start=$( date )
+echo "check_for_update.sh started at : $start"     # show start time
+
 echo "Checking for update..."
 
 echo "checking for update" > /tmp/UPDATE_STATUS
@@ -50,6 +54,9 @@ if [ "$distro" = "yocto" ]; then
         touch /tmp/UPDATE_PENDING_NO
     fi
 
+    stop=$( date )
+    echo "check_for_update.sh finished at: $stop"     # show stop time
+
     exit
 fi
 
@@ -61,6 +68,10 @@ if [ "$?" -ne "0" ]; then           # if don't have git, then run the update, wh
 
     echo "missing git, will update" > /tmp/UPDATE_STATUS
     touch /tmp/UPDATE_PENDING_YES
+
+    stop=$( date )
+    echo "check_for_update.sh finished at: $stop"     # show stop time
+
     exit
 fi
 
@@ -74,6 +85,10 @@ if [ "$?" -ne "0" ]; then           # git complained that this is not a repo? ru
 
     echo "got update for you!" > /tmp/UPDATE_STATUS
     touch /tmp/UPDATE_PENDING_YES
+
+    stop=$( date )
+    echo "check_for_update.sh finished at: $stop"     # show stop time
+
     exit
 fi
 
@@ -91,3 +106,6 @@ else                                # not behind, no update pending
     echo "update not needed" > /tmp/UPDATE_STATUS
     touch /tmp/UPDATE_PENDING_NO
 fi
+
+stop=$( date )
+echo "check_for_update.sh finished at: $stop"     # show stop time

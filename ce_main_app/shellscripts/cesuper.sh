@@ -15,7 +15,7 @@ do
             echo "doing update"
 
             chmod +x /ce/update/doupdate.sh     # make the script executable
-            /ce/update/doupdate.sh              # execute the update script, wait for finish
+            /ce/update/doupdate.sh 2>&1 | tee -a /var/log/ce_update.log	# execute the update script, wait for finish
             rm -f /ce/update/doupdate.sh        # delete the update script
         fi
 

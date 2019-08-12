@@ -781,7 +781,7 @@ void ConfigStream::createScreen_update(void)
     if((now - lastUpdateCheck) >= MIN_CHECK_PAUSE) { // check for update, but not too often
         lastUpdateCheck = now;
         unlink(UPDATE_STATUS_FILE);
-        system("/ce/update/check_for_update.sh &");
+        system("/ce/update/check_for_update.sh 2>&1 | tee -a /var/log/ce_update.log &");
     }
 
     // the following 3 lines should be at start of each createScreen_ method
