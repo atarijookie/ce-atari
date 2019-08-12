@@ -483,18 +483,19 @@ void showFakeProgressOfItem(const char *title, int timeout)
     for(i=0; i<=timeout; i++) {         // wait the whole timeout
         showInt(i, 3);                  // show current time (progress)
         (void) Cconws(" s");            // show time unit
-        sleep(1);                       // wait 1 second
 
-        for(j=0; j<5; j++) {            // delete the displayed time, intentionally using multiple individual Cconws() instead of one longer one, as VT52 seems to break when IKBD data isn't handled (due to Franz being updated and ce_main_app not running)
-            (void) Cconws("\33D");
-        }
-
-        if((i % 5) == 0) {              // every 5 seconds, check if device is alive
+        if(i >= 10 && (i % 5) == 0) {   // every 5 seconds, check if device is alive
             BYTE res = setResolution(); // issue a simple command
     
             if(res) {                   // if succeeded, we quit fake progress
                 break;
             }
+        } else {
+            sleep(1);                   // wait 1 second
+        }
+
+        for(j=0; j<5; j++) {            // delete the displayed time, intentionally using multiple individual Cconws() instead of one longer one, as VT52 seems to break when IKBD data isn't handled (due to Franz being updated and ce_main_app not running)
+            (void) Cconws("\33D");
         }
     }
 

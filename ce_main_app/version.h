@@ -26,6 +26,7 @@ public:
     WORD        getChecksum(void);
 
     void toString(char *str);
+    int  getYear(void);
 
     volatile BYTE downloadStatus;
 

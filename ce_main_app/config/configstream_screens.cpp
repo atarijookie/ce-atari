@@ -770,7 +770,7 @@ void ConfigStream::onNetwork_save(void)
     createScreen_homeScreen();      // now back to the home screen
 }
 
-#define MIN_CHECK_PAUSE             (5 * 60 * 1000)
+#define MIN_CHECK_PAUSE             (15 * 1000)
 DWORD lastUpdateCheck = 0;          // this holds the ime when we've last checked for update
 
 void ConfigStream::createScreen_update(void)

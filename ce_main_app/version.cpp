@@ -73,6 +73,11 @@ void Version::fromInts(int y, int m, int d)
     day     = d;
 }
 
+int Version::getYear(void)
+{
+    return year;
+}
+
 void Version::clear(void)
 {
     year    = 0;
