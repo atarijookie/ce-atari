@@ -3,8 +3,10 @@
 start=$( date )
 echo "ce_update.sh started at : $start"     # show start time
 
-# first stop any cosmosex process (script or app)
-/ce/ce_stop.sh
+# Stop any cosmosex app, and pass 1st and 2nd argument of this script to the stop script
+# When arguments are not given, ce_stop will stop not only CosmosEx app, but also cesuper.sh script, which is fine when called manually from shell by user.
+# When 'nosystemctl dontkillcesuper' arguments are given, ce_stop will stop onl CosmosEx app, but not cesuper.sh script, which is what we want when ce_update.sh is called as a part of update process within the cesuper.sh script
+/ce/ce_stop.sh $1 $2
 
 echo " "
 echo "Updating CosmosEx from internet, this will take a while."

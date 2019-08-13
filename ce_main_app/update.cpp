@@ -48,7 +48,9 @@ bool Update::createUpdateScript(bool withLinuxRestart, bool withForceXilinx)
     }
 
     // write the main update script command
-    res = writeSimpleTextFile(UPDATE_SCRIPT, "#!/bin/sh\n/ce/ce_update.sh\n");
+    // don't forget to pass 'nosystemctl dontkillcesuper' do ce_update.sh here, because we need those to tell ce_stop.sh (which is called in ce_update.sh)
+    // that it shouldn't stop cesuper.sh, which we need to keep running to finish the update and restart ce_main_app back
+    res = writeSimpleTextFile(UPDATE_SCRIPT, "#!/bin/sh\n/ce/ce_update.sh nosystemctl dontkillcesuper\n");
 
     if(!res) {                  // if failed to create first file, just quit already
         return res;
