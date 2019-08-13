@@ -1,16 +1,24 @@
 #!/bin/sh
 
 ce_is_running() {
-    # Count how many instances are running
+    # count instances of cosmosex app
     cnt=$( ps -A | grep cosmosex | wc -l )
 
-    # CosmosEx app is not running?
-    if [ "$cnt" -eq "0" ]; then
-        return 0
+    # more than zero? return true
+    if [ "$cnt" -gt "0" ]; then
+        return 1
     fi
 
-    # CosmosEx app is running
-    return 1
+    # count instances of cesuper.sh script
+    cnt=$( ps -A | grep cesuper.sh | wc -l )
+
+    # more than zero? return true
+    if [ "$cnt" -gt "0" ]; then
+        return 1
+    fi
+
+    # nothing is running, return false
+    return 0
 }
 
 # kill previously running script and app
