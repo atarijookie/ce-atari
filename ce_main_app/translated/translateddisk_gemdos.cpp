@@ -240,45 +240,45 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s, host search string: %s", atariSearchString.c_str(), hostSearchString.c_str());
 
     //----------
-	// now get the dir translator for the right drive
+    // now get the dir translator for the right drive
     // check if this is a root directory
     std::string justPath, justSearchString;
     Utils::splitFilenameFromPath(hostSearchString, justPath, justSearchString); 
-    
+
     bool rootDir = isRootDir(justPath);
 
     bool useZipdirNotFileForThisSubDir = useZipdirNotFile;          // by default - use this useZipdirNotFile flag, if we're not nested in ZIP DIRs too deep
     if(zipDirNestingLevel >= MAX_ZIPDIR_NESTING) {                  // but if we are nested too deep, don't show ZIP files as DIRs anymore for this nested dir
         useZipdirNotFileForThisSubDir = false;
-    }    
-    
-	//now use the dir translator to get the dir content
-	DirTranslator *dt = &conf[atariDriveIndex].dirTranslator;
-	res = dt->buildGemdosFindstorageData(&tempFindStorage, hostSearchString, findAttribs, rootDir, useZipdirNotFileForThisSubDir);
+    }
 
-	if(!res) {
+    //now use the dir translator to get the dir content
+    DirTranslator *dt = &conf[atariDriveIndex].dirTranslator;
+    res = dt->buildGemdosFindstorageData(&tempFindStorage, hostSearchString, findAttribs, rootDir, useZipdirNotFileForThisSubDir);
+
+    if(!res) {
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- failed to build gemdos find storage data", hostSearchString.c_str());
 
-		dataTrans->setStatus(EFILNF);                               // file not found
-		return;
-	}
+        dataTrans->setStatus(EFILNF);                               // file not found
+        return;
+    }
 
-	if (tempFindStorage.count==0)
-	{
-		Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s 0 entries found", hostSearchString.c_str());
+    if (tempFindStorage.count==0)
+    {
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s 0 entries found", hostSearchString.c_str());
 
-		dataTrans->setStatus(EFILNF);                               // file not found
-		return;
-	}
-	
+        dataTrans->setStatus(EFILNF);                               // file not found
+        return;
+    }
+
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - host search string: %s -- found %d dir entries", hostSearchString.c_str(), tempFindStorage.count);
 
-    //----------	
+    //----------
     // now copy from temp findStorage to the some findStorages arrays
     int index;
 
     index = getFindStorageIndexByDta(dta);                              // see if we already have that DTA 
-    
+
     if(index != -1) {                                                   // got the DTA, reuse it
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - DTA %08x is in findStorage, reusing...", dta);
     } else {
@@ -297,7 +297,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     findStorages[index]->dta = dta;
     //----------
 
-    dataTrans->setStatus(E_OK);                                 	// OK!
+    dataTrans->setStatus(E_OK);                                     // OK!
 }
 
 void TranslatedDisk::onFsnext(BYTE *cmd)
@@ -431,7 +431,7 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     if(len > 0) {                                           // there is some path specified?
         if(dataBuffer[len - 1] == ATARIPATH_SEPAR_CHAR) {   // if the path ends with \, then it's invalid (no new dir name specified), return PATH NOT FOUND
             dataTrans->setStatus(EPTHNF);
-            return;    
+            return;
         }
     }
     
@@ -439,7 +439,7 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     // if the new directory name contains ? or *, fail with EACCDN
     if(pathContainsWildCards((char *) dataBuffer)) {    
         dataTrans->setStatus(EACCDN);
-        return;    
+        return;
     }
     
     //---------------
@@ -498,7 +498,7 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     
     //---------------
     // now try to create the dir
-	int status = mkdir(hostPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);		// mod: 0x775
+    int status = mkdir(hostPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);        // mod: 0x775
 
     if(status == 0) {                               // directory created?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -> hostPath: %s -- dir created", newAtariPath.c_str(), hostPath.c_str());
@@ -506,10 +506,10 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
         dataTrans->setStatus(E_OK);
         return;
     }
-	
-	status = errno;
 
-    if(status == EEXIST || status == EACCES) {		// path already exists or other access problem?
+    status = errno;
+
+    if(status == EEXIST || status == EACCES) {      // path already exists or other access problem?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate - newAtariPath: %s -> hostPath: %s -- failed to create dir", newAtariPath.c_str(), hostPath.c_str());
 
         dataTrans->setStatus(EACCDN);
@@ -561,7 +561,7 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
         return;
     }
 
-	int ires = deleteDirectoryPlain(hostPath.c_str());
+    int ires = deleteDirectoryPlain(hostPath.c_str());
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete - deleting directory hostPath: %s, result is %d", hostPath.c_str(), ires);
 
@@ -683,23 +683,23 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
 
     //----------
     // check if not trying to delete directory using Fdelete
-	struct stat attr;
-    res = stat(hostPath.c_str(), &attr);							// get the file status
-	
-	if(res != 0) {
-		Debug::out(LOG_ERROR, "TranslatedDisk::onFdelete() -- stat(%s) failed", hostPath.c_str());
-		dataTrans->setStatus(EINTRN);
-		return;		
-	}
-	
-	bool isDir = (S_ISDIR(attr.st_mode) != 0);						// check if it's a directory
+    struct stat attr;
+    res = stat(hostPath.c_str(), &attr);                            // get the file status
+
+    if(res != 0) {
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFdelete() -- stat(%s) failed", hostPath.c_str());
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    bool isDir = (S_ISDIR(attr.st_mode) != 0);                      // check if it's a directory
 
     if(isDir) {                                                     // if it's a directory, return FILE NOT FOUND
-		Debug::out(LOG_ERROR, "TranslatedDisk::onFdelete() -- can't use Fdelete() to delete a directory!");
-		dataTrans->setStatus(EFILNF);
-		return;		
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFdelete() -- can't use Fdelete() to delete a directory!");
+        dataTrans->setStatus(EFILNF);
+        return;
     }
-    
+
     //----------
     res = unlink(hostPath.c_str());
 
@@ -714,7 +714,7 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
 
     int err = errno;
 
-    if(err == ENOENT) {               				// file not found?
+    if(err == ENOENT) {                             // file not found?
         dataTrans->setStatus(EFILNF);
         return;
     }
@@ -766,60 +766,60 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
     BYTE    oldAttrAtari;
 
     // first read the attributes
-	struct stat attr;
-    res = stat(hostName.c_str(), &attr);							// get the file status
-	
-	if(res != 0) {
-		Debug::out(LOG_ERROR, "TranslatedDisk::onFattrib() -- stat(%s) failed", hostName.c_str());
-		dataTrans->setStatus(EINTRN);
-		return;		
-	}
-	
-	bool isDir = (S_ISDIR(attr.st_mode) != 0);						// check if it's a directory
+    struct stat attr;
+    res = stat(hostName.c_str(), &attr);                            // get the file status
 
-	bool hostIsFAT = false;
-	bool isReadOnly = false;
-	// TODO: checking of read only for file
-	
+    if(res != 0) {
+        Debug::out(LOG_ERROR, "TranslatedDisk::onFattrib() -- stat(%s) failed", hostName.c_str());
+        dataTrans->setStatus(EINTRN);
+        return;
+    }
+
+    bool isDir = (S_ISDIR(attr.st_mode) != 0);                      // check if it's a directory
+
+    bool hostIsFAT = false;
+    bool isReadOnly = false;
+    // TODO: checking of read only for file
+
     Utils::attributesHostToAtari(isReadOnly, isDir, oldAttrAtari);
-	{
-		int fd = open(hostName.c_str(), O_RDONLY);
-		if(fd >= 0) {
-			__u32 dosattrs = 0;
-			if(ioctl(fd, FAT_IOCTL_GET_ATTRIBUTES, &dosattrs) >= 0) {
-				hostIsFAT = true;	// success, that means the underlying FS is FAT
-				if(dosattrs & ATTR_RO) oldAttrAtari |= FA_READONLY;
-				if(dosattrs & ATTR_HIDDEN) oldAttrAtari |= FA_HIDDEN;
-				if(dosattrs & ATTR_SYS) oldAttrAtari |= FA_SYSTEM;
-				//if(dosattrs & ATTR_ARCH) oldAttrAtari |= FA_ARCHIVE;
-			}
-			close(fd);
-		}
-	}
-	
+    {
+        int fd = open(hostName.c_str(), O_RDONLY);
+        if(fd >= 0) {
+            __u32 dosattrs = 0;
+            if(ioctl(fd, FAT_IOCTL_GET_ATTRIBUTES, &dosattrs) >= 0) {
+                hostIsFAT = true;   // success, that means the underlying FS is FAT
+                if(dosattrs & ATTR_RO) oldAttrAtari |= FA_READONLY;
+                if(dosattrs & ATTR_HIDDEN) oldAttrAtari |= FA_HIDDEN;
+                if(dosattrs & ATTR_SYS) oldAttrAtari |= FA_SYSTEM;
+                //if(dosattrs & ATTR_ARCH) oldAttrAtari |= FA_ARCHIVE;
+            }
+            close(fd);
+        }
+    }
+
     if(setNotInquire) {     // SET attribs? - SET FAT Attributes!
-		if(hostIsFAT) {
-			int fd = open(hostName.c_str(), O_RDWR);
-			if(fd < 0) {
-				Debug::out(LOG_ERROR, "TranslatedDisk::onFattrib() -- setting attributes open(%s) failed", hostName.c_str());
-	            dataTrans->setStatus(EACCDN);
-	            return;
-			}
-			__u32 dosattrs = ATTR_NONE;
-			if(attrAtariNew & FA_READONLY) dosattrs |= ATTR_RO;
-			if(attrAtariNew & FA_HIDDEN) dosattrs |= ATTR_HIDDEN;
-			if(attrAtariNew & FA_SYSTEM) dosattrs |= ATTR_SYS;
-			if(attrAtariNew & FA_VOLUME) dosattrs |= ATTR_VOLUME;
-			if(attrAtariNew & FA_DIR) dosattrs |= ATTR_DIR;
-			if(attrAtariNew & FA_ARCHIVE) dosattrs |= ATTR_ARCH;
-			if(ioctl(fd, FAT_IOCTL_SET_ATTRIBUTES, &dosattrs) < 0) {
-				Debug::out(LOG_ERROR, "TranslatedDisk::onFattrib() -- ioctl(%s, FAT_IOCTL_SET_ATTRIBUTES, %x) failed errno %d", hostName.c_str(), (int)dosattrs, errno);
-			} else {
-				Debug::out(LOG_DEBUG, "TranslatedDisk::onFattrib() -- FAT attributes %x set %s", (int)dosattrs, hostName.c_str());
-			}
-			close(fd);
-		}
-	/*
+        if(hostIsFAT) {
+            int fd = open(hostName.c_str(), O_RDWR);
+            if(fd < 0) {
+                Debug::out(LOG_ERROR, "TranslatedDisk::onFattrib() -- setting attributes open(%s) failed", hostName.c_str());
+                dataTrans->setStatus(EACCDN);
+                return;
+            }
+            __u32 dosattrs = ATTR_NONE;
+            if(attrAtariNew & FA_READONLY) dosattrs |= ATTR_RO;
+            if(attrAtariNew & FA_HIDDEN) dosattrs |= ATTR_HIDDEN;
+            if(attrAtariNew & FA_SYSTEM) dosattrs |= ATTR_SYS;
+            if(attrAtariNew & FA_VOLUME) dosattrs |= ATTR_VOLUME;
+            if(attrAtariNew & FA_DIR) dosattrs |= ATTR_DIR;
+            if(attrAtariNew & FA_ARCHIVE) dosattrs |= ATTR_ARCH;
+            if(ioctl(fd, FAT_IOCTL_SET_ATTRIBUTES, &dosattrs) < 0) {
+                Debug::out(LOG_ERROR, "TranslatedDisk::onFattrib() -- ioctl(%s, FAT_IOCTL_SET_ATTRIBUTES, %x) failed errno %d", hostName.c_str(), (int)dosattrs, errno);
+            } else {
+                Debug::out(LOG_DEBUG, "TranslatedDisk::onFattrib() -- FAT attributes %x set %s", (int)dosattrs, hostName.c_str());
+            }
+            close(fd);
+        }
+    /*
         attributesAtariToHost(attrAtariNew, attrHost);
 
         res = SetFileAttributesA(hostName.c_str(), attrHost);
@@ -828,7 +828,7 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
             dataTrans->setStatus(EACCDN);
             return;
         }
-	*/
+    */
     }
 
     // for GET: returns current attribs, for SET: returns old attribs
@@ -854,7 +854,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
 
     if(pathContainsWildCards((char *) (dataBuffer + 1))) {          // if the new filename name contains ? or *, fail with EACCDN
         dataTrans->setStatus(EACCDN);
-        return;    
+        return;
     }
     
     BYTE attribs = dataBuffer[0];
@@ -924,26 +924,26 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     }
 
     // now set it's attributes
-	int fd = fileno(f);
-	if(fd >= 0) {
-		__u32 dosattrs = ATTR_NONE;
-		if(attribs & FA_READONLY) dosattrs |= ATTR_RO;
-		if(attribs & FA_HIDDEN) dosattrs |= ATTR_HIDDEN;
-		if(attribs & FA_SYSTEM) dosattrs |= ATTR_SYS;
-		if(attribs & FA_VOLUME) dosattrs |= ATTR_VOLUME;
-		if(attribs & FA_DIR) dosattrs |= ATTR_DIR;
-		if(attribs & FA_ARCHIVE) dosattrs |= ATTR_ARCH;
-		if(ioctl(fd, FAT_IOCTL_SET_ATTRIBUTES, &dosattrs) < 0) {
-			Debug::out(LOG_ERROR, "TranslatedDisk::onFcreate -- failed to set (FAT) files attributes on %s", hostName.c_str());
-		} else {
-			Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate -- attributes %x set on %s", (int)dosattrs, hostName.c_str());
-		}
-	}
+    int fd = fileno(f);
+    if(fd >= 0) {
+        __u32 dosattrs = ATTR_NONE;
+        if(attribs & FA_READONLY) dosattrs |= ATTR_RO;
+        if(attribs & FA_HIDDEN) dosattrs |= ATTR_HIDDEN;
+        if(attribs & FA_SYSTEM) dosattrs |= ATTR_SYS;
+        if(attribs & FA_VOLUME) dosattrs |= ATTR_VOLUME;
+        if(attribs & FA_DIR) dosattrs |= ATTR_DIR;
+        if(attribs & FA_ARCHIVE) dosattrs |= ATTR_ARCH;
+        if(ioctl(fd, FAT_IOCTL_SET_ATTRIBUTES, &dosattrs) < 0) {
+            Debug::out(LOG_ERROR, "TranslatedDisk::onFcreate -- failed to set (FAT) files attributes on %s", hostName.c_str());
+        } else {
+            Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate -- attributes %x set on %s", (int)dosattrs, hostName.c_str());
+        }
+    }
 
     fclose(f);
 
 
-/*	
+/*  
     DWORD attrHost;
     attributesAtariToHost(attribs, attrHost);
 
@@ -1001,7 +1001,7 @@ void TranslatedDisk::onFopen(BYTE *cmd)
     if(!res) {                                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - createFullAtariPath failed", atariName.c_str());
 
-		dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
+        dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
     }
 
@@ -1037,24 +1037,34 @@ void TranslatedDisk::onFopen(BYTE *cmd)
 
     mode = mode & 0x07;         // leave only lowest 3 bits
 
-	bool justRead = false;
-	
+    bool justRead = false;
+
     switch(mode) {
-        case 0:     fopenMode = mode_S_READ;        justRead = true;	break;
-        case 1:     fopenMode = mode_S_WRITE;       					break;
-        case 2:     fopenMode = mode_S_READWRITE;   					break;
-        default:    fopenMode = mode_S_READ;        justRead = true;	break;
+        case 0:     fopenMode = mode_S_READ;        justRead = true;    break;
+        case 1:     fopenMode = mode_S_WRITE;                           break;
+        case 2:     fopenMode = mode_S_READWRITE;                       break;
+        default:    fopenMode = mode_S_READ;        justRead = true;    break;
     }
 
-	if(justRead) {								// if we should just read from the file (not write and thus create if does not exist)
-		if(!hostPathExists(hostName)) {			// and the file does not exist, quit with FILE NOT FOUND
-            Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is just read, but the file does not exist, failed!", hostName.c_str());
+    if(justRead) {                              // if we should just read from the file (not write and thus create if does not exist)
+        if(!hostPathExists(hostName)) {         // and the file does not exist
 
-			dataTrans->setStatus(EFILNF);
-			return;
-		}
-	}
-	
+            // try to find the file case insensitive
+            std::string justPath, originalFileName, foundFileName;
+            if(hostPathExists_caseInsensitive(hostName, justPath, originalFileName, foundFileName)) { // if found this file with case insensitive search
+                // TODO: update dir translator: replace originalFileName with foundFileName
+
+                hostName = justPath;
+                Utils::mergeHostPaths(hostName, foundFileName);     // now the hostName should contain newly found file, we can continue
+            } else {        // if couldn't find this file even if looked for case insensitive
+                Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is just read, but the file does not exist, failed!", hostName.c_str());
+
+                dataTrans->setStatus(EFILNF);       // quit with FILE NOT FOUND
+                return;
+            }
+        }
+    }
+
     // create file and close it
     FILE *f = fopen(hostName.c_str(), fopenMode);                   // open according to required mode
 
@@ -1125,42 +1135,42 @@ void TranslatedDisk::onFdatime(BYTE *cmd)
         return;
     }
 
-    if(setNotGet) {                            						// on SET
-		tm			timeStruct;
-		time_t		timeT;
-		utimbuf		uTimBuf;
-		
-		Utils::fileDateTimeToHostTime(atariDate, atariTime, &timeStruct);	// convert atari date and time to struct tm
-		//timeT = timelocal(&timeStruct);								// convert tm to time_t
-		timeT = mktime(&timeStruct);								// convert tm to time_t
-		Debug::out(LOG_DEBUG, "TranslatedDisk::onFdatime %hu %hu => %d (%04d-%02d-%02d %02d:%02d:%02d)",
-		           atariTime, atariDate, timeT, timeStruct.tm_year+1900, timeStruct.tm_mon+1, timeStruct.tm_mday,
-		           timeStruct.tm_hour, timeStruct.tm_min, timeStruct.tm_sec);
+    if(setNotGet) {                                                 // on SET
+        tm          timeStruct;
+        time_t      timeT;
+        utimbuf     uTimBuf;
 
-		uTimBuf.actime	= timeT;									// store access time
-		uTimBuf.modtime	= timeT;									// store modification time
-		
-		int ires = utime(files[index].hostPath.c_str(), &uTimBuf);	// try to set the access and modification time
+        Utils::fileDateTimeToHostTime(atariDate, atariTime, &timeStruct);   // convert atari date and time to struct tm
+        //timeT = timelocal(&timeStruct);                               // convert tm to time_t
+        timeT = mktime(&timeStruct);                                // convert tm to time_t
+        Debug::out(LOG_DEBUG, "TranslatedDisk::onFdatime %hu %hu => %d (%04d-%02d-%02d %02d:%02d:%02d)",
+                   atariTime, atariDate, timeT, timeStruct.tm_year+1900, timeStruct.tm_mon+1, timeStruct.tm_mday,
+                   timeStruct.tm_hour, timeStruct.tm_min, timeStruct.tm_sec);
 
-		if(ires != 0) {												// if failed to set the date and time, fail
-			dataTrans->setStatus(EINTRN);
-			return;
-		}		
-    } else {                                    					// on GET
-		int res;
-		struct stat attr;
-		res = stat(files[index].hostPath.c_str(), &attr);			// get the file status
-	
-		if(res != 0) {
-			Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- stat(%s) failed", files[index].hostPath.c_str());
-			dataTrans->setStatus(EINTRN);
-			return;		
-		}
-	
-		tm *time = localtime(&attr.st_mtime);						// convert time_t to tm structure
-	
-		WORD atariTime = Utils::fileTimeToAtariTime(time);
-		WORD atariDate = Utils::fileTimeToAtariDate(time);
+        uTimBuf.actime  = timeT;                                    // store access time
+        uTimBuf.modtime = timeT;                                    // store modification time
+
+        int ires = utime(files[index].hostPath.c_str(), &uTimBuf);  // try to set the access and modification time
+
+        if(ires != 0) {                                             // if failed to set the date and time, fail
+            dataTrans->setStatus(EINTRN);
+            return;
+        }
+    } else {                                                        // on GET
+        int res;
+        struct stat attr;
+        res = stat(files[index].hostPath.c_str(), &attr);           // get the file status
+
+        if(res != 0) {
+            Debug::out(LOG_ERROR, "TranslatedDisk::appendFoundToFindStorage -- stat(%s) failed", files[index].hostPath.c_str());
+            dataTrans->setStatus(EINTRN);
+            return;
+        }
+
+        tm *time = localtime(&attr.st_mtime);                       // convert time_t to tm structure
+
+        WORD atariTime = Utils::fileTimeToAtariTime(time);
+        WORD atariDate = Utils::fileTimeToAtariDate(time);
 
         dataTrans->addDataWord(atariTime);
         dataTrans->addDataWord(atariDate);
@@ -1215,7 +1225,7 @@ void TranslatedDisk::onFread(BYTE *cmd)
     DWORD transferSizeBytes = byteCount + pad;
 
     DWORD cnt = fread (dataBuffer, 1, transferSizeBytes, files[index].hostHandle);
-    dataTrans->addDataBfr(dataBuffer, cnt, false);	// then store the data
+    dataTrans->addDataBfr(dataBuffer, cnt, false);  // then store the data
     dataTrans->padDataToMul16();
 
     files[index].lastDataCount = cnt;                       // store how much data was read

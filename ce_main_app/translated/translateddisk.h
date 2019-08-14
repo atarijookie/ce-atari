@@ -146,6 +146,8 @@ public:
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
     static bool hostPathExists(std::string hostPath);
+    static bool hostPathExists_caseInsensitive(std::string hostPath, std::string &justPath, std::string &originalFileName, std::string &foundFileName);
+
     static void pathSeparatorAtariToHost(std::string &path);
 
     bool createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel);

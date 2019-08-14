@@ -42,23 +42,24 @@ public:
 
     // call this for find first / find next for Gemdos
     bool buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, BYTE findAttribs, bool isRootDir, bool useZipdirNotFile);
-	
+
+    static void toUpperCaseString(std::string &st);
+
 private:
     std::map<std::string, FilenameShortener *>  mapPathToShortener;
     
     TFindStorage    fsDirs;
     TFindStorage    fsFiles;
     
-	FilenameShortener *getShortenerForPath(std::string path);
+    FilenameShortener *getShortenerForPath(std::string path);
     FilenameShortener *createShortener(const std::string &path);
     static void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
 
     void appendFoundToFindStorage(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
     void appendFoundToFindStorage(std::string &hostPath, const char *searchString, TFindStorage *fs, const char *name, bool isDir, BYTE findAttribs);
-	void appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
+    void appendFoundToFindStorage_dirUpDirCurr(std::string &hostPath, const char *searchString, TFindStorage *fs, struct dirent *de, BYTE findAttribs);
 
-	static int compareSearchStringAndFilename(const char *searchString, const char *filename);
-	static void toUpperCaseString(std::string &st);
+    static int compareSearchStringAndFilename(const char *searchString, const char *filename);
 };
 
 #endif // DIRTRANSLATOR_H

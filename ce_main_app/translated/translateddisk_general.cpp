@@ -824,6 +824,57 @@ bool TranslatedDisk::hostPathExists(std::string hostPath)
     return false;
 }
 
+bool TranslatedDisk::hostPathExists_caseInsensitive(std::string hostPath, std::string &justPath, std::string &originalFileName, std::string &foundFileName)
+{
+    // clear path and filename which caller might use for found file
+    foundFileName.clear();
+
+    std::string inFileUpperCase;
+    Utils::splitFilenameFromPath(hostPath, justPath, originalFileName);     // split hostpath into path and filename
+
+    inFileUpperCase = originalFileName;
+    DirTranslator::toUpperCaseString(inFileUpperCase);          // convert the filename to upper case
+
+    // open dir for searching
+    DIR *dir = opendir(justPath.c_str());                       // try to open the dir
+
+    if(dir == NULL) {                                           // not found?
+        return false;
+    }
+
+    bool res = false;                                           // file not found yet
+    std::string foundFile;
+    while(1) {                                                      // while there are more files, store them
+        struct dirent *de = readdir(dir);                           // read the next directory entry
+
+        if(de == NULL) {                                            // no more entries?
+            break;
+        }
+
+        if(de->d_type != DT_DIR && de->d_type != DT_REG) {          // not  a file, not a directory?
+            continue;
+        }
+
+        if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) { // skip special dirs
+            continue;
+        }
+
+        foundFile = std::string(de->d_name);            // char * to std::string
+        DirTranslator::toUpperCaseString(foundFile);    // found file to upper case
+
+        if(inFileUpperCase.compare(foundFile) == 0) {   // in input upper case file matches this found file
+            Debug::out(LOG_DEBUG, "TranslatedDisk::hostPathExists_caseInsensitive -- found that input file %s matches file %s", originalFileName.c_str(), de->d_name);
+
+            foundFileName = std::string(de->d_name);    // store matching filename
+            res = true;                                 // we found it - success
+            break;
+        }
+    }
+
+    closedir(dir);
+    return res;
+}
+
 bool TranslatedDisk::createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel)
 {
     bool res;
