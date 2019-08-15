@@ -27,9 +27,9 @@ ImageList::ImageList(void)
 
 bool ImageList::exists(void)
 {
-    int res = access(IMAGELIST_LOCAL, F_OK);            // check if file exists
+    bool exists = Utils::fileExists(IMAGELIST_LOCAL);   // check if file exists
 
-    if(res == 0) {
+    if(exists) {
         return true;
     }
 

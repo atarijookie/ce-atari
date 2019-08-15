@@ -70,9 +70,10 @@ bool ImageStorage::getStoragePath(std::string &storagePath)             // retur
     Utils::mergeHostPaths(storagePath, subdir);     // to the storage root path add the subdir
 
     // try to access the dir
-    int ires = access(storagePath.c_str(), F_OK);
+    int ires;
+    bool exists = Utils::fileExists(storagePath.c_str());
 
-    if(ires == -1) {        // can't access? try to create it
+    if(!exists) {           // can't access? try to create it
         ires = Utils::mkpath(storagePath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);        // mod: 0x775
 
         if(ires == -1) {    // failed to create dir? fail
@@ -131,11 +132,6 @@ bool ImageStorage::weHaveThisImage(const char *imageFileName)    // returns if f
     std::string path;
     getImageLocalPath(imageFileName, path); // create full local path out of filename
 
-    int res = access(path.c_str(), F_OK);   // try to access the file
-
-    if(res != -1) {                         // if it's not this error, then the file exists
-        return true;
-    }
-
-    return false;                           // if got here, it's a fail
+    bool exists = Utils::fileExists(path.c_str());   // try to access the file
+    return exists;
 }

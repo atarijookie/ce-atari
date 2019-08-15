@@ -494,9 +494,9 @@ void Downloader::run(void)
         Debug::out(LOG_DEBUG, "Downloader: downloading %s", downloadCurrent.srcUrl.c_str());
         //-------------------
         // check if this isn't local file, and if it is, do the rest localy
-        res = access(downloadCurrent.srcUrl.c_str(), F_OK);
+        bool fileExists = Utils::fileExists(downloadCurrent.srcUrl.c_str());
 
-        if(res != -1) {                                                          // it's a local file!
+        if(fileExists) {                                                         // it's a local file!
             if(downloadCurrent.downloadType == DWNTYPE_SEND_CONFIG) {            // if it should be local config upload / post
                 handleSendConfig(downloadCurrent.srcUrl.c_str(), downloadCurrent.dstDir.c_str());
             } else if(downloadCurrent.downloadType == DWNTYPE_LOG_HTTP) {        // if it should be an http log request

@@ -111,10 +111,9 @@ bool Update::checkForUpdateListOnUsb(std::string &updateFilePath)
         strcat(path, "/");
         strcat(path, getUsbArchiveName());
 
-        int res = access(path, F_OK);
+        found = Utils::fileExists(path);
 
-        if(res != -1) {                                             // if it's not this error, then the file exists
-            found = true;
+        if(found) {                                             // found? good
             break;
         }
     }

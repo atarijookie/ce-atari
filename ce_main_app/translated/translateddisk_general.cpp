@@ -810,7 +810,7 @@ void TranslatedDisk::onGetConfig(BYTE *cmd)
     dataTrans->setStatus(E_OK);
 }
 
-bool TranslatedDisk::hostPathExists(std::string hostPath)
+bool TranslatedDisk::hostPathExists(std::string &hostPath, bool alsoCheckCaseInsensitive)
 {
     // now check if it exists
     int res = access(hostPath.c_str(), F_OK);
@@ -820,6 +820,22 @@ bool TranslatedDisk::hostPathExists(std::string hostPath)
         return true;
     }
 
+    // if file / dir not found
+
+    if(alsoCheckCaseInsensitive) {  // should also check case insensitive?
+        std::string justPath, originalFileName, foundFileName;
+
+        if(hostPathExists_caseInsensitive(hostPath, justPath, originalFileName, foundFileName)) { // if found this file with case insensitive search
+            // TODO: update dir translator: replace originalFileName with foundFileName
+
+
+            hostPath = justPath;    // justPath to hostPath, and we'll merge in new file name in the next step
+            Utils::mergeHostPaths(hostPath, foundFileName);     // now the hostPath should contain newly found file
+            return true;            // found this file, case insensitive
+        }
+    }
+
+    // if got here, file / dir not found case sensitive and possibly case insensitive
     Debug::out(LOG_DEBUG, "TranslatedDisk::hostPathExists( %s ) == FALSE (file / dir does not exist)", hostPath.c_str());
     return false;
 }

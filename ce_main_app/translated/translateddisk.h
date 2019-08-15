@@ -92,27 +92,27 @@ class ZipDirEntry {
     ZipDirEntry(int index) {
         clear(index);
     }
-    
+
     std::string realHostPath;           // real path to ZIP file on host dir struct, e.g. /mnt/shared/normal/archive.zip
     std::string mountPoint;             // contains path, where the ZIP file will be mounted, and where createHostPath() will redirect host path
     DWORD       lastAccessTime;         // Utils::getCurrentMs() time which is stored on each access to this folder - will be used to unmount oldest ZIP files, so new ZIP files can be mounted / accessed
-    
+
     int         mountActionStateId;     // this is TMountActionState.id, which you can use to find out if the mount action did already finish
     bool        isMounted;              // if this is set to true, don't have to check mount action state, but just consider this to be mounted
-    
+
     void clear(int index) {
         realHostPath        = "";
         lastAccessTime      = 0;
         mountActionStateId  = 0;
-        
+
         getZipDirMountPoint(index, mountPoint);
     }
-    
+
     void getZipDirMountPoint(int index, std::string &aMountPoint)
     {
         char indexNoStr[128];
         sprintf(indexNoStr, "%d", index);       // generate mount point number string, e.g. "5"
-        
+
         aMountPoint  = ZIPDIR_PATH_PREFIX;      // e.g. /tmp/zipdir
         aMountPoint += indexNoStr;
     }
@@ -145,8 +145,8 @@ public:
 
     void setSettingsReloadProxy(SettingsReloadProxy *rp);
 
-    static bool hostPathExists(std::string hostPath);
-    static bool hostPathExists_caseInsensitive(std::string hostPath, std::string &justPath, std::string &originalFileName, std::string &foundFileName);
+    bool hostPathExists(std::string &hostPath, bool alsoCheckCaseInsensitive = false);
+    bool hostPathExists_caseInsensitive(std::string hostPath, std::string &justPath, std::string &originalFileName, std::string &foundFileName);
 
     static void pathSeparatorAtariToHost(std::string &path);
 
@@ -240,7 +240,7 @@ private:
     void onFread(BYTE *cmd);
     void onFwrite(BYTE *cmd);
     void onFseek(BYTE *cmd);
-    
+
     // Pexec() handling
     void onPexec(BYTE *cmd);
 
@@ -264,12 +264,12 @@ private:
     void onTestRead(BYTE *cmd);
     void onTestWrite(BYTE *cmd);
     void onTestGetACSIids(BYTE *cmd);
-    
+
     void onSetACSIids(BYTE *cmd);
     int  findCurrentIDforDevType(int devType, AcsiIDinfo *aii);
-    
+
     void getScreenShotConfig(BYTE *cmd);
-    
+
     // helper functions
     int findEmptyFileSlot(void);
     int findFileHandleSlot(int atariHandle);
@@ -289,9 +289,9 @@ private:
     void convertAtariASCIItoPc(char *path);
 
     DWORD getByteCountToEOF(FILE *f);
-    
+
     int  driveLetterToDriveIndex(char pathDriveLetter);
-    
+
     bool createFullAtariPath(std::string inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex);
 
     //-----------------------------------
@@ -299,14 +299,14 @@ private:
     ZipDirEntry *zipDirs[MAX_ZIP_DIRS];
 
     bool useZipdirNotFile;
-    
+
     void getZipDirMountPoint(int index, std::string &mountPoint);
     int  getZipDirByMountPoint(std::string &searchedMountPoint);
     bool zipDirAlreadyMounted(const char *zipFile, int &zipDirIndex);
-    
+
     static bool isOkToMountThisAsZipDir(const char *zipFilePath);
     void doZipDirMountOrStateCheck(bool isMounted, char *zipFilePath, int zipDirIndex, bool &waitingForMount);
-    
+
     void replaceHostPathWithZipDirPath(int inAtariDriveIndex, std::string &hostPath, bool &waitingForMount, int &zipDirNestingLevel);
     void replaceHostPathWithZipDirPath_internal(std::string &hostPath, bool &waitingForMount, bool &containsZip);
     //-----------------------------------
@@ -331,17 +331,17 @@ private:
     void onPexec_getBpb(BYTE *cmd);
     void onPexec_readSector(BYTE *cmd);
     void onPexec_writeSector(BYTE *cmd);
-    
+
     bool pexecWholeFileWasRead(void);
 
     WORD prgSectorStart;
     WORD prgSectorEnd;
     int  pexecDriveIndex;
-    
+
     std::string pexecPrgPath;
     std::string pexecPrgFilename;
     std::string pexecFakeRootPath;
-    
+
     BYTE *pexecImage;
     BYTE *pexecImageReadFlags;
     //-----------------------------------

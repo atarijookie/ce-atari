@@ -403,7 +403,7 @@ void FloppySetup::uploadStart(void)
     res = translated->createFullAtariPathAndFullHostPath(atariFilePath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
 
     if(res) {                                               // good? file is on translated drive
-        if(translated->hostPathExists(hostPath)) {          // file exists? do on-device-copy of file
+        if(Utils::fileExists(hostPath)) {                   // file exists? do on-device-copy of file
             pathWithHostSeparators = hostPath;
             doOnDeviceCopy = true;
         }
@@ -599,7 +599,7 @@ void FloppySetup::getNewImageName(char *nameBfr)
             continue;
         }
 
-        if(translated->hostPathExists(fnameWithPath)) {				// if this file does exist, delete it (it's not in silo)
+        if(Utils::fileExists(fnameWithPath)) {                      // if this file does exist, delete it (it's not in silo)
             unlink(fnameWithPath.c_str());
         }
 

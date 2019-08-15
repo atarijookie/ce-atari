@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include "global.h"
 #include "debug.h"
+#include "utils.h"
 #include "mediastreaming.h"
 #include "mediastreaming_commands.h"
 #include "acsidatatrans.h"
@@ -248,8 +249,8 @@ void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 		translated->createFullHostPath(atariPath, driveIndex, hostPath, waitingForMount, zipDirNestingLevel);
 		Debug::out(LOG_DEBUG, "MediaStreaming::openStream %s => %s", path, hostPath.c_str());
 		path_or_url = hostPath.c_str();
-        if(access(path_or_url, R_OK) < 0) {
-            Debug::out(LOG_ERROR, "MediaStreaming::openStream access(%s) : %s", path_or_url, strerror(errno));
+        if(!Utils::fileExists(path_or_url)) {
+            Debug::out(LOG_ERROR, "MediaStreaming::openStream !fileExists(%s) : %s", path_or_url, strerror(errno));
 			dataTrans->setStatus(MEDIASTREAMING_ERR_FILEACCESS);
 			return;
         }
@@ -267,8 +268,8 @@ void MediaStreaming::openStream(AcsiDataTrans *dataTrans)
 		}
 		Debug::out(LOG_DEBUG, "MediaStreaming::openStream %s => %s", path, hostPath.c_str());
 		path_or_url = hostPath.c_str();
-        if(access(path_or_url, R_OK) < 0) {
-            Debug::out(LOG_ERROR, "MediaStreaming::openStream access(%s) : %s", path_or_url, strerror(errno));
+        if(!Utils::fileExists(path_or_url)) {
+            Debug::out(LOG_ERROR, "MediaStreaming::openStream !fileExists(%s) : %s", path_or_url, strerror(errno));
 			dataTrans->setStatus(MEDIASTREAMING_ERR_FILEACCESS);
 			return;
         }

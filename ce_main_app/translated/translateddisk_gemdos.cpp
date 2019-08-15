@@ -57,7 +57,7 @@ void TranslatedDisk::onDsetdrv(BYTE *cmd)
         if(currentDriveIndex != newDrive) {         // if the previous drive was different, mark that really changed
             changed = true;
         }
-    
+
         currentDriveLetter  = 'A' + newDrive;       // store the current drive
         currentDriveIndex   = newDrive;
 
@@ -119,7 +119,7 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
     int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
     res = createFullAtariPathAndFullHostPath(newAtariPath, fullAtariPath, atariDriveIndex, hostPath, waitingForMount, zipDirNestingLevel);
-    
+
     if(!res) {                                      // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, createFullAtariPath failed!", newAtariPath.c_str());
 
@@ -129,12 +129,12 @@ void TranslatedDisk::onDsetpath(BYTE *cmd)
 
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath -- waiting for mount, call this function again to succeed later.");
-    
+
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
     }
-    
-    if(!hostPathExists(hostPath)) {                 // path doesn't exists?
+
+    if(!hostPathExists(hostPath, true)) {           // path doesn't exists?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDsetpath - newAtariPath: %s, hostPathExist failed for %s", newAtariPath.c_str(), hostPath.c_str());
 
         dataTrans->setStatus(EPTHNF);               // path not found
@@ -211,13 +211,13 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
     atariSearchString   = (char *) (dataBuffer + 5);    // get search string, e.g.: C:\\*.*
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst(%08x) - atari search string: %s, find attribs: 0x%02x", dta, atariSearchString.c_str(), findAttribs);
-    
+
     if(LOG_DEBUG <= flags.logLevel) {                   // only when debug is enabled
         std::string atts;
         atariFindAttribsToString(findAttribs, atts);
         Debug::out(LOG_DEBUG, "find attribs: 0x%02x -> %s", findAttribs, atts.c_str());
     }
-    
+
     bool        waitingForMount;
     int         atariDriveIndex, zipDirNestingLevel;
     std::string fullAtariPath;
@@ -229,21 +229,21 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
         dataTrans->setStatus(E_NOTHANDLED);         // if we don't have this, not handled
         return;
     }
-    
+
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst -- waiting for mount, call this function again to succeed later.");
-    
+
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
     }
-    
+
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - atari search string: %s, host search string: %s", atariSearchString.c_str(), hostSearchString.c_str());
 
     //----------
     // now get the dir translator for the right drive
     // check if this is a root directory
     std::string justPath, justSearchString;
-    Utils::splitFilenameFromPath(hostSearchString, justPath, justSearchString); 
+    Utils::splitFilenameFromPath(hostSearchString, justPath, justSearchString);
 
     bool rootDir = isRootDir(justPath);
 
@@ -285,7 +285,7 @@ void TranslatedDisk::onFsfirst(BYTE *cmd)
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - DTA %08x not in findStorage, will try to find empty findStorage slot", dta);
 
         index = getEmptyFindStorageIndex();
-        
+
         if(index == -1) {
             Debug::out(LOG_DEBUG, "TranslatedDisk::onFsfirst - failed to find empty storage slot!");
             dataTrans->setStatus(EFILNF);                               // file not found
@@ -323,7 +323,7 @@ void TranslatedDisk::onFsnext(BYTE *cmd)
 
     if(dtaRemaining == 0) {                                     // nothing more to transfer?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsnext(%08x) - no more DTA remaining", dta);
-        
+
         fs->clear();                                            // we can clear this findStorage - you wouldn't get more from it anyway
         dataTrans->setStatus(ENMFIL);                           // no more files!
         return;
@@ -337,7 +337,7 @@ void TranslatedDisk::onFsnext(BYTE *cmd)
 
     DWORD addr  = dirIndex * 23;                                // calculate offset from which we will start sending stuff
     BYTE *buf   = &fs->buffer[addr];                            // and get pointer to this location
-    
+
     dataTrans->addDataBfr(buf, dtaToSend * 23, true);           // now add the data to buffer
 
     dataTrans->setStatus(E_OK);
@@ -346,7 +346,7 @@ void TranslatedDisk::onFsnext(BYTE *cmd)
 void TranslatedDisk::onFsnext_last(BYTE *cmd)                   // after last Fsnext() call this to release the findStorage
 {
     DWORD dta = Utils::getDword(cmd + 5);                       // bytes 5 to 8 contain address of DTA used on ST with Fsfirst() - will be used as identifier for Fsfirst() / Fsnext()
- 
+
     int index = getFindStorageIndexByDta(dta);                  // now see if we have findStorage for this DTA
     if(index == -1) {                                           // not found?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFsnext_last(%08x) - the findBuffer for this DTA not found!", dta);
@@ -383,7 +383,7 @@ void TranslatedDisk::onDfree(BYTE *cmd)
     std::string pathToAnyFile = conf[whichDrive].hostRootPath + "/.";       // create path to any file in that file system
 
     int res = statvfs(pathToAnyFile.c_str(), svfs);                         // get filesystem info
-    
+
     if(res == 0) {
         unsigned long blksize, blocks, freeblks;
         blksize     = svfs->f_bsize;
@@ -427,21 +427,21 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
     //---------------
     // find out if it's not ending with \ and thus having empty new dir name
     int len = strlen((char *) dataBuffer);
-    
+
     if(len > 0) {                                           // there is some path specified?
         if(dataBuffer[len - 1] == ATARIPATH_SEPAR_CHAR) {   // if the path ends with \, then it's invalid (no new dir name specified), return PATH NOT FOUND
             dataTrans->setStatus(EPTHNF);
             return;
         }
     }
-    
+
     //---------------
     // if the new directory name contains ? or *, fail with EACCDN
-    if(pathContainsWildCards((char *) dataBuffer)) {    
+    if(pathContainsWildCards((char *) dataBuffer)) {
         dataTrans->setStatus(EACCDN);
         return;
     }
-    
+
     //---------------
     // create absolute host path from relative atari path
     std::string newAtariPath, hostPath;
@@ -463,11 +463,11 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
 
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDcreate -- waiting for mount, call this function again to succeed later.");
-    
+
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
     }
-    
+
     //---------------
     // if it's read only (or inside of ZIP DIR - that's also read only), quit
     if(isDriveIndexReadOnly(atariDriveIndex) || zipDirNestingLevel > 0) {
@@ -479,23 +479,23 @@ void TranslatedDisk::onDcreate(BYTE *cmd)
 
     //---------------
     // if the new dir already exists, return ACCESS DENIED
-    bool newPathAlreadyExists = hostPathExists(hostPath.c_str());
-    if(newPathAlreadyExists) {                      
+    bool newPathAlreadyExists = hostPathExists(hostPath, true);
+    if(newPathAlreadyExists) {
         dataTrans->setStatus(EACCDN);
         return;
     }
-    
+
     //---------------
     // check if the specified new path doesn't contain some path, which doesn't exist
     std::string path, file;
     Utils::splitFilenameFromPath(hostPath, path, file);
-    
+
     bool subPathForNewDirExists = hostPathExists(path);
     if(!subPathForNewDirExists) {                   // if the path before the name of new dir doesn't exist, return PATH NOT FOUND
         dataTrans->setStatus(EPTHNF);
         return;
     }
-    
+
     //---------------
     // now try to create the dir
     int status = mkdir(hostPath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);        // mod: 0x775
@@ -549,7 +549,7 @@ void TranslatedDisk::onDdelete(BYTE *cmd)
 
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
         Debug::out(LOG_DEBUG, "TranslatedDisk::onDdelete -- waiting for mount, call this function again to succeed later.");
-    
+
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
     }
@@ -594,14 +594,14 @@ void TranslatedDisk::onFrename(BYTE *cmd)
     std::string oldHostName, newHostName;
     res  = createFullAtariPathAndFullHostPath(oldAtariName, fullAtariPathOld, atariDriveIndexOld, oldHostName, wfm1, zipDirNestingLevel);
     res2 = createFullAtariPathAndFullHostPath(newAtariName, fullAtariPathNew, atariDriveIndexNew, newHostName, wfm2, zipDirNestingLevel);
-    
+
     if(wfm1) {                                                          // if the path will be available in a while, but we're waiting for mount to finish now
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename -- waiting for mount, call this function again to succeed later.");
-    
+
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
     }
-    
+
     if(!res || !res2) {                                             // the path doesn't bellong to us?
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFrename - failed to createFullAtariPath for %s or %s", oldAtariName.c_str(), newAtariName.c_str());
 
@@ -617,12 +617,12 @@ void TranslatedDisk::onFrename(BYTE *cmd)
         dataTrans->setStatus(EACCDN);
         return;
     }
-    
-    if(!hostPathExists(oldHostName)) {                              // old path does not exist? fail, NOT FOUND
+
+    if(!hostPathExists(oldHostName, true)) {                        // old path does not exist? fail, NOT FOUND
         dataTrans->setStatus(EFILNF);
         return;
     }
-    
+
     int ires = rename(oldHostName.c_str(), newHostName.c_str());    // rename host file
 
     if(ires == 0) {                                                 // good
@@ -662,7 +662,7 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
 
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFdelete  -- waiting for mount, call this function again to succeed later.");
-    
+
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
     }
@@ -676,7 +676,7 @@ void TranslatedDisk::onFdelete(BYTE *cmd)
 
     //----------
     // File does not exist? fail, NOT FOUND
-    if(!hostPathExists(hostPath)) {                              
+    if(!hostPathExists(hostPath, true)) {
         dataTrans->setStatus(EFILNF);
         return;
     }
@@ -758,11 +758,11 @@ void TranslatedDisk::onFattrib(BYTE *cmd)
 
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFattrib -- waiting for mount, call this function again to succeed later.");
-    
+
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
     }
-    
+
     BYTE    oldAttrAtari;
 
     // first read the attributes
@@ -856,7 +856,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
         dataTrans->setStatus(EACCDN);
         return;
     }
-    
+
     BYTE attribs = dataBuffer[0];
 
     std::string atariName, hostName;
@@ -875,14 +875,14 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
         dataTrans->setStatus(E_NOTHANDLED);                         // if we don't have this, not handled
         return;
     }
-    
+
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate -- waiting for mount, call this function again to succeed later.");
-    
+
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
     }
-    
+
     if(isDriveIndexReadOnly(atariDriveIndex) || zipDirNestingLevel > 0) {                     // if it's read only (or inside of ZIP DIR - that's also read only), quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFcreate - %s - it's read only", atariName.c_str());
 
@@ -943,7 +943,7 @@ void TranslatedDisk::onFcreate(BYTE *cmd)
     fclose(f);
 
 
-/*  
+/*
     DWORD attrHost;
     attributesAtariToHost(attribs, attrHost);
 
@@ -1007,11 +1007,11 @@ void TranslatedDisk::onFopen(BYTE *cmd)
 
     if(waitingForMount) {                           // if the path will be available in a while, but we're waiting for mount to finish now
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen -- waiting for mount, call this function again to succeed later.");
-    
+
         dataTrans->setStatus(E_WAITING_FOR_MOUNT);
         return;
     }
-    
+
     if((mode & 0x07) != 0 && (isDriveIndexReadOnly(atariDriveIndex) || zipDirNestingLevel > 0)) {      // if it's WRITE mode and read only (or inside of ZIP DIR - that's also read only), quit
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is write, but file is read only, fail! ", atariName.c_str());
 
@@ -1047,21 +1047,11 @@ void TranslatedDisk::onFopen(BYTE *cmd)
     }
 
     if(justRead) {                              // if we should just read from the file (not write and thus create if does not exist)
-        if(!hostPathExists(hostName)) {         // and the file does not exist
+        if(!hostPathExists(hostName, true)) {   // and the file does not exist
+            Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is just read, but the file does not exist, failed!", hostName.c_str());
 
-            // try to find the file case insensitive
-            std::string justPath, originalFileName, foundFileName;
-            if(hostPathExists_caseInsensitive(hostName, justPath, originalFileName, foundFileName)) { // if found this file with case insensitive search
-                // TODO: update dir translator: replace originalFileName with foundFileName
-
-                hostName = justPath;
-                Utils::mergeHostPaths(hostName, foundFileName);     // now the hostName should contain newly found file, we can continue
-            } else {        // if couldn't find this file even if looked for case insensitive
-                Debug::out(LOG_DEBUG, "TranslatedDisk::onFopen - %s - fopen mode is just read, but the file does not exist, failed!", hostName.c_str());
-
-                dataTrans->setStatus(EFILNF);       // quit with FILE NOT FOUND
-                return;
-            }
+            dataTrans->setStatus(EFILNF);       // quit with FILE NOT FOUND
+            return;
         }
     }
 
@@ -1097,7 +1087,7 @@ void TranslatedDisk::onFclose(BYTE *cmd)
         dataTrans->setStatus(E_NOTHANDLED);
         return;
     }
-    
+
     bool res = dataTrans->recvData(dataBuffer, 16);                 // get data from Hans -- this is now here just to tell the whole software chain that this is a DMA WRITE operation (no real data needed)
 
     if(!res) {                                                      // failed to get data? internal error!
@@ -1185,11 +1175,11 @@ void TranslatedDisk::onFread(BYTE *cmd)
     int atariHandle         = cmd[5];
     DWORD byteCount         = Utils::get24bits(cmd + 6);
     int seekOffset          = (signed char) cmd[9];
-    
+
     int index = findFileHandleSlot(atariHandle);
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFread - atariHandle: %d, byteCount: %d, seekOffset: %d", (int) atariHandle, (int) byteCount, (int) seekOffset);
-    
+
     if(index == -1) {                                               // handle not found? not handled, try somewhere else
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFread - atari handle %d not found, not handling", atariHandle);
 
@@ -1323,7 +1313,7 @@ void TranslatedDisk::onFseek(BYTE *cmd)
     int index = findFileHandleSlot(atariHandle);
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onFseek - atariHandle: %d, offset: %d, seekMode: %d", (int) atariHandle, (int) offset, (int) seekMode);
-    
+
     if(index == -1) {                                               // handle not found? not handled, try somewhere else
         Debug::out(LOG_DEBUG, "TranslatedDisk::onFseek - atariHandle %d not found, not handled", atariHandle);
 
@@ -1434,10 +1424,10 @@ void TranslatedDisk::onDrvMap(BYTE *cmd)
 
         Debug::out(LOG_DEBUG, tmp);
     }
-    
+
     dataTrans->addDataWord(drives);         // drive bits
     dataTrans->addDataWord(0);              // add empty WORD - for future extension to 32 drives
-   
+
     dataTrans->padDataToMul16();            // pad to multiple of 16
 
     dataTrans->setStatus(E_OK);
@@ -1447,7 +1437,7 @@ void TranslatedDisk::onMediach(BYTE *cmd)
 {
     WORD mediach = 0;
     int chgCount = 0;
-    
+
     for(int i=2; i<MAX_DRIVES; i++) {       // create media changed bits
         if(conf[i].enabled && conf[i].mediaChanged) {
             mediach |= (1 << i);            // set the bit
@@ -1458,7 +1448,7 @@ void TranslatedDisk::onMediach(BYTE *cmd)
     }
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onMediach() - drives changed count: %d", chgCount);
-    
+
     dataTrans->addDataWord(mediach);
     dataTrans->padDataToMul16();            // pad to multiple of 16
 
@@ -1488,7 +1478,7 @@ void TranslatedDisk::atariFindAttribsToString(BYTE attr, std::string &out)
     if(attr & FA_VOLUME)    out += "FA_VOLUME ";
     if(attr & FA_DIR)       out += "FA_DIR ";
     if(attr & FA_ARCHIVE)   out += "FA_ARCHIVE ";
-    
+
     if(out.empty()) {
         out = "(none)";
     }
@@ -1537,7 +1527,7 @@ DWORD TranslatedDisk::getByteCountToEOF(FILE *f)
 
     bytesToEnd = posEnd - posCurrent;               // calculate how many bytes there are until the end of file
 
-    return bytesToEnd; 
+    return bytesToEnd;
 }
 
 void TranslatedDisk::onTestRead(BYTE *cmd)
@@ -1610,13 +1600,13 @@ void TranslatedDisk::onTestGetACSIids(BYTE *cmd)
     AcsiIDinfo  acsiIdInfo;
     Settings    s;
     s.loadAcsiIDs(&acsiIdInfo);                                 // read the list of device types from settings
-    
+
     for(int id=0; id<8; id++) {                                 // now store it one after another to buffer
         dataTrans->addDataByte(acsiIdInfo.acsiIDdevType[id]);
     }
 
-    dataTrans->addDataByte(acsiIdInfo.enabledIDbits);           // store the enabled ACSI IDs 
-    
+    dataTrans->addDataByte(acsiIdInfo.enabledIDbits);           // store the enabled ACSI IDs
+
     dataTrans->padDataToMul16();                                // pad to multiple of 16
     dataTrans->setStatus(E_OK);
 }
@@ -1648,7 +1638,7 @@ void TranslatedDisk::onSetACSIids(BYTE *cmd)
     int devType = dataBuffer[1];                            // get desired dev type
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onSetACSIids - setting devType %d to ID %d", devType, newId);
-    
+
     AcsiIDinfo  acsiIdInfo;
     Settings    s;
     s.loadAcsiIDs(&acsiIdInfo);                             // read the list of device types from settings
@@ -1657,31 +1647,30 @@ void TranslatedDisk::onSetACSIids(BYTE *cmd)
 
     if(devType == DEVTYPE_TRANSLATED || devType == DEVTYPE_SD) {        // if the device type is one of these, then disable them on their current ID, because we can have only one of them
         int currentId = findCurrentIDforDevType(devType, &acsiIdInfo);  // try to find it
-        
+
         if(currentId == newId) {                            // ID not changed? quit
             dataTrans->setStatus(E_OK);
             Debug::out(LOG_DEBUG, "TranslatedDisk::onSetACSIids - ID not changed, not saving it (it's OK)");
             return;
         }
-        
+
         if(currentId != -1) {                               // if it currently exists, disable it
             sprintf(key, "ACSI_DEVTYPE_%d", currentId);     // create settings KEY, e.g. ACSI_DEVTYPE_0
             s.setInt(key, DEVTYPE_OFF);
-            
+
             Debug::out(LOG_DEBUG, "TranslatedDisk::onSetACSIids - the devType %d was already on ID %d, disabling it there", devType, currentId);
         }
     }
-    
+
     sprintf (key, "ACSI_DEVTYPE_%d", newId);                // create settings KEY, e.g. ACSI_DEVTYPE_0
     s.setInt(key, devType);                                 // save new devType for that ID
 
     Debug::out(LOG_DEBUG, "TranslatedDisk::onSetACSIids - new ID %d was set to devType %d", newId, devType);
     dataTrans->setStatus(E_OK);
-    
+
     if(reloadProxy) {                                       // if got settings reload proxy, invoke reload
         reloadProxy->reloadSettings(SETTINGSUSER_ACSI);
     }
 
-    Utils::forceSync();                                     // tell system to flush the filesystem caches      
+    Utils::forceSync();                                     // tell system to flush the filesystem caches
 }
-
