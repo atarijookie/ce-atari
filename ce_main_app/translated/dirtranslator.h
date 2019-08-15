@@ -43,15 +43,16 @@ public:
     // call this for find first / find next for Gemdos
     bool buildGemdosFindstorageData(TFindStorage *fs, std::string hostSearchPathAndWildcards, BYTE findAttribs, bool isRootDir, bool useZipdirNotFile);
 
+    void updateFileName(std::string hostPath, std::string oldFileName, std::string newFileName);
     static void toUpperCaseString(std::string &st);
 
 private:
     std::map<std::string, FilenameShortener *>  mapPathToShortener;
-    
+
     TFindStorage    fsDirs;
     TFindStorage    fsFiles;
-    
-    FilenameShortener *getShortenerForPath(std::string path);
+
+    FilenameShortener *getShortenerForPath(std::string path, bool createIfNotFound=true);
     FilenameShortener *createShortener(const std::string &path);
     static void splitFilenameFromPath(std::string &pathAndFile, std::string &path, std::string &file);
 

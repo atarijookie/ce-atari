@@ -586,7 +586,6 @@ bool FloppySetup::createNewImage(std::string pathAndFile)
 
 void FloppySetup::getNewImageName(char *nameBfr)
 {
-    TranslatedDisk * translated = TranslatedDisk::getInstance();
     char fileName[24];
 
     for(int i=0; i<100; i++) {

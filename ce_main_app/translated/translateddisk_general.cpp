@@ -826,8 +826,8 @@ bool TranslatedDisk::hostPathExists(std::string &hostPath, bool alsoCheckCaseIns
         std::string justPath, originalFileName, foundFileName;
 
         if(hostPathExists_caseInsensitive(hostPath, justPath, originalFileName, foundFileName)) { // if found this file with case insensitive search
-            // TODO: update dir translator: replace originalFileName with foundFileName
-
+            // update dir translator: replace originalFileName with foundFileName
+            updateDirTranslators(justPath, originalFileName, foundFileName);
 
             hostPath = justPath;    // justPath to hostPath, and we'll merge in new file name in the next step
             Utils::mergeHostPaths(hostPath, foundFileName);     // now the hostPath should contain newly found file
@@ -889,6 +889,14 @@ bool TranslatedDisk::hostPathExists_caseInsensitive(std::string hostPath, std::s
 
     closedir(dir);
     return res;
+}
+
+void TranslatedDisk::updateDirTranslators(std::string hostPath, std::string oldFileName, std::string newFileName)
+{
+    int i;
+    for(i=0; i<MAX_DRIVES; i++) {       // go through all the drives and tell the dir translators to update the file name
+        conf[i].dirTranslator.updateFileName(hostPath, oldFileName, newFileName);
+    }
 }
 
 bool TranslatedDisk::createFullAtariPathAndFullHostPath(const std::string &inPartialAtariPath, std::string &outFullAtariPath, int &outAtariDriveIndex, std::string &outFullHostPath, bool &waitingForMount, int &zipDirNestingLevel)

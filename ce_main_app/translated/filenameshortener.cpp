@@ -367,3 +367,35 @@ void FilenameShortener::extendToLenghtWithSpaces(char *str, int len)
 
     str[len] = 0;                   // terminate with zero
 }
+
+// find oldFileName in long file names and replace it with newFileName
+void FilenameShortener::updateLongFileName(std::string oldFileName, std::string newFileName)
+{
+    // find out if we do have this long file name already
+    std::map<std::string, std::string>::iterator it;
+    it = mapFilenameWithExt.find(oldFileName);      // try to find the string in the map
+
+    if(it == mapFilenameWithExt.end()) {            // didn't find this old file name? then quit
+        return;
+    }
+
+    // found the old file name in the long-to-short map
+
+    std::string shortFileName = it->second;         // get the matching short file name (but make a copy of it, we're going to delete this item from std::map)
+
+    // For associative containers of type map and multimap the keys are immutable, so we'll have to
+    // remove this key and place a new one in the map instead of just modifying the key.
+
+    mapFilenameWithExt.erase(it);                   // erase item by iterator
+    mapFilenameWithExt.insert( std::pair<std::string, std::string>(newFileName, shortFileName) );  // store this key-value pair
+
+    // We still need to find and alter the reverse map, but we can just replace the value there instead of doing delete-insert
+
+    it = mapReverseFilename.find(shortFileName);    // try to find short file name in the reverse map
+
+    if(it == mapReverseFilename.end()) {            // didn't find the short file name? quit
+        return;
+    }
+
+    it->second = newFileName;                       // in the short-to-long map replace the oldFileName with newFileName
+}

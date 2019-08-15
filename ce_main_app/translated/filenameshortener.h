@@ -25,6 +25,8 @@ public:
     bool longToShortFileName(const char *longFileName, char *shortFileName);      // translates 'long file name' to 'long_f~1'
     const bool shortToLongFileName(const char *shortFileName, char *longFileName);      // translates 'long_f~1' to 'long file name'
 
+    void updateLongFileName(std::string oldFileName, std::string newFileName);    // find oldFileName in long file names and replace it with newFileName
+
     static void mergeFilenameAndExtension(const char *shortFn, const char *shortExt, bool extendWithSpaces, char *merged);
 
     static void removeSpaceExtension(const char *extendedFn, char *extRemovedFn); // 'FILE    .C  ' -> 'FILE.C'

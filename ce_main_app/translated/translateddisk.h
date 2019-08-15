@@ -20,7 +20,7 @@ class SettingsReloadProxy;
 #define CONFIG_DRIVE_PATH       "/tmp/configdrive"
 #define SHARED_DRIVE_PATH       "/mnt/shared"
 
-// this version number should be increased whenever command, data or status part of translated disk has changed - to enable CE_DD vs. Main App pairing. 
+// this version number should be increased whenever command, data or status part of translated disk has changed - to enable CE_DD vs. Main App pairing.
 // The CE_DD should check this version number and it this doesn't match expectations, it should refuse to work.
 #define TRANSLATEDDISK_VERSION  0x0101
 
@@ -147,6 +147,7 @@ public:
 
     bool hostPathExists(std::string &hostPath, bool alsoCheckCaseInsensitive = false);
     bool hostPathExists_caseInsensitive(std::string hostPath, std::string &justPath, std::string &originalFileName, std::string &foundFileName);
+    void updateDirTranslators(std::string hostPath, std::string oldFileName, std::string newFileName);
 
     static void pathSeparatorAtariToHost(std::string &path);
 

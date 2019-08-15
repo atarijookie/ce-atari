@@ -48,6 +48,15 @@ void DirTranslator::clear(void)
     mapPathToShortener.clear();
 }
 
+void DirTranslator::updateFileName(std::string hostPath, std::string oldFileName, std::string newFileName)
+{
+    FilenameShortener *fs = getShortenerForPath(hostPath, false);   // try to find a shortener for our path, but don't create it if not found
+
+    if(fs) {        // if existing shortener was found, update filename
+        fs->updateLongFileName(oldFileName, newFileName);
+    }
+}
+
 void DirTranslator::shortToLongPath(const std::string &rootPath, const std::string &shortPath, std::string &longPath)
 {
     #define MAX_DIR_NESTING     64
@@ -120,7 +129,7 @@ bool DirTranslator::longToShortFilename(const std::string &longHostPath, const s
     return res;
 }
 
-FilenameShortener *DirTranslator::getShortenerForPath(std::string path)
+FilenameShortener *DirTranslator::getShortenerForPath(std::string path, bool createIfNotFound)
 {
     // remove trailing '/' if needed
     if(path.size() > 0 && path[path.size() - 1] == HOSTPATH_SEPAR_CHAR) {
@@ -135,8 +144,13 @@ FilenameShortener *DirTranslator::getShortenerForPath(std::string path)
         //Debug::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s found", path.c_str());
         fs = it->second;
     } else {                                        // don't have the shortener yet
-        Debug::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, creating", path.c_str());
-        fs = createShortener(path);
+        if(createIfNotFound) {  // should create?
+            Debug::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, creating", path.c_str());
+            fs = createShortener(path);
+        } else {                // shoul NOT create?
+            Debug::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, returning NULL", path.c_str());
+            fs = NULL;
+        }
     }
     return fs;
 }
