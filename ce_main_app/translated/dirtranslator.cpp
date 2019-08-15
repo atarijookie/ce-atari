@@ -148,7 +148,7 @@ FilenameShortener *DirTranslator::getShortenerForPath(std::string path, bool cre
             Debug::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, creating", path.c_str());
             fs = createShortener(path);
         } else {                // shoul NOT create?
-            Debug::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, returning NULL", path.c_str());
+            //Debug::out(LOG_DEBUG, "DirTranslator::getShortenerForPath - shortener for %s NOT found, returning NULL", path.c_str());
             fs = NULL;
         }
     }
