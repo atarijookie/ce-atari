@@ -37,7 +37,6 @@ public:
     static void createNewScripts(void);
 
 private:
-    static DWORD    whenCanStartInstall;
     static const char *getPropperXilinxTag(void);
 };
 

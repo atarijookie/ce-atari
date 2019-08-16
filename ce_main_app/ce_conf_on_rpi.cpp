@@ -25,6 +25,7 @@
 #include "periodicthread.h"
 
 extern SharedObjects shared;
+ConfigPipes shellPipes;
 
 #define INBFR_SIZE  (10 * 1024)
 BYTE *inBfr;
@@ -471,6 +472,7 @@ void ce_conf_createFifos(void)
 {
     ce_conf_createFifos(&shared.configPipes.web,    (char *) FIFO_WEB_PATH1,     (char *) FIFO_WEB_PATH2);
     ce_conf_createFifos(&shared.configPipes.term,   (char *) FIFO_TERM_PATH1,    (char *) FIFO_TERM_PATH2);
+    ce_conf_createFifos(&shellPipes,                (char *) FIFO_SHELL_PATH1,   (char *) FIFO_SHELL_PATH2);
 }
 
 void ce_conf_createFifos(ConfigPipes *cp, char *path1, char *path2)

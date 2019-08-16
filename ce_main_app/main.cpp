@@ -44,9 +44,6 @@ void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
 void loadDefaultArgumentsFromFile(void);
 
-int     linuxConsole_fdMaster;                                  // file descriptors for linux console
-pid_t   childPid;                                               // pid of forked child
-
 void loadLastHwConfig(void);
 void initializeFlags(void);
 
@@ -120,28 +117,6 @@ int main(int argc, char *argv[])
         if(signal(SIGHUP, sigint_handler) == SIG_ERR) {         // register SIGHUP handler
             printf("Cannot register SIGHUP handler!\n");
         }
-    }
-
-    //------------------------------------
-    // if this is not just a reset command AND not a get HW info command
-    if(!flags.justDoReset && !flags.getHwInfo) {
-        childPid = forkpty(&linuxConsole_fdMaster, NULL, NULL, NULL);
-
-        if(childPid == 0) {                                         // code executed only by child
-            const char *shell = "/bin/sh";  // default shell
-            const char *term = "vt52";
-            shell = getenv("SHELL");
-            if(access("/etc/terminfo/a/atari", R_OK) == 0)
-                term = "atari";
-            if(setenv("TERM", term, 1) < 0) {
-                fprintf(stderr, "Failed to setenv(\"TERM\", \"%s\"): %s\n", term, strerror(errno));
-            }
-            execlp(shell, shell, "-i", (char *) NULL);  // -i for interactive
-
-            return 0;
-        }
-
-        // parent (full app) continues here
     }
 
     //------------------------------------
@@ -543,11 +518,6 @@ void sigint_handler(int sig)
 {
     Debug::out(LOG_DEBUG, "Some SIGNAL received, terminating.");
     sigintReceived = 1;
-
-    if(childPid != 0) {             // in case we fork()ed, kill the child
-        Debug::out(LOG_DEBUG, "Killing child with pid %d\n", childPid);
-        kill(childPid, SIGKILL);
-    }
 }
 
 bool otherInstanceIsRunning(void)
@@ -558,6 +528,9 @@ bool otherInstanceIsRunning(void)
     char proc_path[256];
     char other_exe[PATH_MAX];
     char self_exe[PATH_MAX];
+
+    memset(other_exe, 0, sizeof(other_exe));
+    memset(self_exe, 0, sizeof(self_exe));
 
     self_pid = getpid();
     f = fopen(PIDFILE, "r");
