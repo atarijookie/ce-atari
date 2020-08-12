@@ -34,8 +34,8 @@ AcsiDataTrans::AcsiDataTrans()
     statusWasSet    = false;
     com             = NULL;
     dataDirection   = DATA_DIRECTION_READ;
-	
-	dumpNextData	= false;
+    
+    dumpNextData    = false;
     
     retryMod        = NULL;
 }
@@ -65,8 +65,8 @@ void AcsiDataTrans::clear(bool clearAlsoDataDirection)
     if(clearAlsoDataDirection) {
         dataDirection   = DATA_DIRECTION_READ;
     }
-	
-	dumpNextData	= false;
+    
+    dumpNextData    = false;
 }
 
 void AcsiDataTrans::setStatus(BYTE stat)
@@ -111,8 +111,8 @@ void AcsiDataTrans::addDataBfr(const void *data, DWORD cnt, bool padToMul16)
 
 void AcsiDataTrans::addDataCString(const char *data, bool padToMul16)
 {
-	// include null terminator in byte count
-	addDataBfr(data, strlen(data) + 1, padToMul16);
+    // include null terminator in byte count
+    addDataBfr(data, strlen(data) + 1, padToMul16);
 }
 
 void AcsiDataTrans::padDataToMul16(void)
@@ -124,9 +124,9 @@ void AcsiDataTrans::padDataToMul16(void)
         memset(&buffer[count], 0, pad); // set the padded bytes to zero and add this count
         count += pad;
 
-	    // if((count % 512) != 0) {		// if it's not a full sector
-	    //     pad += 2;				// padding is greater than just to make mod16 == 0, to make the data go into ram
-    	// }
+        // if((count % 512) != 0) {     // if it's not a full sector
+        //     pad += 2;                // padding is greater than just to make mod16 == 0, to make the data go into ram
+        // }
     }
 }
 
@@ -148,7 +148,7 @@ bool AcsiDataTrans::recvData(BYTE *data, DWORD cnt)
 
 void AcsiDataTrans::dumpDataOnce(void)
 {
-	dumpNextData = true;
+    dumpNextData = true;
 }
 
 void AcsiDataTrans::sendDataToFd(int fd)
@@ -203,7 +203,7 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
     if(count == 0 && !statusWasSet) {       // if no data was added and no status was set, nothing to send then
         return;
     }
-	//---------------------------------------
+    //---------------------------------------
 #if defined(ONPC_HIGHLEVEL)
     if(dataDirection == DATA_DIRECTION_READ) {
         // ACSI READ - send (write) data to other side, and also status
@@ -225,40 +225,40 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
         return;
     }
 #endif
-	//---------------------------------------
-	if(dumpNextData) {
-		Debug::out(LOG_DEBUG, "sendDataAndStatus: %d bytes", count);
-		BYTE *src = buffer;
+    //---------------------------------------
+    if(dumpNextData) {
+        Debug::out(LOG_DEBUG, "sendDataAndStatus: %d bytes", count);
+        BYTE *src = buffer;
 
-		WORD dumpCnt = 0;
-		
-		int lines = count / 32;
-		if((count % 32) != 0) {
-			lines++;
-		}
-	
-		for(int i=0; i<lines; i++) {
-			char bfr[1024];
-			char *b = &bfr[0];
+        WORD dumpCnt = 0;
+        
+        int lines = count / 32;
+        if((count % 32) != 0) {
+            lines++;
+        }
+    
+        for(int i=0; i<lines; i++) {
+            char bfr[1024];
+            char *b = &bfr[0];
 
-			for(int j=0; j<32; j++) {
-				int val = (int) *src;
-				src++;
-				sprintf(b, "%02x ", val);
-				b += 3;
-				
-				dumpCnt++;
-				if(dumpCnt >= count) {
-					break;
-				}
-			}
+            for(int j=0; j<32; j++) {
+                int val = (int) *src;
+                src++;
+                sprintf(b, "%02x ", val);
+                b += 3;
+                
+                dumpCnt++;
+                if(dumpCnt >= count) {
+                    break;
+                }
+            }
 
-			Debug::out(LOG_DEBUG, "%s", bfr);
-		}
-		
-		dumpNextData = false;
-	}
-	//---------------------------------------
+            Debug::out(LOG_DEBUG, "%s", bfr);
+        }
+        
+        dumpNextData = false;
+    }
+    //---------------------------------------
     // first send the command
     bool res;
 
@@ -308,7 +308,7 @@ bool AcsiDataTrans::sendData_transferBlock(BYTE *pData, DWORD dataCount)
     }
     
     while(dataCount > 0) {                                          // while there's something to send
-        bool res = com->waitForATN(SPI_CS_HANS, ATN_READ_MORE_DATA, 1000, inBuf);	// wait for ATN_READ_MORE_DATA
+        bool res = com->waitForATN(SPI_CS_HANS, ATN_READ_MORE_DATA, 1000, inBuf);   // wait for ATN_READ_MORE_DATA
 
         if(!res) {                                                  // this didn't come? fuck!
             clear();                                                // clear all the variables

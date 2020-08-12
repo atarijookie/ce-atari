@@ -15,31 +15,31 @@
 
 class DevFinder {
 public:
-	DevFinder();
+    DevFinder();
 
-	void lookForDevChanges(void);
-	void getDevPartitions(std::string devName, std::list<std::string> &partitions);
+    void lookForDevChanges(void);
+    void getDevPartitions(std::string devName, std::list<std::string> &partitions);
 
-	void clearMap(void);						// called to make all the devices appear as new
-	
+    void clearMap(void);                        // called to make all the devices appear as new
+    
 private:
-	std::map<std::string, bool>  mapDevToFound;
-	bool someDevChanged;
+    std::map<std::string, bool>  mapDevToFound;
+    bool someDevChanged;
     std::multimap<std::string, std::string> mapDeviceToHostPaths;
 
-	void cutBeforeFirstNumber(std::string &filename);
+    void cutBeforeFirstNumber(std::string &filename);
 
-	void clearFoundFlags(void);
-	void processFoundDev(std::string file);
-	void findAndSignalDettached(void);
-	
-	bool isAtariDrive(std::string file);
-	bool isAtariPartitionType(char *bfr);
+    void clearFoundFlags(void);
+    void processFoundDev(std::string file);
+    void findAndSignalDettached(void);
+    
+    bool isAtariDrive(std::string file);
+    bool isAtariPartitionType(char *bfr);
     
     void onDevAttached(std::string devName, bool isAtariDrive);
     void onDevDetached(std::string devName);
     void attachDevAsTranslated(std::string devName);
 };
-	
+    
 #endif
 

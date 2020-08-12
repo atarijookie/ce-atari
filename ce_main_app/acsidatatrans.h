@@ -5,12 +5,12 @@
 #include "datatypes.h"
 
 // commands sent from device to host
-#define ATN_FW_VERSION					0x01								// followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
-#define ATN_ACSI_COMMAND				0x02
-#define ATN_READ_MORE_DATA				0x03
-#define ATN_WRITE_MORE_DATA				0x04
-#define ATN_GET_STATUS					0x05
-#define ATN_ANY							0xff								// this is used only on host to wait for any ATN
+#define ATN_FW_VERSION                  0x01                                // followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
+#define ATN_ACSI_COMMAND                0x02
+#define ATN_READ_MORE_DATA              0x03
+#define ATN_WRITE_MORE_DATA             0x04
+#define ATN_GET_STATUS                  0x05
+#define ATN_ANY                         0xff                                // this is used only on host to wait for any ATN
 
 
 // commands sent from host to device
@@ -63,7 +63,7 @@ public:
 
     void addDataBfr(const void *data, DWORD cnt, bool padToMul16);
 
-    void addDataCString(const char *data, bool padToMul16);	// including null terminator
+    void addDataCString(const char *data, bool padToMul16); // including null terminator
 
     void padDataToMul16(void);
 
@@ -101,8 +101,8 @@ private:
 
     BYTE    txBuffer[TX_RX_BUFF_SIZE];
     BYTE    rxBuffer[TX_RX_BUFF_SIZE];
-	
-	bool	dumpNextData;
+    
+    bool    dumpNextData;
 };
 
 #endif // ACSIDATATRANS_H

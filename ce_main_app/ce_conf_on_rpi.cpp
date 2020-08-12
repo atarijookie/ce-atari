@@ -192,45 +192,45 @@ static void emptyFd(int fd, BYTE *bfr)
 
 static bool receiveStream(int byteCount, BYTE *data, int fd)
 {
-	ssize_t n;
-	fd_set readfds;
-	struct timeval timeout;
+    ssize_t n;
+    fd_set readfds;
+    struct timeval timeout;
     DWORD timeOutTime = Utils::getEndTime(1000);
 
     int recvCount = 0;          // how many VT52  chars we already got
 
     while(recvCount < byteCount) {                                          // receive all the data, wait up to 1 second to receive it
-		DWORD now = Utils::getCurrentMs();
+        DWORD now = Utils::getCurrentMs();
         if(now >= timeOutTime) {                          // time out happened, nothing received within specified timeout? fail
             Debug::out(LOG_DEBUG, "receiveStream - fail, wanted %d and got only %d bytes", byteCount, recvCount);
             return false;
         }
-		memset(&timeout, 0, sizeof(timeout));
-		timeout.tv_sec = (timeOutTime - now) / 1000;
-		timeout.tv_usec = ((timeOutTime - now) % 1000) * 1000;
-		FD_ZERO(&readfds);
-		FD_SET(fd, &readfds);
-		if(select(fd + 1, &readfds, NULL, NULL, &timeout) < 0) {
-			Debug::out(LOG_ERROR, "receiveStream - select(): %s", strerror(errno));
-			continue;
-		}
-		if(FD_ISSET(fd, &readfds)) {
-			n = read(fd, data, (unsigned)(byteCount - recvCount));
+        memset(&timeout, 0, sizeof(timeout));
+        timeout.tv_sec = (timeOutTime - now) / 1000;
+        timeout.tv_usec = ((timeOutTime - now) % 1000) * 1000;
+        FD_ZERO(&readfds);
+        FD_SET(fd, &readfds);
+        if(select(fd + 1, &readfds, NULL, NULL, &timeout) < 0) {
+            Debug::out(LOG_ERROR, "receiveStream - select(): %s", strerror(errno));
+            continue;
+        }
+        if(FD_ISSET(fd, &readfds)) {
+            n = read(fd, data, (unsigned)(byteCount - recvCount));
             Debug::out(LOG_DEBUG, "receiveStream - read: %d", (int)n);
-			if(n < 0) {
-				if(errno == EAGAIN)
-					continue;
-				Debug::out(LOG_ERROR, "receiveStream - read(): %s", strerror(errno));
-				return false;
-			} else if(n == 0) {
-				Debug::out(LOG_ERROR, "receiveStream - read(): no more to read");
-				return 0;
-			} else {
-				data += n;
-				recvCount += n;
-				data[0] = '\0';
-			}
-		}
+            if(n < 0) {
+                if(errno == EAGAIN)
+                    continue;
+                Debug::out(LOG_ERROR, "receiveStream - read(): %s", strerror(errno));
+                return false;
+            } else if(n == 0) {
+                Debug::out(LOG_ERROR, "receiveStream - read(): no more to read");
+                return 0;
+            } else {
+                data += n;
+                recvCount += n;
+                data[0] = '\0';
+            }
+        }
     }
 
     Debug::out(LOG_DEBUG, "receiveStream - success, %d bytes", recvCount);
@@ -384,33 +384,33 @@ void ce_conf_mainLoop(void)
     tcsetattr(STDOUT_FILENO,TCSANOW, &new_tio_out); // set the new settings immediately
 
     DWORD lastUpdate = 0;
-	DWORD now;
+    DWORD now;
 
     while(sigintReceived == 0) {
-		fd_set readfds;
-		struct timeval timeout;
-		long time_ms;
-		int max_fd;
+        fd_set readfds;
+        struct timeval timeout;
+        long time_ms;
+        int max_fd;
 
-		FD_ZERO(&readfds);
-		FD_SET(STDIN_FILENO, &readfds);
-		//FD_SET(fd, &readfds);
-		max_fd = STDIN_FILENO;  //max_fd = MAX(STDIN_FILENO, fd);
-		now = Utils::getCurrentMs();
-		time_ms = lastUpdate + 1000 - now;
-		if(time_ms < 0) time_ms = 0;
-		memset(&timeout, 0, sizeof(timeout));
-		timeout.tv_sec = time_ms / 1000;
-		timeout.tv_usec = (time_ms % 1000) * 1000;
-		if(select(max_fd + 1, &readfds, NULL, NULL, &timeout) < 0) {
-			if(errno != EINTR) {
-				Debug::out(LOG_ERROR, "ce_conf_mainLoop - select() %s", strerror(errno));
-			}
-			continue;
-		}
-		if(FD_ISSET(STDIN_FILENO, &readfds)) {
-	        // check if something waiting from keyboard, and if so, read it
-	        int bytesAvailable;
+        FD_ZERO(&readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+        //FD_SET(fd, &readfds);
+        max_fd = STDIN_FILENO;  //max_fd = MAX(STDIN_FILENO, fd);
+        now = Utils::getCurrentMs();
+        time_ms = lastUpdate + 1000 - now;
+        if(time_ms < 0) time_ms = 0;
+        memset(&timeout, 0, sizeof(timeout));
+        timeout.tv_sec = time_ms / 1000;
+        timeout.tv_usec = (time_ms % 1000) * 1000;
+        if(select(max_fd + 1, &readfds, NULL, NULL, &timeout) < 0) {
+            if(errno != EINTR) {
+                Debug::out(LOG_ERROR, "ce_conf_mainLoop - select() %s", strerror(errno));
+            }
+            continue;
+        }
+        if(FD_ISSET(STDIN_FILENO, &readfds)) {
+            // check if something waiting from keyboard, and if so, read it
+            int bytesAvailable;
             int res = ioctl(STDIN_FILENO, FIONREAD, &bytesAvailable);   // how many bytes we can read from keyboard?
 
             if(res != -1 && bytesAvailable > 0) {

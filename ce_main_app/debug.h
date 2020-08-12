@@ -17,8 +17,8 @@ typedef struct {
 class Debug
 {
 public:
-	static void out(int logLevel, const char *format, ...);
-	static void outBfr(BYTE *bfr, int count);
+    static void out(int logLevel, const char *format, ...);
+    static void outBfr(BYTE *bfr, int count);
 
     static void printfLogLevelString(void);
     

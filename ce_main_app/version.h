@@ -4,7 +4,7 @@
 #include <string>
 #include "datatypes.h"
 
-#define XILINX_VERSION_FILE		"/ce/update/xilinx.current"
+#define XILINX_VERSION_FILE     "/ce/update/xilinx.current"
 
 class Version
 {

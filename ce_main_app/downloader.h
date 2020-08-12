@@ -50,7 +50,7 @@ public:
     static int  count(int downloadTypeMask);                            // count pending and running downloads according to mask
     static int  progressOfCurrentDownload(void);
     static void status(std::string &status, int downloadTypeMask);      // create status report string of pending and running downloads according to mask
-	static void statusJson(std::ostringstream &status, int downloadTypeMask);	// same as status(), but returned as json
+    static void statusJson(std::ostringstream &status, int downloadTypeMask);   // same as status(), but returned as json
 
     static bool verifyChecksum(const char *filename, WORD checksum);
     static bool handleZIPedImage(const char *destDirectory, const char *zipFilePath);

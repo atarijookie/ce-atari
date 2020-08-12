@@ -24,58 +24,58 @@ typedef struct {
 } TMountActionState;
 
 typedef struct {
-	int			action;
-	bool		deviceNotShared;
-	
-	std::string	devicePath;				// used when deviceNotShared is true
-	
-	struct {							// used when deviceNotShared is false
-		std::string host;
-		std::string hostDir;
-		bool		nfsNotSamba;
+    int         action;
+    bool        deviceNotShared;
+    
+    std::string devicePath;             // used when deviceNotShared is true
+    
+    struct {                            // used when deviceNotShared is false
+        std::string host;
+        std::string hostDir;
+        bool        nfsNotSamba;
         
         std::string username;
         std::string password;
-	} shared;
+    } shared;
 
-	std::string mountDir;				// location where it should be mounted
+    std::string mountDir;               // location where it should be mounted
     
     int     mountActionStateId;         // TMountActionState.id, which should be updated on change in this mount action
 } TMounterRequest;
 
 extern "C" {
-	void *mountThreadCode(void *ptr);
+    void *mountThreadCode(void *ptr);
 }
 
 class Mounter 
 {
 public:
-	bool mountShared(const char *host, const char *hostDir, bool nfsNotSamba, const char *mountDir, const char *username, const char *password);
-	bool mountDevice(const char *devicePath, const char *mountDir);
+    bool mountShared(const char *host, const char *hostDir, bool nfsNotSamba, const char *mountDir, const char *username, const char *password);
+    bool mountDevice(const char *devicePath, const char *mountDir);
     void mountZipFile(const char *zipFilePath, const char *mountDir);
-	void umountIfMounted(const char *mountDir);
-	void restartNetworkEth0(void);
-	void restartNetworkWlan0(void);
-	void sync(void);
+    void umountIfMounted(const char *mountDir);
+    void restartNetworkEth0(void);
+    void restartNetworkWlan0(void);
+    void sync(void);
 
-	static int add(TMounterRequest &tmr);
+    static int add(TMounterRequest &tmr);
     static int mas_getState(int id);
     void run(void);
     static void stop(void);
 
 private:
-	bool mount(const char *mountCmd, const char *mountDir);
-	bool mount(const char*, const char*, const char*, const char*);
+    bool mount(const char *mountCmd, const char *mountDir);
+    bool mount(const char*, const char*, const char*, const char*);
 
-	bool isAlreadyMounted(const char *source);
-	bool isMountdirUsed(const char *mountDir);
-	bool tryUnmount(const char *mountDir);
-	
-	void createSource(const char *host, const char *hostDir, bool nfsNotSamba, char *source);
-	
-	bool mountDumpContains(const char *searchedString);
+    bool isAlreadyMounted(const char *source);
+    bool isMountdirUsed(const char *mountDir);
+    bool tryUnmount(const char *mountDir);
+    
+    void createSource(const char *host, const char *hostDir, bool nfsNotSamba, char *source);
+    
+    bool mountDumpContains(const char *searchedString);
     bool wlan0IsPresent(void);
-	bool checkIfUp( const char* ifname );
+    bool checkIfUp( const char* ifname );
     bool getWpaSupplicantRunning(void);
 
     void copyTextFileToLog(const char *path);
