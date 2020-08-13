@@ -17,7 +17,6 @@ class ConfigService;
 class FloppyService;
 class ScreencastService;
 class AcsiDataTrans;
-class CConSpi;
 class RetryModule;
 
 class CCoreThread: public ISettingsUser
@@ -38,9 +37,6 @@ private:
     bool shouldRun;
     bool running;
 
-    //-----------------------------------
-    // data connection to STM32 slaves over SPI
-    CConSpi         *conSpi;
     AcsiDataTrans   *dataTrans;
 
     //-----------------------------------
@@ -55,7 +51,7 @@ private:
     AcsiIDinfo      acsiIdInfo;
     RetryModule     *retryMod;
 
-    void handleAcsiCommand(void);
+    void handleAcsiCommand(BYTE *bufIn);
     void handleConfigStream(BYTE *cmd);
 
     //-----------------------------------
@@ -64,32 +60,9 @@ private:
     void handleFwVersion_franz(void);
     int bcdToInt(int bcd);
 
-    void responseStart(int bufferLengthInBytes);
-    void responseAddWord(BYTE *bfr, WORD value);
-    void responseAddByte(BYTE *bfr, BYTE value);
-
-    struct {
-        int bfrLengthInBytes;
-        int currentLength;
-    } response;
-
     void convertXilinxInfo(BYTE xilinxInfo);
     void saveHwConfig(void);
     void getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId);
-
-    struct {
-        struct {
-            WORD acsi;
-            WORD fdd;
-        } current;
-
-        struct {
-            WORD acsi;
-            WORD fdd;
-        } next;
-
-        bool skipNextSet;
-    } hansConfigWords;
 
     //-----------------------------------
     // floppy stuff
@@ -107,7 +80,7 @@ private:
     int                 newFloppyImageLed;
     int                 newFloppyImageLedAfterEncode;
 
-    void handleSendTrack(void);
+    void handleSendTrack(BYTE *inBuf);
     void handleSectorWritten(void);
 
     //----------------------------------

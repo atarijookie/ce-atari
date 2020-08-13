@@ -17,12 +17,12 @@
 
 #include "global.h"
 #include "debug.h"
-#include "gpio.h"
 #include "utils.h"
 #include "settings.h"
 #include "datatypes.h"
 #include "periodicthread.h"
 #include "config/configstream.h"
+#include "chipinterface.h"
 
 #include "ikbd.h"
 
@@ -33,6 +33,7 @@ extern volatile sig_atomic_t    sigintReceived;
 
 extern TFlags flags;                                // global flags from command line
 extern SharedObjects shared;
+extern ChipInterface* chipInterface;
 
 void *ikbdThreadCode(void *ptr)
 {
@@ -50,7 +51,7 @@ void *ikbdThreadCode(void *ptr)
     ikbdLog("----------------------------------------------------------");
     ikbdLog("ikbdThreadCode will enter loop...");
 
-    bcm2835_gpio_write(PIN_TX_SEL1N2, HIGH);        // TX_SEL1N2, switch the RX line to receive from Franz, which does the 9600 to 7812 baud translation
+    chipInterface->ikdbUartEnable(true);        // enable UART for IKDB via some hardware magic
 
     // open and set up uart
     if(ikbd.serialSetup(&termiosStruct) == -1) {

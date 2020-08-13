@@ -3,25 +3,10 @@
 
 #include "datatypes.h"
 
-// defines for Floppy part
-// commands sent from device to host
-#define ATN_FW_VERSION              0x01            // followed by string with FW version (length: 4 WORDs - cmd, v[0], v[1], 0)
-#define ATN_SEND_NEXT_SECTOR        0x02            // sent: 2, side, track #, current sector #, 0, 0, 0, 0 (length: 4 WORDs)
-#define ATN_SECTOR_WRITTEN          0x03            // sent: 3, side (highest bit) + track #, current sector #
-#define ATN_SEND_TRACK              0x04            // send the whole track
-
 // commands sent from host to device
-#define CMD_WRITE_PROTECT_OFF       0x10
-#define CMD_WRITE_PROTECT_ON        0x20
-#define CMD_DISK_CHANGE_OFF         0x30
-#define CMD_DISK_CHANGE_ON          0x40
 #define CMD_CURRENT_SECTOR          0x50                                // followed by sector #
 #define CMD_GET_FW_VERSION          0x60
-#define CMD_SET_DRIVE_ID_0          0x70
-#define CMD_SET_DRIVE_ID_1          0x80
 #define CMD_CURRENT_TRACK           0x90                                // followed by track #
-#define CMD_DRIVE_ENABLED           0xa0
-#define CMD_DRIVE_DISABLED          0xb0
 #define CMD_MARK_READ               0xF000                              // this is not sent from host, but just a mark that this WORD has been read and you shouldn't continue to read further
 
 #define MFM_4US     1
@@ -68,6 +53,12 @@
 #define SCSI_MACHINE_FALCON     2
 
 //////////////////////////////////////////////////////
+// chip interface types
+#define CHIPIF_UNKNOWN  0
+#define CHIPIF_V1_V2    1       // Hans + CPLD, Franz, via SPI
+#define CHIPIF_V3       2       // FPGA, parallel data via GPIO
+
+//////////////////////////////////////////////////////
 
 typedef struct {
     char serial  [20];
@@ -87,6 +78,7 @@ typedef struct {
 typedef struct {
     bool justShowHelp;          // show possible command line arguments and quit
     int  logLevel;              // init current log level to LOG_ERROR
+    int  chipInterface;         // what kind of chip interface we will use - CHIPIF_...
     bool justDoReset;           // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
     bool noReset;               // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
     bool test;                  // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image

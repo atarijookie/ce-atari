@@ -5,7 +5,6 @@
 
 #include "debug.h"
 #include "utils.h"
-#include "gpio.h"
 #include "acsidatatrans.h"
 #include "native/scsi_defs.h"
 
@@ -26,9 +25,6 @@ AcsiDataTrans::AcsiDataTrans()
     memset(buffer,      0, ACSI_BUFFER_SIZE);            // init buffers to zero
     memset(recvBuffer,  0, ACSI_BUFFER_SIZE);
     
-    memset(txBuffer, 0, TX_RX_BUFF_SIZE);
-    memset(rxBuffer, 0, TX_RX_BUFF_SIZE);
-    
     count           = 0;
     status          = SCSI_ST_OK;
     statusWasSet    = false;
@@ -46,7 +42,7 @@ AcsiDataTrans::~AcsiDataTrans()
     delete []recvBuffer;
 }
 
-void AcsiDataTrans::setCommunicationObject(CConSpi *comIn)
+void AcsiDataTrans::setCommunicationObject(ChipInterface *comIn)
 {
     com = comIn;
 }
@@ -181,18 +177,18 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
     if(!retryMod) {         // no retry module?
         return;
     }
-    
+
     if(fromRetryModule) {   // if it's a RETRY, get the copy of data and proceed like it would be from real module
         retryMod->restoreDataAndStatus  (dataDirection, count, buffer, statusWasSet, status);
     } else {                // if it's normal run (not a RETRY), let the retry module do a copy of data
         retryMod->copyDataAndStatus     (dataDirection, count, buffer, statusWasSet, status);
     }
-    
+
 #if defined(ONPC_HIGHLEVEL) 
     if((sockReadNotWrite == 0 && dataDirection != DATA_DIRECTION_WRITE) || (sockReadNotWrite != 0 && dataDirection == DATA_DIRECTION_WRITE)) {
         Debug::out(LOG_ERROR, "!!!!!!!!! AcsiDataTrans::sendDataAndStatus -- DATA DIRECTION DISCREPANCY !!!!! sockReadNotWrite: %d, dataDirection: %d", sockReadNotWrite, dataDirection);
     }
-#endif    
+#endif
 
     // for DATA write transmit just the status in a different way (on separate ATN)
     if(dataDirection == DATA_DIRECTION_WRITE) {
@@ -268,7 +264,7 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
         return;
     }
 
-    res = sendData_transferBlock(buffer, count);    // transfer this block
+    sendData_transferBlock(buffer, count);    // transfer this block
 }
 
 bool AcsiDataTrans::sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool withStatus)
@@ -278,53 +274,18 @@ bool AcsiDataTrans::sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool w
         return false;
     }
 
-    if(totalDataCount > 0xffffff) {
-        Debug::out(LOG_ERROR, "AcsiDataTrans::sendData_start -- trying to send more than 16 MB, fail");
-        return false;
-    }
-
-    BYTE devCommand[COMMAND_SIZE];
-    memset(devCommand, 0, COMMAND_SIZE);
-
-    devCommand[3] = withStatus ? CMD_DATA_READ_WITH_STATUS : CMD_DATA_READ_WITHOUT_STATUS;  // store command - with or without status
-    devCommand[4] = totalDataCount >> 16;                           // store data size
-    devCommand[5] = totalDataCount >>  8;
-    devCommand[6] = totalDataCount  & 0xff;
-    devCommand[7] = scsiStatus;                                     // store status
-
-    com->txRx(SPI_CS_HANS, COMMAND_SIZE, devCommand, recvBuffer);   // transmit this command
-    return true;
+    return com->hdd_sendData_start(totalDataCount, scsiStatus, withStatus);
 }
 
 bool AcsiDataTrans::sendData_transferBlock(BYTE *pData, DWORD dataCount)
 {
-    txBuffer[0] = 0;
-    txBuffer[1] = CMD_DATA_MARKER;                                  // mark the start of data
+    bool res = com->hdd_sendData_transferBlock(pData, dataCount);
 
-    BYTE inBuf[8];
-
-    if((dataCount & 1) != 0) {                                      // odd number of bytes? make it even, we're sending words...
-        dataCount++;
+    if(!res) {                                                  // failed? fail
+        clear();                                                // clear all the variables
     }
-    
-    while(dataCount > 0) {                                          // while there's something to send
-        bool res = com->waitForATN(SPI_CS_HANS, ATN_READ_MORE_DATA, 1000, inBuf);   // wait for ATN_READ_MORE_DATA
 
-        if(!res) {                                                  // this didn't come? fuck!
-            clear();                                                // clear all the variables
-            return false;
-        }
-
-        DWORD cntNow = (dataCount > 512) ? 512 : dataCount;         // max 512 bytes per transfer
-
-        memcpy(txBuffer + 2, pData, cntNow);                        // copy the data after the header (2 bytes)
-        com->txRx(SPI_CS_HANS, cntNow + 4, txBuffer, rxBuffer);     // transmit this buffer with header + terminating zero (WORD)
-
-        pData       += cntNow;                                      // move the data pointer further
-        dataCount   -= cntNow;
-    }
-    
-    return true;
+    return res;
 }
 
 bool AcsiDataTrans::recvData_start(DWORD totalDataCount)
@@ -334,76 +295,29 @@ bool AcsiDataTrans::recvData_start(DWORD totalDataCount)
         return false;
     }
 
-    if(totalDataCount > 0xffffff) {
-        Debug::out(LOG_ERROR, "AcsiDataTrans::recvData_start() -- trying to send more than 16 MB, fail");
-        return false;
-    }
-
     dataDirection = DATA_DIRECTION_WRITE;                           // let the higher function know that we've done data write -- 130 048 Bytes
 
-    // first send the command and tell Hans that we need WRITE data
-    BYTE devCommand[COMMAND_SIZE];
-    memset(devCommand, 0, COMMAND_SIZE);
-
-    devCommand[3] = CMD_DATA_WRITE;                                 // store command - WRITE
-    devCommand[4] = totalDataCount >> 16;                           // store data size
-    devCommand[5] = totalDataCount >>  8;
-    devCommand[6] = totalDataCount  & 0xff;
-    devCommand[7] = 0xff;                                           // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
-
-    com->txRx(SPI_CS_HANS, COMMAND_SIZE, devCommand, recvBuffer);   // transmit this command
-    return true;
+    return com->hdd_recvData_start(recvBuffer, totalDataCount);
 }
 
 bool AcsiDataTrans::recvData_transferBlock(BYTE *pData, DWORD dataCount)
 {
-    memset(txBuffer, 0, TX_RX_BUFF_SIZE);                   // nothing to transmit, really...
-    BYTE inBuf[8];
+    bool res = com->hdd_recvData_transferBlock(pData, dataCount);
 
-    while(dataCount > 0) {
-        // request maximum 512 bytes from host
-        DWORD subCount = (dataCount > 512) ? 512 : dataCount;
-
-        bool res = com->waitForATN(SPI_CS_HANS, ATN_WRITE_MORE_DATA, 1000, inBuf); // wait for ATN_WRITE_MORE_DATA
-
-        if(!res) {                                          // this didn't come? fuck!
-            clear(false);                                   // clear all the variables - except dataDirection, which will be used for retry
-            return false;
-        }
-
-        com->txRx(SPI_CS_HANS, subCount + 8 - 4, txBuffer, rxBuffer);    // transmit data (size = subCount) + header and footer (size = 8) - already received 4 bytes
-        memcpy(pData, rxBuffer + 2, subCount);              // copy just the data, skip sequence number
-
-        dataCount   -= subCount;                            // decreate the data counter
-        pData       += subCount;                            // move in the buffer further
+    if(!res) {              // failed?
+        clear(false);       // clear all the variables
     }
 
-    return true;
+    return res;
 }
 
 void AcsiDataTrans::sendStatusToHans(BYTE statusByte)
 {
-#if defined(ONPC_HIGHLEVEL)        
-//    Debug::out(LOG_ERROR, "AcsiDataTrans::sendStatusToHans -- sending statusByte %02x", statusByte);
-
-    serverSocket_write(&statusByte, 1);
-#elif defined(ONPC_NOTHING) 
-    // nothing here
-#else
-    BYTE inBuf[8];
-    bool res = com->waitForATN(SPI_CS_HANS, ATN_GET_STATUS, 1000, inBuf);   // wait for ATN_GET_STATUS
+    bool res = com->hdd_sendStatusToHans(statusByte);
 
     if(!res) {
-        clear();                                            // clear all the variables
-        return;
+        clear();            // clear all the variables
     }
-
-    memset(txBuffer, 0, 16);                                // clear the tx buffer
-    txBuffer[1] = CMD_SEND_STATUS;                          // set the command and the statusByte
-    txBuffer[2] = statusByte;
-
-    com->txRx(SPI_CS_HANS, 16 - 8, txBuffer, rxBuffer);     // transmit the statusByte (16 bytes total, but 8 already received)
-#endif
 }
 
 DWORD AcsiDataTrans::getCount(void)

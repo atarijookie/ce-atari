@@ -14,7 +14,6 @@
 #include "ccorethread.h"
 #include "native/scsi.h"
 #include "native/scsi_defs.h"
-#include "gpio.h"
 #include "mounter.h"
 #include "downloader.h"
 #include "update.h"
@@ -47,6 +46,7 @@
 
 extern THwConfig    hwConfig;
 extern TFlags       flags;
+extern ChipInterface* chipInterface;
 
 extern DebugVars    dbgVars;
 
@@ -73,16 +73,13 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     setDiskChanged          = false;
     diskChanged             = false;
 
-    memset(&hansConfigWords, 0, sizeof(hansConfigWords));
-
     lastFloppyImageLed = -1;
     newFloppyImageLedAfterEncode = -2;
 
-    conSpi = new CConSpi();
     retryMod = new RetryModule();
 
     dataTrans = new AcsiDataTrans();
-    dataTrans->setCommunicationObject(conSpi);
+    dataTrans->setCommunicationObject(chipInterface);
     dataTrans->setRetryObject(retryMod);
 
     sharedObjects_create(configService, floppyService, screencastService);
@@ -122,7 +119,6 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
 
 CCoreThread::~CCoreThread()
 {
-    delete conSpi;
     delete dataTrans;
     delete retryMod;
 
@@ -196,12 +192,15 @@ void CCoreThread::sharedObjects_destroy(void)
     shared.configStream.dataTransTerm = NULL;
 }
 
+#define INBUF_SIZE  (WRITTENMFMSECTOR_SIZE + 8)
+
 void CCoreThread::run(void)
 {
-    BYTE inBuff[8], outBuf[8];
+    // inBuff might contain whole written floppy sector + header size
+    BYTE inBuff[INBUF_SIZE], outBuf[INBUF_SIZE];
 
-    memset(outBuf, 0, 8);
-    memset(inBuff, 0, 8);
+    memset(outBuf, 0, INBUF_SIZE);
+    memset(inBuff, 0, INBUF_SIZE);
 
     loadSettings();
 
@@ -220,7 +219,7 @@ void CCoreThread::run(void)
     if(flags.noReset) {                                                     // if we're debugging Hans or Franz (noReset is set to true), don't do this alive check
         shouldCheckHansFranzAlive = false;
     } else {                                                            // if we should reset Hans and Franz on start, do it (and we're probably not debugging Hans or Franz)
-        Utils::resetHansAndFranz();
+        chipInterface->resetHDDandFDD();
     }
 
 #ifdef ONPC_NOTHING
@@ -260,7 +259,8 @@ void CCoreThread::run(void)
     lastFwInfoTime.franzResetTime   = Utils::getCurrentMs();
 
 #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
-    bool res;
+    bool needsAction;
+    bool hardNotFloppy;
 #endif
 
     DWORD nextFloppyEncodingCheck   = Utils::getEndTime(1000);
@@ -311,14 +311,14 @@ void CCoreThread::run(void)
                 printf("\033[2KHans not alive, resetting Hans.\n");
                 Debug::out(LOG_INFO, "Hans not alive, resetting Hans.");
                 lastFwInfoTime.hansResetTime = now;
-                Utils::resetHans();
+                chipInterface->resetHDD();
             }
 
             if(!franzAlive && !flags.noReset && (now - lastFwInfoTime.franzResetTime) >= 3000) {
                 printf("\033[2KFranz not alive, resetting Franz.\n");
                 Debug::out(LOG_INFO, "Franz not alive, resetting Franz.");
                 lastFwInfoTime.franzResetTime = now;
-                Utils::resetFranz();
+                chipInterface->resetFDD();
             }
 
             load.clear();                       // clear load counter
@@ -361,10 +361,9 @@ void CCoreThread::run(void)
         load.busy.markStart();                          // mark the start of the busy part of the code
 
 #if !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
-        // check for any ATN code waiting from Hans
-        res = conSpi->waitForATN(SPI_CS_HANS, (BYTE) ATN_ANY, 0, inBuff);
+        needsAction = chipInterface->actionNeeded(hardNotFloppy, inBuff);
 
-        if(res) {    // HANS is signaling attention?
+        if(needsAction && hardNotFloppy) {    // hard drive needs action?
             gotAtn = true;  // we've some ATN
 
             switch(inBuff[3]) {
@@ -385,7 +384,7 @@ void CCoreThread::run(void)
                     statuses.hans.aliveTime = now;
                     statuses.hans.aliveSign = ALIVE_CMD;
 
-                    handleAcsiCommand();
+                    handleAcsiCommand(inBuff + 8);
 
                     dbgVars.isInHandleAcsiCommand = 0;
                 break;
@@ -403,23 +402,21 @@ void CCoreThread::run(void)
         }
 
 #if defined(ONPC_HIGHLEVEL)
-        res = gotCmd();
+        bool res = gotCmd();
 
         if(res) {
-            handleAcsiCommand();
+            handleAcsiCommand(inBuf);
         }
 #endif
 
 #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
         // check for any ATN code waiting from Franz
         if(flags.noFranz) {                         // if running without Franz, don't communicate
-            res = false;
-        } else {                                    // running with Franz - check for any ATN
-            res = conSpi->waitForATN(SPI_CS_FRANZ, (BYTE) ATN_ANY, 0, inBuff);
+            needsAction = false;
         }
 
-        if(res) {                                    // FRANZ is signaling attention?
-            gotAtn = true;                            // we've some ATN
+        if(needsAction && !hardNotFloppy) {         // floppy drive needs action?
+            gotAtn = true;                          // we've some ATN
 
             switch(inBuff[3]) {
             case ATN_FW_VERSION:                    // device has sent FW version
@@ -447,7 +444,7 @@ void CCoreThread::run(void)
                 statuses.fdd.aliveTime   = now;
                 statuses.fdd.aliveSign   = ALIVE_READ;
 
-                handleSendTrack();
+                handleSendTrack(inBuff + 8);
                 break;
 
             default:
@@ -466,23 +463,15 @@ void CCoreThread::run(void)
     }
 }
 
-void CCoreThread::handleAcsiCommand(void)
+void CCoreThread::handleAcsiCommand(BYTE *bufIn)
 {
     Debug::out(LOG_DEBUG, "\n");
-
-    BYTE bufOut[ACSI_CMD_SIZE];
-    BYTE bufIn[ACSI_CMD_SIZE];
-
-    memset(bufOut,  0, ACSI_CMD_SIZE);
-    memset(bufIn,   0, ACSI_CMD_SIZE);
 
     dbgVars.prevAcsiCmdTime = dbgVars.thisAcsiCmdTime;
     dbgVars.thisAcsiCmdTime = Utils::getCurrentMs();
 
 #if defined(ONPC_HIGHLEVEL)
     memcpy(bufIn, header, 14);                          // get the cmd from received header
-#else
-    conSpi->txRx(SPI_CS_HANS, 14, bufOut, bufIn);       // get 14 cmd bytes
 #endif
 
     BYTE justCmd, tag1, tag2, module;
@@ -709,53 +698,20 @@ void CCoreThread::loadSettings(void)
     setFloppyConfig     = true;
 }
 
-#define MAKEWORD(A, B)  ( (((WORD)A)<<8) | ((WORD)B) )
-
 void CCoreThread::handleFwVersion_hans(void)
 {
-    BYTE fwVer[14], oBuf[14];
-    int cmdLength;
+    BYTE fwVer[16];
+    memset(fwVer, 0, 16);
 
-    memset(oBuf,    0, 14);                                         // first clear the output buffer
-    memset(fwVer,   0, 14);
-
-    // WORD sent (bytes shown): 01 23 45 67
-
-    cmdLength = 12;
-    responseStart(cmdLength);                                       // init the response struct
-
-    //--------------
-    // send the ACSI + SD config + FDD enabled images, when they changed from current values to something new
     BYTE enabledIDbits, sdCardAcsiId;
-    getIdBits(enabledIDbits, sdCardAcsiId);                                 // get the enabled IDs
+    getIdBits(enabledIDbits, sdCardAcsiId);     // get the enabled IDs
 
-    hansConfigWords.next.acsi   = MAKEWORD(enabledIDbits,                   sdCardAcsiId);
-    hansConfigWords.next.fdd    = MAKEWORD(shared.imageSilo->getSlotBitmap(), 0);
+    chipInterface->setHDDconfig(enabledIDbits, sdCardAcsiId, shared.imageSilo->getSlotBitmap(), setNewFloppyImageLed, newFloppyImageLed);
+    chipInterface->getFWversion(true, fwVer);
 
-    if( (hansConfigWords.next.acsi  != hansConfigWords.current.acsi) ||
-        (hansConfigWords.next.fdd   != hansConfigWords.current.fdd )) {
-
-        // hansConfigWords.skipNextSet - it's a flag used for skipping one config sending, because we send the new config now, but receive it processed in the next (not this) fw version packet
-
-        if(!hansConfigWords.skipNextSet) {
-            responseAddWord(oBuf, CMD_ACSI_CONFIG);             // CMD: send acsi config
-            responseAddWord(oBuf, hansConfigWords.next.acsi);   // store ACSI enabled IDs and which ACSI ID is used for SD card
-            responseAddWord(oBuf, hansConfigWords.next.fdd);    // store which floppy images are enabled
-
-            hansConfigWords.skipNextSet = true;                 // we have just sent the config, skip the next sending, so we won't send it twice in a row
-        } else {                                                // if we should skip sending config this time, then don't skip it next time (if needed)
-            hansConfigWords.skipNextSet = false;
-        }
+    if(setNewFloppyImageLed) {                  // if was setting floppy LED
+        setNewFloppyImageLed = false;           // don't sent this anymore (until needed)
     }
-    //--------------
-
-    if(setNewFloppyImageLed) {
-        responseAddWord(oBuf, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
-        responseAddWord(oBuf, MAKEWORD(shared.imageSilo->getSlotBitmap(), newFloppyImageLed));  // store which floppy images LED should be on
-        setNewFloppyImageLed = false;                           // and don't sent this anymore (until needed)
-    }
-
-    conSpi->txRx(SPI_CS_HANS, cmdLength, oBuf, fwVer);
 
     int year = bcdToInt(fwVer[1]) + 2000;
 
@@ -764,9 +720,6 @@ void CCoreThread::handleFwVersion_hans(void)
 
     int  currentLed = fwVer[4];
     BYTE xilinxInfo = fwVer[5];
-
-    hansConfigWords.current.acsi    = MAKEWORD(fwVer[6], fwVer[7]);
-    hansConfigWords.current.fdd     = MAKEWORD(fwVer[8],        0);
 
     char recoveryLevel = fwVer[9];
     if(recoveryLevel != 0) {                                                        // if the recovery level is not empty
@@ -818,30 +771,20 @@ void CCoreThread::handleFwVersion_hans(void)
 
 void CCoreThread::handleFwVersion_franz(void)
 {
-    BYTE fwVer[14], oBuf[14];
-    int cmdLength;
-
-    memset(oBuf,    0, 14);                                         // first clear the output buffer
+    BYTE fwVer[14];
     memset(fwVer,   0, 14);
 
-    // WORD sent (bytes shown): 01 23 45 67
+    chipInterface->setFDDconfig(setFloppyConfig, floppyConfig.enabled, floppyConfig.id, floppyConfig.writeProtected, setDiskChanged, diskChanged);
+    chipInterface->getFWversion(false, fwVer);
 
-    cmdLength = 8;
-    responseStart(cmdLength);                                   // init the response struct
-
+    if(setFloppyConfig) {                                       // did set floppy config? don't set again
+        setFloppyConfig = false;
+    }
+    
     static bool franzHandledOnce = false;
 
     if(franzHandledOnce) {                                      // don't send the commands until we did receive at least one firmware message
-        if(setFloppyConfig) {                                   // should set floppy config?
-            responseAddByte(oBuf, ( floppyConfig.enabled        ? CMD_DRIVE_ENABLED     : CMD_DRIVE_DISABLED) );
-            responseAddByte(oBuf, ((floppyConfig.id == 0)       ? CMD_SET_DRIVE_ID_0    : CMD_SET_DRIVE_ID_1) );
-            responseAddByte(oBuf, ( floppyConfig.writeProtected ? CMD_WRITE_PROTECT_ON  : CMD_WRITE_PROTECT_OFF) );
-            setFloppyConfig = false;
-        }
-
         if(setDiskChanged) {
-            responseAddByte(oBuf, ( diskChanged                 ? CMD_DISK_CHANGE_ON    : CMD_DISK_CHANGE_OFF) );
-
             if(diskChanged) {                                   // if the disk changed, change it to not-changed and let it send a command again in a second
                 diskChanged = false;
             } else {                                            // if we're in the not-changed state, don't send it again
@@ -851,8 +794,6 @@ void CCoreThread::handleFwVersion_franz(void)
     }
 
     franzHandledOnce = true;
-
-    conSpi->txRx(SPI_CS_FRANZ, cmdLength, oBuf, fwVer);
 
     int year = bcdToInt(fwVer[1]) + 2000;
     Update::versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
@@ -1008,33 +949,6 @@ void CCoreThread::showHwVersion(void)
     Debug::out(LOG_INFO, "   %s", tmp);    // show in log file
 }
 
-void CCoreThread::responseStart(int bufferLengthInBytes)        // use this to start creating response (commands) to Hans or Franz
-{
-    response.bfrLengthInBytes   = bufferLengthInBytes;
-    response.currentLength      = 0;
-}
-
-void CCoreThread::responseAddWord(BYTE *bfr, WORD value)        // add a WORD to the response (command) to Hans or Franz
-{
-    if(response.currentLength >= response.bfrLengthInBytes) {
-        return;
-    }
-
-    bfr[response.currentLength + 0] = (BYTE) (value >> 8);
-    bfr[response.currentLength + 1] = (BYTE) (value & 0xff);
-    response.currentLength += 2;
-}
-
-void CCoreThread::responseAddByte(BYTE *bfr, BYTE value)        // add a BYTE to the response (command) to Hans or Franz
-{
-    if(response.currentLength >= response.bfrLengthInBytes) {
-        return;
-    }
-
-    bfr[response.currentLength] = value;
-    response.currentLength++;
-}
-
 void CCoreThread::setFloppyImageLed(int ledNo)
 {
     if(ledNo >=0 && ledNo < 3) {                    // if the LED # is within expected range
@@ -1064,18 +978,12 @@ int CCoreThread::bcdToInt(int bcd)
     return ((a * 10) + b);
 }
 
-void CCoreThread::handleSendTrack(void)
+void CCoreThread::handleSendTrack(BYTE *inBuf)
 {
-    BYTE oBuf[2], iBuf[MFM_STREAM_SIZE];
     static int prevTrack = 0;
 
-    memset(oBuf, 0, 2);
-    conSpi->txRx(SPI_CS_FRANZ, 2, oBuf, iBuf);
-
-    int side    = iBuf[0];                      // now read the current floppy position
-    int track   = iBuf[1];
-
-    int remaining   = MFM_STREAM_SIZE - (4*2) - 2;  // this much bytes remain to send after the received ATN
+    int side    = inBuf[0];                      // now read the current floppy position
+    int track   = inBuf[1];
 
     int tr, si, spt;
     shared.imageSilo->getParams(tr, si, spt);      // read the floppy image params
@@ -1093,7 +1001,8 @@ void CCoreThread::handleSendTrack(void)
         encodedTrack = shared.imageSilo->getEncodedTrack(track, side, countInTrack);
     }
 
-    conSpi->txRx(SPI_CS_FRANZ, remaining, encodedTrack, iBuf);
+    int remaining = MFM_STREAM_SIZE - (4*2) - 2;    // this much bytes remain to send after the received ATN
+    chipInterface->fdd_sendTrackToChip(remaining, encodedTrack);
 
     // now we should do some buzzing because of floppy seek
     if(prevTrack != track) {                        // track changed?
@@ -1105,21 +1014,12 @@ void CCoreThread::handleSendTrack(void)
 
 void CCoreThread::handleSectorWritten(void)
 {
-    BYTE oBuf[WRITTENMFMSECTOR_SIZE], iBuf[WRITTENMFMSECTOR_SIZE];
-
-    memset(oBuf, 0, WRITTENMFMSECTOR_SIZE);
-
-    WORD remainingSize = conSpi->getRemainingLength();              // get how many data we still have
-    conSpi->txRx(SPI_CS_FRANZ, remainingSize, oBuf, iBuf);          // get all the remaining data
-
-    // get the written sector, side, track number
-    int sector  = iBuf[1];
-    int track   = iBuf[0] & 0x7f;
-    int side    = (iBuf[0] & 0x80) ? 1 : 0;
+    int side, track, sector, byteCount;
+    BYTE *writtenSector = chipInterface->fdd_sectorWritten(side, track, sector, byteCount); // get side + track + sector number, byte count, and pointer to buffer where the written data is
 
     if(!floppyConfig.writeProtected) {  // not write protected? write
         Debug::out(LOG_DEBUG, "handleSectorWritten -- track %d, side %d, sector %d", track, side, sector);
-        floppyEncoder_decodeMfmWrittenSector(track, side, sector, iBuf, remainingSize); // let floppy encoder handle decoding, reencoding, saving
+        floppyEncoder_decodeMfmWrittenSector(track, side, sector, writtenSector, byteCount); // let floppy encoder handle decoding, reencoding, saving
     } else {                            // is write protected? don't write
         Debug::out(LOG_DEBUG, "handleSectorWritten -- floppy is write protected, not writing");
     }

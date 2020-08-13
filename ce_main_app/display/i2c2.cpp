@@ -1,5 +1,16 @@
 #include "i2c2.h"
-#include "../gpio.h"
+
+#ifndef ONPC_NOTHING
+    #ifndef DISTRO_YOCTO
+        #include <bcm2835.h>
+    
+        #define PIN_SCL             RPI_V2_GPIO_P1_29
+        #define PIN_SDA             RPI_V2_GPIO_P1_31
+    #else
+        #define PIN_SCL             0
+        #define PIN_SDA             0
+    #endif
+#endif
 
 i2c2::i2c2() : i2c_started(false)
 {

@@ -6,7 +6,6 @@
 #include "global.h"
 #include "debug.h"
 #include "utils.h"
-#include "gpio.h"
 #include "acsidatatrans.h"
 #include "native/scsi_defs.h"
 #include "retrymodule.h"

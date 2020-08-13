@@ -15,7 +15,6 @@ BSD license, check license.txt for more information
 
 #include "ssd1306.h"
 #include "i2c2.h"
-#include "../gpio.h"
 #include "../utils.h"
 
 SSD1306::SSD1306()

@@ -14,7 +14,6 @@
 #include "settings.h"
 #include "global.h"
 #include "ccorethread.h"
-#include "gpio.h"
 #include "debug.h"
 #include "mounter.h"
 #include "downloader.h"
@@ -25,6 +24,7 @@
 #include "periodicthread.h"
 #include "display/displaythread.h"
 #include "floppy/floppyencoder.h"
+#include "chipinterface_v1_v2/chipInterface12.h"
 
 #include "webserver/webserver.h"
 #include "webserver/api/apimodule.h"
@@ -55,6 +55,7 @@ TFlags              flags;                              // global flags from com
 RPiConfig           rpiConfig;                          // RPi model, revision, serial
 InterProcessEvents  events;
 SharedObjects       shared;
+ChipInterface*      chipInterface;
 
 #ifdef DISTRO_YOCTO
 const char *distroString = "Yocto";
@@ -106,6 +107,15 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    if(flags.chipInterface == CHIPIF_V1_V2) {                   // SPI chip interface?
+        chipInterface = new ChipInterface12();
+    } else if(flags.chipInterface == CHIPIF_V3) {               // parallel chip interface?
+        //chipInterface = new ChipInterface3();
+    } else {                                                    // unknown chip interface?
+        printf("Unknown chip interface selected, can't start!\n");
+        return 0;
+    }
+    
     loadLastHwConfig();                                         // load last found HW IF, HW version, SCSI machine
 
     printf("CosmosEx main app starting on %s...\n", distroString);
@@ -157,7 +167,7 @@ int main(int argc, char *argv[])
     //------------------------------------
     // if should just get HW info, do a shorter / simpler version of app run
     if(flags.getHwInfo) {
-        if(!gpio_open()) {                                      // try to open GPIO and SPI on RPi
+        if(!chipInterface->open()) {                            // try to open GPIO
             printf("\nHW_VER: UNKNOWN\n");
             printf("\nHDD_IF: UNKNOWN\n");
             return 0;
@@ -168,7 +178,10 @@ int main(int argc, char *argv[])
         core = new CCoreThread(NULL, NULL, NULL);               // create main thread
         core->run();                                            // run the main thread
 
-        gpio_close();
+        chipInterface->close();
+        delete chipInterface;
+        chipInterface = NULL;
+
         return 0;
     }
 
@@ -193,13 +206,16 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    if(!gpio_open()) {                                              // try to open GPIO and SPI on RPi
+    if(!chipInterface->open()) {                                    // try to open GPIO
         return 0;
     }
 
     if(flags.justDoReset) {                                         // is this a reset command? (used with STM32 ST-Link debugger)
-        Utils::resetHansAndFranz();
-        gpio_close();
+        chipInterface->resetHDDandFDD();
+
+        chipInterface->close();
+        delete chipInterface;
+        chipInterface = NULL;
 
         printf("\nJust did reset and quit...\n");
 
@@ -300,7 +316,10 @@ int main(int argc, char *argv[])
     delete pxVMouseService;
 
     delete core;
-    gpio_close();                                       // close gpio and spi
+
+    chipInterface->close();                             // close gpio
+    delete chipInterface;
+    chipInterface = NULL;
 
     printf("Stoping mount thread\n");
     Mounter::stop();
@@ -357,6 +376,7 @@ void initializeFlags(void)
 {
     flags.justShowHelp = false;
     flags.logLevel     = LOG_ERROR;     // init current log level to LOG_ERROR
+    flags.chipInterface = CHIPIF_V1_V2; // assume older chip interface if not specified otherwise
     flags.justDoReset  = false;         // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
     flags.noReset      = false;         // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
     flags.test         = false;         // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
@@ -446,6 +466,26 @@ void parseCmdLineArguments(int argc, char *argv[])
             continue;
         }
 
+        // it's a CHIP INTERFACE command (ci)
+        if(strncmp(argv[i], "ci", 2) == 0) {
+            isKnownTag = true;                                      // this is a known tag
+            int ci;
+
+            ci = (int) argv[i][2];
+
+            if(ci >= 48 && ci <= 57) {                              // if it's a number between 0 and 9
+                ci = ci - 48;
+
+                if(ci == 1 || ci == 2) {                            // 1 or 2 means SPI interface
+                    flags.chipInterface = CHIPIF_V1_V2;
+                } else if(ci == 3) {                                // 3 means parallel interface
+                    flags.chipInterface = CHIPIF_V3;
+                }
+            }
+
+            continue;
+        }
+
         if(strcmp(argv[i], "help") == 0 || strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "/?") == 0 || strcmp(argv[i], "?") == 0) {
             isKnownTag          = true;                             // this is a known tag
             flags.justShowHelp  = true;
@@ -521,6 +561,7 @@ void printfPossibleCmdLineArgs(void)
     printf("reset    - reset Hans and Franz, release lines, quit\n");
     printf("noreset  - when starting, don't reset Hans and Franz\n");
     printf("llx      - set log level to x (default is 1, max is 3)\n");
+    printf("cix      - set chip interface type to x (1 & 2 mean SPI, 3 means parallel)\n");
     printf("test     - some default config for device testing\n");
     printf("ce_conf  - use this app as ce_conf on RPi (the app must be running normally, too)\n");
     printf("hwinfo   - get HW version and HDD interface type\n");
@@ -603,7 +644,7 @@ void showOnDisplay(int argc, char *argv[])
         return;
     }
 
-    if(!gpio_open()) {  // try to open GPIO and SPI on RPi
+    if(!chipInterface->open()) {  // try to open GPIO
         printf("Failed to open GPIO.\n");
         return;
     }

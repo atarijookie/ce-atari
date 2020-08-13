@@ -22,7 +22,6 @@
 #include "../settings.h"
 
 #include "global.h"
-#include "gpio.h"
 
 #include "ssd1306.h"
 #include "adafruit_gfx.h"
@@ -76,6 +75,20 @@ static void display_drawScreen(int screenIndex);
 
 // get pointer to buffer where the line string should be stored
 static char *get_displayLinePtr(int displayLineId);
+
+#ifndef ONPC_NOTHING
+    #ifndef DISTRO_YOCTO
+        // on Raspbian - display, button, beeper
+        #include <bcm2835.h>
+
+        #define PIN_BEEPER          RPI_V2_GPIO_P1_32
+        #define PIN_BUTTON          RPI_V2_GPIO_P1_33
+    #else
+        // on yocto - no display, no button, no beeper
+        #define PIN_BEEPER          0
+        #define PIN_BUTTON          0
+    #endif
+#endif
 
 void *displayThreadCode(void *ptr)
 {

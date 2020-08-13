@@ -24,7 +24,6 @@
 #include "ccorethread.h"
 #include "native/scsi.h"
 #include "native/scsi_defs.h"
-#include "gpio.h"
 #include "mounter.h"
 #include "downloader.h"
 #include "update.h"
