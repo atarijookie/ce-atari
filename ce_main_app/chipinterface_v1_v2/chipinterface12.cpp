@@ -150,7 +150,7 @@ void ChipInterface12::setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEn
     }
 }
 
-#define FDD_FW_RESPONSE_LEN     14
+#define FDD_FW_RESPONSE_LEN     8
 
 void ChipInterface12::setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id, int writeProtected, bool setDiskChanged, bool diskChanged)
 {
