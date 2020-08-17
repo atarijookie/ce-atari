@@ -90,6 +90,7 @@ SUBDIR11 = ikbd
 SUBDIR12 = mediastreaming
 SUBDIR13 = display
 SUBDIR14 = chipinterface_v1_v2
+SUBDIR15 = chipinterface_v3
 
 SRCS  = $(wildcard *.cpp) 
 SRCS += $(wildcard $(SUBDIR1)/*.cpp) 
@@ -108,6 +109,7 @@ SRCS += $(wildcard $(SUBDIR11)/*.cpp)
 SRCS += $(wildcard $(SUBDIR12)/*.cpp)
 SRCS += $(wildcard $(SUBDIR13)/*.cpp)
 SRCS += $(wildcard $(SUBDIR14)/*.cpp)
+SRCS += $(wildcard $(SUBDIR15)/*.cpp)
 
 HDRS  = $(wildcard *.h)
 HDRS += $(wildcard $(SUBDIR1)/*.h)
@@ -126,6 +128,7 @@ HDRS += $(wildcard $(SUBDIR11)/*.h)
 HDRS += $(wildcard $(SUBDIR12)/*.h)
 HDRS += $(wildcard $(SUBDIR13)/*.h)
 HDRS += $(wildcard $(SUBDIR14)/*.h)
+HDRS += $(wildcard $(SUBDIR15)/*.h)
 
 OBJS = $(addprefix $(OBJDIR)/, $(patsubst %.cpp,%.o,$(SRCS:.c=.o)))
 DEPS = $(patsubst %.o,%.d,$(OBJS))

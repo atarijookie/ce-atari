@@ -3,6 +3,10 @@
 
 #include "datatypes.h"
 
+// types of chip interface, as returned by 
+#define CHIP_IF_V1_V2   1
+#define CHIP_IF_V3      3
+
 // The following commands are sent from device to host on chip interface v1 and v2, 
 // but as they are used for command identification in core thread and are reused
 // in chip interface v3 (even though that one doesn't really use them), it's moved here.
@@ -29,6 +33,9 @@ class ChipInterface
 {
 public:
     virtual ~ChipInterface() {};
+
+    // this return CHIP_IF_V1_V2 or CHIP_IF_V3
+    virtual int chipInterfaceType(void) = 0;
 
     //----------------
     // chip interface initialization and deinitialization - e.g. open GPIO, or open socket, ...

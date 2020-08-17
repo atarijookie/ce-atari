@@ -709,6 +709,8 @@ void CCoreThread::handleFwVersion_hans(void)
     chipInterface->setHDDconfig(enabledIDbits, sdCardAcsiId, shared.imageSilo->getSlotBitmap(), setNewFloppyImageLed, newFloppyImageLed);
     chipInterface->getFWversion(true, fwVer);
 
+    int chipIfType = chipInterface->chipInterfaceType();
+
     if(setNewFloppyImageLed) {                  // if was setting floppy LED
         setNewFloppyImageLed = false;           // don't sent this anymore (until needed)
     }
@@ -718,35 +720,43 @@ void CCoreThread::handleFwVersion_hans(void)
     Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));       // store found FW version of Hans
     flags.gotHansFwVersion = true;
 
-    int  currentLed = fwVer[4];
-    BYTE xilinxInfo = fwVer[5];
+    //----------------------------------
+    // do the following only for chip interface v1 v2
+    if(chipIfType == CHIP_IF_V1_V2) {
+        int  currentLed = fwVer[4];
+        BYTE xilinxInfo = fwVer[5];
 
-    char recoveryLevel = fwVer[9];
-    if(recoveryLevel != 0) {                                                        // if the recovery level is not empty
-        if(recoveryLevel == 'R' || recoveryLevel == 'S' || recoveryLevel == 'T') {  // and it's a valid recovery level
-            handleRecoveryCommands(recoveryLevel - 'Q');                            // handle recovery action
+        char recoveryLevel = fwVer[9];
+        if(recoveryLevel != 0) {                                                        // if the recovery level is not empty
+            if(recoveryLevel == 'R' || recoveryLevel == 'S' || recoveryLevel == 'T') {  // and it's a valid recovery level
+                handleRecoveryCommands(recoveryLevel - 'Q');                            // handle recovery action
+            }
         }
+
+        convertXilinxInfo(xilinxInfo);
+
+        if(lastFloppyImageLed != currentLed) {              // did the floppy image LED change since last time?
+            lastFloppyImageLed = currentLed;
+
+            Debug::out(LOG_DEBUG, "Floppy image changed to %d, forcing disk change", currentLed);
+
+            shared.imageSilo->setCurrentSlot(currentLed);     // switch the floppy image
+
+            diskChanged     = true;                         // also tell Franz that floppy changed
+            setDiskChanged  = true;
+        }
+
+        Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d, XI: 0x%02x", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed, xilinxInfo);
+    } else {
+        Debug::out(LOG_DEBUG, "FW: FPGA,  %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
     }
 
-    convertXilinxInfo(xilinxInfo);
-
-    Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d, XI: 0x%02x", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed, xilinxInfo);
+    //----------------------------------
 
     if(shared.imageSilo->currentSlotHasNewContent()) {    // the content of current slot changed?
         Debug::out(LOG_DEBUG, "Content of current floppy image slot changed, forcing disk change", currentLed);
 
         diskChanged     = true;                         // tell Franz that floppy changed
-        setDiskChanged  = true;
-    }
-
-    if(lastFloppyImageLed != currentLed) {              // did the floppy image LED change since last time?
-        lastFloppyImageLed = currentLed;
-
-        Debug::out(LOG_DEBUG, "Floppy image changed to %d, forcing disk change", currentLed);
-
-        shared.imageSilo->setCurrentSlot(currentLed);     // switch the floppy image
-
-        diskChanged     = true;                         // also tell Franz that floppy changed
         setDiskChanged  = true;
     }
 
@@ -759,13 +769,17 @@ void CCoreThread::handleFwVersion_hans(void)
         return;
     }
 
-    // if Xilinx HW vs FW mismatching, flash Xilinx again to fix the situation
-    if(hwConfig.fwMismatch) {
-        Update::createUpdateXilinxScript();
+    //----------------------------------
+    // do the following only for chip interface v1 v2
+    if(chipIfType == CHIP_IF_V1_V2) {
+        // if Xilinx HW vs FW mismatching, flash Xilinx again to fix the situation
+        if(hwConfig.fwMismatch) {
+            Update::createUpdateXilinxScript();
 
-        Debug::out(LOG_ERROR, ">>> Terminating app, because there's Xilinx HW vs FW mismatch! <<<\n");
-        sigintReceived = 1;
-        return;
+            Debug::out(LOG_ERROR, ">>> Terminating app, because there's Xilinx HW vs FW mismatch! <<<\n");
+            sigintReceived = 1;
+            return;
+        }
     }
 }
 

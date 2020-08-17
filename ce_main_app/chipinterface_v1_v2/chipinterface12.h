@@ -40,6 +40,9 @@ public:
     ChipInterface12();
     virtual ~ChipInterface12();
 
+    // this return CHIP_IF_V1_V2 or CHIP_IF_V3
+    virtual int chipInterfaceType(void) = 0;
+
     //----------------
     // chip interface initialization and deinitialization - e.g. open GPIO, or open socket, ...
     bool open(void);

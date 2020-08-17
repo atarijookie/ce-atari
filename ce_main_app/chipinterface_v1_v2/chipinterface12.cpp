@@ -23,6 +23,11 @@ ChipInterface12::~ChipInterface12()
     delete []bufIn;
 }
 
+int ChipInterface12::chipInterfaceType(void)
+{
+    return CHIP_IF_V1_V2;
+}
+
 bool ChipInterface12::open(void)
 {
     return gpio_open();

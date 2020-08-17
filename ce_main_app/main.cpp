@@ -25,6 +25,7 @@
 #include "display/displaythread.h"
 #include "floppy/floppyencoder.h"
 #include "chipinterface_v1_v2/chipInterface12.h"
+#include "chipinterface_v3/chipInterface3.h"
 
 #include "webserver/webserver.h"
 #include "webserver/api/apimodule.h"
@@ -110,7 +111,7 @@ int main(int argc, char *argv[])
     if(flags.chipInterface == CHIPIF_V1_V2) {                   // SPI chip interface?
         chipInterface = new ChipInterface12();
     } else if(flags.chipInterface == CHIPIF_V3) {               // parallel chip interface?
-        //chipInterface = new ChipInterface3();
+        chipInterface = new ChipInterface3();
     } else {                                                    // unknown chip interface?
         printf("Unknown chip interface selected, can't start!\n");
         return 0;
