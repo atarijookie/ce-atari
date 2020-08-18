@@ -1,9 +1,8 @@
-#ifndef CHIPINTERFACE12_H
-#define CHIPINTERFACE12_H
+#ifndef CHIPINTERFACE3_H
+#define CHIPINTERFACE3_H
 
 #include "../datatypes.h"
 #include "../chipinterface.h"
-#include "conspi.h"
 
 // Parallel interface to chip.
 // Used in CosmosEx v3.
@@ -215,7 +214,7 @@ private:
     void fpgaDataOutput(BYTE val);
     BYTE fpgaDataInput(void);
 
-    bYTE intToBcd(int integer);
+    BYTE intToBcd(int integer);
 };
 
-#endif // CHIPINTERFACE12_H
+#endif // CHIPINTERFACE3_H

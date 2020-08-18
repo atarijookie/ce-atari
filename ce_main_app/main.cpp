@@ -24,8 +24,8 @@
 #include "periodicthread.h"
 #include "display/displaythread.h"
 #include "floppy/floppyencoder.h"
-#include "chipinterface_v1_v2/chipInterface12.h"
-#include "chipinterface_v3/chipInterface3.h"
+#include "chipinterface_v1_v2/chipinterface12.h"
+#include "chipinterface_v3/chipinterface3.h"
 
 #include "webserver/webserver.h"
 #include "webserver/api/apimodule.h"

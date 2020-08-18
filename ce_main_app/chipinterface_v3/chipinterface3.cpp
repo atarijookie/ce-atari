@@ -1,20 +1,19 @@
 #include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
     #include <bcm2835.h>
 #endif
 
 #include "chipinterface3.h"
-#include "gpio.h"
+#include "../chipinterface_v1_v2/gpio.h"
 #include "../utils.h"
 #include "../debug.h"
 
 
 ChipInterface3::ChipInterface3()
 {
-    // set these vars to some not valid value, so we'll do the actual setting of pin direction or address on the first time
-    currentPinDir = -123;
-
     ikbdEnabled = false;        // ikbd is not enabled by default, so we need to enable it
 
     fdd.enabled = true;         // if true, floppy part is enabled
@@ -434,7 +433,7 @@ bool ChipInterface3::trackChangedNeedsAction(BYTE *inBuf)
 
 // Call this when there are some bytes written to floppy. When it's not enough data for whole sector, then this just stores the bytes and returns false.
 // If enough data was received for the whole floppy sector, this returns true and later the data will be retrieved using fdd_sectorWritten() function.
-bool ChipInterface::handleFloppyWriteBytes(BYTE *inBuf)
+bool ChipInterface3::handleFloppyWriteBytes(BYTE *inBuf)
 {
     static WORD header = 0;                             // read new byte in the lower part, got header if it contains 0xCAFE
 
@@ -536,7 +535,7 @@ void ChipInterface3::setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id,
     }
 }
 
-bYTE ChipInterface3::intToBcd(int integer)
+BYTE ChipInterface3::intToBcd(int integer)
 {
     int a, b;
     a = integer / 10;
@@ -660,12 +659,12 @@ bool ChipInterface3::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
         BYTE modeDirCnt;
 
         if(sectorCount > 0) {                       // is remaining data is at least 1 sector big? do transfer in whole sectors
-            sectorCount = min(sectorCount, 16);     // limit sector count to 16
+            sectorCount = MIN(sectorCount, 16);     // limit sector count to 16
             byteCount = sectorCount * 512;          // convert sector count to byte count
 
             modeDirCnt = MODE_DMA | DIR_READ | SIZE_IN_SECTORS | (sectorCount - 1);
         } else {                                    // only remaining less than 1 sector of data - do transfer in bytes
-            byteCount = min(dataCount, 16);         // limit byte count to 16
+            byteCount = MIN(dataCount, 16);         // limit byte count to 16
 
             modeDirCnt = MODE_DMA | DIR_READ | SIZE_IN_BYTES | (byteCount - 1);
         }
@@ -679,7 +678,7 @@ bool ChipInterface3::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
 
         while(byteCount > 0) {                          // while we still haven't transfered all of the data
             DWORD now = Utils::getCurrentMs();
-            if((now - start) > timeout) || sigintReceived) {    // if timeout happened or app should terminate, quit
+            if((now - start) > timeout || sigintReceived) {    // if timeout happened or app should terminate, quit
                 return false;
             }
 
@@ -739,7 +738,7 @@ DWORD ChipInterface3::timeoutForDataCount(DWORD dataCount)
     int dataSizeInKB = (dataCount / 1024) + 1;      // calculate how many kBs this transfer is
 
     DWORD timeout = dataSizeInKB * 4;               // allow at least 4 ms to transfer 1 kB (that is 250 kB/s)
-    timeout = max(timeout, 100);                    // let timeout be at least 100 ms, or more
+    timeout = MAX(timeout, 100);                    // let timeout be at least 100 ms, or more
 
     return timeout;
 }
@@ -768,12 +767,12 @@ bool ChipInterface3::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCount)
         BYTE modeDirCnt;
 
         if(sectorCount > 0) {                       // is remaining data is at least 1 sector big? do transfer in whole sectors
-            sectorCount = min(sectorCount, 16);     // limit sector count to 16
+            sectorCount = MIN(sectorCount, 16);     // limit sector count to 16
             byteCount = sectorCount * 512;          // convert sector count to byte count
 
             modeDirCnt = MODE_DMA | DIR_WRITE | SIZE_IN_SECTORS | (sectorCount - 1);
         } else {                                    // only remaining less than 1 sector of data - do transfer in bytes
-            byteCount = min(dataCount, 16);         // limit byte count to 16
+            byteCount = MIN(dataCount, 16);         // limit byte count to 16
 
             modeDirCnt = MODE_DMA | DIR_WRITE | SIZE_IN_BYTES | (byteCount - 1);
         }
@@ -787,7 +786,7 @@ bool ChipInterface3::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCount)
 
         while(byteCount > 0) {                          // while we still haven't transfered all of the data
             DWORD now = Utils::getCurrentMs();
-            if((now - start) > timeout) || sigintReceived) {    // if timeout happened or app should terminate, quit
+            if((now - start) > timeout || sigintReceived) {    // if timeout happened or app should terminate, quit
                 return false;
             }
 

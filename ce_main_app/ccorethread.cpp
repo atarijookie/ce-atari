@@ -754,7 +754,7 @@ void CCoreThread::handleFwVersion_hans(void)
     //----------------------------------
 
     if(shared.imageSilo->currentSlotHasNewContent()) {    // the content of current slot changed?
-        Debug::out(LOG_DEBUG, "Content of current floppy image slot changed, forcing disk change", currentLed);
+        Debug::out(LOG_DEBUG, "Content of current floppy image slot changed, forcing disk change");
 
         diskChanged     = true;                         // tell Franz that floppy changed
         setDiskChanged  = true;
