@@ -30,6 +30,10 @@ ChipInterface3::ChipInterface3()
     fddWrittenSector.data = new BYTE[WRITTENMFMSECTOR_SIZE];    // holds the written sector data until it's all and ready to be processed
     fddWrittenSector.byteCount = 0;                             // count of bytes in the fddWrittenSector buffer
 
+    hddTransferInfo.totalDataCount = 0;
+    hddTransferInfo.scsiStatus = 0;
+    hddTransferInfo.withStatus = true;
+
     int dataPinsInit[8] = {PIN_DATA0, PIN_DATA1, PIN_DATA2, PIN_DATA3, PIN_DATA4, PIN_DATA5, PIN_DATA6, PIN_DATA7};
 
     for(int i=0; i<8; i++) {        // copy data pin numbers from this init array to member array, so we can reuse them without recreating them
@@ -158,13 +162,15 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
 
     if(reportHddVersion) {                                  // if should report FW version
         reportHddVersion = false;
-        inBuff[3] = ATN_FW_VERSION;
+        inBuf[3] = ATN_FW_VERSION;
+        hardNotFloppy = true;
         return true;                                        // action needs handling, FW version will be retrieved via getFWversion() function
     }
 
     if(reportFddVersion) {                                  // if should report FW version
         reportFddVersion = false;
-        inBuff[3] = ATN_FW_VERSION;
+        inBuf[3] = ATN_FW_VERSION;
+        hardNotFloppy = false;
         return true;                                        // action needs handling, FW version will be retrieved via getFWversion() function
     }
 
@@ -182,6 +188,7 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
     status = fpgaDataRead();                            // read the status
 
     if((status & STATUS_HDD_WRITE_FIFO_EMPTY) == 0) {   // if WRITE FIFO is not empty (flag is 0), then ST has sent us CMD byte
+        hardNotFloppy = true;
         return getHddCommand(inBuf);                    // if this command was for one of our enabled HDD IDs, then this will return true and will get handled
     }
 
@@ -192,6 +199,7 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
     bool actionNeeded = trackChangedNeedsAction(inBuf); // if track change happened a while ago, we will need to set new track data
 
     if(actionNeeded) {                                  // if should send track data, quit and request action, otherwise continue with the rest
+        hardNotFloppy = false;
         return true;
     }
 
@@ -199,6 +207,7 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
         actionNeeded = handleFloppyWriteBytes(inBuf);   // get written data and store them in buffer
 
         if(actionNeeded) {                              // if got whole written sector, quit and request action, otherwise continue with the rest
+            hardNotFloppy = false;
             return true;
         }
     }
@@ -207,14 +216,177 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
     return false;
 }
 
+int ChipInterface3::getCmdLengthFromCmdBytes(BYTE *cmd)
+{
+    BYTE justCmd = cmd[0] & 0x1f;
+    BYTE opcode;
+
+    if(interfaceType == INTERFACE_TYPE_ACSI) {          // ACSI interface
+        if(justCmd != 0x1f) {                           // not ICD command - it's 6 bytes long
+            return 6;
+        } else {                                        // it's ICD command - get command opcode from cmd[1]
+            opcode = (cmd[1] & 0xe0) >> 5;
+        }
+    } else if(interfaceType == INTERFACE_TYPE_SCSI) {   // SCSI interface
+        opcode = (cmd[0] & 0xe0) >> 5;                  // get command opcode from cmd[0]
+    } else {                                            // other interfaces - always 6 for now
+        return 6;
+    }
+
+    int cmdLen;
+    switch(opcode) {                                     // get the length of the command from opcode
+        case  0: cmdLen =  6; break;
+        case  1: cmdLen = 10; break;
+        case  2: cmdLen = 10; break;
+        case  4: cmdLen = 16; break;
+        case  5: cmdLen = 12; break;
+        default: cmdLen =  6; break;
+    }
+
+    if(interfaceType == INTERFACE_TYPE_ACSI) {          // when this is ACSI interface, it's 1 byte longer as there's the additional ICD command on start
+        cmdLen++;
+    }
+
+    return cmdLen;
+}
+
 bool ChipInterface3::getHddCommand(BYTE *inBuf)
 {
-    // TODO
+    // HDD WRITE FIFO not empty, so we can read 0th cmd byte
+    BYTE *cmd = inBuf + 8;                              // this is where we will store cmd
+    memset(cmd, 0, 17);                                 // clear place for cmd
 
+    BYTE status;
+    DWORD start = Utils::getCurrentMs();
+    DWORD now;
 
+    fpgaAddressSet(FPGA_ADDR_WRITE_FIFO_DATA);          // set address of WRITE FIFO
+    cmd[0] = fpgaDataRead();                            // read the 0th cmd byte or SCSI selection bits
+    BYTE id, i;
+    int storeIdx;
 
-    inBuff[3] = ATN_ACSI_COMMAND;
-    return true;                                            // this command was for enabled ID, so it needs handling
+    if(interfaceType == INTERFACE_TYPE_ACSI) {          // for ACSI
+        id = (cmd[0] >> 5) & 0x07;                      // get only device ID
+        storeIdx = 1;                                   // store next cmd byte to index 1
+
+        if((hddEnabledIDs & (1 << id)) == 0) {          // ID not enabled? no further action needed
+            return false;
+        }
+    } else if(interfaceType == INTERFACE_TYPE_SCSI) {   // for SCSI
+        id = 0xff;                                      // mark that ID hasn't been found yet
+
+        for(i=0; i<8; i++) {
+            int bitMask = (1 << i);
+
+            if((cmd[0] & bitMask) && (hddEnabledIDs & bitMask)) {   // if ID bit is one and it's in enabled ID, this ID is selected 
+                id = i;                                 // store this ID and quit loop
+                break;
+            }
+        }
+
+        if(id < 0 || id > 7) {                          // ID not found or ID invalid? quit
+            return false;
+        }
+
+        storeIdx = 0;                                   // store next cmd byte to index 0, as this cmd[0] was selection bits, not really cmd[0]
+    } else {                                            // other interfaces? not handling it
+        return false;
+    }
+
+    //-----------------------------------
+    // id now contains found ID of enabled device
+
+    // we want to set that we should read additional 1 cmd byte, after which we can determine the real length of the command
+    fpgaAddressSet(FPGA_ADDR_MODE_DIR_CNT);                     // set address MODE-DIR-CNT config reg
+    fpgaDataWrite(MODE_PIO | DIR_WRITE | SIZE_IN_BYTES | 0);    // PIO WRITE 1 BYTE (set 0 bytes because of internal cnt+1)
+
+    fpgaAddressSet(FPGA_ADDR_STATUS);                       // set status register address
+
+    while(true) {                                           // while app is running
+        if(sigintReceived) {                                // app terminated, quit now, no action
+            return false;
+        }
+
+        now = Utils::getCurrentMs();
+
+        if((now - start) >= 1000) {                         // if his is taking too long
+            fpgaResetAndSetConfig(true, false);             // reset HDD part
+            return false;                                   // fail with no action needed
+        }
+
+        status = fpgaDataRead();                            // read the status
+
+        if((status & STATUS_HDD_WRITE_FIFO_EMPTY) == 0) {   // if WRITE FIFO is not empty (flag is 0), then ST has sent us CMD byte
+            break;
+        }
+    }
+
+    fpgaAddressSet(FPGA_ADDR_WRITE_FIFO_DATA);          // set address of WRITE FIFO
+    cmd[storeIdx] = fpgaDataRead();                     // read next cmd byte
+
+    int cmdLen = 6;
+    cmdLen = getCmdLengthFromCmdBytes(cmd);             // figure out the cmd length
+
+    int gotBytes;                                       // how many bytes we already have
+
+    if(interfaceType == INTERFACE_TYPE_ACSI) {          // on ACSI interface
+        storeIdx++;                                     // store to next index
+
+        gotBytes = 2;                                   // already have 2 cmd bytes (0th and 1st)
+    } else if(interfaceType == INTERFACE_TYPE_SCSI) {   // on SCSI interface
+        if(cmdLen > 6) {                                // for longer command we need to fake the ICD long format command
+            cmd[1] = cmd[0];                            // 0th cmd byte to 1st index
+            cmd[0] = 0x1f | (id << 5);                  // add ID on the top 3 bits
+            storeIdx = 2;                               // store to index 2
+        } else {                                        // SCSI short command
+            cmd[0] = cmd[0] | (id << 5);                // add SCSI ID on top of 0th cmd byte
+            storeIdx++;                                 // store to next index
+        }
+
+        gotBytes = 1;                                   // only got 1 cmd byte (0th)
+    }
+
+    int needBytes = cmdLen - gotBytes;                  // how many more bytes we need - e.g. 6 - 2 = 4, or 12 - 1 = 11
+
+    fpgaAddressSet(FPGA_ADDR_MODE_DIR_CNT);                                 // set address MODE-DIR-CNT config reg
+    fpgaDataWrite(MODE_PIO | DIR_WRITE | SIZE_IN_BYTES | (needBytes - 1));  // PIO WRITE needBytes-1 BYTEs (set to 1 less bytes because of internal cnt+1)
+
+    //---------------------------------------
+    // now the FPGA should read all the needed bytes into FIFO
+    // wait until the WRITE FIFO has all the remaining cmd bytes
+    
+    fpgaAddressSet(FPGA_ADDR_WRITE_FIFO_CNT);           // set address of byte count in WRITE FIFO
+
+    while(true) {                                       // while app is running
+        if(sigintReceived) {                            // app terminated, quit now, no action
+            return false;
+        }
+
+        now = Utils::getCurrentMs();
+
+        if((now - start) >= 1000) {                         // if his is taking too long
+            fpgaResetAndSetConfig(true, false);             // reset HDD part
+            return false;                                   // fail with no action needed
+        }
+
+        int gotCount = fpgaDataRead();                  // read how many bytes we already got
+
+        if(gotCount == needBytes) {                     // if got all the needed bytes, quit this waiting loop
+            break;
+        }
+    }
+
+    //---------------------------------------
+    // read out the cmd bytes from WRITE FIFO
+    fpgaAddressSet(FPGA_ADDR_WRITE_FIFO_DATA);          // set address of WRITE FIFO
+
+    for(i=gotBytes; i<cmdLen; i++) {                    //
+        cmd[storeIdx] = fpgaDataRead();                 // read another cmd byte from FIFO
+        storeIdx++;
+    }
+
+    inBuf[3] = ATN_ACSI_COMMAND;
+    return true;                                        // this command was for enabled ID, so it needs handling
 }
 
 // This function should read which track and side was wanted, mark the time when this happened, but don't send the track just yet....
@@ -278,7 +450,7 @@ bool ChipInterface::handleFloppyWriteBytes(BYTE *inBuf)
     // store the byteCount of written data
 
     // got whole sector, request action. Data will be accessed via fdd_sectorWritten() function.
-    inBuff[3] = ATN_SECTOR_WRITTEN;
+    inBuf[3] = ATN_SECTOR_WRITTEN;
     return true;                                        // action needs handling
 }
 
@@ -357,6 +529,44 @@ void ChipInterface3::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
     memcpy(inFwVer, fwVer, 4);                      // copy in the firmware version in provided buffer
 }
 
+// waits until both HDD FIFOs are empty and then until handshake is idle
+bool ChipInterface3::waitForBusIdle(DWORD maxWaitTime)
+{
+    DWORD start = Utils::getCurrentMs();
+
+    fpgaAddressSet(FPGA_ADDR_STATUS);           // set address of STATUS byte
+
+    while(true) {                               // while app is running
+        if(sigintReceived) {                    // app terminated, quit now, no action
+            return false;
+        }
+
+        DWORD now = Utils::getCurrentMs();
+
+        if((now - start) >= maxWaitTime) {      // if his is taking too long
+            return false;                       // fail with no action needed
+        }
+
+        BYTE status = fpgaDataRead();           // read status byte
+
+        if((status & STATUS_HDD_READ_FIFO_EMPTY) == 0) {    // READ FIFO not empty, wait
+            continue;
+        }
+
+        if((status & STATUS_HDD_WRITE_FIFO_EMPTY) == 0) {   // WRITE FIFO not empty, wait
+            continue;
+        }
+
+        if((status & STATUS_HDD_HANDSHAKE_IDLE) == 0) {     // handshake not idle, wait
+            continue;
+        }
+
+        break;          // everything idle, good, quit loop
+    }
+
+    return true;        // ok, everything idle
+}
+
 bool ChipInterface3::hdd_sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool withStatus)
 {
     if(totalDataCount > 0xffffff) {
@@ -364,20 +574,97 @@ bool ChipInterface3::hdd_sendData_start(DWORD totalDataCount, BYTE scsiStatus, b
         return false;
     }
 
-    // TODO
-
+    // store the requested transfer info
+    hddTransferInfo.totalDataCount = totalDataCount;
+    hddTransferInfo.scsiStatus = scsiStatus;
+    hddTransferInfo.withStatus = withStatus;
 
     return true;
 }
 
 bool ChipInterface3::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
 {
-    if((dataCount & 1) != 0) {                                      // odd number of bytes? make it even, we're sending words...
+    if((dataCount & 1) != 0) {                      // odd number of bytes? make it even, we're sending words...
         dataCount++;
     }
 
-    // TODO
+    DWORD originalDataCount = dataCount;            // make a copy, it will be used at the end to subtract from totalDataCount
 
+    DWORD timeout = timeoutForDataCount(dataCount); // calculate some timeout value based on data size
+    DWORD start = Utils::getCurrentMs();
+
+    while(dataCount > 0) {                          // while there's something to send
+        bool res = waitForBusIdle(100);             // wait until bus gets idle before switching mode
+
+        if(!res) {                                  // wait for bus idle failed?
+            return false;
+        }
+
+        // Logic in FPGA allows us to set transfer size in either bytes (16 bytes maximum), or in sectors (16 sectors maximum, that's 8 kB).
+        // If we use sector size, then the transfered data must be multiple of 512, so it's usefull only when there's at least 512 B of data.
+        // If we use byte size, then maximum size is 16 bytes, so we can do smaller transfers, but if it's less than 512 bytes, it may require 
+        // up to 32 times setting the transfer size (but allows us any transfer size).
+
+        int sectorCount = dataCount / 512;          // calc remaining data size in sectors
+        int byteCount;                              // this holds how many bytes we will transfer after setting the mode-dir-count register
+        BYTE modeDirCnt;
+
+        if(sectorCount > 0) {                       // is remaining data is at least 1 sector big? do transfer in whole sectors
+            sectorCount = min(sectorCount, 16);     // limit sector count to 16
+            byteCount = sectorCount * 512;          // convert sector count to byte count
+
+            modeDirCnt = MODE_DMA | DIR_READ | SIZE_IN_SECTORS | (sectorCount - 1);
+        } else {                                    // only remaining less than 1 sector of data - do transfer in bytes
+            byteCount = min(dataCount, 16);         // limit byte count to 16
+
+            modeDirCnt = MODE_DMA | DIR_READ | SIZE_IN_BYTES | (byteCount - 1);
+        }
+
+        fpgaAddressSet(FPGA_ADDR_MODE_DIR_CNT);     // set address of mode-dir-cnt register and set the new mode-dir-cnt value
+        fpgaDataWrite(modeDirCnt);
+
+        // The FIFO is 256 bytes deep, but it might not be fully empty at this time, so even though we configured that we want to
+        // transfer byteCount of data, we might need to do it in smaller chunks. So the following loop first checks how many bytes can be 
+        // added to FIFO without overflow, and then adding just that much of data in it, then checking again...
+
+        while(byteCount > 0) {                          // while we still haven't transfered all of the data
+            DWORD now = Utils::getCurrentMs();
+            if((now - start) > timeout) || sigintReceived) {    // if timeout happened or app should terminate, quit
+                return false;
+            }
+
+            fpgaAddressSet(FPGA_ADDR_READ_FIFO_CNT);    // find out how many bytes there are already in READ FIFO
+            int countInFifo = fpgaDataRead();
+
+            int canTxBytes = 256 - countInFifo;         // FIFO size is 256 bytes, calculate how many bytes we can move around without over-run / under-run
+
+            if(canTxBytes < 1) {                        // can't tx anything now, wait
+                continue;
+            }
+
+            fpgaAddressSet(FPGA_ADDR_READ_FIFO_DATA);   // set address of READ FIFO so we can start move data 
+
+            for(int i=0; i<canTxBytes; i++) {           // write all the data that can fit into READ FIFO
+                fpgaDataWrite(*pData);                  // write data
+
+                pData++;            // advance data pointer
+                dataCount--;        // decrement data count
+                byteCount--;
+            }
+        }
+    }
+
+    // The data transfer has ended for now, it's time to update the total data count, and if status should be sent at the end of final transfer, then do that too.
+    if(hddTransferInfo.totalDataCount >= originalDataCount) {       // if can safely subtract this data count from total data count
+        hddTransferInfo.totalDataCount -= originalDataCount;
+    } else {                                                        // if we transfered more than we should (shouldn't happen), set total data count to 0
+        hddTransferInfo.totalDataCount = 0;
+    }
+    
+    // nothing to send AND should send status? then just quit with status byte
+    if(hddTransferInfo.totalDataCount == 0 && hddTransferInfo.withStatus) {
+        return hdd_sendStatusToHans(hddTransferInfo.scsiStatus);
+    }
 
     return true;
 }
@@ -389,24 +676,142 @@ bool ChipInterface3::hdd_recvData_start(BYTE *recvBuffer, DWORD totalDataCount)
         return false;
     }
 
-    // TODO
-
+    // store the requested transfer info
+    hddTransferInfo.totalDataCount = totalDataCount;
+    hddTransferInfo.scsiStatus = 0;                 // not used in hdd_recvData_transferBlock
+    hddTransferInfo.withStatus = false;             // not used in hdd_recvData_transferBlock
 
     return true;
 }
 
+DWORD ChipInterface3::timeoutForDataCount(DWORD dataCount)
+{
+    int dataSizeInKB = (dataCount / 1024) + 1;      // calculate how many kBs this transfer is
+
+    DWORD timeout = dataSizeInKB * 4;               // allow at least 4 ms to transfer 1 kB (that is 250 kB/s)
+    timeout = max(timeout, 100);                    // let timeout be at least 100 ms, or more
+
+    return timeout;
+}
+
 bool ChipInterface3::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCount)
 {
-    // TODO
+    DWORD originalDataCount = dataCount;            // make a copy, it will be used at the end to subtract from totalDataCount
 
+    DWORD timeout = timeoutForDataCount(dataCount); // calculate some timeout value based on data size
+    DWORD start = Utils::getCurrentMs();
+
+    while(dataCount > 0) {                          // while there's something to send
+        bool res = waitForBusIdle(100);             // wait until bus gets idle before switching mode
+
+        if(!res) {                                  // wait for bus idle failed?
+            return false;
+        }
+
+        // Logic in FPGA allows us to set transfer size in either bytes (16 bytes maximum), or in sectors (16 sectors maximum, that's 8 kB).
+        // If we use sector size, then the transfered data must be multiple of 512, so it's usefull only when there's at least 512 B of data.
+        // If we use byte size, then maximum size is 16 bytes, so we can do smaller transfers, but if it's less than 512 bytes, it may require 
+        // up to 32 times setting the transfer size (but allows us any transfer size).
+
+        int sectorCount = dataCount / 512;          // calc remaining data size in sectors
+        int byteCount;                              // this holds how many bytes we will transfer after setting the mode-dir-count register
+        BYTE modeDirCnt;
+
+        if(sectorCount > 0) {                       // is remaining data is at least 1 sector big? do transfer in whole sectors
+            sectorCount = min(sectorCount, 16);     // limit sector count to 16
+            byteCount = sectorCount * 512;          // convert sector count to byte count
+
+            modeDirCnt = MODE_DMA | DIR_WRITE | SIZE_IN_SECTORS | (sectorCount - 1);
+        } else {                                    // only remaining less than 1 sector of data - do transfer in bytes
+            byteCount = min(dataCount, 16);         // limit byte count to 16
+
+            modeDirCnt = MODE_DMA | DIR_WRITE | SIZE_IN_BYTES | (byteCount - 1);
+        }
+
+        fpgaAddressSet(FPGA_ADDR_MODE_DIR_CNT);     // set address of mode-dir-cnt register and set the new mode-dir-cnt value
+        fpgaDataWrite(modeDirCnt);
+
+        // The FIFO is 256 bytes deep, but it might not be full at this time, so even though we configured that we want to
+        // transfer byteCount of data, we might need to do it in smaller chunks. So the following loop first checks how many bytes can be 
+        // read from FIFO without underflow, and then read just that much of data in it, then checking again...
+
+        while(byteCount > 0) {                          // while we still haven't transfered all of the data
+            DWORD now = Utils::getCurrentMs();
+            if((now - start) > timeout) || sigintReceived) {    // if timeout happened or app should terminate, quit
+                return false;
+            }
+
+            fpgaAddressSet(FPGA_ADDR_WRITE_FIFO_CNT);   // find out how many bytes there are already in WRITE FIFO
+            int countInFifo = fpgaDataRead();
+
+            if(canTxBytes < 1) {                        // can't tx anything now, wait
+                continue;
+            }
+
+            fpgaAddressSet(FPGA_ADDR_WRITE_FIFO_DATA2); // set address of WITE FIFO so we can start to move data 
+
+            for(int i=0; i<countInFifo; i++) {          // get all the data that is present in WRITE FIFO
+                *pData = fpgaDataRead();                // get data
+
+                pData++;            // advance data pointer
+                dataCount--;        // decrement data count
+                byteCount--;
+            }
+        }
+    }
+
+    // The data transfer has ended for now, it's time to update the total data count, and if status should be sent at the end of final transfer, then do that too.
+    if(hddTransferInfo.totalDataCount >= originalDataCount) {       // if can safely subtract this data count from total data count
+        hddTransferInfo.totalDataCount -= originalDataCount;
+    } else {                                                        // if we transfered more than we should (shouldn't happen), set total data count to 0
+        hddTransferInfo.totalDataCount = 0;
+    }
 
     return true;
 }
 
 bool ChipInterface3::hdd_sendStatusToHans(BYTE statusByte)
 {
-    // TODO
+    bool res;
 
+    res = waitForBusIdle(100); // wait until bus gets idle before switching mode
+
+    if(!res) {                      // wait for bus idle failed?
+        return false;
+    }
+
+    // set address of mode-dir-cnt register and PIO READ BYTE (read status byte)
+    fpgaAddressSet(FPGA_ADDR_MODE_DIR_CNT);
+    fpgaDataWrite(MODE_PIO | DIR_READ | SIZE_IN_BYTES | 0);
+
+    // write of data to address 3 (FPGA_ADDR_MODE_DIR_CNT) changes the address to 4 (FPGA_ADDR_READ_FIFO_DATA), so we can write to READ FIFO without fpgaAddressSet()
+    fpgaDataWrite(statusByte);
+
+    // wait until bus gets idle before proceeding further
+    res = waitForBusIdle(100);
+
+    if(!res) {                      // wait for bus idle failed?
+        return false;
+    }
+
+    if(interfaceType == INTERFACE_TYPE_SCSI) {  // on SCSI interface we also need to send MESSAGE IN byte
+        fpgaAddressSet(FPGA_ADDR_MODE_DIR_CNT);                     // set address of mode-dir-cnt register and MSG READ BYTE (MSG IN byte)
+        fpgaDataWrite(MODE_MSG | DIR_READ | SIZE_IN_BYTES | 0);
+
+        // automatic address change, write to READ FIFO without fpgaAddressSet()
+        fpgaDataWrite(0);
+
+        // wait until bus gets idle before proceeding further
+        res = waitForBusIdle(100);
+
+        if(!res) {                      // wait for bus idle failed?
+            return false;
+        }
+    }
+
+    // set address of mode-dir-cnt register and IDLE mode for another cmd[0] byte receiving
+    fpgaAddressSet(FPGA_ADDR_MODE_DIR_CNT);
+    fpgaDataWrite(MODE_IDLE | DIR_WRITE | SIZE_IN_BYTES | 0);
 
     return true;
 }
@@ -472,11 +877,11 @@ void ChipInterface3::fpgaDataPortSetDirection(int pinDirection)      // pin dire
 }
 
 // set OUTPUT direction, output address to data port, switch to ADDRESS, TRIG the operation
-void ChipInterface3::fpgaAddressSet(BYTE addr)
+void ChipInterface3::fpgaAddressSet(BYTE addr, bool force)
 {
     static BYTE prevAddress = 0xff;                     // holds last set address - used to skip setting the same address over and over again, if not really needed
 
-    if(prevAddress == addr) {                           // if address didn't change since the last time, just quit
+    if(prevAddress == addr && !force) {                 // if address didn't change since the last time and not forcing set, just quit
         return;
     }
 

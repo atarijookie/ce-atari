@@ -243,7 +243,7 @@ bool ChipInterface12::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
     if((dataCount & 1) != 0) {                                      // odd number of bytes? make it even, we're sending words...
         dataCount++;
     }
-    
+
     while(dataCount > 0) {                                          // while there's something to send
         bool res = conSpi->waitForATN(SPI_CS_HANS, ATN_READ_MORE_DATA, 1000, bufIn);   // wait for ATN_READ_MORE_DATA
 

@@ -46,9 +46,9 @@
 // HDD REGISTERS 
 #define FPGA_ADDR_READ_FIFO_CNT         1       // on read  - READ  FIFO count
 #define FPGA_ADDR_WRITE_FIFO_CNT        2       // on read  - WRITE FIFO count
-#define FPGA_ADDR_WRITE_FIFO_DATA       3       // on read  - WRITE FIFO data port
-#define FPGA_ADDR_READ_FIFO_CONFIG      3       // on write - READ  FIFO CONFIG byte
-#define FPGA_ADDR_WRITE_FIFO_DATA       4       // on read  - WRITE FIFO data
+#define FPGA_ADDR_WRITE_FIFO_DATA       3       // on read  - WRITE FIFO data 
+#define FPGA_ADDR_MODE_DIR_CNT          3       // on write - mode + dir + cnt (config byte)
+#define FPGA_ADDR_WRITE_FIFO_DATA2      4       // on read  - WRITE FIFO data (same as read from FPGA_ADDR_WRITE_FIFO_DATA)
 #define FPGA_ADDR_READ_FIFO_DATA        4       // on write - READ  FIFO data
 #define FPGA_ADDR_STATUS2               5       // on read  - status byte 2nd
 
@@ -88,6 +88,18 @@
 #define WRITTENMFMSECTOR_SIZE   2048
 
 //--------------------------------------------------------
+// config values for MODE-DIR-CNT register
+#define MODE_MSG        0xC0
+#define MODE_DMA        0x80
+#define MODE_PIO        0x40
+#define MODE_IDLE       0x00
+
+#define DIR_READ        0x20
+#define DIR_WRITE       0x00
+
+#define SIZE_IN_SECTORS 0x10
+#define SIZE_IN_BYTES   0x00
+//--------------------------------------------------------
 
 class ChipInterface3: public ChipInterface
 {
@@ -96,7 +108,7 @@ public:
     virtual ~ChipInterface3();
 
     // this return CHIP_IF_V1_V2 or CHIP_IF_V3
-    virtual int chipInterfaceType(void) = 0;
+    int chipInterfaceType(void);
 
     //----------------
     // chip interface initialization and deinitialization - e.g. open GPIO, or open socket, ...
@@ -165,10 +177,19 @@ private:
         int byteCount;          // count of bytes in the fddWrittenSector buffer
     } fddWrittenSector;
 
+    struct {                    // holds info from hdd_sendData_start() and hdd_recvData_start()
+        DWORD totalDataCount;
+        BYTE scsiStatus;
+        bool withStatus;
+    } hddTransferInfo;
+
     BYTE interfaceType;                             // ACSI (0), SCSI (1) or CART (2)
 
     void fpgaResetAndSetConfig(bool resetHdd, bool resetFdd);   // this function does reset of HDD and FDD part, but also sets the config of HDD and FDD, so we have to construct new config byte and set it when doing reset
 
+    DWORD timeoutForDataCount(DWORD dataCount);
+    bool waitForBusIdle(DWORD maxWaitTime);         // waits until both HDD FIFOs are empty and then until handshake is idle
+    int  getCmdLengthFromCmdBytes(BYTE *cmd);       // from the received command bytes determine the final length of the command
     bool getHddCommand(BYTE *inBuf);                // get whole HDD command and request action
     void handleTrackChanged(void);                  // get requested track and side, but don't request action just yet
     bool trackChangedNeedsAction(BYTE *inBuf);      // request action if last track request happened enough time ago
@@ -176,7 +197,7 @@ private:
 
     // low level functions to do the simplest operations on the FPGA port
     void fpgaDataPortSetDirection(int pinDirection);
-    void fpgaAddressSet(BYTE addr);                 // set OUTPUT direction, output address to data port, switch to ADDRESS, TRIG the operation
+    void fpgaAddressSet(BYTE addr, bool force=false);   // set OUTPUT direction, output address to data port, switch to ADDRESS, TRIG the operation
     void fpgaDataWrite(BYTE data);                  // set OUTPUT direction, output data    to data port, switch to DATA,    TRIG the operation
     BYTE fpgaDataRead(void);                        // set INPUT  direction, switch to DATA, TRIG the operation, get the data from data port
 
