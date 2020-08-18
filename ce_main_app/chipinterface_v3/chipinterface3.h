@@ -99,6 +99,14 @@
 
 #define SIZE_IN_SECTORS 0x10
 #define SIZE_IN_BYTES   0x00
+
+//--------------------------------------------------------
+// states for fdd written sector FSM
+#define FDD_WRITE_FIND_HEADER       0   // we're looking for 0xCAFE word
+#define FDD_WRITE_GET_SIDE_TRACK    1   // current byte holds side+track
+#define FDD_WRITE_GET_SECTOR_NO     2   // current byte holds sector number
+#define FDD_WRITE_WRITTEN_DATA      3   // keep storing written data, until 0x00 is found
+
 //--------------------------------------------------------
 
 class ChipInterface3: public ChipInterface
@@ -156,25 +164,28 @@ private:
     int  dataPins[8];           // holds which GPIO pins are data pins - used int fpgaDataPortAsInput()
 
     bool ikbdEnabled;           // if false, the FPGA will not send IKBD data to RPi
-    bool fddEnabled;            // if true, floppy part is enabled
-    bool fddId1;                // FDD ID0 on false, FDD ID1 on true
-    bool fddWriteProtected;     // if true, writes to floppy are ignored
-    bool fddDiskChanged;        // if true, disk change is happening
+
+    struct {
+        bool enabled;           // if true, floppy part is enabled
+        bool id1;               // FDD ID0 on false, FDD ID1 on true
+        bool writeProtected;    // if true, writes to floppy are ignored
+        bool diskChanged;       // if true, disk change is happening
+    } fdd;
 
     bool newTrackRequest;       // true if there was track request which wasn't handled yet
     int fddReqSide;             // FDD requested side (0/1)
     int fddReqTrack;            // FDD requested track
     DWORD fddTrackRequestTime;  // when was FDD track requested last time
 
-    BYTE *fddWrittenSector;     // holds the written sector data until it's all and ready to be processed
-    int   fddWrittenCount;      // count of bytes in the fddWrittenSector buffer
-
     struct {
         BYTE *data;             // holds the written sector data until it's all and ready to be processed
+        int index;              // index of position where the next found data should be written
+
+        int state;              // one of the states from FDD_WRITE_..., which define what we're doing now with written data
+
         int side;
         int track;
         int sector;
-        int byteCount;          // count of bytes in the fddWrittenSector buffer
     } fddWrittenSector;
 
     struct {                    // holds info from hdd_sendData_start() and hdd_recvData_start()

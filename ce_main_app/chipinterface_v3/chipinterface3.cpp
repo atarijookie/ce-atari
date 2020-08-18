@@ -17,10 +17,10 @@ ChipInterface3::ChipInterface3()
 
     ikbdEnabled = false;        // ikbd is not enabled by default, so we need to enable it
 
-    fddEnabled = true;          // if true, floppy part is enabled
-    fddId1 = false;             // FDD ID0 on false, FDD ID1 on true
-    fddWriteProtected = false;  // if true, writes to floppy are ignored
-    fddDiskChanged = false;     // if true, disk change is happening
+    fdd.enabled = true;         // if true, floppy part is enabled
+    fdd.id1 = false;            // FDD ID0 on false, FDD ID1 on true
+    fdd.writeProtected = false; // if true, writes to floppy are ignored
+    fdd.diskChanged = false;    // if true, disk change is happening
 
     newTrackRequest = false;    // there was no track request yet
     fddReqSide = 0;             // FDD requested side (0/1)
@@ -28,7 +28,8 @@ ChipInterface3::ChipInterface3()
     fddTrackRequestTime = 0;    // when was FDD track requested last time (not yet)
 
     fddWrittenSector.data = new BYTE[WRITTENMFMSECTOR_SIZE];    // holds the written sector data until it's all and ready to be processed
-    fddWrittenSector.byteCount = 0;                             // count of bytes in the fddWrittenSector buffer
+    fddWrittenSector.index = 0;                                 // index at which the sector data should be stored
+    fddWrittenSector.state = FDD_WRITE_FIND_HEADER;             // start by looking for header
 
     hddTransferInfo.totalDataCount = 0;
     hddTransferInfo.scsiStatus = 0;
@@ -97,9 +98,9 @@ void ChipInterface3::close(void)
 {
     #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
 
-    fpgaDataPortSetDirection(BCM2835_GPIO_FSEL_INPT);  // FPGA data pins as inputs
+    fpgaDataPortSetDirection(BCM2835_GPIO_FSEL_INPT);   // FPGA data pins as inputs
 
-    bcm2835_close();            // close the GPIO library and finish
+    bcm2835_close();                                    // close the GPIO library and finish
 
     #endif
 }
@@ -132,10 +133,10 @@ void ChipInterface3::fpgaResetAndSetConfig(bool resetHdd, bool resetFdd)
     config |= resetHdd          ? (1 << 7) : 0;         // for HDD reset - set bit 7
     config |= resetFdd          ? (1 << 6) : 0;         // for FDD reset - set bit 6
 
-    config |= fddEnabled        ? (1 << 5) : 0;         // if true, floppy part is enabled
-    config |= fddId1            ? (1 << 4) : 0;         // FDD ID0 on false, FDD ID1 on true
-    config |= fddWriteProtected ? (1 << 3) : 0;         // if true, writes to floppy are ignored
-    config |= fddDiskChanged    ? (1 << 2) : 0;         // if true, disk change is happening
+    config |= fdd.enabled        ? (1 << 5) : 0;         // if true, floppy part is enabled
+    config |= fdd.id1            ? (1 << 4) : 0;         // FDD ID0 on false, FDD ID1 on true
+    config |= fdd.writeProtected ? (1 << 3) : 0;         // if true, writes to floppy are ignored
+    config |= fdd.diskChanged    ? (1 << 2) : 0;         // if true, disk change is happening
 
     config |= ikbdEnabled       ? 0        : (1 << 0);  // for disabling IKDB - set bit 0
 
@@ -152,6 +153,7 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
 
     BYTE status;
     DWORD now = Utils::getCurrentMs();
+    bool actionNeeded;
 
     if((now - lastFirmwareVersionReportTime) >= 1000) {     // if at least 1 second passed since we've pretended we got firmware version from chip
         lastFirmwareVersionReportTime = now;
@@ -163,24 +165,24 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
     if(reportHddVersion) {                                  // if should report FW version
         reportHddVersion = false;
         inBuf[3] = ATN_FW_VERSION;
-        hardNotFloppy = true;
+        hardNotFloppy = true;                               // HDD needs action
         return true;                                        // action needs handling, FW version will be retrieved via getFWversion() function
     }
 
     if(reportFddVersion) {                                  // if should report FW version
         reportFddVersion = false;
         inBuf[3] = ATN_FW_VERSION;
-        hardNotFloppy = false;
+        hardNotFloppy = false;                              // FDD needs action
         return true;                                        // action needs handling, FW version will be retrieved via getFWversion() function
     }
 
     if((now - lastInterfaceTypeCheckTime) >= 1000) {        // if at least 1 second passed since we checked interface type, we should check now
         lastInterfaceTypeCheckTime = now;
 
-        fpgaAddressSet(FPGA_ADDR_STATUS2);                      // set status 2 register address
-        status = fpgaDataRead();                                // read the status 2
+        fpgaAddressSet(FPGA_ADDR_STATUS2);                  // set status 2 register address
+        status = fpgaDataRead();                            // read the status 2
 
-        interfaceType = status & STATUS2_HDD_INTERFACE_TYPE;    // get interface type bits
+        interfaceType = status & STATUS2_HDD_INTERFACE_TYPE; // get interface type bits
     }
 
     //------------------------------------
@@ -188,18 +190,22 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
     status = fpgaDataRead();                            // read the status
 
     if((status & STATUS_HDD_WRITE_FIFO_EMPTY) == 0) {   // if WRITE FIFO is not empty (flag is 0), then ST has sent us CMD byte
-        hardNotFloppy = true;
-        return getHddCommand(inBuf);                    // if this command was for one of our enabled HDD IDs, then this will return true and will get handled
+        actionNeeded = getHddCommand(inBuf);            // if this command was for one of our enabled HDD IDs, then this will return true and will get handled
+
+        if(actionNeeded) {                              // action is needed
+            hardNotFloppy = true;                       // HDD needs action
+            return true;
+        }
     }
 
     if(status & STATUS_FDD_SIDE_TRACK_CHANGED) {        // if floppy track or side changed, we need to send new track data
         handleTrackChanged();
     }
 
-    bool actionNeeded = trackChangedNeedsAction(inBuf); // if track change happened a while ago, we will need to set new track data
+    actionNeeded = trackChangedNeedsAction(inBuf);      // if track change happened a while ago, we will need to set new track data
 
     if(actionNeeded) {                                  // if should send track data, quit and request action, otherwise continue with the rest
-        hardNotFloppy = false;
+        hardNotFloppy = false;                          // FDD needs action
         return true;
     }
 
@@ -207,7 +213,7 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
         actionNeeded = handleFloppyWriteBytes(inBuf);   // get written data and store them in buffer
 
         if(actionNeeded) {                              // if got whole written sector, quit and request action, otherwise continue with the rest
-            hardNotFloppy = false;
+            hardNotFloppy = false;                      // FDD needs action
             return true;
         }
     }
@@ -354,7 +360,7 @@ bool ChipInterface3::getHddCommand(BYTE *inBuf)
     //---------------------------------------
     // now the FPGA should read all the needed bytes into FIFO
     // wait until the WRITE FIFO has all the remaining cmd bytes
-    
+
     fpgaAddressSet(FPGA_ADDR_WRITE_FIFO_CNT);           // set address of byte count in WRITE FIFO
 
     while(true) {                                       // while app is running
@@ -364,9 +370,9 @@ bool ChipInterface3::getHddCommand(BYTE *inBuf)
 
         now = Utils::getCurrentMs();
 
-        if((now - start) >= 1000) {                         // if his is taking too long
-            fpgaResetAndSetConfig(true, false);             // reset HDD part
-            return false;                                   // fail with no action needed
+        if((now - start) >= 1000) {                     // if his is taking too long
+            fpgaResetAndSetConfig(true, false);         // reset HDD part
+            return false;                               // fail with no action needed
         }
 
         int gotCount = fpgaDataRead();                  // read how many bytes we already got
@@ -430,28 +436,72 @@ bool ChipInterface3::trackChangedNeedsAction(BYTE *inBuf)
 // If enough data was received for the whole floppy sector, this returns true and later the data will be retrieved using fdd_sectorWritten() function.
 bool ChipInterface::handleFloppyWriteBytes(BYTE *inBuf)
 {
-    // TODO
+    static WORD header = 0;                             // read new byte in the lower part, got header if it contains 0xCAFE
 
+    while(true) {
+        // at least 1 byte present in FDD WRITE FIFO, as STATUS_FDD_WRITE_FIFO_EMPTY flag tells us it's not empty
+        fpgaAddressSet(FPGA_ADDR_WRITE_MFM_FIFO_CNT);   // set address of MFM WRITE FIFO count register
+        int gotBytes = fpgaDataRead();                  // get how many bytes we can read from this FIFO, limited here to 255, even though there might be more in there
 
-//    fddWrittenSector.data = new BYTE[WRITTENMFMSECTOR_SIZE];    // holds the written sector data until it's all and ready to be processed
-//    fddWrittenSector.byteCount = 0;                             // count of bytes in the fddWrittenSector buffer
+        if(gotBytes == 0) {                             // if no more bytes to be processed and didn't reach the end of stream, quit with no action required
+            return false;
+        }
 
-    // if can still can store data
+        fpgaAddressSet(FPGA_ADDR_WRITE_MFM_FIFO);       // set address of MFM WRITE FIFO data register
 
+        for(int i=0; i<gotBytes; i++) {                 // read all available data, process it in state machine
+            BYTE val = fpgaDataRead();
 
-    // find 0xCAFE header
+            switch(fddWrittenSector.state) {            // do stuff depending on FSM state
+                case FDD_WRITE_FIND_HEADER: {           // state: find 0xCAFE header
+                    header = header << 8;
+                    header |= val;                      // add new byte to bottom
 
+                    if(header == 0xCAFE) {              // if header found
+                        fddWrittenSector.index = 0;     // where the next data should go
 
-    // extract SIDE, TRACK, SECTOR
+                        fddWrittenSector.state = FDD_WRITE_GET_SIDE_TRACK;  // go to next state
+                        header = 0;                     // clear the header so it won't get falsy detected next time
+                    }
 
+                    break;
+                };
+                //------------------------------
+                case FDD_WRITE_GET_SIDE_TRACK: {                        // state: store side and track number
+                    fddWrittenSector.side = (val >> 7) & 1;             // highest bit is side
+                    fddWrittenSector.track = val       & 0x7f;          // bits 6..0 are track number
 
-    // keep reading and storing until a ZERO is read from FIFO
+                    fddWrittenSector.state = FDD_WRITE_GET_SECTOR_NO;   // go to next state
+                    break;
+                };
+                //------------------------------
+                case FDD_WRITE_GET_SECTOR_NO: {                         // state: store sector number
+                    fddWrittenSector.sector = val & 0x0f;               // bits 3..0 are sector number
 
-    // store the byteCount of written data
+                    fddWrittenSector.state = FDD_WRITE_WRITTEN_DATA;    // go to next state
+                    break;
+                };
+                //------------------------------
+                case FDD_WRITE_WRITTEN_DATA: {                          // state: store written data until end found
+                    if(val != 0) {          // if it's not the end of stream, store value, advance in array
+                        fddWrittenSector.data[ fddWrittenSector.index ] = val;
+                        fddWrittenSector.index++;
+                    } else {                // end of stream found!
+                        fddWrittenSector.state = FDD_WRITE_FIND_HEADER; // next state - start of the FSM all over again to find next written sector
 
-    // got whole sector, request action. Data will be accessed via fdd_sectorWritten() function.
-    inBuf[3] = ATN_SECTOR_WRITTEN;
-    return true;                                        // action needs handling
+                        // got whole sector, request action. Data will be accessed via fdd_sectorWritten() function.
+                        inBuf[3] = ATN_SECTOR_WRITTEN;
+                        return true;                                    // action needs handling
+                    }
+
+                    break;
+                };
+            }
+        }
+    }
+
+    // if somehow magically ended up here, we don't have the full written sector yet
+    return false;
 }
 
 void ChipInterface3::setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEnabledSlots, bool setNewFloppyImageLed, BYTE newFloppyImageLed)
@@ -462,23 +512,23 @@ void ChipInterface3::setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEna
 
 void ChipInterface3::setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id, int writeProtected, bool setDiskChanged, bool diskChanged)
 {
-    bool configChanged = false;                         // nothing changed yet
+    bool configChanged = false;                                 // nothing changed yet
 
     if(setFloppyConfig) {
-        configChanged |= (this->fddEnabled != fddEnabled);      // if this config changed then set configChanged flag
-        this->fddEnabled = fddEnabled;
+        configChanged |= (fdd.enabled != fddEnabled);           // if this config changed then set configChanged flag
+        fdd.enabled = fddEnabled;
 
         bool newFddId1 = (id == 1);
-        configChanged |= (fddId1 != newFddId1);                 // if this config changed then set configChanged flag
-        fddId1 = newFddId1;
+        configChanged |= (fdd.id1 != newFddId1);                // if this config changed then set configChanged flag
+        fdd.id1 = newFddId1;
 
-        configChanged |= (fddWriteProtected != writeProtected); // if this config changed then set configChanged flag
-        fddWriteProtected = writeProtected;
+        configChanged |= (fdd.writeProtected != writeProtected); // if this config changed then set configChanged flag
+        fdd.writeProtected = writeProtected;
     }
 
     if(setDiskChanged) {
-        configChanged |= (fddDiskChanged != diskChanged);       // if this config changed then set configChanged flag
-        fddDiskChanged = diskChanged;
+        configChanged |= (fdd.diskChanged != diskChanged);      // if this config changed then set configChanged flag
+        fdd.diskChanged = diskChanged;
     }
 
     if(configChanged) {                                 // set new config only if something changed
@@ -660,7 +710,7 @@ bool ChipInterface3::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
     } else {                                                        // if we transfered more than we should (shouldn't happen), set total data count to 0
         hddTransferInfo.totalDataCount = 0;
     }
-    
+
     // nothing to send AND should send status? then just quit with status byte
     if(hddTransferInfo.totalDataCount == 0 && hddTransferInfo.withStatus) {
         return hdd_sendStatusToHans(hddTransferInfo.scsiStatus);
@@ -744,7 +794,7 @@ bool ChipInterface3::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCount)
             fpgaAddressSet(FPGA_ADDR_WRITE_FIFO_CNT);   // find out how many bytes there are already in WRITE FIFO
             int countInFifo = fpgaDataRead();
 
-            if(canTxBytes < 1) {                        // can't tx anything now, wait
+            if(countInFifo < 1) {                       // can't tx anything now, wait
                 continue;
             }
 
@@ -774,7 +824,7 @@ bool ChipInterface3::hdd_sendStatusToHans(BYTE statusByte)
 {
     bool res;
 
-    res = waitForBusIdle(100); // wait until bus gets idle before switching mode
+    res = waitForBusIdle(100);      // wait until bus gets idle before switching mode
 
     if(!res) {                      // wait for bus idle failed?
         return false;
@@ -835,7 +885,7 @@ BYTE* ChipInterface3::fdd_sectorWritten(int &side, int &track, int &sector, int 
     side = fddWrittenSector.side;
     track = fddWrittenSector.track;
     sector = fddWrittenSector.sector;
-    byteCount = fddWrittenSector.byteCount;
+    byteCount = fddWrittenSector.index;
 
     // return pointer to received written sector
     return fddWrittenSector.data;
@@ -849,7 +899,7 @@ void ChipInterface3::fpgaDataPortSetDirection(int pinDirection)      // pin dire
     #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
 
     static int currentPinDir = -123;               // holds which pin direction is the currently set direction, to avoid setting the same again
-    
+
     //-----------
     // keep the track of pin direction we have, so in case this gets called and the pin direction is already set as needed, then just quit and don't fiddle with the directions
     if(currentPinDir == pinDirection) {     // if already we have the right pin direction, just quit
