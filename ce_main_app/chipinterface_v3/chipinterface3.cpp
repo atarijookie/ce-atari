@@ -11,6 +11,7 @@
 #include "../utils.h"
 #include "../debug.h"
 
+#define CHIP_DELAY      1
 
 ChipInterface3::ChipInterface3()
 {
@@ -57,12 +58,14 @@ bool ChipInterface3::open(void)
 
     if(geteuid() != 0) {
         Debug::out(LOG_ERROR, "The bcm2835 library requires to be run as root, try again...");
+        printf("\nThe bcm2835 library requires to be run as root, try again...\n");
         return false;
     }
 
     // try to init the GPIO library
     if (!bcm2835_init()) {
         Debug::out(LOG_ERROR, "bcm2835_init failed, can't use GPIO.");
+        printf("\nbcm2835_init failed, can't use GPIO.\n");
         return false;
     }
 
@@ -88,6 +91,31 @@ bool ChipInterface3::open(void)
     // FPGA data pins as inputs
     fpgaDataPortSetDirection(BCM2835_GPIO_FSEL_INPT);
 
+    //-----------------------------------------
+    // test the connection to FPGA
+    fpgaAddressSet(FPGA_ADDR_TEST_REG);     // set the address of test register
+
+    BYTE testValues[6] = {0x00, 0xff, 0xaa, 0x55, 0x0f, 0xf0};
+    bool good = true;
+
+    for(int i=0; i<6; i++) {
+        fpgaDataWrite(testValues[i]);        // write value
+
+        BYTE response = fpgaDataRead();     // read value back
+        BYTE expected = ~testValues[i];      // inverted value is expected
+
+        if(response != expected) {          // response is different from what was expected, write to log, fail the open() function
+            Debug::out(LOG_ERROR, "ChipInterface3::open() -- connection test - write: 0x%02X, read: 0x%02X, expected: 0x%02X", testValues[i], response, expected);
+            good = false;
+        }
+    }
+
+    if(!good) {
+        Debug::out(LOG_ERROR, "Connection / chip test failed. FPGA might be not programmed yet, or there's a bad connection between RPi and FPGA.");
+        printf("\nConnection / chip test failed. FPGA might be not programmed yet, or there's a bad connection between RPi and FPGA.\n");
+    }
+
+    return good;
     #endif
 
     return true;
@@ -559,6 +587,8 @@ void ChipInterface3::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
         fpgaAddressSet(FPGA_ADDR_FW_VERSION2);      // set addr, get FW 2
         BYTE fw2 = fpgaDataRead();
 
+        Debug::out(LOG_DEBUG, "FW1: %02X, FW2: %02X", fw1, fw2);
+
         int year = fw1 & 0x3F;                      // year on bits 5..0 (0..63)
 
         int month = (fw2 & 0xF0) >> 4;              // month on bits 7..4
@@ -941,8 +971,21 @@ void ChipInterface3::fpgaAddressSet(BYTE addr, bool force)
 
     bcm2835_gpio_write(PIN_DATA_ADDR, LOW);             // H for data register, L for address register
 
+    #ifdef CHIP_DELAY
+    bcm2835_delayMicroseconds(CHIP_DELAY);
+    #endif
+
     bcm2835_gpio_write(PIN_TRIG,      HIGH);            // PIN_TRIG will be low-high-low to trigger the operation
+
+    #ifdef CHIP_DELAY
+    bcm2835_delayMicroseconds(CHIP_DELAY);
+    #endif
+
     bcm2835_gpio_write(PIN_TRIG,      LOW);
+
+    #ifdef CHIP_DELAY
+    bcm2835_delayMicroseconds(CHIP_DELAY);
+    #endif
 }
 
 // set OUTPUT direction, output data to data port, switch to DATA, TRIG the operation
@@ -953,8 +996,21 @@ void ChipInterface3::fpgaDataWrite(BYTE data)
 
     bcm2835_gpio_write(PIN_DATA_ADDR, HIGH);            // H for data register, L for address register
 
+    #ifdef CHIP_DELAY
+    bcm2835_delayMicroseconds(CHIP_DELAY);
+    #endif
+
     bcm2835_gpio_write(PIN_TRIG,      HIGH);            // PIN_TRIG will be low-high-low to trigger the operation
+
+    #ifdef CHIP_DELAY
+    bcm2835_delayMicroseconds(CHIP_DELAY);
+    #endif
+
     bcm2835_gpio_write(PIN_TRIG,      LOW);
+
+    #ifdef CHIP_DELAY
+    bcm2835_delayMicroseconds(CHIP_DELAY);
+    #endif
 }
 
 // set INPUT direction, switch to DATA, TRIG the operation, get the data from data port
@@ -964,8 +1020,21 @@ BYTE ChipInterface3::fpgaDataRead(void)
 
     bcm2835_gpio_write(PIN_DATA_ADDR, HIGH);            // H for data register, L for address register
 
+    #ifdef CHIP_DELAY
+    bcm2835_delayMicroseconds(CHIP_DELAY);
+    #endif
+
     bcm2835_gpio_write(PIN_TRIG,      HIGH);            // PIN_TRIG will be low-high-low to trigger the operation
+
+    #ifdef CHIP_DELAY
+    bcm2835_delayMicroseconds(CHIP_DELAY);
+    #endif
+
     bcm2835_gpio_write(PIN_TRIG,      LOW);
+
+    #ifdef CHIP_DELAY
+    bcm2835_delayMicroseconds(CHIP_DELAY);
+    #endif
 
     BYTE val = fpgaDataInput();                         // get the data from port and return it
     return val;

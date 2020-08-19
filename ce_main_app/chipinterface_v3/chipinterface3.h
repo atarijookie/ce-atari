@@ -51,6 +51,8 @@
 #define FPGA_ADDR_READ_FIFO_DATA        4       // on write - READ  FIFO data
 #define FPGA_ADDR_STATUS2               5       // on read  - status byte 2nd
 
+#define FPGA_ADDR_TEST_REG              7       // on write - write to test reg, on read - read inverted value of what was written to test reg
+
 // FDD REGISTERS 
 #define FPGA_ADDR_SIDE_TRACK            8       // on read  - requested side+track - values based on DIR, STEP and SIDE input signals
 #define FPGA_ADDR_READ_MFM_RAM          9       // on write - storing data into MFM RAM - MFM READ stream halted when this address is selected!

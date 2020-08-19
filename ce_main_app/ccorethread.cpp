@@ -303,7 +303,12 @@ void CCoreThread::run(void)
             bool hansAlive  = (hansTime < 3.0f);
             bool franzAlive = (franzTime < 3.0f);
 
-            printf("\033[2K  [ %c ]  Hans: %s, Franz: %s\033[A\n", progChars[lastFwInfoTime.progress], hansAlive ? "LIVE" : "DEAD", franzAlive ? "LIVE" : "DEAD");
+            int chipIfType = chipInterface->chipInterfaceType();
+            if(chipIfType == CHIP_IF_V1_V2) {       // v1 v2 - with Hans and Franz
+                printf("\033[2K  [ %c ]  Hans: %s, Franz: %s\033[A\n", progChars[lastFwInfoTime.progress], hansAlive ? "LIVE" : "DEAD", franzAlive ? "LIVE" : "DEAD");
+            } else if(chipIfType == CHIP_IF_V3) {   // v3 - with FPGA
+                printf("\033[2K  [ %c ]  FPGA: %s\033[A\n", progChars[lastFwInfoTime.progress], hansAlive ? "LIVE" : "DEAD");
+            }
 
             lastFwInfoTime.progress = (lastFwInfoTime.progress + 1) % 4;
 
@@ -813,7 +818,11 @@ void CCoreThread::handleFwVersion_franz(void)
     Update::versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
     flags.gotFranzFwVersion = true;
 
-    Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+    int chipIfType = chipInterface->chipInterfaceType();
+
+    if(chipIfType == CHIP_IF_V1_V2) {                   // only on IF v1 v2 show info about Franz
+        Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+    }
 }
 
 void CCoreThread::getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId)
