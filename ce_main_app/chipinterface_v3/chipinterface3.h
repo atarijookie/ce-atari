@@ -198,6 +198,7 @@ private:
     BYTE interfaceType;                             // ACSI (0), SCSI (1) or CART (2)
 
     void fpgaResetAndSetConfig(bool resetHdd, bool resetFdd);   // this function does reset of HDD and FDD part, but also sets the config of HDD and FDD, so we have to construct new config byte and set it when doing reset
+    bool readFwVersionFromFpga(BYTE *inFwVer);      // read FPGA version from chip, return true if the values look ok, copy the values into inFwVer
 
     DWORD timeoutForDataCount(DWORD dataCount);
     bool waitForBusIdle(DWORD maxWaitTime);         // waits until both HDD FIFOs are empty and then until handshake is idle

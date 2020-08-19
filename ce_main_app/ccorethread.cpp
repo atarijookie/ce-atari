@@ -753,7 +753,7 @@ void CCoreThread::handleFwVersion_hans(void)
 
         Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d, XI: 0x%02x", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed, xilinxInfo);
     } else {
-        Debug::out(LOG_DEBUG, "FW: FPGA,  %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+        Debug::out(LOG_DEBUG, "FW: FPGA %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
     }
 
     //----------------------------------

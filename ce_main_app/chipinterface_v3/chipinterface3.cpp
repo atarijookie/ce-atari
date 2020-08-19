@@ -11,7 +11,7 @@
 #include "../utils.h"
 #include "../debug.h"
 
-#define CHIP_DELAY      1
+//#define CHIP_DELAY      1
 
 ChipInterface3::ChipInterface3()
 {
@@ -110,12 +110,19 @@ bool ChipInterface3::open(void)
         }
     }
 
-    if(!good) {
+    if(!good) {                             // some test byte failed?
         Debug::out(LOG_ERROR, "Connection / chip test failed. FPGA might be not programmed yet, or there's a bad connection between RPi and FPGA.");
         printf("\nConnection / chip test failed. FPGA might be not programmed yet, or there's a bad connection between RPi and FPGA.\n");
+        return false;
     }
 
-    return good;
+    BYTE fwVer[4];
+    good = readFwVersionFromFpga(fwVer);    // read FW version from chip, check the year-month-day values
+
+    if(!good) {                             // failed to get valid FPGA version?
+        return false;
+    }
+
     #endif
 
     return true;
@@ -573,10 +580,11 @@ BYTE ChipInterface3::intToBcd(int integer)
     return bcd;
 }
 
-void ChipInterface3::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
+bool ChipInterface3::readFwVersionFromFpga(BYTE *inFwVer)
 {
-    static bool didReadFirmwareVersion = false;     // true if at least once was the firmware version read from chip
     static BYTE fwVer[4];                           // this should hold FW version prepared to be copied to inFwVer
+    static bool good = true;
+    static bool didReadFirmwareVersion = false;     // true if at least once was the firmware version read from chip
 
     if(!didReadFirmwareVersion) {                   // if didn't read FW version before, do it now
         didReadFirmwareVersion = true;
@@ -586,8 +594,6 @@ void ChipInterface3::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
 
         fpgaAddressSet(FPGA_ADDR_FW_VERSION2);      // set addr, get FW 2
         BYTE fw2 = fpgaDataRead();
-
-        Debug::out(LOG_DEBUG, "FW1: %02X, FW2: %02X", fw1, fw2);
 
         int year = fw1 & 0x3F;                      // year on bits 5..0 (0..63)
 
@@ -599,13 +605,27 @@ void ChipInterface3::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
             day |= 0x10;
         }
 
+        if(year < 20 || month < 1 || month > 12 || day < 1 || day > 31) {   // if year is less than 2020, or month not from <1, 12>, or day not from <1, 31>
+            good = false;
+            Debug::out(LOG_DEBUG, "FW1: %02X, FW2: %02X", fw1, fw2);
+            Debug::out(LOG_ERROR, "FPGA version seems to be wrong: %d-%02d-%02d . Maybe FPGA needs to be reflashed?", year + 2000, month, day);
+            printf("\nFPGA version seems to be wrong: %d-%02d-%02d\nMaybe FPGA needs to be reflashed?\n", year + 2000, month, day);
+        }
+
         fwVer[0] = 0;
         fwVer[1] = intToBcd(year);
         fwVer[2] = intToBcd(month);
         fwVer[3] = intToBcd(day);
     }
 
-    memcpy(inFwVer, fwVer, 4);                      // copy in the firmware version in provided buffer
+    // the FW version was either just loaded in fwVer array, or it's there since some previous call
+    memcpy(inFwVer, fwVer, 4);      // copy in the firmware version in provided buffer
+    return good;                    // does the FPGA date look ok or not?
+}
+
+void ChipInterface3::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
+{
+    readFwVersionFromFpga(inFwVer); // read or just copy FW version
 }
 
 // waits until both HDD FIFOs are empty and then until handshake is idle
