@@ -134,6 +134,11 @@ void ChipInterface3::close(void)
 
     fpgaDataPortSetDirection(BCM2835_GPIO_FSEL_INPT);   // FPGA data pins as inputs
 
+    bcm2835_gpio_fsel(PIN_TDI, BCM2835_GPIO_FSEL_INPT); // JTAG pins as inputs to not interfere with programmer
+    bcm2835_gpio_fsel(PIN_TMS, BCM2835_GPIO_FSEL_INPT);
+    bcm2835_gpio_fsel(PIN_TCK, BCM2835_GPIO_FSEL_INPT);
+    bcm2835_gpio_fsel(PIN_TDO, BCM2835_GPIO_FSEL_INPT);
+
     bcm2835_close();                                    // close the GPIO library and finish
 
     #endif
@@ -224,6 +229,7 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
     status = fpgaDataRead();                            // read the status
 
     if((status & STATUS_HDD_WRITE_FIFO_EMPTY) == 0) {   // if WRITE FIFO is not empty (flag is 0), then ST has sent us CMD byte
+        Debug::out(LOG_DEBUG, "HDD FIFO NOT EMPTY");
         actionNeeded = getHddCommand(inBuf);            // if this command was for one of our enabled HDD IDs, then this will return true and will get handled
 
         if(actionNeeded) {                              // action is needed
@@ -305,11 +311,15 @@ bool ChipInterface3::getHddCommand(BYTE *inBuf)
     BYTE id, i;
     int storeIdx;
 
+    Debug::out(LOG_DEBUG, "interfaceType: %s", (interfaceType == INTERFACE_TYPE_ACSI) ? "ACSI" : ((interfaceType == INTERFACE_TYPE_SCSI) ? "SCSI" : "OTHER?!" ));
+    Debug::out(LOG_DEBUG, "cmd[0]: %02x", cmd[0]);
+
     if(interfaceType == INTERFACE_TYPE_ACSI) {          // for ACSI
         id = (cmd[0] >> 5) & 0x07;                      // get only device ID
         storeIdx = 1;                                   // store next cmd byte to index 1
 
         if((hddEnabledIDs & (1 << id)) == 0) {          // ID not enabled? no further action needed
+            Debug::out(LOG_DEBUG, "id %d not enabled. hddEnabledIDs: %02x", id, hddEnabledIDs);
             return false;
         }
     } else if(interfaceType == INTERFACE_TYPE_SCSI) {   // for SCSI
@@ -350,6 +360,7 @@ bool ChipInterface3::getHddCommand(BYTE *inBuf)
         now = Utils::getCurrentMs();
 
         if((now - start) >= 1000) {                         // if his is taking too long
+            Debug::out(LOG_DEBUG, "timeout on cmd[1]");
             fpgaResetAndSetConfig(true, false);             // reset HDD part
             return false;                                   // fail with no action needed
         }
@@ -366,6 +377,8 @@ bool ChipInterface3::getHddCommand(BYTE *inBuf)
 
     int cmdLen = 6;
     cmdLen = getCmdLengthFromCmdBytes(cmd);             // figure out the cmd length
+
+    Debug::out(LOG_DEBUG, "cmd: %02X %02X - cmdLen: %d", cmd[0], cmd[1], cmdLen);
 
     int gotBytes;                                       // how many bytes we already have
 
@@ -388,6 +401,8 @@ bool ChipInterface3::getHddCommand(BYTE *inBuf)
 
     int needBytes = cmdLen - gotBytes;                  // how many more bytes we need - e.g. 6 - 2 = 4, or 12 - 1 = 11
 
+    Debug::out(LOG_DEBUG, "needBytes: %d", needBytes);
+
     fpgaAddressSet(FPGA_ADDR_MODE_DIR_CNT);                                 // set address MODE-DIR-CNT config reg
     fpgaDataWrite(MODE_PIO | DIR_WRITE | SIZE_IN_BYTES | (needBytes - 1));  // PIO WRITE needBytes-1 BYTEs (set to 1 less bytes because of internal cnt+1)
 
@@ -405,6 +420,7 @@ bool ChipInterface3::getHddCommand(BYTE *inBuf)
         now = Utils::getCurrentMs();
 
         if((now - start) >= 1000) {                     // if his is taking too long
+            Debug::out(LOG_DEBUG, "timeout on waiting for rest of cmd");
             fpgaResetAndSetConfig(true, false);         // reset HDD part
             return false;                               // fail with no action needed
         }
@@ -424,6 +440,8 @@ bool ChipInterface3::getHddCommand(BYTE *inBuf)
         cmd[storeIdx] = fpgaDataRead();                 // read another cmd byte from FIFO
         storeIdx++;
     }
+
+    Debug::out(LOG_DEBUG, "cmd: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11]);
 
     inBuf[3] = ATN_ACSI_COMMAND;
     return true;                                        // this command was for enabled ID, so it needs handling
@@ -628,10 +646,17 @@ void ChipInterface3::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
     readFwVersionFromFpga(inFwVer); // read or just copy FW version
 }
 
+int ChipInterface3::bitValueTo01(BYTE val)
+{
+    int res = val ? 1 : 0;                      // convert some bit at possibly higher position to simple 0 or 1 for debug purpose
+    return res;
+}
+
 // waits until both HDD FIFOs are empty and then until handshake is idle
 bool ChipInterface3::waitForBusIdle(DWORD maxWaitTime)
 {
     DWORD start = Utils::getCurrentMs();
+    BYTE status;
 
     fpgaAddressSet(FPGA_ADDR_STATUS);           // set address of STATUS byte
 
@@ -643,10 +668,12 @@ bool ChipInterface3::waitForBusIdle(DWORD maxWaitTime)
         DWORD now = Utils::getCurrentMs();
 
         if((now - start) >= maxWaitTime) {      // if his is taking too long
+            Debug::out(LOG_DEBUG, "waitForBusIdle() timeout, status: %02X, STATUS_HDD_READ_FIFO_EMPTY: %d, STATUS_HDD_WRITE_FIFO_EMPTY: %d, STATUS_HDD_HANDSHAKE_IDLE: %d", 
+                    status, bitValueTo01(status & STATUS_HDD_READ_FIFO_EMPTY), bitValueTo01(status & STATUS_HDD_WRITE_FIFO_EMPTY), bitValueTo01(status & STATUS_HDD_HANDSHAKE_IDLE));
             return false;                       // fail with no action needed
         }
 
-        BYTE status = fpgaDataRead();           // read status byte
+        status = fpgaDataRead();           // read status byte
 
         if((status & STATUS_HDD_READ_FIFO_EMPTY) == 0) {    // READ FIFO not empty, wait
             continue;
@@ -683,6 +710,8 @@ bool ChipInterface3::hdd_sendData_start(DWORD totalDataCount, BYTE scsiStatus, b
 
 bool ChipInterface3::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
 {
+    Debug::out(LOG_DEBUG, "hdd_sendData_transferBlock() - starting with dataCount: %d", dataCount);
+
     if((dataCount & 1) != 0) {                      // odd number of bytes? make it even, we're sending words...
         dataCount++;
     }
@@ -696,6 +725,7 @@ bool ChipInterface3::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
         bool res = waitForBusIdle(100);             // wait until bus gets idle before switching mode
 
         if(!res) {                                  // wait for bus idle failed?
+            Debug::out(LOG_DEBUG, "hdd_sendData_transferBlock() failed on waitForBusIdle() due to timeout, dataCount remaining: %d", dataCount);
             return false;
         }
 
@@ -713,10 +743,14 @@ bool ChipInterface3::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
             byteCount = sectorCount * 512;          // convert sector count to byte count
 
             modeDirCnt = MODE_DMA | DIR_READ | SIZE_IN_SECTORS | (sectorCount - 1);
+
+            //Debug::out(LOG_DEBUG, "hdd_sendData_transferBlock() will READ %d sector(s) (= %d bytes)", sectorCount, byteCount);
         } else {                                    // only remaining less than 1 sector of data - do transfer in bytes
             byteCount = MIN(dataCount, 16);         // limit byte count to 16
 
             modeDirCnt = MODE_DMA | DIR_READ | SIZE_IN_BYTES | (byteCount - 1);
+
+            //Debug::out(LOG_DEBUG, "hdd_sendData_transferBlock() will READ %d bytes", byteCount);
         }
 
         fpgaAddressSet(FPGA_ADDR_MODE_DIR_CNT);     // set address of mode-dir-cnt register and set the new mode-dir-cnt value
@@ -729,6 +763,7 @@ bool ChipInterface3::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
         while(byteCount > 0) {                          // while we still haven't transfered all of the data
             DWORD now = Utils::getCurrentMs();
             if((now - start) > timeout || sigintReceived) {    // if timeout happened or app should terminate, quit
+                Debug::out(LOG_DEBUG, "hdd_sendData_transferBlock() failed due to timeout, byteCount remaining: %d", byteCount);
                 return false;
             }
 
@@ -741,9 +776,11 @@ bool ChipInterface3::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
                 continue;
             }
 
+            int byteCountNow = MIN(byteCount, canTxBytes);  // if can transfer less than whole byteCount, transfer only that; or when can transfer more but we need to transfer only byteCount, then transfer only byteCount
+
             fpgaAddressSet(FPGA_ADDR_READ_FIFO_DATA);   // set address of READ FIFO so we can start move data 
 
-            for(int i=0; i<canTxBytes; i++) {           // write all the data that can fit into READ FIFO
+            for(int i=0; i<byteCountNow; i++) {         // write all the data that can fit into READ FIFO
                 fpgaDataWrite(*pData);                  // write data
 
                 pData++;            // advance data pointer
@@ -804,6 +841,7 @@ bool ChipInterface3::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCount)
         bool res = waitForBusIdle(100);             // wait until bus gets idle before switching mode
 
         if(!res) {                                  // wait for bus idle failed?
+            Debug::out(LOG_DEBUG, "hdd_recvData_transferBlock() failed on waitForBusIdle() due to timeout");
             return false;
         }
 
@@ -837,6 +875,7 @@ bool ChipInterface3::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCount)
         while(byteCount > 0) {                          // while we still haven't transfered all of the data
             DWORD now = Utils::getCurrentMs();
             if((now - start) > timeout || sigintReceived) {    // if timeout happened or app should terminate, quit
+                Debug::out(LOG_DEBUG, "hdd_recvData_transferBlock() failed due to timeout");
                 return false;
             }
 
@@ -876,6 +915,7 @@ bool ChipInterface3::hdd_sendStatusToHans(BYTE statusByte)
     res = waitForBusIdle(100);      // wait until bus gets idle before switching mode
 
     if(!res) {                      // wait for bus idle failed?
+        Debug::out(LOG_DEBUG, "hdd_sendStatusToHans() [1] failed on waitForBusIdle() due to timeout");
         return false;
     }
 
@@ -890,6 +930,7 @@ bool ChipInterface3::hdd_sendStatusToHans(BYTE statusByte)
     res = waitForBusIdle(100);
 
     if(!res) {                      // wait for bus idle failed?
+        Debug::out(LOG_DEBUG, "hdd_sendStatusToHans() [2] failed on waitForBusIdle() due to timeout");
         return false;
     }
 
@@ -904,6 +945,7 @@ bool ChipInterface3::hdd_sendStatusToHans(BYTE statusByte)
         res = waitForBusIdle(100);
 
         if(!res) {                      // wait for bus idle failed?
+            Debug::out(LOG_DEBUG, "hdd_sendStatusToHans() [3] failed on waitForBusIdle() due to timeout");
             return false;
         }
     }

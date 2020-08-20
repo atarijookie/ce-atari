@@ -217,7 +217,9 @@ private:
     void fpgaDataOutput(BYTE val);
     BYTE fpgaDataInput(void);
 
+    // other helpers
     BYTE intToBcd(int integer);
+    int  bitValueTo01(BYTE val);
 };
 
 #endif // CHIPINTERFACE3_H
