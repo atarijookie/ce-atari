@@ -722,12 +722,13 @@ void CCoreThread::handleFwVersion_hans(void)
 
     int year = bcdToInt(fwVer[1]) + 2000;
 
-    Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));       // store found FW version of Hans
     flags.gotHansFwVersion = true;
 
     //----------------------------------
     // do the following only for chip interface v1 v2
     if(chipIfType == CHIP_IF_V1_V2) {
+        Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));       // store found FW version of Hans
+
         int  currentLed = fwVer[4];
         BYTE xilinxInfo = fwVer[5];
 
@@ -753,6 +754,8 @@ void CCoreThread::handleFwVersion_hans(void)
 
         Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d, XI: 0x%02x", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed, xilinxInfo);
     } else {
+        Update::versions.current.fpga.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));       // store found FW version of FPGA
+        hwConfig.version = 3;
         Debug::out(LOG_DEBUG, "FW: FPGA %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
     }
 

@@ -45,6 +45,7 @@ typedef struct {
             Version hans;
             Version xilinx;
             Version franz;
+            Version fpga;
             Version imageList;
         } current;
 

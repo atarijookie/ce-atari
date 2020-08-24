@@ -30,6 +30,7 @@
 extern volatile bool do_timeSync;
 extern volatile bool do_loadIkbdConfig;
 
+extern TFlags    flags;                 // global flags from command line
 extern THwConfig hwConfig;
 extern const char *distroString;
 
@@ -800,7 +801,8 @@ void ConfigStream::createScreen_update(void)
     comp = new ConfigComponent(this, ConfigComponent::label, "Hardware version  : ", 22, cl1, line, gotoOffset);
     screen.push_back(comp);
 
-    const char *hwVer = (hwConfig.version == 2) ? "v. 2" : "v. 1";
+    char hwVer[8];
+    sprintf(hwVer, "v. %d", hwConfig.version);  // v1 / v2 / v3
 
     comp = new ConfigComponent(this, ConfigComponent::label, hwVer, 10, cl2, line, gotoOffset);
     screen.push_back(comp);
@@ -867,28 +869,37 @@ void ConfigStream::createScreen_update(void)
     screen.push_back(comp);
     line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Franz", 12,       col1, line, gotoOffset);
-    screen.push_back(comp);
+    if(flags.chipInterface == CHIPIF_V1_V2) {       // for ChipInterface v1 v2
+        comp = new ConfigComponent(this, ConfigComponent::label, "Franz", 12,       col1, line, gotoOffset);
+        screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,           col2, line, gotoOffset);
-    comp->setComponentId(COMPID_UPDATE_FRANZ);
-    screen.push_back(comp);
-    line++;
+        comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,           col2, line, gotoOffset);
+        comp->setComponentId(COMPID_UPDATE_FRANZ);
+        screen.push_back(comp);
+        line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Hans", 12,        col1, line, gotoOffset);
-    screen.push_back(comp);
+        comp = new ConfigComponent(this, ConfigComponent::label, "Hans", 12,        col1, line, gotoOffset);
+        screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,           col2, line, gotoOffset);
-    comp->setComponentId(COMPID_UPDATE_HANZ);
-    screen.push_back(comp);
-    line++;
+        comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,           col2, line, gotoOffset);
+        comp->setComponentId(COMPID_UPDATE_HANZ);
+        screen.push_back(comp);
+        line++;
 
-    comp = new ConfigComponent(this, ConfigComponent::label, "Xilinx", 12,      col1, line, gotoOffset);
-    screen.push_back(comp);
+        comp = new ConfigComponent(this, ConfigComponent::label, "Xilinx", 12,      col1, line, gotoOffset);
+        screen.push_back(comp);
 
-    comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,           col2, line, gotoOffset);
-    comp->setComponentId(COMPID_UPDATE_XILINX);
-    screen.push_back(comp);
+        comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,           col2, line, gotoOffset);
+        comp->setComponentId(COMPID_UPDATE_XILINX);
+        screen.push_back(comp);
+    } else if(flags.chipInterface == CHIPIF_V3) {   // for ChipInterface v3
+        comp = new ConfigComponent(this, ConfigComponent::label, "FPGA", 12,        col1, line, gotoOffset);
+        screen.push_back(comp);
+
+        comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,           col2, line, gotoOffset);
+        comp->setComponentId(COMPID_UPDATE_FPGA);
+        screen.push_back(comp);
+    }
 
     line += 2;
 
@@ -934,6 +945,9 @@ void ConfigStream::fillUpdateWithCurrentVersions(void)
 
     datesToStrings(Update::versions.current.xilinx, str);
     setTextByComponentId(COMPID_UPDATE_XILINX, str);        // set it to component
+
+    datesToStrings(Update::versions.current.fpga, str);
+    setTextByComponentId(COMPID_UPDATE_FPGA, str);          // set it to component
 }
 
 void ConfigStream::datesToStrings(Version &v1, std::string &str)

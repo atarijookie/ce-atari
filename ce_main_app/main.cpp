@@ -112,6 +112,7 @@ int main(int argc, char *argv[])
         chipInterface = new ChipInterface12();
     } else if(flags.chipInterface == CHIPIF_V3) {               // parallel chip interface?
         chipInterface = new ChipInterface3();
+        hwConfig.version = 3;
     } else {                                                    // unknown chip interface?
         printf("Unknown chip interface selected, can't start!\n");
         return 0;
