@@ -22,6 +22,7 @@
 #define PIN_DATA_ADDR   RPI_V2_GPIO_P1_13
 #define PIN_RW          RPI_V2_GPIO_P1_16
 #define PIN_TRIG        RPI_V2_GPIO_P1_36
+#define PIN_STATUS      RPI_V2_GPIO_P1_26
 
 // FPGA data pins
 #define PIN_DATA0       RPI_V2_GPIO_P1_12   // GPIO 18
@@ -85,6 +86,10 @@
 #define INTERFACE_TYPE_SCSI             1
 #define INTERFACE_TYPE_CART             2
 
+#define AT_MODE_MSG     3
+#define AT_MODE_DMA     2
+#define AT_MODE_PIO     1
+#define AT_MODE_IDLE    0
 //--------------------------------------------------------
 #define WRITTENMFMSECTOR_SIZE   2048
 
@@ -201,7 +206,7 @@ private:
     bool readFwVersionFromFpga(BYTE *inFwVer);      // read FPGA version from chip, return true if the values look ok, copy the values into inFwVer
 
     DWORD timeoutForDataCount(DWORD dataCount);
-    bool waitForBusIdle(DWORD maxWaitTime);         // waits until both HDD FIFOs are empty and then until handshake is idle
+    bool waitForBusIdle(DWORD maxWaitTime, BYTE bitsIgnoreMask=0);    // waits until both HDD FIFOs are empty and then until handshake is idle
     int  getCmdLengthFromCmdBytes(BYTE *cmd);       // from the received command bytes determine the final length of the command
     bool getHddCommand(BYTE *inBuf);                // get whole HDD command and request action
     void handleTrackChanged(void);                  // get requested track and side, but don't request action just yet
@@ -220,6 +225,9 @@ private:
     // other helpers
     BYTE intToBcd(int integer);
     int  bitValueTo01(BYTE val);
+
+    const char *atModeString(int at_mode);
+    const char *interfaceTypeString(int iface);
 };
 
 #endif // CHIPINTERFACE3_H

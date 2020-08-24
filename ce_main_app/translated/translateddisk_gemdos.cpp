@@ -1577,6 +1577,16 @@ void TranslatedDisk::onTestWrite(BYTE *cmd)
         counter++;
 
         if(valSt != valGen) {                           // data mismatch? fail
+            Debug::out(LOG_DEBUG, "TranslatedDisk::onTestWrite - data check failed on byte %d out of %d, values: %04X != %04X", i, byteCount, valSt, valGen);
+
+            int iFail = i;
+            int start = MAX(i - 6, 0);                  // go 6 bytes back before error, if it would be bellow index 0, just use 0
+
+            for(i=start; i<(start + 12); i += 2) {      // put 6 WORD values into log to see them
+                WORD valSt  = Utils::getWord(dataBuffer + i);
+                Debug::out(LOG_DEBUG, "  [%d] %04X %s", i, valSt, (i == iFail) ? "<--- BAD" : "");
+            }
+
             dataTrans->setStatus(E_CRC);
             return;
         }
