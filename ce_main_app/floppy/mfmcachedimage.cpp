@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "../debug.h"
 #include "../utils.h"
+#include "../global.h"
 
 #include "mfmcachedimage.h"
 
@@ -9,6 +10,7 @@
 #define HIBYTE(w)   ((BYTE)(((WORD)(w)>>8)&0xFF))
 
 extern pthread_mutex_t floppyEncoderMutex;
+extern THwConfig    hwConfig;
 
 #define DAM_MARK    0xfb
 #define ID_MARK     0xfe
@@ -221,10 +223,12 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
     tracks[index].bytesInStream = bytesInBfr;   // store the data count
     setRawWordAtIndex(0, STREAM_TABLE_OFFSET + bytesInBfr);     // stream table - index 0: stream size in bytes (include those extra 5 empty WORDs on start in Franz)
 
-    for(int i=0; i<MFM_STREAM_SIZE; i += 2) {   // swap bytes - Franz has other endiannes
-        BYTE tmp                        = tracks[index].mfmStream[i + 0];
-        tracks[index].mfmStream[i + 0]  = tracks[index].mfmStream[i + 1];
-        tracks[index].mfmStream[i + 1]  = tmp;
+    if(hwConfig.version == 1 || hwConfig.version == 2) {    // HW v1 and v2 need byte swap, HW v3 needs bytes in the original order
+        for(int i=0; i<MFM_STREAM_SIZE; i += 2) {           // swap bytes - Franz has other endiannes
+            BYTE tmp                        = tracks[index].mfmStream[i + 0];
+            tracks[index].mfmStream[i + 0]  = tracks[index].mfmStream[i + 1];
+            tracks[index].mfmStream[i + 1]  = tmp;
+        }
     }
 
     //-----

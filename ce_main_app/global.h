@@ -69,7 +69,7 @@ typedef struct {
 } RPiConfig;
 
 typedef struct {
-    int  version;               // returned from Hans: HW version (1 for HW from 2014, 2 for new HW from 2015)
+    int  version;               // returned from Hans: HW version (1 for HW from 2014, 2 for HW from 2015, 3 for HW from 2020)
     int  hddIface;              // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
     int  scsiMachine;           // when HwHddIface is HDD_IF_SCSI, this specifies what machine (TT or Falcon) is using this device
     bool fwMismatch;            // when HW and FW types don't match (e.g. SCSI HW + ACSI FW, or ACSI HW + SCSI FW)
