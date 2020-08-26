@@ -90,10 +90,13 @@ void MfmCachedImage::clearWholeCachedImage(void)    // go and memset() all the c
 {
     nextIndex = 0;                      // start encoding from track 0
     gotImage = false;
+    maxTotalSymbolsTime = 0;
 
     for(int i=0; i<MAX_TRACKS; i++) {
         tracks[i].isReady = false;      // not ready yet
         tracks[i].bytesInStream = 0;
+        tracks[i].symbolsInStream = 0;
+        tracks[i].totalSymbolsTime = 0;
         memset(tracks[i].mfmStream, 0, MFM_STREAM_SIZE);
     }
 }
@@ -218,7 +221,26 @@ bool MfmCachedImage::findNotReadyTrackAndEncodeIt(FloppyImage *img, int &track, 
         setRawWordAtIndex(i, STREAM_START_OFFSET);
     }
 
+    // init encoder counters of symbols
+    encoder.symbolsInStream = 0;
+    encoder.totalSymbolsTime = 0;
+
+    // init track @ index counters of symbols
+    tracks[index].symbolsInStream = 0;
+    tracks[index].totalSymbolsTime = 0;
+
     encodeSingleTrack(img, s, t, params.spt);   // encode single track
+
+    // copy the counters from encoder to this track @ index
+    tracks[index].symbolsInStream = encoder.symbolsInStream;
+    tracks[index].totalSymbolsTime = encoder.totalSymbolsTime;
+
+    // found new longest track?
+    if(maxTotalSymbolsTime < tracks[index].totalSymbolsTime) {
+        maxTotalSymbolsTime = tracks[index].totalSymbolsTime;
+        float avgTimePerSymbol = ((float) tracks[index].totalSymbolsTime) / ((float) tracks[index].symbolsInStream);
+        Debug::out(LOG_DEBUG, "MfmCachedImage::findNotReadyTrackAndEncodeIt() - new longest track has %d ms total symbols time, has %d symbols in it, the average symbol time is %.2f us", tracks[index].totalSymbolsTime / 1000, tracks[index].symbolsInStream, avgTimePerSymbol);
+    }
 
     tracks[index].bytesInStream = bytesInBfr;   // store the data count
     setRawWordAtIndex(0, STREAM_TABLE_OFFSET + bytesInBfr);     // stream table - index 0: stream size in bytes (include those extra 5 empty WORDs on start in Franz)
@@ -445,14 +467,23 @@ void MfmCachedImage::appendByteToStream(BYTE val, bool doCalcCrc)
             // threeBits with value 0,3,7 produce 4 us mfm time
             case 0:
             case 3:
-            case 7: time = MFM_4US; break;
+            case 7: time = MFM_4US;
+                    encoder.symbolsInStream++;
+                    encoder.totalSymbolsTime += 4;
+                    break;
 
             // threeBits with value 1,4 produce 6 us mfm time
             case 1:
-            case 4: time = MFM_6US; break;
+            case 4: time = MFM_6US;
+                    encoder.symbolsInStream++;
+                    encoder.totalSymbolsTime += 6;
+                    break;
 
             // threeBits with value 5 produce 8 us mfm time
-            case 5: time = MFM_8US; break;
+            case 5: time = MFM_8US;
+                    encoder.symbolsInStream++;
+                    encoder.totalSymbolsTime += 8;
+                    break;
 
             // threeBits with value 2 or 6 don't produce mfm time value
         }

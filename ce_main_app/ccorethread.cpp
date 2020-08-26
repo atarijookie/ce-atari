@@ -1014,16 +1014,16 @@ void CCoreThread::handleSendTrack(BYTE *inBuf)
     int tr, si, spt;
     shared.imageSilo->getParams(tr, si, spt);      // read the floppy image params
 
-    Debug::out(LOG_DEBUG, "ATN_SEND_TRACK -- Franz wants: [track %d, side %d]. Current image has: [track %d, side %d, sectors/track: %d]", track, side, tr, si, spt);
-
     BYTE *encodedTrack;
     int countInTrack;
 
     if(side < 0 || side > 1 || track < 0 || track >= tr) {      // side / track out of range? use empty track
-        Debug::out(LOG_ERROR, "Side / Track out of range, returning empty track. Franz wants: [track %d, side %d], but current image has only: [track %d, side %d, sectors/track: %d]", track, side, tr, si, spt);
+        Debug::out(LOG_ERROR, "handleSendTrack() -- side / track out of range, returning empty track. Franz wants: [track %d, side %d], but current image has %d tracks, %d sides, %d sectors/track", track, side, tr, si, spt);
 
         encodedTrack = shared.imageSilo->getEmptyTrack();
     } else {                                                    // side + track within range? use encoded track
+        Debug::out(LOG_DEBUG, "handleSendTrack() -- Franz wants: [track %d, side %d]", track, side);
+
         encodedTrack = shared.imageSilo->getEncodedTrack(track, side, countInTrack);
     }
 

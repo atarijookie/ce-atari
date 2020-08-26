@@ -176,12 +176,19 @@ private:
         bool id1;               // FDD ID0 on false, FDD ID1 on true
         bool writeProtected;    // if true, writes to floppy are ignored
         bool diskChanged;       // if true, disk change is happening
-    } fdd;
+    } fddConfig;
 
-    bool newTrackRequest;       // true if there was track request which wasn't handled yet
-    int fddReqSide;             // FDD requested side (0/1)
-    int fddReqTrack;            // FDD requested track
-    DWORD fddTrackRequestTime;  // when was FDD track requested last time
+    struct {                    // struct holds NEW side + track value to be sent to FPGA soon
+        bool  request;          // true if there was track request which wasn't handled yet
+        int   side;             // FDD requested side (0/1)
+        int   track;            // FDD requested track
+        DWORD time;             // when was FDD track requested last time
+    } fddNewTrack;
+
+    struct {                    // struct holds previous side + track value which was sent to FPGA - to avoid sending what we already got there
+        int   side;             // FDD requested side (0/1)
+        int   track;            // FDD requested track
+    } fddPrevTrack;
 
     struct {
         BYTE *data;             // holds the written sector data until it's all and ready to be processed

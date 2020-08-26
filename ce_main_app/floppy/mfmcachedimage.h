@@ -24,6 +24,9 @@ typedef struct {
 
     BYTE    *mfmStream;
     int     bytesInStream;
+
+    int     symbolsInStream;            // how many symbols are the result of encoding this single track
+    int     totalSymbolsTime;           // sum of symbols time in this track
 } TCachedTrack;
 
 class MfmCachedImage
@@ -68,6 +71,9 @@ private:
         BYTE threeBits;
         BYTE times;
         BYTE timesCnt;
+
+        int symbolsInStream;            // how many symbols are the result of encoding this single track
+        int totalSymbolsTime;           // sum of symbols time in this track
     } encoder;
 
     struct {
@@ -91,6 +97,7 @@ private:
         bool isFormatTrack;         // when MFM decoder finds write to ID part of track (not data part), it's format track command
     } decoder;
 
+    int maxTotalSymbolsTime;        // holds the maximum total symbols time found in this image, so we won't show all the tracks symbols time in log
     TCachedTrack tracks[MAX_TRACKS];
     WORD crc;       // current value of CRC calculator
     BYTE *bfr;      // pointer to where we are storing data in the buffer

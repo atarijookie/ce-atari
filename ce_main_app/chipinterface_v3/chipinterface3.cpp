@@ -15,15 +15,18 @@ ChipInterface3::ChipInterface3()
 {
     ikbdEnabled = false;        // ikbd is not enabled by default, so we need to enable it
 
-    fdd.enabled = true;         // if true, floppy part is enabled
-    fdd.id1 = false;            // FDD ID0 on false, FDD ID1 on true
-    fdd.writeProtected = false; // if true, writes to floppy are ignored
-    fdd.diskChanged = false;    // if true, disk change is happening
+    fddConfig.enabled = true;           // if true, floppy part is enabled
+    fddConfig.id1 = false;              // FDD ID0 on false, FDD ID1 on true
+    fddConfig.writeProtected = false;   // if true, writes to floppy are ignored
+    fddConfig.diskChanged = false;      // if true, disk change is happening
 
-    newTrackRequest = false;    // there was no track request yet
-    fddReqSide = 0;             // FDD requested side (0/1)
-    fddReqTrack = 0;            // FDD requested track
-    fddTrackRequestTime = 0;    // when was FDD track requested last time (not yet)
+    fddNewTrack.request = false;    // there was no track request yet
+    fddNewTrack.side = 0;           // FDD requested side (0/1)
+    fddNewTrack.track = 0;          // FDD requested track
+    fddNewTrack.time = 0;           // when was FDD track requested last time (not yet)
+
+    fddPrevTrack.side = -1;         // nothing was sent to FPGA
+    fddPrevTrack.track = -1;
 
     fddWrittenSector.data = new BYTE[WRITTENMFMSECTOR_SIZE];    // holds the written sector data until it's all and ready to be processed
     fddWrittenSector.index = 0;                                 // index at which the sector data should be stored
@@ -171,10 +174,10 @@ void ChipInterface3::fpgaResetAndSetConfig(bool resetHdd, bool resetFdd)
     config |= resetHdd          ? (1 << 7) : 0;         // for HDD reset - set bit 7
     config |= resetFdd          ? (1 << 6) : 0;         // for FDD reset - set bit 6
 
-    config |= fdd.enabled        ? (1 << 5) : 0;         // if true, floppy part is enabled
-    config |= fdd.id1            ? (1 << 4) : 0;         // FDD ID0 on false, FDD ID1 on true
-    config |= fdd.writeProtected ? (1 << 3) : 0;         // if true, writes to floppy are ignored
-    config |= fdd.diskChanged    ? (1 << 2) : 0;         // if true, disk change is happening
+    config |= fddConfig.enabled        ? (1 << 5) : 0;         // if true, floppy part is enabled
+    config |= fddConfig.id1            ? (1 << 4) : 0;         // FDD ID0 on false, FDD ID1 on true
+    config |= fddConfig.writeProtected ? (1 << 3) : 0;         // if true, writes to floppy are ignored
+    config |= fddConfig.diskChanged    ? (1 << 2) : 0;         // if true, disk change is happening
 
     config |= ikbdEnabled       ? 0        : (1 << 0);  // for disabling IKDB - set bit 0
 
@@ -470,14 +473,16 @@ bool ChipInterface3::getHddCommand(BYTE *inBuf)
 // This function should read which track and side was wanted, mark the time when this happened, but don't send the track just yet....
 void ChipInterface3::handleTrackChanged(void)
 {
+    //Debug::out(LOG_DEBUG, "ChipInterface3::handleTrackChanged() - FPGA requested FDD track data to be sent");
+
     fpgaAddressSet(FPGA_ADDR_SIDE_TRACK);               // set REQUESTED SITE/TRACK register address - this also resets the internal READ MFM RAM address to 0, so we can then just write the new READ MFM RAM data from address 0
     BYTE sideTrack = fpgaDataRead();                    // read the status
 
-    fddReqSide = (sideTrack >> 7) & 1;                  // FDD requested side (0/1) - bit 7
-    fddReqTrack = sideTrack & 0x7f;                     // FDD requested track - bits 6..0
+    fddNewTrack.side = (sideTrack >> 7) & 1;            // FDD requested side (0/1) - bit 7
+    fddNewTrack.track = sideTrack & 0x7f;               // FDD requested track - bits 6..0
 
-    fddTrackRequestTime = Utils::getCurrentMs();        // when was FDD track requested last time
-    newTrackRequest = true;                             // this track request is new, it's pending, but shouldn't be handled sooner than when floppy seek ends
+    fddNewTrack.time = Utils::getCurrentMs();           // when was FDD track requested last time
+    fddNewTrack.request = true;                         // this track request is new, it's pending, but shouldn't be handled sooner than when floppy seek ends
 }
 
 // This function takes a look at the timestamp when the last track change was requested, and if it was at least X ms ago, then we can really handle this
@@ -485,23 +490,41 @@ void ChipInterface3::handleTrackChanged(void)
 // so this delay before sending data should make sure that the seek has finished and we really need to send just the last track requested).
 bool ChipInterface3::trackChangedNeedsAction(BYTE *inBuf)
 {
-    if(!newTrackRequest) {          // if there isn't a track request which wasn't handled
-        return false;               // no action to be handled
+    if(fddConfig.diskChanged) {         // if disk changed, we should send new track to FPGA
+        fddConfig.diskChanged = false;  // reset this flag
+        fddNewTrack.request = true;     // ask for new track data
+        fddNewTrack.time = 0;           // right now
+        fddPrevTrack.side = -1;         // we didn't send this side + track yet
+        fddPrevTrack.track = -1;
+        Debug::out(LOG_DEBUG, "trackChangedNeedsAction() - disk changed, forcing loading of new track data");
+    }
+
+    if(!fddNewTrack.request) {          // if there isn't a track request which wasn't handled
+        return false;                   // no action to be handled
     }
 
     DWORD now = Utils::getCurrentMs();
 
-    if((now - fddTrackRequestTime) < 12) {  // there was some track request, but it was less than X ms ago, so floppy seek still migt be going
-        return false;                       // no action to be handled (yet)
+    if((now - fddNewTrack.time) < 12) { // there was some track request, but it was less than X ms ago, so floppy seek still migt be going
+        return false;                   // no action to be handled (yet)
     }
 
     // enough time passed to make sure that floppy seek has ended
-    newTrackRequest = false;        // mark that we've just handled this, don't handle it again
+    fddNewTrack.request = false;        // mark that we've just handled this, don't handle it again
 
-    inBuf[3] = ATN_SEND_TRACK;      // attention code
-    inBuf[8] = fddReqSide;          // fdd side
-    inBuf[9] = fddReqTrack;         // fdd track
-    return true;                    // action needs handling
+    if(fddPrevTrack.side == fddNewTrack.side && fddPrevTrack.track == fddNewTrack.track) { // track and side are the same as last time? ignore this request
+        //Debug::out(LOG_DEBUG, "trackChangedNeedsAction() - ignoring same track %d and side %d request", fddNewTrack.track, fddNewTrack.side);
+        return false;                   // no action to be handled (we're ignoring this request)
+    }
+
+    inBuf[3] = ATN_SEND_TRACK;          // attention code
+    inBuf[8] = fddNewTrack.side;        // fdd side
+    inBuf[9] = fddNewTrack.track;       // fdd track
+
+    fddPrevTrack.side = fddNewTrack.side;   // store the side + track so next time we can skip sending it if we've sent this one already
+    fddPrevTrack.track = fddNewTrack.track;
+
+    return true;                        // action needs handling
 }
 
 // Call this when there are some bytes written to floppy. When it's not enough data for whole sector, then this just stores the bytes and returns false.
@@ -561,6 +584,9 @@ bool ChipInterface3::handleFloppyWriteBytes(BYTE *inBuf)
                 } else {                // end of stream found!
                     fddWrittenSector.state = FDD_WRITE_FIND_HEADER; // next state - start of the FSM all over again to find next written sector
 
+                    fddPrevTrack.side = -1;                         // sector was written, set prev track + side to invalid value so this track with newly written sector will be sent to FPGA
+                    fddPrevTrack.track = -1;
+
                     // got whole sector, request action. Data will be accessed via fdd_sectorWritten() function.
                     inBuf[3] = ATN_SECTOR_WRITTEN;
                     return true;                                    // action needs handling
@@ -588,20 +614,20 @@ void ChipInterface3::setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id,
     bool configChanged = false;                                 // nothing changed yet
 
     if(setFloppyConfig) {
-        configChanged |= (fdd.enabled != fddEnabled);           // if this config changed then set configChanged flag
-        fdd.enabled = fddEnabled;
+        configChanged |= (fddConfig.enabled != fddEnabled);           // if this config changed then set configChanged flag
+        fddConfig.enabled = fddEnabled;
 
         bool newFddId1 = (id == 1);
-        configChanged |= (fdd.id1 != newFddId1);                // if this config changed then set configChanged flag
-        fdd.id1 = newFddId1;
+        configChanged |= (fddConfig.id1 != newFddId1);                // if this config changed then set configChanged flag
+        fddConfig.id1 = newFddId1;
 
-        configChanged |= (fdd.writeProtected != writeProtected); // if this config changed then set configChanged flag
-        fdd.writeProtected = writeProtected;
+        configChanged |= (fddConfig.writeProtected != writeProtected); // if this config changed then set configChanged flag
+        fddConfig.writeProtected = writeProtected;
     }
 
     if(setDiskChanged) {
-        configChanged |= (fdd.diskChanged != diskChanged);      // if this config changed then set configChanged flag
-        fdd.diskChanged = diskChanged;
+        configChanged |= (fddConfig.diskChanged != diskChanged);      // if this config changed then set configChanged flag
+        fddConfig.diskChanged = diskChanged;
     }
 
     if(configChanged) {                                 // set new config only if something changed
