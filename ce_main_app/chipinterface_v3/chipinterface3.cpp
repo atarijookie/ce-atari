@@ -20,13 +20,8 @@ ChipInterface3::ChipInterface3()
     fddConfig.writeProtected = false;   // if true, writes to floppy are ignored
     fddConfig.diskChanged = false;      // if true, disk change is happening
 
-    fddNewTrack.request = false;    // there was no track request yet
     fddNewTrack.side = 0;           // FDD requested side (0/1)
     fddNewTrack.track = 0;          // FDD requested track
-    fddNewTrack.time = 0;           // when was FDD track requested last time (not yet)
-
-    fddPrevTrack.side = -1;         // nothing was sent to FPGA
-    fddPrevTrack.track = -1;
 
     fddWrittenSector.data = new BYTE[WRITTENMFMSECTOR_SIZE];    // holds the written sector data until it's all and ready to be processed
     fddWrittenSector.index = 0;                                 // index at which the sector data should be stored
@@ -261,16 +256,32 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
         }
     }
 
+    //----------------------------------------------------
+    // FDD READ handling of action needed
+    actionNeeded = false;                               // not needing action yet
+
     if(status & STATUS_FDD_SIDE_TRACK_CHANGED) {        // if floppy track or side changed, we need to send new track data
-        handleTrackChanged();
+        readRequestedTrackAndSideFromFPGA();            // get requested track and side from FPGA
+        storeRequestedTrackAndSideToInBuf(inBuf);       // store requested track and side into inBuf
+        actionNeeded = true;
     }
 
-    actionNeeded = trackChangedNeedsAction(inBuf);      // if track change happened a while ago, we will need to set new track data
+    if(fddConfig.diskChanged) {                         // if disk changed, we should send new track to FPGA
+        fddConfig.diskChanged = false;                  // reset this flag
 
-    if(actionNeeded) {                                  // if should send track data, quit and request action, otherwise continue with the rest
+        Debug::out(LOG_DEBUG, "trackChangedNeedsAction() - disk changed, forcing loading of new track data");
+
+        storeRequestedTrackAndSideToInBuf(inBuf);       // store the PREVIOUSLY requested track and side into inBuf to force new floppy load
+        actionNeeded = true;
+    }
+
+    if(actionNeeded) {                                  // if FPGA requested new track data or diskChanged forced track data reload
         hardNotFloppy = false;                          // FDD needs action
         return true;
     }
+
+    //----------------------------------------------------
+    // FDD WRITE handling of action needed
 
     if((status & STATUS_FDD_WRITE_FIFO_EMPTY) == 0) {   // WRITE FIFO NOT EMPTY, so some floppy data was written
         actionNeeded = handleFloppyWriteBytes(inBuf);   // get written data and store them in buffer
@@ -470,61 +481,26 @@ bool ChipInterface3::getHddCommand(BYTE *inBuf)
     return true;                                        // this command was for enabled ID, so it needs handling
 }
 
-// This function should read which track and side was wanted, mark the time when this happened, but don't send the track just yet....
-void ChipInterface3::handleTrackChanged(void)
+void ChipInterface3::readRequestedTrackAndSideFromFPGA(void)
 {
-    //Debug::out(LOG_DEBUG, "ChipInterface3::handleTrackChanged() - FPGA requested FDD track data to be sent");
-
     fpgaAddressSet(FPGA_ADDR_SIDE_TRACK);               // set REQUESTED SITE/TRACK register address - this also resets the internal READ MFM RAM address to 0, so we can then just write the new READ MFM RAM data from address 0
     BYTE sideTrack = fpgaDataRead();                    // read the status
 
     fddNewTrack.side = (sideTrack >> 7) & 1;            // FDD requested side (0/1) - bit 7
     fddNewTrack.track = sideTrack & 0x7f;               // FDD requested track - bits 6..0
 
-    fddNewTrack.time = Utils::getCurrentMs();           // when was FDD track requested last time
-    fddNewTrack.request = true;                         // this track request is new, it's pending, but shouldn't be handled sooner than when floppy seek ends
+    //Debug::out(LOG_DEBUG, "ChipInterface3::readRequestedTrackAndSideFromFPGA() - requested new track data - track %d, side: %d", fddNewTrack.track, fddNewTrack.side);
 }
 
-// This function takes a look at the timestamp when the last track change was requested, and if it was at least X ms ago, then we can really handle this
-// (The seek rate can be 2 / 3 / 6 / 12 ms, so if we send track data very soon, the floppy still might be doing seek and we might need to send it again,
-// so this delay before sending data should make sure that the seek has finished and we really need to send just the last track requested).
-bool ChipInterface3::trackChangedNeedsAction(BYTE *inBuf)
+void ChipInterface3::storeRequestedTrackAndSideToInBuf(BYTE *inBuf)
 {
-    if(fddConfig.diskChanged) {         // if disk changed, we should send new track to FPGA
-        fddConfig.diskChanged = false;  // reset this flag
-        fddNewTrack.request = true;     // ask for new track data
-        fddNewTrack.time = 0;           // right now
-        fddPrevTrack.side = -1;         // we didn't send this side + track yet
-        fddPrevTrack.track = -1;
-        Debug::out(LOG_DEBUG, "trackChangedNeedsAction() - disk changed, forcing loading of new track data");
-    }
+    //Debug::out(LOG_DEBUG, "ChipInterface3::storeRequestedTrackAndSideToInBuf() - storing track  request into inBuf - track %d, side: %d", fddNewTrack.track, fddNewTrack.side);
 
-    if(!fddNewTrack.request) {          // if there isn't a track request which wasn't handled
-        return false;                   // no action to be handled
-    }
-
-    DWORD now = Utils::getCurrentMs();
-
-    if((now - fddNewTrack.time) < 12) { // there was some track request, but it was less than X ms ago, so floppy seek still migt be going
-        return false;                   // no action to be handled (yet)
-    }
-
-    // enough time passed to make sure that floppy seek has ended
-    fddNewTrack.request = false;        // mark that we've just handled this, don't handle it again
-
-    if(fddPrevTrack.side == fddNewTrack.side && fddPrevTrack.track == fddNewTrack.track) { // track and side are the same as last time? ignore this request
-        //Debug::out(LOG_DEBUG, "trackChangedNeedsAction() - ignoring same track %d and side %d request", fddNewTrack.track, fddNewTrack.side);
-        return false;                   // no action to be handled (we're ignoring this request)
-    }
+    // NOTE: even if requested track and side are the same as last time, don't ignore that request as it might be an attempt to re-read the sector, which failed to read a while ago
 
     inBuf[3] = ATN_SEND_TRACK;          // attention code
     inBuf[8] = fddNewTrack.side;        // fdd side
     inBuf[9] = fddNewTrack.track;       // fdd track
-
-    fddPrevTrack.side = fddNewTrack.side;   // store the side + track so next time we can skip sending it if we've sent this one already
-    fddPrevTrack.track = fddNewTrack.track;
-
-    return true;                        // action needs handling
 }
 
 // Call this when there are some bytes written to floppy. When it's not enough data for whole sector, then this just stores the bytes and returns false.
@@ -583,9 +559,6 @@ bool ChipInterface3::handleFloppyWriteBytes(BYTE *inBuf)
                     fddWrittenSector.index++;
                 } else {                // end of stream found!
                     fddWrittenSector.state = FDD_WRITE_FIND_HEADER; // next state - start of the FSM all over again to find next written sector
-
-                    fddPrevTrack.side = -1;                         // sector was written, set prev track + side to invalid value so this track with newly written sector will be sent to FPGA
-                    fddPrevTrack.track = -1;
 
                     // got whole sector, request action. Data will be accessed via fdd_sectorWritten() function.
                     inBuf[3] = ATN_SECTOR_WRITTEN;

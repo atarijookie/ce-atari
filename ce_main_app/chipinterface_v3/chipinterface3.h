@@ -179,16 +179,9 @@ private:
     } fddConfig;
 
     struct {                    // struct holds NEW side + track value to be sent to FPGA soon
-        bool  request;          // true if there was track request which wasn't handled yet
         int   side;             // FDD requested side (0/1)
         int   track;            // FDD requested track
-        DWORD time;             // when was FDD track requested last time
     } fddNewTrack;
-
-    struct {                    // struct holds previous side + track value which was sent to FPGA - to avoid sending what we already got there
-        int   side;             // FDD requested side (0/1)
-        int   track;            // FDD requested track
-    } fddPrevTrack;
 
     struct {
         BYTE *data;             // holds the written sector data until it's all and ready to be processed
@@ -216,8 +209,9 @@ private:
     bool waitForBusIdle(DWORD maxWaitTime, BYTE bitsIgnoreMask=0);    // waits until both HDD FIFOs are empty and then until handshake is idle
     int  getCmdLengthFromCmdBytes(BYTE *cmd);       // from the received command bytes determine the final length of the command
     bool getHddCommand(BYTE *inBuf);                // get whole HDD command and request action
-    void handleTrackChanged(void);                  // get requested track and side, but don't request action just yet
-    bool trackChangedNeedsAction(BYTE *inBuf);      // request action if last track request happened enough time ago
+
+    void readRequestedTrackAndSideFromFPGA(void);           // call this to get requested track and side from FPGA
+    void storeRequestedTrackAndSideToInBuf(BYTE *inBuf);    // call this to store requested track and side into inBuf
     bool handleFloppyWriteBytes(BYTE *inBuf);       // buffer written data until there is whole sector present, then request action
 
     // low level functions to do the simplest operations on the FPGA port
