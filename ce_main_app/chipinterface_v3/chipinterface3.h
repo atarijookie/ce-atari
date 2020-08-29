@@ -44,8 +44,6 @@
 #define FPGA_ADDR_CONFIG                0       // on write - config byte
 
 // HDD REGISTERS 
-#define FPGA_ADDR_READ_FIFO_CNT         1       // on read  - READ  FIFO count
-#define FPGA_ADDR_WRITE_FIFO_CNT        2       // on read  - WRITE FIFO count
 #define FPGA_ADDR_WRITE_FIFO_DATA       3       // on read  - WRITE FIFO data 
 #define FPGA_ADDR_MODE_DIR_CNT          3       // on write - mode + dir + cnt (config byte)
 #define FPGA_ADDR_WRITE_FIFO_DATA2      4       // on read  - WRITE FIFO data (same as read from FPGA_ADDR_WRITE_FIFO_DATA)

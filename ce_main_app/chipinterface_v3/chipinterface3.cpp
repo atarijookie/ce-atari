@@ -441,10 +441,9 @@ bool ChipInterface3::getHddCommand(BYTE *inBuf)
     fpgaDataWrite(MODE_PIO | DIR_WRITE | SIZE_IN_BYTES | (needBytes - 1));  // PIO WRITE needBytes-1 BYTEs (set to 1 less bytes because of internal cnt+1)
 
     //---------------------------------------
-    // now the FPGA should read all the needed bytes into FIFO
-    // wait until the WRITE FIFO has all the remaining cmd bytes
-
-    fpgaAddressSet(FPGA_ADDR_WRITE_FIFO_CNT);           // set address of byte count in WRITE FIFO
+    // read out the cmd bytes from WRITE FIFO
+    fpgaAddressSet(FPGA_ADDR_WRITE_FIFO_DATA);          // set address of WRITE FIFO
+    fpgaDataPortSetDirection(BCM2835_GPIO_FSEL_INPT);   // address + PIN_RW will configure PIN_STATUS as FIFO EMPTY pin
 
     while(true) {                                       // while app is running
         if(sigintReceived) {                            // app terminated, quit now, no action
@@ -459,20 +458,19 @@ bool ChipInterface3::getHddCommand(BYTE *inBuf)
             return false;                               // fail with no action needed
         }
 
-        int gotCount = fpgaDataRead();                  // read how many bytes we already got
+        int status = bcm2835_gpio_lev(PIN_STATUS);      // read the status bit - FIFO EMPTY
 
-        if(gotCount == needBytes) {                     // if got all the needed bytes, quit this waiting loop
+        if(status == HIGH) {                            // FIFO empty? wait some more
+            continue;
+        }
+
+        cmd[storeIdx] = fpgaDataRead();                 // FIFO not empty, read another cmd byte from FIFO
+        storeIdx++;                                     // advance the store index
+        needBytes--;                                    // now we need one byte less
+
+        if(needBytes == 0) {                            // if got all the needed bytes, quit this loop
             break;
         }
-    }
-
-    //---------------------------------------
-    // read out the cmd bytes from WRITE FIFO
-    fpgaAddressSet(FPGA_ADDR_WRITE_FIFO_DATA);          // set address of WRITE FIFO
-
-    for(i=gotBytes; i<cmdLen; i++) {                    //
-        cmd[storeIdx] = fpgaDataRead();                 // read another cmd byte from FIFO
-        storeIdx++;
     }
 
     //Debug::out(LOG_DEBUG, "cmd: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8], cmd[9], cmd[10], cmd[11]);

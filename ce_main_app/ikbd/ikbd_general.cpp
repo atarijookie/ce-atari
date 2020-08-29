@@ -200,6 +200,8 @@ void *ikbdThreadCode(void *ptr)
     }
     ikbd.closeDevs();
 
+    chipInterface->ikdbUartEnable(false);        // disable UART for IKDB via some hardware magic, so Atari keyboard and mouse will work even if ce_main_app doesn't run
+
     logDebugAndIkbd(LOG_DEBUG, "ikbdThreadCode has quit");
     return 0;
 }

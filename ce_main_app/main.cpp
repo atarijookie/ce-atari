@@ -319,10 +319,6 @@ int main(int argc, char *argv[])
 
     delete core;
 
-    chipInterface->close();                             // close gpio
-    delete chipInterface;
-    chipInterface = NULL;
-
     printf("Stoping mount thread\n");
     Mounter::stop();
     pthread_join(mountThreadInfo, NULL);                // wait until mount     thread finishes
@@ -350,6 +346,14 @@ int main(int argc, char *argv[])
         pthread_kill(displayThreadInfo, SIGINT);        // stop the select()
         pthread_join(displayThreadInfo, NULL);          // wait until display thread finishes
     }
+
+    //---------------------------------------------------
+    // Closing of GPIO should be done after stopping IKBD thread and DISPLAY thread 
+    // as they also use some GPIO pins and we want them to be able to use them until the end.
+    chipInterface->close();                             // close gpio
+    delete chipInterface;
+    chipInterface = NULL;
+    //---------------------------------------------------
 
     printf("Downloader clean up before quit\n");
     Downloader::cleanupBeforeQuit();
