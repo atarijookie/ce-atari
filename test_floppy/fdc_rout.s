@@ -174,7 +174,7 @@ Read:
     move    #0x80,(a2)          | select command register
 
 #   move    #0x80,(a1)          | read one sector (m=0)
-    move    #0x90,(a1)          | read multiple sectors (m=1)
+    move    #0x98,(a1)          | read multiple sectors (m=1), disable spin-up (h/s=1)
 
     bsr     wfeoc               | wait for end of command
     move.l  d6,d7

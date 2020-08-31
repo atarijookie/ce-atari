@@ -38,7 +38,7 @@ BYTE bfr     [9*512];
 BYTE writeBfr[9*512];
 
 void removeAllWaitingKeys(void);
-BYTE showDebugInfoFunc(BYTE resultChar, int ms, int howManyTracksSeeked, int lazyTime);
+BYTE showDebugInfoFunc(BYTE resultChar, int ms, int howManyTracksSeeked, int lazyTime, int msSeek, int msRead);
 
 //----------------------------------
 // floppy API 'polymorphism'
@@ -448,7 +448,7 @@ void writeReadVerifyTest(BYTE linearNotRandom, BYTE foreverNotOnce)
         }
 
         if(!testOk && testConf.stopAfterError) {
-            BYTE quit = showDebugInfoFunc(resultChar, 0, 0, 0);
+            BYTE quit = showDebugInfoFunc(resultChar, 0, 0, 0, 0, 0);
             //isAfterStartOrError = 1;
 
             if(quit) {
@@ -492,6 +492,8 @@ void writeReadVerifyTest(BYTE linearNotRandom, BYTE foreverNotOnce)
         }
     }
 }
+
+DWORD afterSeek;
 
 void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
 {
@@ -556,6 +558,7 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
 
         DWORD start, end;
         start       = getTicks();
+        afterSeek   = start;                // if custom FDC routines used, this will hold time after seek. Otherwise init to start and will result in zero time.
         BYTE bRes   = floppy_read(bfr, 0, fl.sector, fl.track, fl.side, testConf.sectorsAtOnce);
         end         = getTicks();
 
@@ -576,6 +579,8 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
         }
 
         DWORD ms = (end - start) * 5;
+        DWORD msSeek = (afterSeek - start) * 5;
+        DWORD msRead = (end - afterSeek) * 5;
 
         //---------------------------------
         // update min / max / avg time, but only if it's not after start (spin up) or error
@@ -634,7 +639,7 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
         Cconout(resultChar);                // show result of this operation
 
         if(showDebugInfo && testConf.stopAfterError) {
-            BYTE quit = showDebugInfoFunc(resultChar, ms, howManyTracksSeeked, lazyTime);
+            BYTE quit = showDebugInfoFunc(resultChar, ms, howManyTracksSeeked, lazyTime, msSeek, msRead);
             isAfterStartOrError = 1;
 
             if(quit) {
@@ -687,7 +692,7 @@ void readTest(BYTE linearNotRandom, BYTE imageTestNotAny, BYTE foreverNotOnce)
     }
 }
 
-BYTE showDebugInfoFunc(BYTE resultChar, int ms, int howManyTracksSeeked, int lazyTime)
+BYTE showDebugInfoFunc(BYTE resultChar, int ms, int howManyTracksSeeked, int lazyTime, int msSeek, int msRead)
 {
     VT52_Goto_pos(0, 5);
 
@@ -704,6 +709,15 @@ BYTE showDebugInfoFunc(BYTE resultChar, int ms, int howManyTracksSeeked, int laz
     showHexByte(fdcStatus);
     (void) Cconws("  \r\nOp time   : ");
     showInt(ms, 4);
+
+    if(msSeek > 0) {    // if got some seek time, show it
+        (void) Cconws("  \r\nSeek time : ");
+        showInt(msSeek, 4);
+
+        (void) Cconws("  \r\nRead time : ");
+        showInt(msRead, 4);
+    }
+
     (void) Cconws("  \r\nSeek count:   ");
     showInt(howManyTracksSeeked, 2);
     (void) Cconws("  \r\nLazy thres: ");
@@ -1082,6 +1096,8 @@ int floppy_read(BYTE *buf, WORD dev, WORD sector, WORD track, WORD side, WORD co
 
     runFdcAsm();                    // do the requested action
 
+    afterSeek = getTicks();         // time stamp after seek finished
+    
     if(argSuccess != 0) {           // failed?
         return argSuccess;          // return that error
     }
