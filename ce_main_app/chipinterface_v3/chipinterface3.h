@@ -227,6 +227,8 @@ private:
 
     const char *atModeString(int at_mode);
     const char *interfaceTypeString(int iface);
+    int getInterfaceTypeAs_HD_IF(void);  // convert INTERFACE_TYPE_... that is stored in FPGA into HDD_IF_... which is used in ccorethread and elsewhere
+    void storeHwConfig(void);
 };
 
 #endif // CHIPINTERFACE3_H

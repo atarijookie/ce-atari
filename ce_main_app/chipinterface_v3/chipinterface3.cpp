@@ -10,6 +10,10 @@
 #include "../chipinterface_v1_v2/gpio.h"
 #include "../utils.h"
 #include "../debug.h"
+#include "../global.h"
+#include "../update.h"
+
+extern THwConfig hwConfig;
 
 ChipInterface3::ChipInterface3()
 {
@@ -191,6 +195,28 @@ const char *ChipInterface3::atModeString(int at_mode)
     }
 }
 
+int ChipInterface3::getInterfaceTypeAs_HD_IF(void)  // convert INTERFACE_TYPE_... that is stored in FPGA into HDD_IF_... which is used in ccorethread and elsewhere
+{
+    switch(interfaceType) {
+        case INTERFACE_TYPE_ACSI:   return HDD_IF_ACSI;     // ashes to ashes
+        case INTERFACE_TYPE_SCSI:   return HDD_IF_SCSI;     // dust to dust
+
+        default:                    return HDD_IF_ACSI;     // or pretend it's ACSI otherwise
+    }
+}
+
+void ChipInterface3::storeHwConfig(void)
+{
+    static int prevHddIface = -1;
+
+    hwConfig.version = 3;                                       // v.3
+    hwConfig.hddIface = getInterfaceTypeAs_HD_IF();             // store current IF
+    hwConfig.fwMismatch = false;                                // never mismatch
+
+    hwConfig.changed = (prevHddIface != hwConfig.hddIface);     // HD IF changed if the previous doesn't match the current one
+    prevHddIface = hwConfig.hddIface;                           // store current version so we won't trigger change next time
+}
+
 const char *ChipInterface3::interfaceTypeString(int iface)
 {
     switch(iface) {
@@ -215,6 +241,8 @@ bool ChipInterface3::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
     status = fpgaDataRead();                                // read the status 2
     BYTE at_mode = (status & STATUS2_HDD_MODE) >> 2;        // bits 3..2 are AT_MODE
     interfaceType = status & STATUS2_HDD_INTERFACE_TYPE;    // bits 1..0 are interface type
+
+    storeHwConfig();                                        // convert interfaceType into hw Info struct
 
     if(at_mode != AT_MODE_IDLE) {                           // if we're in this main situation handled, but the HDD interface mode is not IDLE (= waiting for 0th cmd byte)
         //Debug::out(LOG_DEBUG, "actionNeeded() - AT_MODE was %s (%d), doing resetHDD()", atModeString(at_mode), at_mode);
@@ -622,6 +650,10 @@ bool ChipInterface3::readFwVersionFromFpga(BYTE *inFwVer)
     static bool good = true;
     static bool didReadFirmwareVersion = false;     // true if at least once was the firmware version read from chip
 
+    static int year = 0;
+    static int month = 0;
+    static int day = 0;
+
     if(!didReadFirmwareVersion) {                   // if didn't read FW version before, do it now
         didReadFirmwareVersion = true;
 
@@ -631,11 +663,11 @@ bool ChipInterface3::readFwVersionFromFpga(BYTE *inFwVer)
         fpgaAddressSet(FPGA_ADDR_FW_VERSION2);      // set addr, get FW 2
         BYTE fw2 = fpgaDataRead();
 
-        int year = fw1 & 0x3F;                      // year on bits 5..0 (0..63)
+        year = fw1 & 0x3F;                      // year on bits 5..0 (0..63)
 
-        int month = (fw2 & 0xF0) >> 4;              // month on bits 7..4
+        month = (fw2 & 0xF0) >> 4;              // month on bits 7..4
 
-        int day   = (fw2 & 0x0F);                   // day on bits 3..0 (and bit 4 of day is bit 7 in FW version number 1)
+        day   = (fw2 & 0x0F);                   // day on bits 3..0 (and bit 4 of day is bit 7 in FW version number 1)
 
         if(fw1 & 0x80) {                            // bit 4 of day is bit 7 in FW version number 1
             day |= 0x10;
@@ -652,7 +684,11 @@ bool ChipInterface3::readFwVersionFromFpga(BYTE *inFwVer)
         fwVer[1] = intToBcd(year);
         fwVer[2] = intToBcd(month);
         fwVer[3] = intToBcd(day);
+
+        year += 2000;
     }
+
+    Update::versions.current.fpga.fromInts(year, month, day);   // store found FW version of FPGA
 
     // the FW version was either just loaded in fwVer array, or it's there since some previous call
     memcpy(inFwVer, fwVer, 4);      // copy in the firmware version in provided buffer

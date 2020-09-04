@@ -87,11 +87,6 @@ int main(int argc, char *argv[])
 
     printf("\033[H\033[2J\n");
 
-    if(argc==3 && strcmp(argv[1], "display") == 0) {            // if should show some string on front display - right number of arguments and display command
-        showOnDisplay(argc, argv);
-        return 0;
-    }
-
     initializeFlags();                                          // initialize flags
 
     Debug::setDefaultLogFile();
@@ -99,61 +94,11 @@ int main(int argc, char *argv[])
     loadDefaultArgumentsFromFile();                             // first parse default arguments from file
     parseCmdLineArguments(argc, argv);                          // then parse cmd line arguments and set global variables
 
+    //------------------------------------
+    // if should only show help and quit
     if(flags.justShowHelp) {
         printfPossibleCmdLineArgs();
         return 0;
-    }
-
-    if(flags.display) {                                         // if should show some string on front display, but probably bad number of arguments, quit
-        return 0;
-    }
-
-    if(flags.chipInterface == CHIPIF_V1_V2) {                   // SPI chip interface?
-        chipInterface = new ChipInterface12();
-    } else if(flags.chipInterface == CHIPIF_V3) {               // parallel chip interface?
-        chipInterface = new ChipInterface3();
-        hwConfig.version = 3;
-    } else {                                                    // unknown chip interface?
-        printf("Unknown chip interface selected, can't start!\n");
-        return 0;
-    }
-    
-    loadLastHwConfig();                                         // load last found HW IF, HW version, SCSI machine
-
-    printf("CosmosEx main app starting on %s...\n", distroString);
-
-    //------------------------------------
-    // if not running as ce_conf, register signal handlers
-    if(!flags.actAsCeConf) {
-        if(signal(SIGINT, sigint_handler) == SIG_ERR) {         // register SIGINT handler
-            printf("Cannot register SIGINT handler!\n");
-        }
-
-        if(signal(SIGHUP, sigint_handler) == SIG_ERR) {         // register SIGHUP handler
-            printf("Cannot register SIGHUP handler!\n");
-        }
-    }
-
-    //------------------------------------
-    // if this is not just a reset command AND not a get HW info command
-    if(!flags.justDoReset && !flags.getHwInfo) {
-        childPid = forkpty(&linuxConsole_fdMaster, NULL, NULL, NULL);
-
-        if(childPid == 0) {                                         // code executed only by child
-            const char *shell = "/bin/sh";  // default shell
-            const char *term = "vt52";
-            shell = getenv("SHELL");
-            if(access("/etc/terminfo/a/atari", R_OK) == 0)
-                term = "atari";
-            if(setenv("TERM", term, 1) < 0) {
-                fprintf(stderr, "Failed to setenv(\"TERM\", \"%s\"): %s\n", term, strerror(errno));
-            }
-            execlp(shell, shell, "-i", (char *) NULL);  // -i for interactive
-
-            return 0;
-        }
-
-        // parent (full app) continues here
     }
 
     //------------------------------------
@@ -167,19 +112,104 @@ int main(int argc, char *argv[])
     }
 
     //------------------------------------
-    // if should just get HW info, do a shorter / simpler version of app run
-    if(flags.getHwInfo) {
-        if(!chipInterface->open()) {                            // try to open GPIO
-            printf("\nHW_VER: UNKNOWN\n");
-            printf("\nHDD_IF: UNKNOWN\n");
-            return 0;
+    // before touching GPIO make sure that no other instance is running
+    if(otherInstanceIsRunning()) {
+        Debug::out(LOG_ERROR, "Other instance of CosmosEx is running, terminate it before starting a new one!");
+        printf("\nOther instance of CosmosEx is running, terminate it before starting a new one!\n\n\n");
+        return 0;
+    }
+
+    //------------------------------------------------------------
+    // Opening of chip interface. 
+    // If starting with CHIPIF_UNKNOWN, will do auto-detection, which can test if v3 is present immediatelly, or
+    // if v3 not present, then at least try to open GPIO for v1/v2 and let it run like that (that might fail later).
+    // If starting with CHIPIF_V1_V2 or CHIPIF_V3, it will use chip interface as specified.
+
+    bool good = false;
+
+    if(flags.chipInterface == CHIPIF_UNKNOWN) {                 // unknown chip interface? do the auto detection
+        Debug::out(LOG_INFO, "ChipInterface auto-detect: trying v3");
+
+        chipInterface = new ChipInterface3();                   // chip interface v3 can detect quickly if the hardware is present or not, let's start with that
+        hwConfig.version = 3;
+
+        good = chipInterface->open();                           // try to open chip interface v3
+
+        if(!good) {                                             // v3 not good?
+            Debug::out(LOG_INFO, "ChipInterface auto-detect: v3 failed, trying v1/v2");
+
+            delete chipInterface;                               // delete object with v3
+            chipInterface = new ChipInterface12();              // create chip interface v1/v2
+            hwConfig.version = 2;
+
+            good = chipInterface->open();                       // try to open chip interface v1/v2
+
+            if(!good) {
+                Debug::out(LOG_INFO, "ChipInterface auto-detect: v1/v2 failed, terminating");
+            } else {
+                Debug::out(LOG_INFO, "ChipInterface auto-detect: v1/v2 opened, continuing.");
+                printf("\nChipInterface auto-detect: v1/v2 opened\n");
+            }
+        } else {
+            Debug::out(LOG_INFO, "ChipInterface auto-detect: v3 detected");
+            printf("\nChipInterface auto-detect: v3 detected\n");
         }
 
-        Debug::out(LOG_INFO, ">>> Starting app as HW INFO tool <<<\n");
+    } else if(flags.chipInterface == CHIPIF_V1_V2) {            // SPI chip interface?
+        chipInterface = new ChipInterface12();
+        good = chipInterface->open();                           // try to open chip interface
 
-        core = new CCoreThread(NULL, NULL, NULL);               // create main thread
-        core->run();                                            // run the main thread
+    } else if(flags.chipInterface == CHIPIF_V3) {               // parallel chip interface?
+        chipInterface = new ChipInterface3();
+        good = chipInterface->open();                           // try to open chip interface
+        hwConfig.version = 3;
 
+    } else {
+        Debug::out(LOG_INFO, "ChipInterface - unknown option, terminating.");
+        printf("\nChipInterface - unknown option, terminating.\n");
+        good = false;
+    }
+
+    // after the previous lines the good flag should contain if we were able to open the chip interface
+    if(!good) {
+        printf("\nHW_VER: UNKNOWN\n");
+        printf("\nHDD_IF: UNKNOWN\n");
+
+        Debug::out(LOG_INFO, "ChipInterface - failed to open chip Interface %d, terminating.", flags.chipInterface);
+        printf("\nChipInterface - failed to open chip Interface %d, terminating.\n", flags.chipInterface);
+        return 0;
+    }
+
+    //------------------------------------------------------------
+    loadLastHwConfig();                                         // load last found HW IF, HW version, SCSI machine
+
+    //------------------------------------
+    // register signal handlers
+    if(signal(SIGINT, sigint_handler) == SIG_ERR) {         // register SIGINT handler
+        printf("Cannot register SIGINT handler!\n");
+    }
+
+    if(signal(SIGHUP, sigint_handler) == SIG_ERR) {         // register SIGHUP handler
+        printf("Cannot register SIGHUP handler!\n");
+    }
+
+    //------------------------------------------------------------
+    if(flags.display || flags.getHwInfo || flags.justDoReset) {
+        if(flags.display) {                             // if should show some string on front display
+            showOnDisplay(argc, argv);
+
+        } else if(flags.getHwInfo) {                    // if should just get HW info, do a shorter / simpler version of app run
+            Debug::out(LOG_INFO, ">>> Starting app as HW INFO tool <<<\n");
+
+            core = new CCoreThread(NULL, NULL, NULL);   // create main thread
+            core->run();                                // run the main thread
+
+        } else if(flags.justDoReset) {                  // is this a reset command? (used with STM32 ST-Link debugger)
+            chipInterface->resetHDDandFDD();
+
+        }
+
+        // close the chip interface
         chipInterface->close();
         delete chipInterface;
         chipInterface = NULL;
@@ -188,8 +218,29 @@ int main(int argc, char *argv[])
     }
 
     //------------------------------------
+    // we should fork this and run shell in the forked child
+    childPid = forkpty(&linuxConsole_fdMaster, NULL, NULL, NULL);
+
+    if(childPid == 0) {                             // code executed only by child
+        const char *shell = "/bin/sh";              // default shell
+        const char *term = "vt52";
+        shell = getenv("SHELL");
+        if(access("/etc/terminfo/a/atari", R_OK) == 0)
+            term = "atari";
+        if(setenv("TERM", term, 1) < 0) {
+            fprintf(stderr, "Failed to setenv(\"TERM\", \"%s\"): %s\n", term, strerror(errno));
+        }
+        execlp(shell, shell, "-i", (char *) NULL);  // -i for interactive
+
+        return 0;
+    }
+
+    // parent (full app) continues here
+
+    //------------------------------------
     // normal app run follows
     Debug::printfLogLevelString();
+    printf("\nCosmosEx main app starting on %s...\n", distroString);
 
     char appVersion[16];
     Version::getAppVersion(appVersion);
@@ -201,28 +252,6 @@ int main(int argc, char *argv[])
     Update::createNewScripts();                                     // update the scripts if needed
 
 //  system("sudo echo none > /sys/class/leds/led0/trigger");        // disable usage of GPIO 23 (pin 16) by LED
-
-    if(otherInstanceIsRunning()) {
-        Debug::out(LOG_ERROR, "Other instance of CosmosEx is running, terminate it before starting a new one!");
-        printf("\nOther instance of CosmosEx is running, terminate it before starting a new one!\n\n\n");
-        return 0;
-    }
-
-    if(!chipInterface->open()) {                                    // try to open GPIO
-        return 0;
-    }
-
-    if(flags.justDoReset) {                                         // is this a reset command? (used with STM32 ST-Link debugger)
-        chipInterface->resetHDDandFDD();
-
-        chipInterface->close();
-        delete chipInterface;
-        chipInterface = NULL;
-
-        printf("\nJust did reset and quit...\n");
-
-        return 0;
-    }
 
     printf("Starting threads\n");
 
@@ -376,13 +405,14 @@ void loadLastHwConfig(void)
     hwConfig.hddIface       = s.getInt("HW_HDD_IFACE",     HDD_IF_ACSI);
     hwConfig.scsiMachine    = s.getInt("HW_SCSI_MACHINE",  SCSI_MACHINE_UNKNOWN);
     hwConfig.fwMismatch     = false;
+    hwConfig.changed        = false;
 }
 
 void initializeFlags(void)
 {
     flags.justShowHelp = false;
     flags.logLevel     = LOG_ERROR;     // init current log level to LOG_ERROR
-    flags.chipInterface = CHIPIF_V1_V2; // assume older chip interface if not specified otherwise
+    flags.chipInterface = CHIPIF_UNKNOWN; // start with unknown chip interface, this will do the auto-detect atttempt
     flags.justDoReset  = false;         // if shouldn't run the app, but just reset Hans and Franz (used with STM32 ST-Link JTAG)
     flags.noReset      = false;         // don't reset Hans and Franz on start - used with STM32 ST-Link JTAG
     flags.test         = false;         // if set to true, set ACSI ID 0 to translated, ACSI ID 1 to SD, and load floppy with some image
@@ -647,11 +677,6 @@ void showOnDisplay(int argc, char *argv[])
 {
     if(argc != 3) {
         printf("To use display command: %s display 'Your message'\n", argv[0]);
-        return;
-    }
-
-    if(!chipInterface->open()) {  // try to open GPIO
-        printf("Failed to open GPIO.\n");
         return;
     }
 

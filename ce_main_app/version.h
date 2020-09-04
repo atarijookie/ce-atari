@@ -27,6 +27,8 @@ public:
 
     void toString(char *str);
     int  getYear(void);
+    int  getMonth(void);
+    int  getDay(void);
 
     volatile BYTE downloadStatus;
 

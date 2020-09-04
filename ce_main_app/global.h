@@ -73,6 +73,8 @@ typedef struct {
     int  hddIface;              // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
     int  scsiMachine;           // when HwHddIface is HDD_IF_SCSI, this specifies what machine (TT or Falcon) is using this device
     bool fwMismatch;            // when HW and FW types don't match (e.g. SCSI HW + ACSI FW, or ACSI HW + SCSI FW)
+
+    bool changed;               // true if the value has changes recently
 } THwConfig;
 
 typedef struct {

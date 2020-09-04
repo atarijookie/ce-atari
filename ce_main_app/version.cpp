@@ -78,6 +78,16 @@ int Version::getYear(void)
     return year;
 }
 
+int Version::getMonth(void)
+{
+    return month;
+}
+
+int Version::getDay(void)
+{
+    return day;
+}
+
 void Version::clear(void)
 {
     year    = 0;

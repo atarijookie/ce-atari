@@ -720,17 +720,27 @@ void CCoreThread::handleFwVersion_hans(void)
         setNewFloppyImageLed = false;           // don't sent this anymore (until needed)
     }
 
-    int year = bcdToInt(fwVer[1]) + 2000;
-
     flags.gotHansFwVersion = true;
+
+    //----------------------------------
+    // if HW info changed
+    if(hwConfig.changed) {
+        hwConfig.changed = false;
+
+        setEnabledIDbits = true;                    // resend config 
+
+        pthread_mutex_lock(&shared.mtxScsi);
+        shared.scsi->updateTranslatedBootMedia();   // also update CE_DD bootsector with proper SCSI ID
+        pthread_mutex_unlock(&shared.mtxScsi);
+
+        fillDisplayLines();                         // fill lines for front display
+        saveHwConfig();                             // save the new config
+    }
 
     //----------------------------------
     // do the following only for chip interface v1 v2
     if(chipIfType == CHIP_IF_V1_V2) {
-        Update::versions.current.hans.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));       // store found FW version of Hans
-
-        int  currentLed = fwVer[4];
-        BYTE xilinxInfo = fwVer[5];
+        int currentLed = fwVer[4];
 
         char recoveryLevel = fwVer[9];
         if(recoveryLevel != 0) {                                                        // if the recovery level is not empty
@@ -738,8 +748,6 @@ void CCoreThread::handleFwVersion_hans(void)
                 handleRecoveryCommands(recoveryLevel - 'Q');                            // handle recovery action
             }
         }
-
-        convertXilinxInfo(xilinxInfo);
 
         if(lastFloppyImageLed != currentLed) {              // did the floppy image LED change since last time?
             lastFloppyImageLed = currentLed;
@@ -752,11 +760,9 @@ void CCoreThread::handleFwVersion_hans(void)
             setDiskChanged  = true;
         }
 
-        Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d, XI: 0x%02x", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]), currentLed, xilinxInfo);
+        Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d", Update::versions.current.hans.getYear(), Update::versions.current.hans.getMonth(), Update::versions.current.hans.getDay(), currentLed);
     } else {
-        Update::versions.current.fpga.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));       // store found FW version of FPGA
-        hwConfig.version = 3;
-        Debug::out(LOG_DEBUG, "FW: FPGA %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+        Debug::out(LOG_DEBUG, "FW: FPGA %d-%02d-%02d", Update::versions.current.fpga.getYear(), Update::versions.current.fpga.getMonth(), Update::versions.current.fpga.getDay());
     }
 
     //----------------------------------
@@ -816,15 +822,12 @@ void CCoreThread::handleFwVersion_franz(void)
     }
 
     franzHandledOnce = true;
-
-    int year = bcdToInt(fwVer[1]) + 2000;
-    Update::versions.current.franz.fromInts(year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));              // store found FW version of Franz
     flags.gotFranzFwVersion = true;
 
     int chipIfType = chipInterface->chipInterfaceType();
 
     if(chipIfType == CHIP_IF_V1_V2) {                   // only on IF v1 v2 show info about Franz
-        Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", year, bcdToInt(fwVer[2]), bcdToInt(fwVer[3]));
+        Debug::out(LOG_DEBUG, "FW: Franz, %d-%02d-%02d", Update::versions.current.franz.getYear(), Update::versions.current.franz.getMonth(), Update::versions.current.franz.getDay());
     }
 }
 
@@ -873,62 +876,6 @@ void CCoreThread::getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId)
     }
 }
 
-void CCoreThread::convertXilinxInfo(BYTE xilinxInfo)
-{
-    THwConfig   hwConfigOld     = hwConfig;
-    int         prevHwHddIface  = hwConfig.hddIface;
-
-    switch(xilinxInfo) {
-        // GOOD
-        case 0x21:  hwConfig.version        = 2;                        // v.2
-                    hwConfig.hddIface       = HDD_IF_ACSI;              // HDD int: ACSI
-                    hwConfig.fwMismatch     = false;
-                    break;
-
-        // GOOD
-        case 0x22:  hwConfig.version        = 2;                        // v.2
-                    hwConfig.hddIface       = HDD_IF_SCSI;              // HDD int: SCSI
-                    hwConfig.fwMismatch     = false;
-                    break;
-
-        // BAD: SCSI HW, ACSI FW
-        case 0x29:  hwConfig.version        = 2;                        // v.2
-                    hwConfig.hddIface       = HDD_IF_SCSI;              // HDD int: SCSI
-                    hwConfig.fwMismatch     = true;                     // HW + FW mismatch!
-                    break;
-
-        // BAD: ACSI HW, SCSI FW
-        case 0x2a:  hwConfig.version        = 2;                        // v.2
-                    hwConfig.hddIface       = HDD_IF_ACSI;              // HDD int: ACSI
-                    hwConfig.fwMismatch     = true;                     // HW + FW mismatch!
-                    break;
-
-        // GOOD
-        case 0x11:  // use this for v.1
-        default:    // and also for all other cases
-                    hwConfig.version        = 1;
-                    hwConfig.hddIface       = HDD_IF_ACSI;
-                    hwConfig.fwMismatch     = false;
-                    break;
-    }
-
-    // if the HD IF changed (received the 1st HW info) and we're on SCSI bus, we need to send the new (limited) SCSI IDs to Hans, so he won't answer on Initiator SCSI ID
-    if((prevHwHddIface != hwConfig.hddIface) && hwConfig.hddIface == HDD_IF_SCSI) {
-        Debug::out(LOG_DEBUG, "Found out that we're running on SCSI bus - will resend the ID bits configuration to Hans");
-        setEnabledIDbits = true;
-
-        pthread_mutex_lock(&shared.mtxScsi);
-        shared.scsi->updateTranslatedBootMedia();                   // also update CE_DD bootsector with proper SCSI ID
-        pthread_mutex_unlock(&shared.mtxScsi);
-
-        fillDisplayLines();                                         // fill lines for front display
-    }
-
-    if(memcmp(&hwConfigOld, &hwConfig, sizeof(THwConfig)) != 0) {    // config changed? save it
-        saveHwConfig();
-    }
-}
-
 void CCoreThread::saveHwConfig(void)
 {
     Settings s;
@@ -958,10 +905,16 @@ void CCoreThread::showHwVersion(void)
 {
     char tmp[256];
 
-    Debug::out(LOG_INFO, "Reporting this as HW INFO...");     // show in log file
+    Debug::out(LOG_INFO, "Reporting this as HW INFO...");   // show in log file
 
-    // HW version is 1 or 2, and in other cases defaults to 1
-    sprintf(tmp, "HW_VER: %d", (hwConfig.version == 1 || hwConfig.version == 2) ? hwConfig.version : 1);
+    // HW version is 1 | 2 | 3, and in other cases defaults to 1
+    int hwVer = 1;
+
+    if(hwConfig.version >= 1 && hwConfig.version <=3) {     // if HW version is within valid values, use it
+        hwVer = hwConfig.version;
+    }
+    
+    sprintf(tmp, "HW_VER: %d", hwVer);
     printf("\n%s\n", tmp);                  // show on stdout
     Debug::out(LOG_INFO, "   %s", tmp);    // show in log file
 
@@ -992,16 +945,6 @@ void CCoreThread::setFloppyImageLed(int ledNo)
         newFloppyImageLed       = ledNo;
         setNewFloppyImageLed    = true;
     }
-}
-
-int CCoreThread::bcdToInt(int bcd)
-{
-    int a,b;
-
-    a = bcd >> 4;       // upper nibble
-    b = bcd &  0x0f;    // lower nibble
-
-    return ((a * 10) + b);
 }
 
 void CCoreThread::handleSendTrack(BYTE *inBuf)

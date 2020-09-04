@@ -4,6 +4,10 @@
 #include "gpio.h"
 #include "../utils.h"
 #include "../debug.h"
+#include "../global.h"
+#include "../update.h"
+
+extern THwConfig hwConfig;
 
 ChipInterface12::ChipInterface12()
 {
@@ -174,17 +178,35 @@ void ChipInterface12::setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id
     }
 }
 
+int ChipInterface12::bcdToInt(int bcd)
+{
+    int a,b;
+
+    a = bcd >> 4;       // upper nibble
+    b = bcd &  0x0f;    // lower nibble
+
+    return ((a * 10) + b);
+}
+
 void ChipInterface12::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
 {
     if(hardNotFloppy) {     // for HDD
         // bufOut should be filled with Hans config - by calling setHDDconfig() (and not calling anything else inbetween)
         conSpi->txRx(SPI_CS_HANS, HDD_FW_RESPONSE_LEN, bufOut, inFwVer);
 
+        convertXilinxInfo(inFwVer[5]);  // convert xilinx info into hwInfo struct
+
         hansConfigWords.current.acsi = MAKEWORD(inFwVer[6], inFwVer[7]);
         hansConfigWords.current.fdd  = MAKEWORD(inFwVer[8],        0);
+
+        int year = bcdToInt(inFwVer[1]) + 2000;
+        Update::versions.current.hans.fromInts(year, bcdToInt(inFwVer[2]), bcdToInt(inFwVer[3]));       // store found FW version of Hans
     } else {                // for FDD
         // bufOut should be filled with Franz config - by calling setFDDconfig() (and not calling anything else inbetween)
         conSpi->txRx(SPI_CS_FRANZ, FDD_FW_RESPONSE_LEN, bufOut, inFwVer);
+
+        int year = bcdToInt(inFwVer[1]) + 2000;
+        Update::versions.current.franz.fromInts(year, bcdToInt(inFwVer[2]), bcdToInt(inFwVer[3]));              // store found FW version of Franz
     }
 }
 
@@ -352,4 +374,53 @@ BYTE* ChipInterface12::fdd_sectorWritten(int &side, int &track, int &sector, int
     side    = (bufIn[0] & 0x80) ? 1 : 0;
 
     return bufIn;                                           // return pointer to received written sector
+}
+
+void ChipInterface12::convertXilinxInfo(BYTE xilinxInfo)
+{
+    THwConfig hwConfigOld = hwConfig;
+
+    switch(xilinxInfo) {
+        // GOOD
+        case 0x21:  hwConfig.version        = 2;                        // v.2
+                    hwConfig.hddIface       = HDD_IF_ACSI;              // HDD int: ACSI
+                    hwConfig.fwMismatch     = false;
+                    break;
+
+        // GOOD
+        case 0x22:  hwConfig.version        = 2;                        // v.2
+                    hwConfig.hddIface       = HDD_IF_SCSI;              // HDD int: SCSI
+                    hwConfig.fwMismatch     = false;
+                    break;
+
+        // BAD: SCSI HW, ACSI FW
+        case 0x29:  hwConfig.version        = 2;                        // v.2
+                    hwConfig.hddIface       = HDD_IF_SCSI;              // HDD int: SCSI
+                    hwConfig.fwMismatch     = true;                     // HW + FW mismatch!
+                    break;
+
+        // BAD: ACSI HW, SCSI FW
+        case 0x2a:  hwConfig.version        = 2;                        // v.2
+                    hwConfig.hddIface       = HDD_IF_ACSI;              // HDD int: ACSI
+                    hwConfig.fwMismatch     = true;                     // HW + FW mismatch!
+                    break;
+
+        // GOOD
+        case 0x11:  // use this for v.1
+        default:    // and also for all other cases
+                    hwConfig.version        = 1;
+                    hwConfig.hddIface       = HDD_IF_ACSI;
+                    hwConfig.fwMismatch     = false;
+                    break;
+    }
+
+    // if the HD IF changed (received the 1st HW info) and we're on SCSI bus, we need to send the new (limited) SCSI IDs to Hans, so he won't answer on Initiator SCSI ID
+    if((hwConfigOld.hddIface != hwConfig.hddIface) && hwConfig.hddIface == HDD_IF_SCSI) {
+        hwConfig.changed = true;
+        Debug::out(LOG_DEBUG, "Found out that we're running on SCSI bus - will resend the ID bits configuration to Hans");
+    }
+
+    if(memcmp(&hwConfigOld, &hwConfig, sizeof(THwConfig)) != 0) {    // config changed? save it
+        hwConfig.changed = true;
+    }
 }

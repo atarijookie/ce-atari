@@ -58,9 +58,7 @@ private:
     // handle FW version
     void handleFwVersion_hans(void);
     void handleFwVersion_franz(void);
-    int bcdToInt(int bcd);
 
-    void convertXilinxInfo(BYTE xilinxInfo);
     void saveHwConfig(void);
     void getIdBits(BYTE &enabledIDbits, BYTE &sdCardAcsiId);
 

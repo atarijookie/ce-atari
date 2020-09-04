@@ -112,7 +112,10 @@ private:
 
     void responseStart(int bufferLengthInBytes);        // use this to start creating response (commands) to Hans or Franz
     void responseAddWord(BYTE *bfr, WORD value);        // add a WORD to the response (command) to Hans or Franz
-    void responseAddByte(BYTE *bfr, BYTE value);        // add a BYTE to the response (command) to Hans or Franz    
+    void responseAddByte(BYTE *bfr, BYTE value);        // add a BYTE to the response (command) to Hans or Franz
+
+    int bcdToInt(int bcd);
+    void convertXilinxInfo(BYTE xilinxInfo);            // used to process xilinx info into hwInfo struct
 };
 
 #endif // CHIPINTERFACE12_H
