@@ -70,6 +70,16 @@ if [ -f /tmp/FW_FLASH_XILINX ]; then    # if we're forcing to flash Xilinx (e.g.
 fi
 
 #--------------------------
+# find out which HW version we're running
+# If we're not running v1 or v2, we can skip flashing Hans and Franz, as they are not present in v3.
+hw_ver=$( /ce/whichhw.sh )
+
+if [ "$hw_ver" -eq "3"]; then           # on v3 hardware don't flash Hans and Franz (they are not there!)
+    update_hans=0
+    update_franz=0
+fi
+
+#--------------------------
 # do the actual chip flashing
 
 # update xilinx
