@@ -13,7 +13,7 @@
     #define spiCShigh()     { bcm2835_gpio_write(PIN_CS_SDCARD, HIGH); }
 
     #define spiCShigh_ff_return(X) { bcm2835_spi_transfer(0xff); bcm2835_gpio_write(PIN_CS_SDCARD, HIGH); return X; }
-        
+
 #else
     #define spiCSlow()      {  }
     #define spiCShigh()     {  }
@@ -23,10 +23,10 @@
 
 //--------------------------------------------------------
 
-#define	DEVICETYPE_NOTHING  0x00
-#define	DEVICETYPE_MMC      0x01
-#define	DEVICETYPE_SD       0x02
-#define	DEVICETYPE_SDHC     0x03 
+#define DEVICETYPE_NOTHING  0x00
+#define DEVICETYPE_MMC      0x01
+#define DEVICETYPE_SD       0x02
+#define DEVICETYPE_SDHC     0x03
 
 //--------------------------------
 // constants/macros/typdefs
@@ -110,12 +110,12 @@ private:
     BYTE*   txBufferFF;
     BYTE*   rxBuffer;
 
-    BYTE 	type;           // DEVICETYPE_...
-    bool	isInit;         // is initialized and working? true / false
-    bool	mediaChanged;   // when media is changed
+    BYTE    type;           // DEVICETYPE_...
+    bool    isInit;         // is initialized and working? true / false
+    bool    mediaChanged;   // when media is changed
 
-    DWORD	BCapacity;      // device capacity in bytes
-    DWORD	SCapacity;      // device capacity in sectors
+    DWORD   BCapacity;      // device capacity in bytes
+    DWORD   SCapacity;      // device capacity in sectors
 
     //------------------------
     DWORD opEndTime;      // maximum time when the operation should time out
@@ -146,7 +146,7 @@ private:
     BYTE mmcCommand(BYTE cmd, DWORD arg);
     BYTE mmcSendCommand5B(BYTE cmd, DWORD arg, BYTE *R7buff);
 
-    // Retrieves the CSD Register from the mmc 
+    // Retrieves the CSD Register from the mmc
     BYTE  MMC_CardType(unsigned char *buff);
     DWORD MMC_Capacity(void);
     DWORD SDHC_Capacity(void);
@@ -154,6 +154,11 @@ private:
     BYTE EraseCard(void);
 
     void tryToEmptySdCardBuffer(void);
+
+    bool waitWhileBusy_equalToZero(void);
+    bool waitWhileBusy_equalToValue(BYTE busyValue);
+    bool waitWhileBusy_notEqualToFF(void);
+    bool waitWhileBusy_notEqualToValue(BYTE wantedValue);
 };
 
 #endif // _SPISD_H_

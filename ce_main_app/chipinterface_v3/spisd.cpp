@@ -55,11 +55,11 @@ void SpiSD::spiSetFrequency(BYTE highNotLow)
 
 void SpiSD::clearStruct(void)
 {
-    isInit       = false;                                            
+    isInit       = false;
     type         = DEVICETYPE_NOTHING;
     mediaChanged = false;
     BCapacity    = 0;
-	SCapacity    = 0;
+    SCapacity    = 0;
 }
 
 void SpiSD::init(void)
@@ -67,7 +67,7 @@ void SpiSD::init(void)
     WORD i;
     BYTE res, stat;
     DWORD dRes;
-    
+
     timeoutStart();
 
     //--------------------------
@@ -75,76 +75,77 @@ void SpiSD::init(void)
     spiSetFrequency(SPI_FREQ_LOW);          // low SPI frequency
 
     res = reset();                          // init the MMC card
-            
+
     if(res == DEVICETYPE_NOTHING) {         // if failed to init
         return;
     }
 
     // now to test if we can read from the card
-    stat = mmcReadJustForTest(0);        
+    stat = mmcReadJustForTest(0);
 
     if(stat) {
         return;
-    }                       
+    }
 
-    // get card capacity in blocks 
+    // get card capacity in blocks
     if(res == DEVICETYPE_SDHC) {
         dRes = SDHC_Capacity();
     } else {
         dRes = MMC_Capacity();
     }
-                
+
     type      = res;              // store device type
     SCapacity = dRes;             // store capacity in sectors
     BCapacity = dRes << 9;        // store capacity in bytes
     isInit    = true;             // set the flag
     mediaChanged = true;
-    
-    spiSetFrequency(SPI_FREQ_HIGH); 
+
+    spiSetFrequency(SPI_FREQ_HIGH);
 }
 //-----------------------------------------------
 // It seems that on some cards the init sequence (or something from it) might cause the card
-// to want to talk a little bit more than expected, and thus the 1st command issued to this 
+// to want to talk a little bit more than expected, and thus the 1st command issued to this
 // specific card might fail. For this situation just sending FFs and reading back the results
-// might cure the situation. (Happened to me on 1 out of 5 cards, other 4 were working fine). 
+// might cure the situation. (Happened to me on 1 out of 5 cards, other 4 were working fine).
 
 void SpiSD::tryToEmptySdCardBuffer(void)
 {
-    WORD j;
-
+#ifndef ONPC
     bcm2835_spi_transfernb(txBufferFF, rxBuffer, 2);
 
     spiCSlow();
     bcm2835_spi_transfernb(txBufferFF, rxBuffer, 1024);
- 
+
     spiCShigh();
     bcm2835_spi_transfernb(txBufferFF, rxBuffer, 2);
+#endif
 }
 
 BYTE SpiSD::reset(void)
 {
+#ifndef ONPC
     BYTE r1;
     BYTE buff[5];
     int  devType = DEVICETYPE_NOTHING;
-    
+
     spiSetFrequency(SPI_FREQ_LOW);
     spiCShigh();
-    
+
     // send dummy bytes with CS high before accessing
     bcm2835_spi_transfernb(txBufferFF, rxBuffer, 10);
 
     //---------------
-    // now send the card to IDLE state  
+    // now send the card to IDLE state
     r1 = mmcSendCommand(MMC_GO_IDLE_STATE, 0);
-    
+
     if(r1 != 1) {
         return DEVICETYPE_NOTHING;
     }
 
     //---------------
- 
+
     r1 = mmcSendCommand5B(SDHC_SEND_IF_COND, 0x1AA, buff);         // init SDHC card
-    
+
     if(r1 == 0x01)              // if got the right response -> it's an SD or SDHC card
     {
         if(buff[3] == 0x01 && buff[4] == 0xaa)      // if the rest of R7 is OK (OK echo and voltage)
@@ -159,7 +160,7 @@ BYTE SpiSD::reset(void)
 
                 if(r1 != 1) {                       // if invalid reply to CMD55, then it's MMC card
                     devType = DEVICETYPE_MMC;
-                    break;          
+                    break;
                 }
 
                 r1 = mmcSendCommand(SD_SEND_OP_COND, 0x40000000); // ACMD41 = CMD55 + CMD41 ---  HCS (High Capacity Support) bit set
@@ -170,7 +171,7 @@ BYTE SpiSD::reset(void)
                 }
             }
             //--------------
-            r1 = mmcSendCommand5B(MMC_READ_OCR, 0, buff);          
+            r1 = mmcSendCommand5B(MMC_READ_OCR, 0, buff);
 
             if(r1 == 0)                         // if command succeeded
             {
@@ -178,27 +179,31 @@ BYTE SpiSD::reset(void)
                     return DEVICETYPE_SDHC;
                 }
             }
-        }       
+        }
     }
-    
+
     if(devType == DEVICETYPE_SD && r1 != 0) {     // if it's SD but failed to initialize
         return DEVICETYPE_NOTHING;
     }
-        
+
     //-------------------------------
     if(devType == DEVICETYPE_MMC) {
         // try to initialize the MMC card
         r1 = mmcCmdLow(MMC_SEND_OP_COND, 0, 0);
-    
+
         if(r1 != 0) {
             return DEVICETYPE_NOTHING;
         }
     }
-    
+
     // set block length to 512 bytes
     r1 = mmcSendCommand(MMC_SET_BLOCKLEN, 512);
 
     return devType;
+#else
+
+    return DEVICETYPE_NOTHING;
+#endif
 }
 //-----------------------------------------------
 BYTE SpiSD::mmcCmd(BYTE cmd, DWORD arg, BYTE val)
@@ -207,23 +212,24 @@ BYTE SpiSD::mmcCmd(BYTE cmd, DWORD arg, BYTE val)
 
     do {
         r1 = mmcSendCommand(cmd, arg);
-              
+
         if(timeout()) {
             return 0xff;
         }
 
     } while(r1 != val);
-    
+
     return r1;
 }
 //-----------------------------------------------
 BYTE SpiSD::mmcCmdLow(BYTE cmd, DWORD arg, BYTE val)
 {
+#ifndef ONPC
     BYTE r1;
     int i;
 
     spiCSlow();          // CS to L
-    
+
     do
     {
         // issue the command
@@ -241,14 +247,17 @@ BYTE SpiSD::mmcCmdLow(BYTE cmd, DWORD arg, BYTE val)
     } while(r1 != val);
 
     bcm2835_spi_transfernb(txBufferFF, rxBuffer, 10);
-    
     spiCShigh();         // CS to H
-    
+
     return r1;
+#else
+    return 0;
+#endif
 }
 //-----------------------------------------------
 BYTE SpiSD::mmcSendCommand(BYTE cmd, DWORD arg)
 {
+#ifndef ONPC
     BYTE r1;
 
     // assert chip select
@@ -260,11 +269,15 @@ BYTE SpiSD::mmcSendCommand(BYTE cmd, DWORD arg)
     r1 = mmcCommand(cmd, arg);
 
     spiCShigh_ff_return(r1);    // send 0xff, CS high, return value
+#else
+    return 0;
+#endif
 }
 //-----------------------------------------------
 BYTE SpiSD::mmcSendCommand5B(BYTE cmd, DWORD arg, BYTE *buff)
 {
-    BYTE r1, i;
+#ifndef ONPC
+    BYTE r1;
 
     // assert chip select
     spiCSlow();          // CS to L
@@ -272,61 +285,59 @@ BYTE SpiSD::mmcSendCommand5B(BYTE cmd, DWORD arg, BYTE *buff)
     bcm2835_spi_transfer(0xff);
 
     // issue the command
-    r1 = mmcCommand(cmd, arg);
-    buff[0] = r1;
-    
-    // receive the rest of R7 register  
+    buff[0] = mmcCommand(cmd, arg);
+
+    // receive the rest of R7 register
     bcm2835_spi_transfernb(txBufferFF, buff+1, 4);
 
     spiCShigh_ff_return(r1);    // send 0xff, CS high, return value
+#else
+    return 0;
+#endif
 }
 //-----------------------------------------------
 BYTE SpiSD::mmcCommand(BYTE cmd, DWORD arg)
 {
+#ifndef ONPC
     BYTE r1;
 
     // construct command
     BYTE bfr[7];
     bfr[0] = 0xff;
-    bfr[1] = cmd | 0x40, 
-    bfr[2] = arg >> 24; 
-    bfr[3] = arg >> 16; 
-    bfr[4] = arg >>  8; 
-    bfr[5] = arg; 
+    bfr[1] = cmd | 0x40,
+    bfr[2] = arg >> 24;
+    bfr[3] = arg >> 16;
+    bfr[4] = arg >>  8;
+    bfr[5] = arg;
     bfr[6] = (cmd == SDHC_SEND_IF_COND) ? 0x86 : 0x95;  // crc valid only for: SDHC_SEND_IF_COND / MMC_GO_IDLE_STATE
 
     // send command
     bcm2835_spi_transfernb(bfr, rxBuffer, 7);
-    
-    // end command
-    // wait for response
-    // if more than 8 retries, card has timed-out
-    // return the received 0xFF
-    while(true)
-    {
-        r1 = bcm2835_spi_transfer(0xff);
 
-        if(r1 != 0xff)
-            break;
-        
-        if(timeout()) {
-            break;
-        }
+    // wait for response - while it returning the busy value
+    bool good = waitWhileBusy_equalToValue(0xff);
+
+    if(!good) {                                 // if failed, return 0xff
+        spiCShigh_ff_return(0xff);
     }
-    
+
     // return response
     return r1;
+#else
+    return 0;
+#endif
 }
 //**********************************************************************
 BYTE SpiSD::mmcRead(DWORD sector)
 {
+#ifndef ONPC
     BYTE r1;
     DWORD i;
     BYTE byte;
     BYTE failed = 0;
 
     timeoutStart();
-    
+
     // assert chip select
     spiCSlow();          // CS to L
 
@@ -342,28 +353,12 @@ BYTE SpiSD::mmcRead(DWORD sector)
     }
 
     //------------------------
-    // wait for block start
-    bool fail = false;
+    // wait for block start - while it's not returning expected value
+    bool good = waitWhileBusy_notEqualToValue(MMC_STARTBLOCK_READ);
 
-    while(i)
-    {
-        r1 = spi2_TxRx(0xFF);                            // get byte
-
-        if(r1 == MMC_STARTBLOCK_READ)                   // if it's the wanted byte
-            break;
-        
-        if(timeout()) {
-            fail = true;
-            break;
-        }
+    if(!good) {                                 // if failed, return 0xff
+        spiCShigh_ff_return(0xff);
     }
-    //------------------------
-    if(fail) {                                       // timeout?
-        spiCShigh_ff_return(0xff);    // send 0xff, CS high, return value
-    }
-    //------------------------
-    // read in data
-    ACSI_DATADIR_READ();
 
     // get whole sector into rxBuffer
     // TODO: pass sector data to caller
@@ -374,23 +369,22 @@ BYTE SpiSD::mmcRead(DWORD sector)
 
     spiCShigh();         // CS to H
 
-///////////////////////////////////
-// !!! THIS HELPS TO SYNCHRONIZE THE THING !!!
-    bcm2835_spi_transfernb(txBufferFF, rxBuffer, 3);
-///////////////////////////////////
+    bcm2835_spi_transfernb(txBufferFF, rxBuffer, 3);        // !!! THIS HELPS TO SYNCHRONIZE THE THING !!!
+#endif
 
     // return success
-    return 0;   
+    return 0;
 }
 //-----------------------------------------------
 BYTE SpiSD::mmcReadMore(DWORD sector, WORD count)
 {
+#ifndef ONPC
     BYTE r1, quit;
     WORD i,j;
     BYTE byte;
 
     timeoutStart();
-    
+
     // assert chip select
     spiCSlow();                                             // CS to L
 
@@ -407,26 +401,24 @@ BYTE SpiSD::mmcReadMore(DWORD sector, WORD count)
 
     // read in data
     quit = 0;
-    
+
     for(j=0; j<count; j++)                                  // read this many sectors
     {
-        // wait for block start
-        while(true) {
-            r1 = bcm2835_spi_transfer(0xff);
+        // wait for block start - while it's not returning expected value
+        bool good = waitWhileBusy_notEqualToValue(MMC_STARTBLOCK_READ);
 
-            if(r1 == MMC_STARTBLOCK_READ) {
-                break;
-            }
+        if(!good) {                                 // if failed, return 0xff
+            spiCShigh_ff_return(0xff);
         }
 
         // read sector from SD card
         // TODO: pass rxBuffer to caller
         bcm2835_spi_transfernb(txBufferFF, rxBuffer, 512);
-       
+
         //---------------
         if(j == (count - 1))                                // if we've read the last sector
             break;
-        
+
         // if we need to read more, then just read 16-bit CRC
         bcm2835_spi_transfernb(txBufferFF, rxBuffer, 2);
     }
@@ -435,21 +427,27 @@ BYTE SpiSD::mmcReadMore(DWORD sector, WORD count)
     mmcCommand(MMC_STOP_TRANSMISSION, 0);               // send command instead of CRC
 
     spiCShigh_ff_return(0);    // send 0xff, CS high, return value
+
+#else
+    return 0;
+#endif
 }
 //-----------------------------------------------
 BYTE SpiSD::mmcWriteMore(DWORD sector, WORD count)
 {
+#ifndef ONPC
     BYTE r1, quit;
     WORD i,j;
     DWORD thisSector;
+    bool good;
 
     timeoutStart();
-    
+
     // assert chip select
     spiCSlow();          // CS to L
 
     thisSector = sector;
-    
+
     if(type != DEVICETYPE_SDHC)          // for non SDHC cards change sector into address
         sector = sector<<9;
 
@@ -461,7 +459,7 @@ BYTE SpiSD::mmcWriteMore(DWORD sector, WORD count)
     if(r1 != 0x00) {
         spiCShigh_ff_return(r1);    // send 0xff, CS high, return value
     }
-    
+
     //--------------
     // read in data
     for(j=0; j<count; j++)                      // read this many sectors
@@ -471,54 +469,70 @@ BYTE SpiSD::mmcWriteMore(DWORD sector, WORD count)
             quit = 1;
             break;                              // quit
         }
-        //--------------            
-        while(true) {                           // wait while busy
-            r1 = bcm2835_spi_transfer(0xff);
+        //--------------
+        // wait while card is busy - while it's not returning 0xff
+        good = waitWhileBusy_notEqualToFF();
 
-            if(r1 == 0xff) {
-                break;
+        if(!good) {                                 // if failed, return 0xff
+            spiCShigh_ff_return(0xff);
         }
 
         bcm2835_spi_transfer(MMC_STARTBLOCK_MWRITE);        // 0xfc as start write multiple blocks
 
         // TODO: instead of txBufferFF send some input buffer to card
         bcm2835_spi_transfernb(txBufferFF, rxBuffer, 512);
-        
+
         // send more: 16-bit CRC
         bcm2835_spi_transfernb(txBufferFF, rxBuffer, 2);
 
         thisSector++;                           // increment real sector #
     }
     //-------------------------------
-    // TODO: wait while busy
-    while(spi2_TxRx(0xFF) != 0xff);              // while busy
+    // wait while card is busy - while it's not returning 0xff
+    good = waitWhileBusy_notEqualToFF();
 
-    spi2_TxRx(MMC_STOPTRAN_WRITE);               // 0xfd to stop write multiple blocks
+    if(!good) {                                 // if failed, return 0xff
+        spiCShigh_ff_return(0xff);
+    }
 
-    // TODO: wait while busy
-    while(spi2_TxRx(0xFF) != 0xff);              // while busy
+    bcm2835_spi_transfer(MMC_STOPTRAN_WRITE);   // 0xfd to stop write multiple blocks
+
+    // wait while card is busy - while it's not returning 0xff
+    good = waitWhileBusy_notEqualToFF();
+
+    if(!good) {                                 // if failed, return 0xff
+        spiCShigh_ff_return(0xff);
+    }
 
     //-------------------------------
     // for the MMC cards send the STOP TRANSMISSION also
-    if(type == DEVICETYPE_MMC)       
+    if(type == DEVICETYPE_MMC)
     {
         mmcCommand(MMC_STOP_TRANSMISSION, 0);
 
-        // TODO: wait while busy
-        while(spi2_TxRx(0xFF) != 0xff);          // while busy
+        // wait while card is busy - while it's not returning 0xff
+        good = waitWhileBusy_notEqualToFF();
+
+        if(!good) {                                 // if failed, return 0xff
+            spiCShigh_ff_return(0xff);
+        }
     }
 
     //-------------------------------
     spiCShigh_ff_return(0);    // send 0xff, CS high, return value
+#else
+    return 0;
+#endif
 }
 //-----------------------------------------------
 BYTE SpiSD::mmcReadJustForTest(DWORD sector)
 {
+#ifndef ONPC
     BYTE r1;
     DWORD i;
 
     timeoutStart();
-    
+
     // assert chip select
     spiCSlow();          // CS to L
 
@@ -534,42 +548,39 @@ BYTE SpiSD::mmcReadJustForTest(DWORD sector)
     }
 
     //------------------------
-    // wait for block start
-    while(true)
-    {
-        r1 = bcm2835_spi_transfer(0xff);
+    // wait for block start - while it's not returning expected value
+    bool good = waitWhileBusy_notEqualToValue(MMC_STARTBLOCK_READ);
 
-        if(r1 == MMC_STARTBLOCK_READ)      // if it's the wanted byte
-            break;
-        
-        if(timeout()) {
-            spiCShigh_ff_return(0xff);    // send 0xff, CS high, return value
-        }
+    if(!good) {                                 // if failed, return 0xff
+        spiCShigh_ff_return(0xff);
     }
+
     //------------------------
     // read in data and don't care about them + 16 bit crc + padding 1 byte
     bcm2835_spi_transfernb(txBufferFF, rxBuffer, 515);
 
     spiCShigh();                                // CS to H
+#endif
 
     // return success
-    return 0;   
+    return 0;
 }
 //-----------------------------------------------
 BYTE SpiSD::mmcWrite(DWORD sector)
 {
+#ifndef ONPC
     BYTE r1;
     DWORD i;
-    
+
     timeoutStart();
-    
+
     //-----------------
     // assert chip select
     spiCSlow();                                 // CS to L
-    
+
     if(type != DEVICETYPE_SDHC)          // for non SDHC cards change sector into address
         sector = sector<<9;
-        
+
     // issue command
     r1 = mmcCommand(MMC_WRITE_BLOCK, sector);
 
@@ -577,7 +588,7 @@ BYTE SpiSD::mmcWrite(DWORD sector)
     if(r1 != 0x00) {
         spiCShigh_ff_return(r1);    // send 0xff, CS high, return value
     }
-    
+
     // send dummy
     bcm2835_spi_transfer(0xff);
 
@@ -590,7 +601,7 @@ BYTE SpiSD::mmcWrite(DWORD sector)
 
     // write 16-bit CRC (dummy values)
     bcm2835_spi_transfernb(txBufferFF, rxBuffer, 2);
-    
+
     // read data response token
     r1 = bcm2835_spi_transfer(0xff);
 
@@ -599,37 +610,29 @@ BYTE SpiSD::mmcWrite(DWORD sector)
     }
 
     // wait until card not busy
-    //------------------------
-    // wait for block start
-    BYTE res = 0;
+    bool good = waitWhileBusy_equalToZero();    // wait while the card is busy
 
-    while(true)
-    {
-        res = bcm2835_spi_transfer(0xff);
-
-        if(res != 0) {                          // if it's the wanted byte
-            res = 0;                            // success            
-            break;
-        }
-        
-        if(timeout()) {
-            res = 0xff;
-            break;
-        }
+    if(!good) {                                 // if failed, return 0xff
+        spiCShigh_ff_return(0xff);
     }
 
     //------------------------
-    spiCShigh_ff_return(res);    // send 0xff, CS high, return value
+    spiCShigh_ff_return(0);                     // send 0xff, CS high, return value
+
+#else
+    return 0;
+#endif
 }
 //--------------------------------------------------------
-/** 
-*   Retrieves the CSD Register from the mmc 
-* 
-*   @return      Status response from cmd 
-**/ 
-BYTE SpiSD::MMC_CardType(unsigned char *buff) 
-{ 
-    BYTE byte, i; 
+/**
+*   Retrieves the CSD Register from the mmc
+*
+*   @return      Status response from cmd
+**/
+BYTE SpiSD::MMC_CardType(unsigned char *buff)
+{
+#ifndef ONPC
+    BYTE byte, i;
 
     // assert chip select
     spiCSlow();                     // CS to L
@@ -637,38 +640,36 @@ BYTE SpiSD::MMC_CardType(unsigned char *buff)
     // issue the command
     byte = mmcCommand(MMC_SEND_CSD, 0);
 
-    if (byte!=0) {                     // if error 
+    if (byte!=0) {                     // if error
         spiCShigh_ff_return(byte);      // send 0xff, CS high, return value
-    } 
-
-    // wait for block start
-    for(i=0; i<16; i++) {
-        byte = bcm2835_spi_transfer(0xff);
-     
-        if(byte == MMC_STARTBLOCK_READ)
-            break;
     }
 
-    if (byte!=MMC_STARTBLOCK_READ) {   // if error 
-        spiCShigh_ff_return(byte);      // send 0xff, CS high, return value
-    } 
+    // wait for block start
+    bool good = waitWhileBusy_notEqualToValue(MMC_STARTBLOCK_READ);
+
+    if(!good) {                                 // if failed, return 0xff
+        spiCShigh_ff_return(0xff);
+    }
 
     // read the data
     bcm2835_spi_transfernb(txBufferFF, buff, 16);
 
     spiCShigh_ff_return(0);            // send 0xff, CS high, return value
-} 
+#else
+    return 0;
+#endif
+}
 //--------------------------------------------------------
-DWORD SpiSD::SDHC_Capacity(void) 
-{ 
- BYTE byte, blk_len; 
- DWORD c_size; 
- DWORD sectors; 
- BYTE buff[16];
- 
+DWORD SpiSD::SDHC_Capacity(void)
+{
+    BYTE byte, blk_len;
+    DWORD c_size;
+    DWORD sectors;
+    BYTE buff[16];
+
     timeoutStart();
- 
-    byte = MMC_CardType(buff); 
+
+    byte = MMC_CardType(buff);
 
     if(byte!=0)                     // if failed to get card type
         return 0xffffffff;
@@ -681,65 +682,66 @@ DWORD SpiSD::SDHC_Capacity(void)
     c_size = ((DWORD)(buff[7] & 0x3F) << 16) | ((DWORD)buff[8] << 8) | ((DWORD)(buff[9]));
     sectors = (c_size+1) << 10;     // get MaxSectors -> mcap=(csize+1)*512k -> msec=mcap/BytsPerSec(fix)
 
-    return sectors; 
+    return sectors;
 }
 //--------------------------------------------------------
-/** 
-*   Calculates the capacity of the MMC in blocks 
-* 
-*   @return   uint32 capacity of MMC in blocks or -1 in error; 
-**/ 
-DWORD SpiSD::MMC_Capacity(void) 
-{ 
- BYTE byte,data, multi, blk_len; 
- DWORD c_size; 
- DWORD sectors; 
- BYTE buff[16];
- 
- timeoutStart();
- 
- byte = MMC_CardType(buff); 
+/**
+*   Calculates the capacity of the MMC in blocks
+*
+*   @return   uint32 capacity of MMC in blocks or -1 in error;
+**/
+DWORD SpiSD::MMC_Capacity(void)
+{
+    BYTE byte,data, multi, blk_len;
+    DWORD c_size;
+    DWORD sectors;
+    BYTE buff[16];
 
- if (byte!=0)
+    timeoutStart();
+
+    byte = MMC_CardType(buff);
+
+    if (byte!=0)
     return 0xffffffff;
-    
- // got info okay 
- blk_len = 0x0F & buff[5]; // this should equal 9 -> 512 bytes for cards <= 1 GB
- 
- /*   ; get size into reg 
-      ;     6            7         8 
-      ; xxxx xxxx    xxxx xxxx    xxxx xxxx 
-      ;        ^^    ^^^^ ^^^^    ^^ 
- */ 
- 
- data    = (buff[6] & 0x03) << 6; 
- data   |= (buff[7] >> 2); 
- c_size  = data << 4; 
- data    = (buff[7] << 2) | ((buff[8] & 0xC0)>>6); 
- c_size |= data; 
-       
-      /*   ; get multiplier 
-         ;   9         10 
-         ; xxxx xxxx    xxxx xxxx 
-         ;        ^^    ^ 
-      */ 
-      
- multi    = ((buff[9] & 0x03 ) << 1); 
- multi   |= ((buff[10] & 0x80) >> 7); 
- sectors  = (c_size + 1) << (multi + 2); 
- 
- if(blk_len != 9)                           // sector size > 512B?
+
+    // got info okay
+    blk_len = 0x0F & buff[5]; // this should equal 9 -> 512 bytes for cards <= 1 GB
+
+    /*   ; get size into reg
+      ;     6            7         8
+      ; xxxx xxxx    xxxx xxxx    xxxx xxxx
+      ;        ^^    ^^^^ ^^^^    ^^
+    */
+
+    data    = (buff[6] & 0x03) << 6;
+    data   |= (buff[7] >> 2);
+    c_size  = data << 4;
+    data    = (buff[7] << 2) | ((buff[8] & 0xC0)>>6);
+    c_size |= data;
+
+    /*   ; get multiplier
+     ;   9         10
+     ; xxxx xxxx    xxxx xxxx
+     ;        ^^    ^
+    */
+
+    multi    = ((buff[9] & 0x03 ) << 1);
+    multi   |= ((buff[10] & 0x80) >> 7);
+    sectors  = (c_size + 1) << (multi + 2);
+
+    if(blk_len != 9)                           // sector size > 512B?
     sectors = sectors << (blk_len - 9);     // then capacity of card is bigger
- 
- return sectors; 
+
+    return sectors;
 }
 //--------------------------------------------------------
 BYTE SpiSD::EraseCard(void)
 {
+#ifndef ONPC
     BYTE res;
 
     timeoutStart();
- 
+
     if(type != DEVICETYPE_MMC && type != DEVICETYPE_SD && type != DEVICETYPE_SDHC) {   // not a SD/MMC card?
         return 1;
     }
@@ -772,14 +774,20 @@ BYTE SpiSD::EraseCard(void)
     res = mmcCommand(MMC_ERASE, 0);         // issue the 'erase' command
 
     if(res!=0) {                            // if failed
-        spiCShigh_ff_return(res);    // send 0xff, CS high, return value
+        spiCShigh_ff_return(res);           // send 0xff, CS high, return value
     }
 
-    // TODO: wait while card is busy
-    while(spi2_TxRx(0xFF) == 0) {           // wait while the card is busy
+    // wait while card is busy
+    bool good = waitWhileBusy_equalToZero();    // wait while the card is busy
+
+    if(!good) {                                 // if failed, return 0xff
+        spiCShigh_ff_return(0xff);
     }
-    
+
     spiCShigh_ff_return(0);         // send 0xff, CS high, return value
+#else
+    return 0;
+#endif
 }
 
 //--------------------------------------------------------
@@ -794,4 +802,53 @@ bool SpiSD::timeout(void)
     return (now >= opEndTime);          // it's a timeout when current time is greater than end time
 }
 //--------------------------------------------------------
+bool SpiSD::waitWhileBusy_equalToZero(void)
+{
+    return waitWhileBusy_equalToValue(0);
+}
+//--------------------------------------------------------
+bool SpiSD::waitWhileBusy_equalToValue(BYTE busyValue)
+{
+#ifndef ONPC
+    // wait while the card is busy -- while output == busyValue
+    while(true) {
+        BYTE val = bcm2835_spi_transfer(0xff);
 
+        if(val != busyValue) {  // finally not busy? good
+            return true;
+        }
+
+        if(timeout()) { // timeout happened? fail
+            return false;
+        }
+    }
+#else
+    return false;
+#endif
+}
+//--------------------------------------------------------
+bool SpiSD::waitWhileBusy_notEqualToFF(void)
+{
+    return waitWhileBusy_notEqualToValue(0xff);
+}
+//--------------------------------------------------------
+bool SpiSD::waitWhileBusy_notEqualToValue(BYTE wantedValue)
+{
+#ifndef ONPC
+    // wait while the card is busy -- while output != wantedValue
+    while(true) {
+        BYTE val = bcm2835_spi_transfer(0xff);
+
+        if(val == wantedValue) {    // finally not busy? good
+            return true;
+        }
+
+        if(timeout()) {             // timeout happened? fail
+            return false;
+        }
+    }
+#else
+    return false;
+#endif
+}
+//--------------------------------------------------------
