@@ -2,7 +2,6 @@
 V = 0
 
 #ONPC   = yes
-# in the CFLAGS use ONPC_GPIO or ONPC_HIGHLEVEL or ONPC_NOTHING
 
 CXX	    = g++
 CC	    = gcc
@@ -21,7 +20,7 @@ LDLIBS = -lrt -lanl -lpthread -lcurl -ldl -lutil
 
 ifeq ($(ONPC),yes)
     OBJDIR = obj/onpc
-    CFLAGS += -DONPC_NOTHING -I./
+    CFLAGS += -DONPC -I./
     TARGET = cosmosex_onpc
     LDLIBS += -lcivetweb_onpc -ldl
 else

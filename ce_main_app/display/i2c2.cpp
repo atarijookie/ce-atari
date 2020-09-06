@@ -1,9 +1,9 @@
 #include "i2c2.h"
 
-#ifndef ONPC_NOTHING
+#ifndef ONPC
     #ifndef DISTRO_YOCTO
         #include <bcm2835.h>
-    
+
         #define PIN_SCL             RPI_V2_GPIO_P1_29
         #define PIN_SDA             RPI_V2_GPIO_P1_31
     #else
@@ -16,36 +16,41 @@ i2c2::i2c2() : i2c_started(false)
 {
 }
 
-#ifdef ONPC_NOTHING
-    bool i2c2::read_SCL()  {return true;}
-    bool i2c2::read_SDA()  {return true;}
-    void i2c2::clear_SCL() {}
-    void i2c2::clear_SDA() {}
-#else
     bool i2c2::read_SCL() // Set SCL as input and return current level of line, 0 or 1
     {
+#ifndef ONPC
         bcm2835_gpio_fsel(PIN_SCL, BCM2835_GPIO_FSEL_INPT);
         return (bcm2835_gpio_lev(PIN_SCL) == HIGH);
+#else
+        return true;
+#endif
     }
 
     bool i2c2::read_SDA() // Set SDA as input and return current level of line, 0 or 1
     {
+#ifndef ONPC
         bcm2835_gpio_fsel(PIN_SDA, BCM2835_GPIO_FSEL_INPT);
         return (bcm2835_gpio_lev(PIN_SDA) == HIGH);
+#else
+        return true;
+#endif
     }
 
     void i2c2::clear_SCL() // Actively drive SCL signal low
     {
+#ifndef ONPC
         bcm2835_gpio_fsel(PIN_SCL, BCM2835_GPIO_FSEL_OUTP);
         bcm2835_gpio_write(PIN_SCL, LOW);
+#endif
     }
 
     void i2c2::clear_SDA() // Actively drive SDA signal low
     {
+#ifndef ONPC
         bcm2835_gpio_fsel(PIN_SDA, BCM2835_GPIO_FSEL_OUTP);
         bcm2835_gpio_write(PIN_SDA, LOW);
-    }
 #endif
+    }
 
 void i2c2::arbitration_lost(char *where)
 {
@@ -54,6 +59,7 @@ void i2c2::arbitration_lost(char *where)
 
 void i2c2::i2c_start_cond()
 {
+#ifndef ONPC
     if (i2c_started)
     { // if started, do a restart cond
       // set SDA to 1
@@ -76,10 +82,12 @@ void i2c2::i2c_start_cond()
     bcm2835_delayMicroseconds(I2CBITDELAY);
     clear_SCL();
     i2c_started = true;
+#endif
 }
 
 void i2c2::i2c_stop_cond(void)
 {
+#ifndef ONPC
     // set SDA to 0
     clear_SDA();
     bcm2835_delayMicroseconds(I2CBITDELAY);
@@ -97,15 +105,17 @@ void i2c2::i2c_stop_cond(void)
     if (read_SDA() == 0)
     {
         //arbitration_lost("i2c_stop_cond");
-        return; 
+        return;
     }
     bcm2835_delayMicroseconds(I2CBITDELAY);
     i2c_started = false;
+#endif
 }
 
 // Write a bit to I2C bus
 void i2c2::i2c_write_bit(bool bit)
 {
+#ifndef ONPC
     if (bit)
     {
         read_SDA();
@@ -129,11 +139,13 @@ void i2c2::i2c_write_bit(bool bit)
     }
     bcm2835_delayMicroseconds(I2CBITDELAY);
     clear_SCL();
+#endif
 }
 
 // Read a bit from I2C bus
 bool i2c2::i2c_read_bit()
 {
+#ifndef ONPC
     bool bit;
     // Let the slave drive data
     read_SDA();
@@ -151,6 +163,10 @@ bool i2c2::i2c_read_bit()
 //  cout << "Bit: " << (bit ? "1" : "0" )<< endl;
 
     return bit;
+#else
+    return 0;
+#endif
+
 }
 
 // Write a byte to I2C bus. Return 0 if ack by the slave.

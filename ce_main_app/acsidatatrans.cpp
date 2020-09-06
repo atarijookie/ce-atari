@@ -8,31 +8,22 @@
 #include "acsidatatrans.h"
 #include "native/scsi_defs.h"
 
-#if defined(ONPC_HIGHLEVEL)
-    #include "socks.h"
-#endif
-
 AcsiDataTrans::AcsiDataTrans()
 {
     buffer          = new BYTE[ACSI_BUFFER_SIZE];        // 1 MB buffer
     recvBuffer      = new BYTE[ACSI_BUFFER_SIZE];
-    
-#if defined(ONPC_HIGHLEVEL)
-    bufferRead      = buffer;
-    bufferWrite     = recvBuffer;
-#endif
 
     memset(buffer,      0, ACSI_BUFFER_SIZE);            // init buffers to zero
     memset(recvBuffer,  0, ACSI_BUFFER_SIZE);
-    
+
     count           = 0;
     status          = SCSI_ST_OK;
     statusWasSet    = false;
     com             = NULL;
     dataDirection   = DATA_DIRECTION_READ;
-    
+
     dumpNextData    = false;
-    
+
     retryMod        = NULL;
 }
 
@@ -184,12 +175,6 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
         retryMod->copyDataAndStatus     (dataDirection, count, buffer, statusWasSet, status);
     }
 
-#if defined(ONPC_HIGHLEVEL) 
-    if((sockReadNotWrite == 0 && dataDirection != DATA_DIRECTION_WRITE) || (sockReadNotWrite != 0 && dataDirection == DATA_DIRECTION_WRITE)) {
-        Debug::out(LOG_ERROR, "!!!!!!!!! AcsiDataTrans::sendDataAndStatus -- DATA DIRECTION DISCREPANCY !!!!! sockReadNotWrite: %d, dataDirection: %d", sockReadNotWrite, dataDirection);
-    }
-#endif
-
     // for DATA write transmit just the status in a different way (on separate ATN)
     if(dataDirection == DATA_DIRECTION_WRITE) {
         sendStatusToHans(status);
@@ -200,39 +185,17 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
         return;
     }
     //---------------------------------------
-#if defined(ONPC_HIGHLEVEL)
-    if(dataDirection == DATA_DIRECTION_READ) {
-        // ACSI READ - send (write) data to other side, and also status
-        count = sockByteCount;
-
-        Debug::out(LOG_DEBUG, "sendDataAndStatus: %d bytes status: %02x (%d)", count, status, statusWasSet);
-
-//        Debug::out(LOG_ERROR, "AcsiDataTrans::sendDataAndStatus -- sending %d bytes and status %02x", count, status);
-//        Debug::out(LOG_DEBUG, "AcsiDataTrans::sendDataAndStatus -- %02x %02x %02x %02x %02x %02x %02x %02x ", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7]);
-    
-        BYTE padding = 0xff;
-        serverSocket_write(&padding, 1);
-        serverSocket_write(buffer, count);
-        
-        WORD sum = dataChecksum(buffer, count);     // calculate and send checksum
-        serverSocket_write((BYTE *) &sum, 2);
-        
-        serverSocket_write(&status, 1);
-        return;
-    }
-#endif
-    //---------------------------------------
     if(dumpNextData) {
         Debug::out(LOG_DEBUG, "sendDataAndStatus: %d bytes", count);
         BYTE *src = buffer;
 
         WORD dumpCnt = 0;
-        
+
         int lines = count / 32;
         if((count % 32) != 0) {
             lines++;
         }
-    
+
         for(int i=0; i<lines; i++) {
             char bfr[1024];
             char *b = &bfr[0];
@@ -242,7 +205,7 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
                 src++;
                 sprintf(b, "%02x ", val);
                 b += 3;
-                
+
                 dumpCnt++;
                 if(dumpCnt >= count) {
                     break;
@@ -251,7 +214,7 @@ void AcsiDataTrans::sendDataAndStatus(bool fromRetryModule)
 
             Debug::out(LOG_DEBUG, "%s", bfr);
         }
-        
+
         dumpNextData = false;
     }
     //---------------------------------------

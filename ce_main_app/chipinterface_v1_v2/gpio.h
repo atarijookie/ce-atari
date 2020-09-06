@@ -3,7 +3,7 @@
 
 #include "datatypes.h"
 
-#if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+#ifndef ONPC
 // if compiling for RPi
 
 #include <bcm2835.h>
@@ -40,59 +40,5 @@
 #define SPI_ATN_HANS    PIN_ATN_HANS
 #define SPI_ATN_FRANZ   PIN_ATN_FRANZ
 
-#else
-// if compiling for PC
-
-#define PIN_TDO                 3
-#define PIN_TDI                 5
-#define PIN_TCK                 7
-#define PIN_TMS                 11
-
-// pins for both STM32 programming
-#define PIN_RESET_HANS          27
-#define PIN_RESET_FRANZ         22
-#define PIN_TXD                 8
-#define PIN_RXD                 10
-#define PIN_TX_SEL1N2           18
-#define PIN_BOOT0_FRANZ_HANS    22
-
-// pins for communication with Franz and Hans
-#define PIN_ATN_HANS            23
-#define PIN_ATN_FRANZ           24
-#define PIN_CS_HANS             24
-#define PIN_CS_FRANZ            26
-#define PIN_MOSI                19
-#define PIN_MISO                21
-#define PIN_SCK                 23
-
-#define SPI_CS_HANS     24
-#define SPI_CS_FRANZ    26
-
-#define SPI_ATN_HANS    PIN_ATN_HANS
-#define SPI_ATN_FRANZ   PIN_ATN_FRANZ
-
-#define LOW     0
-#define HIGH    1
-
-#define BCM2835_GPIO_FSEL_OUTP              0
-#define BCM2835_GPIO_FSEL_INPT              0
-#define BCM2835_SPI_BIT_ORDER_MSBFIRST      0
-#define BCM2835_SPI_MODE0                   0
-#define BCM2835_SPI_CLOCK_DIVIDER_16        0
-#define BCM2835_SPI_CS0                     0
-#define BCM2835_SPI_CS1                     0
-
-void bcm2835_gpio_write(int a, int b);
-void bcmSpiAddData(int count, char *data);
-void bcm2835_delayMicroseconds(DWORD a);
-
-#endif
-
-
-bool gpio_open(void);
-void gpio_close(void);
-
-void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf);
-bool spi_atn(int whichSpiAtn);
-
-#endif
+#endif      // end of GPIO
+#endif      // end of _GPIO_H_

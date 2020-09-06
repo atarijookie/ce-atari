@@ -7,7 +7,7 @@
 // Parallel interface to chip.
 // Used in CosmosEx v3.
 
-#if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+#ifndef ONPC
 // if compiling for RPi
 
 #include <bcm2835.h>
@@ -43,8 +43,8 @@
 #define FPGA_ADDR_STATUS                0       // on read  - status byte
 #define FPGA_ADDR_CONFIG                0       // on write - config byte
 
-// HDD REGISTERS 
-#define FPGA_ADDR_WRITE_FIFO_DATA       3       // on read  - WRITE FIFO data 
+// HDD REGISTERS
+#define FPGA_ADDR_WRITE_FIFO_DATA       3       // on read  - WRITE FIFO data
 #define FPGA_ADDR_MODE_DIR_CNT          3       // on write - mode + dir + cnt (config byte)
 #define FPGA_ADDR_WRITE_FIFO_DATA2      4       // on read  - WRITE FIFO data (same as read from FPGA_ADDR_WRITE_FIFO_DATA)
 #define FPGA_ADDR_READ_FIFO_DATA        4       // on write - READ  FIFO data
@@ -52,7 +52,7 @@
 
 #define FPGA_ADDR_TEST_REG              7       // on write - write to test reg, on read - read inverted value of what was written to test reg
 
-// FDD REGISTERS 
+// FDD REGISTERS
 #define FPGA_ADDR_SIDE_TRACK            8       // on read  - requested side+track - values based on DIR, STEP and SIDE input signals
 #define FPGA_ADDR_READ_MFM_RAM          9       // on write - storing data into MFM RAM - MFM READ stream halted when this address is selected!
 #define FPGA_ADDR_STRMD_SIDE_TRACK      10      // on read  - streamed side+track - based on value found in MFM READ stream (exposed for debugging purposes)

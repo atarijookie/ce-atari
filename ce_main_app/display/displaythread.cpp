@@ -76,7 +76,7 @@ static void display_drawScreen(int screenIndex);
 // get pointer to buffer where the line string should be stored
 static char *get_displayLinePtr(int displayLineId);
 
-#ifndef ONPC_NOTHING
+#ifndef ONPC
     #ifndef DISTRO_YOCTO
         // on Raspbian - display, button, beeper
         #include <bcm2835.h>
@@ -96,7 +96,7 @@ void *displayThreadCode(void *ptr)
     DWORD btnDownStart = 0;
     int   btnDownTime = 0, btnDownTimePrev = 0;
 
-#ifndef ONPC_NOTHING
+#ifndef ONPC
     bcm2835_gpio_fsel(PIN_BEEPER, BCM2835_GPIO_FSEL_OUTP);      // config these extra GPIO pins here (not in the gpio_open())
     bcm2835_gpio_fsel(PIN_BUTTON, BCM2835_GPIO_FSEL_INPT);
 #endif
@@ -155,7 +155,7 @@ void *displayThreadCode(void *ptr)
                     redrawDisplay  = true;
                 }
             } else {                    // not enough time for next screen? check button state, possibly show recovery progress
-                #ifdef ONPC_NOTHING
+                #ifdef ONPC
                     bool btnDown = false;
                 #else
                     bool btnDown = bcm2835_gpio_lev(PIN_BUTTON) == LOW;
@@ -411,6 +411,7 @@ void display_setLine(int displayLineId, const char *newLineString)
 
 static void handleBeeperCommand(int beeperCommand, FloppyConfig *fc)
 {
+#ifndef ONPC
     // should be short-mid-long beep?
     if(beeperCommand >= BEEP_SHORT && beeperCommand <= BEEP_LONG) {
         int beepLengthMs[3] = {50, 150, 500};       // beep length: short, mid, long
@@ -455,6 +456,7 @@ static void handleBeeperCommand(int beeperCommand, FloppyConfig *fc)
         s.loadFloppyConfig(fc);
         return;
     }
+#endif
 }
 
 static void fillLine_datetime(void)

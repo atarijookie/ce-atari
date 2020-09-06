@@ -25,7 +25,7 @@ private:
     WORD remainingPacketLength;
     BYTE *paddingBuffer;
 
-    bool readHeader(int whichSpiCs, BYTE *outBuf, BYTE *inBuf); 
+    bool readHeader(int whichSpiCs, BYTE *outBuf, BYTE *inBuf);
     WORD swapWord(WORD val);
 
     void applyTxRxLimits(int whichSpiCs, BYTE *inBuff);

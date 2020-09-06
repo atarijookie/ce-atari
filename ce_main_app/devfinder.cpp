@@ -76,7 +76,7 @@ void DevFinder::lookForDevChanges(void)
             continue;
         }
 
-#ifdef ONPC_HIGHLEVEL //enable mounting of loop devices in PC build
+#ifdef ONPC
         if(file.substr(0,2)=="sd" ) {               // don't mount SCSI device on PC
             continue;
         }

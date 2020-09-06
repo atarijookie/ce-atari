@@ -35,10 +35,6 @@
 
 #include "periodicthread.h"
 
-#if defined(ONPC_HIGHLEVEL)
-    #include "socks.h"
-#endif
-
 #define DEV_CHECK_TIME_MS       3000
 #define UPDATE_CHECK_TIME       1000
 #define INET_IFACE_CHECK_TIME   1000
@@ -222,15 +218,9 @@ void CCoreThread::run(void)
         chipInterface->resetHDDandFDD();
     }
 
-#ifdef ONPC_NOTHING
+#ifdef ONPC
     shouldCheckHansFranzAlive   = false;
     flags.noReset               = true;
-#endif
-
-#if defined(ONPC_HIGHLEVEL)
-    shouldCheckHansFranzAlive = false;                                  // when running ONPC with HIGHLEVEL of emulation, don't check this
-
-    serverSocket_setParams(1111);
 #endif
 
     Debug::out(LOG_DEBUG, "Will check for Hans and Franz alive: %s", (shouldCheckHansFranzAlive ? "yes" : "no") );
@@ -258,7 +248,7 @@ void CCoreThread::run(void)
     lastFwInfoTime.hansResetTime    = Utils::getCurrentMs();
     lastFwInfoTime.franzResetTime   = Utils::getCurrentMs();
 
-#if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+#ifndef ONPC
     bool needsAction;
     bool hardNotFloppy;
 #endif
@@ -365,7 +355,7 @@ void CCoreThread::run(void)
 
         load.busy.markStart();                          // mark the start of the busy part of the code
 
-#if !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+#ifndef ONPC
         needsAction = chipInterface->actionNeeded(hardNotFloppy, inBuff);
 
         if(needsAction && hardNotFloppy) {    // hard drive needs action?
@@ -406,15 +396,7 @@ void CCoreThread::run(void)
             events.insertSpecialFloppyImageId = 0;
         }
 
-#if defined(ONPC_HIGHLEVEL)
-        bool res = gotCmd();
-
-        if(res) {
-            handleAcsiCommand(inBuf);
-        }
-#endif
-
-#if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+#ifndef ONPC
         // check for any ATN code waiting from Franz
         if(flags.noFranz) {                         // if running without Franz, don't communicate
             needsAction = false;
@@ -474,10 +456,6 @@ void CCoreThread::handleAcsiCommand(BYTE *bufIn)
 
     dbgVars.prevAcsiCmdTime = dbgVars.thisAcsiCmdTime;
     dbgVars.thisAcsiCmdTime = Utils::getCurrentMs();
-
-#if defined(ONPC_HIGHLEVEL)
-    memcpy(bufIn, header, 14);                          // get the cmd from received header
-#endif
 
     BYTE justCmd, tag1, tag2, module;
     BYTE *pCmd;

@@ -24,11 +24,14 @@ CConSpi::~CConSpi()
 
 void CConSpi::applyNoTxRxLimis(int whichSpiCs)
 {
+#ifndef ONPC
     setRemainingTxRxLen(whichSpiCs, NO_REMAINING_LENGTH, NO_REMAINING_LENGTH);  // set no remaining length
+#endif
 }
 
 bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *inBuf)
 {
+#ifndef ONPC
     BYTE outBuf[8];
 
     memset(outBuf, 0, 8);
@@ -91,10 +94,14 @@ bool CConSpi::waitForATN(int whichSpiCs, BYTE atnCode, DWORD timeoutMs, BYTE *in
         Debug::out(LOG_ERROR, "waitForATN %02x, but received %02x! Fail!", atnCode, inBuf[3]);
         return false;
     }
+#else
+    return true;
+#endif
 }
 
 bool CConSpi::readHeader(int whichSpiCs, BYTE *outBuf, BYTE *inBuf)
 {
+#ifndef ONPC
     WORD *inWord = (WORD *) inBuf;
     WORD marker;
     DWORD loops = 0;
@@ -122,12 +129,14 @@ bool CConSpi::readHeader(int whichSpiCs, BYTE *outBuf, BYTE *inBuf)
 
     txRx(whichSpiCs, 6, outBuf+2, inBuf+2);                 // receive: 0, ATN code, txLen, rxLen
     applyTxRxLimits(whichSpiCs, inBuf);                     // now apply txLen and rxLen
+#endif
 
     return true;
 }
 
 void CConSpi::applyTxRxLimits(int whichSpiCs, BYTE *inBuff)
 {
+#ifndef ONPC
     WORD *pwIn = (WORD *) inBuff;
 
     // words 0 and 1 are 0 and ATN code, words 2 and 3 are txLen, rxLen);
@@ -152,6 +161,7 @@ void CConSpi::applyTxRxLimits(int whichSpiCs, BYTE *inBuff)
     }
 
     setRemainingTxRxLen(whichSpiCs, txLen, rxLen);
+#endif
 }
 
 WORD CConSpi::swapWord(WORD val)
@@ -166,6 +176,8 @@ WORD CConSpi::swapWord(WORD val)
 
 void CConSpi::setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen)
 {
+#ifndef ONPC
+
 #ifdef DEBUG_SPI_COMMUNICATION
     if(txLen != NO_REMAINING_LENGTH || rxLen != NO_REMAINING_LENGTH || remainingPacketLength != NO_REMAINING_LENGTH) {
         Debug::out(LOG_DEBUG, "CConSpi::setRemainingTxRxLen - TX %d, RX %d, while the remainingPacketLength is %d", txLen, rxLen, remainingPacketLength);
@@ -203,6 +215,7 @@ void CConSpi::setRemainingTxRxLen(int whichSpiCs, WORD txLen, WORD rxLen)
     } else {
         remainingPacketLength = rxLen;
     }
+#endif
 }
 
 WORD CConSpi::getRemainingLength(void)
@@ -212,6 +225,7 @@ WORD CConSpi::getRemainingLength(void)
 
 void CConSpi::txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBufer)
 {
+#ifndef ONPC
     if(SWAP_ENDIAN) {       // swap endian on sending if required
         BYTE tmp;
 
@@ -243,5 +257,6 @@ void CConSpi::txRx(int whichSpiCs, int count, BYTE *sendBuffer, BYTE *receiveBuf
     if(remainingPacketLength != NO_REMAINING_LENGTH) {
         remainingPacketLength -= count;             // mark that we've send this much data
     }
+#endif
 }
 

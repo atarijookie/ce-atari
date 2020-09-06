@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
     CCoreThread *core;
     pthread_t   mountThreadInfo;
     pthread_t   downloadThreadInfo;
-#ifndef ONPC_NOTHING
+#ifndef ONPC
     pthread_t   ikbdThreadInfo;
 #endif
     pthread_t   floppyEncThreadInfo;
@@ -298,7 +298,7 @@ int main(int argc, char *argv[])
     res = pthread_create(&downloadThreadInfo, NULL, downloadThreadCode, NULL);  // create download thread and run it
     handlePthreadCreate(res, "ce download", &downloadThreadInfo);
 
-#ifndef ONPC_NOTHING
+#ifndef ONPC
     res = pthread_create(&ikbdThreadInfo, NULL, ikbdThreadCode, NULL);          // create the keyboard emulation thread and run it
     handlePthreadCreate(res, "ce ikbd", &ikbdThreadInfo);
 #endif
@@ -356,7 +356,7 @@ int main(int argc, char *argv[])
     Downloader::stop();
     pthread_join(downloadThreadInfo, NULL);             // wait until download  thread finishes
 
-#ifndef ONPC_NOTHING
+#ifndef ONPC
     printf("Stoping ikbd thread\n");
     pthread_kill(ikbdThreadInfo, SIGINT);               // stop the select()
     pthread_join(ikbdThreadInfo, NULL);                 // wait until ikbd      thread finishes

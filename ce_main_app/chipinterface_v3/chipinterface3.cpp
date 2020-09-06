@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 
-#if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+#ifndef ONPC
     #include <bcm2835.h>
 #endif
 
@@ -35,11 +35,13 @@ ChipInterface3::ChipInterface3()
     hddTransferInfo.scsiStatus = 0;
     hddTransferInfo.withStatus = true;
 
+#ifndef ONPC
     int dataPinsInit[8] = {PIN_DATA0, PIN_DATA1, PIN_DATA2, PIN_DATA3, PIN_DATA4, PIN_DATA5, PIN_DATA6, PIN_DATA7};
 
     for(int i=0; i<8; i++) {        // copy data pin numbers from this init array to member array, so we can reuse them without recreating them
         dataPins[i] = dataPinsInit[i];
     }
+#endif
 }
 
 ChipInterface3::~ChipInterface3()
@@ -54,7 +56,7 @@ int ChipInterface3::chipInterfaceType(void)
 
 bool ChipInterface3::open(void)
 {
-    #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+    #ifndef ONPC
 
     if(geteuid() != 0) {
         Debug::out(LOG_ERROR, "The bcm2835 library requires to be run as root, try again...");
@@ -69,7 +71,7 @@ bool ChipInterface3::open(void)
         return false;
     }
 
-    // JTAG pins 
+    // JTAG pins
     bcm2835_gpio_fsel(PIN_TDI,  BCM2835_GPIO_FSEL_OUTP);
     bcm2835_gpio_fsel(PIN_TMS,  BCM2835_GPIO_FSEL_OUTP);
     bcm2835_gpio_fsel(PIN_TCK,  BCM2835_GPIO_FSEL_OUTP);
@@ -131,7 +133,7 @@ bool ChipInterface3::open(void)
 
 void ChipInterface3::close(void)
 {
-    #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+    #ifndef ONPC
 
     fpgaDataPortSetDirection(BCM2835_GPIO_FSEL_INPT);   // FPGA data pins as inputs
 
@@ -360,6 +362,7 @@ int ChipInterface3::getCmdLengthFromCmdBytes(BYTE *cmd)
 
 bool ChipInterface3::getHddCommand(BYTE *inBuf)
 {
+#ifndef ONPC
     // HDD WRITE FIFO not empty, so we can read 0th cmd byte
     BYTE *cmd = inBuf + 8;                              // this is where we will store cmd
     memset(cmd, 0, 17);                                 // clear place for cmd
@@ -505,6 +508,10 @@ bool ChipInterface3::getHddCommand(BYTE *inBuf)
 
     inBuf[3] = ATN_ACSI_COMMAND;
     return true;                                        // this command was for enabled ID, so it needs handling
+#else
+
+    return false;
+#endif
 }
 
 void ChipInterface3::readRequestedTrackAndSideFromFPGA(void)
@@ -533,7 +540,7 @@ void ChipInterface3::storeRequestedTrackAndSideToInBuf(BYTE *inBuf)
 // If enough data was received for the whole floppy sector, this returns true and later the data will be retrieved using fdd_sectorWritten() function.
 bool ChipInterface3::handleFloppyWriteBytes(BYTE *inBuf)
 {
-    #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+    #ifndef ONPC
 
     static WORD header = 0;                             // read new byte in the lower part, got header if it contains 0xCAFE
 
@@ -765,6 +772,7 @@ bool ChipInterface3::hdd_sendData_start(DWORD totalDataCount, BYTE scsiStatus, b
 
 bool ChipInterface3::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
 {
+#ifndef ONPC
     //Debug::out(LOG_DEBUG, "hdd_sendData_transferBlock() - starting with dataCount: %d", dataCount);
 
     if((dataCount & 1) != 0) {                      // odd number of bytes? make it even, we're sending words...
@@ -847,12 +855,14 @@ bool ChipInterface3::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
     if(hddTransferInfo.totalDataCount == 0 && hddTransferInfo.withStatus) {
         return hdd_sendStatusToHans(hddTransferInfo.scsiStatus);
     }
+#endif
 
     return true;
 }
 
 bool ChipInterface3::hdd_recvData_start(BYTE *recvBuffer, DWORD totalDataCount)
 {
+#ifndef ONPC
     if(totalDataCount > 0xffffff) {
         Debug::out(LOG_ERROR, "AcsiDataTrans::recvData_start() -- trying to send more than 16 MB, fail");
         return false;
@@ -862,6 +872,7 @@ bool ChipInterface3::hdd_recvData_start(BYTE *recvBuffer, DWORD totalDataCount)
     hddTransferInfo.totalDataCount = totalDataCount;
     hddTransferInfo.scsiStatus = 0;                 // not used in hdd_recvData_transferBlock
     hddTransferInfo.withStatus = false;             // not used in hdd_recvData_transferBlock
+#endif
 
     return true;
 }
@@ -878,7 +889,7 @@ DWORD ChipInterface3::timeoutForDataCount(DWORD dataCount)
 
 bool ChipInterface3::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCount)
 {
-    #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+#ifndef ONPC
 
     DWORD originalDataCount = dataCount;            // make a copy, it will be used at the end to subtract from totalDataCount
 
@@ -955,7 +966,7 @@ bool ChipInterface3::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCount)
         hddTransferInfo.totalDataCount = 0;
     }
 
-    #endif
+#endif
 
     return true;
 }
@@ -1039,7 +1050,7 @@ BYTE* ChipInterface3::fdd_sectorWritten(int &side, int &track, int &sector, int 
 
 void ChipInterface3::fpgaDataPortSetDirection(int pinDirection)      // pin direction is BCM2835_GPIO_FSEL_INPT or BCM2835_GPIO_FSEL_OUTP
 {
-    #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+    #ifndef ONPC
 
     static int currentPinDir = -123;               // holds which pin direction is the currently set direction, to avoid setting the same again
 
@@ -1078,7 +1089,7 @@ void ChipInterface3::fpgaAddressSet(BYTE addr, bool force)
         return;
     }
 
-    #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+    #ifndef ONPC
 
     prevAddress = addr;                                 // remember that we've set this address
 
@@ -1096,7 +1107,7 @@ void ChipInterface3::fpgaAddressSet(BYTE addr, bool force)
 // set OUTPUT direction, output data to data port, switch to DATA, TRIG the operation
 void ChipInterface3::fpgaDataWrite(BYTE data)
 {
-    #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+    #ifndef ONPC
 
     fpgaDataPortSetDirection(BCM2835_GPIO_FSEL_OUTP);   // pins as output
     fpgaDataOutput(data);                               // put address on pins, PIN_RW into right level
@@ -1112,7 +1123,7 @@ void ChipInterface3::fpgaDataWrite(BYTE data)
 // set INPUT direction, switch to DATA, TRIG the operation, get the data from data port
 BYTE ChipInterface3::fpgaDataRead(void)
 {
-    #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+    #ifndef ONPC
 
     fpgaDataPortSetDirection(BCM2835_GPIO_FSEL_INPT);   // pins as input
 
@@ -1132,7 +1143,7 @@ BYTE ChipInterface3::fpgaDataRead(void)
 // output data on data port
 void ChipInterface3::fpgaDataOutput(BYTE val)
 {
-    #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+    #ifndef ONPC
 
     DWORD value = ((((DWORD) val) & 0xe0) << 19) | ((((DWORD) val) & 0x1f) << 18);
     bcm2835_gpio_write_mask(value, DATA_MASK);
@@ -1143,7 +1154,7 @@ void ChipInterface3::fpgaDataOutput(BYTE val)
 // read data from data port
 BYTE ChipInterface3::fpgaDataInput(void)
 {
-    #if !defined(ONPC_GPIO) && !defined(ONPC_HIGHLEVEL) && !defined(ONPC_NOTHING)
+    #ifndef ONPC
 
     // get whole gpio by single read -- taken from bcm library
     volatile DWORD* paddr = bcm2835_gpio + BCM2835_GPLEV0/4;

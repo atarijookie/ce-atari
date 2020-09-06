@@ -34,23 +34,30 @@ int ChipInterface12::chipInterfaceType(void)
 
 bool ChipInterface12::open(void)
 {
+#ifndef ONPC
     return gpio_open();
+#endif
 }
 
 void ChipInterface12::close(void)
 {
+#ifndef ONPC
     gpio_close();
+#endif
 }
 
 void ChipInterface12::ikdbUartEnable(bool enable)
 {
+#ifndef ONPC
     if(enable) {
         bcm2835_gpio_write(PIN_TX_SEL1N2, HIGH);            // TX_SEL1N2, switch the RX line to receive from Franz, which does the 9600 to 7812 baud translation
     }
+#endif
 }
 
 void ChipInterface12::resetHDDandFDD(void)
 {
+#ifndef ONPC
     bcm2835_gpio_write(PIN_RESET_HANS,          LOW);       // reset lines to RESET state
     bcm2835_gpio_write(PIN_RESET_FRANZ,         LOW);
 
@@ -60,26 +67,32 @@ void ChipInterface12::resetHDDandFDD(void)
     bcm2835_gpio_write(PIN_RESET_FRANZ,         HIGH);
 
     Utils::sleepMs(50);                                     // wait a while to let the devices boot
+#endif
 }
 
 void ChipInterface12::resetHDD(void)
 {
+#ifndef ONPC
     bcm2835_gpio_write(PIN_RESET_HANS,          LOW);       // reset lines to RESET state
     Utils::sleepMs(10);                                     // wait a while to let the reset work
     bcm2835_gpio_write(PIN_RESET_HANS,          HIGH);      // reset lines to RUN (not reset) state
     Utils::sleepMs(50);                                     // wait a while to let the devices boot
+#endif
 }
 
 void ChipInterface12::resetFDD(void)
 {
+#ifndef ONPC
     bcm2835_gpio_write(PIN_RESET_FRANZ,         LOW);
     Utils::sleepMs(10);                                     // wait a while to let the reset work
     bcm2835_gpio_write(PIN_RESET_FRANZ,         HIGH);
     Utils::sleepMs(50);                                     // wait a while to let the devices boot
+#endif
 }
 
 bool ChipInterface12::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
 {
+#ifndef ONPC
     // if waitForATN() succeeds, it fills 8 bytes of data in buffer
     // ...but then we might need some little more, so let's determine what it was
     // and keep reading as much as needed
@@ -116,6 +129,7 @@ bool ChipInterface12::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
         hardNotFloppy = false;
         return true;
     }
+#endif
 
     // no action needed
     return false;
@@ -127,6 +141,7 @@ bool ChipInterface12::actionNeeded(bool &hardNotFloppy, BYTE *inBuf)
 
 void ChipInterface12::setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEnabledSlots, bool setNewFloppyImageLed, BYTE newFloppyImageLed)
 {
+#ifndef ONPC
     memset(bufOut, 0, HDD_FW_RESPONSE_LEN);
 
     // WORD sent (bytes shown): 01 23 45 67
@@ -151,12 +166,13 @@ void ChipInterface12::setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEn
             hansConfigWords.skipNextSet = false;
         }
     }
-    
+
     //--------------
     if(setNewFloppyImageLed) {
         responseAddWord(bufOut, CMD_FLOPPY_SWITCH);               // CMD: set new image LED (bytes 8 & 9)
         responseAddWord(bufOut, MAKEWORD(fddEnabledSlots, newFloppyImageLed));  // store which floppy images LED should be on
     }
+#endif
 }
 
 #define FDD_FW_RESPONSE_LEN     8
@@ -164,7 +180,7 @@ void ChipInterface12::setHDDconfig(BYTE hddEnabledIDs, BYTE sdCardId, BYTE fddEn
 void ChipInterface12::setFDDconfig(bool setFloppyConfig, bool fddEnabled, int id, int writeProtected, bool setDiskChanged, bool diskChanged)
 {
     memset(bufOut, 0, FDD_FW_RESPONSE_LEN);
-    
+
     responseStart(FDD_FW_RESPONSE_LEN);                             // init the response struct
 
     if(setFloppyConfig) {                                   // should set floppy config?
@@ -190,6 +206,7 @@ int ChipInterface12::bcdToInt(int bcd)
 
 void ChipInterface12::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
 {
+#ifndef ONPC
     if(hardNotFloppy) {     // for HDD
         // bufOut should be filled with Hans config - by calling setHDDconfig() (and not calling anything else inbetween)
         conSpi->txRx(SPI_CS_HANS, HDD_FW_RESPONSE_LEN, bufOut, inFwVer);
@@ -208,6 +225,7 @@ void ChipInterface12::getFWversion(bool hardNotFloppy, BYTE *inFwVer)
         int year = bcdToInt(inFwVer[1]) + 2000;
         Update::versions.current.franz.fromInts(year, bcdToInt(inFwVer[2]), bcdToInt(inFwVer[3]));              // store found FW version of Franz
     }
+#endif
 }
 
 void ChipInterface12::responseStart(int bufferLengthInBytes)        // use this to start creating response (commands) to Hans or Franz
@@ -239,6 +257,7 @@ void ChipInterface12::responseAddByte(BYTE *bfr, BYTE value)        // add a BYT
 
 bool ChipInterface12::hdd_sendData_start(DWORD totalDataCount, BYTE scsiStatus, bool withStatus)
 {
+#ifndef ONPC
     if(totalDataCount > 0xffffff) {
         Debug::out(LOG_ERROR, "AcsiDataTrans::sendData_start -- trying to send more than 16 MB, fail");
         return false;
@@ -253,12 +272,14 @@ bool ChipInterface12::hdd_sendData_start(DWORD totalDataCount, BYTE scsiStatus, 
     bufOut[7] = scsiStatus;                                     // store status
 
     conSpi->txRx(SPI_CS_HANS, COMMAND_SIZE, bufOut, bufIn);        // transmit this command
+#endif
 
     return true;
 }
 
 bool ChipInterface12::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
 {
+#ifndef ONPC
     bufOut[0] = 0;
     bufOut[1] = CMD_DATA_MARKER;                                  // mark the start of data
 
@@ -281,12 +302,14 @@ bool ChipInterface12::hdd_sendData_transferBlock(BYTE *pData, DWORD dataCount)
         pData       += cntNow;                                      // move the data pointer further
         dataCount   -= cntNow;
     }
+#endif
 
     return true;
 }
 
 bool ChipInterface12::hdd_recvData_start(BYTE *recvBuffer, DWORD totalDataCount)
 {
+#ifndef ONPC
     if(totalDataCount > 0xffffff) {
         Debug::out(LOG_ERROR, "AcsiDataTrans::recvData_start() -- trying to send more than 16 MB, fail");
         return false;
@@ -302,11 +325,13 @@ bool ChipInterface12::hdd_recvData_start(BYTE *recvBuffer, DWORD totalDataCount)
     bufOut[7] = 0xff;                                           // store INVALID status, because the real status will be sent on CMD_SEND_STATUS
 
     conSpi->txRx(SPI_CS_HANS, COMMAND_SIZE, bufOut, bufIn);        // transmit this command
+#endif
     return true;
 }
 
 bool ChipInterface12::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCount)
 {
+#ifndef ONPC
     memset(bufOut, 0, TX_RX_BUFF_SIZE);                   // nothing to transmit, really...
     BYTE inBuf[8];
 
@@ -326,19 +351,14 @@ bool ChipInterface12::hdd_recvData_transferBlock(BYTE *pData, DWORD dataCount)
         dataCount   -= subCount;                            // decreate the data counter
         pData       += subCount;                            // move in the buffer further
     }
+#endif
 
     return true;
 }
 
 bool ChipInterface12::hdd_sendStatusToHans(BYTE statusByte)
 {
-#if defined(ONPC_HIGHLEVEL)        
-//    Debug::out(LOG_ERROR, "AcsiDataTrans::sendStatusToHans -- sending statusByte %02x", statusByte);
-
-    serverSocket_write(&statusByte, 1);
-#elif defined(ONPC_NOTHING) 
-    // nothing here
-#else
+#ifndef ONPC
     bool res = conSpi->waitForATN(SPI_CS_HANS, ATN_GET_STATUS, 1000, bufIn);   // wait for ATN_GET_STATUS
 
     if(!res) {
@@ -357,12 +377,15 @@ bool ChipInterface12::hdd_sendStatusToHans(BYTE statusByte)
 
 void ChipInterface12::fdd_sendTrackToChip(int byteCount, BYTE *encodedTrack)
 {
+#ifndef ONPC
     // send encoded track out, read garbage into bufIn and don't care about it
     conSpi->txRx(SPI_CS_FRANZ, byteCount, encodedTrack, bufIn);
+#endif
 }
 
 BYTE* ChipInterface12::fdd_sectorWritten(int &side, int &track, int &sector, int &byteCount)
 {
+#ifndef ONPC
     byteCount = conSpi->getRemainingLength();               // get how many data we still have
 
     memset(bufOut, 0, byteCount);                           // clear the output buffer before sending it to Franz (just in case)
@@ -372,6 +395,7 @@ BYTE* ChipInterface12::fdd_sectorWritten(int &side, int &track, int &sector, int
     sector  = bufIn[1];
     track   = bufIn[0] & 0x7f;
     side    = (bufIn[0] & 0x80) ? 1 : 0;
+#endif
 
     return bufIn;                                           // return pointer to received written sector
 }
