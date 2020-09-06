@@ -38,7 +38,7 @@ bool SdMedia::isInit(void)
     if(capacityInSectors != 0) {					// got card capacity? It's initialized...
 		return true;
 	}
-	
+
 	return false;
 }
 

@@ -22,7 +22,7 @@
 #define SOURCETYPE_IMAGE                1
 #define SOURCETYPE_IMAGE_TRANSLATEDBOOT 2
 #define SOURCETYPE_DEVICE               3
-#define SOURCETYPE_SD_CARD				4
+#define SOURCETYPE_SD_CARD              4
 #define SOURCETYPE_TESTMEDIA            100
 
 #define MAX_ATTACHED_MEDIA              9
@@ -52,12 +52,12 @@ typedef struct {
 typedef struct {
     int     attachedMediaIndex; // index in attachedMedia[]
 
-    BYTE 	accessType;         // SCSI_ACCESSTYPE_FULL || SCSI_ACCESSTYPE_READ_ONLY || SCSI_ACCESSTYPE_NO_DATA
+    BYTE    accessType;         // SCSI_ACCESSTYPE_FULL || SCSI_ACCESSTYPE_READ_ONLY || SCSI_ACCESSTYPE_NO_DATA
 
-    BYTE	LastStatus;			// last returned SCSI status
-    BYTE	SCSI_ASC;			// additional sense code
-    BYTE	SCSI_ASCQ;			// additional sense code qualifier
-    BYTE	SCSI_SK;			// sense key
+    BYTE    LastStatus;         // last returned SCSI status
+    BYTE    SCSI_ASC;           // additional sense code
+    BYTE    SCSI_ASCQ;          // additional sense code qualifier
+    BYTE    SCSI_SK;            // sense key
 } TDevInfo;
 
 
@@ -87,17 +87,17 @@ public:
     }
 
     static const char * SourceTypeStr(int sourceType);
-    
+
 private:
     AcsiDataTrans   *dataTrans;
 
     BYTE            acsiId;                 // current acsi ID for the command
     IMedia          *dataMedia;             // current data media valid for current ACSI ID
 
-    NoMedia         	noMedia;
-    TestMedia       	testMedia;
-	TranslatedBootMedia	tranBootMedia;
-	SdMedia				sdMedia;
+    NoMedia             noMedia;
+    TestMedia           testMedia;
+    TranslatedBootMedia tranBootMedia;
+    SdMedia             sdMedia;
 
     BYTE            *dataBuffer;
     BYTE            *dataBuffer2;
@@ -105,44 +105,44 @@ private:
     BYTE            shitHasHappened;
 
     bool            sendDataAndStatus_notJustStatus;
-    
+
     TScsiConf       attachedMedia[MAX_ATTACHED_MEDIA];
     TDevInfo        devInfo[8];
 
-	AcsiIDinfo		acsiIdInfo;
+    AcsiIDinfo      acsiIdInfo;
 
     BYTE *cmd;
 
     bool isICDcommand(void);
 
-	// for 6-byte long commands - from scsi6
+    // for 6-byte long commands - from scsi6
     void ProcScsi6(BYTE lun, BYTE justCmd);
 
-	void SCSI_RequestSense(BYTE lun);
-	void SCSI_FormatUnit(void);
+    void SCSI_RequestSense(BYTE lun);
+    void SCSI_FormatUnit(void);
 
     void SCSI_ReadWrite6(bool readNotWrite);
 
-	void SCSI_Inquiry(BYTE lun);
-	void SCSI_ModeSense6(void);
+    void SCSI_Inquiry(BYTE lun);
+    void SCSI_ModeSense6(void);
 
-	void SendOKstatus(void);
-	void ReturnStatusAccordingToIsInit(void);
-	void ReturnUnitAttention(void);
-	void ClearTheUnitAttention(void);
+    void SendOKstatus(void);
+    void ReturnStatusAccordingToIsInit(void);
+    void ReturnUnitAttention(void);
+    void ClearTheUnitAttention(void);
     void returnInvalidCommand(void);
 
-	void SendEmptySecotrs(WORD sectors);
+    void SendEmptySecotrs(WORD sectors);
 
-	// for commands longer than 6 bytes - from scsiICD
-	void ProcICD(BYTE lun, BYTE justCmd);
+    // for commands longer than 6 bytes - from scsiICD
+    void ProcICD(BYTE lun, BYTE justCmd);
 
-	void SCSI_ReadCapacity(void);
-	void ICD7_to_SCSI6(void);
+    void SCSI_ReadCapacity(void);
+    void ICD7_to_SCSI6(void);
     void SCSI_ReadWrite10(bool readNotWrite);
-	void SCSI_Verify(void);
-	
-	void showCommand(WORD id, WORD length, WORD errCode);
+    void SCSI_Verify(void);
+
+    void showCommand(WORD id, WORD length, WORD errCode);
 
     void readWriteGeneric(bool readNotWrite, DWORD startingSector, DWORD sectorCount);
     void storeSenseAndSendStatus(BYTE status, BYTE senseKey, BYTE additionalSenseCode, BYTE ascq);
@@ -166,7 +166,7 @@ private:
     void detachMediaFromACSIidByIndex(int index);
 
     void initializeAttachedMediaVars(int index);
-    
+
     const char *getCommandName(BYTE cmd);
 };
 

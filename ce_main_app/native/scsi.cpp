@@ -421,10 +421,10 @@ void Scsi::processCommand(BYTE *command)
     BYTE justCmd    = isIcd ? (cmd[1]     ) : (cmd[0] & 0x1f);  // get just the command (remove ACSI ID)
 
     Debug::out(LOG_DEBUG, "Scsi::processCommand -- isIcd: %d, ACSI ID: %d, LUN: %d, CMD: 0x%02x - %s", isIcd, acsiId, lun, justCmd, getCommandName(justCmd));
-    
+
     sendDataAndStatus_notJustStatus = true;                     // if this is set, let acsiDataTrans send data and status; if it's false then the data was already sent and we just need to send the status
-    
-    if(lun != 0) {      // if LUN is not zero, the command is invalid 
+
+    if(lun != 0) {      // if LUN is not zero, the command is invalid
         if(justCmd == SCSI_C_REQUEST_SENSE) {                   // special handling in REQUEST SENSE
             SCSI_RequestSense(lun);
         } else if(justCmd == SCSI_C_INQUIRY) {                  // special handling in INQUIRY
@@ -569,7 +569,7 @@ void Scsi::SCSI_Inquiry(BYTE lun)
 
     inquiryData[ 0] = (lun == 0) ? 0 : 0x7f;            // for LUN 0 use 0, for other LUNs use peripheralQualifier = 0x03, deviceType = 0x1f (0x7f)
     inquiryData[25] = '0' + acsiId;                     // send ACSI ID # (0 .. 7)
-    
+
     memcpy(inquiryData + 27, type_str,              4); // IMG / CEDD / RAW / SD
     memcpy(inquiryData + 32, VERSION_STRING_SHORT,  4); // version string
     memcpy(inquiryData + 36, DATE_STRING,           8); // date string
@@ -578,7 +578,7 @@ void Scsi::SCSI_Inquiry(BYTE lun)
         dataTrans->addDataBfr(inquiryData, inquiryLength, false);
     } else {                                            // send more than whole buffer?
         dataTrans->addDataBfr(inquiryData, 44, false);  // send whole buffer
-        
+
         int i;
         for(i=0; i<(inquiryLength - 44); i++) {         // pad with zeros
             dataTrans->addDataByte(0);
@@ -669,10 +669,10 @@ void Scsi::SCSI_RequestSense(BYTE lun)
     badLunDevice.SCSI_SK    = SCSI_E_IllegalRequest;
     badLunDevice.SCSI_ASC   = SCSI_ASC_LU_NOT_SUPPORTED;
     badLunDevice.SCSI_ASCQ = 0;
-    
+
     // if LUN is zero, use device info, if LUN is non-zero, use bad device info
     device = (lun == 0) ? &devInfo[acsiId] : &badLunDevice;
-    
+
     for(i=0; i<xx; i++)
     {
         switch(i)
@@ -787,15 +787,15 @@ void Scsi::SCSI_ReadCapacity(void)
     cap = scap - 1;
 
     if(dataMedia->isInit()) {               // when initialized, store capacity
-        hi        = (cap >> 24) & 0xff;
-        midhi    = (cap >> 16) & 0xff;
-        midlo    = (cap >>  8) & 0xff;
-        lo        =  cap        & 0xff;
+        hi      = (cap >> 24) & 0xff;
+        midhi   = (cap >> 16) & 0xff;
+        midlo   = (cap >>  8) & 0xff;
+        lo      =  cap        & 0xff;
     } else {                                // when not initialized, store zeros
-        hi        = 0;
-        midhi    = 0;
-        midlo    = 0;
-        lo        = 0;
+        hi      = 0;
+        midhi   = 0;
+        midlo   = 0;
+        lo      = 0;
     }
 
     dataTrans->addDataByte(hi);                 // Hi
