@@ -36,6 +36,8 @@ bool ChipInterface12::open(void)
 {
 #ifndef ONPC
     return gpio_open();
+#else
+    return false;
 #endif
 }
 

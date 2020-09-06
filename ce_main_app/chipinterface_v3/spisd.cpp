@@ -64,7 +64,6 @@ void SpiSD::clearStruct(void)
 
 void SpiSD::init(void)
 {
-    WORD i;
     BYTE res, stat;
     DWORD dRes;
 
