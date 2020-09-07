@@ -106,6 +106,20 @@ public:
     SpiSD();
     ~SpiSD();
 
+    bool isInitialized(void);
+
+    void clearStruct(void);
+    void initCard(void);
+
+    BYTE mmcRead(DWORD sector);
+    BYTE mmcReadJustForTest(DWORD sector);
+    BYTE mmcReadMore(DWORD sector, WORD count);
+
+    BYTE mmcWrite(DWORD sector);
+    BYTE mmcWriteMore(DWORD sector, WORD count);
+
+    BYTE eraseCard(void);
+
 private:
     BYTE*   txBufferFF;
     BYTE*   rxBuffer;
@@ -114,7 +128,7 @@ private:
     bool    isInit;         // is initialized and working? true / false
     bool    mediaChanged;   // when media is changed
 
-    DWORD   BCapacity;      // device capacity in bytes
+    int64_t BCapacity;      // device capacity in bytes
     DWORD   SCapacity;      // device capacity in sectors
 
     //------------------------
@@ -123,23 +137,13 @@ private:
     bool  timeout(void);
     //------------------------
 
-    void clearStruct(void);
-    void init(void);
     void spiSetFrequency(BYTE highNotLow);
-    BYTE isCardInserted(void);
 
     BYTE reset(void);
     BYTE mmcSendCommand(BYTE cmd, DWORD arg);
 
     BYTE mmcCmd(BYTE cmd, DWORD arg, BYTE val);
     BYTE mmcCmdLow(BYTE cmd, DWORD arg, BYTE val);
-
-    BYTE mmcRead(DWORD sector);
-    BYTE mmcReadJustForTest(DWORD sector);
-    BYTE mmcReadMore(DWORD sector, WORD count);
-
-    BYTE mmcWrite(DWORD sector);
-    BYTE mmcWriteMore(DWORD sector, WORD count);
 
     // Internal command function.
     // Issues a generic MMC command as specified by cmd and arg.
@@ -150,8 +154,6 @@ private:
     BYTE  MMC_CardType(unsigned char *buff);
     DWORD MMC_Capacity(void);
     DWORD SDHC_Capacity(void);
-
-    BYTE EraseCard(void);
 
     void tryToEmptySdCardBuffer(void);
 

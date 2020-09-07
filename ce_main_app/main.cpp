@@ -45,6 +45,8 @@ void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
 void loadDefaultArgumentsFromFile(void);
 
+void *sdThreadCode(void *ptr);
+
 int     linuxConsole_fdMaster;                                  // file descriptors for linux console
 pid_t   childPid;                                               // pid of forked child
 
@@ -72,6 +74,7 @@ void showOnDisplay(int argc, char *argv[]);
 int main(int argc, char *argv[])
 {
     CCoreThread *core;
+    pthread_t   sdThreadInfo;
     pthread_t   mountThreadInfo;
     pthread_t   downloadThreadInfo;
 #ifndef ONPC
@@ -291,8 +294,14 @@ int main(int argc, char *argv[])
     system("cp -r /ce/app/configdrive/* /tmp/configdrive"); // copy new content
     //-------------
     core = new CCoreThread(pxDateService,pxFloppyService,pxScreencastService);
+    int res;
 
-    int res = pthread_create(&mountThreadInfo, NULL, mountThreadCode, NULL);    // create mount thread and run it
+    if(chipInterface->chipInterfaceType() == CHIP_IF_V3) {                      // when using chip interface v3
+        res = pthread_create(&sdThreadInfo, NULL, sdThreadCode, NULL);          // create SD via SPI thread and run it
+        handlePthreadCreate(res, "SD via SPI", &sdThreadInfo);
+    }
+
+    res = pthread_create(&mountThreadInfo, NULL, mountThreadCode, NULL);        // create mount thread and run it
     handlePthreadCreate(res, "ce mount", &mountThreadInfo);
 
     res = pthread_create(&downloadThreadInfo, NULL, downloadThreadCode, NULL);  // create download thread and run it
@@ -351,6 +360,11 @@ int main(int argc, char *argv[])
     printf("Stoping mount thread\n");
     Mounter::stop();
     pthread_join(mountThreadInfo, NULL);                // wait until mount     thread finishes
+
+    if(chipInterface->chipInterfaceType() == CHIP_IF_V3) {  // when using chip interface v3
+        pthread_kill(sdThreadInfo, SIGINT);                 // stop the select()
+        pthread_join(sdThreadInfo, NULL);                   // wait until SD thread finishes
+    }
 
     printf("Stoping download thread\n");
     Downloader::stop();

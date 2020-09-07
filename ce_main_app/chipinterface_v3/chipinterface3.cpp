@@ -15,6 +15,15 @@
 
 extern THwConfig hwConfig;
 
+//------------------------------------
+// ChipInterface v3 contains also object for accessing SD card as that is done via RPi SPI on v3.
+// This is a global object, because it will be accessed by CoreThread when Atari reads or writes to SD card,
+// but also it will be accessed by other thread, which will detect card insertion and removal.
+// Allocate this object dynamically AFTER the GPIO has been opened, as it needs that when created.
+// Destroy this BEFORE closing GPIO.
+SpiSD *spiSd;
+//------------------------------------
+
 ChipInterface3::ChipInterface3()
 {
     ikbdEnabled = false;        // ikbd is not enabled by default, so we need to enable it
@@ -126,6 +135,10 @@ bool ChipInterface3::open(void)
         return false;
     }
 
+    //-----------------------------------------
+    // when GPIO is open and the connection to FPGA is verified, we can now create the SD via SPI object.
+    spiSd = new SpiSD();
+
     #endif
 
     return true;
@@ -141,6 +154,11 @@ void ChipInterface3::close(void)
     bcm2835_gpio_fsel(PIN_TMS, BCM2835_GPIO_FSEL_INPT);
     bcm2835_gpio_fsel(PIN_TCK, BCM2835_GPIO_FSEL_INPT);
     bcm2835_gpio_fsel(PIN_TDO, BCM2835_GPIO_FSEL_INPT);
+
+    if(spiSd) {                                         // if the SD via SPI object exists, delete it
+        delete spiSd;
+        spiSd = NULL;
+    }
 
     bcm2835_close();                                    // close the GPIO library and finish
 

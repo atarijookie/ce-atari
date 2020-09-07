@@ -3,6 +3,7 @@
 
 #include "../datatypes.h"
 #include "../chipinterface.h"
+#include "spisd.h"
 
 // Parallel interface to chip.
 // Used in CosmosEx v3.

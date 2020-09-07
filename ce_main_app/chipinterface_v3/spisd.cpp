@@ -51,6 +51,11 @@ SpiSD::~SpiSD()
     delete []rxBuffer;
 }
 
+bool SpiSD::isInitialized(void)
+{
+    return isInit;
+}
+
 void SpiSD::spiSetFrequency(BYTE highNotLow)
 {
 #ifndef ONPC
@@ -71,11 +76,12 @@ void SpiSD::clearStruct(void)
     SCapacity    = 0;
 }
 
-void SpiSD::init(void)
+void SpiSD::initCard(void)
 {
     BYTE res, stat;
     DWORD dRes;
 
+    //Debug::out(LOG_DEBUG, "SpiSD::initCard start");
     timeoutStart();
 
     //--------------------------
@@ -85,6 +91,7 @@ void SpiSD::init(void)
     res = reset();                          // init the MMC card
 
     if(res == DEVICETYPE_NOTHING) {         // if failed to init
+        //Debug::out(LOG_DEBUG, "SpiSD::initCard - failed on reset()");
         return;
     }
 
@@ -92,6 +99,7 @@ void SpiSD::init(void)
     stat = mmcReadJustForTest(0);
 
     if(stat) {
+        //Debug::out(LOG_DEBUG, "SpiSD::initCard - failed on mmcReadJustForTest()");
         return;
     }
 
@@ -102,11 +110,16 @@ void SpiSD::init(void)
         dRes = MMC_Capacity();
     }
 
-    type      = res;              // store device type
-    SCapacity = dRes;             // store capacity in sectors
-    BCapacity = dRes << 9;        // store capacity in bytes
-    isInit    = true;             // set the flag
+    type      = res;                    // store device type
+    SCapacity = dRes;                   // store capacity in sectors
+    BCapacity = ((int64_t) dRes) << 9;  // store capacity in bytes
+    isInit    = true;                   // set the flag
     mediaChanged = true;
+
+    float capMB = BCapacity / (1024.0 * 1024.0);
+    float capGB = BCapacity / (1024.0 * 1024.0 * 1024.0);
+    bool showMBs = capGB < 1.0;         // if less than 1 GB, show capacity in MB
+    Debug::out(LOG_DEBUG, "SpiSD::initCard - success, card capacity: %.1f %s", showMBs ? capMB : capGB, showMBs ? "MB" : "GB");
 
     spiSetFrequency(SPI_FREQ_HIGH);
 }
@@ -147,6 +160,7 @@ BYTE SpiSD::reset(void)
     r1 = mmcSendCommand(MMC_GO_IDLE_STATE, 0);
 
     if(r1 != 1) {
+        //Debug::out(LOG_DEBUG, "SpiSD::reset - failed on MMC_GO_IDLE_STATE, wanted 1, got %d", r1);
         return DEVICETYPE_NOTHING;
     }
 
@@ -161,6 +175,7 @@ BYTE SpiSD::reset(void)
             while(true)
             {
                 if(timeout()) {
+                    Debug::out(LOG_DEBUG, "SpiSD::reset - failed on SHDC_SEND_IF_COND");
                     return DEVICETYPE_NOTHING;
                 }
 
@@ -191,6 +206,7 @@ BYTE SpiSD::reset(void)
     }
 
     if(devType == DEVICETYPE_SD && r1 != 0) {     // if it's SD but failed to initialize
+        Debug::out(LOG_DEBUG, "SpiSD::reset - failed on DEVTYPE_SD but failed to initialize");
         return DEVICETYPE_NOTHING;
     }
 
@@ -200,6 +216,7 @@ BYTE SpiSD::reset(void)
         r1 = mmcCmdLow(MMC_SEND_OP_COND, 0, 0);
 
         if(r1 != 0) {
+            Debug::out(LOG_DEBUG, "SpiSD::reset - failed on DEVTYPE_MMC got %d instead of 0", r1);
             return DEVICETYPE_NOTHING;
         }
     }
@@ -270,7 +287,7 @@ BYTE SpiSD::mmcSendCommand(BYTE cmd, DWORD arg)
     // assert chip select
     spiCSlow();          // CS to L
 
-    bcm2835_spi_transfer(0xff);
+    //bcm2835_spi_transfer(0xff);
 
     // issue the command
     r1 = mmcCommand(cmd, arg);
@@ -287,7 +304,7 @@ BYTE SpiSD::mmcSendCommand5B(BYTE cmd, DWORD arg, BYTE *buff)
     // assert chip select
     spiCSlow();                         // CS to L
 
-    bcm2835_spi_transfer(0xff);
+    //bcm2835_spi_transfer(0xff);
 
     // issue the command
     buff[0] = mmcCommand(cmd, arg);
@@ -306,16 +323,16 @@ BYTE SpiSD::mmcCommand(BYTE cmd, DWORD arg)
 #ifndef ONPC
     // construct command
     BYTE bfr[7];
-    bfr[0] = 0xff;
-    bfr[1] = cmd | 0x40;
-    bfr[2] = arg >> 24;
-    bfr[3] = arg >> 16;
-    bfr[4] = arg >>  8;
-    bfr[5] = arg;
-    bfr[6] = (cmd == SDHC_SEND_IF_COND) ? 0x86 : 0x95;  // crc valid only for: SDHC_SEND_IF_COND / MMC_GO_IDLE_STATE
+//    bfr[0] = 0xff;
+    bfr[0] = cmd | 0x40;
+    bfr[1] = arg >> 24;
+    bfr[2] = arg >> 16;
+    bfr[3] = arg >>  8;
+    bfr[4] = arg;
+    bfr[5] = (cmd == SDHC_SEND_IF_COND) ? 0x86 : 0x95;  // crc valid only for: SDHC_SEND_IF_COND / MMC_GO_IDLE_STATE
 
     // send command
-    bcm2835_spi_transfernb((char *) bfr, (char *) rxBuffer, 7);
+    bcm2835_spi_transfernb((char *) bfr, (char *) rxBuffer, 6);
 
     // wait for response - while it returning the busy value
     bool good = waitWhileBusy_equalToValue(0xff);
@@ -728,7 +745,7 @@ DWORD SpiSD::MMC_Capacity(void)
     return sectors;
 }
 //--------------------------------------------------------
-BYTE SpiSD::EraseCard(void)
+BYTE SpiSD::eraseCard(void)
 {
 #ifndef ONPC
     BYTE res;
@@ -791,7 +808,7 @@ void SpiSD::timeoutStart(void)
 
 bool SpiSD::timeout(void)
 {
-    DWORD now = Utils::getEndTime(500);
+    DWORD now = Utils::getCurrentMs();
     return (now >= opEndTime);          // it's a timeout when current time is greater than end time
 }
 //--------------------------------------------------------
@@ -802,6 +819,8 @@ bool SpiSD::waitWhileBusy_equalToZero(void)
 //--------------------------------------------------------
 bool SpiSD::waitWhileBusy_equalToValue(BYTE busyValue)
 {
+//  Debug::out(LOG_DEBUG, "waitWhileBusy_equalToValue - busyValue: %02X", busyValue);
+
 #ifndef ONPC
     // wait while the card is busy -- while output == busyValue
     while(true) {
@@ -812,6 +831,7 @@ bool SpiSD::waitWhileBusy_equalToValue(BYTE busyValue)
         }
 
         if(timeout()) {                 // timeout happened? fail
+//          Debug::out(LOG_DEBUG, "waitWhileBusy_equalToValue - timeout", busyValue);
             return false;
         }
     }
