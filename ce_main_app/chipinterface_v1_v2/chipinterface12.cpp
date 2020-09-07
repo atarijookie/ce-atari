@@ -7,6 +7,10 @@
 #include "../global.h"
 #include "../update.h"
 
+#ifndef ONPC
+    #include <bcm2835.h>
+#endif
+
 extern THwConfig hwConfig;
 
 ChipInterface12::ChipInterface12()

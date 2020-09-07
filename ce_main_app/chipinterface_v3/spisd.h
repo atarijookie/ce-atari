@@ -155,6 +155,8 @@ private:
 
     void tryToEmptySdCardBuffer(void);
 
+    //------------------------------------------------------
+    BYTE lastRxByte;     // this holds the last received value in those waitWhileBusy_... functions, if we need to really use it
     bool waitWhileBusy_equalToZero(void);
     bool waitWhileBusy_equalToValue(BYTE busyValue);
     bool waitWhileBusy_notEqualToFF(void);

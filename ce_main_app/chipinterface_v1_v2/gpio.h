@@ -40,5 +40,10 @@
 #define SPI_ATN_HANS    PIN_ATN_HANS
 #define SPI_ATN_FRANZ   PIN_ATN_FRANZ
 
-#endif      // end of GPIO
+bool gpio_open(void);
+void gpio_close(void);
+bool spi_atn(int whichSpiAtn);
+void spi_tx_rx(int whichSpiCS, int count, BYTE *txBuf, BYTE *rxBuf);
+
+#endif      // end of ONPC
 #endif      // end of _GPIO_H_
