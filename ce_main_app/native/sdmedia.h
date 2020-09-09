@@ -11,8 +11,8 @@ public:
     SdMedia();
     virtual ~SdMedia();
 
-	void setCurrentCapacity(DWORD sectors);
-	
+    void setCurrentCapacity(DWORD sectors);
+
     virtual bool iopen(const char *path, bool createIfNotExists);
     virtual void iclose(void);
 
@@ -24,11 +24,12 @@ public:
     virtual bool readSectors(int64_t sectorNo, DWORD count, BYTE *bfr);
     virtual bool writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr);
 
+    virtual DWORD maxSectorsForSmallReadWrite(void);    // what will be the maximum value where small transfer is used (single transfer to/from media + single transfer to/from ST) and where the larger transfer is used above that
+    virtual DWORD maxSectorsForSingleReadWrite(void);   // what is the maximum sector count we can use on readSectors() and writeSectors()
 private:
-	int64_t	capacityInSectors;
-	bool	mediaChangedFlag;
-	BYTE	senseKey;
-	
+    int64_t capacityInSectors;
+    bool    mediaChangedFlag;
+    BYTE    senseKey;
 };
 
 #endif // _SDMEDIA_H

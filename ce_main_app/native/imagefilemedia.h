@@ -24,8 +24,8 @@ public:
 
 private:
 
-    off_t	BCapacity;			// device capacity in bytes
-    off_t	SCapacity;			// device capacity in sectors
+    off_t   BCapacity;          // device capacity in bytes
+    off_t   SCapacity;          // device capacity in sectors
 
     bool    mediaHasChanged;
 

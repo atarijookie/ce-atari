@@ -6,6 +6,7 @@
 #include "scsi.h"
 #include "../global.h"
 #include "../debug.h"
+#include "../utils.h"
 #include "devicemedia.h"
 #include "imagefilemedia.h"
 
@@ -76,18 +77,12 @@ void Scsi::readWriteGeneric(bool readNotWrite, DWORD startingSector, DWORD secto
     //--------------------------------
     bool res;
 
-    if(sectorCount < 2048) {        // less than 1 MB?
-        if(readNotWrite) {          // if read
-            res = readSectors_small   (startingSector, sectorCount);
-        } else {                    // if write
-            res = writeSectors_small  (startingSector, sectorCount);
-        }
-    } else {                        // more than 1 MB?
-        if(readNotWrite) {          // if read
-            res = readSectors_big   (startingSector, sectorCount);
-        } else {                    // if write
-            res = writeSectors_big  (startingSector, sectorCount);
-        }
+    dataMedia->setSectorCountForThisTransfer(sectorCount);      // let media know how many sectors we will read/write, so it can (possibly) do some pre-read / pre-write stuff
+
+    if(sectorCount <= dataMedia->maxSectorsForSmallReadWrite()) {   // if just a few sectors, do it as a small transfer
+        res = readNotWrite ? readSectors_small(startingSector, sectorCount) : writeSectors_small(startingSector, sectorCount);
+    } else {                                                        // more sectors, do it as a large transfer
+        res = readNotWrite ? readSectors_big  (startingSector, sectorCount) : writeSectors_big  (startingSector, sectorCount);
     }
 
     if(res) {                                            // if everything was OK
@@ -168,8 +163,8 @@ bool Scsi::readSectors_big(DWORD startSectorNo, DWORD sectorCount)
 
     // now transfer the data in big chunks of BUFFER_SIZE_SECTORS
     while(sectorCount > 0) {
-        // maximum transfer size is BUFFER_SIZE_SECTORS, so transfer less or exactly that in loop
-        DWORD sectorCountNow    = (sectorCount < BUFFER_SIZE_SECTORS) ? sectorCount : BUFFER_SIZE_SECTORS;
+        // maximum transfer size is defined by the data media, so transfer that much or less
+        DWORD sectorCountNow    = MIN(sectorCount, dataMedia->maxSectorsForSingleReadWrite());
         DWORD byteCountNow      = sectorCountNow * 512;
 
         Debug::out(LOG_DEBUG, "Scsi::readSectors() - will read sectorCountNow: 0x%x, sectors to go: 0x%x", sectorCountNow, sectorCount - sectorCountNow);
@@ -243,8 +238,8 @@ bool Scsi::writeSectors_big(DWORD startSectorNo, DWORD sectorCount)
 
     // now transfer the data in big chunks of BUFFER_SIZE_SECTORS
     while(sectorCount > 0) {
-        // maximum transfer size is BUFFER_SIZE_SECTORS, so transfer less or exactly that in loop
-        DWORD sectorCountNow    = (sectorCount < BUFFER_SIZE_SECTORS) ? sectorCount : BUFFER_SIZE_SECTORS;
+        // maximum transfer size is defined by the data media, so transfer that much or less
+        DWORD sectorCountNow    = MIN(sectorCount, dataMedia->maxSectorsForSingleReadWrite());
         DWORD byteCountNow      = sectorCountNow * 512;
 
         Debug::out(LOG_DEBUG, "Scsi::writeSectors() - will write sectorCountNow: 0x%x, sectors to go: 0x%x", sectorCountNow, sectorCount - sectorCountNow);
@@ -290,8 +285,8 @@ bool Scsi::compareSectors(DWORD startSectorNo, DWORD sectorCount)
 
     // now transfer the data in big chunks of BUFFER_SIZE_SECTORS
     while(sectorCount > 0) {
-        // maximum transfer size is BUFFER_SIZE_SECTORS, so transfer less or exactly that in loop
-        DWORD sectorCountNow    = (sectorCount < BUFFER_SIZE_SECTORS) ? sectorCount : BUFFER_SIZE_SECTORS;
+        // maximum transfer size is defined by the data media, so transfer that much or less
+        DWORD sectorCountNow    = MIN(sectorCount, dataMedia->maxSectorsForSingleReadWrite());
         DWORD byteCountNow      = sectorCountNow * 512;
 
         // get data from ST

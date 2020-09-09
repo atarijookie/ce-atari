@@ -43,7 +43,7 @@ bool DeviceMedia::iopen(const char *path, bool createIfNotExists)
 
 	DWORD size;
 	int res = ioctl(fdes, BLKGETSIZE, &size);	// try to get device capacity in sectors
-	
+
 	if(res < 0) {								// failed to get capacity?
 		return false;
 	}
@@ -54,7 +54,7 @@ bool DeviceMedia::iopen(const char *path, bool createIfNotExists)
     mediaHasChanged = false;
 
     int64_t capacityInMB = BCapacity / ((int64_t) (1024 * 1024));
-    
+
     Debug::out(LOG_DEBUG, "DeviceMedia - open succeeded, capacity: %d MB, sectors: %08x", (int) capacityInMB, SCapacity);
 
     return true;
@@ -112,7 +112,7 @@ bool DeviceMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 	}
 #else
 	/* Note : why not using lseek64() ? (#define _LARGEFILE64_SOURCE) */
-    off64_t pos = sectorNo * ((int64_t)512);    // convert sector # to offset 
+    off64_t pos = sectorNo * ((int64_t)512);    // convert sector # to offset
     loff_t loff;
     int res = syscall(__NR__llseek, fdes, (unsigned long) (pos >> 32), (unsigned long) pos, &loff, SEEK_SET);
 
@@ -124,7 +124,7 @@ bool DeviceMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 
     size_t byteCount = count * 512;
 	size_t cnt = read(fdes, bfr, byteCount);	// try to read sector(s)
-	
+
     if(cnt != byteCount) {                      // not all data was read? fail
         Debug::out(LOG_DEBUG, "DeviceMedia::readSectors - read() failed");
         return false;
@@ -148,7 +148,7 @@ bool DeviceMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 		return false;
 	}
 #else
-    off64_t pos = sectorNo * ((int64_t)512);    // convert sector # to offset 
+    off64_t pos = sectorNo * ((int64_t)512);    // convert sector # to offset
     loff_t loff;
     int res = syscall(__NR__llseek, fdes, (unsigned long) (pos >> 32), (unsigned long) pos, &loff, SEEK_SET);
 
@@ -160,11 +160,11 @@ bool DeviceMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 
     size_t byteCount = count * 512;
 	size_t cnt = write(fdes, bfr, byteCount);	// try to write sector(s)
-	
+
     if(cnt != byteCount) {                      // not all data was writen? fail
         Debug::out(LOG_DEBUG, "DeviceMedia::writeSectors - write() failed");
         return false;
     }
-	
+
     return true;
 }

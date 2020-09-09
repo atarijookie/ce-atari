@@ -5,7 +5,7 @@
 #include "../datatypes.h"
 #include "imedia.h"
 
-#define TRANSLATEDBOOTMEDIA_SIZE	(128 * 1024)
+#define TRANSLATEDBOOTMEDIA_SIZE    (128 * 1024)
 
 class TranslatedBootMedia: public IMedia
 {
@@ -24,27 +24,27 @@ public:
     virtual bool readSectors (int64_t sectorNo, DWORD count, BYTE *bfr);
     virtual bool writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr);
 
-	void updateBootsectorConfigWithACSIid(BYTE acsiId);
-	
+    void updateBootsectorConfigWithACSIid(BYTE acsiId);
+
 private:
     int     hwHddIfaceCurrent;  // this is the hwHddIface for which the bootsector was loaded, reload on mismatch
 
-    int64_t	BCapacity;			// device capacity in bytes
-    int64_t	SCapacity;			// device capacity in sectors
+    int64_t BCapacity;          // device capacity in bytes
+    int64_t SCapacity;          // device capacity in sectors
 
-	bool	gotImage;
-    BYTE	*imageBuffer;
-	
+    bool    gotImage;
+    BYTE    *imageBuffer;
+
     BYTE    lastUsedAcsiId;
-    
-	bool	loadDataIntoBuffer(void);
-	void 	updateBootsectorConfig(void);
-	int		getConfigPosition(void);
-	void	setDword(BYTE *bfr, DWORD val);
-	
-	void	updateBootsectorChecksum(void);
+
+    bool    loadDataIntoBuffer(void);
+    void    updateBootsectorConfig(void);
+    int     getConfigPosition(void);
+    void    setDword(BYTE *bfr, DWORD val);
+
+    void    updateBootsectorChecksum(void);
     void    calculateChecksum(BYTE *bfr);
-	WORD	swapNibbles(WORD val);
+    WORD    swapNibbles(WORD val);
 };
 
 #endif // __TRANSLATEDBOOTMEDIA_H_

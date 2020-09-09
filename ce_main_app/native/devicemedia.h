@@ -24,12 +24,12 @@ public:
 
 private:
 
-    int64_t	BCapacity;			// device capacity in bytes
-    int64_t	SCapacity;			// device capacity in sectors
+    int64_t BCapacity;          // device capacity in bytes
+    int64_t SCapacity;          // device capacity in sectors
 
     bool    mediaHasChanged;
 
-    int		fdes;				// file descriptor for the opened device
+    int     fdes;               // file descriptor for the opened device
 };
 
 #endif // _DEVICEMEDIA_H

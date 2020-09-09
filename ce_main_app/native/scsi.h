@@ -27,7 +27,7 @@
 
 #define MAX_ATTACHED_MEDIA              9
 
-#define TRANSLATEDBOOTMEDIA_FAKEPATH	"TRANSLATED BOOT MEDIA"
+#define TRANSLATEDBOOTMEDIA_FAKEPATH    "TRANSLATED BOOT MEDIA"
 
 #define RW_ERROR_OK                 0
 #define RW_ERROR_FAIL_TOO_BIG       1
@@ -35,8 +35,9 @@
 #define RW_ERROR_FAIL_RW_OPERATION  3
 #define RW_ERROR_VERIFY_MISCOMPARE  4
 
-#define SCSI_BUFFER_SIZE             (1024*1024)
-#define BUFFER_SIZE_SECTORS         (SCSI_BUFFER_SIZE / 512)
+// The following buffer size is based on maximum read / write size in all the data media objects.
+#define SCSI_BUFFER_SIZE        (MAXIMUM_SECTOR_COUNT_LANGE * 512)
+#define BUFFER_SIZE_SECTORS     MAXIMUM_SECTOR_COUNT_LANGE
 
 typedef struct {
     std::string hostPath;                       // specifies host path to image file or device
@@ -44,7 +45,7 @@ typedef struct {
     int         accessType;                     // access type: read only, read write, no data
 
     IMedia      *dataMedia;                     // pointer to the data provider object
-    bool        dataMediaDynamicallyAllocated;  // set to true if dataMedia was created by new and delete should be used, otherwise set to false and delete won't be used 
+    bool        dataMediaDynamicallyAllocated;  // set to true if dataMedia was created by new and delete should be used, otherwise set to false and delete won't be used
 
     int         devInfoIndex;                   // index in devInfo[]
 } TScsiConf;
