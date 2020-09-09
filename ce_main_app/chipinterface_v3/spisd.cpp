@@ -149,6 +149,9 @@ BYTE SpiSD::reset(void)
     BYTE buff[5];
     int  devType = DEVICETYPE_NOTHING;
 
+    timeoutStart();
+    //Debug::out(LOG_DEBUG, "SpiSD::reset starting");
+
     spiSetFrequency(SPI_FREQ_LOW);
     spiCShigh();
 
@@ -175,7 +178,7 @@ BYTE SpiSD::reset(void)
             while(true)
             {
                 if(timeout()) {
-                    Debug::out(LOG_DEBUG, "SpiSD::reset - failed on SHDC_SEND_IF_COND");
+                    //Debug::out(LOG_DEBUG, "SpiSD::reset - failed on SHDC_SEND_IF_COND");
                     return DEVICETYPE_NOTHING;
                 }
 
@@ -206,7 +209,7 @@ BYTE SpiSD::reset(void)
     }
 
     if(devType == DEVICETYPE_SD && r1 != 0) {     // if it's SD but failed to initialize
-        Debug::out(LOG_DEBUG, "SpiSD::reset - failed on DEVTYPE_SD but failed to initialize");
+        //Debug::out(LOG_DEBUG, "SpiSD::reset - failed on DEVTYPE_SD but failed to initialize");
         return DEVICETYPE_NOTHING;
     }
 
@@ -216,7 +219,7 @@ BYTE SpiSD::reset(void)
         r1 = mmcCmdLow(MMC_SEND_OP_COND, 0, 0);
 
         if(r1 != 0) {
-            Debug::out(LOG_DEBUG, "SpiSD::reset - failed on DEVTYPE_MMC got %d instead of 0", r1);
+            //Debug::out(LOG_DEBUG, "SpiSD::reset - failed on DEVTYPE_MMC got %d instead of 0", r1);
             return DEVICETYPE_NOTHING;
         }
     }
@@ -224,6 +227,7 @@ BYTE SpiSD::reset(void)
     // set block length to 512 bytes
     r1 = mmcSendCommand(MMC_SET_BLOCKLEN, 512);
 
+    //Debug::out(LOG_DEBUG, "SpiSD::reset - returning devType %d", devType);
     return devType;
 #else
 
@@ -323,7 +327,7 @@ BYTE SpiSD::mmcCommand(BYTE cmd, DWORD arg)
 #ifndef ONPC
     // construct command
     BYTE bfr[7];
-//    bfr[0] = 0xff;
+//  bfr[0] = 0xff;
     bfr[0] = cmd | 0x40;
     bfr[1] = arg >> 24;
     bfr[2] = arg >> 16;
@@ -335,7 +339,13 @@ BYTE SpiSD::mmcCommand(BYTE cmd, DWORD arg)
     bcm2835_spi_transfernb((char *) bfr, (char *) rxBuffer, 6);
 
     // wait for response - while it returning the busy value
-    bool good = waitWhileBusy_equalToValue(0xff);
+    bool good;
+
+    if(cmd == MMC_GO_IDLE_STATE) {  // for MMC_GO_IDLE_STATE - wait until we get response value of 1
+        good = waitWhileBusy_notEqualToValue(1);
+    } else {                        // for other commands - anything other than 0xff is valid response
+        good = waitWhileBusy_equalToValue(0xff);
+    }
 
     if(!good) {                                 // if failed, return lastRxByte
         spiCShigh_ff_return(lastRxByte);
@@ -801,15 +811,15 @@ BYTE SpiSD::eraseCard(void)
 }
 
 //--------------------------------------------------------
-void SpiSD::timeoutStart(void)
+void SpiSD::timeoutStart(DWORD timeoutTime)
 {
-    opEndTime = Utils::getEndTime(500);
+    opEndTime = Utils::getEndTime(timeoutTime);
 }
-
+//--------------------------------------------------------
 bool SpiSD::timeout(void)
 {
     DWORD now = Utils::getCurrentMs();
-    return (now >= opEndTime);          // it's a timeout when current time is greater than end time
+    return (now >= opEndTime) || sigintReceived;    // it's a timeout when current time is greater than end time OR when SIGINT is received
 }
 //--------------------------------------------------------
 bool SpiSD::waitWhileBusy_equalToZero(void)
@@ -819,7 +829,7 @@ bool SpiSD::waitWhileBusy_equalToZero(void)
 //--------------------------------------------------------
 bool SpiSD::waitWhileBusy_equalToValue(BYTE busyValue)
 {
-//  Debug::out(LOG_DEBUG, "waitWhileBusy_equalToValue - busyValue: %02X", busyValue);
+//Debug::out(LOG_DEBUG, "waitWhileBusy_equalToValue - busyValue: %02X", busyValue);
 
 #ifndef ONPC
     // wait while the card is busy -- while output == busyValue
@@ -830,8 +840,8 @@ bool SpiSD::waitWhileBusy_equalToValue(BYTE busyValue)
             return true;
         }
 
-        if(timeout()) {                 // timeout happened? fail
-//          Debug::out(LOG_DEBUG, "waitWhileBusy_equalToValue - timeout", busyValue);
+        if(timeout() || sigintReceived) {       // timeout or SIGINT happened? fail
+            //Debug::out(LOG_DEBUG, "waitWhileBusy_equalToValue - timeout", busyValue);
             return false;
         }
     }
@@ -852,11 +862,11 @@ bool SpiSD::waitWhileBusy_notEqualToValue(BYTE wantedValue)
     while(true) {
         lastRxByte = bcm2835_spi_transfer(0xff);
 
-        if(lastRxByte == wantedValue) { // finally not busy? good
+        if(lastRxByte == wantedValue) {     // finally not busy? good
             return true;
         }
 
-        if(timeout()) {                 // timeout happened? fail
+        if(timeout() || sigintReceived) {   // timeout or SIGINT happened? fail
             return false;
         }
     }

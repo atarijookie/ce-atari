@@ -133,7 +133,7 @@ private:
 
     //------------------------
     DWORD opEndTime;      // maximum time when the operation should time out
-    void  timeoutStart(void);
+    void  timeoutStart(DWORD timeoutTime=500);
     bool  timeout(void);
     //------------------------
 
