@@ -15,8 +15,16 @@ DWORD IMedia::maxSectorsForSingleReadWrite(void)
     return MAXIMUM_SECTOR_COUNT_LANGE;
 }
 
-// store sector count for this transfer, so media can do some background pre-read to speed up the transfer
-void IMedia::setSectorCountForThisTransfer(DWORD sectorCount)
+// let media know the whole transfer params, so it can do some background pre-read to speed up the transfer
+void IMedia::startBackgroundTransfer(bool readNotWrite, int64_t sectorNo, DWORD count)
 {
-    sectorCountForThisTransfer = sectorCount;
+    // override this method in child class if the media type supports background transfer
+}
+
+// wait until all the data in the background transfer are finished moving around
+bool IMedia::waitForBackgroundTransferFinish(void)
+{
+    // override this method in child class if the media type supports background transfer
+
+    return true;    // pretend success if not overriden
 }

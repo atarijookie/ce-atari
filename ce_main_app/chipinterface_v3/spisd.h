@@ -18,7 +18,7 @@
     #define spiCSlow()      {  }
     #define spiCShigh()     {  }
 
-    #define spiCShigh_ff_return(X) { }
+    #define spiCShigh_ff_return(X) { return X; }
 #endif
 
 //--------------------------------------------------------
@@ -111,12 +111,18 @@ public:
     void clearStruct(void);
     void initCard(void);
 
-    BYTE mmcRead(DWORD sector);
-    BYTE mmcReadJustForTest(DWORD sector);
-    BYTE mmcReadMore(DWORD sector, WORD count);
+    void getCardInfo(bool& isInit, bool& mediaChanged, int64_t& byteCapacity, int64_t& sectorCapacity);
 
-    BYTE mmcWrite(DWORD sector);
-    BYTE mmcWriteMore(DWORD sector, WORD count);
+    BYTE mmcReadJustForTest(DWORD sector);
+
+    BYTE mmcRead(DWORD sector, BYTE *data);
+    BYTE mmcReadMultipleStart(DWORD sector);
+    BYTE mmcReadMultipleOne(BYTE *data, bool isLast);
+
+    BYTE mmcWrite(DWORD sector, BYTE *data);
+    BYTE mmcWriteMultipleStart(DWORD sector);
+    BYTE mmcWriteMultipleOne(BYTE *data, bool isLast);
+    BYTE mmcWriteMultipleStop(void);
 
     BYTE eraseCard(void);
 
@@ -129,7 +135,7 @@ private:
     bool    mediaChanged;   // when media is changed
 
     int64_t BCapacity;      // device capacity in bytes
-    DWORD   SCapacity;      // device capacity in sectors
+    int64_t SCapacity;      // device capacity in sectors
 
     //------------------------
     DWORD opEndTime;      // maximum time when the operation should time out

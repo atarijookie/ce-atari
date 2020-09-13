@@ -11,8 +11,6 @@ public:
     SdMedia();
     virtual ~SdMedia();
 
-    void setCurrentCapacity(DWORD sectors);
-
     virtual bool iopen(const char *path, bool createIfNotExists);
     virtual void iclose(void);
 
@@ -26,9 +24,14 @@ public:
 
     virtual DWORD maxSectorsForSmallReadWrite(void);    // what will be the maximum value where small transfer is used (single transfer to/from media + single transfer to/from ST) and where the larger transfer is used above that
     virtual DWORD maxSectorsForSingleReadWrite(void);   // what is the maximum sector count we can use on readSectors() and writeSectors()
+
+    virtual void  startBackgroundTransfer(bool readNotWrite, int64_t sectorNo, DWORD count);    // let media know the whole transfer params, so it can do some background pre-read to speed up the transfer
+    virtual bool  waitForBackgroundTransferFinish(void);    // wait until the background transfer finishes and get the final success / failure
 private:
-    int64_t capacityInSectors;
+    bool    isInitialized;
     bool    mediaChangedFlag;
+    int64_t capacityInSectors;
+    int64_t capacityInBytes;
     BYTE    senseKey;
 };
 

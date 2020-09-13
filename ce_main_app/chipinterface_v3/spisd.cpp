@@ -17,7 +17,7 @@ extern THwConfig hwConfig;
 SpiSD::SpiSD()
 {
 #ifndef ONPC
-    // Start SPI operations. Forces RPi SPI0 pins P1-19 (MOSI), P1-21 (MISO), P1-23 (CLK), P1-24 (CE0) 
+    // Start SPI operations. Forces RPi SPI0 pins P1-19 (MOSI), P1-21 (MISO), P1-23 (CLK), P1-24 (CE0)
     // and P1-26 (CE1) to alternate function ALT0, which enables those pins for SPI interface.
     bcm2835_spi_begin();
 
@@ -123,6 +123,15 @@ void SpiSD::initCard(void)
 
     spiSetFrequency(SPI_FREQ_HIGH);
 }
+
+void SpiSD::getCardInfo(bool& isInit, bool& mediaChanged, int64_t& byteCapacity, int64_t& sectorCapacity)
+{
+    isInit          = this->isInit;
+    mediaChanged    = this->mediaChanged;
+    byteCapacity    = BCapacity;
+    sectorCapacity  = SCapacity;
+}
+
 //-----------------------------------------------
 // It seems that on some cards the init sequence (or something from it) might cause the card
 // to want to talk a little bit more than expected, and thus the 1st command issued to this
@@ -358,7 +367,7 @@ BYTE SpiSD::mmcCommand(BYTE cmd, DWORD arg)
 #endif
 }
 //**********************************************************************
-BYTE SpiSD::mmcRead(DWORD sector)
+BYTE SpiSD::mmcRead(DWORD sector, BYTE *data)
 {
 #ifndef ONPC
     BYTE r1;
@@ -387,9 +396,8 @@ BYTE SpiSD::mmcRead(DWORD sector)
         spiCShigh_ff_return(0xff);
     }
 
-    // get whole sector into rxBuffer
-    // TODO: pass sector data to caller
-    bcm2835_spi_transfernb((char *) txBufferFF, (char *) rxBuffer, 512);
+    // get whole sector into data buffer
+    bcm2835_spi_transfernb((char *) txBufferFF, (char *) data, 512);
 
     // read 16-bit CRC and add 1 padding byte
     bcm2835_spi_transfernb((char *) txBufferFF, (char *) rxBuffer, 3);
@@ -403,119 +411,137 @@ BYTE SpiSD::mmcRead(DWORD sector)
     return 0;
 }
 //-----------------------------------------------
-BYTE SpiSD::mmcReadMore(DWORD sector, WORD count)
+BYTE SpiSD::mmcReadMultipleStart(DWORD sector)
 {
 #ifndef ONPC
     BYTE r1;
-    WORD j;
+
+    timeoutStart();                     // start timeout
+
+    // assert chip select
+    spiCSlow();                         // CS to L
+
+    if(type != DEVICETYPE_SDHC) {       // for non SDHC cards change sector into address
+        sector = sector << 9;
+    }
+
+    r1 = mmcCommand(MMC_READ_MULTIPLE_BLOCKS, sector);  // issue command
+
+    // on fail, deactivate CS and return non-zero
+    if(r1 != 0) {                       // if failed to start READ_MULTIPLE_BLOCKS
+        spiCShigh_ff_return(r1);        // send 0xff, CS high, return value
+    }
+#endif
+
+    // on success - keep CS active, return zero
+    return 0;
+}
+
+//-----------------------------------------------
+BYTE SpiSD::mmcReadMultipleOne(BYTE *data, bool isLast)
+{
+#ifndef ONPC
+    timeoutStart();
+
+    // wait for block start - while it's not returning expected value
+    bool good = waitWhileBusy_notEqualToValue(MMC_STARTBLOCK_READ);
+
+    // if failed, deactivate CS and return 0xff
+    if(!good) {
+        mmcCommand(MMC_STOP_TRANSMISSION, 0);
+        spiCShigh_ff_return(0xff);
+    }
+
+    // read sector from SD card
+    bcm2835_spi_transfernb((char *) txBufferFF, (char *) data, 512);
+
+    if(isLast) {    // is last sector in the read op - stop the transmition of next sector
+        mmcCommand(MMC_STOP_TRANSMISSION, 0);   // send command instead of CRC
+        spiCShigh_ff_return(0);                 // send 0xff, CS high, return value
+
+    } else {        // not last sector in the read op - we need to read more - just read 16-bit CRC
+        bcm2835_spi_transfernb((char *) txBufferFF, (char *) rxBuffer, 2);
+        return 0;
+    }
+
+#endif
+
+    return 0;
+}
+//-----------------------------------------------
+BYTE SpiSD::mmcWriteMultipleStart(DWORD sector)
+{
+#ifndef ONPC
+    BYTE r1;
+
+    timeoutStart();                 // timeout start
+    spiCSlow();                     // CS to L
+
+    if(type != DEVICETYPE_SDHC) {   // for non SDHC cards change sector into address
+        sector = sector << 9;
+    }
+
+    r1 = mmcCommand(MMC_WRITE_MULTIPLE_BLOCKS, sector); // issue command
+
+    // if failed to start write multiple blocks
+    if(r1 != 0) {
+        spiCShigh_ff_return(r1);    // deactivate CS, return non-zero
+    }
+#endif
+
+    // on success - keep CS active and return zero
+    return 0;
+}
+//-------------------------------------------------
+BYTE SpiSD::mmcWriteMultipleOne(BYTE *data, bool isLast)
+{
+#ifndef ONPC
+    bool good;
 
     timeoutStart();
 
-    // assert chip select
-    spiCSlow();                                             // CS to L
+    //--------------
+    // wait while card is busy - while it's not returning 0xff
+    good = waitWhileBusy_notEqualToFF();
 
-    if(type != DEVICETYPE_SDHC)                      // for non SDHC cards change sector into address
-        sector = sector<<9;
-
-    // issue command
-    r1 = mmcCommand(MMC_READ_MULTIPLE_BLOCKS, sector);
-
-    // check for valid response
-    if(r1 != 0) {
-        spiCShigh_ff_return(r1);    // send 0xff, CS high, return value
+    if(!good) {     // if failed, stop transfer, return error
+        mmcWriteMultipleStop();
+        return 0xff;
     }
 
-    // read in data
-    for(j=0; j<count; j++)                                  // read this many sectors
-    {
-        // wait for block start - while it's not returning expected value
-        bool good = waitWhileBusy_notEqualToValue(MMC_STARTBLOCK_READ);
+    //--------------
+    // 0xfc as start write multiple blocks
+    bcm2835_spi_transfer(MMC_STARTBLOCK_MWRITE);
+
+    // send buffer to card
+    bcm2835_spi_transfernb((char *) data, (char *) rxBuffer, 512);
+
+    // send more: 16-bit CRC
+    bcm2835_spi_transfernb((char *) txBufferFF, (char *) rxBuffer, 2);
+
+    //-------------------------------
+
+    if(isLast) {    // on last sector stop transfer
+        // wait while card is busy - while it's not returning 0xff
+        good = waitWhileBusy_notEqualToFF();
 
         if(!good) {                                 // if failed, return 0xff
             spiCShigh_ff_return(0xff);
         }
 
-        // read sector from SD card
-        // TODO: pass rxBuffer to caller
-        bcm2835_spi_transfernb((char *) txBufferFF, (char *) rxBuffer, 512);
-
-        //---------------
-        if(j == (count - 1))                                // if we've read the last sector
-            break;
-
-        // if we need to read more, then just read 16-bit CRC
-        bcm2835_spi_transfernb((char *) txBufferFF, (char *) rxBuffer, 2);
+        return mmcWriteMultipleStop();
     }
-    //-------------------------------
-    // stop the transmition of next sector
-    mmcCommand(MMC_STOP_TRANSMISSION, 0);               // send command instead of CRC
-
-    spiCShigh_ff_return(0);    // send 0xff, CS high, return value
-
-#else
-    return 0;
 #endif
+
+    // on other sectors - return success
+    return 0;
 }
 //-----------------------------------------------
-BYTE SpiSD::mmcWriteMore(DWORD sector, WORD count)
+BYTE SpiSD::mmcWriteMultipleStop(void)
 {
 #ifndef ONPC
-    BYTE r1;
-    WORD j;
-    DWORD thisSector;
+
     bool good;
-
-    timeoutStart();
-
-    // assert chip select
-    spiCSlow();          // CS to L
-
-    thisSector = sector;
-
-    if(type != DEVICETYPE_SDHC)          // for non SDHC cards change sector into address
-        sector = sector<<9;
-
-    //--------------------------
-    // issue command
-    r1 = mmcCommand(MMC_WRITE_MULTIPLE_BLOCKS, sector);
-
-    // check for valid response
-    if(r1 != 0) {
-        spiCShigh_ff_return(r1);    // send 0xff, CS high, return value
-    }
-
-    //--------------
-    // read in data
-    for(j=0; j<count; j++)                      // read this many sectors
-    {
-        if(thisSector >= SCapacity) {           // sector out of range?
-            break;                              // quit
-        }
-        //--------------
-        // wait while card is busy - while it's not returning 0xff
-        good = waitWhileBusy_notEqualToFF();
-
-        if(!good) {                             // if failed, return 0xff
-            spiCShigh_ff_return(0xff);
-        }
-
-        bcm2835_spi_transfer(MMC_STARTBLOCK_MWRITE);        // 0xfc as start write multiple blocks
-
-        // TODO: instead of txBufferFF send some input buffer to card
-        bcm2835_spi_transfernb((char *) txBufferFF, (char *) rxBuffer, 512);
-
-        // send more: 16-bit CRC
-        bcm2835_spi_transfernb((char *) txBufferFF, (char *) rxBuffer, 2);
-
-        thisSector++;                           // increment real sector #
-    }
-    //-------------------------------
-    // wait while card is busy - while it's not returning 0xff
-    good = waitWhileBusy_notEqualToFF();
-
-    if(!good) {                                 // if failed, return 0xff
-        spiCShigh_ff_return(0xff);
-    }
 
     bcm2835_spi_transfer(MMC_STOPTRAN_WRITE);   // 0xfd to stop write multiple blocks
 
@@ -539,55 +565,19 @@ BYTE SpiSD::mmcWriteMore(DWORD sector, WORD count)
             spiCShigh_ff_return(0xff);
         }
     }
-
-    //-------------------------------
-    spiCShigh_ff_return(0);    // send 0xff, CS high, return value
-#else
-    return 0;
 #endif
+
+    spiCShigh_ff_return(0);    // send 0xff, CS high, return value
 }
+
 //-----------------------------------------------
 BYTE SpiSD::mmcReadJustForTest(DWORD sector)
 {
-#ifndef ONPC
-    BYTE r1;
-
-    timeoutStart();
-
-    // assert chip select
-    spiCSlow();          // CS to L
-
-    if(type != DEVICETYPE_SDHC)          // for non SDHC cards change sector into address
-        sector = sector<<9;
-
-    // issue command
-    r1 = mmcCommand(MMC_READ_SINGLE_BLOCK, sector);
-
-    // check for valid response
-    if(r1 != 0) {
-        spiCShigh_ff_return(r1);    // send 0xff, CS high, return value
-    }
-
-    //------------------------
-    // wait for block start - while it's not returning expected value
-    bool good = waitWhileBusy_notEqualToValue(MMC_STARTBLOCK_READ);
-
-    if(!good) {                                 // if failed, return 0xff
-        spiCShigh_ff_return(0xff);
-    }
-
-    //------------------------
-    // read in data and don't care about them + 16 bit crc + padding 1 byte
-    bcm2835_spi_transfernb((char *) txBufferFF, (char *) rxBuffer, 515);
-
-    spiCShigh();                                // CS to H
-#endif
-
-    // return success
-    return 0;
+    BYTE bfr[512];
+    return mmcRead(sector, bfr);
 }
 //-----------------------------------------------
-BYTE SpiSD::mmcWrite(DWORD sector)
+BYTE SpiSD::mmcWrite(DWORD sector, BYTE *data)
 {
 #ifndef ONPC
     BYTE r1;
@@ -616,8 +606,8 @@ BYTE SpiSD::mmcWrite(DWORD sector)
     bcm2835_spi_transfer(MMC_STARTBLOCK_WRITE);
     // write data
 
-    // TODO: send data not txBufferFF
-    bcm2835_spi_transfernb((char *) txBufferFF, (char *) rxBuffer, 512);
+    // send data
+    bcm2835_spi_transfernb((char *) data, (char *) rxBuffer, 512);
 
     // write 16-bit CRC (dummy values)
     bcm2835_spi_transfernb((char *) txBufferFF, (char *) rxBuffer, 2);

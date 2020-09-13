@@ -68,7 +68,7 @@ void Scsi::readWriteGeneric(bool readNotWrite, DWORD startingSector, DWORD secto
     int64_t mediaCapacityInBytes, mediaCapacityInSectors;
     dataMedia->getCapacity(mediaCapacityInBytes, mediaCapacityInSectors);
 
-    if((startingSector + sectorCount - 1) > mediaCapacityInSectors) {   // trying to read out of range? 
+    if((startingSector + sectorCount - 1) > mediaCapacityInSectors) {   // trying to read out of range?
         Debug::out(LOG_ERROR, "Scsi::readWriteGeneric() - tried to go out of range");
         storeSenseAndSendStatus(SCSI_ST_CHECK_CONDITION, SCSI_E_IllegalRequest, SCSI_ASC_LBA_OUT_OF_RANGE, SCSI_ASCQ_NO_ADDITIONAL_SENSE);
         return;
@@ -77,7 +77,7 @@ void Scsi::readWriteGeneric(bool readNotWrite, DWORD startingSector, DWORD secto
     //--------------------------------
     bool res;
 
-    dataMedia->setSectorCountForThisTransfer(sectorCount);      // let media know how many sectors we will read/write, so it can (possibly) do some pre-read / pre-write stuff
+    dataMedia->startBackgroundTransfer(readNotWrite, startingSector, sectorCount);  // let media know the whole transfer params, so it can do some background pre-read to speed up the transfer
 
     if(sectorCount <= dataMedia->maxSectorsForSmallReadWrite()) {   // if just a few sectors, do it as a small transfer
         res = readNotWrite ? readSectors_small(startingSector, sectorCount) : writeSectors_small(startingSector, sectorCount);
@@ -85,7 +85,10 @@ void Scsi::readWriteGeneric(bool readNotWrite, DWORD startingSector, DWORD secto
         res = readNotWrite ? readSectors_big  (startingSector, sectorCount) : writeSectors_big  (startingSector, sectorCount);
     }
 
-    if(res) {                                            // if everything was OK
+    // by ANDing result of read / write sector and waitForBackground...() we get success (true) only if both went fine
+    res = res & dataMedia->waitForBackgroundTransferFinish(); // wait until the background transfer finishes and get the final success / failure
+
+    if(res) {                                           // if everything was OK
         SendOKstatus();
     } else {                                            // if error
         storeSenseAndSendStatus(SCSI_ST_CHECK_CONDITION, SCSI_E_MediumError, SCSI_ASC_NO_ADDITIONAL_SENSE, SCSI_ASCQ_NO_ADDITIONAL_SENSE);
@@ -152,7 +155,7 @@ bool Scsi::readSectors_big(DWORD startSectorNo, DWORD sectorCount)
     Debug::out(LOG_DEBUG, "Scsi::readSectors() - startSectorNo: 0x%x, sectorCount: 0x%x -- will do %d loops", startSectorNo, sectorCount, (sectorCount / BUFFER_SIZE_SECTORS) + 1);
 
     sendDataAndStatus_notJustStatus = false;                            // we're handling the _start(), _transferBlock() manually, so later we need to send the status manually
-    
+
     DWORD totalByteCount = sectorCount * 512;
     res = dataTrans->sendData_start(totalByteCount, SCSI_ST_OK, false); // try to start the read data transfer, without status
 
@@ -200,7 +203,7 @@ bool Scsi::writeSectors_small(DWORD startSectorNo, DWORD sectorCount)
     bool res;
 
     Debug::out(LOG_DEBUG, "Scsi::writeSectors_small() - startSectorNo: 0x%x, sectorCount: 0x%x", startSectorNo, sectorCount);
-    
+
     DWORD totalByteCount = sectorCount * 512;
     res = dataTrans->recvData(dataBuffer, totalByteCount);
 
@@ -225,11 +228,11 @@ bool Scsi::writeSectors_big(DWORD startSectorNo, DWORD sectorCount)
     bool res;
 
     Debug::out(LOG_DEBUG, "Scsi::writeSectors() - startSectorNo: 0x%x, sectorCount: 0x%x -- will do %d loops", startSectorNo, sectorCount, (sectorCount / BUFFER_SIZE_SECTORS) + 1);
-    
+
     sendDataAndStatus_notJustStatus = false;                // we're handling the _start(), _transferBlock() manually, so later we need to send the status manually
 
     DWORD totalByteCount = sectorCount * 512;
-    res = dataTrans->recvData_start(totalByteCount);        // try to start the write data transfer    
+    res = dataTrans->recvData_start(totalByteCount);        // try to start the write data transfer
 
     if(!res) {
         Debug::out(LOG_ERROR, "Scsi::writeSectors() - recvData_start() failed");
@@ -276,7 +279,7 @@ bool Scsi::compareSectors(DWORD startSectorNo, DWORD sectorCount)
     Debug::out(LOG_DEBUG, "Scsi::compareSectors() - startSectorNo: %d, sectorCount: %d -- will do %d loops", startSectorNo, sectorCount, (sectorCount / BUFFER_SIZE_SECTORS) + 1);
 
     DWORD totalByteCount = sectorCount * 512;
-    res = dataTrans->recvData_start(totalByteCount);        // try to start the write data transfer    
+    res = dataTrans->recvData_start(totalByteCount);        // try to start the write data transfer
 
     if(!res) {
         Debug::out(LOG_ERROR, "Scsi::compareSectors() - recvData_start() failed");
