@@ -26,7 +26,6 @@ SpiSD::SpiSD()
 
     bcm2835_spi_setClockDivider(BCM2835_SPI_CLOCK_DIVIDER_1024);    // 1024 => 244 kHz or 390 kHz
 
-    bcm2835_spi_setChipSelectPolarity(BCM2835_SPI_CS0, LOW);        // the default
     bcm2835_spi_chipSelect(BCM2835_SPI_CS_NONE);                    // Specify the SPI chip select pin - BCM2835_SPI_CS_NONE = No CS, control it yourself
 
     bcm2835_gpio_fsel(PIN_CS_SDCARD, BCM2835_GPIO_FSEL_OUTP);       // PIN_CS_SDCARD

@@ -139,6 +139,8 @@ bool ChipInterface3::open(void)
     // when GPIO is open and the connection to FPGA is verified, we can now create the SD via SPI object.
     spiSd = new SpiSD();
 
+    bcm2835_gpio_fsel(PIN_STATUS, BCM2835_GPIO_FSEL_INPT);  // after creating SpiSD, which does bcm2835_spi_begin() we must set the STATUS pin back to input (it's CS1, which is not used by SPI, but screwed with)
+
     #endif
 
     return true;
