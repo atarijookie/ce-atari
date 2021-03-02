@@ -436,6 +436,18 @@ void ChipInterface12::convertXilinxInfo(BYTE xilinxInfo)
                     break;
 
         // GOOD
+        case 0x31:  hwConfig.version        = 3;                        // v.3
+                    hwConfig.hddIface       = HDD_IF_ACSI;              // HDD int: ACSI
+                    hwConfig.fwMismatch     = false;
+                    break;
+
+        // GOOD
+        case 0x32:  hwConfig.version        = 3;                        // v.3
+                    hwConfig.hddIface       = HDD_IF_SCSI;              // HDD int: SCSI
+                    hwConfig.fwMismatch     = false;
+                    break;
+
+        // GOOD
         case 0x11:  // use this for v.1
         default:    // and also for all other cases
                     hwConfig.version        = 1;

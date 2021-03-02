@@ -892,13 +892,6 @@ void ConfigStream::createScreen_update(void)
         comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,           col2, line, gotoOffset);
         comp->setComponentId(COMPID_UPDATE_XILINX);
         screen.push_back(comp);
-    } else if(flags.chipInterface == CHIPIF_V3) {   // for ChipInterface v3
-        comp = new ConfigComponent(this, ConfigComponent::label, "FPGA", 12,        col1, line, gotoOffset);
-        screen.push_back(comp);
-
-        comp = new ConfigComponent(this, ConfigComponent::label, " ", 26,           col2, line, gotoOffset);
-        comp->setComponentId(COMPID_UPDATE_FPGA);
-        screen.push_back(comp);
     }
 
     line += 2;
@@ -945,9 +938,6 @@ void ConfigStream::fillUpdateWithCurrentVersions(void)
 
     datesToStrings(Update::versions.current.xilinx, str);
     setTextByComponentId(COMPID_UPDATE_XILINX, str);        // set it to component
-
-    datesToStrings(Update::versions.current.fpga, str);
-    setTextByComponentId(COMPID_UPDATE_FPGA, str);          // set it to component
 }
 
 void ConfigStream::datesToStrings(Version &v1, std::string &str)

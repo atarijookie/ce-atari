@@ -56,7 +56,6 @@
 // chip interface types
 #define CHIPIF_UNKNOWN  0
 #define CHIPIF_V1_V2    1       // Hans + CPLD, Franz, via SPI
-#define CHIPIF_V3       2       // FPGA, parallel data via GPIO
 
 //////////////////////////////////////////////////////
 

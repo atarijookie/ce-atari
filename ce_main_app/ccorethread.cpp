@@ -296,8 +296,6 @@ void CCoreThread::run(void)
             int chipIfType = chipInterface->chipInterfaceType();
             if(chipIfType == CHIP_IF_V1_V2) {       // v1 v2 - with Hans and Franz
                 printf("\033[2K  [ %c ]  Hans: %s, Franz: %s\033[A\n", progChars[lastFwInfoTime.progress], hansAlive ? "LIVE" : "DEAD", franzAlive ? "LIVE" : "DEAD");
-            } else if(chipIfType == CHIP_IF_V3) {   // v3 - with FPGA
-                printf("\033[2K  [ %c ]  FPGA: %s\033[A\n", progChars[lastFwInfoTime.progress], hansAlive ? "LIVE" : "DEAD");
             }
 
             lastFwInfoTime.progress = (lastFwInfoTime.progress + 1) % 4;
@@ -739,8 +737,6 @@ void CCoreThread::handleFwVersion_hans(void)
         }
 
         Debug::out(LOG_DEBUG, "FW: Hans,  %d-%02d-%02d, LED is: %d", Update::versions.current.hans.getYear(), Update::versions.current.hans.getMonth(), Update::versions.current.hans.getDay(), currentLed);
-    } else {
-        Debug::out(LOG_DEBUG, "FW: FPGA %d-%02d-%02d", Update::versions.current.fpga.getYear(), Update::versions.current.fpga.getMonth(), Update::versions.current.fpga.getDay());
     }
 
     //----------------------------------

@@ -4,7 +4,6 @@
 #include "sdmedia.h"
 #include "scsi_defs.h"
 #include "../debug.h"
-#include "../chipinterface_v3/sdthread.h"
 
 SdMedia::SdMedia()
 {
@@ -28,17 +27,11 @@ void SdMedia::iclose(void)
 
 bool SdMedia::isInit(void)
 {
-    // get card info from the other thread
-    sdthread_getCardInfo(isInitialized, mediaChangedFlag, capacityInBytes, capacityInSectors);
-
-    return isInitialized;
+    return false;
 }
 
 bool SdMedia::mediaChanged(void)
 {
-    // get card info from the other thread
-    sdthread_getCardInfo(isInitialized, mediaChangedFlag, capacityInBytes, capacityInSectors);
-
     return mediaChangedFlag;
 }
 
@@ -49,11 +42,8 @@ void SdMedia::setMediaChanged(bool changed)
 
 void SdMedia::getCapacity(int64_t &bytes, int64_t &sectors)
 {
-    // get card info from the other thread
-    sdthread_getCardInfo(isInitialized, mediaChangedFlag, capacityInBytes, capacityInSectors);
-
-    bytes   = capacityInBytes;
-    sectors = capacityInSectors;
+    bytes   = 0;
+    sectors = 0;
 }
 
 DWORD SdMedia::maxSectorsForSmallReadWrite(void)
@@ -68,34 +58,10 @@ DWORD SdMedia::maxSectorsForSingleReadWrite(void)
 
 bool SdMedia::readSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
-    if(count > 1) {     // if requested count is greater than 1, fail
-        return false;
-    }
-
-    // we ignore the sectorNo and count, as that has been sent to sdThread in startBackgroundTransfer()
-
-    return sdthread_sectorDataGet(bfr);
+    return false;
 }
 
 bool SdMedia::writeSectors(int64_t sectorNo, DWORD count, BYTE *bfr)
 {
-    if(count > 1) {     // if requested count is greater than 1, fail
-        return false;
-    }
-
-    // we ignore the sectorNo and count, as that has been sent to sdThread in startBackgroundTransfer()
-
-    return sdthread_sectorDataPut(bfr);
-}
-
-// let media know the whole transfer params, so it can do some background pre-read to speed up the transfer
-void SdMedia::startBackgroundTransfer(bool readNotWrite, int64_t sectorNo, DWORD count)
-{
-    sdthread_startBackgroundTransfer(readNotWrite, sectorNo, count);
-}
-
-// wait until the background transfer finishes and get the final success / failure
-bool SdMedia::waitForBackgroundTransferFinish(void)
-{
-    return sdthread_waitUntilAllDataWritten();
+    return false;
 }

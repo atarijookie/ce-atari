@@ -25,7 +25,6 @@
 #include "display/displaythread.h"
 #include "floppy/floppyencoder.h"
 #include "chipinterface_v1_v2/chipinterface12.h"
-#include "chipinterface_v3/chipinterface3.h"
 
 #include "webserver/webserver.h"
 #include "webserver/api/apimodule.h"
@@ -44,8 +43,6 @@ void handlePthreadCreate(int res, const char *threadName, pthread_t *pThread);
 void parseCmdLineArguments(int argc, char *argv[]);
 void printfPossibleCmdLineArgs(void);
 void loadDefaultArgumentsFromFile(void);
-
-void *sdThreadCode(void *ptr);
 
 int     linuxConsole_fdMaster;                                  // file descriptors for linux console
 pid_t   childPid;                                               // pid of forked child
@@ -74,7 +71,6 @@ void showOnDisplay(int argc, char *argv[]);
 int main(int argc, char *argv[])
 {
     CCoreThread *core;
-    pthread_t   sdThreadInfo;
     pthread_t   mountThreadInfo;
     pthread_t   downloadThreadInfo;
 #ifndef ONPC
@@ -124,49 +120,23 @@ int main(int argc, char *argv[])
 
     //------------------------------------------------------------
     // Opening of chip interface. 
-    // If starting with CHIPIF_UNKNOWN, will do auto-detection, which can test if v3 is present immediatelly, or
-    // if v3 not present, then at least try to open GPIO for v1/v2 and let it run like that (that might fail later).
-    // If starting with CHIPIF_V1_V2 or CHIPIF_V3, it will use chip interface as specified.
 
     bool good = false;
 
     if(flags.chipInterface == CHIPIF_UNKNOWN) {                 // unknown chip interface? do the auto detection
-        Debug::out(LOG_INFO, "ChipInterface auto-detect: trying v3");
+        Debug::out(LOG_INFO, "ChipInterface auto-detect: trying v1/v2");
 
-        chipInterface = new ChipInterface3();                   // chip interface v3 can detect quickly if the hardware is present or not, let's start with that
-        hwConfig.version = 3;
+        chipInterface = new ChipInterface12();              // create chip interface v1/v2
+        hwConfig.version = 2;
 
-        good = chipInterface->open();                           // try to open chip interface v3
+        good = chipInterface->open();                       // try to open chip interface v1/v2
 
-        if(!good) {                                             // v3 not good?
-            Debug::out(LOG_INFO, "ChipInterface auto-detect: v3 failed, trying v1/v2");
-
-            delete chipInterface;                               // delete object with v3
-            chipInterface = new ChipInterface12();              // create chip interface v1/v2
-            hwConfig.version = 2;
-
-            good = chipInterface->open();                       // try to open chip interface v1/v2
-
-            if(!good) {
-                Debug::out(LOG_INFO, "ChipInterface auto-detect: v1/v2 failed, terminating");
-            } else {
-                Debug::out(LOG_INFO, "ChipInterface auto-detect: v1/v2 opened, continuing.");
-                printf("\nChipInterface auto-detect: v1/v2 opened\n");
-            }
+        if(!good) {
+            Debug::out(LOG_INFO, "ChipInterface auto-detect: v1/v2 failed, terminating");
         } else {
-            Debug::out(LOG_INFO, "ChipInterface auto-detect: v3 detected");
-            printf("\nChipInterface auto-detect: v3 detected\n");
+            Debug::out(LOG_INFO, "ChipInterface auto-detect: v1/v2 opened, continuing.");
+            printf("\nChipInterface auto-detect: v1/v2 opened\n");
         }
-
-    } else if(flags.chipInterface == CHIPIF_V1_V2) {            // SPI chip interface?
-        chipInterface = new ChipInterface12();
-        good = chipInterface->open();                           // try to open chip interface
-
-    } else if(flags.chipInterface == CHIPIF_V3) {               // parallel chip interface?
-        chipInterface = new ChipInterface3();
-        good = chipInterface->open();                           // try to open chip interface
-        hwConfig.version = 3;
-
     } else {
         Debug::out(LOG_INFO, "ChipInterface - unknown option, terminating.");
         printf("\nChipInterface - unknown option, terminating.\n");
@@ -296,11 +266,6 @@ int main(int argc, char *argv[])
     core = new CCoreThread(pxDateService,pxFloppyService,pxScreencastService);
     int res;
 
-    if(chipInterface->chipInterfaceType() == CHIP_IF_V3) {                      // when using chip interface v3
-        res = pthread_create(&sdThreadInfo, NULL, sdThreadCode, NULL);          // create SD via SPI thread and run it
-        handlePthreadCreate(res, "SD via SPI", &sdThreadInfo);
-    }
-
     res = pthread_create(&mountThreadInfo, NULL, mountThreadCode, NULL);        // create mount thread and run it
     handlePthreadCreate(res, "ce mount", &mountThreadInfo);
 
@@ -360,11 +325,6 @@ int main(int argc, char *argv[])
     printf("Stoping mount thread\n");
     Mounter::stop();
     pthread_join(mountThreadInfo, NULL);                // wait until mount     thread finishes
-
-    if(chipInterface->chipInterfaceType() == CHIP_IF_V3) {  // when using chip interface v3
-        pthread_kill(sdThreadInfo, SIGINT);                 // stop the select()
-        pthread_join(sdThreadInfo, NULL);                   // wait until SD thread finishes
-    }
 
     printf("Stoping download thread\n");
     Downloader::stop();
@@ -528,8 +488,6 @@ void parseCmdLineArguments(int argc, char *argv[])
 
                 if(ci == 1 || ci == 2) {                            // 1 or 2 means SPI interface
                     flags.chipInterface = CHIPIF_V1_V2;
-                } else if(ci == 3) {                                // 3 means parallel interface
-                    flags.chipInterface = CHIPIF_V3;
                 }
             }
 
