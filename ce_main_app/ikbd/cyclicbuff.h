@@ -1,8 +1,8 @@
 #ifndef _CYCLICBUFF_H_
 #define _CYCLICBUFF_H_
 
-#define CYCLIC_BUF_SIZE     256
-#define CYCLIC_BUF_MASK     0xff;
+#define CYCLIC_BUF_SIZE     2048
+#define CYCLIC_BUF_MASK     0x7FF
 
 class CyclicBuff {
 public:

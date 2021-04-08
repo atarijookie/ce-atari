@@ -20,36 +20,62 @@ void Ikbd::processReceivedCommands(bool skipKeyboardTranslation)
     //-----------------
     // receive if there is something to receive
     BYTE bfr[128];
-    BYTE *pBfr = gotHalfPair ? &bfr[1] : &bfr[0];               // if got half pair, receive to offset +1
+    int res = read(fdUart, bfr, 128);                       // try to read data from uart
 
-    int res = read(fdUart, pBfr, 127);                          // try to read data from uart
-
-    if(res > 0) {                                               // if some data arrived, add it
-        if(gotHalfPair) {                                       // if got half pair from previous read, use it and unmark that we got it
-            bfr[0]      = halfPairData;
-            gotHalfPair = false;
-            res++;                                              // now we got one byte more!
-        }
-
-        // divide the received data to ST commands and keyboard data
-        for(int i=0; i<res; i += 2) {
-            if((i+1) < res) {                                   // there's at least this pair in buffer
-                if(bfr[i] == UARTMARK_STCMD) {                  // this is ST command byte, add it to ST command buffer
-                    cbStCommands.add(bfr[i + 1]);
-                } else if(bfr[i] == UARTMARK_KEYBDATA) {        // this is original keyboard data, add it to keyboard data buffer
-                    cbKeyboardData.add(bfr[i + 1]);
-                } else {                                        // this is not command MARK and not keyboard MARK, move half pair back (we're not in sync with pairs somehow)
-                    i--;
-                }
-            } else {                                            // there's only half of this pair in buffer (this is the last iteration)
-                gotHalfPair     = true;                         // mark that we got half pair and store the data
-                halfPairData    = bfr[i];
-            }
-        }
+    // no data was received, nothing to resend
+    if(res <= 0) {
+        return;
     }
 
-    if(res <= 0) {                                              // no data was received, nothing to resend
-        return;
+    // if some data arrived, split it into
+    for(int i=0; i<res; i++) {                              // add all the received data into cyclic buffer (in case it comes in pieces)
+        cbReceivedData.add(bfr[i]);
+    }
+
+    while(true) {                                           // divide the received data to ST commands, keyboard data and debug strings
+        if(cbReceivedData.count < 2) {                      // not enough data to work on? quit this loop (the data comes as TAG_byte and VALUE_byte)
+            break;
+        }
+
+        BYTE tag = cbReceivedData.peek();                   // peek current value, don't move just yet
+        BYTE val;
+
+        if(tag != UARTMARK_STCMD && tag != UARTMARK_KEYBDATA && tag != UARTMARK_DEBUG_STR) {    // not a valid tag?
+            tag = cbReceivedData.get();                     // remove byte from buffer and try again
+            continue;
+        }
+
+        if(tag == UARTMARK_STCMD || tag == UARTMARK_KEYBDATA) { // for ST command and keyboard data
+            tag = cbReceivedData.get();                     // get and remove tag from buffer
+            val = cbReceivedData.get();                     // get and remove value from buffer
+
+            if(tag == UARTMARK_STCMD) {                     // this is ST command byte, add it to ST command buffer
+                cbStCommands.add(val);
+            } else {                                        // this is original keyboard data, add it to keyboard data buffer
+                cbKeyboardData.add(val);
+            }
+
+            continue;
+        }
+
+        if(tag == UARTMARK_DEBUG_STR) {                     // if this is a debug string from chip
+            // get length of debug string
+            WORD hi, lo, len;
+            hi = cbReceivedData.peekWithOffset(1);
+            lo = cbReceivedData.peekWithOffset(2);
+            len = (hi << 8) | lo;
+
+            if(cbReceivedData.count < (3 + len)) {          // if we don't have enough of received data, quit for now, try later
+                break;
+            }
+
+            // if got here, got enough data to show whole debug string
+            for(int i=0; i<3; i++) {                        // remove tag, len-hi, len-lo bytes, we know them already
+                cbReceivedData.get();
+            }
+
+            chipLog(len, &cbReceivedData);                  // dump len of bytes from cbReceivedData into chip log file
+        }
     }
 
     //-----------------
@@ -77,7 +103,7 @@ void Ikbd::dumpBuffer(bool fromStNotKeyboard)
 {
     std::string text;
     CyclicBuff *cb;
-    
+
     if(fromStNotKeyboard) {
         text = "ST says      : ";
         cb = &cbStCommands;
@@ -85,20 +111,20 @@ void Ikbd::dumpBuffer(bool fromStNotKeyboard)
         text = "Keyboard says: ";
         cb = &cbKeyboardData;
     }
-    
+
     char bfr[16];
 
     while(cb->count > 0) {                      // if there's some data
         BYTE val = cb->get();                   // get data
-        
+
         sprintf(bfr, "%02x ", val);             // add hex dump of this data
         text += bfr;
-        
+
         if(!fromStNotKeyboard) {                // if it's from keyboard, send it to ST
             fdWrite(fdUart, &val, 1);
         }
     }
-    
+
     ikbdLog(text.c_str());                      // show the hex dump of data
 }
 
@@ -134,7 +160,7 @@ void Ikbd::processStCommands(void)
         }
 
         ikbdLog( "Ikbd::processStCommands -- got command %02x, len: %d, cb contains %d bytes", cmd, len, cbStCommands.count);
-        
+
         if(len == 0) {                                          // it's not GET command and we don't have this SET command defined?
             ikbdLog( "Ikbd::processStCommands -- not GET cmd, and we don't know what to do");
             cbStCommands.get();                                 // just remove this byte and try the next byte
@@ -143,7 +169,7 @@ void Ikbd::processStCommands(void)
 
         if(cmd == STCMD_MEMORY_LOAD) {                          // special case: this command has length stored on index[3]
             ikbdLog("Ikbd::processStCommands -- ST says: STCMD_MEMORY_LOAD");
-            
+
             if(cbStCommands.count < 4) {                        // not enough data to determine command length? quit
                 return;
             }
@@ -170,7 +196,7 @@ void Ikbd::processStCommands(void)
 			processGetCommand(cmd);
 			continue;
 		}
-		
+
         switch(bfr[0]) {
             // other commands
             //--------------------------------------------
@@ -238,11 +264,11 @@ void Ikbd::processStCommands(void)
             //--------------------------------------------
             case STCMD_JOYSTICK_INTERROGATION:
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_JOYSTICK_INTERROGATION");
-            
+
 			if(ceIkbdMode != CE_IKBDMODE_SOLO) {		// if we're not in solo mode, don't answer (will be handled when the data from keyboard arrive)
 				break;
 			}
-			
+
 			if(joystickMode != JOYMODE_INTERROGATION) {	// if we're not in joy interrogation mode, ignore
 				break;
 			}
@@ -253,16 +279,16 @@ void Ikbd::processStCommands(void)
             //--------------------------------------------
             case STCMD_DISABLE_JOYSTICKS:               // disable joystick; any valid joystick command enabled joystick
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_DISABLE_JOYSTICKS");
-            
+
             joystickState = Disabled;
             break;
-   
+
             //////////////////////////////////////////////
             // mouse related commands
             //--------------------------------------------
             case STCMD_SET_REL_MOUSE_POS_REPORTING:     // set relative mouse reporting
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_REL_MOUSE_POS_REPORTING");
-            
+
             mouseMode = MOUSEMODE_REL;
             mouseEnabled = true;
             joystickState = EnabledInMouseMode;
@@ -280,23 +306,23 @@ void Ikbd::processStCommands(void)
             //--------------------------------------------
 			case STCMD_SET_MOUSE_THRESHOLD:
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_MOUSE_THRESHOLD");
-                        
+
 			relMouse.threshX	= bfr[1];
 			relMouse.threshY	= bfr[2];
             break;
-			
+
             //--------------------------------------------
 			case STCMD_SET_MOUSE_SCALE:
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_MOUSE_SCALE");
-            
+
 			absMouse.scaleX		= bfr[1];
 			absMouse.scaleY		= bfr[2];
-            break;			
-            
+            break;
+
 			//--------------------------------------------
             case STCMD_SET_ABS_MOUSE_POS_REPORTING:     // set absolute mouse reporting
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_ABS_MOUSE_POS_REPORTING");
-            
+
             mouseMode = MOUSEMODE_ABS;
 
             // read max X and Y max values
@@ -314,27 +340,27 @@ void Ikbd::processStCommands(void)
             //--------------------------------------------
 			case STCMD_INTERROGATE_MOUSE_POS:			// get the current absolute mouse position
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_INTERROGATE_MOUSE_POS");
-        
+
 			if(mouseMode != MOUSEMODE_ABS) {			// this is only valid in absolute mouse mode
                 ikbdLog( "Ikbd::processStCommands -- STCMD_INTERROGATE_MOUSE_POS -- not sending anything because not in ABS mouse mode");
 				break;
 			}
-			
+
 			if(ceIkbdMode == CE_IKBDMODE_INJECT && !gotUsbMouse()) {	// when working in INJECT mode and don't have mouse, don't answer
                 ikbdLog( "Ikbd::processStCommands -- STCMD_INTERROGATE_MOUSE_POS -- not sending anything because we're in INJECT mode and we don't have USB mouse");
 				break;
 			} else {
                 ikbdLog( "Ikbd::processStCommands -- STCMD_INTERROGATE_MOUSE_POS -- will send USB mouse position (either we're in SOLO mode and / or we gotUsbMouse() )");
             }
-			
-			sendMousePosAbsolute(fdUart, absMouse.buttons);				// send position and accumulated buttons		
+
+			sendMousePosAbsolute(fdUart, absMouse.buttons);				// send position and accumulated buttons
 			absMouse.buttons = 0;										// no buttons for now
 			break;
-			
+
             //--------------------------------------------
-            case STCMD_LOAD_MOUSE_POS:                  // load new absolute mouse position 
+            case STCMD_LOAD_MOUSE_POS:                  // load new absolute mouse position
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_LOAD_MOUSE_POS");
-            
+
             // read max X and Y position values
             absMouse.x = (((WORD) bfr[2]) << 8) | ((WORD) bfr[3]);
             absMouse.y = (((WORD) bfr[4]) << 8) | ((WORD) bfr[5]);
@@ -347,14 +373,14 @@ void Ikbd::processStCommands(void)
             //--------------------------------------------
             case STCMD_SET_MOUSE_BTN_ACTION:            // set position reporting for absolute mouse mode on mouse button press
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_MOUSE_BTN_ACTION - param: %02X", (int) bfr[1]);
-            
+
             mouseAbsBtnAct = bfr[1];					// store flags what we should report
             break;
 
             //--------------------------------------------
             case STCMD_SET_Y_AT_TOP:                    // Y=0 at top
             ikbdLog( "Ikbd::processStCommands -- ST says: STCMD_SET_Y_AT_TOP");
-            
+
             mouseY0atTop = true;
             break;
 
@@ -394,12 +420,12 @@ void Ikbd::processGetCommand(BYTE getCmd)
 	BYTE setEquivalent = getCmd & 0x7f;								// remove highest bit
 
 	bool send = false;
-	
+
 	BYTE bfr[8];
 	memset(bfr, 0, 8);
-	
+
 	bfr[0] = KEYBDATA_STATUS;
-	
+
 	switch(setEquivalent) {
 		case STCMD_SET_REL_MOUSE_POS_REPORTING:		// relative mouse: report mouse mode
         ikbdLog( "Ikbd::processGetCommand -- STCMD_SET_REL_MOUSE_POS_REPORTING");
@@ -407,7 +433,7 @@ void Ikbd::processGetCommand(BYTE getCmd)
 		bfr[1] = mouseMode;
 		send = true;
 		break;
-		
+
 		case STCMD_SET_ABS_MOUSE_POS_REPORTING:		// absolute mouse: report mode and maximums
         ikbdLog( "Ikbd::processGetCommand -- STCMD_SET_ABS_MOUSE_POS_REPORTING");
 
@@ -427,7 +453,7 @@ void Ikbd::processGetCommand(BYTE getCmd)
 		bfr[3] = keycodeMouse.deltaY;
 		send = true;
 		break;
-		
+
 		case STCMD_SET_Y_AT_TOP:					// report mouse Y=0 location (top or bottom)
 		case STCMD_SET_Y_AT_BOTTOM:
         ikbdLog( "Ikbd::processGetCommand -- STCMD_SET_Y_AT_TOP or STCMD_SET_Y_AT_BOTTOM");
@@ -435,23 +461,23 @@ void Ikbd::processGetCommand(BYTE getCmd)
 		bfr[1] = mouseY0atTop ? STCMD_SET_Y_AT_TOP : STCMD_SET_Y_AT_BOTTOM;
 		send = true;
 		break;
-	
+
 		case STCMD_DISABLE_MOUSE:					// report if mouse is disabled
         ikbdLog( "Ikbd::processGetCommand -- STCMD_DISABLE_MOUSE");
-        
+
 		bfr[1] = mouseEnabled ? 0 : STCMD_DISABLE_MOUSE;
 		send = true;
 		break;
-		
+
 		case STCMD_SET_JOYSTICK_EVENT_REPORTING:	// report joystick mode
 		case STCMD_SET_JOYSTICK_INTERROG_MODE:
 		case STCMD_SET_JOYSTICK_KEYCODE_MODE:
         ikbdLog( "Ikbd::processGetCommand -- STCMD_SET_JOYSTICK _EVENT_REPORTING or _INTERROG_MODE or _KEYCODE_MODE");
-        
+
 		bfr[1] = joystickMode;
 		send = true;
 		break;
-		
+
 		case STCMD_DISABLE_JOYSTICKS:				// report if joystick is disabled
         ikbdLog( "Ikbd::processGetCommand -- STCMD_DISABLE_JOYSTICK");
 
@@ -465,7 +491,7 @@ void Ikbd::processGetCommand(BYTE getCmd)
 		bfr[1] = mouseAbsBtnAct;
 		send = true;
 		break;
-		
+
 		case STCMD_SET_MOUSE_THRESHOLD:				// report current mouse threshold
         ikbdLog( "Ikbd::processGetCommand -- STCMD_SET_MOUSE_THRESHOLD");
 
@@ -473,18 +499,18 @@ void Ikbd::processGetCommand(BYTE getCmd)
 		bfr[2] = relMouse.threshY;
 		send = true;
 		break;
-		
+
 		case STCMD_SET_MOUSE_SCALE:					// report current mouse scale
         ikbdLog( "Ikbd::processGetCommand -- STCMD_SET_MOUSE_SCALE");
-        
+
 		bfr[1] = absMouse.scaleX;
 		bfr[2] = absMouse.scaleY;
 		send = true;
 		break;
 	}
-	
+
 	if(send) {										// if command was handled
-		fdWrite(fdUart, bfr, 8);	
+		fdWrite(fdUart, bfr, 8);
 	}
 }
 
@@ -535,11 +561,11 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
             for(int i=0; i<len; i++) {                          // get the whole sequence
                 bfr[i] = cbKeyboardData.get();
             }
-			
+
 			ceIkbdMode = CE_IKBDMODE_INJECT;					// if we got at least one data sequence from original keyboard, switch to INJECT mode
-			
+
 			bool resendTheseData = true;						// reset this flag to not resend these data
-			
+
             BYTE stKeyboadCmd = bfr[0];                         // 0th byte is the original ST keyboard command code
             //---------------
             // just for the cause of status alive reporting
@@ -551,7 +577,7 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
                 statuses.ikbdSt.aliveSign = ALIVE_JOYEVENT;
             }
             //---------------
-            
+
 			switch(stKeyboadCmd) {                              // handle data sent from original keyboard
 				case KEYBDATA_MOUSE_ABS:						// report of absolute mouse position?
                 ikbdLog( "Ikbd::processKeyboardData - keyboard says: KEYBDATA_MOUSE_ABS");
@@ -562,7 +588,7 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
 				} else {
                     ikbdLog( "Ikbd::processKeyboardData - KEYBDATA_MOUSE_ABS -- no USB mouse, will resend ABS pos from ST");
                 }
-                
+
 				break;
 
                 case KEYBDATA_JOY0:
@@ -588,7 +614,7 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
 				//----------------------------------------------
 				case KEYBDATA_JOY_BOTH:							// ST asked for both joystick states (interrogation) and this is the response
                 ikbdLog( "Ikbd::processKeyboardData - keyboard says: KEYBDATA_JOY_BOTH");
-            
+
                 if(gotUsbJoy1()) {								// got joy 1?
                     BYTE joy0state = joystick[0].lastDir | joystick[0].lastBtn;	// get state
 					bfr[1] = joy0state;
@@ -602,16 +628,16 @@ void Ikbd::processKeyboardData(bool skipKeyboardTranslation)
                 } else if (firstJoyIs0 && joystickState == Enabled) {
                     bfr[0] = KEYBDATA_JOY0;
 				}
-				
+
 				break;
 				//----------------------------------------------
-				
+
 			}
 
 			if(resendTheseData) {								    // if we should resend this data
 				fdWrite(fdUart, bfr, len);                          // send the whole sequence to ST
             }
-            
+
 			continue;
         } else {                                                    // if it's not special IKBD code, then it's just a key press
             val = cbKeyboardData.get();                             // get data from buffer
@@ -638,13 +664,13 @@ void Ikbd::sendBothJoyReport(void)
 
 	BYTE joy0state = joystick[0].lastDir | joystick[0].lastBtn;	// get state
 	BYTE joy1state = joystick[1].lastDir | joystick[1].lastBtn;	// get state
-	
+
 	bfr[0] = KEYBDATA_JOY_BOTH;
 
     bfr[1] = !firstJoyIs0 ? joy0state : joy1state;
     bfr[2] = !firstJoyIs0 ? joy1state : joy0state;
-	
-	res = fdWrite(fdUart, bfr, 3); 
+
+	res = fdWrite(fdUart, bfr, 3);
 
     if(res < 0) {
         logDebugAndIkbd(LOG_ERROR, "write to uart failed, errno: %d", errno);
@@ -657,7 +683,7 @@ void Ikbd::sendJoyState(int joyNumber, int dirTotal)
     BYTE bfr[2];
     int res;
 
-    // first set the joystick 0 / 1 tag 
+    // first set the joystick 0 / 1 tag
     if(joyNumber == 0) {        // joy 0
         bfr[0] = KEYBDATA_JOY0;
     } else {                    // joy 1
@@ -666,7 +692,7 @@ void Ikbd::sendJoyState(int joyNumber, int dirTotal)
 
     bfr[1] = dirTotal;
 
-    res = fdWrite(fdUart, bfr, 2); 
+    res = fdWrite(fdUart, bfr, 2);
 
     if(res < 0) {
         logDebugAndIkbd(LOG_ERROR, "write to uart (0) failed, errno: %d", errno);
@@ -689,7 +715,7 @@ void Ikbd::sendJoyButtonsInMouseMode(void)
     bfr[1] = 0;
     bfr[2] = 0;
 
-    int res = fdWrite(fdUart, bfr, 3); 
+    int res = fdWrite(fdUart, bfr, 3);
 
     if(res < 0) {
         logDebugAndIkbd(LOG_ERROR, "write to uart (1) failed, errno: %d", errno);
@@ -758,7 +784,7 @@ void Ikbd::sendMousePosAbsolute(int fd, BYTE absButtons)
 
 	// create the absolute mouse position report
 	BYTE bfr[6];
-	
+
 	bfr[0] = KEYBDATA_MOUSE_ABS;
 	bfr[1] = absButtons;
 	bfr[2] = absMouse.x >> 8;
@@ -766,7 +792,7 @@ void Ikbd::sendMousePosAbsolute(int fd, BYTE absButtons)
 	bfr[4] = absMouse.y >> 8;
 	bfr[5] = (BYTE) absMouse.y;
 
-	int res = fdWrite(fd, bfr, 6); 
+	int res = fdWrite(fd, bfr, 6);
 
 	if(res < 0) {
 		logDebugAndIkbd(LOG_ERROR, "sendMousePosAbsolute failed, errno: %d", errno);
@@ -788,18 +814,18 @@ void Ikbd::sendMousePosRelative(int fd, BYTE buttons, BYTE xRel, BYTE yRel)
     }
 
 	BYTE bfr[3];
-	
+
     char yRelVal = yRel;
 
     if(!mouseY0atTop) {                 // if mouse Y=0 is at bottom, invert the Y axis
-        yRelVal = yRelVal * (-1);   
+        yRelVal = yRelVal * (-1);
     }
 
 	bfr[0] = 0xf8 | buttons;
 	bfr[1] = xRel;
     bfr[2] = yRelVal;
-	
-	int res = fdWrite(fd, bfr, 3); 
+
+	int res = fdWrite(fd, bfr, 3);
 
 	if(res < 0) {
 		logDebugAndIkbd(LOG_ERROR, "sendMousePosRelative failed, errno: %d", errno);
@@ -810,10 +836,10 @@ bool Ikbd::handleStKeyAsKeybJoy(BYTE val)
 {
     bool keyDown    = ((val & 0x80) == 0);      // if highest bit is zero, it's key down event
     BYTE stKey      =   val & 0x7f;             // get just the key, without highest bit
-    
+
     bool isKeybJoy0 = keyJoyKeys.isKeybJoyKeyAtari(0, stKey);       // find out if it bellongs to joy0
     bool isKeybJoy1 = keyJoyKeys.isKeybJoyKeyAtari(1, stKey);       // find out if it bellongs to joy1
-    
+
     if(isKeybJoy0 && !keybJoy0) {               // it's keyb joy 0, but keyb joy 0 is not enabled, fail
         return false;
     }
@@ -821,7 +847,7 @@ bool Ikbd::handleStKeyAsKeybJoy(BYTE val)
     if(isKeybJoy1 && !keybJoy1) {               // it's keyb joy 1, but keyb joy 1 is not enabled, fail
         return false;
     }
-    
+
     if(!isKeybJoy0 && !isKeybJoy1) {            // it's not from any keyb joy, quit
         return false;
     }
