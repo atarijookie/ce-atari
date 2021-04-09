@@ -407,32 +407,33 @@ void ikbdLog(const char *format, ...)
     va_end(args);
 }
 
+// chipLog() will receive incomplete lines stored in cb, terminated by '\n'.
+// It should write only complete lines to file, so it will try to gather chars until '\n' char and do write to file then.
 void chipLog(WORD cnt, CyclicBuff *cb)
 {
+    static std::string oneLine;
     static DWORD prevLogOutChips = 0;
-
-    FILE *f = fopen("/var/log/ce_chip_log.txt", "a+t");
-
-    if(!f) {                    // if couldn't open file
-        return;
-    }
 
     DWORD now = Utils::getCurrentMs();
     DWORD diff = now - prevLogOutChips;
     prevLogOutChips = now;
 
-    fprintf(f, "%08d\t%08d\t ", now, diff);
+    char val = 0;
 
-    BYTE val = 0;
+    for(int i=0; i<cnt; i++) {  // for cnt of characters
+        val = cb->get();        // get from cyclic buffer
+        oneLine += val;         // append to string
 
-    for(int i=0; i<cnt; i++) {  // for cnt of characters, get them from cyclic buffer, write them to file
-        val = cb->get();
-        fputc(val, f);
+        if(val == '\n') {       // if last char was new line, dump it to file
+            FILE *f = fopen("/var/log/ce_chip.log", "a+t");
+
+            if(f != NULL) {     // if file open good, write data
+                fprintf(f, "%08d\t%08d\t ", now, diff);
+                fputs(oneLine.c_str(), f);
+                fclose(f);
+            }
+
+            oneLine.clear();    // clear gathered line
+        }
     }
-
-    if(val != '\n') {           // if the last char wasn't new line char, add it
-        fputc('\n', f);
-    }
-
-    fclose(f);
 }

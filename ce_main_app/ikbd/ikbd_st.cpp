@@ -59,14 +59,22 @@ void Ikbd::processReceivedCommands(bool skipKeyboardTranslation)
         }
 
         if(tag == UARTMARK_DEBUG_STR) {                     // if this is a debug string from chip
+            if(cbReceivedData.count < 4) {                  // the received data buffer doesn't have enough data to get count and a valid string, quit here
+                break;
+            }
+
             // get length of debug string
             WORD hi, lo, len;
             hi = cbReceivedData.peekWithOffset(1);
             lo = cbReceivedData.peekWithOffset(2);
             len = (hi << 8) | lo;
 
-            if(cbReceivedData.count < (3 + len)) {          // if we don't have enough of received data, quit for now, try later
-                break;
+            if((len + 3) <= cbReceivedData.size) {          // if the expected size will fit in the buffer, do other checks before trying to write to log
+                if(cbReceivedData.count < (3 + len)) {      // if we don't have enough of received data, quit for now, try later
+                    break;
+                }
+            } else {    // the expected length will not fit in our cbReceivedData buffer - due to trying to send too long string, or it's some garbage data
+                len = cbReceivedData.count - 3;             // the length we now want to dump in file is all the data from buffer
             }
 
             // if got here, got enough data to show whole debug string

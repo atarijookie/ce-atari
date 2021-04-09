@@ -5,12 +5,14 @@
 #include "global.h"
 #include "datatypes.h"
 #include "cyclicbuff.h"
+#include "debug.h"
 
 void CyclicBuff::init(void)
 {
     count    = 0;
     addPos   = 0;
     getPos   = 0;
+    size     = CYCLIC_BUF_SIZE;
 }
 
 void CyclicBuff::add(BYTE val)

@@ -10,6 +10,7 @@ public:
     int  count;
     int  addPos;
     int  getPos;
+    int  size;
 
     void init           (void);
     void add            (BYTE val);
