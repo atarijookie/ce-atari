@@ -190,8 +190,8 @@ Write:
 
     move    #0x180,(a2)         | select command register
 
-#   move    #0xa0,(a1)          | write one sector (m=0)
-    move    #0xb0,(a1)          | write multiple sectors (m=1)
+    move    #0xa0,(a1)          | write one sector (m=0)
+|    move    #0xb0,(a1)          | write multiple sectors (m=1)
 
     bsr     wfeoc               | wait for end of command
     move.l  d6,d7

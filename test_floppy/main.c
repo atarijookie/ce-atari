@@ -1043,7 +1043,7 @@ int floppy_write(BYTE *wrbuf, WORD dev, WORD sector, WORD track, WORD side, WORD
         return argSuccess;                  // return that error
     }
 
-#define WRITE_ALL_IN_ONE_CALL
+//#define WRITE_ALL_IN_ONE_CALL
 
 #ifdef WRITE_ALL_IN_ONE_CALL
     argFuncId = FDC_FUN_WRITE;          // now write the sector
