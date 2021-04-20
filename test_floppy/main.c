@@ -76,14 +76,11 @@ void runFdcAsm(void);
 
 #define FDC_FUN_RESTORE     0
 #define FDC_FUN_SEEK        1
-#define FDC_FUN_STEP        2
-#define FDC_FUN_STEPIN      3
-#define FDC_FUN_STEPOUT     4
-#define FDC_FUN_READ        5
-#define FDC_FUN_WRITE       6
-#define FDC_FUN_READID      7
-#define FDC_FUN_READTRK     8
-#define FDC_FUN_WRITETRK    9
+#define FDC_FUN_READ_ONE    2
+#define FDC_FUN_READ_MULTI  3
+#define FDC_FUN_WRITE       4
+#define FDC_FUN_READTRK     5
+#define FDC_FUN_WRITETRK    6
 //----------------------------------
 
 struct {
@@ -1052,12 +1049,14 @@ int floppy_write(BYTE *wrbuf, WORD dev, WORD sector, WORD track, WORD side, WORD
     argFuncId = FDC_FUN_WRITE;          // now write the sector
     argCount = count;                   // write COUNT sectors at once
     argSector = sector;                 // sector number
+    argLeaveOn = 1;                     // leave drive ON after cmd
 
     runFdcAsm();                        // do the requested action
 #else
     // 2). write
     argFuncId = FDC_FUN_WRITE;          // now write the sector
     argCount = 1;                       // write one sector at a time, count times
+    argLeaveOn = 1;                     // leave drive ON after cmd
 
     int i;
     for(i=0; i<count; i++) {            // work around for write multiple sectors not working by doing multiple single sector writes
@@ -1104,15 +1103,15 @@ int floppy_read(BYTE *buf, WORD dev, WORD sector, WORD track, WORD side, WORD co
 
     //-------------
     // then read
-#define READ_ALL_IN_ONE_CALL
+//#define READ_ALL_IN_ONE_CALL
 
 #ifdef READ_ALL_IN_ONE_CALL
-    argFuncId = FDC_FUN_READ;          // now read the sector
+    argFuncId = FDC_FUN_READ_MULTI;    // now read the sector
     argCount = count;                  // read one sector at a time, count times
 
-    runFdcAsm();                        // do the requested action
+    runFdcAsm();                       // do the requested action
 #else
-    argFuncId = FDC_FUN_READ;          // now read the sector
+    argFuncId = FDC_FUN_READ_ONE;      // now read the sector
     argCount = 1;                      // read one sector at a time, count times
 
     int i;

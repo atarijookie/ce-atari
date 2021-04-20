@@ -23,14 +23,11 @@
 | ------------------------------------------------------
 restore     = 0   | reset drive to track zero
 seek        = 1   | goto track
-step        = 2   | move drive in last Direction
-stepin      = 3   | track=track+1
-stepout     = 4   | track=track-1
-read        = 5   | read sector
-write       = 6   | write sector
-readid      = 7   | get ID fields ( NOT DONE )
-readtrk     = 8   | read track
-writetrk    = 9   |
+readone     = 2   | read one sector
+readmulti   = 3   | read multiple sectors
+write       = 4   | write sector
+readtrk     = 5   | read track
+writetrk    = 6   |
 
 | ------------------------------------------------------
     .text
@@ -84,7 +81,7 @@ RunFDC:
     tst     d4
     bne     notoff
 
-    bsr     MotorOff
+|   bsr     MotorOff
     move    #-1,d3
     bsr     Select_Drive
 
@@ -96,14 +93,11 @@ notoff:
 functiontable:
     dc.l    Restore             | 0 - reset FDC seek track zero
     dc.l    Seek                | 1 - goto previous track
-    dc.l    Step                | 2 - move drive in last Direction
-    dc.l    StepIn              | 3 - track=track+1
-    dc.l    StepOut             | 4 - track=track-1
-    dc.l    Read                | 5 - read sector
-    dc.l    Write               | 6 - write sector
-    dc.l    ReadID              | 7 - get ID fields ( NOT DONE )
-    dc.l    ReadTrk             | 8 - read track
-    dc.l    WriteTrk            | 9
+    dc.l    ReadSectorOne       | 2 - read sector
+    dc.l    ReadSectorMulti     | 3 - read sector
+    dc.l    Write               | 4 - write sector
+    dc.l    ReadTrk             | 5 - read track
+    dc.l    WriteTrk            | 6
 
 | ------------------------------------------------------
 |  d6 id used by wfeoc to signal a time out
@@ -127,7 +121,7 @@ Seek:
 
     clr.l   d6
     move.b  _seekRate,d6        | get seek rate
-    or.b    #0x10,d6            | add command SEEK (0x10) to seek rate
+    or.b    #0x10,d6            | add command SEEK (0x10) to seek rate, enable spin-up sequence (h=0), don't verify dest track (v=0)
 
     move    #0x80,(a2)          | select command register
     move    d6,(a1)             | perform seek - with desired seek rate
@@ -135,28 +129,7 @@ Seek:
     move.l  d6,d7
     rts
 | ------------------------------------------------------
-Step:
-    move    #0x80,(a2)          | select command register
-    move    #0x31,(a1)          | perform step
-    bsr     wfeoc               | wait for end of command
-    move.l  d6,d7
-    rts
-| ------------------------------------------------------
-StepIn:
-    move    #0x80,(a2)          | select command register
-    move    #0x51,(a1)          | perform step in
-    bsr     wfeoc               | wait for end of command
-    move.l  d6,d7
-    rts
-| ------------------------------------------------------
-StepOut:
-    move    #0x80,(a2)          | select command register
-    move    #0x71,(a1)          | perform step out
-    bsr     wfeoc               | wait for end of command
-    move.l  d6,d7
-    rts
-| ------------------------------------------------------
-Read:
+ReadSectorOne:
     move    #0x84,(a2)          | select sector register
     move    d0,(a1)             | set sector
 
@@ -172,14 +145,33 @@ Read:
     move    d5,(a1)             | set sector count
 
     move    #0x80,(a2)          | select command register
-
-#   move    #0x80,(a1)          | read one sector (m=0)
-    move    #0x98,(a1)          | read multiple sectors (m=1), disable spin-up (h/s=1)
+    move    #0x80,(a1)          | read one sector (m=0), enable spin-up (H=0), no settling delay (E=0)
 
     bsr     wfeoc               | wait for end of command
     move.l  d6,d7
     rts
+| ------------------------------------------------------
+ReadSectorMulti:
+    move    #0x84,(a2)          | select sector register
+    move    d0,(a1)             | set sector
 
+    pea     (a0)
+    move.b  3(sp),4(a3)         | lo byte first
+    move.b  2(sp),2(a3)         | middle byte secound
+    move.b  1(sp),0(a3)         | hi byte last
+    addq    #4,sp
+
+    move    #0x90,(a2)          | set dma to read status
+    move    #0x190,(a2)
+    move    #0x90,(a2)
+    move    d5,(a1)             | set sector count
+
+    move    #0x80,(a2)          | select command register
+    move    #0x90,(a1)          | read multiple sectors (m=1), enable spin-up (h=0)
+
+    bsr     wfeoc               | wait for end of command
+    move.l  d6,d7
+    rts
 | ------------------------------------------------------
 Write:
     move    #0x184,(a2)         | select sector register
@@ -203,9 +195,6 @@ Write:
 
     bsr     wfeoc               | wait for end of command
     move.l  d6,d7
-    rts
-| ------------------------------------------------------
-ReadID:
     rts
 
 | ------------------------------------------------------
@@ -264,7 +253,7 @@ wfeoc:
     bne.s   .wfeoc
     clr.l   d6
     rts
-    
+
 Timed_out:
     moveq   #-1,d6
     rts
@@ -287,14 +276,14 @@ Setd:
     move.b  d3,2(a5)
     rts
 | ------------------------------------------------------
-MotorOff:
-    move    #0x180,(a2)         | select status reg
-motson:
-    move    (a1),d4
-    tst.b   d4
-    bmi.s   motson
-    move    d4,stat
-    rts
+|MotorOff:
+|    move    #0x180,(a2)         | select status reg
+|motson:
+|    move    (a1),d4
+|    tst.b   d4
+|    bmi.s   motson
+|    move    d4,stat
+|    rts
 | ------------------------------------------------------
 
 | ------------------------------------------------------
