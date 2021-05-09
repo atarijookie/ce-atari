@@ -22,6 +22,7 @@
 #include "downloader.h"
 #include "utils.h"
 #include "version.h"
+#include "settings.h"
 
 // sudo apt-get install libcurl4-gnutls-dev
 // gcc main.c -lcurl
@@ -288,6 +289,20 @@ size_t Downloader::my_write_func_reportVersions(void *ptr, size_t size, size_t n
     return (size * nmemb);
 }
 
+size_t Downloader::my_write_func_getHwLicense(void *ptr, size_t size, size_t nmemb, std::string *receivedBody)
+{
+    size_t newLength = size * nmemb;
+
+    try {                       // try to append received content to receivedBody
+        receivedBody->append((char*)ptr, newLength);
+    }
+    catch(std::bad_alloc &e) {  // on memory problem
+        return 0;
+    }
+
+    return newLength;
+}
+
 size_t Downloader::my_write_func(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
   return fwrite(ptr, size, nmemb, stream);
@@ -462,6 +477,53 @@ void Downloader::handleReportVersions(CURL *curl, const char *reportUrl)
     curl_easy_cleanup(curl);
 }
 
+void Downloader::handleGetHwLicense(CURL *curl, const char *getLicenseUrl, const char *settingsKeyForLicense)
+{
+    // specify url
+    curl_easy_setopt(curl, CURLOPT_URL, getLicenseUrl);
+
+    // use this string for storing data
+    std::string requestBody;
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &requestBody);
+
+    // specify where the retrieved data should go
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, my_write_func_getHwLicense);
+
+    // Perform the request, res will get the return code
+    CURLcode res = curl_easy_perform(curl);
+
+    if(res != CURLE_OK) {   // on failure
+        Debug::out(LOG_ERROR, "CURL curl_easy_perform() failed: %s", curl_easy_strerror(res));
+    } else {                // on success
+        std::size_t licenseStart = requestBody.find("license:"); // find the license tag in the received data
+
+        bool good = false;
+
+        if (licenseStart != std::string::npos) {                // start of lincense tag found
+            licenseStart += 8;                                  // move beyond the 'license:' tag
+
+            std::size_t licenseEnd = requestBody.find("\n", licenseStart);   // find where that line ends
+
+            if(licenseEnd != std::string::npos) {               // end of lincense line found
+                good = true;
+                std::string hwLicenseHexString = requestBody.substr(licenseStart, (licenseEnd - licenseStart));  // extract just hw license
+
+                Debug::out(LOG_DEBUG, "Downloader is storing %s with value %s", settingsKeyForLicense, hwLicenseHexString.c_str());
+
+                Settings s;
+                s.setString(settingsKeyForLicense, hwLicenseHexString.c_str());    // set received HW license to settingsKeyForLicense
+            }
+        }
+
+        if(!good) {     // on failure
+            Debug::out(LOG_DEBUG, "Downloader failed to find HW license in response: %s", requestBody.c_str());
+        }
+    }
+
+    // always cleanup
+    curl_easy_cleanup(curl);
+}
+
 void Downloader::stop(void)
 {
     pthread_mutex_lock(&downloadQueueMutex);
@@ -520,8 +582,15 @@ void Downloader::run(void)
             curl = NULL;
             continue;
         }
-        //-------------------
 
+        //-------------------
+        // if this is a request to try to retrieve (missing) HW license
+        if(downloadCurrent.downloadType == DWNTYPE_HW_LICENSE) {
+            handleGetHwLicense(curl, downloadCurrent.srcUrl.c_str(), downloadCurrent.dstDir.c_str());
+            curl = NULL;
+            continue;
+        }
+        //-------------------
         std::string urlPath, fileName;
         Utils::splitFilenameFromPath(downloadCurrent.srcUrl, urlPath, fileName);
 

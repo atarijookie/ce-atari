@@ -89,7 +89,7 @@ SUBDIR11 = ikbd
 SUBDIR12 = mediastreaming
 SUBDIR13 = display
 SUBDIR14 = chipinterface_v1_v2
-SUBDIR15 = chipinterface_v3
+SUBDIR15 = misc
 
 SRCS  = $(wildcard *.cpp) 
 SRCS += $(wildcard $(SUBDIR1)/*.cpp) 

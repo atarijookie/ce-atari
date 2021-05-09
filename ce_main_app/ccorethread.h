@@ -10,6 +10,7 @@
 #include "config/configstream.h"
 #include "floppy/floppysetup.h"
 #include "network/netadapter.h"
+#include "misc/misc.h"
 
 #include "version.h"
 
@@ -86,6 +87,8 @@ private:
 
     NetAdapter          netAdapter;
 
+    // host module - misc
+    Misc                misc;
     //----------------------------------
     // recovery stuff
     void handleRecoveryCommands(int recoveryLevel);

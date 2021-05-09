@@ -40,6 +40,9 @@ public:
     char *getString(const char *key, const char *defValue);
     void  setString(const char *key, const char *value);
 
+    char *getBinaryString(const char *key, int len);
+    void  setBinaryString(const char *key, BYTE *inBfr, int len);
+
     char getChar(const char *key, char defValue);
     void setChar(const char *key, char value);
 
@@ -47,6 +50,8 @@ public:
 
     void loadFloppyConfig(FloppyConfig *fc);
     void saveFloppyConfig(FloppyConfig *fc);
+
+    static void binToHex(BYTE *inBfr, int len, char *outBfr);
 
 private:
 

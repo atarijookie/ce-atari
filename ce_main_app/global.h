@@ -25,13 +25,14 @@
 #define DEVTYPE_RAW                 2
 #define DEVTYPE_TRANSLATED          3
 
-// typed of devices / modules we support
+// types of devices / modules we support
 #define HOSTMOD_CONFIG              1
 #define HOSTMOD_LINUX_TERMINAL      2
 #define HOSTMOD_TRANSLATED_DISK     3
 #define HOSTMOD_NETWORK_ADAPTER     4
 #define HOSTMOD_FDD_SETUP           5
 #define HOSTMOD_MEDIA_STREAMING     6
+#define HOSTMOD_MISC                7
 
 //////////////////////////////////////////////////////
 // commands for HOSTMOD_TRANSLATED_DISK
@@ -72,6 +73,7 @@ typedef struct {
     int  hddIface;              // returned from Hans: HDD interface type (ACSI or SCSI (added in 2015))
     int  scsiMachine;           // when HwHddIface is HDD_IF_SCSI, this specifies what machine (TT or Falcon) is using this device
     bool fwMismatch;            // when HW and FW types don't match (e.g. SCSI HW + ACSI FW, or ACSI HW + SCSI FW)
+    BYTE hwSerial[13];          // contains HW serial number, if HW version is 3 and device is running for few seconds
 
     bool changed;               // true if the value has changes recently
 } THwConfig;

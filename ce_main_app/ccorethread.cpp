@@ -110,6 +110,8 @@ CCoreThread::CCoreThread(ConfigService* configService, FloppyService *floppyServ
     // set up network adapter stuff
     netAdapter.setAcsiDataTrans(dataTrans);
 
+    misc.setDataTrans(dataTrans);
+
     // set up mediastreaming service
 }
 
@@ -560,6 +562,11 @@ void CCoreThread::handleAcsiCommand(BYTE *bufIn)
         case HOSTMOD_MEDIA_STREAMING:
             wasHandled = true;
             MediaStreaming::getInstance()->processCommand(pCmd, dataTrans);
+            break;
+
+        case HOSTMOD_MISC:
+            wasHandled = true;
+            misc.processCommand(pCmd);
             break;
         }
     }

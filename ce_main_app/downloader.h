@@ -9,16 +9,17 @@
 #include <sstream>
 #include <iostream>
 
-#define DWNTYPE_ANY             0xff
-#define DWNTYPE_UNKNOWN         0x00
-#define DWNTYPE_UPDATE_LIST     0x01
-#define DWNTYPE_UPDATE_COMP     0x02
-#define DWNTYPE_FLOPPYIMG_LIST  0x04
-#define DWNTYPE_FLOPPYIMG       0x08
-#define DWNTYPE_TIMESYNC        0x10
-#define DWNTYPE_SEND_CONFIG     0x20
-#define DWNTYPE_REPORT_VERSIONS 0x40
-#define DWNTYPE_LOG_HTTP        0x80
+#define DWNTYPE_ANY             0x0ff
+#define DWNTYPE_UNKNOWN         0x000
+#define DWNTYPE_UPDATE_LIST     0x001
+#define DWNTYPE_UPDATE_COMP     0x002
+#define DWNTYPE_FLOPPYIMG_LIST  0x004
+#define DWNTYPE_FLOPPYIMG       0x008
+#define DWNTYPE_TIMESYNC        0x010
+#define DWNTYPE_SEND_CONFIG     0x020
+#define DWNTYPE_REPORT_VERSIONS 0x040
+#define DWNTYPE_LOG_HTTP        0x080
+#define DWNTYPE_HW_LICENSE      0x100
 
 #define DWNSTATUS_WAITING       0
 #define DWNSTATUS_DOWNLOADING   1
@@ -64,7 +65,10 @@ private:
     static void updateStatusByte(TDownloadRequest &tdr, BYTE newStatus);
 
     static void handleReportVersions(CURL *curl, const char *reportUrl);
+    static void handleGetHwLicense(CURL *curl, const char *getLicenseUrl, const char *settingsKeyForLicense);
+
     static size_t my_write_func_reportVersions(void *ptr, size_t size, size_t nmemb, FILE *stream);
+    static size_t my_write_func_getHwLicense(void *ptr, size_t size, size_t nmemb, std::string *receivedBody);
     static size_t my_write_func(void *ptr, size_t size, size_t nmemb, FILE *stream);
     static size_t my_read_func(void *ptr, size_t size, size_t nmemb, FILE *stream);
     static int my_progress_func(void *clientp, double downTotal, double downNow, double upTotal, double upNow);

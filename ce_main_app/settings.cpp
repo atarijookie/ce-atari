@@ -197,6 +197,52 @@ void Settings::setString(const char *key, const char *value)
     fputs(value, file);
     fclose(file);
 }
+
+//-------------------------
+char *Settings::getBinaryString(const char *key, int len)
+{
+    static char buffer[256];
+    memset(buffer, 0, 256);
+
+    char *hexString = getString(key, "INVALID");
+
+    bool good = (strcmp(hexString, "INVALID") != 0);    // if retrieved is something other than the default value, probably valid
+
+    if(good) {                                      // if value seems good, convert it from hex to bin
+        char tmp[3];
+        int val;
+
+        for(int i=0; i<len; i++) {
+            memcpy(tmp, hexString + 2*i, 2);        // copy 2 bytes from value to tmp
+            tmp[3] = 0;                             // terminate with zero
+
+            sscanf(tmp, "%X", &val);                // try to read HEX value from tmp
+            buffer[i] = val;                        // store at position i
+        }
+    }
+
+    return buffer;
+}
+//-------------------------
+void Settings::binToHex(BYTE *inBfr, int len, char *outBfr)
+{
+    outBfr[0] = 0;                          // put string terminator at the supplied pointer to output buffer, to start output here
+    char tmp[16];
+
+    for(int i=0; i<len; i++) {
+        sprintf(tmp, "%02X", inBfr[i]);     // get value from inBfr, convert to HEX into tmp
+        strcat(outBfr, tmp);                // append to existing content
+    }
+}
+//-------------------------
+void Settings::setBinaryString(const char *key, BYTE *inBfr, int len)
+{
+    char tmp[512];
+    memset(tmp, 0, 512);
+
+    binToHex(inBfr, len, tmp);  // binary to hex text string
+    setString(key, tmp);        // store hex text string as normal string
+}
 //-------------------------
 char Settings::getChar(const char *key, char defValue)
 {
